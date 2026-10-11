@@ -250,12 +250,11 @@ function applyAbandonHavocRun(
   const mismatch = validateRunAndRevision(state, command);
   if (mismatch !== null) return mismatch;
   if (state.phase === 'draft') {
-    return rejectHavocCommand(
-      state,
-      command,
-      'phase-mismatch',
-      'draft-phase abandonment is handled by discarding the active draft at the persistence boundary',
-    );
+    return acceptHavocCommand(state, command, {
+      ...state,
+      revision: state.revision + 1,
+      completionState: 'abandoned',
+    });
   }
   if (isFinished(state)) {
     return rejectHavocCommand(state, command, 'already-complete', 'the run is no longer active');

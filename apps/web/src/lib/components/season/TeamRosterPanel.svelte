@@ -42,10 +42,7 @@
 <section aria-labelledby="roster-panel-heading" class="min-w-0" data-team-roster-panel>
   <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
     <div class="min-w-0">
-      <h3
-        id="roster-panel-heading"
-        class="font-display text-xl font-extrabold uppercase tracking-tight"
-      >
+      <h3 id="roster-panel-heading" class="sr-section-label">
         Roster
       </h3>
       <p class="mt-1 font-mono text-[10px] text-muted-foreground">
@@ -59,7 +56,7 @@
     <div
       role="group"
       aria-label="Roster view"
-      class="flex w-full rounded-lg bg-surface-2 p-1 sm:w-auto"
+      class="flex w-full rounded-lg border border-border/60 bg-surface-2/60 p-1 sm:w-auto"
     >
       <button
         type="button"

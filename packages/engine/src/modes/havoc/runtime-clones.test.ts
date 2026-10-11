@@ -1,10 +1,9 @@
 ﻿import { describe, expect, it } from 'vitest';
-import type { HavocMutationId, Position, SimulationRatings } from '@hoop-rush/data-contracts';
-import { POSITIONS, seedSchema } from '@hoop-rush/data-contracts';
+import type { HavocMutationId, SimulationRatings } from '@hoop-rush/data-contracts';
+import { POSITIONS } from '@hoop-rush/data-contracts';
 import { createRng } from '../../sim/rng.ts';
 import { havocCoverageAssignment } from './game.ts';
 import { auditHavocGame } from './audit.ts';
-import { havocGameTapeDigest, havocGameResultDigest } from './digests.ts';
 import {
   buildScenarioTeam,
   runScenario,
@@ -99,7 +98,6 @@ describe('havoc participant mechanics', () => {
     expect(auditHavocGame(run.input, run.result, run.tape).ok).toBe(true);
     const assists = run.tape.events.filter((event) => event.kind === 'assist');
     for (const assist of assists) {
-      if (assist.kind !== 'assist') continue;
       expect(assist.assisterInstanceId).not.toBe(assist.scorerInstanceId);
     }
     expect(run.result.home.participants.length).toBe(6);

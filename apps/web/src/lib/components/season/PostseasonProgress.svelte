@@ -5,6 +5,7 @@
   import type { HubPostseasonProgress } from '$lib/season/season-postseason-presentation';
   import type { HoopRushManifest, SeasonPostseasonScoreline } from '@hoop-rush/data-contracts';
   import { franchiseIdentityOf } from '$lib/season/season-branding';
+  import { franchiseColor } from '$lib/season/franchise-colors';
   import SeasonTeamLogo from '$lib/components/season/SeasonTeamLogo.svelte';
   import LiveSimModal from '$lib/components/season/LiveSimModal.svelte';
   import { SIM_BAR_FILL_MS } from '$lib/components/season/live-sim-animation';
@@ -131,6 +132,7 @@
 {#if isActive}
   <LiveSimModal
     open={dialogOpen}
+    broadcast
     onOpenChange={(next) => {
       if (!next) dismissed = true;
     }}
@@ -140,15 +142,20 @@
     >
       <div class="flex min-w-0 flex-wrap items-center gap-2">
         {#if progress.phase === 'running'}
-          <span class="sim-live-pill" role="status">
-            <span class="sim-live-dot" aria-hidden="true"></span> Simming
+          <span class="sr-badge" data-tone="live" role="status">
+            <span
+              class="sr-live-dot inline-block h-1.5 w-1.5 rounded-full bg-current"
+              aria-hidden="true"></span>
+            Simming
           </span>
         {:else if progress.phase === 'complete'}
-          <span class="sim-live-pill" data-tone="final">Final</span>
+          <span class="sr-badge" data-tone="win">Final</span>
+        {:else if progress.phase === 'failed'}
+          <span class="sr-badge" data-tone="loss">{progress.phase}</span>
         {:else}
-          <span class="sim-live-pill" data-tone="muted">{progress.phase}</span>
+          <span class="sr-badge">{progress.phase}</span>
         {/if}
-        <Dialog.Title class="font-display text-base font-extrabold uppercase tracking-tight">
+        <Dialog.Title class="font-display text-base font-extrabold uppercase tracking-tight text-foreground">
           {label}
         </Dialog.Title>
       </div>
@@ -169,16 +176,19 @@
 
     <div class="flex flex-col gap-3 px-4 py-4">
       <div>
+        <p class="sr-section-label">Latest finals</p>
         {#if feed.length > 0}
-          <ul class="grid gap-2 sm:grid-cols-3" aria-label="Latest postseason finals">
+          <ul class="mt-2 grid gap-2 sm:grid-cols-3" aria-label="Latest postseason finals">
             {#each feed as entry (entry.gameId)}
               {@const spot = progress.latestGameId === entry.gameId && involvesHuman(entry)}
               {@const awayExternalId = teamExternalIdOf(entry.awayFranchiseId)}
               {@const homeExternalId = teamExternalIdOf(entry.homeFranchiseId)}
-              <li class="sim-ticker-card" data-spot={spot}>
-                <span
-                  class="font-mono text-[10px] tracking-[0.12em] text-muted-foreground uppercase"
-                >
+              <li
+                class="sr-gamecard px-3 py-2.5 {spot ? 'ring-1 ring-primary/50' : ''}"
+                data-spot={spot}
+                style:--sr-accent={franchiseColor(entry.homeFranchiseId)}
+              >
+                <span class="sr-section-label">
                   Final{#if spot}
                     · You{/if}
                 </span>
@@ -191,7 +201,7 @@
                       size="sm"
                     />
                   {/if}
-                  <span class="font-display text-lg font-extrabold tabular-nums">
+                  <span class="sr-scoreline text-lg text-foreground">
                     {franchiseAbbrev(entry.awayFranchiseId)}
                     {entry.awayScore}–{entry.homeScore}
                     {franchiseAbbrev(entry.homeFranchiseId)}
@@ -212,7 +222,7 @@
             {/each}
           </ul>
         {:else}
-          <p class="text-xs text-muted-foreground" role="status">
+          <p class="mt-2 text-xs text-muted-foreground" role="status">
             {isRunning
               ? 'Warming the worker… finals stream here as games complete.'
               : 'Finals will appear here while simming.'}
@@ -235,7 +245,7 @@
               ? `${String(progress.gamesCompleted)} of ${String(progress.gamesTotal)} games`
               : 'Starting…'}
           </span>
-          <span class="font-bold tabular-nums">{percent}%</span>
+          <span class="sr-number font-bold">{percent}%</span>
         </div>
         <div class="sim-bar mt-2" aria-hidden="true">
           <div
@@ -248,11 +258,7 @@
 
       {#if progress.phase === 'running'}
         <div class="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onclick={onCancel}
-            class="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:border-line-strong motion-reduce:transition-none"
-          >
+          <button type="button" onclick={onCancel} class="sr-btn-ghost motion-reduce:transition-none">
             Cancel
           </button>
           <p class="w-full text-xs text-muted-foreground">
@@ -262,24 +268,16 @@
       {/if}
 
       {#if progress.phase === 'cancelled'}
-        <div class="rounded-lg bg-surface-2 p-3 text-sm">
+        <div class="sr-panel-quiet p-3 text-sm">
           <p class="font-semibold">Postseason simulation cancelled.</p>
           <p class="mt-1 text-muted-foreground">
             Games already committed stay saved. Retry continues from the current matchup.
           </p>
           <div class="mt-3 flex flex-col gap-2 sm:flex-row">
-            <button
-              type="button"
-              onclick={onRetry}
-              class="inline-flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 motion-reduce:transition-none"
-            >
+            <button type="button" onclick={onRetry} class="sr-btn flex-1 motion-reduce:transition-none">
               Retry
             </button>
-            <Dialog.Close
-              class="inline-flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:border-line-strong"
-            >
-              Close
-            </Dialog.Close>
+            <Dialog.Close class="sr-btn-ghost flex-1">Close</Dialog.Close>
           </div>
         </div>
       {/if}
@@ -289,34 +287,25 @@
           role="alert"
           class="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm"
         >
-          <p class="font-semibold">The postseason simulation failed.</p>
+          <p class="font-semibold text-destructive">The postseason simulation failed.</p>
           <p class="mt-1 text-muted-foreground">{progress.error.message}</p>
           <div class="mt-3 flex flex-col gap-2 sm:flex-row">
-            <button
-              type="button"
-              onclick={onRetry}
-              class="inline-flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 motion-reduce:transition-none"
-            >
+            <button type="button" onclick={onRetry} class="sr-btn flex-1 motion-reduce:transition-none">
               Retry
             </button>
-            <Dialog.Close
-              class="inline-flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:border-line-strong"
-            >
-              Close
-            </Dialog.Close>
+            <Dialog.Close class="sr-btn-ghost flex-1">Close</Dialog.Close>
           </div>
         </div>
       {/if}
 
       {#if progress.phase === 'complete'}
-        <p class="rounded-lg bg-primary/10 px-3 py-2 text-sm font-bold text-primary" role="status">
+        <p
+          class="rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-sm font-bold text-primary"
+          role="status"
+        >
           Postseason simulation complete. Results are saved.
         </p>
-        <Dialog.Close
-          class="inline-flex min-h-[44px] items-center justify-center gap-2 self-start rounded-lg border border-border px-4 py-2 text-sm font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:border-line-strong"
-        >
-          Close
-        </Dialog.Close>
+        <Dialog.Close class="sr-btn-ghost self-start">Close</Dialog.Close>
       {/if}
     </div>
 
@@ -336,18 +325,21 @@
   <div
     class:invisible={dialogOpen}
     aria-hidden={dialogOpen}
-    class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface-1 px-4 py-3"
+    class="sr-panel-quiet flex flex-wrap items-center justify-between gap-3 px-4 py-3"
     role="status"
   >
     <div class="flex min-w-0 flex-wrap items-center gap-2">
       {#if progress.phase === 'running'}
-        <span class="sim-live-pill" role="status">
-          <span class="sim-live-dot" aria-hidden="true"></span> Simming
+        <span class="sr-badge" data-tone="live">
+          <span
+            class="sr-live-dot inline-block h-1.5 w-1.5 rounded-full bg-current"
+            aria-hidden="true"></span>
+          Simming
         </span>
       {:else if progress.phase === 'complete'}
-        <span class="sim-live-pill" data-tone="final">Final</span>
+        <span class="sr-badge" data-tone="win">Final</span>
       {:else}
-        <span class="sim-live-pill" data-tone="muted">{progress.phase}</span>
+        <span class="sr-badge">{progress.phase}</span>
       {/if}
       {#if manifest !== null && humanFranchiseId !== null && humanExternalId !== ''}
         <SeasonTeamLogo
@@ -362,11 +354,7 @@
         {label}{countsText !== null ? ` · ${countsText}` : ''}
       </p>
     </div>
-    <button
-      type="button"
-      onclick={showLive}
-      class="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90"
-    >
+    <button type="button" onclick={showLive} class="sr-btn">
       {progress.phase === 'running' ? 'Watch live' : 'Show results'}
     </button>
   </div>

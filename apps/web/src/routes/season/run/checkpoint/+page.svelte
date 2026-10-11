@@ -245,31 +245,31 @@
     Failed to load block: {loadError}
   </p>
 {:else if acceptedBlocks.length === 0}
-  <div class="mt-10 flex flex-col gap-4">
+  <div class="sr-panel mt-10 flex flex-col gap-4 p-6">
     <p class="font-mono text-sm text-muted-foreground">No block yet — submit the first block.</p>
     <a
       href={hubHref}
-      class="inline-flex w-fit items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90"
+      class="sr-btn w-fit"
     >
       Open Hub
     </a>
   </div>
 {:else if requestedOutOfRange}
-  <div class="mt-10 flex flex-col gap-4">
+  <div class="sr-panel mt-10 flex flex-col gap-4 p-6">
     <p class="font-mono text-sm text-muted-foreground">That block doesn't exist.</p>
     <a
       href={hubHref}
-      class="inline-flex w-fit items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90"
+      class="sr-btn-ghost w-fit"
     >
       Back to Hub
     </a>
   </div>
 {:else if requestedNotAccepted}
-  <div class="mt-10 flex flex-col gap-4">
+  <div class="sr-panel mt-10 flex flex-col gap-4 p-6">
     <p class="font-mono text-sm text-muted-foreground">That block hasn't been reached yet.</p>
     <a
       href={hubHref}
-      class="inline-flex w-fit items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90"
+      class="sr-btn-ghost w-fit"
     >
       Back to Hub
     </a>
@@ -280,12 +280,12 @@
     aria-labelledby="checkpoint-heading"
     class="pt-6"
   >
-    <div class="flex items-end justify-between gap-4 px-3 sm:px-0">
-      <div>
-        <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">Season Run</p>
+    <div class="sr-arrive flex items-end justify-between gap-4">
+      <div class="min-w-0">
+        <p class="sr-eyebrow">Season Run</p>
         <h1
           id="checkpoint-heading"
-          class="font-display mt-1 text-3xl font-extrabold tracking-tight uppercase"
+          class="sr-page-title mt-1"
         >
           Block {displayBlock + 1} recap
         </h1>
@@ -295,7 +295,7 @@
       </div>
       <a
         href={hubHref}
-        class="inline-flex min-h-11 shrink-0 items-center font-mono text-xs text-muted-foreground underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring hover:underline"
+        class="sr-btn-ghost inline-flex min-h-11 shrink-0 px-3 text-xs"
       >
         Hub
       </a>
@@ -320,21 +320,22 @@
         <section aria-labelledby="checkpoint-boxes-heading">
           <h2
             id="checkpoint-boxes-heading"
-            class="font-display px-3 text-xl font-extrabold tracking-tight uppercase sm:px-0"
+            class="sr-section-label"
           >
             Box scores · your games
           </h2>
-          <div class="mt-3 grid gap-0 sm:gap-3 lg:grid-cols-2 lg:items-start">
+          <div class="mt-3 grid gap-2 sm:gap-3 lg:grid-cols-2 lg:items-start">
             {#each humanGames as summary (summary.gameId)}
               {@const box = boxFor(summary)}
               {@const opponentId = opponentOf(summary)}
               <details
                 id={`box-score-${summary.gameId}`}
-                class="group bg-surface-1 open:ring-1 open:ring-ring/30 sm:rounded-xl"
+                data-result={resultLabel(summary).startsWith('W') ? 'win' : 'loss'}
+                class="sr-gamecard group"
                 ontoggle={(event) => onBoxScoreToggle(event, summary.gameId)}
               >
                 <summary
-                  class="flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden"
+                  class="flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 text-sm font-semibold outline-none [&::-webkit-details-marker]:hidden"
                 >
                   <span class="font-mono text-xs text-muted-foreground">R{summary.round}</span>
                   {#if identityOf(opponentId)}
@@ -350,16 +351,13 @@
                     {summary.homeFranchiseId === humanFranchiseId ? 'vs ' : 'at '}
                     {shell.franchiseName(opponentId)}
                   </span>
-                  <span class="font-mono text-xs">
+                  <span class="sr-number font-mono text-xs">
                     {summary.homeScore}–{summary.awayScore}
                     {#if summary.status === 'forfeit'}· forfeit{/if}
                   </span>
                   <span
-                    class="rounded-full bg-surface-2 px-2.5 py-0.5 font-mono text-xs font-bold uppercase tracking-[0.12em] {resultLabel(
-                      summary,
-                    ).startsWith('W')
-                      ? 'text-primary'
-                      : 'text-muted-foreground'}"
+                    class="sr-badge shrink-0"
+                    data-tone={resultLabel(summary).startsWith('W') ? 'win' : 'loss'}
                   >
                     {resultLabel(summary)}
                   </span>

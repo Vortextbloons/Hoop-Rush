@@ -1,17 +1,25 @@
 <script lang="ts">
-  import type { DraftDuelPresentation, DraftDuelRoster } from '@hoop-rush/data-contracts';
-  import { LINEUP_STRUCTURE } from '@hoop-rush/data-contracts';
+  import type {
+    DraftDuelPresentation,
+    DraftDuelRoster,
+    HoopRushManifest,
+  } from '@hoop-rush/data-contracts';
+  import { LINEUP_STRUCTURE, resolveEraTeamIdentity } from '@hoop-rush/data-contracts';
+  import PlayerFace from '$lib/components/PlayerFace.svelte';
+  import TeamLogo from '$lib/components/TeamLogo.svelte';
   import { SLOT_NAMES } from '$lib/player-positions';
   import { draftDuelCardView } from './draft-duel-card-view.ts';
 
   let {
     roster,
     presentation,
+    manifest = null,
     active = false,
     compact = false,
   }: {
     roster: DraftDuelRoster;
     presentation: DraftDuelPresentation;
+    manifest?: HoopRushManifest | null;
     active?: boolean;
     compact?: boolean;
   } = $props();
@@ -22,6 +30,7 @@
       return {
         position,
         name: SLOT_NAMES[slotIndex] ?? position,
+        card: filled?.card ?? null,
         view: filled ? draftDuelCardView(filled.card, presentation) : null,
       };
     }),
@@ -30,6 +39,26 @@
     roster.slots.filter((slot) => slot.slotIndex >= 0 && slot.slotIndex < LINEUP_STRUCTURE.length)
       .length,
   );
+
+  function initialsOf(name: string): string {
+    return name
+      .split(' ')
+      .filter((part) => part.length > 0)
+      .map((part) => part[0] ?? '')
+      .join('')
+      .slice(0, 2)
+      .toUpperCase();
+  }
+
+  function franchiseSlotOf(franchiseId: string) {
+    return manifest?.modernFranchiseSlots.find((slot) => slot.franchiseId === franchiseId) ?? null;
+  }
+
+  function logoCandidatesOf(franchiseId: string, eraId: string): string[] {
+    return manifest
+      ? (resolveEraTeamIdentity(manifest, franchiseId, eraId).logoCandidates ?? [])
+      : [];
+  }
 </script>
 
 <section
@@ -47,10 +76,33 @@
     {#each slots as slot (slot.position)}
       <li class="dd-rail-slot" data-slot={slot.position} data-filled={slot.view !== null}>
         <span class="dd-rail-chip" aria-hidden="true">{slot.position}</span>
-        {#if slot.view}
+        {#if slot.view && slot.card}
           <span class="dd-rail-player">
-            <span class="dd-rail-name">{slot.view.displayName}</span>
-            <span class="dd-rail-meta">{slot.view.seasonKey} · {slot.name}</span>
+            {#if manifest && slot.card.playerExternalId}
+              <PlayerFace
+                player={{
+                  playerId: slot.card.playerId,
+                  playerExternalId: slot.card.playerExternalId,
+                  altIds: null,
+                }}
+                {manifest}
+                size="sm"
+                fallbackInitials={initialsOf(slot.view.displayName)}
+              />
+            {/if}
+            <span class="dd-rail-text">
+              <span class="dd-rail-name">{slot.view.displayName}</span>
+              <span class="dd-rail-meta">{slot.view.seasonKey} · {slot.name}</span>
+            </span>
+            {#if manifest && franchiseSlotOf(slot.card.franchiseId)}
+              <TeamLogo
+                {manifest}
+                franchiseId={slot.card.franchiseId}
+                teamExternalId={franchiseSlotOf(slot.card.franchiseId)?.teamExternalId ?? ''}
+                logoCandidates={logoCandidatesOf(slot.card.franchiseId, slot.card.eraId)}
+                className="h-4 w-4"
+              />
+            {/if}
           </span>
         {:else}
           <span class="dd-rail-empty">
@@ -149,6 +201,15 @@
   .dd-rail-player {
     display: flex;
     min-width: 0;
+    flex: 1;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .dd-rail-text {
+    display: flex;
+    min-width: 0;
+    flex: 1;
     flex-direction: column;
     gap: 0.1rem;
   }

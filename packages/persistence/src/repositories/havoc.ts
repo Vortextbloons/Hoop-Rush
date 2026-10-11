@@ -235,16 +235,12 @@ function asRunId(runId: string): Id {
 
 function parseOutcomeState(rawState: unknown, command: HavocCommand | null): ParsedOutcomeState {
   const direct = havocRunStateSchema.safeParse(rawState);
-  if (direct.success) return { state: direct.data, draftAbandoned: false };
-  const abandonedDraft =
-    typeof rawState === 'object' &&
-    rawState !== null &&
-    (rawState as { phase?: unknown }).phase === 'draft' &&
-    (rawState as { completionState?: unknown }).completionState === 'abandoned' &&
-    (command === null || command.command === 'abandon-havoc-run');
-  if (abandonedDraft) {
-    const relaxed = havocRunStateSchema.safeParse({ ...rawState, completionState: 'draft' });
-    if (relaxed.success) return { state: relaxed.data, draftAbandoned: true };
+  if (direct.success) {
+    const draftAbandoned =
+      direct.data.phase === 'draft' &&
+      direct.data.completionState === 'abandoned' &&
+      (command === null || command.command === 'abandon-havoc-run');
+    return { state: direct.data, draftAbandoned };
   }
   throw new HavocOutcomeIntegrityError([`outcome state: ${direct.error.message}`]);
 }

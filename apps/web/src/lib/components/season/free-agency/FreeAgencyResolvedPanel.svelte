@@ -50,7 +50,7 @@
 
 <section
   aria-labelledby="free-agency-resolved-heading"
-  class="rounded-none border border-border bg-surface-1 p-4 sm:rounded-xl sm:p-5"
+  class="sr-panel-quiet p-4 sm:p-5"
   data-fa-window-resolved
 >
   {#if resolvedInThisSession}
@@ -66,7 +66,7 @@
     >
       Free Agency Window {window.windowIndex + 1} — resolved
     </h2>
-    <span class="font-mono text-[10px] text-muted-foreground">
+    <span class="sr-chip">
       {window.signings.length} signing{window.signings.length === 1 ? '' : 's'}
     </span>
   </div>
@@ -83,9 +83,8 @@
         <li
           data-fa-signing
           data-fa-signing-human={human ? 'true' : 'false'}
-          class="flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-lg bg-surface-2 px-3 py-2 text-sm {human
-            ? 'border border-positive/40'
-            : ''}"
+          class="sr-gamecard flex flex-wrap items-center gap-x-2 gap-y-0.5 p-2.5 text-sm"
+          data-result={human ? 'win' : undefined}
         >
           {#if human}
             <Trophy class="h-4 w-4 shrink-0 text-positive" aria-hidden="true" />

@@ -102,15 +102,10 @@
   <p class="py-10 font-mono text-sm text-muted-foreground">Preparing League Honors…</p>
 {:else}
   <section aria-labelledby="leaders-heading" class="min-w-0 pt-6">
-    <div class="flex flex-col gap-3 px-3 sm:px-0">
+    <div class="sr-arrive flex flex-col gap-3">
       <div class="min-w-0 max-w-3xl lg:max-w-none">
-        <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">
-          Season Run · League Honors
-        </p>
-        <h1
-          id="leaders-heading"
-          class="font-display mt-1 text-4xl font-extrabold tracking-tight uppercase sm:text-5xl"
-        >
+        <p class="sr-eyebrow">Season Run · League Honors</p>
+        <h1 id="leaders-heading" class="sr-page-title mt-1">
           League Honors
         </h1>
         <p class="mt-2 max-w-2xl text-[15px] leading-relaxed text-muted-foreground lg:max-w-3xl">
@@ -120,7 +115,7 @@
       <div
         role="group"
         aria-label="Leader category"
-        class="flex max-w-full gap-1 overflow-x-auto rounded-lg bg-surface-2 p-1 md:hidden"
+        class="flex max-w-full gap-1 overflow-x-auto rounded-full border border-border bg-surface-2 p-1 md:hidden"
       >
         {#each LEADER_CATEGORIES as category (category)}
           <button
@@ -129,10 +124,10 @@
             onclick={() => {
               activeCategory = category;
             }}
-            class="shrink-0 rounded-md px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring {activeCategory ===
+            class="min-h-11 shrink-0 rounded-full px-4 font-mono text-[11px] font-bold uppercase tracking-[0.12em] transition-colors {activeCategory ===
             category
               ? 'bg-primary text-primary-foreground'
-              : 'text-muted-foreground hover:text-foreground'}"
+              : 'text-muted-foreground hover:text-foreground'} motion-reduce:transition-none"
           >
             {LEADER_CATEGORY_LABELS[category]}
           </button>
@@ -141,7 +136,7 @@
     </div>
 
     {#if awards !== null}
-      <div class="mt-8 px-3 sm:px-0">
+      <div class="mt-8">
         <AwardsSection
           {awards}
           playerName={shell.playerName}
@@ -156,21 +151,19 @@
     {/if}
 
     {#if !leaders}
-      <p class="mt-8 rounded-xl bg-surface-1 p-6 text-sm text-muted-foreground">
+      <p class="sr-panel-quiet mt-8 p-6 text-sm text-muted-foreground">
         No leader data yet — accept a block to fold game summaries.
       </p>
     {:else}
-      <div class="mt-10 px-3 sm:px-0">
+      <div class="mt-10">
         <div class="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 class="font-display text-xl font-extrabold uppercase tracking-tight">
-            Category leaders
-          </h2>
+          <h2 class="sr-section-label">Category leaders</h2>
           <p class="text-[13px] text-muted-foreground">
             Winners lead each table · ranks 2–5 stay compact.
           </p>
         </div>
       </div>
-      <div class="mt-4 px-3 sm:px-0 md:hidden">
+      <div class="mt-3 md:hidden">
         <LeadersTable
           category={activeCategory}
           entries={leaders[activeCategory]}
@@ -182,7 +175,7 @@
         />
       </div>
 
-      <div class="mt-4 hidden gap-4 px-3 sm:px-0 md:grid md:grid-cols-2 xl:grid-cols-3">
+      <div class="mt-3 hidden gap-4 md:grid md:grid-cols-2 xl:grid-cols-3">
         {#each LEADER_CATEGORIES as category (category)}
           <LeadersTable
             {category}
@@ -200,7 +193,7 @@
     {#if awards !== null && leaders}
       <footer
         aria-labelledby="season-honors-heading"
-        class="mt-10 rounded-2xl border border-border bg-surface-1 p-5 sm:p-6 mx-3 sm:mx-0"
+        class="sr-panel-featured mt-10 p-5 sm:p-6"
       >
         <div class="flex flex-wrap items-end justify-between gap-3">
           <div>
@@ -216,47 +209,39 @@
           </div>
           <a
             href={resolve('/season/run/postseason')}
-            class="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring hover:brightness-110"
+            class="sr-btn"
           >
             {seasonComplete ? 'View champion & Finals awards' : 'View playoff bracket'}
             <ArrowRight class="h-4 w-4" aria-hidden="true" />
           </a>
         </div>
         <dl class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <div class="rounded-xl bg-surface-2 p-4">
-            <dt
-              class="font-mono text-[10px] font-bold tracking-[0.14em] text-muted-foreground uppercase"
-            >
+          <div class="sr-stat-tile">
+            <dt class="sr-section-label">
               MVP
             </dt>
             <dd class="mt-1 truncate text-[15px] font-bold">
               {shell.playerName(awards.mvp.playerVersionId)}
             </dd>
           </div>
-          <div class="rounded-xl bg-surface-2 p-4">
-            <dt
-              class="font-mono text-[10px] font-bold tracking-[0.14em] text-muted-foreground uppercase"
-            >
+          <div class="sr-stat-tile">
+            <dt class="sr-section-label">
               DPOY
             </dt>
             <dd class="mt-1 truncate text-[15px] font-bold">
               {shell.playerName(awards.defensivePlayerOfYear.playerVersionId)}
             </dd>
           </div>
-          <div class="rounded-xl bg-surface-2 p-4">
-            <dt
-              class="font-mono text-[10px] font-bold tracking-[0.14em] text-muted-foreground uppercase"
-            >
+          <div class="sr-stat-tile">
+            <dt class="sr-section-label">
               Sixth Man
             </dt>
             <dd class="mt-1 truncate text-[15px] font-bold">
               {shell.playerName(awards.sixthManOfYear.playerVersionId)}
             </dd>
           </div>
-          <div class="rounded-xl bg-surface-2 p-4">
-            <dt
-              class="font-mono text-[10px] font-bold tracking-[0.14em] text-muted-foreground uppercase"
-            >
+          <div class="sr-stat-tile">
+            <dt class="sr-section-label">
               First Team
             </dt>
             <dd class="mt-1 text-[13px] leading-relaxed font-semibold">
@@ -267,7 +252,7 @@
         <ul class="mt-3 grid gap-x-6 gap-y-1.5 sm:grid-cols-2 lg:grid-cols-3">
           {#each championRows as row (row.category)}
             <li
-              class="flex items-baseline justify-between gap-3 border-b border-border/50 py-1.5 text-sm"
+              class="flex items-baseline justify-between gap-3 border-b border-border/60 py-1.5 text-sm"
             >
               <span class="text-muted-foreground">{row.label}</span>
               <span class="min-w-0 truncate font-semibold">

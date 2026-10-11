@@ -441,7 +441,7 @@
 <div class="flex min-w-0 flex-col gap-4">
   <div class="flex flex-col gap-3">
     <div>
-      <h2 class="font-display text-base font-extrabold uppercase tracking-tight">Rotation</h2>
+      <h2 class="sr-section-label">Rotation</h2>
       <p class="mt-0.5 text-xs text-muted-foreground">
         Set your starters, minutes, and closing five.
       </p>
@@ -454,10 +454,10 @@
             onclick={() => applyPreset(preset)}
             {disabled}
             aria-pressed={appliedPreset === preset ? 'true' : 'false'}
-            class="min-h-11 rounded-lg px-2 py-1.5 text-xs font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40 sm:text-sm motion-reduce:transition-none {appliedPreset ===
+            class="sr-btn-ghost px-2! py-1.5! text-xs! outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none {appliedPreset ===
             preset
-              ? 'bg-primary text-primary-foreground'
-              : 'bg-surface-2 hover:bg-surface-3'}"
+              ? 'border-primary! bg-primary/10! text-primary!'
+              : ''}"
           >
             {presetLabel(preset)}
           </button>
@@ -471,12 +471,20 @@
   </div>
 
   <div class="flex flex-col gap-2">
-    <p class="text-base font-bold break-words" aria-live="polite">
-      {minutesTotal} / 240 minutes assigned
+    <p class="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1" aria-live="polite">
+      <span
+        class="sr-number text-2xl leading-none font-extrabold"
+        style="color: var(--sr-paper)"
+      >
+        {minutesTotal} / 240
+      </span>
+      <span class="sr-section-label self-center">minutes assigned</span>
       {#if minutesRemaining !== 0}
-        <span class="text-destructive">· {Math.abs(minutesRemaining)} remaining</span>
+        <span class="font-mono text-[11px] font-bold text-destructive"
+          >· {Math.abs(minutesRemaining)} remaining</span
+        >
       {:else}
-        <span class="text-positive">✓</span>
+        <span class="font-mono text-[11px] font-bold text-positive">✓</span>
       {/if}
     </p>
     <p
@@ -513,7 +521,7 @@
         type="button"
         onclick={balanceMinutes}
         {disabled}
-        class="min-h-11 self-start rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none"
+        class="sr-btn-ghost self-start px-4! text-xs! outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none"
       >
         Balance to 240
         {#if minutesRemaining > 0}
@@ -527,30 +535,21 @@
 
   <section
     aria-labelledby="active10-heading"
-    class="min-w-0 overflow-x-hidden rounded-none bg-surface-1 p-3 sm:rounded-xl"
+    class="sr-panel-quiet min-w-0 overflow-x-hidden p-3 sm:p-4"
   >
-    <h3
-      id="active10-heading"
-      class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
-    >
+    <h3 id="active10-heading" class="sr-section-label">
       Active 10
     </h3>
 
     <ol class="mt-2 flex flex-col gap-2" aria-label="Active 10 in playing order">
       {#each activeOrdered as row, index (row.member.playerVersionId)}
         {#if index === 0}
-          <li
-            aria-hidden="true"
-            class="pt-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
-          >
+          <li aria-hidden="true" class="sr-section-label pt-1">
             Starters
           </li>
         {/if}
         {#if index === 5}
-          <li
-            aria-hidden="true"
-            class="pt-2 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
-          >
+          <li aria-hidden="true" class="sr-section-label pt-2">
             Bench
           </li>
         {/if}
@@ -560,7 +559,7 @@
           data-rotation-active-row
           data-player-version-id={row.member.playerVersionId}
           aria-label="{row.member.displayName}, {row.role}, {row.minutes} minutes"
-          class="flex scroll-mt-24 flex-col gap-2 rounded-none bg-surface-2/60 p-3 outline-none focus-visible:ring-2 focus-visible:ring-ring sm:rounded-xl md:flex-row md:items-center md:gap-3{highlightOf(
+          class="flex scroll-mt-24 flex-col gap-2 rounded-xl border border-border/60 bg-surface-2/40 p-3 outline-none focus-visible:ring-2 focus-visible:ring-ring md:flex-row md:items-center md:gap-3{highlightOf(
             row.member.playerVersionId,
           )}"
         >
@@ -604,7 +603,7 @@
                         row.slotIndex,
                         (event.currentTarget as HTMLSelectElement).value,
                       )}
-                    class="min-h-11 min-w-0 w-full rounded-lg bg-surface-2 px-3 py-2 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40 md:min-h-11 md:w-48 md:flex-none"
+                    class="min-h-11 min-w-0 w-full rounded-lg border border-border/60 bg-surface-2 px-3 py-2 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40 md:w-48 md:flex-none"
                   >
                     {#each editor.eligibleForSlot(row.slotIndex) as member (member.playerVersionId)}
                       <option value={member.playerVersionId}>{member.displayName}</option>
@@ -621,7 +620,7 @@
                       aria-label={`Move ${row.member.displayName} up in bench order`}
                       onclick={() => moveBenchRow(row.slotIndex, -1)}
                       disabled={disabled || row.slotIndex === 0}
-                      class="grid h-10 w-10 place-items-center rounded-lg bg-surface-2 text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none sm:h-11 sm:w-11"
+                      class="grid h-11 w-11 place-items-center rounded-lg border border-border/60 bg-surface-2 text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none"
                     >
                       <ChevronUp class="h-4 w-4" />
                     </button>
@@ -630,7 +629,7 @@
                       aria-label={`Move ${row.member.displayName} down in bench order`}
                       onclick={() => moveBenchRow(row.slotIndex, 1)}
                       disabled={disabled || row.slotIndex === 4}
-                      class="grid h-10 w-10 place-items-center rounded-lg bg-surface-2 text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none sm:h-11 sm:w-11"
+                      class="grid h-11 w-11 place-items-center rounded-lg border border-border/60 bg-surface-2 text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none"
                     >
                       <ChevronDown class="h-4 w-4" />
                     </button>
@@ -644,10 +643,10 @@
                     : `Add ${row.member.displayName} to closing five`}
                   onclick={() => toggleClosingFor(row.member.playerVersionId)}
                   {disabled}
-                  class="inline-flex h-10 min-h-10 shrink-0 items-center gap-1 rounded-lg px-2 outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40 transition-colors motion-reduce:transition-none sm:h-11 sm:min-h-11 sm:px-2.5 {row.closingIndex !==
+                  class="inline-flex h-11 min-h-11 shrink-0 items-center gap-1 rounded-lg border border-border/60 px-2.5 outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40 transition-colors motion-reduce:transition-none {row.closingIndex !==
                   -1
-                    ? 'bg-primary/15 text-primary'
-                    : 'bg-surface-2 text-muted-foreground hover:bg-surface-3'}"
+                    ? 'border-primary/50 bg-primary/15 text-primary'
+                    : 'border-border/60 bg-surface-2 text-muted-foreground hover:bg-surface-3'}"
                 >
                   <Star class="h-4 w-4" fill={row.closingIndex !== -1 ? 'currentColor' : 'none'} />
                   <span class="font-mono text-[10px] font-bold">CLOSE</span>
@@ -658,7 +657,7 @@
                     aria-label={`Demote ${row.member.displayName} to inactive`}
                     onclick={() => openSwap('demote', row.member.playerVersionId)}
                     {disabled}
-                    class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-surface-2 text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none sm:h-11 sm:w-11"
+                    class="grid h-11 w-11 shrink-0 place-items-center rounded-lg border border-border/60 bg-surface-2 text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none"
                   >
                     <UserMinus class="h-4 w-4" />
                   </button>
@@ -696,7 +695,7 @@
     <div
       role="alert"
       data-rotation-global-failures
-      class="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm"
+      class="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm"
     >
       <p class="font-semibold">This rotation cannot be submitted:</p>
       <ul class="mt-1 list-inside list-disc text-muted-foreground">
@@ -710,13 +709,10 @@
   <section
     aria-labelledby="closing-strip-heading"
     data-rotation-closing-strip
-    class="rounded-none bg-surface-1 p-3 sm:rounded-xl"
+    class="sr-panel-quiet p-3 sm:p-4"
   >
     <div class="flex items-center justify-between gap-2">
-      <h3
-        id="closing-strip-heading"
-        class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
-      >
+      <h3 id="closing-strip-heading" class="sr-section-label">
         Closing five
       </h3>
       <span class="font-mono text-[10px] text-muted-foreground">
@@ -737,7 +733,7 @@
             aria-label={onSelectPlayer !== null
               ? `View ${row?.member.displayName ?? playerVersionId}`
               : `Show ${row?.member.displayName ?? playerVersionId} in Active 10`}
-            class="flex min-h-11 items-center gap-1.5 rounded-full bg-surface-2 py-1 pr-3 pl-1 font-mono text-xs font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 motion-reduce:transition-none"
+            class="sr-chip min-h-11! gap-1.5! py-1! pr-3! pl-1! text-xs! outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3! motion-reduce:transition-none"
           >
             {#if manifest !== null && faceOf(playerVersionId) !== null}
               <SeasonPlayerFace face={faceOf(playerVersionId)!} {manifest} size="sm" />
@@ -754,22 +750,16 @@
   </section>
 
   {#if inactiveRows.length > 0}
-    <details
-      data-rotation-inactive-section
-      class="group rounded-none border-y border-dashed border-border bg-surface-1/60 p-3 sm:rounded-xl sm:border"
-    >
+    <details data-rotation-inactive-section class="sr-panel-quiet group p-3">
       <summary
         class="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden"
       >
-        <span
-          id="inactive-heading"
-          class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
-        >
+        <span id="inactive-heading" class="sr-section-label">
           Inactive depth · does not play · {inactiveRows.length}
         </span>
         <span
           aria-hidden="true"
-          class="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-surface-2 text-muted-foreground group-open:rotate-180 motion-reduce:transition-none"
+          class="grid h-11 w-11 shrink-0 place-items-center rounded-lg border border-border/60 bg-surface-2 text-muted-foreground group-open:rotate-180 motion-reduce:transition-none"
         >
           <ChevronDown class="h-4 w-4" />
         </span>
@@ -811,7 +801,7 @@
                   data-promote-button
                   onclick={() => (open ? closeSwap() : openSwap('promote', member.playerVersionId))}
                   {disabled}
-                  class="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-surface-2 px-3 py-1.5 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none"
+                  class="sr-btn-ghost px-3! py-1.5! text-xs! outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none"
                 >
                   <UserPlus class="h-4 w-4" />
                   {open ? 'Cancel swap' : 'Swap into active 10'}
@@ -853,27 +843,22 @@
     <p class="text-sm font-semibold leading-snug">
       {row.member.displayName}
       {#if isCloser}
-        <span
-          class="ml-1.5 inline-flex items-center rounded-full bg-primary/15 px-1.5 py-0.5 font-mono text-[10px] font-bold text-primary"
-        >
-          Closer
-        </span>
+        <span class="sr-badge ml-1.5 align-middle" data-tone="hardwood">Closer</span>
       {/if}
     </p>
     <div class="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
       {#if overallByVersion?.has(row.member.playerVersionId)}
         {@const baseOvr = overallByVersion.get(row.member.playerVersionId)!}
         {@const ovrDelta = overallDeltaByVersion?.get(row.member.playerVersionId) ?? null}
-        <span
-          class="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] font-bold text-foreground"
-        >
+        <span class="sr-chip shrink-0">
           OVR {baseOvr}{#if ovrDelta !== null}
             → {baseOvr + ovrDelta}{/if}
         </span>
       {/if}
       {#if (gearPointsByVersion?.get(row.member.playerVersionId) ?? 0) > 0}
         <span
-          class="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 font-mono text-[10px] font-bold text-amber-300 ring-1 ring-amber-400/40"
+          class="sr-badge shrink-0"
+          data-tone="warn"
           title="Attribute points from applied sponsors"
         >
           +{gearPointsByVersion?.get(row.member.playerVersionId)} gear
@@ -888,17 +873,9 @@
         </span>
       {/if}
       {#if row.isStarter}
-        <span
-          class="shrink-0 rounded-full bg-surface-3 px-2 py-0.5 font-mono text-[10px] font-bold text-muted-foreground"
-        >
-          Starter
-        </span>
+        <span class="sr-chip shrink-0">Starter</span>
       {:else}
-        <span
-          class="shrink-0 rounded-full bg-surface-3 px-2 py-0.5 font-mono text-[10px] font-bold text-muted-foreground"
-        >
-          Bench {row.slotIndex + 1}
-        </span>
+        <span class="sr-chip shrink-0">Bench {row.slotIndex + 1}</span>
       {/if}
     </div>
     <p class="mt-1 font-mono text-[10px] leading-snug text-muted-foreground">
@@ -920,26 +897,21 @@
       {#if overallByVersion?.has(member.playerVersionId)}
         {@const baseOvr = overallByVersion.get(member.playerVersionId)!}
         {@const ovrDelta = overallDeltaByVersion?.get(member.playerVersionId) ?? null}
-        <span
-          class="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] font-bold text-foreground"
-        >
+        <span class="sr-chip shrink-0">
           OVR {baseOvr}{#if ovrDelta !== null}
             → {baseOvr + ovrDelta}{/if}
         </span>
       {/if}
       {#if (gearPointsByVersion?.get(member.playerVersionId) ?? 0) > 0}
         <span
-          class="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 font-mono text-[10px] font-bold text-amber-300 ring-1 ring-amber-400/40"
+          class="sr-badge shrink-0"
+          data-tone="warn"
           title="Attribute points from applied sponsors"
         >
           +{gearPointsByVersion?.get(member.playerVersionId)} gear
         </span>
       {/if}
-      <span
-        class="shrink-0 rounded-full bg-surface-3 px-2 py-0.5 font-mono text-[10px] font-bold text-muted-foreground"
-      >
-        Inactive
-      </span>
+      <span class="sr-chip shrink-0">Inactive</span>
     </div>
     <p class="mt-1 font-mono text-[10px] leading-snug text-muted-foreground">
       {member.seasonKey ?? ''}
@@ -955,13 +927,11 @@
 
 {#snippet swapPicker(options: RotationMember[], onPick: (optionPlayerVersionId: string) => void)}
   <div
-    class="rounded-lg bg-surface-2 p-3"
+    class="rounded-xl border border-border/60 bg-surface-2/50 p-3"
     role="group"
     aria-label="Choose the player to swap into the rotation"
   >
-    <p class="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-      Replace who?
-    </p>
+    <p class="sr-section-label">Replace who?</p>
     <ul class="mt-2 flex flex-col gap-1">
       {#each options as option (option.playerVersionId)}
         {@const optionRow = rowByVersion.get(option.playerVersionId)}
@@ -1001,7 +971,7 @@
       aria-label={`Decrease minutes for ${row.member.displayName}`}
       onclick={() => changeMinutes(row.member.playerVersionId, -1)}
       {disabled}
-      class="grid h-10 w-10 place-items-center rounded-lg bg-surface-2 text-base font-bold outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 disabled:opacity-40 motion-reduce:transition-none sm:h-11 sm:w-11"
+      class="grid h-11 w-11 place-items-center rounded-lg border border-border/60 bg-surface-2 text-base font-bold outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 disabled:opacity-40 motion-reduce:transition-none"
     >
       −
     </button>
@@ -1024,7 +994,7 @@
         aria-invalid={editError?.playerVersionId === row.member.playerVersionId
           ? 'true'
           : undefined}
-        class="h-10 w-12 rounded-md bg-surface-2 px-1 text-center font-mono text-sm font-bold tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring sm:h-11"
+        class="h-11 w-12 rounded-md border border-border/60 bg-surface-2 px-1 text-center font-mono text-sm font-bold tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring"
       />
     {:else}
       <button
@@ -1032,7 +1002,8 @@
         aria-label={`Edit target minutes for ${row.member.displayName}, currently ${row.minutes} minutes`}
         onclick={() => startEdit(row.member.playerVersionId, row.minutes)}
         {disabled}
-        class="h-10 w-12 rounded-md text-center font-mono text-sm font-bold tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40 sm:h-11"
+        class="sr-number h-11 w-12 rounded-md text-center text-sm font-extrabold outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 disabled:opacity-40 motion-reduce:transition-none"
+        style="color: var(--sr-paper)"
       >
         {row.minutes}
       </button>
@@ -1042,7 +1013,7 @@
       aria-label={`Increase minutes for ${row.member.displayName}`}
       onclick={() => changeMinutes(row.member.playerVersionId, 1)}
       {disabled}
-      class="grid h-10 w-10 place-items-center rounded-lg bg-surface-2 text-base font-bold outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 disabled:opacity-40 motion-reduce:transition-none sm:h-11 sm:w-11"
+      class="grid h-11 w-11 place-items-center rounded-lg border border-border/60 bg-surface-2 text-base font-bold outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 disabled:opacity-40 motion-reduce:transition-none"
     >
       +
     </button>
@@ -1052,7 +1023,7 @@
       title="Set to 0 without touching teammates"
       onclick={() => setZero(row.member.playerVersionId)}
       disabled={disabled || row.minutes === 0}
-      class="h-10 shrink-0 rounded-lg bg-surface-2 px-2 font-mono text-[10px] font-bold text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none sm:h-11"
+      class="h-11 shrink-0 rounded-lg border border-border/60 bg-surface-2 px-2 font-mono text-[10px] font-bold text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none"
     >
       DNP
     </button>

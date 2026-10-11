@@ -272,12 +272,10 @@
 </svelte:head>
 
 <div class="flex min-w-0 flex-col gap-6 pt-6">
-  <header class="px-3 sm:px-0">
-    <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">Season Run</p>
-    <h1 class="font-display mt-1 text-2xl font-extrabold tracking-tight uppercase sm:text-3xl">
-      Free Agency
-    </h1>
-    <p class="mt-1 font-mono text-[10px] text-muted-foreground">
+  <header class="sr-arrive px-3 sm:px-0">
+    <p class="sr-eyebrow">Season Run</p>
+    <h1 class="sr-page-title mt-1">Free Agency</h1>
+    <p class="sr-section-label mt-2">
       Up to 2 targets per window. Resolve to continue.
     </p>
   </header>
@@ -285,12 +283,13 @@
   {#if freeAgency === null || freeAgency.windows.length === 0}
     <section
       aria-labelledby="free-agency-empty-heading"
-      class="rounded-none border border-border bg-surface-1 p-5 sm:rounded-xl"
+      class="sr-panel-quiet p-5"
       data-fa-empty-state
     >
+      <p class="sr-eyebrow">Market closed</p>
       <h2
         id="free-agency-empty-heading"
-        class="font-display text-xl font-extrabold uppercase tracking-tight"
+        class="font-display mt-1 text-xl font-extrabold uppercase tracking-tight"
       >
         No market open yet
       </h2>
@@ -300,7 +299,7 @@
     {#if openWindow !== null}
       <section
         aria-labelledby="free-agency-window-heading"
-        class="px-3 sm:px-0"
+        class="sr-arrive px-3 sm:px-0"
         data-fa-window-open
       >
         <div class="flex flex-wrap items-baseline justify-between gap-2">
@@ -310,7 +309,7 @@
           >
             Window {openWindow.windowIndex + 1}
           </h2>
-          <span class="font-mono text-[10px] text-muted-foreground">
+          <span class="sr-badge" data-tone={declaration === null ? 'warn' : 'hardwood'}>
             {#if declaration === null}
               open · declare or skip
             {:else if skipped}
@@ -324,29 +323,34 @@
         {#if declaration === null}
           <p
             role="alert"
-            class="mt-3 rounded-none border border-amber-500/40 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-700 sm:rounded-xl dark:text-amber-300"
+            class="sr-panel-quiet mt-3 flex flex-wrap items-center gap-2 px-4 py-3"
             data-fa-unresolved-notice
           >
-            The next block cannot submit until you declare or skip this market — nothing here is
-            saved until you submit.
+            <span class="sr-badge" data-tone="warn">Action needed</span>
+            <span class="text-sm text-muted-foreground">
+              The next block cannot submit until you declare or skip this market — nothing here is
+              saved until you submit.
+            </span>
           </p>
         {:else}
           <p
             role="status"
-            class="mt-3 rounded-none border border-positive/30 bg-positive/10 px-4 py-2.5 text-sm text-positive sm:rounded-xl"
+            class="sr-panel-quiet mt-3 flex flex-wrap items-center gap-2 px-4 py-3"
             data-fa-resolve-notice
           >
-            Locked in. Resolve window.
+            <span class="sr-badge" data-tone="win">Locked in</span>
+            <span class="text-sm text-muted-foreground">Resolve window.</span>
           </p>
         {/if}
 
         {#if freeAgencyCommandError !== null}
           <p
             role="alert"
-            class="mt-3 rounded-none border border-destructive/40 bg-destructive/10 px-4 py-2.5 text-sm text-destructive sm:rounded-xl"
+            class="sr-panel-quiet mt-3 flex flex-wrap items-center gap-2 px-4 py-3"
             data-fa-rejection
           >
-            {freeAgencyCommandError}
+            <span class="sr-badge" data-tone="loss">Rejected</span>
+            <span class="text-sm text-muted-foreground">{freeAgencyCommandError}</span>
           </p>
         {/if}
 

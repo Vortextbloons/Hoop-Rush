@@ -37,15 +37,10 @@
 <section
   aria-labelledby="tiebreak-heading"
   data-season-tiebreak-explanations
-  class="rounded-xl border border-border bg-surface-1 p-4"
+  class="sr-panel-quiet p-4 sm:p-5"
 >
   <div class="flex flex-wrap items-baseline justify-between gap-2">
-    <h2
-      id="tiebreak-heading"
-      class="font-display text-base font-extrabold uppercase tracking-tight"
-    >
-      Tiebreak explanations
-    </h2>
+    <h2 id="tiebreak-heading" class="sr-section-label">Tiebreak explanations</h2>
     <span class="font-mono text-[10px] text-muted-foreground">
       {total} recorded resolution{total === 1 ? '' : 's'} · official NBA sequence
     </span>
@@ -60,25 +55,20 @@
       {#each groups as group (group.conference)}
         {#if group.entries.length > 0}
           <section aria-labelledby={`tiebreak-${group.conference}-heading`}>
-            <h3
-              id={`tiebreak-${group.conference}-heading`}
-              class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
-            >
+            <h3 id={`tiebreak-${group.conference}-heading`} class="sr-section-label">
               {group.conference === 'east' ? 'East' : 'West'}
             </h3>
             <ul class="mt-1.5 flex flex-col gap-1.5">
               {#each group.entries as entry (entry.resolution.resolutionId)}
                 <li>
                   <details
-                    class="group rounded-lg border border-border/60 bg-surface-2"
+                    class="group rounded-lg border border-line bg-surface-2"
                     data-season-tiebreak-resolution={entry.resolution.resolutionId}
                   >
                     <summary
-                      class="flex cursor-pointer flex-wrap items-baseline gap-x-2 gap-y-0.5 px-3 py-2 outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden"
+                      class="flex cursor-pointer flex-wrap items-baseline gap-x-2 gap-y-0.5 px-3 py-2 outline-none [&::-webkit-details-marker]:hidden"
                     >
-                      <span
-                        class="font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-primary"
-                      >
+                      <span class="sr-badge" data-tone="hardwood">
                         {entry.ruleLabel}
                       </span>
                       <span class="font-mono text-[10px] text-muted-foreground">
@@ -90,7 +80,7 @@
                         {entry.teamLabels.join(' > ')}
                       </span>
                     </summary>
-                    <div class="border-t border-border/50 px-3 py-2">
+                    <div class="border-t border-line/60 px-3 py-2">
                       <p class="text-sm">
                         <strong class="text-foreground">{entry.ruleLabel}</strong>
                         decided {entry.kindLabel.toLowerCase()} for
@@ -113,7 +103,9 @@
                             <dt class="font-mono text-[10px] text-muted-foreground">
                               {item.label}
                             </dt>
-                            <dd class="font-mono text-[10px] font-bold">{String(item.value)}</dd>
+                            <dd class="sr-number font-mono text-[10px] font-bold">
+                              {String(item.value)}
+                            </dd>
                           {/each}
                         </dl>
                       {/if}

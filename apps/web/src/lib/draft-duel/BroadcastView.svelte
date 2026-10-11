@@ -1,11 +1,16 @@
 <script lang="ts">
-  import {
-    DRAFT_DUEL_TAPE_STAT_FIELDS,
-    type DraftDuelGameOutput,
-    type DraftDuelParticipantId,
-    type DraftDuelTapeStatLine,
+  import type {
+    DraftDuelCard,
+    DraftDuelGameOutput,
+    DraftDuelParticipantId,
+    DraftDuelTapeStatLine,
+    HoopRushManifest,
   } from '@hoop-rush/data-contracts';
+  import { DRAFT_DUEL_TAPE_STAT_FIELDS } from '@hoop-rush/data-contracts';
   import type { DraftDuelVisibleState } from '$lib/draft-duel-playback';
+  import PlayerFace from '$lib/components/PlayerFace.svelte';
+  import TeamLogo from '$lib/components/TeamLogo.svelte';
+  import { SLOT_LABELS } from '$lib/player-positions';
   import { draftDuelPeriodLabel, type DraftDuelFeedLine } from './draft-duel-broadcast-view';
 
   let {
@@ -14,12 +19,16 @@
     progress,
     localParticipantId,
     feed,
+    cards = {},
+    manifest = null,
   }: {
     output: DraftDuelGameOutput;
     visible: DraftDuelVisibleState;
     progress: number;
     localParticipantId: DraftDuelParticipantId;
     feed: DraftDuelFeedLine[];
+    cards?: Record<string, DraftDuelCard>;
+    manifest?: HoopRushManifest | null;
   } = $props();
 
   const POINTS = DRAFT_DUEL_TAPE_STAT_FIELDS.indexOf('points');
@@ -34,13 +43,17 @@
 
   interface PlayerRow {
     key: string;
-    label: string;
+    name: string;
+    position: string;
+    playerId: string | null;
+    card: DraftDuelCard | null;
     points: number;
     rebounds: number;
     assists: number;
     turnovers: number;
     fieldGoals: string;
     threes: string;
+    hot: boolean;
   }
 
   interface SideView {
@@ -57,23 +70,63 @@
     return `${String(minutes)}:${String(seconds).padStart(2, '0')}`;
   }
 
+  function cardOf(playerId: string | undefined): DraftDuelCard | null {
+    return playerId ? (cards[playerId] ?? null) : null;
+  }
+
+  function nameOf(playerId: string | undefined, slot: number): string {
+    const card = cardOf(playerId);
+    if (card) return card.displayName;
+    if (playerId) return playerId.replace(/^p-/, '#').slice(0, 7);
+    return `Slot ${String(slot + 1)}`;
+  }
+
+  function initialsOf(name: string): string {
+    return name
+      .split(' ')
+      .filter((part) => part.length > 0)
+      .map((part) => part[0] ?? '')
+      .join('')
+      .slice(0, 2)
+      .toUpperCase();
+  }
+
+  const playerIds = $derived(Object.keys(cards));
+
+  function displaySummary(summary: string): string {
+    let text = summary;
+    for (const playerId of playerIds) {
+      const card = cards[playerId];
+      if (card && text.includes(playerId)) text = text.split(playerId).join(card.displayName);
+    }
+    return text;
+  }
+
   function playerRowsOf(
     lines: readonly DraftDuelTapeStatLine[],
-    playerIds: readonly string[],
+    ids: readonly string[],
   ): PlayerRow[] {
-    return lines.map((line, slot) => {
-      const playerId = playerIds[slot];
+    const rows = lines.map((line, slot) => {
+      const playerId = ids[slot] ?? null;
+      const card = cardOf(playerId ?? undefined);
       return {
         key: playerId ?? `slot-${String(slot + 1)}`,
-        label: playerId ?? `Slot ${String(slot + 1)}`,
+        name: nameOf(playerId ?? undefined, slot),
+        position: SLOT_LABELS[slot] ?? '',
+        playerId,
+        card,
         points: line[POINTS] ?? 0,
         rebounds: (line[OFFENSIVE_REBOUNDS] ?? 0) + (line[DEFENSIVE_REBOUNDS] ?? 0),
         assists: line[ASSISTS] ?? 0,
         turnovers: line[TURNOVERS] ?? 0,
         fieldGoals: `${String(line[FIELD_GOAL_MAKES] ?? 0)}-${String(line[FIELD_GOAL_ATTEMPTS] ?? 0)}`,
         threes: `${String(line[THREE_MAKES] ?? 0)}-${String(line[THREE_ATTEMPTS] ?? 0)}`,
+        hot: false,
       };
     });
+    const best = rows.reduce((top, row) => (row.points > top ? row.points : top), 0);
+    for (const row of rows) row.hot = best > 0 && row.points === best;
+    return rows;
   }
 
   const localSide = $derived(output.homeParticipantId === localParticipantId ? 'home' : 'away');
@@ -89,421 +142,707 @@
   );
   const complete = $derived(progress >= 1);
   const recentFeed = $derived([...feed].slice(-10).reverse());
+  const possession = $derived(
+    lastTrip === null
+      ? null
+      : lastTrip.offense === localParticipantId
+        ? 'Your ball'
+        : 'Opponent ball',
+  );
 
   const sides = $derived.by((): SideView[] => {
     const order: readonly ('home' | 'away')[] =
       localSide === 'home' ? ['home', 'away'] : ['away', 'home'];
     return order.map((key) => {
       const lines = key === 'home' ? visible.homePlayerLines : visible.awayPlayerLines;
-      const playerIds = (key === 'home' ? output.result.home : output.result.away).players.map(
+      const ids = (key === 'home' ? output.result.home : output.result.away).players.map(
         (player) => player.playerId,
       );
       return {
         key,
         label: key === localSide ? 'You' : 'Opponent',
         score: key === 'home' ? visible.homeScore : visible.awayScore,
-        rows: playerRowsOf(lines, playerIds),
+        rows: playerRowsOf(lines, ids),
       };
     });
   });
+
+  function feedTag(line: DraftDuelFeedLine): string {
+    if (line.points >= 3) return '3PT';
+    if (line.points === 2) return 'BUCKET';
+    if (line.points === 1) return 'FT';
+    if (line.summary.includes('Turnover')) return 'TO';
+    if (line.summary.includes('Rebound')) return 'REB';
+    return '—';
+  }
+
+  function teamLogoSlot(card: DraftDuelCard | null) {
+    if (!card || !manifest) return null;
+    return (
+      manifest.modernFranchiseSlots.find((slot) => slot.franchiseId === card.franchiseId) ?? null
+    );
+  }
 </script>
 
 <section class="broadcast" aria-label={`Game ${String(output.gameNumber)} broadcast`}>
-  <header class="scorebug">
-    <div class="score-team" data-side="local">
-      <span class="score-team-tag">You</span>
-      <span class="score-num" data-score="local">{localScore}</span>
+  <header class="bc-board">
+    <div class="bc-team you">
+      <span class="bc-team-label">You</span>
+      {#key localScore}
+        <span class="bc-score" data-score="local">{localScore}</span>
+      {/key}
     </div>
-    <div class="score-mid">
-      <span class="sim-live-pill" data-tone={complete ? 'final' : 'live'}>
-        <span class="sim-live-dot" aria-hidden="true"></span>
+    <div class="bc-center">
+      <span class="bc-live" data-tone={complete ? 'final' : 'live'}>
+        <span class="bc-live-dot" aria-hidden="true"></span>
         {complete ? 'Final' : 'Live'}
       </span>
-      <span class="score-clock" aria-live="polite">{periodLabel} · {clockLabel}</span>
+      <span class="bc-clock" aria-live="polite">{periodLabel} · {clockLabel}</span>
+      {#if !complete}
+        <span class="bc-possession">{possession ?? 'Tip-off soon'}</span>
+      {/if}
+      <span class="bc-quarters" aria-hidden="true">
+        {#each [1, 2, 3, 4] as quarter (quarter)}
+          <span
+            class="bc-quarter"
+            class:done={quarter < (lastTrip?.period ?? 1)}
+            class:now={quarter === (lastTrip?.period ?? 1)}
+          ></span>
+        {/each}
+      </span>
     </div>
-    <div class="score-team" data-side="opponent">
-      <span class="score-team-tag">Opp</span>
-      <span class="score-num" data-score="opponent">{opponentScore}</span>
+    <div class="bc-team opp">
+      <span class="bc-team-label">Opponent</span>
+      {#key opponentScore}
+        <span class="bc-score" data-score="opponent">{opponentScore}</span>
+      {/key}
     </div>
   </header>
 
-  <div class="progress-track" aria-hidden="true">
+  <div class="bc-progress" aria-hidden="true">
     <div
-      class="sim-bar-fill"
+      class="bc-progress-fill"
       data-active={complete ? undefined : 'true'}
       style:width={`${progressPct}%`}
     ></div>
   </div>
 
-  <div class="panels">
+  <div class="bc-panels">
     {#each sides as side (side.key)}
-      <section class="stat-panel" data-side={side.key} aria-label={`${side.label} player stats`}>
-        <header class="stat-head">
-          <span class="stat-team" data-side={side.key}>{side.label}</span>
-          <strong class="stat-score">{side.score}</strong>
+      <section class="bc-panel" data-side={side.key} aria-label={`${side.label} player stats`}>
+        <header class="bc-panel-head">
+          <span class="bc-panel-team" data-side={side.key}>{side.label}</span>
+          <strong class="bc-panel-score">{side.score}</strong>
         </header>
-        <div class="stat-scroll">
-          <table>
-            <caption class="sr-only">{side.label} player stats so far</caption>
-            <thead>
-              <tr>
-                <th scope="col" class="is-player">Player</th>
-                <th scope="col">PTS</th>
-                <th scope="col">REB</th>
-                <th scope="col">AST</th>
-                <th scope="col">TO</th>
-                <th scope="col">FG</th>
-                <th scope="col">3P</th>
-              </tr>
-            </thead>
-            <tbody>
-              {#each side.rows as row (row.key)}
-                <tr data-role="player-row">
-                  <th scope="row" class="is-player">{row.label}</th>
-                  <td data-stat="pts">{row.points}</td>
-                  <td data-stat="reb">{row.rebounds}</td>
-                  <td data-stat="ast">{row.assists}</td>
-                  <td data-stat="tov">{row.turnovers}</td>
-                  <td data-stat="fg">{row.fieldGoals}</td>
-                  <td data-stat="tp">{row.threes}</td>
-                </tr>
-              {/each}
-            </tbody>
-          </table>
+        <div class="bc-panel-cols" aria-hidden="true">
+          <span>Player</span>
+          <span>PTS</span>
+          <span>REB</span>
+          <span>AST</span>
+          <span>TO</span>
+          <span>FG</span>
+          <span>3P</span>
         </div>
+        <ul class="bc-rows">
+          {#each side.rows as row (row.key)}
+            <li class="bc-row" class:hot={row.hot} data-role="player-row">
+              <span class="bc-ident">
+                {#if manifest && row.card?.playerExternalId}
+                  <PlayerFace
+                    player={{
+                      playerId: row.card.playerId,
+                      playerExternalId: row.card.playerExternalId,
+                      altIds: null,
+                    }}
+                    {manifest}
+                    size="sm"
+                    fallbackInitials={initialsOf(row.name)}
+                  />
+                {:else}
+                  <span class="bc-face">{initialsOf(row.name)}</span>
+                {/if}
+                <span class="bc-ident-text">
+                  <span class="bc-name">{row.name}</span>
+                  <span class="bc-sub">
+                    {#if manifest && teamLogoSlot(row.card)}
+                      <TeamLogo
+                        {manifest}
+                        franchiseId={row.card.franchiseId}
+                        teamExternalId={teamLogoSlot(row.card)?.teamExternalId ?? ''}
+                        logoCandidates={[]}
+                        className="h-3 w-3"
+                      />
+                    {/if}
+                    {row.position}
+                    {#if row.hot}<span class="bc-hot">Leading</span>{/if}
+                  </span>
+                </span>
+              </span>
+              <span class="bc-stat big" data-stat="pts">{row.points}</span>
+              <span class="bc-stat" data-stat="reb">{row.rebounds}</span>
+              <span class="bc-stat" data-stat="ast">{row.assists}</span>
+              <span class="bc-stat" data-stat="tov">{row.turnovers}</span>
+              <span class="bc-stat" data-stat="fg">{row.fieldGoals}</span>
+              <span class="bc-stat" data-stat="tp">{row.threes}</span>
+            </li>
+          {/each}
+        </ul>
       </section>
     {/each}
   </div>
 
-  <section class="feed-panel" aria-label="Play-by-play feed">
-    <header class="feed-head">
+  <section class="bc-feed" aria-label="Play-by-play feed">
+    <header class="bc-feed-head">
       <h3>Live feed</h3>
-      <span class="feed-count">
+      <span class="bc-feed-count">
         {feed.length}
-        {feed.length === 1 ? 'possession' : 'possessions'} shown
+        {feed.length === 1 ? 'possession' : 'possessions'}
       </span>
     </header>
     {#if recentFeed.length > 0}
-      <ul class="feed-list" aria-live="polite">
-        {#each recentFeed as line (line.key)}
+      <ul class="bc-feed-list" aria-live="polite">
+        {#each recentFeed as line, index (line.key)}
           <li
-            class="feed-line"
+            class="bc-feed-line"
+            class:latest={index === 0}
             data-offense={line.offense === localParticipantId ? 'local' : 'opponent'}
           >
-            <span class="feed-meta"
-              >{draftDuelPeriodLabel(line.period)} · {formatClock(line.clockSeconds)}</span
-            >
+            <span class="bc-feed-clock">
+              {draftDuelPeriodLabel(line.period)}
+              {formatClock(line.clockSeconds)}
+            </span>
             <span
-              class="feed-team"
+              class="bc-feed-team"
               data-side={line.offense === localParticipantId ? 'local' : 'opponent'}
             >
               {line.offense === localParticipantId ? 'You' : 'Opp'}
             </span>
-            <span class="feed-summary">{line.summary}</span>
+            <span class="bc-feed-tag" data-points={line.points > 0 ? 'yes' : 'no'}>
+              {feedTag(line)}
+            </span>
+            <span class="bc-feed-summary">{displaySummary(line.summary)}</span>
             {#if line.points > 0}
-              <span class="feed-pts">+{line.points}</span>
+              <span class="bc-feed-pts">+{line.points}</span>
             {/if}
           </li>
         {/each}
       </ul>
     {:else}
-      <p class="feed-empty">Waiting for the first possession…</p>
+      <p class="bc-feed-empty">Waiting for the first possession…</p>
     {/if}
   </section>
 </section>
 
 <style>
   .broadcast {
+    --dd-opp: hsl(212 90% 62%);
     display: grid;
-    overflow: clip;
-    border: 1px solid var(--color-line-soft);
-    border-radius: var(--radius);
-    background: var(--color-surface-1);
+    gap: 12px;
   }
 
-  .scorebug {
-    display: flex;
-    align-items: stretch;
+  .bc-board {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 16px;
+    padding: 18px 22px;
+    border: 1px solid var(--color-line-soft);
+    border-radius: 16px;
     background:
-      linear-gradient(
-        180deg,
-        color-mix(in srgb, var(--color-primary) 6%, transparent),
-        transparent
+      radial-gradient(
+        120% 150% at 0% 0%,
+        color-mix(in srgb, var(--color-primary) 18%, transparent),
+        transparent 55%
       ),
-      var(--color-surface-2);
+      radial-gradient(
+        120% 150% at 100% 0%,
+        color-mix(in srgb, var(--dd-opp) 16%, transparent),
+        transparent 55%
+      ),
+      var(--color-card);
   }
 
-  .score-team {
-    display: flex;
-    flex: 1 1 0;
-    align-items: center;
-    justify-content: center;
-    gap: 0.6rem;
-    min-width: 0;
-    padding: 1rem 0.6rem;
-  }
-
-  .score-team-tag {
-    font-family: var(--font-mono);
-    font-size: 0.6rem;
-    font-weight: 700;
-    letter-spacing: 0.14em;
-    color: var(--color-muted-foreground);
-    text-transform: uppercase;
-  }
-
-  .score-num {
-    font-family: var(--font-display);
-    font-size: clamp(2rem, 9vw, 2.75rem);
-    font-weight: 800;
-    line-height: 1;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .score-team[data-side='local'] .score-num {
-    color: var(--color-primary);
-  }
-
-  .score-team[data-side='opponent'] {
-    flex-direction: row-reverse;
-  }
-
-  .score-mid {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 0.35rem;
-    padding: 0.7rem 0.5rem;
-    text-align: center;
-  }
-
-  .score-clock {
-    font-family: var(--font-mono);
-    font-size: 0.72rem;
-    font-weight: 700;
-    color: var(--color-muted-foreground);
-    white-space: nowrap;
-  }
-
-  .progress-track {
-    height: 0.3rem;
-    overflow: hidden;
-    background: var(--color-muted);
-  }
-
-  .panels {
+  .bc-team {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.75rem;
-    padding: 0.85rem;
+    gap: 2px;
   }
 
-  .stat-panel {
-    min-width: 0;
-    overflow: clip;
-    border: 1px solid var(--color-line-soft);
-    border-radius: 0.6rem;
-    background: var(--color-surface-2);
+  .bc-team.you {
+    justify-items: start;
   }
 
-  .stat-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    padding: 0.45rem 0.7rem;
-    border-bottom: 1px solid var(--color-line-soft);
-  }
-
-  .stat-team {
-    font-family: var(--font-display);
-    font-size: 0.82rem;
-    font-weight: 800;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-
-  .stat-team[data-side='home'] {
-    color: var(--color-primary);
-  }
-
-  .stat-team[data-side='away'] {
-    color: #8bc9e0;
-  }
-
-  .stat-score {
-    font-family: var(--font-display);
-    font-size: 1.2rem;
-    font-weight: 800;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .stat-scroll {
-    overflow-x: auto;
-  }
-
-  table {
-    width: 100%;
-    min-width: 19rem;
-    border-collapse: collapse;
-    font-size: 0.72rem;
-    font-variant-numeric: tabular-nums;
-  }
-
-  th,
-  td {
-    padding: 0.34rem 0.45rem;
-    white-space: nowrap;
+  .bc-team.opp {
+    justify-items: end;
     text-align: right;
   }
 
-  thead th {
-    color: var(--color-muted-foreground);
+  .bc-team-label {
     font-family: var(--font-mono);
-    font-size: 0.56rem;
+    font-size: 10px;
     font-weight: 700;
-    letter-spacing: 0.1em;
-    border-bottom: 1px solid var(--color-line-soft);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--color-muted-foreground);
   }
 
-  thead th.is-player,
-  th.is-player {
-    width: 100%;
-    text-align: left;
+  .bc-team.you .bc-team-label {
+    color: var(--color-primary);
   }
 
-  tbody tr {
-    border-top: 1px solid color-mix(in srgb, var(--color-line-soft) 55%, transparent);
+  .bc-team.opp .bc-team-label {
+    color: var(--dd-opp);
   }
 
-  tbody tr:first-child {
-    border-top: 0;
-  }
-
-  tbody th.is-player {
-    max-width: 9.5rem;
-    overflow: hidden;
-    font-weight: 600;
-    text-overflow: ellipsis;
-  }
-
-  tbody td[data-stat='pts'] {
-    color: var(--color-foreground);
-    font-weight: 800;
-  }
-
-  .feed-panel {
-    border-top: 1px solid var(--color-line-soft);
-    padding: 0.75rem 0.85rem 0.85rem;
-  }
-
-  .feed-head {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 0.3rem 1rem;
-    margin-bottom: 0.5rem;
-  }
-
-  .feed-head h3 {
-    margin: 0;
+  .bc-score {
     font-family: var(--font-display);
-    font-size: 0.86rem;
-    font-weight: 850;
-    letter-spacing: 0.06em;
+    font-size: clamp(52px, 8vw, 84px);
+    font-weight: 900;
+    line-height: 0.95;
+    font-variant-numeric: tabular-nums;
+    animation: bc-score-pop 340ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .bc-team.you .bc-score {
+    color: var(--color-primary);
+    text-shadow: 0 0 32px color-mix(in srgb, var(--color-primary) 45%, transparent);
+  }
+
+  .bc-team.opp .bc-score {
+    color: #f5f3ef;
+  }
+
+  .bc-center {
+    display: grid;
+    justify-items: center;
+    gap: 6px;
+  }
+
+  .bc-live {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 4px 12px;
+    border: 1px solid color-mix(in srgb, var(--color-primary) 60%, transparent);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+    color: var(--color-primary);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.18em;
     text-transform: uppercase;
   }
 
-  .feed-count {
-    font-family: var(--font-mono);
-    font-size: 0.6rem;
+  .bc-live[data-tone='final'] {
+    border-color: var(--color-line-strong);
+    background: var(--color-surface-2);
     color: var(--color-muted-foreground);
   }
 
-  .feed-list {
+  .bc-live-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: currentcolor;
+    animation: bc-pulse 1.4s ease-in-out infinite;
+  }
+
+  .bc-live[data-tone='final'] .bc-live-dot {
+    animation: none;
+  }
+
+  .bc-clock {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--color-foreground);
+  }
+
+  .bc-possession {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--color-muted-foreground);
+  }
+
+  .bc-quarters {
+    display: flex;
+    gap: 5px;
+    margin-top: 2px;
+  }
+
+  .bc-quarter {
+    width: 20px;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--color-surface-3);
+  }
+
+  .bc-quarter.done {
+    background: color-mix(in srgb, var(--color-primary) 45%, transparent);
+  }
+
+  .bc-quarter.now {
+    background: var(--color-primary);
+  }
+
+  .bc-progress {
+    height: 4px;
+    border-radius: 999px;
+    background: var(--color-surface-3);
+    overflow: hidden;
+  }
+
+  .bc-progress-fill {
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(
+      90deg,
+      var(--color-primary),
+      color-mix(in srgb, var(--color-primary) 55%, white)
+    );
+  }
+
+  .bc-progress-fill[data-active='true'] {
+    box-shadow: 0 0 14px color-mix(in srgb, var(--color-primary) 60%, transparent);
+  }
+
+  .bc-panels {
     display: grid;
-    gap: 0.3rem;
-    max-height: 15rem;
+    gap: 12px;
+    grid-template-columns: 1fr;
+  }
+
+  @media (min-width: 900px) {
+    .bc-panels {
+      grid-template-columns: 1fr 1fr;
+      align-items: start;
+    }
+  }
+
+  .bc-panel {
+    border: 1px solid var(--color-line-soft);
+    border-radius: 14px;
+    background: var(--color-surface-1);
+    overflow: hidden;
+  }
+
+  .bc-panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--color-card) 92%, white 8%),
+      var(--color-card)
+    );
+    border-bottom: 1px solid var(--color-line-soft);
+  }
+
+  .bc-panel-team {
+    font-family: var(--font-display);
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+
+  .bc-panel-team[data-side='home'],
+  .bc-panel-team[data-side='away'] {
+    color: var(--color-foreground);
+  }
+
+  .bc-panel-score {
+    font-family: var(--font-display);
+    font-size: 28px;
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .bc-panel-cols {
+    display: grid;
+    grid-template-columns: minmax(0, 2.4fr) repeat(6, minmax(1.6rem, auto));
+    gap: 8px;
+    padding: 8px 14px 6px;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--color-muted-foreground);
+  }
+
+  .bc-panel-cols span:not(:first-child) {
+    text-align: center;
+  }
+
+  .bc-rows {
     margin: 0;
     padding: 0;
-    overflow-y: auto;
     list-style: none;
   }
 
-  .feed-line {
+  .bc-row {
     display: grid;
-    grid-template-columns: auto auto minmax(0, 1fr) auto;
-    align-items: baseline;
-    gap: 0.45rem;
-    padding: 0.3rem 0.5rem;
-    border-left: 2px solid var(--color-line-strong);
-    border-radius: 0.3rem;
-    background: var(--color-surface-2);
-    font-size: 0.72rem;
+    grid-template-columns: minmax(0, 2.4fr) repeat(6, minmax(1.6rem, auto));
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    border-top: 1px solid var(--color-line-soft);
   }
 
-  .feed-line[data-offense='local'] {
-    border-left-color: var(--color-primary);
+  .bc-row.hot {
+    background: color-mix(in srgb, var(--color-primary) 7%, transparent);
   }
 
-  .feed-line[data-offense='opponent'] {
-    border-left-color: #8bc9e0;
+  .bc-ident {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 10px;
   }
 
-  .feed-meta {
-    font-family: var(--font-mono);
-    font-size: 0.62rem;
+  .bc-face {
+    display: grid;
+    width: 36px;
+    height: 36px;
+    flex: none;
+    place-items: center;
+    border-radius: 9px;
+    background: var(--color-surface-3);
     color: var(--color-muted-foreground);
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 800;
+  }
+
+  .bc-ident-text {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .bc-name {
+    overflow: hidden;
+    font-family: var(--font-display);
+    font-size: 17px;
+    font-weight: 800;
+    line-height: 1.05;
+    text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .feed-team {
+  .bc-sub {
+    display: flex;
+    align-items: center;
+    gap: 6px;
     font-family: var(--font-mono);
-    font-size: 0.58rem;
+    font-size: 9px;
     font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--color-muted-foreground);
+  }
+
+  .bc-hot {
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--color-primary) 16%, transparent);
+    color: var(--color-primary);
+  }
+
+  .bc-stat {
+    justify-self: center;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--color-muted-foreground);
+  }
+
+  .bc-stat.big {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 900;
+    color: var(--color-foreground);
+  }
+
+  .bc-row.hot .bc-stat.big {
+    color: var(--color-primary);
+  }
+
+  .bc-feed {
+    border: 1px solid var(--color-line-soft);
+    border-radius: 14px;
+    background: var(--color-surface-1);
+    padding: 14px;
+  }
+
+  .bc-feed-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+
+  .bc-feed-head h3 {
+    font-family: var(--font-display);
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .bc-feed-count {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--color-muted-foreground);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .bc-feed-list {
+    display: grid;
+    gap: 6px;
+    max-height: 236px;
+    margin: 0;
+    padding: 0 4px 0 0;
+    list-style: none;
+    overflow: auto;
+  }
+
+  .bc-feed-line {
+    display: grid;
+    grid-template-columns: auto auto auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 9px;
+    border-left: 3px solid var(--dd-opp);
+    background: var(--color-surface-2);
+  }
+
+  .bc-feed-line[data-offense='local'] {
+    border-left-color: var(--color-primary);
+  }
+
+  .bc-feed-line.latest {
+    background: color-mix(in srgb, var(--color-surface-2) 80%, white 6%);
+  }
+
+  .bc-feed-clock {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--color-muted-foreground);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .bc-feed-team {
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--dd-opp) 16%, transparent);
+    color: var(--dd-opp);
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 800;
     letter-spacing: 0.08em;
     text-transform: uppercase;
   }
 
-  .feed-team[data-side='local'] {
+  .bc-feed-team[data-side='local'] {
+    background: color-mix(in srgb, var(--color-primary) 16%, transparent);
     color: var(--color-primary);
   }
 
-  .feed-team[data-side='opponent'] {
-    color: #8bc9e0;
+  .bc-feed-tag {
+    min-width: 3.4rem;
+    text-align: center;
+    padding: 2px 6px;
+    border: 1px solid var(--color-line-strong);
+    border-radius: 6px;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    color: var(--color-muted-foreground);
   }
 
-  .feed-summary {
-    min-width: 0;
+  .bc-feed-tag[data-points='yes'] {
+    border-color: color-mix(in srgb, var(--color-primary) 55%, transparent);
+    color: var(--color-primary);
+  }
+
+  .bc-feed-summary {
     overflow: hidden;
+    font-size: 12px;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .feed-pts {
-    font-family: var(--font-mono);
-    font-size: 0.62rem;
-    font-weight: 700;
+  .bc-feed-pts {
+    font-family: var(--font-display);
+    font-size: 15px;
+    font-weight: 900;
     color: var(--color-positive);
-    white-space: nowrap;
   }
 
-  .feed-empty {
-    margin: 0;
-    font-size: 0.75rem;
+  .bc-feed-empty {
     color: var(--color-muted-foreground);
+    font-size: 12px;
   }
 
-  @media (max-width: 720px) {
-    .panels {
-      grid-template-columns: minmax(0, 1fr);
+  @keyframes bc-score-pop {
+    0% {
+      transform: scale(1);
+      filter: brightness(1);
+    }
+    35% {
+      transform: scale(1.07);
+      filter: brightness(1.25);
+    }
+    100% {
+      transform: scale(1);
+      filter: brightness(1);
+    }
+  }
+
+  @keyframes bc-pulse {
+    0%,
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.45;
+      transform: scale(0.8);
+    }
+  }
+
+  @media (max-width: 600px) {
+    .bc-board {
+      padding: 14px;
+      gap: 10px;
     }
 
-    .score-team {
-      gap: 0.4rem;
-      padding: 0.8rem 0.4rem;
+    .bc-panel-cols,
+    .bc-row {
+      grid-template-columns: minmax(0, 1.8fr) repeat(4, minmax(1.4rem, auto));
+    }
+
+    .bc-panel-cols span:nth-child(6),
+    .bc-panel-cols span:nth-child(7),
+    .bc-stat[data-stat='fg'],
+    .bc-stat[data-stat='tp'] {
+      display: none;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .bc-score,
+    .bc-live-dot {
+      animation: none;
     }
   }
 </style>

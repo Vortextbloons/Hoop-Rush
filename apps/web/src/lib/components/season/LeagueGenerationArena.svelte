@@ -40,7 +40,7 @@
   }
 </script>
 
-<div class="mt-10 overflow-hidden rounded-none bg-surface-1 sm:rounded-xl">
+<div class="sr-panel-featured mt-10">
   <div
     aria-hidden="true"
     class="h-1 w-full bg-gradient-to-r from-primary via-primary/40 to-primary motion-reduce:hidden"
@@ -48,10 +48,9 @@
   <div class="p-6">
     <div class="flex flex-wrap items-center gap-2">
       <span class="sim-live-pill"><span class="sim-live-dot" aria-hidden="true"></span>Live</span>
-      <span
-        class="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground"
-        >Arena reveal</span
-      >
+      <span class="sr-section-label">
+        Arena reveal
+      </span>
     </div>
     <h2 class="mt-3 font-display text-xl font-extrabold uppercase tracking-tight">
       Building league…
@@ -69,7 +68,7 @@
       class="mt-4"
     >
       <div class="flex items-center justify-between font-mono text-xs text-muted-foreground">
-        <span>{percent}%</span>
+        <span class="sr-number">{percent}%</span>
         <span class="tabular-nums">{stageLine}</span>
       </div>
       <div class="sim-bar mt-2" aria-hidden="true">
@@ -84,9 +83,7 @@
       <div class="mt-5 grid gap-4 sm:grid-cols-2">
         {#each [{ label: 'East', teams: eastTeams }, { label: 'West', teams: westTeams }] as conf (conf.label)}
           <div>
-            <p
-              class="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground"
-            >
+            <p class="sr-section-label">
               {conf.label}
             </p>
             <div

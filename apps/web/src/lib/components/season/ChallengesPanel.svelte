@@ -69,17 +69,14 @@
 
 <section
   aria-labelledby="challenges-panel-heading"
-  class="scroll-mb-24 rounded-lg bg-surface-2 p-3"
+  class="sr-panel-quiet scroll-mb-24 p-3"
   data-season-challenges-panel
 >
   <div class="flex flex-wrap items-baseline justify-between gap-2">
-    <h3
-      id="challenges-panel-heading"
-      class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
-    >
+    <h3 id="challenges-panel-heading" class="sr-section-label">
       Challenges — all 3 live
     </h3>
-    <span class="font-mono text-[10px] text-muted-foreground">
+    <span class="font-mono text-[10px] text-muted-foreground tabular-nums">
       {blockIndex === null
         ? 'No challenges remain'
         : evaluation !== null
@@ -102,27 +99,19 @@
           <span class="flex items-center justify-between gap-2">
             <span class="text-sm font-semibold">{definition?.name ?? challengeId}</span>
             <span class="flex items-center gap-1">
-              <span
-                class="rounded-full bg-surface-3 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground"
-              >
+              <span class="sr-chip">
                 +{String(definition?.reward ?? 1)}{definition?.difficulty === 'hard' ? ' hard' : ''}
               </span>
               {#if result === null}
-                <span
-                  class="rounded-full bg-primary/15 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-primary"
-                >
+                <span class="sr-badge" data-tone="live">
                   Live
                 </span>
               {:else if result.success}
-                <span
-                  class="rounded-full bg-green-500/15 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-green-700 dark:text-green-300"
-                >
+                <span class="sr-badge" data-tone="win">
                   Done +{String(definition?.reward ?? 1)}
                 </span>
               {:else}
-                <span
-                  class="rounded-full bg-surface-3 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground"
-                >
+                <span class="sr-badge">
                   Missed
                 </span>
               {/if}

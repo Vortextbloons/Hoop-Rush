@@ -1,6 +1,5 @@
 <script lang="ts">
   import {
-    INJURY_SEVERITY_BADGE,
     INJURY_TYPE_LABEL,
     type InjuryTimelinePlayer,
   } from '$lib/season/season-health-view';
@@ -9,6 +8,12 @@
   }: {
     players: InjuryTimelinePlayer[];
   } = $props();
+  const SEVERITY_TONE: Record<string, string> = {
+    minor: 'win',
+    moderate: 'hardwood',
+    major: 'warn',
+    'season-ending': 'loss',
+  };
   const injuredCount = $derived(players.length);
   const summary = $derived(
     `${String(injuredCount)} player${injuredCount === 1 ? '' : 's'} with recorded injuries`,
@@ -17,13 +22,10 @@
 
 <section
   aria-labelledby="injury-timeline-heading"
-  class="rounded-none bg-surface-1 p-4 sm:rounded-xl"
+  class="sr-panel-quiet p-4"
 >
   <div class="flex flex-wrap items-baseline justify-between gap-2">
-    <h2
-      id="injury-timeline-heading"
-      class="font-display text-base font-extrabold uppercase tracking-tight"
-    >
+    <h2 id="injury-timeline-heading" class="sr-section-label">
       Injury history
     </h2>
     <span class="font-mono text-[10px] text-muted-foreground">{summary}</span>
@@ -40,11 +42,7 @@
           <ul class="mt-1 flex flex-col divide-y divide-border/50">
             {#each player.entries as entry (entry.injuryId)}
               <li class="flex flex-wrap items-center gap-x-3 gap-y-1 py-1.5 text-sm">
-                <span
-                  class="rounded-full px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] {INJURY_SEVERITY_BADGE[
-                    entry.severity
-                  ]}"
-                >
+                <span class="sr-badge shrink-0" data-tone={SEVERITY_TONE[entry.severity]}>
                   {INJURY_TYPE_LABEL[entry.type]} · {entry.severity}
                 </span>
                 <span class="font-mono text-[10px] text-muted-foreground">
@@ -69,18 +67,10 @@
                   {/if}
                 </span>
                 {#if entry.recurrence}
-                  <span
-                    class="rounded-full bg-amber-500/15 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-amber-600 dark:text-amber-400"
-                  >
-                    Recurrence risk
-                  </span>
+                  <span class="sr-badge shrink-0" data-tone="warn">Recurrence risk</span>
                 {/if}
                 {#if entry.source === 'risky-rehab-failure'}
-                  <span
-                    class="rounded-full bg-destructive/15 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-destructive"
-                  >
-                    Rehab failure
-                  </span>
+                  <span class="sr-badge shrink-0" data-tone="loss">Rehab failure</span>
                 {/if}
               </li>
             {/each}

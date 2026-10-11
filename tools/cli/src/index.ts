@@ -48,6 +48,9 @@ import {
 } from './commands/data-overalls-distribution.ts';
 import { dataValidate, DATA_VALIDATE_OPTIONS } from './commands/data-validate.ts';
 import { DIAGNOSE_OPTIONS, SEASON_OPTIONS, simDiagnose, simSeason } from './commands/diagnose.ts';
+import { HAVOC_AUDIT_OPTIONS, havocAudit } from './commands/havoc-audit.ts';
+import { HAVOC_CALIBRATE_OPTIONS, havocCalibrate } from './commands/havoc-cohorts.ts';
+import { HAVOC_SIMULATE_OPTIONS, havocSimulate } from './commands/havoc-simulate.ts';
 import { combineDocs, COMBINE_DOCS_OPTIONS } from './commands/docs-combine.ts';
 import {
   IMPORT_ERA_PROFILE_OPTIONS,
@@ -315,6 +318,31 @@ const COMMANDS: Record<string, CommandDef> = {
   'data derive': {
     options: DATA_DERIVE_OPTIONS,
     run: (args) => dataDerive(pickU(args, ['player', 'season', 'franchise'])),
+  },
+  'havoc simulate': {
+    options: HAVOC_SIMULATE_OPTIONS,
+    run: (args) =>
+      havocSimulate({
+        seed: n(args, 'seed'),
+        picks: n(args, 'picks'),
+        comparison: hasOption(args, 'comparison'),
+        manifest: n(args, 'manifest'),
+      }),
+  },
+  'havoc audit': {
+    options: HAVOC_AUDIT_OPTIONS,
+    run: (args) => havocAudit({ input: n(args, 'input'), manifest: n(args, 'manifest') }),
+  },
+  'havoc calibrate': {
+    options: HAVOC_CALIBRATE_OPTIONS,
+    run: (args) =>
+      havocCalibrate({
+        'seed-count': n(args, 'seed-count'),
+        'holdout-count': n(args, 'holdout-count'),
+        mechanism: n(args, 'mechanism'),
+        games: n(args, 'games'),
+        manifest: n(args, 'manifest'),
+      }),
   },
   'sim game': {
     options: SIM_OPTIONS,

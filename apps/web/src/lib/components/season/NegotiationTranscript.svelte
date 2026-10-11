@@ -68,15 +68,15 @@
 
 <section
   aria-labelledby="transcript-heading"
-  class="flex flex-col gap-3 rounded-xl border border-border bg-surface-1 p-4"
+  class="sr-panel-quiet flex flex-col gap-3 p-4"
   data-testid="negotiation-transcript"
 >
   <div class="flex flex-wrap items-baseline justify-between gap-2 border-b border-border pb-3">
-    <h3 id="transcript-heading" class="text-sm font-bold uppercase tracking-tight">Negotiation</h3>
+    <h3 id="transcript-heading" class="font-display text-sm font-extrabold uppercase tracking-tight">Negotiation</h3>
     {#if negotiation !== null}
-      <span class="text-xs text-muted-foreground">Offer {nextOfferNumber} of {exchangeMax}</span>
+      <span class="sr-badge" data-tone="hardwood">Offer {nextOfferNumber} of {exchangeMax}</span>
     {:else}
-      <span class="text-xs text-muted-foreground">No active talk — pick a team</span>
+      <span class="sr-section-label">No active talk — pick a team</span>
     {/if}
   </div>
 
@@ -86,9 +86,9 @@
     </p>
   {:else}
     {#if exchangeCount === 1 && exchangeMax === 3}
-      <p class="text-xs text-muted-foreground" role="status">Offer 2 of 3 — one more after this.</p>
+      <p class="sr-section-label" role="status">Offer 2 of 3 — one more after this.</p>
     {:else if exchangeCount >= 2}
-      <p class="text-xs text-muted-foreground" role="status">
+      <p class="sr-section-label" role="status">
         Offer {nextOfferNumber} of {exchangeMax}{nextOfferNumber >= exchangeMax
           ? ' — last chance.'
           : '.'}
@@ -96,9 +96,9 @@
     {/if}
 
     {#if negotiation.latestRequestedChange !== null}
-      <p class="rounded-lg bg-amber-500/10 p-2.5 text-sm">
-        <span class="font-semibold">They asked:</span>
-        {negotiation.latestRequestedChange}
+      <p class="sr-panel-quiet flex flex-wrap items-center gap-2 p-2.5">
+        <span class="sr-badge" data-tone="warn">They asked</span>
+        <span class="text-sm">{negotiation.latestRequestedChange}</span>
       </p>
     {/if}
 
@@ -125,7 +125,7 @@
           onclick={accept}
           disabled={busy}
           data-testid="negotiation-accept"
-          class="inline-flex min-h-11 items-center justify-center rounded-lg bg-positive px-4 text-sm font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
+          class="sr-btn"
         >
           Accept
         </button>
@@ -134,7 +134,7 @@
           onclick={revise}
           disabled={busy}
           data-testid="negotiation-revise"
-          class="inline-flex min-h-11 items-center justify-center rounded-lg border border-border bg-card px-4 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
+          class="sr-btn-ghost"
         >
           Revise
         </button>
@@ -143,13 +143,13 @@
           onclick={walk}
           disabled={busy}
           data-testid="negotiation-walkaway"
-          class="inline-flex min-h-11 items-center justify-center rounded-lg border border-destructive/30 bg-destructive/10 px-4 text-sm font-semibold text-destructive outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
+          class="sr-btn-danger"
         >
           {confirmWalk ? 'Confirm walk away?' : 'Walk away'}
         </button>
       </div>
       {#if confirmWalk}
-        <p class="text-xs text-muted-foreground" role="status">
+        <p class="sr-section-label" role="status">
           Walking away ends this talk with no penalty. Press Walk away again to confirm.
         </p>
       {/if}

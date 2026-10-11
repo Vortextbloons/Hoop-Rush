@@ -16,16 +16,16 @@
 {#if snapshot !== null}
   <section
     aria-labelledby="series-snapshot-heading"
-    class="rounded-2xl border border-border bg-surface-1 p-4 sm:p-5"
+    class="sr-panel-quiet sr-arrive p-4 sm:p-5"
   >
     <div class="flex flex-wrap items-baseline justify-between gap-2">
       <h2
         id="series-snapshot-heading"
-        class="font-display text-lg font-extrabold uppercase tracking-tight"
+        class="font-display text-lg font-extrabold uppercase tracking-tight text-foreground"
       >
         Series snapshot
       </h2>
-      <p class="font-mono text-[10px] text-muted-foreground">{snapshot.seasonSeries.label}</p>
+      <p class="sr-section-label">{snapshot.seasonSeries.label}</p>
     </div>
     <div class="mt-3 overflow-hidden rounded-xl border border-border/60">
       <div
@@ -36,9 +36,7 @@
               *</span
             >{/if}
         </p>
-        <p
-          class="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground"
-        >
+        <p class="sr-section-label">
           Matchup
         </p>
         <p class="truncate text-sm font-extrabold uppercase">
@@ -53,17 +51,15 @@
             class="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 px-3 py-2"
           >
             <p
-              class={`truncate text-right font-display text-lg font-bold tabular-nums ${row.leader === 'home' ? 'text-foreground' : 'text-muted-foreground'}`}
+              class={`sr-number truncate text-right text-lg font-bold ${row.leader === 'home' ? 'text-foreground' : 'text-muted-foreground'}`}
             >
               {row.homeDisplay}
             </p>
-            <p
-              class="min-w-16 text-center font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
-            >
+            <p class="sr-section-label min-w-16 text-center">
               {row.label}
             </p>
             <p
-              class={`truncate font-display text-lg font-bold tabular-nums ${row.leader === 'away' ? 'text-foreground' : 'text-muted-foreground'}`}
+              class={`sr-number truncate text-lg font-bold ${row.leader === 'away' ? 'text-foreground' : 'text-muted-foreground'}`}
             >
               {row.awayDisplay}
             </p>

@@ -16,6 +16,11 @@ export interface DraftDuelGroupNeeds {
   C: number;
 }
 
+export interface DraftDuelSlotPlacement {
+  slotIndex: number;
+  card: DraftDuelCard;
+}
+
 export interface DraftDuelRoundOffers {
   p1: DraftDuelCard[];
   p2: DraftDuelCard[];
@@ -32,11 +37,21 @@ export interface DraftDuelCompletionInput {
   unclaimedProfileCounts: ReadonlyMap<number, number>;
 }
 
+export interface DraftDuelParticipantShape {
+  placed: readonly DraftDuelSlotPlacement[];
+  unplaced: readonly DraftDuelCard[];
+}
+
 export interface DraftDuelSafetyBase {
   firstPicker: DraftDuelParticipantId;
   currentPicker: DraftDuelParticipantId;
   pickOrdinal: number;
   rosters: { readonly p1: readonly DraftDuelCard[]; readonly p2: readonly DraftDuelCard[] };
+  placements: {
+    readonly p1: readonly DraftDuelSlotPlacement[];
+    readonly p2: readonly DraftDuelSlotPlacement[];
+  };
+  unplaced: { readonly p1: readonly DraftDuelCard[]; readonly p2: readonly DraftDuelCard[] };
   claimedPlayerIds: ReadonlySet<string>;
   profileMaskByPlayerId: ReadonlyMap<string, number>;
   unclaimedProfileCounts: ReadonlyMap<number, number>;
@@ -54,6 +69,20 @@ const LINEUP_SIZE = LINEUP_STRUCTURE.length;
 export function slotGroupAt(slotIndex: number): SlotGroup | undefined {
   const position = LINEUP_STRUCTURE[slotIndex];
   return position === undefined ? undefined : slotGroupOf(position);
+}
+
+export function draftDuelCardPlayableAtSlot(card: DraftDuelCard, slotIndex: number): boolean {
+  const group = slotGroupAt(slotIndex);
+  return group !== undefined && cardPlayableAt(card, group);
+}
+
+function isRecordedSlot(slotIndex: number | undefined): slotIndex is number {
+  return (
+    typeof slotIndex === 'number' &&
+    Number.isInteger(slotIndex) &&
+    slotIndex >= 0 &&
+    slotIndex < LINEUP_SIZE
+  );
 }
 
 export function otherDraftDuelParticipant(
@@ -107,6 +136,36 @@ export function draftDuelCardsOfParticipant(
   return cards;
 }
 
+function collectParticipantShape(
+  state: DraftDuelDraft,
+  participantId: DraftDuelParticipantId,
+): { shape: DraftDuelParticipantShape; cards: DraftDuelCard[] } {
+  const placed: DraftDuelSlotPlacement[] = [];
+  const unplaced: DraftDuelCard[] = [];
+  const cards: DraftDuelCard[] = [];
+  for (const round of state.rounds) {
+    for (const pick of round.picks) {
+      if (pick.participantId !== participantId) continue;
+      cards.push(pick.card);
+      if (isRecordedSlot(pick.slotIndex))
+        placed.push({ slotIndex: pick.slotIndex, card: pick.card });
+      else unplaced.push(pick.card);
+    }
+  }
+  return { shape: { placed, unplaced }, cards };
+}
+
+export function draftDuelOccupiedSlotIndexes(
+  state: DraftDuelDraft,
+  participantId: DraftDuelParticipantId,
+): Set<number> {
+  const occupied = new Set<number>();
+  for (const slot of collectParticipantShape(state, participantId).shape.placed) {
+    occupied.add(slot.slotIndex);
+  }
+  return occupied;
+}
+
 export function assignSlots(cards: readonly DraftDuelCard[]): number[] | null {
   const assignment = new Array<number>(cards.length).fill(-1);
   const used = new Array<boolean>(LINEUP_SIZE).fill(false);
@@ -116,8 +175,7 @@ export function assignSlots(cards: readonly DraftDuelCard[]): number[] | null {
     if (card === undefined) return false;
     for (let slot = 0; slot < LINEUP_SIZE; slot += 1) {
       if (used[slot]) continue;
-      const group = slotGroupAt(slot);
-      if (group === undefined || !cardPlayableAt(card, group)) continue;
+      if (!draftDuelCardPlayableAtSlot(card, slot)) continue;
       assignment[index] = slot;
       used[slot] = true;
       if (search(index + 1)) return true;
@@ -127,6 +185,30 @@ export function assignSlots(cards: readonly DraftDuelCard[]): number[] | null {
     return false;
   }
   return search(0) ? assignment : null;
+}
+
+export function draftDuelFallbackPlacements(
+  placed: readonly DraftDuelSlotPlacement[],
+  unplaced: readonly DraftDuelCard[],
+): DraftDuelSlotPlacement[] | null {
+  const occupied = new Set(placed.map((slot) => slot.slotIndex));
+  const result: DraftDuelSlotPlacement[] = [...placed];
+  function search(index: number): boolean {
+    if (index === unplaced.length) return true;
+    const card = unplaced[index];
+    if (card === undefined) return false;
+    for (let slot = 0; slot < LINEUP_SIZE; slot += 1) {
+      if (occupied.has(slot)) continue;
+      if (!draftDuelCardPlayableAtSlot(card, slot)) continue;
+      occupied.add(slot);
+      result.push({ slotIndex: slot, card });
+      if (search(index + 1)) return true;
+      result.pop();
+      occupied.delete(slot);
+    }
+    return false;
+  }
+  return search(0) ? result : null;
 }
 
 function needsForUsedSlots(used: readonly boolean[]): DraftDuelGroupNeeds {
@@ -245,8 +327,7 @@ export function draftDuelRosterNeedsOptions(
     if (card === undefined) return;
     for (let slot = 0; slot < LINEUP_SIZE; slot += 1) {
       if (used[slot]) continue;
-      const group = slotGroupAt(slot);
-      if (group === undefined || !cardPlayableAt(card, group)) continue;
+      if (!draftDuelCardPlayableAtSlot(card, slot)) continue;
       used[slot] = true;
       visit(index + 1);
       used[slot] = false;
@@ -256,17 +337,107 @@ export function draftDuelRosterNeedsOptions(
   return [...options.values()];
 }
 
+function placementCompletionPossible(
+  placed: readonly DraftDuelSlotPlacement[],
+  unplaced: readonly DraftDuelCard[],
+  remainingPicks: number,
+  unclaimedProfileCounts: ReadonlyMap<number, number>,
+): boolean {
+  const totalCards = placed.length + unplaced.length;
+  if (totalCards + remainingPicks !== LINEUP_SIZE) return false;
+  const occupied = new Set<number>();
+  for (const slot of placed) {
+    if (!isRecordedSlot(slot.slotIndex)) return false;
+    if (occupied.has(slot.slotIndex)) return false;
+    if (!draftDuelCardPlayableAtSlot(slot.card, slot.slotIndex)) return false;
+    occupied.add(slot.slotIndex);
+  }
+  const openSlots: number[] = [];
+  for (let slot = 0; slot < LINEUP_SIZE; slot += 1) {
+    if (!occupied.has(slot)) openSlots.push(slot);
+  }
+  if (unplaced.length > openSlots.length) return false;
+  const usedSlots = new Array<boolean>(LINEUP_SIZE).fill(false);
+  function search(index: number): boolean {
+    if (index === unplaced.length) {
+      const needs: DraftDuelGroupNeeds = { G: 0, F: 0, C: 0 };
+      for (const slot of openSlots) {
+        if (usedSlots[slot]) continue;
+        const group = slotGroupAt(slot);
+        if (group === undefined) continue;
+        needs[group] += 1;
+      }
+      if (needs.G + needs.F + needs.C !== remainingPicks) return false;
+      return completionFeasible({ needed: needs, remainingPicks, unclaimedProfileCounts });
+    }
+    const card = unplaced[index];
+    if (card === undefined) return false;
+    for (const slot of openSlots) {
+      if (usedSlots[slot]) continue;
+      if (!draftDuelCardPlayableAtSlot(card, slot)) continue;
+      usedSlots[slot] = true;
+      if (search(index + 1)) return true;
+      usedSlots[slot] = false;
+    }
+    return false;
+  }
+  return search(0);
+}
+
 export function rosterCompletionPossible(
   cards: readonly DraftDuelCard[],
   remainingPicks: number,
   unclaimedProfileCounts: ReadonlyMap<number, number>,
 ): boolean {
-  if (cards.length + remainingPicks !== LINEUP_SIZE) return false;
-  for (const needed of draftDuelRosterNeedsOptions(cards)) {
-    if (needed.G + needed.F + needed.C !== remainingPicks) continue;
-    if (completionFeasible({ needed, remainingPicks, unclaimedProfileCounts })) return true;
+  return placementCompletionPossible([], cards, remainingPicks, unclaimedProfileCounts);
+}
+
+export function draftDuelParticipantCompletionPossible(
+  input: DraftDuelSafetyBase,
+  participantId: DraftDuelParticipantId,
+): boolean {
+  const placed = input.placements[participantId];
+  const unplaced = input.unplaced[participantId];
+  const remainingPicks = LINEUP_SIZE - placed.length - unplaced.length;
+  return placementCompletionPossible(
+    placed,
+    unplaced,
+    remainingPicks,
+    input.unclaimedProfileCounts,
+  );
+}
+
+export function draftDuelOpenSlotNeeds(
+  input: DraftDuelSafetyBase,
+  participantId: DraftDuelParticipantId,
+): DraftDuelGroupNeeds {
+  const placed = input.placements[participantId];
+  const unplaced = input.unplaced[participantId];
+  const filled = unplaced.length === 0 ? placed : draftDuelFallbackPlacements(placed, unplaced);
+  if (filled === null) {
+    throw new Error('draft duel roster cannot be assigned to lineup slots');
   }
-  return false;
+  const occupied = new Set(filled.map((slot) => slot.slotIndex));
+  const needs: DraftDuelGroupNeeds = { G: 0, F: 0, C: 0 };
+  for (let slot = 0; slot < LINEUP_SIZE; slot += 1) {
+    if (occupied.has(slot)) continue;
+    const group = slotGroupAt(slot);
+    if (group === undefined) continue;
+    needs[group] += 1;
+  }
+  return needs;
+}
+
+export function draftDuelOpenSlots(
+  input: DraftDuelSafetyBase,
+  participantId: DraftDuelParticipantId,
+): number[] {
+  const occupied = new Set(input.placements[participantId].map((slot) => slot.slotIndex));
+  const open: number[] = [];
+  for (let slot = 0; slot < LINEUP_SIZE; slot += 1) {
+    if (!occupied.has(slot)) open.push(slot);
+  }
+  return open;
 }
 
 export function buildDraftDuelSafetyBase(
@@ -275,14 +446,15 @@ export function buildDraftDuelSafetyBase(
 ): DraftDuelSafetyBase {
   const claimedPlayerIds = draftDuelClaimedPlayerIds(state);
   const profileMaskByPlayerId = catalogPlayerProfileMasks(catalog);
+  const p1 = collectParticipantShape(state, 'p1');
+  const p2 = collectParticipantShape(state, 'p2');
   return {
     firstPicker: state.firstPicker,
     currentPicker: draftDuelPickerForOrdinal(state.firstPicker, state.pickOrdinal),
     pickOrdinal: state.pickOrdinal,
-    rosters: {
-      p1: draftDuelCardsOfParticipant(state, 'p1'),
-      p2: draftDuelCardsOfParticipant(state, 'p2'),
-    },
+    rosters: { p1: p1.cards, p2: p2.cards },
+    placements: { p1: p1.shape.placed, p2: p2.shape.placed },
+    unplaced: { p1: p1.shape.unplaced, p2: p2.shape.unplaced },
     claimedPlayerIds,
     profileMaskByPlayerId,
     unclaimedProfileCounts: unclaimedProfileCountsFromMasks(
@@ -318,47 +490,89 @@ function removePlayerFromPoolCounts(
   return next;
 }
 
-function afterDraftDuelClaim(
+function afterDraftDuelPlacement(
   input: DraftDuelSafetyInput,
   picker: DraftDuelParticipantId,
   card: DraftDuelCard,
+  slotIndex: number,
 ): DraftDuelSafetyInput {
   const mask = input.profileMaskByPlayerId.get(card.playerId) ?? draftDuelCardProfileMask(card);
   const claimedPlayerIds = new Set(input.claimedPlayerIds);
   claimedPlayerIds.add(card.playerId);
+  const placement: DraftDuelSlotPlacement = { slotIndex, card };
   const rosters =
     picker === 'p1'
       ? { ...input.rosters, p1: [...input.rosters.p1, card] }
       : { ...input.rosters, p2: [...input.rosters.p2, card] };
+  const placements =
+    picker === 'p1'
+      ? { ...input.placements, p1: [...input.placements.p1, placement] }
+      : { ...input.placements, p2: [...input.placements.p2, placement] };
   return {
     ...input,
     currentPicker: otherDraftDuelParticipant(picker),
     rosters,
+    placements,
     claimedPlayerIds,
     unclaimedProfileCounts: removePlayerFromPoolCounts(input.unclaimedProfileCounts, mask),
   };
+}
+
+function placementReason(
+  input: DraftDuelSafetyInput,
+  picker: DraftDuelParticipantId,
+  card: DraftDuelCard,
+  slotIndex: number,
+): DraftDuelUnavailableReason | null {
+  if (input.claimedPlayerIds.has(card.playerId)) return 'claimed';
+  if (!isRecordedSlot(slotIndex)) return 'position';
+  if (input.placements[picker].some((slot) => slot.slotIndex === slotIndex)) return 'position';
+  if (!draftDuelCardPlayableAtSlot(card, slotIndex)) return 'position';
+  const after = afterDraftDuelPlacement(input, picker, card, slotIndex);
+  if (!draftDuelParticipantCompletionPossible(after, picker)) return 'completion';
+  if (!draftDuelParticipantCompletionPossible(after, otherDraftDuelParticipant(picker))) {
+    return 'completion';
+  }
+  return null;
+}
+
+function placementLegal(
+  input: DraftDuelSafetyInput,
+  picker: DraftDuelParticipantId,
+  card: DraftDuelCard,
+  slotIndex: number,
+): boolean {
+  if (placementReason(input, picker, card, slotIndex) !== null) return false;
+  if (picker !== input.firstPicker) return true;
+  const after = afterDraftDuelPlacement(input, picker, card, slotIndex);
+  const opponent = otherDraftDuelParticipant(picker);
+  for (const candidate of after.offered[opponent]) {
+    for (const opponentSlot of draftDuelOpenSlots(after, opponent)) {
+      if (placementReason(after, opponent, candidate, opponentSlot) === null) return true;
+    }
+  }
+  return false;
 }
 
 export function draftDuelPickSafety(
   input: DraftDuelSafetyInput,
   picker: DraftDuelParticipantId,
   card: DraftDuelCard,
+  slotIndex?: number,
 ): DraftDuelUnavailableReason | null {
   if (input.claimedPlayerIds.has(card.playerId)) return 'claimed';
-  const own = input.rosters[picker];
-  const other = input.rosters[otherDraftDuelParticipant(picker)];
-  const ownTrial = [...own, card];
-  if (assignSlots(ownTrial) === null) return 'position';
-  const after = afterDraftDuelClaim(input, picker, card);
-  if (
-    !rosterCompletionPossible(ownTrial, LINEUP_SIZE - ownTrial.length, after.unclaimedProfileCounts)
-  ) {
-    return 'completion';
+  const candidates =
+    slotIndex === undefined
+      ? draftDuelOpenSlots(input, picker).filter((slot) => draftDuelCardPlayableAtSlot(card, slot))
+      : [slotIndex];
+  if (candidates.length === 0) return 'position';
+  let sawCompletion = false;
+  for (const slot of candidates) {
+    const reason = placementReason(input, picker, card, slot);
+    if (reason === null) return null;
+    if (reason === 'completion') sawCompletion = true;
   }
-  if (!rosterCompletionPossible(other, LINEUP_SIZE - other.length, after.unclaimedProfileCounts)) {
-    return 'completion';
-  }
-  return null;
+  return sawCompletion ? 'completion' : 'position';
 }
 
 export function assessDraftDuelOffers(
@@ -367,52 +581,32 @@ export function assessDraftDuelOffers(
 ): DraftDuelOfferedPick[] {
   const offers = input.offered[picker];
   const markAll = (reason: DraftDuelUnavailableReason): DraftDuelOfferedPick[] =>
-    offers.map((card, slot) => ({ slot, card, available: false, reason }));
+    offers.map((card, slot) => ({ slot, card, available: false, reason, legalSlots: [] }));
   if (input.pickOrdinal >= 10) return markAll('phase');
   if (picker !== input.currentPicker) return markAll('turn');
+  const openSlots = draftDuelOpenSlots(input, picker);
   return offers.map((card, slot) => {
-    let reason = draftDuelPickSafety(input, picker, card);
-    if (reason === null && picker === input.firstPicker) {
-      const after = afterDraftDuelClaim(input, picker, card);
-      const opponent = otherDraftDuelParticipant(picker);
-      let opponentHasLegalPick = false;
-      for (const candidate of after.offered[opponent]) {
-        if (draftDuelPickSafety(after, opponent, candidate) === null) {
-          opponentHasLegalPick = true;
-          break;
-        }
-      }
-      if (!opponentHasLegalPick) reason = 'completion';
+    if (input.claimedPlayerIds.has(card.playerId)) {
+      return { slot, card, available: false, reason: 'claimed', legalSlots: [] };
     }
-    return { slot, card, available: reason === null, reason };
+    const compatibleSlots = openSlots.filter((candidate) =>
+      draftDuelCardPlayableAtSlot(card, candidate),
+    );
+    if (compatibleSlots.length === 0) {
+      return { slot, card, available: false, reason: 'position', legalSlots: [] };
+    }
+    const legalSlots = compatibleSlots.filter((candidate) =>
+      placementLegal(input, picker, card, candidate),
+    );
+    if (legalSlots.length === 0) {
+      return { slot, card, available: false, reason: 'completion', legalSlots: [] };
+    }
+    return { slot, card, available: true, reason: null, legalSlots };
   });
 }
 
 export function draftDuelRoundSafetyHolds(input: DraftDuelSafetyInput): boolean {
   if (input.pickOrdinal >= 10) return false;
   const first = draftDuelPickerForOrdinal(input.firstPicker, input.pickOrdinal);
-  const firstAssessments = assessDraftDuelOffers(input, first);
-  let firstHasLegalPick = false;
-  for (const option of firstAssessments) {
-    if (option.available) {
-      firstHasLegalPick = true;
-      break;
-    }
-  }
-  if (!firstHasLegalPick) return false;
-  for (const option of firstAssessments) {
-    if (!option.available) continue;
-    const after = afterDraftDuelClaim(input, first, option.card);
-    const second = otherDraftDuelParticipant(first);
-    const secondAssessments = assessDraftDuelOffers(after, second);
-    let secondHasLegalPick = false;
-    for (const candidate of secondAssessments) {
-      if (candidate.available) {
-        secondHasLegalPick = true;
-        break;
-      }
-    }
-    if (!secondHasLegalPick) return false;
-  }
-  return true;
+  return assessDraftDuelOffers(input, first).some((option) => option.available);
 }

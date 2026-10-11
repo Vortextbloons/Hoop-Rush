@@ -69,18 +69,19 @@
       eager
     />
     <div class="min-w-0">
+      <p class="sr-eyebrow">{detail.conference === 'east' ? 'East' : 'West'} conference</p>
       <h1
         id="team-detail-heading"
-        class="font-display truncate text-2xl font-extrabold tracking-tight uppercase sm:text-3xl"
+        class="sr-page-title mt-0.5 truncate"
       >
         {shell.franchiseName(detail.franchiseId)}
         {#if isHuman}
           <span class="text-primary" aria-label="your team">*</span>
         {/if}
       </h1>
-      <p class="mt-1 font-mono text-[10px] text-muted-foreground">
-        {detail.conference === 'east' ? 'East' : 'West'} · {detail.wins}–{detail.losses} ·
-        {detail.diff > 0 ? '+' : ''}{detail.diff} diff
+      <p class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[10px] text-muted-foreground">
+        <span class="sr-number font-bold text-foreground">{detail.wins}–{detail.losses}</span>
+        <span>{detail.diff > 0 ? '+' : ''}{detail.diff} diff</span>
         <RuleBadge rule={homeRule} compact />
       </p>
     </div>
@@ -92,33 +93,21 @@
       data-season-team-projection
       aria-label="Team ratings from the locked rotation's player ratings"
     >
-      <div class="rounded-xl bg-surface-1 px-3 py-3 text-center">
-        <dt
-          class="font-mono text-[9px] font-bold tracking-[0.14em] text-muted-foreground uppercase"
-        >
-          Overall
-        </dt>
-        <dd class="font-display mt-1 text-2xl leading-none font-extrabold tracking-tight">
+      <div class="sr-stat-tile text-center">
+        <dt class="sr-section-label">Overall</dt>
+        <dd class="sr-number mt-1 text-2xl leading-none font-extrabold">
           {detail.projection.overall}
         </dd>
       </div>
-      <div class="rounded-xl bg-surface-1 px-3 py-3 text-center">
-        <dt
-          class="font-mono text-[9px] font-bold tracking-[0.14em] text-muted-foreground uppercase"
-        >
-          Offense
-        </dt>
-        <dd class="font-display mt-1 text-2xl leading-none font-extrabold tracking-tight">
+      <div class="sr-stat-tile text-center">
+        <dt class="sr-section-label">Offense</dt>
+        <dd class="sr-number mt-1 text-2xl leading-none font-extrabold">
           {detail.projection.offense}
         </dd>
       </div>
-      <div class="rounded-xl bg-surface-1 px-3 py-3 text-center">
-        <dt
-          class="font-mono text-[9px] font-bold tracking-[0.14em] text-muted-foreground uppercase"
-        >
-          Defense
-        </dt>
-        <dd class="font-display mt-1 text-2xl leading-none font-extrabold tracking-tight">
+      <div class="sr-stat-tile text-center">
+        <dt class="sr-section-label">Defense</dt>
+        <dd class="sr-number mt-1 text-2xl leading-none font-extrabold">
           {detail.projection.defense}
         </dd>
       </div>
@@ -128,8 +117,8 @@
     </p>
   {/if}
 
-  <div class="mt-6 rounded-xl bg-surface-1 p-4">
-    <p class="text-label uppercase text-muted-foreground">Locked rotation</p>
+  <div class="sr-panel-quiet mt-6 p-4">
+    <p class="sr-section-label">Locked rotation</p>
     <div class="mt-3 grid gap-4 sm:grid-cols-2">
       <div>
         <p class="font-mono text-[10px] text-muted-foreground">Starters · PG-SG-SF-PF-C</p>
@@ -170,14 +159,14 @@
   </div>
 
   <div class="mt-6">
-    <p class="font-mono text-[10px] text-muted-foreground">
+    <p class="sr-section-label">
       Roster · ten player-season versions · role and minutes from the locked rotation
     </p>
-    <ul class="mt-2 flex flex-col gap-0 sm:gap-2">
+    <ul class="mt-2 flex flex-col gap-2">
       {#each [...detail.starters, ...detail.bench] as row (row.playerVersionId)}
         {@const face = faceOf(row.playerVersionId)}
         {@const eraLabel = eraLabelOf(row.playerVersionId, row.franchiseId, row.eraId)}
-        <li class="overflow-hidden bg-surface-1 p-3 sm:rounded-xl">
+        <li class="sr-panel-quiet p-3">
           <div class="flex min-w-0 items-start gap-3">
             {#if face !== null}
               <SeasonPlayerFace {face} {manifest} size="sm" />
@@ -194,14 +183,15 @@
                 <p class="min-w-0 truncate text-sm font-semibold">{row.displayName}</p>
                 {#if row.overallRating !== null}
                   <span
-                    class="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] font-bold text-foreground"
+                    class="sr-number shrink-0 rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] font-bold text-foreground"
                   >
                     OVR {row.overallRating}
                   </span>
                 {/if}
                 {#if row.closing}
                   <span
-                    class="shrink-0 rounded-full bg-primary/15 px-2 py-0.5 font-mono text-[10px] font-bold text-primary"
+                    class="sr-badge shrink-0"
+                    data-tone="hardwood"
                   >
                     Closing five
                   </span>
@@ -226,7 +216,7 @@
                 {row.role} · {row.minutes} min
               </span>
               {#if row.stats !== null}
-                <span class="whitespace-nowrap font-mono text-[10px] font-bold">
+                <span class="sr-number whitespace-nowrap font-mono text-[10px] font-bold">
                   {oneDecimal(row.stats.pointsPerGame)} ppg
                 </span>
               {/if}

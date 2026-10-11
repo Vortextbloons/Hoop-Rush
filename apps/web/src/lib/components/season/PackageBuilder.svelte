@@ -369,11 +369,11 @@
 </script>
 
 <div
-  class="flex flex-col gap-4 rounded-xl border border-border bg-card"
+  class="sr-panel flex flex-col gap-4"
   data-testid="package-builder"
 >
   <div class="border-b border-border px-4 py-3">
-    <h3 class="text-sm font-bold uppercase tracking-tight">Build package</h3>
+    <h3 class="font-display text-sm font-extrabold uppercase tracking-tight">Build package</h3>
     <p class="mt-1 text-xs text-muted-foreground">
       Pick 1–{SEASON_TRADE_PACKAGE_MAX} from each side. You {yourRosterSize} → {consequence.fromAfterFilled}
       · {targetFranchiseName}
@@ -388,15 +388,16 @@
   {#if humanizedError !== null}
     <p
       role="alert"
-      class="mx-4 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm"
+      class="sr-panel-quiet mx-4 flex flex-wrap items-center gap-2 px-3 py-2"
     >
-      {humanizedError}
+      <span class="sr-badge" data-tone="loss">Rejected</span>
+      <span class="text-sm">{humanizedError}</span>
     </p>
   {/if}
 
   <div class="grid gap-4 px-4 lg:grid-cols-2">
-    <fieldset>
-      <legend class="px-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+    <fieldset class="sr-panel-quiet p-3">
+      <legend class="sr-section-label px-1">
         You send
       </legend>
       <ul class="mt-2 flex flex-col gap-2">
@@ -410,9 +411,8 @@
           {@const ovr = overallOfLite(player)}
           <li>
             <div
-              class="flex min-h-11 items-center gap-1 rounded-lg border transition-colors has-[input:focus-visible]:ring-2 has-[input:focus-visible]:ring-ring {selected
-                ? 'border-primary bg-primary/10'
-                : 'border-border bg-surface-1'} {disabled ? 'opacity-60' : ''}"
+              class="sr-gamecard flex min-h-11 items-center gap-1 transition-colors has-[input:focus-visible]:ring-2 has-[input:focus-visible]:ring-ring {disabled ? 'opacity-60' : ''}"
+              style:--sr-accent={selected ? 'var(--sr-hardwood)' : undefined}
             >
               <label class="flex min-w-0 flex-1 cursor-pointer items-center gap-3 px-3 py-2">
                 <input
@@ -435,9 +435,7 @@
                   <span class="flex min-w-0 items-center gap-2">
                     <span class="truncate text-sm font-semibold">{player.displayName}</span>
                     {#if ovr !== null}
-                      <span
-                        class="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] font-bold"
-                      >
+                      <span class="sr-chip shrink-0">
                         OVR {ovr}
                       </span>
                     {/if}
@@ -449,7 +447,7 @@
                       : ''}
                   </span>
                   {#if blockedProtected}
-                    <span class="block text-xs font-semibold text-destructive">Off limits</span>
+                    <span class="sr-badge mt-0.5" data-tone="loss">Off limits</span>
                   {:else if elig.status === 'availability-risk'}
                     <span class="block text-xs text-muted-foreground">{elig.reason}</span>
                   {:else if blockedThird}
@@ -474,13 +472,13 @@
           </li>
         {/each}
       </ul>
-      <p class="mt-2 text-xs text-muted-foreground">
+      <p class="sr-section-label mt-2">
         Selected {outgoing.length}/{SEASON_TRADE_PACKAGE_MAX}
       </p>
     </fieldset>
 
-    <fieldset>
-      <legend class="px-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+    <fieldset class="sr-panel-quiet p-3">
+      <legend class="sr-section-label px-1">
         You receive
       </legend>
       <ul class="mt-2 flex flex-col gap-2">
@@ -494,9 +492,8 @@
           {@const ovr = overallOfLite(player)}
           <li>
             <div
-              class="flex min-h-11 items-center gap-1 rounded-lg border transition-colors has-[input:focus-visible]:ring-2 has-[input:focus-visible]:ring-ring {selected
-                ? 'border-primary bg-primary/10'
-                : 'border-border bg-surface-1'} {disabled ? 'opacity-60' : ''}"
+              class="sr-gamecard flex min-h-11 items-center gap-1 transition-colors has-[input:focus-visible]:ring-2 has-[input:focus-visible]:ring-ring {disabled ? 'opacity-60' : ''}"
+              style:--sr-accent={selected ? 'var(--sr-hardwood)' : undefined}
             >
               <label class="flex min-w-0 flex-1 cursor-pointer items-center gap-3 px-3 py-2">
                 <input
@@ -519,9 +516,7 @@
                   <span class="flex min-w-0 items-center gap-2">
                     <span class="truncate text-sm font-semibold">{player.displayName}</span>
                     {#if ovr !== null}
-                      <span
-                        class="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] font-bold"
-                      >
+                      <span class="sr-chip shrink-0">
                         OVR {ovr}
                       </span>
                     {/if}
@@ -533,7 +528,7 @@
                       : ''}
                   </span>
                   {#if blockedProtected}
-                    <span class="block text-xs font-semibold text-destructive">Off limits</span>
+                    <span class="sr-badge mt-0.5" data-tone="loss">Off limits</span>
                   {:else if elig.status === 'availability-risk'}
                     <span class="block text-xs text-muted-foreground">{elig.reason}</span>
                   {:else if blockedThird}
@@ -558,15 +553,15 @@
           </li>
         {/each}
       </ul>
-      <p class="mt-2 text-xs text-muted-foreground">
+      <p class="sr-section-label mt-2">
         Selected {incoming.length}/{SEASON_TRADE_PACKAGE_MAX}
       </p>
     </fieldset>
   </div>
 
   {#if hasOnePlusOne}
-    <fieldset class="mx-4 rounded-xl border border-border p-3">
-      <legend class="px-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+    <fieldset class="sr-panel-quiet mx-4 p-3">
+      <legend class="sr-section-label px-1">
         Influence — optional
       </legend>
       <div class="mt-1 flex flex-wrap gap-2" role="group" aria-label="Influence">
@@ -660,7 +655,7 @@
       </p>
       {#if isLikelyGift}
         <label
-          class="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm"
+          class="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border border-accent/40 bg-accent/10 px-3 py-2 text-sm"
         >
           <input
             type="checkbox"
@@ -680,7 +675,7 @@
       data-testid="package-submit"
       title={submitDisabledReason ?? 'Send offer'}
       aria-disabled={!canSubmit}
-      class="inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-6 text-sm font-semibold text-primary-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40"
+      class="sr-btn mx-0 w-full"
     >
       {busy ? 'Sending…' : isLikelyGift ? 'Send gift offer' : 'Send offer'}
     </button>

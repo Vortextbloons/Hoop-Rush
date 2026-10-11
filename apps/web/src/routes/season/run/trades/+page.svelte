@@ -198,11 +198,11 @@
 <div class="pt-6">
   {#if theyAsked !== null}
     <p
-      class="mb-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm"
+      class="sr-panel-quiet mb-3 flex flex-wrap items-center gap-2 px-4 py-3"
       role="status"
     >
-      <span class="font-semibold">They asked:</span>
-      {theyAsked}
+      <span class="sr-badge" data-tone="warn">They asked</span>
+      <span class="text-sm">{theyAsked}</span>
     </p>
   {/if}
 
@@ -235,26 +235,29 @@
   />
 
   <div
-    class="sticky bottom-0 z-10 mt-4 rounded-xl border border-border bg-surface-1 px-4 py-3 lg:static"
+    class="sr-panel sticky bottom-0 z-10 mt-4 px-4 py-3 lg:static"
     role="status"
     aria-live="polite"
     data-testid="trade-sending-bar"
   >
     {#if busy}
-      <p class="text-sm font-semibold">Sending…</p>
+      <p class="sr-eyebrow">
+        <span class="sr-live-dot mr-2 inline-block h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true"></span>
+        Sending…
+      </p>
     {:else if draft !== null && draft.partner !== null && (draft.outgoing.length > 0 || draft.incoming.length > 0)}
       <p class="text-sm">
-        Deal: you send {draft.outgoing.length} · you receive {draft.incoming.length}{draft.influence
-          .amount > 0
-          ? ` · ${draft.influence.amount}◆`
+        Deal: you send <span class="sr-number">{draft.outgoing.length}</span> · you receive
+        <span class="sr-number">{draft.incoming.length}</span>{draft.influence.amount > 0
+          ? ` · ${String(draft.influence.amount)}◆`
           : ''}
       </p>
     {:else}
-      <p class="text-sm text-muted-foreground">Team → Deal → Track — pick a team to start.</p>
+      <p class="sr-section-label">Team → Deal → Track — pick a team to start.</p>
     {/if}
   </div>
 
-  <p class="mt-4 text-xs text-muted-foreground">One deal at a time, up to 3 offers each.</p>
+  <p class="sr-section-label mt-4">One deal at a time, up to 3 offers each.</p>
 </div>
 
 <style>

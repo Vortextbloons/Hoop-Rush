@@ -36,7 +36,7 @@
 
 <section
   aria-labelledby="free-agency-review-heading"
-  class="rounded-none border border-primary/30 bg-primary/5 p-4 sm:rounded-xl sm:p-5"
+  class="sr-panel-featured p-4 sm:p-5"
   data-fa-review-panel
 >
   <div class="flex flex-wrap items-center justify-between gap-2">
@@ -46,9 +46,7 @@
     >
       Declaration submitted
     </h2>
-    <span
-      class="inline-flex items-center gap-1.5 rounded-full bg-positive/15 px-2.5 py-1 font-mono text-[10px] font-bold text-positive"
-    >
+    <span class="sr-badge" data-tone="win">
       <ShieldCheck class="h-3.5 w-3.5" />
       Immutable
     </span>
@@ -115,7 +113,7 @@
         onclick={onSubmit}
         disabled={busy}
         aria-busy={busy ? 'true' : undefined}
-        class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+        class="sr-btn"
       >
         {busy ? 'Resolving…' : `Resolve Free Agency Window ${windowIndex + 1}`}
       </button>
@@ -124,7 +122,7 @@
           type="button"
           onclick={() => onGoBackToMarket?.()}
           disabled={busy}
-          class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border px-5 py-2.5 text-sm font-semibold text-muted-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+          class="sr-btn-ghost"
         >
           Back to the market
         </button>

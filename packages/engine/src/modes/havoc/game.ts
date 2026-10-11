@@ -1,11 +1,9 @@
 import type {
   HavocEvent,
-  HavocEventKind,
   HavocGameInput,
   HavocGameResult,
   HavocGameTape,
   HavocHighlight,
-  HavocHomeAway,
   HavocMutationId,
   HavocMutationRollup,
   HavocParticipant,
@@ -329,7 +327,6 @@ class HavocGameRuntime implements HavocRuntimeHooks {
   readonly teams: [TeamRuntime, TeamRuntime];
   period = 1;
   possessionId = 0;
-  offense: SideIndex = 0;
   private eventSeq = 0;
   private scoreSeq = 0;
   private shotKindOrdinal = 0;
@@ -546,7 +543,7 @@ class HavocGameRuntime implements HavocRuntimeHooks {
     const participant = this.participantOf(handler);
     if (participant === null || !participant.mutations.has('possession-refund')) return false;
     const half = this.period <= 2 ? 0 : 1;
-    if (participant.refundUsed[half] === true) return false;
+    if (participant.refundUsed[half]) return false;
     participant.refundUsed[half] = true;
     const counters = this.rollupFor(participant, 'possession-refund');
     if (counters !== undefined) {
@@ -837,7 +834,14 @@ class HavocGameRuntime implements HavocRuntimeHooks {
                 : doubleOwners;
         const primary = owners[0];
         if (primary === undefined) continue;
-        pushOwner(primary);
+        if (
+          contribution.source === 'reverse-basketball' ||
+          contribution.source === 'double-or-nothing'
+        ) {
+          for (const owner of owners) pushOwner(owner);
+        } else {
+          pushOwner(primary);
+        }
         attributions.push({
           owner: primary,
           mutationId: contribution.source,
@@ -869,7 +873,7 @@ class HavocGameRuntime implements HavocRuntimeHooks {
           addends: [{ source: 'double-or-nothing', points: -1 }],
           multipliers: [],
           points: -1,
-          owners: [penaltyOwner.instanceId],
+          owners: doubleOwners.map((owner) => owner.instanceId),
           originalEventSequence: shotSequence,
         });
         this.attribute([{ owner: penaltyOwner, mutationId: 'double-or-nothing', points: -1 }]);
@@ -1243,7 +1247,6 @@ class HavocGameRuntime implements HavocRuntimeHooks {
   // -------------------------------------------------------------- lifecycle
 
   beginPossession(offense: SideIndex, possessionId: number): void {
-    this.offense = offense;
     this.possessionId = possessionId;
     this.shotKindOrdinal = 0;
     this.coverageCache = null;
@@ -1270,25 +1273,21 @@ class HavocGameRuntime implements HavocRuntimeHooks {
   beginTipoff(): void {
     for (const team of this.teams) {
       for (const participant of team.participants) {
-        if (
-          participant.kind === 'clone' &&
-          participant.ownerInstanceId !== null &&
-          team.byId.get(participant.ownerInstanceId)?.active === true
-        ) {
-          participant.active = true;
-          participant.started = true;
-          const owner = team.byId.get(participant.ownerInstanceId);
-          const counters = owner?.rollup.get('clone-army');
-          if (counters !== undefined) counters.triggers += 1;
-          this.pushEvent({
-            kind: 'clone',
-            outcome: 'entered',
-            ownerInstanceId: participant.ownerInstanceId,
-            cloneInstanceId: participant.instanceId,
-            side: team.side,
-            reason: null,
-          });
-        }
+        if (participant.kind !== 'clone' || participant.ownerInstanceId === null) continue;
+        const owner = team.byId.get(participant.ownerInstanceId);
+        if (owner?.active !== true || !owner.mutations.has('clone-army')) continue;
+        participant.active = true;
+        participant.started = true;
+        const counters = owner.rollup.get('clone-army');
+        if (counters !== undefined) counters.triggers += 1;
+        this.pushEvent({
+          kind: 'clone',
+          outcome: 'entered',
+          ownerInstanceId: participant.ownerInstanceId,
+          cloneInstanceId: participant.instanceId,
+          side: team.side,
+          reason: null,
+        });
       }
     }
     for (const [ownerId, targetId] of this.bodySnatcherTargets) {
@@ -1613,7 +1612,7 @@ class HavocGameRuntime implements HavocRuntimeHooks {
       period: this.period,
       clockSeconds: this.clock(),
       ...event,
-    } as unknown as HavocEvent;
+    };
     this.events.push(full);
     const sequence = this.eventSeq;
     this.eventSeq += 1;
@@ -1636,11 +1635,6 @@ class HavocGameRuntime implements HavocRuntimeHooks {
   }
 
   // -------------------------------------------------------------- results
-
-  hasMutation(instanceId: string, mutationId: HavocMutationId): boolean {
-    const participant = this.globalById(instanceId);
-    return participant?.mutations.has(mutationId) ?? false;
-  }
 
   rollupsOf(): HavocMutationRollup[] {
     const rollups: HavocMutationRollup[] = [];
@@ -1754,20 +1748,8 @@ class HavocGameRuntime implements HavocRuntimeHooks {
     return this.teams[sideIndex];
   }
 
-  participant(instanceId: string): ParticipantState | null {
-    return this.globalById(instanceId);
-  }
-
   activeParticipants(sideIndex: SideIndex): ParticipantState[] {
     return this.teams[sideIndex].active;
-  }
-
-  expandHomeAway<T>(home: T, away: T): { home: T; away: T } {
-    return this.input.humanSide === 'home' ? { home, away } : { home: away, away: home };
-  }
-
-  homeAwayOf(sideIndex: SideIndex): HavocHomeAway {
-    return sideIndex === 0 ? 'home' : 'away';
   }
 }
 

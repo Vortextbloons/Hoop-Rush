@@ -40,22 +40,19 @@
 </script>
 
 {#if effects !== null}
-  <details class="group rounded-none bg-surface-1 px-3 py-2 sm:rounded-xl" data-unit-chemistry>
+  <details class="sr-panel-quiet group px-3 py-2" data-unit-chemistry>
     <summary
       class="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden"
     >
-      <span class="font-mono text-xs font-bold tracking-[0.12em] uppercase">
-        Chemistry {chemistryLabel}
-      </span>
-      <span class="text-xs font-semibold text-primary">View details</span>
+      <span class="sr-section-label">Chemistry {chemistryLabel}</span>
+      <span class="text-xs font-semibold text-primary group-open:hidden">View details</span>
+      <span class="hidden text-xs font-semibold text-primary group-open:inline">Hide details</span>
     </summary>
     {#if pairs !== null && (pairs.strongest.length > 0 || pairs.weakest.length > 0)}
       <div class="grid gap-3 pb-2 sm:grid-cols-2">
         {#if pairs.strongest.length > 0}
           <div>
-            <p
-              class="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
-            >
+            <p class="sr-section-label">
               Strong chemistry
             </p>
             <ul class="mt-1 space-y-1">
@@ -64,7 +61,7 @@
                   <span class="min-w-0">
                     {nameOf(pair.a)} + {nameOf(pair.b)}
                   </span>
-                  <span class="shrink-0 text-positive">
+                  <span class="sr-number shrink-0 text-positive">
                     {(pair.chemistryBp / 100).toFixed(0)}
                   </span>
                 </li>
@@ -74,9 +71,7 @@
         {/if}
         {#if pairs.weakest.length > 0}
           <div>
-            <p
-              class="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
-            >
+            <p class="sr-section-label">
               Still building
             </p>
             <ul class="mt-1 space-y-1">
@@ -85,7 +80,7 @@
                   <span class="min-w-0">
                     {nameOf(pair.a)} + {nameOf(pair.b)}
                   </span>
-                  <span class="shrink-0 text-muted-foreground">
+                  <span class="sr-number shrink-0 text-muted-foreground">
                     {(pair.chemistryBp / 100).toFixed(0)}
                   </span>
                 </li>

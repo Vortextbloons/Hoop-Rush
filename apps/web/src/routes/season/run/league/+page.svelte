@@ -180,34 +180,35 @@
   <p class="py-10 font-mono text-sm text-muted-foreground">Preparing the league…</p>
 {:else}
   <section aria-labelledby="league-heading" class="min-w-0 pt-6">
-    <div class="flex flex-col gap-3 px-3 sm:flex-row sm:items-end sm:justify-between sm:px-0">
+    <div class="sr-arrive flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div class="min-w-0">
-        <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">Season Run</p>
-        <h1
-          id="league-heading"
-          class="font-display mt-1 text-2xl font-extrabold tracking-tight uppercase sm:text-3xl"
-        >
+        <p class="sr-eyebrow">Season Run</p>
+        <h1 id="league-heading" class="sr-page-title mt-1">
           League
         </h1>
         <p class="mt-1 font-mono text-[10px] text-muted-foreground">
-          {shell.snapshot.acceptedBlocks.length * 10 > 82
+          <span class="sr-number">{shell.snapshot.acceptedBlocks.length * 10 > 82
             ? 82
-            : shell.snapshot.acceptedBlocks.length * 10}
+            : shell.snapshot.acceptedBlocks.length * 10}</span>
           games played
         </p>
       </div>
       <div class="flex shrink-0 flex-col items-start gap-2 sm:items-end">
-        <div role="group" aria-label="League view" class="flex rounded-lg bg-surface-2 p-1">
+        <div
+          role="group"
+          aria-label="League view"
+          class="flex gap-1 rounded-full border border-border bg-surface-2 p-1"
+        >
           <button
             type="button"
             aria-pressed={view === 'standings'}
             onclick={() => {
               view = 'standings';
             }}
-            class="rounded-md px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring {view ===
+            class="min-h-11 rounded-full px-4 font-mono text-[11px] font-bold uppercase tracking-[0.12em] transition-colors {view ===
             'standings'
               ? 'bg-primary text-primary-foreground'
-              : 'text-muted-foreground hover:text-foreground'}"
+              : 'text-muted-foreground hover:text-foreground'} motion-reduce:transition-none"
           >
             Standings
           </button>
@@ -217,26 +218,30 @@
             onclick={() => {
               view = 'stats';
             }}
-            class="rounded-md px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring {view ===
+            class="min-h-11 rounded-full px-4 font-mono text-[11px] font-bold uppercase tracking-[0.12em] transition-colors {view ===
             'stats'
               ? 'bg-primary text-primary-foreground'
-              : 'text-muted-foreground hover:text-foreground'}"
+              : 'text-muted-foreground hover:text-foreground'} motion-reduce:transition-none"
           >
             Team stats
           </button>
         </div>
         {#if view === 'standings'}
-          <div role="group" aria-label="Conference" class="flex rounded-lg bg-surface-2 p-1">
+          <div
+            role="group"
+            aria-label="Conference"
+            class="flex gap-1 rounded-full border border-border bg-surface-2 p-1"
+          >
             <button
               type="button"
               aria-pressed={conference === 'east'}
               onclick={() => {
                 conference = 'east';
               }}
-              class="rounded-md px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring {conference ===
+              class="min-h-11 rounded-full px-4 font-mono text-[11px] font-bold uppercase tracking-[0.12em] transition-colors {conference ===
               'east'
                 ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:text-foreground'}"
+                : 'text-muted-foreground hover:text-foreground'} motion-reduce:transition-none"
             >
               East
             </button>
@@ -246,10 +251,10 @@
               onclick={() => {
                 conference = 'west';
               }}
-              class="rounded-md px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring {conference ===
+              class="min-h-11 rounded-full px-4 font-mono text-[11px] font-bold uppercase tracking-[0.12em] transition-colors {conference ===
               'west'
                 ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:text-foreground'}"
+                : 'text-muted-foreground hover:text-foreground'} motion-reduce:transition-none"
             >
               West
             </button>
@@ -280,11 +285,12 @@
       </div>
     {:else}
       {#if teamStats.length === 0}
-        <p class="mt-8 rounded-xl bg-surface-1 p-6 text-sm text-muted-foreground">
+        <p class="sr-panel-quiet mt-8 p-6 text-sm text-muted-foreground">
           Play a block to see team stats.
         </p>
       {:else}
-        <ul class="mt-6 flex flex-col gap-0 md:hidden md:gap-2">
+        <p class="sr-section-label mt-6">Team stats</p>
+        <ul class="mt-2 flex flex-col gap-2 md:hidden">
           {#each teamStats as team (team.franchiseId)}
             {@const isHuman = team.franchiseId === humanFranchiseId}
             {@const identity = identityOf(team.franchiseId)}
@@ -293,15 +299,14 @@
               aria-label={isHuman
                 ? `${shell.franchiseName(team.franchiseId)} (your team)`
                 : undefined}
-              class="overflow-hidden bg-surface-1 px-3 py-3 sm:rounded-xl {isHuman
-                ? 'ring-1 ring-primary/40'
-                : ''}"
+              class="sr-gamecard {isHuman ? 'ring-1 ring-primary/40' : ''}"
+              style={isHuman ? '--sr-accent: var(--sr-hardwood)' : undefined}
             >
               <a
                 href={resolve(`/season/run/teams?franchiseId=${team.franchiseId}` as any)}
                 data-season-team-stats-link={team.franchiseId}
                 aria-label={`${shell.franchiseName(team.franchiseId)} roster`}
-                class="block outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                class="block outline-none"
               >
                 <div class="grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-x-2">
                   {#if identity}
@@ -322,7 +327,7 @@
                   <span class="shrink-0 font-mono text-[10px] text-muted-foreground">
                     {team.gamesPlayed} GP
                   </span>
-                  <span class="shrink-0 font-mono text-[10px] font-bold">
+                  <span class="sr-number shrink-0 font-mono text-[10px] font-bold">
                     {team.diff > 0 ? '+' : ''}{team.diff}
                   </span>
                 </div>
@@ -341,22 +346,20 @@
           {/each}
         </ul>
 
-        <div class="mt-6 hidden overflow-x-auto rounded-xl bg-surface-1 md:block">
-          <table class="w-full min-w-[42rem] text-sm">
+        <div class="sr-panel-quiet mt-2 hidden overflow-x-auto md:block">
+          <table class="sr-table min-w-[42rem]">
             <caption class="sr-only"> League team statistics — all 30 teams </caption>
             <thead>
-              <tr
-                class="border-b border-border/70 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground"
-              >
-                <th scope="col" class="px-4 py-2 text-left font-medium">Team</th>
-                <th scope="col" class="px-4 py-2 text-right font-medium">GP</th>
-                <th scope="col" class="px-4 py-2 text-right font-medium">PPG</th>
-                <th scope="col" class="px-4 py-2 text-right font-medium">RPG</th>
-                <th scope="col" class="px-4 py-2 text-right font-medium">APG</th>
-                <th scope="col" class="px-4 py-2 text-right font-medium">SPG</th>
-                <th scope="col" class="px-4 py-2 text-right font-medium">BPG</th>
-                <th scope="col" class="px-4 py-2 text-right font-medium">TOPG</th>
-                <th scope="col" class="px-4 py-2 text-right font-medium">Diff</th>
+              <tr>
+                <th scope="col" class="text-left">Team</th>
+                <th scope="col" class="text-right!">GP</th>
+                <th scope="col" class="text-right!">PPG</th>
+                <th scope="col" class="text-right!">RPG</th>
+                <th scope="col" class="text-right!">APG</th>
+                <th scope="col" class="text-right!">SPG</th>
+                <th scope="col" class="text-right!">BPG</th>
+                <th scope="col" class="text-right!">TOPG</th>
+                <th scope="col" class="text-right!">Diff</th>
               </tr>
             </thead>
             <tbody>
@@ -365,19 +368,22 @@
                 {@const identity = identityOf(team.franchiseId)}
                 <tr
                   data-season-team-stats-row
-                  class="border-b border-border/40 transition-colors hover:bg-surface-2/60 {isHuman
-                    ? 'bg-primary/10'
-                    : ''}"
+                  class={isHuman ? 'bg-primary/10' : ''}
                   aria-label={isHuman
                     ? `${shell.franchiseName(team.franchiseId)} (your team)`
                     : undefined}
                 >
-                  <th scope="row" class="max-w-48 truncate px-4 py-2 text-left font-semibold">
+                  <th
+                    scope="row"
+                    class="max-w-48 truncate px-4 py-2 text-left font-semibold {isHuman
+                      ? '[box-shadow:inset_3px_0_0_var(--sr-hardwood)]'
+                      : ''}"
+                  >
                     <a
                       href={resolve(`/season/run/teams?franchiseId=${team.franchiseId}` as any)}
                       data-season-team-stats-link={team.franchiseId}
                       aria-label={`${shell.franchiseName(team.franchiseId)} roster`}
-                      class="flex items-center gap-2 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring hover:text-primary"
+                      class="flex items-center gap-2 transition-colors hover:text-primary motion-reduce:transition-none"
                     >
                       {#if identity}
                         <SeasonTeamLogo
@@ -394,15 +400,18 @@
                       </span>
                     </a>
                   </th>
-                  <td class="px-4 py-2 text-right font-mono text-[10px]">{team.gamesPlayed}</td>
-                  <td class="px-4 py-2 text-right font-mono text-[10px]">{oneDecimal(team.ppg)}</td>
-                  <td class="px-4 py-2 text-right font-mono text-[10px]">{oneDecimal(team.rpg)}</td>
-                  <td class="px-4 py-2 text-right font-mono text-[10px]">{oneDecimal(team.apg)}</td>
-                  <td class="px-4 py-2 text-right font-mono text-[10px]">{oneDecimal(team.spg)}</td>
-                  <td class="px-4 py-2 text-right font-mono text-[10px]">{oneDecimal(team.bpg)}</td>
-                  <td class="px-4 py-2 text-right font-mono text-[10px]">{oneDecimal(team.topg)}</td
+                  <td class="px-4 py-2 text-right font-mono text-muted-foreground">
+                    {team.gamesPlayed}
+                  </td>
+                  <td class="px-4 py-2 text-right font-mono">{oneDecimal(team.ppg)}</td>
+                  <td class="px-4 py-2 text-right font-mono">{oneDecimal(team.rpg)}</td>
+                  <td class="px-4 py-2 text-right font-mono">{oneDecimal(team.apg)}</td>
+                  <td class="px-4 py-2 text-right font-mono">{oneDecimal(team.spg)}</td>
+                  <td class="px-4 py-2 text-right font-mono">{oneDecimal(team.bpg)}</td>
+                  <td class="px-4 py-2 text-right font-mono">{oneDecimal(team.topg)}</td>
+                  <td
+                    class="px-4 py-2 text-right font-mono font-bold"
                   >
-                  <td class="px-4 py-2 text-right font-mono text-[10px] font-bold">
                     {team.diff > 0 ? '+' : ''}{team.diff}
                   </td>
                 </tr>

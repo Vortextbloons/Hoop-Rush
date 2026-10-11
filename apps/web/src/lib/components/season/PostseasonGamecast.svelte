@@ -49,22 +49,27 @@
     } catch {}
     onContinue();
   }
+
+  const glowStyle = $derived(
+    `--sr-accent-a: ${franchiseColor(awayFranchiseId)}; --sr-accent-b: ${franchiseColor(homeFranchiseId)};`,
+  );
 </script>
 
-<LiveSimModal {open} onOpenChange={() => undefined}>
-  <div
-    class="gamecast"
-    style:--home-color={franchiseColor(homeFranchiseId)}
-    style:--away-color={franchiseColor(awayFranchiseId)}
-  >
+<LiveSimModal {open} broadcast onOpenChange={() => undefined}>
+  <div class="gamecast" style={glowStyle}>
     <header class="gamecast-header">
       <div>
-        <p class="gamecast-kicker">Hoop Rush SimCast</p>
-        <Dialog.Title class="font-display text-xl font-extrabold uppercase tracking-tight"
+        <p class="sr-eyebrow">Hoop Rush SimCast</p>
+        <Dialog.Title class="font-display text-xl font-extrabold uppercase tracking-tight text-foreground"
           >{gameLabel}</Dialog.Title
         >
       </div>
-      <span class="gamecast-status" data-final={result !== null}>
+      <span class="sr-badge" data-tone={result === null ? 'live' : 'win'} data-final={result !== null}>
+        {#if result === null}
+          <span
+            class="sr-live-dot inline-block h-1.5 w-1.5 rounded-full bg-current"
+            aria-hidden="true"></span>
+        {/if}
         {result === null ? 'Simulating' : 'Final'}
       </span>
     </header>
@@ -72,7 +77,11 @@
     <div class="scoreboard" aria-live="polite">
       {#each [awayFranchiseId, homeFranchiseId] as franchiseId (franchiseId)}
         {@const identity = identityOf(franchiseId)}
-        <div class="team" data-winner={result?.winnerFranchiseId === franchiseId}>
+        <div
+          class="team"
+          data-winner={result?.winnerFranchiseId === franchiseId}
+          style:--team-color={franchiseColor(franchiseId)}
+        >
           {#if manifest !== null && identity !== null}
             <SeasonTeamLogo
               {manifest}
@@ -84,7 +93,7 @@
           {/if}
           <span class="font-display text-2xl font-black">{franchiseAbbrev(franchiseId)}</span>
           <span class="truncate text-xs text-muted-foreground">{franchiseName(franchiseId)}</span>
-          <strong class="score"
+          <strong class="score sr-scoreline"
             >{result === null
               ? '—'
               : result.homeFranchiseId === franchiseId
@@ -103,7 +112,7 @@
       <p class="gamecast-note" role="status">
         {franchiseName(result.winnerFranchiseId)} wins {result.awayScore}–{result.homeScore}.
       </p>
-      <button type="button" class="continue-button" onclick={handleContinue}
+      <button type="button" class="sr-btn continue-button" onclick={handleContinue}
         >Continue bracket</button
       >
     {/if}
@@ -112,14 +121,29 @@
 
 <style>
   .gamecast {
+    position: relative;
+    overflow: hidden;
+    border-radius: inherit;
     padding: 1.25rem;
     background:
       radial-gradient(
-        circle at 50% -20%,
-        color-mix(in srgb, var(--home-color) 26%, transparent),
-        transparent 48%
+        ellipse 55% 45% at 12% 0%,
+        color-mix(in srgb, var(--sr-accent-a) 26%, transparent),
+        transparent 72%
       ),
-      var(--color-surface-1);
+      radial-gradient(
+        ellipse 55% 45% at 88% 0%,
+        color-mix(in srgb, var(--sr-accent-b) 26%, transparent),
+        transparent 72%
+      ),
+      #10151b;
+  }
+  .gamecast::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--sr-accent-a), #e2a85b 50%, var(--sr-accent-b));
   }
   .gamecast-header {
     display: flex;
@@ -127,36 +151,15 @@
     justify-content: space-between;
     gap: 1rem;
   }
-  .gamecast-kicker {
-    color: var(--color-primary);
-    font-family: var(--font-mono);
-    font-size: 0.625rem;
-    font-weight: 800;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-  }
-  .gamecast-status {
-    border: 1px solid color-mix(in srgb, var(--away-color) 65%, transparent);
-    border-radius: 999px;
-    padding: 0.35rem 0.65rem;
-    font-family: var(--font-mono);
-    font-size: 0.625rem;
-    font-weight: 800;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-  }
-  .gamecast-status:not([data-final='true']) {
-    animation: pulse 1.2s ease-in-out infinite;
-  }
   .scoreboard {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 1px;
     margin-top: 1.25rem;
     overflow: hidden;
-    border: 1px solid var(--color-border);
+    border: 1px solid var(--sr-line);
     border-radius: 1rem;
-    background: var(--color-border);
+    background: var(--sr-line);
   }
   .team {
     display: grid;
@@ -165,16 +168,16 @@
     gap: 0.65rem;
     min-width: 0;
     padding: 1rem;
-    background: color-mix(in srgb, var(--color-surface-2) 92%, transparent);
+    background: #131920;
   }
   .team:first-child {
-    border-top: 3px solid var(--away-color);
+    border-top: 3px solid var(--team-color);
   }
   .team:last-child {
-    border-top: 3px solid var(--home-color);
+    border-top: 3px solid var(--team-color);
   }
   .team[data-winner='true'] {
-    background: color-mix(in srgb, var(--color-primary) 12%, var(--color-surface-2));
+    background: color-mix(in srgb, var(--team-color) 16%, #131920);
   }
   .team > span:nth-of-type(2) {
     grid-column: 1 / 3;
@@ -182,48 +185,37 @@
   .score {
     grid-column: 3;
     grid-row: 1 / 3;
-    font-family: var(--font-display);
-    font-size: 2.5rem;
-    font-weight: 900;
-    font-variant-numeric: tabular-nums;
+    font-size: 3.25rem;
+    line-height: 1;
+    color: var(--sr-paper);
+  }
+  .team[data-winner='false'] .score {
+    color: var(--sr-muted);
   }
   .court-track {
     height: 0.3rem;
     margin-top: 1.25rem;
     overflow: hidden;
     border-radius: 999px;
-    background: var(--color-surface-3);
+    background: var(--sr-raised);
   }
   .court-track span {
     display: block;
     width: 38%;
     height: 100%;
     border-radius: inherit;
-    background: linear-gradient(90deg, var(--away-color), var(--home-color));
+    background: linear-gradient(90deg, var(--sr-accent-a), var(--sr-accent-b));
     animation: drive 1.35s ease-in-out infinite alternate;
   }
   .gamecast-note {
     margin-top: 1rem;
     text-align: center;
     font-size: 0.8rem;
-    color: var(--color-muted-foreground);
+    color: var(--sr-muted);
   }
   .continue-button {
-    display: flex;
-    min-height: 44px;
     width: 100%;
-    align-items: center;
-    justify-content: center;
     margin-top: 1rem;
-    border-radius: 0.65rem;
-    background: var(--color-primary);
-    padding: 0.7rem 1rem;
-    font-weight: 700;
-    color: var(--color-primary-foreground);
-    outline: none;
-  }
-  .continue-button:focus-visible {
-    box-shadow: 0 0 0 2px var(--color-ring);
   }
   @keyframes drive {
     from {
@@ -233,23 +225,14 @@
       transform: translateX(164%);
     }
   }
-  @keyframes pulse {
-    50% {
-      opacity: 0.48;
-    }
-  }
   @media (prefers-reduced-motion: reduce) {
-    .court-track span,
-    .gamecast-status {
+    .court-track span {
       animation: none;
     }
   }
   @media (max-width: 520px) {
     .scoreboard {
       grid-template-columns: 1fr;
-    }
-    .team:last-child {
-      border-top-color: var(--home-color);
     }
   }
 </style>

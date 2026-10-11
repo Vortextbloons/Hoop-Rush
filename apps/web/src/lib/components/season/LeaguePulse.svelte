@@ -14,9 +14,9 @@
 <section
   aria-labelledby="league-pulse-heading"
   data-testid="league-pulse"
-  class="flex flex-col gap-2 rounded-xl border border-border bg-card p-4"
+  class="sr-panel-quiet flex flex-col gap-2 p-4"
 >
-  <h2 id="league-pulse-heading" class="text-base font-extrabold uppercase tracking-tight">
+  <h2 id="league-pulse-heading" class="font-display text-base font-extrabold uppercase tracking-tight text-foreground">
     League pulse
   </h2>
   {#if entries.length === 0}
@@ -25,9 +25,7 @@
     <ul class="flex flex-col gap-2">
       {#each entries as entry (entry.kind + entry.headline)}
         <li class="flex items-start gap-2 text-xs">
-          <span
-            class="mt-0.5 shrink-0 rounded-full bg-surface-3 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wide text-muted-foreground"
-          >
+          <span class="sr-chip mt-0.5 shrink-0">
             {kindLabel[entry.kind]}
           </span>
           <span class="min-w-0">

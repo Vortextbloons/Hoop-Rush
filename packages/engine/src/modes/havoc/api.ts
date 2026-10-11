@@ -40,6 +40,7 @@ export class HavocCatalogCoverageError extends Error {
 export interface HavocDraftEnvironment {
   readonly rngFactory: (seed: string) => Rng;
   readonly definitions: readonly HavocMutationDefinition[];
+  readonly catalog?: HavocCatalog;
 }
 
 export type AdaptHavocCatalog = (

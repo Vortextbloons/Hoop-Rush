@@ -3,18 +3,14 @@
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
-  import type { RouteId } from '$app/types';
   import {
-    ArrowLeftRight,
-    BarChart3,
-    CalendarDays,
-    ClipboardList,
-    Gavel,
-    LayoutGrid,
+    Briefcase,
     LogOut,
     RefreshCw,
     Trophy,
+    Users,
     X,
+    Zap,
   } from '@lucide/svelte';
   import { Dialog } from 'bits-ui';
   import {
@@ -48,7 +44,8 @@
     idlePostseasonProgress,
     POSTSEASON_ORCHESTRATION_UNAVAILABLE,
   } from '$lib/season/season-postseason-presentation';
-  import { isNavItemActive, type NavItem } from '$lib/nav-items';
+  import { isNavItemActive } from '$lib/nav-items';
+  import { buildSeasonNavGroups, seasonMobileNavOf, type SeasonNavGroup } from '$lib/season/season-nav';
   import {
     playablePositionsOfSlice,
     playerSliceOf,
@@ -58,64 +55,27 @@
   import SeasonMasthead from '$lib/components/season/SeasonMasthead.svelte';
   import type { RotationEditor } from '$lib/season/season-rotation-editor';
   import type { SeasonRunPlayerSliceEntry } from '@hoop-rush/persistence';
+  import '$lib/season/season-theme.css';
   let { children } = $props();
-  const seasonNavItems: NavItem[] = [
-    { id: 'hub', label: 'Hub', href: '/season/run', icon: LayoutGrid },
-    { id: 'team', label: 'Rotation', href: '/season/run/team', icon: ClipboardList },
-    { id: 'schedule', label: 'Schedule', href: '/season/run/schedule', icon: CalendarDays },
-    { id: 'league', label: 'League', href: '/season/run/league', icon: Trophy },
-    { id: 'leaders', label: 'League Honors', href: '/season/run/leaders', icon: BarChart3 },
-  ];
-  const freeAgencyNavItem: NavItem = {
-    id: 'free-agency',
-    label: 'Free Agency',
-    href: '/season/run/free-agency',
-    icon: Gavel,
-  };
-  const tradeBoardNavItem: NavItem = {
-    id: 'trades',
-    label: 'Trades',
-    href: '/season/run/trades',
-    icon: ArrowLeftRight,
-  };
-  const navItems = $derived.by(() => {
-    const stage = shell.run?.stage ?? null;
-    const isRegularSeason = stage === 'regular-season' || stage === null;
-    const isPostseason = stage === 'play-in' || stage === 'playoffs' || stage === 'completed';
-    const freeAgencyVisible = (shell.run?.freeAgency.windows.length ?? 0) > 0;
-    if (isPostseason) {
-      const bracketItem: NavItem = {
-        id: 'postseason',
-        label: 'Bracket',
-        href: '/season/run/postseason',
-        icon: Trophy,
-      };
-      const ordered = [
-        seasonNavItems[0]!,
-        seasonNavItems[1]!,
-        bracketItem,
-        seasonNavItems[2]!,
-        seasonNavItems[4]!,
-        seasonNavItems[3]!,
-      ];
-      if (freeAgencyVisible) ordered.push(freeAgencyNavItem);
-      return ordered;
-    }
-    let base = [...seasonNavItems];
-    if (isRegularSeason) base = [...base, tradeBoardNavItem];
-    if (freeAgencyVisible) base = [...base, freeAgencyNavItem];
-    return base;
+  const groups: SeasonNavGroup[] = $derived.by(() => {
+    const stage = (shell.run?.stage ?? null) as Parameters<typeof buildSeasonNavGroups>[1]['stage'];
+    return buildSeasonNavGroups(
+      {
+        gameday: Zap,
+        team: Users,
+        league: Trophy,
+        bracket: Trophy,
+        frontOffice: Briefcase,
+      },
+      {
+        stage,
+        freeAgencyVisible: (shell.run?.freeAgency.windows.length ?? 0) > 0,
+      },
+    );
   });
-  const mobileNavItems = $derived.by(() => {
-    const stage = shell.run?.stage ?? null;
-    const isPostseason = stage === 'play-in' || stage === 'playoffs' || stage === 'completed';
-    if (isPostseason) {
-      return navItems.filter((item) => ['hub', 'team', 'postseason', 'schedule'].includes(item.id));
-    }
-    return navItems.filter((item) => ['hub', 'team', 'schedule', 'league'].includes(item.id));
-  });
-  const mobileOverflowItems = $derived(
-    navItems.filter((item) => !['hub', 'team', 'schedule', 'league'].includes(item.id)),
+  const { primary: mobilePrimary, overflow: mobileOverflow } = $derived(seasonMobileNavOf(groups));
+  const activeSubGroup = $derived.by(
+    () => groups.find((group) => group.children.some((c) => isNavItemActive(c, routeId))) ?? null,
   );
   const shell = new SeasonRunShell();
   setContext(SEASON_RUN_SHELL_CONTEXT, shell);
@@ -662,7 +622,7 @@
       const entry = roster.players.find((p) => p.playerVersionId === playerVersionId);
       if (entry !== undefined) return entry.displayName;
     }
-    return '�';
+    return '';
   };
   shell.playablePositions = (playerVersionId: string): readonly string[] =>
     playablePositionsOfSlice(shell.playerSlice, playerVersionId);
@@ -741,7 +701,7 @@
     return {
       franchiseId,
       record: recordLabel(row.wins, row.losses),
-      position: ranked === undefined ? '�' : `${ordinal(ranked.rank)} in the ${ranked.conference}`,
+      position: ranked === undefined ? '' : `${ordinal(ranked.rank)} in the ${ranked.conference}`,
     };
   });
   const seasonLoadError = $derived(shell.error ?? shell.hubError ?? null);
@@ -765,251 +725,233 @@
 </script>
 
 <svelte:head>
-  <title>Season Run � Hoop Rush</title>
+  <title>Season Run · Hoop Rush</title>
+  <meta name="theme-color" content="#0C1015" />
 </svelte:head>
 
-{#if seasonLoadError !== null || showBrokenResume}
-  <div class="mx-auto mt-16 w-full max-w-xl px-4 sm:px-6">
-    <div class="scoreboard-panel p-6">
-      <h1 class="font-display text-3xl font-extrabold">Season data unavailable</h1>
-      <p class="mt-2 text-sm text-muted-foreground">
-        {#if seasonLoadError !== null}
-          {seasonLoadError.message}
-        {:else}
-          The saved season checkpoint is missing or incomplete. Restart to clear the broken save and
-          start fresh.
-        {/if}
-      </p>
-      {#if seasonLoadError !== null}
-        <div class="mt-4 rounded-lg border border-border bg-surface-2 p-3">
-          <p
-            class="font-mono text-[10px] font-bold tracking-[0.14em] text-muted-foreground uppercase"
-          >
-            Diagnostic code
-          </p>
-          <code class="mt-1 block break-all text-xs text-foreground">{seasonLoadError.code}</code>
-          {#if seasonLoadError.failures.length > 0}
-            <details class="mt-3">
-              <summary class="cursor-pointer text-xs font-semibold text-muted-foreground">
-                Validation details ({seasonLoadError.failures.length})
-              </summary>
-              <ul class="mt-2 list-disc space-y-1 pl-4 text-xs text-muted-foreground">
-                {#each seasonLoadError.failures as failure (failure)}
-                  <li class="break-words">{failure}</li>
-                {/each}
-              </ul>
-            </details>
+<div class="season-root">
+  {#if seasonLoadError !== null || showBrokenResume}
+    <div class="mx-auto mt-16 w-full max-w-xl px-4 sm:px-6">
+      <div class="sr-panel sr-arrive p-6">
+        <p class="sr-eyebrow">Season Run</p>
+        <h1 class="sr-page-title mt-1">Season data unavailable</h1>
+        <p class="mt-3 text-sm text-muted-foreground">
+          {#if seasonLoadError !== null}
+            {seasonLoadError.message}
+          {:else}
+            The saved season checkpoint is missing or incomplete. Restart to clear the broken save
+            and start fresh.
           {/if}
-        </div>
-      {/if}
-      <div class="mt-5 flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          onclick={() => (clearOpen = true)}
-          class="inline-flex items-center gap-2 rounded-xl bg-destructive px-4 py-2 text-sm font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          Restart season
-        </button>
-        <a
-          href={resolve('/season')}
-          class="inline-flex items-center gap-2 rounded-xl border border-border px-4 py-2 text-sm font-semibold text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring hover:text-foreground"
-        >
-          Back to Season setup
-        </a>
-      </div>
-      {#if clearError !== null}
-        <p class="mt-3 text-sm text-destructive" role="alert">{clearError}</p>
-      {/if}
-    </div>
-  </div>
-  <Dialog.Root bind:open={clearOpen}>
-    <Dialog.Content
-      class="fixed left-1/2 top-1/2 z-50 w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-border bg-background p-6 shadow-xl outline-none"
-    >
-      <Dialog.Title class="font-display text-2xl font-extrabold">Restart season?</Dialog.Title>
-      <Dialog.Description class="mt-1 text-sm text-muted-foreground">
-        This permanently deletes your saved Season Run and any in-progress draft from this browser.
-        You will start a new season from the setup screen.
-      </Dialog.Description>
-      <div class="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-        <Dialog.Close
-          class="inline-flex items-center justify-center rounded-xl border border-border px-4 py-2 text-sm font-semibold text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring hover:text-foreground"
-        >
-          Cancel
-        </Dialog.Close>
-        <button
-          type="button"
-          onclick={() => void confirmClearSeasonData()}
-          disabled={clearing}
-          class="inline-flex items-center justify-center rounded-xl bg-destructive px-4 py-2 text-sm font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {clearing ? 'Restarting�' : 'Clear save and restart'}
-        </button>
-      </div>
-    </Dialog.Content>
-  </Dialog.Root>
-{:else if !shell.ready}
-  <div class="mx-auto mt-16 w-full max-w-xl px-4 sm:px-6">
-    <div class="scoreboard-panel p-6" aria-live="polite">
-      <p class="font-mono text-sm text-muted-foreground">Loading your season�</p>
-    </div>
-  </div>
-{:else if showEmptyState}
-  <div class="mx-auto mt-16 w-full max-w-xl px-4 sm:px-6">
-    <div class="scoreboard-panel p-6">
-      <h1 class="font-display text-3xl font-extrabold">No active Season Run</h1>
-      <p class="mt-2 text-sm text-muted-foreground">
-        Create a franchise, draft ten players, and generate the league to open your command center.
-      </p>
-      <a
-        href={resolve('/season')}
-        class="mt-4 inline-block rounded-xl bg-primary px-4 py-2 text-sm font-semibold"
-      >
-        Start a Season Run
-      </a>
-    </div>
-  </div>
-{:else}
-  <div
-    class="mx-auto w-full min-w-0 max-w-6xl overflow-x-clip sm:px-6 xl:max-w-7xl 2xl:max-w-[88rem]"
-  >
-    {#if shell.externalChange !== null}
-      <div
-        role="status"
-        class="flex flex-wrap items-center justify-between gap-2 border-b border-amber-500/40 bg-amber-500/10 px-4 py-2.5 text-sm sm:rounded-b-xl"
-      >
-        <span class="min-w-0 flex-1 font-medium text-amber-700 dark:text-amber-300">
-          {shell.externalChange.message}
-        </span>
-        <span class="flex shrink-0 items-center gap-2">
-          <button
-            type="button"
-            onclick={() => void shell.refresh()}
-            class="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/40 px-2.5 py-1 text-xs font-semibold text-amber-700 outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-amber-500/10 dark:text-amber-300"
-          >
-            <RefreshCw class="h-3.5 w-3.5" />
-            Reload season
-          </button>
-          <button
-            type="button"
-            aria-label="Dismiss"
-            onclick={() => shell.acknowledgeExternalChange()}
-            class="grid h-7 w-7 place-items-center rounded-lg text-amber-700 outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-amber-500/10 dark:text-amber-300"
-          >
-            <X class="h-3.5 w-3.5" />
-          </button>
-        </span>
-      </div>
-    {/if}
-    <div class="px-3 pt-6 sm:px-0">
-      <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start">
-        <div class="min-w-0 flex-1">
-          {#if mastheadFacts}
-            <SeasonMasthead
-              manifest={shell.manifest}
-              franchiseId={mastheadFacts.franchiseId}
-              recordLabel={mastheadFacts.record}
-              positionLabel={mastheadFacts.position}
-            />
-          {/if}
-        </div>
-        <button
-          type="button"
-          onclick={() => (quitOpen = true)}
-          disabled={quitting}
-          class="inline-flex w-fit items-center justify-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:border-destructive/50 hover:text-destructive disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          <LogOut class="h-4 w-4 shrink-0" />
-          Quit run
-        </button>
-      </div>
-    </div>
-
-    <nav
-      aria-label="Season navigation"
-      class="sticky top-0 z-30 mt-4 hidden overflow-x-auto border-y border-border/70 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85 md:block"
-    >
-      <div
-        class="mx-auto flex min-w-max w-full max-w-6xl items-center gap-1 px-4 sm:px-6 xl:max-w-7xl 2xl:max-w-[88rem]"
-      >
-        {#each navItems as item (item.id)}
-          {@const active = isNavItemActive(item, routeId)}
-          <a
-            href={resolve(item.href as any)}
-            aria-current={active ? 'page' : undefined}
-            class="inline-flex shrink-0 items-center gap-2 whitespace-nowrap px-4 py-3 text-sm font-semibold outline-none transition-colors focus-visible:bg-surface-2 focus-visible:text-foreground {active
-              ? 'border-b-2 border-primary text-foreground'
-              : 'text-muted-foreground hover:bg-surface-2 hover:text-foreground'}"
-          >
-            <item.icon class="h-4 w-4 shrink-0" />
-            {item.label}
-          </a>
-        {/each}
-      </div>
-    </nav>
-
-    <main class="min-w-0 overflow-x-clip pb-[max(6.5rem,env(safe-area-inset-bottom))] md:pb-14">
-      {@render children()}
-    </main>
-  </div>
-
-  <BottomNav items={mobileNavItems} overflowItems={mobileOverflowItems} label="Season navigation" />
-
-  <Dialog.Root
-    open={quitOpen}
-    onOpenChange={(open) => {
-      if (!open && !quitting) quitOpen = false;
-    }}
-  >
-    <Dialog.Portal>
-      <Dialog.Overlay class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" />
-      <Dialog.Content
-        class="fixed inset-x-0 bottom-0 z-50 mx-auto max-h-[85dvh] w-full overflow-y-auto rounded-t-2xl border-t border-border bg-card p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl shadow-black/40 outline-none sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:max-w-md sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:border sm:pb-4"
-      >
-        <div class="flex items-start justify-between gap-3">
-          <Dialog.Title
-            class="font-display truncate text-lg font-extrabold tracking-tight uppercase"
-          >
-            Quit this run?
-          </Dialog.Title>
-          <Dialog.Close
-            aria-label="Cancel"
-            class="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-border text-muted-foreground transition-colors hover:text-foreground"
-          >
-            <X class="h-4 w-4" />
-          </Dialog.Close>
-        </div>
-        <p class="mt-2 text-sm text-muted-foreground">
-          Quitting ends this Season Run and deletes its progress from this browser. You can start a
-          new Season Run from the Season setup screen.
         </p>
-        {#if quitError}
-          <p
-            role="alert"
-            class="mt-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm"
-          >
-            {quitError}
-          </p>
+        {#if seasonLoadError !== null}
+          <div class="sr-panel-quiet mt-4 p-3">
+            <p class="sr-section-label">Diagnostic code</p>
+            <code class="mt-1 block break-all text-xs text-foreground">{seasonLoadError.code}</code>
+            {#if seasonLoadError.failures.length > 0}
+              <details class="mt-3">
+                <summary class="sr-section-label cursor-pointer">Validation details ({seasonLoadError.failures.length})</summary>
+                <ul class="mt-2 list-disc space-y-1 pl-4 text-xs text-muted-foreground">
+                  {#each seasonLoadError.failures as failure (failure)}
+                    <li class="break-words">{failure}</li>
+                  {/each}
+                </ul>
+              </details>
+            {/if}
+          </div>
         {/if}
-        <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
-          <button
-            type="button"
-            onclick={() => (quitOpen = false)}
-            disabled={quitting}
-            class="inline-flex items-center justify-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:border-line-strong disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Stay
+        <div class="mt-5 flex flex-wrap items-center gap-3">
+          <button type="button" onclick={() => (clearOpen = true)} class="sr-btn-danger">
+            Restart season
           </button>
+          <a href={resolve('/season')} class="sr-btn-ghost">Back to Season setup</a>
+        </div>
+        {#if clearError !== null}
+          <p class="mt-3 text-sm text-destructive" role="alert">{clearError}</p>
+        {/if}
+      </div>
+    </div>
+    <Dialog.Root bind:open={clearOpen}>
+      <Dialog.Portal>
+        <Dialog.Overlay class="sr-dialog-overlay" />
+        <Dialog.Content class="sr-dialog w-[min(28rem,calc(100vw-2rem))] p-6">
+          <Dialog.Title class="sr-page-title text-2xl">Restart season?</Dialog.Title>
+          <Dialog.Description class="mt-2 text-sm text-muted-foreground">
+            This permanently deletes your saved Season Run and any in-progress draft from this
+            browser. You will start a new season from the setup screen.
+          </Dialog.Description>
+          <div class="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Dialog.Close class="sr-btn-ghost">Cancel</Dialog.Close>
+            <button
+              type="button"
+              onclick={() => void confirmClearSeasonData()}
+              disabled={clearing}
+              class="sr-btn-danger"
+            >
+              {clearing ? 'Restarting…' : 'Clear save and restart'}
+            </button>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  {:else if !shell.ready}
+    <div class="mx-auto mt-16 w-full max-w-xl px-4 sm:px-6">
+      <div class="sr-panel p-6" aria-live="polite">
+        <p class="sr-section-label">Loading your season…</p>
+      </div>
+    </div>
+  {:else if showEmptyState}
+    <div class="mx-auto mt-16 w-full max-w-xl px-4 sm:px-6">
+      <div class="sr-panel p-6">
+        <p class="sr-eyebrow">Season Run</p>
+        <h1 class="sr-page-title mt-1">No active Season Run</h1>
+        <p class="mt-3 text-sm text-muted-foreground">
+          Create a franchise, draft ten players, and generate the league to open your command
+          center.
+        </p>
+        <a href={resolve('/season')} class="sr-btn mt-5">Start a Season Run</a>
+      </div>
+    </div>
+  {:else}
+    <div class="mx-auto w-full min-w-0 max-w-6xl overflow-x-clip sm:px-6 xl:max-w-7xl 2xl:max-w-[88rem]">
+      {#if shell.externalChange !== null}
+        <div
+          role="status"
+          class="flex flex-wrap items-center justify-between gap-2 border-b border-warn/40 bg-warn/10 px-4 py-2.5 text-sm sm:rounded-b-xl"
+          style="border-color: rgb(224 177 94 / 40%); background: rgb(224 177 94 / 8%)"
+        >
+          <span class="min-w-0 flex-1 font-medium" style="color: var(--sr-warn)">
+            {shell.externalChange.message}
+          </span>
+          <span class="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              onclick={() => void shell.refresh()}
+              class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold outline-none"
+              style="border: 1px solid rgb(224 177 94 / 45%); color: var(--sr-warn)"
+            >
+              <RefreshCw class="h-3.5 w-3.5" />
+              Reload season
+            </button>
+            <button
+              type="button"
+              aria-label="Dismiss"
+              onclick={() => shell.acknowledgeExternalChange()}
+              class="grid h-7 w-7 place-items-center rounded-lg outline-none"
+              style="color: var(--sr-warn)"
+            >
+              <X class="h-3.5 w-3.5" />
+            </button>
+          </span>
+        </div>
+      {/if}
+      <div class="px-3 pt-6 sm:px-0">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <div class="min-w-0 flex-1">
+            {#if mastheadFacts}
+              <SeasonMasthead
+                manifest={shell.manifest}
+                franchiseId={mastheadFacts.franchiseId}
+                recordLabel={mastheadFacts.record}
+                positionLabel={mastheadFacts.position}
+              />
+            {/if}
+          </div>
           <button
             type="button"
-            onclick={() => void confirmQuit()}
+            onclick={() => (quitOpen = true)}
             disabled={quitting}
-            class="inline-flex items-center justify-center gap-2 rounded-lg border border-destructive/50 px-4 py-2 text-sm font-semibold text-destructive transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-40"
+            class="sr-btn-ghost inline-flex w-fit shrink-0 px-3 py-2 text-xs"
           >
-            {quitting ? 'Quitting�' : 'Quit and delete'}
+            <LogOut class="h-4 w-4 shrink-0" />
+            Quit run
           </button>
         </div>
-      </Dialog.Content>
-    </Dialog.Portal>
-  </Dialog.Root>
-{/if}
+      </div>
+      <nav aria-label="Season navigation" class="sr-nav-primary mt-5 hidden md:block">
+        <div
+          class="mx-auto flex min-w-max w-full max-w-6xl items-center gap-1 px-4 sm:px-6 xl:max-w-7xl 2xl:max-w-[88rem]"
+        >
+          {#each groups as group (group.id)}
+            {@const groupActive = group.children.some((c) => isNavItemActive(c, routeId))}
+            <a
+              href={resolve(group.href as any)}
+              aria-current={groupActive ? 'page' : undefined}
+            >
+              <group.icon class="h-4 w-4 shrink-0" />
+              {group.label}
+            </a>
+          {/each}
+        </div>
+      </nav>
+      {#if activeSubGroup !== null && activeSubGroup.children.length > 1}
+        <div
+          class="mx-auto hidden w-full max-w-6xl px-4 sm:px-6 md:block xl:max-w-7xl 2xl:max-w-[88rem]"
+        >
+          <nav aria-label={`${activeSubGroup.label} sections`} class="sr-nav-sub">
+            {#each activeSubGroup.children as child (child.id)}
+              <a
+                href={resolve(child.href as any)}
+                aria-current={isNavItemActive(child, routeId) ? 'page' : undefined}
+              >
+                {child.label}
+              </a>
+            {/each}
+          </nav>
+        </div>
+      {/if}
+      <main class="min-w-0 overflow-x-clip pb-[max(6.5rem,env(safe-area-inset-bottom))] md:pb-14">
+        <div class="mx-auto w-full max-w-6xl px-3 sm:px-6 xl:max-w-7xl 2xl:max-w-[88rem]">
+          {@render children()}
+        </div>
+      </main>
+    </div>
+    <BottomNav items={mobilePrimary} overflowItems={mobileOverflow} label="Season navigation" />
+    <Dialog.Root
+      open={quitOpen}
+      onOpenChange={(open) => {
+        if (!open && !quitting) quitOpen = false;
+      }}
+    >
+      <Dialog.Portal>
+        <Dialog.Overlay class="sr-dialog-overlay" />
+        <Dialog.Content class="sr-dialog w-[min(28rem,calc(100vw-2rem))] p-6">
+          <div class="flex items-start justify-between gap-3">
+            <Dialog.Title class="sr-page-title text-2xl">Quit this run?</Dialog.Title>
+            <Dialog.Close
+              aria-label="Cancel"
+              class="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-line-strong text-muted-foreground"
+            >
+              <X class="h-4 w-4" />
+            </Dialog.Close>
+          </div>
+          <p class="mt-3 text-sm text-muted-foreground">
+            Quitting ends this Season Run and deletes its progress from this browser. You can start
+            a new Season Run from the Season setup screen.
+          </p>
+          {#if quitError}
+            <p
+              role="alert"
+              class="mt-3 rounded-lg p-3 text-sm"
+              style="border: 1px solid rgb(229 100 110 / 40%); background: rgb(229 100 110 / 10%); color: var(--sr-loss)"
+            >
+              {quitError}
+            </p>
+          {/if}
+          <div class="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-end">
+            <button type="button" onclick={() => (quitOpen = false)} disabled={quitting} class="sr-btn-ghost">
+              Stay
+            </button>
+            <button
+              type="button"
+              onclick={() => void confirmQuit()}
+              disabled={quitting}
+              class="sr-btn-danger"
+            >
+              {quitting ? 'Quitting…' : 'Quit and delete'}
+            </button>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  {/if}
+</div>

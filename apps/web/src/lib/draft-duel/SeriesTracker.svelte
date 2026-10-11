@@ -225,8 +225,8 @@
   }
 
   .chip[data-state='current'] {
-    border-color: color-mix(in srgb, var(--color-accent) 70%, transparent);
-    background: color-mix(in srgb, var(--color-accent) 10%, var(--color-surface-2));
+    border-color: color-mix(in srgb, var(--color-primary) 70%, transparent);
+    background: color-mix(in srgb, var(--color-primary) 10%, var(--color-surface-2));
   }
 
   .chip[data-result='win'] {

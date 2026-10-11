@@ -78,16 +78,16 @@
 <section
   aria-labelledby="postseason-lineup-heading"
   data-season-postseason-lineup
-  class="rounded-2xl border border-border bg-surface-1 p-4 sm:p-5"
+  class="sr-panel-quiet p-4 sm:p-5"
 >
   <div class="flex flex-wrap items-baseline justify-between gap-2">
     <h2
       id="postseason-lineup-heading"
-      class="font-display text-base font-extrabold uppercase tracking-tight"
+      class="font-display text-base font-extrabold uppercase tracking-tight text-foreground"
     >
       Game 1 rotation
     </h2>
-    <span class="font-mono text-[10px] text-muted-foreground">
+    <span class="sr-section-label">
       {matchupLabel}{matchupDetail !== null ? ` · ${matchupDetail}` : ''}
     </span>
   </div>
@@ -96,7 +96,7 @@
     class="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface-2 px-3 py-2.5"
   >
     <div class="min-w-0">
-      <p class="font-mono text-[11px] font-bold tabular-nums text-foreground">
+      <p class="sr-number font-mono text-[11px] font-bold text-foreground">
         {String(minutesTotal)}/240 min · {String(closersCount)}/5 closers
       </p>
       <p class="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{startersLine}</p>
@@ -104,7 +104,7 @@
     <div class="flex shrink-0 items-center gap-2">
       <a
         href={resolve('/season/run/team' as any)}
-        class="inline-flex min-h-10 items-center justify-center gap-1 rounded-lg border border-border px-3.5 text-xs font-bold outline-none focus-visible:ring-2 focus-visible:ring-ring hover:border-line-strong"
+        class="sr-btn-ghost px-3.5 text-xs"
       >
         Edit rotation
       </a>
@@ -113,7 +113,9 @@
         aria-expanded={fineTuneOpen}
         aria-controls="playoff-fine-tune"
         onclick={() => (fineTuneOpen = !fineTuneOpen)}
-        class="inline-flex min-h-10 items-center justify-center gap-1 rounded-lg border border-border px-3.5 text-xs font-bold text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring hover:text-foreground"
+        class="sr-btn-ghost px-3.5 text-xs {fineTuneOpen
+          ? ''
+          : 'text-muted-foreground'}"
       >
         {fineTuneOpen ? 'Hide fine-tune' : 'Fine-tune here'}
       </button>
@@ -131,7 +133,7 @@
         data-season-postseason-forfeit
         onclick={onForfeit}
         disabled={submitting || disabled}
-        class="mt-2 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-destructive/40 px-4 py-2.5 text-sm font-bold text-destructive outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-40"
+        class="sr-btn-danger mt-2 w-full"
       >
         Forfeit game and continue
       </button>
@@ -146,7 +148,7 @@
         data-season-postseason-submit-secondary
         onclick={onSubmit}
         disabled={!canSubmit || submitting || disabled}
-        class="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-border px-5 py-3 text-sm font-bold outline-none focus-visible:ring-2 focus-visible:ring-ring hover:border-line-strong disabled:cursor-not-allowed disabled:opacity-40"
+        class="sr-btn-ghost mt-3 w-full"
       >
         {submitting ? 'Locking lineup…' : `Lock lineup and play ${matchupLabel}`}
       </button>
@@ -155,9 +157,7 @@
 
   {#if rehabOptions.length > 0}
     <fieldset class="mt-4 rounded-lg bg-surface-2 p-3">
-      <legend
-        class="flex flex-wrap items-baseline gap-2 font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
-      >
+      <legend class="sr-section-label flex flex-wrap items-baseline gap-2">
         Injured players · risky rehab
       </legend>
       <p class="mt-1 text-xs text-muted-foreground">
@@ -168,7 +168,7 @@
           Chance sooner, can set back.
         {/if}
         Balance:
-        <span class="font-mono font-bold text-foreground">{balance}</span>.
+        <span class="sr-number font-mono font-bold text-foreground">{balance}</span>.
       </p>
       {#if rehabInjuredPlayerCount === 0}
         <p class="mt-2 text-sm text-muted-foreground">
@@ -205,21 +205,15 @@
                   </span>
                 </span>
                 {#if option.alreadyRehabbed}
-                  <span
-                    class="shrink-0 rounded-full bg-surface-3 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground"
-                  >
+                  <span class="sr-chip shrink-0">
                     Rolled
                   </span>
                 {:else if !option.available}
-                  <span
-                    class="shrink-0 rounded-full bg-destructive/15 px-2 py-0.5 font-mono text-xs font-bold uppercase tracking-[0.12em] text-destructive"
-                  >
+                  <span class="sr-badge shrink-0" data-tone="loss">
                     Needs {option.cost}◆
                   </span>
                 {:else}
-                  <span
-                    class="shrink-0 rounded-full bg-primary/15 px-2 py-0.5 font-mono text-xs font-bold uppercase tracking-[0.12em] text-primary"
-                  >
+                  <span class="sr-badge shrink-0" data-tone="hardwood">
                     {option.cost}◆
                   </span>
                 {/if}
@@ -242,7 +236,7 @@
         {rejectionMessage}
       </p>
     {/if}
-    <p class="font-mono text-[10px] text-muted-foreground">
+    <p class="sr-section-label">
       The hero card above plays the game — this panel stays a summary unless you open fine-tune.
     </p>
   </div>

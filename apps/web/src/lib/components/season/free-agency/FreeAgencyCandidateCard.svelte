@@ -93,9 +93,10 @@
 <article
   data-fa-candidate-card
   data-fa-candidate-status={selected ? 'targeted' : 'available'}
-  class="flex min-w-0 flex-col gap-3 rounded-none border border-border bg-surface-1 p-3 sm:rounded-xl sm:p-4 {selected
-    ? 'border-primary/50 ring-1 ring-primary/30'
+  class="sr-panel-quiet flex min-w-0 flex-col gap-3 p-3 sm:p-4 {selected
+    ? 'ring-1 ring-primary/40'
     : ''}"
+  style:border-color={selected ? 'var(--sr-hardwood)' : undefined}
 >
   <div class="flex min-w-0 items-start gap-2.5">
     {#if manifest !== null}
@@ -113,7 +114,7 @@
         <h4 class="truncate text-sm font-bold leading-snug">{candidate.displayName}</h4>
         {#if overallRating !== null}
           <span
-            class="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] font-bold"
+            class="sr-chip shrink-0"
             data-fa-overall
             title="Packaged summary Overall (report only)"
           >
@@ -127,17 +128,15 @@
     </div>
     <div class="flex shrink-0 flex-col items-end gap-1">
       <span
-        class="rounded-full px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.1em] {candidate.band ===
-        'featured'
-          ? 'bg-primary/15 text-primary'
-          : 'bg-surface-3 text-muted-foreground'}"
+        class={candidate.band === 'featured' ? 'sr-badge' : 'sr-chip'}
+        data-tone={candidate.band === 'featured' ? 'hardwood' : undefined}
         data-fa-band
       >
         {FREE_AGENCY_BAND_LABEL[candidate.band]}
       </span>
       {#if fit !== null}
         <span
-          class="rounded-full bg-surface-3 px-2 py-0.5 font-mono text-[10px] font-bold text-muted-foreground"
+          class="sr-chip"
           data-fa-fit-badge
         >
           Need: {fit.needTier}
@@ -198,7 +197,7 @@
       <dd
         class="text-xs {candidate.availability.healthy
           ? 'text-positive'
-          : 'text-amber-600 dark:text-amber-400'}"
+          : 'text-accent'}"
       >
         {candidate.availability.healthy
           ? 'Healthy'
@@ -285,9 +284,7 @@
         aria-pressed={selected}
         onclick={onToggleTarget}
         disabled={disabled || (!selected && !canAddTarget)}
-        class="inline-flex min-h-10 items-center justify-center rounded-lg px-3 py-1.5 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40 {selected
-          ? 'bg-primary text-primary-foreground'
-          : 'bg-surface-2 text-foreground hover:bg-surface-3'}"
+        class={selected ? 'sr-btn' : 'sr-btn-ghost'}
       >
         {selected ? 'Remove target' : 'Target'}
       </button>

@@ -3,6 +3,7 @@
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { Dialog } from 'bits-ui';
+  import '$lib/season/season-theme.css';
   import type {
     HoopRushManifest,
     PlayersIndex,
@@ -384,217 +385,192 @@
   <title>Season Run — Hoop Rush</title>
 </svelte:head>
 
-<section class="mx-auto w-full min-w-0 max-w-6xl overflow-x-clip py-6 sm:px-6 sm:py-10">
-  <div class="flex flex-col gap-3 px-3 sm:flex-row sm:items-end sm:justify-between sm:px-0">
-    <div class="min-w-0">
-      <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">Season Run</p>
-      <h1
-        class="font-display mt-2 text-2xl font-extrabold tracking-tight break-words uppercase sm:text-3xl md:text-4xl lg:text-5xl"
-      >
-        Draft 10. Coach 82.
-      </h1>
-      <p class="mt-3 max-w-xl text-xs text-muted-foreground">
-        Choose an executive, then build your roster.
-      </p>
-      <p class="mt-1 font-mono text-[11px] tracking-wide text-muted-foreground">
-        30 teams • 82 games • 10-player roster • 1 champion
-      </p>
-    </div>
-    {#if draftStage !== 'executive'}
-      <a
-        href={resolve('/')}
-        class="shrink-0 self-start font-mono text-xs text-muted-foreground underline-offset-4 hover:underline sm:self-auto"
-      >
-        Back
-      </a>
-    {/if}
-  </div>
-
-  {#if assetsError}
-    <p
-      class="mt-8 mx-3 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-xs sm:mx-0"
-    >
-      Failed to load season data: {assetsError}
-    </p>
-  {:else if !loaded}
-    <p class="mt-8 px-3 font-mono text-xs text-muted-foreground sm:px-0">Loading your season…</p>
-  {:else if brokenRunError}
-    <div class="mt-10 rounded-none bg-surface-1 sm:rounded-xl p-6">
-      <h2 class="font-display text-xl font-extrabold uppercase tracking-tight">
-        Saved season could not load
-      </h2>
-      <p class="mt-2 text-xs text-muted-foreground">{brokenRunError}</p>
-      <div class="mt-4 flex flex-wrap gap-2">
-        <button
-          type="button"
-          onclick={() => (clearOpen = true)}
-          class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-destructive px-5 py-3 text-xs font-semibold text-white transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90"
-        >
-          Restart season
-        </button>
-      </div>
-      {#if clearError}
-        <p role="alert" class="mt-3 text-xs text-destructive">{clearError}</p>
-      {/if}
-    </div>
-  {:else if resumeHref}
-    <div class="mt-10 rounded-none bg-surface-1 sm:rounded-xl p-6">
-      <h2 class="font-display text-xl font-extrabold uppercase tracking-tight">
-        Back to your season
-      </h2>
-      <p class="mt-2 text-xs text-muted-foreground">Pick up right where you left off.</p>
-      <a
-        href={resolve('/season/run')}
-        class="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-xs font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90"
-      >
-        Continue season
-      </a>
-    </div>
-  {:else if draftStage === 'executive'}
-    <div class="mx-auto mt-6 flex w-full max-w-3xl flex-col px-3 pb-10 sm:px-0">
-      <div class="rounded-none bg-surface-1 p-6 sm:rounded-xl">
-        <h2 class="font-display text-xl font-extrabold uppercase tracking-tight">
-          Pick your executive
-        </h2>
-        <p class="mt-2 max-w-xl text-xs text-muted-foreground">
-          Choose one for the season. Their ability and drawback affect your run.
+<div class="season-root min-h-[100svh]">
+  <section class="mx-auto w-full min-w-0 max-w-6xl overflow-x-clip px-3 py-6 sm:px-6 sm:py-10">
+    <header class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <div class="min-w-0">
+        <p class="sr-eyebrow">Season Run</p>
+        <h1 class="sr-page-title sr-arrive mt-2 break-words">Draft 10. Coach 82.</h1>
+        <p class="mt-3 max-w-xl text-xs text-muted-foreground">
+          Choose an executive, then build your roster.
         </p>
-        <div class="mt-5">
-          <FrontOfficePicker
-            value={executiveId}
-            disabled={busy}
-            onChange={(id) => (executiveId = id)}
-          />
-        </div>
-        <div class="mt-6 flex items-center justify-between gap-3 border-t border-border/60 pt-4">
-          <a
-            href={resolve('/')}
-            class="inline-flex min-h-11 items-center justify-center rounded-lg px-4 py-3 text-xs font-semibold text-muted-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring hover:text-foreground"
-          >
-            ← Back
-          </a>
-          <button
-            type="button"
-            onclick={startDraft}
-            disabled={busy || executiveId === null}
-            class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-xs font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {busy ? 'Starting…' : 'Start draft →'}
+        <p class="mt-1 font-mono text-[11px] tracking-wide text-muted-foreground">
+          30 teams • 82 games • 10-player roster • 1 champion
+        </p>
+      </div>
+      {#if draftStage !== 'executive'}
+        <a
+          href={resolve('/')}
+          class="sr-eyebrow shrink-0 self-start underline-offset-4 hover:underline sm:self-auto"
+        >
+          ← Back
+        </a>
+      {/if}
+    </header>
+
+    {#if assetsError}
+      <div class="sr-panel-quiet mt-8 p-4" role="alert">
+        <span class="sr-badge" data-tone="loss">Data error</span>
+        <p class="mt-2 text-xs text-muted-foreground">Failed to load season data: {assetsError}</p>
+      </div>
+    {:else if !loaded}
+      <p class="sr-section-label mt-8">
+        <span class="sr-live-dot mr-2 inline-block h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true"></span>
+        Loading your season…
+      </p>
+    {:else if brokenRunError}
+      <div class="sr-panel-quiet mt-10 p-6">
+        <p class="sr-eyebrow">Save error</p>
+        <h2 class="font-display mt-2 text-xl font-extrabold uppercase tracking-tight">
+          Saved season could not load
+        </h2>
+        <p class="mt-2 text-xs text-muted-foreground">{brokenRunError}</p>
+        <div class="mt-4 flex flex-wrap gap-2">
+          <button type="button" onclick={() => (clearOpen = true)} class="sr-btn-danger">
+            Restart season
           </button>
         </div>
-        {#if friendlyActionError}
-          <p
-            role="alert"
-            class="mt-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs"
-          >
-            {friendlyActionError}
-          </p>
+        {#if clearError}
+          <p role="alert" class="mt-3 text-xs text-destructive">{clearError}</p>
         {/if}
       </div>
-    </div>
-  {:else if generationReveal}
-    <LeagueGenerationArena progress={generationProgress} {league} />
-  {:else if draftStage === 'drafting' || draftStage === 'ready'}
-    <div
-      class="mx-auto mt-6 flex w-full max-w-4xl flex-col gap-4 px-3 pb-[max(6rem,env(safe-area-inset-bottom))] sm:mt-8 sm:px-0"
-    >
-      {#if flow && manifest && board?.draft}
-        <SeasonDraftBoard
-          flow={board}
-          {manifest}
-          {faces}
-          catalog={flow.catalog}
-          {busy}
-          error={friendlyActionError}
-          {onDraw}
-          {onPick}
-          {onFinalize}
-        />
-      {/if}
-      {#if draftStage === 'ready'}
-        <div class="rounded-none bg-surface-1 sm:rounded-xl p-6">
-          <h2 class="text-base font-extrabold uppercase tracking-tight">Build the league</h2>
-          <p class="mt-2 text-xs text-muted-foreground">Fill the other 29 teams, then play.</p>
-          <button
-            type="button"
-            onclick={generateLeague}
-            disabled={busy || promoting}
-            class="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-xs font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Build league
-          </button>
+    {:else if resumeHref}
+      <div class="sr-panel-featured mt-10 p-6">
+        <p class="sr-eyebrow">Welcome back</p>
+        <h2 class="font-display mt-2 text-xl font-extrabold uppercase tracking-tight">
+          Back to your season
+        </h2>
+        <p class="mt-2 text-xs text-muted-foreground">Pick up right where you left off.</p>
+        <a href={resolve('/season/run')} class="sr-btn mt-4">Continue season</a>
+      </div>
+    {:else if draftStage === 'executive'}
+      <div class="mx-auto mt-6 flex w-full max-w-3xl flex-col pb-10">
+        <div class="sr-panel sr-arrive p-6">
+          <p class="sr-eyebrow">Front office</p>
+          <h2 class="font-display mt-2 text-xl font-extrabold uppercase tracking-tight">
+            Pick your executive
+          </h2>
+          <p class="mt-2 max-w-xl text-xs text-muted-foreground">
+            Choose one for the season. Their ability and drawback affect your run.
+          </p>
+          <div class="mt-5">
+            <FrontOfficePicker
+              value={executiveId}
+              disabled={busy}
+              onChange={(id) => (executiveId = id)}
+            />
+          </div>
+          <div class="mt-6 flex items-center justify-between gap-3 border-t border-border/60 pt-4">
+            <a
+              href={resolve('/')}
+              class="inline-flex min-h-11 items-center justify-center rounded-lg px-4 py-3 text-xs font-semibold text-muted-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring hover:text-foreground"
+            >
+              ← Back
+            </a>
+            <button type="button" onclick={startDraft} disabled={busy || executiveId === null} class="sr-btn">
+              {busy ? 'Starting…' : 'Start draft →'}
+            </button>
+          </div>
+          {#if friendlyActionError}
+            <p role="alert" class="sr-panel-quiet mt-3 p-3">
+              <span class="sr-badge" data-tone="loss">Rejected</span>
+              <span class="mt-2 block text-xs text-muted-foreground">{friendlyActionError}</span>
+            </p>
+          {/if}
         </div>
-      {/if}
-    </div>
-  {:else if draftStage === 'generating'}
-    <LeagueGenerationArena progress={generationProgress} {league} />
-  {:else if draftStage === 'stalled'}
-    <div class="mt-10 rounded-none bg-surface-1 sm:rounded-xl p-6">
-      <h2 class="font-display text-xl font-extrabold uppercase tracking-tight">
-        League setup hit a snag
-      </h2>
-      <p class="mt-2 text-xs text-muted-foreground">{friendlyGenerationError}</p>
-      <p class="mt-1 text-xs text-muted-foreground">Your draft is saved.</p>
-      <button
-        type="button"
-        onclick={generateLeague}
-        disabled={busy}
-        class="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-xs font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-      >
-        Retry
-      </button>
-    </div>
-  {:else if draftStage === 'complete'}
-    <div class="mt-10 flex max-w-2xl flex-col gap-6 pb-32">
-      <div class="rounded-none bg-surface-1 sm:rounded-xl p-6">
-        <h2 class="font-display text-xl font-extrabold uppercase tracking-tight">League ready</h2>
-        <p class="mt-2 text-xs text-muted-foreground">Your 10 are set. Time to play 82.</p>
-        <button
-          type="button"
-          onclick={promote}
-          disabled={promoting}
-          class="mt-5 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-xs font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {promoting ? 'Starting…' : 'Start season'}
-        </button>
-        {#if promoteError}
-          <div
-            role="alert"
-            class="mt-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs"
-          >
-            <p class="font-semibold">Couldn’t start the season</p>
-            <p class="mt-1 text-muted-foreground">{promoteError}</p>
-            <p class="mt-1 text-xs text-muted-foreground">Your draft is saved — try again.</p>
+      </div>
+    {:else if generationReveal}
+      <LeagueGenerationArena progress={generationProgress} {league} />
+    {:else if draftStage === 'drafting' || draftStage === 'ready'}
+      <div class="mx-auto mt-6 flex w-full max-w-4xl flex-col gap-4 pb-[max(6rem,env(safe-area-inset-bottom))] sm:mt-8">
+        {#if flow && manifest && board?.draft}
+          <SeasonDraftBoard
+            flow={board}
+            {manifest}
+            {faces}
+            catalog={flow.catalog}
+            {busy}
+            error={friendlyActionError}
+            {onDraw}
+            {onPick}
+            {onFinalize}
+          />
+        {/if}
+        {#if draftStage === 'ready'}
+          <div class="sr-panel-quiet p-6">
+            <p class="sr-eyebrow">Next step</p>
+            <h2 class="font-display mt-1 text-base font-extrabold uppercase tracking-tight">
+              Build the league
+            </h2>
+            <p class="mt-2 text-xs text-muted-foreground">Fill the other 29 teams, then play.</p>
+            <button
+              type="button"
+              onclick={generateLeague}
+              disabled={busy || promoting}
+              class="sr-btn mt-4"
+            >
+              Build league
+            </button>
           </div>
         {/if}
       </div>
-    </div>
-  {/if}
-</section>
+    {:else if draftStage === 'generating'}
+      <LeagueGenerationArena progress={generationProgress} {league} />
+    {:else if draftStage === 'stalled'}
+      <div class="sr-panel-quiet mt-10 p-6">
+        <p class="sr-eyebrow">Generation paused</p>
+        <h2 class="font-display mt-2 text-xl font-extrabold uppercase tracking-tight">
+          League setup hit a snag
+        </h2>
+        <p class="mt-2 text-xs text-muted-foreground">{friendlyGenerationError}</p>
+        <p class="mt-1 text-xs text-muted-foreground">Your draft is saved.</p>
+        <button type="button" onclick={generateLeague} disabled={busy} class="sr-btn mt-4">
+          Retry
+        </button>
+      </div>
+    {:else if draftStage === 'complete'}
+      <div class="mt-10 flex max-w-2xl flex-col gap-6 pb-32">
+        <div class="sr-panel-featured sr-arrive p-6">
+          <p class="sr-eyebrow">Draft complete</p>
+          <h2 class="font-display mt-1 text-xl font-extrabold uppercase tracking-tight">
+            League ready
+          </h2>
+          <p class="mt-2 text-xs text-muted-foreground">Your 10 are set. Time to play 82.</p>
+          <button type="button" onclick={promote} disabled={promoting} class="sr-btn mt-5">
+            {promoting ? 'Starting…' : 'Start season'}
+          </button>
+          {#if promoteError}
+            <div role="alert" class="sr-panel-quiet mt-3 p-3">
+              <p class="font-semibold">Couldn’t start the season</p>
+              <p class="mt-1 text-muted-foreground">{promoteError}</p>
+              <p class="mt-1 text-xs text-muted-foreground">Your draft is saved — try again.</p>
+            </div>
+          {/if}
+        </div>
+      </div>
+    {/if}
+  </section>
 
-<Dialog.Root bind:open={clearOpen}>
-  <Dialog.Content
-    class="fixed left-1/2 top-1/2 z-50 w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-border bg-background p-6 shadow-xl outline-none"
-  >
-    <Dialog.Title class="font-display text-2xl font-extrabold">Restart season?</Dialog.Title>
-    <Dialog.Description class="mt-1 text-sm text-muted-foreground">
-      This permanently deletes your saved Season Run and any in-progress draft from this browser.
-      You will start a new season from the setup screen.
-    </Dialog.Description>
-    <div class="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-      <Dialog.Close
-        class="inline-flex items-center justify-center rounded-xl border border-border px-4 py-2 text-sm font-semibold text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring hover:text-foreground"
-      >
-        Cancel
-      </Dialog.Close>
-      <button
-        type="button"
-        onclick={() => void confirmClearSeasonData()}
-        disabled={clearing}
-        class="inline-flex items-center justify-center rounded-xl bg-destructive px-4 py-2 text-sm font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40"
-      >
-        {clearing ? 'Restarting…' : 'Clear save and restart'}
-      </button>
-    </div>
-  </Dialog.Content>
-</Dialog.Root>
+  <Dialog.Root bind:open={clearOpen}>
+    <Dialog.Content class="sr-dialog w-[calc(100vw-2rem)] max-w-md p-6">
+      <Dialog.Title class="font-display text-2xl font-extrabold tracking-tight uppercase">
+        Restart season?
+      </Dialog.Title>
+      <Dialog.Description class="mt-1 text-sm text-muted-foreground">
+        This permanently deletes your saved Season Run and any in-progress draft from this browser.
+        You will start a new season from the setup screen.
+      </Dialog.Description>
+      <div class="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <Dialog.Close class="sr-btn-ghost">Cancel</Dialog.Close>
+        <button
+          type="button"
+          onclick={() => void confirmClearSeasonData()}
+          disabled={clearing}
+          class="sr-btn-danger"
+        >
+          {clearing ? 'Restarting…' : 'Clear save and restart'}
+        </button>
+      </div>
+    </Dialog.Content>
+  </Dialog.Root>
+</div>

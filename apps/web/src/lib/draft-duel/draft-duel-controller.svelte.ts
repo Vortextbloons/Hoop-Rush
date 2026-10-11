@@ -91,7 +91,7 @@ export class DraftDuelController {
   private deadlineResolving = false;
   private syncing = false;
   private syncQueued = false;
-  private preparingSinceMs: number | null = null;
+  private preparingSinceMs = $state<number | null>(null);
   private lastAutoAttemptMs = 0;
   private proposalSent = new Set<number>();
   private confirmSent = new Set<number>();
@@ -338,7 +338,7 @@ export class DraftDuelController {
     await this.submit({ kind: 'start' });
   }
 
-  async pickOffer(pick: DraftDuelOfferedPick): Promise<void> {
+  async pickOffer(pick: DraftDuelOfferedPick, slotIndex: number): Promise<void> {
     if (!this.draft || this.draft.status !== 'drafting') return;
     if (!this.activeTurn) {
       this.notice = 'It is not your turn.';
@@ -348,11 +348,16 @@ export class DraftDuelController {
       this.notice = 'That card cannot be picked right now.';
       return;
     }
+    if (slotIndex < 0 || slotIndex > 4 || !Number.isInteger(slotIndex)) {
+      this.notice = 'Choose a position for this player.';
+      return;
+    }
     await this.submit({
       kind: 'pick',
       pickOrdinal: this.draft.pickOrdinal,
       playerId: pick.card.playerId,
       playerVersionId: pick.card.playerVersionId,
+      slotIndex,
     });
   }
 
@@ -386,6 +391,20 @@ export class DraftDuelController {
     } catch (error) {
       this.error = friendlyDraftDuelJoinError(error);
       return null;
+    }
+  }
+
+  async removeGuest(): Promise<void> {
+    if (!this.roomId || this.participantId !== 'p1') return;
+    try {
+      const next = await this.transport.removeGuest(
+        this.roomId,
+        otherParticipant(this.participantId),
+      );
+      this.applySnapshot(next);
+      await this.syncFromServer();
+    } catch (error) {
+      this.error = friendlyDraftDuelJoinError(error);
     }
   }
 
@@ -528,12 +547,12 @@ export class DraftDuelController {
     }
     if (
       this.phase === 'preparing-game' &&
-      this.readyCountdownMs === 0 &&
-      !this.opponentReady &&
+      ((this.localReady && this.opponentReady) ||
+        (this.readyCountdownMs === 0 && !this.opponentReady)) &&
       this.now - this.lastAutoAttemptMs >= AUTO_START_RETRY_MS
     ) {
       this.lastAutoAttemptMs = this.now;
-      void this.startBroadcast(true);
+      void this.startBroadcast(!(this.localReady && this.opponentReady));
     }
   }
 
@@ -549,6 +568,7 @@ export class DraftDuelController {
         pickOrdinal: timeoutPick.pickOrdinal,
         playerId: timeoutPick.playerId,
         playerVersionId: timeoutPick.playerVersionId,
+        ...(timeoutPick.slotIndex !== undefined ? { slotIndex: timeoutPick.slotIndex } : {}),
         seedPath: timeoutPick.seedPath,
       };
       await this.transport.commitFallback(this.roomId, cursor, payload);
@@ -644,6 +664,7 @@ export class DraftDuelController {
           participantId: command.actorParticipantId,
           playerId: payload.playerId,
           playerVersionId: payload.playerVersionId,
+          ...(payload.slotIndex !== undefined ? { slotIndex: payload.slotIndex } : {}),
         });
       }
       this.draft = state;

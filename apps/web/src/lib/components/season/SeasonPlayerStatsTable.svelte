@@ -74,11 +74,9 @@
   }
 </script>
 
-<table class="w-full min-w-[44rem] text-sm">
+<table class="sr-table min-w-[44rem] text-sm">
   <thead>
-    <tr
-      class="border-b border-border/70 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground"
-    >
+    <tr>
       <th scope="col" aria-sort={ariaSort('displayName')} class="px-3 py-2 text-left">
         <button
           type="button"
@@ -126,7 +124,7 @@
     {#each rows as row (row.playerVersionId)}
       {@const face = faceOf(row.playerVersionId)}
       {@const eraLabel = eraLabelOf(row.playerVersionId, row.franchiseId, row.eraId)}
-      <tr class="border-b border-border/40">
+      <tr>
         <th scope="row" class="px-3 py-1.5 text-left">
           <div class="flex min-w-0 items-center gap-2">
             {#if face !== null}
@@ -143,11 +141,7 @@
               <p class="flex min-w-0 items-center gap-2">
                 <span class="max-w-44 truncate font-semibold">{row.displayName}</span>
                 {#if row.overallRating !== null}
-                  <span
-                    class="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[9px] font-bold text-foreground"
-                  >
-                    OVR {row.overallRating}
-                  </span>
+                  <span class="sr-chip shrink-0">OVR {row.overallRating}</span>
                 {/if}
               </p>
               <p class="truncate font-mono text-[9px] text-muted-foreground">

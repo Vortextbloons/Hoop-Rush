@@ -247,10 +247,10 @@
     place-items: center;
     width: 3rem;
     height: 3rem;
-    border: 1px solid color-mix(in srgb, var(--color-accent) 55%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-primary) 55%, transparent);
     border-radius: 999px;
-    color: var(--color-accent);
-    background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+    color: var(--color-primary);
+    background: color-mix(in srgb, var(--color-primary) 10%, transparent);
   }
 
   .hero-eyebrow {

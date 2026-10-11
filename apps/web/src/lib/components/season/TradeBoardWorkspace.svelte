@@ -23,6 +23,7 @@
   import NegotiationTranscript from './NegotiationTranscript.svelte';
   import SeasonTeamLogo from './SeasonTeamLogo.svelte';
   import { franchiseIdentityOf } from '$lib/season/season-branding';
+  import { franchiseColor } from '$lib/season/franchise-colors';
   import { inquiryAllowanceView } from '$lib/season/season-evolution-view';
 
   let {
@@ -354,10 +355,10 @@
   class="flex flex-col gap-4"
   data-testid="trade-board-workspace"
 >
-  <div class="rounded-xl border border-border bg-surface-1 px-4 py-3">
+  <div class="sr-panel px-4 py-3">
     <div class="flex flex-wrap items-baseline justify-between gap-2">
-      <h2 id="trade-board-heading" class="text-lg font-bold uppercase tracking-tight">Trades</h2>
-      <span class="text-xs text-muted-foreground">
+      <h2 id="trade-board-heading" class="font-display text-lg font-extrabold uppercase tracking-tight">Trades</h2>
+      <span class="sr-section-label">
         {#if windowState !== null}
           Window {windowState.windowIndex + 1} of 3 · closes after Block {windowState.blockIndex +
             1}
@@ -368,21 +369,21 @@
         {/if}
       </span>
     </div>
-    <div class="mt-2 flex flex-wrap items-center gap-2 text-xs">
-      <span class="font-semibold" aria-live="polite" title={diagnosticsLabel}>{talksLabel}</span>
+    <div class="mt-2 flex flex-wrap items-center gap-2">
+      <span class="sr-badge" data-tone="hardwood" aria-live="polite" title={diagnosticsLabel}>{talksLabel}</span>
       <span
-        class="inline-flex items-center gap-1"
+        class="sr-badge"
         aria-label={`${inquiriesUsed} of ${inquiryAllowance} talks used`}
       >
         {#each talksPips as used, i (i)}
           <span
-            class="inline-block h-2 w-2 rounded-full {used ? 'bg-primary' : 'bg-border'}"
+            class="inline-block h-1.5 w-1.5 rounded-full {used ? 'bg-primary' : 'bg-border'}"
             aria-hidden="true"
           ></span>
         {/each}
       </span>
-      <span class="text-muted-foreground">closes when next block locks</span>
-      <span class="text-muted-foreground" title="Your Influence balance">◆ {humanBalance}</span>
+      <span class="sr-chip">closes when next block locks</span>
+      <span class="sr-chip" title="Your Influence balance">◆ {humanBalance}</span>
       {#if windowState !== null}
         <button
           type="button"
@@ -398,40 +399,44 @@
     {#if guardMessage !== null}
       <p
         role="alert"
-        class="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm"
+        class="sr-panel-quiet mt-2 flex flex-wrap items-center gap-2 px-3 py-2"
       >
-        {guardMessage}
+        <span class="sr-badge" data-tone="warn">Hold on</span>
+        <span class="text-sm">{guardMessage}</span>
       </p>
     {/if}
     {#if humanizedError !== null}
       <p
         role="alert"
-        class="mt-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm"
+        class="sr-panel-quiet mt-2 flex flex-wrap items-center gap-2 px-3 py-2"
       >
-        {humanizedError}
+        <span class="sr-badge" data-tone="loss">Rejected</span>
+        <span class="text-sm">{humanizedError}</span>
       </p>
     {/if}
     {#if blockedMessage !== null}
       <p
-        class="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm"
+        class="sr-panel-quiet mt-2 flex flex-wrap items-center gap-2 px-3 py-2"
         role="status"
       >
-        {blockedMessage}
+        <span class="sr-badge" data-tone="warn">Trading locked</span>
+        <span class="text-sm">{blockedMessage}</span>
       </p>
     {/if}
     {#if receiptText !== null}
       <p
-        class="mt-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm"
+        class="sr-panel-quiet mt-2 flex flex-wrap items-center gap-2 px-3 py-2"
         role="status"
         data-testid="trade-receipt"
       >
-        {receiptText}
+        <span class="sr-badge" data-tone="win">Done</span>
+        <span class="text-sm">{receiptText}</span>
       </p>
     {/if}
     {#if activeNegotiation?.latestRequestedChange !== null && activeNegotiation?.latestRequestedChange !== undefined}
-      <p class="mt-2 rounded-lg bg-amber-500/10 px-3 py-2 text-sm" role="status">
-        <span class="font-semibold">They asked:</span>
-        {activeNegotiation.latestRequestedChange}
+      <p class="sr-panel-quiet mt-2 flex flex-wrap items-center gap-2 px-3 py-2" role="status">
+        <span class="sr-badge" data-tone="warn">They asked</span>
+        <span class="text-sm">{activeNegotiation.latestRequestedChange}</span>
       </p>
     {/if}
   </div>
@@ -469,10 +474,10 @@
       aria-label="Teams"
       class="flex flex-col gap-3 {mobileStep !== 'team' ? 'hidden lg:flex' : ''}"
     >
-      <div class="rounded-xl border border-border bg-surface-1">
+      <div class="sr-panel-quiet">
         <div class="flex items-baseline justify-between border-b border-border px-4 py-3">
-          <h3 class="text-xs font-bold uppercase tracking-wide text-muted-foreground">Teams</h3>
-          <span class="text-xs text-muted-foreground">Browsing is free</span>
+          <h3 class="sr-section-label">Teams</h3>
+          <span class="sr-chip">Browsing is free</span>
         </div>
         {#if windowState === null}
           <p class="p-4 text-sm text-muted-foreground">No trades right now. Play the next block.</p>
@@ -496,9 +501,10 @@
                   aria-pressed={isSelected}
                   onclick={() => selectTeam(profile.franchiseId)}
                   data-testid={`board-team-${profile.franchiseId}`}
-                  class="flex w-full items-center gap-2 rounded-xl border bg-card p-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring {isSelected
-                    ? 'border-primary'
-                    : 'border-border'}"
+                  class="sr-gamecard flex w-full items-center gap-2 p-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring {isSelected
+                    ? 'ring-1 ring-primary/60'
+                    : ''}"
+                  style:--sr-accent={franchiseColor(profile.franchiseId)}
                 >
                   {#if manifest && identity}
                     <SeasonTeamLogo
@@ -517,10 +523,7 @@
                     </span>
                   </span>
                   {#if isActive}
-                    <span
-                      class="shrink-0 rounded-full bg-primary px-2 py-0.5 text-xs font-bold text-primary-foreground"
-                      >Active</span
-                    >
+                    <span class="sr-badge shrink-0" data-tone="live">Active</span>
                   {/if}
                 </button>
               </li>
@@ -537,15 +540,15 @@
       class="flex flex-col gap-3 {mobileStep !== 'deal' ? 'hidden lg:flex' : ''}"
     >
       {#if windowState === null}
-        <div class="rounded-xl border border-border bg-card p-6 text-center">
-          <p class="text-base font-bold uppercase">No trades right now</p>
+        <div class="sr-panel-quiet p-6 text-center">
+          <p class="font-display text-base font-extrabold uppercase">No trades right now</p>
           <p class="mt-1 text-sm text-muted-foreground">
             Play the next block. Past deals stay below.
           </p>
         </div>
       {:else if selectedProfile === null || targetRoster === null || humanRoster === null}
-        <div class="rounded-xl border border-border bg-card p-6 text-center">
-          <p class="text-base font-bold uppercase">Pick a team to start a deal</p>
+        <div class="sr-panel-quiet p-6 text-center">
+          <p class="font-display text-base font-extrabold uppercase">Pick a team to start a deal</p>
           <p class="mt-1 text-sm text-muted-foreground">
             Browsing is free — the talk starts when you send the first offer.
           </p>
@@ -553,7 +556,7 @@
       {:else}
         {@const safeTargetId = selectedFranchiseId ?? ''}
         {@const safeTargetKey = franchiseIdSchema.safeParse(safeTargetId)}
-        <div class="rounded-xl border border-border bg-surface-1 px-4 py-3">
+        <div class="sr-panel-quiet px-4 py-3">
           <p class="text-sm font-bold">
             YOU ({humanRoster.players.length}) vs {franchiseDisplayName(safeTargetId)} ({targetRoster
               .players.length})
@@ -573,7 +576,7 @@
               {selectedProfile.discussablePlayerIds.map(playerName).join(' · ') || '—'}
             </p>
             <p>
-              <span class="font-semibold text-destructive">Off limits:</span>
+              <span class="font-semibold text-negative">Off limits:</span>
               {selectedProfile.protectedPlayerIds.map(playerName).join(' · ') || '—'}
             </p>
             <p class="mt-1">{selectedProfile.rationale}</p>
@@ -618,7 +621,7 @@
         />
       {/if}
 
-      <details class="rounded-xl border border-border bg-surface-1 px-4 py-3">
+      <details class="sr-panel-quiet px-4 py-3">
         <summary
           class="cursor-pointer text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
@@ -629,7 +632,7 @@
         {:else}
           <ul class="mt-2 flex flex-col gap-2">
             {#each closedWindows as win (win.windowIndex)}
-              <li class="rounded-lg border border-border p-2.5 text-xs">
+              <li class="sr-gamecard p-2.5 text-xs">
                 <p class="font-semibold">Window {win.windowIndex + 1}</p>
                 <p class="text-muted-foreground">
                   {win.negotiations?.length ?? 0} talks · {win.offers.length} offers
@@ -640,7 +643,7 @@
         {/if}
       </details>
 
-      <details class="rounded-xl border border-border bg-surface-1 px-4 py-3">
+      <details class="sr-panel-quiet px-4 py-3">
         <summary
           class="cursor-pointer text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
@@ -651,7 +654,7 @@
         {:else}
           <ul class="mt-2 flex flex-col gap-1.5 text-xs">
             {#each humanTrends as trend (trend.playerVersionId)}
-              <li class="rounded-lg border border-border p-2">
+              <li class="sr-gamecard p-2">
                 <span class="font-semibold">{playerName(trend.playerVersionId)}</span>
                 <span class="text-muted-foreground"> — {trend.trend}</span>
               </li>
@@ -660,7 +663,7 @@
         {/if}
       </details>
 
-      <details class="rounded-xl border border-border bg-surface-1 px-4 py-3">
+      <details class="sr-panel-quiet px-4 py-3">
         <summary
           class="cursor-pointer text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
@@ -671,7 +674,7 @@
         {:else}
           <ul class="mt-2 flex flex-col gap-1.5 text-xs">
             {#each ledgerEntries as entry (entry.transactionId)}
-              <li class="rounded-lg border border-border p-2">
+              <li class="sr-gamecard p-2">
                 <span class="font-semibold">{entry.type}</span>
                 <span class="text-muted-foreground"> — {entry.explanation}</span>
               </li>
@@ -702,8 +705,8 @@
         />
 
         {#if negotiations.length > 0}
-          <div class="rounded-xl border border-border bg-surface-1 p-3">
-            <h4 class="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+          <div class="sr-panel-quiet p-3">
+            <h4 class="sr-section-label">
               Your talks
             </h4>
             <ul class="mt-2 flex max-h-[320px] flex-col gap-1.5 overflow-auto">
@@ -723,7 +726,7 @@
                     <span class="min-w-0 flex-1 truncate font-medium">
                       {franchiseDisplayName(n.toFranchiseId)} · {n.status}
                     </span>
-                    <span class="shrink-0 text-xs text-muted-foreground">
+                    <span class="sr-number shrink-0 text-xs text-muted-foreground">
                       Offer {Math.min(3, n.exchangeCount + 1)} of 3
                     </span>
                   </button>

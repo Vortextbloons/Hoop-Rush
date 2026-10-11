@@ -17,8 +17,8 @@ import type { DraftDuelCatalog } from './catalog.ts';
 import {
   buildDraftDuelSafetyBase,
   draftDuelCardProfileMask,
+  draftDuelOpenSlotNeeds,
   draftDuelRoundSafetyHolds,
-  neededGroups,
   profileMaskCovers,
   unclaimedGroupAvailability,
   withDraftDuelOffers,
@@ -95,12 +95,12 @@ function buildOfferContext(
   const availability = unclaimedGroupAvailability(safetyBase.unclaimedProfileCounts);
   const requirements = {
     p1: protectionRequirements(
-      neededGroups(safetyBase.rosters.p1),
+      draftDuelOpenSlotNeeds(safetyBase, 'p1'),
       state.firstPicker !== 'p1',
       availability,
     ),
     p2: protectionRequirements(
-      neededGroups(safetyBase.rosters.p2),
+      draftDuelOpenSlotNeeds(safetyBase, 'p2'),
       state.firstPicker !== 'p2',
       availability,
     ),

@@ -38,8 +38,8 @@
 
 <article
   data-season-playin-card={card.gameId}
-  style:--game-color={franchiseColor(card.winnerFranchiseId ?? card.homeFranchiseId)}
-  class="play-in-card rounded-xl border border-dashed border-border bg-surface-1 p-3 {card.humanGame
+  style:--sr-accent={franchiseColor(card.winnerFranchiseId ?? card.homeFranchiseId)}
+  class="play-in-card p-3 {card.humanGame
     ? 'ring-1 ring-primary/40'
     : ''}"
 >
@@ -134,7 +134,11 @@
 
 <style>
   .play-in-card {
-    border-left: 3px solid var(--game-color);
-    box-shadow: 0 10px 28px rgb(0 0 0 / 0.07);
+    overflow: hidden;
+    border: 1px dashed var(--sr-line-strong);
+    border-radius: 0.75rem;
+    border-left: 3px solid var(--sr-accent, var(--sr-line-strong));
+    background: rgb(15 20 26 / 85%);
+    box-shadow: 0 10px 28px rgb(0 0 0 / 0.3);
   }
 </style>

@@ -102,6 +102,11 @@
 
 <nav aria-label="Season progress" class="w-full">
   <div class="relative">
+    <div
+      aria-hidden="true"
+      class="pointer-events-none absolute top-1/2 right-2 left-2 hidden h-px sm:block"
+      style="background: linear-gradient(90deg, rgb(255 122 77 / 35%), var(--sr-line) 60%)"
+    ></div>
     <ol
       bind:this={track}
       class="flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] sm:flex-wrap sm:overflow-visible sm:pb-0"
@@ -113,16 +118,16 @@
               href={resolve(`/season/run/checkpoint/?block=${String(segment.blockIndex)}` as any)}
               data-season-tape-segment={segment.blockIndex}
               aria-label={labelOf(segment)}
-              class="flex h-full flex-col items-center gap-0.5 rounded-lg border border-border bg-surface-1 px-1.5 py-2 text-center outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring hover:border-line-strong hover:bg-surface-2"
+              class="sr-gamecard relative flex h-full flex-col items-center gap-0.5 px-1.5 py-2 text-center outline-none transition-colors hover:bg-surface-2"
             >
-              <span class="font-mono text-[10px] font-bold text-primary uppercase">
+              <span class="sr-eyebrow">
                 B{segment.blockIndex + 1}
               </span>
-              <span class="font-mono text-[9px] text-muted-foreground">
+              <span class="sr-section-label">
                 {segment.fromRound}–{segment.toRound}
               </span>
               {#if segment.record !== null}
-                <span class="font-mono text-xs font-bold">
+                <span class="sr-number text-sm font-bold" style="color: var(--sr-paper)">
                   {recordLabel(segment.record.wins, segment.record.losses)}
                 </span>
               {/if}
@@ -134,21 +139,35 @@
               data-season-tape-segment={segment.blockIndex}
               aria-label={labelOf(segment)}
               aria-current={segment.state === 'current' ? 'step' : undefined}
-              class="flex h-full flex-col items-center gap-0.5 rounded-lg border px-1.5 py-2 text-center {segment.state ===
+              class="sr-gamecard flex h-full flex-col items-center gap-0.5 px-1.5 py-2 text-center {segment.state ===
               'current'
-                ? 'border-primary/60 bg-primary/10'
-                : 'border-border/60 bg-surface-2/50 opacity-60'}"
+                ? 'bg-surface-2'
+                : 'opacity-55'}"
+              style={segment.state === 'current'
+                ? '--sr-accent: var(--sr-hardwood-bright); border-color: rgb(255 122 77 / 55%)'
+                : undefined}
             >
-              <span class="font-mono text-[10px] font-bold uppercase text-muted-foreground">
-                B{segment.blockIndex + 1}
-              </span>
-              <span class="font-mono text-[9px] text-muted-foreground">
+              {#if segment.state === 'current'}
+                <span class="sr-eyebrow" style="color: var(--sr-hardwood-bright)">
+                  B{segment.blockIndex + 1}
+                </span>
+              {:else}
+                <span class="sr-eyebrow" style="color: var(--sr-muted)">
+                  B{segment.blockIndex + 1}
+                </span>
+              {/if}
+              <span class="sr-section-label">
                 {segment.fromRound}–{segment.toRound}
               </span>
               {#if segment.state === 'current'}
-                <span class="font-mono text-xs font-bold text-primary">Next</span>
+                <span
+                  class="sr-number text-sm font-bold"
+                  style="color: var(--sr-hardwood-bright)"
+                >
+                  Next
+                </span>
               {:else}
-                <span class="font-mono text-[10px] text-muted-foreground">Pending</span>
+                <span class="sr-section-label">Pending</span>
               {/if}
             </span>
           </li>
@@ -157,11 +176,13 @@
     </ol>
     <div
       aria-hidden="true"
-      class="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-background to-transparent sm:hidden"
+      class="pointer-events-none absolute inset-y-0 right-0 w-10 to-transparent sm:hidden"
+      style="background: linear-gradient(to left, var(--sr-bg), transparent)"
     ></div>
     <div
       aria-hidden="true"
-      class="pointer-events-none absolute inset-y-0 left-0 w-10 bg-gradient-to-r from-background to-transparent sm:hidden"
+      class="pointer-events-none absolute inset-y-0 left-0 w-10 to-transparent sm:hidden"
+      style="background: linear-gradient(to right, var(--sr-bg), transparent)"
     ></div>
   </div>
 </nav>

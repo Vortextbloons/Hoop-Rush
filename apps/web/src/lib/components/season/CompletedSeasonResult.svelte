@@ -250,9 +250,10 @@
     <div
       id="result-error-heading"
       role="alert"
-      class="mx-auto w-full max-w-xl rounded-xl border border-destructive/40 bg-destructive/10 p-6"
+      class="sr-panel mx-auto w-full max-w-xl p-6"
     >
-      <h1 class="font-display text-xl font-extrabold uppercase tracking-tight">
+      <p class="sr-eyebrow">Season Run</p>
+      <h1 class="font-display mt-1 text-xl font-extrabold uppercase tracking-tight">
         Season result unavailable
       </h1>
       <p class="mt-2 text-sm text-muted-foreground">
@@ -267,13 +268,13 @@
             loadedRunId = null;
             void loadResult();
           }}
-          class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 motion-reduce:transition-none"
+          class="sr-btn-danger"
         >
           Try again
         </button>
         <a
           href={resolve('/season/run/history')}
-          class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring hover:text-foreground motion-reduce:transition-none"
+          class="sr-btn-ghost"
         >
           Back to history
         </a>
@@ -286,30 +287,28 @@
   </p>
 {:else}
   <section aria-labelledby="result-heading" class="min-w-0 pt-6">
-    <div class="flex flex-col gap-3 px-3 sm:flex-row sm:items-end sm:justify-between sm:px-0">
-      <div class="min-w-0">
-        <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">
-          Season Run · completed season
-        </p>
+    <div class="sr-arrive flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <div class="sr-panel-featured min-w-0 flex-1 p-5 sm:p-6">
+        <p class="sr-eyebrow">Season Run · completed season</p>
         <h1
           id="result-heading"
-          class="font-display mt-1 text-2xl font-extrabold tracking-tight uppercase sm:text-3xl"
+          class="sr-page-title mt-1"
         >
           {run.postseason.championFranchiseId !== null
             ? shell.franchiseName(run.postseason.championFranchiseId)
             : 'Season'}
         </h1>
         {#if championRecord !== null}
-          <p class="font-display mt-1 text-xl font-extrabold tracking-tight">
-            {championRecord}
-            <span class="ml-2 align-middle font-mono text-xs font-normal text-muted-foreground">
+          <p class="mt-2 flex flex-wrap items-baseline gap-x-2">
+            <span class="sr-number text-2xl font-extrabold">{championRecord}</span>
+            <span class="font-mono text-xs text-muted-foreground">
               Final record · champions
             </span>
           </p>
         {/if}
-        <details class="mt-3 rounded-lg border border-border bg-surface-1 px-4 py-3">
+        <details class="mt-3 rounded-lg border border-border bg-surface-2 px-4 py-3">
           <summary
-            class="inline-flex min-h-11 cursor-pointer items-center font-mono text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden"
+            class="sr-section-label inline-flex min-h-11 cursor-pointer items-center outline-none [&::-webkit-details-marker]:hidden"
           >
             Export details
           </summary>
@@ -346,7 +345,7 @@
       <div class="flex shrink-0 flex-wrap gap-2">
         <a
           href={resolve('/season/run/history')}
-          class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:text-foreground motion-reduce:transition-none"
+          class="sr-btn-ghost"
         >
           Back to history
         </a>
@@ -354,7 +353,7 @@
           type="button"
           data-season-history-delete
           onclick={() => (deleteOpen = true)}
-          class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-destructive/50 px-4 py-2 text-sm font-semibold text-destructive transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-destructive/10 motion-reduce:transition-none"
+          class="sr-btn-danger"
         >
           Delete season
         </button>
@@ -374,7 +373,7 @@
     </div>
 
     <div class="mt-8">
-      <h2 class="font-display text-base font-extrabold uppercase tracking-tight">Final bracket</h2>
+      <h2 class="sr-section-label">Final bracket</h2>
       <div class="mt-3">
         <PostseasonBracket
           postseason={run.postseason}
@@ -387,7 +386,7 @@
     </div>
 
     <div class="mt-8">
-      <h2 class="font-display text-base font-extrabold uppercase tracking-tight">
+      <h2 class="sr-section-label">
         Final standings
       </h2>
       <div class="mt-3">
@@ -411,14 +410,15 @@
 
     {#if postseasonRows.length > 0}
       <div class="mt-8">
-        <h2 class="font-display text-base font-extrabold uppercase tracking-tight">
+        <h2 class="sr-section-label">
           Postseason results
         </h2>
-        <ul class="mt-3 flex flex-col gap-1">
+        <ul class="mt-3 flex flex-col gap-2">
           {#each postseasonRows as row (row.summary.gameId)}
             <li
               data-season-history-postseason-game={row.summary.gameId}
-              class="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg bg-surface-1 px-4 py-2.5"
+              data-result={row.humanGame ? (row.humanWon === true ? 'win' : 'loss') : undefined}
+              class="sr-gamecard flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5"
             >
               <span class="w-24 shrink-0 font-mono text-xs text-muted-foreground">
                 {row.phaseLabel} · {row.roundLabel}
@@ -429,8 +429,8 @@
                 {shell.franchiseName(row.summary.homeFranchiseId)}
               </span>
               <span
-                class="shrink-0 font-mono text-xs font-bold {row.humanWon === true
-                  ? 'text-primary'
+                class="sr-number shrink-0 font-mono text-xs font-bold {row.humanWon === true
+                  ? 'text-positive'
                   : ''}"
               >
                 {row.humanGame ? (row.humanWon === true ? 'W ' : 'L ') : ''}{row.scoreLabel}
@@ -440,7 +440,7 @@
                 data-season-history-export={row.summary.gameId}
                 onclick={() => void exportGame(row.summary.gameId)}
                 disabled={exportingGameId !== null || exportingFullRun}
-                class="inline-flex min-h-11 shrink-0 items-center rounded-lg border border-border px-2.5 py-1 font-mono text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none"
+                class="inline-flex min-h-11 shrink-0 items-center rounded-lg border border-border px-2.5 py-1 font-mono text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground outline-none transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none"
               >
                 {exportingGameId === row.summary.gameId ? 'Exporting…' : 'Export'}
               </button>
@@ -472,7 +472,7 @@
 
     {#if leaderTables !== null}
       <div class="mt-8">
-        <h2 class="font-display text-base font-extrabold uppercase tracking-tight">
+        <h2 class="sr-section-label">
           Regular-season leaders
         </h2>
         <p class="mt-1 font-mono text-xs text-muted-foreground">
@@ -480,22 +480,22 @@
         </p>
         <div class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {#each LEADER_CATEGORIES as category (category)}
-            <div class="rounded-xl border border-border bg-surface-1 p-3">
+            <div class="sr-panel-quiet p-3">
               <p
-                class="font-mono text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground"
+                class="sr-section-label"
               >
                 {LEADER_CATEGORY_LABELS[category]}
               </p>
               <ol class="mt-1 flex flex-col divide-y divide-border/40">
                 {#each (leaderTables[category] ?? []).slice(0, 3) as entry, rank (entry.playerVersionId)}
                   <li class="flex items-center gap-2 py-1.5 text-sm">
-                    <span class="w-4 shrink-0 font-mono text-xs font-bold text-muted-foreground">
+                    <span class="sr-number w-4 shrink-0 font-mono text-xs font-bold text-muted-foreground">
                       {rank + 1}
                     </span>
                     <span class="min-w-0 flex-1 truncate font-semibold">
                       {playerName(entry.playerVersionId)}
                     </span>
-                    <span class="shrink-0 font-mono text-xs text-muted-foreground">
+                    <span class="sr-number shrink-0 font-mono text-xs text-muted-foreground">
                       {Number.isInteger(entry.perGame)
                         ? String(entry.perGame)
                         : entry.perGame.toFixed(1)}
@@ -511,18 +511,18 @@
 
     {#if blockRecaps.length > 0}
       <div class="mt-8">
-        <h2 class="font-display text-base font-extrabold uppercase tracking-tight">
+        <h2 class="sr-section-label">
           Regular-season recaps
         </h2>
-        <ul class="mt-3 flex flex-col gap-1">
+        <ul class="mt-3 flex flex-col gap-2">
           {#each blockRecaps as entry (entry.blockIndex)}
-            <li class="rounded-lg bg-surface-1 px-4 py-3">
+            <li class="sr-panel-quiet px-4 py-3">
               <div class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
                 <span class="font-mono text-xs font-bold uppercase text-primary">
                   Block {entry.blockIndex + 1} of 9
                 </span>
                 {#if entry.recap.humanRecord !== null}
-                  <span class="font-mono text-xs font-bold">
+                  <span class="sr-number font-mono text-xs font-bold">
                     {recordLabel(
                       entry.recap.humanRecord.winsAfter,
                       entry.recap.humanRecord.lossesAfter,
@@ -554,10 +554,10 @@
 
     {#if injuryTimeline.length > 0}
       <div class="mt-8">
-        <h2 class="font-display text-base font-extrabold uppercase tracking-tight">Injuries</h2>
-        <ul class="mt-3 flex flex-col gap-1">
+        <h2 class="sr-section-label">Injuries</h2>
+        <ul class="mt-3 flex flex-col gap-2">
           {#each injuryTimeline as player (player.playerVersionId)}
-            <li class="rounded-lg bg-surface-1 px-4 py-2.5">
+            <li class="sr-panel-quiet px-4 py-2.5">
               <p class="text-sm font-semibold">{player.displayName}</p>
               <ul class="mt-1 flex flex-col gap-0.5">
                 {#each player.entries as injury (injury.injuryId)}
@@ -578,10 +578,10 @@
 
     {#if humanTransactions.length > 0}
       <div class="mt-8">
-        <h2 class="font-display text-base font-extrabold uppercase tracking-tight">Transactions</h2>
-        <ul class="mt-3 flex flex-col gap-1">
+        <h2 class="sr-section-label">Transactions</h2>
+        <ul class="mt-3 flex flex-col gap-2">
           {#each humanTransactions.slice(-12).reverse() as entry (entry.transactionId)}
-            <li class="rounded-lg bg-surface-1 px-4 py-2.5 text-sm">
+            <li class="sr-panel-quiet px-4 py-2.5 text-sm">
               <span
                 class="font-mono text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground"
               >
@@ -596,15 +596,15 @@
 
     {#if humanTradeGrades.length > 0}
       <div class="mt-8">
-        <h2 class="font-display text-base font-extrabold uppercase tracking-tight">Trade grades</h2>
+        <h2 class="sr-section-label">Trade grades</h2>
         <p class="mt-1 font-mono text-xs text-muted-foreground">
           Post-trade production, availability, minutes, and team trend from recorded facts
         </p>
-        <ul class="mt-3 flex flex-col gap-1">
+        <ul class="mt-3 flex flex-col gap-2">
           {#each humanTradeGrades as entry (entry.grade.gradeId)}
-            <li class="rounded-lg bg-surface-1 px-4 py-2.5 text-sm">
+            <li class="sr-panel-quiet px-4 py-2.5 text-sm">
               <div class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-                <span class="font-mono text-lg font-bold tracking-tight">{entry.view.label}</span>
+                <span class="sr-number font-mono text-lg font-bold tracking-tight">{entry.view.label}</span>
                 <span class="font-mono text-xs text-muted-foreground">
                   {entry.view.windowLabel}
                 </span>
@@ -622,7 +622,7 @@
         data-season-history-export-full-run
         onclick={() => void exportFullRun()}
         disabled={exportingGameId !== null || exportingFullRun}
-        class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border px-4 py-2 font-mono text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none"
+        class="sr-btn-ghost"
       >
         {exportingFullRun ? 'Exporting full run…' : 'Export full-run replay'}
       </button>
@@ -640,12 +640,12 @@
   }}
 >
   <Dialog.Portal>
-    <Dialog.Overlay class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" />
+    <Dialog.Overlay class="sr-dialog-overlay" />
     <Dialog.Content
-      class="fixed inset-x-0 bottom-0 z-50 mx-auto max-h-[85dvh] w-full overflow-y-auto rounded-t-2xl border-t border-border bg-card p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl shadow-black/40 outline-none sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:max-w-md sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:border sm:pb-4"
+      class="sr-dialog w-[min(28rem,calc(100vw-2rem))] p-6"
     >
       <div class="flex items-start justify-between gap-3">
-        <Dialog.Title class="font-display truncate text-lg font-extrabold tracking-tight uppercase">
+        <Dialog.Title class="sr-page-title text-2xl">
           Delete this season?
         </Dialog.Title>
       </div>
@@ -666,7 +666,7 @@
           type="button"
           onclick={() => (deleteOpen = false)}
           disabled={deleting}
-          class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:border-line-strong disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none"
+          class="sr-btn-ghost"
         >
           Keep it
         </button>
@@ -674,7 +674,7 @@
           type="button"
           onclick={() => void confirmDelete()}
           disabled={deleting}
-          class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-destructive/50 px-4 py-2 text-sm font-semibold text-destructive transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none"
+          class="sr-btn-danger"
         >
           {deleting ? 'Deleting…' : 'Delete season'}
         </button>

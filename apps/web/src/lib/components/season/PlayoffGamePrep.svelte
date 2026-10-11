@@ -30,20 +30,18 @@
   class="flex scroll-mt-24 flex-col gap-3"
 >
   <div class="flex flex-wrap items-baseline justify-between gap-2 px-1">
-    <h2 id="game-prep-heading" class="font-display text-lg font-extrabold uppercase tracking-tight">
+    <h2 id="game-prep-heading" class="font-display text-lg font-extrabold uppercase tracking-tight text-foreground">
       Game prep
     </h2>
-    <p class="font-mono text-[10px] text-muted-foreground">{gameLabel}</p>
+    <p class="sr-section-label">{gameLabel}</p>
   </div>
   <div class="grid gap-3 md:grid-cols-3">
-    <div class="rounded-2xl border border-border bg-surface-1 p-4">
-      <p class="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
-        Rotation
-      </p>
+    <div class="sr-panel-quiet p-4">
+      <p class="sr-section-label">Rotation</p>
       {#if prep === null}
         <p class="mt-2 animate-pulse text-xs text-muted-foreground">Loading rotation…</p>
       {:else}
-        <p class="mt-2 font-display text-xl font-extrabold tabular-nums">{prep.rotationLabel}</p>
+        <p class="sr-number mt-2 text-xl font-extrabold text-foreground">{prep.rotationLabel}</p>
         <p class="mt-1 line-clamp-2 text-xs text-muted-foreground">{prep.startersLabel}</p>
         {#if prep.invalid && prep.firstFailure !== null}
           <p
@@ -61,46 +59,43 @@
           </p>
         {:else}
           <p
-            class="mt-2 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-amber-600 dark:text-amber-400"
+            class="mt-2 inline-flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-accent"
           >
-            Needs a fix
+            <span class="inline-block h-1.5 w-1.5 rounded-full bg-accent" aria-hidden="true"
+            ></span>Needs a fix
           </p>
         {/if}
       {/if}
       <a
         href={resolve('/season/run/team' as any)}
-        class="mt-3 inline-flex min-h-10 items-center gap-1 text-xs font-bold text-primary underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring hover:underline"
+        class="mt-3 inline-flex min-h-11 items-center gap-1 text-xs font-bold text-primary underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring hover:underline"
       >
         Edit rotation <span aria-hidden="true">→</span>
       </a>
     </div>
-    <div class="rounded-2xl border border-border bg-surface-1 p-4">
-      <p class="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
-        Health
-      </p>
-      <p class="mt-2 font-display text-xl font-extrabold">{healthLabel}</p>
+    <div class="sr-panel-quiet p-4">
+      <p class="sr-section-label">Health</p>
+      <p class="sr-number mt-2 text-xl font-extrabold text-foreground">{healthLabel}</p>
       <p class="mt-1 text-xs text-muted-foreground">
         {#if rehabCount > 0}{rehabCount} risky rehab option{rehabCount === 1 ? '' : 's'} below{:else}No
           rehab decisions needed{/if}
       </p>
       <a
         href={resolve('/season/run/team' as any)}
-        class="mt-3 inline-flex min-h-10 items-center gap-1 text-xs font-bold text-primary underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring hover:underline"
+        class="mt-3 inline-flex min-h-11 items-center gap-1 text-xs font-bold text-primary underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring hover:underline"
       >
         Review health <span aria-hidden="true">→</span>
       </a>
     </div>
-    <div class="rounded-2xl border border-border bg-surface-1 p-4">
-      <p class="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
-        Closers
-      </p>
-      <p class="mt-2 font-display text-xl font-extrabold tabular-nums">
+    <div class="sr-panel-quiet p-4">
+      <p class="sr-section-label">Closers</p>
+      <p class="sr-number mt-2 text-xl font-extrabold text-foreground">
         {prep === null ? '—' : `${String(prep.closersSet)}/5 set`}
       </p>
       <p class="mt-1 text-xs text-muted-foreground">Closing five finishes tight playoff games.</p>
       <a
         href={resolve('/season/run/team' as any)}
-        class="mt-3 inline-flex min-h-10 items-center gap-1 text-xs font-bold text-primary underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring hover:underline"
+        class="mt-3 inline-flex min-h-11 items-center gap-1 text-xs font-bold text-primary underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring hover:underline"
       >
         Adjust closers <span aria-hidden="true">→</span>
       </a>

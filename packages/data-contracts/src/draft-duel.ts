@@ -31,7 +31,6 @@ export {
   DRAFT_DUEL_PICK_TIMEOUT_MS,
   DRAFT_DUEL_GAME_READY_TIMEOUT_MS,
   DRAFT_DUEL_BROADCAST_MS,
-  DRAFT_DUEL_ROUND_REVEAL_MS,
   DRAFT_DUEL_PICK_ANIMATION_MS,
   DRAFT_DUEL_SHOWDOWN_MS,
   DRAFT_DUEL_SEED_VERSION,
@@ -106,6 +105,7 @@ export type DraftDuelRoomSettings = z.infer<typeof draftDuelRoomSettingsSchema>;
 export const draftDuelCardSchema = z.object({
   cardId: collectionCardIdSchema,
   playerId: playerIdSchema,
+  playerExternalId: z.string().min(1).max(64).optional(),
   playerVersionId: playerVersionIdSchema,
   displayName: z.string().min(1).max(96),
   seasonKey: seasonKeySchema,
@@ -138,6 +138,7 @@ export const draftDuelPickSchema = z.object({
   slot: z.number().int().min(0).max(7),
   participantId: draftDuelParticipantIdSchema,
   card: draftDuelCardSchema,
+  slotIndex: z.number().int().min(0).max(4).optional(),
 });
 export type DraftDuelPick = z.infer<typeof draftDuelPickSchema>;
 export const draftDuelRoundSchema = z.object({
@@ -182,6 +183,7 @@ export const draftDuelOfferedPickSchema = z.object({
   card: draftDuelCardSchema,
   available: z.boolean(),
   reason: draftDuelUnavailableReasonSchema.nullable(),
+  legalSlots: z.array(z.number().int().min(0).max(4)).max(5).optional(),
 });
 export type DraftDuelOfferedPick = z.infer<typeof draftDuelOfferedPickSchema>;
 
@@ -202,12 +204,14 @@ export const draftDuelPickPayloadSchema = z.object({
   pickOrdinal: z.number().int().min(0).max(9),
   playerId: playerIdSchema,
   playerVersionId: playerVersionIdSchema,
+  slotIndex: z.number().int().min(0).max(4).optional(),
 });
 export const draftDuelTimeoutAutopickPayloadSchema = z.object({
   kind: z.literal('timeout-autopick'),
   pickOrdinal: z.number().int().min(0).max(9),
   playerId: playerIdSchema,
   playerVersionId: playerVersionIdSchema,
+  slotIndex: z.number().int().min(0).max(4).optional(),
   seedPath: z.string().min(1).max(256),
 });
 export const draftDuelReadyNextGamePayloadSchema = z.object({

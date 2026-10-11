@@ -190,14 +190,14 @@ function checkResultInternals(
     if (periodSum !== team.points) {
       fail(
         'period-ledger',
-        `${team.side} period totals ${periodSum} != team points ${team.points}`,
+        `${team.side} period totals ${String(periodSum)} != team points ${String(team.points)}`,
       );
     }
     const participantPoints = team.participants.reduce((sum, line) => sum + line.points, 0);
     if (participantPoints !== team.points) {
       fail(
         'points-ledger',
-        `${team.side} participant points ${participantPoints} != team points ${team.points}`,
+        `${team.side} participant points ${String(participantPoints)} != team points ${String(team.points)}`,
       );
     }
     for (const line of team.participants) {
@@ -298,19 +298,21 @@ function checkTape(
     }
     let points = entry.nominalPoints;
     for (const addend of entry.addends) {
+      const rawSource: string = addend.source;
       if (!isScoringSource(addend.source))
-        fail('scoring-entry', `unknown scoring source ${addend.source}`);
+        fail('scoring-entry', `unknown scoring source ${rawSource}`);
       points += addend.points;
     }
     for (const multiplier of entry.multipliers) {
+      const rawSource: string = multiplier.source;
       if (!isScoringSource(multiplier.source))
-        fail('scoring-entry', `unknown scoring source ${multiplier.source}`);
+        fail('scoring-entry', `unknown scoring source ${rawSource}`);
       points *= multiplier.factor;
     }
     if (points !== entry.points) {
       fail(
         'points-ledger',
-        `scoring entry ${entry.sequence} points ${entry.points} != resolved ${points}`,
+        `scoring entry ${String(entry.sequence)} points ${String(entry.points)} != resolved ${String(points)}`,
       );
     }
     const sources = [...entry.addends, ...entry.multipliers].map((component) => component.source);
@@ -323,14 +325,17 @@ function checkTape(
       if (!sources.some((source) => owner.mutations.has(HAVOC_SCORING_SOURCE_MUTATION[source]))) {
         fail(
           'scoring-entry',
-          `owner ${ownerId} does not own any scoring source on entry ${entry.sequence}`,
+          `owner ${ownerId} does not own any scoring source on entry ${String(entry.sequence)}`,
         );
       }
       if (owner.sideIndex !== sideIndex)
         fail('scoring-entry', `owner ${ownerId} is not on the scoring side`);
     }
     if (sources.length > 0 && entry.owners.length === 0) {
-      fail('scoring-entry', `scoring entry ${entry.sequence} has no owners for its sources`);
+      fail(
+        'scoring-entry',
+        `scoring entry ${String(entry.sequence)} has no owners for its sources`,
+      );
     }
     sidePoints[sideIndex ?? 0] += entry.points;
     const bucket = periodPoints[sideIndex ?? 0];
@@ -338,7 +343,7 @@ function checkTape(
     if (periodIndex >= 0 && periodIndex < bucket.length) {
       bucket[periodIndex] = (bucket[periodIndex] ?? 0) + entry.points;
     } else {
-      fail('period-ledger', `scoring entry ${entry.sequence} period out of range`);
+      fail('period-ledger', `scoring entry ${String(entry.sequence)} period out of range`);
     }
     actorPoints.set(
       entry.actorInstanceId,
@@ -350,7 +355,7 @@ function checkTape(
     if (sidePoints[side] !== team.points) {
       fail(
         'points-ledger',
-        `${team.side} ledger points ${sidePoints[side]} != result ${team.points}`,
+        `${team.side} ledger points ${String(sidePoints[side])} != result ${String(team.points)}`,
       );
     }
     for (let index = 0; index < team.periods.length; index += 1) {
@@ -365,7 +370,10 @@ function checkTape(
   for (const line of [...result.home.participants, ...result.away.participants]) {
     const points = actorPoints.get(line.instanceId) ?? 0;
     if (points !== line.points) {
-      fail('points-ledger', `${line.instanceId} ledger points ${points} != line ${line.points}`);
+      fail(
+        'points-ledger',
+        `${line.instanceId} ledger points ${String(points)} != line ${String(line.points)}`,
+      );
     }
   }
 
@@ -390,6 +398,7 @@ function checkTape(
     }
   }
   const queued = new Map<string, number>();
+  const queuedCounts = new Map<string, number>();
   const cloneEntered = new Set<string>();
   const cloneExited = new Set<string>();
   const grantCounts = new Map<string, number>();
@@ -588,6 +597,7 @@ function checkTape(
         const key = `${event.side}:${event.ownerInstanceId}`;
         if (event.outcome === 'queued') {
           queued.set(key, (queued.get(key) ?? 0) + 1);
+          queuedCounts.set(key, (queuedCounts.get(key) ?? 0) + 1);
         } else if (event.outcome === 'started') {
           if ((queued.get(key) ?? 0) <= 0)
             fail('extra-possessions', 'extra possession started without a grant');
@@ -678,10 +688,16 @@ function checkTape(
     const line = findLine(result, instanceId);
     if (line === undefined) continue;
     if (line.fouls !== state.committed) {
-      fail('fouls', `${instanceId} committed fouls ${state.committed} != line ${line.fouls}`);
+      fail(
+        'fouls',
+        `${instanceId} committed fouls ${String(state.committed)} != line ${String(line.fouls)}`,
+      );
     }
     if (line.chargedFouls !== state.charged) {
-      fail('fouls', `${instanceId} charged fouls ${state.charged} != line ${line.chargedFouls}`);
+      fail(
+        'fouls',
+        `${instanceId} charged fouls ${String(state.charged)} != line ${String(line.chargedFouls)}`,
+      );
     }
   }
   for (const line of [...result.home.participants, ...result.away.participants]) {
@@ -727,7 +743,7 @@ function checkTape(
     if (officialTurnovers + violations !== team.turnovers) {
       fail(
         'turnovers',
-        `${team.side} official turnovers ${officialTurnovers} + clock violations ${violations} != result ${team.turnovers}`,
+        `${team.side} official turnovers ${String(officialTurnovers)} + clock violations ${String(violations)} != result ${String(team.turnovers)}`,
       );
     }
   }
@@ -742,7 +758,7 @@ function checkTape(
     if (official > line.turnovers) {
       fail(
         'turnovers',
-        `${line.instanceId} official turnover events ${official} exceed line ${line.turnovers}`,
+        `${line.instanceId} official turnover events ${String(official)} exceed line ${String(line.turnovers)}`,
       );
     }
     if ((counts.get(`${line.instanceId}:assists`) ?? 0) !== line.assists) {
@@ -771,8 +787,13 @@ function checkTape(
   for (const [key, pending] of queued) {
     if (pending !== 0) fail('extra-possessions', `unexpired extra possessions remain for ${key}`);
   }
-  for (const [key] of grantCounts) {
-    if ((queued.get(key) ?? 0) < 0) fail('extra-possessions', `negative queue for ${key}`);
+  for (const [key, granted] of grantCounts) {
+    if ((queuedCounts.get(key) ?? 0) !== granted) {
+      fail(
+        'extra-possessions',
+        `rebound loop grants ${String(granted)} != queued extra possessions ${String(queuedCounts.get(key) ?? 0)}`,
+      );
+    }
   }
 }
 
@@ -810,14 +831,20 @@ function checkCourtTime(
     if (team.courtSeconds !== 5 * gameSeconds + cloneSeconds) {
       fail(
         'court-time',
-        `${team.side} court seconds ${team.courtSeconds} != 5*game + clone seconds (${5 * gameSeconds + cloneSeconds})`,
+        `${team.side} court seconds ${String(team.courtSeconds)} != 5*game + clone seconds (${String(5 * gameSeconds + cloneSeconds)})`,
       );
     }
     if (totalSeconds !== team.courtSeconds) {
-      fail('court-time', `${team.side} participant seconds ${totalSeconds} != team court seconds`);
+      fail(
+        'court-time',
+        `${team.side} participant seconds ${String(totalSeconds)} != team court seconds`,
+      );
     }
     if (nonCloneSeconds !== 5 * gameSeconds) {
-      fail('court-time', `${team.side} non-clone seconds ${nonCloneSeconds} != 5*game seconds`);
+      fail(
+        'court-time',
+        `${team.side} non-clone seconds ${String(nonCloneSeconds)} != 5*game seconds`,
+      );
     }
   }
 }

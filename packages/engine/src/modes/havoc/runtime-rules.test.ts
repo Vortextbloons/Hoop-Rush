@@ -560,3 +560,144 @@ describe('havoc overtime and free throws', () => {
     expect(entry?.multipliers).toEqual([]);
   });
 });
+
+describe('havoc team-wide powers and physical mechanisms', () => {
+  it('applies a repeated team-wide power once with a coalesced owner list', () => {
+    const human = buildScenarioTeam('human', [
+      scenarioSlot('PG', ['double-or-nothing']),
+      scenarioSlot('SG', ['double-or-nothing']),
+      ...plainSlots().slice(2),
+    ]);
+    const away = buildScenarioTeam('opponent', plainSlots());
+    const run = searchScenario(8, human, away, (candidate) =>
+      candidate.tape.scoring.some(
+        (entry) =>
+          entry.kind === 'field-goal' &&
+          entry.multipliers.some((multiplier) => multiplier.source === 'double-or-nothing'),
+      ),
+    );
+    expect(run, 'expected a doubled field goal').not.toBeNull();
+    if (run === null) return;
+    const doubled = run.tape.scoring.find(
+      (entry) =>
+        entry.kind === 'field-goal' &&
+        entry.multipliers.some((multiplier) => multiplier.source === 'double-or-nothing'),
+    );
+    expect(doubled).toBeDefined();
+    if (doubled === undefined) return;
+    expect(
+      doubled.multipliers.filter((multiplier) => multiplier.source === 'double-or-nothing').length,
+    ).toBe(1);
+    expect(doubled.owners.length).toBe(2);
+  });
+
+  it('keeps a team-wide power active while another owner remains', () => {
+    const foulProne: Partial<SimulationTendencies> = { ...FOUL_MAGNET, foulRate: 20 };
+    const human = buildScenarioTeam('human', [
+      scenarioSlot('PG', ['reverse-basketball'], {
+        ratings: { ...RIM_ATTACK, strength: 99, interiorDefense: 99, defensiveIq: 10 },
+        tendencies: foulProne,
+      }),
+      scenarioSlot('SG', ['reverse-basketball']),
+      ...plainSlots().slice(2),
+    ]);
+    const away = buildScenarioTeam('opponent', plainSlots());
+    const pgInstanceId = human.starters[0]?.instanceId ?? '';
+    const run = searchScenario(96, human, away, (candidate) => {
+      const substitution = candidate.tape.events.find(
+        (event) => event.kind === 'substitution' && event.outInstanceId === pgInstanceId,
+      );
+      if (substitution === undefined) return false;
+      return candidate.tape.scoring.some(
+        (entry) =>
+          entry.addends.some((addend) => addend.source === 'reverse-basketball') &&
+          entry.originalEventSequence !== null &&
+          entry.originalEventSequence > substitution.sequence,
+      );
+    });
+    expect(run, 'expected a game where one reverse owner exits').not.toBeNull();
+    if (run === null) return;
+    const substitution = run.tape.events.find(
+      (event) => event.kind === 'substitution' && event.outInstanceId === pgInstanceId,
+    );
+    if (substitution === undefined) return;
+    const laterEntries = run.tape.scoring.filter(
+      (entry) =>
+        entry.addends.some((addend) => addend.source === 'reverse-basketball') &&
+        entry.originalEventSequence !== null &&
+        entry.originalEventSequence > substitution.sequence,
+    );
+    expect(laterEntries.length).toBeGreaterThan(0);
+    for (const entry of laterEntries) {
+      expect(entry.owners).not.toContain(pgInstanceId);
+    }
+  });
+
+  it('changes simulation outcomes when runtime mechanisms are active', () => {
+    const away = buildScenarioTeam('opponent', plainSlots());
+    const without = buildScenarioTeam('human', plainSlots());
+    const cases: Array<{
+      label: string;
+      build: () => ReturnType<typeof buildScenarioTeam>;
+    }> = [
+      {
+        label: 'body-snatcher',
+        build: () =>
+          buildScenarioTeam('human', [
+            scenarioSlot('PG', ['body-snatcher']),
+            ...plainSlots().slice(1),
+          ]),
+      },
+      {
+        label: 'the-great-equalizer',
+        build: () =>
+          buildScenarioTeam('human', [
+            scenarioSlot('PG', ['the-great-equalizer']),
+            ...plainSlots().slice(1),
+          ]),
+      },
+      {
+        label: 'time-lord',
+        build: () =>
+          buildScenarioTeam('human', [scenarioSlot('PG', ['time-lord']), ...plainSlots().slice(1)]),
+      },
+      {
+        label: 'clone-army',
+        build: () =>
+          buildScenarioTeam('human', [
+            scenarioSlot('PG', ['clone-army']),
+            ...plainSlots().slice(1),
+          ]),
+      },
+      {
+        label: 'reach',
+        build: () =>
+          buildScenarioTeam(
+            'human',
+            plainSlots().map((entry) => ({
+              ...entry,
+              physical: { reachUnits: 2, wingspanDeltaInches: 18 },
+            })),
+          ),
+      },
+      {
+        label: 'height',
+        build: () =>
+          buildScenarioTeam(
+            'human',
+            plainSlots().map((entry) => ({ ...entry, physical: { heightInches: 86 } })),
+          ),
+      },
+    ];
+    for (const scenario of cases) {
+      let differed = false;
+      for (let seedIndex = 0; seedIndex < 4 && !differed; seedIndex += 1) {
+        const seed = `havoc-mechanism-${scenario.label}-${String(seedIndex)}`;
+        const withMechanism = runScenario(scenario.build(), away, seed);
+        const baseline = runScenario(without, away, seed);
+        if (withMechanism.tapeDigest !== baseline.tapeDigest) differed = true;
+      }
+      expect(differed, `${scenario.label} did not change the simulation`).toBe(true);
+    }
+  });
+});

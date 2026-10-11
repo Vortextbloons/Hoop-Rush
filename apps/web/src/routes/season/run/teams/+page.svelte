@@ -66,18 +66,18 @@
 <div
   class="flex min-w-0 flex-col gap-4 pt-6 pb-[calc(5.25rem+env(safe-area-inset-bottom))] md:pb-6"
 >
-  <div class="flex min-w-0 items-center justify-between gap-3 px-3 sm:px-0">
+  <div class="sr-arrive flex min-w-0 items-center justify-between gap-3">
     <a
       href={resolve('/season/run/league')}
       data-season-team-detail-back
-      class="inline-flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring hover:text-foreground"
+      class="font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground outline-none transition-colors hover:text-foreground motion-reduce:transition-none"
     >
       ← League
     </a>
     {#if isHuman && detail !== null}
       <a
         href={resolve('/season/run/team' as any)}
-        class="inline-flex items-center gap-2 rounded-lg border border-primary/60 bg-surface-2 px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-primary transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:border-primary hover:bg-surface-3"
+        class="inline-flex min-h-11 items-center gap-2 rounded-full border border-line-strong bg-surface-2 px-4 font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-primary transition-colors outline-none hover:border-primary motion-reduce:transition-none"
       >
         Edit rotation
       </a>
@@ -87,12 +87,13 @@
   {#if detail === null || manifest === null}
     <section
       aria-labelledby="team-missing-heading"
-      class="mx-auto mt-8 w-full max-w-xl px-3 sm:px-0"
+      class="mx-auto mt-8 w-full max-w-xl"
     >
-      <div class="rounded-xl bg-surface-1 p-6 text-center">
+      <div class="sr-panel p-6 text-center">
+        <p class="sr-eyebrow">Season Run</p>
         <h2
           id="team-missing-heading"
-          class="font-display text-xl font-extrabold uppercase tracking-tight"
+          class="sr-page-title mt-1 text-2xl"
         >
           Team not found
         </h2>
@@ -103,7 +104,7 @@
         </p>
         <a
           href={resolve('/season/run/league')}
-          class="mt-4 inline-block rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+          class="sr-btn-ghost mt-4"
         >
           Back to League
         </a>

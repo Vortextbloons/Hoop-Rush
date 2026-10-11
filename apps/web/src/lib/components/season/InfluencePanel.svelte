@@ -82,7 +82,7 @@
 
 <section
   aria-labelledby="influence-heading"
-  class="rounded-none bg-surface-1 p-4 sm:rounded-xl"
+  class="sr-panel-quiet p-4"
   data-season-influence-panel
 >
   <div class="flex flex-wrap items-baseline justify-between gap-2">
@@ -94,24 +94,26 @@
     </h2>
   </div>
 
-  <div class="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-    <p class="text-lg font-extrabold tabular-nums">◆ {balance}/{cap}</p>
-    <p class="text-xs text-muted-foreground">
-      {atCap
-        ? 'Full — spend to keep earning'
-        : atFloor
-          ? 'Empty — play blocks to earn more'
-          : 'Play blocks to earn more.'}
-    </p>
+  <div class="mt-2">
+    <div class="sr-stat-tile" data-tone={atFloor ? 'loss' : 'live'}>
+      <strong>◆ {balance}/{cap}</strong>
+      <span>
+        {atCap
+          ? 'Full — spend to keep earning'
+          : atFloor
+            ? 'Empty — play blocks to earn more'
+            : 'Play blocks to earn more.'}
+      </span>
+    </div>
   </div>
 
   {#if affordances.some((affordance) => !affordance.spent)}
     <div class="mt-3 flex flex-col gap-2">
-      <p class="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+      <p class="sr-section-label">
         Use Influence
       </p>
       {#each affordances.filter((affordance) => !affordance.spent) as affordance (affordance.purpose + (affordance.injuryId ?? affordance.windowIndex))}
-        <div class="flex flex-wrap items-center justify-between gap-2">
+        <div class="sr-gamecard flex flex-wrap items-center justify-between gap-2 p-3">
           <div class="min-w-0">
             <p class="text-sm font-semibold">
               {#if affordance.purpose === 'extra-trade-offer'}
@@ -119,7 +121,7 @@
               {:else}
                 {rehabTitle(affordance)}
               {/if}
-              <span class="ml-1 text-xs font-normal text-muted-foreground">
+              <span class="sr-chip ml-1">
                 {affordance.cost} Influence
               </span>
             </p>
@@ -133,7 +135,7 @@
             type="button"
             onclick={() => openConfirm(affordance)}
             disabled={!affordance.affordable || busy}
-            class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+            class="sr-btn"
           >
             {affordance.affordable ? `Use ${affordance.cost}` : 'Need more'}
           </button>
@@ -144,7 +146,7 @@
 
   {#if recordedOutcomes.length > 0}
     <div class="mt-4">
-      <p class="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+      <p class="sr-section-label">
         Rehab results
       </p>
       <ul class="mt-1 flex flex-col gap-1">
@@ -155,12 +157,7 @@
                 ? playerName(affordance.playerVersionId)
                 : 'Injury rehab'}
             </span>
-            <span
-              class="shrink-0 rounded-full px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] {affordance.rehabOutcome ===
-              'success'
-                ? 'bg-positive/15 text-positive'
-                : 'bg-destructive/15 text-destructive'}"
-            >
+            <span class="sr-badge shrink-0" data-tone={affordance.rehabOutcome === 'success' ? 'win' : 'loss'}>
               {affordance.rehabOutcome === 'success' ? 'Back sooner' : 'Setback'}
             </span>
           </li>
@@ -172,7 +169,7 @@
   {#if entries.length > 0}
     <details class="mt-4">
       <summary
-        class="cursor-pointer font-mono text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        class="sr-section-label cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         Recent activity
       </summary>
@@ -182,7 +179,7 @@
             <span class="min-w-0 flex-1 truncate text-muted-foreground">
               {SOURCE_LABEL[entry.source]}
             </span>
-            <span class="shrink-0 font-mono text-[10px] font-bold tabular-nums">
+            <span class="sr-number shrink-0 font-mono text-[10px] font-bold tabular-nums">
               {deltaLabel(entry.appliedDelta)} → {entry.balanceAfter}
             </span>
           </li>
@@ -203,9 +200,9 @@
     }}
   >
     <Dialog.Portal>
-      <Dialog.Overlay class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" />
+      <Dialog.Overlay class="sr-dialog-overlay" />
       <Dialog.Content
-        class="fixed inset-x-0 bottom-0 z-50 mx-auto max-h-[85dvh] w-full overflow-y-auto rounded-t-2xl border-t border-border bg-card p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl shadow-black/40 outline-none sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:max-w-md sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:border sm:pb-4"
+        class="sr-dialog max-h-[85dvh] w-[calc(100vw-2rem)] max-w-md overflow-y-auto p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:p-6"
       >
         <div class="flex items-start justify-between gap-3">
           <Dialog.Title
@@ -231,7 +228,7 @@
             type="button"
             onclick={() => (spendOpen = false)}
             disabled={busy}
-            class="inline-flex items-center justify-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:border-line-strong disabled:cursor-not-allowed disabled:opacity-40"
+            class="sr-btn-ghost"
           >
             Cancel
           </button>
@@ -239,7 +236,7 @@
             type="button"
             onclick={confirmSpend}
             disabled={busy}
-            class="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+            class="sr-btn"
           >
             Confirm
           </button>

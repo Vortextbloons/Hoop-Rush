@@ -172,18 +172,20 @@
 
 <style>
   .bracket-shell {
-    --bracket-line: color-mix(in srgb, var(--color-primary) 30%, var(--color-border));
+    --bracket-line: color-mix(in srgb, var(--sr-hardwood) 30%, var(--sr-line));
   }
   .play-in-dock {
     margin-bottom: 1rem;
     padding: 1rem;
-    border: 1px solid var(--color-border);
+    border: 1px solid var(--sr-line);
     border-radius: 1rem;
-    background: linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--color-primary) 8%, var(--color-surface-1)),
-      var(--color-surface-1)
-    );
+    background:
+      linear-gradient(
+        135deg,
+        color-mix(in srgb, var(--sr-hardwood) 8%, transparent),
+        transparent 55%
+      ),
+      var(--sr-panel);
   }
   .dock-heading {
     display: flex;
@@ -193,12 +195,13 @@
     font-family: var(--font-display);
     font-weight: 900;
     text-transform: uppercase;
+    color: var(--sr-paper);
   }
   .dock-heading small,
   .conference-label {
     font-family: var(--font-mono);
     font-size: 0.625rem;
-    color: var(--color-muted-foreground);
+    color: var(--sr-muted);
     letter-spacing: 0.12em;
     text-transform: uppercase;
   }
@@ -207,16 +210,16 @@
     gap: 0.75rem;
     min-width: 940px;
     padding: 1rem;
-    border: 1px solid var(--color-border);
+    border: 1px solid var(--sr-line);
     border-radius: 1rem;
     background:
       linear-gradient(
         90deg,
-        color-mix(in srgb, #174ea6 5%, transparent),
+        color-mix(in srgb, #174ea6 7%, transparent),
         transparent 38% 62%,
-        color-mix(in srgb, #b91c1c 5%, transparent)
+        color-mix(in srgb, #b91c1c 7%, transparent)
       ),
-      var(--color-surface-0);
+      var(--sr-panel);
   }
   .conference-draw {
     display: grid;
@@ -246,11 +249,12 @@
   .finals-column h3,
   .mobile-round {
     margin: 0 0 0.6rem;
-    font-family: var(--font-display);
-    font-size: 0.72rem;
-    font-weight: 900;
-    letter-spacing: 0.04em;
+    font-family: var(--font-mono);
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
+    color: var(--sr-muted);
   }
   .round-stack {
     display: flex;
@@ -284,9 +288,12 @@
     min-width: 0;
     padding: 1rem 0.4rem;
     text-align: center;
-    border: 1px solid color-mix(in srgb, var(--color-primary) 40%, var(--color-border));
+    border: 1px solid color-mix(in srgb, var(--sr-hardwood) 45%, var(--sr-line));
     border-radius: 1rem;
-    background: color-mix(in srgb, var(--color-primary) 7%, var(--color-surface-1));
+    background:
+      linear-gradient(180deg, rgb(255 255 255 / 3%), transparent 30%),
+      color-mix(in srgb, var(--sr-hardwood) 7%, var(--sr-panel));
+    box-shadow: 0 14px 40px rgb(0 0 0 / 35%);
   }
   .finals-column :global(article) {
     text-align: left;
@@ -296,13 +303,13 @@
     font-family: var(--font-mono);
     font-size: 0.58rem;
     letter-spacing: 0.12em;
-    color: var(--color-muted-foreground);
+    color: var(--sr-muted);
     text-transform: uppercase;
   }
   .trophy-mark {
     display: block;
     margin-bottom: 0.35rem;
-    color: var(--color-primary);
+    color: var(--sr-hardwood-bright);
     font-size: 1.4rem;
   }
 </style>

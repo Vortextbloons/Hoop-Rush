@@ -94,7 +94,11 @@
 <section aria-labelledby="awards-heading" data-season-awards class="min-w-0">
   <div class="flex flex-wrap items-end justify-between gap-2">
     <div class="min-w-0">
-      <h2 id="awards-heading" class="font-display text-xl font-extrabold uppercase tracking-tight">
+      <p class="sr-eyebrow">Regular season</p>
+      <h2
+        id="awards-heading"
+        class="font-display mt-1 text-xl font-extrabold uppercase tracking-tight sm:text-2xl"
+      >
         Season awards
       </h2>
       <p class="mt-1 flex items-center gap-1.5 text-[13px] text-muted-foreground">
@@ -104,7 +108,7 @@
           role="note"
           aria-label="Rate-stat leaders and awards require 70 percent of team games. If nobody qualifies, the top available players are shown."
           title="Rate-stat leaders and awards require 70% of team games. If nobody qualifies, the top available players are shown."
-          class="inline-flex items-center text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+          class="inline-flex items-center rounded text-muted-foreground outline-none"
         >
           <Info class="h-3.5 w-3.5" />
         </span>
@@ -117,13 +121,12 @@
       <article
         data-season-award={mvp.key}
         aria-label="Most Valuable Player: {mvp.playerName}"
-        class="relative overflow-hidden rounded-2xl border border-accent/40 bg-surface-1"
+        class="sr-panel-featured"
       >
-        <div class="absolute inset-x-0 top-0 h-1 bg-accent" aria-hidden="true"></div>
         {#if mvpLine}
           <span
             aria-hidden="true"
-            class="font-display pointer-events-none absolute -right-2 -bottom-6 hidden text-[7.5rem] leading-none font-extrabold tabular-nums opacity-[0.08] select-none sm:block"
+            class="sr-number pointer-events-none absolute -right-2 -bottom-6 hidden text-[7.5rem] leading-none font-extrabold opacity-[0.08] select-none sm:block"
           >
             {mvpLine.ppg.toFixed(1)}
           </span>
@@ -136,7 +139,7 @@
             >
               <Trophy class="h-4.5 w-4.5" />
             </span>
-            <span class="font-mono text-[11px] font-bold tracking-[0.16em] text-accent uppercase">
+            <span class="sr-eyebrow">
               Most Valuable Player
             </span>
           </p>
@@ -174,7 +177,7 @@
             </div>
           </div>
           {#if mvpStats && mvpLine}
-            <p class="mt-4 text-base font-bold tracking-tight sm:text-lg">
+            <p class="sr-number mt-4 text-base font-bold tracking-tight sm:text-lg">
               {mvpStats}
             </p>
             <p class="mt-1 font-mono text-xs text-muted-foreground">
@@ -190,10 +193,10 @@
         <article
           data-season-award={dpoy.key}
           aria-label="Defensive Player of the Year: {dpoy.playerName}"
-          class="rounded-2xl border border-border bg-surface-1 p-5"
+          class="sr-panel-quiet p-5"
         >
           <p
-            class="flex items-center gap-2 font-mono text-[11px] font-bold tracking-[0.16em] text-primary uppercase"
+            class="sr-eyebrow flex items-center gap-2"
           >
             <ShieldCheck class="h-4 w-4 shrink-0" aria-hidden="true" />
             Defensive Player of the Year
@@ -203,14 +206,16 @@
               <SeasonPlayerFace face={faceOf(dpoy.playerVersionId)!} {manifest} size="md" />
             {/if}
             <div class="min-w-0">
-              <h3 class="truncate text-2xl font-extrabold tracking-tight">{dpoy.playerName}</h3>
+              <h3 class="font-display truncate text-2xl font-extrabold tracking-tight uppercase">
+                {dpoy.playerName}
+              </h3>
               <p class="mt-0.5 truncate text-[13px] text-muted-foreground">
                 {shortTeam(dpoy.franchiseId, dpoy.franchiseLabel)}
               </p>
             </div>
           </div>
           {#if dpoyStats}
-            <p class="mt-3 text-[15px] font-bold tracking-tight">{dpoyStats}</p>
+            <p class="sr-number mt-3 text-[15px] font-bold tracking-tight">{dpoyStats}</p>
           {/if}
         </article>
       {/if}
@@ -218,10 +223,10 @@
         <article
           data-season-award={sixth.key}
           aria-label="Sixth Man of the Year: {sixth.playerName}"
-          class="rounded-2xl border border-border bg-surface-1 p-5"
+          class="sr-panel-quiet p-5"
         >
           <p
-            class="flex items-center gap-2 font-mono text-[11px] font-bold tracking-[0.16em] text-primary uppercase"
+            class="sr-eyebrow flex items-center gap-2"
           >
             <Zap class="h-4 w-4 shrink-0" aria-hidden="true" />
             Sixth Man of the Year
@@ -231,26 +236,28 @@
               <SeasonPlayerFace face={faceOf(sixth.playerVersionId)!} {manifest} size="md" />
             {/if}
             <div class="min-w-0">
-              <h3 class="truncate text-2xl font-extrabold tracking-tight">{sixth.playerName}</h3>
+              <h3 class="font-display truncate text-2xl font-extrabold tracking-tight uppercase">
+                {sixth.playerName}
+              </h3>
               <p class="mt-0.5 truncate text-[13px] text-muted-foreground">
                 {shortTeam(sixth.franchiseId, sixth.franchiseLabel)}
               </p>
             </div>
           </div>
           {#if sixthStats}
-            <p class="mt-3 text-[15px] font-bold tracking-tight">{sixthStats}</p>
+            <p class="sr-number mt-3 text-[15px] font-bold tracking-tight">{sixthStats}</p>
           {/if}
         </article>
       {/if}
     </div>
   </div>
 
-  <div class="mt-4 rounded-2xl border border-border bg-surface-1 p-5 sm:p-6">
+  <div class="sr-panel-quiet mt-4 p-5 sm:p-6">
     <div class="flex flex-wrap items-baseline justify-between gap-2">
       <h3 class="font-display text-lg font-extrabold uppercase tracking-tight">
         All-League First Team
       </h3>
-      <p class="font-mono text-[11px] tracking-[0.14em] text-muted-foreground uppercase">
+      <p class="sr-section-label">
         First Team · Best five players
       </p>
     </div>
@@ -264,7 +271,7 @@
         {@const team = teamOf(member.playerVersionId)}
         <li
           data-season-award="first-team"
-          class="min-w-0 rounded-xl border border-border/70 bg-surface-2 p-4"
+          class="min-w-0 rounded-xl border border-border bg-surface-2 p-4"
         >
           <div class="flex items-center gap-3">
             {#if manifest !== null && faceOf(member.playerVersionId) !== null}
@@ -289,7 +296,9 @@
               · {line.gamesPlayed} GP{/if}
           </p>
           {#if stats}
-            <p class="mt-2 text-[13px] font-semibold tracking-tight text-foreground/90">{stats}</p>
+            <p class="sr-number mt-2 text-[13px] font-semibold tracking-tight text-foreground/90">
+              {stats}
+            </p>
           {/if}
         </li>
       {/each}

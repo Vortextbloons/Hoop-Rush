@@ -39,7 +39,7 @@
 
 <section
   aria-labelledby="interruption-heading"
-  class="rounded-none border border-destructive/40 bg-destructive/10 p-4 sm:rounded-xl"
+  class="sr-panel-featured p-4 sm:p-5"
   data-season-interruption-panel
   role="alert"
 >
@@ -50,7 +50,7 @@
     >
       Not enough healthy players
     </h2>
-    <span class="font-mono text-[10px] text-muted-foreground">
+    <span class="sr-badge" data-tone="warn">
       Block {pending === null ? '—' : pending.blockIndex + 1} of 9
     </span>
   </div>
@@ -61,12 +61,10 @@
 
   {#if unavailablePlayers.length > 0}
     <div class="mt-3">
-      <p class="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-        Out for the next game
-      </p>
+      <p class="sr-section-label">Out for the next game</p>
       <ul class="mt-1 flex flex-wrap gap-1.5">
         {#each unavailablePlayers as playerVersionId (playerVersionId)}
-          <li class="rounded-full bg-destructive/15 px-2 py-0.5 text-sm font-semibold">
+          <li class="sr-badge" data-tone="loss">
             {playerName(playerVersionId)}
           </li>
         {/each}
@@ -75,22 +73,20 @@
   {/if}
 
   <div class="mt-4 flex flex-col gap-2">
-    <p class="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-      Your options
-    </p>
+    <p class="sr-section-label">Your options</p>
     <ol class="flex flex-col gap-2 text-sm">
-      <li class="rounded-lg bg-surface-2 p-3">
+      <li class="sr-panel-quiet p-3">
         <p class="font-semibold">Fix your lineup</p>
         <p class="mt-1 text-muted-foreground">Swap a healthy player in on the Rotation tab.</p>
         <a
           href={resolve('/season/run/team')}
-          class="mt-2 inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring hover:border-line-strong"
+          class="mt-2 inline-flex min-h-11 items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring hover:border-line-strong"
         >
           Open Rotation
           <span aria-hidden="true">&rarr;</span>
         </a>
       </li>
-      <li class="rounded-lg bg-surface-2 p-3">
+      <li class="sr-panel-quiet p-3">
         <p class="text-xs font-semibold">
           {#if rehabAffordances.length > 0 && rehabAffordances[0] !== undefined}
             Try rehab ({rehabAffordances[0].cost}◆)
@@ -111,7 +107,7 @@
                   type="button"
                   onclick={() => onRehab(affordance)}
                   disabled={!affordance.affordable || affordance.spent || busy}
-                  class="min-h-11 rounded-lg bg-primary/15 px-3 py-1.5 text-xs font-semibold text-primary outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40"
+                  class="min-h-11 rounded-lg border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-primary outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Bring back {injuryPlayerName(affordance.injuryId ?? '')} ({affordance.cost}◆)
                 </button>
@@ -120,14 +116,14 @@
           </ul>
         {/if}
       </li>
-      <li class="rounded-lg bg-surface-2 p-3">
+      <li class="sr-panel-quiet p-3">
         <p class="font-semibold">Skip the game (loss)</p>
         <p class="mt-1 text-muted-foreground">Take the loss and move to the next game.</p>
         <button
           type="button"
           onclick={() => (forfeitOpen = true)}
           disabled={busy}
-          class="mt-2 inline-flex items-center justify-center rounded-lg border border-destructive/50 px-3 py-1.5 text-sm font-semibold text-destructive outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-40"
+          class="mt-2 inline-flex min-h-11 items-center justify-center rounded-lg border border-destructive/50 px-3 py-1.5 text-sm font-semibold text-destructive outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-40"
         >
           Skip game
         </button>
@@ -146,11 +142,11 @@
       type="button"
       onclick={onResume}
       disabled={busy || pending === null}
-      class="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+      class="sr-btn"
     >
       Play on
     </button>
-    <span class="font-mono text-[10px] text-muted-foreground"> Picks up where you stopped. </span>
+    <span class="sr-section-label"> Picks up where you stopped. </span>
   </div>
 
   <p class="sr-only" role="status" aria-live="polite">
@@ -160,12 +156,12 @@
 
 <Dialog.Root bind:open={forfeitOpen}>
   <Dialog.Portal>
-    <Dialog.Overlay class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" />
+    <Dialog.Overlay class="sr-dialog-overlay" />
     <Dialog.Content
-      class="fixed inset-x-0 bottom-0 z-50 mx-auto max-h-[85dvh] w-full overflow-y-auto rounded-t-2xl border-t border-border bg-card p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl shadow-black/40 outline-none sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:max-w-md sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:border sm:pb-4"
+      class="sr-dialog w-[min(28rem,calc(100vw_-_1.5rem))] max-h-[85dvh] overflow-y-auto p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] outline-none sm:p-5"
     >
       <div class="flex items-start justify-between gap-3">
-        <Dialog.Title class="font-display truncate text-lg font-extrabold tracking-tight uppercase">
+        <Dialog.Title class="font-display truncate text-lg font-extrabold tracking-tight uppercase text-foreground">
           Skip this game?
         </Dialog.Title>
         <Dialog.Close
@@ -183,7 +179,7 @@
           type="button"
           onclick={() => (forfeitOpen = false)}
           disabled={busy}
-          class="inline-flex items-center justify-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:border-line-strong disabled:cursor-not-allowed disabled:opacity-40"
+          class="sr-btn-ghost"
         >
           Cancel
         </button>
@@ -194,7 +190,7 @@
             onForfeit();
           }}
           disabled={busy}
-          class="inline-flex items-center justify-center gap-2 rounded-lg border border-destructive/50 px-4 py-2 text-sm font-semibold text-destructive transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-40"
+          class="sr-btn-danger"
         >
           Skip game
         </button>

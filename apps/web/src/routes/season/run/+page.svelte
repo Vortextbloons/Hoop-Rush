@@ -20,6 +20,7 @@
   import SeasonTape from '$lib/components/season/SeasonTape.svelte';
   import SeasonTeamLogo from '$lib/components/season/SeasonTeamLogo.svelte';
   import { franchiseIdentityOf } from '$lib/season/season-branding';
+  import { franchiseColor } from '$lib/season/franchise-colors';
   import {
     SEASON_RUN_SHELL_CONTEXT,
     type SeasonRunShellData,
@@ -393,6 +394,19 @@
       losses: row?.losses ?? 0,
     });
   });
+  const firstGameTitle = $derived.by(() => {
+    const first = nextOpponents[0];
+    if (nextBlockIndex === null) return 'Play block';
+    if (first === undefined) return `Block ${String(nextBlockIndex + 1)} · rest`;
+    return `${first.humanIsHome ? 'vs' : 'at'} ${shell.franchiseName(first.opponentFranchiseId)}`;
+  });
+  const gamedayStyle = $derived.by(() => {
+    const first = nextOpponents[0];
+    const human =
+      humanFranchiseId !== null ? franchiseColor(humanFranchiseId) : '#64748b';
+    const opponent = first !== undefined ? franchiseColor(first.opponentFranchiseId) : '#64748b';
+    return `--sr-accent-a: ${human}; --sr-accent-b: ${opponent};`;
+  });
   const lastAcceptedBlockIndex = $derived.by(() => {
     const accepted = snapshot?.acceptedBlocks ?? [];
     if (accepted.length === 0) return null;
@@ -724,12 +738,10 @@
       <section
         aria-labelledby="season-complete-heading"
         data-season-start-postseason
-        class="flex flex-col gap-3 rounded-none bg-surface-1 p-4 sm:rounded-xl sm:p-5"
+        class="sr-panel-featured flex flex-col gap-3 p-4 sm:p-6"
       >
-        <h2
-          id="season-complete-heading"
-          class="font-display text-xl font-extrabold uppercase tracking-tight"
-        >
+        <p class="sr-eyebrow">82 down</p>
+        <h2 id="season-complete-heading" class="sr-page-title text-3xl">
           Regular season complete
         </h2>
 
@@ -739,7 +751,7 @@
             data-season-start-postseason-button
             onclick={() => void startPostseason()}
             disabled={postseasonBusy || postseasonSubmitting}
-            class="inline-flex w-fit items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+            class="sr-btn w-fit"
           >
             {postseasonBusy
               ? 'Starting playoffs…'
@@ -747,16 +759,10 @@
                 ? 'Starting…'
                 : 'Start playoffs'}
           </button>
-          <a
-            href={resolve('/season/run/league' as any)}
-            class="inline-flex w-fit items-center justify-center gap-2 rounded-lg border border-border px-5 py-3 text-sm font-semibold text-muted-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:text-foreground"
-          >
+          <a href={resolve('/season/run/league' as any)} class="sr-btn-ghost w-fit">
             Final standings
           </a>
-          <a
-            href={resolve(lastRecapPath as any)}
-            class="inline-flex w-fit items-center justify-center gap-2 rounded-lg border border-border px-5 py-3 text-sm font-semibold text-muted-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:text-foreground motion-reduce:transition-none"
-          >
+          <a href={resolve(lastRecapPath as any)} class="sr-btn-ghost w-fit">
             Last Block recap
           </a>
         </div>
@@ -803,33 +809,139 @@
       {:else}
         <section
           aria-labelledby="next-decision-heading"
-          class="flex flex-col gap-4 rounded-none border border-border bg-surface-1 p-4 sm:rounded-xl sm:p-5"
+          class="sr-gameday sr-arrive"
+          style={gamedayStyle}
         >
-          <div class="flex flex-wrap items-baseline justify-between gap-2">
-            <h2
-              id="next-decision-heading"
-              class="font-display text-lg font-extrabold uppercase tracking-tight"
+          <div class="flex flex-col gap-5 p-4 sm:p-6">
+            <div class="flex flex-wrap items-end justify-between gap-3">
+              <div class="min-w-0">
+                <p class="sr-eyebrow">
+                  Gameday{nextBlockIndex === null
+                    ? ''
+                    : ` · Block ${String(nextBlockIndex + 1)} of 9`}
+                </p>
+                <h2 id="next-decision-heading" class="sr-page-title mt-1 text-3xl sm:text-4xl">
+                  {firstGameTitle}
+                </h2>
+                {#if blockLine !== ''}
+                  <p class="mt-2 font-mono text-xs text-muted-foreground">{blockLine}</p>
+                {/if}
+              </div>
+              {#if hubStrip !== null}
+                <span class="sr-badge shrink-0" data-tone="hardwood">{hubStrip}</span>
+              {/if}
+            </div>
+            <div class="flex flex-col gap-4">
+              <p class="sr-section-label">Your slate</p>
+              {#if preview === null}
+                <p class="text-xs text-muted-foreground" aria-live="polite">Loading your matchups…</p>
+              {:else if nextOpponents.length === 0}
+                <p class="text-xs text-muted-foreground">
+                  No games for you — Play sims the league and earns Influence.
+                </p>
+              {:else}
+                <ol
+                  class="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3"
+                  aria-label="Your upcoming games"
+                >
+                  {#each nextOpponents as game (game.gameId)}
+                    {@const opponentIdentity =
+                      shell.manifest !== null
+                        ? franchiseIdentityOf(shell.manifest, game.opponentFranchiseId)
+                        : null}
+                    <li class="sr-gamecard" data-result="pending">
+                      <div class="flex items-center gap-3 px-3 py-2.5 pl-4">
+                        {#if shell.manifest !== null}
+                          <SeasonTeamLogo
+                            manifest={shell.manifest}
+                            franchiseId={game.opponentFranchiseId}
+                            teamExternalId={opponentIdentity?.teamExternalId ?? ''}
+                            size="sm"
+                          />
+                        {/if}
+                        <div class="min-w-0 flex-1">
+                          <p class="truncate text-sm font-semibold">
+                            {game.humanIsHome ? 'vs' : 'at'}
+                            {shell.franchiseName(game.opponentFranchiseId)}
+                          </p>
+                          <p class="sr-section-label mt-0.5">Round {game.round}</p>
+                        </div>
+                        {#if run}
+                          <RuleBadge rule={homeRuleOf(run, game.homeFranchiseId)} compact />
+                        {/if}
+                      </div>
+                    </li>
+                  {/each}
+                </ol>
+                <a
+                  href={resolve('/season/run/schedule' as any)}
+                  class="inline-flex min-h-11 w-fit items-center gap-1 text-xs font-semibold text-primary underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring hover:underline motion-reduce:transition-none"
+                >
+                  Full schedule
+                  <span aria-hidden="true">&rarr;</span>
+                </a>
+              {/if}
+            </div>
+            <div
+              class="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-border bg-surface-1/70 px-4 py-3"
             >
-              {nextBlockIndex === null
-                ? 'Next block'
-                : `Play Block ${String(nextBlockIndex + 1)} of 9`}
-            </h2>
-            {#if hubStrip !== null}
-              <span class="font-mono text-xs text-muted-foreground">{hubStrip}</span>
+              <p class="sr-section-label">Lineup</p>
+              {#if preview === null}
+                <p class="text-xs text-muted-foreground">Checking your rotations…</p>
+              {:else if rotationFailures.length > 0}
+                <p role="alert" class="text-xs text-destructive">
+                  {rotationFailures[0]}
+                  <a
+                    href={resolve('/season/run/team' as any)}
+                    class="ml-1 font-semibold underline underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    Fix
+                  </a>
+                </p>
+              {:else if preview.unchangedSinceLastLock || preview.changes.length === 0}
+                <p class="text-xs text-muted-foreground">
+                  Ready — plays {preview.gamesToLock === 1
+                    ? '1 game'
+                    : `${String(preview.gamesToLock)} games`} with this lineup.
+                </p>
+                <a
+                  href={resolve('/season/run/team' as any)}
+                  class="ml-auto inline-flex min-h-11 items-center gap-1 text-xs font-semibold text-primary underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring hover:underline motion-reduce:transition-none"
+                >
+                  Change lineup
+                  <span aria-hidden="true">&rarr;</span>
+                </a>
+              {:else}
+                <p class="text-xs">
+                  <strong class="text-foreground">{preview.changes.length}</strong>
+                  change{preview.changes.length === 1 ? '' : 's'} since last lock ·
+                  {preview.changes[0]?.displayName ?? ''}{preview.changes.length > 1
+                    ? ` +${String(preview.changes.length - 1)} more`
+                    : ''}
+                </p>
+                <a
+                  href={resolve('/season/run/team' as any)}
+                  class="ml-auto inline-flex min-h-11 items-center gap-1 text-xs font-semibold text-primary underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring hover:underline motion-reduce:transition-none"
+                >
+                  Change lineup
+                  <span aria-hidden="true">&rarr;</span>
+                </a>
+              {/if}
+            </div>
+            {#if innovationImpactAvailable}
+              <a
+                href={resolve(lastRecapPath as any)}
+                class="inline-flex min-h-11 w-fit items-center gap-2 rounded-lg border border-primary/35 bg-primary/10 px-4 py-2 text-xs font-semibold text-primary outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring hover:bg-primary/15"
+              >
+                Review court impact
+                <span aria-hidden="true">→</span>
+              </a>
             {/if}
-          </div>
-          {#if blockLine !== ''}
-            <p class="font-mono text-xs text-muted-foreground">{blockLine}</p>
-          {/if}
-          {#if innovationImpactAvailable}
-            <a
-              href={resolve(lastRecapPath as any)}
-              class="inline-flex min-h-11 w-fit items-center gap-2 rounded-lg border border-primary/35 bg-primary/10 px-4 py-2 text-xs font-semibold text-primary outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring hover:bg-primary/15"
-            >
-              Review court impact
-              <span aria-hidden="true">→</span>
-            </a>
-          {/if}
+
+            <div class="mt-1 flex items-center gap-3">
+              <p class="sr-section-label">Offers on the desk</p>
+              <span class="h-px flex-1" style="background: var(--sr-line)"></span>
+            </div>
 
           {#if challengesVm !== null}
             <ChallengesPanel
@@ -842,13 +954,13 @@
 
           <section
             aria-labelledby="sponsor-shop-trigger-heading"
-            class="flex flex-col gap-3 rounded-xl border border-border bg-card p-4"
+            class="sr-panel-quiet flex flex-col gap-3 p-4"
             data-testid="sponsor-shop-trigger"
           >
             <div class="flex flex-wrap items-baseline justify-between gap-2">
               <h2
                 id="sponsor-shop-trigger-heading"
-                class="text-base font-extrabold uppercase tracking-tight"
+                class="font-display text-base font-extrabold uppercase tracking-tight"
               >
                 Sponsor deal board
               </h2>
@@ -920,154 +1032,6 @@
             />
           {/if}
 
-          <div class="grid gap-4 lg:grid-cols-3">
-            <div class="rounded-lg bg-surface-2 p-3">
-              <h3
-                class="font-mono text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground"
-              >
-                Up next
-              </h3>
-              {#if preview === null}
-                <p class="mt-2 animate-pulse text-xs text-muted-foreground">
-                  Loading your matchups…
-                </p>
-              {:else if nextOpponents.length === 0}
-                <p class="mt-2 text-xs text-muted-foreground">
-                  No games for you — Play sims league + earns Influence.
-                </p>
-              {:else}
-                <ol class="mt-2 flex flex-col gap-2">
-                  {#each nextOpponents.slice(0, 3) as game (game.gameId)}
-                    {@const opponentIdentity =
-                      shell.manifest !== null
-                        ? franchiseIdentityOf(shell.manifest, game.opponentFranchiseId)
-                        : null}
-                    <li class="flex items-center gap-2.5">
-                      {#if shell.manifest !== null}
-                        <SeasonTeamLogo
-                          manifest={shell.manifest}
-                          franchiseId={game.opponentFranchiseId}
-                          teamExternalId={opponentIdentity?.teamExternalId ?? ''}
-                          size="sm"
-                        />
-                      {/if}
-                      <span class="min-w-0 flex-1 truncate text-xs font-semibold">
-                        {game.humanIsHome ? 'vs' : 'at'}
-                        {shell.franchiseName(game.opponentFranchiseId)}
-                      </span>
-                      {#if run}
-                        <RuleBadge rule={homeRuleOf(run, game.homeFranchiseId)} compact />
-                      {/if}
-                      <span
-                        class="shrink-0 rounded-full bg-surface-3 px-2 py-0.5 font-mono text-xs text-muted-foreground"
-                      >
-                        R{game.round}
-                      </span>
-                    </li>
-                  {/each}
-                </ol>
-                {#if nextOpponents.length > 3}
-                  <p class="mt-1 font-mono text-xs text-muted-foreground">
-                    +{nextOpponents.length - 3} more
-                  </p>
-                {/if}
-                <a
-                  href={resolve('/season/run/schedule' as any)}
-                  class="mt-2 inline-flex min-h-11 items-center gap-1 text-xs font-semibold text-primary underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring hover:underline motion-reduce:transition-none"
-                >
-                  Full schedule
-                  <span aria-hidden="true">&rarr;</span>
-                </a>
-              {/if}
-            </div>
-
-            <div class="rounded-lg bg-surface-2 p-3">
-              <h3
-                class="font-mono text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground"
-              >
-                Lineup
-              </h3>
-              {#if preview === null}
-                <p class="mt-2 animate-pulse text-xs text-muted-foreground">
-                  Loading your matchups…
-                </p>
-              {:else if preview.unchangedSinceLastLock || preview.changes.length === 0}
-                <p class="mt-2 text-xs text-muted-foreground">Lineup ready.</p>
-              {:else}
-                <p class="mt-2 text-xs">
-                  <strong class="text-foreground">{preview.changes.length}</strong>
-                  change{preview.changes.length === 1 ? '' : 's'}:
-                </p>
-                <ul class="mt-1 flex flex-col gap-1">
-                  {#each preview.changes.slice(0, 2) as change (change.playerVersionId)}
-                    <li class="truncate text-xs">
-                      <span class="font-semibold">{change.displayName}</span>
-                    </li>
-                  {/each}
-                </ul>
-                {#if preview.changes.length > 2}
-                  <p class="mt-1 font-mono text-xs text-muted-foreground">
-                    +{preview.changes.length - 2} more
-                  </p>
-                {/if}
-              {/if}
-              {#if rotationFailures.length > 0}
-                <p role="alert" class="mt-2 text-xs text-destructive">
-                  {rotationFailures[0]}
-                  <a
-                    href={resolve('/season/run/team' as any)}
-                    class="ml-1 font-semibold underline underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    Fix
-                  </a>
-                </p>
-                <a
-                  href={resolve('/season/run/team' as any)}
-                  class="mt-2 inline-flex min-h-11 items-center justify-center gap-1 rounded-lg border border-border px-4 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring hover:border-line-strong"
-                >
-                  Change lineup
-                </a>
-              {:else}
-                <a
-                  href={resolve('/season/run/team' as any)}
-                  class="mt-2 inline-flex min-h-11 items-center gap-1 text-xs font-semibold text-primary underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring hover:underline motion-reduce:transition-none"
-                >
-                  Change lineup
-                  <span aria-hidden="true">&rarr;</span>
-                </a>
-              {/if}
-            </div>
-
-            <div class="rounded-lg bg-surface-2 p-3">
-              <h3
-                class="font-mono text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground"
-              >
-                This block
-              </h3>
-              {#if preview === null}
-                <p class="mt-2 animate-pulse text-xs text-muted-foreground">
-                  Loading your matchups…
-                </p>
-              {:else}
-                <p class="mt-2 text-xs text-muted-foreground">
-                  Plays {preview.gamesToLock === 1
-                    ? '1 game'
-                    : `${String(preview.gamesToLock)} games`} with this lineup.
-                </p>
-                {#if sponsorOffers !== null}
-                  <p class="mt-1 font-mono text-[11px] text-muted-foreground">
-                    Sponsors: {sponsorOwnedCount}/{sponsorOffers.length} owned
-                  </p>
-                {/if}
-                {#if preview.upcomingGames.length === 0}
-                  <p class="mt-2 text-xs text-muted-foreground">
-                    No games for you — Play sims league + earns Influence.
-                  </p>
-                {/if}
-              {/if}
-            </div>
-          </div>
-
           <div class="flex flex-col gap-3">
             {#if readiness.blockers.length > 0}
               <ul class="flex flex-col gap-2" aria-label="To play">
@@ -1079,7 +1043,8 @@
                           ? '/season/run' + blocker.destination
                           : blocker.destination) as any,
                       )}
-                      class="flex min-h-11 items-center justify-between gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-700 outline-none focus-visible:ring-2 focus-visible:ring-ring dark:text-amber-300"
+                      class="flex min-h-11 items-center justify-between gap-3 rounded-lg px-3 py-2 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      style="border: 1px solid rgb(224 177 94 / 40%); background: rgb(224 177 94 / 10%); color: var(--sr-warn)"
                     >
                       <span>{blocker.label}</span>
                       <span aria-hidden="true">&rarr;</span>
@@ -1116,6 +1081,11 @@
                 {commandError.message}
               </p>
             {/if}
+            {#if sponsorOffers !== null && nextBlockIndex !== null && nextBlockIndex < 8}
+              <p class="sr-section-label">
+                {sponsorOffers.length - sponsorOwnedCount} sponsor offer{(sponsorOffers.length - sponsorOwnedCount) === 1 ? '' : 's'} left · influence {sponsorBalance}/{sponsorCap}
+              </p>
+            {/if}
             <div class="sticky bottom-3 z-20">
               <button
                 type="button"
@@ -1125,9 +1095,7 @@
                 data-can-submit={canSubmit}
                 data-block-phase={block.phase}
                 data-editor-ready={shell.editor !== null}
-                class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 sm:text-base motion-reduce:transition-none {canSubmit
-                  ? ''
-                  : 'opacity-60'}"
+                class="sr-btn min-h-13 w-full text-lg {canSubmit ? '' : 'opacity-60'}"
               >
                 {block.phase === 'running'
                   ? 'Playing block…'
@@ -1157,8 +1125,8 @@
               onRetry={() => shell.retryBlock()}
             />
             {#if !blockProgressVisible}
-              <div class="rounded-lg border border-dashed border-border/60 px-3 py-2">
-                <p class="font-mono text-xs text-muted-foreground">
+              <div class="rounded-xl border border-dashed px-3 py-2" style="border-color: var(--sr-line)">
+                <p class="sr-section-label">
                   Block progress appears here while playing.
                 </p>
               </div>
@@ -1173,7 +1141,7 @@
             <section
               aria-labelledby="free-agency-cta-heading"
               data-fa-hub-cta
-              class="flex h-full flex-col gap-3 rounded-none border border-primary/30 bg-primary/5 p-4 sm:rounded-xl sm:p-5"
+              class="sr-panel-quiet flex h-full flex-col gap-3 p-4 sm:p-5"
             >
               <div class="flex flex-wrap items-baseline justify-between gap-2">
                 <h2
@@ -1182,7 +1150,7 @@
                 >
                   Free Agency Window {openFreeAgencyWindow.windowIndex + 1}
                 </h2>
-                <span class="font-mono text-[10px] text-muted-foreground">
+                <span class="sr-badge" data-tone="hardwood">
                   {openFreeAgencyWindow.candidates.length} candidate
                   {openFreeAgencyWindow.candidates.length === 1 ? '' : 's'} on the market
                 </span>
@@ -1194,7 +1162,7 @@
               <a
                 href={resolve('/season/run/free-agency' as any)}
                 data-fa-hub-cta-link
-                class="inline-flex w-fit items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90"
+                class="sr-btn mt-auto w-fit"
               >
                 Open Free Agency
                 <span aria-hidden="true">&rarr;</span>
@@ -1203,19 +1171,14 @@
           {/if}
 
           {#if openWindow !== null}
-            <section
-              class="flex h-full flex-col justify-center rounded-none border border-border bg-surface-1 p-4 sm:rounded-xl sm:p-5"
-            >
+            <section class="sr-panel-quiet flex h-full flex-col justify-center p-4 sm:p-5">
               <h2 class="font-display text-base font-extrabold uppercase tracking-tight">
                 Trade window open
               </h2>
               <p class="mt-1 text-sm text-muted-foreground">
                 {tradeOffers.length} offer{tradeOffers.length === 1 ? '' : 's'} waiting.
               </p>
-              <a
-                href={resolve('/season/run/trades' as any)}
-                class="mt-3 inline-flex w-fit items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
-              >
+              <a href={resolve('/season/run/trades' as any)} class="sr-btn mt-3 w-fit">
                 Open trades
               </a>
             </section>
@@ -1224,6 +1187,10 @@
       {/if}
 
       {#if influenceVm !== null || recentBlocks.length > 0}
+        <div class="mt-2 flex items-center gap-3">
+          <p class="sr-section-label">League wire</p>
+          <span class="h-px flex-1" style="background: var(--sr-line)"></span>
+        </div>
         <div class="grid gap-6 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:items-start">
           <div class="min-w-0">
             {#if influenceVm !== null}
@@ -1259,20 +1226,20 @@
                 >
                   Recent blocks
                 </h2>
-                <ul class="mt-2 flex flex-col gap-0 sm:gap-2">
+                <ul class="mt-2 flex flex-col gap-2">
                   {#each recentBlocks as entry (entry.accepted.blockIndex)}
                     <li>
                       <a
                         href={resolve(
                           `/season/run/checkpoint?block=${String(entry.accepted.blockIndex)}` as any,
                         )}
-                        class="flex items-center justify-between gap-3 bg-surface-1 px-4 py-3 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-2 sm:rounded-xl motion-reduce:transition-none"
+                        class="sr-gamecard flex items-center justify-between gap-3 px-4 py-3 outline-none transition-colors hover:bg-surface-2 motion-reduce:transition-none"
                       >
-                        <span class="font-mono text-[10px] font-bold uppercase text-primary">
+                        <span class="sr-badge" data-tone="hardwood">
                           Block {entry.accepted.blockIndex + 1} of 9
                         </span>
                         {#if entry.record !== null}
-                          <span class="font-mono text-xs font-bold">
+                          <span class="sr-number text-lg font-bold">
                             {recordLabel(entry.record.wins, entry.record.losses)}
                           </span>
                         {/if}
@@ -1289,32 +1256,20 @@
   {:else if inPostseason}
     <section
       aria-labelledby="postseason-hub-heading"
-      class="flex min-w-0 flex-col gap-4 px-3 sm:px-0"
+      class="flex min-w-0 flex-col gap-4 px-0 sm:px-0"
     >
       <div class="flex flex-wrap items-end justify-between gap-2">
         <div class="min-w-0">
-          <p class="font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-accent">
-            {playoffEyebrow}
-          </p>
-          <h2
-            id="postseason-hub-heading"
-            class="font-display mt-1 text-2xl font-black uppercase tracking-tight sm:text-3xl"
-          >
+          <p class="sr-eyebrow">{playoffEyebrow}</p>
+          <h2 id="postseason-hub-heading" class="sr-page-title mt-1">
             {stageLabel}
           </h2>
         </div>
         <div class="flex items-center gap-2">
           {#if humanSeed !== null}
-            <span
-              class="rounded-full bg-surface-3 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground"
-            >
-              {ordinal(humanSeed)} seed
-            </span>
+            <span class="sr-badge" data-tone="hardwood">{ordinal(humanSeed)} seed</span>
           {/if}
-          <a
-            href={resolve('/season/run/postseason' as any)}
-            class="rounded-lg border border-border px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring hover:text-foreground"
-          >
+          <a href={resolve('/season/run/postseason' as any)} class="sr-btn-ghost px-3 py-1.5 text-xs">
             Bracket
           </a>
         </div>
@@ -1324,10 +1279,11 @@
         <div
           role="status"
           data-season-eliminated
-          class="rounded-none border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm sm:rounded-xl"
+          class="rounded-xl px-4 py-3 text-sm"
+          style="border: 1px solid rgb(224 177 94 / 40%); background: rgb(224 177 94 / 10%)"
         >
-          <span class="font-bold text-amber-700 dark:text-amber-300">Eliminated.</span>
-          <span class="text-amber-700/80 dark:text-amber-300/80">
+          <span class="font-bold" style="color: var(--sr-warn)">Eliminated.</span>
+          <span class="text-muted-foreground">
             Your season is over — spectate or fast-forward to the champion.
           </span>
         </div>

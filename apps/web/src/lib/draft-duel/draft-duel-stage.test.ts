@@ -1,10 +1,9 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render } from '@testing-library/svelte';
-import { draftDuelCardSchema, DRAFT_DUEL_ROUND_REVEAL_MS } from '@hoop-rush/data-contracts';
+import { draftDuelCardSchema } from '@hoop-rush/data-contracts';
 import DraftBoard from './DraftBoard.svelte';
 import RosterRail from './RosterRail.svelte';
-import RevealOverlay from './RevealOverlay.svelte';
 import ReactionBar from './ReactionBar.svelte';
 import RivalConsideration from './RivalConsideration.svelte';
 
@@ -26,13 +25,14 @@ const offers = Array.from({ length: 8 }, (_, slot) => ({
   card,
   available: slot < 6,
   reason: slot < 6 ? null : ('claimed' as const),
+  legalSlots: slot < 6 ? [0, 1] : [],
 }));
 
 describe('draft-duel components smoke', () => {
-  it('renders the board and reports picks', async () => {
-    const onpick = vi.fn();
+  it('renders the board and reports the chosen card', async () => {
+    const onchoose = vi.fn();
     const { container } = render(DraftBoard, {
-      props: { offers, active: true, round: 2, presentation: 'ratings', onpick },
+      props: { offers, active: true, round: 2, presentation: 'ratings', onchoose },
     });
     const slots = container.querySelectorAll('.dd-board-slot');
     expect(slots).toHaveLength(8);
@@ -41,10 +41,11 @@ describe('draft-duel components smoke', () => {
     expect(style).toContain('--dd-pick-ms');
     const first = slots[0]?.querySelector('button');
     await fireEvent.click(first as HTMLButtonElement);
-    expect(onpick).toHaveBeenCalledTimes(1);
+    expect(onchoose).toHaveBeenCalledTimes(1);
+    expect(onchoose).toHaveBeenCalledWith(expect.objectContaining({ slot: 0 }));
     const disabled = slots[6]?.querySelector('button');
     await fireEvent.click(disabled as HTMLButtonElement);
-    expect(onpick).toHaveBeenCalledTimes(1);
+    expect(onchoose).toHaveBeenCalledTimes(1);
   });
 
   it('renders the roster rail in both presentations', () => {
@@ -54,17 +55,6 @@ describe('draft-duel components smoke', () => {
     expect(ratings.container.textContent).toContain('Point Guard');
     expect(ratings.container.querySelectorAll('li')).toHaveLength(5);
     expect(ratings.container.querySelector('[data-filled="false"]')).not.toBeNull();
-  });
-
-  it('renders the reveal overlay only while visible', async () => {
-    const { container, rerender } = render(RevealOverlay, { props: { visible: false, round: 1 } });
-    expect(container.querySelector('.dd-reveal')).toBeNull();
-    await rerender({ visible: true, round: 3 });
-    const overlay = container.querySelector('.dd-reveal');
-    expect(overlay).not.toBeNull();
-    expect(overlay?.getAttribute('data-reveal-ms')).toBe(String(DRAFT_DUEL_ROUND_REVEAL_MS));
-    expect(overlay?.getAttribute('style')).toContain('--dd-reveal-ms');
-    expect(container.textContent).toContain('3');
   });
 
   it('toggles mute and emits reactions', async () => {

@@ -89,27 +89,22 @@
         <p class="text-sm font-semibold leading-snug">{displayName}</p>
         <div class="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
           {#if overall !== null}
-            <span
-              class="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] font-bold text-foreground"
-            >
+            <span class="sr-chip shrink-0">
               OVR {overall}{#if overallDelta !== null}
                 → {overall + overallDelta}{/if}
             </span>
           {/if}
           {#if gearPoints > 0}
             <span
-              class="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 font-mono text-[10px] font-bold text-amber-300 ring-1 ring-amber-400/40"
+              class="sr-badge shrink-0"
+              data-tone="warn"
               title="Attribute points from applied sponsors"
             >
               +{gearPoints} gear
             </span>
           {/if}
           {#if !active}
-            <span
-              class="shrink-0 rounded-full bg-surface-3 px-2 py-0.5 font-mono text-[10px] font-bold text-muted-foreground"
-            >
-              Inactive
-            </span>
+            <span class="sr-chip shrink-0">Inactive</span>
           {/if}
           {#if fatigueBadgeClass !== null && fatigueBadgeText !== null}
             <span

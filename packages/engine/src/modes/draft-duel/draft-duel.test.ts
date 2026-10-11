@@ -51,10 +51,9 @@ import {
   assignSlots,
   buildDraftDuelSafetyInput,
   completionFeasible,
-  draftDuelCardsOfParticipant,
+  draftDuelParticipantCompletionPossible,
   neededGroups,
   rosterCompletionPossible,
-  unclaimedProfileCounts,
   type DraftDuelGroupNeeds,
 } from './feasibility.ts';
 import {
@@ -251,11 +250,16 @@ function slotGroupAt(slotIndex: number) {
   return slotGroupOf(position);
 }
 
-function pickInput(participantId: DraftDuelParticipantId, card: DraftDuelCard): DraftDuelPickInput {
+function pickInput(
+  participantId: DraftDuelParticipantId,
+  card: DraftDuelCard,
+  slotIndex?: number,
+): DraftDuelPickInput {
   return {
     participantId,
     playerId: card.playerId,
     playerVersionId: card.playerVersionId,
+    ...(slotIndex === undefined ? {} : { slotIndex }),
   };
 }
 
@@ -280,6 +284,26 @@ function playFullDraft(
     if (state.status === 'drafting' && state.pickOrdinal >= 10) {
       throw new Error('draft overflow');
     }
+  }
+  return state;
+}
+
+function playFullDraftWithSlots(
+  rootSeed: Seed,
+  catalog: DraftDuelCatalog,
+  fairness: 'fair' | 'unfair' = 'fair',
+): DraftDuelDraft {
+  let state = createDraftDuelDraft({ rootSeed, fairness, catalog });
+  while (!isDraftDuelComplete(state)) {
+    const picker = draftDuelCurrentPicker(state);
+    const option = draftDuelLegalPicks(state, catalog).find(
+      (entry) => entry.available && (entry.legalSlots?.length ?? 0) > 0,
+    );
+    if (!option) throw new Error('draft has no legal placements');
+    const legalSlots = option.legalSlots ?? [];
+    const slotIndex = legalSlots[legalSlots.length - 1];
+    if (slotIndex === undefined) throw new Error('legal placement lost its slot');
+    state = applyDraftDuelPick(state, catalog, pickInput(picker, option.card, slotIndex));
   }
   return state;
 }
@@ -324,20 +348,32 @@ function expectRoundStartSafety(state: DraftDuelDraft, catalog: DraftDuelCatalog
   expect(legal.length).toBeGreaterThan(0);
   const picker = draftDuelCurrentPicker(state);
   for (const option of legal) {
-    const after = applyDraftDuelPick(state, catalog, pickInput(picker, option.card));
-    const opponentLegal = draftDuelLegalPicks(after, catalog).filter((entry) => entry.available);
-    expect(opponentLegal.length).toBeGreaterThan(0);
-    const pools = unclaimedProfileCounts(catalog, draftDuelClaimedPlayerIds(after));
-    for (const participant of ['p1', 'p2'] as const) {
-      const cards = draftDuelCardsOfParticipant(after, participant);
-      expect(rosterCompletionPossible(cards, 5 - cards.length, pools)).toBe(true);
+    const legalSlots = option.legalSlots ?? [];
+    expect(legalSlots.length).toBeGreaterThan(0);
+    for (const slotIndex of legalSlots) {
+      const after = applyDraftDuelPick(state, catalog, pickInput(picker, option.card, slotIndex));
+      const opponentPlacements = draftDuelLegalPicks(after, catalog).filter(
+        (entry) => entry.available,
+      );
+      expect(opponentPlacements.length).toBeGreaterThan(0);
+      const safety = buildDraftDuelSafetyInput(
+        after,
+        catalog,
+        after.rounds[Math.floor(after.pickOrdinal / 2)]?.offers ?? {
+          p1: [],
+          p2: [],
+        },
+      );
+      for (const participant of ['p1', 'p2'] as const) {
+        expect(draftDuelParticipantCompletionPossible(safety, participant)).toBe(true);
+      }
     }
   }
 }
 
 function buildHandState(options: {
   firstPicker: DraftDuelParticipantId;
-  picks: Array<{ participantId: DraftDuelParticipantId; card: DraftDuelCard }>;
+  picks: Array<{ participantId: DraftDuelParticipantId; card: DraftDuelCard; slotIndex?: number }>;
   currentOffers: { p1: DraftDuelCard[]; p2: DraftDuelCard[] };
   placeholder: DraftDuelCard;
 }): DraftDuelDraft {
@@ -361,6 +397,7 @@ function buildHandState(options: {
       slot: 0,
       participantId: pick.participantId,
       card: pick.card,
+      ...(pick.slotIndex === undefined ? {} : { slotIndex: pick.slotIndex }),
     };
     round.picks.push(entry);
   });
@@ -376,6 +413,30 @@ function buildHandState(options: {
     rounds,
     status: pickOrdinal === 10 ? 'complete' : 'drafting',
   };
+}
+
+function slotHandState(catalog: DraftDuelCatalog): {
+  state: DraftDuelDraft;
+  offers: { p1: DraftDuelCard[]; p2: DraftDuelCard[] };
+} {
+  const offers = {
+    p1: ['s-g2', 's-f2', 's-c1', 's-hgf', 's-hgc', 's-g3', 's-f3', 's-c2'].map((id) =>
+      cardOf(catalog, id),
+    ),
+    p2: ['s-g2', 's-f2', 's-c1', 's-hgf', 's-hgc', 's-g3', 's-f3', 's-c2'].map((id) =>
+      cardOf(catalog, id),
+    ),
+  };
+  const state = buildHandState({
+    firstPicker: 'p1',
+    picks: [
+      { participantId: 'p1', card: cardOf(catalog, 's-g1'), slotIndex: 0 },
+      { participantId: 'p2', card: cardOf(catalog, 's-f1'), slotIndex: 2 },
+    ],
+    currentOffers: offers,
+    placeholder: cardOf(catalog, 's-c3'),
+  });
+  return { state, offers };
 }
 
 function completionHandCatalog(): DraftDuelCatalog {
@@ -408,6 +469,24 @@ function positionHandCatalog(): DraftDuelCatalog {
     { id: 'x-fd', positions: ['PF'], band: 5 },
     { id: 'x-ca', positions: ['C'], band: 2 },
     { id: 'x-cb', positions: ['C'], band: 3 },
+  ]);
+}
+
+function slotTestCatalog(): DraftDuelCatalog {
+  return buildCatalogFromSpecs([
+    { id: 's-g1', positions: ['PG'], band: 1 },
+    { id: 's-g2', positions: ['SG'], band: 2 },
+    { id: 's-g3', positions: ['PG'], band: 3 },
+    { id: 's-g4', positions: ['SG'], band: 4 },
+    { id: 's-f1', positions: ['SF'], band: 5 },
+    { id: 's-f2', positions: ['PF'], band: 6 },
+    { id: 's-f3', positions: ['SF'], band: 7 },
+    { id: 's-f4', positions: ['PF'], band: 8 },
+    { id: 's-c1', positions: ['C'], band: 9 },
+    { id: 's-c2', positions: ['C'], band: 0 },
+    { id: 's-c3', positions: ['C'], band: 1 },
+    { id: 's-hgf', positions: ['PG', 'SF'], band: 2 },
+    { id: 's-hgc', positions: ['SG', 'C'], band: 3 },
   ]);
 }
 
@@ -558,6 +637,10 @@ describe('draft state', () => {
           for (const pick of round.picks) picks.push(pick);
         }
         expect(picks).toHaveLength(10);
+        const slotUsage = new Map<DraftDuelParticipantId, Set<number>>([
+          ['p1', new Set<number>()],
+          ['p2', new Set<number>()],
+        ]);
         picks.forEach((pick, ordinal) => {
           const expectedPicker =
             ordinal % 2 === 0 ? state.firstPicker : state.firstPicker === 'p1' ? 'p2' : 'p1';
@@ -566,6 +649,12 @@ describe('draft state', () => {
           const offered = round?.offers[pick.participantId][pick.slot];
           expect(offered?.playerId).toBe(pick.card.playerId);
           expect(offered?.playerVersionId).toBe(pick.card.playerVersionId);
+          expect(pick.slotIndex).toBeGreaterThanOrEqual(0);
+          expect(pick.slotIndex).toBeLessThanOrEqual(4);
+          const used = slotUsage.get(pick.participantId);
+          if (!used) throw new Error('missing participant slot usage');
+          expect(used.has(pick.slotIndex ?? -1)).toBe(false);
+          if (pick.slotIndex !== undefined) used.add(pick.slotIndex);
         });
         for (const round of state.rounds) {
           for (const participant of ['p1', 'p2'] as const) {
@@ -577,6 +666,14 @@ describe('draft state', () => {
         const roster2 = draftDuelRoster(state, catalog, 'p2');
         expectValidRoster(roster1);
         expectValidRoster(roster2);
+        for (const participant of ['p1', 'p2'] as const) {
+          const roster = participant === 'p1' ? roster1 : roster2;
+          for (const pick of picks) {
+            if (pick.participantId !== participant || pick.slotIndex === undefined) continue;
+            const slot = roster.slots.find((entry) => entry.slotIndex === pick.slotIndex);
+            expect(slot?.card.playerVersionId).toBe(pick.card.playerVersionId);
+          }
+        }
         const allPlayers = new Set([
           ...roster1.slots.map((slot) => slot.card.playerId),
           ...roster2.slots.map((slot) => slot.card.playerId),
@@ -588,6 +685,7 @@ describe('draft state', () => {
         for (const entry of phasePicks) {
           expect(entry.available).toBe(false);
           expect(entry.reason).toBe('phase');
+          expect(entry.legalSlots).toEqual([]);
         }
       }
     }
@@ -656,6 +754,7 @@ describe('draft state', () => {
       const assessment = draftDuelLegalPicks(next, catalog)[slot];
       expect(assessment?.available).toBe(false);
       expect(assessment?.reason).toBe('claimed');
+      expect(assessment?.legalSlots).toEqual([]);
     }
   });
 });
@@ -704,10 +803,10 @@ describe('round safety', () => {
     const state = buildHandState({
       firstPicker: 'p1',
       picks: [
-        { participantId: 'p1', card: cardOf(catalog, 'h-g1') },
-        { participantId: 'p2', card: cardOf(catalog, 'h-g2') },
-        { participantId: 'p1', card: cardOf(catalog, 'h-f1') },
-        { participantId: 'p2', card: cardOf(catalog, 'h-c2') },
+        { participantId: 'p1', card: cardOf(catalog, 'h-g1'), slotIndex: 0 },
+        { participantId: 'p2', card: cardOf(catalog, 'h-g2'), slotIndex: 0 },
+        { participantId: 'p1', card: cardOf(catalog, 'h-f1'), slotIndex: 2 },
+        { participantId: 'p2', card: cardOf(catalog, 'h-c2'), slotIndex: 4 },
       ],
       currentOffers: offers,
       placeholder,
@@ -718,6 +817,11 @@ describe('round safety', () => {
     expect(requirePick(assessments, 1).available).toBe(true);
     expectDraftError(
       () => applyDraftDuelPick(state, catalog, pickInput('p1', requirePick(assessments, 0).card)),
+      'illegal',
+    );
+    expectDraftError(
+      () =>
+        applyDraftDuelPick(state, catalog, pickInput('p1', requirePick(assessments, 0).card, 3)),
       'illegal',
     );
     const next = applyDraftDuelPick(
@@ -742,10 +846,10 @@ describe('round safety', () => {
     const state = buildHandState({
       firstPicker: 'p1',
       picks: [
-        { participantId: 'p1', card: cardOf(catalog, 'x-g1') },
-        { participantId: 'p2', card: cardOf(catalog, 'x-fa') },
-        { participantId: 'p1', card: cardOf(catalog, 'x-g2') },
-        { participantId: 'p2', card: cardOf(catalog, 'x-fc') },
+        { participantId: 'p1', card: cardOf(catalog, 'x-g1'), slotIndex: 0 },
+        { participantId: 'p2', card: cardOf(catalog, 'x-fa'), slotIndex: 2 },
+        { participantId: 'p1', card: cardOf(catalog, 'x-g2'), slotIndex: 1 },
+        { participantId: 'p2', card: cardOf(catalog, 'x-fc'), slotIndex: 3 },
       ],
       currentOffers: offers,
       placeholder,
@@ -772,6 +876,135 @@ describe('round safety', () => {
       expect(entry.available).toBe(false);
       expect(entry.reason).toBe('turn');
     }
+  });
+});
+
+describe('slot selection', () => {
+  const catalog = buildCatalogFromSpecs(standardSpecs());
+
+  it('lists exactly the safe empty slots for each offered card', () => {
+    const handCatalog = slotTestCatalog();
+    const { state } = slotHandState(handCatalog);
+    const assessments = draftDuelLegalPicks(state, handCatalog);
+    expect(requirePick(assessments, 0).legalSlots).toEqual([1]);
+    expect(requirePick(assessments, 0).available).toBe(true);
+    expect(requirePick(assessments, 1).legalSlots).toEqual([2, 3]);
+    expect(requirePick(assessments, 2).legalSlots).toEqual([4]);
+    expect(requirePick(assessments, 3).legalSlots).toEqual([1, 2, 3]);
+    expect(requirePick(assessments, 4).legalSlots).toEqual([1, 4]);
+    expect(requirePick(assessments, 5).legalSlots).toEqual([1]);
+    expect(requirePick(assessments, 6).legalSlots).toEqual([2, 3]);
+    expect(requirePick(assessments, 7).legalSlots).toEqual([4]);
+    const placed = applyDraftDuelPick(
+      state,
+      handCatalog,
+      pickInput('p1', requirePick(assessments, 3).card, 3),
+    );
+    expect(placed.rounds[1]?.picks[0]?.slotIndex).toBe(3);
+    expect(placed.pickOrdinal).toBe(3);
+  });
+
+  it('matches legalSlots against accept or reject on a real round', () => {
+    for (const seed of [SEED_A, SEED_B]) {
+      const state = createDraftDuelDraft({ rootSeed: seed, fairness: 'fair', catalog });
+      const picker = draftDuelCurrentPicker(state);
+      const occupied = new Set<number>();
+      const assessments = draftDuelLegalPicks(state, catalog);
+      for (const option of assessments) {
+        const compatible = [0, 1, 2, 3, 4].filter(
+          (slot) => !occupied.has(slot) && cardPlayableAt(option.card, slotGroupAt(slot)),
+        );
+        if (option.reason === 'claimed') {
+          expect(option.legalSlots).toEqual([]);
+          continue;
+        }
+        if (compatible.length === 0) {
+          expect(option.reason).toBe('position');
+          expect(option.legalSlots).toEqual([]);
+          continue;
+        }
+        if ((option.legalSlots ?? []).length === 0) {
+          expect(option.reason).toBe('completion');
+        }
+        for (const slot of compatible) {
+          if (option.legalSlots?.includes(slot)) {
+            const next = applyDraftDuelPick(state, catalog, pickInput(picker, option.card, slot));
+            expect(next.pickOrdinal).toBe(1);
+            expect(next.rounds[0]?.picks[0]?.slotIndex).toBe(slot);
+          } else {
+            expectDraftError(
+              () => applyDraftDuelPick(state, catalog, pickInput(picker, option.card, slot)),
+              'illegal',
+            );
+          }
+        }
+      }
+    }
+  });
+
+  it('completes full drafts where every pick chooses a slot', () => {
+    for (const fairness of FAIRNESS_MODES) {
+      for (const seed of [SEED_A, SEED_B, SEED_C]) {
+        const state = playFullDraftWithSlots(seed, catalog, fairness);
+        expect(draftDuelDraftSchema.safeParse(state).success).toBe(true);
+        expect(state.status).toBe('complete');
+        expect(state.pickOrdinal).toBe(10);
+        expect(playFullDraftWithSlots(seed, catalog, fairness)).toEqual(state);
+        const picks = state.rounds.flatMap((round) => round.picks);
+        expect(picks).toHaveLength(10);
+        const used = new Map<DraftDuelParticipantId, Set<number>>([
+          ['p1', new Set<number>()],
+          ['p2', new Set<number>()],
+        ]);
+        for (const pick of picks) {
+          if (pick.slotIndex === undefined) throw new Error('pick lost its slotIndex');
+          expect(pick.slotIndex).toBeGreaterThanOrEqual(0);
+          expect(pick.slotIndex).toBeLessThanOrEqual(4);
+          const participantUsed = used.get(pick.participantId);
+          if (!participantUsed) throw new Error('missing participant usage');
+          expect(participantUsed.has(pick.slotIndex)).toBe(false);
+          participantUsed.add(pick.slotIndex);
+        }
+        const roster1 = draftDuelRoster(state, catalog, 'p1');
+        const roster2 = draftDuelRoster(state, catalog, 'p2');
+        expectValidRoster(roster1);
+        expectValidRoster(roster2);
+        for (const participant of ['p1', 'p2'] as const) {
+          const roster = participant === 'p1' ? roster1 : roster2;
+          for (const pick of picks) {
+            if (pick.participantId !== participant || pick.slotIndex === undefined) continue;
+            const slot = roster.slots.find((entry) => entry.slotIndex === pick.slotIndex);
+            expect(slot?.card.playerVersionId).toBe(pick.card.playerVersionId);
+          }
+        }
+        const allPlayers = new Set([
+          ...roster1.slots.map((slot) => slot.card.playerId),
+          ...roster2.slots.map((slot) => slot.card.playerId),
+        ]);
+        expect(allPlayers.size).toBe(10);
+      }
+    }
+  });
+
+  it('falls back to matching for picks without a recorded slot', () => {
+    const handCatalog = positionHandCatalog();
+    const placeholder = cardOf(handCatalog, 'x-fd');
+    const state = buildHandState({
+      firstPicker: 'p1',
+      picks: [
+        { participantId: 'p1', card: cardOf(handCatalog, 'x-g1'), slotIndex: 0 },
+        { participantId: 'p2', card: cardOf(handCatalog, 'x-fa') },
+        { participantId: 'p1', card: cardOf(handCatalog, 'x-g2') },
+      ],
+      currentOffers: {
+        p1: Array.from({ length: 8 }, () => placeholder),
+        p2: Array.from({ length: 8 }, () => placeholder),
+      },
+      placeholder,
+    });
+    const roster = draftDuelRoster(state, handCatalog, 'p1');
+    expect(roster.slots.map((slot) => slot.slotIndex)).toEqual([0, 1]);
+    expect(roster.slots.map((slot) => slot.card.playerId)).toEqual(['x-g1', 'x-g2']);
   });
 });
 
@@ -889,23 +1122,27 @@ describe('timeout autopick', () => {
       const state = createDraftDuelDraft({ rootSeed: seed, fairness: 'fair', catalog });
       const legal = draftDuelLegalPicks(state, catalog).filter((option) => option.available);
       const timeout = draftDuelTimeoutPick(state, catalog);
-      expect(
-        legal.some(
-          (option) =>
-            option.card.playerId === timeout.playerId &&
-            option.card.playerVersionId === timeout.playerVersionId,
-        ),
-      ).toBe(true);
+      const matched = legal.find(
+        (option) =>
+          option.card.playerId === timeout.playerId &&
+          option.card.playerVersionId === timeout.playerVersionId,
+      );
+      expect(matched).toBeDefined();
+      expect(matched?.legalSlots).toContain(timeout.slotIndex);
+      expect(timeout.slotIndex).toBe(Math.min(...(matched?.legalSlots ?? [])));
+      const repeat = draftDuelTimeoutPick(state, catalog);
+      expect(repeat).toEqual(timeout);
       const topOverall = Math.max(...legal.map((option) => option.card.overall));
-      const chosen = legal.find((option) => option.card.playerId === timeout.playerId);
-      if (chosen?.card.overall === topOverall) topChosen += 1;
+      if (matched?.card.overall === topOverall) topChosen += 1;
       counts.set(timeout.playerId, (counts.get(timeout.playerId) ?? 0) + 1);
       const next = applyDraftDuelPick(state, catalog, {
         participantId: draftDuelCurrentPicker(state),
         playerId: timeout.playerId,
         playerVersionId: timeout.playerVersionId,
+        slotIndex: timeout.slotIndex,
       });
       expect(next.pickOrdinal).toBe(1);
+      expect(next.rounds[0]?.picks[0]?.slotIndex).toBe(timeout.slotIndex);
     }
     const frequencies = [...counts.values()];
     const min = Math.min(...frequencies);
@@ -924,10 +1161,13 @@ describe('timeout autopick', () => {
         const timeout = draftDuelTimeoutPick(state, catalog);
         expect(timeout.pickOrdinal).toBe(state.pickOrdinal);
         expect(timeout.seedPath).toBe(draftDuelTimeoutSeedPath(picker, state.pickOrdinal));
+        expect(timeout.slotIndex).toBeGreaterThanOrEqual(0);
+        expect(timeout.slotIndex).toBeLessThanOrEqual(4);
         state = applyDraftDuelPick(state, catalog, {
           participantId: picker,
           playerId: timeout.playerId,
           playerVersionId: timeout.playerVersionId,
+          slotIndex: timeout.slotIndex,
         });
       }
       expect(state.status).toBe('complete');
@@ -1014,9 +1254,9 @@ describe('pick rejections', () => {
     const state = buildHandState({
       firstPicker: 'p1',
       picks: [
-        { participantId: 'p1', card: cardOf(handCatalog, 'x-g1') },
-        { participantId: 'p2', card: cardOf(handCatalog, 'x-fa') },
-        { participantId: 'p1', card: cardOf(handCatalog, 'x-g2') },
+        { participantId: 'p1', card: cardOf(handCatalog, 'x-g1'), slotIndex: 0 },
+        { participantId: 'p2', card: cardOf(handCatalog, 'x-fa'), slotIndex: 2 },
+        { participantId: 'p1', card: cardOf(handCatalog, 'x-g2'), slotIndex: 1 },
       ],
       currentOffers: offers,
       placeholder,
@@ -1024,6 +1264,32 @@ describe('pick rejections', () => {
     expectDraftError(
       () => applyDraftDuelPick(state, handCatalog, pickInput('p2', cardOf(handCatalog, 'x-g1'))),
       'claimed',
+    );
+  });
+
+  it('rejects occupied and out-of-range slots', () => {
+    const handCatalog = slotTestCatalog();
+    const { state } = slotHandState(handCatalog);
+    expectDraftError(
+      () => applyDraftDuelPick(state, handCatalog, pickInput('p1', cardOf(handCatalog, 's-g2'), 0)),
+      'slot',
+    );
+    expectDraftError(
+      () => applyDraftDuelPick(state, handCatalog, pickInput('p1', cardOf(handCatalog, 's-g2'), 5)),
+      'slot',
+    );
+  });
+
+  it('rejects slots the card cannot play', () => {
+    const handCatalog = slotTestCatalog();
+    const { state } = slotHandState(handCatalog);
+    expectDraftError(
+      () => applyDraftDuelPick(state, handCatalog, pickInput('p1', cardOf(handCatalog, 's-g2'), 4)),
+      'position',
+    );
+    expectDraftError(
+      () => applyDraftDuelPick(state, handCatalog, pickInput('p1', cardOf(handCatalog, 's-c1'), 1)),
+      'position',
     );
   });
 
@@ -1045,8 +1311,8 @@ describe('pick rejections', () => {
     const state = buildHandState({
       firstPicker: 'p1',
       picks: [
-        { participantId: 'p1', card: cardOf(handCatalog, 'h-g1') },
-        { participantId: 'p2', card: cardOf(handCatalog, 'h-g2') },
+        { participantId: 'p1', card: cardOf(handCatalog, 'h-g1'), slotIndex: 0 },
+        { participantId: 'p2', card: cardOf(handCatalog, 'h-g2'), slotIndex: 0 },
       ],
       currentOffers: offers,
       placeholder,

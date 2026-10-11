@@ -19,6 +19,7 @@ export function buildDraftDuelCatalogSource(catalog: CollectionCatalog): DraftDu
       card: {
         cardId: card.cardId,
         playerId: card.playerId,
+        playerExternalId: card.playerExternalId,
         playerVersionId: card.sourcePlayerVersionId,
         displayName: card.displayName,
         seasonKey: card.seasonKey,

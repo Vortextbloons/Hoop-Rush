@@ -85,14 +85,14 @@
 
 <Dialog.Root {open} {onOpenChange}>
   <Dialog.Portal>
-    <Dialog.Overlay class="sim-modal-overlay fixed inset-0 z-50 bg-black/70 backdrop-blur-sm" />
+    <Dialog.Overlay class="sr-dialog-overlay" />
     <Dialog.Content
       data-testid="sponsor-shop-modal"
-      class="sim-modal-content fixed inset-x-0 bottom-0 z-50 mx-auto max-h-[88dvh] w-full overflow-y-auto rounded-t-2xl border-t border-border bg-surface-1 p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl shadow-black/40 outline-none sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:max-w-4xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:border sm:p-5"
+      class="sr-dialog max-h-[88dvh] w-[calc(100vw-2rem)] max-w-4xl overflow-y-auto p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:p-5"
     >
       <div class="flex items-start justify-between gap-3">
         <div class="min-w-0">
-          <p class="font-mono text-[10px] font-bold tracking-[0.18em] text-primary uppercase">
+          <p class="sr-eyebrow">
             Sponsor deal board
           </p>
           <Dialog.Title
@@ -102,18 +102,18 @@
             Sponsor shop
           </Dialog.Title>
           <Dialog.Description class="mt-2 flex flex-wrap gap-1.5 font-mono text-[11px]">
-            <span class="rounded-md bg-surface-3 px-2 py-1 font-bold">
+            <span class="sr-chip">
               {blockLabel ?? 'Block —'}
             </span>
             <span
-              class="rounded-md bg-surface-3 px-2 py-1 font-bold"
+              class="sr-chip"
               data-testid="sponsor-shop-balance"
             >
               Influence: {balance}/{cap}
             </span>
             {#if offers !== null}
               <span
-                class="rounded-md bg-surface-3 px-2 py-1 font-bold"
+                class="sr-chip"
                 data-testid="sponsor-shop-count"
               >
                 Owned Gear: {ownedCount}/{offers.length} owned
@@ -191,9 +191,9 @@
               </ul>
             {/if}
             {#if historySummary !== null}
-              <details class="mt-3 rounded-xl border border-border bg-surface-2">
+              <details class="sr-panel-quiet mt-3">
                 <summary
-                  class="cursor-pointer p-3 font-mono text-[11px] font-bold uppercase tracking-wide text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  class="sr-section-label cursor-pointer p-3 outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   History · {historySummary}
                 </summary>
@@ -211,12 +211,12 @@
 
         <aside
           aria-labelledby="sponsor-vault-heading"
-          class="h-fit rounded-xl border border-border bg-surface-2 p-4 lg:sticky lg:top-0"
+          class="sr-panel-quiet h-fit p-4 lg:sticky lg:top-0"
         >
           <div class="flex items-baseline justify-between gap-2">
             <h3
               id="sponsor-vault-heading"
-              class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
+              class="sr-section-label"
             >
               Vault · {vault.length} items
             </h3>
@@ -251,9 +251,7 @@
                       {SPONSOR_SLOT_LABELS[entry.slot]} · {entry.boostLine}
                     </p>
                   </div>
-                  <span
-                    class="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] font-bold text-muted-foreground"
-                  >
+                  <span class="sr-chip shrink-0">
                     {entry.tier}
                   </span>
                 </li>
@@ -268,7 +266,7 @@
           {/if}
           <a
             href={resolve('/season/run/team' as any)}
-            class="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-border px-3 text-xs font-bold outline-none focus-visible:ring-2 focus-visible:ring-ring hover:text-foreground"
+            class="sr-btn-ghost mt-3 w-full px-3"
           >
             Equip from roster →
           </a>

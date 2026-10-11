@@ -219,8 +219,14 @@ describe('havoc sim hooks: physical and aggregation options', () => {
     const recorder = new GameRecorder([15, 15]);
     recorder.setActiveFive(0, [0, 1, 2, 3, 4]);
     recorder.setActiveUnits(0, [0, 1, 2, 3, 4, 5, 6]);
-    expect(() => recorder.setActiveFive(0, [0, 1, 2, 3, 4, 5])).toThrow();
-    expect(() => recorder.setActiveUnits(0, [0, 1, 2, 3])).toThrow();
-    expect(() => recorder.setActiveUnits(0, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10])).toThrow();
+    expect(() => {
+      recorder.setActiveFive(0, [0, 1, 2, 3, 4, 5]);
+    }).toThrow();
+    expect(() => {
+      recorder.setActiveUnits(0, [0, 1, 2, 3]);
+    }).toThrow();
+    expect(() => {
+      recorder.setActiveUnits(0, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    }).toThrow();
   });
 });

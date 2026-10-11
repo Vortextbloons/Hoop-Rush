@@ -103,9 +103,9 @@
   }}
 >
   <Dialog.Portal>
-    <Dialog.Overlay class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" />
+    <Dialog.Overlay class="sr-dialog-overlay" />
     <Dialog.Content
-      class="fixed inset-x-0 bottom-0 z-50 mx-auto max-h-[88dvh] w-full overflow-y-auto rounded-t-2xl border-t border-border bg-card p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl shadow-black/40 outline-none sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:max-w-3xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:border sm:pb-4"
+      class="sr-dialog max-h-[86dvh] w-[min(48rem,calc(100vw-1.5rem))] overflow-y-auto p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] outline-none sm:p-6 sm:pb-6"
     >
       {#if card !== null}
         {@const families = wornFamilies()}
@@ -115,10 +115,8 @@
               <SeasonPlayerFace {face} {manifest} size="md" />
             {/if}
             <div class="min-w-0">
-              <p class="font-mono text-[10px] font-bold tracking-[0.18em] text-primary uppercase">
-                Player loadout
-              </p>
-              <Dialog.Title class="font-display text-xl font-extrabold uppercase tracking-tight">
+              <p class="sr-eyebrow">Player loadout</p>
+              <Dialog.Title class="sr-page-title mt-1 text-2xl!">
                 {card.displayName}
               </Dialog.Title>
               <p class="mt-0.5 text-xs text-muted-foreground">
@@ -133,14 +131,12 @@
               <div class="mt-2 flex flex-wrap items-center gap-1.5">
                 {#if card.overall !== null}
                   {#if ovrDelta === null}
-                    <span
-                      class="rounded-lg bg-primary px-2 py-1 font-mono text-xs font-extrabold text-primary-foreground"
-                    >
+                    <span class="sr-chip">
                       OVR {card.overall}
                     </span>
                   {:else}
                     <span
-                      class="rounded-lg bg-primary px-2 py-1 font-mono text-xs font-extrabold text-primary-foreground"
+                      class="sr-chip"
                       data-testid="sponsor-ovr-delta"
                       title="Overall with gear applied"
                     >
@@ -148,12 +144,13 @@
                     </span>
                   {/if}
                 {/if}
-                <span class="rounded-lg bg-surface-3 px-2 py-1 font-mono text-[10px] font-bold">
+                <span class="sr-chip">
                   {card.role} · {card.minutes} min
                 </span>
                 {#if card.gearPoints > 0}
                   <span
-                    class="rounded-lg bg-amber-500/15 px-2 py-1 font-mono text-[10px] font-extrabold text-amber-300 ring-1 ring-amber-400/40"
+                    class="sr-badge"
+                    data-tone="warn"
                     title="Total attribute points from applied sponsors"
                   >
                     +{card.gearPoints} gear
@@ -174,7 +171,7 @@
           </div>
           <Dialog.Close
             aria-label="Close player card"
-            class="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-muted-foreground outline-none hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-ring"
+            class="grid h-11 w-11 shrink-0 place-items-center rounded-lg border border-border/60 text-muted-foreground outline-none hover:bg-surface-2 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
           >
             <X class="h-5 w-5" />
           </Dialog.Close>
@@ -183,14 +180,15 @@
         <div class="mt-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
           <section aria-labelledby="loadout-ratings-heading" class="min-w-0">
             <div class="flex items-center justify-between gap-2">
-              <h3
-                id="loadout-ratings-heading"
-                class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
-              >
+              <h3 id="loadout-ratings-heading" class="sr-section-label">
                 Ratings{#if changedCount > 0}
                   · +{changedCount} boosted{/if}
               </h3>
-              <div class="flex rounded-lg bg-surface-2 p-0.5" role="group" aria-label="Rating view">
+              <div
+                class="flex rounded-lg border border-border/60 bg-surface-2/60 p-0.5"
+                role="group"
+                aria-label="Rating view"
+              >
                 <button
                   type="button"
                   aria-pressed={ratingMode === 'boosted'}
@@ -198,7 +196,7 @@
                   onclick={() => {
                     ratingMode = 'boosted';
                   }}
-                  class="min-h-9 rounded-md px-2.5 font-mono text-[10px] font-bold outline-none focus-visible:ring-2 focus-visible:ring-ring {ratingMode ===
+                  class="min-h-11 rounded-md px-2.5 font-mono text-[10px] font-bold outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-9 {ratingMode ===
                   'boosted'
                     ? 'bg-primary text-primary-foreground'
                     : 'text-muted-foreground hover:text-foreground'}"
@@ -212,7 +210,7 @@
                   onclick={() => {
                     ratingMode = 'base';
                   }}
-                  class="min-h-9 rounded-md px-2.5 font-mono text-[10px] font-bold outline-none focus-visible:ring-2 focus-visible:ring-ring {ratingMode ===
+                  class="min-h-11 rounded-md px-2.5 font-mono text-[10px] font-bold outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-9 {ratingMode ===
                   'base'
                     ? 'bg-primary text-primary-foreground'
                     : 'text-muted-foreground hover:text-foreground'}"
@@ -226,7 +224,7 @@
                   onclick={() => {
                     ratingMode = 'changes';
                   }}
-                  class="min-h-9 rounded-md px-2.5 font-mono text-[10px] font-bold outline-none focus-visible:ring-2 focus-visible:ring-ring {ratingMode ===
+                  class="min-h-11 rounded-md px-2.5 font-mono text-[10px] font-bold outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-9 {ratingMode ===
                   'changes'
                     ? 'bg-primary text-primary-foreground'
                     : 'text-muted-foreground hover:text-foreground'}"
@@ -237,7 +235,7 @@
             </div>
 
             {#if ratingMode === 'changes' && changedCount === 0}
-              <p class="mt-2 rounded-lg bg-surface-2 p-3 text-xs text-muted-foreground">
+              <p class="mt-2 rounded-lg border border-border/50 bg-surface-2/60 p-3 text-xs text-muted-foreground">
                 No gear boosts yet. Equip gear to see rating changes here.
               </p>
             {/if}
@@ -249,9 +247,7 @@
                   .filter((row) => ratingMode !== 'changes' || row.boosted !== row.base)}
                 {#if groupRows.length > 0}
                   <div>
-                    <h4
-                      class="font-mono text-[10px] font-bold tracking-[0.14em] text-muted-foreground uppercase"
-                    >
+                    <h4 class="sr-section-label">
                       {group.title}
                     </h4>
                     <ul class="mt-1.5 grid grid-cols-2 gap-1.5">
@@ -259,9 +255,9 @@
                         {@const boosted = row.boosted !== row.base}
                         <li
                           data-rating-key={row.key}
-                          class="rounded-lg bg-surface-1 px-2 py-1.5 {boosted &&
+                          class="rounded-lg border border-border/50 bg-surface-2/60 px-2 py-1.5 {boosted &&
                           ratingMode !== 'base'
-                            ? 'ring-1 ring-amber-400/40'
+                            ? 'ring-1 ring-primary/40'
                             : ''}"
                         >
                           <p
@@ -270,13 +266,13 @@
                           >
                             {row.label}
                           </p>
-                          <p class="flex items-baseline gap-1.5 font-mono tabular-nums">
-                            <span class="text-sm font-extrabold">
+                          <p class="sr-number flex items-baseline gap-1.5">
+                            <span class="text-sm font-extrabold" style="color: var(--sr-paper)">
                               {ratingMode === 'base' ? row.base : row.boosted}
                             </span>
                             {#if ratingMode !== 'base' && boosted}
                               <span
-                                class="rounded bg-amber-500/15 px-1 py-px text-[10px] font-extrabold text-amber-300"
+                                class="rounded bg-primary/15 px-1 py-px font-mono text-[10px] font-extrabold text-primary"
                               >
                                 +{row.boosted - row.base}
                               </span>
@@ -286,7 +282,7 @@
                             <p class="font-mono text-[9px] text-muted-foreground">
                               base {row.base}
                             </p>
-                            <p class="truncate font-mono text-[9px] text-amber-300/90">
+                            <p class="truncate font-mono text-[9px] text-primary/90">
                               {row.source}
                             </p>
                           {/if}
@@ -301,10 +297,7 @@
 
           <section aria-labelledby="loadout-gear-heading" class="min-w-0">
             <div class="flex items-baseline justify-between gap-2">
-              <h3
-                id="loadout-gear-heading"
-                class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
-              >
+              <h3 id="loadout-gear-heading" class="sr-section-label">
                 Gear loadout · permanent
               </h3>
             </div>
@@ -325,10 +318,10 @@
                     selectedSlot = slot;
                     pendingApply = null;
                   }}
-                  class="rounded-lg px-2 py-2 font-mono text-[10px] font-bold outline-none focus-visible:ring-2 focus-visible:ring-ring {selectedSlot ===
+                  class="min-h-11 rounded-lg border px-2 py-2 font-mono text-[10px] font-bold outline-none focus-visible:ring-2 focus-visible:ring-ring {selectedSlot ===
                   slot
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-surface-2 text-muted-foreground hover:text-foreground'}"
+                    ? 'border-primary/60 bg-primary/15 text-primary'
+                    : 'border-border/60 bg-surface-2 text-muted-foreground hover:text-foreground'}"
                 >
                   <span aria-hidden="true">{SPONSOR_SLOT_ICONS[slot]}</span>
                   {SPONSOR_SLOT_LABELS[slot]}
@@ -353,17 +346,17 @@
                 {@const worn = card.slots?.[slot] ?? null}
                 <div
                   class="rounded-xl border p-3 {selectedSlot === slot
-                    ? 'border-primary/50 bg-surface-1'
-                    : 'border-border bg-surface-1/60'}"
+                    ? 'border-primary/60 bg-surface-2/60'
+                    : 'border-border/60 bg-surface-1/40'}"
                   data-testid={`sponsor-slot-${slot}`}
                 >
                   <div class="flex items-center justify-between gap-2">
-                    <p class="font-mono text-[11px] font-bold">
+                    <p class="sr-section-label">
                       <span aria-hidden="true">{SPONSOR_SLOT_ICONS[slot]}</span>
                       {SPONSOR_SLOT_LABELS[slot]}
                     </p>
                     {#if worn !== null}
-                      <span class="font-mono text-[10px] font-bold text-amber-300">
+                      <span class="font-mono text-[10px] font-bold text-primary">
                         Equipped — permanent
                       </span>
                     {:else}
@@ -390,7 +383,7 @@
                     <ul class="mt-2 flex flex-wrap gap-1.5">
                       {#each worn.boosts as boost (boost.key)}
                         <li
-                          class="rounded bg-amber-500/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-amber-300 ring-1 ring-amber-400/30"
+                          class="rounded bg-primary/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-primary ring-1 ring-primary/30"
                         >
                           +{boost.points}
                           {SPONSOR_RATING_LONG_LABELS[boost.key] ?? boost.key}
@@ -406,7 +399,7 @@
                       <div class="mt-2 flex flex-wrap gap-2">
                         <a
                           href={resolve('/season/run' as any)}
-                          class="inline-flex min-h-11 items-center rounded-lg border border-border px-3 text-xs font-bold outline-none focus-visible:ring-2 focus-visible:ring-ring hover:text-foreground"
+                          class="sr-btn-ghost px-3! text-xs! outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         >
                           Open Shop
                         </a>
@@ -426,7 +419,7 @@
                                   card.slots,
                                   { slot, boosts: option.boosts },
                                 )}
-                          <li class="rounded-lg bg-surface-2 p-2">
+                          <li class="rounded-lg border border-border/50 bg-surface-2/60 p-2">
                             <div class="flex items-center gap-2">
                               <SponsorMark
                                 family={option.brandFamily}
@@ -436,7 +429,7 @@
                               />
                               <div class="min-w-0 flex-1">
                                 <p class="truncate text-xs font-bold">{option.displayName}</p>
-                                <p class="font-mono text-[10px] font-bold text-amber-300">
+                                <p class="font-mono text-[10px] font-bold text-primary">
                                   {option.boostLine}
                                 </p>
                                 <p class="font-mono text-[10px] text-muted-foreground">
@@ -475,7 +468,7 @@
                                           slot,
                                         })}
                                       data-testid={`confirm-apply-${option.instanceId}`}
-                                      class="min-h-11 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
+                                      class="sr-btn min-h-11 px-3! text-xs! outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
                                     >
                                       Confirm
                                     </button>
@@ -484,7 +477,7 @@
                                       onclick={() => {
                                         pendingApply = null;
                                       }}
-                                      class="min-h-11 rounded-lg bg-surface-3 px-3 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                      class="sr-btn-ghost min-h-11 px-3! text-xs! outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                     >
                                       Back
                                     </button>
@@ -498,7 +491,7 @@
                                     pendingApply = option.instanceId;
                                   }}
                                   data-testid={`apply-sponsor-${option.instanceId}`}
-                                  class="inline-flex min-h-11 shrink-0 items-center rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40"
+                                  class="sr-btn min-h-11 shrink-0 px-3! text-xs! outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40"
                                 >
                                   Equip
                                 </button>

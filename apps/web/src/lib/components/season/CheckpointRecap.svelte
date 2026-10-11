@@ -103,17 +103,9 @@
 
 <div class="flex flex-col gap-6">
   {#if humanRecord}
-    <section
-      aria-labelledby="recap-record-heading"
-      class="rounded-none bg-surface-1 p-4 sm:rounded-xl"
-    >
-      <h2
-        id="recap-record-heading"
-        class="font-display text-base font-extrabold uppercase tracking-tight"
-      >
-        Your block
-      </h2>
-      <div class="mt-2 flex items-center gap-3">
+    <section aria-labelledby="recap-record-heading" class="sr-panel-featured p-4 sm:p-5">
+      <h2 id="recap-record-heading" class="sr-section-label">Your block</h2>
+      <div class="mt-3 flex items-center gap-3">
         {#if manifest && franchiseIdentity(humanRecord.franchiseId)}
           <SeasonTeamLogo
             {manifest}
@@ -123,15 +115,17 @@
             size="md"
           />
         {/if}
-        <p class="text-2xl font-extrabold">
-          {recordLabel(humanRecord.winsAfter, humanRecord.lossesAfter)}
-          <span class="ml-2 font-mono text-xs font-normal text-muted-foreground">
+        <div class="min-w-0">
+          <p class="sr-number text-4xl leading-none font-extrabold sm:text-5xl">
+            {recordLabel(humanRecord.winsAfter, humanRecord.lossesAfter)}
+          </p>
+          <p class="mt-2 font-mono text-xs text-muted-foreground">
             from {recordLabel(humanRecord.winsBefore, humanRecord.lossesBefore)} ·
             {ordinal(humanRecord.positionAfter)} in conference
-          </span>
-        </p>
+          </p>
+        </div>
       </div>
-      <p class="mt-1 font-mono text-xs text-muted-foreground">
+      <p class="mt-3 font-mono text-xs text-muted-foreground">
         Block {recap.blockIndex + 1} of 9 · rounds 1–{recap.completedRounds} complete
       </p>
     </section>
@@ -148,15 +142,10 @@
   {#if recap.standingsMovement.length > 0}
     <section
       aria-labelledby="recap-movement-heading"
-      class="rounded-none bg-surface-1 p-4 sm:rounded-xl"
+      class="sr-panel-quiet p-4 sm:p-5"
     >
-      <h2
-        id="recap-movement-heading"
-        class="font-display text-base font-extrabold uppercase tracking-tight"
-      >
-        Standings movement
-      </h2>
-      <ul class="mt-2 flex flex-col divide-y divide-border/50">
+      <h2 id="recap-movement-heading" class="sr-section-label">Standings movement</h2>
+      <ul class="mt-2 flex flex-col divide-y divide-border/60">
         {#each recap.standingsMovement as movement (movement.franchiseId)}
           <li class="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-sm">
             {#if manifest && franchiseIdentity(movement.franchiseId)}
@@ -171,7 +160,7 @@
             <span class="min-w-0 flex-1 truncate font-semibold">
               {franchiseName(movement.franchiseId)}
             </span>
-            <span class="font-mono text-xs text-muted-foreground">
+            <span class="sr-number shrink-0 font-mono text-xs text-muted-foreground">
               {movementLabel(movement)}
             </span>
           </li>
@@ -183,54 +172,52 @@
   {#if recap.notablePerformances.length > 0}
     <section
       aria-labelledby="recap-performances-heading"
-      class="rounded-none bg-surface-1 p-4 sm:rounded-xl"
+      class="sr-panel-quiet p-4 sm:p-5"
     >
-      <h2
-        id="recap-performances-heading"
-        class="font-display text-base font-extrabold uppercase tracking-tight"
-      >
-        Notable performances
-      </h2>
-      <ul class="mt-2 flex flex-col divide-y divide-border/50">
+      <h2 id="recap-performances-heading" class="sr-section-label">Notable performances</h2>
+      <ul class="mt-3 grid gap-2 sm:grid-cols-2">
         {#each recap.notablePerformances as performance (performance.playerVersionId + performance.gameId)}
           {@const source = versionSource(performance.playerVersionId)}
-          <li class="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-sm">
-            {#if manifest && faces.get(performance.playerVersionId)}
-              <SeasonPlayerFace
-                face={faces.get(performance.playerVersionId)!}
-                {manifest}
-                size="sm"
-              />
-            {/if}
-            <span class="min-w-0 flex-1">
-              <span class="block truncate font-semibold">
-                {playerName(performance.playerVersionId)}
-              </span>
-              <span class="flex items-center gap-2 font-mono text-xs text-muted-foreground">
-                {#if source && manifest}
-                  <SeasonTeamLogo
-                    {manifest}
-                    franchiseId={performance.franchiseId}
-                    teamExternalId={source.teamExternalId}
-                    logoCandidates={source.logoCandidates}
-                    alt=""
-                    size="sm"
-                  />
-                {/if}
-                <span class="min-w-0 truncate">
-                  {performance.points} pts · {performance.rebounds} reb · {performance.assists} ast{source
-                    ? source.seasonLabel
-                    : ''}
+          <li
+            class="sr-gamecard px-3 py-3"
+            style={performance.humanTeam ? '--sr-accent: var(--sr-hardwood)' : undefined}
+          >
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+              {#if manifest && faces.get(performance.playerVersionId)}
+                <SeasonPlayerFace
+                  face={faces.get(performance.playerVersionId)!}
+                  {manifest}
+                  size="sm"
+                />
+              {/if}
+              <span class="min-w-0 flex-1">
+                <span class="block truncate font-semibold">
+                  {playerName(performance.playerVersionId)}
+                </span>
+                <span class="flex items-center gap-2 font-mono text-xs text-muted-foreground">
+                  {#if source && manifest}
+                    <SeasonTeamLogo
+                      {manifest}
+                      franchiseId={performance.franchiseId}
+                      teamExternalId={source.teamExternalId}
+                      logoCandidates={source.logoCandidates}
+                      alt=""
+                      size="sm"
+                    />
+                  {/if}
+                  <span class="min-w-0 truncate">
+                    {performance.points} pts · {performance.rebounds} reb · {performance.assists} ast{source
+                      ? source.seasonLabel
+                      : ''}
+                  </span>
                 </span>
               </span>
-            </span>
-            {#if performance.humanTeam}
-              <span
-                class="rounded-full bg-primary/15 px-2 py-0.5 font-mono text-xs font-bold uppercase tracking-[0.12em] text-primary"
-              >
-                Your team
-              </span>
-            {/if}
+              {#if performance.humanTeam}
+                <span class="sr-badge shrink-0" data-tone="hardwood">
+                  Your team
+                </span>
+              {/if}
+            </div>
           </li>
         {/each}
       </ul>
@@ -240,14 +227,9 @@
   {#if recap.streaks.length > 0}
     <section
       aria-labelledby="recap-streaks-heading"
-      class="rounded-none bg-surface-1 p-4 sm:rounded-xl"
+      class="sr-panel-quiet p-4 sm:p-5"
     >
-      <h2
-        id="recap-streaks-heading"
-        class="font-display text-base font-extrabold uppercase tracking-tight"
-      >
-        Streaks
-      </h2>
+      <h2 id="recap-streaks-heading" class="sr-section-label">Streaks</h2>
       <ul class="mt-2 flex flex-col gap-1.5">
         {#each recap.streaks as streak (streak.franchiseId)}
           <li class="flex items-center gap-2 text-sm">
@@ -263,7 +245,7 @@
             <span class="min-w-0 flex-1 truncate font-semibold">
               {franchiseName(streak.franchiseId)}
             </span>
-            <span class="shrink-0 font-mono text-xs font-bold">
+            <span class="sr-badge shrink-0" data-tone={streak.kind === 'wins' ? 'win' : 'loss'}>
               {streakLabel(streak.kind, streak.length)}
             </span>
           </li>
@@ -275,15 +257,10 @@
   {#if recap.versionSpotlights.length > 0}
     <section
       aria-labelledby="recap-spotlights-heading"
-      class="rounded-none bg-surface-1 p-4 sm:rounded-xl"
+      class="sr-panel-quiet p-4 sm:p-5"
     >
-      <h2
-        id="recap-spotlights-heading"
-        class="font-display text-base font-extrabold uppercase tracking-tight"
-      >
-        Head to head
-      </h2>
-      <ul class="mt-2 flex flex-col divide-y divide-border/50">
+      <h2 id="recap-spotlights-heading" class="sr-section-label">Head to head</h2>
+      <ul class="mt-2 flex flex-col divide-y divide-border/60">
         {#each recap.versionSpotlights as spotlight (spotlight.versionA + spotlight.versionB)}
           <li class="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-sm">
             {#if manifest && faces.get(spotlight.versionA)}
@@ -319,14 +296,9 @@
 
   <section
     aria-labelledby="recap-upcoming-heading"
-    class="rounded-none bg-surface-1 p-4 sm:rounded-xl"
+    class="sr-panel-quiet p-4 sm:p-5"
   >
-    <h2
-      id="recap-upcoming-heading"
-      class="font-display text-base font-extrabold uppercase tracking-tight"
-    >
-      Next opponents
-    </h2>
+    <h2 id="recap-upcoming-heading" class="sr-section-label">Next opponents</h2>
     {#if recap.upcomingHumanGames.length === 0}
       <p class="mt-2 text-sm text-muted-foreground">
         {recap.completedRounds >= 82
@@ -362,24 +334,19 @@
   {#if effectsEvidence.length > 0}
     <section
       aria-labelledby="recap-effects-heading"
-      class="rounded-none bg-surface-1 p-4 sm:rounded-xl"
+      class="sr-panel-quiet p-4 sm:p-5"
     >
-      <h2
-        id="recap-effects-heading"
-        class="font-display text-base font-extrabold uppercase tracking-tight"
-      >
-        Why it happened
-      </h2>
+      <h2 id="recap-effects-heading" class="sr-section-label">Why it happened</h2>
       <ul class="mt-3 flex flex-col gap-2">
         {#each effectsEvidence as row (row.mechanism + row.side)}
           <li class="flex flex-col gap-0.5 rounded-lg bg-surface-2 p-3">
             <div class="flex flex-wrap items-baseline justify-between gap-2">
               <p class="text-sm font-semibold">{MECHANISM_LABEL[row.mechanism]}</p>
-              <p class="shrink-0 text-xs text-muted-foreground">
+              <p class="shrink-0 font-mono text-xs text-muted-foreground">
                 {row.side} · {row.opportunities} plays
               </p>
             </div>
-            <p class="text-xs text-muted-foreground">
+            <p class="font-mono text-xs text-muted-foreground">
               {#if row.mechanism === 'assist-conversion' || row.mechanism === 'turnover-security' || row.mechanism === 'help-defense'}
                 Lineup chemistry
               {:else}
@@ -399,14 +366,9 @@
     <HealthStrip rows={healthRows} title="Health" />
     <section
       aria-labelledby="recap-injury-heading"
-      class="rounded-none bg-surface-1 p-4 sm:rounded-xl"
+      class="sr-panel-quiet p-4 sm:p-5"
     >
-      <h2
-        id="recap-injury-heading"
-        class="font-display text-base font-extrabold uppercase tracking-tight"
-      >
-        Health
-      </h2>
+      <h2 id="recap-injury-heading" class="sr-section-label">Health</h2>
       <p class="mt-1 text-sm text-muted-foreground">{injurySummary}</p>
     </section>
   {/if}
@@ -414,26 +376,17 @@
   {#if challengeView?.kind === 'challenges'}
     <section
       aria-labelledby="recap-challenges-heading"
-      class="rounded-none bg-surface-1 p-4 sm:rounded-xl"
+      class="sr-panel-quiet p-4 sm:p-5"
       data-recap-challenge-evidence
     >
-      <h2
-        id="recap-challenges-heading"
-        class="font-display text-base font-extrabold uppercase tracking-tight"
-      >
-        Challenges
-      </h2>
+      <h2 id="recap-challenges-heading" class="sr-section-label">Challenges</h2>
       <ul class="mt-2 flex flex-col gap-1.5">
         {#each challengeView.evidence as result (result.challengeId)}
           <li class="flex flex-wrap items-center gap-x-3 gap-y-0.5 py-1 text-sm">
             <span class="min-w-0 flex-1 truncate font-semibold">
               {challengeName(result.challengeId)}
             </span>
-            <span
-              class="shrink-0 rounded-full px-2 py-0.5 font-mono text-xs font-bold uppercase tracking-[0.12em] {result.success
-                ? 'bg-positive/15 text-positive'
-                : 'bg-surface-3 text-muted-foreground'}"
-            >
+            <span class="sr-badge shrink-0" data-tone={result.success ? 'win' : undefined}>
               {result.success ? `Hit · +${String(result.reward)} Influence` : 'Missed'}
             </span>
           </li>
@@ -445,15 +398,10 @@
   {#if recap.freeAgencyEvidence.windowIndex !== null}
     <section
       aria-labelledby="recap-free-agency-heading"
-      class="rounded-none bg-surface-1 p-4 sm:rounded-xl"
+      class="sr-panel-quiet p-4 sm:p-5"
       data-recap-free-agency-evidence
     >
-      <h2
-        id="recap-free-agency-heading"
-        class="font-display text-base font-extrabold uppercase tracking-tight"
-      >
-        Free agency
-      </h2>
+      <h2 id="recap-free-agency-heading" class="sr-section-label">Free agency</h2>
       <p class="mt-1 text-sm text-muted-foreground">
         Window {recap.freeAgencyEvidence.windowIndex + 1} · {recap.freeAgencyEvidence.signings
           .length} signing{recap.freeAgencyEvidence.signings.length === 1 ? '' : 's'}

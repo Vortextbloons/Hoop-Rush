@@ -48,6 +48,7 @@
   } from '$lib/season/season-effects-view';
   import { candidateOf } from '$lib/season/season-catalog-index';
   import { resolveAssetUrl } from '$lib/asset-url';
+  import { franchiseColor } from '$lib/season/franchise-colors';
   import { loadSponsorsIndex } from '$lib/season/season-assets';
   import {
     boostedOverallDeltaForPlayer,
@@ -97,6 +98,7 @@
       ? (run.rosters.find((r) => r.franchiseId === humanFranchiseId) ?? null)
       : null,
   );
+  const teamColor = $derived(franchiseColor(humanFranchiseId));
   let summaries: SeasonGameSummary[] = $state([]);
   let rotationRevision = $state(0);
   let selectedPlayerId: string | null = $state(null);
@@ -373,97 +375,109 @@
     </p>
   {:else}
     <section aria-labelledby="workspace-heading" class="flex min-w-0 flex-col gap-6 px-3 sm:px-0">
-      <div>
-        <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">Your team</p>
-        <h2
-          id="workspace-heading"
-          class="font-display mt-1 text-2xl font-extrabold tracking-tight uppercase sm:text-3xl"
+      <div
+        class="sr-panel-featured sr-arrive relative p-4 sm:p-6"
+        style="--sr-accent-a: {teamColor}; --sr-accent-b: {teamColor}"
+      >
+        <div
+          aria-hidden="true"
+          class="pointer-events-none absolute inset-0"
+          style="background: radial-gradient(ellipse 55% 85% at 88% -10%, color-mix(in srgb, var(--sr-accent-a) 18%, transparent), transparent 72%)"
+        ></div>
+        <div
+          class="relative flex min-w-0 flex-col gap-4 lg:flex-row lg:items-end lg:justify-between"
         >
-          Rotation
-        </h2>
-        <p class="mt-1 text-xs text-muted-foreground">Who starts? How many minutes? Who closes?</p>
-      </div>
+          <div class="min-w-0">
+            <p class="sr-eyebrow">Your team</p>
+            <h2 id="workspace-heading" class="sr-page-title mt-1">Rotation</h2>
+            <p class="mt-1.5 text-xs text-muted-foreground">
+              Who starts? How many minutes? Who closes?
+            </p>
+          </div>
 
-      {#if teamProjection !== null}
-        {@const overallDelta = projectionDelta(
-          teamProjection.overall,
-          lockedTeamProjection?.overall,
-        )}
-        {@const offenseDelta = projectionDelta(
-          teamProjection.offense,
-          lockedTeamProjection?.offense,
-        )}
-        {@const defenseDelta = projectionDelta(
-          teamProjection.defense,
-          lockedTeamProjection?.defense,
-        )}
-        <dl
-          class="flex flex-wrap items-baseline gap-x-5 gap-y-1 rounded-xl bg-surface-1 px-4 py-2.5"
-          data-season-team-projection
-          aria-label="Team ratings from the pending rotation's player ratings"
-        >
-          <div class="flex items-baseline gap-1.5">
-            <dt
-              class="font-mono text-[10px] font-bold tracking-[0.14em] text-muted-foreground uppercase"
-            >
-              Off
-            </dt>
-            <dd class="font-display text-xl leading-none font-extrabold tracking-tight">
-              {teamProjection.offense}
-              {#if offenseDelta !== null}
-                <span
-                  class="ml-1 font-mono text-[11px] font-bold {offenseDelta > 0
-                    ? 'text-positive'
-                    : 'text-destructive'}"
-                >
-                  {offenseDelta > 0 ? '+' : ''}{offenseDelta}
-                </span>
+          {#if teamProjection !== null}
+            {@const overallDelta = projectionDelta(
+              teamProjection.overall,
+              lockedTeamProjection?.overall,
+            )}
+            {@const offenseDelta = projectionDelta(
+              teamProjection.offense,
+              lockedTeamProjection?.offense,
+            )}
+            {@const defenseDelta = projectionDelta(
+              teamProjection.defense,
+              lockedTeamProjection?.defense,
+            )}
+            <div class="min-w-0 lg:shrink-0">
+              <dl
+                class="grid grid-cols-3 gap-2"
+                data-season-team-projection
+                aria-label="Team ratings from the pending rotation's player ratings"
+              >
+                <div class="sr-stat-tile">
+                  <dt class="sr-section-label">Off</dt>
+                  <dd
+                    class="sr-number mt-2 text-3xl leading-none font-extrabold"
+                    style="color: var(--sr-paper)"
+                  >
+                    {teamProjection.offense}
+                    {#if offenseDelta !== null}
+                      <b
+                        class="ml-1 align-middle font-mono text-xs font-bold {offenseDelta > 0
+                          ? 'text-positive'
+                          : 'text-destructive'}"
+                      >
+                        {offenseDelta > 0 ? '+' : ''}{offenseDelta}
+                      </b>
+                    {/if}
+                  </dd>
+                </div>
+                <div class="sr-stat-tile">
+                  <dt class="sr-section-label">Def</dt>
+                  <dd
+                    class="sr-number mt-2 text-3xl leading-none font-extrabold"
+                    style="color: var(--sr-paper)"
+                  >
+                    {teamProjection.defense}
+                    {#if defenseDelta !== null}
+                      <b
+                        class="ml-1 align-middle font-mono text-xs font-bold {defenseDelta > 0
+                          ? 'text-positive'
+                          : 'text-destructive'}"
+                      >
+                        {defenseDelta > 0 ? '+' : ''}{defenseDelta}
+                      </b>
+                    {/if}
+                  </dd>
+                </div>
+                <div class="sr-stat-tile">
+                  <dt class="sr-section-label">Overall</dt>
+                  <dd
+                    class="sr-number mt-2 text-3xl leading-none font-extrabold"
+                    style="color: var(--sr-paper)"
+                  >
+                    {teamProjection.overall}
+                    {#if overallDelta !== null}
+                      <b
+                        class="ml-1 align-middle font-mono text-xs font-bold {overallDelta > 0
+                          ? 'text-positive'
+                          : 'text-destructive'}"
+                      >
+                        {overallDelta > 0 ? '+' : ''}{overallDelta}
+                      </b>
+                    {/if}
+                  </dd>
+                </div>
+              </dl>
+              {#if overallDelta !== null || offenseDelta !== null || defenseDelta !== null}
+                <p class="mt-1.5 font-mono text-[9px] text-muted-foreground/70">
+                  Change vs last rotation
+                </p>
               {/if}
-            </dd>
-          </div>
-          <div class="flex items-baseline gap-1.5">
-            <dt
-              class="font-mono text-[10px] font-bold tracking-[0.14em] text-muted-foreground uppercase"
-            >
-              Def
-            </dt>
-            <dd class="font-display text-xl leading-none font-extrabold tracking-tight">
-              {teamProjection.defense}
-              {#if defenseDelta !== null}
-                <span
-                  class="ml-1 font-mono text-[11px] font-bold {defenseDelta > 0
-                    ? 'text-positive'
-                    : 'text-destructive'}"
-                >
-                  {defenseDelta > 0 ? '+' : ''}{defenseDelta}
-                </span>
-              {/if}
-            </dd>
-          </div>
-          <div class="flex items-baseline gap-1.5">
-            <dt
-              class="font-mono text-[10px] font-bold tracking-[0.14em] text-muted-foreground uppercase"
-            >
-              Overall
-            </dt>
-            <dd class="font-display text-xl leading-none font-extrabold tracking-tight">
-              {teamProjection.overall}
-              {#if overallDelta !== null}
-                <span
-                  class="ml-1 font-mono text-[11px] font-bold {overallDelta > 0
-                    ? 'text-positive'
-                    : 'text-destructive'}"
-                >
-                  {overallDelta > 0 ? '+' : ''}{overallDelta}
-                </span>
-              {/if}
-            </dd>
-          </div>
-        </dl>
-        {#if overallDelta !== null || offenseDelta !== null || defenseDelta !== null}
-          <p class="mt-1 font-mono text-[9px] text-muted-foreground/70">Change vs last rotation</p>
-        {/if}
-      {/if}
+            </div>
+          {/if}
+        </div>
+      </div>
 
       <UnitChemistry {roster} {effects} {shell} />
 
@@ -513,17 +527,17 @@
           {/if}
 
           {#if statsView !== null}
-            <details class="mt-6 rounded-none bg-surface-1 px-3 py-2 sm:rounded-xl">
+            <details class="sr-panel-quiet group mt-6 px-3 py-2">
               <summary
                 class="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden"
               >
-                <span
-                  id="team-season-stats-heading"
-                  class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
-                >
-                  Season stats
+                <span id="team-season-stats-heading" class="sr-section-label">
+                  Season stats · fold
                 </span>
-                <span class="text-xs font-semibold text-primary">View stats</span>
+                <span class="text-xs font-semibold text-primary group-open:hidden">View stats</span>
+                <span class="hidden text-xs font-semibold text-primary group-open:inline"
+                  >Hide stats</span
+                >
               </summary>
               <div class="pb-2">
                 <SeasonPlayerStats view={statsView} {manifest} {shell} embedded />
@@ -576,17 +590,16 @@
     <div
       class="sticky bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-20 mt-6 scroll-mb-24 px-3 sm:bottom-4 sm:px-0"
     >
-      <div
-        class="rounded-none border border-border bg-surface-1 p-3 shadow-2xl shadow-black/40 backdrop-blur supports-[backdrop-filter]:bg-surface-1/95 sm:rounded-xl"
-      >
+      <div class="sr-panel p-3 backdrop-blur-md">
         <div class="min-w-0 text-sm" aria-live="polite">
           {#if failures.length === 0}
-            <p class="font-semibold text-positive">Rotation ready</p>
+            <p class="sr-badge shrink-0" data-tone="win">Rotation ready</p>
           {:else}
-            <p class="font-semibold text-destructive">Rotation incomplete</p>
+            <p class="sr-badge shrink-0" data-tone="loss">Rotation incomplete</p>
           {/if}
-          <p class="mt-1 font-mono text-[11px] text-muted-foreground">
-            {minutesTotal}/240 minutes · {starterCount} starters · {closerCount} closers
+          <p class="mt-1.5 font-mono text-[11px] text-muted-foreground">
+            <span class="sr-number text-sm font-bold text-foreground">{minutesTotal}</span>/240
+            minutes · {starterCount} starters · {closerCount} closers
             {#if failures.length > 0 && minutesRemaining !== 0}
               · {Math.abs(minutesRemaining)} still need assignment
             {/if}

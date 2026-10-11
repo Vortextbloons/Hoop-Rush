@@ -64,14 +64,11 @@
   data-season-roster-list
 >
   {#if !embedded}
-    <h3
-      id="roster-heading"
-      class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
-    >
+    <h3 id="roster-heading" class="sr-section-label">
       Roster
     </h3>
   {/if}
-  <ul class="flex flex-col gap-0 sm:gap-2">
+  <ul class="flex flex-col gap-2">
     {#each roster.players as entry (entry.playerVersionId)}
       {@const face = shell.facesByVersion.get(entry.playerVersionId) ?? null}
       {@const eraIdentity = eraIdentityOf(manifest, entry.franchiseId, entry.eraId)}
@@ -96,7 +93,7 @@
             })}
       <li
         data-season-roster-status={active ? 'active' : 'inactive'}
-        class="overflow-hidden bg-surface-1 p-0 sm:rounded-xl"
+        class="sr-panel-quiet overflow-hidden"
       >
         <SeasonRosterRow
           playerVersionId={entry.playerVersionId}

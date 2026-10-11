@@ -15,6 +15,9 @@
     LockKeyhole,
     ChartNoAxesColumn,
     Brain,
+    Sparkles,
+    Scale,
+    Shuffle,
   } from '@lucide/svelte';
   import {
     CLASSIC_ROLL_VERSION,
@@ -29,6 +32,8 @@
   } from '@hoop-rush/data-contracts';
   import { ENGINE_VERSION } from '@hoop-rush/engine';
   import { getFixedFiveTransport, isFixedFiveSupabaseConfigured } from '$lib/fixed-five-transport';
+  import { DraftDuelController } from '$lib/draft-duel/draft-duel-controller.svelte';
+  import { getDraftDuelTransport, isDraftDuelSupabaseConfigured } from '$lib/draft-duel-transport';
   import {
     friendlyFixedFiveJoinError,
     loadLastFixedFiveRoomId,
@@ -37,14 +42,18 @@
   import { loadRunPreamble } from '$lib/run-preamble';
   type View = 'create' | 'join';
   let view = $state<View>('create');
-  let matchFormat = $state<'season' | 'duel'>('season');
+  let matchFormat = $state<'season' | 'duel' | 'draft-duel'>('season');
   let sourceMode = $state<FixedFiveSourceMode>('classic');
-  const mode = $derived<FixedFiveRoomMode>(
+  let ddFairness = $state<'fair' | 'unfair'>('fair');
+  const draftDuelController = new DraftDuelController();
+  const mode = $derived<FixedFiveRoomMode | null>(
     matchFormat === 'duel'
       ? 'duel'
-      : sourceMode === 'sandbox'
-        ? 'sandbox-shared-82'
-        : 'classic-shared-82',
+      : matchFormat === 'season'
+        ? sourceMode === 'sandbox'
+          ? 'sandbox-shared-82'
+          : 'classic-shared-82'
+        : null,
   );
   let variant = $state<'ratings' | 'ball-knowledge'>('ratings');
   let code = $state('');
@@ -73,9 +82,19 @@
         'Two five-player lineups. One best-of-seven series. First to four wins takes the match.',
       format: 'Best of 7',
     },
+    {
+      id: 'draft-duel',
+      name: 'Draft Duel',
+      category: '5 rounds · Bo7',
+      icon: Sparkles,
+      image: '/images/multiplayer/draft-duel.png',
+      description:
+        'Five rounds, eight cards, one pick each round. Both tables reveal together, then a best-of-seven broadcast settles it.',
+      format: 'Best of 7',
+    },
   ] as const;
   const selectedFormat = $derived(formats.find((item) => item.id === matchFormat)!);
-  function selectFormat(nextFormat: 'season' | 'duel') {
+  function selectFormat(nextFormat: 'season' | 'duel' | 'draft-duel') {
     matchFormat = nextFormat;
     view = 'create';
     error = null;
@@ -122,6 +141,16 @@
     busy = true;
     error = null;
     try {
+      if (matchFormat === 'draft-duel') {
+        const created = await draftDuelController.createRoom(ddFairness, variant);
+        if (!created) {
+          error = draftDuelController.error ?? 'Could not create the Draft Duel room.';
+          return;
+        }
+        await goto(resolve('/draft-duel/room/[roomId]', { roomId: created.roomId }));
+        return;
+      }
+      if (!mode) return;
       const t = transport();
       const created = await t.create({
         mode,
@@ -154,6 +183,21 @@
     busy = true;
     error = null;
     try {
+      if (matchFormat === 'draft-duel') {
+        const snap = await getDraftDuelTransport().preview(code);
+        const phaseName =
+          snap.phase === 'lobby'
+            ? 'waiting to start'
+            : snap.phase === 'drafting'
+              ? 'drafting now'
+              : snap.phase === 'championship'
+                ? 'finished'
+                : 'playing';
+        preview = `Draft Duel · ${snap.settings.fairness === 'fair' ? 'Fair' : 'Unfair'} · ${
+          snap.settings.presentation === 'ratings' ? 'Ratings' : 'Ball Knowledge'
+        } · ${phaseName}`;
+        return;
+      }
       const snap = await transport().preview(code);
       const modeName = snap.settings.mode === 'duel' ? 'Duel' : 'Season';
       const sourceName =
@@ -183,6 +227,15 @@
     busy = true;
     error = null;
     try {
+      if (matchFormat === 'draft-duel') {
+        const joined = await draftDuelController.joinRoom(code);
+        if (!joined) {
+          error = draftDuelController.error ?? 'Could not join that Draft Duel room.';
+          return;
+        }
+        await goto(resolve('/draft-duel/room/[roomId]', { roomId: joined.roomId }));
+        return;
+      }
       const { snapshot, membership } = await transport().join(code);
       saveFixedFiveMembership(membership);
       await goto(resolve('/multiplayer/room/[roomId]', { roomId: snapshot.roomId }));
@@ -222,14 +275,6 @@
       </div>
     {/if}
   </header>
-
-  <a class="draft-duel-banner" href={resolve('/draft-duel')}>
-    <div>
-      <span class="eyebrow">New mode</span>
-      <p>Draft Duel · five rounds, eight cards, best-of-seven broadcast</p>
-    </div>
-    <ArrowRight size={16} aria-hidden="true" />
-  </a>
 
   <div class="match-layout">
     <div class="mode-selection">
@@ -311,29 +356,55 @@
               <p>{selectedFormat.format} · 2 players</p>
             </div>
           </div>
-          <fieldset disabled={busy} class="draft-source">
-            <legend class="field-label">Draft source</legend>
-            <div class="knowledge-options">
-              <button
-                type="button"
-                aria-pressed={sourceMode === 'classic'}
-                class={['option', { active: sourceMode === 'classic' }]}
-                onclick={() => selectSource('classic')}
-                ><Swords size={21} aria-hidden="true" /><span
-                  ><strong>Classic</strong><small>Roll Draft</small></span
-                ></button
-              >
-              <button
-                type="button"
-                aria-pressed={sourceMode === 'sandbox'}
-                class={['option', { active: sourceMode === 'sandbox' }]}
-                onclick={() => selectSource('sandbox')}
-                ><Zap size={21} aria-hidden="true" /><span
-                  ><strong>Sandbox</strong><small>Snake Draft</small></span
-                ></button
-              >
-            </div>
-          </fieldset>
+          {#if matchFormat === 'draft-duel'}
+            <fieldset disabled={busy}>
+              <legend class="field-label">Fairness</legend>
+              <div class="knowledge-options">
+                <button
+                  type="button"
+                  aria-pressed={ddFairness === 'fair'}
+                  class={['option', { active: ddFairness === 'fair' }]}
+                  onclick={() => (ddFairness = 'fair')}
+                  ><Scale size={21} aria-hidden="true" /><span
+                    ><strong>Fair</strong><small>Shared strength bands</small></span
+                  ></button
+                >
+                <button
+                  type="button"
+                  aria-pressed={ddFairness === 'unfair'}
+                  class={['option', { active: ddFairness === 'unfair' }]}
+                  onclick={() => (ddFairness = 'unfair')}
+                  ><Shuffle size={21} aria-hidden="true" /><span
+                    ><strong>Unfair</strong><small>Equal player odds</small></span
+                  ></button
+                >
+              </div>
+            </fieldset>
+          {:else}
+            <fieldset disabled={busy} class="draft-source">
+              <legend class="field-label">Draft source</legend>
+              <div class="knowledge-options">
+                <button
+                  type="button"
+                  aria-pressed={sourceMode === 'classic'}
+                  class={['option', { active: sourceMode === 'classic' }]}
+                  onclick={() => selectSource('classic')}
+                  ><Swords size={21} aria-hidden="true" /><span
+                    ><strong>Classic</strong><small>Roll Draft</small></span
+                  ></button
+                >
+                <button
+                  type="button"
+                  aria-pressed={sourceMode === 'sandbox'}
+                  class={['option', { active: sourceMode === 'sandbox' }]}
+                  onclick={() => selectSource('sandbox')}
+                  ><Zap size={21} aria-hidden="true" /><span
+                    ><strong>Sandbox</strong><small>Snake Draft</small></span
+                  ></button
+                >
+              </div>
+            </fieldset>
+          {/if}
           <fieldset disabled={busy}>
             <legend class="field-label">Knowledge setting</legend>
             <div class="knowledge-options">
@@ -364,7 +435,13 @@
             </div>
             <div>
               <dt><Clock size={15} aria-hidden="true" /> Pick timer</dt>
-              <dd>{mode === 'sandbox-shared-82' ? '5m picks' : '90s picks'}</dd>
+              <dd>
+                {matchFormat === 'draft-duel'
+                  ? '60s picks'
+                  : mode === 'sandbox-shared-82'
+                    ? '5m picks'
+                    : '90s picks'}
+              </dd>
             </div>
             <div>
               <dt><LockKeyhole size={15} aria-hidden="true" /> Room access</dt>
@@ -419,7 +496,9 @@
           {#if preview}<p class="room-preview" role="status">{preview}</p>{/if}
         {/if}
         {#if error}<p class="room-error" role="alert">{error}</p>{/if}
-        {#if !isFixedFiveSupabaseConfigured()}<p class="connection-note">
+        {#if !(matchFormat === 'draft-duel' ? isDraftDuelSupabaseConfigured() : isFixedFiveSupabaseConfigured())}<p
+            class="connection-note"
+          >
             Online rooms are unavailable in this setup. Solo Classic and Sandbox are ready to play.
           </p>{/if}
       </div>
@@ -505,33 +584,6 @@
     grid-template-columns: minmax(0, 1fr) 370px;
     gap: 24px;
     align-items: start;
-  }
-  .draft-duel-banner {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    margin: 16px 0 0;
-    padding: 12px 16px;
-    border: 1px solid var(--color-border);
-    border-radius: 12px;
-    text-decoration: none;
-    color: inherit;
-    background: var(--color-surface, transparent);
-  }
-  .draft-duel-banner:hover {
-    border-color: var(--color-primary);
-  }
-  .draft-duel-banner .eyebrow {
-    text-transform: uppercase;
-    letter-spacing: 0.14em;
-    font-family: 'Roboto Mono', monospace;
-    font-size: 0.68rem;
-    color: var(--color-muted-foreground);
-  }
-  .draft-duel-banner p {
-    margin: 2px 0 0;
-    font-weight: 600;
   }
   .section-heading {
     display: flex;

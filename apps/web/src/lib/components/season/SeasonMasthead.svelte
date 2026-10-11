@@ -18,27 +18,31 @@
   const teamExternalId = $derived(identity?.teamExternalId ?? '');
 </script>
 
-<header class="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-  <div class="flex min-w-0 items-center gap-3">
+<header class="flex w-full min-w-0 flex-col gap-3 sm:flex-row sm:items-end">
+  <div class="flex min-w-0 items-center gap-4">
     {#if manifest !== null}
       <SeasonTeamLogo {manifest} {franchiseId} {teamExternalId} size="lg" eager alt={displayName} />
     {/if}
     <div class="min-w-0">
-      <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">Season Run</p>
-      <h1
-        class="font-display mt-1 max-w-full text-xl font-extrabold tracking-tight break-words uppercase sm:text-3xl md:text-4xl"
-      >
+      <p class="sr-eyebrow">Season Run</p>
+      <h1 class="sr-page-title mt-1 max-w-full break-words">
         {displayName}
       </h1>
     </div>
   </div>
   <div
-    class="flex w-full items-baseline gap-3 font-mono text-xs text-muted-foreground sm:ml-auto sm:w-auto"
+    class="flex items-end gap-4 border-border/70 sm:ml-auto sm:border-l sm:pl-5"
     aria-label={`Record ${recordLabel}; ${positionLabel}`}
   >
-    <span class="shrink-0 text-2xl font-extrabold tracking-tight text-foreground"
-      >{recordLabel}</span
-    >
-    <span class="min-w-0 truncate">{positionLabel}</span>
+    <div class="text-right">
+      <p class="sr-eyebrow text-right">Record</p>
+      <p
+        class="sr-number mt-0.5 text-4xl leading-none font-extrabold text-paper sm:text-5xl"
+        style="color: var(--sr-paper)"
+      >
+        {recordLabel}
+      </p>
+    </div>
+    <span class="sr-badge" data-tone="hardwood">{positionLabel}</span>
   </div>
 </header>

@@ -1,12 +1,16 @@
 <script lang="ts">
   import { Clock, ShieldAlert, ShieldCheck } from '@lucide/svelte';
   import type {
+    DraftDuelCard,
     DraftDuelGameOutput,
     DraftDuelParticipantId,
     DraftDuelSeriesSnapshot,
+    HoopRushManifest,
     PlayerBoxScore,
     TeamResult,
   } from '@hoop-rush/data-contracts';
+  import PlayerFace from '$lib/components/PlayerFace.svelte';
+  import { SLOT_LABELS } from '$lib/player-positions';
   import { draftDuelTeamOf } from './draft-duel-broadcast-view';
 
   let {
@@ -17,6 +21,8 @@
     readyCountdownMs,
     localReady,
     onready,
+    cards = {},
+    manifest = null,
   }: {
     output: DraftDuelGameOutput;
     series: DraftDuelSeriesSnapshot;
@@ -25,7 +31,27 @@
     readyCountdownMs: number | null;
     localReady: boolean;
     onready: () => void;
+    cards?: Record<string, DraftDuelCard>;
+    manifest?: HoopRushManifest | null;
   } = $props();
+
+  function cardOf(playerId: string): DraftDuelCard | null {
+    return cards[playerId] ?? null;
+  }
+
+  function nameOf(playerId: string): string {
+    return cardOf(playerId)?.displayName ?? playerId.replace(/^p-/, '#').slice(0, 7);
+  }
+
+  function initialsOf(name: string): string {
+    return name
+      .split(' ')
+      .filter((part) => part.length > 0)
+      .map((part) => part[0] ?? '')
+      .join('')
+      .slice(0, 2)
+      .toUpperCase();
+  }
 
   function formatCountdown(ms: number): string {
     const total = Math.max(0, Math.ceil(ms / 1000));
@@ -177,9 +203,30 @@
               </tr>
             </thead>
             <tbody>
-              {#each panel.team.players as player (player.playerId)}
+              {#each panel.team.players as player, slotIndex (player.playerId)}
                 <tr data-role="player-row">
-                  <th scope="row" class="is-player">{player.playerId}</th>
+                  <th scope="row" class="is-player">
+                    <span class="player-cell">
+                      {#if manifest && cardOf(player.playerId)?.playerExternalId}
+                        <PlayerFace
+                          player={{
+                            playerId: player.playerId,
+                            playerExternalId: cardOf(player.playerId)?.playerExternalId ?? '',
+                            altIds: null,
+                          }}
+                          {manifest}
+                          size="sm"
+                          fallbackInitials={initialsOf(nameOf(player.playerId))}
+                        />
+                      {:else}
+                        <span class="player-fallback">{initialsOf(nameOf(player.playerId))}</span>
+                      {/if}
+                      <span class="player-text">
+                        <span class="player-name">{nameOf(player.playerId)}</span>
+                        <span class="player-pos">{SLOT_LABELS[slotIndex] ?? ''}</span>
+                      </span>
+                    </span>
+                  </th>
                   <td>{player.minutes}</td>
                   <td data-stat="pts">{player.points}</td>
                   <td>{player.rebounds.total}</td>
@@ -314,9 +361,9 @@
   }
 
   .badge[data-tone='pending'] {
-    border-color: color-mix(in srgb, var(--color-accent) 55%, transparent);
-    background: color-mix(in srgb, var(--color-accent) 10%, transparent);
-    color: var(--color-accent);
+    border-color: color-mix(in srgb, var(--color-primary) 55%, transparent);
+    background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+    color: var(--color-primary);
   }
 
   .badge[data-tone='verified'] {
@@ -449,6 +496,53 @@
 
   tbody th.is-player {
     font-weight: 600;
+  }
+
+  .player-cell {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .player-fallback {
+    display: grid;
+    width: 36px;
+    height: 36px;
+    flex: none;
+    place-items: center;
+    border-radius: 9px;
+    background: var(--color-surface-3);
+    color: var(--color-muted-foreground);
+    font-family: var(--font-display);
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  .player-text {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 1px;
+  }
+
+  .player-name {
+    overflow: hidden;
+    font-family: var(--font-display);
+    font-size: 0.95rem;
+    font-weight: 800;
+    line-height: 1.05;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .player-pos {
+    font-family: var(--font-mono);
+    font-size: 0.5rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--color-muted-foreground);
   }
 
   tbody td[data-stat='pts'] {

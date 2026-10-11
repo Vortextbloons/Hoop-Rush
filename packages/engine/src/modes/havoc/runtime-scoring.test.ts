@@ -323,7 +323,6 @@ describe('havoc scoring mutations in simulation', () => {
     const rolls = run.tape.events.filter((event) => event.kind === 'roulette');
     expect(rolls.length).toBeGreaterThan(0);
     for (const roll of rolls) {
-      if (roll.kind !== 'roulette') continue;
       expect(roll.attemptOrdinal % 5).toBe(0);
       expect(roll.rolled).toBeGreaterThanOrEqual(1);
       expect(roll.rolled).toBeLessThanOrEqual(6);
@@ -338,11 +337,9 @@ describe('havoc scoring mutations in simulation', () => {
       }
     }
     // missed fifth attempts retain the roll with a null scoring reference
-    const missedRoll = rolls.find(
-      (event) => event.kind === 'roulette' && event.scoringSequence === null,
-    );
+    const missedRoll = rolls.find((roll) => roll.scoringSequence === null);
     if (missedRoll !== undefined) {
-      expect(missedRoll.kind).toBe('roulette');
+      expect(missedRoll.rolled).toBeGreaterThanOrEqual(1);
     }
   });
 

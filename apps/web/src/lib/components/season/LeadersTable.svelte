@@ -55,19 +55,22 @@
 <section
   data-season-leaders-category={category}
   aria-labelledby={`leaders-${category}-heading`}
-  class="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-border bg-surface-1"
+  class="sr-panel flex min-w-0 flex-col overflow-hidden"
 >
   <h3
     id={`leaders-${category}-heading`}
-    class="border-b border-border/70 px-5 py-3.5 font-display text-base font-extrabold uppercase tracking-tight"
+    class="flex items-center justify-between gap-2 border-b border-border px-5 py-3"
   >
-    {LEADER_CATEGORY_LABELS[category]}
+    <span class="sr-section-label">{LEADER_CATEGORY_LABELS[category]}</span>
+    <span class="font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-primary/60">
+      {entries.length === 0 ? '—' : '1–' + String(entries.length)}
+    </span>
   </h3>
 
   {#if entries.length === 0}
     <p class="px-5 py-4 text-sm text-muted-foreground">No qualified players yet.</p>
   {:else if first}
-    <div class="border-b border-border/50 px-5 py-5">
+    <div class="border-b border-border bg-surface-2 px-5 py-5">
       <div class="flex items-center gap-4">
         {#if faces.get(first.playerVersionId)}
           <SeasonPlayerFace
@@ -78,7 +81,7 @@
           />
         {/if}
         <div class="min-w-0 flex-1">
-          <p class="truncate text-2xl font-extrabold tracking-tight">
+          <p class="font-display truncate text-2xl font-extrabold uppercase tracking-tight">
             {playerName(first.playerVersionId)}
           </p>
           <p class="mt-1 flex items-center gap-1.5 text-[13px] text-muted-foreground">
@@ -87,7 +90,6 @@
                 {manifest}
                 franchiseId={first.franchiseId}
                 teamExternalId={firstSource.teamExternalId}
-                logoCandidates={firstSource.logoCandidates}
                 alt=""
                 size="sm"
               />
@@ -96,7 +98,7 @@
           </p>
         </div>
         <p class="shrink-0 text-right">
-          <span class="font-display block text-4xl leading-none font-extrabold tabular-nums">
+          <span class="sr-number block text-4xl leading-none font-extrabold">
             {valueText(first.value)}
           </span>
           <span class="mt-1 block font-mono text-xs text-muted-foreground">
@@ -106,13 +108,13 @@
       </div>
     </div>
 
-    <ol class="flex flex-col divide-y divide-border/50">
+    <ol class="flex flex-col divide-y divide-border/60">
       {#each rest as entry, index (entry.playerVersionId)}
         <li
-          class="flex items-center gap-3 px-5 py-3"
+          class="flex items-center gap-3 px-5 py-3 transition-colors hover:bg-surface-2"
           aria-label={`Rank ${String(index + 2)}: ${playerName(entry.playerVersionId)}, ${oneDecimal(entry.perGame)} per game`}
         >
-          <span class="w-6 shrink-0 font-mono text-sm font-bold text-muted-foreground">
+          <span class="sr-number w-6 shrink-0 font-mono text-sm font-bold text-muted-foreground">
             {index + 2}
           </span>
           {#if faces.get(entry.playerVersionId)}
@@ -122,7 +124,7 @@
             {playerName(entry.playerVersionId)}
           </span>
           <span class="shrink-0 text-right">
-            <span class="font-display block text-lg leading-none font-extrabold tabular-nums">
+            <span class="sr-number block text-lg leading-none font-extrabold">
               {valueText(entry.value)}
             </span>
             <span class="mt-0.5 block font-mono text-xs text-muted-foreground">

@@ -39,16 +39,14 @@
     >
       {#if selected}
         <span aria-hidden="true" class="absolute inset-y-0 left-0 w-1 bg-primary"></span>
-        <span
-          class="absolute top-3 right-3 inline-flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 font-mono text-[10px] font-bold tracking-[0.12em] text-primary-foreground uppercase"
-        >
+        <span class="sr-badge absolute top-3 right-3" data-tone="hardwood">
           <span aria-hidden="true">✓</span> Selected
         </span>
       {/if}
       <p class="font-display text-base font-extrabold tracking-tight uppercase">
         {executive.displayName}
       </p>
-      <p class="mt-0.5 font-mono text-[11px] tracking-[0.14em] text-muted-foreground uppercase">
+      <p class="sr-eyebrow mt-0.5">
         {executive.title}
       </p>
       <ul class="mt-3 space-y-1.5">

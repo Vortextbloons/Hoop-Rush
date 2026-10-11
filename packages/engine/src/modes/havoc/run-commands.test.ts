@@ -433,7 +433,7 @@ describe('havoc run command flow', () => {
 });
 
 describe('havoc draft-phase abandonment', () => {
-  it('rejects abandon-havoc-run before the lineup is locked', () => {
+  it('abandons a draft before the lineup is locked', () => {
     const draft = buildHavocRunState();
     const command = havocAbandonRunCommandSchema.parse({
       schemaVersion: HAVOC_SCHEMA_VERSION,
@@ -443,8 +443,10 @@ describe('havoc draft-phase abandonment', () => {
       command: 'abandon-havoc-run',
     });
     const outcome = ApplyHavocCommand(draft, command, environment, lockSources);
-    expect(outcome.result.status).toBe('rejected');
-    expect(outcome.result.rejection?.code).toBe('phase-mismatch');
-    expect(outcome.state).toBe(draft);
+    expect(outcome.result.status).toBe('accepted');
+    expect(outcome.state.phase).toBe('draft');
+    expect(outcome.state.completionState).toBe('abandoned');
+    expect(outcome.state.draft).not.toBeNull();
+    expect(outcome.state.revision).toBe(draft.revision + 1);
   });
 });

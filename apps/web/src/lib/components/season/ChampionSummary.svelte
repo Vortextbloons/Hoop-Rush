@@ -23,14 +23,14 @@
 <section
   aria-labelledby="champion-heading"
   data-season-champion
-  class="rounded-none border border-primary/40 bg-gradient-to-b from-primary/15 to-surface-1 p-5 sm:rounded-xl sm:p-6"
+  class="sr-panel-featured sr-arrive p-5 sm:p-6"
 >
-  <p class="font-mono text-xs font-bold uppercase tracking-[0.2em] text-primary">
+  <p class="sr-eyebrow">
     Season complete · {postseasonStageLabel('completed')}
   </p>
   <h2
     id="champion-heading"
-    class="font-display mt-2 text-3xl font-extrabold uppercase tracking-tight sm:text-4xl"
+    class="sr-page-title mt-2"
   >
     {championFranchiseId !== null ? franchiseName(championFranchiseId) : 'Champion decided'}
     <span class="sr-only">won the championship</span>
@@ -43,13 +43,13 @@
   <div class="mt-4 flex flex-wrap gap-2">
     <a
       href={resolve('/season/run/postseason' as any)}
-      class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 motion-reduce:transition-none"
+      class="sr-btn"
     >
       View final bracket
     </a>
     <a
       href={resolve('/season/run/history' as any)}
-      class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:text-foreground motion-reduce:transition-none"
+      class="sr-btn-ghost"
     >
       Season history
     </a>

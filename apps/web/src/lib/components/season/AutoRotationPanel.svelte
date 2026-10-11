@@ -242,14 +242,11 @@
 
 <section
   aria-labelledby="auto-rotation-heading"
-  class="rounded-none bg-surface-1 p-3 sm:rounded-xl"
+  class="sr-panel-quiet p-3 sm:p-4"
 >
   <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-    <div>
-      <h3
-        id="auto-rotation-heading"
-        class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
-      >
+    <div class="min-w-0">
+      <h3 id="auto-rotation-heading" class="sr-section-label">
         Auto build rotation
       </h3>
       <p class="mt-0.5 text-xs text-muted-foreground">
@@ -266,7 +263,7 @@
         type="button"
         onclick={undoAuto}
         disabled={disabled || busy}
-        class="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg border border-border px-3 py-1.5 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40"
+        class="sr-btn-ghost shrink-0 px-3! py-1.5! text-xs! outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40"
       >
         Undo auto
       </button>
@@ -283,14 +280,14 @@
         option = (event.currentTarget as HTMLSelectElement).value as AutoScopeOption;
       }}
       disabled={busy || disabled}
-      class="min-h-11 min-w-0 flex-1 rounded-lg border border-border bg-surface-2 px-3 py-2 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40 sm:max-w-56"
+      class="min-h-11 min-w-0 flex-1 rounded-lg border border-border/60 bg-surface-2 px-3 py-2 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40 sm:max-w-56"
     >
       <option value="full-auto">Full auto</option>
       <option value="minutes-only">Minutes only</option>
       <option value="keep-10">Keep my 10</option>
     </select>
     <label
-      class="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border bg-surface-2 px-3 py-2 text-xs font-semibold"
+      class="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border/60 bg-surface-2 px-3 py-2 text-xs font-semibold"
     >
       <input type="checkbox" bind:checked={allowDnp} disabled={busy || disabled} class="h-4 w-4" />
       Allow DNP when better
@@ -300,7 +297,7 @@
         type="button"
         onclick={cancelAuto}
         aria-label="Cancel auto rotation"
-        class="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg bg-surface-2 px-4 py-2 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3"
+        class="sr-btn-ghost flex-1 text-sm! outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         Cancel…
       </button>
@@ -310,7 +307,7 @@
         onclick={() => void runAuto()}
         disabled={!canRun}
         aria-busy={busy ? 'true' : undefined}
-        class="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+        class="sr-btn flex-1 text-sm! outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40"
       >
         Auto build
       </button>
@@ -339,11 +336,11 @@
     <div
       role="status"
       aria-live="polite"
-      class="mt-2 rounded-lg border border-primary/40 bg-primary/5 p-3"
+      class="mt-3 rounded-xl border border-primary/40 bg-primary/5 p-3"
     >
-      <p class="text-sm font-semibold">Preview — nothing applied yet</p>
+      <p class="sr-badge" data-tone="hardwood">Preview — nothing applied yet</p>
       {#if preview.metrics.projectedNetRating !== null}
-        <p class="mt-1 font-mono text-[11px]">
+        <p class="mt-1.5 font-mono text-[11px]">
           Projected net {preview.metrics.projectedNetRating > 0
             ? '+'
             : ''}{preview.metrics.projectedNetRating.toFixed(1)}
@@ -352,7 +349,7 @@
           )} · relief {preview.metrics.relief.toFixed(2)}
         </p>
       {:else}
-        <p class="mt-1 font-mono text-[11px]">
+        <p class="mt-1.5 font-mono text-[11px]">
           Quality {preview.metrics.quality.toFixed(3)} · risk {preview.metrics.riskScore.toFixed(3)} ·
           relief {preview.metrics.relief.toFixed(2)} · {preview.metrics.strainBand}
         </p>
@@ -360,14 +357,12 @@
 
       {#if dnps.length > 0}
         <div class="mt-2">
-          <p
-            class="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
-          >
+          <p class="sr-section-label">
             DNP-CD — dressed, 0 min{hasDnpPreview ? '' : ''}
           </p>
           <ul class="mt-1 flex flex-col gap-1 text-xs">
             {#each dnps as dnp (dnp.playerVersionId)}
-              <li class="rounded bg-surface-2 px-2 py-1.5">
+              <li class="rounded-lg border border-border/50 bg-surface-2/60 px-2 py-1.5">
                 <span class="font-semibold text-destructive">DNP {nameOf(dnp.playerVersionId)}</span
                 >
                 <span class="text-muted-foreground"> · was {dnp.from}m → 0m</span>
@@ -379,14 +374,10 @@
 
       {#if swaps.length > 0}
         <div class="mt-2">
-          <p
-            class="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
-          >
-            Active-10 swaps
-          </p>
+          <p class="sr-section-label">Active-10 swaps</p>
           <ul class="mt-1 flex flex-col gap-1 text-xs">
             {#each swaps as swap (swap.inPlayerVersionId)}
-              <li class="rounded bg-surface-2 px-2 py-1.5">
+              <li class="rounded-lg border border-border/50 bg-surface-2/60 px-2 py-1.5">
                 <span class="font-semibold text-positive">IN {nameOf(swap.inPlayerVersionId)}</span>
                 <span class="text-muted-foreground"> · </span>
                 <span class="font-semibold text-destructive"
@@ -400,16 +391,12 @@
 
       <div class="mt-2 grid gap-2 sm:grid-cols-3">
         <div>
-          <p
-            class="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
-          >
-            Starters
-          </p>
+          <p class="sr-section-label">Starters</p>
           <ol class="mt-1 flex flex-col gap-0.5 text-xs">
             {#each preview.candidate.starters as id, index (id)}
-              <li class="flex justify-between gap-2 rounded bg-surface-2 px-2 py-1">
+              <li class="flex justify-between gap-2 rounded-lg border border-border/50 bg-surface-2/60 px-2 py-1">
                 <span class="min-w-0 truncate">S{index + 1} {nameOf(id)}</span>
-                <span class="font-mono text-[10px] text-muted-foreground"
+                <span class="sr-number shrink-0 text-[10px] font-bold text-muted-foreground"
                   >{minutesOf(preview.candidate, id)}m</span
                 >
               </li>
@@ -417,16 +404,12 @@
           </ol>
         </div>
         <div>
-          <p
-            class="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
-          >
-            Bench
-          </p>
+          <p class="sr-section-label">Bench</p>
           <ol class="mt-1 flex flex-col gap-0.5 text-xs">
             {#each preview.candidate.benchOrder as id, index (id)}
-              <li class="flex justify-between gap-2 rounded bg-surface-2 px-2 py-1">
+              <li class="flex justify-between gap-2 rounded-lg border border-border/50 bg-surface-2/60 px-2 py-1">
                 <span class="min-w-0 truncate">B{index + 1} {nameOf(id)}</span>
-                <span class="font-mono text-[10px] text-muted-foreground"
+                <span class="sr-number shrink-0 text-[10px] font-bold text-muted-foreground"
                   >{minutesOf(preview.candidate, id)}m</span
                 >
               </li>
@@ -434,16 +417,12 @@
           </ol>
         </div>
         <div>
-          <p
-            class="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
-          >
-            Closing
-          </p>
+          <p class="sr-section-label">Closing</p>
           <ol class="mt-1 flex flex-col gap-0.5 text-xs">
             {#each preview.candidate.closingFive as id, index (id)}
-              <li class="flex justify-between gap-2 rounded bg-surface-2 px-2 py-1">
+              <li class="flex justify-between gap-2 rounded-lg border border-border/50 bg-surface-2/60 px-2 py-1">
                 <span class="min-w-0 truncate">C{index + 1} {nameOf(id)}</span>
-                <span class="font-mono text-[10px] text-muted-foreground"
+                <span class="sr-number shrink-0 text-[10px] font-bold text-muted-foreground"
                   >{minutesOf(preview.candidate, id)}m</span
                 >
               </li>
@@ -461,7 +440,7 @@
           </summary>
           <ul class="mt-1 flex max-h-48 flex-col gap-1 overflow-y-auto text-xs">
             {#each preview.changes as change, index (index)}
-              <li class="rounded bg-surface-2 px-2 py-1">
+              <li class="rounded-lg border border-border/50 bg-surface-2/60 px-2 py-1">
                 <span class="text-muted-foreground">{change.reason}</span>
               </li>
             {/each}
@@ -485,7 +464,7 @@
             <button
               type="button"
               onclick={applyAuto}
-              class="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90"
+              class="sr-btn flex-1 px-3! text-xs! outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               Confirm apply
             </button>
@@ -494,7 +473,7 @@
               onclick={() => {
                 confirmingSwaps = false;
               }}
-              class="inline-flex min-h-11 items-center justify-center rounded-lg border border-border px-3 py-1.5 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-2"
+              class="sr-btn-ghost flex-1 px-3! text-xs! outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               Back
             </button>
@@ -505,14 +484,14 @@
           <button
             type="button"
             onclick={applyAuto}
-            class="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90"
+            class="sr-btn flex-1 text-xs! outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             {needsSwapConfirm ? 'Review swaps & apply' : 'Apply'}
           </button>
           <button
             type="button"
             onclick={discardPreview}
-            class="inline-flex min-h-11 items-center justify-center rounded-lg border border-border px-3 py-1.5 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-2"
+            class="sr-btn-ghost flex-1 text-xs! outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             Keep mine
           </button>

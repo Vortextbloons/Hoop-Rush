@@ -21,7 +21,7 @@
     align-items: baseline;
     gap: 0.45rem;
     padding: 0.4rem 0.65rem;
-    border: 1px dashed color-mix(in srgb, var(--color-accent) 45%, transparent);
+    border: 1px dashed color-mix(in srgb, var(--color-primary) 45%, transparent);
     border-radius: 9px;
     background: color-mix(in srgb, var(--color-surface-2) 70%, transparent);
     animation: dd-consideration-in 160ms ease both;

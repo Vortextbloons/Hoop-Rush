@@ -15,19 +15,22 @@ import { catalogEntryForVersion } from './catalog.ts';
 import type { DraftDuelCatalog } from './catalog.ts';
 import {
   assessDraftDuelOffers,
-  assignSlots,
   buildDraftDuelSafetyInput,
-  draftDuelCardsOfParticipant,
+  draftDuelCardPlayableAtSlot,
   draftDuelClaimedPlayerIds,
+  draftDuelFallbackPlacements,
+  draftDuelOccupiedSlotIndexes,
   draftDuelPickerForOrdinal,
   otherDraftDuelParticipant,
   type DraftDuelRoundOffers,
+  type DraftDuelSlotPlacement,
 } from './feasibility.ts';
 import { buildRoundOffers } from './offers.ts';
 import { createRng } from '../../sim/rng.ts';
 import { draftDuelFirstPicker, draftDuelTimeoutSeed, draftDuelTimeoutSeedPath } from './seeds.ts';
 
-export type DraftDuelDraftErrorCode = 'turn' | 'not-offered' | 'claimed' | 'illegal' | 'phase';
+export type DraftDuelDraftErrorCode =
+  'turn' | 'not-offered' | 'claimed' | 'slot' | 'position' | 'illegal' | 'phase';
 
 export class DraftDuelDraftError extends Error {
   readonly code: DraftDuelDraftErrorCode;
@@ -48,12 +51,14 @@ export interface DraftDuelPickInput {
   participantId: DraftDuelParticipantId;
   playerId: PlayerId;
   playerVersionId: string;
+  slotIndex?: number;
 }
 
 export interface DraftDuelTimeoutPick {
   pickOrdinal: number;
   playerId: PlayerId;
   playerVersionId: string;
+  slotIndex: number;
   seedPath: string;
 }
 
@@ -125,6 +130,7 @@ export function draftDuelLegalPicks(
       card,
       available: false,
       reason: 'phase',
+      legalSlots: [],
     }));
   }
   const picker = draftDuelCurrentPicker(state);
@@ -143,25 +149,48 @@ export function draftDuelRoster(
   catalog: DraftDuelCatalog,
   participantId: DraftDuelParticipantId,
 ): DraftDuelRoster {
-  const cards = draftDuelCardsOfParticipant(state, participantId);
-  const assignment = assignSlots(cards);
-  if (assignment === null) {
+  const placed: DraftDuelSlotPlacement[] = [];
+  const legacyCards: DraftDuelCard[] = [];
+  const occupied = new Set<number>();
+  for (const round of state.rounds) {
+    for (const pick of round.picks) {
+      if (pick.participantId !== participantId) continue;
+      catalogEntryForVersion(catalog, pick.card.playerVersionId);
+      if (pick.slotIndex === undefined) {
+        legacyCards.push(pick.card);
+        continue;
+      }
+      const slotIndex = pick.slotIndex;
+      if (!Number.isInteger(slotIndex) || slotIndex < 0 || slotIndex > 4) {
+        throw new DraftDuelDraftError(
+          'illegal',
+          `draft duel pick ${String(pick.pickOrdinal)} has an invalid slotIndex`,
+        );
+      }
+      if (occupied.has(slotIndex)) {
+        throw new DraftDuelDraftError(
+          'illegal',
+          `draft duel roster for ${participantId} has duplicate slot ${String(slotIndex)}`,
+        );
+      }
+      if (!draftDuelCardPlayableAtSlot(pick.card, slotIndex)) {
+        throw new DraftDuelDraftError(
+          'illegal',
+          `draft duel card ${pick.card.playerVersionId} cannot play slot ${String(slotIndex)}`,
+        );
+      }
+      occupied.add(slotIndex);
+      placed.push({ slotIndex, card: pick.card });
+    }
+  }
+  const filled = draftDuelFallbackPlacements(placed, legacyCards);
+  if (filled === null) {
     throw new DraftDuelDraftError(
       'illegal',
       `draft duel roster for ${participantId} cannot be assigned to lineup slots`,
     );
   }
-  for (const card of cards) catalogEntryForVersion(catalog, card.playerVersionId);
-  const slots: DraftDuelRosterSlot[] = [];
-  for (let index = 0; index < cards.length; index += 1) {
-    const card = cards[index];
-    const slotIndex = assignment[index];
-    if (card === undefined || slotIndex === undefined) {
-      throw new DraftDuelDraftError('illegal', `draft duel roster assignment is incomplete`);
-    }
-    slots.push({ slotIndex, card });
-  }
-  slots.sort((a, b) => a.slotIndex - b.slotIndex);
+  const slots: DraftDuelRosterSlot[] = [...filled].sort((a, b) => a.slotIndex - b.slotIndex);
   return { participantId, slots };
 }
 
@@ -197,19 +226,60 @@ export function applyDraftDuelPick(
   if (draftDuelClaimedPlayerIds(state).has(input.playerId)) {
     throw new DraftDuelDraftError('claimed', `player ${input.playerId} is already claimed`);
   }
-  const assessed = draftDuelLegalPicks(state, catalog)[slot];
-  if (!assessed || !assessed.available) {
+  const card = round.offers[picker][slot];
+  if (!card) {
     throw new DraftDuelDraftError(
-      'illegal',
-      `pick ${input.playerId}/${input.playerVersionId} at ordinal ${String(state.pickOrdinal)} is unavailable (${assessed?.reason ?? 'unknown'})`,
+      'not-offered',
+      `${input.playerId}/${input.playerVersionId} is missing from the offers`,
     );
+  }
+  const assessed = draftDuelLegalPicks(state, catalog)[slot];
+  let slotIndex: number;
+  if (input.slotIndex !== undefined) {
+    const requested = input.slotIndex;
+    if (!Number.isInteger(requested) || requested < 0 || requested > 4) {
+      throw new DraftDuelDraftError(
+        'slot',
+        `slot ${String(requested)} is outside the lineup range 0..4`,
+      );
+    }
+    if (draftDuelOccupiedSlotIndexes(state, picker).has(requested)) {
+      throw new DraftDuelDraftError(
+        'slot',
+        `slot ${String(requested)} is already occupied for ${picker}`,
+      );
+    }
+    if (!draftDuelCardPlayableAtSlot(card, requested)) {
+      throw new DraftDuelDraftError(
+        'position',
+        `${card.playerId}/${card.playerVersionId} cannot play slot ${String(requested)}`,
+      );
+    }
+    const legalSlots = assessed?.legalSlots ?? [];
+    if (!assessed?.available || !legalSlots.includes(requested)) {
+      throw new DraftDuelDraftError(
+        'illegal',
+        `pick ${input.playerId}/${input.playerVersionId} at slot ${String(requested)} is unavailable (${assessed?.reason ?? 'unknown'})`,
+      );
+    }
+    slotIndex = requested;
+  } else {
+    const legalSlots = assessed?.legalSlots ?? [];
+    if (!assessed?.available || legalSlots.length === 0) {
+      throw new DraftDuelDraftError(
+        'illegal',
+        `pick ${input.playerId}/${input.playerVersionId} at ordinal ${String(state.pickOrdinal)} is unavailable (${assessed?.reason ?? 'unknown'})`,
+      );
+    }
+    slotIndex = Math.min(...legalSlots);
   }
   const pick: DraftDuelPick = {
     pickOrdinal: state.pickOrdinal,
     round: round.round,
     slot,
     participantId: picker,
-    card: assessed.card,
+    card,
+    slotIndex,
   };
   const pickOrdinal = state.pickOrdinal + 1;
   const next: DraftDuelDraft = {
@@ -241,14 +311,16 @@ export function draftDuelTimeoutPick(
     throw new DraftDuelDraftError('phase', 'draft duel is not drafting');
   }
   const picker = draftDuelCurrentPicker(state);
-  const legal = draftDuelLegalPicks(state, catalog).filter((option) => option.available);
-  const players: Array<{ playerId: PlayerId; cards: DraftDuelCard[] }> = [];
-  const seen = new Set<string>();
+  const legal = draftDuelLegalPicks(state, catalog).filter(
+    (option) => option.available && (option.legalSlots?.length ?? 0) > 0,
+  );
+  const optionsByPlayer = new Map<string, DraftDuelOfferedPick[]>();
   for (const option of legal) {
-    if (seen.has(option.card.playerId)) continue;
-    seen.add(option.card.playerId);
-    players.push({ playerId: option.card.playerId, cards: [option.card] });
+    const list = optionsByPlayer.get(option.card.playerId);
+    if (list) list.push(option);
+    else optionsByPlayer.set(option.card.playerId, [option]);
   }
+  const players = [...optionsByPlayer.values()];
   if (players.length === 0) {
     throw new DraftDuelDraftError(
       'illegal',
@@ -256,15 +328,20 @@ export function draftDuelTimeoutPick(
     );
   }
   const rng = createRng(draftDuelTimeoutSeed(state.rootSeed, picker, state.pickOrdinal));
-  const player = rng.pick(players);
-  const card = player.cards.length === 1 ? player.cards[0] : rng.pick(player.cards);
-  if (!card) {
+  const options = rng.pick(players);
+  const option = options.length === 1 ? options[0] : rng.pick(options);
+  if (!option) {
     throw new DraftDuelDraftError('illegal', 'timeout pick lost its card');
+  }
+  const legalSlots = option.legalSlots ?? [];
+  if (legalSlots.length === 0) {
+    throw new DraftDuelDraftError('illegal', 'timeout pick lost its legal slots');
   }
   return {
     pickOrdinal: state.pickOrdinal,
-    playerId: player.playerId,
-    playerVersionId: card.playerVersionId,
+    playerId: option.card.playerId,
+    playerVersionId: option.card.playerVersionId,
+    slotIndex: Math.min(...legalSlots),
     seedPath: draftDuelTimeoutSeedPath(picker, state.pickOrdinal),
   };
 }

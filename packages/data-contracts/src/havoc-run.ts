@@ -133,10 +133,10 @@ export const havocRunStateSchema = z
       if (state.havocCursor !== 0 || state.normalCursor !== 0) {
         ctx.addIssue({ code: 'custom', message: 'draft phase cannot have advanced cursors' });
       }
-      if (state.completionState !== 'draft') {
+      if (state.completionState !== 'draft' && state.completionState !== 'abandoned') {
         ctx.addIssue({
           code: 'custom',
-          message: 'draft phase must report the draft completion state',
+          message: 'draft phase must report the draft or abandoned state',
         });
       }
     } else {

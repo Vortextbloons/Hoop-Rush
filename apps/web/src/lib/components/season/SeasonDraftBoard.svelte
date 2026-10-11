@@ -113,15 +113,10 @@
     if (need <= 0) return 'Complete';
     return need === 1 ? 'Need 1' : `Need ${String(need)}`;
   }
-  const NEED_BOX_TONE: Record<'complete' | 'need-one' | 'urgent', string> = {
-    complete: 'border-border bg-surface-2',
-    'need-one': 'border-primary/60 bg-primary/5',
-    urgent: 'border-destructive/60 bg-destructive/10',
-  };
-  const NEED_COUNT_TONE: Record<'complete' | 'need-one' | 'urgent', string> = {
-    complete: 'text-foreground',
-    'need-one': 'text-foreground',
-    urgent: 'text-destructive',
+  const NEED_TILE_TONE: Record<'complete' | 'need-one' | 'urgent', 'win' | 'loss' | 'live' | undefined> = {
+    complete: undefined,
+    'need-one': 'live',
+    urgent: 'loss',
   };
   const NEED_STATUS_TONE: Record<'complete' | 'need-one' | 'urgent', string> = {
     complete: 'text-muted-foreground',
@@ -235,7 +230,7 @@
       <section aria-labelledby="season-needs-heading" class="mt-4 px-4 pb-4 sm:px-5 sm:pb-5">
         <h2
           id="season-needs-heading"
-          class="font-mono text-xs font-bold tracking-[0.14em] text-muted-foreground uppercase"
+          class="sr-section-label"
         >
           Roster needs
         </h2>
@@ -243,34 +238,40 @@
           One versatile player may cover more than one group.
         </p>
         <dl class="mt-2 grid grid-cols-3 gap-2">
-          <div class="rounded-lg border p-2 text-center {NEED_BOX_TONE[guardTone]}">
-            <dt class="font-mono text-[11px] tracking-[0.12em] text-muted-foreground uppercase">
+          <div class="sr-stat-tile text-center" data-tone={NEED_TILE_TONE[guardTone]}>
+            <dt class="sr-section-label">
               Guards
             </dt>
-            <dd class="font-display mt-0.5 text-xl font-extrabold {NEED_COUNT_TONE[guardTone]}">
-              {needDisplay(needs.guards, FIVE_COVERAGE_TARGETS.guards)}
+            <dd>
+              <strong class="sr-number">
+                {needDisplay(needs.guards, FIVE_COVERAGE_TARGETS.guards)}
+              </strong>
             </dd>
             <dd class="mt-0.5 text-[11px] {NEED_STATUS_TONE[guardTone]}">
               {needStatus(needs.guards, FIVE_COVERAGE_TARGETS.guards)}
             </dd>
           </div>
-          <div class="rounded-lg border p-2 text-center {NEED_BOX_TONE[forwardTone]}">
-            <dt class="font-mono text-[11px] tracking-[0.12em] text-muted-foreground uppercase">
+          <div class="sr-stat-tile text-center" data-tone={NEED_TILE_TONE[forwardTone]}>
+            <dt class="sr-section-label">
               Forwards
             </dt>
-            <dd class="font-display mt-0.5 text-xl font-extrabold {NEED_COUNT_TONE[forwardTone]}">
-              {needDisplay(needs.forwards, FIVE_COVERAGE_TARGETS.forwards)}
+            <dd>
+              <strong class="sr-number">
+                {needDisplay(needs.forwards, FIVE_COVERAGE_TARGETS.forwards)}
+              </strong>
             </dd>
             <dd class="mt-0.5 text-[11px] {NEED_STATUS_TONE[forwardTone]}">
               {needStatus(needs.forwards, FIVE_COVERAGE_TARGETS.forwards)}
             </dd>
           </div>
-          <div class="rounded-lg border p-2 text-center {NEED_BOX_TONE[centerTone]}">
-            <dt class="font-mono text-[11px] tracking-[0.12em] text-muted-foreground uppercase">
+          <div class="sr-stat-tile text-center" data-tone={NEED_TILE_TONE[centerTone]}>
+            <dt class="sr-section-label">
               Centers
             </dt>
-            <dd class="font-display mt-0.5 text-xl font-extrabold {NEED_COUNT_TONE[centerTone]}">
-              {needDisplay(needs.centers, FIVE_COVERAGE_TARGETS.centers)}
+            <dd>
+              <strong class="sr-number">
+                {needDisplay(needs.centers, FIVE_COVERAGE_TARGETS.centers)}
+              </strong>
             </dd>
             <dd class="mt-0.5 text-[11px] {NEED_STATUS_TONE[centerTone]}">
               {needStatus(needs.centers, FIVE_COVERAGE_TARGETS.centers)}
@@ -354,11 +355,10 @@
             {@const playerName = candidate?.displayName ?? 'Unknown player'}
             {@const teamLine = `${shortTeam ?? (candidate ? franchiseLabel(candidate.franchiseId) : 'Unknown team')}${candidate ? ` · ${eraLabel(candidate.eraId)}` : ''}`}
             <li
-              class="draft-card-enter flex h-full min-w-0 flex-col gap-2 rounded-xl border bg-surface-2 p-3 transition-transform duration-150 {fillsNeed
-                ? 'border-primary/60'
-                : 'border-transparent'} {card.selectable
+              class="sr-gamecard draft-card-enter flex h-full min-w-0 flex-col gap-2 p-3 {card.selectable
                 ? 'hover:-translate-y-1'
                 : 'draft-card-off'}"
+              style:--sr-accent={fillsNeed ? 'var(--sr-hardwood)' : undefined}
               style="--draft-index: {index}"
               class:opacity-70={!card.selectable}
             >
@@ -402,9 +402,7 @@
                   </p>
                   <div class="mt-1 min-h-5">
                     {#if fillsNeed}
-                      <span
-                        class="inline-flex rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-bold tracking-wide text-primary uppercase"
-                      >
+                      <span class="sr-badge" data-tone="hardwood">
                         Fills a need
                       </span>
                     {/if}
@@ -452,7 +450,7 @@
                       onPick(card.playerVersionId);
                     }}
                     disabled={busy}
-                    class="mt-auto inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-extrabold tracking-wide text-primary-foreground uppercase outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none"
+                    class="sr-btn mt-auto w-full"
                   >
                     Draft No. {String(index + 1).padStart(2, '0')}
                   </button>
@@ -502,7 +500,7 @@
           >
             Your roster
           </h2>
-          <span class="text-xs font-semibold text-muted-foreground">{picks.length}/10</span>
+          <span class="sr-number text-xs font-semibold text-muted-foreground">{picks.length}/10</span>
         </div>
         <ul class="flex flex-col divide-y divide-border/60">
           {#each picks as pick (pick.playerVersionId)}

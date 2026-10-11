@@ -67,15 +67,12 @@
 <section
   aria-labelledby={embedded ? undefined : 'season-stats-heading'}
   class={embedded ? 'min-w-0' : 'mt-6'}
-  data-season-player-stats
+    data-season-player-stats
 >
   <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
     {#if !embedded}
       <div class="min-w-0">
-        <h2
-          id="season-stats-heading"
-          class="font-display text-xl font-extrabold uppercase tracking-tight"
-        >
+        <h2 id="season-stats-heading" class="sr-section-label">
           Season stats
         </h2>
         <p class="mt-1 font-mono text-[10px] text-muted-foreground">
@@ -96,7 +93,7 @@
       <div
         role="group"
         aria-label="Stat measurement"
-        class="flex w-full rounded-lg bg-surface-2 p-1 sm:w-auto"
+        class="flex w-full rounded-lg border border-border/60 bg-surface-2/60 p-1 sm:w-auto"
       >
         <button
           type="button"
@@ -130,7 +127,7 @@
 
   {#if !view.hasStats}
     <div
-      class="mt-3 rounded-xl border border-dashed border-border/70 bg-surface-1 px-4 py-8 text-center"
+      class="mt-3 rounded-xl border border-dashed border-border/70 bg-surface-1/60 px-4 py-8 text-center"
     >
       <p class="font-mono text-xs font-semibold text-foreground">No season stats yet</p>
       <p class="mt-1 font-mono text-[10px] text-muted-foreground">
@@ -140,7 +137,7 @@
   {:else}
     <SeasonPlayerStatsMobileList {...tableProps} />
     <div class="mt-3 hidden overflow-x-auto overscroll-x-contain md:block">
-      <div class="min-w-0 overflow-hidden rounded-xl border border-border/40 bg-surface-1">
+      <div class="sr-panel-quiet min-w-0 overflow-hidden">
         <SeasonPlayerStatsTable {...tableProps} />
       </div>
     </div>

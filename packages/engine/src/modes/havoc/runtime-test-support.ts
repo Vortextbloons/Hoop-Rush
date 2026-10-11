@@ -35,6 +35,11 @@ export interface ScenarioSlot {
   tendencies?: Partial<SimulationTendencies>;
   overall?: number;
   heightInches?: number | null;
+  physical?: {
+    heightInches?: number;
+    wingspanDeltaInches?: number;
+    reachUnits?: number;
+  };
   authoritativeChannels?: HavocAuthoritativeChannel[];
   clone?: boolean;
 }
@@ -63,9 +68,16 @@ export function buildScenarioTeam(
         weightLbs: 215,
       },
     });
-    const effective = buildHavocEffectiveProfile(source, {
+    const baseEffective = buildHavocEffectiveProfile(source, {
       authoritativeChannels: entry.authoritativeChannels ?? [],
     });
+    const effective =
+      entry.physical === undefined
+        ? baseEffective
+        : buildHavocEffectiveProfile(source, {
+            authoritativeChannels: entry.authoritativeChannels ?? [],
+            physical: { ...baseEffective.physical, ...entry.physical },
+          });
     return buildHavocParticipant({
       instanceId: scenarioInstanceId(base + index),
       kind: 'starter',

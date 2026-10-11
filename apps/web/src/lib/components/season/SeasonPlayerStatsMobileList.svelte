@@ -127,7 +127,7 @@
         value={sortKey}
         onchange={(event) =>
           onSort((event.currentTarget as HTMLSelectElement).value as SeasonPlayerStatsSortKey)}
-        class="mt-1 min-h-11 w-full rounded-lg bg-surface-2 px-3 py-2 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        class="mt-1 min-h-11 w-full rounded-lg border border-border/60 bg-surface-2 px-3 py-2 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         {#each mobileSortOptions as option (option.key)}
           <option value={option.key}>{option.label}</option>
@@ -138,15 +138,13 @@
       type="button"
       aria-label={`Sort direction: ${sortDir === 'desc' ? 'descending' : 'ascending'}`}
       onclick={() => onSort(sortKey)}
-      class="min-h-11 rounded-lg bg-surface-2 px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      class="sr-btn-ghost min-h-11 px-3! py-2! text-[10px]! outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       {sortDir === 'desc' ? 'Highest first' : 'Lowest first'}
     </button>
   </div>
 
-  <ul
-    class="flex flex-col divide-y divide-border/60 overflow-hidden rounded-xl border border-border/40 bg-surface-1"
-  >
+  <ul class="sr-panel-quiet flex flex-col divide-y divide-border/60 overflow-hidden">
     {#each rows as row (row.playerVersionId)}
       {@const face = faceOf(row.playerVersionId)}
       {@const eraLabel = eraLabelOf(row.playerVersionId, row.franchiseId, row.eraId)}
@@ -174,11 +172,7 @@
                 </p>
               </div>
               {#if row.overallRating !== null}
-                <span
-                  class="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] font-bold text-foreground"
-                >
-                  OVR {row.overallRating}
-                </span>
+                <span class="sr-chip shrink-0">OVR {row.overallRating}</span>
               {/if}
             </div>
             {#if eraLabel !== null}
@@ -191,11 +185,14 @@
 
         <dl class="mt-3 grid grid-cols-4 gap-2">
           {#each primaryStats as stat (stat.key)}
-            <div class="rounded-lg bg-surface-2 px-2 py-1.5 text-center">
+            <div class="rounded-lg border border-border/50 bg-surface-2/60 px-2 py-1.5 text-center">
               <dt class="font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground">
                 {stat.label}
               </dt>
-              <dd class="mt-0.5 font-display text-base font-extrabold tabular-nums">
+              <dd
+                class="sr-number mt-0.5 text-base font-extrabold"
+                style="color: var(--sr-paper)"
+              >
                 {formatValue(row, stat.key)}
               </dd>
             </div>
@@ -208,7 +205,7 @@
               <dt class="font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground">
                 {stat.label}
               </dt>
-              <dd class="mt-0.5 font-mono text-xs font-semibold tabular-nums">
+              <dd class="sr-number mt-0.5 text-xs font-bold text-foreground">
                 {secondaryValue(row, stat)}
               </dd>
             </div>
@@ -221,7 +218,7 @@
               <dt class="font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground">
                 {stat.label}
               </dt>
-              <dd class="mt-0.5 font-mono text-xs font-semibold tabular-nums">
+              <dd class="sr-number mt-0.5 text-xs font-bold text-foreground">
                 {formatValue(row, stat.key)}
               </dd>
             </div>

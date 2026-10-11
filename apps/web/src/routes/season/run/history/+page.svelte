@@ -9,6 +9,7 @@
     type SeasonRunShellData,
   } from '$lib/season/season-shell-context';
   import CompletedSeasonResult from '$lib/components/season/CompletedSeasonResult.svelte';
+  import { franchiseColor } from '$lib/season/franchise-colors';
   const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
   const selectedRunId = $derived(page.url.searchParams.get('runId'));
   let entries = $state<SeasonCompletedRunIndexEntry[] | null>(null);
@@ -41,12 +42,12 @@
   <CompletedSeasonResult runId={selectedRunId} />
 {:else}
   <section aria-labelledby="history-heading" class="min-w-0 pt-6">
-    <div class="flex flex-col gap-3 px-3 sm:flex-row sm:items-end sm:justify-between sm:px-0">
+    <div class="sr-arrive flex flex-col gap-3">
       <div class="min-w-0">
-        <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">Season Run</p>
+        <p class="sr-eyebrow">Season Run</p>
         <h1
           id="history-heading"
-          class="font-display mt-1 text-2xl font-extrabold tracking-tight uppercase sm:text-3xl"
+          class="sr-page-title mt-1"
         >
           Completed seasons
         </h1>
@@ -57,9 +58,10 @@
     {#if loadError !== null}
       <div
         role="alert"
-        class="mx-auto mt-8 w-full max-w-xl rounded-xl border border-destructive/40 bg-destructive/10 p-6"
+        class="sr-panel mx-auto mt-8 w-full max-w-xl p-6"
       >
-        <h2 class="font-display text-lg font-extrabold uppercase tracking-tight">
+        <p class="sr-eyebrow">Season archive</p>
+        <h2 class="font-display mt-1 text-lg font-extrabold uppercase tracking-tight">
           History could not load
         </h2>
 
@@ -67,7 +69,7 @@
         <button
           type="button"
           onclick={() => void loadHistory()}
-          class="mt-4 inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90"
+          class="sr-btn-danger mt-4"
         >
           Try again
         </button>
@@ -77,8 +79,9 @@
         Loading completed seasons…
       </p>
     {:else if entries.length === 0}
-      <div class="mx-auto mt-8 w-full max-w-xl rounded-xl bg-surface-1 p-6 text-center">
-        <p class="font-display text-lg font-extrabold uppercase tracking-tight">
+      <div class="sr-panel mx-auto mt-8 w-full max-w-xl p-6 text-center">
+        <p class="sr-eyebrow">Nothing archived yet</p>
+        <p class="font-display mt-1 text-lg font-extrabold uppercase tracking-tight">
           No completed seasons yet
         </p>
         <p class="mt-2 text-sm text-muted-foreground">
@@ -87,19 +90,21 @@
         </p>
         <a
           href={resolve('/season/run')}
-          class="mt-4 inline-block rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90"
+          class="sr-btn-ghost mt-4"
         >
           Back to the hub
         </a>
       </div>
     {:else}
-      <ul class="mt-6 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+      <p class="sr-section-label mt-6">Finals archive</p>
+      <ul class="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
         {#each entries as entry (entry.runId)}
           <li>
             <a
               href={resolve(`/season/run/history?runId=${entry.runId}`)}
               data-season-history-entry={entry.runId}
-              class="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl bg-surface-1 px-4 py-3 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-2"
+              class="sr-gamecard flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 transition-colors hover:bg-surface-2"
+              style="--sr-accent: {franchiseColor(entry.championFranchiseId)}"
             >
               <span class="min-w-0 flex-1">
                 <span class="block truncate text-base font-bold">

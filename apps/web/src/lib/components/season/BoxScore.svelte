@@ -47,9 +47,9 @@
   );
 </script>
 
-<div class="rounded-xl bg-surface-1" data-season-box-score>
+<div class="sr-panel-quiet overflow-hidden" data-season-box-score>
   <div
-    class="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 px-4 py-3"
+    class="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3"
   >
     <div class="flex min-w-0 items-center gap-2">
       {#if manifest && teamIdentity}
@@ -61,7 +61,7 @@
           size="sm"
         />
       {/if}
-      <h3 class="font-display text-base font-extrabold uppercase tracking-tight">
+      <h3 class="sr-section-label">
         {resultLabel}
       </h3>
       {#if note}
@@ -69,7 +69,7 @@
       {/if}
     </div>
     <p class="flex items-center gap-2 text-sm text-muted-foreground">
-      <span class="font-mono text-sm text-foreground">
+      <span class="sr-number text-lg text-foreground">
         {box.team.points} – {box.opponent.points}
       </span>
       <span>vs {opponentName}</span>
@@ -86,144 +86,144 @@
   </div>
 
   <div class="md:hidden">
-    <table class="w-full text-sm">
+    <table class="sr-table w-full">
       <thead>
-        <tr
-          class="border-b border-border/70 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground"
-        >
-          <th scope="col" class="px-3 py-2 text-left font-medium">Player</th>
-          <th scope="col" class="px-3 py-2 text-right font-medium">Min</th>
-          <th scope="col" class="px-3 py-2 text-right font-medium">Pts</th>
-          <th scope="col" class="px-3 py-2 text-right font-medium">Reb</th>
-          <th scope="col" class="px-3 py-2 text-right font-medium">Ast</th>
+        <tr>
+          <th scope="col" class="text-left">Player</th>
+          <th scope="col" class="text-right!">Min</th>
+          <th scope="col" class="text-right!">Pts</th>
+          <th scope="col" class="text-right!">Reb</th>
+          <th scope="col" class="text-right!">Ast</th>
         </tr>
       </thead>
       <tbody>
         {#each box.players as player (player.playerVersionId)}
-          <tr class="border-b border-border/40">
+          <tr>
             <th scope="row" class="max-w-36 truncate px-3 py-1.5 text-left font-semibold">
               {player.displayName}
             </th>
-            <td class="px-3 py-1.5 text-right font-mono text-[10px]">
+            <td class="px-3 py-1.5 text-right font-mono text-muted-foreground">
               {formatClock(player.seconds)}
             </td>
             <td class="px-3 py-1.5 text-right font-bold">{player.points}</td>
-            <td class="px-3 py-1.5 text-right font-mono text-[10px]">
+            <td class="px-3 py-1.5 text-right font-mono">
               {player.offensiveRebounds + player.defensiveRebounds}
             </td>
-            <td class="px-3 py-1.5 text-right font-mono text-[10px]">{player.assists}</td>
+            <td class="px-3 py-1.5 text-right font-mono">{player.assists}</td>
           </tr>
         {/each}
       </tbody>
       <tfoot>
-        <tr class="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-          <th scope="row" class="px-3 py-2 text-left font-medium">Team</th>
+        <tr class="border-t-2 border-line-strong bg-surface-2">
+          <th scope="row" class="px-3 py-2 text-left">
+            <span class="sr-section-label">Team</span>
+          </th>
           <td class="px-3 py-2"></td>
-          <td class="px-3 py-2 text-right font-bold text-foreground">{box.team.points}</td>
-          <td class="px-3 py-2 text-right">
+          <td class="sr-number px-3 py-2 text-right font-extrabold">{box.team.points}</td>
+          <td class="px-3 py-2 text-right font-mono">
             {box.team.offensiveRebounds + box.team.defensiveRebounds}
           </td>
-          <td class="px-3 py-2 text-right">{teamTotal.assists}</td>
+          <td class="px-3 py-2 text-right font-mono">{teamTotal.assists}</td>
         </tr>
       </tfoot>
     </table>
 
-    <details class="group border-t border-border/60">
+    <details class="group border-t border-border">
       <summary
-        class="cursor-pointer px-4 py-2.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden"
+        class="sr-section-label cursor-pointer px-4 py-2.5 outline-none [&::-webkit-details-marker]:hidden"
       >
         Full stats
       </summary>
-      <div class="overflow-x-auto border-t border-border/40">
-        <table class="w-full min-w-[42rem] text-sm">
+      <div class="overflow-x-auto border-t border-border/60">
+        <table class="sr-table min-w-[42rem]">
           <thead>
-            <tr
-              class="border-b border-border/70 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground"
-            >
-              <th scope="col" class="px-3 py-2 text-left font-medium">Player</th>
-              <th scope="col" class="px-3 py-2 text-right font-medium">Pos</th>
-              <th scope="col" class="px-3 py-2 text-right font-medium">Min</th>
-              <th scope="col" class="px-3 py-2 text-right font-medium">Pts</th>
-              <th scope="col" class="px-3 py-2 text-right font-medium">FG</th>
-              <th scope="col" class="px-3 py-2 text-right font-medium">3PT</th>
+            <tr>
+              <th scope="col" class="text-left">Player</th>
+              <th scope="col" class="text-right!">Pos</th>
+              <th scope="col" class="text-right!">Min</th>
+              <th scope="col" class="text-right!">Pts</th>
+              <th scope="col" class="text-right!">FG</th>
+              <th scope="col" class="text-right!">3PT</th>
               {#if hasDeep}
-                <th scope="col" class="px-3 py-2 text-right font-medium">4PT</th>
+                <th scope="col" class="text-right!">4PT</th>
               {/if}
-              <th scope="col" class="px-3 py-2 text-right font-medium">FT</th>
-              <th scope="col" class="px-3 py-2 text-right font-medium">Reb</th>
-              <th scope="col" class="px-3 py-2 text-right font-medium">Ast</th>
-              <th scope="col" class="px-3 py-2 text-right font-medium">Stl</th>
-              <th scope="col" class="px-3 py-2 text-right font-medium">Blk</th>
-              <th scope="col" class="px-3 py-2 text-right font-medium">TO</th>
-              <th scope="col" class="px-3 py-2 text-right font-medium">PF</th>
+              <th scope="col" class="text-right!">FT</th>
+              <th scope="col" class="text-right!">Reb</th>
+              <th scope="col" class="text-right!">Ast</th>
+              <th scope="col" class="text-right!">Stl</th>
+              <th scope="col" class="text-right!">Blk</th>
+              <th scope="col" class="text-right!">TO</th>
+              <th scope="col" class="text-right!">PF</th>
             </tr>
           </thead>
           <tbody>
             {#each box.players as player (player.playerVersionId)}
-              <tr class="border-b border-border/40">
+              <tr>
                 <th scope="row" class="max-w-44 truncate px-3 py-1.5 text-left font-semibold">
                   {player.displayName}
                 </th>
-                <td class="px-3 py-1.5 text-right font-mono text-[10px] text-muted-foreground">
+                <td class="px-3 py-1.5 text-right font-mono text-muted-foreground">
                   {player.position}
                 </td>
-                <td class="px-3 py-1.5 text-right font-mono text-[10px]">
+                <td class="px-3 py-1.5 text-right font-mono text-muted-foreground">
                   {formatClock(player.seconds)}
                 </td>
                 <td class="px-3 py-1.5 text-right font-bold">{player.points}</td>
-                <td class="px-3 py-1.5 text-right font-mono text-[10px]">
+                <td class="px-3 py-1.5 text-right font-mono">
                   {player.fieldGoalsMade}/{player.fieldGoalsAttempted}
                 </td>
-                <td class="px-3 py-1.5 text-right font-mono text-[10px]">
+                <td class="px-3 py-1.5 text-right font-mono">
                   {player.threePointersMade}/{player.threePointersAttempted}
                 </td>
                 {#if hasDeep}
-                  <td class="px-3 py-1.5 text-right font-mono text-[10px]">
+                  <td class="px-3 py-1.5 text-right font-mono">
                     {player.fourPointersMade}/{player.fourPointersAttempted}
                   </td>
                 {/if}
-                <td class="px-3 py-1.5 text-right font-mono text-[10px]">
+                <td class="px-3 py-1.5 text-right font-mono">
                   {player.freeThrowsMade}/{player.freeThrowsAttempted}
                 </td>
-                <td class="px-3 py-1.5 text-right font-mono text-[10px]">
+                <td class="px-3 py-1.5 text-right font-mono">
                   {player.offensiveRebounds + player.defensiveRebounds}
                 </td>
-                <td class="px-3 py-1.5 text-right font-mono text-[10px]">{player.assists}</td>
-                <td class="px-3 py-1.5 text-right font-mono text-[10px]">{player.steals}</td>
-                <td class="px-3 py-1.5 text-right font-mono text-[10px]">{player.blocks}</td>
-                <td class="px-3 py-1.5 text-right font-mono text-[10px]">{player.turnovers}</td>
-                <td class="px-3 py-1.5 text-right font-mono text-[10px]">{player.fouls}</td>
+                <td class="px-3 py-1.5 text-right font-mono">{player.assists}</td>
+                <td class="px-3 py-1.5 text-right font-mono">{player.steals}</td>
+                <td class="px-3 py-1.5 text-right font-mono">{player.blocks}</td>
+                <td class="px-3 py-1.5 text-right font-mono">{player.turnovers}</td>
+                <td class="px-3 py-1.5 text-right font-mono">{player.fouls}</td>
               </tr>
             {/each}
           </tbody>
           <tfoot>
-            <tr class="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-              <th scope="row" class="px-3 py-2 text-left font-medium">Team</th>
+            <tr class="border-t-2 border-line-strong bg-surface-2">
+              <th scope="row" class="px-3 py-2 text-left">
+                <span class="sr-section-label">Team</span>
+              </th>
               <td class="px-3 py-2"></td>
               <td class="px-3 py-2"></td>
-              <td class="px-3 py-2 text-right font-bold text-foreground">{box.team.points}</td>
-              <td class="px-3 py-2 text-right">
+              <td class="sr-number px-3 py-2 text-right font-extrabold">{box.team.points}</td>
+              <td class="px-3 py-2 text-right font-mono">
                 {box.team.fieldGoalsMade}/{box.team.fieldGoalsAttempted}
               </td>
-              <td class="px-3 py-2 text-right">
+              <td class="px-3 py-2 text-right font-mono">
                 {box.team.threePointersMade}/{box.team.threePointersAttempted}
               </td>
               {#if hasDeep}
-                <td class="px-3 py-2 text-right"
+                <td class="px-3 py-2 text-right font-mono"
                   >{box.team.fourPointersMade ?? 0}/{box.team.fourPointersAttempted ?? 0}</td
                 >
               {/if}
-              <td class="px-3 py-2 text-right">
+              <td class="px-3 py-2 text-right font-mono">
                 {box.team.freeThrowsMade}/{box.team.freeThrowsAttempted}
               </td>
-              <td class="px-3 py-2 text-right">
+              <td class="px-3 py-2 text-right font-mono">
                 {box.team.offensiveRebounds + box.team.defensiveRebounds}
               </td>
-              <td class="px-3 py-2 text-right">{teamTotal.assists}</td>
-              <td class="px-3 py-2 text-right">{teamTotal.steals}</td>
-              <td class="px-3 py-2 text-right">{teamTotal.blocks}</td>
-              <td class="px-3 py-2 text-right">{teamTotal.turnovers}</td>
-              <td class="px-3 py-2 text-right">{teamTotal.fouls}</td>
+              <td class="px-3 py-2 text-right font-mono">{teamTotal.assists}</td>
+              <td class="px-3 py-2 text-right font-mono">{teamTotal.steals}</td>
+              <td class="px-3 py-2 text-right font-mono">{teamTotal.blocks}</td>
+              <td class="px-3 py-2 text-right font-mono">{teamTotal.turnovers}</td>
+              <td class="px-3 py-2 text-right font-mono">{teamTotal.fouls}</td>
             </tr>
           </tfoot>
         </table>
@@ -232,95 +232,95 @@
   </div>
 
   <div class="hidden overflow-x-auto md:block">
-    <table class="w-full min-w-[42rem] text-sm">
+    <table class="sr-table min-w-[42rem]">
       <thead>
-        <tr
-          class="border-b border-border/70 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground"
-        >
-          <th scope="col" class="px-3 py-2 text-left font-medium">Player</th>
-          <th scope="col" class="px-3 py-2 text-right font-medium">Pos</th>
-          <th scope="col" class="px-3 py-2 text-right font-medium">Min</th>
-          <th scope="col" class="px-3 py-2 text-right font-medium">Pts</th>
-          <th scope="col" class="px-3 py-2 text-right font-medium">FG</th>
-          <th scope="col" class="px-3 py-2 text-right font-medium">3PT</th>
+        <tr>
+          <th scope="col" class="text-left">Player</th>
+          <th scope="col" class="text-right!">Pos</th>
+          <th scope="col" class="text-right!">Min</th>
+          <th scope="col" class="text-right!">Pts</th>
+          <th scope="col" class="text-right!">FG</th>
+          <th scope="col" class="text-right!">3PT</th>
           {#if hasDeep}
-            <th scope="col" class="px-3 py-2 text-right font-medium">4PT</th>
+            <th scope="col" class="text-right!">4PT</th>
           {/if}
-          <th scope="col" class="px-3 py-2 text-right font-medium">FT</th>
-          <th scope="col" class="px-3 py-2 text-right font-medium">Reb</th>
-          <th scope="col" class="px-3 py-2 text-right font-medium">Ast</th>
-          <th scope="col" class="px-3 py-2 text-right font-medium">Stl</th>
-          <th scope="col" class="px-3 py-2 text-right font-medium">Blk</th>
-          <th scope="col" class="px-3 py-2 text-right font-medium">TO</th>
-          <th scope="col" class="px-3 py-2 text-right font-medium">PF</th>
+          <th scope="col" class="text-right!">FT</th>
+          <th scope="col" class="text-right!">Reb</th>
+          <th scope="col" class="text-right!">Ast</th>
+          <th scope="col" class="text-right!">Stl</th>
+          <th scope="col" class="text-right!">Blk</th>
+          <th scope="col" class="text-right!">TO</th>
+          <th scope="col" class="text-right!">PF</th>
         </tr>
       </thead>
       <tbody>
         {#each box.players as player (player.playerVersionId)}
-          <tr class="border-b border-border/40">
+          <tr>
             <th scope="row" class="max-w-44 truncate px-3 py-1.5 text-left font-semibold">
               {player.displayName}
             </th>
-            <td class="px-3 py-1.5 text-right font-mono text-[10px] text-muted-foreground">
+            <td class="px-3 py-1.5 text-right font-mono text-muted-foreground">
               {player.position}
             </td>
-            <td class="px-3 py-1.5 text-right font-mono text-[10px]">
+            <td class="px-3 py-1.5 text-right font-mono text-muted-foreground">
               {formatClock(player.seconds)}
             </td>
             <td class="px-3 py-1.5 text-right font-bold">{player.points}</td>
-            <td class="px-3 py-1.5 text-right font-mono text-[10px]">
+            <td class="px-3 py-1.5 text-right font-mono">
               {player.fieldGoalsMade}/{player.fieldGoalsAttempted}
             </td>
-            <td class="px-3 py-1.5 text-right font-mono text-[10px]">
+            <td class="px-3 py-1.5 text-right font-mono">
               {player.threePointersMade}/{player.threePointersAttempted}
             </td>
             {#if hasDeep}
-              <td class="px-3 py-1.5 text-right font-mono text-[10px]">
+              <td class="px-3 py-1.5 text-right font-mono">
                 {player.fourPointersMade}/{player.fourPointersAttempted}
               </td>
             {/if}
-            <td class="px-3 py-1.5 text-right font-mono text-[10px]">
+            <td class="px-3 py-1.5 text-right font-mono">
               {player.freeThrowsMade}/{player.freeThrowsAttempted}
             </td>
-            <td class="px-3 py-1.5 text-right font-mono text-[10px]">
+            <td class="px-3 py-1.5 text-right font-mono">
               {player.offensiveRebounds + player.defensiveRebounds}
             </td>
-            <td class="px-3 py-1.5 text-right font-mono text-[10px]">{player.assists}</td>
-            <td class="px-3 py-1.5 text-right font-mono text-[10px]">{player.steals}</td>
-            <td class="px-3 py-1.5 text-right font-mono text-[10px]">{player.blocks}</td>
-            <td class="px-3 py-1.5 text-right font-mono text-[10px]">{player.turnovers}</td>
-            <td class="px-3 py-1.5 text-right font-mono text-[10px]">{player.fouls}</td>
+            <td class="px-3 py-1.5 text-right font-mono">{player.assists}</td>
+            <td class="px-3 py-1.5 text-right font-mono">{player.steals}</td>
+            <td class="px-3 py-1.5 text-right font-mono">{player.blocks}</td>
+            <td class="px-3 py-1.5 text-right font-mono">{player.turnovers}</td>
+            <td class="px-3 py-1.5 text-right font-mono">{player.fouls}</td>
           </tr>
         {/each}
       </tbody>
       <tfoot>
-        <tr class="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-          <th scope="row" class="px-3 py-2 text-left font-medium">Team</th>
+        <tr class="border-t-2 border-line-strong bg-surface-2">
+          <th scope="row" class="px-3 py-2 text-left">
+            <span class="sr-section-label">Team</span>
+          </th>
           <td class="px-3 py-2"></td>
           <td class="px-3 py-2"></td>
-          <td class="px-3 py-2 text-right font-bold text-foreground">{box.team.points}</td>
-          <td class="px-3 py-2 text-right">
+          <td class="sr-number px-3 py-2 text-right font-extrabold">{box.team.points}</td>
+          <td class="px-3 py-2 text-right font-mono">
             {box.team.fieldGoalsMade}/{box.team.fieldGoalsAttempted}
           </td>
-          <td class="px-3 py-2 text-right">
+          <td class="px-3 py-2 text-right font-mono">
             {box.team.threePointersMade}/{box.team.threePointersAttempted}
           </td>
           {#if hasDeep}
-            <td class="px-3 py-2 text-right"
+            <td class="px-3 py-2 text-right font-mono"
               >{box.team.fourPointersMade ?? 0}/{box.team.fourPointersAttempted ?? 0}</td
             >
           {/if}
-          <td class="px-3 py-2 text-right">
+          <td class="px-3 py-2 text-right font-mono">
             {box.team.freeThrowsMade}/{box.team.freeThrowsAttempted}
           </td>
-          <td class="px-3 py-2 text-right">
+          <td class="px-3 py-2 text-right font-mono">
             {box.team.offensiveRebounds + box.team.defensiveRebounds}
           </td>
-          <td class="px-3 py-2 text-right">{teamTotal.assists}</td>
-          <td class="px-3 py-2 text-right">{teamTotal.steals}</td>
-          <td class="px-3 py-2 text-right">{teamTotal.blocks}</td>
-          <td class="px-3 py-2 text-right">{teamTotal.turnovers}</td>
-          <td class="px-3 py-2 text-right">{teamTotal.fouls}</td>
+          <td class="px-3 py-2 text-right font-mono">{teamTotal.assists}</td>
+          <td class="px-3 py-2 text-right font-mono">{teamTotal.steals}</td>
+          <td class="px-3 py-2 text-right font-mono">{teamTotal.blocks}</td>
+          <td class="px-3 py-2 text-right font-mono">{teamTotal.turnovers}</td>
+          <td class="px-3 py-2 text-right font-mono">{teamTotal.fouls}</td>
         </tr>
       </tfoot>
     </table>

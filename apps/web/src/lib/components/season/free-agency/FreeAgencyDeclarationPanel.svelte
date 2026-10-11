@@ -39,7 +39,7 @@
 
 <section
   aria-labelledby="free-agency-declaration-heading"
-  class="rounded-none border border-border bg-surface-1 p-4 sm:rounded-xl sm:p-5"
+  class="sr-panel-quiet p-4 sm:p-5"
   data-fa-declaration
 >
   <h2
@@ -54,48 +54,45 @@
   </p>
 
   <dl class="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4" data-fa-budget>
-    <div class="rounded-lg bg-surface-2 px-3 py-2">
-      <dt class="font-mono text-[9px] font-bold tracking-[0.14em] text-muted-foreground uppercase">
+    <div class="sr-stat-tile">
+      <dt class="sr-section-label">
         Balance
       </dt>
-      <dd class="font-display text-xl leading-none font-extrabold tabular-nums" data-fa-balance>
-        {balance}
-      </dd>
+      <dd><strong data-fa-balance>{balance}</strong></dd>
     </div>
-    <div class="rounded-lg bg-surface-2 px-3 py-2">
-      <dt class="font-mono text-[9px] font-bold tracking-[0.14em] text-muted-foreground uppercase">
+    <div
+      class="sr-stat-tile"
+      data-tone={committed > balance || committed > remainingBudget ? 'loss' : undefined}
+    >
+      <dt class="sr-section-label">
         Committed
       </dt>
-      <dd
-        class="font-display text-xl leading-none font-extrabold tabular-nums {committed > balance ||
-        committed > remainingBudget
-          ? 'text-destructive'
-          : ''}"
-        data-fa-committed
-      >
-        {committed}
-      </dd>
+      <dd><strong data-fa-committed>{committed}</strong></dd>
     </div>
-    <div class="rounded-lg bg-surface-2 px-3 py-2">
-      <dt class="font-mono text-[9px] font-bold tracking-[0.14em] text-muted-foreground uppercase">
+    <div class="sr-stat-tile">
+      <dt class="sr-section-label">
         Season spend
       </dt>
-      <dd class="font-display text-xl leading-none font-extrabold tabular-nums">
-        {seasonSpend}
-        <span class="font-mono text-xs font-semibold text-muted-foreground">
-          / {FREE_AGENCY_SPEND_CAP}
-        </span>
+      <dd>
+        <strong>
+          {seasonSpend}
+          <small class="font-mono text-xs font-semibold text-muted-foreground">
+            / {FREE_AGENCY_SPEND_CAP}
+          </small>
+        </strong>
       </dd>
     </div>
-    <div class="rounded-lg bg-surface-2 px-3 py-2">
-      <dt class="font-mono text-[9px] font-bold tracking-[0.14em] text-muted-foreground uppercase">
+    <div class="sr-stat-tile">
+      <dt class="sr-section-label">
         Signings
       </dt>
-      <dd class="font-display text-xl leading-none font-extrabold tabular-nums">
-        {signingCount}
-        <span class="font-mono text-xs font-semibold text-muted-foreground">
-          / {FREE_AGENCY_SIGNING_CAP}
-        </span>
+      <dd>
+        <strong>
+          {signingCount}
+          <small class="font-mono text-xs font-semibold text-muted-foreground">
+            / {FREE_AGENCY_SIGNING_CAP}
+          </small>
+        </strong>
       </dd>
     </div>
   </dl>
@@ -130,7 +127,7 @@
 
   {#if atSigningCap}
     <p
-      class="mt-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300"
+      class="mt-3 rounded-lg border border-accent/40 bg-accent/10 px-3 py-2 text-xs text-accent"
     >
       You have already signed {FREE_AGENCY_SIGNING_CAP} free agents this season — a declaration stays
       recorded, but a win cannot be applied.
@@ -155,7 +152,7 @@
       data-fa-declare-submit
       onclick={onSubmit}
       disabled={busy || targets.length === 0 || failures.length > 0}
-      class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+      class="sr-btn"
     >
       {busy ? 'Submitting…' : 'Submit declaration'}
     </button>
@@ -164,12 +161,12 @@
       data-fa-skip
       onclick={onSkip}
       disabled={busy}
-      class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border px-5 py-2.5 text-sm font-semibold text-muted-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+      class="sr-btn-ghost"
     >
       Skip this market
     </button>
   </div>
-  <p class="mt-2 font-mono text-[9px] text-muted-foreground/70">
+  <p class="sr-section-label mt-2">
     Skipping records that your team will not bid — free, no Influence, and the market can still be
     resolved.
   </p>

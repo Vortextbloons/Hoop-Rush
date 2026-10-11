@@ -6,6 +6,7 @@
   } from '$lib/season/season-postseason-presentation';
   import SeasonTeamLogo from './SeasonTeamLogo.svelte';
   import { franchiseIdentityOf } from '$lib/season/season-branding';
+  import { franchiseColor } from '$lib/season/franchise-colors';
   let {
     series = null,
     playInCard = null,
@@ -79,23 +80,25 @@
     }
     return playInCard?.consequence ?? '';
   });
+  const gamedayStyle = $derived(
+    `--sr-accent-a: ${franchiseColor(homeFranchiseId)}; --sr-accent-b: ${franchiseColor(awayFranchiseId)};`,
+  );
 </script>
 
 <section
   aria-labelledby="current-matchup-heading"
   data-season-current-matchup
-  class="playoff-hero relative overflow-hidden rounded-2xl border border-border bg-surface-1"
+  class="sr-gameday sr-arrive relative overflow-hidden"
+  style={gamedayStyle}
 >
   <div class="playoff-hero-court" aria-hidden="true"></div>
   <div class="relative flex flex-col gap-5 p-5 sm:p-7">
     <div class="flex flex-wrap items-center justify-between gap-2">
-      <p class="font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-accent">
+      <p class="sr-eyebrow">
         {roundEyebrow}{nextGameNumber !== null ? ` · Game ${String(nextGameNumber)}` : ''}
       </p>
       {#if locationLabel !== null && locationLabel !== ''}
-        <p
-          class="rounded-full border border-border bg-surface-2 px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground"
-        >
+        <p class="sr-chip">
           {locationLabel}
         </p>
       {/if}
@@ -113,9 +116,7 @@
           />
         {/if}
         <div class="min-w-0">
-          <p
-            class="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
-          >
+          <p class="sr-section-label">
             {#if homeSeed !== null}#{String(homeSeed)} seed ·
             {/if}{homeFranchiseId !== null
               ? franchiseAbbrev(homeFranchiseId)
@@ -123,7 +124,7 @@
               · you{/if}
           </p>
           <h2
-            class="font-display text-2xl font-black uppercase leading-[0.95] tracking-tight sm:text-4xl"
+            class="font-display text-2xl font-black uppercase leading-[0.95] tracking-tight text-foreground sm:text-4xl"
           >
             {homeFranchiseId !== null ? franchiseName(homeFranchiseId) : 'TBD'}
           </h2>
@@ -138,7 +139,7 @@
               >
             {/each}
           </div>
-          <p class="mt-1 font-display text-5xl font-black tabular-nums leading-none sm:text-6xl">
+          <p class="sr-scoreline mt-1 text-5xl leading-none text-foreground sm:text-6xl">
             {homeWins}
           </p>
         </div>
@@ -147,7 +148,7 @@
       <div class="flex flex-col items-center gap-1 pt-1">
         <p
           id="current-matchup-heading"
-          class="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground"
+          class="sr-section-label"
         >
           Series
         </p>
@@ -172,9 +173,7 @@
           />
         {/if}
         <div class="min-w-0">
-          <p
-            class="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
-          >
+          <p class="sr-section-label">
             {#if awaySeed !== null}#{String(awaySeed)} seed ·
             {/if}{awayFranchiseId !== null
               ? franchiseAbbrev(awayFranchiseId)
@@ -182,7 +181,7 @@
               · you{/if}
           </p>
           <h2
-            class="font-display text-2xl font-black uppercase leading-[0.95] tracking-tight sm:text-4xl"
+            class="font-display text-2xl font-black uppercase leading-[0.95] tracking-tight text-foreground sm:text-4xl"
           >
             {awayFranchiseId !== null ? franchiseName(awayFranchiseId) : 'TBD'}
           </h2>
@@ -197,7 +196,7 @@
               >
             {/each}
           </div>
-          <p class="mt-1 font-display text-5xl font-black tabular-nums leading-none sm:text-6xl">
+          <p class="sr-scoreline mt-1 text-5xl leading-none text-foreground sm:text-6xl">
             {awayWins}
           </p>
         </div>
@@ -223,13 +222,13 @@
             data-season-postseason-submit
             onclick={onPrimary}
             disabled={primaryDisabled || primaryBusy}
-            class="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-primary px-7 py-3 text-base font-extrabold uppercase tracking-wide text-primary-foreground outline-none transition-opacity focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+            class="sr-btn"
           >
             {primaryBusy ? 'Locking in…' : primaryLabel}
             <span aria-hidden="true">→</span>
           </button>
           {#if primaryHint !== null}<p
-              class="text-center font-mono text-[10px] text-muted-foreground sm:text-right"
+              class="sr-section-label text-center sm:text-right"
             >
               {primaryHint}
             </p>{/if}
@@ -247,17 +246,17 @@
     background:
       radial-gradient(
         60% 90% at 50% 115%,
-        color-mix(in srgb, var(--color-court-wood) 18%, transparent),
+        color-mix(in srgb, var(--sr-hardwood) 16%, transparent),
         transparent 70%
       ),
       linear-gradient(
         90deg,
         transparent 49.6%,
-        color-mix(in srgb, var(--color-court-wood) 26%, transparent) 49.6%,
-        color-mix(in srgb, var(--color-court-wood) 26%, transparent) 50.4%,
+        color-mix(in srgb, var(--sr-hardwood) 22%, transparent) 49.6%,
+        color-mix(in srgb, var(--sr-hardwood) 22%, transparent) 50.4%,
         transparent 50.4%
       );
-    opacity: 0.8;
+    opacity: 0.7;
   }
   .playoff-hero-court::after {
     content: '';
@@ -267,15 +266,15 @@
     width: min(46%, 220px);
     aspect-ratio: 1;
     transform: translate(-50%, -50%);
-    border: 1px solid color-mix(in srgb, var(--color-court-wood) 30%, transparent);
+    border: 1px solid color-mix(in srgb, var(--sr-hardwood) 28%, transparent);
     border-radius: 999px;
   }
   .playoff-pip {
-    width: 1.35rem;
-    height: 1.35rem;
+    width: 1.5rem;
+    height: 1.5rem;
     border-radius: 999px;
-    border: 1px dashed var(--color-border-strong);
-    background: color-mix(in srgb, var(--color-surface-3) 70%, transparent);
+    border: 1px dashed var(--sr-line-strong);
+    background: color-mix(in srgb, var(--sr-raised) 70%, transparent);
     animation: playoff-pip-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
   }
   .playoff-pip:nth-child(2) {
@@ -289,27 +288,27 @@
   }
   .playoff-pip[data-filled='true'][data-side='home'] {
     border-style: solid;
-    border-color: color-mix(in srgb, var(--color-primary) 70%, transparent);
+    border-color: color-mix(in srgb, var(--sr-accent-a) 70%, transparent);
     background:
       radial-gradient(
         circle at 32% 30%,
         color-mix(in srgb, white 22%, transparent),
         transparent 46%
       ),
-      var(--color-primary);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 22%, transparent);
+      var(--sr-accent-a);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--sr-accent-a) 22%, transparent);
   }
   .playoff-pip[data-filled='true'][data-side='away'] {
     border-style: solid;
-    border-color: color-mix(in srgb, var(--color-accent) 70%, transparent);
+    border-color: color-mix(in srgb, var(--sr-accent-b) 70%, transparent);
     background:
       radial-gradient(
         circle at 32% 30%,
         color-mix(in srgb, white 22%, transparent),
         transparent 46%
       ),
-      var(--color-accent);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 20%, transparent);
+      var(--sr-accent-b);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--sr-accent-b) 20%, transparent);
   }
   @keyframes playoff-pip-in {
     from {

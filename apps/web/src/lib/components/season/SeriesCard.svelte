@@ -42,8 +42,8 @@
 <article
   data-season-series-card={card.seriesId}
   data-series-status={card.status}
-  style:--series-color={franchiseColor(card.winnerFranchiseId ?? home)}
-  class="series-card rounded-xl border border-border bg-surface-1 {compact
+  style:--sr-accent={franchiseColor(card.winnerFranchiseId ?? home)}
+  class="series-card {compact
     ? 'compact'
     : 'p-3'} {card.humanSeries ? 'ring-1 ring-primary/40' : ''}"
 >
@@ -156,8 +156,11 @@
   .series-card {
     min-width: 0;
     overflow: hidden;
-    border-left: 3px solid var(--series-color);
-    box-shadow: 0 10px 30px rgb(0 0 0 / 0.08);
+    border: 1px solid var(--sr-line);
+    border-radius: 0.75rem;
+    border-left: 3px solid var(--sr-accent, var(--sr-line-strong));
+    background: rgb(15 20 26 / 85%);
+    box-shadow: 0 10px 30px rgb(0 0 0 / 0.35);
   }
   .series-card.compact {
     padding: 0.55rem;
@@ -175,7 +178,7 @@
   }
   .series-card[data-series-status='in-progress'] {
     box-shadow:
-      0 0 0 1px color-mix(in srgb, var(--series-color) 28%, transparent),
-      0 12px 30px rgb(0 0 0 / 0.1);
+      0 0 0 1px color-mix(in srgb, var(--sr-accent) 28%, transparent),
+      0 12px 30px rgb(0 0 0 / 0.4);
   }
 </style>

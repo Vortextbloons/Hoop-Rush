@@ -50,7 +50,7 @@
     >
       Market
     </h2>
-    <span class="font-mono text-[10px] text-muted-foreground">
+    <span class="sr-section-label">
       {cards.length} candidate{cards.length === 1 ? '' : 's'} · {cards.filter(
         (card) => card.isBestFit,
       ).length} highlighted best fit{cards.filter((card) => card.isBestFit).length === 1 ? '' : 's'}

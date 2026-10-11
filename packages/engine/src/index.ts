@@ -876,3 +876,4 @@ export {
   draftDuelGameResultDigest,
   draftDuelGameTapeDigest,
 } from './modes/draft-duel/digests.ts';
+export * from './modes/havoc/index.ts';
