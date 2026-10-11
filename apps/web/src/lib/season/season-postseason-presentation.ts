@@ -25,7 +25,10 @@ import {
   type SeasonTiebreakResolution,
   franchiseIdSchema,
 } from '@hoop-rush/data-contracts';
-import { describeCommandRejection, type SeasonPostseasonProgress } from './season-hub-state';
+import {
+  describeCommandRejection,
+  type SeasonPostseasonProgress,
+} from '@hoop-rush/application/season';
 export type HubPostseasonPhase = SeasonPostseasonProgress['phase'];
 export type HubPostseasonProgress = SeasonPostseasonProgress;
 export function idlePostseasonProgress(): HubPostseasonProgress {

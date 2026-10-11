@@ -11,7 +11,7 @@ import { freeAgencyUnresolvedWindowIndex } from '@hoop-rush/engine';
 import { loadSeasonHomeCourtProfile, seasonArtifactUrls } from './season-assets';
 import { newSeasonId } from '$lib/ids';
 import { pendingRotationSetDigest } from './season-lock-preview';
-import type { SubmitBlockEnvelope } from './season-hub-state';
+import type { SubmitBlockEnvelope } from '@hoop-rush/application/season';
 import type { SeasonRunShellData } from './season-shell-context';
 import type { SeasonBlockStartInput } from './season-block-runner';
 export type SubmitBlockFailureCode =

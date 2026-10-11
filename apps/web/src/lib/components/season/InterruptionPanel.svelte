@@ -6,7 +6,7 @@
     SeasonInvalidRosterInterruption,
     SeasonPendingBlockCandidate,
   } from '@hoop-rush/data-contracts';
-  import type { SeasonRunCommandError } from '$lib/season/season-hub-state';
+  import type { SeasonRunCommandError } from '@hoop-rush/application/season';
   import type { InfluenceSpendAffordance } from '$lib/season/season-influence-view';
   let {
     interruption,

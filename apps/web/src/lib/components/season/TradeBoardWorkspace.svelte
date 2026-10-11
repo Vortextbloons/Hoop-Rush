@@ -74,7 +74,7 @@
     onWalkAway: (inquiryId: string) => void;
     onPurchaseInquiry: () => void;
     commandError?: string | null;
-    receipt?: import('$lib/season/season-hub-state').SeasonTradeReceipt | null;
+    receipt?: import('@hoop-rush/application/season').SeasonTradeReceipt | null;
     blockedMessage?: string | null;
     busy?: boolean;
     playerName?: (playerVersionId: string) => string;

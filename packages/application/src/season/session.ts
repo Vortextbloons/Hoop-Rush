@@ -1,90 +1,77 @@
 import {
   humanFranchiseIdOf,
   SEASON_RUN_SCHEMA_VERSION,
+  commandIdSchema,
   franchiseIdSchema,
   postseasonGameIdSchema,
   seasonSubmitBlockCommandSchema,
-  type EraSimulationProfile,
-  type FranchiseId,
-  type Id,
-  type SeasonActiveRunIndex,
-  type SeasonDraftCatalog,
-  type SeasonEffectsState,
-  type SeasonFreeAgencyIndex,
-  type SeasonFreeAgencyRoleExpectation,
-  type SeasonGameSummary,
-  type SeasonHomeCourtProfile,
-  type SeasonInvalidRosterInterruption,
-  type SeasonPendingBlockCandidate,
-  type SeasonPostseasonRotationPayload,
-  type SeasonPostseasonScoreline,
-  type SeasonPostseasonSummary,
-  type SeasonRetainedGameDetail,
-  type SeasonRosterTargets,
-  type SeasonRun,
-  type SeasonRunCommand,
-  type SeasonRunCommandRejection,
-  type SeasonScoreline,
-  type SeasonSpendInfluenceCommand,
-  type SeasonSubmitBlockCommand,
-  type SeasonTradeBoardTeamProfile,
-  type SeasonTradeNegotiation,
-  type SeasonTradeRosterChange,
-  type SeasonTradeState,
-  type SeasonTradeValueTrend,
-  type SeasonTradeWindowState,
+  SeasonRunCommandStaleStateError,
+  SeasonRunLoadError,
+} from '@hoop-rush/data-contracts';
+import type {
+  CommandId,
+  EraSimulationProfile,
+  FranchiseId,
+  Id,
+  SeasonActiveRunIndex,
+  SeasonDraftCatalog,
+  SeasonEffectsState,
+  SeasonFreeAgencyIndex,
+  SeasonFreeAgencyRoleExpectation,
+  SeasonGameSummary,
+  SeasonHomeCourtProfile,
+  SeasonInvalidRosterInterruption,
+  SeasonPendingBlockCandidate,
+  SeasonPostseasonRotationPayload,
+  SeasonPostseasonScoreline,
+  SeasonPostseasonSummary,
+  SeasonRetainedGameDetail,
+  SeasonRosterTargets,
+  SeasonRun,
+  SeasonRunCommand,
+  SeasonRunCommandRejection,
+  SeasonScoreline,
+  SeasonSpendInfluenceCommand,
+  SeasonSubmitBlockCommand,
+  SeasonTradeBoardTeamProfile,
+  SeasonTradeNegotiation,
+  SeasonTradeRosterChange,
+  SeasonTradeState,
+  SeasonTradeValueTrend,
+  SeasonTradeWindowState,
 } from '@hoop-rush/data-contracts';
 import { handleSeasonRunCommand, type SeasonRunCommandContext } from '@hoop-rush/engine';
 import { seasonFranchiseLegalFiveFacts } from '@hoop-rush/engine';
 import type {
+  CommitPostseasonAdvancementInput,
+  SeasonRunPlayerSliceEntry,
+  SeasonRunSnapshot,
+} from '@hoop-rush/persistence';
+import { runSubmission } from '../submission.ts';
+import type {
   SeasonBlockResumeInput,
-  SeasonBlockRunner,
   SeasonBlockStartInput,
   SeasonRunnerEvent,
-} from '$lib/season/season-block-runner';
-import type {
-  SeasonPostseasonEvent,
-  SeasonPostseasonRunner,
-} from '$lib/season/season-postseason-runner';
+} from './block-wire.ts';
+import type { SeasonPostseasonEvent } from './postseason-wire.ts';
 import {
   seasonPostseasonCommitResultDigest,
   seasonPostseasonTransactionIdsOf,
-} from '$lib/season/season-postseason-simulation';
+} from './postseason-wire.ts';
+import { SEASON_BLOCK_POLICY, SEASON_COMMAND_POLICY, canResubmitBlock } from './policies.ts';
 import type {
-  CommitPostseasonAdvancementInput,
-  SeasonPostseasonRepository,
-  SeasonRunRepository,
-  SeasonRunSnapshot,
-} from '@hoop-rush/persistence';
-import { SeasonRunCommandStaleStateError, SeasonRunLoadError } from '@hoop-rush/persistence';
-import { newSeasonId } from '$lib/ids';
-import { sleep } from '$lib/sleep';
-import {
-  SEASON_BLOCK_POLICY,
-  SEASON_COMMAND_POLICY,
-  canResubmitBlock,
-  runSubmission,
-} from '$lib/submit';
-import {
-  cachedSeasonSnapshotMatches,
-  clearCachedSeasonSnapshot,
-  getCachedSeasonSnapshot,
-  rosterKeyOfSnapshotRun,
-  setCachedSeasonSnapshot,
-} from './season-state-cache';
-function rosterKeyOfRun(rosters: SeasonRun['rosters']): string {
-  return rosterKeyOfSnapshotRun(rosters);
-}
-import {
-  createSeasonRunChannel,
-  type SeasonRunChannel,
-  type SeasonRunMutation,
-} from './season-cross-tab';
-function monotonicNow(): number {
-  return typeof performance !== 'undefined' && typeof performance.now === 'function'
-    ? performance.now()
-    : Date.now();
-}
+  SeasonAssetPort,
+  SeasonBlockRunnerPort,
+  SeasonClockPort,
+  SeasonDraftCleanerPort,
+  SeasonIdPort,
+  SeasonNotifierPort,
+  SeasonPostseasonRunnerFactory,
+  SeasonPostseasonRunnerPort,
+  SeasonRunMutation,
+  SeasonRunRepositoryPort,
+} from './ports.ts';
+import { SeasonSnapshotCache, rosterKeyOfSnapshotRun } from './state-cache.ts';
 export type BlockPhase = 'idle' | 'running' | 'interrupted' | 'cancelled' | 'failed' | 'complete';
 export interface BlockRunState {
   requestId: string | null;
@@ -150,8 +137,32 @@ export interface SeasonPostseasonProgress {
     message: string;
   } | null;
 }
-export interface SeasonHubStateOptions {
-  now?: () => number;
+export interface SeasonSessionOptions {
+  repository: SeasonRunRepositoryPort;
+  blockRunner: SeasonBlockRunnerPort;
+  postseasonRunner?: SeasonPostseasonRunnerPort;
+  postseasonRunnerFactory?: SeasonPostseasonRunnerFactory;
+  assets: SeasonAssetPort;
+  notifier: SeasonNotifierPort;
+  clock: SeasonClockPort;
+  ids: SeasonIdPort;
+  draftCleaner: SeasonDraftCleanerPort;
+}
+export interface SeasonExternalChange {
+  kind: SeasonRunMutation['kind'];
+  message: string;
+}
+export interface SeasonSessionView {
+  readonly snapshot: SeasonRunSnapshot | null;
+  readonly index: SeasonActiveRunIndex | null;
+  readonly block: BlockRunState;
+  readonly postseason: SeasonPostseasonProgress;
+  readonly pending: SeasonPendingBlockCandidate | null;
+  readonly interruption: SeasonInvalidRosterInterruption | null;
+  readonly commandError: SeasonRunCommandError | null;
+  readonly commandReceipt: SeasonTradeReceipt | null;
+  readonly externalChange: SeasonExternalChange | null;
+  readonly error: SeasonRunLoadDiagnostic | null;
 }
 export interface SeasonRunLoadDiagnostic {
   code: string;
@@ -218,24 +229,30 @@ const IDLE_POSTSEASON: SeasonPostseasonProgress = {
   latestResult: null,
   error: null,
 };
-export class SeasonHubState {
-  private readonly repo: SeasonRunRepository & SeasonPostseasonRepository;
-  private readonly runner: SeasonBlockRunner;
+export class SeasonSession {
+  private readonly repo: SeasonRunRepositoryPort;
+  private readonly runner: SeasonBlockRunnerPort;
+  private readonly assets: SeasonAssetPort;
+  private readonly notifier: SeasonNotifierPort;
+  private readonly clock: SeasonClockPort;
+  private readonly ids: SeasonIdPort;
+  private readonly draftCleaner: SeasonDraftCleanerPort;
+  private readonly postseasonRunnerFactory: SeasonPostseasonRunnerFactory | null;
+  private readonly cache = new SeasonSnapshotCache();
   private readonly listeners = new Set<() => void>();
+  private disposed = false;
+  private isDisposed(): boolean {
+    return this.disposed;
+  }
   private unsubscribeRunner: (() => void) | null = null;
-  private postseasonRunner: SeasonPostseasonRunner | null = null;
-  private postseasonRunnerPromise: Promise<SeasonPostseasonRunner> | null = null;
+  private postseasonRunner: SeasonPostseasonRunnerPort | null = null;
+  private postseasonRunnerPromise: Promise<SeasonPostseasonRunnerPort> | null = null;
   private unsubscribePostseasonRunner: (() => void) | null = null;
   private postseasonRequestId: string | null = null;
   private profilePromise: Promise<EraSimulationProfile> | null = null;
-  private readonly channel: SeasonRunChannel;
-  private readonly now: () => number;
   private unsubscribeChannel: (() => void) | null = null;
   private externalReloading = false;
-  externalChange: {
-    kind: SeasonRunMutation['kind'];
-    message: string;
-  } | null = null;
+  externalChange: SeasonExternalChange | null = null;
   snapshot: SeasonRunSnapshot | null = null;
   index: SeasonActiveRunIndex | null = null;
   block: BlockRunState = { ...IDLE_BLOCK };
@@ -248,27 +265,40 @@ export class SeasonHubState {
   catalog: SeasonDraftCatalog | null = null;
   freeAgencyIndex: SeasonFreeAgencyIndex | null = null;
   freeAgencyTargets: SeasonRosterTargets | null = null;
-  constructor(
-    repo: SeasonRunRepository & SeasonPostseasonRepository,
-    runner: SeasonBlockRunner,
-    postseasonRunner?: SeasonPostseasonRunner,
-    options: SeasonHubStateOptions = {},
-  ) {
-    this.repo = repo;
-    this.runner = runner;
-    this.now = options.now ?? (() => Date.now());
-    this.unsubscribeRunner = runner.subscribe((event) => {
+  constructor(options: SeasonSessionOptions) {
+    this.repo = options.repository;
+    this.runner = options.blockRunner;
+    this.assets = options.assets;
+    this.notifier = options.notifier;
+    this.clock = options.clock;
+    this.ids = options.ids;
+    this.draftCleaner = options.draftCleaner;
+    this.postseasonRunnerFactory = options.postseasonRunnerFactory ?? null;
+    this.unsubscribeRunner = this.runner.subscribe((event) => {
       this.onRunnerEvent(event);
     });
-    if (postseasonRunner !== undefined) {
-      this.attachPostseasonRunner(postseasonRunner);
+    if (options.postseasonRunner !== undefined) {
+      this.attachPostseasonRunner(options.postseasonRunner);
     }
-    this.channel = createSeasonRunChannel();
-    this.unsubscribeChannel = this.channel.subscribe((mutation) => {
+    this.unsubscribeChannel = this.notifier.onMutation((mutation) => {
       void this.onExternalMutation(mutation);
     });
   }
   private lastProgressEmitAt = 0;
+  getSnapshot(): SeasonSessionView {
+    return {
+      snapshot: this.snapshot,
+      index: this.index,
+      block: this.block,
+      postseason: this.postseason,
+      pending: this.pending,
+      interruption: this.interruption,
+      commandError: this.commandError,
+      commandReceipt: this.commandReceipt,
+      externalChange: this.externalChange,
+      error: this.error,
+    };
+  }
   private cancelInFlightRunners(): void {
     const blockRequestId = this.block.requestId;
     if (this.block.phase === 'running' && blockRequestId !== null) {
@@ -304,6 +334,7 @@ export class SeasonHubState {
     this.resetRunnerProgress();
   }
   destroy(): void {
+    this.disposed = true;
     this.teardownRunners();
     this.unsubscribeRunner?.();
     this.unsubscribeRunner = null;
@@ -311,26 +342,30 @@ export class SeasonHubState {
     this.unsubscribePostseasonRunner = null;
     this.unsubscribeChannel?.();
     this.unsubscribeChannel = null;
-    this.channel.close();
+    this.notifier.close();
     this.postseasonRunner = null;
     this.listeners.clear();
   }
   prewarm(): void {
+    if (this.isDisposed()) return;
     this.runner.prewarm();
     this.postseasonRunner?.prewarm();
   }
-  private attachPostseasonRunner(runner: SeasonPostseasonRunner): void {
+  private attachPostseasonRunner(runner: SeasonPostseasonRunnerPort): void {
+    if (this.isDisposed()) return;
     this.postseasonRunner = runner;
     this.unsubscribePostseasonRunner = runner.subscribe((event) => {
       this.onPostseasonRunnerEvent(event);
     });
   }
-  private resolvePostseasonRunner(): Promise<SeasonPostseasonRunner> {
+  private resolvePostseasonRunner(): Promise<SeasonPostseasonRunnerPort> {
     if (this.postseasonRunner !== null) return Promise.resolve(this.postseasonRunner);
     if (this.postseasonRunnerPromise === null) {
-      this.postseasonRunnerPromise = import('./season-repo').then((module) =>
-        module.getSeasonPostseasonRunner(),
-      );
+      const factory = this.postseasonRunnerFactory;
+      if (factory === null) {
+        return Promise.reject(new Error('no postseason runner is configured'));
+      }
+      this.postseasonRunnerPromise = factory();
       this.postseasonRunnerPromise
         .then((runner) => {
           if (this.postseasonRunner === null) this.attachPostseasonRunner(runner);
@@ -343,9 +378,7 @@ export class SeasonHubState {
   }
   private loadProfile(): Promise<EraSimulationProfile> {
     if (this.profilePromise === null) {
-      this.profilePromise = import('./season-assets').then((module) =>
-        module.loadSeasonEraProfile(),
-      );
+      this.profilePromise = this.assets.loadEraProfile();
       this.profilePromise.catch(() => {
         this.profilePromise = null;
       });
@@ -354,26 +387,24 @@ export class SeasonHubState {
   }
   private async ensureFreeAgencyIndex(): Promise<SeasonFreeAgencyIndex> {
     if (this.freeAgencyIndex !== null) return this.freeAgencyIndex;
-    const module = await import('./season-assets');
-    const index = await module.loadSeasonFreeAgencyIndex();
+    const index = await this.assets.loadFreeAgencyIndex();
     this.freeAgencyIndex = index;
     return index;
   }
   private async ensureFreeAgencyTargets(): Promise<SeasonRosterTargets> {
     if (this.freeAgencyTargets !== null) return this.freeAgencyTargets;
-    const module = await import('./season-assets');
-    const targets = await module.loadSeasonFreeAgencyTargets();
+    const targets = await this.assets.loadFreeAgencyTargets();
     this.freeAgencyTargets = targets;
     return targets;
   }
   private async ensureCatalog(): Promise<SeasonDraftCatalog> {
     if (this.catalog !== null) return this.catalog;
-    const module = await import('./season-assets');
-    const catalog = await module.loadSeasonDraftCatalog();
+    const catalog = await this.assets.loadDraftCatalog();
     this.catalog = catalog;
     return catalog;
   }
   private async onExternalMutation(mutation: SeasonRunMutation): Promise<void> {
+    if (this.isDisposed()) return;
     if (this.externalReloading) return;
     this.externalReloading = true;
     try {
@@ -388,7 +419,7 @@ export class SeasonHubState {
         return;
       }
       this.teardownRunners();
-      clearCachedSeasonSnapshot();
+      this.cache.clear();
       this.externalChange = {
         kind: mutation.kind,
         message:
@@ -415,32 +446,37 @@ export class SeasonHubState {
     return () => this.listeners.delete(listener);
   }
   async refresh(): Promise<void> {
+    if (this.isDisposed()) return;
     try {
       const index = await this.repo.loadActiveRunIndex();
+      if (this.isDisposed()) return;
       const local = this.snapshot;
       if (
         index !== null &&
         local !== null &&
         local.run.runId === index.runId &&
         local.acceptedBlocks.length === index.revision &&
-        cachedSeasonSnapshotMatches(index.runId, index.revision, local.run.stateRevision)
+        this.cache.matches(index.runId, index.revision, local.run.stateRevision)
       ) {
-        this.snapshot = getCachedSeasonSnapshot() ?? local;
+        this.snapshot = this.cache.get() ?? local;
         this.index = index;
         this.error = null;
         this.emit();
         return;
       }
       const snapshot: SeasonRunSnapshot | null = await this.repo.loadActiveRun();
+      if (this.isDisposed()) return;
       this.snapshot = snapshot;
       this.index = index;
       if (snapshot !== null) {
         try {
           this.pending = await this.repo.loadPendingBlock(snapshot.run.runId);
+          if (this.isDisposed()) return;
           if (this.pending === null) {
             this.interruption = null;
           } else {
             this.interruption = await this.repo.loadPendingInterruption(snapshot.run.runId);
+            if (this.isDisposed()) return;
           }
         } catch {
           this.pending = null;
@@ -456,7 +492,7 @@ export class SeasonHubState {
         index.runId === snapshot.run.runId &&
         index.revision === snapshot.acceptedBlocks.length
       ) {
-        setCachedSeasonSnapshot(snapshot);
+        this.cache.set(snapshot);
       }
       this.error =
         snapshot === null && index !== null
@@ -470,11 +506,12 @@ export class SeasonHubState {
             }
           : null;
     } catch (error) {
+      if (this.isDisposed()) return;
       this.snapshot = null;
       this.index = null;
       this.pending = null;
       this.interruption = null;
-      clearCachedSeasonSnapshot();
+      this.cache.clear();
       this.error = seasonRunLoadDiagnosticOf(error);
     }
     this.emit();
@@ -486,16 +523,15 @@ export class SeasonHubState {
     try {
       this.teardownRunners();
       await this.repo.forceClearActiveSeasonRun();
-      const { DexieSeasonDraftRepository } = await import('@hoop-rush/persistence');
-      await new DexieSeasonDraftRepository().clearSeasonDraft();
-      clearCachedSeasonSnapshot();
+      await this.draftCleaner.clearDraftSave();
+      this.cache.clear();
       this.snapshot = null;
       this.index = null;
       this.pending = null;
       this.interruption = null;
       this.block = { ...IDLE_BLOCK };
       this.error = null;
-      this.channel.announce({ kind: 'clear', runId: null, committedAt: this.now() });
+      this.notifier.announce({ kind: 'clear', runId: null, committedAt: this.clock.now() });
       await this.refresh();
       return { ok: true, error: null };
     } catch (error) {
@@ -512,15 +548,10 @@ export class SeasonHubState {
   loadRetainedDetails(runId: string): Promise<SeasonRetainedGameDetail[]> {
     return this.repo.loadRetainedDetails(runId);
   }
-  loadPlayerSlice(
-    runId: string,
-  ): Promise<import('@hoop-rush/persistence').SeasonRunPlayerSliceEntry[] | null> {
+  loadPlayerSlice(runId: string): Promise<SeasonRunPlayerSliceEntry[] | null> {
     return this.repo.loadSeasonRunPlayerSlice(runId);
   }
-  upsertPlayerSlice(
-    runId: string,
-    entries: import('@hoop-rush/persistence').SeasonRunPlayerSliceEntry[],
-  ): Promise<void> {
+  upsertPlayerSlice(runId: string, entries: SeasonRunPlayerSliceEntry[]): Promise<void> {
     return this.repo.upsertSeasonRunPlayerSlice(runId, entries);
   }
   startBlock(envelope: SubmitBlockEnvelope): void {
@@ -587,8 +618,8 @@ export class SeasonHubState {
       const run = this.snapshot?.run;
       if (run === undefined) return;
       const [homeCourt, urls] = await Promise.all([
-        import('./season-assets').then((module) => module.loadSeasonHomeCourtProfile()),
-        import('./season-assets').then((module) => module.seasonArtifactUrls()),
+        this.assets.loadHomeCourtProfile(),
+        this.assets.loadArtifactUrls(),
       ]);
       const rawHumanResume = humanFranchiseIdOf(run.league);
       input = {
@@ -844,9 +875,7 @@ export class SeasonHubState {
       await Promise.all([
         this.ensureFreeAgencyIndex(),
         this.ensureFreeAgencyTargets(),
-        this.catalog === null
-          ? import('./season-assets').then((module) => module.loadSeasonDraftCatalog())
-          : Promise.resolve(null),
+        this.catalog === null ? this.assets.loadDraftCatalog() : Promise.resolve(null),
       ]).then(([index, targets, catalog]) => {
         this.freeAgencyIndex = index;
         this.freeAgencyTargets = targets;
@@ -882,10 +911,11 @@ export class SeasonHubState {
     const command: SeasonRunCommand['command'] = 'advance-postseason';
     if (!this.requirePostseasonStage(command)) return;
     const runner = await this.resolvePostseasonRunner();
+    if (this.isDisposed()) return;
     const rawHuman = this.humanFranchiseId();
     this.postseasonRequestId = runner.advancePostseason({
       runId: this.requiredRunId(),
-      commandId: newSeasonId('adv'),
+      commandId: this.newCommandId('adv'),
       ...(input?.targetGameId !== undefined
         ? { targetGameId: postseasonGameIdSchema.parse(input.targetGameId) }
         : {}),
@@ -918,10 +948,11 @@ export class SeasonHubState {
     const command: SeasonRunCommand['command'] = 'spectate-postseason-game';
     if (!this.requirePostseasonStage(command)) return;
     const runner = await this.resolvePostseasonRunner();
+    if (this.isDisposed()) return;
     const rawHumanSpectate = this.humanFranchiseId();
     this.postseasonRequestId = runner.spectatePostseasonGame({
       runId: this.requiredRunId(),
-      commandId: newSeasonId('spc'),
+      commandId: this.newCommandId('spc'),
       targetGameId: postseasonGameIdSchema.parse(input.targetGameId),
       humanFranchiseId:
         rawHumanSpectate === null ? null : franchiseIdSchema.parse(rawHumanSpectate),
@@ -931,10 +962,11 @@ export class SeasonHubState {
     const command: SeasonRunCommand['command'] = 'fast-forward-postseason';
     if (!this.requirePostseasonStage(command)) return;
     const runner = await this.resolvePostseasonRunner();
+    if (this.isDisposed()) return;
     const rawHumanFf = this.humanFranchiseId();
     this.postseasonRequestId = runner.fastForwardPostseason({
       runId: this.requiredRunId(),
-      commandId: newSeasonId('ff'),
+      commandId: this.newCommandId('ff'),
       ...(input?.targetGameId !== undefined
         ? { targetGameId: postseasonGameIdSchema.parse(input.targetGameId) }
         : {}),
@@ -952,6 +984,9 @@ export class SeasonHubState {
   }
   loadPostseasonSummary(runId: string, gameId: string): Promise<SeasonPostseasonSummary | null> {
     return this.repo.loadPostseasonSummary(runId, gameId);
+  }
+  private newCommandId(prefix: string): CommandId {
+    return commandIdSchema.parse(this.ids.id(prefix));
   }
   private failCommand(command: SeasonRunCommand['command'], message: string): void {
     this.commandError = { command, rejection: null, message };
@@ -972,7 +1007,7 @@ export class SeasonHubState {
     const snapshot = this.snapshot;
     if (snapshot === null) return false;
     this.snapshot = { ...snapshot, run, effects };
-    setCachedSeasonSnapshot(this.snapshot);
+    this.cache.set(this.snapshot);
     return true;
   }
   private async executeRunCommand(
@@ -1078,6 +1113,7 @@ export class SeasonHubState {
     });
   }
   private onPostseasonRunnerEvent(event: SeasonPostseasonEvent): void {
+    if (this.isDisposed()) return;
     if (event.type === 'started') {
       this.postseasonRequestId = event.requestId;
     } else if (event.requestId !== this.postseasonRequestId) {
@@ -1103,17 +1139,17 @@ export class SeasonHubState {
       case 'committed': {
         if (this.activeRunId() !== event.runId) break;
         this.snapshot = event.snapshot;
-        this.index = indexAfterCommit(this.index, event.snapshot, this.now);
-        setCachedSeasonSnapshot(event.snapshot);
+        this.index = indexAfterCommit(this.index, event.snapshot, () => this.clock.now());
+        this.cache.set(event.snapshot);
         this.postseason = {
           ...this.postseason,
           phase: 'running',
           gamesCompleted: this.postseason.gamesCompleted + event.gameIds.length,
         };
-        this.channel.announce({
+        this.notifier.announce({
           kind: 'replace',
           runId: event.runId,
-          committedAt: this.now(),
+          committedAt: this.clock.now(),
         });
         break;
       }
@@ -1128,20 +1164,20 @@ export class SeasonHubState {
           error: null,
         };
         if (promoted) {
-          clearCachedSeasonSnapshot();
+          this.cache.clear();
           this.snapshot = null;
           this.index = null;
           this.pending = null;
           this.interruption = null;
-          this.channel.announce({
+          this.notifier.announce({
             kind: 'clear',
             runId: event.runId,
-            committedAt: this.now(),
+            committedAt: this.clock.now(),
           });
         } else if (event.snapshot !== null) {
           this.snapshot = event.snapshot;
-          this.index = indexAfterCommit(this.index, event.snapshot, this.now);
-          setCachedSeasonSnapshot(event.snapshot);
+          this.index = indexAfterCommit(this.index, event.snapshot, () => this.clock.now());
+          this.cache.set(event.snapshot);
         }
         void this.refresh();
         break;
@@ -1185,11 +1221,11 @@ export class SeasonHubState {
     const runId = this.snapshot.run.runId;
     this.cancelInFlightRunners();
     if (this.block.phase === 'running') {
-      const deadline = monotonicNow() + 5000;
+      const deadline = this.clock.now() + 5000;
       let waited = 0;
       const phaseOf = (): BlockPhase => this.block.phase;
-      while (phaseOf() === 'running' && waited < 5000 && monotonicNow() < deadline) {
-        await sleep(100);
+      while (phaseOf() === 'running' && waited < 5000 && this.clock.now() < deadline) {
+        await this.clock.sleep(100);
         waited += 100;
       }
       if (phaseOf() === 'running') {
@@ -1203,8 +1239,8 @@ export class SeasonHubState {
     this.emit();
     try {
       await this.repo.clearSeasonRun(runId);
-      clearCachedSeasonSnapshot();
-      this.channel.announce({ kind: 'clear', runId, committedAt: this.now() });
+      this.cache.clear();
+      this.notifier.announce({ kind: 'clear', runId, committedAt: this.clock.now() });
       await this.refresh();
       return { ok: true, error: null };
     } catch (error) {
@@ -1215,7 +1251,7 @@ export class SeasonHubState {
   async retry(): Promise<void> {
     if (this.block.command === null || this.block.startInput === null) return;
     if (this.block.phase !== 'cancelled' && this.block.phase !== 'failed') return;
-    clearCachedSeasonSnapshot();
+    this.cache.clear();
     await this.refresh();
     const revision = this.snapshot?.acceptedBlocks.length;
     if (!canResubmitBlock(SEASON_BLOCK_POLICY, this.block.command.expectedRevision, revision)) {
@@ -1226,9 +1262,7 @@ export class SeasonHubState {
     const start = this.block.startInput;
     let homeCourt: SeasonHomeCourtProfile;
     try {
-      homeCourt = await import('./season-assets').then((module) =>
-        module.loadSeasonHomeCourtProfile(),
-      );
+      homeCourt = await this.assets.loadHomeCourtProfile();
     } catch {
       homeCourt = start.homeCourt;
     }
@@ -1307,7 +1341,7 @@ export class SeasonHubState {
         freeAgencyTargets: this.freeAgencyTargets ?? undefined,
       }),
       apply: async (output, snapshot) => {
-        const beforeRosterKey = rosterKeyOfRun(snapshot.run.rosters);
+        const beforeRosterKey = rosterKeyOfSnapshotRun(snapshot.run.rosters);
         const pendingInterruption =
           command.command === 'forfeit-interrupted-game' && output.pending !== null
             ? this.interruptionStateForPending(output.pending)
@@ -1335,15 +1369,15 @@ export class SeasonHubState {
           current !== null &&
           this.adoptCommittedRun(output.run, postCommandEffects(output.run, current.effects))
         ) {
-          this.channel.announce({
+          this.notifier.announce({
             kind: 'commit',
             runId: output.run.runId,
             revision: output.run.stateRevision,
-            committedAt: this.now(),
+            committedAt: this.clock.now(),
           });
           this.emit();
         }
-        if (beforeRosterKey === rosterKeyOfRun(output.run.rosters)) return;
+        if (beforeRosterKey === rosterKeyOfSnapshotRun(output.run.rosters)) return;
         await this.refresh();
       },
     });
@@ -1356,7 +1390,7 @@ export class SeasonHubState {
   > {
     return {
       schemaVersion: SEASON_RUN_SCHEMA_VERSION,
-      commandId: newSeasonId(prefix),
+      commandId: this.newCommandId(prefix),
       runId: this.requiredRunId(),
       expectedStateRevision: this.requiredStateRevision(),
       expectedStateDigest: this.requiredStateDigest(),
@@ -1388,6 +1422,7 @@ export class SeasonHubState {
     return this.snapshot?.run.runId ?? this.index?.runId ?? null;
   }
   private onRunnerEvent(event: SeasonRunnerEvent): void {
+    if (this.isDisposed()) return;
     if (event.type === 'started') {
       if (this.block.blockIndex !== event.blockIndex) return;
       this.block.requestId = event.requestId;
@@ -1408,7 +1443,7 @@ export class SeasonHubState {
         this.block.humanRecordInBlock = event.humanRecordInBlock;
         this.block.humanResults = event.humanResults;
         this.block.leaguePulse = event.leaguePulse;
-        const now = this.now();
+        const now = this.clock.now();
         const isFinal = event.gamesTotal > 0 && event.gamesCompleted >= event.gamesTotal;
         if (!isFinal && !event.isHumanGame && now - this.lastProgressEmitAt < 1000) return;
         this.lastProgressEmitAt = now;
@@ -1423,14 +1458,14 @@ export class SeasonHubState {
         this.pending = null;
         this.interruption = null;
         this.snapshot = event.snapshot;
-        this.index = indexAfterCommit(this.index, event.snapshot, this.now);
-        setCachedSeasonSnapshot(event.snapshot);
+        this.index = indexAfterCommit(this.index, event.snapshot, () => this.clock.now());
+        this.cache.set(event.snapshot);
         this.block = { ...IDLE_BLOCK };
-        this.channel.announce({
+        this.notifier.announce({
           kind: 'commit',
           runId: event.snapshot.run.runId,
           revision: event.snapshot.acceptedBlocks.length,
-          committedAt: this.now(),
+          committedAt: this.clock.now(),
         });
         this.emit();
         return;
@@ -1490,10 +1525,11 @@ export class SeasonHubState {
     };
   }
   private emit(): void {
+    if (this.isDisposed()) return;
     for (const listener of this.listeners) listener();
   }
 }
-function indexAfterCommit(
+export function indexAfterCommit(
   index: SeasonActiveRunIndex | null,
   snapshot: SeasonRunSnapshot,
   now: () => number,

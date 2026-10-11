@@ -88,7 +88,7 @@
     parsePlayoffGameId,
     type SeasonPostseasonSummary,
   } from '@hoop-rush/data-contracts';
-  import type { SeasonRunCommandError } from '$lib/season/season-hub-state';
+  import type { SeasonRunCommandError } from '@hoop-rush/application/season';
   const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
   let mounted = $state(true);
   $effect(() => {

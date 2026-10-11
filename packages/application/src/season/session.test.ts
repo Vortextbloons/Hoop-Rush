@@ -28,8 +28,10 @@ import {
   seedSchema,
   commandIdSchema,
   idSchema,
+  SeasonRunCommandStaleStateError,
+  SeasonRunLoadError,
 } from '@hoop-rush/data-contracts';
-import type { SeasonRunSnapshot } from '@hoop-rush/persistence';
+import type { CommitPostseasonAdvancementInput, SeasonRunSnapshot } from '@hoop-rush/persistence';
 import { SEASON_HOME_COURT_PROFILE } from '@hoop-rush/engine';
 import { generateSeasonSchedule } from '@hoop-rush/engine';
 import { handleSeasonRunCommand } from '@hoop-rush/engine';
@@ -40,40 +42,59 @@ import {
   buildSeasonLeague,
   buildSeasonRunFixture,
 } from '@hoop-rush/test-fixtures';
-import { SeasonRunLoadError } from '@hoop-rush/persistence';
-import { SeasonRunCommandStaleStateError } from '@hoop-rush/persistence';
-import { SeasonHubState, type BlockRunState, describeCommandRejection } from './season-hub-state';
-import { clearCachedSeasonSnapshot } from './season-state-cache';
+import { SeasonSession, describeCommandRejection, type BlockRunState } from './session.ts';
+import { SeasonSnapshotCache } from './state-cache.ts';
 import type {
   SeasonBlockResumeInput,
   SeasonBlockRunner,
   SeasonBlockStartInput,
   SeasonRunnerEvent,
-} from './season-block-runner';
+} from './block-wire.ts';
 import type {
   SeasonPostseasonEvent,
   SeasonPostseasonRunner,
   SeasonPostseasonRunInput,
-} from './season-postseason-runner';
-import type { CommitPostseasonAdvancementInput } from '@hoop-rush/persistence';
-vi.mock('$lib/season/season-assets', async (importOriginal) => {
-  const original = await importOriginal<typeof import('$lib/season/season-assets')>();
-  return {
-    ...original,
-    loadSeasonEraProfile: () => Promise.resolve(buildEraSimulationProfile()),
+} from './postseason-wire.ts';
+import type { SeasonAssetPort, SeasonRunRepositoryPort } from './ports.ts';
+let nextTestCommandId = 0;
+function createSession(
+  repository: SeasonRunRepositoryPort,
+  blockRunner: SeasonBlockRunner,
+  postseasonRunner?: SeasonPostseasonRunner,
+): SeasonSession {
+  const assets: SeasonAssetPort = {
+    loadEraProfile: () => Promise.resolve(buildEraSimulationProfile()),
+    loadDraftCatalog: () => Promise.reject(new Error('the season draft catalog is unavailable')),
+    loadFreeAgencyIndex: () => Promise.reject(new Error('the free-agency index is unavailable')),
+    loadFreeAgencyTargets: () =>
+      Promise.reject(new Error('the free-agency targets are unavailable')),
+    loadHomeCourtProfile: () => Promise.resolve({ ...SEASON_HOME_COURT_PROFILE }),
+    loadArtifactUrls: () => Promise.reject(new Error('the season artifact urls are unavailable')),
   };
-});
-vi.mock('@hoop-rush/persistence', async (importOriginal) => {
-  const original = await importOriginal<typeof import('@hoop-rush/persistence')>();
-  return {
-    ...original,
-    DexieSeasonDraftRepository: class {
-      clearSeasonDraft(): Promise<void> {
-        return Promise.resolve();
-      }
+  return new SeasonSession({
+    repository,
+    blockRunner,
+    ...(postseasonRunner !== undefined ? { postseasonRunner } : {}),
+    assets,
+    notifier: {
+      announce: () => {},
+      onMutation: () => () => {},
+      close: () => {},
     },
-  };
-});
+    clock: {
+      now: () => 0,
+      sleep: (ms: number) => new Promise((resolve) => setTimeout(resolve, ms)),
+    },
+    ids: {
+      id: (prefix: string): string => {
+        nextTestCommandId += 1;
+        return `${prefix}-test-${String(nextTestCommandId)}`;
+      },
+    },
+    draftCleaner: { clearDraftSave: () => Promise.resolve() },
+  });
+}
+
 class FakeRunner implements SeasonBlockRunner {
   ackCancel = true;
   terminateCalls = 0;
@@ -179,7 +200,7 @@ function runningBlock(requestId: string, blockIndex: number): BlockRunState {
     startInput: null,
   };
 }
-describe('SeasonHubState season-load diagnostics', () => {
+describe('SeasonSession season-load diagnostics', () => {
   it('preserves a typed load diagnostic for the recovery screen', async () => {
     const repo = repoWith(null);
     repo.loadActiveRun.mockRejectedValueOnce(
@@ -189,7 +210,7 @@ describe('SeasonHubState season-load diagnostics', () => {
         'SEASON_RUN_STATE_VALIDATION_FAILED',
       ),
     );
-    const hub = new SeasonHubState(repo, new FakeRunner());
+    const hub = createSession(repo, new FakeRunner());
 
     await hub.refresh();
 
@@ -214,7 +235,7 @@ describe('SeasonHubState season-load diagnostics', () => {
       humanWins: 0,
       humanLosses: 0,
     } as never);
-    const hub = new SeasonHubState(repo, new FakeRunner());
+    const hub = createSession(repo, new FakeRunner());
 
     await hub.refresh();
 
@@ -225,7 +246,7 @@ describe('SeasonHubState season-load diagnostics', () => {
     hub.destroy();
   });
 });
-describe('SeasonHubState.quitRun', () => {
+describe('SeasonSession.quitRun', () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -235,7 +256,7 @@ describe('SeasonHubState.quitRun', () => {
   it('clears the active run and reloads the empty state', async () => {
     const repo = repoWith(snapshot());
     const runner = new FakeRunner();
-    const hub = new SeasonHubState(repo, runner);
+    const hub = createSession(repo, runner);
     await hub.refresh();
     expect(hub.snapshot?.run.runId).toBe(RUN_ID);
     const result = await hub.quitRun();
@@ -249,7 +270,7 @@ describe('SeasonHubState.quitRun', () => {
     const repo = repoWith(snapshot());
     const runner = new FakeRunner();
     runner.ackCancel = false;
-    const hub = new SeasonHubState(repo, runner);
+    const hub = createSession(repo, runner);
     await hub.refresh();
     hub.block = runningBlock('fake-1', 0);
     const pending = hub.quitRun();
@@ -265,7 +286,7 @@ describe('SeasonHubState.quitRun', () => {
   it('refuses to quit when no run is active', async () => {
     const repo = repoWith(null);
     const runner = new FakeRunner();
-    const hub = new SeasonHubState(repo, runner);
+    const hub = createSession(repo, runner);
     await hub.refresh();
     const result = await hub.quitRun();
     expect(result.ok).toBe(false);
@@ -274,12 +295,12 @@ describe('SeasonHubState.quitRun', () => {
     hub.destroy();
   });
 });
-describe('SeasonHubState.retry', () => {
+describe('SeasonSession.retry', () => {
   it('re-derives the home-court profile instead of resubmitting the stored copy', async () => {
     const run = { runId: RUN_ID, rosters: [] } as unknown as SeasonRun;
     const repo = repoWith({ ...snapshot(), run });
     const runner = new FakeRunner();
-    const hub = new SeasonHubState(repo, runner);
+    const hub = createSession(repo, runner);
     await hub.refresh();
     const staleHomeCourt: SeasonHomeCourtProfile = {
       ...SEASON_HOME_COURT_PROFILE,
@@ -585,6 +606,7 @@ class FakePostseasonRunner implements SeasonPostseasonRunner {
   fastForwardCalls: SeasonPostseasonRunInput[] = [];
   cancelCalls: string[] = [];
   terminateCalls = 0;
+  subscribeCalls = 0;
   private readonly listeners = new Set<(event: SeasonPostseasonEvent) => void>();
   advancePostseason(input: SeasonPostseasonRunInput): string {
     this.advanceCalls.push(input);
@@ -631,6 +653,7 @@ class FakePostseasonRunner implements SeasonPostseasonRunner {
   }
   prewarm(): void {}
   subscribe(listener: (event: SeasonPostseasonEvent) => void): () => void {
+    this.subscribeCalls += 1;
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
   }
@@ -692,9 +715,8 @@ function hubPostseasonRepo(initial: SeasonRunSnapshot | null) {
     buildReplayExport: vi.fn(() => Promise.resolve(null)),
   };
 }
-describe('SeasonHubState postseason commands (M2.6)', () => {
+describe('SeasonSession postseason commands (M2.6)', () => {
   afterEach(() => {
-    clearCachedSeasonSnapshot();
     vi.restoreAllMocks();
   });
   it('startPostseason dispatches through the engine and commits the advancement', async () => {
@@ -706,7 +728,7 @@ describe('SeasonHubState postseason commands (M2.6)', () => {
       acceptedBlocks: [],
       effects: hubZeroEffects(run),
     });
-    const hub = new SeasonHubState(repo, new FakeRunner(), new FakePostseasonRunner());
+    const hub = createSession(repo, new FakeRunner(), new FakePostseasonRunner());
     hub.catalog = hubCatalogOf(run);
     await hub.refresh();
     expect(hub.snapshot?.run.stage).toBe('regular-season');
@@ -734,7 +756,7 @@ describe('SeasonHubState postseason commands (M2.6)', () => {
     repo.commitPostseasonAdvancement.mockRejectedValueOnce(
       new SeasonRunCommandStaleStateError('cmd-stale', 0, 1),
     );
-    const hub = new SeasonHubState(repo, new FakeRunner(), new FakePostseasonRunner());
+    const hub = createSession(repo, new FakeRunner(), new FakePostseasonRunner());
     hub.catalog = hubCatalogOf(run);
     await hub.refresh();
     await hub.startPostseason();
@@ -754,7 +776,7 @@ describe('SeasonHubState postseason commands (M2.6)', () => {
       acceptedBlocks: [],
       effects: hubZeroEffects(run),
     });
-    const hub = new SeasonHubState(repo, new FakeRunner(), new FakePostseasonRunner());
+    const hub = createSession(repo, new FakeRunner(), new FakePostseasonRunner());
     hub.catalog = hubCatalogOf(run);
     await hub.refresh();
     await hub.startPostseason();
@@ -798,7 +820,7 @@ describe('SeasonHubState postseason commands (M2.6)', () => {
       acceptedBlocks: [],
       effects: hubZeroEffects(run),
     });
-    const hub = new SeasonHubState(repo, new FakeRunner(), new FakePostseasonRunner());
+    const hub = createSession(repo, new FakeRunner(), new FakePostseasonRunner());
     hub.catalog = hubCatalogOf(run);
     await hub.refresh();
     await hub.startPostseason();
@@ -848,7 +870,7 @@ describe('SeasonHubState postseason commands (M2.6)', () => {
       effects: hubZeroEffects(run),
     });
     const postseasonRunner = new FakePostseasonRunner();
-    const hub = new SeasonHubState(repo, new FakeRunner(), postseasonRunner);
+    const hub = createSession(repo, new FakeRunner(), postseasonRunner);
     hub.catalog = hubCatalogOf(run);
     await hub.refresh();
     await hub.startPostseason();
@@ -902,7 +924,7 @@ describe('SeasonHubState postseason commands (M2.6)', () => {
       effects: hubZeroEffects(run),
     });
     const postseasonRunner = new FakePostseasonRunner();
-    const hub = new SeasonHubState(repo, new FakeRunner(), postseasonRunner);
+    const hub = createSession(repo, new FakeRunner(), postseasonRunner);
     hub.catalog = hubCatalogOf(run);
     await hub.refresh();
     await hub.startPostseason();
@@ -938,7 +960,7 @@ describe('SeasonHubState postseason commands (M2.6)', () => {
       effects: hubZeroEffects(run),
     });
     const postseasonRunner = new FakePostseasonRunner();
-    const hub = new SeasonHubState(repo, new FakeRunner(), postseasonRunner);
+    const hub = createSession(repo, new FakeRunner(), postseasonRunner);
     hub.catalog = hubCatalogOf(run);
     await hub.refresh();
     await hub.startPostseason();
@@ -960,7 +982,7 @@ describe('SeasonHubState postseason commands (M2.6)', () => {
       effects: hubZeroEffects(run),
     });
     const postseasonRunner = new FakePostseasonRunner();
-    const hub = new SeasonHubState(repo, new FakeRunner(), postseasonRunner);
+    const hub = createSession(repo, new FakeRunner(), postseasonRunner);
     await hub.refresh();
     await hub.advancePostseason();
     expect(postseasonRunner.advanceCalls).toHaveLength(0);
@@ -973,13 +995,13 @@ describe('SeasonHubState postseason commands (M2.6)', () => {
     hub.destroy();
   });
 });
-describe('SeasonHubState trade guards', () => {
+describe('SeasonSession trade guards', () => {
   it('blocks trade commands while a block is pending or running', async () => {
     const repo = repoWith(snapshot());
     const runner = new FakeRunner();
-    const hub = new SeasonHubState(repo, runner);
+    const hub = createSession(repo, runner);
     await hub.refresh();
-    hub.pending = { runId: RUN_ID, blockIndex: 3 } as unknown as SeasonHubState['pending'];
+    hub.pending = { runId: RUN_ID, blockIndex: 3 } as unknown as SeasonSession['pending'];
     await hub.openTradeInquiry({ windowIndex: 0, toFranchiseId: 'celtics' });
     expect(hub.commandError?.command).toBe('open-trade-inquiry');
     expect(hub.commandError?.rejection).toMatchObject({ code: 'pending-block', blockIndex: 3 });
@@ -1050,15 +1072,15 @@ describe('SeasonHubState trade guards', () => {
     ).toContain('illegal roster');
   });
 });
-describe('SeasonHubState runner teardown', () => {
-  function setPostseasonRequestId(hub: SeasonHubState, requestId: string | null): void {
+describe('SeasonSession runner teardown', () => {
+  function setPostseasonRequestId(hub: SeasonSession, requestId: string | null): void {
     (hub as unknown as { postseasonRequestId: string | null }).postseasonRequestId = requestId;
   }
   it('destroy cancels and terminates both runners', async () => {
     const repo = repoWith(snapshot());
     const runner = new FakeRunner();
     const postseasonRunner = new FakePostseasonRunner();
-    const hub = new SeasonHubState(repo, runner, postseasonRunner);
+    const hub = createSession(repo, runner, postseasonRunner);
     await hub.refresh();
     hub.block = runningBlock('fake-1', 0);
     hub.postseason = { ...hub.postseason, phase: 'running' };
@@ -1073,7 +1095,7 @@ describe('SeasonHubState runner teardown', () => {
     const repo = repoWith(snapshot());
     const runner = new FakeRunner();
     const postseasonRunner = new FakePostseasonRunner();
-    const hub = new SeasonHubState(repo, runner, postseasonRunner);
+    const hub = createSession(repo, runner, postseasonRunner);
     await hub.refresh();
     hub.postseason = { ...hub.postseason, phase: 'running' };
     setPostseasonRequestId(hub, 'sp-1');
@@ -1096,7 +1118,7 @@ describe('SeasonHubState runner teardown', () => {
   it('drops late block events that no longer match the active request or run', async () => {
     const repo = repoWith(snapshot());
     const runner = new FakeRunner();
-    const hub = new SeasonHubState(repo, runner);
+    const hub = createSession(repo, runner);
     await hub.refresh();
     hub.block = runningBlock('fake-1', 0);
     runner.emit({
@@ -1107,6 +1129,126 @@ describe('SeasonHubState runner teardown', () => {
     });
     expect(hub.snapshot?.run.runId).toBe(RUN_ID);
     expect(hub.block.requestId).toBe('fake-1');
+    hub.destroy();
+  });
+});
+function cacheSnapshot(
+  runId: string,
+  acceptedCount: number,
+  stateRevision: number,
+): SeasonRunSnapshot {
+  return {
+    run: { runId, stateRevision, rosters: [] },
+    summaries: [],
+    retainedDetails: [],
+    acceptedBlocks: Array.from({ length: acceptedCount }, () => ({}) as never),
+  } as unknown as SeasonRunSnapshot;
+}
+describe('SeasonSnapshotCache', () => {
+  it('caches snapshots by run, accepted count, and state revision', () => {
+    const cache = new SeasonSnapshotCache();
+    const stored = cacheSnapshot('run-cache', 1, 2);
+    cache.set(stored);
+    expect(cache.get()).toBe(stored);
+    expect(cache.getFor('run-cache', 1, 2)).toBe(stored);
+    expect(cache.matches('run-cache', 1, 2)).toBe(true);
+    expect(cache.matches('run-cache', 2, 2)).toBe(false);
+    expect(cache.rosterKeyFor('run-cache', 1, 2)).toBe('');
+    cache.clear();
+    expect(cache.get()).toBeNull();
+    expect(cache.matches('run-cache', 1, 2)).toBe(false);
+  });
+  it('keeps cache state isolated per instance and evicts beyond the limit', () => {
+    const first = new SeasonSnapshotCache();
+    const second = new SeasonSnapshotCache();
+    first.set(cacheSnapshot('run-isolated', 0, 0));
+    expect(first.get()).not.toBeNull();
+    expect(second.get()).toBeNull();
+    for (let index = 0; index < 5; index += 1) {
+      first.set(cacheSnapshot(`run-${String(index)}`, 0, index));
+    }
+    expect(first.matches('run-0', 0, 0)).toBe(false);
+    expect(first.matches('run-4', 0, 4)).toBe(true);
+  });
+});
+describe('SeasonSession disposed guard', () => {
+  it('ignores a late postseason runner attach after destroy', async () => {
+    const repo = repoWith(snapshot());
+    const runner = new FakeRunner();
+    const postseasonRunner = new FakePostseasonRunner();
+    const lateFactory = Promise.withResolvers<SeasonPostseasonRunner>();
+    const session = new SeasonSession({
+      repository: repo,
+      blockRunner: runner,
+      postseasonRunnerFactory: () => lateFactory.promise,
+      assets: {
+        loadEraProfile: () => Promise.resolve(buildEraSimulationProfile()),
+        loadDraftCatalog: () =>
+          Promise.reject(new Error('the season draft catalog is unavailable')),
+        loadFreeAgencyIndex: () =>
+          Promise.reject(new Error('the free-agency index is unavailable')),
+        loadFreeAgencyTargets: () =>
+          Promise.reject(new Error('the free-agency targets are unavailable')),
+        loadHomeCourtProfile: () => Promise.resolve({ ...SEASON_HOME_COURT_PROFILE }),
+        loadArtifactUrls: () =>
+          Promise.reject(new Error('the season artifact urls are unavailable')),
+      },
+      notifier: {
+        announce: () => {},
+        onMutation: () => () => {},
+        close: () => {},
+      },
+      clock: {
+        now: () => 0,
+        sleep: (ms: number) => new Promise((resolve) => setTimeout(resolve, ms)),
+      },
+      ids: { id: (prefix: string): string => `${prefix}-late` },
+      draftCleaner: { clearDraftSave: () => Promise.resolve() },
+    });
+    await session.refresh();
+    session.destroy();
+    lateFactory.resolve(postseasonRunner);
+    await lateFactory.promise;
+    postseasonRunner.emit({
+      type: 'started',
+      requestId: 'sp-1',
+      mode: 'advance',
+      targetGameId: null,
+      gamesTotal: 0,
+    });
+    expect(session.postseason.phase).toBe('idle');
+    expect(session.commandError).toBeNull();
+    expect(postseasonRunner.subscribeCalls).toBe(0);
+  });
+  it('ignores late refresh continuations after destroy', async () => {
+    const repo = repoWith(null);
+    const lateLoad = Promise.withResolvers<SeasonRunSnapshot | null>();
+    repo.loadActiveRun.mockImplementationOnce(() => lateLoad.promise);
+    const session = createSession(repo, new FakeRunner());
+    const pending = session.refresh();
+    session.destroy();
+    lateLoad.resolve(snapshot());
+    await pending;
+    expect(session.snapshot).toBeNull();
+    expect(session.error).toBeNull();
+  });
+});
+describe('SeasonSession getSnapshot', () => {
+  it('composes the session view from the live session state', async () => {
+    const repo = repoWith(snapshot());
+    const hub = createSession(repo, new FakeRunner());
+    await hub.refresh();
+    const view = hub.getSnapshot();
+    expect(view.snapshot).toBe(hub.snapshot);
+    expect(view.index).toBe(hub.index);
+    expect(view.block).toBe(hub.block);
+    expect(view.postseason).toBe(hub.postseason);
+    expect(view.pending).toBe(hub.pending);
+    expect(view.interruption).toBe(hub.interruption);
+    expect(view.commandError).toBeNull();
+    expect(view.commandReceipt).toBeNull();
+    expect(view.externalChange).toBeNull();
+    expect(view.error).toBeNull();
     hub.destroy();
   });
 });

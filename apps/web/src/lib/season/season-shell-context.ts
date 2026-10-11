@@ -1,4 +1,12 @@
 import type {
+  BlockRunState,
+  SeasonRunCommandError,
+  SeasonRunLoadDiagnostic,
+  SeasonSession,
+  SeasonSpendInfluencePurpose,
+  SeasonTradeReceipt,
+} from '@hoop-rush/application/season';
+import type {
   HoopRushManifest,
   PlayersIndexEntry,
   SeasonActiveRunIndex,
@@ -18,14 +26,6 @@ import type {
 } from '@hoop-rush/data-contracts';
 import type { SeasonRunSnapshot } from '@hoop-rush/persistence';
 import type { SeasonRunPlayerSlice } from './season-player-slice';
-import type {
-  BlockRunState,
-  SeasonHubState,
-  SeasonRunLoadDiagnostic,
-  SeasonRunCommandError,
-  SeasonSpendInfluencePurpose,
-  SeasonTradeReceipt,
-} from './season-hub-state';
 import type { HubPostseasonProgress } from './season-postseason-presentation';
 import type { SeasonFaceRef } from './season-branding';
 import type { RotationEditor } from './season-rotation-editor';
@@ -62,7 +62,7 @@ export interface SeasonRunShellData {
   ready: boolean;
   error: SeasonRunLoadDiagnostic | null;
   hubError: SeasonRunLoadDiagnostic | null;
-  hub: SeasonHubState | null;
+  hub: SeasonSession | null;
   snapshot: SeasonRunSnapshot | null;
   index: SeasonActiveRunIndex | null;
   block: BlockRunState;

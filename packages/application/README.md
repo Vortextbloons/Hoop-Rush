@@ -41,33 +41,27 @@ Landed:
 2. Season command/block policies moved here (web re-exports them).
 3. Season domain error classes moved to `data-contracts`
    (`SeasonRunLoadError`, `SeasonRunCommandStaleStateError`, ...).
-4. Block wire/acceptance helpers moved here; `season-block-runner.ts`
-   re-exports them until its consumers migrate.
+4. Block wire/acceptance helpers moved here (`block-wire.ts`).
+5. **`SeasonSession` landed**: the former web `season-hub-state.ts` now lives
+   in `src/season/session.ts`, constructed through the ports in `ports.ts`.
+   The snapshot cache is instance-scoped (`state-cache.ts`), and a `disposed`
+   guard drops late continuations. The web app builds it through
+   `apps/web/src/lib/season/season-session-ports.ts`; the old web hub and
+   cache modules are deleted, and `session.test.ts` (23 tests) runs here.
 
-Next (stage 2 continued):
+Next:
 
-1. Add `src/season/ports.ts`:
-   `SeasonRunRepositoryPort` (`SeasonRunRepository & SeasonPostseasonRepository`
-   type), `SeasonBlockRunnerPort`/`SeasonPostseasonRunnerPort` (the event
-   contracts in `block-wire.ts` plus the postseason twin), `SeasonAssetPort`
-   (era profile, catalog, free-agency index/targets, home-court profile),
-   `SeasonNotifierPort` (cross-tab), `ClockPort` (`now`/`monotonic`/`sleep`),
-   `IdPort` (`newId(prefix)`), `ClearDraftPort`.
-2. Move `season-hub-state.ts` into `src/season/session.ts` as `SeasonSession`
-   with `getSnapshot`, `subscribe`, `execute`, `cancel`, `dispose`, keeping
-   the current public method names so the Svelte shell facade is unchanged.
-   Bind the snapshot cache to the instance instead of the module singleton,
-   and add a `disposed` guard for late async continuations.
-3. Move the pure selectors with it: `describeCommandRejection`,
-   `tradeBoardViewModel`, `indexAfterCommit`, `seasonRunLoadDiagnosticOf`.
-4. Rewire `apps/web` through `season-session-ports.ts` (asset/worker/cross-tab/
-   Dexie/id/clock adapters), delete `season-hub-state.ts` and
-   `season-state-cache.ts`, and port `season-hub-state.test.ts` here with
-   injected fakes.
-5. Then move block acceptance/commit sequencing out of
-   `season-block-runner.ts` (candidate + progress from the job, acceptance and
-   atomic commit in the session) and the postseason orchestration out of
-   `season-postseason-runner.ts`.
+1. Stage 3: replace the mirrored shell state with selectors over
+   `session.getSnapshot()` and a thin reactive presenter (delete the
+   placeholder façade and manual cache mirroring in
+   `apps/web/src/routes/season/run/+layout.svelte` and
+   `apps/web/src/lib/season/season-shell-state.svelte.ts`).
+2. Stage 2 remainder: move block acceptance/commit sequencing out of
+   `season-block-runner.ts` (jobs return candidates + progress, the session
+   validates and requests the atomic commit) and postseason orchestration out
+   of `season-postseason-runner.ts`.
+3. Stages 4-7 as planned: engine orchestration split, remaining modes,
+   storage/multiplayer adapters, tooling and deletion.
 
 Determinism guard for all of it: seeded block/postseason digests, the
 committed fixtures under `tools/cli/src/fixtures/`, and the golden suites must

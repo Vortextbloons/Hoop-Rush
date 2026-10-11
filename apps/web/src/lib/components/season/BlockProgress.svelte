@@ -3,7 +3,7 @@
   import { resolve } from '$app/paths';
   import { Dialog } from 'bits-ui';
   import { X } from '@lucide/svelte';
-  import type { BlockRunState } from '$lib/season/season-hub-state';
+  import type { BlockRunState } from '@hoop-rush/application/season';
   import type {
     HoopRushManifest,
     SeasonSchedule,

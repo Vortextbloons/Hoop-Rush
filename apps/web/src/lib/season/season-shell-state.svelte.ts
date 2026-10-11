@@ -1,4 +1,11 @@
 import type {
+  BlockRunState,
+  SeasonRunCommandError,
+  SeasonRunLoadDiagnostic,
+  SeasonSession,
+  SeasonTradeReceipt,
+} from '@hoop-rush/application/season';
+import type {
   HoopRushManifest,
   PlayersIndexEntry,
   SeasonActiveRunIndex,
@@ -16,13 +23,6 @@ import type {
 } from '@hoop-rush/data-contracts';
 import type { SeasonRunSnapshot } from '@hoop-rush/persistence';
 import type { SeasonRunPlayerSlice } from './season-player-slice';
-import type {
-  BlockRunState,
-  SeasonHubState,
-  SeasonRunLoadDiagnostic,
-  SeasonRunCommandError,
-  SeasonTradeReceipt,
-} from './season-hub-state';
 import type { HubPostseasonProgress } from './season-postseason-presentation';
 import type { SeasonFaceRef } from './season-branding';
 import type { RotationEditor } from './season-rotation-editor';
@@ -32,7 +32,7 @@ export class SeasonRunShell implements SeasonRunShellData {
   ready = $state(false);
   error = $state<SeasonRunLoadDiagnostic | null>(null);
   hubError = $state<SeasonRunLoadDiagnostic | null>(null);
-  hub = $state<SeasonHubState | null>(null);
+  hub = $state<SeasonSession | null>(null);
   snapshot = $state.raw<SeasonRunSnapshot | null>(null);
   index = $state<SeasonActiveRunIndex | null>(null);
   block = $state<BlockRunState>(idleBlockRunState());

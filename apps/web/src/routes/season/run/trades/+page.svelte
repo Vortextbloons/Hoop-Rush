@@ -6,7 +6,7 @@
     type SeasonRunShellData,
   } from '$lib/season/season-shell-context';
   import TradeBoardWorkspace from '$lib/components/season/TradeBoardWorkspace.svelte';
-  import { tradeBoardViewModel } from '$lib/season/season-hub-state';
+  import { tradeBoardViewModel } from '@hoop-rush/application/season';
   import type { TradePackageDraft } from '$lib/season/season-presentation';
   import { overallRatingOf, candidateOf } from '$lib/season/season-catalog-index';
   import { overallRatingOfSlice } from '$lib/season/season-player-slice';

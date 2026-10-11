@@ -14,8 +14,8 @@
   import { ordinal, provisionalRanking, recordLabel } from '$lib/season/season-presentation';
   import { loadSeasonLeague, loadSeasonSchedule } from '$lib/season/season-assets';
   import { getManifest, getPlayersIndex } from '$lib/data';
-  import { getSeasonBlockRunner, getSeasonRunRepository } from '$lib/season/season-repo';
-  import { seasonRunLoadDiagnosticOf, SeasonHubState } from '$lib/season/season-hub-state';
+  import { seasonRunLoadDiagnosticOf, SeasonSession } from '@hoop-rush/application/season';
+  import { createSeasonSessionPorts } from '$lib/season/season-session-ports';
   import { SeasonRunShell } from '$lib/season/season-shell-state.svelte';
   import {
     SEASON_RUN_SHELL_CONTEXT,
@@ -353,9 +353,7 @@
       shell.manifest = manifest;
       shell.league = league;
       shell.schedule = schedule;
-      const repo = await getSeasonRunRepository(schedule);
-      const runner = await getSeasonBlockRunner();
-      const hub = new SeasonHubState(repo, runner);
+      const hub = new SeasonSession(await createSeasonSessionPorts({ schedule }));
       shell.hub = hub;
       unsubscribeHub = hub.subscribe(() => mirrorHub());
       hub.prewarm();

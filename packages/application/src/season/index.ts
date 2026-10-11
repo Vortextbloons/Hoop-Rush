@@ -11,4 +11,46 @@ export {
   type SeasonWorkerProgress,
   type WorkerRequestState,
 } from './block-wire.ts';
+export {
+  seasonPostseasonCommitResultDigest,
+  seasonPostseasonTransactionIdsOf,
+  type SeasonPostseasonEvent,
+  type SeasonPostseasonMode,
+  type SeasonPostseasonRunInput,
+  type SeasonPostseasonRunner,
+} from './postseason-wire.ts';
 export { SEASON_BLOCK_POLICY, SEASON_COMMAND_POLICY, canResubmitBlock } from './policies.ts';
+export type {
+  SeasonAssetPort,
+  SeasonBlockRunnerPort,
+  SeasonClockPort,
+  SeasonDraftCleanerPort,
+  SeasonIdPort,
+  SeasonNotifierPort,
+  SeasonPostseasonRunnerFactory,
+  SeasonPostseasonRunnerPort,
+  SeasonRunAnnouncement,
+  SeasonRunMutation,
+  SeasonRunRepositoryPort,
+} from './ports.ts';
+export {
+  SeasonSession,
+  describeCommandRejection,
+  indexAfterCommit,
+  seasonRunLoadDiagnosticOf,
+  tradeBoardViewModel,
+  type BlockPhase,
+  type BlockRunState,
+  type SeasonExternalChange,
+  type SeasonPostseasonPhase,
+  type SeasonPostseasonProgress,
+  type SeasonRunCommandError,
+  type SeasonRunLoadDiagnostic,
+  type SeasonSessionOptions,
+  type SeasonSessionView,
+  type SeasonSpendInfluencePurpose,
+  type SeasonTradeReceipt,
+  type SubmitBlockEnvelope,
+  type TradeBoardViewModel,
+} from './session.ts';
+export { SeasonSnapshotCache, rosterKeyOfSnapshotRun } from './state-cache.ts';

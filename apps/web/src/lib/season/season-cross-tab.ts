@@ -1,25 +1,6 @@
+import type { SeasonRunAnnouncement, SeasonRunMutation } from '@hoop-rush/application/season';
 import { newRequestId } from '$lib/ids';
-
-export type SeasonRunAnnouncement =
-  | {
-      kind: 'commit';
-      runId: string;
-      revision: number;
-      committedAt: number;
-    }
-  | {
-      kind: 'clear';
-      runId: string | null;
-      committedAt: number;
-    }
-  | {
-      kind: 'replace';
-      runId: string;
-      committedAt: number;
-    };
-export type SeasonRunMutation = SeasonRunAnnouncement & {
-  sourceId: string;
-};
+export type { SeasonRunAnnouncement, SeasonRunMutation } from '@hoop-rush/application/season';
 export const SEASON_RUN_CHANNEL_NAME = 'hoop-rush:season-run';
 function isSeasonRunMutation(value: unknown): value is SeasonRunMutation {
   if (typeof value !== 'object' || value === null) return false;

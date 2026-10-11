@@ -105,3 +105,8 @@ paths change (stages 2, 4, and 6).
   contract types, `SeasonArtifactUrls`) moved to
   `packages/application/season`; the web runner re-exports them for existing
   consumers. Measured after the slice with `pnpm code-size`.
+- 2026-10-11, stage 2d: `SeasonSession` and its ports moved to
+  `packages/application/src/season/` (session, ports, state cache,
+  postseason wire, selectors); web now constructs it through
+  `season-session-ports.ts`. The old web hub and module cache are deleted;
+  the session test suite (23 tests) runs in the application package.

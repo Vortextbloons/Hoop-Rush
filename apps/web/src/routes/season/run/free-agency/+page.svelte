@@ -24,7 +24,7 @@
   } from '$lib/components/season/free-agency/free-agency-view';
   import { overallRatingOf } from '$lib/season/season-catalog-index';
   import { mergeFreeAgencyFaces } from '$lib/season/season-branding';
-  import { describeCommandRejection } from '$lib/season/season-hub-state';
+  import { describeCommandRejection } from '@hoop-rush/application/season';
   import {
     SEASON_RUN_SHELL_CONTEXT,
     type SeasonRunShellData,
