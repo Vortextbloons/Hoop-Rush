@@ -94,3 +94,14 @@ paths change (stages 2, 4, and 6).
 - 2026-10-11, stage 1: baseline captured before any refactor stage. Full test
   run recorded above; the one timeout was repro'd isolated, then its ceiling
   was raised to 120 s.
+- 2026-10-11, stage 2a (`9ab1e708`): shared submission runtime moved to
+  `packages/application`; web `$lib/submit` re-exports it. Policies stay in
+  web until their modes migrate.
+- 2026-10-11, stage 2b (`e78ed913`): season domain error classes moved to
+  `data-contracts` so framework-independent code can classify failures without
+  importing Dexie-backed runtime modules. Persistence re-exports them.
+- 2026-10-11, stage 2c: season command/block policies and the block
+  wire/acceptance helpers (`buildWorkerRequest`, `acceptWorkerResult`, runner
+  contract types, `SeasonArtifactUrls`) moved to
+  `packages/application/season`; the web runner re-exports them for existing
+  consumers. Measured after the slice with `pnpm code-size`.

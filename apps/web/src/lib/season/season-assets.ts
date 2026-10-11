@@ -20,14 +20,8 @@ import {
 import { SEASON_HOME_COURT_PROFILE } from '@hoop-rush/engine';
 import { clearMemoizedLoaders, memoized, resolveAssetUrl } from '$lib/asset-url';
 import { clearManifestAssetCaches, getManifest, loadManifestAsset } from '$lib/manifest-assets';
-export interface SeasonArtifactUrls {
-  catalogUrl: string;
-  catalogHash: string;
-  profileUrl: string;
-  profileHash: string;
-  modelUrl?: string;
-  modelHash?: string;
-}
+import type { SeasonArtifactUrls } from '@hoop-rush/application/season';
+export type { SeasonArtifactUrls };
 const FIXED_SEASON_ERA = '2010s';
 
 export function loadSeasonLeague(): Promise<SeasonLeague> {
