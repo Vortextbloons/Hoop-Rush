@@ -123,7 +123,7 @@ function draftToCompletion(start: HavocRunState): HavocRunState {
 describe('havoc draft command flow', () => {
   it('creates a round-1 draft state from the frozen command', () => {
     const state = createDraftState();
-    expect(state.revision).toBe(0);
+    expect(state.revision).toBe(1);
     expect(state.phase).toBe('draft');
     expect(state.runSeed).toBe(HAVOC_TEST_RUN_SEED);
     expect(state.draft).not.toBeNull();
@@ -146,7 +146,7 @@ describe('havoc draft command flow', () => {
     expect(HavocStateDigest(first)).toBe(HavocStateDigest(second));
     expect(first.draft?.status).toBe('complete');
     expect(first.draft?.picks).toHaveLength(5);
-    expect(first.revision).toBe(5);
+    expect(first.revision).toBe(6);
 
     const rerollFirst = (() => {
       const created = createDraftState();
@@ -163,13 +163,13 @@ describe('havoc draft command flow', () => {
     expect(canonicalJson(rerollFirst)).toBe(canonicalJson(rerollSecond));
     expect(HavocStateDigest(rerollFirst)).toBe(HavocStateDigest(rerollSecond));
     expect(rerollFirst.draft?.rerollUsed).toBe(true);
-    expect(rerollFirst.revision).toBe(6);
+    expect(rerollFirst.revision).toBe(7);
     expect(rerollFirst.draft?.picks).toHaveLength(5);
   });
 
   it('resumes a reloaded draft state without granting extra randomness', () => {
     const partial = pickFirstCard(pickFirstCard(createDraftState()));
-    expect(partial.revision).toBe(2);
+    expect(partial.revision).toBe(3);
     expect(partial.draft?.round).toBe(3);
     const reloaded = havocRunStateSchema.parse(JSON.parse(JSON.stringify(partial)) as unknown);
     expect(HavocStateDigest(reloaded)).toBe(HavocStateDigest(partial));
@@ -187,9 +187,9 @@ describe('havoc draft command flow', () => {
     const before = state.draft?.offerId;
     const first = ApplyHavocCommand(state, rerollCommand(state), environment, lockSources);
     expect(first.result.status).toBe('accepted');
-    expect(first.result.revisionBefore).toBe(0);
-    expect(first.result.revisionAfter).toBe(1);
-    expect(first.state.revision).toBe(1);
+    expect(first.result.revisionBefore).toBe(1);
+    expect(first.result.revisionAfter).toBe(2);
+    expect(first.state.revision).toBe(2);
     expect(first.state.draft?.rerollUsed).toBe(true);
     expect(first.state.draft?.offerIndex).toBe(1);
     expect(first.state.draft?.offerId).not.toBe(before);
@@ -202,7 +202,7 @@ describe('havoc draft command flow', () => {
     expect(second.result.status).toBe('rejected');
     expect(second.result.rejection?.code).toBe('reroll-spent');
     expect(second.state).toBe(first.state);
-    expect(second.result.revisionAfter).toBe(1);
+    expect(second.result.revisionAfter).toBe(2);
     expect(HavocStateDigest(second.state)).toBe(HavocStateDigest(first.state));
 
     const picked = pickFirstCard(first.state);

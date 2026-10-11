@@ -189,6 +189,7 @@ describe('HavocRunner', () => {
       resultDigest,
       tapeDigest: havocGameTapeDigest(tape),
       summary: havocGameSummaryOf(result, resultDigest),
+      result,
       tape,
     };
     fake.emit(message);

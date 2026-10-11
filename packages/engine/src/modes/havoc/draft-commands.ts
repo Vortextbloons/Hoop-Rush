@@ -134,7 +134,7 @@ export function CreateHavocRunState(
   const draft = havocDraftStateSchema.parse({
     schemaVersion: HAVOC_SCHEMA_VERSION,
     runId: parsed.runId,
-    revision: 0,
+    revision: 1,
     runSeed: parsed.runSeed,
     versionSet: parsed.versionSet,
     catalog: parsed.catalog,
@@ -150,7 +150,7 @@ export function CreateHavocRunState(
   return havocRunStateSchema.parse({
     schemaVersion: HAVOC_SCHEMA_VERSION,
     runId: parsed.runId,
-    revision: 0,
+    revision: 1,
     runSeed: parsed.runSeed,
     versionSet: parsed.versionSet,
     phase: 'draft',

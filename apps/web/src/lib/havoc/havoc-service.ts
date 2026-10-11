@@ -124,6 +124,12 @@ class HavocAppService implements HavocService {
   private run: HavocRunState | null = null;
   private lastRunId: string | null = null;
   private lastAcceptedResult: HavocCommandResult | null = null;
+  private lastWatched: {
+    runId: string;
+    gameNumber: number;
+    variant: HavocVariant;
+    result: HavocGameResult;
+  } | null = null;
   private assetsPromise: Promise<HavocAssets> | null = null;
 
   constructor(options: CreateHavocServiceOptions) {
@@ -145,16 +151,38 @@ class HavocAppService implements HavocService {
 
   async loadActive(): Promise<HavocActiveSnapshot> {
     return this.guard(async () => {
-      const state = await this.repository.loadActiveRun();
-      this.run = state;
-      if (state !== null) {
-        this.lastRunId = state.runId;
+      const active = await this.repository.loadActiveRun();
+      if (active !== null) {
+        this.run = active;
+        this.lastRunId = active.runId;
+        return { run: this.buildRunView(active), draft: active.draft };
       }
-      return {
-        run: state === null ? null : this.buildRunView(state),
-        draft: state?.draft ?? null,
-      };
+      const resumable = await this.findResumableCompleted();
+      if (resumable !== null) {
+        this.run = resumable;
+        this.lastRunId = resumable.runId;
+        return { run: this.buildRunView(resumable), draft: null };
+      }
+      this.run = null;
+      return { run: null, draft: null };
     });
+  }
+
+  private async findResumableCompleted(): Promise<HavocRunState | null> {
+    if (this.lastRunId !== null) {
+      const completed = await this.repository.readCompletedRun(this.lastRunId);
+      if (completed !== null) return completed.state;
+    }
+    const history = await this.repository.listHistory();
+    const candidate = history.find(
+      (entry) =>
+        entry.completionState !== 'abandoned' &&
+        entry.completionState !== 'complete' &&
+        entry.comparisonStatus !== 'complete',
+    );
+    if (candidate === undefined) return null;
+    const completed = await this.repository.readCompletedRun(candidate.runId);
+    return completed?.state ?? null;
   }
 
   async listHistory(): Promise<HavocHistoryView[]> {
@@ -183,7 +211,8 @@ class HavocAppService implements HavocService {
 
   async createDraft(): Promise<HavocCommandResult> {
     return this.guard(async () => {
-      if (this.run !== null) {
+      const active = await this.repository.loadActiveRun();
+      if (active !== null) {
         throw new HavocServiceError('invalid-phase', 'an active havoc run already exists');
       }
       const assets = await this.loadAssets();
@@ -279,6 +308,8 @@ class HavocAppService implements HavocService {
       if (state.locked === null) {
         throw new HavocServiceError('invalid-phase', 'the lineup is not locked');
       }
+      const assets = await this.loadAssets();
+      this.assertSupportedVersion(state, assets);
       if (input.variant === 'normal' && state.havocCursor < HAVOC_GAME_COUNT) {
         throw new HavocServiceError(
           'invalid-phase',
@@ -363,6 +394,8 @@ class HavocAppService implements HavocService {
       if (state.locked === null) {
         throw new HavocServiceError('invalid-phase', 'the lineup is not locked');
       }
+      const assets = await this.loadAssets();
+      this.assertSupportedVersion(state, assets);
       const cursor = input.variant === 'havoc' ? state.havocCursor : state.normalCursor;
       if (input.gameNumber !== cursor + 1) {
         throw new HavocServiceError('invalid-phase', 'only the next game can be watched');
@@ -379,12 +412,19 @@ class HavocAppService implements HavocService {
         locked: state.locked,
       });
       const message = await this.runner.runTape(request);
+      this.lastWatched = {
+        runId: state.runId,
+        gameNumber: message.gameNumber,
+        variant: message.variant,
+        result: message.result,
+      };
       return {
         gameNumber: message.gameNumber,
         variant: message.variant,
         seed: message.tape.seed,
         tape: message.tape,
         summary: message.summary,
+        result: message.result,
       };
     });
   }
@@ -440,7 +480,16 @@ class HavocAppService implements HavocService {
     return this.guard(async () => {
       const runId = this.requireRunId();
       const stored = await this.repository.readRunGame(runId, input.variant, input.gameNumber);
-      return stored?.result ?? null;
+      if (stored !== null) return stored.result;
+      if (
+        this.lastWatched !== null &&
+        this.lastWatched.runId === runId &&
+        this.lastWatched.variant === input.variant &&
+        this.lastWatched.gameNumber === input.gameNumber
+      ) {
+        return this.lastWatched.result;
+      }
+      return null;
     });
   }
 
@@ -460,6 +509,7 @@ class HavocAppService implements HavocService {
       const existing = await this.repository.readComparison(state.runId);
       if (existing !== null) return existing;
       const assets = await this.loadAssets();
+      this.assertSupportedVersion(state, assets);
       const havocGames = await this.storedGames(state.runId, 'havoc');
       const normalGames = await this.storedGames(state.runId, 'normal');
       const comparison = compareHavocSeasons({
@@ -580,9 +630,29 @@ class HavocAppService implements HavocService {
       .sort((a, b) => a.gameNumber - b.gameNumber);
   }
 
+  private assertSupportedVersion(state: HavocRunState, assets: HavocAssets): void {
+    const locked = state.locked?.versionSet ?? null;
+    if (locked === null) return;
+    const current = assets.versionSet;
+    if (
+      locked.engineVersion !== current.engineVersion ||
+      locked.catalogVersion !== current.catalogVersion ||
+      locked.catalogHash !== current.catalogHash ||
+      locked.profileVersion !== current.profileVersion ||
+      locked.profileHash !== current.profileHash ||
+      locked.bracketHash !== current.bracketHash
+    ) {
+      throw new HavocServiceError(
+        'unsupported-version',
+        'this run was created with a different engine or data version and cannot be replayed',
+      );
+    }
+  }
+
   private async acceptStreamedGame(message: HavocWorkerGameMessage): Promise<void> {
     const state = this.requireRun();
     const assets = await this.loadAssets();
+    this.assertSupportedVersion(state, assets);
     const command: HavocCommand =
       message.variant === 'havoc'
         ? havocAcceptGameCommandSchema.parse({
@@ -635,6 +705,13 @@ class HavocAppService implements HavocService {
     }
     this.run = outcome.state;
     this.lastAcceptedResult = applied;
+    if (
+      this.lastWatched !== null &&
+      this.lastWatched.variant === message.variant &&
+      this.lastWatched.gameNumber === message.cursor
+    ) {
+      this.lastWatched = null;
+    }
   }
 
   private async dispatch(
@@ -646,6 +723,7 @@ class HavocAppService implements HavocService {
       const existing = await this.repository.loadCommandResult(command.commandId);
       if (existing !== null) return existing;
       const assets = await this.loadAssets();
+      this.assertSupportedVersion(state, assets);
       const environment = createHavocCommandEnvironment(assets.catalog);
       const outcome = ApplyHavocCommand(state, command, environment, {
         bracket: assets.bracket,

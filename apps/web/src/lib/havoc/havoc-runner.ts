@@ -53,7 +53,9 @@ export class HavocRunner {
     if (this.options.createWorker !== undefined) {
       return this.options.createWorker();
     }
-    return new Worker(new URL('../workers/havoc-worker.ts', import.meta.url), { type: 'module' });
+    return new Worker(new URL('../../workers/havoc-worker.ts', import.meta.url), {
+      type: 'module',
+    });
   }
 
   startBatch(

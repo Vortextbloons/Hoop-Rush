@@ -12,7 +12,7 @@ import type {
   Seed,
   SimulationTeam,
 } from '@hoop-rush/data-contracts';
-import { gameScore } from '../../challenge/mvp.ts';
+import { gameScore } from '../../challenge/league-value.ts';
 import { catalogEntryForVersion, catalogSimulationForVersion } from './catalog.ts';
 import type { DraftDuelCatalog } from './catalog.ts';
 import { draftDuelHomeWinner } from './seeds.ts';

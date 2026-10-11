@@ -1,5 +1,7 @@
 import {
   LINEUP_STRUCTURE,
+  LEAGUE_RECORD_VERSION,
+  LEAGUE_SCHEDULE_VERSION,
   POSITION_SLOTS,
   SIMULATION_RATINGS,
   SIMULATION_TENDENCIES,
@@ -11,11 +13,14 @@ import {
   franchiseIdSchema,
   gameSimulationInputSchema,
   hoopRushManifestSchema,
+  leagueRecordDigest,
+  leagueRecordSchema,
   opponentBracketSchema,
   opponentTeamSchema,
   peakPlayerSeasonSchema,
   playerIdSchema,
   seedFromString,
+  seedSchema,
   simulationPlayerSchema,
   simulationTeamSchema,
 } from '@hoop-rush/data-contracts';
@@ -28,6 +33,7 @@ import type {
   FranchiseEraPool,
   GameSimulationInput,
   HoopRushManifest,
+  LeagueRecord,
   ModernFranchiseSlot,
   OpponentBracket,
   OpponentTeam,
@@ -423,6 +429,52 @@ export function buildChallengeRun(overrides: Partial<ChallengeRun> = {}): Challe
     aggregates: zeroAggregates(players),
     ...overrides,
   });
+}
+export function buildLeagueRecord(overrides: Partial<LeagueRecord> = {}): LeagueRecord {
+  const avatarSlots = ALL_FRANCHISE_SLOTS.slice(0, 30);
+  const teams = avatarSlots.map((slot, index) => {
+    const quota = index < 8 ? 80 : 79;
+    const wins = Math.floor(quota / 2);
+    return {
+      teamId: franchiseIdSchema.parse(slot.franchiseId),
+      gamesPlayed: quota,
+      wins,
+      losses: quota - wins,
+    };
+  });
+  const players = avatarSlots.flatMap((slot, index) => {
+    const quota = index < 8 ? 80 : 79;
+    return Array.from({ length: 5 }, (_, slotIndex) => ({
+      playerId: playerIdSchema.parse(`p-opp-${String(index)}-${String(slotIndex)}`),
+      teamId: franchiseIdSchema.parse(slot.franchiseId),
+      games: quota,
+      totalValueBase: quota * 12,
+      totalValueBaseSquared: quota * 200,
+      totalShots: quota * 14,
+      totalShotsSquared: quota * 240,
+      totalValueShots: quota * 170,
+      totalPoints: quota * 18,
+      totalRebounds: quota * 6,
+      totalAssists: quota * 4,
+      totalSteals: quota,
+      totalBlocks: Math.floor(quota / 2),
+      totalGameScore: quota * 11,
+      totalTrueShooting: quota * 0.55,
+    }));
+  });
+  const material = {
+    leagueVersion: LEAGUE_RECORD_VERSION,
+    scheduleVersion: LEAGUE_SCHEDULE_VERSION,
+    seed: seedSchema.parse(seedFromString('fixture-league-1')),
+    bracketVersion: 'bracket-v1',
+    dataVersion: 'data-v1',
+    eraProfileVersion: 'm2-1990s-fixture-v1',
+    gamesSimulated: 1189,
+    teams,
+    players,
+  } as const;
+  const merged = { ...material, ...overrides };
+  return leagueRecordSchema.parse({ ...merged, digest: leagueRecordDigest(merged) });
 }
 export function buildUserTeam(): SimulationTeam {
   return simulationTeamSchema.parse(

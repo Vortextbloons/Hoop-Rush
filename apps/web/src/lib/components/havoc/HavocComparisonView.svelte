@@ -27,7 +27,7 @@
       paths can still diverge, so a delta is not exact causal attribution to one mutation. "Direct
       mutation points" only count ledger adjustments.
     </p>
-    <div class="mt-3 overflow-x-auto">
+    <div class="havoc-scroll-x mt-3 overflow-x-auto">
       <table class="w-full min-w-[30rem] text-xs">
         <thead>
           <tr
@@ -108,7 +108,7 @@
     {#if comparison.mutations.length === 0}
       <p class="mt-2 text-xs text-muted-foreground">No mutation triggers recorded.</p>
     {:else}
-      <div class="mt-3 overflow-x-auto">
+      <div class="havoc-scroll-x mt-3 overflow-x-auto">
         <table class="w-full min-w-[34rem] text-xs" data-havoc-comparison-mutations>
           <thead>
             <tr

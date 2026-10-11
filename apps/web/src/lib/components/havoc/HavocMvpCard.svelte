@@ -22,23 +22,29 @@
     {mvp.displayName}
     <span class="text-primary">· {mvp.slot}</span>
   </h2>
-  <dl class="mt-3 grid grid-cols-3 gap-3 text-sm">
-    <div>
+  <dl class="mt-3 grid grid-cols-3 gap-2 text-sm sm:gap-3">
+    <div class="min-w-0">
       <dt class="font-mono text-[10px] tracking-[0.1em] text-muted-foreground uppercase">
         Havoc index
       </dt>
-      <dd class="font-mono text-xl font-bold" data-havoc-mvp-havoc-index>{mvp.havocIndex}</dd>
+      <dd class="font-mono text-base font-bold break-words sm:text-xl" data-havoc-mvp-havoc-index>
+        {mvp.havocIndex}
+      </dd>
     </div>
-    <div>
+    <div class="min-w-0">
       <dt class="font-mono text-[10px] tracking-[0.1em] text-muted-foreground uppercase">
         Normal index
       </dt>
-      <dd class="font-mono text-xl font-bold" data-havoc-mvp-normal-index>{mvp.normalIndex}</dd>
+      <dd class="font-mono text-base font-bold break-words sm:text-xl" data-havoc-mvp-normal-index>
+        {mvp.normalIndex}
+      </dd>
     </div>
-    <div>
+    <div class="min-w-0">
       <dt class="font-mono text-[10px] tracking-[0.1em] text-muted-foreground uppercase">Gain</dt>
       <dd
-        class="font-mono text-xl font-bold {mvp.gain < 0 ? 'text-destructive' : 'text-primary'}"
+        class="font-mono text-base font-bold break-words sm:text-xl {mvp.gain < 0
+          ? 'text-destructive'
+          : 'text-primary'}"
         data-havoc-mvp-gain
       >
         {mvp.gain >= 0 ? '+' : ''}{mvp.gain}

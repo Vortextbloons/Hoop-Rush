@@ -81,6 +81,7 @@ export interface HavocWatchSession {
   seed: string;
   tape: HavocGameTape;
   summary: HavocGameSummary;
+  result: HavocGameResult;
 }
 
 export type HavocServiceErrorCode =

@@ -5,6 +5,7 @@ import { lineupSchema } from './lineup.ts';
 import { simulationPlayerSchema } from './simulation.ts';
 import { gameResultSchema, playerBoxScoreSchema, teamBoxScoreSchema } from './result.ts';
 import { opponentBracketCoreSchema } from './bracket.ts';
+import { leagueRecordSchema } from './league.ts';
 import { RUN_SCHEMA_VERSION, SAVE_SCHEMA_VERSION } from './versions.ts';
 import { classicCompletedDraftSchema, classicVariantSchema } from './classic.ts';
 export const runVersionBoundariesSchema = z.object({
@@ -65,6 +66,7 @@ export const challengeRunSchema = z.object({
   eraProfileVersion: z.string().min(1).max(64),
   difficulty: difficultyProfileSchema,
   bracket: opponentBracketCoreSchema,
+  league: leagueRecordSchema.optional(),
   status: runStatusSchema,
   outcome: runOutcomeSchema.optional(),
   firstLossGameNumber: z.number().int().min(1).max(82).nullable(),

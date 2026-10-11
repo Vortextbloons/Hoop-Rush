@@ -37,7 +37,9 @@
       </p>
     </div>
   {:else}
-    <header class="mt-4 flex flex-wrap items-end justify-between gap-3">
+    <header
+      class="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between"
+    >
       <div class="min-w-0">
         <p class="font-mono text-[10px] font-bold tracking-[0.16em] text-primary uppercase">
           Havoc run · {run.runId}

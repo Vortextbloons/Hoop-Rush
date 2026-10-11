@@ -75,8 +75,12 @@ describe('multiplayer entry', () => {
     expect(screen.queryByRole('heading', { name: 'Match format' })).toBeNull();
     await fireEvent.input(screen.getByLabelText('Room code'), { target: { value: '0042' } });
     await fireEvent.click(screen.getByRole('button', { name: 'Join room' }));
-    await waitFor(() => expect(mocks.join).toHaveBeenCalledWith('0042'));
-    await waitFor(() => expect(mocks.resume).toHaveBeenCalledWith(gameKind, lobby.gameRoomId));
+    await waitFor(() => {
+      expect(mocks.join).toHaveBeenCalledWith('0042');
+    });
+    await waitFor(() => {
+      expect(mocks.resume).toHaveBeenCalledWith(gameKind, lobby.gameRoomId);
+    });
     expect(mocks.remember).toHaveBeenCalledWith({ ...lobby, gameKind });
     expect(mocks.goto).toHaveBeenCalledWith(
       gameKind === 'draft-duel'
@@ -91,9 +95,9 @@ describe('multiplayer entry', () => {
     await fireEvent.click(screen.getByRole('button', { name: 'Join a room' }));
     await fireEvent.input(screen.getByLabelText('Room code'), { target: { value: '0042' } });
     await fireEvent.click(screen.getByRole('button', { name: 'Join room' }));
-    await waitFor(() =>
-      expect(screen.getByRole('heading', { name: 'Waiting for your host' })).toBeTruthy(),
-    );
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Waiting for your host' })).toBeTruthy();
+    });
     expect(mocks.resume).not.toHaveBeenCalled();
     expect(mocks.goto).toHaveBeenCalledWith(`/multiplayer?lobby=${lobby.id}`);
   });

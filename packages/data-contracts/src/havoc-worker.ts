@@ -100,6 +100,7 @@ export const havocWorkerTapeMessageSchema = z.object({
   resultDigest: havocDigestSchema,
   tapeDigest: havocDigestSchema,
   summary: havocGameSummarySchema,
+  result: havocGameResultSchema,
   tape: havocGameTapeSchema,
 });
 export type HavocWorkerTapeMessage = z.infer<typeof havocWorkerTapeMessageSchema>;

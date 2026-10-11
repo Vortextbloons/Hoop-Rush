@@ -33,6 +33,8 @@ describe('Havoc Hall of Freaks', () => {
       '62–20',
     );
     expect(container.textContent).toContain('havoc-rules-v1');
+    expect(container.textContent).toContain('Normal combined');
+    expect(container.textContent).toContain('Production index');
     state.destroy();
   });
 

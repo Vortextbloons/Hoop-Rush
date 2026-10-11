@@ -5,6 +5,7 @@ import type {
   EraSimulationProfile,
   GameResult,
   GameSimulationInput,
+  LeagueRecord,
   Lineup,
   OpponentBracket,
   RunAggregates,
@@ -18,6 +19,8 @@ import {
   classicCompletedDraftSchema,
   eraIdSchema,
   franchiseIdSchema,
+  leagueRecordDigest,
+  leagueRecordSchema,
   seedSchema,
   type RunPlayerSelection,
 } from '@hoop-rush/data-contracts';
@@ -27,6 +30,7 @@ import type { EngineContext } from '../sim/kernel.ts';
 import { simulateGame } from '../sim/game.ts';
 import { checkGameResult } from '../sim/invariants.ts';
 import { addGameToAggregates, zeroRunAggregates } from './aggregates.ts';
+import { leagueGamesSimulated, leagueQuotas } from './league.ts';
 import { SEED_DERIVATION_VERSION, deriveGameSeed } from './seeds.ts';
 export interface ChallengeCreationBase {
   runId: string;
@@ -43,6 +47,7 @@ export interface ChallengeCreationBase {
   engineVersion: string;
   profile: EraSimulationProfile;
   bracket: OpponentBracket;
+  league?: LeagueRecord;
 }
 export interface SandboxChallengeCreation extends ChallengeCreationBase {
   mode: 'sandbox';
@@ -148,6 +153,98 @@ export function validateSchedule(bracket: OpponentBracket): string[] {
   }
   return failures;
 }
+function validateLeagueContent(input: ChallengeCreation): string[] {
+  const league = input.league;
+  if (!league) return [];
+  const failures: string[] = [];
+  const parsed = leagueRecordSchema.safeParse(league);
+  if (!parsed.success) {
+    failures.push('league record is invalid');
+    return failures;
+  }
+  if (league.seed !== input.runSeed) {
+    failures.push('league seed must match the run seed');
+  }
+  if (league.bracketVersion !== input.bracket.bracketVersion) {
+    failures.push('league bracket version must match the bracket');
+  }
+  if (league.dataVersion !== input.dataVersion) {
+    failures.push('league data version must match the run data version');
+  }
+  if (league.eraProfileVersion !== input.profile.profileVersion) {
+    failures.push('league profile version must match the era profile');
+  }
+  let quotas: number[] = [];
+  let expectedGames = 0;
+  try {
+    quotas = leagueQuotas(input.bracket);
+    expectedGames = leagueGamesSimulated(input.bracket);
+  } catch (error) {
+    failures.push(error instanceof Error ? error.message : String(error));
+    return failures;
+  }
+  if (league.gamesSimulated !== expectedGames) {
+    failures.push(
+      `league must simulate ${String(expectedGames)} games (got ${String(league.gamesSimulated)})`,
+    );
+  }
+  for (const [index, opponent] of input.bracket.opponents.entries()) {
+    const team = league.teams[index];
+    if (team === undefined) continue;
+    if (team.teamId !== opponent.teamId) {
+      failures.push(`league team ${String(index)} does not match the bracket`);
+    }
+    const quota = quotas[index] ?? 0;
+    if (team.gamesPlayed !== quota) {
+      failures.push(
+        `league team ${team.teamId} must play ${String(quota)} opponent games (got ${String(team.gamesPlayed)})`,
+      );
+    }
+    if (team.wins + team.losses !== team.gamesPlayed) {
+      failures.push(`league team ${team.teamId} wins and losses must sum to games played`);
+    }
+  }
+  const seenKeys = new Set<string>();
+  for (const player of league.players) {
+    const index = input.bracket.opponents.findIndex(
+      (opponent) => opponent.teamId === player.teamId,
+    );
+    if (index < 0) {
+      failures.push(`league player ${player.playerId} references unknown team ${player.teamId}`);
+      continue;
+    }
+    const opponent = input.bracket.opponents[index];
+    const known = opponent?.players.some((entry) => entry.playerId === player.playerId) ?? false;
+    if (!known) {
+      failures.push(`league player ${player.playerId} is not on team ${player.teamId}`);
+      continue;
+    }
+    const key = `${String(index)}|${player.playerId}`;
+    if (seenKeys.has(key)) {
+      failures.push(`league player ${player.playerId} appears twice in the league record`);
+    }
+    seenKeys.add(key);
+    const quota = quotas[index] ?? 0;
+    if (player.games !== quota) {
+      failures.push(
+        `league player ${player.playerId} must play ${String(quota)} opponent games (got ${String(player.games)})`,
+      );
+    }
+  }
+  const expectedPlayers = input.bracket.opponents.reduce(
+    (sum, opponent) => sum + opponent.players.length,
+    0,
+  );
+  if (seenKeys.size !== expectedPlayers) {
+    failures.push(
+      `league player totals must cover every bracket player (got ${String(seenKeys.size)} of ${String(expectedPlayers)})`,
+    );
+  }
+  if (leagueRecordDigest(league) !== league.digest) {
+    failures.push('league digest does not match its contents');
+  }
+  return failures;
+}
 function validateCreationInput(input: ChallengeCreation): string[] {
   const failures: string[] = [];
   if (!input.eraId || input.eraId.trim() === '') {
@@ -185,6 +282,7 @@ function validateCreationInput(input: ChallengeCreation): string[] {
     failures.push('dataVersion must match the era profile dataVersion');
   }
   failures.push(...validateBracketContent(input.bracket));
+  failures.push(...validateLeagueContent(input));
   if (input.mode === 'classic') {
     const parsedDraft = classicCompletedDraftSchema.safeParse(input.classicDraft);
     if (!parsedDraft.success) {
@@ -278,6 +376,7 @@ export function createChallenge(input: ChallengeCreation): ChallengeRun {
       opponents: input.bracket.opponents,
       schedule: input.bracket.schedule,
     },
+    ...(input.league ? { league: input.league } : {}),
     status: 'active',
     firstLossGameNumber: null,
     games: [],

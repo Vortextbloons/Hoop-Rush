@@ -279,6 +279,11 @@ export class HavocGamecastState {
           case 'turnover':
             ensure(event.playerInstanceId).turnovers += 1;
             break;
+          case 'turnover-cancelled': {
+            const line = ensure(event.playerInstanceId);
+            line.turnovers = Math.max(0, line.turnovers - 1);
+            break;
+          }
           case 'foul':
             ensure(event.foulerInstanceId).fouls += 1;
             break;

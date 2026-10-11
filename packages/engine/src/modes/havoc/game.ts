@@ -608,7 +608,8 @@ class HavocGameRuntime implements HavocRuntimeHooks {
     let helpPressure = 0;
     if (coverage === null) {
       const defensePrep = tripContext.preps[args.defense];
-      const shooterSlot = defensePrep.slotByPlayerId.get(defensePrep.keyOf(args.shooter)) ?? 0;
+      const offensePrep = tripContext.preps[args.offense];
+      const shooterSlot = offensePrep.slotByPlayerId.get(offensePrep.keyOf(args.shooter)) ?? 0;
       const chosen = pickDefender(
         tripContext.teams[args.defense],
         args.zone,
@@ -1033,7 +1034,7 @@ class HavocGameRuntime implements HavocRuntimeHooks {
           addends: [{ source: 'double-or-nothing', points: -1 }],
           multipliers: [],
           points: -1,
-          owners: [primary.instanceId],
+          owners: doubleOwners.map((owner) => owner.instanceId),
           originalEventSequence: attemptSequence,
         });
         this.attribute([{ owner: primary, mutationId: 'double-or-nothing', points: -1 }]);

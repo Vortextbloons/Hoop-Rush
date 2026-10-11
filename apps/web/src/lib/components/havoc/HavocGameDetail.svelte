@@ -61,17 +61,17 @@
       </div>
     </div>
     <dl class="mt-3 grid grid-cols-3 gap-2 text-xs">
-      <div>
+      <div class="min-w-0">
         <dt class="text-muted-foreground">Δ points for</dt>
-        <dd class="font-mono font-bold">{game.deltas.pointsFor}</dd>
+        <dd class="font-mono font-bold break-words">{game.deltas.pointsFor}</dd>
       </div>
-      <div>
+      <div class="min-w-0">
         <dt class="text-muted-foreground">Δ points against</dt>
-        <dd class="font-mono font-bold">{game.deltas.pointsAgainst}</dd>
+        <dd class="font-mono font-bold break-words">{game.deltas.pointsAgainst}</dd>
       </div>
-      <div>
+      <div class="min-w-0">
         <dt class="text-muted-foreground">Δ margin</dt>
-        <dd class="font-mono font-bold">{game.deltas.margin}</dd>
+        <dd class="font-mono font-bold break-words">{game.deltas.margin}</dd>
       </div>
     </dl>
     {#if game.flips.havocWinNormalLoss || game.flips.normalWinHavocLoss}

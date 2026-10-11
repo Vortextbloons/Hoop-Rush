@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 /* eslint-disable @typescript-eslint/require-await -- the in-memory fake mirrors async repository methods without I/O */
 import {
+  HAVOC_GAME_COUNT,
   HAVOC_WORKER_WIRE_SCHEMA_VERSION,
   type HavocCommandResult,
   type HavocComparison,
@@ -61,6 +62,12 @@ class MemoryHavocRepository implements HavocRepository {
     this.commands.set(result.commandId, result);
     if (result.status !== 'accepted') return result;
     const next = input.outcome.state;
+    if (next.revision !== result.revisionAfter) {
+      throw new Error('accepted outcome state must match revisionAfter');
+    }
+    if (result.revisionAfter <= result.revisionBefore) {
+      throw new Error('accepted commands must advance the run revision');
+    }
     if (input.game !== undefined) {
       this.games.set(
         `${next.runId}:${input.game.result.variant}:${String(input.game.result.gameNumber)}`,
@@ -81,7 +88,8 @@ class MemoryHavocRepository implements HavocRepository {
     }
     const archived =
       next.completionState === 'complete' ||
-      (next.completionState === 'abandoned' && next.phase === 'run');
+      (next.completionState === 'abandoned' && next.phase === 'run') ||
+      next.havocCursor === HAVOC_GAME_COUNT;
     if (next.phase === 'draft' && next.completionState === 'abandoned') {
       this.active = null;
       this.history.delete(next.runId);
@@ -223,6 +231,7 @@ class EngineRunner implements HavocRunnerLike {
       resultDigest,
       tapeDigest: havocGameTapeDigest(tape),
       summary: havocGameSummaryOf(result, resultDigest),
+      result,
       tape,
     };
   }
@@ -243,6 +252,13 @@ const MANIFEST = {
   ],
   bracket: { url: '/data/opponents/bracket.json', contentHash: 'c'.repeat(64) },
 } as unknown as HoopRushManifest;
+
+function manifestWithBracketHash(hash: string): HoopRushManifest {
+  return {
+    ...(MANIFEST as unknown as Record<string, unknown>),
+    bracket: { url: '/data/opponents/bracket.json', contentHash: hash },
+  } as unknown as HoopRushManifest;
+}
 
 function buildService() {
   const repository = new MemoryHavocRepository();
@@ -308,6 +324,8 @@ describe('HavocService integration', () => {
 
     const session = await service.watchGame({ gameNumber: 3, variant: 'havoc' });
     expect(session.tape.events.length).toBeGreaterThan(0);
+    const pendingGame = await service.readGame({ gameNumber: 3, variant: 'havoc' });
+    expect(pendingGame?.gameNumber).toBe(3);
     const accepted = await service.acceptGame({ gameNumber: 3, variant: 'havoc' });
     expect(accepted.status).toBe('accepted');
     snapshot = await service.loadActive();
@@ -317,6 +335,7 @@ describe('HavocService integration', () => {
     expect(rest.accepted).toBe(79);
     snapshot = await service.loadActive();
     expect(snapshot.run?.havocCursor).toBe(82);
+    expect(snapshot.run?.runId).toBe('havoc-run-test');
 
     const normal = await service.startNormalSeason();
     expect(normal.accepted).toBe(82);
@@ -361,5 +380,33 @@ describe('HavocService integration', () => {
       'games must be accepted in order',
     );
     service.dispose();
+  });
+
+  it('refuses to replay a run under a different engine or data version', async () => {
+    const repository = new MemoryHavocRepository();
+    let counter = 0;
+    const deps = (bracketHash: string) => ({
+      repository,
+      runner: new EngineRunner(),
+      loadCatalog: async () => buildSeasonDraftCatalog({ playersPerPool: 40 }),
+      loadPreamble: async () => ({
+        profile: buildHavocEraProfile() as unknown as EraSimulationProfile,
+        bracket: buildFixtureBracket(),
+      }),
+      loadManifest: async () => manifestWithBracketHash(bracketHash),
+      newRunId: () => 'havoc-run-version',
+      newCommandId: () => `havoc-cmd-version-${String(++counter)}`,
+    });
+    const first = createHavocService(deps('c'.repeat(64)));
+    await first.createDraft();
+    await draftFivePicks(first);
+    await first.lockLineup();
+    first.dispose();
+    const second = createHavocService(deps('d'.repeat(64)));
+    await second.loadActive();
+    await expect(second.simulateRange({ variant: 'havoc', count: 1 })).rejects.toThrow(
+      'different engine or data version',
+    );
+    second.dispose();
   });
 });

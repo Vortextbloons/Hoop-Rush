@@ -11,6 +11,10 @@
 
   let { report }: { report: HavocReport } = $props();
   const comparison = $derived(report.comparison);
+
+  function signed(value: number): string {
+    return value >= 0 ? `+${String(value)}` : String(value);
+  }
 </script>
 
 <div class="flex min-w-0 flex-col gap-4" data-havoc-report>
@@ -157,11 +161,11 @@
       {:else}
         <ul class="mt-2 flex flex-col gap-1 text-xs">
           {#each report.topGains as difference (difference.gameNumber)}
-            <li class="flex items-center justify-between gap-2">
-              <span class="text-muted-foreground"
+            <li class="flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5">
+              <span class="min-w-0 text-muted-foreground"
                 >Game {difference.gameNumber} vs {difference.opponentId}</span
               >
-              <span class="font-mono">
+              <span class="shrink-0 font-mono">
                 {difference.humanScore}–{difference.opponentScore}
                 <span class="font-bold text-primary">+{difference.pointsDelta}</span>
               </span>
@@ -183,11 +187,11 @@
       {:else}
         <ul class="mt-2 flex flex-col gap-1 text-xs">
           {#each report.topLosses as difference (difference.gameNumber)}
-            <li class="flex items-center justify-between gap-2">
-              <span class="text-muted-foreground"
+            <li class="flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5">
+              <span class="min-w-0 text-muted-foreground"
                 >Game {difference.gameNumber} vs {difference.opponentId}</span
               >
-              <span class="font-mono">
+              <span class="shrink-0 font-mono">
                 {difference.humanScore}–{difference.opponentScore}
                 <span class="font-bold text-destructive">{difference.pointsDelta}</span>
               </span>
@@ -208,11 +212,13 @@
     {#if report.wildestGames.length === 0}
       <p class="mt-2 text-xs text-muted-foreground">No games recorded yet.</p>
     {:else}
-      <ul class="mt-2 flex flex-col gap-1 text-xs">
+      <ul class="mt-2 flex flex-col gap-1.5 text-xs">
         {#each report.wildestGames as game (game.gameNumber)}
-          <li class="flex flex-wrap items-center justify-between gap-2">
-            <span class="text-muted-foreground">Game {game.gameNumber} vs {game.opponentId}</span>
-            <span class="font-mono">
+          <li class="flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5">
+            <span class="min-w-0 text-muted-foreground"
+              >Game {game.gameNumber} vs {game.opponentId}</span
+            >
+            <span class="shrink-0 font-mono">
               {game.humanScore}–{game.opponentScore} · margin {game.absoluteMargin} · adjustments
               {game.adjustments}
             </span>
@@ -236,65 +242,140 @@
       </p>
       <div class="mt-3 flex flex-col gap-3">
         {#each comparison.slots as slot (slot.slot)}
-          <div class="overflow-x-auto rounded-lg bg-surface-2 p-3">
+          <div class="min-w-0 rounded-lg bg-surface-2 p-3">
             <p class="flex items-center gap-2 text-sm font-semibold">
               <span class="font-mono text-xs text-muted-foreground uppercase">{slot.slot}</span>
               {slot.displayName}
             </p>
-            <table class="mt-2 w-full min-w-[34rem] text-xs">
-              <thead>
-                <tr
-                  class="border-b border-border/70 font-mono text-[10px] tracking-[0.1em] text-muted-foreground uppercase"
-                >
-                  <th scope="col" class="px-2 py-1 text-left font-medium">Line</th>
-                  <th scope="col" class="px-2 py-1 text-right font-medium">Pts</th>
-                  <th scope="col" class="px-2 py-1 text-right font-medium">FG</th>
-                  <th scope="col" class="px-2 py-1 text-right font-medium">Reb</th>
-                  <th scope="col" class="px-2 py-1 text-right font-medium">Ast</th>
-                  <th scope="col" class="px-2 py-1 text-right font-medium">Stl</th>
-                  <th scope="col" class="px-2 py-1 text-right font-medium">Blk</th>
-                  <th scope="col" class="px-2 py-1 text-right font-medium">TO</th>
-                  <th scope="col" class="px-2 py-1 text-right font-medium">PF</th>
-                </tr>
-              </thead>
-              <tbody>
-                {#each slot.havoc.lines as line (line.instanceId)}
-                  <tr class="border-b border-border/40">
-                    <th scope="row" class="max-w-44 truncate px-2 py-1 text-left font-semibold">
-                      {line.displayName}
-                      <span class="ml-1 font-mono text-[10px] font-normal text-muted-foreground">
-                        {havocParticipantKindLabel(line.kind)}
-                      </span>
-                    </th>
-                    <td class="px-2 py-1 text-right font-mono font-bold">{line.line.points}</td>
-                    <td class="px-2 py-1 text-right font-mono">
-                      {line.line.fieldGoals.made}/{line.line.fieldGoals.attempted}
-                    </td>
-                    <td class="px-2 py-1 text-right font-mono">{line.line.rebounds.total}</td>
-                    <td class="px-2 py-1 text-right font-mono">{line.line.assists}</td>
-                    <td class="px-2 py-1 text-right font-mono">{line.line.steals}</td>
-                    <td class="px-2 py-1 text-right font-mono">{line.line.blocks}</td>
-                    <td class="px-2 py-1 text-right font-mono">{line.line.turnovers}</td>
-                    <td class="px-2 py-1 text-right font-mono">{line.line.fouls}</td>
-                  </tr>
-                {/each}
-                <tr class="font-semibold">
-                  <th scope="row" class="px-2 py-1 text-left">Combined (slot total)</th>
-                  <td class="px-2 py-1 text-right font-mono">{slot.havoc.combined.points}</td>
-                  <td class="px-2 py-1 text-right font-mono">
-                    {slot.havoc.combined.fieldGoals.made}/{slot.havoc.combined.fieldGoals.attempted}
-                  </td>
-                  <td class="px-2 py-1 text-right font-mono"
-                    >{slot.havoc.combined.rebounds.total}</td
+            <div class="havoc-scroll-x mt-2 overflow-x-auto">
+              <table class="w-full min-w-[34rem] text-xs">
+                <thead>
+                  <tr
+                    class="border-b border-border/70 font-mono text-[10px] tracking-[0.1em] text-muted-foreground uppercase"
                   >
-                  <td class="px-2 py-1 text-right font-mono">{slot.havoc.combined.assists}</td>
-                  <td class="px-2 py-1 text-right font-mono">{slot.havoc.combined.steals}</td>
-                  <td class="px-2 py-1 text-right font-mono">{slot.havoc.combined.blocks}</td>
-                  <td class="px-2 py-1 text-right font-mono">{slot.havoc.combined.turnovers}</td>
-                  <td class="px-2 py-1 text-right font-mono">{slot.havoc.combined.fouls}</td>
-                </tr>
-              </tbody>
-            </table>
+                    <th scope="col" class="px-2 py-1 text-left font-medium">Line</th>
+                    <th scope="col" class="px-2 py-1 text-right font-medium">Pts</th>
+                    <th scope="col" class="px-2 py-1 text-right font-medium">FG</th>
+                    <th scope="col" class="px-2 py-1 text-right font-medium">Reb</th>
+                    <th scope="col" class="px-2 py-1 text-right font-medium">Ast</th>
+                    <th scope="col" class="px-2 py-1 text-right font-medium">Stl</th>
+                    <th scope="col" class="px-2 py-1 text-right font-medium">Blk</th>
+                    <th scope="col" class="px-2 py-1 text-right font-medium">TO</th>
+                    <th scope="col" class="px-2 py-1 text-right font-medium">PF</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {#each slot.havoc.lines as line (line.instanceId)}
+                    <tr class="border-b border-border/40">
+                      <th scope="row" class="max-w-44 truncate px-2 py-1 text-left font-semibold">
+                        {line.displayName}
+                        <span class="ml-1 font-mono text-[10px] font-normal text-muted-foreground">
+                          {havocParticipantKindLabel(line.kind)}
+                        </span>
+                      </th>
+                      <td class="px-2 py-1 text-right font-mono font-bold">{line.line.points}</td>
+                      <td class="px-2 py-1 text-right font-mono">
+                        {line.line.fieldGoals.made}/{line.line.fieldGoals.attempted}
+                      </td>
+                      <td class="px-2 py-1 text-right font-mono">{line.line.rebounds.total}</td>
+                      <td class="px-2 py-1 text-right font-mono">{line.line.assists}</td>
+                      <td class="px-2 py-1 text-right font-mono">{line.line.steals}</td>
+                      <td class="px-2 py-1 text-right font-mono">{line.line.blocks}</td>
+                      <td class="px-2 py-1 text-right font-mono">{line.line.turnovers}</td>
+                      <td class="px-2 py-1 text-right font-mono">{line.line.fouls}</td>
+                    </tr>
+                  {/each}
+                  <tr class="font-semibold">
+                    <th scope="row" class="px-2 py-1 text-left">Combined (slot total)</th>
+                    <td class="px-2 py-1 text-right font-mono">{slot.havoc.combined.points}</td>
+                    <td class="px-2 py-1 text-right font-mono">
+                      {slot.havoc.combined.fieldGoals.made}/{slot.havoc.combined.fieldGoals
+                        .attempted}
+                    </td>
+                    <td class="px-2 py-1 text-right font-mono"
+                      >{slot.havoc.combined.rebounds.total}</td
+                    >
+                    <td class="px-2 py-1 text-right font-mono">{slot.havoc.combined.assists}</td>
+                    <td class="px-2 py-1 text-right font-mono">{slot.havoc.combined.steals}</td>
+                    <td class="px-2 py-1 text-right font-mono">{slot.havoc.combined.blocks}</td>
+                    <td class="px-2 py-1 text-right font-mono">{slot.havoc.combined.turnovers}</td>
+                    <td class="px-2 py-1 text-right font-mono">{slot.havoc.combined.fouls}</td>
+                  </tr>
+                </tbody>
+              </table>
+              <table class="mt-2 w-full min-w-[34rem] text-xs">
+                <caption class="sr-only">
+                  Matched normal and havoc totals for the {slot.slot} draft slot
+                </caption>
+                <thead>
+                  <tr
+                    class="border-b border-border/70 font-mono text-[10px] tracking-[0.1em] text-muted-foreground uppercase"
+                  >
+                    <th scope="col" class="px-2 py-1 text-left font-medium">Season</th>
+                    <th scope="col" class="px-2 py-1 text-right font-medium">Pts</th>
+                    <th scope="col" class="px-2 py-1 text-right font-medium">FG</th>
+                    <th scope="col" class="px-2 py-1 text-right font-medium">Reb</th>
+                    <th scope="col" class="px-2 py-1 text-right font-medium">Ast</th>
+                    <th scope="col" class="px-2 py-1 text-right font-medium">Stl</th>
+                    <th scope="col" class="px-2 py-1 text-right font-medium">Blk</th>
+                    <th scope="col" class="px-2 py-1 text-right font-medium">TO</th>
+                    <th scope="col" class="px-2 py-1 text-right font-medium">PF</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr class="border-b border-border/40">
+                    <th scope="row" class="px-2 py-1 text-left font-semibold">Havoc combined</th>
+                    <td class="px-2 py-1 text-right font-mono">{slot.havoc.combined.points}</td>
+                    <td class="px-2 py-1 text-right font-mono">
+                      {slot.havoc.combined.fieldGoals.made}/{slot.havoc.combined.fieldGoals
+                        .attempted}
+                    </td>
+                    <td class="px-2 py-1 text-right font-mono"
+                      >{slot.havoc.combined.rebounds.total}</td
+                    >
+                    <td class="px-2 py-1 text-right font-mono">{slot.havoc.combined.assists}</td>
+                    <td class="px-2 py-1 text-right font-mono">{slot.havoc.combined.steals}</td>
+                    <td class="px-2 py-1 text-right font-mono">{slot.havoc.combined.blocks}</td>
+                    <td class="px-2 py-1 text-right font-mono">{slot.havoc.combined.turnovers}</td>
+                    <td class="px-2 py-1 text-right font-mono">{slot.havoc.combined.fouls}</td>
+                  </tr>
+                  <tr class="border-b border-border/40">
+                    <th scope="row" class="px-2 py-1 text-left font-semibold">Normal combined</th>
+                    <td class="px-2 py-1 text-right font-mono">{slot.normal.combined.points}</td>
+                    <td class="px-2 py-1 text-right font-mono">
+                      {slot.normal.combined.fieldGoals.made}/{slot.normal.combined.fieldGoals
+                        .attempted}
+                    </td>
+                    <td class="px-2 py-1 text-right font-mono"
+                      >{slot.normal.combined.rebounds.total}</td
+                    >
+                    <td class="px-2 py-1 text-right font-mono">{slot.normal.combined.assists}</td>
+                    <td class="px-2 py-1 text-right font-mono">{slot.normal.combined.steals}</td>
+                    <td class="px-2 py-1 text-right font-mono">{slot.normal.combined.blocks}</td>
+                    <td class="px-2 py-1 text-right font-mono">{slot.normal.combined.turnovers}</td>
+                    <td class="px-2 py-1 text-right font-mono">{slot.normal.combined.fouls}</td>
+                  </tr>
+                  <tr class="font-semibold">
+                    <th scope="row" class="px-2 py-1 text-left">Delta</th>
+                    <td class="px-2 py-1 text-right font-mono">{signed(slot.deltas.points)}</td>
+                    <td class="px-2 py-1 text-right font-mono">
+                      {signed(slot.deltas.fieldGoalsMade)}/{signed(slot.deltas.fieldGoalAttempts)}
+                    </td>
+                    <td class="px-2 py-1 text-right font-mono">{signed(slot.deltas.rebounds)}</td>
+                    <td class="px-2 py-1 text-right font-mono">{signed(slot.deltas.assists)}</td>
+                    <td class="px-2 py-1 text-right font-mono">{signed(slot.deltas.steals)}</td>
+                    <td class="px-2 py-1 text-right font-mono">{signed(slot.deltas.blocks)}</td>
+                    <td class="px-2 py-1 text-right font-mono">{signed(slot.deltas.turnovers)}</td>
+                    <td class="px-2 py-1 text-right font-mono">{signed(slot.deltas.fouls)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p class="mt-2 font-mono text-[10px] text-muted-foreground">
+              Production index {slot.productionIndex.havoc} vs {slot.productionIndex.normal} · gain {signed(
+                slot.productionIndex.gain,
+              )}
+            </p>
           </div>
         {/each}
       </div>

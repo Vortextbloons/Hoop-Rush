@@ -39,13 +39,13 @@ function humanTeam(input: HavocGameInput): HavocTeamInput {
   return input.humanSide === 'home' ? input.home : input.away;
 }
 
-/** Opponent starters ranked by frozen original Overall, version id, instance id. */
+/** Opponent starters ranked by frozen original Overall, source version id, source player id. */
 export function rankedHavocOpponentStarters(input: HavocGameInput): HavocParticipant[] {
   return [...opponentTeam(input).starters].sort((a, b) => {
     const overall = b.source.originalOverall - a.source.originalOverall;
     if (overall !== 0) return overall;
-    const aVersion = a.source.playerVersionId ?? a.instanceId;
-    const bVersion = b.source.playerVersionId ?? b.instanceId;
+    const aVersion = a.source.playerVersionId ?? a.source.playerId;
+    const bVersion = b.source.playerVersionId ?? b.source.playerId;
     const version = compareStrings(aVersion, bVersion);
     if (version !== 0) return version;
     return compareStrings(a.instanceId, b.instanceId);

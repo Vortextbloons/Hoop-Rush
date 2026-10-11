@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
   saveDraft: vi.fn(),
 }));
 vi.mock('./fixed-five-transport', () => ({
-  getMultiplayerClient: async () => ({ rpc: mocks.rpc }),
+  getMultiplayerClient: () => Promise.resolve({ rpc: mocks.rpc }),
   getFixedFiveTransport: () => ({ resume: mocks.fixedResume }),
 }));
 vi.mock('./draft-duel-transport', () => ({

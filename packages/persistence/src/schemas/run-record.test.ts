@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { buildChallengeRun, buildClassicCompletedDraft } from '@hoop-rush/test-fixtures';
+import {
+  buildChallengeRun,
+  buildClassicCompletedDraft,
+  buildLeagueRecord,
+} from '@hoop-rush/test-fixtures';
 import { playerIdSchema } from '@hoop-rush/data-contracts';
 import {
   activeRunCheckpointSchema,
@@ -83,6 +87,36 @@ describe('storedRunRecordSchema', () => {
       recordId: 'record-8',
       saveSchemaVersion: 2,
       run: withoutFranchise,
+    };
+    expect(storedRunRecordSchema.safeParse(record).success).toBe(false);
+  });
+  it('round-trips a run with an attached challenge league', () => {
+    const run = buildChallengeRun({ league: buildLeagueRecord() });
+    const record = {
+      recordId: 'record-9',
+      saveSchemaVersion: 2,
+      run,
+    };
+    const parsed = storedRunRecordSchema.parse(record);
+    expect(parsed.run.league?.players).toHaveLength(150);
+    expect(parsed.run.league?.teams).toHaveLength(30);
+    const checkpoint = checkpointFromRun({
+      ...record,
+      run: { ...run, games: [], status: 'active' },
+    });
+    expect(checkpoint.league?.digest).toBe(run.league?.digest);
+    const restored = runFromCheckpoint(checkpoint, []);
+    expect(restored.league?.digest).toBe(run.league?.digest);
+  });
+  it('rejects a run with a malformed league record', () => {
+    const run = buildChallengeRun({ league: buildLeagueRecord() });
+    const record = {
+      recordId: 'record-10',
+      saveSchemaVersion: 2,
+      run: {
+        ...run,
+        league: { ...run.league, digest: 'nope' },
+      },
     };
     expect(storedRunRecordSchema.safeParse(record).success).toBe(false);
   });

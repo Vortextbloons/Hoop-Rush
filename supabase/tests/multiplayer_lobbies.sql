@@ -53,7 +53,7 @@ begin
   exception when raise_exception then assert sqlerrm = 'game-in-progress', 'unfinished matches are protected'; end;
   update public.fixed_five_rooms set phase = 'completed' where id = v_room;
   select jsonb_object_agg(key, value) into v_versions from public.draft_duel_server_versions;
-  v_versions := jsonb_build_object('dataVersion', 'data-v1', 'ratingsVersion', 'ratings-v3.12', 'catalogVersion', 'catalog-v1', 'catalogHash', repeat('a',64), 'playerVersionIdVersion', 'player-version-v1', 'positionNormalizationVersion', 'position-v3', 'engineVersion', 'draft-duel-web-v1', 'profileVersion', '2010s-fixed-v1') || v_versions;
+  v_versions := jsonb_build_object('seedDerivationVersion', 'seed-v1', 'dataVersion', 'data-v1', 'ratingsVersion', 'ratings-v3.12', 'catalogVersion', 'catalog-v1', 'catalogHash', repeat('a',64), 'playerVersionIdVersion', 'player-version-v1', 'positionNormalizationVersion', 'position-v3', 'engineVersion', 'draft-duel-web-v1', 'profileVersion', '2010s-fixed-v1') || v_versions;
   v_settings := jsonb_build_object('gameKind', 'draft-duel', 'fairness', 'fair', 'variant', 'ball-knowledge', 'versions', v_versions);
   v_next := public.multiplayer_lobby_command(jsonb_build_object('kind', 'start', 'lobbyId', v_lobby->>'id', 'expectedRevision', v_revision, 'settings', v_settings));
   assert v_next->>'code' = v_code, 'mode switch preserves code';

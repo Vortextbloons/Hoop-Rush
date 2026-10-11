@@ -75,10 +75,11 @@ describe('havoc runtime smoke', () => {
   });
 });
 
-// Captured before the Time Lord clock fix; default 24/24 games must not drift.
-const DEFAULT_HAVOC_RESULT_DIGEST = '00329afdb85164418b077c9fe2221f0d';
-const DEFAULT_HAVOC_TAPE_DIGEST = 'bd021d35cae552b9aed21eff351b64a5';
-const LOCKED_HAVOC_RESULT_DIGEST = '11e0fe814d03b0ada93bbda7d3bb71b1';
-const LOCKED_HAVOC_TAPE_DIGEST = '73d5d54ebdbff5327664ea80f38d843e';
-const LOCKED_NORMAL_RESULT_DIGEST = '8649ccbb1dbcc877e89c3801ef7ccaab';
-const LOCKED_NORMAL_TAPE_DIGEST = '9460e850b1891c0cee6af276f64142a0';
+// Captured after the 5-on-5 defender-selection fidelity fix; default 24/24 games must not drift
+// again without an explicit behavior change.
+const DEFAULT_HAVOC_RESULT_DIGEST = '1d868e91ebeaf195b5084aff075ad9a1';
+const DEFAULT_HAVOC_TAPE_DIGEST = '08b6ecee56a2b2327c7380e82328469e';
+const LOCKED_HAVOC_RESULT_DIGEST = '0d969c8b053acb57bfa15c558c16eddb';
+const LOCKED_HAVOC_TAPE_DIGEST = 'fea0808c1e3a11e02659b1cedf699fbc';
+const LOCKED_NORMAL_RESULT_DIGEST = 'e28e1705ef494f713b80663f0b9dc095';
+const LOCKED_NORMAL_TAPE_DIGEST = 'cd53e0dab4b459d619f505d0d1c0deaa';

@@ -17,3 +17,5 @@ export const POSITION_NORMALIZATION_VERSION = 'position-v4';
 export const POSITION_OVERRIDES_VERSION = 'position-overrides-v2';
 export const CLASSIC_DRAFT_SCHEMA_VERSION = 1;
 export const CLASSIC_ROLL_VERSION = 'classic-roll-v1';
+export const LEAGUE_RECORD_VERSION = 'league-v1';
+export const LEAGUE_SCHEDULE_VERSION = 'league-schedule-v1';

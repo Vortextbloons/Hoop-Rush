@@ -115,6 +115,24 @@
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+    text-size-adjust: 100%;
+    -webkit-text-size-adjust: 100%;
+  }
+  @supports (padding: env(safe-area-inset-bottom)) {
+    body {
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+  }
+  .havoc-scroll-x {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    touch-action: pan-x pan-y;
+    scrollbar-width: thin;
+  }
+  .havoc-scroll-y {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
   }
   ::selection {
     background: color-mix(in oklab, var(--color-primary) 50%, transparent);

@@ -59,42 +59,42 @@
   </header>
 
   <div class="grid grid-cols-2 gap-px bg-border" aria-live="polite">
-    <div class="bg-surface-2 p-4">
+    <div class="bg-surface-2 p-3 sm:p-4">
       <p
         class="truncate font-mono text-[10px] font-bold tracking-[0.12em] text-muted-foreground uppercase"
       >
         {state.humanName}
       </p>
-      <p class="font-display text-4xl font-black tabular-nums" data-score="human">
+      <p class="font-display text-3xl font-black tabular-nums sm:text-4xl" data-score="human">
         {state.humanScore}
       </p>
     </div>
-    <div class="bg-surface-2 p-4 text-right">
+    <div class="bg-surface-2 p-3 text-right sm:p-4">
       <p
         class="truncate font-mono text-[10px] font-bold tracking-[0.12em] text-muted-foreground uppercase"
       >
         {state.opponentName}
       </p>
-      <p class="font-display text-4xl font-black tabular-nums" data-score="opponent">
+      <p class="font-display text-3xl font-black tabular-nums sm:text-4xl" data-score="opponent">
         {state.opponentScore}
       </p>
     </div>
   </div>
 
   <div
-    class="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 px-4 py-3"
+    class="flex flex-col gap-3 border-b border-border/70 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between"
   >
     <p class="font-mono text-xs text-muted-foreground" data-havoc-gamecast-clock>
       {havocPeriodLabel(state.period)} · {formatHavocClock(state.clockSeconds)} ·
       {visible.length} of {state.items.length} plays
     </p>
-    <div class="flex flex-wrap items-center gap-2">
+    <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
       <button
         type="button"
         data-havoc-playback-toggle
         onclick={() => (state.playing ? state.pause() : state.play())}
         disabled={finished}
-        class="inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-primary-foreground uppercase outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40"
+        class="inline-flex min-h-12 w-full touch-manipulation items-center justify-center gap-1.5 rounded-lg bg-primary px-4 py-3 text-xs font-bold text-primary-foreground uppercase outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto sm:min-h-10"
       >
         {#if state.playing}
           <Pause class="h-4 w-4" aria-hidden="true" /> Pause
@@ -103,7 +103,7 @@
         {/if}
       </button>
       <div
-        class="inline-flex rounded-lg border border-border p-0.5"
+        class="grid w-full grid-cols-4 rounded-lg border border-border p-0.5 sm:inline-flex sm:w-auto"
         role="group"
         aria-label="Playback speed"
       >
@@ -113,7 +113,7 @@
             data-havoc-speed={speed}
             aria-pressed={state.speed === speed}
             onclick={() => state.setSpeed(speed)}
-            class="min-h-9 rounded-md px-2 py-1 font-mono text-xs font-bold outline-none focus-visible:ring-2 focus-visible:ring-ring {state.speed ===
+            class="min-h-11 min-w-11 touch-manipulation rounded-md px-2 py-2 font-mono text-xs font-bold outline-none focus-visible:ring-2 focus-visible:ring-ring {state.speed ===
             speed
               ? 'bg-primary text-primary-foreground'
               : 'text-muted-foreground'}"
@@ -136,7 +136,7 @@
         <p class="mt-2 text-xs text-muted-foreground">Press play to run the tape.</p>
       {:else}
         <ol
-          class="mt-2 flex max-h-96 flex-col gap-1.5 overflow-y-auto pr-1"
+          class="havoc-scroll-y mt-2 flex max-h-96 flex-col gap-1.5 overflow-y-auto overscroll-contain pr-1"
           data-havoc-gamecast-feed
         >
           {#each feed as item (item.key)}
@@ -161,7 +161,46 @@
       <h3 class="font-mono text-[10px] font-bold tracking-[0.14em] text-muted-foreground uppercase">
         Live lines
       </h3>
-      <div class="mt-2 overflow-x-auto">
+      <ul class="mt-2 flex flex-col gap-2 sm:hidden" data-havoc-gamecast-box-mobile>
+        {#each lines as line (line.instanceId)}
+          <li class="rounded-lg bg-surface-2 p-3" data-havoc-line-mobile={line.kind}>
+            <p class="flex items-baseline justify-between gap-2">
+              <span class="min-w-0 truncate text-sm font-semibold">{line.displayName}</span>
+              <span class="shrink-0 font-mono text-sm font-bold">{line.points} pts</span>
+            </p>
+            <p class="mt-0.5 font-mono text-[10px] text-muted-foreground uppercase">
+              {havocParticipantKindLabel(line.kind)} · {line.fieldGoalsMade}/{line.fieldGoalsAttempted}
+              FG · {line.freeThrowsMade}/{line.freeThrowsAttempted} FT
+            </p>
+            <dl class="mt-2 grid grid-cols-5 gap-1 text-center">
+              <div>
+                <dt class="font-mono text-[9px] text-muted-foreground uppercase">Reb</dt>
+                <dd class="font-mono text-xs font-bold">{line.rebounds}</dd>
+              </div>
+              <div>
+                <dt class="font-mono text-[9px] text-muted-foreground uppercase">Ast</dt>
+                <dd class="font-mono text-xs font-bold">{line.assists}</dd>
+              </div>
+              <div>
+                <dt class="font-mono text-[9px] text-muted-foreground uppercase">Stl</dt>
+                <dd class="font-mono text-xs font-bold">{line.steals}</dd>
+              </div>
+              <div>
+                <dt class="font-mono text-[9px] text-muted-foreground uppercase">Blk</dt>
+                <dd class="font-mono text-xs font-bold">{line.blocks}</dd>
+              </div>
+              <div>
+                <dt class="font-mono text-[9px] text-muted-foreground uppercase">TO</dt>
+                <dd class="font-mono text-xs font-bold">{line.turnovers}</dd>
+              </div>
+            </dl>
+            <p class="mt-1 text-right font-mono text-[10px] text-muted-foreground">
+              {line.fouls} PF
+            </p>
+          </li>
+        {/each}
+      </ul>
+      <div class="havoc-scroll-x mt-2 hidden overflow-x-auto sm:block">
         <table class="w-full min-w-[34rem] text-xs" data-havoc-gamecast-box>
           <thead>
             <tr
@@ -220,13 +259,13 @@
   {/if}
 
   <footer
-    class="flex flex-wrap items-center justify-between gap-2 border-t border-border/70 px-4 py-3"
+    class="flex flex-col-reverse gap-2 border-t border-border/70 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between"
   >
     <button
       type="button"
       data-havoc-gamecast-close
       onclick={onClose}
-      class="inline-flex min-h-10 items-center justify-center rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+      class="inline-flex min-h-11 w-full touch-manipulation items-center justify-center rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring sm:w-auto"
     >
       Back to hub
     </button>
@@ -236,7 +275,7 @@
         data-havoc-gamecast-accept
         onclick={onAccept}
         disabled={state.accepted || state.accepting}
-        class="inline-flex min-h-10 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground uppercase outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40"
+        class="inline-flex min-h-12 w-full touch-manipulation items-center justify-center rounded-lg bg-primary px-4 py-3 text-sm font-bold text-primary-foreground uppercase outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto sm:min-h-10"
       >
         {state.accepted
           ? 'Result accepted'

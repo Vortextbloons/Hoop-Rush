@@ -925,16 +925,18 @@ export class FakeHavocService implements HavocService {
       this.summaryFor(input.gameNumber);
     const tape =
       this.tapeBuilder === null ? buildFakeTape(summary) : this.tapeBuilder(input.gameNumber);
+    const result = this.results.get(key) ?? this.resultFor(summary);
     const session: HavocWatchSession = {
       gameNumber: input.gameNumber,
       variant,
       seed: summary.seed,
       tape,
       summary,
+      result,
     };
     if (!this.summaries[variant].some((entry) => entry.gameNumber === input.gameNumber)) {
       this.pendingSummaries.set(key, summary);
-      this.results.set(key, this.resultFor(summary));
+      this.results.set(key, result);
     }
     return session;
   }

@@ -114,7 +114,7 @@
       </h4>
       <span class="font-mono text-[10px] text-muted-foreground">{changedRatings.size} changed</span>
     </div>
-    <dl class="mt-1.5 grid grid-cols-3 gap-x-2 gap-y-1">
+    <dl class="mt-1.5 grid grid-cols-2 gap-x-2 gap-y-1 min-[420px]:grid-cols-3">
       {#each REQUIRED_RATING_KEYS as key (key)}
         {@const changed = changedRatings.has(key)}
         <div
@@ -177,7 +177,7 @@
     onclick={() => onPick(card.cardId)}
     disabled={busy}
     aria-label="Draft {card.source.displayName} — {card.nickname}"
-    class="inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-primary px-3 py-2 text-xs font-extrabold tracking-wide text-primary-foreground uppercase outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none"
+    class="inline-flex min-h-12 w-full touch-manipulation items-center justify-center rounded-lg bg-primary px-3 py-3 text-xs font-extrabold tracking-wide text-primary-foreground uppercase outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none"
   >
     Pick {card.nickname}
   </button>

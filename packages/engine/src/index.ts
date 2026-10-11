@@ -31,7 +31,20 @@ export {
 } from './challenge/draft-fit-projection.ts';
 export { explainSeason } from './challenge/explain.ts';
 export { selectMemorableGames } from './challenge/memorable.ts';
-export { leagueMvp } from './challenge/mvp.ts';
+export { leagueMvp, type LeagueMvp } from './challenge/mvp.ts';
+export {
+  createLeagueSimulation,
+  leagueGamesSimulated,
+  leagueQuotas,
+  leagueUserGameCounts,
+  planLeagueSchedule,
+  simulateLeague,
+  validateLeagueSchedule,
+  LEAGUE_GAMES_PER_TEAM,
+  type LeagueGamePlan,
+  type LeagueSimulation,
+  type LeagueSimulationInput,
+} from './challenge/league.ts';
 export { perGamePlayer } from './challenge/aggregates.ts';
 export {
   acceptGameResult,

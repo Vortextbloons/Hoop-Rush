@@ -80,12 +80,12 @@
       </a>
     </div>
   {:else}
-    <header class="flex flex-wrap items-end justify-between gap-3">
+    <header class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
       <div class="min-w-0">
         <p class="font-mono text-[10px] font-bold tracking-[0.16em] text-primary uppercase">
           Hoop Havoc · Season complete
         </p>
-        <h1 class="font-display mt-1 text-4xl font-extrabold tracking-tight uppercase">
+        <h1 class="font-display mt-1 text-3xl font-extrabold tracking-tight uppercase sm:text-4xl">
           {havocRecordLabel(run.havocWins, run.havocLosses)}
         </h1>
         {#if objective !== null}
@@ -94,18 +94,18 @@
           </p>
         {/if}
       </div>
-      <div class="flex flex-wrap gap-2">
+      <div class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
         <a
           href={run === null
             ? resolve('/havoc/history')
             : resolve('/havoc/history/[runId]', { runId: run.runId })}
-          class="inline-flex min-h-11 items-center justify-center rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          class="inline-flex min-h-11 touch-manipulation items-center justify-center rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
         >
           Full report
         </a>
         <a
           href={resolve('/havoc/run')}
-          class="inline-flex min-h-11 items-center justify-center rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          class="inline-flex min-h-11 touch-manipulation items-center justify-center rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
         >
           Back to hub
         </a>
@@ -201,13 +201,13 @@
             style="width: {progressPercent}%"
           ></div>
         </div>
-        <div class="mt-4 flex flex-wrap gap-2">
+        <div class="mt-4 grid gap-2 sm:flex sm:flex-wrap">
           <button
             type="button"
             data-havoc-run-normal
             onclick={() => void state.runNormalSeason()}
             disabled={state.busy}
-            class="inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-5 py-3 text-xs font-extrabold tracking-wide text-primary-foreground uppercase outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40"
+            class="inline-flex min-h-12 w-full touch-manipulation items-center justify-center rounded-lg bg-primary px-5 py-3 text-xs font-extrabold tracking-wide text-primary-foreground uppercase outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto sm:min-h-11"
           >
             {state.busy ? 'Simulating…' : pendingLabel}
           </button>
@@ -217,7 +217,7 @@
               data-havoc-cancel-comparison
               onclick={() => void state.cancelComparison()}
               disabled={state.cancelling}
-              class="inline-flex min-h-11 items-center justify-center rounded-lg border border-destructive/50 px-4 py-2 text-xs font-semibold text-destructive outline-none hover:bg-destructive/10 focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40"
+              class="inline-flex min-h-11 w-full touch-manipulation items-center justify-center rounded-lg border border-destructive/50 px-4 py-2 text-xs font-semibold text-destructive outline-none hover:bg-destructive/10 focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
             >
               {state.cancelling ? 'Stopping…' : 'Cancel at game boundary'}
             </button>

@@ -21,3 +21,11 @@ export function deriveAttemptSeed(runSeed: Seed, attemptIndex: number): Seed {
   }
   return deriveSeed(runSeed, `attempt-${String(attemptIndex)}`);
 }
+export function deriveLeagueGameSeed(runSeed: Seed, leagueGameIndex: number): Seed {
+  if (!Number.isInteger(leagueGameIndex) || leagueGameIndex < 0) {
+    throw new Error(
+      `leagueGameIndex must be a nonnegative integer (got ${String(leagueGameIndex)})`,
+    );
+  }
+  return deriveSeed(runSeed, `league-${String(leagueGameIndex)}`);
+}

@@ -7,7 +7,7 @@ import {
 } from '@hoop-rush/data-contracts';
 export function inviteLinkForDraftDuelCode(code: string): string {
   const parsed = draftDuelRoomCodeSchema.parse(code);
-  return `/draft-duel?code=${parsed}`;
+  return `/multiplayer?code=${parsed}`;
 }
 export function friendlyDraftDuelJoinError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);

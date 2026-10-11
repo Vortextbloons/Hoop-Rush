@@ -75,6 +75,7 @@ async function runTape(request: HavocWorkerTapeRequest): Promise<void> {
       resultDigest,
       tapeDigest: havocGameTapeDigest(tape),
       summary: havocGameSummaryOf(result, resultDigest),
+      result,
       tape,
     });
   } catch (error) {

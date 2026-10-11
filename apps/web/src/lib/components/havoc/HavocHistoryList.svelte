@@ -48,7 +48,7 @@
           <a
             href={resolve('/havoc/history/[runId]', { runId: entry.runId })}
             data-havoc-history-entry={entry.runId}
-            class="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl bg-surface-1 p-4 outline-none transition-colors hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-ring"
+            class="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl bg-surface-1 p-4 touch-manipulation outline-none transition-colors hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-ring"
           >
             <span class="min-w-0 flex-1">
               <span

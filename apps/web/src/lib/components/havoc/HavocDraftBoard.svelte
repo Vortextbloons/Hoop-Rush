@@ -68,9 +68,11 @@
       </ol>
     </div>
 
-    <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
+    <div
+      class="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between"
+    >
       <div
-        class="inline-flex rounded-lg border border-border p-0.5"
+        class="grid w-full grid-cols-2 rounded-lg border border-border p-0.5 sm:inline-flex sm:w-auto"
         role="group"
         aria-label="Attribute view"
       >
@@ -78,7 +80,7 @@
           type="button"
           aria-pressed={mode === 'effective'}
           onclick={() => (mode = 'effective')}
-          class="min-h-9 rounded-md px-3 py-1.5 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring {mode ===
+          class="min-h-11 rounded-md px-3 py-2 text-xs font-semibold touch-manipulation outline-none focus-visible:ring-2 focus-visible:ring-ring {mode ===
           'effective'
             ? 'bg-primary text-primary-foreground'
             : 'text-muted-foreground'}"
@@ -89,7 +91,7 @@
           type="button"
           aria-pressed={mode === 'original'}
           onclick={() => (mode = 'original')}
-          class="min-h-9 rounded-md px-3 py-1.5 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring {mode ===
+          class="min-h-11 rounded-md px-3 py-2 text-xs font-semibold touch-manipulation outline-none focus-visible:ring-2 focus-visible:ring-ring {mode ===
           'original'
             ? 'bg-primary text-primary-foreground'
             : 'text-muted-foreground'}"
@@ -98,17 +100,20 @@
         </button>
       </div>
       {#if !complete}
-        <div class="flex items-center gap-2">
+        <div class="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-end">
           <button
             type="button"
             data-havoc-reroll
             onclick={onReroll}
             disabled={busy || draft.rerollUsed}
-            class="inline-flex min-h-10 items-center justify-center rounded-lg border border-border px-3 py-2 text-xs font-semibold outline-none hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40"
+            class="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg border border-border px-4 py-2 text-xs font-semibold touch-manipulation outline-none hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none"
           >
             Reroll offer
           </button>
-          <span class="font-mono text-[11px] text-muted-foreground" data-havoc-rerolls-remaining>
+          <span
+            class="shrink-0 font-mono text-[11px] text-muted-foreground"
+            data-havoc-rerolls-remaining
+          >
             {remainingRerolls} of {HAVOC_REROLL_LIMIT} reroll{remainingRerolls === 1 ? '' : 's'} left
           </span>
         </div>
@@ -123,7 +128,7 @@
 
   {#if !complete}
     <section aria-label="Current offer" class="min-w-0">
-      <ul class="grid auto-rows-fr gap-3 lg:grid-cols-3">
+      <ul class="grid auto-rows-fr gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {#each draft.cards as card (card.cardId)}
           <li class="flex h-full min-w-0">
             <HavocDraftCard {card} {mode} {busy} {franchiseName} {onPick} />
