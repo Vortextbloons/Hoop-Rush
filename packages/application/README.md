@@ -51,10 +51,24 @@ Landed:
 
 Next:
 
-1. Stage 4: separate block validation/execution/candidate assembly and
-   postseason scheduling/progression/resolution inside `packages/engine`
-   (preserving RNG consumption, iteration order, and recorded facts), then
-   stage 5 mode migrations and stages 6-7.
+1. Stage 5 mode migrations and stages 6-7.
+
+Stage 4 landed: engine season orchestration is split and de-duplicated.
+`postseason.ts` (1,911 lines) became `postseason/{schedule,state,play-in,
+bracket,injuries,game,progression}` with a facade, and the three postseason
+command handlers share one `advanceSeasonPostseason` loop. `block.ts` (2,174
+lines) became `block/{validation,preparation,execution,assembly,commit,audit,
+run}` with a facade. Shared regular-season/postseason mechanisms now live in
+`injuries.ts` (`rollInjuryWithSeedNamespace`), `health.ts`
+(`seasonGameHealthSeamWithRoll`), `injury-events.ts`, and `game-launch.ts`;
+deliberate differences (postseason ignores the rehab premium) are pinned by
+`injuries.test.ts`. Golden pins added before the split:
+`block-golden.test.ts` (block-0 checkpoint/state/commit digests),
+`season-block-validation.test.ts` (rejection matrix), and
+`injuries.test.ts` (roll vectors for both namespaces). Engine production
+lines moved 61,408 → 61,548 (split scaffolding offset by ~360 de-duplicated
+lines); the worker/CLI block-iteration and post-block-commit consolidation
+remain open for the next slice.
 
 Stage 2 complete: block jobs return raw `candidate`/`interrupted` events and
 `SeasonSession` owns start/resume reconciliation, acceptance, atomic commits,

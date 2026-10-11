@@ -165,3 +165,11 @@ paths change (stages 2, 4, and 6).
   both delegate. Verified by the block-0 golden digest, postseason and command
   suites, the application session suites, web season suites, and
   `cli-season-reproduce`.
+- 2026-10-11, stage 4 close: full gates re-run on the split engine.
+  `pnpm static` 0 errors (1 pre-existing a11y warning); `pnpm test:run`
+  111 files / 1,052 passed + 1 skipped (baseline 103 / 995 + 1); `pnpm build`
+  pass; `pnpm hoop-rush data validate` OK; `pnpm code-size` engine production
+  61,408 → 61,548 lines (split scaffolding offset by ~360 de-duplicated
+  runtime lines) and test lines 38,488 → 41,124 (new pins and suites).
+  Remaining stage-4 follow-ups: one block game-iteration primitive for the
+  worker/CLI, and the CLI post-block commit composition.
