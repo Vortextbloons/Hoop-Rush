@@ -373,7 +373,9 @@ export function computeForSeason(season: string, force = false, overallOnly = fa
         tendencies,
         abilityProvenance: player.provenance,
         stats,
-        position: player.position ?? 'SF',
+        position:
+          positionOverrideFor(player.externalId ?? '')?.primary ??
+          primaryPositionForSource(player.position ?? 'SF'),
         heightInches: safeHeight(player.heightInches),
         playerId: player.externalId ? `p-${player.externalId}` : (player.id ?? undefined),
         artifact,

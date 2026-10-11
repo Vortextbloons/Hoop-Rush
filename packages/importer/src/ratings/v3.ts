@@ -16,6 +16,7 @@ import {
 import { clamp, clampRating, safeFloat } from '../json.ts';
 import type { StatsRow } from './stats.ts';
 import type { IndividualHonor, ProvenanceMap } from '@hoop-rush/data-contracts';
+import { positionGroupForSource } from '../positions/normalize.ts';
 export const RATING_ARCHETYPES: readonly RatingArchetype[] = [
   'primaryCreator',
   'secondaryCreator',
@@ -228,11 +229,7 @@ export function offensiveAbilityFor(
   );
 }
 export function defensePositionGroup(position?: string | null): 'G' | 'F' | 'C' {
-  // Same buckets as positionGroup: only listed wings are forwards. F-C and
-  // C-F are centers, matching how interior defense is already derived.
-  if (position === 'PG' || position === 'SG' || position === 'G') return 'G';
-  if (position === 'PF' || position === 'SF' || position === 'F') return 'F';
-  return 'C';
+  return positionGroupForSource(position ?? 'SF');
 }
 const DEFENSE_ABILITY_SHARES: Record<
   'G' | 'F' | 'C',
@@ -274,7 +271,11 @@ function evidenceCoverage(input: RatingProfileInput, keys: readonly string[]): n
     }, 0) / keys.length
   );
 }
-function recognitionFor(input: RatingProfileInput, domain: 'overall' | 'defense') {
+function recognitionFor(
+  input: RatingProfileInput,
+  domain: 'overall' | 'defense',
+  estimate: number,
+) {
   const order: IndividualHonor[] =
     domain === 'overall' ? ['MVP-1', 'NBA1', 'NBA2', 'NBA3'] : ['DEF1', 'DEF2'];
   const honors = Array.isArray(input.stats.honors) ? input.stats.honors : [];
@@ -300,7 +301,10 @@ function recognitionFor(input: RatingProfileInput, domain: 'overall' | 'defense'
   return {
     honor: honor ?? null,
     prior: prior.mean,
-    weight: Math.min(0.2, variance / (variance + prior.variance)) * sample,
+    weight:
+      honor && prior.mean <= estimate
+        ? 0
+        : Math.min(0.2, variance / (variance + prior.variance)) * sample,
   };
 }
 function deriveNonlinear(
@@ -542,7 +546,7 @@ export function deriveRatingProfile(input: RatingProfileInput): DerivedRatingPro
   );
   const offensiveAbility = offensiveAbilityFor(input.ratings, input.tendencies);
   const defensiveAbility = defensiveAbilityFor(input.ratings, input.position);
-  const defensiveRecognition = recognitionFor(input, 'defense');
+  const defensiveRecognition = recognitionFor(input, 'defense', defensiveAbility);
   const defensiveValue =
     defensiveAbility * (1 - defensiveRecognition.weight) +
     (defensiveRecognition.prior ?? 0) * defensiveRecognition.weight;
@@ -550,7 +554,7 @@ export function deriveRatingProfile(input: RatingProfileInput): DerivedRatingPro
     offensiveAbility * (1 - production.weight) + production.score * production.weight;
   const baseScore = 0.65 * offensiveAbility + 0.35 * defensiveValue;
   const rawBeforeRecognition = 0.65 * offensiveValue + 0.35 * defensiveValue;
-  const recognition = recognitionFor(input, 'overall');
+  const recognition = recognitionFor(input, 'overall', rawBeforeRecognition);
   const abilityContribution =
     (0.65 * offensiveAbility * (1 - production.weight) + 0.35 * defensiveValue) *
     (1 - recognition.weight);

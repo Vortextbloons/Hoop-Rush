@@ -1,8 +1,21 @@
 ﻿<script lang="ts">
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
-  import { resolve } from '$app/paths';
-  import { Swords, Zap, Trophy, Plus, LogIn, ArrowLeft } from '@lucide/svelte';
+  import { asset, resolve } from '$app/paths';
+  import {
+    Swords,
+    Zap,
+    Trophy,
+    LogIn,
+    ArrowRight,
+    Users,
+    CalendarDays,
+    Clock,
+    Check,
+    LockKeyhole,
+    ChartNoAxesColumn,
+    Brain,
+  } from '@lucide/svelte';
   import {
     CLASSIC_ROLL_VERSION,
     FIXED_FIVE_AUTOPICK_VERSION,
@@ -22,8 +35,8 @@
     saveFixedFiveMembership,
   } from '$lib/fixed-five-identity';
   import { loadRunPreamble } from '$lib/run-preamble';
-  type View = 'choose' | 'create' | 'join';
-  let view = $state<View>('choose');
+  type View = 'create' | 'join';
+  let view = $state<View>('create');
   let mode = $state<FixedFiveRoomMode>('classic-shared-82');
   let sourceMode = $state<FixedFiveSourceMode>('classic');
   let variant = $state<'ratings' | 'ball-knowledge'>('ratings');
@@ -32,6 +45,51 @@
   let error = $state<string | null>(null);
   let preview = $state<string | null>(null);
   let lastRoomId = $state<string | null>(null);
+  const modes = [
+    {
+      id: 'classic-shared-82',
+      name: 'Shared Season',
+      category: 'Season',
+      icon: Swords,
+      image: '/images/multiplayer/shared-season.jpg',
+      description:
+        'Same schedule. Same draft pools. Build your five and go head to head over 82 games.',
+      format: '82 games',
+      draft: 'Classic roll draft',
+    },
+    {
+      id: 'sandbox-shared-82',
+      name: 'Sandbox Season',
+      category: 'Draft',
+      icon: Zap,
+      image: '/images/multiplayer/sandbox-season.jpg',
+      description:
+        'The whole player pool is yours. Snake draft your five; every pick blocks all variants of that player.',
+      format: '82 games',
+      draft: 'Sandbox snake draft',
+    },
+    {
+      id: 'duel',
+      name: 'Duel',
+      category: 'Competitive',
+      icon: Trophy,
+      image: '/images/multiplayer/duel.jpg',
+      description:
+        'A five-player lineup. A best-of-seven series. Take turns drafting and settle it on the court.',
+      format: 'Best of 7',
+      draft: 'Turn draft',
+    },
+  ] as const;
+  let selectedMode = $derived(modes.find((item) => item.id === mode)!);
+  function selectMode(nextMode: FixedFiveRoomMode) {
+    mode = nextMode;
+    view = 'create';
+    error = null;
+  }
+  function switchView(nextView: View) {
+    view = nextView;
+    error = null;
+  }
   function transport() {
     return getFixedFiveTransport();
   }
@@ -88,6 +146,8 @@
   function cleanCode(): void {
     const clean = code.replace(/\D/g, '').slice(0, 4);
     if (clean !== code) code = clean;
+    preview = null;
+    error = null;
   }
   async function doPreview() {
     cleanCode();

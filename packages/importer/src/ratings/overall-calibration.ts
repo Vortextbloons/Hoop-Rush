@@ -23,6 +23,8 @@ import { DEFAULT_RATINGS_MODEL_ARTIFACT } from './artifact.ts';
 import { getEra } from './era.ts';
 import { deriveRatingProfile, defensiveAbilityFor } from './v3.ts';
 import { loadOverallEvidence } from './overall-evidence.ts';
+import { primaryPositionForSource } from '../positions/normalize.ts';
+import { positionOverrideFor } from '../positions/overrides.ts';
 
 const referenceStatsSchema = z.looseObject({
   playerExternalId: z.string().min(1),
@@ -179,7 +181,9 @@ export function calibrateOverallScale(
         tendencies: simulationTendenciesSchema.parse(player.tendencies),
         stats: { ...row, ...evidence.get(player.externalId ?? '') },
         abilityProvenance: player.provenance,
-        position: player.position ?? 'SF',
+        position:
+          positionOverrideFor(player.externalId ?? '')?.primary ??
+          primaryPositionForSource(player.position ?? 'SF'),
         heightInches: player.heightInches ?? null,
         artifact: DEFAULT_RATINGS_MODEL_ARTIFACT,
         eraPace: era.pace,
