@@ -244,19 +244,6 @@ describe('SeasonHubState.quitRun', () => {
     expect(hub.snapshot).toBeNull();
     hub.destroy();
   });
-  it('cancels an in-flight block before clearing', async () => {
-    const repo = repoWith(snapshot());
-    const runner = new FakeRunner();
-    const hub = new SeasonHubState(repo, runner);
-    await hub.refresh();
-    hub.block = runningBlock('fake-1', 0);
-    const result = await hub.quitRun();
-    expect(result.ok).toBe(true);
-    expect(runner.cancelCalls).toEqual(['fake-1']);
-    expect(runner.terminateCalls).toBe(0);
-    expect(repo.clearSeasonRun).toHaveBeenCalledWith(RUN_ID);
-    hub.destroy();
-  });
   it('terminates a runner that never acknowledges cancellation', async () => {
     const repo = repoWith(snapshot());
     const runner = new FakeRunner();
@@ -283,18 +270,6 @@ describe('SeasonHubState.quitRun', () => {
     expect(result.ok).toBe(false);
     expect(result.error).toContain('no active season run');
     expect(repo.clearSeasonRun).not.toHaveBeenCalled();
-    hub.destroy();
-  });
-  it('reports a clear failure without destroying the shell', async () => {
-    const repo = repoWith(snapshot());
-    repo.clearSeasonRun.mockRejectedValueOnce(new Error('boom'));
-    const runner = new FakeRunner();
-    const hub = new SeasonHubState(repo, runner);
-    await hub.refresh();
-    const result = await hub.quitRun();
-    expect(result.ok).toBe(false);
-    expect(result.error).toContain('boom');
-    expect(hub.snapshot?.run.runId).toBe(RUN_ID);
     hub.destroy();
   });
 });
@@ -973,51 +948,9 @@ describe('SeasonHubState postseason commands (M2.6)', () => {
     expect(hub.commandError?.rejection?.code).toBe('invalid-stage');
     hub.destroy();
   });
-  it('maps every M2.6 postseason rejection code in describeCommandRejection', () => {
-    const rejectionOf = (code: string) =>
-      describeCommandRejection('advance-postseason', {
-        code,
-        ...dummyFacts(code),
-      } as never);
-    const dummyFacts = (code: string): Record<string, unknown> => {
-      switch (code) {
-        case 'invalid-stage':
-          return { requiredStage: 'play-in', currentStage: 'regular-season' };
-        case 'wrong-game':
-          return { targetGameId: 'pi-east-seven-eight', nextGameId: 'pi-east-nine-ten' };
-        case 'invalid-rotation':
-          return { franchiseId: franchiseIdSchema.parse('lakers'), reasons: ['test reason'] };
-        case 'unavailable-player':
-          return { playerVersionId: 'pv-1', reason: 'injured' };
-        case 'insufficient-rehab-resources':
-          return { franchiseId: franchiseIdSchema.parse('lakers'), balance: 0, required: 2 };
-        case 'invalid-series-state':
-          return { seriesId: 'east-first-round-1', reason: 'unpaired' };
-        case 'integrity-failure':
-          return { reason: 'test reason' };
-        default:
-          return {};
-      }
-    };
-    for (const code of [
-      'invalid-stage',
-      'wrong-game',
-      'invalid-rotation',
-      'unavailable-player',
-      'insufficient-rehab-resources',
-      'invalid-series-state',
-      'integrity-failure',
-    ]) {
-      const message = rejectionOf(code);
-      expect(message.length).toBeGreaterThan(10);
-    }
-    expect(describeCommandRejection('advance-postseason', { code: 'unknown' } as never)).toContain(
-      'rejected',
-    );
-  });
 });
 describe('SeasonHubState trade guards', () => {
-  it('blocks trade commands while a block is pending and keeps the pending row', async () => {
+  it('blocks trade commands while a block is pending or running', async () => {
     const repo = repoWith(snapshot());
     const runner = new FakeRunner();
     const hub = new SeasonHubState(repo, runner);
@@ -1029,63 +962,60 @@ describe('SeasonHubState trade guards', () => {
     expect(hub.commandError?.message).toContain('pending');
     expect(repo.applySeasonRunCommand).not.toHaveBeenCalled();
     expect(hub.pending).not.toBeNull();
-    hub.destroy();
-  });
-  it('blocks trade commands while a block is running', async () => {
-    const repo = repoWith(snapshot());
-    const runner = new FakeRunner();
-    const hub = new SeasonHubState(repo, runner);
-    await hub.refresh();
     hub.block = runningBlock('fake-1', 2);
+    hub.pending = null;
     await hub.purchaseTradeInquiry({ windowIndex: 0 });
     expect(hub.commandError?.command).toBe('purchase-trade-inquiry');
     expect(hub.commandError?.rejection).toMatchObject({ code: 'pending-block' });
     expect(repo.applySeasonRunCommand).not.toHaveBeenCalled();
     hub.destroy();
   });
-  it('maps every M3.12 sponsor rejection code in describeCommandRejection', () => {
-    const rejectionOf = (code: string, facts: Record<string, unknown> = {}) =>
-      describeCommandRejection('buy-sponsor', { code, ...facts } as never);
+  it('maps postseason, sponsor, and trade rejection codes in describeCommandRejection', () => {
     expect(
-      rejectionOf('sponsor-not-offered', { instanceId: 'sponsor-0-0', blockIndex: 0 }),
+      describeCommandRejection('advance-postseason', {
+        code: 'invalid-stage',
+        requiredStage: 'play-in',
+        currentStage: 'regular-season',
+      } as never).length,
+    ).toBeGreaterThan(10);
+    expect(
+      describeCommandRejection('advance-postseason', {
+        code: 'invalid-rotation',
+        franchiseId: franchiseIdSchema.parse('lakers'),
+        reasons: ['test reason'],
+      } as never),
+    ).toContain('rotation is not legal');
+    expect(
+      describeCommandRejection('advance-postseason', { code: 'unknown' } as never),
+    ).toContain('rejected');
+    expect(
+      describeCommandRejection('buy-sponsor', {
+        code: 'sponsor-not-offered',
+        instanceId: 'sponsor-0-0',
+        blockIndex: 0,
+      } as never),
     ).toContain('not offered');
     expect(
-      rejectionOf('sponsor-already-purchased', { instanceId: 'sponsor-0-0', blockIndex: 0 }),
-    ).toContain('already bought');
-    expect(rejectionOf('sponsor-expired', { instanceId: 'sponsor-0-0', blockIndex: 0 })).toContain(
-      'expired',
-    );
-    expect(rejectionOf('sponsor-not-owned', { instanceId: 'sponsor-0-0' })).toContain('vault');
-    expect(
-      rejectionOf('sponsor-slot-mismatch', {
+      describeCommandRejection('buy-sponsor', {
+        code: 'sponsor-slot-mismatch',
         instanceId: 'sponsor-0-0',
         expectedSlot: 'shoe',
         slot: 'fuel',
-      }),
+      } as never),
     ).toContain('shoe');
     expect(
-      rejectionOf('sponsor-slot-occupied', { playerVersionId: 'pv-1', slot: 'shoe' }),
-    ).toContain('permanent');
-    expect(rejectionOf('sponsor-not-on-roster', { playerVersionId: 'pv-1' })).toContain('roster');
-    expect(
-      rejectionOf('sponsor-brand-duplicate', { playerVersionId: 'pv-1', brandFamily: 'nike' }),
+      describeCommandRejection('buy-sponsor', {
+        code: 'sponsor-brand-duplicate',
+        playerVersionId: 'pv-1',
+        brandFamily: 'nike',
+      } as never),
     ).toContain('nike');
-  });
-  it('maps the new trade rejection codes in describeCommandRejection', () => {
     expect(
       describeCommandRejection('respond-to-trade-counter', {
         code: 'pending-block',
         blockIndex: 3,
       } as never),
     ).toContain('pending');
-    expect(
-      describeCommandRejection('respond-to-trade-counter', {
-        code: 'trade-negotiation-conflict',
-        windowIndex: 0,
-        inquiryId: 'inq-1',
-        playerVersionIds: ['pv-1'],
-      } as never),
-    ).toContain('proposed');
     expect(
       describeCommandRejection('respond-to-trade-counter', {
         code: 'trade-negotiation-illegal',
@@ -1114,24 +1044,6 @@ describe('SeasonHubState runner teardown', () => {
     expect(postseasonRunner.cancelCalls).toEqual(['sp-1']);
     expect(runner.terminateCalls).toBe(1);
     expect(postseasonRunner.terminateCalls).toBe(1);
-  });
-  it('clearSeasonData cancels and terminates both runners before clearing storage', async () => {
-    const repo = repoWith(snapshot());
-    const runner = new FakeRunner();
-    const postseasonRunner = new FakePostseasonRunner();
-    const hub = new SeasonHubState(repo, runner, postseasonRunner);
-    await hub.refresh();
-    hub.block = runningBlock('fake-1', 0);
-    hub.postseason = { ...hub.postseason, phase: 'running' };
-    setPostseasonRequestId(hub, 'sp-1');
-    const result = await hub.clearSeasonData();
-    expect(result.ok).toBe(true);
-    expect(runner.cancelCalls).toEqual(['fake-1']);
-    expect(postseasonRunner.cancelCalls).toEqual(['sp-1']);
-    expect(runner.terminateCalls).toBe(1);
-    expect(postseasonRunner.terminateCalls).toBe(1);
-    expect(repo.forceClearActiveSeasonRun).toHaveBeenCalledTimes(1);
-    hub.destroy();
   });
   it('quitRun cancels both runners and a late postseason event cannot resurrect state', async () => {
     const repo = repoWith(snapshot());

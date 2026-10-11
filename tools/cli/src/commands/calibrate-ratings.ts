@@ -1,6 +1,11 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { createEngineContext, simulateGame, toSimulationPlayer } from '@hoop-rush/engine';
+import {
+  ENGINE_VERSION,
+  createEngineContext,
+  simulateGame,
+  toSimulationPlayer,
+} from '@hoop-rush/engine';
 import type {
   EraSimulationProfile,
   FranchiseEraPool,
@@ -190,11 +195,13 @@ function pairImpact(args: {
   samples: number;
   playerId: string;
   context: string;
-}): PairAccumulator {
+}): PairAccumulator & { netRatingStandardError: number | null } {
   const { candidate, replacement, benchmark, profile, samples, playerId, context } = args;
   const candidateAcc = newAccumulator();
   const replacementAcc = newAccumulator();
   const engineContext = createEngineContext();
+  let pairedNetSum = 0;
+  let pairedNetSquaredSum = 0;
   for (let index = 0; index < samples; index += 1) {
     const seed = seedFor({ playerId, context, index });
     const homeFirst = index % 2 === 0;
@@ -221,6 +228,9 @@ function pairImpact(args: {
     const replacementSide = homeFirst ? 'home' : 'away';
     const candidateMetrics = teamMetric(candidateResult, candidateSide);
     const replacementMetrics = teamMetric(replacementResult, replacementSide);
+    const pairedNet = candidateMetrics.netRating - replacementMetrics.netRating;
+    pairedNetSum += pairedNet;
+    pairedNetSquaredSum += pairedNet * pairedNet;
     candidateAcc.games += 1;
     replacementAcc.games += 1;
     if (candidateResult.winner === candidateSide) candidateAcc.wins += 1;
@@ -239,6 +249,14 @@ function pairImpact(args: {
     replacementAcc.shotQuality += replacementMetrics.shotQuality;
   }
   return {
+    netRatingStandardError:
+      samples > 1
+        ? Math.sqrt(
+            Math.max(0, pairedNetSquaredSum - pairedNetSum ** 2 / samples) /
+              (samples - 1) /
+              samples,
+          )
+        : null,
     games: candidateAcc.games,
     wins: candidateAcc.wins - replacementAcc.wins,
     netRating:
@@ -261,6 +279,8 @@ function pairImpact(args: {
   };
 }
 export const CALIBRATE_RATINGS_OPTIONS: Record<string, boolean> = {
+  player: true,
+  report: true,
   samples: true,
   workers: true,
   output: true,
@@ -269,6 +289,8 @@ export const CALIBRATE_RATINGS_OPTIONS: Record<string, boolean> = {
   verbose: false,
 };
 export function calibrateRatings(args: {
+  player?: string;
+  report?: string;
   samples?: string;
   workers?: string;
   output?: string;
@@ -305,10 +327,21 @@ export function calibrateRatings(args: {
   const playerAdjustments: NonNullable<RatingsModelArtifact['playerAdjustments']> = {};
   let candidateCount = 0;
   let skipped = 0;
+  const filters = args.player?.split(',').map((name) => name.trim().toLocaleLowerCase());
+  const contextImpacts = [];
   for (const pool of pools) {
     const { strong, weak } = poolStrength(pool);
     const average = leagueAverage(pool);
     for (const player of pool.players) {
+      if (
+        filters &&
+        !filters.some(
+          (name) =>
+            player.playerId.toLocaleLowerCase() === name ||
+            player.displayName.toLocaleLowerCase() === name,
+        )
+      )
+        continue;
       const candidate = roleLineup(pool, player.playerId);
       const replacement = replacementLineup(pool, player.playerId);
       if (!candidate || !replacement) {
@@ -344,6 +377,18 @@ export function calibrateRatings(args: {
         rebounds: meanMetric('rebounds'),
         shotQuality: meanMetric('shotQuality'),
       };
+      contextImpacts.push({
+        player: player.displayName,
+        playerId: player.playerId,
+        franchise: pool.franchiseId,
+        era: pool.eraId,
+        season: player.seasonKey,
+        overall: player.summaryRatings.overallRating,
+        candidateLineup: candidate.players.map((member) => member.playerId),
+        replacementLineup: replacement.players.map((member) => member.playerId),
+        contexts: CONTEXTS.map((context, index) => ({ context, ...totals[index] })),
+        metrics,
+      });
       const adjustment = Math.max(
         -6,
         Math.min(
@@ -366,8 +411,36 @@ export function calibrateRatings(args: {
       };
     }
   }
+  if (filters && candidateCount === 0) {
+    return makeReport(
+      'calibrate ratings',
+      { player: args.player },
+      {
+        failures: ['No eligible candidates matched --player'],
+        exitCode: 1,
+      },
+    );
+  }
   const outputArtifact = buildRatingsModelArtifact({ artifact, playerAdjustments, samples });
   writeFileSync(output, `${JSON.stringify(outputArtifact, null, 2)}\n`, 'utf8');
+  if (args.report) {
+    writeFileSync(
+      args.report,
+      `${JSON.stringify(
+        {
+          modelVersion: RATING_MODEL_VERSION,
+          engineVersion: ENGINE_VERSION,
+          dataVersion: packaged.manifest.dataVersion,
+          samples,
+          seedVersion: artifact.seedVersion,
+          contextImpacts,
+        },
+        null,
+        2,
+      )}\n`,
+      'utf8',
+    );
+  }
   return makeReport(
     'calibrate ratings',
     { samples, workers: args.workers ?? '1', output },

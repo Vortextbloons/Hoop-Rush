@@ -1,6 +1,8 @@
 import type { ShotZone, SlotGroup } from '@hoop-rush/data-contracts';
 import type { PositionResponsibilityModifiers } from './position-responsibilities.ts';
 import type { ActionType } from './usage.ts';
+// m3-engine-v24: usage congestion is gap-based instead of rank-ordered; near-peer
+// high-usage lineups split shots instead of crowning an array-order alpha.
 // m3-engine-v23: usage role weights normalize against a fixed league reference
 // instead of lineup-mean usage; role caps raised so multiple high-usage peaks
 // can still separate instead of saturating together.
@@ -14,7 +16,7 @@ import type { ActionType } from './usage.ts';
 // seeded 5-offer shop per block, vault + 3-slot equipment, sponsor boosts
 // applied to ratings inputs (sim, trade valuation, AI kits); formulas unchanged.
 // m3-engine-v19: season parity tune (season-trade-v7, season-free-agency-v3).
-export const ENGINE_VERSION = 'm3-engine-v23';
+export const ENGINE_VERSION = 'm3-engine-v24';
 export const ENGINE_CONSTANTS = {
   version: ENGINE_VERSION,
   zoneBaseMake: {

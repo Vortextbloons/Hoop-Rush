@@ -13,6 +13,7 @@ import { clamp, fileExists, parseJsonLoose, readJson, safeFloat, writeJsonRetry 
 import { chunkList, defaultWorkerCount, runWorker } from '../shared/worker-pool.ts';
 import { join } from 'node:path';
 import { deriveRatingProfile } from './v3.ts';
+import { overallWithBoost } from './overall-boosts.ts';
 import { deriveTraits } from './traits.ts';
 import { deriveContract } from './contracts.ts';
 import { derivePlayerRecord, fieldPublished, positionGroup, type SeasonContext } from './v2.ts';
@@ -21,7 +22,7 @@ import { canonicalPlayerName } from '../identity.ts';
 import { positionOverrideFor } from '../positions/overrides.ts';
 import { primaryPositionForSource } from '../positions/normalize.ts';
 import { loadRatingsModelArtifact } from './artifact.ts';
-import { loadOverallEvidence } from './overall-evidence.ts';
+import { loadOverallEvidence, loadOverallTracking } from './overall-evidence.ts';
 import { loadThreePointReconstructionArtifact } from '../reconstruction/artifact.ts';
 const rosterPlayerSchema = z.looseObject({
   externalId: z.string().nullable().optional(),
@@ -361,11 +362,13 @@ export function computeForSeason(season: string, force = false, overallOnly = fa
     if (!artifact.overallScale) throw new Error('Overall rebuild requires calibrate overall');
     const era = seasonContext(season);
     const overallEvidence = loadOverallEvidence(season, artifact.schemaVersion === 4);
+    const overallTracking = loadOverallTracking(season);
     for (const player of roster) {
       const ratings = simulationRatingsSchema.parse(player.ratings);
       const tendencies = simulationTendenciesSchema.parse(player.tendencies);
       const stats = {
         ...statsById.get(player.externalId ?? ''),
+        ...overallTracking.get(player.externalId ?? ''),
         ...overallEvidence.get(player.externalId ?? ''),
       };
       const derived = deriveRatingProfile({
@@ -382,6 +385,12 @@ export function computeForSeason(season: string, force = false, overallOnly = fa
         eraPace: era.pace,
         eraThreeRate: era.league3PARate,
       });
+      derived.summaryRatings.overallRating = overallWithBoost(
+        player.externalId ? `p-${player.externalId}` : (player.id ?? ''),
+        season,
+        derived.summaryRatings.overallRating,
+      );
+      derived.profile.canonicalOverall = derived.summaryRatings.overallRating;
       player.ratingProfile = ratingProfileSchema.parse(derived.profile);
       player.summaryRatings = derived.summaryRatings;
       player.contract = deriveContract(
@@ -403,6 +412,7 @@ export function computeForSeason(season: string, force = false, overallOnly = fa
   const playerWinPctMap = loadPlayerWinPctMap(season);
   const standingsWinPctMap = loadStandingsMap(out);
   const overallEvidence = loadOverallEvidence(season, artifact.schemaVersion === 4);
+  const overallTracking = loadOverallTracking(season);
   let computed = 0;
   for (const player of roster) {
     const extId = player.externalId ?? '';
@@ -453,7 +463,12 @@ export function computeForSeason(season: string, force = false, overallOnly = fa
     }
     const baseStats: RatingsStatsRow = statsById.get(extId) ?? {};
     const evidence = extId !== '' ? (evidenceById.get(extId) ?? {}) : {};
-    const stats: RatingsStatsRow = { ...baseStats, ...evidence, ...overallEvidence.get(extId) };
+    const stats: RatingsStatsRow = {
+      ...baseStats,
+      ...evidence,
+      ...overallTracking.get(extId),
+      ...overallEvidence.get(extId),
+    };
     const rosterTeamId = typeof player.teamExternalId === 'string' ? player.teamExternalId : null;
     const playerWinPct = extId ? (playerWinPctMap.get(extId) ?? null) : null;
     const standingsWinPct = teamWinPctForPlayer(stats, rosterTeamId, standingsWinPctMap);
@@ -476,6 +491,12 @@ export function computeForSeason(season: string, force = false, overallOnly = fa
     player.ratings = derived.ratings;
     player.tendencies = derived.tendencies;
     player.summaryRatings = derived.summaryRatings;
+    player.summaryRatings.overallRating = overallWithBoost(
+      extId ? `p-${extId}` : (player.id ?? ''),
+      season,
+      player.summaryRatings.overallRating,
+    );
+    derived.ratingProfile.canonicalOverall = player.summaryRatings.overallRating;
     player.anchors = derived.anchors;
     player.reconstructedThreePoint = derived.reconstructedThreePoint;
     player.provenance = derived.provenance;

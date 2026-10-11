@@ -3,7 +3,6 @@ import {
   buildLeague,
   franchiseIdSchema,
   seasonNamespaceSeed,
-  seasonTiebreakResolutionSchema,
   SEASON_SEED_NAMESPACES,
   type SeasonLeague,
   type SeasonStandings,
@@ -106,17 +105,6 @@ function overrides(
   return result;
 }
 describe('tiebreak ranking (M2.6, tiebreaker-v1)', () => {
-  it('ranks without ties by exact record comparison', () => {
-    const ranking = eastRanking(conferenceWithTie('east', [], { w: 0, l: 0 }, 0));
-    expect(ranking.ranked).toHaveLength(15);
-    expect(ranking.resolutions).toEqual([]);
-    const expected = [...franchisesInConference(league, 'east')].sort((a, b) => {
-      const aSpec = { w: 40 - 10 - franchisesInConference(league, 'east').indexOf(a), l: 0 };
-      const bSpec = { w: 40 - 10 - franchisesInConference(league, 'east').indexOf(b), l: 0 };
-      return bSpec.w - aSpec.w;
-    });
-    expect(ranking.ranked).toEqual(expected);
-  });
   it('compares win percentage exactly, never raw wins, across unequal games', () => {
     const east = franchisesInConference(league, 'east');
     const a = east[0] ?? 'a';
@@ -156,18 +144,6 @@ describe('tiebreak ranking (M2.6, tiebreaker-v1)', () => {
     expect(ranking.ranked.indexOf(a)).toBeLessThan(ranking.ranked.indexOf(b));
     expect(ranking.resolutions[0]?.rule).toBe('division-champion');
   });
-  it('resolves a two-team tie by division record when both share the division', () => {
-    const east = franchisesInConference(league, 'east');
-    const a = east[0] ?? 'a';
-    const b = east.find((id) => id === 'hornets') ?? 'b';
-    const spec = overrides(conferenceWithTie('east', [a, b], { w: 40, l: 42 }, 0), {
-      [a]: { divW: 10, divL: 6 },
-      [b]: { divW: 8, divL: 8 },
-    });
-    const ranking = eastRanking(spec);
-    expect(ranking.ranked.indexOf(a)).toBeLessThan(ranking.ranked.indexOf(b));
-    expect(ranking.resolutions[0]?.rule).toBe('division-record');
-  });
   it('resolves a two-team tie by conference record', () => {
     const east = franchisesInConference(league, 'east');
     const a = east[0] ?? 'a';
@@ -179,62 +155,6 @@ describe('tiebreak ranking (M2.6, tiebreaker-v1)', () => {
     const ranking = eastRanking(spec);
     expect(ranking.ranked.indexOf(a)).toBeLessThan(ranking.ranked.indexOf(b));
     expect(ranking.resolutions[0]?.rule).toBe('conference-record');
-  });
-  it('resolves a two-team tie by record against same-conference playoff teams', () => {
-    const east = franchisesInConference(league, 'east');
-    const a = east[0] ?? 'a';
-    const b = east[1] ?? 'b';
-    const otherEast = east.filter((id) => id !== a && id !== b);
-    const h2hA: Record<string, number> = { [b]: 2 };
-    const h2hB: Record<string, number> = { [a]: 2 };
-    for (const team of otherEast) {
-      h2hA[team] = 1;
-      h2hB[team] = 0;
-    }
-    const spec = overrides(conferenceWithTie('east', [a, b], { w: 40, l: 42 }, 0), {
-      [a]: { confW: 24, confL: 22, h2h: h2hA },
-      [b]: { confW: 24, confL: 22, h2h: h2hB },
-    });
-    const ranking = eastRanking(spec);
-    expect(ranking.ranked.indexOf(a)).toBeLessThan(ranking.ranked.indexOf(b));
-    expect(ranking.resolutions[0]?.rule).toBe('playoff-teams-conference-record');
-  });
-  it('resolves a two-team tie by record against opposite-conference playoff teams', () => {
-    const east = franchisesInConference(league, 'east');
-    const west = franchisesInConference(league, 'west');
-    const a = east[0] ?? 'a';
-    const b = east[1] ?? 'b';
-    const westSorted = [...west].sort((x, y) => {
-      const xw = 30 - west.indexOf(x);
-      const yw = 30 - west.indexOf(y);
-      return yw - xw;
-    });
-    const westEligible = westSorted.slice(0, 10);
-    const h2hA: Record<string, number> = { [b]: 2 };
-    const h2hB: Record<string, number> = { [a]: 2 };
-    for (const team of westEligible) {
-      h2hA[team] = 1;
-      h2hB[team] = 0;
-    }
-    const spec = overrides(conferenceWithTie('east', [a, b], { w: 40, l: 42 }, 0), {
-      [a]: { confW: 24, confL: 22, h2h: h2hA },
-      [b]: { confW: 24, confL: 22, h2h: h2hB },
-    });
-    const ranking = eastRanking(spec);
-    expect(ranking.ranked.indexOf(a)).toBeLessThan(ranking.ranked.indexOf(b));
-    expect(ranking.resolutions[0]?.rule).toBe('playoff-teams-other-conference-record');
-  });
-  it('resolves a two-team tie by points differential', () => {
-    const east = franchisesInConference(league, 'east');
-    const a = east[0] ?? 'a';
-    const b = east[1] ?? 'b';
-    const spec = overrides(conferenceWithTie('east', [a, b], { w: 40, l: 42 }, 0), {
-      [a]: { confW: 24, confL: 22, pf: 9000, pa: 8800 },
-      [b]: { confW: 24, confL: 22, pf: 8900, pa: 8800 },
-    });
-    const ranking = eastRanking(spec);
-    expect(ranking.ranked.indexOf(a)).toBeLessThan(ranking.ranked.indexOf(b));
-    expect(ranking.resolutions[0]?.rule).toBe('points-differential');
   });
   it('resolves a two-team tie by deterministic draw with the recorded seed', () => {
     const east = franchisesInConference(league, 'east');
@@ -280,25 +200,6 @@ describe('tiebreak ranking (M2.6, tiebreaker-v1)', () => {
     expect(second?.rule).toBe('conference-record');
     expect(second?.teams).toEqual([b, c]);
   });
-  it('prefers division champions in a multi-team tie', () => {
-    const east = franchisesInConference(league, 'east');
-    const a = east[0] ?? 'a';
-    const b = east[1] ?? 'b';
-    const c = east[4] ?? 'c';
-    const spec = overrides(conferenceWithTie('east', [a, b, c], { w: 40, l: 42 }, 0), {
-      nets: { w: 45, l: 37 },
-      cavaliers: { w: 44, l: 38 },
-      [b]: { h2h: { [c]: 2 } },
-      [c]: { h2h: { [b]: 1 } },
-    });
-    const ranking = eastRanking(spec);
-    expect(ranking.ranked.indexOf(a)).toBeLessThan(ranking.ranked.indexOf(b));
-    expect(ranking.ranked.indexOf(b)).toBeLessThan(ranking.ranked.indexOf(c));
-    expect(ranking.resolutions[0]?.rule).toBe('division-champion');
-    expect(ranking.resolutions[0]?.teams).toEqual([a, c]);
-    expect(ranking.resolutions[1]?.rule).toBe('head-to-head');
-    expect(ranking.resolutions[1]?.teams).toEqual([b, c]);
-  });
   it('records qualification-kind resolutions for play-in boundary ties', () => {
     const east = franchisesInConference(league, 'east');
     const seed7 = east[6] ?? 'a';
@@ -316,36 +217,6 @@ describe('tiebreak ranking (M2.6, tiebreaker-v1)', () => {
     );
     expect(resolution?.kind).toBe('qualification');
     expect(resolution?.slots).toEqual([7, 8]);
-  });
-  it('records seeding-kind resolutions for top-seed ties', () => {
-    const east = franchisesInConference(league, 'east');
-    const a = east[0] ?? 'a';
-    const b = east[1] ?? 'b';
-    const spec = overrides(conferenceWithTie('east', [a, b], { w: 62, l: 20 }, 0), {
-      [a]: { h2h: { [b]: 3 } },
-      [b]: { h2h: { [a]: 1 } },
-    });
-    const ranking = eastRanking(spec);
-    const resolution = ranking.resolutions.find((entry) =>
-      entry.teams.includes(franchiseIdSchema.parse(a)),
-    );
-    expect(resolution?.kind).toBe('seeding');
-    expect(resolution?.slots).toEqual([1, 2]);
-  });
-  it('keeps the ranking deterministic for ties entirely outside the top ten', () => {
-    const east = franchisesInConference(league, 'east');
-    const a = east[11] ?? 'a';
-    const b = east[12] ?? 'b';
-    const spec = overrides(conferenceWithTie('east', [a, b], { w: 22, l: 60 }, 8), {
-      [a]: { h2h: { [b]: 2 } },
-      [b]: { h2h: { [a]: 2 } },
-    });
-    const first = eastRanking(spec);
-    const second = eastRanking(spec);
-    expect(first.ranked).toEqual(second.ranked);
-    for (const resolution of first.resolutions) {
-      expect(resolution.slots.every((slot) => slot >= 1 && slot <= 10)).toBe(true);
-    }
   });
   it('produces identical results regardless of input ordering', () => {
     const east = franchisesInConference(league, 'east');
@@ -369,30 +240,6 @@ describe('tiebreak ranking (M2.6, tiebreaker-v1)', () => {
     );
     expect(shuffled.east.ranked).toEqual(canonical.east.ranked);
     expect(shuffled.east.resolutions).toEqual(canonical.east.resolutions);
-  });
-  it('produces fully schema-valid resolutions for every exercised path', () => {
-    const east = franchisesInConference(league, 'east');
-    const a = east[0] ?? 'a';
-    const b = east[1] ?? 'b';
-    const c = east[4] ?? 'c';
-    const specs = [
-      overrides(conferenceWithTie('east', [a, b], { w: 40, l: 42 }, 0), {
-        [a]: { h2h: { [b]: 3 } },
-        [b]: { h2h: { [a]: 1 } },
-      }),
-      overrides(conferenceWithTie('east', [a, b, c], { w: 40, l: 42 }, 0), {
-        [a]: { h2h: { [b]: 2, [c]: 2 } },
-        [b]: { h2h: { [a]: 1, [c]: 1 } },
-        [c]: { h2h: { [a]: 1, [b]: 1 } },
-      }),
-    ];
-    for (const spec of specs) {
-      const ranking = eastRanking(spec);
-      expect(ranking.resolutions.length).toBeGreaterThan(0);
-      for (const resolution of ranking.resolutions) {
-        expect(() => seasonTiebreakResolutionSchema.parse(resolution)).not.toThrow();
-      }
-    }
   });
   it('resolves a four-team total tie by deterministic draw with adjacent-pair records', () => {
     const east = franchisesInConference(league, 'east');

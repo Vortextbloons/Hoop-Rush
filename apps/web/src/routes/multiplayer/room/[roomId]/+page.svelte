@@ -2,8 +2,19 @@
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
-  import { resolve } from '$app/paths';
-  import { Check, Copy } from '@lucide/svelte';
+  import { asset, resolve } from '$app/paths';
+  import {
+    Check,
+    Copy,
+    ArrowLeft,
+    ArrowRight,
+    Users,
+    Clock,
+    LockKeyhole,
+    Link,
+    LogOut,
+    ShieldCheck,
+  } from '@lucide/svelte';
   import type {
     CommandId,
     ContentHash,
@@ -30,7 +41,6 @@
   import { submitFixedFiveCommand } from '$lib/fixed-five-command-submit';
   import {
     friendlyFixedFiveJoinError,
-    inviteLinkForFixedFiveCode,
     loadFixedFiveMembership,
     saveFixedFiveMembership,
   } from '$lib/fixed-five-identity';
@@ -153,8 +163,7 @@
     verificationError = null;
     saveVerifyGuards();
     if (mounted) {
-      notice =
-        'Server verification receipts are unavailable — completing with result confirmation instead.';
+      notice = 'Checking that both players have the same result.';
     }
   }
   function verifyGuardStorageKey(id: string): string {
@@ -223,7 +232,9 @@
     rollAnimationFor(commands, snapshot?.settings.mode ?? 'classic-shared-82', selfId),
   );
   const phase = $derived(
-    snapshot && replay ? deriveEffectivePhase(snapshot.phase, replay, simDone) : 'lobby',
+    snapshot && replay
+      ? deriveEffectivePhase(snapshot.phase, replay, simDone)
+      : (snapshot?.phase ?? 'lobby'),
   );
   const display = $derived(
     snapshot && replay ? overlaySnapshotProgress(snapshot, replay, facts) : snapshot,
@@ -299,7 +310,7 @@
       ? Date.parse(snapshot.deadline.deadlineAt)
       : anchorMs + timeoutMs;
     const remaining = deadlineMs - Date.now();
-    if (remaining <= 0) return 'Pick clock expired — resolving the deterministic fallback…';
+    if (remaining <= 0) return 'Time is up · choosing an automatic pick…';
     const total = Math.floor(remaining / 1000);
     return `Pick clock: ${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
   });
@@ -329,21 +340,33 @@
   }
   async function copyInviteLink() {
     if (!snapshot?.code) return;
+    error = null;
     try {
       await navigator.clipboard.writeText(
-        `${window.location.origin}${inviteLinkForFixedFiveCode(snapshot.code)}`,
+        new URL(`${resolve('/multiplayer')}?code=${snapshot.code}`, window.location.origin).href,
       );
+      if (!mounted) return;
       copiedInvite = true;
-      setTimeout(() => (copiedInvite = false), 1500);
-    } catch {}
+      setTimeout(() => {
+        if (mounted) copiedInvite = false;
+      }, 1500);
+    } catch {
+      if (mounted) error = 'Could not copy the invite. Share the room code instead.';
+    }
   }
   async function copyRoomCode() {
     if (!snapshot?.code) return;
+    error = null;
     try {
       await navigator.clipboard.writeText(snapshot.code);
+      if (!mounted) return;
       copiedCode = true;
-      setTimeout(() => (copiedCode = false), 1500);
-    } catch {}
+      setTimeout(() => {
+        if (mounted) copiedCode = false;
+      }, 1500);
+    } catch {
+      if (mounted) error = 'Could not copy the code. You can select and copy the digits below.';
+    }
   }
   function brandedRoomId(): Id {
     return idSchema.parse(roomId);
@@ -372,7 +395,7 @@
         }
         saveActivityNow(roomId);
         if (addedCount > 0) {
-          notice = `Synced ${String(addedCount)} command${addedCount === 1 ? '' : 's'} after the last accepted ordinal.`;
+          notice = 'Room is up to date.';
         }
       }
       await fixedFiveRepository.saveActiveSnapshot(snapshot, lastOrdinal + 1).catch(() => {});
@@ -1316,10 +1339,9 @@
   );
   const modeDetailLabel = $derived.by((): string => {
     const current = snapshot;
-    if (!current) return 'Fixed-Five';
-    if (current.settings.mode === 'duel') return 'Fixed-Five · Duel · Best of 7';
-    if (current.settings.mode === 'sandbox-shared-82') return 'Fixed-Five · Sandbox · Shared 82';
-    return 'Fixed-Five · Classic · Shared 82';
+    if (!current) return 'Multiplayer';
+    const format = current.settings.mode === 'duel' ? 'Duel · Best of 7' : 'Season · 82 games';
+    return `${format} · ${current.settings.sourceMode === 'sandbox' ? 'Sandbox' : 'Classic'}`;
   });
   const resultVerified = $derived.by((): boolean => {
     if (!snapshot || !localResult) return false;
@@ -1354,195 +1376,238 @@
       rematchBusy = false;
     }
   }
+
+  const roomName = $derived(snapshot?.settings.mode === 'duel' ? 'Duel' : 'Season');
+  const roomImage = $derived(
+    snapshot?.settings.mode === 'duel'
+      ? '/images/multiplayer/duel.jpg'
+      : snapshot?.settings.mode === 'sandbox-shared-82'
+        ? '/images/multiplayer/sandbox-season.jpg'
+        : '/images/multiplayer/shared-season.jpg',
+  );
+  const stageIndex = $derived(
+    phase === 'lobby' ? 0 : phase === 'drafting' ? 1 : phase === 'completed' ? 3 : 2,
+  );
+  const phaseLabel = $derived(
+    phase === 'lobby'
+      ? 'Lobby'
+      : phase === 'drafting'
+        ? 'Draft'
+        : phase === 'simulating'
+          ? 'Playing'
+          : phase === 'awaiting-confirmation'
+            ? 'Checking results'
+            : phase === 'completed'
+              ? 'Final'
+              : phase === 'expired'
+                ? 'Room expired'
+                : 'Result mismatch',
+  );
+  async function removeGuest(): Promise<void> {
+    if (busyAction !== null || selfId !== 'p1' || phase !== 'lobby') return;
+    busyAction = 'remove';
+    error = null;
+    try {
+      const next = await transport().removeGuest(roomId, 'p2');
+      if (mounted) snapshot = next;
+    } catch (e) {
+      if (mounted) error = friendlyFixedFiveJoinError(e);
+    } finally {
+      if (mounted) busyAction = null;
+    }
+  }
 </script>
 
 <svelte:head>
   <title>Room — Hoop Rush Multiplayer</title>
 </svelte:head>
 
-<section class="mx-auto w-full max-w-6xl px-4 pb-24 sm:px-6 md:pb-10">
-  <a
-    href={resolve('/multiplayer')}
-    class="text-label mt-6 inline-flex items-center gap-1.5 self-start text-muted-foreground hover:text-foreground"
-  >
-    <span aria-hidden="true">←</span> All rooms
-  </a>
-
+<section class="room-page">
+  <div class="room-nav">
+    <a href={resolve('/multiplayer')}><ArrowLeft size={15} aria-hidden="true" /> Multiplayer</a
+    ><ArenaSoundToggle />
+  </div>
   {#if loading}
-    <p class="mt-8 text-sm text-muted-foreground" role="status">Loading room…</p>
+    <div class="room-empty" role="status">
+      <Users size={28} aria-hidden="true" />
+      <h1>Opening your room</h1>
+      <p>Loading players and match settings…</p>
+    </div>
   {:else if error && !snapshot}
-    <p
-      role="alert"
-      class="mt-8 rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm"
-    >
-      {error}
-    </p>
+    <div class="room-empty">
+      <h1>Couldn’t open this room</h1>
+      <p role="alert">{error}</p>
+      <a href={resolve('/multiplayer')} class="room-primary"
+        >Back to multiplayer <ArrowRight size={16} /></a
+      >
+    </div>
   {:else if snapshot && display}
-    <div class="mt-4 flex flex-wrap items-end justify-between gap-3">
+    <header class="room-header">
       <div>
-        <p class="text-label text-primary break-words">
-          {modeDetailLabel} · {phase}
+        <p class="room-eyebrow">Multiplayer · {phaseLabel}</p>
+        <h1>{roomName}</h1>
+        <p class="room-subtitle">
+          {snapshot.settings.sourceMode === 'sandbox'
+            ? 'Sandbox · Snake Draft'
+            : 'Classic · Roll Draft'} · {snapshot.settings.variant === 'ball-knowledge'
+            ? 'Ball Knowledge'
+            : 'Ratings'} · {snapshot.settings.mode === 'duel' ? 'Best of 7' : '82 games'} · Room {snapshot.code ??
+            'closed'}
         </p>
-        <h1 class="font-display mt-2 text-2xl font-extrabold tracking-tight uppercase sm:text-3xl">
-          Room {snapshot.code ?? '····'}
-        </h1>
       </div>
-      <div class="flex items-center gap-2">
-        <ArenaSoundToggle />
-        {#if resultVerified}
-          <p
-            class="inline-flex items-center gap-1.5 rounded-full border border-positive/40 bg-positive/10 px-3 py-1 font-mono text-[11px] font-bold text-positive"
+      {#if resultVerified}<span class="verified-pill"
+          ><ShieldCheck size={15} aria-hidden="true" /> Result verified</span
+        >{/if}
+    </header>
+    {#if phase !== 'expired' && phase !== 'integrity-failed'}
+      <ol class="room-stages" aria-label="Match progress">
+        {#each ['Lobby', 'Draft your five', 'Play', 'Results'] as label, i (label)}
+          <li
+            class:current={i === stageIndex}
+            class:finished={i < stageIndex}
+            aria-current={i === stageIndex ? 'step' : undefined}
           >
-            <span aria-hidden="true" class="inline-block h-1.5 w-1.5 rounded-full bg-current"
-            ></span>
-            Verified locally
-          </p>
-        {/if}
-      </div>
-    </div>
-
-    <div class="mt-4">
-      {#if phase !== 'completed' && phase !== 'awaiting-confirmation' && phase !== 'integrity-failed'}
-        <FixedFiveScoreboard snapshot={display} {selfId} />
-      {/if}
-    </div>
-
-    {#if replay && replay.skipped > 0}
-      <p class="mt-3 text-xs text-amber-600" role="status">
-        {replay.skipped} command{replay.skipped === 1 ? '' : 's'} could not be applied to the draft and
-        {replay.skipped === 1 ? 'was' : 'were'} skipped.
-      </p>
+            <span
+              >{#if i < stageIndex}<Check size={13} aria-hidden="true" />{:else}{i + 1}{/if}</span
+            >{label}
+          </li>
+        {/each}
+      </ol>
     {/if}
-    {#if reconnecting}<p class="mt-3 text-xs text-muted-foreground" role="status">
-        Reconnecting… syncing after wake-up hint.
+    {#if error}<p class="room-alert" role="alert">{error}</p>{/if}
+    {#if reconnecting || syncing}<p class="room-connection" role="status">
+        {reconnecting ? 'Reconnecting to your room…' : 'Updating your room…'}
       </p>{/if}
-    {#if syncing}<p class="mt-1 text-xs text-muted-foreground" role="status">
-        Syncing commands after last accepted ordinal…
-      </p>{/if}
-    {#if notice}<p
-        class="mt-3 rounded-lg border border-line-soft bg-card p-3 text-xs"
+    {#if opponent && !opponent.online && phase !== 'lobby' && phase !== 'completed'}<p
+        class="room-connection"
         role="status"
       >
-        {notice}
+        Your opponent is offline. Their place in the room is kept.
       </p>{/if}
-    {#if error}<p
-        class="mt-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm"
-        role="alert"
+    {#if notice || (replay && replay.skipped > 0)}
+      <details class="room-activity">
+        <summary>Room activity</summary>{#if notice}<p>
+            {notice}
+          </p>{/if}{#if replay && replay.skipped > 0}<p>
+            {replay.skipped} draft update{replay.skipped === 1 ? ' was' : 's were'} skipped because it
+            could not be applied.
+          </p>{/if}
+      </details>
+    {/if}
+    {#if phase !== 'lobby' && phase !== 'completed' && phase !== 'awaiting-confirmation' && phase !== 'integrity-failed' && phase !== 'expired'}<div
+        class="room-players"
       >
-        {error}
-      </p>{/if}
-    {#if opponent && !opponent.online}<p class="mt-3 text-xs text-amber-600" role="status">
-        Opponent offline — presence is display-only and never decides validity.
-      </p>{/if}
+        <FixedFiveScoreboard snapshot={display} {selfId} />
+      </div>{/if}
 
     {#if phase === 'lobby'}
-      <div class="mt-6 rounded-2xl bg-surface-1 p-4 sm:p-6">
-        <h2 class="font-display text-sm font-extrabold uppercase">
-          {selfId === 'p1' ? 'Lobby — start when your opponent joins' : 'Lobby — waiting for host'}
-        </h2>
-        <p class="mt-1 text-xs text-muted-foreground">
-          Variant frozen: {snapshot.settings.variant}. Codes expire after 15 minutes; rooms after 24
-          hours.
-        </p>
-        {#if selfId === 'p1'}
-          {#if snapshot.code}
-            <div class="mt-4 rounded-xl border border-primary/30 bg-primary/5 p-4">
-              <p class="text-label text-primary">Share with your opponent</p>
-              <div class="mt-3 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-                <div class="flex justify-center gap-1.5 sm:justify-start">
-                  {#each snapshot.code.split('') as digit, i (i)}
-                    <span
-                      class="inline-flex h-12 w-10 items-center justify-center rounded-xl border-2 border-primary/40 bg-card font-mono text-2xl font-black sm:h-14 sm:w-12 sm:text-3xl"
-                      >{digit}</span
-                    >
-                  {/each}
-                </div>
-                <div class="grid gap-2 sm:flex sm:flex-wrap">
-                  <button
-                    type="button"
-                    onclick={copyRoomCode}
-                    class="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-line-soft bg-card px-4 py-2.5 text-sm font-semibold sm:w-auto"
-                  >
-                    {#if copiedCode}<Check class="h-4 w-4" /> Copied!{:else}<Copy class="h-4 w-4" /> Copy
-                      code{/if}
-                  </button>
-                  <button
-                    type="button"
-                    onclick={copyInviteLink}
-                    class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground sm:w-auto"
-                  >
-                    {#if copiedInvite}<Check class="h-4 w-4" /> Copied!{:else}Copy invite link{/if}
-                  </button>
-                </div>
+      <div class="lobby-layout">
+        <div class="invite-panel">
+          <div class="lobby-photo">
+            <img src={asset(roomImage)} alt="" width="1536" height="1024" /><span
+              class="photo-caption">{roomName} · Head to head</span
+            >
+          </div>
+          <div class="invite-body">
+            <p class="room-eyebrow">{selfId === 'p1' ? 'Bring your opponent' : 'You’re in'}</p>
+            <h2>{selfId === 'p1' ? 'Your court. Your invite.' : 'The matchup is set.'}</h2>
+            <p>
+              {selfId === 'p1'
+                ? 'Share this code or send an invite link. The draft begins when you start it.'
+                : 'Stay in this room. The draft opens for both players when the host starts.'}
+            </p>
+            {#if snapshot.code}
+              <div class="invite-code" aria-label={`Room code ${snapshot.code}`}>
+                {snapshot.code}
               </div>
+              <div class="invite-actions">
+                <button type="button" onclick={copyRoomCode} class="room-secondary"
+                  >{#if copiedCode}<Check size={16} /> Copied{:else}<Copy size={16} /> Copy code{/if}</button
+                ><button type="button" onclick={copyInviteLink} class="room-primary"
+                  >{#if copiedInvite}<Check size={16} /> Copied{:else}<Link size={16} /> Copy invite link{/if}</button
+                >
+              </div>
+              <p class="invite-footnote">Room codes expire after 15 minutes.</p>
+            {/if}
+          </div>
+        </div>
+        <div class="lobby-settings">
+          <div class="lobby-panel-heading">
+            <h2>Your matchup</h2>
+            <span><Users size={14} aria-hidden="true" /> {display.members.length}/2</span>
+          </div>
+          <FixedFiveScoreboard snapshot={display} {selfId} />
+          <dl class="lobby-rules">
+            <div>
+              <dt>Draft source</dt>
+              <dd>{snapshot.settings.sourceMode === 'sandbox' ? 'Sandbox' : 'Classic'}</dd>
             </div>
-          {/if}
-          {#if opponent?.online}
-            <p class="mt-4 text-sm font-semibold text-positive" role="status">
-              Opponent joined — start the draft for both players.
+            <div>
+              <dt>Player ratings</dt>
+              <dd>{snapshot.settings.variant === 'ball-knowledge' ? 'Hidden' : 'Visible'}</dd>
+            </div>
+            <div>
+              <dt><Clock size={14} aria-hidden="true" /> Pick timer</dt>
+              <dd>{snapshot.settings.mode === 'sandbox-shared-82' ? '5 minutes' : '90 seconds'}</dd>
+            </div>
+            <div>
+              <dt><LockKeyhole size={14} aria-hidden="true" /> Room access</dt>
+              <dd>Invite only</dd>
+            </div>
+          </dl>
+          {#if assetsError}<p class="room-alert" role="alert">
+              The player pool could not be loaded. Reload the room to try again.
             </p>
-          {:else}
-            <p class="mt-4 text-sm text-muted-foreground" role="status">
-              Waiting for opponent to join… Share the code above. Start unlocks once they join.
+            <button type="button" class="room-secondary" onclick={() => window.location.reload()}
+              >Reload room</button
+            >{/if}
+          <div class="lobby-ready" role="status">
+            <span class:joined={opponent?.online}></span>
+            <p>
+              {selfId === 'p1'
+                ? opponent?.online
+                  ? 'Your opponent is here. Ready when you are.'
+                  : 'Waiting for your opponent to join.'
+                : 'Waiting for the host to start the draft.'}
             </p>
-          {/if}
-          <div class="mt-4 grid gap-2 sm:flex sm:flex-wrap">
-            <button
+          </div>
+          {#if selfId === 'p1'}<button
               type="button"
               onclick={startDraft}
-              disabled={busyAction !== null || !opponent?.online}
-              title={!opponent?.online
-                ? 'Waiting for opponent to join'
-                : 'Start the draft for both'}
-              class="rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-40 sm:py-2"
-              >{busyAction === 'start' ? 'Starting…' : 'Start'}</button
-            >
-            <button
-              type="button"
-              onclick={() =>
-                transport()
-                  .removeGuest(roomId, 'p2')
-                  .then((s) => (snapshot = s))}
-              class="rounded-xl border border-line-soft bg-card px-4 py-2.5 text-sm font-semibold sm:py-2"
-              >Remove guest (pre-draft)</button
-            >
-            <button
-              type="button"
-              onclick={doLeave}
-              disabled={leaveBusy}
-              class="rounded-xl border border-line-soft bg-card px-4 py-2.5 text-sm font-semibold disabled:opacity-40 sm:py-2"
-              >Leave</button
+              disabled={busyAction !== null || !opponent?.online || !assets}
+              class="room-primary start-draft"
+              >{busyAction === 'start'
+                ? 'Starting draft…'
+                : !assets && !assetsError
+                  ? 'Loading players…'
+                  : 'Start draft'}<ArrowRight size={18} aria-hidden="true" /></button
+            >{/if}
+          <div class="lobby-manage">
+            {#if selfId === 'p1' && opponent}<button
+                type="button"
+                onclick={removeGuest}
+                disabled={busyAction !== null}
+                >{busyAction === 'remove' ? 'Removing…' : 'Remove opponent'}</button
+              >{/if}<button type="button" onclick={doLeave} disabled={leaveBusy}
+              ><LogOut size={14} aria-hidden="true" />{leaveBusy
+                ? 'Leaving…'
+                : 'Leave room'}</button
             >
           </div>
-        {:else}
-          <div class="mt-4 rounded-xl border border-line-soft bg-card p-4" role="status">
-            <p class="text-sm font-semibold">Joined ✓ Waiting for the host to start the draft…</p>
-            <p class="mt-1 text-xs text-muted-foreground">
-              No action needed — the draft opens here automatically once the host starts it.
-            </p>
-          </div>
-          <div class="mt-4 grid gap-2 sm:flex sm:flex-wrap">
-            <button
-              type="button"
-              onclick={doLeave}
-              disabled={leaveBusy}
-              class="rounded-xl border border-line-soft bg-card px-4 py-2.5 text-sm font-semibold disabled:opacity-40 sm:py-2"
-              >Leave</button
-            >
-          </div>
-        {/if}
+        </div>
+      </div>
+    {:else if phase === 'drafting' && (!replay || !assets)}
+      <div class="room-empty">
+        <h2>Preparing your draft</h2>
+        <p role="status">{assetsError ?? 'Loading your player pool and lineup…'}</p>
+        {#if assetsError}<button
+            type="button"
+            class="room-secondary"
+            onclick={() => window.location.reload()}>Reload room</button
+          >{/if}
       </div>
     {:else if phase === 'drafting' && replay && assets}
-      <div class="mt-4 min-w-0 overflow-x-clip rounded-2xl bg-surface-1 p-3 sm:mt-6 sm:p-6">
-        <h2 class="font-display text-sm font-extrabold break-words uppercase">
-          Drafting — {snapshot.settings.mode === 'duel'
-            ? snapshot.settings.sourceMode === 'sandbox'
-              ? 'snake duel draft'
-              : 'alternating duel draft'
-            : snapshot.settings.mode === 'sandbox-shared-82'
-              ? 'snake sandbox draft'
-              : 'simultaneous roll draft'}
-        </h2>
+      <div class="draft-room">
         {#if assetsError}
           <p class="mt-2 text-xs text-destructive" role="alert">{assetsError}</p>
         {:else}
@@ -1606,15 +1671,7 @@
         {/if}
       </div>
     {:else if phase === 'awaiting-confirmation'}
-      {@const youShort =
-        localResult != null
-          ? `${localResult.digest.slice(0, 6)}…${localResult.digest.slice(-4)}`
-          : null}
       {@const rivalProposal = facts.proposals.find((p) => p.actor !== selfId) ?? null}
-      {@const rivalShort =
-        rivalProposal != null
-          ? `${rivalProposal.digest.slice(0, 6)}…${rivalProposal.digest.slice(-4)}`
-          : null}
       {@const digestsMatch =
         localResult != null && rivalProposal != null
           ? rivalProposal.digest === localResult.digest
@@ -1631,36 +1688,30 @@
         <div class="verify-banner" role="status">
           <span class="verify-orb" aria-hidden="true"></span>
           <div class="min-w-0 flex-1">
-            <h2 class="font-display text-sm font-extrabold uppercase">
-              Deterministic verification — no tap needed
-            </h2>
+            <h2 class="font-display text-sm font-extrabold uppercase">Checking the final result</h2>
             <p class="mt-1 text-xs text-muted-foreground">
               {#if !localResult}
-                Recomputing the shared result from the accepted command log…
+                Rebuilding your match result…
               {:else if receiptsUnsupported && rivalProposal == null}
-                You proposed {youShort} — waiting for your rival's result…
+                Your result is ready. Waiting for your opponent…
               {:else if receiptsUnsupported && !digestsMatch}
-                Results differ — you {youShort} vs rival {rivalShort}. Re-running from the shared
-                log…
+                The results differ. Replaying the match to check them…
               {:else if receiptsUnsupported}
-                Both sides agree ({youShort}). Locking the room…
+                Both players have the same result. Finishing your match…
               {:else if verificationError}
-                Local verification failed: {verificationError}. This result cannot receive a
-                receipt, so the room cannot complete from this device.
+                The result could not be verified: {verificationError}
               {:else if rivalProposal == null}
-                Result {youShort} ready — proposing to the room…
+                Your result is ready. Sharing it with your opponent…
               {:else if !digestsMatch}
-                Results differ — you {youShort} vs rival {rivalShort}. Re-running from the shared
-                log…
+                The results differ. Replaying the match to check them…
               {:else if !foreignConfirmed}
-                Waiting for your rival's verified confirmation of {youShort}…
+                Waiting for your opponent to confirm the result…
               {:else if !verificationReceipt}
-                Both seats confirmed {youShort} — replaying every game from the accepted command log to
-                produce a verification receipt…
+                Both players agree. Checking the replay…
               {:else if submittedReceipt !== verificationReceipt.receiptDigest}
-                Replay verified against the accepted command log — storing receipt {receiptShort}…
+                Replay checked. Saving verification…
               {:else}
-                Receipt {receiptShort} stored — locking the room…
+                Result verified. Finishing your match…
               {/if}
             </p>
             {#if verificationError}
@@ -1698,15 +1749,10 @@
                 disabled={busyAction !== null}
                 class="mt-2 rounded-lg border border-primary/50 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary disabled:opacity-40"
               >
-                {busyAction === 'complete' ? 'Locking…' : 'Try locking again'}
+                {busyAction === 'complete' ? 'Finishing…' : 'Retry finishing match'}
               </button>
             {/if}
           </div>
-          <span
-            class="verify-count"
-            title={`Receipt ${submittedReceipt ?? 'pending'} · proposals ${facts.proposals.length} · confirmations ${facts.confirms.length}`}
-            >{facts.proposals.length}/{facts.confirms.length}</span
-          >
         </div>
         {#if localResult && snapshot && assets}
           <FixedFiveResults
@@ -1729,12 +1775,15 @@
             receiptDigest={verificationReceipt?.receiptDigest ?? null}
           />
         {/if}
-        <p class="mt-2 text-xs text-muted-foreground">
-          Receipt {receiptShort ?? 'pending'} · proposals {facts.proposals.length} · confirmations
-          {facts.confirms.length}{reranMismatch ? ' · mismatch rerun done' : ''}. Both clients
-          replay every game from the accepted command log and store a verification receipt; the room
-          locks only after the matching confirmations.
-        </p>
+        <details class="room-activity">
+          <summary>Verification details</summary>
+          <p>
+            Receipt {receiptShort ?? 'pending'} · proposals {facts.proposals.length} · confirmations
+            {facts.confirms.length}{reranMismatch ? ' · mismatch rerun done' : ''}. Both clients
+            replay every game from the accepted command log and store a verification receipt; the
+            room locks only after the matching confirmations.
+          </p>
+        </details>
       </div>
     {:else if phase === 'completed' && localResult}
       <div class="mt-6 flex flex-col gap-4">
@@ -1758,15 +1807,21 @@
             modeDetail={modeDetailLabel}
             receiptDigest={verificationReceipt?.receiptDigest ?? null}
             onRematch={doRematchAction}
-            onNewRoom={doRematch}
+            rematchWaiting={facts.rematchRequested[selfId] &&
+              !facts.rematchRequested[selfId === 'p1' ? 'p2' : 'p1']}
+            rematchLabel={canRematch
+              ? 'Start rematch'
+              : facts.rematchRequested[selfId === 'p1' ? 'p2' : 'p1']
+                ? 'Accept rematch'
+                : facts.rematchRequested[selfId]
+                  ? 'Waiting for opponent'
+                  : 'Rematch'}
             {rematchBusy}
-            canNewRoom={canRematch}
           />
         {/if}
         {#if !canRematch}
           <p class="text-xs text-muted-foreground">
-            Rematch needs both players to hit rematch in this completed room; it never overwrites
-            this run.
+            Both players need to agree to a rematch. This result stays saved.
           </p>
         {/if}
       </div>
@@ -1781,88 +1836,448 @@
     {:else if phase === 'integrity-failed'}
       <div class="mt-6 rounded-2xl border border-destructive/40 bg-destructive/10 p-6" role="alert">
         <h2 class="font-display text-sm font-extrabold uppercase">
-          Integrity failure — mismatch rerun failed
+          The results could not be verified
         </h2>
         <p class="mt-1 text-xs">
-          Both clients reran once from the accepted log and still disagreed. Neither result is
+          The match was replayed, but the two results still differ. Neither result has been
           accepted.
         </p>
       </div>
     {:else if phase === 'expired'}
       <div class="mt-6 rounded-2xl bg-surface-1 p-6">
-        <h2 class="font-display text-sm font-extrabold uppercase">Expired</h2>
+        <h2 class="font-display text-2xl font-extrabold uppercase">Room expired</h2>
         <p class="mt-1 text-xs text-muted-foreground">
-          Local saves are kept. Start a fresh room from the hub.
+          Your local saves are kept. Create a new room to play again.
         </p>
+        <a class="room-primary mt-4" href={resolve('/multiplayer')}
+          >Choose a match <ArrowRight size={16} /></a
+        >
       </div>
     {/if}
 
-    <div class="mt-6 flex gap-2">
-      <button
-        type="button"
-        onclick={doLeave}
-        disabled={leaveBusy}
-        class="rounded-xl border border-line-soft bg-card px-4 py-2 text-sm font-semibold disabled:opacity-40"
-        >Leave room</button
-      >
-    </div>
+    {#if phase !== 'lobby'}<div class="room-footer">
+        <button
+          type="button"
+          onclick={doLeave}
+          disabled={leaveBusy}
+          class="rounded-xl border border-line-soft bg-card px-4 py-2 text-sm font-semibold disabled:opacity-40"
+          >{leaveBusy ? 'Leaving…' : 'Leave room'}</button
+        >
+      </div>{/if}
   {/if}
 </section>
 
 <style>
+  .room-page {
+    width: 100%;
+    max-width: 1400px;
+    margin: auto;
+    padding: 24px 32px 80px;
+  }
+  .room-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 30px;
+  }
+  .room-nav a {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--color-muted-foreground);
+    font-size: 12px;
+  }
+  .room-nav a:hover {
+    color: var(--color-foreground);
+  }
+  .room-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .room-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--color-primary);
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .room-header h1,
+  .room-empty h1 {
+    margin-top: 6px;
+    font-family: var(--font-display);
+    font-size: clamp(38px, 4vw, 58px);
+    font-weight: 800;
+    line-height: 1;
+    text-transform: uppercase;
+  }
+  .room-subtitle {
+    color: var(--color-muted-foreground);
+    font-size: 12px;
+    margin-top: 12px;
+  }
+  .verified-pill {
+    display: flex;
+    gap: 7px;
+    align-items: center;
+    color: var(--color-positive);
+    font-size: 11px;
+  }
+  .room-stages {
+    display: flex;
+    margin: 28px 0;
+    padding: 17px 0;
+    border-top: 1px solid var(--color-line-soft);
+    border-bottom: 1px solid var(--color-line-soft);
+    gap: 32px;
+  }
+  .room-stages li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--color-muted-foreground);
+    font-size: 12px;
+  }
+  .room-stages li > span {
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border: 1px solid var(--color-line-strong);
+    border-radius: 50%;
+    font-family: var(--font-mono);
+    font-size: 10px;
+  }
+  .room-stages .current {
+    color: var(--color-foreground);
+    font-weight: 600;
+  }
+  .room-stages .current > span {
+    color: var(--color-primary-foreground);
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+  }
+  .room-stages .finished > span {
+    color: var(--color-positive);
+    border-color: var(--color-positive);
+  }
+  .room-alert {
+    margin: 16px 0;
+    padding: 14px;
+    border: 1px solid var(--color-destructive);
+    background: color-mix(in srgb, var(--color-destructive) 8%, var(--color-card));
+    border-radius: 8px;
+    font-size: 13px;
+    line-height: 1.7;
+  }
+  .room-connection {
+    color: var(--color-muted-foreground);
+    font-size: 12px;
+    margin: 14px 0;
+  }
+  .room-activity {
+    color: var(--color-muted-foreground);
+    font-size: 11px;
+    line-height: 1.7;
+    margin: 16px 0;
+  }
+  .room-activity summary {
+    cursor: pointer;
+    width: fit-content;
+  }
+  .room-activity p {
+    margin-top: 8px;
+  }
+  .room-players {
+    margin-bottom: 24px;
+  }
+  .lobby-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(340px, 0.8fr);
+    gap: 24px;
+    align-items: start;
+  }
+  .invite-panel,
+  .lobby-settings {
+    overflow: hidden;
+    border: 1px solid var(--color-line-soft);
+    border-radius: 12px;
+    background: var(--color-card);
+  }
+  .lobby-photo {
+    position: relative;
+    height: 205px;
+    color: #f5f3ef;
+  }
+  .lobby-photo::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, transparent 30%, rgb(8 12 17 / 85%));
+  }
+  .lobby-photo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 50% 30%;
+  }
+  .photo-caption {
+    position: absolute;
+    z-index: 1;
+    bottom: 20px;
+    left: 28px;
+    font-family: var(--font-display);
+    font-size: 15px;
+    text-transform: uppercase;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+  }
+  .invite-body {
+    padding: 28px;
+  }
+  .invite-body h2 {
+    font-family: var(--font-display);
+    font-size: 34px;
+    line-height: 1.1;
+    font-weight: 800;
+    margin: 7px 0 10px;
+  }
+  .invite-body > p:not(.room-eyebrow) {
+    color: var(--color-muted-foreground);
+    font-size: 12px;
+    line-height: 1.7;
+    max-width: 420px;
+  }
+  .invite-code {
+    font-family: var(--font-mono);
+    font-size: clamp(40px, 5vw, 62px);
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    line-height: 1;
+    padding: 28px 0;
+    user-select: all;
+  }
+  .invite-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .room-primary,
+  .room-secondary {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 18px;
+    border-radius: 7px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .room-primary {
+    background: var(--color-primary);
+    color: var(--color-primary-foreground);
+  }
+  .room-secondary {
+    border: 1px solid var(--color-line-strong);
+    background: var(--color-surface-2);
+  }
+  .invite-body .invite-footnote {
+    margin-top: 16px;
+    font-size: 10px;
+  }
+  .lobby-settings {
+    border-top: 2px solid var(--color-primary);
+    padding: 24px;
+  }
+  .lobby-panel-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  .lobby-panel-heading h2 {
+    font-family: var(--font-display);
+    font-size: 24px;
+    font-weight: 700;
+  }
+  .lobby-panel-heading > span {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    font-size: 11px;
+    color: var(--color-muted-foreground);
+  }
+  .lobby-settings :global(.player-seats) {
+    grid-template-columns: 1fr;
+  }
+  .lobby-rules {
+    margin: 24px 0;
+    padding: 20px 0;
+    border-block: 1px solid var(--color-line-soft);
+  }
+  .lobby-rules > div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 12px;
+    margin-bottom: 13px;
+  }
+  .lobby-rules > div:last-child {
+    margin: 0;
+  }
+  .lobby-rules dt {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--color-muted-foreground);
+  }
+  .lobby-rules dd {
+    font-weight: 600;
+  }
+  .lobby-ready {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    color: var(--color-muted-foreground);
+    font-size: 12px;
+    line-height: 1.6;
+    margin-bottom: 16px;
+  }
+  .lobby-ready > span {
+    height: 6px;
+    width: 6px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--color-muted-foreground);
+  }
+  .lobby-ready > span.joined {
+    background: var(--color-positive);
+  }
+  .start-draft {
+    width: 100%;
+    padding: 14px;
+  }
+  .lobby-manage {
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+    margin-top: 22px;
+  }
+  .lobby-manage button {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--color-muted-foreground);
+    font-size: 11px;
+  }
+  .lobby-manage button:hover {
+    color: var(--color-foreground);
+  }
+  .draft-room {
+    min-width: 0;
+  }
+  .room-footer {
+    border-top: 1px solid var(--color-line-soft);
+    margin-top: 30px;
+    padding-top: 20px;
+  }
+  .room-empty {
+    display: flex;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 18px;
+    padding: 60px 0;
+  }
+  .room-empty h2 {
+    font-family: var(--font-display);
+    font-size: 32px;
+    font-weight: 800;
+  }
+  .room-empty p {
+    font-size: 13px;
+    color: var(--color-muted-foreground);
+  }
+  button {
+    cursor: pointer;
+  }
+  button:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+  button:focus-visible,
+  a:focus-visible,
+  summary:focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 4px;
+  }
+  @media (max-width: 850px) {
+    .lobby-layout {
+      grid-template-columns: 1fr;
+    }
+    .room-page {
+      padding: 24px 20px 88px;
+    }
+    .lobby-photo {
+      height: 180px;
+    }
+  }
+  @media (max-width: 520px) {
+    .room-stages {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .room-stages li {
+      flex-direction: column;
+      text-align: center;
+      gap: 6px;
+      font-size: 10px;
+    }
+    .room-stages li > span {
+      width: 18px;
+      height: 18px;
+    }
+    .room-header {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+    .invite-body,
+    .lobby-settings {
+      padding: 20px;
+    }
+    .invite-actions > button {
+      flex: 1;
+      padding-inline: 10px;
+    }
+  }
+
   .verify-banner {
     display: flex;
     align-items: center;
-    gap: 0.8rem;
-    border-radius: 1rem;
-    border: 1px solid color-mix(in srgb, var(--color-primary) 45%, transparent);
-    background:
-      radial-gradient(
-        60% 120% at 0% 0%,
-        color-mix(in srgb, var(--color-primary) 16%, transparent),
-        transparent 70%
-      ),
-      var(--color-surface-1);
-    padding: 0.9rem 1rem;
-    animation: verify-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+    gap: 14px;
+    border: 1px solid var(--color-line-soft);
+    border-radius: 10px;
+    padding: 20px;
+    background: var(--color-card);
   }
   .verify-orb {
-    width: 1rem;
-    height: 1rem;
-    border-radius: 999px;
+    width: 18px;
+    height: 18px;
     flex-shrink: 0;
-    background: conic-gradient(var(--color-primary), var(--color-accent), var(--color-primary));
-    animation: orb-spin 1s linear infinite;
-    box-shadow: 0 0 16px color-mix(in srgb, var(--color-primary) 60%, transparent);
+    border: 2px solid var(--color-line-strong);
+    border-top-color: var(--color-primary);
+    border-radius: 50%;
+    animation: verify-spin 1s linear infinite;
   }
-  .verify-count {
-    margin-left: auto;
-    font-family: var(--font-mono);
-    font-size: 11px;
-    font-weight: 800;
-    color: var(--color-primary);
-    border: 1px solid color-mix(in srgb, var(--color-primary) 50%, transparent);
-    border-radius: 999px;
-    padding: 0.25rem 0.6rem;
-    flex-shrink: 0;
-  }
-  @keyframes verify-in {
-    from {
-      opacity: 0;
-      transform: translateY(8px) scale(0.98);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0) scale(1);
-    }
-  }
-  @keyframes orb-spin {
+  @keyframes verify-spin {
     to {
       transform: rotate(360deg);
     }
   }
   @media (prefers-reduced-motion: reduce) {
-    .verify-banner,
     .verify-orb {
       animation: none;
     }

@@ -1,4 +1,5 @@
 import { readdirSync } from 'node:fs';
+import { overallWithBoost } from '../ratings/overall-boosts.ts';
 import { basename, join } from 'node:path';
 import { z } from 'zod';
 import { hoopRushManifestSchema, parsePool } from '@hoop-rush/data-contracts';
@@ -741,12 +742,16 @@ export function normalizePoolOveralls(
       scale && profile && (profile.schemaVersion ?? 0) >= 3 && hasRawOverallScore(row)
         ? overallForScore(profile.rawOverallScore as number, scale)
         : null;
-    row.summaryRatings.overallRating = minutesFloorOverall(
-      mapped?.overall ?? profile?.canonicalOverall ?? row.summaryRatings.overallRating,
-      minutesOf(row),
+    row.summaryRatings.overallRating = overallWithBoost(
+      row.playerId,
+      row.seasonKey,
+      minutesFloorOverall(
+        mapped?.overall ?? profile?.canonicalOverall ?? row.summaryRatings.overallRating,
+        minutesOf(row),
+      ),
     );
     if (mapped && profile && scale) {
-      profile.canonicalOverall = mapped.overall;
+      profile.canonicalOverall = row.summaryRatings.overallRating;
       profile.overallPercentile = mapped.percentile;
       profile.overallCohortVersion = scale.version;
     }

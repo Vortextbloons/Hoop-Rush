@@ -22,7 +22,7 @@ import { fileExists, readJson, writeJsonRetry } from '../json.ts';
 import { DEFAULT_RATINGS_MODEL_ARTIFACT } from './artifact.ts';
 import { getEra } from './era.ts';
 import { deriveRatingProfile, defensiveAbilityFor } from './v3.ts';
-import { loadOverallEvidence } from './overall-evidence.ts';
+import { loadOverallEvidence, loadOverallTracking } from './overall-evidence.ts';
 import { primaryPositionForSource } from '../positions/normalize.ts';
 import { positionOverrideFor } from '../positions/overrides.ts';
 
@@ -172,6 +172,7 @@ export function calibrateOverallScale(
     const roster = z.array(referenceRosterSchema).parse(readJson(join(directory, 'roster.json')));
     const era = getEra(season);
     const evidence = loadOverallEvidence(season, true);
+    const tracking = loadOverallTracking(season);
     for (const player of roster) {
       const row = byId.get(player.externalId ?? '');
       if (!row || row.gamesPlayed < 50 || row.minutes < 1500) continue;
@@ -179,7 +180,11 @@ export function calibrateOverallScale(
       const input: Parameters<typeof deriveRatingProfile>[0] = {
         ratings: simulationRatingsSchema.parse(player.ratings),
         tendencies: simulationTendenciesSchema.parse(player.tendencies),
-        stats: { ...row, ...evidence.get(player.externalId ?? '') },
+        stats: {
+          ...row,
+          ...tracking.get(player.externalId ?? ''),
+          ...evidence.get(player.externalId ?? ''),
+        },
         abilityProvenance: player.provenance,
         position:
           positionOverrideFor(player.externalId ?? '')?.primary ??
@@ -198,7 +203,10 @@ export function calibrateOverallScale(
       return {
         key,
         score: profile.rawOverallScore,
-        defense: defensiveAbilityFor(input.ratings, input.position),
+        defense:
+          profile.overallDiagnostics?.schemaVersion === 2
+            ? profile.overallDiagnostics.defensiveValue
+            : defensiveAbilityFor(input.ratings, input.position),
         honors: z.array(individualHonorSchema).parse(input.stats.honors ?? []),
       };
     }),

@@ -47,18 +47,22 @@ export function isFloorCandidate(candidate: SeasonDraftCandidate): boolean {
   return overallOf(candidate) <= SEASON_DRAFT_SCRIPT_FLOOR_MAX_OVERALL;
 }
 
-export function starTierWeight(overall: number): number {
-  for (const tier of DRAFT_SCRIPT_STAR_TIER_WEIGHTS) {
+function tierWeightFor(
+  overall: number,
+  tiers: ReadonlyArray<{ min: number; max: number; weight: number }>,
+): number {
+  for (const tier of tiers) {
     if (overall >= tier.min && overall <= tier.max) return tier.weight;
   }
   return 0;
 }
 
+export function starTierWeight(overall: number): number {
+  return tierWeightFor(overall, DRAFT_SCRIPT_STAR_TIER_WEIGHTS);
+}
+
 export function floorTierWeight(overall: number): number {
-  for (const tier of DRAFT_SCRIPT_FLOOR_TIER_WEIGHTS) {
-    if (overall >= tier.min && overall <= tier.max) return tier.weight;
-  }
-  return 0;
+  return tierWeightFor(overall, DRAFT_SCRIPT_FLOOR_TIER_WEIGHTS);
 }
 
 export function scriptedRoundsFor(rootSeed: string): { stars: Set<number>; floors: Set<number> } {
@@ -83,22 +87,28 @@ export function scriptKindFor(rootSeed: string, draftRound: number): DraftScript
   return null;
 }
 
+function chooseTieredCandidate(
+  eligible: readonly SeasonDraftCandidate[],
+  seed: string,
+  weightFor: (overall: number) => number,
+): SeasonDraftCandidate {
+  const rng = createRng(seed);
+  return rng.weightedPick(
+    eligible,
+    eligible.map((candidate) => weightFor(overallOf(candidate))),
+  );
+}
+
 export function chooseStarCandidate(
   eligible: readonly SeasonDraftCandidate[],
   seed: string,
 ): SeasonDraftCandidate {
-  const rng = createRng(seed);
-  const weights = eligible.map((candidate) => starTierWeight(overallOf(candidate)));
-  return rng.weightedPick(eligible, weights);
+  return chooseTieredCandidate(eligible, seed, starTierWeight);
 }
 
 export function chooseFloorCandidate(
   eligible: readonly SeasonDraftCandidate[],
   seed: string,
 ): SeasonDraftCandidate {
-  const rng = createRng(seed);
-  return rng.weightedPick(
-    eligible,
-    eligible.map((candidate) => floorTierWeight(overallOf(candidate))),
-  );
+  return chooseTieredCandidate(eligible, seed, floorTierWeight);
 }

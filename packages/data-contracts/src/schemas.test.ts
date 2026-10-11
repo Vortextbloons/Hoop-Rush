@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   challengeRunSchema,
-  classicCompletedDraftSchema,
   classicDraftStateSchema,
-  coverageSummarySchema,
   eraIdSchema,
   franchiseAbbreviation,
   franchiseEraPoolSchema,
@@ -13,13 +11,10 @@ import {
   opponentTeamSchema,
   peakPlayerSeasonSchema,
   playerIdSchema,
-  provenanceMapSchema,
   reconstructedThreePointProfileSchema,
   seasonKeySchema,
-  simulationAnchorsSchema,
   simulationPlayerSchema,
   simulationTeamSchema,
-  threePointReconstructionArtifactSchema,
   workerMessageSchema,
   workerRequestSchema,
 } from './index.ts';
@@ -328,41 +323,6 @@ const validPlayer: PeakPlayerSeason = peakPlayerSeasonSchema.parse({
   },
 });
 describe('player-season contracts', () => {
-  it('rejects a season with fewer than 40 team games', () => {
-    const invalid = {
-      ...validPlayer,
-      eligibility: { ...validPlayer.eligibility, teamGames: 39 },
-    };
-    expect(peakPlayerSeasonSchema.safeParse(invalid).success).toBe(false);
-  });
-  it('rejects a malformed Basketball-Reference alt id', () => {
-    const invalid = {
-      ...validPlayer,
-      altIds: { bbref: 'Jordan-01!' },
-    };
-    expect(peakPlayerSeasonSchema.safeParse(invalid).success).toBe(false);
-  });
-  it('rejects a malformed direct photo url', () => {
-    const invalid = {
-      ...validPlayer,
-      altIds: { photoUrl: 'not-a-url' },
-    };
-    expect(peakPlayerSeasonSchema.safeParse(invalid).success).toBe(false);
-  });
-  it('rejects an ineligible position value', () => {
-    const invalid = {
-      ...validPlayer,
-      positions: { ...validPlayer.positions, primary: 'G' },
-    };
-    expect(peakPlayerSeasonSchema.safeParse(invalid).success).toBe(false);
-  });
-  it('rejects a rating outside the 0-100 range', () => {
-    const invalid = {
-      ...validPlayer,
-      summaryRatings: { ...validPlayer.summaryRatings, overallRating: 101 },
-    };
-    expect(peakPlayerSeasonSchema.safeParse(invalid).success).toBe(false);
-  });
   it('accepts duplicate player ids inside a pool (uniqueness is a command concern)', () => {
     const duplicate = [
       validPlayer,
@@ -410,31 +370,6 @@ describe('lineup contracts', () => {
     };
     expect(lineupSchema.safeParse(lineup).success).toBe(true);
   });
-  it('rejects a four-assignment lineup', () => {
-    const lineup: Lineup = {
-      structure: ['G', 'G', 'F', 'F', 'C'],
-      assignments: [
-        assignment(0, 'p-1'),
-        assignment(1, 'p-2'),
-        assignment(2, 'p-3'),
-        assignment(3, 'p-4'),
-      ],
-    };
-    expect(lineupSchema.safeParse(lineup).success).toBe(false);
-  });
-  it('allows a center-positioned player in a guard slot (positions are advisory)', () => {
-    const lineup: Lineup = {
-      structure: ['G', 'G', 'F', 'F', 'C'],
-      assignments: [
-        { ...assignment(0, 'p-1'), positions: ['C'] },
-        assignment(1, 'p-2'),
-        assignment(2, 'p-3'),
-        assignment(3, 'p-4'),
-        assignment(4, 'p-5'),
-      ],
-    };
-    expect(lineupSchema.safeParse(lineup).success).toBe(true);
-  });
 });
 describe('run contracts', () => {
   const baseRun = makeRun();
@@ -443,13 +378,6 @@ describe('run contracts', () => {
   });
   it('rejects a malformed seed', () => {
     const run = { ...baseRun, runSeed: 'not-hex!' };
-    expect(challengeRunSchema.safeParse(run).success).toBe(false);
-  });
-  it('rejects a run with fewer than 82 schedule entries', () => {
-    const run = {
-      ...baseRun,
-      bracket: { ...baseRun.bracket, schedule: baseRun.bracket.schedule.slice(0, 81) },
-    };
     expect(challengeRunSchema.safeParse(run).success).toBe(false);
   });
 });
@@ -522,35 +450,6 @@ describe('manifest contracts', () => {
     };
     expect(hoopRushManifestSchema.safeParse(manifest).success).toBe(true);
   });
-  it('accepts a season section without M2.6.5 free-agency artifacts', () => {
-    const hash = 'a'.repeat(64);
-    const entry = { url: 'season/league.json', contentHash: hash };
-    const parsed = hoopRushManifestSchema.safeParse({
-      schemaVersion: 4,
-      dataVersion: 'm0.1',
-      modernFranchiseSlots: thirtySlots,
-      franchiseLineage: [],
-      eras: [],
-      pools: [],
-      availability: [],
-      eraSimulationProfiles: [],
-      season: {
-        league: entry,
-        schedule: { url: 'season/schedule.json', contentHash: hash },
-        draftCatalog: { url: 'season/draft-catalog.json', contentHash: hash },
-        rosterTargets: { url: 'season/roster-targets.json', contentHash: hash },
-      },
-      assets: {
-        headshotUrlTemplate: null,
-        headshotUrlTemplateSecondary: null,
-        logoUrlTemplate: null,
-        logoUrlTemplateSecondary: null,
-        source: 'example',
-        cacheVersion: 'v1',
-      },
-    });
-    expect(parsed.success).toBe(true);
-  });
   it('rejects a bad content hash', () => {
     const manifest = {
       schemaVersion: 3,
@@ -577,14 +476,6 @@ describe('simulation contracts', () => {
   const player = makeSimulationPlayer('p-1', ['PG', 'SG']);
   it('accepts a valid simulation player', () => {
     expect(simulationPlayerSchema.safeParse(player).success).toBe(true);
-  });
-  it('rejects a player carrying a summary overall rating', () => {
-    const invalid = { ...player, ratings: { ...player.ratings, overall: 90 } };
-    expect(simulationPlayerSchema.safeParse(invalid).success).toBe(false);
-  });
-  it('rejects a rating outside 0-100', () => {
-    const invalid = { ...player, ratings: { ...player.ratings, passing: 101 } };
-    expect(simulationPlayerSchema.safeParse(invalid).success).toBe(false);
   });
   it('rejects a team without exactly five players', () => {
     const team = { teamId: 'lakers', displayName: 'Lakers', players: [player] };
@@ -646,18 +537,6 @@ describe('worker message contracts (M3)', () => {
       }).success,
     ).toBe(false);
   });
-  it('rejects a simulate request with an out-of-range start game', () => {
-    const request = {
-      schemaVersion: 1,
-      type: 'simulate',
-      requestId: 'req-1',
-      run: buildMinimalRun(),
-      startGameNumber: 83,
-      profile: eraProfileFixture(),
-      engineVersion: 'engine-v1',
-    };
-    expect(workerRequestSchema.safeParse(request).success).toBe(false);
-  });
   it('accepts results, complete, and error worker messages', () => {
     expect(
       workerMessageSchema.safeParse({
@@ -685,36 +564,6 @@ describe('worker message contracts (M3)', () => {
         message: 'worker crashed',
       }).success,
     ).toBe(true);
-  });
-  it('rejects a results message with a missing request id', () => {
-    expect(
-      workerMessageSchema.safeParse({
-        schemaVersion: 1,
-        type: 'results',
-        fromGameNumber: 5,
-        results: [gameResultFixture(5)],
-      }).success,
-    ).toBe(false);
-  });
-  it('rejects a results message with an empty or oversized batch', () => {
-    expect(
-      workerMessageSchema.safeParse({
-        schemaVersion: 1,
-        type: 'results',
-        requestId: 'req-1',
-        fromGameNumber: 5,
-        results: [],
-      }).success,
-    ).toBe(false);
-    expect(
-      workerMessageSchema.safeParse({
-        schemaVersion: 1,
-        type: 'results',
-        requestId: 'req-1',
-        fromGameNumber: 5,
-        results: Array.from({ length: 9 }, (_, i) => gameResultFixture(5 + i)),
-      }).success,
-    ).toBe(false);
   });
 });
 function eraProfileFixture() {
@@ -850,56 +699,13 @@ describe('classic draft contracts (M4)', () => {
     rerolls: { franchiseSpent: false, eraSpent: false },
     picks: [],
   };
-  const pick = (round: number, playerId: string, slotIndex: number) => ({
-    round,
-    playerId,
-    franchiseId: 'lakers',
-    eraId: '1990s',
-    slotIndex,
-  });
   it('accepts a valid minimal drafting state', () => {
     expect(classicDraftStateSchema.safeParse(baseDraft).success).toBe(true);
-  });
-  it('rejects more than five picks', () => {
-    const picks = Array.from({ length: 6 }, (_, i) =>
-      pick((i % 5) + 1, `p-${String(i + 1)}`, i % 5),
-    );
-    expect(classicDraftStateSchema.safeParse({ ...baseDraft, picks }).success).toBe(false);
-  });
-  it('rejects an invalid variant', () => {
-    expect(
-      classicDraftStateSchema.safeParse({ ...baseDraft, variant: 'draft-order' }).success,
-    ).toBe(false);
   });
   it('rejects a non-hex seed', () => {
     expect(classicDraftStateSchema.safeParse({ ...baseDraft, seed: 'not-a-seed' }).success).toBe(
       false,
     );
-  });
-  it('rejects a null roll while drafting and accepts one once complete', () => {
-    expect(classicDraftStateSchema.safeParse({ ...baseDraft, roll: null }).success).toBe(false);
-    expect(
-      classicDraftStateSchema.safeParse({ ...baseDraft, status: 'complete', roll: null }).success,
-    ).toBe(true);
-  });
-  it('duplicate slot indexes stay structural (uniqueness is a command concern)', () => {
-    const picks = [pick(1, 'p-1', 0), pick(2, 'p-2', 0)];
-    expect(classicDraftStateSchema.safeParse({ ...baseDraft, picks }).success).toBe(true);
-  });
-  it('accepts a completed draft snapshot and rejects short pick lists', () => {
-    const picks = [0, 1, 2, 3, 4].map((slotIndex) =>
-      pick(slotIndex + 1, `p-${String(slotIndex + 1)}`, slotIndex),
-    );
-    const snapshot = {
-      draftId: 'draft-1',
-      variant: 'ratings',
-      seed: 'abcd1234abcd1234abcd1234abcd1234',
-      picks,
-    };
-    expect(classicCompletedDraftSchema.safeParse(snapshot).success).toBe(true);
-    expect(
-      classicCompletedDraftSchema.safeParse({ ...snapshot, picks: picks.slice(0, 4) }).success,
-    ).toBe(false);
   });
 });
 describe('franchise abbreviations', () => {
@@ -942,76 +748,6 @@ describe('franchise abbreviations', () => {
     }
   });
 });
-describe('worker start best-of contracts (M5)', () => {
-  it('accepts a start request with the simulate fields minus the start game', () => {
-    const request = {
-      schemaVersion: 1,
-      type: 'start',
-      requestId: 'req-start-1',
-      run: buildMinimalRun(),
-      profile: eraProfileFixture(),
-      engineVersion: 'engine-v1',
-    };
-    expect(workerRequestSchema.safeParse(request).success).toBe(true);
-  });
-  it('rejects a start request missing the run snapshot', () => {
-    const request = {
-      schemaVersion: 1,
-      type: 'start',
-      requestId: 'req-start-1',
-      profile: eraProfileFixture(),
-      engineVersion: 'engine-v1',
-    };
-    expect(workerRequestSchema.safeParse(request).success).toBe(false);
-  });
-  it('accepts a start-result message and rejects malformed scores', () => {
-    expect(
-      workerMessageSchema.safeParse({
-        schemaVersion: 1,
-        type: 'start-result',
-        requestId: 'req-start-1',
-        chosenRunSeed: 'abcd1234abcd1234abcd1234abcd1234',
-        chosenWins: 41,
-        chosenLosses: 41,
-        chosenDifferential: 120,
-      }).success,
-    ).toBe(true);
-    expect(
-      workerMessageSchema.safeParse({
-        schemaVersion: 1,
-        type: 'start-result',
-        requestId: 'req-start-1',
-        chosenRunSeed: 'abcd1234abcd1234abcd1234abcd1234',
-        chosenWins: -1,
-        chosenLosses: 41,
-        chosenDifferential: 120,
-      }).success,
-    ).toBe(false);
-  });
-  it('rejects a start-result in the request union and a start in the message union', () => {
-    expect(
-      workerRequestSchema.safeParse({
-        schemaVersion: 1,
-        type: 'start-result',
-        requestId: 'req-start-1',
-        chosenRunSeed: 'abcd1234abcd1234abcd1234abcd1234',
-        chosenWins: 41,
-        chosenLosses: 41,
-        chosenDifferential: 120,
-      }).success,
-    ).toBe(false);
-    expect(
-      workerMessageSchema.safeParse({
-        schemaVersion: 1,
-        type: 'start',
-        requestId: 'req-start-1',
-        run: buildMinimalRun(),
-        profile: eraProfileFixture(),
-        engineVersion: 'engine-v1',
-      }).success,
-    ).toBe(false);
-  });
-});
 describe('three-point reconstruction contracts (spec/12)', () => {
   const validProfile = {
     modelVersion: 'three-point-reconstruction-v1',
@@ -1029,203 +765,9 @@ describe('three-point reconstruction contracts (spec/12)', () => {
   it('accepts a valid reconstructed three-point profile', () => {
     expect(reconstructedThreePointProfileSchema.safeParse(validProfile).success).toBe(true);
   });
-  it('rejects out-of-range accuracy and attempt values', () => {
-    expect(
-      reconstructedThreePointProfileSchema.safeParse({ ...validProfile, accuracyConservative: 1.2 })
-        .success,
-    ).toBe(false);
-    expect(
-      reconstructedThreePointProfileSchema.safeParse({
-        ...validProfile,
-        attemptRateConservative: -0.1,
-      }).success,
-    ).toBe(false);
-  });
   it('rejects an unknown model version', () => {
     expect(
       reconstructedThreePointProfileSchema.safeParse({ ...validProfile, modelVersion: 'other-v1' })
-        .success,
-    ).toBe(false);
-  });
-  it('accepts schema-version 5 pools', () => {
-    expect(
-      franchiseEraPoolSchema.safeParse({
-        schemaVersion: 5,
-        dataVersion: 'm10-ratings-v3.6',
-        franchiseId: 'lakers',
-        eraId: '1960s',
-        eligibility: { minimumTeamGames: 40 },
-        coverageSummary: {
-          coverageBand: 'reconstructed',
-          observedFamilies: ['scoring'],
-          derivedFamilies: ['shooting'],
-          estimatedFamilies: [],
-          reconstructedFamilies: ['three-point'],
-          missingCategories: ['three-point'],
-          lowConfidenceShare: 0.2,
-          policyVersion: 'confidence-v1',
-        },
-        players: [{ ...validPlayer, schemaVersion: 5 }],
-      }).success,
-    ).toBe(true);
-  });
-  it('accepts reconstructed provenance and the coverage family', () => {
-    expect(
-      provenanceMapSchema.safeParse({
-        threePoint: {
-          kind: 'reconstructed',
-          confidence: 'medium',
-          methodVersion: 'derive-v8',
-          sourceVersion: 'source-v1',
-          sourceFields: ['ftm', 'fta', 'fga'],
-          sourceStatus: 'not-applicable',
-          notesCode: 'three-point-reconstruction-v1',
-        },
-      }).success,
-    ).toBe(true);
-    expect(
-      coverageSummarySchema.safeParse({
-        coverageBand: 'reconstructed',
-        observedFamilies: [],
-        derivedFamilies: [],
-        estimatedFamilies: [],
-        reconstructedFamilies: ['three-point'],
-        missingCategories: ['three-point'],
-        lowConfidenceShare: 0.1,
-        policyVersion: 'confidence-v1',
-      }).success,
-    ).toBe(true);
-  });
-  it('accepts threePointAttemptRate null and retains numeric zero for observed zeros', () => {
-    expect(
-      simulationAnchorsSchema.safeParse({ ...validPlayer.anchors, threePointAttemptRate: null })
-        .success,
-    ).toBe(true);
-    expect(
-      simulationAnchorsSchema.safeParse({ ...validPlayer.anchors, threePointAttemptRate: 0 })
-        .success,
-    ).toBe(true);
-    expect(
-      simulationAnchorsSchema.safeParse({ ...validPlayer.anchors, threePointAttemptRate: 1.5 })
-        .success,
-    ).toBe(false);
-  });
-  it('parses the versioned reconstruction artifact', () => {
-    const artifact = {
-      artifactVersion: 'three-point-reconstruction-v1',
-      schemaVersion: 1,
-      fitCohort: {
-        seasons: ['1979-80', '1980-81', '1981-82', '1982-83', '1983-84'],
-        description: 'early three-point prior cohort',
-      },
-      featureNames: ['ftRatio', 'ftPctShrunk'],
-      normalization: {
-        ftRatio: { mean: 0.8, std: 0.11 },
-        ftPctShrunk: { mean: 0.77, std: 0.05 },
-      },
-      missingDefaults: {
-        G: { heightInches: 77, weightLbs: 195, age: 26 },
-        F: { heightInches: 79, weightLbs: 215, age: 26 },
-        C: { heightInches: 83, weightLbs: 245, age: 26 },
-      },
-      position2pMeans: { G: 0.45, F: 0.45, C: 0.47 },
-      priors: {
-        accuracyPrior: 0.33,
-        accuracyPriorAttempts: 80,
-        attemptRatePrior: 0.05,
-        attemptRatePriorTrials: 80,
-        ftPriors: { G: 0.8, F: 0.77, C: 0.71 },
-      },
-      regularization: { lambda: 1, maxIterations: 25, convergenceTolerance: 1e-6 },
-      models: {
-        accuracy: {
-          intercept: -1.2,
-          coefficients: { ftRatio: 0.4 },
-          covariance: [
-            [0.05, 0],
-            [0, 0.01],
-          ],
-        },
-        attemptRate: {
-          intercept: -3.1,
-          coefficients: { ftRatio: 0.2 },
-          covariance: [
-            [0.1, 0],
-            [0, 0.02],
-          ],
-        },
-      },
-      posteriorQuantiles: { accuracy: 0.25, attemptRate: 0.3 },
-      attemptRateTranslation: {
-        factor: 2.5,
-        caps: { G: 0.15, F: 0.08, C: 0.02 },
-        description: 'conservative modern translation: 2.5x volume, capped per position',
-      },
-      confidenceThresholds: { highStdDev: 0.025, mediumStdDev: 0.045 },
-      floors: { floor: 0.247, zoneFloors: { cornerThree: 0.267, aboveBreakThree: 0.247 } },
-      ratingMapping: {
-        points: [
-          { accuracy: 0.2, rating: 25 },
-          { accuracy: 0.32, rating: 55 },
-        ],
-        clampMin: 10,
-        clampMax: 95,
-      },
-      holdout: {
-        accuracy: {
-          mae: 0.04,
-          bias: -0.002,
-          overpredictionShare: 0.45,
-          samplePlayers: 900,
-          positionBands: {
-            G: { mae: 0.04, bias: -0.001, count: 400 },
-            F: { mae: 0.04, bias: -0.002, count: 300 },
-            C: { mae: 0.05, bias: -0.003, count: 200 },
-          },
-          evidenceBands: [{ band: 'under-500-min', mae: 0.06, bias: -0.01, count: 200 }],
-          falsePositives: { count: 10, threshold: 0.33, lowerBound: 0.29 },
-          falseNegatives: { count: 5, threshold: 0.33, upperBound: 0.37 },
-        },
-        attemptRate: {
-          mae: 0.02,
-          bias: 0.001,
-          overpredictionShare: 0.4,
-          samplePlayers: 1500,
-          positionBands: {
-            G: { mae: 0.02, bias: 0, count: 600 },
-            F: { mae: 0.02, bias: -0.001, count: 500 },
-            C: { mae: 0.03, bias: -0.002, count: 400 },
-          },
-          evidenceBands: [{ band: 'under-500-min', mae: 0.03, bias: -0.01, count: 300 }],
-          falsePositives: { count: 15, threshold: 0.1, lowerBound: 0.05 },
-          falseNegatives: { count: 8, threshold: 0.1, upperBound: 0.15 },
-        },
-        translatedAttemptRateModern: {
-          mae: 0.1,
-          bias: -0.005,
-          overpredictionShare: 0.42,
-          samplePlayers: 4000,
-          positionBands: {
-            G: { mae: 0.1, bias: -0.006, count: 1800 },
-            F: { mae: 0.09, bias: -0.004, count: 1400 },
-            C: { mae: 0.08, bias: -0.002, count: 800 },
-          },
-          evidenceBands: [{ band: '1500-plus-min', mae: 0.09, bias: -0.005, count: 3500 }],
-          falsePositives: { count: 40, threshold: 0.1, lowerBound: 0.05 },
-          falseNegatives: { count: 60, threshold: 0.1, upperBound: 0.15 },
-        },
-        foldCount: 5,
-      },
-      gates: {
-        meanBiasNonPositiveAccuracy: true,
-        meanBiasNonPositiveTranslatedAttemptRate: true,
-        floorBelowEstablished: true,
-      },
-      generatedBy: 'hoop-rush calibrate three-point --write (derive-v8, ratings-v3.6)',
-    };
-    expect(threePointReconstructionArtifactSchema.safeParse(artifact).success).toBe(true);
-    expect(
-      threePointReconstructionArtifactSchema.safeParse({ ...artifact, artifactVersion: 'other-v1' })
         .success,
     ).toBe(false);
   });

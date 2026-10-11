@@ -110,6 +110,9 @@ function slotOrZero(prep: TeamPrep, player: SimulationPlayer): number {
   const slot = slotOf(prep, player);
   return slot >= 0 ? slot : 0;
 }
+function homeDefenseShotAdjustment(ctx: TripContext, defenseSide: SideIndex): number {
+  return defenseSide === 0 ? (ctx.homeCourt?.homeDefenseShotAdjustment ?? 0) : 0;
+}
 export class PossessionStepper {
   private phase: 'sample' | 'security' | 'foul' | 'inbound' | 'shot' | 'continuation' | 'done' =
     'sample';
@@ -660,8 +663,7 @@ function resolveShot(
   if (rng.chance(foulP)) {
     recorder.foul(defenseSide, defenderSlot >= 0 ? defenderSlot : 0);
     state.periodFouls[defenseSide] += 1;
-    const homeDefenseAdjustment =
-      defenseSide === 0 ? (ctx.homeCourt?.homeDefenseShotAdjustment ?? 0) : 0;
+    const homeDefenseAdjustment = homeDefenseShotAdjustment(ctx, defenseSide);
     const shotP =
       makeProbability(
         shooter,
@@ -741,8 +743,7 @@ function resolveShot(
       defender.playerVersionId,
     );
   }
-  const homeDefenseAdjustment =
-    defenseSide === 0 ? (ctx.homeCourt?.homeDefenseShotAdjustment ?? 0) : 0;
+  const homeDefenseAdjustment = homeDefenseShotAdjustment(ctx, defenseSide);
   const baseShotP = makeProbability(
     shooter,
     defender,

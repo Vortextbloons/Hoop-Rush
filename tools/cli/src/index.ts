@@ -417,7 +417,10 @@ const COMMANDS: Record<string, CommandDef> = {
   },
   'calibrate ratings': {
     options: CALIBRATE_RATINGS_OPTIONS,
-    run: (args) => calibrateRatings(pickU(args, ['samples', 'workers', 'output', 'manifest'])),
+    run: (args) =>
+      calibrateRatings(
+        pickU(args, ['samples', 'workers', 'output', 'manifest', 'player', 'report']),
+      ),
   },
   'calibrate three-point': {
     options: CALIBRATE_THREE_POINT_OPTIONS,

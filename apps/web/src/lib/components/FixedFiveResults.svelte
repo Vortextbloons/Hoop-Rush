@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { resolve } from '$app/paths';
   import {
     ArrowRight,
     Calendar,
@@ -38,9 +39,9 @@
     modeDetail = null,
     receiptDigest = null,
     onRematch = null,
-    onNewRoom = null,
+    rematchLabel = 'Rematch',
+    rematchWaiting = false,
     rematchBusy = false,
-    canNewRoom = true,
   }: {
     mode: FixedFiveRoomMode;
     result: FixedFiveCompetitionResult;
@@ -60,9 +61,9 @@
     modeDetail?: string | null;
     receiptDigest?: string | null;
     onRematch?: (() => void) | null;
-    onNewRoom?: (() => void) | null;
+    rematchLabel?: string;
+    rematchWaiting?: boolean;
     rematchBusy?: boolean;
-    canNewRoom?: boolean;
   } = $props();
   let tab = $state<'overview' | 'games' | 'players' | 'team'>('overview');
   let statsSide = $state<'you' | 'opp'>('you');
@@ -85,14 +86,8 @@
     if (attempted <= 0) return '—';
     return `${((made / attempted) * 100).toFixed(1)}%`;
   }
-  const modeLabel = $derived(
-    mode === 'duel'
-      ? 'Duel · Best of 7'
-      : mode === 'sandbox-shared-82'
-        ? 'Sandbox · Shared 82'
-        : 'Classic · Shared 82',
-  );
-  const modeDetailLabel = $derived(modeDetail ?? `Fixed-Five · ${modeLabel}`);
+  const modeLabel = $derived(mode === 'duel' ? 'Duel · Best of 7' : 'Season · 82 games');
+  const modeDetailLabel = $derived(modeDetail ?? modeLabel);
   const youWon = $derived(
     result.competition === 'duel' ? result.winner === selfId : result.ranking[0] === selfId,
   );
@@ -224,15 +219,37 @@
     if (Number.isNaN(d.getTime())) return '—';
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   });
-  const heroEyebrow = $derived(duel ? 'Series complete' : 'Shared 82 complete');
+  const heroEyebrow = $derived(
+    !verified ? 'Result awaiting verification' : duel ? 'Series complete' : 'Season complete',
+  );
   function viewMatchStats() {
     tab = 'team';
     document.getElementById('fixed-five-match-tabs')?.scrollIntoView({ behavior: 'smooth' });
   }
+  function handleTabKey(event: KeyboardEvent): void {
+    const keys = ['ArrowLeft', 'ArrowRight', 'Home', 'End'];
+    if (!keys.includes(event.key)) return;
+    event.preventDefault();
+    const button = event.currentTarget as HTMLButtonElement;
+    const buttons = Array.from(
+      button.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]') ?? [],
+    );
+    const index = buttons.indexOf(button);
+    const next =
+      event.key === 'Home'
+        ? 0
+        : event.key === 'End'
+          ? buttons.length - 1
+          : (index + (event.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length;
+    const ids = ['overview', 'games', 'players', 'team'] as const;
+    if (!ids[next] || !buttons[next]) return;
+    tab = ids[next];
+    buttons[next].focus();
+  }
 </script>
 
-<div class="rounded-2xl border border-primary/25 bg-card shadow-[0_0_40px_hsl(13_100%_62%/0.12)]">
-  <div class="border-b border-border/60 px-4 py-6 text-center sm:px-8 sm:py-8">
+<div class="match-results">
+  <div class="result-hero">
     <div
       class="flex flex-wrap items-center justify-center gap-2 font-mono text-[11px] tracking-[0.18em] uppercase"
     >
@@ -302,7 +319,7 @@
   {:else if shared && youShared && oppShared}
     <div
       class="grid grid-cols-2 gap-3 px-4 py-4 sm:grid-cols-4 sm:px-6"
-      aria-label="Gauntlet summary"
+      aria-label="Season summary"
     >
       <div class="rounded-xl border border-primary/25 bg-surface-1 p-3 text-center sm:p-4">
         <p class="font-mono text-[11px] text-muted-foreground uppercase">You</p>
@@ -340,32 +357,22 @@
     </div>
   {/if}
 
-  {#if onRematch || onNewRoom}
+  {#if onRematch}
     <div class="rematch-strip">
-      {#if onRematch}
-        <button type="button" onclick={onRematch} disabled={rematchBusy} class="rematch-main">
-          <span class="rematch-ball" aria-hidden="true"></span>
-          {rematchBusy ? 'Locking run-back…' : 'Run it back'}
-        </button>
-      {/if}
-      {#if onNewRoom}
-        <button
-          type="button"
-          onclick={onNewRoom}
-          disabled={!canNewRoom || rematchBusy}
-          title={canNewRoom ? 'Create the successor room' : 'Needs both confirmations first'}
-          class="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-line-soft bg-surface-1 px-6 py-3 text-sm font-bold tracking-widest uppercase disabled:opacity-40"
-        >
-          New room
-        </button>
-      {/if}
       <button
         type="button"
-        onclick={viewMatchStats}
-        class="inline-flex items-center justify-center gap-1.5 px-4 py-3 font-mono text-xs font-bold tracking-widest uppercase text-muted-foreground hover:text-foreground sm:ml-auto"
+        onclick={onRematch}
+        disabled={rematchBusy || rematchWaiting}
+        class="rematch-main"
+        >{rematchBusy ? 'Preparing rematch…' : rematchLabel}<ArrowRight
+          size={16}
+          aria-hidden="true"
+        /></button
       >
-        View match stats <ArrowRight class="h-4 w-4" />
-      </button>
+      <a href={resolve('/multiplayer')} class="new-match">Choose another match</a>
+      <button type="button" onclick={viewMatchStats} class="stats-shortcut"
+        >View match stats <ArrowRight size={14} aria-hidden="true" /></button
+      >
     </div>
   {/if}
 
@@ -380,6 +387,10 @@
         type="button"
         role="tab"
         aria-selected={tab === id}
+        id={`match-tab-${id}`}
+        aria-controls="fixed-five-result-panel"
+        tabindex={tab === id ? 0 : -1}
+        onkeydown={handleTabKey}
         onclick={() => (tab = id as typeof tab)}
         class="border-b-2 py-3 font-mono text-xs font-bold tracking-widest uppercase {tab === id
           ? 'border-primary text-primary'
@@ -390,340 +401,312 @@
     {/each}
   </div>
 
-  {#if tab === 'overview'}
-    <div
-      class="grid gap-4 p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:items-stretch"
-    >
-      {#each ['p1', 'p2'] as const as pid, pi (pid)}
-        {@const rows = pid === 'p1' ? p1Rows : p2Rows}
-        {@const isYou = pid === selfId}
-        {#if pi === 1}
-          <div class="hidden items-center lg:flex" aria-hidden="true">
-            <span
-              class="grid h-10 w-10 place-items-center rounded-full border border-line-soft bg-surface-1 font-mono text-xs font-bold text-muted-foreground"
-              >VS</span
-            >
-          </div>
-        {/if}
+  <div
+    role="tabpanel"
+    id="fixed-five-result-panel"
+    aria-labelledby={`match-tab-${tab}`}
+    tabindex="0"
+  >
+    {#if tab === 'overview'}
+      <div
+        class="grid gap-4 p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:items-stretch"
+      >
+        {#each ['p1', 'p2'] as const as pid, pi (pid)}
+          {@const rows = pid === 'p1' ? p1Rows : p2Rows}
+          {@const isYou = pid === selfId}
+          {#if pi === 1}
+            <div class="hidden items-center lg:flex" aria-hidden="true">
+              <span
+                class="grid h-10 w-10 place-items-center rounded-full border border-line-soft bg-surface-1 font-mono text-xs font-bold text-muted-foreground"
+                >VS</span
+              >
+            </div>
+          {/if}
+          <section
+            aria-label={isYou ? 'Your five' : 'Opponent five'}
+            class="rounded-xl border border-line-soft bg-surface-1 p-4"
+          >
+            <h3 class="font-mono text-[11px] font-bold tracking-[0.16em] text-primary uppercase">
+              {isYou ? 'Your five' : 'Opponent five'}
+            </h3>
+            <ul class="mt-2 flex flex-col divide-y divide-border/60">
+              {#each rows as r, i (i)}
+                <li class="flex min-w-0 items-center gap-3 py-2.5">
+                  {#if r}
+                    <PlayerFace
+                      player={r}
+                      {manifest}
+                      size="sm"
+                      fallbackInitials={r.firstName[0]! + r.lastName[0]!}
+                    />
+                    <span class="min-w-0 flex-1">
+                      <span class="block truncate text-sm font-bold">{r.displayName}</span>
+                      <span class="block truncate font-mono text-[10px] text-muted-foreground">
+                        {r.seasonKey} · {formatPositions(r.positionsPlayable)}
+                      </span>
+                    </span>
+                    <span class="flex shrink-0 items-center gap-2">
+                      <span class="font-mono text-sm font-bold tabular-nums">
+                        {ppgByPlayerId.has(r.playerId)
+                          ? `${ppgByPlayerId.get(r.playerId)!.toFixed(1)} `
+                          : '— '}
+                        <span class="text-[10px] font-normal text-muted-foreground">PPG</span>
+                      </span>
+                      <span class="flex items-end gap-[2px]" aria-hidden="true">
+                        <span
+                          class="inline-block w-[3px] rounded-sm bg-muted-foreground/60"
+                          style="height: 5px"
+                        ></span>
+                        <span
+                          class="inline-block w-[3px] rounded-sm bg-muted-foreground/60"
+                          style="height: 8px"
+                        ></span>
+                        <span
+                          class="inline-block w-[3px] rounded-sm bg-muted-foreground/60"
+                          style="height: 11px"
+                        ></span>
+                        <span
+                          class="inline-block w-[3px] rounded-sm bg-muted-foreground/60"
+                          style="height: 14px"
+                        ></span>
+                      </span>
+                    </span>
+                  {:else}
+                    <span class="text-sm text-muted-foreground">Slot {i + 1} — unknown</span>
+                  {/if}
+                </li>
+              {/each}
+            </ul>
+          </section>
+        {/each}
+      </div>
+
+      <div class="grid gap-4 px-4 pb-4 sm:px-6 sm:pb-6 lg:grid-cols-3">
         <section
-          aria-label={isYou ? 'Your five' : 'Opponent five'}
+          aria-label="Series MVP"
+          class="rounded-xl border border-line-soft bg-surface-1 p-4 text-center"
+        >
+          <h3
+            class="text-left font-mono text-[11px] font-bold tracking-[0.16em] text-primary uppercase"
+          >
+            Series MVP
+          </h3>
+          {#if mvp && mvp.entry}
+            <div class="mx-auto mt-2 h-16 w-16 overflow-hidden rounded-full">
+              <PlayerFace
+                player={mvp.entry}
+                {manifest}
+                size="md"
+                fallbackInitials={mvp.entry.firstName[0]! + mvp.entry.lastName[0]!}
+              />
+            </div>
+            <p class="font-display mt-2 text-xl font-extrabold">{mvp.entry.displayName}</p>
+            <p class="font-mono text-[11px] text-muted-foreground">
+              {formatPositions(mvp.entry.positionsPlayable)} · {mvp.pid === selfId
+                ? 'You'
+                : 'Opponent'}
+            </p>
+            <div class="mt-3 grid grid-cols-3 divide-x divide-border/60">
+              <div>
+                <p class="font-display text-2xl font-extrabold text-primary tabular-nums">
+                  {perGame(mvp.line.points, mvp.line.games)}
+                </p>
+                <p class="font-mono text-[10px] text-muted-foreground uppercase">PPG</p>
+              </div>
+              <div>
+                <p class="font-display text-2xl font-extrabold text-primary tabular-nums">
+                  {perGame(mvp.line.rebounds, mvp.line.games)}
+                </p>
+                <p class="font-mono text-[10px] text-muted-foreground uppercase">REB</p>
+              </div>
+              <div>
+                <p class="font-display text-2xl font-extrabold text-primary tabular-nums">
+                  {perGame(mvp.line.assists, mvp.line.games)}
+                </p>
+                <p class="font-mono text-[10px] text-muted-foreground uppercase">AST</p>
+              </div>
+            </div>
+          {:else if statsState === 'building'}
+            <p class="mt-3 animate-pulse text-sm text-muted-foreground" role="status">
+              Finding the series MVP…
+            </p>
+          {:else}
+            <p class="mt-3 text-sm text-muted-foreground">MVP needs simulated games.</p>
+            {#if onRebuildStats}
+              <button
+                type="button"
+                onclick={onRebuildStats}
+                class="mt-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-semibold"
+              >
+                Build player stats
+              </button>
+            {/if}
+          {/if}
+        </section>
+
+        <section
+          aria-label="Series comparison"
           class="rounded-xl border border-line-soft bg-surface-1 p-4"
         >
           <h3 class="font-mono text-[11px] font-bold tracking-[0.16em] text-primary uppercase">
-            {isYou ? 'Your five' : 'Opponent five'}
+            Series comparison
           </h3>
-          <ul class="mt-2 flex flex-col divide-y divide-border/60">
-            {#each rows as r, i (i)}
-              <li class="flex min-w-0 items-center gap-3 py-2.5">
-                {#if r}
-                  <PlayerFace
-                    player={r}
-                    {manifest}
-                    size="sm"
-                    fallbackInitials={r.firstName[0]! + r.lastName[0]!}
-                  />
-                  <span class="min-w-0 flex-1">
-                    <span class="block truncate text-sm font-bold">{r.displayName}</span>
-                    <span class="block truncate font-mono text-[10px] text-muted-foreground">
-                      {r.seasonKey} · {formatPositions(r.positionsPlayable)}
-                    </span>
-                  </span>
-                  <span class="flex shrink-0 items-center gap-2">
-                    <span class="font-mono text-sm font-bold tabular-nums">
-                      {ppgByPlayerId.has(r.playerId)
-                        ? `${ppgByPlayerId.get(r.playerId)!.toFixed(1)} `
-                        : '— '}
-                      <span class="text-[10px] font-normal text-muted-foreground">PPG</span>
-                    </span>
-                    <span class="flex items-end gap-[2px]" aria-hidden="true">
-                      <span
-                        class="inline-block w-[3px] rounded-sm bg-muted-foreground/60"
-                        style="height: 5px"
-                      ></span>
-                      <span
-                        class="inline-block w-[3px] rounded-sm bg-muted-foreground/60"
-                        style="height: 8px"
-                      ></span>
-                      <span
-                        class="inline-block w-[3px] rounded-sm bg-muted-foreground/60"
-                        style="height: 11px"
-                      ></span>
-                      <span
-                        class="inline-block w-[3px] rounded-sm bg-muted-foreground/60"
-                        style="height: 14px"
-                      ></span>
-                    </span>
-                  </span>
-                {:else}
-                  <span class="text-sm text-muted-foreground">Slot {i + 1} — unknown</span>
-                {/if}
-              </li>
-            {/each}
+          {#if comparison}
+            <table class="mt-2 w-full text-sm">
+              <thead>
+                <tr class="font-mono text-[10px] tracking-widest text-muted-foreground uppercase">
+                  <th scope="col" class="py-1 text-left">You</th>
+                  <th scope="col" class="py-1 text-center">Stat</th>
+                  <th scope="col" class="py-1 text-right">Opponent</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-border/50 tabular-nums">
+                <tr>
+                  <td class="py-2 text-left font-bold"
+                    >{perGame(comparison.you.points, comparison.games)}</td
+                  >
+                  <td class="py-2 text-center text-xs text-muted-foreground">Points per game</td>
+                  <td class="py-2 text-right font-bold"
+                    >{perGame(comparison.opp.points, comparison.games)}</td
+                  >
+                </tr>
+                <tr>
+                  <td class="py-2 text-left font-bold"
+                    >{pctStr(comparison.you.fgm, comparison.you.fga)}</td
+                  >
+                  <td class="py-2 text-center text-xs text-muted-foreground">FG%</td>
+                  <td class="py-2 text-right font-bold"
+                    >{pctStr(comparison.opp.fgm, comparison.opp.fga)}</td
+                  >
+                </tr>
+                <tr>
+                  <td class="py-2 text-left font-bold"
+                    >{pctStr(comparison.you.tpm, comparison.you.tpa)}</td
+                  >
+                  <td class="py-2 text-center text-xs text-muted-foreground">3P%</td>
+                  <td class="py-2 text-right font-bold"
+                    >{pctStr(comparison.opp.tpm, comparison.opp.tpa)}</td
+                  >
+                </tr>
+                <tr>
+                  <td class="py-2 text-left font-bold"
+                    >{perGame(comparison.you.reb, comparison.games)}</td
+                  >
+                  <td class="py-2 text-center text-xs text-muted-foreground">Rebounds per game</td>
+                  <td class="py-2 text-right font-bold"
+                    >{perGame(comparison.opp.reb, comparison.games)}</td
+                  >
+                </tr>
+                <tr>
+                  <td class="py-2 text-left font-bold"
+                    >{perGame(comparison.you.tov, comparison.games)}</td
+                  >
+                  <td class="py-2 text-center text-xs text-muted-foreground">Turnovers per game</td>
+                  <td class="py-2 text-right font-bold"
+                    >{perGame(comparison.opp.tov, comparison.games)}</td
+                  >
+                </tr>
+              </tbody>
+            </table>
+          {:else}
+            <p class="mt-3 text-sm text-muted-foreground">Comparison needs simulated games.</p>
+          {/if}
+        </section>
+
+        <section
+          aria-label="Series summary"
+          class="rounded-xl border border-line-soft bg-surface-1 p-4"
+        >
+          <h3 class="font-mono text-[11px] font-bold tracking-[0.16em] text-primary uppercase">
+            Series summary
+          </h3>
+          <ul class="mt-3 flex flex-col gap-3 text-sm">
+            <li class="flex items-center gap-3">
+              <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface-3"
+                ><Calendar class="h-4 w-4 text-muted-foreground" /></span
+              >
+              <span
+                ><span class="block font-mono text-[10px] text-muted-foreground uppercase"
+                  >Date</span
+                ><span class="font-semibold">{summaryDate}</span></span
+              >
+            </li>
+            <li class="flex items-center gap-3">
+              <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface-3"
+                ><Gamepad2 class="h-4 w-4 text-muted-foreground" /></span
+              >
+              <span
+                ><span class="block font-mono text-[10px] text-muted-foreground uppercase"
+                  >Mode</span
+                ><span class="font-semibold">{modeDetailLabel}</span></span
+              >
+            </li>
+            <li class="flex items-center gap-3">
+              <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface-3"
+                ><Clock class="h-4 w-4 text-muted-foreground" /></span
+              >
+              <span
+                ><span class="block font-mono text-[10px] text-muted-foreground uppercase"
+                  >Games</span
+                ><span class="font-semibold"
+                  >{duel
+                    ? `${duel.stoppedAtGame} played · first to 4`
+                    : '82 per side · H2H mirrored'}</span
+                ></span
+              >
+            </li>
+            <li class="flex items-center gap-3">
+              <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface-3"
+                ><Trophy class="h-4 w-4 text-muted-foreground" /></span
+              >
+              <span
+                ><span class="block font-mono text-[10px] text-muted-foreground uppercase"
+                  >Winner</span
+                ><span class="font-semibold"
+                  >{youWon
+                    ? `You (${youWins}–${oppWins})`
+                    : `Opponent (${oppWins}–${youWins})`}</span
+                ></span
+              >
+            </li>
           </ul>
         </section>
-      {/each}
-    </div>
+      </div>
 
-    <div class="grid gap-4 px-4 pb-4 sm:px-6 sm:pb-6 lg:grid-cols-3">
-      <section
-        aria-label="Series MVP"
-        class="rounded-xl border border-line-soft bg-surface-1 p-4 text-center"
-      >
-        <h3
-          class="text-left font-mono text-[11px] font-bold tracking-[0.16em] text-primary uppercase"
-        >
-          Series MVP
-        </h3>
-        {#if mvp && mvp.entry}
-          <div class="mx-auto mt-2 h-16 w-16 overflow-hidden rounded-full">
-            <PlayerFace
-              player={mvp.entry}
-              {manifest}
-              size="md"
-              fallbackInitials={mvp.entry.firstName[0]! + mvp.entry.lastName[0]!}
-            />
-          </div>
-          <p class="font-display mt-2 text-xl font-extrabold">{mvp.entry.displayName}</p>
-          <p class="font-mono text-[11px] text-muted-foreground">
-            {formatPositions(mvp.entry.positionsPlayable)} · {mvp.pid === selfId
-              ? 'You'
-              : 'Opponent'}
-          </p>
-          <div class="mt-3 grid grid-cols-3 divide-x divide-border/60">
-            <div>
-              <p class="font-display text-2xl font-extrabold text-primary tabular-nums">
-                {perGame(mvp.line.points, mvp.line.games)}
+      <div class="px-4 pb-4 sm:px-6 sm:pb-6">
+        <details class="rounded-xl border border-line-soft bg-surface-1">
+          <summary
+            class="flex cursor-pointer list-none items-center gap-3 p-4 [&::-webkit-details-marker]:hidden"
+          >
+            <ShieldCheck class="h-5 w-5 text-muted-foreground" />
+            <span class="font-mono text-xs font-bold tracking-widest uppercase">Match details</span>
+            <span class="text-xs text-muted-foreground">Click to view technical details</span>
+            <ChevronDown class="ml-auto h-4 w-4 text-muted-foreground" />
+          </summary>
+          <div class="border-t border-border/60 p-4">
+            {#if digest}
+              <p class="truncate font-mono text-[11px] text-muted-foreground" title={digest}>
+                Digest: {digest.slice(0, 16)}…{digest.slice(-8)}
               </p>
-              <p class="font-mono text-[10px] text-muted-foreground uppercase">PPG</p>
-            </div>
-            <div>
-              <p class="font-display text-2xl font-extrabold text-primary tabular-nums">
-                {perGame(mvp.line.rebounds, mvp.line.games)}
-              </p>
-              <p class="font-mono text-[10px] text-muted-foreground uppercase">REB</p>
-            </div>
-            <div>
-              <p class="font-display text-2xl font-extrabold text-primary tabular-nums">
-                {perGame(mvp.line.assists, mvp.line.games)}
-              </p>
-              <p class="font-mono text-[10px] text-muted-foreground uppercase">AST</p>
-            </div>
-          </div>
-        {:else if statsState === 'building'}
-          <p class="mt-3 animate-pulse text-sm text-muted-foreground" role="status">
-            Finding the series MVP…
-          </p>
-        {:else}
-          <p class="mt-3 text-sm text-muted-foreground">MVP needs simulated games.</p>
-          {#if onRebuildStats}
-            <button
-              type="button"
-              onclick={onRebuildStats}
-              class="mt-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-semibold"
-            >
-              Build player stats
-            </button>
-          {/if}
-        {/if}
-      </section>
-
-      <section
-        aria-label="Series comparison"
-        class="rounded-xl border border-line-soft bg-surface-1 p-4"
-      >
-        <h3 class="font-mono text-[11px] font-bold tracking-[0.16em] text-primary uppercase">
-          Series comparison
-        </h3>
-        {#if comparison}
-          <table class="mt-2 w-full text-sm">
-            <thead>
-              <tr class="font-mono text-[10px] tracking-widest text-muted-foreground uppercase">
-                <th scope="col" class="py-1 text-left">You</th>
-                <th scope="col" class="py-1 text-center">Stat</th>
-                <th scope="col" class="py-1 text-right">Opponent</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-border/50 tabular-nums">
-              <tr>
-                <td class="py-2 text-left font-bold"
-                  >{perGame(comparison.you.points, comparison.games)}</td
-                >
-                <td class="py-2 text-center text-xs text-muted-foreground">Points per game</td>
-                <td class="py-2 text-right font-bold"
-                  >{perGame(comparison.opp.points, comparison.games)}</td
-                >
-              </tr>
-              <tr>
-                <td class="py-2 text-left font-bold"
-                  >{pctStr(comparison.you.fgm, comparison.you.fga)}</td
-                >
-                <td class="py-2 text-center text-xs text-muted-foreground">FG%</td>
-                <td class="py-2 text-right font-bold"
-                  >{pctStr(comparison.opp.fgm, comparison.opp.fga)}</td
-                >
-              </tr>
-              <tr>
-                <td class="py-2 text-left font-bold"
-                  >{pctStr(comparison.you.tpm, comparison.you.tpa)}</td
-                >
-                <td class="py-2 text-center text-xs text-muted-foreground">3P%</td>
-                <td class="py-2 text-right font-bold"
-                  >{pctStr(comparison.opp.tpm, comparison.opp.tpa)}</td
-                >
-              </tr>
-              <tr>
-                <td class="py-2 text-left font-bold"
-                  >{perGame(comparison.you.reb, comparison.games)}</td
-                >
-                <td class="py-2 text-center text-xs text-muted-foreground">Rebounds per game</td>
-                <td class="py-2 text-right font-bold"
-                  >{perGame(comparison.opp.reb, comparison.games)}</td
-                >
-              </tr>
-              <tr>
-                <td class="py-2 text-left font-bold"
-                  >{perGame(comparison.you.tov, comparison.games)}</td
-                >
-                <td class="py-2 text-center text-xs text-muted-foreground">Turnovers per game</td>
-                <td class="py-2 text-right font-bold"
-                  >{perGame(comparison.opp.tov, comparison.games)}</td
-                >
-              </tr>
-            </tbody>
-          </table>
-        {:else}
-          <p class="mt-3 text-sm text-muted-foreground">Comparison needs simulated games.</p>
-        {/if}
-      </section>
-
-      <section
-        aria-label="Series summary"
-        class="rounded-xl border border-line-soft bg-surface-1 p-4"
-      >
-        <h3 class="font-mono text-[11px] font-bold tracking-[0.16em] text-primary uppercase">
-          Series summary
-        </h3>
-        <ul class="mt-3 flex flex-col gap-3 text-sm">
-          <li class="flex items-center gap-3">
-            <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface-3"
-              ><Calendar class="h-4 w-4 text-muted-foreground" /></span
-            >
-            <span
-              ><span class="block font-mono text-[10px] text-muted-foreground uppercase">Date</span
-              ><span class="font-semibold">{summaryDate}</span></span
-            >
-          </li>
-          <li class="flex items-center gap-3">
-            <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface-3"
-              ><Gamepad2 class="h-4 w-4 text-muted-foreground" /></span
-            >
-            <span
-              ><span class="block font-mono text-[10px] text-muted-foreground uppercase">Mode</span
-              ><span class="font-semibold">{modeDetailLabel}</span></span
-            >
-          </li>
-          <li class="flex items-center gap-3">
-            <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface-3"
-              ><Clock class="h-4 w-4 text-muted-foreground" /></span
-            >
-            <span
-              ><span class="block font-mono text-[10px] text-muted-foreground uppercase">Games</span
-              ><span class="font-semibold"
-                >{duel
-                  ? `${duel.stoppedAtGame} played · first to 4`
-                  : '82 per side · H2H mirrored'}</span
-              ></span
-            >
-          </li>
-          <li class="flex items-center gap-3">
-            <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface-3"
-              ><Trophy class="h-4 w-4 text-muted-foreground" /></span
-            >
-            <span
-              ><span class="block font-mono text-[10px] text-muted-foreground uppercase"
-                >Winner</span
-              ><span class="font-semibold"
-                >{youWon ? `You (${youWins}–${oppWins})` : `Opponent (${oppWins}–${youWins})`}</span
-              ></span
-            >
-          </li>
-        </ul>
-      </section>
-    </div>
-
-    <div class="px-4 pb-4 sm:px-6 sm:pb-6">
-      <details class="rounded-xl border border-line-soft bg-surface-1">
-        <summary
-          class="flex cursor-pointer list-none items-center gap-3 p-4 [&::-webkit-details-marker]:hidden"
-        >
-          <ShieldCheck class="h-5 w-5 text-muted-foreground" />
-          <span class="font-mono text-xs font-bold tracking-widest uppercase">Match details</span>
-          <span class="text-xs text-muted-foreground">Click to view technical details</span>
-          <ChevronDown class="ml-auto h-4 w-4 text-muted-foreground" />
-        </summary>
-        <div class="border-t border-border/60 p-4">
-          {#if digest}
-            <p class="truncate font-mono text-[11px] text-muted-foreground" title={digest}>
-              Digest: {digest.slice(0, 16)}…{digest.slice(-8)}
+              <p class="mt-1 break-all font-mono text-[11px] text-muted-foreground">{digest}</p>
+            {:else}
+              <p class="font-mono text-[11px] text-muted-foreground">No digest recorded yet.</p>
+            {/if}
+            <p class="mt-2 font-mono text-[11px] text-muted-foreground">
+              Wins → differential → seeded tie-break · both clients simulate locally and confirm the
+              digest.
             </p>
-            <p class="mt-1 break-all font-mono text-[11px] text-muted-foreground">{digest}</p>
-          {:else}
-            <p class="font-mono text-[11px] text-muted-foreground">No digest recorded yet.</p>
-          {/if}
-          <p class="mt-2 font-mono text-[11px] text-muted-foreground">
-            Wins → differential → seeded tie-break · both clients simulate locally and confirm the
-            digest.
-          </p>
-        </div>
-      </details>
-    </div>
-  {:else if tab === 'games'}
-    <div class="p-4 sm:p-6">
-      {#if duel}
-        <ol class="grid gap-3 sm:grid-cols-2" aria-label="All series games">
-          {#each duelScores as g (g.gameNumber)}
-            <li class="rounded-xl border border-primary/25 bg-surface-1 p-4">
-              <div class="flex items-center justify-between">
-                <span class="font-mono text-xs text-muted-foreground">Game {g.gameNumber}</span>
-                <span
-                  class="font-mono text-xs font-bold tracking-widest uppercase {g.won
-                    ? 'text-positive'
-                    : 'text-primary'}">{g.won ? 'Win' : 'Loss'}</span
-                >
-              </div>
-              <p class="font-display mt-2 text-3xl font-extrabold tabular-nums">
-                {#if g.youScore !== null && g.oppScore !== null}
-                  {g.youScore} <span class="text-muted-foreground">-</span> {g.oppScore}
-                {:else}
-                  <span class={g.won ? 'text-positive' : 'text-primary'}>{g.won ? 'W' : 'L'}</span>
-                {/if}
-              </p>
-              <p class="mt-1 font-mono text-[11px] text-muted-foreground uppercase">
-                You · Opp · Final
-              </p>
-              {#if g.youScore === null}
-                <p class="mt-1 text-xs text-muted-foreground">
-                  Score streams in once the simulated games rebuild on this device.
-                </p>
-              {/if}
-            </li>
-          {/each}
-        </ol>
-        {#if duelScores.every((g) => g.youScore === null)}
-          <p class="mt-3 text-xs text-muted-foreground">
-            Scores need the simulated games, which are not on this device yet. Win/loss comes from
-            the verified result.
-          </p>
-        {/if}
-      {:else}
-        {#if h2hScores.length > 0}
-          <ol class="grid gap-3 sm:grid-cols-2" aria-label="Head-to-head games">
-            {#each h2hScores as g (g.gameNumber)}
+          </div>
+        </details>
+      </div>
+    {:else if tab === 'games'}
+      <div class="p-4 sm:p-6">
+        {#if duel}
+          <ol class="grid gap-3 sm:grid-cols-2" aria-label="All series games">
+            {#each duelScores as g (g.gameNumber)}
               <li class="rounded-xl border border-primary/25 bg-surface-1 p-4">
                 <div class="flex items-center justify-between">
-                  <span class="font-mono text-xs text-muted-foreground"
-                    >H2H · Game {g.gameNumber}</span
-                  >
+                  <span class="font-mono text-xs text-muted-foreground">Game {g.gameNumber}</span>
                   <span
                     class="font-mono text-xs font-bold tracking-widest uppercase {g.won
                       ? 'text-positive'
@@ -731,508 +714,540 @@
                   >
                 </div>
                 <p class="font-display mt-2 text-3xl font-extrabold tabular-nums">
-                  {g.youScore} <span class="text-muted-foreground">-</span>
-                  {g.oppScore}
+                  {#if g.youScore !== null && g.oppScore !== null}
+                    {g.youScore} <span class="text-muted-foreground">-</span> {g.oppScore}
+                  {:else}
+                    <span class={g.won ? 'text-positive' : 'text-primary'}>{g.won ? 'W' : 'L'}</span
+                    >
+                  {/if}
                 </p>
                 <p class="mt-1 font-mono text-[11px] text-muted-foreground uppercase">
                   You · Opp · Final
                 </p>
+                {#if g.youScore === null}
+                  <p class="mt-1 text-xs text-muted-foreground">
+                    Score streams in once the simulated games rebuild on this device.
+                  </p>
+                {/if}
               </li>
             {/each}
           </ol>
-          <p class="mt-3 text-xs text-muted-foreground">
-            Head-to-head games simulate once and mirror into both records. The remaining gauntlet
-            games run against the shared bracket.
-          </p>
-        {:else if shared && youShared && oppShared}
-          <div class="grid gap-3 sm:grid-cols-2">
-            <div class="rounded-xl border border-line-soft bg-surface-1 p-4 text-center">
-              <p class="font-mono text-[11px] text-muted-foreground uppercase">You</p>
-              <p class="font-display mt-1 text-4xl font-extrabold tabular-nums">
-                {youShared.wins}<span class="text-muted-foreground">–</span>{youShared.losses}
-              </p>
-              <p class="mt-1 font-mono text-[11px] text-muted-foreground">
-                Diff {youShared.differential >= 0 ? '+' : ''}{youShared.differential} · H2H {youShared.h2hWins}
-              </p>
-            </div>
-            <div class="rounded-xl border border-line-soft bg-surface-1 p-4 text-center">
-              <p class="font-mono text-[11px] text-muted-foreground uppercase">Opponent</p>
-              <p class="font-display mt-1 text-4xl font-extrabold tabular-nums">
-                {oppShared.wins}<span class="text-muted-foreground">–</span>{oppShared.losses}
-              </p>
-              <p class="mt-1 font-mono text-[11px] text-muted-foreground">
-                Diff {oppShared.differential >= 0 ? '+' : ''}{oppShared.differential} · H2H {oppShared.h2hWins}
-              </p>
-            </div>
-          </div>
-          <p class="mt-3 text-xs text-muted-foreground">
-            Per-game scores rebuild on this device after the simulated games stream back.
-          </p>
-        {/if}
-      {/if}
-    </div>
-  {:else if tab === 'players'}
-    <section aria-label="Player stats, both fives" class="p-4 sm:p-6">
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <h3 class="font-display text-lg font-extrabold tracking-tight uppercase">
-          Player stats · both fives
-        </h3>
-        <div class="flex flex-wrap items-center gap-2">
-          <div
-            class="flex rounded-lg border border-border p-0.5"
-            role="group"
-            aria-label="Stats side"
-          >
-            <button
-              type="button"
-              aria-pressed={statsSide === 'you'}
-              onclick={() => (statsSide = 'you')}
-              class="rounded-md px-3 py-1 font-mono text-xs font-semibold {statsSide === 'you'
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground'}"
-            >
-              You
-            </button>
-            <button
-              type="button"
-              aria-pressed={statsSide === 'opp'}
-              onclick={() => (statsSide = 'opp')}
-              class="rounded-md px-3 py-1 font-mono text-xs font-semibold {statsSide === 'opp'
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground'}"
-            >
-              Opponent
-            </button>
-          </div>
-          <div
-            class="flex rounded-lg border border-border p-0.5"
-            role="group"
-            aria-label="Stats values"
-          >
-            <button
-              type="button"
-              aria-pressed={!statsTotals}
-              onclick={() => (statsTotals = false)}
-              class="rounded-md px-3 py-1 font-mono text-xs font-semibold {!statsTotals
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground'}"
-            >
-              Per game
-            </button>
-            <button
-              type="button"
-              aria-pressed={statsTotals}
-              onclick={() => (statsTotals = true)}
-              class="rounded-md px-3 py-1 font-mono text-xs font-semibold {statsTotals
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground'}"
-            >
-              Totals
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {#if statsState === 'building'}
-        <p class="mt-3 animate-pulse text-sm text-muted-foreground" role="status">
-          Building player stats from the simulated games…
-        </p>
-      {:else if statsState !== 'ready' || !stats}
-        <div class="mt-3 flex flex-wrap items-center gap-3">
-          <p class="text-sm text-muted-foreground">
-            Stats need the simulated games, which are not on this device.
-          </p>
-          {#if onRebuildStats}
-            <button
-              type="button"
-              onclick={onRebuildStats}
-              class="rounded-lg border border-border bg-surface-1 px-4 py-2 text-sm font-semibold transition-colors hover:border-line-strong"
-            >
-              Build player stats
-            </button>
+          {#if duelScores.every((g) => g.youScore === null)}
+            <p class="mt-3 text-xs text-muted-foreground">
+              Scores need the simulated games, which are not on this device yet. Win/loss comes from
+              the verified result.
+            </p>
           {/if}
-        </div>
-      {:else}
-        <div class="mt-4 hidden overflow-x-auto sm:block">
-          <table class="w-full min-w-[760px] border-collapse text-sm">
-            <thead>
-              <tr
-                class="border-b border-border font-mono text-[10px] tracking-[0.12em] text-muted-foreground uppercase"
-              >
-                <th scope="col" class="py-2 pr-3 text-left">Player</th>
-                <th scope="col" class="px-2 py-2 text-right">Min</th>
-                <th scope="col" class="px-2 py-2 text-right">PTS</th>
-                <th scope="col" class="px-2 py-2 text-right">FG%</th>
-                <th scope="col" class="px-2 py-2 text-right">3P%</th>
-                <th scope="col" class="px-2 py-2 text-right">FT%</th>
-                <th scope="col" class="px-2 py-2 text-right">REB</th>
-                <th scope="col" class="px-2 py-2 text-right">AST</th>
-                <th scope="col" class="px-2 py-2 text-right">STL</th>
-                <th scope="col" class="px-2 py-2 text-right">BLK</th>
-                <th scope="col" class="px-2 py-2 text-right">TOV</th>
-              </tr>
-            </thead>
-            <tbody>
-              {#each statsRows as row, i (i)}
-                {@const line = row ? statsLines.get(row.playerId) : undefined}
-                <tr class="border-b border-border/50 last:border-0">
-                  <th scope="row" class="py-2 pr-3 text-left">
-                    <span class="flex items-center gap-2">
-                      {#if row}
-                        <PlayerFace
-                          player={row}
-                          {manifest}
-                          size="sm"
-                          fallbackInitials={row.firstName[0]! + row.lastName[0]!}
-                        />
-                        <span class="min-w-0">
-                          <span class="block truncate font-semibold">{row.displayName}</span>
-                          <span class="block font-mono text-[10px] text-muted-foreground">
-                            {line ? `${line.games} games` : 'no games'}
-                          </span>
-                        </span>
-                      {:else}
-                        <span class="font-mono text-xs">Slot {i + 1}</span>
-                      {/if}
-                    </span>
-                  </th>
-                  {#if line}
-                    <td class="px-2 py-2 text-right font-mono"
-                      >{statValue(line.minutes, line.games)}</td
-                    >
-                    <td class="px-2 py-2 text-right font-mono font-bold"
-                      >{statValue(line.points, line.games)}</td
-                    >
-                    <td class="px-2 py-2 text-right font-mono"
-                      >{pctStr(line.fieldGoalsMade, line.fieldGoalsAttempted)}</td
-                    >
-                    <td class="px-2 py-2 text-right font-mono"
-                      >{pctStr(line.threesMade, line.threesAttempted)}</td
-                    >
-                    <td class="px-2 py-2 text-right font-mono"
-                      >{pctStr(line.freeThrowsMade, line.freeThrowsAttempted)}</td
-                    >
-                    <td class="px-2 py-2 text-right font-mono"
-                      >{statValue(line.rebounds, line.games)}</td
-                    >
-                    <td class="px-2 py-2 text-right font-mono"
-                      >{statValue(line.assists, line.games)}</td
-                    >
-                    <td class="px-2 py-2 text-right font-mono"
-                      >{statValue(line.steals, line.games)}</td
-                    >
-                    <td class="px-2 py-2 text-right font-mono"
-                      >{statValue(line.blocks, line.games)}</td
-                    >
-                    <td class="px-2 py-2 text-right font-mono"
-                      >{statValue(line.turnovers, line.games)}</td
-                    >
-                  {:else}
-                    <td colspan="10" class="px-2 py-2 text-right font-mono text-muted-foreground"
-                      >—</td
-                    >
-                  {/if}
-                </tr>
-              {/each}
-            </tbody>
-          </table>
-        </div>
-        <div class="mt-4 grid min-w-0 gap-2 sm:hidden">
-          {#each statsRows as row, i (i)}
-            {@const line = row ? statsLines.get(row.playerId) : undefined}
-            <article class="min-w-0 rounded-lg border border-border bg-surface-1 px-4 py-3">
-              <div class="flex items-start gap-3">
-                {#if row}
-                  <PlayerFace
-                    player={row}
-                    {manifest}
-                    size="sm"
-                    fallbackInitials={row.firstName[0]! + row.lastName[0]!}
-                  />
-                {/if}
-                <div class="min-w-0 flex-1">
-                  <div class="flex items-start justify-between gap-3">
-                    <div class="min-w-0 flex-1">
-                      <p class="truncate text-sm font-bold">
-                        {row?.displayName ?? `Slot ${i + 1}`}
-                      </p>
-                      <p class="font-mono text-[10px] text-muted-foreground">
-                        {line ? `${line.games} games` : 'no games'}
-                      </p>
-                    </div>
-                    {#if line}
-                      <p class="shrink-0 font-mono text-sm font-bold tabular-nums">
-                        {statValue(line.points, line.games)} PTS
-                      </p>
-                    {/if}
-                  </div>
-                </div>
-              </div>
-              {#if line}
-                <div class="mt-3 grid min-w-0 grid-cols-2 gap-x-4 text-xs font-mono tabular-nums">
-                  <div class="min-w-0 divide-y divide-border/40">
-                    <div class="flex items-center justify-between gap-2 py-1.5">
-                      <span class="text-muted-foreground">MIN</span>
-                      <span class="font-semibold text-foreground"
-                        >{statValue(line.minutes, line.games)}</span
-                      >
-                    </div>
-                    <div class="flex items-center justify-between gap-2 py-1.5">
-                      <span class="text-muted-foreground">FG%</span>
-                      <span class="font-semibold text-foreground"
-                        >{pctStr(line.fieldGoalsMade, line.fieldGoalsAttempted)}</span
-                      >
-                    </div>
-                    <div class="flex items-center justify-between gap-2 py-1.5">
-                      <span class="text-muted-foreground">3P%</span>
-                      <span class="font-semibold text-foreground"
-                        >{pctStr(line.threesMade, line.threesAttempted)}</span
-                      >
-                    </div>
-                    <div class="flex items-center justify-between gap-2 py-1.5">
-                      <span class="text-muted-foreground">FT%</span>
-                      <span class="font-semibold text-foreground"
-                        >{pctStr(line.freeThrowsMade, line.freeThrowsAttempted)}</span
-                      >
-                    </div>
-                  </div>
-                  <div class="min-w-0 divide-y divide-border/40">
-                    <div class="flex items-center justify-between gap-2 py-1.5">
-                      <span class="text-muted-foreground">REB</span>
-                      <span class="font-semibold text-foreground"
-                        >{statValue(line.rebounds, line.games)}</span
-                      >
-                    </div>
-                    <div class="flex items-center justify-between gap-2 py-1.5">
-                      <span class="text-muted-foreground">AST</span>
-                      <span class="font-semibold text-foreground"
-                        >{statValue(line.assists, line.games)}</span
-                      >
-                    </div>
-                    <div class="flex items-center justify-between gap-2 py-1.5">
-                      <span class="text-muted-foreground">STL</span>
-                      <span class="font-semibold text-foreground"
-                        >{statValue(line.steals, line.games)}</span
-                      >
-                    </div>
-                    <div class="flex items-center justify-between gap-2 py-1.5">
-                      <span class="text-muted-foreground">BLK / TOV</span>
-                      <span class="font-semibold text-foreground">
-                        {statValue(line.blocks, line.games)} / {statValue(
-                          line.turnovers,
-                          line.games,
-                        )}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              {/if}
-            </article>
-          {/each}
-        </div>
-      {/if}
-    </section>
-  {:else}
-    <div class="grid gap-4 p-4 sm:p-6 lg:grid-cols-2">
-      <section
-        aria-label="Team comparison detail"
-        class="rounded-xl border border-line-soft bg-surface-1 p-4"
-      >
-        <h3 class="font-mono text-[11px] font-bold tracking-[0.16em] text-primary uppercase">
-          Team comparison
-        </h3>
-        {#if comparison}
-          <table class="mt-2 w-full text-sm">
-            <thead>
-              <tr class="font-mono text-[10px] tracking-widest text-muted-foreground uppercase">
-                <th scope="col" class="py-1 text-left">You</th>
-                <th scope="col" class="py-1 text-center">Stat</th>
-                <th scope="col" class="py-1 text-right">Opponent</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-border/50 tabular-nums">
-              <tr>
-                <td class="py-2 text-left font-bold"
-                  >{perGame(comparison.you.points, comparison.games)}</td
-                >
-                <td class="py-2 text-center text-xs text-muted-foreground">Points per game</td>
-                <td class="py-2 text-right font-bold"
-                  >{perGame(comparison.opp.points, comparison.games)}</td
-                >
-              </tr>
-              <tr>
-                <td class="py-2 text-left font-bold"
-                  >{pctStr(comparison.you.fgm, comparison.you.fga)}</td
-                >
-                <td class="py-2 text-center text-xs text-muted-foreground">FG%</td>
-                <td class="py-2 text-right font-bold"
-                  >{pctStr(comparison.opp.fgm, comparison.opp.fga)}</td
-                >
-              </tr>
-              <tr>
-                <td class="py-2 text-left font-bold"
-                  >{pctStr(comparison.you.tpm, comparison.you.tpa)}</td
-                >
-                <td class="py-2 text-center text-xs text-muted-foreground">3P%</td>
-                <td class="py-2 text-right font-bold"
-                  >{pctStr(comparison.opp.tpm, comparison.opp.tpa)}</td
-                >
-              </tr>
-              <tr>
-                <td class="py-2 text-left font-bold"
-                  >{perGame(comparison.you.reb, comparison.games)}</td
-                >
-                <td class="py-2 text-center text-xs text-muted-foreground">Rebounds per game</td>
-                <td class="py-2 text-right font-bold"
-                  >{perGame(comparison.opp.reb, comparison.games)}</td
-                >
-              </tr>
-              <tr>
-                <td class="py-2 text-left font-bold"
-                  >{perGame(comparison.you.tov, comparison.games)}</td
-                >
-                <td class="py-2 text-center text-xs text-muted-foreground">Turnovers per game</td>
-                <td class="py-2 text-right font-bold"
-                  >{perGame(comparison.opp.tov, comparison.games)}</td
-                >
-              </tr>
-            </tbody>
-          </table>
         {:else}
-          <p class="mt-3 text-sm text-muted-foreground">Comparison needs simulated games.</p>
-          {#if onRebuildStats}
-            <button
-              type="button"
-              onclick={onRebuildStats}
-              class="mt-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-semibold"
-            >
-              Build player stats
-            </button>
+          {#if h2hScores.length > 0}
+            <ol class="grid gap-3 sm:grid-cols-2" aria-label="Head-to-head games">
+              {#each h2hScores as g (g.gameNumber)}
+                <li class="rounded-xl border border-primary/25 bg-surface-1 p-4">
+                  <div class="flex items-center justify-between">
+                    <span class="font-mono text-xs text-muted-foreground"
+                      >H2H · Game {g.gameNumber}</span
+                    >
+                    <span
+                      class="font-mono text-xs font-bold tracking-widest uppercase {g.won
+                        ? 'text-positive'
+                        : 'text-primary'}">{g.won ? 'Win' : 'Loss'}</span
+                    >
+                  </div>
+                  <p class="font-display mt-2 text-3xl font-extrabold tabular-nums">
+                    {g.youScore} <span class="text-muted-foreground">-</span>
+                    {g.oppScore}
+                  </p>
+                  <p class="mt-1 font-mono text-[11px] text-muted-foreground uppercase">
+                    You · Opp · Final
+                  </p>
+                </li>
+              {/each}
+            </ol>
+            <p class="mt-3 text-xs text-muted-foreground">
+              Head-to-head games simulate once and mirror into both records. The remaining gauntlet
+              games run against the shared bracket.
+            </p>
+          {:else if shared && youShared && oppShared}
+            <div class="grid gap-3 sm:grid-cols-2">
+              <div class="rounded-xl border border-line-soft bg-surface-1 p-4 text-center">
+                <p class="font-mono text-[11px] text-muted-foreground uppercase">You</p>
+                <p class="font-display mt-1 text-4xl font-extrabold tabular-nums">
+                  {youShared.wins}<span class="text-muted-foreground">–</span>{youShared.losses}
+                </p>
+                <p class="mt-1 font-mono text-[11px] text-muted-foreground">
+                  Diff {youShared.differential >= 0 ? '+' : ''}{youShared.differential} · H2H {youShared.h2hWins}
+                </p>
+              </div>
+              <div class="rounded-xl border border-line-soft bg-surface-1 p-4 text-center">
+                <p class="font-mono text-[11px] text-muted-foreground uppercase">Opponent</p>
+                <p class="font-display mt-1 text-4xl font-extrabold tabular-nums">
+                  {oppShared.wins}<span class="text-muted-foreground">–</span>{oppShared.losses}
+                </p>
+                <p class="mt-1 font-mono text-[11px] text-muted-foreground">
+                  Diff {oppShared.differential >= 0 ? '+' : ''}{oppShared.differential} · H2H {oppShared.h2hWins}
+                </p>
+              </div>
+            </div>
+            <p class="mt-3 text-xs text-muted-foreground">
+              Per-game scores rebuild on this device after the simulated games stream back.
+            </p>
           {/if}
         {/if}
+      </div>
+    {:else if tab === 'players'}
+      <section aria-label="Player stats, both fives" class="p-4 sm:p-6">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <h3 class="font-display text-lg font-extrabold tracking-tight uppercase">
+            Player stats · both fives
+          </h3>
+          <div class="flex flex-wrap items-center gap-2">
+            <div
+              class="flex rounded-lg border border-border p-0.5"
+              role="group"
+              aria-label="Stats side"
+            >
+              <button
+                type="button"
+                aria-pressed={statsSide === 'you'}
+                onclick={() => (statsSide = 'you')}
+                class="rounded-md px-3 py-1 font-mono text-xs font-semibold {statsSide === 'you'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground'}"
+              >
+                You
+              </button>
+              <button
+                type="button"
+                aria-pressed={statsSide === 'opp'}
+                onclick={() => (statsSide = 'opp')}
+                class="rounded-md px-3 py-1 font-mono text-xs font-semibold {statsSide === 'opp'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground'}"
+              >
+                Opponent
+              </button>
+            </div>
+            <div
+              class="flex rounded-lg border border-border p-0.5"
+              role="group"
+              aria-label="Stats values"
+            >
+              <button
+                type="button"
+                aria-pressed={!statsTotals}
+                onclick={() => (statsTotals = false)}
+                class="rounded-md px-3 py-1 font-mono text-xs font-semibold {!statsTotals
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground'}"
+              >
+                Per game
+              </button>
+              <button
+                type="button"
+                aria-pressed={statsTotals}
+                onclick={() => (statsTotals = true)}
+                class="rounded-md px-3 py-1 font-mono text-xs font-semibold {statsTotals
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground'}"
+              >
+                Totals
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {#if statsState === 'building'}
+          <p class="mt-3 animate-pulse text-sm text-muted-foreground" role="status">
+            Building player stats from the simulated games…
+          </p>
+        {:else if statsState !== 'ready' || !stats}
+          <div class="mt-3 flex flex-wrap items-center gap-3">
+            <p class="text-sm text-muted-foreground">
+              Stats need the simulated games, which are not on this device.
+            </p>
+            {#if onRebuildStats}
+              <button
+                type="button"
+                onclick={onRebuildStats}
+                class="rounded-lg border border-border bg-surface-1 px-4 py-2 text-sm font-semibold transition-colors hover:border-line-strong"
+              >
+                Build player stats
+              </button>
+            {/if}
+          </div>
+        {:else}
+          <div class="mt-4 hidden overflow-x-auto sm:block">
+            <table class="w-full min-w-[760px] border-collapse text-sm">
+              <thead>
+                <tr
+                  class="border-b border-border font-mono text-[10px] tracking-[0.12em] text-muted-foreground uppercase"
+                >
+                  <th scope="col" class="py-2 pr-3 text-left">Player</th>
+                  <th scope="col" class="px-2 py-2 text-right">Min</th>
+                  <th scope="col" class="px-2 py-2 text-right">PTS</th>
+                  <th scope="col" class="px-2 py-2 text-right">FG%</th>
+                  <th scope="col" class="px-2 py-2 text-right">3P%</th>
+                  <th scope="col" class="px-2 py-2 text-right">FT%</th>
+                  <th scope="col" class="px-2 py-2 text-right">REB</th>
+                  <th scope="col" class="px-2 py-2 text-right">AST</th>
+                  <th scope="col" class="px-2 py-2 text-right">STL</th>
+                  <th scope="col" class="px-2 py-2 text-right">BLK</th>
+                  <th scope="col" class="px-2 py-2 text-right">TOV</th>
+                </tr>
+              </thead>
+              <tbody>
+                {#each statsRows as row, i (i)}
+                  {@const line = row ? statsLines.get(row.playerId) : undefined}
+                  <tr class="border-b border-border/50 last:border-0">
+                    <th scope="row" class="py-2 pr-3 text-left">
+                      <span class="flex items-center gap-2">
+                        {#if row}
+                          <PlayerFace
+                            player={row}
+                            {manifest}
+                            size="sm"
+                            fallbackInitials={row.firstName[0]! + row.lastName[0]!}
+                          />
+                          <span class="min-w-0">
+                            <span class="block truncate font-semibold">{row.displayName}</span>
+                            <span class="block font-mono text-[10px] text-muted-foreground">
+                              {line ? `${line.games} games` : 'no games'}
+                            </span>
+                          </span>
+                        {:else}
+                          <span class="font-mono text-xs">Slot {i + 1}</span>
+                        {/if}
+                      </span>
+                    </th>
+                    {#if line}
+                      <td class="px-2 py-2 text-right font-mono"
+                        >{statValue(line.minutes, line.games)}</td
+                      >
+                      <td class="px-2 py-2 text-right font-mono font-bold"
+                        >{statValue(line.points, line.games)}</td
+                      >
+                      <td class="px-2 py-2 text-right font-mono"
+                        >{pctStr(line.fieldGoalsMade, line.fieldGoalsAttempted)}</td
+                      >
+                      <td class="px-2 py-2 text-right font-mono"
+                        >{pctStr(line.threesMade, line.threesAttempted)}</td
+                      >
+                      <td class="px-2 py-2 text-right font-mono"
+                        >{pctStr(line.freeThrowsMade, line.freeThrowsAttempted)}</td
+                      >
+                      <td class="px-2 py-2 text-right font-mono"
+                        >{statValue(line.rebounds, line.games)}</td
+                      >
+                      <td class="px-2 py-2 text-right font-mono"
+                        >{statValue(line.assists, line.games)}</td
+                      >
+                      <td class="px-2 py-2 text-right font-mono"
+                        >{statValue(line.steals, line.games)}</td
+                      >
+                      <td class="px-2 py-2 text-right font-mono"
+                        >{statValue(line.blocks, line.games)}</td
+                      >
+                      <td class="px-2 py-2 text-right font-mono"
+                        >{statValue(line.turnovers, line.games)}</td
+                      >
+                    {:else}
+                      <td colspan="10" class="px-2 py-2 text-right font-mono text-muted-foreground"
+                        >—</td
+                      >
+                    {/if}
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+          </div>
+          <div class="mt-4 grid min-w-0 gap-2 sm:hidden">
+            {#each statsRows as row, i (i)}
+              {@const line = row ? statsLines.get(row.playerId) : undefined}
+              <article class="min-w-0 rounded-lg border border-border bg-surface-1 px-4 py-3">
+                <div class="flex items-start gap-3">
+                  {#if row}
+                    <PlayerFace
+                      player={row}
+                      {manifest}
+                      size="sm"
+                      fallbackInitials={row.firstName[0]! + row.lastName[0]!}
+                    />
+                  {/if}
+                  <div class="min-w-0 flex-1">
+                    <div class="flex items-start justify-between gap-3">
+                      <div class="min-w-0 flex-1">
+                        <p class="truncate text-sm font-bold">
+                          {row?.displayName ?? `Slot ${i + 1}`}
+                        </p>
+                        <p class="font-mono text-[10px] text-muted-foreground">
+                          {line ? `${line.games} games` : 'no games'}
+                        </p>
+                      </div>
+                      {#if line}
+                        <p class="shrink-0 font-mono text-sm font-bold tabular-nums">
+                          {statValue(line.points, line.games)} PTS
+                        </p>
+                      {/if}
+                    </div>
+                  </div>
+                </div>
+                {#if line}
+                  <div class="mt-3 grid min-w-0 grid-cols-2 gap-x-4 text-xs font-mono tabular-nums">
+                    <div class="min-w-0 divide-y divide-border/40">
+                      <div class="flex items-center justify-between gap-2 py-1.5">
+                        <span class="text-muted-foreground">MIN</span>
+                        <span class="font-semibold text-foreground"
+                          >{statValue(line.minutes, line.games)}</span
+                        >
+                      </div>
+                      <div class="flex items-center justify-between gap-2 py-1.5">
+                        <span class="text-muted-foreground">FG%</span>
+                        <span class="font-semibold text-foreground"
+                          >{pctStr(line.fieldGoalsMade, line.fieldGoalsAttempted)}</span
+                        >
+                      </div>
+                      <div class="flex items-center justify-between gap-2 py-1.5">
+                        <span class="text-muted-foreground">3P%</span>
+                        <span class="font-semibold text-foreground"
+                          >{pctStr(line.threesMade, line.threesAttempted)}</span
+                        >
+                      </div>
+                      <div class="flex items-center justify-between gap-2 py-1.5">
+                        <span class="text-muted-foreground">FT%</span>
+                        <span class="font-semibold text-foreground"
+                          >{pctStr(line.freeThrowsMade, line.freeThrowsAttempted)}</span
+                        >
+                      </div>
+                    </div>
+                    <div class="min-w-0 divide-y divide-border/40">
+                      <div class="flex items-center justify-between gap-2 py-1.5">
+                        <span class="text-muted-foreground">REB</span>
+                        <span class="font-semibold text-foreground"
+                          >{statValue(line.rebounds, line.games)}</span
+                        >
+                      </div>
+                      <div class="flex items-center justify-between gap-2 py-1.5">
+                        <span class="text-muted-foreground">AST</span>
+                        <span class="font-semibold text-foreground"
+                          >{statValue(line.assists, line.games)}</span
+                        >
+                      </div>
+                      <div class="flex items-center justify-between gap-2 py-1.5">
+                        <span class="text-muted-foreground">STL</span>
+                        <span class="font-semibold text-foreground"
+                          >{statValue(line.steals, line.games)}</span
+                        >
+                      </div>
+                      <div class="flex items-center justify-between gap-2 py-1.5">
+                        <span class="text-muted-foreground">BLK / TOV</span>
+                        <span class="font-semibold text-foreground">
+                          {statValue(line.blocks, line.games)} / {statValue(
+                            line.turnovers,
+                            line.games,
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                {/if}
+              </article>
+            {/each}
+          </div>
+        {/if}
       </section>
-      <section
-        aria-label="Verification"
-        class="rounded-xl border border-line-soft bg-surface-1 p-4"
-      >
-        <h3 class="font-mono text-[11px] font-bold tracking-[0.16em] text-primary uppercase">
-          Verification
-        </h3>
-        <ul class="mt-3 flex flex-col gap-2 font-mono text-[11px] text-muted-foreground">
-          <li class="flex items-center gap-2">
-            <ShieldCheck class="h-4 w-4" />
-            {verified
-              ? 'Verified locally against the accepted command log'
-              : 'Verification receipt pending'}
-          </li>
-          <li>Mode · {modeDetailLabel}</li>
-          {#if digest}
-            <li class="break-all" title={digest}>Digest · {digest}</li>
+    {:else}
+      <div class="grid gap-4 p-4 sm:p-6 lg:grid-cols-2">
+        <section
+          aria-label="Team comparison detail"
+          class="rounded-xl border border-line-soft bg-surface-1 p-4"
+        >
+          <h3 class="font-mono text-[11px] font-bold tracking-[0.16em] text-primary uppercase">
+            Team comparison
+          </h3>
+          {#if comparison}
+            <table class="mt-2 w-full text-sm">
+              <thead>
+                <tr class="font-mono text-[10px] tracking-widest text-muted-foreground uppercase">
+                  <th scope="col" class="py-1 text-left">You</th>
+                  <th scope="col" class="py-1 text-center">Stat</th>
+                  <th scope="col" class="py-1 text-right">Opponent</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-border/50 tabular-nums">
+                <tr>
+                  <td class="py-2 text-left font-bold"
+                    >{perGame(comparison.you.points, comparison.games)}</td
+                  >
+                  <td class="py-2 text-center text-xs text-muted-foreground">Points per game</td>
+                  <td class="py-2 text-right font-bold"
+                    >{perGame(comparison.opp.points, comparison.games)}</td
+                  >
+                </tr>
+                <tr>
+                  <td class="py-2 text-left font-bold"
+                    >{pctStr(comparison.you.fgm, comparison.you.fga)}</td
+                  >
+                  <td class="py-2 text-center text-xs text-muted-foreground">FG%</td>
+                  <td class="py-2 text-right font-bold"
+                    >{pctStr(comparison.opp.fgm, comparison.opp.fga)}</td
+                  >
+                </tr>
+                <tr>
+                  <td class="py-2 text-left font-bold"
+                    >{pctStr(comparison.you.tpm, comparison.you.tpa)}</td
+                  >
+                  <td class="py-2 text-center text-xs text-muted-foreground">3P%</td>
+                  <td class="py-2 text-right font-bold"
+                    >{pctStr(comparison.opp.tpm, comparison.opp.tpa)}</td
+                  >
+                </tr>
+                <tr>
+                  <td class="py-2 text-left font-bold"
+                    >{perGame(comparison.you.reb, comparison.games)}</td
+                  >
+                  <td class="py-2 text-center text-xs text-muted-foreground">Rebounds per game</td>
+                  <td class="py-2 text-right font-bold"
+                    >{perGame(comparison.opp.reb, comparison.games)}</td
+                  >
+                </tr>
+                <tr>
+                  <td class="py-2 text-left font-bold"
+                    >{perGame(comparison.you.tov, comparison.games)}</td
+                  >
+                  <td class="py-2 text-center text-xs text-muted-foreground">Turnovers per game</td>
+                  <td class="py-2 text-right font-bold"
+                    >{perGame(comparison.opp.tov, comparison.games)}</td
+                  >
+                </tr>
+              </tbody>
+            </table>
           {:else}
-            <li>No digest recorded yet.</li>
+            <p class="mt-3 text-sm text-muted-foreground">Comparison needs simulated games.</p>
+            {#if onRebuildStats}
+              <button
+                type="button"
+                onclick={onRebuildStats}
+                class="mt-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-semibold"
+              >
+                Build player stats
+              </button>
+            {/if}
           {/if}
-          {#if receiptDigest}
-            <li class="break-all" title={receiptDigest}>Receipt · {receiptDigest}</li>
-          {/if}
-          {#if shared}
-            <li>Tie-break · {shared.tiebreakPath}</li>
-            <li>Ranking · {shared.ranking.join(' → ')}</li>
-          {/if}
-          {#if duel}
-            <li>First to 4 · stopped at game {duel.stoppedAtGame}</li>
-          {/if}
-        </ul>
-      </section>
-    </div>
-  {/if}
+        </section>
+        <section
+          aria-label="Verification"
+          class="rounded-xl border border-line-soft bg-surface-1 p-4"
+        >
+          <h3 class="font-mono text-[11px] font-bold tracking-[0.16em] text-primary uppercase">
+            Verification
+          </h3>
+          <ul class="mt-3 flex flex-col gap-2 font-mono text-[11px] text-muted-foreground">
+            <li class="flex items-center gap-2">
+              <ShieldCheck class="h-4 w-4" />
+              {verified
+                ? 'Verified locally against the accepted command log'
+                : 'Verification receipt pending'}
+            </li>
+            <li>Mode · {modeDetailLabel}</li>
+            {#if digest}
+              <li class="break-all" title={digest}>Digest · {digest}</li>
+            {:else}
+              <li>No digest recorded yet.</li>
+            {/if}
+            {#if receiptDigest}
+              <li class="break-all" title={receiptDigest}>Receipt · {receiptDigest}</li>
+            {/if}
+            {#if shared}
+              <li>Tie-break · {shared.tiebreakPath}</li>
+              <li>Ranking · {shared.ranking.join(' → ')}</li>
+            {/if}
+            {#if duel}
+              <li>First to 4 · stopped at game {duel.stoppedAtGame}</li>
+            {/if}
+          </ul>
+        </section>
+      </div>
+    {/if}
+  </div>
 </div>
 
 <style>
+  .match-results {
+    overflow: hidden;
+    border: 1px solid var(--color-line-soft);
+    border-radius: 12px;
+    background: var(--color-card);
+  }
+  .result-hero {
+    position: relative;
+    border-bottom: 1px solid var(--color-line-soft);
+    border-top: 3px solid var(--color-primary);
+    padding: 36px 28px;
+    text-align: center;
+    background: var(--color-surface-2);
+  }
   .rematch-strip {
     display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    padding: 0 1rem 1rem;
-  }
-  @media (min-width: 640px) {
-    .rematch-strip {
-      flex-direction: row;
-      align-items: center;
-      padding: 0 1.5rem 1rem;
-    }
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    padding: 20px 24px;
   }
   .rematch-main {
-    position: relative;
-    overflow: hidden;
-    flex: 1;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 0.6rem;
-    border-radius: 0.9rem;
+    gap: 12px;
+    border-radius: 7px;
     background: var(--color-primary);
     color: var(--color-primary-foreground);
-    padding: 0.85rem 1.5rem;
-    font-family: var(--font-display);
-    font-size: 1.05rem;
-    font-weight: 900;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    isolation: isolate;
+    padding: 12px 24px;
+    font-size: 13px;
+    font-weight: 700;
   }
-  .rematch-main::after {
-    content: '';
-    position: absolute;
-    inset: -40% -20%;
-    z-index: 0;
-    background: linear-gradient(
-      100deg,
-      transparent 42%,
-      color-mix(in srgb, white 35%, transparent) 50%,
-      transparent 58%
-    );
-    animation: rematch-sheen 2.6s ease infinite;
+  .new-match {
+    padding: 12px 18px;
+    font-size: 12px;
+    border: 1px solid var(--color-line-strong);
+    border-radius: 7px;
   }
-  .rematch-ball {
-    position: relative;
-    z-index: 1;
-    width: 1.2rem;
-    height: 1.2rem;
-    border-radius: 999px;
-    flex-shrink: 0;
-    background:
-      linear-gradient(90deg, transparent 46%, black 46%, black 54%, transparent 54%),
-      radial-gradient(circle at 30% 25%, white 0 12%, transparent 13%), var(--color-court-wood);
-    border: 1px solid black;
-    animation: ball-bounce 1.1s ease-in-out infinite;
+  .stats-shortcut {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-left: auto;
+    color: var(--color-muted-foreground);
+    font-size: 12px;
+    padding: 12px 0;
   }
-  @keyframes rematch-sheen {
-    0%,
-    55% {
-      transform: translateX(-70%);
-      opacity: 0;
-    }
-    75% {
-      opacity: 1;
-    }
-    100% {
-      transform: translateX(70%);
-      opacity: 0;
-    }
+  button,
+  a {
+    cursor: pointer;
   }
-  @keyframes ball-bounce {
-    0%,
-    100% {
-      transform: translateY(0) rotate(0);
-    }
-    50% {
-      transform: translateY(-4px) rotate(40deg);
-    }
+  button:disabled {
+    cursor: default;
+    opacity: 0.45;
   }
-  @media (prefers-reduced-motion: reduce) {
-    .rematch-main::after,
-    .rematch-ball {
-      animation: none;
+  button:focus-visible,
+  a:focus-visible,
+  [role='tabpanel']:focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: -3px;
+  }
+  @media (max-width: 640px) {
+    .result-hero {
+      padding: 28px 18px;
+    }
+    .rematch-strip {
+      padding: 18px;
+    }
+    .rematch-main,
+    .new-match {
+      width: 100%;
+      text-align: center;
+    }
+    .stats-shortcut {
+      margin: 0 auto;
     }
   }
 </style>

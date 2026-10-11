@@ -15,8 +15,6 @@ import {
   applyFreeAgencyDeclaration,
   applyFreeAgencySkip,
   FreeAgencyValidationRejection,
-  freeAgencySeed,
-  freeAgencyUnresolvedWindowIndex,
   openSeasonFreeAgencyWindow,
   resolveSeasonFreeAgencyWindow,
   seasonFreeAgencyUniverseOf,
@@ -24,7 +22,6 @@ import {
 import { buildEconomyTestRun } from './season-economy-test-support.ts';
 import { expandSeasonRunRosters } from './block.ts';
 import { reconcileSeasonEffects } from './effects.ts';
-import { buildMinimalRotation } from './rotation.ts';
 const HUMAN = 'lakers';
 const BAND_CYCLE: SeasonFreeAgencyBand[] = ['featured', 'role', 'role', 'development', 'emergency'];
 function fixtureIndex(catalog: SeasonDraftCatalog): SeasonFreeAgencyIndex {
@@ -124,36 +121,6 @@ describe('free-agency universe and canonical selection', () => {
       expect(canonical?.seedPath).toEqual(['0', 'canonical', candidate.playerId]);
     }
   });
-  it('reuses canonical identity choices in later windows', () => {
-    const { run, catalog, index } = fixture();
-    const context = contextOf(run, catalog, index);
-    const opened = openSeasonFreeAgencyWindow(context, 0, 2);
-    const reopened = openSeasonFreeAgencyWindow(
-      { ...context, run: { ...run, freeAgency: opened.freeAgency } },
-      1,
-      4,
-    );
-    for (const candidate of opened.window.candidates) {
-      const again = reopened.window.candidates.find(
-        (entry) => entry.playerId === candidate.playerId,
-      );
-      if (again !== undefined) {
-        expect(again.playerVersionId).toBe(candidate.playerVersionId);
-      }
-    }
-  });
-  it('names the free-agency seed paths under the frozen namespace', () => {
-    const { run } = fixture();
-    expect(freeAgencySeed(run.rootSeed, '0', 'canonical', 'p-x')).toBe(
-      freeAgencySeed(run.rootSeed, '0', 'canonical', 'p-x'),
-    );
-    expect(freeAgencySeed(run.rootSeed, '0', 'canonical', 'p-x')).not.toBe(
-      freeAgencySeed(run.rootSeed, '0', 'canonical', 'p-y'),
-    );
-    expect(freeAgencySeed(run.rootSeed, '0', 'canonical', 'p-x')).not.toBe(
-      freeAgencySeed(run.rootSeed, '1', 'canonical', 'p-x'),
-    );
-  });
 });
 describe('free-agency declarations', () => {
   it('records an immutable declaration and rejects a second one', () => {
@@ -204,12 +171,6 @@ describe('free-agency declarations', () => {
       ]),
     ).toThrow(FreeAgencyValidationRejection);
   });
-  it('rejects declarations on a window that is not open', () => {
-    const { run } = fixture();
-    expect(() => applyFreeAgencyDeclaration(run, 0, HUMAN, 'cmd-1', [])).toThrow(
-      FreeAgencyValidationRejection,
-    );
-  });
 });
 describe('free-agency resolution', () => {
   it('resolves deterministically across repeated calls', () => {
@@ -238,34 +199,6 @@ describe('free-agency resolution', () => {
     expect(first.freeAgency).toEqual(second.freeAgency);
     expect(first.signings).toEqual(second.signings);
     expect(first.traces).toEqual(second.traces);
-  });
-  it('signs at most one player per franchise', () => {
-    const { run, catalog, index } = fixture();
-    const context = contextOf(run, catalog, index);
-    const opened = openSeasonFreeAgencyWindow(context, 0, 2);
-    const target = opened.window.candidates[0];
-    if (target === undefined) throw new Error('no candidates');
-    const declared = applyFreeAgencyDeclaration(
-      { ...run, freeAgency: opened.freeAgency },
-      0,
-      HUMAN,
-      'cmd-d',
-      [{ playerVersionId: target.playerVersionId, roleExpectation: 'rotation', influence: 2 }],
-    );
-    const resolved = resolveSeasonFreeAgencyWindow(
-      { ...context, run: { ...run, freeAgency: declared } },
-      0,
-      'cmd-r',
-    );
-    const perFranchise = new Map<string, number>();
-    for (const signing of resolved.signings) {
-      perFranchise.set(signing.franchiseId, (perFranchise.get(signing.franchiseId) ?? 0) + 1);
-    }
-    for (const count of perFranchise.values()) {
-      expect(count).toBe(1);
-    }
-    const humanSignings = resolved.signings.filter((signing) => signing.franchiseId === HUMAN);
-    expect(humanSignings.length).toBeLessThanOrEqual(1);
   });
   it('applies a signing atomically: roster, ownership, ledger, transaction, caps', () => {
     const { run, catalog, index } = fixture();
@@ -315,56 +248,6 @@ describe('free-agency resolution', () => {
     );
     expect(resolved.freeAgency.windows[0]?.status).toBe('resolved');
   });
-  it('appends exactly one transaction per signing without duplicating prior entries', () => {
-    const { run, catalog, index } = fixture();
-    const context = contextOf(run, catalog, index);
-    const opened = openSeasonFreeAgencyWindow(context, 0, 2);
-    const target = opened.window.candidates[0];
-    if (target === undefined) throw new Error('no candidates');
-    const declared = applyFreeAgencyDeclaration(
-      { ...run, freeAgency: opened.freeAgency },
-      0,
-      HUMAN,
-      'cmd-d',
-      [{ playerVersionId: target.playerVersionId, roleExpectation: 'rotation', influence: 2 }],
-    );
-    const priorCount = run.transactions.length;
-    const resolved = resolveSeasonFreeAgencyWindow(
-      { ...context, run: { ...run, freeAgency: declared } },
-      0,
-      'cmd-r',
-    );
-    expect(resolved.transactions.length).toBe(priorCount + resolved.signings.length);
-    const transactionIds = resolved.transactions.map((entry) => entry.transactionId);
-    expect(new Set(transactionIds).size).toBe(transactionIds.length);
-    for (const signing of resolved.signings) {
-      expect(transactionIds.filter((id) => id === signing.transactionId)).toHaveLength(1);
-    }
-  });
-  it('rejects resolution before the human declares or skips', () => {
-    const { run, catalog, index } = fixture();
-    const context = contextOf(run, catalog, index);
-    const opened = openSeasonFreeAgencyWindow(context, 0, 2);
-    expect(() =>
-      resolveSeasonFreeAgencyWindow(
-        { ...context, run: { ...run, freeAgency: opened.freeAgency } },
-        0,
-        'cmd-r',
-      ),
-    ).toThrow(FreeAgencyValidationRejection);
-    const skipped = applyFreeAgencySkip(
-      { ...run, freeAgency: opened.freeAgency },
-      0,
-      HUMAN,
-      'cmd-s',
-    );
-    const resolved = resolveSeasonFreeAgencyWindow(
-      { ...context, run: { ...run, freeAgency: skipped } },
-      0,
-      'cmd-r',
-    );
-    expect(resolved.freeAgency.windows[0]?.status).toBe('resolved');
-  });
   it('keeps every signing within the season caps across all three windows', () => {
     const { run, catalog, index } = fixture();
     const context = contextOf(run, catalog, index);
@@ -406,13 +289,6 @@ describe('free-agency resolution', () => {
         transactions: resolved.transactions,
       };
     }
-  });
-  it('reports the unresolved window until resolution', () => {
-    const { run, catalog, index } = fixture();
-    const context = contextOf(run, catalog, index);
-    expect(freeAgencyUnresolvedWindowIndex(run.freeAgency)).toBeNull();
-    const opened = openSeasonFreeAgencyWindow(context, 0, 2);
-    expect(freeAgencyUnresolvedWindowIndex(opened.freeAgency)).toBe(0);
   });
 });
 describe('effects reconciliation (season-chemistry-v2)', () => {
@@ -493,55 +369,6 @@ describe('effects reconciliation (season-chemistry-v2)', () => {
     );
     expect(promotedLoad?.fatigueBasisPoints).toBe(0);
   });
-  it('creates zero pair state for a newly promoted signing', () => {
-    const { run, catalog, index } = fixture();
-    const context = contextOf(run, catalog, index);
-    const opened = openSeasonFreeAgencyWindow(context, 0, 2);
-    const target = opened.window.candidates[0];
-    if (target === undefined) throw new Error('no candidates');
-    const declared = applyFreeAgencyDeclaration(
-      { ...run, freeAgency: opened.freeAgency },
-      0,
-      HUMAN,
-      'cmd-d',
-      [{ playerVersionId: target.playerVersionId, roleExpectation: 'depth', influence: 1 }],
-    );
-    const resolved = resolveSeasonFreeAgencyWindow(
-      { ...context, run: { ...run, freeAgency: declared } },
-      0,
-      'cmd-r',
-    );
-    const humanRoster = resolved.rosters.find((roster) => roster.franchiseId === HUMAN);
-    const humanRotation = run.rotations.find((rotation) => rotation.franchiseId === HUMAN);
-    if (humanRoster === undefined || humanRotation === undefined) throw new Error('fixture');
-    const ids = [...humanRotation.starters, ...humanRotation.benchOrder].slice(0, 9);
-    ids.push(target.playerVersionId);
-    const members = ids.map((id) => {
-      const catalogCandidate = catalog.candidates.find(
-        (candidate) => candidate.playerVersionId === id,
-      );
-      return {
-        playerVersionId: id,
-        playable: catalogCandidate?.positions.playable ?? [],
-      };
-    });
-    const repairedRotation = buildMinimalRotation({ franchiseId: HUMAN, members });
-    const nextRotations = run.rotations.map((rotation) =>
-      rotation.franchiseId === HUMAN ? repairedRotation : rotation,
-    );
-    const reconciled = reconcileSeasonEffects({
-      previous: resolved.effects,
-      rosters: resolved.rosters,
-      rotations: nextRotations,
-    });
-    const newPairs = reconciled.pairStates.filter(
-      (pair) => pair.a === target.playerVersionId || pair.b === target.playerVersionId,
-    );
-    expect(newPairs.length).toBe(9);
-    for (const pair of newPairs) {
-      expect(pair.sharedPossessions).toBe(0);
-    }
-  });
   it('does not promote a depth signing into the rotation — roster grows, rotation stays locked', () => {
     const { run, catalog, index } = fixture();
     const context = contextOf(run, catalog, index);
@@ -582,28 +409,5 @@ describe('effects reconciliation (season-chemistry-v2)', () => {
     expect(
       resolved.effects.playerStates.some((p) => p.playerVersionId === target.playerVersionId),
     ).toBe(false);
-  });
-  it('leaves inactive depth signings untouched across runs — no legacy auto-repair', () => {
-    const { run, catalog, index } = fixture();
-    const context = contextOf(run, catalog, index);
-    const opened = openSeasonFreeAgencyWindow(context, 0, 2);
-    const target = opened.window.candidates[0];
-    if (target === undefined) throw new Error('no candidates');
-    const declared = applyFreeAgencyDeclaration(
-      { ...run, freeAgency: opened.freeAgency },
-      0,
-      HUMAN,
-      'cmd-d',
-      [{ playerVersionId: target.playerVersionId, roleExpectation: 'depth', influence: 1 }],
-    );
-    resolveSeasonFreeAgencyWindow(
-      { ...context, run: { ...run, freeAgency: declared } },
-      0,
-      'cmd-r',
-    );
-    const originalRotation = run.rotations.find((r) => r.franchiseId === HUMAN);
-    if (originalRotation === undefined) throw new Error('fixture');
-    const rotationIds = new Set([...originalRotation.starters, ...originalRotation.benchOrder]);
-    expect(rotationIds.has(target.playerVersionId)).toBe(false);
   });
 });

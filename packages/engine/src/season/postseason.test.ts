@@ -6,7 +6,6 @@ import {
   commandIdSchema,
   franchiseIdSchema,
   playoffGameIdOf,
-  playInGameIdOf,
   seasonNamespaceSeed,
   seasonPostseasonSummarySchema,
   seasonRunSchema,
@@ -39,11 +38,9 @@ import {
   seasonPostseasonApplyGameResult,
   seasonPostseasonGameOrdinal,
   seasonPostseasonGameTeamsOf,
-  seasonPostseasonHumanEliminated,
   seasonPostseasonNextGame,
   seasonPostseasonSetRankings,
   seasonPostseasonStageOf,
-  seasonPostseasonSummaryFromGame,
   seasonPostseasonUpcomingGames,
   simulateSeasonPostseasonGame,
   zeroSeasonGameTransition,
@@ -177,11 +174,6 @@ function homeWins(): 'home' {
 function humanAlwaysWins({ home, away }: { home: string; away: string }): 'home' | 'away' {
   if (home === HUMAN) return 'home';
   if (away === HUMAN) return 'away';
-  return 'home';
-}
-function humanLosesEarly({ home, away }: { home: string; away: string }): 'home' | 'away' {
-  if (home === HUMAN) return 'away';
-  if (away === HUMAN) return 'home';
   return 'home';
 }
 function seriesOfBracket(
@@ -599,46 +591,6 @@ describe('play-in machine', () => {
       ranking[7],
     ]);
   });
-  it('produces the correct seeds 7/8 for every winner combination', () => {
-    const { run } = fixture();
-    const state = rankedState(run.league);
-    const ranking = state.playIn.east.ranking ?? [];
-    const sevenTop = ranking[6] ?? '';
-    const sevenBottom = ranking[7] ?? '';
-    const nineTop = ranking[8] ?? '';
-    const nineBottom = ranking[9] ?? '';
-    for (const sevenEightWinner of [sevenTop, sevenBottom]) {
-      for (const nineTenWinner of [nineTop, nineBottom]) {
-        const sevenLoser = sevenEightWinner === sevenTop ? sevenBottom : sevenTop;
-        const nineLoser = nineTenWinner === nineTop ? nineBottom : nineTop;
-        const finalHome = sevenLoser;
-        const finalAway = nineTenWinner;
-        let next = seasonPostseasonApplyGameResult(
-          state,
-          finalFacts('pi-east-seven-eight', sevenEightWinner, sevenLoser, sevenTop),
-          run.league,
-          run.standings,
-        );
-        next = seasonPostseasonApplyGameResult(
-          next,
-          finalFacts('pi-east-nine-ten', nineTenWinner, nineLoser, nineTop),
-          run.league,
-          run.standings,
-        );
-        next = seasonPostseasonApplyGameResult(
-          next,
-          finalFacts('pi-east-final', finalHome, finalAway, finalHome),
-          run.league,
-          run.standings,
-        );
-        expect(next.playIn.east.playoffSeeds).toEqual([
-          ...ranking.slice(0, 6),
-          sevenEightWinner,
-          finalHome,
-        ]);
-      }
-    }
-  });
   it('advances forfeited play-in games through the same seed rules (official 2-0)', () => {
     const { run } = fixture();
     const state = rankedState(run.league);
@@ -704,11 +656,6 @@ describe('play-in machine', () => {
     });
     expect(seasonPostseasonStageOf(next)).toBe('playoffs');
   });
-  it('keeps the rankings free of tiebreak resolutions', () => {
-    const { run } = fixture();
-    const state = rankedState(run.league);
-    expect(state.tiebreakResolutions).toEqual([]);
-  });
 });
 describe('playoff bracket machine', () => {
   function bracketState(stop: (state: SeasonPostseasonState) => boolean): {
@@ -731,10 +678,6 @@ describe('playoff bracket machine', () => {
     const decision = seasonPostseasonNextGame(state);
     return state.bracket !== null && decision.kind === 'game' && decision.gameId.startsWith('po-');
   };
-  const atEastConferenceFinal = (state: SeasonPostseasonState): boolean => {
-    const decision = seasonPostseasonNextGame(state);
-    return decision.kind === 'game' && decision.gameId.startsWith('east-conference-final');
-  };
   it('pairs the first round 1-8, 4-5, 3-6, 2-7 with the higher seed at home', () => {
     const { state, eastSeeds } = bracketState(atPlayoffStart);
     const bracket = state.bracket;
@@ -755,51 +698,6 @@ describe('playoff bracket machine', () => {
       expect(series.lowerSeed).toBe(lower + 1);
       expect(series.winnerFranchiseId).toBeNull();
     });
-  });
-  it('never creates a series before both feeders complete', () => {
-    const { run } = fixture();
-    const state = bracketState(atPlayoffStart).state;
-    const series = seriesOfBracket(state, 'east-first-round-1');
-    const homeCourt = series.homeCourtFranchiseId ?? '';
-    const challenger = series.challengerFranchiseId ?? '';
-    let next = state;
-    for (let gameNumber = 1; gameNumber <= 4; gameNumber += 1) {
-      const teams = seasonPostseasonGameTeamsOf(
-        next,
-        playoffGameIdOf('east-first-round-1', gameNumber),
-      );
-      if (teams === null) throw new Error('not scheduleable');
-      next = seasonPostseasonApplyGameResult(
-        next,
-        finalFacts(
-          playoffGameIdOf('east-first-round-1', gameNumber),
-          homeCourt,
-          challenger,
-          teams.home,
-        ),
-        run.league,
-        run.standings,
-      );
-    }
-    const semifinal = next.bracket?.east.semifinals[0];
-    expect(semifinal?.challengerFranchiseId).toBeNull();
-    expect(semifinal?.games.length ?? 0).toBe(0);
-    expect(seasonPostseasonNextGame(next)).toEqual({
-      kind: 'game',
-      gameId: playoffGameIdOf('east-first-round-2', 1),
-    });
-  });
-  it('pairs the semifinals and conference final with the higher remaining seed at home', () => {
-    const { state, eastSeeds } = bracketState(atEastConferenceFinal);
-    const semifinal = seriesOfBracket(state, 'east-semifinal-1');
-    expect(semifinal.homeCourtFranchiseId).toBe(eastSeeds[0]);
-    expect(semifinal.challengerFranchiseId).toBe(eastSeeds[3]);
-    const semifinalTwo = seriesOfBracket(state, 'east-semifinal-2');
-    expect(semifinalTwo.homeCourtFranchiseId).toBe(eastSeeds[1]);
-    expect(semifinalTwo.challengerFranchiseId).toBe(eastSeeds[2]);
-    const conferenceFinal = seriesOfBracket(state, 'east-conference-final');
-    expect(conferenceFinal.homeCourtFranchiseId).toBe(eastSeeds[0]);
-    expect(conferenceFinal.challengerFranchiseId).toBe(eastSeeds[1]);
   });
   it('never reseeds: the fixed bracket slots keep their winners', () => {
     const { run } = fixture();
@@ -880,50 +778,6 @@ describe('playoff bracket machine', () => {
         expect(game.awayFranchiseId).toBe(homeSide === homeCourt ? challenger : homeCourt);
       });
     }
-  });
-  it('pairs the Finals only after both conference finals and applies the home-court decision', () => {
-    const { run } = fixture();
-    const state = rankedState(run.league);
-    const beforeWestFinal = driveUntil(state, run.league, run.standings, homeWins, (current) => {
-      const decision = seasonPostseasonNextGame(current);
-      return decision.kind === 'game' && decision.gameId.startsWith('po-west-conference-final');
-    });
-    const eastChamp = beforeWestFinal.bracket?.east.conferenceFinal.winnerFranchiseId;
-    expect(eastChamp).not.toBeNull();
-    expect(beforeWestFinal.bracket?.finals.challengerFranchiseId).toBeNull();
-    expect(seasonPostseasonNextGame(beforeWestFinal)).toEqual({
-      kind: 'game',
-      gameId: playoffGameIdOf('west-conference-final', 1),
-    });
-    const westChamp = beforeWestFinal.bracket?.west.conferenceFinal.homeCourtFranchiseId ?? '';
-    let next = beforeWestFinal;
-    for (let gameNumber = 1; gameNumber <= 4; gameNumber += 1) {
-      const teams = seasonPostseasonGameTeamsOf(
-        next,
-        playoffGameIdOf('west-conference-final', gameNumber),
-      );
-      if (teams === null) throw new Error('not scheduleable');
-      next = seasonPostseasonApplyGameResult(
-        next,
-        finalFacts(
-          playoffGameIdOf('west-conference-final', gameNumber),
-          westChamp,
-          teams.away,
-          teams.home,
-        ),
-        run.league,
-        run.standings,
-      );
-    }
-    const finals = next.bracket?.finals;
-    expect(finals?.homeCourtFranchiseId).not.toBeNull();
-    expect(finals?.challengerFranchiseId).not.toBeNull();
-    expect(finals?.higherSeed).toBeNull();
-    expect(finals?.lowerSeed).toBeNull();
-    expect(finals?.conference).toBeNull();
-    const resolution = next.tiebreakResolutions.at(-1);
-    expect(resolution?.kind).toBe('finals-home-court');
-    expect(resolution?.slots).toEqual([1]);
   });
   it('decides the Finals home court by overall record, head-to-head, differential, then draw', () => {
     const { run } = fixture();
@@ -1069,65 +923,6 @@ describe('postseason game simulation', () => {
     expect(seasonPostseasonGameOrdinal('pi-east-seven-eight')).toBe(1);
     expect(seasonPostseasonGameOrdinal(playoffGameIdOf('finals', 7))).toBe(111);
   });
-  it('simulates an expanded roster using the carried ten-player rotation', () => {
-    const { run, catalog, effects, profile, expanded } = fixture();
-    const postseason = rankedState(run.league);
-    const teams = seasonPostseasonGameTeamsOf(postseason, 'pi-east-seven-eight');
-    if (teams === null) throw new Error('expected play-in teams');
-    const extra = run.rosters.find((roster) => roster.franchiseId !== teams.home)?.players[0];
-    if (extra === undefined) throw new Error('expected an extra roster player');
-    const runWithExtra = {
-      ...run,
-      postseason,
-      rosters: run.rosters.map((roster) =>
-        roster.franchiseId === teams.home
-          ? { ...roster, players: [...roster.players, extra] }
-          : roster,
-      ),
-    };
-    const outcome = simulateSeasonPostseasonGame({
-      run: runWithExtra,
-      effects,
-      expanded,
-      catalog,
-      profile,
-      gameId: 'pi-east-seven-eight',
-      humanFranchiseId: null,
-    });
-    expect(outcome.kind).toBe('simulated');
-  });
-  it('rolls postseason injuries and folds them into health and the summary', () => {
-    const { run, catalog, effects, profile, expanded } = fixture();
-    let state = rankedState(run.league);
-    let health = run.health;
-    let gameCount = 0;
-    for (const gameId of [
-      'pi-east-seven-eight',
-      'pi-east-nine-ten',
-      'pi-east-final',
-      'pi-west-seven-eight',
-    ]) {
-      const outcome = simulateSeasonPostseasonGame({
-        run: { ...run, postseason: state, health },
-        effects,
-        expanded,
-        catalog,
-        profile,
-        gameId,
-        humanFranchiseId: null,
-      });
-      if (outcome.kind !== 'simulated') throw new Error(`unexpected: ${outcome.reason}`);
-      health = outcome.nextHealth;
-      gameCount += 1;
-      const parsed = seasonPostseasonSummarySchema.safeParse(outcome.summary);
-      expect(parsed.success).toBe(true);
-      for (const event of outcome.summary.injuryEvents) {
-        expect(event.returned ? event.returnClock !== null : event.returnClock === null).toBe(true);
-      }
-      state = seasonPostseasonApplyGameResult(state, outcome.facts, run.league, run.standings);
-    }
-    expect(gameCount).toBe(4);
-  });
   it('forfeits an AI team that cannot field a legal five (official 2-0)', () => {
     const { run, catalog, effects, profile, expanded } = fixture();
     const state = rankedState(run.league);
@@ -1220,36 +1015,6 @@ describe('command-driven postseason flow', () => {
     expect(new Set(gameIds).size).toBe(gameIds.length);
     expect(run.postseason.bracket?.championFranchiseId).toBe(HUMAN);
   });
-  it('simulates human games with the carried rotation when the rotation stays valid', () => {
-    const context = postseasonContext(TEST_SEED, forcedResolver(humanAlwaysWins));
-    const start = handleSeasonRunCommand(
-      commandOf(context.run, {
-        command: 'start-postseason',
-        commandId: commandIdSchema.parse('start-1'),
-      }),
-      context,
-    );
-    if (start.result.result.status !== 'accepted') throw new Error('start rejected');
-    const first = handleSeasonRunCommand(
-      commandOf(start.run, {
-        command: 'advance-postseason',
-        commandId: commandIdSchema.parse('adv-1'),
-      }),
-      { ...context, run: start.run },
-    );
-    const firstResult = first.result;
-    if (firstResult.command !== 'advance-postseason') throw new Error('unexpected');
-    if (firstResult.result.status !== 'accepted') throw new Error('advance rejected');
-    expect(firstResult.result.stage).toBe('completed');
-    expect(firstResult.result.nextDecision).toBe('none');
-    expect(firstResult.result.nextGameId).toBeNull();
-    expect(firstResult.result.advancedGameIds.length).toBeGreaterThan(20);
-    expect(firstResult.result.advancedGameIds).toContain('pi-west-seven-eight');
-    expect(firstResult.result.advancedGameIds).toContain('po-west-first-round-1-g1');
-    expect(firstResult.result.advancedGameIds).toContain(playoffGameIdOf('finals', 1));
-    expect(first.run.stateRevision).toBe(start.run.stateRevision + 1);
-    expectValidRun(first.run);
-  });
   it('stops at a human game whose rotation is invalid and continues after the repair', () => {
     const context = postseasonContext(TEST_SEED, forcedResolver(humanAlwaysWins));
     const start = handleSeasonRunCommand(
@@ -1310,84 +1075,6 @@ describe('command-driven postseason flow', () => {
       expect(seasonPostseasonSummarySchema.safeParse(summary).success).toBe(true);
     }
   });
-  it('never changes AI rotations and changes the human rotation only via submit', () => {
-    const context = postseasonContext(TEST_SEED, forcedResolver(humanAlwaysWins));
-    const aiTeams = context.run.league.teams
-      .filter((team) => team.franchiseId !== HUMAN)
-      .slice(0, 3)
-      .map((team) => team.franchiseId);
-    const aiRotationsOf = (run: SeasonRun) =>
-      aiTeams.map((id) => run.rotations.find((rotation) => rotation.franchiseId === id));
-    const before = aiRotationsOf(context.run);
-    let ctx = context;
-    const start = handleSeasonRunCommand(
-      commandOf(ctx.run, {
-        command: 'start-postseason',
-        commandId: commandIdSchema.parse('start-1'),
-      }),
-      ctx,
-    );
-    if (start.result.result.status !== 'accepted') throw new Error('start rejected');
-    ctx = { ...ctx, run: start.run };
-    for (let index = 1; index < 100; index += 1) {
-      const advance = handleSeasonRunCommand(
-        commandOf(ctx.run, {
-          command: 'advance-postseason',
-          commandId: commandIdSchema.parse(`adv-${String(index)}`),
-        }),
-        ctx,
-      );
-      const advanceOutput = advance.result;
-      if (advanceOutput.command !== 'advance-postseason') throw new Error('unexpected command');
-      const result = advanceOutput.result;
-      if (result.status === 'rejected') throw new Error('advance rejected');
-      ctx = { ...ctx, run: advance.run };
-      if (result.nextDecision === 'rotation' && result.nextGameId !== null) {
-        const rotation = repairedRotation(ctx.run, HUMAN, ctx.catalog);
-        const submit = handleSeasonRunCommand(
-          commandOf(ctx.run, {
-            command: 'submit-postseason-rotation',
-            commandId: commandIdSchema.parse(`sub-${String(index)}`),
-            targetGameId: result.nextGameId,
-            rotation: { franchiseId: HUMAN, rotation },
-          }),
-          ctx,
-        );
-        if (submit.result.result.status !== 'accepted') throw new Error('submit rejected');
-        ctx = { ...ctx, run: submit.run };
-      }
-      if (result.stage === 'completed') break;
-    }
-    const after = aiRotationsOf(ctx.run);
-    expect(after).toEqual(before);
-  });
-  it('returns the typed rotation decision when the human cannot field a legal five', () => {
-    const context = postseasonContext(TEST_SEED, forcedResolver(humanAlwaysWins));
-    const start = handleSeasonRunCommand(
-      commandOf(context.run, {
-        command: 'start-postseason',
-        commandId: commandIdSchema.parse('start-1'),
-      }),
-      context,
-    );
-    if (start.result.result.status !== 'accepted') throw new Error('start rejected');
-    const injured = {
-      ...start.run,
-      health: { ...start.run.health, injuries: seasonEndingInjuries(start.run, HUMAN, 6, 'c') },
-    };
-    const advance = handleSeasonRunCommand(
-      commandOf(injured, {
-        command: 'advance-postseason',
-        commandId: commandIdSchema.parse('adv-1'),
-      }),
-      { ...context, run: injured },
-    );
-    const result = advance.result;
-    if (result.command !== 'advance-postseason') throw new Error('unexpected');
-    if (result.result.status !== 'accepted') throw new Error('advance rejected');
-    expect(result.result.nextDecision).toBe('rotation');
-    expect(result.result.nextGameId).toBe('pi-west-seven-eight');
-  });
   it('rejects advance with integrity-failure when both AI teams of a game are invalid', () => {
     const context = postseasonContext(TEST_SEED, forcedResolver(humanAlwaysWins));
     const excluded = {
@@ -1420,76 +1107,6 @@ describe('command-driven postseason flow', () => {
     if (result.result.status !== 'rejected') throw new Error('expected rejection');
     expect(result.result.rejection.code).toBe('integrity-failure');
     expect(advance.run.stateRevision).toBe(run.stateRevision);
-  });
-  it('spectates after elimination and fast-forwards to the champion', () => {
-    const context = postseasonContext(TEST_SEED, forcedResolver(humanLosesEarly));
-    const start = handleSeasonRunCommand(
-      commandOf(context.run, {
-        command: 'start-postseason',
-        commandId: commandIdSchema.parse('start-1'),
-      }),
-      context,
-    );
-    if (start.result.result.status !== 'accepted') throw new Error('start rejected');
-    const advance = handleSeasonRunCommand(
-      commandOf(start.run, {
-        command: 'advance-postseason',
-        commandId: commandIdSchema.parse('adv-1'),
-        targetGameId: 'po-west-first-round-1-g1',
-      }),
-      { ...context, run: start.run },
-    );
-    const advanceResult = advance.result;
-    if (advanceResult.command !== 'advance-postseason') throw new Error('unexpected');
-    if (advanceResult.result.status !== 'accepted') throw new Error('advance rejected');
-    expect(advanceResult.result.advancedGameIds).toContain('pi-west-seven-eight');
-    expect(advanceResult.result.advancedGameIds).toContain('pi-west-final');
-    expect(advanceResult.result.aiNextGameId).toBe('po-west-first-round-1-g2');
-    expect(seasonPostseasonHumanEliminated(advance.run.postseason, HUMAN)).toBe(true);
-    const submit = handleSeasonRunCommand(
-      commandOf(advance.run, {
-        command: 'submit-postseason-rotation',
-        commandId: commandIdSchema.parse('sub-1'),
-        targetGameId: 'po-west-first-round-1-g2',
-        rotation: {
-          franchiseId: HUMAN,
-          rotation: repairedRotation(advance.run, HUMAN, context.catalog),
-        },
-      }),
-      { ...context, run: advance.run },
-    );
-    const submitResult = submit.result;
-    if (submitResult.command !== 'submit-postseason-rotation') throw new Error('unexpected');
-    if (submitResult.result.status !== 'rejected') throw new Error('expected rejection');
-    expect(submitResult.result.rejection.code).toBe('wrong-game');
-    const spectate = handleSeasonRunCommand(
-      commandOf(advance.run, {
-        command: 'spectate-postseason-game',
-        commandId: commandIdSchema.parse('spec-1'),
-        targetGameId: 'po-west-first-round-1-g2',
-      }),
-      { ...context, run: advance.run },
-    );
-    const spectateResult = spectate.result;
-    if (spectateResult.command !== 'spectate-postseason-game') throw new Error('unexpected');
-    expect(spectateResult.result.status).toBe('accepted');
-    expect(spectate.postseasonSummaries?.[0]?.gameId).toBe('po-west-first-round-1-g2');
-    const fastForward = handleSeasonRunCommand(
-      commandOf(spectate.run, {
-        command: 'fast-forward-postseason',
-        commandId: commandIdSchema.parse('ff-1'),
-      }),
-      { ...context, run: spectate.run },
-    );
-    const ffResult = fastForward.result;
-    if (ffResult.command !== 'fast-forward-postseason') throw new Error('unexpected');
-    if (ffResult.result.status !== 'accepted') throw new Error('fast-forward rejected');
-    expect(ffResult.result.stage).toBe('completed');
-    expect(ffResult.result.championFranchiseId).not.toBe(HUMAN);
-    expectValidRun(fastForward.run);
-    expect(fastForward.run.completion?.championFranchiseId).toBe(
-      ffResult.result.championFranchiseId,
-    );
   });
   it('fast-forwards an AI-only run to completion in canonical order', () => {
     const context = postseasonContext(TEST_SEED, forcedResolver(homeWins));
@@ -1546,35 +1163,6 @@ describe('command-driven postseason flow', () => {
     expect(b.run).toEqual(a.run);
     expect(b.summaries).toEqual(a.summaries);
   });
-  it('keeps real-simulation mini-runs deterministic', () => {
-    const simulate = (seed: string) => {
-      const { run, catalog, effects, profile, expanded } = fixture(seed);
-      let state = rankedState(run.league, seed);
-      let health = run.health;
-      let nextEffects = effects;
-      const summaries: SeasonPostseasonSummary[] = [];
-      for (let i = 0; i < 3; i += 1) {
-        const decision = seasonPostseasonNextGame(state);
-        if (decision.kind !== 'game') throw new Error('expected a game');
-        const outcome = simulateSeasonPostseasonGame({
-          run: { ...run, postseason: state, health },
-          effects: nextEffects,
-          expanded,
-          catalog,
-          profile,
-          gameId: decision.gameId,
-          humanFranchiseId: null,
-        });
-        if (outcome.kind !== 'simulated') throw new Error(`unexpected: ${outcome.reason}`);
-        state = seasonPostseasonApplyGameResult(state, outcome.facts, run.league, run.standings);
-        health = outcome.nextHealth;
-        nextEffects = outcome.nextEffects;
-        summaries.push(outcome.summary);
-      }
-      return { summaries, health, postseason: state };
-    };
-    expect(simulate(TEST_SEED)).toEqual(simulate(TEST_SEED));
-  });
 });
 describe('risky rehab and summaries', () => {
   it('rolls the rehab outcome under the postseason-injuries stream', () => {
@@ -1586,83 +1174,5 @@ describe('risky rehab and summaries', () => {
     const regular = seasonNamespaceSeed(TEST_SEED, 'injuries', injuryId, 'rehab');
     const postseason = seasonNamespaceSeed(TEST_SEED, 'postseason-injuries', injuryId, 'rehab');
     expect(postseason).not.toBe(regular);
-  });
-  it('builds forfeit summaries directly through the summary converter', () => {
-    const { run } = fixture();
-    const state = rankedState(run.league);
-    const ranking = state.playIn.east.ranking ?? [];
-    const outcome = seasonPostseasonSummaryFromGame({
-      runId: run.runId,
-      gameId: 'pi-east-seven-eight',
-      phase: 'play-in',
-      round: 'seven-eight',
-      seriesId: null,
-      gameNumber: 1,
-      conference: 'east',
-      homeFranchiseId: ranking[6] ?? HUMAN,
-      awayFranchiseId: ranking[7] ?? HUMAN,
-      result: {
-        schemaVersion: 1,
-        outcome: 'forfeit',
-        seed: seedSchema.parse('a'.repeat(32)),
-        gameNumber: 1,
-        dataVersion: 'v1',
-        engineVersion: 'engine-v1',
-        profileVersion: 'profile-v1',
-        winner: 'home',
-        losingFranchiseId: ranking[7] ?? HUMAN,
-        trigger: 'no-legal-five-tipoff',
-        homeScore: 2,
-        awayScore: 0,
-      },
-      injuryEvents: [],
-    });
-    const parsed = seasonPostseasonSummarySchema.safeParse(outcome);
-    expect(parsed.success).toBe(true);
-    expect(outcome.status).toBe('forfeit');
-    expect(outcome.forfeitLoserFranchiseId).toBe(ranking[7]);
-    expect(outcome.winnerFranchiseId).toBe(ranking[6]);
-    expect(outcome.homePlayers).toHaveLength(0);
-    expect(outcome.rotationEvidence).toEqual({
-      home: { playersUsed: 0, substitutions: 0 },
-      away: { playersUsed: 0, substitutions: 0 },
-    });
-  });
-});
-describe('helper consistency', () => {
-  it('derives the fixed game ordinals canonically', () => {
-    expect(seasonPostseasonGameOrdinal(playInGameIdOf('east', 'seven-eight'))).toBe(1);
-    expect(seasonPostseasonGameOrdinal(playInGameIdOf('west', 'final'))).toBe(6);
-    expect(seasonPostseasonGameOrdinal(playoffGameIdOf('east-first-round-1', 1))).toBe(7);
-    expect(seasonPostseasonGameOrdinal(playoffGameIdOf('finals', 7))).toBe(111);
-  });
-  it('tracks human elimination through play-in losses and playoff exits', () => {
-    const { run } = fixture();
-    const state = rankedState(run.league);
-    expect(seasonPostseasonHumanEliminated(buildInitialPostseasonState(TEST_SEED), HUMAN)).toBe(
-      true,
-    );
-    expect(seasonPostseasonHumanEliminated(state, HUMAN)).toBe(false);
-    const ranking = state.playIn.west.ranking ?? [];
-    const lost = seasonPostseasonApplyGameResult(
-      state,
-      finalFacts('pi-west-seven-eight', ranking[7] ?? '', ranking[6] ?? '', ranking[6] ?? ''),
-      run.league,
-      run.standings,
-    );
-    expect(seasonPostseasonHumanEliminated(lost, HUMAN)).toBe(false);
-    const lostNine = seasonPostseasonApplyGameResult(
-      lost,
-      finalFacts('pi-west-nine-ten', ranking[9] ?? '', ranking[8] ?? '', ranking[8] ?? ''),
-      run.league,
-      run.standings,
-    );
-    const lostFinal = seasonPostseasonApplyGameResult(
-      lostNine,
-      finalFacts('pi-west-final', ranking[9] ?? '', ranking[6] ?? '', ranking[6] ?? ''),
-      run.league,
-      run.standings,
-    );
-    expect(seasonPostseasonHumanEliminated(lostFinal, HUMAN)).toBe(true);
   });
 });

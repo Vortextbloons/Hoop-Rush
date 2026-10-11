@@ -17,7 +17,6 @@
   import LineupCourt from '$lib/components/LineupCourt.svelte';
   import PlayerFace from '$lib/components/PlayerFace.svelte';
   import DraftValuePanel from '$lib/components/DraftValuePanel.svelte';
-  import LineupSummaryNav from '$lib/components/LineupSummaryNav.svelte';
   import { classicPoolRows } from '$lib/classic-draft';
   import FixedFiveTurnTakeover from '$lib/components/FixedFiveTurnTakeover.svelte';
   import { arenaPickSlam } from '$lib/arena-sound';
@@ -710,279 +709,300 @@
   );
 </script>
 
-<div class="mt-2 flex min-w-0 flex-col gap-6 pb-24">
-  <FixedFiveTurnTakeover
-    turn={takeover.turn}
-    label={takeover.label}
-    ordinal={takeover.ordinal}
-    total={takeover.total}
-    {mode}
-  />
-  {#if slamName}
-    <p class="pick-slam" role="status" aria-live="polite">
-      <span class="pick-slam-ball" aria-hidden="true"></span>
-      Slammed {slamName} into your five
-    </p>
-  {/if}
-  <div class="clock-slot">
-    {#if deadlineText}
-      <p class="clock-line {clockUrgent ? 'clock-line--hot' : ''}" role="status">
-        <span class="clock-ring" aria-hidden="true"><span class="clock-hand"></span></span
-        >{deadlineText}
+<div class="draft-workspace">
+  <div class="draft-status">
+    <FixedFiveTurnTakeover
+      turn={takeover.turn}
+      label={takeover.label}
+      ordinal={takeover.ordinal}
+      total={takeover.total}
+      {mode}
+    />
+    {#if slamName}
+      <p class="pick-slam" role="status" aria-live="polite">
+        <span class="pick-slam-ball" aria-hidden="true"></span>
+        Added {slamName} to your five
+      </p>
+    {/if}
+    <div class="clock-slot">
+      {#if deadlineText}
+        <p class="clock-line {clockUrgent ? 'clock-line--hot' : ''}">
+          <span class="clock-ring" aria-hidden="true"><span class="clock-hand"></span></span
+          >{deadlineText}
+        </p>
+      {/if}
+    </div>
+    {#if lastAutopick}
+      <div class="mt-1 rounded-lg border border-line-soft bg-card p-2 text-xs" role="status">
+        Timeout auto-pick: <strong>{lastAutopick.displayName}</strong>
+        <details class="autopick-details">
+          <summary>Pick details</summary><span>{lastAutopick.seedPath}</span>
+        </details>
+      </div>
+    {/if}
+    {#if error}
+      <p
+        class="mt-2 rounded-lg border border-destructive/40 bg-destructive/10 p-2 text-xs"
+        role="alert"
+      >
+        {error}
       </p>
     {/if}
   </div>
-  {#if lastAutopick}
-    <p class="mt-1 rounded-lg border border-line-soft bg-card p-2 text-xs" role="status">
-      Timeout auto-pick: <strong>{lastAutopick.displayName}</strong>
-      <span class="text-muted-foreground">({lastAutopick.seedPath})</span>
-    </p>
-  {/if}
-  {#if error}
-    <p
-      class="mt-2 rounded-lg border border-destructive/40 bg-destructive/10 p-2 text-xs"
-      role="alert"
-    >
-      {error}
-    </p>
-  {/if}
-
   {#if mode !== 'sandbox-shared-82' && rollView}
-    {#if !rollView.complete}
-      <DraftRoundCard
-        label={rollView.label}
-        round={rollView.round}
-        turnText={rollView.turnText}
-        turnPill={mode === 'duel' ? (rollView.turn ? 'you' : 'rival') : null}
-        ariaLabel={rollFranchise && rollEra
-          ? `${rollView.label} · ${rollIdentity?.displayLabel ?? rollFranchise.displayName} · ${rollEra.label}`
-          : rollView.label}
-        manifest={rollManifest}
-        franchiseId={rollView.franchiseId}
-        teamExternalId={rollFranchise?.teamExternalId ?? ''}
-        logoCandidates={rollIdentity?.logoCandidates ?? []}
-        franchiseAbbreviation={rollFranchiseAbbreviation}
-        franchiseDisplayName={rollFranchiseDisplayName}
-        eraLabel={rollEraLabel}
-        franchiseRerollAvailable={!rollView.rerollFranchiseSpent}
-        franchiseRerollSpent={rollView.rerollFranchiseSpent}
-        eraRerollAvailable={!rollView.rerollEraSpent}
-        eraRerollSpent={rollView.rerollEraSpent}
-        controlsDisabled={disabled || !rollView.turn}
-        onRerollFranchise={() => onReroll('franchise')}
-        onRerollEra={() => onReroll('era')}
-      />
-      <ClassicRollReel
-        manifest={assets.manifest}
-        franchiseId={rollView.franchiseId}
-        eraId={rollView.eraId}
-        {franchiseOptions}
-        {eraOptions}
-        axis={rollAxis}
-        spinKey={rollNonce}
-        spinId={reelSpinId}
-        spotlight={reelSpotlight}
-        announceText={mode === 'duel'
-          ? rollView.turn
-            ? `Your roll: ${rollView.label}, ${rollFranchiseDisplayName ?? rollView.franchiseId}, ${rollEraLabel}`
-            : `Rival's roll: ${rollView.label}, ${rollFranchiseDisplayName ?? rollView.franchiseId}, ${rollEraLabel}`
-          : `${rollView.label}: ${rollView.franchiseId} ${rollView.eraId}`}
-        roundLabel={mode === 'duel'
-          ? rollView.turn
-            ? `Your roll · ${rollView.label}`
-            : `Rival's roll · ${rollView.label}`
-          : rollView.label}
-        onSettled={() => {}}
-      />
-      {#if mode === 'duel' && !rollView.turn}
-        <p class="rival-watch" role="status">Watching live — your pool opens on your turn.</p>
+    <div class="draft-pool">
+      {#if !rollView.complete}
+        <DraftRoundCard
+          label={rollView.label}
+          round={rollView.round}
+          turnText={rollView.turnText}
+          turnPill={mode === 'duel' ? (rollView.turn ? 'you' : 'rival') : null}
+          ariaLabel={rollFranchise && rollEra
+            ? `${rollView.label} · ${rollIdentity?.displayLabel ?? rollFranchise.displayName} · ${rollEra.label}`
+            : rollView.label}
+          manifest={rollManifest}
+          franchiseId={rollView.franchiseId}
+          teamExternalId={rollFranchise?.teamExternalId ?? ''}
+          logoCandidates={rollIdentity?.logoCandidates ?? []}
+          franchiseAbbreviation={rollFranchiseAbbreviation}
+          franchiseDisplayName={rollFranchiseDisplayName}
+          eraLabel={rollEraLabel}
+          franchiseRerollAvailable={!rollView.rerollFranchiseSpent}
+          franchiseRerollSpent={rollView.rerollFranchiseSpent}
+          eraRerollAvailable={!rollView.rerollEraSpent}
+          eraRerollSpent={rollView.rerollEraSpent}
+          controlsDisabled={disabled || !rollView.turn}
+          onRerollFranchise={() => onReroll('franchise')}
+          onRerollEra={() => onReroll('era')}
+        />
+        <details class="roll-reveal">
+          <summary>View the draft roll</summary>
+          <ClassicRollReel
+            manifest={assets.manifest}
+            franchiseId={rollView.franchiseId}
+            eraId={rollView.eraId}
+            {franchiseOptions}
+            {eraOptions}
+            axis={rollAxis}
+            spinKey={rollNonce}
+            spinId={reelSpinId}
+            spotlight={reelSpotlight}
+            announceText={mode === 'duel'
+              ? rollView.turn
+                ? `Your roll: ${rollView.label}, ${rollFranchiseDisplayName ?? rollView.franchiseId}, ${rollEraLabel}`
+                : `Rival's roll: ${rollView.label}, ${rollFranchiseDisplayName ?? rollView.franchiseId}, ${rollEraLabel}`
+              : `${rollView.label}: ${rollView.franchiseId} ${rollView.eraId}`}
+            roundLabel={mode === 'duel'
+              ? rollView.turn
+                ? `Your roll · ${rollView.label}`
+                : `Rival's roll · ${rollView.label}`
+              : rollView.label}
+            onSettled={() => {}}
+          />
+        </details>
+        {#if mode === 'duel' && !rollView.turn}
+          <p class="rival-watch" role="status">Watching live — your pool opens on your turn.</p>
+        {/if}
       {/if}
-    {/if}
-    {#if !rollView.complete}
-      <DraftPoolBrowser
-        heading={poolHeading}
-        rows={rollRows}
-        slots={myCourtRows}
-        countLabel={poolCountLabel}
-        manifest={assets.manifest}
-        {presentation}
-        filtersEditable={true}
-        {allowDisplacement}
-        fitByRow={rollFitByRow}
-        selectionDisabled={disabled || !rollView.turn}
-        error={null}
-        emptyMessage="No players in this pool."
-        onpick={openPicker}
-      />
-    {:else}
-      <div class="rounded-xl bg-surface-1">
-        <div class="px-3 py-3 sm:px-4">
-          <h3 class="font-display text-lg font-extrabold tracking-tight uppercase">Your five</h3>
+      {#if !rollView.complete}
+        <DraftPoolBrowser
+          heading={poolHeading}
+          rows={rollRows}
+          slots={myCourtRows}
+          countLabel={poolCountLabel}
+          manifest={assets.manifest}
+          {presentation}
+          filtersEditable={true}
+          {allowDisplacement}
+          fitByRow={rollFitByRow}
+          selectionDisabled={disabled || !rollView.turn}
+          error={null}
+          emptyMessage="No players in this pool."
+          onpick={openPicker}
+        />
+      {:else}
+        <div class="rounded-xl bg-surface-1">
+          <div class="px-3 py-3 sm:px-4">
+            <h3 class="font-display text-lg font-extrabold tracking-tight uppercase">Your five</h3>
+          </div>
+          <ul class="flex flex-col divide-y divide-border/60">
+            {#each myPicks as pick (pick.playerId)}
+              {@const row =
+                (pick.playerVersionId ? indexByVersionId.get(pick.playerVersionId) : null) ??
+                indexById.get(pick.playerId) ??
+                null}
+              <li class="flex min-w-0 items-center gap-3 px-3 py-3 sm:px-4">
+                {#if row}
+                  <PlayerFace
+                    player={row}
+                    manifest={rollManifest}
+                    size="sm"
+                    fallbackInitials={row.firstName[0]! + row.lastName[0]!}
+                  />
+                  <span class="min-w-0 flex-1 truncate text-sm font-bold">
+                    {row.displayName}
+                  </span>
+                  <span
+                    class="shrink-0 truncate font-mono text-[10px] text-muted-foreground"
+                    title={`Slot ${pick.slotIndex + 1}`}
+                  >
+                    {row.seasonKey} · {formatPositions(row.positionsPlayable)} ·
+                    {resolveEraTeamIdentity(rollManifest, row.franchiseId, row.eraId)
+                      .abbreviationLabel ?? franchiseAbbreviation(row.franchiseId)}
+                  </span>
+                {:else}
+                  <span class="min-w-0 flex-1 truncate text-sm font-bold">
+                    {displayNameOf(pick.playerId)}
+                  </span>
+                  <span class="shrink-0 font-mono text-[10px] text-muted-foreground">
+                    Slot {pick.slotIndex + 1}
+                  </span>
+                {/if}
+              </li>
+            {/each}
+          </ul>
         </div>
-        <ul class="flex flex-col divide-y divide-border/60">
-          {#each myPicks as pick (pick.playerId)}
-            {@const row =
-              (pick.playerVersionId ? indexByVersionId.get(pick.playerVersionId) : null) ??
-              indexById.get(pick.playerId) ??
-              null}
-            <li class="flex min-w-0 items-center gap-3 px-3 py-3 sm:px-4">
-              {#if row}
-                <PlayerFace
-                  player={row}
-                  manifest={rollManifest}
-                  size="sm"
-                  fallbackInitials={row.firstName[0]! + row.lastName[0]!}
-                />
-                <span class="min-w-0 flex-1 truncate text-sm font-bold">
-                  {row.displayName}
-                </span>
-                <span
-                  class="shrink-0 truncate font-mono text-[10px] text-muted-foreground"
-                  title={`Slot ${pick.slotIndex + 1}`}
-                >
-                  {row.seasonKey} · {formatPositions(row.positionsPlayable)} ·
-                  {resolveEraTeamIdentity(rollManifest, row.franchiseId, row.eraId)
-                    .abbreviationLabel ?? franchiseAbbreviation(row.franchiseId)}
-                </span>
-              {:else}
-                <span class="min-w-0 flex-1 truncate text-sm font-bold">
-                  {displayNameOf(pick.playerId)}
-                </span>
-                <span class="shrink-0 font-mono text-[10px] text-muted-foreground">
-                  Slot {pick.slotIndex + 1}
-                </span>
-              {/if}
-            </li>
-          {/each}
-        </ul>
-      </div>
-    {/if}
-    <LineupCourt
-      slots={myCourtRows}
-      manifest={assets.manifest}
-      ready={rollView.complete}
-      allowRemove={false}
-      onmove={openPickerForCourt}
-      onremove={() => undefined}
-    />
-    <DraftValuePanel
-      players={resolvedLineupPlayers}
-      {presentation}
-      poolScores={rollFitReport?.top ?? null}
-      missingNeeds={rollFitReport?.missingNeeds ?? []}
-      refinedCount={rollFitReport?.refinedCount ?? 0}
-      onSuggestionPick={disabled || !rollView.turn ? undefined : pickSuggested}
-    />
-    <LineupSummaryNav slots={myCourtRows} {pickedCount} />
+      {/if}
+    </div>
+    <aside class="draft-lineup" aria-label="Your lineup">
+      <h3 class="lineup-heading">Your five <span>{pickedCount}/5</span></h3>
+      <LineupCourt
+        slots={myCourtRows}
+        manifest={assets.manifest}
+        ready={rollView.complete}
+        allowRemove={false}
+        onmove={openPickerForCourt}
+        onremove={() => undefined}
+      />
+      <DraftValuePanel
+        players={resolvedLineupPlayers}
+        {presentation}
+        poolScores={rollFitReport?.top ?? null}
+        missingNeeds={rollFitReport?.missingNeeds ?? []}
+        refinedCount={rollFitReport?.refinedCount ?? 0}
+        onSuggestionPick={disabled || !rollView.turn ? undefined : pickSuggested}
+      />
+    </aside>
   {/if}
 
   {#if sandboxDuelView && !sandboxDuelView.complete}
-    <div class="min-w-0 rounded-xl bg-surface-1 p-3 sm:p-4">
-      <div class="flex items-center justify-between gap-2">
-        <h3 class="font-display text-sm font-extrabold uppercase">
-          {mode === 'duel' ? 'Duel' : 'Sandbox Season'} · snake draft
-        </h3>
-        <span
-          class="shrink-0 rounded-full px-2.5 py-1 font-mono text-[10px] font-extrabold tracking-[0.14em] uppercase {sandboxDuelView.turn
-            ? 'bg-primary text-primary-foreground'
-            : 'bg-destructive/15 text-destructive'}"
-        >
-          {sandboxDuelView.turn ? 'Your pick' : "Rival's pick"}
-        </span>
+    <div class="draft-pool">
+      <div class="min-w-0 rounded-xl bg-surface-1 p-3 sm:p-4">
+        <div class="flex items-center justify-between gap-2">
+          <h3 class="font-display text-sm font-extrabold uppercase">
+            {mode === 'duel' ? 'Duel' : 'Season'} · Snake Draft
+          </h3>
+          <span
+            class="shrink-0 rounded-full px-2.5 py-1 font-mono text-[10px] font-extrabold tracking-[0.14em] uppercase {sandboxDuelView.turn
+              ? 'bg-primary text-primary-foreground'
+              : 'bg-destructive/15 text-destructive'}"
+          >
+            {sandboxDuelView.turn ? 'Your pick' : "Rival's pick"}
+          </span>
+        </div>
+        <p class="mt-1 text-xs text-muted-foreground" role="status">
+          {sandboxDuelView.label} · {sandboxDuelView.turnText}
+        </p>
       </div>
-      <p class="mt-1 text-xs text-muted-foreground" role="status">
-        {sandboxDuelView.label} · {sandboxDuelView.turnText} Picking a player blocks every variant.
-      </p>
+      <DraftPoolBrowser
+        heading="Global pool"
+        rows={sandboxDuelRows}
+        slots={myCourtRows}
+        countLabel={sandboxDuelCountLabel}
+        filtersEditable={true}
+        manifest={assets.manifest}
+        {presentation}
+        error={null}
+        emptyMessage="No players match."
+        allowDisplacement={false}
+        fitByRow={sandboxFitByRow}
+        selectionDisabled={disabled || !sandboxDuelView.turn}
+        onpick={openPicker}
+        onvisible={handleSandboxVisible}
+      />
     </div>
-    <DraftPoolBrowser
-      heading="Global pool"
-      rows={sandboxDuelRows}
-      slots={myCourtRows}
-      countLabel={sandboxDuelCountLabel}
-      filtersEditable={true}
-      manifest={assets.manifest}
-      {presentation}
-      error={null}
-      emptyMessage="No players match."
-      allowDisplacement={false}
-      fitByRow={sandboxFitByRow}
-      selectionDisabled={disabled || !sandboxDuelView.turn}
-      onpick={openPicker}
-      onvisible={handleSandboxVisible}
-    />
-    <LineupCourt
-      slots={myCourtRows}
-      manifest={assets.manifest}
-      ready={false}
-      allowRemove={false}
-      onmove={openPickerForCourt}
-      onremove={() => undefined}
-    />
-    <DraftValuePanel
-      players={resolvedLineupPlayers}
-      {presentation}
-      poolScores={sandboxFitReport?.top ?? null}
-      missingNeeds={sandboxFitReport?.missingNeeds ?? []}
-      refinedCount={sandboxFitReport?.refinedCount ?? 0}
-      onSuggestionPick={disabled || !sandboxDuelView.turn ? undefined : pickSuggested}
-    />
-    <LineupSummaryNav slots={myCourtRows} {pickedCount} />
+    <aside class="draft-lineup" aria-label="Your lineup">
+      <h3 class="lineup-heading">Your five <span>{pickedCount}/5</span></h3>
+      <LineupCourt
+        slots={myCourtRows}
+        manifest={assets.manifest}
+        ready={false}
+        allowRemove={false}
+        onmove={openPickerForCourt}
+        onremove={() => undefined}
+      />
+      <DraftValuePanel
+        players={resolvedLineupPlayers}
+        {presentation}
+        poolScores={sandboxFitReport?.top ?? null}
+        missingNeeds={sandboxFitReport?.missingNeeds ?? []}
+        refinedCount={sandboxFitReport?.refinedCount ?? 0}
+        onSuggestionPick={disabled || !sandboxDuelView.turn ? undefined : pickSuggested}
+      />
+    </aside>
   {/if}
 
   {#if mode === 'sandbox-shared-82' && replay.mode === 'sandbox-shared-82' && replay.draftStyle === 'legacy'}
-    <div class="min-w-0 rounded-xl bg-surface-1 p-3 sm:p-4">
-      <h3 class="font-display text-sm font-extrabold uppercase">Build your five</h3>
-      <p class="mt-1 text-xs text-muted-foreground">
-        Same player may appear on both teams. Five minutes to build and lock; timeouts auto-fill
-        from safe moves and then lock.
-      </p>
-    </div>
-    <DraftPoolBrowser
-      heading="Global pool"
-      rows={sandboxRows}
-      slots={courtRows}
-      countLabel={`${sandboxRows.length} players · ${poolSortLabel(presentation)}`}
-      filtersEditable={true}
-      manifest={assets.manifest}
-      {presentation}
-      fitByRow={sandboxFitByRow}
-      error={null}
-      emptyMessage="No players match."
-      allowDisplacement={true}
-      selectionDisabled={disabled || sandboxLocked}
-      onpick={openPicker}
-      onvisible={handleSandboxVisible}
-    />
-    <LineupCourt
-      slots={courtRows}
-      manifest={assets.manifest}
-      ready={sandboxLocked}
-      allowRemove={!sandboxLocked}
-      onmove={openPicker}
-      onremove={(index) => onRemove(index as SlotIndex)}
-    />
-    <DraftValuePanel
-      players={resolvedLineupPlayers}
-      {presentation}
-      poolScores={sandboxFitReport?.top ?? null}
-      missingNeeds={sandboxFitReport?.missingNeeds ?? []}
-      refinedCount={sandboxFitReport?.refinedCount ?? 0}
-      onSuggestionPick={disabled || sandboxLocked ? undefined : pickSuggested}
-    />
-    {#if !sandboxLocked}
-      <div>
-        <button
-          type="button"
-          onclick={onLock}
-          disabled={disabled || sandboxLocked}
-          class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          Lock my five
-        </button>
+    <div class="draft-pool">
+      <div class="min-w-0 rounded-xl bg-surface-1 p-3 sm:p-4">
+        <h3 class="font-display text-sm font-extrabold uppercase">Build your five</h3>
+        <p class="mt-1 text-xs text-muted-foreground">
+          Same player may appear on both teams. Five minutes to build and lock; timeouts auto-fill
+          from safe moves and then lock.
+        </p>
       </div>
-    {/if}
-    <LineupSummaryNav slots={courtRows} {pickedCount} />
+      <DraftPoolBrowser
+        heading="Global pool"
+        rows={sandboxRows}
+        slots={courtRows}
+        countLabel={`${sandboxRows.length} players · ${poolSortLabel(presentation)}`}
+        filtersEditable={true}
+        manifest={assets.manifest}
+        {presentation}
+        fitByRow={sandboxFitByRow}
+        error={null}
+        emptyMessage="No players match."
+        allowDisplacement={true}
+        selectionDisabled={disabled || sandboxLocked}
+        onpick={openPicker}
+        onvisible={handleSandboxVisible}
+      />
+    </div>
+    <aside class="draft-lineup" aria-label="Your lineup">
+      <h3 class="lineup-heading">Your five <span>{pickedCount}/5</span></h3>
+      <LineupCourt
+        slots={courtRows}
+        manifest={assets.manifest}
+        ready={sandboxLocked}
+        allowRemove={!sandboxLocked}
+        onmove={openPicker}
+        onremove={(index) => onRemove(index as SlotIndex)}
+      />
+      <DraftValuePanel
+        players={resolvedLineupPlayers}
+        {presentation}
+        poolScores={sandboxFitReport?.top ?? null}
+        missingNeeds={sandboxFitReport?.missingNeeds ?? []}
+        refinedCount={sandboxFitReport?.refinedCount ?? 0}
+        onSuggestionPick={disabled || sandboxLocked ? undefined : pickSuggested}
+      />
+      {#if !sandboxLocked}
+        <div>
+          <button
+            type="button"
+            onclick={onLock}
+            disabled={disabled || sandboxLocked}
+            class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            Lock my five
+          </button>
+        </div>
+      {/if}
+    </aside>
   {/if}
+  <nav class="draft-jump" aria-label="Draft shortcuts">
+    <a href="#your-five">View your lineup</a><span>{pickedCount}/5 picked</span>
+  </nav>
 </div>
 
 {#if pickerPlayer}
@@ -1000,126 +1020,155 @@
 {/if}
 
 <style>
-  .rival-watch {
-    border-radius: 0.875rem;
-    border: 1px dashed color-mix(in srgb, var(--color-destructive) 45%, transparent);
-    background: color-mix(in srgb, var(--color-destructive) 6%, transparent);
-    padding: 0.625rem 0.875rem;
+  .draft-workspace {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 360px;
+    gap: 22px;
+    padding-bottom: 80px;
+    min-width: 0;
+  }
+  .draft-jump {
+    display: none;
+  }
+  .draft-status {
+    grid-column: 1 / -1;
+    display: grid;
+    gap: 12px;
+  }
+  .draft-pool {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    min-width: 0;
+  }
+  .draft-lineup {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 0;
+    align-self: start;
+    border: 1px solid var(--color-line-soft);
+    border-radius: 10px;
+    background: var(--color-card);
+    padding: 16px;
+    position: sticky;
+    top: 20px;
+  }
+  .lineup-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-family: var(--font-display);
+    font-size: 23px;
+    font-weight: 800;
+  }
+  .lineup-heading span {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--color-muted-foreground);
+  }
+  .roll-reveal {
+    color: var(--color-muted-foreground);
     font-size: 11px;
+  }
+  .roll-reveal summary,
+  .autopick-details summary {
+    cursor: pointer;
+    margin-bottom: 8px;
+  }
+  .rival-watch {
+    padding: 12px 16px;
+    border: 1px solid var(--color-line-soft);
+    border-radius: 8px;
+    font-size: 12px;
     color: var(--color-muted-foreground);
   }
   .pick-slam {
     display: flex;
     align-items: center;
-    gap: 0.55rem;
-    border-radius: 0.75rem;
-    border: 1px solid color-mix(in srgb, var(--color-primary) 55%, transparent);
-    background: color-mix(in srgb, var(--color-primary) 10%, transparent);
-    padding: 0.55rem 0.75rem;
-    font-family: var(--font-display);
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
-    animation: slam-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--color-positive);
   }
   .pick-slam-ball {
-    width: 1.1rem;
-    height: 1.1rem;
-    border-radius: 999px;
-    flex-shrink: 0;
-    background:
-      linear-gradient(
-        90deg,
-        transparent 46%,
-        var(--color-court-rim) 46%,
-        var(--color-court-rim) 54%,
-        transparent 54%
-      ),
-      radial-gradient(
-        circle at 30% 25%,
-        color-mix(in srgb, white 30%, transparent),
-        transparent 45%
-      ),
-      var(--color-court-wood);
-    border: 1px solid color-mix(in srgb, black 30%, var(--color-court-wood));
-    animation: ball-spin 0.6s ease both;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: currentColor;
   }
   .clock-line {
     display: flex;
     align-items: center;
-    gap: 0.55rem;
-    font-family: var(--font-mono);
-    font-size: 11px;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
+    gap: 8px;
     color: var(--color-muted-foreground);
+    font-family: var(--font-mono);
+    font-size: 12px;
   }
   .clock-line--hot {
     color: var(--color-destructive);
-    animation: clock-blink 0.8s ease-in-out infinite;
   }
   .clock-ring {
-    display: grid;
-    place-items: center;
-    width: 1.6rem;
-    height: 1.6rem;
-    border-radius: 999px;
-    border: 2px solid var(--color-border);
-    border-top-color: var(--color-primary);
-    animation: ring-spin 1.2s linear infinite;
-    flex-shrink: 0;
-  }
-  .clock-slot {
-    min-height: 1.6rem;
-  }
-  .clock-line--hot .clock-ring {
-    border-top-color: var(--color-destructive);
-    box-shadow: 0 0 14px color-mix(in srgb, var(--color-destructive) 50%, transparent);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 17px;
+    height: 17px;
+    border: 1px solid currentColor;
+    border-radius: 50%;
   }
   .clock-hand {
-    width: 2px;
-    height: 0.55rem;
+    width: 1px;
+    height: 5px;
     background: currentColor;
-    border-radius: 2px;
   }
-  @keyframes slam-in {
-    from {
-      opacity: 0;
-      transform: scale(0.94) translateY(6px);
-    }
-    to {
-      opacity: 1;
-      transform: scale(1) translateY(0);
-    }
+  .autopick-details {
+    margin-top: 7px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--color-muted-foreground);
+    overflow-wrap: anywhere;
   }
-  @keyframes ball-spin {
-    from {
-      transform: rotate(-180deg) scale(0.6);
+  @media (max-width: 1050px) {
+    .draft-workspace {
+      grid-template-columns: minmax(0, 1fr) 300px;
+      gap: 16px;
     }
-    to {
-      transform: rotate(0) scale(1);
+    .draft-lineup {
+      padding: 12px;
     }
   }
-  @keyframes ring-spin {
-    to {
-      transform: rotate(360deg);
+  @media (max-width: 850px) {
+    .draft-jump {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 40;
+      padding: 16px 20px max(16px, env(safe-area-inset-bottom));
+      border-top: 1px solid var(--color-line-strong);
+      background: var(--color-background);
+      font-size: 12px;
     }
-  }
-  @keyframes clock-blink {
-    0%,
-    100% {
-      opacity: 1;
+    .draft-jump a {
+      color: var(--color-primary);
+      font-weight: 600;
     }
-    50% {
-      opacity: 0.55;
+    .draft-jump span {
+      color: var(--color-muted-foreground);
+      font-family: var(--font-mono);
+      font-size: 11px;
     }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .pick-slam,
-    .pick-slam-ball,
-    .clock-ring,
-    .clock-line--hot {
-      animation: none;
+
+    .draft-workspace {
+      display: flex;
+      flex-direction: column;
+    }
+    .draft-lineup {
+      width: 100%;
+      position: static;
     }
   }
 </style>

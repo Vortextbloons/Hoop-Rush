@@ -46,21 +46,16 @@ export function lineupMeanUsage(team: SimulationTeam): number {
   return total / team.players.length;
 }
 const HIGH_USAGE_THRESHOLD = 23;
+const CONGESTION_GAP_SLOPE = 0.5;
+const CONGESTION_FLOOR = 0.7;
 export function usageCongestionScale(player: SimulationPlayer, team: SimulationTeam): number {
   const highUsage = team.players.filter((p) => p.tendencies.usageRate >= HIGH_USAGE_THRESHOLD);
   if (highUsage.length < 2 || player.tendencies.usageRate < HIGH_USAGE_THRESHOLD) return 1;
-  const ordered = [...highUsage].sort((a, b) => b.tendencies.usageRate - a.tendencies.usageRate);
-  let rank = ordered.length;
-  for (let i = 0; i < ordered.length; i += 1) {
-    const peer = ordered[i];
-    if (peer === undefined) continue;
-    if (peer.playerId === player.playerId) {
-      rank = i;
-      break;
-    }
-  }
-  if (rank === 0) return 1;
-  return Math.max(0.55, 1 - 0.14 * rank - 0.06 * Math.max(0, highUsage.length - 2));
+  let top = 0;
+  for (const peer of highUsage) top = Math.max(top, peer.tendencies.usageRate);
+  if (!(top > 0)) return 1;
+  const gap = Math.max(0, (top - player.tendencies.usageRate) / top);
+  return Math.max(CONGESTION_FLOOR, 1 - CONGESTION_GAP_SLOPE * gap);
 }
 export function relativeUsage(player: SimulationPlayer, team: SimulationTeam): number {
   const base =

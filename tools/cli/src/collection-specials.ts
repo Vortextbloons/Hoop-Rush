@@ -4,7 +4,7 @@ import type {
   CollectionRarity,
 } from '@hoop-rush/data-contracts';
 
-export const COLLECTION_SPECIALS_VERSION: string = 'collection-specials-v5';
+export const COLLECTION_SPECIALS_VERSION: string = 'collection-specials-v6';
 
 export type AuthoredSpecial = {
   family: Exclude<CollectionFamily, 'Base'>;
@@ -127,7 +127,7 @@ export const COLLECTION_SPECIALS: readonly AuthoredSpecial[] = [
   {
     family: 'Heat Check',
     rarity: 'Titan',
-    sourcePlayerVersionId: 'pv-c324a9f4360b5e5812c5602a46fe8ec4',
+    sourcePlayerVersionId: 'pv-3403aab8d9062e9499e652cefe30bcc8',
     ratingOverlay: { threePoint: 10, midrange: 5, offensiveIq: 3, ballHandling: 2 },
   },
   {
@@ -155,7 +155,7 @@ export const COLLECTION_SPECIAL_SOURCE_SEASONS: Record<string, string> = {
   'pv-7cade7ffd36dd1fbc109dd0d6587b34f': 'Stephen Curry 2014-15',
   'pv-95878fdf2e3c464375ca2d492b1e8c2f': 'Klay Thompson 2014-15',
   'pv-e232bb54fc4d64987c28ee7280b2e544': 'Damian Lillard 2019-20',
-  'pv-c324a9f4360b5e5812c5602a46fe8ec4': 'Devin Booker 2023-24',
+  'pv-3403aab8d9062e9499e652cefe30bcc8': 'Devin Booker 2023-24',
   'pv-df08d554ee506d60278c77225edb0b44': 'Jamal Murray 2025-26',
   'pv-861bb119df8ca81d3c77b327ee6c55e9': 'Reggie Miller 1989-90',
 };

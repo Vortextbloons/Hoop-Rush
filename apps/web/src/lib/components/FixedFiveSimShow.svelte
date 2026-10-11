@@ -21,7 +21,6 @@
   const isDuel = $derived(mode === 'duel');
   const total = $derived(progress?.total ?? (isDuel ? 7 : 161));
   let shownCount = $state(0);
-  let spot = $state<'p1' | 'p2'>('p1');
   let duelTick = $state(0);
   $effect(() => {
     shownCount = 0;
@@ -41,12 +40,6 @@
       );
       if (shownCount >= entries.length) clearInterval(timer);
     }, SHOW_TICK_MS);
-    return () => clearInterval(timer);
-  });
-  $effect(() => {
-    const timer = setInterval(() => {
-      spot = spot === 'p1' ? 'p2' : 'p1';
-    }, 700);
     return () => clearInterval(timer);
   });
   const visible = $derived(entries.slice(0, shownCount));
@@ -223,9 +216,7 @@
   }
 </script>
 
-<div
-  class="broadcast overflow-hidden rounded-2xl border border-line-strong bg-card shadow-[0_0_32px_hsl(13_100%_62%/0.14)]"
->
+<div class="broadcast overflow-hidden rounded-xl border border-line-strong bg-card">
   <div class="scorebug">
     <span class="scorebug-team scorebug-team--you">
       <span class="scorebug-abbr">YOU</span>
@@ -265,25 +256,17 @@
   </div>
   <div class="flex items-center justify-between gap-3 border-b border-border/60 px-4 py-2 sm:px-5">
     <p class="font-display text-sm font-extrabold tracking-widest uppercase">
-      {#if mode === 'duel'}Duel · Best of 7{:else if mode === 'sandbox-shared-82'}Sandbox · Shared
-        82{:else}Classic · Shared 82{/if}
+      {#if mode === 'duel'}Duel · Best of 7{:else}Season · 82 games{/if}
     </p>
     <span class="font-mono text-[10px] tracking-[0.16em] text-muted-foreground uppercase">
-      {momentum > 0 ? '▲ You' : momentum < 0 ? '▼ Opp' : 'Even'} · {pct.toFixed(0)}%
+      {pct.toFixed(0)}% of games revealed
     </span>
-  </div>
-
-  <div class="momentum" aria-hidden="true">
-    <div
-      class="momentum-needle"
-      style={`left: ${Math.max(4, Math.min(96, 50 + Math.max(-30, Math.min(30, momentum)) * 1.4))}%`}
-    ></div>
   </div>
 
   <div class="px-4 py-4 sm:px-5">
     {#if isDuel}
       <div class="showdown-duel">
-        <div class="duel-lane {spot === 'p1' ? 'duel-lane--spot' : ''}">
+        <div class="duel-lane">
           <p class="font-mono text-[10px] tracking-[0.16em] text-muted-foreground uppercase">
             {laneName('p1')}
           </p>
@@ -295,7 +278,7 @@
           </p>
         </div>
         <div class="vs-puck" aria-hidden="true"><span>VS</span></div>
-        <div class="duel-lane {spot === 'p2' ? 'duel-lane--spot' : ''}">
+        <div class="duel-lane">
           <p class="font-mono text-[10px] tracking-[0.16em] text-muted-foreground uppercase">
             {laneName('p2')}
           </p>
@@ -324,7 +307,7 @@
         {/each}
       </ol>
       <p class="mt-2 text-center font-mono text-[11px] text-muted-foreground" role="status">
-        {spot === selfId ? 'Your ball…' : "Opponent's ball…"}
+        First to four wins the series.
       </p>
     {:else}
       <div class="showdown-grid">
@@ -334,7 +317,7 @@
           <div
             class="showdown-lane rounded-xl border p-3 {pid === selfId
               ? 'border-primary/50 bg-primary/5'
-              : 'border-line-soft bg-surface-1'} {spot === pid ? 'showdown-lane--spot' : ''}"
+              : 'border-line-soft bg-surface-1'}"
           >
             <div class="flex items-baseline justify-between gap-2">
               <p class="font-mono text-[10px] tracking-[0.16em] text-muted-foreground uppercase">
@@ -394,383 +377,186 @@
         {/each}
       </ul>
     {:else}
-      <p class="mt-3 text-xs text-muted-foreground" role="status">
-        Warming the worker… games stream in batches of 4.
-      </p>
+      <p class="mt-3 text-xs text-muted-foreground" role="status">Preparing your games…</p>
     {/if}
     <p class="mt-3 text-[11px] text-muted-foreground">
-      Every game validated. H2H simulates once and mirrors into both records.
+      Results appear as your games finish. The head-to-head games count toward both records.
     </p>
   </div>
-  {#if bottomLine.length > 0}
-    <div class="bottomline" aria-label="Game bottom line">
-      <span class="bottomline-tag">Bottom line</span>
-      <div class="bottomline-track">
-        <span class="bottomline-scroll"
-          >{bottomLine.join('   •   ')} • {bottomLine.join('   •   ')}</span
-        >
-      </div>
-    </div>
-  {/if}
+  {#if bottomLine.length > 0}<details class="game-log">
+      <summary>Game log · {completed} games</summary>
+      <ol>
+        {#each bottomLine as line, i (i)}<li>{line}</li>{/each}
+      </ol>
+    </details>{/if}
 </div>
 
 <style>
-  .broadcast {
-    position: relative;
-  }
   .scorebug {
     display: flex;
-    align-items: stretch;
-    gap: 0;
-    background: hsl(222 28% 5%);
-    border-bottom: 1px solid var(--color-border);
+    background: var(--color-surface-2);
+    border-bottom: 1px solid var(--color-line-soft);
   }
   .scorebug-team {
     flex: 1;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 0.6rem;
-    padding: 0.6rem 0.5rem;
-    font-family: var(--font-display);
-  }
-  .scorebug-team--you {
-    background: linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--color-primary) 22%, transparent),
-      transparent
-    );
-    border-right: 1px solid var(--color-border);
-  }
-  .scorebug-team--opp {
-    background: linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--color-destructive) 14%, transparent),
-      transparent
-    );
-    border-left: 1px solid var(--color-border);
+    gap: 12px;
+    padding: 20px 12px;
   }
   .scorebug-abbr {
     font-family: var(--font-mono);
     font-size: 10px;
-    font-weight: 800;
-    letter-spacing: 0.2em;
     color: var(--color-muted-foreground);
+    letter-spacing: 0.1em;
   }
   .scorebug-num {
-    font-size: 2rem;
-    font-weight: 900;
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 38px;
     line-height: 1;
     font-variant-numeric: tabular-nums;
   }
   .scorebug-team--you .scorebug-num {
     color: var(--color-primary);
-    text-shadow: 0 0 18px color-mix(in srgb, var(--color-primary) 50%, transparent);
   }
   .scorebug-mid {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 0.25rem;
-    padding: 0.4rem 0.8rem;
-    min-width: 7rem;
+    gap: 6px;
+    padding: 14px;
   }
-  .streak {
-    font-family: var(--font-mono);
-    font-size: 10px;
-    font-weight: 800;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--color-accent);
-    animation: streak-pop 0.35s ease both;
-  }
-  .momentum {
-    position: relative;
-    height: 0.45rem;
-    background: linear-gradient(
-      90deg,
-      var(--color-destructive) 0%,
-      var(--color-surface-3) 30%,
-      var(--color-surface-3) 70%,
-      var(--color-primary) 100%
-    );
-    opacity: 0.9;
-  }
-  .momentum-needle {
-    position: absolute;
-    top: -3px;
-    width: 3px;
-    height: 12px;
-    background: white;
-    border-radius: 2px;
-    box-shadow: 0 0 10px white;
-    transform: translateX(-50%);
-    transition: left 0.4s ease;
-  }
-  .bottomline {
+  .live-pill {
     display: flex;
     align-items: center;
-    gap: 0;
-    border-top: 1px solid var(--color-border);
-    background: hsl(222 28% 5%);
-    overflow: hidden;
-  }
-  .bottomline-tag {
-    flex-shrink: 0;
-    font-family: var(--font-mono);
-    font-size: 9px;
-    font-weight: 800;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: var(--color-primary-foreground);
-    background: var(--color-primary);
-    padding: 0.55rem 0.65rem;
-  }
-  .bottomline-track {
-    overflow: hidden;
-    flex: 1;
-    white-space: nowrap;
-  }
-  .bottomline-scroll {
-    display: inline-block;
-    padding: 0.55rem 0;
+    gap: 6px;
     font-family: var(--font-mono);
     font-size: 11px;
     color: var(--color-muted-foreground);
-    animation: bottom-scroll 28s linear infinite;
-  }
-  .live-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    border-radius: 999px;
-    border: 1px solid color-mix(in srgb, var(--color-primary) 45%, transparent);
-    background: color-mix(in srgb, var(--color-primary) 12%, transparent);
-    color: var(--color-primary);
-    font-family: var(--font-mono);
-    font-size: 10px;
-    font-weight: 800;
-    letter-spacing: 0.16em;
-    padding: 0.25rem 0.65rem;
   }
   .live-dot {
-    width: 0.5rem;
-    height: 0.5rem;
-    border-radius: 999px;
-    background: currentColor;
-    animation: live-pulse 1.2s ease-in-out infinite;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--color-primary);
+  }
+  .streak {
+    font-size: 10px;
+    color: var(--color-accent);
   }
   .showdown-duel {
-    position: relative;
     display: flex;
-    align-items: stretch;
+    align-items: center;
     justify-content: center;
-    gap: 1rem;
+    gap: 20px;
+    padding: 20px 0;
   }
   .duel-lane {
     flex: 1;
-    max-width: 12rem;
+    max-width: 220px;
     text-align: center;
-    border-radius: 1rem;
-    border: 1px solid transparent;
-    padding: 0.5rem 0.25rem;
-    transition:
-      border-color 0.3s ease,
-      background 0.3s ease;
   }
-  .duel-lane--spot {
-    border-color: color-mix(in srgb, var(--color-primary) 55%, transparent);
-    background: color-mix(in srgb, var(--color-primary) 8%, transparent);
-  }
-  .showdown-grid {
-    position: relative;
-    display: grid;
-    gap: 0.75rem;
-  }
-  @media (min-width: 640px) {
-    .showdown-grid {
-      grid-template-columns: 1fr 1fr;
-    }
-  }
-  .showdown-lane {
-    transition:
-      border-color 0.3s ease,
-      box-shadow 0.3s ease;
-  }
-  .showdown-lane--spot {
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 45%, transparent);
+  .duel-lane p:first-child {
+    margin-bottom: 8px;
   }
   .vs-puck {
-    align-self: center;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--color-muted-foreground);
+  }
+  .vs-puck--grid {
+    display: none;
+  }
+  .showdown-grid {
     display: grid;
-    place-items: center;
-    flex-shrink: 0;
-    width: 2.5rem;
-    height: 2.5rem;
-    border-radius: 999px;
-    background: var(--color-primary);
-    color: var(--color-primary-foreground);
-    font-family: var(--font-display);
-    font-size: 12px;
-    font-weight: 800;
-    animation: vs-slide 1.4s ease-in-out infinite alternate;
-  }
-  .vs-puck--grid {
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-  }
-  .vs-puck--grid {
-    animation: vs-nudge 1.4s ease-in-out infinite alternate;
-  }
-  .race-fill {
-    transition: width 0.25s ease;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    padding: 10px 0;
   }
   .sim-bar {
-    height: 0.65rem;
+    height: 5px;
+    border-radius: 3px;
     overflow: hidden;
-    border-radius: 999px;
     background: var(--color-muted);
   }
   .sim-bar-fill {
     height: 100%;
-    border-radius: 999px;
-    background: linear-gradient(
-      90deg,
-      var(--color-primary),
-      color-mix(in srgb, var(--color-primary) 55%, white)
-    );
-    background-size: 200% 100%;
-    animation: sim-shimmer 1.4s linear infinite;
-    transition: width 0.25s ease;
+    background: var(--color-primary);
+    transition: width 250ms;
   }
   .duel-dot {
     display: grid;
     place-items: center;
-    width: 2rem;
-    height: 2rem;
-    border-radius: 999px;
-    border: 1px solid var(--color-border);
-    background: var(--color-surface-1);
+    width: 30px;
+    height: 30px;
+    border-radius: 6px;
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-line-soft);
+    color: var(--color-muted-foreground);
     font-family: var(--font-mono);
     font-size: 11px;
-    font-weight: 800;
-    color: var(--color-muted-foreground);
   }
   .duel-dot--win {
-    border-color: color-mix(in srgb, var(--color-primary) 60%, transparent);
-    background: color-mix(in srgb, var(--color-primary) 16%, transparent);
-    color: var(--color-primary);
-    animation: dot-pop 0.3s ease both;
+    color: var(--color-positive);
+    border-color: var(--color-positive);
   }
   .duel-dot--loss {
-    border-color: color-mix(in srgb, var(--color-destructive) 55%, transparent);
-    background: color-mix(in srgb, var(--color-destructive) 12%, transparent);
     color: var(--color-destructive);
-    animation: dot-pop 0.3s ease both;
+    border-color: var(--color-destructive);
   }
   .ticker-card {
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    border-radius: 0.75rem;
-    border: 1px solid var(--color-border);
+    gap: 4px;
+    padding: 14px;
+    border: 1px solid var(--color-line-soft);
+    border-radius: 8px;
     background: var(--color-surface-1);
-    padding: 0.6rem 0.75rem;
-    animation: ticker-in 0.28s ease both;
   }
   .ticker-card--win {
-    border-color: color-mix(in srgb, var(--color-primary) 50%, transparent);
+    border-left: 3px solid var(--color-positive);
   }
   .ticker-card--loss {
-    border-color: color-mix(in srgb, var(--color-destructive) 40%, transparent);
+    border-left: 3px solid var(--color-destructive);
   }
-  @keyframes live-pulse {
-    0%,
-    100% {
-      opacity: 1;
-      transform: scale(1);
-    }
-    50% {
-      opacity: 0.45;
-      transform: scale(0.8);
-    }
+  .game-log {
+    border-top: 1px solid var(--color-line-soft);
+    padding: 16px 20px;
+    font-size: 11px;
+    color: var(--color-muted-foreground);
   }
-  @keyframes sim-shimmer {
-    from {
-      background-position: 200% 0;
-    }
-    to {
-      background-position: -200% 0;
-    }
+  .game-log summary {
+    cursor: pointer;
   }
-  @keyframes dot-pop {
-    from {
-      transform: scale(1.35);
-    }
-    to {
-      transform: scale(1);
-    }
+  .game-log ol {
+    max-height: 220px;
+    overflow: auto;
+    display: grid;
+    gap: 7px;
+    margin-top: 16px;
+    font-family: var(--font-mono);
   }
-  @keyframes ticker-in {
-    from {
-      opacity: 0;
-      transform: translateY(6px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
+  summary:focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 4px;
   }
-  @keyframes streak-pop {
-    from {
-      opacity: 0;
-      transform: scale(0.8);
+  @media (max-width: 640px) {
+    .showdown-grid {
+      grid-template-columns: 1fr;
     }
-    to {
-      opacity: 1;
-      transform: scale(1);
+    .scorebug-team {
+      gap: 7px;
+      padding: 16px 8px;
     }
-  }
-  @keyframes bottom-scroll {
-    from {
-      transform: translateX(0);
-    }
-    to {
-      transform: translateX(-50%);
-    }
-  }
-  @keyframes vs-slide {
-    from {
-      transform: translateX(-6px) scale(1);
-    }
-    to {
-      transform: translateX(6px) scale(1.08);
-    }
-  }
-  @keyframes vs-nudge {
-    from {
-      transform: translate(-58%, -50%) scale(1);
-    }
-    to {
-      transform: translate(-42%, -50%) scale(1.08);
+    .scorebug-mid {
+      padding: 8px;
     }
   }
   @media (prefers-reduced-motion: reduce) {
-    .live-dot,
-    .sim-bar-fill,
-    .duel-dot--win,
-    .duel-dot--loss,
-    .ticker-card,
-    .vs-puck {
-      animation: none;
-    }
-    .sim-bar-fill,
-    .duel-lane,
-    .showdown-lane,
-    .race-fill {
+    .sim-bar-fill {
       transition: none;
     }
   }

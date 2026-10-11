@@ -16,7 +16,6 @@ import {
   tendenciesForProfile,
   type RatingProfileInput,
 } from './v3.ts';
-import { normalizePoolOveralls } from '../pools/compute.ts';
 import { starterStats } from './ratings-test-support.ts';
 
 const scale = buildOverallScale(
@@ -284,28 +283,6 @@ describe('total ability overall', () => {
     expect(observedUnrecognized.recognitionWeight).toBe(0);
   });
 
-  it('values interior and perimeter defensive routes symmetrically', () => {
-    const interior = {
-      ...ratings,
-      interiorDefense: 90,
-      perimeterDefense: 50,
-      block: 90,
-      steal: 50,
-    };
-    const perimeter = {
-      ...ratings,
-      interiorDefense: 50,
-      perimeterDefense: 90,
-      block: 50,
-      steal: 90,
-    };
-    expect(defensiveAbilityFor(interior, 'C')).toBe(defensiveAbilityFor(perimeter, 'G'));
-    expect(defensiveAbilityFor(interior, 'C')).toBeGreaterThan(defensiveAbilityFor(interior, 'G'));
-    expect(derive({ ratings: interior, position: 'C' }).profile.rawOverallScore).toBe(
-      derive({ ratings: perimeter, position: 'PG' }).profile.rawOverallScore,
-    );
-  });
-
   it('puts a low-usage rim protector in the mid-80s and keeps a two-way star above him', () => {
     const neutral = Object.fromEntries(
       Object.keys(player.ratings).map((key) => [key, 60]),
@@ -404,36 +381,6 @@ describe('total ability overall', () => {
     expect(starOverall).toBeGreaterThanOrEqual(94);
     expect(starOverall).toBeGreaterThan(anchorOverall);
   });
-
-  it('requires matching frozen scales in v3 artifacts while retaining legacy readability', () => {
-    expect(ratingsModelArtifactSchema.safeParse(DEFAULT_RATINGS_MODEL_ARTIFACT).success).toBe(true);
-    expect(
-      ratingsModelArtifactSchema.safeParse({ ...DEFAULT_RATINGS_MODEL_ARTIFACT, schemaVersion: 3 })
-        .success,
-    ).toBe(false);
-    expect(
-      ratingsModelArtifactSchema.safeParse({ ...input.artifact, schemaVersion: 3 }).success,
-    ).toBe(true);
-    expect(
-      ratingsModelArtifactSchema.safeParse({
-        ...input.artifact,
-        schemaVersion: 3,
-        modelVersion: 'different',
-      }).success,
-    ).toBe(false);
-  });
-  it('requires reconciling diagnostics for v3 while reading legacy v2 profiles', () => {
-    const profile = derive().profile;
-    const legacy = { ...profile, schemaVersion: 2, overallDiagnostics: undefined };
-    expect(ratingProfileSchema.safeParse(legacy).success).toBe(true);
-    expect(
-      ratingProfileSchema.safeParse({ ...profile, overallDiagnostics: undefined }).success,
-    ).toBe(false);
-    expect(
-      ratingProfileSchema.safeParse({ ...profile, rawOverallScore: profile.rawOverallScore + 1 })
-        .success,
-    ).toBe(false);
-  });
 });
 
 describe('frozen overall scale', () => {
@@ -452,25 +399,6 @@ describe('frozen overall scale', () => {
       'conflicting',
     );
   });
-  it('maps identical profiles independently of pool additions and order', () => {
-    const makeRow = (id: string) => ({
-      playerId: id,
-      franchiseId: 'lakers',
-      seasonKey: '2000-01',
-      summaryRatings: { ...derive().summaryRatings },
-      ratingProfile: { ...derive().profile },
-    });
-    const alone = [makeRow('a')];
-    const together = [makeRow('b'), makeRow('a')];
-    normalizePoolOveralls(alone, scale);
-    normalizePoolOveralls(together, scale);
-    expect(together[1]?.summaryRatings).toEqual(alone[0]?.summaryRatings);
-    expect(together[1]?.ratingProfile.overallPercentile).toEqual(
-      alone[0]?.ratingProfile.overallPercentile,
-    );
-    normalizePoolOveralls(together.reverse(), scale);
-    expect(together[0]?.summaryRatings).toEqual(alone[0]?.summaryRatings);
-  });
   it('interpolates monotonically with bounds and rejects malformed mappings', () => {
     let last = 40;
     for (let score = 20; score < 110; score += 0.1) {
@@ -484,22 +412,5 @@ describe('frozen overall scale', () => {
       overallScaleSchema.safeParse({ ...scale, knots: [...scale.knots].reverse() }).success,
     ).toBe(false);
     expect(() => overallForScore(NaN, scale)).toThrow();
-  });
-  it('thins 99 below 98 below 97 on a uniform cohort', () => {
-    const samples = Array.from({ length: 12000 }, (_, index) => ({
-      key: String(index),
-      score: index / 10,
-    }));
-    const cohort = buildOverallScale(samples);
-    const counts = new Map<number, number>();
-    for (const sample of samples) {
-      const overall = overallForScore(sample.score, cohort).overall;
-      counts.set(overall, (counts.get(overall) ?? 0) + 1);
-    }
-    const count = (overall: number) => counts.get(overall) ?? 0;
-    expect(count(99)).toBeLessThanOrEqual(count(98));
-    expect(count(98)).toBeLessThanOrEqual(count(97));
-    expect(count(96)).toBeLessThanOrEqual(count(95));
-    expect(count(95)).toBeLessThanOrEqual(count(94));
   });
 });

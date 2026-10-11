@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ArrowUpRight, Check, Layers, LockKeyhole } from '@lucide/svelte';
+  import { ArrowUpRight, Check, ChevronDown, Layers, LockKeyhole } from '@lucide/svelte';
   import { asset } from '$app/paths';
   import CurrencyIcon from './CurrencyIcon.svelte';
   import type { SetProgressView } from './collection-progression-view.ts';
@@ -24,6 +24,17 @@
     onInspect: (cardId: string) => void;
   } = $props();
 
+  let expanded = $state<Record<string, boolean>>({});
+
+  function isExpanded(view: SetProgressView): boolean {
+    return expanded[view.setId] ?? (view.complete && !view.claimed);
+  }
+
+  function toggleSet(setId: string): void {
+    const view = views.find((entry) => entry.setId === setId);
+    expanded[setId] = view ? !isExpanded(view) : true;
+  }
+
   function formatExchange(amount: number): string {
     return amount.toLocaleString('en-US');
   }
@@ -46,8 +57,15 @@
   <ul class="set-list">
     {#each views as view (view.setId)}
       {@const status = view.claimed ? 'Claimed' : view.complete ? 'Complete' : 'Incomplete'}
-      <li class="ur-set-entry" class:complete={view.complete}>
-        <div class="set-overview">
+      {@const expandedSet = isExpanded(view)}
+      <li class="ur-set-entry" class:complete={view.complete} class:expanded={expandedSet}>
+        <button
+          type="button"
+          class="set-overview"
+          aria-expanded={expandedSet}
+          aria-controls={`set-detail-${view.setId}`}
+          onclick={() => toggleSet(view.setId)}
+        >
           <div class="set-intro">
             <div class="set-kicker">
               <span>Collection set</span>
@@ -79,9 +97,15 @@
                 : `${view.missingCardIds.length} cards still to collect`}
             </p>
           </div>
-        </div>
+          <span class="set-toggle" aria-hidden="true">
+            <span class="set-toggle-hint">{expandedSet ? 'Hide' : 'View'} set</span>
+            <ChevronDown size={18} />
+          </span>
+        </button>
 
-        <ul class="member-grid">
+        {#if expandedSet}
+          <div class="set-detail" id={`set-detail-${view.setId}`}>
+            <ul class="member-grid">
           {#each view.memberCardIds as cardId (cardId)}
             {@const owned = !view.missingCardIds.includes(cardId)}
             {@const fullName = cardNameOf(cardId)}
@@ -160,6 +184,8 @@
             {/if}
           </div>
         </div>
+          </div>
+        {/if}
       </li>
     {/each}
   </ul>
@@ -225,15 +251,52 @@
 
   .set-overview {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(200px, 0.4fr);
+    grid-template-columns: minmax(0, 1fr) minmax(200px, 0.4fr) auto;
     align-items: center;
     gap: 1.5rem;
+    width: 100%;
     padding: 1.4rem 1.5rem;
+    border: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
     background: linear-gradient(
       110deg,
       color-mix(in srgb, var(--ur-ember) 13%, transparent),
       transparent 65%
     );
+  }
+  .set-overview:hover {
+    background: linear-gradient(
+      110deg,
+      color-mix(in srgb, var(--ur-ember) 22%, transparent),
+      transparent 70%
+    );
+  }
+  .set-overview:focus-visible {
+    outline: 2px solid var(--ur-focus);
+    outline-offset: -4px;
+    border-radius: 0.9rem;
+  }
+  .set-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--ur-muted);
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  .set-toggle :global(svg) {
+    transition: transform 180ms ease;
+  }
+  .ur-set-entry.expanded .set-toggle :global(svg) {
+    transform: rotate(180deg);
+  }
+  .set-detail {
+    min-width: 0;
   }
 
   .set-kicker {
@@ -508,9 +571,15 @@
   }
   @media (max-width: 600px) {
     .set-overview {
-      grid-template-columns: minmax(0, 1fr);
+      grid-template-columns: minmax(0, 1fr) auto;
       gap: 0.9rem;
       padding: 1.1rem;
+    }
+    .set-progress {
+      grid-column: 1 / -1;
+    }
+    .set-toggle-hint {
+      display: none;
     }
     .member-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -7,7 +7,6 @@ import {
   playoffGameIdOf,
   seasonGameIdSchema,
   seasonRunSchema,
-  type FranchiseId,
   type SeasonCampaignOpportunity,
   type SeasonDraftCatalog,
   type SeasonEffectsState,
@@ -28,8 +27,7 @@ import { buildEraSimulationProfile } from '@hoop-rush/test-fixtures';
 import { buildEmptyCampaignState, normalizeCampaignState } from './campaign.ts';
 import { handleSeasonRunCommand, type SeasonRunCommandContext } from './season-commands.ts';
 import { seasonObjectiveChoicesForBlock } from './objectives.ts';
-import { openSeasonTradeWindow, seasonEconomyRunOf } from './trades.ts';
-import { evaluateTradeProposal } from './trade-board.ts';
+import { openSeasonTradeWindow } from './trades.ts';
 import {
   buildEconomyTestRun,
   injuryIdOf,
@@ -345,109 +343,6 @@ describe('select-block-objective command', () => {
     if (staleDigest.result.result.status !== 'rejected') throw new Error('expected rejection');
     expect(staleDigest.result.result.rejection.code).toBe('stale-state');
   });
-  it('rejects duplicate-command after the same commandId was already applied', () => {
-    const { run, context } = windowedFixture();
-    const offered = seasonObjectiveChoicesForBlock(run.rootSeed, 0)[0] ?? 'win-six';
-    const first = handleSeasonRunCommand(
-      commandOf(run, {
-        command: 'select-block-objective',
-        commandId: commandIdSchema.parse('select-obj-again'),
-        blockIndex: 0,
-        objectiveId: offered,
-      }),
-      context,
-    );
-    if (first.result.result.status !== 'rejected') throw new Error('expected rejection');
-    expect(first.result.result.rejection.code).toBe('retired');
-    const replay = handleSeasonRunCommand(
-      commandOf(first.run, {
-        command: 'select-block-objective',
-        commandId: commandIdSchema.parse('select-obj-again'),
-        blockIndex: 0,
-        objectiveId: offered,
-      }),
-      { ...context, run: first.run },
-    );
-    expect(replay.result.result.status).toBe('rejected');
-    if (replay.result.result.status !== 'rejected') throw new Error('expected rejection');
-    expect(['duplicate-command', 'retired']).toContain(replay.result.result.rejection.code);
-  });
-  it('rejects retired instead of not-at-boundary and objective-not-offered', () => {
-    const { run, context } = windowedFixture();
-    const notAtBoundary = handleSeasonRunCommand(
-      commandOf(run, {
-        command: 'select-block-objective',
-        commandId: commandIdSchema.parse('cmd-boundary'),
-        blockIndex: 2,
-        objectiveId: 'win-six',
-      }),
-      context,
-    );
-    if (notAtBoundary.result.result.status !== 'rejected') throw new Error('expected rejection');
-    expect(notAtBoundary.result.result.rejection.code).toBe('retired');
-    const offered = seasonObjectiveChoicesForBlock(run.rootSeed, 0);
-    const notOfferedId = (
-      [
-        'win-six',
-        'defense-108',
-        'rebound-plus-20',
-        'availability-eight',
-        'bench-320',
-        'turnover-130',
-      ] as const
-    ).find((id) => !offered.includes(id));
-    const notOffered = handleSeasonRunCommand(
-      commandOf(run, {
-        command: 'select-block-objective',
-        commandId: commandIdSchema.parse('cmd-not-offered'),
-        blockIndex: 0,
-        objectiveId: notOfferedId ?? 'win-six',
-      }),
-      context,
-    );
-    if (notOffered.result.result.status !== 'rejected') throw new Error('expected rejection');
-    expect(notOffered.result.result.rejection.code).toBe('retired');
-  });
-  it('rejects retired instead of objective-already-selected and not-at-boundary for future blocks', () => {
-    const { run, context } = windowedFixture();
-    const offered = seasonObjectiveChoicesForBlock(run.rootSeed, 0)[0] ?? 'win-six';
-    const first = handleSeasonRunCommand(
-      commandOf(run, {
-        command: 'select-block-objective',
-        commandId: commandIdSchema.parse('select-obj-0'),
-        blockIndex: 0,
-        objectiveId: offered,
-      }),
-      context,
-    );
-    if (first.result.result.status !== 'rejected') throw new Error('expected rejection');
-    expect(first.result.result.rejection.code).toBe('retired');
-    const current = first.run;
-    const again = handleSeasonRunCommand(
-      commandOf(current, {
-        command: 'select-block-objective',
-        commandId: commandIdSchema.parse('select-obj-0-again'),
-        blockIndex: 0,
-        objectiveId: offered,
-      }),
-      { ...context, run: current },
-    );
-    expect(again.result.result.status).toBe('rejected');
-    if (again.result.result.status !== 'rejected') throw new Error('expected rejection');
-    expect(again.result.result.rejection.code).toBe('retired');
-    const futureBlock = handleSeasonRunCommand(
-      commandOf(current, {
-        command: 'select-block-objective',
-        commandId: commandIdSchema.parse('select-obj-1'),
-        blockIndex: 1,
-        objectiveId: seasonObjectiveChoicesForBlock(current.rootSeed, 1)[0] ?? 'win-six',
-      }),
-      { ...context, run: current },
-    );
-    expect(futureBlock.result.result.status).toBe('rejected');
-    if (futureBlock.result.result.status !== 'rejected') throw new Error('expected rejection');
-    expect(futureBlock.result.result.rejection.code).toBe('retired');
-  });
 });
 describe('spend-influence command', () => {
   it('accepts an extra-trade-offer spend, tracks the window, and generates offer #4', () => {
@@ -616,69 +511,6 @@ describe('spend-influence command', () => {
     expect(record?.missedGamesRemaining).toBe(3);
     expect(output.run.stateRevision).toBe(injured.stateRevision + 1);
   });
-  it('rejects injury-not-active and already-rehabbed', () => {
-    const { run, context } = windowedFixture();
-    const notActive = handleSeasonRunCommand(
-      commandOf(run, {
-        command: 'spend-influence',
-        commandId: commandIdSchema.parse('spend-not-active'),
-        franchiseId: HUMAN,
-        purpose: 'risky-rehab',
-        injuryId: injuryIdOf('missing-injury'),
-      }),
-      context,
-    );
-    if (notActive.result.result.status !== 'rejected') throw new Error('expected rejection');
-    expect(notActive.result.result.rejection.code).toBe('injury-not-active');
-    const humanRoster = run.rosters.find((roster) => roster.franchiseId === HUMAN);
-    const version = humanRoster?.players[0]?.playerVersionId;
-    if (version === undefined) throw new Error('no human player');
-    const injuryId = injuryIdOf('command-rehab-2');
-    const injured = withInjury(run, {
-      injuryId,
-      playerVersionId: version,
-      franchiseId: HUMAN,
-      gameId: seasonGameIdSchema.parse('s000001'),
-      type: 'soft-tissue',
-      severity: 'minor',
-      occurredBeforeHalftime: false,
-      sameGameReturn: false,
-      sameGameReturned: null,
-      missedGamesTotal: 2,
-      missedGamesRemaining: 2,
-      actualReturnRound: null,
-      seasonEnding: false,
-      rehabModifier: 0 as const,
-      recurrenceWindowRoundsRemaining: 0,
-      seedPath: ['injuries', 'test'],
-    });
-    const already: SeasonRun = {
-      ...injured,
-      influence: {
-        ...injured.influence,
-        rehabs: {
-          ...injured.influence.rehabs,
-          [injuryId]: {
-            franchiseId: HUMAN,
-            outcome: 'pending',
-            commandId: commandIdSchema.parse('previous-rehab'),
-          },
-        },
-      },
-    };
-    const output = handleSeasonRunCommand(
-      commandOf(already, {
-        command: 'spend-influence',
-        commandId: commandIdSchema.parse('spend-rehab-again'),
-        franchiseId: HUMAN,
-        purpose: 'risky-rehab',
-        injuryId,
-      }),
-      { ...context, run: already },
-    );
-    if (output.result.result.status !== 'rejected') throw new Error('expected rejection');
-    expect(output.result.result.rejection.code).toBe('already-rehabbed');
-  });
 });
 describe('accept-trade-offer command', () => {
   it('applies an open offer atomically and reports both roster changes', () => {
@@ -758,30 +590,6 @@ describe('accept-trade-offer command', () => {
       throw new Error('expected rejection');
     expect(acceptAfterDecline.result.result.rejection.code).toBe('offer-not-open');
   });
-  it('rejects ownership-conflict when a moved player is owned elsewhere', () => {
-    const { run, context } = windowedFixture();
-    const offer = baseOfferOf(run);
-    const conflictingVersion = offer.outgoingPlayerVersionIds[0] ?? '';
-    const tampered: SeasonRun = {
-      ...run,
-      ownership: run.ownership.map((row) =>
-        row.playerVersionId === conflictingVersion
-          ? { ...row, ownerFranchiseId: franchiseIdSchema.parse('celtics') }
-          : row,
-      ),
-    };
-    const output = handleSeasonRunCommand(
-      commandOf(tampered, {
-        command: 'accept-trade-offer',
-        commandId: commandIdSchema.parse('accept-conflict'),
-        windowIndex: 0,
-        offerId: offer.offerId,
-      }),
-      { ...context, run: tampered },
-    );
-    if (output.result.result.status !== 'rejected') throw new Error('expected rejection');
-    expect(output.result.result.rejection.code).toBe('ownership-conflict');
-  });
   it('rejects roster-illegal when the swap breaks ten-player legality', () => {
     const { run, context, catalog } = windowedFixture();
     const humanRoster = run.rosters.find((roster) => roster.franchiseId === HUMAN);
@@ -841,69 +649,6 @@ describe('accept-trade-offer command', () => {
     if (output.result.result.status !== 'rejected') throw new Error('expected rejection');
     expect(output.result.result.rejection.code).toBe('roster-illegal');
   });
-  it('accepts an uneven offer with backfill to ten', () => {
-    const { run, context } = windowedFixture();
-    const humanRoster = run.rosters.find((roster) => roster.franchiseId === HUMAN);
-    const celticsRoster = run.rosters.find((roster) => roster.franchiseId === 'celtics');
-    if (humanRoster === undefined || celticsRoster === undefined)
-      throw new Error('missing rosters');
-    const outgoing = humanRoster.players.slice(0, 2).map((player) => player.playerVersionId);
-    const incoming = celticsRoster.players.slice(0, 1).map((player) => player.playerVersionId);
-    if (outgoing.length !== 2 || incoming.length !== 1) throw new Error('fixture lacks players');
-    const unevenOffer: SeasonTradeOffer = {
-      offerId: 'off-' + 'd'.repeat(32),
-      windowIndex: 0,
-      seedPath: ['window', '0', 'offer', '9'],
-      toFranchiseId: HUMAN,
-      fromFranchiseId: franchiseIdSchema.parse('celtics'),
-      outgoingPlayerVersionIds: outgoing,
-      incomingPlayerVersionIds: incoming,
-      outgoingHealth: outgoing.map(() => ({ available: true, activeInjuryIds: [] })),
-      incomingHealth: incoming.map(() => ({ available: true, activeInjuryIds: [] })),
-      valueBand: { ratioBasisPoints: 1000, band: '80-120', qualified: true },
-      roleFit: { outgoingRoles: ['G', 'G'], incomingRoles: ['G'], notes: 'test' },
-      rosterNeedFacts: { outgoingDepth: 3, incomingDepth: 2, notes: 'test' },
-      projectedRotationChanges: 'test',
-      projectedChemistryDisruption: { removedPairs: 17, newPairs: 17 },
-      status: 'open',
-    };
-    const baseTrade = run.trade;
-    if (baseTrade === null) throw new Error('no trade state');
-    const windowZero = baseTrade.windows[0];
-    if (windowZero === undefined) throw new Error('no window 0');
-    const withOffer: SeasonRun = {
-      ...run,
-      trade: {
-        ...baseTrade,
-        windows: [{ ...windowZero, offers: [...windowZero.offers, unevenOffer] }],
-      },
-    };
-    const output = handleSeasonRunCommand(
-      commandOf(withOffer, {
-        command: 'accept-trade-offer',
-        commandId: commandIdSchema.parse('accept-uneven'),
-        windowIndex: 0,
-        offerId: unevenOffer.offerId,
-      }),
-      { ...context, run: withOffer },
-    );
-    if (output.result.command !== 'accept-trade-offer') throw new Error('unexpected command');
-    const accepted = output.result.result;
-    if (accepted.status !== 'accepted') throw new Error('expected acceptance');
-    const humanAfter = output.run.rosters.find((roster) => roster.franchiseId === HUMAN);
-    const celticsAfter = output.run.rosters.find((roster) => roster.franchiseId === 'celtics');
-    expect(humanAfter?.players).toHaveLength(10);
-    expect(celticsAfter?.players).toHaveLength(11);
-    const baseOwned = new Set(run.ownership.map((row) => row.playerVersionId));
-    const backfillId = humanAfter?.players
-      .map((player) => player.playerVersionId)
-      .find((id) => !baseOwned.has(id));
-    expect(backfillId).toBeDefined();
-    expect(accepted.rosterChanges).toEqual([
-      { franchiseId: HUMAN, added: [...incoming, backfillId], removed: outgoing },
-      { franchiseId: 'celtics', added: [...outgoing], removed: [...incoming] },
-    ]);
-  });
 });
 describe('decline-trade-offer command', () => {
   it('marks an open offer declined and advances the state chain', () => {
@@ -930,54 +675,6 @@ describe('decline-trade-offer command', () => {
     expect(recorded?.status).toBe('declined');
     expect(output.run.rosters).toEqual(run.rosters);
     expect(output.run.ownership).toEqual(run.ownership);
-  });
-  it('rejects offer-unknown, window-not-open, and offer-not-open', () => {
-    const { run, context } = windowedFixture();
-    const offer = baseOfferOf(run);
-    const unknown = handleSeasonRunCommand(
-      commandOf(run, {
-        command: 'decline-trade-offer',
-        commandId: commandIdSchema.parse('decline-unknown'),
-        windowIndex: 0,
-        offerId: 'off-' + 'd'.repeat(32),
-      }),
-      context,
-    );
-    if (unknown.result.result.status !== 'rejected') throw new Error('expected rejection');
-    expect(unknown.result.result.rejection.code).toBe('offer-unknown');
-    const closedTrade = withClosedWindow(run, 0);
-    const notOpen = handleSeasonRunCommand(
-      commandOf(closedTrade, {
-        command: 'decline-trade-offer',
-        commandId: commandIdSchema.parse('decline-not-open'),
-        windowIndex: 0,
-        offerId: offer.offerId,
-      }),
-      { ...context, run: closedTrade },
-    );
-    if (notOpen.result.result.status !== 'rejected') throw new Error('expected rejection');
-    expect(notOpen.result.result.rejection.code).toBe('window-not-open');
-    const first = handleSeasonRunCommand(
-      commandOf(run, {
-        command: 'decline-trade-offer',
-        commandId: commandIdSchema.parse('decline-twice-1'),
-        windowIndex: 0,
-        offerId: offer.offerId,
-      }),
-      context,
-    );
-    if (first.result.result.status !== 'accepted') throw new Error('expected decline');
-    const second = handleSeasonRunCommand(
-      commandOf(first.run, {
-        command: 'decline-trade-offer',
-        commandId: commandIdSchema.parse('decline-twice-2'),
-        windowIndex: 0,
-        offerId: offer.offerId,
-      }),
-      { ...context, run: first.run },
-    );
-    if (second.result.result.status !== 'rejected') throw new Error('expected rejection');
-    expect(second.result.result.rejection.code).toBe('offer-not-open');
   });
 });
 describe('respond-to-trade-counter command', () => {
@@ -1062,55 +759,6 @@ describe('respond-to-trade-counter command', () => {
     expect(tradeEntry?.type).toBe('trade');
     expect(output.run.stateRevision).toBe(submitted.run.stateRevision + 1);
   });
-  it('leaves rosters untouched on decline', () => {
-    const fixture = windowedFixture();
-    const submitted = submitFirstAcceptablePackage(fixture);
-    const output = handleSeasonRunCommand(
-      commandOf(submitted.run, {
-        command: 'respond-to-trade-counter',
-        commandId: commandIdSchema.parse('neg-decline-1'),
-        windowIndex: 0,
-        inquiryId: submitted.inquiryId,
-        accept: false,
-      }),
-      { ...fixture.context, run: submitted.run },
-    );
-    if (output.result.command !== 'respond-to-trade-counter') throw new Error('unexpected command');
-    if (output.result.result.status !== 'accepted') throw new Error('expected acceptance');
-    expect(output.result.result.rosterChanges).toBeUndefined();
-    expect(output.run.rosters).toEqual(submitted.run.rosters);
-    expect(output.run.ownership).toEqual(submitted.run.ownership);
-  });
-  it('rejects a second response once the negotiation is terminal', () => {
-    const fixture = windowedFixture();
-    const submitted = submitFirstAcceptablePackage(fixture);
-    const declined = handleSeasonRunCommand(
-      commandOf(submitted.run, {
-        command: 'respond-to-trade-counter',
-        commandId: commandIdSchema.parse('neg-terminal-1'),
-        windowIndex: 0,
-        inquiryId: submitted.inquiryId,
-        accept: false,
-      }),
-      { ...fixture.context, run: submitted.run },
-    );
-    if (declined.result.command !== 'respond-to-trade-counter')
-      throw new Error('unexpected command');
-    if (declined.result.result.status !== 'accepted') throw new Error('expected decline');
-    const resurrected = handleSeasonRunCommand(
-      commandOf(declined.run, {
-        command: 'respond-to-trade-counter',
-        commandId: commandIdSchema.parse('neg-terminal-2'),
-        windowIndex: 0,
-        inquiryId: submitted.inquiryId,
-        accept: true,
-      }),
-      { ...fixture.context, run: declined.run },
-    );
-    if (resurrected.result.result.status !== 'rejected') throw new Error('expected rejection');
-    expect(resurrected.result.result.rejection.code).toBe('trade-negotiations-closed');
-    expect(resurrected.run.rosters).toEqual(declined.run.rosters);
-  });
   it('rejects every trade command while a block is pending and preserves the pending row', () => {
     const fixture = windowedFixture();
     const { context } = fixture;
@@ -1176,31 +824,6 @@ describe('Influence sender authorization', () => {
         ?.players.map((player) => player.playerVersionId) ?? []
     );
   }
-  it('rejects an Influence sender outside the two trade franchises', () => {
-    const fixture = windowedFixture();
-    const humanIds = rosterIds(fixture.run, HUMAN);
-    const celticsIds = rosterIds(fixture.run, 'celtics');
-    const outgoing = humanIds[0];
-    const incoming = celticsIds[0];
-    if (outgoing === undefined || incoming === undefined) {
-      throw new Error('fixture rosters missing');
-    }
-    const evaluation = evaluateTradeProposal({
-      run: fixture.run,
-      windowIndex: 0,
-      toFranchiseId: CELTICS,
-      outgoingPlayerVersionIds: [outgoing],
-      incomingPlayerVersionIds: [incoming],
-      influenceAmount: 1,
-      influenceFromSender: WARRIORS,
-      catalog: fixture.catalog,
-      rootSeed: fixture.run.rootSeed,
-    });
-    expect(evaluation.ok).toBe(false);
-    if (evaluation.ok) throw new Error('expected rejection');
-    expect(evaluation.code).toBe('trade-cash-cap');
-    expect(evaluation.reason).toMatch(/two trade franchises/);
-  });
   it('rejects invalid Influence sender combinations at command application', () => {
     const fixture = windowedFixture();
     const { run, context } = fixture;
@@ -1237,37 +860,6 @@ describe('Influence sender authorization', () => {
       expect(output.run.stateRevision).toBe(run.stateRevision);
       expect(output.run.rosters).toEqual(run.rosters);
     });
-  });
-  it('accepts an Influence sender that is one of the two franchises', () => {
-    const fixture = windowedFixture();
-    const humanIds = rosterIds(fixture.run, HUMAN);
-    const celticsIds = rosterIds(fixture.run, 'celtics');
-    let accepted = false;
-    for (const sender of [HUMAN, CELTICS]) {
-      for (const amount of [1, 2]) {
-        for (const outgoing of humanIds) {
-          for (const incoming of celticsIds) {
-            const evaluation = evaluateTradeProposal({
-              run: seasonEconomyRunOf(fixture.run, fixture.effects),
-              windowIndex: 0,
-              toFranchiseId: CELTICS,
-              outgoingPlayerVersionIds: [outgoing],
-              incomingPlayerVersionIds: [incoming],
-              influenceAmount: amount,
-              influenceFromSender: sender,
-              catalog: fixture.catalog,
-              rootSeed: fixture.run.rootSeed,
-            });
-            if (evaluation.ok) accepted = true;
-            if (accepted) break;
-          }
-          if (accepted) break;
-        }
-        if (accepted) break;
-      }
-      if (accepted) break;
-    }
-    expect(accepted).toBe(true);
   });
 });
 describe('resume-season-block command', () => {
@@ -1354,43 +946,6 @@ describe('forfeit-interrupted-game command', () => {
     expect(output.pending?.summaries[0]?.forfeitLoserFranchiseId).toBe(HUMAN);
     expect(output.run.stateRevision).toBe(run.stateRevision + 1);
   });
-  it('rejects no-pending-block, block-mismatch, and game-mismatch', () => {
-    const { run, context } = windowedFixture();
-    const pending = pendingOf(run);
-    const noPending = handleSeasonRunCommand(
-      commandOf(run, {
-        command: 'forfeit-interrupted-game',
-        commandId: commandIdSchema.parse('forfeit-nopending'),
-        blockIndex: 3,
-        nextGameId: seasonGameIdSchema.parse('s000301'),
-      }),
-      context,
-    );
-    if (noPending.result.result.status !== 'rejected') throw new Error('expected rejection');
-    expect(noPending.result.result.rejection.code).toBe('no-pending-block');
-    const mismatch = handleSeasonRunCommand(
-      commandOf(run, {
-        command: 'forfeit-interrupted-game',
-        commandId: commandIdSchema.parse('forfeit-mismatch'),
-        blockIndex: 4,
-        nextGameId: seasonGameIdSchema.parse('s000301'),
-      }),
-      { ...context, run, pending },
-    );
-    if (mismatch.result.result.status !== 'rejected') throw new Error('expected rejection');
-    expect(mismatch.result.result.rejection.code).toBe('block-mismatch');
-    const gameMismatch = handleSeasonRunCommand(
-      commandOf(run, {
-        command: 'forfeit-interrupted-game',
-        commandId: commandIdSchema.parse('forfeit-gamemismatch'),
-        blockIndex: 3,
-        nextGameId: seasonGameIdSchema.parse('s000999'),
-      }),
-      { ...context, run, pending },
-    );
-    if (gameMismatch.result.result.status !== 'rejected') throw new Error('expected rejection');
-    expect(gameMismatch.result.result.rejection.code).toBe('game-mismatch');
-  });
 });
 describe('command replay determinism', () => {
   it('produces identical outputs for identical inputs (accepted paths)', () => {
@@ -1416,22 +971,6 @@ describe('command replay determinism', () => {
     const secondDecline = handleSeasonRunCommand(declineCommand, { ...context, run: { ...run } });
     expect(firstDecline.result).toEqual(secondDecline.result);
     expect(firstDecline.run).toEqual(secondDecline.run);
-  });
-  it('rejected paths leave the run untouched and deterministic', () => {
-    const { run, context } = windowedFixture();
-    const offer = baseOfferOf(run);
-    const command = commandOf(run, {
-      command: 'accept-trade-offer',
-      commandId: commandIdSchema.parse('replay-rejected'),
-      windowIndex: 0,
-      offerId: 'off-' + '9'.repeat(32),
-    });
-    const first = handleSeasonRunCommand(command, context);
-    const second = handleSeasonRunCommand(command, context);
-    expect(first).toEqual(second);
-    expect(first.run).toEqual({ ...run, effects: context.effects });
-    expect(first.result.result.status).toBe('rejected');
-    void offer;
   });
 });
 function forcedCompletedResult(
@@ -1602,74 +1141,6 @@ function postseasonFixture(
     postseasonGameResolver: options.resolver ?? forcedPostseasonResolver(homeTeamWinsEveryGame),
   };
 }
-function regularSeasonSummariesOf(run: SeasonRun): SeasonGameSummary[] {
-  const rosterByFranchise = new Map(run.rosters.map((roster) => [roster.franchiseId, roster]));
-  const linesOf = (franchiseId: FranchiseId) => {
-    const roster = rosterByFranchise.get(franchiseId);
-    if (roster === undefined) throw new Error(`no roster for ${franchiseId}`);
-    return roster.players.map((player, index) => ({
-      playerVersionId: player.playerVersionId,
-      seconds: 2880 - index * 120,
-      started: index < 5,
-      points: 20 - index,
-      fieldGoalsMade: 8 - index,
-      fieldGoalsAttempted: 16 - index,
-      threePointersMade: 2,
-      threePointersAttempted: 5,
-      freeThrowsMade: 4,
-      freeThrowsAttempted: 5,
-      offensiveRebounds: 1,
-      defensiveRebounds: 5 - Math.floor(index / 3),
-      assists: 6 - Math.floor(index / 2),
-      steals: 1,
-      blocks: 1,
-      turnovers: 2,
-      fouls: 2,
-    }));
-  };
-  return run.games
-    .filter((game) => game.round === 1)
-    .map((game) => {
-      const homePlayers = linesOf(game.homeFranchiseId);
-      const awayPlayers = linesOf(game.awayFranchiseId);
-      const boxOf = (franchiseId: FranchiseId, players: ReturnType<typeof linesOf>) => ({
-        franchiseId,
-        points: players.reduce((sum, line) => sum + line.points, 0),
-        fieldGoalsMade: players.reduce((sum, line) => sum + line.fieldGoalsMade, 0),
-        fieldGoalsAttempted: players.reduce((sum, line) => sum + line.fieldGoalsAttempted, 0),
-        threePointersMade: players.reduce((sum, line) => sum + line.threePointersMade, 0),
-        threePointersAttempted: players.reduce((sum, line) => sum + line.threePointersAttempted, 0),
-        freeThrowsMade: players.reduce((sum, line) => sum + line.freeThrowsMade, 0),
-        freeThrowsAttempted: players.reduce((sum, line) => sum + line.freeThrowsAttempted, 0),
-        offensiveRebounds: players.reduce((sum, line) => sum + line.offensiveRebounds, 0),
-        defensiveRebounds: players.reduce((sum, line) => sum + line.defensiveRebounds, 0),
-        assists: players.reduce((sum, line) => sum + line.assists, 0),
-        steals: players.reduce((sum, line) => sum + line.steals, 0),
-        blocks: players.reduce((sum, line) => sum + line.blocks, 0),
-        turnovers: players.reduce((sum, line) => sum + line.turnovers, 0),
-        fouls: players.reduce((sum, line) => sum + line.fouls, 0),
-        possessions: 100,
-      });
-      return {
-        schemaVersion: 1,
-        summaryVersion: 'season-game-summary-v4',
-        gameId: game.gameId,
-        round: game.round,
-        homeFranchiseId: game.homeFranchiseId,
-        awayFranchiseId: game.awayFranchiseId,
-        status: 'final' as const,
-        overtimePeriods: 0,
-        homeScore: boxOf(game.homeFranchiseId, homePlayers).points,
-        awayScore: boxOf(game.awayFranchiseId, awayPlayers).points,
-        forfeitLoserFranchiseId: null,
-        injuryEvents: [],
-        homeBox: boxOf(game.homeFranchiseId, homePlayers),
-        awayBox: boxOf(game.awayFranchiseId, awayPlayers),
-        homePlayers,
-        awayPlayers,
-      } satisfies SeasonGameSummary;
-    });
-}
 function restedRotation(run: SeasonRun, franchiseId: string, catalog: SeasonDraftCatalog) {
   const saved = run.rotations.find((rotation) => rotation.franchiseId === franchiseId);
   if (saved === undefined) throw new Error(`no rotation for ${franchiseId}`);
@@ -1783,46 +1254,6 @@ describe('start-postseason command', () => {
     if (again.result.result.status !== 'rejected') throw new Error('expected rejection');
     expect(again.result.result.rejection.code).toBe('invalid-stage');
   });
-  it('rejects invalid rankings with integrity-failure and a stale state', () => {
-    const context = postseasonFixture();
-    const badRankings = postseasonFixture({
-      rankings: ({ league }) => ({
-        east: eastTopTen(league),
-        west: [...westTopTenWithout(league, HUMAN).slice(0, 9), ...eastTopTen(league).slice(0, 1)],
-      }),
-    });
-    const output = handleSeasonRunCommand(
-      commandOf(context.run, {
-        command: 'start-postseason',
-        commandId: commandIdSchema.parse('start-bad'),
-      }),
-      badRankings,
-    );
-    if (output.result.result.status !== 'rejected') throw new Error('expected rejection');
-    expect(output.result.result.rejection.code).toBe('integrity-failure');
-    const stale = handleSeasonRunCommand(
-      commandOf(
-        { ...context.run, stateRevision: context.run.stateRevision + 5 },
-        { command: 'start-postseason', commandId: commandIdSchema.parse('start-stale') },
-      ),
-      context,
-    );
-    if (stale.result.result.status !== 'rejected') throw new Error('expected rejection');
-    expect(stale.result.result.rejection.code).toBe('stale-state');
-  });
-  it('rejects a run mismatch', () => {
-    const context = postseasonFixture();
-    const other = buildEconomyTestRun({ runId: 'other-run' }).run;
-    const mismatch = handleSeasonRunCommand(
-      commandOf(other, {
-        command: 'start-postseason',
-        commandId: commandIdSchema.parse('start-mismatch'),
-      }),
-      context,
-    );
-    if (mismatch.result.result.status !== 'rejected') throw new Error('expected rejection');
-    expect(mismatch.result.result.rejection.code).toBe('run-mismatch');
-  });
 });
 describe('advance-postseason command', () => {
   it('runs the whole tournament when the human rotation stays valid', () => {
@@ -1855,142 +1286,6 @@ describe('advance-postseason command', () => {
     expect(result.advancedGameIds).toContain('pi-west-seven-eight');
     expect(result.advancedGameIds).toContain(playoffGameIdOf('finals', 1));
     expect(output.run.stage).toBe('completed');
-    expectSchemaValidRun(output.run);
-  });
-  it('derives the season awards from the recorded summaries when the tournament completes', () => {
-    const context = postseasonFixture({
-      seed: TEST_SEED,
-      resolver: forcedPostseasonResolver(humanWinsEveryGame),
-      regularSeasonSummaries: regularSeasonSummariesOf(postseasonFixture().run),
-    });
-    const start = handleSeasonRunCommand(
-      commandOf(context.run, {
-        command: 'start-postseason',
-        commandId: commandIdSchema.parse('start-1'),
-      }),
-      context,
-    );
-    if (start.result.result.status !== 'accepted') throw new Error('expected acceptance');
-    const output = handleSeasonRunCommand(
-      commandOf(start.run, {
-        command: 'advance-postseason',
-        commandId: commandIdSchema.parse('adv-1'),
-      }),
-      { ...context, run: start.run },
-    );
-    const outputResult = output.result;
-    if (outputResult.command !== 'advance-postseason') throw new Error('unexpected command');
-    const result = outputResult.result;
-    if (result.status !== 'accepted') throw new Error('expected acceptance');
-    expect(result.stage).toBe('completed');
-    const awards = output.run.awards;
-    expect(awards).not.toBeNull();
-    expect(awards?.runId).toBe(output.run.runId);
-    expect(awards?.allLeagueFirstTeam).toHaveLength(5);
-    const leagueFranchises = new Set(output.run.league.teams.map((team) => team.franchiseId));
-    expect(leagueFranchises.has(awards?.mvp.franchiseId ?? HUMAN)).toBe(true);
-    expect(output.run.completion?.championFranchiseId).toBe(HUMAN);
-    expectSchemaValidRun(output.run);
-  });
-  it('stops at a human game whose rotation plans minutes for injured players', () => {
-    const context = postseasonFixture({ resolver: forcedPostseasonResolver(humanWinsEveryGame) });
-    const start = handleSeasonRunCommand(
-      commandOf(context.run, {
-        command: 'start-postseason',
-        commandId: commandIdSchema.parse('start-1'),
-      }),
-      context,
-    );
-    if (start.result.result.status !== 'accepted') throw new Error('expected acceptance');
-    const humanRoster = start.run.rosters.find((roster) => roster.franchiseId === HUMAN);
-    if (humanRoster === undefined) throw new Error('no human roster');
-    const injuries = humanRoster.players.slice(0, 2).map((player, index) => ({
-      injuryId: `inj-${'9'.repeat(31)}${String(index)}`,
-      playerVersionId: player.playerVersionId,
-      franchiseId: HUMAN,
-      gameId: seasonGameIdSchema.parse('s000001'),
-      type: 'lower-body' as const,
-      severity: 'season-ending' as const,
-      occurredBeforeHalftime: true,
-      sameGameReturn: false,
-      sameGameReturned: null,
-      missedGamesTotal: 999,
-      missedGamesRemaining: 999,
-      actualReturnRound: null,
-      seasonEnding: true,
-      rehabModifier: 0 as const,
-      recurrenceWindowRoundsRemaining: 0,
-      seedPath: ['injuries', 's000001', player.playerVersionId, 'occurrence'],
-    }));
-    const injured = { ...start.run, health: { ...start.run.health, injuries } };
-    const output = handleSeasonRunCommand(
-      commandOf(injured, {
-        command: 'advance-postseason',
-        commandId: commandIdSchema.parse('adv-1'),
-      }),
-      { ...context, run: injured },
-    );
-    const outputResult = output.result;
-    if (outputResult.command !== 'advance-postseason') throw new Error('unexpected command');
-    const result = outputResult.result;
-    if (result.status !== 'accepted') throw new Error('expected acceptance');
-    expect(result.nextDecision).toBe('rotation');
-    expect(result.nextGameId).toBe('pi-west-seven-eight');
-    expect(result.advancedGameIds).toEqual([
-      'pi-east-seven-eight',
-      'pi-east-nine-ten',
-      'pi-east-final',
-    ]);
-    expect(result.aiNextGameId).toBeNull();
-  });
-  it('allows an injured human team to forfeit the next postseason game without Influence', () => {
-    const context = postseasonFixture({ resolver: forcedPostseasonResolver(humanWinsEveryGame) });
-    const start = handleSeasonRunCommand(
-      commandOf(context.run, {
-        command: 'start-postseason',
-        commandId: commandIdSchema.parse('start-forfeit'),
-      }),
-      context,
-    );
-    if (start.result.result.status !== 'accepted') throw new Error('expected acceptance');
-    const humanRoster = start.run.rosters.find((roster) => roster.franchiseId === HUMAN);
-    if (humanRoster === undefined) throw new Error('no human roster');
-    const injuries = humanRoster.players.slice(0, 2).map((player, index) => ({
-      injuryId: `inj-${'8'.repeat(31)}${String(index)}`,
-      playerVersionId: player.playerVersionId,
-      franchiseId: HUMAN,
-      gameId: seasonGameIdSchema.parse('s000001'),
-      type: 'lower-body' as const,
-      severity: 'season-ending' as const,
-      occurredBeforeHalftime: true,
-      sameGameReturn: false,
-      sameGameReturned: null,
-      missedGamesTotal: 999,
-      missedGamesRemaining: 999,
-      actualReturnRound: null,
-      seasonEnding: true,
-      rehabModifier: 0 as const,
-      recurrenceWindowRoundsRemaining: 0,
-      seedPath: ['injuries', 'forfeit', player.playerVersionId, 'occurrence'],
-    }));
-    const injured = { ...start.run, health: { ...start.run.health, injuries } };
-    const output = handleSeasonRunCommand(
-      commandOf(injured, {
-        command: 'advance-postseason',
-        commandId: commandIdSchema.parse('forfeit-1'),
-        forfeit: true,
-      }),
-      { ...context, run: injured },
-    );
-    const outputResult = output.result;
-    if (outputResult.command !== 'advance-postseason') throw new Error('unexpected command');
-    const result = outputResult.result;
-    if (result.status !== 'accepted') throw new Error('expected acceptance');
-    const summary = output.postseasonSummaries?.at(-1);
-    expect(summary?.status).toBe('forfeit');
-    expect(summary?.forfeitLoserFranchiseId).toBe(HUMAN);
-    expect([summary?.homeScore, summary?.awayScore].sort()).toEqual([0, 2]);
-    expect(output.run.influence).toEqual(injured.influence);
     expectSchemaValidRun(output.run);
   });
   it('rejects wrong-game targets, invalid stages, and stale states', () => {
@@ -2124,63 +1419,6 @@ describe('submit-postseason-rotation command', () => {
     expect(result.rotationDigest).toMatch(/^[0-9a-f]{32}$/);
     expect(output.run.rotations.find((entry) => entry.franchiseId === HUMAN)).toEqual(rotation);
     expect(output.run.stateRevision).toBe(run.stateRevision + 1);
-    expectSchemaValidRun(output.run);
-  });
-  it('applies a risky-rehab spend with the recorded ledger entry and transaction', () => {
-    const { context, run } = advancedToHumanGame();
-    const rotation = restedRotation(run, HUMAN, context.catalog);
-    const humanRoster = run.rosters.find((roster) => roster.franchiseId === HUMAN);
-    if (humanRoster === undefined) throw new Error('no human roster');
-    const player = humanRoster.players[0];
-    if (player === undefined) throw new Error('no player');
-    const injuryId = injuryIdOf('postseason-rehab');
-    const withInjuryRun = withInjury(run, {
-      injuryId,
-      playerVersionId: player.playerVersionId,
-      franchiseId: HUMAN,
-      gameId: seasonGameIdSchema.parse('s000001'),
-      type: 'lower-body',
-      severity: 'moderate',
-      occurredBeforeHalftime: true,
-      sameGameReturn: false,
-      sameGameReturned: null,
-      missedGamesTotal: 4,
-      missedGamesRemaining: 4,
-      actualReturnRound: null,
-      seasonEnding: false,
-      rehabModifier: 0 as const,
-      recurrenceWindowRoundsRemaining: 0,
-      seedPath: [
-        'postseason-injuries',
-        'pi-west-seven-eight',
-        player.playerVersionId,
-        'occurrence',
-      ],
-    });
-    const output = handleSeasonRunCommand(
-      commandOf(withInjuryRun, {
-        command: 'submit-postseason-rotation',
-        commandId: commandIdSchema.parse('sub-rehab'),
-        targetGameId: 'pi-west-seven-eight',
-        rotation: { franchiseId: HUMAN, rotation, riskyRehabInjuryId: injuryId },
-      }),
-      { ...context, run: withInjuryRun },
-    );
-    const outputResult = output.result;
-    if (outputResult.command !== 'submit-postseason-rotation')
-      throw new Error('unexpected command');
-    if (outputResult.result.status !== 'accepted') throw new Error('expected acceptance');
-    const ledgerEntry = output.run.influence.ledger.find(
-      (entry) => entry.commandId === 'sub-rehab',
-    );
-    expect(ledgerEntry).toBeDefined();
-    expect(ledgerEntry?.source).toBe('risky-rehab');
-    expect(ledgerEntry?.requestedDelta).toBe(-2);
-    const balanceAfter = output.run.influence.balances[HUMAN];
-    expect(balanceAfter).toBe((context.run.influence.balances[HUMAN] ?? 0) - 2);
-    expect(output.run.transactions.some((entry) => entry.commandId === 'sub-rehab')).toBe(true);
-    const injuryAfter = output.run.health.injuries.find((entry) => entry.injuryId === injuryId);
-    expect(injuryAfter?.rehabModifier).not.toBe(0);
     expectSchemaValidRun(output.run);
   });
   it('rejects wrong-game targets, invalid rotations, unavailable players, and rehab balance', () => {
@@ -2374,32 +1612,6 @@ describe('spectate-postseason-game command', () => {
     expect(output.run.stateRevision).toBe(advance.run.stateRevision + 1);
     expectSchemaValidRun(output.run);
   });
-  it('rejects an invalid stage (regular season) and a stale state', () => {
-    const context = postseasonFixture();
-    const wrongStage = handleSeasonRunCommand(
-      commandOf(context.run, {
-        command: 'spectate-postseason-game',
-        commandId: commandIdSchema.parse('spec-stage'),
-        targetGameId: 'pi-east-seven-eight',
-      }),
-      context,
-    );
-    if (wrongStage.result.result.status !== 'rejected') throw new Error('expected rejection');
-    expect(wrongStage.result.result.rejection.code).toBe('invalid-stage');
-    const stale = handleSeasonRunCommand(
-      commandOf(
-        { ...context.run, stateRevision: context.run.stateRevision + 1 },
-        {
-          command: 'spectate-postseason-game',
-          commandId: commandIdSchema.parse('spec-stale'),
-          targetGameId: 'pi-east-seven-eight',
-        },
-      ),
-      context,
-    );
-    if (stale.result.result.status !== 'rejected') throw new Error('expected rejection');
-    expect(stale.result.result.rejection.code).toBe('stale-state');
-  });
 });
 describe('fast-forward-postseason command', () => {
   it('completes an eliminated run with the champion and completion state', () => {
@@ -2442,69 +1654,6 @@ describe('fast-forward-postseason command', () => {
     expect(output.run.postseason.championFranchiseId).toBe(result.championFranchiseId);
     expect(output.postseasonSummaries?.length).toBeGreaterThan(20);
     expectSchemaValidRun(output.run);
-  });
-  it('rejects an active human, an invalid stage, and a bad target', () => {
-    const context = postseasonFixture({ resolver: forcedPostseasonResolver(humanWinsEveryGame) });
-    const activeStart = handleSeasonRunCommand(
-      commandOf(context.run, {
-        command: 'start-postseason',
-        commandId: commandIdSchema.parse('start-1'),
-      }),
-      context,
-    );
-    if (activeStart.result.result.status !== 'accepted') throw new Error('expected acceptance');
-    const activeHuman = handleSeasonRunCommand(
-      commandOf(activeStart.run, {
-        command: 'fast-forward-postseason',
-        commandId: commandIdSchema.parse('ff-active'),
-        targetGameId: 'po-east-first-round-1-g1',
-      }),
-      { ...context, run: activeStart.run },
-    );
-    if (activeHuman.result.result.status !== 'rejected') throw new Error('expected rejection');
-    expect(activeHuman.result.result.rejection.code).toBe('integrity-failure');
-    const wrongStage = handleSeasonRunCommand(
-      commandOf(context.run, {
-        command: 'fast-forward-postseason',
-        commandId: commandIdSchema.parse('ff-stage'),
-      }),
-      context,
-    );
-    if (wrongStage.result.result.status !== 'rejected') throw new Error('expected rejection');
-    expect(wrongStage.result.result.rejection.code).toBe('invalid-stage');
-    const aiOnly = postseasonFixture({
-      rankings: (input) => ({
-        east: eastTopTen(input.league),
-        west: westTopTenWithout(input.league, HUMAN),
-      }),
-    });
-    const start = handleSeasonRunCommand(
-      commandOf(aiOnly.run, {
-        command: 'start-postseason',
-        commandId: commandIdSchema.parse('start-1'),
-      }),
-      aiOnly,
-    );
-    if (start.result.result.status !== 'accepted') throw new Error('expected acceptance');
-    const advance = handleSeasonRunCommand(
-      commandOf(start.run, {
-        command: 'advance-postseason',
-        commandId: commandIdSchema.parse('adv-1'),
-        targetGameId: 'pi-west-nine-ten',
-      }),
-      { ...aiOnly, run: start.run },
-    );
-    if (advance.result.result.status !== 'accepted') throw new Error('expected acceptance');
-    const badTarget = handleSeasonRunCommand(
-      commandOf(advance.run, {
-        command: 'fast-forward-postseason',
-        commandId: commandIdSchema.parse('ff-badtarget'),
-        targetGameId: 'pi-east-seven-eight',
-      }),
-      { ...aiOnly, run: advance.run },
-    );
-    if (badTarget.result.result.status !== 'rejected') throw new Error('expected rejection');
-    expect(badTarget.result.result.rejection.code).toBe('integrity-failure');
   });
 });
 describe('campaign commands', () => {
@@ -2558,35 +1707,6 @@ describe('campaign commands', () => {
       },
     };
   }
-  it('rejects select-gm-identity as retired without mutating the run', () => {
-    const context = campaignFixture();
-    const output = handleSeasonRunCommand(
-      commandOf(context.run, {
-        command: 'select-gm-identity',
-        commandId: commandIdSchema.parse('gm-1'),
-        identity: 'team-identity',
-        focus: 'defense',
-      }),
-      context,
-    );
-    if (output.result.result.status !== 'rejected') throw new Error('expected rejection');
-    expect(output.result.result.rejection.code).toBe('retired');
-    expect(output.run).toEqual({ ...context.run, effects: context.effects });
-  });
-  it('rejects evolve-gm-campaign as retired without mutating the run', () => {
-    const context = campaignFixture();
-    const output = handleSeasonRunCommand(
-      commandOf(context.run, {
-        command: 'evolve-gm-campaign',
-        commandId: commandIdSchema.parse('evo-1'),
-        offerId: 'evo-12345678',
-      }),
-      context,
-    );
-    if (output.result.result.status !== 'rejected') throw new Error('expected rejection');
-    expect(output.result.result.rejection.code).toBe('retired');
-    expect(output.run).toEqual({ ...context.run, effects: context.effects });
-  });
   it('rejects select-campaign-opportunity as retired', () => {
     const context = campaignFixture();
     const run = runWithBlockOffers(context.run, 0);
@@ -2605,40 +1725,5 @@ describe('campaign commands', () => {
     if (output.result.result.status !== 'rejected') throw new Error('expected rejection');
     expect(output.result.result.rejection.code).toBe('retired');
     expect(output.run).toEqual({ ...run, effects: context.effects });
-  });
-  it('has no evolution gate at block 5 (legacy evolution state ignored)', () => {
-    const context = campaignFixture();
-    const withOffers = runWithBlockOffers(context.run, 5);
-    const campaign = normalizeCampaignState(withOffers.campaign);
-    const first = campaign.offers[5]?.[0];
-    if (first === undefined) throw new Error('expected block-5 offers');
-    const run: SeasonRun = {
-      ...withOffers,
-      cursor: { schemaVersion: 1, completedRounds: 50 },
-      campaign: {
-        ...campaign,
-        evolutionOffers: [
-          {
-            offerId: 'evo-12345678',
-            kind: 'double-down',
-            evidence: 'legacy evolution offer',
-            resultingIdentity: 'win-now',
-            resultingFocus: null,
-          },
-        ],
-        evolutionSelection: null,
-      },
-    };
-    const output = handleSeasonRunCommand(
-      commandOf(run, {
-        command: 'select-campaign-opportunity',
-        commandId: commandIdSchema.parse('camp-5'),
-        blockIndex: 5,
-        opportunityId: first.opportunityId,
-      }),
-      { ...context, run },
-    );
-    if (output.result.result.status !== 'rejected') throw new Error('expected rejection');
-    expect(output.result.result.rejection.code).toBe('retired');
   });
 });

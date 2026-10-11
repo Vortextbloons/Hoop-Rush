@@ -57,6 +57,7 @@ export const nonlinearComponentsSchema = z.object({
 });
 export type NonlinearComponents = z.infer<typeof nonlinearComponentsSchema>;
 export const productionEvidenceSchema = z.object({
+  creationPer36: z.number().finite().nonnegative().optional(),
   score: z.number().min(0).max(100),
   weight: z.number().min(0).max(1),
   confidence: z.enum(['high', 'medium', 'low']),
@@ -89,6 +90,8 @@ export const overallDiagnosticsSchema = z.union([
     offensiveValue: z.number().min(0).max(100),
     defensiveValue: z.number().min(0).max(100),
     defensiveAbility: z.number().min(0).max(100),
+    defensiveTrackingAdjustment: z.number().min(-100).max(100).optional(),
+    defensiveEvidenceCoverage: z.number().min(0).max(1).optional(),
     rawBeforeRecognition: z.number().min(0).max(100),
     recognitionContribution: z.number().min(0).max(100),
     recognitionWeight: z.number().min(0).max(0.75),

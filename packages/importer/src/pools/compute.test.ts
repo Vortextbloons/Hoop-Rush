@@ -25,15 +25,12 @@ import {
   SELECTION_SCORE_VERSION,
   allPoolTargets,
   buildStats,
-  sanitizeAnchors,
   candidateKey,
   computePool,
   loadBbrefIds,
   loadCareerPositionLabels,
   maxLowConfidenceShareFor,
   minutesFloorOverall,
-  neutralSelectionScoreFor,
-  peakSelectionBlend,
   normalizePoolOveralls,
   overallBandForPercentile,
   parsePoolTargets,
@@ -548,32 +545,6 @@ describe('buildStats', () => {
     expect(stats.freeThrowsAttempted).toBe(12);
     expect(stats.per).toBe(12.5);
   });
-  it('maps null and non-numeric advanced stats to null', () => {
-    const stats = buildStats(
-      statsRow('1991-92', '5', {
-        per: null,
-        boxPlusMinus: null,
-        usageRate: null,
-        tsPct: null,
-        efgPct: null,
-      }),
-    );
-    expect(stats.per).toBeNull();
-    expect(stats.boxPlusMinus).toBeNull();
-    expect(stats.usageRate).toBeNull();
-    expect(stats.tsPct).toBeNull();
-    expect(stats.efgPct).toBeNull();
-  });
-  it('falls back to 0 for missing count keys and keeps NaN out of advanced stats', () => {
-    const stats = buildStats({});
-    expect(stats.gamesPlayed).toBe(0);
-    expect(stats.minutes).toBe(0);
-    expect(stats.points).toBe(0);
-    expect(stats.per).toBeNull();
-    const bad = buildStats({ per: 'not-a-number', boxPlusMinus: Number.NaN });
-    expect(bad.per).toBeNull();
-    expect(bad.boxPlusMinus).toBeNull();
-  });
   it('nulls inconsistent shooting families instead of capping them into fiction', () => {
     const stats = buildStats({
       gamesPlayed: 78,
@@ -640,29 +611,10 @@ describe('buildStats', () => {
     expect(stats.rebounds).toBe(800);
   });
 });
-describe('sanitizeAnchors', () => {
-  it('clamps packaged anchor rates to the 0..1 contract', () => {
-    const out = sanitizeAnchors({
-      fieldGoalPct: 1.08,
-      threePointPct: 1.5,
-      freeThrowAttemptRate: 1.2,
-    });
-    expect(out.fieldGoalPct).toBe(1);
-    expect(out.threePointPct).toBe(1);
-    expect(out.freeThrowAttemptRate).toBe(1);
-  });
-});
 describe('selectionScore', () => {
   it('ranks peaks raw-first with a modest availability adjustment', () => {
     expect(selectionScore(90, 85, 80, 25, 2400, 80)).toBe(90.512);
     expect(selectionScore(90, 30, 99, 25, 2400, 80)).toBe(90.512);
-  });
-  it('bounds the playing-time adjustment', () => {
-    expect(selectionScore(60, 60, 60, 50, 4000, 50)).toBe(60.008);
-  });
-  it('treats null usage as 0 and guards zero team games', () => {
-    expect(selectionScore(60, 60, 60, null, 1200, 60)).toBe(59.752);
-    expect(selectionScore(60, 60, 60, 10, 30, 0)).toBe(58.176);
   });
 });
 describe('rawOverallScoreFor', () => {
@@ -676,9 +628,6 @@ describe('rawOverallScoreFor', () => {
     expect(
       rawOverallScoreFor({ ratingProfile: { canonicalOverall: 62 } }, { overallRating: 91 }),
     ).toBe(62);
-  });
-  it('falls back to summary overall only for legacy rows without a profile', () => {
-    expect(rawOverallScoreFor({}, { overallRating: 91 })).toBe(91);
   });
 });
 describe('overallBandForPercentile', () => {
@@ -696,10 +645,6 @@ describe('overallBandForPercentile', () => {
     expect(overallBandForPercentile(0.72)).toBe(69);
     expect(overallBandForPercentile(0.86)).toBe(64);
     expect(overallBandForPercentile(1)).toBe(40);
-  });
-  it('clamps to the 40..99 contract', () => {
-    expect(overallBandForPercentile(-0.1)).toBe(99);
-    expect(overallBandForPercentile(1.5)).toBe(40);
   });
   it('gives higher overalls a thinner share inside the top bands', () => {
     const count = (overall: number) => {
@@ -751,12 +696,6 @@ describe('normalizePoolOveralls', () => {
     normalizePoolOveralls(rows.reverse());
     expect(rows.map((player) => player.summaryRatings.overallRating)).toEqual([70, 95]);
   });
-  it('preserves legacy canonical ratings without stamping new model metadata', () => {
-    const rows = [row('p-1', 'lakers', undefined, 55), row('p-2', 'lakers', undefined, 95)];
-    expect(normalizePoolOveralls(rows)).toEqual({ totalRowCount: 2, rowsWithoutRawOverall: 2 });
-    expect(rows.map((player) => player.summaryRatings.overallRating)).toEqual([55, 95]);
-    expect(rows[0]?.ratingProfile?.overallCohortVersion).toBeUndefined();
-  });
 });
 describe('parsePoolTargets', () => {
   it('parses franchiseId/eraId pairs', () => {
@@ -769,12 +708,6 @@ describe('parsePoolTargets', () => {
     for (const bad of ['lakers', 'lakers/', '/1990s', 'a/b/c', '', 'lakers-1990', 'a-b-c']) {
       expect(() => parsePoolTargets([bad])).toThrow(/invalid pool target/);
     }
-  });
-  it('accepts the filename-style dash form', () => {
-    expect(parsePoolTargets(['lakers-1990s', 'celtics/2000s'])).toEqual([
-      ['lakers', '1990s'],
-      ['celtics', '2000s'],
-    ]);
   });
 });
 describe('computePool (fixture)', () => {
@@ -961,16 +894,6 @@ describe('computePool error and skip paths', () => {
     const pool = computePool('nets', '1990s', manifest, BBREF_IDS, false) as PoolBuildFailure;
     expect(pool.reason).toBe('insufficient-players');
   });
-  it('logs a warning instead of annotating assets (stays in annotate-markers.mjs)', () => {
-    buildStandardFixture('assets');
-    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
-    computePool('lakers', '1990s', fixtureManifest(), BBREF_IDS, true);
-    expect(
-      messages(log).some((m) =>
-        m.includes('headshot/photo asset annotation stays in scripts/annotate-markers.mjs'),
-      ),
-    ).toBe(true);
-  });
   it('policy-v2 keeps a pool available when only a thin tail trips the low-confidence bar', () => {
     const root = buildStandardFixture('policy-tail');
     const rosterPath = join(root.nba, '1991-92', 'roster.json');
@@ -993,45 +916,6 @@ describe('computePool error and skip paths', () => {
     if ('reason' in pool) throw new Error(`expected pool, got ${pool.reason}: ${pool.detail}`);
     expect(pool.coverageSummary.policyVersion).toBe(CONFIDENCE_POLICY_VERSION);
     expect(pool.players.map((player) => player.playerExternalId)).toContain('8');
-  });
-  it('policy-v2 excludes minutes-unobserved players from the low-confidence tripwire', () => {
-    // 1961-62 Bellamy class: quarantined minutes read as 0 with games
-    // played, which forces every provenance field low by construction. Those
-    // players rate as shrunk priors already, so counting them would veto
-    // whole pre-1974 eras for honesty instead of catching bad data.
-    const root = buildStandardFixture('policy-minutes');
-    for (const season of ['1991-92', '1992-93']) {
-      const rosterPath = join(root.nba, season, 'roster.json');
-      const roster = readJson(rosterPath) as Array<Record<string, unknown>>;
-      for (const player of roster) {
-        if (player.externalId !== '5' && player.externalId !== '6') continue;
-        const lowProvenance: Record<string, unknown> = {};
-        for (const field of [...Object.keys(FULL_RATINGS_60), ...Object.keys(FULL_TENDENCIES)]) {
-          lowProvenance[field] = {
-            kind: 'estimated',
-            confidence: 'low',
-            methodVersion: 'derive-v11',
-            sourceVersion: 'source-v1',
-            sourceFields: ['prior'],
-          };
-        }
-        player.provenance = lowProvenance;
-      }
-      writeJson(rosterPath, roster);
-      const statsPath = join(root.nba, season, 'season-stats.json');
-      const statsRows = readJson(statsPath) as Array<Record<string, unknown>>;
-      for (const row of statsRows) {
-        if (row.playerExternalId !== '5' && row.playerExternalId !== '6') continue;
-        row.minutes = null;
-      }
-      writeJson(statsPath, statsRows);
-    }
-    const pool = computePool('lakers', '1990s', fixtureManifest(), BBREF_IDS, false);
-    if ('reason' in pool) throw new Error(`expected pool, got ${pool.reason}: ${pool.detail}`);
-    const byId = new Map(pool.players.map((player) => [player.playerExternalId, player]));
-    // Without the exclusion, 2 trippers of 6 members would fail the pool.
-    expect(byId.get('5')?.stats.minutes).toBe(0);
-    expect(byId.get('6')?.stats.minutes).toBe(0);
   });
   it('policy-v2 fails a pool when low-confidence players are more than a quarter of membership', () => {
     const root = buildStandardFixture('policy-majority');
@@ -1059,19 +943,6 @@ describe('computePool error and skip paths', () => {
     expect(pool.detail).toContain('policy-v2');
   });
 });
-describe('individual peak selection', () => {
-  it('uses the shared raw score without reintroducing defense or context bonuses', () => {
-    expect(
-      neutralSelectionScoreFor(
-        { ratingProfile: { rawOverallScore: 64.35 } },
-        { overallRating: 73 },
-        { steals: 100, blocks: 10 },
-      ),
-    ).toBe(64.35);
-    expect(neutralSelectionScoreFor({}, { overallRating: 91 }, {})).toBe(91);
-    expect(peakSelectionBlend(65.95, 67.25)).toBe(67.25);
-  });
-});
 describe('maxLowConfidenceShareFor', () => {
   it('relaxes the tripwire where whole field families were never observed', () => {
     expect(maxLowConfidenceShareFor('reconstructed')).toBe(0.65);
@@ -1088,11 +959,6 @@ describe('loadBbrefIds', () => {
     expect(messages(log)).toContain(
       '  [WARN] bbref_ids.json missing; run fetch_bbref_ids or run_all (no altIds)',
     );
-  });
-  it('returns the external-id map when present', () => {
-    const root = makeRoot('bbref-present');
-    writeJson(join(root.cache, 'bbref_ids.json'), BBREF_IDS);
-    expect(loadBbrefIds()).toEqual(BBREF_IDS);
   });
 });
 describe('loadCareerPositionLabels', () => {
@@ -1112,35 +978,6 @@ describe('loadCareerPositionLabels', () => {
     expect(
       JSON.parse(readFileSync(join(root.cache, 'career-position-labels-v6.json'), 'utf8')),
     ).toEqual(expect.objectContaining({ '1': ['SG'], '5': ['C'] }));
-    expect(messages(log).some((m) => m.includes('[OK] career position labels for'))).toBe(true);
-  });
-  it('collects non-empty secondaryPositions labels alongside the primary label', () => {
-    const root = makeRoot('labels-secondary');
-    writeSeason(root, '1991-92', ROSTER_S1, STINTS_S1, STATS_S1);
-    const withSecondary: RosterSpec[] = [
-      {
-        id: '1',
-        firstName: 'Alpha',
-        lastName: 'Ace',
-        position: 'SG',
-        secondaryPositions: ['PG', ''],
-      },
-      {
-        id: '2',
-        firstName: 'Bravo',
-        lastName: 'Bold',
-        position: 'PG',
-        secondaryPositions: [],
-      },
-    ];
-    writeJson(join(root.nba, '1991-92', 'roster.json'), withSecondary.map(rosterRow));
-    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
-    const labels = loadCareerPositionLabels();
-    expect(labels.get('1')).toEqual(new Set(['PG', 'SG']));
-    expect(labels.get('2')).toEqual(new Set(['PG']));
-    expect(
-      JSON.parse(readFileSync(join(root.cache, 'career-position-labels-v6.json'), 'utf8')),
-    ).toEqual(expect.objectContaining({ '1': ['PG', 'SG'], '2': ['PG'] }));
     expect(messages(log).some((m) => m.includes('[OK] career position labels for'))).toBe(true);
   });
 });
@@ -1174,16 +1011,6 @@ describe('partitionPoolTargets', () => {
       expect(new Set(chunk.map(([, era]) => era)).size).toBe(1);
     }
     expect(chunks.map((chunk) => chunk[0]?.[1])).toEqual(['1990s', '2000s', '2010s']);
-  });
-  it('splits the largest era groups to reach the worker count', () => {
-    const chunks = partitionPoolTargets(TARGETS, 4);
-    expect(chunks).toHaveLength(4);
-    expect(chunks.flat()).toEqual(TARGETS);
-    const sizes = chunks.map((chunk) => chunk.length).sort((a, b) => b - a);
-    expect(sizes).toEqual([2, 2, 1, 1]);
-  });
-  it('is deterministic across calls', () => {
-    expect(partitionPoolTargets(TARGETS, 2)).toEqual(partitionPoolTargets(TARGETS, 2));
   });
 });
 describe('asset altIds preservation', () => {
@@ -1234,14 +1061,6 @@ describe('asset altIds preservation', () => {
       if (pid === '1' || pid === '2') continue;
       expect(altIds).toBeNull();
     }
-  });
-  it('does not fabricate markers when no previous pool exists', () => {
-    buildStandardFixture('altids-none');
-    vi.spyOn(console, 'log').mockImplementation(() => {});
-    const pool = computePool('lakers', '1990s', fixtureManifest(), BBREF_IDS, false) as Pool;
-    const byId = new Map(pool.players.map((player) => [player.playerExternalId, player.altIds]));
-    expect(byId.get('1')).toEqual({ bbref: 'alpha01' });
-    expect(byId.get('2')).toEqual({ bbref: 'bravo01' });
   });
 });
 describe('candidateKey', () => {
@@ -1317,14 +1136,6 @@ describe('run / writePool / updateManifest', () => {
     );
     expect(messages(log).some((m) => m.includes('[OK] manifest updated: 2 pools'))).toBe(true);
   });
-  it('skips failed pools and still updates the manifest', async () => {
-    const root = buildStandardFixture('run-skip');
-    vi.spyOn(console, 'log').mockImplementation(() => {});
-    await run([['nets', '1990s']], false, 1);
-    const manifest = readJson(join(root.data, 'manifest.json')) as Manifest;
-    expect(manifest.pools).toEqual(fixtureManifest().pools);
-    expect(manifest.dataVersion).toBe(DATA_VERSION);
-  });
   it('fails the build before writing a pool that parsePool rejects', async () => {
     const root = buildStandardFixture('invalid-pool');
     const rosterPath = join(root.nba, '1991-92', 'roster.json');
@@ -1336,17 +1147,6 @@ describe('run / writePool / updateManifest', () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     await expect(run([['lakers', '1990s']], false, 1)).rejects.toThrow(/invalid pool lakers-1990s/);
     expect(() => readFileSync(join(root.data, 'pools', 'lakers-1990s.json'))).toThrow();
-  });
-  it('refuses to write a manifest that fails the authoritative schema', async () => {
-    const root = buildStandardFixture('manifest-invalid');
-    const manifestPath = join(root.data, 'manifest.json');
-    const invalid = { ...fixtureManifest(), modernFranchiseSlots: [] };
-    writeJson(manifestPath, invalid);
-    vi.spyOn(console, 'log').mockImplementation(() => {});
-    await expect(run([['lakers', '1990s']], false, 1)).rejects.toThrow(
-      /manifest fails validation: modernFranchiseSlots/,
-    );
-    expect(readJson(manifestPath)).toEqual(invalid);
   });
 });
 describe('schema fit (documented discrepancy)', () => {

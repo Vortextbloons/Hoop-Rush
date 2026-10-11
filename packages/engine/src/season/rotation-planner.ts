@@ -204,12 +204,7 @@ function overlapWith(unit: readonly string[], currentUnit: ReadonlySet<string>):
   return overlap;
 }
 function currentOverlap(unit: readonly string[], currentUnit: readonly string[]): number {
-  const current = new Set(currentUnit);
-  let overlap = 0;
-  for (const playerVersionId of unit) {
-    if (current.has(playerVersionId)) overlap += 1;
-  }
-  return overlap;
+  return overlapWith(unit, new Set(currentUnit));
 }
 function unitCompare(
   a: readonly string[],

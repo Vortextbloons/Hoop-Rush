@@ -176,11 +176,15 @@ export function productionEvidence(
   const efficiencyScale = usage < 18 ? clamp(usage / 18, 0.5, 1) : 1;
   const evidence = confidenceFor(stats);
   const astPer36 = per36(stats.assists, 3.5) * (100 / pace);
+  const secondaryPer36 = per36(stats.secondaryAssists, 0) * (100 / pace);
+  const potentialPer36 = per36(stats.potentialAssists, (astPer36 * pace) / 100) * (100 / pace);
+  const creationPer36 =
+    astPer36 + secondaryPer36 * 0.5 + Math.max(0, potentialPer36 - astPer36) * 0.1;
   const score = clamp(
     50 +
       (pointsPer36 - 15) * 0.9 +
       (offensiveReboundsPer36 - 1.5) * 0.25 +
-      (astPer36 - 3.5) * 0.9 +
+      (creationPer36 - 3.5) * 0.9 +
       (usage - 20) * 0.1 -
       Math.max(0, usage - 30) * 0.22 +
       (ts === null ? 0 : (ts - tsRef) * 85 * loadFactor * efficiencyScale),
@@ -196,6 +200,7 @@ export function productionEvidence(
     sampleGames: games,
     sampleMinutes: minutes,
     shrinkage,
+    creationPer36,
   };
 }
 export function possessionPaceFor(stats: StatsRow, eraPace?: number | null): number {
@@ -212,11 +217,14 @@ export function possessionPaceFor(stats: StatsRow, eraPace?: number | null): num
 export function offensiveAbilityFor(
   ratings: SimulationRatings,
   tendencies: SimulationTendencies,
+  eraThreeRate?: number | null,
 ): number {
   const routes = [ratings.insideScoring, ratings.midrange, ratings.threePoint];
-  const scoring =
-    0.9 * (0.6 * Math.max(...routes) + (0.4 * routes.reduce((sum, value) => sum + value, 0)) / 3) +
-    0.1 * ratings.freeThrow;
+  const spacingWeight = spacingWeightForEra(eraThreeRate);
+  const routeBreadth =
+    (ratings.insideScoring + ratings.midrange + spacingWeight * ratings.threePoint) /
+    (2 + spacingWeight);
+  const scoring = 0.9 * (0.6 * Math.max(...routes) + 0.4 * routeBreadth) + 0.1 * ratings.freeThrow;
   const creation = 0.6 * ratings.passing + 0.4 * ratings.ballHandling;
   const security =
     0.5 * ratings.ballHandling + 0.5 * clamp(100 - (tendencies.turnoverRate - 5) * 5, 0, 100);
@@ -257,6 +265,47 @@ export function defensiveAbilityFor(ratings: SimulationRatings, position?: strin
     shares.block * ratings.block +
     shares.iq * ratings.defensiveIq +
     shares.rebound * ratings.defensiveRebound
+  );
+}
+function rimEvidenceAdjustment(input: RatingProfileInput): number {
+  const pct = input.stats.defFgPct;
+  const attempts = input.stats.defRimFga;
+  const baseline = input.stats.leagueRimFgPct;
+  if (
+    typeof pct !== 'number' ||
+    !Number.isFinite(pct) ||
+    pct < 0 ||
+    pct > 1 ||
+    typeof attempts !== 'number' ||
+    !Number.isFinite(attempts) ||
+    attempts <= 0 ||
+    typeof baseline !== 'number' ||
+    !Number.isFinite(baseline) ||
+    baseline <= 0 ||
+    baseline >= 1
+  )
+    return 0;
+  const sampleWeight = attempts / (attempts + 80);
+  const observedMargin = (baseline - pct) * sampleWeight;
+  const provenance = input.abilityProvenance?.interiorDefense;
+  const previousMargin =
+    provenance?.kind === 'derived' && provenance.sourceFields.includes('defFgPct') ? 0.52 - pct : 0;
+  const games = Math.max(0, safeFloat(input.stats.gamesPlayed));
+  const minutes = Math.max(0, safeFloat(input.stats.minutes));
+  const seasonWeight = clamp(
+    0.6 * Math.min(1, minutes / 1500) +
+      0.4 * Math.min(1, games / 45, minutes / Math.max(1, games) / 20),
+    0,
+    1,
+  );
+  const correctedInterior = clamp(
+    input.ratings.interiorDefense + (observedMargin - previousMargin) * 100 * seasonWeight,
+    0,
+    100,
+  );
+  return (
+    DEFENSE_ABILITY_SHARES[defensePositionGroup(input.position)].interior *
+    (correctedInterior - input.ratings.interiorDefense)
   );
 }
 function evidenceCoverage(input: RatingProfileInput, keys: readonly string[]): number {
@@ -544,11 +593,13 @@ export function deriveRatingProfile(input: RatingProfileInput): DerivedRatingPro
     input.eraThreeRate,
     input.position,
   );
-  const offensiveAbility = offensiveAbilityFor(input.ratings, input.tendencies);
+  const offensiveAbility = offensiveAbilityFor(input.ratings, input.tendencies, input.eraThreeRate);
   const defensiveAbility = defensiveAbilityFor(input.ratings, input.position);
-  const defensiveRecognition = recognitionFor(input, 'defense', defensiveAbility);
+  const defensiveTrackingAdjustment = rimEvidenceAdjustment(input);
+  const evidenceAdjustedDefense = defensiveAbility + defensiveTrackingAdjustment;
+  const defensiveRecognition = recognitionFor(input, 'defense', evidenceAdjustedDefense);
   const defensiveValue =
-    defensiveAbility * (1 - defensiveRecognition.weight) +
+    evidenceAdjustedDefense * (1 - defensiveRecognition.weight) +
     (defensiveRecognition.prior ?? 0) * defensiveRecognition.weight;
   const offensiveValue =
     offensiveAbility * (1 - production.weight) + production.score * production.weight;
@@ -579,6 +630,8 @@ export function deriveRatingProfile(input: RatingProfileInput): DerivedRatingPro
       confidenceWeight: production.weight,
       offensiveAbility,
       defensiveAbility,
+      defensiveTrackingAdjustment,
+      defensiveEvidenceCoverage: evidenceCoverage(input, ['interiorDefense', 'perimeterDefense']),
       offensiveValue,
       defensiveValue,
       rawBeforeRecognition,

@@ -1,140 +1,162 @@
 <script lang="ts">
+  import { UserRound, Check, Users } from '@lucide/svelte';
   import type { FixedFiveRoomSnapshot } from '@hoop-rush/data-contracts';
-  let {
-    snapshot,
-    selfId = 'p1',
-  }: {
-    snapshot: FixedFiveRoomSnapshot;
-    selfId?: 'p1' | 'p2';
-  } = $props();
-  function laneLabel(id: 'p1' | 'p2'): string {
-    if (id === selfId) return id === 'p1' ? 'You · P1' : 'You · P2';
-    return id === 'p1' ? 'Opponent · P1' : 'Opponent · P2';
-  }
-  const leader = $derived.by(() => {
-    const [a, b] = snapshot.members;
-    if (!a || !b) return null;
-    if (a.picksCommitted === b.picksCommitted) return null;
-    return a.picksCommitted > b.picksCommitted ? a.participantId : b.participantId;
-  });
+  let { snapshot, selfId = 'p1' }: { snapshot: FixedFiveRoomSnapshot; selfId?: 'p1' | 'p2' } =
+    $props();
+  const seats = $derived([selfId, selfId === 'p1' ? 'p2' : 'p1'] as const);
+  const drafting = $derived(snapshot.phase === 'drafting');
 </script>
 
-<div class="board-head">
-  <span class="board-live"><span class="board-dot" aria-hidden="true"></span>Draft race</span>
-  {#if leader}
-    <span class="board-lead">{leader === selfId ? 'You lead' : 'Opp leads'}</span>
-  {:else}
-    <span class="board-lead board-lead--tied">Tied</span>
-  {/if}
-</div>
-<div class="grid gap-2 sm:grid-cols-2" role="status" aria-label="Room scoreboard">
-  {#each snapshot.members as member (member.participantId)}
-    <div
-      class="race-card rounded-xl border p-3 {member.participantId === selfId
-        ? 'border-primary/50 bg-primary/5'
-        : 'border-line-soft bg-card'}"
-      data-leader={leader === member.participantId ? 'true' : 'false'}
-    >
-      <div class="flex items-center justify-between gap-2">
-        <p class="text-xs font-bold tracking-widest uppercase">{laneLabel(member.participantId)}</p>
-        <span
-          class="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold {member.online
-            ? 'bg-positive/15 text-positive'
-            : 'bg-muted text-muted-foreground'}"
+<div class="player-seats" aria-label="Players in this room">
+  {#each seats as id (id)}
+    {@const member = snapshot.members.find((item) => item.participantId === id)}
+    <div class={['player-seat', { yours: id === selfId, empty: !member }]}>
+      <div class="seat-top">
+        <span class="player-avatar"
+          >{#if member}<UserRound size={21} aria-hidden="true" />{:else}<Users
+              size={21}
+              aria-hidden="true"
+            />{/if}</span
         >
-          <span aria-hidden="true" class="inline-block h-1.5 w-1.5 rounded-full bg-current"></span>
-          {member.online ? 'Online' : 'Offline'}
-        </span>
+        <div class="player-name">
+          <strong>{id === selfId ? 'You' : member ? 'Opponent' : 'Open seat'}</strong><small
+            >{id === 'p1' ? 'Room host' : member ? 'Challenger' : 'Waiting for a challenger'}</small
+          >
+        </div>
+        {#if member}<span class={['presence', { online: member.online }]}
+            ><span aria-hidden="true"></span>{member.online ? 'Online' : 'Offline'}</span
+          >{/if}
       </div>
-      <div class="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
-        <span>{member.picksCommitted}/5 picks</span>
-        <span>{member.locked ? 'Locked' : member.ready ? 'Ready' : 'Waiting'}</span>
-        {#if snapshot.deadline && snapshot.phase === 'drafting'}
-          <span class="ml-auto font-mono">clock running</span>
-        {/if}
-      </div>
-      <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-muted" aria-hidden="true">
-        <div
-          class="race-fill h-full rounded-full bg-primary transition-all"
-          style={`width: ${(member.picksCommitted / 5) * 100}%`}
-        ></div>
-      </div>
+      {#if member && snapshot.phase !== 'lobby'}
+        <div class="seat-progress">
+          <span
+            >{member.locked || member.picksCommitted === 5
+              ? 'Five is set'
+              : drafting
+                ? 'Building lineup'
+                : 'Lineup'}<strong>{member.picksCommitted}/5</strong></span
+          >
+          <div class="pick-pips" aria-label={`${member.picksCommitted} of 5 picks made`}>
+            {#each [0, 1, 2, 3, 4] as pick (pick)}<span class:filled={pick < member.picksCommitted}
+                >{#if pick < member.picksCommitted}<Check size={11} aria-hidden="true" />{/if}</span
+              >{/each}
+          </div>
+        </div>
+      {/if}
     </div>
   {/each}
 </div>
 
 <style>
-  .board-head {
+  .player-seats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .player-seat {
+    min-width: 0;
+    border: 1px solid var(--color-line-soft);
+    border-radius: 10px;
+    background: var(--color-card);
+    padding: 18px;
+  }
+  .yours {
+    border-left: 3px solid var(--color-primary);
+  }
+  .empty {
+    border-style: dashed;
+    background: var(--color-surface-1);
+  }
+  .seat-top {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    margin-bottom: 0.5rem;
+    gap: 12px;
   }
-  .board-live {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-family: var(--font-mono);
-    font-size: 10px;
-    font-weight: 800;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
+  .player-avatar {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 42px;
+    height: 42px;
+    border-radius: 9px;
+    color: var(--color-muted-foreground);
+    background: var(--color-surface-2);
+  }
+  .yours .player-avatar {
     color: var(--color-primary);
   }
-  .board-dot {
-    width: 0.5rem;
-    height: 0.5rem;
-    border-radius: 999px;
-    background: currentColor;
-    animation: board-pulse 1.1s ease-in-out infinite;
+  .player-name {
+    min-width: 0;
+    flex: 1;
   }
-  .board-lead {
-    font-family: var(--font-mono);
+  .player-name strong {
+    display: block;
+    font-family: var(--font-display);
+    font-size: 23px;
+    line-height: 1.1;
+    font-weight: 700;
+  }
+  .player-name small {
+    display: block;
     font-size: 10px;
-    font-weight: 800;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--color-accent);
+    color: var(--color-muted-foreground);
+    margin-top: 5px;
   }
-  .board-lead--tied {
+  .presence {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    flex-shrink: 0;
+    color: var(--color-muted-foreground);
+    font-size: 10px;
+  }
+  .presence > span {
+    width: 5px;
+    height: 5px;
+    background: currentColor;
+    border-radius: 50%;
+  }
+  .presence.online {
+    color: var(--color-positive);
+  }
+  .seat-progress {
+    border-top: 1px solid var(--color-line-soft);
+    margin-top: 16px;
+    padding-top: 12px;
+  }
+  .seat-progress > span {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
     color: var(--color-muted-foreground);
   }
-  .race-card {
-    transition:
-      border-color 0.3s ease,
-      box-shadow 0.3s ease,
-      transform 0.3s ease;
+  .seat-progress strong {
+    color: var(--color-foreground);
+    font-family: var(--font-mono);
   }
-  .race-card[data-leader='true'] {
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 40%, transparent);
-    animation: leader-thump 0.4s ease both;
+  .pick-pips {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 5px;
+    margin-top: 9px;
   }
-  .race-fill {
-    transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  .pick-pips > span {
+    display: grid;
+    place-items: center;
+    height: 15px;
+    border-radius: 3px;
+    background: var(--color-surface-3);
   }
-  @keyframes board-pulse {
-    0%,
-    100% {
-      opacity: 1;
-      transform: scale(1);
+  .pick-pips > span.filled {
+    background: var(--color-primary);
+    color: var(--color-primary-foreground);
+  }
+  @media (max-width: 640px) {
+    .player-seats {
+      grid-template-columns: 1fr;
     }
-    50% {
-      opacity: 0.4;
-      transform: scale(0.8);
-    }
-  }
-  @keyframes leader-thump {
-    from {
-      transform: scale(1.02);
-    }
-    to {
-      transform: scale(1);
-    }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .board-dot,
-    .race-card[data-leader='true'] {
-      animation: none;
+    .player-seat {
+      padding: 14px;
     }
   }
 </style>
