@@ -51,20 +51,19 @@ Landed:
 
 Next:
 
-1. Finish stage 2 (part B): move postseason coordination out of
-   `season-postseason-runner.ts` — the runner becomes a simulation job
-   returning results and progress, while `SeasonSession` runs the decision
-   loop, commits advancements, and promotes the champion.
-2. Stages 4-7 as planned: engine orchestration split, remaining modes,
-   storage/multiplayer adapters, tooling and deletion.
+1. Stage 4: separate block validation/execution/candidate assembly and
+   postseason scheduling/progression/resolution inside `packages/engine`
+   (preserving RNG consumption, iteration order, and recorded facts), then
+   stage 5 mode migrations and stages 6-7.
 
-Stage 2 (part A) landed: block jobs now return raw `candidate`/`interrupted`
-events. `SeasonSession` owns start/resume reconciliation, acceptance digest
-gates, the engine commit pipeline, the atomic `commitSeasonBlock`, pending
-interruption persistence, and post-commit publication. The web block runner is
-a transport over the worker only; the pure assembly helpers live in
-`src/season/block-state.ts`. Covered by `session-block.test.ts` (16 tests) and
-the web candidate→commit integration test.
+Stage 2 complete: block jobs return raw `candidate`/`interrupted` events and
+`SeasonSession` owns start/resume reconciliation, acceptance, atomic commits,
+interruption persistence, and publication (part A). Postseason coordination
+also lives in the session now: the decision loop, command-id chaining,
+duplicate retry, advancement commits, and champion promotion; the web
+postseason runner is a simulation job over the worker only (part B). Covered
+by `session-block.test.ts` (16), `session-postseason.test.ts` (14), and the
+web transport/integration suites.
 
 Stage 3 landed: `apps/web/src/lib/season/season-shell-state.svelte.ts` is now
 the reactive presenter — one subscription mirrors `session.getSnapshot()`

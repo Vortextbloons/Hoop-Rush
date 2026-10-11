@@ -17,6 +17,7 @@ import {
   type SeasonEffectsState,
   type SeasonHomeCourtProfile,
   type SeasonPostseasonRotationPayload,
+  type SeasonPostseasonWorkerStartRequest,
   type SeasonRun,
   type SeasonRunCommand,
   type SeasonStandings,
@@ -51,17 +52,13 @@ import type {
   SeasonBlockStartInput,
   SeasonRunnerEvent,
 } from './block-wire.ts';
-import type {
-  SeasonPostseasonEvent,
-  SeasonPostseasonRunner,
-  SeasonPostseasonRunInput,
-} from './postseason-wire.ts';
+import type { SeasonPostseasonJob, SeasonPostseasonJobOutcome } from './postseason-wire.ts';
 import type { SeasonAssetPort, SeasonRunRepositoryPort } from './ports.ts';
 let nextTestCommandId = 0;
 function createSession(
   repository: SeasonRunRepositoryPort,
   blockRunner: SeasonBlockRunner,
-  postseasonRunner?: SeasonPostseasonRunner,
+  postseasonJob?: SeasonPostseasonJob,
 ): SeasonSession {
   const assets: SeasonAssetPort = {
     loadEraProfile: () => Promise.resolve(buildEraSimulationProfile()),
@@ -70,13 +67,19 @@ function createSession(
     loadFreeAgencyTargets: () =>
       Promise.reject(new Error('the free-agency targets are unavailable')),
     loadHomeCourtProfile: () => Promise.resolve({ ...SEASON_HOME_COURT_PROFILE }),
-    loadArtifactUrls: () => Promise.reject(new Error('the season artifact urls are unavailable')),
+    loadArtifactUrls: () =>
+      Promise.resolve({
+        catalogUrl: 'https://example.test/season/draft-catalog.json',
+        catalogHash: '0'.repeat(64),
+        profileUrl: 'https://example.test/season/era-sim.json',
+        profileHash: '0'.repeat(64),
+      }),
     loadSchedule: () => Promise.reject(new Error('the season schedule is unavailable')),
   };
   return new SeasonSession({
     repository,
     blockRunner,
-    ...(postseasonRunner !== undefined ? { postseasonRunner } : {}),
+    ...(postseasonJob !== undefined ? { postseasonJob } : {}),
     assets,
     notifier: {
       announce: () => {},
@@ -612,65 +615,48 @@ async function advanceHubRunToHumanGame(
     }
   }
 }
-class FakePostseasonRunner implements SeasonPostseasonRunner {
-  advanceCalls: SeasonPostseasonRunInput[] = [];
-  spectateCalls: SeasonPostseasonRunInput[] = [];
-  fastForwardCalls: SeasonPostseasonRunInput[] = [];
+class FakePostseasonJob implements SeasonPostseasonJob {
+  simulateCalls: SeasonPostseasonWorkerStartRequest[] = [];
   cancelCalls: string[] = [];
   terminateCalls = 0;
-  subscribeCalls = 0;
-  private readonly listeners = new Set<(event: SeasonPostseasonEvent) => void>();
-  advancePostseason(input: SeasonPostseasonRunInput): string {
-    this.advanceCalls.push(input);
-    this.emit({
-      type: 'started',
-      requestId: 'sp-1',
-      mode: 'advance',
-      targetGameId: null,
-      gamesTotal: 0,
-    });
-    return 'sp-1';
+  prewarmCalls = 0;
+  private readonly pending: Array<{
+    resolve: (outcome: SeasonPostseasonJobOutcome) => void;
+  }> = [];
+  private readonly queued: SeasonPostseasonJobOutcome[] = [];
+  enqueue(outcome: SeasonPostseasonJobOutcome): void {
+    const next = this.pending.shift();
+    if (next === undefined) {
+      this.queued.push(outcome);
+      return;
+    }
+    next.resolve(outcome);
   }
-  spectatePostseasonGame(
-    input: SeasonPostseasonRunInput & {
-      targetGameId: string;
-    },
-  ): string {
-    this.spectateCalls.push(input);
-    this.emit({
-      type: 'started',
-      requestId: 'sp-2',
-      mode: 'spectate',
-      targetGameId: input.targetGameId,
-      gamesTotal: 0,
+  simulate(request: SeasonPostseasonWorkerStartRequest): Promise<SeasonPostseasonJobOutcome> {
+    this.simulateCalls.push(request);
+    const queued = this.queued.shift();
+    if (queued !== undefined) return Promise.resolve(queued);
+    return new Promise((resolve) => {
+      this.pending.push({ resolve });
     });
-    return 'sp-2';
-  }
-  fastForwardPostseason(input: SeasonPostseasonRunInput): string {
-    this.fastForwardCalls.push(input);
-    this.emit({
-      type: 'started',
-      requestId: 'sp-3',
-      mode: 'fast-forward',
-      targetGameId: null,
-      gamesTotal: 0,
-    });
-    return 'sp-3';
   }
   cancel(requestId: string): void {
     this.cancelCalls.push(requestId);
   }
   terminate(): void {
     this.terminateCalls += 1;
+    const cancelled: SeasonPostseasonJobOutcome = {
+      kind: 'error',
+      code: 'cancelled',
+      message: 'postseason worker terminated',
+      seed: null,
+      gameId: null,
+    };
+    for (const entry of [...this.pending]) entry.resolve(cancelled);
+    this.pending.length = 0;
   }
-  prewarm(): void {}
-  subscribe(listener: (event: SeasonPostseasonEvent) => void): () => void {
-    this.subscribeCalls += 1;
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
-  }
-  emit(event: SeasonPostseasonEvent): void {
-    for (const listener of [...this.listeners]) listener(event);
+  prewarm(): void {
+    this.prewarmCalls += 1;
   }
 }
 function hubPostseasonRepo(initial: SeasonRunSnapshot | null) {
@@ -740,7 +726,7 @@ describe('SeasonSession postseason commands (M2.6)', () => {
       acceptedBlocks: [],
       effects: hubZeroEffects(run),
     });
-    const hub = createSession(repo, new FakeRunner(), new FakePostseasonRunner());
+    const hub = createSession(repo, new FakeRunner(), new FakePostseasonJob());
     hub.catalog = hubCatalogOf(run);
     await hub.refresh();
     expect(hub.snapshot?.run.stage).toBe('regular-season');
@@ -768,7 +754,7 @@ describe('SeasonSession postseason commands (M2.6)', () => {
     repo.commitPostseasonAdvancement.mockRejectedValueOnce(
       new SeasonRunCommandStaleStateError('cmd-stale', 0, 1),
     );
-    const hub = createSession(repo, new FakeRunner(), new FakePostseasonRunner());
+    const hub = createSession(repo, new FakeRunner(), new FakePostseasonJob());
     hub.catalog = hubCatalogOf(run);
     await hub.refresh();
     await hub.startPostseason();
@@ -788,7 +774,7 @@ describe('SeasonSession postseason commands (M2.6)', () => {
       acceptedBlocks: [],
       effects: hubZeroEffects(run),
     });
-    const hub = createSession(repo, new FakeRunner(), new FakePostseasonRunner());
+    const hub = createSession(repo, new FakeRunner(), new FakePostseasonJob());
     hub.catalog = hubCatalogOf(run);
     await hub.refresh();
     await hub.startPostseason();
@@ -832,7 +818,7 @@ describe('SeasonSession postseason commands (M2.6)', () => {
       acceptedBlocks: [],
       effects: hubZeroEffects(run),
     });
-    const hub = createSession(repo, new FakeRunner(), new FakePostseasonRunner());
+    const hub = createSession(repo, new FakeRunner(), new FakePostseasonJob());
     hub.catalog = hubCatalogOf(run);
     await hub.refresh();
     await hub.startPostseason();
@@ -872,7 +858,7 @@ describe('SeasonSession postseason commands (M2.6)', () => {
     expect(repo.commits).toHaveLength(4);
     hub.destroy();
   });
-  it('advancePostseason routes to the runner and mirrors progress events', async () => {
+  it('advancePostseason drives the job for the next postseason game', async () => {
     const run = hubBoundaryRun();
     const repo = hubPostseasonRepo({
       run,
@@ -881,52 +867,24 @@ describe('SeasonSession postseason commands (M2.6)', () => {
       acceptedBlocks: [],
       effects: hubZeroEffects(run),
     });
-    const postseasonRunner = new FakePostseasonRunner();
-    const hub = createSession(repo, new FakeRunner(), postseasonRunner);
+    const job = new FakePostseasonJob();
+    const hub = createSession(repo, new FakeRunner(), job);
     hub.catalog = hubCatalogOf(run);
     await hub.refresh();
     await hub.startPostseason();
     await hub.advancePostseason();
-    expect(postseasonRunner.advanceCalls).toHaveLength(1);
+    await vi.waitFor(() => {
+      expect(job.simulateCalls).toHaveLength(1);
+    });
     expect(hub.postseason.phase).toBe('running');
     expect(hub.postseason.error).toBeNull();
-    const snapshot = hub.snapshot;
-    if (snapshot === null) throw new Error('expected a snapshot');
-    postseasonRunner.emit({
-      type: 'committed',
-      requestId: 'sp-1',
-      runId: snapshot.run.runId,
-      gameIds: ['pi-east-seven-eight'],
-      snapshot,
-    });
-    expect(hub.postseason.gamesCompleted).toBe(1);
-    expect(hub.postseason.phase).toBe('running');
-    postseasonRunner.emit({
-      type: 'progress',
-      requestId: 'sp-1',
-      gamesCompleted: 1,
-      gamesTotal: 109,
-      latestGameId: 'pi-east-seven-eight',
-      latestResult: null,
-    });
-    expect(hub.postseason.gamesTotal).toBe(109);
-    expect(hub.postseason.latestGameId).toBe('pi-east-seven-eight');
-    postseasonRunner.emit({
-      type: 'complete',
-      requestId: 'sp-1',
-      runId: snapshot.run.runId,
-      snapshot,
-      stage: 'play-in',
-      nextDecision: 'rotation',
-      nextGameId: 'pi-west-seven-eight',
-      aiNextGameId: null,
-      promoted: false,
-    });
-    expect(hub.postseason.phase).toBe('complete');
-    expect(hub.snapshot?.run.runId).toBe(snapshot.run.runId);
+    const request = job.simulateCalls[0];
+    expect(request?.type).toBe('season-postseason-start');
+    expect(request?.runId).toBe(run.runId);
+    expect(request?.commandId).toMatch(/^adv-test-/);
     hub.destroy();
   });
-  it('fastForwardPostseason routes to the runner and promotion clears the run', async () => {
+  it('spectatePostseasonGame drives the job and cancelPostseason cancels the wire request', async () => {
     const run = hubBoundaryRun();
     const repo = hubPostseasonRepo({
       run,
@@ -935,53 +893,21 @@ describe('SeasonSession postseason commands (M2.6)', () => {
       acceptedBlocks: [],
       effects: hubZeroEffects(run),
     });
-    const postseasonRunner = new FakePostseasonRunner();
-    const hub = createSession(repo, new FakeRunner(), postseasonRunner);
-    hub.catalog = hubCatalogOf(run);
-    await hub.refresh();
-    await hub.startPostseason();
-    await hub.fastForwardPostseason();
-    expect(postseasonRunner.fastForwardCalls).toHaveLength(1);
-    const snapshot = hub.snapshot;
-    if (snapshot === null) throw new Error('expected a snapshot');
-    await repo.promoteChampionToCompleted();
-    postseasonRunner.emit({
-      type: 'complete',
-      requestId: 'sp-3',
-      runId: snapshot.run.runId,
-      snapshot: null,
-      stage: 'completed',
-      nextDecision: 'none',
-      nextGameId: null,
-      aiNextGameId: null,
-      promoted: true,
-    });
-    await hub.refresh();
-    expect(hub.postseason.phase).toBe('complete');
-    expect(hub.snapshot).toBeNull();
-    expect(hub.index).toBeNull();
-    hub.destroy();
-  });
-  it('spectatePostseasonGame routes to the runner and cancelPostseason cancels', async () => {
-    const run = hubBoundaryRun();
-    const repo = hubPostseasonRepo({
-      run,
-      summaries: [],
-      retainedDetails: [],
-      acceptedBlocks: [],
-      effects: hubZeroEffects(run),
-    });
-    const postseasonRunner = new FakePostseasonRunner();
-    const hub = createSession(repo, new FakeRunner(), postseasonRunner);
+    const job = new FakePostseasonJob();
+    const hub = createSession(repo, new FakeRunner(), job);
     hub.catalog = hubCatalogOf(run);
     await hub.refresh();
     await hub.startPostseason();
     await hub.spectatePostseasonGame({ targetGameId: 'pi-east-seven-eight' });
-    expect(postseasonRunner.spectateCalls).toHaveLength(1);
-    expect(postseasonRunner.spectateCalls[0]?.targetGameId).toBe('pi-east-seven-eight');
+    await vi.waitFor(() => {
+      expect(job.simulateCalls).toHaveLength(1);
+    });
+    expect(job.simulateCalls[0]?.targetGameId).toBe('pi-east-seven-eight');
+    expect(job.simulateCalls[0]?.commandId).toMatch(/^spc-test-/);
     expect(hub.postseason.phase).toBe('running');
     hub.cancelPostseason();
-    expect(postseasonRunner.cancelCalls).toEqual(['sp-2']);
+    expect(job.cancelCalls).toEqual([job.simulateCalls[0]?.requestId]);
+    expect(hub.postseason.phase).toBe('cancelled');
     hub.destroy();
   });
   it('rejects runner-routed commands outside the play-in/playoffs stages', async () => {
@@ -993,16 +919,16 @@ describe('SeasonSession postseason commands (M2.6)', () => {
       acceptedBlocks: [],
       effects: hubZeroEffects(run),
     });
-    const postseasonRunner = new FakePostseasonRunner();
-    const hub = createSession(repo, new FakeRunner(), postseasonRunner);
+    const job = new FakePostseasonJob();
+    const hub = createSession(repo, new FakeRunner(), job);
     await hub.refresh();
     await hub.advancePostseason();
-    expect(postseasonRunner.advanceCalls).toHaveLength(0);
+    expect(job.simulateCalls).toHaveLength(0);
     expect(hub.commandError?.command).toBe('advance-postseason');
     expect(hub.commandError?.rejection?.code).toBe('invalid-stage');
     expect(hub.commandError?.message).toContain('regular-season');
     await hub.fastForwardPostseason();
-    expect(postseasonRunner.fastForwardCalls).toHaveLength(0);
+    expect(job.simulateCalls).toHaveLength(0);
     expect(hub.commandError?.rejection?.code).toBe('invalid-stage');
     hub.destroy();
   });
@@ -1088,40 +1014,55 @@ describe('SeasonSession runner teardown', () => {
   function setPostseasonRequestId(hub: SeasonSession, requestId: string | null): void {
     (hub as unknown as { postseasonRequestId: string | null }).postseasonRequestId = requestId;
   }
+  function setPostseasonWireRequestId(hub: SeasonSession, requestId: string | null): void {
+    (hub as unknown as { postseasonWireRequestId: string | null }).postseasonWireRequestId =
+      requestId;
+  }
   it('destroy cancels and terminates both runners', async () => {
     const repo = repoWith(snapshot());
     const runner = new FakeRunner();
-    const postseasonRunner = new FakePostseasonRunner();
-    const hub = createSession(repo, runner, postseasonRunner);
+    const job = new FakePostseasonJob();
+    const hub = createSession(repo, runner, job);
     await hub.refresh();
     hub.block = runningBlock('fake-1', 0);
     hub.postseason = { ...hub.postseason, phase: 'running' };
     setPostseasonRequestId(hub, 'sp-1');
+    setPostseasonWireRequestId(hub, 'sp-1-0');
     hub.destroy();
     expect(runner.cancelCalls).toEqual(['fake-1']);
-    expect(postseasonRunner.cancelCalls).toEqual(['sp-1']);
+    expect(job.cancelCalls).toEqual(['sp-1-0']);
     expect(runner.terminateCalls).toBe(1);
-    expect(postseasonRunner.terminateCalls).toBe(1);
+    expect(job.terminateCalls).toBe(1);
   });
-  it('quitRun cancels both runners and a late postseason event cannot resurrect state', async () => {
+  it('quitRun cancels both runners and a late postseason result cannot resurrect state', async () => {
     const repo = repoWith(snapshot());
     const runner = new FakeRunner();
-    const postseasonRunner = new FakePostseasonRunner();
-    const hub = createSession(repo, runner, postseasonRunner);
+    const job = new FakePostseasonJob();
+    const hub = createSession(repo, runner, job);
     await hub.refresh();
     hub.postseason = { ...hub.postseason, phase: 'running' };
     setPostseasonRequestId(hub, 'sp-1');
+    setPostseasonWireRequestId(hub, 'sp-1-0');
     const result = await hub.quitRun();
     expect(result.ok).toBe(true);
-    expect(postseasonRunner.cancelCalls).toEqual(['sp-1']);
-    expect(postseasonRunner.terminateCalls).toBe(1);
+    expect(job.cancelCalls).toEqual(['sp-1-0']);
+    expect(job.terminateCalls).toBe(1);
     expect(hub.snapshot).toBeNull();
-    postseasonRunner.emit({
-      type: 'committed',
-      requestId: 'sp-1',
-      runId: idSchema.parse(RUN_ID),
-      gameIds: [],
-      snapshot: snapshot(),
+    job.enqueue({
+      kind: 'accepted',
+      result: {
+        status: 'accepted',
+        stage: 'play-in',
+        advancedGameIds: [],
+        summaries: [],
+        run: snapshot().run,
+        nextDecision: 'none',
+        nextGameId: null,
+        aiNextGameId: null,
+      },
+    });
+    await vi.waitFor(() => {
+      expect(hub.postseason.phase).toBe('idle');
     });
     expect(hub.snapshot).toBeNull();
     expect(hub.index).toBeNull();
@@ -1184,15 +1125,15 @@ describe('SeasonSnapshotCache', () => {
   });
 });
 describe('SeasonSession disposed guard', () => {
-  it('ignores a late postseason runner attach after destroy', async () => {
+  it('ignores a late postseason job attach after destroy', async () => {
     const repo = repoWith(snapshot());
     const runner = new FakeRunner();
-    const postseasonRunner = new FakePostseasonRunner();
-    const lateFactory = Promise.withResolvers<SeasonPostseasonRunner>();
+    const job = new FakePostseasonJob();
+    const lateFactory = Promise.withResolvers<SeasonPostseasonJob>();
     const session = new SeasonSession({
       repository: repo,
       blockRunner: runner,
-      postseasonRunnerFactory: () => lateFactory.promise,
+      postseasonJobFactory: () => lateFactory.promise,
       assets: {
         loadEraProfile: () => Promise.resolve(buildEraSimulationProfile()),
         loadDraftCatalog: () =>
@@ -1220,18 +1161,13 @@ describe('SeasonSession disposed guard', () => {
     });
     await session.refresh();
     session.destroy();
-    lateFactory.resolve(postseasonRunner);
+    lateFactory.resolve(job);
     await lateFactory.promise;
-    postseasonRunner.emit({
-      type: 'started',
-      requestId: 'sp-1',
-      mode: 'advance',
-      targetGameId: null,
-      gamesTotal: 0,
-    });
+    await Promise.resolve();
     expect(session.postseason.phase).toBe('idle');
     expect(session.commandError).toBeNull();
-    expect(postseasonRunner.subscribeCalls).toBe(0);
+    expect((session as unknown as { postseasonJob: unknown }).postseasonJob).toBeNull();
+    expect(job.terminateCalls).toBe(0);
   });
   it('ignores late refresh continuations after destroy', async () => {
     const repo = repoWith(null);

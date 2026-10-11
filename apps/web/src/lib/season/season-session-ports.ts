@@ -15,7 +15,7 @@ import {
 import { createSeasonRunChannel } from './season-cross-tab';
 import {
   getSeasonBlockRunner,
-  getSeasonPostseasonRunner,
+  getSeasonPostseasonJob,
   getSeasonRunRepository,
 } from './season-repo';
 
@@ -32,7 +32,7 @@ export async function createSeasonSessionPorts(options: {
   return {
     repository,
     blockRunner,
-    postseasonRunnerFactory: () => getSeasonPostseasonRunner(),
+    postseasonJobFactory: () => getSeasonPostseasonJob(),
     assets: {
       loadEraProfile: () => loadSeasonEraProfile(),
       loadDraftCatalog: () => loadSeasonDraftCatalog(),

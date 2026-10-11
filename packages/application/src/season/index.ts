@@ -22,11 +22,14 @@ export {
 } from './block-state.ts';
 export {
   seasonPostseasonCommitResultDigest,
+  seasonPostseasonScorelineOf,
   seasonPostseasonTransactionIdsOf,
-  type SeasonPostseasonEvent,
+  seasonPostseasonWireRequestOf,
+  type SeasonPostseasonJob,
+  type SeasonPostseasonJobOutcome,
   type SeasonPostseasonMode,
   type SeasonPostseasonRunInput,
-  type SeasonPostseasonRunner,
+  type SeasonPostseasonWireRequestInput,
 } from './postseason-wire.ts';
 export { SEASON_BLOCK_POLICY, SEASON_COMMAND_POLICY, canResubmitBlock } from './policies.ts';
 export type {
@@ -36,8 +39,8 @@ export type {
   SeasonDraftCleanerPort,
   SeasonIdPort,
   SeasonNotifierPort,
-  SeasonPostseasonRunnerFactory,
-  SeasonPostseasonRunnerPort,
+  SeasonPostseasonJobFactory,
+  SeasonPostseasonJobPort,
   SeasonRunAnnouncement,
   SeasonRunMutation,
   SeasonRunRepositoryPort,

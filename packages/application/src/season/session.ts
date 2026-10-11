@@ -1,10 +1,17 @@
 import {
   humanFranchiseIdOf,
   SEASON_RUN_SCHEMA_VERSION,
+  canonicalJson,
   commandIdSchema,
   franchiseIdSchema,
   postseasonGameIdSchema,
+  seasonAlmanacDigest,
+  seasonCommandLogDigest,
+  seasonDigestHex,
   seasonSubmitBlockCommandSchema,
+  seasonTradeGradeLogDigest,
+  SeasonRunCommandDuplicateError,
+  SeasonRunCommandRunMismatchError,
   SeasonRunCommandStaleStateError,
   SeasonRunLoadError,
 } from '@hoop-rush/data-contracts';
@@ -13,8 +20,11 @@ import type {
   EraSimulationProfile,
   FranchiseId,
   Id,
+  PostseasonGameId,
   SeasonAcceptedBlock,
   SeasonActiveRunIndex,
+  SeasonAdvancePostseasonRejection,
+  SeasonAlmanac,
   SeasonCandidateCheckpoint,
   SeasonDraftCatalog,
   SeasonEffectsState,
@@ -46,9 +56,14 @@ import type {
   SeasonTradeWindowState,
 } from '@hoop-rush/data-contracts';
 import {
+  POSTSEASON_ALMANAC_DIGEST_PLACEHOLDER,
   completeSeasonBlockCommit,
+  deriveSeasonTradeGrades,
   handleSeasonRunCommand,
   seasonNextBlockIndex,
+  seasonPostseasonHumanEliminated,
+  seasonPostseasonNextGame,
+  seasonPostseasonUpcomingGames,
   seasonRotationSetDigest,
   type SeasonRunCommandContext,
 } from '@hoop-rush/engine';
@@ -72,10 +87,13 @@ import {
   mergeSortedByGameId,
   objectivesWithSuccess,
 } from './block-state.ts';
-import type { SeasonPostseasonEvent } from './postseason-wire.ts';
 import {
   seasonPostseasonCommitResultDigest,
+  seasonPostseasonScorelineOf,
   seasonPostseasonTransactionIdsOf,
+  seasonPostseasonWireRequestOf,
+  type SeasonPostseasonMode,
+  type SeasonPostseasonRunInput,
 } from './postseason-wire.ts';
 import { SEASON_BLOCK_POLICY, SEASON_COMMAND_POLICY, canResubmitBlock } from './policies.ts';
 import type {
@@ -85,8 +103,8 @@ import type {
   SeasonDraftCleanerPort,
   SeasonIdPort,
   SeasonNotifierPort,
-  SeasonPostseasonRunnerFactory,
-  SeasonPostseasonRunnerPort,
+  SeasonPostseasonJobFactory,
+  SeasonPostseasonJobPort,
   SeasonRunMutation,
   SeasonRunRepositoryPort,
 } from './ports.ts';
@@ -197,8 +215,8 @@ export interface SeasonPostseasonProgress {
 export interface SeasonSessionOptions {
   repository: SeasonRunRepositoryPort;
   blockRunner: SeasonBlockRunnerPort;
-  postseasonRunner?: SeasonPostseasonRunnerPort;
-  postseasonRunnerFactory?: SeasonPostseasonRunnerFactory;
+  postseasonJob?: SeasonPostseasonJobPort;
+  postseasonJobFactory?: SeasonPostseasonJobFactory;
   assets: SeasonAssetPort;
   notifier: SeasonNotifierPort;
   clock: SeasonClockPort;
@@ -286,6 +304,7 @@ const IDLE_POSTSEASON: SeasonPostseasonProgress = {
   latestResult: null,
   error: null,
 };
+const SEASON_POSTSEASON_CHUNK_MAX_GAMES = 8;
 export class SeasonSession {
   private readonly repo: SeasonRunRepositoryPort;
   private readonly runner: SeasonBlockRunnerPort;
@@ -294,7 +313,7 @@ export class SeasonSession {
   private readonly clock: SeasonClockPort;
   private readonly ids: SeasonIdPort;
   private readonly draftCleaner: SeasonDraftCleanerPort;
-  private readonly postseasonRunnerFactory: SeasonPostseasonRunnerFactory | null;
+  private readonly postseasonJobFactory: SeasonPostseasonJobFactory | null;
   private readonly cache = new SeasonSnapshotCache();
   private readonly listeners = new Set<() => void>();
   private disposed = false;
@@ -302,10 +321,18 @@ export class SeasonSession {
     return this.disposed;
   }
   private unsubscribeRunner: (() => void) | null = null;
-  private postseasonRunner: SeasonPostseasonRunnerPort | null = null;
-  private postseasonRunnerPromise: Promise<SeasonPostseasonRunnerPort> | null = null;
-  private unsubscribePostseasonRunner: (() => void) | null = null;
+  private postseasonJob: SeasonPostseasonJobPort | null = null;
+  private postseasonJobPromise: Promise<SeasonPostseasonJobPort> | null = null;
   private postseasonRequestId: string | null = null;
+  private postseasonWireRequestId: string | null = null;
+  private postseasonCancelRequested = false;
+  private postseasonWireSnapshotCache: {
+    stateRevision: number;
+    stateDigest: string;
+    run: SeasonRun;
+    effects: SeasonEffectsState;
+    regularSeasonSummaries: readonly SeasonGameSummary[];
+  } | null = null;
   private profilePromise: Promise<EraSimulationProfile> | null = null;
   private schedulePromise: Promise<SeasonSchedule> | null = null;
   private blockRunToken = 0;
@@ -335,12 +362,12 @@ export class SeasonSession {
     this.clock = options.clock;
     this.ids = options.ids;
     this.draftCleaner = options.draftCleaner;
-    this.postseasonRunnerFactory = options.postseasonRunnerFactory ?? null;
+    this.postseasonJobFactory = options.postseasonJobFactory ?? null;
     this.unsubscribeRunner = this.runner.subscribe((event) => {
       this.onRunnerEvent(event);
     });
-    if (options.postseasonRunner !== undefined) {
-      this.attachPostseasonRunner(options.postseasonRunner);
+    if (options.postseasonJob !== undefined) {
+      this.postseasonJob = options.postseasonJob;
     }
     this.unsubscribeChannel = this.notifier.onMutation((mutation) => {
       void this.onExternalMutation(mutation);
@@ -371,17 +398,20 @@ export class SeasonSession {
     if (this.block.phase === 'running') {
       this.blockCancelRequested = true;
     }
-    const postseasonRunner = this.postseasonRunner;
-    const postseasonRequestId = this.postseasonRequestId;
-    if (
-      postseasonRunner !== null &&
-      this.postseason.phase === 'running' &&
-      postseasonRequestId !== null
-    ) {
+    if (this.postseason.phase === 'running' && this.postseasonRequestId !== null) {
+      this.abandonPostseasonRun();
+    }
+  }
+  private abandonPostseasonRun(): void {
+    const wireRequestId = this.postseasonWireRequestId;
+    if (this.postseasonJob !== null && wireRequestId !== null) {
       try {
-        postseasonRunner.cancel(postseasonRequestId);
+        this.postseasonJob.cancel(wireRequestId);
       } catch {}
     }
+    this.postseasonCancelRequested = true;
+    this.postseason = { ...this.postseason, phase: 'cancelled', error: null };
+    this.emit();
   }
   private resetRunnerProgress(): void {
     this.activeBlock = null;
@@ -389,6 +419,8 @@ export class SeasonSession {
     this.block = { ...IDLE_BLOCK };
     this.postseason = { ...IDLE_POSTSEASON };
     this.postseasonRequestId = null;
+    this.postseasonWireRequestId = null;
+    this.postseasonCancelRequested = false;
   }
   private teardownRunners(): void {
     this.cancelInFlightRunners();
@@ -396,8 +428,9 @@ export class SeasonSession {
       this.runner.terminate();
     } catch {}
     try {
-      this.postseasonRunner?.terminate();
+      this.postseasonJob?.terminate();
     } catch {}
+    this.postseasonWireSnapshotCache = null;
     this.resetRunnerProgress();
   }
   destroy(): void {
@@ -405,43 +438,35 @@ export class SeasonSession {
     this.teardownRunners();
     this.unsubscribeRunner?.();
     this.unsubscribeRunner = null;
-    this.unsubscribePostseasonRunner?.();
-    this.unsubscribePostseasonRunner = null;
     this.unsubscribeChannel?.();
     this.unsubscribeChannel = null;
     this.notifier.close();
-    this.postseasonRunner = null;
+    this.postseasonJob = null;
     this.listeners.clear();
   }
   prewarm(): void {
     if (this.isDisposed()) return;
     this.runner.prewarm();
-    this.postseasonRunner?.prewarm();
+    this.postseasonJob?.prewarm();
   }
-  private attachPostseasonRunner(runner: SeasonPostseasonRunnerPort): void {
-    if (this.isDisposed()) return;
-    this.postseasonRunner = runner;
-    this.unsubscribePostseasonRunner = runner.subscribe((event) => {
-      this.onPostseasonRunnerEvent(event);
-    });
-  }
-  private resolvePostseasonRunner(): Promise<SeasonPostseasonRunnerPort> {
-    if (this.postseasonRunner !== null) return Promise.resolve(this.postseasonRunner);
-    if (this.postseasonRunnerPromise === null) {
-      const factory = this.postseasonRunnerFactory;
+  private resolvePostseasonJob(): Promise<SeasonPostseasonJobPort> {
+    if (this.postseasonJob !== null) return Promise.resolve(this.postseasonJob);
+    if (this.postseasonJobPromise === null) {
+      const factory = this.postseasonJobFactory;
       if (factory === null) {
         return Promise.reject(new Error('no postseason runner is configured'));
       }
-      this.postseasonRunnerPromise = factory();
-      this.postseasonRunnerPromise
-        .then((runner) => {
-          if (this.postseasonRunner === null) this.attachPostseasonRunner(runner);
+      this.postseasonJobPromise = factory();
+      this.postseasonJobPromise
+        .then((job) => {
+          if (this.isDisposed()) return;
+          if (this.postseasonJob === null) this.postseasonJob = job;
         })
         .catch(() => {
-          this.postseasonRunnerPromise = null;
+          this.postseasonJobPromise = null;
         });
     }
-    return this.postseasonRunnerPromise;
+    return this.postseasonJobPromise;
   }
   private loadProfile(): Promise<EraSimulationProfile> {
     if (this.profilePromise === null) {
@@ -1491,17 +1516,15 @@ export class SeasonSession {
   async advancePostseason(input?: { targetGameId?: string }): Promise<void> {
     const command: SeasonRunCommand['command'] = 'advance-postseason';
     if (!this.requirePostseasonStage(command)) return;
-    const runner = await this.resolvePostseasonRunner();
-    if (this.isDisposed()) return;
     const rawHuman = this.humanFranchiseId();
-    this.postseasonRequestId = runner.advancePostseason({
+    await this.startPostseasonRun('advance', () => ({
       runId: this.requiredRunId(),
       commandId: this.newCommandId('adv'),
       ...(input?.targetGameId !== undefined
         ? { targetGameId: postseasonGameIdSchema.parse(input.targetGameId) }
         : {}),
       humanFranchiseId: rawHuman === null ? null : franchiseIdSchema.parse(rawHuman),
-    });
+    }));
   }
   async forfeitPostseasonGame(input: { targetGameId: string }): Promise<void> {
     const command: SeasonRunCommand = {
@@ -1528,43 +1551,490 @@ export class SeasonSession {
   async spectatePostseasonGame(input: { targetGameId: string }): Promise<void> {
     const command: SeasonRunCommand['command'] = 'spectate-postseason-game';
     if (!this.requirePostseasonStage(command)) return;
-    const runner = await this.resolvePostseasonRunner();
-    if (this.isDisposed()) return;
     const rawHumanSpectate = this.humanFranchiseId();
-    this.postseasonRequestId = runner.spectatePostseasonGame({
+    await this.startPostseasonRun('spectate', () => ({
       runId: this.requiredRunId(),
       commandId: this.newCommandId('spc'),
       targetGameId: postseasonGameIdSchema.parse(input.targetGameId),
       humanFranchiseId:
         rawHumanSpectate === null ? null : franchiseIdSchema.parse(rawHumanSpectate),
-    });
+    }));
   }
   async fastForwardPostseason(input?: { targetGameId?: string }): Promise<void> {
     const command: SeasonRunCommand['command'] = 'fast-forward-postseason';
     if (!this.requirePostseasonStage(command)) return;
-    const runner = await this.resolvePostseasonRunner();
-    if (this.isDisposed()) return;
     const rawHumanFf = this.humanFranchiseId();
-    this.postseasonRequestId = runner.fastForwardPostseason({
+    await this.startPostseasonRun('fast-forward', () => ({
       runId: this.requiredRunId(),
       commandId: this.newCommandId('ff'),
       ...(input?.targetGameId !== undefined
         ? { targetGameId: postseasonGameIdSchema.parse(input.targetGameId) }
         : {}),
       humanFranchiseId: rawHumanFf === null ? null : franchiseIdSchema.parse(rawHumanFf),
-    });
+    }));
   }
   cancelPostseason(): void {
     const requestId = this.postseasonRequestId;
-    const runner = this.postseasonRunner;
-    if (this.postseason.phase !== 'running' || requestId === null || runner === null) return;
-    runner.cancel(requestId);
+    if (this.postseason.phase !== 'running' || requestId === null) return;
+    this.abandonPostseasonRun();
   }
   loadPostseasonSummaries(runId: string): Promise<SeasonPostseasonSummary[]> {
     return this.repo.loadPostseasonSummaries(runId);
   }
   loadPostseasonSummary(runId: string, gameId: string): Promise<SeasonPostseasonSummary | null> {
     return this.repo.loadPostseasonSummary(runId, gameId);
+  }
+  private async startPostseasonRun(
+    mode: SeasonPostseasonMode,
+    buildInput: () => SeasonPostseasonRunInput,
+  ): Promise<void> {
+    const job = await this.resolvePostseasonJob();
+    if (this.isDisposed()) return;
+    const input = buildInput();
+    if (this.postseasonRequestId !== null) {
+      throw new Error('a postseason run is already in flight; cancel it first');
+    }
+    const requestId = this.ids.id('sp');
+    this.postseasonRequestId = requestId;
+    this.postseasonWireRequestId = null;
+    this.postseasonCancelRequested = false;
+    void this.orchestratePostseason(job, requestId, input, mode);
+  }
+  private postseasonAborted(requestId: string): boolean {
+    return (
+      this.isDisposed() || this.postseasonRequestId !== requestId || this.postseasonCancelRequested
+    );
+  }
+  private failPostseason(
+    requestId: string,
+    code: 'invariant-failure' | 'cancelled' | 'internal',
+    message: string,
+  ): void {
+    if (this.postseasonAborted(requestId)) return;
+    this.postseason = { ...this.postseason, phase: 'failed', error: { code, message } };
+    this.emit();
+  }
+  private publishPostseasonCommit(
+    requestId: string,
+    runId: Id,
+    gameIds: readonly PostseasonGameId[],
+    snapshot: SeasonRunSnapshot,
+  ): void {
+    if (this.postseasonAborted(requestId)) return;
+    if (this.activeRunId() === runId) {
+      this.snapshot = snapshot;
+      this.index = indexAfterCommit(this.index, snapshot, () => this.clock.now());
+      this.cache.set(snapshot);
+      this.postseason = {
+        ...this.postseason,
+        phase: 'running',
+        gamesCompleted: this.postseason.gamesCompleted + gameIds.length,
+      };
+      this.notifier.announce({ kind: 'replace', runId, committedAt: this.clock.now() });
+    }
+    this.emit();
+  }
+  private publishPostseasonProgress(
+    requestId: string,
+    gamesTotal: number,
+    latestGameId: PostseasonGameId | null,
+    latestResult: SeasonPostseasonScoreline | null,
+  ): void {
+    if (this.postseasonAborted(requestId)) return;
+    this.postseason = { ...this.postseason, gamesTotal, latestGameId, latestResult };
+    this.emit();
+  }
+  private completePostseason(requestId: string, runId: Id, snapshot: SeasonRunSnapshot): void {
+    if (this.postseasonAborted(requestId)) return;
+    if (this.activeRunId() !== runId) {
+      this.emit();
+      return;
+    }
+    this.postseason = {
+      ...this.postseason,
+      phase: 'complete',
+      latestGameId: null,
+      latestResult: null,
+      error: null,
+    };
+    this.snapshot = snapshot;
+    this.index = indexAfterCommit(this.index, snapshot, () => this.clock.now());
+    this.cache.set(snapshot);
+    void this.refresh();
+    this.emit();
+  }
+  private async promotePostseasonChampion(
+    requestId: string,
+    run: SeasonRun,
+    snapshot: SeasonRunSnapshot,
+  ): Promise<void> {
+    if (this.postseasonAborted(requestId)) return;
+    try {
+      await this.promoteSeasonChampion(run, snapshot);
+      if (this.postseasonAborted(requestId)) return;
+      if (this.activeRunId() !== run.runId) {
+        this.emit();
+        return;
+      }
+      this.postseason = {
+        ...this.postseason,
+        phase: 'complete',
+        latestGameId: null,
+        latestResult: null,
+        error: null,
+      };
+      this.cache.clear();
+      this.snapshot = null;
+      this.index = null;
+      this.pending = null;
+      this.interruption = null;
+      this.notifier.announce({ kind: 'clear', runId: run.runId, committedAt: this.clock.now() });
+      void this.refresh();
+      this.emit();
+    } catch (error) {
+      if (this.postseasonAborted(requestId)) return;
+      this.failPostseason(
+        requestId,
+        'internal',
+        `champion promotion failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+  private async promoteSeasonChampion(
+    run: SeasonRun,
+    snapshot: SeasonRunSnapshot,
+  ): Promise<SeasonAlmanac> {
+    const championFranchiseId = run.postseason.championFranchiseId;
+    if (championFranchiseId === null) {
+      throw new Error('the completed run has no champion');
+    }
+    const commandLog = await this.repo.loadCommandLog(run.runId);
+    if (commandLog === null) {
+      throw new Error('the completed run has no command log');
+    }
+    const postseasonSummaries = await this.repo.loadPostseasonSummaries(run.runId);
+    const tradeGrades = deriveSeasonTradeGrades({
+      runId: run.runId,
+      run,
+      summaries: snapshot.summaries,
+      postseasonSummaries,
+    });
+    const almanacFacts = {
+      schemaVersion: 1 as const,
+      almanacVersion: 'almanac-v2' as const,
+      runId: run.runId,
+      rootSeed: run.rootSeed,
+      championFranchiseId,
+      postseasonDigest: seasonDigestHex(canonicalJson(run.postseason)),
+      commandLogDigest: seasonCommandLogDigest(commandLog.entries),
+      awardsDigest: seasonDigestHex(canonicalJson(run.awards)),
+      tradeGradesDigest: seasonTradeGradeLogDigest(tradeGrades),
+      digest: POSTSEASON_ALMANAC_DIGEST_PLACEHOLDER,
+    };
+    const almanac: SeasonAlmanac = { ...almanacFacts, digest: seasonAlmanacDigest(almanacFacts) };
+    const completion = run.completion;
+    if (completion === null) {
+      throw new Error('the completed run has no completion state');
+    }
+    await this.repo.promoteChampionToCompleted({
+      runId: run.runId,
+      run: { ...run, completion: { ...completion, almanacDigest: almanac.digest } },
+      almanac,
+      commandLog,
+      postseasonSummaries,
+      expectedStateRevision: snapshot.run.stateRevision,
+      expectedStateDigest: snapshot.run.stateDigest,
+      expectedRevision: snapshot.acceptedBlocks.length,
+    });
+    return almanac;
+  }
+  private postseasonWireSnapshotOf(snapshot: SeasonRunSnapshot): {
+    stateRevision: number;
+    stateDigest: string;
+    run: SeasonRun;
+    effects: SeasonEffectsState;
+    regularSeasonSummaries: readonly SeasonGameSummary[];
+  } {
+    const run = snapshot.run;
+    const cache = this.postseasonWireSnapshotCache;
+    if (
+      cache !== null &&
+      cache.stateRevision === run.stateRevision &&
+      cache.stateDigest === run.stateDigest &&
+      cache.regularSeasonSummaries === snapshot.summaries
+    ) {
+      return cache;
+    }
+    return {
+      stateRevision: run.stateRevision,
+      stateDigest: run.stateDigest,
+      run,
+      effects: snapshot.effects,
+      regularSeasonSummaries: snapshot.summaries,
+    };
+  }
+  private async orchestratePostseason(
+    job: SeasonPostseasonJobPort,
+    requestId: string,
+    input: SeasonPostseasonRunInput,
+    mode: SeasonPostseasonMode,
+  ): Promise<void> {
+    let commitCount = 0;
+    try {
+      const artifacts = await this.assets.loadArtifactUrls();
+      if (this.postseasonAborted(requestId)) return;
+      this.postseason = { ...this.postseason, phase: 'running', gamesTotal: 0, error: null };
+      this.emit();
+      let firstCommandId: CommandId | null = input.commandId;
+      let terminalTarget: PostseasonGameId | null = input.targetGameId ?? null;
+      let estimatedGamesTotal = 0;
+      for (;;) {
+        if (this.postseasonAborted(requestId)) return;
+        const snapshot = await this.repo.loadActiveRun();
+        if (this.postseasonAborted(requestId)) return;
+        if (snapshot === null) {
+          this.failPostseason(requestId, 'internal', 'no active season run to advance');
+          return;
+        }
+        if (snapshot.run.runId !== input.runId) {
+          this.failPostseason(
+            requestId,
+            'internal',
+            'the active run does not match the submitted run',
+          );
+          return;
+        }
+        const run = snapshot.run;
+        estimatedGamesTotal = seasonPostseasonUpcomingGames(run.postseason).length;
+        if (mode === 'fast-forward') {
+          const humanFranchiseId = input.humanFranchiseId;
+          if (
+            humanFranchiseId !== null &&
+            !seasonPostseasonHumanEliminated(run.postseason, humanFranchiseId)
+          ) {
+            this.failPostseason(
+              requestId,
+              'internal',
+              `the human franchise ${humanFranchiseId} still has postseason decisions; fast-forward requires elimination`,
+            );
+            return;
+          }
+        }
+        const decision = seasonPostseasonNextGame(run.postseason);
+        if (decision.kind === 'integrity-failure') {
+          this.failPostseason(requestId, 'invariant-failure', decision.reason);
+          return;
+        }
+        if (decision.kind === 'complete') {
+          if (run.stage === 'completed') {
+            await this.promotePostseasonChampion(requestId, run, snapshot);
+          } else {
+            this.failPostseason(
+              requestId,
+              'invariant-failure',
+              'the postseason ended without a champion',
+            );
+          }
+          return;
+        }
+        const nextGameId = decision.gameId;
+        let targetGameId: PostseasonGameId;
+        if (mode === 'spectate') {
+          targetGameId = terminalTarget ?? nextGameId;
+        } else if (mode === 'fast-forward') {
+          const upcoming = seasonPostseasonUpcomingGames(run.postseason);
+          if (terminalTarget !== null) {
+            const position = upcoming.indexOf(terminalTarget);
+            if (position < 0) {
+              this.failPostseason(
+                requestId,
+                'internal',
+                `the fast-forward target ${terminalTarget} is not an upcoming postseason game`,
+              );
+              return;
+            }
+            if (position >= SEASON_POSTSEASON_CHUNK_MAX_GAMES) {
+              this.failPostseason(
+                requestId,
+                'internal',
+                `the fast-forward target is beyond the ${String(SEASON_POSTSEASON_CHUNK_MAX_GAMES)}-game chunk bound`,
+              );
+              return;
+            }
+            targetGameId = terminalTarget;
+            terminalTarget = null;
+          } else {
+            const count = Math.min(SEASON_POSTSEASON_CHUNK_MAX_GAMES, upcoming.length);
+            targetGameId = upcoming[count - 1] ?? nextGameId;
+          }
+        } else {
+          targetGameId = nextGameId;
+        }
+        const commandId =
+          firstCommandId !== null
+            ? firstCommandId
+            : commandIdSchema.parse(this.ids.id(mode === 'fast-forward' ? 'ff' : 'adv'));
+        firstCommandId = null;
+        const wireRequestId = `${requestId}-${String(commitCount)}`;
+        commitCount += 1;
+        const wireSnapshot = this.postseasonWireSnapshotOf(snapshot);
+        this.postseasonWireSnapshotCache = wireSnapshot;
+        const request = seasonPostseasonWireRequestOf({
+          requestId: wireRequestId,
+          runId: run.runId,
+          rootSeed: run.rootSeed,
+          commandId,
+          expectedStateRevision: run.stateRevision,
+          expectedStateDigest: run.stateDigest,
+          humanFranchiseId: input.humanFranchiseId,
+          targetGameId,
+          catalogUrl: artifacts.catalogUrl,
+          catalogHash: artifacts.catalogHash,
+          profileUrl: artifacts.profileUrl,
+          profileHash: artifacts.profileHash,
+          run: wireSnapshot.run,
+          effects: wireSnapshot.effects,
+          regularSeasonSummaries: wireSnapshot.regularSeasonSummaries,
+        });
+        this.postseasonWireRequestId = wireRequestId;
+        const outcome = await job.simulate(request, (progress) => {
+          this.publishPostseasonProgress(
+            requestId,
+            progress.gamesTotal,
+            progress.latestGameId,
+            progress.latestResult,
+          );
+        });
+        if (this.postseasonAborted(requestId)) return;
+        if (outcome.kind === 'error') {
+          if (outcome.code === 'cancelled') {
+            this.postseason = { ...this.postseason, phase: 'cancelled', error: null };
+            this.emit();
+          } else {
+            this.failPostseason(requestId, outcome.code, outcome.message);
+          }
+          return;
+        }
+        if (outcome.kind === 'rejected') {
+          const rejection = outcome.rejection;
+          const message = describeAdvanceRejection(rejection);
+          this.commandError = { command: 'advance-postseason', rejection, message };
+          this.postseason = {
+            ...this.postseason,
+            phase: 'failed',
+            error: { code: rejection.code, message },
+          };
+          this.emit();
+          return;
+        }
+        const accepted = outcome.result;
+        const command: SeasonRunCommand = {
+          schemaVersion: SEASON_RUN_SCHEMA_VERSION,
+          command: 'advance-postseason',
+          commandId,
+          runId: run.runId,
+          expectedStateRevision: run.stateRevision,
+          expectedStateDigest: run.stateDigest,
+          targetGameId,
+        };
+        const commitInput: CommitPostseasonAdvancementInput = {
+          runId: run.runId,
+          run: accepted.run,
+          summaries: accepted.summaries,
+          effects: postCommandEffects(accepted.run, snapshot.effects),
+          command,
+          preStateRevision: command.expectedStateRevision,
+          preStateDigest: command.expectedStateDigest,
+          resultDigest: seasonPostseasonCommitResultDigest(
+            commandId,
+            accepted.advancedGameIds,
+            accepted.summaries,
+          ),
+          relatedGameIds: [...accepted.advancedGameIds],
+          transactionIds: seasonPostseasonTransactionIdsOf(accepted.run, commandId),
+        };
+        try {
+          await this.repo.commitPostseasonAdvancement(commitInput);
+        } catch (error) {
+          if (this.postseasonAborted(requestId)) return;
+          if (error instanceof SeasonRunCommandDuplicateError) {
+            continue;
+          }
+          if (
+            error instanceof SeasonRunCommandStaleStateError ||
+            error instanceof SeasonRunCommandRunMismatchError
+          ) {
+            this.failPostseason(
+              requestId,
+              'internal',
+              `the run moved before the commit could apply: ${error instanceof Error ? error.message : String(error)}`,
+            );
+            return;
+          }
+          this.failPostseason(
+            requestId,
+            'internal',
+            `postseason commit failed: ${error instanceof Error ? error.message : String(error)}`,
+          );
+          return;
+        }
+        if (this.postseasonAborted(requestId)) return;
+        const after = await this.repo.loadActiveRun();
+        if (this.postseasonAborted(requestId)) return;
+        if (after === null) {
+          this.failPostseason(requestId, 'internal', 'the active run disappeared after the commit');
+          return;
+        }
+        if (after.run.runId !== run.runId) {
+          this.failPostseason(requestId, 'internal', 'the active run changed after the commit');
+          return;
+        }
+        this.publishPostseasonCommit(requestId, run.runId, accepted.advancedGameIds, after);
+        const latest = accepted.summaries[accepted.summaries.length - 1];
+        this.publishPostseasonProgress(
+          requestId,
+          estimatedGamesTotal,
+          latest?.gameId ?? null,
+          latest !== undefined ? seasonPostseasonScorelineOf(latest) : null,
+        );
+        if (mode === 'spectate') {
+          this.completePostseason(requestId, run.runId, after);
+          return;
+        }
+        if (after.run.stage === 'completed') {
+          await this.promotePostseasonChampion(requestId, after.run, after);
+          return;
+        }
+        if (accepted.nextDecision === 'rotation') {
+          this.completePostseason(requestId, run.runId, after);
+          return;
+        }
+        if (accepted.aiNextGameId === null) {
+          this.completePostseason(requestId, run.runId, after);
+          return;
+        }
+        if (
+          mode === 'advance' &&
+          terminalTarget !== null &&
+          accepted.advancedGameIds.includes(terminalTarget)
+        ) {
+          this.completePostseason(requestId, run.runId, after);
+          return;
+        }
+      }
+    } catch (error) {
+      if (this.postseasonAborted(requestId)) return;
+      this.failPostseason(
+        requestId,
+        'internal',
+        error instanceof Error ? error.message : String(error),
+      );
+    } finally {
+      if (this.postseasonRequestId === requestId) {
+        this.postseasonRequestId = null;
+        this.postseasonWireRequestId = null;
+      }
+    }
   }
   private newCommandId(prefix: string): CommandId {
     return commandIdSchema.parse(this.ids.id(prefix));
@@ -1693,105 +2163,6 @@ export class SeasonSession {
       },
     });
   }
-  private onPostseasonRunnerEvent(event: SeasonPostseasonEvent): void {
-    if (this.isDisposed()) return;
-    if (event.type === 'started') {
-      this.postseasonRequestId = event.requestId;
-    } else if (event.requestId !== this.postseasonRequestId) {
-      return;
-    }
-    switch (event.type) {
-      case 'started':
-        this.postseason = {
-          ...this.postseason,
-          phase: 'running',
-          gamesTotal: event.gamesTotal,
-          error: null,
-        };
-        break;
-      case 'progress':
-        this.postseason = {
-          ...this.postseason,
-          gamesTotal: event.gamesTotal,
-          latestGameId: event.latestGameId,
-          latestResult: event.latestResult,
-        };
-        break;
-      case 'committed': {
-        if (this.activeRunId() !== event.runId) break;
-        this.snapshot = event.snapshot;
-        this.index = indexAfterCommit(this.index, event.snapshot, () => this.clock.now());
-        this.cache.set(event.snapshot);
-        this.postseason = {
-          ...this.postseason,
-          phase: 'running',
-          gamesCompleted: this.postseason.gamesCompleted + event.gameIds.length,
-        };
-        this.notifier.announce({
-          kind: 'replace',
-          runId: event.runId,
-          committedAt: this.clock.now(),
-        });
-        break;
-      }
-      case 'complete': {
-        if (this.activeRunId() !== event.runId) break;
-        const promoted = event.promoted;
-        this.postseason = {
-          ...this.postseason,
-          phase: 'complete',
-          latestGameId: null,
-          latestResult: null,
-          error: null,
-        };
-        if (promoted) {
-          this.cache.clear();
-          this.snapshot = null;
-          this.index = null;
-          this.pending = null;
-          this.interruption = null;
-          this.notifier.announce({
-            kind: 'clear',
-            runId: event.runId,
-            committedAt: this.clock.now(),
-          });
-        } else if (event.snapshot !== null) {
-          this.snapshot = event.snapshot;
-          this.index = indexAfterCommit(this.index, event.snapshot, () => this.clock.now());
-          this.cache.set(event.snapshot);
-        }
-        void this.refresh();
-        break;
-      }
-      case 'rejected':
-        this.commandError = {
-          command: event.command,
-          rejection: event.rejection,
-          message: event.message,
-        };
-        this.postseason = {
-          ...this.postseason,
-          phase: 'failed',
-          error: { code: event.rejection.code, message: event.message },
-        };
-        break;
-      case 'cancelled':
-        this.postseason = {
-          ...this.postseason,
-          phase: 'cancelled',
-          error: null,
-        };
-        break;
-      case 'error':
-        this.postseason = {
-          ...this.postseason,
-          phase: 'failed',
-          error: { code: event.code, message: event.message },
-        };
-        break;
-    }
-    this.emit();
-  }
   async quitRun(): Promise<{
     ok: boolean;
     error: string | null;
@@ -1814,8 +2185,9 @@ export class SeasonSession {
       }
     }
     try {
-      this.postseasonRunner?.terminate();
+      this.postseasonJob?.terminate();
     } catch {}
+    this.postseasonWireSnapshotCache = null;
     this.resetRunnerProgress();
     this.emit();
     try {
@@ -2192,6 +2564,26 @@ export function tradeBoardViewModel(run: SeasonRun | null): TradeBoardViewModel 
     activeInquiryId: openWindow?.activeInquiryId ?? null,
     exchangeCounts,
   };
+}
+function describeAdvanceRejection(rejection: SeasonAdvancePostseasonRejection): string {
+  switch (rejection.code) {
+    case 'invalid-stage':
+      return `The run is in stage ${rejection.currentStage}; advancing requires ${rejection.requiredStage} or later.`;
+    case 'wrong-game':
+      return `The target game ${rejection.targetGameId} is not the next game (${rejection.nextGameId}).`;
+    case 'invalid-series-state':
+      return `Series ${rejection.seriesId} cannot advance: ${rejection.reason}.`;
+    case 'integrity-failure':
+      return `The postseason integrity check failed: ${rejection.reason}.`;
+    case 'run-mismatch':
+      return 'The command does not belong to the active run.';
+    case 'stale-state':
+      return `The run moved on (revision ${String(rejection.currentStateRevision)}); the command was based on stale state. Refresh and try again.`;
+    case 'duplicate-command':
+      return 'This command was already applied.';
+    default:
+      return 'The postseason advance was rejected.';
+  }
 }
 export function describeCommandRejection(
   command: SeasonRunCommand['command'],

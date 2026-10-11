@@ -2,11 +2,11 @@ import type { SeasonPostseasonRepository, SeasonRunRepository } from '@hoop-rush
 import type { SeasonSchedule } from '@hoop-rush/data-contracts';
 import { getPersistence } from '$lib/persistence';
 import type { SeasonBlockRunner, SeasonBlockStartInput } from '$lib/season/season-block-runner';
-import type { SeasonPostseasonRunner } from '$lib/season/season-postseason-runner';
+import type { SeasonPostseasonJob } from '$lib/season/season-postseason-runner';
 declare global {
   interface Window {
     __HOOP_RUSH_SEASON_BLOCK_RUNNER__?: SeasonBlockRunner;
-    __HOOP_RUSH_SEASON_POSTSEASON_RUNNER__?: SeasonPostseasonRunner;
+    __HOOP_RUSH_SEASON_POSTSEASON_RUNNER__?: SeasonPostseasonJob;
     __HOOP_RUSH_E2E_FAKE_RUNNER__?: boolean;
     __HOOP_RUSH_E2E_FAKE_POSTSEASON_RUNNER__?: boolean;
   }
@@ -63,24 +63,24 @@ export function getSeasonBlockRunner(): Promise<SeasonBlockRunner> {
   }
   return runnerPromise;
 }
-let postseasonRunnerPromise: Promise<SeasonPostseasonRunner> | null = null;
-export function getSeasonPostseasonRunner(): Promise<SeasonPostseasonRunner> {
+let postseasonJobPromise: Promise<SeasonPostseasonJob> | null = null;
+export function getSeasonPostseasonJob(): Promise<SeasonPostseasonJob> {
   if (typeof window !== 'undefined' && window.__HOOP_RUSH_SEASON_POSTSEASON_RUNNER__) {
     return Promise.resolve(window.__HOOP_RUSH_SEASON_POSTSEASON_RUNNER__);
   }
   if (typeof window !== 'undefined' && window.__HOOP_RUSH_E2E_FAKE_POSTSEASON_RUNNER__) {
     return import('./fake-season-postseason-runner').then((module) =>
-      module.createFakeSeasonPostseasonRunner(),
+      module.createFakeSeasonPostseasonJob(),
     );
   }
-  if (postseasonRunnerPromise === null) {
-    postseasonRunnerPromise = import('$lib/season/season-postseason-runner').then((module) =>
-      module.getSeasonPostseasonRunner(),
+  if (postseasonJobPromise === null) {
+    postseasonJobPromise = import('$lib/season/season-postseason-runner').then((module) =>
+      module.getSeasonPostseasonJob(),
     );
-    postseasonRunnerPromise.catch(() => {
-      postseasonRunnerPromise = null;
+    postseasonJobPromise.catch(() => {
+      postseasonJobPromise = null;
     });
   }
-  return postseasonRunnerPromise;
+  return postseasonJobPromise;
 }
 export type { SeasonBlockStartInput };

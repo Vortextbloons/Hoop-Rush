@@ -8,15 +8,15 @@ import type {
 } from '@hoop-rush/data-contracts';
 import type { SeasonPostseasonRepository, SeasonRunRepository } from '@hoop-rush/persistence';
 import type { SeasonArtifactUrls, SeasonBlockRunner } from './block-wire.ts';
-import type { SeasonPostseasonRunner } from './postseason-wire.ts';
+import type { SeasonPostseasonJob } from './postseason-wire.ts';
 
 export type SeasonRunRepositoryPort = SeasonRunRepository & SeasonPostseasonRepository;
 
 export type SeasonBlockRunnerPort = SeasonBlockRunner;
 
-export type SeasonPostseasonRunnerPort = SeasonPostseasonRunner;
+export type SeasonPostseasonJobPort = SeasonPostseasonJob;
 
-export type SeasonPostseasonRunnerFactory = () => Promise<SeasonPostseasonRunnerPort>;
+export type SeasonPostseasonJobFactory = () => Promise<SeasonPostseasonJobPort>;
 
 export type SeasonRunAnnouncement =
   | {

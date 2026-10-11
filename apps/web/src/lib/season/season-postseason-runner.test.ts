@@ -1,38 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  SEASON_POSTSEASON_WORKER_WIRE_SCHEMA_VERSION,
   commandIdSchema,
   franchiseIdSchema,
+  postseasonGameIdSchema,
+  seasonPostseasonWorkerStartRequestSchema,
   seedSchema,
   type SeasonEffectsState,
-  type SeasonPostseasonSummary,
   type SeasonRun,
-  type SeasonSchedule,
+  type SeasonPostseasonWorkerProgressMessage,
+  type SeasonPostseasonWorkerStartRequest,
 } from '@hoop-rush/data-contracts';
-import type {
-  SeasonPostseasonRepository,
-  SeasonRunRepository,
-  SeasonRunSnapshot,
-} from '@hoop-rush/persistence';
 import { buildSeasonLeague, buildSeasonRunFixture } from '@hoop-rush/test-fixtures';
 import { generateSeasonSchedule } from '@hoop-rush/engine';
 import {
-  createSeasonPostseasonRunner,
+  createSeasonPostseasonJob,
   type SeasonPostseasonSimulatorFn,
 } from './season-postseason-runner';
-const postseasonFns = vi.hoisted(() => ({
-  nextGame: vi.fn(),
-  upcomingGames: vi.fn(() => [] as string[]),
-  humanEliminated: vi.fn(() => false),
-}));
-vi.mock('@hoop-rush/engine', async (importOriginal) => {
-  const original = await importOriginal<typeof import('@hoop-rush/engine')>();
-  return {
-    ...original,
-    seasonPostseasonNextGame: postseasonFns.nextGame,
-    seasonPostseasonUpcomingGames: postseasonFns.upcomingGames,
-    seasonPostseasonHumanEliminated: postseasonFns.humanEliminated,
-  };
-});
 const LEAGUE = buildSeasonLeague({}, { humanFranchiseId: franchiseIdSchema.parse('lakers') });
 const ARTIFACTS = {
   catalogUrl: 'u',
@@ -43,11 +27,32 @@ const ARTIFACTS = {
 function artifacts(): Promise<typeof ARTIFACTS> {
   return Promise.resolve({ ...ARTIFACTS });
 }
-const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
-async function flush(): Promise<void> {
-  for (let i = 0; i < 10; i += 1) {
-    await tick();
+class FakeWorker {
+  static instances: FakeWorker[] = [];
+  posted: unknown[] = [];
+  private messageListeners: Array<(event: MessageEvent<unknown>) => void> = [];
+  private errorListeners: Array<(event: { message: string }) => void> = [];
+  constructor(
+    public url: string,
+    public options?: { type?: string },
+  ) {
+    FakeWorker.instances.push(this);
   }
+  postMessage(data: unknown): void {
+    this.posted.push(data);
+  }
+  addEventListener(type: string, listener: (event: never) => void): void {
+    if (type === 'message') this.messageListeners.push(listener as never);
+    if (type === 'error') this.errorListeners.push(listener as never);
+  }
+  removeEventListener(): void {}
+  emitMessage(data: unknown): void {
+    for (const listener of [...this.messageListeners]) listener({ data } as MessageEvent<unknown>);
+  }
+  emitError(message: string): void {
+    for (const listener of [...this.errorListeners]) listener({ message });
+  }
+  terminate(): void {}
 }
 function buildZeroEffects(run: SeasonRun): SeasonEffectsState {
   const playerStates = run.rosters.flatMap((roster) =>
@@ -79,49 +84,87 @@ function buildZeroEffects(run: SeasonRun): SeasonEffectsState {
     archivedPairs: [],
   };
 }
-type PostseasonRepositoryMock = {
-  loadActiveRun: ReturnType<typeof vi.fn>;
-  commitPostseasonAdvancement: ReturnType<typeof vi.fn>;
-  loadCommandLog: ReturnType<typeof vi.fn>;
-  loadPostseasonSummaries: ReturnType<typeof vi.fn>;
-  promoteChampionToCompleted: ReturnType<typeof vi.fn>;
-};
-function makeRepository(run: SeasonRun): {
-  repository: SeasonRunRepository & SeasonPostseasonRepository;
-  mock: PostseasonRepositoryMock;
+interface Fixture {
+  run: SeasonRun;
+  request: SeasonPostseasonWorkerStartRequest;
+}
+function fixture(): Fixture {
+  const schedule = generateSeasonSchedule({
+    league: LEAGUE,
+    seed: seedSchema.parse('a'.repeat(32)),
+  });
+  const run = buildSeasonRunFixture({ schedule, stateDigest: 'a'.repeat(32) });
+  const request: SeasonPostseasonWorkerStartRequest =
+    seasonPostseasonWorkerStartRequestSchema.parse({
+      schemaVersion: SEASON_POSTSEASON_WORKER_WIRE_SCHEMA_VERSION,
+      type: 'season-postseason-start',
+      requestId: 'sp-wire-0',
+      runId: run.runId,
+      rootSeed: run.rootSeed,
+      commandId: commandIdSchema.parse('cmd-postseason-1'),
+      expectedStateRevision: run.stateRevision,
+      expectedStateDigest: run.stateDigest,
+      humanFranchiseId: null,
+      targetGameId: postseasonGameIdSchema.parse('pi-east-seven-eight'),
+      catalogUrl: ARTIFACTS.catalogUrl,
+      catalogHash: ARTIFACTS.catalogHash,
+      profileUrl: ARTIFACTS.profileUrl,
+      profileHash: ARTIFACTS.profileHash,
+      run,
+      effects: buildZeroEffects(run),
+      regularSeasonSummaries: [],
+    });
+  return { run, request };
+}
+function completeMessage(
+  request: SeasonPostseasonWorkerStartRequest,
+  run: SeasonRun,
+): {
+  schemaVersion: typeof SEASON_POSTSEASON_WORKER_WIRE_SCHEMA_VERSION;
+  type: 'season-postseason-complete';
+  requestId: string;
+  result: {
+    status: 'accepted';
+    stage: SeasonRun['stage'];
+    advancedGameIds: string[];
+    summaries: [];
+    run: SeasonRun;
+    nextDecision: 'rotation';
+    nextGameId: string;
+    aiNextGameId: null;
+  };
 } {
-  const snapshot: SeasonRunSnapshot = {
-    run,
-    summaries: [],
-    retainedDetails: [],
-    acceptedBlocks: [],
-    effects: buildZeroEffects(run),
-  };
-  const mock: PostseasonRepositoryMock = {
-    loadActiveRun: vi.fn(() => Promise.resolve(snapshot)),
-    commitPostseasonAdvancement: vi.fn(() => Promise.resolve()),
-    loadCommandLog: vi.fn(() =>
-      Promise.resolve({
-        schemaVersion: 1,
-        commandLogVersion: 'command-log-v3',
-        runId: run.runId,
-        entries: [],
-      }),
-    ),
-    loadPostseasonSummaries: vi.fn(() => Promise.resolve([] as SeasonPostseasonSummary[])),
-    promoteChampionToCompleted: vi.fn(() => Promise.resolve()),
-  };
   return {
-    repository: mock as unknown as SeasonRunRepository & SeasonPostseasonRepository,
-    mock,
+    schemaVersion: SEASON_POSTSEASON_WORKER_WIRE_SCHEMA_VERSION,
+    type: 'season-postseason-complete',
+    requestId: request.requestId,
+    result: {
+      status: 'accepted',
+      stage: run.stage,
+      advancedGameIds: [request.targetGameId],
+      summaries: [],
+      run,
+      nextDecision: 'rotation',
+      nextGameId: request.targetGameId,
+      aiNextGameId: null,
+    },
   };
 }
-function acceptedSimulator(run: SeasonRun): SeasonPostseasonSimulatorFn {
-  return (request) =>
-    Promise.resolve({
-      schemaVersion: 1,
-      type: 'season-postseason-complete',
-      requestId: request.requestId,
+describe('season postseason job transport', () => {
+  beforeEach(() => {
+    FakeWorker.instances = [];
+    vi.stubGlobal('Worker', FakeWorker);
+  });
+  it('posts the wire request and maps an accepted complete message', async () => {
+    const { run, request } = fixture();
+    const job = createSeasonPostseasonJob({ workerUrl: 'fake-postseason-worker.ts' });
+    const outcomePromise = job.simulate(request);
+    expect(FakeWorker.instances).toHaveLength(1);
+    expect(FakeWorker.instances[0]?.posted[0]).toEqual(request);
+    FakeWorker.instances[0]?.emitMessage(completeMessage(request, run));
+    const outcome = await outcomePromise;
+    expect(outcome).toEqual({
+      kind: 'accepted',
       result: {
         status: 'accepted',
         stage: run.stage,
@@ -133,224 +176,83 @@ function acceptedSimulator(run: SeasonRun): SeasonPostseasonSimulatorFn {
         aiNextGameId: null,
       },
     });
-}
-describe('season postseason runner cancellation', () => {
-  let schedule: SeasonSchedule;
-  beforeEach(() => {
-    schedule = generateSeasonSchedule({
-      league: LEAGUE,
-      seed: seedSchema.parse('a'.repeat(32)),
-    });
-    postseasonFns.nextGame.mockReset();
-    postseasonFns.upcomingGames.mockReset().mockReturnValue([]);
-    postseasonFns.humanEliminated.mockReset().mockReturnValue(false);
+    job.terminate();
   });
-  it('drops a commit that resolves after cancel without emitting late events', async () => {
-    const run = buildSeasonRunFixture({ schedule, stateDigest: 'a'.repeat(32) });
-    const { repository, mock } = makeRepository(run);
-    let resolveCommit!: () => void;
-    const deferredCommit = new Promise<void>((resolve) => {
-      resolveCommit = resolve;
-    });
-    mock.commitPostseasonAdvancement.mockImplementationOnce(() => deferredCommit);
-    postseasonFns.nextGame.mockReturnValue({ kind: 'game', gameId: 'pi-east-seven-eight' });
-    const runner = createSeasonPostseasonRunner({
-      repository,
-      schedule,
-      artifacts,
-      simulate: acceptedSimulator(run),
-    });
-    const events: Array<{ type: string; requestId?: string }> = [];
-    runner.subscribe((event) => events.push(event));
-    const requestId = runner.advancePostseason({
-      runId: run.runId,
-      commandId: commandIdSchema.parse('cmd-cancel-1'),
-      humanFranchiseId: null,
-    });
-    await flush();
-    expect(events.some((event) => event.type === 'started')).toBe(true);
-    expect(mock.commitPostseasonAdvancement).toHaveBeenCalledTimes(1);
-    runner.cancel(requestId);
-    expect(events.some((event) => event.type === 'cancelled')).toBe(true);
-    const loadsBeforeResolve = mock.loadActiveRun.mock.calls.length;
-    resolveCommit();
-    await flush();
-    expect(events.some((event) => event.type === 'committed')).toBe(false);
-    expect(events.some((event) => event.type === 'complete')).toBe(false);
-    expect(events.some((event) => event.type === 'error')).toBe(false);
-    expect(mock.loadActiveRun.mock.calls.length).toBe(loadsBeforeResolve);
-    runner.terminate();
-  });
-  it('drops a champion promotion that resolves after cancel without emitting complete', async () => {
-    const base = buildSeasonRunFixture({ schedule, stateDigest: 'a'.repeat(32) });
-    const champion = franchiseIdSchema.parse(base.league.teams[0]?.franchiseId ?? 'lakers');
-    const run: SeasonRun = {
-      ...base,
-      stage: 'completed',
-      postseason: { ...base.postseason, championFranchiseId: champion },
-      completion: {
-        championFranchiseId: champion,
-        almanacDigest: 'a'.repeat(32),
-        finalizedAtStateRevision: base.stateRevision,
-      },
-    };
-    const { repository, mock } = makeRepository(run);
-    let resolvePromotion!: () => void;
-    const deferredPromotion = new Promise<void>((resolve) => {
-      resolvePromotion = resolve;
-    });
-    mock.promoteChampionToCompleted.mockImplementationOnce(() => deferredPromotion);
-    postseasonFns.nextGame.mockReturnValue({ kind: 'complete' });
-    const runner = createSeasonPostseasonRunner({
-      repository,
-      schedule,
-      artifacts,
-      simulate: acceptedSimulator(run),
-    });
-    const events: Array<{ type: string; requestId?: string }> = [];
-    runner.subscribe((event) => events.push(event));
-    const requestId = runner.advancePostseason({
-      runId: run.runId,
-      commandId: commandIdSchema.parse('cmd-cancel-2'),
-      humanFranchiseId: null,
-    });
-    await flush();
-    expect(mock.promoteChampionToCompleted).toHaveBeenCalledTimes(1);
-    runner.cancel(requestId);
-    resolvePromotion();
-    await flush();
-    expect(events.some((event) => event.type === 'complete')).toBe(false);
-    expect(events.some((event) => event.type === 'error')).toBe(false);
-    runner.terminate();
-  });
-  it('rejects a stale promotion input through the persisted state facts', async () => {
-    const base = buildSeasonRunFixture({ schedule, stateDigest: 'a'.repeat(32) });
-    const champion = franchiseIdSchema.parse(base.league.teams[0]?.franchiseId ?? 'lakers');
-    const run: SeasonRun = {
-      ...base,
-      stage: 'completed',
-      postseason: { ...base.postseason, championFranchiseId: champion },
-      completion: {
-        championFranchiseId: champion,
-        almanacDigest: 'a'.repeat(32),
-        finalizedAtStateRevision: base.stateRevision,
-      },
-    };
-    const { repository, mock } = makeRepository(run);
-    mock.promoteChampionToCompleted.mockImplementationOnce(
-      (input: { expectedStateRevision: number; expectedStateDigest: string }) => {
-        expect(input.expectedStateRevision).toBe(run.stateRevision);
-        expect(input.expectedStateDigest).toBe(run.stateDigest);
-        return Promise.resolve();
-      },
-    );
-    postseasonFns.nextGame.mockReturnValue({ kind: 'complete' });
-    const runner = createSeasonPostseasonRunner({
-      repository,
-      schedule,
-      artifacts,
-      simulate: acceptedSimulator(run),
-    });
-    runner.advancePostseason({
-      runId: run.runId,
-      commandId: commandIdSchema.parse('cmd-cancel-3'),
-      humanFranchiseId: null,
-    });
-    await flush();
-    expect(mock.promoteChampionToCompleted).toHaveBeenCalledTimes(1);
-    const call = mock.promoteChampionToCompleted.mock.calls[0]?.[0] as
-      | {
-          expectedStateRevision: number;
-          expectedRevision: number;
-        }
-      | undefined;
-    expect(call?.expectedRevision).toBe(0);
-    runner.terminate();
-  });
-  it('does not commit when the session is cancelled during simulate', async () => {
-    const run = buildSeasonRunFixture({ schedule, stateDigest: 'a'.repeat(32) });
-    const { repository, mock } = makeRepository(run);
-    let resolveSimulate!: (value: Awaited<ReturnType<SeasonPostseasonSimulatorFn>>) => void;
-    const deferredSimulate = new Promise<Awaited<ReturnType<SeasonPostseasonSimulatorFn>>>(
-      (resolve) => {
-        resolveSimulate = resolve;
-      },
-    );
-    const simulate: SeasonPostseasonSimulatorFn = () => deferredSimulate;
-    postseasonFns.nextGame.mockReturnValue({ kind: 'game', gameId: 'pi-east-seven-eight' });
-    const runner = createSeasonPostseasonRunner({
-      repository,
-      schedule,
-      artifacts,
-      simulate,
-    });
-    const events: Array<{ type: string }> = [];
-    runner.subscribe((event) => events.push(event));
-    const requestId = runner.advancePostseason({
-      runId: run.runId,
-      commandId: commandIdSchema.parse('cmd-cancel-4'),
-      humanFranchiseId: null,
-    });
-    await flush();
-    runner.cancel(requestId);
-    resolveSimulate({
-      schemaVersion: 1,
+  it('maps a rejected complete message', async () => {
+    const { request } = fixture();
+    const job = createSeasonPostseasonJob({ workerUrl: 'fake-postseason-worker.ts' });
+    const outcomePromise = job.simulate(request);
+    FakeWorker.instances[0]?.emitMessage({
+      schemaVersion: SEASON_POSTSEASON_WORKER_WIRE_SCHEMA_VERSION,
       type: 'season-postseason-complete',
-      requestId: 'sp-wire-0',
+      requestId: request.requestId,
       result: {
-        status: 'accepted',
-        stage: run.stage,
-        advancedGameIds: ['pi-east-seven-eight'],
-        summaries: [],
-        run,
-        nextDecision: 'rotation',
-        nextGameId: 'pi-east-seven-eight',
-        aiNextGameId: null,
+        status: 'rejected',
+        commandId: request.commandId,
+        rejection: { code: 'integrity-failure', reason: 'box score drift' },
       },
     });
-    await flush();
-    expect(mock.commitPostseasonAdvancement).not.toHaveBeenCalled();
-    expect(events.some((event) => event.type === 'committed')).toBe(false);
-    expect(events.some((event) => event.type === 'complete')).toBe(false);
-    expect(events.some((event) => event.type === 'error')).toBe(false);
-    runner.terminate();
-  });
-});
-
-describe('season postseason runner worker envelope', () => {
-  let schedule: SeasonSchedule;
-  class EnvelopeFakeWorker {
-    static instances: EnvelopeFakeWorker[] = [];
-    posted: unknown[] = [];
-    private listeners: Array<(event: MessageEvent<unknown>) => void> = [];
-    constructor(
-      public url: string,
-      public options?: { type?: string },
-    ) {
-      EnvelopeFakeWorker.instances.push(this);
-    }
-    postMessage(data: unknown): void {
-      this.posted.push(data);
-    }
-    addEventListener(type: string, listener: (event: MessageEvent<unknown>) => void): void {
-      if (type === 'message') this.listeners.push(listener);
-    }
-    removeEventListener(): void {}
-    emit(data: unknown): void {
-      for (const listener of [...this.listeners]) listener({ data } as MessageEvent<unknown>);
-    }
-    terminate(): void {}
-  }
-  beforeEach(() => {
-    EnvelopeFakeWorker.instances = [];
-    schedule = generateSeasonSchedule({
-      league: LEAGUE,
-      seed: seedSchema.parse('a'.repeat(32)),
+    await expect(outcomePromise).resolves.toEqual({
+      kind: 'rejected',
+      commandId: request.commandId,
+      rejection: { code: 'integrity-failure', reason: 'box score drift' },
     });
-    postseasonFns.nextGame.mockReset();
-    postseasonFns.upcomingGames.mockReset().mockReturnValue([]);
-    postseasonFns.humanEliminated.mockReset().mockReturnValue(false);
-    vi.stubGlobal('Worker', EnvelopeFakeWorker);
+    job.terminate();
+  });
+  it('maps a worker error message', async () => {
+    const { request } = fixture();
+    const job = createSeasonPostseasonJob({ workerUrl: 'fake-postseason-worker.ts' });
+    const outcomePromise = job.simulate(request);
+    FakeWorker.instances[0]?.emitMessage({
+      schemaVersion: SEASON_POSTSEASON_WORKER_WIRE_SCHEMA_VERSION,
+      type: 'season-postseason-error',
+      requestId: request.requestId,
+      code: 'invariant-failure',
+      message: 'the box score does not reconcile',
+      seed: null,
+      gameId: null,
+    });
+    await expect(outcomePromise).resolves.toEqual({
+      kind: 'error',
+      code: 'invariant-failure',
+      message: 'the box score does not reconcile',
+      seed: null,
+      gameId: null,
+    });
+    job.terminate();
+  });
+  it('forwards worker progress to the simulate callback', () => {
+    const { request } = fixture();
+    const job = createSeasonPostseasonJob({ workerUrl: 'fake-postseason-worker.ts' });
+    const progress: SeasonPostseasonWorkerProgressMessage[] = [];
+    void job.simulate(request, (message) => progress.push(message));
+    FakeWorker.instances[0]?.emitMessage({
+      schemaVersion: SEASON_POSTSEASON_WORKER_WIRE_SCHEMA_VERSION,
+      type: 'season-postseason-progress',
+      requestId: request.requestId,
+      gamesCompleted: 2,
+      gamesTotal: 12,
+      latestGameId: request.targetGameId,
+      latestResult: null,
+    });
+    expect(progress).toHaveLength(1);
+    expect(progress[0]).toMatchObject({ gamesCompleted: 2, gamesTotal: 12 });
+    job.terminate();
+  });
+  it('ignores complete messages for unknown requests', async () => {
+    const { run, request } = fixture();
+    const job = createSeasonPostseasonJob({ workerUrl: 'fake-postseason-worker.ts' });
+    const outcomePromise = job.simulate(request);
+    const message = completeMessage(request, run);
+    FakeWorker.instances[0]?.emitMessage({ ...message, requestId: 'sp-other' });
+    let settled = false;
+    void outcomePromise.then(() => {
+      settled = true;
+    });
+    await Promise.resolve();
+    expect(settled).toBe(false);
+    job.terminate();
+    await expect(outcomePromise).resolves.toMatchObject({ kind: 'error', code: 'cancelled' });
   });
   it.each([
     ['undefined', undefined],
@@ -381,35 +283,94 @@ describe('season postseason runner worker envelope', () => {
   ])(
     'fuzz: unparsable envelope %s surfaces invariant-failure instead of hanging',
     async (_label, payload) => {
-      const run = buildSeasonRunFixture({ schedule, stateDigest: 'a'.repeat(32) });
-      const { repository } = makeRepository(run);
-      postseasonFns.nextGame.mockReturnValue({ kind: 'game', gameId: 'pi-east-seven-eight' });
-      const runner = createSeasonPostseasonRunner({
-        repository,
-        schedule,
-        artifacts,
-        workerUrl: 'fake-postseason-worker.ts',
+      const { request } = fixture();
+      const job = createSeasonPostseasonJob({ workerUrl: 'fake-postseason-worker.ts' });
+      const outcomePromise = job.simulate(request);
+      FakeWorker.instances[0]?.emitMessage(payload);
+      await expect(outcomePromise).resolves.toMatchObject({
+        kind: 'error',
+        code: 'invariant-failure',
+        message: 'the postseason worker sent a message outside the wire schema',
       });
-      try {
-        const events: Array<{ type: string; code?: string }> = [];
-        runner.subscribe((event) => events.push(event));
-        runner.advancePostseason({
-          runId: run.runId,
-          commandId: commandIdSchema.parse('cmd-fuzz-1'),
-          humanFranchiseId: null,
-        });
-        await flush();
-        expect(events.some((event) => event.type === 'started')).toBe(true);
-        EnvelopeFakeWorker.instances[0]?.emit(payload);
-        await flush();
-        const error = events.find((event) => event.type === 'error');
-        expect(error).toMatchObject({ code: 'invariant-failure' });
-        expect(events.some((event) => event.type === 'committed')).toBe(false);
-        expect(events.some((event) => event.type === 'complete')).toBe(false);
-      } finally {
-        runner.terminate();
-        vi.unstubAllGlobals();
-      }
+      job.terminate();
     },
   );
+  it('posts the wire cancel for the active request only', () => {
+    const { request } = fixture();
+    const job = createSeasonPostseasonJob({ workerUrl: 'fake-postseason-worker.ts' });
+    void job.simulate(request);
+    job.cancel('sp-other');
+    expect(FakeWorker.instances[0]?.posted).toHaveLength(1);
+    job.cancel(request.requestId);
+    expect(FakeWorker.instances[0]?.posted[1]).toEqual({
+      schemaVersion: SEASON_POSTSEASON_WORKER_WIRE_SCHEMA_VERSION,
+      type: 'season-postseason-cancel',
+      requestId: request.requestId,
+    });
+    job.terminate();
+  });
+  it('terminate resolves in-flight simulations with cancelled', async () => {
+    const { request } = fixture();
+    const job = createSeasonPostseasonJob({ workerUrl: 'fake-postseason-worker.ts' });
+    const outcomePromise = job.simulate(request);
+    job.terminate();
+    await expect(outcomePromise).resolves.toEqual({
+      kind: 'error',
+      code: 'cancelled',
+      message: 'postseason worker terminated',
+      seed: null,
+      gameId: null,
+    });
+  });
+  it('surfaces a worker error event as an internal outcome', async () => {
+    const { request } = fixture();
+    const job = createSeasonPostseasonJob({ workerUrl: 'fake-postseason-worker.ts' });
+    const outcomePromise = job.simulate(request);
+    FakeWorker.instances[0]?.emitError('worker exploded');
+    await expect(outcomePromise).resolves.toMatchObject({
+      kind: 'error',
+      code: 'internal',
+      message: 'worker exploded',
+    });
+    job.terminate();
+  });
+  it('prewarms the worker with the packaged asset URLs', async () => {
+    const job = createSeasonPostseasonJob({ workerUrl: 'fake-postseason-worker.ts', artifacts });
+    job.prewarm();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(FakeWorker.instances).toHaveLength(1);
+    expect(FakeWorker.instances[0]?.posted[0]).toMatchObject({
+      type: 'season-postseason-warm',
+      catalogUrl: 'u',
+      profileUrl: 'p',
+    });
+    job.prewarm();
+    expect(FakeWorker.instances[0]?.posted).toHaveLength(1);
+    job.terminate();
+  });
+  it('maps the injected simulator seam and forwards its progress', async () => {
+    const { run, request } = fixture();
+    const progress: SeasonPostseasonWorkerProgressMessage[] = [];
+    const simulate: SeasonPostseasonSimulatorFn = (incoming, onProgress) => {
+      expect(incoming).toEqual(request);
+      onProgress({
+        schemaVersion: SEASON_POSTSEASON_WORKER_WIRE_SCHEMA_VERSION,
+        type: 'season-postseason-progress',
+        requestId: incoming.requestId,
+        gamesCompleted: 1,
+        gamesTotal: 5,
+        latestGameId: incoming.targetGameId,
+        latestResult: null,
+      });
+      return Promise.resolve(completeMessage(incoming, run));
+    };
+    const job = createSeasonPostseasonJob({ simulate, artifacts });
+    const outcome = await job.simulate(request, (message) => progress.push(message));
+    expect(outcome.kind).toBe('accepted');
+    expect(progress).toHaveLength(1);
+    expect(progress[0]?.gamesCompleted).toBe(1);
+    expect(FakeWorker.instances).toHaveLength(0);
+    job.terminate();
+  });
 });

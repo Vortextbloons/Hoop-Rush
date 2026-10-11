@@ -114,3 +114,10 @@ paths change (stages 2, 4, and 6).
   presenter (single mirror of `session.getSnapshot()`, `$derived` views,
   `init`/`dispose` lifetime); `routes/season/run/+layout.svelte` dropped from
   957 to 428 lines with markup unchanged. New presenter suite (7 tests).
+- 2026-10-11, stage 2e: block acceptance/commit moved into `SeasonSession`;
+  the web block runner is a transport emitting raw `candidate`/`interrupted`
+  events. New session block suites (16 + 1 integration test).
+- 2026-10-11, stage 2f: postseason coordination (decision loop, commits,
+  promotion) moved into `SeasonSession`; the web postseason runner is a
+  simulation job. New session postseason suite (14 tests) and reworked
+  transport suite. Stage 2 complete.

@@ -1,6 +1,5 @@
 import {
   SEASON_RUN_SCHEMA_VERSION,
-  seasonPostseasonWorkerStartRequestSchema,
   type CommandId,
   type EraSimulationProfile,
   type FranchiseId,
@@ -14,9 +13,6 @@ import {
   type SeasonRun,
   type SeasonRunStage,
   type PostseasonGameId,
-  type Seed,
-  type SeasonPostseasonScoreline,
-  type SeasonPostseasonWorkerStartRequest,
 } from '@hoop-rush/data-contracts';
 import { handleSeasonRunCommand } from '@hoop-rush/engine';
 import {
@@ -101,17 +97,6 @@ export function simulateSeasonPostseasonCommand(
     },
   };
 }
-export function seasonPostseasonScorelineOf(
-  summary: SeasonPostseasonSummary,
-): SeasonPostseasonScoreline {
-  return {
-    gameId: summary.gameId,
-    homeFranchiseId: summary.homeFranchiseId,
-    homeScore: summary.homeScore,
-    awayScore: summary.awayScore,
-    awayFranchiseId: summary.awayFranchiseId,
-  };
-}
 export function postseasonPostCommandEffects(
   run: SeasonRun,
   prior: SeasonEffectsState,
@@ -123,35 +108,7 @@ export function postseasonPostCommandEffects(
 }
 export {
   seasonPostseasonCommitResultDigest,
+  seasonPostseasonScorelineOf,
   seasonPostseasonTransactionIdsOf,
+  seasonPostseasonWireRequestOf,
 } from '@hoop-rush/application/season';
-export function seasonPostseasonWireRequestOf(
-  request: Omit<SeasonPostseasonSimulationRequest, 'catalog' | 'profile'> & {
-    requestId: string;
-    rootSeed: Seed;
-    catalogUrl: string;
-    catalogHash: string;
-    profileUrl: string;
-    profileHash: string;
-  },
-): SeasonPostseasonWorkerStartRequest {
-  return seasonPostseasonWorkerStartRequestSchema.parse({
-    schemaVersion: 1,
-    type: 'season-postseason-start',
-    requestId: request.requestId,
-    runId: request.runId,
-    rootSeed: request.rootSeed,
-    commandId: request.commandId,
-    expectedStateRevision: request.expectedStateRevision,
-    expectedStateDigest: request.expectedStateDigest,
-    humanFranchiseId: request.humanFranchiseId,
-    targetGameId: request.targetGameId,
-    catalogUrl: request.catalogUrl,
-    catalogHash: request.catalogHash,
-    profileUrl: request.profileUrl,
-    profileHash: request.profileHash,
-    run: request.run,
-    effects: request.effects,
-    regularSeasonSummaries: [...request.regularSeasonSummaries],
-  });
-}

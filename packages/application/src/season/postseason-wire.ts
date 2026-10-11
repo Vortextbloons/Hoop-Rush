@@ -1,75 +1,25 @@
 import {
   canonicalJson,
   seasonDigestHex,
+  seasonPostseasonWorkerStartRequestSchema,
   type CommandId,
   type FranchiseId,
   type Id,
   type PostseasonGameId,
   type SeasonAdvancePostseasonRejection,
+  type SeasonEffectsState,
+  type SeasonGameSummary,
   type SeasonPostseasonScoreline,
   type SeasonPostseasonSummary,
+  type SeasonPostseasonWorkerErrorCode,
+  type SeasonPostseasonWorkerProgressMessage,
+  type SeasonPostseasonWorkerStartRequest,
+  type SeasonPostseasonWorkerAcceptedResult,
   type SeasonRun,
-  type SeasonRunCommand,
-  type SeasonRunStage,
   type Seed,
 } from '@hoop-rush/data-contracts';
-import type { SeasonRunSnapshot } from '@hoop-rush/persistence';
 
 export type SeasonPostseasonMode = 'advance' | 'spectate' | 'fast-forward';
-
-export type SeasonPostseasonEvent =
-  | {
-      type: 'started';
-      requestId: string;
-      mode: SeasonPostseasonMode;
-      targetGameId: PostseasonGameId | null;
-      gamesTotal: number;
-    }
-  | {
-      type: 'progress';
-      requestId: string;
-      gamesCompleted: number;
-      gamesTotal: number;
-      latestGameId: PostseasonGameId | null;
-      latestResult: SeasonPostseasonScoreline | null;
-    }
-  | {
-      type: 'committed';
-      requestId: string;
-      runId: Id;
-      gameIds: PostseasonGameId[];
-      snapshot: SeasonRunSnapshot;
-    }
-  | {
-      type: 'complete';
-      requestId: string;
-      runId: Id;
-      snapshot: SeasonRunSnapshot | null;
-      stage: SeasonRunStage;
-      nextDecision: 'rotation' | 'none';
-      nextGameId: PostseasonGameId | null;
-      aiNextGameId: PostseasonGameId | null;
-      promoted: boolean;
-    }
-  | {
-      type: 'rejected';
-      requestId: string;
-      command: SeasonRunCommand['command'];
-      rejection: SeasonAdvancePostseasonRejection;
-      message: string;
-    }
-  | {
-      type: 'cancelled';
-      requestId: string;
-    }
-  | {
-      type: 'error';
-      requestId: string;
-      code: 'invariant-failure' | 'cancelled' | 'internal';
-      message: string;
-      seed: Seed | null;
-      gameId: PostseasonGameId | null;
-    };
 
 export interface SeasonPostseasonRunInput {
   runId: Id;
@@ -78,18 +28,79 @@ export interface SeasonPostseasonRunInput {
   humanFranchiseId: FranchiseId | null;
 }
 
-export interface SeasonPostseasonRunner {
-  advancePostseason(input: SeasonPostseasonRunInput): string;
-  spectatePostseasonGame(
-    input: SeasonPostseasonRunInput & {
-      targetGameId: string;
-    },
-  ): string;
-  fastForwardPostseason(input: SeasonPostseasonRunInput): string;
+export type SeasonPostseasonJobOutcome =
+  | { kind: 'accepted'; result: SeasonPostseasonWorkerAcceptedResult }
+  | { kind: 'rejected'; commandId: CommandId; rejection: SeasonAdvancePostseasonRejection }
+  | {
+      kind: 'error';
+      code: SeasonPostseasonWorkerErrorCode;
+      message: string;
+      seed: Seed | null;
+      gameId: PostseasonGameId | null;
+    };
+
+export interface SeasonPostseasonJob {
+  simulate(
+    request: SeasonPostseasonWorkerStartRequest,
+    onProgress?: (progress: SeasonPostseasonWorkerProgressMessage) => void,
+  ): Promise<SeasonPostseasonJobOutcome>;
   cancel(requestId: string): void;
-  terminate(): void;
   prewarm(): void;
-  subscribe(listener: (event: SeasonPostseasonEvent) => void): () => void;
+  terminate(): void;
+}
+
+export interface SeasonPostseasonWireRequestInput {
+  requestId: string;
+  runId: Id;
+  rootSeed: Seed;
+  commandId: CommandId;
+  expectedStateRevision: number;
+  expectedStateDigest: string;
+  humanFranchiseId: FranchiseId | null;
+  targetGameId: PostseasonGameId;
+  catalogUrl: string;
+  catalogHash: string;
+  profileUrl: string;
+  profileHash: string;
+  run: SeasonRun;
+  effects: SeasonEffectsState;
+  regularSeasonSummaries: readonly SeasonGameSummary[];
+}
+
+export function seasonPostseasonWireRequestOf(
+  request: SeasonPostseasonWireRequestInput,
+): SeasonPostseasonWorkerStartRequest {
+  return seasonPostseasonWorkerStartRequestSchema.parse({
+    schemaVersion: 1,
+    type: 'season-postseason-start',
+    requestId: request.requestId,
+    runId: request.runId,
+    rootSeed: request.rootSeed,
+    commandId: request.commandId,
+    expectedStateRevision: request.expectedStateRevision,
+    expectedStateDigest: request.expectedStateDigest,
+    humanFranchiseId: request.humanFranchiseId,
+    targetGameId: request.targetGameId,
+    catalogUrl: request.catalogUrl,
+    catalogHash: request.catalogHash,
+    profileUrl: request.profileUrl,
+    profileHash: request.profileHash,
+    run: request.run,
+    effects: request.effects,
+    regularSeasonSummaries: [...request.regularSeasonSummaries],
+  });
+}
+
+export function seasonPostseasonScorelineOf(
+  summary: SeasonPostseasonSummary,
+): SeasonPostseasonScoreline {
+  return {
+    gameId: summary.gameId,
+    homeFranchiseId: summary.homeFranchiseId,
+    homeScore: summary.homeScore,
+    awayScore: summary.awayScore,
+    awayFranchiseId: summary.awayFranchiseId,
+  };
 }
 
 export function seasonPostseasonCommitResultDigest(

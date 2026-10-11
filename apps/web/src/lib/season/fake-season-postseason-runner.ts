@@ -13,7 +13,7 @@ import {
   simulateSeasonPostseasonCommand,
 } from '$lib/season/season-postseason-simulation';
 import {
-  createSeasonPostseasonRunner,
+  createSeasonPostseasonJob,
   type SeasonPostseasonSimulatorFn,
 } from '$lib/season/season-postseason-runner';
 const catalogCache = new Map<string, SeasonDraftCatalog>();
@@ -106,10 +106,8 @@ async function loadProfileCached(url: string, contentHash: string): Promise<EraS
   profileCache.set(contentHash, profile);
   return profile;
 }
-export function createFakeSeasonPostseasonRunner(): ReturnType<
-  typeof createSeasonPostseasonRunner
-> {
-  return createSeasonPostseasonRunner({
+export function createFakeSeasonPostseasonJob(): ReturnType<typeof createSeasonPostseasonJob> {
+  return createSeasonPostseasonJob({
     simulate: createSeasonPostseasonEngineSimulator(),
   });
 }
