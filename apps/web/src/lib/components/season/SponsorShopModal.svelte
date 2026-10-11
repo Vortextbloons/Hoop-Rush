@@ -92,9 +92,7 @@
     >
       <div class="flex items-start justify-between gap-3">
         <div class="min-w-0">
-          <p class="sr-eyebrow">
-            Sponsor deal board
-          </p>
+          <p class="sr-eyebrow">Sponsor deal board</p>
           <Dialog.Title
             class="font-display text-xl font-extrabold uppercase tracking-tight"
             data-testid="sponsor-shop-modal-title"
@@ -105,17 +103,11 @@
             <span class="sr-chip">
               {blockLabel ?? 'Block —'}
             </span>
-            <span
-              class="sr-chip"
-              data-testid="sponsor-shop-balance"
-            >
+            <span class="sr-chip" data-testid="sponsor-shop-balance">
               Influence: {balance}/{cap}
             </span>
             {#if offers !== null}
-              <span
-                class="sr-chip"
-                data-testid="sponsor-shop-count"
-              >
+              <span class="sr-chip" data-testid="sponsor-shop-count">
                 Owned Gear: {ownedCount}/{offers.length} owned
               </span>
             {/if}
@@ -214,10 +206,7 @@
           class="sr-panel-quiet h-fit p-4 lg:sticky lg:top-0"
         >
           <div class="flex items-baseline justify-between gap-2">
-            <h3
-              id="sponsor-vault-heading"
-              class="sr-section-label"
-            >
+            <h3 id="sponsor-vault-heading" class="sr-section-label">
               Vault · {vault.length} items
             </h3>
           </div>
@@ -264,10 +253,7 @@
             {/if}
             <p class="mt-2 text-xs text-muted-foreground">Equipped gear is permanent.</p>
           {/if}
-          <a
-            href={resolve('/season/run/team' as any)}
-            class="sr-btn-ghost mt-3 w-full px-3"
-          >
+          <a href={resolve('/season/run/team' as any)} class="sr-btn-ghost mt-3 w-full px-3">
             Equip from roster →
           </a>
         </aside>

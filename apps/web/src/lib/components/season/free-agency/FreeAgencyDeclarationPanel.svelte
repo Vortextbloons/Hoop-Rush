@@ -55,24 +55,18 @@
 
   <dl class="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4" data-fa-budget>
     <div class="sr-stat-tile">
-      <dt class="sr-section-label">
-        Balance
-      </dt>
+      <dt class="sr-section-label">Balance</dt>
       <dd><strong data-fa-balance>{balance}</strong></dd>
     </div>
     <div
       class="sr-stat-tile"
       data-tone={committed > balance || committed > remainingBudget ? 'loss' : undefined}
     >
-      <dt class="sr-section-label">
-        Committed
-      </dt>
+      <dt class="sr-section-label">Committed</dt>
       <dd><strong data-fa-committed>{committed}</strong></dd>
     </div>
     <div class="sr-stat-tile">
-      <dt class="sr-section-label">
-        Season spend
-      </dt>
+      <dt class="sr-section-label">Season spend</dt>
       <dd>
         <strong>
           {seasonSpend}
@@ -83,9 +77,7 @@
       </dd>
     </div>
     <div class="sr-stat-tile">
-      <dt class="sr-section-label">
-        Signings
-      </dt>
+      <dt class="sr-section-label">Signings</dt>
       <dd>
         <strong>
           {signingCount}
@@ -126,9 +118,7 @@
   {/if}
 
   {#if atSigningCap}
-    <p
-      class="mt-3 rounded-lg border border-accent/40 bg-accent/10 px-3 py-2 text-xs text-accent"
-    >
+    <p class="mt-3 rounded-lg border border-accent/40 bg-accent/10 px-3 py-2 text-xs text-accent">
       You have already signed {FREE_AGENCY_SIGNING_CAP} free agents this season — a declaration stays
       recorded, but a win cannot be applied.
     </p>
@@ -156,13 +146,7 @@
     >
       {busy ? 'Submitting…' : 'Submit declaration'}
     </button>
-    <button
-      type="button"
-      data-fa-skip
-      onclick={onSkip}
-      disabled={busy}
-      class="sr-btn-ghost"
-    >
+    <button type="button" data-fa-skip onclick={onSkip} disabled={busy} class="sr-btn-ghost">
       Skip this market
     </button>
   </div>

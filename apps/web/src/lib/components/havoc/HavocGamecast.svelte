@@ -1,7 +1,14 @@
 <script lang="ts">
   import { Pause, Play } from '@lucide/svelte';
-  import type { HavocGamecastState, HavocPlaybackSpeed } from '$lib/havoc/havoc-gamecast-state.svelte';
-  import { formatHavocClock, havocParticipantKindLabel, havocPeriodLabel } from './havoc-presentation';
+  import type {
+    HavocGamecastState,
+    HavocPlaybackSpeed,
+  } from '$lib/havoc/havoc-gamecast-state.svelte';
+  import {
+    formatHavocClock,
+    havocParticipantKindLabel,
+    havocPeriodLabel,
+  } from './havoc-presentation';
   import HavocMutationBadge from './HavocMutationBadge.svelte';
 
   let {
@@ -29,7 +36,9 @@
   class="min-w-0 rounded-xl bg-surface-1"
   data-havoc-gamecast
 >
-  <header class="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 px-4 py-3">
+  <header
+    class="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 px-4 py-3"
+  >
     <div class="min-w-0">
       <p class="font-mono text-[10px] font-bold tracking-[0.16em] text-primary uppercase">
         Hoop Havoc Gamecast · {state.session.variant === 'havoc' ? 'Mutated' : 'Normal'}
@@ -51,30 +60,30 @@
 
   <div class="grid grid-cols-2 gap-px bg-border" aria-live="polite">
     <div class="bg-surface-2 p-4">
-      <p class="truncate font-mono text-[10px] font-bold tracking-[0.12em] text-muted-foreground uppercase">
+      <p
+        class="truncate font-mono text-[10px] font-bold tracking-[0.12em] text-muted-foreground uppercase"
+      >
         {state.humanName}
       </p>
-      <p
-        class="font-display text-4xl font-black tabular-nums"
-        data-score="human"
-      >
+      <p class="font-display text-4xl font-black tabular-nums" data-score="human">
         {state.humanScore}
       </p>
     </div>
     <div class="bg-surface-2 p-4 text-right">
-      <p class="truncate font-mono text-[10px] font-bold tracking-[0.12em] text-muted-foreground uppercase">
+      <p
+        class="truncate font-mono text-[10px] font-bold tracking-[0.12em] text-muted-foreground uppercase"
+      >
         {state.opponentName}
       </p>
-      <p
-        class="font-display text-4xl font-black tabular-nums"
-        data-score="opponent"
-      >
+      <p class="font-display text-4xl font-black tabular-nums" data-score="opponent">
         {state.opponentScore}
       </p>
     </div>
   </div>
 
-  <div class="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 px-4 py-3">
+  <div
+    class="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 px-4 py-3"
+  >
     <p class="font-mono text-xs text-muted-foreground" data-havoc-gamecast-clock>
       {havocPeriodLabel(state.period)} · {formatHavocClock(state.clockSeconds)} ·
       {visible.length} of {state.items.length} plays
@@ -93,7 +102,11 @@
           <Play class="h-4 w-4" aria-hidden="true" /> Play
         {/if}
       </button>
-      <div class="inline-flex rounded-lg border border-border p-0.5" role="group" aria-label="Playback speed">
+      <div
+        class="inline-flex rounded-lg border border-border p-0.5"
+        role="group"
+        aria-label="Playback speed"
+      >
         {#each speeds as speed (speed)}
           <button
             type="button"
@@ -122,12 +135,16 @@
       {#if feed.length === 0}
         <p class="mt-2 text-xs text-muted-foreground">Press play to run the tape.</p>
       {:else}
-        <ol class="mt-2 flex max-h-96 flex-col gap-1.5 overflow-y-auto pr-1" data-havoc-gamecast-feed>
+        <ol
+          class="mt-2 flex max-h-96 flex-col gap-1.5 overflow-y-auto pr-1"
+          data-havoc-gamecast-feed
+        >
           {#each feed as item (item.key)}
             <li class="rounded-lg bg-surface-2 px-2.5 py-1.5" data-havoc-feed-item={item.kind}>
               <div class="flex min-w-0 flex-wrap items-center gap-1.5">
                 <span class="font-mono text-[10px] text-muted-foreground">
-                  {havocPeriodLabel(item.period)} {item.clockSeconds}s
+                  {havocPeriodLabel(item.period)}
+                  {item.clockSeconds}s
                 </span>
                 {#if item.mutationId !== null}
                   <HavocMutationBadge mutationId={item.mutationId} />
@@ -194,12 +211,17 @@
   </div>
 
   {#if state.error !== null}
-    <p role="alert" class="mx-4 mb-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs">
+    <p
+      role="alert"
+      class="mx-4 mb-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs"
+    >
       {state.error}
     </p>
   {/if}
 
-  <footer class="flex flex-wrap items-center justify-between gap-2 border-t border-border/70 px-4 py-3">
+  <footer
+    class="flex flex-wrap items-center justify-between gap-2 border-t border-border/70 px-4 py-3"
+  >
     <button
       type="button"
       data-havoc-gamecast-close

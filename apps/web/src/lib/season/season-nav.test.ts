@@ -20,6 +20,13 @@ function childIds(groups: ReturnType<typeof buildSeasonNavGroups>): string[] {
   return groups.flatMap((group) => group.children.map((child) => child.id));
 }
 
+function groupOf(
+  groups: ReturnType<typeof buildSeasonNavGroups>,
+  id: string,
+): ReturnType<typeof buildSeasonNavGroups>[number] | undefined {
+  return groups.find((group) => group.id === id);
+}
+
 describe('buildSeasonNavGroups', () => {
   it('groups regular-season destinations into four clusters', () => {
     const groups = buildSeasonNavGroups(icons, {
@@ -27,9 +34,13 @@ describe('buildSeasonNavGroups', () => {
       freeAgencyVisible: false,
     });
     expect(groups.map((group) => group.id)).toEqual(['gameday', 'team', 'league', 'office']);
-    expect(groups[2]!.children.map((child) => child.id)).toEqual(['league', 'schedule', 'leaders']);
-    expect(groups[3]!.children.map((child) => child.id)).toEqual(['trades']);
-    expect(groups[3]!.href).toBe('/season/run/trades');
+    expect(groupOf(groups, 'league')?.children.map((child) => child.id)).toEqual([
+      'league',
+      'schedule',
+      'leaders',
+    ]);
+    expect(groupOf(groups, 'office')?.children.map((child) => child.id)).toEqual(['trades']);
+    expect(groupOf(groups, 'office')?.href).toBe('/season/run/trades');
   });
 
   it('replaces the league landing with the bracket and keeps sub-tabs during postseason', () => {
@@ -37,8 +48,8 @@ describe('buildSeasonNavGroups', () => {
       stage: 'playoffs',
       freeAgencyVisible: false,
     });
-    expect(groups[2]!.href).toBe('/season/run/postseason');
-    expect(groups[2]!.children.map((child) => child.id)).toEqual([
+    expect(groupOf(groups, 'league')?.href).toBe('/season/run/postseason');
+    expect(groupOf(groups, 'league')?.children.map((child) => child.id)).toEqual([
       'postseason',
       'league',
       'schedule',
@@ -77,12 +88,7 @@ describe('seasonMobileNavOf', () => {
       freeAgencyVisible: true,
     });
     const { primary, overflow } = seasonMobileNavOf(groups);
-    expect(primary.map((item) => item.id)).toEqual([
-      'gameday',
-      'team',
-      'league',
-      'office',
-    ]);
+    expect(primary.map((item) => item.id)).toEqual(['gameday', 'team', 'league', 'office']);
     expect(overflow.map((item) => item.id)).toEqual(['schedule', 'leaders', 'free-agency']);
     const landingHrefs = new Set(groups.map((group) => group.href));
     expect(overflow.every((item) => item.href !== null)).toBe(true);

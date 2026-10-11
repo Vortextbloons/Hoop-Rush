@@ -158,7 +158,6 @@ export class DexieDraftDuelRepository {
       'rw',
       this.db.draftDuelActive,
       this.db.draftDuelCommands,
-      this.db.draftDuelResults,
       this.db.draftDuelCompleted,
       this.db.draftDuelHistory,
       async () => {
@@ -166,7 +165,6 @@ export class DexieDraftDuelRepository {
         await this.db.draftDuelHistory.put(index);
         await this.db.draftDuelActive.delete(validated.roomId);
         await this.db.draftDuelCommands.where('roomId').equals(validated.roomId).delete();
-        await this.db.draftDuelResults.where('roomId').equals(validated.roomId).delete();
       },
     );
   }
@@ -184,9 +182,11 @@ export class DexieDraftDuelRepository {
       'rw',
       this.db.draftDuelCompleted,
       this.db.draftDuelHistory,
+      this.db.draftDuelResults,
       async () => {
         await this.db.draftDuelCompleted.delete(roomId);
         await this.db.draftDuelHistory.delete(`dd-${roomId}`);
+        await this.db.draftDuelResults.where('roomId').equals(roomId).delete();
       },
     );
   }

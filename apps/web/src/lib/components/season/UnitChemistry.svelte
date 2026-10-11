@@ -52,9 +52,7 @@
       <div class="grid gap-3 pb-2 sm:grid-cols-2">
         {#if pairs.strongest.length > 0}
           <div>
-            <p class="sr-section-label">
-              Strong chemistry
-            </p>
+            <p class="sr-section-label">Strong chemistry</p>
             <ul class="mt-1 space-y-1">
               {#each pairs.strongest as pair (pair.a + pair.b)}
                 <li class="flex items-baseline justify-between gap-2 font-mono text-xs">
@@ -71,9 +69,7 @@
         {/if}
         {#if pairs.weakest.length > 0}
           <div>
-            <p class="sr-section-label">
-              Still building
-            </p>
+            <p class="sr-section-label">Still building</p>
             <ul class="mt-1 space-y-1">
               {#each pairs.weakest as pair (pair.a + pair.b)}
                 <li class="flex items-baseline justify-between gap-2 font-mono text-xs">

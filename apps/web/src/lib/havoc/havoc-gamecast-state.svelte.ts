@@ -4,12 +4,11 @@ import type {
   HavocMutationId,
   HavocParticipantKind,
   HavocScoringEntry,
-  HavocService,
   HavocSide,
-  HavocWatchSession,
   Position,
 } from '@hoop-rush/data-contracts';
 import { POSITIONS } from '@hoop-rush/data-contracts';
+import type { HavocService, HavocWatchSession } from './havoc-service-contract.ts';
 import {
   formatHavocClock,
   havocEventMutationIdOf,
@@ -98,11 +97,11 @@ export class HavocGamecastState {
   private timer: ReturnType<typeof setInterval> | null = null;
   private destroyed = false;
 
-  constructor(
-    service: HavocService,
-    session: HavocWatchSession,
-    result: HavocGameResult | null,
-  ) {
+  private isDestroyed(): boolean {
+    return this.destroyed;
+  }
+
+  constructor(service: HavocService, session: HavocWatchSession, result: HavocGameResult | null) {
     this.service = service;
     this.session = session;
     this.result = result;
@@ -346,7 +345,11 @@ export class HavocGamecastState {
   private updateAnnouncement(): void {
     const last = this.items[this.cursor - 1];
     if (last === undefined) return;
-    if (last.kind === 'scoring' || last.event?.kind === 'period-end' || last.event?.kind === 'game-end') {
+    if (
+      last.kind === 'scoring' ||
+      last.event?.kind === 'period-end' ||
+      last.event?.kind === 'game-end'
+    ) {
       this.announcement = `${last.text}. ${this.humanName} ${String(this.humanScore)}, ${this.opponentName} ${String(this.opponentScore)}.`;
     }
   }
@@ -361,7 +364,7 @@ export class HavocGamecastState {
         gameNumber: this.session.gameNumber,
         variant: this.session.variant,
       });
-      if (this.destroyed) return false;
+      if (this.isDestroyed()) return false;
       if (result.status === 'rejected') {
         this.error = result.rejection?.message ?? 'The game was rejected.';
         return false;
@@ -369,7 +372,7 @@ export class HavocGamecastState {
       this.accepted = true;
       return true;
     } catch (error) {
-      if (!this.destroyed) {
+      if (!this.isDestroyed()) {
         this.error = error instanceof HavocServiceError ? error.message : String(error);
       }
       return false;

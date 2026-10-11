@@ -7,6 +7,7 @@ import type {
   SeasonRotationDigestMismatchRejection,
 } from '@hoop-rush/data-contracts';
 import { advancePendingAfterForfeit, seasonForfeitSummaryForGame } from '../health.ts';
+import { auditSeasonGameSummary } from '../game-summary.ts';
 import {
   SeasonRunCommandNotImplementedError,
   acceptedCommand,
@@ -95,6 +96,12 @@ export function handleForfeitInterruptedGame(
   }
   const forfeitedGameId = command.nextGameId;
   const summary = seasonForfeitSummaryForGame(run, forfeitedGameId, humanFranchiseId);
+  const summaryFailures = auditSeasonGameSummary(summary);
+  if (summaryFailures.length > 0) {
+    throw new Error(
+      `season forfeit: generated summary for ${forfeitedGameId} fails audit: ${summaryFailures.join('; ')}`,
+    );
+  }
   const nextPending = advancePendingAfterForfeit(
     { ...pending, summaries: [...pending.summaries, summary] },
     forfeitedGameId,

@@ -318,7 +318,8 @@
           <span class="sr-badge" data-tone="live" role="status">
             <span
               class="sr-live-dot inline-block h-1.5 w-1.5 rounded-full bg-current"
-              aria-hidden="true"></span>
+              aria-hidden="true"
+            ></span>
             Simming
           </span>
         {:else if block.phase === 'complete'}
@@ -337,7 +338,9 @@
             eager
           />
         {/if}
-        <Dialog.Title class="font-display text-base font-extrabold uppercase tracking-tight text-foreground">
+        <Dialog.Title
+          class="font-display text-base font-extrabold uppercase tracking-tight text-foreground"
+        >
           {#if blockNum !== null}
             You’re {wins}–{losses} · Block {blockNum} of 9
           {:else}
@@ -590,7 +593,11 @@
 
       {#if block.phase === 'running'}
         <div class="flex flex-wrap items-center gap-2">
-          <button type="button" onclick={onCancel} class="sr-btn-ghost motion-reduce:transition-none">
+          <button
+            type="button"
+            onclick={onCancel}
+            class="sr-btn-ghost motion-reduce:transition-none"
+          >
             Cancel block
           </button>
           <p class="w-full text-xs text-muted-foreground">
@@ -653,7 +660,8 @@
         <span class="sr-badge" data-tone="live">
           <span
             class="sr-live-dot inline-block h-1.5 w-1.5 rounded-full bg-current"
-            aria-hidden="true"></span>
+            aria-hidden="true"
+          ></span>
           Simming
         </span>
       {:else if block.phase === 'complete'}

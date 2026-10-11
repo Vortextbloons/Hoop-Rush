@@ -4,34 +4,32 @@
   import { X } from '@lucide/svelte';
   import { HAVOC_GAME_COUNT } from '@hoop-rush/data-contracts';
   import type { HavocHubState } from '$lib/havoc/havoc-hub-state.svelte';
-  import {
-    havocObjectiveStatusOf,
-    havocRecordLabel,
-    mutationNameOf,
-  } from './havoc-presentation';
+  import { havocObjectiveStatusOf, havocRecordLabel, mutationNameOf } from './havoc-presentation';
   import HavocGamecast from './HavocGamecast.svelte';
   import HavocLineupLock from './HavocLineupLock.svelte';
 
   let {
-    state,
+    hub,
     onOpenResult,
     onAbandoned,
   }: {
-    state: HavocHubState;
+    hub: HavocHubState;
     onOpenResult: () => void;
     onAbandoned: () => void;
   } = $props();
 
   let abandonOpen = $state(false);
-  const run = $derived(state.run);
+  const run = $derived(hub.run);
   const objective = $derived(run === null ? null : havocObjectiveStatusOf(run));
   const progressPercent = $derived(
-    run === null ? 0 : Math.round(((state.progress?.gamesCompleted ?? run.havocCursor) / HAVOC_GAME_COUNT) * 100),
+    run === null
+      ? 0
+      : Math.round(((hub.progress?.gamesCompleted ?? run.havocCursor) / HAVOC_GAME_COUNT) * 100),
   );
   const havocComplete = $derived((run?.havocCursor ?? 0) >= HAVOC_GAME_COUNT);
 
   async function confirmAbandon(): Promise<void> {
-    const accepted = await state.abandon();
+    const accepted = await hub.abandon();
     if (accepted) {
       abandonOpen = false;
       onAbandoned();
@@ -40,11 +38,13 @@
 </script>
 
 <section class="mx-auto w-full max-w-6xl px-3 py-6 sm:px-6 sm:py-10" data-havoc-hub>
-  {#if state.loading}
+  {#if hub.loading}
     <p class="font-mono text-sm text-muted-foreground" aria-live="polite">Loading your run…</p>
   {:else if run === null}
     <div class="mx-auto w-full max-w-xl rounded-xl bg-surface-1 p-6">
-      <h1 class="font-display text-xl font-extrabold tracking-tight uppercase">No active Havoc run</h1>
+      <h1 class="font-display text-xl font-extrabold tracking-tight uppercase">
+        No active Havoc run
+      </h1>
       <p class="mt-2 text-sm text-muted-foreground">
         Start a draft to build five mutated player-seasons and take on the 82-game challenge.
       </p>
@@ -57,7 +57,9 @@
     </div>
   {:else if run.phase === 'draft'}
     <div class="mx-auto w-full max-w-xl rounded-xl bg-surface-1 p-6">
-      <h1 class="font-display text-xl font-extrabold tracking-tight uppercase">Draft in progress</h1>
+      <h1 class="font-display text-xl font-extrabold tracking-tight uppercase">
+        Draft in progress
+      </h1>
       <p class="mt-2 text-sm text-muted-foreground">
         Your draft is saved. Head back to finish picking five.
       </p>
@@ -97,12 +99,12 @@
       </button>
     </header>
 
-    {#if state.gamecast !== null}
+    {#if hub.gamecast !== null}
       <div class="mt-5">
         <HavocGamecast
-          state={state.gamecast}
-          onAccept={() => void state.acceptWatchedGame()}
-          onClose={() => state.closeGamecast()}
+          state={hub.gamecast}
+          onAccept={() => void hub.acceptWatchedGame()}
+          onClose={() => hub.closeGamecast()}
         />
       </div>
     {:else}
@@ -127,7 +129,7 @@
             {/if}
           </div>
           <span class="font-mono text-xs text-muted-foreground" data-havoc-progress-label>
-            {state.progress?.gamesCompleted ?? run.havocCursor} / {HAVOC_GAME_COUNT}
+            {hub.progress?.gamesCompleted ?? run.havocCursor} / {HAVOC_GAME_COUNT}
           </span>
         </div>
 
@@ -137,7 +139,7 @@
           aria-label="Havoc season progress"
           aria-valuemin="0"
           aria-valuemax={HAVOC_GAME_COUNT}
-          aria-valuenow={state.progress?.gamesCompleted ?? run.havocCursor}
+          aria-valuenow={hub.progress?.gamesCompleted ?? run.havocCursor}
         >
           <div
             class="h-full rounded-full bg-primary transition-[width] motion-reduce:transition-none"
@@ -159,17 +161,17 @@
             <button
               type="button"
               data-havoc-watch
-              onclick={() => void state.watchNext()}
-              disabled={state.watchBusy || state.busy}
+              onclick={() => void hub.watchNext()}
+              disabled={hub.watchBusy || hub.busy}
               class="inline-flex min-h-11 items-center justify-center rounded-lg border border-primary px-4 py-2 text-xs font-extrabold tracking-wide text-primary uppercase outline-none hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {state.watchBusy ? 'Preparing tape…' : 'Watch game'}
+              {hub.watchBusy ? 'Preparing tape…' : 'Watch game'}
             </button>
             <button
               type="button"
               data-havoc-next-game
-              onclick={() => void state.nextGame()}
-              disabled={state.busy}
+              onclick={() => void hub.nextGame()}
+              disabled={hub.busy}
               class="inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-4 py-2 text-xs font-extrabold tracking-wide text-primary-foreground uppercase outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40"
             >
               Next game
@@ -177,8 +179,8 @@
             <button
               type="button"
               data-havoc-next-ten
-              onclick={() => void state.nextTen()}
-              disabled={state.busy}
+              onclick={() => void hub.nextTen()}
+              disabled={hub.busy}
               class="inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-4 py-2 text-xs font-extrabold tracking-wide text-primary-foreground uppercase outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40"
             >
               Next ten
@@ -186,28 +188,28 @@
             <button
               type="button"
               data-havoc-finish-season
-              onclick={() => void state.finishSeason()}
-              disabled={state.busy}
+              onclick={() => void hub.finishSeason()}
+              disabled={hub.busy}
               class="inline-flex min-h-11 items-center justify-center rounded-lg border border-border px-4 py-2 text-xs font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40"
             >
               Finish season
             </button>
-            {#if state.busy}
+            {#if hub.busy}
               <button
                 type="button"
                 data-havoc-cancel
-                onclick={() => void state.cancel()}
-                disabled={state.cancelling}
+                onclick={() => void hub.cancel()}
+                disabled={hub.cancelling}
                 class="inline-flex min-h-11 items-center justify-center rounded-lg border border-destructive/50 px-4 py-2 text-xs font-semibold text-destructive outline-none hover:bg-destructive/10 focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40"
               >
-                {state.cancelling ? 'Stopping…' : 'Stop after this game'}
+                {hub.cancelling ? 'Stopping…' : 'Stop after this game'}
               </button>
             {/if}
           </div>
         {/if}
 
-        {#if state.notice !== null}
-          <p role="status" class="mt-3 rounded-lg bg-surface-2 p-3 text-xs">{state.notice}</p>
+        {#if hub.notice !== null}
+          <p role="status" class="mt-3 rounded-lg bg-surface-2 p-3 text-xs">{hub.notice}</p>
         {/if}
       </section>
 
@@ -223,16 +225,16 @@
               Results
             </h2>
             <p class="mt-1 text-xs text-muted-foreground">
-              {state.games.length} of {HAVOC_GAME_COUNT} games accepted.
+              {hub.games.length} of {HAVOC_GAME_COUNT} games accepted.
             </p>
           </div>
-          {#if state.games.length === 0}
+          {#if hub.games.length === 0}
             <p class="px-4 py-3 text-xs text-muted-foreground">
               No games played yet. Simulate or watch game 1.
             </p>
           {:else}
             <ul class="grid max-h-96 grid-cols-1 gap-1.5 overflow-y-auto p-3 sm:grid-cols-2">
-              {#each state.games as game (game.gameNumber)}
+              {#each hub.games as game (game.gameNumber)}
                 <li
                   class="flex items-center justify-between gap-2 rounded-lg bg-surface-2 px-2.5 py-1.5"
                   data-havoc-game-result={game.gameNumber}
@@ -260,7 +262,10 @@
         </section>
       </div>
 
-      <section aria-labelledby="havoc-stats-heading" class="mt-5 rounded-xl bg-surface-1 p-4 sm:p-5">
+      <section
+        aria-labelledby="havoc-stats-heading"
+        class="mt-5 rounded-xl bg-surface-1 p-4 sm:p-5"
+      >
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2
@@ -276,19 +281,19 @@
           <button
             type="button"
             data-havoc-load-stats
-            onclick={() => void state.loadSeasonStats()}
-            disabled={state.statsLoading || state.games.length === 0}
+            onclick={() => void hub.loadSeasonStats()}
+            disabled={hub.statsLoading || hub.games.length === 0}
             class="inline-flex min-h-10 items-center justify-center rounded-lg border border-border px-3 py-2 text-xs font-semibold outline-none hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {state.statsLoading
+            {hub.statsLoading
               ? 'Folding stats…'
-              : state.seasonStats === null
+              : hub.seasonStats === null
                 ? 'Load season stats'
                 : 'Reload stats'}
           </button>
         </div>
 
-        {#if state.seasonStats !== null}
+        {#if hub.seasonStats !== null}
           <div class="mt-4 grid gap-4 lg:grid-cols-2">
             <div class="overflow-x-auto">
               <table class="w-full min-w-[30rem] text-xs" data-havoc-player-stats>
@@ -308,7 +313,7 @@
                   </tr>
                 </thead>
                 <tbody>
-                  {#each state.seasonStats.players as player (player.instanceId)}
+                  {#each hub.seasonStats.players as player (player.instanceId)}
                     <tr class="border-b border-border/40">
                       <th scope="row" class="max-w-40 truncate px-2 py-1.5 text-left font-semibold">
                         {player.displayName}
@@ -344,7 +349,7 @@
                   </tr>
                 </thead>
                 <tbody>
-                  {#each state.seasonStats.mutations as mutation (mutation.mutationId)}
+                  {#each hub.seasonStats.mutations as mutation (mutation.mutationId)}
                     <tr class="border-b border-border/40">
                       <th scope="row" class="px-2 py-1.5 text-left font-semibold">
                         {mutationNameOf(mutation.mutationId)}
@@ -370,9 +375,12 @@
       </section>
     {/if}
 
-    {#if state.error !== null}
-      <p role="alert" class="mt-4 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs">
-        {state.error}
+    {#if hub.error !== null}
+      <p
+        role="alert"
+        class="mt-4 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs"
+      >
+        {hub.error}
       </p>
     {/if}
 
@@ -407,7 +415,7 @@
               type="button"
               data-havoc-confirm-abandon
               onclick={() => void confirmAbandon()}
-              disabled={state.busy}
+              disabled={hub.busy}
               class="inline-flex min-h-11 items-center justify-center rounded-lg bg-destructive px-4 py-2 text-sm font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40"
             >
               Abandon run

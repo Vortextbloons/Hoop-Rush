@@ -14,10 +14,7 @@
 </script>
 
 {#if snapshot !== null}
-  <section
-    aria-labelledby="series-snapshot-heading"
-    class="sr-panel-quiet sr-arrive p-4 sm:p-5"
-  >
+  <section aria-labelledby="series-snapshot-heading" class="sr-panel-quiet sr-arrive p-4 sm:p-5">
     <div class="flex flex-wrap items-baseline justify-between gap-2">
       <h2
         id="series-snapshot-heading"
@@ -36,9 +33,7 @@
               *</span
             >{/if}
         </p>
-        <p class="sr-section-label">
-          Matchup
-        </p>
+        <p class="sr-section-label">Matchup</p>
         <p class="truncate text-sm font-extrabold uppercase">
           {franchiseAbbrev(snapshot.awayFranchiseId)}{#if awayIsYou}<span class="text-primary">
               *</span

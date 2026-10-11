@@ -48,9 +48,7 @@
   <div class="p-6">
     <div class="flex flex-wrap items-center gap-2">
       <span class="sim-live-pill"><span class="sim-live-dot" aria-hidden="true"></span>Live</span>
-      <span class="sr-section-label">
-        Arena reveal
-      </span>
+      <span class="sr-section-label"> Arena reveal </span>
     </div>
     <h2 class="mt-3 font-display text-xl font-extrabold uppercase tracking-tight">
       Building league…

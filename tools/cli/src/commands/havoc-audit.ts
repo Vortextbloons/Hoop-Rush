@@ -1,7 +1,6 @@
 import { canonicalJson } from '@hoop-rush/data-contracts';
 import { FoldHavocAggregate, buildHavocGameInput } from '@hoop-rush/engine';
 import { UsageError } from '../args.ts';
-import { readJsonFile } from '../io.ts';
 import { EXIT_USAGE_OR_DATA_ERROR, makeReport, type CliReport } from '../report.ts';
 import {
   HavocCliError,
@@ -12,6 +11,7 @@ import {
   havocSimulateReportSchema,
   loadHavocCliAssets,
   lockedInputsDigest,
+  readHavocJsonFile,
   replayHavocCliRunFromReport,
   simulateHavocCliVariant,
   type HavocAuditReport,
@@ -92,7 +92,9 @@ function compareReSimulatedGames(
       ok = false;
     }
     if (!sameJson(fresh.summary, game.summary)) {
-      findings.push(`game: ${label} game ${String(game.gameNumber)} summary disagrees with the re-simulation`);
+      findings.push(
+        `game: ${label} game ${String(game.gameNumber)} summary disagrees with the re-simulation`,
+      );
       ok = false;
     }
   }
@@ -105,11 +107,7 @@ function compareReSimulatedGames(
   return ok;
 }
 
-function pairedChecks(
-  report: HavocSimulateReport,
-  assets: HavocCliAssets,
-  findings: string[],
-): boolean {
+function pairedChecks(report: HavocSimulateReport, findings: string[]): boolean {
   const havocNumbers = new Set(report.havoc.games.map((game) => game.gameNumber));
   const normalNumbers = new Set(report.normal?.games.map((game) => game.gameNumber) ?? []);
   if (report.normal === null) {
@@ -143,7 +141,10 @@ function pairedChecks(
   for (const [gameNumber, havocGame] of havocByNumber) {
     const normalGame = normalByNumber.get(gameNumber);
     if (normalGame === undefined) continue;
-    if (havocGame.opponentId !== normalGame.opponentId || havocGame.humanHome !== normalGame.humanHome) {
+    if (
+      havocGame.opponentId !== normalGame.opponentId ||
+      havocGame.humanHome !== normalGame.humanHome
+    ) {
       findings.push(`paired: game ${String(gameNumber)} schedule entries differ across variants`);
       ok = false;
     }
@@ -158,6 +159,7 @@ function pairedChecks(
 export function auditHavocSimulateReport(
   report: HavocSimulateReport,
   assets: HavocCliAssets,
+  inputPath: string,
 ): HavocAuditReport {
   const findings: string[] = [];
   const checks = {
@@ -258,7 +260,7 @@ export function auditHavocSimulateReport(
       }
     }
   }
-  if (!pairedChecks(report, assets, findings)) checks.paired = false;
+  if (!pairedChecks(report, findings)) checks.paired = false;
 
   const aggregatesOk =
     reconcileAggregate('havoc', report.havoc, findings) &&
@@ -272,16 +274,19 @@ export function auditHavocSimulateReport(
       checks.aggregates = false;
     }
   }
-  if (report.comparison === null && report.normal !== null && havocRun !== null && normalRun !== null) {
+  if (
+    report.comparison === null &&
+    report.normal !== null &&
+    havocRun !== null &&
+    normalRun !== null
+  ) {
     findings.push('aggregate: normal season recorded without a comparison section');
     checks.aggregates = false;
   }
 
   const recomputedDigest = havocCliReportDigest(report);
   if (recomputedDigest !== report.reportDigest) {
-    findings.push(
-      `digest: report digest ${report.reportDigest} != recomputed ${recomputedDigest}`,
-    );
+    findings.push(`digest: report digest ${report.reportDigest} != recomputed ${recomputedDigest}`);
     checks.digests = false;
   }
 
@@ -289,7 +294,7 @@ export function auditHavocSimulateReport(
   return havocAuditReportSchema.parse({
     schemaVersion: 1,
     command: 'havoc audit',
-    input: assets.manifestPath,
+    input: inputPath,
     reportDigest: report.reportDigest,
     recomputedReportDigest: recomputedDigest,
     findings: capped,
@@ -298,13 +303,24 @@ export function auditHavocSimulateReport(
   });
 }
 
+function unwrapReportJson(value: unknown): unknown {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return value;
+  const record = value as Record<string, unknown>;
+  if (record['command'] === 'havoc simulate' && record['payload'] !== undefined) {
+    return record['payload'];
+  }
+  return value;
+}
+
 export function havocAudit(args: { input: string | null; manifest: string | null }): CliReport {
   const input = { input: args.input, manifest: args.manifest };
   const inputPath = args.input;
   if (inputPath === null) throw new UsageError('havoc audit requires --input <report.json>');
   let parsedReport: HavocSimulateReport;
   try {
-    const parsed = havocSimulateReportSchema.safeParse(readJsonFile(inputPath));
+    const parsed = havocSimulateReportSchema.safeParse(
+      unwrapReportJson(readHavocJsonFile(inputPath)),
+    );
     if (!parsed.success) {
       return makeReport('havoc audit', input, {
         failures: [
@@ -323,7 +339,7 @@ export function havocAudit(args: { input: string | null; manifest: string | null
   }
   try {
     const assets = loadHavocCliAssets(args.manifest ?? undefined);
-    const payload = auditHavocSimulateReport(parsedReport, assets);
+    const payload = auditHavocSimulateReport(parsedReport, assets, inputPath);
     const details = [
       `report ${inputPath} · seed ${parsedReport.runSeed} · draft ${parsedReport.draft.mode}`,
       `re-simulated ${String(payload.checks.havocGames)} havoc + ${String(payload.checks.normalGames)} normal games`,

@@ -126,13 +126,7 @@
       <ul class="grid auto-rows-fr gap-3 lg:grid-cols-3">
         {#each draft.cards as card (card.cardId)}
           <li class="flex h-full min-w-0">
-            <HavocDraftCard
-              {card}
-              {mode}
-              {busy}
-              {franchiseName}
-              {onPick}
-            />
+            <HavocDraftCard {card} {mode} {busy} {franchiseName} {onPick} />
           </li>
         {/each}
       </ul>
@@ -140,7 +134,7 @@
   {/if}
 
   {#if draft.picks.length > 0}
-    <HavocLineupLock slots={slots} />
+    <HavocLineupLock {slots} />
   {/if}
 
   {#if complete}

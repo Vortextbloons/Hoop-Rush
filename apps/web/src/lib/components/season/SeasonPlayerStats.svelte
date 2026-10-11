@@ -67,14 +67,12 @@
 <section
   aria-labelledby={embedded ? undefined : 'season-stats-heading'}
   class={embedded ? 'min-w-0' : 'mt-6'}
-    data-season-player-stats
+  data-season-player-stats
 >
   <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
     {#if !embedded}
       <div class="min-w-0">
-        <h2 id="season-stats-heading" class="sr-section-label">
-          Season stats
-        </h2>
+        <h2 id="season-stats-heading" class="sr-section-label">Season stats</h2>
         <p class="mt-1 font-mono text-[10px] text-muted-foreground">
           Your ten players · folded from accepted game summaries
         </p>

@@ -140,10 +140,7 @@
   {/if}
 
   {#if recap.standingsMovement.length > 0}
-    <section
-      aria-labelledby="recap-movement-heading"
-      class="sr-panel-quiet p-4 sm:p-5"
-    >
+    <section aria-labelledby="recap-movement-heading" class="sr-panel-quiet p-4 sm:p-5">
       <h2 id="recap-movement-heading" class="sr-section-label">Standings movement</h2>
       <ul class="mt-2 flex flex-col divide-y divide-border/60">
         {#each recap.standingsMovement as movement (movement.franchiseId)}
@@ -170,10 +167,7 @@
   {/if}
 
   {#if recap.notablePerformances.length > 0}
-    <section
-      aria-labelledby="recap-performances-heading"
-      class="sr-panel-quiet p-4 sm:p-5"
-    >
+    <section aria-labelledby="recap-performances-heading" class="sr-panel-quiet p-4 sm:p-5">
       <h2 id="recap-performances-heading" class="sr-section-label">Notable performances</h2>
       <ul class="mt-3 grid gap-2 sm:grid-cols-2">
         {#each recap.notablePerformances as performance (performance.playerVersionId + performance.gameId)}
@@ -213,9 +207,7 @@
                 </span>
               </span>
               {#if performance.humanTeam}
-                <span class="sr-badge shrink-0" data-tone="hardwood">
-                  Your team
-                </span>
+                <span class="sr-badge shrink-0" data-tone="hardwood"> Your team </span>
               {/if}
             </div>
           </li>
@@ -225,10 +217,7 @@
   {/if}
 
   {#if recap.streaks.length > 0}
-    <section
-      aria-labelledby="recap-streaks-heading"
-      class="sr-panel-quiet p-4 sm:p-5"
-    >
+    <section aria-labelledby="recap-streaks-heading" class="sr-panel-quiet p-4 sm:p-5">
       <h2 id="recap-streaks-heading" class="sr-section-label">Streaks</h2>
       <ul class="mt-2 flex flex-col gap-1.5">
         {#each recap.streaks as streak (streak.franchiseId)}
@@ -255,10 +244,7 @@
   {/if}
 
   {#if recap.versionSpotlights.length > 0}
-    <section
-      aria-labelledby="recap-spotlights-heading"
-      class="sr-panel-quiet p-4 sm:p-5"
-    >
+    <section aria-labelledby="recap-spotlights-heading" class="sr-panel-quiet p-4 sm:p-5">
       <h2 id="recap-spotlights-heading" class="sr-section-label">Head to head</h2>
       <ul class="mt-2 flex flex-col divide-y divide-border/60">
         {#each recap.versionSpotlights as spotlight (spotlight.versionA + spotlight.versionB)}
@@ -294,10 +280,7 @@
     </section>
   {/if}
 
-  <section
-    aria-labelledby="recap-upcoming-heading"
-    class="sr-panel-quiet p-4 sm:p-5"
-  >
+  <section aria-labelledby="recap-upcoming-heading" class="sr-panel-quiet p-4 sm:p-5">
     <h2 id="recap-upcoming-heading" class="sr-section-label">Next opponents</h2>
     {#if recap.upcomingHumanGames.length === 0}
       <p class="mt-2 text-sm text-muted-foreground">
@@ -332,10 +315,7 @@
   </section>
 
   {#if effectsEvidence.length > 0}
-    <section
-      aria-labelledby="recap-effects-heading"
-      class="sr-panel-quiet p-4 sm:p-5"
-    >
+    <section aria-labelledby="recap-effects-heading" class="sr-panel-quiet p-4 sm:p-5">
       <h2 id="recap-effects-heading" class="sr-section-label">Why it happened</h2>
       <ul class="mt-3 flex flex-col gap-2">
         {#each effectsEvidence as row (row.mechanism + row.side)}
@@ -364,10 +344,7 @@
 
   {#if healthRows.length > 0}
     <HealthStrip rows={healthRows} title="Health" />
-    <section
-      aria-labelledby="recap-injury-heading"
-      class="sr-panel-quiet p-4 sm:p-5"
-    >
+    <section aria-labelledby="recap-injury-heading" class="sr-panel-quiet p-4 sm:p-5">
       <h2 id="recap-injury-heading" class="sr-section-label">Health</h2>
       <p class="mt-1 text-sm text-muted-foreground">{injurySummary}</p>
     </section>

@@ -357,7 +357,12 @@
 >
   <div class="sr-panel px-4 py-3">
     <div class="flex flex-wrap items-baseline justify-between gap-2">
-      <h2 id="trade-board-heading" class="font-display text-lg font-extrabold uppercase tracking-tight">Trades</h2>
+      <h2
+        id="trade-board-heading"
+        class="font-display text-lg font-extrabold uppercase tracking-tight"
+      >
+        Trades
+      </h2>
       <span class="sr-section-label">
         {#if windowState !== null}
           Window {windowState.windowIndex + 1} of 3 · closes after Block {windowState.blockIndex +
@@ -370,11 +375,10 @@
       </span>
     </div>
     <div class="mt-2 flex flex-wrap items-center gap-2">
-      <span class="sr-badge" data-tone="hardwood" aria-live="polite" title={diagnosticsLabel}>{talksLabel}</span>
-      <span
-        class="sr-badge"
-        aria-label={`${inquiriesUsed} of ${inquiryAllowance} talks used`}
+      <span class="sr-badge" data-tone="hardwood" aria-live="polite" title={diagnosticsLabel}
+        >{talksLabel}</span
       >
+      <span class="sr-badge" aria-label={`${inquiriesUsed} of ${inquiryAllowance} talks used`}>
         {#each talksPips as used, i (i)}
           <span
             class="inline-block h-1.5 w-1.5 rounded-full {used ? 'bg-primary' : 'bg-border'}"
@@ -397,28 +401,19 @@
       {/if}
     </div>
     {#if guardMessage !== null}
-      <p
-        role="alert"
-        class="sr-panel-quiet mt-2 flex flex-wrap items-center gap-2 px-3 py-2"
-      >
+      <p role="alert" class="sr-panel-quiet mt-2 flex flex-wrap items-center gap-2 px-3 py-2">
         <span class="sr-badge" data-tone="warn">Hold on</span>
         <span class="text-sm">{guardMessage}</span>
       </p>
     {/if}
     {#if humanizedError !== null}
-      <p
-        role="alert"
-        class="sr-panel-quiet mt-2 flex flex-wrap items-center gap-2 px-3 py-2"
-      >
+      <p role="alert" class="sr-panel-quiet mt-2 flex flex-wrap items-center gap-2 px-3 py-2">
         <span class="sr-badge" data-tone="loss">Rejected</span>
         <span class="text-sm">{humanizedError}</span>
       </p>
     {/if}
     {#if blockedMessage !== null}
-      <p
-        class="sr-panel-quiet mt-2 flex flex-wrap items-center gap-2 px-3 py-2"
-        role="status"
-      >
+      <p class="sr-panel-quiet mt-2 flex flex-wrap items-center gap-2 px-3 py-2" role="status">
         <span class="sr-badge" data-tone="warn">Trading locked</span>
         <span class="text-sm">{blockedMessage}</span>
       </p>
@@ -706,9 +701,7 @@
 
         {#if negotiations.length > 0}
           <div class="sr-panel-quiet p-3">
-            <h4 class="sr-section-label">
-              Your talks
-            </h4>
+            <h4 class="sr-section-label">Your talks</h4>
             <ul class="mt-2 flex max-h-[320px] flex-col gap-1.5 overflow-auto">
               {#each negotiations as n (n.inquiryId)}
                 <li>

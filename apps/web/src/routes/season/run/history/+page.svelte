@@ -45,32 +45,20 @@
     <div class="sr-arrive flex flex-col gap-3">
       <div class="min-w-0">
         <p class="sr-eyebrow">Season Run</p>
-        <h1
-          id="history-heading"
-          class="sr-page-title mt-1"
-        >
-          Completed seasons
-        </h1>
+        <h1 id="history-heading" class="sr-page-title mt-1">Completed seasons</h1>
         <p class="mt-1 font-mono text-[10px] text-muted-foreground">Champions on this device</p>
       </div>
     </div>
 
     {#if loadError !== null}
-      <div
-        role="alert"
-        class="sr-panel mx-auto mt-8 w-full max-w-xl p-6"
-      >
+      <div role="alert" class="sr-panel mx-auto mt-8 w-full max-w-xl p-6">
         <p class="sr-eyebrow">Season archive</p>
         <h2 class="font-display mt-1 text-lg font-extrabold uppercase tracking-tight">
           History could not load
         </h2>
 
         <p class="mt-2 font-mono text-xs text-destructive">{loadError}</p>
-        <button
-          type="button"
-          onclick={() => void loadHistory()}
-          class="sr-btn-danger mt-4"
-        >
+        <button type="button" onclick={() => void loadHistory()} class="sr-btn-danger mt-4">
           Try again
         </button>
       </div>
@@ -88,12 +76,7 @@
           Finish a Season Run through the champion to see it here — results, awards, and the final
           bracket are preserved on this device.
         </p>
-        <a
-          href={resolve('/season/run')}
-          class="sr-btn-ghost mt-4"
-        >
-          Back to the hub
-        </a>
+        <a href={resolve('/season/run')} class="sr-btn-ghost mt-4"> Back to the hub </a>
       </div>
     {:else}
       <p class="sr-section-label mt-6">Finals archive</p>

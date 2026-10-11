@@ -7,8 +7,10 @@
     mutationTierOf,
   } from './havoc-presentation';
 
-  let { mutationId, pointsDelta = null }: { mutationId: HavocMutationId; pointsDelta?: number | null } =
-    $props();
+  let {
+    mutationId,
+    pointsDelta = null,
+  }: { mutationId: HavocMutationId; pointsDelta?: number | null } = $props();
   const color = $derived(HAVOC_TIER_COLORS[mutationTierOf(mutationId)]);
 </script>
 

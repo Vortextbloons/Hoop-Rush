@@ -139,9 +139,7 @@
             >
               <Trophy class="h-4.5 w-4.5" />
             </span>
-            <span class="sr-eyebrow">
-              Most Valuable Player
-            </span>
+            <span class="sr-eyebrow"> Most Valuable Player </span>
           </p>
           <div class="mt-4 flex items-start gap-4">
             {#if manifest !== null && faceOf(mvp.playerVersionId) !== null}
@@ -195,9 +193,7 @@
           aria-label="Defensive Player of the Year: {dpoy.playerName}"
           class="sr-panel-quiet p-5"
         >
-          <p
-            class="sr-eyebrow flex items-center gap-2"
-          >
+          <p class="sr-eyebrow flex items-center gap-2">
             <ShieldCheck class="h-4 w-4 shrink-0" aria-hidden="true" />
             Defensive Player of the Year
           </p>
@@ -225,9 +221,7 @@
           aria-label="Sixth Man of the Year: {sixth.playerName}"
           class="sr-panel-quiet p-5"
         >
-          <p
-            class="sr-eyebrow flex items-center gap-2"
-          >
+          <p class="sr-eyebrow flex items-center gap-2">
             <Zap class="h-4 w-4 shrink-0" aria-hidden="true" />
             Sixth Man of the Year
           </p>
@@ -257,9 +251,7 @@
       <h3 class="font-display text-lg font-extrabold uppercase tracking-tight">
         All-League First Team
       </h3>
-      <p class="sr-section-label">
-        First Team · Best five players
-      </p>
+      <p class="sr-section-label">First Team · Best five players</p>
     </div>
     <ol class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
       {#each view.firstTeam as member (member.playerVersionId)}

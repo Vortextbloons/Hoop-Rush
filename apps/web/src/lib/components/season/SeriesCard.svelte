@@ -43,9 +43,9 @@
   data-season-series-card={card.seriesId}
   data-series-status={card.status}
   style:--sr-accent={franchiseColor(card.winnerFranchiseId ?? home)}
-  class="series-card {compact
-    ? 'compact'
-    : 'p-3'} {card.humanSeries ? 'ring-1 ring-primary/40' : ''}"
+  class="series-card {compact ? 'compact' : 'p-3'} {card.humanSeries
+    ? 'ring-1 ring-primary/40'
+    : ''}"
 >
   <header class="flex items-baseline justify-between gap-2">
     <span class="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">

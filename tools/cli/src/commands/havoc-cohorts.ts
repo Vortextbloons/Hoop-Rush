@@ -2,14 +2,12 @@ import { z } from 'zod';
 import {
   POSITIONS,
   havocMutationIdSchema,
-  havocSeasonTotalsSchema,
   seedFromString,
   seedSchema,
   type HavocCatalog,
   type HavocCatalogSource,
   type HavocLockedInputs,
   type HavocMutationId,
-  type HavocSeasonTotals,
   type HavocTeamInput,
   type HavocVersionSet,
   type EraSimulationProfile,
@@ -35,7 +33,6 @@ import {
   havocCliFailureSchema,
   havocCliGameNumbers,
   havocCliRunIdOf,
-  havocSeasonTotalsOf,
   loadHavocCliAssets,
   replayHavocCliDraft,
   simulateHavocCliVariant,
@@ -47,11 +44,7 @@ import {
 } from '../havoc-cli-support.ts';
 
 export type HavocCliLineupKind =
-  | 'ordinary'
-  | 'risky'
-  | 'extreme'
-  | 'mechanism-on'
-  | 'mechanism-off';
+  'ordinary' | 'risky' | 'extreme' | 'mechanism-on' | 'mechanism-off';
 
 export const HAVOC_CLI_COHORT_LINEUPS = ['ordinary', 'risky', 'extreme'] as const;
 export type HavocCliCohortLineup = (typeof HAVOC_CLI_COHORT_LINEUPS)[number];
@@ -157,9 +150,7 @@ export const havocCliLineupStatsSchema = z.object({
 });
 export type HavocCliLineupStats = z.infer<typeof havocCliLineupStatsSchema>;
 
-function mutationAggregatesOf(
-  facts: readonly HavocCliGameFacts[],
-): HavocCliMutationAggregate[] {
+function mutationAggregatesOf(facts: readonly HavocCliGameFacts[]): HavocCliMutationAggregate[] {
   const byMutation = new Map<string, HavocCliMutationAggregate>();
   for (const fact of facts) {
     for (const rollup of fact.rollups) {
@@ -371,7 +362,9 @@ export function runHavocCohortLineup(
 }
 
 export function havocCalibrationSeed(cohort: string, index: number): Seed {
-  return seedSchema.parse(seedFromString(`${HAVOC_CLI_CALIBRATION_BASE}/${cohort}/${index}`));
+  return seedSchema.parse(
+    seedFromString(`${HAVOC_CLI_CALIBRATION_BASE}/${cohort}/${String(index)}`),
+  );
 }
 
 export interface HavocCohortResult {
@@ -431,16 +424,64 @@ export function runHavocCalibrationCohorts(options: {
   return { train, holdout, normal, trainSeeds, holdoutSeeds };
 }
 
+export const havocCliCohortTotalsSchema = z.object({
+  seeds: z.number().int().nonnegative(),
+  games: z.number().int().nonnegative(),
+  wins: z.number().int().nonnegative(),
+  losses: z.number().int().nonnegative(),
+  winRate: z.number(),
+  pointsFor: z.number().int(),
+  pointsAgainst: z.number().int(),
+  differential: z.number().int(),
+  averagePointsFor: z.number(),
+  averagePointsAgainst: z.number(),
+  adjustments: z.number().int(),
+});
+export type HavocCliCohortTotals = z.infer<typeof havocCliCohortTotalsSchema>;
+
+function cohortTotalsOf(runs: readonly HavocCohortRun[]): HavocCliCohortTotals {
+  let wins = 0;
+  let losses = 0;
+  let pointsFor = 0;
+  let pointsAgainst = 0;
+  let adjustments = 0;
+  let games = 0;
+  for (const run of runs) {
+    for (const game of run.games) {
+      games += 1;
+      if (game.summary.outcome === 'win') wins += 1;
+      else losses += 1;
+      pointsFor += game.summary.humanScore;
+      pointsAgainst += game.summary.opponentScore;
+      adjustments += game.summary.adjustments;
+    }
+  }
+  return havocCliCohortTotalsSchema.parse({
+    seeds: runs.length,
+    games,
+    wins,
+    losses,
+    winRate: games === 0 ? 0 : round4(wins / games),
+    pointsFor,
+    pointsAgainst,
+    differential: pointsFor - pointsAgainst,
+    averagePointsFor: games === 0 ? 0 : pointsFor / games,
+    averagePointsAgainst: games === 0 ? 0 : pointsAgainst / games,
+    adjustments,
+  });
+}
+
 export function pairedTotalsOf(
   havocRuns: readonly HavocCohortRun[],
   normalRuns: readonly HavocCohortRun[],
-): { havoc: HavocSeasonTotals; normal: HavocSeasonTotals; winsGained: number; differentialDelta: number } {
-  const havoc = havocSeasonTotalsOf(
-    havocRuns.flatMap((run) => run.games.map((game) => game.summary)),
-  );
-  const normal = havocSeasonTotalsOf(
-    normalRuns.flatMap((run) => run.games.map((game) => game.summary)),
-  );
+): {
+  havoc: HavocCliCohortTotals;
+  normal: HavocCliCohortTotals;
+  winsGained: number;
+  differentialDelta: number;
+} {
+  const havoc = cohortTotalsOf(havocRuns);
+  const normal = cohortTotalsOf(normalRuns);
   return {
     havoc,
     normal,
@@ -459,7 +500,9 @@ export type HavocCliMechanismMetricId =
   | 'humanTurnoverRate'
   | 'cloneSeconds'
   | 'humanFullShotClock'
-  | 'opponentFullShotClock';
+  | 'opponentFullShotClock'
+  | 'humanShotClockViolations'
+  | 'opponentShotClockViolations';
 
 export interface HavocCliMechanismSlotSpec {
   readonly slot: Position;
@@ -530,11 +573,11 @@ export const HAVOC_CLI_MECHANISMS: readonly HavocCliMechanismDefinition[] = [
   {
     id: 'physical-size',
     label: 'Physical size and reach',
-    channel: 'rebounding and rim contests',
+    channel: 'rim contests and opponent shooting',
     description: 'Alien Arms + Growth Spurt + Super Soldier on the center.',
     on: [{ slot: 'C', tier: 1, mutationIds: ['alien-arms', 'growth-spurt', 'super-soldier'] }],
-    metricId: 'reboundShare',
-    direction: 'increase',
+    metricId: 'opponentFieldGoalPct',
+    direction: 'decrease',
     minDelta: 0.005,
     structural: (onRuns) =>
       structuralStarterFinding(
@@ -626,7 +669,9 @@ export const HAVOC_CLI_MECHANISMS: readonly HavocCliMechanismDefinition[] = [
     label: 'Risky caps',
     channel: 'assist creation under caps',
     description: 'Trigger Happy + The Statue + Reverse Evolution on the point guard.',
-    on: [{ slot: 'PG', tier: 1, mutationIds: ['trigger-happy', 'the-statue', 'reverse-evolution'] }],
+    on: [
+      { slot: 'PG', tier: 1, mutationIds: ['trigger-happy', 'the-statue', 'reverse-evolution'] },
+    ],
     metricId: 'assistRate',
     direction: 'decrease',
     minDelta: 0.01,
@@ -700,9 +745,7 @@ export function havocMechanismById(id: string): HavocCliMechanismDefinition {
   return definition;
 }
 
-function mechanismSlots(
-  specs: readonly HavocCliMechanismSlotSpec[],
-): HavocCliConstructedSlot[] {
+function mechanismSlots(specs: readonly HavocCliMechanismSlotSpec[]): HavocCliConstructedSlot[] {
   return POSITIONS.map((slot) => {
     const spec = specs.find((candidate) => candidate.slot === slot);
     return {
@@ -713,7 +756,10 @@ function mechanismSlots(
   });
 }
 
-function mechanismMetricValue(metricId: HavocCliMechanismMetricId, fact: HavocCliGameFacts): number {
+function mechanismMetricValue(
+  metricId: HavocCliMechanismMetricId,
+  fact: HavocCliGameFacts,
+): number {
   switch (metricId) {
     case 'reboundShare':
       return fact.humanRebounds / Math.max(1, fact.humanRebounds + fact.opponentRebounds);
@@ -731,6 +777,10 @@ function mechanismMetricValue(metricId: HavocCliMechanismMetricId, fact: HavocCl
       return fact.humanFullShotClock ?? HAVOC_CLI_DEFAULT_FULL_SHOT_CLOCK_SECONDS;
     case 'opponentFullShotClock':
       return fact.opponentFullShotClock ?? HAVOC_CLI_DEFAULT_FULL_SHOT_CLOCK_SECONDS;
+    case 'humanShotClockViolations':
+      return fact.humanShotClockViolations;
+    case 'opponentShotClockViolations':
+      return fact.opponentShotClockViolations;
   }
 }
 
@@ -784,12 +834,11 @@ const HAVOC_CLI_MECHANISM_METRIC_IDS: readonly HavocCliMechanismMetricId[] = [
   'cloneSeconds',
   'humanFullShotClock',
   'opponentFullShotClock',
+  'humanShotClockViolations',
+  'opponentShotClockViolations',
 ];
 
-function mechanismSideOf(
-  runs: readonly HavocCohortRun[],
-  metricId: HavocCliMechanismMetricId,
-): HavocCliMechanismSide {
+function mechanismSideOf(runs: readonly HavocCohortRun[]): HavocCliMechanismSide {
   const facts = runs.flatMap((run) => run.facts);
   const wins = facts.filter((fact) => fact.outcome === 'win').length;
   const metrics: Record<string, number> = {};
@@ -841,13 +890,15 @@ export function runHavocMechanismSensitivity(options: {
       }),
     );
   }
-  const onSide = mechanismSideOf(on, definition.metricId);
-  const offSide = mechanismSideOf(off, definition.metricId);
+  const onSide = mechanismSideOf(on);
+  const offSide = mechanismSideOf(off);
   const onMean = onSide.metrics[definition.metricId] ?? 0;
   const offMean = offSide.metrics[definition.metricId] ?? 0;
   const delta = round4(onMean - offMean);
   const responded =
-    definition.direction === 'increase' ? delta >= definition.minDelta : -delta >= definition.minDelta;
+    definition.direction === 'increase'
+      ? delta >= definition.minDelta
+      : -delta >= definition.minDelta;
   const structuralFindings = definition.structural(on, off);
   const report = havocCliMechanismReportSchema.parse({
     id: definition.id,
@@ -903,8 +954,8 @@ export const havocCalibrateReportSchema = z.object({
   paired: z
     .object({
       seeds: z.number().int().nonnegative(),
-      havoc: havocSeasonTotalsSchema,
-      normal: havocSeasonTotalsSchema,
+      havoc: havocCliCohortTotalsSchema,
+      normal: havocCliCohortTotalsSchema,
       winsGained: z.number().int(),
       differentialDelta: z.number().int(),
     })
@@ -961,10 +1012,7 @@ function renderLineupStats(label: string, stats: HavocCliLineupStats): string {
   return `${label}: ${String(stats.wins)}-${String(stats.losses)} (${(stats.winRate * 100).toFixed(1)}%) · score mean ${stats.score.mean.toFixed(1)} · turnovers ${stats.humanTurnovers.mean.toFixed(1)}/${stats.opponentTurnovers.mean.toFixed(1)} · rebounds ${stats.humanRebounds.mean.toFixed(1)}/${stats.opponentRebounds.mean.toFixed(1)} · fouls ${stats.humanFouls.mean.toFixed(1)}/${stats.opponentFouls.mean.toFixed(1)} · adjustments ${stats.adjustments.mean.toFixed(1)} · clone seconds ${stats.clones.seconds.mean.toFixed(1)} · OT ${String(stats.overtimeGames)} · audit ${String(stats.auditFailures)} · typed ${String(stats.typedFailures)}`;
 }
 
-export function havocCalibrate(
-  args: HavocCalibrateArgs,
-  deps: HavocCalibrateDeps = {},
-): CliReport {
+export function havocCalibrate(args: HavocCalibrateArgs, deps: HavocCalibrateDeps = {}): CliReport {
   const input = {
     seedCount: args['seed-count'],
     holdoutCount: args['holdout-count'],
@@ -1043,6 +1091,24 @@ export function havocCalibrate(
       cohorts.train.filter((run) => run.lineup === 'ordinary'),
       cohorts.normal.filter((run) => cohorts.trainSeeds.includes(run.seed)),
     );
+    const cohortsPayload = {
+      train: {
+        seeds: cohorts.trainSeeds.length,
+        lineups: {
+          ordinary: statsOf(cohorts.train, 'ordinary'),
+          risky: statsOf(cohorts.train, 'risky'),
+          extreme: statsOf(cohorts.train, 'extreme'),
+        },
+      },
+      holdout: {
+        seeds: cohorts.holdoutSeeds.length,
+        lineups: {
+          ordinary: statsOf(cohorts.holdout, 'ordinary'),
+          risky: statsOf(cohorts.holdout, 'risky'),
+          extreme: statsOf(cohorts.holdout, 'extreme'),
+        },
+      },
+    };
     const report = havocCalibrateReportSchema.parse({
       schemaVersion: 1,
       command: 'havoc calibrate',
@@ -1051,24 +1117,7 @@ export function havocCalibrate(
       gamesPerSeason: games,
       seedCount,
       holdoutCount,
-      cohorts: {
-        train: {
-          seeds: cohorts.trainSeeds.length,
-          lineups: {
-            ordinary: statsOf(cohorts.train, 'ordinary'),
-            risky: statsOf(cohorts.train, 'risky'),
-            extreme: statsOf(cohorts.train, 'extreme'),
-          },
-        },
-        holdout: {
-          seeds: cohorts.holdoutSeeds.length,
-          lineups: {
-            ordinary: statsOf(cohorts.holdout, 'ordinary'),
-            risky: statsOf(cohorts.holdout, 'risky'),
-            extreme: statsOf(cohorts.holdout, 'extreme'),
-          },
-        },
-      },
+      cohorts: cohortsPayload,
       paired: {
         seeds: cohorts.trainSeeds.length,
         havoc: paired.havoc,
@@ -1092,12 +1141,12 @@ export function havocCalibrate(
     }
     const details = [
       `cohorts: ${String(seedCount)} train + ${String(holdoutCount)} holdout seeds × ${String(games)} games × ${String(HAVOC_CLI_COHORT_LINEUPS.length)} lineups, plus paired normal seasons`,
-      renderLineupStats('train ordinary', report.cohorts.train.lineups.ordinary),
-      renderLineupStats('train risky', report.cohorts.train.lineups.risky),
-      renderLineupStats('train extreme', report.cohorts.train.lineups.extreme),
-      renderLineupStats('holdout ordinary', report.cohorts.holdout.lineups.ordinary),
-      renderLineupStats('holdout risky', report.cohorts.holdout.lineups.risky),
-      renderLineupStats('holdout extreme', report.cohorts.holdout.lineups.extreme),
+      renderLineupStats('train ordinary', cohortsPayload.train.lineups.ordinary),
+      renderLineupStats('train risky', cohortsPayload.train.lineups.risky),
+      renderLineupStats('train extreme', cohortsPayload.train.lineups.extreme),
+      renderLineupStats('holdout ordinary', cohortsPayload.holdout.lineups.ordinary),
+      renderLineupStats('holdout risky', cohortsPayload.holdout.lineups.risky),
+      renderLineupStats('holdout extreme', cohortsPayload.holdout.lineups.extreme),
       `paired ordinary train: havoc ${String(paired.havoc.wins)}-${String(paired.havoc.losses)} vs normal ${String(paired.normal.wins)}-${String(paired.normal.losses)} · wins gained ${String(paired.winsGained)} · differential delta ${String(paired.differentialDelta)}`,
       `audit failures ${String(report.auditFailures)} · typed failures ${String(report.typedFailures.length)}`,
     ];

@@ -39,9 +39,7 @@
 <article
   data-season-playin-card={card.gameId}
   style:--sr-accent={franchiseColor(card.winnerFranchiseId ?? card.homeFranchiseId)}
-  class="play-in-card p-3 {card.humanGame
-    ? 'ring-1 ring-primary/40'
-    : ''}"
+  class="play-in-card p-3 {card.humanGame ? 'ring-1 ring-primary/40' : ''}"
 >
   <header class="flex items-baseline justify-between gap-2">
     <span class="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">

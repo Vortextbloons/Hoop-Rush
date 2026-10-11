@@ -1,13 +1,19 @@
 <script lang="ts">
-  import type { HavocLineupSlotView } from '@hoop-rush/data-contracts';
+  import type { HavocLineupSlotView } from '$lib/havoc/havoc-service-contract';
   import HavocTierBadge from './HavocTierBadge.svelte';
   import { mutationEntriesSummary } from './havoc-presentation';
 
-  let { slots, title = 'Locked lineup' }: { slots: readonly HavocLineupSlotView[]; title?: string } =
-    $props();
+  let {
+    slots,
+    title = 'Locked lineup',
+  }: { slots: readonly HavocLineupSlotView[]; title?: string } = $props();
 </script>
 
-<section aria-labelledby="havoc-lineup-heading" class="min-w-0 rounded-xl bg-surface-1" data-havoc-lineup>
+<section
+  aria-labelledby="havoc-lineup-heading"
+  class="min-w-0 rounded-xl bg-surface-1"
+  data-havoc-lineup
+>
   <div class="border-b border-border/70 px-4 py-3">
     <h2
       id="havoc-lineup-heading"
@@ -16,9 +22,9 @@
       {title}
     </h2>
     <p class="mt-1 text-xs text-muted-foreground">
-      Emergency replacement rule: if a starter fouls out at six personal fouls, an unmutated copy
-      of the same player-season takes the floor. That replacement owns no mutations, gains no
-      powers, and stays in the game through further fouls.
+      Emergency replacement rule: if a starter fouls out at six personal fouls, an unmutated copy of
+      the same player-season takes the floor. That replacement owns no mutations, gains no powers,
+      and stays in the game through further fouls.
     </p>
   </div>
   <ul class="divide-y divide-border/60">

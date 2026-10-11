@@ -121,8 +121,8 @@
   const lastOutput = $derived(
     lastPlayedGame ? (controller.outputs[lastPlayedGame.gameNumber] ?? null) : null,
   );
-  const lastVerification = $derived.by<'pending' | 'verified' | 'mismatch'>(() => {
-    const gameNumber = lastPlayedGame?.gameNumber;
+  const resultVerification = $derived.by<'pending' | 'verified' | 'mismatch'>(() => {
+    const gameNumber = controller.currentOutput?.gameNumber;
     if (gameNumber === undefined) return 'pending';
     return (
       controller.verification.find((entry) => entry.gameNumber === gameNumber)?.status ?? 'pending'
@@ -511,13 +511,13 @@
           manifest={controller.assets?.manifest ?? null}
         />
       </section>
-    {:else if controller.phase === 'game-results' && lastOutput && controller.series}
+    {:else if controller.phase === 'game-results' && controller.currentOutput && controller.series}
       <section class="panel" aria-label="Game results">
         <GameResultsPanel
-          output={lastOutput}
+          output={controller.currentOutput}
           series={controller.series}
           localParticipantId={controller.participantId ?? 'p1'}
-          verification={lastVerification}
+          verification={resultVerification}
           readyCountdownMs={controller.readyCountdownMs}
           localReady={controller.localReady}
           onready={() => controller.readyForNextGame()}
@@ -533,6 +533,8 @@
           standouts={controller.seriesStandouts}
           localParticipantId={controller.participantId ?? 'p1'}
           games={championshipGames}
+          cards={playerCards}
+          manifest={controller.assets?.manifest ?? null}
           rematchRequested={controller.rivalRematchRequested}
           rematchConfirmed={controller.successorRoomId !== null}
           onrematch={() => controller.requestRematch()}

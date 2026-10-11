@@ -105,9 +105,7 @@
     <div class="sr-arrive flex flex-col gap-3">
       <div class="min-w-0 max-w-3xl lg:max-w-none">
         <p class="sr-eyebrow">Season Run · League Honors</p>
-        <h1 id="leaders-heading" class="sr-page-title mt-1">
-          League Honors
-        </h1>
+        <h1 id="leaders-heading" class="sr-page-title mt-1">League Honors</h1>
         <p class="mt-2 max-w-2xl text-[15px] leading-relaxed text-muted-foreground lg:max-w-3xl">
           Every award and category champion from the regular season.
         </p>
@@ -191,10 +189,7 @@
     {/if}
 
     {#if awards !== null && leaders}
-      <footer
-        aria-labelledby="season-honors-heading"
-        class="sr-panel-featured mt-10 p-5 sm:p-6"
-      >
+      <footer aria-labelledby="season-honors-heading" class="sr-panel-featured mt-10 p-5 sm:p-6">
         <div class="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h2
@@ -207,43 +202,32 @@
               The regular season, decided — take it into the postseason.
             </p>
           </div>
-          <a
-            href={resolve('/season/run/postseason')}
-            class="sr-btn"
-          >
+          <a href={resolve('/season/run/postseason')} class="sr-btn">
             {seasonComplete ? 'View champion & Finals awards' : 'View playoff bracket'}
             <ArrowRight class="h-4 w-4" aria-hidden="true" />
           </a>
         </div>
         <dl class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div class="sr-stat-tile">
-            <dt class="sr-section-label">
-              MVP
-            </dt>
+            <dt class="sr-section-label">MVP</dt>
             <dd class="mt-1 truncate text-[15px] font-bold">
               {shell.playerName(awards.mvp.playerVersionId)}
             </dd>
           </div>
           <div class="sr-stat-tile">
-            <dt class="sr-section-label">
-              DPOY
-            </dt>
+            <dt class="sr-section-label">DPOY</dt>
             <dd class="mt-1 truncate text-[15px] font-bold">
               {shell.playerName(awards.defensivePlayerOfYear.playerVersionId)}
             </dd>
           </div>
           <div class="sr-stat-tile">
-            <dt class="sr-section-label">
-              Sixth Man
-            </dt>
+            <dt class="sr-section-label">Sixth Man</dt>
             <dd class="mt-1 truncate text-[15px] font-bold">
               {shell.playerName(awards.sixthManOfYear.playerVersionId)}
             </dd>
           </div>
           <div class="sr-stat-tile">
-            <dt class="sr-section-label">
-              First Team
-            </dt>
+            <dt class="sr-section-label">First Team</dt>
             <dd class="mt-1 text-[13px] leading-relaxed font-semibold">
               {firstTeamNames.join(' · ')}
             </dd>

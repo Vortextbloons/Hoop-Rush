@@ -72,7 +72,12 @@
   data-testid="negotiation-transcript"
 >
   <div class="flex flex-wrap items-baseline justify-between gap-2 border-b border-border pb-3">
-    <h3 id="transcript-heading" class="font-display text-sm font-extrabold uppercase tracking-tight">Negotiation</h3>
+    <h3
+      id="transcript-heading"
+      class="font-display text-sm font-extrabold uppercase tracking-tight"
+    >
+      Negotiation
+    </h3>
     {#if negotiation !== null}
       <span class="sr-badge" data-tone="hardwood">Offer {nextOfferNumber} of {exchangeMax}</span>
     {:else}

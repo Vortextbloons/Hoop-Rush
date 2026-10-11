@@ -240,15 +240,10 @@
   }
 </script>
 
-<section
-  aria-labelledby="auto-rotation-heading"
-  class="sr-panel-quiet p-3 sm:p-4"
->
+<section aria-labelledby="auto-rotation-heading" class="sr-panel-quiet p-3 sm:p-4">
   <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
     <div class="min-w-0">
-      <h3 id="auto-rotation-heading" class="sr-section-label">
-        Auto build rotation
-      </h3>
+      <h3 id="auto-rotation-heading" class="sr-section-label">Auto build rotation</h3>
       <p class="mt-0.5 text-xs text-muted-foreground">
         {option === 'full-auto'
           ? 'Picks the 10, starters, minutes, and closing five.'
@@ -270,7 +265,7 @@
     {/if}
   </div>
 
-  <div class="mt-2 flex flex-col gap-2 sm:flex-row">
+  <div class="mt-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
     <label class="sr-only" for="auto-scope-select">Auto scope</label>
     <select
       id="auto-scope-select"
@@ -280,7 +275,7 @@
         option = (event.currentTarget as HTMLSelectElement).value as AutoScopeOption;
       }}
       disabled={busy || disabled}
-      class="min-h-11 min-w-0 flex-1 rounded-lg border border-border/60 bg-surface-2 px-3 py-2 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40 sm:max-w-56"
+      class="min-h-11 min-w-0 flex-1 rounded-lg border border-border/60 bg-surface-2 px-3 py-2 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40 sm:max-w-44"
     >
       <option value="full-auto">Full auto</option>
       <option value="minutes-only">Minutes only</option>
@@ -394,7 +389,9 @@
           <p class="sr-section-label">Starters</p>
           <ol class="mt-1 flex flex-col gap-0.5 text-xs">
             {#each preview.candidate.starters as id, index (id)}
-              <li class="flex justify-between gap-2 rounded-lg border border-border/50 bg-surface-2/60 px-2 py-1">
+              <li
+                class="flex justify-between gap-2 rounded-lg border border-border/50 bg-surface-2/60 px-2 py-1"
+              >
                 <span class="min-w-0 truncate">S{index + 1} {nameOf(id)}</span>
                 <span class="sr-number shrink-0 text-[10px] font-bold text-muted-foreground"
                   >{minutesOf(preview.candidate, id)}m</span
@@ -407,7 +404,9 @@
           <p class="sr-section-label">Bench</p>
           <ol class="mt-1 flex flex-col gap-0.5 text-xs">
             {#each preview.candidate.benchOrder as id, index (id)}
-              <li class="flex justify-between gap-2 rounded-lg border border-border/50 bg-surface-2/60 px-2 py-1">
+              <li
+                class="flex justify-between gap-2 rounded-lg border border-border/50 bg-surface-2/60 px-2 py-1"
+              >
                 <span class="min-w-0 truncate">B{index + 1} {nameOf(id)}</span>
                 <span class="sr-number shrink-0 text-[10px] font-bold text-muted-foreground"
                   >{minutesOf(preview.candidate, id)}m</span
@@ -420,7 +419,9 @@
           <p class="sr-section-label">Closing</p>
           <ol class="mt-1 flex flex-col gap-0.5 text-xs">
             {#each preview.candidate.closingFive as id, index (id)}
-              <li class="flex justify-between gap-2 rounded-lg border border-border/50 bg-surface-2/60 px-2 py-1">
+              <li
+                class="flex justify-between gap-2 rounded-lg border border-border/50 bg-surface-2/60 px-2 py-1"
+              >
                 <span class="min-w-0 truncate">C{index + 1} {nameOf(id)}</span>
                 <span class="sr-number shrink-0 text-[10px] font-bold text-muted-foreground"
                   >{minutesOf(preview.candidate, id)}m</span

@@ -166,9 +166,7 @@
     <div class="sr-arrive flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div class="min-w-0">
         <p class="sr-eyebrow">Season Run</p>
-        <h1 id="schedule-heading" class="sr-page-title mt-1">
-          Schedule
-        </h1>
+        <h1 id="schedule-heading" class="sr-page-title mt-1">Schedule</h1>
         <p class="mt-1 font-mono text-xs text-muted-foreground">
           <span class="sr-number">{playedCount}</span> of 82 played · 9 blocks
         </p>
@@ -205,10 +203,7 @@
         {#each filteredGroups as group (group.blockIndex)}
           <section aria-labelledby={`schedule-block-${group.blockIndex}-heading`}>
             <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <h2
-                id={`schedule-block-${group.blockIndex}-heading`}
-                class="sr-section-label"
-              >
+              <h2 id={`schedule-block-${group.blockIndex}-heading`} class="sr-section-label">
                 Block {group.blockIndex + 1} of 9
               </h2>
               <span class="font-mono text-xs text-muted-foreground">
@@ -248,7 +243,7 @@
                         size="sm"
                       />
                     {:else}
-                        <span class="h-7 w-7 shrink-0" aria-hidden="true"></span>
+                      <span class="h-7 w-7 shrink-0" aria-hidden="true"></span>
                     {/if}
                     <p class="min-w-0 text-sm font-semibold leading-tight">
                       <span
@@ -412,12 +407,7 @@
     {:else if postseasonRows.length > 0}
       <section aria-labelledby="postseason-schedule-heading" class="mt-8">
         <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <h2
-            id="postseason-schedule-heading"
-            class="sr-section-label"
-          >
-            Postseason
-          </h2>
+          <h2 id="postseason-schedule-heading" class="sr-section-label">Postseason</h2>
           <span class="font-mono text-xs text-muted-foreground">
             {postseasonPlayed} game{postseasonPlayed === 1 ? '' : 's'} played · Play-In and playoffs
           </span>
@@ -496,7 +486,9 @@
                   >
                     {row.humanGame ? (row.humanWon === true ? 'W' : 'L') : ''}
                   </span>
-                  <span class="mt-0.5 block font-mono text-[10px] leading-none text-muted-foreground">
+                  <span
+                    class="mt-0.5 block font-mono text-[10px] leading-none text-muted-foreground"
+                  >
                     {row.scoreLabel}
                   </span>
                 </span>

@@ -28,10 +28,7 @@
   <p class="sr-eyebrow">
     Season complete · {postseasonStageLabel('completed')}
   </p>
-  <h2
-    id="champion-heading"
-    class="sr-page-title mt-2"
-  >
+  <h2 id="champion-heading" class="sr-page-title mt-2">
     {championFranchiseId !== null ? franchiseName(championFranchiseId) : 'Champion decided'}
     <span class="sr-only">won the championship</span>
   </h2>
@@ -41,17 +38,7 @@
       : `The ${championFranchiseId !== null ? franchiseAbbrev(championFranchiseId) : 'championship'} banner goes up. Your run is saved to your history.`}
   </p>
   <div class="mt-4 flex flex-wrap gap-2">
-    <a
-      href={resolve('/season/run/postseason' as any)}
-      class="sr-btn"
-    >
-      View final bracket
-    </a>
-    <a
-      href={resolve('/season/run/history' as any)}
-      class="sr-btn-ghost"
-    >
-      Season history
-    </a>
+    <a href={resolve('/season/run/postseason' as any)} class="sr-btn"> View final bracket </a>
+    <a href={resolve('/season/run/history' as any)} class="sr-btn-ghost"> Season history </a>
   </div>
 </section>

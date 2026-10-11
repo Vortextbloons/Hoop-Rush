@@ -85,29 +85,16 @@
   </div>
 
   {#if detail === null || manifest === null}
-    <section
-      aria-labelledby="team-missing-heading"
-      class="mx-auto mt-8 w-full max-w-xl"
-    >
+    <section aria-labelledby="team-missing-heading" class="mx-auto mt-8 w-full max-w-xl">
       <div class="sr-panel p-6 text-center">
         <p class="sr-eyebrow">Season Run</p>
-        <h2
-          id="team-missing-heading"
-          class="sr-page-title mt-1 text-2xl"
-        >
-          Team not found
-        </h2>
+        <h2 id="team-missing-heading" class="sr-page-title mt-1 text-2xl">Team not found</h2>
         <p class="mt-2 text-sm text-muted-foreground">
           {franchiseId === '' || shell.run === null
             ? 'No active Season Run is loaded.'
             : `${shell.franchiseName(franchiseId)} is not part of this run.`}
         </p>
-        <a
-          href={resolve('/season/run/league')}
-          class="sr-btn-ghost mt-4"
-        >
-          Back to League
-        </a>
+        <a href={resolve('/season/run/league')} class="sr-btn-ghost mt-4"> Back to League </a>
       </div>
     </section>
   {:else}

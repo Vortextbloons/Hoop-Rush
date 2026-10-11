@@ -15,6 +15,8 @@ export * from './physical.ts';
 export * from './run-commands.ts';
 export * from './state-digest.ts';
 export * from './transform.ts';
+export * from './comparison.ts';
+export * from './report.ts';
 export { FoldHavocAggregate } from './aggregate.ts';
 export { AdaptHavocCatalog } from './catalog.ts';
 export { CreateHavocRunState } from './draft-commands.ts';

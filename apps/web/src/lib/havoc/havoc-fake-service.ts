@@ -1,8 +1,11 @@
+/* eslint-disable @typescript-eslint/require-await -- test double mirrors the async service contract without real I/O */
 import {
   HAVOC_GAME_COUNT,
   HAVOC_MVP_INDEX_WEIGHTS,
   HAVOC_SCHEMA_VERSION,
   POSITIONS,
+  eraIdSchema,
+  franchiseIdSchema,
   havocCommandResultSchema,
   havocComparisonSchema,
   havocDraftStateSchema,
@@ -10,13 +13,15 @@ import {
   havocGameSummarySchema,
   havocGameTapeSchema,
   havocMatchedGameSchema,
+  havocParticipantLineSchema,
   havocReportSchema,
   havocRunStateSchema,
+  havocSlotComparisonSchema,
+  playerIdSchema,
+  seasonKeySchema,
   seedFromString,
 } from '@hoop-rush/data-contracts';
 import type {
-  HavocActiveSnapshot,
-  HavocBatchResult,
   HavocCommandResult,
   HavocCommandRejectionCode,
   HavocComparison,
@@ -26,30 +31,31 @@ import type {
   HavocGameResult,
   HavocGameSummary,
   HavocGameTape,
-  HavocHistoryView,
   HavocMatchedGame,
   HavocMutationEntry,
-  HavocMutationId,
   HavocReport,
   HavocRunState,
-  HavocRunView,
   HavocSeasonTotals,
-  HavocService,
-  HavocServiceErrorCode,
-  HavocServiceEvent,
-  HavocSimulationProgress,
   HavocSlotComparison,
   HavocStatDelta,
   HavocStatLine,
   HavocTier,
   HavocVariant,
-  HavocWatchSession,
   Position,
 } from '@hoop-rush/data-contracts';
+import type {
+  HavocActiveSnapshot,
+  HavocBatchResult,
+  HavocHistoryView,
+  HavocRunView,
+  HavocService,
+  HavocServiceErrorCode,
+  HavocServiceEvent,
+  HavocSimulationProgress,
+  HavocWatchSession,
+} from './havoc-service-contract.ts';
 import {
-  HAVOC_FIXTURE_SEED,
   buildHavocEffectiveProfile,
-  buildHavocEraProfile,
   buildHavocLockedInputs,
   buildHavocSourcePlayer,
   buildHavocStatLine,
@@ -72,6 +78,24 @@ function fakeHex32(): string {
 
 function instanceHex(index: number): string {
   return `hvi-${String(index).padStart(32, '0')}`;
+}
+
+function requireAt<T>(values: readonly T[], index: number): T {
+  const value = values[index];
+  if (value === undefined) throw new Error(`fake fixture is missing index ${String(index)}`);
+  return value;
+}
+
+function starterId(index: number): string {
+  return FAKE_HUMAN_STARTER_IDS[index % FAKE_HUMAN_STARTER_IDS.length] ?? instanceHex(1);
+}
+
+function replacementId(index: number): string {
+  return FAKE_HUMAN_REPLACEMENT_IDS[index % FAKE_HUMAN_REPLACEMENT_IDS.length] ?? instanceHex(11);
+}
+
+function cloneId(index: number): string {
+  return FAKE_HUMAN_CLONE_IDS[index % FAKE_HUMAN_CLONE_IDS.length] ?? instanceHex(21);
 }
 
 export const FAKE_HUMAN_STARTER_IDS = [1, 2, 3, 4, 5].map(instanceHex);
@@ -133,7 +157,7 @@ function specFor(slot: Position, round: number, offerIndex: number, cardIndex: n
     OPPONENT_STARTER_NAMES[(seedIndex + cardIndex + 2) % OPPONENT_STARTER_NAMES.length] ??
       'Cameron Vale',
   ];
-  const displayName = `${names[cardIndex] ?? 'Fixture Player'}`;
+  const displayName = names[cardIndex] ?? 'Fixture Player';
   const mutations: HavocMutationEntry[] =
     tier === 1
       ? [
@@ -142,7 +166,7 @@ function specFor(slot: Position, round: number, offerIndex: number, cardIndex: n
           { mutationId: 'point-god' },
         ]
       : tier === 2
-        ? [{ mutationId: 'four-point-dunk' }, { mutationId: 'sniper-gene' }]
+        ? [{ mutationId: 'four-point-dunk' }, { mutationId: 'trigger-happy' }]
         : [{ mutationId: 'clone-army' }];
   return {
     playerId: `p-havoc-${slot.toLowerCase()}-${String(round)}-${String(cardIndex)}-${String(offerIndex)}`,
@@ -156,7 +180,10 @@ function specFor(slot: Position, round: number, offerIndex: number, cardIndex: n
   };
 }
 
-function effectiveFor(source: ReturnType<typeof buildHavocSourcePlayer>, mutations: HavocMutationEntry[]) {
+function effectiveFor(
+  source: ReturnType<typeof buildHavocSourcePlayer>,
+  mutations: HavocMutationEntry[],
+) {
   const base = buildHavocEffectiveProfile(source);
   const ratings = { ...base.ratings };
   const tendencies = { ...base.tendencies };
@@ -180,6 +207,16 @@ function effectiveFor(source: ReturnType<typeof buildHavocSourcePlayer>, mutatio
       case 'sniper-gene':
         ratings.threePoint = 97;
         tendencies.threePointRate = 90;
+        break;
+      case 'trigger-happy':
+        ratings.insideScoring = 99;
+        ratings.closeShot = 99;
+        ratings.midrange = 99;
+        ratings.threePoint = 99;
+        ratings.freeThrow = 99;
+        tendencies.shotRate = 99;
+        tendencies.usageRate = 45;
+        tendencies.passRate = 2;
         break;
       case 'alien-arms':
         wingspanDelta += 18;
@@ -206,12 +243,12 @@ function makeCard(input: {
 }): HavocDraftCard {
   const spec = specFor(input.slot, input.round, input.offerIndex, input.cardIndex);
   const source = buildHavocSourcePlayer({
-    playerId: spec.playerId,
+    playerId: playerIdSchema.parse(spec.playerId),
     playerVersionId: `pv-${fakeHex32()}`,
     displayName: spec.displayName,
-    franchiseId: 'lakers',
-    eraId: '1990s',
-    seasonKey: spec.seasonKey,
+    franchiseId: franchiseIdSchema.parse('lakers'),
+    eraId: eraIdSchema.parse('1990s'),
+    seasonKey: seasonKeySchema.parse(spec.seasonKey),
     positions: [input.slot],
     originalOverall: spec.overall,
     physical: { heightInches: spec.heightInches, weightLbs: 205 + input.cardIndex * 10 },
@@ -236,17 +273,15 @@ function buildOffer(input: {
   offerIndex: number;
 }): HavocDraftOffer {
   const offerId = `hvo-${fakeHex32()}`;
-  const cards = [0, 1, 2].map((cardIndex) =>
-    makeCard({ ...input, cardIndex, offerId }),
-  );
+  const cards = [0, 1, 2].map((cardIndex) => makeCard({ ...input, cardIndex, offerId }));
   return { offerId, offerIndex: input.offerIndex, round: input.round, slot: input.slot, cards };
 }
 
-function makeDraftState(runSeed: string): HavocDraftState {
+function makeDraftState(runSeed: string, runId = RUN_ID): HavocDraftState {
   const offer = buildOffer({ runSeed, round: 1, slot: 'PG', offerIndex: 0 });
   return havocDraftStateSchema.parse({
     schemaVersion: HAVOC_SCHEMA_VERSION,
-    runId: RUN_ID,
+    runId,
     revision: 0,
     runSeed,
     versionSet: buildHavocVersionSet(),
@@ -269,21 +304,35 @@ function makeDraftState(runSeed: string): HavocDraftState {
   });
 }
 
-function makeDraftRunState(): HavocRunState {
+function makeDraftRunState(runId = RUN_ID): HavocRunState {
   const runSeed = seedFromString('havoc-fake-run-seed');
   return havocRunStateSchema.parse({
     schemaVersion: HAVOC_SCHEMA_VERSION,
-    runId: RUN_ID,
+    runId,
     revision: 0,
     runSeed,
     versionSet: buildHavocVersionSet(),
     phase: 'draft',
-    draft: makeDraftState(runSeed),
+    draft: makeDraftState(runSeed, runId),
     locked: null,
     havocCursor: 0,
     normalCursor: 0,
-    havocAggregate: { games: 0, wins: 0, losses: 0, pointsFor: 0, pointsAgainst: 0, adjustments: 0 },
-    normalAggregate: { games: 0, wins: 0, losses: 0, pointsFor: 0, pointsAgainst: 0, adjustments: 0 },
+    havocAggregate: {
+      games: 0,
+      wins: 0,
+      losses: 0,
+      pointsFor: 0,
+      pointsAgainst: 0,
+      adjustments: 0,
+    },
+    normalAggregate: {
+      games: 0,
+      wins: 0,
+      losses: 0,
+      pointsFor: 0,
+      pointsAgainst: 0,
+      adjustments: 0,
+    },
     perfectSeason: false,
     comparisonStatus: 'not-started',
     completionState: 'draft',
@@ -299,7 +348,10 @@ function lockedFromDraft(state: HavocRunState, draft: HavocDraftState) {
     versionSet: state.versionSet,
     human: { ...base.human, displayName: HUMAN_TEAM_NAME },
     opponents: [
-      { opponentId: OPPONENT_ID, team: { ...base.opponents[0]!.team, displayName: OPPONENT_NAME } },
+      {
+        opponentId: OPPONENT_ID,
+        team: { ...requireAt(base.opponents, 0).team, displayName: OPPONENT_NAME },
+      },
     ],
   };
 }
@@ -316,7 +368,9 @@ function toRunView(state: HavocRunState): HavocRunView {
     mutations: pick.card.mutations,
   }));
   const scheduleEntry =
-    locked === null ? undefined : locked.schedule[Math.min(state.havocCursor, HAVOC_GAME_COUNT - 1)];
+    locked === null
+      ? undefined
+      : locked.schedule[Math.min(state.havocCursor, HAVOC_GAME_COUNT - 1)];
   const opponent =
     locked === null || scheduleEntry === undefined
       ? undefined
@@ -391,20 +445,25 @@ export interface FakeHavocServiceOptions {
 
 export class FakeHavocService implements HavocService {
   outcomeFor: (gameNumber: number) => 'win' | 'loss' = () => 'win';
-  scoreFor: (gameNumber: number, outcome: 'win' | 'loss') => { human: number; opponent: number } =
-    (gameNumber, outcome) =>
-      outcome === 'win'
-        ? { human: 100 + (gameNumber % 11), opponent: 92 + (gameNumber % 7) }
-        : { human: 96 + (gameNumber % 5), opponent: 104 + (gameNumber % 9) };
+  scoreFor: (gameNumber: number, outcome: 'win' | 'loss') => { human: number; opponent: number } = (
+    gameNumber,
+    outcome,
+  ) =>
+    outcome === 'win'
+      ? { human: 100 + (gameNumber % 11), opponent: 92 + (gameNumber % 7) }
+      : { human: 96 + (gameNumber % 5), opponent: 104 + (gameNumber % 9) };
   normalOutcomeFor: (gameNumber: number) => 'win' | 'loss' = (gameNumber) =>
     gameNumber % 4 === 0 ? 'loss' : 'win';
-  normalScoreFor: (gameNumber: number, outcome: 'win' | 'loss') => {
+  normalScoreFor: (
+    gameNumber: number,
+    outcome: 'win' | 'loss',
+  ) => {
     human: number;
     opponent: number;
   } = (gameNumber, outcome) =>
     outcome === 'win'
-      ? { human: 98 + (gameNumber % 5), opponent: 93 + (gameNumber % 6) }
-      : { human: 95 + (gameNumber % 4), opponent: 101 + (gameNumber % 8) };
+      ? { human: 98 + (gameNumber % 5), opponent: 91 + (gameNumber % 6) }
+      : { human: 95 + (gameNumber % 4), opponent: 102 + (gameNumber % 8) };
   tapeBuilder: ((gameNumber: number) => HavocGameTape) | null = null;
   resultBuilder: ((gameNumber: number) => HavocGameResult) | null = null;
 
@@ -423,6 +482,10 @@ export class FakeHavocService implements HavocService {
   };
   readonly emitted: HavocServiceEvent[] = [];
   cancelled = false;
+
+  private isCancelled(): boolean {
+    return this.cancelled;
+  }
 
   private listeners = new Set<(event: HavocServiceEvent) => void>();
   private runState: HavocRunState | null = null;
@@ -488,7 +551,7 @@ export class FakeHavocService implements HavocService {
       completionState: 'complete',
     });
     const abandonedState = havocRunStateSchema.parse({
-      ...makeLockedRunState(),
+      ...makeLockedRunState('havoc-run-2'),
       havocCursor: 5,
       havocAggregate: {
         games: 5,
@@ -525,6 +588,13 @@ export class FakeHavocService implements HavocService {
     this.runState = state;
     this.summaries.havoc = [];
     this.summaries.normal = [];
+    this.comparison = null;
+    this.report = null;
+  }
+
+  seedComparison(comparison: HavocComparison, report: HavocReport | null = null): void {
+    this.comparison = comparison;
+    this.report = report ?? buildFakeReport(comparison.runId, comparison);
   }
 
   activeRunState(): HavocRunState | null {
@@ -565,7 +635,12 @@ export class FakeHavocService implements HavocService {
   async createDraft(): Promise<HavocCommandResult> {
     this.calls.createDraft += 1;
     if (this.runState !== null) {
-      return rejected(this.runState.runId, this.runState.revision, 'phase-mismatch', 'a run is already active');
+      return rejected(
+        this.runState.runId,
+        this.runState.revision,
+        'phase-mismatch',
+        'a run is already active',
+      );
     }
     this.runState = makeDraftRunState();
     return commandResult({
@@ -586,7 +661,12 @@ export class FakeHavocService implements HavocService {
       return rejected(state.runId, state.revision, 'not-drafting', 'the draft is already complete');
     }
     if (draft.rerollUsed) {
-      return rejected(state.runId, state.revision, 'reroll-spent', 'the draft-wide reroll is spent');
+      return rejected(
+        state.runId,
+        state.revision,
+        'reroll-spent',
+        'the draft-wide reroll is spent',
+      );
     }
     const offer = buildOffer({
       runSeed: state.runSeed,
@@ -625,7 +705,12 @@ export class FakeHavocService implements HavocService {
     }
     const card = draft.cards.find((candidate) => candidate.cardId === cardId);
     if (card === undefined) {
-      return rejected(state.runId, state.revision, 'unknown-card', 'card is not in the current offer');
+      return rejected(
+        state.runId,
+        state.revision,
+        'unknown-card',
+        'card is not in the current offer',
+      );
     }
     const pick = {
       pickOrdinal: draft.picks.length,
@@ -671,7 +756,12 @@ export class FakeHavocService implements HavocService {
       throw new HavocServiceError('no-active-run', 'no active havoc draft');
     }
     if (state.draft.status !== 'complete') {
-      return rejected(state.runId, state.revision, 'incomplete-lineup', 'the draft is not complete');
+      return rejected(
+        state.runId,
+        state.revision,
+        'incomplete-lineup',
+        'the draft is not complete',
+      );
     }
     const locked = lockedFromDraft(state, state.draft);
     this.runState = havocRunStateSchema.parse({
@@ -768,8 +858,7 @@ export class FakeHavocService implements HavocService {
       normalAggregate: aggregate,
       comparisonStatus:
         state.comparisonStatus === 'not-started' ? 'running' : state.comparisonStatus,
-      completionState:
-        normalCursor === HAVOC_GAME_COUNT ? 'comparison' : state.completionState,
+      completionState: normalCursor === HAVOC_GAME_COUNT ? 'comparison' : state.completionState,
     });
     this.summaries.normal.push(summary);
     this.results.set(`normal:${String(summary.gameNumber)}`, this.resultFor(summary));
@@ -792,7 +881,7 @@ export class FakeHavocService implements HavocService {
     const target = input.count === 'remaining' ? remaining : Math.min(input.count, remaining);
     let accepted = 0;
     for (let index = 0; index < target; index += 1) {
-      if (this.cancelled) break;
+      if (this.isCancelled()) break;
       const current = this.runState;
       if (current === null) break;
       const gameNumber = current.havocCursor + 1;
@@ -801,7 +890,12 @@ export class FakeHavocService implements HavocService {
       accepted += 1;
       this.emit({
         type: 'progress',
-        progress: { variant: 'havoc', gamesCompleted: gameNumber, gamesTotal: HAVOC_GAME_COUNT, latestGameNumber: gameNumber },
+        progress: {
+          variant: 'havoc',
+          gamesCompleted: gameNumber,
+          gamesTotal: HAVOC_GAME_COUNT,
+          latestGameNumber: gameNumber,
+        },
       });
       this.emit({ type: 'game-accepted', summary });
       await Promise.resolve();
@@ -829,7 +923,8 @@ export class FakeHavocService implements HavocService {
       this.summaries[variant].find((entry) => entry.gameNumber === input.gameNumber) ??
       this.pendingSummaries.get(key) ??
       this.summaryFor(input.gameNumber);
-    const tape = this.tapeBuilder === null ? buildFakeTape(summary) : this.tapeBuilder(input.gameNumber);
+    const tape =
+      this.tapeBuilder === null ? buildFakeTape(summary) : this.tapeBuilder(input.gameNumber);
     const session: HavocWatchSession = {
       gameNumber: input.gameNumber,
       variant,
@@ -856,11 +951,18 @@ export class FakeHavocService implements HavocService {
     const key = `${input.variant}:${String(input.gameNumber)}`;
     const cursor = input.variant === 'havoc' ? state.havocCursor : state.normalCursor;
     if (input.gameNumber !== cursor + 1) {
-      return rejected(state.runId, state.revision, 'cursor-mismatch', 'game is not the next cursor');
+      return rejected(
+        state.runId,
+        state.revision,
+        'cursor-mismatch',
+        'game is not the next cursor',
+      );
     }
     const summary =
       this.pendingSummaries.get(key) ??
-      (input.variant === 'havoc' ? this.summaryFor(input.gameNumber) : this.normalSummaryFor(input.gameNumber));
+      (input.variant === 'havoc'
+        ? this.summaryFor(input.gameNumber)
+        : this.normalSummaryFor(input.gameNumber));
     if (input.variant === 'havoc') this.acceptHavocSummary(summary);
     else this.acceptNormalSummary(summary);
     this.emit({ type: 'game-accepted', summary });
@@ -883,7 +985,9 @@ export class FakeHavocService implements HavocService {
     const key = `${input.variant}:${String(input.gameNumber)}`;
     const stored = this.results.get(key);
     if (stored !== undefined) return stored;
-    const summary = this.summaries[input.variant].find((entry) => entry.gameNumber === input.gameNumber);
+    const summary = this.summaries[input.variant].find(
+      (entry) => entry.gameNumber === input.gameNumber,
+    );
     if (summary === undefined) return null;
     const result = this.resultFor(summary);
     this.results.set(key, result);
@@ -894,7 +998,10 @@ export class FakeHavocService implements HavocService {
     this.calls.startNormalSeason += 1;
     const state = this.runState;
     if (state === null || state.phase !== 'run') {
-      throw new HavocServiceError('invalid-phase', 'startNormalSeason requires an active locked run');
+      throw new HavocServiceError(
+        'invalid-phase',
+        'startNormalSeason requires an active locked run',
+      );
     }
     if (state.havocCursor < HAVOC_GAME_COUNT) {
       throw new HavocServiceError('invalid-phase', 'the normal season starts after havoc game 82');
@@ -902,13 +1009,18 @@ export class FakeHavocService implements HavocService {
     this.cancelled = false;
     let accepted = 0;
     for (let gameNumber = state.normalCursor + 1; gameNumber <= HAVOC_GAME_COUNT; gameNumber += 1) {
-      if (this.cancelled) break;
+      if (this.isCancelled()) break;
       const summary = this.normalSummaryFor(gameNumber);
       this.acceptNormalSummary(summary);
       accepted += 1;
       this.emit({
         type: 'progress',
-        progress: { variant: 'normal', gamesCompleted: gameNumber, gamesTotal: HAVOC_GAME_COUNT, latestGameNumber: gameNumber },
+        progress: {
+          variant: 'normal',
+          gamesCompleted: gameNumber,
+          gamesTotal: HAVOC_GAME_COUNT,
+          latestGameNumber: gameNumber,
+        },
       });
       await Promise.resolve();
     }
@@ -989,12 +1101,17 @@ export class FakeHavocService implements HavocService {
   }
 }
 
-function makeLockedRunState(): HavocRunState {
-  const draftState = makeDraftRunState();
+function makeLockedRunState(runId = RUN_ID): HavocRunState {
+  const draftState = makeDraftRunState(runId);
   const draft = draftState.draft;
   if (draft === null) throw new Error('fake draft state missing');
   const picks = (['PG', 'SG', 'SF', 'PF', 'C'] as const).map((slot, index) => {
-    const offer = buildOffer({ runSeed: draftState.runSeed, round: index + 1, slot, offerIndex: 0 });
+    const offer = buildOffer({
+      runSeed: draftState.runSeed,
+      round: index + 1,
+      slot,
+      offerIndex: 0,
+    });
     const card = offer.cards[0];
     if (card === undefined) throw new Error('fake offer missing card');
     return {
@@ -1034,29 +1151,33 @@ function foldAggregate(
 }
 
 function humanTeamParticipants(): HavocGameResult['home']['participants'] {
-  return FAKE_HUMAN_STARTER_IDS.map((instanceId, index) => ({
-    instanceId,
-    kind: 'starter' as const,
-    slot: POSITIONS[index] ?? 'PG',
-    ownerInstanceId: null,
-    sourcePlayerId: `p-havoc-human-${String(index + 1)}`,
-    sourcePlayerVersionId: `pv-${'1'.repeat(32)}`,
-    displayName: HUMAN_STARTER_NAMES[index] ?? 'Marcus Webb',
-    ...buildHavocStatLine(),
-  }));
+  return FAKE_HUMAN_STARTER_IDS.map((instanceId, index) =>
+    havocParticipantLineSchema.parse({
+      instanceId,
+      kind: 'starter',
+      slot: POSITIONS[index] ?? 'PG',
+      ownerInstanceId: null,
+      sourcePlayerId: `p-havoc-human-${String(index + 1)}`,
+      sourcePlayerVersionId: `pv-${'1'.repeat(32)}`,
+      displayName: HUMAN_STARTER_NAMES[index] ?? 'Marcus Webb',
+      ...buildHavocStatLine(),
+    }),
+  );
 }
 
 function opponentTeamParticipants(): HavocGameResult['away']['participants'] {
-  return OPPONENT_STARTER_NAMES.map((displayName, index) => ({
-    instanceId: instanceHex(31 + index),
-    kind: 'starter' as const,
-    slot: POSITIONS[index] ?? 'PG',
-    ownerInstanceId: null,
-    sourcePlayerId: `p-havoc-opponent-${String(index + 1)}`,
-    sourcePlayerVersionId: null,
-    displayName,
-    ...buildHavocStatLine(),
-  }));
+  return OPPONENT_STARTER_NAMES.map((displayName, index) =>
+    havocParticipantLineSchema.parse({
+      instanceId: instanceHex(31 + index),
+      kind: 'starter',
+      slot: POSITIONS[index] ?? 'PG',
+      ownerInstanceId: null,
+      sourcePlayerId: `p-havoc-opponent-${String(index + 1)}`,
+      sourcePlayerVersionId: null,
+      displayName,
+      ...buildHavocStatLine(),
+    }),
+  );
 }
 
 export function buildFakeGameResult(summary: HavocGameSummary): HavocGameResult {
@@ -1142,13 +1263,13 @@ export function buildFakeGameResult(summary: HavocGameSummary): HavocGameResult 
 }
 
 export function buildFakeTape(summary: HavocGameSummary): HavocGameTape {
+  type TapeChunk = { kind: 'field-goal'; nominal: 2 | 3 } | { kind: 'free-throw'; nominal: 1 };
   const events: HavocGameTape['events'] = [];
   const scoring: HavocGameTape['scoring'] = [];
   let eventSequence = 0;
   let scoringSequence = 0;
-  const humanSide: HavocSide = summary.humanSide === 'home' ? 'home' : 'away';
-  const chunksFor = (total: number): Array<{ nominal: 2 | 3 | 1; kind: 'field-goal' | 'free-throw' }> => {
-    const chunks: Array<{ nominal: 2 | 3 | 1; kind: 'field-goal' | 'free-throw' }> = [];
+  const chunksFor = (total: number): TapeChunk[] => {
+    const chunks: TapeChunk[] = [];
     let remaining = Math.max(0, total);
     while (remaining >= 4) {
       chunks.push({ nominal: 3, kind: 'field-goal' });
@@ -1172,20 +1293,13 @@ export function buildFakeTape(summary: HavocGameSummary): HavocGameTape {
     });
     eventSequence += 1;
   }
-  const pushChunk = (
-    chunk: { nominal: 2 | 3 | 1; kind: 'field-goal' | 'free-throw' },
-    side: HavocSide,
-    ordinal: number,
-  ): void => {
+  const pushChunk = (chunk: TapeChunk, side: HavocSide, ordinal: number): void => {
     const period = Math.min(4, Math.floor((ordinal * 4) / Math.max(1, total)) + 1);
     const clockSeconds = Math.max(
       0,
-      Math.floor(720 - ((ordinal * 720) / Math.max(1, total)) % 720),
+      Math.floor(720 - (((ordinal * 720) / Math.max(1, total)) % 720)),
     );
-    const instanceId =
-      side === 'human'
-        ? (FAKE_HUMAN_STARTER_IDS[ordinal % 5] ?? FAKE_HUMAN_STARTER_IDS[0]!)
-        : instanceHex(31 + (ordinal % 5));
+    const instanceId = side === 'human' ? starterId(ordinal % 5) : instanceHex(31 + (ordinal % 5));
     if (chunk.kind === 'field-goal') {
       events.push({
         kind: 'shot-attempt',
@@ -1210,9 +1324,7 @@ export function buildFakeTape(summary: HavocGameSummary): HavocGameTape {
         clockSeconds,
         possessionId: ordinal,
         assisterInstanceId:
-          side === 'human'
-            ? (FAKE_HUMAN_STARTER_IDS[(ordinal + 1) % 5] ?? FAKE_HUMAN_STARTER_IDS[0]!)
-            : instanceHex(31 + ((ordinal + 1) % 5)),
+          side === 'human' ? starterId((ordinal + 1) % 5) : instanceHex(31 + ((ordinal + 1) % 5)),
         scorerInstanceId: instanceId,
         side,
       });
@@ -1255,12 +1367,13 @@ export function buildFakeTape(summary: HavocGameSummary): HavocGameTape {
   let humanIndex = 0;
   let opponentIndex = 0;
   while (humanIndex < humanChunks.length || opponentIndex < opponentChunks.length) {
-    const takeHuman = ordinal % 2 === 0 ? humanIndex < humanChunks.length : opponentIndex >= opponentChunks.length;
+    const takeHuman =
+      ordinal % 2 === 0 ? humanIndex < humanChunks.length : opponentIndex >= opponentChunks.length;
     if (takeHuman) {
-      pushChunk(humanChunks[humanIndex]!, 'human', ordinal);
+      pushChunk(requireAt(humanChunks, humanIndex), 'human', ordinal);
       humanIndex += 1;
     } else {
-      pushChunk(opponentChunks[opponentIndex]!, 'opponent', ordinal);
+      pushChunk(requireAt(opponentChunks, opponentIndex), 'opponent', ordinal);
       opponentIndex += 1;
     }
     ordinal += 1;
@@ -1303,7 +1416,7 @@ export function buildNegativeScoreTape(gameNumber = 1): HavocGameTape {
     actorIndex: number;
   }): void => {
     const instanceId =
-      entry.side === 'human' ? FAKE_HUMAN_STARTER_IDS[entry.actorIndex]! : instanceHex(31 + entry.actorIndex);
+      entry.side === 'human' ? starterId(entry.actorIndex) : instanceHex(31 + entry.actorIndex);
     events.push({
       kind: 'shot-attempt',
       sequence: eventSequence,
@@ -1343,7 +1456,7 @@ export function buildNegativeScoreTape(gameNumber = 1): HavocGameTape {
   for (let index = 0; index < 5; index += 1) {
     const period = index < 3 ? 1 : 2;
     const clockSeconds = 400 - index * 40;
-    const instanceId = FAKE_HUMAN_STARTER_IDS[index % 5]!;
+    const instanceId = starterId(index % 5);
     events.push({
       kind: 'shot-attempt',
       sequence: eventSequence,
@@ -1403,7 +1516,7 @@ export function buildMutationTape(gameNumber = 1): HavocGameTape {
   const scoring: HavocGameTape['scoring'] = [];
   let eventSequence = 0;
   let scoringSequence = 0;
-  const shooter = FAKE_HUMAN_STARTER_IDS[0]!;
+  const shooter = starterId(0);
   events.push({
     kind: 'shot-attempt',
     sequence: eventSequence,
@@ -1489,7 +1602,7 @@ export function buildMutationTape(gameNumber = 1): HavocGameTape {
     gameNumber,
     period: 1,
     clockSeconds: 520,
-    ownerInstanceId: FAKE_HUMAN_STARTER_IDS[1]!,
+    ownerInstanceId: starterId(1),
     side: 'human',
     attemptOrdinal: 5,
     rolled: 6,
@@ -1505,7 +1618,7 @@ export function buildMutationTape(gameNumber = 1): HavocGameTape {
     possessionId: 3,
     side: 'human',
     kind: 'field-goal',
-    actorInstanceId: FAKE_HUMAN_STARTER_IDS[1]!,
+    actorInstanceId: starterId(1),
     beneficiaryInstanceId: null,
     nominalPoints: 3,
     addends: [{ source: 'roulette', points: 3 }],
@@ -1537,9 +1650,9 @@ export function buildMutationTape(gameNumber = 1): HavocGameTape {
 
 export function buildCloneGameResult(gameNumber = 1): HavocGameResult {
   const starterIds = FAKE_HUMAN_STARTER_IDS;
-  const replacementId = FAKE_HUMAN_REPLACEMENT_IDS[2]!;
-  const cloneId = FAKE_HUMAN_CLONE_IDS[0]!;
-  const humanParticipants: HavocGameResult['home']['participants'] = [
+  const replacementInstanceId = replacementId(2);
+  const cloneInstanceId = cloneId(0);
+  const humanParticipants = [
     ...starterIds.map((instanceId, index) => ({
       instanceId,
       kind: 'starter' as const,
@@ -1557,10 +1670,10 @@ export function buildCloneGameResult(gameNumber = 1): HavocGameResult {
       }),
     })),
     {
-      instanceId: replacementId,
+      instanceId: replacementInstanceId,
       kind: 'replacement' as const,
       slot: 'SF',
-      ownerInstanceId: starterIds[2]!,
+      ownerInstanceId: requireAt(starterIds, 2),
       sourcePlayerId: 'p-havoc-human-3',
       sourcePlayerVersionId: `pv-${'1'.repeat(32)}`,
       displayName: HUMAN_REPLACEMENT_NAMES[2] ?? 'Pavel Novak',
@@ -1573,10 +1686,10 @@ export function buildCloneGameResult(gameNumber = 1): HavocGameResult {
       }),
     },
     {
-      instanceId: cloneId,
+      instanceId: cloneInstanceId,
       kind: 'clone' as const,
       slot: 'PG',
-      ownerInstanceId: starterIds[0]!,
+      ownerInstanceId: requireAt(starterIds, 0),
       sourcePlayerId: 'p-havoc-human-1',
       sourcePlayerVersionId: `pv-${'1'.repeat(32)}`,
       displayName: `${HUMAN_STARTER_NAMES[0] ?? 'Marcus Webb'} (Clone)`,
@@ -1591,20 +1704,27 @@ export function buildCloneGameResult(gameNumber = 1): HavocGameResult {
       }),
     },
   ];
-  const opponentParticipants: HavocGameResult['away']['participants'] = OPPONENT_STARTER_NAMES.map(
-    (displayName, index) => ({
-      instanceId: instanceHex(31 + index),
-      kind: 'starter' as const,
-      slot: POSITIONS[index] ?? 'PG',
-      ownerInstanceId: null,
-      sourcePlayerId: `p-havoc-opponent-${String(index + 1)}`,
-      sourcePlayerVersionId: null,
-      displayName,
-      ...buildHavocStatLine({ points: 14 - index, rebounds: { total: 4, offensive: 1, defensive: 3 } }),
+  const opponentParticipants = OPPONENT_STARTER_NAMES.map((displayName, index) => ({
+    instanceId: instanceHex(31 + index),
+    kind: 'starter' as const,
+    slot: POSITIONS[index] ?? 'PG',
+    ownerInstanceId: null,
+    sourcePlayerId: `p-havoc-opponent-${String(index + 1)}`,
+    sourcePlayerVersionId: null,
+    displayName,
+    ...buildHavocStatLine({
+      points: 14 - index,
+      rebounds: { total: 4, offensive: 1, defensive: 3 },
     }),
+  }));
+  const humanPoints = humanParticipants.reduce(
+    (total, participant) => total + participant.points,
+    0,
   );
-  const humanPoints = humanParticipants.reduce((total, participant) => total + participant.points, 0);
-  const opponentPoints = opponentParticipants.reduce((total, participant) => total + participant.points, 0);
+  const opponentPoints = opponentParticipants.reduce(
+    (total, participant) => total + participant.points,
+    0,
+  );
   const humanTeam = {
     side: 'home' as const,
     teamId: 'human-team',
@@ -1661,7 +1781,7 @@ export function buildCloneGameResult(gameNumber = 1): HavocGameResult {
     inputDigest: fakeHex32(),
     rollups: [
       {
-        ownerInstanceId: FAKE_HUMAN_STARTER_IDS[0]!,
+        ownerInstanceId: starterId(0),
         mutationId: 'clone-army',
         side: 'human',
         triggers: 1,
@@ -1676,7 +1796,7 @@ export function buildCloneGameResult(gameNumber = 1): HavocGameResult {
         activeSeconds: 620,
       },
       {
-        ownerInstanceId: FAKE_HUMAN_STARTER_IDS[1]!,
+        ownerInstanceId: starterId(1),
         mutationId: 'four-point-dunk',
         side: 'human',
         triggers: 3,
@@ -1696,7 +1816,7 @@ export function buildCloneGameResult(gameNumber = 1): HavocGameResult {
         kind: 'foul-out',
         period: 3,
         clockSeconds: 420,
-        instanceId: FAKE_HUMAN_STARTER_IDS[2]!,
+        instanceId: starterId(2),
         mutationId: null,
         pointsDelta: 0,
       },
@@ -1712,7 +1832,7 @@ export function buildFakeComparison(runId = RUN_ID): HavocComparison {
     const havocOpponent = havocWin ? havocHuman - 5 : havocHuman + 6;
     const normalWin = gameNumber % 4 !== 0;
     const normalHuman = 98 + (gameNumber % 5);
-    const normalOpponent = normalWin ? normalHuman - 3 : normalHuman + 7;
+    const normalOpponent = normalWin ? normalHuman - 7 : normalHuman + 7;
     return havocMatchedGameSchema.parse({
       gameNumber,
       opponentId: OPPONENT_ID,
@@ -1745,7 +1865,7 @@ export function buildFakeComparison(runId = RUN_ID): HavocComparison {
                 kind: 'mutation',
                 period: 2,
                 clockSeconds: 420,
-                instanceId: FAKE_HUMAN_STARTER_IDS[0]!,
+                instanceId: starterId(0),
                 mutationId: 'four-point-dunk',
                 pointsDelta: 2,
               },
@@ -1756,7 +1876,9 @@ export function buildFakeComparison(runId = RUN_ID): HavocComparison {
   const havocTotals = totalsFromGames(games, 'havoc');
   const normalTotals = totalsFromGames(games, 'normal');
   const slots = buildFakeSlots();
-  const mvpSlot = slots.reduce((best, slot) => (slot.productionIndex.gain > best.productionIndex.gain ? slot : best));
+  const mvpSlot = slots.reduce((best, slot) =>
+    slot.productionIndex.gain > best.productionIndex.gain ? slot : best,
+  );
   const mutations = [
     {
       mutationId: 'four-point-dunk' as const,
@@ -1964,7 +2086,7 @@ function buildFakeSlots(): HavocSlotComparison[] {
     const havocLines: HavocSlotComparison['havoc']['lines'] = [
       {
         kind: 'starter',
-        instanceId: FAKE_HUMAN_STARTER_IDS[index]!,
+        instanceId: starterId(index),
         displayName: HUMAN_STARTER_NAMES[index] ?? 'Marcus Webb',
         line: havocStarter,
       },
@@ -1972,7 +2094,7 @@ function buildFakeSlots(): HavocSlotComparison[] {
     if (index === 0) {
       havocLines.push({
         kind: 'clone',
-        instanceId: FAKE_HUMAN_CLONE_IDS[0]!,
+        instanceId: cloneId(0),
         displayName: `${HUMAN_STARTER_NAMES[0] ?? 'Marcus Webb'} (Clone)`,
         line: buildHavocStatLine({
           points: 10,
@@ -1988,7 +2110,7 @@ function buildFakeSlots(): HavocSlotComparison[] {
     if (index === 2) {
       havocLines.push({
         kind: 'replacement',
-        instanceId: FAKE_HUMAN_REPLACEMENT_IDS[2]!,
+        instanceId: replacementId(2),
         displayName: HUMAN_REPLACEMENT_NAMES[2] ?? 'Pavel Novak',
         line: buildHavocStatLine({
           points: 5,
@@ -2020,7 +2142,7 @@ function buildFakeSlots(): HavocSlotComparison[] {
       30 * line.steals +
       30 * line.blocks -
       10 * line.turnovers;
-    return {
+    return havocSlotComparisonSchema.parse({
       slot,
       displayName: HUMAN_STARTER_NAMES[index] ?? 'Marcus Webb',
       playerId: `p-havoc-slot-${String(index + 1)}`,
@@ -2031,7 +2153,7 @@ function buildFakeSlots(): HavocSlotComparison[] {
         lines: [
           {
             kind: 'starter',
-            instanceId: FAKE_HUMAN_STARTER_IDS[index]!,
+            instanceId: starterId(index),
             displayName: HUMAN_STARTER_NAMES[index] ?? 'Marcus Webb',
             line: normalStarter,
           },
@@ -2043,7 +2165,7 @@ function buildFakeSlots(): HavocSlotComparison[] {
         normal: indexOf(normalCombined),
         gain: indexOf(havocCombined) - indexOf(normalCombined),
       },
-    };
+    });
   });
 }
 
@@ -2052,27 +2174,27 @@ export function buildFakeReport(
   comparison: HavocComparison | null = null,
   havocTotalsOverride?: HavocSeasonTotals,
 ): HavocReport {
-  const havocTotals = comparison?.havoc ?? havocTotalsOverride ?? {
-    games: 82,
-    wins: 55,
-    losses: 27,
-    pointsFor: 8321,
-    pointsAgainst: 8110,
-    differential: 211,
-    averagePointsFor: 101.5,
-    averagePointsAgainst: 98.9,
-    largestPointsFor: 128,
-    largestPointsAgainst: 122,
-    adjustments: 214,
-  };
+  const havocTotals = comparison?.havoc ??
+    havocTotalsOverride ?? {
+      games: 82,
+      wins: 55,
+      losses: 27,
+      pointsFor: 8321,
+      pointsAgainst: 8110,
+      differential: 211,
+      averagePointsFor: 101.5,
+      averagePointsAgainst: 98.9,
+      largestPointsFor: 128,
+      largestPointsAgainst: 122,
+      adjustments: 214,
+    };
   const wildestGames =
     comparison === null
       ? []
       : [...comparison.games]
           .sort(
             (a, b) =>
-              Math.abs(a.deltas.margin) - Math.abs(b.deltas.margin) ||
-              a.gameNumber - b.gameNumber,
+              Math.abs(a.deltas.margin) - Math.abs(b.deltas.margin) || a.gameNumber - b.gameNumber,
           )
           .slice(0, 5)
           .map((game) => ({
@@ -2199,5 +2321,10 @@ export function havocProgressOf(
   variant: HavocVariant,
   gamesCompleted: number,
 ): HavocSimulationProgress {
-  return { variant, gamesCompleted, gamesTotal: HAVOC_GAME_COUNT, latestGameNumber: gamesCompleted };
+  return {
+    variant,
+    gamesCompleted,
+    gamesTotal: HAVOC_GAME_COUNT,
+    latestGameNumber: gamesCompleted,
+  };
 }

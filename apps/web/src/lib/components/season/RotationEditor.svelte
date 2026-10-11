@@ -1,5 +1,6 @@
 <script lang="ts">
   import { ChevronDown, ChevronUp, Star, UserMinus, UserPlus } from '@lucide/svelte';
+  import type { Snippet } from 'svelte';
   import type {
     HoopRushManifest,
     SeasonEffectsState,
@@ -41,6 +42,7 @@
     presetLoad = null,
     presetHorizon = null,
     onSelectPlayer = null,
+    headerActions = null,
   }: {
     editor: RotationEditor;
     disabled: boolean;
@@ -62,6 +64,7 @@
     }> | null;
     presetHorizon?: number | null;
     onSelectPlayer?: ((playerVersionId: string) => void) | null;
+    headerActions?: Snippet | null;
   } = $props();
   const rows = $derived.by(() => {
     void revision;
@@ -439,97 +442,110 @@
 </script>
 
 <div class="flex min-w-0 flex-col gap-4">
-  <div class="flex flex-col gap-3">
-    <div>
-      <h2 class="sr-section-label">Rotation</h2>
-      <p class="mt-0.5 text-xs text-muted-foreground">
-        Set your starters, minutes, and closing five.
-      </p>
-    </div>
-    <div>
-      <div class="grid grid-cols-3 gap-2" role="group" aria-label="Minute strategies">
-        {#each ROTATION_PRESETS as preset (preset)}
+  <div
+    class="grid min-w-0 items-start gap-4 {headerActions !== null
+      ? 'lg:grid-cols-[minmax(0,1fr)_minmax(0,400px)] lg:gap-6'
+      : ''}"
+  >
+    <div class="flex min-w-0 flex-col gap-4">
+      <div class="flex flex-col gap-3">
+        <div>
+          <h2 class="sr-section-label">Rotation</h2>
+          <p class="mt-0.5 text-xs text-muted-foreground">
+            Set your starters, minutes, and closing five.
+          </p>
+        </div>
+        <div>
+          <div class="grid grid-cols-3 gap-2" role="group" aria-label="Minute strategies">
+            {#each ROTATION_PRESETS as preset (preset)}
+              <button
+                type="button"
+                onclick={() => applyPreset(preset)}
+                {disabled}
+                aria-pressed={appliedPreset === preset ? 'true' : 'false'}
+                class="sr-btn-ghost px-2! py-1.5! text-xs! outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none {appliedPreset ===
+                preset
+                  ? 'border-primary! bg-primary/10! text-primary!'
+                  : ''}"
+              >
+                {presetLabel(preset)}
+              </button>
+            {/each}
+          </div>
+          <p class="mt-1.5 text-xs text-muted-foreground">
+            Presets retune target minutes from ratings, stamina, and fatigue. Starters and closing
+            five stay the same.
+          </p>
+        </div>
+      </div>
+
+      <div class="flex flex-col gap-2">
+        <p class="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1" aria-live="polite">
+          <span
+            class="sr-number text-2xl leading-none font-extrabold"
+            style="color: var(--sr-paper)"
+          >
+            {minutesTotal} / 240
+          </span>
+          <span class="sr-section-label self-center">minutes assigned</span>
+          {#if minutesRemaining !== 0}
+            <span class="font-mono text-[11px] font-bold text-destructive"
+              >· {Math.abs(minutesRemaining)} remaining</span
+            >
+          {:else}
+            <span class="font-mono text-[11px] font-bold text-positive">✓</span>
+          {/if}
+          <span
+            class="inline-flex items-center gap-1 self-center font-mono text-[10px]"
+            aria-label={closingValid ? 'Closing five valid' : 'Closing five needs work'}
+          >
+            <span
+              aria-hidden="true"
+              class="inline-block h-2 w-2 rounded-full {closingValid
+                ? 'bg-positive'
+                : 'bg-destructive'}"
+            ></span>
+            {closingValid ? '5 closers set' : 'Closers need work'}
+          </span>
+        </p>
+        <div
+          class="h-2 overflow-hidden rounded-full bg-surface-2"
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={240}
+          aria-valuenow={minutesTotal}
+          aria-label="Target minutes total"
+        >
+          <div
+            class="h-full rounded-full transition-[width] duration-200 motion-reduce:transition-none {minutesTotal ===
+            240
+              ? 'bg-positive'
+              : 'bg-primary'}"
+            style:width="{minutesProgress}%"
+          ></div>
+        </div>
+        {#if rebalanceNotice !== null}
+          <p role="status" class="text-xs font-semibold text-primary">{rebalanceNotice}</p>
+        {/if}
+        {#if minutesRemaining !== 0}
           <button
             type="button"
-            onclick={() => applyPreset(preset)}
+            onclick={balanceMinutes}
             {disabled}
-            aria-pressed={appliedPreset === preset ? 'true' : 'false'}
-            class="sr-btn-ghost px-2! py-1.5! text-xs! outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none {appliedPreset ===
-            preset
-              ? 'border-primary! bg-primary/10! text-primary!'
-              : ''}"
+            class="sr-btn-ghost self-start px-4! text-xs! outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none"
           >
-            {presetLabel(preset)}
+            Balance to 240
+            {#if minutesRemaining > 0}
+              (+{minutesRemaining})
+            {:else}
+              ({minutesRemaining})
+            {/if}
           </button>
-        {/each}
-      </div>
-      <p class="mt-1.5 text-xs text-muted-foreground">
-        Presets retune target minutes from ratings, stamina, and fatigue. Starters and closing five
-        stay the same.
-      </p>
-    </div>
-  </div>
-
-  <div class="flex flex-col gap-2">
-    <p class="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1" aria-live="polite">
-      <span
-        class="sr-number text-2xl leading-none font-extrabold"
-        style="color: var(--sr-paper)"
-      >
-        {minutesTotal} / 240
-      </span>
-      <span class="sr-section-label self-center">minutes assigned</span>
-      {#if minutesRemaining !== 0}
-        <span class="font-mono text-[11px] font-bold text-destructive"
-          >· {Math.abs(minutesRemaining)} remaining</span
-        >
-      {:else}
-        <span class="font-mono text-[11px] font-bold text-positive">✓</span>
-      {/if}
-    </p>
-    <p
-      class="inline-flex items-center gap-1 font-mono text-[10px]"
-      aria-label={closingValid ? 'Closing five valid' : 'Closing five needs work'}
-    >
-      <span
-        aria-hidden="true"
-        class="inline-block h-2 w-2 rounded-full {closingValid ? 'bg-positive' : 'bg-destructive'}"
-      ></span>
-      {closingValid ? '5 closers set' : 'Closers need work'}
-    </p>
-    <div
-      class="h-2 overflow-hidden rounded-full bg-surface-2"
-      role="progressbar"
-      aria-valuemin={0}
-      aria-valuemax={240}
-      aria-valuenow={minutesTotal}
-      aria-label="Target minutes total"
-    >
-      <div
-        class="h-full rounded-full transition-[width] duration-200 motion-reduce:transition-none {minutesTotal ===
-        240
-          ? 'bg-positive'
-          : 'bg-primary'}"
-        style:width="{minutesProgress}%"
-      ></div>
-    </div>
-    {#if rebalanceNotice !== null}
-      <p role="status" class="text-xs font-semibold text-primary">{rebalanceNotice}</p>
-    {/if}
-    {#if minutesRemaining !== 0}
-      <button
-        type="button"
-        onclick={balanceMinutes}
-        {disabled}
-        class="sr-btn-ghost self-start px-4! text-xs! outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none"
-      >
-        Balance to 240
-        {#if minutesRemaining > 0}
-          (+{minutesRemaining})
-        {:else}
-          ({minutesRemaining})
         {/if}
-      </button>
+      </div>
+    </div>
+    {#if headerActions !== null}
+      <div class="min-w-0">{@render headerActions()}</div>
     {/if}
   </div>
 
@@ -537,21 +553,15 @@
     aria-labelledby="active10-heading"
     class="sr-panel-quiet min-w-0 overflow-x-hidden p-3 sm:p-4"
   >
-    <h3 id="active10-heading" class="sr-section-label">
-      Active 10
-    </h3>
+    <h3 id="active10-heading" class="sr-section-label">Active 10</h3>
 
     <ol class="mt-2 flex flex-col gap-2" aria-label="Active 10 in playing order">
       {#each activeOrdered as row, index (row.member.playerVersionId)}
         {#if index === 0}
-          <li aria-hidden="true" class="sr-section-label pt-1">
-            Starters
-          </li>
+          <li aria-hidden="true" class="sr-section-label pt-1">Starters</li>
         {/if}
         {#if index === 5}
-          <li aria-hidden="true" class="sr-section-label pt-2">
-            Bench
-          </li>
+          <li aria-hidden="true" class="sr-section-label pt-2">Bench</li>
         {/if}
         {@const rowFailures = humanizedFor(row.member.playerVersionId)}
         <li
@@ -559,7 +569,7 @@
           data-rotation-active-row
           data-player-version-id={row.member.playerVersionId}
           aria-label="{row.member.displayName}, {row.role}, {row.minutes} minutes"
-          class="flex scroll-mt-24 flex-col gap-2 rounded-xl border border-border/60 bg-surface-2/40 p-3 outline-none focus-visible:ring-2 focus-visible:ring-ring md:flex-row md:items-center md:gap-3{highlightOf(
+          class="flex scroll-mt-24 flex-col gap-2 rounded-xl border border-border/60 bg-surface-2/40 px-3 py-2.5 outline-none focus-visible:ring-2 focus-visible:ring-ring md:flex-row md:items-center md:gap-3{highlightOf(
             row.member.playerVersionId,
           )}"
         >
@@ -603,7 +613,7 @@
                         row.slotIndex,
                         (event.currentTarget as HTMLSelectElement).value,
                       )}
-                    class="min-h-11 min-w-0 w-full rounded-lg border border-border/60 bg-surface-2 px-3 py-2 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40 md:w-48 md:flex-none"
+                    class="min-h-11 min-w-0 w-full rounded-lg border border-border/60 bg-surface-2 px-3 py-2 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40 md:min-h-9 md:w-40 md:flex-none"
                   >
                     {#each editor.eligibleForSlot(row.slotIndex) as member (member.playerVersionId)}
                       <option value={member.playerVersionId}>{member.displayName}</option>
@@ -620,7 +630,7 @@
                       aria-label={`Move ${row.member.displayName} up in bench order`}
                       onclick={() => moveBenchRow(row.slotIndex, -1)}
                       disabled={disabled || row.slotIndex === 0}
-                      class="grid h-11 w-11 place-items-center rounded-lg border border-border/60 bg-surface-2 text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none"
+                      class="grid h-11 w-11 place-items-center rounded-lg border border-border/60 bg-surface-2 text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none md:h-9 md:w-9"
                     >
                       <ChevronUp class="h-4 w-4" />
                     </button>
@@ -629,7 +639,7 @@
                       aria-label={`Move ${row.member.displayName} down in bench order`}
                       onclick={() => moveBenchRow(row.slotIndex, 1)}
                       disabled={disabled || row.slotIndex === 4}
-                      class="grid h-11 w-11 place-items-center rounded-lg border border-border/60 bg-surface-2 text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none"
+                      class="grid h-11 w-11 place-items-center rounded-lg border border-border/60 bg-surface-2 text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none md:h-9 md:w-9"
                     >
                       <ChevronDown class="h-4 w-4" />
                     </button>
@@ -643,7 +653,7 @@
                     : `Add ${row.member.displayName} to closing five`}
                   onclick={() => toggleClosingFor(row.member.playerVersionId)}
                   {disabled}
-                  class="inline-flex h-11 min-h-11 shrink-0 items-center gap-1 rounded-lg border border-border/60 px-2.5 outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40 transition-colors motion-reduce:transition-none {row.closingIndex !==
+                  class="inline-flex h-11 min-h-11 shrink-0 items-center gap-1 rounded-lg border border-border/60 px-2.5 outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40 transition-colors motion-reduce:transition-none md:h-9 md:min-h-9 {row.closingIndex !==
                   -1
                     ? 'border-primary/50 bg-primary/15 text-primary'
                     : 'border-border/60 bg-surface-2 text-muted-foreground hover:bg-surface-3'}"
@@ -657,7 +667,7 @@
                     aria-label={`Demote ${row.member.displayName} to inactive`}
                     onclick={() => openSwap('demote', row.member.playerVersionId)}
                     {disabled}
-                    class="grid h-11 w-11 shrink-0 place-items-center rounded-lg border border-border/60 bg-surface-2 text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none"
+                    class="grid h-11 w-11 shrink-0 place-items-center rounded-lg border border-border/60 bg-surface-2 text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none md:h-9 md:w-9"
                   >
                     <UserMinus class="h-4 w-4" />
                   </button>
@@ -712,9 +722,7 @@
     class="sr-panel-quiet p-3 sm:p-4"
   >
     <div class="flex items-center justify-between gap-2">
-      <h3 id="closing-strip-heading" class="sr-section-label">
-        Closing five
-      </h3>
+      <h3 id="closing-strip-heading" class="sr-section-label">Closing five</h3>
       <span class="font-mono text-[10px] text-muted-foreground">
         {onSelectPlayer !== null ? 'tap a chip to view the player' : 'tap a chip to find the row'}
       </span>
@@ -840,13 +848,13 @@
     />
   {/if}
   <div class="min-w-0 flex-1">
-    <p class="text-sm font-semibold leading-snug">
-      {row.member.displayName}
+    <p
+      class="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm leading-snug font-semibold"
+    >
+      <span class="min-w-0">{row.member.displayName}</span>
       {#if isCloser}
-        <span class="sr-badge ml-1.5 align-middle" data-tone="hardwood">Closer</span>
+        <span class="sr-badge shrink-0" data-tone="hardwood">Closer</span>
       {/if}
-    </p>
-    <div class="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
       {#if overallByVersion?.has(row.member.playerVersionId)}
         {@const baseOvr = overallByVersion.get(row.member.playerVersionId)!}
         {@const ovrDelta = overallDeltaByVersion?.get(row.member.playerVersionId) ?? null}
@@ -877,8 +885,8 @@
       {:else}
         <span class="sr-chip shrink-0">Bench {row.slotIndex + 1}</span>
       {/if}
-    </div>
-    <p class="mt-1 font-mono text-[10px] leading-snug text-muted-foreground">
+    </p>
+    <p class="mt-0.5 font-mono text-[10px] leading-snug text-muted-foreground">
       {#if row.member.playable.length > 0}{formatPositions(row.member.playable)}{/if}
       {#if row.member.seasonKey !== undefined}
         · {row.member.seasonKey}{/if}
@@ -971,7 +979,7 @@
       aria-label={`Decrease minutes for ${row.member.displayName}`}
       onclick={() => changeMinutes(row.member.playerVersionId, -1)}
       {disabled}
-      class="grid h-11 w-11 place-items-center rounded-lg border border-border/60 bg-surface-2 text-base font-bold outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 disabled:opacity-40 motion-reduce:transition-none"
+      class="grid h-11 w-11 place-items-center rounded-lg border border-border/60 bg-surface-2 text-base font-bold outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 disabled:opacity-40 motion-reduce:transition-none md:h-9 md:w-9"
     >
       −
     </button>
@@ -994,7 +1002,7 @@
         aria-invalid={editError?.playerVersionId === row.member.playerVersionId
           ? 'true'
           : undefined}
-        class="h-11 w-12 rounded-md border border-border/60 bg-surface-2 px-1 text-center font-mono text-sm font-bold tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        class="h-11 w-12 rounded-md border border-border/60 bg-surface-2 px-1 text-center font-mono text-sm font-bold tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring md:h-9"
       />
     {:else}
       <button
@@ -1002,7 +1010,7 @@
         aria-label={`Edit target minutes for ${row.member.displayName}, currently ${row.minutes} minutes`}
         onclick={() => startEdit(row.member.playerVersionId, row.minutes)}
         {disabled}
-        class="sr-number h-11 w-12 rounded-md text-center text-sm font-extrabold outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 disabled:opacity-40 motion-reduce:transition-none"
+        class="sr-number h-11 w-12 rounded-md text-center text-sm font-extrabold outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 disabled:opacity-40 motion-reduce:transition-none md:h-9"
         style="color: var(--sr-paper)"
       >
         {row.minutes}
@@ -1013,7 +1021,7 @@
       aria-label={`Increase minutes for ${row.member.displayName}`}
       onclick={() => changeMinutes(row.member.playerVersionId, 1)}
       {disabled}
-      class="grid h-11 w-11 place-items-center rounded-lg border border-border/60 bg-surface-2 text-base font-bold outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 disabled:opacity-40 motion-reduce:transition-none"
+      class="grid h-11 w-11 place-items-center rounded-lg border border-border/60 bg-surface-2 text-base font-bold outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 disabled:opacity-40 motion-reduce:transition-none md:h-9 md:w-9"
     >
       +
     </button>
@@ -1023,7 +1031,7 @@
       title="Set to 0 without touching teammates"
       onclick={() => setZero(row.member.playerVersionId)}
       disabled={disabled || row.minutes === 0}
-      class="h-11 shrink-0 rounded-lg border border-border/60 bg-surface-2 px-2 font-mono text-[10px] font-bold text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none"
+      class="h-11 shrink-0 rounded-lg border border-border/60 bg-surface-2 px-2 font-mono text-[10px] font-bold text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none md:h-9"
     >
       DNP
     </button>

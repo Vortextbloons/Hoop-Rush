@@ -122,6 +122,9 @@
     readyCountdownMs === null ? null : formatCountdown(readyCountdownMs),
   );
   const nextGameNumber = $derived(series.currentGameNumber ?? Math.min(7, output.gameNumber + 1));
+  const canReady = $derived(
+    verification === 'verified' && !seriesOver && nextGameNumber > output.gameNumber,
+  );
   const readyLabel = $derived(
     localReady ? 'Ready' : seriesOver ? 'Ready' : `Ready for Game ${nextGameNumber}`,
   );
@@ -275,7 +278,7 @@
         </p>
       {/if}
     </div>
-    <button type="button" disabled={localReady} onclick={onready}>{readyLabel}</button>
+    <button type="button" disabled={localReady || !canReady} onclick={onready}>{readyLabel}</button>
   </footer>
 </section>
 

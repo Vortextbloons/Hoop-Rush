@@ -138,12 +138,7 @@
   {/if}
 
   <div class="mt-4 flex flex-wrap items-center gap-3">
-    <button
-      type="button"
-      onclick={onResume}
-      disabled={busy || pending === null}
-      class="sr-btn"
-    >
+    <button type="button" onclick={onResume} disabled={busy || pending === null} class="sr-btn">
       Play on
     </button>
     <span class="sr-section-label"> Picks up where you stopped. </span>
@@ -161,7 +156,9 @@
       class="sr-dialog w-[min(28rem,calc(100vw_-_1.5rem))] max-h-[85dvh] overflow-y-auto p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] outline-none sm:p-5"
     >
       <div class="flex items-start justify-between gap-3">
-        <Dialog.Title class="font-display truncate text-lg font-extrabold tracking-tight uppercase text-foreground">
+        <Dialog.Title
+          class="font-display truncate text-lg font-extrabold tracking-tight uppercase text-foreground"
+        >
           Skip this game?
         </Dialog.Title>
         <Dialog.Close

@@ -16,7 +16,10 @@
   data-testid="league-pulse"
   class="sr-panel-quiet flex flex-col gap-2 p-4"
 >
-  <h2 id="league-pulse-heading" class="font-display text-base font-extrabold uppercase tracking-tight text-foreground">
+  <h2
+    id="league-pulse-heading"
+    class="font-display text-base font-extrabold uppercase tracking-tight text-foreground"
+  >
     League pulse
   </h2>
   {#if entries.length === 0}

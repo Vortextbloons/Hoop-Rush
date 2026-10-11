@@ -77,14 +77,25 @@ vi.mock('./health.ts', async (importOriginal) => {
       humanFranchiseId: string,
     ): SeasonGameSummary => {
       const game = run.games.find((entry) => entry.gameId === gameId);
-      const homeFranchiseId = game?.homeFranchiseId ?? franchiseIdSchema.parse('lakers');
-      const awayFranchiseId = game?.awayFranchiseId ?? franchiseIdSchema.parse('celtics');
+      if (game === undefined) {
+        throw new Error(`season forfeit: game ${gameId} is not in the run schedule`);
+      }
+      if (
+        game.homeFranchiseId !== humanFranchiseId &&
+        game.awayFranchiseId !== humanFranchiseId
+      ) {
+        throw new Error(
+          `season forfeit: game ${gameId} does not involve ${humanFranchiseId} (${game.homeFranchiseId} vs ${game.awayFranchiseId})`,
+        );
+      }
+      const homeFranchiseId = game.homeFranchiseId;
+      const awayFranchiseId = game.awayFranchiseId;
       const humanIsHome = homeFranchiseId === humanFranchiseId;
       return {
         schemaVersion: 1,
         summaryVersion: 'season-game-summary-v4',
         gameId: seasonGameIdSchema.parse(gameId),
-        round: game?.round ?? 1,
+        round: game.round,
         homeFranchiseId,
         awayFranchiseId,
         status: 'forfeit',
@@ -925,13 +936,22 @@ describe('resume-season-block command', () => {
 describe('forfeit-interrupted-game command', () => {
   it('accepts a matching forfeit, appends the summary, and advances the pending', () => {
     const { run, context } = windowedFixture();
-    const pending = pendingOf(run);
+    const humanGame = run.games.find(
+      (entry) => entry.homeFranchiseId === HUMAN || entry.awayFranchiseId === HUMAN,
+    );
+    if (humanGame === undefined) throw new Error('fixture has no human game');
+    const forfeitedGameId = humanGame.gameId;
+    const nextNumber = Number(forfeitedGameId.slice(1)) + 1;
+    const expectedNextGameId = seasonGameIdSchema.parse(
+      `s${String(nextNumber).padStart(6, '0')}`,
+    );
+    const pending = pendingOf(run, { nextGameId: forfeitedGameId });
     const output = handleSeasonRunCommand(
       commandOf(run, {
         command: 'forfeit-interrupted-game',
         commandId: commandIdSchema.parse('forfeit-1'),
         blockIndex: 3,
-        nextGameId: seasonGameIdSchema.parse('s000301'),
+        nextGameId: forfeitedGameId,
       }),
       { ...context, run, pending },
     );
@@ -939,12 +959,31 @@ describe('forfeit-interrupted-game command', () => {
     if (outputResult.command !== 'forfeit-interrupted-game') throw new Error('unexpected command');
     const result = outputResult.result;
     if (result.status !== 'accepted') throw new Error('expected acceptance');
-    expect(result.forfeitedGameId).toBe('s000301');
-    expect(result.nextGameId).toBe('s000302');
+    expect(result.forfeitedGameId).toBe(forfeitedGameId);
+    expect(result.nextGameId).toBe(expectedNextGameId);
     expect(output.pending?.summaries).toHaveLength(1);
     expect(output.pending?.summaries[0]?.status).toBe('forfeit');
     expect(output.pending?.summaries[0]?.forfeitLoserFranchiseId).toBe(HUMAN);
     expect(output.run.stateRevision).toBe(run.stateRevision + 1);
+  });
+  it('throws when the forfeited game does not involve the human franchise', () => {
+    const { run, context } = windowedFixture();
+    const nonHumanGame = run.games.find(
+      (entry) => entry.homeFranchiseId !== HUMAN && entry.awayFranchiseId !== HUMAN,
+    );
+    if (nonHumanGame === undefined) throw new Error('fixture has no non-human game');
+    const pending = pendingOf(run, { nextGameId: nonHumanGame.gameId });
+    expect(() =>
+      handleSeasonRunCommand(
+        commandOf(run, {
+          command: 'forfeit-interrupted-game',
+          commandId: commandIdSchema.parse('forfeit-bad'),
+          blockIndex: 3,
+          nextGameId: nonHumanGame.gameId,
+        }),
+        { ...context, run, pending },
+      ),
+    ).toThrow(/does not involve/);
   });
 });
 describe('command replay determinism', () => {

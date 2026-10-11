@@ -55,8 +55,7 @@
         Back to your run
       </h1>
       <p class="mt-2 text-sm text-muted-foreground">
-        Record {havocRecordLabel(run.havocWins, run.havocLosses)} · game {run.havocCursor} of 82
-        played.
+        Record {havocRecordLabel(run.havocWins, run.havocLosses)} · game {run.havocCursor} of 82 played.
       </p>
       {#if objective !== null}
         <p class="mt-1 text-sm font-semibold">{objective.label} — {objective.detail}</p>
@@ -91,9 +90,7 @@
       <p class="font-mono text-[10px] font-bold tracking-[0.16em] text-primary uppercase">
         Mode 05 · Hoop Havoc
       </p>
-      <h1
-        class="font-display mt-2 text-3xl font-extrabold tracking-tight uppercase sm:text-4xl"
-      >
+      <h1 class="font-display mt-2 text-3xl font-extrabold tracking-tight uppercase sm:text-4xl">
         Draft freaks. Survive 82.
       </h1>
       <p class="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
@@ -104,8 +101,8 @@
       <ul class="mt-4 flex flex-col gap-2 text-sm text-muted-foreground">
         <li class="flex gap-2">
           <span aria-hidden="true" class="text-primary">•</span>
-          Each card carries a mutation package that changes real simulation behavior: ratings,
-          tendencies, dimensions, and event rules.
+          Each card carries a mutation package that changes real simulation behavior: ratings, tendencies,
+          dimensions, and event rules.
         </li>
         <li class="flex gap-2">
           <span aria-hidden="true" class="text-primary">•</span>
@@ -113,13 +110,13 @@
         </li>
         <li class="flex gap-2">
           <span aria-hidden="true" class="text-primary">•</span>
-          No guarantees: overpowered and disastrous combinations are both legitimate. Mutations
-          change the math, they do not promise more wins.
+          No guarantees: overpowered and disastrous combinations are both legitimate. Mutations change
+          the math, they do not promise more wins.
         </li>
         <li class="flex gap-2">
           <span aria-hidden="true" class="text-primary">•</span>
-          After all 82 games, a matched normal season with the same schedule and seeds reveals how
-          the mutations actually changed the year.
+          After all 82 games, a matched normal season with the same schedule and seeds reveals how the
+          mutations actually changed the year.
         </li>
       </ul>
       <div class="mt-6 flex flex-wrap items-center gap-3">
@@ -140,7 +137,10 @@
         </a>
       </div>
       {#if controller.error !== null}
-        <p role="alert" class="mt-4 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs">
+        <p
+          role="alert"
+          class="mt-4 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs"
+        >
           {controller.error}
         </p>
       {/if}

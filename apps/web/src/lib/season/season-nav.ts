@@ -33,7 +33,12 @@ export function buildSeasonNavGroups(
   facts: SeasonNavFacts,
 ): SeasonNavGroup[] {
   const postseason = isPostseasonStage(facts.stage);
-  const gameday: NavItem = { id: 'hub', label: 'Gameday', href: '/season/run', icon: icons.gameday };
+  const gameday: NavItem = {
+    id: 'hub',
+    label: 'Gameday',
+    href: '/season/run',
+    icon: icons.gameday,
+  };
   const team: NavItem = { id: 'team', label: 'Team', href: '/season/run/team', icon: icons.team };
   const standings: NavItem = {
     id: 'league',
@@ -65,17 +70,13 @@ export function buildSeasonNavGroups(
     href: '/season/run/free-agency',
     icon: icons.frontOffice,
   };
-  const groups: SeasonNavGroup[] = [
-    { id: 'gameday', label: 'Gameday', icon: icons.gameday, href: '/season/run', children: [gameday] },
-    { id: 'team', label: 'Team', icon: icons.team, href: '/season/run/team', children: [team] },
-    {
-      id: 'league',
-      label: 'League',
-      icon: icons.league,
-      href: postseason ? '/season/run/postseason' : '/season/run/league',
-      children: [standings, schedule, honors],
-    },
-  ];
+  const leagueGroup: SeasonNavGroup = {
+    id: 'league',
+    label: 'League',
+    icon: icons.league,
+    href: postseason ? '/season/run/postseason' : '/season/run/league',
+    children: [standings, schedule, honors],
+  };
   if (postseason) {
     const bracket: NavItem = {
       id: 'postseason',
@@ -83,8 +84,19 @@ export function buildSeasonNavGroups(
       href: '/season/run/postseason',
       icon: icons.bracket,
     };
-    groups[2]!.children.unshift(bracket);
+    leagueGroup.children.unshift(bracket);
   }
+  const groups: SeasonNavGroup[] = [
+    {
+      id: 'gameday',
+      label: 'Gameday',
+      icon: icons.gameday,
+      href: '/season/run',
+      children: [gameday],
+    },
+    { id: 'team', label: 'Team', icon: icons.team, href: '/season/run/team', children: [team] },
+    leagueGroup,
+  ];
   const officeChildren: NavItem[] = [];
   if (!postseason) officeChildren.push(trades);
   if (facts.freeAgencyVisible) officeChildren.push(freeAgency);

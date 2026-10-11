@@ -43,10 +43,7 @@
         simulated alternate outcome.
       </p>
     </div>
-    <div
-      class="sr-stat-tile shrink-0 text-right"
-      aria-label="Home innovation game record"
-    >
+    <div class="sr-stat-tile shrink-0 text-right" aria-label="Home innovation game record">
       <p class="sr-section-label">Home record</p>
       <p class="sr-number mt-1 text-3xl leading-none font-black">
         {impact.wins}–{impact.losses}
@@ -94,9 +91,7 @@
   <div class="mt-5 rounded-xl border border-border bg-surface-2/70 p-3 sm:p-4">
     <div class="flex flex-wrap items-baseline justify-between gap-2">
       <div>
-        <p class="sr-eyebrow">
-          What showed up on court
-        </p>
+        <p class="sr-eyebrow">What showed up on court</p>
         <p class="mt-1 text-xs text-muted-foreground">
           Directly recorded signals from the rule’s home-game mechanics.
         </p>

@@ -250,10 +250,16 @@ export class PossessionStepper {
     const offense = this.offenseSide;
     const full = havoc.fullShotClock(offense);
     const raw = this.ctx.meanTripSeconds * (0.6 + rng.next() * 0.8);
-    const planned = Math.max(
-      (raw * full) / ENGINE_CONSTANTS.shotClockSeconds,
-      ENGINE_CONSTANTS.minimumTripSeconds,
-    );
+    // A side clock limits natural possessions; it does not rescale them. Keep
+    // the historical expression at the default 24s limit because x*24/24 is
+    // not an exact IEEE-754 identity and default games must stay byte-identical.
+    const planned =
+      full === ENGINE_CONSTANTS.shotClockSeconds
+        ? Math.max(
+            (raw * full) / ENGINE_CONSTANTS.shotClockSeconds,
+            ENGINE_CONSTANTS.minimumTripSeconds,
+          )
+        : Math.max(raw, ENGINE_CONSTANTS.minimumTripSeconds);
     if (planned > clock.remaining && planned <= state.secondsRemaining) {
       const team = teams[offense];
       const teamPrep = preps[offense];

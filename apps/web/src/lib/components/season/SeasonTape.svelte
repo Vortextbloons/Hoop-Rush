@@ -160,10 +160,7 @@
                 {segment.fromRound}–{segment.toRound}
               </span>
               {#if segment.state === 'current'}
-                <span
-                  class="sr-number text-sm font-bold"
-                  style="color: var(--sr-hardwood-bright)"
-                >
+                <span class="sr-number text-sm font-bold" style="color: var(--sr-hardwood-bright)">
                   Next
                 </span>
               {:else}

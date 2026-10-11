@@ -1,11 +1,10 @@
+import type { HavocComparison, HavocReport } from '@hoop-rush/data-contracts';
 import type {
-  HavocComparison,
-  HavocReport,
   HavocRunView,
   HavocService,
   HavocServiceEvent,
   HavocSimulationProgress,
-} from '@hoop-rush/data-contracts';
+} from './havoc-service-contract.ts';
 import { HAVOC_GAME_COUNT } from '@hoop-rush/data-contracts';
 import { HavocServiceError } from './havoc-service-contract.ts';
 
@@ -29,13 +28,19 @@ export class HavocResultState {
   private unsubscribe: (() => void) | null = null;
   private destroyed = false;
 
+  private isDestroyed(): boolean {
+    return this.destroyed;
+  }
+
   constructor(service: HavocService) {
     this.service = service;
-    this.unsubscribe = service.subscribe((event) => this.onEvent(event));
+    this.unsubscribe = service.subscribe((event) => {
+      this.onEvent(event);
+    });
   }
 
   private onEvent(event: HavocServiceEvent): void {
-    if (this.destroyed) return;
+    if (this.isDestroyed()) return;
     if (event.type === 'progress') {
       this.progress = event.progress;
     } else if (event.type === 'comparison-updated') {
@@ -65,7 +70,7 @@ export class HavocResultState {
     if (this.run === null) this.loading = true;
     try {
       const snapshot = await this.service.loadActive();
-      if (this.destroyed) return;
+      if (this.isDestroyed()) return;
       this.run = snapshot.run;
       if (snapshot.run === null) {
         this.report = null;
@@ -73,19 +78,19 @@ export class HavocResultState {
         return;
       }
       const report = await this.service.readReport();
-      if (this.destroyed) return;
+      if (this.isDestroyed()) return;
       this.report = report;
       if (snapshot.run.comparisonStatus === 'complete') {
         const comparison = await this.service.readComparison();
-        if (this.destroyed) return;
+        if (this.isDestroyed()) return;
         this.comparison = comparison;
       } else {
         this.comparison = null;
       }
     } catch (error) {
-      if (!this.destroyed) this.error = errorMessageOf(error);
+      if (!this.isDestroyed()) this.error = errorMessageOf(error);
     } finally {
-      if (!this.destroyed) this.loading = false;
+      if (!this.isDestroyed()) this.loading = false;
     }
   }
 
@@ -97,9 +102,9 @@ export class HavocResultState {
     this.progress = null;
     try {
       const batch = await this.service.startNormalSeason();
-      if (this.destroyed) return;
+      if (this.isDestroyed()) return;
       await this.load();
-      if (this.destroyed) return;
+      if (this.isDestroyed()) return;
       const run = this.run;
       if (
         !batch.cancelled &&
@@ -113,9 +118,9 @@ export class HavocResultState {
         this.notice = `Normal season paused at game ${String(batch.nextCursor)}. Its results stay hidden until all 82 games finish.`;
       }
     } catch (error) {
-      if (!this.destroyed) this.error = errorMessageOf(error);
+      if (!this.isDestroyed()) this.error = errorMessageOf(error);
     } finally {
-      if (!this.destroyed) this.busy = false;
+      if (!this.isDestroyed()) this.busy = false;
     }
   }
 

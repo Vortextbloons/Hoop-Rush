@@ -112,9 +112,7 @@
       <h4 class="font-mono text-[10px] font-bold tracking-[0.14em] text-muted-foreground uppercase">
         {mode === 'effective' ? 'Effective ratings' : 'Original ratings'}
       </h4>
-      <span class="font-mono text-[10px] text-muted-foreground"
-        >{changedRatings.size} changed</span
-      >
+      <span class="font-mono text-[10px] text-muted-foreground">{changedRatings.size} changed</span>
     </div>
     <dl class="mt-1.5 grid grid-cols-3 gap-x-2 gap-y-1">
       {#each REQUIRED_RATING_KEYS as key (key)}
@@ -129,12 +127,14 @@
           </dt>
           <dd class="font-mono text-xs">
             {#if changed}
-              <span class:font-bold={mode === 'effective'} class:text-muted-foreground={mode === 'original'}
-                >{original[key]}</span
+              <span
+                class:font-bold={mode === 'effective'}
+                class:text-muted-foreground={mode === 'original'}>{original[key]}</span
               >
               <span aria-hidden="true">→</span>
-              <span class:font-bold={mode === 'original'} class:text-muted-foreground={mode === 'effective'}
-                >{effective[key]}</span
+              <span
+                class:font-bold={mode === 'original'}
+                class:text-muted-foreground={mode === 'effective'}>{effective[key]}</span
               >
             {:else}
               <span>{mode === 'effective' ? effective[key] : original[key]}</span>

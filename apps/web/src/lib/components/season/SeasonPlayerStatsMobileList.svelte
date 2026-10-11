@@ -189,10 +189,7 @@
               <dt class="font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground">
                 {stat.label}
               </dt>
-              <dd
-                class="sr-number mt-0.5 text-base font-extrabold"
-                style="color: var(--sr-paper)"
-              >
+              <dd class="sr-number mt-0.5 text-base font-extrabold" style="color: var(--sr-paper)">
                 {formatValue(row, stat.key)}
               </dd>
             </div>

@@ -32,17 +32,11 @@
         <li class="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-sm">
           <span class="min-w-0 flex-1 truncate font-semibold">{row.displayName}</span>
           {#if row.status === 'active'}
-            <span class="sr-badge" data-tone="loss">
-              Out
-            </span>
+            <span class="sr-badge" data-tone="loss"> Out </span>
           {:else if row.status === 'returned'}
-            <span class="sr-badge" data-tone="win">
-              Back
-            </span>
+            <span class="sr-badge" data-tone="win"> Back </span>
           {:else}
-            <span class="sr-badge">
-              Available
-            </span>
+            <span class="sr-badge"> Available </span>
           {/if}
           {#if row.returnRange !== null && row.returnRange.min !== null}
             <span class="font-mono text-[10px] text-muted-foreground">

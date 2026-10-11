@@ -247,32 +247,17 @@
 {:else if acceptedBlocks.length === 0}
   <div class="sr-panel mt-10 flex flex-col gap-4 p-6">
     <p class="font-mono text-sm text-muted-foreground">No block yet — submit the first block.</p>
-    <a
-      href={hubHref}
-      class="sr-btn w-fit"
-    >
-      Open Hub
-    </a>
+    <a href={hubHref} class="sr-btn w-fit"> Open Hub </a>
   </div>
 {:else if requestedOutOfRange}
   <div class="sr-panel mt-10 flex flex-col gap-4 p-6">
     <p class="font-mono text-sm text-muted-foreground">That block doesn't exist.</p>
-    <a
-      href={hubHref}
-      class="sr-btn-ghost w-fit"
-    >
-      Back to Hub
-    </a>
+    <a href={hubHref} class="sr-btn-ghost w-fit"> Back to Hub </a>
   </div>
 {:else if requestedNotAccepted}
   <div class="sr-panel mt-10 flex flex-col gap-4 p-6">
     <p class="font-mono text-sm text-muted-foreground">That block hasn't been reached yet.</p>
-    <a
-      href={hubHref}
-      class="sr-btn-ghost w-fit"
-    >
-      Back to Hub
-    </a>
+    <a href={hubHref} class="sr-btn-ghost w-fit"> Back to Hub </a>
   </div>
 {:else if displayBlock !== null && recap}
   <section
@@ -283,22 +268,14 @@
     <div class="sr-arrive flex items-end justify-between gap-4">
       <div class="min-w-0">
         <p class="sr-eyebrow">Season Run</p>
-        <h1
-          id="checkpoint-heading"
-          class="sr-page-title mt-1"
-        >
+        <h1 id="checkpoint-heading" class="sr-page-title mt-1">
           Block {displayBlock + 1} recap
         </h1>
         <p class="mt-1 font-mono text-xs text-muted-foreground">
           {progressLabel(recap.completedRounds)} · {ordinal(recap.completedRounds)} rounds
         </p>
       </div>
-      <a
-        href={hubHref}
-        class="sr-btn-ghost inline-flex min-h-11 shrink-0 px-3 text-xs"
-      >
-        Hub
-      </a>
+      <a href={hubHref} class="sr-btn-ghost inline-flex min-h-11 shrink-0 px-3 text-xs"> Hub </a>
     </div>
 
     <div class="mt-8 flex flex-col gap-8">
@@ -318,12 +295,7 @@
 
       {#if humanGames.length > 0}
         <section aria-labelledby="checkpoint-boxes-heading">
-          <h2
-            id="checkpoint-boxes-heading"
-            class="sr-section-label"
-          >
-            Box scores · your games
-          </h2>
+          <h2 id="checkpoint-boxes-heading" class="sr-section-label">Box scores · your games</h2>
           <div class="mt-3 grid gap-2 sm:gap-3 lg:grid-cols-2 lg:items-start">
             {#each humanGames as summary (summary.gameId)}
               {@const box = boxFor(summary)}

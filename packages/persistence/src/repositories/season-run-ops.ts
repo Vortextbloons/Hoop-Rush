@@ -861,6 +861,11 @@ export class SeasonRunOps {
             ...storedSeasonPendingBlockRowSchema.parse(existingPending).interruption,
             nextGameId: input.pending.nextGameId,
           };
+          storedSeasonPendingBlockRowSchema.parse({
+            runId: input.runId,
+            block: input.pending,
+            interruption,
+          });
           await this.db.seasonPendingBlocks.put({
             runId: input.runId,
             block: input.pending,

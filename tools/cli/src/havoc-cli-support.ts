@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { z } from 'zod';
 import {
   HAVOC_DRAFT_ROUNDS,
@@ -9,9 +10,12 @@ import {
   POSITIONS,
   canonicalJson,
   commandIdSchema,
+  havocAcceptGameCommandSchema,
+  havocAcceptNormalGameCommandSchema,
   havocCardIdSchema,
   havocCatalogSourceSchema,
   havocClaimKeySchema,
+  havocComparisonSchema,
   havocCreateDraftCommandSchema,
   havocDigestSchema,
   havocDraftCardSchema,
@@ -20,9 +24,9 @@ import {
   havocLockLineupCommandSchema,
   havocMutationEntrySchema,
   havocPickCardCommandSchema,
+  havocReportSchema,
   havocRerollOfferCommandSchema,
   havocSeasonAggregateSchema,
-  havocSeasonTotalsSchema,
   havocSourcePlayerSchema,
   havocTierSchema,
   havocVariantSchema,
@@ -37,6 +41,7 @@ import {
   type HavocCatalog,
   type HavocCatalogSource,
   type HavocCommand,
+  type HavocComparison,
   type HavocDraftCard,
   type HavocDraftPick,
   type HavocGameInput,
@@ -47,9 +52,9 @@ import {
   type HavocMutationEntry,
   type HavocMutationId,
   type HavocMutationRollup,
+  type HavocReport,
   type HavocRunState,
   type HavocSeasonAggregate,
-  type HavocSeasonTotals,
   type HavocVariant,
   type HavocVersionSet,
   type OpponentBracket,
@@ -64,7 +69,6 @@ import {
   ENGINE_VERSION,
   FoldHavocAggregate,
   HavocSimulationExhaustedError,
-  HavocStateDigest,
   applyHavocMutationPackage,
   auditHavocGame,
   buildHavocGameInput,
@@ -77,10 +81,13 @@ import {
   havocGameSummaryOf,
   havocGameTapeDigest,
   HAVOC_MUTATION_DEFINITIONS,
+  compareHavocSeasons,
+  deriveHavocReport,
   simulateHavocGame,
   type EngineContext,
   type HavocCommandEnvironment,
   type HavocLockSources,
+  type HavocStoredGame,
 } from '@hoop-rush/engine';
 import { DEFAULT_MANIFEST, PackagedData, loadPackagedData } from './commands/data-loader.ts';
 import { loadSeasonDraftCatalog, resolveSeasonArtifact } from './commands/season-data.ts';
@@ -97,6 +104,21 @@ export class HavocCliError extends Error {
     super(message);
     this.name = 'HavocCliError';
     this.code = code;
+  }
+}
+
+/** JSON file reader that tolerates a UTF-8 BOM (common on Windows editors). */
+export function readHavocJsonFile(path: string): unknown {
+  let text: string;
+  try {
+    text = readFileSync(path, 'utf8').replace(/^\uFEFF/, '');
+  } catch (error) {
+    throw new Error(`cannot read ${path}: ${(error as Error).message}`);
+  }
+  try {
+    return JSON.parse(text) as unknown;
+  } catch (error) {
+    throw new Error(`cannot read ${path}: ${(error as Error).message}`);
   }
 }
 
@@ -273,7 +295,7 @@ export function replayHavocCliDraft(input: {
       if (pin.slot !== expected) {
         throw new HavocCliError(
           'picks',
-          `picks[${String(index)}] must fill ${String(expected)} (got ${String(pin.slot)})`,
+          `picks[${String(index)}] must fill ${String(expected)} (got ${pin.slot})`,
         );
       }
     });
@@ -325,7 +347,7 @@ export function replayHavocCliDraft(input: {
       const available = draft.cards.map((entry) => entry.source.playerVersionId ?? 'null');
       throw new HavocCliError(
         'pin-missing',
-        `round ${String(round)} (${String(draft.slot)}) offer does not contain pinned version ${String(pin?.playerVersionId)}; available: ${available.join(', ')}${draft.rerollUsed ? ' (reroll spent)' : ''}`,
+        `round ${String(round)} (${draft.slot}) offer does not contain pinned version ${String(pin?.playerVersionId)}; available: ${available.join(', ')}${draft.rerollUsed ? ' (reroll spent)' : ''}`,
       );
     }
     const pickCommand = havocPickCardCommandSchema.parse({
@@ -395,6 +417,7 @@ export function assertHavocCliPackageCompatible(
   tier: 1 | 2 | 3,
   mutationIds: readonly HavocMutationId[],
 ): void {
+  if (mutationIds.length === 0) return;
   if (!havocBundleIsCompatible({ tier, mutationIds }, HAVOC_MUTATION_DEFINITIONS)) {
     throw new HavocCliError(
       'constructed-package',
@@ -424,7 +447,7 @@ export function buildConstructedHavocLockedInputs(input: {
     if (slotSpec.slot !== expected) {
       throw new HavocCliError(
         'constructed-lineup',
-        `constructed slot ${String(index)} must be ${String(expected)} (got ${String(slotSpec.slot)})`,
+        `constructed slot ${String(index)} must be ${String(expected)} (got ${slotSpec.slot})`,
       );
     }
     assertHavocCliPackageCompatible(slotSpec.tier, slotSpec.mutationIds);
@@ -445,7 +468,7 @@ export function buildConstructedHavocLockedInputs(input: {
     if (candidate === undefined || candidate.seasonKey === null) {
       throw new HavocCliError(
         'constructed-lineup',
-        `catalog has no eligible constructed candidate for ${String(slotSpec.slot)}`,
+        `catalog has no eligible constructed candidate for ${slotSpec.slot}`,
       );
     }
     usedClaims.add(`${candidate.playerId}::${candidate.seasonKey}`);
@@ -462,9 +485,7 @@ export function buildConstructedHavocLockedInputs(input: {
           mutations,
         }),
       )}`,
-      offerId: `hvo-${seasonDigestHex(
-        canonicalJson({ label: input.label, slot: slotSpec.slot }),
-      )}`,
+      offerId: `hvo-${seasonDigestHex(canonicalJson({ label: input.label, slot: slotSpec.slot }))}`,
       cardIndex: 0,
       slot: slotSpec.slot,
       tier: slotSpec.tier,
@@ -561,6 +582,8 @@ export interface HavocCliVariantRun {
   readonly facts: readonly HavocCliGameFacts[];
   readonly failures: readonly HavocCliFailure[];
   readonly auditFindings: number;
+  /** Full results for the canonical comparison; empty unless `retainResults` was requested. */
+  readonly results: readonly HavocStoredGame[];
 }
 
 export function havocCliGameNumbers(count: number = HAVOC_GAME_COUNT): number[] {
@@ -590,12 +613,12 @@ function shotClockViolationsOf(tape: HavocGameTape, side: 'human' | 'opponent'):
   return count;
 }
 
+/** First observed full clock for a side: the tipoff time-lord application, before any owner exit. */
 function fullShotClockOf(tape: HavocGameTape, side: 'human' | 'opponent'): number | null {
-  let limit: number | null = null;
   for (const event of tape.events) {
-    if (event.kind === 'time-lord' && event.side === side) limit = event.fullSeconds;
+    if (event.kind === 'time-lord' && event.side === side) return event.fullSeconds;
   }
-  return limit;
+  return null;
 }
 
 function factsOf(
@@ -662,11 +685,13 @@ export function simulateHavocCliVariant(input: {
   readonly variant: HavocVariant;
   readonly gameNumbers: readonly number[];
   readonly context?: EngineContext;
+  readonly retainResults?: boolean;
 }): HavocCliVariantRun {
   const context = input.context ?? createEngineContext();
   const games: HavocCliGameEntry[] = [];
   const facts: HavocCliGameFacts[] = [];
   const failures: HavocCliFailure[] = [];
+  const results: HavocStoredGame[] = [];
   let aggregate: HavocSeasonAggregate = {
     games: 0,
     wins: 0,
@@ -730,139 +755,78 @@ export function simulateHavocCliVariant(input: {
       summary,
     });
     facts.push(factsOf(gameInput, result, tape, summary, audit.findings.length));
+    if (input.retainResults === true) results.push({ gameNumber, result, resultDigest });
     aggregate = FoldHavocAggregate(aggregate, summary);
   }
-  return { variant: input.variant, games, aggregate, facts, failures, auditFindings };
+  return { variant: input.variant, games, aggregate, facts, failures, auditFindings, results };
 }
 
-// ----------------------------------------------------------- comparison
+// ------------------------------------------------- comparison and report
 
-export function havocSeasonTotalsOf(games: readonly HavocGameSummary[]): HavocSeasonTotals {
-  let wins = 0;
-  let losses = 0;
-  let pointsFor = 0;
-  let pointsAgainst = 0;
-  let adjustments = 0;
-  let largestPointsFor = Number.NEGATIVE_INFINITY;
-  let largestPointsAgainst = Number.NEGATIVE_INFINITY;
-  for (const game of games) {
-    if (game.outcome === 'win') wins += 1;
-    else losses += 1;
-    pointsFor += game.humanScore;
-    pointsAgainst += game.opponentScore;
-    adjustments += game.adjustments;
-    largestPointsFor = Math.max(largestPointsFor, game.humanScore);
-    largestPointsAgainst = Math.max(largestPointsAgainst, game.opponentScore);
+function havocCliAcceptCommandId(seed: Seed, suffix: string): string {
+  return commandIdSchema.parse(`havoc-cli-${seed.slice(0, 8)}-${suffix}`);
+}
+
+export function acceptHavocCliVariant(input: {
+  readonly state: HavocRunState;
+  readonly environment: HavocCommandEnvironment;
+  readonly lockSources: HavocLockSources;
+  readonly run: HavocCliVariantRun;
+}): HavocRunState {
+  let state = input.state;
+  for (const game of input.run.games) {
+    const base = {
+      schemaVersion: HAVOC_SCHEMA_VERSION,
+      runId: state.runId,
+      expectedRevision: state.revision,
+      cursor: game.gameNumber,
+      inputDigest: game.inputDigest,
+      resultDigest: game.resultDigest,
+      summary: game.summary,
+    };
+    const command =
+      input.run.variant === 'havoc'
+        ? havocAcceptGameCommandSchema.parse({
+            ...base,
+            commandId: havocCliAcceptCommandId(state.runSeed, `accept-h-${String(game.gameNumber)}`),
+            command: 'accept-havoc-game',
+          })
+        : havocAcceptNormalGameCommandSchema.parse({
+            ...base,
+            commandId: havocCliAcceptCommandId(state.runSeed, `accept-n-${String(game.gameNumber)}`),
+            command: 'accept-havoc-normal-game',
+          });
+    state = applyOrThrow(state, command, input.environment, input.lockSources);
   }
-  const count = games.length;
-  return havocSeasonTotalsSchema.parse({
-    games: count,
-    wins,
-    losses,
-    pointsFor,
-    pointsAgainst,
-    differential: pointsFor - pointsAgainst,
-    averagePointsFor: count === 0 ? 0 : pointsFor / count,
-    averagePointsAgainst: count === 0 ? 0 : pointsAgainst / count,
-    largestPointsFor: count === 0 ? 0 : largestPointsFor,
-    largestPointsAgainst: count === 0 ? 0 : largestPointsAgainst,
-    adjustments,
+  return state;
+}
+
+export function canonicalHavocComparisonOf(input: {
+  readonly runId: string;
+  readonly locked: HavocLockedInputs;
+  readonly havoc: HavocCliVariantRun;
+  readonly normal: HavocCliVariantRun;
+}): HavocComparison {
+  return compareHavocSeasons({
+    runId: input.runId,
+    locked: input.locked,
+    havocGames: input.havoc.results,
+    normalGames: input.normal.results,
   });
 }
 
-export interface HavocCliMatchedGame {
-  readonly gameNumber: number;
-  readonly opponentId: string;
-  readonly humanHome: boolean;
-  readonly havoc: {
-    readonly humanScore: number;
-    readonly opponentScore: number;
-    readonly outcome: 'win' | 'loss';
-    readonly resultDigest: string;
-  };
-  readonly normal: {
-    readonly humanScore: number;
-    readonly opponentScore: number;
-    readonly outcome: 'win' | 'loss';
-    readonly resultDigest: string;
-  };
-  readonly deltas: {
-    readonly pointsFor: number;
-    readonly pointsAgainst: number;
-    readonly margin: number;
-  };
-  readonly flips: {
-    readonly havocWinNormalLoss: boolean;
-    readonly normalWinHavocLoss: boolean;
-  };
-}
-
-export interface HavocCliComparison {
-  readonly kind: 'paired-evidence';
-  readonly havoc: HavocSeasonTotals;
-  readonly normal: HavocSeasonTotals;
-  readonly winsGained: number;
-  readonly differentialDelta: number;
-  readonly games: readonly HavocCliMatchedGame[];
-}
-
-export function havocCliComparisonOf(
-  havoc: HavocCliVariantRun,
-  normal: HavocCliVariantRun,
-): HavocCliComparison {
-  const normalByNumber = new Map(normal.games.map((game) => [game.gameNumber, game]));
-  const games: HavocCliMatchedGame[] = [];
-  for (const havocGame of havoc.games) {
-    const normalGame = normalByNumber.get(havocGame.gameNumber);
-    if (normalGame === undefined) {
-      throw new HavocCliError(
-        'comparison',
-        `normal season is missing paired game ${String(havocGame.gameNumber)}`,
-      );
-    }
-    const havocHuman = havocGame.summary.humanScore;
-    const havocOpponent = havocGame.summary.opponentScore;
-    const normalHuman = normalGame.summary.humanScore;
-    const normalOpponent = normalGame.summary.opponentScore;
-    games.push({
-      gameNumber: havocGame.gameNumber,
-      opponentId: havocGame.opponentId,
-      humanHome: havocGame.humanHome,
-      havoc: {
-        humanScore: havocHuman,
-        opponentScore: havocOpponent,
-        outcome: havocGame.summary.outcome,
-        resultDigest: havocGame.resultDigest,
-      },
-      normal: {
-        humanScore: normalHuman,
-        opponentScore: normalOpponent,
-        outcome: normalGame.summary.outcome,
-        resultDigest: normalGame.resultDigest,
-      },
-      deltas: {
-        pointsFor: havocHuman - normalHuman,
-        pointsAgainst: havocOpponent - normalOpponent,
-        margin: havocHuman - havocOpponent - (normalHuman - normalOpponent),
-      },
-      flips: {
-        havocWinNormalLoss:
-          havocGame.summary.outcome === 'win' && normalGame.summary.outcome === 'loss',
-        normalWinHavocLoss:
-          havocGame.summary.outcome === 'loss' && normalGame.summary.outcome === 'win',
-      },
-    });
-  }
-  const havocTotals = havocSeasonTotalsOf(havoc.games.map((game) => game.summary));
-  const normalTotals = havocSeasonTotalsOf(normal.games.map((game) => game.summary));
-  return {
-    kind: 'paired-evidence',
-    havoc: havocTotals,
-    normal: normalTotals,
-    winsGained: havocTotals.wins - normalTotals.wins,
-    differentialDelta: havocTotals.differential - normalTotals.differential,
-    games,
-  };
+export function canonicalHavocReportOf(input: {
+  readonly state: HavocRunState;
+  readonly havoc: HavocCliVariantRun;
+  readonly normal: HavocCliVariantRun;
+  readonly comparison: HavocComparison;
+}): HavocReport {
+  return deriveHavocReport({
+    state: input.state,
+    havocGames: input.havoc.results,
+    normalGames: input.normal.results,
+    comparison: input.comparison,
+  });
 }
 
 // ------------------------------------------------------- report schemas
@@ -922,42 +886,6 @@ export const havocCliVariantReportSchema = z.object({
   aggregate: havocSeasonAggregateSchema,
 });
 
-export const havocCliMatchedGameSchema = z.object({
-  gameNumber: z.number().int().min(1).max(HAVOC_GAME_COUNT),
-  opponentId: z.string().min(1).max(64),
-  humanHome: z.boolean(),
-  havoc: z.object({
-    humanScore: z.number().int(),
-    opponentScore: z.number().int(),
-    outcome: z.enum(['win', 'loss']),
-    resultDigest: havocDigestSchema,
-  }),
-  normal: z.object({
-    humanScore: z.number().int(),
-    opponentScore: z.number().int(),
-    outcome: z.enum(['win', 'loss']),
-    resultDigest: havocDigestSchema,
-  }),
-  deltas: z.object({
-    pointsFor: z.number().int(),
-    pointsAgainst: z.number().int(),
-    margin: z.number().int(),
-  }),
-  flips: z.object({
-    havocWinNormalLoss: z.boolean(),
-    normalWinHavocLoss: z.boolean(),
-  }),
-});
-
-export const havocCliComparisonSchema = z.object({
-  kind: z.literal('paired-evidence'),
-  havoc: havocSeasonTotalsSchema,
-  normal: havocSeasonTotalsSchema,
-  winsGained: z.number().int(),
-  differentialDelta: z.number().int(),
-  games: z.array(havocCliMatchedGameSchema).min(1).max(HAVOC_GAME_COUNT),
-});
-
 export const havocSimulateReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('havoc simulate'),
@@ -970,7 +898,8 @@ export const havocSimulateReportSchema = z.object({
   draft: havocCliDraftReportSchema,
   havoc: havocCliVariantReportSchema,
   normal: havocCliVariantReportSchema.nullable(),
-  comparison: havocCliComparisonSchema.nullable(),
+  comparison: havocComparisonSchema.nullable(),
+  report: havocReportSchema.nullable(),
   failures: z.array(havocCliFailureSchema),
   audits: z.object({
     games: z.number().int().nonnegative(),
@@ -1089,7 +1018,8 @@ export function havocCliInputPairCheck(
   if (havocInput.variant !== 'havoc' || normalInput.variant !== 'normal') {
     findings.push(`paired variants are wrong at game ${String(havocInput.gameNumber)}`);
   }
-  const opponentOf = (input: HavocGameInput) => (input.humanSide === 'home' ? input.away : input.home);
+  const opponentOf = (input: HavocGameInput) =>
+    input.humanSide === 'home' ? input.away : input.home;
   const humanOf = (input: HavocGameInput) => (input.humanSide === 'home' ? input.home : input.away);
   const havocOpponent = opponentOf(havocInput);
   const normalOpponent = opponentOf(normalInput);

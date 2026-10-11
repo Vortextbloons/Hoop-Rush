@@ -95,9 +95,7 @@
 
         {#if candidate?.anchors}
           <section class="mt-4">
-            <h3 class="sr-section-label">
-              Peak season
-            </h3>
+            <h3 class="sr-section-label">Peak season</h3>
             <dl class="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
               <div>
                 <dt class="text-xs text-muted-foreground">MPG</dt>
@@ -141,9 +139,7 @@
 
         {#if runStats !== null}
           <section class="mt-4 border-t border-border pt-4">
-            <h3 class="sr-section-label">
-              This season run
-            </h3>
+            <h3 class="sr-section-label">This season run</h3>
             <p class="mt-1 text-xs text-muted-foreground">
               {runStats.gamesPlayed} gp · folded from accepted games
             </p>
@@ -174,11 +170,15 @@
               </div>
               <div>
                 <dt class="text-xs text-muted-foreground">FG%</dt>
-                <dd class="sr-number font-mono text-sm font-semibold">{pct(runStats.fieldGoalPct)}</dd>
+                <dd class="sr-number font-mono text-sm font-semibold">
+                  {pct(runStats.fieldGoalPct)}
+                </dd>
               </div>
               <div>
                 <dt class="text-xs text-muted-foreground">3P%</dt>
-                <dd class="sr-number font-mono text-sm font-semibold">{pct(runStats.threePointPct)}</dd>
+                <dd class="sr-number font-mono text-sm font-semibold">
+                  {pct(runStats.threePointPct)}
+                </dd>
               </div>
             </dl>
           </section>

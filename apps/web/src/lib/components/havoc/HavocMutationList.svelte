@@ -1,12 +1,10 @@
 <script lang="ts">
   import type { HavocMutationEntry } from '@hoop-rush/data-contracts';
-  import {
-    mutationDescriptionOf,
-    mutationDownsideOf,
-    mutationNameOf,
-  } from './havoc-presentation';
-  let { mutations, compact = false }: { mutations: readonly HavocMutationEntry[]; compact?: boolean } =
-    $props();
+  import { mutationDescriptionOf, mutationDownsideOf, mutationNameOf } from './havoc-presentation';
+  let {
+    mutations,
+    compact = false,
+  }: { mutations: readonly HavocMutationEntry[]; compact?: boolean } = $props();
 </script>
 
 <ul class="flex flex-col gap-1.5" data-havoc-mutation-list>

@@ -1,4 +1,5 @@
-import type { HavocDraftState, HavocRunView, HavocService } from '@hoop-rush/data-contracts';
+import type { HavocDraftState } from '@hoop-rush/data-contracts';
+import type { HavocRunView, HavocService } from './havoc-service-contract.ts';
 import { HavocServiceError } from './havoc-service-contract.ts';
 
 function errorMessageOf(error: unknown): string {
@@ -35,7 +36,10 @@ export class HavocDraftController {
   }
 
   private async runCommand(
-    command: () => Promise<{ status: 'accepted' | 'rejected'; rejection: { message: string } | null }>,
+    command: () => Promise<{
+      status: 'accepted' | 'rejected';
+      rejection: { message: string } | null;
+    }>,
   ): Promise<boolean> {
     if (this.busy) return false;
     this.busy = true;

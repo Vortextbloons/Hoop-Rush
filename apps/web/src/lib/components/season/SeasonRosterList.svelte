@@ -64,9 +64,7 @@
   data-season-roster-list
 >
   {#if !embedded}
-    <h3 id="roster-heading" class="sr-section-label">
-      Roster
-    </h3>
+    <h3 id="roster-heading" class="sr-section-label">Roster</h3>
   {/if}
   <ul class="flex flex-col gap-2">
     {#each roster.players as entry (entry.playerVersionId)}

@@ -30,7 +30,11 @@ import {
   draftDuelTimeoutPick,
   createDraftDuelDraft,
 } from '@hoop-rush/engine';
-import { DexieDraftDuelRepository, type DraftDuelCompletionRecap } from '@hoop-rush/persistence';
+import {
+  DexieDraftDuelRepository,
+  type DraftDuelCompletionRecap,
+  type StoredDraftDuelCompleted,
+} from '@hoop-rush/persistence';
 import { newRequestId } from '$lib/ids';
 import { getDraftDuelTransport } from '$lib/draft-duel-transport';
 import { DraftDuelRunner } from '$lib/draft-duel-runner';
@@ -66,6 +70,7 @@ export class DraftDuelController {
   draft = $state<ReturnType<typeof createDraftDuelDraft> | null>(null);
   outputs = $state<Record<number, DraftDuelGameOutput>>({});
   verification = $state<DraftDuelPartiallyVerified[]>([]);
+  private completedRecap = $state<StoredDraftDuelCompleted | null>(null);
   consideration = $state<{ displayName: string; seasonKey: string } | null>(null);
   reaction = $state<{
     participantId: DraftDuelParticipantId;
@@ -93,6 +98,7 @@ export class DraftDuelController {
   private syncQueued = false;
   private preparingSinceMs = $state<number | null>(null);
   private lastAutoAttemptMs = 0;
+  private resultRetryAtMs = 0;
   private proposalSent = new Set<number>();
   private confirmSent = new Set<number>();
   private simulating = new Set<number>();
@@ -210,18 +216,30 @@ export class DraftDuelController {
     return played;
   });
   seriesMvp = $derived.by(() => {
-    if (!this.assets || !this.series?.champion) return null;
-    const rosters = this.rosters();
-    if (!rosters) return null;
-    if (this.playedGames.length !== this.series.games.length) return null;
-    return draftDuelSeriesMvp(this.assets.catalog, rosters, this.playedGames, this.series.champion);
+    if (!this.series?.champion) return null;
+    if (this.assets) {
+      const rosters = this.rosters();
+      if (
+        rosters &&
+        this.series.games.length > 0 &&
+        this.playedGames.length === this.series.games.length
+      ) {
+        return draftDuelSeriesMvp(
+          this.assets.catalog,
+          rosters,
+          this.playedGames,
+          this.series.champion,
+        );
+      }
+    }
+    return this.completedRecap?.mvp ?? null;
   });
   seriesStandouts = $derived.by(() => {
-    if (!this.assets) return [];
-    const rosters = this.rosters();
-    if (!rosters) return [];
-    if (this.playedGames.length === 0) return [];
-    return draftDuelStandouts(this.assets.catalog, rosters, this.playedGames);
+    if (this.assets && this.playedGames.length > 0) {
+      const rosters = this.rosters();
+      if (rosters) return draftDuelStandouts(this.assets.catalog, rosters, this.playedGames);
+    }
+    return this.completedRecap?.standouts ?? [];
   });
   rivalRematchRequested = $derived.by(() =>
     this.commands.some(
@@ -255,11 +273,18 @@ export class DraftDuelController {
       this.applySnapshot(resumed.snapshot);
       const restored = await this.repo.loadActive(roomId);
       if (restored) {
+        this.verification = restored.verification;
+      }
+      const completed = await this.repo.loadCompleted(roomId);
+      if (completed) {
+        this.completedRecap = completed;
+        this.completedPersisted = true;
+      }
+      const rows = await this.repo.loadResults(roomId);
+      if (rows.length > 0) {
         const outputs: Record<number, DraftDuelGameOutput> = {};
-        const rows = await this.repo.loadResults(roomId);
         for (const row of rows) outputs[row.gameNumber] = row.output;
         this.outputs = { ...this.outputs, ...outputs };
-        this.verification = restored.verification;
       }
       this.subscriptions.push(
         this.transport.subscribe(roomId, (snapshot) => {
@@ -536,6 +561,7 @@ export class DraftDuelController {
 
   private tick(): void {
     if (this.disposed || this.busy) return;
+    this.maybeProposeOrConfirm();
     const deadline = this.snapshot?.deadline;
     if (
       this.phase === 'drafting' &&
@@ -568,7 +594,7 @@ export class DraftDuelController {
         pickOrdinal: timeoutPick.pickOrdinal,
         playerId: timeoutPick.playerId,
         playerVersionId: timeoutPick.playerVersionId,
-        ...(timeoutPick.slotIndex !== undefined ? { slotIndex: timeoutPick.slotIndex } : {}),
+        slotIndex: timeoutPick.slotIndex,
         seedPath: timeoutPick.seedPath,
       };
       await this.transport.commitFallback(this.roomId, cursor, payload);
@@ -594,13 +620,16 @@ export class DraftDuelController {
     this.busy = true;
     this.error = null;
     try {
-      await this.transport.submitCommand({
+      const receipt = await this.transport.submitCommand({
         schemaVersion: 1,
         roomId: this.roomId,
         commandId: commandIdSchema.parse(newRequestId()),
         actorParticipantId: this.participantId,
         payload,
       });
+      if (!receipt.accepted) {
+        throw new Error(`Draft Duel command rejected: ${receipt.rejectionCode ?? 'unknown'}`);
+      }
       await this.syncFromServer();
       return true;
     } catch (error) {
@@ -608,6 +637,7 @@ export class DraftDuelController {
       return false;
     } finally {
       this.busy = false;
+      this.maybeProposeOrConfirm();
     }
   }
 
@@ -777,6 +807,7 @@ export class DraftDuelController {
   }
 
   private maybeProposeOrConfirm(): void {
+    if (this.disposed || this.busy || Date.now() < this.resultRetryAtMs) return;
     const snapshot = this.snapshot;
     const series = snapshot?.series;
     const output = this.currentOutput;
@@ -793,10 +824,16 @@ export class DraftDuelController {
         resultDigest: output.resultDigest,
         tapeDigest: output.tapeDigest,
         inputDigest: output.inputDigest,
+      }).then((accepted) => {
+        if (!accepted) {
+          this.proposalSent.delete(gameNumber);
+          this.resultRetryAtMs = Date.now() + AUTO_START_RETRY_MS;
+        }
       });
       return;
     }
     const { byParticipant } = this.proposalOf(gameNumber);
+    if (byParticipant[this.participantId] !== output.resultDigest) return;
     const rivalId = otherParticipant(this.participantId);
     const rivalDigest = byParticipant[rivalId];
     if (rivalDigest === undefined || this.confirmSent.has(gameNumber)) return;
@@ -807,8 +844,14 @@ export class DraftDuelController {
         gameNumber,
         resultDigest: output.resultDigest,
         verified: true,
+      }).then((accepted) => {
+        if (accepted) {
+          this.recordVerification(gameNumber, output.resultDigest, rivalDigest, 'verified');
+        } else {
+          this.confirmSent.delete(gameNumber);
+          this.resultRetryAtMs = Date.now() + AUTO_START_RETRY_MS;
+        }
       });
-      this.recordVerification(gameNumber, output.resultDigest, rivalDigest, 'verified');
     } else {
       this.recordVerification(gameNumber, output.resultDigest, rivalDigest, 'mismatch');
       this.integrityFailed = true;

@@ -415,7 +415,10 @@
       </div>
     {:else if !loaded}
       <p class="sr-section-label mt-8">
-        <span class="sr-live-dot mr-2 inline-block h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true"></span>
+        <span
+          class="sr-live-dot mr-2 inline-block h-1.5 w-1.5 rounded-full bg-primary"
+          aria-hidden="true"
+        ></span>
         Loading your season…
       </p>
     {:else if brokenRunError}
@@ -467,7 +470,12 @@
             >
               ← Back
             </a>
-            <button type="button" onclick={startDraft} disabled={busy || executiveId === null} class="sr-btn">
+            <button
+              type="button"
+              onclick={startDraft}
+              disabled={busy || executiveId === null}
+              class="sr-btn"
+            >
               {busy ? 'Starting…' : 'Start draft →'}
             </button>
           </div>
@@ -482,7 +490,9 @@
     {:else if generationReveal}
       <LeagueGenerationArena progress={generationProgress} {league} />
     {:else if draftStage === 'drafting' || draftStage === 'ready'}
-      <div class="mx-auto mt-6 flex w-full max-w-4xl flex-col gap-4 pb-[max(6rem,env(safe-area-inset-bottom))] sm:mt-8">
+      <div
+        class="mx-auto mt-6 flex w-full max-w-4xl flex-col gap-4 pb-[max(6rem,env(safe-area-inset-bottom))] sm:mt-8"
+      >
         {#if flow && manifest && board?.draft}
           <SeasonDraftBoard
             flow={board}

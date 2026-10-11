@@ -183,13 +183,13 @@
     <div class="sr-arrive flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div class="min-w-0">
         <p class="sr-eyebrow">Season Run</p>
-        <h1 id="league-heading" class="sr-page-title mt-1">
-          League
-        </h1>
+        <h1 id="league-heading" class="sr-page-title mt-1">League</h1>
         <p class="mt-1 font-mono text-[10px] text-muted-foreground">
-          <span class="sr-number">{shell.snapshot.acceptedBlocks.length * 10 > 82
-            ? 82
-            : shell.snapshot.acceptedBlocks.length * 10}</span>
+          <span class="sr-number"
+            >{shell.snapshot.acceptedBlocks.length * 10 > 82
+              ? 82
+              : shell.snapshot.acceptedBlocks.length * 10}</span
+          >
           games played
         </p>
       </div>
@@ -409,9 +409,7 @@
                   <td class="px-4 py-2 text-right font-mono">{oneDecimal(team.spg)}</td>
                   <td class="px-4 py-2 text-right font-mono">{oneDecimal(team.bpg)}</td>
                   <td class="px-4 py-2 text-right font-mono">{oneDecimal(team.topg)}</td>
-                  <td
-                    class="px-4 py-2 text-right font-mono font-bold"
-                  >
+                  <td class="px-4 py-2 text-right font-mono font-bold">
                     {team.diff > 0 ? '+' : ''}{team.diff}
                   </td>
                 </tr>

@@ -47,7 +47,39 @@ export class PoolFillDeadlock extends Error {
     this.round = round;
   }
 }
+export function poolRemovalRobustAfterAdd(
+  state: GenerationState,
+  team: PoolTeam,
+  versionId: string | null,
+): boolean {
+  const ids = [...team.pool, ...(versionId !== null ? [versionId] : [])];
+  const slotsLeft = Math.max(0, state.targets.policy.poolSize - ids.length);
+  for (let subset = 1; subset < 32; subset += 1) {
+    let required = 1;
+    for (let bit = 0; bit < 5; bit += 1) {
+      if ((subset & (1 << bit)) !== 0) required += 1;
+    }
+    let ownedCover = 0;
+    for (const id of ids) {
+      if (((state.maskByVersion.get(id) ?? 0) & subset) !== 0) ownedCover += 1;
+    }
+    if (ownedCover >= required) continue;
+    let availableCover = 0;
+    for (let mask = 1; mask < 32; mask += 1) {
+      if ((mask & subset) !== 0) availableCover += state.unassignedMaskCountsArr[mask] ?? 0;
+    }
+    if (
+      versionId !== null &&
+      state.unassigned.has(versionId) &&
+      ((state.maskByVersion.get(versionId) ?? 0) & subset) !== 0
+    )
+      availableCover -= 1;
+    if (ownedCover + Math.min(slotsLeft, availableCover) < required) return false;
+  }
+  return true;
+}
 export function poolAdmitsTenExact(state: GenerationState, team: PoolTeam): boolean {
+  if (!poolRemovalRobustAfterAdd(state, team, null)) return false;
   const anchorIds = team.anchors.map((anchor) => anchor.playerVersionId);
   const anchorCounts = positionCountsOf(membersOf(state, anchorIds));
   const anchorSet = new Set(anchorIds);
@@ -66,6 +98,7 @@ export function poolTenFeasibleAfterAdd(
   team: PoolTeam,
   versionId: string | null,
 ): boolean {
+  if (!poolRemovalRobustAfterAdd(state, team, versionId)) return false;
   const anchorIds = team.anchors.map((anchor) => anchor.playerVersionId);
   const anchorSet = new Set(anchorIds);
   const anchorCounts = positionCountsOf(membersOf(state, anchorIds));
@@ -167,6 +200,8 @@ export function poolTenFeasibleAfterAddExact(
   team: PoolTeam,
   versionId: string | null,
 ): boolean {
+  const fullPool = [...team.pool, ...(versionId !== null ? [versionId] : [])];
+  if (!legalFiveAfterAnyRemoval(membersOf(state, fullPool))) return false;
   const anchorIds = team.anchors.map((anchor) => anchor.playerVersionId);
   const anchorSet = new Set(anchorIds);
   const anchorCounts = positionCountsOf(membersOf(state, anchorIds));

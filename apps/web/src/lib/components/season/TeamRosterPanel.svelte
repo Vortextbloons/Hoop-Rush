@@ -42,9 +42,7 @@
 <section aria-labelledby="roster-panel-heading" class="min-w-0" data-team-roster-panel>
   <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
     <div class="min-w-0">
-      <h3 id="roster-panel-heading" class="sr-section-label">
-        Roster
-      </h3>
+      <h3 id="roster-panel-heading" class="sr-section-label">Roster</h3>
       <p class="mt-1 font-mono text-[10px] text-muted-foreground">
         Ten active rotation players
         {#if inactiveCount > 0}

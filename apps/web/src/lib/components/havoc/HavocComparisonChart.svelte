@@ -12,14 +12,10 @@
   } = $props();
 
   const games = $derived(comparison.games);
-  const values = $derived(
-    games.flatMap((game) => [game.havoc.humanScore, game.normal.humanScore]),
-  );
+  const values = $derived(games.flatMap((game) => [game.havoc.humanScore, game.normal.humanScore]));
   const minValue = $derived(Math.min(0, ...values));
   const maxValue = $derived(Math.max(10, ...values));
-  const maxDelta = $derived(
-    Math.max(1, ...games.map((game) => Math.abs(game.deltas.pointsFor))),
-  );
+  const maxDelta = $derived(Math.max(1, ...games.map((game) => Math.abs(game.deltas.pointsFor))));
   const width = 820;
   const plotLeft = 34;
   const plotRight = 812;
@@ -39,10 +35,14 @@
   }
 
   const havocPolyline = $derived(
-    games.map((game, index) => `${xFor(index).toFixed(1)},${yFor(game.havoc.humanScore).toFixed(1)}`).join(' '),
+    games
+      .map((game, index) => `${xFor(index).toFixed(1)},${yFor(game.havoc.humanScore).toFixed(1)}`)
+      .join(' '),
   );
   const normalPolyline = $derived(
-    games.map((game, index) => `${xFor(index).toFixed(1)},${yFor(game.normal.humanScore).toFixed(1)}`).join(' '),
+    games
+      .map((game, index) => `${xFor(index).toFixed(1)},${yFor(game.normal.humanScore).toFixed(1)}`)
+      .join(' '),
   );
 </script>
 
@@ -85,12 +85,7 @@
         stroke-width="1.5"
         stroke-dasharray="4 3"
       />
-      <polyline
-        points={havocPolyline}
-        fill="none"
-        stroke="#37B7CC"
-        stroke-width="2"
-      />
+      <polyline points={havocPolyline} fill="none" stroke="#37B7CC" stroke-width="2" />
       <line
         x1={plotLeft}
         y1={deltaCenter}
@@ -121,7 +116,8 @@
           class="text-primary"
           role="button"
           tabindex="0"
-          aria-label="Game {game.gameNumber}: Havoc {game.havoc.humanScore}, Normal {game.normal.humanScore}. View details"
+          aria-label="Game {game.gameNumber}: Havoc {game.havoc.humanScore}, Normal {game.normal
+            .humanScore}. View details"
           data-havoc-chart-game={game.gameNumber}
           onclick={() => onSelect(game.gameNumber)}
           onkeydown={(event) => {

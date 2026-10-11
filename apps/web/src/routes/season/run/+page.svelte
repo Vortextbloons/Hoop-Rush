@@ -402,8 +402,7 @@
   });
   const gamedayStyle = $derived.by(() => {
     const first = nextOpponents[0];
-    const human =
-      humanFranchiseId !== null ? franchiseColor(humanFranchiseId) : '#64748b';
+    const human = humanFranchiseId !== null ? franchiseColor(humanFranchiseId) : '#64748b';
     const opponent = first !== undefined ? franchiseColor(first.opponentFranchiseId) : '#64748b';
     return `--sr-accent-a: ${human}; --sr-accent-b: ${opponent};`;
   });
@@ -741,9 +740,7 @@
         class="sr-panel-featured flex flex-col gap-3 p-4 sm:p-6"
       >
         <p class="sr-eyebrow">82 down</p>
-        <h2 id="season-complete-heading" class="sr-page-title text-3xl">
-          Regular season complete
-        </h2>
+        <h2 id="season-complete-heading" class="sr-page-title text-3xl">Regular season complete</h2>
 
         <div class="flex flex-wrap items-center gap-2">
           <button
@@ -762,9 +759,7 @@
           <a href={resolve('/season/run/league' as any)} class="sr-btn-ghost w-fit">
             Final standings
           </a>
-          <a href={resolve(lastRecapPath as any)} class="sr-btn-ghost w-fit">
-            Last Block recap
-          </a>
+          <a href={resolve(lastRecapPath as any)} class="sr-btn-ghost w-fit"> Last Block recap </a>
         </div>
         {#if postseasonCommandError !== null}
           <p
@@ -834,7 +829,9 @@
             <div class="flex flex-col gap-4">
               <p class="sr-section-label">Your slate</p>
               {#if preview === null}
-                <p class="text-xs text-muted-foreground" aria-live="polite">Loading your matchups…</p>
+                <p class="text-xs text-muted-foreground" aria-live="polite">
+                  Loading your matchups…
+                </p>
               {:else if nextOpponents.length === 0}
                 <p class="text-xs text-muted-foreground">
                   No games for you — Play sims the league and earns Influence.
@@ -943,194 +940,200 @@
               <span class="h-px flex-1" style="background: var(--sr-line)"></span>
             </div>
 
-          {#if challengesVm !== null}
-            <ChallengesPanel
-              blockIndex={challengesVm.blockIndex}
-              deal={challengesVm.deal}
-              evaluation={challengesVm.evaluation}
-              franchiseName={shell.franchiseName}
-            />
-          {/if}
-
-          <section
-            aria-labelledby="sponsor-shop-trigger-heading"
-            class="sr-panel-quiet flex flex-col gap-3 p-4"
-            data-testid="sponsor-shop-trigger"
-          >
-            <div class="flex flex-wrap items-baseline justify-between gap-2">
-              <h2
-                id="sponsor-shop-trigger-heading"
-                class="font-display text-base font-extrabold uppercase tracking-tight"
-              >
-                Sponsor deal board
-              </h2>
-              {#if sponsorOffers !== null}
-                <p
-                  class="font-mono text-[11px] text-muted-foreground"
-                  data-testid="sponsor-shop-count"
-                >
-                  Owned Gear: {sponsorOwnedCount}/{sponsorOffers.length} · Vault: {sponsorVault.length}
-                  items · Influence: {sponsorBalance}/{sponsorCap}
-                </p>
-              {/if}
-            </div>
-            <p class="text-xs text-muted-foreground">
-              {#if nextBlockIndex !== null && nextBlockIndex >= 8}
-                Final block — no new offers. Open the shop to review the vault, then equip from the
-                roster.
-              {:else if sponsorOffers === null}
-                Loading this block's endorsement board…
-              {:else}
-                {sponsorOffers.length - sponsorOwnedCount} offers left this block. Bought gear goes to
-                your vault — equip it to players from the roster.
-              {/if}
-            </p>
-            <button
-              type="button"
-              data-testid="open-sponsor-shop"
-              onclick={() => {
-                sponsorShopOpen = true;
-              }}
-              class="inline-flex min-h-11 w-fit items-center justify-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground outline-none transition-opacity focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90"
-            >
-              Open sponsor shop
-              <span aria-hidden="true">&rarr;</span>
-            </button>
-          </section>
-
-          <SponsorShopModal
-            open={sponsorShopOpen}
-            offers={sponsorOffers}
-            balance={sponsorBalance}
-            cap={sponsorCap}
-            busy={block.phase === 'running'}
-            commandError={sponsorCommandError}
-            isFinalBlock={nextBlockIndex !== null && nextBlockIndex >= 8}
-            ownedCount={sponsorOwnedCount}
-            history={run !== null ? sponsorBoardHistoryOf(run) : []}
-            vault={sponsorVault}
-            logos={sponsorLogos}
-            blockLabel={sponsorBlockLabel}
-            onBuy={(input) => {
-              if (!mounted) return;
-              void shell.hub?.buySponsor(input);
-            }}
-            onOpenChange={(next) => {
-              if (!mounted) return;
-              sponsorShopOpen = next;
-            }}
-          />
-
-          {#if needsInnovation}
-            <CourtInnovationPicker
-              busy={block.phase === 'running'}
-              commandError={innovationCommandError}
-              onSelect={(input) => {
-                if (!mounted) return;
-                void shell.selectCourtInnovation?.(input);
-              }}
-            />
-          {/if}
-
-          <div class="flex flex-col gap-3">
-            {#if readiness.blockers.length > 0}
-              <ul class="flex flex-col gap-2" aria-label="To play">
-                {#each readiness.blockers as blocker (blocker.kind)}
-                  <li>
-                    <a
-                      href={resolve(
-                        (blocker.destination.startsWith('#')
-                          ? '/season/run' + blocker.destination
-                          : blocker.destination) as any,
-                      )}
-                      class="flex min-h-11 items-center justify-between gap-3 rounded-lg px-3 py-2 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      style="border: 1px solid rgb(224 177 94 / 40%); background: rgb(224 177 94 / 10%); color: var(--sr-warn)"
-                    >
-                      <span>{blocker.label}</span>
-                      <span aria-hidden="true">&rarr;</span>
-                    </a>
-                  </li>
-                {/each}
-              </ul>
+            {#if challengesVm !== null}
+              <ChallengesPanel
+                blockIndex={challengesVm.blockIndex}
+                deal={challengesVm.deal}
+                evaluation={challengesVm.evaluation}
+                franchiseName={shell.franchiseName}
+              />
             {/if}
-            {#if submitErrorView !== null}
-              <p
-                role="alert"
-                class="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs"
-              >
-                {submitErrorView.message}
-                {#if submitErrorView.destination !== null}
-                  <a
-                    href={resolve(
-                      (submitErrorView.destination.startsWith('#')
-                        ? '/season/run' + submitErrorView.destination
-                        : submitErrorView.destination) as any,
-                    )}
-                    class="ml-1 font-semibold underline underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+
+            <section
+              aria-labelledby="sponsor-shop-trigger-heading"
+              class="sr-panel-quiet flex flex-col gap-3 p-4"
+              data-testid="sponsor-shop-trigger"
+            >
+              <div class="flex flex-wrap items-baseline justify-between gap-2">
+                <h2
+                  id="sponsor-shop-trigger-heading"
+                  class="font-display text-base font-extrabold uppercase tracking-tight"
+                >
+                  Sponsor deal board
+                </h2>
+                {#if sponsorOffers !== null}
+                  <p
+                    class="font-mono text-[11px] text-muted-foreground"
+                    data-testid="sponsor-shop-count"
                   >
-                    Fix
-                  </a>
+                    Owned Gear: {sponsorOwnedCount}/{sponsorOffers.length} · Vault: {sponsorVault.length}
+                    items · Influence: {sponsorBalance}/{sponsorCap}
+                  </p>
+                {/if}
+              </div>
+              <p class="text-xs text-muted-foreground">
+                {#if nextBlockIndex !== null && nextBlockIndex >= 8}
+                  Final block — no new offers. Open the shop to review the vault, then equip from
+                  the roster.
+                {:else if sponsorOffers === null}
+                  Loading this block's endorsement board…
+                {:else}
+                  {sponsorOffers.length - sponsorOwnedCount} offers left this block. Bought gear goes
+                  to your vault — equip it to players from the roster.
                 {/if}
               </p>
-            {/if}
-            {#if commandError !== null}
-              <p
-                role="alert"
-                class="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs"
-              >
-                {commandError.message}
-              </p>
-            {/if}
-            {#if sponsorOffers !== null && nextBlockIndex !== null && nextBlockIndex < 8}
-              <p class="sr-section-label">
-                {sponsorOffers.length - sponsorOwnedCount} sponsor offer{(sponsorOffers.length - sponsorOwnedCount) === 1 ? '' : 's'} left · influence {sponsorBalance}/{sponsorCap}
-              </p>
-            {/if}
-            <div class="sticky bottom-3 z-20">
               <button
                 type="button"
-                onclick={() => void submitBlock()}
-                disabled={block.phase === 'running' || submitting}
-                aria-disabled={!canSubmit}
-                data-can-submit={canSubmit}
-                data-block-phase={block.phase}
-                data-editor-ready={shell.editor !== null}
-                class="sr-btn min-h-13 w-full text-lg {canSubmit ? '' : 'opacity-60'}"
+                data-testid="open-sponsor-shop"
+                onclick={() => {
+                  sponsorShopOpen = true;
+                }}
+                class="inline-flex min-h-11 w-fit items-center justify-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground outline-none transition-opacity focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90"
               >
-                {block.phase === 'running'
-                  ? 'Playing block…'
-                  : submitting
-                    ? 'Getting ready…'
-                    : nextBlockIndex === null
-                      ? 'Play block'
-                      : `Play Block ${String(nextBlockIndex + 1)}`}
+                Open sponsor shop
+                <span aria-hidden="true">&rarr;</span>
               </button>
-            </div>
-          </div>
+            </section>
 
-          <div aria-live="polite" class="min-h-6">
-            <BlockProgress
-              {block}
-              label={blockLine}
-              {humanFranchiseId}
-              schedule={shell.schedule}
-              franchiseName={shell.franchiseName}
-              franchiseAbbrev={shell.franchiseAbbrev}
-              recapHref={block.blockIndex !== null
-                ? `/season/run/checkpoint?block=${String(block.blockIndex)}`
-                : '/season/run/checkpoint'}
-              manifest={shell.manifest}
-              bind:visible={blockProgressVisible}
-              onCancel={() => shell.cancelBlock()}
-              onRetry={() => shell.retryBlock()}
+            <SponsorShopModal
+              open={sponsorShopOpen}
+              offers={sponsorOffers}
+              balance={sponsorBalance}
+              cap={sponsorCap}
+              busy={block.phase === 'running'}
+              commandError={sponsorCommandError}
+              isFinalBlock={nextBlockIndex !== null && nextBlockIndex >= 8}
+              ownedCount={sponsorOwnedCount}
+              history={run !== null ? sponsorBoardHistoryOf(run) : []}
+              vault={sponsorVault}
+              logos={sponsorLogos}
+              blockLabel={sponsorBlockLabel}
+              onBuy={(input) => {
+                if (!mounted) return;
+                void shell.hub?.buySponsor(input);
+              }}
+              onOpenChange={(next) => {
+                if (!mounted) return;
+                sponsorShopOpen = next;
+              }}
             />
-            {#if !blockProgressVisible}
-              <div class="rounded-xl border border-dashed px-3 py-2" style="border-color: var(--sr-line)">
-                <p class="sr-section-label">
-                  Block progress appears here while playing.
-                </p>
-              </div>
+
+            {#if needsInnovation}
+              <CourtInnovationPicker
+                busy={block.phase === 'running'}
+                commandError={innovationCommandError}
+                onSelect={(input) => {
+                  if (!mounted) return;
+                  void shell.selectCourtInnovation?.(input);
+                }}
+              />
             {/if}
+
+            <div class="flex flex-col gap-3">
+              {#if readiness.blockers.length > 0}
+                <ul class="flex flex-col gap-2" aria-label="To play">
+                  {#each readiness.blockers as blocker (blocker.kind)}
+                    <li>
+                      <a
+                        href={resolve(
+                          (blocker.destination.startsWith('#')
+                            ? '/season/run' + blocker.destination
+                            : blocker.destination) as any,
+                        )}
+                        class="flex min-h-11 items-center justify-between gap-3 rounded-lg px-3 py-2 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        style="border: 1px solid rgb(224 177 94 / 40%); background: rgb(224 177 94 / 10%); color: var(--sr-warn)"
+                      >
+                        <span>{blocker.label}</span>
+                        <span aria-hidden="true">&rarr;</span>
+                      </a>
+                    </li>
+                  {/each}
+                </ul>
+              {/if}
+              {#if submitErrorView !== null}
+                <p
+                  role="alert"
+                  class="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs"
+                >
+                  {submitErrorView.message}
+                  {#if submitErrorView.destination !== null}
+                    <a
+                      href={resolve(
+                        (submitErrorView.destination.startsWith('#')
+                          ? '/season/run' + submitErrorView.destination
+                          : submitErrorView.destination) as any,
+                      )}
+                      class="ml-1 font-semibold underline underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      Fix
+                    </a>
+                  {/if}
+                </p>
+              {/if}
+              {#if commandError !== null}
+                <p
+                  role="alert"
+                  class="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs"
+                >
+                  {commandError.message}
+                </p>
+              {/if}
+              {#if sponsorOffers !== null && nextBlockIndex !== null && nextBlockIndex < 8}
+                <p class="sr-section-label">
+                  {sponsorOffers.length - sponsorOwnedCount} sponsor offer{sponsorOffers.length -
+                    sponsorOwnedCount ===
+                  1
+                    ? ''
+                    : 's'} left · influence {sponsorBalance}/{sponsorCap}
+                </p>
+              {/if}
+              <div class="sticky bottom-3 z-20">
+                <button
+                  type="button"
+                  onclick={() => void submitBlock()}
+                  disabled={block.phase === 'running' || submitting}
+                  aria-disabled={!canSubmit}
+                  data-can-submit={canSubmit}
+                  data-block-phase={block.phase}
+                  data-editor-ready={shell.editor !== null}
+                  class="sr-btn min-h-13 w-full text-lg {canSubmit ? '' : 'opacity-60'}"
+                >
+                  {block.phase === 'running'
+                    ? 'Playing block…'
+                    : submitting
+                      ? 'Getting ready…'
+                      : nextBlockIndex === null
+                        ? 'Play block'
+                        : `Play Block ${String(nextBlockIndex + 1)}`}
+                </button>
+              </div>
+            </div>
+
+            <div aria-live="polite" class="min-h-6">
+              <BlockProgress
+                {block}
+                label={blockLine}
+                {humanFranchiseId}
+                schedule={shell.schedule}
+                franchiseName={shell.franchiseName}
+                franchiseAbbrev={shell.franchiseAbbrev}
+                recapHref={block.blockIndex !== null
+                  ? `/season/run/checkpoint?block=${String(block.blockIndex)}`
+                  : '/season/run/checkpoint'}
+                manifest={shell.manifest}
+                bind:visible={blockProgressVisible}
+                onCancel={() => shell.cancelBlock()}
+                onRetry={() => shell.retryBlock()}
+              />
+              {#if !blockProgressVisible}
+                <div
+                  class="rounded-xl border border-dashed px-3 py-2"
+                  style="border-color: var(--sr-line)"
+                >
+                  <p class="sr-section-label">Block progress appears here while playing.</p>
+                </div>
+              {/if}
+            </div>
           </div>
         </section>
       {/if}
@@ -1269,7 +1272,10 @@
           {#if humanSeed !== null}
             <span class="sr-badge" data-tone="hardwood">{ordinal(humanSeed)} seed</span>
           {/if}
-          <a href={resolve('/season/run/postseason' as any)} class="sr-btn-ghost px-3 py-1.5 text-xs">
+          <a
+            href={resolve('/season/run/postseason' as any)}
+            class="sr-btn-ghost px-3 py-1.5 text-xs"
+          >
             Bracket
           </a>
         </div>

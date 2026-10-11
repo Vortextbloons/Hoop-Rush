@@ -80,11 +80,7 @@
   const deltaLabel = (delta: number): string => (delta >= 0 ? `+${String(delta)}` : String(delta));
 </script>
 
-<section
-  aria-labelledby="influence-heading"
-  class="sr-panel-quiet p-4"
-  data-season-influence-panel
->
+<section aria-labelledby="influence-heading" class="sr-panel-quiet p-4" data-season-influence-panel>
   <div class="flex flex-wrap items-baseline justify-between gap-2">
     <h2
       id="influence-heading"
@@ -109,9 +105,7 @@
 
   {#if affordances.some((affordance) => !affordance.spent)}
     <div class="mt-3 flex flex-col gap-2">
-      <p class="sr-section-label">
-        Use Influence
-      </p>
+      <p class="sr-section-label">Use Influence</p>
       {#each affordances.filter((affordance) => !affordance.spent) as affordance (affordance.purpose + (affordance.injuryId ?? affordance.windowIndex))}
         <div class="sr-gamecard flex flex-wrap items-center justify-between gap-2 p-3">
           <div class="min-w-0">
@@ -146,9 +140,7 @@
 
   {#if recordedOutcomes.length > 0}
     <div class="mt-4">
-      <p class="sr-section-label">
-        Rehab results
-      </p>
+      <p class="sr-section-label">Rehab results</p>
       <ul class="mt-1 flex flex-col gap-1">
         {#each recordedOutcomes as affordance (affordance.injuryId)}
           <li class="flex flex-wrap items-center gap-x-2 text-sm">
@@ -157,7 +149,10 @@
                 ? playerName(affordance.playerVersionId)
                 : 'Injury rehab'}
             </span>
-            <span class="sr-badge shrink-0" data-tone={affordance.rehabOutcome === 'success' ? 'win' : 'loss'}>
+            <span
+              class="sr-badge shrink-0"
+              data-tone={affordance.rehabOutcome === 'success' ? 'win' : 'loss'}
+            >
               {affordance.rehabOutcome === 'success' ? 'Back sooner' : 'Setback'}
             </span>
           </li>
@@ -232,12 +227,7 @@
           >
             Cancel
           </button>
-          <button
-            type="button"
-            onclick={confirmSpend}
-            disabled={busy}
-            class="sr-btn"
-          >
+          <button type="button" onclick={confirmSpend} disabled={busy} class="sr-btn">
             Confirm
           </button>
         </div>

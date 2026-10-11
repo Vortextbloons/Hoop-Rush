@@ -1,6 +1,6 @@
 import type { SeasonAiIdentity, SeasonRosterRole } from '@hoop-rush/data-contracts';
 import { POSITIONS } from '@hoop-rush/data-contracts';
-import { ROSTER_ROLES, ROLE_COVERAGE_THRESHOLD } from '../ai-scoring.ts';
+import { ROLE_COVERAGE_THRESHOLD } from '../ai-scoring.ts';
 import { FIVE_COVERAGE_TARGETS } from './constants.ts';
 import { identityScoreOf } from './state.ts';
 import type { GenerationState } from './types.ts';
@@ -243,51 +243,25 @@ export function coverageFeasibleFromPool(
   slots: number,
 ): boolean {
   if (uncovered.length === 0) return true;
-  if (uncovered.length > slots) return false;
-  let subsetMask = 0;
-  for (const role of uncovered) {
-    const index = ROSTER_ROLES.indexOf(role);
-    if (index >= 0) subsetMask |= 1 << index;
-  }
-  const maskCounts = new Array<number>(1 << uncovered.length).fill(0);
+  if (slots <= 0) return false;
+  const full = (1 << uncovered.length) - 1;
+  const minimumPicks = new Array<number>(full + 1).fill(Infinity);
+  minimumPicks[0] = 0;
   for (const id of memberIds) {
     const scores = state.roleScores.get(id);
     if (scores === undefined) continue;
-    let coveredMask = 0;
-    ROSTER_ROLES.forEach((role, roleIndex) => {
-      if (scores[role] >= ROLE_COVERAGE_THRESHOLD) coveredMask |= 1 << roleIndex;
+    let mask = 0;
+    uncovered.forEach((role, roleIndex) => {
+      if (scores[role] >= ROLE_COVERAGE_THRESHOLD) mask |= 1 << roleIndex;
     });
-    const masked = coveredMask & subsetMask;
-    if (masked !== 0) maskCounts[masked] = (maskCounts[masked] ?? 0) + 1;
-  }
-  const full = (1 << uncovered.length) - 1;
-  const reachable = new Uint8Array((slots + 1) * (full + 1));
-  reachable[0] = 1;
-  for (let pass = 0; pass <= slots; pass += 1) {
-    const before = new Uint8Array(reachable);
-    for (let mask = 1; mask <= full; mask += 1) {
-      const count = maskCounts[mask] ?? 0;
-      if (count === 0) continue;
-      for (let used = slots - 1; used >= 0; used -= 1) {
-        const maxAdd = Math.min(count, slots - used);
-        for (let covered = full; covered >= 0; covered -= 1) {
-          const idx = used * (full + 1) + covered;
-          if (before[idx] === 0) continue;
-          for (let add = 1; add <= maxAdd; add += 1) {
-            reachable[(used + add) * (full + 1) + (covered | mask)] = 1;
-          }
-        }
-      }
+    if (mask === 0) continue;
+    for (let covered = full; covered >= 0; covered -= 1) {
+      const picks = (minimumPicks[covered] ?? Infinity) + 1;
+      if (picks > slots) continue;
+      const combined = covered | mask;
+      minimumPicks[combined] = Math.min(minimumPicks[combined] ?? Infinity, picks);
     }
-    if (reachable[slots * (full + 1) + full] === 1) return true;
-    let unchanged = true;
-    for (let i = 0; i < reachable.length; i += 1) {
-      if (reachable[i] !== before[i]) {
-        unchanged = false;
-        break;
-      }
-    }
-    if (unchanged) break;
+    if ((minimumPicks[full] ?? Infinity) <= slots) return true;
   }
-  return reachable[slots * (full + 1) + full] === 1;
+  return false;
 }

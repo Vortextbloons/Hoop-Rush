@@ -70,16 +70,15 @@
     />
     <div class="min-w-0">
       <p class="sr-eyebrow">{detail.conference === 'east' ? 'East' : 'West'} conference</p>
-      <h1
-        id="team-detail-heading"
-        class="sr-page-title mt-0.5 truncate"
-      >
+      <h1 id="team-detail-heading" class="sr-page-title mt-0.5 truncate">
         {shell.franchiseName(detail.franchiseId)}
         {#if isHuman}
           <span class="text-primary" aria-label="your team">*</span>
         {/if}
       </h1>
-      <p class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[10px] text-muted-foreground">
+      <p
+        class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[10px] text-muted-foreground"
+      >
         <span class="sr-number font-bold text-foreground">{detail.wins}–{detail.losses}</span>
         <span>{detail.diff > 0 ? '+' : ''}{detail.diff} diff</span>
         <RuleBadge rule={homeRule} compact />
@@ -189,12 +188,7 @@
                   </span>
                 {/if}
                 {#if row.closing}
-                  <span
-                    class="sr-badge shrink-0"
-                    data-tone="hardwood"
-                  >
-                    Closing five
-                  </span>
+                  <span class="sr-badge shrink-0" data-tone="hardwood"> Closing five </span>
                 {/if}
               </div>
               <p class="truncate font-mono text-[10px] text-muted-foreground">

@@ -73,9 +73,7 @@
   data-season-challenges-panel
 >
   <div class="flex flex-wrap items-baseline justify-between gap-2">
-    <h3 id="challenges-panel-heading" class="sr-section-label">
-      Challenges — all 3 live
-    </h3>
+    <h3 id="challenges-panel-heading" class="sr-section-label">Challenges — all 3 live</h3>
     <span class="font-mono text-[10px] text-muted-foreground tabular-nums">
       {blockIndex === null
         ? 'No challenges remain'
@@ -103,17 +101,13 @@
                 +{String(definition?.reward ?? 1)}{definition?.difficulty === 'hard' ? ' hard' : ''}
               </span>
               {#if result === null}
-                <span class="sr-badge" data-tone="live">
-                  Live
-                </span>
+                <span class="sr-badge" data-tone="live"> Live </span>
               {:else if result.success}
                 <span class="sr-badge" data-tone="win">
                   Done +{String(definition?.reward ?? 1)}
                 </span>
               {:else}
-                <span class="sr-badge">
-                  Missed
-                </span>
+                <span class="sr-badge"> Missed </span>
               {/if}
             </span>
           </span>

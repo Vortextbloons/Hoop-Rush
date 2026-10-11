@@ -60,15 +60,21 @@
     <header class="gamecast-header">
       <div>
         <p class="sr-eyebrow">Hoop Rush SimCast</p>
-        <Dialog.Title class="font-display text-xl font-extrabold uppercase tracking-tight text-foreground"
+        <Dialog.Title
+          class="font-display text-xl font-extrabold uppercase tracking-tight text-foreground"
           >{gameLabel}</Dialog.Title
         >
       </div>
-      <span class="sr-badge" data-tone={result === null ? 'live' : 'win'} data-final={result !== null}>
+      <span
+        class="sr-badge"
+        data-tone={result === null ? 'live' : 'win'}
+        data-final={result !== null}
+      >
         {#if result === null}
           <span
             class="sr-live-dot inline-block h-1.5 w-1.5 rounded-full bg-current"
-            aria-hidden="true"></span>
+            aria-hidden="true"
+          ></span>
         {/if}
         {result === null ? 'Simulating' : 'Final'}
       </span>

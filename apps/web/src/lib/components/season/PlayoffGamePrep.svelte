@@ -30,7 +30,10 @@
   class="flex scroll-mt-24 flex-col gap-3"
 >
   <div class="flex flex-wrap items-baseline justify-between gap-2 px-1">
-    <h2 id="game-prep-heading" class="font-display text-lg font-extrabold uppercase tracking-tight text-foreground">
+    <h2
+      id="game-prep-heading"
+      class="font-display text-lg font-extrabold uppercase tracking-tight text-foreground"
+    >
       Game prep
     </h2>
     <p class="sr-section-label">{gameLabel}</p>

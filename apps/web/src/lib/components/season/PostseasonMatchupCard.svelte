@@ -146,12 +146,7 @@
       </div>
 
       <div class="flex flex-col items-center gap-1 pt-1">
-        <p
-          id="current-matchup-heading"
-          class="sr-section-label"
-        >
-          Series
-        </p>
+        <p id="current-matchup-heading" class="sr-section-label">Series</p>
         <p class="font-display text-center text-sm font-black uppercase leading-tight text-accent">
           First<br />to 4
         </p>
@@ -227,9 +222,7 @@
             {primaryBusy ? 'Locking in…' : primaryLabel}
             <span aria-hidden="true">→</span>
           </button>
-          {#if primaryHint !== null}<p
-              class="sr-section-label text-center sm:text-right"
-            >
+          {#if primaryHint !== null}<p class="sr-section-label text-center sm:text-right">
               {primaryHint}
             </p>{/if}
         </div>

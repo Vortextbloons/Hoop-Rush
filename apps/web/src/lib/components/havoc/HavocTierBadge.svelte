@@ -4,7 +4,6 @@
   import { HAVOC_TIER_COLORS, havocTierLabel } from './havoc-presentation';
   let { tier, size = 'md' }: { tier: HavocTier; size?: 'sm' | 'md' } = $props();
   const color = $derived(HAVOC_TIER_COLORS[tier]);
-  const icon = $derived(tier === 1 ? Sparkles : tier === 2 ? Zap : Flame);
 </script>
 
 <span
@@ -16,7 +15,12 @@
   style="border-color: {color}; color: {color}; background: color-mix(in srgb, {color} 12%, transparent)"
   aria-label={havocTierLabel(tier)}
 >
-  {@const TierIcon = icon}
-  <TierIcon class="h-3 w-3 shrink-0" aria-hidden="true" />
+  {#if tier === 1}
+    <Sparkles class="h-3 w-3 shrink-0" aria-hidden="true" />
+  {:else if tier === 2}
+    <Zap class="h-3 w-3 shrink-0" aria-hidden="true" />
+  {:else}
+    <Flame class="h-3 w-3 shrink-0" aria-hidden="true" />
+  {/if}
   {havocTierLabel(tier)}
 </span>

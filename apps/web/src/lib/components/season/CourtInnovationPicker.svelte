@@ -36,7 +36,10 @@
   id="court-innovation"
   class="sr-panel-quiet p-4"
 >
-  <h2 id="court-innovation-heading" class="font-display text-base font-extrabold uppercase tracking-tight">
+  <h2
+    id="court-innovation-heading"
+    class="font-display text-base font-extrabold uppercase tracking-tight"
+  >
     Home-court rule — required before Block 4
   </h2>
   <p class="mt-1 text-xs text-muted-foreground">
@@ -55,7 +58,9 @@
           ? 'border-primary bg-primary/5'
           : 'border-border hover:border-line-strong'}"
       >
-        <div class="font-display text-sm font-extrabold uppercase tracking-tight">{entry.displayName}</div>
+        <div class="font-display text-sm font-extrabold uppercase tracking-tight">
+          {entry.displayName}
+        </div>
         <p class="mt-2 text-xs">{entry.description}</p>
         <p class="mt-1 text-xs text-muted-foreground">{entry.rosterImplication}</p>
         <button
@@ -83,12 +88,7 @@
       {commandError}
     </p>
   {/if}
-  <button
-    type="button"
-    onclick={confirm}
-    disabled={selected === null || busy}
-    class="sr-btn mt-3"
-  >
+  <button type="button" onclick={confirm} disabled={selected === null || busy} class="sr-btn mt-3">
     {busy ? 'Locking…' : selected === null ? 'Select a rule' : 'Lock rule'}
   </button>
 </section>

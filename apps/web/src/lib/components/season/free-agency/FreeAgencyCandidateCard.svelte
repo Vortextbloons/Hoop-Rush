@@ -135,10 +135,7 @@
         {FREE_AGENCY_BAND_LABEL[candidate.band]}
       </span>
       {#if fit !== null}
-        <span
-          class="sr-chip"
-          data-fa-fit-badge
-        >
+        <span class="sr-chip" data-fa-fit-badge>
           Need: {fit.needTier}
         </span>
       {/if}
@@ -194,11 +191,7 @@
       >
         Availability
       </dt>
-      <dd
-        class="text-xs {candidate.availability.healthy
-          ? 'text-positive'
-          : 'text-accent'}"
-      >
+      <dd class="text-xs {candidate.availability.healthy ? 'text-positive' : 'text-accent'}">
         {candidate.availability.healthy
           ? 'Healthy'
           : candidate.availability.notes || 'Limited availability'}

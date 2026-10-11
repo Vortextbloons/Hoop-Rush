@@ -368,10 +368,7 @@
   });
 </script>
 
-<div
-  class="sr-panel flex flex-col gap-4"
-  data-testid="package-builder"
->
+<div class="sr-panel flex flex-col gap-4" data-testid="package-builder">
   <div class="border-b border-border px-4 py-3">
     <h3 class="font-display text-sm font-extrabold uppercase tracking-tight">Build package</h3>
     <p class="mt-1 text-xs text-muted-foreground">
@@ -386,10 +383,7 @@
   </div>
 
   {#if humanizedError !== null}
-    <p
-      role="alert"
-      class="sr-panel-quiet mx-4 flex flex-wrap items-center gap-2 px-3 py-2"
-    >
+    <p role="alert" class="sr-panel-quiet mx-4 flex flex-wrap items-center gap-2 px-3 py-2">
       <span class="sr-badge" data-tone="loss">Rejected</span>
       <span class="text-sm">{humanizedError}</span>
     </p>
@@ -397,9 +391,7 @@
 
   <div class="grid gap-4 px-4 lg:grid-cols-2">
     <fieldset class="sr-panel-quiet p-3">
-      <legend class="sr-section-label px-1">
-        You send
-      </legend>
+      <legend class="sr-section-label px-1"> You send </legend>
       <ul class="mt-2 flex flex-col gap-2">
         {#each yourPlayers as player (player.playerVersionId)}
           {@const elig = eligibilityOf(player.playerVersionId, 'you', player.available)}
@@ -411,7 +403,9 @@
           {@const ovr = overallOfLite(player)}
           <li>
             <div
-              class="sr-gamecard flex min-h-11 items-center gap-1 transition-colors has-[input:focus-visible]:ring-2 has-[input:focus-visible]:ring-ring {disabled ? 'opacity-60' : ''}"
+              class="sr-gamecard flex min-h-11 items-center gap-1 transition-colors has-[input:focus-visible]:ring-2 has-[input:focus-visible]:ring-ring {disabled
+                ? 'opacity-60'
+                : ''}"
               style:--sr-accent={selected ? 'var(--sr-hardwood)' : undefined}
             >
               <label class="flex min-w-0 flex-1 cursor-pointer items-center gap-3 px-3 py-2">
@@ -478,9 +472,7 @@
     </fieldset>
 
     <fieldset class="sr-panel-quiet p-3">
-      <legend class="sr-section-label px-1">
-        You receive
-      </legend>
+      <legend class="sr-section-label px-1"> You receive </legend>
       <ul class="mt-2 flex flex-col gap-2">
         {#each theirPlayers as player (player.playerVersionId)}
           {@const elig = eligibilityOf(player.playerVersionId, 'them', player.available)}
@@ -492,7 +484,9 @@
           {@const ovr = overallOfLite(player)}
           <li>
             <div
-              class="sr-gamecard flex min-h-11 items-center gap-1 transition-colors has-[input:focus-visible]:ring-2 has-[input:focus-visible]:ring-ring {disabled ? 'opacity-60' : ''}"
+              class="sr-gamecard flex min-h-11 items-center gap-1 transition-colors has-[input:focus-visible]:ring-2 has-[input:focus-visible]:ring-ring {disabled
+                ? 'opacity-60'
+                : ''}"
               style:--sr-accent={selected ? 'var(--sr-hardwood)' : undefined}
             >
               <label class="flex min-w-0 flex-1 cursor-pointer items-center gap-3 px-3 py-2">
@@ -561,9 +555,7 @@
 
   {#if hasOnePlusOne}
     <fieldset class="sr-panel-quiet mx-4 p-3">
-      <legend class="sr-section-label px-1">
-        Influence — optional
-      </legend>
+      <legend class="sr-section-label px-1"> Influence — optional </legend>
       <div class="mt-1 flex flex-wrap gap-2" role="group" aria-label="Influence">
         <button
           type="button"

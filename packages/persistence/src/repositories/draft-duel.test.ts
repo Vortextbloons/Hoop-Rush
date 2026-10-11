@@ -284,7 +284,7 @@ describe('DexieDraftDuelRepository', () => {
     db.close();
   });
 
-  it('completes atomically: recap persisted and working tables cleared', async () => {
+  it('completes atomically: recap persisted and results kept for the recap screen', async () => {
     const { db, repo } = createRepository('draft-duel-complete');
     await repo.saveActive(buildActiveState());
     await repo.appendCommands(ROOM_ID, [buildCommand(0), buildCommand(1)]);
@@ -299,7 +299,10 @@ describe('DexieDraftDuelRepository', () => {
     });
     expect(await repo.loadActive(ROOM_ID)).toBeNull();
     expect(await repo.loadCommands(ROOM_ID)).toEqual([]);
-    expect(await repo.loadResults(ROOM_ID)).toEqual([]);
+    const results = await repo.loadResults(ROOM_ID);
+    expect(results).toHaveLength(1);
+    expect(results[0]?.gameNumber).toBe(1);
+    expect(results[0]?.output.resultDigest).toBe('b'.repeat(64));
     const completed = await repo.loadCompleted(ROOM_ID);
     expect(completed?.champion).toBe('p1');
     expect(completed?.games).toBe(6);
@@ -314,6 +317,7 @@ describe('DexieDraftDuelRepository', () => {
     await repo.deleteCompleted(ROOM_ID);
     expect(await repo.loadCompleted(ROOM_ID)).toBeNull();
     expect(await repo.listHistory()).toEqual([]);
+    expect(await repo.loadResults(ROOM_ID)).toEqual([]);
     db.close();
   });
 

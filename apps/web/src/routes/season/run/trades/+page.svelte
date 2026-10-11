@@ -197,10 +197,7 @@
 
 <div class="pt-6">
   {#if theyAsked !== null}
-    <p
-      class="sr-panel-quiet mb-3 flex flex-wrap items-center gap-2 px-4 py-3"
-      role="status"
-    >
+    <p class="sr-panel-quiet mb-3 flex flex-wrap items-center gap-2 px-4 py-3" role="status">
       <span class="sr-badge" data-tone="warn">They asked</span>
       <span class="text-sm">{theyAsked}</span>
     </p>
@@ -242,7 +239,10 @@
   >
     {#if busy}
       <p class="sr-eyebrow">
-        <span class="sr-live-dot mr-2 inline-block h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true"></span>
+        <span
+          class="sr-live-dot mr-2 inline-block h-1.5 w-1.5 rounded-full bg-primary"
+          aria-hidden="true"
+        ></span>
         Sending…
       </p>
     {:else if draft !== null && draft.partner !== null && (draft.outgoing.length > 0 || draft.incoming.length > 0)}

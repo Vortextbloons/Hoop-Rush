@@ -49,4 +49,36 @@ describe('havoc runtime smoke', () => {
       expect(team.participants.every((line) => line.kind !== 'clone')).toBe(true);
     }
   });
+
+  it('keeps default 24/24 digests byte-identical to the pre-Time-Lord-fix baseline', () => {
+    const context = createEngineContext();
+    const fixture = simulateHavocGame(buildFixtureGameInput(), context);
+    expect(havocGameResultDigest(fixture.result)).toBe(DEFAULT_HAVOC_RESULT_DIGEST);
+    expect(havocGameTapeDigest(fixture.tape)).toBe(DEFAULT_HAVOC_TAPE_DIGEST);
+    const locked = buildHavocLockedInputs();
+    const havoc = simulateHavocGame(
+      buildHavocGameInput({ locked, gameNumber: 1, variant: 'havoc' }),
+      context,
+    );
+    const normal = simulateHavocGame(
+      buildHavocGameInput({ locked, gameNumber: 1, variant: 'normal' }),
+      context,
+    );
+    expect(havocGameResultDigest(havoc.result)).toBe(LOCKED_HAVOC_RESULT_DIGEST);
+    expect(havocGameTapeDigest(havoc.tape)).toBe(LOCKED_HAVOC_TAPE_DIGEST);
+    expect(havocGameResultDigest(normal.result)).toBe(LOCKED_NORMAL_RESULT_DIGEST);
+    expect(havocGameTapeDigest(normal.tape)).toBe(LOCKED_NORMAL_TAPE_DIGEST);
+    for (const game of [fixture, havoc, normal]) {
+      expect(game.tape.events.every((event) => event.kind !== 'time-lord')).toBe(true);
+      expect(game.tape.events.every((event) => event.kind !== 'shot-clock-violation')).toBe(true);
+    }
+  });
 });
+
+// Captured before the Time Lord clock fix; default 24/24 games must not drift.
+const DEFAULT_HAVOC_RESULT_DIGEST = '00329afdb85164418b077c9fe2221f0d';
+const DEFAULT_HAVOC_TAPE_DIGEST = 'bd021d35cae552b9aed21eff351b64a5';
+const LOCKED_HAVOC_RESULT_DIGEST = '11e0fe814d03b0ada93bbda7d3bb71b1';
+const LOCKED_HAVOC_TAPE_DIGEST = '73d5d54ebdbff5327664ea80f38d843e';
+const LOCKED_NORMAL_RESULT_DIGEST = '8649ccbb1dbcc877e89c3801ef7ccaab';
+const LOCKED_NORMAL_TAPE_DIGEST = '9460e850b1891c0cee6af276f64142a0';

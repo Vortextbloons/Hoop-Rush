@@ -48,9 +48,7 @@
 </script>
 
 <div class="sr-panel-quiet overflow-hidden" data-season-box-score>
-  <div
-    class="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3"
-  >
+  <div class="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
     <div class="flex min-w-0 items-center gap-2">
       {#if manifest && teamIdentity}
         <SeasonTeamLogo

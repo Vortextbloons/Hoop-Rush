@@ -1,8 +1,5 @@
 <script lang="ts">
-  import {
-    INJURY_TYPE_LABEL,
-    type InjuryTimelinePlayer,
-  } from '$lib/season/season-health-view';
+  import { INJURY_TYPE_LABEL, type InjuryTimelinePlayer } from '$lib/season/season-health-view';
   let {
     players,
   }: {
@@ -20,14 +17,9 @@
   );
 </script>
 
-<section
-  aria-labelledby="injury-timeline-heading"
-  class="sr-panel-quiet p-4"
->
+<section aria-labelledby="injury-timeline-heading" class="sr-panel-quiet p-4">
   <div class="flex flex-wrap items-baseline justify-between gap-2">
-    <h2 id="injury-timeline-heading" class="sr-section-label">
-      Injury history
-    </h2>
+    <h2 id="injury-timeline-heading" class="sr-section-label">Injury history</h2>
     <span class="font-mono text-[10px] text-muted-foreground">{summary}</span>
   </div>
   {#if players.length === 0}

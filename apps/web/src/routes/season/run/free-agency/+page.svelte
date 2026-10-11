@@ -275,9 +275,7 @@
   <header class="sr-arrive px-3 sm:px-0">
     <p class="sr-eyebrow">Season Run</p>
     <h1 class="sr-page-title mt-1">Free Agency</h1>
-    <p class="sr-section-label mt-2">
-      Up to 2 targets per window. Resolve to continue.
-    </p>
+    <p class="sr-section-label mt-2">Up to 2 targets per window. Resolve to continue.</p>
   </header>
 
   {#if freeAgency === null || freeAgency.windows.length === 0}

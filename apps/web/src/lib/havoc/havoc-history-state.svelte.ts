@@ -1,4 +1,5 @@
-import type { HavocComparison, HavocHistoryView, HavocReport, HavocRunView, HavocService } from '@hoop-rush/data-contracts';
+import type { HavocComparison, HavocReport } from '@hoop-rush/data-contracts';
+import type { HavocHistoryView, HavocRunView, HavocService } from './havoc-service-contract.ts';
 import { HavocServiceError } from './havoc-service-contract.ts';
 
 export interface HavocHistoryDetail {
@@ -22,6 +23,10 @@ export class HavocHistoryState {
   private readonly service: HavocService;
   private destroyed = false;
 
+  private isDestroyed(): boolean {
+    return this.destroyed;
+  }
+
   constructor(service: HavocService) {
     this.service = service;
   }
@@ -31,12 +36,12 @@ export class HavocHistoryState {
     this.error = null;
     try {
       const entries = await this.service.listHistory();
-      if (this.destroyed) return;
+      if (this.isDestroyed()) return;
       this.entries = entries;
     } catch (error) {
-      if (!this.destroyed) this.error = errorMessageOf(error);
+      if (!this.isDestroyed()) this.error = errorMessageOf(error);
     } finally {
-      if (!this.destroyed) this.loading = false;
+      if (!this.isDestroyed()) this.loading = false;
     }
   }
 
@@ -45,13 +50,13 @@ export class HavocHistoryState {
     this.error = null;
     try {
       const detail = await this.service.readCompletedRun(runId);
-      if (this.destroyed) return;
+      if (this.isDestroyed()) return;
       this.detail = detail;
       if (detail === null) this.error = `No completed Havoc run with id ${runId} was found.`;
     } catch (error) {
-      if (!this.destroyed) this.error = errorMessageOf(error);
+      if (!this.isDestroyed()) this.error = errorMessageOf(error);
     } finally {
-      if (!this.destroyed) this.detailLoading = false;
+      if (!this.isDestroyed()) this.detailLoading = false;
     }
   }
 

@@ -247,11 +247,7 @@
 
 {#if loadError !== null}
   <section aria-labelledby="result-error-heading" class="min-w-0 pt-6">
-    <div
-      id="result-error-heading"
-      role="alert"
-      class="sr-panel mx-auto w-full max-w-xl p-6"
-    >
+    <div id="result-error-heading" role="alert" class="sr-panel mx-auto w-full max-w-xl p-6">
       <p class="sr-eyebrow">Season Run</p>
       <h1 class="font-display mt-1 text-xl font-extrabold uppercase tracking-tight">
         Season result unavailable
@@ -272,12 +268,7 @@
         >
           Try again
         </button>
-        <a
-          href={resolve('/season/run/history')}
-          class="sr-btn-ghost"
-        >
-          Back to history
-        </a>
+        <a href={resolve('/season/run/history')} class="sr-btn-ghost"> Back to history </a>
       </div>
     </div>
   </section>
@@ -290,10 +281,7 @@
     <div class="sr-arrive flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div class="sr-panel-featured min-w-0 flex-1 p-5 sm:p-6">
         <p class="sr-eyebrow">Season Run · completed season</p>
-        <h1
-          id="result-heading"
-          class="sr-page-title mt-1"
-        >
+        <h1 id="result-heading" class="sr-page-title mt-1">
           {run.postseason.championFranchiseId !== null
             ? shell.franchiseName(run.postseason.championFranchiseId)
             : 'Season'}
@@ -301,9 +289,7 @@
         {#if championRecord !== null}
           <p class="mt-2 flex flex-wrap items-baseline gap-x-2">
             <span class="sr-number text-2xl font-extrabold">{championRecord}</span>
-            <span class="font-mono text-xs text-muted-foreground">
-              Final record · champions
-            </span>
+            <span class="font-mono text-xs text-muted-foreground"> Final record · champions </span>
           </p>
         {/if}
         <details class="mt-3 rounded-lg border border-border bg-surface-2 px-4 py-3">
@@ -343,12 +329,7 @@
         </details>
       </div>
       <div class="flex shrink-0 flex-wrap gap-2">
-        <a
-          href={resolve('/season/run/history')}
-          class="sr-btn-ghost"
-        >
-          Back to history
-        </a>
+        <a href={resolve('/season/run/history')} class="sr-btn-ghost"> Back to history </a>
         <button
           type="button"
           data-season-history-delete
@@ -386,9 +367,7 @@
     </div>
 
     <div class="mt-8">
-      <h2 class="sr-section-label">
-        Final standings
-      </h2>
+      <h2 class="sr-section-label">Final standings</h2>
       <div class="mt-3">
         <StandingsTable
           standings={run.standings}
@@ -410,9 +389,7 @@
 
     {#if postseasonRows.length > 0}
       <div class="mt-8">
-        <h2 class="sr-section-label">
-          Postseason results
-        </h2>
+        <h2 class="sr-section-label">Postseason results</h2>
         <ul class="mt-3 flex flex-col gap-2">
           {#each postseasonRows as row (row.summary.gameId)}
             <li
@@ -472,24 +449,22 @@
 
     {#if leaderTables !== null}
       <div class="mt-8">
-        <h2 class="sr-section-label">
-          Regular-season leaders
-        </h2>
+        <h2 class="sr-section-label">Regular-season leaders</h2>
         <p class="mt-1 font-mono text-xs text-muted-foreground">
           Top three per category · per game, then total
         </p>
         <div class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {#each LEADER_CATEGORIES as category (category)}
             <div class="sr-panel-quiet p-3">
-              <p
-                class="sr-section-label"
-              >
+              <p class="sr-section-label">
                 {LEADER_CATEGORY_LABELS[category]}
               </p>
               <ol class="mt-1 flex flex-col divide-y divide-border/40">
                 {#each (leaderTables[category] ?? []).slice(0, 3) as entry, rank (entry.playerVersionId)}
                   <li class="flex items-center gap-2 py-1.5 text-sm">
-                    <span class="sr-number w-4 shrink-0 font-mono text-xs font-bold text-muted-foreground">
+                    <span
+                      class="sr-number w-4 shrink-0 font-mono text-xs font-bold text-muted-foreground"
+                    >
                       {rank + 1}
                     </span>
                     <span class="min-w-0 flex-1 truncate font-semibold">
@@ -511,9 +486,7 @@
 
     {#if blockRecaps.length > 0}
       <div class="mt-8">
-        <h2 class="sr-section-label">
-          Regular-season recaps
-        </h2>
+        <h2 class="sr-section-label">Regular-season recaps</h2>
         <ul class="mt-3 flex flex-col gap-2">
           {#each blockRecaps as entry (entry.blockIndex)}
             <li class="sr-panel-quiet px-4 py-3">
@@ -604,7 +577,9 @@
           {#each humanTradeGrades as entry (entry.grade.gradeId)}
             <li class="sr-panel-quiet px-4 py-2.5 text-sm">
               <div class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-                <span class="sr-number font-mono text-lg font-bold tracking-tight">{entry.view.label}</span>
+                <span class="sr-number font-mono text-lg font-bold tracking-tight"
+                  >{entry.view.label}</span
+                >
                 <span class="font-mono text-xs text-muted-foreground">
                   {entry.view.windowLabel}
                 </span>
@@ -641,13 +616,9 @@
 >
   <Dialog.Portal>
     <Dialog.Overlay class="sr-dialog-overlay" />
-    <Dialog.Content
-      class="sr-dialog w-[min(28rem,calc(100vw-2rem))] p-6"
-    >
+    <Dialog.Content class="sr-dialog w-[min(28rem,calc(100vw-2rem))] p-6">
       <div class="flex items-start justify-between gap-3">
-        <Dialog.Title class="sr-page-title text-2xl">
-          Delete this season?
-        </Dialog.Title>
+        <Dialog.Title class="sr-page-title text-2xl">Delete this season?</Dialog.Title>
       </div>
       <p class="mt-2 text-sm text-muted-foreground">
         This permanently deletes the completed season — its champion, bracket, awards, and results —

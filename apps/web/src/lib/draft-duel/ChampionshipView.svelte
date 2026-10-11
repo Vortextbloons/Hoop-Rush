@@ -1,12 +1,18 @@
 <script lang="ts">
   import { Repeat, Trophy } from '@lucide/svelte';
   import type {
+    DraftDuelCard,
     DraftDuelGameOutput,
     DraftDuelParticipantId,
     DraftDuelSeriesMvp,
     DraftDuelSeriesSnapshot,
     DraftDuelStandout,
+    HoopRushManifest,
+    PlayerId,
+    TeamResult,
   } from '@hoop-rush/data-contracts';
+  import PlayerFace from '$lib/components/PlayerFace.svelte';
+  import { SLOT_LABELS } from '$lib/player-positions';
 
   let {
     series,
@@ -14,6 +20,8 @@
     standouts,
     localParticipantId,
     games,
+    cards = {},
+    manifest = null,
     rematchRequested,
     rematchConfirmed,
     onrematch,
@@ -24,6 +32,8 @@
     standouts: DraftDuelStandout[];
     localParticipantId: DraftDuelParticipantId;
     games: DraftDuelGameOutput[];
+    cards?: Record<string, DraftDuelCard>;
+    manifest?: HoopRushManifest | null;
     rematchRequested: boolean;
     rematchConfirmed: boolean;
     onrematch: () => void;
@@ -35,17 +45,280 @@
     localScore: number;
     opponentScore: number;
     localWon: boolean;
+    margin: number;
+    overtime: boolean;
     record: string;
     standouts: DraftDuelStandout[];
+  }
+
+  interface SideTotals {
+    games: number;
+    points: number;
+    fieldGoalMakes: number;
+    fieldGoalAttempts: number;
+    threeMakes: number;
+    threeAttempts: number;
+    rebounds: number;
+    assists: number;
+    turnovers: number;
+  }
+
+  interface LeaderCandidate {
+    playerId: PlayerId;
+    points: number;
+    rebounds: number;
+    assists: number;
+    games: number;
+  }
+
+  interface Leader {
+    playerId: PlayerId;
+    name: string;
+    total: number;
+    perGame: string;
+  }
+
+  interface SideLeaders {
+    points: Leader | null;
+    rebounds: Leader | null;
+    assists: Leader | null;
+  }
+
+  interface PlayerAggregate {
+    playerId: PlayerId;
+    games: number;
+    minutes: number;
+    points: number;
+    rebounds: number;
+    assists: number;
+    steals: number;
+    blocks: number;
+    turnovers: number;
+    fieldGoalMakes: number;
+    fieldGoalAttempts: number;
+    threeMakes: number;
+    threeAttempts: number;
+    freeThrowMakes: number;
+    freeThrowAttempts: number;
+  }
+
+  let statsSide = $state<'you' | 'opp'>('you');
+  let statsTotals = $state(false);
+
+  const orderedGames = $derived([...games].sort((a, b) => a.gameNumber - b.gameNumber));
+  const localWins = $derived(localParticipantId === 'p1' ? series.p1Wins : series.p2Wins);
+  const opponentWins = $derived(localParticipantId === 'p1' ? series.p2Wins : series.p1Wins);
+  const championIsLocal = $derived(series.champion === localParticipantId);
+  const seriesDecided = $derived(series.champion !== null);
+  const hasBoxScores = $derived(orderedGames.length > 0);
+
+  function nameOf(playerId: string): string {
+    return cards[playerId]?.displayName ?? playerId.replace(/^p-/, '#').slice(0, 7);
+  }
+
+  function initialsOf(name: string): string {
+    return name
+      .split(' ')
+      .filter((part) => part.length > 0)
+      .map((part) => part[0] ?? '')
+      .join('')
+      .slice(0, 2)
+      .toUpperCase();
+  }
+
+  function faceOf(playerId: PlayerId): {
+    playerId: PlayerId;
+    playerExternalId: string;
+    altIds: null;
+  } {
+    return {
+      playerId,
+      playerExternalId: cards[playerId]?.playerExternalId ?? '',
+      altIds: null,
+    };
+  }
+
+  function localTeamOf(game: DraftDuelGameOutput): TeamResult {
+    return game.homeParticipantId === localParticipantId ? game.result.home : game.result.away;
+  }
+
+  function opponentTeamOf(game: DraftDuelGameOutput): TeamResult {
+    return game.homeParticipantId === localParticipantId ? game.result.away : game.result.home;
   }
 
   function perGame(total: number, gamesPlayed: number): string {
     return (total / Math.max(1, gamesPlayed)).toFixed(1);
   }
 
-  const localWins = $derived(localParticipantId === 'p1' ? series.p1Wins : series.p2Wins);
-  const opponentWins = $derived(localParticipantId === 'p1' ? series.p2Wins : series.p1Wins);
-  const championIsLocal = $derived(series.champion === localParticipantId);
+  function pct(made: number, attempted: number): string {
+    return attempted === 0 ? '—' : `${((made / attempted) * 100).toFixed(1)}%`;
+  }
+
+  function emptyTotals(): SideTotals {
+    return {
+      games: 0,
+      points: 0,
+      fieldGoalMakes: 0,
+      fieldGoalAttempts: 0,
+      threeMakes: 0,
+      threeAttempts: 0,
+      rebounds: 0,
+      assists: 0,
+      turnovers: 0,
+    };
+  }
+
+  function addTeamTotals(totals: SideTotals, team: TeamResult): void {
+    totals.games += 1;
+    totals.points += team.box.points;
+    totals.fieldGoalMakes += team.box.fieldGoals.made;
+    totals.fieldGoalAttempts += team.box.fieldGoals.attempted;
+    totals.threeMakes += team.box.threes.made;
+    totals.threeAttempts += team.box.threes.attempted;
+    totals.rebounds += team.box.rebounds.total;
+    totals.assists += team.box.assists;
+    totals.turnovers += team.box.turnovers;
+  }
+
+  const comparison = $derived.by((): { local: SideTotals; opponent: SideTotals } => {
+    const local = emptyTotals();
+    const opponent = emptyTotals();
+    for (const game of orderedGames) {
+      addTeamTotals(local, localTeamOf(game));
+      addTeamTotals(opponent, opponentTeamOf(game));
+    }
+    return { local, opponent };
+  });
+
+  function collectLeaders(
+    teamOf: (game: DraftDuelGameOutput) => TeamResult,
+  ): Map<string, LeaderCandidate> {
+    const candidates = new Map<string, LeaderCandidate>();
+    for (const game of orderedGames) {
+      for (const player of teamOf(game).players) {
+        const entry = candidates.get(player.playerId) ?? {
+          playerId: player.playerId,
+          points: 0,
+          rebounds: 0,
+          assists: 0,
+          games: 0,
+        };
+        entry.points += player.points;
+        entry.rebounds += player.rebounds.total;
+        entry.assists += player.assists;
+        entry.games += 1;
+        candidates.set(player.playerId, entry);
+      }
+    }
+    return candidates;
+  }
+
+  function topLeader(
+    candidates: Map<string, LeaderCandidate>,
+    key: 'points' | 'rebounds' | 'assists',
+  ): Leader | null {
+    let best: LeaderCandidate | null = null;
+    for (const candidate of candidates.values()) {
+      if (
+        best === null ||
+        candidate[key] > best[key] ||
+        (candidate[key] === best[key] && candidate.playerId < best.playerId)
+      ) {
+        best = candidate;
+      }
+    }
+    if (best === null) return null;
+    return {
+      playerId: best.playerId,
+      name: nameOf(best.playerId),
+      total: best[key],
+      perGame: perGame(best[key], best.games),
+    };
+  }
+
+  const leaders = $derived.by((): { local: SideLeaders; opponent: SideLeaders } => {
+    const local = collectLeaders(localTeamOf);
+    const opponent = collectLeaders(opponentTeamOf);
+    return {
+      local: {
+        points: topLeader(local, 'points'),
+        rebounds: topLeader(local, 'rebounds'),
+        assists: topLeader(local, 'assists'),
+      },
+      opponent: {
+        points: topLeader(opponent, 'points'),
+        rebounds: topLeader(opponent, 'rebounds'),
+        assists: topLeader(opponent, 'assists'),
+      },
+    };
+  });
+
+  const leaderRows = [
+    { key: 'points', label: 'Points', unit: 'PPG' },
+    { key: 'rebounds', label: 'Rebounds', unit: 'RPG' },
+    { key: 'assists', label: 'Assists', unit: 'APG' },
+  ] as const;
+
+  function collectPlayerStats(
+    teamOf: (game: DraftDuelGameOutput) => TeamResult,
+  ): PlayerAggregate[] {
+    const byPlayerId = new Map<string, PlayerAggregate>();
+    const order: string[] = [];
+    for (const game of orderedGames) {
+      for (const player of teamOf(game).players) {
+        let entry = byPlayerId.get(player.playerId);
+        if (entry === undefined) {
+          entry = {
+            playerId: player.playerId,
+            games: 0,
+            minutes: 0,
+            points: 0,
+            rebounds: 0,
+            assists: 0,
+            steals: 0,
+            blocks: 0,
+            turnovers: 0,
+            fieldGoalMakes: 0,
+            fieldGoalAttempts: 0,
+            threeMakes: 0,
+            threeAttempts: 0,
+            freeThrowMakes: 0,
+            freeThrowAttempts: 0,
+          };
+          byPlayerId.set(player.playerId, entry);
+          order.push(player.playerId);
+        }
+        entry.games += 1;
+        entry.minutes += player.minutes;
+        entry.points += player.points;
+        entry.rebounds += player.rebounds.total;
+        entry.assists += player.assists;
+        entry.steals += player.steals;
+        entry.blocks += player.blocks;
+        entry.turnovers += player.turnovers;
+        entry.fieldGoalMakes += player.fieldGoals.made;
+        entry.fieldGoalAttempts += player.fieldGoals.attempted;
+        entry.threeMakes += player.threes.made;
+        entry.threeAttempts += player.threes.attempted;
+        entry.freeThrowMakes += player.freeThrows.made;
+        entry.freeThrowAttempts += player.freeThrows.attempted;
+      }
+    }
+    return order
+      .map((playerId) => byPlayerId.get(playerId))
+      .filter((entry): entry is PlayerAggregate => entry !== undefined);
+  }
+
+  const playerStats = $derived.by(() => ({
+    local: collectPlayerStats(localTeamOf),
+    opponent: collectPlayerStats(opponentTeamOf),
+  }));
+
+  const statsRows = $derived(statsSide === 'you' ? playerStats.local : playerStats.opponent);
+
+  function statValue(value: number, gamesPlayed: number): string {
+    return statsTotals ? String(value) : (value / Math.max(1, gamesPlayed)).toFixed(1);
+  }
 
   const recap = $derived.by((): RecapGame[] => {
     const byGame = new Map<number, DraftDuelStandout[]>();
@@ -56,26 +329,24 @@
     }
     let localRunning = 0;
     let opponentRunning = 0;
-    return [...games]
-      .sort((a, b) => a.gameNumber - b.gameNumber)
-      .map((game) => {
-        const localIsHome = game.homeParticipantId === localParticipantId;
-        const localScore = localIsHome ? game.result.home.box.points : game.result.away.box.points;
-        const opponentScore = localIsHome
-          ? game.result.away.box.points
-          : game.result.home.box.points;
-        const localWon = (game.result.winner === 'home') === localIsHome;
-        if (localWon) localRunning += 1;
-        else opponentRunning += 1;
-        return {
-          gameNumber: game.gameNumber,
-          localScore,
-          opponentScore,
-          localWon,
-          record: `${String(localRunning)}–${String(opponentRunning)}`,
-          standouts: byGame.get(game.gameNumber) ?? [],
-        };
-      });
+    return orderedGames.map((game) => {
+      const localTeam = localTeamOf(game);
+      const opponentTeam = opponentTeamOf(game);
+      const localWon =
+        game.result.winner === (game.homeParticipantId === localParticipantId ? 'home' : 'away');
+      if (localWon) localRunning += 1;
+      else opponentRunning += 1;
+      return {
+        gameNumber: game.gameNumber,
+        localScore: localTeam.box.points,
+        opponentScore: opponentTeam.box.points,
+        localWon,
+        margin: localTeam.box.points - opponentTeam.box.points,
+        overtime: game.result.overtimePeriods > 0,
+        record: `${String(localRunning)}–${String(opponentRunning)}`,
+        standouts: byGame.get(game.gameNumber) ?? [],
+      };
+    });
   });
 
   const mvpIsLocal = $derived(mvp !== null && mvp.participantId === localParticipantId);
@@ -92,6 +363,16 @@
           assists: mvp.assists,
           gameScore: mvp.gameScoreSum.toFixed(1),
         },
+  );
+  const mvpEmptyCopy = $derived(
+    seriesDecided
+      ? 'The series MVP is not available on this device.'
+      : 'Series MVP will be recorded once the games are complete.',
+  );
+  const recapEmptyCopy = $derived(
+    seriesDecided || series.games.length > 0
+      ? 'The series box scores are not available on this device.'
+      : 'No completed games to recap yet.',
   );
 </script>
 
@@ -125,33 +406,261 @@
     </p>
   </header>
 
-  <section class="mvp" aria-label="Series MVP">
-    <h3>Series MVP</h3>
-    {#if mvp !== null && mvpLine !== null}
-      <p class="mvp-name">{mvp.displayName}</p>
-      <p class="mvp-team">
-        {mvpIsLocal ? 'Your roster' : 'Opponent roster'} · {mvpLine.games} games
-      </p>
-      <dl class="mvp-stats">
-        <div>
-          <dt>PPG</dt>
-          <dd>{mvpLine.ppg}</dd>
+  <div class="top-grid">
+    <section class="mvp" aria-label="Series MVP">
+      <h3>Series MVP</h3>
+      {#if mvp !== null && mvpLine !== null}
+        <div class="mvp-body">
+          {#if manifest && cards[mvp.playerId]?.playerExternalId}
+            <PlayerFace
+              player={faceOf(mvp.playerId)}
+              {manifest}
+              size="md"
+              fallbackInitials={initialsOf(mvp.displayName)}
+            />
+          {:else}
+            <span class="player-fallback">{initialsOf(mvp.displayName)}</span>
+          {/if}
+          <div class="mvp-identity">
+            <p class="mvp-name">{mvp.displayName}</p>
+            <p class="mvp-team">
+              {mvpIsLocal ? 'Your roster' : 'Opponent roster'} · {mvpLine.games} games
+            </p>
+          </div>
         </div>
-        <div>
-          <dt>RPG</dt>
-          <dd>{mvpLine.rpg}</dd>
+        <dl class="mvp-stats">
+          <div>
+            <dt>PPG</dt>
+            <dd>{mvpLine.ppg}</dd>
+          </div>
+          <div>
+            <dt>RPG</dt>
+            <dd>{mvpLine.rpg}</dd>
+          </div>
+          <div>
+            <dt>APG</dt>
+            <dd>{mvpLine.apg}</dd>
+          </div>
+        </dl>
+        <p class="mvp-totals">
+          Totals: {mvpLine.points} pts · {mvpLine.rebounds} reb · {mvpLine.assists} ast · series game
+          score {mvpLine.gameScore}
+        </p>
+      {:else}
+        <p class="mvp-empty">{mvpEmptyCopy}</p>
+      {/if}
+    </section>
+
+    <section class="comparison" aria-label="Series comparison">
+      <h3>Series comparison</h3>
+      {#if hasBoxScores}
+        <table class="comparison-table">
+          <caption class="sr-only">Per-game team averages for the series</caption>
+          <thead>
+            <tr>
+              <th scope="col">You</th>
+              <th scope="col">Stat</th>
+              <th scope="col">Opp</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>{perGame(comparison.local.points, comparison.local.games)}</td>
+              <th scope="row">Points per game</th>
+              <td>{perGame(comparison.opponent.points, comparison.opponent.games)}</td>
+            </tr>
+            <tr>
+              <td>{pct(comparison.local.fieldGoalMakes, comparison.local.fieldGoalAttempts)}</td>
+              <th scope="row">FG%</th>
+              <td
+                >{pct(
+                  comparison.opponent.fieldGoalMakes,
+                  comparison.opponent.fieldGoalAttempts,
+                )}</td
+              >
+            </tr>
+            <tr>
+              <td>{pct(comparison.local.threeMakes, comparison.local.threeAttempts)}</td>
+              <th scope="row">3P%</th>
+              <td>{pct(comparison.opponent.threeMakes, comparison.opponent.threeAttempts)}</td>
+            </tr>
+            <tr>
+              <td>{perGame(comparison.local.rebounds, comparison.local.games)}</td>
+              <th scope="row">Rebounds per game</th>
+              <td>{perGame(comparison.opponent.rebounds, comparison.opponent.games)}</td>
+            </tr>
+            <tr>
+              <td>{perGame(comparison.local.assists, comparison.local.games)}</td>
+              <th scope="row">Assists per game</th>
+              <td>{perGame(comparison.opponent.assists, comparison.opponent.games)}</td>
+            </tr>
+            <tr>
+              <td>{perGame(comparison.local.turnovers, comparison.local.games)}</td>
+              <th scope="row">Turnovers per game</th>
+              <td>{perGame(comparison.opponent.turnovers, comparison.opponent.games)}</td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="panel-note">
+          {comparison.local.games} game{comparison.local.games === 1 ? '' : 's'} · per-game averages
+        </p>
+      {:else}
+        <p class="mvp-empty">Box scores are not available on this device.</p>
+      {/if}
+    </section>
+  </div>
+
+  <section class="leaders" aria-label="Series leaders">
+    <h3>Series leaders</h3>
+    {#if hasBoxScores}
+      <table class="leaders-table">
+        <caption class="sr-only">Series leaders for both rosters</caption>
+        <thead>
+          <tr>
+            <th scope="col">Stat</th>
+            <th scope="col">Your five</th>
+            <th scope="col">Opponent five</th>
+          </tr>
+        </thead>
+        <tbody>
+          {#each leaderRows as row (row.key)}
+            <tr>
+              <th scope="row">{row.label}</th>
+              {#each [leaders.local[row.key], leaders.opponent[row.key]] as leader, index (row.key + String(index))}
+                <td>
+                  {#if leader}
+                    <span class="leader-cell">
+                      {#if manifest && cards[leader.playerId]?.playerExternalId}
+                        <PlayerFace
+                          player={faceOf(leader.playerId)}
+                          {manifest}
+                          size="sm"
+                          fallbackInitials={initialsOf(leader.name)}
+                        />
+                      {:else}
+                        <span class="player-fallback sm">{initialsOf(leader.name)}</span>
+                      {/if}
+                      <span class="leader-text">
+                        <span class="leader-name">{leader.name}</span>
+                        <span class="leader-value"
+                          >{leader.perGame} <span class="leader-unit">{row.unit}</span></span
+                        >
+                      </span>
+                    </span>
+                  {:else}
+                    <span class="leader-empty">—</span>
+                  {/if}
+                </td>
+              {/each}
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    {:else}
+      <p class="mvp-empty">Box scores are not available on this device.</p>
+    {/if}
+  </section>
+
+  <section class="player-stats" aria-label="Series player stats">
+    <div class="stats-head">
+      <h3>Series player stats</h3>
+      {#if hasBoxScores}
+        <div class="stats-controls">
+          <div class="segmented" role="group" aria-label="Roster">
+            <button
+              type="button"
+              aria-pressed={statsSide === 'you'}
+              class:active={statsSide === 'you'}
+              onclick={() => (statsSide = 'you')}>You</button
+            >
+            <button
+              type="button"
+              aria-pressed={statsSide === 'opp'}
+              class:active={statsSide === 'opp'}
+              onclick={() => (statsSide = 'opp')}>Opponent</button
+            >
+          </div>
+          <div class="segmented" role="group" aria-label="Stat values">
+            <button
+              type="button"
+              aria-pressed={!statsTotals}
+              class:active={!statsTotals}
+              onclick={() => (statsTotals = false)}>Per game</button
+            >
+            <button
+              type="button"
+              aria-pressed={statsTotals}
+              class:active={statsTotals}
+              onclick={() => (statsTotals = true)}>Totals</button
+            >
+          </div>
         </div>
-        <div>
-          <dt>APG</dt>
-          <dd>{mvpLine.apg}</dd>
-        </div>
-      </dl>
-      <p class="mvp-totals">
-        Totals: {mvpLine.points} pts · {mvpLine.rebounds} reb · {mvpLine.assists} ast · series game score
-        {mvpLine.gameScore}
+      {/if}
+    </div>
+    {#if hasBoxScores}
+      <div class="stats-scroll">
+        <table class="stats-table">
+          <caption class="sr-only"
+            >{statsSide === 'you' ? 'Your five' : 'Opponent five'} series stats</caption
+          >
+          <thead>
+            <tr>
+              <th scope="col" class="is-player">Player</th>
+              <th scope="col">GP</th>
+              <th scope="col">MIN</th>
+              <th scope="col">PTS</th>
+              <th scope="col">REB</th>
+              <th scope="col">AST</th>
+              <th scope="col">STL</th>
+              <th scope="col">BLK</th>
+              <th scope="col">TOV</th>
+              <th scope="col">FG</th>
+              <th scope="col">3P</th>
+              <th scope="col">FT</th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each statsRows as row, slotIndex (row.playerId)}
+              <tr>
+                <th scope="row" class="is-player">
+                  <span class="player-cell">
+                    {#if manifest && cards[row.playerId]?.playerExternalId}
+                      <PlayerFace
+                        player={faceOf(row.playerId)}
+                        {manifest}
+                        size="sm"
+                        fallbackInitials={initialsOf(nameOf(row.playerId))}
+                      />
+                    {:else}
+                      <span class="player-fallback sm">{initialsOf(nameOf(row.playerId))}</span>
+                    {/if}
+                    <span class="player-text">
+                      <span class="player-name">{nameOf(row.playerId)}</span>
+                      <span class="player-pos">{SLOT_LABELS[slotIndex] ?? ''}</span>
+                    </span>
+                  </span>
+                </th>
+                <td>{row.games}</td>
+                <td>{statValue(row.minutes, row.games)}</td>
+                <td class="is-points">{statValue(row.points, row.games)}</td>
+                <td>{statValue(row.rebounds, row.games)}</td>
+                <td>{statValue(row.assists, row.games)}</td>
+                <td>{statValue(row.steals, row.games)}</td>
+                <td>{statValue(row.blocks, row.games)}</td>
+                <td>{statValue(row.turnovers, row.games)}</td>
+                <td>{pct(row.fieldGoalMakes, row.fieldGoalAttempts)}</td>
+                <td>{pct(row.threeMakes, row.threeAttempts)}</td>
+                <td>{pct(row.freeThrowMakes, row.freeThrowAttempts)}</td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </div>
+      <p class="panel-note">
+        {statsTotals ? 'Series totals' : 'Per-game averages'} · {statsRows.length} players
       </p>
     {:else}
-      <p class="mvp-empty">Series MVP will be recorded once the games are complete.</p>
+      <p class="mvp-empty">Box scores are not available on this device.</p>
     {/if}
   </section>
 
@@ -163,13 +672,21 @@
           <li class="recap-game" data-result={game.localWon ? 'win' : 'loss'}>
             <div class="recap-head">
               <span class="recap-label">Game {game.gameNumber}</span>
-              <span class="recap-result">{game.localWon ? 'W' : 'L'}</span>
+              <span class="recap-tags">
+                {#if game.overtime}
+                  <span class="recap-ot">OT</span>
+                {/if}
+                <span class="recap-result">{game.localWon ? 'W' : 'L'}</span>
+              </span>
             </div>
             <p class="recap-score">
               <span>{game.localScore}</span><span class="recap-dash" aria-hidden="true">–</span
               ><span>{game.opponentScore}</span>
             </p>
-            <p class="recap-record">Series {game.record}</p>
+            <p class="recap-record">
+              {game.localWon ? `Won by ${String(game.margin)}` : `Lost by ${String(-game.margin)}`} ·
+              Series {game.record}
+            </p>
             {#each game.standouts as standout (standout.playerId)}
               <p class="recap-standout">
                 <strong>{standout.displayName}</strong>
@@ -181,7 +698,7 @@
         {/each}
       </ol>
     {:else}
-      <p class="recap-empty">No completed games to recap yet.</p>
+      <p class="recap-empty">{recapEmptyCopy}</p>
     {/if}
   </section>
 
@@ -295,13 +812,33 @@
     color: var(--color-muted-foreground);
   }
 
+  .top-grid {
+    display: grid;
+    gap: 0.85rem;
+  }
+
+  @media (min-width: 900px) {
+    .top-grid {
+      grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+      align-items: stretch;
+    }
+  }
+
   .mvp,
+  .comparison,
+  .leaders,
+  .player-stats,
   .recap,
   .rematch {
     padding: 0.85rem 1rem;
     border: 1px solid var(--color-line-soft);
     border-radius: 0.75rem;
     background: var(--color-surface-1);
+  }
+
+  .comparison,
+  .leaders {
+    min-width: 0;
   }
 
   h3 {
@@ -314,18 +851,52 @@
     text-transform: uppercase;
   }
 
+  .mvp-body {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    margin-top: 0.6rem;
+  }
+
+  .mvp-identity {
+    min-width: 0;
+    flex: 1;
+  }
+
   .mvp-name {
-    margin: 0.5rem 0 0;
+    margin: 0;
     font-family: var(--font-display);
     font-size: 1.5rem;
     font-weight: 800;
+    line-height: 1.05;
   }
 
   .mvp-team {
-    margin: 0.1rem 0 0;
+    margin: 0.15rem 0 0;
     font-family: var(--font-mono);
     font-size: 0.66rem;
     color: var(--color-muted-foreground);
+  }
+
+  .player-fallback {
+    display: grid;
+    width: 3rem;
+    height: 3rem;
+    flex: none;
+    place-items: center;
+    border-radius: 0.55rem;
+    background: var(--color-surface-3);
+    color: var(--color-muted-foreground);
+    font-family: var(--font-display);
+    font-size: 0.85rem;
+    font-weight: 800;
+  }
+
+  .player-fallback.sm {
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 0.45rem;
+    font-size: 0.68rem;
   }
 
   .mvp-stats {
@@ -372,6 +943,256 @@
     color: var(--color-muted-foreground);
   }
 
+  .comparison-table,
+  .leaders-table {
+    width: 100%;
+    margin-top: 0.55rem;
+    border-collapse: collapse;
+    font-size: 0.78rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .comparison-table thead th,
+  .leaders-table thead th {
+    padding: 0 0.3rem 0.4rem;
+    border-bottom: 1px solid var(--color-line-soft);
+    color: var(--color-muted-foreground);
+    font-family: var(--font-mono);
+    font-size: 0.56rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .comparison-table thead th:first-child,
+  .leaders-table thead th:first-child {
+    text-align: left;
+  }
+
+  .comparison-table thead th:last-child,
+  .leaders-table thead th:last-child {
+    text-align: right;
+  }
+
+  .comparison-table tbody tr,
+  .leaders-table tbody tr {
+    border-bottom: 1px solid color-mix(in srgb, var(--color-line-soft) 55%, transparent);
+  }
+
+  .comparison-table tbody tr:last-child,
+  .leaders-table tbody tr:last-child {
+    border-bottom: 0;
+  }
+
+  .comparison-table tbody th,
+  .leaders-table tbody th {
+    padding: 0.42rem 0.3rem;
+    font-weight: 600;
+    text-align: center;
+    color: var(--color-muted-foreground);
+  }
+
+  .comparison-table tbody td {
+    padding: 0.42rem 0.3rem;
+    font-weight: 700;
+  }
+
+  .comparison-table tbody td:first-child {
+    text-align: left;
+  }
+
+  .comparison-table tbody td:last-child {
+    text-align: right;
+  }
+
+  .leaders-table tbody th {
+    width: 6.5rem;
+    text-align: left;
+  }
+
+  .leaders-table tbody td {
+    padding: 0.4rem 0.3rem;
+    vertical-align: middle;
+  }
+
+  .leader-cell {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    min-width: 0;
+  }
+
+  .leader-text {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.05rem;
+  }
+
+  .leader-name {
+    overflow: hidden;
+    font-family: var(--font-display);
+    font-size: 0.9rem;
+    font-weight: 800;
+    line-height: 1.1;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .leader-value {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: var(--color-foreground);
+  }
+
+  .leader-unit {
+    color: var(--color-muted-foreground);
+    font-weight: 400;
+  }
+
+  .leader-empty {
+    color: var(--color-muted-foreground);
+  }
+
+  .panel-note {
+    margin: 0.5rem 0 0;
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    color: var(--color-muted-foreground);
+  }
+
+  .stats-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem 0.75rem;
+  }
+
+  .stats-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+
+  .segmented {
+    display: inline-flex;
+    padding: 0.12rem;
+    border: 1px solid var(--color-line-soft);
+    border-radius: 0.5rem;
+    background: var(--color-surface-2);
+  }
+
+  .segmented button {
+    padding: 0.22rem 0.55rem;
+    border-radius: 0.35rem;
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-muted-foreground);
+    cursor: pointer;
+    outline: none;
+  }
+
+  .segmented button.active {
+    background: var(--color-primary);
+    color: var(--color-primary-foreground);
+  }
+
+  .segmented button:focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+  }
+
+  .stats-scroll {
+    margin-top: 0.55rem;
+    overflow-x: auto;
+  }
+
+  .stats-table {
+    width: 100%;
+    min-width: 38rem;
+    border-collapse: collapse;
+    font-size: 0.72rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .stats-table th,
+  .stats-table td {
+    padding: 0.32rem 0.42rem;
+    text-align: right;
+  }
+
+  .stats-table thead th {
+    border-bottom: 1px solid var(--color-line-soft);
+    color: var(--color-muted-foreground);
+    font-family: var(--font-mono);
+    font-size: 0.56rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+  }
+
+  .stats-table tbody tr {
+    border-top: 1px solid color-mix(in srgb, var(--color-line-soft) 55%, transparent);
+  }
+
+  .stats-table tbody tr:first-child {
+    border-top: 0;
+  }
+
+  .stats-table .is-player {
+    width: 100%;
+    max-width: 11rem;
+    overflow: hidden;
+    text-align: left;
+    text-overflow: ellipsis;
+  }
+
+  .stats-table tbody th.is-player {
+    font-weight: 600;
+  }
+
+  .stats-table .is-points {
+    color: var(--color-foreground);
+    font-weight: 800;
+  }
+
+  .player-cell {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .player-text {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.05rem;
+  }
+
+  .player-name {
+    overflow: hidden;
+    font-family: var(--font-display);
+    font-size: 0.88rem;
+    font-weight: 800;
+    line-height: 1.05;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .player-pos {
+    font-family: var(--font-mono);
+    font-size: 0.5rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--color-muted-foreground);
+  }
+
   .recap-list {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
@@ -412,6 +1233,23 @@
     letter-spacing: 0.1em;
     color: var(--color-muted-foreground);
     text-transform: uppercase;
+  }
+
+  .recap-tags {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.35rem;
+  }
+
+  .recap-ot {
+    padding: 0.05rem 0.3rem;
+    border: 1px solid var(--color-line-strong);
+    border-radius: 0.25rem;
+    font-family: var(--font-mono);
+    font-size: 0.55rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--color-muted-foreground);
   }
 
   .recap-result {

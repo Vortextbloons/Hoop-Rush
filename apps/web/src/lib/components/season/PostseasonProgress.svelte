@@ -145,7 +145,8 @@
           <span class="sr-badge" data-tone="live" role="status">
             <span
               class="sr-live-dot inline-block h-1.5 w-1.5 rounded-full bg-current"
-              aria-hidden="true"></span>
+              aria-hidden="true"
+            ></span>
             Simming
           </span>
         {:else if progress.phase === 'complete'}
@@ -155,7 +156,9 @@
         {:else}
           <span class="sr-badge">{progress.phase}</span>
         {/if}
-        <Dialog.Title class="font-display text-base font-extrabold uppercase tracking-tight text-foreground">
+        <Dialog.Title
+          class="font-display text-base font-extrabold uppercase tracking-tight text-foreground"
+        >
           {label}
         </Dialog.Title>
       </div>
@@ -258,7 +261,11 @@
 
       {#if progress.phase === 'running'}
         <div class="flex flex-wrap items-center gap-2">
-          <button type="button" onclick={onCancel} class="sr-btn-ghost motion-reduce:transition-none">
+          <button
+            type="button"
+            onclick={onCancel}
+            class="sr-btn-ghost motion-reduce:transition-none"
+          >
             Cancel
           </button>
           <p class="w-full text-xs text-muted-foreground">
@@ -274,7 +281,11 @@
             Games already committed stay saved. Retry continues from the current matchup.
           </p>
           <div class="mt-3 flex flex-col gap-2 sm:flex-row">
-            <button type="button" onclick={onRetry} class="sr-btn flex-1 motion-reduce:transition-none">
+            <button
+              type="button"
+              onclick={onRetry}
+              class="sr-btn flex-1 motion-reduce:transition-none"
+            >
               Retry
             </button>
             <Dialog.Close class="sr-btn-ghost flex-1">Close</Dialog.Close>
@@ -290,7 +301,11 @@
           <p class="font-semibold text-destructive">The postseason simulation failed.</p>
           <p class="mt-1 text-muted-foreground">{progress.error.message}</p>
           <div class="mt-3 flex flex-col gap-2 sm:flex-row">
-            <button type="button" onclick={onRetry} class="sr-btn flex-1 motion-reduce:transition-none">
+            <button
+              type="button"
+              onclick={onRetry}
+              class="sr-btn flex-1 motion-reduce:transition-none"
+            >
               Retry
             </button>
             <Dialog.Close class="sr-btn-ghost flex-1">Close</Dialog.Close>
@@ -333,7 +348,8 @@
         <span class="sr-badge" data-tone="live">
           <span
             class="sr-live-dot inline-block h-1.5 w-1.5 rounded-full bg-current"
-            aria-hidden="true"></span>
+            aria-hidden="true"
+          ></span>
           Simming
         </span>
       {:else if progress.phase === 'complete'}

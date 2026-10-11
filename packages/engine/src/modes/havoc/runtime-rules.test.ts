@@ -377,33 +377,31 @@ describe('havoc tier-3 rules', () => {
     }
   });
 
-  it('applies time lord 30/12 clocks and real violations', () => {
+  it('applies time lord 30/12 clocks with real 12-second violations at fixture pace', () => {
     const human = buildScenarioTeam('human', humanSlotMutation('PG', 'time-lord'));
     const away = buildScenarioTeam('opponent', plainSlots());
-    const run = runScenario(human, away, 'havoc-time', 1, { pace: 60 });
-    const tipoffEvents = run.tape.events.filter(
-      (event) => event.kind === 'time-lord' && event.source === 'tipoff',
-    );
-    expect(tipoffEvents.length).toBe(2);
-    for (const event of tipoffEvents) {
-      if (event.kind !== 'time-lord') continue;
-      expect(event.fullSeconds).toBe(event.side === 'human' ? 30 : 12);
-      expect(event.reboundSeconds).toBeLessThanOrEqual(event.fullSeconds);
+    let violations = 0;
+    let twelveSecondViolations = 0;
+    for (let index = 0; index < 8; index += 1) {
+      const run = runScenario(human, away, `havoc-time-${String(index)}`);
+      const tipoffEvents = run.tape.events.filter(
+        (event) => event.kind === 'time-lord' && event.source === 'tipoff',
+      );
+      expect(tipoffEvents.length).toBe(2);
+      for (const event of tipoffEvents) {
+        if (event.kind !== 'time-lord') continue;
+        expect(event.fullSeconds).toBe(event.side === 'human' ? 30 : 12);
+        expect(event.reboundSeconds).toBeLessThanOrEqual(event.fullSeconds);
+      }
+      for (const event of run.tape.events) {
+        if (event.kind !== 'shot-clock-violation') continue;
+        violations += 1;
+        expect([12, 24, 30]).toContain(event.limitSeconds);
+        if (event.limitSeconds === 12) twelveSecondViolations += 1;
+      }
     }
-    const violationRun = searchScenario(
-      24,
-      human,
-      away,
-      (candidate) => candidate.tape.events.some((event) => event.kind === 'shot-clock-violation'),
-      'havoc-time-violation',
-      { pace: 60 },
-    );
-    expect(violationRun, 'expected a shot-clock violation').not.toBeNull();
-    if (violationRun === null) return;
-    for (const event of violationRun.tape.events) {
-      if (event.kind !== 'shot-clock-violation') continue;
-      expect([30, 12, 24]).toContain(event.limitSeconds);
-    }
+    expect(twelveSecondViolations, 'expected the 12-second side to violate').toBeGreaterThan(0);
+    expect(violations).toBeGreaterThanOrEqual(twelveSecondViolations);
   });
 
   it('applies and ends body snatcher without retargeting', () => {

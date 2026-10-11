@@ -197,7 +197,7 @@ describe('GameResultsPanel', () => {
   it('fires the ready callback and shows the countdown', async () => {
     const onready = vi.fn();
     const { getByRole, getByText } = render(GameResultsPanel, {
-      props: baseProps({ readyCountdownMs: 7000, onready }),
+      props: baseProps({ verification: 'verified', readyCountdownMs: 7000, onready }),
     });
     const button = getByRole('button', { name: 'Ready for Game 3' });
     await fireEvent.click(button);
@@ -214,5 +214,28 @@ describe('GameResultsPanel', () => {
     const button = getByRole('button', { name: 'Ready' }) as HTMLButtonElement;
     expect(button.disabled).toBe(true);
     expect(getByText("You're ready for the next game.")).toBeTruthy();
+  });
+
+  it.each(['pending', 'mismatch'] as const)(
+    'keeps the ready button disabled for %s results',
+    (verification) => {
+      const onready = vi.fn();
+      const { getByRole } = render(GameResultsPanel, {
+        props: baseProps({ verification, onready }),
+      });
+      const button = getByRole('button', { name: 'Ready for Game 3' }) as HTMLButtonElement;
+      expect(button.disabled).toBe(true);
+      button.click();
+      expect(onready).not.toHaveBeenCalled();
+    },
+  );
+
+  it('waits for the series to advance before allowing readiness', () => {
+    const props = baseProps({ verification: 'verified' });
+    props.series.currentGameNumber = props.output.gameNumber;
+    const { getByRole } = render(GameResultsPanel, { props });
+    expect((getByRole('button', { name: 'Ready for Game 2' }) as HTMLButtonElement).disabled).toBe(
+      true,
+    );
   });
 });

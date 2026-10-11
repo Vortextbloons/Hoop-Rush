@@ -4,16 +4,15 @@ import type {
   HavocEvent,
   HavocGameResult,
   HavocHomeAway,
-  HavocLineupSlotView,
   HavocMutationEntry,
   HavocMutationId,
   HavocParticipantKind,
-  HavocRunView,
   HavocScoringEntry,
   HavocSide,
   HavocStatLine,
   HavocTier,
 } from '@hoop-rush/data-contracts';
+import type { HavocLineupSlotView, HavocRunView } from '$lib/havoc/havoc-service-contract';
 import { HAVOC_GAME_COUNT, POSITIONS } from '@hoop-rush/data-contracts';
 import { havocMutationDefinitionOf } from '@hoop-rush/engine';
 
@@ -69,6 +68,21 @@ export function mutationTierOf(mutationId: HavocMutationId): HavocTier {
   return havocMutationDefinitionOf(mutationId).tier;
 }
 
+const HAVOC_SCORING_SOURCE_LABELS: Record<string, string> = {
+  roulette: 'Basketball Roulette',
+  'four-point-dunk': 'Four-Point Dunk',
+  'reverse-basketball': 'Reverse Basketball',
+  'golden-assist': 'Golden Assist',
+  'double-or-nothing': 'Double or Nothing',
+  'heat-check': 'Heat Check',
+  'second-chance-jackpot': 'Second Chance Jackpot',
+  'the-bounty': 'The Bounty',
+};
+
+export function havocScoringSourceLabel(source: string): string {
+  return HAVOC_SCORING_SOURCE_LABELS[source] ?? source;
+}
+
 export interface HavocObjectiveStatus {
   tone: 'alive' | 'lost' | 'perfect' | 'finished';
   label: string;
@@ -102,9 +116,7 @@ export function havocObjectiveStatusOf(run: HavocRunView): HavocObjectiveStatus 
   };
 }
 
-export function havocComparisonStatusLabel(
-  status: HavocRunView['comparisonStatus'],
-): string {
+export function havocComparisonStatusLabel(status: HavocRunView['comparisonStatus']): string {
   if (status === 'not-started') return 'Not started';
   if (status === 'running') return 'In progress';
   if (status === 'complete') return 'Complete';
@@ -157,6 +169,8 @@ export function havocEventMutationIdOf(event: HavocEvent): HavocMutationId | nul
       return 'second-chance-jackpot';
     case 'and-one-bonus':
       return 'and-one-machine';
+    case 'turnover-cancelled':
+      return 'possession-refund';
     case 'possession-refund':
       return 'possession-refund';
     case 'rebound-loop':
@@ -206,8 +220,10 @@ export function havocEventTextOf(event: HavocEvent, context: HavocEventNameConte
     case 'turnover-cancelled':
       return `${name(event.playerInstanceId)} turnover cancelled (Possession Refund)`;
     case 'foul': {
-      const shooter = event.shooterInstanceId === null ? '' : ` on ${name(event.shooterInstanceId)}`;
-      const bonus = event.freeThrowsAwarded > 0 ? ` — ${String(event.freeThrowsAwarded)} free throws` : '';
+      const shooter =
+        event.shooterInstanceId === null ? '' : ` on ${name(event.shooterInstanceId)}`;
+      const bonus =
+        event.freeThrowsAwarded > 0 ? ` — ${String(event.freeThrowsAwarded)} free throws` : '';
       const technical = event.technicalFreeThrows > 0 ? ' — technical free throw' : '';
       return `${name(event.foulerInstanceId)} foul${shooter}${bonus}${technical}`;
     }
@@ -240,7 +256,8 @@ export function havocEventTextOf(event: HavocEvent, context: HavocEventNameConte
     case 'rebound-loop':
       return `${name(event.ownerInstanceId)} Rebound Loop #${String(event.reboundOrdinal)}: +${String(event.granted)} extra possession`;
     case 'bounty': {
-      const blocked = event.blockedInstanceId === null ? '' : ` on ${name(event.blockedInstanceId)}`;
+      const blocked =
+        event.blockedInstanceId === null ? '' : ` on ${name(event.blockedInstanceId)}`;
       return `The Bounty ${event.outcome}${blocked}`;
     }
     case 'foul-relief':
@@ -262,12 +279,17 @@ export function havocScoringTextOf(
     parts.push(`${String(entry.nominalPoints)} nominal`);
   }
   for (const addend of entry.addends) {
-    parts.push(`${mutationNameOf(addend.source)} ${formatSignedPoints(addend.points)}`);
+    parts.push(`${havocScoringSourceLabel(addend.source)} ${formatSignedPoints(addend.points)}`);
   }
   for (const multiplier of entry.multipliers) {
-    parts.push(`${mutationNameOf(multiplier.source)} ×2`);
+    parts.push(`${havocScoringSourceLabel(multiplier.source)} ×2`);
   }
-  const label = entry.kind === 'field-goal' ? 'field goal' : entry.kind === 'free-throw' ? 'free throw' : 'adjustment';
+  const label =
+    entry.kind === 'field-goal'
+      ? 'field goal'
+      : entry.kind === 'free-throw'
+        ? 'free throw'
+        : 'adjustment';
   const detail = parts.length > 0 ? ` (${parts.join(', ')})` : '';
   return `${actor} ${formatSignedPoints(entry.points)} pts — ${label}${detail}`;
 }

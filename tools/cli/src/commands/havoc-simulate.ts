@@ -1,11 +1,6 @@
 import { HAVOC_MUTATION_DEFINITIONS } from '@hoop-rush/engine';
-import {
-  seedSchema,
-  type HavocMutationDefinition,
-  type Seed,
-} from '@hoop-rush/data-contracts';
+import { seedSchema, type HavocMutationDefinition, type Seed } from '@hoop-rush/data-contracts';
 import { UsageError } from '../args.ts';
-import { readJson } from '../io.ts';
 import { EXIT_USAGE_OR_DATA_ERROR, makeReport, type CliReport } from '../report.ts';
 import {
   HavocCliError,
@@ -20,6 +15,7 @@ import {
   havocSimulateReportSchema,
   loadHavocCliAssets,
   lockedInputsDigest,
+  readHavocJsonFile,
   replayHavocCliDraft,
   simulateHavocCliVariant,
   type HavocCliAssets,
@@ -157,7 +153,7 @@ export function havocSimulate(args: {
     if (!parsedSeed.success) throw new UsageError(`--seed must be hex (got "${rawSeed}")`);
     let plan: HavocCliDraftPlan = { pins: null, rerollRound: null };
     if (args.picks !== null) {
-      const parsed = havocCliPicksSchema.safeParse(readJson(args.picks));
+      const parsed = havocCliPicksSchema.safeParse(readHavocJsonFile(args.picks));
       if (!parsed.success) {
         throw new UsageError(
           `picks ${args.picks} fails validation: ${parsed.error.issues[0]?.message ?? 'unknown'}`,
@@ -165,8 +161,7 @@ export function havocSimulate(args: {
       }
       plan = havocCliDraftPlanOf(parsed.data);
     }
-    const assets =
-      args.manifest === null ? undefined : loadHavocCliAssets(args.manifest);
+    const assets = args.manifest === null ? undefined : loadHavocCliAssets(args.manifest);
     const { report, durationMs } = runHavocCliSimulation({
       seed: parsedSeed.data,
       plan,

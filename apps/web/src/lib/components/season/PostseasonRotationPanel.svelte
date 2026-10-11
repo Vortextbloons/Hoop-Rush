@@ -102,10 +102,7 @@
       <p class="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{startersLine}</p>
     </div>
     <div class="flex shrink-0 items-center gap-2">
-      <a
-        href={resolve('/season/run/team' as any)}
-        class="sr-btn-ghost px-3.5 text-xs"
-      >
+      <a href={resolve('/season/run/team' as any)} class="sr-btn-ghost px-3.5 text-xs">
         Edit rotation
       </a>
       <button
@@ -113,9 +110,7 @@
         aria-expanded={fineTuneOpen}
         aria-controls="playoff-fine-tune"
         onclick={() => (fineTuneOpen = !fineTuneOpen)}
-        class="sr-btn-ghost px-3.5 text-xs {fineTuneOpen
-          ? ''
-          : 'text-muted-foreground'}"
+        class="sr-btn-ghost px-3.5 text-xs {fineTuneOpen ? '' : 'text-muted-foreground'}"
       >
         {fineTuneOpen ? 'Hide fine-tune' : 'Fine-tune here'}
       </button>
@@ -205,9 +200,7 @@
                   </span>
                 </span>
                 {#if option.alreadyRehabbed}
-                  <span class="sr-chip shrink-0">
-                    Rolled
-                  </span>
+                  <span class="sr-chip shrink-0"> Rolled </span>
                 {:else if !option.available}
                   <span class="sr-badge shrink-0" data-tone="loss">
                     Needs {option.cost}◆

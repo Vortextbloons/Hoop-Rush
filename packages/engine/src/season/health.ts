@@ -297,6 +297,11 @@ export function seasonForfeitSummaryForGame(
   if (game === undefined) {
     throw new Error(`season forfeit: game ${gameId} is not in the run schedule`);
   }
+  if (game.homeFranchiseId !== humanFranchiseId && game.awayFranchiseId !== humanFranchiseId) {
+    throw new Error(
+      `season forfeit: game ${gameId} does not involve ${humanFranchiseId} (${game.homeFranchiseId} vs ${game.awayFranchiseId})`,
+    );
+  }
   const humanIsHome = game.homeFranchiseId === humanFranchiseId;
   return {
     schemaVersion: 1,

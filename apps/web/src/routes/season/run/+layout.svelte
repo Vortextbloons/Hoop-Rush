@@ -3,15 +3,7 @@
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
-  import {
-    Briefcase,
-    LogOut,
-    RefreshCw,
-    Trophy,
-    Users,
-    X,
-    Zap,
-  } from '@lucide/svelte';
+  import { Briefcase, LogOut, RefreshCw, Trophy, Users, X, Zap } from '@lucide/svelte';
   import { Dialog } from 'bits-ui';
   import {
     franchiseAbbreviation,
@@ -45,7 +37,11 @@
     POSTSEASON_ORCHESTRATION_UNAVAILABLE,
   } from '$lib/season/season-postseason-presentation';
   import { isNavItemActive } from '$lib/nav-items';
-  import { buildSeasonNavGroups, seasonMobileNavOf, type SeasonNavGroup } from '$lib/season/season-nav';
+  import {
+    buildSeasonNavGroups,
+    seasonMobileNavOf,
+    type SeasonNavGroup,
+  } from '$lib/season/season-nav';
   import {
     playablePositionsOfSlice,
     playerSliceOf,
@@ -749,7 +745,9 @@
             <code class="mt-1 block break-all text-xs text-foreground">{seasonLoadError.code}</code>
             {#if seasonLoadError.failures.length > 0}
               <details class="mt-3">
-                <summary class="sr-section-label cursor-pointer">Validation details ({seasonLoadError.failures.length})</summary>
+                <summary class="sr-section-label cursor-pointer"
+                  >Validation details ({seasonLoadError.failures.length})</summary
+                >
                 <ul class="mt-2 list-disc space-y-1 pl-4 text-xs text-muted-foreground">
                   {#each seasonLoadError.failures as failure (failure)}
                     <li class="break-words">{failure}</li>
@@ -812,7 +810,9 @@
       </div>
     </div>
   {:else}
-    <div class="mx-auto w-full min-w-0 max-w-6xl overflow-x-clip sm:px-6 xl:max-w-7xl 2xl:max-w-[88rem]">
+    <div
+      class="mx-auto w-full min-w-0 max-w-6xl overflow-x-clip sm:px-6 xl:max-w-7xl 2xl:max-w-[88rem]"
+    >
       {#if shell.externalChange !== null}
         <div
           role="status"
@@ -873,10 +873,7 @@
         >
           {#each groups as group (group.id)}
             {@const groupActive = group.children.some((c) => isNavItemActive(c, routeId))}
-            <a
-              href={resolve(group.href as any)}
-              aria-current={groupActive ? 'page' : undefined}
-            >
+            <a href={resolve(group.href as any)} aria-current={groupActive ? 'page' : undefined}>
               <group.icon class="h-4 w-4 shrink-0" />
               {group.label}
             </a>
@@ -938,7 +935,12 @@
             </p>
           {/if}
           <div class="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-end">
-            <button type="button" onclick={() => (quitOpen = false)} disabled={quitting} class="sr-btn-ghost">
+            <button
+              type="button"
+              onclick={() => (quitOpen = false)}
+              disabled={quitting}
+              class="sr-btn-ghost"
+            >
               Stay
             </button>
             <button

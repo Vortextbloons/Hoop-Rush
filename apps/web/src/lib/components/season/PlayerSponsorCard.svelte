@@ -235,7 +235,9 @@
             </div>
 
             {#if ratingMode === 'changes' && changedCount === 0}
-              <p class="mt-2 rounded-lg border border-border/50 bg-surface-2/60 p-3 text-xs text-muted-foreground">
+              <p
+                class="mt-2 rounded-lg border border-border/50 bg-surface-2/60 p-3 text-xs text-muted-foreground"
+              >
                 No gear boosts yet. Equip gear to see rating changes here.
               </p>
             {/if}
@@ -297,9 +299,7 @@
 
           <section aria-labelledby="loadout-gear-heading" class="min-w-0">
             <div class="flex items-baseline justify-between gap-2">
-              <h3 id="loadout-gear-heading" class="sr-section-label">
-                Gear loadout · permanent
-              </h3>
+              <h3 id="loadout-gear-heading" class="sr-section-label">Gear loadout · permanent</h3>
             </div>
             {#if !unlocked}
               <p class="mt-1 font-mono text-[10px] text-muted-foreground">
