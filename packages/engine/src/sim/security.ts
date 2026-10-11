@@ -4,6 +4,7 @@ import type {
   SimulationTeam,
 } from '@hoop-rush/data-contracts';
 import type { Rng } from './rng.ts';
+import type { HavocEvidence } from './havoc-runtime.ts';
 import { ENGINE_CONSTANTS } from './constants.ts';
 export function defenderPressure(defender: SimulationPlayer): number {
   return (
@@ -37,6 +38,7 @@ export function turnoverProbability(
   profile: EraSimulationProfile,
   extraPressure = 0,
   effectsAdjustment = 0,
+  evidence?: HavocEvidence,
 ): number {
   const c = ENGINE_CONSTANTS;
   const eraBase = profile.parameters.turnoverPerPossession;
@@ -44,9 +46,10 @@ export function turnoverProbability(
   const tendencyPerTrip = tendency * possEstimatePerTrip;
   const handling = (handler.ratings.ballHandling - 50) / 50;
   const passing = (handler.ratings.passing - 50) / 100;
+  const observedBlend = evidence?.isAuthoritative('turnover-blend') ? 1 : c.turnoverObservedBlend;
   const raw =
-    eraBase * (1 - c.turnoverObservedBlend) +
-    tendencyPerTrip * c.turnoverObservedBlend +
+    eraBase * (1 - observedBlend) +
+    tendencyPerTrip * observedBlend +
     (pressure - c.turnoverNeutralPressure) * c.turnoverPressureWeight -
     (handling - c.turnoverNeutralHandling) * c.turnoverHandlingWeight -
     (passing - c.turnoverNeutralPassing) * c.turnoverPassingWeight +

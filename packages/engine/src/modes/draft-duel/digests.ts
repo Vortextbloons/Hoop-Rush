@@ -6,12 +6,17 @@ import type {
 } from '@hoop-rush/data-contracts';
 import { canonicalJson, contentHashSchema, seasonDigestHex } from '@hoop-rush/data-contracts';
 
+function digest64(namespace: string, material: string): ContentHash {
+  return contentHashSchema.parse(
+    `${seasonDigestHex(`${namespace}-v1:${material}`)}${seasonDigestHex(`${namespace}-v2:${material}`)}`,
+  );
+}
 export function draftDuelSimulationInputDigest(input: DraftDuelSimulationInput): ContentHash {
-  return contentHashSchema.parse(seasonDigestHex(`draft-duel-input-v1:${canonicalJson(input)}`));
+  return digest64('draft-duel-input', canonicalJson(input));
 }
 export function draftDuelGameResultDigest(result: GameResult): ContentHash {
-  return contentHashSchema.parse(seasonDigestHex(`draft-duel-result-v1:${canonicalJson(result)}`));
+  return digest64('draft-duel-result', canonicalJson(result));
 }
 export function draftDuelGameTapeDigest(tape: DraftDuelGameOutput['tape']): ContentHash {
-  return contentHashSchema.parse(seasonDigestHex(`draft-duel-tape-v1:${canonicalJson(tape)}`));
+  return digest64('draft-duel-tape', canonicalJson(tape));
 }

@@ -229,8 +229,7 @@ function slotForPosition(
 ): 0 | 1 | 2 | 3 | 4 {
   for (const s of [0, 1, 2, 3, 4] as const) {
     if (used.has(s)) continue;
-    const req = LINEUP_STRUCTURE[s];
-    if (req !== undefined && positions.includes(req)) return s;
+    if (positions.includes(LINEUP_STRUCTURE[s])) return s;
   }
   throw new Error('no legal slot');
 }

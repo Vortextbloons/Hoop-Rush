@@ -9,11 +9,12 @@ import { createRng } from '../../sim/rng.ts';
 import { searchRosterRotationCandidates } from '../../projection/index.ts';
 import { BAND_CEILING_PENALTY, ROLE_COVERAGE_THRESHOLD, identityScore } from '../ai-scoring.ts';
 import {
+  positionCountsOf,
   legalFiveAfterAnyRemoval,
-  rosterGroupCounts,
   validateSeasonRoster,
 } from '../roster-rules.ts';
 import { buildMinimalRotation, validateSeasonRotation } from '../rotation.ts';
+import { FIVE_COVERAGE_TARGETS, ZERO_POSITION_COUNTS } from './constants.ts';
 import { coverageFeasibleFromPool, memberReachCapped } from './reachability.ts';
 import {
   budgetForPhase,
@@ -108,7 +109,7 @@ export function greedySelection(state: GenerationState, team: PoolTeam): string[
   const sortedPool = [...team.pool].sort();
   while (picked.length < 10) {
     const slotsLeft = 10 - picked.length - 1;
-    const pickedCounts = rosterGroupCounts(membersOf(state, picked));
+    const pickedCounts = positionCountsOf(membersOf(state, picked));
     const pickedRoleScores = roleScoresOfIds(state, picked);
     const uncovered = uncoveredRoles(pickedRoleScores);
     let best:
@@ -127,30 +128,21 @@ export function greedySelection(state: GenerationState, team: PoolTeam): string[
         continue;
       }
       const mask = state.maskByVersion.get(id) ?? 0;
-      const probeCounts = {
-        guards: pickedCounts.guards + ((mask & 1) !== 0 ? 1 : 0),
-        forwards: pickedCounts.forwards + ((mask & 2) !== 0 ? 1 : 0),
-        centers: pickedCounts.centers + ((mask & 4) !== 0 ? 1 : 0),
-      };
+      const probeCounts = [...pickedCounts];
+      for (let p = 0; p < 5; p += 1) {
+        if ((mask & (1 << p)) !== 0) probeCounts[p] = (probeCounts[p] ?? 0) + 1;
+      }
       const remaining = team.pool.filter(
         (memberId) => !picked.includes(memberId) && memberId !== id,
       );
-      if (
-        !memberReachCapped(
-          state,
-          { guards: 2, forwards: 2, centers: 1 },
-          probeCounts,
-          remaining,
-          slotsLeft - 1,
-        )
-      ) {
+      if (!memberReachCapped(state, FIVE_COVERAGE_TARGETS, probeCounts, remaining, slotsLeft - 1)) {
         continue;
       }
       if (
         !memberReachCapped(
           state,
-          { guards: 2, forwards: 2, centers: 1 },
-          { guards: 0, forwards: 0, centers: 0 },
+          FIVE_COVERAGE_TARGETS,
+          ZERO_POSITION_COUNTS,
           [...picked, id, ...remaining],
           5,
         )
@@ -260,9 +252,13 @@ export function bestTenDfs(
     if (bitsDiff !== 0) return bitsDiff;
     const maskA = state.maskByVersion.get(a) ?? 0;
     const maskB = state.maskByVersion.get(b) ?? 0;
-    const groupA = (maskA & 4) !== 0 ? 0 : (maskA & 2) !== 0 ? 1 : 2;
-    const groupB = (maskB & 4) !== 0 ? 0 : (maskB & 2) !== 0 ? 1 : 2;
-    if (groupA !== groupB) return groupA - groupB;
+    const posBits = (mask: number): number => {
+      let count = 0;
+      for (let bit = 0; bit < 5; bit += 1) if ((mask & (1 << bit)) !== 0) count += 1;
+      return count;
+    };
+    const posDiff = posBits(maskA) - posBits(maskB);
+    if (posDiff !== 0) return posDiff;
     return a < b ? -1 : 1;
   });
   let best = incumbent;
@@ -280,7 +276,7 @@ export function bestTenDfs(
       }
       return;
     }
-    const pickedCounts = rosterGroupCounts(membersOf(state, picked));
+    const pickedCounts = positionCountsOf(membersOf(state, picked));
     const slotsLeft = 10 - picked.length;
     for (let i = index; i < ordered.length; i += 1) {
       const id = ordered[i];
@@ -295,27 +291,18 @@ export function bestTenDfs(
       const afterPicked = [...picked, id];
       const remaining = ordered.slice(i + 1);
       const mask = state.maskByVersion.get(id) ?? 0;
-      const probeCounts = {
-        guards: pickedCounts.guards + ((mask & 1) !== 0 ? 1 : 0),
-        forwards: pickedCounts.forwards + ((mask & 2) !== 0 ? 1 : 0),
-        centers: pickedCounts.centers + ((mask & 4) !== 0 ? 1 : 0),
-      };
-      if (
-        !memberReachCapped(
-          state,
-          { guards: 2, forwards: 2, centers: 1 },
-          probeCounts,
-          remaining,
-          slotsLeft - 1,
-        )
-      ) {
+      const probeCounts = [...pickedCounts];
+      for (let p = 0; p < 5; p += 1) {
+        if ((mask & (1 << p)) !== 0) probeCounts[p] = (probeCounts[p] ?? 0) + 1;
+      }
+      if (!memberReachCapped(state, FIVE_COVERAGE_TARGETS, probeCounts, remaining, slotsLeft - 1)) {
         continue;
       }
       if (
         !memberReachCapped(
           state,
-          { guards: 2, forwards: 2, centers: 1 },
-          { guards: 0, forwards: 0, centers: 0 },
+          FIVE_COVERAGE_TARGETS,
+          ZERO_POSITION_COUNTS,
           [...afterPicked, ...remaining],
           5,
         )

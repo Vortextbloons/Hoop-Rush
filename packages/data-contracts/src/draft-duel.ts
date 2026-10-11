@@ -89,7 +89,7 @@ export function defaultDraftDuelVersionLocks(
     positionNormalizationVersion: overrides.positionNormalizationVersion ?? 'unknown',
     engineVersion: overrides.engineVersion ?? 'unknown',
     profileVersion: overrides.profileVersion ?? 'unknown',
-    seedDerivationVersion: overrides.seedDerivationVersion ?? 'draft-duel-seed-v1',
+    seedDerivationVersion: overrides.seedDerivationVersion ?? 'draft-duel-v1',
     multiplayerVersion: overrides.multiplayerVersion ?? DRAFT_DUEL_MULTIPLAYER_VERSION,
     autopickVersion: overrides.autopickVersion ?? DRAFT_DUEL_AUTOPICK_VERSION,
   };
@@ -218,10 +218,12 @@ export const draftDuelReadyNextGamePayloadSchema = z.object({
 export const draftDuelBroadcastStartPayloadSchema = z.object({
   kind: z.literal('broadcast-start'),
   gameNumber: z.number().int().min(1).max(7),
+  auto: z.boolean().optional(),
 });
 export const draftDuelProposeResultPayloadSchema = z.object({
   kind: z.literal('propose-result'),
   gameNumber: z.number().int().min(1).max(7),
+  winner: draftDuelParticipantIdSchema,
   resultDigest: contentHashSchema,
   tapeDigest: contentHashSchema,
   inputDigest: contentHashSchema,
@@ -397,10 +399,10 @@ export const draftDuelTapeTripSchema = z.object({
   kind: z.literal('trip'),
   index: z.number().int().nonnegative(),
   period: z.number().int().min(1).max(40),
-  clockSeconds: z.number().int().min(0).max(3600),
+  clockSeconds: z.number().min(0).max(3600),
   offense: z.union([z.literal(0), z.literal(1)]),
   ended: z.boolean(),
-  secondsElapsed: z.number().int().min(0).max(3600),
+  secondsElapsed: z.number().min(0).max(3600),
   homeScore: z.number().int().nonnegative(),
   awayScore: z.number().int().nonnegative(),
   homeDeltas: z.array(draftDuelTapeStatLineSchema).length(5),
@@ -574,6 +576,7 @@ export interface DraftDuelMultiplayerTransport {
   ): {
     unsubscribe: () => void;
   };
+  publishTransient(roomId: string, event: DraftDuelTransientEvent): Promise<boolean>;
   refetch(roomId: string, afterOrdinal: number): Promise<DraftDuelCommand[]>;
   submitCommand(
     command: Omit<DraftDuelCommand, 'ordinal'> & {

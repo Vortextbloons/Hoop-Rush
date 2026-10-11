@@ -74,7 +74,11 @@ import {
   buildSeasonLeague,
 } from '@hoop-rush/test-fixtures';
 import { buildMinimalRotation } from './rotation.ts';
-import { validateSeasonRoster, type SeasonRosterMemberInput } from './roster-rules.ts';
+import {
+  legalFiveAfterAnyRemoval,
+  validateSeasonRoster,
+  type SeasonRosterMemberInput,
+} from './roster-rules.ts';
 import { createInitialSeasonInfluenceState } from './influence.ts';
 export const ECONOMY_TEST_SEED = 'b1d2e3f405162738495a6b7c8d9e0f11';
 export const SEASON_VERSIONS_M25: SeasonRun['versions'] = {
@@ -127,11 +131,11 @@ export const SEASON_VERSIONS_M25: SeasonRun['versions'] = {
   freeAgencyTargetsVersion: SEASON_FREE_AGENCY_TARGETS_VERSION,
 };
 const LEGAL_ROSTER_PATTERNS: readonly (readonly number[])[] = [
-  [0, 1, 2, 3, 4, 5, 6, 7, 17, 18],
-  [1, 2, 6, 7, 8, 9, 16, 17, 18, 19],
-  [0, 2, 3, 4, 6, 7, 8, 9, 17, 18],
+  [0, 1, 2, 3, 4, 5, 6, 7, 8, 18],
+  [2, 1, 0, 6, 7, 8, 9, 17, 18, 16],
+  [0, 1, 2, 3, 4, 6, 7, 8, 9, 18],
   [0, 1, 2, 3, 6, 7, 8, 9, 17, 18],
-  [1, 2, 3, 5, 6, 7, 8, 9, 17, 18],
+  [0, 1, 2, 3, 5, 6, 7, 8, 9, 18],
 ];
 function patternIndexOf(franchiseId: string): number {
   const hash = seasonNamespaceSeed('0'.repeat(32), 'economy-test-patterns', franchiseId);
@@ -232,6 +236,9 @@ export function buildEconomyTestRun(
     const failures = validateSeasonRoster(members);
     if (failures.length > 0) {
       throw new Error(`fixture roster ${roster.franchiseId} is illegal: ${failures.join('; ')}`);
+    }
+    if (!legalFiveAfterAnyRemoval(members)) {
+      throw new Error(`fixture roster ${roster.franchiseId} is not removal-robust`);
     }
   }
   const aiAssignments = buildSeasonAiAssignments(league);

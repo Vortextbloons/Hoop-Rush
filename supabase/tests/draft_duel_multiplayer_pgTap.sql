@@ -7,7 +7,7 @@
 -- scratch table, so pgTAP state is never role-switched.
 
 begin;
-select plan(164);
+select plan(174);
 
 -- 1. Schema.
 select has_table('public', 'draft_duel_rooms', 'draft_duel_rooms exists');
@@ -1131,6 +1131,134 @@ select is(
 select is(
   (select phase from public.draft_duel_rooms where id = (select value::uuid from public.dd_pgtap_ctx where name = 'room_b')),
   'integrity-failed', 'receipt disagreement sets integrity-failed');
+
+-- 15. Auto-start after a 60-second idle window (room D).
+set local role authenticated;
+select public.dd_pgtap_claim((select value from public.dd_pgtap_ctx where name = 'uid_c1'));
+with created as (
+  select public.draft_duel_room_create(
+    'fair', 'ratings',
+    (select value::jsonb from public.dd_pgtap_ctx where name = 'versions')
+  ) as r
+)
+insert into public.dd_pgtap_ctx (name, value)
+select 'room_d', r->>'room_id' from created
+union all
+select 'code_d', r->>'code' from created;
+reset role;
+select ok(
+  (select value from public.dd_pgtap_ctx where name = 'room_d') is not null,
+  'room D is created');
+
+set local role authenticated;
+select public.dd_pgtap_claim((select value from public.dd_pgtap_ctx where name = 'uid_c2'));
+insert into public.dd_pgtap_ctx (name, value)
+select 'join_d', public.draft_duel_room_join(
+  (select value from public.dd_pgtap_ctx where name = 'code_d'))->>'participant_id';
+reset role;
+select is((select value from public.dd_pgtap_ctx where name = 'join_d'), 'p2', 'guest joins room D');
+
+set local role authenticated;
+do $$
+begin
+  perform public.dd_pgtap_claim((select value from public.dd_pgtap_ctx where name = 'uid_c1'));
+  perform public.draft_duel_command_submit(
+    (select value::uuid from public.dd_pgtap_ctx where name = 'room_d'),
+    'ready-d1', null, '{"kind":"ready","ready":true}'::jsonb);
+  perform public.dd_pgtap_claim((select value from public.dd_pgtap_ctx where name = 'uid_c2'));
+  perform public.draft_duel_command_submit(
+    (select value::uuid from public.dd_pgtap_ctx where name = 'room_d'),
+    'ready-d2', null, '{"kind":"ready","ready":true}'::jsonb);
+  perform public.dd_pgtap_claim((select value from public.dd_pgtap_ctx where name = 'uid_c1'));
+  perform public.draft_duel_command_submit(
+    (select value::uuid from public.dd_pgtap_ctx where name = 'room_d'),
+    'start-d1', null, '{"kind":"start"}'::jsonb);
+end $$;
+reset role;
+
+set local role authenticated;
+do $$
+declare
+  v_room uuid := (select value::uuid from public.dd_pgtap_ctx where name = 'room_d');
+  v_first text := (select draft_state->>'first_picker' from public.draft_duel_rooms where id = v_room);
+  v_ord integer;
+begin
+  for v_ord in 0..9 loop
+    perform public.dd_pgtap_claim(public.dd_pgtap_uid(
+      case when v_ord % 2 = 0 then v_first when v_first = 'p1' then 'p2' else 'p1' end,
+      'uid_c1', 'uid_c2'));
+    perform public.draft_duel_command_submit(
+      v_room,
+      'pick-d-' || v_ord::text,
+      null,
+      jsonb_build_object('kind', 'pick', 'pickOrdinal', v_ord,
+        'playerId', 'pick-d-' || v_ord::text, 'playerVersionId', 'pv-' || repeat('a', 32)));
+  end loop;
+end $$;
+reset role;
+
+set local role authenticated;
+select public.dd_pgtap_claim((select value from public.dd_pgtap_ctx where name = 'uid_c1'));
+insert into public.dd_pgtap_ctx (name, value)
+select 'auto_rn_d1', public.draft_duel_command_submit(
+  (select value::uuid from public.dd_pgtap_ctx where name = 'room_d'),
+  'rn1-d1', null, '{"kind":"ready-next-game","gameNumber":1,"ready":true}'::jsonb)::text;
+reset role;
+select is(
+  (select value::jsonb->>'accepted' from public.dd_pgtap_ctx where name = 'auto_rn_d1'),
+  'true', 'one ready seat moves room D to preparing-game');
+
+set local role authenticated;
+select public.dd_pgtap_claim((select value from public.dd_pgtap_ctx where name = 'uid_c2'));
+insert into public.dd_pgtap_ctx (name, value)
+select 'auto_bs_manual', public.draft_duel_command_submit(
+  (select value::uuid from public.dd_pgtap_ctx where name = 'room_d'),
+  'bs-d-manual', null, '{"kind":"broadcast-start","gameNumber":1}'::jsonb)::text;
+reset role;
+select is(
+  (select value::jsonb->>'rejectionCode' from public.dd_pgtap_ctx where name = 'auto_bs_manual'),
+  'not-ready', 'broadcast-start without auto waits for the missing seat');
+
+set local role authenticated;
+select public.dd_pgtap_claim((select value from public.dd_pgtap_ctx where name = 'uid_c2'));
+insert into public.dd_pgtap_ctx (name, value)
+select 'auto_bs_early', public.draft_duel_command_submit(
+  (select value::uuid from public.dd_pgtap_ctx where name = 'room_d'),
+  'bs-d-early', null, '{"kind":"broadcast-start","gameNumber":1,"auto":true}'::jsonb)::text;
+reset role;
+select is(
+  (select value::jsonb->>'rejectionCode' from public.dd_pgtap_ctx where name = 'auto_bs_early'),
+  'not-ready', 'auto start is rejected before the idle window');
+
+update public.draft_duel_rooms set updated_at = now() - interval '61 seconds'
+  where id = (select value::uuid from public.dd_pgtap_ctx where name = 'room_d');
+
+set local role authenticated;
+select public.dd_pgtap_claim((select value from public.dd_pgtap_ctx where name = 'uid_c2'));
+insert into public.dd_pgtap_ctx (name, value)
+select 'auto_bs_ok', public.draft_duel_command_submit(
+  (select value::uuid from public.dd_pgtap_ctx where name = 'room_d'),
+  'bs-d-auto', null, '{"kind":"broadcast-start","gameNumber":1,"auto":true}'::jsonb)::text;
+reset role;
+select is(
+  (select value::jsonb->>'accepted' from public.dd_pgtap_ctx where name = 'auto_bs_ok'),
+  'true', 'auto start is accepted after the idle window');
+select is(
+  (select phase from public.draft_duel_rooms where id = (select value::uuid from public.dd_pgtap_ctx where name = 'room_d')),
+  'broadcasting', 'auto start applies the normal broadcast phase');
+select is(
+  (select broadcast->>'gameNumber' from public.draft_duel_rooms where id = (select value::uuid from public.dd_pgtap_ctx where name = 'room_d')),
+  '1', 'auto start records the broadcast game number');
+select is(
+  (select count(*)::int from public.draft_duel_room_members
+    where room_id = (select value::uuid from public.dd_pgtap_ctx where name = 'room_d') and next_game_ready <> 0),
+  0, 'auto start consumes both next-game ready flags');
+select is(
+  (select count(*)::int from public.draft_duel_room_commands
+    where room_id = (select value::uuid from public.dd_pgtap_ctx where name = 'room_d')
+      and payload->>'kind' = 'ready-next-game'
+      and actor_participant_id = 'p2'),
+  0, 'the idle seat never readied before the auto start');
 
 select * from finish();
 rollback;

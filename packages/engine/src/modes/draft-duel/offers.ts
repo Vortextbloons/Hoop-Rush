@@ -23,6 +23,7 @@ import {
   unclaimedGroupAvailability,
   withDraftDuelOffers,
   type DraftDuelGroupNeeds,
+  type DraftDuelOfferPools,
   type DraftDuelRoundOffers,
   type DraftDuelSafetyBase,
 } from './feasibility.ts';
@@ -188,12 +189,7 @@ function buildFairPool(
   const coverage: DraftDuelGroupNeeds = { G: 0, F: 0, C: 0 };
   for (const band of slice) {
     const candidates = fairBandCandidates(context, band, placed);
-    if (candidates.length === 0) {
-      console.log(
-        `no candidates round=${String(context.round)} participant=${participantId} attempt=${String(attempt)} band=${String(band)} placed=${[...placed].join(',')} claimed=${[...context.safetyBase.claimedPlayerIds].join(',')}`,
-      );
-      return null;
-    }
+    if (candidates.length === 0) return null;
     const preferred = preferScarceGroup(context, participantId, candidates, coverage);
     const player = rng.pick(preferred);
     const version = rng.pick(player.entries);
@@ -276,6 +272,45 @@ function poolsSatisfyProtection(
   return true;
 }
 
+function offersMatch(
+  left: DraftDuelRoundOffers,
+  right: DraftDuelOfferPools | DraftDuelRoundOffers,
+): boolean {
+  for (const participantId of ['p1', 'p2'] as const) {
+    const leftPool = left[participantId];
+    const rightPool = right[participantId];
+    if (leftPool.length !== rightPool.length) return false;
+    for (let slot = 0; slot < leftPool.length; slot += 1) {
+      const leftCard = leftPool[slot];
+      const rightCard = rightPool[slot];
+      if (leftCard === undefined || rightCard === undefined) return false;
+      if (leftCard.cardId !== rightCard.cardId) return false;
+      if (leftCard.playerVersionId !== rightCard.playerVersionId) return false;
+    }
+  }
+  return true;
+}
+
+export function draftDuelFairAttemptForState(
+  state: DraftDuelDraft,
+  catalog: DraftDuelCatalog,
+): number | null {
+  if (state.fairness !== 'fair') return null;
+  const firstRound = state.rounds[0];
+  if (!firstRound) return null;
+  const beforeAnyPicks: DraftDuelDraft = {
+    ...state,
+    pickOrdinal: 0,
+    rounds: state.rounds.map((round) => ({ ...round, picks: [] })),
+  };
+  const context = buildOfferContext(beforeAnyPicks, catalog, 1);
+  for (let attempt = 0; attempt < DRAFT_DUEL_MAX_GENERATION_ATTEMPTS; attempt += 1) {
+    const offers = buildFairOffers(context, attempt);
+    if (offers !== null && offersMatch(offers, firstRound.offers)) return attempt;
+  }
+  return null;
+}
+
 export function buildRoundOffers(
   state: DraftDuelDraft,
   catalog: DraftDuelCatalog,
@@ -291,8 +326,33 @@ export function buildRoundOffers(
   }
   const round = Math.floor(state.pickOrdinal / 2) + 1;
   const context = buildOfferContext(state, catalog, round);
+  let attemptPlan: number[];
+  if (context.fairness === 'fair') {
+    if (round === 1) {
+      attemptPlan = Array.from(
+        { length: DRAFT_DUEL_MAX_GENERATION_ATTEMPTS },
+        (_, attempt) => attempt,
+      );
+    } else {
+      const committedAttempt = draftDuelFairAttemptForState(state, catalog);
+      if (committedAttempt === null) {
+        throw new DraftDuelGenerationError(
+          context.fairness,
+          round,
+          0,
+          `draft duel fair generation could not recover the committed band history for round ${String(round)}`,
+        );
+      }
+      attemptPlan = [committedAttempt];
+    }
+  } else {
+    attemptPlan = Array.from(
+      { length: DRAFT_DUEL_MAX_GENERATION_ATTEMPTS },
+      (_, attempt) => attempt,
+    );
+  }
   let lastFailure = 'unknown';
-  for (let attempt = 0; attempt < DRAFT_DUEL_MAX_GENERATION_ATTEMPTS; attempt += 1) {
+  for (const attempt of attemptPlan) {
     const offers =
       context.fairness === 'fair'
         ? buildFairOffers(context, attempt)
@@ -314,7 +374,7 @@ export function buildRoundOffers(
   throw new DraftDuelGenerationError(
     context.fairness,
     round,
-    DRAFT_DUEL_MAX_GENERATION_ATTEMPTS,
-    `draft duel generation failed for round ${String(round)} (${context.fairness}) after ${String(DRAFT_DUEL_MAX_GENERATION_ATTEMPTS)} attempts; last failure: ${lastFailure}`,
+    attemptPlan.length,
+    `draft duel generation failed for round ${String(round)} (${context.fairness}) after ${String(attemptPlan.length)} generation attempt(s); last failure: ${lastFailure}`,
   );
 }

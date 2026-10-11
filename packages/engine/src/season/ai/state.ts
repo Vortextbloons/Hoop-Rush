@@ -162,7 +162,7 @@ export function maskCountsOf(
   versionIds: readonly string[],
   maskByVersion: ReadonlyMap<string, number>,
 ): number[] {
-  const counts = new Array<number>(8).fill(0);
+  const counts = new Array<number>(32).fill(0);
   for (const versionId of versionIds) {
     const mask = maskByVersion.get(versionId) ?? 0;
     if (mask !== 0) counts[mask] = (counts[mask] ?? 0) + 1;

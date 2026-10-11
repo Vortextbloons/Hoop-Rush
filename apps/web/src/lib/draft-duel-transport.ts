@@ -1,4 +1,4 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js';
 import {
   commandIdSchema,
   createInMemoryDraftDuelTransport,
@@ -49,6 +49,43 @@ async function supabaseClient(
   }) as DraftDuelClient;
   sharedClients.set(key, client);
   return client;
+}
+const transientSenderChannels = new Map<string, Promise<RealtimeChannel>>();
+async function transientSenderChannel(
+  roomId: string,
+  client: DraftDuelClient,
+): Promise<RealtimeChannel> {
+  const existing = transientSenderChannels.get(roomId);
+  if (existing) return existing;
+  const creating = (async (): Promise<RealtimeChannel> => {
+    try {
+      await client.realtime.setAuth();
+    } catch {
+      await Promise.resolve();
+    }
+    const channel = client.channel(`draft-duel:${roomId}`, {
+      config: { private: true, broadcast: { self: false } },
+    });
+    await new Promise<void>((resolve) => {
+      const timer = setTimeout(() => {
+        resolve();
+      }, 1500);
+      channel.subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          clearTimeout(timer);
+          resolve();
+        }
+      });
+    });
+    return channel;
+  })();
+  transientSenderChannels.set(roomId, creating);
+  creating.catch(() => {
+    if (transientSenderChannels.get(roomId) === creating) {
+      transientSenderChannels.delete(roomId);
+    }
+  });
+  return creating;
 }
 function parseRoomCode(code: string): DraftDuelRoomCode {
   const clean = code.replace(/\D/g, '').slice(0, 4);
@@ -617,6 +654,23 @@ export function createDraftDuelTransport(options?: {
           }
         },
       };
+    },
+    async publishTransient(roomId, event) {
+      const parsed = draftDuelTransientEventSchema.safeParse(event);
+      if (!parsed.success || parsed.data.roomId !== roomId) return false;
+      try {
+        const client = await getClient();
+        await ensureAnonymous(client);
+        const channel = await transientSenderChannel(roomId, client);
+        const status = await channel.send({
+          type: 'broadcast',
+          event: 'transient',
+          payload: parsed.data,
+        });
+        return status === 'ok';
+      } catch {
+        return false;
+      }
     },
     async refetch(roomId, afterOrdinal) {
       const client = await getClient();

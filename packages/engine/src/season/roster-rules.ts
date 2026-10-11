@@ -1,6 +1,5 @@
 import type { Position } from '@hoop-rush/data-contracts';
-import { slotGroupOf } from '../domain/positions.ts';
-import { SEASON_ROSTER_RULES_VERSION } from '@hoop-rush/data-contracts';
+import { POSITIONS, SEASON_ROSTER_RULES_VERSION } from '@hoop-rush/data-contracts';
 export const SEASON_ROSTER_RULES = {
   version: SEASON_ROSTER_RULES_VERSION,
   size: 10,
@@ -13,12 +12,41 @@ export interface SeasonRosterMemberInput {
 export function groupMaskOf(playable: readonly Position[]): number {
   let mask = 0;
   for (const position of playable) {
-    const group = slotGroupOf(position);
-    if (group === 'G') mask |= 1;
-    else if (group === 'F') mask |= 2;
-    else mask |= 4;
+    switch (position) {
+      case 'PG':
+      case 'SG':
+        mask |= 1;
+        break;
+      case 'SF':
+      case 'PF':
+        mask |= 2;
+        break;
+      case 'C':
+        mask |= 4;
+        break;
+      default:
+        break;
+    }
   }
   return mask;
+}
+export function positionMaskOf(playable: readonly Position[]): number {
+  let mask = 0;
+  for (const position of playable) {
+    const index = POSITIONS.indexOf(position);
+    if (index >= 0) mask |= 1 << index;
+  }
+  return mask;
+}
+export function positionCountsOf(members: readonly SeasonRosterMemberInput[]): number[] {
+  const counts = new Array<number>(POSITIONS.length).fill(0);
+  for (const member of members) {
+    const mask = positionMaskOf(member.playable);
+    for (let p = 0; p < POSITIONS.length; p += 1) {
+      if ((mask & (1 << p)) !== 0) counts[p] = (counts[p] ?? 0) + 1;
+    }
+  }
+  return counts;
 }
 export function rosterGroupCounts(members: readonly SeasonRosterMemberInput[]): {
   guards: number;
@@ -39,22 +67,20 @@ export function rosterGroupCounts(members: readonly SeasonRosterMemberInput[]): 
 export function legalFiveExists(members: readonly SeasonRosterMemberInput[]): boolean {
   let reachable = 1;
   for (const member of members) {
-    const mask = groupMaskOf(member.playable);
-    const next = new Set<number>();
-    for (let state = 0; state < 18; state += 1) {
+    const mask = positionMaskOf(member.playable);
+    if (mask === 0) continue;
+    let next = reachable;
+    for (let state = 0; state < 32; state += 1) {
       if ((reachable & (1 << state)) === 0) continue;
-      const g = Math.floor(state / 6);
-      const f = Math.floor((state % 6) / 2);
-      const c = state % 2;
-      next.add(state);
-      if ((mask & 1) !== 0 && g < 2) next.add((g + 1) * 6 + f * 2 + c);
-      if ((mask & 2) !== 0 && f < 2) next.add(g * 6 + (f + 1) * 2 + c);
-      if ((mask & 4) !== 0 && c < 1) next.add(g * 6 + f * 2 + 1);
+      for (let slot = 0; slot < POSITIONS.length; slot += 1) {
+        const bit = 1 << slot;
+        if ((mask & bit) === 0 || (state & bit) !== 0) continue;
+        next |= 1 << (state | bit);
+      }
     }
-    reachable = 0;
-    for (const state of next) reachable |= 1 << state;
+    reachable = next;
   }
-  return (reachable & (1 << 17)) !== 0;
+  return (reachable & (1 << 31)) !== 0;
 }
 export function legalFiveAfterAnyRemoval(members: readonly SeasonRosterMemberInput[]): boolean {
   for (let remove = 0; remove < members.length; remove += 1) {
@@ -80,73 +106,100 @@ export function validateSeasonRoster(members: readonly SeasonRosterMemberInput[]
     failures.push('roster must contain ten distinct playerVersionIds');
   }
   if (!legalFiveExists(members)) {
-    failures.push('roster has no legal G,G,F,F,C starting five');
+    failures.push('roster has no legal PG,SG,SF,PF,C starting five');
   }
   return failures;
 }
+function popcount(mask: number): number {
+  let count = 0;
+  while (mask !== 0) {
+    mask &= mask - 1;
+    count += 1;
+  }
+  return count;
+}
+function coverCount(members: readonly SeasonRosterMemberInput[], subset: number): number {
+  let cover = 0;
+  for (const member of members) {
+    if ((positionMaskOf(member.playable) & subset) !== 0) cover += 1;
+  }
+  return cover;
+}
 export function rosterFeasibleFromCounts(
-  ownedCounts: {
-    guards: number;
-    forwards: number;
-    centers: number;
-  },
+  ownedCounts: readonly number[],
   availableMaskCounts: readonly number[],
   remainingPicks: number,
 ): boolean {
   if (!Number.isInteger(remainingPicks) || remainingPicks < 0) {
     throw new Error(`remainingPicks must be a nonnegative integer (got ${String(remainingPicks)})`);
   }
-  const startG = Math.min(2, ownedCounts.guards);
-  const startF = Math.min(2, ownedCounts.forwards);
-  const startC = Math.min(1, ownedCounts.centers);
-  if (startG >= 2 && startF >= 2 && startC >= 1) return true;
-  const usedBase = 18;
-  const stateCount = usedBase * (remainingPicks + 1);
-  const reachable = new Uint8Array(stateCount);
-  const targetUsed = remainingPicks;
-  const targetG = 2;
-  const targetF = 2;
-  const targetC = 1;
-  reachable[startG * 6 + startF * 2 + startC] = 1;
-  for (let mask = 1; mask <= 7; mask += 1) {
-    const count = availableMaskCounts[mask] ?? 0;
-    if (count === 0) continue;
-    for (let used = targetUsed - 1; used >= 0; used -= 1) {
-      const maxAdd = Math.min(count, targetUsed - used);
-      for (let g = targetG; g >= 0; g -= 1) {
-        for (let f = targetF; f >= 0; f -= 1) {
-          for (let c = targetC; c >= 0; c -= 1) {
-            const idx = used * usedBase + g * 6 + f * 2 + c;
-            if (reachable[idx] === 0) continue;
-            for (let add = 1; add <= maxAdd; add += 1) {
-              const ng = Math.min(targetG, g + ((mask & 1) !== 0 ? add : 0));
-              const nf = Math.min(targetF, f + ((mask & 2) !== 0 ? add : 0));
-              const nc = Math.min(targetC, c + ((mask & 4) !== 0 ? add : 0));
-              const nidx = (used + add) * usedBase + ng * 6 + nf * 2 + nc;
-              reachable[nidx] = 1;
-            }
-          }
-        }
-      }
+  const slots = POSITIONS.length;
+  for (let subset = 1; subset < 1 << slots; subset += 1) {
+    const size = popcount(subset);
+    let ownedCover = 0;
+    for (let p = 0; p < slots; p += 1) {
+      if ((subset & (1 << p)) === 0) continue;
+      ownedCover += Math.min(ownedCounts[p] ?? 0, size);
     }
-    if (reachable[targetUsed * usedBase + targetG * 6 + targetF * 2 + targetC] === 1) {
-      return true;
+    let availableCover = 0;
+    for (let mask = 1; mask < 1 << slots; mask += 1) {
+      if ((mask & subset) === 0) continue;
+      availableCover += availableMaskCounts[mask] ?? 0;
     }
+    if (ownedCover + Math.min(availableCover, remainingPicks) < size) return false;
   }
-  return reachable[targetUsed * usedBase + targetG * 6 + targetF * 2 + targetC] === 1;
+  return true;
 }
 export function rosterFeasible(
   owned: readonly SeasonRosterMemberInput[],
   available: readonly SeasonRosterMemberInput[],
   remainingPicks: number,
 ): boolean {
-  const ownedCounts = rosterGroupCounts(owned);
-  const maskCounts = new Array<number>(8).fill(0);
-  for (const member of available) {
-    const mask = groupMaskOf(member.playable);
-    if (mask !== 0) maskCounts[mask] = (maskCounts[mask] ?? 0) + 1;
+  return rosterFeasibleFromCounts(
+    positionCountsOf(owned),
+    maskCountsOfMembers(available),
+    remainingPicks,
+  );
+}
+export function fiveAliveFromCounts(
+  ownedMaskCounts: readonly number[],
+  availableMaskCounts: readonly number[],
+  remainingPicks: number,
+): boolean {
+  if (!Number.isInteger(remainingPicks) || remainingPicks < 0) {
+    throw new Error(`remainingPicks must be a nonnegative integer (got ${String(remainingPicks)})`);
   }
-  return rosterFeasibleFromCounts(ownedCounts, maskCounts, remainingPicks);
+  const slots = POSITIONS.length;
+  for (let subset = 1; subset < 1 << slots; subset += 1) {
+    let ownCover = 0;
+    let availableCover = 0;
+    for (let mask = 1; mask < 1 << slots; mask += 1) {
+      if ((mask & subset) === 0) continue;
+      ownCover += ownedMaskCounts[mask] ?? 0;
+      availableCover += availableMaskCounts[mask] ?? 0;
+    }
+    const futureCover = Math.max(0, availableCover - ownCover);
+    if (ownCover + Math.min(futureCover, remainingPicks) < popcount(subset)) {
+      return false;
+    }
+  }
+  return true;
+}
+export function fiveAlive(
+  owned: readonly SeasonRosterMemberInput[],
+  available: readonly SeasonRosterMemberInput[],
+  remainingPicks: number,
+): boolean {
+  const ownedMaskCounts = maskCountsOfMembers(owned);
+  return fiveAliveFromCounts(ownedMaskCounts, maskCountsOfMembers(available), remainingPicks);
+}
+function maskCountsOfMembers(members: readonly SeasonRosterMemberInput[]): number[] {
+  const counts = new Array<number>(1 << POSITIONS.length).fill(0);
+  for (const member of members) {
+    const mask = positionMaskOf(member.playable);
+    if (mask !== 0) counts[mask] = (counts[mask] ?? 0) + 1;
+  }
+  return counts;
 }
 export function fiveCompletable(
   owned: readonly SeasonRosterMemberInput[],
@@ -156,68 +209,15 @@ export function fiveCompletable(
 ): boolean {
   if (!Number.isInteger(remainingPicks) || remainingPicks < 0) return false;
   if (!Number.isInteger(scarcityMargin) || scarcityMargin < 0) return false;
-  if (owned.length + remainingPicks !== SEASON_ROSTER_RULES.size) return false;
+  if (owned.length + remainingPicks !== SEASON_ROSTER_SIZE) return false;
   if (available.length - scarcityMargin < remainingPicks) return false;
-  const targetG = 2;
-  const targetF = 2;
-  const targetC = 1;
-  const capU = Math.min(remainingPicks, 5);
-  const index = (g: number, f: number, c: number, u: number): number =>
-    ((u * (targetC + 1) + c) * (targetF + 1) + f) * (targetG + 1) + g;
-  const reachable = new Uint8Array((targetG + 1) * (targetF + 1) * (targetC + 1) * (capU + 1));
-  reachable[index(0, 0, 0, 0)] = 1;
-  for (const member of owned) {
-    const mask = groupMaskOf(member.playable);
-    if (mask === 0) continue;
-    for (let u = 0; u <= capU; u += 1) {
-      for (let g = targetG; g >= 0; g -= 1) {
-        for (let f = targetF; f >= 0; f -= 1) {
-          for (let c = targetC; c >= 0; c -= 1) {
-            if (reachable[index(g, f, c, u)] === 0) continue;
-            if ((mask & 1) !== 0) {
-              reachable[index(Math.min(targetG, g + 1), f, c, u)] = 1;
-            }
-            if ((mask & 2) !== 0) {
-              reachable[index(g, Math.min(targetF, f + 1), c, u)] = 1;
-            }
-            if ((mask & 4) !== 0) {
-              reachable[index(g, f, Math.min(targetC, c + 1), u)] = 1;
-            }
-          }
-        }
-      }
-    }
+  const slots = POSITIONS.length;
+  for (let subset = 1; subset < 1 << slots; subset += 1) {
+    const size = popcount(subset);
+    const ownedCover = coverCount(owned, subset);
+    const availableCover = coverCount(available, subset);
+    const effective = Math.max(0, Math.min(availableCover - scarcityMargin, remainingPicks));
+    if (ownedCover + effective < size) return false;
   }
-  const maskCounts = new Array<number>(8).fill(0);
-  for (const member of available) {
-    const mask = groupMaskOf(member.playable);
-    if (mask !== 0) maskCounts[mask] = (maskCounts[mask] ?? 0) + 1;
-  }
-  for (let mask = 1; mask <= 7; mask += 1) {
-    const takes = Math.min(Math.max(0, (maskCounts[mask] ?? 0) - scarcityMargin), 5, capU);
-    for (let t = 0; t < takes; t += 1) {
-      for (let u = capU - 1; u >= 0; u -= 1) {
-        for (let g = targetG; g >= 0; g -= 1) {
-          for (let f = targetF; f >= 0; f -= 1) {
-            for (let c = targetC; c >= 0; c -= 1) {
-              if (reachable[index(g, f, c, u)] === 0) continue;
-              if ((mask & 1) !== 0) {
-                reachable[index(Math.min(targetG, g + 1), f, c, u + 1)] = 1;
-              }
-              if ((mask & 2) !== 0) {
-                reachable[index(g, Math.min(targetF, f + 1), c, u + 1)] = 1;
-              }
-              if ((mask & 4) !== 0) {
-                reachable[index(g, f, Math.min(targetC, c + 1), u + 1)] = 1;
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-  for (let u = 0; u <= capU; u += 1) {
-    if (reachable[index(targetG, targetF, targetC, u)] === 1) return true;
-  }
-  return false;
+  return true;
 }

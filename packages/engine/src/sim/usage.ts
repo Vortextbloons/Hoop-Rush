@@ -6,6 +6,7 @@ import type {
 } from '@hoop-rush/data-contracts';
 import type { Rng, WeightedPickTable } from './rng.ts';
 import { buildWeightedPickTable } from './rng.ts';
+import type { HavocEvidence } from './havoc-runtime.ts';
 import { ENGINE_CONSTANTS, type PositionResponsibilityModifiers } from './constants.ts';
 import { sameGroupMatchWeight } from './position-responsibilities.ts';
 import { creationScore, interiorScoringScore, spacingScore } from '../domain/archetypes.ts';
@@ -91,9 +92,14 @@ export function initiatorWeight(
 export function teamInitiatorWeights(
   team: SimulationTeam,
   positionModifiers: ReadonlyMap<string, PositionResponsibilityModifiers>,
+  keyOf: (player: SimulationPlayer) => string = (player) => player.playerId,
 ): number[] {
   return team.players.map((p) =>
-    initiatorWeight(p, team, positionModifiers.get(p.playerId) ?? identityModifiers),
+    initiatorWeight(
+      p,
+      team,
+      positionModifiers.get(keyOf(p)) ?? positionModifiers.get(p.playerId) ?? identityModifiers,
+    ),
   );
 }
 export const identityModifiers: PositionResponsibilityModifiers = {
@@ -175,13 +181,17 @@ export function teammateShotWeights(
   initiator: SimulationPlayer,
   action: ActionType,
   positionModifiers: ReadonlyMap<string, PositionResponsibilityModifiers>,
+  keyOf: (player: SimulationPlayer) => string = (player) => player.playerId,
 ): TeammateShotWeights {
-  const teammates = team.players.filter((p) => p.playerId !== initiator.playerId);
+  const initiatorKey = keyOf(initiator);
+  const teammates = team.players.filter((p) => keyOf(p) !== initiatorKey);
   const weights = teammates.map((p) =>
     action === 'pickAndRollRoll'
       ? Math.max(0.5, p.tendencies.pickAndRollRollManRate) *
         (0.6 + 0.8 * interiorScoringScore(p)) *
-        (positionModifiers.get(p.playerId)?.rollMan ?? 1) *
+        (positionModifiers.get(keyOf(p))?.rollMan ??
+          positionModifiers.get(p.playerId)?.rollMan ??
+          1) *
         finisherRole(p, team)
       : Math.max(0.3, p.tendencies.shotRate * spacingWeight(p) * finisherRole(p, team)),
   );
@@ -209,26 +219,42 @@ export function pickShot(
     passed: true,
   };
 }
-function assisterCandidatesOf(team: SimulationTeam, shooter: SimulationPlayer): SimulationPlayer[] {
-  return team.players.filter((p) => p.playerId !== shooter.playerId);
+function assisterCandidatesOf(
+  team: SimulationTeam,
+  shooter: SimulationPlayer,
+  keyOf: (player: SimulationPlayer) => string,
+): SimulationPlayer[] {
+  const shooterKey = keyOf(shooter);
+  return team.players.filter((p) => keyOf(p) !== shooterKey);
 }
-function assisterWeightOf(p: SimulationPlayer, initiator: SimulationPlayer): number {
-  const observedCreation = p.anchors?.assistsPerGame;
+function assisterWeightOf(
+  p: SimulationPlayer,
+  initiator: SimulationPlayer,
+  keyOf: (player: SimulationPlayer) => string,
+  evidence?: HavocEvidence,
+): number {
+  const observedCreation = evidence?.isAuthoritative('assist-anchor')
+    ? undefined
+    : p.anchors?.assistsPerGame;
   const roleWeight =
     observedCreation === undefined
       ? Math.max(0.5, p.tendencies.passRate / 5)
       : Math.max(0.5, observedCreation + 1);
   const passingWeight = 0.7 + p.ratings.passing / 100;
   const creationMod = 0.75 + 0.5 * creationScore(p);
-  const initiatorBonus = p.playerId === initiator.playerId ? 1.35 : 1;
+  const initiatorBonus = keyOf(p) === keyOf(initiator) ? 1.35 : 1;
   return roleWeight * passingWeight * creationMod * initiatorBonus;
 }
 export function assisterWeights(
   team: SimulationTeam,
   shooter: SimulationPlayer,
   initiator: SimulationPlayer,
+  keyOf: (player: SimulationPlayer) => string = (player) => player.playerId,
+  evidenceOf?: (player: SimulationPlayer) => HavocEvidence | undefined,
 ): number[] {
-  return assisterCandidatesOf(team, shooter).map((p) => assisterWeightOf(p, initiator));
+  return assisterCandidatesOf(team, shooter, keyOf).map((p) =>
+    assisterWeightOf(p, initiator, keyOf, evidenceOf?.(p)),
+  );
 }
 export interface AssisterPickPrep {
   candidates: SimulationPlayer[];
@@ -238,11 +264,13 @@ export function assisterPickPrep(
   team: SimulationTeam,
   shooter: SimulationPlayer,
   initiator: SimulationPlayer,
+  keyOf: (player: SimulationPlayer) => string = (player) => player.playerId,
+  evidenceOf?: (player: SimulationPlayer) => HavocEvidence | undefined,
 ): AssisterPickPrep {
-  const candidates = assisterCandidatesOf(team, shooter);
+  const candidates = assisterCandidatesOf(team, shooter, keyOf);
   return {
     candidates,
-    pickTable: buildWeightedPickTable(assisterWeights(team, shooter, initiator)),
+    pickTable: buildWeightedPickTable(assisterWeights(team, shooter, initiator, keyOf, evidenceOf)),
   };
 }
 export function pickAssister(prep: AssisterPickPrep, rng: Rng): SimulationPlayer | null {
@@ -267,16 +295,27 @@ export interface DefenderBase {
 export function defenderBase(
   team: SimulationTeam,
   positionModifiers: ReadonlyMap<string, PositionResponsibilityModifiers>,
+  keyOf: (player: SimulationPlayer) => string = (player) => player.playerId,
+  baseSlotOf: (index: number) => number = (index) => index,
 ): DefenderBase {
   const count = team.players.length;
+  const baseSlots = Array.from({ length: count }, (_value, index) => baseSlotOf(index));
   const weights = SHOT_ZONES.map((zone) =>
     team.players.map((defender) => defenderWeight(defender, zone)),
   );
   const rimProtection = team.players.map(
-    (defender) => positionModifiers.get(defender.playerId)?.rimProtection ?? 1,
+    (defender) =>
+      positionModifiers.get(keyOf(defender))?.rimProtection ??
+      positionModifiers.get(defender.playerId)?.rimProtection ??
+      1,
   );
   const matchMatrix = team.players.map((_, defenderSlot) =>
-    team.players.map((_, shooterSlot) => sameGroupMatchWeight(defenderSlot, shooterSlot)),
+    team.players.map((_, shooterSlot) =>
+      sameGroupMatchWeight(
+        baseSlots[defenderSlot] ?? defenderSlot,
+        baseSlots[shooterSlot] ?? shooterSlot,
+      ),
+    ),
   );
   const pickTables: WeightedPickTable[][] = [];
   for (let zoneIndex = 0; zoneIndex < SHOT_ZONES.length; zoneIndex += 1) {
@@ -316,11 +355,20 @@ const ZONE_INDEX = Object.fromEntries(SHOT_ZONES.map((zone, index) => [zone, ind
   ShotZone,
   number
 >;
-export function threePointTarget(shooter: SimulationPlayer, profile: EraSimulationProfile): number {
+export function threePointTarget(
+  shooter: SimulationPlayer,
+  profile: EraSimulationProfile,
+  evidence?: HavocEvidence,
+): number {
   const f = shooter.tendencies;
   const eraThreeRate = profile.parameters.league3PARate;
-  const observedRate = shooter.anchors?.threePointAttemptRate;
+  const observedRate = evidence?.isAuthoritative('three-point-volume')
+    ? undefined
+    : shooter.anchors?.threePointAttemptRate;
   const observedPct = shooter.anchors?.threePointPct;
+  const reconstructed = evidence?.isAuthoritative('three-point-volume')
+    ? undefined
+    : shooter.reconstructedThreePoint;
   if (observedRate === undefined) {
     return Math.min(
       0.65,
@@ -331,8 +379,8 @@ export function threePointTarget(shooter: SimulationPlayer, profile: EraSimulati
       ),
     );
   }
-  if (observedRate === null && shooter.reconstructedThreePoint !== undefined) {
-    return Math.min(0.65, Math.max(0.01, shooter.reconstructedThreePoint.attemptRateConservative));
+  if (observedRate === null && reconstructed !== undefined) {
+    return Math.min(0.65, Math.max(0.01, reconstructed.attemptRateConservative));
   }
   if (
     observedPct === null ||
@@ -403,9 +451,13 @@ export interface ZonePrep {
   base: number[];
   actionPickTables: Record<ActionType, WeightedPickTable>;
 }
-export function zonePrep(shooter: SimulationPlayer, profile: EraSimulationProfile): ZonePrep {
+export function zonePrep(
+  shooter: SimulationPlayer,
+  profile: EraSimulationProfile,
+  evidence?: HavocEvidence,
+): ZonePrep {
   const blend = blendedZoneWeights(shooter, profile);
-  const targetThreeRate = threePointTarget(shooter, profile);
+  const targetThreeRate = threePointTarget(shooter, profile, evidence);
   const driveRate = shooter.tendencies.driveRate;
   const base = rescaleZoneWeights(blend, targetThreeRate);
   const actionPickTables = Object.fromEntries(

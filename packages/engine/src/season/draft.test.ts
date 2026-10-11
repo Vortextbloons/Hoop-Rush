@@ -845,12 +845,16 @@ describe('season draft picks', () => {
       {
         franchiseId: 'lakers',
         eraId: '1990s',
-        positions: Array.from({ length: 12 }, (_, i) => (i < 5 ? ['PG'] : i < 10 ? ['SF'] : ['C'])),
+        positions: Array.from({ length: 12 }, (_, i) =>
+          i < 3 ? ['PG'] : i < 5 ? ['SG'] : i < 7 ? ['SF'] : i < 9 ? ['PF'] : ['C'],
+        ),
       },
       {
         franchiseId: 'lakers',
         eraId: '2000s',
-        positions: Array.from({ length: 12 }, (_, i) => (i < 5 ? ['PG'] : i < 10 ? ['SF'] : ['C'])),
+        positions: Array.from({ length: 12 }, (_, i) =>
+          i < 3 ? ['PG'] : i < 5 ? ['SG'] : i < 7 ? ['SF'] : i < 9 ? ['PF'] : ['C'],
+        ),
       },
     ]);
     const lakers90 = catalog.candidates.find(

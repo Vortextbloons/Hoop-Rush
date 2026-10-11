@@ -204,21 +204,15 @@ alter table public.draft_duel_room_commands replica identity full;
 
 -- Realtime Authorization: private broadcast channel 'draft-duel:<roomId>' for
 -- transient consideration/reaction events, restricted to room members.
-drop policy if exists "dd members read room transient channel" on realtime.messages;
-create policy "dd members read room transient channel"
-  on realtime.messages for select to authenticated
-  using (
-    realtime.topic() ~ '^draft-duel:[0-9a-f-]{36}$'
-    and public.draft_duel_is_member(substring(realtime.topic() from 12)::uuid)
-  );
-
-drop policy if exists "dd members send room transient channel" on realtime.messages;
-create policy "dd members send room transient channel"
-  on realtime.messages for insert to authenticated
-  with check (
-    realtime.topic() ~ '^draft-duel:[0-9a-f-]{36}$'
-    and public.draft_duel_is_member(substring(realtime.topic() from 12)::uuid)
-  );
+do $guard$
+begin
+  if to_regclass('realtime.messages') is not null then
+    execute $sql$drop policy if exists "dd members read room transient channel" on realtime.messages$sql$;
+    execute $sql$create policy "dd members read room transient channel" on realtime.messages for select to authenticated using (realtime.topic() ~ '^draft-duel:[0-9a-f-]{36}$' and public.draft_duel_is_member(substring(realtime.topic() from 12)::uuid))$sql$;
+    execute $sql$drop policy if exists "dd members send room transient channel" on realtime.messages$sql$;
+    execute $sql$create policy "dd members send room transient channel" on realtime.messages for insert to authenticated with check (realtime.topic() ~ '^draft-duel:[0-9a-f-]{36}$' and public.draft_duel_is_member(substring(realtime.topic() from 12)::uuid))$sql$;
+  end if;
+end $guard$;
 
 create or replace function public.draft_duel_random_code()
 returns text
@@ -597,7 +591,7 @@ begin
         or p_payload->>'inputDigest' is null or (p_payload->>'inputDigest') !~ '^[0-9a-f]{64}$' then
         return jsonb_build_object('accepted', false, 'rejectionCode', 'illegal-move');
       end if;
-      if p_payload ? 'winner' and p_payload->>'winner' is null then
+      if jsonb_exists(p_payload, 'winner') and p_payload->>'winner' is null then
         return jsonb_build_object('accepted', false, 'rejectionCode', 'illegal-move');
       end if;
     when 'confirm-result' then
@@ -848,9 +842,9 @@ begin
     if v_game <> coalesce((v_room.series->>'currentGameNumber')::integer, -1) then
       return jsonb_build_object('accepted', false, 'rejectionCode', 'turn', 'revision', v_room.revision);
     end if;
-    if p_payload ? 'winner' then
+    if jsonb_exists(p_payload, 'winner') then
       v_home := case
-        when v_game in (1, 2, 5, 6, 7) then v_room.series->>'homeWinner'
+        when v_game in (1, 2, 5, 7) then v_room.series->>'homeWinner'
         when v_room.series->>'homeWinner' = 'p1' then 'p2'
         else 'p1'
       end;
@@ -913,7 +907,7 @@ begin
       v_series := v_room.series;
       if v_winner is not null then
         v_home := case
-          when v_game in (1, 2, 5, 6, 7) then v_series->>'homeWinner'
+          when v_game in (1, 2, 5, 7) then v_series->>'homeWinner'
           when v_series->>'homeWinner' = 'p1' then 'p2'
           else 'p1'
         end;
@@ -941,7 +935,6 @@ begin
           'champion', null);
       end if;
       if v_series->>'champion' is not null then
-        v_code := null;
         update public.draft_duel_rooms
           set series = v_series,
               phase = 'championship',

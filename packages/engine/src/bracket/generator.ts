@@ -13,6 +13,7 @@ import type {
   SimulationTendencies,
 } from '@hoop-rush/data-contracts';
 import {
+  canPlay,
   franchiseIdSchema,
   LINEUP_STRUCTURE,
   opponentBracketSchema,
@@ -25,7 +26,6 @@ import { validateBracketContent } from '../challenge/commands.ts';
 import { evaluateLineupBalance, evaluateLineupStrength } from '../challenge/lineup-eval.ts';
 import { BENCHMARK_VERSION } from '../challenge/benchmarks.ts';
 import { assignLineup } from '../domain/lineup.ts';
-import { playableSlotGroups } from '../domain/positions.ts';
 import { generateSchedule, scheduleInvariants, SCHEDULE_GENERATION_VERSION } from './schedule.ts';
 export const SCHEDULE_VERSION_LABEL = `schedule-${SCHEDULE_GENERATION_VERSION.replace('schedule-', '')}`;
 export interface BracketCandidatePlayer {
@@ -107,12 +107,13 @@ export function generateBracket(options: BracketGenerationOptions): OpponentBrac
   const proposalsByFranchise = new Map<string, Proposal[]>();
   for (const candidates of options.candidates) {
     const eligible = candidates.players.filter((p) => p.score >= minPlayerScore);
-    const guards = eligible.filter((p) => playableSlotGroups(p.positions).includes('G'));
-    const forwards = eligible.filter((p) => playableSlotGroups(p.positions).includes('F'));
-    const centers = eligible.filter((p) => playableSlotGroups(p.positions).includes('C'));
-    if (guards.length < 2 || forwards.length < 2 || centers.length < 1) {
+    const slotPools = LINEUP_STRUCTURE.map((slot) =>
+      eligible.filter((p) => canPlay(p.positions, slot)),
+    );
+    if (slotPools.some((pool) => pool.length === 0)) {
+      const counts = slotPools.map((pool) => String(pool.length)).join('/');
       throw new Error(
-        `${candidates.franchiseId} cannot form a legal lineup (${String(guards.length)} guards, ${String(forwards.length)} forwards, ${String(centers.length)} centers)`,
+        `${candidates.franchiseId} cannot form a legal lineup (PG/SG/SF/PF/C eligible: ${counts})`,
       );
     }
     const rng = createRng(`${seed}:propose:${candidates.franchiseId}`);
@@ -132,7 +133,7 @@ export function generateBracket(options: BracketGenerationOptions): OpponentBrac
       if (bias === undefined) {
         throw new Error(`bracket: no bias for proposal ${String(k)}`);
       }
-      const chosen = pickFive(rng, guards, forwards, centers, bias, (player) => {
+      const chosen = pickFive(rng, slotPools, bias, (player) => {
         const count = participation.get(player.playerId) ?? 0;
         return count >= maxParticipation;
       });
@@ -493,38 +494,25 @@ export function generateBracket(options: BracketGenerationOptions): OpponentBrac
 }
 function pickFive(
   rng: ReturnType<typeof createRng>,
-  guards: readonly BracketCandidatePlayer[],
-  forwards: readonly BracketCandidatePlayer[],
-  centers: readonly BracketCandidatePlayer[],
+  slotPools: ReadonlyArray<readonly BracketCandidatePlayer[]>,
   bias: 'strong' | 'mid' | 'uniform',
   isExhausted: (player: BracketCandidatePlayer) => boolean,
 ): BracketCandidatePlayer[] | null {
   const chosen: BracketCandidatePlayer[] = [];
   const used = new Set<string>();
-  const picks: ReadonlyArray<{
-    pool: readonly BracketCandidatePlayer[];
-    count: number;
-  }> = [
-    { pool: guards, count: 2 },
-    { pool: forwards, count: 2 },
-    { pool: centers, count: 1 },
-  ];
-  for (const { pool, count } of picks) {
+  for (const pool of slotPools) {
     const available = pool.filter((p) => !used.has(p.playerId) && !isExhausted(p));
-    for (let i = 0; i < count; i += 1) {
-      if (available.length === 0) return null;
-      const weight = (score: number) =>
-        bias === 'strong'
-          ? Math.pow(Math.max(1, score), 3)
-          : bias === 'mid'
-            ? Math.max(1, score)
-            : 1 + rng.next() * 2;
-      const weights = available.map((p) => Math.max(1, weight(p.score)));
-      const pick = rng.weightedPick(available, weights);
-      chosen.push(pick);
-      used.add(pick.playerId);
-      available.splice(available.indexOf(pick), 1);
-    }
+    if (available.length === 0) return null;
+    const weight = (score: number) =>
+      bias === 'strong'
+        ? Math.pow(Math.max(1, score), 3)
+        : bias === 'mid'
+          ? Math.max(1, score)
+          : 1 + rng.next() * 2;
+    const weights = available.map((p) => Math.max(1, weight(p.score)));
+    const pick = rng.weightedPick(available, weights);
+    chosen.push(pick);
+    used.add(pick.playerId);
   }
   return chosen;
 }

@@ -19,7 +19,12 @@ import {
   type PossessionStartType,
 } from './usage.ts';
 import { eraPossEstimatePerTrip, isSteal, turnoverProbability } from './security.ts';
-import { blockProbability, makeProbability, type ShotPrep } from './shooting.ts';
+import {
+  blockProbability,
+  makeProbability,
+  type HavocShotProbabilityAdjustments,
+  type ShotPrep,
+} from './shooting.ts';
 import {
   freeThrowsForZone,
   freeThrowProbability,
@@ -33,7 +38,8 @@ import {
   DEEP_FOUR_FT_MISS,
   DEEP_FOUR_MAKE_SCALE,
 } from './evolution-rules.ts';
-import { prepareTeam, enginePlayerKey, type TeamPrep } from './prepare.ts';
+import { prepareTeam, type TeamPrep } from './prepare.ts';
+import type { HavocRuntimeHooks, HavocEvidence } from './havoc-runtime.ts';
 import { ENGINE_CONSTANTS } from './constants.ts';
 import { creationScore } from '../domain/archetypes.ts';
 import type { SeasonHomeCourtMechanisms } from '../season/home-court.ts';
@@ -71,6 +77,7 @@ export interface TripContext {
   race?: { home: number; away: number; target: number; decided: 'home' | 'away' | null };
   homeCourt?: SeasonHomeCourtMechanisms;
   effects?: SeasonEffectsHook;
+  havoc?: HavocRuntimeHooks;
 }
 export function createTripContext(
   rng: Rng,
@@ -104,12 +111,12 @@ export interface PossessionStep {
   finished: boolean;
 }
 function slotOf(prep: TeamPrep, player: SimulationPlayer): number {
-  return prep.slotByPlayerId.get(enginePlayerKey(player)) ?? -1;
+  return prep.slotByPlayerId.get(prep.keyOf(player)) ?? -1;
 }
 function slotOfOrThrow(prep: TeamPrep, player: SimulationPlayer): number {
   const slot = slotOf(prep, player);
   if (slot < 0) {
-    throw new Error(`possession: no slot for player ${enginePlayerKey(player)}`);
+    throw new Error(`possession: no slot for player ${prep.keyOf(player)}`);
   }
   return slot;
 }
@@ -127,6 +134,7 @@ export class PossessionStepper {
   private readonly startedRemaining: number;
   private finalStep: PossessionStep | null = null;
   private handlerVersion: string | undefined;
+  private handlerSlot = 0;
   private shooterVersion: string | undefined;
   private defenderVersion: string | undefined;
   private readonly tripRebounds: [number, number] = [0, 0];
@@ -135,6 +143,9 @@ export class PossessionStepper {
     this.offenseSide = offenseSide;
     this.startedRemaining = ctx.state.secondsRemaining;
     if (ctx.gameRule === 'twenty-second-clock') ctx.shotClock = { remaining: 20 };
+    if (ctx.havoc !== undefined) {
+      ctx.shotClock = { remaining: ctx.havoc.fullShotClock(offenseSide) };
+    }
   }
   step(): PossessionStep {
     if (this.phase === 'done') {
@@ -152,7 +163,12 @@ export class PossessionStepper {
         return this.stepFoulCheck();
       case 'inbound': {
         consumeTime(this.ctx.state, ENGINE_CONSTANTS.inboundConsumption);
-        if (this.ctx.shotClock) this.ctx.shotClock.remaining -= ENGINE_CONSTANTS.inboundConsumption;
+        if (this.ctx.shotClock) {
+          this.ctx.shotClock.remaining -= ENGINE_CONSTANTS.inboundConsumption;
+          if (this.ctx.havoc !== undefined) {
+            this.ctx.shotClock.remaining = Math.max(0, this.ctx.shotClock.remaining);
+          }
+        }
         this.phase = 'foul';
         return { ended: false, pause: false, periodEnded: false, finished: false };
       }
@@ -165,6 +181,9 @@ export class PossessionStepper {
   }
   private stepSample(): PossessionStep {
     const { rng, state, profile } = this.ctx;
+    if (this.ctx.havoc !== undefined) {
+      return this.stepSampleHavoc();
+    }
     if (this.ctx.gameRule === 'twenty-second-clock' && this.ctx.shotClock) {
       return this.stepSampleTwentySecond();
     }
@@ -217,8 +236,51 @@ export class PossessionStepper {
     this.phase = 'security';
     return { ended: false, pause: false, periodEnded: false, finished: false };
   }
+  private stepSampleHavoc(): PossessionStep {
+    const { rng, state, recorder, teams, preps } = this.ctx;
+    const havoc = this.ctx.havoc;
+    const clock = this.ctx.shotClock;
+    if (havoc === undefined || clock === undefined) {
+      this.phase = 'security';
+      return { ended: false, pause: false, periodEnded: false, finished: false };
+    }
+    if (state.secondsRemaining < ENGINE_CONSTANTS.minimumStartSeconds) {
+      return this.finish({ ended: false, pause: true, periodEnded: true });
+    }
+    const offense = this.offenseSide;
+    const full = havoc.fullShotClock(offense);
+    const raw = this.ctx.meanTripSeconds * (0.6 + rng.next() * 0.8);
+    const planned = Math.max(
+      (raw * full) / ENGINE_CONSTANTS.shotClockSeconds,
+      ENGINE_CONSTANTS.minimumTripSeconds,
+    );
+    if (planned > clock.remaining && planned <= state.secondsRemaining) {
+      const team = teams[offense];
+      const teamPrep = preps[offense];
+      const handler = rng.weightedPick(team.players, teamPrep.initiatorPickTable);
+      const handlerSlot = slotOf(teamPrep, handler);
+      this.handlerVersion = handler.playerVersionId;
+      this.handlerSlot = handlerSlot >= 0 ? handlerSlot : 0;
+      consumeTime(state, Math.min(Math.max(0, clock.remaining), state.secondsRemaining));
+      clock.remaining = 0;
+      recorder.shotClockViolation(offense, this.handlerSlot);
+      havoc.onShotClockViolation(offense, full);
+      recorder.possession(offense);
+      this.ctx.possessionStart = 'deadBall';
+      return this.endedStep(true);
+    }
+    const consumed = consumeTime(state, Math.min(planned, state.secondsRemaining));
+    clock.remaining = Math.max(0, clock.remaining - consumed);
+    if (state.secondsRemaining <= 0) {
+      return this.finish({ ended: false, pause: true, periodEnded: true });
+    }
+    this.deadBall = consumed >= this.startedRemaining - ENGINE_CONSTANTS.minimumStartSeconds;
+    this.phase = 'security';
+    return { ended: false, pause: false, periodEnded: false, finished: false };
+  }
   private stepSecurity(): PossessionStep {
     const { rng, recorder, teams, preps } = this.ctx;
+    const havoc = this.ctx.havoc;
     const offense = this.offenseSide;
     const defense = (1 - offense) as SideIndex;
     const team = teams[offense];
@@ -227,6 +289,7 @@ export class PossessionStepper {
     const handler = rng.weightedPick(team.players, teamPrep.initiatorPickTable);
     const handlerSlot = slotOf(teamPrep, handler);
     this.handlerVersion = handler.playerVersionId;
+    this.handlerSlot = handlerSlot >= 0 ? handlerSlot : 0;
     const awayTurnoverPressure =
       this.offenseSide === 1 ? (this.ctx.homeCourt?.awayTurnoverPressureAdjustment ?? 0) : 0;
     const effectsAdjustment =
@@ -243,14 +306,22 @@ export class PossessionStepper {
           this.ctx.profile,
           awayTurnoverPressure,
           effectsAdjustment / 1000000,
+          havoc?.evidenceOf(handler),
         ),
       )
     ) {
-      recorder.turnover(offense, handlerSlot >= 0 ? handlerSlot : 0);
+      const cancelled = havoc?.cancelTurnover(offense, handler) ?? false;
+      havoc?.onTurnover(offense, handler, cancelled);
+      if (cancelled) {
+        this.phase = 'foul';
+        return { ended: false, pause: false, periodEnded: false, finished: false };
+      }
+      recorder.turnover(offense, this.handlerSlot);
       if (isSteal(rng, defensePrep.stealAbility, this.ctx.profile)) {
         const stealer = rng.weightedPick(teams[defense].players, defensePrep.stealerPickTable);
         const stealerSlot = slotOf(defensePrep, stealer);
         recorder.steal(defense, stealerSlot >= 0 ? stealerSlot : 0);
+        havoc?.onSteal(defense, stealer);
       }
       this.ctx.possessionStart = 'liveTurnover';
       recorder.possession(offense);
@@ -261,6 +332,7 @@ export class PossessionStepper {
   }
   private stepFoulCheck(): PossessionStep {
     const { rng, recorder, state, teams, preps, profile } = this.ctx;
+    const havoc = this.ctx.havoc;
     const offense = this.offenseSide;
     const defense = (1 - offense) as SideIndex;
     if (this.foulIndex >= 4) {
@@ -277,9 +349,29 @@ export class PossessionStepper {
       const offensePrep = preps[offense];
       const fouler = rng.weightedPick(offenseTeam.players, offensePrep.foulerPickTable);
       const foulerSlot = slotOf(offensePrep, fouler);
+      const cancelled = havoc?.cancelTurnover(offense, fouler) ?? false;
+      havoc?.onTurnover(offense, fouler, cancelled);
       recorder.foul(offense, foulerSlot >= 0 ? foulerSlot : 0);
-      recorder.turnover(offense, foulerSlot >= 0 ? foulerSlot : 0);
       state.periodFouls[offense] += 1;
+      const awards = havoc?.onFoul({
+        fouler,
+        foulerSide: offense,
+        shooter: null,
+        shooting: false,
+        madeShot: false,
+        inBonus: false,
+        zone: null,
+      });
+      if (!cancelled) {
+        recorder.turnover(offense, foulerSlot >= 0 ? foulerSlot : 0);
+      }
+      if (awards !== undefined && awards.technicalFreeThrows > 0 && awards.technicalForDefense) {
+        resolveTechnicalFreeThrow(this.ctx, defense, offense);
+      }
+      if (cancelled) {
+        this.phase = 'shot';
+        return { ended: false, pause: false, periodEnded: false, finished: false };
+      }
       recorder.possession(offense);
       this.ctx.possessionStart = 'deadBall';
       return this.endedStep(true);
@@ -290,20 +382,33 @@ export class PossessionStepper {
     const foulerSlot = slotOf(defensePrep, fouler);
     recorder.foul(defense, foulerSlot >= 0 ? foulerSlot : 0);
     state.periodFouls[defense] += 1;
-    if (teamInBonus(state.periodFouls[defense], state.periodIndex >= 4)) {
+    const inBonus = teamInBonus(state.periodFouls[defense], state.periodIndex >= 4);
+    const awards = havoc?.onFoul({
+      fouler,
+      foulerSide: defense,
+      shooter: null,
+      shooting: false,
+      madeShot: false,
+      inBonus,
+      zone: null,
+    });
+    if (inBonus) {
       const team = teams[offense];
       const teamPrep = preps[offense];
       const shooter = rng.weightedPick(team.players, teamPrep.freeThrowShooterPickTable);
       const shooterSlot = slotOf(teamPrep, shooter);
       this.ctx.possessionStart = 'deadBall';
+      const technical = awards?.technicalFreeThrows ?? 0;
+      const attempts = 2 + technical;
       const freeThrows = resolveFreeThrows(
         this.ctx,
         offense,
         defense,
         shooterSlot,
-        2,
+        attempts,
         this.deadBall,
         this.tripRebounds,
+        havoc !== undefined ? { bonusAttempts: attempts } : undefined,
       );
       if (freeThrows.continues) {
         this.phase = 'continuation';
@@ -312,9 +417,19 @@ export class PossessionStepper {
       recorder.possession(offense);
       return this.endedStep(!freeThrows.liveReboundEnd);
     }
+    if (awards !== undefined && awards.technicalFreeThrows > 0) {
+      const teamPrep = preps[offense];
+      const shooter = rng.weightedPick(teams[offense].players, teamPrep.freeThrowShooterPickTable);
+      const shooterSlot = slotOf(teamPrep, shooter);
+      resolveFreeThrows(this.ctx, offense, defense, shooterSlot, 1, true, this.tripRebounds, {
+        bonusAttempts: 1,
+      });
+      this.ctx.possessionStart = 'deadBall';
+    }
     this.phase = 'inbound';
     if (this.ctx.shotClock) {
-      this.ctx.shotClock.remaining = Math.max(this.ctx.shotClock.remaining, 14);
+      const reset = havoc !== undefined ? Math.min(14, havoc.fullShotClock(offense)) : 14;
+      this.ctx.shotClock.remaining = Math.max(this.ctx.shotClock.remaining, reset);
     }
     return { ended: false, pause: true, periodEnded: false, finished: false };
   }
@@ -346,6 +461,22 @@ export class PossessionStepper {
         0,
         this.ctx.shotClock.remaining - ENGINE_CONSTANTS.continuationConsumption,
       );
+    }
+    const havoc = this.ctx.havoc;
+    if (
+      havoc !== undefined &&
+      this.ctx.shotClock !== undefined &&
+      this.ctx.shotClock.remaining <= 0
+    ) {
+      recorder.shotClockViolation(offense, this.handlerSlot);
+      havoc.onShotClockViolation(offense, havoc.fullShotClock(offense));
+      recorder.possession(offense);
+      this.recordTrip();
+      return this.finish({
+        ended: true,
+        pause: true,
+        periodEnded: state.secondsRemaining <= 0,
+      });
     }
     if (state.secondsRemaining < ENGINE_CONSTANTS.minimumStartSeconds) {
       recorder.possession(offense);
@@ -420,11 +551,14 @@ export function assistProbabilityPure(
   zone: ShotZone,
   shooter: SimulationPlayer,
   effectsAdjustment = 0,
+  evidence?: HavocEvidence,
 ): number {
   const factor = 0.5 + (passer.ratings.passing - 50) / 100;
-  const roleFactor = passer.anchors
-    ? 0.75 + Math.min(1, passer.anchors.assistsPerGame / 8) * 0.25
-    : 1;
+  const anchorAuthoritative = evidence?.isAuthoritative('assist-anchor') ?? false;
+  const roleFactor =
+    anchorAuthoritative || !passer.anchors
+      ? 1
+      : 0.75 + Math.min(1, passer.anchors.assistsPerGame / 8) * 0.25;
   const creation = 0.6 + 0.7 * creationScore(passer);
   const actionFactor =
     action === 'transition'
@@ -480,7 +614,7 @@ function creditAssist(
   if (!passed) return;
   const teamPrep = ctx.preps[offenseSide];
   const assisterPrep = teamPrep.assisterByPair.get(
-    `${shooter.playerId}\u0000${initiator.playerId}`,
+    `${teamPrep.keyOf(shooter)}\u0000${teamPrep.keyOf(initiator)}`,
   );
   if (assisterPrep === undefined) return;
   const passer = pickAssister(assisterPrep, ctx.rng);
@@ -499,12 +633,14 @@ function creditAssist(
         zone,
         shooter,
         effectsAdjustment / 1000000,
+        ctx.havoc?.evidenceOf(passer),
       ),
     )
   ) {
     return;
   }
   ctx.recorder.assist(offenseSide, slot);
+  ctx.havoc?.onAssist(offenseSide, passer, shooter);
 }
 function reboundChances(
   ctx: TripContext,
@@ -548,8 +684,9 @@ function reboundFromLiveMissedFreeThrow(
       prep.rebounderPickTables[0],
     );
     ctx.recorder.offensiveRebound(offenseSide, slotOfOrThrow(prep, rebounder));
+    ctx.havoc?.onRebound(offenseSide, rebounder, true);
     ctx.possessionStart = 'offensiveRebound';
-    if (ctx.shotClock) ctx.shotClock.remaining = 14;
+    if (ctx.shotClock) ctx.shotClock.remaining = reboundShotClockOf(ctx, offenseSide);
     return { continues: true, liveReboundEnd: false };
   }
   const prep = ctx.preps[defenseSide];
@@ -558,6 +695,7 @@ function reboundFromLiveMissedFreeThrow(
     prep.rebounderPickTables[1],
   );
   ctx.recorder.defensiveRebound(defenseSide, slotOfOrThrow(prep, rebounder));
+  ctx.havoc?.onRebound(defenseSide, rebounder, false);
   ctx.possessionStart = 'defensiveRebound';
   return { continues: false, liveReboundEnd: true };
 }
@@ -569,12 +707,14 @@ function resolveFreeThrows(
   attempts: number,
   deadBall: boolean,
   reboundCounter: [number, number],
+  bonusOptions?: { bonusAttempts?: number },
 ): FreeThrowOutcome {
   const { rng, recorder } = ctx;
   const shooter = ctx.teams[offenseSide].players[shooterSlot];
   if (shooter === undefined) {
     throw new Error(`possession: no player at slot ${String(shooterSlot)}`);
   }
+  const bonusAttempts = bonusOptions?.bonusAttempts ?? 0;
   let outcome: FreeThrowOutcome = { continues: false, liveReboundEnd: false };
   for (let i = 0; i < attempts; i += 1) {
     if (ctx.race?.decided) break;
@@ -583,6 +723,12 @@ function resolveFreeThrows(
       ctx.preps[offenseSide].freeThrowP[shooterSlot] ?? freeThrowProbability(shooter, ctx.profile);
     const made = rng.chance(p);
     recorder.freeThrow(offenseSide, shooterSlot, made);
+    ctx.havoc?.onFreeThrow({
+      side: offenseSide,
+      shooter,
+      made,
+      bonus: bonusAttempts > 0 && i >= attempts - bonusAttempts,
+    });
     if (made) {
       raceRecordPoints(ctx, offenseSide, 1);
       continue;
@@ -614,46 +760,61 @@ function resolveShot(
   reboundCounter: [number, number],
 ): ShotOutcome {
   const { rng, recorder, state, profile } = ctx;
+  const havoc = ctx.havoc;
   const team = ctx.teams[offenseSide];
   const teamPrep = ctx.preps[offenseSide];
   const defense = ctx.teams[defenseSide];
   const defensePrep = ctx.preps[defenseSide];
   const initiator = rng.weightedPick(team.players, teamPrep.initiatorPickTable);
-  const actionWeights = teamPrep.actionWeights.get(enginePlayerKey(initiator));
+  const actionWeights = teamPrep.actionWeights.get(teamPrep.keyOf(initiator));
   if (actionWeights === undefined) {
-    throw new Error(`possession: no action weights for ${initiator.playerId}`);
+    throw new Error(`possession: no action weights for ${teamPrep.keyOf(initiator)}`);
   }
   const action = pickAction(initiator, actionWeights, rng, ctx.possessionStart);
-  const teammateShots = teamPrep.teammateShots.get(enginePlayerKey(initiator));
+  const teammateShots = teamPrep.teammateShots.get(teamPrep.keyOf(initiator));
   if (teammateShots === undefined) {
-    throw new Error(`possession: no teammate shot table for ${initiator.playerId}`);
+    throw new Error(`possession: no teammate shot table for ${teamPrep.keyOf(initiator)}`);
   }
   const shot = pickShot(
     teammateShots,
     initiator,
     action,
     rng,
-    teamPrep.passP.get(enginePlayerKey(initiator)),
+    teamPrep.passP.get(teamPrep.keyOf(initiator)),
   );
   const shooter = shot.shooter;
-  const zonePrep = teamPrep.zonePrep.get(enginePlayerKey(shooter));
+  const zonePrep = teamPrep.zonePrep.get(teamPrep.keyOf(shooter));
   if (zonePrep === undefined) {
-    throw new Error(`possession: no zone preparation for ${shooter.playerId}`);
+    throw new Error(`possession: no zone preparation for ${teamPrep.keyOf(shooter)}`);
   }
   const zone = pickZone(action, zonePrep, rng);
   const deep =
     ctx.gameRule === 'deep-four' && zone === 'aboveBreakThree' && rng.chance(DEEP_FOUR_SPLIT);
   const ruleMakeScale =
     (deep ? DEEP_FOUR_MAKE_SCALE : 1) *
-    (ctx.shotClock ? twentySecondClockPressure(ctx.shotClock.remaining) : 1);
+    (ctx.gameRule === 'twenty-second-clock' && ctx.shotClock
+      ? twentySecondClockPressure(ctx.shotClock.remaining)
+      : 1);
   const shooterSlot = slotOf(teamPrep, shooter);
-  const defender = pickDefender(defense, zone, rng, defensePrep.defenderBase, shooterSlot);
+  const havocPlan =
+    havoc?.planShot({
+      offense: offenseSide,
+      defense: defenseSide,
+      shooter,
+      zone,
+      action,
+      passed: shot.passed,
+    }) ?? null;
+  const defender =
+    havocPlan === null
+      ? pickDefender(defense, zone, rng, defensePrep.defenderBase, shooterSlot)
+      : havocPlan.defender;
   const three = isThreePointZone(zone);
   const defenderSlot = slotOf(defensePrep, defender);
   if (defenderSlot >= 0) recorder.contest(defenseSide, defenderSlot);
   const shotPrep: ShotPrep = {
     spacing: teamPrep.spacing,
-    twoPointAnchor: teamPrep.twoPointAnchor.get(enginePlayerKey(shooter)) ?? null,
+    twoPointAnchor: teamPrep.twoPointAnchor.get(teamPrep.keyOf(shooter)) ?? null,
   };
   const effectsAdjustment =
     ctx.effects?.makeAdjustment({
@@ -662,6 +823,28 @@ function resolveShot(
       defenseSide,
     }) ?? 0;
   const effectsAdjustmentFraction = effectsAdjustment / 1000000;
+  const makeOptions: HavocShotProbabilityAdjustments | undefined =
+    havocPlan === null
+      ? undefined
+      : {
+          contestScale: havocPlan.contestScale,
+          contestPointDelta: havocPlan.contestPointDelta,
+          makePointDelta: havocPlan.makePointDelta,
+          shooterEvidence: havoc?.evidenceOf(shooter),
+          defenderEvidence: havoc?.evidenceOf(defender),
+        };
+  const havocRecord = (made: boolean): void => {
+    if (havoc === undefined || havocPlan === null) return;
+    havoc.onFieldGoal({
+      offense: offenseSide,
+      shooter,
+      made,
+      three,
+      passed: shot.passed,
+      shotKind: havocPlan.shotKind,
+      putback: havocPlan.putback,
+    });
+  };
   const foulP = shootingFoulProbability(shooter, defender, zone, profile);
   if (rng.chance(foulP)) {
     recorder.foul(defenseSide, defenderSlot >= 0 ? defenderSlot : 0);
@@ -678,9 +861,20 @@ function resolveShot(
         shotPrep,
         homeDefenseAdjustment,
         effectsAdjustmentFraction,
+        makeOptions,
       ) * ENGINE_CONSTANTS.fouledShotMakeScale;
     const made = rng.chance(shotP * ruleMakeScale);
+    const awards = havoc?.onFoul({
+      fouler: defender,
+      foulerSide: defenseSide,
+      shooter,
+      shooting: true,
+      madeShot: made,
+      inBonus: false,
+      zone,
+    });
     recorder.fieldGoalAttempt(offenseSide, shooterSlot, zone, made, three, shot.passed, deep);
+    havocRecord(made);
     if (made) raceRecordPoints(ctx, offenseSide, deep ? 4 : three ? 3 : 2);
     if (ctx.race?.decided) {
       ctx.possessionStart = 'deadBall';
@@ -691,6 +885,8 @@ function resolveShot(
         defenderVersion: defender.playerVersionId,
       };
     }
+    const technical = awards?.technicalFreeThrows ?? 0;
+    const bonusAttempts = (awards?.bonusAttempts ?? 0) + technical;
     let freeThrows: FreeThrowOutcome;
     if (made) {
       creditAssist(ctx, offenseSide, team, shooter, initiator, action, zone, shot.passed);
@@ -699,9 +895,10 @@ function resolveShot(
         offenseSide,
         defenseSide,
         shooterSlot,
-        1,
+        (awards?.freeThrowsAwarded ?? 1) + technical,
         false,
         reboundCounter,
+        havoc !== undefined && bonusAttempts > 0 ? { bonusAttempts } : undefined,
       );
     } else {
       recorder.teamRebound(defenseSide);
@@ -710,9 +907,11 @@ function resolveShot(
         offenseSide,
         defenseSide,
         shooterSlot,
-        deep ? DEEP_FOUR_FT_MISS : freeThrowsForZone(zone),
+        (awards?.freeThrowsAwarded ?? (deep ? DEEP_FOUR_FT_MISS : freeThrowsForZone(zone))) +
+          technical,
         deadBall,
         reboundCounter,
+        havoc !== undefined && bonusAttempts > 0 ? { bonusAttempts } : undefined,
       );
     }
     if (freeThrows.continues) {
@@ -731,10 +930,18 @@ function resolveShot(
       defenderVersion: defender.playerVersionId,
     };
   }
-  const blockP = blockProbability(defender, zone, action);
+  const blockP = blockProbability(
+    defender,
+    zone,
+    action,
+    havoc?.evidenceOf(defender),
+    havocPlan?.blockPointDelta ?? 0,
+  );
   if (rng.chance(blockP)) {
     recorder.block(defenseSide, defenderSlot >= 0 ? defenderSlot : 0);
+    havoc?.onBlock(defenseSide, defender, shooter);
     recorder.fieldGoalAttempt(offenseSide, shooterSlot, zone, false, three, shot.passed, deep);
+    havocRecord(false);
     return reboundAfterMiss(
       ctx,
       offenseSide,
@@ -757,6 +964,7 @@ function resolveShot(
     shotPrep,
     homeDefenseAdjustment,
     effectsAdjustmentFraction,
+    makeOptions,
   );
   const shotP =
     shotPrep.twoPointAnchor !== null && !three
@@ -764,6 +972,7 @@ function resolveShot(
       : baseShotP;
   const made = rng.chance(shotP * ruleMakeScale);
   recorder.fieldGoalAttempt(offenseSide, shooterSlot, zone, made, three, shot.passed, deep);
+  havocRecord(made);
   if (made) raceRecordPoints(ctx, offenseSide, deep ? 4 : three ? 3 : 2);
   if (made) {
     creditAssist(ctx, offenseSide, team, shooter, initiator, action, zone, shot.passed);
@@ -820,8 +1029,9 @@ function reboundAfterMiss(
     const prep = ctx.preps[offenseSide];
     const rebounder = rng.weightedPick(ctx.teams[offenseSide].players, prep.rebounderPickTables[0]);
     recorder.offensiveRebound(offenseSide, slotOfOrThrow(prep, rebounder));
+    ctx.havoc?.onRebound(offenseSide, rebounder, true);
     ctx.possessionStart = 'offensiveRebound';
-    if (ctx.shotClock) ctx.shotClock.remaining = 14;
+    if (ctx.shotClock) ctx.shotClock.remaining = reboundShotClockOf(ctx, offenseSide);
     return {
       continues: true,
       liveReboundEnd: false,
@@ -832,6 +1042,7 @@ function reboundAfterMiss(
   const prep = ctx.preps[defenseSide];
   const rebounder = rng.weightedPick(ctx.teams[defenseSide].players, prep.rebounderPickTables[1]);
   recorder.defensiveRebound(defenseSide, slotOfOrThrow(prep, rebounder));
+  ctx.havoc?.onRebound(defenseSide, rebounder, false);
   ctx.possessionStart = 'defensiveRebound';
   return {
     continues: false,
@@ -839,6 +1050,25 @@ function reboundAfterMiss(
     ...(shooterVersion !== undefined ? { shooterVersion } : {}),
     ...(defenderVersion !== undefined ? { defenderVersion } : {}),
   };
+}
+function reboundShotClockOf(ctx: TripContext, side: SideIndex): number {
+  const havoc = ctx.havoc;
+  if (havoc === undefined) return 14;
+  return Math.min(14, havoc.reboundShotClock(side));
+}
+function resolveTechnicalFreeThrow(
+  ctx: TripContext,
+  offenseSide: SideIndex,
+  defenseSide: SideIndex,
+): void {
+  const { rng } = ctx;
+  const team = ctx.teams[offenseSide];
+  const teamPrep = ctx.preps[offenseSide];
+  const shooter = rng.weightedPick(team.players, teamPrep.freeThrowShooterPickTable);
+  const shooterSlot = slotOf(teamPrep, shooter);
+  resolveFreeThrows(ctx, offenseSide, defenseSide, shooterSlot, 1, true, [0, 0], {
+    bonusAttempts: 1,
+  });
 }
 function raceRecordPoints(ctx: TripContext, side: SideIndex, points: number): void {
   const race = ctx.race;

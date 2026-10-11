@@ -4,10 +4,15 @@ import { createRng, shuffle } from '../../sim/rng.ts';
 import { BAND_CEILING_PENALTY, ROSTER_ROLES, type PercentileTier } from '../ai-scoring.ts';
 import {
   legalFiveAfterAnyRemoval,
-  rosterGroupCounts,
+  positionCountsOf,
   validateSeasonRoster,
 } from '../roster-rules.ts';
-import { POOL_COMPOSITION_TARGETS, identityPriorityRolesOf } from './constants.ts';
+import {
+  FIVE_COVERAGE_TARGETS,
+  POOL_COMPOSITION_TARGETS,
+  ZERO_POSITION_COUNTS,
+  identityPriorityRolesOf,
+} from './constants.ts';
 import {
   coverageFeasibleFromPool,
   memberReachCapped,
@@ -44,22 +49,14 @@ export class PoolFillDeadlock extends Error {
 }
 export function poolAdmitsTenExact(state: GenerationState, team: PoolTeam): boolean {
   const anchorIds = team.anchors.map((anchor) => anchor.playerVersionId);
-  const anchorCounts = rosterGroupCounts(membersOf(state, anchorIds));
+  const anchorCounts = positionCountsOf(membersOf(state, anchorIds));
   const anchorSet = new Set(anchorIds);
   const rest = team.pool.filter((id) => !anchorSet.has(id));
   const picks = 10 - team.anchors.length;
-  if (!memberReachCapped(state, { ...POOL_COMPOSITION_TARGETS }, anchorCounts, rest, picks)) {
+  if (!memberReachCapped(state, POOL_COMPOSITION_TARGETS, anchorCounts, rest, picks)) {
     return false;
   }
-  if (
-    !memberReachCapped(
-      state,
-      { guards: 2, forwards: 2, centers: 1 },
-      { guards: 0, forwards: 0, centers: 0 },
-      team.pool,
-      5,
-    )
-  ) {
+  if (!memberReachCapped(state, FIVE_COVERAGE_TARGETS, ZERO_POSITION_COUNTS, team.pool, 5)) {
     return false;
   }
   return true;
@@ -71,7 +68,7 @@ export function poolTenFeasibleAfterAdd(
 ): boolean {
   const anchorIds = team.anchors.map((anchor) => anchor.playerVersionId);
   const anchorSet = new Set(anchorIds);
-  const anchorCounts = rosterGroupCounts(membersOf(state, anchorIds));
+  const anchorCounts = positionCountsOf(membersOf(state, anchorIds));
   const fixedMasks: number[] = [];
   for (const memberId of team.pool) {
     if (anchorSet.has(memberId)) continue;
@@ -91,7 +88,7 @@ export function poolTenFeasibleAfterAdd(
   const picksForTen = 10 - team.anchors.length;
   if (
     !reachableAfterFixedAndFills(
-      { ...POOL_COMPOSITION_TARGETS },
+      POOL_COMPOSITION_TARGETS,
       anchorCounts,
       fixedMasks,
       unassignedMasks,
@@ -103,8 +100,8 @@ export function poolTenFeasibleAfterAdd(
   }
   if (
     !reachableAfterFixedAndFills(
-      { guards: 2, forwards: 2, centers: 1 },
-      { guards: 0, forwards: 0, centers: 0 },
+      FIVE_COVERAGE_TARGETS,
+      ZERO_POSITION_COUNTS,
       fixedMasks,
       unassignedMasks,
       slotsToFill,
@@ -172,7 +169,7 @@ export function poolTenFeasibleAfterAddExact(
 ): boolean {
   const anchorIds = team.anchors.map((anchor) => anchor.playerVersionId);
   const anchorSet = new Set(anchorIds);
-  const anchorCounts = rosterGroupCounts(membersOf(state, anchorIds));
+  const anchorCounts = positionCountsOf(membersOf(state, anchorIds));
   const members: string[] = [];
   for (const memberId of team.pool) {
     if (anchorSet.has(memberId)) continue;
@@ -180,14 +177,14 @@ export function poolTenFeasibleAfterAddExact(
   }
   if (versionId !== null) members.push(versionId);
   const picks = 10 - team.anchors.length;
-  if (!memberReachCapped(state, { ...POOL_COMPOSITION_TARGETS }, anchorCounts, members, picks)) {
+  if (!memberReachCapped(state, POOL_COMPOSITION_TARGETS, anchorCounts, members, picks)) {
     return false;
   }
   if (
     !memberReachCapped(
       state,
-      { guards: 2, forwards: 2, centers: 1 },
-      { guards: 0, forwards: 0, centers: 0 },
+      FIVE_COVERAGE_TARGETS,
+      ZERO_POSITION_COUNTS,
       [...team.pool, ...(versionId !== null ? [versionId] : [])],
       5,
     )
@@ -200,7 +197,7 @@ export function poolTenFeasibleAfterAddExact(
     if (identityScoreOf(state, anchorId, team.identity) > capValue) anchorOutliers += 1;
   }
   if (
-    !memberReachCapped(state, { ...POOL_COMPOSITION_TARGETS }, anchorCounts, members, picks, {
+    !memberReachCapped(state, POOL_COMPOSITION_TARGETS, anchorCounts, members, picks, {
       identity: team.identity,
       capValue,
       startOutliers: anchorOutliers,
@@ -251,11 +248,12 @@ export function addPoolMember(
   leaveUnassigned(state, versionId);
   claimIdentity(state, versionId);
   const mask = state.maskByVersion.get(versionId);
-  const coverageMask = state.coverageMaskByVersion.get(versionId) ?? 0;
-  team.coverageMask |= coverageMask;
-  if (mask !== undefined && (mask & 1) !== 0) team.groupCounts.guards += 1;
-  if (mask !== undefined && (mask & 2) !== 0) team.groupCounts.forwards += 1;
-  if (mask !== undefined && (mask & 4) !== 0) team.groupCounts.centers += 1;
+  team.coverageMask |= state.coverageMaskByVersion.get(versionId) ?? 0;
+  if (mask !== undefined) {
+    for (let p = 0; p < 5; p += 1) {
+      if ((mask & (1 << p)) !== 0) team.positionCounts[p] = (team.positionCounts[p] ?? 0) + 1;
+    }
+  }
   state.remainingSlots -= 1;
   const tier = state.poolTiers.get(versionId) ?? 'depth';
   team.tierCounts[tier] += 1;
@@ -272,12 +270,13 @@ export function removePoolMember(state: GenerationState, team: PoolTeam, version
   enterUnassigned(state, versionId);
   releaseIdentity(state, versionId);
   const mask = state.maskByVersion.get(versionId);
-  if (mask !== undefined && (mask & 1) !== 0)
-    team.groupCounts.guards = Math.max(0, team.groupCounts.guards - 1);
-  if (mask !== undefined && (mask & 2) !== 0)
-    team.groupCounts.forwards = Math.max(0, team.groupCounts.forwards - 1);
-  if (mask !== undefined && (mask & 4) !== 0)
-    team.groupCounts.centers = Math.max(0, team.groupCounts.centers - 1);
+  if (mask !== undefined) {
+    for (let p = 0; p < 5; p += 1) {
+      if ((mask & (1 << p)) !== 0) {
+        team.positionCounts[p] = Math.max(0, (team.positionCounts[p] ?? 0) - 1);
+      }
+    }
+  }
   team.coverageMask = 0;
   for (const memberId of team.pool) {
     team.coverageMask |= state.coverageMaskByVersion.get(memberId) ?? 0;
@@ -309,11 +308,7 @@ export function poolPickScore(
   rngRank: number,
   priorityRoles: readonly SeasonRosterRole[],
   weakest: readonly SeasonRosterRole[],
-  poolCounts: {
-    guards: number;
-    forwards: number;
-    centers: number;
-  },
+  poolCounts: readonly number[],
 ): number {
   const identity = identityScoreOf(state, versionId, team.identity);
   let score = identity;
@@ -341,12 +336,14 @@ export function poolPickScore(
   }
   const mask = state.maskByVersion.get(versionId) ?? 0;
   let positionHelp = 0;
-  if (Math.max(0, POOL_COMPOSITION_TARGETS.guards - poolCounts.guards) > 0 && (mask & 1) !== 0)
-    positionHelp += 1;
-  if (Math.max(0, POOL_COMPOSITION_TARGETS.forwards - poolCounts.forwards) > 0 && (mask & 2) !== 0)
-    positionHelp += 1;
-  if (Math.max(0, POOL_COMPOSITION_TARGETS.centers - poolCounts.centers) > 0 && (mask & 4) !== 0)
-    positionHelp += 1;
+  for (let p = 0; p < 5; p += 1) {
+    if (
+      Math.max(0, (POOL_COMPOSITION_TARGETS[p] ?? 0) - (poolCounts[p] ?? 0)) > 0 &&
+      (mask & (1 << p)) !== 0
+    ) {
+      positionHelp += 1;
+    }
+  }
   score += positionHelp * 0.4;
   score += rngRank * 2.5;
   return score;
@@ -380,7 +377,7 @@ export function pickForPool(state: GenerationState, team: PoolTeam, round: numbe
   if (state.unassigned.size < state.remainingSlots) return null;
   const feasibleMasks = new Set<number>();
   const slotsLeft = state.targets.policy.poolSize - team.pool.length - 1;
-  for (let mask = 1; mask <= 7; mask += 1) {
+  for (let mask = 1; mask <= 31; mask += 1) {
     if ((state.unassignedMaskCountsArr[mask] ?? 0) === 0) continue;
     if (!positionScarcityAfter(state, team, mask)) continue;
     const probeId = probeForMask(state, team, mask);
@@ -410,7 +407,7 @@ export function pickForPool(state: GenerationState, team: PoolTeam, round: numbe
   const poolRoleScores = roleScoresOfIds(state, team.pool);
   const priorityRoles = identityPriorityRolesOf(state.targets, team.identity);
   const weakest = weakestRoles(poolRoleScores, 2);
-  const poolCounts = team.groupCounts;
+  const poolCounts = team.positionCounts;
   const lacking = lackingCoverageMask(state);
   const teamPrefix = `${team.franchiseId}:`;
   let best:
@@ -467,40 +464,28 @@ export function positionScarcityAfter(
   team: PoolTeam,
   mask: number,
 ): boolean {
-  const need = { guards: 0, forwards: 0, centers: 0 };
+  const need = new Array<number>(5).fill(0);
   for (const teamId of state.teamOrder) {
     const t = state.teams.get(teamId);
     if (t === undefined) continue;
-    const counts = t.groupCounts;
+    const counts = t.positionCounts;
     const addToTeam = t === team;
-    const g = counts.guards + (addToTeam && (mask & 1) !== 0 ? 1 : 0);
-    const f = counts.forwards + (addToTeam && (mask & 2) !== 0 ? 1 : 0);
-    const c = counts.centers + (addToTeam && (mask & 4) !== 0 ? 1 : 0);
-    need.guards += Math.max(0, POOL_COMPOSITION_TARGETS.guards - g);
-    need.forwards += Math.max(0, POOL_COMPOSITION_TARGETS.forwards - f);
-    need.centers += Math.max(0, POOL_COMPOSITION_TARGETS.centers - c);
+    for (let p = 0; p < 5; p += 1) {
+      const count = (counts[p] ?? 0) + (addToTeam && (mask & (1 << p)) !== 0 ? 1 : 0);
+      need[p] = (need[p] ?? 0) + Math.max(0, (POOL_COMPOSITION_TARGETS[p] ?? 0) - count);
+    }
   }
   const counts = state.unassignedMaskCountsArr;
-  const supply = {
-    guards:
-      (counts[1] ?? 0) +
-      (counts[3] ?? 0) +
-      (counts[5] ?? 0) +
-      (counts[7] ?? 0) -
-      ((mask & 1) !== 0 ? 1 : 0),
-    forwards:
-      (counts[2] ?? 0) +
-      (counts[3] ?? 0) +
-      (counts[6] ?? 0) +
-      (counts[7] ?? 0) -
-      ((mask & 2) !== 0 ? 1 : 0),
-    centers: (counts[4] ?? 0) + (counts[6] ?? 0) - ((mask & 4) !== 0 ? 1 : 0),
-  };
-  return (
-    supply.guards >= need.guards &&
-    supply.forwards >= need.forwards &&
-    supply.centers >= need.centers
-  );
+  for (let p = 0; p < 5; p += 1) {
+    let supply = 0;
+    for (let m = 1; m < 32; m += 1) {
+      if ((m & (1 << p)) === 0) continue;
+      supply += counts[m] ?? 0;
+    }
+    if ((mask & (1 << p)) !== 0) supply -= 1;
+    if (supply < (need[p] ?? 0)) return false;
+  }
+  return true;
 }
 export function fillPools(state: GenerationState): void {
   const poolSize = state.targets.policy.poolSize;
@@ -566,13 +551,15 @@ export function restorePools(state: GenerationState, snapshot: PoolSnapshot): vo
   for (const teamId of state.teamOrder) {
     const team = state.teams.get(teamId);
     if (team === undefined) continue;
-    team.groupCounts = { guards: 0, forwards: 0, centers: 0 };
+    team.positionCounts = new Array<number>(5).fill(0);
     team.coverageMask = 0;
     for (const memberId of team.pool) {
       const mask = state.maskByVersion.get(memberId);
-      if (mask !== undefined && (mask & 1) !== 0) team.groupCounts.guards += 1;
-      if (mask !== undefined && (mask & 2) !== 0) team.groupCounts.forwards += 1;
-      if (mask !== undefined && (mask & 4) !== 0) team.groupCounts.centers += 1;
+      if (mask !== undefined) {
+        for (let p = 0; p < 5; p += 1) {
+          if ((mask & (1 << p)) !== 0) team.positionCounts[p] = (team.positionCounts[p] ?? 0) + 1;
+        }
+      }
       team.coverageMask |= state.coverageMaskByVersion.get(memberId) ?? 0;
     }
   }
@@ -700,27 +687,18 @@ export function legalTenExists(state: GenerationState, members: readonly string[
         uncoveredRoles(roleScoresOfIds(state, picked)).length === 0
       );
     }
-    const pickedCounts = rosterGroupCounts(membersOf(state, picked));
+    const pickedCounts = positionCountsOf(membersOf(state, picked));
     const slotsLeft = 10 - picked.length;
     for (let i = index; i < ordered.length; i += 1) {
       const id = ordered[i];
       if (id === undefined) continue;
       const remaining = ordered.slice(i + 1);
       const mask = state.maskByVersion.get(id) ?? 0;
-      const probeCounts = {
-        guards: pickedCounts.guards + ((mask & 1) !== 0 ? 1 : 0),
-        forwards: pickedCounts.forwards + ((mask & 2) !== 0 ? 1 : 0),
-        centers: pickedCounts.centers + ((mask & 4) !== 0 ? 1 : 0),
-      };
-      if (
-        !memberReachCapped(
-          state,
-          { guards: 2, forwards: 2, centers: 1 },
-          probeCounts,
-          remaining,
-          slotsLeft - 1,
-        )
-      ) {
+      const probeCounts = [...pickedCounts];
+      for (let p = 0; p < 5; p += 1) {
+        if ((mask & (1 << p)) !== 0) probeCounts[p] = (probeCounts[p] ?? 0) + 1;
+      }
+      if (!memberReachCapped(state, FIVE_COVERAGE_TARGETS, probeCounts, remaining, slotsLeft - 1)) {
         continue;
       }
       const afterPicked = [...picked, id];

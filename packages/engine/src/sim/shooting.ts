@@ -4,6 +4,7 @@ import type {
   SimulationPlayer,
   SimulationTeam,
 } from '@hoop-rush/data-contracts';
+import type { HavocEvidence } from './havoc-runtime.ts';
 import { ENGINE_CONSTANTS } from './constants.ts';
 import {
   blendedZoneWeights,
@@ -52,7 +53,11 @@ export function contestPenalty(defender: SimulationPlayer, zone: ShotZone): numb
   );
   return ratio * ENGINE_CONSTANTS.contestMax;
 }
-export function observedTwoPointPct(shooter: SimulationPlayer): number | null {
+export function observedTwoPointPct(
+  shooter: SimulationPlayer,
+  evidence?: HavocEvidence,
+): number | null {
+  if (evidence?.isAuthoritative('two-point-accuracy') === true) return null;
   const anchors = shooter.anchors;
   if (!anchors) return null;
   const reconstructed = shooter.reconstructedThreePoint;
@@ -69,8 +74,9 @@ export function twoPointAnchorFactor(
   shooter: SimulationPlayer,
   profile: EraSimulationProfile,
   blend: readonly number[] = blendedZoneWeights(shooter, profile),
+  evidence?: HavocEvidence,
 ): number | null {
-  const observed = observedTwoPointPct(shooter);
+  const observed = observedTwoPointPct(shooter, evidence);
   if (observed === null) return null;
   const shares = twoPointZoneSharesFromBlend(blend);
   const bases = [
@@ -98,9 +104,11 @@ export function blockProbability(
   defender: SimulationPlayer,
   zone: ShotZone,
   action: ActionType,
+  evidence?: HavocEvidence,
+  pointDelta = 0,
 ): number {
   const c = ENGINE_CONSTANTS;
-  const anchors = defender.anchors;
+  const anchors = evidence?.isAuthoritative('block-anchor') ? undefined : defender.anchors;
   const per48 =
     anchors && anchors.minutesPerGame > 0
       ? (anchors.blocksPerGame / anchors.minutesPerGame) * 48
@@ -110,30 +118,39 @@ export function blockProbability(
       ? Math.min(c.blockAnchorMax, (per48 - c.blockAnchorFloorPer48) * c.blockAnchorScale)
       : 0;
   const attemptFactor = 0.75 + Math.min(20, defender.tendencies.blockAttemptRate) / 40;
+  const finish = (value: number, max: number): number =>
+    Math.min(max + (pointDelta > 0 ? pointDelta : 0), Math.max(0, value + pointDelta));
   if (zone === 'rim') {
     const base = Math.min(
       c.blockRimMax,
       Math.max(0, ((defender.ratings.block - 40) / 60) * c.blockRimMax),
     );
-    return Math.min(
-      c.blockRimMax + c.blockDriveBonus + c.blockAnchorMax,
+    return finish(
       (base +
         (action === 'isolation' || action === 'pickAndRoll' ? c.blockDriveBonus : 0) +
         anchorBonus) *
         attemptFactor,
+      c.blockRimMax + c.blockDriveBonus + c.blockAnchorMax,
     );
   }
   if (zone === 'shortMid') {
-    return Math.min(
-      c.blockMidMax,
+    return finish(
       (Math.max(0, ((defender.ratings.block - 50) / 50) * c.blockMidMax) + anchorBonus * 0.5) *
         attemptFactor,
+      c.blockMidMax,
     );
   }
-  return Math.min(
-    c.blockThreeMax,
+  return finish(
     Math.max(0, ((defender.ratings.perimeterDefense - 60) / 40) * c.blockThreeMax) * attemptFactor,
+    c.blockThreeMax,
   );
+}
+export interface HavocShotProbabilityAdjustments {
+  contestScale?: number;
+  contestPointDelta?: number;
+  makePointDelta?: number;
+  shooterEvidence?: HavocEvidence;
+  defenderEvidence?: HavocEvidence;
 }
 export function makeProbability(
   shooter: SimulationPlayer,
@@ -145,11 +162,16 @@ export function makeProbability(
   prep: ShotPrep,
   homeCourtAdjustment = 0,
   effectsAdjustment = 0,
+  havoc?: HavocShotProbabilityAdjustments,
 ): number {
   const threePointZone = isThreePointZone(zone);
-  const reconstructed = threePointZone ? shooter.reconstructedThreePoint : undefined;
+  const threeAuthoritative =
+    havoc?.shooterEvidence?.isAuthoritative('three-point-accuracy') === true;
+  const reconstructed =
+    threePointZone && !threeAuthoritative ? shooter.reconstructedThreePoint : undefined;
   const hasReconstructed = reconstructed !== undefined;
-  const observedThreePointPct = threePointZone ? shooter.anchors?.threePointPct : null;
+  const observedThreePointPct =
+    threePointZone && !threeAuthoritative ? shooter.anchors?.threePointPct : null;
   const hasObservedThree = observedThreePointPct !== null && observedThreePointPct !== undefined;
   const twoAnchor = threePointZone ? null : prep.twoPointAnchor;
   const anchoredTwo = twoAnchor !== null;
@@ -171,7 +193,11 @@ export function makeProbability(
     : ((zoneSkillRating(shooter, zone) - 70) / 30) *
       ENGINE_CONSTANTS.skillRange *
       (anchoredTwo ? ENGINE_CONSTANTS.twoPointAnchorSkillScale : 1);
-  const contest = -contestPenalty(defender, zone);
+  const contestScale = havoc?.contestScale ?? 1;
+  const contest =
+    -contestPenalty(defender, zone) * contestScale +
+    (havoc?.contestPointDelta ?? 0) +
+    (havoc?.makePointDelta ?? 0);
   const era =
     anchoredTwo || hasObservedThree || hasReconstructed
       ? 0

@@ -16,20 +16,44 @@ function positionedCatalog(): SeasonDraftCatalog {
   const versionIds = source.candidates.map((candidate) => candidate.playerVersionId).sort();
   const playableById = new Map<string, Position[]>();
   versionIds.forEach((versionId, index) => {
-    playableById.set(
-      versionId,
-      index <= 1 ? ['PG'] : index <= 3 ? ['SF'] : index === 4 ? ['C'] : ['PG'],
-    );
+    const playable: Position[] =
+      index <= 1
+        ? ['PG']
+        : index === 2
+          ? ['SG']
+          : index === 3
+            ? ['SF']
+            : index === 4
+              ? ['PF']
+              : index === 5
+                ? ['C']
+                : index === 6
+                  ? ['PG', 'SG']
+                  : index === 7
+                    ? ['SF', 'PF']
+                    : index === 8
+                      ? ['SG', 'SF']
+                      : ['PF', 'C'];
+    playableById.set(versionId, playable);
   });
   return {
     ...source,
-    candidates: source.candidates.map((candidate) => ({
-      ...candidate,
-      positions: {
-        ...candidate.positions,
-        playable: [...(playableById.get(candidate.playerVersionId) ?? ['PG'])],
-      },
-    })),
+    candidates: source.candidates.map((candidate) => {
+      const first = source.candidates[0];
+      if (first === undefined) throw new Error('catalog has no candidates');
+      return {
+        ...candidate,
+        positions: {
+          ...candidate.positions,
+          playable: [...(playableById.get(candidate.playerVersionId) ?? (['PG'] as Position[]))],
+        },
+        summaryRatings: { ...first.summaryRatings },
+        detailedRatings: { ...first.detailedRatings },
+        tendencies: { ...first.tendencies },
+        stamina: { ...first.stamina },
+        durability: { ...first.durability },
+      };
+    }),
   };
 }
 

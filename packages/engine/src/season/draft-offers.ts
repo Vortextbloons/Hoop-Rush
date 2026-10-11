@@ -20,7 +20,7 @@ import {
 import {
   SEASON_ROSTER_SIZE,
   fiveCompletable,
-  groupMaskOf,
+  positionMaskOf,
   type SeasonRosterMemberInput,
 } from './roster-rules.ts';
 export const OFFER_SAFE_ORDER_KEY = 'safe-order';
@@ -180,7 +180,7 @@ export function drawGlobalOffer(
   const maskOfCandidate = new Map(
     candidates.map((candidate) => [
       candidate.playerVersionId,
-      groupMaskOf(candidate.positions.playable),
+      positionMaskOf(candidate.positions.playable),
     ]),
   );
   const probedMasks = new Map<number, boolean>();

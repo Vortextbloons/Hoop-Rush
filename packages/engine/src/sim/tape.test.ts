@@ -4,11 +4,16 @@ import {
   buildLegalSimulationTeam,
   seedFromString,
 } from '@hoop-rush/test-fixtures';
-import { seedSchema } from '@hoop-rush/data-contracts';
-import type { GameSimulationInput } from '@hoop-rush/data-contracts';
+import { draftDuelGameOutputSchema, idSchema, seedSchema } from '@hoop-rush/data-contracts';
+import type { DraftDuelSimulationInput, GameSimulationInput } from '@hoop-rush/data-contracts';
 import { createEngineContext } from './kernel.ts';
 import { simulateGame } from './game.ts';
 import { simulateRecordedGame } from './tape.ts';
+import {
+  draftDuelGameResultDigest,
+  draftDuelGameTapeDigest,
+  draftDuelSimulationInputDigest,
+} from '../modes/draft-duel/digests.ts';
 
 const context = createEngineContext();
 function fixtureInput(seed: string): GameSimulationInput {
@@ -35,11 +40,10 @@ describe('recorded fixed-five game tape', () => {
   it('reconstructs player and team boxes from trip deltas', () => {
     const recorded = simulateRecordedGame(fixtureInput('tape-accounting'), context);
     const sides = [recorded.result.home, recorded.result.away] as const;
-    const playerSums: Array<number[][]> = [
-      [0, 1, 2, 3, 4].map(() => new Array(15).fill(0)),
-      [0, 1, 2, 3, 4].map(() => new Array(15).fill(0)),
-    ];
-    const teamSums: number[][] = [new Array(15).fill(0), new Array(15).fill(0)];
+    const zeroFifteen = (): number[] => new Array<number>(15).fill(0);
+    const zeroRow = (): number[][] => [0, 1, 2, 3, 4].map(() => zeroFifteen());
+    const playerSums: [number[][], number[][]] = [zeroRow(), zeroRow()];
+    const teamSums: [number[], number[]] = [zeroFifteen(), zeroFifteen()];
     for (const event of recorded.tape) {
       if (event.kind !== 'trip') continue;
       const deltaSets = [event.homeDeltas, event.awayDeltas] as const;
@@ -50,22 +54,23 @@ describe('recorded fixed-five game tape', () => {
           const line = deltas[slot];
           if (!line) continue;
           for (let field = 0; field < 15; field += 1) {
-            const sums = playerSums[sideIndex]![slot]!;
+            const sums = playerSums[sideIndex][slot] ?? zeroFifteen();
+            playerSums[sideIndex][slot] = sums;
             sums[field] = (sums[field] ?? 0) + (line[field] ?? 0);
           }
         }
         const line = teamDeltas[sideIndex];
         for (let field = 0; field < 15; field += 1) {
-          teamSums[sideIndex]![field] = (teamSums[sideIndex]![field] ?? 0) + (line[field] ?? 0);
+          teamSums[sideIndex][field] = (teamSums[sideIndex][field] ?? 0) + (line[field] ?? 0);
         }
       }
     }
     for (const sideIndex of [0, 1] as const) {
       const side = sides[sideIndex];
-      const sums = playerSums[sideIndex]!;
       for (let slot = 0; slot < 5; slot += 1) {
-        const player = side.players[slot]!;
-        const sum = sums[slot]!;
+        const player = side.players[slot];
+        const sum = playerSums[sideIndex][slot];
+        if (!player || !sum) continue;
         expect(sum[0]).toBe(player.points);
         expect(sum[1]).toBe(player.fieldGoals.made);
         expect(sum[2]).toBe(player.fieldGoals.attempted);
@@ -83,7 +88,7 @@ describe('recorded fixed-five game tape', () => {
         expect(sum[14]).toBe(0);
       }
       const team = side.box;
-      const teamTotals = teamSums[sideIndex]!;
+      const teamTotals = teamSums[sideIndex];
       expect(teamTotals[0]).toBe(team.points);
       expect(teamTotals[1]).toBe(team.fieldGoals.made);
       expect(teamTotals[2]).toBe(team.fieldGoals.attempted);
@@ -124,7 +129,7 @@ describe('recorded fixed-five game tape', () => {
     const recorded = simulateRecordedGame(fixtureInput('tape-clock'), context);
     const trips = recorded.tape.filter((event) => event.kind === 'trip');
     for (const trip of trips) {
-      expect(trip.offense === 0 || trip.offense === 1).toBe(true);
+      expect([0, 1]).toContain(trip.offense);
       expect(trip.clockSeconds).toBeGreaterThanOrEqual(0);
       expect(trip.clockSeconds).toBeLessThanOrEqual(periodSecondsFor(trip.period));
       expect(trip.homeDeltas.length).toBe(5);
@@ -135,3 +140,41 @@ describe('recorded fixed-five game tape', () => {
 function periodSecondsFor(period: number): number {
   return period <= 4 ? 12 * 60 : 5 * 60;
 }
+describe('draft duel game output contract', () => {
+  it('accepts a recorded game with digests and rejects tampered digests', () => {
+    const gameInput = fixtureInput('tape-contract');
+    const recorded = simulateRecordedGame(gameInput, context);
+    const roomId = idSchema.parse('room-contract');
+    const simulationInput: DraftDuelSimulationInput = {
+      schemaVersion: 1,
+      roomId,
+      gameNumber: 1,
+      homeParticipantId: 'p1',
+      awayParticipantId: 'p2',
+      seed: gameInput.seed,
+      dataVersion: gameInput.dataVersion,
+      home: gameInput.home,
+      away: gameInput.away,
+    };
+    const output = draftDuelGameOutputSchema.parse({
+      schemaVersion: 1,
+      roomId,
+      gameNumber: 1,
+      homeParticipantId: 'p1',
+      awayParticipantId: 'p2',
+      seed: gameInput.seed,
+      result: recorded.result,
+      tape: recorded.tape,
+      inputDigest: draftDuelSimulationInputDigest(simulationInput),
+      resultDigest: draftDuelGameResultDigest(recorded.result),
+      tapeDigest: draftDuelGameTapeDigest(recorded.tape),
+    });
+    expect(output.tape.length).toBe(recorded.tape.length);
+    const shorter = recorded.tape.slice(0, -1);
+    expect(draftDuelGameTapeDigest(shorter)).not.toBe(draftDuelGameTapeDigest(recorded.tape));
+    const movedSeed = seedSchema.parse(seedFromString('tape-contract-2'));
+    expect(draftDuelSimulationInputDigest({ ...simulationInput, seed: movedSeed })).not.toBe(
+      draftDuelSimulationInputDigest(simulationInput),
+    );
+  });
+});

@@ -20,7 +20,7 @@ import {
   type PercentileTier,
 } from '../ai-scoring.ts';
 import { validateDraftCatalog } from '../catalog-validation.ts';
-import { groupMaskOf } from '../roster-rules.ts';
+import { positionMaskOf } from '../roster-rules.ts';
 import { BAND_ORDER, IDENTITIES, identityPriorityRolesOf } from './constants.ts';
 import { maskCountsOf, roleCoverCountsOf } from './state.ts';
 import type { GenerationState, PoolTeam, SeasonAiGenerationInput } from './types.ts';
@@ -197,7 +197,7 @@ export function prepareGenerationState(input: SeasonAiGenerationInput): {
   for (const candidate of canonicalCandidates) {
     const scores = roleScoresOf(candidate);
     roleScores.set(candidate.playerVersionId, scores);
-    maskByVersion.set(candidate.playerVersionId, groupMaskOf(candidate.positions.playable));
+    maskByVersion.set(candidate.playerVersionId, positionMaskOf(candidate.positions.playable));
     let coverageMask = 0;
     ROSTER_ROLES.forEach((role, roleIndex) => {
       if (scores[role] >= ROLE_COVERAGE_THRESHOLD) coverageMask |= 1 << roleIndex;
@@ -246,7 +246,7 @@ export function prepareGenerationState(input: SeasonAiGenerationInput): {
       band: assignment.band,
       identity: assignment.identity,
       pool: [],
-      groupCounts: { guards: 0, forwards: 0, centers: 0 },
+      positionCounts: new Array<number>(5).fill(0),
       coverageMask: 0,
       tierCounts: zeroTierCounts(),
       outliers: 0,

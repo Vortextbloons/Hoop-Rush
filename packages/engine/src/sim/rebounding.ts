@@ -5,14 +5,25 @@ import type {
   SimulationTeam,
 } from '@hoop-rush/data-contracts';
 import type { Rng } from './rng.ts';
+import type { HavocEvidence } from './havoc-runtime.ts';
 import { ENGINE_CONSTANTS, type PositionResponsibilityModifiers } from './constants.ts';
-export function teamMean(team: SimulationTeam, rating: keyof SimulationPlayer['ratings']): number {
+export function teamMean(
+  team: SimulationTeam,
+  rating: keyof SimulationPlayer['ratings'],
+  options?: {
+    reachOf?: (player: SimulationPlayer) => number;
+    divisor?: number;
+  },
+): number {
+  const divisor = options?.divisor ?? team.players.length;
   return (
     team.players.reduce((sum, p) => {
       const tendencyFactor =
         rating === 'offensiveRebound' ? 0.75 + p.tendencies.crashOffensiveGlassRate / 40 : 1;
-      return sum + p.ratings[rating] * tendencyFactor;
-    }, 0) / team.players.length
+      const contribution = p.ratings[rating] * tendencyFactor;
+      const reach = options?.reachOf?.(p) ?? 0;
+      return sum + (reach === 0 ? contribution : Math.max(0, contribution + reach));
+    }, 0) / Math.max(1e-9, divisor)
   );
 }
 export interface ReboundResult {
@@ -52,15 +63,25 @@ export function rebounderWeights(
   team: SimulationTeam,
   offensive: boolean,
   positionModifiers?: ReadonlyMap<string, PositionResponsibilityModifiers>,
+  keyOf: (player: SimulationPlayer) => string = (player) => player.playerId,
+  evidenceOf?: (player: SimulationPlayer) => HavocEvidence | undefined,
+  weightScale?: (player: SimulationPlayer) => number,
 ): number[] {
   const rating = offensive ? 'offensiveRebound' : 'defensiveRebound';
   return team.players.map((p) => {
-    const historical = offensive
-      ? (p.anchors?.offensiveReboundsPerGame ?? 0)
-      : (p.anchors?.defensiveReboundsPerGame ?? 0);
+    const authoritative = evidenceOf?.(p)?.isAuthoritative('rebound-weights') ?? false;
+    const historical = authoritative
+      ? 0
+      : offensive
+        ? (p.anchors?.offensiveReboundsPerGame ?? 0)
+        : (p.anchors?.defensiveReboundsPerGame ?? 0);
     const heightContribution = p.heightInches === null ? 0 : Math.max(0, p.heightInches - 72) * 0.8;
     const weightContribution = p.weightLbs === null ? 0 : Math.max(0, p.weightLbs - 180) * 0.03;
-    const responsibility = positionModifiers?.get(p.playerId)?.rebounding ?? 1;
+    const responsibility =
+      positionModifiers?.get(keyOf(p))?.rebounding ??
+      positionModifiers?.get(p.playerId)?.rebounding ??
+      1;
+    const scale = weightScale?.(p) ?? 1;
     return (
       Math.max(
         0.5,
@@ -69,7 +90,9 @@ export function rebounderWeights(
           historical * ENGINE_CONSTANTS.observedReboundWeight +
           heightContribution +
           weightContribution,
-      ) * responsibility
+      ) *
+      responsibility *
+      scale
     );
   });
 }

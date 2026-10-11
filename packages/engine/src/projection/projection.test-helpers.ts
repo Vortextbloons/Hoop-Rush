@@ -10,11 +10,19 @@ import {
 } from '@hoop-rush/data-contracts';
 import { DEFAULT_ERA_SIM_PROFILE, buildSimulationPlayer } from '@hoop-rush/test-fixtures';
 
+const REFERENCE_POSITIONS: SimulationPlayer['positions'][] = [
+  ['PG'],
+  ['SG'],
+  ['SF'],
+  ['PF'],
+  ['C'],
+];
+
 function referencePlayer(index: number): SimulationPlayer {
   return buildSimulationPlayer({
     playerId: playerIdSchema.parse(`p-ref-${String(index)}`),
     displayName: `Ref ${String(index)}`,
-    positions: index === 4 ? ['C'] : index >= 2 ? ['SF'] : ['PG'],
+    positions: REFERENCE_POSITIONS[index] ?? ['PG'],
   });
 }
 

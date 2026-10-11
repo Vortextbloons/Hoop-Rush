@@ -4,6 +4,7 @@ import type {
   SimulationPlayer,
   SimulationTeam,
 } from '@hoop-rush/data-contracts';
+import type { HavocEvidence } from './havoc-runtime.ts';
 import { ENGINE_CONSTANTS } from './constants.ts';
 import { finisherRole, isThreePointZone } from './usage.ts';
 export function shootingFoulProbability(
@@ -56,11 +57,14 @@ export function freeThrowsForZone(zone: ShotZone): number {
 export function freeThrowProbability(
   shooter: SimulationPlayer,
   profile: EraSimulationProfile,
+  evidence?: HavocEvidence,
 ): number {
   const anchor = profile.parameters.freeThrowAnchorRating;
   const factor = shooter.ratings.freeThrow / Math.max(1, anchor);
   const ratingProbability = profile.parameters.leagueFtPct * factor;
-  const observedProbability = shooter.anchors?.freeThrowPct;
+  const observedProbability = evidence?.isAuthoritative('free-throw-accuracy')
+    ? undefined
+    : shooter.anchors?.freeThrowPct;
   const probability =
     observedProbability === undefined
       ? ratingProbability

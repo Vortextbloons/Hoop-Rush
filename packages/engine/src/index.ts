@@ -824,6 +824,51 @@ export {
   catalogSimulationForVersion,
   type DraftDuelCatalog,
 } from './modes/draft-duel/catalog.ts';
+export {
+  createDraftDuelDraft,
+  draftDuelCurrentPicker,
+  isDraftDuelComplete,
+  draftDuelRoster,
+  draftDuelLegalPicks,
+  applyDraftDuelPick,
+  draftDuelTimeoutPick,
+  DraftDuelDraftError,
+  type DraftDuelDraftErrorCode,
+  type CreateDraftDuelDraftInput,
+  type DraftDuelPickInput,
+  type DraftDuelTimeoutPick,
+} from './modes/draft-duel/draft.ts';
+export {
+  buildRoundOffers,
+  DraftDuelGenerationError,
+  draftDuelFairBandTokens,
+  draftDuelFairAttemptForState,
+} from './modes/draft-duel/offers.ts';
+export {
+  assignSlots,
+  neededGroups,
+  completionFeasible,
+  unclaimedProfileCounts,
+  rosterCompletionPossible,
+  draftDuelCardProfileMask,
+  draftDuelClaimedPlayerIds,
+  buildDraftDuelSafetyInput,
+  assessDraftDuelOffers,
+  draftDuelRoundSafetyHolds,
+  type DraftDuelGroupNeeds,
+  type DraftDuelRoundOffers,
+  type DraftDuelSafetyInput,
+} from './modes/draft-duel/feasibility.ts';
+export {
+  createDraftDuelSeries,
+  draftDuelHomeForGame,
+  applyDraftDuelGameResult,
+  draftDuelSimulationTeam,
+  draftDuelSeriesMvp,
+  draftDuelStandouts,
+  type DraftDuelPlayedGame,
+  type DraftDuelSeriesRosters,
+} from './modes/draft-duel/series.ts';
 export { simulateRecordedGame, type RecordedGameOutput } from './sim/tape.ts';
 export type { GameObservers, PeriodObservation, TripObservation } from './sim/game.ts';
 export {

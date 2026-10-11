@@ -76,6 +76,14 @@ import type {
   StoredCollectionGameRow,
   StoredCollectionPlayStateRow,
 } from '../schemas/collection-record.ts';
+import type {
+  StoredHavocActiveRun,
+  StoredHavocCommandRow,
+  StoredHavocCompletedRun,
+  StoredHavocGameRow,
+  StoredHavocHistoryRow,
+  StoredHavocRetainedTape,
+} from '../schemas/havoc-record.ts';
 import {
   storedCollectionPlayStateV1Schema,
   storedCollectionPlayStateV2Schema,
@@ -126,6 +134,14 @@ export const HOOP_RUSH_DATABASE_STORES: Record<string, string> = {
   collectionGames: '[collectionId+gameId], collectionId',
   collectionGameCommands: '[collectionId+commandId], collectionId',
 };
+export const HAVOC_DATABASE_STORES: Record<string, string> = {
+  havocActiveRuns: 'recordId',
+  havocCommands: 'commandId, runId',
+  havocGames: '[runId+variant+gameNumber], runId, [runId+variant]',
+  havocRetainedTapes: '[runId+gameNumber], runId',
+  havocCompletedRuns: 'runId',
+  havocHistory: 'runId, updatedAtIso',
+};
 function hasStaleSaveSchemaVersion(record: unknown, expected: number): boolean {
   if (typeof record !== 'object' || record === null) return false;
   if (!Object.hasOwn(record, 'saveSchemaVersion')) return false;
@@ -175,6 +191,12 @@ export class HoopRushDatabase extends Dexie {
   collectionPlayState!: EntityTable<StoredCollectionPlayStateRow, 'collectionId'>;
   collectionGames!: Table<StoredCollectionGameRow, [string, string]>;
   collectionGameCommands!: Table<StoredCollectionGameCommandRow, [string, string]>;
+  havocActiveRuns!: EntityTable<StoredHavocActiveRun, 'recordId'>;
+  havocCommands!: EntityTable<StoredHavocCommandRow, 'commandId'>;
+  havocGames!: Table<StoredHavocGameRow, [string, string, number]>;
+  havocRetainedTapes!: Table<StoredHavocRetainedTape, [string, number]>;
+  havocCompletedRuns!: EntityTable<StoredHavocCompletedRun, 'runId'>;
+  havocHistory!: EntityTable<StoredHavocHistoryRow, 'runId'>;
   constructor(name = 'hoop-rush-saves') {
     super(name);
     this.version(1).stores({
@@ -415,6 +437,8 @@ export class HoopRushDatabase extends Dexie {
       });
     // Draft Duel release: new stores only; existing records untouched.
     this.version(21).stores(HOOP_RUSH_DATABASE_STORES);
+    // Hoop Havoc release: new stores only; existing records untouched.
+    this.version(22).stores({ ...HOOP_RUSH_DATABASE_STORES, ...HAVOC_DATABASE_STORES });
   }
 }
 export class DexieChallengeRepository {

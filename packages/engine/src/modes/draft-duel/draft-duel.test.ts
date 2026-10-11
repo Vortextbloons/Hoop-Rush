@@ -10,7 +10,6 @@ import type {
   DraftDuelRound,
   GameResult,
   PlayerBoxScore,
-  PlayerId,
   Position,
   Seed,
   TeamResult,
@@ -58,7 +57,12 @@ import {
   unclaimedProfileCounts,
   type DraftDuelGroupNeeds,
 } from './feasibility.ts';
-import { buildRoundOffers, draftDuelFairBandTokens, DraftDuelGenerationError } from './offers.ts';
+import {
+  buildRoundOffers,
+  draftDuelFairAttemptForState,
+  draftDuelFairBandTokens,
+  DraftDuelGenerationError,
+} from './offers.ts';
 import { draftDuelFirstPicker, draftDuelHomeWinner, draftDuelTimeoutSeedPath } from './seeds.ts';
 import {
   applyDraftDuelGameResult,
@@ -109,12 +113,13 @@ function buildCatalogFromSpecs(specs: readonly PlayerSpec[], shuffled?: boolean)
       const overall = version.overall ?? spec.overall ?? bandOverall(band);
       const material = `${spec.id}:v${String(index)}`;
       const displayName = `Player ${spec.id} v${String(index + 1)}`;
+      const playerVersionId = `pv-${seasonDigestHex(material).slice(0, 32)}`;
       entries.push(
         draftDuelCatalogEntrySchema.parse({
           card: {
             cardId: `card-${seasonDigestHex(`${material}:card`).slice(0, 32)}`,
             playerId,
-            playerVersionId: `pv-${seasonDigestHex(material).slice(0, 32)}`,
+            playerVersionId,
             displayName,
             seasonKey: '1990-91',
             franchiseId: 'lakers',
@@ -123,7 +128,7 @@ function buildCatalogFromSpecs(specs: readonly PlayerSpec[], shuffled?: boolean)
             overall,
             bandIndex: band,
           },
-          simulation: buildSimulationPlayer({ playerId, displayName, positions }),
+          simulation: buildSimulationPlayer({ playerId, displayName, positions, playerVersionId }),
         }),
       );
     });
@@ -153,55 +158,84 @@ const GROUP_PROFILES: Position[][] = [
   ['PG', 'C'],
 ];
 
-function standardSpecs(): PlayerSpec[] {
+const NO_CENTER_PROFILES: Position[][] = [
+  ['PG'],
+  ['SG'],
+  ['SF'],
+  ['PF'],
+  ['PG', 'SG'],
+  ['SF', 'PF'],
+  ['SG', 'SF'],
+  ['PG', 'PF'],
+];
+
+const TIGHT_PROFILES: Position[][] = [
+  ['PG'],
+  ['SG'],
+  ['SF'],
+  ['PF'],
+  ['PG', 'SF'],
+  ['SG', 'PF'],
+  ['PG', 'SG'],
+  ['SF', 'PF'],
+];
+
+function specsForBands(
+  perBand: number,
+  profiles: readonly Position[][],
+  idPrefix: string,
+): PlayerSpec[] {
   const specs: PlayerSpec[] = [];
   for (let band = 0; band < 10; band += 1) {
-    for (let index = 0; index < 5; index += 1) {
-      const profile = GROUP_PROFILES[(band * 5 + index) % GROUP_PROFILES.length] ?? ['PG'];
-      const versionCount = (index % 3) + 1;
+    for (let index = 0; index < perBand; index += 1) {
+      const profile = profiles[(band + index) % profiles.length] ?? ['PG'];
       specs.push({
-        id: `p-${String(band)}-${String(index)}`,
+        id: `${idPrefix}-${String(band)}-${String(index)}`,
         positions: profile,
         band,
-        versions: Array.from({ length: versionCount }, () => ({})),
       });
     }
   }
   return specs;
 }
 
-function manySpecs(
-  count: number,
-  positions: Position[],
-  idPrefix: string,
-  bandOffset: number,
-): PlayerSpec[] {
-  return Array.from({ length: count }, (_, index) => ({
-    id: `${idPrefix}-${String(index)}`,
-    positions,
-    band: (bandOffset + index) % 10,
-  }));
+function standardSpecs(): PlayerSpec[] {
+  const specs = specsForBands(8, GROUP_PROFILES, 'p');
+  for (let index = 0; index < specs.length; index += 3) {
+    const spec = specs[index];
+    if (!spec) continue;
+    const versionCount = (index % 3) + 2;
+    spec.versions = Array.from({ length: versionCount }, () => ({}));
+  }
+  return specs;
 }
 
 function scarceCenterSpecs(): PlayerSpec[] {
   return [
-    ...manySpecs(10, ['PG'], 'sc-g', 0),
-    ...manySpecs(10, ['SF'], 'sc-f', 0),
-    ...manySpecs(2, ['PG', 'SG'], 'sc-gx', 5),
-    { id: 'sc-c0', positions: ['C'], band: 0 },
-    { id: 'sc-c1', positions: ['C'], band: 4 },
+    ...specsForBands(8, NO_CENTER_PROFILES, 'sc'),
+    { id: 'sc-c0', positions: ['C'], band: 5 },
+    { id: 'sc-c1', positions: ['C'], band: 6 },
     { id: 'sc-c2', positions: ['C'], band: 7 },
-    { id: 'sc-cx', positions: ['PG', 'C'], band: 2 },
+    { id: 'sc-c3', positions: ['PF', 'C'], band: 5 },
+    { id: 'sc-c4', positions: ['PF', 'C'], band: 6 },
+    { id: 'sc-c5', positions: ['C'], band: 8 },
+    { id: 'sc-c6', positions: ['PF', 'C'], band: 8 },
+    { id: 'sc-c7', positions: ['C'], band: 9 },
+    { id: 'sc-c8', positions: ['PF', 'C'], band: 9 },
   ];
 }
 
-function threeCenterSpecs(): PlayerSpec[] {
+function tightEligibilitySpecs(): PlayerSpec[] {
   return [
-    ...manySpecs(14, ['PG'], 'tc-g', 0),
-    ...manySpecs(14, ['SF'], 'tc-f', 0),
-    { id: 'tc-c0', positions: ['C'], band: 1 },
-    { id: 'tc-c1', positions: ['C'], band: 5 },
-    { id: 'tc-c2', positions: ['C'], band: 8 },
+    ...specsForBands(5, TIGHT_PROFILES, 'te'),
+    { id: 'te-c0', positions: ['C'], band: 4 },
+    { id: 'te-c1', positions: ['C'], band: 5 },
+    { id: 'te-c2', positions: ['PF', 'C'], band: 6 },
+    { id: 'te-c3', positions: ['PF', 'C'], band: 7 },
+    { id: 'te-c4', positions: ['C'], band: 8 },
+    { id: 'te-c5', positions: ['PF', 'C'], band: 8 },
+    { id: 'te-c6', positions: ['C'], band: 9 },
+    { id: 'te-c7', positions: ['PF', 'C'], band: 9 },
   ];
 }
 
@@ -559,6 +593,46 @@ describe('draft state', () => {
     }
   });
 
+  it('plays a big seeded case across 400 players', () => {
+    const specs: PlayerSpec[] = [];
+    for (let band = 0; band < 10; band += 1) {
+      for (let index = 0; index < 40; index += 1) {
+        specs.push({
+          id: `big-${String(band)}-${String(index)}`,
+          positions: GROUP_PROFILES[(band + index) % GROUP_PROFILES.length] ?? ['PG'],
+          band,
+        });
+      }
+    }
+    const big = buildCatalogFromSpecs(specs);
+    const state = playFullDraft(SEED_A, big);
+    expect(state.status).toBe('complete');
+    expect(state.pickOrdinal).toBe(10);
+    const replay = playFullDraft(SEED_A, big);
+    expect(replay).toEqual(state);
+    const roster = draftDuelRoster(state, big, 'p2');
+    expectValidRoster(roster);
+  });
+
+  it('completes a full draft on an eight-thousand-card catalog', () => {
+    const specs: PlayerSpec[] = [];
+    for (let band = 0; band < 10; band += 1) {
+      for (let index = 0; index < 200; index += 1) {
+        specs.push({
+          id: `scale-${String(band)}-${String(index)}`,
+          positions: GROUP_PROFILES[(band + index) % GROUP_PROFILES.length] ?? ['PG'],
+          band,
+          versions: [{}, {}, {}, {}],
+        });
+      }
+    }
+    const scale = buildCatalogFromSpecs(specs);
+    expect(scale.entries.length).toBe(8000);
+    const state = playFullDraft(SEED_A, scale, 'fair');
+    expect(state.status).toBe('complete');
+    expect(draftDuelRoster(state, scale, 'p1').slots).toHaveLength(5);
+  });
+
   it('claims every version of a player for both participants', () => {
     const state = createDraftDuelDraft({ rootSeed: SEED_A, fairness: 'fair', catalog });
     const picker = draftDuelCurrentPicker(state);
@@ -567,6 +641,12 @@ describe('draft state', () => {
     if (!choice) throw new Error('no legal first pick');
     const next = applyDraftDuelPick(state, catalog, pickInput(picker, choice.card));
     expect(draftDuelClaimedPlayerIds(next).has(choice.card.playerId)).toBe(true);
+    const partialRoster = draftDuelRoster(next, catalog, picker);
+    expect(partialRoster.slots).toHaveLength(1);
+    const partialSlot = partialRoster.slots[0];
+    if (!partialSlot) throw new Error('missing partial roster slot');
+    expect(partialSlot.card.playerVersionId).toBe(choice.card.playerVersionId);
+    expect(cardPlayableAt(partialSlot.card, slotGroupAt(partialSlot.slotIndex))).toBe(true);
     const round = next.rounds[0];
     const opponent = picker === 'p1' ? 'p2' : 'p1';
     const opponentOffers = round?.offers[opponent] ?? [];
@@ -585,20 +665,29 @@ describe('round safety', () => {
     const catalogs = [
       buildCatalogFromSpecs(standardSpecs()),
       buildCatalogFromSpecs(scarceCenterSpecs()),
-      buildCatalogFromSpecs(threeCenterSpecs()),
+      buildCatalogFromSpecs(tightEligibilitySpecs()),
     ];
+    let overlappingRounds = 0;
     for (const catalog of catalogs) {
       for (const seed of [SEED_A, SEED_B]) {
         for (const fairness of FAIRNESS_MODES) {
           let state = createDraftDuelDraft({ rootSeed: seed, fairness, catalog });
           while (!isDraftDuelComplete(state)) {
             expectRoundStartSafety(state, catalog);
+            const round = state.rounds[Math.floor(state.pickOrdinal / 2)];
+            if (round) {
+              const p1Players = new Set(round.offers.p1.map((card) => card.playerId));
+              if (round.offers.p2.some((card) => p1Players.has(card.playerId))) {
+                overlappingRounds += 1;
+              }
+            }
             state = applyDraftDuelPick(state, catalog, chooseFirstAvailable(state, catalog));
           }
           expect(isDraftDuelComplete(state)).toBe(true);
         }
       }
     }
+    expect(overlappingRounds).toBeGreaterThan(0);
   });
 
   it('marks a pick that strands the opponent as completion-blocked', () => {
@@ -689,32 +778,39 @@ describe('round safety', () => {
 describe('fair offer generation', () => {
   const catalog = buildCatalogFromSpecs(standardSpecs());
 
-  it('shares one band histogram per round between participants', () => {
+  function countBands(values: readonly number[]): number[] {
+    const counts = new Array<number>(10).fill(0);
+    for (const value of values) counts[value] = (counts[value] ?? 0) + 1;
+    return counts;
+  }
+
+  function isSubMultiset(values: readonly number[], counts: readonly number[]): boolean {
+    const used = new Array<number>(counts.length).fill(0);
+    for (const value of values) {
+      const available = counts[value] ?? 0;
+      const index = used[value] ?? 0;
+      if (index >= available) return false;
+      used[value] = index + 1;
+    }
+    return true;
+  }
+
+  it('shares one 40-token draft histogram between participants', () => {
     const histograms = new Set<string>();
     for (const seed of [SEED_A, SEED_B, SEED_C]) {
       let state = createDraftDuelDraft({ rootSeed: seed, fairness: 'fair', catalog });
+      const attempt = draftDuelFairAttemptForState(state, catalog);
+      expect(attempt).not.toBeNull();
+      const tokenCounts = countBands(draftDuelFairBandTokens(seed, attempt ?? 0));
       const p1Total = new Array<number>(10).fill(0);
       const p2Total = new Array<number>(10).fill(0);
       for (let round = 1; round <= 5; round += 1) {
         const entry = state.rounds[round - 1];
         if (!entry) throw new Error('missing round');
-        const p1Bands = entry.offers.p1.map((card) => card.bandIndex).sort((a, b) => a - b);
-        const p2Bands = entry.offers.p2.map((card) => card.bandIndex).sort((a, b) => a - b);
-        expect(p1Bands).toEqual(p2Bands);
-        let matchedAttempt = -1;
-        for (let attempt = 0; attempt < DRAFT_DUEL_MAX_GENERATION_ATTEMPTS; attempt += 1) {
-          const tokens = draftDuelFairBandTokens(seed, attempt)
-            .slice((round - 1) * 8, round * 8)
-            .sort((a, b) => a - b);
-          if (
-            tokens.length === p1Bands.length &&
-            tokens.every((band, index) => band === p1Bands[index])
-          ) {
-            matchedAttempt = attempt;
-            break;
-          }
-        }
-        expect(matchedAttempt).toBeGreaterThanOrEqual(0);
+        const p1Bands = entry.offers.p1.map((card) => card.bandIndex);
+        const p2Bands = entry.offers.p2.map((card) => card.bandIndex);
+        expect(isSubMultiset(p1Bands, tokenCounts)).toBe(true);
+        expect(isSubMultiset(p2Bands, tokenCounts)).toBe(true);
         for (const card of entry.offers.p1)
           p1Total[card.bandIndex] = (p1Total[card.bandIndex] ?? 0) + 1;
         for (const card of entry.offers.p2)
@@ -723,14 +819,17 @@ describe('fair offer generation', () => {
         state = applyDraftDuelPick(state, catalog, chooseFirstAvailable(state, catalog));
       }
       expect(p1Total).toEqual(p2Total);
+      expect(p1Total).toEqual(tokenCounts);
+      expect(draftDuelFairAttemptForState(state, catalog)).toBe(attempt);
       histograms.add(JSON.stringify(p1Total));
     }
     expect(histograms.size).toBeGreaterThan(1);
   });
 
-  it('rejects malformed committed rounds instead of regenerating them', () => {
+  it('rejects calls that would regenerate a committed round', () => {
     const state = createDraftDuelDraft({ rootSeed: SEED_A, fairness: 'fair', catalog });
-    expect(() => buildRoundOffers(state, catalog)).toThrow(/round starts/);
+    const next = applyDraftDuelPick(state, catalog, chooseFirstAvailable(state, catalog));
+    expect(() => buildRoundOffers(next, catalog)).toThrow(/round starts/);
   });
 });
 
@@ -812,7 +911,8 @@ describe('timeout autopick', () => {
     const min = Math.min(...frequencies);
     const max = Math.max(...frequencies);
     expect(counts.size).toBeGreaterThanOrEqual(4);
-    expect(max).toBeLessThanOrEqual(min * 4);
+    expect(min).toBeGreaterThanOrEqual(1);
+    expect(max).toBeLessThanOrEqual(Math.ceil(seeds.length / 4));
     expect(topChosen).toBeLessThanOrEqual(seeds.length * 0.5);
   });
 
@@ -989,7 +1089,7 @@ describe('feasibility primitives', () => {
     const big = cardOf(catalog, 'f-big');
     expect(assignSlots([hybrid, guard])).toEqual([0, 1]);
     expect(neededGroups([hybrid, guard])).toEqual({ G: 0, F: 2, C: 1 });
-    expect(assignSlots([guard, guard])).toBeNull();
+    expect(assignSlots([big, big])).toBeNull();
     expect(assignSlots([hybrid, guard, big])).not.toBeNull();
   });
 

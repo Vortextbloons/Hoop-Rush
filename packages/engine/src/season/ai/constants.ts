@@ -44,7 +44,9 @@ export const DEFAULT_IDENTITY_PRIORITY_ROLES: Record<
   continuity: ROSTER_ROLES,
   'active-trader': ROSTER_ROLES,
 };
-export const POOL_COMPOSITION_TARGETS = { guards: 4, forwards: 4, centers: 3 } as const;
+export const FIVE_COVERAGE_TARGETS: readonly number[] = [1, 1, 1, 1, 1];
+export const POOL_COMPOSITION_TARGETS: readonly number[] = [2, 2, 2, 2, 2];
+export const ZERO_POSITION_COUNTS: readonly number[] = [0, 0, 0, 0, 0];
 export function identityPriorityRolesOf(
   targets: SeasonRosterTargets,
   identity: SeasonAiIdentity,

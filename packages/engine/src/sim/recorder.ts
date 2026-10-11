@@ -144,13 +144,24 @@ export class GameRecorder {
     if (rosterIndices.length !== 5) {
       throw new Error(`recorder: active five must have exactly five slots`);
     }
+    this.setActiveUnitsChecked(side, rosterIndices);
+  }
+  setActiveUnits(side: SideIndex, rosterIndices: readonly number[]): void {
+    if (rosterIndices.length < 5 || rosterIndices.length > 10) {
+      throw new Error(
+        `recorder: active units must have between five and ten slots, got ${String(rosterIndices.length)}`,
+      );
+    }
+    this.setActiveUnitsChecked(side, rosterIndices);
+  }
+  private setActiveUnitsChecked(side: SideIndex, rosterIndices: readonly number[]): void {
     const seen = new Set<number>();
     for (const index of rosterIndices) {
       if (index < 0 || index >= this.players[side].length) {
         throw new Error(`recorder: roster index ${String(index)} out of range`);
       }
       if (seen.has(index)) {
-        throw new Error(`recorder: duplicate roster index ${String(index)} in active five`);
+        throw new Error(`recorder: duplicate roster index ${String(index)} in active units`);
       }
       seen.add(index);
     }

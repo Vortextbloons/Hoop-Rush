@@ -3,16 +3,12 @@ import { createRng } from '../sim/rng.ts';
 import { memberReachCapped } from './ai/reachability.ts';
 import type { GenerationState } from './ai/types.ts';
 
-interface GroupCounts {
-  guards: number;
-  forwards: number;
-  centers: number;
-}
+const SLOTS = 5;
 
 function bruteReach(
   masks: readonly number[],
-  targets: GroupCounts,
-  start: GroupCounts,
+  targets: readonly number[],
+  start: readonly number[],
   maxPicks: number,
   outlierFlags: readonly number[] | null,
   startOutliers: number,
@@ -24,9 +20,7 @@ function bruteReach(
   const subsets = 1 << count;
   for (let subset = 0; subset < subsets; subset += 1) {
     let picked = 0;
-    let guards = start.guards;
-    let forwards = start.forwards;
-    let centers = start.centers;
+    const counts = [...start];
     let outliers = startOutliers;
     let tooMany = false;
     for (let i = 0; i < count; i += 1) {
@@ -37,16 +31,21 @@ function bruteReach(
         break;
       }
       const mask = masks[i] ?? 0;
-      if ((mask & 1) !== 0) guards += 1;
-      if ((mask & 2) !== 0) forwards += 1;
-      if ((mask & 4) !== 0) centers += 1;
+      for (let p = 0; p < SLOTS; p += 1) {
+        if ((mask & (1 << p)) !== 0) counts[p] = (counts[p] ?? 0) + 1;
+      }
       if (outlierFlags !== null && outlierFlags[i] === 1) outliers += 1;
     }
     if (tooMany) continue;
     if (outlierFlags !== null && outliers > maxOutliers) continue;
-    if (guards >= targets.guards && forwards >= targets.forwards && centers >= targets.centers) {
-      return true;
+    let complete = true;
+    for (let p = 0; p < SLOTS; p += 1) {
+      if ((counts[p] ?? 0) < (targets[p] ?? 0)) {
+        complete = false;
+        break;
+      }
     }
+    if (complete) return true;
   }
   return false;
 }
@@ -63,12 +62,8 @@ function stateFor(masks: readonly number[], outlierFlags: readonly number[]): Ge
   return { maskByVersion, identityScores } as unknown as GenerationState;
 }
 
-function randomCounts(rng: ReturnType<typeof createRng>): GroupCounts {
-  return {
-    guards: rng.nextInt(0, 3),
-    forwards: rng.nextInt(0, 3),
-    centers: rng.nextInt(0, 2),
-  };
+function randomCounts(rng: ReturnType<typeof createRng>): number[] {
+  return Array.from({ length: SLOTS }, () => rng.nextInt(0, 2));
 }
 
 describe('memberReachCapped', () => {
@@ -79,7 +74,7 @@ describe('memberReachCapped', () => {
       const masks: number[] = [];
       const flags: number[] = [];
       for (let i = 0; i < size; i += 1) {
-        masks.push(rng.nextInt(0, 7));
+        masks.push(rng.nextInt(0, 31));
         flags.push(rng.nextInt(0, 1));
       }
       const targets = randomCounts(rng);
@@ -98,7 +93,7 @@ describe('memberReachCapped', () => {
       const masks: number[] = [];
       const flags: number[] = [];
       for (let i = 0; i < size; i += 1) {
-        masks.push(rng.nextInt(0, 7));
+        masks.push(rng.nextInt(0, 31));
         flags.push(rng.nextInt(0, 1));
       }
       const targets = randomCounts(rng);
@@ -126,12 +121,12 @@ describe('memberReachCapped', () => {
     }
   });
   it('applies the outlier budget only when provided', () => {
-    const masks = [1, 1, 2, 2, 4];
+    const masks = [1, 2, 4, 8, 16];
     const flags = [1, 1, 0, 0, 0];
     const ids = masks.map((_mask, index) => `pv-${String(index)}`);
     const state = stateFor(masks, flags);
-    const targets = { guards: 2, forwards: 2, centers: 1 };
-    const start = { guards: 0, forwards: 0, centers: 0 };
+    const targets = [1, 1, 1, 1, 1];
+    const start = [0, 0, 0, 0, 0];
     expect(memberReachCapped(state, targets, start, ids, 5)).toBe(true);
     expect(
       memberReachCapped(state, targets, start, ids, 5, {

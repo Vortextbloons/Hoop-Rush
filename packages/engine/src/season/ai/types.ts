@@ -20,11 +20,7 @@ export interface PoolTeam {
   band: SeasonStrengthBand;
   identity: SeasonAiIdentity;
   pool: string[];
-  groupCounts: {
-    guards: number;
-    forwards: number;
-    centers: number;
-  };
+  positionCounts: number[];
   coverageMask: number;
   tierCounts: Record<PercentileTier, number>;
   outliers: number;

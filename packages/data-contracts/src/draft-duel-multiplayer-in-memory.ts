@@ -67,13 +67,16 @@ function pickerFor(
   return pickOrdinal % 2 === 0 ? firstPicker : otherParticipant(firstPicker);
 }
 
-function seriesHomeFor(
-  series: DraftDuelSeriesSnapshot,
+const DRAFT_DUEL_HOME_GAMES: ReadonlySet<number> = new Set([1, 2, 5, 7]);
+
+export function draftDuelHomeForGameFor(
+  homeWinner: DraftDuelParticipantId,
   gameNumber: number,
 ): DraftDuelParticipantId {
-  return gameNumber === 1 || gameNumber === 2 || gameNumber >= 5
-    ? series.homeWinner
-    : otherParticipant(series.homeWinner);
+  if (!Number.isInteger(gameNumber) || gameNumber < 1 || gameNumber > 7) {
+    throw new Error(`draft duel gameNumber must be an integer in 1..7 (got ${String(gameNumber)})`);
+  }
+  return DRAFT_DUEL_HOME_GAMES.has(gameNumber) ? homeWinner : otherParticipant(homeWinner);
 }
 
 function cryptoRng(): number {
@@ -162,18 +165,6 @@ function memberWith(
   };
 }
 
-function winnerHintOf(payload: unknown): {
-  present: boolean;
-  winner: DraftDuelParticipantId | null;
-} {
-  if (typeof payload !== 'object' || payload === null) return { present: false, winner: null };
-  const record = payload as Record<string, unknown>;
-  if (!('winner' in record)) return { present: false, winner: null };
-  const raw = record['winner'];
-  if (raw === 'p1' || raw === 'p2') return { present: true, winner: raw };
-  return { present: true, winner: null };
-}
-
 interface FallbackCommitment {
   cursor: string;
   participantId: DraftDuelParticipantId;
@@ -192,7 +183,7 @@ interface GameProposal {
   resultDigest: string;
   tapeDigest: string;
   inputDigest: string;
-  winner: DraftDuelParticipantId | null;
+  winner: DraftDuelParticipantId;
 }
 
 interface GameConfirmation {
@@ -208,6 +199,7 @@ interface RoomRecord {
   payloadHashes: Map<string, string>;
   code: DraftDuelRoomCode;
   codeExpiresAt: number;
+  updatedAt: number;
   subscribers: Set<(snapshot: DraftDuelRoomSnapshot) => void>;
   transientSubscribers: Set<(event: DraftDuelTransientEvent) => void>;
   verificationChallenge: string | null;
@@ -220,7 +212,7 @@ interface RoomRecord {
 }
 
 export interface InMemoryDraftDuelTransport extends DraftDuelMultiplayerTransport {
-  publishTransient(roomId: string, event: DraftDuelTransientEvent): boolean;
+  publishTransient(roomId: string, event: DraftDuelTransientEvent): Promise<boolean>;
 }
 
 export function createInMemoryDraftDuelTransport(options?: {
@@ -332,7 +324,7 @@ export function createInMemoryDraftDuelTransport(options?: {
       };
       return;
     }
-    const home = seriesHomeFor(series, gameNumber);
+    const home = draftDuelHomeForGameFor(series.homeWinner, gameNumber);
     const away = otherParticipant(home);
     const p1Wins = series.p1Wins + (winner === 'p1' ? 1 : 0);
     const p2Wins = series.p2Wins + (winner === 'p2' ? 1 : 0);
@@ -555,7 +547,7 @@ export function createInMemoryDraftDuelTransport(options?: {
         nextGameReady: payload.ready ? payload.gameNumber : null,
         lastSeenAt: nowIsoWith(clock),
       });
-      if (payload.ready && phase === 'lineup-showdown') {
+      if (payload.ready && phase !== 'preparing-game') {
         record.snapshot = { ...record.snapshot, phase: 'preparing-game' };
       }
     } else if (payload.kind === 'broadcast-start') {
@@ -566,8 +558,21 @@ export function createInMemoryDraftDuelTransport(options?: {
       if (payload.gameNumber !== series.currentGameNumber) {
         return rejection(command.roomId, commandId, 'turn', record.snapshot.revision);
       }
-      if (!record.snapshot.members.every((member) => member.nextGameReady === payload.gameNumber)) {
-        return rejection(command.roomId, commandId, 'not-ready', record.snapshot.revision);
+      const readyCount = record.snapshot.members.filter(
+        (member) => member.nextGameReady === payload.gameNumber,
+      ).length;
+      if (readyCount < 2) {
+        const autoStart = payload.auto === true && clock() - record.updatedAt >= 60_000;
+        if (!autoStart) {
+          return rejection(command.roomId, commandId, 'not-ready', record.snapshot.revision);
+        }
+        record.snapshot = {
+          ...record.snapshot,
+          members: record.snapshot.members.map((member) => ({
+            ...member,
+            nextGameReady: payload.gameNumber,
+          })),
+        };
       }
       record.snapshot = {
         ...record.snapshot,
@@ -587,13 +592,9 @@ export function createInMemoryDraftDuelTransport(options?: {
       if (payload.gameNumber !== series.currentGameNumber) {
         return rejection(command.roomId, commandId, 'turn', record.snapshot.revision);
       }
-      const hint = winnerHintOf(command.payload);
-      if (hint.present) {
-        const home = seriesHomeFor(series, payload.gameNumber);
-        const away = otherParticipant(home);
-        if (hint.winner === null || (hint.winner !== home && hint.winner !== away)) {
-          return rejection(command.roomId, commandId, 'illegal-move', record.snapshot.revision);
-        }
+      const home = draftDuelHomeForGameFor(series.homeWinner, payload.gameNumber);
+      if (payload.winner !== home && payload.winner !== otherParticipant(home)) {
+        return rejection(command.roomId, commandId, 'illegal-move', record.snapshot.revision);
       }
       record.proposals = {
         ...record.proposals,
@@ -602,7 +603,7 @@ export function createInMemoryDraftDuelTransport(options?: {
           resultDigest: payload.resultDigest,
           tapeDigest: payload.tapeDigest,
           inputDigest: payload.inputDigest,
-          winner: hint.winner,
+          winner: payload.winner,
         },
       };
       record.snapshot = {
@@ -689,6 +690,7 @@ export function createInMemoryDraftDuelTransport(options?: {
       commandCount: record.commands.length,
       revision: record.snapshot.revision + 1,
     };
+    record.updatedAt = clock();
     emit(record);
     return {
       roomId: record.snapshot.roomId,
@@ -776,6 +778,7 @@ export function createInMemoryDraftDuelTransport(options?: {
       payloadHashes: new Map(),
       code,
       codeExpiresAt: now + DRAFT_DUEL_CODE_TTL_MS,
+      updatedAt: now,
       subscribers: new Set(),
       transientSubscribers: new Set(),
       verificationChallenge: null,
@@ -856,6 +859,7 @@ export function createInMemoryDraftDuelTransport(options?: {
         lastSeenAt: nowIsoWith(clock),
       });
       record.snapshot = { ...record.snapshot, revision: record.snapshot.revision + 1 };
+      record.updatedAt = clock();
       emit(record);
       return {
         snapshot: record.snapshot,
@@ -892,9 +896,9 @@ export function createInMemoryDraftDuelTransport(options?: {
     },
     publishTransient(roomId, event) {
       const parsed = draftDuelTransientEventSchema.safeParse(event);
-      if (!parsed.success || parsed.data.roomId !== roomId) return false;
+      if (!parsed.success || parsed.data.roomId !== roomId) return Promise.resolve(false);
       const record = rooms.get(roomId);
-      if (!record) return false;
+      if (!record) return Promise.resolve(false);
       for (const handler of record.transientSubscribers) {
         try {
           handler(parsed.data);
@@ -902,7 +906,7 @@ export function createInMemoryDraftDuelTransport(options?: {
           continue;
         }
       }
-      return true;
+      return Promise.resolve(true);
     },
     async refetch(roomId, afterOrdinal) {
       await Promise.resolve();
@@ -945,6 +949,7 @@ export function createInMemoryDraftDuelTransport(options?: {
         });
       }
       record.receipts.set(parsed.data.receiptDigest, parsed.data);
+      record.updatedAt = clock();
       return { receiptId: parsed.data.receiptDigest, revision: record.snapshot.revision };
     },
     async commitFallback(roomId, cursor, payload, expectedRevision) {
@@ -981,6 +986,7 @@ export function createInMemoryDraftDuelTransport(options?: {
         ...record.snapshot,
         deadline: { ...deadline, fallback: parsed.data },
       };
+      record.updatedAt = clock();
       return { stored: true, revision: record.snapshot.revision };
     },
     async resolveTimeout(roomId) {
@@ -1027,6 +1033,7 @@ export function createInMemoryDraftDuelTransport(options?: {
         codeActive: true,
         revision: record.snapshot.revision + 1,
       };
+      record.updatedAt = clock();
       emit(record);
       return record.snapshot;
     },
@@ -1036,6 +1043,7 @@ export function createInMemoryDraftDuelTransport(options?: {
       if (!record) return;
       record.snapshot = memberWith(record.snapshot, participantId, { online: false });
       record.snapshot = { ...record.snapshot, revision: record.snapshot.revision + 1 };
+      record.updatedAt = clock();
       emit(record);
     },
     async rematch(roomId) {
@@ -1049,6 +1057,7 @@ export function createInMemoryDraftDuelTransport(options?: {
         versions: record.snapshot.settings.versions,
       });
       record.snapshot = { ...record.snapshot, successorRoomId: created.snapshot.roomId };
+      record.updatedAt = clock();
       emit(record);
       return { snapshot: created.snapshot, code: created.code };
     },
@@ -1072,6 +1081,7 @@ export function createInMemoryDraftDuelTransport(options?: {
         confirmedDigest: contentHashSchema.parse(receipt.resultDigest),
         members: record.snapshot.members.map((member) => ({ ...member, locked: true })),
       };
+      record.updatedAt = clock();
       emit(record);
       return { completed: true, phase: record.snapshot.phase };
     },
@@ -1106,6 +1116,7 @@ export function createInMemoryDraftDuelTransport(options?: {
         code: null,
         codeActive: false,
       };
+      record.updatedAt = clock();
       emit(record);
       return { failed: true, phase: record.snapshot.phase };
     },

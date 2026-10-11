@@ -5,6 +5,7 @@ import {
   contentHashSchema,
   defaultDraftDuelVersionLocks,
   draftDuelFirstPickerFor,
+  draftDuelHomeForGameFor,
   draftDuelHomeWinnerFor,
   playerIdSchema,
   playerVersionIdSchema,
@@ -84,7 +85,7 @@ function proposePayload(
     tapeDigest: contentHashSchema.parse('e'.repeat(64)),
     inputDigest: contentHashSchema.parse('f'.repeat(64)),
     winner,
-  } as DraftDuelCommandPayload;
+  };
 }
 
 async function playGame(
@@ -341,12 +342,12 @@ describe('in-memory Draft Duel transport', () => {
       playerVersionId: playerVersion('a'),
       sentAtMs: 1,
     };
-    expect(transport.publishTransient(roomA.snapshot.roomId, event)).toBe(true);
+    expect(await transport.publishTransient(roomA.snapshot.roomId, event)).toBe(true);
     expect(receivedA).toEqual(['consideration']);
     expect(receivedB).toEqual([]);
 
     expect(
-      transport.publishTransient(roomA.snapshot.roomId, {
+      await transport.publishTransient(roomA.snapshot.roomId, {
         ...event,
         roomId: roomB.snapshot.roomId,
       }),
@@ -354,13 +355,13 @@ describe('in-memory Draft Duel transport', () => {
     expect(receivedA).toEqual(['consideration']);
 
     expect(
-      transport.publishTransient(roomA.snapshot.roomId, {
+      await transport.publishTransient(roomA.snapshot.roomId, {
         kind: 'nope',
       } as unknown as typeof event),
     ).toBe(false);
 
     subscriptionA.unsubscribe();
-    expect(transport.publishTransient(roomA.snapshot.roomId, event)).toBe(true);
+    expect(await transport.publishTransient(roomA.snapshot.roomId, event)).toBe(true);
     expect(receivedA).toEqual(['consideration']);
   });
 
@@ -431,5 +432,104 @@ describe('in-memory Draft Duel transport', () => {
       },
     );
     expect(secondPick.accepted).toBe(true);
+  });
+
+  it('maps home court with the engine 2-2-1-1-1 pattern', () => {
+    expect(
+      [1, 2, 3, 4, 5, 6, 7].map((gameNumber) => draftDuelHomeForGameFor('p1', gameNumber)),
+    ).toEqual(['p1', 'p1', 'p2', 'p2', 'p1', 'p2', 'p1']);
+    expect(
+      [1, 2, 3, 4, 5, 6, 7].map((gameNumber) => draftDuelHomeForGameFor('p2', gameNumber)),
+    ).toEqual(['p2', 'p2', 'p1', 'p1', 'p2', 'p1', 'p2']);
+    expect(() => draftDuelHomeForGameFor('p1', 0)).toThrow();
+    expect(() => draftDuelHomeForGameFor('p1', 8)).toThrow();
+  });
+
+  it('labels game 6 home/away opposite to the home-winner seat', async () => {
+    const transport = createInMemoryDraftDuelTransport({ seed: 'draft-duel-game-six' });
+    const { roomId } = await createAndJoin(transport);
+    const started = await readyBothAndStart(transport, roomId);
+    const rootSeed = started.rootSeed;
+    if (!rootSeed) throw new Error('draft duel room is missing a root seed');
+    await playDraft(transport, roomId, draftDuelFirstPickerFor(rootSeed), '');
+    const homeWinner = draftDuelHomeWinnerFor(rootSeed);
+    const awaySeat = otherParticipant(homeWinner);
+    const scheduledWinners: DraftDuelParticipantId[] = [
+      homeWinner,
+      awaySeat,
+      homeWinner,
+      awaySeat,
+      homeWinner,
+      awaySeat,
+    ];
+    for (let gameNumber = 1; gameNumber <= scheduledWinners.length; gameNumber += 1) {
+      const winner = scheduledWinners[gameNumber - 1];
+      if (!winner) throw new Error('missing scheduled winner');
+      await playGame(transport, roomId, gameNumber, winner);
+    }
+    const current = await snapshot(transport, roomId);
+    const gameSix = current.series?.games.find((game) => game.gameNumber === 6);
+    if (!gameSix) throw new Error('game 6 was not recorded');
+    expect(gameSix.homeParticipantId).toBe(awaySeat);
+    expect(gameSix.awayParticipantId).toBe(homeWinner);
+    expect(gameSix.winner).toBe(awaySeat);
+    expect(current.series?.p1Wins).toBe(3);
+    expect(current.series?.p2Wins).toBe(3);
+    expect(current.series?.currentGameNumber).toBe(7);
+  });
+
+  it('auto-starts after 60 seconds of idleness and readies the absent seat', async () => {
+    let now = 7_000_000;
+    const transport = createInMemoryDraftDuelTransport({
+      seed: 'draft-duel-auto-start',
+      clock: () => now,
+    });
+    const { roomId } = await createAndJoin(transport);
+    const started = await readyBothAndStart(transport, roomId);
+    const rootSeed = started.rootSeed;
+    if (!rootSeed) throw new Error('draft duel room is missing a root seed');
+    await playDraft(transport, roomId, draftDuelFirstPickerFor(rootSeed), '');
+
+    await submit(transport, roomId, 'auto-ready-p1', 'p1', {
+      kind: 'ready-next-game',
+      gameNumber: 1,
+      ready: true,
+    });
+    const afterReady = await snapshot(transport, roomId);
+    expect(afterReady.phase).toBe('preparing-game');
+    expect(afterReady.members.map((member) => member.nextGameReady)).toEqual([1, null]);
+
+    const manual = await submit(transport, roomId, 'auto-bs-manual', 'p2', {
+      kind: 'broadcast-start',
+      gameNumber: 1,
+    });
+    expect(manual.rejectionCode).toBe('not-ready');
+
+    const early = await submit(transport, roomId, 'auto-bs-early', 'p2', {
+      kind: 'broadcast-start',
+      gameNumber: 1,
+      auto: true,
+    });
+    expect(early.rejectionCode).toBe('not-ready');
+
+    now += 60_001;
+    const auto = await submit(transport, roomId, 'auto-bs-ok', 'p2', {
+      kind: 'broadcast-start',
+      gameNumber: 1,
+      auto: true,
+    });
+    expect(auto.accepted).toBe(true);
+
+    const broadcasting = await snapshot(transport, roomId);
+    expect(broadcasting.phase).toBe('broadcasting');
+    expect(broadcasting.broadcast?.gameNumber).toBe(1);
+    expect(broadcasting.members.map((member) => member.nextGameReady)).toEqual([null, null]);
+
+    const commands = await transport.refetch(roomId, 0);
+    const p2ReadyCommands = commands.filter(
+      (command) =>
+        command.payload.kind === 'ready-next-game' && command.actorParticipantId === 'p2',
+    );
+    expect(p2ReadyCommands).toHaveLength(0);
   });
 });

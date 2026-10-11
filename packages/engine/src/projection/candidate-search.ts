@@ -20,6 +20,7 @@ import {
   type MinutePlanPlayerInput,
 } from '../season/minute-plan.ts';
 import {
+  fiveAlive,
   legalFiveExists,
   rosterFeasible,
   validateSeasonRoster,
@@ -477,7 +478,7 @@ export function searchRosterRotationCandidates(
         ) {
           continue;
         }
-        if (stateMembers.length >= 5 && !legalFiveExists(stateMembers)) continue;
+        if (!fiveAlive(stateMembers, availableInput, 10 - stateMembers.length)) continue;
         if (stateMembers.length === 10) {
           complete.set(key, state);
           continue;
