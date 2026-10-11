@@ -75,11 +75,11 @@ describe('havoc runtime smoke', () => {
   });
 });
 
-// Captured after the 5-on-5 defender-selection fidelity fix; default 24/24 games must not drift
+// Captured after the foul-avoidance calibration; default 24/24 games must not drift
 // again without an explicit behavior change.
-const DEFAULT_HAVOC_RESULT_DIGEST = '1d868e91ebeaf195b5084aff075ad9a1';
-const DEFAULT_HAVOC_TAPE_DIGEST = '08b6ecee56a2b2327c7380e82328469e';
-const LOCKED_HAVOC_RESULT_DIGEST = '0d969c8b053acb57bfa15c558c16eddb';
-const LOCKED_HAVOC_TAPE_DIGEST = 'fea0808c1e3a11e02659b1cedf699fbc';
-const LOCKED_NORMAL_RESULT_DIGEST = 'e28e1705ef494f713b80663f0b9dc095';
-const LOCKED_NORMAL_TAPE_DIGEST = 'cd53e0dab4b459d619f505d0d1c0deaa';
+const DEFAULT_HAVOC_RESULT_DIGEST = 'c600303650ef19aa6a10484c6ccac186';
+const DEFAULT_HAVOC_TAPE_DIGEST = '4dcada61bfa5b995ed96cf237bf8e3b1';
+const LOCKED_HAVOC_RESULT_DIGEST = 'a1e08c56cf91c28289366e2cf517b366';
+const LOCKED_HAVOC_TAPE_DIGEST = 'f246ced818f50974ec7a84925edd6f08';
+const LOCKED_NORMAL_RESULT_DIGEST = '6f043858f5bb72445e702b9e0c4c7368';
+const LOCKED_NORMAL_TAPE_DIGEST = 'c903a35e900ef912423b7c6cbee5b4ee';

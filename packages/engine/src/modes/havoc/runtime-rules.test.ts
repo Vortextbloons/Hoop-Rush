@@ -351,7 +351,7 @@ describe('havoc tier-3 rules', () => {
       scenarioSlot('SG', ['clone-army']),
       ...plainSlots().slice(2),
     ]);
-    const run = runScenario(human, buildScenarioTeam('opponent', plainSlots()), 'havoc-clones');
+    const run = runScenario(human, buildScenarioTeam('opponent', plainSlots()), 'havoc-clones-0');
     const entered = run.tape.events.filter(
       (event) => event.kind === 'clone' && event.outcome === 'entered',
     );
@@ -476,15 +476,8 @@ describe('havoc tier-3 rules', () => {
 
 describe('havoc overtime and free throws', () => {
   it('plays overtime periods with powers preserved', () => {
-    const mutations = (withPower: boolean): ScenarioSlot[] => [
-      { slot: 'PG', mutations: withPower ? ['reverse-basketball'] : [] },
-      { slot: 'SG', mutations: [] },
-      { slot: 'SF', mutations: [] },
-      { slot: 'PF', mutations: [] },
-      { slot: 'C', mutations: [] },
-    ];
-    const human = buildScenarioTeam('human', mutations(true));
-    const away = buildScenarioTeam('opponent', mutations(false));
+    const human = buildScenarioTeam('human', humanSlotMutation('PG', 'the-great-equalizer'));
+    const away = buildScenarioTeam('opponent', plainSlots());
     const run = searchScenario(
       384,
       human,
