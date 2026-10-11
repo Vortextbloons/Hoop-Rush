@@ -387,3 +387,16 @@ export function auditSeasonStandings(
   }
   return failures;
 }
+export interface StandingsOrderKey {
+  franchiseId: string;
+  wins: number;
+  pointsFor: number;
+  pointsAgainst: number;
+}
+export function standingsOrderComparator(a: StandingsOrderKey, b: StandingsOrderKey): number {
+  return (
+    b.wins - a.wins ||
+    b.pointsFor - b.pointsAgainst - (a.pointsFor - a.pointsAgainst) ||
+    (a.franchiseId < b.franchiseId ? -1 : 1)
+  );
+}

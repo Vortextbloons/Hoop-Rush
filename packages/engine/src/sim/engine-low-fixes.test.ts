@@ -5,7 +5,7 @@ import {
   buildLegalSimulationTeam,
   seedFromString,
 } from '@hoop-rush/test-fixtures';
-import { createEngineContext } from './context.ts';
+import { createEngineContext } from './kernel.ts';
 import { DEEP_FOUR_FT_MISS } from './evolution-rules.ts';
 import { createGameState, createTripContext } from './possession.ts';
 import { GameRecorder } from './recorder.ts';

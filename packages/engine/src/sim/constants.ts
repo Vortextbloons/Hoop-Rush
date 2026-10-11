@@ -1,24 +1,20 @@
 import type { ShotZone, SlotGroup } from '@hoop-rush/data-contracts';
-import type { PositionResponsibilityModifiers } from './position-responsibilities.ts';
 import type { ActionType } from './usage.ts';
-// m3-engine-v24: usage congestion is gap-based instead of rank-ordered; near-peer
-// high-usage lineups split shots instead of crowning an array-order alpha.
-// m3-engine-v23: usage role weights normalize against a fixed league reference
-// instead of lineup-mean usage; role caps raised so multiple high-usage peaks
-// can still separate instead of saturating together.
-// m3-engine-v22: free-throw integrity — non-final misses are dead-ball team
-// rebounds, a live final miss continues only through an explicit offensive
-// rebound, and rebound opportunities count live contests only.
-// m3-engine-v21: interior-finisher fidelity (2P anchor 0.70/1.32 + block-aware
-// conversion, rim-heavy importer diet, foul-draw 0.70 blend, assist 1.01,
-// saturated usage caps 1.48/1.28) — seeded formulas unchanged.
-// m3-engine-v20: player sponsorship gear (season-sponsor-gear-v1) —
-// seeded 5-offer shop per block, vault + 3-slot equipment, sponsor boosts
-// applied to ratings inputs (sim, trade valuation, AI kits); formulas unchanged.
-// m3-engine-v19: season parity tune (season-trade-v7, season-free-agency-v3).
+
+export interface PositionResponsibilityModifiers {
+  initiation: number;
+  pnrHandler: number;
+  rollMan: number;
+  postUp: number;
+  rebounding: number;
+  rimProtection: number;
+}
+
 export const ENGINE_VERSION = 'm3-engine-v24';
+
 export const ENGINE_CONSTANTS = {
   version: ENGINE_VERSION,
+
   zoneBaseMake: {
     rim: 0.62,
     shortMid: 0.46,
@@ -39,51 +35,20 @@ export const ENGINE_CONSTANTS = {
   contestRatioPivot: 66,
   contestRatioRange: 28,
   eraEfficiencyWeight: 0.35,
-  turnoverObservedBlend: 0.62,
-  turnoverNeutralTendency: 0.14,
-  turnoverNeutralPressure: 0.671,
-  turnoverNeutralHandling: 0.22,
-  turnoverNeutralPassing: 0.12,
-  turnoverPressureWeight: 0.12,
-  turnoverHandlingWeight: 0.05,
-  turnoverPassingWeight: 0.03,
-  turnoverMin: 0.03,
-  turnoverMax: 0.3,
-  stealNeutralAbility: 67,
-  blockRimMax: 0.14,
-  blockMidMax: 0.07,
-  blockThreeMax: 0.04,
-  blockDriveBonus: 0.03,
-  blockAnchorFloorPer48: 0.8,
-  blockAnchorScale: 0.025,
-  blockAnchorMax: 0.06,
-  shootingFoulScale: 1.33,
-  fouledShotMakeScale: 0.95,
-  observedFoulDrawBlend: 0.7,
-  offensiveFoulShare: 0.32,
-  offensiveFoulTurnoverOffset: 0.029,
-  freeThrowAnchorRating: 75,
-  bonusFoulsRegulation: 5,
-  bonusFoulsOvertime: 2,
-  inboundConsumption: 2,
-  continuationConsumption: 3,
-  shotClockSeconds: 24,
-  minimumTripSeconds: 1,
-  minimumStartSeconds: 0.5,
+  shotQuality: {
+    isolation: { rim: 0, shortMid: -0.005, longMid: -0.01, cornerThree: 0, aboveBreakThree: 0 },
+    pickAndRoll: { rim: 0.01, shortMid: 0, longMid: 0, cornerThree: 0, aboveBreakThree: 0 },
+    pickAndRollRoll: { rim: 0.02, shortMid: 0, longMid: 0, cornerThree: 0, aboveBreakThree: 0 },
+    postUp: { rim: -0.005, shortMid: -0.005, longMid: 0, cornerThree: 0, aboveBreakThree: 0 },
+    spotUp: { rim: 0, shortMid: 0, longMid: 0, cornerThree: 0, aboveBreakThree: 0 },
+    cut: { rim: 0.03, shortMid: 0, longMid: 0, cornerThree: 0, aboveBreakThree: 0 },
+    transition: { rim: 0.03, shortMid: 0.02, longMid: 0, cornerThree: 0, aboveBreakThree: 0 },
+  } as const satisfies Record<ActionType, Record<ShotZone, number>>,
+  spacingBonusScale: 0.06,
+
   threePointRateWeight: 0.35,
   eraZoneMixBlend: 0.55,
-  transitionStartMultiplier: {
-    neutral: 1,
-    madeBasket: 0.45,
-    deadBall: 0.35,
-    liveTurnover: 2.15,
-    defensiveRebound: 1.55,
-    offensiveRebound: 0.2,
-  } as const,
-  estimateToTripsFactor: 0.93,
   observedThreePointBlend: 0.55,
-  observedFreeThrowBlend: 0.72,
-  freeThrowCalibrationOffset: -0.001,
   anchoredThreePointSkillRange: 0.06,
   threePointCalibrationOffset: -0.003,
   threePointEvidenceMinimum: 0.02,
@@ -91,6 +56,7 @@ export const ENGINE_CONSTANTS = {
   threePointLowVolumeCap: 0.08,
   threePointLowVolumeEraPull: 0.05,
   threePointEraPull: 0.3,
+
   usageExponent: 1.6,
   usageRoleReference: 20,
   initiatorRoleExponent: 1.6,
@@ -102,21 +68,59 @@ export const ENGINE_CONSTANTS = {
   twoPointAnchorMin: 0.82,
   twoPointAnchorMax: 1.32,
   twoPointAnchorSkillScale: 0.3,
-  shotQuality: {
-    isolation: { rim: 0, shortMid: -0.005, longMid: -0.01, cornerThree: 0, aboveBreakThree: 0 },
-    pickAndRoll: { rim: 0.01, shortMid: 0, longMid: 0, cornerThree: 0, aboveBreakThree: 0 },
-    pickAndRollRoll: { rim: 0.02, shortMid: 0, longMid: 0, cornerThree: 0, aboveBreakThree: 0 },
-    postUp: { rim: -0.005, shortMid: -0.005, longMid: 0, cornerThree: 0, aboveBreakThree: 0 },
-    spotUp: { rim: 0, shortMid: 0, longMid: 0, cornerThree: 0, aboveBreakThree: 0 },
-    cut: { rim: 0.03, shortMid: 0, longMid: 0, cornerThree: 0, aboveBreakThree: 0 },
-    transition: { rim: 0.03, shortMid: 0.02, longMid: 0, cornerThree: 0, aboveBreakThree: 0 },
-  } as const satisfies Record<ActionType, Record<ShotZone, number>>,
-  spacingBonusScale: 0.06,
+  transitionStartMultiplier: {
+    neutral: 1,
+    madeBasket: 0.45,
+    deadBall: 0.35,
+    liveTurnover: 2.15,
+    defensiveRebound: 1.55,
+    offensiveRebound: 0.2,
+  } as const,
+
+  turnoverObservedBlend: 0.62,
+  turnoverNeutralTendency: 0.14,
+  turnoverNeutralPressure: 0.671,
+  turnoverNeutralHandling: 0.22,
+  turnoverNeutralPassing: 0.12,
+  turnoverPressureWeight: 0.12,
+  turnoverHandlingWeight: 0.05,
+  turnoverPassingWeight: 0.03,
+  turnoverMin: 0.03,
+  turnoverMax: 0.3,
+
+  stealNeutralAbility: 67,
+  blockRimMax: 0.14,
+  blockMidMax: 0.07,
+  blockThreeMax: 0.04,
+  blockDriveBonus: 0.03,
+  blockAnchorFloorPer48: 0.8,
+  blockAnchorScale: 0.025,
+  blockAnchorMax: 0.06,
+
+  shootingFoulScale: 1.33,
+  fouledShotMakeScale: 0.95,
+  observedFoulDrawBlend: 0.7,
+  offensiveFoulShare: 0.32,
+  offensiveFoulTurnoverOffset: 0.029,
+  freeThrowAnchorRating: 75,
+  bonusFoulsRegulation: 5,
+  bonusFoulsOvertime: 2,
+  observedFreeThrowBlend: 0.72,
+  freeThrowCalibrationOffset: -0.001,
+
   offensiveReboundScale: 0.055,
   offensiveReboundRange: 50,
   offensiveReboundRimBonus: 0.045,
   offensiveReboundPerimeterPenalty: 0.04,
   observedReboundWeight: 6,
+
+  shotClockSeconds: 24,
+  minimumTripSeconds: 1,
+  minimumStartSeconds: 0.5,
+  inboundConsumption: 2,
+  continuationConsumption: 3,
+  estimateToTripsFactor: 0.93,
+
   positionResponsibility: {
     G: {
       initiation: 1.08,

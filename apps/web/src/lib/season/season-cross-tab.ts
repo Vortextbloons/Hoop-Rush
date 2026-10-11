@@ -1,3 +1,5 @@
+import { newRequestId } from '$lib/ids';
+
 export type SeasonRunAnnouncement =
   | {
       kind: 'commit';
@@ -59,7 +61,7 @@ export function createSeasonRunChannel(): SeasonRunChannel {
       },
     };
   }
-  const sourceId = `tab-${crypto.randomUUID()}`;
+  const sourceId = newRequestId('tab');
   const channel = new BroadcastChannel(SEASON_RUN_CHANNEL_NAME);
   const listeners = new Set<(mutation: SeasonRunMutation) => void>();
   channel.onmessage = (event: MessageEvent<SeasonRunMutation>) => {

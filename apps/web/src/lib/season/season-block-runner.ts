@@ -45,7 +45,7 @@ import type { SeasonSchedule } from '@hoop-rush/data-contracts';
 import type { EraSimulationProfile } from '@hoop-rush/data-contracts';
 import type { SeasonArtifactUrls } from './season-assets';
 import { getSeasonRunRepository } from '$lib/season/season-repo';
-import { randomUUID } from '$lib/ids';
+import { newRequestId } from '$lib/ids';
 export type SeasonRunnerEvent =
   | {
       type: 'started';
@@ -830,8 +830,8 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       const priorPendingSummaries = state.resumePending?.summaries ?? [];
       const mergedPending: typeof pending = {
         ...pending,
-        summaries: mergeSortedSummaries(priorPendingSummaries, pending.summaries),
-        retainedDetails: mergeSortedDetails(
+        summaries: mergeSortedByGameId(priorPendingSummaries, pending.summaries),
+        retainedDetails: mergeSortedByGameId(
           priorRetained,
           dedupeNewByGameId(priorRetained, pending.retainedDetails),
         ),
@@ -883,7 +883,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       if (currentRequestId !== null) {
         throw new Error('a season block is already running; cancel it first');
       }
-      const requestId = `sb-${randomUUID()}`;
+      const requestId = newRequestId('sb');
       const requestEpoch = cancellationEpoch;
       currentRequestId = requestId;
       current = {
@@ -992,7 +992,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       if (currentRequestId !== null) {
         throw new Error('a season block is already running; cancel it first');
       }
-      const requestId = `sb-${randomUUID()}`;
+      const requestId = newRequestId('sb');
       const requestEpoch = cancellationEpoch;
       currentRequestId = requestId;
       void (async () => {
@@ -1131,7 +1131,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
     },
     prewarm(): void {
       if (currentRequestId !== null || warmed || warmRequestId !== null) return;
-      const pendingWarmId = `warm-${randomUUID()}`;
+      const pendingWarmId = newRequestId('warm');
       warmRequestId = pendingWarmId;
       void (async () => {
         try {
@@ -1203,58 +1203,16 @@ function isSortedByGameId(items: readonly { gameId: string }[]): boolean {
   }
   return true;
 }
-function mergeSortedSummaries(
-  prior: readonly SeasonGameSummary[],
-  next: readonly SeasonGameSummary[],
-): SeasonGameSummary[] {
+function mergeSortedByGameId<T extends { gameId: string }>(
+  prior: readonly T[],
+  next: readonly T[],
+): T[] {
   if (prior.length === 0) return [...next].sort((a, b) => (a.gameId < b.gameId ? -1 : 1));
   if (next.length === 0) return [...prior];
   if (!isSortedByGameId(prior))
     return [...prior, ...next].sort((a, b) => (a.gameId < b.gameId ? -1 : 1));
   const sortedNext = [...next].sort((a, b) => (a.gameId < b.gameId ? -1 : 1));
-  const result: SeasonGameSummary[] = [];
-  let i = 0;
-  let j = 0;
-  while (i < prior.length && j < sortedNext.length) {
-    const a = prior[i];
-    const b = sortedNext[j];
-    if (a === undefined || b === undefined) break;
-    if (a.gameId <= b.gameId) {
-      const last = result[result.length - 1];
-      if (last === undefined || last.gameId !== a.gameId) result.push(a);
-      i += 1;
-    } else {
-      const last = result[result.length - 1];
-      if (last === undefined || last.gameId !== b.gameId) result.push(b);
-      j += 1;
-    }
-  }
-  while (i < prior.length) {
-    const a = prior[i];
-    if (a === undefined) break;
-    const last = result[result.length - 1];
-    if (last === undefined || last.gameId !== a.gameId) result.push(a);
-    i += 1;
-  }
-  while (j < sortedNext.length) {
-    const b = sortedNext[j];
-    if (b === undefined) break;
-    const last = result[result.length - 1];
-    if (last === undefined || last.gameId !== b.gameId) result.push(b);
-    j += 1;
-  }
-  return result;
-}
-function mergeSortedDetails(
-  prior: readonly SeasonRetainedGameDetail[],
-  next: readonly SeasonRetainedGameDetail[],
-): SeasonRetainedGameDetail[] {
-  if (prior.length === 0) return [...next].sort((a, b) => (a.gameId < b.gameId ? -1 : 1));
-  if (next.length === 0) return [...prior];
-  if (!isSortedByGameId(prior))
-    return [...prior, ...next].sort((a, b) => (a.gameId < b.gameId ? -1 : 1));
-  const sortedNext = [...next].sort((a, b) => (a.gameId < b.gameId ? -1 : 1));
-  const result: SeasonRetainedGameDetail[] = [];
+  const result: T[] = [];
   let i = 0;
   let j = 0;
   while (i < prior.length && j < sortedNext.length) {
@@ -1350,8 +1308,8 @@ export function assembleCommittedSnapshot(input: {
     stateDigest: input.stateDigest,
   } as unknown as SeasonRun;
   const newDetails = dedupeNewByGameId(input.priorRetainedDetails, checkpoint.retainedDetails);
-  const summaries = mergeSortedSummaries(input.priorSummaries, checkpoint.gameSummaries);
-  const retainedDetails = mergeSortedDetails(input.priorRetainedDetails, newDetails);
+  const summaries = mergeSortedByGameId(input.priorSummaries, checkpoint.gameSummaries);
+  const retainedDetails = mergeSortedByGameId(input.priorRetainedDetails, newDetails);
   const acceptedBlock = seasonAcceptedBlockSchema.parse({
     runId: checkpoint.runId,
     blockIndex: checkpoint.blockIndex,

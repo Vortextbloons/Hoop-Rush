@@ -4,6 +4,7 @@ import {
   type CollectionGameWorkerCompleteMessage,
   type CollectionPreparedGameUnion,
 } from '@hoop-rush/data-contracts';
+import { newRequestId } from '$lib/ids';
 import { runCollectionWorker } from './collection-worker-runner.ts';
 
 export interface CollectionGameRunInput {
@@ -19,7 +20,7 @@ export interface CollectionGameRunInput {
 export function runCollectionGame(
   input: CollectionGameRunInput,
 ): Promise<CollectionGameWorkerCompleteMessage> {
-  const requestId = input.requestId ?? crypto.randomUUID();
+  const requestId = input.requestId ?? newRequestId();
   const request = collectionGameWorkerRequestSchema.parse({
     wireVersion: COLLECTION_GAME_WORKER_WIRE_VERSION,
     type: 'collection-game-simulate',

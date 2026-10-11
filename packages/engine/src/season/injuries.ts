@@ -13,7 +13,7 @@ import {
   HALFTIME_SECOND,
   REGULATION_PERIOD_SECONDS,
   REGULATION_TOTAL_SECONDS,
-} from '../sim/periods.ts';
+} from '../sim/clock.ts';
 import { drawHexInt } from './season-seeds.ts';
 export const SEASON_INJURY_BASE_RISK_BP = 80;
 export const SEASON_INJURY_RISK_MIN_BP = 20;

@@ -1,6 +1,6 @@
 import type { SeasonEffectsState } from '@hoop-rush/data-contracts';
 import type { SeasonStaminaInput } from '@hoop-rush/data-contracts';
-import { REGULATION_TOTAL_SECONDS } from '../sim/periods.ts';
+import { REGULATION_TOTAL_SECONDS } from '../sim/clock.ts';
 export const SEASON_STAMINA_RATING_FLOOR = 45;
 export const SEASON_STAMINA_RATING_CEIL = 95;
 export const SEASON_STAMINA_RATING_PER_MPG = 1.25;

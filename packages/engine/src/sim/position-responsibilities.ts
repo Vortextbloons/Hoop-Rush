@@ -1,14 +1,6 @@
 import { LINEUP_STRUCTURE, type SlotGroup } from '@hoop-rush/data-contracts';
 import { clamp } from '../domain/math.ts';
-import { ENGINE_CONSTANTS } from './constants.ts';
-export interface PositionResponsibilityModifiers {
-  initiation: number;
-  pnrHandler: number;
-  rollMan: number;
-  postUp: number;
-  rebounding: number;
-  rimProtection: number;
-}
+import { ENGINE_CONSTANTS, type PositionResponsibilityModifiers } from './constants.ts';
 export function slotGroupOfSlot(slot: number): SlotGroup {
   const group = LINEUP_STRUCTURE[slot];
   if (group === undefined) {

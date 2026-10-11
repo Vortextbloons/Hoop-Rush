@@ -15,7 +15,7 @@ import {
   type CompletedRunIndex,
   type StoredRunRecord,
 } from '@hoop-rush/persistence';
-import { randomUUID } from '$lib/ids';
+import { newRequestId } from '$lib/ids';
 import { sleep } from '$lib/sleep';
 export const REVEAL_INTERVAL_MS = 36;
 export type RunnerPhase = 'idle' | 'starting' | 'running' | 'paused' | 'finished' | 'error';
@@ -71,7 +71,7 @@ export class ChallengeRunner {
     this.queue = [];
     this.queueHead = 0;
     this.lastError = null;
-    this.requestId = randomUUID();
+    this.requestId = newRequestId();
     this.worker = new Worker(new URL('../workers/challenge-worker.ts', import.meta.url), {
       type: 'module',
     });

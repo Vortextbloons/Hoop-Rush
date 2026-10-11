@@ -5,6 +5,7 @@ import {
   type CollectionPlayState,
 } from '@hoop-rush/data-contracts';
 import type { CollectionGameCommandInput, CollectionGameCommandResult } from '@hoop-rush/engine';
+import { newRequestId } from '$lib/ids';
 import type { CollectionGameWorkerAssets } from './collection-hub';
 import { runCollectionWorker } from './collection-worker-runner.ts';
 
@@ -20,7 +21,7 @@ export interface CollectionGameVerifyRunInput {
 export function runCollectionGameVerification(
   input: CollectionGameVerifyRunInput,
 ): Promise<CollectionGameCommandResult> {
-  const requestId = input.requestId ?? crypto.randomUUID();
+  const requestId = input.requestId ?? newRequestId();
   const request = collectionGameWorkerRequestSchema.parse({
     wireVersion: COLLECTION_GAME_WORKER_WIRE_VERSION,
     type: 'collection-game-verify',

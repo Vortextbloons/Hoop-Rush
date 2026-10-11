@@ -8,7 +8,7 @@ import {
   type SimulationPlayer,
   type SimulationTeam,
 } from '@hoop-rush/data-contracts';
-import { meanTripSeconds } from '../sim/timing.ts';
+import { meanTripSeconds } from '../sim/clock.ts';
 import { shootingFoulProbability } from '../sim/fouls.ts';
 import { prepareTeam } from '../sim/prepare.ts';
 import {

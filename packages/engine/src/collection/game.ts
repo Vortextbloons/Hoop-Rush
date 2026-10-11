@@ -33,7 +33,7 @@ import {
   type CollectionPreparedGameV1,
   type EraSimulationProfile,
 } from '@hoop-rush/data-contracts';
-import { createEngineContext } from '../sim/context.ts';
+import { createEngineContext } from '../sim/kernel.ts';
 import { simulateSeasonGame, type RotationGameFact } from '../season/season-game.ts';
 import { validateCollectionActiveTeam } from './active-team.ts';
 import {

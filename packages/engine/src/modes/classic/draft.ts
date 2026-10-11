@@ -24,7 +24,7 @@ import {
 import { canPlay, slotGroupOf } from '../../domain/positions.ts';
 import { slotRequirement, validateLineup } from '../../domain/lineup.ts';
 import { planLineupReposition } from '../../domain/lineup-reposition.ts';
-import type { EngineContext } from '../../sim/context.ts';
+import type { EngineContext } from '../../sim/kernel.ts';
 import type { ClassicChallengeCreation } from '../../challenge/commands.ts';
 export type ClassicRollKind = 'initial' | 'franchise-reroll' | 'era-reroll';
 export function classicRollSeed(

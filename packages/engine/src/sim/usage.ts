@@ -6,12 +6,9 @@ import type {
 } from '@hoop-rush/data-contracts';
 import type { Rng, WeightedPickTable } from './rng.ts';
 import { buildWeightedPickTable } from './rng.ts';
-import { ENGINE_CONSTANTS } from './constants.ts';
+import { ENGINE_CONSTANTS, type PositionResponsibilityModifiers } from './constants.ts';
+import { sameGroupMatchWeight } from './position-responsibilities.ts';
 import { creationScore, interiorScoringScore, spacingScore } from '../domain/archetypes.ts';
-import {
-  sameGroupMatchWeight,
-  type PositionResponsibilityModifiers,
-} from './position-responsibilities.ts';
 import { SHOT_ZONES } from '../domain/zones.ts';
 export type ActionType =
   'isolation' | 'pickAndRoll' | 'pickAndRollRoll' | 'postUp' | 'spotUp' | 'cut' | 'transition';
@@ -139,28 +136,11 @@ export function pickAction(
 ): ActionType {
   const transitionIndex = ACTION_INDEX.transition;
   const scale = ENGINE_CONSTANTS.transitionStartMultiplier[start];
-  let total = 0;
-  for (let i = 0; i < ACTION_TYPES.length; i += 1) {
+  const scaled = ACTION_TYPES.map((_, i) => {
     const raw = weights[i] ?? 0;
-    const scaled = i === transitionIndex ? raw * scale : raw;
-    total += Math.max(0, scaled);
-  }
-  if (total <= 0) return rng.pick(ACTION_TYPES);
-  let roll = rng.next() * total;
-  for (let i = 0; i < ACTION_TYPES.length; i += 1) {
-    const raw = weights[i] ?? 0;
-    const scaled = i === transitionIndex ? raw * scale : raw;
-    const w = Math.max(0, scaled);
-    if (roll < w) {
-      const action = ACTION_TYPES[i];
-      if (action === undefined) throw new Error('pickAction: index out of range');
-      return action;
-    }
-    roll -= w;
-  }
-  const last = ACTION_TYPES[ACTION_TYPES.length - 1];
-  if (last === undefined) throw new Error('pickAction: index out of range');
-  return last;
+    return Math.max(0, i === transitionIndex ? raw * scale : raw);
+  });
+  return rng.weightedPick(ACTION_TYPES, scaled);
 }
 export function passProbability(initiator: SimulationPlayer, action: ActionType): number {
   const actionBase =
@@ -229,23 +209,8 @@ export function pickShot(
     passed: true,
   };
 }
-export function assisterWeights(
-  team: SimulationTeam,
-  shooter: SimulationPlayer,
-  initiator: SimulationPlayer,
-): number[] {
-  const candidates = team.players.filter((p) => p.playerId !== shooter.playerId);
-  return candidates.map((p) => {
-    const observedCreation = p.anchors?.assistsPerGame;
-    const roleWeight =
-      observedCreation === undefined
-        ? Math.max(0.5, p.tendencies.passRate / 5)
-        : Math.max(0.5, observedCreation + 1);
-    const passingWeight = 0.7 + p.ratings.passing / 100;
-    const creationMod = 0.75 + 0.5 * creationScore(p);
-    const initiatorBonus = p.playerId === initiator.playerId ? 1.35 : 1;
-    return roleWeight * passingWeight * creationMod * initiatorBonus;
-  });
+function assisterCandidatesOf(team: SimulationTeam, shooter: SimulationPlayer): SimulationPlayer[] {
+  return team.players.filter((p) => p.playerId !== shooter.playerId);
 }
 function assisterWeightOf(p: SimulationPlayer, initiator: SimulationPlayer): number {
   const observedCreation = p.anchors?.assistsPerGame;
@@ -258,6 +223,13 @@ function assisterWeightOf(p: SimulationPlayer, initiator: SimulationPlayer): num
   const initiatorBonus = p.playerId === initiator.playerId ? 1.35 : 1;
   return roleWeight * passingWeight * creationMod * initiatorBonus;
 }
+export function assisterWeights(
+  team: SimulationTeam,
+  shooter: SimulationPlayer,
+  initiator: SimulationPlayer,
+): number[] {
+  return assisterCandidatesOf(team, shooter).map((p) => assisterWeightOf(p, initiator));
+}
 export interface AssisterPickPrep {
   candidates: SimulationPlayer[];
   pickTable: WeightedPickTable;
@@ -267,9 +239,11 @@ export function assisterPickPrep(
   shooter: SimulationPlayer,
   initiator: SimulationPlayer,
 ): AssisterPickPrep {
-  const candidates = team.players.filter((p) => p.playerId !== shooter.playerId);
-  const weights = candidates.map((p) => assisterWeightOf(p, initiator));
-  return { candidates, pickTable: buildWeightedPickTable(weights) };
+  const candidates = assisterCandidatesOf(team, shooter);
+  return {
+    candidates,
+    pickTable: buildWeightedPickTable(assisterWeights(team, shooter, initiator)),
+  };
 }
 export function pickAssister(prep: AssisterPickPrep, rng: Rng): SimulationPlayer | null {
   if (prep.candidates.length === 0) return null;
@@ -470,22 +444,7 @@ export function applyZonePulls(
   return weights;
 }
 export function pickZone(action: ActionType, prep: ZonePrep, rng: Rng): ShotZone {
-  const table = prep.actionPickTables[action];
-  const pickUniform = () => rng.pick(SHOT_ZONES);
-  let roll = rng.next() * table.total;
-  if (table.total <= 0) return pickUniform();
-  for (let i = 0; i < SHOT_ZONES.length; i += 1) {
-    const w = table.weights[i] ?? 0;
-    if (roll < w) {
-      const zone = SHOT_ZONES[i];
-      if (zone === undefined) throw new Error('pickZone: index out of range');
-      return zone;
-    }
-    roll -= w;
-  }
-  const last = SHOT_ZONES[SHOT_ZONES.length - 1];
-  if (last === undefined) throw new Error('pickZone: index out of range');
-  return last;
+  return rng.weightedPick(SHOT_ZONES, prep.actionPickTables[action]);
 }
 export function isThreePointZone(zone: ShotZone): boolean {
   return zone === 'cornerThree' || zone === 'aboveBreakThree';

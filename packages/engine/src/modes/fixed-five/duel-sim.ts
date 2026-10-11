@@ -7,7 +7,7 @@ import type {
 } from '@hoop-rush/data-contracts';
 import { checkGameResult } from '../../sim/invariants.ts';
 import { simulateGame } from '../../sim/game.ts';
-import type { EngineContext } from '../../sim/context.ts';
+import type { EngineContext } from '../../sim/kernel.ts';
 import { fixedFiveDuelGameSeed } from './seeds.ts';
 import { summarizeDuelGames } from './results.ts';
 export interface DuelSimulationInput {

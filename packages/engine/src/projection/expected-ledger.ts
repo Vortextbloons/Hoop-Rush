@@ -9,7 +9,7 @@ import type {
 import { SHOT_ZONES } from '@hoop-rush/data-contracts';
 import { creationScore, spacingScore } from '../domain/archetypes.ts';
 import { ENGINE_CONSTANTS } from '../sim/constants.ts';
-import { REGULATION_PERIOD_SECONDS } from '../sim/periods.ts';
+import { REGULATION_PERIOD_SECONDS } from '../sim/clock.ts';
 import {
   freeThrowProbability,
   freeThrowsForZone,

@@ -7,7 +7,7 @@ import {
 } from '../../challenge/commands.ts';
 import { deriveAttemptSeed } from '../../challenge/seeds.ts';
 import { simulateGame } from '../../sim/game.ts';
-import type { EngineContext } from '../../sim/context.ts';
+import type { EngineContext } from '../../sim/kernel.ts';
 export const BEST_OF_ATTEMPTS = 2;
 export interface RunScore {
   wins: number;

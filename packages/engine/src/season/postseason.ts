@@ -47,8 +47,8 @@ import {
   type SeasonStandings,
   type SeasonTiebreakResolution,
 } from '@hoop-rush/data-contracts';
-import { createEngineContext } from '../sim/context.ts';
-import { HALFTIME_SECOND, REGULATION_TOTAL_SECONDS } from '../sim/periods.ts';
+import { createEngineContext } from '../sim/kernel.ts';
+import { HALFTIME_SECOND, REGULATION_TOTAL_SECONDS } from '../sim/clock.ts';
 import { createRng } from '../sim/rng.ts';
 import { applySeasonGameEffectsTransition } from './effects.ts';
 import { seasonGameSummaryFromResult } from './game-summary.ts';

@@ -23,7 +23,7 @@ import {
 } from '@hoop-rush/data-contracts';
 import { validateLineup } from '../domain/lineup.ts';
 import { auditScheduleEntries } from '../bracket/schedule.ts';
-import type { EngineContext } from '../sim/context.ts';
+import type { EngineContext } from '../sim/kernel.ts';
 import { simulateGame } from '../sim/game.ts';
 import { checkGameResult } from '../sim/invariants.ts';
 import { addGameToAggregates, zeroRunAggregates } from './aggregates.ts';

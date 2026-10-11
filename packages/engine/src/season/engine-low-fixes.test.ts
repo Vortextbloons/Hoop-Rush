@@ -21,7 +21,7 @@ import {
   buildSimulationPlayer,
   seedFromString,
 } from '@hoop-rush/test-fixtures';
-import { createEngineContext } from '../sim/context.ts';
+import { createEngineContext } from '../sim/kernel.ts';
 import { createSeasonEffectsState } from './effects.ts';
 import { checkSeasonGameResult } from './season-game-audit.ts';
 import { simulateSeasonGame, simulateSeasonGameWithEffects } from './season-game.ts';

@@ -244,7 +244,7 @@ interface CommandDef {
   run: (args: ParsedArgs) => CliReport | Promise<CliReport>;
 }
 const COMMANDS: Record<string, CommandDef> = {
-  help: { options: {}, run: () => helpCommand() },
+  help: { options: {}, run: () => helpCommand(COMMANDS) },
   'calibrate overall': {
     options: CALIBRATE_OVERALL_OPTIONS,
     run: (args) => calibrateOverall(s(args, 'output')),

@@ -1,4 +1,3 @@
-import { mkdirSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
 import {
@@ -34,6 +33,7 @@ import {
 import { makeReport, type CliReport } from '../report.ts';
 import { collectionPackCalibrateReportSchema } from '../report-schemas.ts';
 import { validateTargetsArtifact } from '../artifact.ts';
+import { atomicWriteFileSync } from '../io.ts';
 import { DEFAULT_MANIFEST, readJsonFile, sha256Hex } from './season-data.ts';
 import { loadCollectionCatalog } from './collection.ts';
 
@@ -428,10 +428,7 @@ function runOwnershipCohort(
 
 function writeTargetsArtifact(outPath: string, manifestPath: string, content: unknown): void {
   const target = resolve(outPath);
-  mkdirSync(dirname(target), { recursive: true });
-  const tmp = `${target}.tmp-${String(Date.now())}-${Math.random().toString(16).slice(2)}`;
-  writeFileSync(tmp, `${JSON.stringify(content, null, 2)}\n`);
-  renameSync(tmp, target);
+  atomicWriteFileSync(target, `${JSON.stringify(content, null, 2)}\n`);
   if (resolve(outPath) === resolve(DEFAULT_COLLECTION_TARGETS)) {
     const manifest = readJsonFile(manifestPath) as {
       collection?: Record<string, { url?: string; contentHash?: string }>;
@@ -442,9 +439,7 @@ function writeTargetsArtifact(outPath: string, manifestPath: string, content: un
         contentHash: sha256Hex(JSON.stringify(content)),
       };
       const manifestTarget = resolve(manifestPath);
-      const manifestTmp = `${manifestTarget}.tmp-${String(Date.now())}-${Math.random().toString(16).slice(2)}`;
-      writeFileSync(manifestTmp, `${JSON.stringify(manifest, null, 2)}\n`);
-      renameSync(manifestTmp, manifestTarget);
+      atomicWriteFileSync(manifestTarget, `${JSON.stringify(manifest, null, 2)}\n`);
     }
   }
 }

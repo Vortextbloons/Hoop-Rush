@@ -29,7 +29,7 @@ const pid = (value: string): PlayerId => playerIdSchema.parse(value);
 const fid = (value: string): FranchiseId => franchiseIdSchema.parse(value);
 const eid = (value: string): EraId => eraIdSchema.parse(value);
 import { DEFAULT_ERA_SIM_PROFILE } from '@hoop-rush/test-fixtures';
-import { createEngineContext } from '../../sim/context.ts';
+import { createEngineContext } from '../../sim/kernel.ts';
 import {
   applyClassicBuilderCommand,
   createClassicDraft,

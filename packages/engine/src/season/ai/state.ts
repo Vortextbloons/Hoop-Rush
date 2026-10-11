@@ -7,7 +7,7 @@ import {
   type SeasonRosterRole,
   type SeasonRosterTargets,
 } from '@hoop-rush/data-contracts';
-import { assertNever } from '../../sim/assert-never.ts';
+import { assertNever } from '../../sim/kernel.ts';
 import { ROSTER_ROLES, ROLE_COVERAGE_THRESHOLD, identityScore } from '../ai-scoring.ts';
 import type { SeasonRosterMemberInput } from '../roster-rules.ts';
 import type {

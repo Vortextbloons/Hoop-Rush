@@ -8,7 +8,7 @@ import type {
 } from '@hoop-rush/data-contracts';
 import { checkGameResult } from '../../sim/invariants.ts';
 import { simulateGame } from '../../sim/game.ts';
-import type { EngineContext } from '../../sim/context.ts';
+import type { EngineContext } from '../../sim/kernel.ts';
 import { fixedFiveH2HSeed, fixedFiveSharedGameSeed } from './seeds.ts';
 import { summarizeShared82Games, type Shared82Summary } from './results.ts';
 export function findWeakestOpponent<

@@ -5,7 +5,7 @@ import {
   type PlannerRotationContext,
   type PlannerUnitRequest,
 } from '../season/rotation-planner.ts';
-import { OVERTIME_PERIOD_SECONDS, REGULATION_PERIOD_SECONDS } from '../sim/periods.ts';
+import { OVERTIME_PERIOD_SECONDS, REGULATION_PERIOD_SECONDS } from '../sim/clock.ts';
 const REGULATION_TICKS = 48;
 const TICK_SECONDS = 60;
 const CLOSING_WINDOW_SECONDS = OVERTIME_PERIOD_SECONDS;

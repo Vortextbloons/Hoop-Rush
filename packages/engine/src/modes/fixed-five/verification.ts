@@ -15,7 +15,7 @@ import {
   fixedFiveCompetitionResultSchema,
   seasonDigestHex,
 } from '@hoop-rush/data-contracts';
-import type { EngineContext } from '../../sim/context.ts';
+import type { EngineContext } from '../../sim/kernel.ts';
 import { fixedFiveResultDigest } from './digest.ts';
 import { findWeakestOpponent, simulateShared82 } from './shared82.ts';
 import { simulateDuelSeries } from './duel-sim.ts';

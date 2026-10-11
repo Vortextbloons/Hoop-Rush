@@ -6,7 +6,7 @@ import type {
 } from '@hoop-rush/data-contracts';
 import type { Rng } from './rng.ts';
 import { GameRecorder, type SideIndex } from './recorder.ts';
-import { meanTripSeconds, sampleTripSeconds } from './timing.ts';
+import { meanTripSeconds, sampleTripSeconds } from './clock.ts';
 import {
   pickAction,
   pickDefender,
@@ -106,9 +106,12 @@ export interface PossessionStep {
 function slotOf(prep: TeamPrep, player: SimulationPlayer): number {
   return prep.slotByPlayerId.get(enginePlayerKey(player)) ?? -1;
 }
-function slotOrZero(prep: TeamPrep, player: SimulationPlayer): number {
+function slotOfOrThrow(prep: TeamPrep, player: SimulationPlayer): number {
   const slot = slotOf(prep, player);
-  return slot >= 0 ? slot : 0;
+  if (slot < 0) {
+    throw new Error(`possession: no slot for player ${enginePlayerKey(player)}`);
+  }
+  return slot;
 }
 function homeDefenseShotAdjustment(ctx: TripContext, defenseSide: SideIndex): number {
   return defenseSide === 0 ? (ctx.homeCourt?.homeDefenseShotAdjustment ?? 0) : 0;
@@ -544,7 +547,7 @@ function reboundFromLiveMissedFreeThrow(
       ctx.teams[offenseSide].players,
       prep.rebounderPickTables[0],
     );
-    ctx.recorder.offensiveRebound(offenseSide, slotOrZero(prep, rebounder));
+    ctx.recorder.offensiveRebound(offenseSide, slotOfOrThrow(prep, rebounder));
     ctx.possessionStart = 'offensiveRebound';
     if (ctx.shotClock) ctx.shotClock.remaining = 14;
     return { continues: true, liveReboundEnd: false };
@@ -554,7 +557,7 @@ function reboundFromLiveMissedFreeThrow(
     ctx.teams[defenseSide].players,
     prep.rebounderPickTables[1],
   );
-  ctx.recorder.defensiveRebound(defenseSide, slotOrZero(prep, rebounder));
+  ctx.recorder.defensiveRebound(defenseSide, slotOfOrThrow(prep, rebounder));
   ctx.possessionStart = 'defensiveRebound';
   return { continues: false, liveReboundEnd: true };
 }
@@ -816,7 +819,7 @@ function reboundAfterMiss(
   if (result.offensive) {
     const prep = ctx.preps[offenseSide];
     const rebounder = rng.weightedPick(ctx.teams[offenseSide].players, prep.rebounderPickTables[0]);
-    recorder.offensiveRebound(offenseSide, slotOrZero(prep, rebounder));
+    recorder.offensiveRebound(offenseSide, slotOfOrThrow(prep, rebounder));
     ctx.possessionStart = 'offensiveRebound';
     if (ctx.shotClock) ctx.shotClock.remaining = 14;
     return {
@@ -828,7 +831,7 @@ function reboundAfterMiss(
   }
   const prep = ctx.preps[defenseSide];
   const rebounder = rng.weightedPick(ctx.teams[defenseSide].players, prep.rebounderPickTables[1]);
-  recorder.defensiveRebound(defenseSide, slotOrZero(prep, rebounder));
+  recorder.defensiveRebound(defenseSide, slotOfOrThrow(prep, rebounder));
   ctx.possessionStart = 'defensiveRebound';
   return {
     continues: false,

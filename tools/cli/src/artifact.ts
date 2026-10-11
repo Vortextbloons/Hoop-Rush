@@ -1,14 +1,9 @@
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { Worker } from 'node:worker_threads';
 import { z } from 'zod';
-import { sha256Hex, readJson } from './io.ts';
+import { sha256Hex, readJson, atomicWriteFileSync } from './io.ts';
 import { makeReport, type CliReport } from './report.ts';
-function atomicWriteFileSync(target: string, content: string): void {
-  const tmp = `${target}.tmp-${String(Date.now())}-${String(Math.random()).slice(2)}`;
-  writeFileSync(tmp, content);
-  renameSync(tmp, target);
-}
 export function commitTargetsArtifact(args: {
   outPath: string;
   defaultTargetsPath: string;
@@ -23,7 +18,6 @@ export function commitTargetsArtifact(args: {
 } {
   try {
     const target = resolve(args.outPath);
-    mkdirSync(dirname(target), { recursive: true });
     atomicWriteFileSync(target, `${JSON.stringify(args.content, null, 2)}\n`);
     if (resolve(args.outPath) === resolve(args.defaultTargetsPath)) {
       const manifestPathResolved = resolve(args.manifestPath);

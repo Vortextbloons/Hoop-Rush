@@ -45,7 +45,7 @@ import {
 } from '@hoop-rush/persistence';
 import type { CommitPostseasonAdvancementInput } from '@hoop-rush/persistence';
 import type { SeasonArtifactUrls } from './season-assets';
-import { randomUUID } from '$lib/ids';
+import { newRequestId } from '$lib/ids';
 import { newSeasonId } from '$lib/ids';
 import {
   postseasonPostCommandEffects,
@@ -714,7 +714,7 @@ export function createSeasonPostseasonRunner(
               : await import('./season-assets').then((module) => module.seasonArtifactUrls());
           if (requestActive()) return;
           const target = createWorker();
-          const requestId = `warm-${randomUUID()}`;
+          const requestId = newRequestId('warm');
           warmRequestId = requestId;
           target.postMessage(
             seasonPostseasonWorkerWarmRequestSchema.parse({
@@ -743,7 +743,7 @@ export function createSeasonPostseasonRunner(
     if (currentRequestId !== null) {
       throw new Error('a postseason run is already in flight; cancel it first');
     }
-    const requestId = `sp-${randomUUID()}`;
+    const requestId = newRequestId('sp');
     currentRequestId = requestId;
     cancelled = false;
     void orchestrate(requestId, input, mode);

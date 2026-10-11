@@ -12,7 +12,7 @@ import {
 import { checkGameResult, gameResultDigest } from './invariants.ts';
 import { fnv1a32 } from './rng.ts';
 import { simulateGame } from './game.ts';
-import { createEngineContext } from './context.ts';
+import { createEngineContext } from './kernel.ts';
 declare const process: {
   env: Record<string, string | undefined>;
 };

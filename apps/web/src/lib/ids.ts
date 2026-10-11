@@ -22,6 +22,9 @@ export function randomUUID(): string {
   }
   throw new Error('secure randomness unavailable: crypto.getRandomValues is required');
 }
+export function newRequestId(prefix?: string): string {
+  return prefix === undefined ? randomUUID() : `${prefix}-${randomUUID()}`;
+}
 function randomUUIDFromBytes(): string {
   const bytes = randomBytes(16);
   bytes[6] = ((bytes[6] ?? 0) & 0x0f) | 0x40;

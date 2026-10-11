@@ -1,11 +1,11 @@
 import type { GameResult, GameSimulationInput, SimulationTeam } from '@hoop-rush/data-contracts';
-import type { EngineContext } from './context.ts';
+import type { EngineContext } from './kernel.ts';
 import {
   MAX_PERIODS_HARD_CAP,
   OVERTIME_PERIOD_SECONDS,
   REGULATION_PERIOD_SECONDS,
   overtimePeriodsOf,
-} from './periods.ts';
+} from './clock.ts';
 import { GameRecorder, type SideIndex } from './recorder.ts';
 import { createGameState, createTripContext, resolveTrip } from './possession.ts';
 import { buildFacts } from './facts.ts';

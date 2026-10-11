@@ -9,7 +9,7 @@ import type {
 import { CLASSIC_ROLL_VERSION, slotGroupOf } from '@hoop-rush/data-contracts';
 import { canPlay } from '../../domain/positions.ts';
 import { slotRequirement } from '../../domain/lineup.ts';
-import type { EngineContext } from '../../sim/context.ts';
+import type { EngineContext } from '../../sim/kernel.ts';
 import { classicRollSeed, sortClassicCatalog } from '../classic/draft.ts';
 import { fixedFiveFirstPicker } from './seeds.ts';
 import type { FixedFiveCandidate } from './sandbox-builder.ts';

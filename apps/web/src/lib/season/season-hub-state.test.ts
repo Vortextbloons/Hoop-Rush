@@ -41,6 +41,7 @@ import {
   buildSeasonRunFixture,
 } from '@hoop-rush/test-fixtures';
 import { SeasonRunLoadError } from '@hoop-rush/persistence';
+import { SeasonRunCommandStaleStateError } from '@hoop-rush/persistence';
 import { SeasonHubState, type BlockRunState, describeCommandRejection } from './season-hub-state';
 import { clearCachedSeasonSnapshot } from './season-state-cache';
 import type {
@@ -721,6 +722,29 @@ describe('SeasonHubState postseason commands (M2.6)', () => {
     expect(commit.run.stateRevision).toBe(1);
     hub.destroy();
   });
+  it('surfaces a stale command commit as an explicit retry prompt', async () => {
+    const run = hubBoundaryRun();
+    const repo = hubPostseasonRepo({
+      run,
+      summaries: [],
+      retainedDetails: [],
+      acceptedBlocks: [],
+      effects: hubZeroEffects(run),
+    });
+    repo.commitPostseasonAdvancement.mockRejectedValueOnce(
+      new SeasonRunCommandStaleStateError('cmd-stale', 0, 1),
+    );
+    const hub = new SeasonHubState(repo, new FakeRunner(), new FakePostseasonRunner());
+    hub.catalog = hubCatalogOf(run);
+    await hub.refresh();
+    await hub.startPostseason();
+    expect(hub.commandError?.command).toBe('start-postseason');
+    expect(hub.commandError?.rejection).toBeNull();
+    expect(hub.commandError?.message).toBe(
+      'The season changed before this action was saved. Refresh and try again.',
+    );
+    hub.destroy();
+  });
   it('submitPostseasonRotation accepts a legal rotation for the human team', async () => {
     const run = hubBoundaryRun();
     const repo = hubPostseasonRepo({
@@ -985,9 +1009,9 @@ describe('SeasonHubState trade guards', () => {
         reasons: ['test reason'],
       } as never),
     ).toContain('rotation is not legal');
-    expect(
-      describeCommandRejection('advance-postseason', { code: 'unknown' } as never),
-    ).toContain('rejected');
+    expect(describeCommandRejection('advance-postseason', { code: 'unknown' } as never)).toContain(
+      'rejected',
+    );
     expect(
       describeCommandRejection('buy-sponsor', {
         code: 'sponsor-not-offered',

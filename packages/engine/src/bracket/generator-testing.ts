@@ -13,7 +13,7 @@ import type {
   FranchiseCandidates,
 } from './generator.ts';
 import { generateBracket } from './generator.ts';
-import { createEngineContext } from '../sim/context.ts';
+import { createEngineContext } from '../sim/kernel.ts';
 function candidatePlayer(
   franchiseId: string,
   index: number,

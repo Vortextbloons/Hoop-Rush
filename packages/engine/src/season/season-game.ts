@@ -21,13 +21,13 @@ import type {
   SeasonEffectsState,
 } from '@hoop-rush/data-contracts';
 import type { Position, SimulationPlayer, SimulationTeam } from '@hoop-rush/data-contracts';
-import type { EngineContext } from '../sim/context.ts';
+import type { EngineContext } from '../sim/kernel.ts';
 import {
   MAX_PERIODS_HARD_CAP,
   OVERTIME_PERIOD_SECONDS,
   REGULATION_PERIOD_SECONDS,
   overtimePeriodsOf,
-} from '../sim/periods.ts';
+} from '../sim/clock.ts';
 import { GameRecorder, type SideIndex } from '../sim/recorder.ts';
 import {
   createGameState,

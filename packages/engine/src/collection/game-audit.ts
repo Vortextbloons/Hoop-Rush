@@ -14,7 +14,7 @@ import {
   OVERTIME_PERIOD_SECONDS,
   REGULATION_PERIOD_SECONDS,
   REGULATION_TOTAL_SECONDS,
-} from '../sim/periods.ts';
+} from '../sim/clock.ts';
 import { sameUnit } from '../season/season-game.ts';
 import { verifyDifficultyRatingAdjustments } from './difficulty.ts';
 import {

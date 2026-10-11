@@ -26,7 +26,7 @@ import {
   type SeasonFreeAgencyState,
 } from '@hoop-rush/data-contracts';
 import { blockRoundRange, canonicalJson } from '@hoop-rush/data-contracts';
-import { provisionalStandingOrder } from './aggregates.ts';
+import { provisionalStandingOrder, winnerOf } from './aggregates.ts';
 import { sortedBy } from './canonical.ts';
 export interface SeasonBlockRecapInput {
   runId: string;
@@ -60,16 +60,6 @@ function blockSummariesOf(
 ): SeasonGameSummary[] {
   const count = seasonBlockGameCount(blockIndex);
   return summaries.slice(Math.max(0, summaries.length - count), summaries.length);
-}
-function winnerOf(summary: SeasonGameSummary): string {
-  if (summary.status === 'forfeit') {
-    const loser = summary.forfeitLoserFranchiseId;
-    if (loser === null) {
-      throw new Error(`forfeit summary ${summary.gameId} does not name the losing team`);
-    }
-    return loser === summary.homeFranchiseId ? summary.awayFranchiseId : summary.homeFranchiseId;
-  }
-  return summary.homeScore > summary.awayScore ? summary.homeFranchiseId : summary.awayFranchiseId;
 }
 function positionOf(standings: SeasonStandings, franchiseId: string): number {
   const order = provisionalStandingOrder(standings);

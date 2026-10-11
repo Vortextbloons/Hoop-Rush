@@ -1,5 +1,4 @@
-import { mkdirSync, renameSync, writeFileSync } from 'node:fs';
-import { createHash } from 'node:crypto';
+import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -23,17 +22,7 @@ import {
   collectionLaunchSetRewardDefinitions,
 } from './collection-progression-constants.ts';
 import { loadCollectionCatalog } from './commands/collection.ts';
-import { readJson } from './io.ts';
-
-function atomicWriteFileSync(target: string, content: string): void {
-  const tmp = `${target}.tmp-${String(Date.now())}-${String(Math.random()).slice(2)}`;
-  writeFileSync(tmp, content);
-  renameSync(tmp, target);
-}
-
-function sha256Hex(content: string): string {
-  return createHash('sha256').update(content, 'utf8').digest('hex');
-}
+import { readJson, atomicWriteFileSync, sha256Hex } from './io.ts';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../');
 const STATIC_DATA = resolve(REPO_ROOT, 'apps/web/static/data');

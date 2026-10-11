@@ -15,6 +15,9 @@ import {
   type SeasonChallengeEvaluationFacts,
 } from '@hoop-rush/data-contracts';
 
+import { conferenceOf } from './league.ts';
+import { standingsOrderComparator } from './standings.ts';
+
 interface StandingsRow {
   franchiseId: string;
   wins: number;
@@ -35,21 +38,6 @@ function rowsById(standings: SeasonStandings): Map<string, StandingsRow> {
     });
   }
   return map;
-}
-
-function orderedByStandings(rows: StandingsRow[]): StandingsRow[] {
-  return [...rows].sort(
-    (a, b) =>
-      b.wins - a.wins ||
-      b.pointsFor - b.pointsAgainst - (a.pointsFor - a.pointsAgainst) ||
-      (a.franchiseId < b.franchiseId ? -1 : 1),
-  );
-}
-
-function conferenceOf(league: SeasonLeague, franchiseId: string): string {
-  const team = league.teams.find((entry) => entry.franchiseId === franchiseId);
-  if (team === undefined) throw new Error(`franchise ${franchiseId} is not part of the league`);
-  return team.conference;
 }
 
 function humanGamesInBlock(
@@ -104,7 +92,7 @@ export function dealSeasonBlockChallenges(
     .filter((team) => team.conference === humanConference)
     .map((team) => byId.get(team.franchiseId))
     .filter((row): row is StandingsRow => row !== undefined);
-  const orderedConf = orderedByStandings(confRows);
+  const orderedConf = [...confRows].sort(standingsOrderComparator);
   const leader = orderedConf[0] ?? null;
   const leaderFranchiseId =
     leader !== null && leader.franchiseId !== humanFranchiseId ? leader.franchiseId : null;

@@ -20,7 +20,7 @@ import {
   buildSimulationPlayer,
   seedFromString,
 } from '@hoop-rush/test-fixtures';
-import { createEngineContext } from '../sim/context.ts';
+import { createEngineContext } from '../sim/kernel.ts';
 import { simulateSeasonGame } from './season-game.ts';
 import {
   SEASON_HOME_COURT_DEFENSE_MAX_ADJUSTMENT,

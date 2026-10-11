@@ -15,7 +15,7 @@ import {
   type SeasonDraftPick,
   type SeasonDraftState,
 } from '@hoop-rush/data-contracts';
-import { assertNever } from '../sim/assert-never.ts';
+import { assertNever } from '../sim/kernel.ts';
 import { createRng } from '../sim/rng.ts';
 import { validateDraftCatalog } from './catalog-validation.ts';
 import {

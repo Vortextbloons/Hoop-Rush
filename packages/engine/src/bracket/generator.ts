@@ -18,7 +18,7 @@ import {
   playerIdSchema,
   seasonKeySchema,
 } from '@hoop-rush/data-contracts';
-import type { EngineContext } from '../sim/context.ts';
+import type { EngineContext } from '../sim/kernel.ts';
 import { createRng, shuffle } from '../sim/rng.ts';
 import { validateBracketContent } from '../challenge/commands.ts';
 import { evaluateLineupBalance, evaluateLineupStrength } from '../challenge/lineup-eval.ts';

@@ -5,13 +5,13 @@ import type {
   SeasonUnitStint,
 } from '@hoop-rush/data-contracts';
 import { auditSideAccounting } from '../sim/accounting-core.ts';
-import { createEngineContext } from '../sim/context.ts';
+import { createEngineContext } from '../sim/kernel.ts';
 import {
   MAX_PERIODS_HARD_CAP,
   OVERTIME_PERIOD_SECONDS,
   REGULATION_PERIOD_SECONDS,
   REGULATION_TOTAL_SECONDS,
-} from '../sim/periods.ts';
+} from '../sim/clock.ts';
 import { SEASON_ROSTER_SIZE } from './roster-rules.ts';
 import { chooseInitialUnit, type PlannerRotationContext } from './rotation-planner.ts';
 import { sameUnit, simulateSeasonGame, simulateSeasonGameWithEffects } from './season-game.ts';

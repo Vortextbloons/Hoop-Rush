@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import {
   COLLECTION_CATALOG_VERSION,
@@ -61,6 +61,7 @@ import {
 import { makeReport, type CliReport } from '../report.ts';
 import { collectionProgressionCalibrateReportSchema } from '../report-schemas.ts';
 import { validateTargetsArtifact } from '../artifact.ts';
+import { atomicWriteFileSync } from '../io.ts';
 import {
   createSeedChunkRunner,
   resolveCountCalibrationArgs,
@@ -1168,11 +1169,8 @@ function writeProgressionTargetsArtifact(input: {
 }): { written: boolean; path: string; error: string | null; pinned: boolean } {
   try {
     const target = resolve(input.outPath);
-    mkdirSync(dirname(target), { recursive: true });
     const serialized = `${JSON.stringify(input.content)}\n`;
-    const tmp = `${target}.tmp-${String(Date.now())}-${String(Math.random()).slice(2)}`;
-    writeFileSync(tmp, serialized);
-    renameSync(tmp, target);
+    atomicWriteFileSync(target, serialized);
     let pinned = false;
     if (target === resolve(DEFAULT_COLLECTION_PROGRESSION_TARGETS)) {
       const manifestPath = resolve(input.manifestPath);
@@ -1186,9 +1184,7 @@ function writeProgressionTargetsArtifact(input: {
           contentHash: sha256Hex(readFileSync(target)),
         },
       };
-      const manifestTmp = `${manifestPath}.tmp-${String(Date.now())}-${String(Math.random()).slice(2)}`;
-      writeFileSync(manifestTmp, `${JSON.stringify(manifest, null, 2)}\n`);
-      renameSync(manifestTmp, manifestPath);
+      atomicWriteFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
       pinned = true;
     }
     return { written: true, path: target, error: null, pinned };

@@ -1,5 +1,6 @@
 import type { SeasonPostseasonRepository, SeasonRunRepository } from '@hoop-rush/persistence';
 import type { SeasonSchedule } from '@hoop-rush/data-contracts';
+import { getPersistence } from '$lib/persistence';
 import type { SeasonBlockRunner, SeasonBlockStartInput } from '$lib/season/season-block-runner';
 import type { SeasonPostseasonRunner } from '$lib/season/season-postseason-runner';
 declare global {
@@ -39,8 +40,7 @@ export function getSeasonRunRepository(
 async function createRepo(options: {
   schedule?: SeasonSchedule;
 }): Promise<SeasonRunRepository & SeasonPostseasonRepository> {
-  const module = await import('@hoop-rush/persistence');
-  return new module.DexieSeasonRunRepository(undefined, options);
+  return getPersistence().seasonRunRepository(options);
 }
 let runnerPromise: Promise<SeasonBlockRunner> | null = null;
 export function getSeasonBlockRunner(): Promise<SeasonBlockRunner> {

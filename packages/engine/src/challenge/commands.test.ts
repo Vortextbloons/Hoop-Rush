@@ -12,7 +12,7 @@ import {
   franchiseIdSchema,
   seedSchema,
 } from '@hoop-rush/data-contracts';
-import { createEngineContext } from '../sim/context.ts';
+import { createEngineContext } from '../sim/kernel.ts';
 import { simulateGame } from '../sim/game.ts';
 import {
   abandonChallenge,

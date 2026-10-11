@@ -22,10 +22,8 @@ import { teamSpacing, twoPointAnchorFactor } from './shooting.ts';
 import { defenderPressure, stealerWeights } from './security.ts';
 import { rebounderWeights, teamMean } from './rebounding.ts';
 import { foulerWeights, freeThrowProbability, freeThrowShooterWeights } from './fouls.ts';
-import {
-  responsibilityModifiersForSlot,
-  type PositionResponsibilityModifiers,
-} from './position-responsibilities.ts';
+import { responsibilityModifiersForSlot } from './position-responsibilities.ts';
+import { type PositionResponsibilityModifiers } from './constants.ts';
 export function enginePlayerKey(player: SimulationPlayer): string {
   return player.playerVersionId ?? player.playerId;
 }

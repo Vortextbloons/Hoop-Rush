@@ -2,13 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { buildGameSimulationInput, seedFromString } from '@hoop-rush/test-fixtures';
 import { seedSchema } from '@hoop-rush/data-contracts';
 import type { GameSimulationInput } from '@hoop-rush/data-contracts';
-import { createEngineContext } from './context.ts';
+import { createEngineContext } from './kernel.ts';
 import { GameRecorder, type RecorderSide, type SideIndex } from './recorder.ts';
 import {
   MAX_PERIODS_HARD_CAP,
   OVERTIME_PERIOD_SECONDS,
   REGULATION_PERIOD_SECONDS,
-} from './periods.ts';
+} from './clock.ts';
 import {
   createGameState,
   createTripContext,

@@ -41,6 +41,12 @@ import {
 import { getManifest } from '$lib/data';
 import { resolveAssetUrl } from '$lib/asset-url';
 import {
+  COLLECTION_COMMAND_POLICY,
+  COLLECTION_PACK_PURCHASE_POLICY,
+  runSubmission,
+  type SubmissionPolicy,
+} from '$lib/submit';
+import {
   loadCollectionCatalog,
   loadCollectionGameRules,
   loadCollectionProgression,
@@ -170,13 +176,21 @@ export async function claimWelcomeStarter(nowIso: string): Promise<ClaimOutcome>
     command: 'claim-welcome',
     acquiredAtIso: nowIso,
   });
-  const outcome = await repo.applyCollectionCommand({
+  const catalogHash = await collectionCatalogHash();
+  const progression = await progressionCommandArgs();
+  const outcome = await applyCollectionOutcome(
+    COLLECTION_COMMAND_POLICY,
     command,
-    catalog,
-    catalogHash: await collectionCatalogHash(),
-    ...(await progressionCommandArgs()),
-    recordedAtIso: nowIso,
-  });
+    (current) =>
+      repo.applyCollectionCommand({
+        command: current,
+        catalog,
+        catalogHash,
+        ...progression,
+        recordedAtIso: nowIso,
+      }),
+    rethrowCollectionStale,
+  );
   if (!outcome.pull) throw new Error('The starter claim did not produce cards.');
   return {
     state: outcome.state,
@@ -205,6 +219,25 @@ function assertPreviewCurrent(state: CollectionState, preview?: CollectionPrevie
   }
 }
 
+function rethrowCollectionStale(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
+async function applyCollectionOutcome<TCommand, TResult>(
+  policy: SubmissionPolicy,
+  command: TCommand,
+  apply: (command: TCommand) => Promise<TResult>,
+  mapStale: (error: unknown) => Error,
+): Promise<TResult> {
+  const report = await runSubmission(policy, command, {
+    submit: (current) => apply(current),
+    classify: () => 'accepted',
+    classifyError: (error) => (error instanceof CollectionCommandStaleError ? 'stale' : null),
+  });
+  if (report.disposition === 'stale') throw mapStale(report.error);
+  return report.receipt as TResult;
+}
+
 export async function openPack(
   packId: string,
   nowIso: string,
@@ -227,19 +260,21 @@ export async function openPack(
     packId: parsedPackId,
     acquiredAtIso: nowIso,
   });
-  let outcome;
-  try {
-    outcome = await repo.applyCollectionCommand({
-      command,
-      catalog,
-      catalogHash: await collectionCatalogHash(),
-      ...(await progressionCommandArgs()),
-      recordedAtIso: nowIso,
-    });
-  } catch (error) {
-    if (error instanceof CollectionCommandStaleError) throw new StaleCollectionPreviewError();
-    throw error;
-  }
+  const catalogHash = await collectionCatalogHash();
+  const progression = await progressionCommandArgs();
+  const outcome = await applyCollectionOutcome(
+    COLLECTION_PACK_PURCHASE_POLICY,
+    command,
+    (current) =>
+      repo.applyCollectionCommand({
+        command: current,
+        catalog,
+        catalogHash,
+        ...progression,
+        recordedAtIso: nowIso,
+      }),
+    () => new StaleCollectionPreviewError(),
+  );
   if (!outcome.pull) throw new Error('The pack did not produce cards.');
   return {
     state: outcome.state,
@@ -267,13 +302,21 @@ export async function setTargetPlayer(
     command: 'set-target-player',
     playerId,
   });
-  const outcome = await repo.applyCollectionCommand({
+  const catalogHash = await collectionCatalogHash();
+  const progression = await progressionCommandArgs();
+  const outcome = await applyCollectionOutcome(
+    COLLECTION_COMMAND_POLICY,
     command,
-    catalog,
-    catalogHash: await collectionCatalogHash(),
-    ...(await progressionCommandArgs()),
-    recordedAtIso: nowIso,
-  });
+    (current) =>
+      repo.applyCollectionCommand({
+        command: current,
+        catalog,
+        catalogHash,
+        ...progression,
+        recordedAtIso: nowIso,
+      }),
+    rethrowCollectionStale,
+  );
   return outcome.state;
 }
 
@@ -299,13 +342,21 @@ export async function claimSetReward(setId: string, nowIso: string): Promise<Set
     setId,
     claimedAtIso: nowIso,
   });
-  const outcome = await repo.applyCollectionCommand({
+  const catalogHash = await collectionCatalogHash();
+  const progression = await progressionCommandArgs();
+  const outcome = await applyCollectionOutcome(
+    COLLECTION_COMMAND_POLICY,
     command,
-    catalog,
-    catalogHash: await collectionCatalogHash(),
-    ...(await progressionCommandArgs()),
-    recordedAtIso: nowIso,
-  });
+    (current) =>
+      repo.applyCollectionCommand({
+        command: current,
+        catalog,
+        catalogHash,
+        ...progression,
+        recordedAtIso: nowIso,
+      }),
+    rethrowCollectionStale,
+  );
   return {
     state: outcome.state,
     receipt: outcome.setReceipt ?? null,

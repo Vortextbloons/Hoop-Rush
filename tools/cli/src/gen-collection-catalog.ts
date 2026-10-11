@@ -1,5 +1,4 @@
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
-import { createHash } from 'node:crypto';
+import { mkdirSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -25,21 +24,11 @@ import {
   COLLECTION_VERSION,
   summaryRatingsOfRatings,
 } from '@hoop-rush/data-contracts';
-import { readJson } from './io.ts';
+import { readJson, atomicWriteFileSync, sha256Hex } from './io.ts';
 import {
   COLLECTION_SPECIALS,
   COLLECTION_SPECIALS_VERSION as AUTHORED_SPECIALS_VERSION,
 } from './collection-specials.ts';
-
-function atomicWriteFileSync(target: string, content: string): void {
-  const tmp = `${target}.tmp-${String(Date.now())}-${String(Math.random()).slice(2)}`;
-  writeFileSync(tmp, content);
-  renameSync(tmp, target);
-}
-
-function sha256Hex(content: string): string {
-  return createHash('sha256').update(content, 'utf8').digest('hex');
-}
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../');
 const STATIC_DATA = resolve(REPO_ROOT, 'apps/web/static/data');

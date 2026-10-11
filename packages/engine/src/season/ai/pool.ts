@@ -1,5 +1,5 @@
 import { seasonNamespaceSeed, type SeasonRosterRole } from '@hoop-rush/data-contracts';
-import { assertNever } from '../../sim/assert-never.ts';
+import { assertNever } from '../../sim/kernel.ts';
 import { createRng, shuffle } from '../../sim/rng.ts';
 import { BAND_CEILING_PENALTY, ROSTER_ROLES, type PercentileTier } from '../ai-scoring.ts';
 import {

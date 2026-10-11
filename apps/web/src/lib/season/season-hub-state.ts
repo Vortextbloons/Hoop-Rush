@@ -56,9 +56,15 @@ import type {
   SeasonRunRepository,
   SeasonRunSnapshot,
 } from '@hoop-rush/persistence';
-import { SeasonRunLoadError } from '@hoop-rush/persistence';
+import { SeasonRunCommandStaleStateError, SeasonRunLoadError } from '@hoop-rush/persistence';
 import { newSeasonId } from '$lib/ids';
 import { sleep } from '$lib/sleep';
+import {
+  SEASON_BLOCK_POLICY,
+  SEASON_COMMAND_POLICY,
+  canResubmitBlock,
+  runSubmission,
+} from '$lib/submit';
 import {
   cachedSeasonSnapshotMatches,
   clearCachedSeasonSnapshot,
@@ -183,6 +189,11 @@ function postCommandEffects(run: SeasonRun, prior: SeasonEffectsState): SeasonEf
 }
 const handleRunCommand = handleSeasonRunCommand;
 type RunCommandOutput = ReturnType<typeof handleRunCommand>;
+type RunCommandSubmission =
+  | { kind: 'accepted'; output: RunCommandOutput }
+  | { kind: 'rejected'; output: RunCommandOutput; rejection: SeasonRunCommandRejection };
+const STALE_SEASON_COMMAND_MESSAGE =
+  'The season changed before this action was saved. Refresh and try again.';
 const IDLE_BLOCK: BlockRunState = {
   requestId: null,
   blockIndex: null,
@@ -981,17 +992,34 @@ export class SeasonHubState {
     }
     if (hooks.beforeExecute !== undefined && !hooks.beforeExecute()) return;
     if (hooks.prepare !== undefined && !(await hooks.prepare())) return;
-    try {
-      const output = handleRunCommand(command, hooks.context(snapshot));
-      const envelope = output.result;
-      if (envelope.result.status === 'rejected') {
-        this.rejectCommand(command.command, envelope.result.rejection);
-        return;
-      }
-      await hooks.apply(output, snapshot);
-    } catch (error) {
-      this.failCommand(command.command, error instanceof Error ? error.message : String(error));
+    const report = await runSubmission(SEASON_COMMAND_POLICY, command, {
+      submit: async (current): Promise<RunCommandSubmission> => {
+        const output = handleRunCommand(current, hooks.context(snapshot));
+        const envelope = output.result;
+        if (envelope.result.status === 'rejected') {
+          return { kind: 'rejected', output, rejection: envelope.result.rejection };
+        }
+        await hooks.apply(output, snapshot);
+        return { kind: 'accepted', output };
+      },
+      classify: (submission) => (submission.kind === 'accepted' ? 'accepted' : 'rejected'),
+      classifyError: (error) =>
+        error instanceof SeasonRunCommandStaleStateError ? 'stale' : 'rejected',
+    });
+    if (report.disposition === 'accepted') return;
+    if (report.disposition === 'stale') {
+      this.failCommand(command.command, STALE_SEASON_COMMAND_MESSAGE);
+      return;
     }
+    const submission = report.receipt;
+    if (submission !== null && submission.kind === 'rejected') {
+      this.rejectCommand(command.command, submission.rejection);
+      return;
+    }
+    this.failCommand(
+      command.command,
+      report.error instanceof Error ? report.error.message : String(report.error),
+    );
   }
   private requirePostseasonStage(command: SeasonRunCommand['command']): boolean {
     const stage = this.snapshot?.run.stage ?? null;
@@ -1190,7 +1218,7 @@ export class SeasonHubState {
     clearCachedSeasonSnapshot();
     await this.refresh();
     const revision = this.snapshot?.acceptedBlocks.length;
-    if (revision === undefined || this.block.command.expectedRevision !== revision) {
+    if (!canResubmitBlock(SEASON_BLOCK_POLICY, this.block.command.expectedRevision, revision)) {
       this.block = { ...IDLE_BLOCK };
       this.emit();
       return;

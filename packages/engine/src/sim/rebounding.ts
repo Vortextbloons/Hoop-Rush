@@ -5,8 +5,7 @@ import type {
   SimulationTeam,
 } from '@hoop-rush/data-contracts';
 import type { Rng } from './rng.ts';
-import { ENGINE_CONSTANTS } from './constants.ts';
-import type { PositionResponsibilityModifiers } from './position-responsibilities.ts';
+import { ENGINE_CONSTANTS, type PositionResponsibilityModifiers } from './constants.ts';
 export function teamMean(team: SimulationTeam, rating: keyof SimulationPlayer['ratings']): number {
   return (
     team.players.reduce((sum, p) => {

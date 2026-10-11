@@ -12,7 +12,7 @@ import {
   type Seed,
 } from '@hoop-rush/data-contracts';
 import type { FixedFiveVerificationInput } from '@hoop-rush/engine';
-import { randomUUID } from '$lib/ids';
+import { newRequestId } from '$lib/ids';
 export type FixedFiveRunnerEvent =
   | {
       kind: 'progress';
@@ -57,7 +57,7 @@ export class FixedFiveRunner {
     this.start({
       schemaVersion: FIXED_FIVE_WORKER_WIRE_VERSION,
       type: 'fixed-five-shared-82',
-      requestId: randomUUID(),
+      requestId: newRequestId(),
       rootSeed: input.rootSeed,
       p1Team: input.p1Team,
       p2Team: input.p2Team,
@@ -79,7 +79,7 @@ export class FixedFiveRunner {
     this.start({
       schemaVersion: FIXED_FIVE_WORKER_WIRE_VERSION,
       type: 'fixed-five-duel',
-      requestId: randomUUID(),
+      requestId: newRequestId(),
       rootSeed: input.rootSeed,
       p1Team: input.p1Team,
       p2Team: input.p2Team,
@@ -93,7 +93,7 @@ export class FixedFiveRunner {
       fixedFiveWorkerRequestSchema.parse({
         schemaVersion: FIXED_FIVE_WORKER_WIRE_VERSION,
         type: 'fixed-five-verify',
-        requestId: randomUUID(),
+        requestId: newRequestId(),
         roomId: input.roomId,
         competition: input.competition,
         rootSeed: input.rootSeed,

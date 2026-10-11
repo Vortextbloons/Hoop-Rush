@@ -1,4 +1,5 @@
 import type {
+  FixedFiveCommand,
   FixedFiveCommandPayload,
   FixedFiveCommandReceipt,
   FixedFiveMultiplayerTransport,
@@ -6,6 +7,12 @@ import type {
   Id,
   CommandId,
 } from '@hoop-rush/data-contracts';
+import {
+  FIXED_FIVE_COMMAND_POLICY,
+  FIXED_FIVE_SINGLE_ATTEMPT_POLICY,
+  runSubmission,
+} from '$lib/submit';
+
 const STALE_RETRY_SAFE_KINDS: ReadonlySet<FixedFiveCommandPayload['kind']> = new Set([
   'ready',
   'reroll',
@@ -16,6 +23,12 @@ const STALE_RETRY_SAFE_KINDS: ReadonlySet<FixedFiveCommandPayload['kind']> = new
   'sandbox-reposition',
   'sandbox-remove',
 ]);
+
+type FixedFiveOutboundCommand = Omit<FixedFiveCommand, 'ordinal'> & {
+  ordinal?: number;
+  expectedRevision?: number;
+};
+
 export interface SubmitFixedFiveCommandInput {
   submitCommand: FixedFiveMultiplayerTransport['submitCommand'];
   roomId: Id;
@@ -27,14 +40,16 @@ export interface SubmitFixedFiveCommandInput {
   retry?: boolean;
   retryAfterResync?: () => boolean;
 }
+
 export interface SubmitFixedFiveCommandResult {
   receipt: FixedFiveCommandReceipt;
   retried: boolean;
 }
+
 export async function submitFixedFiveCommand(
   input: SubmitFixedFiveCommandInput,
 ): Promise<SubmitFixedFiveCommandResult> {
-  const command = {
+  const command: FixedFiveOutboundCommand = {
     schemaVersion: 1 as const,
     roomId: input.roomId,
     commandId: input.commandId,
@@ -42,20 +57,21 @@ export async function submitFixedFiveCommand(
     payload: input.payload,
     expectedRevision: input.expectedRevision,
   };
-  let receipt = await input.submitCommand(command);
-  if (receipt.accepted || receipt.rejectionCode !== 'stale-revision') {
-    return { receipt, retried: false };
-  }
-  if (input.retry === false) return { receipt, retried: false };
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    await input.resync();
-    const retrySafe =
-      STALE_RETRY_SAFE_KINDS.has(input.payload.kind) || input.retryAfterResync?.() === true;
-    if (!retrySafe) return { receipt, retried: attempt > 0 };
-    receipt = await input.submitCommand({ ...command, expectedRevision: receipt.revision });
-    if (receipt.accepted || receipt.rejectionCode !== 'stale-revision') {
-      return { receipt, retried: true };
-    }
-  }
-  return { receipt, retried: true };
+  const policy =
+    input.retry === false ? FIXED_FIVE_SINGLE_ATTEMPT_POLICY : FIXED_FIVE_COMMAND_POLICY;
+  const report = await runSubmission(policy, command, {
+    submit: (current) => input.submitCommand(current),
+    classify: (receipt) =>
+      receipt.accepted
+        ? 'accepted'
+        : receipt.rejectionCode === 'stale-revision'
+          ? 'stale'
+          : 'rejected',
+    canRetry: () =>
+      STALE_RETRY_SAFE_KINDS.has(input.payload.kind) || input.retryAfterResync?.() === true,
+    revise: (current, receipt) => ({ ...current, expectedRevision: receipt.revision }),
+    resync: input.resync,
+  });
+  if (report.receipt === null) throw report.error;
+  return { receipt: report.receipt, retried: report.retried };
 }
