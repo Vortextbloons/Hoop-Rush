@@ -121,3 +121,18 @@ paths change (stages 2, 4, and 6).
   promotion) moved into `SeasonSession`; the web postseason runner is a
   simulation job. New session postseason suite (14 tests) and reworked
   transport suite. Stage 2 complete.
+- 2026-10-11, stage 4a: golden harness frozen before splitting engine
+  orchestration. New pins: `season-block-validation.test.ts` (rejection-code
+  matrix, runs in quick), `block-golden.test.ts` (block-0 checkpoint,
+  post-block state, and commit digests plus per-game summary digest),
+  `injuries.test.ts` (regular/postseason roll vectors covering miss, minor
+  same-game return, moderate, major, and season-ending, plus the rehab
+  premium). Season suite re-baselined green (12 files / 136 tests).
+  Pre-existing baseline issue found while capturing CLI gates:
+  `season block simulate` and `season full simulate` on the committed
+  `tools/cli/src/fixtures/season-run.json` throw `SeasonBlockInvariantError`
+  at game s000023 (thunder loses its rotation's only legal replacement in
+  block 0); the CLI's monolithic path has no interruption handling, so those
+  two commands are not usable as stage-4 gates. Stage-4 gates are the engine
+  and application golden suites plus `cli-season-reproduce` (self-contained)
+  and the full CI run.
