@@ -10,7 +10,7 @@ import {
 } from './season-versions.ts';
 import type { SimulationPlayer } from './simulation.ts';
 import { simulationPlayerSchema } from './simulation.ts';
-export const PROJECTION_SLOTS = ['G1', 'G2', 'F1', 'F2', 'C'] as const;
+export const PROJECTION_SLOTS = ['PG', 'SG', 'SF', 'PF', 'C'] as const;
 export const projectionSlotSchema = z.enum(PROJECTION_SLOTS);
 export type ProjectionSlot = z.infer<typeof projectionSlotSchema>;
 export const PROJECTION_MATCHUP_ARCHETYPES = [

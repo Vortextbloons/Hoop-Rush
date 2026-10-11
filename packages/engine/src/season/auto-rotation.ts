@@ -260,7 +260,7 @@ export function recommendSeasonRotation(
   if (eligible.length < 10) {
     return {
       status: 'unavailable',
-      reason: `need five legal G/G/F/F/C players from ten eligible (got ${String(eligible.length)} eligible)`,
+      reason: `need five legal PG/SG/SF/PF/C players from ten eligible (got ${String(eligible.length)} eligible)`,
       degraded: input.projection == null,
       facts: { ...baseFacts, consideredCombos: 0 },
     };
@@ -544,7 +544,7 @@ export function recommendSeasonRotation(
       return {
         status: 'unavailable',
         reason:
-          'need five legal G/G/F/F/C players from ten eligible (keep-active-10 has no legal five)',
+          'need five legal PG/SG/SF/PF/C players from ten eligible (keep-active-10 has no legal five)',
         degraded,
         facts: { ...factsBase, consideredCombos: 0 },
       };
@@ -560,7 +560,7 @@ export function recommendSeasonRotation(
     if (!legalFiveExists(asMembers)) {
       return {
         status: 'unavailable',
-        reason: 'need five legal G/G/F/F/C players from ten eligible (no legal five)',
+        reason: 'need five legal PG/SG/SF/PF/C players from ten eligible (no legal five)',
         degraded,
         facts: { ...factsBase, consideredCombos: 0 },
       };
@@ -586,7 +586,7 @@ export function recommendSeasonRotation(
     if (legal.length === 0) {
       return {
         status: 'unavailable',
-        reason: 'need five legal G/G/F/F/C players from ten eligible (no legal active-ten)',
+        reason: 'need five legal PG/SG/SF/PF/C players from ten eligible (no legal active-ten)',
         degraded,
         facts: { ...factsBase, consideredCombos: raw.length },
       };
@@ -647,7 +647,7 @@ export function recommendSeasonRotation(
     if (active === undefined) {
       return {
         status: 'unavailable',
-        reason: 'need five legal G/G/F/F/C players from ten eligible (no legal active-ten)',
+        reason: 'need five legal PG/SG/SF/PF/C players from ten eligible (no legal active-ten)',
         degraded,
         facts: factsBase,
       };
@@ -703,7 +703,7 @@ export function recommendSeasonRotation(
   if (rankedRotations.length === 0) {
     return {
       status: 'unavailable',
-      reason: 'need five legal G/G/F/F/C players from ten eligible (no valid rotation)',
+      reason: 'need five legal PG/SG/SF/PF/C players from ten eligible (no valid rotation)',
       degraded,
       facts: factsBase,
     };
@@ -712,7 +712,7 @@ export function recommendSeasonRotation(
   if (winner === undefined) {
     return {
       status: 'unavailable',
-      reason: 'need five legal G/G/F/F/C players from ten eligible (no valid rotation)',
+      reason: 'need five legal PG/SG/SF/PF/C players from ten eligible (no valid rotation)',
       degraded,
       facts: factsBase,
     };

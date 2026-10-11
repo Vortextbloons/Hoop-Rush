@@ -1,12 +1,12 @@
-import { LINEUP_STRUCTURE, type SlotGroup } from '@hoop-rush/data-contracts';
+import { LINEUP_STRUCTURE, slotGroupOf, type SlotGroup } from '@hoop-rush/data-contracts';
 import { clamp } from '../domain/math.ts';
 import { ENGINE_CONSTANTS, type PositionResponsibilityModifiers } from './constants.ts';
 export function slotGroupOfSlot(slot: number): SlotGroup {
-  const group = LINEUP_STRUCTURE[slot];
-  if (group === undefined) {
+  const position = LINEUP_STRUCTURE[slot];
+  if (position === undefined) {
     throw new Error(`position-responsibilities: no slot group for slot ${String(slot)}`);
   }
-  return group;
+  return slotGroupOf(position);
 }
 export function boundResponsibilityModifiers(
   modifiers: PositionResponsibilityModifiers,

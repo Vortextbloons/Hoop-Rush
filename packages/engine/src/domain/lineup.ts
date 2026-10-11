@@ -1,14 +1,14 @@
 import type {
   Lineup,
   LineupAssignment,
+  Position,
   PositionUnion,
-  SlotGroup,
   SlotIndex,
 } from '@hoop-rush/data-contracts';
 import { LINEUP_STRUCTURE } from '@hoop-rush/data-contracts';
 import { playerIdSchema } from '@hoop-rush/data-contracts';
 import { canPlay } from './positions.ts';
-export function slotRequirement(slotIndex: SlotIndex): SlotGroup {
+export function slotRequirement(slotIndex: SlotIndex): Position {
   const requirement = LINEUP_STRUCTURE[slotIndex];
   if (requirement === undefined) {
     throw new Error(`lineup: no position requirement for slot ${String(slotIndex)}`);

@@ -6,7 +6,7 @@ import type {
   Seed,
   SlotIndex,
 } from '@hoop-rush/data-contracts';
-import { CLASSIC_ROLL_VERSION, slotGroupOf } from '@hoop-rush/data-contracts';
+import { CLASSIC_ROLL_VERSION } from '@hoop-rush/data-contracts';
 import { canPlay } from '../../domain/positions.ts';
 import { slotRequirement } from '../../domain/lineup.ts';
 import type { EngineContext } from '../../sim/kernel.ts';
@@ -93,7 +93,7 @@ export function duelRollCandidates(
         const positions = candidate?.positions ?? player.positions;
         const versionId = candidate?.playerVersionId ?? player.playerId;
         if (claimedVersions.has(versionId)) return false;
-        return positions.some((position) => openRequirements.has(slotGroupOf(position)));
+        return positions.some((position) => openRequirements.has(position));
       });
     }),
   );

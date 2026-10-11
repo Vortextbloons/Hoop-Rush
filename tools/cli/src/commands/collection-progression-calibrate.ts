@@ -33,6 +33,7 @@ import {
   type CollectionPullRecord,
   type CollectionRarity,
   type CollectionState,
+  type Position,
 } from '@hoop-rush/data-contracts';
 import {
   ENGINE_VERSION,
@@ -56,7 +57,6 @@ import {
   validateCollectionActiveTeam,
   validateCollectionChallengeTeam,
   validateCollectionProgressionRules,
-  type SlotGroup,
 } from '@hoop-rush/engine';
 import { makeReport, type CliReport } from '../report.ts';
 import { collectionProgressionCalibrateReportSchema } from '../report-schemas.ts';
@@ -271,7 +271,7 @@ interface BuiltCohortTeam {
   failures: string[];
 }
 
-const STARTER_SLOT_ORDER: SlotGroup[] = ['G', 'G', 'F', 'F', 'C'];
+const STARTER_SLOT_ORDER: Position[] = ['PG', 'SG', 'SF', 'PF', 'C'];
 const STARTER_SLOT_CANDIDATES = 8;
 
 function dedupePlayers(cards: readonly CollectionCatalogCard[]): CollectionCatalogCard[] {
@@ -348,14 +348,16 @@ function buildCohortTeam(input: {
   ).sort((a, b) => overallOf(a) - overallOf(b) || (a.cardId < b.cardId ? -1 : 1));
   const matchingOrdered = [...matchingInBand, ...matchingAboveBand];
   const matchingPlayerIds = new Set(matchingOrdered.map((card) => card.playerId));
-  const positionCoverage = (slot: SlotGroup, count: number): CollectionCatalogCard[] =>
+  const positionCoverage = (slot: Position, count: number): CollectionCatalogCard[] =>
     poolBest.filter((card) => canPlay(card.positions, slot)).slice(0, count);
   const candidates = dedupePlayers([
     ...matchingOrdered.slice(0, 60),
     ...poolBest.slice(0, 60),
+    ...positionCoverage('PG', 20),
+    ...positionCoverage('SG', 20),
+    ...positionCoverage('SF', 20),
+    ...positionCoverage('PF', 20),
     ...positionCoverage('C', 20),
-    ...positionCoverage('F', 20),
-    ...positionCoverage('G', 20),
   ]);
   const five = findLegalFive({
     candidates,

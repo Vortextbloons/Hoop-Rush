@@ -1,4 +1,5 @@
 import {
+  LINEUP_STRUCTURE,
   POSITION_SLOTS,
   SIMULATION_RATINGS,
   SIMULATION_TENDENCIES,
@@ -389,7 +390,7 @@ export function buildChallengeRun(overrides: Partial<ChallengeRun> = {}): Challe
     homeDisplayName: 'Los Angeles Lakers',
     playerIds: ['p-1', 'p-2', 'p-3', 'p-4', 'p-5'],
     lineup: {
-      structure: ['G', 'G', 'F', 'F', 'C'],
+      structure: LINEUP_STRUCTURE,
       assignments: players.map((player, slotIndex) => ({
         slotIndex: slotIndex as 0 | 1 | 2 | 3 | 4,
         playerId: player.playerId,
@@ -491,7 +492,7 @@ function buildBracketOpponent(
     displayName: `Fixture ${franchiseId}`,
     seasonKey: '1995-96',
     lineup: {
-      structure: ['G', 'G', 'F', 'F', 'C'],
+      structure: LINEUP_STRUCTURE,
       assignments: players.map((player, slotIndex) => ({
         slotIndex: slotIndex as 0 | 1 | 2 | 3 | 4,
         playerId: player.playerId,
@@ -1015,7 +1016,7 @@ export function buildOpeningOpponent(overrides: Partial<OpponentTeam> = {}): Opp
     displayName: 'Los Angeles Lakers',
     seasonKey: '1995-96',
     lineup: {
-      structure: ['G', 'G', 'F', 'F', 'C'],
+      structure: LINEUP_STRUCTURE,
       assignments: [
         { slotIndex: 0, playerId: 'p-89', positions: ['PG'] },
         { slotIndex: 1, playerId: 'p-9', positions: ['SG'] },

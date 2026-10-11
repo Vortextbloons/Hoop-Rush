@@ -16,6 +16,7 @@ import type {
   SimulationPlayer,
 } from '@hoop-rush/data-contracts';
 import {
+  LINEUP_STRUCTURE,
   commandIdSchema,
   contentHashSchema,
   eraIdSchema,
@@ -228,11 +229,8 @@ function slotForPosition(
 ): 0 | 1 | 2 | 3 | 4 {
   for (const s of [0, 1, 2, 3, 4] as const) {
     if (used.has(s)) continue;
-    const req = s <= 1 ? 'G' : s <= 3 ? 'F' : 'C';
-    const groups = positions.map((pos) =>
-      pos === 'PG' || pos === 'SG' ? 'G' : pos === 'C' ? 'C' : 'F',
-    );
-    if (groups.includes(req)) return s;
+    const req = LINEUP_STRUCTURE[s];
+    if (req !== undefined && positions.includes(req)) return s;
   }
   throw new Error('no legal slot');
 }
@@ -259,7 +257,7 @@ describe('fixed-five seeds', () => {
   });
 });
 describe('sandbox builder', () => {
-  it('places five through the pure G/G/F/F/C path and locks', () => {
+  it('places five through the pure PG/SG/SF/PF/C path and locks', () => {
     const pool = candidatePool();
     let state = createSandboxBuilder();
     state = applySandboxBuilderCommand(state, pool, {
@@ -869,7 +867,7 @@ describe('result digest', () => {
     const lineups = {
       p1: {
         lineup: {
-          structure: ['G', 'G', 'F', 'F', 'C'] as ['G', 'G', 'F', 'F', 'C'],
+          structure: LINEUP_STRUCTURE,
           assignments: p1Players.map((p, slotIndex) => ({
             slotIndex: slotIndex as 0 | 1 | 2 | 3 | 4,
             playerId: p.playerId,
@@ -880,7 +878,7 @@ describe('result digest', () => {
       },
       p2: {
         lineup: {
-          structure: ['G', 'G', 'F', 'F', 'C'] as ['G', 'G', 'F', 'F', 'C'],
+          structure: LINEUP_STRUCTURE,
           assignments: p2Players.map((p, slotIndex) => ({
             slotIndex: slotIndex as 0 | 1 | 2 | 3 | 4,
             playerId: p.playerId,
@@ -1050,7 +1048,7 @@ describe('result digest', () => {
         lineups: {
           p1: {
             lineup: {
-              structure: ['G', 'G', 'F', 'F', 'C'] as ['G', 'G', 'F', 'F', 'C'],
+              structure: LINEUP_STRUCTURE,
               assignments: p1Players.map((p, slotIndex) => ({
                 slotIndex: slotIndex as 0 | 1 | 2 | 3 | 4,
                 playerId: p.playerId,
@@ -1061,7 +1059,7 @@ describe('result digest', () => {
           },
           p2: {
             lineup: {
-              structure: ['G', 'G', 'F', 'F', 'C'] as ['G', 'G', 'F', 'F', 'C'],
+              structure: LINEUP_STRUCTURE,
               assignments: p1Players.map((p, slotIndex) => ({
                 slotIndex: slotIndex as 0 | 1 | 2 | 3 | 4,
                 playerId: p.playerId,
@@ -1119,7 +1117,7 @@ describe('competition verification receipts', () => {
   function lineupEntryOf(players: readonly SimulationPlayer[]): FixedFiveLineupEntry {
     return {
       lineup: {
-        structure: ['G', 'G', 'F', 'F', 'C'] as ['G', 'G', 'F', 'F', 'C'],
+        structure: LINEUP_STRUCTURE,
         assignments: players.map((player, slotIndex) => ({
           slotIndex: slotIndex as 0 | 1 | 2 | 3 | 4,
           playerId: player.playerId,

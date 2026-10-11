@@ -12,7 +12,7 @@
   import CollectionCardFace from '$lib/collection/CollectionCardFace.svelte';
   import { ensurePlayState, setActiveTeam } from '$lib/collection/collection-hub.ts';
   import {
-    STARTER_SLOT_GROUPS,
+    STARTER_SLOT_POSITIONS,
     STARTER_SLOT_LABELS,
     TEAM_MINUTES_TOTAL,
     MINUTE_STRATEGIES,
@@ -492,7 +492,7 @@
                   >
                     <span class="slot-top">
                       <span class="slot-pos"
-                        >{DISPLAY_SLOT_SHORT[index] ?? STARTER_SLOT_GROUPS[index]}</span
+                        >{DISPLAY_SLOT_SHORT[index] ?? STARTER_SLOT_POSITIONS[index]}</span
                       >
                       <span class="slot-ovr">{card ? overallOf(card) : ''}</span>
                     </span>

@@ -1,4 +1,5 @@
 import type {
+  DraftDuelTapeStatLine,
   GameResult,
   PlayerBoxScore,
   PlayerDiagnostics,
@@ -463,4 +464,42 @@ function playerBoxBase(p: RecorderPlayer): Omit<
     fouls: p.fouls,
     diagnostics: playerDiagnostics(p),
   };
+}
+export function recorderPlayerStatLine(p: RecorderPlayer): DraftDuelTapeStatLine {
+  return [
+    p.points,
+    p.fieldGoalMakes,
+    p.fieldGoalAttempts,
+    p.threeMakes,
+    p.threeAttempts,
+    p.freeThrowMakes,
+    p.freeThrowAttempts,
+    p.offensiveRebounds,
+    p.defensiveRebounds,
+    p.assists,
+    p.steals,
+    p.blocks,
+    p.turnovers,
+    p.fouls,
+    0,
+  ];
+}
+export function recorderSideStatLine(s: RecorderSide): DraftDuelTapeStatLine {
+  return [
+    s.points,
+    s.fieldGoalMakes,
+    s.fieldGoalAttempts,
+    s.threeMakes,
+    s.threeAttempts,
+    s.freeThrowMakes,
+    s.freeThrowAttempts,
+    s.offensiveRebounds,
+    s.defensiveRebounds,
+    s.assists,
+    s.steals,
+    s.blocks,
+    s.turnovers,
+    s.fouls,
+    s.teamRebounds,
+  ];
 }

@@ -131,10 +131,10 @@ function buildProjectionLineup(
 ): BaseFiveProjection {
   return projectBaseFive({
     lineup: [
-      { player: lineupPlayer(0, ratings, tendencies), slot: 'G1' },
-      { player: lineupPlayer(1, ratings, tendencies), slot: 'G2' },
-      { player: lineupPlayer(2, ratings, tendencies), slot: 'F1' },
-      { player: lineupPlayer(3, ratings, tendencies), slot: 'F2' },
+      { player: lineupPlayer(0, ratings, tendencies), slot: 'PG' },
+      { player: lineupPlayer(1, ratings, tendencies), slot: 'SG' },
+      { player: lineupPlayer(2, ratings, tendencies), slot: 'SF' },
+      { player: lineupPlayer(3, ratings, tendencies), slot: 'PF' },
       { player: lineupPlayer(4, ratings, tendencies), slot: 'C' },
     ],
     eraProfile: DEFAULT_ERA_SIM_PROFILE,
@@ -174,7 +174,7 @@ describe('projectBaseFive', () => {
             positions: ['PG'],
             overall: 99,
           }),
-          slot: 'G1',
+          slot: 'PG',
         },
         {
           player: buildSimulationPlayer({
@@ -182,7 +182,7 @@ describe('projectBaseFive', () => {
             displayName: 'L 2',
             positions: ['SG'],
           }),
-          slot: 'G2',
+          slot: 'SG',
         },
         {
           player: buildSimulationPlayer({
@@ -190,7 +190,7 @@ describe('projectBaseFive', () => {
             displayName: 'L 3',
             positions: ['SF'],
           }),
-          slot: 'F1',
+          slot: 'SF',
         },
         {
           player: buildSimulationPlayer({
@@ -198,7 +198,7 @@ describe('projectBaseFive', () => {
             displayName: 'L 4',
             positions: ['PF'],
           }),
-          slot: 'F2',
+          slot: 'PF',
         },
         {
           player: buildSimulationPlayer({
@@ -250,10 +250,10 @@ describe('projectBaseFive', () => {
     ];
     const input = {
       lineup: [
-        { player: players[0], slot: 'G1' },
-        { player: players[1], slot: 'G2' },
-        { player: players[2], slot: 'F1' },
-        { player: players[3], slot: 'F2' },
+        { player: players[0], slot: 'PG' },
+        { player: players[1], slot: 'SG' },
+        { player: players[2], slot: 'SF' },
+        { player: players[3], slot: 'PF' },
         { player: players[4], slot: 'C' },
       ] as const,
       eraProfile: DEFAULT_ERA_SIM_PROFILE,
@@ -263,10 +263,10 @@ describe('projectBaseFive', () => {
       projectBaseFive({
         ...input,
         lineup: [
-          { player: players[0], slot: 'G1' },
-          { player: players[1], slot: 'G1' },
-          { player: players[2], slot: 'F1' },
-          { player: players[3], slot: 'F2' },
+          { player: players[0], slot: 'PG' },
+          { player: players[1], slot: 'PG' },
+          { player: players[2], slot: 'SF' },
+          { player: players[3], slot: 'PF' },
           { player: players[4], slot: 'C' },
         ],
       }),
@@ -275,10 +275,10 @@ describe('projectBaseFive', () => {
       projectBaseFive({
         ...input,
         lineup: [
-          { player: players[0], slot: 'G1' },
-          { player: players[1], slot: 'G2' },
-          { player: players[2], slot: 'F1' },
-          { player: players[3], slot: 'F2' },
+          { player: players[0], slot: 'PG' },
+          { player: players[1], slot: 'SG' },
+          { player: players[2], slot: 'SF' },
+          { player: players[3], slot: 'PF' },
           { player: players[0], slot: 'C' },
         ],
       }),
@@ -294,7 +294,7 @@ describe('projectBaseFive', () => {
               displayName: 'A',
               positions: ['PG'],
             }),
-            slot: 'G1',
+            slot: 'PG',
           },
           {
             player: buildSimulationPlayer({
@@ -302,7 +302,7 @@ describe('projectBaseFive', () => {
               displayName: 'B',
               positions: ['SG'],
             }),
-            slot: 'G2',
+            slot: 'SG',
           },
           {
             player: buildSimulationPlayer({
@@ -310,7 +310,7 @@ describe('projectBaseFive', () => {
               displayName: 'C',
               positions: ['SF'],
             }),
-            slot: 'F1',
+            slot: 'SF',
           },
           {
             player: buildSimulationPlayer({
@@ -318,7 +318,7 @@ describe('projectBaseFive', () => {
               displayName: 'D',
               positions: ['C'],
             }),
-            slot: 'F2',
+            slot: 'PF',
           },
           {
             player: buildSimulationPlayer({
@@ -332,7 +332,7 @@ describe('projectBaseFive', () => {
         eraProfile: DEFAULT_ERA_SIM_PROFILE,
         model: buildModel(),
       }),
-    ).toThrow(/cannot fill F slot/);
+    ).toThrow(/cannot fill PF slot/);
   });
   it('keeps ledger accounting exact', () => {
     const projection = buildProjectionLineup();
@@ -408,7 +408,7 @@ describe('projectBaseFive', () => {
             { ballHandling: 30, passing: 30, offensiveIq: 30 },
             { usageRate: 5 },
           ),
-          slot: 'G1',
+          slot: 'PG',
         },
         {
           player: lineupPlayer(
@@ -416,7 +416,7 @@ describe('projectBaseFive', () => {
             { ballHandling: 30, passing: 30, offensiveIq: 30 },
             { usageRate: 5 },
           ),
-          slot: 'G2',
+          slot: 'SG',
         },
         {
           player: lineupPlayer(
@@ -424,7 +424,7 @@ describe('projectBaseFive', () => {
             { ballHandling: 30, passing: 30, offensiveIq: 30 },
             { usageRate: 5 },
           ),
-          slot: 'F1',
+          slot: 'SF',
         },
         {
           player: lineupPlayer(
@@ -432,7 +432,7 @@ describe('projectBaseFive', () => {
             { ballHandling: 30, passing: 30, offensiveIq: 30 },
             { usageRate: 5 },
           ),
-          slot: 'F2',
+          slot: 'PF',
         },
         {
           player: lineupPlayer(
@@ -458,7 +458,7 @@ describe('projectBaseFive', () => {
             displayName: 'L 1',
             positions: ['PG'],
           }),
-          slot: 'G1',
+          slot: 'PG',
         },
         {
           player: buildSimulationPlayer({
@@ -466,7 +466,7 @@ describe('projectBaseFive', () => {
             displayName: 'L 2',
             positions: ['SG'],
           }),
-          slot: 'G2',
+          slot: 'SG',
         },
         {
           player: buildSimulationPlayer({
@@ -474,7 +474,7 @@ describe('projectBaseFive', () => {
             displayName: 'L 3',
             positions: ['SF'],
           }),
-          slot: 'F1',
+          slot: 'SF',
         },
         {
           player: buildSimulationPlayer({
@@ -482,7 +482,7 @@ describe('projectBaseFive', () => {
             displayName: 'L 4',
             positions: ['PF'],
           }),
-          slot: 'F2',
+          slot: 'PF',
         },
         {
           player: buildSimulationPlayer({
@@ -580,7 +580,7 @@ describe('ProjectionCache', () => {
       eraId: '1990s',
       modelVersion: 'projection-model-v1',
       referenceId,
-      slots: ['G1', 'G2', 'F1', 'F2', 'C'],
+      slots: ['PG', 'SG', 'SF', 'PF', 'C'],
       playerIds: ['p-1', 'p-2', 'p-3', 'p-4', 'p-5'],
       playerVersionIds: [null, null, null, null, null],
       playerFingerprints: ['f-1', 'f-2', 'f-3', 'f-4', 'f-5'],

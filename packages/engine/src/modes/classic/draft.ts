@@ -12,7 +12,6 @@ import type {
   Position,
   Seed,
   SimulationPlayer,
-  SlotGroup,
   SlotIndex,
 } from '@hoop-rush/data-contracts';
 import {
@@ -21,7 +20,7 @@ import {
   LINEUP_STRUCTURE,
   classicDraftCatalogSchema,
 } from '@hoop-rush/data-contracts';
-import { canPlay, slotGroupOf } from '../../domain/positions.ts';
+import { canPlay } from '../../domain/positions.ts';
 import { slotRequirement, validateLineup } from '../../domain/lineup.ts';
 import { planLineupReposition } from '../../domain/lineup-reposition.ts';
 import type { EngineContext } from '../../sim/kernel.ts';
@@ -72,7 +71,7 @@ export function classicRollCandidates(
   }
   const draftedIds = new Set(state.picks.map((p) => p.playerId));
   const occupiedSlots = new Set(state.picks.map((p) => p.slotIndex));
-  const requirements = new Set<SlotGroup>();
+  const requirements = new Set<Position>();
   for (let slotIndex = 0; slotIndex < LINEUP_STRUCTURE.length; slotIndex += 1) {
     if (!occupiedSlots.has(slotIndex)) {
       requirements.add(slotRequirement(slotIndex));
@@ -93,7 +92,7 @@ export function classicRollCandidates(
       return entry.players.some(
         (player) =>
           !draftedIds.has(player.playerId) &&
-          player.positions.some((position) => requirements.has(slotGroupOf(position))),
+          player.positions.some((position) => requirements.has(position)),
       );
     }),
   );

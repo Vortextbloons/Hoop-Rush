@@ -19,7 +19,7 @@ describe('validateLineup', () => {
     const result = validateLineup(
       five([
         assignment(0, 'a', ['PG']),
-        assignment(1, 'b', ['PG', 'SF']),
+        assignment(1, 'b', ['PG', 'SG']),
         assignment(2, 'c', ['SF']),
         assignment(3, 'd', ['PF']),
         assignment(4, 'e', ['C']),
@@ -84,8 +84,8 @@ describe('validateLineup', () => {
 describe('assignLineup', () => {
   it('assigns a flexible five to legal slots', () => {
     const players = [
-      { playerId: 'a', positions: ['PG'] as PositionUnion },
-      { playerId: 'b', positions: ['PG', 'SF'] as PositionUnion },
+      { playerId: 'a', positions: ['SG'] as PositionUnion },
+      { playerId: 'b', positions: ['PG', 'SG'] as PositionUnion },
       { playerId: 'c', positions: ['SF'] as PositionUnion },
       { playerId: 'd', positions: ['PF'] as PositionUnion },
       { playerId: 'e', positions: ['C'] as PositionUnion },

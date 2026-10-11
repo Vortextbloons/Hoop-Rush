@@ -1,4 +1,5 @@
 import type { PlayerId, Position, SlotIndex } from '@hoop-rush/data-contracts';
+import { LINEUP_STRUCTURE } from '@hoop-rush/data-contracts';
 import { canPlay } from '../../domain/positions.ts';
 import { slotRequirement, validateLineup } from '../../domain/lineup.ts';
 import { planLineupReposition } from '../../domain/lineup-reposition.ts';
@@ -82,7 +83,7 @@ export function selectionKeepsFeasibility(
   }
   if (placed.length === 5) {
     const lineup = {
-      structure: ['G', 'G', 'F', 'F', 'C'] as ['G', 'G', 'F', 'F', 'C'],
+      structure: LINEUP_STRUCTURE,
       assignments: placed.map((p) => ({
         slotIndex: p.slotIndex,
         playerId: p.playerId,
@@ -108,7 +109,7 @@ export function selectionKeepsFeasibility(
         full.push({ playerId: c.playerId, slotIndex: slotAt, playerVersionId: c.playerVersionId });
       }
       const lineup = {
-        structure: ['G', 'G', 'F', 'F', 'C'] as ['G', 'G', 'F', 'F', 'C'],
+        structure: LINEUP_STRUCTURE,
         assignments: full.map((p) => ({
           slotIndex: p.slotIndex,
           playerId: p.playerId,

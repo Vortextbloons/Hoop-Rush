@@ -8,6 +8,7 @@ import {
   type CollectionActiveTeam,
   type CollectionCatalogCard,
   type PositionUnion,
+  LINEUP_STRUCTURE,
 } from '@hoop-rush/data-contracts';
 import { assignLineup, canFillSlot, validateLineup } from '../domain/lineup.ts';
 import type { SlotIndex } from '@hoop-rush/data-contracts';
@@ -138,11 +139,11 @@ export function validateCollectionActiveTeam(
       issues.push({
         code: 'illegal-starters',
         cardId: '',
-        message: 'starters cannot fill G/G/F/F/C',
+        message: 'starters cannot fill PG/SG/SF/PF/C',
       });
     } else {
       const checked = validateLineup({
-        structure: ['G', 'G', 'F', 'F', 'C'],
+        structure: LINEUP_STRUCTURE,
         assignments: assignment,
       });
       if (!checked.ok) {

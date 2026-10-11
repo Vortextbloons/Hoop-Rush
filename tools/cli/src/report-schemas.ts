@@ -448,7 +448,7 @@ export const benchmarkReportSchema = z.object({
 });
 export type BenchmarkReport = z.infer<typeof benchmarkReportSchema>;
 const draftFitBenchmarkPlayerSchema = z.object({
-  slot: z.enum(['G1', 'G2', 'F1', 'F2', 'C']),
+  slot: z.enum(['PG', 'SG', 'SF', 'PF', 'C']),
   playerId: z.string().min(1).max(64),
   displayName: z.string().min(1).max(96),
   overall: z.number().int().min(0).max(100),
@@ -463,7 +463,7 @@ const draftFitBenchmarkPickSchema = z.object({
   playerId: z.string().min(1).max(64),
   displayName: z.string().min(1).max(96),
   overall: z.number().int().min(0).max(100),
-  recommendedSlot: z.enum(['G1', 'G2', 'F1', 'F2', 'C']).nullable(),
+  recommendedSlot: z.enum(['PG', 'SG', 'SF', 'PF', 'C']).nullable(),
   netDelta: z.number().nullable(),
   worstNetDelta: z.number().nullable(),
   tier: z.enum(['best', 'strong', 'solid', 'situational', 'poor']),

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  LINEUP_STRUCTURE,
   challengeRunSchema,
   classicDraftStateSchema,
   eraIdSchema,
@@ -88,7 +89,7 @@ function makeRun() {
     displayName: `Opponent ${String(index)}`,
     seasonKey: '1995-96',
     lineup: {
-      structure: ['G', 'G', 'F', 'F', 'C'],
+      structure: LINEUP_STRUCTURE,
       assignments: fivePlayers.map((player, slotIndex) => ({
         slotIndex,
         playerId: player.playerId,
@@ -158,7 +159,7 @@ function makeRun() {
     homeDisplayName: 'Los Angeles Lakers',
     playerIds: five,
     lineup: {
-      structure: ['G', 'G', 'F', 'F', 'C'],
+      structure: LINEUP_STRUCTURE,
       assignments: fivePlayers.map((player, slotIndex) => ({
         slotIndex,
         playerId: player.playerId,
@@ -359,7 +360,7 @@ describe('lineup contracts', () => {
   });
   it('accepts a five-assignment legal lineup', () => {
     const lineup: Lineup = {
-      structure: ['G', 'G', 'F', 'F', 'C'],
+      structure: LINEUP_STRUCTURE,
       assignments: [
         assignment(0, 'p-1'),
         assignment(1, 'p-2'),
@@ -493,7 +494,7 @@ describe('opponent contracts', () => {
       displayName: 'Los Angeles Lakers',
       seasonKey: '1995-96',
       lineup: {
-        structure: ['G', 'G', 'F', 'F', 'C'],
+        structure: LINEUP_STRUCTURE,
         assignments: [
           { slotIndex: 0, playerId: 'p-89', positions: ['PG', 'SG'] },
           { slotIndex: 1, playerId: 'p-9', positions: ['PG', 'SG'] },

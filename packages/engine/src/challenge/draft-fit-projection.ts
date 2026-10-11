@@ -9,7 +9,8 @@ import type {
   SimulationPlayer,
 } from '@hoop-rush/data-contracts';
 import { seasonDigestHex } from '@hoop-rush/data-contracts';
-import { canPlay, type SlotGroup } from '../domain/positions.ts';
+import { PROJECTION_SLOTS } from '@hoop-rush/data-contracts';
+import { canPlay } from '../domain/positions.ts';
 import { planLineupReposition } from '../domain/lineup-reposition.ts';
 import { projectBaseFive } from '../projection/base.ts';
 import { archetypeReferences, neutralReference } from '../projection/reference-lineups.ts';
@@ -55,13 +56,9 @@ export const DRAFT_FIT_REFINE_MAX = 96;
 export const DRAFT_FIT_TOP_COUNT = 5;
 const DRAFT_FIT_DIGEST_VERSION = 2;
 
-const DRAFT_FIT_SLOTS: readonly { slot: ProjectionSlot; group: SlotGroup }[] = [
-  { slot: 'G1', group: 'G' },
-  { slot: 'G2', group: 'G' },
-  { slot: 'F1', group: 'F' },
-  { slot: 'F2', group: 'F' },
-  { slot: 'C', group: 'C' },
-];
+const DRAFT_FIT_SLOTS: readonly { slot: ProjectionSlot }[] = PROJECTION_SLOTS.map((slot) => ({
+  slot,
+}));
 
 const NEED_OF_REASON: Record<ContextualReasonCode, DraftFitNeed> = {
   'spacing-supply': 'spacing',
@@ -102,7 +99,7 @@ function assignDraftFive(players: readonly SimulationPlayer[]): (SimulationPlaye
     for (let s = 0; s < DRAFT_FIT_SLOTS.length; s += 1) {
       const entry = DRAFT_FIT_SLOTS[s];
       if (entry === undefined || slots[s] !== null) continue;
-      if (!canPlay(player.positions, entry.group)) continue;
+      if (!canPlay(player.positions, entry.slot)) continue;
       slots[s] = player;
       if (place(index + 1)) return true;
       slots[s] = null;
@@ -128,7 +125,7 @@ function fillWithReference(
     if (entry === undefined) return false;
     for (const filler of reference) {
       const key = playerKey(filler);
-      if (used.has(key) || !canPlay(filler.positions, entry.group)) continue;
+      if (used.has(key) || !canPlay(filler.positions, entry.slot)) continue;
       five[slotIndex] = filler;
       used.add(key);
       if (place(slotIndex + 1)) return true;
@@ -194,7 +191,7 @@ function assignedFromSlots(
     const slotIndex = DRAFT_FIT_SLOTS.findIndex((entry) => entry.slot === slot);
     if (slotIndex < 0 || assigned[slotIndex] !== null || used.has(playerKey(player))) return null;
     const fitSlot = DRAFT_FIT_SLOTS[slotIndex];
-    if (fitSlot === undefined || !canPlay(player.positions, fitSlot.group)) return null;
+    if (fitSlot === undefined || !canPlay(player.positions, fitSlot.slot)) return null;
     used.add(playerKey(player));
     assigned[slotIndex] = player;
   }

@@ -12,21 +12,18 @@ import type {
   SimulationPlayer,
   SimulationTeam,
 } from '@hoop-rush/data-contracts';
-import { PROJECTION_SCHEMA_VERSION, seasonDigestHex } from '@hoop-rush/data-contracts';
+import {
+  PROJECTION_SLOTS,
+  PROJECTION_SCHEMA_VERSION,
+  seasonDigestHex,
+} from '@hoop-rush/data-contracts';
 import { canPlay } from '../domain/positions.ts';
 import { prepareTeam, type TeamPrep } from '../sim/prepare.ts';
 import { projectExpectedLedger, type LedgerSide } from './expected-ledger.ts';
 import { resolveReference } from './reference-lineups.ts';
 import { identifyWeaknesses } from './weaknesses.ts';
 import { normalizeValue } from './normalize.ts';
-const SLOT_GROUP: Record<ProjectionSlot, 'G' | 'F' | 'C'> = {
-  G1: 'G',
-  G2: 'G',
-  F1: 'F',
-  F2: 'F',
-  C: 'C',
-};
-const SLOT_ORDER: readonly ProjectionSlot[] = ['G1', 'G2', 'F1', 'F2', 'C'];
+const SLOT_ORDER: readonly ProjectionSlot[] = PROJECTION_SLOTS;
 const referenceTeamCache = new WeakMap<readonly SimulationPlayer[], SimulationTeam>();
 function referenceTeamOf(reference: ProjectionReferenceFive): SimulationTeam {
   let team = referenceTeamCache.get(reference.players);
@@ -193,9 +190,9 @@ function validateAndBuildTeam(input: BaseFiveProjectionInput): SimulationTeam {
       throw new Error(`projection: duplicate player version ${identity}`);
     }
     seen.add(identity);
-    if (!canPlay(entry.player.positions, SLOT_GROUP[entry.slot])) {
+    if (!canPlay(entry.player.positions, entry.slot)) {
       throw new Error(
-        `projection: ${entry.player.playerId} (${entry.player.positions.join('/')}) cannot fill ${SLOT_GROUP[entry.slot]} slot ${entry.slot}`,
+        `projection: ${entry.player.playerId} (${entry.player.positions.join('/')}) cannot fill ${entry.slot} slot ${entry.slot}`,
       );
     }
   }
@@ -271,7 +268,7 @@ function sideOf(input: {
   const creation = creationOf({ facts, players, scale: creationScale });
   const defense: ProjectionDefense = { ...coverage, expectedOpponentShotQuality };
   const contributions: ProjectionPlayerContribution[] = facts.players.map((row) => ({
-    slot: slots[row.slotIndex] ?? 'G1',
+    slot: slots[row.slotIndex] ?? 'PG',
     playerId: row.player.playerId,
     playerVersionId: row.player.playerVersionId ?? null,
     displayName: row.player.displayName,
@@ -379,7 +376,7 @@ export function projectBaseFive(input: BaseFiveProjectionInput): BaseFiveProject
     inputDigest,
     digest,
     lineup: team.players.map((player, index) => ({
-      slot: SLOT_ORDER[index] ?? 'G1',
+      slot: SLOT_ORDER[index] ?? 'PG',
       playerId: player.playerId,
       playerVersionId: player.playerVersionId ?? null,
       displayName: player.displayName,

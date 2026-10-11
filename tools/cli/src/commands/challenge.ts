@@ -62,7 +62,7 @@ export function lineupForTeam(team: SimulationTeam): {
 } {
   const players = team.players.map((player) => ({ ...player, positions: [...player.positions] }));
   const lineup: ChallengeCreation['lineup'] = {
-    structure: ['G', 'G', 'F', 'F', 'C'],
+    structure: [...LINEUP_STRUCTURE],
     assignments: players.map((player, slotIndex) => ({
       slotIndex: slotIndex as 0 | 1 | 2 | 3 | 4,
       playerId: player.playerId,

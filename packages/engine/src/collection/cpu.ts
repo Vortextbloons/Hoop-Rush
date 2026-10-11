@@ -169,7 +169,7 @@ export function generateCollectionCpuTeam(
       .map((card) => ({ playerId: card.playerId, positions: card.positions })),
   );
   if (assignment === null) {
-    throw new CollectionCommandError('no-legal-five', 'cpu starters cannot fill G/G/F/F/C');
+    throw new CollectionCommandError('no-legal-five', 'cpu starters cannot fill PG/SG/SF/PF/C');
   }
   const starters = chosen.slice(0, STARTER_SLOTS.length);
   const bench = chosen.slice(STARTER_SLOTS.length);
@@ -585,7 +585,10 @@ export function generateCollectionCpuTeamV2(
     starters.map((card) => ({ playerId: card.playerId, positions: card.positions })),
   );
   if (assignment === null) {
-    throw new CollectionCommandError('no-legal-five', 'cpu chosen starters cannot fill G/G/F/F/C');
+    throw new CollectionCommandError(
+      'no-legal-five',
+      'cpu chosen starters cannot fill PG/SG/SF/PF/C',
+    );
   }
   const rosterEntries = [...starters, ...bench].map((card) => ({
     cardId: card.cardId,

@@ -7,6 +7,7 @@ import {
 } from '@hoop-rush/test-fixtures';
 import type { GameResult, RunPlayerSelection, SimulationPlayer } from '@hoop-rush/data-contracts';
 import {
+  LINEUP_STRUCTURE,
   challengeRunSchema,
   eraIdSchema,
   franchiseIdSchema,
@@ -49,7 +50,7 @@ function fixtureCreation(overrides: Partial<ChallengeCreationBase> = {}): Challe
     eraId: '1990s',
     homeDisplayName: 'Los Angeles Lakers',
     lineup: {
-      structure: ['G', 'G', 'F', 'F', 'C'],
+      structure: LINEUP_STRUCTURE,
       assignments: team.players.map((player, slotIndex) => ({
         slotIndex: slotIndex as 0 | 1 | 2 | 3 | 4,
         playerId: player.playerId,

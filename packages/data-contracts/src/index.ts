@@ -144,6 +144,11 @@ export type {
 export * from './fixed-five-versions.ts';
 export * from './fixed-five-multiplayer.ts';
 export * from './fixed-five-multiplayer-in-memory.ts';
+export * from './draft-duel-versions.ts';
+export * from './draft-duel.ts';
+export * from './draft-duel-multiplayer-in-memory.ts';
+export * from './draft-duel-worker.ts';
+export * from './loaders/draft-duel-catalog.ts';
 export * from './collection-versions.ts';
 export * from './collection-difficulty.ts';
 export * from './collection-objective.ts';

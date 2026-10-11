@@ -25,7 +25,7 @@ import {
 } from './cache.ts';
 import { projectBaseFive } from './base.ts';
 import { projectSeasonRoster } from './season.ts';
-const SLOT_ORDER = ['G1', 'G2', 'F1', 'F2', 'C'] as const;
+const SLOT_ORDER = ['PG', 'SG', 'SF', 'PF', 'C'] as const;
 function unitKeyOf(players: readonly string[]): string {
   return [...players].sort().join(',');
 }
@@ -53,10 +53,10 @@ function projectStructureUnit(input: {
   const cached = cache.get(key);
   if (cached !== undefined) return cached;
   const lineup: BaseFiveProjectionInput['lineup'] = [
-    { player: byVersion.get(players[0] ?? '') ?? missingPlayer(players[0] ?? ''), slot: 'G1' },
-    { player: byVersion.get(players[1] ?? '') ?? missingPlayer(players[1] ?? ''), slot: 'G2' },
-    { player: byVersion.get(players[2] ?? '') ?? missingPlayer(players[2] ?? ''), slot: 'F1' },
-    { player: byVersion.get(players[3] ?? '') ?? missingPlayer(players[3] ?? ''), slot: 'F2' },
+    { player: byVersion.get(players[0] ?? '') ?? missingPlayer(players[0] ?? ''), slot: 'PG' },
+    { player: byVersion.get(players[1] ?? '') ?? missingPlayer(players[1] ?? ''), slot: 'SG' },
+    { player: byVersion.get(players[2] ?? '') ?? missingPlayer(players[2] ?? ''), slot: 'SF' },
+    { player: byVersion.get(players[3] ?? '') ?? missingPlayer(players[3] ?? ''), slot: 'PF' },
     { player: byVersion.get(players[4] ?? '') ?? missingPlayer(players[4] ?? ''), slot: 'C' },
   ];
   const projection = projectBaseFive({ lineup, eraProfile: profile, model });

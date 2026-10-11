@@ -14,4 +14,6 @@ export * from './season/engine-seam-types.ts';
 export * from './season/audit.ts';
 export * from './schemas/fixed-five-record.ts';
 export * from './repositories/fixed-five.ts';
+export * from './schemas/draft-duel-record.ts';
+export * from './repositories/draft-duel.ts';
 export * from './benchmark/season-run.ts';

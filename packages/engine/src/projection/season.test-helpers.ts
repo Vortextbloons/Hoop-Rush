@@ -3,6 +3,7 @@ import {
   SEASON_MINUTE_POLICY_VERSION,
   SEASON_ROTATION_VERSION,
   franchiseIdSchema,
+  type Position,
   type SeasonDraftCandidate,
   type SeasonRotation,
   type SimulationPlayer,
@@ -28,15 +29,13 @@ export function buildInput() {
     playersPerPool: 20,
   });
   const pool = catalog.candidates.slice(0, 20).map((candidate) => candidateToPlayer(candidate));
-  const canPlay = (player: SimulationPlayer, group: 'G' | 'F' | 'C') =>
-    group === 'G'
-      ? player.positions.includes('PG') || player.positions.includes('SG')
-      : group === 'F'
-        ? player.positions.includes('SF') || player.positions.includes('PF')
-        : player.positions.includes('C');
-  const guards = pool.filter((player) => canPlay(player, 'G'));
-  const forwards = pool.filter((player) => canPlay(player, 'F'));
-  const centers = pool.filter((player) => canPlay(player, 'C'));
+  const byPosition = (position: Position) =>
+    pool.filter((player) => player.positions.includes(position));
+  const pgs = byPosition('PG');
+  const sgs = byPosition('SG');
+  const sfs = byPosition('SF');
+  const pfs = byPosition('PF');
+  const centers = byPosition('C');
   const used = new Set<string>();
   const pick = (list: SimulationPlayer[], index: number) => {
     for (const player of list.slice(index)) {
@@ -47,20 +46,8 @@ export function buildInput() {
     }
     throw new Error('not enough unique position players in fixture');
   };
-  const starters = [
-    pick(guards, 0),
-    pick(guards, 1),
-    pick(forwards, 0),
-    pick(forwards, 1),
-    pick(centers, 0),
-  ];
-  const bench = [
-    pick(guards, 2),
-    pick(forwards, 2),
-    pick(centers, 1),
-    pick(guards, 3),
-    pick(forwards, 3),
-  ];
+  const starters = [pick(pgs, 0), pick(sgs, 0), pick(sfs, 0), pick(pfs, 0), pick(centers, 0)];
+  const bench = [pick(pgs, 1), pick(sfs, 1), pick(centers, 1), pick(sgs, 1), pick(pfs, 1)];
   const rotation: SeasonRotation = {
     franchiseId: franchiseIdSchema.parse('lakers'),
     starters: starters.map((player) => player.playerVersionId ?? ''),

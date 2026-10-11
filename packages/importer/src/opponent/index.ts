@@ -9,10 +9,10 @@ export const SEASON_KEY = '1995-96';
 export const OPPONENTS_DIR = join(PUBLIC_DATA, 'opponents');
 export const POOL_PATH = join(PUBLIC_DATA, 'pools', 'lakers-1990s.json');
 export const LINEUP = [
-  { playerId: 'p-89', slotIndex: 0, position: 'G' },
-  { playerId: 'p-9', slotIndex: 1, position: 'G' },
-  { playerId: 'p-920', slotIndex: 2, position: 'F' },
-  { playerId: 'p-109', slotIndex: 3, position: 'F' },
+  { playerId: 'p-89', slotIndex: 0, position: 'PG' },
+  { playerId: 'p-9', slotIndex: 1, position: 'SG' },
+  { playerId: 'p-920', slotIndex: 2, position: 'SF' },
+  { playerId: 'p-109', slotIndex: 3, position: 'PF' },
   { playerId: 'p-124', slotIndex: 4, position: 'C' },
 ] as const;
 export const RATING_KEYS = REQUIRED_RATING_KEYS;
@@ -134,7 +134,7 @@ export interface OpponentArtifact {
   displayName: 'Los Angeles Lakers';
   seasonKey: string;
   lineup: {
-    structure: readonly ['G', 'G', 'F', 'F', 'C'];
+    structure: readonly ['PG', 'SG', 'SF', 'PF', 'C'];
     assignments: {
       slotIndex: number;
       playerId: string;
@@ -258,7 +258,7 @@ export function buildOpponentArtifact(pool: { players: PoolPlayer[] }): Opponent
     teamId: 'lakers',
     displayName: 'Los Angeles Lakers',
     seasonKey: SEASON_KEY,
-    lineup: { structure: ['G', 'G', 'F', 'F', 'C'], assignments },
+    lineup: { structure: ['PG', 'SG', 'SF', 'PF', 'C'], assignments },
     players,
   };
 }

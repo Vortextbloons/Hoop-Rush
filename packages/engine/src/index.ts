@@ -803,3 +803,31 @@ export {
   prepareCollectionChallengeGame,
   CollectionChallengeTeamIneligibleError,
 } from './collection/challenge-game.ts';
+export {
+  DRAFT_DUEL_SEED_VERSION,
+  DRAFT_DUEL_FAIR_BAND_VERSION,
+  draftDuelSharedBandSeed,
+  draftDuelOfferSeed,
+  draftDuelSafetySeed,
+  draftDuelFirstPicker,
+  draftDuelTimeoutSeed,
+  draftDuelTimeoutSeedPath,
+  draftDuelHomeWinner,
+  draftDuelGameSeed,
+  draftDuelRematchSeed,
+} from './modes/draft-duel/seeds.ts';
+export {
+  buildDraftDuelCatalog,
+  cardGroupSet,
+  cardPlayableAt,
+  catalogEntryForVersion,
+  catalogSimulationForVersion,
+  type DraftDuelCatalog,
+} from './modes/draft-duel/catalog.ts';
+export { simulateRecordedGame, type RecordedGameOutput } from './sim/tape.ts';
+export type { GameObservers, PeriodObservation, TripObservation } from './sim/game.ts';
+export {
+  draftDuelSimulationInputDigest,
+  draftDuelGameResultDigest,
+  draftDuelGameTapeDigest,
+} from './modes/draft-duel/digests.ts';

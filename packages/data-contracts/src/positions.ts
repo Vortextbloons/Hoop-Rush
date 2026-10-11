@@ -30,6 +30,6 @@ export function playableSlotGroups(positions: readonly Position[]): SlotGroup[] 
   }
   return [...groups].sort();
 }
-export function canPlay(positions: readonly Position[], slot: SlotGroup): boolean {
-  return positions.some((position) => slotGroupOf(position) === slot);
+export function canPlay(positions: readonly Position[], slot: Position): boolean {
+  return positions.includes(slot);
 }

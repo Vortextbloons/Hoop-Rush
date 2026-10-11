@@ -6,7 +6,6 @@ import {
   type Position,
   type SeasonRotation,
   type SeasonRotationPreset,
-  type SlotGroup,
 } from '@hoop-rush/data-contracts';
 import {
   applySeasonRotationPreset,
@@ -22,8 +21,8 @@ export interface RotationMember {
   eraId?: string;
   seasonKey?: string;
 }
-export const SLOT_GROUPS: readonly SlotGroup[] = LINEUP_STRUCTURE;
-export const CLOSING_SLOT_LABELS = ['G1', 'G2', 'F1', 'F2', 'C'] as const;
+export const SLOT_GROUPS: readonly Position[] = LINEUP_STRUCTURE;
+export const CLOSING_SLOT_LABELS = ['PG', 'SG', 'SF', 'PF', 'C'] as const;
 export interface MinuteAdjustment {
   playerVersionId: string;
   minutes: number;
@@ -332,7 +331,7 @@ export class RotationEditor {
     if (currentSlot !== -1) {
       const group = SLOT_GROUPS[currentSlot];
       if (group === undefined) {
-        return ['closing five slot is not a G, F, or C slot'];
+        return ['closing five slot is not a PG, SG, SF, PF, or C slot'];
       }
       const replacement = this.rotation.targetMinutes
         .filter((entry) => !closingFive.includes(entry.playerVersionId))

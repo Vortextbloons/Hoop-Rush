@@ -1,5 +1,4 @@
 import {
-  playableSlotGroups,
   type CollectionActiveTeam,
   type CollectionCatalogCard,
   type Position,
@@ -14,8 +13,14 @@ import {
   type CollectionTeamCheck,
 } from '@hoop-rush/engine';
 
-export const STARTER_SLOT_LABELS = ['Guard', 'Guard', 'Forward', 'Forward', 'Center'] as const;
-export const STARTER_SLOT_GROUPS = ['G', 'G', 'F', 'F', 'C'] as const;
+export const STARTER_SLOT_LABELS = [
+  'Point Guard',
+  'Shooting Guard',
+  'Small Forward',
+  'Power Forward',
+  'Center',
+] as const;
+export const STARTER_SLOT_POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C'] as const;
 export const TEAM_MINUTES_TOTAL = 240;
 
 export interface TeamDraft {
@@ -126,9 +131,9 @@ export function blockedCardIds(
 }
 
 export function slotEligibility(positions: readonly Position[], slotIndex: number): boolean {
-  const group = STARTER_SLOT_GROUPS[slotIndex];
-  if (group === undefined) return false;
-  return playableSlotGroups([...positions]).includes(group);
+  const slotPosition = STARTER_SLOT_POSITIONS[slotIndex];
+  if (slotPosition === undefined) return false;
+  return positions.includes(slotPosition);
 }
 
 export function buildAutoDraft(

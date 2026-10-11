@@ -1,0 +1,194 @@
+import {
+  canonicalJson,
+  draftDuelGameOutputSchema,
+  draftDuelPartiallyVerifiedSchema,
+  type DraftDuelCommand,
+  type DraftDuelGameOutput,
+  type DraftDuelPartiallyVerified,
+} from '@hoop-rush/data-contracts';
+import {
+  DRAFT_DUEL_SAVE_SCHEMA_VERSION,
+  draftDuelCompletionRecapSchema,
+  storedDraftDuelActiveSchema,
+  storedDraftDuelCommandRowSchema,
+  storedDraftDuelCompletedSchema,
+  storedDraftDuelHistoryIndexSchema,
+  storedDraftDuelResultRowSchema,
+  type DraftDuelActiveState,
+  type DraftDuelCompletionRecap,
+  type StoredDraftDuelActive,
+  type StoredDraftDuelCompleted,
+  type StoredDraftDuelHistoryIndex,
+  type StoredDraftDuelResultRow,
+} from '../schemas/draft-duel-record.ts';
+import { HoopRushDatabase } from './dexie.ts';
+export class DexieDraftDuelRepository {
+  private readonly db: HoopRushDatabase;
+  constructor(db: HoopRushDatabase = new HoopRushDatabase()) {
+    this.db = db;
+  }
+  async saveActive(state: DraftDuelActiveState): Promise<void> {
+    const record: StoredDraftDuelActive = storedDraftDuelActiveSchema.parse({
+      ...state,
+      saveSchemaVersion: DRAFT_DUEL_SAVE_SCHEMA_VERSION,
+      updatedAtIso: new Date().toISOString(),
+    });
+    await this.db.draftDuelActive.put(record);
+  }
+  async loadActive(roomId: string): Promise<StoredDraftDuelActive | null> {
+    const record = await this.db.draftDuelActive.get(roomId);
+    if (record === undefined) return null;
+    return storedDraftDuelActiveSchema.parse(record);
+  }
+  async deleteActive(roomId: string): Promise<void> {
+    await this.db.draftDuelActive.delete(roomId);
+  }
+  async appendCommands(roomId: string, commands: readonly DraftDuelCommand[]): Promise<void> {
+    if (commands.length === 0) return;
+    const updatedAtIso = new Date().toISOString();
+    const rows = commands
+      .map((command) => {
+        if (command.roomId !== roomId) {
+          throw new Error(
+            `appendCommands: command ${String(command.commandId)} does not belong to room ${roomId}`,
+          );
+        }
+        return storedDraftDuelCommandRowSchema.parse({
+          saveSchemaVersion: DRAFT_DUEL_SAVE_SCHEMA_VERSION,
+          roomId,
+          ordinal: command.ordinal,
+          command,
+          updatedAtIso,
+        });
+      })
+      .sort((a, b) => a.ordinal - b.ordinal);
+    await this.db.transaction('rw', this.db.draftDuelCommands, async () => {
+      const existingRows = await this.db.draftDuelCommands.where('roomId').equals(roomId).toArray();
+      const byOrdinal = new Map<number, (typeof rows)[number]>();
+      for (const existing of existingRows) {
+        const parsed = storedDraftDuelCommandRowSchema.parse(existing);
+        byOrdinal.set(parsed.ordinal, parsed);
+      }
+      for (const row of rows) {
+        const existing = byOrdinal.get(row.ordinal);
+        if (existing !== undefined) {
+          if (canonicalJson(existing.command) === canonicalJson(row.command)) continue;
+          throw new Error(
+            `appendCommands: conflicting command at ordinal ${String(row.ordinal)} in room ${roomId}`,
+          );
+        }
+        await this.db.draftDuelCommands.put(row);
+        byOrdinal.set(row.ordinal, row);
+      }
+    });
+  }
+  async loadCommands(roomId: string): Promise<DraftDuelCommand[]> {
+    const rows = await this.db.draftDuelCommands.where('roomId').equals(roomId).sortBy('ordinal');
+    return rows.map((row) => storedDraftDuelCommandRowSchema.parse(row).command);
+  }
+  async saveResult(output: DraftDuelGameOutput): Promise<void> {
+    const validated = draftDuelGameOutputSchema.parse(output);
+    const key: [string, number] = [validated.roomId, validated.gameNumber];
+    await this.db.transaction('rw', this.db.draftDuelResults, async () => {
+      const existing = await this.db.draftDuelResults.get(key);
+      const verified =
+        existing === undefined ? false : storedDraftDuelResultRowSchema.parse(existing).verified;
+      const row: StoredDraftDuelResultRow = storedDraftDuelResultRowSchema.parse({
+        saveSchemaVersion: DRAFT_DUEL_SAVE_SCHEMA_VERSION,
+        roomId: validated.roomId,
+        gameNumber: validated.gameNumber,
+        output: validated,
+        verified,
+        storedAtIso: new Date().toISOString(),
+      });
+      await this.db.draftDuelResults.put(row);
+    });
+  }
+  async loadResults(roomId: string): Promise<StoredDraftDuelResultRow[]> {
+    const rows = await this.db.draftDuelResults.where('roomId').equals(roomId).sortBy('gameNumber');
+    return rows.map((row) => storedDraftDuelResultRowSchema.parse(row));
+  }
+  async saveVerification(
+    roomId: string,
+    entries: readonly DraftDuelPartiallyVerified[],
+  ): Promise<void> {
+    const verification = draftDuelPartiallyVerifiedSchema.array().parse(entries);
+    await this.db.transaction('rw', this.db.draftDuelActive, this.db.draftDuelResults, async () => {
+      const active = await this.db.draftDuelActive.get(roomId);
+      if (active !== undefined) {
+        const parsed = storedDraftDuelActiveSchema.parse(active);
+        await this.db.draftDuelActive.put({
+          ...parsed,
+          verification,
+          updatedAtIso: new Date().toISOString(),
+        });
+      }
+      for (const entry of verification) {
+        const row = await this.db.draftDuelResults.get([roomId, entry.gameNumber]);
+        if (row === undefined) continue;
+        const parsedRow = storedDraftDuelResultRowSchema.parse(row);
+        const verified = entry.status === 'verified';
+        if (parsedRow.verified === verified) continue;
+        await this.db.draftDuelResults.put({ ...parsedRow, verified });
+      }
+    });
+  }
+  async complete(recap: DraftDuelCompletionRecap): Promise<void> {
+    const validated = draftDuelCompletionRecapSchema.parse(recap);
+    const completedAtIso = new Date().toISOString();
+    const completed: StoredDraftDuelCompleted = storedDraftDuelCompletedSchema.parse({
+      saveSchemaVersion: DRAFT_DUEL_SAVE_SCHEMA_VERSION,
+      roomId: validated.roomId,
+      champion: validated.champion,
+      series: validated.series,
+      mvp: validated.mvp,
+      standouts: validated.standouts,
+      games: validated.games,
+      completedAtIso,
+    });
+    const index: StoredDraftDuelHistoryIndex = storedDraftDuelHistoryIndexSchema.parse({
+      saveSchemaVersion: DRAFT_DUEL_SAVE_SCHEMA_VERSION,
+      recordId: `dd-${validated.roomId}`,
+      roomId: validated.roomId,
+      champion: validated.champion,
+      gameCount: validated.games,
+      completedAtIso,
+    });
+    await this.db.transaction(
+      'rw',
+      this.db.draftDuelActive,
+      this.db.draftDuelCommands,
+      this.db.draftDuelResults,
+      this.db.draftDuelCompleted,
+      this.db.draftDuelHistory,
+      async () => {
+        await this.db.draftDuelCompleted.put(completed);
+        await this.db.draftDuelHistory.put(index);
+        await this.db.draftDuelActive.delete(validated.roomId);
+        await this.db.draftDuelCommands.where('roomId').equals(validated.roomId).delete();
+        await this.db.draftDuelResults.where('roomId').equals(validated.roomId).delete();
+      },
+    );
+  }
+  async loadCompleted(roomId: string): Promise<StoredDraftDuelCompleted | null> {
+    const record = await this.db.draftDuelCompleted.get(roomId);
+    if (record === undefined) return null;
+    return storedDraftDuelCompletedSchema.parse(record);
+  }
+  async listHistory(): Promise<StoredDraftDuelHistoryIndex[]> {
+    const rows = await this.db.draftDuelHistory.orderBy('completedAtIso').reverse().toArray();
+    return rows.map((row) => storedDraftDuelHistoryIndexSchema.parse(row));
+  }
+  async deleteCompleted(roomId: string): Promise<void> {
+    await this.db.transaction(
+      'rw',
+      this.db.draftDuelCompleted,
+      this.db.draftDuelHistory,
+      async () => {
+        await this.db.draftDuelCompleted.delete(roomId);
+        await this.db.draftDuelHistory.delete(`dd-${roomId}`);
+      },
+    );
+  }
+}
+export type DraftDuelRepository = DexieDraftDuelRepository;

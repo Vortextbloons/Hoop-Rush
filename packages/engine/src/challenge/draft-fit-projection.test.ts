@@ -142,7 +142,7 @@ describe('scoreDraftPool', () => {
     const report = scoreDraftPool({
       candidates: [blocked, legal],
       locked,
-      lockedSlots: ['G1', 'G2'],
+      lockedSlots: ['PG', 'SG'],
     });
     expect(report.scores.map((entry) => entry.playerId)).toEqual(['p-fit-59']);
   });

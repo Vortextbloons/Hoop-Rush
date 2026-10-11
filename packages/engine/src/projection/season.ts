@@ -38,7 +38,7 @@ import {
   type RotationTraceResult,
 } from './rotation-trace.ts';
 import { identifyWeaknesses } from './weaknesses.ts';
-const SLOT_ORDER = ['G1', 'G2', 'F1', 'F2', 'C'] as const;
+const SLOT_ORDER = ['PG', 'SG', 'SF', 'PF', 'C'] as const;
 export interface SeasonProjectionOptions {
   cache?: ProjectionCache;
   fingerprints?: ProjectionFingerprints;
@@ -75,10 +75,10 @@ export function projectUnit(input: {
   const cached = cache.get(key);
   if (cached !== undefined) return cached;
   const lineup: BaseFiveProjectionInputTuple = [
-    { player: byVersion.get(players[0] ?? '') ?? missingPlayer(players[0] ?? ''), slot: 'G1' },
-    { player: byVersion.get(players[1] ?? '') ?? missingPlayer(players[1] ?? ''), slot: 'G2' },
-    { player: byVersion.get(players[2] ?? '') ?? missingPlayer(players[2] ?? ''), slot: 'F1' },
-    { player: byVersion.get(players[3] ?? '') ?? missingPlayer(players[3] ?? ''), slot: 'F2' },
+    { player: byVersion.get(players[0] ?? '') ?? missingPlayer(players[0] ?? ''), slot: 'PG' },
+    { player: byVersion.get(players[1] ?? '') ?? missingPlayer(players[1] ?? ''), slot: 'SG' },
+    { player: byVersion.get(players[2] ?? '') ?? missingPlayer(players[2] ?? ''), slot: 'SF' },
+    { player: byVersion.get(players[3] ?? '') ?? missingPlayer(players[3] ?? ''), slot: 'PF' },
     { player: byVersion.get(players[4] ?? '') ?? missingPlayer(players[4] ?? ''), slot: 'C' },
   ];
   const projection = projectBaseFive({

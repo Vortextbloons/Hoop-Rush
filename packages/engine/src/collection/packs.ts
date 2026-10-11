@@ -248,7 +248,7 @@ export function generateCollectionStarter(
     chosen.map((card) => ({ playerId: card.playerId, positions: card.positions })),
   );
   if (assignment === null) {
-    throw new CollectionCommandError('no-feasible-starter', 'starter cannot fill G/G/F/F/C');
+    throw new CollectionCommandError('no-feasible-starter', 'starter cannot fill PG/SG/SF/PF/C');
   }
   return {
     cardIds: chosen.map((card) => card.cardId),

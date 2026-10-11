@@ -116,10 +116,10 @@ function lineupInput(players: readonly SimulationPlayer[]): BaseFiveProjectionIn
     throw new Error('projection: lineup is missing a slot');
   }
   return [
-    { player: g1, slot: 'G1' },
-    { player: g2, slot: 'G2' },
-    { player: f1, slot: 'F1' },
-    { player: f2, slot: 'F2' },
+    { player: g1, slot: 'PG' },
+    { player: g2, slot: 'SG' },
+    { player: f1, slot: 'SF' },
+    { player: f2, slot: 'PF' },
     { player: c, slot: 'C' },
   ];
 }

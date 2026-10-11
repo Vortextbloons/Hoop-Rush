@@ -2,14 +2,14 @@ import { z } from 'zod';
 import { playerIdSchema } from './ids.ts';
 import { positionSchema } from './positions.ts';
 export const lineupStructureSchema = z.tuple([
-  z.literal('G'),
-  z.literal('G'),
-  z.literal('F'),
-  z.literal('F'),
+  z.literal('PG'),
+  z.literal('SG'),
+  z.literal('SF'),
+  z.literal('PF'),
   z.literal('C'),
 ]);
 export type LineupStructure = z.infer<typeof lineupStructureSchema>;
-export const LINEUP_STRUCTURE: LineupStructure = ['G', 'G', 'F', 'F', 'C'];
+export const LINEUP_STRUCTURE: LineupStructure = ['PG', 'SG', 'SF', 'PF', 'C'];
 export const slotIndexSchema = z.number().int().min(0).max(4);
 export type SlotIndex = z.infer<typeof slotIndexSchema>;
 export const lineupAssignmentSchema = z.object({

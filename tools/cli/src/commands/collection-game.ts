@@ -614,7 +614,7 @@ function verifyCpuConstruction(input: {
   const playable = validateCollectionPlayableFive(starters, (cardId) => byId.get(cardId));
   if (!playable.ok) {
     failures.push(
-      `cpu: starters are not a legal G/G/F/F/C five: ${playable.issues[0]?.message ?? ''}`,
+      `cpu: starters are not a legal PG/SG/SF/PF/C five: ${playable.issues[0]?.message ?? ''}`,
     );
   }
   if (new Set(roster).size !== roster.length) failures.push('cpu: duplicate exact cards');

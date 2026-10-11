@@ -1,4 +1,5 @@
 import type { CollectionCatalogCard } from '@hoop-rush/data-contracts';
+import { LINEUP_STRUCTURE } from '@hoop-rush/data-contracts';
 import { assignLineup, validateLineup } from '../domain/lineup.ts';
 
 export interface CollectionTeamCheck {
@@ -81,13 +82,13 @@ export function validateCollectionPlayableFive(
         {
           code: 'no-legal-five',
           cardId: '',
-          message: 'first five cards cannot fill G/G/F/F/C',
+          message: 'first five cards cannot fill PG/SG/SF/PF/C',
         },
       ],
     };
   }
   const lineup = {
-    structure: ['G', 'G', 'F', 'F', 'C'] as ['G', 'G', 'F', 'F', 'C'],
+    structure: LINEUP_STRUCTURE,
     assignments: assignment,
   };
   const checked = validateLineup(lineup);

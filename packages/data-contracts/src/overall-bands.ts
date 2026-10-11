@@ -46,3 +46,15 @@ export function overallBandForPercentile(
   }
   return 40;
 }
+export function overallBandIndexOf(
+  overall: number,
+  bands: readonly OverallBand[] = OVERALL_BANDS,
+): number {
+  for (let index = 0; index < bands.length; index += 1) {
+    const band = bands[index];
+    if (band !== undefined && overall >= band.min && overall <= band.max) return index;
+  }
+  const first = bands[0];
+  if (first !== undefined && overall > first.max) return 0;
+  return Math.max(0, bands.length - 1);
+}

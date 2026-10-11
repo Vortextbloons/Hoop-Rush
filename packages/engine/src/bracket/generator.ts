@@ -14,6 +14,7 @@ import type {
 } from '@hoop-rush/data-contracts';
 import {
   franchiseIdSchema,
+  LINEUP_STRUCTURE,
   opponentBracketSchema,
   playerIdSchema,
   seasonKeySchema,
@@ -23,6 +24,7 @@ import { createRng, shuffle } from '../sim/rng.ts';
 import { validateBracketContent } from '../challenge/commands.ts';
 import { evaluateLineupBalance, evaluateLineupStrength } from '../challenge/lineup-eval.ts';
 import { BENCHMARK_VERSION } from '../challenge/benchmarks.ts';
+import { assignLineup } from '../domain/lineup.ts';
 import { playableSlotGroups } from '../domain/positions.ts';
 import { generateSchedule, scheduleInvariants, SCHEDULE_GENERATION_VERSION } from './schedule.ts';
 export const SCHEDULE_VERSION_LABEL = `schedule-${SCHEDULE_GENERATION_VERSION.replace('schedule-', '')}`;
@@ -137,6 +139,10 @@ export function generateBracket(options: BracketGenerationOptions): OpponentBrac
       if (!chosen) continue;
       const key = chosen.map((p) => p.playerId).join(',');
       if (seen.has(key)) continue;
+      if (
+        assignLineup(chosen.map((p) => ({ playerId: p.playerId, positions: p.positions }))) === null
+      )
+        continue;
       seen.add(key);
       for (const player of chosen) {
         participation.set(player.playerId, (participation.get(player.playerId) ?? 0) + 1);
@@ -391,13 +397,18 @@ export function generateBracket(options: BracketGenerationOptions): OpponentBrac
     }
     const seasonKey = seasonKeySchema.parse(top.seasonKey);
     const opponentId = `bracket-${franchiseId}`;
-    const lineup: BracketOpponent['lineup'] = {
-      structure: ['G', 'G', 'F', 'F', 'C'],
-      assignments: proposal.players.map((player, slotIndex) => ({
-        slotIndex: slotIndex as 0 | 1 | 2 | 3 | 4,
-        playerId: playerIdSchema.parse(player.playerId),
+    const assignment = assignLineup(
+      proposal.players.map((player) => ({
+        playerId: player.playerId,
         positions: player.positions,
       })),
+    );
+    if (assignment === null) {
+      throw new Error(`bracket: proposal for ${franchiseId} cannot fill PG/SG/SF/PF/C`);
+    }
+    const lineup: BracketOpponent['lineup'] = {
+      structure: LINEUP_STRUCTURE,
+      assignments: assignment,
     };
     for (const player of proposal.players) {
       if (usedInBracket.has(playerIdSchema.parse(player.playerId))) {

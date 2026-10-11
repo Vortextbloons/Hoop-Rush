@@ -58,6 +58,13 @@ import type {
   StoredFixedFivePendingResult,
 } from '../schemas/fixed-five-record.ts';
 import type {
+  StoredDraftDuelActive,
+  StoredDraftDuelCommandRow,
+  StoredDraftDuelCompleted,
+  StoredDraftDuelHistoryIndex,
+  StoredDraftDuelResultRow,
+} from '../schemas/draft-duel-record.ts';
+import type {
   StoredCollectionCommandRow,
   StoredCollectionLedgerRow,
   StoredCollectionOwnershipRow,
@@ -105,6 +112,11 @@ export const HOOP_RUSH_DATABASE_STORES: Record<string, string> = {
   fixedFivePendingResults: 'roomId',
   fixedFiveCompleted: 'roomId',
   fixedFiveHistory: 'recordId, completedAtIso',
+  draftDuelActive: 'roomId',
+  draftDuelCommands: '[roomId+ordinal], roomId',
+  draftDuelResults: '[roomId+gameNumber], roomId',
+  draftDuelCompleted: 'roomId',
+  draftDuelHistory: 'recordId, completedAtIso',
   collectionState: 'collectionId',
   collectionOwnership: '[collectionId+cardId], collectionId',
   collectionPulls: '[collectionId+pullSequence], collectionId',
@@ -150,6 +162,11 @@ export class HoopRushDatabase extends Dexie {
   fixedFivePendingResults!: EntityTable<StoredFixedFivePendingResult, 'roomId'>;
   fixedFiveCompleted!: EntityTable<StoredFixedFiveCompleted, 'roomId'>;
   fixedFiveHistory!: EntityTable<StoredFixedFiveHistoryIndex, 'recordId'>;
+  draftDuelActive!: EntityTable<StoredDraftDuelActive, 'roomId'>;
+  draftDuelCommands!: Table<StoredDraftDuelCommandRow, [string, number]>;
+  draftDuelResults!: Table<StoredDraftDuelResultRow, [string, number]>;
+  draftDuelCompleted!: EntityTable<StoredDraftDuelCompleted, 'roomId'>;
+  draftDuelHistory!: EntityTable<StoredDraftDuelHistoryIndex, 'recordId'>;
   collectionState!: EntityTable<StoredCollectionStateRow, 'collectionId'>;
   collectionOwnership!: Table<StoredCollectionOwnershipRow, [string, string]>;
   collectionPulls!: Table<StoredCollectionPullRow, [string, number]>;
@@ -396,6 +413,8 @@ export class HoopRushDatabase extends Dexie {
           await playTable.put(migrated.data);
         }
       });
+    // Draft Duel release: new stores only; existing records untouched.
+    this.version(21).stores(HOOP_RUSH_DATABASE_STORES);
   }
 }
 export class DexieChallengeRepository {

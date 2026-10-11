@@ -1,4 +1,5 @@
 import {
+  LINEUP_STRUCTURE,
   canonicalJson,
   contentHashSchema,
   FIXED_FIVE_MULTIPLAYER_VERSION,
@@ -655,7 +656,7 @@ export function lineupEntryFor(refs: PickRef[], players: SimulationPlayer[]): Fi
   const byId = new Map(players.map((p) => [p.playerId, p]));
   return {
     lineup: {
-      structure: ['G', 'G', 'F', 'F', 'C'],
+      structure: LINEUP_STRUCTURE,
       assignments: refs.map((ref) => {
         const playerId = playerIdSchema.parse(ref.playerId);
         const player = byId.get(playerId);

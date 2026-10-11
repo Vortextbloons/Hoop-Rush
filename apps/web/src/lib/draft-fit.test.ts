@@ -132,13 +132,13 @@ describe('scoreDraftPoolMemo', () => {
     const firstSlots = scoreDraftPoolMemo({
       pool,
       locked,
-      lockedSlots: ['G1', 'C'],
+      lockedSlots: ['PG', 'C'],
       context: context(),
     });
     const secondSlots = scoreDraftPoolMemo({
       pool,
       locked,
-      lockedSlots: ['G2', 'C'],
+      lockedSlots: ['SG', 'C'],
       context: context(),
     });
     expect(secondSlots).not.toBe(firstSlots);
@@ -150,7 +150,7 @@ describe('scoreDraftPoolMemo', () => {
     const reordered = scoreDraftPoolMemo({
       pool,
       locked: [secondLocked, firstLocked],
-      lockedSlots: ['G1', 'C'],
+      lockedSlots: ['PG', 'C'],
       context: context(),
     });
     expect(reordered).not.toBe(firstSlots);
