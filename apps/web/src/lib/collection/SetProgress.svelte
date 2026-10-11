@@ -106,84 +106,85 @@
         {#if expandedSet}
           <div class="set-detail" id={`set-detail-${view.setId}`}>
             <ul class="member-grid">
-          {#each view.memberCardIds as cardId (cardId)}
-            {@const owned = !view.missingCardIds.includes(cardId)}
-            {@const fullName = cardNameOf(cardId)}
-            {@const playerName = fullName.startsWith(`${view.title} `)
-              ? fullName.slice(view.title.length + 1)
-              : fullName}
-            {@const artwork = cardArtOf?.(cardId) ?? null}
-            <li class="member-slot" class:owned>
-              <div class="member-topline">
-                <span class="member-family">{view.title}</span>
-                {#if owned}
-                  <Check size={16} aria-hidden="true" />
-                {:else}
-                  <LockKeyhole size={14} aria-hidden="true" />
-                {/if}
-              </div>
-              <div class="card-mark" aria-hidden="true">
-                {#if artwork}
-                  <img class="card-art" src={asset(artwork)} alt="" loading="lazy" />
-                {:else}
-                  {playerName
-                    .split(' ')
-                    .map((part) => part.charAt(0))
-                    .slice(0, 2)
-                    .join('')}
-                {/if}
-              </div>
-              <p class="member-name">{playerName}</p>
-              {#if owned}
-                <span class="owned-label"><Check size={14} aria-hidden="true" /> Owned</span>
-              {:else}
-                <button
-                  type="button"
-                  onclick={() => onInspect(cardId)}
-                  aria-label={`Inspect missing ${fullName}`}
-                >
-                  Inspect missing <ArrowUpRight size={15} aria-hidden="true" />
-                </button>
-              {/if}
-            </li>
-          {/each}
-        </ul>
+              {#each view.memberCardIds as cardId (cardId)}
+                {@const owned = !view.missingCardIds.includes(cardId)}
+                {@const fullName = cardNameOf(cardId)}
+                {@const playerName = fullName.startsWith(`${view.title} `)
+                  ? fullName.slice(view.title.length + 1)
+                  : fullName}
+                {@const artwork = cardArtOf?.(cardId) ?? null}
+                <li class="member-slot" class:owned>
+                  <div class="member-topline">
+                    <span class="member-family">{view.title}</span>
+                    {#if owned}
+                      <Check size={16} aria-hidden="true" />
+                    {:else}
+                      <LockKeyhole size={14} aria-hidden="true" />
+                    {/if}
+                  </div>
+                  <div class="card-mark" aria-hidden="true">
+                    {#if artwork}
+                      <img class="card-art" src={asset(artwork)} alt="" loading="lazy" />
+                    {:else}
+                      {playerName
+                        .split(' ')
+                        .map((part) => part.charAt(0))
+                        .slice(0, 2)
+                        .join('')}
+                    {/if}
+                  </div>
+                  <p class="member-name">{playerName}</p>
+                  {#if owned}
+                    <span class="owned-label"><Check size={14} aria-hidden="true" /> Owned</span>
+                  {:else}
+                    <button
+                      type="button"
+                      onclick={() => onInspect(cardId)}
+                      aria-label={`Inspect missing ${fullName}`}
+                    >
+                      Inspect missing <ArrowUpRight size={15} aria-hidden="true" />
+                    </button>
+                  {/if}
+                </li>
+              {/each}
+            </ul>
 
-        <div class="reward-bar">
-          <div class="reward-value">
-            <CurrencyIcon currency={view.currency} size={40} />
-            <div>
-              <p class="reward-caption">Set completion reward</p>
-              <p><strong>{formatExchange(view.amount)}</strong> <span>{view.currency}</span></p>
+            <div class="reward-bar">
+              <div class="reward-value">
+                <CurrencyIcon currency={view.currency} size={40} />
+                <div>
+                  <p class="reward-caption">Set completion reward</p>
+                  <p><strong>{formatExchange(view.amount)}</strong> <span>{view.currency}</span></p>
+                </div>
+              </div>
+              <div class="reward-action">
+                {#if view.complete && !view.claimed}
+                  <button
+                    type="button"
+                    class="claim-button"
+                    onclick={() => onClaim(view.setId)}
+                    disabled={busySetId !== null}
+                  >
+                    {busySetId === view.setId
+                      ? 'Claiming…'
+                      : `Claim ${formatExchange(view.amount)} ${view.currency}`}
+                    <ArrowUpRight size={17} aria-hidden="true" />
+                  </button>
+                  <p>One-time reward. Your cards stay yours.</p>
+                {:else if view.claimed}
+                  <span class="claimed-label"
+                    ><Check size={16} aria-hidden="true" /> Reward claimed</span
+                  >
+                  <p>Every member card stays owned and usable.</p>
+                {:else}
+                  <span class="reward-locked"
+                    ><LockKeyhole size={14} aria-hidden="true" /> Collect all {view.requiredCount} to
+                    unlock</span
+                  >
+                  <p>One-time reward. Cards are never consumed.</p>
+                {/if}
+              </div>
             </div>
-          </div>
-          <div class="reward-action">
-            {#if view.complete && !view.claimed}
-              <button
-                type="button"
-                class="claim-button"
-                onclick={() => onClaim(view.setId)}
-                disabled={busySetId !== null}
-              >
-                {busySetId === view.setId
-                  ? 'Claiming…'
-                  : `Claim ${formatExchange(view.amount)} ${view.currency}`}
-                <ArrowUpRight size={17} aria-hidden="true" />
-              </button>
-              <p>One-time reward. Your cards stay yours.</p>
-            {:else if view.claimed}
-              <span class="claimed-label"
-                ><Check size={16} aria-hidden="true" /> Reward claimed</span
-              >
-              <p>Every member card stays owned and usable.</p>
-            {:else}
-              <span class="reward-locked"
-                ><LockKeyhole size={14} aria-hidden="true" /> Collect all {view.requiredCount} to unlock</span
-              >
-              <p>One-time reward. Cards are never consumed.</p>
-            {/if}
-          </div>
-        </div>
           </div>
         {/if}
       </li>

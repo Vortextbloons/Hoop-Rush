@@ -57,7 +57,7 @@ export const nonlinearComponentsSchema = z.object({
 });
 export type NonlinearComponents = z.infer<typeof nonlinearComponentsSchema>;
 export const productionEvidenceSchema = z.object({
-  creationPer36: z.number().finite().nonnegative().optional(),
+  creationPer36: z.number().nonnegative().optional(),
   score: z.number().min(0).max(100),
   weight: z.number().min(0).max(1),
   confidence: z.enum(['high', 'medium', 'low']),

@@ -6,9 +6,9 @@ import { z } from 'zod';
 
 const trackingEvidenceSchema = z.object({
   defFgPct: z.number().min(0).max(1).nullable().optional(),
-  defRimFga: z.number().finite().nonnegative().nullable().optional(),
-  secondaryAssists: z.number().finite().nonnegative().nullable().optional(),
-  potentialAssists: z.number().finite().nonnegative().nullable().optional(),
+  defRimFga: z.number().nonnegative().nullable().optional(),
+  secondaryAssists: z.number().nonnegative().nullable().optional(),
+  potentialAssists: z.number().nonnegative().nullable().optional(),
 });
 
 type OverallTracking = z.infer<typeof trackingEvidenceSchema> & { leagueRimFgPct: number | null };

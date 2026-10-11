@@ -37,10 +37,10 @@ export function getSeasonRunRepository(
   }
   return repoPlainPromise;
 }
-async function createRepo(options: {
+function createRepo(options: {
   schedule?: SeasonSchedule;
 }): Promise<SeasonRunRepository & SeasonPostseasonRepository> {
-  return getPersistence().seasonRunRepository(options);
+  return Promise.resolve(getPersistence().seasonRunRepository(options));
 }
 let runnerPromise: Promise<SeasonBlockRunner> | null = null;
 export function getSeasonBlockRunner(): Promise<SeasonBlockRunner> {
