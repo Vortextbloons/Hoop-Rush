@@ -40,6 +40,7 @@ const gamesPlayedByPlayer = new Map<string, number>();
 const foulsByPlayer = new Map<string, number>();
 const foulOutsByPlayer = new Map<string, number>();
 const minutesByPlayer = new Map<string, number>();
+const teamFoulsByGame: number[] = [];
 let completedGames = 0;
 let foulOutEventsTotal = 0;
 let removalEventsTotal = 0;
@@ -98,6 +99,7 @@ for (let blockIndex = 0; blockIndex <= MAX_BLOCK && !stopped; blockIndex += 1) {
     completedGames += 1;
     foulOutEventsTotal += result.foulOuts.length;
     removalEventsTotal += result.removals.length;
+    teamFoulsByGame.push(result.home.box.fouls + result.away.box.fouls);
     for (const side of [result.home, result.away]) {
       for (const player of side.players) {
         gamesPlayedByPlayer.set(
@@ -143,6 +145,10 @@ const playerRows = [...gamesPlayedByPlayer.entries()]
     minutes: minutesByPlayer.get(playerVersionId) ?? 0,
   }))
   .sort((a, b) => b.foulOuts - a.foulOuts || b.fouls - a.fouls);
+const teamFoulSamples: number[] = teamFoulsByGame;
+console.log(
+  `team fouls per game: mean=${(teamFoulSamples.reduce((a, b) => a + b, 0) / Math.max(1, teamFoulSamples.length)).toFixed(2)} (target 21 ± 2.5)`,
+);
 
 console.log(`players tracked: ${String(playerRows.length)}`);
 console.log('top foul-out players:');

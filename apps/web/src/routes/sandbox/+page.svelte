@@ -7,6 +7,7 @@
     PeakPlayerSeason,
     PlayersIndex,
     PlayersIndexEntry,
+    Seed,
   } from '@hoop-rush/data-contracts';
   import {
     franchiseAbbreviation,
@@ -18,6 +19,7 @@
   import { resolvePlayerRefs } from '$lib/player-refs';
   import { generateSeed, parseSandboxUrl } from '$lib/sandbox-url';
   import { startSandboxRun } from '$lib/sandbox-run';
+  import { leaguePrecompute } from '$lib/league-precompute';
   import { sortDraftRows } from '$lib/draft-presentation';
   import {
     heuristicDraftPoolReport,
@@ -67,6 +69,13 @@
     };
   });
   let slots = $state<(IndexRow | null)[]>([null, null, null, null, null]);
+  let runSeed = $state<Seed | null>(null);
+  $effect(() => {
+    if (runSeed !== null) return;
+    const seed = generateSeed();
+    runSeed = seed;
+    leaguePrecompute.prime(seed);
+  });
   let resolvedDraftPlayers = $state.raw<PeakPlayerSeason[]>([]);
   let sandboxFitContext = $state.raw<DraftFitContext | null>(null);
   let pageDots = $state.raw<ReadonlyMap<
@@ -453,7 +462,7 @@
       }));
       const resolved = await resolveRefsToPlayers(refs);
       if (!mounted) return;
-      await startSandboxRun(resolved, generateSeed());
+      await startSandboxRun(resolved, runSeed ?? generateSeed());
       if (!mounted) return;
     } catch (e) {
       if (!mounted) return;

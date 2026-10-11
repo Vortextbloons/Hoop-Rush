@@ -3,7 +3,6 @@ import { franchiseIdSchema, playerIdSchema } from '@hoop-rush/data-contracts';
 import { accumulateLeagueAppearance, emptyLeaguePlayerTotals } from './league-value.ts';
 
 const CONSISTENCY_PENALTY = 0.08;
-export { gameScore, mvpValue, shotsUsed, trueShooting } from './league-value.ts';
 
 export interface LeagueMvp {
   playerId: string;

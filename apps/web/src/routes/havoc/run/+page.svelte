@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import HavocHub from '$lib/components/havoc/HavocHub.svelte';
@@ -8,7 +9,7 @@
   let hub = $state<HavocHubState | null>(null);
   let serviceError = $state<string | null>(null);
 
-  $effect(() => {
+  onMount(() => {
     let instance: HavocHubState;
     try {
       instance = new HavocHubState(getHavocService());
@@ -17,8 +18,17 @@
       return;
     }
     hub = instance;
-    void instance.load();
-    return () => instance.destroy();
+    let mounted = true;
+    void instance.load().then(async () => {
+      if (!mounted || instance.error !== null) return;
+      if (await instance.playSeason()) {
+        if (mounted) await goto(resolve('/havoc/result'));
+      }
+    });
+    return () => {
+      mounted = false;
+      instance.destroy();
+    };
   });
 </script>
 

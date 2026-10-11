@@ -61,6 +61,24 @@ describe('Havoc result view', () => {
     expect(container.querySelector('[data-havoc-mvp]')).not.toBeNull();
     expect(container.querySelectorAll('[data-havoc-chart-game]')).toHaveLength(82);
     expect(container.querySelector('[data-havoc-comparison-table]')).not.toBeNull();
+    expect(container.querySelectorAll('[data-havoc-player-stats]')).toHaveLength(5);
+    expect(container.querySelector('[data-havoc-ability-report]')).not.toBeNull();
+    expect(container.querySelectorAll('[data-havoc-ability]')).toHaveLength(
+      buildFakeComparison('havoc-run-1').mutations.length,
+    );
+    expect(container.textContent).not.toContain('NaN');
+    expect(container.textContent).not.toContain('undefined');
+    const first = buildFakeComparison('havoc-run-1').slots[0];
+    if (!first) throw new Error('missing comparison player');
+    const row = container.querySelector(
+      `[data-havoc-player-stats="${first.slot}"] [data-havoc-stat="points"]`,
+    );
+    expect(row?.textContent).toContain((first.havoc.combined.points / 82).toFixed(1));
+    expect(row?.textContent).toContain((first.normal.combined.points / 82).toFixed(1));
+    const rebounds = container.querySelector(
+      `[data-havoc-player-stats="${first.slot}"] [data-havoc-stat="rebounds"]`,
+    );
+    expect(rebounds?.textContent).toContain((first.havoc.combined.rebounds.total / 82).toFixed(1));
     state.destroy();
   });
 });

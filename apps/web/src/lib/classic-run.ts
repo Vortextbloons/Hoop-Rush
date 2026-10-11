@@ -8,6 +8,7 @@ import {
   toSimulationPlayer,
 } from '@hoop-rush/engine';
 import { challengeRepository } from '$lib/challenge-repo';
+import { leaguePrecompute } from '$lib/league-precompute';
 import { randomUUID } from '$lib/ids';
 import { setClassicGuardBypass } from '$lib/classic-nav-guard';
 import { resolvePlayerRefs } from '$lib/player-refs';
@@ -19,7 +20,10 @@ export async function startClassicRun(draft: ClassicDraftState, runSeed: Seed): 
   if (draft.picks.length !== 5) {
     throw new Error('A classic draft needs exactly five picks.');
   }
-  const { manifest, profile, bracket } = await loadRunPreamble();
+  const [{ manifest, profile, bracket }, league] = await Promise.all([
+    loadRunPreamble(),
+    leaguePrecompute.ensure(runSeed),
+  ]);
   const pickBySlot = new Map(draft.picks.map((pick) => [pick.slotIndex, pick]));
   const refs = [0, 1, 2, 3, 4].map((slotIndex) => {
     const pick = pickBySlot.get(slotIndex);
@@ -46,6 +50,7 @@ export async function startClassicRun(draft: ClassicDraftState, runSeed: Seed): 
       .map((p) => p.displayName)
       .join(' · ')
       .slice(0, 96),
+    ...(league ? { league } : {}),
   });
   const run = createChallenge(creation);
   await challengeRepository.promoteClassicDraftToRun(

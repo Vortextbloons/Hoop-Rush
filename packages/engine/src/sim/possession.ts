@@ -27,6 +27,7 @@ import {
 } from './shooting.ts';
 import {
   freeThrowsForZone,
+  foulAvoidanceFactor,
   freeThrowProbability,
   nonShootingFoulProbability,
   shootingFoulProbability,
@@ -67,6 +68,7 @@ export interface TripContext {
   profile: EraSimulationProfile;
   teams: [SimulationTeam, SimulationTeam];
   teamUnits: [readonly string[], readonly string[]];
+  personalFouls: [Map<string, number>, Map<string, number>];
   preps: [TeamPrep, TeamPrep];
   meanTripSeconds: number;
   eraPossEstimatePerTrip: number;
@@ -95,6 +97,7 @@ export function createTripContext(
     profile,
     teams,
     teamUnits: [unitVersionIdsOf(teams[0]), unitVersionIdsOf(teams[1])],
+    personalFouls: [new Map(), new Map()],
     preps: [prepareTeam(teams[0], profile), prepareTeam(teams[1], profile)],
     meanTripSeconds: meanTripSeconds(profile),
     eraPossEstimatePerTrip: eraPossEstimatePerTrip(profile) ?? 1,
@@ -119,6 +122,36 @@ function slotOfOrThrow(prep: TeamPrep, player: SimulationPlayer): number {
     throw new Error(`possession: no slot for player ${prep.keyOf(player)}`);
   }
   return slot;
+}
+function personalFoulCount(
+  ctx: TripContext,
+  side: SideIndex,
+  prep: TeamPrep,
+  player: SimulationPlayer,
+): number {
+  return ctx.personalFouls[side].get(prep.keyOf(player)) ?? 0;
+}
+function recordPersonalFoul(
+  ctx: TripContext,
+  side: SideIndex,
+  prep: TeamPrep,
+  player: SimulationPlayer,
+): void {
+  const key = prep.keyOf(player);
+  ctx.personalFouls[side].set(key, (ctx.personalFouls[side].get(key) ?? 0) + 1);
+}
+function pickFoulerWithAvoidance(
+  ctx: TripContext,
+  side: SideIndex,
+  team: SimulationTeam,
+  prep: TeamPrep,
+): SimulationPlayer {
+  for (;;) {
+    const fouler = ctx.rng.weightedPick(team.players, prep.foulerPickTable);
+    if (ctx.rng.chance(foulAvoidanceFactor(personalFoulCount(ctx, side, prep, fouler)))) {
+      return fouler;
+    }
+  }
 }
 function homeDefenseShotAdjustment(ctx: TripContext, defenseSide: SideIndex): number {
   return defenseSide === 0 ? (ctx.homeCourt?.homeDefenseShotAdjustment ?? 0) : 0;
@@ -353,11 +386,12 @@ export class PossessionStepper {
     if (rng.chance(ENGINE_CONSTANTS.offensiveFoulShare)) {
       const offenseTeam = teams[offense];
       const offensePrep = preps[offense];
-      const fouler = rng.weightedPick(offenseTeam.players, offensePrep.foulerPickTable);
+      const fouler = pickFoulerWithAvoidance(this.ctx, offense, offenseTeam, offensePrep);
       const foulerSlot = slotOf(offensePrep, fouler);
       const cancelled = havoc?.cancelTurnover(offense, fouler) ?? false;
       havoc?.onTurnover(offense, fouler, cancelled);
       recorder.foul(offense, foulerSlot >= 0 ? foulerSlot : 0);
+      recordPersonalFoul(this.ctx, offense, offensePrep, fouler);
       state.periodFouls[offense] += 1;
       const awards = havoc?.onFoul({
         fouler,
@@ -385,9 +419,10 @@ export class PossessionStepper {
     }
     const defenseTeam = teams[defense];
     const defensePrep = preps[defense];
-    const fouler = rng.weightedPick(defenseTeam.players, defensePrep.foulerPickTable);
+    const fouler = pickFoulerWithAvoidance(this.ctx, defense, defenseTeam, defensePrep);
     const foulerSlot = slotOf(defensePrep, fouler);
     recorder.foul(defense, foulerSlot >= 0 ? foulerSlot : 0);
+    recordPersonalFoul(this.ctx, defense, defensePrep, fouler);
     state.periodFouls[defense] += 1;
     const inBonus = teamInBonus(state.periodFouls[defense], state.periodIndex >= 4);
     const awards = havoc?.onFoul({
@@ -855,8 +890,15 @@ function resolveShot(
     });
   };
   const foulP = shootingFoulProbability(shooter, defender, zone, profile);
-  if (rng.chance(foulP)) {
+  let foulDrawn = rng.chance(foulP);
+  if (foulDrawn) {
+    foulDrawn = rng.chance(
+      foulAvoidanceFactor(personalFoulCount(ctx, defenseSide, defensePrep, defender)),
+    );
+  }
+  if (foulDrawn) {
     recorder.foul(defenseSide, defenderSlot >= 0 ? defenderSlot : 0);
+    recordPersonalFoul(ctx, defenseSide, defensePrep, defender);
     state.periodFouls[defenseSide] += 1;
     const homeDefenseAdjustment = homeDefenseShotAdjustment(ctx, defenseSide);
     const shotP =

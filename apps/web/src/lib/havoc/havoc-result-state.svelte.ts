@@ -75,6 +75,18 @@ export class HavocResultState {
       if (snapshot.run === null) {
         this.report = null;
         this.comparison = null;
+        const history = await this.service.listHistory();
+        if (this.isDestroyed()) return;
+        const latest = history.find((entry) => entry.completionState === 'complete');
+        if (latest !== undefined) {
+          const saved = await this.service.readCompletedRun(latest.runId);
+          if (this.isDestroyed()) return;
+          if (saved !== null) {
+            this.run = saved.run;
+            this.report = saved.report;
+            this.comparison = saved.comparison;
+          }
+        }
         return;
       }
       const report = await this.service.readReport();

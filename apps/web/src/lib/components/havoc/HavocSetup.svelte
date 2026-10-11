@@ -1,149 +1,154 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
+  import { Zap, ArrowRight, Trophy } from '@lucide/svelte';
   import type { HavocDraftController } from '$lib/havoc/havoc-draft-state.svelte';
   import HavocDraftBoard from './HavocDraftBoard.svelte';
-  import { havocObjectiveStatusOf, havocRecordLabel } from './havoc-presentation';
-
   let {
     controller,
     franchiseName,
     onLocked,
   }: {
     controller: HavocDraftController;
-    franchiseName?: (franchiseId: string) => string;
+    franchiseName?: (id: string) => string;
     onLocked: () => void;
   } = $props();
-
   const run = $derived(controller.run);
   const draft = $derived(controller.draft);
-  const objective = $derived(run === null ? null : havocObjectiveStatusOf(run));
-
-  async function lock(): Promise<void> {
-    const accepted = await controller.lockLineup();
-    if (accepted) onLocked();
+  async function lock() {
+    if (await controller.lockLineup()) onLocked();
   }
 </script>
 
-<section class="mx-auto w-full max-w-5xl px-3 py-6 sm:px-6 sm:py-10" data-havoc-setup>
+<section class="h-shell" data-havoc-setup>
   {#if controller.loading}
-    <p class="font-mono text-sm text-muted-foreground" aria-live="polite">
-      Loading your Havoc save…
-    </p>
-  {:else if controller.error !== null && run === null && draft === null}
-    <div
-      role="alert"
-      class="mx-auto w-full max-w-xl rounded-xl border border-destructive/40 bg-destructive/10 p-6"
-    >
-      <h1 class="font-display text-xl font-extrabold tracking-tight uppercase">
-        Havoc save unavailable
-      </h1>
-      <p class="mt-2 text-sm text-muted-foreground">{controller.error}</p>
-      <button
-        type="button"
-        onclick={() => void controller.load()}
-        class="mt-4 inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        Try again
-      </button>
-    </div>
-  {:else if run !== null && run.phase === 'run'}
-    <div class="mx-auto w-full max-w-2xl rounded-xl bg-surface-1 p-6">
-      <p class="font-mono text-[10px] font-bold tracking-[0.16em] text-primary uppercase">
-        Hoop Havoc · Run in progress
-      </p>
-      <h1 class="font-display mt-1 text-2xl font-extrabold tracking-tight uppercase">
-        Back to your run
-      </h1>
-      <p class="mt-2 text-sm text-muted-foreground">
-        Record {havocRecordLabel(run.havocWins, run.havocLosses)} · game {run.havocCursor} of 82 played.
-      </p>
-      {#if objective !== null}
-        <p class="mt-1 text-sm font-semibold">{objective.label} — {objective.detail}</p>
-      {/if}
-      <div class="mt-4 flex flex-wrap gap-2">
-        <a
-          href={resolve('/havoc/run')}
-          class="inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-5 py-3 text-xs font-extrabold tracking-wide text-primary-foreground uppercase outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          Resume run
-        </a>
-        <a
-          href={resolve('/havoc/history')}
-          class="inline-flex min-h-11 items-center justify-center rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          Hall of Freaks
-        </a>
-      </div>
-    </div>
-  {:else if draft !== null}
+    <p class="h-copy" aria-live="polite">Getting the draft room ready…</p>
+  {:else if draft !== null && run?.phase !== 'run'}
     <HavocDraftBoard
       {draft}
       busy={controller.busy}
       error={controller.error}
       {franchiseName}
       onReroll={() => void controller.reroll()}
-      onPick={(cardId) => void controller.pick(cardId)}
+      onPick={(id) => void controller.pick(id)}
       onLock={() => void lock()}
     />
-  {:else}
-    <div class="mx-auto w-full max-w-3xl">
-      <p class="font-mono text-[10px] font-bold tracking-[0.16em] text-primary uppercase">
-        Mode 05 · Hoop Havoc
-      </p>
-      <h1 class="font-display mt-2 text-3xl font-extrabold tracking-tight uppercase sm:text-4xl">
-        Draft freaks. Survive 82.
+  {:else if run?.phase === 'run'}
+    <div class="h-panel">
+      <p class="h-eyebrow">Your squad is ready</p>
+      <h1 class="h-title">
+        {run.havocCursor >= 82 ? 'The results are in.' : 'Back to the havoc.'}
       </h1>
-      <p class="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-        Draft five mutated player-seasons — one per position, PG through C — then play all 82 games
-        against the frozen NBA opponents. The objective is <strong>82-0</strong>. There is no bench
-        editor and no trades: the five you lock are the five you ride.
+      <p class="h-copy mt-4">
+        {run.havocCursor} of 82 games completed. Your lineup and progress are saved.
       </p>
-      <ul class="mt-4 flex flex-col gap-2 text-sm text-muted-foreground">
-        <li class="flex gap-2">
-          <span aria-hidden="true" class="text-primary">•</span>
-          Each card carries a mutation package that changes real simulation behavior: ratings, tendencies,
-          dimensions, and event rules.
-        </li>
-        <li class="flex gap-2">
-          <span aria-hidden="true" class="text-primary">•</span>
-          One whole-offer reroll for the entire draft. Reloading never changes an offer.
-        </li>
-        <li class="flex gap-2">
-          <span aria-hidden="true" class="text-primary">•</span>
-          No guarantees: overpowered and disastrous combinations are both legitimate. Mutations change
-          the math, they do not promise more wins.
-        </li>
-        <li class="flex gap-2">
-          <span aria-hidden="true" class="text-primary">•</span>
-          After all 82 games, a matched normal season with the same schedule and seeds reveals how the
-          mutations actually changed the year.
-        </li>
-      </ul>
-      <div class="mt-6 flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          data-havoc-start
-          onclick={() => void controller.createDraft()}
-          disabled={controller.busy}
-          class="inline-flex min-h-12 items-center justify-center rounded-lg bg-primary px-6 py-3 text-sm font-extrabold tracking-wide text-primary-foreground uppercase outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {controller.busy ? 'Starting…' : 'Start draft'}
-        </button>
-        <a
-          href={resolve('/havoc/history')}
-          class="inline-flex min-h-11 items-center justify-center rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          Hall of Freaks
-        </a>
+      <div class="h-actions mt-6">
+        {#if run.comparisonStatus === 'complete'}<button
+            class="h-button"
+            disabled={controller.busy}
+            onclick={() => void controller.createDraft()}>Draft another squad</button
+          >{/if}<a
+          class="h-button secondary"
+          href={resolve(run.havocCursor >= 82 ? '/havoc/result' : '/havoc/run')}
+          >{run.havocCursor >= 82 ? 'See season report' : 'Continue season'}
+          <ArrowRight size={18} /></a
+        ><a class="h-link" href={resolve('/havoc/history')}>Hall of Freaks</a>
       </div>
-      {#if controller.error !== null}
-        <p
-          role="alert"
-          class="mt-4 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs"
-        >
-          {controller.error}
-        </p>
-      {/if}
     </div>
+  {:else}
+    <div class="h-header">
+      <p class="h-eyebrow">Hoop Havoc · Anything but ordinary</p>
+      <a class="h-link" href={resolve('/havoc/history')}>Hall of Freaks</a>
+    </div>
+    <div class="h-intro">
+      <div>
+        <h1 class="h-title">Real legends.<br /><span>Unreal powers.</span></h1>
+        <p class="h-copy mt-6">
+          Build a starting five with outrageous basketball mutations. Send them into an 82-game
+          season. See just how far your freaks can go.
+        </p>
+        <div class="h-actions mt-8">
+          <button
+            class="h-button"
+            data-havoc-start
+            disabled={controller.busy}
+            onclick={() => void controller.createDraft()}
+            ><Zap size={18} />{controller.busy ? 'Opening draft…' : 'Draft your squad'}</button
+          >
+        </div>
+      </div>
+      <div class="h-challenge">
+        <Trophy size={48} strokeWidth={1.5} /><span class="h-eyebrow"
+          >The perfect season challenge</span
+        ><strong>82–0</strong>
+        <p>Five players. Thirty opponents.<br />One impossible-looking mission.</p>
+      </div>
+    </div>
+    <ol class="h-steps">
+      <li><strong>1</strong> Pick five powered-up legends</li>
+      <li><strong>2</strong> Launch your automatic season</li>
+      <li><strong>3</strong> Reveal your squad's final report</li>
+    </ol>
+    <details class="h-panel">
+      <summary>How does Havoc work?</summary>
+      <p class="h-copy">
+        Choose one player for each position, PG through C. Every card has powers and tradeoffs. You
+        get one reroll for the entire draft. No guarantees: rarer powers can backfire. Once your
+        five are locked, the full season simulates automatically, followed by the same season
+        without powers so you can compare the results.
+      </p>
+    </details>
   {/if}
+  {#if controller.error !== null}<div role="alert" class="h-alert">
+      {controller.error}<button
+        class="h-button secondary mt-3"
+        onclick={() => void controller.load()}>Try again</button
+      >
+    </div>{/if}
 </section>
+
+<style>
+  .h-intro {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr;
+    gap: 48px;
+    align-items: center;
+    padding: 32px 0;
+  }
+  h1 span {
+    color: #f290c5;
+  }
+  .h-challenge {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+    background: #20294c;
+    border: 2px solid #ffd782;
+    border-radius: 50% 50% 24px 24px;
+    padding: 48px 24px;
+    color: #ffd782;
+    text-align: center;
+    transform: rotate(3deg);
+  }
+  .h-challenge strong {
+    font-family: var(--font-display);
+    font-size: 6rem;
+    font-weight: 900;
+    line-height: 1;
+  }
+  .h-challenge p {
+    color: #c1cae4;
+    font-size: 14px;
+  }
+  @media (max-width: 760px) {
+    .h-intro {
+      grid-template-columns: 1fr;
+      gap: 28px;
+    }
+    .h-challenge {
+      transform: none;
+      padding: 28px;
+      border-radius: 24px;
+    }
+  }
+</style>

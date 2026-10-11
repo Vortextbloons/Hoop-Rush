@@ -1,241 +1,161 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
-  import { HAVOC_GAME_COUNT } from '@hoop-rush/data-contracts';
+  import { Trophy, ArrowRight } from '@lucide/svelte';
   import type { HavocResultState } from '$lib/havoc/havoc-result-state.svelte';
   import HavocComparisonView from './HavocComparisonView.svelte';
   import HavocMvpCard from './HavocMvpCard.svelte';
-  import {
-    havocComparisonStatusLabel,
-    havocObjectiveStatusOf,
-    havocRecordLabel,
-  } from './havoc-presentation';
-
-  let { state }: { state: HavocResultState } = $props();
-
-  const run = $derived(state.run);
-  const objective = $derived(run === null ? null : havocObjectiveStatusOf(run));
-  const havocComplete = $derived((run?.havocCursor ?? 0) >= HAVOC_GAME_COUNT);
-  const normalCompleted = $derived(
-    state.progress?.variant === 'normal'
-      ? state.progress.gamesCompleted
-      : state.normalGamesCompleted,
-  );
-  const progressPercent = $derived(
-    Math.round((Math.min(HAVOC_GAME_COUNT, normalCompleted) / HAVOC_GAME_COUNT) * 100),
-  );
-  const pendingLabel = $derived(
-    run !== null && run.normalCursor >= HAVOC_GAME_COUNT
-      ? 'Finish comparison'
-      : run?.comparisonStatus === 'running'
-        ? 'Resume normal season'
-        : 'Run normal season',
+  import HavocLineupLock from './HavocLineupLock.svelte';
+  import HavocSquadReport from './HavocSquadReport.svelte';
+  import HavocAbilityReport from './HavocAbilityReport.svelte';
+  import HavocComparisonChart from './HavocComparisonChart.svelte';
+  import HavocGameDetail from './HavocGameDetail.svelte';
+  import { havocRecordLabel } from './havoc-presentation';
+  let { state: resultState }: { state: HavocResultState } = $props();
+  const run = $derived(resultState.run);
+  const comparison = $derived(resultState.comparison);
+  let selectedGame = $state<number | null>(null);
+  const completed = $derived(
+    resultState.progress?.variant === 'normal'
+      ? resultState.progress.gamesCompleted
+      : resultState.normalGamesCompleted,
   );
 </script>
 
-<section class="mx-auto w-full max-w-6xl px-3 py-6 sm:px-6 sm:py-10" data-havoc-result>
-  {#if state.loading}
-    <p class="font-mono text-sm text-muted-foreground" aria-live="polite">
-      Loading the season result…
-    </p>
-  {:else if run === null}
-    <div class="mx-auto w-full max-w-xl rounded-xl bg-surface-1 p-6">
-      <h1 class="font-display text-xl font-extrabold tracking-tight uppercase">
-        No active Havoc run
-      </h1>
-      <p class="mt-2 text-sm text-muted-foreground">
-        Season results appear here once a run reaches game 82.
-      </p>
-      <a
-        href={resolve('/havoc')}
-        class="mt-4 inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-5 py-3 text-xs font-extrabold tracking-wide text-primary-foreground uppercase outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        Go to Havoc setup
-      </a>
+<section class="h-shell" data-havoc-result>
+  {#if resultState.loading}<p class="h-copy" aria-live="polite">Opening your season report…</p>
+  {:else if run === null || run.phase === 'draft'}<div class="h-panel">
+      <h1 class="h-title">Your story starts here.</h1>
+      <a class="h-button mt-6" href={resolve('/havoc')}>Draft your squad</a>
     </div>
-  {:else if run.phase === 'draft'}
-    <div class="mx-auto w-full max-w-xl rounded-xl bg-surface-1 p-6">
-      <h1 class="font-display text-xl font-extrabold tracking-tight uppercase">
-        Finish the draft first
-      </h1>
-      <a
-        href={resolve('/havoc')}
-        class="mt-4 inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-5 py-3 text-xs font-extrabold tracking-wide text-primary-foreground uppercase outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        Continue draft
-      </a>
+  {:else if !resultState.havocSeasonComplete}<div class="h-panel">
+      <h1 class="h-title">Season in progress.</h1>
+      <p class="h-copy mt-4">Your report arrives after all 82 games.</p>
+      <a class="h-button mt-6" href={resolve('/havoc/run')}>Continue season</a>
     </div>
-  {:else if !havocComplete}
-    <div class="mx-auto w-full max-w-xl rounded-xl bg-surface-1 p-6">
-      <h1 class="font-display text-xl font-extrabold tracking-tight uppercase">
-        Season in progress
-      </h1>
-      <p class="mt-2 text-sm text-muted-foreground">
-        {run.havocCursor} of {HAVOC_GAME_COUNT} games played. The comparison unlocks after game 82.
+  {:else if !resultState.comparisonComplete && run.comparisonStatus !== 'unsupported'}
+    <div class="h-panel" data-havoc-comparison-pending>
+      <p class="h-eyebrow">One last thing</p>
+      <h1 class="h-title mt-3">The powers. The proof.</h1>
+      <p class="h-copy mt-4">
+        We're playing the same season without powers. Both results will be revealed together.
       </p>
-      <a
-        href={resolve('/havoc/run')}
-        class="mt-4 inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-5 py-3 text-xs font-extrabold tracking-wide text-primary-foreground uppercase outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring"
+      <div
+        class="h-meter"
+        role="progressbar"
+        aria-label="Report preparation"
+        aria-valuemin={0}
+        aria-valuemax={82}
+        aria-valuenow={completed}
       >
-        Back to the hub
-      </a>
+        <div style:width={`${(completed / 82) * 100}%`}></div>
+      </div>
+      <p class="h-copy" data-havoc-comparison-progress>{completed} / 82</p>
+      {#if !resultState.busy}<button
+          class="h-button mt-4"
+          data-havoc-run-normal
+          onclick={() => void resultState.runNormalSeason()}>Finish season report</button
+        >{/if}
     </div>
   {:else}
-    <header class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
-      <div class="min-w-0">
-        <p class="font-mono text-[10px] font-bold tracking-[0.16em] text-primary uppercase">
-          Hoop Havoc · Season complete
-        </p>
-        <h1 class="font-display mt-1 text-3xl font-extrabold tracking-tight uppercase sm:text-4xl">
-          {havocRecordLabel(run.havocWins, run.havocLosses)}
+    <header class="h-header">
+      <div>
+        <p class="h-eyebrow">Hoop Havoc · Final buzzer</p>
+        <h1 class="h-title mt-3">
+          {run.perfectSeason ? 'Perfect. Absolute havoc.' : 'That was your havoc.'}
         </h1>
-        {#if objective !== null}
-          <p class="mt-1 text-sm font-semibold" data-havoc-result-objective>
-            {objective.label} — {objective.detail}
-          </p>
-        {/if}
       </div>
-      <div class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-        <a
-          href={run === null
-            ? resolve('/havoc/history')
-            : resolve('/havoc/history/[runId]', { runId: run.runId })}
-          class="inline-flex min-h-11 touch-manipulation items-center justify-center rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          Full report
-        </a>
-        <a
-          href={resolve('/havoc/run')}
-          class="inline-flex min-h-11 touch-manipulation items-center justify-center rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          Back to hub
-        </a>
-      </div>
+      <Trophy size={64} color="#ffd782" strokeWidth={1.5} />
     </header>
-
-    {#if state.report !== null}
-      <dl class="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-        <div class="rounded-xl bg-surface-1 p-3">
-          <dt class="font-mono text-[10px] tracking-[0.1em] text-muted-foreground uppercase">
-            Points for
-          </dt>
-          <dd class="font-mono text-lg font-bold">{state.report.havoc.pointsFor}</dd>
+    <div class="h-panel">
+      <p class="h-eyebrow">Your final record</p>
+      <p class="h-score">{havocRecordLabel(run.havocWins, run.havocLosses)}</p>
+      <p class="h-copy mt-3" data-havoc-result-objective>
+        {run.perfectSeason
+          ? '82 wins. Zero losses. Your squad cleared the perfect season challenge.'
+          : 'The 82–0 challenge is over. See what your squad pulled off, then build your next five.'}
+      </p>
+    </div>
+    {#if resultState.report !== null}<dl class="h-stats">
+        <div>
+          <dt>Average score margin</dt>
+          <dd>{(resultState.report.havoc.differential / 82).toFixed(1)}</dd>
         </div>
-        <div class="rounded-xl bg-surface-1 p-3">
-          <dt class="font-mono text-[10px] tracking-[0.1em] text-muted-foreground uppercase">
-            Points against
-          </dt>
-          <dd class="font-mono text-lg font-bold">{state.report.havoc.pointsAgainst}</dd>
-        </div>
-        <div class="rounded-xl bg-surface-1 p-3">
-          <dt class="font-mono text-[10px] tracking-[0.1em] text-muted-foreground uppercase">
-            Differential
-          </dt>
-          <dd class="font-mono text-lg font-bold">{state.report.havoc.differential}</dd>
-        </div>
-        <div class="rounded-xl bg-surface-1 p-3">
-          <dt class="font-mono text-[10px] tracking-[0.1em] text-muted-foreground uppercase">
-            Direct mutation points
-          </dt>
-          <dd class="font-mono text-lg font-bold" data-havoc-direct-mutation-points>
-            {state.report.directMutationPoints}
+        <div>
+          <dt>Wins gained with powers</dt>
+          <dd>
+            {comparison ? `${comparison.winsGained >= 0 ? '+' : ''}${comparison.winsGained}` : '—'}
           </dd>
         </div>
-      </dl>
-    {/if}
-
-    {#if run.comparisonStatus === 'unsupported'}
-      <section
-        class="mt-4 rounded-xl border border-warn/40 bg-warn/10 p-4"
-        data-havoc-comparison-unsupported
-      >
-        <h2 class="font-display text-base font-extrabold tracking-tight uppercase">
-          Normal comparison unsupported
-        </h2>
-        <p class="mt-1 text-sm text-muted-foreground">
-          This run was recorded with engine, rule, or data versions that cannot be replayed
-          faithfully. The Havoc results stand; the baseline season is not simulated under different
-          rules.
+        <div>
+          <dt>Direct power points</dt>
+          <dd data-havoc-direct-mutation-points>{resultState.report.directMutationPoints}</dd>
+        </div>
+      </dl>{/if}
+    {#if comparison !== null && resultState.comparisonComplete}<HavocMvpCard {comparison} />
+      <div class="h-panel mt-6">
+        <h2 class="h-subtitle">Same squad. Without powers.</h2>
+        <p class="h-copy mt-2">
+          The unmutated five finished {havocRecordLabel(
+            comparison.normal.wins,
+            comparison.normal.losses,
+          )} against the same opponents. This compares two seasons; it doesn't isolate the effect of each
+          power.
         </p>
-      </section>
-    {:else if state.comparisonComplete && state.comparison !== null}
-      <div class="mt-4 flex flex-col gap-4">
-        <HavocMvpCard comparison={state.comparison} />
-        <HavocComparisonView comparison={state.comparison} />
-      </div>
-    {:else}
-      <section
-        aria-labelledby="havoc-comparison-pending"
-        class="mt-4 rounded-xl bg-surface-1 p-4 sm:p-5"
-        data-havoc-comparison-pending
-      >
-        <div class="flex flex-wrap items-end justify-between gap-3">
-          <div class="min-w-0">
-            <h2
-              id="havoc-comparison-pending"
-              class="font-display text-lg font-extrabold tracking-tight uppercase"
+      </div>{:else}<p class="h-alert" data-havoc-comparison-unsupported>
+        This saved season uses older rules. Its results are preserved, but a matching comparison is
+        unavailable.
+      </p>{/if}
+    {#if comparison !== null && resultState.comparisonComplete}
+      <dl class="h-stats">
+        <div>
+          <dt>Scored per game · Havoc / Normal</dt>
+          <dd>
+            {comparison.havoc.averagePointsFor.toFixed(1)}
+            <span class="text-lg text-muted-foreground"
+              >/ {comparison.normal.averagePointsFor.toFixed(1)}</span
             >
-              Normal season · hidden until complete
-            </h2>
-            <p class="mt-1 text-xs leading-relaxed text-muted-foreground">
-              The same 82 opponents and seeds are replayed without mutations. Baseline scores,
-              records, and the chart are revealed together when the normal season finishes — never
-              early.
-            </p>
-            <p class="mt-1 font-mono text-xs text-muted-foreground" data-havoc-comparison-progress>
-              {normalCompleted} / {HAVOC_GAME_COUNT} normal games · status:
-              {havocComparisonStatusLabel(run.comparisonStatus)}
-            </p>
-          </div>
-          <span class="font-mono text-xs text-muted-foreground">{progressPercent}%</span>
+          </dd>
         </div>
-        <div
-          class="mt-3 h-2 overflow-hidden rounded-full bg-surface-3"
-          role="progressbar"
-          aria-label="Normal season progress"
-          aria-valuemin="0"
-          aria-valuemax={HAVOC_GAME_COUNT}
-          aria-valuenow={Math.min(HAVOC_GAME_COUNT, normalCompleted)}
-        >
-          <div
-            class="h-full rounded-full bg-primary transition-[width] motion-reduce:transition-none"
-            style="width: {progressPercent}%"
-          ></div>
-        </div>
-        <div class="mt-4 grid gap-2 sm:flex sm:flex-wrap">
-          <button
-            type="button"
-            data-havoc-run-normal
-            onclick={() => void state.runNormalSeason()}
-            disabled={state.busy}
-            class="inline-flex min-h-12 w-full touch-manipulation items-center justify-center rounded-lg bg-primary px-5 py-3 text-xs font-extrabold tracking-wide text-primary-foreground uppercase outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto sm:min-h-11"
-          >
-            {state.busy ? 'Simulating…' : pendingLabel}
-          </button>
-          {#if state.busy}
-            <button
-              type="button"
-              data-havoc-cancel-comparison
-              onclick={() => void state.cancelComparison()}
-              disabled={state.cancelling}
-              class="inline-flex min-h-11 w-full touch-manipulation items-center justify-center rounded-lg border border-destructive/50 px-4 py-2 text-xs font-semibold text-destructive outline-none hover:bg-destructive/10 focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
+        <div>
+          <dt>Allowed per game · Havoc / Normal</dt>
+          <dd>
+            {comparison.havoc.averagePointsAgainst.toFixed(1)}
+            <span class="text-lg text-muted-foreground"
+              >/ {comparison.normal.averagePointsAgainst.toFixed(1)}</span
             >
-              {state.cancelling ? 'Stopping…' : 'Cancel at game boundary'}
-            </button>
-          {/if}
+          </dd>
         </div>
-        {#if state.notice !== null}
-          <p role="status" class="mt-3 rounded-lg bg-surface-2 p-3 text-xs">{state.notice}</p>
-        {/if}
+        <div>
+          <dt>Normal record</dt>
+          <dd>{havocRecordLabel(comparison.normal.wins, comparison.normal.losses)}</dd>
+        </div>
+      </dl>
+      <HavocSquadReport {comparison} lineup={run.lineup} />
+      <section class="h-panel mt-6">
+        <h2 class="h-subtitle mb-4">Your season, game by game</h2>
+        <HavocComparisonChart
+          {comparison}
+          {selectedGame}
+          onSelect={(gameNumber) => (selectedGame = gameNumber)}
+        />{#if selectedGame !== null}<HavocGameDetail {comparison} gameNumber={selectedGame} />{/if}
       </section>
-    {/if}
-
-    {#if state.error !== null}
-      <p
-        role="alert"
-        class="mt-4 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs"
-      >
-        {state.error}
-      </p>
-    {/if}
+    {:else}<div class="mt-6"><HavocLineupLock slots={run.lineup} /></div>{/if}
+    {#if comparison !== null && resultState.comparisonComplete}<HavocAbilityReport
+        {comparison}
+      />{/if}
+    <div class="h-actions mt-6">
+      <a class="h-button" href={resolve('/havoc')}>Draft another squad <ArrowRight size={18} /></a
+      ><a class="h-link" href={resolve('/havoc/history')}>Hall of Freaks</a>
+    </div>
+    {#if comparison !== null && resultState.comparisonComplete}<details class="h-panel mt-8">
+        <summary>Explore the box scores, powers & game-by-game comparison</summary
+        ><HavocComparisonView {comparison} showChart={false} />
+      </details>{/if}
+    <a
+      class="h-link mt-6 inline-block"
+      href={resolve('/havoc/history/[runId]', { runId: run.runId })}>Open full saved report</a
+    >
   {/if}
+  {#if resultState.error !== null}<p role="alert" class="h-alert">{resultState.error}</p>{/if}
+  {#if resultState.notice !== null}<p role="status" class="h-alert">{resultState.notice}</p>{/if}
 </section>

@@ -1,10 +1,10 @@
 <script lang="ts">
   import type { HavocDraftState } from '@hoop-rush/data-contracts';
   import { HAVOC_REROLL_LIMIT } from '@hoop-rush/data-contracts';
+  import { Shuffle, Rocket } from '@lucide/svelte';
   import HavocDraftCard from './HavocDraftCard.svelte';
   import HavocLineupLock from './HavocLineupLock.svelte';
   import { lineupSlotsFromPicks } from './havoc-presentation';
-
   let {
     draft,
     busy,
@@ -17,152 +17,111 @@
     draft: HavocDraftState;
     busy: boolean;
     error: string | null;
-    franchiseName?: (franchiseId: string) => string;
+    franchiseName?: (id: string) => string;
     onReroll: () => void;
-    onPick: (cardId: string) => void;
+    onPick: (id: string) => void;
     onLock: () => void;
   } = $props();
-
   let mode = $state<'effective' | 'original'>('effective');
-  const pickNumber = $derived(draft.picks.length + 1);
-  const remainingRerolls = $derived(HAVOC_REROLL_LIMIT - (draft.rerollUsed ? 1 : 0));
   const complete = $derived(draft.status === 'complete');
   const slots = $derived(lineupSlotsFromPicks(draft.picks));
+  const positions = ['PG', 'SG', 'SF', 'PF', 'C'];
 </script>
 
-<div class="flex min-w-0 flex-col gap-4" data-havoc-draft-board>
-  <section aria-labelledby="havoc-draft-heading" class="rounded-xl bg-surface-1 p-4 sm:p-5">
-    <div class="flex flex-wrap items-end justify-between gap-3">
-      <div class="min-w-0">
-        <p class="font-mono text-[10px] font-bold tracking-[0.16em] text-primary uppercase">
-          Hoop Havoc · Draft night
-        </p>
-        <h1
-          id="havoc-draft-heading"
-          class="font-display mt-1 text-2xl font-extrabold tracking-tight uppercase sm:text-3xl"
-        >
-          Round {draft.round} of 5 · {draft.slot}
-        </h1>
-        <p class="mt-1 text-sm text-muted-foreground">
-          {#if complete}
-            Five picked. Lock the lineup to start the 82-game run.
-          {:else}
-            Pick {pickNumber} of 5 — fill the {draft.slot} slot.
-          {/if}
-        </p>
-      </div>
-      <ol class="flex items-center gap-1" aria-label="Draft progress">
-        {#each [1, 2, 3, 4, 5] as slotNumber (slotNumber)}
-          <li
-            aria-current={slotNumber === pickNumber && !complete ? 'step' : undefined}
-            class="grid h-7 w-7 place-items-center rounded-full font-mono text-[11px] font-bold {slotNumber <=
-            draft.picks.length
-              ? 'bg-primary text-primary-foreground'
-              : slotNumber === pickNumber && !complete
-                ? 'border border-primary text-primary'
-                : 'bg-surface-3 text-muted-foreground'}"
-          >
-            {slotNumber}
-          </li>
-        {/each}
-      </ol>
+<div data-havoc-draft-board>
+  <header class="h-header">
+    <div>
+      <p class="h-eyebrow">Hoop Havoc · Draft night</p>
+      <h1 class="h-title mt-2">{complete ? 'Meet your freaks.' : `Pick your ${draft.slot}.`}</h1>
+      <p class="h-copy mt-3">
+        {complete
+          ? 'Your five are ready. Launch the season and let them loose.'
+          : 'Three legends. Three twists. Who gets the spot?'}
+      </p>
     </div>
-
-    <div
-      class="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between"
-    >
-      <div
-        class="grid w-full grid-cols-2 rounded-lg border border-border p-0.5 sm:inline-flex sm:w-auto"
-        role="group"
-        aria-label="Attribute view"
-      >
-        <button
-          type="button"
-          aria-pressed={mode === 'effective'}
-          onclick={() => (mode = 'effective')}
-          class="min-h-11 rounded-md px-3 py-2 text-xs font-semibold touch-manipulation outline-none focus-visible:ring-2 focus-visible:ring-ring {mode ===
-          'effective'
-            ? 'bg-primary text-primary-foreground'
-            : 'text-muted-foreground'}"
+    <ol class="h-draft-progress" aria-label="Draft progress">
+      {#each positions as position, i (position)}<li
+          class:chosen={i < draft.picks.length}
+          aria-current={i === draft.picks.length ? 'step' : undefined}
         >
-          Effective
-        </button>
-        <button
-          type="button"
-          aria-pressed={mode === 'original'}
-          onclick={() => (mode = 'original')}
-          class="min-h-11 rounded-md px-3 py-2 text-xs font-semibold touch-manipulation outline-none focus-visible:ring-2 focus-visible:ring-ring {mode ===
-          'original'
-            ? 'bg-primary text-primary-foreground'
-            : 'text-muted-foreground'}"
-        >
-          Original
-        </button>
-      </div>
-      {#if !complete}
-        <div class="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-end">
-          <button
-            type="button"
-            data-havoc-reroll
-            onclick={onReroll}
-            disabled={busy || draft.rerollUsed}
-            class="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg border border-border px-4 py-2 text-xs font-semibold touch-manipulation outline-none hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none"
-          >
-            Reroll offer
-          </button>
-          <span
-            class="shrink-0 font-mono text-[11px] text-muted-foreground"
-            data-havoc-rerolls-remaining
-          >
-            {remainingRerolls} of {HAVOC_REROLL_LIMIT} reroll{remainingRerolls === 1 ? '' : 's'} left
-          </span>
-        </div>
-      {/if}
-    </div>
-
-    <p class="mt-3 text-xs text-muted-foreground">
-      Tiers are rarity bands, not strength promises — a Tier 3 card is not guaranteed to be stronger
-      than a Tier 1 card. Every package changes the simulation in its own way.
-    </p>
-  </section>
-
+          {position}<span>{i < draft.picks.length ? '✓' : i + 1}</span>
+        </li>{/each}
+    </ol>
+  </header>
   {#if !complete}
-    <section aria-label="Current offer" class="min-w-0">
-      <ul class="grid auto-rows-fr gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {#each draft.cards as card (card.cardId)}
-          <li class="flex h-full min-w-0">
+    <div class="h-header">
+      <p class="h-copy text-xs">
+        Powers come with tradeoffs. Tier means rarity, not guaranteed strength.
+      </p>
+      <div class="h-actions">
+        <button
+          class="h-button secondary"
+          data-havoc-reroll
+          onclick={onReroll}
+          disabled={busy || draft.rerollUsed}><Shuffle size={16} />New choices</button
+        ><span class="h-copy text-xs" data-havoc-rerolls-remaining
+          >{draft.rerollUsed ? 0 : 1} of {HAVOC_REROLL_LIMIT} reroll{draft.rerollUsed ? 's' : ''} left</span
+        >
+      </div>
+    </div>
+    <section aria-label="Current offer">
+      <ul class="h-cards">
+        {#each draft.cards as card (card.cardId)}<li class="flex min-w-0">
             <HavocDraftCard {card} {mode} {busy} {franchiseName} {onPick} />
-          </li>
-        {/each}
+          </li>{/each}
       </ul>
     </section>
+    <details class="mt-4">
+      <summary>Compare original player ratings</summary>
+      <div class="h-actions" role="group" aria-label="Attribute view">
+        <button
+          class="h-button secondary"
+          aria-pressed={mode === 'effective'}
+          onclick={() => (mode = 'effective')}>Effective</button
+        ><button
+          class="h-button secondary"
+          aria-pressed={mode === 'original'}
+          onclick={() => (mode = 'original')}>Original</button
+        >
+      </div>
+      <p class="h-copy text-xs mt-2">Expand a card's attributes to inspect the numbers.</p>
+    </details>
   {/if}
-
-  {#if draft.picks.length > 0}
-    <HavocLineupLock {slots} />
-  {/if}
-
-  {#if complete}
-    <div class="rounded-xl bg-surface-1 p-4 sm:p-5">
-      <h2 class="font-display text-lg font-extrabold tracking-tight uppercase">Lock the lineup</h2>
-      <p class="mt-1 text-xs text-muted-foreground">
-        No trades, upgrades, or bench management. Once locked, the five start all 82 games together.
-      </p>
-      <button
-        type="button"
-        data-havoc-lock
-        onclick={onLock}
-        disabled={busy}
-        class="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-primary px-5 py-3 text-xs font-extrabold tracking-wide text-primary-foreground uppercase outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
+  {#if slots.length > 0}<div class="mt-6">
+      <HavocLineupLock {slots} title={complete ? 'Your starting five' : 'Your squad so far'} />
+    </div>{/if}
+  {#if complete}<div class="h-actions mt-6">
+      <button class="h-button" data-havoc-lock onclick={onLock} disabled={busy}
+        ><Rocket size={18} />{busy ? 'Launching…' : 'Launch 82-game season'}</button
       >
-        {busy ? 'Locking…' : 'Lock lineup and start run'}
-      </button>
-    </div>
-  {/if}
-
-  {#if error !== null}
-    <p role="alert" class="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs">
-      {error}
-    </p>
-  {/if}
+      <p class="h-copy text-xs">All games play automatically. Your report comes next.</p>
+    </div>{/if}
+  {#if error !== null}<p role="alert" class="h-alert">{error}</p>{/if}
 </div>
+
+<style>
+  .h-draft-progress {
+    display: flex;
+    gap: 8px;
+  }
+  .h-draft-progress li {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: center;
+    padding: 12px;
+    border-radius: 12px;
+    background: #20294c;
+    color: #aab9db;
+    font-size: 12px;
+    font-weight: 800;
+  }
+  .h-draft-progress li[aria-current='step'] {
+    outline: 2px solid #ffd782;
+    color: #ffd782;
+  }
+  .h-draft-progress .chosen {
+    background: #679dff;
+    color: #141b39;
+  }
+</style>

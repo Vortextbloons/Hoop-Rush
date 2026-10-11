@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import MultiplayerLobbyLink from '$lib/components/MultiplayerLobbyLink.svelte';
   import { loadLobbyId, lobbyCommand } from '$lib/multiplayer-lobby';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
@@ -1464,6 +1465,7 @@
             'closed'}
         </p>
       </div>
+      {#if phase !== 'completed'}<MultiplayerLobbyLink {roomId} />{/if}
       {#if resultVerified}<span class="verified-pill"
           ><ShieldCheck size={15} aria-hidden="true" /> Result verified</span
         >{/if}
@@ -1483,6 +1485,7 @@
         {/each}
       </ol>
     {/if}
+    {#if phase === 'completed'}<MultiplayerLobbyLink {roomId} completed />{/if}
     {#if error}<p class="room-alert" role="alert">{error}</p>{/if}
     {#if reconnecting || syncing}<p class="room-connection" role="status">
         {reconnecting ? 'Reconnecting to your room…' : 'Updating your room…'}
@@ -1815,22 +1818,16 @@
             verified={resultVerified}
             modeDetail={modeDetailLabel}
             receiptDigest={verificationReceipt?.receiptDigest ?? null}
-            onRematch={lobbyId
-              ? () => {
-                  void goto(resolve(`/multiplayer?lobby=${lobbyId}`));
-                }
-              : doRematchAction}
+            onRematch={lobbyId ? null : doRematchAction}
             rematchWaiting={facts.rematchRequested[selfId] &&
               !facts.rematchRequested[selfId === 'p1' ? 'p2' : 'p1']}
-            rematchLabel={lobbyId
-              ? 'Back to lobby'
-              : canRematch
-                ? 'Start rematch'
-                : facts.rematchRequested[selfId === 'p1' ? 'p2' : 'p1']
-                  ? 'Accept rematch'
-                  : facts.rematchRequested[selfId]
-                    ? 'Waiting for opponent'
-                    : 'Rematch'}
+            rematchLabel={canRematch
+              ? 'Start rematch'
+              : facts.rematchRequested[selfId === 'p1' ? 'p2' : 'p1']
+                ? 'Accept rematch'
+                : facts.rematchRequested[selfId]
+                  ? 'Waiting for opponent'
+                  : 'Rematch'}
             {rematchBusy}
           />
         {/if}

@@ -18,6 +18,7 @@
     Users,
   } from '@lucide/svelte';
   import ArenaSoundToggle from '$lib/components/ArenaSoundToggle.svelte';
+  import MultiplayerLobbyLink from '$lib/components/MultiplayerLobbyLink.svelte';
   import type { DraftDuelCard, DraftDuelOfferedPick } from '@hoop-rush/data-contracts';
   import { DraftDuelController } from '$lib/draft-duel/draft-duel-controller.svelte';
   import DraftBoard from '$lib/draft-duel/DraftBoard.svelte';
@@ -229,6 +230,7 @@
           {settingsName} · Best of 7 · Room {controller.snapshot.code ?? 'closed'}
         </p>
       </div>
+      {#if controller.phase !== 'championship'}<MultiplayerLobbyLink {roomId} />{/if}
     </header>
 
     <ol class="room-stages" aria-label="Match progress">
@@ -245,6 +247,7 @@
       {/each}
     </ol>
 
+    {#if controller.phase === 'championship'}<MultiplayerLobbyLink {roomId} completed />{/if}
     {#if controller.error}<p class="room-alert" role="alert">{controller.error}</p>{/if}
     {#if controller.notice}<p class="room-connection" role="status">{controller.notice}</p>{/if}
     {#if rivalMember && !rivalMember.online && controller.phase !== 'lobby'}
@@ -559,11 +562,7 @@
           rematchConfirmed={controller.successorRoomId !== null}
           onrematch={() => controller.requestRematch()}
           onconfirmrematch={() => controller.confirmRematch()}
-          onlobby={lobbyId
-            ? () => {
-                void goto(resolve(`/multiplayer?lobby=${lobbyId}`));
-              }
-            : null}
+          showRematch={!lobbyId}
         />
       </section>
     {:else if controller.phase === 'expired'}

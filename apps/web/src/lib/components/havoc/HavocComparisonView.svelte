@@ -5,7 +5,8 @@
   import HavocGameDetail from './HavocGameDetail.svelte';
   import { havocRecordLabel, mutationNameOf } from './havoc-presentation';
 
-  let { comparison }: { comparison: HavocComparison } = $props();
+  let { comparison, showChart = true }: { comparison: HavocComparison; showChart?: boolean } =
+    $props();
   let selectedGame = $state<number | null>(null);
   const activeGame = $derived(selectedGame ?? comparison.games[0]?.gameNumber ?? 1);
 
@@ -155,11 +156,12 @@
       Every matched game
     </h2>
     <div class="mt-3">
-      <HavocComparisonChart
-        {comparison}
-        selectedGame={activeGame}
-        onSelect={(gameNumber) => (selectedGame = gameNumber)}
-      />
+      {#if showChart}
+        <HavocComparisonChart
+          {comparison}
+          selectedGame={activeGame}
+          onSelect={(gameNumber) => (selectedGame = gameNumber)}
+        />{/if}
     </div>
     <div class="mt-4">
       <HavocComparisonTable

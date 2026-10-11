@@ -34,12 +34,17 @@ export function nonShootingFoulProbability(profile: EraSimulationProfile): numbe
   const p = profile.parameters;
   return Math.min(0.3, Math.max(0.01, p.foulsPerPossession * (1 - p.shootingFoulShare)));
 }
+export function foulAvoidanceFactor(personalFouls: number): number {
+  const trouble = Math.max(0, personalFouls - ENGINE_CONSTANTS.foulTroubleStart);
+  const penalty = ENGINE_CONSTANTS.foulAvoidancePerFoulSquared * trouble * trouble;
+  return Math.max(ENGINE_CONSTANTS.foulAvoidanceFloor, 1 - penalty);
+}
 export function foulerWeights(defense: SimulationTeam): number[] {
   return defense.players.map((d) =>
     Math.max(
       0.5,
-      ((d.ratings.strength + d.ratings.interiorDefense) / 2) *
-        (0.55 + Math.min(20, d.tendencies.foulRate) / 10),
+      (30 + (d.ratings.strength + d.ratings.interiorDefense) / 4) *
+        (0.8 + Math.min(20, d.tendencies.foulRate) / 25),
     ),
   );
 }

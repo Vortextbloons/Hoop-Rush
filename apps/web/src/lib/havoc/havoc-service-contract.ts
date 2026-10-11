@@ -24,6 +24,9 @@ export interface HavocHistoryView {
 
 export interface HavocLineupSlotView {
   slot: Position;
+  playerId?: string;
+  franchiseId?: string | null;
+  seasonKey?: string | null;
   displayName: string;
   nickname: string;
   playerVersionId: string | null;

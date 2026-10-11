@@ -34,7 +34,7 @@ describe('Havoc draft board', () => {
     const { getByText } = render(HavocSetup, {
       props: { controller, onLocked: () => undefined },
     });
-    expect(getByText(/82-0/)).toBeTruthy();
+    expect(getByText(/82–0/)).toBeTruthy();
     expect(getByText(/No guarantees/)).toBeTruthy();
   });
 
@@ -54,6 +54,9 @@ describe('Havoc draft board', () => {
       '1 of 1 reroll',
     );
     expect(container.querySelectorAll('[data-havoc-changed="true"]').length).toBeGreaterThan(0);
+    const affected = container.querySelector('[data-havoc-affected-attributes]');
+    expect(affected?.closest('details')).toBeNull();
+    expect(affected?.querySelectorAll('[data-havoc-changed="true"]').length).toBeGreaterThan(0);
   });
 
   it('drafts all five positions with focusable pick buttons', async () => {

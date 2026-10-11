@@ -29,6 +29,7 @@
     onrematch,
     onconfirmrematch,
     onlobby = null,
+    showRematch = true,
   }: {
     series: DraftDuelSeriesSnapshot;
     mvp: DraftDuelSeriesMvp | null;
@@ -44,6 +45,7 @@
     onrematch: () => void;
     onconfirmrematch: () => void;
     onlobby?: (() => void) | null;
+    showRematch?: boolean;
   } = $props();
 
   interface RecapGame {
@@ -708,31 +710,31 @@
     {/if}
   </section>
 
-  <section class="rematch" aria-label="Rematch">
-    {#if onlobby}
-      <p class="rematch-state">Play again with the same opponent.</p>
-      <button type="button" class="rematch-btn" onclick={onlobby}>Back to lobby</button>
-    {:else if rematchConfirmed}
-      <p class="rematch-state" data-state="confirmed">
-        Rematch confirmed — the new series is being prepared.
-      </p>
-    {:else if rematchRequested}
-      <p class="rematch-state" data-state="requested">Your opponent requested a rematch.</p>
-      <button type="button" class="rematch-btn" disabled={rematchBusy} onclick={onconfirmrematch}>
-        {rematchBusy ? 'Preparing rematch…' : 'Confirm rematch'}
-      </button>
-    {:else if localRematchRequested}
-      <p class="rematch-state" data-state="waiting" role="status">
-        Waiting for your opponent to accept the rematch.
-      </p>
-    {:else}
-      <p class="rematch-state" data-state="idle">Run it back?</p>
-      <button type="button" class="rematch-btn" disabled={rematchBusy} onclick={onrematch}>
-        <Repeat size={15} aria-hidden="true" />
-        {rematchBusy ? 'Requesting rematch…' : 'Request rematch'}
-      </button>
-    {/if}
-  </section>
+  {#if showRematch}<section class="rematch" aria-label="Rematch">
+      {#if onlobby}
+        <p class="rematch-state">Play again with the same opponent.</p>
+        <button type="button" class="rematch-btn" onclick={onlobby}>Back to lobby</button>
+      {:else if rematchConfirmed}
+        <p class="rematch-state" data-state="confirmed">
+          Rematch confirmed — the new series is being prepared.
+        </p>
+      {:else if rematchRequested}
+        <p class="rematch-state" data-state="requested">Your opponent requested a rematch.</p>
+        <button type="button" class="rematch-btn" disabled={rematchBusy} onclick={onconfirmrematch}>
+          {rematchBusy ? 'Preparing rematch…' : 'Confirm rematch'}
+        </button>
+      {:else if localRematchRequested}
+        <p class="rematch-state" data-state="waiting" role="status">
+          Waiting for your opponent to accept the rematch.
+        </p>
+      {:else}
+        <p class="rematch-state" data-state="idle">Run it back?</p>
+        <button type="button" class="rematch-btn" disabled={rematchBusy} onclick={onrematch}>
+          <Repeat size={15} aria-hidden="true" />
+          {rematchBusy ? 'Requesting rematch…' : 'Request rematch'}
+        </button>
+      {/if}
+    </section>{/if}
 </section>
 
 <style>

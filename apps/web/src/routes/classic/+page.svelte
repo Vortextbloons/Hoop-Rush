@@ -10,6 +10,7 @@
     PlayersIndex,
     PlayersIndexEntry,
     PeakPlayerSeason,
+    Seed,
     SlotIndex,
   } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation, resolveEraTeamIdentity } from '@hoop-rush/data-contracts';
@@ -30,6 +31,7 @@
     type ClassicGuardTarget,
   } from '$lib/classic-nav-guard';
   import { startClassicRun } from '$lib/classic-run';
+  import { leaguePrecompute } from '$lib/league-precompute';
   import { randomUUID } from '$lib/ids';
   import { resolvePlayerRefs } from '$lib/player-refs';
   import { poolSortLabel, presentationForVariant, variantLabel } from '$lib/draft-presentation';
@@ -84,6 +86,13 @@
   let resolvedDraftPlayers = $state.raw<PeakPlayerSeason[]>([]);
   let poolDetails = $state.raw<PeakPlayerSeason[]>([]);
   let fitContext = $state.raw<DraftFitContext | null>(null);
+  let runSeed = $state<Seed | null>(null);
+  $effect(() => {
+    if (runSeed !== null) return;
+    const seed = classicDraftSeed();
+    runSeed = seed;
+    leaguePrecompute.prime(seed);
+  });
   let mounted = true;
   $effect(() => {
     mounted = true;
@@ -447,7 +456,7 @@
     starting = true;
     launchError = null;
     try {
-      await startClassicRun(draftToRun, classicDraftSeed());
+      await startClassicRun(draftToRun, runSeed ?? classicDraftSeed());
     } catch (error) {
       if (!mounted) return;
       launchError = error instanceof Error ? error.message : String(error);

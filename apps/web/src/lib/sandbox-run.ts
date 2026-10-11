@@ -13,13 +13,17 @@ import {
   type ChallengeCreation,
 } from '@hoop-rush/engine';
 import { challengeRepository } from '$lib/challenge-repo';
+import { leaguePrecompute } from '$lib/league-precompute';
 import { randomUUID } from '$lib/ids';
 import { FIXED_SANDBOX_ERA, loadRunPreamble } from '$lib/run-preamble';
 export async function startSandboxRun(players: PeakPlayerSeason[], seed: Seed): Promise<void> {
   if (players.length !== 5) {
     throw new Error('A lineup needs exactly five players.');
   }
-  const { profile, bracket } = await loadRunPreamble();
+  const [{ profile, bracket }, league] = await Promise.all([
+    loadRunPreamble(),
+    leaguePrecompute.ensure(seed),
+  ]);
   const selections: RunPlayerSelection[] = players.map((p) => ({
     playerId: p.playerId,
     franchiseId: p.franchiseId,
@@ -53,6 +57,7 @@ export async function startSandboxRun(players: PeakPlayerSeason[], seed: Seed): 
     engineVersion: context.engineVersion,
     profile,
     bracket,
+    ...(league ? { league } : {}),
   };
   const run = createChallenge({ ...creation, runSeed: seed });
   await challengeRepository.saveActiveRun({

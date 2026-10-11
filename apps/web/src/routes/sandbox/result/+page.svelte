@@ -1,12 +1,20 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
-  import type { ChallengeRun, PeakPlayerSeason } from '@hoop-rush/data-contracts';
+  import type { ChallengeRun, PeakPlayerSeason, Seed } from '@hoop-rush/data-contracts';
   import type { SandboxHref } from '$lib/sandbox-url';
   import { lineupPlayersFromRun } from '$lib/sandbox-lineup';
   import { startSandboxRun } from '$lib/sandbox-run';
+  import { leaguePrecompute } from '$lib/league-precompute';
   import { buildSandboxHref, generateSeed } from '$lib/sandbox-url';
   import ResultPage from '$lib/components/ResultPage.svelte';
+  let retrySeed = $state<Seed | null>(null);
+  $effect(() => {
+    if (retrySeed !== null) return;
+    const seed = generateSeed();
+    retrySeed = seed;
+    leaguePrecompute.prime(seed);
+  });
   async function runAgain() {
     void goto(resolve('/sandbox'));
   }
@@ -18,7 +26,7 @@
     if (!players) {
       throw new Error('Could not restore the lineup for another run.');
     }
-    await startSandboxRun(players, generateSeed());
+    await startSandboxRun(players, retrySeed ?? generateSeed());
   }
   function editTeamHrefFor(current: ChallengeRun): SandboxHref | null {
     return current.mode === 'sandbox' && current.selections

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import HavocSetup from '$lib/components/havoc/HavocSetup.svelte';
@@ -10,7 +11,7 @@
   let serviceError = $state<string | null>(null);
   let franchiseName = $state<(franchiseId: string) => string>((franchiseId) => franchiseId);
 
-  $effect(() => {
+  onMount(() => {
     let instance: HavocDraftController;
     try {
       instance = new HavocDraftController(getHavocService());
@@ -18,16 +19,21 @@
       serviceError = error instanceof Error ? error.message : String(error);
       return;
     }
+    let mounted = true;
     controller = instance;
     void instance.load();
     void getManifest()
       .then((manifest) => {
+        if (!mounted) return;
         franchiseName = (franchiseId) =>
           manifest.modernFranchiseSlots.find((slot) => slot.franchiseId === franchiseId)
             ?.displayName ?? franchiseId;
       })
       .catch(() => undefined);
-    return () => instance.destroy();
+    return () => {
+      mounted = false;
+      instance.destroy();
+    };
   });
 </script>
 

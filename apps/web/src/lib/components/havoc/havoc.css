@@ -1,0 +1,345 @@
+.havoc-world {
+  --h-blue: #679dff;
+  --h-pink: #f290c5;
+  --h-gold: #ffd782;
+  --h-ink: #141b39;
+  --h-paper: #f2f4ff;
+  color: var(--h-paper);
+  min-height: calc(100svh - 64px);
+  background: radial-gradient(ellipse at 85% 5%, #394779 0, transparent 48%), #141b39;
+}
+.havoc-world .h-shell {
+  max-width: 1180px;
+  margin: auto;
+  padding: 40px 24px 64px;
+}
+.havoc-world .h-eyebrow {
+  color: var(--h-blue);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.havoc-world .h-title {
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: clamp(3rem, 7vw, 6rem);
+  line-height: 0.95;
+  text-transform: uppercase;
+  letter-spacing: -0.025em;
+}
+.havoc-world .h-subtitle {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  line-height: 1.1;
+}
+.havoc-world .h-copy {
+  color: #c1cae4;
+  font-size: 14px;
+  line-height: 1.65;
+  max-width: 540px;
+}
+.havoc-world .h-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 28px;
+}
+.havoc-world .h-panel {
+  background: #20294c;
+  border: 1px solid #465273;
+  border-radius: 22px;
+  padding: 24px;
+}
+.havoc-world .h-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 12px 24px;
+  border-radius: 12px;
+  background: var(--h-gold);
+  color: var(--h-ink);
+  font-weight: 800;
+  font-size: 14px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: transform 0.15s;
+}
+.havoc-world .h-button:hover {
+  transform: translateY(-2px);
+}
+.havoc-world .h-button:disabled {
+  opacity: 0.45;
+  cursor: wait;
+  transform: none;
+}
+.havoc-world .h-button.secondary {
+  background: #303c63;
+  color: var(--h-paper);
+}
+.havoc-world :is(button, a, summary):focus-visible {
+  outline: 3px solid var(--h-pink);
+  outline-offset: 4px;
+}
+.havoc-world .h-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.havoc-world .h-link {
+  color: #c1cae4;
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.havoc-world .h-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+.havoc-world .h-card {
+  border: 1px solid color-mix(in srgb, var(--card-color) 65%, #465273);
+  background: #20294c;
+  border-radius: 22px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  box-shadow: 0 12px 30px #060b242b;
+}
+.havoc-world .h-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 18px;
+}
+.havoc-world .h-card-art {
+  background: radial-gradient(
+    ellipse at bottom,
+    color-mix(in srgb, var(--card-color) 45%, #20294c),
+    #20294c 75%
+  );
+}
+.havoc-world .h-card-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  flex: 1;
+}
+.havoc-world .h-card-name {
+  color: var(--card-color);
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: 2rem;
+  line-height: 1;
+  text-transform: uppercase;
+}
+.havoc-world .h-card-body > .h-button {
+  margin-top: auto;
+  width: 100%;
+}
+.havoc-world .h-card details {
+  font-size: 12px;
+  color: #c1cae4;
+}
+.havoc-world summary {
+  cursor: pointer;
+  padding: 12px 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+.havoc-world .h-rating-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+.havoc-world .h-rating-grid > div {
+  padding: 8px;
+  background: #141b39;
+  border-radius: 8px;
+}
+.havoc-world .h-rating-grid dt {
+  font-size: 10px;
+  color: #aab9db;
+}
+.havoc-world .h-rating-grid dd {
+  font-weight: 800;
+}
+.havoc-world .h-affected-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+.havoc-world .h-affected-grid > div {
+  background: #141b39;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+.havoc-world .h-affected-grid dt {
+  color: #c1cae4;
+  font-size: 10px;
+}
+.havoc-world .h-affected-grid dd {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.havoc-world .h-affected-grid dd > span {
+  color: #aab9db;
+}
+.havoc-world .h-affected-grid strong {
+  color: #8bceaf;
+}
+.havoc-world .h-affected-grid strong.reduced {
+  color: #f290c5;
+}
+.havoc-world .h-lineup {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+.havoc-world .h-lineup li {
+  background: #141b39;
+  border: 1px solid #3e4a6c;
+  border-radius: 16px;
+  padding: 16px 12px;
+  min-width: 0;
+}
+.havoc-world .h-lineup-name {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  line-height: 1.05;
+  font-weight: 800;
+  margin: 12px 0 6px;
+  text-transform: uppercase;
+}
+.havoc-world .h-meter {
+  height: 12px;
+  background: #111831;
+  border-radius: 8px;
+  overflow: hidden;
+  margin: 24px 0 10px;
+}
+.havoc-world .h-meter > div {
+  height: 100%;
+  background: var(--h-blue);
+  border-radius: inherit;
+  transition: width 0.2s;
+}
+.havoc-world .h-score {
+  font-family: var(--font-display);
+  font-size: clamp(4rem, 10vw, 8rem);
+  font-weight: 900;
+  line-height: 1;
+  color: var(--h-gold);
+}
+.havoc-world .h-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin: 24px 0;
+}
+.havoc-world .h-stats > div {
+  padding: 20px;
+  border-radius: 16px;
+  background: #20294c;
+}
+.havoc-world .h-stats dt {
+  color: #c1cae4;
+  font-size: 12px;
+}
+.havoc-world .h-stats dd {
+  font-family: var(--font-display);
+  font-size: 2.5rem;
+  font-weight: 800;
+}
+.havoc-world .h-alert {
+  padding: 16px;
+  border: 1px solid var(--h-pink);
+  border-radius: 12px;
+  margin: 20px 0;
+}
+.havoc-world .h-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  color: #c1cae4;
+  font-size: 13px;
+  margin: 32px 0;
+}
+.havoc-world .h-steps strong {
+  color: var(--h-gold);
+  margin-right: 8px;
+}
+@media (max-width: 760px) {
+  .havoc-world .h-shell {
+    padding: 28px 16px 48px;
+  }
+  .havoc-world .h-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .havoc-world .h-cards {
+    grid-template-columns: 1fr;
+  }
+  .havoc-world .h-lineup {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .havoc-world .h-stats {
+    gap: 8px;
+  }
+  .havoc-world .h-stats > div {
+    padding: 12px;
+  }
+  .havoc-world .h-panel {
+    padding: 18px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .havoc-world *,
+  .havoc-world *::before {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+.havoc-world .h-card-name {
+  font-size: 1.9rem;
+  color: #f2f4ff;
+}
+.havoc-world .h-nickname {
+  color: var(--card-color);
+  font-size: 12px;
+  font-weight: 700;
+  margin: 5px 0;
+}
+.havoc-world .h-card-body {
+  gap: 18px;
+}
+.havoc-world .h-affected-grid {
+  column-gap: 18px;
+  row-gap: 0;
+}
+.havoc-world .h-affected-grid > div {
+  background: transparent;
+  border-radius: 0;
+  border-bottom: 1px solid #3c486b;
+  padding: 7px 0;
+}
+.havoc-world .h-affected-grid dd {
+  gap: 6px;
+  font-size: 12px;
+}
+.havoc-world .h-affected-grid dt {
+  font-size: 10px;
+}

@@ -1,4 +1,4 @@
-import type { HavocGameSummary } from '@hoop-rush/data-contracts';
+import { HAVOC_GAME_COUNT, type HavocGameSummary } from '@hoop-rush/data-contracts';
 import type {
   HavocRunView,
   HavocService,
@@ -112,6 +112,61 @@ export class HavocHubState {
 
   async finishSeason(): Promise<void> {
     await this.simulate('remaining');
+  }
+
+  async playSeason(): Promise<boolean> {
+    if (this.busy || this.isDestroyed()) return false;
+    this.busy = true;
+    this.error = null;
+    this.notice = null;
+    this.progress = null;
+    try {
+      const run = this.run;
+      if (run === null || run.phase !== 'run') return false;
+      if (run.havocCursor < HAVOC_GAME_COUNT) {
+        const batch = await this.service.simulateRange({ variant: 'havoc', count: 'remaining' });
+        if (this.isDestroyed()) return false;
+        await this.load();
+        if (this.isDestroyed()) return false;
+        if (batch.cancelled) {
+          this.notice = 'Season paused. Your completed games are saved.';
+          return false;
+        }
+      }
+      if (this.run === null || this.run.havocCursor < HAVOC_GAME_COUNT || this.hasError())
+        return false;
+      if (this.run.comparisonStatus === 'unsupported' || this.run.comparisonStatus === 'complete')
+        return true;
+      const baseline = await this.service.startNormalSeason();
+      if (this.isDestroyed()) return false;
+      await this.load();
+      if (this.isDestroyed()) return false;
+      if (baseline.cancelled) {
+        this.notice = 'Report preparation paused. Your season is saved.';
+        return false;
+      }
+      if (this.run.normalCursor < HAVOC_GAME_COUNT || this.hasError()) return false;
+      await this.service.finalizeComparison();
+      if (this.isDestroyed()) return false;
+      await this.load();
+      return !this.isDestroyed() && !this.hasError() && this.reportReady();
+    } catch (error) {
+      if (!this.isDestroyed()) this.error = errorMessageOf(error);
+      return false;
+    } finally {
+      if (!this.isDestroyed()) {
+        this.busy = false;
+        this.cancelling = false;
+      }
+    }
+  }
+
+  private hasError(): boolean {
+    return this.error !== null;
+  }
+
+  private reportReady(): boolean {
+    return this.run?.comparisonStatus === 'complete';
   }
 
   async cancel(): Promise<void> {

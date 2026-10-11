@@ -6,17 +6,16 @@
   let { state }: { state: HavocHistoryState } = $props();
 </script>
 
-<section class="mx-auto w-full max-w-4xl px-3 py-6 sm:px-6 sm:py-10" data-havoc-history>
+<section class="h-shell" data-havoc-history>
   <header>
     <p class="font-mono text-[10px] font-bold tracking-[0.16em] text-primary uppercase">
       Hoop Havoc · Hall of Freaks
     </p>
     <h1 class="font-display mt-1 text-3xl font-extrabold tracking-tight uppercase">
-      Every run is kept
+      Hall of Freaks
     </h1>
     <p class="mt-2 max-w-2xl text-sm text-muted-foreground">
-      Completed and abandoned Havoc runs stay addressable, including their packages and reports.
-      Unsuccessful runs are preserved exactly as they ended.
+      Every squad has a story. Revisit your seasons, wildest powers, and greatest runs.
     </p>
   </header>
 
@@ -48,7 +47,7 @@
           <a
             href={resolve('/havoc/history/[runId]', { runId: entry.runId })}
             data-havoc-history-entry={entry.runId}
-            class="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl bg-surface-1 p-4 touch-manipulation outline-none transition-colors hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-ring"
+            class="h-panel flex flex-wrap items-center gap-x-4 gap-y-2"
           >
             <span class="min-w-0 flex-1">
               <span
@@ -60,7 +59,7 @@
                 {/if}
               </span>
               <span class="mt-0.5 block truncate font-mono text-[11px] text-muted-foreground">
-                {entry.runId}
+                {new Date(entry.createdAtIso).toLocaleDateString()}
               </span>
               <span class="mt-0.5 block text-xs text-muted-foreground">
                 {havocCompletionStateLabel(entry.completionState)} · comparison:

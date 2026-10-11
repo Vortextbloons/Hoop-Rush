@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import HavocResultView from '$lib/components/havoc/HavocResultView.svelte';
   import { HavocResultState } from '$lib/havoc/havoc-result-state.svelte';
   import { getHavocService } from '$lib/havoc/havoc-service';
@@ -6,7 +7,7 @@
   let resultState = $state<HavocResultState | null>(null);
   let serviceError = $state<string | null>(null);
 
-  $effect(() => {
+  onMount(() => {
     let instance: HavocResultState;
     try {
       instance = new HavocResultState(getHavocService());
@@ -15,8 +16,17 @@
       return;
     }
     resultState = instance;
-    void instance.load();
-    return () => instance.destroy();
+    let mounted = true;
+    void instance.load().then(async () => {
+      if (!mounted || instance.error !== null || !instance.havocSeasonComplete) return;
+      if (!instance.comparisonComplete && instance.run?.comparisonStatus !== 'unsupported') {
+        await instance.runNormalSeason();
+      }
+    });
+    return () => {
+      mounted = false;
+      instance.destroy();
+    };
   });
 </script>
 

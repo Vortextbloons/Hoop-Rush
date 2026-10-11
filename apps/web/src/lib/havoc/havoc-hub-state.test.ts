@@ -91,3 +91,60 @@ describe('HavocHubState', () => {
     hub.destroy();
   });
 });
+
+describe('Havoc automatic season orchestration', () => {
+  it('runs all games despite losses, then completes the comparison', async () => {
+    const service = new FakeHavocService({ outcomes: ['win', 'loss'] });
+    await createLockedRun(service);
+    const hub = new HavocHubState(service);
+    await hub.load();
+    expect(await hub.playSeason()).toBe(true);
+    expect(hub.run?.havocCursor).toBe(82);
+    expect(hub.run?.normalCursor).toBe(82);
+    expect(hub.run?.comparisonStatus).toBe('complete');
+    expect(service.calls.simulateRange).toBe(1);
+    expect(service.calls.startNormalSeason).toBe(1);
+    expect(service.calls.finalizeComparison).toBe(1);
+    expect(await hub.playSeason()).toBe(true);
+    expect(service.calls.startNormalSeason).toBe(1);
+    hub.destroy();
+  });
+  it('does not open the report after a simulation failure and can retry', async () => {
+    const service = new FakeHavocService();
+    await createLockedRun(service);
+    const hub = new HavocHubState(service);
+    await hub.load();
+    const simulate = service.simulateRange.bind(service);
+    service.simulateRange = () => Promise.reject(new Error('Worker failed'));
+    expect(await hub.playSeason()).toBe(false);
+    expect(hub.error).toBe('Worker failed');
+    expect(service.calls.startNormalSeason).toBe(0);
+    service.simulateRange = simulate;
+    expect(await hub.playSeason()).toBe(true);
+    expect(hub.error).toBeNull();
+    hub.destroy();
+  });
+});
+
+it('pauses the automatic season at a saved game and resumes to the full report', async () => {
+  const service = new FakeHavocService();
+  await createLockedRun(service);
+  const hub = new HavocHubState(service);
+  await hub.load();
+  const unsubscribe = service.subscribe((event) => {
+    if (
+      event.type === 'progress' &&
+      event.progress.variant === 'havoc' &&
+      event.progress.gamesCompleted === 3
+    )
+      void hub.cancel();
+  });
+  expect(await hub.playSeason()).toBe(false);
+  expect(hub.run?.havocCursor).toBe(3);
+  expect(service.calls.startNormalSeason).toBe(0);
+  unsubscribe();
+  expect(await hub.playSeason()).toBe(true);
+  expect(hub.run?.havocCursor).toBe(82);
+  expect(hub.run?.comparisonStatus).toBe('complete');
+  hub.destroy();
+});

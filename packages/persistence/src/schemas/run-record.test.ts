@@ -92,7 +92,7 @@ describe('storedRunRecordSchema', () => {
   });
   it('round-trips a run with an attached challenge league', () => {
     const run = buildChallengeRun({ league: buildLeagueRecord() });
-    const record = {
+    const record: StoredRunRecord = {
       recordId: 'record-9',
       saveSchemaVersion: 2,
       run,
