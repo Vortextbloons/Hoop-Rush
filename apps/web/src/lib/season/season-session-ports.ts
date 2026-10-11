@@ -9,6 +9,7 @@ import {
   loadSeasonFreeAgencyIndex,
   loadSeasonFreeAgencyTargets,
   loadSeasonHomeCourtProfile,
+  loadSeasonSchedule,
   seasonArtifactUrls,
 } from './season-assets';
 import { createSeasonRunChannel } from './season-cross-tab';
@@ -39,6 +40,7 @@ export async function createSeasonSessionPorts(options: {
       loadFreeAgencyTargets: () => loadSeasonFreeAgencyTargets(),
       loadHomeCourtProfile: () => loadSeasonHomeCourtProfile(),
       loadArtifactUrls: () => seasonArtifactUrls(),
+      loadSchedule: async () => options.schedule ?? loadSeasonSchedule(),
     },
     notifier: {
       announce: (mutation) => {

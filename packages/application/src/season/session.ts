@@ -13,12 +13,15 @@ import type {
   EraSimulationProfile,
   FranchiseId,
   Id,
+  SeasonAcceptedBlock,
   SeasonActiveRunIndex,
+  SeasonCandidateCheckpoint,
   SeasonDraftCatalog,
   SeasonEffectsState,
   SeasonFreeAgencyIndex,
   SeasonFreeAgencyRoleExpectation,
   SeasonGameSummary,
+  SeasonHealthState,
   SeasonHomeCourtProfile,
   SeasonInvalidRosterInterruption,
   SeasonPendingBlockCandidate,
@@ -27,9 +30,11 @@ import type {
   SeasonPostseasonSummary,
   SeasonRetainedGameDetail,
   SeasonRosterTargets,
+  SeasonRotation,
   SeasonRun,
   SeasonRunCommand,
   SeasonRunCommandRejection,
+  SeasonSchedule,
   SeasonScoreline,
   SeasonSpendInfluenceCommand,
   SeasonSubmitBlockCommand,
@@ -40,19 +45,33 @@ import type {
   SeasonTradeValueTrend,
   SeasonTradeWindowState,
 } from '@hoop-rush/data-contracts';
-import { handleSeasonRunCommand, type SeasonRunCommandContext } from '@hoop-rush/engine';
+import {
+  completeSeasonBlockCommit,
+  handleSeasonRunCommand,
+  seasonNextBlockIndex,
+  seasonRotationSetDigest,
+  type SeasonRunCommandContext,
+} from '@hoop-rush/engine';
 import { seasonFranchiseLegalFiveFacts } from '@hoop-rush/engine';
 import type {
   CommitPostseasonAdvancementInput,
   SeasonRunPlayerSliceEntry,
   SeasonRunSnapshot,
+  SeasonWindowOpenResult,
 } from '@hoop-rush/persistence';
 import { runSubmission } from '../submission.ts';
-import type {
-  SeasonBlockResumeInput,
-  SeasonBlockStartInput,
-  SeasonRunnerEvent,
+import {
+  acceptWorkerResult,
+  type SeasonBlockStartInput,
+  type SeasonRunnerEvent,
 } from './block-wire.ts';
+import {
+  assembleCommittedSnapshot,
+  challengesWithSuccess,
+  dedupeNewByGameId,
+  mergeSortedByGameId,
+  objectivesWithSuccess,
+} from './block-state.ts';
 import type { SeasonPostseasonEvent } from './postseason-wire.ts';
 import {
   seasonPostseasonCommitResultDigest,
@@ -101,6 +120,44 @@ export interface BlockRunState {
 export interface SubmitBlockEnvelope {
   command: SeasonSubmitBlockCommand;
   start: SeasonBlockStartInput;
+}
+interface BlockRequestFacts {
+  blockIndex: number;
+  expectedRevision: number;
+  rotationDigest: string;
+  commandId: CommandId;
+  rotations: SeasonRotation[];
+  run: SeasonRun;
+  humanFranchiseId: FranchiseId | null;
+  resumePending: SeasonPendingBlockCandidate | null;
+  catalogUrl: string;
+}
+interface BlockResumeBase {
+  runId: Id;
+  blockIndex: number;
+  expectedRevision: number;
+  rotationDigest: string;
+  commandId: CommandId;
+  rotations: SeasonRotation[];
+  humanFranchiseId: FranchiseId | null;
+  homeCourt: SeasonHomeCourtProfile;
+  catalogUrl: string;
+  catalogHash: string;
+  profileUrl: string;
+  profileHash: string;
+}
+interface BlockCheckpointFacts {
+  runId: string;
+  revision: number;
+  completedRounds: number;
+  commandIds: Set<string>;
+  summaries: SeasonGameSummary[];
+  blocks: SeasonAcceptedBlock[];
+  retainedDetails: SeasonRetainedGameDetail[];
+  effects: SeasonEffectsState | null;
+  health: SeasonHealthState | null;
+  stateRevision: number;
+  stateDigest: string;
 }
 export interface SeasonRunCommandError {
   command: SeasonRunCommand['command'];
@@ -250,6 +307,11 @@ export class SeasonSession {
   private unsubscribePostseasonRunner: (() => void) | null = null;
   private postseasonRequestId: string | null = null;
   private profilePromise: Promise<EraSimulationProfile> | null = null;
+  private schedulePromise: Promise<SeasonSchedule> | null = null;
+  private blockRunToken = 0;
+  private blockCancelRequested = false;
+  private activeBlock: BlockRequestFacts | null = null;
+  private blockFacts: BlockCheckpointFacts | null = null;
   private unsubscribeChannel: (() => void) | null = null;
   private externalReloading = false;
   externalChange: SeasonExternalChange | null = null;
@@ -306,6 +368,9 @@ export class SeasonSession {
         this.runner.cancel(blockRequestId);
       } catch {}
     }
+    if (this.block.phase === 'running') {
+      this.blockCancelRequested = true;
+    }
     const postseasonRunner = this.postseasonRunner;
     const postseasonRequestId = this.postseasonRequestId;
     if (
@@ -319,6 +384,8 @@ export class SeasonSession {
     }
   }
   private resetRunnerProgress(): void {
+    this.activeBlock = null;
+    this.blockCancelRequested = false;
     this.block = { ...IDLE_BLOCK };
     this.postseason = { ...IDLE_POSTSEASON };
     this.postseasonRequestId = null;
@@ -402,6 +469,518 @@ export class SeasonSession {
     const catalog = await this.assets.loadDraftCatalog();
     this.catalog = catalog;
     return catalog;
+  }
+  private loadSchedule(): Promise<SeasonSchedule> {
+    if (this.schedulePromise === null) {
+      this.schedulePromise = this.assets.loadSchedule();
+      this.schedulePromise.catch(() => {
+        this.schedulePromise = null;
+      });
+    }
+    return this.schedulePromise;
+  }
+  private prefetchBlockAssets(input: SeasonBlockStartInput): void {
+    void this.ensureCatalog().catch(() => null);
+    if (input.blockIndex === 2 || input.blockIndex === 4 || input.blockIndex === 6) {
+      void Promise.all([this.ensureFreeAgencyIndex(), this.ensureFreeAgencyTargets()]).catch(
+        () => null,
+      );
+    }
+    if (input.blockIndex === 3) {
+      void Promise.all([this.loadProfile(), this.loadSchedule()]).catch(() => null);
+    }
+  }
+  private adoptBlockFacts(snapshot: SeasonRunSnapshot): void {
+    this.blockFacts = {
+      runId: snapshot.run.runId,
+      revision: snapshot.acceptedBlocks.length,
+      completedRounds: snapshot.run.cursor.completedRounds,
+      commandIds: new Set(snapshot.acceptedBlocks.map((block) => block.commandId)),
+      summaries: snapshot.summaries,
+      blocks: [...snapshot.acceptedBlocks],
+      retainedDetails: [...snapshot.retainedDetails],
+      effects: snapshot.effects,
+      health: snapshot.run.health,
+      stateRevision: snapshot.run.stateRevision,
+      stateDigest: snapshot.run.stateDigest,
+    };
+  }
+  private beginBlockRequest(): number {
+    this.blockRunToken += 1;
+    this.blockCancelRequested = false;
+    this.activeBlock = null;
+    return this.blockRunToken;
+  }
+  private settleCancelledBlock(requestId: string | null): void {
+    if (this.isDisposed()) return;
+    if (this.block.phase !== 'running') return;
+    if (requestId !== null && this.block.requestId !== requestId) return;
+    this.activeBlock = null;
+    this.block.phase = 'cancelled';
+    this.pending = null;
+    this.interruption = null;
+    this.emit();
+  }
+  private blockPipelineAbandoned(token: number, requestId: string | null): boolean {
+    if (this.isDisposed()) return true;
+    const live =
+      this.blockRunToken === token &&
+      this.block.phase === 'running' &&
+      (requestId === null || this.block.requestId === requestId);
+    if (live && !this.blockCancelRequested) return false;
+    if (this.blockCancelRequested) this.settleCancelledBlock(requestId);
+    return true;
+  }
+  private async reconcileBlockStart(input: SeasonBlockStartInput): Promise<void> {
+    let facts = this.blockFacts;
+    if (
+      facts === null ||
+      facts.runId !== input.run.runId ||
+      input.expectedRevision !== facts.revision
+    ) {
+      const loaded = await this.repo.loadActiveRun();
+      if (loaded === null) throw new Error('no active season run to advance');
+      if (loaded.run.runId !== input.run.runId) {
+        throw new Error('the active run does not match the submitted run');
+      }
+      const persistedRevision = loaded.acceptedBlocks.length;
+      if (
+        facts !== null &&
+        facts.runId === input.run.runId &&
+        input.expectedRevision !== persistedRevision
+      ) {
+        throw new Error(
+          `stale cursor: the run is at revision ${String(persistedRevision)}, command expects ${String(input.expectedRevision)}`,
+        );
+      }
+      this.adoptBlockFacts(loaded);
+      facts = this.blockFacts;
+    }
+    if (facts === null) {
+      throw new Error('no active season run to advance');
+    }
+    if (input.expectedRevision !== facts.revision) {
+      throw new Error(
+        `stale cursor: the run is at revision ${String(facts.revision)}, command expects ${String(input.expectedRevision)}`,
+      );
+    }
+    if (facts.commandIds.has(input.commandId)) {
+      throw new Error(`duplicate command ${input.commandId}`);
+    }
+    const next = seasonNextBlockIndex(facts.completedRounds);
+    if (next === null || next !== input.blockIndex) {
+      throw new Error(
+        `non-boundary block: the run expects ${String(next)}, command submits ${String(input.blockIndex)}`,
+      );
+    }
+    if (seasonRotationSetDigest(input.rotations) !== input.rotationDigest) {
+      throw new Error('rotation digest does not match the submitted rotations');
+    }
+  }
+  private async startBlockRequest(input: SeasonBlockStartInput, token: number): Promise<void> {
+    try {
+      await this.reconcileBlockStart(input);
+      if (this.blockPipelineAbandoned(token, null)) return;
+      const facts = this.blockFacts;
+      this.activeBlock = {
+        blockIndex: input.blockIndex,
+        expectedRevision: input.expectedRevision,
+        rotationDigest: input.rotationDigest,
+        commandId: input.commandId,
+        rotations: input.rotations,
+        run: input.run,
+        humanFranchiseId: input.humanFranchiseId,
+        resumePending: null,
+        catalogUrl: input.catalogUrl,
+      };
+      const knownSummaries =
+        facts !== null && facts.runId === input.run.runId ? facts.summaries : [];
+      const requestId = this.runner.startBlock({ ...input, knownSummaries });
+      this.block.requestId = requestId;
+    } catch (error) {
+      if (this.blockPipelineAbandoned(token, null)) return;
+      this.activeBlock = null;
+      this.block.phase = 'failed';
+      this.block.error = {
+        code: 'internal',
+        message: error instanceof Error ? error.message : String(error),
+        seed: input.run.rootSeed,
+        gameId: null,
+      };
+      this.emit();
+    }
+  }
+  private async resumeBlockRequest(base: BlockResumeBase, token: number): Promise<void> {
+    try {
+      const loaded = await this.repo.loadActiveRun();
+      if (this.blockPipelineAbandoned(token, null)) return;
+      if (loaded === null) throw new Error('no active season run to resume');
+      if (loaded.run.runId !== base.runId) {
+        throw new Error('the active run does not match the resume request');
+      }
+      const storedPending = await this.repo.loadPendingBlock(base.runId);
+      if (this.blockPipelineAbandoned(token, null)) return;
+      if (storedPending === null) {
+        throw new Error(`no pending block for run ${base.runId}`);
+      }
+      if (storedPending.blockIndex !== base.blockIndex) {
+        throw new Error(
+          `pending blockIndex ${String(storedPending.blockIndex)} does not match resume ${String(base.blockIndex)}`,
+        );
+      }
+      if (storedPending.expectedRevision !== base.expectedRevision) {
+        throw new Error('pending expectedRevision does not match the resume request');
+      }
+      if (storedPending.rotationDigest !== base.rotationDigest) {
+        throw new Error('pending rotationDigest does not match the resume request');
+      }
+      if (this.blockFacts === null || this.blockFacts.runId !== loaded.run.runId) {
+        this.adoptBlockFacts(loaded);
+      }
+      const facts = this.blockFacts;
+      this.activeBlock = {
+        blockIndex: base.blockIndex,
+        expectedRevision: base.expectedRevision,
+        rotationDigest: base.rotationDigest,
+        commandId: base.commandId,
+        rotations: base.rotations,
+        run: loaded.run,
+        humanFranchiseId: base.humanFranchiseId,
+        resumePending: storedPending,
+        catalogUrl: base.catalogUrl,
+      };
+      const requestId = this.runner.resumeBlock({
+        ...base,
+        run: loaded.run,
+        effects: loaded.effects,
+        pending: storedPending,
+        knownSummaries: facts !== null ? facts.summaries : [],
+      });
+      this.block.requestId = requestId;
+    } catch (error) {
+      if (this.blockPipelineAbandoned(token, null)) return;
+      this.activeBlock = null;
+      this.block.phase = 'failed';
+      this.block.error = {
+        code: 'internal',
+        message: error instanceof Error ? error.message : String(error),
+        seed: null,
+        gameId: null,
+      };
+      this.emit();
+    }
+  }
+  private async acceptBlockCandidate(
+    requestId: string,
+    checkpoint: SeasonCandidateCheckpoint,
+  ): Promise<void> {
+    const state = this.activeBlock;
+    if (state === null) return;
+    const token = this.blockRunToken;
+    if (this.blockCancelRequested) {
+      this.settleCancelledBlock(requestId);
+      return;
+    }
+    const failures = acceptWorkerResult(checkpoint, {
+      runId: state.run.runId,
+      blockIndex: state.blockIndex,
+      revision: state.expectedRevision,
+      rotationDigest: state.rotationDigest,
+      expectedStateRevision: state.run.stateRevision,
+      expectedStateDigest: state.run.stateDigest,
+    });
+    if (failures.length > 0) {
+      if (this.blockPipelineAbandoned(token, requestId)) return;
+      this.activeBlock = null;
+      this.block.phase = 'failed';
+      this.block.error = {
+        code: 'invariant-failure',
+        message: failures.join('; '),
+        seed: state.run.rootSeed,
+        gameId: null,
+      };
+      this.emit();
+      return;
+    }
+    try {
+      const authoritative = { ...checkpoint, freeAgency: state.run.freeAgency };
+      const scheduleForSnapshot = await this.loadSchedule();
+      if (this.blockPipelineAbandoned(token, requestId)) return;
+      const needsCatalog =
+        state.blockIndex === 2 ||
+        state.blockIndex === 4 ||
+        state.blockIndex === 5 ||
+        state.blockIndex === 6;
+      let catalog: SeasonDraftCatalog | undefined;
+      try {
+        catalog = await this.ensureCatalog();
+      } catch (error) {
+        if (needsCatalog) {
+          throw new Error(
+            `season block ${String(state.blockIndex)} requires the packaged draft catalog: season block catalog load failed for ${state.catalogUrl}: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+        catalog = undefined;
+      }
+      if (this.blockPipelineAbandoned(token, requestId)) return;
+      const freeAgencyAssets =
+        state.blockIndex === 2 || state.blockIndex === 4 || state.blockIndex === 6
+          ? await Promise.all([this.ensureFreeAgencyIndex(), this.ensureFreeAgencyTargets()])
+          : null;
+      if (this.blockPipelineAbandoned(token, requestId)) return;
+      const evolutionAssets =
+        state.blockIndex === 3
+          ? await Promise.all([this.loadProfile(), this.loadSchedule()])
+              .then(([profile, schedule]) => ({ profile, schedule }))
+              .catch(() => null)
+          : null;
+      if (this.blockPipelineAbandoned(token, requestId)) return;
+      const candidateGameIds = new Set(
+        authoritative.gameSummaries.map((summary) => summary.gameId),
+      );
+      const knownSummaries =
+        this.blockFacts !== null && this.blockFacts.runId === state.run.runId
+          ? this.blockFacts.summaries
+          : [];
+      const evolutionPriorSummaries = knownSummaries.filter(
+        (summary) => !candidateGameIds.has(summary.gameId),
+      );
+      const committed = completeSeasonBlockCommit({
+        run: { ...state.run, rotations: state.rotations },
+        candidate: authoritative,
+        commandId: state.commandId,
+        rotationDigest: state.rotationDigest,
+        humanFranchiseId: state.humanFranchiseId,
+        catalog,
+        effects: checkpoint.effects,
+        freeAgencyIndex: freeAgencyAssets?.[0],
+        freeAgencyTargets: freeAgencyAssets?.[1],
+        profile: evolutionAssets?.profile,
+        schedule: evolutionAssets?.schedule,
+        priorSummaries: evolutionPriorSummaries,
+      });
+      const window: SeasonWindowOpenResult | null = committed.window;
+      const retainedDetails = [
+        ...(state.resumePending?.retainedDetails ?? []),
+        ...dedupeNewByGameId(
+          state.resumePending?.retainedDetails ?? [],
+          checkpoint.retainedDetails,
+        ),
+      ];
+      const objectives = objectivesWithSuccess(state.run, authoritative);
+      const challenges = committed.challenges ?? challengesWithSuccess(state.run, authoritative);
+      const campaign = committed.campaign ?? null;
+      if (this.blockPipelineAbandoned(token, requestId)) return;
+      await this.repo.commitSeasonBlock({
+        runId: authoritative.runId,
+        revision: authoritative.revision + 1,
+        commandId: state.commandId,
+        rotationDigest: authoritative.rotationDigest,
+        checkpointDigest: authoritative.digest,
+        completedRounds: authoritative.completedRounds,
+        standings: authoritative.standings,
+        teamAggregates: authoritative.teamAggregates,
+        playerAggregates: authoritative.playerAggregates,
+        summaries: authoritative.gameSummaries,
+        retainedDetails,
+        recap: authoritative.recap,
+        rotations: window !== null ? window.rotations : state.rotations,
+        effects: window !== null ? window.effects : authoritative.effects,
+        freeAgency: committed.freeAgency,
+        health: authoritative.health,
+        transactions: window !== null ? window.transactions : authoritative.transactions,
+        influence: window !== null ? window.influence : authoritative.influence,
+        trade: window !== null ? window.trade : state.run.trade,
+        objectives,
+        challenges,
+        campaign,
+        evolution: committed.evolution,
+        sponsors: committed.sponsors,
+        checkpointState: committed.checkpointState,
+        stateRevision: committed.stateRevision,
+        stateDigest: committed.stateDigest,
+        expectedStateRevision: state.run.stateRevision,
+        expectedStateDigest: state.run.stateDigest,
+        window,
+      });
+      if (this.blockPipelineAbandoned(token, requestId)) return;
+      this.publishCommittedBlock(state, authoritative, committed, window, scheduleForSnapshot);
+    } catch (error) {
+      if (this.blockPipelineAbandoned(token, requestId)) return;
+      this.activeBlock = null;
+      this.block.phase = 'failed';
+      this.block.error = {
+        code: 'internal',
+        message: `checkpoint commit failed: ${error instanceof Error ? error.message : String(error)}`,
+        seed: state.run.rootSeed,
+        gameId: null,
+      };
+      this.emit();
+    }
+  }
+  private publishCommittedBlock(
+    state: BlockRequestFacts,
+    checkpoint: SeasonCandidateCheckpoint,
+    committed: ReturnType<typeof completeSeasonBlockCommit>,
+    window: SeasonWindowOpenResult | null,
+    schedule: SeasonSchedule,
+  ): void {
+    this.activeBlock = null;
+    if (this.activeRunId() !== checkpoint.runId) return;
+    const priorSummaries =
+      this.blockFacts !== null && this.blockFacts.runId === checkpoint.runId
+        ? this.blockFacts.summaries
+        : [];
+    const priorAcceptedBlocks =
+      this.blockFacts !== null && this.blockFacts.runId === checkpoint.runId
+        ? this.blockFacts.blocks
+        : [];
+    const priorRetainedDetails =
+      this.blockFacts !== null && this.blockFacts.runId === checkpoint.runId
+        ? this.blockFacts.retainedDetails
+        : [];
+    if (this.blockFacts === null || this.blockFacts.runId !== checkpoint.runId) {
+      this.blockFacts = {
+        runId: checkpoint.runId,
+        revision: checkpoint.revision,
+        completedRounds: checkpoint.completedRounds,
+        commandIds: new Set(),
+        summaries: [],
+        blocks: [],
+        retainedDetails: [],
+        effects: checkpoint.effects,
+        health: checkpoint.health,
+        stateRevision: state.run.stateRevision,
+        stateDigest: state.run.stateDigest,
+      };
+    }
+    this.blockFacts.revision = checkpoint.revision + 1;
+    this.blockFacts.completedRounds = checkpoint.completedRounds;
+    this.blockFacts.commandIds.add(state.commandId);
+    this.blockFacts.summaries = [...this.blockFacts.summaries, ...checkpoint.gameSummaries];
+    this.blockFacts.effects = window !== null ? window.effects : checkpoint.effects;
+    this.blockFacts.health = window !== null ? window.health : checkpoint.health;
+    this.blockFacts.stateRevision = committed.stateRevision;
+    this.blockFacts.stateDigest = committed.stateDigest;
+    const snapshot = assembleCommittedSnapshot({
+      run: state.run,
+      rotations: state.rotations,
+      checkpoint,
+      commandId: state.commandId,
+      rotationDigest: state.rotationDigest,
+      window,
+      freeAgency: committed.freeAgency,
+      campaign: committed.campaign,
+      challenges: committed.challenges,
+      evolution: committed.evolution,
+      sponsors: committed.sponsors,
+      checkpointState: committed.checkpointState,
+      stateRevision: committed.stateRevision,
+      stateDigest: committed.stateDigest,
+      schedule,
+      priorSummaries,
+      priorAcceptedBlocks,
+      priorRetainedDetails,
+    });
+    this.blockFacts.blocks = snapshot.acceptedBlocks;
+    this.blockFacts.retainedDetails = snapshot.retainedDetails;
+    this.block.latestGameId = null;
+    this.block.latestResult = null;
+    this.block.error = null;
+    this.pending = null;
+    this.interruption = null;
+    this.snapshot = snapshot;
+    this.index = indexAfterCommit(this.index, snapshot, () => this.clock.now());
+    this.cache.set(snapshot);
+    this.block = { ...IDLE_BLOCK };
+    this.notifier.announce({
+      kind: 'commit',
+      runId: snapshot.run.runId,
+      revision: snapshot.acceptedBlocks.length,
+      committedAt: this.clock.now(),
+    });
+    this.emit();
+  }
+  private async acceptBlockInterruption(
+    requestId: string,
+    pending: SeasonPendingBlockCandidate,
+  ): Promise<void> {
+    const state = this.activeBlock;
+    if (state === null) return;
+    const token = this.blockRunToken;
+    if (this.blockCancelRequested) {
+      this.settleCancelledBlock(requestId);
+      return;
+    }
+    try {
+      if (pending.runId !== state.run.runId) {
+        throw new Error('pending candidate runId mismatch');
+      }
+      if (pending.blockIndex !== state.blockIndex) {
+        throw new Error('pending candidate blockIndex mismatch');
+      }
+      if (pending.commandId !== state.commandId) {
+        throw new Error('pending candidate commandId mismatch');
+      }
+      if (pending.expectedRevision !== state.expectedRevision) {
+        throw new Error('pending candidate expectedRevision mismatch');
+      }
+      if (pending.rotationDigest !== state.rotationDigest) {
+        throw new Error('pending candidate rotationDigest mismatch');
+      }
+      if (state.humanFranchiseId === null) {
+        throw new Error('invalid-roster interruption without a human franchise');
+      }
+      const availability = seasonFranchiseLegalFiveFacts(
+        state.run,
+        state.humanFranchiseId,
+        pending.health,
+      );
+      const interruption: SeasonInvalidRosterInterruption = {
+        code: 'invalid-roster',
+        runId: pending.runId,
+        blockIndex: pending.blockIndex,
+        commandId: pending.commandId,
+        nextGameId: pending.nextGameId,
+        humanFranchiseId: franchiseIdSchema.parse(state.humanFranchiseId),
+        unavailablePlayerVersionIds: availability.unavailablePlayerVersionIds,
+      };
+      const priorRetained = state.resumePending?.retainedDetails ?? [];
+      const priorPendingSummaries = state.resumePending?.summaries ?? [];
+      const mergedPending: typeof pending = {
+        ...pending,
+        summaries: mergeSortedByGameId(priorPendingSummaries, pending.summaries),
+        retainedDetails: mergeSortedByGameId(
+          priorRetained,
+          dedupeNewByGameId(priorRetained, pending.retainedDetails),
+        ),
+      };
+      await this.repo.savePendingBlock(mergedPending, interruption);
+      if (this.blockPipelineAbandoned(token, requestId)) return;
+      if (this.block.blockIndex !== mergedPending.blockIndex) return;
+      if (this.activeRunId() !== mergedPending.runId) return;
+      this.activeBlock = null;
+      this.block.phase = 'interrupted';
+      this.block.latestGameId = null;
+      this.block.latestResult = null;
+      this.block.isHumanGame = false;
+      this.block.error = null;
+      this.pending = mergedPending;
+      this.interruption = interruption;
+      this.commandError = null;
+      this.emit();
+    } catch (error) {
+      if (this.blockPipelineAbandoned(token, requestId)) return;
+      this.activeBlock = null;
+      this.block.phase = 'failed';
+      this.block.error = {
+        code: 'internal',
+        message: `interruption persistence failed: ${error instanceof Error ? error.message : String(error)}`,
+        seed: state.run.rootSeed,
+        gameId: null,
+      };
+      this.emit();
+    }
   }
   private async onExternalMutation(mutation: SeasonRunMutation): Promise<void> {
     if (this.isDisposed()) return;
@@ -570,6 +1149,25 @@ export class SeasonSession {
       this.emit();
       return;
     }
+    if (this.block.phase === 'running') {
+      this.block = {
+        ...IDLE_BLOCK,
+        requestId: null,
+        blockIndex: envelope.command.blockIndex,
+        phase: 'failed',
+        gamesTotal: 0,
+        command: envelope.command,
+        startInput: envelope.start,
+        error: {
+          code: 'internal',
+          message: 'a season block is already running; cancel it first',
+          seed: null,
+          gameId: null,
+        },
+      };
+      this.emit();
+      return;
+    }
     this.block = {
       ...IDLE_BLOCK,
       requestId: null,
@@ -579,28 +1177,19 @@ export class SeasonSession {
       command: envelope.command,
       startInput: envelope.start,
     };
-    try {
-      const requestId = this.runner.startBlock(envelope.start);
-      this.block.requestId = requestId;
-    } catch (error) {
-      this.block.phase = 'failed';
-      this.block.error = {
-        code: 'internal',
-        message: error instanceof Error ? error.message : String(error),
-        seed: null,
-        gameId: null,
-      };
-    }
+    const token = this.beginBlockRequest();
+    this.prefetchBlockAssets(envelope.start);
     this.emit();
+    void this.startBlockRequest(envelope.start, token);
   }
   async resumeBlock(): Promise<void> {
     const pending = this.pending;
     if (pending === null) return;
     if (this.block.phase === 'running') return;
     const submitted = this.block.startInput;
-    let input: SeasonBlockResumeInput;
+    let base: BlockResumeBase;
     if (submitted !== null) {
-      input = {
+      base = {
         runId: submitted.run.runId,
         blockIndex: submitted.blockIndex,
         expectedRevision: submitted.expectedRevision,
@@ -622,7 +1211,7 @@ export class SeasonSession {
         this.assets.loadArtifactUrls(),
       ]);
       const rawHumanResume = humanFranchiseIdOf(run.league);
-      input = {
+      base = {
         runId: run.runId,
         blockIndex: pending.blockIndex,
         expectedRevision: pending.expectedRevision,
@@ -644,19 +1233,9 @@ export class SeasonSession {
       command: null,
       startInput: null,
     };
-    try {
-      const requestId = this.runner.resumeBlock(input);
-      this.block.requestId = requestId;
-    } catch (error) {
-      this.block.phase = 'failed';
-      this.block.error = {
-        code: 'internal',
-        message: error instanceof Error ? error.message : String(error),
-        seed: null,
-        gameId: null,
-      };
-    }
+    const token = this.beginBlockRequest();
     this.emit();
+    void this.resumeBlockRequest(base, token);
   }
   async selectFrontOffice(input: { executiveId: string }): Promise<void> {
     const command: SeasonRunCommand = {
@@ -896,8 +1475,10 @@ export class SeasonSession {
     await this.dispatch(command);
   }
   cancel(): void {
+    if (this.block.phase !== 'running') return;
+    this.blockCancelRequested = true;
     const requestId = this.block.requestId;
-    if (this.block.phase !== 'running' || requestId === null) return;
+    if (requestId === null) return;
     this.runner.cancel(requestId);
   }
   async startPostseason(): Promise<void> {
@@ -1449,39 +2030,24 @@ export class SeasonSession {
         this.lastProgressEmitAt = now;
         break;
       }
-      case 'complete': {
-        if (this.block.blockIndex !== event.checkpoint.blockIndex) break;
-        if (this.activeRunId() !== event.snapshot.run.runId) break;
-        this.block.latestGameId = null;
-        this.block.latestResult = null;
-        this.block.error = null;
-        this.pending = null;
-        this.interruption = null;
-        this.snapshot = event.snapshot;
-        this.index = indexAfterCommit(this.index, event.snapshot, () => this.clock.now());
-        this.cache.set(event.snapshot);
-        this.block = { ...IDLE_BLOCK };
-        this.notifier.announce({
-          kind: 'commit',
-          runId: event.snapshot.run.runId,
-          revision: event.snapshot.acceptedBlocks.length,
-          committedAt: this.clock.now(),
-        });
-        this.emit();
+      case 'candidate': {
+        if (this.block.blockIndex !== event.blockIndex) break;
+        if (this.blockCancelRequested) {
+          this.settleCancelledBlock(event.requestId);
+          return;
+        }
+        void this.acceptBlockCandidate(event.requestId, event.checkpoint);
         return;
       }
       case 'interrupted':
         if (this.block.blockIndex !== event.blockIndex) break;
         if (this.activeRunId() !== event.runId) break;
-        this.block.phase = 'interrupted';
-        this.block.latestGameId = null;
-        this.block.latestResult = null;
-        this.block.isHumanGame = false;
-        this.block.error = null;
-        this.pending = event.pending;
-        this.interruption = event.interruption;
-        this.commandError = null;
-        break;
+        if (this.blockCancelRequested) {
+          this.settleCancelledBlock(event.requestId);
+          return;
+        }
+        void this.acceptBlockInterruption(event.requestId, event.pending);
+        return;
       case 'cancelled':
         if (this.block.blockIndex !== event.blockIndex) break;
         this.block.phase = 'cancelled';

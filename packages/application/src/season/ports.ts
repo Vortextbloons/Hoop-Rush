@@ -4,6 +4,7 @@ import type {
   SeasonFreeAgencyIndex,
   SeasonHomeCourtProfile,
   SeasonRosterTargets,
+  SeasonSchedule,
 } from '@hoop-rush/data-contracts';
 import type { SeasonPostseasonRepository, SeasonRunRepository } from '@hoop-rush/persistence';
 import type { SeasonArtifactUrls, SeasonBlockRunner } from './block-wire.ts';
@@ -52,6 +53,7 @@ export interface SeasonAssetPort {
   loadFreeAgencyTargets(): Promise<SeasonRosterTargets>;
   loadHomeCourtProfile(): Promise<SeasonHomeCourtProfile>;
   loadArtifactUrls(): Promise<SeasonArtifactUrls>;
+  loadSchedule(): Promise<SeasonSchedule>;
 }
 
 export interface SeasonClockPort {

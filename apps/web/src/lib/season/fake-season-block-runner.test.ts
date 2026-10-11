@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   PLAYER_VERSION_ID_VERSION,
   SEASON_DRAFT_CATALOG_VERSION,
@@ -33,34 +33,7 @@ import {
 } from '@hoop-rush/engine';
 import { acceptWorkerResult } from './season-block-runner';
 import type { SeasonBlockStartInput, SeasonRunnerEvent } from './season-block-runner';
-import type { SeasonRunSnapshot } from '@hoop-rush/persistence';
-
-const commitSeasonBlock = vi.hoisted(() => vi.fn(() => Promise.resolve(undefined)));
-const savePendingBlock = vi.hoisted(() => vi.fn(() => Promise.resolve(undefined)));
-const loadPendingBlock = vi.hoisted(() =>
-  vi.fn((): Promise<SeasonPendingBlockCandidate | null> => Promise.resolve(null)),
-);
-const loadActiveRun = vi.hoisted(() =>
-  vi.fn((): Promise<SeasonRunSnapshot | null> => Promise.resolve(null)),
-);
-let createFakeSeasonBlockRunner: (typeof import('./fake-season-block-runner'))['createFakeSeasonBlockRunner'];
-
-beforeEach(async () => {
-  vi.resetModules();
-  vi.doMock('$lib/season/season-repo', () => ({
-    getSeasonRunRepository: () =>
-      Promise.resolve({
-        commitSeasonBlock,
-        savePendingBlock,
-        loadPendingBlock,
-        loadActiveRun,
-        loadBlockHistory: () => Promise.resolve([]),
-        loadRetainedDetails: () => Promise.resolve([]),
-      }),
-  }));
-  createFakeSeasonBlockRunner = (await import('./fake-season-block-runner'))
-    .createFakeSeasonBlockRunner;
-});
+import { createFakeSeasonBlockRunner } from './fake-season-block-runner';
 
 const LEAGUE = buildSeasonLeague({}, { humanFranchiseId: franchiseIdSchema.parse('lakers') });
 
@@ -157,16 +130,6 @@ function buildZeroEffects(run: SeasonRun): SeasonEffectsState {
   };
 }
 
-function snapshotOf(run: SeasonRun, effects: SeasonEffectsState): SeasonRunSnapshot {
-  return {
-    run,
-    summaries: [],
-    retainedDetails: [],
-    acceptedBlocks: [],
-    effects,
-  };
-}
-
 function fixtureBlock0(): {
   run: SeasonRun;
   schedule: SeasonSchedule;
@@ -196,6 +159,7 @@ function fixtureBlock0(): {
     humanFranchiseId,
     objectiveId: null,
     challengeDeal,
+    knownSummaries: [],
     homeCourt: SEASON_NEUTRAL_HOME_COURT,
     catalogUrl: 'https://example.test/season/draft-catalog.json',
     catalogHash: '0'.repeat(64),
@@ -218,7 +182,7 @@ function collect(runner: ReturnType<typeof createFakeSeasonBlockRunner>): {
     wake = () => {
       const done = events.find(
         (event) =>
-          event.type === 'complete' || event.type === 'error' || event.type === 'interrupted',
+          event.type === 'candidate' || event.type === 'error' || event.type === 'interrupted',
       );
       if (done !== undefined) {
         clearTimeout(timeout);
@@ -235,20 +199,19 @@ function collect(runner: ReturnType<typeof createFakeSeasonBlockRunner>): {
 
 describe('fake season block runner contract', () => {
   it('emits the same event types in the same order as the real runner', async () => {
-    const { run, schedule, input } = fixtureBlock0();
-    loadActiveRun.mockResolvedValue(snapshotOf(run, input.effects));
+    const { input, schedule } = fixtureBlock0();
     const runner = createFakeSeasonBlockRunner({
       schedule,
-      catalog: catalogOf(run),
+      catalog: catalogOf(input.run),
       profile: buildEraSimulationProfile(),
     });
     const { events, terminal } = collect(runner);
     runner.startBlock(input);
     const done = await terminal;
     runner.terminate();
-    if (done.type !== 'complete') {
+    if (done.type !== 'candidate') {
       throw new Error(
-        `fake runner ended with ${done.type}: ${done.type === 'error' ? done.message : 'no complete'}`,
+        `fake runner ended with ${done.type}: ${done.type === 'error' ? done.message : 'no candidate'}`,
       );
     }
     expect(events.length).toBeGreaterThan(2);
@@ -256,7 +219,7 @@ describe('fake season block runner contract', () => {
     const middle = events.slice(1, -1);
     expect(middle.length).toBeGreaterThan(0);
     for (const event of middle) expect(event.type).toBe('progress');
-    expect(events[events.length - 1]?.type).toBe('complete');
+    expect(events[events.length - 1]?.type).toBe('candidate');
     const requestIds = new Set(events.map((event) => event.requestId));
     expect(requestIds.size).toBe(1);
     let lastCompleted = -1;
@@ -279,21 +242,20 @@ describe('fake season block runner contract', () => {
     expect(lastCompleted).toBe(gamesTotal);
   }, 90000);
 
-  it('produces an engine checkpoint that passes the real digest/commit gate', async () => {
-    const { run, schedule, input } = fixtureBlock0();
-    loadActiveRun.mockResolvedValue(snapshotOf(run, input.effects));
+  it('produces an engine checkpoint that passes the real digest gate', async () => {
+    const { input, schedule } = fixtureBlock0();
     const runner = createFakeSeasonBlockRunner({
       schedule,
-      catalog: catalogOf(run),
+      catalog: catalogOf(input.run),
       profile: buildEraSimulationProfile(),
     });
     const { events, terminal } = collect(runner);
     runner.startBlock(input);
     const done = await terminal;
     runner.terminate();
-    if (done.type !== 'complete') {
+    if (done.type !== 'candidate') {
       throw new Error(
-        `fake runner ended with ${done.type}: ${done.type === 'error' ? done.message : 'no complete'}`,
+        `fake runner ended with ${done.type}: ${done.type === 'error' ? done.message : 'no candidate'}`,
       );
     }
     const checkpoint = done.checkpoint;
@@ -309,8 +271,7 @@ describe('fake season block runner contract', () => {
       }),
     ).toEqual([]);
     expect(checkpoint.gameSummaries.length).toBeGreaterThan(0);
-    expect(commitSeasonBlock).toHaveBeenCalled();
-    expect(events[events.length - 1]?.type).toBe('complete');
+    expect(events[events.length - 1]?.type).toBe('candidate');
   }, 90000);
 
   it('resumes from a saved pending candidate and completes the block', async () => {
@@ -320,7 +281,7 @@ describe('fake season block runner contract', () => {
       .filter((game) => game.round >= 1 && game.round <= 10)
       .sort((a, b) => (a.gameId < b.gameId ? -1 : 1))[0];
     if (firstGame === undefined) throw new Error('block 0 has no games');
-    const pending = assembleSeasonPendingBlock({
+    const pending: SeasonPendingBlockCandidate = assembleSeasonPendingBlock({
       run,
       commandId: input.commandId,
       blockIndex: 0,
@@ -336,8 +297,6 @@ describe('fake season block runner contract', () => {
       health: run.health,
       rotationDigest: seasonRotationSetDigest(run.rotations),
     });
-    loadPendingBlock.mockResolvedValueOnce(pending);
-    loadActiveRun.mockResolvedValue(snapshotOf(run, effects));
     const runner = createFakeSeasonBlockRunner({
       schedule,
       catalog: catalogOf(run),
@@ -345,6 +304,10 @@ describe('fake season block runner contract', () => {
     });
     const { events, terminal } = collect(runner);
     runner.resumeBlock({
+      run,
+      effects,
+      pending,
+      knownSummaries: [],
       runId: run.runId,
       blockIndex: 0,
       expectedRevision: 0,
@@ -360,43 +323,13 @@ describe('fake season block runner contract', () => {
     });
     const done = await terminal;
     runner.terminate();
-    if (done.type !== 'complete') {
+    if (done.type !== 'candidate') {
       throw new Error(
-        `fake resume ended with ${done.type}: ${done.type === 'error' ? done.message : 'no complete'}`,
+        `fake resume ended with ${done.type}: ${done.type === 'error' ? done.message : 'no candidate'}`,
       );
     }
     expect(seasonCheckpointDigest(done.checkpoint)).toBe(done.checkpoint.digest);
     expect(events[0]?.type).toBe('started');
-    expect(events[events.length - 1]?.type).toBe('complete');
+    expect(events[events.length - 1]?.type).toBe('candidate');
   }, 90000);
-
-  it('fails loudly when there is no pending block to resume', async () => {
-    const { run, schedule, input } = fixtureBlock0();
-    loadActiveRun.mockResolvedValue(snapshotOf(run, input.effects));
-    loadPendingBlock.mockResolvedValueOnce(null);
-    const runner = createFakeSeasonBlockRunner({
-      schedule,
-      catalog: catalogOf(run),
-      profile: buildEraSimulationProfile(),
-    });
-    const { terminal } = collect(runner);
-    runner.resumeBlock({
-      runId: run.runId,
-      blockIndex: 0,
-      expectedRevision: 0,
-      rotationDigest: seasonRotationSetDigest(run.rotations),
-      commandId: input.commandId,
-      rotations: run.rotations,
-      humanFranchiseId: franchiseIdSchema.parse('lakers'),
-      homeCourt: SEASON_NEUTRAL_HOME_COURT,
-      catalogUrl: 'https://example.test/season/draft-catalog.json',
-      catalogHash: '0'.repeat(64),
-      profileUrl: 'https://example.test/season/era-sim.json',
-      profileHash: '0'.repeat(64),
-    });
-    const done = await terminal;
-    runner.terminate();
-    expect(done.type).toBe('error');
-    if (done.type === 'error') expect(done.message).toMatch(/no pending block/);
-  }, 30000);
 });

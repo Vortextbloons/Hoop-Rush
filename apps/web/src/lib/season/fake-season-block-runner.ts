@@ -10,7 +10,6 @@ import {
   type SeasonWorkerWarmAckMessage,
   type SeasonWorkerWarmRequest,
 } from '@hoop-rush/data-contracts';
-import type { SeasonRunRepository } from '@hoop-rush/persistence';
 import {
   createSeasonBlockRunner,
   type SeasonBlockRunner,
@@ -25,7 +24,6 @@ import {
 } from './season-block-job';
 
 export interface FakeSeasonBlockRunnerDeps {
-  repository?: SeasonRunRepository;
   schedule?: SeasonSchedule;
   catalog?: SeasonDraftCatalog;
   profile?: EraSimulationProfile;
@@ -162,7 +160,6 @@ export function createFakeSeasonBlockRunner(
   deps: FakeSeasonBlockRunnerDeps = {},
 ): SeasonBlockRunner {
   return createSeasonBlockRunner({
-    repository: deps.repository,
     schedule: deps.schedule,
     artifacts:
       deps.catalog !== undefined && deps.profile !== undefined ? inProcessArtifacts : undefined,

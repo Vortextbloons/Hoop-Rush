@@ -22,7 +22,6 @@ import {
   seasonWorkerStartRequestSchema,
 } from '@hoop-rush/data-contracts';
 import { seasonCheckpointDigest } from '@hoop-rush/engine';
-import type { SeasonRunRepository, SeasonRunSnapshot } from '@hoop-rush/persistence';
 
 export interface SeasonArtifactUrls {
   catalogUrl: string;
@@ -55,10 +54,10 @@ export type SeasonRunnerEvent =
       leaguePulse: SeasonWorkerProgress['leaguePulse'];
     }
   | {
-      type: 'complete';
+      type: 'candidate';
       requestId: string;
+      blockIndex: number;
       checkpoint: SeasonCandidateCheckpoint;
-      snapshot: SeasonRunSnapshot;
     }
   | {
       type: 'interrupted';
@@ -66,7 +65,6 @@ export type SeasonRunnerEvent =
       runId: string;
       blockIndex: number;
       pending: SeasonPendingBlockCandidate;
-      interruption: import('@hoop-rush/data-contracts').SeasonInvalidRosterInterruption;
     }
   | {
       type: 'cancelled';
@@ -100,9 +98,14 @@ export interface SeasonBlockStartInput {
   catalogHash: string;
   profileUrl: string;
   profileHash: string;
+  knownSummaries?: SeasonGameSummary[];
 }
 
 export interface SeasonBlockResumeInput {
+  run: SeasonRun;
+  effects: SeasonEffectsState;
+  pending: SeasonPendingBlockCandidate;
+  knownSummaries: SeasonGameSummary[];
   runId: Id;
   blockIndex: number;
   expectedRevision: number;
@@ -134,7 +137,6 @@ export interface SeasonBlockTransport {
 }
 
 export interface SeasonBlockRunnerDeps {
-  repository?: SeasonRunRepository;
   schedule?: SeasonSchedule;
   workerUrl?: string;
   artifacts?: () => Promise<SeasonArtifactUrls>;

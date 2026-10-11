@@ -204,6 +204,7 @@ function sessionOptions(
         Promise.reject(new Error('free agency targets unavailable in tests')),
       loadHomeCourtProfile: () => Promise.reject(new Error('home court unavailable in tests')),
       loadArtifactUrls: () => Promise.reject(new Error('artifact urls unavailable in tests')),
+      loadSchedule: () => Promise.resolve(SCHEDULE),
     },
     notifier: {
       announce: () => {},

@@ -1,28 +1,14 @@
 ﻿import type {
-  SeasonAcceptedBlock,
-  SeasonCandidateCheckpoint,
-  SeasonCheckpointState,
-  SeasonDraftCatalog,
-  SeasonEffectsState,
-  SeasonFreeAgencyIndex,
-  SeasonFreeAgencyState,
-  SeasonGameSummary,
-  SeasonHealthState,
-  SeasonInvalidRosterInterruption,
-  SeasonObjectiveState,
-  SeasonPendingBlockCandidate,
-  SeasonRetainedGameDetail,
-  SeasonRosterTargets,
   SeasonRotation,
-  SeasonRun,
+  SeasonGameSummary,
+  SeasonPendingBlockCandidate,
 } from '@hoop-rush/data-contracts';
 import {
   SEASON_WORKER_WIRE_SCHEMA_VERSION,
-  franchiseIdSchema,
-  seasonAcceptedBlockSchema,
   seasonWorkerCancelRequestSchema,
   seasonWorkerMessageSchema,
   seasonWorkerWarmRequestSchema,
+  type SeasonSchedule,
   type SeasonWorkerStartRequest,
 } from '@hoop-rush/data-contracts';
 import {
@@ -35,18 +21,6 @@ import {
   type SeasonBlockTransport,
   type SeasonRunnerEvent,
 } from '@hoop-rush/application/season';
-import { completeSeasonBlockCommit, seasonNextBlockIndex } from '@hoop-rush/engine';
-import { reconstructSeasonGames } from '@hoop-rush/engine';
-import { seasonFranchiseLegalFiveFacts } from '@hoop-rush/engine';
-import { seasonRotationSetDigest } from '@hoop-rush/engine';
-import type {
-  SeasonRunRepository,
-  SeasonRunSnapshot,
-  SeasonWindowOpenResult,
-} from '@hoop-rush/persistence';
-import type { EraSimulationProfile, SeasonSchedule } from '@hoop-rush/data-contracts';
-import type { SeasonArtifactUrls } from './season-assets';
-import { getSeasonRunRepository } from '$lib/season/season-repo';
 import { newRequestId } from '$lib/ids';
 export { acceptWorkerResult, buildWorkerRequest };
 export type {
@@ -101,30 +75,17 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
     rotations: SeasonRotation[];
     input: SeasonBlockStartInput;
     resumePending: SeasonPendingBlockCandidate | null;
+    knownSummaries: SeasonGameSummary[];
   } | null = null;
-  let runState: {
-    runId: string;
-    revision: number;
-    completedRounds: number;
-    commandIds: Set<string>;
-    summaries: SeasonGameSummary[];
-    blocks: SeasonAcceptedBlock[];
-    retainedDetails: SeasonRetainedGameDetail[];
-    effects: SeasonEffectsState | null;
-    health: SeasonHealthState | null;
-    stateRevision: number;
-    stateDigest: string;
-  } | null = null;
-  const repositoryPromise = deps.repository !== undefined ? Promise.resolve(deps.repository) : null;
   const schedulePromise = deps.schedule !== undefined ? Promise.resolve(deps.schedule) : null;
   function resolveSchedule(): Promise<SeasonSchedule> {
     if (schedulePromise !== null) return schedulePromise;
     return import('./season-assets').then((module) => module.loadSeasonSchedule());
   }
-  async function resolveRepository(): Promise<SeasonRunRepository> {
-    if (repositoryPromise !== null) return repositoryPromise;
-    const schedule = await resolveSchedule();
-    return getSeasonRunRepository(schedule);
+  function resolveArtifacts(): Promise<import('@hoop-rush/application/season').SeasonArtifactUrls> {
+    return deps.artifacts !== undefined
+      ? deps.artifacts()
+      : import('./season-assets').then((module) => module.seasonArtifactUrls());
   }
   function emit(event: SeasonRunnerEvent): void {
     for (const listener of [...listeners]) listener(event);
@@ -168,111 +129,6 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       currentRequestId === requestId &&
       !cancelledRequestIds.has(requestId)
     );
-  }
-  function abandonIfNotLive(requestId: string, epoch: number): boolean {
-    if (requestLive(requestId, epoch)) return false;
-    signalCancellation(requestId);
-    return true;
-  }
-  let catalogCache: {
-    url: string;
-    hash: string;
-    catalog: SeasonDraftCatalog;
-  } | null = null;
-  let catalogInflight: Promise<SeasonDraftCatalog> | null = null;
-  async function resolveCatalog(input: SeasonBlockStartInput): Promise<SeasonDraftCatalog> {
-    if (
-      catalogCache !== null &&
-      catalogCache.url === input.catalogUrl &&
-      catalogCache.hash === input.catalogHash
-    ) {
-      return catalogCache.catalog;
-    }
-    if (catalogInflight !== null) return catalogInflight;
-    catalogInflight = (async () => {
-      try {
-        const { loadSeasonDraftCatalog } = await import('@hoop-rush/data-contracts');
-        const catalog = await loadSeasonDraftCatalog(input.catalogUrl, input.catalogHash);
-        catalogCache = { url: input.catalogUrl, hash: input.catalogHash, catalog };
-        return catalog;
-      } catch (error) {
-        throw new Error(
-          `season block catalog load failed for ${input.catalogUrl}: ${error instanceof Error ? error.message : String(error)}`,
-        );
-      } finally {
-        catalogInflight = null;
-      }
-    })();
-    return catalogInflight;
-  }
-  function prefetchCommitAssets(input: SeasonBlockStartInput): void {
-    void resolveCatalog(input).catch(() => null);
-    if (input.blockIndex === 2 || input.blockIndex === 4 || input.blockIndex === 6) {
-      void resolveFreeAgencyAssets().catch(() => null);
-    }
-    if (input.blockIndex === 3) {
-      void resolveEvolutionAssets().catch(() => null);
-    }
-  }
-  let freeAgencyCache: {
-    freeAgencyIndex: SeasonFreeAgencyIndex;
-    freeAgencyTargets: SeasonRosterTargets;
-  } | null = null;
-  let freeAgencyInflight: Promise<{
-    freeAgencyIndex: SeasonFreeAgencyIndex;
-    freeAgencyTargets: SeasonRosterTargets;
-  }> | null = null;
-  async function resolveFreeAgencyAssets(): Promise<{
-    freeAgencyIndex: SeasonFreeAgencyIndex;
-    freeAgencyTargets: SeasonRosterTargets;
-  }> {
-    if (freeAgencyCache !== null) return freeAgencyCache;
-    if (freeAgencyInflight !== null) return freeAgencyInflight;
-    freeAgencyInflight = (async () => {
-      const module = await import('./season-assets');
-      const [freeAgencyIndex, freeAgencyTargets] = await Promise.all([
-        module.loadSeasonFreeAgencyIndex(),
-        module.loadSeasonFreeAgencyTargets(),
-      ]);
-      freeAgencyCache = { freeAgencyIndex, freeAgencyTargets };
-      return freeAgencyCache;
-    })();
-    try {
-      return await freeAgencyInflight;
-    } catch (error) {
-      freeAgencyInflight = null;
-      throw error;
-    }
-  }
-  let evolutionCache: {
-    profile: EraSimulationProfile;
-    schedule: SeasonSchedule;
-  } | null = null;
-  let evolutionInflight: Promise<{
-    profile: EraSimulationProfile;
-    schedule: SeasonSchedule;
-  }> | null = null;
-  async function resolveEvolutionAssets(): Promise<{
-    profile: EraSimulationProfile;
-    schedule: SeasonSchedule;
-  }> {
-    if (evolutionCache !== null) return evolutionCache;
-    if (evolutionInflight !== null) return evolutionInflight;
-    evolutionInflight = (async () => {
-      const module = await import('./season-assets');
-      const [profile, schedule] = await Promise.all([
-        module.loadSeasonEraProfile(),
-        resolveSchedule(),
-      ]);
-      evolutionCache = { profile, schedule };
-      return evolutionCache;
-    })();
-    try {
-      return await evolutionInflight;
-    } catch (error) {
-      evolutionInflight = null;
-      throw error;
-    }
   }
   function handleTransportError(message: string): void {
     if (warmRequestId !== null) {
@@ -340,9 +196,9 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       });
       return;
     }
+    const requestId = message.requestId;
+    const blockIndex = current.blockIndex;
     if (message.type === 'season-block-error') {
-      const requestId = message.requestId;
-      const blockIndex = current.blockIndex;
       if (message.code === 'cancelled') {
         if (cancelledRequestIds.has(requestId)) {
           signalCancellation(requestId);
@@ -367,11 +223,26 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       postedRequestId = null;
       return;
     }
-    if (message.result.status === 'interrupted') {
-      void acceptInterruption(message.result.pending);
+    const result = message.result;
+    const wasCancelled = cancelledRequestIds.has(requestId);
+    currentRequestId = null;
+    current = null;
+    postedRequestId = null;
+    if (wasCancelled) {
+      signalCancellation(requestId);
       return;
     }
-    void acceptCandidate(message.result.checkpoint);
+    if (result.status === 'interrupted') {
+      emit({
+        type: 'interrupted',
+        requestId,
+        runId: result.pending.runId,
+        blockIndex,
+        pending: result.pending,
+      });
+      return;
+    }
+    emit({ type: 'candidate', requestId, blockIndex, checkpoint: result.checkpoint });
   }
   function createTransport(): SeasonBlockTransport {
     if (transport !== null) return transport;
@@ -382,301 +253,54 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
     target.onMessage(handleTransportMessage);
     return target;
   }
-  async function acceptCandidate(checkpoint: SeasonCandidateCheckpoint): Promise<void> {
-    const requestId = currentRequestId;
-    const state = current;
-    if (requestId === null || state === null) return;
-    const epoch = cancellationEpoch;
-    const failures = acceptWorkerResult(checkpoint, {
-      runId: state.input.run.runId,
-      blockIndex: state.blockIndex,
-      revision: state.expectedRevision,
-      rotationDigest: state.rotationDigest,
-      expectedStateRevision: state.input.run.stateRevision,
-      expectedStateDigest: state.input.run.stateDigest,
-    });
-    if (failures.length > 0) {
-      emit({
-        type: 'error',
-        requestId,
-        blockIndex: state.blockIndex,
-        code: 'invariant-failure',
-        message: failures.join('; '),
-        seed: state.input.run.rootSeed,
-        gameId: null,
-      });
-      currentRequestId = null;
-      current = null;
-      return;
-    }
-    try {
-      const repository = await resolveRepository();
-      if (abandonIfNotLive(requestId, epoch)) return;
-      const authoritative = { ...checkpoint, freeAgency: state.input.run.freeAgency };
-      const scheduleForSnapshot = await resolveSchedule();
-      if (abandonIfNotLive(requestId, epoch)) return;
-      const needsCatalog =
-        state.blockIndex === 2 ||
-        state.blockIndex === 4 ||
-        state.blockIndex === 5 ||
-        state.blockIndex === 6;
-      let catalog: SeasonDraftCatalog | undefined;
-      try {
-        catalog = await resolveCatalog(state.input);
-      } catch (error) {
-        if (needsCatalog) {
-          throw new Error(
-            `season block ${String(state.blockIndex)} requires the packaged draft catalog: ${error instanceof Error ? error.message : String(error)}`,
-          );
-        }
-        catalog = undefined;
-      }
-      if (abandonIfNotLive(requestId, epoch)) return;
-      const freeAgencyAssets =
-        state.blockIndex === 2 || state.blockIndex === 4 || state.blockIndex === 6
-          ? await resolveFreeAgencyAssets()
-          : null;
-      if (abandonIfNotLive(requestId, epoch)) return;
-      const evolutionAssets =
-        state.blockIndex === 3 ? await resolveEvolutionAssets().catch(() => null) : null;
-      if (abandonIfNotLive(requestId, epoch)) return;
-      const candidateGameIds = new Set(
-        authoritative.gameSummaries.map((summary) => summary.gameId),
-      );
-      const knownSummaries =
-        runState !== null && runState.runId === state.input.run.runId ? runState.summaries : [];
-      const evolutionPriorSummaries = knownSummaries.filter(
-        (summary) => !candidateGameIds.has(summary.gameId),
-      );
-      const committed = completeSeasonBlockCommit({
-        run: { ...state.input.run, rotations: state.rotations },
-        candidate: authoritative,
-        commandId: state.commandId,
-        rotationDigest: state.rotationDigest,
-        humanFranchiseId: state.input.humanFranchiseId,
-        catalog,
-        effects: checkpoint.effects,
-        freeAgencyIndex: freeAgencyAssets?.freeAgencyIndex,
-        freeAgencyTargets: freeAgencyAssets?.freeAgencyTargets,
-        profile: evolutionAssets?.profile,
-        schedule: evolutionAssets?.schedule,
-        priorSummaries: evolutionPriorSummaries,
-      });
-      const window: SeasonWindowOpenResult | null = committed.window;
-      const retainedDetails = [
-        ...(state.resumePending?.retainedDetails ?? []),
-        ...dedupeNewByGameId(
-          state.resumePending?.retainedDetails ?? [],
-          checkpoint.retainedDetails,
-        ),
-      ];
-      const objectives = objectivesWithSuccess(state.input.run, authoritative);
-      const challenges =
-        (
-          committed as unknown as {
-            challenges?: import('@hoop-rush/data-contracts').SeasonChallengeState | undefined;
-          }
-        ).challenges ?? challengesWithSuccess(state.input.run, authoritative);
-      const campaign =
-        (
-          committed as unknown as {
-            campaign?: import('@hoop-rush/data-contracts').SeasonCampaignState | null;
-          }
-        ).campaign ?? null;
-      if (abandonIfNotLive(requestId, epoch)) return;
-      await repository.commitSeasonBlock({
-        runId: authoritative.runId,
-        revision: authoritative.revision + 1,
-        commandId: state.commandId,
-        rotationDigest: authoritative.rotationDigest,
-        checkpointDigest: authoritative.digest,
-        completedRounds: authoritative.completedRounds,
-        standings: authoritative.standings,
-        teamAggregates: authoritative.teamAggregates,
-        playerAggregates: authoritative.playerAggregates,
-        summaries: authoritative.gameSummaries,
-        retainedDetails,
-        recap: authoritative.recap,
-        rotations: window !== null ? window.rotations : state.rotations,
-        effects: window !== null ? window.effects : authoritative.effects,
-        freeAgency: committed.freeAgency,
-        health: authoritative.health,
-        transactions: window !== null ? window.transactions : authoritative.transactions,
-        influence: window !== null ? window.influence : authoritative.influence,
-        trade: window !== null ? window.trade : state.input.run.trade,
-        objectives,
-        challenges,
-        campaign,
-        evolution: committed.evolution,
-        sponsors: committed.sponsors,
-        checkpointState: committed.checkpointState,
-        stateRevision: committed.stateRevision,
-        stateDigest: committed.stateDigest,
-        expectedStateRevision: state.input.run.stateRevision,
-        expectedStateDigest: state.input.run.stateDigest,
-        window,
-      });
-      if (abandonIfNotLive(requestId, epoch)) return;
-      const priorSummaries = runState?.runId === checkpoint.runId ? runState.summaries : [];
-      const priorAcceptedBlocks = runState?.runId === checkpoint.runId ? runState.blocks : [];
-      const priorRetainedDetails =
-        runState?.runId === checkpoint.runId ? runState.retainedDetails : [];
-      if (runState === null || runState.runId !== checkpoint.runId) {
-        runState = {
-          runId: checkpoint.runId,
-          revision: checkpoint.revision,
-          completedRounds: checkpoint.completedRounds,
-          commandIds: new Set(),
-          summaries: [],
-          blocks: [],
-          retainedDetails: [],
-          effects: checkpoint.effects,
-          health: checkpoint.health,
-          stateRevision: state.input.run.stateRevision,
-          stateDigest: state.input.run.stateDigest,
-        };
-      }
-      runState.revision = checkpoint.revision + 1;
-      runState.completedRounds = checkpoint.completedRounds;
-      runState.commandIds.add(state.commandId);
-      runState.summaries = [...runState.summaries, ...checkpoint.gameSummaries];
-      runState.effects = window !== null ? window.effects : checkpoint.effects;
-      runState.health = window !== null ? window.health : checkpoint.health;
-      runState.stateRevision = committed.stateRevision;
-      runState.stateDigest = committed.stateDigest;
-      const snapshot = assembleCommittedSnapshot({
-        run: state.input.run,
-        rotations: state.rotations,
-        checkpoint: authoritative,
-        commandId: state.commandId,
-        rotationDigest: state.rotationDigest,
-        window,
-        freeAgency: committed.freeAgency,
-        campaign,
-        challenges,
-        evolution: committed.evolution,
-        sponsors: committed.sponsors,
-        checkpointState: committed.checkpointState,
-        stateRevision: committed.stateRevision,
-        stateDigest: committed.stateDigest,
-        schedule: scheduleForSnapshot,
-        priorSummaries,
-        priorAcceptedBlocks,
-        priorRetainedDetails,
-      });
-      if (abandonIfNotLive(requestId, epoch)) return;
-      emit({ type: 'complete', requestId, checkpoint: authoritative, snapshot });
-    } catch (error) {
-      if (abandonIfNotLive(requestId, epoch)) return;
-      console.error('[season-block-runner] checkpoint commit failed', error);
-      emit({
-        type: 'error',
-        requestId,
-        blockIndex: state.blockIndex,
-        code: 'internal',
-        message: `checkpoint commit failed: ${error instanceof Error ? error.message : String(error)}`,
-        seed: state.input.run.rootSeed,
-        gameId: null,
-      });
-    } finally {
-      if (currentRequestId === requestId) {
-        currentRequestId = null;
-        current = null;
-        postedRequestId = null;
-      }
-    }
-  }
-  async function acceptInterruption(pending: SeasonPendingBlockCandidate): Promise<void> {
-    const requestId = currentRequestId;
-    const state = current;
-    if (requestId === null || state === null) return;
-    const epoch = cancellationEpoch;
-    try {
-      if (pending.runId !== state.input.run.runId) {
-        throw new Error('pending candidate runId mismatch');
-      }
-      if (pending.blockIndex !== state.blockIndex) {
-        throw new Error('pending candidate blockIndex mismatch');
-      }
-      if (pending.commandId !== state.commandId) {
-        throw new Error('pending candidate commandId mismatch');
-      }
-      if (pending.expectedRevision !== state.expectedRevision) {
-        throw new Error('pending candidate expectedRevision mismatch');
-      }
-      if (pending.rotationDigest !== state.rotationDigest) {
-        throw new Error('pending candidate rotationDigest mismatch');
-      }
-      if (state.input.humanFranchiseId === null) {
-        throw new Error('invalid-roster interruption without a human franchise');
-      }
-      const availability = seasonFranchiseLegalFiveFacts(
-        state.input.run,
-        state.input.humanFranchiseId,
-        pending.health,
-      );
-      const interruption: SeasonInvalidRosterInterruption = {
-        code: 'invalid-roster',
-        runId: pending.runId,
-        blockIndex: pending.blockIndex,
-        commandId: pending.commandId,
-        nextGameId: pending.nextGameId,
-        humanFranchiseId: franchiseIdSchema.parse(state.input.humanFranchiseId),
-        unavailablePlayerVersionIds: availability.unavailablePlayerVersionIds,
-      };
-      const repository = await resolveRepository();
-      if (abandonIfNotLive(requestId, epoch)) return;
-      const priorRetained = state.resumePending?.retainedDetails ?? [];
-      const priorPendingSummaries = state.resumePending?.summaries ?? [];
-      const mergedPending: typeof pending = {
-        ...pending,
-        summaries: mergeSortedByGameId(priorPendingSummaries, pending.summaries),
-        retainedDetails: mergeSortedByGameId(
-          priorRetained,
-          dedupeNewByGameId(priorRetained, pending.retainedDetails),
-        ),
-      };
-      await repository.savePendingBlock(mergedPending, interruption);
-      if (abandonIfNotLive(requestId, epoch)) return;
-      emit({
-        type: 'interrupted',
-        requestId,
-        runId: mergedPending.runId,
-        blockIndex: mergedPending.blockIndex,
-        pending: mergedPending,
-        interruption,
-      });
-    } catch (error) {
-      if (abandonIfNotLive(requestId, epoch)) return;
-      emit({
-        type: 'error',
-        requestId,
-        blockIndex: state.blockIndex,
-        code: 'internal',
-        message: `interruption persistence failed: ${error instanceof Error ? error.message : String(error)}`,
-        seed: state.input.run.rootSeed,
-        gameId: null,
-      });
-    } finally {
-      if (currentRequestId === requestId) {
-        currentRequestId = null;
-        current = null;
-        postedRequestId = null;
-      }
-    }
-  }
   function buildRequest(
     requestId: string,
     state: NonNullable<typeof current>,
     schedule: SeasonSchedule,
-    artifacts: SeasonArtifactUrls,
+    artifacts: import('@hoop-rush/application/season').SeasonArtifactUrls,
   ): SeasonWorkerStartRequest {
-    const summaries = runState?.runId === state.input.run.runId ? runState.summaries : [];
     return buildWorkerRequest(requestId, state, {
-      knownSummaries: summaries,
+      knownSummaries: state.knownSummaries,
       schedule,
       artifacts,
     });
+  }
+  function postRequest(
+    requestId: string,
+    requestEpoch: number,
+    blockIndex: number,
+    seed: string | null,
+  ): void {
+    void (async () => {
+      try {
+        const [schedule, artifacts] = await Promise.all([resolveSchedule(), resolveArtifacts()]);
+        if (consumePreWorkerCancellation(requestId)) return;
+        if (!requestLive(requestId, requestEpoch)) return;
+        const state = current;
+        if (state === null) return;
+        const plainStart = buildRequest(requestId, state, schedule, artifacts);
+        const target = createTransport();
+        target.postMessage(plainStart);
+        postedRequestId = requestId;
+        warmed = true;
+        emit({ type: 'started', requestId, blockIndex });
+      } catch (error) {
+        if (consumePreWorkerCancellation(requestId)) return;
+        if (!requestLive(requestId, requestEpoch)) return;
+        emit({
+          type: 'error',
+          requestId,
+          blockIndex,
+          code: 'internal',
+          message: error instanceof Error ? error.message : String(error),
+          seed,
+          gameId: null,
+        });
+        currentRequestId = null;
+        current = null;
+        postedRequestId = null;
+      }
+    })();
   }
   return {
     startBlock(input: SeasonBlockStartInput): string {
@@ -694,98 +318,9 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
         rotations: input.rotations,
         input,
         resumePending: null,
+        knownSummaries: input.knownSummaries ?? [],
       };
-      prefetchCommitAssets(input);
-      void (async () => {
-        try {
-          const [repository, schedule, artifacts] = await Promise.all([
-            resolveRepository(),
-            resolveSchedule(),
-            deps.artifacts !== undefined
-              ? deps.artifacts()
-              : import('./season-assets').then((module) => module.seasonArtifactUrls()),
-          ]);
-          if (consumePreWorkerCancellation(requestId)) return;
-          if (!requestLive(requestId, requestEpoch)) return;
-          if (
-            runState === null ||
-            runState.runId !== input.run.runId ||
-            input.expectedRevision !== runState.revision
-          ) {
-            const snapshot = await repository.loadActiveRun();
-            if (consumePreWorkerCancellation(requestId)) return;
-            if (!requestLive(requestId, requestEpoch)) return;
-            if (snapshot === null) throw new Error('no active season run to advance');
-            if (snapshot.run.runId !== input.run.runId) {
-              throw new Error('the active run does not match the submitted run');
-            }
-            const persistedRevision = snapshot.acceptedBlocks.length;
-            if (
-              runState !== null &&
-              runState.runId === input.run.runId &&
-              input.expectedRevision !== persistedRevision
-            ) {
-              throw new Error(
-                `stale cursor: the run is at revision ${String(persistedRevision)}, command expects ${String(input.expectedRevision)}`,
-              );
-            }
-            runState = {
-              runId: snapshot.run.runId,
-              revision: persistedRevision,
-              completedRounds: snapshot.run.cursor.completedRounds,
-              commandIds: new Set(snapshot.acceptedBlocks.map((block) => block.commandId)),
-              summaries: snapshot.summaries,
-              blocks: [...snapshot.acceptedBlocks],
-              retainedDetails: [...snapshot.retainedDetails],
-              effects: snapshot.effects,
-              health: snapshot.run.health,
-              stateRevision: snapshot.run.stateRevision,
-              stateDigest: snapshot.run.stateDigest,
-            };
-          }
-          const revision = runState.revision;
-          if (input.expectedRevision !== revision) {
-            throw new Error(
-              `stale cursor: the run is at revision ${String(revision)}, command expects ${String(input.expectedRevision)}`,
-            );
-          }
-          if (runState.commandIds.has(input.commandId)) {
-            throw new Error(`duplicate command ${input.commandId}`);
-          }
-          const next = seasonNextBlockIndex(runState.completedRounds);
-          if (next === null || next !== input.blockIndex) {
-            throw new Error(
-              `non-boundary block: the run expects ${String(next)}, command submits ${String(input.blockIndex)}`,
-            );
-          }
-          if (seasonRotationSetDigest(input.rotations) !== input.rotationDigest) {
-            throw new Error('rotation digest does not match the submitted rotations');
-          }
-          if (consumePreWorkerCancellation(requestId)) return;
-          if (!requestLive(requestId, requestEpoch)) return;
-          const plainStart = buildRequest(requestId, current, schedule, artifacts);
-          const target = createTransport();
-          target.postMessage(plainStart);
-          postedRequestId = requestId;
-          warmed = true;
-          emit({ type: 'started', requestId, blockIndex: input.blockIndex });
-        } catch (error) {
-          if (consumePreWorkerCancellation(requestId)) return;
-          if (!requestLive(requestId, requestEpoch)) return;
-          emit({
-            type: 'error',
-            requestId,
-            blockIndex: input.blockIndex,
-            code: 'internal',
-            message: error instanceof Error ? error.message : String(error),
-            seed: input.run.rootSeed,
-            gameId: null,
-          });
-          currentRequestId = null;
-          current = null;
-          postedRequestId = null;
-        }
-      })();
+      postRequest(requestId, requestEpoch, input.blockIndex, input.run.rootSeed);
       return requestId;
     },
     resumeBlock(input: SeasonBlockResumeInput): string {
@@ -795,113 +330,36 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       const requestId = newRequestId('sb');
       const requestEpoch = cancellationEpoch;
       currentRequestId = requestId;
-      void (async () => {
-        try {
-          const [repository, schedule, artifacts] = await Promise.all([
-            resolveRepository(),
-            resolveSchedule(),
-            deps.artifacts !== undefined
-              ? deps.artifacts()
-              : import('./season-assets').then((module) => module.seasonArtifactUrls()),
-          ]);
-          if (consumePreWorkerCancellation(requestId)) return;
-          if (!requestLive(requestId, requestEpoch)) return;
-          const snapshot = await repository.loadActiveRun();
-          if (consumePreWorkerCancellation(requestId)) return;
-          if (!requestLive(requestId, requestEpoch)) return;
-          if (snapshot === null) throw new Error('no active season run to resume');
-          if (snapshot.run.runId !== input.runId) {
-            throw new Error('the active run does not match the resume request');
-          }
-          const pending = await repository.loadPendingBlock(input.runId);
-          if (consumePreWorkerCancellation(requestId)) return;
-          if (!requestLive(requestId, requestEpoch)) return;
-          if (pending === null) {
-            throw new Error(`no pending block for run ${input.runId}`);
-          }
-          if (pending.blockIndex !== input.blockIndex) {
-            throw new Error(
-              `pending blockIndex ${String(pending.blockIndex)} does not match resume ${String(input.blockIndex)}`,
-            );
-          }
-          if (pending.expectedRevision !== input.expectedRevision) {
-            throw new Error('pending expectedRevision does not match the resume request');
-          }
-          if (pending.rotationDigest !== input.rotationDigest) {
-            throw new Error('pending rotationDigest does not match the resume request');
-          }
-          if (runState === null || runState.runId !== snapshot.run.runId) {
-            runState = {
-              runId: snapshot.run.runId,
-              revision: snapshot.acceptedBlocks.length,
-              completedRounds: snapshot.run.cursor.completedRounds,
-              commandIds: new Set(snapshot.acceptedBlocks.map((block) => block.commandId)),
-              summaries: snapshot.summaries,
-              blocks: [...snapshot.acceptedBlocks],
-              retainedDetails: [...snapshot.retainedDetails],
-              effects: snapshot.effects,
-              health: snapshot.run.health,
-              stateRevision: snapshot.run.stateRevision,
-              stateDigest: snapshot.run.stateDigest,
-            };
-          }
-          const startInput: SeasonBlockStartInput = {
-            run: snapshot.run,
-            effects: snapshot.effects,
-            rotations: input.rotations,
-            blockIndex: input.blockIndex,
-            expectedRevision: input.expectedRevision,
-            rotationDigest: input.rotationDigest,
-            commandId: input.commandId,
-            humanFranchiseId: input.humanFranchiseId,
-            objectiveId: pending.objectiveId ?? null,
-            challengeDeal: pending.challengeDeal ?? null,
-            campaignOpportunityId:
-              (
-                pending as unknown as {
-                  campaignOpportunityId?: string | null;
-                }
-              ).campaignOpportunityId ?? null,
-            homeCourt: input.homeCourt,
-            catalogUrl: input.catalogUrl,
-            catalogHash: input.catalogHash,
-            profileUrl: input.profileUrl,
-            profileHash: input.profileHash,
-          };
-          if (consumePreWorkerCancellation(requestId)) return;
-          if (!requestLive(requestId, requestEpoch)) return;
-          current = {
-            blockIndex: input.blockIndex,
-            expectedRevision: input.expectedRevision,
-            rotationDigest: input.rotationDigest,
-            commandId: input.commandId,
-            rotations: input.rotations,
-            input: startInput,
-            resumePending: pending,
-          };
-          const plainStart = buildRequest(requestId, current, schedule, artifacts);
-          const target = createTransport();
-          target.postMessage(plainStart);
-          postedRequestId = requestId;
-          warmed = true;
-          emit({ type: 'started', requestId, blockIndex: input.blockIndex });
-        } catch (error) {
-          if (consumePreWorkerCancellation(requestId)) return;
-          if (!requestLive(requestId, requestEpoch)) return;
-          emit({
-            type: 'error',
-            requestId,
-            blockIndex: input.blockIndex,
-            code: 'internal',
-            message: error instanceof Error ? error.message : String(error),
-            seed: null,
-            gameId: null,
-          });
-          currentRequestId = null;
-          current = null;
-          postedRequestId = null;
-        }
-      })();
+      const startInput: SeasonBlockStartInput = {
+        run: input.run,
+        effects: input.effects,
+        rotations: input.rotations,
+        blockIndex: input.blockIndex,
+        expectedRevision: input.expectedRevision,
+        rotationDigest: input.rotationDigest,
+        commandId: input.commandId,
+        humanFranchiseId: input.humanFranchiseId,
+        objectiveId: input.pending.objectiveId ?? null,
+        challengeDeal: input.pending.challengeDeal ?? null,
+        campaignOpportunityId: input.pending.campaignOpportunityId ?? null,
+        homeCourt: input.homeCourt,
+        catalogUrl: input.catalogUrl,
+        catalogHash: input.catalogHash,
+        profileUrl: input.profileUrl,
+        profileHash: input.profileHash,
+        knownSummaries: input.knownSummaries,
+      };
+      current = {
+        blockIndex: input.blockIndex,
+        expectedRevision: input.expectedRevision,
+        rotationDigest: input.rotationDigest,
+        commandId: input.commandId,
+        rotations: input.rotations,
+        input: startInput,
+        resumePending: input.pending,
+        knownSummaries: input.knownSummaries,
+      };
+      postRequest(requestId, requestEpoch, input.blockIndex, null);
       return requestId;
     },
     cancel(requestId: string): void {
@@ -935,10 +393,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       warmRequestId = pendingWarmId;
       void (async () => {
         try {
-          const artifacts =
-            deps.artifacts !== undefined
-              ? await deps.artifacts()
-              : await import('./season-assets').then((module) => module.seasonArtifactUrls());
+          const artifacts = await resolveArtifacts();
           if (requestActive()) {
             if (warmRequestId === pendingWarmId) warmRequestId = null;
             return;
@@ -967,197 +422,5 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
         listeners.delete(listener);
       };
     },
-  };
-}
-function dedupeByGameId(details: SeasonRetainedGameDetail[]): SeasonRetainedGameDetail[] {
-  const seen = new Set<string>();
-  const result: SeasonRetainedGameDetail[] = [];
-  for (const detail of details) {
-    if (seen.has(detail.gameId)) continue;
-    seen.add(detail.gameId);
-    result.push(detail);
-  }
-  return result;
-}
-function dedupeNewByGameId(
-  prior: readonly SeasonRetainedGameDetail[],
-  incoming: readonly SeasonRetainedGameDetail[],
-): SeasonRetainedGameDetail[] {
-  if (prior.length === 0) return dedupeByGameId([...incoming]);
-  const seen = new Set<string>();
-  for (const detail of prior) seen.add(detail.gameId);
-  const result: SeasonRetainedGameDetail[] = [];
-  for (const detail of incoming) {
-    if (seen.has(detail.gameId)) continue;
-    seen.add(detail.gameId);
-    result.push(detail);
-  }
-  return result;
-}
-function isSortedByGameId(items: readonly { gameId: string }[]): boolean {
-  for (let i = 1; i < items.length; i += 1) {
-    const prev = items[i - 1];
-    const curr = items[i];
-    if (prev === undefined || curr === undefined) continue;
-    if (prev.gameId > curr.gameId) return false;
-  }
-  return true;
-}
-function mergeSortedByGameId<T extends { gameId: string }>(
-  prior: readonly T[],
-  next: readonly T[],
-): T[] {
-  if (prior.length === 0) return [...next].sort((a, b) => (a.gameId < b.gameId ? -1 : 1));
-  if (next.length === 0) return [...prior];
-  if (!isSortedByGameId(prior))
-    return [...prior, ...next].sort((a, b) => (a.gameId < b.gameId ? -1 : 1));
-  const sortedNext = [...next].sort((a, b) => (a.gameId < b.gameId ? -1 : 1));
-  const result: T[] = [];
-  let i = 0;
-  let j = 0;
-  while (i < prior.length && j < sortedNext.length) {
-    const a = prior[i];
-    const b = sortedNext[j];
-    if (a === undefined || b === undefined) break;
-    if (a.gameId <= b.gameId) {
-      const last = result[result.length - 1];
-      if (last === undefined || last.gameId !== a.gameId) result.push(a);
-      i += 1;
-    } else {
-      const last = result[result.length - 1];
-      if (last === undefined || last.gameId !== b.gameId) result.push(b);
-      j += 1;
-    }
-  }
-  while (i < prior.length) {
-    const a = prior[i];
-    if (a === undefined) break;
-    const last = result[result.length - 1];
-    if (last === undefined || last.gameId !== a.gameId) result.push(a);
-    i += 1;
-  }
-  while (j < sortedNext.length) {
-    const b = sortedNext[j];
-    if (b === undefined) break;
-    const last = result[result.length - 1];
-    if (last === undefined || last.gameId !== b.gameId) result.push(b);
-    j += 1;
-  }
-  return result;
-}
-export function assembleCommittedSnapshot(input: {
-  run: SeasonRun;
-  rotations: SeasonRotation[];
-  checkpoint: SeasonCandidateCheckpoint;
-  commandId: string;
-  rotationDigest: string;
-  window: SeasonWindowOpenResult | null;
-  freeAgency: SeasonFreeAgencyState;
-  campaign?: import('@hoop-rush/data-contracts').SeasonCampaignState | null;
-  challenges?: import('@hoop-rush/data-contracts').SeasonChallengeState | null;
-  evolution?: import('@hoop-rush/data-contracts').SeasonEvolutionState | null;
-  sponsors?: import('@hoop-rush/data-contracts').SeasonSponsorGearState | null;
-  checkpointState: SeasonCheckpointState;
-  stateRevision: number;
-  stateDigest: string;
-  schedule: SeasonSchedule;
-  priorSummaries: SeasonGameSummary[];
-  priorAcceptedBlocks: SeasonAcceptedBlock[];
-  priorRetainedDetails: SeasonRetainedGameDetail[];
-}): SeasonRunSnapshot {
-  const { run, rotations, checkpoint, window, schedule } = input;
-  const objectives = objectivesWithSuccess(run, checkpoint);
-  const challenges =
-    (
-      input as {
-        challenges?: import('@hoop-rush/data-contracts').SeasonChallengeState | null;
-      }
-    ).challenges ?? challengesWithSuccess(run, checkpoint);
-  const campaign =
-    (
-      input as {
-        campaign?: import('@hoop-rush/data-contracts').SeasonCampaignState | null;
-      }
-    ).campaign ??
-    (
-      run as {
-        campaign?: import('@hoop-rush/data-contracts').SeasonCampaignState | null;
-      }
-    ).campaign ??
-    null;
-  const postCommitRun = {
-    ...run,
-    rosters: window !== null ? window.rosters : run.rosters,
-    ownership: window !== null ? window.ownership : run.ownership,
-    rotations: window !== null ? window.rotations : rotations,
-    cursor: { schemaVersion: 1, completedRounds: checkpoint.completedRounds },
-    standings: checkpoint.standings,
-    health: window !== null ? window.health : checkpoint.health,
-    influence: window !== null ? window.influence : checkpoint.influence,
-    transactions: window !== null ? window.transactions : checkpoint.transactions,
-    trade: window !== null ? window.trade : run.trade,
-    freeAgency: input.freeAgency,
-    objectives,
-    challenges:
-      challenges ?? (run as unknown as { challenges?: SeasonRun['challenges'] }).challenges,
-    campaign,
-    evolution: input.evolution ?? run.evolution,
-    sponsors: input.sponsors ?? run.sponsors,
-    checkpointState: input.checkpointState,
-    stateRevision: input.stateRevision,
-    stateDigest: input.stateDigest,
-  } as unknown as SeasonRun;
-  const newDetails = dedupeNewByGameId(input.priorRetainedDetails, checkpoint.retainedDetails);
-  const summaries = mergeSortedByGameId(input.priorSummaries, checkpoint.gameSummaries);
-  const retainedDetails = mergeSortedByGameId(input.priorRetainedDetails, newDetails);
-  const acceptedBlock = seasonAcceptedBlockSchema.parse({
-    runId: checkpoint.runId,
-    blockIndex: checkpoint.blockIndex,
-    completedRounds: checkpoint.completedRounds,
-    revision: checkpoint.revision + 1,
-    commandId: input.commandId,
-    rotationDigest: input.rotationDigest,
-    checkpointDigest: checkpoint.digest,
-    summaryCount: checkpoint.gameSummaries.length,
-    stateRevision: input.stateRevision,
-    stateDigest: input.stateDigest,
-  });
-  return {
-    run: { ...postCommitRun, games: reconstructSeasonGames(schedule, summaries) },
-    summaries,
-    retainedDetails,
-    acceptedBlocks: [...input.priorAcceptedBlocks, acceptedBlock],
-    effects: window !== null ? window.effects : checkpoint.effects,
-  };
-}
-export function objectivesWithSuccess(
-  run: SeasonRun,
-  checkpoint: SeasonCandidateCheckpoint,
-): SeasonObjectiveState | undefined {
-  const objectives = run.objectives as SeasonObjectiveState | undefined;
-  if (objectives === undefined) return undefined;
-  if (checkpoint.blockIndex === 8) return objectives;
-  const selection = objectives.selections[checkpoint.blockIndex];
-  if (selection === undefined) return objectives;
-  return {
-    ...objectives,
-    selections: {
-      ...objectives.selections,
-      [checkpoint.blockIndex]: { ...selection, success: checkpoint.objective?.success ?? null },
-    },
-  };
-}
-export function challengesWithSuccess(
-  run: SeasonRun,
-  checkpoint: SeasonCandidateCheckpoint,
-): SeasonRun['challenges'] {
-  const base = (run as unknown as { challenges?: SeasonRun['challenges'] }).challenges;
-  if (base == null) return base;
-  const evaluation = checkpoint.challenges;
-  if (evaluation == null) return base;
-  if (base.evaluations.some((entry) => entry.blockIndex === evaluation.blockIndex)) return base;
-  return {
-    ...base,
-    evaluations: [...base.evaluations, evaluation].sort((a, b) => a.blockIndex - b.blockIndex),
   };
 }

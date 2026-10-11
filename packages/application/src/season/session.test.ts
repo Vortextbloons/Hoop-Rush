@@ -36,6 +36,7 @@ import { SEASON_HOME_COURT_PROFILE } from '@hoop-rush/engine';
 import { generateSeasonSchedule } from '@hoop-rush/engine';
 import { handleSeasonRunCommand } from '@hoop-rush/engine';
 import { seasonPostseasonNextGame } from '@hoop-rush/engine';
+import { seasonRotationSetDigest } from '@hoop-rush/engine';
 import { seasonRunStateDigest } from '@hoop-rush/engine';
 import {
   buildEraSimulationProfile,
@@ -70,6 +71,7 @@ function createSession(
       Promise.reject(new Error('the free-agency targets are unavailable')),
     loadHomeCourtProfile: () => Promise.resolve({ ...SEASON_HOME_COURT_PROFILE }),
     loadArtifactUrls: () => Promise.reject(new Error('the season artifact urls are unavailable')),
+    loadSchedule: () => Promise.reject(new Error('the season schedule is unavailable')),
   };
   return new SeasonSession({
     repository,
@@ -297,7 +299,13 @@ describe('SeasonSession.quitRun', () => {
 });
 describe('SeasonSession.retry', () => {
   it('re-derives the home-court profile instead of resubmitting the stored copy', async () => {
-    const run = { runId: RUN_ID, rosters: [] } as unknown as SeasonRun;
+    const run = {
+      runId: RUN_ID,
+      rosters: [],
+      cursor: { schemaVersion: 1, completedRounds: 0 },
+      stateRevision: 0,
+      stateDigest: '0'.repeat(32),
+    } as unknown as SeasonRun;
     const repo = repoWith({ ...snapshot(), run });
     const runner = new FakeRunner();
     const hub = createSession(repo, runner);
@@ -306,6 +314,8 @@ describe('SeasonSession.retry', () => {
       ...SEASON_HOME_COURT_PROFILE,
       homeDefensiveCommunication: 0.1,
     };
+    const rotations: SeasonRun['rotations'] = [];
+    const digest = seasonRotationSetDigest(rotations);
     const command: SeasonSubmitBlockCommand = {
       schemaVersion: SEASON_RUN_SCHEMA_VERSION,
       blockVersion: SEASON_BLOCK_VERSION,
@@ -314,7 +324,7 @@ describe('SeasonSession.retry', () => {
       runId: idSchema.parse(RUN_ID),
       expectedRevision: 0,
       blockIndex: 0,
-      rotationDigest: '0'.repeat(32),
+      rotationDigest: digest,
       objectiveId: null,
       expectedStateRevision: 0,
       expectedStateDigest: '0'.repeat(32),
@@ -322,10 +332,10 @@ describe('SeasonSession.retry', () => {
     const startInput: SeasonBlockStartInput = {
       run,
       effects: hubZeroEffects(run),
-      rotations: [],
+      rotations,
       blockIndex: 0,
       expectedRevision: 0,
-      rotationDigest: '0'.repeat(32),
+      rotationDigest: digest,
       commandId: command.commandId,
       humanFranchiseId: null,
       objectiveId: null,
@@ -337,7 +347,9 @@ describe('SeasonSession.retry', () => {
     };
     hub.block = { ...runningBlock('fake-1', 0), phase: 'failed', command, startInput };
     await hub.retry();
-    expect(runner.startCalls).toHaveLength(1);
+    await vi.waitFor(() => {
+      expect(runner.startCalls).toHaveLength(1);
+    });
     expect(runner.startCalls[0]?.homeCourt).toEqual(SEASON_HOME_COURT_PROFILE);
     expect(runner.startCalls[0]?.homeCourt).not.toBe(staleHomeCourt);
     hub.destroy();
@@ -1122,10 +1134,10 @@ describe('SeasonSession runner teardown', () => {
     await hub.refresh();
     hub.block = runningBlock('fake-1', 0);
     runner.emit({
-      type: 'complete',
+      type: 'candidate',
       requestId: 'stale-request',
+      blockIndex: 0,
       checkpoint: { blockIndex: 0 } as never,
-      snapshot: snapshot(),
     });
     expect(hub.snapshot?.run.runId).toBe(RUN_ID);
     expect(hub.block.requestId).toBe('fake-1');
@@ -1192,6 +1204,7 @@ describe('SeasonSession disposed guard', () => {
         loadHomeCourtProfile: () => Promise.resolve({ ...SEASON_HOME_COURT_PROFILE }),
         loadArtifactUrls: () =>
           Promise.reject(new Error('the season artifact urls are unavailable')),
+        loadSchedule: () => Promise.reject(new Error('the season schedule is unavailable')),
       },
       notifier: {
         announce: () => {},

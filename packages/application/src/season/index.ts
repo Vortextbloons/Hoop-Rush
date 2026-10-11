@@ -12,6 +12,15 @@ export {
   type WorkerRequestState,
 } from './block-wire.ts';
 export {
+  assembleCommittedSnapshot,
+  challengesWithSuccess,
+  dedupeByGameId,
+  dedupeNewByGameId,
+  isSortedByGameId,
+  mergeSortedByGameId,
+  objectivesWithSuccess,
+} from './block-state.ts';
+export {
   seasonPostseasonCommitResultDigest,
   seasonPostseasonTransactionIdsOf,
   type SeasonPostseasonEvent,
