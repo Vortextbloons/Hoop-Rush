@@ -136,3 +136,14 @@ paths change (stages 2, 4, and 6).
   two commands are not usable as stage-4 gates. Stage-4 gates are the engine
   and application golden suites plus `cli-season-reproduce` (self-contained)
   and the full CI run.
+- 2026-10-11, stage 4b: `postseason.ts` (1,911 lines) split into
+  `postseason/{schedule,state,play-in,bracket,injuries,game}.ts` plus
+  `constants/errors/types` and a 38-line facade; importers moved to
+  `./postseason/index.ts` and the old module deleted. Pure moves; engine,
+  application, and web season suites unchanged.
+- 2026-10-11, stage 4c: the three postseason command handlers now share one
+  `advanceSeasonPostseason` loop (`postseason/progression.ts`) with explicit
+  stop/forfeit options; the duplicated simulate-apply loops in
+  `commands/postseason.ts` are deleted (advance 186 → 97 lines). Verified with
+  `season-commands`, `postseason`, application session, web transport, and
+  `cli-season-reproduce` suites.

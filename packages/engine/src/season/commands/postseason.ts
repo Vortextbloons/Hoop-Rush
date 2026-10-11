@@ -6,7 +6,6 @@ import type {
   SeasonInvalidRotationRejection,
   SeasonInvalidStageRejection,
   SeasonPostseasonState,
-  SeasonPostseasonSummary,
   SeasonRun,
   SeasonRunStage,
   SeasonSpectatePostseasonGameCommand,
@@ -23,7 +22,6 @@ import {
 } from '@hoop-rush/data-contracts';
 import { expandSeasonRunRosters } from '../block.ts';
 import { rehabPriceOf } from '../evolution.ts';
-import { seasonFranchiseLegalFiveFacts } from '../health.ts';
 import { applyRiskyRehabOutcome, seasonPlayerAvailable } from '../injuries.ts';
 import { SEASON_INFLUENCE_FLOOR, applySeasonInfluenceSpend } from '../influence.ts';
 import {
@@ -31,16 +29,15 @@ import {
   SeasonPostseasonContextError,
   SeasonPostseasonInvariantError,
   rollPostseasonRehabOutcome,
-  seasonPostseasonApplyGameResult,
   seasonPostseasonHumanEliminated,
   seasonPostseasonHumanPlaysGame,
   seasonPostseasonNextGame,
   seasonPostseasonSetRankings,
   seasonPostseasonStageOf,
   seasonPostseasonUpcomingGames,
-  simulateSeasonPostseasonGame,
   type SeasonPostseasonRankingsInput,
 } from '../postseason/index.ts';
+import { advanceSeasonPostseason } from '../postseason/progression.ts';
 import { legalFiveExists, type SeasonRosterMemberInput } from '../roster-rules.ts';
 import { seasonRotationSetDigest, validateSeasonRotation } from '../rotation.ts';
 import { rankSeasonPostseason } from '../tiebreakers.ts';
@@ -127,10 +124,6 @@ export function handleAdvancePostseason(
     );
   }
   const expanded = expandSeasonRunRosters(run, context.catalog);
-  const positions = new Map<string, readonly Position[]>();
-  for (const player of expanded.values()) {
-    positions.set(player.playerVersionId, player.positions);
-  }
   const target = command.targetGameId;
   if (target !== undefined) {
     const upcoming = seasonPostseasonUpcomingGames(run.postseason);
@@ -154,113 +147,28 @@ export function handleAdvancePostseason(
     }
   }
   const humanFranchiseId = context.humanFranchiseId;
-  let current = run;
-  const advanced: string[] = [];
-  const summaries: SeasonPostseasonSummary[] = [];
-  let humanWait: string | null = null;
-  let integrityReason: string | null = null;
-  let forfeitedHumanGame = false;
-  for (;;) {
-    const decision = seasonPostseasonNextGame(current.postseason);
-    if (decision.kind === 'integrity-failure') {
-      integrityReason = decision.reason;
-      break;
-    }
-    if (decision.kind === 'complete') break;
-    const gameId = decision.gameId;
-    if (
-      humanFranchiseId !== null &&
-      seasonPostseasonHumanPlaysGame(current.postseason, gameId, humanFranchiseId)
-    ) {
-      if (command.forfeit === true) {
-        const outcome = simulateSeasonPostseasonGame(
-          {
-            run: current,
-            effects: current.effects,
-            expanded,
-            catalog: context.catalog,
-            profile: context.profile,
-            gameId,
-            humanFranchiseId,
-            forfeitHumanGame: true,
-          },
-          { resolver: context.postseasonGameResolver },
-        );
-        if (outcome.kind === 'integrity-failure') {
-          integrityReason = outcome.reason;
-          break;
-        }
-        current = {
-          ...current,
-          postseason: seasonPostseasonApplyGameResult(
-            current.postseason,
-            outcome.facts,
-            current.league,
-            current.standings,
-          ),
-          health: outcome.nextHealth,
-          effects: outcome.nextEffects,
-        };
-        advanced.push(gameId);
-        summaries.push(outcome.summary);
-        forfeitedHumanGame = true;
-        break;
-      }
-      const humanRotation = current.rotations.find(
-        (rotation) => rotation.franchiseId === humanFranchiseId,
-      );
-      const minutesOnUnavailable = (humanRotation?.targetMinutes ?? []).some(
-        (entry) =>
-          entry.minutes > 0 && !seasonPlayerAvailable(current.health, entry.playerVersionId),
-      );
-      const legalFacts = seasonFranchiseLegalFiveFacts(
-        current,
-        humanFranchiseId,
-        current.health,
-        positions,
-      );
-      if (minutesOnUnavailable || !legalFacts.legal) {
-        humanWait = gameId;
-        break;
-      }
-    }
-    const outcome = simulateSeasonPostseasonGame(
-      {
-        run: current,
-        effects: current.effects,
-        expanded,
-        catalog: context.catalog,
-        profile: context.profile,
-        gameId,
-        humanFranchiseId,
-      },
-      { resolver: context.postseasonGameResolver },
-    );
-    if (outcome.kind === 'integrity-failure') {
-      integrityReason = outcome.reason;
-      break;
-    }
-    current = {
-      ...current,
-      postseason: seasonPostseasonApplyGameResult(
-        current.postseason,
-        outcome.facts,
-        current.league,
-        current.standings,
-      ),
-      health: outcome.nextHealth,
-      effects: outcome.nextEffects,
-    };
-    advanced.push(gameId);
-    summaries.push(outcome.summary);
-    if (target !== undefined && gameId === target) break;
+  const outcome = advanceSeasonPostseason(
+    run,
+    {
+      catalog: context.catalog,
+      profile: context.profile,
+      resolver: context.postseasonGameResolver,
+    },
+    {
+      humanFranchiseId,
+      expanded,
+      targetGameId: command.targetGameId,
+      stopOnHumanRotation: true,
+      forfeitNextHumanGame: command.forfeit === true,
+    },
+  );
+  if (outcome.kind === 'integrity-failure') {
+    return rejectedCommand(command, { code: 'integrity-failure', reason: outcome.reason }, run);
   }
-  if (command.forfeit === true && !forfeitedHumanGame && integrityReason === null) {
-    integrityReason = 'forfeit requested, but the human franchise has no upcoming game';
-  }
-  if (integrityReason !== null) {
-    return rejectedCommand(command, { code: 'integrity-failure', reason: integrityReason }, run);
-  }
+  const current = outcome.run;
+  const advanced = outcome.advancedGameIds;
+  const summaries = outcome.summaries;
+  const humanWait = outcome.humanWaitGameId;
   const stage = seasonPostseasonStageOf(current.postseason);
   const championFranchiseId = current.postseason.championFranchiseId;
   if (stage === 'completed' && championFranchiseId === null) {
@@ -553,32 +461,23 @@ export function handleSpectatePostseasonGame(
     return rejectedCommand(command, rejection, run);
   }
   const expanded = expandSeasonRunRosters(run, context.catalog);
-  const outcome = simulateSeasonPostseasonGame(
+  const outcome = advanceSeasonPostseason(
+    run,
     {
-      run,
-      effects: run.effects,
-      expanded,
       catalog: context.catalog,
       profile: context.profile,
-      gameId: command.targetGameId,
-      humanFranchiseId,
+      resolver: context.postseasonGameResolver,
     },
-    { resolver: context.postseasonGameResolver },
+    {
+      humanFranchiseId,
+      expanded,
+      targetGameId: command.targetGameId,
+    },
   );
   if (outcome.kind === 'integrity-failure') {
     return rejectedCommand(command, { code: 'integrity-failure', reason: outcome.reason }, run);
   }
-  const current = {
-    ...run,
-    postseason: seasonPostseasonApplyGameResult(
-      run.postseason,
-      outcome.facts,
-      run.league,
-      run.standings,
-    ),
-    health: outcome.nextHealth,
-    effects: outcome.nextEffects,
-  };
+  const current = outcome.run;
   const stage = seasonPostseasonStageOf(current.postseason);
   const championFranchiseId = current.postseason.championFranchiseId;
   if (stage === 'completed' && championFranchiseId === null) {
@@ -611,7 +510,7 @@ export function handleSpectatePostseasonGame(
     },
     nextRun,
     null,
-    [outcome.summary],
+    outcome.summaries,
   );
 }
 export function handleFastForwardPostseason(
@@ -657,48 +556,20 @@ export function handleFastForwardPostseason(
     );
   }
   const expanded = expandSeasonRunRosters(run, context.catalog);
-  let current = run;
-  const summaries: SeasonPostseasonSummary[] = [];
-  let integrityReason: string | null = null;
-  for (;;) {
-    const decision = seasonPostseasonNextGame(current.postseason);
-    if (decision.kind === 'integrity-failure') {
-      integrityReason = decision.reason;
-      break;
-    }
-    if (decision.kind === 'complete') break;
-    const outcome = simulateSeasonPostseasonGame(
-      {
-        run: current,
-        effects: current.effects,
-        expanded,
-        catalog: context.catalog,
-        profile: context.profile,
-        gameId: decision.gameId,
-        humanFranchiseId,
-      },
-      { resolver: context.postseasonGameResolver },
-    );
-    if (outcome.kind === 'integrity-failure') {
-      integrityReason = outcome.reason;
-      break;
-    }
-    current = {
-      ...current,
-      postseason: seasonPostseasonApplyGameResult(
-        current.postseason,
-        outcome.facts,
-        current.league,
-        current.standings,
-      ),
-      health: outcome.nextHealth,
-      effects: outcome.nextEffects,
-    };
-    summaries.push(outcome.summary);
+  const outcome = advanceSeasonPostseason(
+    run,
+    {
+      catalog: context.catalog,
+      profile: context.profile,
+      resolver: context.postseasonGameResolver,
+    },
+    { humanFranchiseId, expanded },
+  );
+  if (outcome.kind === 'integrity-failure') {
+    return rejectedCommand(command, { code: 'integrity-failure', reason: outcome.reason }, run);
   }
-  if (integrityReason !== null) {
-    return rejectedCommand(command, { code: 'integrity-failure', reason: integrityReason }, run);
-  }
+  const current = outcome.run;
+  const summaries = outcome.summaries;
   const championFranchiseId = current.postseason.championFranchiseId;
   if (championFranchiseId === null) {
     return rejectedCommand(
