@@ -14,7 +14,7 @@ import {
   seasonBlockGamesOf,
   simulateSeasonBlock,
   simulateSeasonBlockGame,
-} from './block.ts';
+} from './block/index.ts';
 import { buildTestRun, pipelineInput, scheduleOf } from './block-test-support.ts';
 
 describe('season block pipeline golden pins', () => {

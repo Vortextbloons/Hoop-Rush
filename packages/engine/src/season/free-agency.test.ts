@@ -20,7 +20,7 @@ import {
   seasonFreeAgencyUniverseOf,
 } from './free-agency.ts';
 import { buildEconomyTestRun } from './season-economy-test-support.ts';
-import { expandSeasonRunRosters } from './block.ts';
+import { expandSeasonRunRosters } from './block/index.ts';
 import { reconcileSeasonEffects } from './effects.ts';
 const HUMAN = 'lakers';
 const BAND_CYCLE: SeasonFreeAgencyBand[] = ['featured', 'role', 'role', 'development', 'emergency'];

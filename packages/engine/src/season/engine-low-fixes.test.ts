@@ -25,7 +25,7 @@ import { createEngineContext } from '../sim/kernel.ts';
 import { createSeasonEffectsState } from './effects.ts';
 import { checkSeasonGameResult } from './season-game-audit.ts';
 import { simulateSeasonGame, simulateSeasonGameWithEffects } from './season-game.ts';
-import { seasonBlockGamesOf, simulateSeasonBlockGame } from './block.ts';
+import { seasonBlockGamesOf, simulateSeasonBlockGame } from './block/index.ts';
 import { buildTestRun, pipelineInput, scheduleOf } from './block-test-support.ts';
 
 const POSITION_PLAN: ReadonlyArray<readonly Position[]> = [

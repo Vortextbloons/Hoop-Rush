@@ -5,7 +5,7 @@ import {
   normalizeSponsorGearState,
   sponsorGearEntryOf,
 } from '@hoop-rush/data-contracts';
-import { seasonNextBlockIndex } from '../block.ts';
+import { seasonNextBlockIndex } from '../block/index.ts';
 import { SEASON_INFLUENCE_FLOOR, applySeasonInfluenceSpend } from '../influence.ts';
 import type { SeasonEconomyRun } from '../trades.ts';
 import { seasonTransactionEntry } from '../transactions.ts';

@@ -13,7 +13,7 @@ import {
   handleSubmitSeasonBlockCommand,
   seasonBlockRejection,
   type SeasonBlockSimulationInput,
-} from './block.ts';
+} from './block/index.ts';
 import { buildTestRun, pipelineInput } from './block-test-support.ts';
 
 function validInput(): SeasonBlockSimulationInput {

@@ -29,7 +29,7 @@ import {
 } from '@hoop-rush/data-contracts';
 import { buildEraSimulationProfile } from '@hoop-rush/test-fixtures';
 import { createRng } from '../sim/rng.ts';
-import { expandSeasonRunRosters } from './block.ts';
+import { expandSeasonRunRosters } from './block/index.ts';
 import { seasonPlayerAvailable } from './injuries.ts';
 import {
   POSTSEASON_ALMANAC_DIGEST_PLACEHOLDER,

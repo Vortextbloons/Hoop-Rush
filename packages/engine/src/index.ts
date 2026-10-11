@@ -335,7 +335,7 @@ export {
   type SeasonBlockSimulationOptions,
   type SeasonSubmitBlockCommandInput,
   type SeasonBlockGameOutcome,
-} from './season/block.ts';
+} from './season/block/index.ts';
 export { seasonRotationSetDigest } from './season/rotation.ts';
 export {
   buildMinutePlanCandidates,

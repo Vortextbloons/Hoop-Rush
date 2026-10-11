@@ -147,3 +147,8 @@ paths change (stages 2, 4, and 6).
   `commands/postseason.ts` are deleted (advance 186 → 97 lines). Verified with
   `season-commands`, `postseason`, application session, web transport, and
   `cli-season-reproduce` suites.
+- 2026-10-11, stage 4d: `block.ts` (2,174 lines) split into
+  `block/{validation,preparation,execution,assembly,commit,audit,run}.ts`
+  plus `types/errors` and a 35-line facade; importers moved to
+  `./block/index.ts` and the old module deleted. Pure moves; engine,
+  application, web, and `cli-season-reproduce` suites unchanged.

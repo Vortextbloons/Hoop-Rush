@@ -20,7 +20,7 @@ import {
   normalizeEvolutionState,
   playInGameIdOf,
 } from '@hoop-rush/data-contracts';
-import { expandSeasonRunRosters } from '../block.ts';
+import { expandSeasonRunRosters } from '../block/index.ts';
 import { rehabPriceOf } from '../evolution.ts';
 import { applyRiskyRehabOutcome, seasonPlayerAvailable } from '../injuries.ts';
 import { SEASON_INFLUENCE_FLOOR, applySeasonInfluenceSpend } from '../influence.ts';

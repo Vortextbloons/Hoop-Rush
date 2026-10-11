@@ -83,7 +83,7 @@ import {
   rosterPlayerIdsOf,
   simulateSeasonBlock,
   type SeasonBlockSimulationInput,
-} from './block.ts';
+} from './block/index.ts';
 import { seasonRotationSetDigest } from './rotation.ts';
 import { createInitialSeasonInfluenceState } from './influence.ts';
 export const TEST_SEED = 'a1b2c3d4e5f60718293a4b5c6d7e8f9a';
