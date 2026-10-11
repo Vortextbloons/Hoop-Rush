@@ -97,12 +97,33 @@ it('scratch havoc seed search', () => {
     { slot: 'PF', mutations: [], ratings: RIM_ATTACK, tendencies: HIGH_USAGE },
     { slot: 'C', mutations: [], ratings: RIM_ATTACK, tendencies: HIGH_USAGE },
   ];
-  const otHuman = buildScenarioTeam('human', mutations(true));
-  const otAway = buildScenarioTeam('opponent', mutations(false));
-  const otSeeds: string[] = [];
-  for (let i = 96; i < 1400 && otSeeds.length < 4; i += 1) {
+  const eqMutations = (): ScenarioSlot[] => {
+    const slots = plainSlots();
+    const pg = slots[0];
+    if (pg === undefined) throw new Error('missing pg');
+    slots[0] = { ...pg, mutations: ['the-great-equalizer'] };
+    return slots;
+  };
+  const otHuman = buildScenarioTeam('human', eqMutations());
+  const otAway = buildScenarioTeam('opponent', plainSlots());
+  const n = 384;
+  let otCount = 0;
+  let firstOt = -1;
+  let totalMargin = 0;
+  for (let i = 0; i < n; i += 1) {
     const r = runScenario(otHuman, otAway, `havoc-ot-${String(i)}`);
-    if (r.result.overtimePeriods > 0) otSeeds.push(`havoc-ot-${String(i)}`);
+    if (r.result.overtimePeriods > 0) {
+      otCount += 1;
+      if (firstOt < 0) firstOt = i;
+    }
+    totalMargin += Math.abs(r.result.home.points - r.result.away.points);
   }
-  console.log('OT_SEEDS', JSON.stringify(otSeeds));
+  console.log(
+    'EQUALIZER_OT_RATE',
+    `${String(otCount)}/${String(n)}`,
+    'FIRST_OT_INDEX',
+    String(firstOt),
+    'AVG_MARGIN',
+    (totalMargin / n).toFixed(1),
+  );
 });
