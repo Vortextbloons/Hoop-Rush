@@ -277,4 +277,38 @@
     width: 1.6rem;
     height: 1.6rem;
   }
+
+  @media (max-width: 640px) {
+    .dd-rail {
+      gap: 0.45rem;
+      padding: 0.6rem;
+      border-radius: 11px;
+    }
+    .dd-rail-title {
+      font-size: 1.02rem;
+    }
+    .dd-rail-slots {
+      gap: 0.32rem;
+    }
+    .dd-rail-slot {
+      gap: 0.45rem;
+      padding: 0.38rem 0.45rem;
+      border-radius: 8px;
+    }
+    .dd-rail-chip {
+      width: 1.65rem;
+      height: 1.65rem;
+      border-radius: 6px;
+      font-size: 9px;
+    }
+    .dd-rail-name {
+      font-size: 0.9rem;
+    }
+    .dd-rail-meta {
+      font-size: 8px;
+    }
+    .dd-rail-requirement {
+      font-size: 0.78rem;
+    }
+  }
 </style>

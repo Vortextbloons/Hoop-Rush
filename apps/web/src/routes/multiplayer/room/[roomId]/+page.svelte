@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { loadLobbyId, lobbyCommand } from '$lib/multiplayer-lobby';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { asset, resolve } from '$app/paths';
@@ -88,6 +89,7 @@
   import type { SimulationPlayer } from '@hoop-rush/data-contracts';
   import type { FixedFiveWorkerTeam } from '@hoop-rush/data-contracts';
   let roomId = $derived($page.params.roomId as string);
+  let lobbyId = $state<string | null>(null);
   let snapshot = $state<FixedFiveRoomSnapshot | null>(null);
   let commands = $state<FixedFiveCommand[]>([]);
   let assets = $state<FixedFiveAssets | null>(null);
@@ -968,6 +970,7 @@
   }
   onMount(() => {
     mounted = true;
+    lobbyId = loadLobbyId(roomId);
     restoreVerifyGuards();
     const membership = loadFixedFiveMembership(roomId);
     if (membership) selfId = membership.participantId;
@@ -1408,6 +1411,12 @@
     busyAction = 'remove';
     error = null;
     try {
+      if (lobbyId) {
+        await lobbyCommand({ kind: 'remove-guest', lobbyId });
+        const resumed = await transport().resume(roomId);
+        if (mounted) snapshot = resumed.snapshot;
+        return;
+      }
       const next = await transport().removeGuest(roomId, 'p2');
       if (mounted) snapshot = next;
     } catch (e) {
@@ -1806,20 +1815,26 @@
             verified={resultVerified}
             modeDetail={modeDetailLabel}
             receiptDigest={verificationReceipt?.receiptDigest ?? null}
-            onRematch={doRematchAction}
+            onRematch={lobbyId
+              ? () => {
+                  void goto(resolve(`/multiplayer?lobby=${lobbyId}`));
+                }
+              : doRematchAction}
             rematchWaiting={facts.rematchRequested[selfId] &&
               !facts.rematchRequested[selfId === 'p1' ? 'p2' : 'p1']}
-            rematchLabel={canRematch
-              ? 'Start rematch'
-              : facts.rematchRequested[selfId === 'p1' ? 'p2' : 'p1']
-                ? 'Accept rematch'
-                : facts.rematchRequested[selfId]
-                  ? 'Waiting for opponent'
-                  : 'Rematch'}
+            rematchLabel={lobbyId
+              ? 'Back to lobby'
+              : canRematch
+                ? 'Start rematch'
+                : facts.rematchRequested[selfId === 'p1' ? 'p2' : 'p1']
+                  ? 'Accept rematch'
+                  : facts.rematchRequested[selfId]
+                    ? 'Waiting for opponent'
+                    : 'Rematch'}
             {rematchBusy}
           />
         {/if}
-        {#if !canRematch}
+        {#if !lobbyId && !canRematch}
           <p class="text-xs text-muted-foreground">
             Both players need to agree to a rematch. This result stays saved.
           </p>

@@ -159,15 +159,28 @@
     color: var(--color-foreground);
     text-align: left;
     cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
     transition:
       border-color 140ms ease,
       box-shadow 140ms ease,
       transform 140ms ease;
   }
 
-  .dd-card:hover {
-    transform: translateY(-2px);
-    border-color: var(--color-line-strong);
+  @media (hover: hover) {
+    .dd-card:hover {
+      transform: translateY(-2px);
+      border-color: var(--color-line-strong);
+    }
+
+    .dd-card-disabled:hover {
+      transform: none;
+      border-color: var(--color-line-soft);
+    }
+  }
+
+  .dd-card:active:not(.dd-card-disabled) {
+    transform: scale(0.98);
   }
 
   .dd-card:focus-visible {
@@ -189,11 +202,6 @@
     cursor: not-allowed;
     opacity: 0.62;
     filter: grayscale(0.4);
-  }
-
-  .dd-card-disabled:hover {
-    transform: none;
-    border-color: var(--color-line-soft);
   }
 
   .dd-card-elite {
@@ -365,9 +373,70 @@
     font-size: 0.85rem;
   }
 
+  @media (max-width: 640px) {
+    .dd-card {
+      min-height: 7.25rem;
+      gap: 0.5rem;
+      padding: 0.6rem;
+      border-radius: 11px;
+    }
+    .dd-card-top {
+      gap: 0.45rem;
+    }
+    .dd-card-face {
+      width: 2.1rem;
+      height: 2.1rem;
+      border-radius: 8px;
+      font-size: 0.88rem;
+    }
+    .dd-card-name {
+      font-size: 0.92rem;
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      line-clamp: 2;
+      overflow: hidden;
+    }
+    .dd-card-season {
+      font-size: 9px;
+    }
+    .dd-card-ovr {
+      padding: 0.12rem 0.3rem 0.16rem;
+      border-radius: 7px;
+    }
+    .dd-card-ovr strong {
+      font-size: 1.18rem;
+    }
+    .dd-card-meta {
+      font-size: 9px;
+      gap: 0.35rem;
+    }
+    .dd-card-foot {
+      min-height: 1rem;
+      gap: 0.3rem;
+      flex-wrap: wrap;
+    }
+  }
+
+  @media (max-width: 380px) {
+    .dd-card {
+      min-height: 6.9rem;
+      padding: 0.55rem;
+    }
+    .dd-card-name {
+      font-size: 0.86rem;
+    }
+    .dd-card-ovr strong {
+      font-size: 1.08rem;
+    }
+    .dd-card-meta {
+      font-size: 8px;
+    }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .dd-card,
-    .dd-card:hover {
+    .dd-card:active:not(.dd-card-disabled) {
       transition: none;
       transform: none;
     }

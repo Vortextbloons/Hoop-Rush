@@ -127,6 +127,29 @@
     color: var(--color-muted-foreground);
   }
 
+  @media (max-width: 640px) {
+    .dd-reactions {
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      gap: 0.45rem;
+      margin: 0 -0.25rem;
+      padding: 0.25rem 0.25rem 0.35rem;
+      scroll-snap-type: x proximity;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .dd-reactions::-webkit-scrollbar {
+      display: none;
+    }
+    .dd-react {
+      flex: 0 0 auto;
+      min-height: 2.9rem;
+      padding: 0.5rem 0.75rem;
+      scroll-snap-align: start;
+      touch-action: manipulation;
+    }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .dd-react,
     .dd-react:hover:not(:disabled) {

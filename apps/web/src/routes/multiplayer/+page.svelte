@@ -1,4 +1,4 @@
-﻿<script lang="ts">
+<script lang="ts">
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { asset, resolve } from '$app/paths';
@@ -26,22 +26,32 @@
     POSITION_NORMALIZATION_VERSION,
     RATINGS_VERSION,
     defaultFixedFiveVersionLocks,
+    multiplayerLobbySchema,
+    type MultiplayerLobby,
     type FixedFiveRoomMode,
     type FixedFiveSourceMode,
     type FixedFiveVersionLocks,
   } from '@hoop-rush/data-contracts';
   import { ENGINE_VERSION } from '@hoop-rush/engine';
-  import { getFixedFiveTransport, isFixedFiveSupabaseConfigured } from '$lib/fixed-five-transport';
+  import { isFixedFiveSupabaseConfigured } from '$lib/fixed-five-transport';
   import { DraftDuelController } from '$lib/draft-duel/draft-duel-controller.svelte';
-  import { getDraftDuelTransport, isDraftDuelSupabaseConfigured } from '$lib/draft-duel-transport';
-  import {
-    friendlyFixedFiveJoinError,
-    loadLastFixedFiveRoomId,
-    saveFixedFiveMembership,
-  } from '$lib/fixed-five-identity';
+  import { isDraftDuelSupabaseConfigured } from '$lib/draft-duel-transport';
+  import { friendlyFixedFiveJoinError, loadLastFixedFiveRoomId } from '$lib/fixed-five-identity';
   import { loadRunPreamble } from '$lib/run-preamble';
-  type View = 'create' | 'join';
-  let view = $state<View>('create');
+  import {
+    lobbyCommand,
+    getLobby,
+    joinMultiplayerRoom,
+    previewMultiplayerRoom,
+    rememberLobby,
+    loadLobbyId,
+    resumeMultiplayerGame,
+  } from '$lib/multiplayer-lobby';
+  type View = 'choose' | 'create' | 'join';
+  let view = $state<View>('choose');
+  let lobby = $state<MultiplayerLobby | null>(null);
+  let lastLobbyId = $state<string | null>(null);
+  let mounted = false;
   let matchFormat = $state<'season' | 'duel' | 'draft-duel'>('season');
   let sourceMode = $state<FixedFiveSourceMode>('classic');
   let ddFairness = $state<'fair' | 'unfair'>('fair');
@@ -107,9 +117,6 @@
     view = nextView;
     error = null;
   }
-  function transport() {
-    return getFixedFiveTransport();
-  }
   async function versions(): Promise<FixedFiveVersionLocks> {
     const { manifest, profile, bracket } = await loadRunPreamble();
     return defaultFixedFiveVersionLocks({
@@ -125,47 +132,97 @@
       autopickVersion: FIXED_FIVE_AUTOPICK_VERSION,
     });
   }
-  onMount(() => {
+  async function openGame(kind: 'fixed-five' | 'draft-duel', roomId: string) {
+    await resumeMultiplayerGame(kind, roomId);
+    if (!mounted) return;
+    await goto(
+      kind === 'draft-duel'
+        ? resolve('/draft-duel/room/[roomId]', { roomId })
+        : resolve('/multiplayer/room/[roomId]', { roomId }),
+    );
+  }
+  async function refreshLobby(lobbyId: string) {
     try {
-      lastRoomId = loadLastFixedFiveRoomId();
-      const params = new URLSearchParams(window.location.search);
+      const next = await getLobby(lobbyId);
+      if (!mounted) return;
+      lobby = next;
+      rememberLobby(next);
+      if (next.participantId === 'p2' && !next.canStart && next.gameKind && next.gameRoomId) {
+        await openGame(next.gameKind, next.gameRoomId);
+      }
+    } catch (e) {
+      if (mounted) error = friendlyFixedFiveJoinError(e);
+    }
+  }
+  onMount(() => {
+    mounted = true;
+    lastRoomId = loadLastFixedFiveRoomId();
+    lastLobbyId = loadLobbyId();
+    const params = new URLSearchParams(window.location.search);
+    const lobbyParam = params.get('lobby');
+    if (lobbyParam) {
+      view = 'create';
+      void refreshLobby(lobbyParam);
+    } else {
       const codeParam = params.get('code');
       if (codeParam && /^[0-9]{4}$/.test(codeParam)) {
         code = codeParam;
         view = 'join';
-        void doPreview();
       }
-    } catch {}
+    }
+    let refreshing = false;
+    const timer = setInterval(() => {
+      if (!lobby || busy || refreshing) return;
+      refreshing = true;
+      void refreshLobby(lobby.id).finally(() => {
+        refreshing = false;
+      });
+    }, 2000);
+    return () => {
+      mounted = false;
+      clearInterval(timer);
+      draftDuelController.dispose();
+    };
   });
   async function startCreate() {
     busy = true;
     error = null;
     try {
-      if (matchFormat === 'draft-duel') {
-        const created = await draftDuelController.createRoom(ddFairness, variant);
-        if (!created) {
-          error = draftDuelController.error ?? 'Could not create the Draft Duel room.';
-          return;
-        }
-        await goto(resolve('/draft-duel/room/[roomId]', { roomId: created.roomId }));
-        return;
-      }
-      if (!mode) return;
-      const t = transport();
-      const created = await t.create({
-        mode,
-        sourceMode,
-        variant,
-        versions: await versions(),
-      });
-      saveFixedFiveMembership({ ...created.membership, code: created.code });
-      await goto(resolve('/multiplayer/room/[roomId]', { roomId: created.snapshot.roomId }));
+      const settings =
+        matchFormat === 'draft-duel'
+          ? {
+              gameKind: 'draft-duel' as const,
+              fairness: ddFairness,
+              variant,
+              versions: { ...(await draftDuelController.roomVersions()) },
+            }
+          : {
+              gameKind: 'fixed-five' as const,
+              mode: mode!,
+              sourceMode,
+              variant,
+              versions: { ...(await versions()) },
+            };
+      const current = lobby ?? multiplayerLobbySchema.parse(await lobbyCommand({ kind: 'create' }));
+      if (!mounted) return;
+      lobby = current;
+      rememberLobby(current);
+      const next = multiplayerLobbySchema.parse(
+        await lobbyCommand({
+          kind: 'start',
+          lobbyId: current.id,
+          expectedRevision: current.revision,
+          settings,
+        }),
+      );
+      if (!mounted) return;
+      lobby = next;
+      rememberLobby(next);
+      if (next.gameKind && next.gameRoomId) await openGame(next.gameKind, next.gameRoomId);
     } catch (e) {
-      error = friendlyFixedFiveJoinError(e);
-      if (!isFixedFiveSupabaseConfigured())
-        error = 'Multiplayer is offline right now. You can still play solo Classic/Sandbox.';
+      if (mounted) error = friendlyFixedFiveJoinError(e);
     } finally {
-      busy = false;
+      if (mounted) busy = false;
     }
   }
   function cleanCode(): void {
@@ -183,39 +240,18 @@
     busy = true;
     error = null;
     try {
-      if (matchFormat === 'draft-duel') {
-        const snap = await getDraftDuelTransport().preview(code);
-        const phaseName =
-          snap.phase === 'lobby'
-            ? 'waiting to start'
-            : snap.phase === 'drafting'
-              ? 'drafting now'
-              : snap.phase === 'championship'
-                ? 'finished'
-                : 'playing';
-        preview = `Draft Duel · ${snap.settings.fairness === 'fair' ? 'Fair' : 'Unfair'} · ${
-          snap.settings.presentation === 'ratings' ? 'Ratings' : 'Ball Knowledge'
-        } · ${phaseName}`;
-        return;
-      }
-      const snap = await transport().preview(code);
-      const modeName = snap.settings.mode === 'duel' ? 'Duel' : 'Season';
-      const sourceName =
-        snap.settings.sourceMode === 'sandbox' ? 'Sandbox · Snake Draft' : 'Classic · Roll Draft';
-      const phaseName =
-        snap.phase === 'lobby'
-          ? 'waiting to start'
-          : snap.phase === 'drafting'
-            ? 'drafting now'
-            : snap.phase === 'completed'
-              ? 'finished'
-              : 'playing';
-      preview = `${modeName} · ${sourceName} · ${phaseName}`;
+      const result = await previewMultiplayerRoom(code);
+      if (!mounted) return;
+      preview = result.legacy
+        ? `${result.gameKind === 'draft-duel' ? 'Draft Duel' : 'Season / Duel'} room`
+        : `Shared lobby · ${result.guestJoined ? '2 players' : 'Waiting for an opponent'}`;
     } catch (e) {
-      error = friendlyFixedFiveJoinError(e);
-      preview = null;
+      if (mounted) {
+        error = friendlyFixedFiveJoinError(e);
+        preview = null;
+      }
     } finally {
-      busy = false;
+      if (mounted) busy = false;
     }
   }
   async function doJoin() {
@@ -227,29 +263,56 @@
     busy = true;
     error = null;
     try {
-      if (matchFormat === 'draft-duel') {
-        const joined = await draftDuelController.joinRoom(code);
-        if (!joined) {
-          error = draftDuelController.error ?? 'Could not join that Draft Duel room.';
-          return;
+      const result = await joinMultiplayerRoom(code);
+      if (!mounted) return;
+      if ('legacy' in result) {
+        await openGame(result.gameKind, result.gameRoomId);
+      } else {
+        rememberLobby(result);
+        if (!result.canStart && result.gameKind && result.gameRoomId) {
+          await openGame(result.gameKind, result.gameRoomId);
+        } else {
+          await goto(resolve(`/multiplayer?lobby=${result.id}`));
+          lobby = result;
+          view = 'create';
         }
-        await goto(resolve('/draft-duel/room/[roomId]', { roomId: joined.roomId }));
-        return;
       }
-      const { snapshot, membership } = await transport().join(code);
-      saveFixedFiveMembership(membership);
-      await goto(resolve('/multiplayer/room/[roomId]', { roomId: snapshot.roomId }));
     } catch (e) {
-      error = friendlyFixedFiveJoinError(e);
+      if (mounted) error = friendlyFixedFiveJoinError(e);
     } finally {
-      busy = false;
+      if (mounted) busy = false;
     }
   }
   async function resumeLast() {
+    if (lastLobbyId) {
+      await goto(resolve(`/multiplayer?lobby=${lastLobbyId}`));
+      view = 'create';
+      await refreshLobby(lastLobbyId);
+      return;
+    }
     if (!lastRoomId) return;
     await goto(resolve('/multiplayer/room/[roomId]', { roomId: lastRoomId }));
   }
+  async function leaveLobby() {
+    if (!lobby || busy) return;
+    busy = true;
+    try {
+      await lobbyCommand({ kind: 'leave', lobbyId: lobby.id });
+      if (!mounted) return;
+      localStorage.removeItem('hoop-rush:multiplayer:last-lobby');
+      lobby = null;
+      lastLobbyId = null;
+      view = 'choose';
+      await goto(resolve('/multiplayer'));
+    } catch (e) {
+      if (mounted) error = friendlyFixedFiveJoinError(e);
+    } finally {
+      if (mounted) busy = false;
+    }
+  }
 </script>
+
+﻿
 
 <svelte:head>
   <title>Multiplayer — Hoop Rush</title>
@@ -259,10 +322,18 @@
   <header class="match-header">
     <div>
       <p class="eyebrow">Multiplayer · Live rooms</p>
-      <h1>Choose your match</h1>
-      <p class="intro">Your five against theirs. Pick your game, share a code, hit the court.</p>
+      <h1>
+        {lobby
+          ? 'Your lobby'
+          : view === 'choose'
+            ? 'Play together'
+            : view === 'join'
+              ? 'Join a room'
+              : 'Choose your match'}
+      </h1>
+      <p class="intro">One room. Every mode. Play again with the same opponent.</p>
     </div>
-    {#if lastRoomId}
+    {#if lastRoomId || lastLobbyId}
       <div class="resume-room">
         <Users size={24} aria-hidden="true" />
         <div>
@@ -276,78 +347,128 @@
     {/if}
   </header>
 
-  <div class="match-layout">
-    <div class="mode-selection">
-      <div class="section-heading">
-        <h2>Match format</h2>
-        <span><Users size={14} aria-hidden="true" /> 2 players · head to head</span>
+  {#if lobby}
+    <div class="lobby-status" role="status">
+      <div>
+        <span class="eyebrow">Room code</span><strong class="lobby-code">{lobby.code}</strong>
       </div>
-      <div class="mode-grid">
-        {#each formats as item (item.id)}
+      <p>
+        {lobby.guestJoined
+          ? 'Your opponent is in the lobby.'
+          : 'Share this code with your opponent.'}
+        {lobby.canStart ? ' Choose your next match.' : ' Your match is still in progress.'}
+      </p>
+      {#if !lobby.canStart && lobby.gameKind && lobby.gameRoomId}
+        <button
+          class="resume-button"
+          onclick={() =>
+            lobby?.gameKind && lobby.gameRoomId && openGame(lobby.gameKind, lobby.gameRoomId)}
+          >Return to match</button
+        >
+      {/if}
+      <button class="secondary-action" disabled={busy || !lobby.canStart} onclick={leaveLobby}
+        >Leave lobby</button
+      >
+    </div>
+  {/if}
+  <div
+    class={['match-layout', { 'entry-layout': view !== 'create' || lobby?.participantId === 'p2' }]}
+  >
+    {#if view === 'create' && (!lobby || lobby.participantId === 'p1')}
+      <div class="mode-selection">
+        <div class="section-heading">
+          <h2>Match format</h2>
+          <span><Users size={14} aria-hidden="true" /> 2 players · head to head</span>
+        </div>
+        <div class="mode-grid">
+          {#each formats as item (item.id)}
+            <button
+              type="button"
+              class={['mode-card', { selected: matchFormat === item.id }]}
+              aria-pressed={matchFormat === item.id}
+              disabled={busy}
+              onclick={() => selectFormat(item.id)}
+            >
+              <img
+                src={asset(
+                  item.id === 'season' && sourceMode === 'sandbox'
+                    ? '/images/multiplayer/sandbox-season.jpg'
+                    : item.image,
+                )}
+                alt=""
+                width="1536"
+                height="1024"
+                class="mode-image"
+              />
+              <div class="card-top">
+                <span class="mode-tag"
+                  ><item.icon size={14} aria-hidden="true" /> {item.category}</span
+                >
+                {#if matchFormat === item.id}<span class="selection-check"
+                    ><Check size={16} aria-hidden="true" /><span class="sr-only">Selected</span
+                    ></span
+                  >{/if}
+              </div>
+              <div class="card-copy">
+                <h3>{item.name}</h3>
+                <p>{item.description}</p>
+                <div class="card-facts">
+                  <span><Users size={14} aria-hidden="true" /> 1v1</span><span
+                    ><CalendarDays size={14} aria-hidden="true" /> {item.format}</span
+                  >
+                </div>
+              </div>
+            </button>
+          {/each}
+        </div>
+        <div class="court-note">
+          <LockKeyhole size={17} aria-hidden="true" />
+          <p>Just you and your opponent. Every room uses a private 4-digit invite code.</p>
+        </div>
+      </div>
+    {/if}
+    <aside class="setup-panel" aria-label="Match setup">
+      {#if !lobby && view !== 'choose'}
+        <div class="panel-tabs" aria-label="Room action">
           <button
             type="button"
-            class={['mode-card', { selected: matchFormat === item.id }]}
-            aria-pressed={matchFormat === item.id}
+            aria-pressed={view === 'create'}
+            class={['panel-tab', { active: view === 'create' }]}
             disabled={busy}
-            onclick={() => selectFormat(item.id)}
+            onclick={() => switchView('create')}>Create a room</button
           >
-            <img
-              src={asset(
-                item.id === 'season' && sourceMode === 'sandbox'
-                  ? '/images/multiplayer/sandbox-season.jpg'
-                  : item.image,
-              )}
-              alt=""
-              width="1536"
-              height="1024"
-              class="mode-image"
-            />
-            <div class="card-top">
-              <span class="mode-tag"
-                ><item.icon size={14} aria-hidden="true" /> {item.category}</span
-              >
-              {#if matchFormat === item.id}<span class="selection-check"
-                  ><Check size={16} aria-hidden="true" /><span class="sr-only">Selected</span></span
-                >{/if}
-            </div>
-            <div class="card-copy">
-              <h3>{item.name}</h3>
-              <p>{item.description}</p>
-              <div class="card-facts">
-                <span><Users size={14} aria-hidden="true" /> 1v1</span><span
-                  ><CalendarDays size={14} aria-hidden="true" /> {item.format}</span
-                >
-              </div>
-            </div>
-          </button>
-        {/each}
-      </div>
-      <div class="court-note">
-        <LockKeyhole size={17} aria-hidden="true" />
-        <p>Just you and your opponent. Every room uses a private 4-digit invite code.</p>
-      </div>
-    </div>
-
-    <aside class="setup-panel" aria-label="Match setup">
-      <div class="panel-tabs" aria-label="Room action">
-        <button
-          type="button"
-          aria-pressed={view === 'create'}
-          class={['panel-tab', { active: view === 'create' }]}
-          disabled={busy}
-          onclick={() => switchView('create')}>Create a room</button
-        >
-        <button
-          type="button"
-          aria-pressed={view === 'join'}
-          class={['panel-tab', { active: view === 'join' }]}
-          disabled={busy}
-          onclick={() => switchView('join')}
-          ><LogIn size={15} aria-hidden="true" /> Join a room</button
-        >
-      </div>
+          <button
+            type="button"
+            aria-pressed={view === 'join'}
+            class={['panel-tab', { active: view === 'join' }]}
+            disabled={busy}
+            onclick={() => switchView('join')}
+            ><LogIn size={15} aria-hidden="true" /> Join a room</button
+          >
+        </div>
+      {/if}
       <div class="panel-body">
-        {#if view === 'create'}
+        {#if view === 'choose'}
+          <p class="eyebrow">Multiplayer</p>
+          <h2>Meet in the lobby</h2>
+          <p class="join-description">
+            Create a room to choose a game, or join any mode with your opponent’s code.
+          </p>
+          <div class="entry-actions">
+            <button class="primary-action" onclick={() => switchView('create')}
+              >Create a room <ArrowRight size={18} /></button
+            >
+            <button class="secondary-action" onclick={() => switchView('join')}
+              >Join a room <LogIn size={18} /></button
+            >
+          </div>
+        {:else if lobby?.participantId === 'p2'}
+          <p class="eyebrow">Same room · Next match</p>
+          <h2>Waiting for your host</h2>
+          <p class="join-description">
+            Your host can choose Season, Duel, or Draft Duel. You’ll enter the next match together.
+          </p>
+        {:else if view === 'create'}
           <p class="eyebrow">Configure your match</p>
           <div class="selected-summary">
             <span class="summary-icon"><selectedFormat.icon size={25} aria-hidden="true" /></span>
@@ -448,17 +569,23 @@
               <dd>Invite only</dd>
             </div>
           </dl>
-          <button type="button" onclick={startCreate} disabled={busy} class="primary-action"
+          <button
+            type="button"
+            onclick={startCreate}
+            disabled={busy || (lobby !== null && !lobby.canStart)}
+            class="primary-action"
             >{busy ? 'Creating room…' : 'Create room'}<ArrowRight
               size={18}
               aria-hidden="true"
             /></button
           >
-          <p class="action-note">Share your room code after creating the room.</p>
+          <p class="action-note">Keep this room code to play every mode with the same opponent.</p>
         {:else}
           <p class="eyebrow">Meet on the court</p>
           <h2 class="join-title">Join your opponent</h2>
-          <p class="join-description">Enter the 4-digit code shared by your room host.</p>
+          <p class="join-description">
+            Enter your host’s 4-digit code. The game mode is picked automatically.
+          </p>
           <form
             onsubmit={(event) => {
               event.preventDefault();
@@ -578,6 +705,39 @@
     color: var(--color-primary-foreground);
     font-size: 12px;
     font-weight: 700;
+  }
+  .entry-layout {
+    max-width: 520px;
+    margin-inline: auto;
+  }
+  .match-layout.entry-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .entry-actions {
+    display: grid;
+    gap: 12px;
+    margin-top: 24px;
+  }
+  .lobby-status {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 20px;
+    padding: 20px;
+    margin-bottom: 24px;
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    background: var(--color-surface-2);
+  }
+  .lobby-status p {
+    flex: 1;
+    min-width: 200px;
+  }
+  .lobby-code {
+    display: block;
+    font-size: 32px;
+    letter-spacing: 0.18em;
+    font-variant-numeric: tabular-nums;
   }
   .match-layout {
     display: grid;

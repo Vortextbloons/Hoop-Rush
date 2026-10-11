@@ -34,6 +34,8 @@ export function friendlyFixedFiveJoinError(error: unknown): string {
   if (message.includes('authorization') || message.includes('membership'))
     return 'You are not a member of that room.';
   if (message.includes('stale-revision')) return 'The room changed. Syncing and retrying once.';
+  if (message.includes('game-in-progress'))
+    return 'Finish your current match before choosing another game.';
   if (
     message.trimStart().startsWith('[') ||
     message.includes('invalid_format') ||

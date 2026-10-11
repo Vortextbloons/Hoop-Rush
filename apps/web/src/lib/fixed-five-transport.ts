@@ -182,6 +182,13 @@ export function isFixedFiveSupabaseConfigured(): boolean {
   const { url, publishableKey } = supabaseEnv();
   return Boolean(url && publishableKey);
 }
+export async function getMultiplayerClient(): Promise<SupabaseClient> {
+  const { url, publishableKey } = supabaseEnv();
+  if (!url || !publishableKey) throw new Error('Online rooms are unavailable in this setup.');
+  const client = await supabaseClient(url, publishableKey);
+  await ensureAnonymous(client);
+  return client;
+}
 export function createConfiguredFixedFiveTransport(): FixedFiveMultiplayerTransport {
   const { url, publishableKey } = supabaseEnv();
   return createFixedFiveTransport({ url, publishableKey });

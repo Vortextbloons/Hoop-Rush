@@ -76,6 +76,12 @@
   const shell = new SeasonRunShell();
   setContext(SEASON_RUN_SHELL_CONTEXT, shell);
   const routeId = $derived(page.route.id);
+  const leagueRoute = $derived(routeId === '/season/run/league');
+  const shellWidthClass = $derived(
+    leagueRoute
+      ? 'max-w-6xl xl:max-w-[96rem] 2xl:max-w-[110rem]'
+      : 'max-w-6xl xl:max-w-7xl 2xl:max-w-[88rem]',
+  );
   let playersIndex: PlayersIndexEntry[] | null = null;
   let faceIndexKey = '';
   let lastHeavyMirrorAt = 0;
@@ -810,9 +816,7 @@
       </div>
     </div>
   {:else}
-    <div
-      class="mx-auto w-full min-w-0 max-w-6xl overflow-x-clip sm:px-6 xl:max-w-7xl 2xl:max-w-[88rem]"
-    >
+    <div class="mx-auto w-full min-w-0 overflow-x-clip sm:px-6 {shellWidthClass}">
       {#if shell.externalChange !== null}
         <div
           role="status"
@@ -869,7 +873,7 @@
       </div>
       <nav aria-label="Season navigation" class="sr-nav-primary mt-5 hidden md:block">
         <div
-          class="mx-auto flex min-w-max w-full max-w-6xl items-center gap-1 px-4 sm:px-6 xl:max-w-7xl 2xl:max-w-[88rem]"
+          class="mx-auto flex min-w-max w-full items-center gap-1 px-4 sm:px-6 {shellWidthClass}"
         >
           {#each groups as group (group.id)}
             {@const groupActive = group.children.some((c) => isNavItemActive(c, routeId))}
@@ -881,9 +885,7 @@
         </div>
       </nav>
       {#if activeSubGroup !== null && activeSubGroup.children.length > 1}
-        <div
-          class="mx-auto hidden w-full max-w-6xl px-4 sm:px-6 md:block xl:max-w-7xl 2xl:max-w-[88rem]"
-        >
+        <div class="mx-auto hidden w-full px-4 sm:px-6 md:block {shellWidthClass}">
           <nav aria-label={`${activeSubGroup.label} sections`} class="sr-nav-sub">
             {#each activeSubGroup.children as child (child.id)}
               <a
@@ -897,7 +899,7 @@
         </div>
       {/if}
       <main class="min-w-0 overflow-x-clip pb-[max(6.5rem,env(safe-area-inset-bottom))] md:pb-14">
-        <div class="mx-auto w-full max-w-6xl px-3 sm:px-6 xl:max-w-7xl 2xl:max-w-[88rem]">
+        <div class="mx-auto w-full px-3 sm:px-6 {shellWidthClass}">
           {@render children()}
         </div>
       </main>

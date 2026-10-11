@@ -9,6 +9,7 @@
   import { Toaster } from 'svelte-sonner';
   import BottomNav from '$lib/components/BottomNav.svelte';
   import ArenaSoundToggle from '$lib/components/ArenaSoundToggle.svelte';
+  import MultiplayerLobbyLink from '$lib/components/MultiplayerLobbyLink.svelte';
   import { isNavItemActive, type NavItem } from '$lib/nav-items';
   let { children } = $props();
   const homeHref = resolve('/');
@@ -97,6 +98,12 @@
       </div>
     </div>
   </header>
+{/if}
+
+{#if page.params.roomId && (routeId?.startsWith('/multiplayer/room/') || routeId?.startsWith('/draft-duel/room/'))}
+  {#key page.params.roomId}
+    <MultiplayerLobbyLink roomId={page.params.roomId} />
+  {/key}
 {/if}
 
 <main class="min-w-0 overflow-x-clip">

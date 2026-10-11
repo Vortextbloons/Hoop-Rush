@@ -195,6 +195,7 @@
 
   .dd-board-slot {
     min-width: 0;
+    touch-action: manipulation;
   }
 
   .dd-board-slot[data-state='picked'] {
@@ -223,6 +224,49 @@
   @media (min-width: 768px) {
     .dd-board-grid {
       grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 640px) {
+    .dd-board {
+      gap: 0.6rem;
+      padding: 0.6rem;
+      border-radius: 11px;
+    }
+    .dd-board-head {
+      gap: 0.5rem;
+    }
+    .dd-board-heading {
+      gap: 0.4rem;
+    }
+    .dd-board-round {
+      font-size: 1rem;
+    }
+    .dd-board-turn {
+      padding: 0.14rem 0.5rem;
+      font-size: 8px;
+    }
+    .dd-board-grid {
+      gap: 0.5rem;
+    }
+    .dd-board-dots {
+      gap: 0.28rem;
+    }
+    .dd-board-dots span {
+      width: 0.42rem;
+      height: 0.42rem;
+    }
+  }
+
+  @media (max-width: 380px) {
+    .dd-board {
+      padding: 0.55rem;
+    }
+    .dd-board-grid {
+      gap: 0.42rem;
+    }
+    .dd-board-round {
+      font-size: 0.92rem;
     }
   }
 

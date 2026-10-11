@@ -95,10 +95,11 @@ export class DraftDuelController {
   private rafId: number | null = null;
   private playbackElapsedMs = 0;
   private playbackLastFrameMs: number | null = null;
-  private commands: DraftDuelCommand[] = [];
+  private commands = $state.raw<DraftDuelCommand[]>([]);
   private resolvedCursor: string | null = null;
   private deadlineResolving = false;
   private deadlineRetryAtMs = 0;
+  private rematchRetryAtMs = 0;
   private syncing = false;
   private syncQueued = false;
   private preparingSinceMs = $state<number | null>(null);
@@ -334,6 +335,11 @@ export class DraftDuelController {
     }
   }
 
+  async roomVersions(): Promise<DraftDuelVersionLocks> {
+    await this.loadAssets();
+    return this.versionLocks();
+  }
+
   async joinRoom(code: string): Promise<{ roomId: Id; code: DraftDuelRoomCode } | null> {
     this.busy = true;
     this.error = null;
@@ -408,17 +414,7 @@ export class DraftDuelController {
   }
 
   async confirmRematch(): Promise<void> {
-    const accepted = await this.submit({ kind: 'rematch-confirm' });
-    if (!accepted || !this.roomId) return;
-    this.busy = true;
-    try {
-      await this.transport.rematch(this.roomId);
-      await this.syncFromServer();
-    } catch (error) {
-      this.error = friendlyDraftDuelJoinError(error);
-    } finally {
-      this.busy = false;
-    }
+    await this.submit({ kind: 'rematch-confirm' });
   }
 
   async followRematch(): Promise<Id | null> {
@@ -581,6 +577,7 @@ export class DraftDuelController {
 
   private tick(): void {
     if (this.disposed || this.busy) return;
+    if (this.shouldCreateRematch()) void this.syncFromServer();
     this.maybeProposeOrConfirm();
     const deadline = this.snapshot?.deadline;
     if (
@@ -672,6 +669,11 @@ export class DraftDuelController {
       const commands = await this.transport.refetch(this.roomId, -1);
       if (isDisposed()) return;
       this.commands = commands;
+      if (this.shouldCreateRematch()) {
+        this.rematchRetryAtMs = Date.now() + AUTO_START_RETRY_MS;
+        await this.transport.rematch(this.roomId);
+        this.applySnapshot((await this.transport.resume(this.roomId)).snapshot);
+      }
       await this.repo.appendCommands(this.roomId, commands);
       this.rebuildDraft();
       await this.ensureGamePipeline();
@@ -686,6 +688,16 @@ export class DraftDuelController {
         void this.syncFromServer();
       }
     }
+  }
+
+  private shouldCreateRematch(): boolean {
+    return (
+      this.participantId === 'p1' &&
+      this.phase === 'championship' &&
+      !this.successorRoomId &&
+      Date.now() >= this.rematchRetryAtMs &&
+      this.commands.some((command) => command.payload.kind === 'rematch-confirm')
+    );
   }
 
   private rebuildDraft(): void {

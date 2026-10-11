@@ -64,9 +64,14 @@
   };
   const identityOf = (franchiseId: string) =>
     manifest ? franchiseIdentityOf(manifest, franchiseId) : null;
+  const gridClass = $derived(
+    conferences.length === 2
+      ? 'grid gap-8 lg:grid-cols-2 lg:items-start'
+      : 'grid gap-8 lg:items-start',
+  );
 </script>
 
-<div class="grid gap-8 lg:grid-cols-2 lg:items-start">
+<div class={gridClass}>
   {#each conferences as section (section.title)}
     <section aria-labelledby={`standings-${section.title.toLowerCase()}-heading`} class="min-w-0">
       <h3

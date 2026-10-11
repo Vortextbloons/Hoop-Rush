@@ -28,6 +28,7 @@
     rematchConfirmed,
     onrematch,
     onconfirmrematch,
+    onlobby = null,
   }: {
     series: DraftDuelSeriesSnapshot;
     mvp: DraftDuelSeriesMvp | null;
@@ -42,6 +43,7 @@
     rematchConfirmed: boolean;
     onrematch: () => void;
     onconfirmrematch: () => void;
+    onlobby?: (() => void) | null;
   } = $props();
 
   interface RecapGame {
@@ -707,7 +709,10 @@
   </section>
 
   <section class="rematch" aria-label="Rematch">
-    {#if rematchConfirmed}
+    {#if onlobby}
+      <p class="rematch-state">Play again with the same opponent.</p>
+      <button type="button" class="rematch-btn" onclick={onlobby}>Back to lobby</button>
+    {:else if rematchConfirmed}
       <p class="rematch-state" data-state="confirmed">
         Rematch confirmed — the new series is being prepared.
       </p>
@@ -734,6 +739,7 @@
   .championship {
     display: grid;
     gap: 0.85rem;
+    min-width: 0;
   }
 
   .hero {
@@ -840,6 +846,7 @@
     border: 1px solid var(--color-line-soft);
     border-radius: 0.75rem;
     background: var(--color-surface-1);
+    min-width: 0;
   }
 
   .comparison,
@@ -875,6 +882,7 @@
     font-size: 1.5rem;
     font-weight: 800;
     line-height: 1.05;
+    overflow-wrap: anywhere;
   }
 
   .mvp-team {
@@ -1343,14 +1351,245 @@
     text-transform: uppercase;
     cursor: pointer;
     outline: none;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
   }
 
-  .rematch-btn:hover {
-    filter: brightness(1.08);
+  @media (hover: hover) {
+    .rematch-btn:hover {
+      filter: brightness(1.08);
+    }
+  }
+
+  .rematch-btn:active:not(:disabled) {
+    transform: scale(0.99);
   }
 
   .rematch-btn:focus-visible {
     outline: 2px solid var(--color-ring);
     outline-offset: 2px;
+  }
+
+  @media (max-width: 640px) {
+    .championship {
+      gap: 0.7rem;
+    }
+    .hero {
+      gap: 0.2rem;
+      padding: 1.1rem 0.85rem 1rem;
+    }
+    .hero-icon {
+      width: 2.5rem;
+      height: 2.5rem;
+    }
+    .hero h2 {
+      font-size: clamp(1.45rem, 7vw, 2rem);
+      text-wrap: balance;
+    }
+    .hero-score {
+      font-size: clamp(2rem, 11vw, 2.8rem);
+      gap: 0.55rem;
+    }
+    .hero-sub {
+      max-width: 26rem;
+      font-size: 0.75rem;
+      line-height: 1.5;
+      text-wrap: balance;
+    }
+    .mvp,
+    .comparison,
+    .leaders,
+    .player-stats,
+    .recap,
+    .rematch {
+      padding: 0.7rem 0.75rem;
+      border-radius: 0.65rem;
+    }
+    .mvp-body {
+      gap: 0.6rem;
+    }
+    .mvp-name {
+      font-size: 1.22rem;
+    }
+    .mvp-team {
+      font-size: 0.62rem;
+    }
+    .mvp-stats {
+      gap: 0.4rem;
+      max-width: none;
+    }
+    .mvp-stats div {
+      padding: 0.4rem 0.25rem;
+    }
+    .mvp-stats dd {
+      font-size: 1.15rem;
+    }
+    .mvp-totals {
+      font-size: 0.7rem;
+      line-height: 1.55;
+    }
+    .comparison-table {
+      font-size: 0.72rem;
+    }
+    .comparison-table tbody th,
+    .comparison-table tbody td {
+      padding: 0.36rem 0.25rem;
+      line-height: 1.35;
+    }
+    .leaders-table {
+      display: block;
+      margin-top: 0.5rem;
+    }
+    .leaders-table thead {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+    }
+    .leaders-table tbody {
+      display: grid;
+      gap: 0.55rem;
+    }
+    .leaders-table tbody tr {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.4rem;
+      border-bottom: 0;
+      padding: 0;
+    }
+    .leaders-table tbody th {
+      grid-column: 1 / -1;
+      width: auto;
+      padding: 0;
+      font-family: var(--font-mono);
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      text-align: left;
+    }
+    .leaders-table tbody td {
+      min-width: 0;
+      padding: 0;
+    }
+    .leader-cell {
+      gap: 0.45rem;
+      padding: 0.45rem 0.5rem;
+      border: 1px solid var(--color-line-soft);
+      border-radius: 0.55rem;
+      background: var(--color-surface-2);
+    }
+    .leader-name {
+      font-size: 0.8rem;
+      white-space: normal;
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      line-clamp: 2;
+      overflow: hidden;
+    }
+    .leader-value {
+      font-size: 0.64rem;
+    }
+    .stats-head {
+      align-items: stretch;
+      flex-direction: column;
+    }
+    .stats-controls {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      width: 100%;
+    }
+    .segmented {
+      min-width: 0;
+    }
+    .segmented button {
+      flex: 1;
+      min-height: 2.25rem;
+      min-width: 0;
+      padding: 0.35rem 0.4rem;
+      font-size: 0.6rem;
+      touch-action: manipulation;
+    }
+    .stats-scroll {
+      margin-inline: -0.25rem;
+      padding-inline: 0.25rem;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: thin;
+    }
+    .stats-table {
+      min-width: 0;
+      font-size: 0.68rem;
+    }
+    .stats-table th,
+    .stats-table td {
+      padding: 0.28rem 0.3rem;
+    }
+    .stats-table th:nth-child(3),
+    .stats-table td:nth-child(3),
+    .stats-table th:nth-child(7),
+    .stats-table td:nth-child(7),
+    .stats-table th:nth-child(8),
+    .stats-table td:nth-child(8),
+    .stats-table th:nth-child(9),
+    .stats-table td:nth-child(9),
+    .stats-table th:nth-child(12),
+    .stats-table td:nth-child(12) {
+      display: none;
+    }
+    .stats-table .is-player {
+      max-width: 8.5rem;
+    }
+    .player-cell {
+      gap: 0.4rem;
+    }
+    .player-name {
+      font-size: 0.8rem;
+    }
+    .recap-list {
+      grid-template-columns: 1fr;
+      gap: 0.5rem;
+    }
+    .recap-score {
+      font-size: 1.5rem;
+    }
+    .recap-standout {
+      font-size: 0.7rem;
+      line-height: 1.5;
+    }
+    .rematch {
+      flex-direction: column;
+      align-items: stretch;
+      text-align: center;
+    }
+    .rematch-state {
+      font-size: 0.8rem;
+      text-wrap: balance;
+    }
+    .rematch-btn {
+      width: 100%;
+      min-height: 3rem;
+      justify-content: center;
+      font-size: 0.85rem;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+  }
+
+  @media (max-width: 380px) {
+    .mvp-name {
+      font-size: 1.08rem;
+    }
+    .mvp-stats dd {
+      font-size: 1.05rem;
+    }
+    .leader-cell {
+      padding: 0.4rem;
+    }
+    .stats-controls {
+      grid-template-columns: 1fr;
+    }
   }
 </style>

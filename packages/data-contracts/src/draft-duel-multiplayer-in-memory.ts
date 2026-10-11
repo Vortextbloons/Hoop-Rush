@@ -7,7 +7,6 @@ import {
   DRAFT_DUEL_PICK_TIMEOUT_MS,
   DRAFT_DUEL_ROOM_RETENTION_MS,
   DRAFT_DUEL_ROOM_SCHEMA_VERSION,
-  DRAFT_DUEL_SEED_VERSION,
   draftDuelCommandPayloadSchema,
   draftDuelRoomCodeSchema,
   draftDuelRoomSettingsSchema,

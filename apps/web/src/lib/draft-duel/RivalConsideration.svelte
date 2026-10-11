@@ -56,6 +56,21 @@
     letter-spacing: 0.06em;
   }
 
+  @media (max-width: 640px) {
+    .dd-consideration {
+      flex-wrap: wrap;
+      row-gap: 0.15rem;
+      padding: 0.45rem 0.6rem;
+    }
+    .dd-consideration-eyebrow {
+      width: 100%;
+      font-size: 8px;
+    }
+    .dd-consideration-name {
+      font-size: 0.9rem;
+    }
+  }
+
   @keyframes dd-consideration-in {
     from {
       opacity: 0;

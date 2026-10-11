@@ -106,10 +106,14 @@
   <Dialog.Portal>
     <Dialog.Overlay class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" />
     <Dialog.Content
-      class="fixed inset-x-0 bottom-0 z-50 mx-auto max-h-[85dvh] w-full overflow-y-auto rounded-t-2xl border-t border-border bg-card p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl shadow-black/40 outline-none sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:max-w-md sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:border sm:pb-4"
+      class="fixed inset-x-0 bottom-0 z-50 mx-auto max-h-[92dvh] w-full overflow-y-auto rounded-t-2xl border-t border-border bg-card p-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-2xl shadow-black/40 outline-none overscroll-contain sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:max-w-md sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:border sm:pb-4"
     >
       {#if card}
         {@const subject = card}
+        <div
+          class="mx-auto mb-3 h-1 w-10 shrink-0 rounded-full bg-border sm:hidden"
+          aria-hidden="true"
+        ></div>
         <div class="flex items-start justify-between gap-3">
           <div class="flex min-w-0 items-center gap-3">
             {#if manifest && subject.playerExternalId}
@@ -143,7 +147,7 @@
           </div>
           <Dialog.Close
             aria-label="Cancel"
-            class="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-border text-muted-foreground transition-colors hover:text-foreground"
+            class="grid h-11 w-11 shrink-0 touch-manipulation place-items-center rounded-full border border-border text-muted-foreground transition-colors hover:text-foreground"
           >
             <X class="h-4 w-4" />
           </Dialog.Close>
@@ -160,12 +164,12 @@
               aria-label={option.ariaLabel}
               disabled={option.state !== 'open'}
               onclick={() => onplace(option.index)}
-              class="flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed {stateClass(
+              class="flex min-h-[3.5rem] w-full touch-manipulation items-center gap-3 rounded-xl border px-3 py-3 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.99] disabled:cursor-not-allowed {stateClass(
                 option.state,
               )}"
             >
               <span
-                class="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-surface-3 font-display text-sm font-extrabold {option.state ===
+                class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-surface-3 font-display text-sm font-extrabold {option.state ===
                 'open'
                   ? 'text-primary'
                   : 'text-muted-foreground'}"

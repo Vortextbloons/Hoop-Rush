@@ -45,6 +45,14 @@
       cta: 'Open collection',
       href: '/ultimate/run' as any,
     },
+    {
+      code: '05',
+      name: 'Hoop Havoc',
+      line: 'Draft five mutated freaks, then chase 82-0 against the frozen gauntlet.',
+      status: 'available',
+      cta: 'Start Havoc',
+      href: '/havoc' as any,
+    },
   ] as const;
   let manifest = $state<HoopRushManifest | null>(null);
   let active = $state.raw<ActiveRunCheckpoint | null>(null);

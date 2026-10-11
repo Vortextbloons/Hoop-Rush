@@ -255,6 +255,17 @@ function baseProps(overrides: Partial<ChampionshipProps> = {}): ChampionshipProp
 }
 
 describe('ChampionshipView', () => {
+  it('confirms an opponent request and blocks duplicate clicks while busy', async () => {
+    const onconfirmrematch = vi.fn();
+    const props = { ...baseProps(), rematchRequested: true, onconfirmrematch };
+    const { getByRole, rerender } = render(ChampionshipView, { props });
+    await fireEvent.click(getByRole('button', { name: 'Confirm rematch' }));
+    expect(onconfirmrematch).toHaveBeenCalledTimes(1);
+    await rerender({ ...props, rematchBusy: true });
+    expect(
+      (getByRole('button', { name: 'Preparing rematch…' }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+  });
   it('shows a waiting state after requesting a rematch', () => {
     const { getByText, queryByRole } = render(ChampionshipView, {
       props: { ...baseProps(), localRematchRequested: true },

@@ -33,6 +33,7 @@ type ControllerLifecycle = {
   ensureGamePipeline: () => Promise<void>;
   persistActive: () => Promise<void>;
   resolveDeadline: (cursor: string, pickOrdinal: number) => Promise<void>;
+  syncFromServer: () => Promise<void>;
   repo: {
     appendCommands: (...args: unknown[]) => Promise<void>;
     saveVerification: (...args: unknown[]) => Promise<void>;
@@ -125,6 +126,52 @@ describe('Draft Duel ready check progression', () => {
     expect(controller.phase).toBe('preparing-game');
     expect(controller.localReady).toBe(true);
   });
+
+  it.each(['p1', 'p2'] as const)(
+    'creates one successor when %s confirms the rematch',
+    async (confirmingSeat) => {
+      const lifecycle = isolateSync();
+      const digest = contentHashSchema.parse('b'.repeat(64));
+      for (let gameNumber = 1; gameNumber <= 4; gameNumber++) {
+        await submit('p1', { kind: 'ready-next-game', gameNumber, ready: true });
+        await submit('p2', { kind: 'ready-next-game', gameNumber, ready: true });
+        await submit('p1', { kind: 'broadcast-start', gameNumber });
+        for (const actor of ['p1', 'p2'] as const) {
+          await submit(actor, {
+            kind: 'propose-result',
+            gameNumber,
+            winner: 'p1',
+            resultDigest: digest,
+            tapeDigest: digest,
+            inputDigest: digest,
+          });
+        }
+        for (const actor of ['p1', 'p2'] as const) {
+          await submit(actor, {
+            kind: 'confirm-result',
+            gameNumber,
+            resultDigest: digest,
+            verified: true,
+          });
+        }
+      }
+      expect(controller.myRematchRequested).toBe(false);
+      expect(controller.rivalRematchRequested).toBe(false);
+      await controller.requestRematch();
+      expect(controller.myRematchRequested).toBe(true);
+      await submit('p2', { kind: 'rematch-request' });
+      if (confirmingSeat === 'p1') await controller.confirmRematch();
+      else {
+        await submit('p2', { kind: 'rematch-confirm' });
+        await lifecycle.syncFromServer();
+      }
+      const successor = controller.successorRoomId;
+      expect(successor).not.toBeNull();
+      expect(controller.error).toBeNull();
+      expect(await controller.followRematch()).toBe(successor);
+      expect((await transport.rematch(roomId)).snapshot.roomId).toBe(successor);
+    },
+  );
 
   it('does not roll back to an older room snapshot', () => {
     const lifecycle = controller as unknown as ControllerLifecycle;

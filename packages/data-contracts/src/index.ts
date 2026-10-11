@@ -184,3 +184,4 @@ export * from './havoc-run.ts';
 export * from './havoc-commands.ts';
 export * from './havoc-worker.ts';
 export * from './havoc-comparison.ts';
+export * from './multiplayer-lobby.ts';

@@ -30,9 +30,11 @@
   import GameResultsPanel from '$lib/draft-duel/GameResultsPanel.svelte';
   import ChampionshipView from '$lib/draft-duel/ChampionshipView.svelte';
   import { inviteLinkForDraftDuelCode } from '$lib/draft-duel-identity';
+  import { loadLobbyId, lobbyCommand } from '$lib/multiplayer-lobby';
 
   const roomId = $derived($page.params.roomId as string);
   const controller = new DraftDuelController();
+  let lobbyId = $state<string | null>(null);
   let copiedCode = $state(false);
   let copiedLink = $state(false);
   let pendingSelection = $state<{ pick: DraftDuelOfferedPick; ordinal: number } | null>(null);
@@ -44,6 +46,7 @@
   let followingRematch = false;
 
   onMount(() => {
+    lobbyId = loadLobbyId(roomId);
     void controller.attach(roomId);
   });
   onDestroy(() => {
@@ -179,6 +182,17 @@
   async function leaveRoom(): Promise<void> {
     await controller.leaveRoom();
     await goto(resolve('/draft-duel'));
+  }
+  async function removeOpponent(): Promise<void> {
+    if (!lobbyId) {
+      await controller.removeGuest();
+      return;
+    }
+    try {
+      await lobbyCommand({ kind: 'remove-guest', lobbyId });
+    } catch (error) {
+      controller.error = error instanceof Error ? error.message : 'Could not remove opponent.';
+    }
   }
 </script>
 
@@ -363,10 +377,8 @@
           {/if}
           <div class="lobby-manage">
             {#if isHost && rivalMember}
-              <button
-                type="button"
-                onclick={() => controller.removeGuest()}
-                disabled={controller.busy}>Remove opponent</button
+              <button type="button" onclick={removeOpponent} disabled={controller.busy}
+                >Remove opponent</button
               >
             {/if}<button type="button" onclick={leaveRoom} disabled={controller.busy}
               ><LogOut size={14} aria-hidden="true" /> Leave room</button
@@ -547,6 +559,11 @@
           rematchConfirmed={controller.successorRoomId !== null}
           onrematch={() => controller.requestRematch()}
           onconfirmrematch={() => controller.confirmRematch()}
+          onlobby={lobbyId
+            ? () => {
+                void goto(resolve(`/multiplayer?lobby=${lobbyId}`));
+              }
+            : null}
         />
       </section>
     {:else if controller.phase === 'expired'}
@@ -931,6 +948,7 @@
     display: grid;
     gap: 0.9rem;
     position: relative;
+    min-width: 0;
   }
   .draft-stage h2,
   .panel h2 {
@@ -939,6 +957,7 @@
     font-size: 1.5rem;
     letter-spacing: 0.03em;
     font-weight: 800;
+    line-height: 1.1;
   }
   .stage-header {
     display: flex;
@@ -957,13 +976,26 @@
   .pick-clock {
     font-family: var(--font-mono);
     font-size: 1.5rem;
+    font-variant-numeric: tabular-nums;
     border: 1px solid var(--color-line-strong);
     border-radius: 10px;
     padding: 0.35rem 0.8rem;
+    min-width: 4.5rem;
+    text-align: center;
   }
   .pick-clock.urgent {
     border-color: #b91c1c;
     color: #fca5a5;
+    animation: pick-pulse 1s ease-in-out infinite;
+  }
+  @keyframes pick-pulse {
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 rgb(185 28 28 / 0%);
+    }
+    50% {
+      box-shadow: 0 0 0 4px rgb(185 28 28 / 22%);
+    }
   }
   .boards {
     display: grid;
@@ -973,6 +1005,9 @@
   .board-solo {
     display: grid;
     gap: 1rem;
+    min-width: 0;
+  }
+  .board-column {
     min-width: 0;
   }
   @media (min-width: 900px) {
@@ -1033,6 +1068,62 @@
       height: 180px;
     }
   }
+  @media (max-width: 640px) {
+    .room-page {
+      padding: 16px 12px calc(88px + env(safe-area-inset-bottom));
+    }
+    .draft-stage,
+    .panel {
+      gap: 0.7rem;
+      padding: 0.7rem;
+      border-radius: 11px;
+    }
+    .draft-stage h2,
+    .panel h2 {
+      font-size: 1.25rem;
+    }
+    .stage-header {
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      gap: 0.6rem;
+      margin: -0.7rem -0.7rem 0;
+      padding: 0.6rem 0.7rem;
+      border-bottom: 1px solid var(--color-line-soft);
+      border-radius: 11px 11px 0 0;
+      background: color-mix(in srgb, var(--color-card) 88%, transparent);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+    .stage-eyebrow {
+      font-size: 9px;
+    }
+    .pick-clock {
+      min-width: 3.9rem;
+      padding: 0.3rem 0.6rem;
+      font-size: 1.2rem;
+      border-radius: 9px;
+    }
+    .board-solo {
+      gap: 0.7rem;
+    }
+    .board-column h3 {
+      margin: 0 0 0.4rem;
+      font-size: 0.72rem;
+    }
+    .panel-actions {
+      gap: 0.6rem;
+    }
+    .panel-actions .room-primary {
+      flex: 1 1 100%;
+      min-height: 3rem;
+    }
+    .room-primary,
+    .room-secondary {
+      min-height: 2.9rem;
+      touch-action: manipulation;
+    }
+  }
   @media (max-width: 520px) {
     .room-stages {
       display: grid;
@@ -1060,6 +1151,11 @@
     .invite-actions > button {
       flex: 1;
       padding-inline: 10px;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .pick-clock.urgent {
+      animation: none;
     }
   }
 </style>
