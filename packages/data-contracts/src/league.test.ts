@@ -6,24 +6,33 @@ import {
   leagueRecordSchema,
   leagueWorkerMessageSchema,
   leagueWorkerRequestSchema,
+  franchiseIdSchema,
+  playerIdSchema,
+  seedSchema,
 } from './index.ts';
+import type { LeagueRecord } from './league.ts';
 
 const TEAM_IDS = Array.from({ length: 30 }, (_, index) => `fixture-${String(index)}`);
 
-function buildRecordMaterial() {
+function buildRecordMaterial(): Omit<LeagueRecord, 'digest'> {
   return {
     leagueVersion: LEAGUE_RECORD_VERSION,
     scheduleVersion: LEAGUE_SCHEDULE_VERSION,
-    seed: 'aaaaaaaaaaaaaaaa',
+    seed: seedSchema.parse('aaaaaaaaaaaaaaaa'),
     bracketVersion: 'bracket-v1',
     dataVersion: 'data-v1',
     eraProfileVersion: 'profile-v1',
     gamesSimulated: 1189,
-    teams: TEAM_IDS.map((teamId) => ({ teamId, gamesPlayed: 79, wins: 40, losses: 39 })),
+    teams: TEAM_IDS.map((teamId) => ({
+      teamId: franchiseIdSchema.parse(teamId),
+      gamesPlayed: 79,
+      wins: 40,
+      losses: 39,
+    })),
     players: TEAM_IDS.flatMap((teamId, teamIndex) =>
       Array.from({ length: 5 }, (_, slot) => ({
-        playerId: `p-${String(teamIndex)}-${String(slot)}`,
-        teamId,
+        playerId: playerIdSchema.parse(`p-${String(teamIndex)}-${String(slot)}`),
+        teamId: franchiseIdSchema.parse(teamId),
         games: 79,
         totalValueBase: 100,
         totalValueBaseSquared: 200,

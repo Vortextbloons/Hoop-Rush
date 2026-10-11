@@ -80,10 +80,7 @@ vi.mock('./health.ts', async (importOriginal) => {
       if (game === undefined) {
         throw new Error(`season forfeit: game ${gameId} is not in the run schedule`);
       }
-      if (
-        game.homeFranchiseId !== humanFranchiseId &&
-        game.awayFranchiseId !== humanFranchiseId
-      ) {
+      if (game.homeFranchiseId !== humanFranchiseId && game.awayFranchiseId !== humanFranchiseId) {
         throw new Error(
           `season forfeit: game ${gameId} does not involve ${humanFranchiseId} (${game.homeFranchiseId} vs ${game.awayFranchiseId})`,
         );
@@ -942,9 +939,7 @@ describe('forfeit-interrupted-game command', () => {
     if (humanGame === undefined) throw new Error('fixture has no human game');
     const forfeitedGameId = humanGame.gameId;
     const nextNumber = Number(forfeitedGameId.slice(1)) + 1;
-    const expectedNextGameId = seasonGameIdSchema.parse(
-      `s${String(nextNumber).padStart(6, '0')}`,
-    );
+    const expectedNextGameId = seasonGameIdSchema.parse(`s${String(nextNumber).padStart(6, '0')}`);
     const pending = pendingOf(run, { nextGameId: forfeitedGameId });
     const output = handleSeasonRunCommand(
       commandOf(run, {

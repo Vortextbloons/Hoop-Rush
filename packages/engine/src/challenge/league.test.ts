@@ -13,7 +13,12 @@ import {
   seedSchema,
 } from '@hoop-rush/data-contracts';
 import { createEngineContext } from '../sim/kernel.ts';
-import { createChallenge, simulateChallenge, type ChallengeCreation } from './commands.ts';
+import {
+  createChallenge,
+  simulateChallenge,
+  type ChallengeCreation,
+  type ChallengeCreationBase,
+} from './commands.ts';
 import {
   createLeagueSimulation,
   leagueGamesSimulated,
@@ -38,7 +43,7 @@ function fixtureSelections(players: SimulationPlayer[]): RunPlayerSelection[] {
   }));
 }
 
-function fixtureCreation(overrides: Partial<ChallengeCreation> = {}): ChallengeCreation {
+function fixtureCreation(overrides: Partial<ChallengeCreationBase> = {}): ChallengeCreation {
   const bracket = buildFixtureBracket();
   const team = buildUserTeam();
   return {
