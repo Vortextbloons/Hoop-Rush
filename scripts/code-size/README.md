@@ -159,3 +159,9 @@ paths change (stages 2, 4, and 6).
   The two modes now delegate; deliberate differences (postseason ignores the
   rehab premium) stay pinned by `injuries.test.ts`. Block-0 golden digest and
   all postseason/command suites unchanged.
+- 2026-10-11, stage 4f: `game-launch.ts` now owns active-player selection,
+  per-version position/target/durability maps, and the shared
+  `SeasonGameSimulationInput` assembly; block and postseason game execution
+  both delegate. Verified by the block-0 golden digest, postseason and command
+  suites, the application session suites, web season suites, and
+  `cli-season-reproduce`.

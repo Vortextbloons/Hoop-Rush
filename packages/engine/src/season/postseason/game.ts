@@ -11,7 +11,6 @@ import {
   seasonPostseasonSummarySchema,
   type ConferenceId,
   type EraSimulationProfile,
-  type Position,
   type SeasonCompactInjuryEvent,
   type SeasonDraftCatalog,
   type SeasonEffectsState,
@@ -28,16 +27,17 @@ import {
 } from '@hoop-rush/data-contracts';
 import { createEngineContext } from '../../sim/kernel.ts';
 import { applySeasonGameEffectsTransition } from '../effects.ts';
+import {
+  activeSeasonPlayers,
+  buildSeasonGameSimulationInput,
+  durabilityByCatalog,
+  positionsOfPlayers,
+  targetMinutesOfRotations,
+} from '../game-launch.ts';
 import { seasonGameSummaryFromResult } from '../game-summary.ts';
 import { seasonFranchiseLegalFiveFacts, seasonPregameAvailabilityOf } from '../health.ts';
-import { SEASON_HOME_COURT_PROFILE } from '../home-court.ts';
-import { resolveHomeGameRule } from '../evolution.ts';
 import { applySeasonGameHealthTransition } from '../injuries.ts';
-import {
-  compactSeasonInjuryEvents,
-  sameGameReturnResolutionsOf,
-  seasonSideOfPlayer,
-} from '../injury-events.ts';
+import { compactSeasonInjuryEvents, sameGameReturnResolutionsOf } from '../injury-events.ts';
 import { conferenceOf } from '../league.ts';
 import { simulateSeasonGameWithEffects } from '../season-game.ts';
 import { findSeriesOrNull } from './bracket.ts';
@@ -132,19 +132,24 @@ export function simulateSeasonPostseasonGame(
       reason: `game ${gameId} references a roster or rotation outside the run`,
     };
   }
-  const expandedPlayers = (roster: typeof homeRoster): SeasonGamePlayerInput[] =>
-    roster.players.map((player) => expandedPlayer(input, player.playerVersionId));
-  const activePlayers = (
-    players: readonly SeasonGamePlayerInput[],
-    rotation: typeof homeRotation,
-  ): SeasonGamePlayerInput[] => {
-    const activeIds = new Set([...rotation.starters, ...rotation.benchOrder]);
-    return players.filter((player) => activeIds.has(player.playerVersionId));
-  };
-  const allHomePlayers = expandedPlayers(homeRoster);
-  const allAwayPlayers = expandedPlayers(awayRoster);
-  const homePlayers = activePlayers(allHomePlayers, homeRotation);
-  const awayPlayers = activePlayers(allAwayPlayers, awayRotation);
+  const expandedPlayerOf = (playerVersionId: string): SeasonGamePlayerInput =>
+    expandedPlayer(input, playerVersionId);
+  const allHomePlayers = homeRoster.players.map((player) =>
+    expandedPlayerOf(player.playerVersionId),
+  );
+  const allAwayPlayers = awayRoster.players.map((player) =>
+    expandedPlayerOf(player.playerVersionId),
+  );
+  const homePlayers = activeSeasonPlayers({
+    roster: homeRoster,
+    rotation: homeRotation,
+    expandedPlayer: expandedPlayerOf,
+  });
+  const awayPlayers = activeSeasonPlayers({
+    roster: awayRoster,
+    rotation: awayRotation,
+    expandedPlayer: expandedPlayerOf,
+  });
   const seed = seasonNamespaceSeed(
     run.rootSeed,
     phase === 'play-in' ? SEASON_SEED_NAMESPACES.playInGames : SEASON_SEED_NAMESPACES.playoffGames,
@@ -200,20 +205,9 @@ export function simulateSeasonPostseasonGame(
       nextEffects: effects,
     };
   }
-  const positions = new Map<string, readonly Position[]>();
-  const targetMinutes = new Map<string, number>();
-  for (const player of [...allHomePlayers, ...allAwayPlayers]) {
-    positions.set(player.playerVersionId, player.positions);
-  }
-  for (const rotation of [homeRotation, awayRotation]) {
-    for (const entry of rotation.targetMinutes) {
-      targetMinutes.set(entry.playerVersionId, entry.minutes);
-    }
-  }
-  const durability = new Map<string, number>();
-  for (const candidate of catalog.candidates) {
-    durability.set(candidate.playerVersionId, candidate.durability.rating);
-  }
+  const positions = positionsOfPlayers([...allHomePlayers, ...allAwayPlayers]);
+  const targetMinutes = targetMinutesOfRotations([homeRotation, awayRotation]);
+  const durability = durabilityByCatalog(catalog);
   const homeLegalFacts = seasonFranchiseLegalFiveFacts(run, homeId, run.health, positions);
   const awayLegalFacts = seasonFranchiseLegalFiveFacts(run, awayId, run.health, positions);
   if (
@@ -269,51 +263,25 @@ export function simulateSeasonPostseasonGame(
         durabilityByPlayer: durability,
         effects: pregame,
       });
-  const gameInput: SeasonGameSimulationInput = {
-    schemaVersion: 1,
+  const gameInput: SeasonGameSimulationInput = buildSeasonGameSimulationInput({
     seed,
     gameNumber: ordinal,
     dataVersion: catalog.dataVersion,
     profile,
-    home: {
-      teamId: homeId,
-      displayName: homeId,
-      franchiseId: franchiseIdSchema.parse(homeId),
-      players: homePlayers,
-    },
-    away: {
-      teamId: awayId,
-      displayName: awayId,
-      franchiseId: franchiseIdSchema.parse(awayId),
-      players: awayPlayers,
-    },
+    homeFranchiseId: homeId,
+    awayFranchiseId: awayId,
+    homePlayers,
+    awayPlayers,
     homeRotation,
     awayRotation,
-    availability: [...homePlayers, ...awayPlayers].map((player) => ({
-      playerVersionId: player.playerVersionId,
-      available: seam.pregame.get(player.playerVersionId) ?? true,
-    })),
-    removals: seam.removals.map((removal) => ({
-      side: seasonSideOfPlayer(homeRoster, awayRoster, removal.playerVersionId, missingSide),
-      playerVersionId: removal.playerVersionId,
-      period: removal.clock.period,
-      secondsRemaining: removal.clock.seconds,
-      reason: 'injury' as const,
-    })),
-    returns: seam.returns.map((ret) => ({
-      side: seasonSideOfPlayer(homeRoster, awayRoster, ret.playerVersionId, missingSide),
-      playerVersionId: ret.playerVersionId,
-      period: ret.clock.period,
-      secondsRemaining: ret.clock.seconds,
-      reason: 'injury-return' as const,
-    })),
-    homeCourt: SEASON_HOME_COURT_PROFILE,
-    gameRule: resolveHomeGameRule(
+    seam,
+    homeRoster,
+    awayRoster,
+    evolution:
       (run as unknown as { evolution?: import('@hoop-rush/data-contracts').SeasonEvolutionState })
         .evolution ?? null,
-      homeId,
-    ),
-  };
+    missingSide,
+  });
   const resolver = options.resolver ?? defaultSeasonPostseasonGameResolver;
   const { result, transition } = resolver({ gameId, gameInput, pregameEffects: pregame });
   if (result.seed !== seed) {

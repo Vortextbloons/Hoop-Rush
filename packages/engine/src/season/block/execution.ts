@@ -17,23 +17,23 @@ import {
 import { createEngineContext } from '../../sim/kernel.ts';
 import { applySeasonGameEffectsTransition } from '../effects.ts';
 import {
+  activeSeasonPlayers,
+  buildSeasonGameSimulationInput,
+  durabilityByCatalog,
+  positionsOfPlayers,
+} from '../game-launch.ts';
+import {
   auditSeasonGameSummary,
   seasonGameSummaryFromResult,
   seasonRetainedDetailFromResult,
 } from '../game-summary.ts';
-import { SEASON_HOME_COURT_PROFILE } from '../home-court.ts';
 import {
   seasonFranchiseLegalFiveFacts,
   seasonGameHealthSeam,
   seasonPregameAvailabilityOf,
 } from '../health.ts';
 import { applySeasonGameHealthTransition } from '../injuries.ts';
-import {
-  compactSeasonInjuryEvents,
-  sameGameReturnResolutionsOf,
-  seasonSideOfPlayer,
-} from '../injury-events.ts';
-import { resolveHomeGameRule } from '../evolution.ts';
+import { compactSeasonInjuryEvents, sameGameReturnResolutionsOf } from '../injury-events.ts';
 import { seasonBlockGameCount } from '../recap.ts';
 import { simulateSeasonGameWithEffects } from '../season-game.ts';
 import { applySeasonRecoveryTick } from '../stamina.ts';
@@ -137,14 +137,18 @@ export function simulateSeasonBlockGame(
       { gameId: game.gameId, blockIndex: command.blockIndex },
     );
   }
-  const activePlayers = (roster: typeof homeRoster, rotation: typeof homeRotation) => {
-    const activeIds = new Set([...rotation.starters, ...rotation.benchOrder]);
-    return roster.players
-      .filter((player) => activeIds.has(player.playerVersionId))
-      .map((player) => expandedPlayer(input, game.gameId, player.playerVersionId));
-  };
-  const homePlayers = activePlayers(homeRoster, homeRotation);
-  const awayPlayers = activePlayers(awayRoster, awayRotation);
+  const expandedPlayerOf = (playerVersionId: string): SeasonGamePlayerInput =>
+    expandedPlayer(input, game.gameId, playerVersionId);
+  const homePlayers = activeSeasonPlayers({
+    roster: homeRoster,
+    rotation: homeRotation,
+    expandedPlayer: expandedPlayerOf,
+  });
+  const awayPlayers = activeSeasonPlayers({
+    roster: awayRoster,
+    rotation: awayRotation,
+    expandedPlayer: expandedPlayerOf,
+  });
   const missingSide = (playerVersionId: string): Error =>
     new SeasonBlockInvariantError(
       `season block: version ${playerVersionId} plays neither side of ${game.gameId}`,
@@ -228,51 +232,25 @@ export function simulateSeasonBlockGame(
     );
     input.collectedTipAvailability = [...retained, ...fresh];
   }
-  const gameInput: SeasonGameSimulationInput = {
-    schemaVersion: 1,
+  const gameInput: SeasonGameSimulationInput = buildSeasonGameSimulationInput({
     seed,
     gameNumber: gameNumberById.get(game.gameId) ?? 1,
     dataVersion: input.catalog.dataVersion,
     profile: input.profile,
-    home: {
-      teamId: game.homeFranchiseId,
-      displayName: game.homeFranchiseId,
-      franchiseId: game.homeFranchiseId,
-      players: homePlayers,
-    },
-    away: {
-      teamId: game.awayFranchiseId,
-      displayName: game.awayFranchiseId,
-      franchiseId: game.awayFranchiseId,
-      players: awayPlayers,
-    },
+    homeFranchiseId: game.homeFranchiseId,
+    awayFranchiseId: game.awayFranchiseId,
+    homePlayers,
+    awayPlayers,
     homeRotation,
     awayRotation,
-    availability: [...homePlayers, ...awayPlayers].map((player) => ({
-      playerVersionId: player.playerVersionId,
-      available: seam.pregame.get(player.playerVersionId) ?? true,
-    })),
-    removals: seam.removals.map((removal) => ({
-      side: seasonSideOfPlayer(homeRoster, awayRoster, removal.playerVersionId, missingSide),
-      playerVersionId: removal.playerVersionId,
-      period: removal.clock.period,
-      secondsRemaining: removal.clock.seconds,
-      reason: 'injury',
-    })),
-    returns: seam.returns.map((ret) => ({
-      side: seasonSideOfPlayer(homeRoster, awayRoster, ret.playerVersionId, missingSide),
-      playerVersionId: ret.playerVersionId,
-      period: ret.clock.period,
-      secondsRemaining: ret.clock.seconds,
-      reason: 'injury-return',
-    })),
-    homeCourt: SEASON_HOME_COURT_PROFILE,
-    gameRule: resolveHomeGameRule(
+    seam,
+    homeRoster,
+    awayRoster,
+    evolution:
       (run as unknown as { evolution?: import('@hoop-rush/data-contracts').SeasonEvolutionState })
         .evolution ?? null,
-      game.homeFranchiseId,
-    ),
-  };
+    missingSide,
+  });
   const { result, transition } = simulateSeasonGameWithEffects(
     gameInput,
     createEngineContext(),
@@ -377,16 +355,8 @@ function targetMinutesOf(
   return targets;
 }
 export function durabilityByVersionOf(input: SeasonBlockSimulationInput): Map<string, number> {
-  const ratings = new Map<string, number>();
-  for (const candidate of input.catalog.candidates) {
-    ratings.set(candidate.playerVersionId, candidate.durability.rating);
-  }
-  return ratings;
+  return durabilityByCatalog(input.catalog);
 }
 export function positionsOf(input: SeasonBlockSimulationInput): Map<string, readonly Position[]> {
-  const positions = new Map<string, readonly Position[]>();
-  for (const player of input.expanded.values()) {
-    positions.set(player.playerVersionId, player.positions);
-  }
-  return positions;
+  return positionsOfPlayers(input.expanded.values());
 }
