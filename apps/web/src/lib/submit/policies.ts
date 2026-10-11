@@ -1,4 +1,4 @@
-import type { SubmissionIntent, SubmissionPolicy } from './submission';
+import type { SubmissionIntent, SubmissionPolicy } from '@hoop-rush/application';
 
 /**
  * Fixed-five multiplayer commands retry once the room has resynced, but only

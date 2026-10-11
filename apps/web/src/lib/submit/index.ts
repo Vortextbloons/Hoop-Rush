@@ -5,7 +5,7 @@ export {
   type SubmissionIntent,
   type SubmissionPolicy,
   type SubmissionReport,
-} from './submission';
+} from '@hoop-rush/application';
 export {
   COLLECTION_COMMAND_POLICY,
   COLLECTION_PACK_PURCHASE_POLICY,

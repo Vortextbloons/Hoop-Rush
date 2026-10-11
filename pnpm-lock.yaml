@@ -56,6 +56,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@hoop-rush/application':
+        specifier: workspace:*
+        version: link:../../packages/application
       '@hoop-rush/data-contracts':
         specifier: workspace:*
         version: link:../../packages/data-contracts
@@ -129,6 +132,28 @@ importers:
       vite:
         specifier: ^8.2.0
         version: 8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.4)(yaml@2.9.0)
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.10(@types/node@26.1.2)(jsdom@30.0.1)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.4)(yaml@2.9.0))
+
+  packages/application:
+    dependencies:
+      '@hoop-rush/data-contracts':
+        specifier: workspace:*
+        version: link:../data-contracts
+      '@hoop-rush/engine':
+        specifier: workspace:*
+        version: link:../engine
+    devDependencies:
+      eslint:
+        specifier: 'catalog:'
+        version: 10.8.0(jiti@2.7.0)
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      typescript-eslint:
+        specifier: 'catalog:'
+        version: 8.65.0(eslint@10.8.0(jiti@2.7.0))(typescript@6.0.3)
       vitest:
         specifier: 'catalog:'
         version: 4.1.10(@types/node@26.1.2)(jsdom@30.0.1)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.4)(yaml@2.9.0))

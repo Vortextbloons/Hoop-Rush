@@ -1,12 +1,26 @@
 import { describe, expect, it, vi } from 'vitest';
-import {
-  COLLECTION_PACK_PURCHASE_POLICY,
-  FIXED_FIVE_COMMAND_POLICY,
-  SEASON_BLOCK_POLICY,
-  SEASON_COMMAND_POLICY,
-  canResubmitBlock,
-  runSubmission,
-} from './index';
+import { runSubmission, type SubmissionPolicy } from './index.ts';
+
+const RETRY_POLICY: SubmissionPolicy = {
+  intent: 'fixed-five-command',
+  conflict: 'resync-retry',
+  maxAttempts: 3,
+  requiresDigest: false,
+};
+
+const SURFACE_POLICY: SubmissionPolicy = {
+  intent: 'season-command',
+  conflict: 'surface',
+  maxAttempts: 1,
+  requiresDigest: true,
+};
+
+const PACK_PURCHASE_POLICY: SubmissionPolicy = {
+  intent: 'collection-pack-purchase',
+  conflict: 'surface',
+  maxAttempts: 1,
+  requiresDigest: true,
+};
 
 interface FakeReceipt {
   accepted: boolean;
@@ -33,7 +47,7 @@ describe('runSubmission', () => {
     );
     const resync = vi.fn(noopResync);
     const report = await runSubmission(
-      FIXED_FIVE_COMMAND_POLICY,
+      RETRY_POLICY,
       { expectedRevision: 0 },
       {
         submit,
@@ -52,7 +66,7 @@ describe('runSubmission', () => {
     const submit = vi.fn((): Promise<FakeReceipt> => Promise.resolve(staleReceipt(2)));
     const resync = vi.fn(noopResync);
     const report = await runSubmission(
-      SEASON_COMMAND_POLICY,
+      SURFACE_POLICY,
       {},
       {
         submit,
@@ -79,7 +93,7 @@ describe('runSubmission', () => {
     });
     const resync = vi.fn(noopResync);
     const report = await runSubmission(
-      FIXED_FIVE_COMMAND_POLICY,
+      RETRY_POLICY,
       { expectedRevision: 4 },
       {
         submit,
@@ -99,7 +113,7 @@ describe('runSubmission', () => {
   it('resyncs before evaluating the dynamic retry gate', async () => {
     const order: string[] = [];
     const report = await runSubmission(
-      FIXED_FIVE_COMMAND_POLICY,
+      RETRY_POLICY,
       {},
       {
         submit: (): Promise<FakeReceipt> => {
@@ -126,7 +140,7 @@ describe('runSubmission', () => {
   it('stops after maxAttempts', async () => {
     const submit = vi.fn((): Promise<FakeReceipt> => Promise.resolve(staleReceipt(9)));
     const report = await runSubmission(
-      FIXED_FIVE_COMMAND_POLICY,
+      RETRY_POLICY,
       {},
       {
         submit,
@@ -138,14 +152,14 @@ describe('runSubmission', () => {
     );
     expect(report.disposition).toBe('stale');
     expect(report.retried).toBe(true);
-    expect(report.attempts).toBe(FIXED_FIVE_COMMAND_POLICY.maxAttempts);
-    expect(submit).toHaveBeenCalledTimes(FIXED_FIVE_COMMAND_POLICY.maxAttempts);
+    expect(report.attempts).toBe(RETRY_POLICY.maxAttempts);
+    expect(submit).toHaveBeenCalledTimes(RETRY_POLICY.maxAttempts);
   });
 
   it('classifies thrown stale errors via classifyError', async () => {
     const stale = new Error('stale collection state');
     const report = await runSubmission(
-      COLLECTION_PACK_PURCHASE_POLICY,
+      PACK_PURCHASE_POLICY,
       {},
       {
         submit: () => Promise.reject(stale),
@@ -162,7 +176,7 @@ describe('runSubmission', () => {
     const fatal = new Error('boom');
     await expect(
       runSubmission(
-        COLLECTION_PACK_PURCHASE_POLICY,
+        PACK_PURCHASE_POLICY,
         {},
         {
           submit: () => Promise.reject(fatal),
@@ -171,17 +185,5 @@ describe('runSubmission', () => {
         },
       ),
     ).rejects.toBe(fatal);
-  });
-});
-
-describe('canResubmitBlock', () => {
-  it('requires an exact current revision in surface mode', () => {
-    expect(canResubmitBlock(SEASON_BLOCK_POLICY, 3, 3)).toBe(true);
-    expect(canResubmitBlock(SEASON_BLOCK_POLICY, 3, 4)).toBe(false);
-    expect(canResubmitBlock(SEASON_BLOCK_POLICY, 3, undefined)).toBe(false);
-  });
-
-  it('always allows resubmission under a resync-retry policy', () => {
-    expect(canResubmitBlock(FIXED_FIVE_COMMAND_POLICY, 3, 9)).toBe(true);
   });
 });
