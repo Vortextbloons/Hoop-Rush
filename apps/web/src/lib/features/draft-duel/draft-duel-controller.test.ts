@@ -22,7 +22,9 @@ import type { DraftDuelAssets } from './draft-duel-assets';
 import { DraftDuelController } from './draft-duel-controller.svelte';
 
 let transport: DraftDuelMultiplayerTransport;
-vi.mock('$lib/draft-duel-transport', () => ({ getDraftDuelTransport: () => transport }));
+vi.mock('$lib/features/draft-duel/draft-duel-transport', () => ({
+  getDraftDuelTransport: () => transport,
+}));
 
 type ControllerLifecycle = {
   roomId: Id;

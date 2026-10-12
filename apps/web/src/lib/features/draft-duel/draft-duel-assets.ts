@@ -10,8 +10,8 @@ import {
   type EngineContext,
 } from '@hoop-rush/engine';
 import { getManifest } from '$lib/data';
-import { loadCollectionCatalog } from '$lib/collection/collection-assets';
-import { loadCollectionProfile } from '$lib/collection/collection-hub';
+import { loadCollectionCatalog } from '$lib/features/collection/collection-assets';
+import { loadCollectionProfile } from '$lib/features/collection/collection-hub';
 
 export interface DraftDuelAssets {
   catalog: DraftDuelCatalog;

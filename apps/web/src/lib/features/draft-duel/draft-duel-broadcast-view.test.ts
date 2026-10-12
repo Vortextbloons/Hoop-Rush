@@ -15,7 +15,7 @@ import {
   buildLegalSimulationTeam,
   seedFromString,
 } from '@hoop-rush/test-fixtures';
-import { draftDuelVisibleState } from '../draft-duel-playback';
+import { draftDuelVisibleState } from './draft-duel-playback';
 import {
   draftDuelFeedLines,
   draftDuelPeriodLabel,

@@ -14,7 +14,9 @@ import {
 } from '@hoop-rush/persistence';
 import { DraftDuelController } from './draft-duel-controller.svelte';
 
-vi.mock('$lib/draft-duel-transport', () => ({ getDraftDuelTransport: () => ({}) }));
+vi.mock('$lib/features/draft-duel/draft-duel-transport', () => ({
+  getDraftDuelTransport: () => ({}),
+}));
 
 type ControllerInternals = {
   applySnapshot: (snapshot: DraftDuelRoomSnapshot) => void;

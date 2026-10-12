@@ -1,7 +1,7 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
-  import '$lib/collection/ultimate-theme.css';
+  import '$lib/features/collection/ultimate-theme.css';
   import { tick } from 'svelte';
   import type {
     CollectionCatalogCard,
@@ -16,16 +16,16 @@
   import { collectionGameIdSchema } from '@hoop-rush/data-contracts';
   import { validateCollectionChallengeTeam } from '@hoop-rush/engine';
   import AsyncState from '$lib/components/AsyncState.svelte';
-  import ChallengeCard from '$lib/collection/ChallengeCard.svelte';
-  import CollectionBoxScore from '$lib/collection/CollectionBoxScore.svelte';
-  import DifficultyPicker from '$lib/collection/DifficultyPicker.svelte';
-  import MatchupReport from '$lib/collection/MatchupReport.svelte';
-  import GamecastCourt from '$lib/collection/GamecastCourt.svelte';
-  import QuickGamecast from '$lib/collection/QuickGamecast.svelte';
-  import ObjectivePicker from '$lib/collection/ObjectivePicker.svelte';
-  import MatchupCard from '$lib/collection/MatchupCard.svelte';
-  import RewardReceipt from '$lib/collection/RewardReceipt.svelte';
-  import { loadCollectionGameRules } from '$lib/collection/collection-assets.ts';
+  import ChallengeCard from '$lib/features/collection/ChallengeCard.svelte';
+  import CollectionBoxScore from '$lib/features/collection/CollectionBoxScore.svelte';
+  import DifficultyPicker from '$lib/features/collection/DifficultyPicker.svelte';
+  import MatchupReport from '$lib/features/collection/MatchupReport.svelte';
+  import GamecastCourt from '$lib/features/collection/GamecastCourt.svelte';
+  import QuickGamecast from '$lib/features/collection/QuickGamecast.svelte';
+  import ObjectivePicker from '$lib/features/collection/ObjectivePicker.svelte';
+  import MatchupCard from '$lib/features/collection/MatchupCard.svelte';
+  import RewardReceipt from '$lib/features/collection/RewardReceipt.svelte';
+  import { loadCollectionGameRules } from '$lib/features/collection/collection-assets.ts';
   import {
     abandonBasicGame,
     abandonChallengeGame,
@@ -39,10 +39,10 @@
     prepareBasicGame,
     prepareChallengeGame,
     type AcceptedGameOutcome,
-  } from '$lib/collection/collection-hub.ts';
-  import { runCollectionGame } from '$lib/collection/collection-game-runner.ts';
-  import { collectionErrorMessage } from '$lib/collection/collection-errors.ts';
-  import { startersOf } from '$lib/collection/collection-box-score';
+  } from '$lib/features/collection/collection-hub.ts';
+  import { runCollectionGame } from '$lib/features/collection/collection-game-runner.ts';
+  import { collectionErrorMessage } from '$lib/features/collection/collection-errors.ts';
+  import { startersOf } from '$lib/features/collection/collection-box-score';
   import {
     cadenceFor,
     clockLabel,
@@ -50,18 +50,18 @@
     explanationFacts,
     visibleEvents,
     type WatchMode,
-  } from '$lib/collection/collection-gamecast.ts';
+  } from '$lib/features/collection/collection-gamecast.ts';
   import {
     difficultyOptionViews,
     objectiveOptionViews,
     rewardPreview,
-  } from '$lib/collection/collection-setup.ts';
+  } from '$lib/features/collection/collection-setup.ts';
   import {
     challengeCardView,
     challengeRewardPreview,
     requirementLabel,
     type ChallengeCardView,
-  } from '$lib/collection/collection-progression-view.ts';
+  } from '$lib/features/collection/collection-progression-view.ts';
   import { arenaError, arenaGameResult } from '$lib/arena-sound';
   import { onDestroy } from 'svelte';
   import { createUltimatePageShell } from './ultimate-page.svelte.ts';

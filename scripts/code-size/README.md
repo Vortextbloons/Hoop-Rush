@@ -190,3 +190,9 @@ paths change (stages 2, 4, and 6).
   `HavocLoadError` moved to data-contracts (persistence re-exports it for
   existing consumers). The worker runner stays a web transport implementing
   the application runner port.
+- 2026-10-12, stage 5c: remaining mode code co-located under
+  `apps/web/src/lib/features/`: `collection/**` (pages, presenters, selectors,
+  runners, styles), `draft-duel/**` (controller, transport, playback, views),
+  and `multiplayer/**` (fixed-five transport/runner/state/command submit,
+  lobby boundary, views). Pure file moves plus `$lib` import rewrites; no
+  behavior change.

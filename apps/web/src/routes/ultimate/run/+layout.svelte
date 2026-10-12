@@ -7,9 +7,9 @@
   import {
     UltimateRunShell,
     ULTIMATE_RUN_SHELL_CONTEXT,
-  } from '$lib/collection/ultimate-shell.svelte';
+  } from '$lib/features/collection/ultimate-shell.svelte';
   import { isNavItemActive, type NavItem } from '$lib/nav-items';
-  import '$lib/collection/ultimate-theme.css';
+  import '$lib/features/collection/ultimate-theme.css';
 
   let { children } = $props();
   const shell = new UltimateRunShell();

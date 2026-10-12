@@ -9,7 +9,7 @@
     loadLobbyId,
     rememberLobby,
     resumeMultiplayerGame,
-  } from '$lib/multiplayer-lobby';
+  } from '$lib/features/multiplayer/multiplayer-lobby';
 
   let { roomId, completed = false }: { roomId: string; completed?: boolean } = $props();
   let lobbyId = $state<string | null>(null);

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
-  import '$lib/collection/ultimate-theme.css';
+  import '$lib/features/collection/ultimate-theme.css';
   import { tick } from 'svelte';
   import type {
     CollectionActiveTeam,
@@ -9,8 +9,8 @@
     CollectionPlayState,
   } from '@hoop-rush/data-contracts';
   import AsyncState from '$lib/components/AsyncState.svelte';
-  import CollectionCardFace from '$lib/collection/CollectionCardFace.svelte';
-  import { ensurePlayState, setActiveTeam } from '$lib/collection/collection-hub.ts';
+  import CollectionCardFace from '$lib/features/collection/CollectionCardFace.svelte';
+  import { ensurePlayState, setActiveTeam } from '$lib/features/collection/collection-hub.ts';
   import {
     STARTER_SLOT_POSITIONS,
     STARTER_SLOT_LABELS,
@@ -28,7 +28,7 @@
     minutesTotal,
     slotEligibility,
     type TeamDraft,
-  } from '$lib/collection/collection-team-utils.ts';
+  } from '$lib/features/collection/collection-team-utils.ts';
   import type { CollectionMinuteStrategy } from '@hoop-rush/engine';
   import { createUltimatePageShell } from './ultimate-page.svelte.ts';
 

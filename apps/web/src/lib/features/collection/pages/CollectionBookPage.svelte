@@ -1,25 +1,25 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
-  import '$lib/collection/ultimate-theme.css';
+  import '$lib/features/collection/ultimate-theme.css';
   import { page } from '$app/state';
   import { getContext, onDestroy, onMount, tick, untrack } from 'svelte';
   import type { CollectionIndexEntry, CollectionSetId } from '@hoop-rush/data-contracts';
   import { COLLECTION_RARITY_ORDER } from '@hoop-rush/data-contracts';
   import { DETAILED_POSITIONS } from '$lib/player-positions';
   import AsyncState from '$lib/components/AsyncState.svelte';
-  import CollectionCard from '$lib/collection/CollectionCard.svelte';
-  import CardDialog from '$lib/collection/CardDialog.svelte';
+  import CollectionCard from '$lib/features/collection/CollectionCard.svelte';
+  import CardDialog from '$lib/features/collection/CardDialog.svelte';
   import {
     ULTIMATE_RUN_SHELL_CONTEXT,
     type UltimateRunShell,
-  } from '$lib/collection/ultimate-shell.svelte';
-  import ActiveTarget from '$lib/collection/ActiveTarget.svelte';
-  import SetProgress from '$lib/collection/SetProgress.svelte';
+  } from '$lib/features/collection/ultimate-shell.svelte';
+  import ActiveTarget from '$lib/features/collection/ActiveTarget.svelte';
+  import SetProgress from '$lib/features/collection/SetProgress.svelte';
   import {
     loadCollectionIndex,
     loadCollectionProgression,
-  } from '$lib/collection/collection-assets.ts';
+  } from '$lib/features/collection/collection-assets.ts';
   import {
     buildBookItems,
     COLLECTION_PAGE_SIZE,
@@ -29,22 +29,22 @@
     sortBookItems,
     type CollectionFilters,
     type CollectionSortId,
-  } from '$lib/collection/collection-browser.ts';
+  } from '$lib/features/collection/collection-browser.ts';
   import {
     claimSetReward,
     claimWelcomeStarter,
     setTargetPlayer,
-  } from '$lib/collection/collection-hub.ts';
+  } from '$lib/features/collection/collection-hub.ts';
   import {
     targetPlayerSummary,
     targetedSummaryForPlayer,
-  } from '$lib/collection/collection-targeting-view.ts';
-  import { collectionErrorMessage } from '$lib/collection/collection-errors.ts';
-  import { collectionCardArtOf } from '$lib/collection/collection-card-art.ts';
-  import { setProgressViews } from '$lib/collection/collection-progression-view.ts';
-  import PackOpenTheater from '$lib/collection/PackOpenTheater.svelte';
-  import { collectionCardViewOf } from '$lib/collection/collection-card-view.ts';
-  import { packRevealPlanOf } from '$lib/collection/pack-reveal-plan.ts';
+  } from '$lib/features/collection/collection-targeting-view.ts';
+  import { collectionErrorMessage } from '$lib/features/collection/collection-errors.ts';
+  import { collectionCardArtOf } from '$lib/features/collection/collection-card-art.ts';
+  import { setProgressViews } from '$lib/features/collection/collection-progression-view.ts';
+  import PackOpenTheater from '$lib/features/collection/PackOpenTheater.svelte';
+  import { collectionCardViewOf } from '$lib/features/collection/collection-card-view.ts';
+  import { packRevealPlanOf } from '$lib/features/collection/pack-reveal-plan.ts';
   import { arenaPackOpen, arenaPackReveal } from '$lib/arena-sound';
   import type { CollectionProgressionRules, CollectionPullRecord } from '@hoop-rush/data-contracts';
 

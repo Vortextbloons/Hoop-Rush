@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import MultiplayerLobbyLink from '$lib/components/MultiplayerLobbyLink.svelte';
-  import { loadLobbyId, lobbyCommand } from '$lib/multiplayer-lobby';
+  import MultiplayerLobbyLink from '$lib/features/multiplayer/MultiplayerLobbyLink.svelte';
+  import { loadLobbyId, lobbyCommand } from '$lib/features/multiplayer/multiplayer-lobby';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { asset, resolve } from '$app/paths';
@@ -39,28 +39,28 @@
     playerVersionId,
   } from '@hoop-rush/data-contracts';
   import { z } from 'zod';
-  import { getFixedFiveTransport } from '$lib/fixed-five-transport';
-  import { submitFixedFiveCommand } from '$lib/fixed-five-command-submit';
+  import { getFixedFiveTransport } from '$lib/features/multiplayer/fixed-five-transport';
+  import { submitFixedFiveCommand } from '$lib/features/multiplayer/fixed-five-command-submit';
   import {
     friendlyFixedFiveJoinError,
     loadFixedFiveMembership,
     saveFixedFiveMembership,
-  } from '$lib/fixed-five-identity';
-  import { fixedFiveRepository } from '$lib/fixed-five-repo';
-  import { FixedFiveRunner } from '$lib/fixed-five-runner';
+  } from '$lib/features/multiplayer/fixed-five-identity';
+  import { fixedFiveRepository } from '$lib/features/multiplayer/fixed-five-repo';
+  import { FixedFiveRunner } from '$lib/features/multiplayer/fixed-five-runner';
   import {
     FixedFiveSimulationGate,
     type FixedFiveSimulationReason,
-  } from '$lib/fixed-five-simulation-gate';
-  import FixedFiveScoreboard from '$lib/components/FixedFiveScoreboard.svelte';
-  import FixedFiveDraftPanel from '$lib/components/FixedFiveDraftPanel.svelte';
-  import FixedFiveSimShow from '$lib/components/FixedFiveSimShow.svelte';
-  import FixedFiveResults from '$lib/components/FixedFiveResults.svelte';
+  } from '$lib/features/multiplayer/fixed-five-simulation-gate';
+  import FixedFiveScoreboard from '$lib/features/multiplayer/FixedFiveScoreboard.svelte';
+  import FixedFiveDraftPanel from '$lib/features/multiplayer/FixedFiveDraftPanel.svelte';
+  import FixedFiveSimShow from '$lib/features/multiplayer/FixedFiveSimShow.svelte';
+  import FixedFiveResults from '$lib/features/multiplayer/FixedFiveResults.svelte';
   import {
     aggregateFixedFivePlayerStats,
     type FixedFivePlayerStats,
-  } from '$lib/fixed-five-player-stats';
-  import { rollAnimationFor } from '$lib/fixed-five-roll-animation';
+  } from '$lib/features/multiplayer/fixed-five-player-stats';
+  import { rollAnimationFor } from '$lib/features/multiplayer/fixed-five-roll-animation';
   import {
     assembleCompetitionRun,
     buildFixedFiveVerificationInput,
@@ -83,7 +83,7 @@
     type DraftReplay,
     type FixedFiveAssets,
     type PickRef,
-  } from '$lib/fixed-five-room-state';
+  } from '$lib/features/multiplayer/fixed-five-room-state';
   import { presentationForVariant } from '$lib/draft-presentation';
   import ArenaSoundToggle from '$lib/components/ArenaSoundToggle.svelte';
   import { arenaWin } from '$lib/arena-sound';

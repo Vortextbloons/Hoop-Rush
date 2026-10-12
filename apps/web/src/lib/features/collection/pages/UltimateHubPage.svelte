@@ -7,14 +7,17 @@
   } from '@hoop-rush/data-contracts';
   import { validateCollectionActiveTeam } from '@hoop-rush/engine';
   import AsyncState from '$lib/components/AsyncState.svelte';
-  import CollectionCardFace from '$lib/collection/CollectionCardFace.svelte';
-  import CurrencyIcon from '$lib/collection/CurrencyIcon.svelte';
-  import { ensurePlayStateSnapshot, loadCommittedGame } from '$lib/collection/collection-hub.ts';
+  import CollectionCardFace from '$lib/features/collection/CollectionCardFace.svelte';
+  import CurrencyIcon from '$lib/features/collection/CurrencyIcon.svelte';
+  import {
+    ensurePlayStateSnapshot,
+    loadCommittedGame,
+  } from '$lib/features/collection/collection-hub.ts';
   import {
     humanizeIdentifier,
     setProgressViews,
-  } from '$lib/collection/collection-progression-view.ts';
-  import { ultimateNextActionOf } from '$lib/collection/ultimate-hub.ts';
+  } from '$lib/features/collection/collection-progression-view.ts';
+  import { ultimateNextActionOf } from '$lib/features/collection/ultimate-hub.ts';
   import { createUltimatePageShell } from './ultimate-page.svelte.ts';
 
   const pageShell = createUltimatePageShell({

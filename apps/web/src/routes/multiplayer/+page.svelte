@@ -33,10 +33,13 @@
     type FixedFiveVersionLocks,
   } from '@hoop-rush/data-contracts';
   import { ENGINE_VERSION } from '@hoop-rush/engine';
-  import { isFixedFiveSupabaseConfigured } from '$lib/fixed-five-transport';
-  import { DraftDuelController } from '$lib/draft-duel/draft-duel-controller.svelte';
-  import { isDraftDuelSupabaseConfigured } from '$lib/draft-duel-transport';
-  import { friendlyFixedFiveJoinError, loadLastFixedFiveRoomId } from '$lib/fixed-five-identity';
+  import { isFixedFiveSupabaseConfigured } from '$lib/features/multiplayer/fixed-five-transport';
+  import { DraftDuelController } from '$lib/features/draft-duel/draft-duel-controller.svelte';
+  import { isDraftDuelSupabaseConfigured } from '$lib/features/draft-duel/draft-duel-transport';
+  import {
+    friendlyFixedFiveJoinError,
+    loadLastFixedFiveRoomId,
+  } from '$lib/features/multiplayer/fixed-five-identity';
   import { loadRunPreamble } from '$lib/run-preamble';
   import {
     lobbyCommand,
@@ -46,7 +49,7 @@
     rememberLobby,
     loadLobbyId,
     resumeMultiplayerGame,
-  } from '$lib/multiplayer-lobby';
+  } from '$lib/features/multiplayer/multiplayer-lobby';
   type View = 'choose' | 'create' | 'join';
   let view = $state<View>('choose');
   let lobby = $state<MultiplayerLobby | null>(null);

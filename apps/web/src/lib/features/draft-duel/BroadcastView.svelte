@@ -7,7 +7,10 @@
     HoopRushManifest,
   } from '@hoop-rush/data-contracts';
   import { DRAFT_DUEL_TAPE_STAT_FIELDS } from '@hoop-rush/data-contracts';
-  import type { DraftDuelPlaybackSpeed, DraftDuelVisibleState } from '$lib/draft-duel-playback';
+  import type {
+    DraftDuelPlaybackSpeed,
+    DraftDuelVisibleState,
+  } from '$lib/features/draft-duel/draft-duel-playback';
   import PlayerFace from '$lib/components/PlayerFace.svelte';
   import TeamLogo from '$lib/components/TeamLogo.svelte';
   import { SLOT_LABELS } from '$lib/player-positions';

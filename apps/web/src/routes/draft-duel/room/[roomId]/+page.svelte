@@ -18,20 +18,20 @@
     Users,
   } from '@lucide/svelte';
   import ArenaSoundToggle from '$lib/components/ArenaSoundToggle.svelte';
-  import MultiplayerLobbyLink from '$lib/components/MultiplayerLobbyLink.svelte';
+  import MultiplayerLobbyLink from '$lib/features/multiplayer/MultiplayerLobbyLink.svelte';
   import type { DraftDuelCard, DraftDuelOfferedPick } from '@hoop-rush/data-contracts';
-  import { DraftDuelController } from '$lib/draft-duel/draft-duel-controller.svelte';
-  import DraftBoard from '$lib/draft-duel/DraftBoard.svelte';
-  import DraftSlotDialog from '$lib/draft-duel/DraftSlotDialog.svelte';
-  import RosterRail from '$lib/draft-duel/RosterRail.svelte';
-  import ReactionBar from '$lib/draft-duel/ReactionBar.svelte';
-  import RivalConsideration from '$lib/draft-duel/RivalConsideration.svelte';
-  import SeriesTracker from '$lib/draft-duel/SeriesTracker.svelte';
-  import BroadcastView from '$lib/draft-duel/BroadcastView.svelte';
-  import GameResultsPanel from '$lib/draft-duel/GameResultsPanel.svelte';
-  import ChampionshipView from '$lib/draft-duel/ChampionshipView.svelte';
-  import { inviteLinkForDraftDuelCode } from '$lib/draft-duel-identity';
-  import { loadLobbyId, lobbyCommand } from '$lib/multiplayer-lobby';
+  import { DraftDuelController } from '$lib/features/draft-duel/draft-duel-controller.svelte';
+  import DraftBoard from '$lib/features/draft-duel/DraftBoard.svelte';
+  import DraftSlotDialog from '$lib/features/draft-duel/DraftSlotDialog.svelte';
+  import RosterRail from '$lib/features/draft-duel/RosterRail.svelte';
+  import ReactionBar from '$lib/features/draft-duel/ReactionBar.svelte';
+  import RivalConsideration from '$lib/features/draft-duel/RivalConsideration.svelte';
+  import SeriesTracker from '$lib/features/draft-duel/SeriesTracker.svelte';
+  import BroadcastView from '$lib/features/draft-duel/BroadcastView.svelte';
+  import GameResultsPanel from '$lib/features/draft-duel/GameResultsPanel.svelte';
+  import ChampionshipView from '$lib/features/draft-duel/ChampionshipView.svelte';
+  import { inviteLinkForDraftDuelCode } from '$lib/features/draft-duel/draft-duel-identity';
+  import { loadLobbyId, lobbyCommand } from '$lib/features/multiplayer/multiplayer-lobby';
 
   const roomId = $derived($page.params.roomId as string);
   const controller = new DraftDuelController();

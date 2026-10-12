@@ -36,19 +36,19 @@ import {
   type StoredDraftDuelCompleted,
 } from '@hoop-rush/persistence';
 import { newRequestId } from '$lib/ids';
-import { getDraftDuelTransport } from '$lib/draft-duel-transport';
-import { DraftDuelRunner } from '$lib/draft-duel-runner';
+import { getDraftDuelTransport } from '$lib/features/draft-duel/draft-duel-transport';
+import { DraftDuelRunner } from '$lib/features/draft-duel/draft-duel-runner';
 import {
   draftDuelVisibleEventCount,
   draftDuelVisibleState,
   type DraftDuelPlaybackSpeed,
   type DraftDuelVisibleState,
-} from '$lib/draft-duel-playback';
+} from '$lib/features/draft-duel/draft-duel-playback';
 import {
   loadDraftDuelMembership,
   saveDraftDuelMembership,
   friendlyDraftDuelJoinError,
-} from '$lib/draft-duel-identity';
+} from '$lib/features/draft-duel/draft-duel-identity';
 import { loadDraftDuelAssets, type DraftDuelAssets } from './draft-duel-assets';
 import { draftDuelFeedLines, type DraftDuelFeedLine } from './draft-duel-broadcast-view';
 

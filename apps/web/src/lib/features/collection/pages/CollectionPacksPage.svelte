@@ -1,6 +1,6 @@
 <script lang="ts">
   import { asset, resolve } from '$app/paths';
-  import '$lib/collection/ultimate-theme.css';
+  import '$lib/features/collection/ultimate-theme.css';
   import type {
     CollectionIndexEntry,
     CollectionProgressionRules,
@@ -11,16 +11,16 @@
   import { describeCollectionPackOdds, describeCollectionTargetOdds } from '@hoop-rush/engine';
   import AsyncState from '$lib/components/AsyncState.svelte';
   import { createUltimatePageShell } from './ultimate-page.svelte.ts';
-  import ActiveTarget from '$lib/collection/ActiveTarget.svelte';
-  import CurrencyIcon from '$lib/collection/CurrencyIcon.svelte';
-  import { loadCollectionIndex } from '$lib/collection/collection-assets.ts';
+  import ActiveTarget from '$lib/features/collection/ActiveTarget.svelte';
+  import CurrencyIcon from '$lib/features/collection/CurrencyIcon.svelte';
+  import { loadCollectionIndex } from '$lib/features/collection/collection-assets.ts';
   import {
     openPack,
     setTargetPlayer,
     StaleCollectionPreviewError,
-  } from '$lib/collection/collection-hub.ts';
-  import { getCollectionRepo } from '$lib/collection/collection-hub.ts';
-  import { collectionErrorMessage } from '$lib/collection/collection-errors.ts';
+  } from '$lib/features/collection/collection-hub.ts';
+  import { getCollectionRepo } from '$lib/features/collection/collection-hub.ts';
+  import { collectionErrorMessage } from '$lib/features/collection/collection-errors.ts';
   import {
     isTargetedPullSlot,
     packTargetOddsView,
@@ -30,11 +30,11 @@
     targetedSummaryForPlayer,
     type PackTargetOddsView,
     type TargetedReceiptFacts,
-  } from '$lib/collection/collection-targeting-view.ts';
+  } from '$lib/features/collection/collection-targeting-view.ts';
   import { arenaDuplicate, arenaError, arenaPackOpen, arenaPackReveal } from '$lib/arena-sound';
-  import PackOpenTheater from '$lib/collection/PackOpenTheater.svelte';
-  import { collectionCardViewOf } from '$lib/collection/collection-card-view.ts';
-  import { packRevealPlanOf } from '$lib/collection/pack-reveal-plan.ts';
+  import PackOpenTheater from '$lib/features/collection/PackOpenTheater.svelte';
+  import { collectionCardViewOf } from '$lib/features/collection/collection-card-view.ts';
+  import { packRevealPlanOf } from '$lib/features/collection/pack-reveal-plan.ts';
 
   const page = createUltimatePageShell({
     failureMessage: 'Could not load the packs.',

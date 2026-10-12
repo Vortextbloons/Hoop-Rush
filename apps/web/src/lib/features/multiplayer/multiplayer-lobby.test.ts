@@ -17,11 +17,13 @@ vi.mock('./fixed-five-transport', () => ({
   getMultiplayerClient: () => Promise.resolve({ rpc: mocks.rpc }),
   getFixedFiveTransport: () => ({ resume: mocks.fixedResume }),
 }));
-vi.mock('./draft-duel-transport', () => ({
+vi.mock('./fixed-five-identity', () => ({ saveFixedFiveMembership: mocks.saveFixed }));
+vi.mock('$lib/features/draft-duel/draft-duel-transport', () => ({
   getDraftDuelTransport: () => ({ resume: mocks.draftResume }),
 }));
-vi.mock('./fixed-five-identity', () => ({ saveFixedFiveMembership: mocks.saveFixed }));
-vi.mock('./draft-duel-identity', () => ({ saveDraftDuelMembership: mocks.saveDraft }));
+vi.mock('$lib/features/draft-duel/draft-duel-identity', () => ({
+  saveDraftDuelMembership: mocks.saveDraft,
+}));
 
 const lobbyId = '10b3b9f2-b103-4f01-a883-63885be10011';
 beforeEach(() => vi.clearAllMocks());

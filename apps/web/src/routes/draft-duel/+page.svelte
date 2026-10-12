@@ -16,9 +16,12 @@
     Users,
   } from '@lucide/svelte';
   import type { DraftDuelFairness, DraftDuelPresentation } from '@hoop-rush/data-contracts';
-  import { DraftDuelController } from '$lib/draft-duel/draft-duel-controller.svelte';
-  import { isDraftDuelSupabaseConfigured, getDraftDuelTransport } from '$lib/draft-duel-transport';
-  import { loadLastDraftDuelRoomId } from '$lib/draft-duel-identity';
+  import { DraftDuelController } from '$lib/features/draft-duel/draft-duel-controller.svelte';
+  import {
+    isDraftDuelSupabaseConfigured,
+    getDraftDuelTransport,
+  } from '$lib/features/draft-duel/draft-duel-transport';
+  import { loadLastDraftDuelRoomId } from '$lib/features/draft-duel/draft-duel-identity';
 
   type View = 'create' | 'join';
   const controller = new DraftDuelController();

@@ -18,7 +18,7 @@
   import PlayerFace from '$lib/components/PlayerFace.svelte';
   import DraftValuePanel from '$lib/components/DraftValuePanel.svelte';
   import { classicPoolRows } from '$lib/classic-draft';
-  import FixedFiveTurnTakeover from '$lib/components/FixedFiveTurnTakeover.svelte';
+  import FixedFiveTurnTakeover from '$lib/features/multiplayer/FixedFiveTurnTakeover.svelte';
   import { arenaPickSlam } from '$lib/arena-sound';
   import { poolSortLabel, sortDraftRows, type DraftPresentation } from '$lib/draft-presentation';
   import {
@@ -30,8 +30,8 @@
     scoreDraftPoolMemo,
     type DraftFitContext,
   } from '$lib/draft-fit';
-  import type { RollAnimationAxis } from '$lib/fixed-five-roll-animation';
-  import { stableRollAnimationId } from '$lib/fixed-five-roll-animation';
+  import type { RollAnimationAxis } from '$lib/features/multiplayer/fixed-five-roll-animation';
+  import { stableRollAnimationId } from '$lib/features/multiplayer/fixed-five-roll-animation';
   import { formatPositions } from '$lib/player-positions';
   import { resolvePlayerRefs } from '$lib/player-refs';
   import type { PeakPlayerSeason } from '@hoop-rush/data-contracts';
@@ -39,7 +39,7 @@
     isFixedFiveDraftTurn,
     type DraftReplay,
     type FixedFiveAssets,
-  } from '$lib/fixed-five-room-state';
+  } from '$lib/features/multiplayer/fixed-five-room-state';
   let {
     mode,
     selfId,
