@@ -1,10 +1,7 @@
 import {
   COLLECTION_GAME_V1_VERSION,
   COLLECTION_GAME_V2_VERSION,
-  COLLECTION_PLAY_SAVE_V2_VERSION,
   COLLECTION_PLAY_SAVE_VERSION,
-  COLLECTION_PLAY_SAVE_V1_VERSION,
-  COLLECTION_SAVE_V1_VERSION,
   COLLECTION_SAVE_VERSION,
   seedSchema,
   type CollectionBalances,
@@ -31,9 +28,6 @@ import {
   collectionStateFactsOf,
   initializeCollectionPlayState,
   initializeCollectionState,
-  migrateCollectionPlayStateV1,
-  migrateCollectionPlayStateV2,
-  migrateCollectionStateV1,
   validateCollectionProgressionRules,
   type CollectionGameCommandInput,
   type CollectionGameCommandResult,
@@ -43,7 +37,9 @@ import {
   commandReceiptMatches,
   deleteScopedNumericRows,
   deleteScopedRows,
+  hasSaveSchemaVersion,
   parseRecord,
+  saveSchemaVersionOf,
   scopedNumericRows,
   scopedRows,
   stateMatches,
@@ -59,10 +55,8 @@ import {
   storedCollectionLedgerSchema,
   storedCollectionOwnershipSchema,
   storedCollectionPlayStateSchema,
-  storedCollectionPlayStateUnionSchema,
   storedCollectionPullSchema,
   storedCollectionStateSchema,
-  storedCollectionStateUnionSchema,
   type StoredCollectionCommandRow,
   type StoredCollectionGameCommandRow,
 } from '../schemas/collection-record.ts';
@@ -167,10 +161,7 @@ function parseChecked<T>(schema: ParseableSchema<T>, value: unknown, label: stri
 export class DexieCollectionRepository {
   private readonly db: HoopRushDatabase;
   private readonly applyGameCommand: CollectionGameCommandApplier;
-  constructor(
-    db: HoopRushDatabase = new HoopRushDatabase(),
-    options: DexieCollectionRepositoryOptions = {},
-  ) {
+  constructor(db: HoopRushDatabase, options: DexieCollectionRepositoryOptions = {}) {
     this.db = db;
     this.applyGameCommand =
       options.applyGameCommand ??
@@ -192,20 +183,13 @@ export class DexieCollectionRepository {
       async (): Promise<LoadedCollection | null> => {
         const row = await this.db.collectionState.get(collectionId);
         if (row === undefined) return null;
-        const savedVersion: number = row.saveSchemaVersion;
-        if (
-          savedVersion !== COLLECTION_SAVE_VERSION &&
-          savedVersion !== COLLECTION_SAVE_V1_VERSION
-        ) {
+        if (!hasSaveSchemaVersion(row, COLLECTION_SAVE_VERSION)) {
           throw new CollectionLoadError('unsupported', [
-            `saveSchemaVersion ${String(savedVersion)} != ${String(COLLECTION_SAVE_VERSION)}`,
+            `saveSchemaVersion ${String(saveSchemaVersionOf(row))} != ${String(COLLECTION_SAVE_VERSION)}`,
           ]);
         }
-        const parsedRow = parseChecked(storedCollectionStateUnionSchema, row, 'state row');
-        const state: CollectionState =
-          parsedRow.saveSchemaVersion === COLLECTION_SAVE_VERSION
-            ? parsedRow.state
-            : migrateCollectionStateV1(parsedRow.state);
+        const parsedRow = parseChecked(storedCollectionStateSchema, row, 'state row');
+        const state: CollectionState = parsedRow.state;
         const ownership = await scopedRows(
           this.db.collectionOwnership,
           '[collectionId+cardId]',
@@ -592,23 +576,13 @@ export class DexieCollectionRepository {
       async (): Promise<LoadedPlayState | null> => {
         const row = await this.db.collectionPlayState.get(collectionId);
         if (row === undefined) return null;
-        const savedVersion: number = row.saveSchemaVersion;
-        if (
-          savedVersion !== COLLECTION_PLAY_SAVE_VERSION &&
-          savedVersion !== COLLECTION_PLAY_SAVE_V2_VERSION &&
-          savedVersion !== COLLECTION_PLAY_SAVE_V1_VERSION
-        ) {
+        if (!hasSaveSchemaVersion(row, COLLECTION_PLAY_SAVE_VERSION)) {
           throw new CollectionLoadError('unsupported', [
-            `play saveSchemaVersion ${String(savedVersion)} is not supported`,
+            `play saveSchemaVersion ${String(saveSchemaVersionOf(row))} is not supported`,
           ]);
         }
-        const parsed = parseChecked(storedCollectionPlayStateUnionSchema, row, 'play state row');
-        const playState =
-          parsed.saveSchemaVersion === COLLECTION_PLAY_SAVE_VERSION
-            ? parsed.playState
-            : parsed.saveSchemaVersion === COLLECTION_PLAY_SAVE_V2_VERSION
-              ? migrateCollectionPlayStateV2(parsed.playState)
-              : migrateCollectionPlayStateV1(parsed.playState);
+        const parsed = parseChecked(storedCollectionPlayStateSchema, row, 'play state row');
+        const playState = parsed.playState;
         const gameRows = await scopedRows(
           this.db.collectionGames,
           '[collectionId+gameId]',
@@ -834,7 +808,7 @@ export class DexieCollectionRepository {
         if (currentPlay === undefined) {
           throw new CollectionCommandStaleError('play state deleted during commit');
         }
-        const parsedPlay = storedCollectionPlayStateUnionSchema.parse(currentPlay);
+        const parsedPlay = storedCollectionPlayStateSchema.parse(currentPlay);
         if (!stateMatches(parsedPlay.playState, play.playState)) {
           throw new CollectionCommandStaleError('play state revision advanced during commit');
         }

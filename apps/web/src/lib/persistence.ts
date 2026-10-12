@@ -1,8 +1,12 @@
 import {
   DexieChallengeRepository,
+  DexieCollectionRepository,
+  DexieDraftDuelRepository,
   DexieFixedFiveRepository,
+  DexieHavocRepository,
   DexieSeasonRunRepository,
   HoopRushDatabase,
+  type DexieCollectionRepositoryOptions,
   type SeasonPostseasonRepository,
   type SeasonRunRepository,
 } from '@hoop-rush/persistence';
@@ -12,6 +16,9 @@ export interface Persistence {
   db: HoopRushDatabase;
   challengeRepository: DexieChallengeRepository;
   fixedFiveRepository: DexieFixedFiveRepository;
+  havocRepository: DexieHavocRepository;
+  draftDuelRepository: DexieDraftDuelRepository;
+  collectionRepository(options: DexieCollectionRepositoryOptions): DexieCollectionRepository;
   seasonRunRepository(options: {
     schedule?: SeasonSchedule;
   }): SeasonRunRepository & SeasonPostseasonRepository;
@@ -26,6 +33,9 @@ export function getPersistence(): Persistence {
       db,
       challengeRepository: new DexieChallengeRepository(db),
       fixedFiveRepository: new DexieFixedFiveRepository(db),
+      havocRepository: new DexieHavocRepository(db),
+      draftDuelRepository: new DexieDraftDuelRepository(db),
+      collectionRepository: (options) => new DexieCollectionRepository(db, options),
       seasonRunRepository: (options) => new DexieSeasonRunRepository(db, options),
     };
   }

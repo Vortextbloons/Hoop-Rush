@@ -29,7 +29,7 @@ import {
 } from './support.ts';
 export class DexieDraftDuelRepository {
   private readonly db: HoopRushDatabase;
-  constructor(db: HoopRushDatabase = new HoopRushDatabase()) {
+  constructor(db: HoopRushDatabase) {
     this.db = db;
   }
   async saveActive(state: DraftDuelActiveState): Promise<void> {

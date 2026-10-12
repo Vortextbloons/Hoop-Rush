@@ -44,10 +44,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
   private readonly run: SeasonRunOps;
   private readonly postseason: SeasonPostseasonOps;
   private readonly completed: SeasonCompletedOps;
-  constructor(
-    db: HoopRushDatabase = new HoopRushDatabase(),
-    options: SeasonRunRepositoryOptions = {},
-  ) {
+  constructor(db: HoopRushDatabase, options: SeasonRunRepositoryOptions = {}) {
     const schedule = options.schedule ?? null;
     const seam = options.seam ?? seasonRunEngineSeam;
     this.run = new SeasonRunOps(db, schedule, seam);
@@ -142,10 +139,4 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
   buildReplayExport(runId: string, gameId: string): Promise<SeasonReplayExport | null> {
     return this.completed.buildReplayExport(runId, gameId);
   }
-}
-export function loadActiveRunWithSchedule(
-  schedule: SeasonSchedule,
-  db: HoopRushDatabase = new HoopRushDatabase(),
-): Promise<SeasonRunSnapshot | null> {
-  return new DexieSeasonRunRepository(db, { schedule }).loadActiveRun();
 }

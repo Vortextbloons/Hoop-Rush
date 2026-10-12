@@ -707,8 +707,6 @@ export {
   toCollectionSimulationPlayer,
   collectionStateDigest,
   collectionStateFactsOf,
-  collectionStateV1Digest,
-  collectionStateV1FactsOf,
 } from './collection/cards.ts';
 export {
   validateCollectionTeamFoundation,
@@ -765,8 +763,6 @@ export {
   initializeCollectionPlayState,
   collectionPlayStateFactsOf,
   collectionPlayStateDigest,
-  migrateCollectionPlayStateV1,
-  migrateCollectionPlayStateV2,
 } from './collection/play-state.ts';
 export {
   applyCollectionGameCommand,
@@ -774,7 +770,7 @@ export {
   type CommandInput as CollectionGameCommandInput,
 } from './collection/game-commands.ts';
 export { auditCollectionState, auditCollectionFirstClearState } from './collection/audit.ts';
-export { initializeCollectionState, migrateCollectionStateV1 } from './collection/state.ts';
+export { initializeCollectionState } from './collection/state.ts';
 export {
   WELCOME_COIN_GRANT,
   CollectionCommandError,

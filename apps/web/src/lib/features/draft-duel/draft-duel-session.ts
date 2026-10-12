@@ -38,11 +38,12 @@ import {
   type DraftDuelSeriesRosters,
 } from '@hoop-rush/engine';
 import {
-  DexieDraftDuelRepository,
+  type DexieDraftDuelRepository,
   type DraftDuelCompletionRecap,
   type StoredDraftDuelCompleted,
 } from '@hoop-rush/persistence';
 import { newRequestId } from '$lib/ids';
+import { getPersistence } from '$lib/persistence';
 import { getDraftDuelTransport } from '$lib/features/draft-duel/draft-duel-transport';
 import { DraftDuelRunner } from '$lib/features/draft-duel/draft-duel-runner';
 import {
@@ -112,7 +113,7 @@ export function createDraftDuelSession(
 ): DraftDuelSession {
   return new DraftDuelSession({
     transport: overrides.transport ?? getDraftDuelTransport(),
-    repository: overrides.repository ?? new DexieDraftDuelRepository(),
+    repository: overrides.repository ?? getPersistence().draftDuelRepository,
     runner: overrides.runner ?? new DraftDuelRunner(),
     loadAssets: overrides.loadAssets ?? (() => loadDraftDuelAssets()),
     now: overrides.now ?? (() => Date.now()),

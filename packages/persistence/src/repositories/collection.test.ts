@@ -1,8 +1,6 @@
-import Dexie from 'dexie';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   COLLECTION_COMMAND_VERSION,
-  COLLECTION_SAVE_V1_VERSION,
   COLLECTION_STATE_SCHEMA_VERSION,
   collectionCommandSchema,
   collectionGameCommandSchema,
@@ -35,7 +33,7 @@ import {
   DexieCollectionRepository,
   type LoadedPlayState,
 } from './collection.ts';
-import { HOOP_RUSH_DATABASE_STORES, HoopRushDatabase } from './dexie.ts';
+import { HoopRushDatabase } from './dexie.ts';
 import {
   resetIndexedDb,
   restoreIndexedDb,
@@ -439,99 +437,6 @@ describe('M4.4 collection persistence', () => {
         recordedAtIso: '2026-01-01T00:00:00.000Z',
       }),
     ).rejects.toMatchObject({ code: 'set-already-claimed' });
-  });
-
-  it('migrates a v1 collection row to v2 without losing records', async () => {
-    resetIndexedDb();
-    const name = testDatabaseName('collection-v1-migration');
-    const legacy = new Dexie(name);
-    legacy.version(19).stores(HOOP_RUSH_DATABASE_STORES);
-    await legacy.open();
-    const firstCard = CATALOG.cards[0];
-    if (firstCard === undefined) throw new Error('fixture catalog too small');
-    const v1State = {
-      schemaVersion: 1,
-      collectionVersion: 'collection-v1',
-      catalogVersion: 'collection-catalog-v1',
-      economyVersion: 'collection-economy-v1',
-      collectionId: 'collection-1',
-      rootSeed: '0'.repeat(32),
-      revision: 1,
-      digest: 'f'.repeat(32),
-      claimedWelcome: true,
-      owned: [
-        {
-          cardId: firstCard.cardId,
-          acquiredPullSequence: 0,
-          acquiredSlotIndex: 0,
-          acquiredAtIso: '2026-01-01T00:00:00.000Z',
-        },
-      ],
-      balances: { Coins: 3000, Exchange: 0 },
-      nextPullSequence: 1,
-    };
-    await legacy.table('collectionState').put({
-      collectionId: 'collection-1',
-      saveSchemaVersion: COLLECTION_SAVE_V1_VERSION,
-      state: v1State,
-      catalogHash: HASH,
-      updatedAtIso: '2026-01-01T00:00:00.000Z',
-    });
-    await legacy.table('collectionOwnership').put({
-      collectionId: 'collection-1',
-      cardId: firstCard.cardId,
-      owned: v1State.owned[0],
-    });
-    await legacy.table('collectionPulls').put({
-      collectionId: 'collection-1',
-      pullSequence: 0,
-      pull: {
-        pullSequence: 0,
-        kind: 'welcome',
-        packRulesVersion: 'collection-pack-rules-v1',
-        economyVersion: 'collection-economy-v1',
-        catalogVersion: 'collection-catalog-v1',
-        catalogHash: HASH,
-        commandId: 'cmd-welcome',
-        seedPath: ['collection', 'starter'],
-        slots: [
-          {
-            slotIndex: 0,
-            cardId: firstCard.cardId,
-            rarity: firstCard.rarity,
-            kept: true,
-            conversionAmount: 0,
-          },
-        ],
-      },
-    });
-    await legacy.table('collectionLedger').put({
-      collectionId: 'collection-1',
-      transactionId: `txn-${'1'.repeat(32)}`,
-      entry: {
-        transactionId: `txn-${'1'.repeat(32)}`,
-        commandId: 'cmd-welcome',
-        pullSequence: 0,
-        currency: 'Coins',
-        amount: 3000,
-        reason: 'welcome-grant',
-      },
-    });
-    legacy.close();
-
-    const db = new HoopRushDatabase(name);
-    const repo = new DexieCollectionRepository(db);
-    const loaded = await repo.loadCollection('collection-1');
-    expect(loaded).not.toBeNull();
-    expect(loaded?.state.schemaVersion).toBe(COLLECTION_STATE_SCHEMA_VERSION);
-    expect(loaded?.state.activeTargetPlayerId).toBeNull();
-    expect(loaded?.state.claimedSetIds).toEqual([]);
-    expect(loaded?.state.progressionHash).toBeNull();
-    expect(loaded?.state.owned).toHaveLength(1);
-    expect(loaded?.state.balances.Coins).toBe(3000);
-    expect(loaded?.pulls).toHaveLength(1);
-    expect(loaded?.state.digest).not.toBe('f'.repeat(32));
-    db.close();
   });
 
   it('completes a challenge game atomically with reward ledger and clear state', async () => {

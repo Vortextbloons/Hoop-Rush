@@ -5,7 +5,6 @@ import {
   COLLECTION_STATE_SCHEMA_VERSION,
   COLLECTION_VERSION,
   type CollectionState,
-  type CollectionStateV1,
 } from '@hoop-rush/data-contracts';
 import { collectionStateDigest, collectionStateFactsOf } from './cards.ts';
 
@@ -33,26 +32,4 @@ export function initializeCollectionState(input: {
     claimedSetIds: [],
   };
   return { ...state, digest: collectionStateDigest(collectionStateFactsOf(state)) };
-}
-
-export function migrateCollectionStateV1(state: CollectionStateV1): CollectionState {
-  const migrated: CollectionState = {
-    schemaVersion: COLLECTION_STATE_SCHEMA_VERSION,
-    collectionVersion: COLLECTION_VERSION,
-    catalogVersion: state.catalogVersion,
-    economyVersion: state.economyVersion,
-    progressionVersion: COLLECTION_PROGRESSION_VERSION,
-    progressionHash: null,
-    collectionId: state.collectionId,
-    rootSeed: state.rootSeed,
-    revision: state.revision,
-    digest: '0'.repeat(32),
-    claimedWelcome: state.claimedWelcome,
-    owned: [...state.owned],
-    balances: { ...state.balances },
-    nextPullSequence: state.nextPullSequence,
-    activeTargetPlayerId: null,
-    claimedSetIds: [],
-  };
-  return { ...migrated, digest: collectionStateDigest(collectionStateFactsOf(migrated)) };
 }

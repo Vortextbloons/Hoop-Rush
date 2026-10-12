@@ -34,10 +34,9 @@ import {
 } from '@hoop-rush/engine';
 import {
   CollectionCommandStaleError,
-  DexieCollectionRepository,
-  HoopRushDatabase,
   type CollectionGameCommandApplier,
 } from '@hoop-rush/persistence';
+import { getPersistence } from '$lib/persistence';
 import { getManifest } from '$lib/data';
 import { resolveAssetUrl } from '$lib/asset-url';
 import {
@@ -64,12 +63,6 @@ export class StaleCollectionPreviewError extends Error {
   }
 }
 
-let dbInstance: HoopRushDatabase | null = null;
-export function getCollectionDb(): HoopRushDatabase {
-  if (!dbInstance) dbInstance = new HoopRushDatabase();
-  return dbInstance;
-}
-
 const ACCEPT_RESULT_COMMANDS = new Set([
   'accept-basic-game-result',
   'accept-challenge-game-result',
@@ -93,10 +86,8 @@ const workerGameCommandApplier: CollectionGameCommandApplier = async (
   });
 };
 
-export function getCollectionRepo(): DexieCollectionRepository {
-  return new DexieCollectionRepository(getCollectionDb(), {
-    applyGameCommand: workerGameCommandApplier,
-  });
+export function getCollectionRepo() {
+  return getPersistence().collectionRepository({ applyGameCommand: workerGameCommandApplier });
 }
 
 function randomSeedHex(): string {

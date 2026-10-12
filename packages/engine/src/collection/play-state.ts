@@ -8,8 +8,6 @@ import {
   type CollectionActiveTeam,
   type CollectionCatalogCard,
   type CollectionPlayState,
-  type CollectionPlayStateV1,
-  type CollectionPlayStateV2,
 } from '@hoop-rush/data-contracts';
 import { CollectionCommandError } from './packs.ts';
 import { initializeCollectionActiveTeam } from './active-team.ts';
@@ -74,40 +72,4 @@ export function initializeCollectionPlayState(input: {
     clearedChallengeIds: [],
   };
   return { ...state, digest: collectionPlayStateDigest(collectionPlayStateFactsOf(state)) };
-}
-
-export function migrateCollectionPlayStateV1(state: CollectionPlayStateV1): CollectionPlayState {
-  const migrated: CollectionPlayState = {
-    saveVersion: COLLECTION_PLAY_SAVE_VERSION,
-    schemaVersion: COLLECTION_SCHEMA_VERSION,
-    teamVersion: state.teamVersion,
-    gameVersion: COLLECTION_GAME_VERSION,
-    collectionId: state.collectionId,
-    activeTeam: state.activeTeam,
-    revision: state.revision,
-    digest: '0'.repeat(32),
-    nextGameSequence: state.nextGameSequence,
-    pendingGame: state.pendingGame,
-    clearedDifficultyIds: [],
-    clearedChallengeIds: [],
-  };
-  return { ...migrated, digest: collectionPlayStateDigest(collectionPlayStateFactsOf(migrated)) };
-}
-
-export function migrateCollectionPlayStateV2(state: CollectionPlayStateV2): CollectionPlayState {
-  const migrated: CollectionPlayState = {
-    saveVersion: COLLECTION_PLAY_SAVE_VERSION,
-    schemaVersion: COLLECTION_SCHEMA_VERSION,
-    teamVersion: state.teamVersion,
-    gameVersion: COLLECTION_GAME_VERSION,
-    collectionId: state.collectionId,
-    activeTeam: state.activeTeam,
-    revision: state.revision,
-    digest: '0'.repeat(32),
-    nextGameSequence: state.nextGameSequence,
-    pendingGame: state.pendingGame,
-    clearedDifficultyIds: [...state.clearedDifficultyIds],
-    clearedChallengeIds: [],
-  };
-  return { ...migrated, digest: collectionPlayStateDigest(collectionPlayStateFactsOf(migrated)) };
 }

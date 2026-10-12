@@ -11,9 +11,9 @@ import {
   type OpponentBracket,
   type SeasonDraftCatalog,
 } from '@hoop-rush/data-contracts';
-import { DexieHavocRepository } from '@hoop-rush/persistence';
 import { getManifest } from '$lib/data';
 import { newRequestId, newSeasonId, seasonRootSeed } from '$lib/ids';
+import { getPersistence } from '$lib/persistence';
 import { loadRunPreamble } from '$lib/run-preamble';
 import { loadSeasonDraftCatalog } from '$lib/season/season-assets';
 import { HavocRunner } from './havoc-runner';
@@ -30,7 +30,7 @@ export interface CreateHavocServiceOptions {
 
 export function createHavocService(options: CreateHavocServiceOptions = {}): HavocService {
   return new HavocSession({
-    repository: options.repository ?? new DexieHavocRepository(),
+    repository: options.repository ?? getPersistence().havocRepository,
     runner: options.runner ?? new HavocRunner(),
     assets: {
       loadCatalog: options.loadCatalog ?? loadSeasonDraftCatalog,

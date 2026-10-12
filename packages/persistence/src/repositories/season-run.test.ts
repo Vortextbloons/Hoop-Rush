@@ -1,5 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
-import Dexie from 'dexie';
+import { describe, expect, it } from 'vitest';
 import {
   SEASON_RUN_SAVE_SCHEMA_VERSION,
   commandIdSchema,
@@ -13,21 +12,15 @@ import {
 } from '@hoop-rush/data-contracts';
 import { SEASON_RUN_RECORD_ID } from '../schemas/season-run-record.ts';
 import { challengeRunProgressDigest } from '@hoop-rush/engine';
-import { DexieChallengeRepository, HoopRushDatabase } from './dexie.ts';
+import { DexieChallengeRepository } from './dexie.ts';
 import { DexieSeasonDraftRepository } from './season-draft.ts';
 import { DexieSeasonRunRepository, SeasonRunLoadError } from './season-run-dexie.ts';
-import {
-  TestDatabase,
-  resetIndexedDb,
-  restoreIndexedDb,
-  testDatabaseName,
-} from '../testing/repo-test-support.ts';
+import { TestDatabase, testDatabaseName } from '../testing/repo-test-support.ts';
 import {
   buildFixtureEffectsState,
   buildFixtureInterruption,
   buildFixturePendingBlock,
   buildFixtureRun,
-  buildFixtureSchedule,
   buildFixtureStateDigest,
   buildFixtureStoredDraft,
   buildStubSeasonEngineSeam,
@@ -544,39 +537,6 @@ describe('season run unsupported-version handling', () => {
       await corruptStoredEffects(adapters, mutate);
       await expect(repo.loadActiveRun(), name).rejects.toThrow(SeasonRunLoadError);
     }
-  });
-});
-describe('season run storage upgrades', () => {
-  afterEach(restoreIndexedDb);
-  it('opens a v5-era save at schema version 6 and keeps the stored draft intact', async () => {
-    resetIndexedDb();
-    const run = buildFixtureRun({});
-    const legacyDb = new Dexie('hoop-rush-saves');
-    legacyDb.version(1).stores({ active: 'recordId', completed: 'recordId', history: 'recordId' });
-    legacyDb.version(2).stores({
-      active: 'recordId',
-      activeGames: '[runId+gameNumber], runId',
-      completed: 'recordId',
-      history: 'recordId',
-    });
-    legacyDb.version(3).stores({ history: 'recordId, completedAtIso' });
-    legacyDb.version(4).stores({ classicDrafts: 'recordId' });
-    legacyDb.version(5).stores({ seasonDrafts: 'recordId' });
-    await legacyDb.open();
-    await legacyDb.table('seasonDrafts').put(buildFixtureStoredDraft(run));
-    legacyDb.close();
-    const db = new HoopRushDatabase();
-    const seasonDraft = new DexieSeasonDraftRepository(db);
-    const seasonRun = new DexieSeasonRunRepository(db, {
-      schedule: buildFixtureSchedule(run.rootSeed),
-      seam: buildStubSeasonEngineSeam(),
-    });
-    expect((await seasonDraft.loadSeasonDraft())?.draft.runId).toBe(run.runId);
-    expect(await seasonRun.loadActiveRunIndex()).toBeNull();
-    await seasonRun.promoteSeasonDraftToRun(buildFixtureStoredDraft(run), run);
-    const snapshot = await seasonRun.loadActiveRun();
-    expect(snapshot?.run.games).toHaveLength(1230);
-    expect(await seasonDraft.loadSeasonDraft()).toBeNull();
   });
 });
 describe('season run M2.5 pending blocks (v5)', () => {

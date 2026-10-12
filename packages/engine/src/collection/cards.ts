@@ -5,7 +5,6 @@ import {
   type CollectionCatalogCard,
   type CollectionCardDefinition,
   type CollectionState,
-  type CollectionStateV1,
   type SimulationPlayer,
   type SimulationRatings,
   type SimulationTendencies,
@@ -98,52 +97,6 @@ export function toCollectionSimulationPlayer(
     tendencies: resolved.tendencies,
     anchors: source.anchors,
     reconstructedThreePoint: source.reconstructedThreePoint,
-  };
-}
-
-export function collectionStateV1Digest(facts: {
-  collectionId: string;
-  revision: number;
-  claimedWelcome: boolean;
-  ownedCardIds: readonly string[];
-  balances: CollectionBalances;
-  nextPullSequence: number;
-  catalogVersion: string;
-  economyVersion: string;
-}): string {
-  return seasonDigestHex(
-    canonicalJson({
-      balances: facts.balances,
-      catalogVersion: facts.catalogVersion,
-      claimedWelcome: facts.claimedWelcome,
-      collectionId: facts.collectionId,
-      economyVersion: facts.economyVersion,
-      nextPullSequence: facts.nextPullSequence,
-      ownedCardIds: [...facts.ownedCardIds].sort(),
-      revision: facts.revision,
-    }),
-  );
-}
-
-export function collectionStateV1FactsOf(state: CollectionStateV1): {
-  collectionId: string;
-  revision: number;
-  claimedWelcome: boolean;
-  ownedCardIds: string[];
-  balances: CollectionBalances;
-  nextPullSequence: number;
-  catalogVersion: string;
-  economyVersion: string;
-} {
-  return {
-    collectionId: state.collectionId,
-    revision: state.revision,
-    claimedWelcome: state.claimedWelcome,
-    ownedCardIds: state.owned.map((entry) => entry.cardId),
-    balances: state.balances,
-    nextPullSequence: state.nextPullSequence,
-    catalogVersion: state.catalogVersion,
-    economyVersion: state.economyVersion,
   };
 }
 

@@ -1,20 +1,6 @@
 import Dexie, { type EntityTable, type Table } from 'dexie';
-import {
-  CHECKPOINT_SAVE_SCHEMA_VERSION,
-  CLASSIC_DRAFT_SCHEMA_VERSION,
-  COLLECTION_PLAY_SAVE_V1_VERSION,
-  COLLECTION_PLAY_SAVE_V2_VERSION,
-  COLLECTION_PLAY_SAVE_VERSION,
-  COLLECTION_SAVE_V1_VERSION,
-  COLLECTION_SAVE_VERSION,
-  SAVE_SCHEMA_VERSION,
-} from '@hoop-rush/data-contracts';
-import {
-  challengeRunProgressDigest,
-  migrateCollectionPlayStateV1,
-  migrateCollectionPlayStateV2,
-  migrateCollectionStateV1,
-} from '@hoop-rush/engine';
+import { SAVE_SCHEMA_VERSION } from '@hoop-rush/data-contracts';
+import { challengeRunProgressDigest } from '@hoop-rush/engine';
 import {
   classicDraftRecordSchema,
   type StoredClassicDraft,
@@ -82,17 +68,11 @@ import type {
   StoredHavocHistoryRow,
   StoredHavocRetainedTape,
 } from '../schemas/havoc-record.ts';
-import {
-  storedCollectionPlayStateV1Schema,
-  storedCollectionPlayStateV2Schema,
-  storedCollectionPlayStateV3Schema,
-  storedCollectionStateV1Schema,
-  storedCollectionStateV2Schema,
-} from '../schemas/collection-record.ts';
-import { hasStaleSaveSchemaVersion, listCompletedHistory } from './support.ts';
+import { listCompletedHistory } from './support.ts';
 const ACTIVE_RECORD_ID = 'active';
 const CLASSIC_DRAFT_RECORD_ID = 'classic-draft';
-const V2_MIGRATED_CHECKPOINT_SAVE_SCHEMA_VERSION = 3;
+
+export const HOOP_RUSH_DATABASE_NAME = 'hoop-rush-saves-v2';
 
 export const HOOP_RUSH_DATABASE_STORES: Record<string, string> = {
   active: 'recordId',
@@ -132,9 +112,7 @@ export const HOOP_RUSH_DATABASE_STORES: Record<string, string> = {
   collectionPlayState: 'collectionId',
   collectionGames: '[collectionId+gameId], collectionId',
   collectionGameCommands: '[collectionId+commandId], collectionId',
-};
-// havocActiveRuns is a singleton store keyed by the fixed 'active' record id.
-export const HAVOC_DATABASE_STORES: Record<string, string> = {
+  // havocActiveRuns is a singleton store keyed by the fixed 'active' record id.
   havocActiveRuns: 'recordId',
   havocCommands: 'commandId, runId',
   havocGames: '[runId+variant+gameNumber], runId, [runId+variant]',
@@ -186,253 +164,14 @@ export class HoopRushDatabase extends Dexie {
   havocRetainedTapes!: Table<StoredHavocRetainedTape, [string, number]>;
   havocCompletedRuns!: EntityTable<StoredHavocCompletedRun, 'runId'>;
   havocHistory!: EntityTable<StoredHavocHistoryRow, 'runId'>;
-  constructor(name = 'hoop-rush-saves') {
+  constructor(name = HOOP_RUSH_DATABASE_NAME) {
     super(name);
-    this.version(1).stores({
-      active: 'recordId',
-      completed: 'recordId',
-      history: 'recordId',
-    });
-    this.version(2)
-      .stores({
-        active: 'recordId',
-        activeGames: '[runId+gameNumber], runId',
-        completed: 'recordId',
-        history: 'recordId',
-      })
-      .upgrade(async (tx) => {
-        const legacy = await tx.table<StoredRunRecord, string>('active').get(ACTIVE_RECORD_ID);
-        if (legacy === undefined) return;
-        const validated = storedRunRecordSchema.parse(legacy);
-        await tx.table('activeGames').bulkPut(
-          validated.run.games.map((result) => ({
-            runId: validated.run.runId,
-            gameNumber: result.gameNumber,
-            result,
-            updatedAtIso: validated.updatedAtIso,
-          })),
-        );
-        const { games: _games, schemaVersion: _schemaVersion, ...run } = validated.run;
-        await tx.table('active').put({
-          recordId: ACTIVE_RECORD_ID,
-          saveSchemaVersion: V2_MIGRATED_CHECKPOINT_SAVE_SCHEMA_VERSION,
-          ...run,
-          updatedAtIso: validated.updatedAtIso,
-        });
-      });
-    this.version(3).stores({
-      history: 'recordId, completedAtIso',
-    });
-    this.version(4).stores({
-      classicDrafts: 'recordId',
-    });
-    this.version(5).stores({
-      seasonDrafts: 'recordId',
-    });
-    this.version(6).stores({
-      seasonRuns: 'recordId',
-      seasonRunSummaries: '[runId+gameId], runId, blockIndex',
-      seasonRunDetails: '[runId+gameId], runId',
-      seasonRunBlocks: '[runId+blockIndex], runId',
-      seasonRunIndex: 'recordId',
-    });
-    this.version(7).stores({
-      seasonPendingBlocks: 'runId',
-    });
-    this.version(8).stores({
-      seasonPostseasonSummaries: '[runId+gameId], runId',
-      seasonCommandLog: '[runId+ordinal], runId',
-      seasonAlmanacs: 'runId',
-      seasonCompletedRuns: 'runId',
-      seasonCompletedIndex: 'recordId, completedAtIso',
-    });
-    this.version(9).stores({
-      seasonRuns: 'recordId',
-      seasonRunSummaries: '[runId+gameId], [runId+blockIndex], runId, blockIndex',
-      seasonRunDetails: '[runId+gameId], runId',
-      seasonRunBlocks: '[runId+blockIndex], runId',
-      seasonRunIndex: 'recordId',
-      seasonPendingBlocks: 'runId',
-      seasonPostseasonSummaries: '[runId+gameId], runId',
-      seasonCommandLog: '[runId+ordinal], runId',
-      seasonAlmanacs: 'runId',
-      seasonCompletedRuns: 'runId',
-      seasonCompletedIndex: 'recordId, completedAtIso',
-      seasonRunPlayerSlices: 'runId',
-    });
-    this.version(10).stores({
-      seasonRuns: 'recordId',
-      seasonRunSummaries: '[runId+gameId], [runId+blockIndex], runId, blockIndex',
-      seasonRunDetails: '[runId+gameId], runId',
-      seasonRunBlocks: '[runId+blockIndex], runId',
-      seasonRunIndex: 'recordId',
-      seasonPendingBlocks: 'runId',
-      seasonPostseasonSummaries: '[runId+gameId], runId',
-      seasonPostseasonDetails: '[runId+gameId], runId',
-      seasonCommandLog: '[runId+ordinal], runId',
-      seasonAlmanacs: 'runId',
-      seasonCompletedRuns: 'runId',
-      seasonCompletedIndex: 'recordId, completedAtIso',
-      seasonRunPlayerSlices: 'runId',
-    });
-    this.version(11).stores({
-      seasonRuns: 'recordId',
-      seasonRunSummaries: '[runId+gameId], [runId+blockIndex], runId, blockIndex',
-      seasonRunDetails: '[runId+gameId], runId',
-      seasonRunBlocks: '[runId+blockIndex], runId',
-      seasonRunIndex: 'recordId',
-      seasonPendingBlocks: 'runId',
-      seasonPostseasonSummaries: '[runId+gameId], runId',
-      seasonPostseasonDetails: '[runId+gameId], runId',
-      seasonCommandLog: '[runId+ordinal], runId',
-      seasonAlmanacs: 'runId',
-      seasonCompletedRuns: 'runId',
-      seasonCompletedIndex: 'recordId, completedAtIso',
-      seasonRunPlayerSlices: 'runId',
-    });
-    this.version(12).stores({
-      seasonRuns: 'recordId',
-      seasonRunSummaries: '[runId+gameId], [runId+blockIndex], runId, blockIndex',
-      seasonRunDetails: '[runId+gameId], runId',
-      seasonRunBlocks: '[runId+blockIndex], runId',
-      seasonRunIndex: 'recordId',
-      seasonPendingBlocks: 'runId',
-      seasonPostseasonSummaries: '[runId+gameId], runId',
-      seasonPostseasonDetails: '[runId+gameId], runId',
-      seasonCommandLog: '[runId+ordinal], runId',
-      seasonAlmanacs: 'runId',
-      seasonCompletedRuns: 'runId',
-      seasonCompletedIndex: 'recordId, completedAtIso',
-      seasonRunPlayerSlices: 'runId',
-      seasonRoomStates: 'roomId',
-    });
-    this.version(13).stores({
-      seasonRuns: 'recordId',
-      seasonRunSummaries: '[runId+gameId], [runId+blockIndex], runId, blockIndex',
-      seasonRunDetails: '[runId+gameId], runId',
-      seasonRunBlocks: '[runId+blockIndex], runId',
-      seasonRunIndex: 'recordId',
-      seasonPendingBlocks: 'runId',
-      seasonPostseasonSummaries: '[runId+gameId], runId',
-      seasonPostseasonDetails: '[runId+gameId], runId',
-      seasonCommandLog: '[runId+ordinal], runId',
-      seasonAlmanacs: 'runId',
-      seasonCompletedRuns: 'runId',
-      seasonCompletedIndex: 'recordId, completedAtIso',
-      seasonRunPlayerSlices: 'runId',
-      seasonRoomStates: 'roomId',
-    });
-    this.version(14).stores({
-      seasonRuns: 'recordId',
-      seasonRunSummaries: '[runId+gameId], [runId+blockIndex], runId, blockIndex',
-      seasonRunDetails: '[runId+gameId], runId',
-      seasonRunBlocks: '[runId+blockIndex], runId',
-      seasonRunIndex: 'recordId',
-      seasonPendingBlocks: 'runId',
-      seasonPostseasonSummaries: '[runId+gameId], runId',
-      seasonPostseasonDetails: '[runId+gameId], runId',
-      seasonCommandLog: '[runId+ordinal], runId',
-      seasonAlmanacs: 'runId',
-      seasonCompletedRuns: 'runId',
-      seasonCompletedIndex: 'recordId, completedAtIso',
-      seasonRunPlayerSlices: 'runId',
-      seasonRoomStates: 'roomId',
-      fixedFiveActive: 'roomId',
-      fixedFiveCommands: '[roomId+ordinal], roomId',
-      fixedFivePendingResults: 'roomId',
-      fixedFiveCompleted: 'roomId',
-      fixedFiveHistory: 'recordId, completedAtIso',
-    });
-    this.version(15).stores({
-      seasonRuns: 'recordId',
-      seasonRunSummaries: '[runId+gameId], [runId+blockIndex], runId, blockIndex',
-      seasonRunDetails: '[runId+gameId], runId',
-      seasonRunBlocks: '[runId+blockIndex], runId',
-      seasonRunIndex: 'recordId',
-      seasonPendingBlocks: 'runId',
-      seasonPostseasonSummaries: '[runId+gameId], runId',
-      seasonPostseasonDetails: '[runId+gameId], runId',
-      seasonCommandLog: '[runId+ordinal], runId',
-      seasonAlmanacs: 'runId',
-      seasonCompletedRuns: 'runId',
-      seasonCompletedIndex: 'recordId, completedAtIso',
-      seasonRunPlayerSlices: 'runId',
-      seasonRoomStates: null,
-      fixedFiveActive: 'roomId',
-      fixedFiveCommands: '[roomId+ordinal], roomId',
-      fixedFivePendingResults: 'roomId',
-      fixedFiveCompleted: 'roomId',
-      fixedFiveHistory: 'recordId, completedAtIso',
-    });
-    // Preserve shipped no-op releases in the append-only Dexie version chain.
-    this.version(16).stores(HOOP_RUSH_DATABASE_STORES);
-    this.version(17).stores(HOOP_RUSH_DATABASE_STORES);
-    this.version(18).stores(HOOP_RUSH_DATABASE_STORES);
-    this.version(19)
-      .stores(HOOP_RUSH_DATABASE_STORES)
-      .upgrade(async (transaction) => {
-        const table = transaction.table('collectionPlayState');
-        const rows: unknown[] = await table.toArray();
-        for (const row of rows) {
-          if (typeof row !== 'object' || row === null) continue;
-          const saveSchemaVersion = (row as { saveSchemaVersion?: unknown }).saveSchemaVersion;
-          if (saveSchemaVersion !== COLLECTION_PLAY_SAVE_V1_VERSION) continue;
-          const parsed = storedCollectionPlayStateV1Schema.safeParse(row);
-          if (!parsed.success) continue;
-          const migrated = storedCollectionPlayStateV2Schema.safeParse({
-            ...parsed.data,
-            saveSchemaVersion: COLLECTION_PLAY_SAVE_VERSION,
-            playState: migrateCollectionPlayStateV1(parsed.data.playState),
-          });
-          if (!migrated.success) continue;
-          await table.put(migrated.data);
-        }
-      });
-    this.version(20)
-      .stores(HOOP_RUSH_DATABASE_STORES)
-      .upgrade(async (transaction) => {
-        const stateTable = transaction.table('collectionState');
-        const stateRows: unknown[] = await stateTable.toArray();
-        for (const row of stateRows) {
-          if (typeof row !== 'object' || row === null) continue;
-          const saveSchemaVersion = (row as { saveSchemaVersion?: unknown }).saveSchemaVersion;
-          if (saveSchemaVersion !== COLLECTION_SAVE_V1_VERSION) continue;
-          const parsed = storedCollectionStateV1Schema.safeParse(row);
-          if (!parsed.success) continue;
-          const migrated = storedCollectionStateV2Schema.safeParse({
-            ...parsed.data,
-            saveSchemaVersion: COLLECTION_SAVE_VERSION,
-            state: migrateCollectionStateV1(parsed.data.state),
-          });
-          if (!migrated.success) continue;
-          await stateTable.put(migrated.data);
-        }
-        const playTable = transaction.table('collectionPlayState');
-        const playRows: unknown[] = await playTable.toArray();
-        for (const row of playRows) {
-          if (typeof row !== 'object' || row === null) continue;
-          const saveSchemaVersion = (row as { saveSchemaVersion?: unknown }).saveSchemaVersion;
-          if (saveSchemaVersion !== COLLECTION_PLAY_SAVE_V2_VERSION) continue;
-          const parsed = storedCollectionPlayStateV2Schema.safeParse(row);
-          if (!parsed.success) continue;
-          const migrated = storedCollectionPlayStateV3Schema.safeParse({
-            ...parsed.data,
-            saveSchemaVersion: COLLECTION_PLAY_SAVE_VERSION,
-            playState: migrateCollectionPlayStateV2(parsed.data.playState),
-          });
-          if (!migrated.success) continue;
-          await playTable.put(migrated.data);
-        }
-      });
-    // Draft Duel release: new stores only; existing records untouched.
-    this.version(21).stores(HOOP_RUSH_DATABASE_STORES);
-    // Hoop Havoc release: new stores only; existing records untouched.
-    this.version(22).stores({ ...HOOP_RUSH_DATABASE_STORES, ...HAVOC_DATABASE_STORES });
+    this.version(1).stores(HOOP_RUSH_DATABASE_STORES);
   }
 }
 export class DexieChallengeRepository {
   private readonly db: HoopRushDatabase;
-  constructor(db: HoopRushDatabase = new HoopRushDatabase()) {
+  constructor(db: HoopRushDatabase) {
     this.db = db;
   }
   async saveActiveRun(record: StoredRunRecord): Promise<void> {
@@ -486,10 +225,6 @@ export class DexieChallengeRepository {
   async loadActiveRun(): Promise<StoredRunRecord | null> {
     const checkpoint = await this.db.active.get(ACTIVE_RECORD_ID);
     if (checkpoint === undefined) return null;
-    if (hasStaleSaveSchemaVersion(checkpoint, CHECKPOINT_SAVE_SCHEMA_VERSION)) {
-      await this.clearStaleActiveRun();
-      return null;
-    }
     const validatedCheckpoint = activeRunCheckpointSchema.parse(checkpoint);
     const rows = await this.db.activeGames
       .where('runId')
@@ -509,21 +244,9 @@ export class DexieChallengeRepository {
       await this.db.activeGames.clear();
     });
   }
-  private async clearStaleActiveRun(): Promise<void> {
-    await this.db.transaction('rw', this.db.active, this.db.activeGames, async () => {
-      const checkpoint = await this.db.active.get(ACTIVE_RECORD_ID);
-      if (!hasStaleSaveSchemaVersion(checkpoint, CHECKPOINT_SAVE_SCHEMA_VERSION)) return;
-      await this.db.active.delete(ACTIVE_RECORD_ID);
-      await this.db.activeGames.clear();
-    });
-  }
   async loadActiveRunCheckpoint(): Promise<ActiveRunCheckpoint | null> {
     const checkpoint = await this.db.active.get(ACTIVE_RECORD_ID);
     if (checkpoint === undefined) return null;
-    if (hasStaleSaveSchemaVersion(checkpoint, CHECKPOINT_SAVE_SCHEMA_VERSION)) {
-      await this.clearStaleActiveRun();
-      return null;
-    }
     const validated = activeRunCheckpointSchema.parse(checkpoint);
     if (validated.gamesPlayed === undefined) {
       const gamesPlayed = await this.db.activeGames.where('runId').equals(validated.runId).count();
@@ -597,15 +320,6 @@ export class DexieChallengeRepository {
   async loadCompletedRun(runId: string): Promise<StoredRunRecord | null> {
     const record = await this.db.completed.get(runId);
     if (record === undefined) return null;
-    if (hasStaleSaveSchemaVersion(record, SAVE_SCHEMA_VERSION)) {
-      await this.db.transaction('rw', this.db.completed, this.db.history, async () => {
-        const current = await this.db.completed.get(runId);
-        if (!hasStaleSaveSchemaVersion(current, SAVE_SCHEMA_VERSION)) return;
-        await this.db.completed.delete(runId);
-        await this.db.history.delete(runId);
-      });
-      return null;
-    }
     return storedRunRecordSchema.parse(record);
   }
   async clearHistory(): Promise<void> {
@@ -624,15 +338,6 @@ export class DexieChallengeRepository {
   async loadClassicDraft(): Promise<StoredClassicDraft | null> {
     const record = await this.db.classicDrafts.get(CLASSIC_DRAFT_RECORD_ID);
     if (record === undefined) return null;
-    if (hasStaleSaveSchemaVersion(record, CLASSIC_DRAFT_SCHEMA_VERSION)) {
-      await this.db.transaction('rw', this.db.classicDrafts, async () => {
-        const current = await this.db.classicDrafts.get(CLASSIC_DRAFT_RECORD_ID);
-        if (hasStaleSaveSchemaVersion(current, CLASSIC_DRAFT_SCHEMA_VERSION)) {
-          await this.db.classicDrafts.delete(CLASSIC_DRAFT_RECORD_ID);
-        }
-      });
-      return null;
-    }
     return classicDraftRecordSchema.parse(record);
   }
   async clearClassicDraft(): Promise<void> {

@@ -368,7 +368,7 @@ function assertCommandArtifacts(
 
 export class DexieHavocRepository implements HavocRepository {
   private readonly db: HoopRushDatabase;
-  constructor(db: HoopRushDatabase = new HoopRushDatabase()) {
+  constructor(db: HoopRushDatabase) {
     this.db = db;
   }
 

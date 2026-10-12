@@ -1,9 +1,6 @@
 import { z } from 'zod';
 import {
-  COLLECTION_PLAY_SAVE_V1_VERSION,
-  COLLECTION_PLAY_SAVE_V2_VERSION,
   COLLECTION_PLAY_SAVE_VERSION,
-  COLLECTION_SAVE_V1_VERSION,
   COLLECTION_SAVE_VERSION,
   collectionCommandSchema,
   collectionGameCommandSchema,
@@ -13,12 +10,9 @@ import {
   collectionGameRecordV3Schema,
   collectionLedgerEntrySchema,
   collectionOwnedCardSchema,
-  collectionPlayStateV1Schema,
-  collectionPlayStateV2Schema,
   collectionPlayStateV3Schema,
   collectionPullRecordUnionSchema,
   collectionSetClaimReceiptSchema,
-  collectionStateV1Schema,
   collectionStateV2Schema,
   contentHashSchema,
   seedSchema,
@@ -30,7 +24,7 @@ import {
   type CollectionPlayStateUnion,
   type CollectionPullRecord,
   type CollectionSetClaimReceipt,
-  type CollectionStateUnion,
+  type CollectionState,
 } from '@hoop-rush/data-contracts';
 
 const storedCollectionStateRowBaseSchema = z.object({
@@ -39,24 +33,11 @@ const storedCollectionStateRowBaseSchema = z.object({
   updatedAtIso: z.string().min(1).max(64),
 });
 
-export const storedCollectionStateV1Schema = storedCollectionStateRowBaseSchema.extend({
-  saveSchemaVersion: z.literal(COLLECTION_SAVE_V1_VERSION),
-  state: collectionStateV1Schema,
-});
-export type StoredCollectionStateV1Row = z.infer<typeof storedCollectionStateV1Schema>;
-
-export const storedCollectionStateV2Schema = storedCollectionStateRowBaseSchema.extend({
+export const storedCollectionStateSchema = storedCollectionStateRowBaseSchema.extend({
   saveSchemaVersion: z.literal(COLLECTION_SAVE_VERSION),
   state: collectionStateV2Schema,
 });
-export type StoredCollectionStateV2Row = z.infer<typeof storedCollectionStateV2Schema>;
-
-export const storedCollectionStateUnionSchema = z.union([
-  storedCollectionStateV2Schema,
-  storedCollectionStateV1Schema,
-]);
-export const storedCollectionStateSchema = storedCollectionStateV2Schema;
-export type StoredCollectionStateRow = z.infer<typeof storedCollectionStateUnionSchema>;
+export type StoredCollectionStateRow = z.infer<typeof storedCollectionStateSchema>;
 
 export const storedCollectionOwnershipSchema = z.object({
   collectionId: z.string().min(1).max(64),
@@ -96,7 +77,7 @@ export const storedCollectionCommandSchema = z.object({
 });
 export type StoredCollectionCommandRow = z.infer<typeof storedCollectionCommandSchema>;
 
-export type StoredCollectionState = CollectionStateUnion;
+export type StoredCollectionState = CollectionState;
 export type StoredCollectionOwned = CollectionOwnedCard;
 export type StoredCollectionPull = CollectionPullRecord;
 export type StoredCollectionLedger = CollectionLedgerEntry;
@@ -110,33 +91,12 @@ const storedCollectionPlayStateRowBaseSchema = z.object({
   updatedAtIso: z.string().min(1).max(64),
 });
 
-export const storedCollectionPlayStateV1Schema = storedCollectionPlayStateRowBaseSchema.extend({
-  saveSchemaVersion: z.literal(COLLECTION_PLAY_SAVE_V1_VERSION),
-  playState: collectionPlayStateV1Schema,
-});
-
-export const storedCollectionPlayStateV2Schema = storedCollectionPlayStateRowBaseSchema.extend({
-  saveSchemaVersion: z.literal(COLLECTION_PLAY_SAVE_V2_VERSION),
-  playState: collectionPlayStateV2Schema,
-});
-
-export const storedCollectionPlayStateV3Schema = storedCollectionPlayStateRowBaseSchema.extend({
+export const storedCollectionPlayStateSchema = storedCollectionPlayStateRowBaseSchema.extend({
   saveSchemaVersion: z.literal(COLLECTION_PLAY_SAVE_VERSION),
   playState: collectionPlayStateV3Schema,
 });
 
-export const storedCollectionPlayStateUnionSchema = z.union([
-  storedCollectionPlayStateV3Schema,
-  storedCollectionPlayStateV2Schema,
-  storedCollectionPlayStateV1Schema,
-]);
-
-export const storedCollectionPlayStateSchema = storedCollectionPlayStateV3Schema;
-
-export type StoredCollectionPlayStateV1Row = z.infer<typeof storedCollectionPlayStateV1Schema>;
-export type StoredCollectionPlayStateV2Row = z.infer<typeof storedCollectionPlayStateV2Schema>;
-export type StoredCollectionPlayStateV3Row = z.infer<typeof storedCollectionPlayStateV3Schema>;
-export type StoredCollectionPlayStateRow = z.infer<typeof storedCollectionPlayStateUnionSchema>;
+export type StoredCollectionPlayStateRow = z.infer<typeof storedCollectionPlayStateSchema>;
 
 const storedCollectionGameRowBaseSchema = z.object({
   collectionId: z.string().min(1).max(64),

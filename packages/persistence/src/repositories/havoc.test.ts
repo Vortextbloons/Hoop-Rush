@@ -1,4 +1,3 @@
-import Dexie, { type EntityTable } from 'dexie';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   HAVOC_GAME_COUNT,
@@ -61,7 +60,6 @@ import {
   type HavocCommandOutcome,
   type HavocLoadFailureCode,
 } from './havoc.ts';
-import { HAVOC_DATABASE_STORES, HOOP_RUSH_DATABASE_STORES, HoopRushDatabase } from './dexie.ts';
 import {
   HAVOC_ACTIVE_RECORD_ID,
   storedHavocHistoryRowSchema,
@@ -1285,85 +1283,6 @@ describe('DexieHavocRepository', () => {
     expect(await repo.readRunGame(RUN_ID, 'normal', 1)).toBeNull();
     expect(await repo.loadCommandResult('cmd-normal-parse')).toBeNull();
     expect(await db.havocHistory.count()).toBe(1);
-    db.close();
-  });
-});
-
-interface LegacyDraftDuelHistoryRow {
-  saveSchemaVersion: number;
-  recordId: string;
-  roomId: string;
-  champion: string;
-  gameCount: number;
-  completedAtIso: string;
-}
-
-interface LegacySeasonCompletedRow {
-  recordId: string;
-  runId: string;
-  rootSeed: string;
-  humanFranchiseId: string;
-  championFranchiseId: string;
-  almanacDigest: string;
-  commandLogDigest: string;
-  completedAtIso: string;
-}
-
-class LegacyV21Database extends Dexie {
-  draftDuelHistory!: EntityTable<LegacyDraftDuelHistoryRow, 'recordId'>;
-  seasonCompletedIndex!: EntityTable<LegacySeasonCompletedRow, 'recordId'>;
-  constructor(name: string) {
-    super(name);
-    this.version(21).stores(HOOP_RUSH_DATABASE_STORES);
-  }
-}
-
-describe('havoc dexie migration', () => {
-  it('preserves v21-era records while adding the v22 havoc stores', async () => {
-    resetIndexedDb();
-    const name = testDatabaseName('havoc-migration');
-    const legacy = new LegacyV21Database(name);
-    const draftDuelRow: LegacyDraftDuelHistoryRow = {
-      saveSchemaVersion: 1,
-      recordId: 'dd-legacy-room',
-      roomId: 'legacy-room',
-      champion: 'p1',
-      gameCount: 5,
-      completedAtIso: '2026-01-01T00:00:00.000Z',
-    };
-    const seasonRow: LegacySeasonCompletedRow = {
-      recordId: 'season-completed-legacy',
-      runId: 'legacy-season',
-      rootSeed: 'a'.repeat(32),
-      humanFranchiseId: 'lakers',
-      championFranchiseId: 'celtics',
-      almanacDigest: 'b'.repeat(32),
-      commandLogDigest: 'c'.repeat(32),
-      completedAtIso: '2026-01-01T00:00:00.000Z',
-    };
-    await legacy.draftDuelHistory.put(draftDuelRow);
-    await legacy.seasonCompletedIndex.put(seasonRow);
-    legacy.close();
-
-    const db = new HoopRushDatabase(name);
-    expect(db.verno).toBe(22);
-    expect(await db.draftDuelHistory.get('dd-legacy-room')).toEqual(draftDuelRow);
-    expect(await db.seasonCompletedIndex.get('season-completed-legacy')).toEqual(seasonRow);
-    for (const store of Object.keys(HAVOC_DATABASE_STORES)) {
-      expect(db.tables.some((table) => table.name === store)).toBe(true);
-    }
-    expect(await db.havocActiveRuns.count()).toBe(0);
-    expect(await db.havocCommands.count()).toBe(0);
-    expect(await db.havocGames.count()).toBe(0);
-    expect(await db.havocRetainedTapes.count()).toBe(0);
-    expect(await db.havocCompletedRuns.count()).toBe(0);
-    expect(await db.havocHistory.count()).toBe(0);
-    expect(Object.keys(HOOP_RUSH_DATABASE_STORES)).not.toContain('havocActiveRuns');
-    expect(Object.keys(HOOP_RUSH_DATABASE_STORES)).not.toContain('havocHistory');
-
-    const repo = new DexieHavocRepository(db);
-    const state = await repo.loadActiveRun();
-    expect(state).toBeNull();
     db.close();
   });
 });

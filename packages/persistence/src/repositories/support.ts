@@ -30,13 +30,6 @@ export function hasSaveSchemaVersion(row: unknown, expected: number): boolean {
   return saveSchemaVersionOf(row) === expected;
 }
 
-export function hasStaleSaveSchemaVersion(row: unknown, expected: number): boolean {
-  if (typeof row !== 'object' || row === null || !Object.hasOwn(row, 'saveSchemaVersion')) {
-    return false;
-  }
-  return (row as { saveSchemaVersion?: unknown }).saveSchemaVersion !== expected;
-}
-
 export function assertSaveSchemaVersion(
   row: unknown,
   expected: number,
