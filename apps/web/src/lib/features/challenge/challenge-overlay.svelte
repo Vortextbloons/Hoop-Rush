@@ -4,7 +4,7 @@
   import { X } from '@lucide/svelte';
   import type { ChallengeRun, HoopRushManifest } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
-  import type { RunnerPhase } from '$lib/challenge-runner';
+  import type { ChallengePhase } from '@hoop-rush/application/challenge';
   import GameStrip from '$lib/components/GameStrip.svelte';
   import TeamLogo from '$lib/components/TeamLogo.svelte';
   let {
@@ -20,7 +20,7 @@
   }: {
     manifest: HoopRushManifest | null;
     run: ChallengeRun;
-    phase: RunnerPhase;
+    phase: ChallengePhase;
     error: string | null;
     modeLabel: string;
     draftHref: string;

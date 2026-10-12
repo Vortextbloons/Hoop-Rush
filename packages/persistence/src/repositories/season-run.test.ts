@@ -12,7 +12,8 @@ import {
   type SeasonRunCommand,
 } from '@hoop-rush/data-contracts';
 import { SEASON_RUN_RECORD_ID } from '../schemas/season-run-record.ts';
-import { DexieChallengeRepository, HoopRushDatabase, challengeRunProgressDigest } from './dexie.ts';
+import { challengeRunProgressDigest } from '@hoop-rush/engine';
+import { DexieChallengeRepository, HoopRushDatabase } from './dexie.ts';
 import { DexieSeasonDraftRepository } from './season-draft.ts';
 import { DexieSeasonRunRepository, SeasonRunLoadError } from './season-run-dexie.ts';
 import {

@@ -8,11 +8,9 @@ import {
   COLLECTION_SAVE_V1_VERSION,
   COLLECTION_SAVE_VERSION,
   SAVE_SCHEMA_VERSION,
-  canonicalJson,
-  seasonDigestHex,
-  type ChallengeRun,
 } from '@hoop-rush/data-contracts';
 import {
+  challengeRunProgressDigest,
   migrateCollectionPlayStateV1,
   migrateCollectionPlayStateV2,
   migrateCollectionStateV1,
@@ -671,17 +669,6 @@ export class DexieChallengeRepository {
   }
 }
 export type ChallengeRepository = DexieChallengeRepository;
-export function challengeRunProgressDigest(run: ChallengeRun): string {
-  return seasonDigestHex(
-    canonicalJson({
-      runId: run.runId,
-      status: run.status,
-      firstLossGameNumber: run.firstLossGameNumber,
-      aggregates: run.aggregates,
-      games: run.games,
-    }),
-  );
-}
 export interface PromoteActiveToCompletedExpectation {
   expectedGamesPlayed: number;
   expectedRunDigest: string;

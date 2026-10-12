@@ -4,7 +4,7 @@
   import type { ChallengeRun } from '@hoop-rush/data-contracts';
   import { variantLabel } from '$lib/draft-presentation';
   import { clearClassicDraftState } from '$lib/classic-draft';
-  import ResultPage from '$lib/components/ResultPage.svelte';
+  import ResultPage from '$lib/features/challenge/challenge-result.svelte';
   async function runAgain() {
     await clearClassicDraftState();
     void goto(resolve('/classic'));

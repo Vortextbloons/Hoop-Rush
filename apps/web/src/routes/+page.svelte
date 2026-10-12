@@ -88,7 +88,7 @@
     );
     deferIdle(() => {
       if (cancelled) return;
-      import('$lib/challenge-repo')
+      import('$lib/features/challenge/challenge-repo')
         .then(({ challengeRepository }) =>
           Promise.all([
             challengeRepository.loadActiveRunCheckpoint(),

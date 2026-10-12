@@ -10,11 +10,11 @@
   } from '@hoop-rush/data-contracts';
   import type { SandboxHref } from '$lib/sandbox-url';
   import { clearDataLoaderCaches, getManifest, getPlayersIndex } from '$lib/data';
-  import { challengeRepository } from '$lib/challenge-repo';
-  import { loadRunPlayersById } from '$lib/sandbox-lineup';
+  import { challengeRepository } from './challenge-repo';
+  import { loadRunPlayersById } from './sandbox-lineup';
   import { arenaBlockComplete } from '$lib/arena-sound';
-  import SeasonReport from './SeasonReport.svelte';
-  import AsyncState from './AsyncState.svelte';
+  import SeasonReport from '$lib/components/SeasonReport.svelte';
+  import AsyncState from '$lib/components/AsyncState.svelte';
   let {
     mode,
     eyebrow,

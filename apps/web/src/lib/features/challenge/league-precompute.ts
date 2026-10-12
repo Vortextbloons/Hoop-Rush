@@ -19,7 +19,7 @@ const MAX_CACHED_RECORDS = 4;
 
 const defaultDeps: LeaguePrecomputeDeps = {
   createWorker: () =>
-    new Worker(new URL('../workers/league-worker.ts', import.meta.url), { type: 'module' }),
+    new Worker(new URL('../../../workers/league-worker.ts', import.meta.url), { type: 'module' }),
   loadPreamble: () => loadRunPreamble(),
 };
 

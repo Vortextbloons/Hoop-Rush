@@ -173,3 +173,12 @@ paths change (stages 2, 4, and 6).
   runtime lines) and test lines 38,488 → 41,124 (new pins and suites).
   Remaining stage-4 follow-ups: one block game-iteration primitive for the
   worker/CLI, and the CLI post-block commit composition.
+- 2026-10-12, stage 5a: Classic/Sandbox challenge orchestration moved to
+  `packages/application/src/challenge` (`ChallengeSession` + ports, 11 new
+  tests); the web `ChallengeRunner` is replaced by the session and a worker
+  job port. Views and mode modules moved under
+  `apps/web/src/lib/features/challenge/`; `challengeRunProgressDigest` moved
+  from persistence to `packages/engine/src/challenge/digests.ts` so the
+  application session can gate promotions without a persistence runtime
+  import. Byte-identical seeded game results: results are still produced by
+  `challenge-worker.ts` via the same engine calls.

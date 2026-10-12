@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { buildChallengeRun, buildGameSimulationInput } from '@hoop-rush/test-fixtures';
 import {
   acceptGameResult,
+  challengeRunProgressDigest,
   createEngineContext,
   createGameInput,
   simulateGame,
@@ -14,7 +15,6 @@ import {
   testDatabaseName,
   TestDatabase,
 } from '../testing/repo-test-support.ts';
-import { challengeRunProgressDigest } from './dexie.ts';
 
 describe('dexie active run save/load round-trip', () => {
   afterEach(restoreIndexedDb);

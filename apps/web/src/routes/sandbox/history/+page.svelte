@@ -1,5 +1,5 @@
 <script lang="ts">
-  import HistoryPage from '$lib/components/HistoryPage.svelte';
+  import HistoryPage from '$lib/features/challenge/challenge-history.svelte';
 </script>
 
 <svelte:head>

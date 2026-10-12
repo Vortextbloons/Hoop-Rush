@@ -6,7 +6,7 @@ import type {
   PlayersIndexEntry,
   Seed,
 } from '@hoop-rush/data-contracts';
-import { challengeRepository } from '$lib/challenge-repo';
+import { challengeRepository } from '$lib/features/challenge/challenge-repo';
 import { sortDraftRows, type DraftPresentation } from '$lib/draft-presentation';
 import { generateSeed } from '$lib/sandbox-url';
 function franchiseEraKey(franchiseId: string, eraId: string): string {

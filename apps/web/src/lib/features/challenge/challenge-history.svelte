@@ -4,9 +4,9 @@
   import type { ActiveRunCheckpoint, CompletedRunIndex } from '@hoop-rush/persistence';
   import type { HoopRushManifest } from '@hoop-rush/data-contracts';
   import { clearDataLoaderCaches, getManifest } from '$lib/data';
-  import { challengeRepository } from '$lib/challenge-repo';
-  import AsyncState from './AsyncState.svelte';
-  import HistoryList from './HistoryList.svelte';
+  import { challengeRepository } from './challenge-repo';
+  import AsyncState from '$lib/components/AsyncState.svelte';
+  import HistoryList from './challenge-history-list.svelte';
   let {
     mode,
     eyebrow,

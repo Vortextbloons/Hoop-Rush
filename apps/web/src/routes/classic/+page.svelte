@@ -29,9 +29,9 @@
     registerClassicDraftNavigationGuard,
     setClassicGuardBypass,
     type ClassicGuardTarget,
-  } from '$lib/classic-nav-guard';
-  import { startClassicRun } from '$lib/classic-run';
-  import { leaguePrecompute } from '$lib/league-precompute';
+  } from '$lib/features/challenge/classic-nav-guard';
+  import { startClassicRun } from '$lib/features/challenge/start-challenge-run';
+  import { leaguePrecompute } from '$lib/features/challenge/league-precompute';
   import { randomUUID } from '$lib/ids';
   import { resolvePlayerRefs } from '$lib/player-refs';
   import { poolSortLabel, presentationForVariant, variantLabel } from '$lib/draft-presentation';

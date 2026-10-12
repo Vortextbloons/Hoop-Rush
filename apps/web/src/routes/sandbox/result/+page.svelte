@@ -3,11 +3,11 @@
   import { resolve } from '$app/paths';
   import type { ChallengeRun, PeakPlayerSeason, Seed } from '@hoop-rush/data-contracts';
   import type { SandboxHref } from '$lib/sandbox-url';
-  import { lineupPlayersFromRun } from '$lib/sandbox-lineup';
-  import { startSandboxRun } from '$lib/sandbox-run';
-  import { leaguePrecompute } from '$lib/league-precompute';
+  import { lineupPlayersFromRun } from '$lib/features/challenge/sandbox-lineup';
+  import { startSandboxRun } from '$lib/features/challenge/start-challenge-run';
+  import { leaguePrecompute } from '$lib/features/challenge/league-precompute';
   import { buildSandboxHref, generateSeed } from '$lib/sandbox-url';
-  import ResultPage from '$lib/components/ResultPage.svelte';
+  import ResultPage from '$lib/features/challenge/challenge-result.svelte';
   let retrySeed = $state<Seed | null>(null);
   $effect(() => {
     if (retrySeed !== null) return;

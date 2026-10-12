@@ -18,8 +18,8 @@
   import { clearDataLoaderCaches, getManifest, getPlayersIndex, getPool } from '$lib/data';
   import { resolvePlayerRefs } from '$lib/player-refs';
   import { generateSeed, parseSandboxUrl } from '$lib/sandbox-url';
-  import { startSandboxRun } from '$lib/sandbox-run';
-  import { leaguePrecompute } from '$lib/league-precompute';
+  import { startSandboxRun } from '$lib/features/challenge/start-challenge-run';
+  import { leaguePrecompute } from '$lib/features/challenge/league-precompute';
   import { sortDraftRows } from '$lib/draft-presentation';
   import {
     heuristicDraftPoolReport,

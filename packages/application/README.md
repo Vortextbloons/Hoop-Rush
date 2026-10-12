@@ -19,6 +19,7 @@ gathers intent, the engine owns basketball rules, adapters own I/O.
 
 ```text
 @hoop-rush/application          shared submission runtime (runSubmission + types)
+@hoop-rush/application/challenge  challenge run session (classic/sandbox job lifecycle)
 @hoop-rush/application/season   season block wire/acceptance + season policies
 ```
 
@@ -26,6 +27,9 @@ gathers intent, the engine owns basketball rules, adapters own I/O.
 
 - `runSubmission` and submission policies/report types: the retry and
   conflict policy runtime shared by every mode (`src/submission.ts`).
+- `ChallengeSession` + ports: the classic/sandbox run lifecycle (load, start,
+  cancel, reveal pacing, acceptance, completion promotion) with a worker job
+  port, repository port, asset port, and clock (`src/challenge/`).
 - Season block wire helpers moved out of the web runner:
   `buildWorkerRequest`, `acceptWorkerResult`, `SeasonRunnerEvent`,
   `SeasonBlockStartInput`, `SeasonBlockResumeInput`, `SeasonBlockRunner`,
@@ -52,6 +56,13 @@ Landed:
 Next:
 
 1. Stage 5 mode migrations and stages 6-7.
+
+Stage 5a landed: Classic/Sandbox challenge orchestration moved into
+`ChallengeSession` (`src/challenge/`). The web `ChallengeRunner` is replaced
+by the session plus a worker job port (`challenge-job.ts`); the presenter
+mirrors the session snapshot, and the mode views moved under
+`apps/web/src/lib/features/challenge/`. `challengeRunProgressDigest` moved to
+the engine so framework-independent code can gate promotions.
 
 Stage 4 landed: engine season orchestration is split and de-duplicated.
 `postseason.ts` (1,911 lines) became `postseason/{schedule,state,play-in,
