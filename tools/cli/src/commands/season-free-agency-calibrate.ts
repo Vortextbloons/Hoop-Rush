@@ -439,9 +439,7 @@ function simulateBlockGames(
         `game ${step.interruption.nextGameId} interrupted: the human franchise cannot field a legal five from health availability`,
       );
     }
-    if (step.kind === 'complete' || step.kind === 'game') {
-      accumulator = step.accumulator;
-    }
+    accumulator = step.accumulator;
   }
   if (accumulator === null) {
     throw new Error(`block ${String(blockIndex)} produced no simulation steps`);

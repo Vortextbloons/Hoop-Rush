@@ -10,7 +10,7 @@ import {
   type SeasonSchedule,
   type SeasonScheduleGame,
 } from '@hoop-rush/data-contracts';
-import { SeasonBlockCancelledError } from './errors.ts';
+import { SeasonBlockCancelledError, SeasonBlockInvariantError } from './errors.ts';
 import {
   durabilityByVersionOf,
   positionsOf,
@@ -146,7 +146,12 @@ export function* seasonBlockGameSteps(
     ) {
       throw new SeasonBlockCancelledError(args.blockIndex, accumulator.summaries.length);
     }
-    const game = games[gameIndex]!;
+    const game = games.at(gameIndex);
+    if (game === undefined) {
+      throw new SeasonBlockInvariantError('season block iteration advanced past scheduled games', {
+        blockIndex: args.blockIndex,
+      });
+    }
     const outcome = simulateSeasonBlockGame(
       args.input,
       game,

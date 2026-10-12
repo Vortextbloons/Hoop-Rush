@@ -44,9 +44,7 @@ export function simulateSeasonBlock(
         },
       );
     }
-    if (step.kind === 'complete' || step.kind === 'game') {
-      accumulator = step.accumulator;
-    }
+    accumulator = step.accumulator;
   }
   if (accumulator === null) {
     throw new SeasonBlockInvariantError('season block iteration produced no accumulator', {
