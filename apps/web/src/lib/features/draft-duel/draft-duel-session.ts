@@ -23,8 +23,6 @@ import {
   type Id,
 } from '@hoop-rush/data-contracts';
 import {
-  applyDraftDuelPick,
-  createDraftDuelDraft,
   draftDuelCurrentPicker,
   draftDuelGameSeed,
   draftDuelHomeForGame,
@@ -33,6 +31,7 @@ import {
   draftDuelSimulationTeam,
   draftDuelStandouts,
   draftDuelTimeoutPick,
+  replayDraftDuelLog,
   type DraftDuelCatalog,
   type DraftDuelPlayedGame,
   type DraftDuelSeriesRosters,
@@ -800,28 +799,13 @@ export class DraftDuelSession {
       this.publish();
       return;
     }
-    const draftCommands = this.commands
-      .filter(
-        (command) => command.payload.kind === 'pick' || command.payload.kind === 'timeout-autopick',
-      )
-      .sort((a, b) => a.ordinal - b.ordinal);
     try {
-      let state = createDraftDuelDraft({
+      this.draft = replayDraftDuelLog({
         rootSeed,
         fairness: snapshot.settings.fairness,
         catalog: assets.catalog,
+        commands: this.commands,
       });
-      for (const command of draftCommands) {
-        const payload = command.payload;
-        if (payload.kind !== 'pick' && payload.kind !== 'timeout-autopick') continue;
-        state = applyDraftDuelPick(state, assets.catalog, {
-          participantId: command.actorParticipantId,
-          playerId: payload.playerId,
-          playerVersionId: payload.playerVersionId,
-          ...(payload.slotIndex !== undefined ? { slotIndex: payload.slotIndex } : {}),
-        });
-      }
-      this.draft = state;
       this.publish();
     } catch (error) {
       this.error =

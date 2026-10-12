@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type {
   DraftDuelCard,
   DraftDuelCatalogEntry,
+  DraftDuelCommand,
   DraftDuelDraft,
   DraftDuelOfferedPick,
   DraftDuelParticipantId,
@@ -21,6 +22,7 @@ import {
   SHOT_ZONES,
   contentHashSchema,
   draftDuelCatalogEntrySchema,
+  draftDuelCommandSchema,
   draftDuelDraftSchema,
   gameResultSchema,
   playerIdSchema,
@@ -73,6 +75,7 @@ import {
   type DraftDuelPlayedGame,
   type DraftDuelSeriesRosters,
 } from './series.ts';
+import { replayDraftDuelLog } from './log.ts';
 
 const SEED_A = seedSchema.parse(seedFromString('draft-duel-seed-a'));
 const SEED_B = seedSchema.parse(seedFromString('draft-duel-seed-b'));
@@ -1605,5 +1608,100 @@ describe('round generation guards', () => {
     expect(groups).toEqual({ G: 2, F: 2, C: 1 });
     const empty: DraftDuelGroupNeeds = { G: 0, F: 0, C: 0 };
     expect(empty).toEqual({ G: 0, F: 0, C: 0 });
+  });
+});
+
+describe('replayDraftDuelLog', () => {
+  function commandLogFor(
+    rootSeed: Seed,
+    catalog: DraftDuelCatalog,
+    fairness: 'fair' | 'unfair',
+  ): { commands: DraftDuelCommand[]; expected: DraftDuelDraft } {
+    const commands: DraftDuelCommand[] = [];
+    let state = createDraftDuelDraft({ rootSeed, fairness, catalog });
+    let ordinal = 0;
+    commands.push(
+      draftDuelCommandSchema.parse({
+        schemaVersion: 1,
+        roomId: 'dd-room',
+        commandId: `cmd-${String(ordinal)}`,
+        ordinal,
+        actorParticipantId: 'p1',
+        payload: { kind: 'start' },
+      }),
+    );
+    ordinal += 1;
+    while (!isDraftDuelComplete(state)) {
+      const pick = chooseFirstAvailable(state, catalog);
+      commands.push(
+        draftDuelCommandSchema.parse({
+          schemaVersion: 1,
+          roomId: 'dd-room',
+          commandId: `cmd-${String(ordinal)}`,
+          ordinal,
+          actorParticipantId: pick.participantId,
+          payload: {
+            kind: 'pick',
+            pickOrdinal: state.pickOrdinal,
+            playerId: pick.playerId,
+            playerVersionId: pick.playerVersionId,
+            ...(pick.slotIndex === undefined ? {} : { slotIndex: pick.slotIndex }),
+          },
+        }),
+      );
+      ordinal += 1;
+      state = applyDraftDuelPick(state, catalog, pick);
+    }
+    commands.push(
+      draftDuelCommandSchema.parse({
+        schemaVersion: 1,
+        roomId: 'dd-room',
+        commandId: 'cmd-ready',
+        ordinal,
+        actorParticipantId: 'p2',
+        payload: { kind: 'ready', ready: true },
+      }),
+    );
+    return { commands, expected: state };
+  }
+
+  it('replays a full pick log identically regardless of command order', () => {
+    const catalog = buildCatalogFromSpecs(standardSpecs());
+    const { commands, expected } = commandLogFor(SEED_A, catalog, 'fair');
+    const replayed = replayDraftDuelLog({
+      rootSeed: SEED_A,
+      fairness: 'fair',
+      catalog,
+      commands,
+    });
+    expect(replayed).toEqual(expected);
+
+    const shuffled = [...commands].reverse();
+    const replayedFromShuffled = replayDraftDuelLog({
+      rootSeed: SEED_A,
+      fairness: 'fair',
+      catalog,
+      commands: shuffled,
+    });
+    expect(replayedFromShuffled).toEqual(expected);
+  });
+
+  it('ignores non-draft commands and rejects illegal picks by failing the replay', () => {
+    const catalog = buildCatalogFromSpecs(standardSpecs());
+    const { commands, expected } = commandLogFor(SEED_B, catalog, 'unfair');
+    const withNoise: DraftDuelCommand[] = [
+      ...commands,
+      draftDuelCommandSchema.parse({
+        schemaVersion: 1,
+        roomId: 'dd-room',
+        commandId: 'cmd-settings',
+        ordinal: 100,
+        actorParticipantId: 'p1',
+        payload: { kind: 'settings', fairness: 'unfair', presentation: 'ratings' },
+      }),
+    ];
+    expect(
+      replayDraftDuelLog({ rootSeed: SEED_B, fairness: 'unfair', catalog, commands: withNoise }),
+    ).toEqual(expected);
   });
 });

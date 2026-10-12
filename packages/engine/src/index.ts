@@ -682,6 +682,38 @@ export {
   type FixedFiveVerificationReceipt,
   type FixedFiveReceiptGameSeed,
 } from './modes/fixed-five/verification.ts';
+export {
+  replayFixedFiveLog,
+  isDraftComplete,
+  isFixedFiveDraftTurn,
+  picksCommittedOf,
+  lockedOf,
+  roomLogFacts,
+  mergeFixedFiveCommands,
+  restoreFixedFiveCommandSyncState,
+  deriveEffectivePhase,
+  pickOrdinalOf,
+  timeoutMsFor,
+  computeDueAutopick,
+  summarizeWorkerEntries,
+  lineupEntryFor,
+  assembleCompetitionRun,
+  computeCompetitionDigest,
+  buildFixedFiveVerificationInput,
+  type FixedFiveDraftLogInputs,
+  type FixedFivePickRef,
+  type DraftReplay,
+  type ClassicDraftReplay,
+  type SandboxDraftReplay,
+  type SandboxSnakeDraftReplay,
+  type DuelDraftReplay,
+  type SandboxDuelDraftReplay,
+  type RoomLogFacts,
+  type WorkerSummaryInput,
+  type CompetitionAssembleInput,
+  type CompetitionDigestInput,
+  type VerificationInputBuild,
+} from './modes/fixed-five/log.ts';
 export { ENGINE_VERSION } from './sim/constants.ts';
 export {
   collectionNamespaceSeed,
@@ -885,6 +917,7 @@ export {
   type DraftDuelPlayedGame,
   type DraftDuelSeriesRosters,
 } from './modes/draft-duel/series.ts';
+export { replayDraftDuelLog, type DraftDuelLogReplayInput } from './modes/draft-duel/log.ts';
 export { simulateRecordedGame, type RecordedGameOutput } from './sim/tape.ts';
 export type { GameObservers, PeriodObservation, TripObservation } from './sim/game.ts';
 export {

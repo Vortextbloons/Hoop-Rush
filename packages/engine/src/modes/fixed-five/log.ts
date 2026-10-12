@@ -1,0 +1,763 @@
+import {
+  FIXED_FIVE_MULTIPLAYER_VERSION,
+  LINEUP_STRUCTURE,
+  canonicalJson,
+  contentHashSchema,
+  fixedFiveTimeoutMsForMode,
+  idSchema,
+  playerIdSchema,
+  type ClassicDraftCatalog,
+  type ClassicDraftState,
+  type ContentHash,
+  type EraSimulationProfile,
+  type FixedFiveCommand,
+  type FixedFiveCommandPayload,
+  type FixedFiveCompetitionResult,
+  type FixedFiveCompetitionRun,
+  type FixedFiveLineupEntry,
+  type FixedFiveParticipantId,
+  type FixedFiveRoomMode,
+  type FixedFiveRoomPhase,
+  type FixedFiveRoomSettings,
+  type FixedFiveWorkerResultEntry,
+  type OpponentBracket,
+  type Seed,
+  type SimulationPlayer,
+  type SlotIndex,
+} from '@hoop-rush/data-contracts';
+import type { EngineContext } from '../../sim/kernel.ts';
+import {
+  applyClassicBuilderCommand,
+  createParticipantClassicDraft,
+  type ClassicBuilderCommand,
+} from '../classic/draft.ts';
+import {
+  applySandboxBuilderCommand,
+  createSandboxBuilder,
+  enumerateSandboxSafeMoves,
+  type FixedFiveCandidate,
+  type SandboxBuilderState,
+} from './sandbox-builder.ts';
+import {
+  claimDuelPlayer,
+  createDuelDraft,
+  duelCurrentPicker,
+  rerollDuel,
+  type DuelDraftState,
+} from './duel.ts';
+import {
+  claimSandboxDuelPlayer,
+  createSandboxDuelDraft,
+  sandboxDuelPicker,
+  type SandboxDuelState,
+} from './sandbox-duel.ts';
+import {
+  chooseAutopick,
+  enumerateClassicSafeMoves,
+  enumerateDuelSafeMoves,
+  enumerateSandboxDuelSafeMoves,
+  type AutopickSelection,
+} from './timeout.ts';
+import { FIXED_FIVE_TIEBREAK_PATH, fixedFiveDraftSeed, fixedFiveTiebreakWinner } from './seeds.ts';
+import { fixedFiveResultDigest } from './digest.ts';
+import { summarizeDuelGames, summarizeShared82Games } from './results.ts';
+import type { FixedFiveVerificationInput } from './verification.ts';
+
+export interface FixedFiveDraftLogInputs {
+  catalog: ClassicDraftCatalog;
+  pool: FixedFiveCandidate[];
+  poolById: Map<string, FixedFiveCandidate>;
+  context: EngineContext;
+}
+
+export interface FixedFivePickRef {
+  playerId: string;
+  franchiseId: string;
+  eraId: string;
+  slotIndex: SlotIndex;
+  playerVersionId?: string;
+}
+
+export interface ClassicDraftReplay {
+  hasStart: boolean;
+  p1: ClassicDraftState;
+  p2: ClassicDraftState;
+  skipped: number;
+}
+
+export interface SandboxDraftReplay {
+  hasStart: boolean;
+  draftStyle: 'legacy';
+  p1: SandboxBuilderState;
+  p2: SandboxBuilderState;
+  skipped: number;
+}
+
+export interface SandboxSnakeDraftReplay {
+  hasStart: boolean;
+  draftStyle: 'snake';
+  state: SandboxDuelState;
+  skipped: number;
+}
+
+export interface DuelDraftReplay {
+  hasStart: boolean;
+  state: DuelDraftState;
+  skipped: number;
+}
+
+export interface SandboxDuelDraftReplay {
+  hasStart: boolean;
+  state: SandboxDuelState;
+  skipped: number;
+}
+
+export type DraftReplay =
+  | ({
+      mode: 'classic-shared-82';
+    } & ClassicDraftReplay)
+  | ({
+      mode: 'sandbox-shared-82';
+    } & (SandboxDraftReplay | SandboxSnakeDraftReplay))
+  | ({
+      mode: 'duel';
+    } & DuelDraftReplay)
+  | ({
+      mode: 'sandbox-duel';
+    } & SandboxDuelDraftReplay);
+
+function draftIdFor(roomId: string, participant: FixedFiveParticipantId): string {
+  return `${roomId.slice(0, 48)}:${participant}`;
+}
+
+function applyClassicPayload(
+  state: ClassicDraftState,
+  assets: FixedFiveDraftLogInputs,
+  payload: FixedFiveCommandPayload,
+): ClassicDraftState {
+  if (payload.kind === 'reroll') {
+    const command: ClassicBuilderCommand = { kind: 'reroll', axis: payload.axis };
+    return applyClassicBuilderCommand(state, assets.catalog, command, assets.context);
+  }
+  if (
+    payload.kind === 'classic-pick' ||
+    payload.kind === 'classic-reposition' ||
+    payload.kind === 'timeout-autopick'
+  ) {
+    const command: ClassicBuilderCommand = {
+      kind: payload.kind === 'classic-reposition' ? 'classic-reposition' : 'classic-pick',
+      playerId: payload.playerId,
+      slotIndex: payload.slotIndex,
+    };
+    return applyClassicBuilderCommand(state, assets.catalog, command, assets.context);
+  }
+  return state;
+}
+
+function applySandboxPayload(
+  state: SandboxBuilderState,
+  assets: FixedFiveDraftLogInputs,
+  payload: FixedFiveCommandPayload,
+): SandboxBuilderState {
+  if (
+    payload.kind === 'sandbox-place' ||
+    payload.kind === 'sandbox-reposition' ||
+    payload.kind === 'timeout-autopick'
+  ) {
+    return applySandboxBuilderCommand(state, assets.pool, {
+      kind: payload.kind === 'sandbox-reposition' ? 'sandbox-reposition' : 'sandbox-place',
+      playerId: payload.playerId,
+      slotIndex: payload.slotIndex,
+    });
+  }
+  if (payload.kind === 'sandbox-remove') {
+    return applySandboxBuilderCommand(state, assets.pool, {
+      kind: 'sandbox-remove',
+      slotIndex: payload.slotIndex,
+    });
+  }
+  if (payload.kind === 'sandbox-lock') {
+    return applySandboxBuilderCommand(state, assets.pool, { kind: 'sandbox-lock' });
+  }
+  return state;
+}
+
+function applyDuelPayload(
+  state: DuelDraftState,
+  assets: FixedFiveDraftLogInputs,
+  actor: FixedFiveParticipantId,
+  payload: FixedFiveCommandPayload,
+): DuelDraftState {
+  if (payload.kind === 'reroll') {
+    return rerollDuel(state, assets.catalog, assets.poolById, payload.axis, actor, assets.context);
+  }
+  if (
+    payload.kind === 'duel-claim' ||
+    payload.kind === 'classic-pick' ||
+    payload.kind === 'timeout-autopick'
+  ) {
+    return claimDuelPlayer(
+      state,
+      assets.catalog,
+      assets.poolById,
+      { playerId: payload.playerId, slotIndex: payload.slotIndex, actor },
+      assets.context,
+    );
+  }
+  return state;
+}
+
+function applySandboxDuelPayload(
+  state: SandboxDuelState,
+  assets: FixedFiveDraftLogInputs,
+  command: FixedFiveCommand,
+): SandboxDuelState {
+  const payload = command.payload;
+  if (payload.kind === 'sandbox-place' || payload.kind === 'timeout-autopick') {
+    return claimSandboxDuelPlayer(state, assets.pool, {
+      playerId: payload.playerId,
+      playerVersionId: payload.playerVersionId,
+      slotIndex: payload.slotIndex,
+      actor: command.actorParticipantId,
+    });
+  }
+  return state;
+}
+
+function isDraftPayload(
+  mode: FixedFiveRoomMode,
+  kind: FixedFiveCommandPayload['kind'],
+  sandboxDuel = false,
+  sandboxSnake = false,
+): boolean {
+  if (mode === 'duel') {
+    if (sandboxDuel) {
+      return kind === 'sandbox-place' || kind === 'timeout-autopick';
+    }
+    return (
+      kind === 'reroll' ||
+      kind === 'duel-claim' ||
+      kind === 'classic-pick' ||
+      kind === 'timeout-autopick'
+    );
+  }
+  if (mode === 'sandbox-shared-82') {
+    if (sandboxSnake) return kind === 'sandbox-place' || kind === 'timeout-autopick';
+    return (
+      kind === 'sandbox-place' ||
+      kind === 'sandbox-reposition' ||
+      kind === 'sandbox-remove' ||
+      kind === 'sandbox-lock' ||
+      kind === 'timeout-autopick'
+    );
+  }
+  return (
+    kind === 'reroll' ||
+    kind === 'classic-pick' ||
+    kind === 'classic-reposition' ||
+    kind === 'timeout-autopick'
+  );
+}
+
+export function replayFixedFiveLog(
+  mode: FixedFiveRoomMode,
+  roomId: string,
+  rootSeed: Seed,
+  dataVersion: string,
+  variant: FixedFiveRoomSettings['variant'],
+  assets: FixedFiveDraftLogInputs,
+  commands: FixedFiveCommand[],
+  sourceMode: FixedFiveRoomSettings['sourceMode'] = 'classic',
+  multiplayerVersion = FIXED_FIVE_MULTIPLAYER_VERSION,
+): DraftReplay {
+  const ordered = [...commands].sort((a, b) => a.ordinal - b.ordinal);
+  const hasStart = ordered.some((c) => c.payload.kind === 'start');
+  if (mode === 'duel' && sourceMode === 'sandbox') {
+    const snake = multiplayerVersion === FIXED_FIVE_MULTIPLAYER_VERSION;
+    let state = createSandboxDuelDraft(rootSeed, undefined, snake ? 'snake' : 'alternating');
+    let skipped = 0;
+    for (const command of ordered) {
+      if (!isDraftPayload(mode, command.payload.kind, true)) continue;
+      try {
+        state = applySandboxDuelPayload(state, assets, command);
+      } catch {
+        skipped += 1;
+      }
+    }
+    return { mode: 'sandbox-duel', hasStart, state, skipped };
+  }
+  if (mode === 'duel') {
+    let state = createDuelDraft(rootSeed, assets.catalog, assets.poolById, assets.context);
+    let skipped = 0;
+    for (const command of ordered) {
+      if (!isDraftPayload(mode, command.payload.kind)) continue;
+      try {
+        state = applyDuelPayload(state, assets, command.actorParticipantId, command.payload);
+      } catch {
+        skipped += 1;
+      }
+    }
+    return { mode, hasStart, state, skipped };
+  }
+  if (mode === 'sandbox-shared-82') {
+    if (multiplayerVersion === FIXED_FIVE_MULTIPLAYER_VERSION) {
+      let state = createSandboxDuelDraft(rootSeed);
+      let skipped = 0;
+      for (const command of ordered) {
+        if (!isDraftPayload(mode, command.payload.kind, false, true)) continue;
+        try {
+          state = applySandboxDuelPayload(state, assets, command);
+        } catch {
+          skipped += 1;
+        }
+      }
+      return { mode, hasStart, draftStyle: 'snake', state, skipped };
+    }
+    let p1 = createSandboxBuilder();
+    let p2 = createSandboxBuilder();
+    let skipped = 0;
+    for (const command of ordered) {
+      if (!isDraftPayload(mode, command.payload.kind)) continue;
+      try {
+        if (command.actorParticipantId === 'p1') {
+          p1 = applySandboxPayload(p1, assets, command.payload);
+        } else {
+          p2 = applySandboxPayload(p2, assets, command.payload);
+        }
+      } catch {
+        skipped += 1;
+      }
+    }
+    return { mode, hasStart, draftStyle: 'legacy', p1, p2, skipped };
+  }
+  let p1 = createParticipantClassicDraft(
+    draftIdFor(roomId, 'p1'),
+    variant,
+    fixedFiveDraftSeed(rootSeed, 'p1'),
+    dataVersion,
+    assets.catalog,
+    assets.context,
+  );
+  let p2 = createParticipantClassicDraft(
+    draftIdFor(roomId, 'p2'),
+    variant,
+    fixedFiveDraftSeed(rootSeed, 'p2'),
+    dataVersion,
+    assets.catalog,
+    assets.context,
+  );
+  let skipped = 0;
+  for (const command of ordered) {
+    if (!isDraftPayload(mode, command.payload.kind)) continue;
+    try {
+      if (command.actorParticipantId === 'p1') {
+        p1 = applyClassicPayload(p1, assets, command.payload);
+      } else {
+        p2 = applyClassicPayload(p2, assets, command.payload);
+      }
+    } catch {
+      skipped += 1;
+    }
+  }
+  return { mode, hasStart, p1, p2, skipped };
+}
+
+export function isDraftComplete(replay: DraftReplay): boolean {
+  if (replay.mode === 'duel') return replay.state.status === 'complete';
+  if (replay.mode === 'sandbox-duel') return replay.state.status === 'complete';
+  if (replay.mode === 'sandbox-shared-82') {
+    return replay.draftStyle === 'snake'
+      ? replay.state.status === 'complete'
+      : replay.p1.locked && replay.p2.locked;
+  }
+  return replay.p1.status === 'complete' && replay.p2.status === 'complete';
+}
+
+export function isFixedFiveDraftTurn(
+  replay: DraftReplay,
+  participant: FixedFiveParticipantId,
+): boolean {
+  if (replay.mode === 'duel') {
+    return (
+      replay.state.status === 'drafting' &&
+      replay.state.currentRoll !== null &&
+      duelCurrentPicker(replay.state) === participant
+    );
+  }
+  if (replay.mode === 'sandbox-duel') {
+    return replay.state.status === 'drafting' && sandboxDuelPicker(replay.state) === participant;
+  }
+  if (replay.mode === 'sandbox-shared-82') {
+    if (replay.draftStyle === 'snake') {
+      return replay.state.status === 'drafting' && sandboxDuelPicker(replay.state) === participant;
+    }
+    return !(participant === 'p1' ? replay.p1 : replay.p2).locked;
+  }
+  return (participant === 'p1' ? replay.p1 : replay.p2).status === 'drafting';
+}
+
+export function picksCommittedOf(replay: DraftReplay, participant: FixedFiveParticipantId): number {
+  if (replay.mode === 'duel') {
+    return replay.state.picks.filter((p) => p.participantId === participant).length;
+  }
+  if (replay.mode === 'sandbox-duel') {
+    return replay.state.picks.filter((p) => p.participantId === participant).length;
+  }
+  if (replay.mode === 'sandbox-shared-82') {
+    if (replay.draftStyle === 'snake') {
+      return replay.state.picks.filter((p) => p.participantId === participant).length;
+    }
+    const builder = participant === 'p1' ? replay.p1 : replay.p2;
+    return builder.placements.length;
+  }
+  const draft = participant === 'p1' ? replay.p1 : replay.p2;
+  return draft.picks.length;
+}
+
+export function lockedOf(replay: DraftReplay, participant: FixedFiveParticipantId): boolean {
+  if (replay.mode === 'duel') return replay.state.status === 'complete';
+  if (replay.mode === 'sandbox-duel') return replay.state.status === 'complete';
+  if (replay.mode === 'sandbox-shared-82') {
+    if (replay.draftStyle === 'snake') return replay.state.status === 'complete';
+    return (participant === 'p1' ? replay.p1 : replay.p2).locked;
+  }
+  return (participant === 'p1' ? replay.p1 : replay.p2).status === 'complete';
+}
+
+export interface RoomLogFacts {
+  ready: Record<FixedFiveParticipantId, boolean>;
+  rematchRequested: Record<FixedFiveParticipantId, boolean>;
+  rematchConfirmed: Record<FixedFiveParticipantId, boolean>;
+  proposals: Array<{
+    actor: FixedFiveParticipantId;
+    digest: ContentHash;
+  }>;
+  confirms: Array<{
+    actor: FixedFiveParticipantId;
+    digest: ContentHash;
+    verified: boolean;
+  }>;
+}
+
+export function mergeFixedFiveCommands(
+  existing: FixedFiveCommand[],
+  incoming: FixedFiveCommand[],
+): FixedFiveCommand[] {
+  const byOrdinal = new Map<number, FixedFiveCommand>();
+  const ordinalByCommandId = new Map<string, number>();
+  for (const command of [...existing, ...incoming]) {
+    const knownOrdinal = ordinalByCommandId.get(command.commandId);
+    if (knownOrdinal !== undefined && knownOrdinal !== command.ordinal) {
+      throw new Error(`fixed-five command ${command.commandId} changed ordinal`);
+    }
+    const atOrdinal = byOrdinal.get(command.ordinal);
+    if (atOrdinal) {
+      if (
+        atOrdinal.commandId !== command.commandId ||
+        canonicalJson(atOrdinal) !== canonicalJson(command)
+      ) {
+        throw new Error(`fixed-five command log conflicts at ordinal ${String(command.ordinal)}`);
+      }
+      continue;
+    }
+    ordinalByCommandId.set(command.commandId, command.ordinal);
+    byOrdinal.set(command.ordinal, command);
+  }
+  return [...byOrdinal.values()].sort((a, b) => a.ordinal - b.ordinal);
+}
+
+export function restoreFixedFiveCommandSyncState(storedCommands: FixedFiveCommand[]): {
+  commands: FixedFiveCommand[];
+  lastOrdinal: number;
+} {
+  const merged = mergeFixedFiveCommands([], storedCommands);
+  const commands: FixedFiveCommand[] = [];
+  let lastOrdinal = -1;
+  for (const command of merged) {
+    if (command.ordinal !== lastOrdinal + 1) break;
+    commands.push(command);
+    lastOrdinal = command.ordinal;
+  }
+  return { commands, lastOrdinal };
+}
+
+export function roomLogFacts(commands: FixedFiveCommand[]): RoomLogFacts {
+  const facts: RoomLogFacts = {
+    ready: { p1: false, p2: false },
+    rematchRequested: { p1: false, p2: false },
+    rematchConfirmed: { p1: false, p2: false },
+    proposals: [],
+    confirms: [],
+  };
+  for (const command of [...commands].sort((a, b) => a.ordinal - b.ordinal)) {
+    const payload = command.payload;
+    if (payload.kind === 'ready') facts.ready[command.actorParticipantId] = payload.ready;
+    if (payload.kind === 'rematch-request')
+      facts.rematchRequested[command.actorParticipantId] = true;
+    if (payload.kind === 'rematch-confirm')
+      facts.rematchConfirmed[command.actorParticipantId] = true;
+    if (payload.kind === 'propose-result')
+      facts.proposals.push({ actor: command.actorParticipantId, digest: payload.resultDigest });
+    if (payload.kind === 'confirm-result')
+      facts.confirms.push({
+        actor: command.actorParticipantId,
+        digest: payload.resultDigest,
+        verified: payload.verified,
+      });
+  }
+  return facts;
+}
+
+export function deriveEffectivePhase(
+  serverPhase: FixedFiveRoomPhase,
+  replay: DraftReplay,
+  localSimDone: boolean,
+): FixedFiveRoomPhase {
+  if (
+    serverPhase === 'completed' ||
+    serverPhase === 'integrity-failed' ||
+    serverPhase === 'expired'
+  ) {
+    return serverPhase;
+  }
+  if (!replay.hasStart) return 'lobby';
+  if (!isDraftComplete(replay)) return 'drafting';
+  if (!localSimDone) return 'simulating';
+  return 'awaiting-confirmation';
+}
+
+export function pickOrdinalOf(replay: DraftReplay, participant: FixedFiveParticipantId): number {
+  if (replay.mode === 'duel') return replay.state.pickOrdinal;
+  if (replay.mode === 'sandbox-duel') return replay.state.pickOrdinal;
+  if (replay.mode === 'sandbox-shared-82') {
+    if (replay.draftStyle === 'snake') return replay.state.pickOrdinal;
+    return (participant === 'p1' ? replay.p1 : replay.p2).placements.length;
+  }
+  return (participant === 'p1' ? replay.p1 : replay.p2).picks.length;
+}
+
+export function timeoutMsFor(mode: FixedFiveRoomMode): number {
+  return fixedFiveTimeoutMsForMode(mode);
+}
+
+export function computeDueAutopick(
+  mode: FixedFiveRoomMode,
+  rootSeed: Seed,
+  replay: DraftReplay,
+  assets: FixedFiveDraftLogInputs,
+  participant: FixedFiveParticipantId,
+): AutopickSelection | null {
+  if (!replay.hasStart || isDraftComplete(replay)) return null;
+  const ordinal = pickOrdinalOf(replay, participant);
+  if (mode === 'sandbox-shared-82') {
+    if (replay.mode !== 'sandbox-shared-82') return null;
+    if (replay.draftStyle === 'snake') {
+      if (!isFixedFiveDraftTurn(replay, participant)) return null;
+      const safe = enumerateSandboxDuelSafeMoves(assets.pool, replay.state);
+      if (safe.length === 0) return null;
+      return chooseAutopick(rootSeed, mode, participant, ordinal, safe);
+    }
+    const builder = participant === 'p1' ? replay.p1 : replay.p2;
+    if (builder.locked) return null;
+    const safe = enumerateSandboxSafeMoves(assets.pool, builder);
+    if (safe.length === 0) return null;
+    return chooseAutopick(rootSeed, mode, participant, ordinal, safe);
+  }
+  if (mode === 'duel') {
+    if (replay.mode === 'sandbox-duel') {
+      if (!isFixedFiveDraftTurn(replay, participant)) return null;
+      const safe = enumerateSandboxDuelSafeMoves(assets.pool, replay.state);
+      if (safe.length === 0) return null;
+      return chooseAutopick(rootSeed, mode, participant, ordinal, safe);
+    }
+    if (replay.mode !== 'duel') return null;
+    if (!isFixedFiveDraftTurn(replay, participant)) return null;
+    const safe = enumerateDuelSafeMoves(assets.catalog, assets.poolById, replay.state);
+    if (safe.length === 0) return null;
+    return chooseAutopick(rootSeed, mode, participant, ordinal, safe);
+  }
+  if (replay.mode !== 'classic-shared-82') return null;
+  const draft = participant === 'p1' ? replay.p1 : replay.p2;
+  if (draft.status !== 'drafting') return null;
+  const safe = enumerateClassicSafeMoves(assets.catalog, assets.poolById, draft);
+  if (safe.length === 0) return null;
+  return chooseAutopick(rootSeed, mode, participant, ordinal, safe);
+}
+
+export interface WorkerSummaryInput {
+  mode: FixedFiveRoomMode;
+  bracket: OpponentBracket;
+  rootSeed: Seed;
+  p1TeamId: string;
+  p2TeamId: string;
+  p1PlayerIds: readonly string[];
+  p2PlayerIds: readonly string[];
+  entries: FixedFiveWorkerResultEntry[];
+}
+
+export function summarizeWorkerEntries(input: WorkerSummaryInput): {
+  result: FixedFiveCompetitionResult;
+  weakestReplacedOpponentId: string | null;
+} {
+  if (input.mode === 'duel') {
+    const { result } = summarizeDuelGames({
+      games: input.entries.map((entry) => entry.game),
+      p1TeamId: input.p1TeamId,
+      p2TeamId: input.p2TeamId,
+      p1PlayerIds: input.p1PlayerIds,
+      p2PlayerIds: input.p2PlayerIds,
+      rootSeed: input.rootSeed,
+    });
+    return { result, weakestReplacedOpponentId: null };
+  }
+  const h2h = input.entries.filter((entry) => entry.tag === 'h2h').map((entry) => entry.game);
+  const p1NonH2h = input.entries.filter((entry) => entry.tag === 'p1').map((entry) => entry.game);
+  const p2NonH2h = input.entries.filter((entry) => entry.tag === 'p2').map((entry) => entry.game);
+  const { result } = summarizeShared82Games({
+    bracket: input.bracket,
+    rootSeed: input.rootSeed,
+    p1TeamId: input.p1TeamId,
+    p2TeamId: input.p2TeamId,
+    p1PlayerIds: input.p1PlayerIds,
+    p2PlayerIds: input.p2PlayerIds,
+    h2h,
+    p1NonH2h,
+    p2NonH2h,
+  });
+  return { result, weakestReplacedOpponentId: result.weakestReplacedOpponentId };
+}
+
+export function lineupEntryFor(
+  refs: readonly FixedFivePickRef[],
+  players: readonly SimulationPlayer[],
+): FixedFiveLineupEntry {
+  const byId = new Map(players.map((p) => [p.playerId, p]));
+  return {
+    lineup: {
+      structure: LINEUP_STRUCTURE,
+      assignments: refs.map((ref) => {
+        const playerId = playerIdSchema.parse(ref.playerId);
+        const player = byId.get(playerId);
+        if (!player) throw new Error(`lineup is missing snapshot for ${ref.playerId}`);
+        return { slotIndex: ref.slotIndex, playerId, positions: player.positions };
+      }),
+    },
+    players: [...players],
+  };
+}
+
+export interface CompetitionAssembleInput {
+  roomId: string;
+  sourceMode: FixedFiveRoomSettings['sourceMode'];
+  competition: FixedFiveCompetitionRun['competition'];
+  rootSeed: Seed;
+  versions: FixedFiveRoomSettings['versions'];
+  commands: FixedFiveCommand[];
+  p1: {
+    refs: readonly FixedFivePickRef[];
+    players: readonly SimulationPlayer[];
+  };
+  p2: {
+    refs: readonly FixedFivePickRef[];
+    players: readonly SimulationPlayer[];
+  };
+  result: FixedFiveCompetitionRun['result'];
+  resultDigest: string;
+  weakestReplacedOpponentId: string | null;
+}
+
+export function assembleCompetitionRun(input: CompetitionAssembleInput): FixedFiveCompetitionRun {
+  const tiebreakWinner = fixedFiveTiebreakWinner(input.rootSeed);
+  return {
+    schemaVersion: 1,
+    runId: idSchema.parse(input.roomId),
+    roomId: idSchema.parse(input.roomId),
+    mode: input.sourceMode,
+    competition: input.competition,
+    lineups: {
+      p1: lineupEntryFor(input.p1.refs, input.p1.players),
+      p2: lineupEntryFor(input.p2.refs, input.p2.players),
+    },
+    rootSeed: input.rootSeed,
+    versions: input.versions,
+    acceptedCommands: [...input.commands].sort((a, b) => a.ordinal - b.ordinal),
+    authorityFacts: {
+      tiebreakPath: FIXED_FIVE_TIEBREAK_PATH,
+      tiebreakWinner,
+      weakestReplacedOpponentId: input.weakestReplacedOpponentId,
+    },
+    resultDigest: contentHashSchema.parse(input.resultDigest),
+    result: input.result,
+  };
+}
+
+export interface CompetitionDigestInput {
+  rootSeed: Seed;
+  versions: FixedFiveRoomSettings['versions'];
+  p1: {
+    refs: readonly FixedFivePickRef[];
+    players: readonly SimulationPlayer[];
+  };
+  p2: {
+    refs: readonly FixedFivePickRef[];
+    players: readonly SimulationPlayer[];
+  };
+  commands: FixedFiveCommand[];
+  result: FixedFiveCompetitionResult;
+}
+
+export function computeCompetitionDigest(input: CompetitionDigestInput): ContentHash {
+  return fixedFiveResultDigest({
+    rootSeed: input.rootSeed,
+    versions: input.versions,
+    lineups: {
+      p1: lineupEntryFor(input.p1.refs, input.p1.players),
+      p2: lineupEntryFor(input.p2.refs, input.p2.players),
+    },
+    acceptedCommands: [...input.commands].sort((a, b) => a.ordinal - b.ordinal),
+    result: input.result,
+  });
+}
+
+export interface VerificationInputBuild {
+  roomId: string;
+  competition: FixedFiveCompetitionRun['competition'];
+  rootSeed: Seed;
+  versions: FixedFiveRoomSettings['versions'];
+  challenge: string;
+  commands: FixedFiveCommand[];
+  bracket: OpponentBracket;
+  profile: EraSimulationProfile;
+  result: FixedFiveCompetitionResult;
+  resultDigest: ContentHash;
+  p1: {
+    refs: readonly FixedFivePickRef[];
+    players: readonly SimulationPlayer[];
+  };
+  p2: {
+    refs: readonly FixedFivePickRef[];
+    players: readonly SimulationPlayer[];
+  };
+}
+
+export function buildFixedFiveVerificationInput(
+  input: VerificationInputBuild,
+): FixedFiveVerificationInput {
+  return {
+    roomId: input.roomId,
+    competition: input.competition,
+    rootSeed: input.rootSeed,
+    versions: input.versions,
+    challenge: input.challenge,
+    acceptedCommands: [...input.commands].sort((a, b) => a.ordinal - b.ordinal),
+    lineups: {
+      p1: lineupEntryFor(input.p1.refs, input.p1.players),
+      p2: lineupEntryFor(input.p2.refs, input.p2.players),
+    },
+    result: input.result,
+    resultDigest: input.resultDigest,
+    bracket: input.bracket,
+    profile: input.profile,
+    dataVersion: input.versions.dataVersion,
+  };
+}
