@@ -10,7 +10,6 @@
     CollectionGameRecordUnion,
     CollectionGameRules,
     CollectionObjectiveId,
-    CollectionPlayState,
     CollectionProgressionRules,
   } from '@hoop-rush/data-contracts';
   import { collectionGameIdSchema } from '@hoop-rush/data-contracts';
@@ -38,7 +37,6 @@
     loadCommittedGame,
     prepareBasicGame,
     prepareChallengeGame,
-    type AcceptedGameOutcome,
   } from '$lib/features/collection/collection-hub.ts';
   import { runCollectionGame } from '$lib/features/collection/collection-game-runner.ts';
   import { collectionErrorMessage } from '$lib/features/collection/collection-errors.ts';
@@ -65,7 +63,9 @@
   import { arenaError, arenaGameResult } from '$lib/arena-sound';
   import { onDestroy } from 'svelte';
   import { createUltimatePageShell } from './ultimate-page.svelte.ts';
+  import { CollectionPlayPresenter } from '$lib/features/collection/collection-play-presenter.svelte.ts';
 
+  const playSession = new CollectionPlayPresenter();
   const pageShell = createUltimatePageShell({
     failureMessage: 'Could not load play.',
     load: async (ctx) => {
@@ -73,10 +73,8 @@
       if (!pageShell.isMounted()) return false;
       readFlowFromUrl();
       if (pageShell.collectionState?.claimedWelcome) {
-        const snapshot = await ensurePlayStateSnapshot(new Date().toISOString());
+        await playSession.load();
         if (!pageShell.isMounted()) return false;
-        playState = snapshot.playState;
-        rootSeed = snapshot.rootSeed;
         await restoreLastGame();
         if (!pageShell.isMounted()) return false;
       }
@@ -95,7 +93,40 @@
     },
   });
   const shell = pageShell.shell;
+  playSession.init({
+    ensurePlayState: (nowIso) => ensurePlayStateSnapshot(nowIso),
+    prepareBasicGame: (nowIso, setup) => prepareBasicGame(nowIso, setup),
+    prepareChallengeGame: (challengeId, objectiveId, nowIso) =>
+      prepareChallengeGame(challengeId, objectiveId, nowIso),
+    abandonBasicGame: (nowIso) => abandonBasicGame(nowIso),
+    abandonChallengeGame: (nowIso) => abandonChallengeGame(nowIso),
+    runGame: async (prepared) => {
+      const assets = await collectionGameWorkerAssets();
+      return runCollectionGame({
+        prepared,
+        catalogUrl: assets.catalogUrl,
+        catalogHash: assets.catalogHash,
+        profileUrl: assets.profileUrl,
+        profileHash: assets.profileHash,
+      });
+    },
+    acceptBasicGameResult: (input) => acceptBasicGameResult(input),
+    acceptChallengeGameResult: (input) => acceptChallengeGameResult(input),
+    loadCommittedGame: (gameId) => loadCommittedGame(gameId),
+    reloadCollection: () => shell.reloadCollection(),
+    clock: {
+      nowIso: () => new Date().toISOString(),
+      sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+    },
+    anticipationMs: () =>
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        ? 0
+        : 650,
+    errorMessage: (error, fallback) => collectionErrorMessage(error, fallback),
+  });
   onDestroy(() => {
+    playSession.dispose();
     stopPlayback();
   });
 
@@ -108,10 +139,10 @@
   let rules = $state<CollectionGameRules | null>(null);
   let progression = $state<CollectionProgressionRules | null>(null);
   let progressionError = $state<string | null>(null);
-  let playState = $state<CollectionPlayState | null>(null);
-  let rootSeed = $state<string | null>(null);
-  let busy = $state<'idle' | 'preparing' | 'playing' | 'committing'>('idle');
-  let flowError = $state<string | null>(null);
+  const playState = $derived(playSession.playState);
+  const rootSeed = $derived(playSession.rootSeed);
+  const busy = $derived(playSession.busy);
+  const flowError = $derived(playSession.error);
   let record = $state<CollectionGameRecordUnion | null>(null);
   let announcement = $state('');
 
@@ -486,7 +517,7 @@
   async function restoreLastGame(): Promise<void> {
     try {
       const rawGameId = sessionStorage.getItem('collection-last-game');
-      if (!rawGameId || playState?.pendingGame) return;
+      if (!rawGameId || playSession.pending) return;
       const parsedGameId = collectionGameIdSchema.safeParse(rawGameId);
       if (!parsedGameId.success) return;
       const committed = await loadCommittedGame(parsedGameId.data);
@@ -504,182 +535,91 @@
   }
 
   async function refreshState(): Promise<void> {
-    const [snapshot] = await Promise.all([
-      ensurePlayStateSnapshot(new Date().toISOString()),
-      shell.reloadCollection(),
-    ]);
-    if (!pageShell.isMounted()) return;
-    playState = snapshot.playState;
-    rootSeed = snapshot.rootSeed;
+    await Promise.all([playSession.load(), shell.reloadCollection()]);
   }
 
   async function prepare(): Promise<void> {
-    if (busy !== 'idle') return;
+    if (playSession.busy !== 'idle') return;
     if (mode === 'challenges' && selectedChallengeId === null) return;
     stopPlayback();
-    busy = 'preparing';
-    flowError = null;
+    const ok = await playSession.prepare({
+      mode,
+      difficultyId,
+      objectiveId: effectiveObjectiveId,
+      challengeId: selectedChallengeId,
+    });
+    if (!pageShell.isMounted() || !ok) return;
+    record = null;
     try {
-      const anticipation = new Promise<void>((done) =>
-        setTimeout(done, window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 650),
-      );
-      const nowIso = new Date().toISOString();
-      const outcome =
-        mode === 'challenges'
-          ? await prepareChallengeGame(
-              selectedChallengeId as string,
-              effectiveChallengeObjectiveId,
-              nowIso,
-            )
-          : await prepareBasicGame(nowIso, {
-              difficultyId,
-              objectiveId: effectiveObjectiveId,
-            });
-      await anticipation;
-      if (!pageShell.isMounted()) return;
-      playState = outcome.playState;
-      record = null;
-      try {
-        sessionStorage.removeItem('collection-last-game');
-      } catch {
-        // Session storage is best-effort.
-      }
-      announcement =
-        mode === 'challenges' && selectedChallenge !== null
-          ? `Challenge matchup prepared: ${selectedChallenge.displayName}.`
-          : `Matchup prepared at ${difficultyNameOf(difficultyId)}.`;
-    } catch (prepareError) {
-      if (!pageShell.isMounted()) return;
-      flowError = collectionErrorMessage(prepareError, 'Preparing failed.');
-    } finally {
-      if (pageShell.isMounted()) busy = 'idle';
+      sessionStorage.removeItem('collection-last-game');
+    } catch {
+      // Session storage is best-effort.
     }
+    announcement =
+      mode === 'challenges' && selectedChallenge !== null
+        ? `Challenge matchup prepared: ${selectedChallenge.displayName}.`
+        : `Matchup prepared at ${difficultyNameOf(difficultyId)}.`;
   }
 
   async function abandon(): Promise<void> {
-    if (busy !== 'idle') return;
-    const pendingGame = pending;
+    if (playSession.busy !== 'idle') return;
+    const pendingGame = playSession.pending;
     const challengeName =
       pendingGame !== null && pendingGame.gameVersion === 'collection-game-v3'
         ? pendingGame.challenge.displayName
         : null;
-    busy = 'preparing';
-    flowError = null;
-    try {
-      const next =
-        challengeName !== null
-          ? await abandonChallengeGame(new Date().toISOString())
-          : await abandonBasicGame(new Date().toISOString());
-      if (!pageShell.isMounted()) return;
-      playState = next;
-      record = null;
-      announcement =
-        challengeName !== null
-          ? `Challenge abandoned: ${challengeName}. No reward or clear was granted and the game sequence advanced.`
-          : 'Matchup abandoned. Prepare a new game when ready.';
-    } catch (abandonError) {
-      if (!pageShell.isMounted()) return;
-      flowError = collectionErrorMessage(abandonError, 'Abandoning failed.');
-    } finally {
-      if (pageShell.isMounted()) busy = 'idle';
-    }
+    const ok = await playSession.abandon();
+    if (!pageShell.isMounted() || !ok) return;
+    record = null;
+    announcement =
+      challengeName !== null
+        ? `Challenge abandoned: ${challengeName}. No reward or clear was granted and the game sequence advanced.`
+        : 'Matchup abandoned. Prepare a new game when ready.';
   }
 
   async function play(): Promise<void> {
-    const matchup = pending;
-    if (busy !== 'idle' || !matchup) return;
-    busy = 'playing';
+    const matchup = playSession.pending;
+    if (playSession.busy !== 'idle' || !matchup) return;
     castOpen = true;
-    flowError = null;
     stopPlayback();
-    try {
-      const assets = await collectionGameWorkerAssets();
-      const completed = await runCollectionGame({
-        prepared: matchup,
-        catalogUrl: assets.catalogUrl,
-        catalogHash: assets.catalogHash,
-        profileUrl: assets.profileUrl,
-        profileHash: assets.profileHash,
-      });
-      if (!pageShell.isMounted()) return;
-      busy = 'committing';
-      const completedAtIso = new Date().toISOString();
-      try {
-        let accepted: AcceptedGameOutcome;
-        if (matchup.gameVersion === 'collection-game-v3') {
-          if (completed.result.gameVersion !== 'collection-game-v3') {
-            throw new Error('The worker returned a result for a different game version.');
-          }
-          accepted = await acceptChallengeGameResult({
-            result: completed.result,
-            events: completed.events,
-            completedAtIso,
-            recordedAtIso: new Date().toISOString(),
-          });
-        } else {
-          accepted = await acceptBasicGameResult({
-            result: completed.result,
-            events: completed.events,
-            completedAtIso,
-            recordedAtIso: new Date().toISOString(),
-          });
-        }
-        if (!pageShell.isMounted()) return;
-        playState = accepted.playState;
-        record = accepted.record;
-        if (accepted.record.gameVersion === 'collection-game-v3') {
-          mode = 'challenges';
-          selectedChallengeId = accepted.record.prepared.challenge.challengeId;
-        }
-        await shell.reloadCollection();
-        if (!pageShell.isMounted()) return;
-      } catch (acceptError) {
-        const recovered = await loadCommittedGame(matchup.gameId).catch(() => null);
-        if (!pageShell.isMounted()) return;
-        if (recovered) {
-          await refreshState().catch(() => undefined);
-          if (!pageShell.isMounted()) return;
-          record = recovered;
-        } else {
-          throw acceptError;
-        }
-      }
-      if (!pageShell.isMounted()) return;
-      try {
-        if (collectionGameIdSchema.safeParse(matchup.gameId).success) {
-          sessionStorage.setItem('collection-last-game', matchup.gameId);
-        }
-      } catch {
-        // Receipt restore is best-effort.
-      }
-      cursor = 0;
-      watchMode = 'standard';
-      resultView = 'recap';
-      const committed = record;
-      const won = committed?.result.winner === 'home';
-      const coins = committed === null ? 0 : rewardCoinsOf(committed);
-      let objectiveNote = '';
-      if (committed?.gameVersion === 'collection-game-v2') {
-        const evaluation = committed.objectiveEvaluation;
-        if (evaluation.kind === 'evaluated') {
-          objectiveNote = evaluation.success ? ' Objective passed.' : ' Objective failed.';
-        }
-      }
-      const challengeNote = committed === null ? '' : challengeRewardNoteOf(committed);
-      savedResultAnnouncement = `${won ? 'You won' : 'CPU won'}. +${String(coins)} Coins.${objectiveNote}${challengeNote}`;
-      firstWatch = true;
-      announcement = 'Game ready. Watching the recorded gamecast.';
-      busy = 'idle';
-    } catch (playError) {
-      if (!pageShell.isMounted()) return;
+    const acceptedRecord = await playSession.play();
+    if (!pageShell.isMounted()) return;
+    if (acceptedRecord === null) {
       castOpen = false;
       try {
         arenaError();
       } catch {}
-      flowError = collectionErrorMessage(playError, 'The game failed. Try again.');
-      await refreshState().catch(() => undefined);
-      if (pageShell.isMounted()) busy = 'idle';
+      return;
     }
+    record = acceptedRecord;
+    if (record.gameVersion === 'collection-game-v3') {
+      mode = 'challenges';
+      selectedChallengeId = record.prepared.challenge.challengeId;
+    }
+    try {
+      if (collectionGameIdSchema.safeParse(matchup.gameId).success) {
+        sessionStorage.setItem('collection-last-game', matchup.gameId);
+      }
+    } catch {
+      // Receipt restore is best-effort.
+    }
+    cursor = 0;
+    watchMode = 'standard';
+    resultView = 'recap';
+    const committed = record;
+    const won = committed?.result.winner === 'home';
+    const coins = committed === null ? 0 : rewardCoinsOf(committed);
+    let objectiveNote = '';
+    if (committed?.gameVersion === 'collection-game-v2') {
+      const evaluation = committed.objectiveEvaluation;
+      if (evaluation.kind === 'evaluated') {
+        objectiveNote = evaluation.success ? ' Objective passed.' : ' Objective failed.';
+      }
+    }
+    const challengeNote = committed === null ? '' : challengeRewardNoteOf(committed);
+    savedResultAnnouncement = `${won ? 'You won' : 'CPU won'}. +${String(coins)} Coins.${objectiveNote}${challengeNote}`;
+    firstWatch = true;
+    announcement = 'Game ready. Watching the recorded gamecast.';
   }
 </script>
 
