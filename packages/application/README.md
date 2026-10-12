@@ -59,8 +59,8 @@ Landed:
 
 Next:
 
-1. Fixed-five multiplayer session with ports (orchestration still lives in
-   the room page), then stages 6-7.
+1. Move the web-side Collection/Draft Duel/multiplayer sessions behind
+   application ports, then stages 6-7.
 
 Stage 5a landed: Classic/Sandbox challenge orchestration moved into
 `ChallengeSession` (`src/challenge/`). The web `ChallengeRunner` is replaced
@@ -74,6 +74,13 @@ behind repository, runner, asset, and id ports; the web `havoc-service.ts` is
 now only composition and singletons. The web service contract, state
 presenters, and views moved under `apps/web/src/lib/features/havoc/`;
 `HavocLoadError` moved to data-contracts (persistence re-exports it).
+
+Stages 5c-5f landed: every mode's code is co-located under
+`apps/web/src/lib/features/<mode>/`, and Collection, Draft Duel, and fixed-five
+multiplayer gained web-side sessions with presenters
+(`CollectionPlaySession`, `DraftDuelSession`, `FixedFiveRoomSession`) that own
+preparation/execution/acceptance/retries and drop late results after dispose.
+Moving those three behind application ports is the documented follow-up.
 
 Stage 4 landed: engine season orchestration is split and de-duplicated.
 `postseason.ts` (1,911 lines) became `postseason/{schedule,state,play-in,

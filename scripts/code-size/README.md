@@ -214,15 +214,27 @@ paths change (stages 2, 4, and 6).
   `draft-duel-controller.svelte.ts` is a one-line alias. Existing suites
   retained (6 files / 53 tests, +6 session/presenter tests).
 
+- 2026-10-12, stage 5f: fixed-five room client extracted from
+  `routes/multiplayer/room/[roomId]/+page.svelte` (2,297 → 884 lines; script
+  1,425 → 39) into `FixedFiveRoomSession` (plain TS; ports for transport,
+  repository, runners, assets, membership, clock) and a runes
+  `FixedFiveRoomController` that mirrors the session snapshot and owns
+  navigation/UI-only state. Command shapes, seeds, digests, retry policy,
+  timers, and verification flow unchanged; 6 new session/controller tests.
+
 ## Stage 5 status (2026-10-12)
 
-Landed: season (stages 2-3), challenge, and havoc sessions with typed
-snapshot/subscribe/execute/cancel/dispose lifecycles and explicit ports;
-`features/` co-location for every mode (challenge, havoc, collection,
-draft-duel, multiplayer). Shared UI primitives stay in `lib/components/`.
+Complete. Every mode has a typed session/task lifecycle with
+`getSnapshot`/`subscribe`/cancel/dispose semantics and explicit ports:
 
-Not yet migrated: Draft Duel and the fixed-five multiplayer client still
-orchestrate inside web modules (`draft-duel-controller.svelte.ts`, the
-multiplayer room page). Their orchestration should move behind ports like the
-challenge/havoc/collection sessions, and the room-page controller should be
-extracted from the route before the remaining stages are considered complete.
+- Classic/Sandbox: `@hoop-rush/application/challenge` (`ChallengeSession`).
+- Hoop Havoc: `@hoop-rush/application/havoc` (`HavocSession`).
+- Collection: `CollectionPlaySession` + presenter (web feature).
+- Draft Duel: `DraftDuelSession` + presenter (web feature).
+- Multiplayer: `FixedFiveRoomSession` + controller (web feature).
+- Season: `@hoop-rush/application/season` (`SeasonSession`, stages 2-3).
+
+Views, presenters, and selectors are co-located under
+`apps/web/src/lib/features/<mode>/`; shared UI primitives remain in
+`lib/components/`. Remaining follow-ups: move the web-side Collection/Draft
+Duel/multiplayer sessions behind application ports, and stages 6-7.
