@@ -1,5 +1,4 @@
 import {
-  canonicalJson,
   draftDuelGameOutputSchema,
   draftDuelPartiallyVerifiedSchema,
   type DraftDuelCommand,
@@ -22,6 +21,12 @@ import {
   type StoredDraftDuelResultRow,
 } from '../schemas/draft-duel-record.ts';
 import { HoopRushDatabase } from './dexie.ts';
+import {
+  commandReceiptMatches,
+  deleteWhereEquals,
+  listCompletedHistory,
+  rowsWhereEquals,
+} from './support.ts';
 export class DexieDraftDuelRepository {
   private readonly db: HoopRushDatabase;
   constructor(db: HoopRushDatabase = new HoopRushDatabase()) {
@@ -63,7 +68,7 @@ export class DexieDraftDuelRepository {
       })
       .sort((a, b) => a.ordinal - b.ordinal);
     await this.db.transaction('rw', this.db.draftDuelCommands, async () => {
-      const existingRows = await this.db.draftDuelCommands.where('roomId').equals(roomId).toArray();
+      const existingRows = await rowsWhereEquals(this.db.draftDuelCommands, 'roomId', roomId);
       const byOrdinal = new Map<number, (typeof rows)[number]>();
       for (const existing of existingRows) {
         const parsed = storedDraftDuelCommandRowSchema.parse(existing);
@@ -72,7 +77,7 @@ export class DexieDraftDuelRepository {
       for (const row of rows) {
         const existing = byOrdinal.get(row.ordinal);
         if (existing !== undefined) {
-          if (canonicalJson(existing.command) === canonicalJson(row.command)) continue;
+          if (commandReceiptMatches(existing.command, row.command)) continue;
           throw new Error(
             `appendCommands: conflicting command at ordinal ${String(row.ordinal)} in room ${roomId}`,
           );
@@ -164,7 +169,7 @@ export class DexieDraftDuelRepository {
         await this.db.draftDuelCompleted.put(completed);
         await this.db.draftDuelHistory.put(index);
         await this.db.draftDuelActive.delete(validated.roomId);
-        await this.db.draftDuelCommands.where('roomId').equals(validated.roomId).delete();
+        await deleteWhereEquals(this.db.draftDuelCommands, 'roomId', validated.roomId);
       },
     );
   }
@@ -174,8 +179,7 @@ export class DexieDraftDuelRepository {
     return storedDraftDuelCompletedSchema.parse(record);
   }
   async listHistory(): Promise<StoredDraftDuelHistoryIndex[]> {
-    const rows = await this.db.draftDuelHistory.orderBy('completedAtIso').reverse().toArray();
-    return rows.map((row) => storedDraftDuelHistoryIndexSchema.parse(row));
+    return listCompletedHistory(this.db.draftDuelHistory);
   }
   async deleteCompleted(roomId: string): Promise<void> {
     await this.db.transaction(
@@ -186,7 +190,7 @@ export class DexieDraftDuelRepository {
       async () => {
         await this.db.draftDuelCompleted.delete(roomId);
         await this.db.draftDuelHistory.delete(`dd-${roomId}`);
-        await this.db.draftDuelResults.where('roomId').equals(roomId).delete();
+        await deleteWhereEquals(this.db.draftDuelResults, 'roomId', roomId);
       },
     );
   }

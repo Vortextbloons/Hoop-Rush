@@ -18,6 +18,7 @@ import {
 import type { HoopRushDatabase } from './dexie.ts';
 import type { SeasonPostseasonOps } from './season-postseason-ops.ts';
 import { SeasonRunLoadError, deleteRunRows } from './season-run-shared.ts';
+import { listCompletedHistory, rowsWhereEquals } from './support.ts';
 export class SeasonCompletedOps {
   private readonly db: HoopRushDatabase;
   private readonly schedule: SeasonSchedule | null;
@@ -62,7 +63,7 @@ export class SeasonCompletedOps {
         'corrupt stored completed Season Run',
       );
     }
-    const summaryRows = await this.db.seasonRunSummaries.where('runId').equals(runId).toArray();
+    const summaryRows = await rowsWhereEquals(this.db.seasonRunSummaries, 'runId', runId);
     const summaries = summaryRows
       .map((row) => storedSeasonSummaryRowSchema.parse(row).summary)
       .sort((a, b) => (a.gameId < b.gameId ? -1 : 1));
@@ -114,7 +115,7 @@ export class SeasonCompletedOps {
     );
   }
   async listCompletedSeasonRuns(): Promise<SeasonCompletedRunIndexEntry[]> {
-    const rows = await this.db.seasonCompletedIndex.orderBy('completedAtIso').reverse().toArray();
+    const rows = await listCompletedHistory(this.db.seasonCompletedIndex);
     return rows.map((row) => storedSeasonCompletedIndexSchema.parse(row));
   }
   async buildReplayExport(runId: string, gameId: string): Promise<SeasonReplayExport | null> {

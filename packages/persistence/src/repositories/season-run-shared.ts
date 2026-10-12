@@ -8,6 +8,7 @@ import {
 import type { Table } from 'dexie';
 import type { HoopRushDatabase } from './dexie.ts';
 import { SeasonRunLoadError } from '@hoop-rush/data-contracts';
+import { deleteWhereEquals, saveSchemaVersionOf } from './support.ts';
 export { SeasonRunLoadError };
 export function SEASON_RUN_SCOPED_TABLES(db: HoopRushDatabase): Table<unknown>[] {
   return [
@@ -27,22 +28,14 @@ export function SEASON_RUN_SCOPED_TABLES(db: HoopRushDatabase): Table<unknown>[]
   ] as Table<unknown>[];
 }
 export function hasUnsupportedSaveSchema(row: unknown): boolean {
-  if (typeof row !== 'object' || row === null) return false;
-  const version = (
-    row as {
-      saveSchemaVersion?: unknown;
-    }
-  ).saveSchemaVersion;
-  return typeof version === 'number' && version !== SEASON_RUN_SAVE_SCHEMA_VERSION;
+  const version = saveSchemaVersionOf(row);
+  return version !== null && version !== SEASON_RUN_SAVE_SCHEMA_VERSION;
 }
 export function unsupportedSaveVersionError(row: unknown): SeasonRunLoadError {
-  const version =
-    typeof row === 'object' && row !== null
-      ? (row as { saveSchemaVersion?: unknown }).saveSchemaVersion
-      : undefined;
+  const version = saveSchemaVersionOf(row);
   return new SeasonRunLoadError(
     [
-      `stored save schema ${typeof version === 'number' ? String(version) : 'unknown'} does not match current schema ${String(SEASON_RUN_SAVE_SCHEMA_VERSION)}`,
+      `stored save schema ${version === null ? 'unknown' : String(version)} does not match current schema ${String(SEASON_RUN_SAVE_SCHEMA_VERSION)}`,
     ],
     `This saved season uses an unsupported version. Restart the season to continue. ${LIVE_SEASON_RUN_VERSION_MESSAGE}`,
     'SEASON_RUN_VERSION_UNSUPPORTED',
@@ -89,13 +82,13 @@ export function topUpPlayerAggregates(
   return [...byVersionId.values()].sort((a, b) => (a.playerVersionId < b.playerVersionId ? -1 : 1));
 }
 export async function deleteRunRows(db: HoopRushDatabase, runId: string): Promise<void> {
-  await db.seasonRunSummaries.where('runId').equals(runId).delete();
-  await db.seasonRunDetails.where('runId').equals(runId).delete();
-  await db.seasonRunBlocks.where('runId').equals(runId).delete();
+  await deleteWhereEquals(db.seasonRunSummaries, 'runId', runId);
+  await deleteWhereEquals(db.seasonRunDetails, 'runId', runId);
+  await deleteWhereEquals(db.seasonRunBlocks, 'runId', runId);
   await db.seasonPendingBlocks.delete(runId);
-  await db.seasonPostseasonSummaries.where('runId').equals(runId).delete();
-  await db.seasonPostseasonDetails.where('runId').equals(runId).delete();
-  await db.seasonCommandLog.where('runId').equals(runId).delete();
+  await deleteWhereEquals(db.seasonPostseasonSummaries, 'runId', runId);
+  await deleteWhereEquals(db.seasonPostseasonDetails, 'runId', runId);
+  await deleteWhereEquals(db.seasonCommandLog, 'runId', runId);
   await db.seasonAlmanacs.delete(runId);
   await db.seasonCompletedRuns.delete(runId);
   await db.seasonCompletedIndex.delete(runId);

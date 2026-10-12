@@ -64,6 +64,7 @@ import {
   normalizeSeasonTransactions,
 } from '../season/normalize-mutable-state.ts';
 import type { HoopRushDatabase } from './dexie.ts';
+import { hasSaveSchemaVersion, rowsWhereEquals } from './support.ts';
 import {
   assertCommandNotDuplicated,
   assertCommandStateCurrent,
@@ -163,9 +164,9 @@ export class SeasonRunOps {
         const activeRunId =
           typeof activeRun?.runId === 'string' ? activeRun.runId : probe.run.runId;
         const [summaryRows, detailRows, blockRows, indexRow, pendingRow] = await Promise.all([
-          this.db.seasonRunSummaries.where('runId').equals(activeRunId).toArray(),
-          this.db.seasonRunDetails.where('runId').equals(activeRunId).toArray(),
-          this.db.seasonRunBlocks.where('runId').equals(activeRunId).toArray(),
+          rowsWhereEquals(this.db.seasonRunSummaries, 'runId', activeRunId),
+          rowsWhereEquals(this.db.seasonRunDetails, 'runId', activeRunId),
+          rowsWhereEquals(this.db.seasonRunBlocks, 'runId', activeRunId),
           this.db.seasonRunIndex.get(SEASON_RUN_RECORD_ID),
           this.db.seasonPendingBlocks.get(activeRunId),
         ]);
@@ -336,7 +337,7 @@ export class SeasonRunOps {
     );
   }
   async loadRetainedDetails(runId: string): Promise<SeasonRetainedGameDetail[]> {
-    const rows = await this.db.seasonRunDetails.where('runId').equals(runId).toArray();
+    const rows = await rowsWhereEquals(this.db.seasonRunDetails, 'runId', runId);
     return byGameId(
       rows.map((row) => {
         try {
@@ -351,7 +352,7 @@ export class SeasonRunOps {
     );
   }
   async loadBlockHistory(runId: string): Promise<SeasonAcceptedBlock[]> {
-    const rows = await this.db.seasonRunBlocks.where('runId').equals(runId).toArray();
+    const rows = await rowsWhereEquals(this.db.seasonRunBlocks, 'runId', runId);
     return byRevision(
       rows.map((row) => {
         try {
@@ -391,13 +392,7 @@ export class SeasonRunOps {
         if (checkpoint === undefined) {
           throw new Error('commitSeasonBlock: no active run checkpoint to advance');
         }
-        if (
-          (
-            checkpoint as {
-              saveSchemaVersion?: unknown;
-            }
-          ).saveSchemaVersion !== SEASON_RUN_SAVE_SCHEMA_VERSION
-        ) {
+        if (!hasSaveSchemaVersion(checkpoint, SEASON_RUN_SAVE_SCHEMA_VERSION)) {
           throw new Error('commitSeasonBlock: no active run checkpoint to advance');
         }
         const cursor = seasonRunCursorSchema.parse(checkpoint);
@@ -674,13 +669,7 @@ export class SeasonRunOps {
       if (checkpoint === undefined) {
         throw new SeasonPendingBlockRejectedError('no active run checkpoint exists');
       }
-      if (
-        (
-          checkpoint as {
-            saveSchemaVersion?: unknown;
-          }
-        ).saveSchemaVersion !== SEASON_RUN_SAVE_SCHEMA_VERSION
-      ) {
+      if (!hasSaveSchemaVersion(checkpoint, SEASON_RUN_SAVE_SCHEMA_VERSION)) {
         throw new SeasonPendingBlockRejectedError('the active checkpoint is not current');
       }
       const cursor = seasonRunCursorSchema.parse(checkpoint);
@@ -751,13 +740,7 @@ export class SeasonRunOps {
         if (checkpoint === undefined) {
           throw new SeasonRunCommandRunMismatchError(input.runId);
         }
-        if (
-          (
-            checkpoint as {
-              saveSchemaVersion?: unknown;
-            }
-          ).saveSchemaVersion !== SEASON_RUN_SAVE_SCHEMA_VERSION
-        ) {
+        if (!hasSaveSchemaVersion(checkpoint, SEASON_RUN_SAVE_SCHEMA_VERSION)) {
           throw new SeasonRunCommandRunMismatchError(input.runId);
         }
         const cursor = seasonRunCursorSchema.parse(checkpoint);

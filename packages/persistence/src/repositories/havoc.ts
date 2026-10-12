@@ -42,6 +42,12 @@ import {
   type StoredHavocCompletedRun,
 } from '../schemas/havoc-record.ts';
 import { HoopRushDatabase } from './dexie.ts';
+import {
+  assertSaveSchemaVersion,
+  commandReceiptMatches,
+  listCompletedHistory,
+  revisionMatches,
+} from './support.ts';
 
 export interface HavocCommandOutcome {
   readonly state: HavocRunState;
@@ -191,15 +197,11 @@ function HAVOC_SCOPED_TABLES(db: HoopRushDatabase): Table<unknown>[] {
 }
 
 function assertStoredSaveVersion(row: unknown, label: string): void {
-  const version =
-    typeof row === 'object' && row !== null
-      ? (row as { saveSchemaVersion?: unknown }).saveSchemaVersion
-      : undefined;
-  if (version !== HAVOC_SAVE_SCHEMA_VERSION) {
-    throw new HavocLoadError('unsupported', [
-      `${label}: stored save schema ${typeof version === 'number' ? String(version) : 'unknown'} does not match ${String(HAVOC_SAVE_SCHEMA_VERSION)}`,
-    ]);
-  }
+  assertSaveSchemaVersion(
+    row,
+    HAVOC_SAVE_SCHEMA_VERSION,
+    (message) => new HavocLoadError('unsupported', [`${label}: ${message}`]),
+  );
 }
 
 function collectHavocVersionStrings(value: unknown, out: string[]): void {
@@ -460,12 +462,12 @@ export class DexieHavocRepository implements HavocRepository {
           `command ${result.commandId}`,
         );
         if (command !== null && existing.command !== null) {
-          if (canonicalJson(command) === canonicalJson(existing.command)) return existing.result;
+          if (commandReceiptMatches(command, existing.command)) return existing.result;
           throw new HavocCommandConflictError(result.commandId);
         }
         if (
           existing.outcomeDigest === outcomeDigest ||
-          canonicalJson(existing.result) === canonicalJson(result)
+          commandReceiptMatches(existing.result, result)
         ) {
           return existing.result;
         }
@@ -506,7 +508,7 @@ export class DexieHavocRepository implements HavocRepository {
         }
         targetActive = true;
       } else if (active !== null && active.runId === result.runId) {
-        if (result.revisionBefore !== active.state.revision) {
+        if (!revisionMatches(active.state, result.revisionBefore)) {
           throw new HavocStaleRevisionError(
             result.commandId,
             result.revisionBefore,
@@ -515,7 +517,7 @@ export class DexieHavocRepository implements HavocRepository {
         }
         targetActive = true;
       } else if (completed !== null) {
-        if (result.revisionBefore !== completed.state.revision) {
+        if (!revisionMatches(completed.state, result.revisionBefore)) {
           throw new HavocStaleRevisionError(
             result.commandId,
             result.revisionBefore,
@@ -743,7 +745,7 @@ export class DexieHavocRepository implements HavocRepository {
   }
 
   async listHistory(): Promise<HavocHistoryEntry[]> {
-    const rows = await this.db.havocHistory.orderBy('updatedAtIso').reverse().toArray();
+    const rows = await listCompletedHistory(this.db.havocHistory, 'updatedAtIso');
     return rows.map((row) => {
       const parsed = parseStored(storedHavocHistoryRowSchema, row, `history ${row.runId}`);
       return {

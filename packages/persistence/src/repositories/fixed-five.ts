@@ -16,6 +16,7 @@ import {
   type StoredFixedFivePendingResult,
 } from '../schemas/fixed-five-record.ts';
 import type { HoopRushDatabase } from './dexie.ts';
+import { deleteWhereEquals, listCompletedHistory } from './support.ts';
 export class DexieFixedFiveRepository {
   private readonly db: HoopRushDatabase;
   constructor(db: HoopRushDatabase) {
@@ -118,7 +119,7 @@ export class DexieFixedFiveRepository {
         await this.db.fixedFiveHistory.put(index);
         await this.db.fixedFivePendingResults.delete(roomId);
         await this.db.fixedFiveActive.delete(roomId);
-        await this.db.fixedFiveCommands.where('roomId').equals(roomId).delete();
+        await deleteWhereEquals(this.db.fixedFiveCommands, 'roomId', roomId);
       },
     );
   }
@@ -128,7 +129,6 @@ export class DexieFixedFiveRepository {
     return storedFixedFiveCompletedSchema.parse(record);
   }
   async listHistory(): Promise<StoredFixedFiveHistoryIndex[]> {
-    const rows = await this.db.fixedFiveHistory.orderBy('completedAtIso').reverse().toArray();
-    return rows.map((row) => storedFixedFiveHistoryIndexSchema.parse(row));
+    return listCompletedHistory(this.db.fixedFiveHistory);
   }
 }

@@ -89,6 +89,7 @@ import {
   storedCollectionStateV1Schema,
   storedCollectionStateV2Schema,
 } from '../schemas/collection-record.ts';
+import { hasStaleSaveSchemaVersion, listCompletedHistory } from './support.ts';
 const ACTIVE_RECORD_ID = 'active';
 const CLASSIC_DRAFT_RECORD_ID = 'classic-draft';
 const V2_MIGRATED_CHECKPOINT_SAVE_SCHEMA_VERSION = 3;
@@ -141,17 +142,6 @@ export const HAVOC_DATABASE_STORES: Record<string, string> = {
   havocCompletedRuns: 'runId',
   havocHistory: 'runId, updatedAtIso',
 };
-function hasStaleSaveSchemaVersion(record: unknown, expected: number): boolean {
-  if (typeof record !== 'object' || record === null) return false;
-  if (!Object.hasOwn(record, 'saveSchemaVersion')) return false;
-  return (
-    (
-      record as {
-        saveSchemaVersion?: unknown;
-      }
-    ).saveSchemaVersion !== expected
-  );
-}
 export class HoopRushDatabase extends Dexie {
   active!: EntityTable<ActiveRunCheckpoint, 'recordId'>;
   activeGames!: Table<ActiveGameRow, [string, number]>;
@@ -601,7 +591,7 @@ export class DexieChallengeRepository {
     );
   }
   async listCompletedRuns(): Promise<CompletedRunIndex[]> {
-    const rows = await this.db.history.orderBy('completedAtIso').reverse().toArray();
+    const rows = await listCompletedHistory(this.db.history);
     return rows.map((row) => completedRunIndexSchema.parse(row));
   }
   async loadCompletedRun(runId: string): Promise<StoredRunRecord | null> {

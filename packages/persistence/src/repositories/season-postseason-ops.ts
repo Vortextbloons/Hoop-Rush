@@ -44,6 +44,7 @@ import {
 } from './season-postseason.ts';
 import { SeasonRunCommandRunMismatchError, SeasonRunCommandStaleStateError } from './season-run.ts';
 import { SeasonRunLoadError } from './season-run-shared.ts';
+import { hasSaveSchemaVersion, rowsWhereEquals } from './support.ts';
 export class SeasonPostseasonOps {
   private readonly db: HoopRushDatabase;
   private readonly seam: SeasonRunEngineSeam;
@@ -92,13 +93,7 @@ export class SeasonPostseasonOps {
         if (checkpoint === undefined) {
           throw new SeasonRunCommandRunMismatchError(input.runId);
         }
-        if (
-          (
-            checkpoint as {
-              saveSchemaVersion?: unknown;
-            }
-          ).saveSchemaVersion !== SEASON_RUN_SAVE_SCHEMA_VERSION
-        ) {
+        if (!hasSaveSchemaVersion(checkpoint, SEASON_RUN_SAVE_SCHEMA_VERSION)) {
           throw new SeasonRunCommandRunMismatchError(input.runId);
         }
         const cursor = seasonRunCursorSchema.parse(checkpoint);
@@ -106,10 +101,11 @@ export class SeasonPostseasonOps {
           throw new SeasonRunCommandRunMismatchError(input.runId);
         }
         assertCommandStateCurrent(cursor, command);
-        const existingLogRows = await this.db.seasonCommandLog
-          .where('runId')
-          .equals(input.runId)
-          .toArray();
+        const existingLogRows = await rowsWhereEquals(
+          this.db.seasonCommandLog,
+          'runId',
+          input.runId,
+        );
         assertCommandNotDuplicatedAgainstStoredRows(
           recordedCommandIdsFromCursor(cursor, { includeEvolution: false }),
           existingLogRows,
@@ -214,7 +210,7 @@ export class SeasonPostseasonOps {
     );
   }
   async loadPostseasonSummaries(runId: string): Promise<SeasonPostseasonSummary[]> {
-    const rows = await this.db.seasonPostseasonSummaries.where('runId').equals(runId).toArray();
+    const rows = await rowsWhereEquals(this.db.seasonPostseasonSummaries, 'runId', runId);
     const summaries: SeasonPostseasonSummary[] = [];
     for (const row of rows) {
       const parsed = storedSeasonPostseasonSummaryRowSchema.parse(row);
@@ -244,7 +240,7 @@ export class SeasonPostseasonOps {
     return parsed.summary;
   }
   async loadPostseasonDetails(runId: string): Promise<SeasonPostseasonDetail[]> {
-    const rows = await this.db.seasonPostseasonDetails.where('runId').equals(runId).toArray();
+    const rows = await rowsWhereEquals(this.db.seasonPostseasonDetails, 'runId', runId);
     const details: SeasonPostseasonDetail[] = [];
     for (const row of rows) {
       const parsed = storedSeasonPostseasonDetailRowSchema.parse(row);
@@ -259,7 +255,7 @@ export class SeasonPostseasonOps {
     return details.sort((a, b) => (a.gameId < b.gameId ? -1 : 1));
   }
   async loadCommandLog(runId: string): Promise<SeasonCommandLog | null> {
-    const rows = await this.db.seasonCommandLog.where('runId').equals(runId).toArray();
+    const rows = await rowsWhereEquals(this.db.seasonCommandLog, 'runId', runId);
     if (rows.length === 0) return null;
     const entries = rows
       .map((row) => {
@@ -381,10 +377,11 @@ export class SeasonPostseasonOps {
             cursor.stateRevision,
           );
         }
-        const storedPostseasonRows = await this.db.seasonPostseasonSummaries
-          .where('runId')
-          .equals(input.runId)
-          .toArray();
+        const storedPostseasonRows = await rowsWhereEquals(
+          this.db.seasonPostseasonSummaries,
+          'runId',
+          input.runId,
+        );
         const storedGameIds = new Set(
           storedPostseasonRows.map(
             (row) => storedSeasonPostseasonSummaryRowSchema.parse(row).gameId,
