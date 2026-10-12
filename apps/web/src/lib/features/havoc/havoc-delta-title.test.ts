@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { havocDeltaTitle } from '../components/havoc/havoc-presentation';
+import { havocDeltaTitle } from './havoc-presentation';
 describe('Havoc delta titles', () => {
   it.each([
     [-20, 'Havoc overload'],

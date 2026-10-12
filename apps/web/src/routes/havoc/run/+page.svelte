@@ -2,9 +2,9 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
-  import HavocHub from '$lib/components/havoc/HavocHub.svelte';
-  import { HavocHubState } from '$lib/havoc/havoc-hub-state.svelte';
-  import { getHavocService } from '$lib/havoc/havoc-service';
+  import HavocHub from '$lib/features/havoc/HavocHub.svelte';
+  import { HavocHubState } from '$lib/features/havoc/havoc-hub-state.svelte';
+  import { getHavocService } from '$lib/features/havoc/havoc-service';
 
   let hub = $state<HavocHubState | null>(null);
   let serviceError = $state<string | null>(null);

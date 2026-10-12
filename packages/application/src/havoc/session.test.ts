@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   HAVOC_GAME_COUNT,
   HAVOC_WORKER_WIRE_SCHEMA_VERSION,
+  seedSchema,
   type HavocCommandResult,
   type HavocComparison,
   type HavocGameResult,
@@ -32,9 +33,8 @@ import {
   buildHavocEraProfile,
   buildSeasonDraftCatalog,
 } from '@hoop-rush/test-fixtures';
-import type { HavocRunnerLike } from './havoc-service';
-import { createHavocService } from './havoc-service';
-import type { HavocBatchHandlers } from './havoc-runner';
+import type { HavocBatchHandlers, HavocRunnerPort } from './ports.ts';
+import { HavocSession, type HavocService, type HavocSessionOptions } from './index.ts';
 import type { HavocWorkerCompleteMessage, HavocWorkerTapeMessage } from '@hoop-rush/data-contracts';
 
 class MemoryHavocRepository implements HavocRepository {
@@ -165,7 +165,7 @@ class MemoryHavocRepository implements HavocRepository {
   }
 }
 
-class EngineRunner implements HavocRunnerLike {
+class EngineRunner implements HavocRunnerPort {
   private cancelled = false;
 
   private isCancelled(): boolean {
@@ -173,7 +173,7 @@ class EngineRunner implements HavocRunnerLike {
   }
 
   async startBatch(
-    request: Parameters<HavocRunnerLike['startBatch']>[0],
+    request: Parameters<HavocRunnerPort['startBatch']>[0],
     handlers: HavocBatchHandlers,
   ): Promise<HavocWorkerCompleteMessage> {
     this.cancelled = false;
@@ -216,7 +216,7 @@ class EngineRunner implements HavocRunnerLike {
   }
 
   async runTape(
-    request: Parameters<HavocRunnerLike['runTape']>[0],
+    request: Parameters<HavocRunnerPort['runTape']>[0],
   ): Promise<HavocWorkerTapeMessage> {
     const input = buildHavocGameInput({
       locked: request.locked,
@@ -267,22 +267,28 @@ function manifestWithBracketHash(hash: string): HoopRushManifest {
 function buildService() {
   const repository = new MemoryHavocRepository();
   let counter = 0;
-  const service = createHavocService({
+  const service = new HavocSession({
     repository,
     runner: new EngineRunner(),
-    loadCatalog: async () => buildSeasonDraftCatalog({ playersPerPool: 40 }),
-    loadPreamble: async () => ({
-      profile: buildHavocEraProfile() as unknown as EraSimulationProfile,
-      bracket: buildFixtureBracket(),
-    }),
-    loadManifest: async () => MANIFEST,
-    newRunId: () => 'havoc-run-test',
-    newCommandId: () => `havoc-cmd-${String(++counter)}`,
+    assets: {
+      loadCatalog: async () => buildSeasonDraftCatalog({ playersPerPool: 40 }),
+      loadPreamble: async () => ({
+        profile: buildHavocEraProfile() as unknown as EraSimulationProfile,
+        bracket: buildFixtureBracket(),
+      }),
+      loadManifest: async () => MANIFEST,
+    },
+    ids: {
+      newRunId: () => 'havoc-run-test',
+      newCommandId: () => `havoc-cmd-${String(++counter)}`,
+      newRequestId: (prefix) => `${prefix}-${String(++counter)}`,
+      rootSeed: () => seedSchema.parse('f'.repeat(32)),
+    },
   });
   return { service, repository };
 }
 
-async function draftFivePicks(service: ReturnType<typeof createHavocService>): Promise<void> {
+async function draftFivePicks(service: HavocService): Promise<void> {
   for (let round = 0; round < 5; round += 1) {
     const snapshot = await service.loadActive();
     const card = snapshot.draft?.cards[0];
@@ -389,24 +395,30 @@ describe('HavocService integration', () => {
   it('refuses to replay a run under a different engine or data version', async () => {
     const repository = new MemoryHavocRepository();
     let counter = 0;
-    const deps = (bracketHash: string) => ({
+    const deps = (bracketHash: string): HavocSessionOptions => ({
       repository,
       runner: new EngineRunner(),
-      loadCatalog: async () => buildSeasonDraftCatalog({ playersPerPool: 40 }),
-      loadPreamble: async () => ({
-        profile: buildHavocEraProfile() as unknown as EraSimulationProfile,
-        bracket: buildFixtureBracket(),
-      }),
-      loadManifest: async () => manifestWithBracketHash(bracketHash),
-      newRunId: () => 'havoc-run-version',
-      newCommandId: () => `havoc-cmd-version-${String(++counter)}`,
+      assets: {
+        loadCatalog: async () => buildSeasonDraftCatalog({ playersPerPool: 40 }),
+        loadPreamble: async () => ({
+          profile: buildHavocEraProfile() as unknown as EraSimulationProfile,
+          bracket: buildFixtureBracket(),
+        }),
+        loadManifest: async () => manifestWithBracketHash(bracketHash),
+      },
+      ids: {
+        newRunId: () => 'havoc-run-version',
+        newCommandId: () => `havoc-cmd-version-${String(++counter)}`,
+        newRequestId: (prefix) => `${prefix}-version-${String(++counter)}`,
+        rootSeed: () => seedSchema.parse('e'.repeat(32)),
+      },
     });
-    const first = createHavocService(deps('c'.repeat(64)));
+    const first = new HavocSession(deps('c'.repeat(64)));
     await first.createDraft();
     await draftFivePicks(first);
     await first.lockLineup();
     first.dispose();
-    const second = createHavocService(deps('d'.repeat(64)));
+    const second = new HavocSession(deps('d'.repeat(64)));
     await second.loadActive();
     await expect(second.simulateRange({ variant: 'havoc', count: 1 })).rejects.toThrow(
       'different engine or data version',

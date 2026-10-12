@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { havocObjectiveStatusOf } from '$lib/components/havoc/havoc-presentation';
+import { havocObjectiveStatusOf } from './havoc-presentation';
 import { HavocHubState } from './havoc-hub-state.svelte.ts';
 import { FakeHavocService } from './havoc-fake-service.ts';
 

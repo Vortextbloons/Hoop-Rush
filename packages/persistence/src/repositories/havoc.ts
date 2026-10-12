@@ -8,6 +8,7 @@ import {
   HAVOC_COMPARISON_VERSION,
   HAVOC_SAVE_SCHEMA_VERSION,
   HAVOC_SEED_DERIVATION_VERSION,
+  HavocLoadError,
   canonicalJson,
   havocCommandResultSchema,
   havocCommandSchema,
@@ -102,18 +103,9 @@ export interface HavocRepository {
   ): Promise<{ state: HavocRunState; report: HavocReport | null } | null>;
 }
 
-export type HavocLoadFailureCode = 'corrupt' | 'unsupported';
+export type { HavocLoadFailureCode } from '@hoop-rush/data-contracts';
 
-export class HavocLoadError extends Error {
-  readonly code: HavocLoadFailureCode;
-  readonly diagnostics: readonly string[];
-  constructor(code: HavocLoadFailureCode, diagnostics: readonly string[]) {
-    super(`havoc load ${code}: ${diagnostics.join('; ')}`);
-    this.name = 'HavocLoadError';
-    this.code = code;
-    this.diagnostics = diagnostics;
-  }
-}
+export { HavocLoadError };
 
 export class HavocOutcomeIntegrityError extends Error {
   readonly diagnostics: readonly string[];

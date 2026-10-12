@@ -4,11 +4,8 @@ import type {
   HavocService,
   HavocServiceEvent,
   HavocSimulationProgress,
-} from './havoc-service-contract.ts';
-import {
-  foldHavocSeasonStats,
-  type HavocSeasonStats,
-} from '$lib/components/havoc/havoc-presentation';
+} from '@hoop-rush/application/havoc';
+import { foldHavocSeasonStats, type HavocSeasonStats } from './havoc-presentation';
 import { HavocGamecastState } from './havoc-gamecast-state.svelte.ts';
 import { errorMessageOf } from './havoc-state-util.ts';
 

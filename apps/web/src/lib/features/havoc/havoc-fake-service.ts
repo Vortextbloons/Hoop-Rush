@@ -53,7 +53,7 @@ import type {
   HavocServiceEvent,
   HavocSimulationProgress,
   HavocWatchSession,
-} from './havoc-service-contract.ts';
+} from '@hoop-rush/application/havoc';
 import {
   buildHavocEffectiveProfile,
   buildHavocLockedInputs,
@@ -61,7 +61,7 @@ import {
   buildHavocStatLine,
   buildHavocVersionSet,
 } from '@hoop-rush/test-fixtures';
-import { HavocServiceError } from './havoc-service-contract.ts';
+import { HavocServiceError } from '@hoop-rush/application/havoc';
 
 const RUN_ID = 'havoc-run-1';
 const OPPONENT_ID = 'opponent-a';
@@ -614,6 +614,13 @@ export class FakeHavocService implements HavocService {
     this.listeners.add(listener);
     return () => {
       this.listeners.delete(listener);
+    };
+  }
+
+  getSnapshot(): HavocActiveSnapshot {
+    return {
+      run: this.runState === null ? null : toRunView(this.runState),
+      draft: this.runState?.draft ?? null,
     };
   }
 

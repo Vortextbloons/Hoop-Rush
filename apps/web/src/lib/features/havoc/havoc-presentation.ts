@@ -12,7 +12,7 @@ import type {
   HavocStatLine,
   HavocTier,
 } from '@hoop-rush/data-contracts';
-import type { HavocLineupSlotView, HavocRunView } from '$lib/havoc/havoc-service-contract';
+import type { HavocLineupSlotView, HavocRunView } from '@hoop-rush/application/havoc';
 import { HAVOC_GAME_COUNT, POSITIONS } from '@hoop-rush/data-contracts';
 import { havocMutationDefinitionOf } from '@hoop-rush/engine';
 

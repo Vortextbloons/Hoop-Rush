@@ -1,5 +1,5 @@
 import type { HavocDraftState } from '@hoop-rush/data-contracts';
-import type { HavocRunView, HavocService } from './havoc-service-contract.ts';
+import type { HavocRunView, HavocService } from '@hoop-rush/application/havoc';
 import { errorMessageOf } from './havoc-state-util.ts';
 
 export class HavocDraftController {

@@ -5,7 +5,7 @@
     type HavocComparison,
     type HavocStatLine,
   } from '@hoop-rush/data-contracts';
-  import type { HavocLineupSlotView } from '$lib/havoc/havoc-service-contract';
+  import type { HavocLineupSlotView } from '@hoop-rush/application/havoc';
   import {
     havocMvpFormulaLabel,
     mutationNameOf,

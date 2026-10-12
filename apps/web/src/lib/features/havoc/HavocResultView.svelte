@@ -2,7 +2,7 @@
   import { Dialog } from 'bits-ui';
   import { resolve } from '$app/paths';
   import { ArrowRight } from '@lucide/svelte';
-  import type { HavocResultState } from '$lib/havoc/havoc-result-state.svelte';
+  import type { HavocResultState } from './havoc-result-state.svelte';
   import HavocComparisonView from './HavocComparisonView.svelte';
   import HavocLineupLock from './HavocLineupLock.svelte';
   import HavocSquadReport from './HavocSquadReport.svelte';

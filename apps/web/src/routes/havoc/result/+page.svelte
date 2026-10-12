@@ -1,8 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import HavocResultView from '$lib/components/havoc/HavocResultView.svelte';
-  import { HavocResultState } from '$lib/havoc/havoc-result-state.svelte';
-  import { getHavocService } from '$lib/havoc/havoc-service';
+  import HavocResultView from '$lib/features/havoc/HavocResultView.svelte';
+  import { HavocResultState } from '$lib/features/havoc/havoc-result-state.svelte';
+  import { getHavocService } from '$lib/features/havoc/havoc-service';
 
   let resultState = $state<HavocResultState | null>(null);
   let serviceError = $state<string | null>(null);

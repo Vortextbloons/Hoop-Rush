@@ -108,6 +108,7 @@ export class HavocServiceError extends Error {
 
 export interface HavocService {
   subscribe(listener: (event: HavocServiceEvent) => void): () => void;
+  getSnapshot(): HavocActiveSnapshot;
   loadActive(): Promise<HavocActiveSnapshot>;
   listHistory(): Promise<HavocHistoryView[]>;
   readCompletedRun(runId: string): Promise<{

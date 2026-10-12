@@ -4,7 +4,7 @@ import type {
   HavocService,
   HavocServiceEvent,
   HavocSimulationProgress,
-} from './havoc-service-contract.ts';
+} from '@hoop-rush/application/havoc';
 import { HAVOC_GAME_COUNT } from '@hoop-rush/data-contracts';
 import { errorMessageOf } from './havoc-state-util.ts';
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { HavocLineupSlotView } from '$lib/havoc/havoc-service-contract';
+  import type { HavocLineupSlotView } from '@hoop-rush/application/havoc';
   import HavocPlayerArt from './HavocPlayerArt.svelte';
   import HavocTierBadge from './HavocTierBadge.svelte';
   import { mutationEntriesSummary } from './havoc-presentation';

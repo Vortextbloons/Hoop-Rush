@@ -1,9 +1,6 @@
 <script lang="ts">
   import { Pause, Play } from '@lucide/svelte';
-  import type {
-    HavocGamecastState,
-    HavocPlaybackSpeed,
-  } from '$lib/havoc/havoc-gamecast-state.svelte';
+  import type { HavocGamecastState, HavocPlaybackSpeed } from './havoc-gamecast-state.svelte';
   import {
     formatHavocClock,
     havocParticipantKindLabel,

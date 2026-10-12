@@ -4,18 +4,13 @@ import {
   type HavocWorkerCancelRequest,
   type HavocWorkerCompleteMessage,
   type HavocWorkerErrorMessage,
-  type HavocWorkerGameMessage,
-  type HavocWorkerProgressMessage,
   type HavocWorkerSimulateRequest,
   type HavocWorkerTapeMessage,
   type HavocWorkerTapeRequest,
 } from '@hoop-rush/data-contracts';
+import type { HavocBatchHandlers } from '@hoop-rush/application/havoc';
 
-export interface HavocBatchHandlers {
-  onGame?: (message: HavocWorkerGameMessage) => void | Promise<void>;
-  onProgress?: (message: HavocWorkerProgressMessage) => void;
-  onError?: (message: HavocWorkerErrorMessage) => void;
-}
+export type { HavocBatchHandlers } from '@hoop-rush/application/havoc';
 
 export interface HavocRunnerOptions {
   createWorker?: () => Worker;
@@ -53,7 +48,7 @@ export class HavocRunner {
     if (this.options.createWorker !== undefined) {
       return this.options.createWorker();
     }
-    return new Worker(new URL('../../workers/havoc-worker.ts', import.meta.url), {
+    return new Worker(new URL('../../../workers/havoc-worker.ts', import.meta.url), {
       type: 'module',
     });
   }

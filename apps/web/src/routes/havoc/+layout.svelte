@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
-  import '$lib/components/havoc/havoc.css';
+  import '$lib/features/havoc/havoc.css';
   let { children }: { children: Snippet } = $props();
 </script>
 

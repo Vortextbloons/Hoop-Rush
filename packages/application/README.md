@@ -20,6 +20,7 @@ gathers intent, the engine owns basketball rules, adapters own I/O.
 ```text
 @hoop-rush/application          shared submission runtime (runSubmission + types)
 @hoop-rush/application/challenge  challenge run session (classic/sandbox job lifecycle)
+@hoop-rush/application/havoc    havoc session + run/history view contract
 @hoop-rush/application/season   season block wire/acceptance + season policies
 ```
 
@@ -30,6 +31,9 @@ gathers intent, the engine owns basketball rules, adapters own I/O.
 - `ChallengeSession` + ports: the classic/sandbox run lifecycle (load, start,
   cancel, reveal pacing, acceptance, completion promotion) with a worker job
   port, repository port, asset port, and clock (`src/challenge/`).
+- `HavocSession` + ports: the havoc draft/run/season/comparison lifecycle with
+  a runner port, repository port, asset port, and id port; `HavocServiceError`
+  and the run/history view contract live here (`src/havoc/`).
 - Season block wire helpers moved out of the web runner:
   `buildWorkerRequest`, `acceptWorkerResult`, `SeasonRunnerEvent`,
   `SeasonBlockStartInput`, `SeasonBlockResumeInput`, `SeasonBlockRunner`,
@@ -63,6 +67,12 @@ by the session plus a worker job port (`challenge-job.ts`); the presenter
 mirrors the session snapshot, and the mode views moved under
 `apps/web/src/lib/features/challenge/`. `challengeRunProgressDigest` moved to
 the engine so framework-independent code can gate promotions.
+
+Stage 5b landed: havoc orchestration moved into `HavocSession` (`src/havoc/`)
+behind repository, runner, asset, and id ports; the web `havoc-service.ts` is
+now only composition and singletons. The web service contract, state
+presenters, and views moved under `apps/web/src/lib/features/havoc/`;
+`HavocLoadError` moved to data-contracts (persistence re-exports it).
 
 Stage 4 landed: engine season orchestration is split and de-duplicated.
 `postseason.ts` (1,911 lines) became `postseason/{schedule,state,play-in,

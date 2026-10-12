@@ -8,14 +8,14 @@ import type {
   Position,
 } from '@hoop-rush/data-contracts';
 import { POSITIONS } from '@hoop-rush/data-contracts';
-import type { HavocService, HavocWatchSession } from './havoc-service-contract.ts';
+import type { HavocService, HavocWatchSession } from '@hoop-rush/application/havoc';
 import {
   formatHavocClock,
   havocEventMutationIdOf,
   havocEventTextOf,
   havocPeriodLabel,
   havocScoringTextOf,
-} from '$lib/components/havoc/havoc-presentation';
+} from './havoc-presentation';
 import { errorMessageOf } from './havoc-state-util.ts';
 
 export type HavocPlaybackSpeed = 1 | 2 | 4 | 8;

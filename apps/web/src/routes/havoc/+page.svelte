@@ -2,10 +2,10 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
-  import HavocSetup from '$lib/components/havoc/HavocSetup.svelte';
+  import HavocSetup from '$lib/features/havoc/HavocSetup.svelte';
   import { getManifest } from '$lib/data';
-  import { HavocDraftController } from '$lib/havoc/havoc-draft-state.svelte';
-  import { getHavocService } from '$lib/havoc/havoc-service';
+  import { HavocDraftController } from '$lib/features/havoc/havoc-draft-state.svelte';
+  import { getHavocService } from '$lib/features/havoc/havoc-service';
 
   let controller = $state<HavocDraftController | null>(null);
   let serviceError = $state<string | null>(null);

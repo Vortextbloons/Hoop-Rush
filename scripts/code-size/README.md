@@ -182,3 +182,11 @@ paths change (stages 2, 4, and 6).
   application session can gate promotions without a persistence runtime
   import. Byte-identical seeded game results: results are still produced by
   `challenge-worker.ts` via the same engine calls.
+- 2026-10-12, stage 5b: havoc orchestration moved to
+  `packages/application/src/havoc` (`HavocSession` + contract + ports; the
+  former web service integration suite now runs there, 4 tests). The web
+  `havoc-service.ts` is composition only; service contract, presenters,
+  selectors, and views moved under `apps/web/src/lib/features/havoc/`.
+  `HavocLoadError` moved to data-contracts (persistence re-exports it for
+  existing consumers). The worker runner stays a web transport implementing
+  the application runner port.

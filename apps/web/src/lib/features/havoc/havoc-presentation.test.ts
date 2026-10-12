@@ -9,7 +9,7 @@ import {
   havocRecordLabel,
   havocScoringTextOf,
   mutationNameOf,
-} from '$lib/components/havoc/havoc-presentation';
+} from './havoc-presentation';
 import { HAVOC_MVP_INDEX_WEIGHTS, havocGameSummarySchema } from '@hoop-rush/data-contracts';
 import {
   FAKE_HUMAN_STARTER_IDS,

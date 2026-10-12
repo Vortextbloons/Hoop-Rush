@@ -5,6 +5,7 @@ import {
   HAVOC_SCHEMA_VERSION,
   HAVOC_SEED_DERIVATION_VERSION,
   HAVOC_WORKER_WIRE_SCHEMA_VERSION,
+  HavocLoadError,
   canonicalJson,
   havocAbandonRunCommandSchema,
   havocAcceptGameCommandSchema,
@@ -17,8 +18,8 @@ import {
   havocRerollOfferCommandSchema,
   havocWorkerSimulateRequestSchema,
   havocWorkerTapeRequestSchema,
-  idSchema,
   seasonDigestHex,
+  type EraSimulationProfile,
   type HavocCatalogSource,
   type HavocCatalog,
   type HavocCommand,
@@ -33,13 +34,7 @@ import {
   type HavocVersionSet,
   type HavocWorkerCompleteMessage,
   type HavocWorkerGameMessage,
-  type HavocWorkerSimulateRequest,
-  type HavocWorkerTapeMessage,
-  type HavocWorkerTapeRequest,
-  type HoopRushManifest,
-  type EraSimulationProfile,
   type OpponentBracket,
-  type SeasonDraftCatalog,
 } from '@hoop-rush/data-contracts';
 import {
   AdaptHavocCatalog,
@@ -54,12 +49,6 @@ import {
   havocGameSummaryOf,
   type HavocStoredGame,
 } from '@hoop-rush/engine';
-import { DexieHavocRepository, HavocLoadError, type HavocRepository } from '@hoop-rush/persistence';
-import { getManifest } from '$lib/data';
-import { newRequestId, newSeasonId, seasonRootSeed } from '$lib/ids';
-import { loadRunPreamble } from '$lib/run-preamble';
-import { loadSeasonDraftCatalog } from '$lib/season/season-assets';
-import { HavocRunner, type HavocBatchHandlers } from './havoc-runner';
 import {
   HavocServiceError,
   type HavocActiveSnapshot,
@@ -71,7 +60,14 @@ import {
   type HavocServiceEvent,
   type HavocSimulationProgress,
   type HavocWatchSession,
-} from './havoc-service-contract';
+} from './contract.ts';
+import type {
+  HavocAssetPort,
+  HavocBatchHandlers,
+  HavocIdPort,
+  HavocRunRepositoryPort,
+  HavocRunnerPort,
+} from './ports.ts';
 
 interface HavocAssets {
   catalog: HavocCatalog;
@@ -81,24 +77,11 @@ interface HavocAssets {
   bracket: OpponentBracket;
 }
 
-export interface HavocRunnerLike {
-  startBatch(
-    request: HavocWorkerSimulateRequest,
-    handlers: HavocBatchHandlers,
-  ): Promise<HavocWorkerCompleteMessage>;
-  runTape(request: HavocWorkerTapeRequest): Promise<HavocWorkerTapeMessage>;
-  cancel(): void;
-  dispose(): void;
-}
-
-export interface CreateHavocServiceOptions {
-  repository?: HavocRepository;
-  runner?: HavocRunnerLike;
-  loadCatalog?: () => Promise<SeasonDraftCatalog>;
-  loadPreamble?: () => Promise<{ profile: EraSimulationProfile; bracket: OpponentBracket }>;
-  loadManifest?: () => Promise<HoopRushManifest>;
-  newRunId?: () => string;
-  newCommandId?: () => string;
+export interface HavocSessionOptions {
+  repository: HavocRunRepositoryPort;
+  runner: HavocRunnerPort;
+  assets: HavocAssetPort;
+  ids: HavocIdPort;
 }
 
 function lockedDigestOf(locked: HavocLockedInputs): string {
@@ -109,17 +92,11 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : 'unknown havoc service failure';
 }
 
-class HavocAppService implements HavocService {
-  private readonly repository: HavocRepository;
-  private readonly runner: HavocRunnerLike;
-  private readonly loadCatalog: () => Promise<SeasonDraftCatalog>;
-  private readonly loadPreamble: () => Promise<{
-    profile: EraSimulationProfile;
-    bracket: OpponentBracket;
-  }>;
-  private readonly loadManifest: () => Promise<HoopRushManifest>;
-  private readonly newRunId: () => string;
-  private readonly newCommandId: () => string;
+export class HavocSession implements HavocService {
+  private readonly repository: HavocRunRepositoryPort;
+  private readonly runner: HavocRunnerPort;
+  private readonly assets: HavocAssetPort;
+  private readonly ids: HavocIdPort;
   private readonly listeners = new Set<(event: HavocServiceEvent) => void>();
   private run: HavocRunState | null = null;
   private lastRunId: string | null = null;
@@ -132,14 +109,11 @@ class HavocAppService implements HavocService {
   } | null = null;
   private assetsPromise: Promise<HavocAssets> | null = null;
 
-  constructor(options: CreateHavocServiceOptions) {
-    this.repository = options.repository ?? new DexieHavocRepository();
-    this.runner = options.runner ?? new HavocRunner();
-    this.loadCatalog = options.loadCatalog ?? loadSeasonDraftCatalog;
-    this.loadPreamble = options.loadPreamble ?? loadRunPreamble;
-    this.loadManifest = options.loadManifest ?? getManifest;
-    this.newRunId = options.newRunId ?? (() => idSchema.parse(newSeasonId('havoc-run')));
-    this.newCommandId = options.newCommandId ?? (() => newSeasonId('havoc-cmd'));
+  constructor(options: HavocSessionOptions) {
+    this.repository = options.repository;
+    this.runner = options.runner;
+    this.assets = options.assets;
+    this.ids = options.ids;
   }
 
   subscribe(listener: (event: HavocServiceEvent) => void): () => void {
@@ -147,6 +121,12 @@ class HavocAppService implements HavocService {
     return () => {
       this.listeners.delete(listener);
     };
+  }
+
+  getSnapshot(): HavocActiveSnapshot {
+    const state = this.run;
+    if (state === null) return { run: null, draft: null };
+    return { run: this.buildRunView(state), draft: state.draft };
   }
 
   async loadActive(): Promise<HavocActiveSnapshot> {
@@ -216,13 +196,13 @@ class HavocAppService implements HavocService {
         throw new HavocServiceError('invalid-phase', 'an active havoc run already exists');
       }
       const assets = await this.loadAssets();
-      const runId = this.newRunId();
+      const runId = this.ids.newRunId();
       const command = havocCreateDraftCommandSchema.parse({
         schemaVersion: HAVOC_SCHEMA_VERSION,
-        commandId: this.newCommandId(),
+        commandId: this.ids.newCommandId(),
         runId,
         command: 'create-havoc-draft',
-        runSeed: seasonRootSeed(),
+        runSeed: this.ids.rootSeed(),
         versionSet: assets.versionSet,
         catalog: assets.catalogSource,
       });
@@ -257,7 +237,7 @@ class HavocAppService implements HavocService {
       }
       return havocRerollOfferCommandSchema.parse({
         schemaVersion: HAVOC_SCHEMA_VERSION,
-        commandId: this.newCommandId(),
+        commandId: this.ids.newCommandId(),
         runId: state.runId,
         expectedRevision: state.revision,
         command: 'reroll-havoc-offer',
@@ -273,7 +253,7 @@ class HavocAppService implements HavocService {
       }
       return havocPickCardCommandSchema.parse({
         schemaVersion: HAVOC_SCHEMA_VERSION,
-        commandId: this.newCommandId(),
+        commandId: this.ids.newCommandId(),
         runId: state.runId,
         expectedRevision: state.revision,
         command: 'pick-havoc-card',
@@ -290,7 +270,7 @@ class HavocAppService implements HavocService {
       }
       return havocLockLineupCommandSchema.parse({
         schemaVersion: HAVOC_SCHEMA_VERSION,
-        commandId: this.newCommandId(),
+        commandId: this.ids.newCommandId(),
         runId: state.runId,
         expectedRevision: state.revision,
         command: 'lock-havoc-lineup',
@@ -323,7 +303,7 @@ class HavocAppService implements HavocService {
       }
       const requested =
         input.count === 'remaining' ? remaining : Math.max(1, Math.min(input.count, remaining));
-      const requestId = newRequestId('havoc-sim');
+      const requestId = this.ids.newRequestId('havoc-sim');
       const request = havocWorkerSimulateRequestSchema.parse({
         schemaVersion: HAVOC_WORKER_WIRE_SCHEMA_VERSION,
         type: 'havoc-simulate',
@@ -403,7 +383,7 @@ class HavocAppService implements HavocService {
       const request = havocWorkerTapeRequestSchema.parse({
         schemaVersion: HAVOC_WORKER_WIRE_SCHEMA_VERSION,
         type: 'havoc-tape',
-        requestId: newRequestId('havoc-tape'),
+        requestId: this.ids.newRequestId('havoc-tape'),
         runId: state.runId,
         revision: state.revision,
         inputDigest: lockedDigestOf(state.locked),
@@ -526,7 +506,7 @@ class HavocAppService implements HavocService {
       });
       const command = havocCompleteComparisonCommandSchema.parse({
         schemaVersion: HAVOC_SCHEMA_VERSION,
-        commandId: this.newCommandId(),
+        commandId: this.ids.newCommandId(),
         runId: state.runId,
         expectedRevision: state.revision,
         command: 'complete-havoc-comparison',
@@ -570,7 +550,7 @@ class HavocAppService implements HavocService {
     return this.dispatch((state) =>
       havocAbandonRunCommandSchema.parse({
         schemaVersion: HAVOC_SCHEMA_VERSION,
-        commandId: this.newCommandId(),
+        commandId: this.ids.newCommandId(),
         runId: state.runId,
         expectedRevision: state.revision,
         command: 'abandon-havoc-run',
@@ -619,7 +599,7 @@ class HavocAppService implements HavocService {
   private syntheticAccepted(state: HavocRunState): HavocCommandResult {
     return havocCommandResultSchema.parse({
       schemaVersion: HAVOC_SCHEMA_VERSION,
-      commandId: this.newCommandId(),
+      commandId: this.ids.newCommandId(),
       runId: state.runId,
       status: 'accepted',
       revisionBefore: state.revision,
@@ -667,7 +647,7 @@ class HavocAppService implements HavocService {
       message.variant === 'havoc'
         ? havocAcceptGameCommandSchema.parse({
             schemaVersion: HAVOC_SCHEMA_VERSION,
-            commandId: this.newCommandId(),
+            commandId: this.ids.newCommandId(),
             runId: state.runId,
             expectedRevision: state.revision,
             command: 'accept-havoc-game',
@@ -678,7 +658,7 @@ class HavocAppService implements HavocService {
           })
         : havocAcceptNormalGameCommandSchema.parse({
             schemaVersion: HAVOC_SCHEMA_VERSION,
-            commandId: this.newCommandId(),
+            commandId: this.ids.newCommandId(),
             runId: state.runId,
             expectedRevision: state.revision,
             command: 'accept-havoc-normal-game',
@@ -758,14 +738,17 @@ class HavocAppService implements HavocService {
   }
 
   private async buildAssets(): Promise<HavocAssets> {
-    const manifest = await this.loadManifest();
+    const manifest = await this.assets.loadManifest();
     const catalogEntry = manifest.season?.draftCatalog;
     const profileEntry = manifest.eraSimulationProfiles.find((entry) => entry.eraId === '2010s');
     const bracketEntry = manifest.bracket;
     if (catalogEntry === undefined || profileEntry === undefined || bracketEntry === undefined) {
       throw new HavocServiceError('storage', 'the havoc data assets are unavailable');
     }
-    const [seasonCatalog, preamble] = await Promise.all([this.loadCatalog(), this.loadPreamble()]);
+    const [seasonCatalog, preamble] = await Promise.all([
+      this.assets.loadCatalog(),
+      this.assets.loadPreamble(),
+    ]);
     const catalogSource: HavocCatalogSource = {
       catalogVersion: seasonCatalog.catalogVersion,
       catalogHash: catalogEntry.contentHash,
@@ -862,21 +845,4 @@ class HavocAppService implements HavocService {
       throw new HavocServiceError('storage', messageOf(error));
     }
   }
-}
-
-export function createHavocService(options: CreateHavocServiceOptions = {}): HavocService {
-  return new HavocAppService(options);
-}
-
-let activeService: HavocService | null = null;
-
-export function setHavocService(service: HavocService | null): void {
-  activeService = service;
-}
-
-export function getHavocService(): HavocService {
-  if (activeService === null) {
-    activeService = createHavocService();
-  }
-  return activeService;
 }
