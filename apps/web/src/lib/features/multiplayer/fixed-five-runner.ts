@@ -131,7 +131,7 @@ export class FixedFiveRunner {
     this.cancel();
     this.disposed = false;
     this.requestId = request.requestId;
-    this.worker = new Worker(new URL('../workers/fixed-five-worker.ts', import.meta.url), {
+    this.worker = new Worker(new URL('../../../workers/fixed-five-worker.ts', import.meta.url), {
       type: 'module',
     });
     this.worker.onmessage = (event: MessageEvent<unknown>) => {

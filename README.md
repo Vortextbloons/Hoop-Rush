@@ -122,10 +122,11 @@ Open **http://localhost:5173**, choose a mode, and draft.
 **Stack:** SvelteKit client · TypeScript simulation engine · IndexedDB saves · Web Workers for long sims · Vitest.
 
 ```
-apps/web              → game UI
-packages/engine       → basketball & mode logic
+apps/web                → game UI (mode code under src/lib/features/<mode>)
+packages/application    → mode sessions & shared command runtime (framework-free)
+packages/engine         → basketball & mode logic
 packages/data-contracts → schemas & packaged data
-packages/persistence  → local saves
+packages/persistence    → local saves
 ```
 
 | Command | Purpose |

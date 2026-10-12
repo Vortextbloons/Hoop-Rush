@@ -4,7 +4,7 @@ import {
 } from '@hoop-rush/data-contracts';
 
 const COLLECTION_GAME_WORKER_URL = new URL(
-  '../../workers/collection-game-worker.ts',
+  '../../../workers/collection-game-worker.ts',
   import.meta.url,
 );
 

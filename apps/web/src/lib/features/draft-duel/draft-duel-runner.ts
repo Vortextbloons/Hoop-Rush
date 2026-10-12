@@ -35,9 +35,12 @@ export class DraftDuelRunner {
       roomId: request.roomId,
       input: request.input,
     });
-    const worker = new Worker(new URL('../workers/draft-duel-game-worker.ts', import.meta.url), {
-      type: 'module',
-    });
+    const worker = new Worker(
+      new URL('../../../workers/draft-duel-game-worker.ts', import.meta.url),
+      {
+        type: 'module',
+      },
+    );
     this.worker = worker;
     return new Promise<DraftDuelGameOutput>((resolve, reject) => {
       const timeout = setTimeout(() => {
