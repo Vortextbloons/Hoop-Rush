@@ -197,6 +197,15 @@ paths change (stages 2, 4, and 6).
   lobby boundary, views). Pure file moves plus `$lib` import rewrites; no
   behavior change.
 
+- 2026-10-12, stage 5d: Collection play lifecycle moved out of
+  `CollectionPlayPage.svelte` into `CollectionPlaySession` +
+  `CollectionPlayPresenter` (`apps/web/src/lib/features/collection/`).
+  Preparation, worker execution, acceptance, reward refresh, recovery of an
+  already-committed game, cancellation/disposal, and snapshot publication now
+  live in the session with injected ports (hub actions, worker job, clock,
+  error mapping); the page renders the mirrored snapshot and owns playback
+  only. 12 new session tests.
+
 ## Stage 5 status (2026-10-12)
 
 Landed: season (stages 2-3), challenge, and havoc sessions with typed
@@ -204,9 +213,8 @@ snapshot/subscribe/execute/cancel/dispose lifecycles and explicit ports;
 `features/` co-location for every mode (challenge, havoc, collection,
 draft-duel, multiplayer). Shared UI primitives stay in `lib/components/`.
 
-Not yet migrated: Collection, Draft Duel, and the fixed-five multiplayer
-client still orchestrate inside web modules (`collection-hub.ts` +
-`CollectionPlayPage.svelte`, `draft-duel-controller.svelte.ts`, the
+Not yet migrated: Draft Duel and the fixed-five multiplayer client still
+orchestrate inside web modules (`draft-duel-controller.svelte.ts`, the
 multiplayer room page). Their orchestration should move behind ports like the
-challenge/havoc sessions, and the room-page controller should be extracted
-from the route before the remaining stages are considered complete.
+challenge/havoc/collection sessions, and the room-page controller should be
+extracted from the route before the remaining stages are considered complete.

@@ -212,6 +212,7 @@ export class CollectionPlaySession {
       this.error = this.deps.errorMessage(error, 'The game failed. Try again.');
       this.publish();
       await this.load().catch(() => undefined);
+      await this.deps.reloadCollection().catch(() => undefined);
       return null;
     }
   }

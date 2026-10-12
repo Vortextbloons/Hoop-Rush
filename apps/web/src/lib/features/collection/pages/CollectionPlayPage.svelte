@@ -113,7 +113,9 @@
     acceptBasicGameResult: (input) => acceptBasicGameResult(input),
     acceptChallengeGameResult: (input) => acceptChallengeGameResult(input),
     loadCommittedGame: (gameId) => loadCommittedGame(gameId),
-    reloadCollection: () => shell.reloadCollection(),
+    reloadCollection: async () => {
+      await shell.reloadCollection();
+    },
     clock: {
       nowIso: () => new Date().toISOString(),
       sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
