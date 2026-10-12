@@ -59,8 +59,8 @@ Landed:
 
 Next:
 
-1. Draft Duel and fixed-five multiplayer sessions with ports (orchestration
-   still lives in their web modules), then stages 6-7.
+1. Fixed-five multiplayer session with ports (orchestration still lives in
+   the room page), then stages 6-7.
 
 Stage 5a landed: Classic/Sandbox challenge orchestration moved into
 `ChallengeSession` (`src/challenge/`). The web `ChallengeRunner` is replaced

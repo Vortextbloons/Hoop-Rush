@@ -206,6 +206,14 @@ paths change (stages 2, 4, and 6).
   error mapping); the page renders the mirrored snapshot and owns playback
   only. 12 new session tests.
 
+- 2026-10-12, stage 5e: Draft Duel split into a plain
+  `DraftDuelSession` (transport/repository/runner/assets/clock ports; command
+  dedup + retry timers, deadline autopick, game pipeline, propose/confirm,
+  persistence, rematch flows) and a runes `DraftDuelPresenter` that mirrors the
+  session view and owns playback/transient display. The old
+  `draft-duel-controller.svelte.ts` is a one-line alias. Existing suites
+  retained (6 files / 53 tests, +6 session/presenter tests).
+
 ## Stage 5 status (2026-10-12)
 
 Landed: season (stages 2-3), challenge, and havoc sessions with typed

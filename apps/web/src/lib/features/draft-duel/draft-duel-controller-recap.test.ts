@@ -1,7 +1,8 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   DRAFT_DUEL_AUTOPICK_VERSION,
   contentHashSchema,
+  createInMemoryDraftDuelTransport,
   defaultDraftDuelVersionLocks,
   draftDuelRoomSnapshotSchema,
   playerIdSchema,
@@ -13,13 +14,11 @@ import {
   type StoredDraftDuelCompleted,
 } from '@hoop-rush/persistence';
 import { DraftDuelController } from './draft-duel-controller.svelte';
+import { createDraftDuelSession } from './draft-duel-session';
 
-vi.mock('$lib/features/draft-duel/draft-duel-transport', () => ({
-  getDraftDuelTransport: () => ({}),
-}));
-
-type ControllerInternals = {
+type SessionInternals = {
   applySnapshot: (snapshot: DraftDuelRoomSnapshot) => void;
+  outputs: Record<number, never>;
   completedRecap: StoredDraftDuelCompleted | null;
 };
 
@@ -126,11 +125,12 @@ function storedRecap(): StoredDraftDuelCompleted {
 
 describe('Draft Duel championship recap fallback', () => {
   it('serves the stored MVP and standouts when the device has no game outputs', () => {
-    const controller = new DraftDuelController();
-    const internals = controller as unknown as ControllerInternals;
+    const session = createDraftDuelSession({ transport: createInMemoryDraftDuelTransport() });
+    const internals = session as unknown as SessionInternals;
     internals.applySnapshot(championshipSnapshot());
-    controller.outputs = {};
+    internals.outputs = {};
     internals.completedRecap = storedRecap();
+    const controller = new DraftDuelController(session);
 
     expect(controller.seriesMvp?.displayName).toBe('Alpha Ace');
     expect(controller.seriesMvp?.points).toBe(134);
@@ -141,10 +141,11 @@ describe('Draft Duel championship recap fallback', () => {
   });
 
   it('reports no MVP or standouts while nothing is restored yet', () => {
-    const controller = new DraftDuelController();
-    const internals = controller as unknown as ControllerInternals;
+    const session = createDraftDuelSession({ transport: createInMemoryDraftDuelTransport() });
+    const internals = session as unknown as SessionInternals;
     internals.applySnapshot(championshipSnapshot());
-    controller.outputs = {};
+    internals.outputs = {};
+    const controller = new DraftDuelController(session);
 
     expect(controller.seriesMvp).toBeNull();
     expect(controller.seriesStandouts).toEqual([]);

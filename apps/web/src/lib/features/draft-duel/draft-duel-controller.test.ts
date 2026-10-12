@@ -10,9 +10,12 @@ import {
   playerVersionIdSchema,
   seedSchema,
   type DraftDuelCommandPayload,
+  type DraftDuelDraft,
+  type DraftDuelGameOutput,
   type DraftDuelMultiplayerTransport,
   type DraftDuelParticipantId,
   type DraftDuelRoomSnapshot,
+  type DraftDuelTransientEvent,
   type Id,
 } from '@hoop-rush/data-contracts';
 import { createEngineContext, simulateRecordedGame } from '@hoop-rush/engine';
@@ -20,14 +23,17 @@ import * as engine from '@hoop-rush/engine';
 import { buildLegalSimulationTeam, DEFAULT_ERA_SIM_PROFILE } from '@hoop-rush/test-fixtures';
 import type { DraftDuelAssets } from './draft-duel-assets';
 import { DraftDuelController } from './draft-duel-controller.svelte';
+import { createDraftDuelSession, type DraftDuelSession } from './draft-duel-session';
 
-let transport: DraftDuelMultiplayerTransport;
-vi.mock('$lib/features/draft-duel/draft-duel-transport', () => ({
-  getDraftDuelTransport: () => transport,
-}));
-
-type ControllerLifecycle = {
+type SessionLifecycle = {
   roomId: Id;
+  participantId: DraftDuelParticipantId | null;
+  snapshot: DraftDuelRoomSnapshot | null;
+  draft: DraftDuelDraft | null;
+  outputs: Record<number, DraftDuelGameOutput>;
+  assets: DraftDuelAssets | null;
+  progress: number;
+  publish: () => void;
   applySnapshot: (snapshot: DraftDuelRoomSnapshot) => void;
   startTimers: () => void;
   maybeProposeOrConfirm: () => void;
@@ -36,14 +42,24 @@ type ControllerLifecycle = {
   persistActive: () => Promise<void>;
   resolveDeadline: (cursor: string, pickOrdinal: number) => Promise<void>;
   syncFromServer: () => Promise<void>;
-  repo: {
-    appendCommands: (...args: unknown[]) => Promise<void>;
-    saveVerification: (...args: unknown[]) => Promise<void>;
+  deps: {
+    repository: {
+      appendCommands: (...args: unknown[]) => Promise<void>;
+      saveVerification: (...args: unknown[]) => Promise<void>;
+    };
   };
 };
 
+function emitTransient(session: DraftDuelSession, event: DraftDuelTransientEvent): void {
+  (session as unknown as { emitTransient: (event: DraftDuelTransientEvent) => void }).emitTransient(
+    event,
+  );
+}
+
 describe('Draft Duel ready check progression', () => {
+  let session: DraftDuelSession;
   let controller: DraftDuelController;
+  let transport: DraftDuelMultiplayerTransport;
   let unsubscribe: () => void;
   let roomId: Id;
   let commandNumber: number;
@@ -92,9 +108,10 @@ describe('Draft Duel ready check progression', () => {
         playerVersionId: playerVersionIdSchema.parse(`pv-${String(ordinal).padStart(32, '0')}`),
       });
     }
-    controller = new DraftDuelController();
-    controller.participantId = 'p1';
-    const lifecycle = controller as unknown as ControllerLifecycle;
+    session = createDraftDuelSession({ transport });
+    controller = new DraftDuelController(session);
+    const lifecycle = session as unknown as SessionLifecycle;
+    lifecycle.participantId = 'p1';
     lifecycle.roomId = roomId;
     lifecycle.applySnapshot((await transport.resume(roomId)).snapshot);
     unsubscribe = transport.subscribe(roomId, (snapshot) => {
@@ -112,12 +129,12 @@ describe('Draft Duel ready check progression', () => {
   });
 
   function isolateSync() {
-    controller.assets = {} as DraftDuelAssets;
-    const lifecycle = controller as unknown as ControllerLifecycle;
+    const lifecycle = session as unknown as SessionLifecycle;
+    lifecycle.assets = {} as DraftDuelAssets;
     vi.spyOn(lifecycle, 'rebuildDraft').mockImplementation(() => {});
     vi.spyOn(lifecycle, 'ensureGamePipeline').mockResolvedValue();
     vi.spyOn(lifecycle, 'persistActive').mockResolvedValue();
-    vi.spyOn(lifecycle.repo, 'appendCommands').mockResolvedValue();
+    vi.spyOn(lifecycle.deps.repository, 'appendCommands').mockResolvedValue();
     return lifecycle;
   }
 
@@ -176,7 +193,7 @@ describe('Draft Duel ready check progression', () => {
   );
 
   it('does not roll back to an older room snapshot', () => {
-    const lifecycle = controller as unknown as ControllerLifecycle;
+    const lifecycle = session as unknown as SessionLifecycle;
     const current = controller.snapshot;
     if (!current) throw new Error('Missing snapshot');
     lifecycle.applySnapshot({ ...current, revision: current.revision - 1, phase: 'lobby' });
@@ -199,7 +216,7 @@ describe('Draft Duel ready check progression', () => {
   }
 
   function applyBroadcastSnapshot(startedAtMs: number): void {
-    const lifecycle = controller as unknown as ControllerLifecycle;
+    const lifecycle = session as unknown as SessionLifecycle;
     const current = controller.snapshot;
     if (!current) throw new Error('Missing snapshot');
     lifecycle.applySnapshot({
@@ -256,11 +273,11 @@ describe('Draft Duel ready check progression', () => {
       const started = (await transport.resume(roomId)).snapshot;
       const deadline = started.deadline;
       if (!deadline) throw new Error('Missing deadline');
-      controller.snapshot = null;
+      lifecycle.snapshot = null;
       lifecycle.applySnapshot(started);
-      controller.participantId = deadline.participantId === 'p1' ? 'p2' : 'p1';
-      controller.draft = { status: 'drafting', pickOrdinal: 0 } as NonNullable<
-        typeof controller.draft
+      lifecycle.participantId = deadline.participantId === 'p1' ? 'p2' : 'p1';
+      lifecycle.draft = { status: 'drafting', pickOrdinal: 0 } as NonNullable<
+        typeof lifecycle.draft
       >;
       vi.spyOn(engine, 'draftDuelTimeoutPick').mockReturnValue({
         pickOrdinal: 0,
@@ -378,7 +395,8 @@ describe('Draft Duel ready check progression', () => {
       },
       createEngineContext(),
     );
-    controller.outputs = {
+    const lifecycle = session as unknown as SessionLifecycle;
+    lifecycle.outputs = {
       2: {
         schemaVersion: DRAFT_DUEL_TAPE_VERSION,
         roomId,
@@ -393,14 +411,13 @@ describe('Draft Duel ready check progression', () => {
         inputDigest: digest,
       },
     };
-    controller.progress = 1;
-    controller.assets = {} as DraftDuelAssets;
-    const lifecycle = controller as unknown as ControllerLifecycle;
+    lifecycle.progress = 1;
+    lifecycle.assets = {} as DraftDuelAssets;
     vi.spyOn(lifecycle, 'rebuildDraft').mockImplementation(() => {});
     vi.spyOn(lifecycle, 'ensureGamePipeline').mockResolvedValue();
     vi.spyOn(lifecycle, 'persistActive').mockResolvedValue();
-    vi.spyOn(lifecycle.repo, 'appendCommands').mockResolvedValue();
-    vi.spyOn(lifecycle.repo, 'saveVerification').mockResolvedValue();
+    vi.spyOn(lifecycle.deps.repository, 'appendCommands').mockResolvedValue();
+    vi.spyOn(lifecycle.deps.repository, 'saveVerification').mockResolvedValue();
     await submit('p2', {
       kind: 'propose-result',
       gameNumber: 2,
@@ -489,4 +506,72 @@ describe('Draft Duel ready check progression', () => {
       );
     },
   );
+
+  it('displays an opponent consideration and clears it after two seconds', () => {
+    const lifecycle = session as unknown as SessionLifecycle;
+    const playerVersionId = playerVersionIdSchema.parse(`pv-${'7'.repeat(32)}`);
+    lifecycle.assets = {
+      catalog: {
+        byVersionId: new Map([
+          [playerVersionId, { card: { displayName: 'Considered Cal', seasonKey: '1999-lal' } }],
+        ]),
+      },
+    } as unknown as DraftDuelAssets;
+    lifecycle.publish();
+    expect(controller.consideration).toBeNull();
+
+    emitTransient(session, {
+      kind: 'consideration',
+      roomId,
+      participantId: 'p2',
+      pickOrdinal: 0,
+      playerId: playerIdSchema.parse('dd-considered'),
+      playerVersionId,
+      sentAtMs: Date.now(),
+    });
+    expect(controller.consideration?.displayName).toBe('Considered Cal');
+    expect(controller.consideration?.seasonKey).toBe('1999-lal');
+
+    vi.advanceTimersByTime(2000);
+    expect(controller.consideration).toBeNull();
+  });
+
+  it('gates outgoing and incoming reactions while muted', async () => {
+    const lifecycle = session as unknown as SessionLifecycle;
+    lifecycle.draft = { status: 'drafting', pickOrdinal: 0 } as NonNullable<typeof lifecycle.draft>;
+    const publish = vi.spyOn(transport, 'publishTransient').mockResolvedValue(true);
+
+    await controller.react('hype');
+    expect(publish).toHaveBeenCalledTimes(1);
+    expect(publish.mock.calls[0]?.[1]).toMatchObject({
+      kind: 'reaction',
+      participantId: 'p1',
+      reaction: 'hype',
+    });
+
+    controller.setMuted(true);
+    await controller.react('clap');
+    expect(publish).toHaveBeenCalledTimes(1);
+
+    emitTransient(session, {
+      kind: 'reaction',
+      roomId,
+      participantId: 'p2',
+      pickOrdinal: 0,
+      reaction: 'cold',
+      sentAtMs: Date.now(),
+    });
+    expect(controller.reaction).toBeNull();
+
+    controller.setMuted(false);
+    emitTransient(session, {
+      kind: 'reaction',
+      roomId,
+      participantId: 'p2',
+      pickOrdinal: 0,
+      reaction: 'wow',
+      sentAtMs: Date.now(),
+    });
+    expect(controller.reaction?.reaction).toBe('wow');
+  });
 });
