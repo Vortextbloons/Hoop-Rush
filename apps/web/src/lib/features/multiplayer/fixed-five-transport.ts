@@ -20,40 +20,20 @@ import {
   type Id,
 } from '@hoop-rush/data-contracts';
 import { randomUUID } from '$lib/ids';
+import {
+  createRealtimeRoomRegistry,
+  ensureAnonymous,
+  getCachedTransport,
+  isUsablePublishableKey,
+  isUsableSupabaseUrl,
+  parseRoomCode,
+  readSupabaseEnv,
+  stringField,
+  supabaseClient,
+} from '$lib/supabase-runtime';
+
 type FixedFiveClient = SupabaseClient;
-const sharedClients = new Map<string, FixedFiveClient>();
-let supabaseModulePromise: Promise<typeof import('@supabase/supabase-js')> | null = null;
-function loadSupabaseModule(): Promise<typeof import('@supabase/supabase-js')> {
-  if (!supabaseModulePromise) supabaseModulePromise = import('@supabase/supabase-js');
-  return supabaseModulePromise;
-}
-async function supabaseClient(
-  url: string,
-  publishableKey: string,
-  storageKey?: string,
-): Promise<FixedFiveClient> {
-  const key = `${url}${publishableKey}${storageKey ?? ''}`;
-  const existing = sharedClients.get(key);
-  if (existing) return existing;
-  const { createClient } = await loadSupabaseModule();
-  const client = createClient(url, publishableKey, {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      ...(storageKey ? { storageKey } : {}),
-    },
-  }) as FixedFiveClient;
-  sharedClients.set(key, client);
-  return client;
-}
-function parseRoomCode(code: string): FixedFiveRoomCode {
-  const clean = code.replace(/\D/g, '').slice(0, 4);
-  const parsed = fixedFiveRoomCodeSchema.safeParse(clean);
-  if (!parsed.success) {
-    throw new Error(`invalid-code: expected the host's 4-digit code (got ${code})`);
-  }
-  return parsed.data;
-}
+
 interface FixedFiveRoomRow {
   id: Id;
   code: FixedFiveRoomCode | null;
@@ -78,6 +58,7 @@ interface FixedFiveRoomRow {
   expires_at: string;
   created_at: string;
 }
+
 interface FixedFiveMemberRow {
   participant_id: string;
   online: boolean;
@@ -86,21 +67,20 @@ interface FixedFiveMemberRow {
   locked: boolean;
   last_seen_at: string | null;
 }
+
 interface FixedFiveCommandRow {
   command_id: string;
   ordinal: number;
   actor_participant_id: string;
   payload: unknown;
 }
+
 interface RpcRoomPayload {
   room_id: Id;
   code: FixedFiveRoomCode | null;
   participant_id?: FixedFiveParticipantId;
 }
-function stringField(record: Record<string, unknown>, key: string, fallback = ''): string {
-  const value = record[key];
-  return typeof value === 'string' ? value : fallback;
-}
+
 function rpcPayload(value: unknown): RpcRoomPayload {
   const record = value as Record<string, unknown>;
   const participantRaw = record['participant_id'];
@@ -111,12 +91,14 @@ function rpcPayload(value: unknown): RpcRoomPayload {
     participant_id: participantRaw === 'p1' || participantRaw === 'p2' ? participantRaw : undefined,
   };
 }
+
 interface RpcCommandPayload {
   accepted: boolean;
   ordinal?: number;
   revision?: number;
   rejection_code?: string;
 }
+
 function commandPayload(value: unknown): RpcCommandPayload {
   const record = value as Record<string, unknown>;
   const accepted = record['accepted'] === true;
@@ -126,105 +108,24 @@ function commandPayload(value: unknown): RpcCommandPayload {
     typeof record['rejection_code'] === 'string' ? record['rejection_code'] : undefined;
   return { accepted, ordinal, revision, rejection_code: rejection };
 }
-function isUsableSupabaseUrl(url: string): boolean {
-  let parsed: URL;
-  try {
-    parsed = new URL(url);
-  } catch {
-    return false;
-  }
-  const host = parsed.hostname.toLowerCase();
-  if (host === 'localhost' || host === '127.0.0.1') return parsed.protocol === 'http:';
-  return parsed.protocol === 'https:' && host.endsWith('.supabase.co');
-}
-function legacyJwtRole(key: string): string | null {
-  const parts = key.split('.');
-  if (parts.length !== 3) return null;
-  const segment = parts[1];
-  if (!segment) return null;
-  try {
-    const normalized = segment.replace(/-/g, '+').replace(/_/g, '/');
-    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
-    const payload: unknown = JSON.parse(atob(padded));
-    if (typeof payload !== 'object' || payload === null) return null;
-    const role = (payload as Record<string, unknown>)['role'];
-    return typeof role === 'string' ? role : null;
-  } catch {
-    return null;
-  }
-}
-export function isUsablePublishableKey(key: string): boolean {
-  if (key.length < 20 || /\s/.test(key)) return false;
-  const lower = key.toLowerCase();
-  if (lower.includes('your-') || lower.includes('example') || lower.includes('placeholder'))
-    return false;
-  if (key.startsWith('sb_secret_')) return false;
-  if (key.startsWith('sb_publishable_')) return true;
-  if (!key.startsWith('eyJ')) return false;
-  return legacyJwtRole(key) === 'anon';
-}
-function supabaseEnv(): {
-  url?: string;
-  publishableKey?: string;
-} {
-  const env = import.meta.env as Record<string, unknown>;
-  const rawUrl = env['VITE_SUPABASE_URL'];
-  const rawKey = env['VITE_SUPABASE_PUBLISHABLE_KEY'];
-  const url = typeof rawUrl === 'string' ? rawUrl.trim().replace(/\/+$/, '') : undefined;
-  const publishableKey = typeof rawKey === 'string' ? rawKey.trim() : undefined;
-  return {
-    url: url && isUsableSupabaseUrl(url) ? url : undefined,
-    publishableKey:
-      publishableKey && isUsablePublishableKey(publishableKey) ? publishableKey : undefined,
-  };
-}
-export function isFixedFiveSupabaseConfigured(): boolean {
-  const { url, publishableKey } = supabaseEnv();
-  return Boolean(url && publishableKey);
-}
-export async function getMultiplayerClient(): Promise<SupabaseClient> {
-  const { url, publishableKey } = supabaseEnv();
-  if (!url || !publishableKey) throw new Error('Online rooms are unavailable in this setup.');
-  const client = await supabaseClient(url, publishableKey);
-  await ensureAnonymous(client);
-  return client;
-}
-export function createConfiguredFixedFiveTransport(): FixedFiveMultiplayerTransport {
-  const { url, publishableKey } = supabaseEnv();
-  return createFixedFiveTransport({ url, publishableKey });
-}
+
 const configuredTransportCache = new Map<string, FixedFiveMultiplayerTransport>();
+
 export function getFixedFiveTransport(options?: {
   url?: string;
   publishableKey?: string;
   storageKey?: string;
 }): FixedFiveMultiplayerTransport {
-  const env = supabaseEnv();
+  const env = readSupabaseEnv();
   const url = options?.url ?? env.url;
   const publishableKey = options?.publishableKey ?? env.publishableKey;
   const storageKey = options?.storageKey ?? '';
   const key = `${url ?? 'memory'}${publishableKey ?? ''}${storageKey}`;
-  const existing = configuredTransportCache.get(key);
-  if (existing) return existing;
-  const created = createFixedFiveTransport({ url, publishableKey, storageKey });
-  configuredTransportCache.set(key, created);
-  return created;
+  return getCachedTransport(configuredTransportCache, key, () =>
+    createFixedFiveTransport({ url, publishableKey, storageKey }),
+  );
 }
-async function ensureAnonymous(client: FixedFiveClient): Promise<void> {
-  try {
-    const session = await client.auth.getSession();
-    if (session.data.session) return;
-  } catch {
-    throw new Error('anonymous sign-in unreachable: failed to fetch');
-  }
-  try {
-    const signed = await client.auth.signInAnonymously();
-    if (signed.error) throw new Error(`anonymous sign-in failed: ${signed.error.message}`);
-  } catch (e) {
-    if (e instanceof Error && e.message.startsWith('anonymous sign-in failed:')) throw e;
-    throw new Error('anonymous sign-in unreachable: failed to fetch');
-  }
-}
+
 export function createFixedFiveTransport(options?: {
   url?: string;
   publishableKey?: string;
@@ -251,14 +152,6 @@ export function createFixedFiveTransport(options?: {
       clientPromise = supabaseClient(transportUrl, transportPublishableKey, transportStorageKey);
     return clientPromise;
   }
-  const rooms = new Map<
-    string,
-    {
-      handlers: Set<(snapshot: FixedFiveRoomSnapshot) => void>;
-      channel: ReturnType<FixedFiveClient['channel']> | null;
-      lastSnapshot: FixedFiveRoomSnapshot | null;
-    }
-  >();
   function memberFallback(participantId: FixedFiveParticipantId): FixedFiveMemberSnapshot {
     return {
       participantId,
@@ -361,26 +254,14 @@ export function createFixedFiveTransport(options?: {
     const memberRows = (Array.isArray(memberData) ? memberData : []) as FixedFiveMemberRow[];
     return roomRowToSnapshot(row, memberRows);
   }
-  function emit(roomId: string, snapshot: FixedFiveRoomSnapshot): void {
-    const record = rooms.get(roomId);
-    if (!record) return;
-    record.lastSnapshot = snapshot;
-    for (const handler of record.handlers) handler(snapshot);
-  }
-  async function refresh(roomId: string): Promise<void> {
-    try {
-      const snapshot = await fetchSnapshot(roomId);
-      emit(roomId, snapshot);
-    } catch (error) {
-      const record = rooms.get(roomId);
-      if (!record) return;
-      record.lastSnapshot = null;
-      console.error('Fixed-five realtime refresh failed; snapshot invalidated', {
-        roomId,
-        errorType: error instanceof Error ? error.name : 'UnknownError',
-      });
-    }
-  }
+  const registry = createRealtimeRoomRegistry<FixedFiveRoomSnapshot>({
+    label: 'Fixed-five',
+    roomsTable: 'fixed_five_rooms',
+    commandsTable: 'fixed_five_room_commands',
+    topic: (roomId) => `fixed-five-room-${roomId}`,
+    fetchSnapshot,
+    getClient,
+  });
   return {
     async create(settingsInput) {
       const client = await getClient();
@@ -441,7 +322,7 @@ export function createFixedFiveTransport(options?: {
           : null;
       return {
         roomId: idSchema.parse(stringField(record, 'room_id')),
-        code: parseRoomCode(code),
+        code: parseRoomCode(code, fixedFiveRoomCodeSchema),
         codeActive: true,
         settings,
         phase,
@@ -467,7 +348,7 @@ export function createFixedFiveTransport(options?: {
       const payload = rpcPayload(response.data);
       const snapshot = await fetchSnapshot(payload.room_id);
       const participantId: FixedFiveParticipantId = payload.participant_id ?? 'p2';
-      const membershipCode = parseRoomCode(code);
+      const membershipCode = parseRoomCode(code, fixedFiveRoomCodeSchema);
       return {
         snapshot,
         membership: { roomId: payload.room_id, participantId, code: membershipCode },
@@ -510,69 +391,7 @@ export function createFixedFiveTransport(options?: {
       };
     },
     subscribe(roomId, handler) {
-      let record = rooms.get(roomId);
-      if (!record) {
-        record = { handlers: new Set(), channel: null, lastSnapshot: null };
-        rooms.set(roomId, record);
-      }
-      record.handlers.add(handler);
-      if (!record.channel) {
-        const target = record;
-        void getClient()
-          .then((resolved) => {
-            const current = rooms.get(roomId);
-            if (!current || current !== target || current.channel || current.handlers.size === 0)
-              return;
-            const channel = resolved
-              .channel(`fixed-five-room-${roomId}`)
-              .on(
-                'postgres_changes',
-                {
-                  event: '*',
-                  schema: 'public',
-                  table: 'fixed_five_rooms',
-                  filter: `id=eq.${roomId}`,
-                },
-                () => {
-                  void refresh(roomId);
-                },
-              )
-              .on(
-                'postgres_changes',
-                {
-                  event: 'INSERT',
-                  schema: 'public',
-                  table: 'fixed_five_room_commands',
-                  filter: `room_id=eq.${roomId}`,
-                },
-                () => {
-                  void refresh(roomId);
-                },
-              )
-              .subscribe();
-            current.channel = channel;
-          })
-          .catch(() => {});
-      }
-      return {
-        unsubscribe: () => {
-          const existing = rooms.get(roomId);
-          if (!existing) return;
-          existing.handlers.delete(handler);
-          if (existing.handlers.size === 0) {
-            const channel = existing.channel;
-            existing.channel = null;
-            rooms.delete(roomId);
-            if (channel) {
-              void channel.unsubscribe().then(() => {
-                void getClient()
-                  .then((resolved) => resolved.removeChannel(channel))
-                  .catch(() => {});
-              });
-            }
-          }
-        },
-      };
+      return registry.subscribe(roomId, handler);
     },
     async refetch(roomId, afterOrdinal) {
       const client = await getClient();

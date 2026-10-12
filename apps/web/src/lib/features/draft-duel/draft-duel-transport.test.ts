@@ -11,12 +11,19 @@ import {
 import { createFakeSupabaseHarness, type FakeSupabaseHarness } from '$lib/fake-supabase-client';
 import { createDraftDuelTransport } from './draft-duel-transport';
 
-const mockState = vi.hoisted(() => ({ harness: null as FakeSupabaseHarness | null }));
+const mockState = vi.hoisted(() => {
+  const state = { harness: null as FakeSupabaseHarness | null };
+  (globalThis as { __hoopRushFakeSupabase?: typeof state }).__hoopRushFakeSupabase = state;
+  return state;
+});
 
 vi.mock('@supabase/supabase-js', () => ({
   createClient: (url: string, key: string, options?: unknown) => {
-    if (!mockState.harness) throw new Error('fake supabase harness not installed');
-    return mockState.harness.createClient(url, key, options);
+    const state = (
+      globalThis as { __hoopRushFakeSupabase?: { harness: FakeSupabaseHarness | null } }
+    ).__hoopRushFakeSupabase;
+    if (!state?.harness) throw new Error('fake supabase harness not installed');
+    return state.harness.createClient(url, key, options);
   },
   REALTIME_SUBSCRIBE_STATES: {
     SUBSCRIBED: 'SUBSCRIBED',

@@ -1,14 +1,15 @@
 import {
   draftDuelRoomCodeSchema,
   draftDuelRoomMembershipSchema,
-  idSchema,
   type DraftDuelRoomMembership,
-  type Id,
 } from '@hoop-rush/data-contracts';
+import { createMembershipStore } from '$lib/multiplayer-membership';
+
 export function inviteLinkForDraftDuelCode(code: string): string {
   const parsed = draftDuelRoomCodeSchema.parse(code);
   return `/multiplayer?code=${parsed}`;
 }
+
 export function friendlyDraftDuelJoinError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
   const lower = message.toLowerCase();
@@ -43,38 +44,23 @@ export function friendlyDraftDuelJoinError(error: unknown): string {
   }
   return message.slice(0, 240) || 'Something went wrong with the room.';
 }
-const MEMBERSHIP_PREFIX = 'hoop-rush:draft-duel:membership:';
-const LAST_ROOM_KEY = 'hoop-rush:draft-duel:last-room';
+
+const membershipStore = createMembershipStore<DraftDuelRoomMembership>({
+  prefix: 'hoop-rush:draft-duel:membership:',
+  lastRoomKey: 'hoop-rush:draft-duel:last-room',
+  schema: draftDuelRoomMembershipSchema,
+});
+
 export type StoredDraftDuelMembership = DraftDuelRoomMembership;
+
 export function saveDraftDuelMembership(membership: StoredDraftDuelMembership): void {
-  try {
-    localStorage.setItem(`${MEMBERSHIP_PREFIX}${membership.roomId}`, JSON.stringify(membership));
-    localStorage.setItem(LAST_ROOM_KEY, membership.roomId);
-  } catch {}
+  membershipStore.save(membership);
 }
+
 export function loadDraftDuelMembership(roomId: string): StoredDraftDuelMembership | null {
-  try {
-    const parsedRoomId = idSchema.safeParse(roomId);
-    if (!parsedRoomId.success) return null;
-    const raw = localStorage.getItem(`${MEMBERSHIP_PREFIX}${parsedRoomId.data}`);
-    if (!raw) return null;
-    const parsed: unknown = JSON.parse(raw);
-    const result = draftDuelRoomMembershipSchema.safeParse(parsed);
-    if (!result.success) return null;
-    if (result.data.roomId !== parsedRoomId.data) return null;
-    return result.data;
-  } catch {
-    return null;
-  }
+  return membershipStore.load(roomId);
 }
-export function loadLastDraftDuelRoomId(): Id | null {
-  try {
-    const raw = localStorage.getItem(LAST_ROOM_KEY);
-    if (raw === null) return null;
-    const parsed = idSchema.safeParse(raw);
-    if (!parsed.success) return null;
-    return parsed.data;
-  } catch {
-    return null;
-  }
+
+export function loadLastDraftDuelRoomId() {
+  return membershipStore.loadLastRoomId();
 }

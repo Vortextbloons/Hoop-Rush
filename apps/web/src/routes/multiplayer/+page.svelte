@@ -33,9 +33,8 @@
     type FixedFiveVersionLocks,
   } from '@hoop-rush/data-contracts';
   import { ENGINE_VERSION } from '@hoop-rush/engine';
-  import { isFixedFiveSupabaseConfigured } from '$lib/features/multiplayer/fixed-five-transport';
   import { DraftDuelController } from '$lib/features/draft-duel/draft-duel-controller.svelte';
-  import { isDraftDuelSupabaseConfigured } from '$lib/features/draft-duel/draft-duel-transport';
+  import { isMultiplayerConfigured } from '$lib/supabase-runtime';
   import {
     friendlyFixedFiveJoinError,
     loadLastFixedFiveRoomId,
@@ -626,9 +625,7 @@
           {#if preview}<p class="room-preview" role="status">{preview}</p>{/if}
         {/if}
         {#if error}<p class="room-error" role="alert">{error}</p>{/if}
-        {#if !(matchFormat === 'draft-duel' ? isDraftDuelSupabaseConfigured() : isFixedFiveSupabaseConfigured())}<p
-            class="connection-note"
-          >
+        {#if !isMultiplayerConfigured()}<p class="connection-note">
             Online rooms are unavailable in this setup. Solo Classic and Sandbox are ready to play.
           </p>{/if}
       </div>

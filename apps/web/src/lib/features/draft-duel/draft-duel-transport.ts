@@ -1,4 +1,4 @@
-import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   commandIdSchema,
   createInMemoryDraftDuelTransport,
@@ -21,81 +21,26 @@ import {
   type DraftDuelRoomCode,
   type DraftDuelRoomSettings,
   type DraftDuelRoomSnapshot,
+  type DraftDuelTransientEvent,
   type Id,
 } from '@hoop-rush/data-contracts';
 import { randomUUID } from '$lib/ids';
+import {
+  createRealtimeRoomRegistry,
+  ensureAnonymous,
+  getCachedTransport,
+  isUsablePublishableKey,
+  isUsableSupabaseUrl,
+  parseRoomCode,
+  publishTransientPayload,
+  readSupabaseEnv,
+  stringField,
+  subscribeTransientPayloads,
+  supabaseClient,
+} from '$lib/supabase-runtime';
+
 type DraftDuelClient = SupabaseClient;
-const sharedClients = new Map<string, DraftDuelClient>();
-let supabaseModulePromise: Promise<typeof import('@supabase/supabase-js')> | null = null;
-function loadSupabaseModule(): Promise<typeof import('@supabase/supabase-js')> {
-  if (!supabaseModulePromise) supabaseModulePromise = import('@supabase/supabase-js');
-  return supabaseModulePromise;
-}
-async function supabaseClient(
-  url: string,
-  publishableKey: string,
-  storageKey?: string,
-): Promise<DraftDuelClient> {
-  const key = `${url}${publishableKey}${storageKey ?? ''}`;
-  const existing = sharedClients.get(key);
-  if (existing) return existing;
-  const { createClient } = await loadSupabaseModule();
-  const client = createClient(url, publishableKey, {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      ...(storageKey ? { storageKey } : {}),
-    },
-  }) as DraftDuelClient;
-  sharedClients.set(key, client);
-  return client;
-}
-const transientSenderChannels = new Map<string, Promise<RealtimeChannel>>();
-async function transientSenderChannel(
-  roomId: string,
-  client: DraftDuelClient,
-): Promise<RealtimeChannel> {
-  const existing = transientSenderChannels.get(roomId);
-  if (existing) return existing;
-  const creating = (async (): Promise<RealtimeChannel> => {
-    const { REALTIME_SUBSCRIBE_STATES } = await loadSupabaseModule();
-    try {
-      await client.realtime.setAuth();
-    } catch {
-      await Promise.resolve();
-    }
-    const channel = client.channel(`draft-duel:${roomId}`, {
-      config: { private: true, broadcast: { self: false } },
-    });
-    await new Promise<void>((resolve) => {
-      const timer = setTimeout(() => {
-        resolve();
-      }, 1500);
-      channel.subscribe((status) => {
-        if (status === REALTIME_SUBSCRIBE_STATES.SUBSCRIBED) {
-          clearTimeout(timer);
-          resolve();
-        }
-      });
-    });
-    return channel;
-  })();
-  transientSenderChannels.set(roomId, creating);
-  creating.catch(() => {
-    if (transientSenderChannels.get(roomId) === creating) {
-      transientSenderChannels.delete(roomId);
-    }
-  });
-  return creating;
-}
-function parseRoomCode(code: string): DraftDuelRoomCode {
-  const clean = code.replace(/\D/g, '').slice(0, 4);
-  const parsed = draftDuelRoomCodeSchema.safeParse(clean);
-  if (!parsed.success) {
-    throw new Error(`invalid-code: expected the host's 4-digit code (got ${code})`);
-  }
-  return parsed.data;
-}
+
 interface DraftDuelRoomRow {
   id: Id;
   code: DraftDuelRoomCode | null;
@@ -120,6 +65,7 @@ interface DraftDuelRoomRow {
   expires_at: string;
   created_at: string;
 }
+
 interface DraftDuelMemberRow {
   participant_id: string;
   online: boolean;
@@ -128,21 +74,20 @@ interface DraftDuelMemberRow {
   locked: boolean;
   last_seen_at: string | null;
 }
+
 interface DraftDuelCommandRow {
   command_id: string;
   ordinal: number;
   actor_participant_id: string;
   payload: unknown;
 }
+
 interface RpcRoomPayload {
   room_id: Id;
   code: DraftDuelRoomCode | null;
   participant_id?: DraftDuelParticipantId;
 }
-function stringField(record: Record<string, unknown>, key: string, fallback = ''): string {
-  const value = record[key];
-  return typeof value === 'string' ? value : fallback;
-}
+
 function rpcPayload(value: unknown): RpcRoomPayload {
   const record = value as Record<string, unknown>;
   const participantRaw = record['participant_id'];
@@ -153,6 +98,7 @@ function rpcPayload(value: unknown): RpcRoomPayload {
     participant_id: participantRaw === 'p1' || participantRaw === 'p2' ? participantRaw : undefined,
   };
 }
+
 interface RpcCommandPayload {
   accepted: boolean;
   ordinal?: number;
@@ -160,6 +106,7 @@ interface RpcCommandPayload {
   rejectionCode?: string;
   commandId?: string;
 }
+
 function commandPayload(value: unknown): RpcCommandPayload {
   const record = value as Record<string, unknown>;
   const accepted = record['accepted'] === true;
@@ -170,98 +117,24 @@ function commandPayload(value: unknown): RpcCommandPayload {
   const commandId = typeof record['commandId'] === 'string' ? record['commandId'] : undefined;
   return { accepted, ordinal, revision, rejectionCode, commandId };
 }
-function isUsableSupabaseUrl(url: string): boolean {
-  let parsed: URL;
-  try {
-    parsed = new URL(url);
-  } catch {
-    return false;
-  }
-  const host = parsed.hostname.toLowerCase();
-  if (host === 'localhost' || host === '127.0.0.1') return parsed.protocol === 'http:';
-  return parsed.protocol === 'https:' && host.endsWith('.supabase.co');
-}
-function legacyJwtRole(key: string): string | null {
-  const parts = key.split('.');
-  if (parts.length !== 3) return null;
-  const segment = parts[1];
-  if (!segment) return null;
-  try {
-    const normalized = segment.replace(/-/g, '+').replace(/_/g, '/');
-    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
-    const payload: unknown = JSON.parse(atob(padded));
-    if (typeof payload !== 'object' || payload === null) return null;
-    const role = (payload as Record<string, unknown>)['role'];
-    return typeof role === 'string' ? role : null;
-  } catch {
-    return null;
-  }
-}
-export function isUsablePublishableKey(key: string): boolean {
-  if (key.length < 20 || /\s/.test(key)) return false;
-  const lower = key.toLowerCase();
-  if (lower.includes('your-') || lower.includes('example') || lower.includes('placeholder'))
-    return false;
-  if (key.startsWith('sb_secret_')) return false;
-  if (key.startsWith('sb_publishable_')) return true;
-  if (!key.startsWith('eyJ')) return false;
-  return legacyJwtRole(key) === 'anon';
-}
-function supabaseEnv(): {
-  url?: string;
-  publishableKey?: string;
-} {
-  const env = import.meta.env as Record<string, unknown>;
-  const rawUrl = env['VITE_SUPABASE_URL'];
-  const rawKey = env['VITE_SUPABASE_PUBLISHABLE_KEY'];
-  const url = typeof rawUrl === 'string' ? rawUrl.trim().replace(/\/+$/, '') : undefined;
-  const publishableKey = typeof rawKey === 'string' ? rawKey.trim() : undefined;
-  return {
-    url: url && isUsableSupabaseUrl(url) ? url : undefined,
-    publishableKey:
-      publishableKey && isUsablePublishableKey(publishableKey) ? publishableKey : undefined,
-  };
-}
-export function isDraftDuelSupabaseConfigured(): boolean {
-  const { url, publishableKey } = supabaseEnv();
-  return Boolean(url && publishableKey);
-}
-export function createConfiguredDraftDuelTransport(): DraftDuelMultiplayerTransport {
-  const { url, publishableKey } = supabaseEnv();
-  return createDraftDuelTransport({ url, publishableKey });
-}
+
 const configuredTransportCache = new Map<string, DraftDuelMultiplayerTransport>();
+
 export function getDraftDuelTransport(options?: {
   url?: string;
   publishableKey?: string;
   storageKey?: string;
 }): DraftDuelMultiplayerTransport {
-  const env = supabaseEnv();
+  const env = readSupabaseEnv();
   const url = options?.url ?? env.url;
   const publishableKey = options?.publishableKey ?? env.publishableKey;
   const storageKey = options?.storageKey ?? '';
   const key = `${url ?? 'memory'}${publishableKey ?? ''}${storageKey}`;
-  const existing = configuredTransportCache.get(key);
-  if (existing) return existing;
-  const created = createDraftDuelTransport({ url, publishableKey, storageKey });
-  configuredTransportCache.set(key, created);
-  return created;
+  return getCachedTransport(configuredTransportCache, key, () =>
+    createDraftDuelTransport({ url, publishableKey, storageKey }),
+  );
 }
-async function ensureAnonymous(client: DraftDuelClient): Promise<void> {
-  try {
-    const session = await client.auth.getSession();
-    if (session.data.session) return;
-  } catch {
-    throw new Error('anonymous sign-in unreachable: failed to fetch');
-  }
-  try {
-    const signed = await client.auth.signInAnonymously();
-    if (signed.error) throw new Error(`anonymous sign-in failed: ${signed.error.message}`);
-  } catch (e) {
-    if (e instanceof Error && e.message.startsWith('anonymous sign-in failed:')) throw e;
-    throw new Error('anonymous sign-in unreachable: failed to fetch');
-  }
-}
+
 export function createDraftDuelTransport(options?: {
   url?: string;
   publishableKey?: string;
@@ -288,14 +161,6 @@ export function createDraftDuelTransport(options?: {
       clientPromise = supabaseClient(transportUrl, transportPublishableKey, transportStorageKey);
     return clientPromise;
   }
-  const rooms = new Map<
-    string,
-    {
-      handlers: Set<(snapshot: DraftDuelRoomSnapshot) => void>;
-      channel: ReturnType<DraftDuelClient['channel']> | null;
-      lastSnapshot: DraftDuelRoomSnapshot | null;
-    }
-  >();
   function memberFallback(participantId: DraftDuelParticipantId): DraftDuelMemberSnapshot {
     return {
       participantId,
@@ -406,26 +271,15 @@ export function createDraftDuelTransport(options?: {
     const memberRows = (Array.isArray(memberData) ? memberData : []) as DraftDuelMemberRow[];
     return roomRowToSnapshot(row, memberRows);
   }
-  function emit(roomId: string, snapshot: DraftDuelRoomSnapshot): void {
-    const record = rooms.get(roomId);
-    if (!record) return;
-    record.lastSnapshot = snapshot;
-    for (const handler of record.handlers) handler(snapshot);
-  }
-  async function refresh(roomId: string): Promise<void> {
-    try {
-      const snapshot = await fetchSnapshot(roomId);
-      emit(roomId, snapshot);
-    } catch (error) {
-      const record = rooms.get(roomId);
-      if (!record) return;
-      record.lastSnapshot = null;
-      console.error('Draft Duel realtime refresh failed; snapshot invalidated', {
-        roomId,
-        errorType: error instanceof Error ? error.name : 'UnknownError',
-      });
-    }
-  }
+  const registry = createRealtimeRoomRegistry<DraftDuelRoomSnapshot>({
+    label: 'Draft Duel',
+    roomsTable: 'draft_duel_rooms',
+    commandsTable: 'draft_duel_room_commands',
+    topic: (roomId) => `draft-duel-room-${roomId}`,
+    fetchSnapshot,
+    getClient,
+  });
+  const transientTopic = (roomId: string): string => `draft-duel:${roomId}`;
   return {
     async create(settingsInput) {
       const client = await getClient();
@@ -484,7 +338,7 @@ export function createDraftDuelTransport(options?: {
           : null;
       return {
         roomId: idSchema.parse(stringField(record, 'room_id')),
-        code: parseRoomCode(code),
+        code: parseRoomCode(code, draftDuelRoomCodeSchema),
         codeActive: true,
         settings,
         phase,
@@ -511,7 +365,7 @@ export function createDraftDuelTransport(options?: {
       const payload = rpcPayload(response.data);
       const snapshot = await fetchSnapshot(payload.room_id);
       const participantId: DraftDuelParticipantId = payload.participant_id ?? 'p2';
-      const membershipCode = parseRoomCode(code);
+      const membershipCode = parseRoomCode(code, draftDuelRoomCodeSchema);
       return {
         snapshot,
         membership: { roomId: payload.room_id, participantId, code: membershipCode },
@@ -554,124 +408,25 @@ export function createDraftDuelTransport(options?: {
       };
     },
     subscribe(roomId, handler) {
-      let record = rooms.get(roomId);
-      if (!record) {
-        record = { handlers: new Set(), channel: null, lastSnapshot: null };
-        rooms.set(roomId, record);
-      }
-      record.handlers.add(handler);
-      if (!record.channel) {
-        const target = record;
-        void getClient()
-          .then((resolved) => {
-            const current = rooms.get(roomId);
-            if (!current || current !== target || current.channel || current.handlers.size === 0)
-              return;
-            const channel = resolved
-              .channel(`draft-duel-room-${roomId}`)
-              .on(
-                'postgres_changes',
-                {
-                  event: '*',
-                  schema: 'public',
-                  table: 'draft_duel_rooms',
-                  filter: `id=eq.${roomId}`,
-                },
-                () => {
-                  void refresh(roomId);
-                },
-              )
-              .on(
-                'postgres_changes',
-                {
-                  event: 'INSERT',
-                  schema: 'public',
-                  table: 'draft_duel_room_commands',
-                  filter: `room_id=eq.${roomId}`,
-                },
-                () => {
-                  void refresh(roomId);
-                },
-              )
-              .subscribe();
-            current.channel = channel;
-          })
-          .catch(() => {});
-      }
-      return {
-        unsubscribe: () => {
-          const existing = rooms.get(roomId);
-          if (!existing) return;
-          existing.handlers.delete(handler);
-          if (existing.handlers.size === 0) {
-            const channel = existing.channel;
-            existing.channel = null;
-            rooms.delete(roomId);
-            if (channel) {
-              void channel.unsubscribe().then(() => {
-                void getClient()
-                  .then((resolved) => resolved.removeChannel(channel))
-                  .catch(() => {});
-              });
-            }
-          }
-        },
-      };
+      return registry.subscribe(roomId, handler);
     },
     subscribeTransient(roomId, handler) {
-      const topic = `draft-duel:${roomId}`;
-      let channel: ReturnType<DraftDuelClient['channel']> | null = null;
-      let cancelled = false;
-      void getClient()
-        .then(async (resolved) => {
-          try {
-            await resolved.realtime.setAuth();
-          } catch {
-            await Promise.resolve();
-          }
-          if (cancelled) return;
-          channel = resolved
-            .channel(topic, { config: { private: true, broadcast: { self: false } } })
-            .on('broadcast', { event: 'transient' }, (message) => {
-              const parsed = draftDuelTransientEventSchema.safeParse(message.payload);
-              if (!parsed.success) return;
-              if (parsed.data.roomId !== roomId) return;
-              handler(parsed.data);
-            })
-            .subscribe();
-        })
-        .catch(() => {});
-      return {
-        unsubscribe: () => {
-          cancelled = true;
-          const existing = channel;
-          channel = null;
-          if (existing) {
-            void existing.unsubscribe().then(() => {
-              void getClient()
-                .then((resolved) => resolved.removeChannel(existing))
-                .catch(() => {});
-            });
-          }
+      return subscribeTransientPayloads({
+        getClient,
+        topic: transientTopic(roomId),
+        event: 'transient',
+        onPayload: (payload) => {
+          const parsed = draftDuelTransientEventSchema.safeParse(payload);
+          if (!parsed.success) return;
+          if (parsed.data.roomId !== roomId) return;
+          handler(parsed.data);
         },
-      };
+      });
     },
-    async publishTransient(roomId, event) {
+    async publishTransient(roomId, event: DraftDuelTransientEvent) {
       const parsed = draftDuelTransientEventSchema.safeParse(event);
       if (!parsed.success || parsed.data.roomId !== roomId) return false;
-      try {
-        const client = await getClient();
-        await ensureAnonymous(client);
-        const channel = await transientSenderChannel(roomId, client);
-        const status = await channel.send({
-          type: 'broadcast',
-          event: 'transient',
-          payload: parsed.data,
-        });
-        return status === 'ok';
-      } catch {
-        return false;
-      }
+      return publishTransientPayload(getClient, transientTopic(roomId), 'transient', parsed.data);
     },
     async refetch(roomId, afterOrdinal) {
       const client = await getClient();

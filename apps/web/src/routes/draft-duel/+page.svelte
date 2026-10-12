@@ -17,11 +17,9 @@
   } from '@lucide/svelte';
   import type { DraftDuelFairness, DraftDuelPresentation } from '@hoop-rush/data-contracts';
   import { DraftDuelController } from '$lib/features/draft-duel/draft-duel-controller.svelte';
-  import {
-    isDraftDuelSupabaseConfigured,
-    getDraftDuelTransport,
-  } from '$lib/features/draft-duel/draft-duel-transport';
+  import { getDraftDuelTransport } from '$lib/features/draft-duel/draft-duel-transport';
   import { loadLastDraftDuelRoomId } from '$lib/features/draft-duel/draft-duel-identity';
+  import { isMultiplayerConfigured } from '$lib/supabase-runtime';
 
   type View = 'create' | 'join';
   const controller = new DraftDuelController();
@@ -314,7 +312,7 @@
           {#if preview}<p class="room-preview" role="status">{preview}</p>{/if}
         {/if}
         {#if displayError}<p class="room-error" role="alert">{displayError}</p>{/if}
-        {#if !isDraftDuelSupabaseConfigured()}<p class="connection-note">
+        {#if !isMultiplayerConfigured()}<p class="connection-note">
             Online rooms are unavailable in this setup. Draft Duel needs the online lobby.
           </p>{/if}
       </div>
