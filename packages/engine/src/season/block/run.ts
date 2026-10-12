@@ -1,29 +1,19 @@
 import {
-  blockRoundRange,
   type SeasonCandidateCheckpoint,
-  type SeasonGameSummary,
   type SeasonPendingBlockCandidate,
-  type SeasonRetainedGameDetail,
   type SeasonResumeSeasonBlockCommand,
   type SeasonResumeSeasonBlockResult,
   type SeasonRun,
   type SeasonSubmitBlockResult,
 } from '@hoop-rush/data-contracts';
 import { assembleSeasonBlockCandidate } from './assembly.ts';
+import { SeasonBlockInvariantError, SeasonBlockValidationError } from './errors.ts';
 import {
-  SeasonBlockCancelledError,
-  SeasonBlockInvariantError,
-  SeasonBlockValidationError,
-} from './errors.ts';
-import {
-  durabilityByVersionOf,
-  positionsOf,
-  seasonBlockGamesOf,
-  simulateSeasonBlockGame,
-  staminaByVersionOf,
-} from './execution.ts';
+  defaultSeasonBlockGameSharedOptions,
+  seasonBlockGameSteps,
+  type SeasonBlockIterationAccumulator,
+} from './iteration.ts';
 import type {
-  SeasonBlockGameSimulationOptions,
   SeasonBlockSimulationInput,
   SeasonBlockSimulationOptions,
   SeasonSubmitBlockCommandInput,
@@ -35,48 +25,35 @@ export function simulateSeasonBlock(
   options: SeasonBlockSimulationOptions = {},
 ): SeasonCandidateCheckpoint {
   requireValidSeasonBlockCommand(input);
-  const summaries: SeasonGameSummary[] = [];
-  const retainedDetails: SeasonRetainedGameDetail[] = [];
-  const { fromRound } = blockRoundRange(input.command.blockIndex);
-  let previousRound = fromRound - 1;
-  let effects = input.effects;
-  let health = input.health;
-  const shared: SeasonBlockGameSimulationOptions = {
-    gameNumberById: new Map(input.schedule.games.map((game, index) => [game.gameId, index + 1])),
-    rotationByFranchise: new Map(
-      input.run.rotations.map((rotation) => [rotation.franchiseId, rotation]),
-    ),
-    rosterByFranchise: new Map(input.run.rosters.map((roster) => [roster.franchiseId, roster])),
-    staminaByVersion: staminaByVersionOf(input),
-    durabilityByVersion: durabilityByVersionOf(input),
-    positions: positionsOf(input),
-  };
-  for (const game of seasonBlockGamesOf(input.schedule, input.command.blockIndex)) {
-    if (options.cancelAfterGames !== undefined && summaries.length >= options.cancelAfterGames) {
-      throw new SeasonBlockCancelledError(input.command.blockIndex, summaries.length);
-    }
-    const outcome = simulateSeasonBlockGame({
-      input,
-      game,
-      effects,
-      health,
-      options: {
-        skipRecoveryTick: !(previousRound !== 0 && game.round > previousRound),
-        ...shared,
-      },
-    });
-    if ('interruption' in outcome) {
+  const blockIndex = input.command.blockIndex;
+  const shared = defaultSeasonBlockGameSharedOptions(input);
+  let accumulator: SeasonBlockIterationAccumulator | null = null;
+  for (const step of seasonBlockGameSteps({
+    input,
+    blockIndex,
+    sharedOptions: shared,
+    cancelAfterGames: options.cancelAfterGames,
+  })) {
+    if (step.kind === 'interrupted') {
       throw new SeasonBlockInvariantError(
-        `game ${game.gameId} interrupted: the human franchise ${outcome.interruption.humanFranchiseId} cannot field a legal five from health availability`,
-        { seed: input.command.runId, gameId: game.gameId, blockIndex: input.command.blockIndex },
+        `game ${step.interruption.nextGameId} interrupted: the human franchise ${step.interruption.humanFranchiseId} cannot field a legal five from health availability`,
+        {
+          seed: input.command.runId,
+          gameId: step.interruption.nextGameId,
+          blockIndex: input.command.blockIndex,
+        },
       );
     }
-    effects = outcome.effects;
-    health = outcome.health;
-    previousRound = game.round;
-    summaries.push(outcome.summary);
-    if (outcome.retainedDetail !== null) retainedDetails.push(outcome.retainedDetail);
+    if (step.kind === 'complete' || step.kind === 'game') {
+      accumulator = step.accumulator;
+    }
   }
+  if (accumulator === null) {
+    throw new SeasonBlockInvariantError('season block iteration produced no accumulator', {
+      blockIndex,
+    });
+  }
+  const { summaries, retainedDetails, effects, health } = accumulator;
   return assembleSeasonBlockCandidate({ input, summaries, retainedDetails, effects, health });
 }
 

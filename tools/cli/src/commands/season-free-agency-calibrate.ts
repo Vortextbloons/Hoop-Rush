@@ -30,20 +30,21 @@ import {
   SEASON_FREE_AGENCY_WINDOW_MAX_CANDIDATES,
   assembleSeasonBlockCandidate,
   createEngineContext,
+  defaultSeasonBlockGameSharedOptions,
   deriveSeasonPostBlockState,
   freeAgencyUnresolvedWindowIndex,
   handleSeasonRunCommand,
   legalFiveExists,
   openSeasonFreeAgencyWindow,
   openSeasonTradeWindow,
+  rosterByFranchiseScopedToRotations,
   rosterPlayerIdsOf,
-  seasonBlockGamesOf,
+  seasonBlockGameSteps,
   seasonNextBlockIndex,
   seasonRotationSetDigest,
   seasonRunStateDigest,
-  simulateSeasonBlockGame,
   validateSeasonRotation,
-  type SeasonBlockGameOutcome,
+  type SeasonBlockIterationAccumulator,
   type SeasonBlockSimulationInput,
   type SeasonRosterMemberInput,
 } from '@hoop-rush/engine';
@@ -424,88 +425,29 @@ function assertBlockPreconditions(
   }
 }
 function simulateBlockGames(
-  state: SeasonBlockRunnerState,
+  _state: SeasonBlockRunnerState,
   input: SeasonBlockSimulationInput,
   blockIndex: number,
 ): SeasonCandidateCheckpoint {
-  const summaries: SeasonGameSummary[] = [];
-  const retainedDetails: NonNullable<
-    Extract<
-      SeasonBlockGameOutcome,
-      {
-        summary: SeasonGameSummary;
-      }
-    >['retainedDetail']
-  >[] = [];
-  const { fromRound } = blockRoundRangeLocal(blockIndex);
-  let previousRound = fromRound - 1;
-  let effects = input.effects;
-  let health = input.health;
-  const rotationIdsByFranchise = new Map(
-    state.run.rotations.map((rotation) => [
-      rotation.franchiseId,
-      new Set([...rotation.starters, ...rotation.benchOrder]),
-    ]),
-  );
-  const shared = {
-    gameNumberById: new Map(input.schedule.games.map((game, index) => [game.gameId, index + 1])),
-    rotationByFranchise: new Map(
-      input.run.rotations.map((rotation) => [rotation.franchiseId, rotation]),
-    ),
-    rosterByFranchise: new Map(
-      input.run.rosters.map((roster) => {
-        const rotationIds = rotationIdsByFranchise.get(roster.franchiseId) ?? new Set<string>();
-        return [
-          roster.franchiseId,
-          {
-            ...roster,
-            players: roster.players.filter((player) => rotationIds.has(player.playerVersionId)),
-          },
-        ];
-      }),
-    ),
-    staminaByVersion: new Map(
-      [...input.expanded.values()].map((player) => {
-        if (player.stamina === undefined) {
-          throw new Error(`expanded player ${player.playerVersionId} has no stamina profile`);
-        }
-        return [player.playerVersionId, player.stamina.rating];
-      }),
-    ),
-    durabilityByVersion: new Map(
-      input.catalog.candidates.map((candidate) => [
-        candidate.playerVersionId,
-        candidate.durability.rating,
-      ]),
-    ),
-    positions: new Map(
-      [...input.expanded.values()].map((player) => [player.playerVersionId, player.positions]),
-    ),
-  };
-  for (const game of seasonBlockGamesOf(input.schedule, blockIndex)) {
-    const outcome = simulateSeasonBlockGame(input, game, effects, health, {
-      skipRecoveryTick: !(previousRound !== 0 && game.round > previousRound),
-      ...shared,
-    });
-    if ('interruption' in outcome) {
+  const shared = defaultSeasonBlockGameSharedOptions(input, {
+    rosterByFranchise: rosterByFranchiseScopedToRotations(input.run),
+  });
+  let accumulator: SeasonBlockIterationAccumulator | null = null;
+  for (const step of seasonBlockGameSteps({ input, blockIndex, sharedOptions: shared })) {
+    if (step.kind === 'interrupted') {
       throw new Error(
-        `game ${game.gameId} interrupted: the human franchise cannot field a legal five from health availability`,
+        `game ${step.interruption.nextGameId} interrupted: the human franchise cannot field a legal five from health availability`,
       );
     }
-    effects = outcome.effects;
-    health = outcome.health;
-    previousRound = game.round;
-    summaries.push(outcome.summary);
-    if (outcome.retainedDetail !== null) retainedDetails.push(outcome.retainedDetail);
+    if (step.kind === 'complete' || step.kind === 'game') {
+      accumulator = step.accumulator;
+    }
   }
+  if (accumulator === null) {
+    throw new Error(`block ${String(blockIndex)} produced no simulation steps`);
+  }
+  const { summaries, retainedDetails, effects, health } = accumulator;
   return assembleSeasonBlockCandidate(input, summaries, retainedDetails, effects, health);
-}
-function blockRoundRangeLocal(blockIndex: number): {
-  fromRound: number;
-  toRound: number;
-} {
-  const fromRound = blockIndex * 10 + 1;
-  return { fromRound, toRound: fromRound + 9 };
 }
 function runFreeAgencyCommands(
   state: SeasonBlockRunnerState,

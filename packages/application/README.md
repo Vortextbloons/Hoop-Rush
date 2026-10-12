@@ -87,10 +87,11 @@ deliberate differences (postseason ignores the rehab premium) are pinned by
 `injuries.test.ts`. Golden pins added before the split:
 `block-golden.test.ts` (block-0 checkpoint/state/commit digests),
 `season-block-validation.test.ts` (rejection matrix), and
-`injuries.test.ts` (roll vectors for both namespaces). Engine production
-lines moved 61,408 → 61,548 (split scaffolding offset by ~360 de-duplicated
-lines); the worker/CLI block-iteration and post-block-commit consolidation
-remain open for the next slice.
+`injuries.test.ts` (roll vectors for both namespaces). Block game iteration
+is centralized in `block/iteration.ts` (`seasonBlockGameSteps`, shared
+options, rotation-scoped rosters); `run.ts`, the season block worker job, and
+the free-agency calibrate CLI all use it. CLI post-block commit
+deduplication against `completeSeasonBlockCommit` remains open.
 
 Stage 2 complete: block jobs return raw `candidate`/`interrupted` events and
 `SeasonSession` owns start/resume reconciliation, acceptance, atomic commits,

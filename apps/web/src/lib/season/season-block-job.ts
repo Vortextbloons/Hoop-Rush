@@ -32,12 +32,14 @@ import {
   assembleSeasonPendingBlock,
   auditSeasonBlock,
   createInitialSeasonInfluenceState,
+  createSeasonBlockIterationAccumulator,
+  defaultSeasonBlockGameSharedOptions,
   expandSeasonRunRosters,
   rosterPlayerIdsOf,
   seasonBlockGamesOf,
+  seasonBlockGameSteps,
   seasonBlockRejection,
   SeasonBlockInvariantError,
-  simulateSeasonBlockGame,
   type SeasonBlockSimulationInput,
 } from '@hoop-rush/engine';
 const PROGRESS_MIN_INTERVAL_MS = 250;
@@ -268,19 +270,6 @@ export function blockLiveFactsOf(
     leaguePulse: { closest, blowout, highestScoring: highest },
   };
 }
-function isInterruption(outcome: unknown): outcome is {
-  interruption: SeasonInvalidRosterInterruption;
-} {
-  return (
-    typeof outcome === 'object' &&
-    outcome !== null &&
-    (
-      outcome as {
-        interruption?: unknown;
-      }
-    ).interruption !== undefined
-  );
-}
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -444,48 +433,51 @@ export async function runSeasonBlockJob(
     );
     return;
   }
-  const remainingGames = games.slice(startIndex);
   const { fromRound } = blockRoundRange(request.blockIndex);
   const precedingRound =
     startIndex > 0 ? (games[startIndex - 1]?.round ?? fromRound) : fromRound - 1;
-  let previousRound = precedingRound;
-  let effects = blockEffects;
-  let health = blockHealth;
+  const shared = defaultSeasonBlockGameSharedOptions(input);
+  const initial = createSeasonBlockIterationAccumulator(input, request.blockIndex, {
+    summaries,
+    retainedDetails,
+    effects: blockEffects,
+    health: blockHealth,
+    previousRound: precedingRound,
+  });
   let lastProgressAt = 0;
   let latestSummary: SeasonGameSummary | null = null;
   let interruption: SeasonInvalidRosterInterruption | null = null;
   const orderByGameId = new Map(games.map((entry, index) => [entry.gameId, index]));
-  const gameNumberById = new Map(
-    input.schedule.games.map((game, index) => [game.gameId, index + 1]),
-  );
-  const rotationByFranchise = new Map(
-    input.run.rotations.map((rotation) => [rotation.franchiseId, rotation]),
-  );
-  const rosterByFranchise = new Map(
-    input.run.rosters.map((roster) => [roster.franchiseId, roster]),
-  );
   let gamesSinceYield = 0;
   let yieldStartedAt = io.perfNow();
-  for (const game of remainingGames) {
+  let effects = blockEffects;
+  let health = blockHealth;
+  for (const step of seasonBlockGameSteps({
+    input,
+    blockIndex: request.blockIndex,
+    games,
+    startIndex,
+    initial,
+    sharedOptions: shared,
+  })) {
+    if (step.kind === 'interrupted') {
+      interruption = step.interruption;
+      summaries = step.accumulator.summaries;
+      retainedDetails = step.accumulator.retainedDetails;
+      effects = step.accumulator.effects;
+      health = step.accumulator.health;
+      break;
+    }
+    if (step.kind !== 'game') continue;
     if (io.isCancelled()) {
       throw new SeasonWorkerCancelled();
     }
     throwIfCancelled(io);
-    const outcome = simulateSeasonBlockGame(input, game, effects, health, {
-      skipRecoveryTick: !(previousRound !== 0 && game.round > previousRound),
-      gameNumberById,
-      rotationByFranchise,
-      rosterByFranchise,
-    });
-    if (isInterruption(outcome)) {
-      interruption = outcome.interruption;
-      break;
-    }
-    effects = outcome.effects;
-    health = outcome.health;
-    previousRound = game.round;
-    summaries.push(outcome.summary);
-    latestSummary = outcome.summary;
+    summaries = step.accumulator.summaries;
+    retainedDetails = step.accumulator.retainedDetails;
+    effects = step.accumulator.effects;
+    health = step.accumulator.health;
+    latestSummary = step.outcome.summary;
     gamesSinceYield += 1;
     const elapsed = io.perfNow() - yieldStartedAt;
     if (gamesSinceYield >= YIELD_GAME_BATCH || elapsed >= YIELD_TIME_BUDGET_MS) {
@@ -494,7 +486,6 @@ export async function runSeasonBlockJob(
       gamesSinceYield = 0;
       yieldStartedAt = io.perfNow();
     }
-    if (outcome.retainedDetail !== null) retainedDetails.push(outcome.retainedDetail);
     const now = io.now();
     const isLast = summaries.length === games.length;
     const latestIsHuman = isHumanSummary(latestSummary, request.humanFranchiseId);

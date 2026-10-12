@@ -20,6 +20,15 @@ export {
 } from './commit.ts';
 export { seasonBlockGamesOf, simulateSeasonBlockGame } from './execution.ts';
 export {
+  createSeasonBlockIterationAccumulator,
+  defaultSeasonBlockGameSharedOptions,
+  rosterByFranchiseScopedToRotations,
+  seasonBlockGameSteps,
+  seasonBlockSkipRecoveryTick,
+  type SeasonBlockGameStepEvent,
+  type SeasonBlockIterationAccumulator,
+} from './iteration.ts';
+export {
   handleSubmitSeasonBlockCommand,
   resumeSeasonBlockFromPending,
   simulateSeasonBlock,

@@ -320,6 +320,10 @@ export {
   simulateSeasonBlock,
   seasonBlockGamesOf,
   simulateSeasonBlockGame,
+  seasonBlockGameSteps,
+  createSeasonBlockIterationAccumulator,
+  defaultSeasonBlockGameSharedOptions,
+  rosterByFranchiseScopedToRotations,
   assembleSeasonBlockCandidate,
   seasonBlockRejection,
   auditSeasonBlock,
@@ -336,6 +340,8 @@ export {
   type SeasonBlockSimulationOptions,
   type SeasonSubmitBlockCommandInput,
   type SeasonBlockGameOutcome,
+  type SeasonBlockIterationAccumulator,
+  type SeasonBlockGameStepEvent,
 } from './season/block/index.ts';
 export { seasonRotationSetDigest } from './season/rotation.ts';
 export {
