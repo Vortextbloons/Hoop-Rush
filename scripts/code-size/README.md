@@ -196,3 +196,17 @@ paths change (stages 2, 4, and 6).
   and `multiplayer/**` (fixed-five transport/runner/state/command submit,
   lobby boundary, views). Pure file moves plus `$lib` import rewrites; no
   behavior change.
+
+## Stage 5 status (2026-10-12)
+
+Landed: season (stages 2-3), challenge, and havoc sessions with typed
+snapshot/subscribe/execute/cancel/dispose lifecycles and explicit ports;
+`features/` co-location for every mode (challenge, havoc, collection,
+draft-duel, multiplayer). Shared UI primitives stay in `lib/components/`.
+
+Not yet migrated: Collection, Draft Duel, and the fixed-five multiplayer
+client still orchestrate inside web modules (`collection-hub.ts` +
+`CollectionPlayPage.svelte`, `draft-duel-controller.svelte.ts`, the
+multiplayer room page). Their orchestration should move behind ports like the
+challenge/havoc sessions, and the room-page controller should be extracted
+from the route before the remaining stages are considered complete.
