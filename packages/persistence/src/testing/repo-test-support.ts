@@ -23,3 +23,14 @@ export function testDatabaseName(filePrefix: string): string {
   databaseNameCounter += 1;
   return `test-${filePrefix}-${String(databaseNameCounter)}`;
 }
+
+export interface TestDatabasePair {
+  name: string;
+  first: HoopRushDatabase;
+  second: HoopRushDatabase;
+}
+
+export function openTestDatabasePair(filePrefix: string): TestDatabasePair {
+  const name = testDatabaseName(filePrefix);
+  return { name, first: new TestDatabase(name), second: new TestDatabase(name) };
+}
