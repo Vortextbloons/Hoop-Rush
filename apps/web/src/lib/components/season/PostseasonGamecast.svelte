@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Dialog } from 'bits-ui';
+  import GameScoreboard from '$lib/components/GameScoreboard.svelte';
   import type { HoopRushManifest, SeasonPostseasonSummary } from '@hoop-rush/data-contracts';
   import LiveSimModal from './LiveSimModal.svelte';
   import SeasonTeamLogo from './SeasonTeamLogo.svelte';
@@ -80,35 +81,45 @@
       </span>
     </header>
 
-    <div class="scoreboard" aria-live="polite">
-      {#each [awayFranchiseId, homeFranchiseId] as franchiseId (franchiseId)}
-        {@const identity = identityOf(franchiseId)}
+    <GameScoreboard
+      teams={[
+        {
+          key: awayFranchiseId,
+          label: franchiseAbbrev(awayFranchiseId),
+          score: result === null ? '—' : result.awayScore,
+        },
+        {
+          key: homeFranchiseId,
+          label: franchiseAbbrev(homeFranchiseId),
+          score: result === null ? '—' : result.homeScore,
+        },
+      ]}
+      layout="duo"
+      ariaLive="polite"
+      class="scoreboard"
+    >
+      {#snippet team(entry)}
+        {@const identity = identityOf(entry.key)}
         <div
           class="team"
-          data-winner={result?.winnerFranchiseId === franchiseId}
-          style:--team-color={franchiseColor(franchiseId)}
+          data-winner={result?.winnerFranchiseId === entry.key}
+          style:--team-color={franchiseColor(entry.key)}
         >
           {#if manifest !== null && identity !== null}
             <SeasonTeamLogo
               {manifest}
-              {franchiseId}
+              franchiseId={entry.key}
               teamExternalId={identity.teamExternalId}
               size="lg"
               eager
             />
           {/if}
-          <span class="font-display text-2xl font-black">{franchiseAbbrev(franchiseId)}</span>
-          <span class="truncate text-xs text-muted-foreground">{franchiseName(franchiseId)}</span>
-          <strong class="score sr-scoreline"
-            >{result === null
-              ? '—'
-              : result.homeFranchiseId === franchiseId
-                ? result.homeScore
-                : result.awayScore}</strong
-          >
+          <span class="font-display text-2xl font-black">{franchiseAbbrev(entry.key)}</span>
+          <span class="truncate text-xs text-muted-foreground">{franchiseName(entry.key)}</span>
+          <strong class="score sr-scoreline">{entry.score}</strong>
         </div>
-      {/each}
-    </div>
+      {/snippet}
+    </GameScoreboard>
 
     <div class="court-track" aria-hidden="true"><span></span></div>
 
@@ -157,7 +168,7 @@
     justify-content: space-between;
     gap: 1rem;
   }
-  .scoreboard {
+  :global(.gamecast .scoreboard) {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 1px;
@@ -237,7 +248,7 @@
     }
   }
   @media (max-width: 520px) {
-    .scoreboard {
+    :global(.gamecast .scoreboard) {
       grid-template-columns: 1fr;
     }
   }

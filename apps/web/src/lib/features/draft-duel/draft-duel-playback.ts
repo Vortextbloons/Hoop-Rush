@@ -17,7 +17,6 @@ export interface DraftDuelVisibleState {
   periods: DraftDuelVisiblePeriod[];
 }
 
-export type DraftDuelPlaybackSpeed = 1 | 2;
 export interface DraftDuelPlaybackPositionInput {
   startedAtIso: string;
   durationMs: number;
@@ -28,9 +27,7 @@ function zeroLine(): DraftDuelTapeStatLine {
   return [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 }
 export function draftDuelPlaybackWeights(tape: readonly DraftDuelTapeEvent[]): number[] {
-  const weights = tape.map((event) =>
-    event.kind === 'trip' ? Math.max(1, event.secondsElapsed) : 0,
-  );
+  const weights: number[] = tape.map((event) => (event.kind === 'trip' ? 1 : 0));
   const total = weights.reduce((sum, weight) => sum + weight, 0);
   if (total === 0) {
     return weights.map((_, index) => (index === weights.length - 1 ? 1 : 0));

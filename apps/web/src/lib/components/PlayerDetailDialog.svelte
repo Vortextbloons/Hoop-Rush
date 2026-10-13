@@ -2,7 +2,7 @@
   import type { HoopRushManifest } from '@hoop-rush/data-contracts';
   import { resolveEraTeamIdentity } from '@hoop-rush/data-contracts';
   import { Dialog } from 'bits-ui';
-  import { X } from '@lucide/svelte';
+  import DialogShell from '$lib/components/DialogShell.svelte';
   import {
     formatDecimal,
     formatPct,
@@ -112,88 +112,74 @@
   });
 </script>
 
-<Dialog.Root
+<DialogShell
   open={player !== null}
   onOpenChange={(open) => {
     if (!open) onClose();
   }}
+  size="md"
 >
-  <Dialog.Portal>
-    <Dialog.Overlay class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" />
-    <Dialog.Content
-      class="fixed inset-x-0 bottom-0 z-50 mx-auto max-h-[85dvh] w-full overflow-y-auto rounded-t-2xl border-t border-border bg-card p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl shadow-black/40 outline-none sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:max-w-lg sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:border sm:pb-4"
-    >
-      {#if player}
-        {@const subject = player}
-        <div class="flex items-start justify-between gap-3">
-          <div class="flex min-w-0 items-center gap-3">
-            <PlayerFace
-              player={subject}
-              {manifest}
-              size="md"
-              fallbackInitials={subject.firstName[0]! + subject.lastName[0]!}
-            />
-            <div class="min-w-0">
-              <Dialog.Title
-                class="font-display truncate text-lg font-extrabold tracking-tight uppercase"
-              >
-                {subject.displayName}
-              </Dialog.Title>
-              <p class="font-mono text-[10px] text-muted-foreground">
-                {teamNameFor(subject)} ·
-                {eraLabel.get(subject.eraId) ?? subject.eraId} · {subject.seasonKey}
-              </p>
-            </div>
-          </div>
-          <Dialog.Close
-            aria-label="Close"
-            class="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-border text-muted-foreground transition-colors hover:text-foreground"
+  {#snippet header()}
+    {#if player}
+      {@const subject = player}
+      <div class="flex min-w-0 items-center gap-3">
+        <PlayerFace
+          player={subject}
+          {manifest}
+          size="md"
+          fallbackInitials={subject.firstName[0]! + subject.lastName[0]!}
+        />
+        <div class="min-w-0">
+          <Dialog.Title
+            class="font-display truncate text-lg font-extrabold tracking-tight uppercase"
           >
-            <X class="h-4 w-4" />
-          </Dialog.Close>
+            {subject.displayName}
+          </Dialog.Title>
+          <p class="font-mono text-[10px] text-muted-foreground">
+            {teamNameFor(subject)} ·
+            {eraLabel.get(subject.eraId) ?? subject.eraId} · {subject.seasonKey}
+          </p>
         </div>
+      </div>
+    {/if}
+  {/snippet}
 
-        <div class="mt-3 flex flex-wrap items-center gap-1.5 font-mono text-[10px]">
-          <span class="rounded bg-surface-3 px-1.5 py-0.5">
-            {formatPositions(subject.positionsPlayable)}
-          </span>
-          <span class="rounded bg-primary/10 px-1.5 py-0.5 font-bold text-primary" title="Overall">
-            O {subject.overall}
-          </span>
-          <span class="rounded bg-surface-3 px-1.5 py-0.5" title="Offense"
-            >OF {subject.offense}</span
-          >
-          <span class="rounded bg-surface-3 px-1.5 py-0.5" title="Defense"
-            >DF {subject.defense}</span
-          >
-        </div>
+  {#if player}
+    {@const subject = player}
+    <div class="mt-3 flex flex-wrap items-center gap-1.5 font-mono text-[10px]">
+      <span class="rounded bg-surface-3 px-1.5 py-0.5">
+        {formatPositions(subject.positionsPlayable)}
+      </span>
+      <span class="rounded bg-primary/10 px-1.5 py-0.5 font-bold text-primary" title="Overall">
+        O {subject.overall}
+      </span>
+      <span class="rounded bg-surface-3 px-1.5 py-0.5" title="Offense">OF {subject.offense}</span>
+      <span class="rounded bg-surface-3 px-1.5 py-0.5" title="Defense">DF {subject.defense}</span>
+    </div>
 
-        <div class="mt-4 grid gap-4 sm:grid-cols-2">
-          {#each sections as section (section.title)}
-            <div>
-              <h3
-                class="font-mono text-[10px] font-bold tracking-[0.14em] text-muted-foreground uppercase"
+    <div class="mt-4 grid gap-4 sm:grid-cols-2">
+      {#each sections as section (section.title)}
+        <div>
+          <h3
+            class="font-mono text-[10px] font-bold tracking-[0.14em] text-muted-foreground uppercase"
+          >
+            {section.title}
+          </h3>
+          <dl class="mt-2 grid grid-cols-2 gap-1.5">
+            {#each section.items as [label, value] (label)}
+              <div
+                class="flex items-center justify-between gap-2 rounded-md border border-border bg-surface-1 px-2.5 py-1.5"
               >
-                {section.title}
-              </h3>
-              <dl class="mt-2 grid grid-cols-2 gap-1.5">
-                {#each section.items as [label, value] (label)}
-                  <div
-                    class="flex items-center justify-between gap-2 rounded-md border border-border bg-surface-1 px-2.5 py-1.5"
-                  >
-                    <dt class="font-mono text-[10px] text-muted-foreground">{label}</dt>
-                    <dd class="font-mono text-xs font-bold tabular-nums">{value}</dd>
-                  </div>
-                {/each}
-              </dl>
-            </div>
-          {/each}
+                <dt class="font-mono text-[10px] text-muted-foreground">{label}</dt>
+                <dd class="font-mono text-xs font-bold tabular-nums">{value}</dd>
+              </div>
+            {/each}
+          </dl>
         </div>
-        <p class="mt-3 text-xs text-muted-foreground">
-          — means unavailable in the historical source. Some stats were not recorded in older
-          seasons.
-        </p>
-      {/if}
-    </Dialog.Content>
-  </Dialog.Portal>
-</Dialog.Root>
+      {/each}
+    </div>
+    <p class="mt-3 text-xs text-muted-foreground">
+      — means unavailable in the historical source. Some stats were not recorded in older seasons.
+    </p>
+  {/if}
+</DialogShell>

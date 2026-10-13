@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Dialog } from 'bits-ui';
+  import GameScoreboard from '$lib/components/GameScoreboard.svelte';
   import LiveSimModal from '$lib/components/season/LiveSimModal.svelte';
   import type { CollectionGameRecordUnion } from '@hoop-rush/data-contracts';
   import GamecastCourt from './GamecastCourt.svelte';
@@ -60,22 +61,23 @@
     <Dialog.Description class="cast-description">
       {record ? 'Highlights from your recorded game.' : 'Your matchup is taking the court…'}
     </Dialog.Description>
-    <div class="scoreboard" aria-label="Game score">
-      <div>
-        <span>Your team</span>{#key event?.homeScore}<strong>{event?.homeScore ?? '—'}</strong
-          >{/key}
-      </div>
-      <p>
-        {event
-          ? final
-            ? 'FINAL'
-            : `${event.period > 4 ? `OT${event.period - 4}` : `Q${event.period}`} · ${clockLabel(event.secondsRemaining)}`
-          : 'TIP-OFF'}
-      </p>
-      <div>
-        <span>CPU</span>{#key event?.awayScore}<strong>{event?.awayScore ?? '—'}</strong>{/key}
-      </div>
-    </div>
+    <GameScoreboard
+      teams={[
+        { key: 'home', label: 'Your team', score: event?.homeScore ?? '—' },
+        { key: 'away', label: 'CPU', score: event?.awayScore ?? '—' },
+      ]}
+      class="scoreboard"
+    >
+      {#snippet status()}
+        <p>
+          {event
+            ? final
+              ? 'FINAL'
+              : `${event.period > 4 ? `OT${event.period - 4}` : `Q${event.period}`} · ${clockLabel(event.secondsRemaining)}`
+            : 'TIP-OFF'}
+        </p>
+      {/snippet}
+    </GameScoreboard>
     <GamecastCourt {event} {nameOf} playing={!final} duration={QUICK_CAST_BEAT_MS} />
     <div class="cast-progress" aria-hidden="true">
       {#each [0, 1, 2, 3, 4] as beat (beat)}<span class:lit={record !== null && beat <= cursor}
@@ -148,10 +150,7 @@
   .live-pill.final i {
     animation: none;
   }
-  .scoreboard {
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    align-items: center;
+  :global(.quick-cast .scoreboard) {
     margin-top: 1rem;
     padding: 0.8rem;
     border: 1px solid #ffffff1a;
@@ -159,21 +158,21 @@
     background: #080f14;
     text-align: center;
   }
-  .scoreboard div {
+  :global(.quick-cast .scoreboard .ui-scoreboard-team) {
     display: grid;
   }
-  .scoreboard span {
+  :global(.quick-cast .scoreboard .ui-scoreboard-label) {
     color: #a5afb4;
     font-size: 0.65rem;
     text-transform: uppercase;
     letter-spacing: 0.08em;
   }
-  .scoreboard strong {
+  :global(.quick-cast .scoreboard .ui-scoreboard-score) {
     font: 900 3rem var(--font-display);
     font-variant-numeric: tabular-nums;
     animation: score-in 0.24s ease-out;
   }
-  .scoreboard p {
+  :global(.quick-cast .scoreboard p) {
     color: #ffc53d;
     font: 700 0.65rem var(--font-mono);
   }
@@ -236,7 +235,7 @@
   }
   @media (prefers-reduced-motion: reduce) {
     .live-pill i,
-    .scoreboard strong {
+    :global(.quick-cast .scoreboard .ui-scoreboard-score) {
       animation: none;
     }
     .cast-progress span {

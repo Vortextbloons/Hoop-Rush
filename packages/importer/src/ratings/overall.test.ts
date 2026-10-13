@@ -43,6 +43,19 @@ const derive = (overrides: Partial<RatingProfileInput> = {}) =>
   deriveRatingProfile({ ...input, ...overrides });
 
 describe('total ability overall', () => {
+  it('keeps each domain contribution independent of which domain is stronger', () => {
+    const defensiveGains = [30, 60, 90].map(
+      (offense) => combineDomainValues(offense, 85).score - combineDomainValues(offense, 65).score,
+    );
+    const offensiveGains = [30, 60, 90].map(
+      (defense) => combineDomainValues(85, defense).score - combineDomainValues(65, defense).score,
+    );
+    for (const gain of defensiveGains) expect(gain).toBeCloseTo(defensiveGains[0] ?? 0, 10);
+    for (const gain of offensiveGains) expect(gain).toBeCloseTo(offensiveGains[0] ?? 0, 10);
+    expect(defensiveGains[0]).toBeGreaterThan(0);
+    expect(offensiveGains[0]).toBeGreaterThan(0);
+  });
+
   it('values efficient supporting production above inefficient scoring volume', () => {
     const volume = starterStats({
       points: 1800,

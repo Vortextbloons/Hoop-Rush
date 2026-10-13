@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   commandIdSchema,
   contentHashSchema,
+  DRAFT_DUEL_BROADCAST_MS,
   DRAFT_DUEL_TAPE_VERSION,
   createInMemoryDraftDuelTransport,
   defaultDraftDuelVersionLocks,
@@ -226,26 +227,25 @@ describe('Draft Duel ready check progression', () => {
       broadcast: {
         gameNumber: 1,
         startedAtIso: new Date(startedAtMs).toISOString(),
-        durationMs: 20_000,
+        durationMs: DRAFT_DUEL_BROADCAST_MS,
       },
     });
   }
 
   it('resumes broadcast progress from wall clock when attaching mid-broadcast', () => {
     const tick = stubManualRaf();
-    applyBroadcastSnapshot(Date.now() - 10_000);
+    applyBroadcastSnapshot(Date.now() - DRAFT_DUEL_BROADCAST_MS / 2);
     tick();
     expect(controller.progress).toBeCloseTo(0.5, 5);
   });
 
-  it('doubles broadcast playback progress at 2x speed', () => {
+  it('advances broadcast playback uniformly at a fixed rate', () => {
     const tick = stubManualRaf();
     applyBroadcastSnapshot(Date.now());
     tick();
     expect(controller.progress).toBe(0);
 
-    controller.playbackSpeed = 2;
-    for (let frame = 0; frame < 5; frame++) {
+    for (let frame = 0; frame < 4; frame++) {
       vi.advanceTimersByTime(1000);
       tick();
     }
@@ -453,6 +453,93 @@ describe('Draft Duel ready check progression', () => {
     expect(controller.currentGameNumber).toBe(3);
     await controller.readyForNextGame();
     expect(controller.localReady).toBe(true);
+  });
+
+  it('holds the Game 2 results screen until continue is approved', async () => {
+    const { lifecycle, digest } = await prepareSecondGame();
+    session.advancePlayback(DRAFT_DUEL_BROADCAST_MS);
+    lifecycle.maybeProposeOrConfirm();
+    await vi.waitFor(async () => {
+      const commands = await transport.refetch(roomId, -1);
+      expect(
+        commands.some(
+          (command) =>
+            command.actorParticipantId === 'p1' &&
+            command.payload.kind === 'propose-result' &&
+            command.payload.gameNumber === 2,
+        ),
+      ).toBe(true);
+    });
+    const held = await transport.refetch(roomId, -1);
+    expect(
+      held.some(
+        (command) =>
+          command.actorParticipantId === 'p1' &&
+          command.payload.kind === 'confirm-result' &&
+          command.payload.gameNumber === 2,
+      ),
+    ).toBe(false);
+    expect(controller.awaitingContinue).toBe(true);
+
+    controller.continueAfterGame();
+    await vi.waitFor(async () => {
+      const commands = await transport.refetch(roomId, -1);
+      expect(
+        commands.some(
+          (command) =>
+            command.actorParticipantId === 'p1' &&
+            command.payload.kind === 'confirm-result' &&
+            command.payload.gameNumber === 2,
+        ),
+      ).toBe(true);
+    });
+    await submit('p2', {
+      kind: 'confirm-result',
+      gameNumber: 2,
+      resultDigest: digest,
+      verified: true,
+    });
+    expect(controller.phase).toBe('preparing-game');
+    expect(controller.currentGameNumber).toBe(3);
+    expect(controller.awaitingContinue).toBe(false);
+  });
+
+  it('auto-continues from the Game 2 results screen after the hold window', async () => {
+    const { lifecycle, digest } = await prepareSecondGame();
+    session.advancePlayback(DRAFT_DUEL_BROADCAST_MS);
+    lifecycle.maybeProposeOrConfirm();
+    await vi.waitFor(async () => {
+      const commands = await transport.refetch(roomId, -1);
+      expect(
+        commands.some(
+          (command) =>
+            command.actorParticipantId === 'p1' &&
+            command.payload.kind === 'propose-result' &&
+            command.payload.gameNumber === 2,
+        ),
+      ).toBe(true);
+    });
+    expect(controller.awaitingContinue).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(60_000);
+    await vi.waitFor(async () => {
+      const commands = await transport.refetch(roomId, -1);
+      expect(
+        commands.some(
+          (command) =>
+            command.actorParticipantId === 'p1' &&
+            command.payload.kind === 'confirm-result' &&
+            command.payload.gameNumber === 2,
+        ),
+      ).toBe(true);
+    });
+    await submit('p2', {
+      kind: 'confirm-result',
+      gameNumber: 2,
+      resultDigest: digest,
+      verified: true,
+    });
+    expect(controller.phase).toBe('preparing-game');
   });
 
   it.each([

@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { HoopRushManifest, SeasonDraftCatalog } from '@hoop-rush/data-contracts';
   import { Dialog } from 'bits-ui';
-  import { X } from '@lucide/svelte';
+  import DialogShell from '$lib/components/DialogShell.svelte';
   import SeasonPlayerFace from '$lib/components/season/SeasonPlayerFace.svelte';
   import { eraIdentityOf, type SeasonFaceRef } from '$lib/season/season-branding';
   import { candidateOf } from '$lib/season/season-catalog-index';
@@ -35,155 +35,142 @@
   }
 </script>
 
-<Dialog.Root
+<DialogShell
   open={player !== null}
   onOpenChange={(open) => {
     if (!open) onClose();
   }}
+  layout="center"
+  size="md"
+  overlayClass="sr-dialog-overlay"
+  contentClass="sr-dialog p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:p-6"
 >
-  <Dialog.Portal>
-    <Dialog.Overlay class="sr-dialog-overlay" />
-    <Dialog.Content
-      class="sr-dialog max-h-[85dvh] w-[calc(100vw-2rem)] max-w-lg overflow-y-auto p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:p-6"
-    >
-      {#if player !== null}
-        <div class="flex items-start justify-between gap-3">
-          <div class="flex min-w-0 items-start gap-3">
-            {#if face !== null}
-              <SeasonPlayerFace {face} {manifest} size="md" />
+  {#snippet header()}
+    {#if player !== null}
+      <div class="flex min-w-0 items-start gap-3">
+        {#if face !== null}
+          <SeasonPlayerFace {face} {manifest} size="md" />
+        {/if}
+        <div class="min-w-0">
+          <Dialog.Title class="font-display text-lg font-extrabold tracking-tight uppercase">
+            {player.displayName}
+          </Dialog.Title>
+          <p class="mt-1 text-sm text-muted-foreground">
+            {player.seasonKey}
+            {#if player.playable.length > 0}
+              · {formatPositions(player.playable)}
             {/if}
-            <div class="min-w-0">
-              <Dialog.Title class="font-display text-lg font-extrabold tracking-tight uppercase">
-                {player.displayName}
-              </Dialog.Title>
-              <p class="mt-1 text-sm text-muted-foreground">
-                {player.seasonKey}
-                {#if player.playable.length > 0}
-                  · {formatPositions(player.playable)}
-                {/if}
-              </p>
-              {#if eraLabel}
-                <p class="mt-0.5 text-xs text-muted-foreground">{eraLabel}</p>
-              {/if}
-            </div>
-          </div>
-          <Dialog.Close
-            aria-label="Close"
-            class="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-border text-muted-foreground transition-colors hover:text-foreground"
-          >
-            <X class="h-4 w-4" />
-          </Dialog.Close>
-        </div>
-
-        <div class="mt-4 flex flex-wrap gap-2">
-          {#if player.overallRating !== null}
-            <span class="sr-badge" data-tone="hardwood">
-              OVR {player.overallRating}
-            </span>
-          {/if}
-          {#if player.offenseRating !== null}
-            <span class="sr-chip">
-              OFF {player.offenseRating}
-            </span>
-          {/if}
-          {#if player.defenseRating !== null}
-            <span class="sr-chip">
-              DEF {player.defenseRating}
-            </span>
+          </p>
+          {#if eraLabel}
+            <p class="mt-0.5 text-xs text-muted-foreground">{eraLabel}</p>
           {/if}
         </div>
+      </div>
+    {/if}
+  {/snippet}
 
-        {#if candidate?.anchors}
-          <section class="mt-4">
-            <h3 class="sr-section-label">Peak season</h3>
-            <dl class="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
-              <div>
-                <dt class="text-xs text-muted-foreground">MPG</dt>
-                <dd class="sr-number font-mono text-sm font-semibold">
-                  {oneDecimal(candidate.anchors.minutesPerGame)}
-                </dd>
-              </div>
-              <div>
-                <dt class="text-xs text-muted-foreground">PPG</dt>
-                <dd class="sr-number font-mono text-sm font-semibold">
-                  {oneDecimal(candidate.anchors.pointsPerGame)}
-                </dd>
-              </div>
-              <div>
-                <dt class="text-xs text-muted-foreground">RPG</dt>
-                <dd class="sr-number font-mono text-sm font-semibold">
-                  {oneDecimal(candidate.anchors.reboundsPerGame)}
-                </dd>
-              </div>
-              <div>
-                <dt class="text-xs text-muted-foreground">APG</dt>
-                <dd class="sr-number font-mono text-sm font-semibold">
-                  {oneDecimal(candidate.anchors.assistsPerGame)}
-                </dd>
-              </div>
-              <div>
-                <dt class="text-xs text-muted-foreground">FG%</dt>
-                <dd class="sr-number font-mono text-sm font-semibold">
-                  {pct(candidate.anchors.fieldGoalPct)}
-                </dd>
-              </div>
-              <div>
-                <dt class="text-xs text-muted-foreground">3P%</dt>
-                <dd class="sr-number font-mono text-sm font-semibold">
-                  {pct(candidate.anchors.threePointPct)}
-                </dd>
-              </div>
-            </dl>
-          </section>
-        {/if}
-
-        {#if runStats !== null}
-          <section class="mt-4 border-t border-border pt-4">
-            <h3 class="sr-section-label">This season run</h3>
-            <p class="mt-1 text-xs text-muted-foreground">
-              {runStats.gamesPlayed} gp · folded from accepted games
-            </p>
-            <dl class="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
-              <div>
-                <dt class="text-xs text-muted-foreground">MPG</dt>
-                <dd class="sr-number font-mono text-sm font-semibold">
-                  {oneDecimal(runStats.minutesPerGame)}
-                </dd>
-              </div>
-              <div>
-                <dt class="text-xs text-muted-foreground">PPG</dt>
-                <dd class="sr-number font-mono text-sm font-semibold">
-                  {oneDecimal(runStats.pointsPerGame)}
-                </dd>
-              </div>
-              <div>
-                <dt class="text-xs text-muted-foreground">RPG</dt>
-                <dd class="sr-number font-mono text-sm font-semibold">
-                  {oneDecimal(runStats.reboundsPerGame)}
-                </dd>
-              </div>
-              <div>
-                <dt class="text-xs text-muted-foreground">APG</dt>
-                <dd class="sr-number font-mono text-sm font-semibold">
-                  {oneDecimal(runStats.assistsPerGame)}
-                </dd>
-              </div>
-              <div>
-                <dt class="text-xs text-muted-foreground">FG%</dt>
-                <dd class="sr-number font-mono text-sm font-semibold">
-                  {pct(runStats.fieldGoalPct)}
-                </dd>
-              </div>
-              <div>
-                <dt class="text-xs text-muted-foreground">3P%</dt>
-                <dd class="sr-number font-mono text-sm font-semibold">
-                  {pct(runStats.threePointPct)}
-                </dd>
-              </div>
-            </dl>
-          </section>
-        {/if}
+  {#if player !== null}
+    <div class="mt-4 flex flex-wrap gap-2">
+      {#if player.overallRating !== null}
+        <span class="sr-badge" data-tone="hardwood"> OVR {player.overallRating} </span>
       {/if}
-    </Dialog.Content>
-  </Dialog.Portal>
-</Dialog.Root>
+      {#if player.offenseRating !== null}
+        <span class="sr-chip"> OFF {player.offenseRating} </span>
+      {/if}
+      {#if player.defenseRating !== null}
+        <span class="sr-chip"> DEF {player.defenseRating} </span>
+      {/if}
+    </div>
+
+    {#if candidate?.anchors}
+      <section class="mt-4">
+        <h3 class="sr-section-label">Peak season</h3>
+        <dl class="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
+          <div>
+            <dt class="text-xs text-muted-foreground">MPG</dt>
+            <dd class="sr-number font-mono text-sm font-semibold">
+              {oneDecimal(candidate.anchors.minutesPerGame)}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-xs text-muted-foreground">PPG</dt>
+            <dd class="sr-number font-mono text-sm font-semibold">
+              {oneDecimal(candidate.anchors.pointsPerGame)}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-xs text-muted-foreground">RPG</dt>
+            <dd class="sr-number font-mono text-sm font-semibold">
+              {oneDecimal(candidate.anchors.reboundsPerGame)}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-xs text-muted-foreground">APG</dt>
+            <dd class="sr-number font-mono text-sm font-semibold">
+              {oneDecimal(candidate.anchors.assistsPerGame)}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-xs text-muted-foreground">FG%</dt>
+            <dd class="sr-number font-mono text-sm font-semibold">
+              {pct(candidate.anchors.fieldGoalPct)}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-xs text-muted-foreground">3P%</dt>
+            <dd class="sr-number font-mono text-sm font-semibold">
+              {pct(candidate.anchors.threePointPct)}
+            </dd>
+          </div>
+        </dl>
+      </section>
+    {/if}
+
+    {#if runStats !== null}
+      <section class="mt-4 border-t border-border pt-4">
+        <h3 class="sr-section-label">This season run</h3>
+        <p class="mt-1 text-xs text-muted-foreground">
+          {runStats.gamesPlayed} gp · folded from accepted games
+        </p>
+        <dl class="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
+          <div>
+            <dt class="text-xs text-muted-foreground">MPG</dt>
+            <dd class="sr-number font-mono text-sm font-semibold">
+              {oneDecimal(runStats.minutesPerGame)}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-xs text-muted-foreground">PPG</dt>
+            <dd class="sr-number font-mono text-sm font-semibold">
+              {oneDecimal(runStats.pointsPerGame)}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-xs text-muted-foreground">RPG</dt>
+            <dd class="sr-number font-mono text-sm font-semibold">
+              {oneDecimal(runStats.reboundsPerGame)}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-xs text-muted-foreground">APG</dt>
+            <dd class="sr-number font-mono text-sm font-semibold">
+              {oneDecimal(runStats.assistsPerGame)}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-xs text-muted-foreground">FG%</dt>
+            <dd class="sr-number font-mono text-sm font-semibold">
+              {pct(runStats.fieldGoalPct)}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-xs text-muted-foreground">3P%</dt>
+            <dd class="sr-number font-mono text-sm font-semibold">
+              {pct(runStats.threePointPct)}
+            </dd>
+          </div>
+        </dl>
+      </section>
+    {/if}
+  {/if}
+</DialogShell>

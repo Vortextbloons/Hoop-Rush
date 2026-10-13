@@ -4,6 +4,7 @@
   --h-gold: #ffd782;
   --h-ink: #141b39;
   --h-paper: #f2f4ff;
+  --ui-focus: var(--h-pink);
   color: var(--h-paper);
   min-height: calc(100svh - 64px);
   background: radial-gradient(ellipse at 85% 5%, #394779 0, transparent 48%), #141b39;
@@ -58,9 +59,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  min-height: 48px;
-  padding: 12px 24px;
+  gap: var(--ui-control-gap);
+  min-height: var(--ui-control-height);
+  padding: 0.6rem var(--ui-control-padding-inline);
   border-radius: 12px;
   background: var(--h-gold);
   color: var(--h-ink);
@@ -74,7 +75,7 @@
   transform: translateY(-2px);
 }
 .havoc-world .h-button:disabled {
-  opacity: 0.45;
+  opacity: var(--ui-disabled-opacity);
   cursor: wait;
   transform: none;
 }

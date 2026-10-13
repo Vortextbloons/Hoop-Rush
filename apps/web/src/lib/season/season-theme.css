@@ -31,6 +31,8 @@
   --sr-accent-a: #64748b;
   --sr-accent-b: #64748b;
 
+  --ui-focus: var(--sr-focus);
+
   --color-background: var(--sr-bg);
   --color-foreground: var(--sr-ink);
   --color-card: var(--sr-panel);
@@ -300,9 +302,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
-  min-height: 2.75rem;
-  padding: 0.6rem 1.3rem;
+  gap: var(--ui-control-gap);
+  min-height: var(--ui-control-height);
+  padding: 0.6rem var(--ui-control-padding-inline);
   border: 1px solid var(--sr-hardwood);
   border-radius: 12px;
   background: linear-gradient(180deg, var(--sr-hardwood-bright), var(--sr-hardwood));
@@ -322,16 +324,16 @@
 
 .sr-btn:disabled {
   cursor: not-allowed;
-  opacity: 0.45;
+  opacity: var(--ui-disabled-opacity);
 }
 
 .sr-btn-ghost {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
-  min-height: 2.75rem;
-  padding: 0.6rem 1.2rem;
+  gap: var(--ui-control-gap);
+  min-height: var(--ui-control-height);
+  padding: 0.6rem var(--ui-control-padding-inline);
   border: 1px solid var(--sr-line-strong);
   border-radius: 12px;
   background: rgb(255 255 255 / 3%);
@@ -352,16 +354,16 @@
 
 .sr-btn-ghost:disabled {
   cursor: not-allowed;
-  opacity: 0.45;
+  opacity: var(--ui-disabled-opacity);
 }
 
 .sr-btn-danger {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
-  min-height: 2.75rem;
-  padding: 0.6rem 1.2rem;
+  gap: var(--ui-control-gap);
+  min-height: var(--ui-control-height);
+  padding: 0.6rem var(--ui-control-padding-inline);
   border: 1px solid rgb(229 100 110 / 55%);
   border-radius: 12px;
   background: rgb(229 100 110 / 10%);
@@ -382,7 +384,7 @@
 
 .sr-btn-danger:disabled {
   cursor: not-allowed;
-  opacity: 0.45;
+  opacity: var(--ui-disabled-opacity);
 }
 
 .season-root .sr-btn,

@@ -2,6 +2,7 @@
   import { resolve } from '$app/paths';
   import type { RouteId } from '$app/types';
   import { Trophy } from '@lucide/svelte';
+  import AsyncState from '$lib/components/AsyncState.svelte';
   import type { ActiveRunCheckpoint, CompletedRunIndex } from '@hoop-rush/persistence';
   import type { HoopRushManifest } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
@@ -47,14 +48,17 @@
 </script>
 
 {#if rows.length === 0 && !active}
-  <div class="mt-8 rounded-xl border border-border bg-card p-10 text-center">
-    <p class="font-mono text-sm text-muted-foreground">{emptyTitle}</p>
-    <a
-      href={resolve(emptyHref as any)}
-      class="mt-4 inline-flex rounded-lg bg-primary px-5 py-2.5 font-semibold text-primary-foreground"
-    >
-      {emptyCta}
-    </a>
+  <div class="mt-8">
+    <AsyncState kind="empty" title={emptyTitle}>
+      {#snippet actions()}
+        <a
+          href={resolve(emptyHref as any)}
+          class="ui-btn ui-btn--sm bg-primary text-primary-foreground"
+        >
+          {emptyCta}
+        </a>
+      {/snippet}
+    </AsyncState>
   </div>
 {:else}
   {#if active && active.status === 'active' && continueHref}

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
   import { Dialog } from 'bits-ui';
-  import { X } from '@lucide/svelte';
+  import DialogShell from '$lib/components/DialogShell.svelte';
   import SponsorMark from '$lib/components/season/SponsorMark.svelte';
   import SponsorOfferCard from '$lib/components/season/SponsorOfferCard.svelte';
   import {
@@ -83,181 +83,171 @@
   const historySummary = $derived(sponsorHistorySummary(history));
 </script>
 
-<Dialog.Root {open} {onOpenChange}>
-  <Dialog.Portal>
-    <Dialog.Overlay class="sr-dialog-overlay" />
-    <Dialog.Content
-      data-testid="sponsor-shop-modal"
-      class="sr-dialog max-h-[88dvh] w-[calc(100vw-2rem)] max-w-4xl overflow-y-auto p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:p-5"
-    >
-      <div class="flex items-start justify-between gap-3">
-        <div class="min-w-0">
-          <p class="sr-eyebrow">Sponsor deal board</p>
-          <Dialog.Title
-            class="font-display text-xl font-extrabold uppercase tracking-tight"
-            data-testid="sponsor-shop-modal-title"
+<DialogShell
+  {open}
+  {onOpenChange}
+  layout="center"
+  size="xl"
+  overlayClass="sr-dialog-overlay"
+  contentTestId="sponsor-shop-modal"
+  closeLabel="Close sponsor shop"
+  closeTestId="close-sponsor-shop"
+  contentClass="sr-dialog p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:p-5"
+>
+  {#snippet header()}
+    <div class="min-w-0">
+      <p class="sr-eyebrow">Sponsor deal board</p>
+      <Dialog.Title
+        class="font-display text-xl font-extrabold uppercase tracking-tight"
+        data-testid="sponsor-shop-modal-title"
+      >
+        Sponsor shop
+      </Dialog.Title>
+      <Dialog.Description class="mt-2 flex flex-wrap gap-1.5 font-mono text-[11px]">
+        <span class="sr-chip">
+          {blockLabel ?? 'Block —'}
+        </span>
+        <span class="sr-chip" data-testid="sponsor-shop-balance">
+          Influence: {balance}/{cap}
+        </span>
+        {#if offers !== null}
+          <span class="sr-chip" data-testid="sponsor-shop-count">
+            Owned Gear: {ownedCount}/{offers.length} owned
+          </span>
+        {/if}
+      </Dialog.Description>
+      <p class="mt-2 text-xs text-muted-foreground">
+        Buy gear offers now. Bought gear goes to your vault — equip it to players from the roster.
+      </p>
+    </div>
+  {/snippet}
+
+  <div class="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
+    <div class="min-w-0">
+      <div
+        class="flex flex-wrap items-center gap-1.5"
+        role="group"
+        aria-label="Filter offers by slot"
+      >
+        {#each SLOT_FILTERS as filter (filter.value)}
+          <button
+            type="button"
+            aria-pressed={slotFilter === filter.value}
+            data-testid={`filter-sponsor-${filter.value}`}
+            onclick={() => {
+              slotFilter = filter.value;
+            }}
+            class="min-h-11 rounded-lg px-3 py-2 font-mono text-[11px] font-bold outline-none focus-visible:ring-2 focus-visible:ring-ring {slotFilter ===
+            filter.value
+              ? 'bg-primary text-primary-foreground'
+              : 'bg-surface-2 text-muted-foreground hover:text-foreground'}"
           >
-            Sponsor shop
-          </Dialog.Title>
-          <Dialog.Description class="mt-2 flex flex-wrap gap-1.5 font-mono text-[11px]">
-            <span class="sr-chip">
-              {blockLabel ?? 'Block —'}
-            </span>
-            <span class="sr-chip" data-testid="sponsor-shop-balance">
-              Influence: {balance}/{cap}
-            </span>
-            {#if offers !== null}
-              <span class="sr-chip" data-testid="sponsor-shop-count">
-                Owned Gear: {ownedCount}/{offers.length} owned
-              </span>
-            {/if}
-          </Dialog.Description>
-          <p class="mt-2 text-xs text-muted-foreground">
-            Buy gear offers now. Bought gear goes to your vault — equip it to players from the
-            roster.
-          </p>
-        </div>
-        <Dialog.Close
-          aria-label="Close sponsor shop"
-          data-testid="close-sponsor-shop"
-          class="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-muted-foreground outline-none hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          <X class="h-5 w-5" />
-        </Dialog.Close>
+            {filter.label} ({countsBySlot[filter.value]})
+          </button>
+        {/each}
       </div>
 
-      <div class="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
-        <div class="min-w-0">
-          <div
-            class="flex flex-wrap items-center gap-1.5"
-            role="group"
-            aria-label="Filter offers by slot"
-          >
-            {#each SLOT_FILTERS as filter (filter.value)}
-              <button
-                type="button"
-                aria-pressed={slotFilter === filter.value}
-                data-testid={`filter-sponsor-${filter.value}`}
-                onclick={() => {
-                  slotFilter = filter.value;
-                }}
-                class="min-h-11 rounded-lg px-3 py-2 font-mono text-[11px] font-bold outline-none focus-visible:ring-2 focus-visible:ring-ring {slotFilter ===
-                filter.value
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-surface-2 text-muted-foreground hover:text-foreground'}"
-              >
-                {filter.label} ({countsBySlot[filter.value]})
-              </button>
-            {/each}
-          </div>
-
-          {#if offers === null}
-            {#if isFinalBlock}
-              <p class="mt-3 rounded-lg bg-surface-2 p-3 text-xs text-muted-foreground">
-                Final block — no new offers. Vault gear can still be applied from the roster.
-              </p>
-            {:else}
-              <p class="mt-3 rounded-xl bg-surface-2 p-4 text-xs text-muted-foreground">
-                Loading offers…
-              </p>
-            {/if}
-          {:else}
-            {#if commandError !== null}
-              <p
-                role="alert"
-                class="mt-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs"
-              >
-                {commandError}
-              </p>
-            {/if}
-            {#if visibleOffers.length === 0}
-              <p class="mt-3 rounded-xl bg-surface-2 p-4 text-xs text-muted-foreground">
-                No {SPONSOR_SLOT_LABELS[slotFilter as SeasonSponsorSlot]} offers this block. Try another
-                slot.
-              </p>
-            {:else}
-              <ul class="mt-3 grid gap-3 sm:grid-cols-2" data-testid="sponsor-shop-panel">
-                {#each visibleOffers as offer (offer.instanceId)}
-                  <SponsorOfferCard {offer} {balance} {cap} {busy} {logos} {onBuy} />
-                {/each}
-              </ul>
-            {/if}
-            {#if historySummary !== null}
-              <details class="sr-panel-quiet mt-3">
-                <summary
-                  class="sr-section-label cursor-pointer p-3 outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  History · {historySummary}
-                </summary>
-                <ul class="flex flex-col gap-1.5 border-t border-border p-3">
-                  {#each history as entry (entry.blockIndex)}
-                    <li class="font-mono text-[11px] text-muted-foreground">
-                      Block {entry.blockIndex + 1} · {entry.bought} purchased · {entry.expired} expired
-                    </li>
-                  {/each}
-                </ul>
-              </details>
-            {/if}
-          {/if}
-        </div>
-
-        <aside
-          aria-labelledby="sponsor-vault-heading"
-          class="sr-panel-quiet h-fit p-4 lg:sticky lg:top-0"
-        >
-          <div class="flex items-baseline justify-between gap-2">
-            <h3 id="sponsor-vault-heading" class="sr-section-label">
-              Vault · {vault.length} items
-            </h3>
-          </div>
-          <p
-            class="mt-1 font-mono text-[10px] text-muted-foreground"
-            data-testid="sponsor-vault-counts"
-          >
-            SHOE {vaultBySlot.shoe} · APPAREL {vaultBySlot.apparel} · FUEL {vaultBySlot.fuel}
+      {#if offers === null}
+        {#if isFinalBlock}
+          <p class="mt-3 rounded-lg bg-surface-2 p-3 text-xs text-muted-foreground">
+            Final block — no new offers. Vault gear can still be applied from the roster.
           </p>
-          {#if vault.length === 0}
-            <p class="mt-2 text-xs text-muted-foreground">
-              Bought gear goes to your vault. Equip it to players from the roster. Equipped gear is
-              permanent.
-            </p>
-          {:else}
-            <ul class="mt-2 flex flex-col gap-1.5">
-              {#each vault.slice(0, 6) as entry (entry.instanceId)}
-                <li
-                  class="flex items-center gap-2"
-                  data-testid={`sponsor-vault-${entry.instanceId}`}
-                >
-                  <SponsorMark
-                    family={entry.brandFamily}
-                    displayName={entry.displayName}
-                    logoUrl={logos.get(entry.brandFamily) ?? null}
-                    size="sm"
-                  />
-                  <div class="min-w-0 flex-1">
-                    <p class="truncate text-xs font-bold">{entry.displayName}</p>
-                    <p class="font-mono text-[10px] text-muted-foreground">
-                      {SPONSOR_SLOT_LABELS[entry.slot]} · {entry.boostLine}
-                    </p>
-                  </div>
-                  <span class="sr-chip shrink-0">
-                    {entry.tier}
-                  </span>
+        {:else}
+          <p class="mt-3 rounded-xl bg-surface-2 p-4 text-xs text-muted-foreground">
+            Loading offers…
+          </p>
+        {/if}
+      {:else}
+        {#if commandError !== null}
+          <p
+            role="alert"
+            class="mt-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs"
+          >
+            {commandError}
+          </p>
+        {/if}
+        {#if visibleOffers.length === 0}
+          <p class="mt-3 rounded-xl bg-surface-2 p-4 text-xs text-muted-foreground">
+            No {SPONSOR_SLOT_LABELS[slotFilter as SeasonSponsorSlot]} offers this block. Try another slot.
+          </p>
+        {:else}
+          <ul class="mt-3 grid gap-3 sm:grid-cols-2" data-testid="sponsor-shop-panel">
+            {#each visibleOffers as offer (offer.instanceId)}
+              <SponsorOfferCard {offer} {balance} {cap} {busy} {logos} {onBuy} />
+            {/each}
+          </ul>
+        {/if}
+        {#if historySummary !== null}
+          <details class="sr-panel-quiet mt-3">
+            <summary
+              class="sr-section-label cursor-pointer p-3 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              History · {historySummary}
+            </summary>
+            <ul class="flex flex-col gap-1.5 border-t border-border p-3">
+              {#each history as entry (entry.blockIndex)}
+                <li class="font-mono text-[11px] text-muted-foreground">
+                  Block {entry.blockIndex + 1} · {entry.bought} purchased · {entry.expired} expired
                 </li>
               {/each}
             </ul>
-            {#if vault.length > 6}
-              <p class="mt-2 font-mono text-[10px] text-muted-foreground">
-                +{vault.length - 6} more in the vault
-              </p>
-            {/if}
-            <p class="mt-2 text-xs text-muted-foreground">Equipped gear is permanent.</p>
-          {/if}
-          <a href={resolve('/season/run/team' as any)} class="sr-btn-ghost mt-3 w-full px-3">
-            Equip from roster →
-          </a>
-        </aside>
+          </details>
+        {/if}
+      {/if}
+    </div>
+
+    <aside
+      aria-labelledby="sponsor-vault-heading"
+      class="sr-panel-quiet h-fit p-4 lg:sticky lg:top-0"
+    >
+      <div class="flex items-baseline justify-between gap-2">
+        <h3 id="sponsor-vault-heading" class="sr-section-label">
+          Vault · {vault.length} items
+        </h3>
       </div>
-    </Dialog.Content>
-  </Dialog.Portal>
-</Dialog.Root>
+      <p
+        class="mt-1 font-mono text-[10px] text-muted-foreground"
+        data-testid="sponsor-vault-counts"
+      >
+        SHOE {vaultBySlot.shoe} · APPAREL {vaultBySlot.apparel} · FUEL {vaultBySlot.fuel}
+      </p>
+      {#if vault.length === 0}
+        <p class="mt-2 text-xs text-muted-foreground">
+          Bought gear goes to your vault. Equip it to players from the roster. Equipped gear is
+          permanent.
+        </p>
+      {:else}
+        <ul class="mt-2 flex flex-col gap-1.5">
+          {#each vault.slice(0, 6) as entry (entry.instanceId)}
+            <li class="flex items-center gap-2" data-testid={`sponsor-vault-${entry.instanceId}`}>
+              <SponsorMark
+                family={entry.brandFamily}
+                displayName={entry.displayName}
+                logoUrl={logos.get(entry.brandFamily) ?? null}
+                size="sm"
+              />
+              <div class="min-w-0 flex-1">
+                <p class="truncate text-xs font-bold">{entry.displayName}</p>
+                <p class="font-mono text-[10px] text-muted-foreground">
+                  {SPONSOR_SLOT_LABELS[entry.slot]} · {entry.boostLine}
+                </p>
+              </div>
+              <span class="sr-chip shrink-0">
+                {entry.tier}
+              </span>
+            </li>
+          {/each}
+        </ul>
+        {#if vault.length > 6}
+          <p class="mt-2 font-mono text-[10px] text-muted-foreground">
+            +{vault.length - 6} more in the vault
+          </p>
+        {/if}
+        <p class="mt-2 text-xs text-muted-foreground">Equipped gear is permanent.</p>
+      {/if}
+      <a href={resolve('/season/run/team' as any)} class="sr-btn-ghost mt-3 w-full px-3">
+        Equip from roster →
+      </a>
+    </aside>
+  </div>
+</DialogShell>

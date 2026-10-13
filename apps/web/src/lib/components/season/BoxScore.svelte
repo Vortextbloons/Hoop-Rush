@@ -1,8 +1,10 @@
 <script lang="ts">
   import type { HoopRushManifest } from '@hoop-rush/data-contracts';
-  import type { BoxScore } from '$lib/season/season-presentation';
+  import type { BoxScore, BoxScoreRow } from '$lib/season/season-presentation';
   import { formatClock } from '$lib/season/season-presentation';
   import { franchiseIdentityOf } from '$lib/season/season-branding';
+  import PlayerStatsTable from '$lib/components/PlayerStatsTable.svelte';
+  import type { PlayerStatColumn, PlayerStatsTotals } from '$lib/components/player-stats-table';
   import SeasonTeamLogo from './SeasonTeamLogo.svelte';
   let {
     box,
@@ -45,6 +47,137 @@
     (box.team.fourPointersAttempted ?? 0) > 0 ||
       box.players.some((player) => player.fourPointersAttempted > 0),
   );
+  const compactColumns: readonly PlayerStatColumn<BoxScoreRow>[] = [
+    {
+      key: 'seconds',
+      label: 'Min',
+      value: (player) => formatClock(player.seconds),
+      cellClass: 'font-mono text-muted-foreground',
+    },
+    {
+      key: 'points',
+      label: 'Pts',
+      value: (player) => player.points,
+      cellClass: 'font-bold',
+      totalClass: 'sr-number font-extrabold',
+    },
+    {
+      key: 'rebounds',
+      label: 'Reb',
+      value: (player) => player.offensiveRebounds + player.defensiveRebounds,
+      cellClass: 'font-mono',
+    },
+    { key: 'assists', label: 'Ast', value: (player) => player.assists, cellClass: 'font-mono' },
+  ];
+  const fullColumns = $derived.by((): PlayerStatColumn<BoxScoreRow>[] => {
+    const columns: PlayerStatColumn<BoxScoreRow>[] = [
+      {
+        key: 'position',
+        label: 'Pos',
+        value: (player) => player.position,
+        cellClass: 'font-mono text-muted-foreground',
+      },
+      {
+        key: 'seconds',
+        label: 'Min',
+        value: (player) => formatClock(player.seconds),
+        cellClass: 'font-mono text-muted-foreground',
+      },
+      {
+        key: 'points',
+        label: 'Pts',
+        value: (player) => player.points,
+        cellClass: 'font-bold',
+        totalClass: 'sr-number font-extrabold',
+      },
+      {
+        key: 'fieldGoals',
+        label: 'FG',
+        value: (player) => `${player.fieldGoalsMade}/${player.fieldGoalsAttempted}`,
+        cellClass: 'font-mono',
+      },
+      {
+        key: 'threes',
+        label: '3PT',
+        value: (player) => `${player.threePointersMade}/${player.threePointersAttempted}`,
+        cellClass: 'font-mono',
+      },
+    ];
+    if (hasDeep) {
+      columns.push({
+        key: 'fourPointers',
+        label: '4PT',
+        value: (player) => `${player.fourPointersMade}/${player.fourPointersAttempted}`,
+        cellClass: 'font-mono',
+      });
+    }
+    columns.push(
+      {
+        key: 'freeThrows',
+        label: 'FT',
+        value: (player) => `${player.freeThrowsMade}/${player.freeThrowsAttempted}`,
+        cellClass: 'font-mono',
+      },
+      {
+        key: 'rebounds',
+        label: 'Reb',
+        value: (player) => player.offensiveRebounds + player.defensiveRebounds,
+        cellClass: 'font-mono',
+      },
+      { key: 'assists', label: 'Ast', value: (player) => player.assists, cellClass: 'font-mono' },
+      { key: 'steals', label: 'Stl', value: (player) => player.steals, cellClass: 'font-mono' },
+      { key: 'blocks', label: 'Blk', value: (player) => player.blocks, cellClass: 'font-mono' },
+      {
+        key: 'turnovers',
+        label: 'TO',
+        value: (player) => player.turnovers,
+        cellClass: 'font-mono',
+      },
+      { key: 'fouls', label: 'PF', value: (player) => player.fouls, cellClass: 'font-mono' },
+    );
+    return columns;
+  });
+  const compactTotals = $derived.by((): PlayerStatsTotals<BoxScoreRow> => ({
+    label: 'Team',
+    value: (column) => {
+      if (column.key === 'points') return box.team.points;
+      if (column.key === 'rebounds') return box.team.offensiveRebounds + box.team.defensiveRebounds;
+      if (column.key === 'assists') return teamTotal.assists;
+      return '';
+    },
+  }));
+  const fullTotals = $derived.by((): PlayerStatsTotals<BoxScoreRow> => ({
+    label: 'Team',
+    value: (column) => {
+      switch (column.key) {
+        case 'points':
+          return box.team.points;
+        case 'fieldGoals':
+          return `${box.team.fieldGoalsMade}/${box.team.fieldGoalsAttempted}`;
+        case 'threes':
+          return `${box.team.threePointersMade}/${box.team.threePointersAttempted}`;
+        case 'fourPointers':
+          return `${box.team.fourPointersMade ?? 0}/${box.team.fourPointersAttempted ?? 0}`;
+        case 'freeThrows':
+          return `${box.team.freeThrowsMade}/${box.team.freeThrowsAttempted}`;
+        case 'rebounds':
+          return box.team.offensiveRebounds + box.team.defensiveRebounds;
+        case 'assists':
+          return teamTotal.assists;
+        case 'steals':
+          return teamTotal.steals;
+        case 'blocks':
+          return teamTotal.blocks;
+        case 'turnovers':
+          return teamTotal.turnovers;
+        case 'fouls':
+          return teamTotal.fouls;
+        default:
+          return '';
+      }
+    },
+  }));
+  const rowKey = (player: BoxScoreRow) => player.playerVersionId;
 </script>
 
 <div class="sr-panel-quiet overflow-hidden" data-season-box-score>
@@ -84,47 +217,23 @@
   </div>
 
   <div class="md:hidden">
-    <table class="sr-table w-full">
-      <thead>
-        <tr>
-          <th scope="col" class="text-left">Player</th>
-          <th scope="col" class="text-right!">Min</th>
-          <th scope="col" class="text-right!">Pts</th>
-          <th scope="col" class="text-right!">Reb</th>
-          <th scope="col" class="text-right!">Ast</th>
-        </tr>
-      </thead>
-      <tbody>
-        {#each box.players as player (player.playerVersionId)}
-          <tr>
-            <th scope="row" class="max-w-36 truncate px-3 py-1.5 text-left font-semibold">
-              {player.displayName}
-            </th>
-            <td class="px-3 py-1.5 text-right font-mono text-muted-foreground">
-              {formatClock(player.seconds)}
-            </td>
-            <td class="px-3 py-1.5 text-right font-bold">{player.points}</td>
-            <td class="px-3 py-1.5 text-right font-mono">
-              {player.offensiveRebounds + player.defensiveRebounds}
-            </td>
-            <td class="px-3 py-1.5 text-right font-mono">{player.assists}</td>
-          </tr>
-        {/each}
-      </tbody>
-      <tfoot>
-        <tr class="border-t-2 border-line-strong bg-surface-2">
-          <th scope="row" class="px-3 py-2 text-left">
-            <span class="sr-section-label">Team</span>
-          </th>
-          <td class="px-3 py-2"></td>
-          <td class="sr-number px-3 py-2 text-right font-extrabold">{box.team.points}</td>
-          <td class="px-3 py-2 text-right font-mono">
-            {box.team.offensiveRebounds + box.team.defensiveRebounds}
-          </td>
-          <td class="px-3 py-2 text-right font-mono">{teamTotal.assists}</td>
-        </tr>
-      </tfoot>
-    </table>
+    <PlayerStatsTable
+      columns={compactColumns}
+      rows={box.players}
+      {rowKey}
+      totals={compactTotals}
+      tableClass="w-full"
+      playerCellClass="max-w-36 truncate px-3 py-1.5 text-left font-semibold"
+      playerHeadCellClass="text-left"
+      statCellClass="px-3 py-1.5 text-right"
+      headCellClass="text-right!"
+      totalCellClass="px-3 py-2 text-right font-mono"
+      playerTotalCellClass="sr-section-label px-3 py-2 text-left"
+    >
+      {#snippet identity(player)}
+        {player.displayName}
+      {/snippet}
+    </PlayerStatsTable>
 
     <details class="group border-t border-border">
       <summary
@@ -133,194 +242,44 @@
         Full stats
       </summary>
       <div class="overflow-x-auto border-t border-border/60">
-        <table class="sr-table min-w-[42rem]">
-          <thead>
-            <tr>
-              <th scope="col" class="text-left">Player</th>
-              <th scope="col" class="text-right!">Pos</th>
-              <th scope="col" class="text-right!">Min</th>
-              <th scope="col" class="text-right!">Pts</th>
-              <th scope="col" class="text-right!">FG</th>
-              <th scope="col" class="text-right!">3PT</th>
-              {#if hasDeep}
-                <th scope="col" class="text-right!">4PT</th>
-              {/if}
-              <th scope="col" class="text-right!">FT</th>
-              <th scope="col" class="text-right!">Reb</th>
-              <th scope="col" class="text-right!">Ast</th>
-              <th scope="col" class="text-right!">Stl</th>
-              <th scope="col" class="text-right!">Blk</th>
-              <th scope="col" class="text-right!">TO</th>
-              <th scope="col" class="text-right!">PF</th>
-            </tr>
-          </thead>
-          <tbody>
-            {#each box.players as player (player.playerVersionId)}
-              <tr>
-                <th scope="row" class="max-w-44 truncate px-3 py-1.5 text-left font-semibold">
-                  {player.displayName}
-                </th>
-                <td class="px-3 py-1.5 text-right font-mono text-muted-foreground">
-                  {player.position}
-                </td>
-                <td class="px-3 py-1.5 text-right font-mono text-muted-foreground">
-                  {formatClock(player.seconds)}
-                </td>
-                <td class="px-3 py-1.5 text-right font-bold">{player.points}</td>
-                <td class="px-3 py-1.5 text-right font-mono">
-                  {player.fieldGoalsMade}/{player.fieldGoalsAttempted}
-                </td>
-                <td class="px-3 py-1.5 text-right font-mono">
-                  {player.threePointersMade}/{player.threePointersAttempted}
-                </td>
-                {#if hasDeep}
-                  <td class="px-3 py-1.5 text-right font-mono">
-                    {player.fourPointersMade}/{player.fourPointersAttempted}
-                  </td>
-                {/if}
-                <td class="px-3 py-1.5 text-right font-mono">
-                  {player.freeThrowsMade}/{player.freeThrowsAttempted}
-                </td>
-                <td class="px-3 py-1.5 text-right font-mono">
-                  {player.offensiveRebounds + player.defensiveRebounds}
-                </td>
-                <td class="px-3 py-1.5 text-right font-mono">{player.assists}</td>
-                <td class="px-3 py-1.5 text-right font-mono">{player.steals}</td>
-                <td class="px-3 py-1.5 text-right font-mono">{player.blocks}</td>
-                <td class="px-3 py-1.5 text-right font-mono">{player.turnovers}</td>
-                <td class="px-3 py-1.5 text-right font-mono">{player.fouls}</td>
-              </tr>
-            {/each}
-          </tbody>
-          <tfoot>
-            <tr class="border-t-2 border-line-strong bg-surface-2">
-              <th scope="row" class="px-3 py-2 text-left">
-                <span class="sr-section-label">Team</span>
-              </th>
-              <td class="px-3 py-2"></td>
-              <td class="px-3 py-2"></td>
-              <td class="sr-number px-3 py-2 text-right font-extrabold">{box.team.points}</td>
-              <td class="px-3 py-2 text-right font-mono">
-                {box.team.fieldGoalsMade}/{box.team.fieldGoalsAttempted}
-              </td>
-              <td class="px-3 py-2 text-right font-mono">
-                {box.team.threePointersMade}/{box.team.threePointersAttempted}
-              </td>
-              {#if hasDeep}
-                <td class="px-3 py-2 text-right font-mono"
-                  >{box.team.fourPointersMade ?? 0}/{box.team.fourPointersAttempted ?? 0}</td
-                >
-              {/if}
-              <td class="px-3 py-2 text-right font-mono">
-                {box.team.freeThrowsMade}/{box.team.freeThrowsAttempted}
-              </td>
-              <td class="px-3 py-2 text-right font-mono">
-                {box.team.offensiveRebounds + box.team.defensiveRebounds}
-              </td>
-              <td class="px-3 py-2 text-right font-mono">{teamTotal.assists}</td>
-              <td class="px-3 py-2 text-right font-mono">{teamTotal.steals}</td>
-              <td class="px-3 py-2 text-right font-mono">{teamTotal.blocks}</td>
-              <td class="px-3 py-2 text-right font-mono">{teamTotal.turnovers}</td>
-              <td class="px-3 py-2 text-right font-mono">{teamTotal.fouls}</td>
-            </tr>
-          </tfoot>
-        </table>
+        <PlayerStatsTable
+          columns={fullColumns}
+          rows={box.players}
+          {rowKey}
+          totals={fullTotals}
+          tableClass="min-w-[42rem]"
+          playerCellClass="max-w-44 truncate px-3 py-1.5 text-left font-semibold"
+          playerHeadCellClass="text-left"
+          statCellClass="px-3 py-1.5 text-right"
+          headCellClass="text-right!"
+          totalCellClass="px-3 py-2 text-right font-mono"
+          playerTotalCellClass="sr-section-label px-3 py-2 text-left"
+        >
+          {#snippet identity(player)}
+            {player.displayName}
+          {/snippet}
+        </PlayerStatsTable>
       </div>
     </details>
   </div>
 
   <div class="hidden overflow-x-auto md:block">
-    <table class="sr-table min-w-[42rem]">
-      <thead>
-        <tr>
-          <th scope="col" class="text-left">Player</th>
-          <th scope="col" class="text-right!">Pos</th>
-          <th scope="col" class="text-right!">Min</th>
-          <th scope="col" class="text-right!">Pts</th>
-          <th scope="col" class="text-right!">FG</th>
-          <th scope="col" class="text-right!">3PT</th>
-          {#if hasDeep}
-            <th scope="col" class="text-right!">4PT</th>
-          {/if}
-          <th scope="col" class="text-right!">FT</th>
-          <th scope="col" class="text-right!">Reb</th>
-          <th scope="col" class="text-right!">Ast</th>
-          <th scope="col" class="text-right!">Stl</th>
-          <th scope="col" class="text-right!">Blk</th>
-          <th scope="col" class="text-right!">TO</th>
-          <th scope="col" class="text-right!">PF</th>
-        </tr>
-      </thead>
-      <tbody>
-        {#each box.players as player (player.playerVersionId)}
-          <tr>
-            <th scope="row" class="max-w-44 truncate px-3 py-1.5 text-left font-semibold">
-              {player.displayName}
-            </th>
-            <td class="px-3 py-1.5 text-right font-mono text-muted-foreground">
-              {player.position}
-            </td>
-            <td class="px-3 py-1.5 text-right font-mono text-muted-foreground">
-              {formatClock(player.seconds)}
-            </td>
-            <td class="px-3 py-1.5 text-right font-bold">{player.points}</td>
-            <td class="px-3 py-1.5 text-right font-mono">
-              {player.fieldGoalsMade}/{player.fieldGoalsAttempted}
-            </td>
-            <td class="px-3 py-1.5 text-right font-mono">
-              {player.threePointersMade}/{player.threePointersAttempted}
-            </td>
-            {#if hasDeep}
-              <td class="px-3 py-1.5 text-right font-mono">
-                {player.fourPointersMade}/{player.fourPointersAttempted}
-              </td>
-            {/if}
-            <td class="px-3 py-1.5 text-right font-mono">
-              {player.freeThrowsMade}/{player.freeThrowsAttempted}
-            </td>
-            <td class="px-3 py-1.5 text-right font-mono">
-              {player.offensiveRebounds + player.defensiveRebounds}
-            </td>
-            <td class="px-3 py-1.5 text-right font-mono">{player.assists}</td>
-            <td class="px-3 py-1.5 text-right font-mono">{player.steals}</td>
-            <td class="px-3 py-1.5 text-right font-mono">{player.blocks}</td>
-            <td class="px-3 py-1.5 text-right font-mono">{player.turnovers}</td>
-            <td class="px-3 py-1.5 text-right font-mono">{player.fouls}</td>
-          </tr>
-        {/each}
-      </tbody>
-      <tfoot>
-        <tr class="border-t-2 border-line-strong bg-surface-2">
-          <th scope="row" class="px-3 py-2 text-left">
-            <span class="sr-section-label">Team</span>
-          </th>
-          <td class="px-3 py-2"></td>
-          <td class="px-3 py-2"></td>
-          <td class="sr-number px-3 py-2 text-right font-extrabold">{box.team.points}</td>
-          <td class="px-3 py-2 text-right font-mono">
-            {box.team.fieldGoalsMade}/{box.team.fieldGoalsAttempted}
-          </td>
-          <td class="px-3 py-2 text-right font-mono">
-            {box.team.threePointersMade}/{box.team.threePointersAttempted}
-          </td>
-          {#if hasDeep}
-            <td class="px-3 py-2 text-right font-mono"
-              >{box.team.fourPointersMade ?? 0}/{box.team.fourPointersAttempted ?? 0}</td
-            >
-          {/if}
-          <td class="px-3 py-2 text-right font-mono">
-            {box.team.freeThrowsMade}/{box.team.freeThrowsAttempted}
-          </td>
-          <td class="px-3 py-2 text-right font-mono">
-            {box.team.offensiveRebounds + box.team.defensiveRebounds}
-          </td>
-          <td class="px-3 py-2 text-right font-mono">{teamTotal.assists}</td>
-          <td class="px-3 py-2 text-right font-mono">{teamTotal.steals}</td>
-          <td class="px-3 py-2 text-right font-mono">{teamTotal.blocks}</td>
-          <td class="px-3 py-2 text-right font-mono">{teamTotal.turnovers}</td>
-          <td class="px-3 py-2 text-right font-mono">{teamTotal.fouls}</td>
-        </tr>
-      </tfoot>
-    </table>
+    <PlayerStatsTable
+      columns={fullColumns}
+      rows={box.players}
+      {rowKey}
+      totals={fullTotals}
+      tableClass="min-w-[42rem]"
+      playerCellClass="max-w-44 truncate px-3 py-1.5 text-left font-semibold"
+      playerHeadCellClass="text-left"
+      statCellClass="px-3 py-1.5 text-right"
+      headCellClass="text-right!"
+      totalCellClass="px-3 py-2 text-right font-mono"
+      playerTotalCellClass="sr-section-label px-3 py-2 text-left"
+    >
+      {#snippet identity(player)}
+        {player.displayName}
+      {/snippet}
+    </PlayerStatsTable>
   </div>
 </div>

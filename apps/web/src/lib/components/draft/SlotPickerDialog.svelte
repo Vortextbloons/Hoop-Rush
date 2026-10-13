@@ -1,8 +1,10 @@
 <script lang="ts">
   import type { HoopRushManifest, PlayersIndexEntry } from '@hoop-rush/data-contracts';
   import type { LineupRepositionMove, LineupRepositionPlan } from '@hoop-rush/engine';
-  import { ArrowRight, Check, Lock, Plus, X } from '@lucide/svelte';
+  import { ArrowRight, Check, Lock, Plus } from '@lucide/svelte';
   import { Dialog } from 'bits-ui';
+  import DialogShell from '$lib/components/DialogShell.svelte';
+  import PositionOptionRow from '$lib/components/PositionOptionRow.svelte';
   import {
     ratingBadges,
     type DraftPresentation,
@@ -121,124 +123,95 @@
   function placePlayer(subject: IndexRow, slotIndex: number) {
     onplace(subject, slotIndex);
   }
+  function toneOf(state: PickerOption['state']): 'open' | 'move' | 'self' | 'muted' {
+    if (state === 'open') return 'open';
+    if (state === 'displace' || state === 'swap') return 'move';
+    if (state === 'self') return 'self';
+    return 'muted';
+  }
 </script>
 
-<Dialog.Root
+<DialogShell
   open={player !== null}
   onOpenChange={(open) => {
     if (!open) onclose();
   }}
+  size="sm"
+  closeLabel="Cancel"
 >
-  <Dialog.Portal>
-    <Dialog.Overlay class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" />
-    <Dialog.Content
-      class="fixed inset-x-0 bottom-0 z-50 mx-auto max-h-[85dvh] w-full overflow-y-auto rounded-t-2xl border-t border-border bg-card p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl shadow-black/40 outline-none sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:max-w-md sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:border sm:pb-4"
-    >
-      {#if player}
-        {@const subject = player}
-        <div class="flex items-start justify-between gap-3">
-          <div class="flex min-w-0 items-center gap-3">
-            <PlayerFace
-              player={subject}
-              {manifest}
-              size="sm"
-              fallbackInitials={subject.firstName[0]! + subject.lastName[0]!}
-            />
-            <div class="min-w-0">
-              <Dialog.Title
-                class="font-display truncate text-lg font-extrabold tracking-tight uppercase"
-              >
-                {subject.displayName}
-              </Dialog.Title>
-              <p class="font-mono text-[10px] text-muted-foreground">
-                {subject.seasonKey} · {formatPositions(subject.positionsPlayable)}
-                {#each ratingBadges(subject, presentation) as badge (badge.label)}
-                  <span
-                    class="rounded bg-surface-3 px-1.5 py-0.5"
-                    title={BADGE_TITLES[badge.label]}
-                  >
-                    · {`${badge.label} ${badge.value}`}
-                  </span>
-                {/each}
-              </p>
-            </div>
-          </div>
-          <Dialog.Close
-            aria-label="Cancel"
-            class="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-border text-muted-foreground transition-colors hover:text-foreground"
+  {#snippet header()}
+    {#if player}
+      {@const subject = player}
+      <div class="flex min-w-0 items-center gap-3">
+        <PlayerFace
+          player={subject}
+          {manifest}
+          size="sm"
+          fallbackInitials={subject.firstName[0]! + subject.lastName[0]!}
+        />
+        <div class="min-w-0">
+          <Dialog.Title
+            class="font-display truncate text-lg font-extrabold tracking-tight uppercase"
           >
-            <X class="h-4 w-4" />
-          </Dialog.Close>
+            {subject.displayName}
+          </Dialog.Title>
+          <p class="font-mono text-[10px] text-muted-foreground">
+            {subject.seasonKey} · {formatPositions(subject.positionsPlayable)}
+            {#each ratingBadges(subject, presentation) as badge (badge.label)}
+              <span class="rounded bg-surface-3 px-1.5 py-0.5" title={BADGE_TITLES[badge.label]}>
+                · {`${badge.label} ${badge.value}`}
+              </span>
+            {/each}
+          </p>
         </div>
+      </div>
+    {/if}
+  {/snippet}
 
-        <div class="mt-4 flex flex-col gap-2">
-          {#each pickerOptions as opt (opt.index)}
-            {@const label = SLOT_LABELS[opt.index]}
-            <button
-              type="button"
-              aria-label={opt.ariaLabel}
-              disabled={opt.state === 'self' ||
-                opt.state === 'blocked' ||
-                opt.state === 'cant-play'}
-              onclick={() => placePlayer(subject, opt.index)}
-              class="flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed {opt.state ===
-              'open'
-                ? 'border-primary/50 bg-primary/5 hover:bg-primary/10'
-                : opt.state === 'displace' || opt.state === 'swap'
-                  ? 'border-accent/60 bg-accent/10 hover:bg-accent/15'
-                  : opt.state === 'self'
-                    ? 'border-primary/40 bg-primary/10 opacity-70'
-                    : 'border-border bg-surface-1 opacity-45'}"
-            >
-              <span
-                class="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-surface-3 font-display text-sm font-extrabold {opt.state ===
-                  'displace' || opt.state === 'swap'
-                  ? 'text-accent'
-                  : 'text-primary'}"
-              >
-                {label}
+  {#if player}
+    {@const subject = player}
+    <div class="mt-4 flex flex-col gap-2">
+      {#each pickerOptions as opt (opt.index)}
+        {@const label = SLOT_LABELS[opt.index] ?? ''}
+        <PositionOptionRow
+          slotLabel={label}
+          ariaLabel={opt.ariaLabel}
+          disabled={opt.state === 'self' || opt.state === 'blocked' || opt.state === 'cant-play'}
+          tone={toneOf(opt.state)}
+          incumbent={opt.incumbent === null
+            ? null
+            : {
+                name: opt.incumbent.displayName,
+                meta: `${opt.incumbent.seasonKey} · ${formatPositions(opt.incumbent.positionsPlayable)}`,
+              }}
+          emptyLabel={`Open ${label} slot`}
+          onSelect={() => placePlayer(subject, opt.index)}
+        >
+          {#snippet trailing()}
+            {#if opt.state === 'self'}
+              <Check class="h-4 w-4 text-primary" />
+              <span class="font-mono text-[10px] tracking-wide uppercase">Current</span>
+            {:else if opt.state === 'displace' && opt.plan !== null}
+              {@const secondaryMoves = secondaryMovesFor(opt.plan, subject.playerId)}
+              <ArrowRight class="h-4 w-4 shrink-0 text-accent" />
+              <span class="font-mono text-[10px] tracking-wide uppercase text-accent">
+                Moves {secondaryMoves.length} player{secondaryMoves.length === 1 ? '' : 's'}:
+                {secondaryMoves.map(moveLabel).join(', ')}
               </span>
-              <span class="min-w-0 flex-1">
-                {#if opt.incumbent}
-                  <span class="block truncate text-sm font-bold">
-                    {opt.incumbent.displayName}
-                  </span>
-                  <span class="block font-mono text-[10px] text-muted-foreground">
-                    {opt.incumbent.seasonKey} · {formatPositions(opt.incumbent.positionsPlayable)}
-                  </span>
-                {:else}
-                  <span class="block truncate text-sm font-semibold">Open {label} slot</span>
-                {/if}
-              </span>
-              <span class="flex shrink-0 items-center gap-1.5">
-                {#if opt.state === 'self'}
-                  <Check class="h-4 w-4 text-primary" />
-                  <span class="font-mono text-[10px] tracking-wide uppercase">Current</span>
-                {:else if opt.state === 'displace' && opt.plan !== null}
-                  {@const secondaryMoves = secondaryMovesFor(opt.plan, subject.playerId)}
-                  <ArrowRight class="h-4 w-4 shrink-0 text-accent" />
-                  <span class="font-mono text-[10px] tracking-wide uppercase text-accent">
-                    Moves {secondaryMoves.length} player{secondaryMoves.length === 1 ? '' : 's'}:
-                    {secondaryMoves.map(moveLabel).join(', ')}
-                  </span>
-                {:else if opt.state === 'swap'}
-                  <ArrowRight class="h-4 w-4 shrink-0 text-accent" />
-                  <span class="font-mono text-[10px] tracking-wide uppercase text-accent">
-                    Swap
-                  </span>
-                {:else if opt.state === 'blocked'}
-                  <Lock class="h-4 w-4 shrink-0" />
-                  <span class="font-mono text-[10px] tracking-wide uppercase">Occupied</span>
-                {:else if opt.state === 'cant-play'}
-                  <span class="font-mono text-[10px] tracking-wide uppercase">Can't play</span>
-                {:else}
-                  <Plus class="h-4 w-4 shrink-0 text-primary" />
-                {/if}
-              </span>
-            </button>
-          {/each}
-        </div>
-      {/if}
-    </Dialog.Content>
-  </Dialog.Portal>
-</Dialog.Root>
+            {:else if opt.state === 'swap'}
+              <ArrowRight class="h-4 w-4 shrink-0 text-accent" />
+              <span class="font-mono text-[10px] tracking-wide uppercase text-accent">Swap</span>
+            {:else if opt.state === 'blocked'}
+              <Lock class="h-4 w-4 shrink-0" />
+              <span class="font-mono text-[10px] tracking-wide uppercase">Occupied</span>
+            {:else if opt.state === 'cant-play'}
+              <span class="font-mono text-[10px] tracking-wide uppercase">Can't play</span>
+            {:else}
+              <Plus class="h-4 w-4 shrink-0 text-primary" />
+            {/if}
+          {/snippet}
+        </PositionOptionRow>
+      {/each}
+    </div>
+  {/if}
+</DialogShell>

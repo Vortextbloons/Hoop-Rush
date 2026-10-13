@@ -522,9 +522,7 @@ export class PossessionStepper {
         attempts,
         this.deadBall,
         this.tripRebounds,
-        havoc !== undefined
-          ? { bonusAttempts: 2 + technical, trailingAttempts: extra }
-          : undefined,
+        havoc !== undefined ? { bonusAttempts: 2 + technical, trailingAttempts: extra } : undefined,
       );
       if (freeThrows.continues) {
         this.phase = 'continuation';
@@ -542,10 +540,19 @@ export class PossessionStepper {
         teamPrep.freeThrowShooterPickTable,
       );
       const shooterSlot = slotOf(teamPrep, shooter);
-      resolveFreeThrows(this.ctx, offense, defense, shooterSlot, technical + extra, true, this.tripRebounds, {
-        bonusAttempts: technical,
-        trailingAttempts: extra,
-      });
+      resolveFreeThrows(
+        this.ctx,
+        offense,
+        defense,
+        shooterSlot,
+        technical + extra,
+        true,
+        this.tripRebounds,
+        {
+          bonusAttempts: technical,
+          trailingAttempts: extra,
+        },
+      );
       this.ctx.possessionStart = 'deadBall';
     }
     this.phase = 'inbound';
@@ -1240,6 +1247,10 @@ function raceRecordPoints(ctx: TripContext, side: SideIndex, points: number): vo
 function teamInBonus(foulsInPeriod: number, overtime: boolean): boolean {
   const limit = overtime
     ? ENGINE_CONSTANTS.bonusFoulsOvertime
+    : ENGINE_CONSTANTS.bonusFoulsRegulation;
+  return foulsInPeriod >= limit;
+}
+.bonusFoulsOvertime
     : ENGINE_CONSTANTS.bonusFoulsRegulation;
   return foulsInPeriod >= limit;
 }

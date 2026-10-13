@@ -225,8 +225,8 @@ export function combineDomainValues(
   offense: number,
   defense: number,
 ): { score: number; offenseWeight: number; defenseWeight: number } {
-  const offenseWeight = offense >= defense * 0.9 ? 0.6 : 0.4;
-  const defenseWeight = (1 - offenseWeight) * 0.9;
+  const offenseWeight = 0.6;
+  const defenseWeight = 0.4 * 0.9;
   return { score: offenseWeight * offense + defenseWeight * defense, offenseWeight, defenseWeight };
 }
 export function eraAdjustmentFor(

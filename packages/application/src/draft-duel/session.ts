@@ -50,6 +50,7 @@ import type {
 const TICK_MS = 250;
 const AUTO_START_RETRY_MS = 5000;
 const GAME_READY_WINDOW_MS = 60_000;
+const GAME_RESULTS_HOLD_MS = 60_000;
 
 export type ReactionKey = 'hype' | 'clap' | 'cold' | 'wow';
 
@@ -90,6 +91,7 @@ export interface DraftDuelSessionView {
   notice: string | null;
   integrityFailed: boolean;
   progress: number;
+  awaitingContinue: boolean;
   localReady: boolean;
   opponentReady: boolean;
   readyCountdownMs: number | null;
@@ -204,6 +206,8 @@ export class DraftDuelSession {
   private subscriptions: Array<{ unsubscribe: () => void }> = [];
   private tickTimer: ReturnType<typeof setInterval> | null = null;
   private playbackElapsedMs = 0;
+  private playbackDoneAtMs: number | null = null;
+  private continueApprovedGame: number | null = null;
   private resolvedCursor: string | null = null;
   private deadlineResolving = false;
   private deadlineRetryAtMs = 0;
@@ -240,6 +244,7 @@ export class DraftDuelSession {
       notice: this.notice,
       integrityFailed: this.integrityFailed,
       progress: this.progress,
+      awaitingContinue: this.awaitingContinue(),
       localReady: this.localReady(),
       opponentReady: this.opponentReady(),
       readyCountdownMs: this.readyCountdownMs(),
@@ -512,8 +517,20 @@ export class DraftDuelSession {
     this.playbackElapsedMs += deltaMs;
     const progress = clamp01(this.playbackElapsedMs / broadcast.durationMs);
     this.progress = progress;
+    if (progress >= 1 && this.playbackDoneAtMs === null) {
+      this.playbackDoneAtMs = this.deps.now();
+      this.continueApprovedGame = null;
+    }
     this.publish();
     if (progress >= 1) this.maybeProposeOrConfirm();
+  }
+
+  continueAfterGame(): void {
+    if (this.disposed) return;
+    const output = this.currentOutput();
+    if (!output) return;
+    this.continueApprovedGame = output.gameNumber;
+    this.maybeProposeOrConfirm();
   }
 
   seriesGameEntries(): DraftDuelSeriesGame[] {
@@ -644,6 +661,8 @@ export class DraftDuelSession {
     const broadcastGame = snapshot.broadcast?.gameNumber ?? null;
     if (broadcastGame !== null && broadcastGame !== previousBroadcastGame) {
       this.progress = 0;
+      this.playbackDoneAtMs = null;
+      this.continueApprovedGame = null;
     }
     this.publish();
   }
@@ -889,6 +908,22 @@ export class DraftDuelSession {
     return { byParticipant };
   }
 
+  private continueApproved(gameNumber: number): boolean {
+    if (this.continueApprovedGame === gameNumber) return true;
+    if (this.playbackDoneAtMs === null) return true;
+    return this.deps.now() - this.playbackDoneAtMs >= GAME_RESULTS_HOLD_MS;
+  }
+
+  private awaitingContinue(): boolean {
+    const snapshot = this.snapshot;
+    const output = this.currentOutput();
+    if (!snapshot || !output) return false;
+    if (snapshot.phase !== 'game-results') return false;
+    const gameNumber = output.gameNumber;
+    if (this.confirmSent.has(gameNumber)) return false;
+    return !this.continueApproved(gameNumber);
+  }
+
   private maybeProposeOrConfirm(): void {
     if (this.disposed || this.busy || this.deps.now() < this.resultRetryAtMs) return;
     const snapshot = this.snapshot;
@@ -920,6 +955,7 @@ export class DraftDuelSession {
     const rivalId = otherParticipant(this.participantId);
     const rivalDigest = byParticipant[rivalId];
     if (rivalDigest === undefined || this.confirmSent.has(gameNumber)) return;
+    if (rivalDigest === output.resultDigest && !this.continueApproved(gameNumber)) return;
     this.confirmSent.add(gameNumber);
     if (rivalDigest === output.resultDigest) {
       void this.submit({

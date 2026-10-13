@@ -1,0 +1,330 @@
+/*
+ * Shared UI foundations: sizes, spacing, focus, disabled, and panel structure.
+ * Mode themes (season-theme.css, ultimate-theme.css, havoc.css) keep their
+ * colors and decoration; these classes and tokens keep the structure aligned.
+ */
+
+:root {
+  --ui-focus: var(--color-ring);
+  --ui-control-height: 2.75rem;
+  --ui-control-height-sm: 2.25rem;
+  --ui-control-padding-inline: 1.25rem;
+  --ui-control-padding-inline-sm: 0.9rem;
+  --ui-control-gap: 0.5rem;
+  --ui-control-radius: 0.75rem;
+  --ui-control-radius-sm: 0.625rem;
+  --ui-disabled-opacity: 0.45;
+  --ui-panel-radius: 0.875rem;
+  --ui-panel-line: var(--color-border);
+}
+
+@layer components {
+  .ui-panel {
+    position: relative;
+    min-width: 0;
+    border: 1px solid var(--ui-panel-line);
+    border-radius: var(--ui-panel-radius);
+    background: var(--color-surface-1);
+  }
+
+  .ui-panel-quiet {
+    position: relative;
+    min-width: 0;
+    border: 1px solid var(--ui-panel-line);
+    border-radius: var(--ui-panel-radius);
+    background: var(--color-card);
+  }
+
+  .ui-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--ui-control-gap);
+    min-height: var(--ui-control-height);
+    padding: 0.6rem var(--ui-control-padding-inline);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--ui-control-radius);
+    background: var(--color-surface-2);
+    color: var(--color-foreground);
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    line-height: 1.1;
+    text-align: center;
+    text-decoration: none;
+    text-transform: uppercase;
+    cursor: pointer;
+    outline: none;
+    transition:
+      transform 150ms ease,
+      filter 150ms ease,
+      background-color 150ms ease,
+      border-color 150ms ease;
+  }
+
+  .ui-btn:disabled,
+  .ui-btn[aria-disabled='true'] {
+    cursor: not-allowed;
+    opacity: var(--ui-disabled-opacity);
+  }
+
+  .ui-btn:focus-visible {
+    outline: 3px solid var(--ui-focus);
+    outline-offset: 2px;
+  }
+
+  .ui-btn--sm {
+    min-height: var(--ui-control-height-sm);
+    padding: 0.4rem var(--ui-control-padding-inline-sm);
+    border-radius: var(--ui-control-radius-sm);
+    font-size: 0.8rem;
+  }
+
+  .ui-icon-btn {
+    display: inline-grid;
+    place-items: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    flex: none;
+    padding: 0;
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--color-muted-foreground);
+    cursor: pointer;
+    outline: none;
+    touch-action: manipulation;
+    transition:
+      color 150ms ease,
+      background-color 150ms ease,
+      border-color 150ms ease;
+  }
+
+  .ui-icon-btn:hover {
+    color: var(--color-foreground);
+  }
+
+  .ui-icon-btn:focus-visible {
+    outline: 3px solid var(--ui-focus);
+    outline-offset: 2px;
+  }
+
+  .ui-icon-btn:disabled {
+    cursor: not-allowed;
+    opacity: var(--ui-disabled-opacity);
+  }
+
+  .ui-stats-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .ui-stats-table th,
+  .ui-stats-table td {
+    white-space: nowrap;
+  }
+
+  .ui-dialog-sheet {
+    position: fixed;
+    inset-inline: 0;
+    bottom: 0;
+    z-index: 50;
+    margin-inline: auto;
+    width: 100%;
+    max-height: 85dvh;
+    overflow-y: auto;
+    border-top: 1px solid var(--color-border);
+    border-top-left-radius: 1rem;
+    border-top-right-radius: 1rem;
+    background: var(--color-card);
+    padding: 1rem;
+    padding-bottom: max(1.25rem, env(safe-area-inset-bottom));
+    box-shadow: 0 25px 50px -12px rgb(0 0 0 / 40%);
+    outline: none;
+  }
+
+  .ui-dialog-center {
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    z-index: 50;
+    transform: translate(-50%, -50%);
+    max-height: 85dvh;
+    width: calc(100vw - 2rem);
+    overflow-y: auto;
+    border: 1px solid var(--color-border);
+    border-radius: 1rem;
+    background: var(--color-card);
+    padding: 1rem;
+    padding-bottom: max(1.25rem, env(safe-area-inset-bottom));
+    box-shadow: 0 25px 50px -12px rgb(0 0 0 / 40%);
+    outline: none;
+  }
+
+  .ui-pos-option {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-height: 3.5rem;
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--color-border);
+    border-radius: 0.75rem;
+    background: var(--color-surface-1);
+    color: var(--color-foreground);
+    text-align: left;
+    cursor: pointer;
+    outline: none;
+    touch-action: manipulation;
+    transition:
+      background-color 150ms ease,
+      border-color 150ms ease;
+  }
+
+  .ui-pos-option:focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+  }
+
+  .ui-pos-option:disabled {
+    cursor: not-allowed;
+  }
+
+  .ui-pos-option[data-tone='open'] {
+    border-color: color-mix(in srgb, var(--color-primary) 50%, transparent);
+    background: color-mix(in srgb, var(--color-primary) 5%, transparent);
+  }
+
+  .ui-pos-option[data-tone='open']:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+  }
+
+  .ui-pos-option[data-tone='move'] {
+    border-color: color-mix(in srgb, var(--color-accent) 60%, transparent);
+    background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  }
+
+  .ui-pos-option[data-tone='move']:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--color-accent) 15%, transparent);
+  }
+
+  .ui-pos-option[data-tone='self'] {
+    border-color: color-mix(in srgb, var(--color-primary) 40%, transparent);
+    background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+  }
+
+  .ui-pos-option[data-tone='muted'] {
+    opacity: var(--ui-disabled-opacity);
+  }
+
+  .ui-pos-option[data-tone='self'] {
+    opacity: 0.7;
+  }
+
+  .ui-pos-badge {
+    display: grid;
+    place-items: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    flex: none;
+    border-radius: 0.5rem;
+    background: var(--color-surface-3);
+    color: var(--color-primary);
+    font-family: var(--font-display);
+    font-size: 0.875rem;
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+
+  .ui-pos-option[data-tone='move'] .ui-pos-badge {
+    color: var(--color-accent);
+  }
+
+  .ui-pos-option[data-tone='muted'] .ui-pos-badge {
+    color: var(--color-muted-foreground);
+  }
+
+  .ui-scoreboard {
+    display: grid;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 0;
+  }
+
+  .ui-scoreboard[data-layout='inline'] {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  }
+
+  .ui-scoreboard[data-layout='duo'] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ui-scoreboard-team {
+    display: grid;
+    gap: 0.15rem;
+    min-width: 0;
+    justify-items: center;
+    text-align: center;
+  }
+
+  .ui-scoreboard-team[data-align='start'] {
+    justify-items: start;
+    text-align: left;
+  }
+
+  .ui-scoreboard-team[data-align='end'] {
+    justify-items: end;
+    text-align: right;
+  }
+
+  .ui-scoreboard-label {
+    color: var(--color-muted-foreground);
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .ui-scoreboard-score {
+    font-family: var(--font-display);
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+
+  .ui-scoreboard-status {
+    display: grid;
+    justify-items: center;
+    gap: 0.15rem;
+    min-width: 0;
+    color: var(--color-muted-foreground);
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .ui-scoreboard[data-layout='duo'] .ui-scoreboard-status {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (min-width: 640px) {
+  .ui-dialog-sheet {
+    inset-inline: auto;
+    left: 50%;
+    top: 50%;
+    bottom: auto;
+    transform: translate(-50%, -50%);
+    width: 100%;
+    max-height: 85dvh;
+    border: 1px solid var(--color-border);
+    border-radius: 1rem;
+    padding: 1rem;
+    padding-bottom: 1rem;
+  }
+}

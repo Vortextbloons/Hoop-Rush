@@ -27,7 +27,6 @@ import { createDraftDuelSession } from './draft-duel-session';
 import {
   draftDuelVisibleEventCount,
   draftDuelVisibleState,
-  type DraftDuelPlaybackSpeed,
   type DraftDuelVisibleState,
 } from './draft-duel-playback';
 import { draftDuelFeedLines, type DraftDuelFeedLine } from './draft-duel-broadcast-view';
@@ -51,6 +50,7 @@ export class DraftDuelPresenter {
   notice = $state<string | null>(null);
   integrityFailed = $state(false);
   progress = $state(0);
+  awaitingContinue = $state(false);
   localReady = $state(false);
   opponentReady = $state(false);
   readyCountdownMs = $state<number | null>(null);
@@ -62,7 +62,6 @@ export class DraftDuelPresenter {
     atMs: number;
   } | null>(null);
   muted = $state(false);
-  playbackSpeed = $state<DraftDuelPlaybackSpeed>(1);
   private commands = $state.raw<DraftDuelCommand[]>([]);
   private completedRecap = $state.raw<StoredDraftDuelCompleted | null>(null);
   private errorState = $state<string | null>(null);
@@ -267,8 +266,8 @@ export class DraftDuelPresenter {
     this.muted = muted;
   }
 
-  setPlaybackSpeed(speed: DraftDuelPlaybackSpeed): void {
-    this.playbackSpeed = speed;
+  continueAfterGame(): void {
+    this.session.continueAfterGame();
   }
 
   seriesGameEntries(): DraftDuelSeriesGame[] {
@@ -306,6 +305,7 @@ export class DraftDuelPresenter {
     this.notice = view.notice;
     this.integrityFailed = view.integrityFailed;
     this.progress = view.progress;
+    this.awaitingContinue = view.awaitingContinue;
     this.localReady = view.localReady;
     this.opponentReady = view.opponentReady;
     this.readyCountdownMs = view.readyCountdownMs;
@@ -333,7 +333,7 @@ export class DraftDuelPresenter {
       const nowMs = Date.now();
       const lastFrameMs = this.playbackLastFrameMs ?? nowMs;
       this.playbackLastFrameMs = nowMs;
-      this.session.advancePlayback((nowMs - lastFrameMs) * this.playbackSpeed);
+      this.session.advancePlayback(nowMs - lastFrameMs);
       if (this.session.getSnapshot().progress >= 1) {
         this.rafId = null;
         return;

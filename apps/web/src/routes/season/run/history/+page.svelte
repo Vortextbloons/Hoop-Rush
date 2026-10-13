@@ -4,6 +4,7 @@
   import { page } from '$app/state';
   import type { SeasonCompletedRunIndexEntry } from '@hoop-rush/persistence';
   import { getSeasonRunRepository } from '$lib/season/season-repo';
+  import AsyncState from '$lib/components/AsyncState.svelte';
   import {
     SEASON_RUN_SHELL_CONTEXT,
     type SeasonRunShellData,
@@ -51,32 +52,30 @@
     </div>
 
     {#if loadError !== null}
-      <div role="alert" class="sr-panel mx-auto mt-8 w-full max-w-xl p-6">
-        <p class="sr-eyebrow">Season archive</p>
-        <h2 class="font-display mt-1 text-lg font-extrabold uppercase tracking-tight">
-          History could not load
-        </h2>
-
-        <p class="mt-2 font-mono text-xs text-destructive">{loadError}</p>
-        <button type="button" onclick={() => void loadHistory()} class="sr-btn-danger mt-4">
-          Try again
-        </button>
+      <div class="mx-auto mt-8 w-full max-w-xl">
+        <AsyncState kind="error" title="History could not load" message={loadError}>
+          {#snippet actions()}
+            <button type="button" onclick={() => void loadHistory()} class="sr-btn-danger">
+              Try again
+            </button>
+          {/snippet}
+        </AsyncState>
       </div>
     {:else if entries === null}
-      <p class="py-10 font-mono text-sm text-muted-foreground" aria-live="polite">
-        Loading completed seasons…
-      </p>
+      <div class="mx-auto mt-8 w-full max-w-xl">
+        <AsyncState kind="loading" title="Loading completed seasons" />
+      </div>
     {:else if entries.length === 0}
-      <div class="sr-panel mx-auto mt-8 w-full max-w-xl p-6 text-center">
-        <p class="sr-eyebrow">Nothing archived yet</p>
-        <p class="font-display mt-1 text-lg font-extrabold uppercase tracking-tight">
-          No completed seasons yet
-        </p>
-        <p class="mt-2 text-sm text-muted-foreground">
-          Finish a Season Run through the champion to see it here — results, awards, and the final
-          bracket are preserved on this device.
-        </p>
-        <a href={resolve('/season/run')} class="sr-btn-ghost mt-4"> Back to the hub </a>
+      <div class="mx-auto mt-8 w-full max-w-xl">
+        <AsyncState
+          kind="empty"
+          title="No completed seasons yet"
+          message="Finish a Season Run through the champion to see it here — results, awards, and the final bracket are preserved on this device."
+        >
+          {#snippet actions()}
+            <a href={resolve('/season/run')} class="sr-btn-ghost">Back to the hub</a>
+          {/snippet}
+        </AsyncState>
       </div>
     {:else}
       <p class="sr-section-label mt-6">Finals archive</p>

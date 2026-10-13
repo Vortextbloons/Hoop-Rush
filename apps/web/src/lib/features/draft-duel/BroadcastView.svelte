@@ -7,11 +7,9 @@
     HoopRushManifest,
   } from '@hoop-rush/data-contracts';
   import { DRAFT_DUEL_TAPE_STAT_FIELDS } from '@hoop-rush/data-contracts';
-  import type {
-    DraftDuelPlaybackSpeed,
-    DraftDuelVisibleState,
-  } from '$lib/features/draft-duel/draft-duel-playback';
+  import type { DraftDuelVisibleState } from '$lib/features/draft-duel/draft-duel-playback';
   import PlayerFace from '$lib/components/PlayerFace.svelte';
+  import GameScoreboard from '$lib/components/GameScoreboard.svelte';
   import TeamLogo from '$lib/components/TeamLogo.svelte';
   import { SLOT_LABELS } from '$lib/player-positions';
   import { draftDuelPeriodLabel, type DraftDuelFeedLine } from './draft-duel-broadcast-view';
@@ -24,8 +22,6 @@
     feed,
     cards = {},
     manifest = null,
-    speed,
-    onspeedchange,
   }: {
     output: DraftDuelGameOutput;
     visible: DraftDuelVisibleState;
@@ -34,11 +30,7 @@
     feed: DraftDuelFeedLine[];
     cards?: Record<string, DraftDuelCard>;
     manifest?: HoopRushManifest | null;
-    speed: DraftDuelPlaybackSpeed;
-    onspeedchange: (speed: DraftDuelPlaybackSpeed) => void;
   } = $props();
-
-  const speeds: DraftDuelPlaybackSpeed[] = [1, 2];
 
   const POINTS = DRAFT_DUEL_TAPE_STAT_FIELDS.indexOf('points');
   const FIELD_GOAL_MAKES = DRAFT_DUEL_TAPE_STAT_FIELDS.indexOf('fieldGoalMakes');
@@ -194,51 +186,46 @@
 </script>
 
 <section class="broadcast" aria-label={`Game ${String(output.gameNumber)} broadcast`}>
-  <header class="bc-board">
-    <div class="bc-team you">
-      <span class="bc-team-label">You</span>
-      {#key localScore}
-        <span class="bc-score" data-score="local">{localScore}</span>
-      {/key}
-    </div>
-    <div class="bc-center">
-      <span class="bc-live" data-tone={complete ? 'final' : 'live'}>
-        <span class="bc-live-dot" aria-hidden="true"></span>
-        {complete ? 'Final' : 'Live'}
-      </span>
-      <span class="bc-clock" aria-live="polite">{periodLabel} · {clockLabel}</span>
-      {#if !complete}
-        <span class="bc-possession">{possession ?? 'Tip-off soon'}</span>
-      {/if}
-      <span class="bc-quarters" aria-hidden="true">
-        {#each [1, 2, 3, 4] as quarter (quarter)}
-          <span
-            class="bc-quarter"
-            class:done={quarter < (lastTrip?.period ?? 1)}
-            class:now={quarter === (lastTrip?.period ?? 1)}
-          ></span>
-        {/each}
-      </span>
-      <div class="bc-speed" role="group" aria-label="Playback speed">
-        {#each speeds as option (option)}
-          <button
-            type="button"
-            class="bc-speed-btn"
-            aria-pressed={speed === option}
-            onclick={() => onspeedchange(option)}
-          >
-            {option}×
-          </button>
-        {/each}
+  <GameScoreboard
+    teams={[
+      { key: 'local', label: 'You', score: localScore },
+      { key: 'opponent', label: 'Opponent', score: opponentScore },
+    ]}
+    label={`Game ${String(output.gameNumber)} score`}
+    class="bc-board"
+  >
+    {#snippet team(entry)}
+      <div class={entry.key === 'local' ? 'bc-team you' : 'bc-team opp'}>
+        <span class="bc-team-label">{entry.label}</span>
+        {#key entry.score}
+          <span class="bc-score" data-score={entry.key === 'local' ? 'local' : 'opponent'}>
+            {entry.score}
+          </span>
+        {/key}
       </div>
-    </div>
-    <div class="bc-team opp">
-      <span class="bc-team-label">Opponent</span>
-      {#key opponentScore}
-        <span class="bc-score" data-score="opponent">{opponentScore}</span>
-      {/key}
-    </div>
-  </header>
+    {/snippet}
+    {#snippet status()}
+      <div class="bc-center">
+        <span class="bc-live" data-tone={complete ? 'final' : 'live'}>
+          <span class="bc-live-dot" aria-hidden="true"></span>
+          {complete ? 'Final' : 'Live'}
+        </span>
+        <span class="bc-clock" aria-live="polite">{periodLabel} · {clockLabel}</span>
+        {#if !complete}
+          <span class="bc-possession">{possession ?? 'Tip-off soon'}</span>
+        {/if}
+        <span class="bc-quarters" aria-hidden="true">
+          {#each [1, 2, 3, 4] as quarter (quarter)}
+            <span
+              class="bc-quarter"
+              class:done={quarter < (lastTrip?.period ?? 1)}
+              class:now={quarter === (lastTrip?.period ?? 1)}
+            ></span>
+          {/each}
+        </span>
+      </div>
+    {/snippet}
+  </GameScoreboard>
 
   <div class="bc-progress" aria-hidden="true">
     <div
@@ -361,7 +348,7 @@
     gap: 12px;
   }
 
-  .bc-board {
+  :global(.broadcast .bc-board) {
     display: grid;
     grid-template-columns: 1fr auto 1fr;
     align-items: center;
@@ -490,7 +477,6 @@
   .bc-quarters {
     display: flex;
     gap: 5px;
-    margin-top: 2px;
   }
 
   .bc-quarter {
@@ -506,40 +492,6 @@
 
   .bc-quarter.now {
     background: var(--color-primary);
-  }
-
-  .bc-speed {
-    display: inline-flex;
-    gap: 4px;
-    margin-top: 2px;
-  }
-
-  .bc-speed-btn {
-    padding: 3px 10px;
-    border: 1px solid var(--color-line-strong);
-    border-radius: 999px;
-    background: var(--color-surface-2);
-    color: var(--color-muted-foreground);
-    font-family: var(--font-mono);
-    font-size: 10px;
-    font-weight: 800;
-    letter-spacing: 0.08em;
-    cursor: pointer;
-  }
-
-  .bc-speed-btn:hover {
-    color: var(--color-foreground);
-  }
-
-  .bc-speed-btn[aria-pressed='true'] {
-    border-color: color-mix(in srgb, var(--color-primary) 55%, transparent);
-    background: color-mix(in srgb, var(--color-primary) 14%, transparent);
-    color: var(--color-primary);
-  }
-
-  .bc-speed-btn:focus-visible {
-    outline: 2px solid var(--color-ring);
-    outline-offset: 2px;
   }
 
   .bc-progress {
@@ -876,7 +828,7 @@
   }
 
   @media (max-width: 600px) {
-    .bc-board {
+    :global(.broadcast .bc-board) {
       padding: 14px;
       gap: 10px;
     }

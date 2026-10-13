@@ -25,6 +25,7 @@
   --ur-panel: #10161c;
   --ur-gold: #ffc53d;
   --ur-gold-line: rgb(255 197 61 / 25%);
+  --ui-focus: var(--ur-focus);
   position: relative;
   isolation: isolate;
   overflow-x: clip;
@@ -283,9 +284,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.45rem;
-  min-height: 2.75rem;
-  padding: 0.6rem 1.25rem;
+  gap: var(--ui-control-gap);
+  min-height: var(--ui-control-height);
+  padding: 0.6rem var(--ui-control-padding-inline);
   border: 1px solid var(--ur-gold);
   border-radius: 999px;
   background: linear-gradient(180deg, #ffda73, var(--ur-gold));
@@ -299,13 +300,18 @@
   background: linear-gradient(180deg, #ffe39a, #ffd04d);
 }
 
+.ur-btn-gold:disabled {
+  cursor: not-allowed;
+  opacity: var(--ui-disabled-opacity);
+}
+
 .ur-btn-ghost-gold {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.45rem;
-  min-height: 2.75rem;
-  padding: 0.6rem 1.25rem;
+  gap: var(--ui-control-gap);
+  min-height: var(--ui-control-height);
+  padding: 0.6rem var(--ui-control-padding-inline);
   border: 1px solid rgb(255 197 61 / 40%);
   border-radius: 999px;
   background: transparent;
@@ -318,6 +324,11 @@
 .ur-btn-ghost-gold:hover {
   background: rgb(255 197 61 / 10%);
   color: #fff1bd;
+}
+
+.ur-btn-ghost-gold:disabled {
+  cursor: not-allowed;
+  opacity: var(--ui-disabled-opacity);
 }
 
 .ur-eyebrow-gold {

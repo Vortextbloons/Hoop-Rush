@@ -10,6 +10,8 @@
     TeamResult,
   } from '@hoop-rush/data-contracts';
   import PlayerFace from '$lib/components/PlayerFace.svelte';
+  import PlayerStatsTable from '$lib/components/PlayerStatsTable.svelte';
+  import type { PlayerStatColumn, PlayerStatsTotals } from '$lib/components/player-stats-table';
   import { SLOT_LABELS } from '$lib/player-positions';
   import { draftDuelTeamOf } from './draft-duel-broadcast-view';
 
@@ -21,6 +23,8 @@
     readyCountdownMs,
     localReady,
     onready,
+    awaitingContinue,
+    oncontinue,
     cards = {},
     manifest = null,
   }: {
@@ -31,6 +35,8 @@
     readyCountdownMs: number | null;
     localReady: boolean;
     onready: () => void;
+    awaitingContinue: boolean;
+    oncontinue: () => void;
     cards?: Record<string, DraftDuelCard>;
     manifest?: HoopRushManifest | null;
   } = $props();
@@ -87,6 +93,50 @@
       won: !localWon,
     },
   ]);
+
+  type DraftDuelBoxRow = PlayerBoxScore & { slotIndex: number };
+
+  const boxColumns: readonly PlayerStatColumn<DraftDuelBoxRow>[] = [
+    { key: 'minutes', label: 'MIN', value: (row) => row.minutes },
+    { key: 'points', label: 'PTS', value: (row) => row.points, cellClass: 'is-strong' },
+    { key: 'rebounds', label: 'REB', value: (row) => row.rebounds.total },
+    { key: 'assists', label: 'AST', value: (row) => row.assists },
+    { key: 'turnovers', label: 'TO', value: (row) => row.turnovers },
+    { key: 'fieldGoals', label: 'FG', value: (row) => statLine(row) },
+    { key: 'threes', label: '3P', value: (row) => threeLine(row) },
+    { key: 'freeThrows', label: 'FT', value: (row) => freeThrowLine(row) },
+  ];
+
+  function rowsOf(panel: TeamPanel): DraftDuelBoxRow[] {
+    return panel.team.players.map((player, slotIndex) => ({ ...player, slotIndex }));
+  }
+
+  function totalsOf(panel: TeamPanel): PlayerStatsTotals<DraftDuelBoxRow> {
+    return {
+      value: (column) => {
+        switch (column.key) {
+          case 'minutes':
+            return panel.team.players.reduce((total, player) => total + player.minutes, 0);
+          case 'points':
+            return panel.team.box.points;
+          case 'rebounds':
+            return panel.team.box.rebounds.total;
+          case 'assists':
+            return panel.team.box.assists;
+          case 'turnovers':
+            return panel.team.box.turnovers;
+          case 'fieldGoals':
+            return `${String(panel.team.box.fieldGoals.made)}-${String(panel.team.box.fieldGoals.attempted)}`;
+          case 'threes':
+            return `${String(panel.team.box.threes.made)}-${String(panel.team.box.threes.attempted)}`;
+          case 'freeThrows':
+            return `${String(panel.team.box.freeThrows.made)}-${String(panel.team.box.freeThrows.attempted)}`;
+          default:
+            return '';
+        }
+      },
+    };
+  }
 
   const verificationView = $derived.by(() => {
     if (verification === 'verified') {
@@ -190,95 +240,67 @@
           <strong class="box-score">{panel.team.box.points}</strong>
         </header>
         <div class="box-scroll">
-          <table>
-            <caption class="sr-only">{panel.label} box score</caption>
-            <thead>
-              <tr>
-                <th scope="col" class="is-player">Player</th>
-                <th scope="col">MIN</th>
-                <th scope="col">PTS</th>
-                <th scope="col">REB</th>
-                <th scope="col">AST</th>
-                <th scope="col">TO</th>
-                <th scope="col">FG</th>
-                <th scope="col">3P</th>
-                <th scope="col">FT</th>
-              </tr>
-            </thead>
-            <tbody>
-              {#each panel.team.players as player, slotIndex (player.playerId)}
-                <tr data-role="player-row">
-                  <th scope="row" class="is-player">
-                    <span class="player-cell">
-                      {#if manifest && cardOf(player.playerId)?.playerExternalId}
-                        <PlayerFace
-                          player={{
-                            playerId: player.playerId,
-                            playerExternalId: cardOf(player.playerId)?.playerExternalId ?? '',
-                            altIds: null,
-                          }}
-                          {manifest}
-                          size="sm"
-                          fallbackInitials={initialsOf(nameOf(player.playerId))}
-                        />
-                      {:else}
-                        <span class="player-fallback">{initialsOf(nameOf(player.playerId))}</span>
-                      {/if}
-                      <span class="player-text">
-                        <span class="player-name">{nameOf(player.playerId)}</span>
-                        <span class="player-pos">{SLOT_LABELS[slotIndex] ?? ''}</span>
-                      </span>
-                    </span>
-                  </th>
-                  <td>{player.minutes}</td>
-                  <td data-stat="pts">{player.points}</td>
-                  <td>{player.rebounds.total}</td>
-                  <td>{player.assists}</td>
-                  <td>{player.turnovers}</td>
-                  <td>{statLine(player)}</td>
-                  <td>{threeLine(player)}</td>
-                  <td>{freeThrowLine(player)}</td>
-                </tr>
-              {/each}
-            </tbody>
-            <tfoot>
-              <tr>
-                <th scope="row" class="is-player">Team</th>
-                <td>
-                  {panel.team.players.reduce((total, player) => total + player.minutes, 0)}
-                </td>
-                <td>{panel.team.box.points}</td>
-                <td>{panel.team.box.rebounds.total}</td>
-                <td>{panel.team.box.assists}</td>
-                <td>{panel.team.box.turnovers}</td>
-                <td>
-                  {panel.team.box.fieldGoals.made}-{panel.team.box.fieldGoals.attempted}
-                </td>
-                <td>{panel.team.box.threes.made}-{panel.team.box.threes.attempted}</td>
-                <td>
-                  {panel.team.box.freeThrows.made}-{panel.team.box.freeThrows.attempted}
-                </td>
-              </tr>
-            </tfoot>
-          </table>
+          <PlayerStatsTable
+            columns={boxColumns}
+            rows={rowsOf(panel)}
+            rowKey={(row) => row.playerId}
+            totals={totalsOf(panel)}
+            caption={`${panel.label} box score`}
+            playerCellClass="is-player"
+            playerHeadCellClass="is-player"
+            playerTotalCellClass="is-player"
+            rowAttributes={() => ({ 'data-role': 'player-row' })}
+          >
+            {#snippet identity(row)}
+              <span class="player-cell">
+                {#if manifest && cardOf(row.playerId)?.playerExternalId}
+                  <PlayerFace
+                    player={{
+                      playerId: row.playerId,
+                      playerExternalId: cardOf(row.playerId)?.playerExternalId ?? '',
+                      altIds: null,
+                    }}
+                    {manifest}
+                    size="sm"
+                    fallbackInitials={initialsOf(nameOf(row.playerId))}
+                  />
+                {:else}
+                  <span class="player-fallback">{initialsOf(nameOf(row.playerId))}</span>
+                {/if}
+                <span class="player-text">
+                  <span class="player-name">{nameOf(row.playerId)}</span>
+                  <span class="player-pos">{SLOT_LABELS[row.slotIndex] ?? ''}</span>
+                </span>
+              </span>
+            {/snippet}
+          </PlayerStatsTable>
         </div>
       </section>
     {/each}
   </div>
 
   <footer class="ready">
-    <div class="ready-copy">
-      <p class="ready-line">
-        {localReady ? "You're ready for the next game." : 'Ready to continue?'}
-      </p>
-      {#if countdownLabel !== null}
-        <p class="countdown">
-          <Clock size={13} aria-hidden="true" />
-          Auto-ready in <strong>{countdownLabel}</strong>
+    {#if awaitingContinue}
+      <div class="ready-copy">
+        <p class="ready-line">Review the box score, then continue when ready.</p>
+      </div>
+      <button type="button" onclick={oncontinue}>Continue</button>
+    {:else}
+      <div class="ready-copy">
+        <p class="ready-line">
+          {localReady ? "You're ready for the next game." : 'Ready to continue?'}
         </p>
-      {/if}
-    </div>
-    <button type="button" disabled={localReady || !canReady} onclick={onready}>{readyLabel}</button>
+        {#if countdownLabel !== null}
+          <p class="countdown">
+            <Clock size={13} aria-hidden="true" />
+            Auto-ready in <strong>{countdownLabel}</strong>
+          </p>
+        {/if}
+      </div>
+      <button type="button" disabled={localReady || !canReady} onclick={onready}>
+        {readyLabel}
+      </button>
+    {/if}
   </footer>
 </section>
 
@@ -457,7 +479,7 @@
     overflow-x: auto;
   }
 
-  table {
+  :global(.results table) {
     width: 100%;
     min-width: 26rem;
     border-collapse: collapse;
@@ -465,14 +487,13 @@
     font-variant-numeric: tabular-nums;
   }
 
-  th,
-  td {
+  :global(.results th, .results td) {
     padding: 0.32rem 0.42rem;
     white-space: nowrap;
     text-align: right;
   }
 
-  thead th {
+  :global(.results thead th) {
     color: var(--color-muted-foreground);
     font-family: var(--font-mono);
     font-size: 0.56rem;
@@ -481,7 +502,7 @@
     border-bottom: 1px solid var(--color-line-soft);
   }
 
-  .is-player {
+  :global(.results .is-player) {
     width: 100%;
     max-width: 10rem;
     overflow: hidden;
@@ -489,15 +510,15 @@
     text-overflow: ellipsis;
   }
 
-  tbody tr {
+  :global(.results tbody tr) {
     border-top: 1px solid color-mix(in srgb, var(--color-line-soft) 55%, transparent);
   }
 
-  tbody tr:first-child {
+  :global(.results tbody tr:first-child) {
     border-top: 0;
   }
 
-  tbody th.is-player {
+  :global(.results tbody th.is-player) {
     font-weight: 600;
   }
 
@@ -548,18 +569,17 @@
     color: var(--color-muted-foreground);
   }
 
-  tbody td[data-stat='pts'] {
+  :global(.results tbody td.is-strong) {
     color: var(--color-foreground);
     font-weight: 800;
   }
 
-  tfoot tr {
+  :global(.results tfoot tr) {
     border-top: 1px solid var(--color-line-strong);
     background: color-mix(in srgb, var(--color-foreground) 4%, transparent);
   }
 
-  tfoot th,
-  tfoot td {
+  :global(.results tfoot th, .results tfoot td) {
     font-weight: 700;
   }
 

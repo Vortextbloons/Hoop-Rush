@@ -1,5 +1,6 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
+  import AsyncState from '$lib/components/AsyncState.svelte';
   import type { HavocHistoryState } from './havoc-history-state.svelte';
   import { havocCompletionStateLabel, havocRecordLabel } from './havoc-presentation';
 
@@ -20,25 +21,24 @@
   </header>
 
   {#if state.loading}
-    <p class="mt-6 font-mono text-sm text-muted-foreground" aria-live="polite">Loading history…</p>
+    <div class="mt-6">
+      <AsyncState kind="loading" title="Loading history" message="Reading your Havoc runs…" />
+    </div>
   {:else if state.error !== null && state.entries.length === 0}
-    <p
-      role="alert"
-      class="mt-6 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs"
-    >
-      {state.error}
-    </p>
+    <div class="mt-6">
+      <AsyncState kind="error" title="History unavailable" message={state.error} />
+    </div>
   {:else if state.entries.length === 0}
-    <div class="mt-6 rounded-xl bg-surface-1 p-6">
-      <p class="text-sm text-muted-foreground">
-        No Havoc runs yet. Draft a lineup and play the 82-game challenge.
-      </p>
-      <a
-        href={resolve('/havoc')}
-        class="mt-4 inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-5 py-3 text-xs font-extrabold tracking-wide text-primary-foreground uppercase outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring"
+    <div class="mt-6">
+      <AsyncState
+        kind="empty"
+        title="No Havoc runs yet"
+        message="Draft a lineup and play the 82-game challenge."
       >
-        Start a Havoc run
-      </a>
+        {#snippet actions()}
+          <a href={resolve('/havoc')} class="h-button">Start a Havoc run</a>
+        {/snippet}
+      </AsyncState>
     </div>
   {:else}
     <ul class="mt-6 flex flex-col gap-3">

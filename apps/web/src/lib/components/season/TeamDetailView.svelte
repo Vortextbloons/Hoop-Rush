@@ -2,11 +2,10 @@
   import type { SeasonGameRule } from '@hoop-rush/data-contracts';
   import RuleBadge from './RuleBadge.svelte';
   import type { HoopRushManifest } from '@hoop-rush/data-contracts';
-  import SeasonPlayerFace from '$lib/components/season/SeasonPlayerFace.svelte';
+  import SeasonPlayerIdentity from '$lib/components/season/SeasonPlayerIdentity.svelte';
   import SeasonTeamLogo from '$lib/components/season/SeasonTeamLogo.svelte';
   import { eraIdentityOf, franchiseIdentityOf } from '$lib/season/season-branding';
   import type { SeasonRunShellData } from '$lib/season/season-shell-context';
-  import { formatPositions } from '$lib/player-positions';
   import { oneDecimal } from '$lib/format';
   import type {
     SeasonTeamDetail,
@@ -167,43 +166,23 @@
         {@const eraLabel = eraLabelOf(row.playerVersionId, row.franchiseId, row.eraId)}
         <li class="sr-panel-quiet p-3">
           <div class="flex min-w-0 items-start gap-3">
-            {#if face !== null}
-              <SeasonPlayerFace {face} {manifest} size="sm" />
-            {:else}
-              <span
-                class="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-surface-3 font-display font-extrabold text-muted-foreground"
-                aria-hidden="true"
-              >
-                ?
-              </span>
-            {/if}
             <div class="min-w-0 flex-1">
-              <div class="flex min-w-0 flex-wrap items-center gap-2">
-                <p class="min-w-0 truncate text-sm font-semibold">{row.displayName}</p>
-                {#if row.overallRating !== null}
-                  <span
-                    class="sr-number shrink-0 rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] font-bold text-foreground"
-                  >
-                    OVR {row.overallRating}
-                  </span>
-                {/if}
-                {#if row.closing}
-                  <span class="sr-badge shrink-0" data-tone="hardwood"> Closing five </span>
-                {/if}
-              </div>
-              <p class="truncate font-mono text-[10px] text-muted-foreground">
-                {row.seasonKey}
-                {#if row.positions.length > 0}
-                  · {formatPositions(row.positions)}
-                {/if}
-              </p>
-              {#if eraLabel}
-                <p
-                  class="mt-1 line-clamp-2 font-mono text-[9px] leading-snug text-muted-foreground/70"
-                >
-                  {eraLabel}
-                </p>
-              {/if}
+              <SeasonPlayerIdentity
+                {face}
+                {manifest}
+                displayName={row.displayName}
+                seasonKey={row.seasonKey}
+                positions={row.positions}
+                overall={row.overallRating}
+                {eraLabel}
+                chipsInline
+              >
+                {#snippet chips()}
+                  {#if row.closing}
+                    <span class="sr-badge shrink-0" data-tone="hardwood">Closing five</span>
+                  {/if}
+                {/snippet}
+              </SeasonPlayerIdentity>
             </div>
             <div class="flex shrink-0 flex-col items-end gap-1">
               <span class="whitespace-nowrap font-mono text-[10px] text-muted-foreground">

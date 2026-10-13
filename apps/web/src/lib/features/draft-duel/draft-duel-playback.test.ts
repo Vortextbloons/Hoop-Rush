@@ -84,15 +84,16 @@ describe('draftDuelPlaybackWeights', () => {
     }
   });
 
-  it('clamps a zero-second trip to at least one second of weight', () => {
+  it('weights every trip uniformly regardless of game-clock duration', () => {
     const trip = output.tape.find((event): event is DraftDuelTapeTrip => event.kind === 'trip');
     expect(trip).toBeDefined();
     if (trip === undefined) return;
     const weights = draftDuelPlaybackWeights([
       { ...trip, secondsElapsed: 0 },
+      { ...trip, secondsElapsed: 24 },
       { ...trip, secondsElapsed: 2 },
     ]);
-    expect(weights).toEqual([1 / 3, 1]);
+    expect(weights).toEqual([1 / 3, 2 / 3, 1]);
   });
 });
 

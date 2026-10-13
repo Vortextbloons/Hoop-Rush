@@ -693,7 +693,7 @@ function checkTape(
           }
         }
         const owner = requireActive(event.ownerInstanceId, 'actor-eligibility');
-        if (owner !== undefined) {
+        if (owner != null) {
           if (!owner.mutations.has('double-or-nothing')) {
             fail('double-or-nothing', 'extra free throw owner does not own Double or Nothing');
           }

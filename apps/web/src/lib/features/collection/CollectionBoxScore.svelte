@@ -1,6 +1,8 @@
 <script lang="ts">
   import type { CollectionCatalogCard, HoopRushManifest } from '@hoop-rush/data-contracts';
   import PlayerFace from '$lib/components/PlayerFace.svelte';
+  import PlayerStatsTable from '$lib/components/PlayerStatsTable.svelte';
+  import type { PlayerStatColumn, PlayerStatsTotals } from '$lib/components/player-stats-table';
   import type { GameExplanationFacts } from './collection-gamecast';
   import {
     teamBoxViewOf,
@@ -57,6 +59,81 @@
 
   function deepFoursOf(row: PlayerBoxRow): string {
     return `${String(row.deepFours?.made ?? 0)}-${String(row.deepFours?.attempted ?? 0)}`;
+  }
+
+  const boxColumns = $derived.by((): PlayerStatColumn<PlayerBoxRow>[] => {
+    const columns: PlayerStatColumn<PlayerBoxRow>[] = [
+      {
+        key: 'minutes',
+        label: 'Min',
+        value: (row) => (row.seconds === 0 ? '—' : row.minutes.toFixed(1)),
+      },
+      {
+        key: 'points',
+        label: 'Pts',
+        value: (row) => row.points,
+        cellClass: 'is-strong',
+        totalClass: 'is-strong',
+      },
+      { key: 'rebounds', label: 'Reb', value: (row) => row.rebounds },
+      { key: 'assists', label: 'Ast', value: (row) => row.assists },
+      { key: 'steals', label: 'Stl', value: (row) => row.steals },
+      { key: 'blocks', label: 'Blk', value: (row) => row.blocks },
+      { key: 'turnovers', label: 'TO', value: (row) => row.turnovers },
+      { key: 'fouls', label: 'PF', value: (row) => row.fouls },
+      {
+        key: 'fieldGoals',
+        label: 'FG',
+        value: (row) => `${String(row.fieldGoals.made)}-${String(row.fieldGoals.attempted)}`,
+      },
+      {
+        key: 'threes',
+        label: '3P',
+        value: (row) => `${String(row.threes.made)}-${String(row.threes.attempted)}`,
+      },
+      {
+        key: 'freeThrows',
+        label: 'FT',
+        value: (row) => `${String(row.freeThrows.made)}-${String(row.freeThrows.attempted)}`,
+      },
+    ];
+    if (hasDeepFours) {
+      columns.push({ key: 'deepFours', label: '4P', value: (row) => deepFoursOf(row) });
+    }
+    return columns;
+  });
+
+  function totalsOf(team: ReturnType<typeof teamBoxViewOf>): PlayerStatsTotals<PlayerBoxRow> {
+    return {
+      value: (column) => {
+        switch (column.key) {
+          case 'points':
+            return team.totals.points;
+          case 'rebounds':
+            return team.totals.rebounds;
+          case 'assists':
+            return team.totals.assists;
+          case 'steals':
+            return team.totals.steals;
+          case 'blocks':
+            return team.totals.blocks;
+          case 'turnovers':
+            return team.totals.turnovers;
+          case 'fouls':
+            return team.totals.fouls;
+          case 'fieldGoals':
+            return `${String(team.totals.fieldGoals.made)}-${String(team.totals.fieldGoals.attempted)}`;
+          case 'threes':
+            return `${String(team.totals.threes.made)}-${String(team.totals.threes.attempted)}`;
+          case 'freeThrows':
+            return `${String(team.totals.freeThrows.made)}-${String(team.totals.freeThrows.attempted)}`;
+          case 'deepFours':
+            return `${String(team.totals.deepFours?.made ?? 0)}-${String(team.totals.deepFours?.attempted ?? 0)}`;
+          default:
+            return '';
+        }
+      },
+    };
   }
 </script>
 
@@ -115,104 +192,51 @@
           <strong class="ur-box-team-score ur-number">{teamRow.team.score}</strong>
         </header>
         <div class="ur-box-scroll">
-          <table class="ur-box-table">
-            <caption class="sr-only"
-              >{teamRow.label} player box score · {teamRow.team.score} points</caption
-            >
-            <thead>
-              <tr>
-                <th scope="col" class="is-player">Player</th>
-                <th scope="col" class="is-stat">Min</th>
-                <th scope="col" class="is-stat is-strong">Pts</th>
-                <th scope="col" class="is-stat">Reb</th>
-                <th scope="col" class="is-stat">Ast</th>
-                <th scope="col" class="is-stat">Stl</th>
-                <th scope="col" class="is-stat">Blk</th>
-                <th scope="col" class="is-stat">TO</th>
-                <th scope="col" class="is-stat">PF</th>
-                <th scope="col" class="is-stat">FG</th>
-                <th scope="col" class="is-stat">3P</th>
-                <th scope="col" class="is-stat">FT</th>
-                {#if hasDeepFours}<th scope="col" class="is-stat">4P</th>{/if}
-              </tr>
-            </thead>
-            <tbody>
-              {#each teamRow.team.players as player (player.cardId)}
-                {@const card = cardOf(player.cardId)}
-                <tr data-starter={player.starter} data-dnp={player.seconds === 0}>
-                  <th scope="row" class="is-player">
-                    <span class="ur-box-player">
-                      <span class="ur-box-avatar" aria-hidden="true">
-                        {#if card && manifest}
-                          <PlayerFace
-                            player={{
-                              playerId: card.playerId,
-                              playerExternalId: card.playerExternalId,
-                              altIds: null,
-                            }}
-                            {manifest}
-                            size="sm"
-                            fallbackInitials={initialsOf(player.cardId)}
-                          />
-                        {:else}
-                          <span class="ur-box-initials">{initialsOf(player.cardId)}</span>
-                        {/if}
-                      </span>
-                      <span class="ur-box-name">
-                        <span>{nameOf(player.cardId)}</span>
-                        <small
-                          >{card?.rarity ?? ''}{card ? ' · ' : ''}{card?.positions[0] ?? ''}</small
-                        >
-                      </span>
-                      {#if player.starter}<span class="sr-only">Starter</span>{/if}
-                    </span>
-                  </th>
-                  <td class="is-stat">{player.seconds === 0 ? '—' : player.minutes.toFixed(1)}</td>
-                  <td class="is-stat is-strong">{player.points}</td>
-                  <td class="is-stat">{player.rebounds}</td>
-                  <td class="is-stat">{player.assists}</td>
-                  <td class="is-stat">{player.steals}</td>
-                  <td class="is-stat">{player.blocks}</td>
-                  <td class="is-stat">{player.turnovers}</td>
-                  <td class="is-stat">{player.fouls}</td>
-                  <td class="is-stat">{player.fieldGoals.made}-{player.fieldGoals.attempted}</td>
-                  <td class="is-stat">{player.threes.made}-{player.threes.attempted}</td>
-                  <td class="is-stat">{player.freeThrows.made}-{player.freeThrows.attempted}</td>
-                  {#if hasDeepFours}<td class="is-stat">{deepFoursOf(player)}</td>{/if}
-                </tr>
-              {/each}
-            </tbody>
-            <tfoot>
-              <tr>
-                <th scope="row" class="is-player">Team</th>
-                <td class="is-stat"></td>
-                <td class="is-stat is-strong">{teamRow.team.totals.points}</td>
-                <td class="is-stat">{teamRow.team.totals.rebounds}</td>
-                <td class="is-stat">{teamRow.team.totals.assists}</td>
-                <td class="is-stat">{teamRow.team.totals.steals}</td>
-                <td class="is-stat">{teamRow.team.totals.blocks}</td>
-                <td class="is-stat">{teamRow.team.totals.turnovers}</td>
-                <td class="is-stat">{teamRow.team.totals.fouls}</td>
-                <td class="is-stat"
-                  >{teamRow.team.totals.fieldGoals.made}-{teamRow.team.totals.fieldGoals
-                    .attempted}</td
-                >
-                <td class="is-stat"
-                  >{teamRow.team.totals.threes.made}-{teamRow.team.totals.threes.attempted}</td
-                >
-                <td class="is-stat"
-                  >{teamRow.team.totals.freeThrows.made}-{teamRow.team.totals.freeThrows
-                    .attempted}</td
-                >
-                {#if hasDeepFours}
-                  <td class="is-stat"
-                    >{teamRow.team.totals.deepFours?.made ?? 0}-{teamRow.team.totals.deepFours
-                      ?.attempted ?? 0}</td
-                  >
-                {/if}
-              </tr>
-            </tfoot>
-          </table>
+          <PlayerStatsTable
+            columns={boxColumns}
+            rows={teamRow.team.players}
+            rowKey={(player) => player.cardId}
+            totals={totalsOf(teamRow.team)}
+            caption={`${teamRow.label} player box score · ${String(teamRow.team.score)} points`}
+            tableClass="ur-box-table"
+            playerCellClass="is-player"
+            playerHeadCellClass="is-player"
+            playerTotalCellClass="is-player"
+            statCellClass="is-stat"
+            headCellClass="is-stat"
+            totalCellClass="is-stat"
+            rowAttributes={(player) => ({
+              'data-starter': String(player.starter),
+              'data-dnp': String(player.seconds === 0),
+            })}
+          >
+            {#snippet identity(player)}
+              {@const card = cardOf(player.cardId)}
+              <span class="ur-box-player">
+                <span class="ur-box-avatar" aria-hidden="true">
+                  {#if card && manifest}
+                    <PlayerFace
+                      player={{
+                        playerId: card.playerId,
+                        playerExternalId: card.playerExternalId,
+                        altIds: null,
+                      }}
+                      {manifest}
+                      size="sm"
+                      fallbackInitials={initialsOf(player.cardId)}
+                    />
+                  {:else}
+                    <span class="ur-box-initials">{initialsOf(player.cardId)}</span>
+                  {/if}
+                </span>
+                <span class="ur-box-name">
+                  <span>{nameOf(player.cardId)}</span>
+                  <small>{card?.rarity ?? ''}{card ? ' · ' : ''}{card?.positions[0] ?? ''}</small>
+                </span>
+                {#if player.starter}<span class="sr-only">Starter</span>{/if}
+              </span>
+            {/snippet}
+          </PlayerStatsTable>
         </div>
       </section>
     {/each}
@@ -447,7 +471,7 @@
     overflow-x: auto;
   }
 
-  .ur-box-table {
+  :global(.ur-box-table) {
     width: 100%;
     min-width: 34rem;
     border-collapse: collapse;
@@ -455,13 +479,12 @@
     font-variant-numeric: tabular-nums;
   }
 
-  .ur-box-table th,
-  .ur-box-table td {
+  :global(.ur-box-table th, .ur-box-table td) {
     padding: 0.3rem 0.4rem;
     white-space: nowrap;
   }
 
-  .ur-box-table thead th {
+  :global(.ur-box-table thead th) {
     color: var(--ur-muted);
     font-size: 0.58rem;
     font-weight: 800;
@@ -471,7 +494,7 @@
     border-bottom: 1px solid var(--ur-line);
   }
 
-  .ur-box-table .is-player {
+  :global(.ur-box-table .is-player) {
     position: sticky;
     left: 0;
     z-index: 1;
@@ -480,53 +503,50 @@
     text-align: left;
   }
 
-  .ur-box-table thead .is-player {
+  :global(.ur-box-table thead .is-player) {
     z-index: 2;
     background: #121a1f;
   }
 
-  .ur-box-table tbody .is-player,
-  .ur-box-table tfoot .is-player {
+  :global(.ur-box-table tbody .is-player, .ur-box-table tfoot .is-player) {
     background: #10171c;
   }
 
-  .ur-box-table tbody tr {
+  :global(.ur-box-table tbody tr) {
     border-top: 1px solid color-mix(in srgb, var(--ur-line) 55%, transparent);
   }
 
-  .ur-box-table tbody tr:first-child {
+  :global(.ur-box-table tbody tr:first-child) {
     border-top: 0;
   }
 
-  .ur-box-table tbody tr:hover,
-  .ur-box-table tbody tr:hover .is-player {
+  :global(.ur-box-table tbody tr:hover, .ur-box-table tbody tr:hover .is-player) {
     background: #151e24;
   }
 
-  .ur-box-table tbody tr[data-dnp='true'] {
+  :global(.ur-box-table tbody tr[data-dnp='true']) {
     opacity: 0.45;
   }
 
-  .ur-box-table tbody tr[data-starter='true'] .is-player {
+  :global(.ur-box-table tbody tr[data-starter='true'] .is-player) {
     box-shadow: inset 2px 0 0 var(--ur-apex);
   }
 
-  .ur-box-table .is-stat {
+  :global(.ur-box-table .is-stat) {
     text-align: right;
   }
 
-  .ur-box-table tbody .is-strong {
+  :global(.ur-box-table tbody .is-strong) {
     color: #fff;
     font-weight: 800;
   }
 
-  .ur-box-table tfoot tr {
+  :global(.ur-box-table tfoot tr) {
     border-top: 1px solid var(--ur-line-strong);
     background: rgb(255 255 255 / 3%);
   }
 
-  .ur-box-table tfoot th,
-  .ur-box-table tfoot td {
+  :global(.ur-box-table tfoot th, .ur-box-table tfoot td) {
     padding-block: 0.42rem;
     color: var(--ur-paper);
     font-size: 0.66rem;

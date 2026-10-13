@@ -524,8 +524,6 @@
           output={controller.currentOutput}
           visible={controller.visible}
           progress={controller.progress}
-          speed={controller.playbackSpeed}
-          onspeedchange={(speed) => controller.setPlaybackSpeed(speed)}
           localParticipantId={controller.participantId ?? 'p1'}
           feed={controller.feed}
           cards={playerCards}
@@ -542,6 +540,8 @@
           readyCountdownMs={controller.readyCountdownMs}
           localReady={controller.localReady}
           onready={() => controller.readyForNextGame()}
+          awaitingContinue={controller.awaitingContinue}
+          oncontinue={() => controller.continueAfterGame()}
           cards={playerCards}
           manifest={controller.assets?.manifest ?? null}
         />

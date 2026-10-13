@@ -1,8 +1,7 @@
 <script lang="ts">
   import type { HoopRushManifest } from '@hoop-rush/data-contracts';
-  import SeasonPlayerFace from '$lib/components/season/SeasonPlayerFace.svelte';
+  import SeasonPlayerIdentity from '$lib/components/season/SeasonPlayerIdentity.svelte';
   import SeasonTeamLogo from '$lib/components/season/SeasonTeamLogo.svelte';
-  import { formatPositions } from '$lib/player-positions';
   import type { SeasonFaceRef } from '$lib/season/season-branding';
   let {
     playerVersionId,
@@ -74,26 +73,18 @@
 
 {#snippet row()}
   <div class="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:gap-3">
-    <div class="flex min-w-0 items-start gap-2 sm:gap-3">
-      {#if face !== null}
-        <SeasonPlayerFace {face} {manifest} size="sm" />
-      {:else}
-        <span
-          class="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-surface-3 font-display font-extrabold text-muted-foreground"
-          aria-hidden="true"
-        >
-          ?
-        </span>
-      {/if}
-      <div class="min-w-0 flex-1">
-        <p class="text-sm font-semibold leading-snug">{displayName}</p>
-        <div class="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
-          {#if overall !== null}
-            <span class="sr-chip shrink-0">
-              OVR {overall}{#if overallDelta !== null}
-                → {overall + overallDelta}{/if}
-            </span>
-          {/if}
+    <div class="min-w-0 flex-1">
+      <SeasonPlayerIdentity
+        {face}
+        {manifest}
+        {displayName}
+        {seasonKey}
+        positions={playable}
+        {overall}
+        {overallDelta}
+        eraLabel={eraDisplayLabel}
+      >
+        {#snippet chips()}
           {#if gearPoints > 0}
             <span
               class="sr-badge shrink-0"
@@ -113,27 +104,18 @@
               {fatigueBadgeText}
             </span>
           {/if}
-        </div>
-        <p class="mt-1 font-mono text-[10px] leading-snug text-muted-foreground">
-          {seasonKey}
-          {#if playable.length > 0}
-            · {formatPositions(playable)}
+        {/snippet}
+        {#snippet footer()}
+          {#if recentLoadText !== null}
+            <p class="mt-1 font-mono text-[9px] text-muted-foreground/70">
+              {recentLoadText}
+              {#if lastMinutes !== null}
+                · last game {Math.round(lastMinutes)} min
+              {/if}
+            </p>
           {/if}
-        </p>
-        {#if eraDisplayLabel}
-          <p class="mt-0.5 line-clamp-2 font-mono text-[9px] leading-snug text-muted-foreground/70">
-            {eraDisplayLabel}
-          </p>
-        {/if}
-        {#if recentLoadText !== null}
-          <p class="mt-1 font-mono text-[9px] text-muted-foreground/70">
-            {recentLoadText}
-            {#if lastMinutes !== null}
-              · last game {Math.round(lastMinutes)} min
-            {/if}
-          </p>
-        {/if}
-      </div>
+        {/snippet}
+      </SeasonPlayerIdentity>
     </div>
     <div
       class="flex shrink-0 items-center justify-between gap-2 border-t border-border/40 pt-2 sm:flex-col sm:items-end sm:justify-start sm:border-t-0 sm:pt-0"
