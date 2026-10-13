@@ -262,8 +262,10 @@ plumbing is shared, and every mode session lives in `@hoop-rush/application`
 behind ports. Web keeps views, presenters/controllers, composition, and
 browser adapters. Remaining: stage 7 (tooling consolidation and deletion).
 
-Measured after stage 6f: maintained source 230,329 physical (runtime 182,490;
-web production 89,563, engine production 62,466, application production 8,534,
+Measured after stage 6f: maintained source 230,319 physical (runtime 182,480;
+web production 89,553, engine production 62,466, application production 8,534,
 persistence production 8,838). The session/engine moves are line-neutral
-relocations; the storage slice removed ~750 runtime lines, and the remaining
-net reduction lands with stage 7's tooling consolidation.
+relocations; the storage slice removed ~750 runtime lines (web production
+93,196 → 89,553, persistence 9,111 → 8,838), offset by the new application
+session/port scaffolding. The remaining net reduction lands with stage 7's
+tooling consolidation and deletion.

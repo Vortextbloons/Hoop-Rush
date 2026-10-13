@@ -62,8 +62,8 @@ Landed:
 
 Next:
 
-1. Move the web-side Collection/Draft Duel/multiplayer sessions behind
-   application ports, then stages 6-7.
+1. Stage 7: consolidate tooling, finish deletion, and land the remaining net
+   source reduction.
 
 Stage 5a landed: Classic/Sandbox challenge orchestration moved into
 `ChallengeSession` (`src/challenge/`). The web `ChallengeRunner` is replaced
