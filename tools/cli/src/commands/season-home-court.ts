@@ -34,8 +34,6 @@ import {
 } from '../calibration/index.ts';
 export const SEASON_HOME_COURT_CALIBRATION_SEED_COUNT = 1024;
 export const SEASON_HOME_COURT_VALIDATION_SEED_COUNT = 256;
-export const SEASON_HOME_COURT_SEED_TOTAL =
-  SEASON_HOME_COURT_CALIBRATION_SEED_COUNT + SEASON_HOME_COURT_VALIDATION_SEED_COUNT;
 export const SEASON_HOME_COURT_TOLERANCE = 0.01;
 export function homeWinRateStandardError(n: number): number {
   if (n <= 0) return 0;

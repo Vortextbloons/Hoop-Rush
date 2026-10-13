@@ -20,12 +20,6 @@ export function activeInjuriesOf(
       record.sameGameReturned !== true,
   );
 }
-export function injuryStatusOf(health: SeasonHealthState, playerVersionId: string): InjuryStatus {
-  if (activeInjuriesOf(health, playerVersionId).length > 0) return 'active';
-  const hasRecord = health.injuries.some((record) => record.playerVersionId === playerVersionId);
-  if (hasRecord) return 'returned';
-  return 'none';
-}
 export interface RecoveryEstimate {
   remainingGames: number;
   returnRoundMin: number | null;
@@ -235,15 +229,3 @@ export const INJURY_SEVERITY_LABEL: Record<SeasonInjurySeverity, string> = {
   major: 'Major',
   'season-ending': 'Season-ending',
 };
-export const INJURY_SEVERITY_BADGE: Record<SeasonInjurySeverity, string> = {
-  minor: 'bg-positive/15 text-positive',
-  moderate: 'bg-primary/15 text-primary',
-  major: 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
-  'season-ending': 'bg-destructive/15 text-destructive',
-};
-export function injuryBandOf(severity: SeasonInjurySeverity): {
-  label: string;
-  badge: string;
-} {
-  return { label: INJURY_SEVERITY_LABEL[severity], badge: INJURY_SEVERITY_BADGE[severity] };
-}

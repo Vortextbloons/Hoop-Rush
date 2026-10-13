@@ -2,22 +2,7 @@ export const SEASON_RUN_SCHEMA_VERSION = 14;
 export const SEASON_DRAFT_SAVE_SCHEMA_VERSION = 4;
 export const SEASON_RUN_SAVE_SCHEMA_VERSION = 12;
 export const SEASON_ROOM_PROTOCOL_SCHEMA_VERSION = 2;
-export const SEASON_ROOM_PROTOCOL_SCHEMA_VERSION_V1 = 1;
 export const SEASON_MULTIPLAYER_VERSION = 'season-multiplayer-v2';
-export const SEASON_MULTIPLAYER_VERSION_V1 = 'season-multiplayer-v1';
-export function isSeasonRoomProtocolOutdated(row: {
-  multiplayerVersion?: string | null;
-  roomProtocolVersion?: number | string | null;
-  multiplayer_version?: string | null;
-  room_protocol_version?: number | string | null;
-}): boolean {
-  const multiplayerVersion = row.multiplayerVersion ?? row.multiplayer_version;
-  const roomProtocolVersion = row.roomProtocolVersion ?? row.room_protocol_version;
-  return (
-    multiplayerVersion !== SEASON_MULTIPLAYER_VERSION ||
-    Number(roomProtocolVersion) !== SEASON_ROOM_PROTOCOL_SCHEMA_VERSION
-  );
-}
 export const SEASON_TIMER_POLICY_VERSION = 'season-timers-v1';
 export const SEASON_AUTHORITY_VERSION = 'season-authority-v1';
 export const SEASON_LEAGUE_VERSION = 'league-v1';
@@ -74,7 +59,6 @@ export const PROJECTION_TARGETS_VERSION = 'projection-targets-v1';
 export const PROJECTION_SCHEMA_VERSION = 'projection-schema-v1';
 export const SEASON_PROJECTION_VERSION = 'season-projection-v1';
 export const SEASON_PROJECTION_TARGETS_VERSION = 'season-projection-targets-v1';
-export const SEASON_ROSTER_AUTOFILL_VERSION = 'season-roster-autofill-v1';
 export const SEASON_HEALTH_VERSION = 'season-health-v2';
 export const SEASON_FRONT_OFFICE_VERSION = 'season-front-office-v1';
 export const SEASON_SPONSOR_GEAR_VERSION = 'season-sponsor-gear-v1';

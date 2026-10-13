@@ -39,8 +39,6 @@ import {
 import { lowerMedian, percentile } from '../stats.ts';
 export const SEASON_GAME_CALIBRATION_SEED_COUNT = 1024;
 export const SEASON_GAME_VALIDATION_SEED_COUNT = 256;
-export const SEASON_GAME_CALIBRATION_SEED_TOTAL =
-  SEASON_GAME_CALIBRATION_SEED_COUNT + SEASON_GAME_VALIDATION_SEED_COUNT;
 export const SEASON_GAME_CHUNKING_PROBE_COUNT = 32;
 export const SEASON_GAME_PRESET_FIXTURES = [
   'season-game-balanced',

@@ -9,4 +9,3 @@ export const FIXED_FIVE_ROOM_RETENTION_MS = 24 * 60 * 60 * 1000;
 export const FIXED_FIVE_CLASSIC_PICK_TIMEOUT_MS = 90 * 1000;
 export const FIXED_FIVE_DUEL_PICK_TIMEOUT_MS = 90 * 1000;
 export const FIXED_FIVE_SANDBOX_BUILD_TIMEOUT_MS = 5 * 60 * 1000;
-export const ENGINE_VERSION_PLACEHOLDER = 'fixed-five-engine-bound-at-runtime';

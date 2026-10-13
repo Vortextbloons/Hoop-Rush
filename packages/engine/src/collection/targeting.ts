@@ -3,12 +3,10 @@ import {
   COLLECTION_RARITY_ORDER,
   COLLECTION_TARGET_BASE_WEIGHT_BP,
   COLLECTION_TARGETING_VERSION,
-  canonicalJson,
   collectionTargetOddsSchema,
   collectionTargetSnapshotSchema,
   type CollectionCatalog,
   type CollectionPackDefinition,
-  type CollectionPullRecordV2,
   type CollectionRarity,
   type CollectionTargetOdds,
   type CollectionTargetSnapshot,
@@ -287,13 +285,4 @@ function drawRarityFrom(
     if (rarity !== undefined && distribution[rarity] > 0) return rarity;
   }
   throw new CollectionCommandError('invalid-definition', 'empty rarity distribution');
-}
-
-export function targetedPullDigestMaterial(pull: CollectionPullRecordV2): string {
-  return canonicalJson({
-    pullSequence: pull.pullSequence,
-    packId: pull.packId,
-    targeting: pull.targeting,
-    slots: pull.slots,
-  });
 }

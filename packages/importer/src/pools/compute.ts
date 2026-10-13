@@ -562,14 +562,6 @@ const overallScoreProfileSchema = z.looseObject({
   rawOverallScore: z.unknown().optional(),
   canonicalOverall: z.unknown().optional(),
 });
-export function neutralSelectionScoreFor(
-  player: OverallScoreInput,
-  summary: SummaryRatingsRaw | undefined,
-  _stats: SeasonStatsInput,
-): number {
-  void _stats;
-  return rawOverallScoreFor(player, summary);
-}
 type OverallScoreInput = { ratingProfile?: unknown };
 export function rawOverallScoreFor(
   player: OverallScoreInput,
@@ -602,9 +594,6 @@ export function selectionScore(
   // score below carries the season; offense/defense break ties.
   const raw = peakScore + 0.02 * mpg;
   return Math.round(raw * availability * 1000) / 1000;
-}
-export function peakSelectionBlend(_neutralScore: number, rawOverallScore: number): number {
-  return rawOverallScore;
 }
 export type Candidate = {
   season: string;

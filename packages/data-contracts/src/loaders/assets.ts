@@ -40,7 +40,6 @@ export function resolveHeadshotUrls(
 export function isNbaCdnHeadshotUrl(url: string): boolean {
   return url.includes('cdn.nba.com/headshots/');
 }
-export const NBA_HEADSHOT_PLACEHOLDER_BYTES = 12430;
 export function shouldStallTimeoutHeadshot(
   url: string,
   urls: string[],

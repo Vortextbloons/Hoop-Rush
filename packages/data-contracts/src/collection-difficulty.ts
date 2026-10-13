@@ -16,9 +16,6 @@ export const collectionCpuIdentitySchema = z.enum([
   'interior',
 ]);
 export type CollectionCpuIdentity = z.infer<typeof collectionCpuIdentitySchema>;
-
-export const COLLECTION_CPU_IDENTITIES = collectionCpuIdentitySchema.options;
-
 const rarityIndex = new Map<string, number>(
   COLLECTION_RARITY_ORDER.map((rarity, index) => [rarity, index]),
 );
@@ -135,15 +132,6 @@ export const collectionDifficultyProfileSchema = z
     }
   });
 export type CollectionDifficultyProfile = z.infer<typeof collectionDifficultyProfileSchema>;
-
-export function collectionRarityWeightOf(
-  profile: CollectionDifficultyProfile,
-  rarity: string,
-): number {
-  const entry = profile.rarityWeightsBp.find((candidate) => candidate.rarity === rarity);
-  return entry?.weightBp ?? 0;
-}
-
 export function collectionDifficultyProfileOf(
   profiles: readonly CollectionDifficultyProfile[],
   difficultyId: CollectionDifficultyId,

@@ -158,11 +158,6 @@ export function arenaPickSlam(): void {
   blip(140, 120, 'square', 0.07);
   blip(880, 160, 'triangle', 0.08, 60);
 }
-
-export function arenaTick(): void {
-  blip(1200, 40, 'square', 0.025);
-}
-
 export function arenaBuzzer(): void {
   noiseBurst(280, 0.03, 0, 700);
   blip(180, 320, 'sawtooth', 0.07);

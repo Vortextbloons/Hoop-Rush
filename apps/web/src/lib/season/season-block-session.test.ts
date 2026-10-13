@@ -39,7 +39,7 @@ import {
 } from '@hoop-rush/application/season';
 import type { CommitSeasonBlockInput, SeasonRunSnapshot } from '@hoop-rush/persistence';
 import { seasonRotationSetDigest } from '@hoop-rush/engine';
-import { createFakeSeasonBlockRunner } from './fake-season-block-runner';
+import { createFakeSeasonBlockRunner } from './testing/fake-season-block-runner';
 
 const LEAGUE = buildSeasonLeague({}, { humanFranchiseId: franchiseIdSchema.parse('lakers') });
 

@@ -1,19 +1,15 @@
 import {
   SEASON_INFLUENCE_CAP,
   SEASON_INFLUENCE_FLOOR,
-  SEASON_OBJECTIVE_CATALOG,
   franchiseIdSchema,
   type SeasonHealthState,
   type SeasonInfluenceLedgerEntry,
   type SeasonInfluenceRehabOutcome,
   type SeasonInfluenceState,
   type SeasonObjectiveId,
-  type SeasonRun,
   type SeasonTradeWindowState,
 } from '@hoop-rush/data-contracts';
-import { seasonObjectiveChoicesForBlock } from '@hoop-rush/engine';
 import { rehabPriceOf } from '@hoop-rush/engine';
-import { SEASON_ROUND_COUNT } from '@hoop-rush/data-contracts';
 export interface InfluenceSpendAffordance {
   purpose: 'extra-trade-offer' | 'risky-rehab';
   cost: number;
@@ -123,9 +119,6 @@ export function influenceViewModel(
     affordances,
   };
 }
-export function canAffordSpend(balance: number, cost: number): boolean {
-  return balance - cost >= SEASON_INFLUENCE_FLOOR;
-}
 export interface ObjectiveChoiceViewModel {
   objectiveId: SeasonObjectiveId;
   name: string;
@@ -144,79 +137,4 @@ export interface ObjectiveChoicesViewModel {
     name: string;
     success: boolean;
   } | null;
-}
-export function objectiveChoicesViewModel(
-  run: SeasonRun,
-  acceptedBlockCount: number | null = null,
-): ObjectiveChoicesViewModel {
-  const blockIndex = currentObjectiveBlock(run, acceptedBlockCount);
-  const definitions = new Map(SEASON_OBJECTIVE_CATALOG.map((entry) => [entry.objectiveId, entry]));
-  if (blockIndex === null) {
-    return {
-      blockIndex: null,
-      choices: [],
-      selectedObjectiveId: null,
-      success: null,
-      lastEvaluation: lastEvaluatedSelection(run, definitions),
-    };
-  }
-  const offered: SeasonObjectiveId[] = seasonObjectiveChoicesForBlock(run.rootSeed, blockIndex);
-  const selection = run.objectives.selections[blockIndex] ?? null;
-  const choices = offered.map((objectiveId) => {
-    const definition = definitions.get(objectiveId);
-    return {
-      objectiveId,
-      name: definition?.name ?? objectiveId,
-      description: definition?.description ?? '',
-      measure: definition?.measure ?? '',
-      selected: selection?.objectiveId === objectiveId,
-    };
-  });
-  return {
-    blockIndex,
-    choices,
-    selectedObjectiveId: selection?.objectiveId ?? null,
-    success: selection?.success ?? null,
-    lastEvaluation: lastEvaluatedSelection(run, definitions),
-  };
-}
-function lastEvaluatedSelection(
-  run: SeasonRun,
-  definitions: Map<SeasonObjectiveId, (typeof SEASON_OBJECTIVE_CATALOG)[number]>,
-): ObjectiveChoicesViewModel['lastEvaluation'] {
-  for (let blockIndex = 7; blockIndex >= 0; blockIndex -= 1) {
-    const selection = run.objectives.selections[blockIndex];
-    if (selection !== undefined && selection.success !== null) {
-      return {
-        blockIndex,
-        objectiveId: selection.objectiveId,
-        name: definitions.get(selection.objectiveId)?.name ?? selection.objectiveId,
-        success: selection.success,
-      };
-    }
-  }
-  return null;
-}
-function acceptedBlockCountOf(completedRounds: number): number {
-  if (completedRounds <= 0) return 0;
-  return Math.ceil(completedRounds / 10);
-}
-export function currentObjectiveBlock(
-  run: SeasonRun,
-  acceptedBlockCount: number | null = null,
-): number | null {
-  if (run.cursor.completedRounds >= SEASON_ROUND_COUNT) return null;
-  const fromCursor = acceptedBlockCountOf(run.cursor.completedRounds);
-  // acceptedBlocks.length (shell.nextBlockIndex) is the commit boundary the block
-  // runner and submit gate use. If it disagrees with ceil(completedRounds/10) the
-  // snapshot is stale (e.g. a select bumped stateRevision without moving the cursor,
-  // or a block commit landed without a refresh) — prefer acceptedBlocks and let the
-  // caller force a refresh so the picker and the submit gate agree.
-  const blockIndex = acceptedBlockCount ?? fromCursor;
-  if (acceptedBlockCount !== null && acceptedBlockCount !== fromCursor) {
-    if (acceptedBlockCount >= 8) return null;
-    return acceptedBlockCount;
-  }
-  if (blockIndex >= 8) return null;
-  return blockIndex;
 }

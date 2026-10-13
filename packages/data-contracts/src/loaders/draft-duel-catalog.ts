@@ -1,12 +1,7 @@
-import { collectionCatalogSchema, type CollectionCatalog } from '../collection.ts';
+import type { CollectionCatalog } from '../collection.ts';
 import { DRAFT_DUEL_CATALOG_FAMILY } from '../draft-duel-versions.ts';
-import {
-  draftDuelCatalogSourceSchema,
-  type DraftDuelCatalogEntry,
-  type DraftDuelCatalogSource,
-} from '../draft-duel.ts';
+import type { DraftDuelCatalogEntry, DraftDuelCatalogSource } from '../draft-duel.ts';
 import { overallBandIndexOf } from '../overall-bands.ts';
-import { loadAsset } from './index.ts';
 
 const FALLBACK_OVERALL = 60;
 
@@ -55,16 +50,4 @@ export function buildDraftDuelCatalogSource(catalog: CollectionCatalog): DraftDu
     positionNormalizationVersion: catalog.positionNormalizationVersion,
     entries,
   };
-}
-export function parseDraftDuelCatalogSource(value: unknown): DraftDuelCatalogSource {
-  return draftDuelCatalogSourceSchema.parse(value);
-}
-export function loadDraftDuelCatalogSource(
-  url: string,
-  expectedHash?: string,
-  init?: RequestInit,
-): Promise<DraftDuelCatalogSource> {
-  return loadAsset(url, collectionCatalogSchema, 'collection catalog', expectedHash, init).then(
-    buildDraftDuelCatalogSource,
-  );
 }

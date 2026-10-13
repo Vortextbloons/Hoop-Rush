@@ -4,7 +4,7 @@ import {
   type SeasonFrontOfficeId,
   type SeasonGameRule,
 } from '@hoop-rush/data-contracts';
-import { baseInquiryAllowanceOf, purchasedInquiryCostOf, rehabPriceOf } from '@hoop-rush/engine';
+import { baseInquiryAllowanceOf, purchasedInquiryCostOf } from '@hoop-rush/engine';
 
 export function homeRuleOf(
   run: { evolution?: SeasonEvolutionState | null },
@@ -37,22 +37,5 @@ export function inquiryAllowanceView(run: { evolution?: SeasonEvolutionState | n
         : executiveId === 'alex-chen'
           ? 'Base allowance 3 per window (cap 5); purchased inquiries cost 2 Influence (Recovery Director drawback).'
           : 'Base allowance 3 per window (cap 5); purchased inquiries cost 1 Influence.',
-  };
-}
-
-export function rehabPriceView(run: { evolution?: SeasonEvolutionState | null }): {
-  price: number;
-  explanation: string;
-} {
-  const executiveId = frontOfficeOf(run);
-  const price = rehabPriceOf(executiveId);
-  return {
-    price,
-    explanation:
-      executiveId === 'alex-chen'
-        ? `Risky rehab costs ${String(price)} Influence (Recovery Director discount).`
-        : executiveId === null
-          ? `Risky rehab costs ${String(price)} Influence.`
-          : `Risky rehab costs ${String(price)} Influence.`,
   };
 }

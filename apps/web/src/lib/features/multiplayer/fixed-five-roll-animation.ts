@@ -53,12 +53,3 @@ export function stableRollAnimationId(input: {
 }): string {
   return `${input.mode}|${String(input.nonce)}|${input.axis}`;
 }
-export function stableRollSpinId(input: {
-  mode: string;
-  ordinal: number;
-  franchiseId: string;
-  eraId: string;
-  axis: RollAnimationAxis;
-}): string {
-  return `${input.mode}|${String(input.ordinal)}|${input.franchiseId}|${input.eraId}|${input.axis}`;
-}

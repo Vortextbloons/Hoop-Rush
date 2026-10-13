@@ -1,4 +1,4 @@
-import { POSITION_OVERRIDES_VERSION, type Position } from '@hoop-rush/data-contracts';
+import type { Position } from '@hoop-rush/data-contracts';
 export interface PositionOverride {
   primary: Position;
   secondary: Position[];
@@ -20,7 +20,6 @@ export const POSITION_OVERRIDES: Readonly<Record<string, PositionOverride>> = {
   '922': { primary: 'C', secondary: ['PF'] },
   '78293': { primary: 'C', secondary: ['PF'] },
 };
-export const POSITION_OVERRIDES_TABLE_VERSION: string = POSITION_OVERRIDES_VERSION;
 export function positionOverrideFor(playerExternalId: string): PositionOverride | null {
   return POSITION_OVERRIDES[playerExternalId] ?? null;
 }

@@ -247,9 +247,6 @@ export function applySandboxBuilderCommand(
 function nextIsFull(state: SandboxBuilderState): boolean {
   return state.placements.length === 5;
 }
-export function listSandboxOpenSlots(state: SandboxBuilderState): SlotIndex[] {
-  return openSlots(state);
-}
 export interface SandboxSafeMove {
   playerId: PlayerId;
   playerVersionId: string;
@@ -284,7 +281,4 @@ export function enumerateSandboxSafeMoves(
       return a.playerVersionId < b.playerVersionId ? -1 : 1;
     return a.slotIndex - b.slotIndex;
   });
-}
-export function missingSandboxSlots(state: SandboxBuilderState): SlotIndex[] {
-  return openSlots(state);
 }

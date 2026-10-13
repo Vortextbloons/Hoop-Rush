@@ -37,30 +37,6 @@ export function normalQuantile(p: number): number {
   return (num(a, inner) * r) / den(b, inner);
 }
 export { fnv1a32 } from '@hoop-rush/data-contracts';
-export function withIntercept(rows: readonly (readonly number[])[]): number[][] {
-  return rows.map((row) => [1, ...row]);
-}
-export function matMul(
-  a: readonly (readonly number[])[],
-  b: readonly (readonly number[])[],
-): number[][] {
-  const m = a.length;
-  const n = b[0]?.length ?? 0;
-  const inner = b.length;
-  const out: number[][] = [];
-  for (let i = 0; i < m; i += 1) {
-    const row: number[] = [];
-    for (let j = 0; j < n; j += 1) {
-      let sum = 0;
-      for (let k = 0; k < inner; k += 1) {
-        sum += (a[i]?.[k] ?? 0) * (b[k]?.[j] ?? 0);
-      }
-      row.push(sum);
-    }
-    out.push(row);
-  }
-  return out;
-}
 export function transpose(a: readonly (readonly number[])[]): number[][] {
   const rows = a.length;
   const cols = a[0]?.length ?? 0;

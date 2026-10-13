@@ -315,8 +315,6 @@ export const collectionGameResultV1V2UnionSchema = z.union([
   collectionGameResultV2Schema,
 ]);
 export type CollectionGameResultV1V2Union = z.infer<typeof collectionGameResultV1V2UnionSchema>;
-
-export const collectionGameResultSchema = collectionGameResultV2Schema;
 export type CollectionGameResult = CollectionGameResultV2;
 
 export const collectionGameSeedPathsV1Schema = z
@@ -741,8 +739,6 @@ export const collectionPreparedGameV3Schema = z
     }
   });
 export type CollectionPreparedGameV3 = z.infer<typeof collectionPreparedGameV3Schema>;
-
-export const collectionPreparedGameSchema = collectionPreparedGameV2Schema;
 export type CollectionPreparedGame = CollectionPreparedGameV2;
 export type CollectionCurrentPreparedGame = CollectionPreparedGameV2 | CollectionPreparedGameV3;
 
@@ -972,8 +968,6 @@ export const collectionGameRecordV3Schema = z
     }
   });
 export type CollectionGameRecordV3 = z.infer<typeof collectionGameRecordV3Schema>;
-
-export const collectionGameRecordSchema = collectionGameRecordV2Schema;
 export type CollectionGameRecord = CollectionGameRecordV2;
 
 export const collectionGameRecordUnionSchema = z.union([
@@ -1404,14 +1398,3 @@ export type CollectionGameRulesV2 = z.infer<typeof collectionGameRulesV2Schema>;
 
 export const collectionGameRulesSchema = collectionGameRulesV2Schema;
 export type CollectionGameRules = CollectionGameRulesV2;
-
-export function collectionCpuRarityWeightOf(
-  weights: CollectionCpuRarityWeights,
-  rarity: CollectionRarity,
-): number {
-  const weight = weights[rarity];
-  if (!(weight > 0)) {
-    throw new Error(`collection game rules: missing positive weight for ${rarity}`);
-  }
-  return weight;
-}

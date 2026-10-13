@@ -2,7 +2,6 @@ import { readFileSync } from 'node:fs';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import {
   seasonDraftCatalogSchema,
-  seasonDraftStateSchema,
   seasonFreeAgencyIndexSchema,
   seasonLeagueSchema,
   seasonRosterRoleSchema,
@@ -35,11 +34,7 @@ export { sha256Hex };
 export { readJsonFile };
 export { DEFAULT_MANIFEST, REPO_ROOT };
 export const DEFAULT_SEASON_DIR = resolve(dirname(DEFAULT_MANIFEST), 'season');
-export const DEFAULT_DRAFT_CATALOG = resolve(DEFAULT_SEASON_DIR, 'draft-catalog.json');
-export const DEFAULT_LEAGUE = resolve(DEFAULT_SEASON_DIR, 'league.json');
-export const DEFAULT_SCHEDULE = resolve(DEFAULT_SEASON_DIR, 'schedule.json');
 export const DEFAULT_ROSTER_TARGETS = resolve(DEFAULT_SEASON_DIR, 'roster-targets.json');
-export const DEFAULT_FREE_AGENCY_INDEX = resolve(DEFAULT_SEASON_DIR, 'free-agency-index.json');
 export type SeasonArtifactKey =
   'league' | 'schedule' | 'draftCatalog' | 'rosterTargets' | 'freeAgencyIndex';
 interface SeasonArtifactEntry {
@@ -207,15 +202,6 @@ export function loadSeasonFreeAgencyIndex(
   if (parsed.data.catalogRef.contentHash !== draftEntry.contentHash) {
     throw new Error(
       `free-agency index catalogRef hash ${parsed.data.catalogRef.contentHash} does not match the packaged draft catalog ${draftEntry.contentHash}`,
-    );
-  }
-  return parsed.data;
-}
-export function loadDraftStateInput(path: string): SeasonDraftState {
-  const parsed = seasonDraftStateSchema.safeParse(readJsonFile(path));
-  if (!parsed.success) {
-    throw new Error(
-      `draft input fails the schema: ${parsed.error.issues[0]?.message ?? 'unknown'}`,
     );
   }
   return parsed.data;

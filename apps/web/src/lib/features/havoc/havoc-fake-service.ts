@@ -51,7 +51,6 @@ import type {
   HavocService,
   HavocServiceErrorCode,
   HavocServiceEvent,
-  HavocSimulationProgress,
   HavocWatchSession,
 } from '@hoop-rush/application/havoc';
 import {
@@ -2321,20 +2320,4 @@ export function buildCompleteRunState(): HavocRunState {
     comparisonStatus: 'complete',
     completionState: 'complete',
   });
-}
-
-export const FAKE_OPPONENT_NAME = OPPONENT_NAME;
-export const FAKE_HUMAN_TEAM_NAME = HUMAN_TEAM_NAME;
-export const FAKE_RUN_ID = RUN_ID;
-
-export function havocProgressOf(
-  variant: HavocVariant,
-  gamesCompleted: number,
-): HavocSimulationProgress {
-  return {
-    variant,
-    gamesCompleted,
-    gamesTotal: HAVOC_GAME_COUNT,
-    latestGameNumber: gamesCompleted,
-  };
 }

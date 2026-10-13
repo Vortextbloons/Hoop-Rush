@@ -31,8 +31,8 @@ import {
   seasonCheckpointDigest,
   seasonRotationSetDigest,
 } from '@hoop-rush/engine';
-import { acceptWorkerResult } from './season-block-runner';
-import type { SeasonBlockStartInput, SeasonRunnerEvent } from './season-block-runner';
+import { acceptWorkerResult } from '../season-block-runner';
+import type { SeasonBlockStartInput, SeasonRunnerEvent } from '../season-block-runner';
 import { createFakeSeasonBlockRunner } from './fake-season-block-runner';
 
 const LEAGUE = buildSeasonLeague({}, { humanFranchiseId: franchiseIdSchema.parse('lakers') });

@@ -143,10 +143,4 @@ export function seasonPostseasonSummaryFacts(summary: SeasonPostseasonSummary): 
 export function seasonPostseasonSummaryDigest(summary: SeasonPostseasonSummary): string {
   return seasonDigestHex(canonicalJson(seasonPostseasonSummaryFacts(summary)));
 }
-export function seasonPostseasonRoundLabel(round: SeasonPostseasonRound): string {
-  if (postseasonRoundIsPlayIn(round)) {
-    return `play-in ${round.replace('-', ' vs ')}`;
-  }
-  return round;
-}
 export type { PlayInMatchupId, PlayoffRound };

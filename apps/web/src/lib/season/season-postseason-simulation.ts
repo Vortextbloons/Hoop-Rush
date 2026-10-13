@@ -97,15 +97,6 @@ export function simulateSeasonPostseasonCommand(
     },
   };
 }
-export function postseasonPostCommandEffects(
-  run: SeasonRun,
-  prior: SeasonEffectsState,
-): SeasonEffectsState {
-  const withEffects = run as SeasonRun & {
-    effects?: SeasonEffectsState;
-  };
-  return withEffects.effects ?? prior;
-}
 export {
   seasonPostseasonCommitResultDigest,
   seasonPostseasonScorelineOf,

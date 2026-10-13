@@ -453,8 +453,6 @@ export const collectionGameRewardReceiptUnionSchema = z.union([
 export type CollectionGameRewardReceiptUnion = z.infer<
   typeof collectionGameRewardReceiptUnionSchema
 >;
-
-export const collectionGameRewardReceiptSchema = collectionGameRewardReceiptV3Schema;
 export type CollectionGameRewardReceipt = CollectionGameRewardReceiptV3;
 
 export const collectionFirstClearStateSchema = z

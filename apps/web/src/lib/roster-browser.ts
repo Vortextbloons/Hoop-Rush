@@ -149,35 +149,6 @@ export interface RosterGroup {
   eraId: string;
   players: RosterDetailRow[];
 }
-export function groupRoster(rows: RosterDetailRow[]): RosterGroup[] {
-  const groups: RosterGroup[] = [];
-  const byKey = new Map<string, RosterGroup>();
-  for (const row of rows) {
-    const key = `${row.franchiseId}/${row.eraId}`;
-    let group = byKey.get(key);
-    if (!group) {
-      group = { franchiseId: row.franchiseId, eraId: row.eraId, players: [] };
-      byKey.set(key, group);
-      groups.push(group);
-    }
-    group.players.push(row);
-  }
-  return groups;
-}
-export function paginateItems<
-  T extends {
-    type: string;
-  },
->(items: T[], count: number): T[] {
-  let players = 0;
-  const page: T[] = [];
-  for (const item of items) {
-    if (item.type === 'player') players += 1;
-    page.push(item);
-    if (players >= count) break;
-  }
-  return page;
-}
 export function paginateGroupedRows<T extends PlayersIndexEntry>(
   rows: T[],
   count: number,

@@ -3,7 +3,6 @@ export interface EraConfig {
   league3PARate: number;
   pace: number;
 }
-export const MODERN_PPG = 114.7;
 export const ERA_CONFIGS: Record<string, EraConfig> = {
   '1960-61': { leaguePpg: 118.1, league3PARate: 0, pace: 122.0 },
   '1961-62': { leaguePpg: 118.8, league3PARate: 0, pace: 123.0 },

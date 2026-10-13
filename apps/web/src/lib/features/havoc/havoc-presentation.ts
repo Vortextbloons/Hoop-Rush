@@ -9,11 +9,10 @@ import type {
   HavocParticipantKind,
   HavocScoringEntry,
   HavocSide,
-  HavocStatLine,
   HavocTier,
 } from '@hoop-rush/data-contracts';
 import type { HavocLineupSlotView, HavocRunView } from '@hoop-rush/application/havoc';
-import { HAVOC_GAME_COUNT, POSITIONS } from '@hoop-rush/data-contracts';
+import { HAVOC_GAME_COUNT } from '@hoop-rush/data-contracts';
 import { havocMutationDefinitionOf } from '@hoop-rush/engine';
 
 export const HAVOC_TIER_COLORS: Record<HavocTier, string> = {
@@ -416,23 +415,6 @@ export function havocMvpFormulaLabel(weights: HavocComparison['mvpIndexWeights']
     term(weights.turnovers, 'turnovers', false),
   ].join(' ');
 }
-
-export function statLineProductionIndex(line: HavocStatLine): number {
-  return (
-    10 * line.points +
-    12 * line.rebounds.total +
-    15 * line.assists +
-    30 * line.steals +
-    30 * line.blocks -
-    10 * line.turnovers
-  );
-}
-
-export function positionIndexLabel(slot: string): string {
-  const index = POSITIONS.indexOf(slot as (typeof POSITIONS)[number]);
-  return index >= 0 ? `Pick ${String(index + 1)}` : slot;
-}
-
 export function havocFieldLabel(field: string): string {
   const spaced = field
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')

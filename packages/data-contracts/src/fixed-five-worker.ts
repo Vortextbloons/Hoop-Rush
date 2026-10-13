@@ -140,4 +140,3 @@ export const fixedFiveWorkerMessageSchema = z.discriminatedUnion('type', [
   fixedFiveWorkerVerificationFailedSchema,
 ]);
 export type FixedFiveWorkerMessage = z.infer<typeof fixedFiveWorkerMessageSchema>;
-export const FIXED_FIVE_WORKER_PROGRESS_MIN_INTERVAL_MS = 250;

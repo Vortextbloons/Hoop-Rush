@@ -169,16 +169,6 @@ export function sponsorSlotsOf(run: SeasonRun | null, playerVersionId: string) {
   if (run === null) return null;
   return normalizeSponsorGearState(run.sponsors).players.slots[playerVersionId] ?? null;
 }
-
-export function boostedRatingsOf(
-  base: SimulationRatings,
-  run: SeasonRun | null,
-  playerVersionId: string,
-): SimulationRatings {
-  if (run === null) return { ...base };
-  return applySponsorBoosts(base, sponsorSlotsOf(run, playerVersionId));
-}
-
 export function gearPointsOf(slots: ReturnType<typeof sponsorSlotsOf>): number {
   if (slots === null) return 0;
   let total = 0;

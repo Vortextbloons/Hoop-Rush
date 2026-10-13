@@ -54,11 +54,6 @@ import { loadCollectionCatalog } from './collection.ts';
 
 const FIXED_ROOT_SEED = 'c04c3c71061eca4c71061eca4c71061e';
 const HELD_OUT_ROOT_SEED = '9a9e3e771061eca4c71061eca4c71061e';
-export const COLLECTION_GAME_AUDIT_DIFFICULTIES: CollectionDifficultyId[] = [
-  'street',
-  'pro',
-  'legend',
-];
 const V2_AUDIT_ROSTER_SIZE = 9;
 const V2_AUDIT_MAX_SEQUENCES_PER_RANGE = 6;
 const V1_ROSTER_SIZE_CYCLE = [5, 6, 7, 8, 9, 10, 11, 12];

@@ -7,6 +7,7 @@ import type {
   SeasonTradeReceipt,
 } from '@hoop-rush/application/season';
 import type {
+  FranchiseId,
   HoopRushManifest,
   PlayersIndexEntry,
   SeasonActiveRunIndex,
@@ -76,7 +77,7 @@ export interface SeasonRunShellData {
   facesReady: boolean;
   playersIndex: readonly PlayersIndexEntry[] | null;
   run: SeasonRun | null;
-  humanFranchiseId: string | null;
+  humanFranchiseId: FranchiseId | null;
   humanTeam: SeasonTeam | null;
   nextBlockIndex: number | null;
   seasonComplete: boolean;

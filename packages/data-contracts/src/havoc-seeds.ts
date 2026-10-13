@@ -66,12 +66,6 @@ export function havocGameSeed(runSeed: Seed, gameNumber: number): Seed {
   assertGameNumber(gameNumber);
   return havocSeed(runSeed, 'game', gameNumber, 'basketball');
 }
-
-export function havocCapabilityAssignmentSeed(runSeed: Seed, gameNumber: number): Seed {
-  assertGameNumber(gameNumber);
-  return havocSeed(runSeed, 'game', gameNumber, 'capability-assignment');
-}
-
 export function havocMutationStreamSeed(
   runSeed: Seed,
   gameNumber: number,
@@ -87,16 +81,6 @@ export function havocMutationStreamSeed(
   }
   return havocSeed(runSeed, 'game', gameNumber, 'mutation', instanceId, effect, eventOrdinal);
 }
-
-export function havocRuntimeStreamSeed(
-  runSeed: Seed,
-  gameNumber: number,
-  ...keys: readonly (string | number)[]
-): Seed {
-  assertGameNumber(gameNumber);
-  return havocSeed(runSeed, 'game', gameNumber, 'runtime', ...keys);
-}
-
 export function havocInstanceSeed(
   runSeed: Seed,
   purpose: string,

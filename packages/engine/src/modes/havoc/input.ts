@@ -1,10 +1,8 @@
 import type {
   HavocEffectiveProfile,
   HavocGameInput,
-  HavocLockedInputs,
   HavocParticipant,
   HavocTeamInput,
-  HavocVariant,
 } from '@hoop-rush/data-contracts';
 import {
   HAVOC_MUTATION_CATALOG_VERSION,
@@ -119,12 +117,4 @@ export function buildHavocGameInput(input: BuildHavocGameInputInput): HavocGameI
     away,
     versionSet: locked.versionSet,
   } satisfies HavocGameInput);
-}
-
-export function buildHavocGameVariantInput(
-  locked: HavocLockedInputs,
-  gameNumber: number,
-  variant: HavocVariant,
-): HavocGameInput {
-  return buildHavocGameInput({ locked, gameNumber, variant });
 }

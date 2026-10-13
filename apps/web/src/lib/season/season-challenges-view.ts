@@ -31,15 +31,3 @@ export function challengesViewModel(
     challenges.evaluations.find((entry) => entry.blockIndex === nextBlockIndex) ?? null;
   return { blockIndex: nextBlockIndex, deal, evaluation };
 }
-
-export function currentChallengeBlock(
-  run: SeasonRun,
-  acceptedBlockCount: number | null = null,
-): number | null {
-  if (run.cursor.completedRounds >= 82) return null;
-  const fromCursor =
-    run.cursor.completedRounds <= 0 ? 0 : Math.ceil(run.cursor.completedRounds / 10);
-  const blockIndex = acceptedBlockCount ?? fromCursor;
-  if (blockIndex >= 8) return null;
-  return blockIndex;
-}

@@ -52,7 +52,6 @@ import {
   SEASON_ROSTER_TARGETS_VERSION,
   SEASON_ROTATION_PLANNER_VERSION,
   SEASON_ROTATION_VERSION,
-  SEASON_RUN_SAVE_SCHEMA_VERSION,
   SEASON_RUN_SCHEMA_VERSION,
   SEASON_SCHEDULE_FORMULA_VERSION,
   SEASON_SCHEDULE_VERSION,
@@ -130,7 +129,6 @@ import type {
 } from '@hoop-rush/engine';
 import type { SeasonRunStateDigestFacts } from '../season/engine-seam-types.ts';
 import type { SeasonRunEngineSeam } from '../season/engine-seam-types.ts';
-import { SEASON_RUN_RECORD_ID, type StoredSeasonRunRecord } from '../schemas/season-run-record.ts';
 import { SEASON_DRAFT_RECORD_ID, type StoredSeasonDraft } from '../schemas/season-draft-record.ts';
 const ALIGNMENT = SEASON_ALIGNMENT;
 const FRANCHISE_ORDER = SEASON_ALIGNMENT.map((entry) => franchiseIdSchema.parse(entry.franchiseId));
@@ -1102,36 +1100,6 @@ export function buildFixturePendingBlock(input: {
     teamAggregates: foldTeamAggregatesFixture(input.run.league, summaries),
     playerAggregates: foldPlayerAggregatesFixture(input.run.rosters, summaries),
     rotationDigest: input.rotationDigest ?? seasonRotationSetDigestFixture(input.run.rotations),
-  };
-}
-export function buildFixtureCheckpointRow(
-  run: SeasonRun,
-  overrides: Partial<StoredSeasonRunRecord> = {},
-): StoredSeasonRunRecord {
-  const { games: _games, ...runWithoutGames } = run;
-  return {
-    recordId: SEASON_RUN_RECORD_ID,
-    saveSchemaVersion: SEASON_RUN_SAVE_SCHEMA_VERSION,
-    run: runWithoutGames,
-    completedRounds: 0,
-    revision: 0,
-    lastCommandId: null,
-    lastRotationDigest: null,
-    lastCheckpointDigest: null,
-    standings: run.standings,
-    teamAggregates: foldTeamAggregatesFixture(run.league, []),
-    playerAggregates: foldPlayerAggregatesFixture(run.rosters, []),
-    recap: null,
-    effects: buildFixtureEffectsState(run.rosters),
-    health: buildFixtureHealthState(),
-    transactions: [],
-    influence: buildFixtureInfluenceState(run.league),
-    trade: null,
-    objectives: buildFixtureObjectiveState(),
-    checkpointState: null,
-    stateRevision: 0,
-    stateDigest: run.stateDigest,
-    ...overrides,
   };
 }
 export function buildFixtureSeasonDraftFacts(seed: string): SeasonRun['draft'] {

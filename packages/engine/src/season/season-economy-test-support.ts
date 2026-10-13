@@ -59,7 +59,6 @@ import {
   seedSchema,
   type SeasonDraftCatalog,
   type SeasonEffectsState,
-  type SeasonGameSummary,
   type SeasonRoster,
   type SeasonRosterEntry,
   type SeasonRun,
@@ -377,101 +376,4 @@ export function withInjury(
 }
 export function injuryIdOf(seed: string): `inj-${string}` {
   return `inj-${seasonNamespaceSeed(seed, 'injuries', 'test')}`;
-}
-export function aiTradeCountOf(run: SeasonRun, humanFranchiseId: string): number {
-  let count = 0;
-  for (const window of run.trade?.windows ?? []) {
-    for (const offer of window.offers) {
-      if (
-        offer.toFranchiseId !== humanFranchiseId &&
-        offer.fromFranchiseId !== humanFranchiseId &&
-        offer.status === 'accepted'
-      ) {
-        count += 1;
-      }
-    }
-  }
-  return count;
-}
-export function fixtureSummary(
-  gameId: string,
-  homeFranchiseId: string,
-  awayFranchiseId: string,
-  homeScore: number,
-  awayScore: number,
-  opts: {
-    homeLines?: SeasonGameSummary['homePlayers'];
-    awayLines?: SeasonGameSummary['awayPlayers'];
-    homeBox?: SeasonGameSummary['homeBox'];
-    awayBox?: SeasonGameSummary['awayBox'];
-  } = {},
-): SeasonGameSummary {
-  const zeroLine = (playerVersionId: string): SeasonGameSummary['homePlayers'][number] => ({
-    playerVersionId,
-    seconds: 0,
-    points: 0,
-    fieldGoalsMade: 0,
-    fieldGoalsAttempted: 0,
-    threePointersMade: 0,
-    threePointersAttempted: 0,
-    freeThrowsMade: 0,
-    freeThrowsAttempted: 0,
-    offensiveRebounds: 0,
-    defensiveRebounds: 0,
-    assists: 0,
-    steals: 0,
-    blocks: 0,
-    turnovers: 0,
-    fouls: 0,
-  });
-  const box = (
-    franchiseId: string,
-    points: number,
-    overrides: Partial<SeasonGameSummary['homeBox']> = {},
-  ): SeasonGameSummary['homeBox'] => ({
-    franchiseId: franchiseIdSchema.parse(franchiseId),
-    points,
-    fieldGoalsMade: 0,
-    fieldGoalsAttempted: 0,
-    threePointersMade: 0,
-    threePointersAttempted: 0,
-    freeThrowsMade: 0,
-    freeThrowsAttempted: 0,
-    offensiveRebounds: 0,
-    defensiveRebounds: 0,
-    assists: 0,
-    steals: 0,
-    blocks: 0,
-    turnovers: 0,
-    fouls: 0,
-    possessions: 0,
-    ...overrides,
-  });
-  return {
-    schemaVersion: 1,
-    summaryVersion: SEASON_GAME_SUMMARY_VERSION,
-    gameId: seasonGameIdSchema.parse(gameId),
-    round: 1,
-    homeFranchiseId: franchiseIdSchema.parse(homeFranchiseId),
-    awayFranchiseId: franchiseIdSchema.parse(awayFranchiseId),
-    status: 'final',
-    overtimePeriods: 0,
-    homeScore,
-    awayScore,
-    forfeitLoserFranchiseId: null,
-    homeBox: opts.homeBox ?? box(homeFranchiseId, homeScore),
-    awayBox: opts.awayBox ?? box(awayFranchiseId, awayScore),
-    homePlayers:
-      opts.homeLines ??
-      Array.from({ length: 10 }, (_, index) => zeroLine(`pv-${String(index).padStart(32, '0')}`)),
-    awayPlayers:
-      opts.awayLines ??
-      Array.from({ length: 10 }, (_, index) =>
-        zeroLine(`pv-${String(index + 100).padStart(32, '0')}`),
-      ),
-    injuryEvents: [],
-  };
-}
-export function allFixtureFranchiseIds(league: SeasonRun['league']): string[] {
-  return league.teams.map((team) => team.franchiseId);
 }

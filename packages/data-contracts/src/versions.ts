@@ -1,4 +1,3 @@
-export const ARTIFACT_SCHEMA_VERSION = 3;
 export const MANIFEST_SCHEMA_VERSION = 4;
 export const RUN_SCHEMA_VERSION = 2;
 export const SAVE_SCHEMA_VERSION = 2;
@@ -14,7 +13,6 @@ export const COHORT_NORMALIZATION_VERSION = 'overall-scale-v6';
 export const POOL_SCHEMA_VERSION = 5;
 export const PLAYERS_INDEX_SCHEMA_VERSION = 5;
 export const POSITION_NORMALIZATION_VERSION = 'position-v4';
-export const POSITION_OVERRIDES_VERSION = 'position-overrides-v2';
 export const CLASSIC_DRAFT_SCHEMA_VERSION = 1;
 export const CLASSIC_ROLL_VERSION = 'classic-roll-v1';
 export const LEAGUE_RECORD_VERSION = 'league-v1';

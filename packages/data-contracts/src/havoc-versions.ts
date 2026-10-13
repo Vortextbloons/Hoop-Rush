@@ -16,9 +16,6 @@ export const HAVOC_OFFER_SIZE = 3;
 export const HAVOC_REROLL_LIMIT = 1;
 export const HAVOC_OVERALL_WINDOW_WIDTH = 3;
 export const HAVOC_PERSONAL_FOUL_LIMIT = 6;
-export const HAVOC_RETAINED_TAPE_LIMIT = 5;
-export const HAVOC_MAX_ACTIVE_PARTICIPANTS = 10;
-export const HAVOC_MAX_PARTICIPANTS_PER_TEAM = 15;
 export const HAVOC_SEED_ROOT = 'havoc-v1';
 export const HAVOC_TIER_PROBABILITIES = {
   1: 0.6,

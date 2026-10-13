@@ -79,9 +79,7 @@ import { generateSeasonSchedule } from './schedule.ts';
 import { generateAiLeague } from './ai.ts';
 import {
   expandSeasonRunRosters,
-  deriveSeasonPostBlockState,
   rosterPlayerIdsOf,
-  simulateSeasonBlock,
   type SeasonBlockSimulationInput,
 } from './block/index.ts';
 import { seasonRotationSetDigest } from './rotation.ts';
@@ -402,36 +400,4 @@ export interface RunnerState {
   catalog: SeasonDraftCatalog;
   summaries: SeasonGameSummary[];
   effects: SeasonEffectsState;
-}
-export function runBlock(
-  state: RunnerState,
-  blockIndex: number,
-): import('@hoop-rush/data-contracts').SeasonCandidateCheckpoint {
-  const command = blockCommand(state.run, blockIndex, blockIndex);
-  const input = pipelineInput(state.run, state.catalog, blockIndex, state.summaries, state.effects);
-  const checkpoint = simulateSeasonBlock(input);
-  state.summaries = [...state.summaries, ...checkpoint.gameSummaries];
-  state.effects = checkpoint.effects;
-  const stateFacts = deriveSeasonPostBlockState({
-    run: state.run,
-    candidate: checkpoint,
-    commandId: command.commandId,
-    rotationDigest: command.rotationDigest,
-  });
-  state.run = {
-    ...state.run,
-    cursor: { schemaVersion: 1, completedRounds: checkpoint.completedRounds },
-    standings: checkpoint.standings,
-    health: checkpoint.health,
-    influence: checkpoint.influence,
-    transactions: checkpoint.transactions,
-    checkpointState: stateFacts.checkpointState,
-    stateRevision: stateFacts.stateRevision,
-    stateDigest: stateFacts.stateDigest,
-  };
-  return checkpoint;
-}
-export function freshState(): RunnerState {
-  const { run, catalog } = buildTestRun();
-  return { run, catalog, summaries: [] as SeasonGameSummary[], effects: zeroEffectsOf(run) };
 }

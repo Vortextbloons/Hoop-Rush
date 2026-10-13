@@ -2,7 +2,6 @@ import { z } from 'zod';
 import {
   SEASON_BLOCK_COUNT,
   SEASON_BLOCK_TEAM_GAMES,
-  SEASON_FINAL_BLOCK_TEAM_GAMES,
   SEASON_ROUND_COUNT,
 } from './season-versions.ts';
 export const seasonCursorSchema = z.object({
@@ -10,11 +9,6 @@ export const seasonCursorSchema = z.object({
   completedRounds: z.number().int().min(0).max(SEASON_ROUND_COUNT),
 });
 export type SeasonCursor = z.infer<typeof seasonCursorSchema>;
-export const seasonCursorVersionsSchema = z.object({
-  blockCount: z.literal(SEASON_BLOCK_COUNT),
-  blockTeamGames: z.literal(SEASON_BLOCK_TEAM_GAMES),
-  finalBlockTeamGames: z.literal(SEASON_FINAL_BLOCK_TEAM_GAMES),
-});
 export function blockIndexForRound(round: number): number {
   if (round < 1 || round > SEASON_ROUND_COUNT) {
     throw new Error(`round ${String(round)} out of range 1..${String(SEASON_ROUND_COUNT)}`);
@@ -36,7 +30,4 @@ export function blockRoundRange(blockIndex: number): {
       ? SEASON_ROUND_COUNT
       : (blockIndex + 1) * SEASON_BLOCK_TEAM_GAMES;
   return { fromRound, toRound };
-}
-export function isSeasonComplete(completedRounds: number): boolean {
-  return completedRounds >= SEASON_ROUND_COUNT;
 }

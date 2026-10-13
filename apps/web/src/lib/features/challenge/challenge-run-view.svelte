@@ -79,6 +79,7 @@
       const result = current.games[soundGameNumber];
       soundGameNumber += 1;
       announcedCount += 1;
+      if (result === undefined) continue;
       try {
         arenaSimTick();
       } catch {}

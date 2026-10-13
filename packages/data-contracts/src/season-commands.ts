@@ -1267,7 +1267,6 @@ export const seasonApplySponsorResultSchema = seasonCommandResultSchema(
   }),
 );
 export type SeasonApplySponsorResult = z.infer<typeof seasonApplySponsorResultSchema>;
-export const seasonRetiredCommandRejectionSchema = seasonCampaignRetiredRejectionSchema;
 export type SeasonRetiredCommandRejection = SeasonCampaignRetiredRejection;
 export const seasonLegacyRunCommandSchema = z.discriminatedUnion('command', [
   seasonSelectBlockObjectiveCommandSchema,

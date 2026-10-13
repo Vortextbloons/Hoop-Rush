@@ -149,17 +149,3 @@ export const collectionObjectiveEvaluationSchema = z.discriminatedUnion('kind', 
     .strict(),
 ]);
 export type CollectionObjectiveEvaluation = z.infer<typeof collectionObjectiveEvaluationSchema>;
-
-export function collectionObjectiveThresholdOf(condition: CollectionObjectiveCondition): number {
-  return condition.threshold;
-}
-
-export function collectionObjectiveFeasible(input: {
-  requirement: CollectionObjectiveFeasibilityRequirement;
-  facts: CollectionObjectiveFeasibilityFacts;
-}): boolean {
-  return (
-    input.facts.benchPlayerCount >= input.requirement.minimumBenchPlayers &&
-    input.facts.plannedBenchMinutes >= input.requirement.minimumPlannedBenchMinutes
-  );
-}

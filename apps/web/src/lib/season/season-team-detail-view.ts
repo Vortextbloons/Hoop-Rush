@@ -187,24 +187,6 @@ export function seasonLeagueTeamProjections(input: {
   }
   return projections;
 }
-export function seasonTeamRatings(input: {
-  roster: SeasonRoster;
-  rotation: SeasonRotation;
-  summaryRatingsOf: (playerVersionId: string) => SeasonSummaryRatings | null;
-  leagueBaselines?: LeagueProjectionBaselines | null;
-}): SeasonTeamProjection | null {
-  const raw = rawSeasonTeamRatings(input);
-  if (raw === null) return null;
-  const baselines =
-    input.leagueBaselines ??
-    buildLeagueProjectionBaselines({
-      rosters: [input.roster],
-      rotations: [input.rotation],
-      summaryRatingsOf: input.summaryRatingsOf,
-    });
-  if (baselines === null) return null;
-  return normalizeTeamProjection(raw, baselines);
-}
 export interface SeasonTeamDetail {
   franchiseId: string;
   conference: 'east' | 'west';

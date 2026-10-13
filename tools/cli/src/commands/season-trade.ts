@@ -50,7 +50,6 @@ export const SEASON_TRADE_VALUE_BANDS = {
   multi: { min: 800, max: 1200 },
 } as const;
 export const SEASON_TRADE_INQUIRY_BASE = 3;
-export const SEASON_TRADE_INQUIRY_MAX = 5;
 export const SEASON_TRADE_CASH_MAX_PER_PROPOSAL = 2;
 export const SEASON_TRADE_CASH_MAX_PER_WINDOW = 2;
 export const SEASON_TRADE_EXCHANGE_MAX = 3;

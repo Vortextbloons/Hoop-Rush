@@ -41,8 +41,3 @@ export const generationWorkerErrorSchema = z.object({
   requestId: z.string().min(1).max(64),
   message: z.string().min(1).max(512),
 });
-export const generationWorkerResponseSchema = z.discriminatedUnion('type', [
-  generationWorkerCompleteSchema,
-  generationWorkerErrorSchema,
-  generationWorkerProgressSchema,
-]);

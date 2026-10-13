@@ -15,13 +15,13 @@ import {
   type SeasonBlockRunner,
   type SeasonBlockTransport,
 } from '$lib/season/season-block-runner';
-import type { SeasonArtifactUrls } from './season-assets';
+import type { SeasonArtifactUrls } from '../season-assets';
 import {
   describeSeasonBlockJobError,
   runSeasonBlockJob,
   warmSeasonBlockJob,
   type SeasonBlockJobIo,
-} from './season-block-job';
+} from '../season-block-job';
 
 export interface FakeSeasonBlockRunnerDeps {
   schedule?: SeasonSchedule;

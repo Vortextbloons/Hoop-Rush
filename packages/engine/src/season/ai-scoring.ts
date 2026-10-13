@@ -1,7 +1,6 @@
 import type {
   SeasonAiIdentity,
   SeasonRosterRole,
-  SeasonStrengthBand,
   SimulationRatings,
   SimulationTendencies,
 } from '@hoop-rush/data-contracts';
@@ -78,18 +77,6 @@ export const IDENTITY_ROLE_WEIGHTS: Record<SeasonAiIdentity, Record<SeasonRoster
     'offensive-rebounding': 0.95,
     'defensive-rebounding': 0.95,
   },
-};
-export const BAND_SELECTION_BIAS: Record<SeasonStrengthBand, number> = {
-  contender: 10,
-  playoff: 4,
-  average: 0,
-  weaker: -8,
-};
-export const BAND_SCORE_CEILINGS: Record<SeasonStrengthBand, number> = {
-  contender: 100,
-  playoff: 92,
-  average: 84,
-  weaker: 74,
 };
 export const BAND_CEILING_PENALTY = 1.6;
 export interface SeasonScoreMember {

@@ -16,6 +16,3 @@ export function memoized<T>(key: string, load: () => Promise<T>): Promise<T> {
   promise.catch(() => memoCache.delete(key));
   return promise;
 }
-export function clearMemoizedLoaders(): void {
-  memoCache.clear();
-}

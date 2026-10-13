@@ -20,7 +20,6 @@ import {
   clearManifestAssetCaches,
   clearManifestCache,
   getManifest,
-  isContentHashMismatch,
   loadManifestAsset,
   reloadManifest,
   retryWithFreshManifest,
@@ -32,11 +31,6 @@ function cacheBustedUrl(url: string): string {
   const separator = url.includes('?') ? '&' : '?';
   return `${url}${separator}v=${String(Date.now())}`;
 }
-
-export function isCollectionContentHashMismatch(error: unknown): boolean {
-  return isContentHashMismatch(error);
-}
-
 const poolCache = new Map<string, Promise<FranchiseEraPool>>();
 export function getPool(entry: PoolIndexEntry): Promise<FranchiseEraPool> {
   const key = `${entry.franchiseId}/${entry.eraId}`;

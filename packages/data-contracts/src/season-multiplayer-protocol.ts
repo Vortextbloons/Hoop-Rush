@@ -3,9 +3,7 @@ import { commandIdSchema, franchiseIdSchema, idSchema, seedSchema } from './ids.
 import { seasonCheckpointDigestSchema } from './season-hash.ts';
 import {
   SEASON_MULTIPLAYER_VERSION,
-  SEASON_MULTIPLAYER_VERSION_V1,
   SEASON_ROOM_PROTOCOL_SCHEMA_VERSION,
-  SEASON_ROOM_PROTOCOL_SCHEMA_VERSION_V1,
   SEASON_TIMER_POLICY_VERSION,
 } from './season-versions.ts';
 export const seasonRoomPaceSchema = z.enum(['live', 'async']);
@@ -38,14 +36,6 @@ export const seasonRoomSettingsSchema = z.object({
   timerPolicyVersion: z.literal(SEASON_TIMER_POLICY_VERSION),
 });
 export type SeasonRoomSettings = z.infer<typeof seasonRoomSettingsSchema>;
-export const seasonRoomSettingsV1Schema = z.object({
-  schemaVersion: z.literal(SEASON_ROOM_PROTOCOL_SCHEMA_VERSION_V1),
-  pace: seasonRoomPaceSchema,
-  mode: seasonRoomModeSchema.default('season'),
-  roomProtocolVersion: z.literal(SEASON_ROOM_PROTOCOL_SCHEMA_VERSION_V1),
-  multiplayerVersion: z.literal(SEASON_MULTIPLAYER_VERSION_V1),
-  timerPolicyVersion: z.literal(SEASON_TIMER_POLICY_VERSION),
-});
 export const PRESENCE_OFFLINE_AFTER_MS = 30000;
 export const seasonRoomPublicSnapshotSchema = z.object({
   roomId: idSchema,

@@ -17,18 +17,6 @@ export function autoEngineArgsOf(option: AutoScopeOption): {
       return { scope: 'full', keepActive10: true };
   }
 }
-
-export function autoScopeLabel(option: AutoScopeOption): string {
-  switch (option) {
-    case 'full-auto':
-      return 'Full Auto';
-    case 'minutes-only':
-      return 'Minutes only';
-    case 'keep-10':
-      return 'Keep my active 10';
-  }
-}
-
 export function buildAutoRecommendInput(input: {
   roster: readonly string[];
   unavailable: readonly string[];

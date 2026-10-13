@@ -25,7 +25,6 @@ import {
   simulationRatingsSchema,
   simulationTendenciesSchema,
 } from './simulation.ts';
-export const SEASON_DRAFT_CATALOG_V3 = 'season-draft-catalog-v3';
 export const seasonDraftCatalogPoolSchema = z.object({
   franchiseId: franchiseIdSchema,
   eraId: eraIdSchema,

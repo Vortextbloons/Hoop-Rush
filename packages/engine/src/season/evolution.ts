@@ -1,8 +1,6 @@
 import {
   SEASON_COURT_INNOVATION_CATALOG,
   SEASON_COURT_INNOVATION_VERSION,
-  SEASON_EVOLUTION_TARGETS_VERSION,
-  SEASON_FRONT_OFFICE_VERSION,
   SEASON_SPONSOR_CATALOG,
   frontOfficeEntryOf,
   type SeasonCourtInnovationId,
@@ -19,7 +17,6 @@ import { seasonNamespaceSeed, seasonDigestHex } from '@hoop-rush/data-contracts'
 import { createRng } from '../sim/rng.ts';
 export const FRONT_OFFICE_BASE_REHAB_COST = 2;
 export const FRONT_OFFICE_MIN_REHAB_COST = 1;
-export const TRADE_INQUIRY_TOTAL_CAP = 5;
 export const SPONSOR_WRAP_PROBABILITY = 0.5;
 export const SPONSOR_CONTENT_VERSION = 'sponsor-content-v1';
 
@@ -29,18 +26,6 @@ export function rehabPriceOf(executiveId: SeasonFrontOfficeId | null | undefined
   const price = FRONT_OFFICE_BASE_REHAB_COST + entry.rehabDelta;
   return Math.max(FRONT_OFFICE_MIN_REHAB_COST, price);
 }
-
-export function rehabPriceExplanation(executiveId: SeasonFrontOfficeId | null | undefined): string {
-  if (executiveId === null || executiveId === undefined)
-    return 'Risky rehabilitation costs 2 Influence.';
-  const entry = frontOfficeEntryOf(executiveId);
-  const price = rehabPriceOf(executiveId);
-  if (entry.rehabDelta === 0) return `Risky rehabilitation costs ${String(price)} Influence.`;
-  if (entry.rehabDelta < 0)
-    return `Risky rehabilitation costs ${String(price)} Influence (${entry.displayName} recovery discount, minimum ${String(FRONT_OFFICE_MIN_REHAB_COST)}).`;
-  return `Risky rehabilitation costs ${String(price)} Influence (${entry.displayName} drawback).`;
-}
-
 export function baseInquiryAllowanceOf(
   executiveId: SeasonFrontOfficeId | null | undefined,
 ): number {
@@ -54,35 +39,10 @@ export function purchasedInquiryCostOf(
   if (executiveId === undefined || executiveId === null) return 1;
   return frontOfficeEntryOf(executiveId).purchasedInquiryCost;
 }
-
-export function inquiryAllowanceExplanation(
-  executiveId: SeasonFrontOfficeId | null | undefined,
-): string {
-  const base = baseInquiryAllowanceOf(executiveId);
-  const cost = purchasedInquiryCostOf(executiveId);
-  if (executiveId === null || executiveId === undefined)
-    return `Base allowance ${String(base)} per window (cap ${String(TRADE_INQUIRY_TOTAL_CAP)}); purchased inquiries cost ${String(cost)} Influence.`;
-  const entry = frontOfficeEntryOf(executiveId);
-  return `Base allowance ${String(base)} per window (cap ${String(TRADE_INQUIRY_TOTAL_CAP)}); purchased inquiries cost ${String(cost)} Influence (${entry.displayName} ${entry.id === 'morgan-vale' ? 'ability' : entry.id === 'alex-chen' ? 'drawback' : 'standard'}).`;
-}
-
 export function campaignBonusOf(executiveId: SeasonFrontOfficeId | null | undefined): number {
   if (executiveId === undefined || executiveId === null) return 0;
   return frontOfficeEntryOf(executiveId).campaignBonus;
 }
-
-export function evolutionVersions(): {
-  frontOfficeVersion: typeof SEASON_FRONT_OFFICE_VERSION;
-  courtInnovationVersion: typeof SEASON_COURT_INNOVATION_VERSION;
-  targetsVersion: typeof SEASON_EVOLUTION_TARGETS_VERSION;
-} {
-  return {
-    frontOfficeVersion: SEASON_FRONT_OFFICE_VERSION,
-    courtInnovationVersion: SEASON_COURT_INNOVATION_VERSION,
-    targetsVersion: SEASON_EVOLUTION_TARGETS_VERSION,
-  };
-}
-
 type SponsorCandidate = {
   opportunityId: string;
   family: string;
@@ -153,17 +113,6 @@ export function createEvolutionDiscovery(input: { rootSeed: string; acceptedBloc
     seed: seasonNamespaceSeed(input.rootSeed, 'evolution', 'discovery', 'block-2'),
   };
 }
-
-export function evolutionGateAllowsBlock(
-  evolution: SeasonEvolutionState | null | undefined,
-  nextBlockIndex: number,
-): boolean {
-  if (nextBlockIndex < 3) return true;
-  if (!evolution?.discovery) return true;
-  const humanSelected = Object.keys(evolution.selections).length > 0;
-  return humanSelected;
-}
-
 export { resolveHomeGameRule } from '@hoop-rush/data-contracts';
 
 export interface AiInnovationScorer {

@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import { z } from 'zod';
 import {
   COLLECTION_DIFFICULTY_ORDER,
@@ -31,12 +31,6 @@ import {
   type CollectionGameProjection,
   type CollectionGameProjectionJob,
 } from './collection-game-projection.ts';
-
-export const DEFAULT_COLLECTION_GAME_TARGETS = resolve(
-  dirname(DEFAULT_MANIFEST),
-  'collection/game-targets.json',
-);
-
 export const collectionGameTargetsSchema = z
   .object({
     schemaVersion: z.literal(1),

@@ -607,7 +607,6 @@ export interface RiskyRehabOption {
   available: boolean;
   alreadyRehabbed: boolean;
 }
-export const SEASON_POSTSEASON_REHAB_COST = SEASON_POSTSEASON_RISKY_REHAB_COST;
 export function riskyRehabOptionsOf(
   run: SeasonRun,
   humanFranchiseId: string,

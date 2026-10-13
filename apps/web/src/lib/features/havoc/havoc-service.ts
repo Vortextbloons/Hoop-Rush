@@ -48,10 +48,6 @@ export function createHavocService(options: CreateHavocServiceOptions = {}): Hav
 
 let activeService: HavocService | null = null;
 
-export function setHavocService(service: HavocService | null): void {
-  activeService = service;
-}
-
 export function getHavocService(): HavocService {
   if (activeService === null) {
     activeService = createHavocService();

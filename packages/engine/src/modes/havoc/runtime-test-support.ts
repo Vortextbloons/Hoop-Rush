@@ -9,7 +9,6 @@ import type {
   SimulationTendencies,
 } from '@hoop-rush/data-contracts';
 import {
-  POSITIONS,
   SIMULATION_RATINGS,
   SIMULATION_TENDENCIES,
   playerIdSchema,
@@ -200,13 +199,4 @@ export function searchScenario(
     if (predicate(run)) return run;
   }
   return null;
-}
-
-export function cloneArmyHuman(): HavocTeamInput {
-  const slots: ScenarioSlot[] = POSITIONS.map((slot, index) => ({
-    slot,
-    mutations: index === 0 || index === 2 ? ['clone-army'] : [],
-    ratings: { insideScoring: 80, closeShot: 80, vertical: 85 },
-  }));
-  return buildScenarioTeam('human', slots);
 }

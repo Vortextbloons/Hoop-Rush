@@ -1,23 +1,4 @@
-import type { SeasonLeaderCategory, SeasonPlayerAggregate } from '@hoop-rush/data-contracts';
-
-export const CATEGORY_CHAMPION_LABELS: Record<SeasonLeaderCategory, string> = {
-  points: 'Scoring champion',
-  rebounds: 'Rebounding champion',
-  assists: 'Assist champion',
-  steals: 'Steals champion',
-  blocks: 'Blocks champion',
-  threePointersMade: 'Three-point champion',
-};
-
-export const CATEGORY_UNITS: Record<SeasonLeaderCategory, string> = {
-  points: 'PPG',
-  rebounds: 'RPG',
-  assists: 'APG',
-  steals: 'SPG',
-  blocks: 'BPG',
-  threePointersMade: '3PG',
-};
-
+import type { SeasonPlayerAggregate } from '@hoop-rush/data-contracts';
 export interface HonorsLine {
   gamesPlayed: number;
   points: number;
@@ -67,18 +48,4 @@ export function awardStatLine(
     return `${line.bpg.toFixed(1)} BLK · ${line.rpg.toFixed(1)} REB · ${line.spg.toFixed(1)} STL`;
   }
   return `${line.ppg.toFixed(1)} PPG · ${line.rpg.toFixed(1)} REB · ${line.apg.toFixed(1)} AST`;
-}
-
-export function firstTeamStatLine(
-  aggregate: SeasonPlayerAggregate | null | undefined,
-): string | null {
-  return awardStatLine(aggregate, 'first-team');
-}
-
-export function aggregateMapOf(
-  players: readonly SeasonPlayerAggregate[] | null | undefined,
-): Map<string, SeasonPlayerAggregate> {
-  const map = new Map<string, SeasonPlayerAggregate>();
-  for (const row of players ?? []) map.set(row.playerVersionId, row);
-  return map;
 }

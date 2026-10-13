@@ -266,7 +266,6 @@ export const collectionStateUnionSchema = z.union([
   collectionStateV2Schema,
   collectionStateV1Schema,
 ]);
-export const collectionStateSchema = collectionStateV2Schema;
 export type CollectionState = CollectionStateV2;
 export type CollectionStateUnion = z.infer<typeof collectionStateUnionSchema>;
 
@@ -289,9 +288,6 @@ export const collectionCommandBaseV2Schema = z.object({
   expectedDigest: seasonCheckpointDigestSchema,
 });
 export type CollectionCommandBaseV2 = z.infer<typeof collectionCommandBaseV2Schema>;
-
-export const collectionCommandBaseSchema = collectionCommandBaseV2Schema;
-
 export const collectionClaimWelcomeCommandV1Schema = collectionCommandBaseV1Schema.extend({
   command: z.literal('claim-welcome'),
   acquiredAtIso: z.string().min(1).max(64),

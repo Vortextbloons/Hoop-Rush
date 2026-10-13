@@ -3,14 +3,10 @@ import {
   SEASON_SEED_NAMESPACES,
   seasonNamespaceSeed,
   type SeasonGameSummary,
-  type SeasonObjectiveDefinition,
   type SeasonObjectiveEvaluation,
   type SeasonObjectiveId,
   type SeasonRotation,
 } from '@hoop-rush/data-contracts';
-export function seasonObjectiveCatalog(): readonly SeasonObjectiveDefinition[] {
-  return SEASON_OBJECTIVE_CATALOG;
-}
 export function seasonObjectiveChoicesForBlock(
   rootSeed: string,
   blockIndex: number,

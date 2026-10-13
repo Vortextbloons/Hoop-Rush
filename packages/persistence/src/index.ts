@@ -18,4 +18,3 @@ export * from './schemas/draft-duel-record.ts';
 export * from './repositories/draft-duel.ts';
 export * from './schemas/havoc-record.ts';
 export * from './repositories/havoc.ts';
-export * from './benchmark/season-run.ts';

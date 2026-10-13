@@ -1,8 +1,5 @@
 import { hoopRushManifestSchema, type HoopRushManifest } from '../manifest.ts';
 import { loadAsset } from './index.ts';
-export function parseManifest(value: unknown): HoopRushManifest {
-  return hoopRushManifestSchema.parse(value);
-}
 export function loadManifest(
   url: string,
   expectedHash?: string,

@@ -20,7 +20,6 @@ import {
   seasonCampaignStateSchema,
   seasonEvolutionStateSchema,
   type SeasonEvolutionState,
-  type SeasonSponsorGearState,
   seasonHealthStateSchema,
   seasonInfluenceStateSchema,
   seasonInvalidRosterInterruptionSchema,
@@ -45,7 +44,6 @@ import {
   seasonAwardsSchema,
   seasonPostseasonStateSchema,
   normalizeEvolutionState,
-  normalizeSponsorGearState,
   SEASON_ROSTER_MAX_SIZE,
   SEASON_ROSTER_MIN_SIZE,
   SEASON_RUN_SAVE_SCHEMA_VERSION,
@@ -90,12 +88,6 @@ export function storedEvolutionOf(stored: {
   run?: { evolution?: unknown } | null;
 }): SeasonEvolutionState {
   return normalizeEvolutionState(stored.run?.evolution ?? stored.evolution);
-}
-export function storedSponsorsOf(stored: {
-  sponsors?: unknown;
-  run?: { sponsors?: unknown } | null;
-}): SeasonSponsorGearState {
-  return normalizeSponsorGearState(stored.run?.sponsors ?? stored.sponsors);
 }
 export const seasonRunCursorSchema = z.object({
   run: z.object({

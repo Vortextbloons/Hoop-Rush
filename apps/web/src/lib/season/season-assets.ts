@@ -18,8 +18,8 @@ import {
   type SeasonSchedule,
 } from '@hoop-rush/data-contracts';
 import { SEASON_HOME_COURT_PROFILE } from '@hoop-rush/engine';
-import { clearMemoizedLoaders, memoized, resolveAssetUrl } from '$lib/asset-url';
-import { clearManifestAssetCaches, getManifest, loadManifestAsset } from '$lib/manifest-assets';
+import { memoized, resolveAssetUrl } from '$lib/asset-url';
+import { getManifest, loadManifestAsset } from '$lib/manifest-assets';
 import type { SeasonArtifactUrls } from '@hoop-rush/application/season';
 export type { SeasonArtifactUrls };
 const FIXED_SEASON_ERA = '2010s';
@@ -131,10 +131,4 @@ export function loadSeasonProjectionModel(): Promise<ProjectionModelArtifact> {
     find: (manifest) => manifest.projection?.model ?? null,
     missingMessage: 'The projection model artifact is unavailable.',
   });
-}
-
-export function clearSeasonAssetCaches(): void {
-  clearMemoizedLoaders();
-  clearManifestAssetCaches('season/');
-  clearManifestAssetCaches('projection/');
 }

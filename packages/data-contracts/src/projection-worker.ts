@@ -98,26 +98,6 @@ export const projectionWorkerRequestSchema = z.discriminatedUnion('type', [
   projectionRotationRecommendRequestSchema,
 ]);
 export type ProjectionWorkerRequest = z.infer<typeof projectionWorkerRequestSchema>;
-export const projectionLegacyRosterBuildRequestSchema = z.looseObject({
-  schemaVersion: z.literal(PROJECTION_WORKER_WIRE_SCHEMA_VERSION_V1),
-  type: z.literal('build-roster'),
-  requestId: requestIdSchema,
-});
-export const projectionLegacyRotationOptimizeRequestSchema = z.looseObject({
-  schemaVersion: z.literal(PROJECTION_WORKER_WIRE_SCHEMA_VERSION_V1),
-  type: z.literal('optimize-rotation'),
-  requestId: requestIdSchema,
-});
-export const projectionLegacyRotationRecommendRequestSchema = z.looseObject({
-  schemaVersion: z.literal(PROJECTION_WORKER_WIRE_SCHEMA_VERSION_V1),
-  type: z.literal('recommend-rotation'),
-  requestId: requestIdSchema,
-});
-export const projectionWorkerLegacyRequestSchema = z.discriminatedUnion('type', [
-  projectionLegacyRosterBuildRequestSchema,
-  projectionLegacyRotationOptimizeRequestSchema,
-  projectionLegacyRotationRecommendRequestSchema,
-]);
 export const projectionWorkerCompleteResponseSchema = z
   .object({
     schemaVersion: z.literal(PROJECTION_WORKER_WIRE_SCHEMA_VERSION).optional(),
@@ -139,8 +119,3 @@ export const projectionWorkerResponseSchema = z.discriminatedUnion('type', [
   projectionWorkerErrorResponseSchema,
 ]);
 export type ProjectionWorkerResponse = z.infer<typeof projectionWorkerResponseSchema>;
-export function isLiveProjectionWorkerRequest(request: { schemaVersion: number }): boolean {
-  return request.schemaVersion === PROJECTION_WORKER_WIRE_SCHEMA_VERSION;
-}
-export const LIVE_PROJECTION_WORKER_VERSION_MESSAGE =
-  'projection worker message uses an outdated wire version (expected v2); discard and retry with the current worker';

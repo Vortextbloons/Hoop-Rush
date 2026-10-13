@@ -3,14 +3,6 @@ import type { SeasonSchedule } from '@hoop-rush/data-contracts';
 import { getPersistence } from '$lib/persistence';
 import type { SeasonBlockRunner, SeasonBlockStartInput } from '$lib/season/season-block-runner';
 import type { SeasonPostseasonJob } from '$lib/season/season-postseason-runner';
-declare global {
-  interface Window {
-    __HOOP_RUSH_SEASON_BLOCK_RUNNER__?: SeasonBlockRunner;
-    __HOOP_RUSH_SEASON_POSTSEASON_RUNNER__?: SeasonPostseasonJob;
-    __HOOP_RUSH_E2E_FAKE_RUNNER__?: boolean;
-    __HOOP_RUSH_E2E_FAKE_POSTSEASON_RUNNER__?: boolean;
-  }
-}
 let repoPlainPromise: Promise<SeasonRunRepository & SeasonPostseasonRepository> | null = null;
 let repoSchedulePromise: Promise<SeasonRunRepository & SeasonPostseasonRepository> | null = null;
 export function resetSeasonRepositories(): void {
@@ -44,14 +36,6 @@ function createRepo(options: {
 }
 let runnerPromise: Promise<SeasonBlockRunner> | null = null;
 export function getSeasonBlockRunner(): Promise<SeasonBlockRunner> {
-  if (typeof window !== 'undefined' && window.__HOOP_RUSH_SEASON_BLOCK_RUNNER__) {
-    return Promise.resolve(window.__HOOP_RUSH_SEASON_BLOCK_RUNNER__);
-  }
-  if (typeof window !== 'undefined' && window.__HOOP_RUSH_E2E_FAKE_RUNNER__) {
-    return import('./fake-season-block-runner').then((module) =>
-      module.createFakeSeasonBlockRunner(),
-    );
-  }
   if (runnerPromise === null) {
     runnerPromise = (async () => {
       const module = await import('$lib/season/season-block-runner');
@@ -65,14 +49,6 @@ export function getSeasonBlockRunner(): Promise<SeasonBlockRunner> {
 }
 let postseasonJobPromise: Promise<SeasonPostseasonJob> | null = null;
 export function getSeasonPostseasonJob(): Promise<SeasonPostseasonJob> {
-  if (typeof window !== 'undefined' && window.__HOOP_RUSH_SEASON_POSTSEASON_RUNNER__) {
-    return Promise.resolve(window.__HOOP_RUSH_SEASON_POSTSEASON_RUNNER__);
-  }
-  if (typeof window !== 'undefined' && window.__HOOP_RUSH_E2E_FAKE_POSTSEASON_RUNNER__) {
-    return import('./fake-season-postseason-runner').then((module) =>
-      module.createFakeSeasonPostseasonJob(),
-    );
-  }
   if (postseasonJobPromise === null) {
     postseasonJobPromise = import('$lib/season/season-postseason-runner').then((module) =>
       module.getSeasonPostseasonJob(),

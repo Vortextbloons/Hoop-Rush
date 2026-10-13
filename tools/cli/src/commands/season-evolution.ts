@@ -24,7 +24,7 @@ import {
   wrapSponsorshipsForBlock,
 } from '@hoop-rush/engine';
 import { makeReport, type CliReport } from '../report.ts';
-import { DEFAULT_MANIFEST, DEFAULT_SEASON_DIR, readJsonFile } from './season-data.ts';
+import { DEFAULT_MANIFEST, DEFAULT_SEASON_DIR } from './season-data.ts';
 import { parseSeedRange } from '../args.ts';
 import { seasonCalibrationSeed, seedIndexRange } from './season-calibration.ts';
 import { commitTargetsArtifact, validateTargetsArtifact } from '../calibration/index.ts';
@@ -450,8 +450,4 @@ export function seasonEvolutionBenchmark(args: {
   checkAiSelection();
   details.push(`ai selection (30 franchises): ${(performance.now() - aiStarted).toFixed(2)}ms`);
   return makeReport('season evolution benchmark', {}, { details });
-}
-
-export function readEvolutionTargetsFile(path: string): SeasonEvolutionTargets {
-  return seasonEvolutionTargetsSchema.parse(readJsonFile(path));
 }

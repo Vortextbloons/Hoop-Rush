@@ -28,7 +28,7 @@ import {
   simulateSeasonGameWithEffects,
   unitChemistryBasisPoints,
 } from '@hoop-rush/engine';
-import { parseCount, UsageError } from '../args.ts';
+import { parseCount } from '../args.ts';
 import { makeReport, type CliReport } from '../report.ts';
 import {
   seasonEffectsCalibrateReportSchema,
@@ -36,14 +36,13 @@ import {
   seasonEffectsRolesReportSchema,
   seasonEffectsSensitivityReportSchema,
 } from '../report-schemas.ts';
-import { seasonGameFixtureSchema } from '../fixture-schema.ts';
 import {
   seasonGameCalibrationSeed,
   loadSeasonGameFixture,
   resolveSeasonGameFixturePath,
   type SeasonGameEngineDeps,
 } from './season-game.ts';
-import { DEFAULT_MANIFEST, DEFAULT_SEASON_DIR, readJsonFile } from './season-data.ts';
+import { DEFAULT_MANIFEST, DEFAULT_SEASON_DIR } from './season-data.ts';
 import { seedIndexRange } from './season-calibration.ts';
 import {
   commitTargetsArtifact,
@@ -343,27 +342,6 @@ export async function runSeasonEffectsCohort(
       seedIndices,
     }),
   })(request);
-}
-export function runSeasonEffectsCohortInProcess(
-  request: SeasonEffectsCohortRequest,
-  deps: SeasonEffectsEngineDeps,
-): Promise<SeasonEffectsGameFacts[]> {
-  const facts: SeasonEffectsGameFacts[] = [];
-  for (const fixture of request.fixtures) {
-    const parsed = seasonGameFixtureSchema.safeParse(readJsonFile(fixture.path));
-    if (!parsed.success) {
-      throw new Error(`season game fixture ${fixture.fixtureId} fails validation`);
-    }
-    for (const index of request.seedIndices) {
-      const seed = seasonGameCalibrationSeed(index);
-      const input = seasonGameSimulationInputSchema.parse({
-        ...withFixtureStamina(parsed.data.input),
-        seed,
-      });
-      facts.push(simulateSeasonEffectsGameFacts(fixture.fixtureId, index, input, deps));
-    }
-  }
-  return Promise.resolve(facts);
 }
 function pct(delta: number, base: number): number {
   return base === 0 ? 0 : (delta / base) * 100;
@@ -956,31 +934,4 @@ export function validateSeasonEffectTargets(args: SeasonEffectsArgs, outPath: st
         : { details: [], failures: ['artifact mechanism caps do not match the engine constants'] };
     },
   });
-}
-export async function seasonEffectsCommand(
-  args: SeasonEffectsArgs,
-  extra: string[],
-  deps: SeasonEffectsEngineDeps = {
-    simulateSeasonGame,
-    checkSeasonGameResult,
-    simulateSeasonGameWithEffects,
-    createSeasonEffectsState,
-  },
-  runner: SeasonEffectsCohortRunner = runSeasonEffectsCohort,
-): Promise<CliReport> {
-  const subcommand = extra[0] ?? '';
-  switch (subcommand) {
-    case 'sensitivity':
-      return seasonEffectsSensitivity(args, deps);
-    case 'distribution':
-      return seasonEffectsDistribution(args, runner);
-    case 'roles':
-      return seasonEffectsRoles(args, deps);
-    case 'calibrate':
-      return seasonEffectsCalibrate(args, deps, runner);
-    default:
-      throw new UsageError(
-        'season effects requires a subcommand: sensitivity | distribution | roles | calibrate',
-      );
-  }
 }

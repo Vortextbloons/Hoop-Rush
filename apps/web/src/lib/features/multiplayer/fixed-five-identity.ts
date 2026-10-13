@@ -1,15 +1,8 @@
 import {
-  fixedFiveRoomCodeSchema,
   fixedFiveRoomMembershipSchema,
   type FixedFiveRoomMembership,
 } from '@hoop-rush/data-contracts';
 import { createMembershipStore } from '$lib/multiplayer-membership';
-
-export function inviteLinkForFixedFiveCode(code: string): string {
-  const parsed = fixedFiveRoomCodeSchema.parse(code);
-  return `/multiplayer?code=${parsed}`;
-}
-
 export function friendlyFixedFiveJoinError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
   const lower = message.toLowerCase();

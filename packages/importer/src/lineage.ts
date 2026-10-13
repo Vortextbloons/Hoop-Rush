@@ -1097,13 +1097,3 @@ export function resolveHistoricalIdentity(
   }
   return null;
 }
-export function foundingSeasonByTeamExternalId(): Record<string, string> {
-  const map: Record<string, string> = {};
-  for (const segment of LINEAGE_SEGMENTS) {
-    const existing = map[segment.historicalTeamId];
-    if (existing === undefined || segment.validFromSeasonKey < existing) {
-      map[segment.historicalTeamId] = segment.validFromSeasonKey;
-    }
-  }
-  return map;
-}

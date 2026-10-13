@@ -1,5 +1,4 @@
 import type { SeasonEffectsState } from '@hoop-rush/data-contracts';
-import type { SeasonStaminaInput } from '@hoop-rush/data-contracts';
 import { REGULATION_TOTAL_SECONDS } from '../sim/clock.ts';
 export const SEASON_STAMINA_RATING_FLOOR = 45;
 export const SEASON_STAMINA_RATING_CEIL = 95;
@@ -10,14 +9,10 @@ export const SEASON_STAMINA_OFF_COURT_BASE = 3;
 export const SEASON_STAMINA_STINT_RAMP_START_SECONDS = 360;
 export const SEASON_STAMINA_STINT_RAMP_END_SECONDS = 720;
 export const SEASON_STAMINA_STINT_MULTIPLIER_MAX = 12500;
-export const SEASON_STAMINA_ROLE_HANDLER_BP = 12;
-export const SEASON_STAMINA_ROLE_DEFENDER_BP = 8;
-export const SEASON_STAMINA_ROLE_REBOUND_BP = 2;
 export const SEASON_STAMINA_HALFTIME_BASE_BP = 250;
 export const SEASON_STAMINA_HALFTIME_PER_RATING_BP = 2;
 export const SEASON_STAMINA_RECENT_LOAD_RETAIN = 60;
 export const SEASON_STAMINA_RECENT_LOAD_SHARE = 40;
-export const SEASON_STAMINA_RECENT_LOAD_MAX_FACTOR = 1.5;
 export const SEASON_STAMINA_RECOVERY_DIVISOR = 4500;
 export const SEASON_STAMINA_RECOVERY_PER_RATING = 20;
 export function stintMultiplierBp(stintSeconds: number): number {
@@ -95,12 +90,4 @@ export function applySeasonRecoveryTick(
     pairStates: state.pairStates,
     archivedPairs: state.archivedPairs,
   };
-}
-export const SEASON_EFFECTS_STATE_SCHEMA_VERSION = 1;
-export function assertStaminaInputs(inputs: readonly SeasonStaminaInput[], label: string): void {
-  for (const input of inputs) {
-    if (input.rating < SEASON_STAMINA_RATING_FLOOR || input.rating > SEASON_STAMINA_RATING_CEIL) {
-      throw new Error(`season stamina: ${label} ${input.playerVersionId} rating out of range`);
-    }
-  }
 }

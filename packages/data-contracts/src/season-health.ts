@@ -17,8 +17,6 @@ export const seasonInjurySourceSchema = z.enum(['natural', 'risky-rehab-failure'
 export type SeasonInjurySource = z.infer<typeof seasonInjurySourceSchema>;
 export const injuryIdSchema = z.string().regex(/^inj-[0-9a-f]{32}$/);
 export type InjuryId = z.infer<typeof injuryIdSchema>;
-export const SEASON_REHAB_RECURRENCE_PREMIUM_BASIS_POINTS = 60;
-export const SEASON_REHAB_SUCCESS_BASIS_POINTS = 6000;
 export const seasonInjuryRecordSchema = z.object({
   injuryId: injuryIdSchema,
   playerVersionId: playerVersionIdSchema,

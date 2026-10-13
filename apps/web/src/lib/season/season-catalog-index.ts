@@ -38,9 +38,3 @@ export function summaryRatingsOf(
 } | null {
   return candidateOf(catalog, playerVersionId)?.summaryRatings ?? null;
 }
-export function staminaRatingOf(
-  catalog: SeasonDraftCatalog | null,
-  playerVersionId: string,
-): number | null {
-  return candidateOf(catalog, playerVersionId)?.stamina.rating ?? null;
-}

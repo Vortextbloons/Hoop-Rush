@@ -1,4 +1,3 @@
-export const MODERN_ERA = { leaguePpg: 110, league3PARate: 0.36, pace: 99 };
 export function starterStats(over: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     gamesPlayed: 78,

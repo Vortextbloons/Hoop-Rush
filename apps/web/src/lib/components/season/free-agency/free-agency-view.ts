@@ -145,13 +145,6 @@ export function bestFitOrder(
   });
   return ordered.slice(0, limit).map((candidate) => candidate.playerVersionId);
 }
-export function influenceOptionsOf(candidate: SeasonFreeAgencyCandidate): number[] {
-  const options: number[] = [];
-  for (let value = candidate.minimumInfluence; value <= FREE_AGENCY_MAX_COMMITMENT; value += 1) {
-    options.push(value);
-  }
-  return options;
-}
 export interface DeclarationDraftTarget {
   playerVersionId: string;
   roleExpectation: SeasonFreeAgencyRoleExpectation;

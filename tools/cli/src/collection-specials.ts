@@ -143,19 +143,3 @@ export const COLLECTION_SPECIALS: readonly AuthoredSpecial[] = [
     ratingOverlay: { threePoint: 10, midrange: 5, offensiveIq: 3, ballHandling: 2 },
   },
 ];
-
-export const COLLECTION_SPECIAL_SOURCE_SEASONS: Record<string, string> = {
-  'pv-f4d00dd58ebad5097f4e5ba3307a9085': 'Luka Dončić 2023-24',
-  'pv-4f9bfe1ff8fb4b3bed084899071a304f': 'Magic Johnson 1988-89',
-  'pv-3f5b52ec3a1798b0bad644defdb7c47c': 'Trae Young 2021-22',
-  'pv-d6f09fada4f8f7c1d26258b3b045611d': 'James Harden 2018-19',
-  'pv-e672c0d85044e49475d29e2691a16bc8': "D'Angelo Russell 2023-24",
-  'pv-91b01c4775957fb343db81099c6d7d37': 'Jordan Clarkson 2020-21',
-  'pv-4efd0118ae40c6f4ed7689ee95d6e728': 'Bogdan Bogdanović 2020-21',
-  'pv-7cade7ffd36dd1fbc109dd0d6587b34f': 'Stephen Curry 2014-15',
-  'pv-95878fdf2e3c464375ca2d492b1e8c2f': 'Klay Thompson 2014-15',
-  'pv-e232bb54fc4d64987c28ee7280b2e544': 'Damian Lillard 2019-20',
-  'pv-3403aab8d9062e9499e652cefe30bcc8': 'Devin Booker 2023-24',
-  'pv-df08d554ee506d60278c77225edb0b44': 'Jamal Murray 2025-26',
-  'pv-861bb119df8ca81d3c77b327ee6c55e9': 'Reggie Miller 1989-90',
-};

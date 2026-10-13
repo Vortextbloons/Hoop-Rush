@@ -259,7 +259,7 @@ export async function seasonBenchmarkPersistence(args: {
 }): Promise<CliReport> {
   const samples = Math.max(1, Number.parseInt(args.samples ?? '1', 10) || 1);
   let report: Awaited<
-    ReturnType<typeof import('@hoop-rush/persistence').benchmarkSeasonRunPersistence>
+    ReturnType<typeof import('@hoop-rush/persistence/benchmark').benchmarkSeasonRunPersistence>
   >;
   try {
     const { IDBFactory, IDBKeyRange } = await import('fake-indexeddb');
@@ -271,7 +271,7 @@ export async function seasonBenchmarkPersistence(args: {
     environment.IDBKeyRange = IDBKeyRange;
     const { Dexie } = await import('dexie');
     const { HoopRushDatabase } = await import('@hoop-rush/persistence');
-    const { benchmarkSeasonRunPersistence } = await import('@hoop-rush/persistence');
+    const { benchmarkSeasonRunPersistence } = await import('@hoop-rush/persistence/benchmark');
     report = await benchmarkSeasonRunPersistence({
       samples,
       createDatabase: () => {

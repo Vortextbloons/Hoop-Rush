@@ -3,7 +3,6 @@ import {
   seasonDigestHex,
   type EraSimulationProfile,
   type ProjectionLedger,
-  type SeasonCourtInnovationId,
   type SeasonGameRule,
   type SimulationPlayer,
   type SimulationTeam,
@@ -400,11 +399,4 @@ export function projectGameWithRule(input: {
     overtime,
     facts,
   };
-}
-
-export function innovationIdOfRule(rule: SeasonGameRule): SeasonCourtInnovationId | null {
-  if (rule === 'deep-four') return 'deep-four';
-  if (rule === 'twenty-second-clock') return 'twenty-second-clock';
-  if (rule === 'first-to-seven-overtime') return 'first-to-seven-overtime';
-  return null;
 }

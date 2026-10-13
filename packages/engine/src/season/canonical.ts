@@ -75,21 +75,3 @@ export function canonicalInfluencePayload(influence: {
     rehabs: Object.fromEntries(sortedEntries(influence.rehabs)),
   });
 }
-
-export function canonicalTeamAggregatesPayload(
-  rows: readonly { franchiseId: string }[],
-): { franchiseId: string }[] {
-  return sortedBy(rows, (row) => row.franchiseId);
-}
-
-export function canonicalPlayerAggregatesPayload(
-  rows: readonly { playerVersionId: string }[],
-): { playerVersionId: string }[] {
-  return sortedBy(rows, (row) => row.playerVersionId);
-}
-
-export function canonicalGameSummariesPayload(
-  rows: readonly { gameId: string }[],
-): { gameId: string }[] {
-  return sortedBy(rows, (row) => row.gameId);
-}

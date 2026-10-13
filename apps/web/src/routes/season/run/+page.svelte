@@ -116,6 +116,13 @@
   const openFreeAgencyWindow = $derived(
     shell.freeAgency?.windows.find((window) => window.status === 'open') ?? null,
   );
+  const evolution = $derived(
+    (
+      run as unknown as {
+        evolution?: import('@hoop-rush/data-contracts').SeasonEvolutionState | null;
+      } | null
+    )?.evolution ?? null,
+  );
   const influenceVm = $derived(
     shell.influence !== null && humanFranchiseId !== null
       ? influenceViewModel(
@@ -174,13 +181,6 @@
     if (e === null) return null;
     return e.command === 'select-court-innovation' ? e.message : null;
   });
-  const evolution = $derived(
-    (
-      run as unknown as {
-        evolution?: import('@hoop-rush/data-contracts').SeasonEvolutionState | null;
-      } | null
-    )?.evolution ?? null,
-  );
   const needsInnovation = $derived(
     run !== null &&
       humanFranchiseId !== null &&
@@ -282,16 +282,16 @@
   );
   let submitting = $state(false);
   let blockProgressVisible = $state(false);
-  let submitFailure: { code: SubmitBlockFailureCode; faWindowIndex: number | null } | null =
-    $state(null);
-  const submitErrorView = $derived(
-    submitFailure === null
-      ? null
-      : humanizeBlockSubmitFailure(submitFailure.code, {
-          faWindowIndex: submitFailure.faWindowIndex,
-          firstFailure: rotationFailures[0] ?? null,
-        }),
-  );
+  type SubmitFailure = { code: SubmitBlockFailureCode; faWindowIndex: number | null };
+  let submitFailure: SubmitFailure | null = $state(null);
+  function blockSubmitErrorView(failure: SubmitFailure | null) {
+    if (failure === null) return null;
+    return humanizeBlockSubmitFailure(failure.code, {
+      faWindowIndex: failure.faWindowIndex,
+      firstFailure: rotationFailures[0] ?? null,
+    });
+  }
+  const submitErrorView = $derived(blockSubmitErrorView(submitFailure));
   async function submitBlock() {
     if (submitting) return;
     if (!canSubmit) {
@@ -318,7 +318,9 @@
         submitFailure = {
           code: result.error.code,
           faWindowIndex:
-            freeAgencyUnresolvedWindowIndex(shell.run?.freeAgency ?? undefined) ?? null,
+            shell.run === null
+              ? null
+              : (freeAgencyUnresolvedWindowIndex(shell.run.freeAgency) ?? null),
         };
         return;
       }
@@ -1360,7 +1362,7 @@
           onRehabSelect={(injuryId) => (selectedRehabInjuryId = injuryId)}
           failures={shell.editor?.validate() ?? []}
           rejectionMessage={postseasonCommandError}
-          balance={run?.influence.balances[humanFranchiseId ?? ''] ?? 0}
+          balance={humanFranchiseId === null ? 0 : (run?.influence.balances[humanFranchiseId] ?? 0)}
           submitting={postseasonSubmitting}
           canSubmit={canSubmitPostseason}
           canForfeit={canForfeitPostseason}

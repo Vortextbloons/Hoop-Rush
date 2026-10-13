@@ -177,8 +177,6 @@ export function applyAiInfluenceSpends(
 }
 
 export const TRADE_INQUIRY_BASE = 3;
-export const TRADE_INQUIRY_MAX = 5;
-export const TRADE_EXCHANGE_MAX = 3;
 export const TRADE_CASH_MAX_PER_PROPOSAL = 2;
 export const TRADE_CASH_MAX_PER_WINDOW = 3;
 export const TRADE_CASH_PCT_PER_POINT = 8;

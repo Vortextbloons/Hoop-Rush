@@ -1,11 +1,11 @@
 import {
   SeasonRunCommandNotImplementedError,
+  handleRetiredSeasonCommand,
   type SeasonRunCommandContext,
   type SeasonRunCommandInput,
   type SeasonRunCommandOutput,
   type SeasonRunCommandResult,
 } from './commands/shared.ts';
-import { handleRetiredSeasonCommand } from './commands/retired.ts';
 import { handleApplySponsor, handleBuySponsor } from './commands/sponsors.ts';
 import {
   handleAcceptTradeOffer,

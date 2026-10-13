@@ -28,11 +28,6 @@ export function fatiguePercent(fatigueBasisPoints: number): number {
 export function loadStateOf(state: SeasonEffectsState, playerVersionId: string) {
   return state.playerStates.find((player) => player.playerVersionId === playerVersionId) ?? null;
 }
-export function pairSharedOf(state: SeasonEffectsState, a: string, b: string): number {
-  const [x, y] = a < b ? [a, b] : [b, a];
-  const pair = state.pairStates.find((p) => p.a === x && p.b === y);
-  return pair?.sharedPossessions ?? 0;
-}
 export function activeLineupChemistryBp(
   state: SeasonEffectsState,
   unit: readonly string[],

@@ -498,9 +498,6 @@ export const draftDuelTransientEventSchema = z.discriminatedUnion('kind', [
   }),
 ]);
 export type DraftDuelTransientEvent = z.infer<typeof draftDuelTransientEventSchema>;
-export const draftDuelConsiderationSchema = draftDuelTransientEventSchema.options[0];
-export const draftDuelReactionSchema = draftDuelTransientEventSchema.options[1];
-
 export const draftDuelMultiplayerErrorCodeSchema = z.enum([
   'authorization',
   'membership',

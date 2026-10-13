@@ -9,7 +9,6 @@ import {
   seasonUpcomingHumanGameSchema,
   type FranchiseId,
   type SeasonGameId,
-  type HoopRushManifest,
   type SeasonBlockChallengeEvidence,
   type SeasonBlockInjuryEvidence,
   type SeasonBlockRecap,
@@ -29,7 +28,6 @@ import {
   type SeasonTeamAggregate,
   type SeasonTeamBox,
   type SeasonTradeGrade,
-  type SeasonTradeValueTrend,
   type SeasonUpcomingHumanGame,
   type SeasonVersionSpotlight,
 } from '@hoop-rush/data-contracts';
@@ -139,21 +137,6 @@ function streakOfGames(
   if (kind === null) return null;
   return { kind, length: streak };
 }
-export function franchiseStreak(
-  summaries: readonly SeasonGameSummary[],
-  franchiseId: string,
-): {
-  kind: 'wins' | 'losses';
-  length: number;
-} | null {
-  const games = summaries
-    .filter(
-      (summary) =>
-        summary.homeFranchiseId === franchiseId || summary.awayFranchiseId === franchiseId,
-    )
-    .sort((a, b) => a.round - b.round);
-  return streakOfGames(games, franchiseId);
-}
 export function franchiseStreaks(
   summaries: readonly SeasonGameSummary[],
   franchiseIds: readonly string[],
@@ -229,9 +212,6 @@ export const LEADER_CATEGORY_LABELS: Record<SeasonLeaderCategory, string> = {
   blocks: 'Blocks',
   threePointersMade: '3-pointers',
 };
-export function franchiseLabelMap(manifest: HoopRushManifest): Map<string, string> {
-  return new Map(manifest.modernFranchiseSlots.map((slot) => [slot.franchiseId, slot.displayName]));
-}
 export interface BoxScoreRow {
   playerVersionId: string;
   displayName: string;
@@ -845,36 +825,11 @@ export const TRADE_PRIORITY_LABELS: Record<string, string> = {
   depth: 'Depth',
   influence: 'Influence',
 };
-export const COMPETITOR_INTEREST_LABELS: Record<string, string> = {
-  low: 'Low',
-  possible: 'Possible',
-  strong: 'Strong',
-  'preferred-fit': 'Preferred fit',
-};
-export const TRADE_RESPONSE_CAUSE_LABELS: Record<string, string> = {
-  acceptable: 'acceptable',
-  'close-needs-more-value': 'close needs more value',
-  'wrong-roster-fit': 'wrong roster fit',
-  'unacceptable-injury-risk': 'unacceptable injury/availability risk',
-  'protected-player': 'protected player',
-  'illegal-roster': 'illegal roster/rotation',
-  'negotiations-closed': 'negotiations closed',
-  'close needs more value': 'close needs more value',
-  'wrong roster fit': 'wrong roster fit',
-  'unacceptable injury risk': 'unacceptable injury/availability risk',
-};
 export function formatTradeNeeds(needs: readonly string[]): string {
   return needs.map((n) => TRADE_NEED_LABELS[n] ?? n).join(' / ');
 }
 export function formatTradePriority(priority: string): string {
   return TRADE_PRIORITY_LABELS[priority] ?? priority;
-}
-export function competitorInterestLabel(interest: string): string {
-  return COMPETITOR_INTEREST_LABELS[interest] ?? interest;
-}
-export function responseCauseLabel(cause: string | null): string {
-  if (cause === null) return '—';
-  return TRADE_RESPONSE_CAUSE_LABELS[cause] ?? cause;
 }
 export function inquiryCounterLabel(
   allowance: number,
@@ -1160,29 +1115,6 @@ export function chemistryFootnote(removedPairs: number, newPairs: number): strin
   void removedPairs;
   void newPairs;
   return 'New teammates start neutral.';
-}
-export function valueTrendToneLabel(trend: SeasonTradeValueTrend['trend']): string {
-  switch (trend) {
-    case 'rising':
-      return 'Rising';
-    case 'falling':
-      return 'Falling';
-    case 'stable':
-      return 'Stable';
-  }
-}
-export function rehabPresentationFacts(): {
-  cost: number;
-  successRate: string;
-  successNote: string;
-  failureNote: string;
-} {
-  return {
-    cost: 2,
-    successRate: '60%',
-    successNote: 'Success brings the player back sooner',
-    failureNote: 'It can also set the return back',
-  };
 }
 export function recordRankOutLabel(input: {
   wins: number;

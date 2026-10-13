@@ -288,20 +288,3 @@ export function buildEmptyChallengeState(): SeasonChallengeState {
     evaluations: [],
   };
 }
-
-export function challengeInstancesOfDeal(deal: SeasonChallengeDeal): SeasonChallengeInstance[] {
-  const catalogById = new Map(SEASON_CHALLENGE_CATALOG.map((entry) => [entry.challengeId, entry]));
-  return deal.challengeIds.map((challengeId) => {
-    const definition = catalogById.get(challengeId);
-    if (!definition) throw new Error(`unknown challenge ${challengeId}`);
-    return {
-      challengeId,
-      blockIndex: deal.blockIndex,
-      difficulty: definition.difficulty,
-      reward: definition.reward,
-      seedDigest: deal.seedDigest,
-      contextDigest: deal.contextDigest,
-      targets: deal.targets,
-    };
-  });
-}

@@ -11,7 +11,6 @@ export const COLLECTION_COMMAND_VERSION = 'collection-command-v2';
 export const COLLECTION_REPLAY_V1_VERSION = 'collection-replay-v1';
 export const COLLECTION_REPLAY_VERSION = 'collection-replay-v2';
 export const COLLECTION_PACK_TARGETS_VERSION = 'pack-targets-v1';
-export const COLLECTION_SAVE_V1_VERSION = 1;
 export const COLLECTION_SAVE_VERSION = 2;
 export const COLLECTION_SEED_DERIVATION_VERSION = 'collection-seeds-v1';
 export const COLLECTION_SEED_NAMESPACES = {
@@ -43,7 +42,6 @@ export const COLLECTION_REWARD_VERSION = 'collection-reward-v3';
 export const COLLECTION_GAME_V1_REPLAY_VERSION = 'collection-game-replay-v1';
 export const COLLECTION_GAME_V2_REPLAY_VERSION = 'collection-game-replay-v2';
 export const COLLECTION_GAME_REPLAY_VERSION = 'collection-game-replay-v3';
-export const COLLECTION_PLAY_SAVE_V1_VERSION = 1;
 export const COLLECTION_PLAY_SAVE_V2_VERSION = 2;
 export const COLLECTION_PLAY_SAVE_VERSION = 3;
 export const COLLECTION_GAME_SEED_DERIVATION_VERSION = 'collection-game-seeds-v2';
@@ -83,9 +81,3 @@ export const COLLECTION_TARGET_BASE_WEIGHT_BP = 10_000;
 
 export const COLLECTION_DIFFICULTY_ORDER = ['street', 'pro', 'legend'] as const;
 export type CollectionDifficultyOrder = (typeof COLLECTION_DIFFICULTY_ORDER)[number];
-
-export const COLLECTION_DIFFICULTY_NAMES = {
-  street: 'Street',
-  pro: 'Pro',
-  legend: 'Legend',
-} as const;
