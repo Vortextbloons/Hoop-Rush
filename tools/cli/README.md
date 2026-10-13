@@ -17,9 +17,11 @@ simulation implementation.
   `docs.ts`) declares each command's name, options, help text, and handler.
   `index.ts` fixes the help order.
 - `src/calibration/` — shared calibration infrastructure: `harness.ts` (seed and
-  worker resolution, cohort runners, worker fixture loading),
-  `artifacts.ts` (artifact commit + validation + manifest hash pinning),
-  `report.ts` (targets label and gate-failure epilogue).
+  worker resolution, cohort runners, worker fixture loading), `artifacts.ts`
+  (artifact commit + validation + manifest hash pinning), `report.ts` (targets
+  label and gate-failure epilogue), and `shell.ts` (the shared calibration flow:
+  validate short circuit, cohort measurement, gate summary, lazy artifact build,
+  commit, report assembly).
 - `src/commands/` — the handlers and their basketball metrics. Calibration
   gates, cohort definitions, and artifact schemas stay with each command.
 - `src/gen-*.ts` — standalone generators run through package scripts

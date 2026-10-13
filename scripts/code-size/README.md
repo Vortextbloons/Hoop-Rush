@@ -157,10 +157,31 @@ reducing; the refactor's net reduction lands with stages 7e/7f.
   Remaining runtime dead exports after the sweep: 0 (the reference scan reports
   no unreferenced exported function/const/class/enum outside test files).
 
-Final stage 7 measurement: maintained source 227,065 physical (runtime
-179,229) from 230,319 (runtime 182,480) at stage 7a — a net reduction of 3,254
-maintained lines. Test lines grew (43,887 → 44,117) from the registry and
-calibration reporting suites.
+- 2026-10-12, stage 7c (completion): the calibration shell is real now.
+  `tools/cli/src/calibration/shell.ts` owns the shared flow — `--validate`
+  short circuit, cohort measurement (throwing cohorts report
+  `calibration cohort failed` with exit 2), gate summary, lazy artifact build,
+  manifest commit, gate epilogue ordering, payload schema parse, and report
+  assembly. `season challenges/health/influence/trade/free-agency calibrate`
+  keep their metrics, schemas, and payload/details builders and call the shell.
+  Verified: CLI check/lint, CLI suite 8 files / 44 tests, shell unit suite (6
+  tests: pass/commit, failed gate with no artifact build, skipped gate, cohort
+  throw, validate short circuit, commit error ordering), and a before/after run
+  of all ten command invocations (five tiny cohorts that fail deterministically
+  and five `--validate` runs) — identical exit codes, stdout, and stderr with
+  only `durationMs` normalized. Note: a *passing* real cohort cannot be
+  exercised because `runSeasonM25` hits the committed fixture interruption
+  (`game s000794`, pre-existing); the pass path is covered by the shell suite.
+- 2026-10-12, stage 7e (completion): the havoc fake is split into
+  `features/havoc/testing/havoc-fixtures.ts` (pure builders, tapes, comparisons,
+  reports, run states; 1,570 lines) and `havoc-service-double.ts` (the scripted
+  `FakeHavocService`, 806 lines) with the six havoc suites importing each
+  module directly. Web eslint/check/tests green (27 files / 211 tests).
+
+Final stage 7 measurement: maintained source 227,169 physical (runtime
+179,333) from 230,319 (runtime 182,480) at stage 7a — a net reduction of 3,150
+maintained lines and 3,147 runtime lines. Test lines grew (43,887 → 44,264)
+from the registry, calibration-shell, and fixtures suites.
 
 ## Baseline log
 
