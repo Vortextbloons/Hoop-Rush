@@ -234,7 +234,7 @@
     <AsyncState
       kind="loading"
       title="Opening your run"
-      message="Loading your collection and lineupâ€¦"
+      message="Loading your collection and lineup…"
     />
   {:else if phase === 'error'}
     <AsyncState
@@ -315,7 +315,7 @@
                 stroke-linejoin="round"
               />
             </svg>
-            <strong class="ur-number">{totalCount > 0 ? fmt(totalCount) : 'â€”'}</strong>
+            <strong class="ur-number">{totalCount > 0 ? fmt(totalCount) : '—'}</strong>
             <span>In the collection</span>
             <small>{completePct}% complete</small>
             <span class="ur-mini-track" aria-hidden="true">
@@ -361,8 +361,8 @@
               {@const ovr = card ? overallOf(card.cardId) : null}
               {@const tone = card?.rarity.toLowerCase() ?? 'empty'}
               <li class="ur-hub-player-card ur-rarity-tone-{tone}">
-                <span class="ur-hub-slot">{SHORT_SLOT_LABELS[index] ?? 'â€”'}</span>
-                <span class="ur-hub-ovr ur-number">{ovr ?? 'â€”'}</span>
+                <span class="ur-hub-slot">{SHORT_SLOT_LABELS[index] ?? '—'}</span>
+                <span class="ur-hub-ovr ur-number">{ovr ?? '—'}</span>
                 <span class="ur-hub-face">
                   {#if card}
                     <CollectionCardFace
@@ -410,7 +410,7 @@
           <h3 id="run-snapshot-title">Last game</h3>
           <a class="ur-panel-link" href={resolve('/ultimate/run/play' as any)}>
             {playState?.pendingGame ? 'Resume' : recentGame ? 'Play again' : 'Play'}
-            <span aria-hidden="true">â†’</span>
+            <span aria-hidden="true">→</span>
           </a>
         </div>
         {#if playState?.pendingGame}
@@ -435,9 +435,9 @@
               {gameScore.home}<span> - </span>{gameScore.away}
             </strong>
             <p>
-              Final score Â· {gameLabelOf(recentGame)}
+              Final score · {gameLabelOf(recentGame)}
               {#if timeAgo(recentGame.completedAtIso)}
-                <span class="ur-game-ago"> Â· {timeAgo(recentGame.completedAtIso)}</span>
+                <span class="ur-game-ago"> · {timeAgo(recentGame.completedAtIso)}</span>
               {/if}
             </p>
           </div>
@@ -473,7 +473,7 @@
               <span>Margin</span>
             </div>
           </div>
-          <a class="ur-quiet-link" href={resolve(resultHref(recentGame) as any)}>View result â†’</a>
+          <a class="ur-quiet-link" href={resolve(resultHref(recentGame) as any)}>View result →</a>
         {:else}
           <div class="ur-score-hero">
             <span class="ur-status-badge">No game in progress</span>
@@ -487,7 +487,7 @@
         <div class="ur-panel-heading">
           <h3 id="collection-chase-title">Collection chase</h3>
           <a class="ur-panel-link" href={resolve('/ultimate/run/collection' as any)}>
-            Browse cards <span aria-hidden="true">â†’</span>
+            Browse cards <span aria-hidden="true">→</span>
           </a>
         </div>
         <p class="ur-panel-sub">Progress across the three launch sets.</p>
@@ -557,7 +557,7 @@
         <div class="ur-panel-heading">
           <h3 id="pack-shortcuts-title">On the shelf</h3>
           <a class="ur-panel-link" href={resolve('/ultimate/run/packs' as any)}>
-            Full odds <span aria-hidden="true">â†’</span>
+            Full odds <span aria-hidden="true">→</span>
           </a>
         </div>
         <p class="ur-panel-sub">Useful packs you can afford now.</p>
@@ -586,7 +586,7 @@
                     <CurrencyIcon currency="Coins" size={18} />
                     <span class="ur-number">{fmt(pack.priceAmount)} {pack.priceCurrency}</span>
                   </span>
-                  <span class="ur-chevron" aria-hidden="true">â€º</span>
+                  <span class="ur-chevron" aria-hidden="true">›</span>
                 </a>
               </li>
             {/each}
@@ -628,11 +628,11 @@
           <span class="ur-receipt-copy">
             <strong>{packNameOf(latestPull.packId)} received</strong>
             <small>
-              {latestPull.newCount} new {latestPull.newCount === 1 ? 'card' : 'cards'} Â· +{latestPull.exchangeGained}
+              {latestPull.newCount} new {latestPull.newCount === 1 ? 'card' : 'cards'} · +{latestPull.exchangeGained}
               Exchange from duplicates
             </small>
           </span>
-          <span class="ur-receipt-view">View receipt <span aria-hidden="true">â†’</span></span>
+          <span class="ur-receipt-view">View receipt <span aria-hidden="true">→</span></span>
         </a>
       {/if}
     </div>

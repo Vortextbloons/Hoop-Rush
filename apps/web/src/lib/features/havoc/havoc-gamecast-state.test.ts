@@ -5,7 +5,7 @@ import {
   buildCloneGameResult,
   buildMutationTape,
   buildNegativeScoreTape,
-} from './havoc-fake-service.ts';
+} from './testing/havoc-fake-service.ts';
 
 async function createLockedRun(service: FakeHavocService): Promise<void> {
   await service.createDraft();

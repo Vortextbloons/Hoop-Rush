@@ -339,7 +339,7 @@
 <div class="team-page">
   <div class="team-hero">
     <div class="team-hero-copy">
-      <p class="team-eyebrow">Ultimate Run Â· Pre-game</p>
+      <p class="team-eyebrow">Ultimate Run · Pre-game</p>
       <h2>Build your starting five</h2>
       <p class="team-sub">
         Place your collection on the heat-check, then set the rotation for all 240 minutes.
@@ -361,7 +361,7 @@
         {/if}
         <div class="stat-duo" aria-label="Team overview">
           <span class="stat-box stat-gold"
-            ><strong>{teamOvr ?? 'â€”'}</strong><small>OVR Team</small></span
+            ><strong>{teamOvr ?? '—'}</strong><small>OVR Team</small></span
           >
           <span class="stat-box"><strong>{rosterIds.length}/12</strong><small>Cards</small></span>
           <span class="stat-box"><strong>{starterCount}/5</strong><small>Starters</small></span>
@@ -392,7 +392,7 @@
 
   {#if phase === 'loading'}
     <div class="mt-6">
-      <AsyncState kind="loading" title="Loading" message="Loading your teamâ€¦" />
+      <AsyncState kind="loading" title="Loading" message="Loading your team…" />
     </div>
   {:else if phase === 'error'}
     <div class="mt-6">
@@ -481,7 +481,7 @@
           <div class="panel-head">
             <h2 class="bench-title">Rotation</h2>
             <span class="bench-count"
-              >{draft.bench.length}/7 bench Â· {total}/{TEAM_MINUTES_TOTAL} min</span
+              >{draft.bench.length}/7 bench · {total}/{TEAM_MINUTES_TOTAL} min</span
             >
           </div>
           <ol class="rotation-strip">
@@ -558,8 +558,8 @@
                 <span class="bench-copy">
                   <strong>{card?.displayName ?? cardId}</strong>
                   <span class="bench-tags">
-                    <span class="pos-badge">{card?.positions[0] ?? 'â€”'}</span>
-                    <span class="ovr-text">OVR {card ? overallOf(card) : 'â€”'}</span>
+                    <span class="pos-badge">{card?.positions[0] ?? '—'}</span>
+                    <span class="ovr-text">OVR {card ? overallOf(card) : '—'}</span>
                     {#if card}<span class="set-badge" data-rarity={rarityToken(card)}
                         >{card.rarity}</span
                       >{/if}
@@ -571,7 +571,7 @@
                   aria-label={`Remove ${card?.displayName ?? cardId} from the team`}
                   class="bench-remove"
                 >
-                  <span aria-hidden="true">Ã—</span>
+                  <span aria-hidden="true">×</span>
                 </button>
               </li>
             {:else}
@@ -585,7 +585,7 @@
             <div>
               <h2 class="bench-title">Rotation Plan</h2>
               <p class="kicker">
-                Team minutes Â· Starters {starterMinutes} Â· Bench {benchMinutes}
+                Team minutes · Starters {starterMinutes} · Bench {benchMinutes}
               </p>
             </div>
             <div class="minutes-head-actions">
@@ -644,7 +644,7 @@
                     <strong>{card?.displayName ?? cardId}</strong>
                     <span>
                       {#if card}<span class="pos-badge">{card.positions[0]}</span>{/if}
-                      {card ? `${card.rarity} Â· OVR ${overallOf(card)}` : 'Team card'}
+                      {card ? `${card.rarity} · OVR ${overallOf(card)}` : 'Team card'}
                     </span>
                   </label>
                   <div class="stepper">
@@ -697,7 +697,7 @@
               >âš– Balance minutes</button
             >
             <button type="button" onclick={save} disabled={!check.ok || saving} class="btn-gold">
-              {saving ? 'Savingâ€¦' : committed ? 'Save changes' : 'Save team'}
+              {saving ? 'Saving…' : committed ? 'Save changes' : 'Save team'}
             </button>
           </div>
           <p class="save-note" role="status">
@@ -734,7 +734,7 @@
         <div class="owned-filters">
           <input
             type="search"
-            placeholder="Search your collectionâ€¦"
+            placeholder="Search your collection…"
             aria-label="Search owned cards"
             value={search}
             oninput={(event) => {
@@ -803,7 +803,7 @@
           Starter slots: {STARTER_SLOT_LABELS.map(
             (label, index) =>
               `${label} takes ${['guards', 'guards', 'forwards', 'forwards', 'centers'][index]}`,
-          ).join(' Â· ')}.
+          ).join(' · ')}.
         </p>
       </aside>
     </div>
@@ -1337,7 +1337,7 @@
   }
 
   .slot-nameplate span::after {
-    content: ' Â· UR';
+    content: ' · UR';
     color: color-mix(in srgb, var(--slot-glow, var(--ur-muted)) 70%, #fff);
     font-size: 0.55rem;
     font-weight: 900;

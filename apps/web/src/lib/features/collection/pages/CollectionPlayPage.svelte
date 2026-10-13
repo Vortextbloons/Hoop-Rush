@@ -632,7 +632,7 @@
 <div class="ur-page ur-play-page">
   <div class="ur-pregame-hero">
     <div class="ur-pregame-copy">
-      <p class="ur-pregame-kicker">Ultimate Run Â· {record ? 'Post-game' : 'Pre-game'}</p>
+      <p class="ur-pregame-kicker">Ultimate Run · {record ? 'Post-game' : 'Pre-game'}</p>
       <h2 class="ur-pregame-title">
         {record ? 'The final whistle' : pending ? 'Ready for tip-off' : 'Under the lights'}
       </h2>
@@ -654,8 +654,8 @@
         >{playState?.pendingGame
           ? 'Locked until abandoned'
           : record
-            ? 'Game saved Â· Rewards credited'
-            : 'Pre-game Â· setup locks on prepare'}</small
+            ? 'Game saved · Rewards credited'
+            : 'Pre-game · setup locks on prepare'}</small
       >
       {#if playState}
         <span
@@ -674,7 +674,7 @@
 
   {#if phase === 'loading'}
     <div class="mt-6">
-      <AsyncState kind="loading" title="Loading" message="Loading playâ€¦" />
+      <AsyncState kind="loading" title="Loading" message="Loading play…" />
     </div>
   {:else if phase === 'error'}
     <div class="mt-6">
@@ -733,7 +733,7 @@
               <ul class="mt-2 space-y-1 text-sm">
                 {#each pendingPlayerStarters as card, index (index)}
                   <li class="tabular-nums">
-                    {card ? `${card.displayName} Â· Overall ${overallOf(card)}` : 'Unknown card'}
+                    {card ? `${card.displayName} · Overall ${overallOf(card)}` : 'Unknown card'}
                   </li>
                 {/each}
               </ul>
@@ -743,7 +743,7 @@
               <ul class="mt-2 space-y-1 text-sm">
                 {#each pendingCpuStarters as card, index (index)}
                   <li class="tabular-nums">
-                    {card ? `${card.displayName} Â· Overall ${overallOf(card)}` : 'Unknown card'}
+                    {card ? `${card.displayName} · Overall ${overallOf(card)}` : 'Unknown card'}
                   </li>
                 {/each}
               </ul>
@@ -758,11 +758,7 @@
           disabled={busy !== 'idle'}
           class="ur-btn-gold ur-start-sim px-5 py-2.5 text-sm outline-none disabled:opacity-40"
         >
-          {busy === 'playing'
-            ? 'Playingâ€¦'
-            : busy === 'committing'
-              ? 'Saving gameâ€¦'
-              : 'Tip off â†’'}
+          {busy === 'playing' ? 'Playing…' : busy === 'committing' ? 'Saving game…' : 'Tip off →'}
         </button>
         <button
           type="button"
@@ -876,7 +872,7 @@
                   <small>COINS</small>
                 </div>
                 <p class="ur-reward-sub">
-                  {difficultyNameOf(difficultyId)} Â· {objectiveOptions.find(
+                  {difficultyNameOf(difficultyId)} · {objectiveOptions.find(
                     (option) => option.objectiveId === effectiveObjectiveId,
                   )?.title ?? 'No objective'}
                 </p>
@@ -894,7 +890,7 @@
                         >
                       </span>
                       <span class="ur-reward-coins" data-zero={row.coins === 0}>
-                        {row.coins === 0 ? 'â€”' : `+${row.coins}`}
+                        {row.coins === 0 ? '—' : `+${row.coins}`}
                       </span>
                     </li>
                   {/each}
@@ -915,7 +911,7 @@
                   disabled={setupLocked}
                   class="ur-btn-gold ur-prepare-btn"
                 >
-                  {busy === 'preparing' ? 'Preparingâ€¦' : 'Prepare matchup â†’'}
+                  {busy === 'preparing' ? 'Preparing…' : 'Prepare matchup →'}
                 </button>
                 <p class="ur-reward-lock" aria-live="polite">
                   Setup locks on prepare. Abandoning uses a new matchup.
@@ -956,7 +952,7 @@
             </div>
           {:else if progression === null}
             <div class="mt-4">
-              <AsyncState kind="loading" title="Loading" message="Loading challengesâ€¦" />
+              <AsyncState kind="loading" title="Loading" message="Loading challenges…" />
             </div>
           {:else}
             <ul class="ur-challenge-grid mt-4 grid gap-4 lg:grid-cols-2">
@@ -986,13 +982,13 @@
                   {selectedChallenge.displayName}
                 </h3>
                 <p class="mt-1 text-sm text-muted-foreground">
-                  {requirementLabel(selectedChallenge.requirement, setTitleOf)} Â·
-                  {difficultyNameOf(selectedChallenge.difficultyId)} difficulty Â· snapshotted when you
+                  {requirementLabel(selectedChallenge.requirement, setTitleOf)} ·
+                  {difficultyNameOf(selectedChallenge.difficultyId)} difficulty · snapshotted when you
                   prepare
                 </p>
                 <p class="mt-2 text-sm tabular-nums">
                   Team progress: {selectedChallengeFacts.rosterCount}/{selectedChallengeFacts.requiredRosterCount}
-                  matching active cards Â· {selectedChallengeFacts.starterCount}/{selectedChallengeFacts.requiredStarterCount}
+                  matching active cards · {selectedChallengeFacts.starterCount}/{selectedChallengeFacts.requiredStarterCount}
                   matching starters
                 </p>
                 {#if !selectedChallengeFacts.success}
@@ -1017,10 +1013,10 @@
                       Full requirement facts
                     </summary>
                     <p class="mt-2">
-                      Team legal: {selectedChallengeFacts.teamValid ? 'yes' : 'no'} Â· matching card IDs:
+                      Team legal: {selectedChallengeFacts.teamValid ? 'yes' : 'no'} · matching card IDs:
                       {selectedChallengeFacts.matchingCardIds.length === 0
                         ? 'none'
-                        : selectedChallengeFacts.matchingCardIds.join(', ')} Â· team issues:
+                        : selectedChallengeFacts.matchingCardIds.join(', ')} · team issues:
                       {selectedChallengeFacts.teamIssueCodes.length === 0
                         ? 'none'
                         : selectedChallengeFacts.teamIssueCodes.join(', ')}
@@ -1068,7 +1064,7 @@
                                   ? 'text-muted-foreground'
                                   : 'text-accent'}"
                               >
-                                {row.coins === 0 ? 'â€”' : `+${row.coins}`}
+                                {row.coins === 0 ? '—' : `+${row.coins}`}
                               </span>
                             </li>
                           {/each}
@@ -1093,7 +1089,7 @@
                                   ? 'text-muted-foreground'
                                   : 'text-accent'}"
                               >
-                                {row.coins === 0 ? 'â€”' : `+${row.coins}`}
+                                {row.coins === 0 ? '—' : `+${row.coins}`}
                               </span>
                             </li>
                           {/each}
@@ -1124,7 +1120,7 @@
                           disabled={setupLocked}
                           class="ur-btn-gold mt-4 w-full px-5 py-2.5 text-sm outline-none disabled:opacity-40"
                         >
-                          {busy === 'preparing' ? 'Preparingâ€¦' : 'Prepare challenge'}
+                          {busy === 'preparing' ? 'Preparing…' : 'Prepare challenge'}
                         </button>
                         <p class="mt-2 text-xs text-muted-foreground" aria-live="polite">
                           Preparing locks the matchup and consumes the game sequence. Abandoning
@@ -1150,7 +1146,7 @@
       <section aria-label="Result and gamecast" class="ur-gamecast mt-4">
         <div class="ur-broadcast-mast">
           <div>
-            <p class="ur-broadcast-note">Game saved Â· Rewards added to your collection</p>
+            <p class="ur-broadcast-note">Game saved · Rewards added to your collection</p>
             <div class="result-navigation" role="group" aria-label="Game result view">
               {#each [{ id: 'recap', label: 'Recap' }, { id: 'replay', label: 'Replay' }, { id: 'box', label: 'Box score' }] as view (view.id)}
                 <button
@@ -1168,7 +1164,7 @@
             disabled={busy !== 'idle'}
             class="ur-play-again ur-play-again--mast"
           >
-            {busy === 'preparing' ? 'Preparingâ€¦' : 'Play again'}
+            {busy === 'preparing' ? 'Preparing…' : 'Play again'}
           </button>
           <button
             type="button"
@@ -1186,9 +1182,9 @@
                   ? 'Win by forfeit'
                   : 'Loss by forfeit'
                 : facts.winner === 'home'
-                  ? 'Final Â· Win'
-                  : 'Final Â· Loss'}
-            <span aria-hidden="true"> Â· </span>
+                  ? 'Final · Win'
+                  : 'Final · Loss'}
+            <span aria-hidden="true"> · </span>
             <span>
               {record.gameVersion === 'collection-game-v3'
                 ? record.prepared.challenge.displayName
@@ -1231,7 +1227,7 @@
             <p class="ur-final-meta">
               {facts.winner === 'home' ? 'You won' : 'CPU won'}
               {facts.overtimePeriods > 0
-                ? ` Â· ${facts.overtimePeriods} overtime${facts.overtimePeriods === 1 ? '' : 's'}`
+                ? ` · ${facts.overtimePeriods} overtime${facts.overtimePeriods === 1 ? '' : 's'}`
                 : ''}
             </p>
           {:else}
@@ -1239,7 +1235,7 @@
               {scoreboardEvent?.kind === 'final'
                 ? 'FINAL'
                 : scoreboardEvent
-                  ? `${scoreboardEvent.period > 4 ? `OT${scoreboardEvent.period - 4}` : `Q${scoreboardEvent.period}`} Â· ${clockLabel(scoreboardEvent.secondsRemaining)}`
+                  ? `${scoreboardEvent.period > 4 ? `OT${scoreboardEvent.period - 4}` : `Q${scoreboardEvent.period}`} · ${clockLabel(scoreboardEvent.secondsRemaining)}`
                   : 'No recorded events'}
             </p>
           {/if}
@@ -1253,7 +1249,7 @@
             duration={cadenceFor(watchMode) ?? 900}
           />
           <p class="replay-disclaimer">
-            Replay of your saved game Â· playback does not change the result or rewards.
+            Replay of your saved game · playback does not change the result or rewards.
           </p>
           <div class="ur-gamecast-controls ur-control-bar">
             <div class="ur-speed-pills" role="group" aria-label="Recorded replay speed">
@@ -1299,7 +1295,7 @@
                     {manifest}
                     card={scorerCard}
                     compact
-                    detail={`${scorer.points} points this play Â· ${scorer.side === 'home' ? 'Your team' : 'CPU'}`}
+                    detail={`${scorer.points} points this play · ${scorer.side === 'home' ? 'Your team' : 'CPU'}`}
                   />
                 </div>
               {/if}
@@ -1317,12 +1313,10 @@
             </label>
             <p class="ur-event-meta tabular-nums" aria-live="off">
               {Math.min(cursor + 1, shownEvents.length)} / {shownEvents.length}
-              {watchMode === 'standard' ? 'Â· Highlights' : 'Â· Every play'}
+              {watchMode === 'standard' ? '· Highlights' : '· Every play'}
               {#if scoreboardEvent}
                 <span>
-                  Â· Q{scoreboardEvent.period} Â· {clockLabel(
-                    scoreboardEvent.secondsRemaining,
-                  )}</span
+                  · Q{scoreboardEvent.period} · {clockLabel(scoreboardEvent.secondsRemaining)}</span
                 >
               {/if}
             </p>
@@ -1349,7 +1343,7 @@
                     {manifest}
                     {card}
                     compact
-                    detail={`${leader.top.points} points Â· Final game stats`}
+                    detail={`${leader.top.points} points · Final game stats`}
                   />
                 </div>{/if}
             {/each}
@@ -1360,13 +1354,13 @@
               <ul class="tabular-nums">
                 <li>
                   Top scorer (you): {facts.topHome
-                    ? `${nameOf(facts.topHome.cardId)} Â· ${facts.topHome.points}`
-                    : 'â€”'}
+                    ? `${nameOf(facts.topHome.cardId)} · ${facts.topHome.points}`
+                    : '—'}
                 </li>
                 <li>
                   Top scorer (CPU): {facts.topAway
-                    ? `${nameOf(facts.topAway.cardId)} Â· ${facts.topAway.points}`
-                    : 'â€”'}
+                    ? `${nameOf(facts.topAway.cardId)} · ${facts.topAway.points}`
+                    : '—'}
                 </li>
                 <li>Lead changes: {facts.leadChanges}</li>
                 <li>
@@ -1385,7 +1379,7 @@
                 <p class="tabular-nums">
                   +{facts.rewardCoins} Coins ({facts.rewardReason === 'game-win-reward'
                     ? 'win'
-                    : 'loss'}) Â· balances now {balances.Coins} Coins.
+                    : 'loss'}) · balances now {balances.Coins} Coins.
                 </p>
               </div>
             {/if}

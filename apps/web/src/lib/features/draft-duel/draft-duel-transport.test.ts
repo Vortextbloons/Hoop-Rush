@@ -8,7 +8,10 @@ import {
   idSchema,
   type DraftDuelMultiplayerTransport,
 } from '@hoop-rush/data-contracts';
-import { createFakeSupabaseHarness, type FakeSupabaseHarness } from '$lib/fake-supabase-client';
+import {
+  createFakeSupabaseHarness,
+  type FakeSupabaseHarness,
+} from '$lib/testing/fake-supabase-client';
 import { createDraftDuelTransport } from './draft-duel-transport';
 
 const mockState = vi.hoisted(() => {

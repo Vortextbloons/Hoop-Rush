@@ -368,7 +368,7 @@
 
   {#if phase === 'loading'}
     <div class="mt-6">
-      <AsyncState kind="loading" title="Loading" message="Loading the pack storeâ€¦" />
+      <AsyncState kind="loading" title="Loading" message="Loading the pack store…" />
     </div>
   {:else if phase === 'error'}
     <div class="mt-6">
@@ -503,7 +503,7 @@
                 <small>
                   {pack.slots.length}
                   {pack.slots.length === 1 ? 'slot' : 'slots'}{#if guaranteedCount > 0}
-                    Â· {guaranteedCount} guaranteed{/if}
+                    · {guaranteedCount} guaranteed{/if}
                 </small>
               </p>
               <p
@@ -536,7 +536,7 @@
 
             <details class="ur-pack-odds-details">
               <summary
-                ><span>Odds details</span><span class="details-chevron" aria-hidden="true">â€º</span
+                ><span>Odds details</span><span class="details-chevron" aria-hidden="true">›</span
                 ></summary
               >
               <div class="ur-odds-table-wrap">
@@ -573,10 +573,10 @@
                 </table>
               </div>
               <p class="ur-odds-note">
-                Pool: {odds.cardCount} slots Â· duplicate values
+                Pool: {odds.cardCount} slots · duplicate values
                 {COLLECTION_RARITY_ORDER.map(
                   (rarity) => `${rarity} +${odds.duplicateExchange[rarity] ?? 0}`,
-                ).join(' Â· ')}. No pity, no rarity boosts, no duplicate protection. Targeting keeps
+                ).join(' · ')}. No pity, no rarity boosts, no duplicate protection. Targeting keeps
                 every rarity weight unchanged.
               </p>
               {#if targetOdds?.hasTarget}
@@ -600,7 +600,7 @@
             >
               <span class="buy-count" aria-hidden="true">1</span>
               {#if purchasing === pack.packId}
-                Openingâ€¦
+                Opening…
               {:else}
                 Open for {pack.priceAmount} {pack.priceCurrency}
               {/if}

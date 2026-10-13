@@ -6,7 +6,10 @@ import {
   idSchema,
   type FixedFiveMultiplayerTransport,
 } from '@hoop-rush/data-contracts';
-import { createFakeSupabaseHarness, type FakeSupabaseHarness } from '$lib/fake-supabase-client';
+import {
+  createFakeSupabaseHarness,
+  type FakeSupabaseHarness,
+} from '$lib/testing/fake-supabase-client';
 import { createFixedFiveTransport } from './fixed-five-transport';
 
 const mockState = vi.hoisted(() => {

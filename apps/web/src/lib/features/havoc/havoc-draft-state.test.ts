@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { POSITIONS } from '@hoop-rush/data-contracts';
 import { HavocDraftController } from './havoc-draft-state.svelte.ts';
-import { FakeHavocService } from './havoc-fake-service.ts';
+import { FakeHavocService } from './testing/havoc-fake-service.ts';
 
 async function createController(
   service: FakeHavocService,

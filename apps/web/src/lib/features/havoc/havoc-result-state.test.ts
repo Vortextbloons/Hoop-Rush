@@ -5,7 +5,7 @@ import {
   buildCompleteRunState,
   buildFakeComparison,
   buildPendingComparisonRunState,
-} from './havoc-fake-service.ts';
+} from './testing/havoc-fake-service.ts';
 
 describe('HavocResultState', () => {
   it('keeps baseline numbers hidden while the normal season is pending', async () => {

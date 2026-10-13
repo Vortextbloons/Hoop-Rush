@@ -173,7 +173,7 @@ export function tiebreakKindLabel(kind: SeasonTiebreakResolution['kind']): strin
 export function tiebreakSlotsLabel(slots: readonly number[]): string {
   return slots.length === 1
     ? `slot ${String(slots[0])}`
-    : `slots ${slots.map((slot) => String(slot)).join('â€“')}`;
+    : `slots ${slots.map((slot) => String(slot)).join('–')}`;
 }
 export interface TiebreakResolutionViewModel {
   resolution: SeasonTiebreakResolution;
@@ -197,7 +197,7 @@ export function tiebreakResolutionViewModel(
     kindLabel,
     slotsLabel,
     teamLabels,
-    summary: `${ruleLabel} Â· ${kindLabel} Â· ${slotsLabel}`,
+    summary: `${ruleLabel} · ${kindLabel} · ${slotsLabel}`,
   };
 }
 export interface SeriesGameResultViewModel {
@@ -361,10 +361,10 @@ export function playInGameCardViewModel(
   };
   const consequence =
     matchup === 'seven-eight'
-      ? 'Winner takes seed 7 Â· loser hosts the final'
+      ? 'Winner takes seed 7 · loser hosts the final'
       : matchup === 'nine-ten'
-        ? 'Loser eliminated Â· winner travels to the final'
-        : 'Winner takes seed 8 Â· loser eliminated';
+        ? 'Loser eliminated · winner travels to the final'
+        : 'Winner takes seed 8 · loser eliminated';
   return {
     gameId: game.gameId,
     matchup,
@@ -426,7 +426,7 @@ export function bracketColumnsOf(
   const playInColumn: BracketColumnViewModel = {
     key: 'play-in',
     title: 'Play-In',
-    subtitle: 'Seeds 7â€“10 Â· win or go home',
+    subtitle: 'Seeds 7–10 · win or go home',
     playIn: (['east', 'west'] as const).map((conference) =>
       playInColumnViewModel(state, conference, humanFranchiseId),
     ),
@@ -539,8 +539,8 @@ export function postseasonSummaryRow(
     roundLabel: roundLabelText,
     scoreLabel:
       summary.status === 'forfeit'
-        ? '2â€“0 Â· forfeit'
-        : `${String(summary.homeScore)}â€“${String(summary.awayScore)}`,
+        ? '2–0 · forfeit'
+        : `${String(summary.homeScore)}–${String(summary.awayScore)}`,
     humanWon,
     humanGame,
   };

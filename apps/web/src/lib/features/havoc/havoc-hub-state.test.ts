@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { havocObjectiveStatusOf } from './havoc-presentation';
 import { HavocHubState } from './havoc-hub-state.svelte.ts';
-import { FakeHavocService } from './havoc-fake-service.ts';
+import { FakeHavocService } from './testing/havoc-fake-service.ts';
 
 async function createLockedRun(service: FakeHavocService): Promise<void> {
   await service.createDraft();
