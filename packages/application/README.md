@@ -20,6 +20,9 @@ gathers intent, the engine owns basketball rules, adapters own I/O.
 ```text
 @hoop-rush/application          shared submission runtime (runSubmission + types)
 @hoop-rush/application/challenge  challenge run session (classic/sandbox job lifecycle)
+@hoop-rush/application/collection collection play session (prep, execution, acceptance)
+@hoop-rush/application/draft-duel draft duel room session (transport/repository ports)
+@hoop-rush/application/fixed-five fixed-five room session + command policy/retry helpers
 @hoop-rush/application/havoc    havoc session + run/history view contract
 @hoop-rush/application/season   season block wire/acceptance + season policies
 ```
@@ -80,7 +83,29 @@ Stages 5c-5f landed: every mode's code is co-located under
 multiplayer gained web-side sessions with presenters
 (`CollectionPlaySession`, `DraftDuelSession`, `FixedFiveRoomSession`) that own
 preparation/execution/acceptance/retries and drop late results after dispose.
-Moving those three behind application ports is the documented follow-up.
+
+Stage 6 landed: storage and multiplayer adapters simplified.
+
+- 6b: `packages/persistence/src/repositories/support.ts` shares record
+  envelopes, parse helpers, scoped compound-index reads/deletes, command
+  receipt comparison, and revision/digest guards across every repository.
+- 6c: the IndexedDB namespace moved to `hoop-rush-saves-v2` at a single Dexie
+  version; the v1→v22 migration chain, Collection legacy read paths, and the
+  unused engine `migrateCollection*` exports were deleted. Web composes one
+  `HoopRushDatabase` instance through `$lib/persistence`.
+- 6d: multiplayer replay and deterministic transitions live in the engine
+  (`modes/fixed-five/log.ts`, `modes/draft-duel/log.ts`); the web room-state
+  module keeps asset loading, player-ref resolution, and snapshot overlay only.
+- 6e: `apps/web/src/lib/supabase-runtime.ts` owns the Supabase client cache,
+  anonymous auth, env validation, realtime room registry, and transient
+  broadcast plumbing; `multiplayer-membership.ts` shares membership storage.
+  Deployed RPC names/arguments and payload shapes are pinned by
+  `*-transport.test.ts` conformance suites.
+- 6f: `CollectionPlaySession`, `DraftDuelSession`, and `FixedFiveRoomSession`
+  moved into this package behind ports (transport, repository, runner, assets,
+  clock, ids, membership, notice, guard storage). Web keeps presenters,
+  controllers, composition, and browser adapters; `createDraftDuelSession`
+  stays in web as composition.
 
 Stage 4 landed: engine season orchestration is split and de-duplicated.
 `postseason.ts` (1,911 lines) became `postseason/{schedule,state,play-in,

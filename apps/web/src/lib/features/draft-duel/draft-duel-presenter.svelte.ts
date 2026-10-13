@@ -16,13 +16,14 @@ import type {
 import { draftDuelCurrentPicker, draftDuelLegalPicks, draftDuelRoster } from '@hoop-rush/engine';
 import type { StoredDraftDuelCompleted } from '@hoop-rush/persistence';
 import {
-  createDraftDuelSession,
   draftDuelPlayedGames,
   draftDuelSeriesMvpOf,
   draftDuelSeriesStandoutsOf,
   type DraftDuelSession,
+  type DraftDuelSessionAssets,
   type ReactionKey,
-} from './draft-duel-session';
+} from '@hoop-rush/application/draft-duel';
+import { createDraftDuelSession } from './draft-duel-session';
 import {
   draftDuelVisibleEventCount,
   draftDuelVisibleState,
@@ -30,7 +31,6 @@ import {
   type DraftDuelVisibleState,
 } from './draft-duel-playback';
 import { draftDuelFeedLines, type DraftDuelFeedLine } from './draft-duel-broadcast-view';
-import type { DraftDuelAssets } from './draft-duel-assets';
 
 const CONSIDERATION_CLEAR_MS = 2000;
 
@@ -41,7 +41,7 @@ function otherParticipant(participantId: DraftDuelParticipantId): DraftDuelParti
 export class DraftDuelPresenter {
   readonly session: DraftDuelSession;
 
-  assets = $state.raw<DraftDuelAssets | null>(null);
+  assets = $state.raw<DraftDuelSessionAssets | null>(null);
   snapshot = $state.raw<DraftDuelRoomSnapshot | null>(null);
   participantId = $state<DraftDuelParticipantId | null>(null);
   draft = $state.raw<DraftDuelDraft | null>(null);

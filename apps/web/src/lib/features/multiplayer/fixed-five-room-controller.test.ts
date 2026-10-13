@@ -5,14 +5,15 @@ import {
   defaultFixedFiveVersionLocks,
   type FixedFiveCommand,
   type FixedFiveMultiplayerTransport,
+  type FixedFiveRoomMembership,
   type FixedFiveRoomSnapshot,
+  type FixedFiveWorkerTeam,
 } from '@hoop-rush/data-contracts';
 import type { FixedFiveRunnerEvent } from './fixed-five-runner';
-import type { StoredFixedFiveMembership } from './fixed-five-identity';
 import type {
   FixedFiveRoomRepositoryPort,
   FixedFiveRoomSessionDeps,
-} from './fixed-five-room-session';
+} from '@hoop-rush/application/fixed-five';
 import { FixedFiveRoomController } from './fixed-five-room-controller.svelte';
 
 const goto = vi.hoisted(() => vi.fn());
@@ -22,7 +23,10 @@ vi.mock('./fixed-five-repo', () => ({ fixedFiveRepository: {} }));
 
 class FakeRunner {
   disposed = false;
-  constructor(private readonly onEvent: (event: FixedFiveRunnerEvent) => void) {}
+  private readonly onEvent: (event: FixedFiveRunnerEvent) => void;
+  constructor(onEvent: (event: FixedFiveRunnerEvent) => void) {
+    this.onEvent = onEvent;
+  }
   runShared82(): void {}
   runDuel(): void {}
   verify(): void {}
@@ -55,13 +59,22 @@ function createHarness(): {
   createRoom(): Promise<{ snapshot: FixedFiveRoomSnapshot; code: string }>;
 } {
   const transport = createInMemoryFixedFiveTransport({ seed: 'fixed-five-controller-test' });
-  const memberships: StoredFixedFiveMembership[] = [];
+  const memberships: FixedFiveRoomMembership[] = [];
   const deps: FixedFiveRoomSessionDeps = {
     roomId: 'pending-room',
     transport,
     repository: createFakeRepository(),
     createRunner: (onEvent) => new FakeRunner(onEvent),
     loadAssets: () => Promise.resolve(null),
+    buildTeam: (_manifest, teamId, displayName, refs) =>
+      Promise.resolve({
+        teamId,
+        displayName,
+        players: refs.map((ref) => ({
+          playerId: ref.playerId,
+          displayName: `Player ${ref.playerId}`,
+        })),
+      } as unknown as FixedFiveWorkerTeam),
     loadMembership: () => null,
     saveMembership: (membership) => {
       memberships.push(membership);
@@ -71,9 +84,15 @@ function createHarness(): {
       throw new Error('unexpected lobby remove');
     },
     now: () => Date.now(),
+    newCommandId: () => 'command-id-1',
+    friendlyError: (error) => (error instanceof Error ? error.message : String(error)),
     loadActivityAt: () => null,
     saveActivityNow: () => {},
     prefersReducedMotion: () => false,
+    guardStorage: {
+      load: () => null,
+      save: () => {},
+    },
   };
   return {
     transport,

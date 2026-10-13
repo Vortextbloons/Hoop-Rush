@@ -10,50 +10,35 @@ import {
   type FixedFiveMultiplayerTransport,
   type FixedFiveRoomMode,
   type FixedFiveRoomSnapshot,
+  type FixedFiveRoomMembership,
   type FixedFiveSourceMode,
+  type FixedFiveWorkerTeam,
   type Id,
 } from '@hoop-rush/data-contracts';
-import type { FixedFiveRunner, FixedFiveRunnerEvent } from './fixed-five-runner';
-import type { StoredFixedFiveMembership } from './fixed-five-identity';
 import {
   FixedFiveRoomSession,
   type FixedFiveRoomRepositoryPort,
   type FixedFiveRoomSessionDeps,
   type FixedFiveRoomSessionSnapshot,
-} from './fixed-five-room-session';
-import type { FixedFiveAssets, FixedFiveCandidate } from './fixed-five-room-state';
+  type FixedFiveRunnerEvent,
+  type FixedFiveRunnerPort,
+  type FixedFiveSessionAssets,
+} from './session.ts';
+import type { FixedFiveCandidate } from '@hoop-rush/engine';
 
-vi.mock('$lib/player-refs', () => ({
-  resolvePlayerRefs: (
-    refs: readonly { playerId: string; franchiseId: string; eraId: string }[],
-  ): Promise<unknown[]> =>
-    Promise.resolve(
-      refs.map((ref) => ({
-        playerId: ref.playerId,
-        displayName: `Player ${ref.playerId}`,
-        positions: { playable: ['PG', 'SG', 'SF', 'PF', 'C'] },
-        heightInches: 78,
-        weightLbs: 205,
-        detailedRatings: {},
-        tendencies: {},
-        anchors: {},
-        reconstructedThreePoint: 0.35,
-        summaryRatings: { overallRating: 72 },
-        ratingProfile: {},
-      })),
-    ),
-}));
-
-class FakeRunner {
+class FakeRunner implements FixedFiveRunnerPort {
   readonly events: FixedFiveRunnerEvent[] = [];
-  readonly sharedRuns: Parameters<FixedFiveRunner['runShared82']>[0][] = [];
-  readonly duelRuns: Parameters<FixedFiveRunner['runDuel']>[0][] = [];
+  readonly sharedRuns: Parameters<FixedFiveRunnerPort['runShared82']>[0][] = [];
+  readonly duelRuns: Parameters<FixedFiveRunnerPort['runDuel']>[0][] = [];
   disposed = false;
-  constructor(private readonly onEvent: (event: FixedFiveRunnerEvent) => void) {}
-  runShared82(input: Parameters<FixedFiveRunner['runShared82']>[0]): void {
+  private readonly onEvent: (event: FixedFiveRunnerEvent) => void;
+  constructor(onEvent: (event: FixedFiveRunnerEvent) => void) {
+    this.onEvent = onEvent;
+  }
+  runShared82(input: Parameters<FixedFiveRunnerPort['runShared82']>[0]): void {
     this.sharedRuns.push(input);
   }
-  runDuel(input: Parameters<FixedFiveRunner['runDuel']>[0]): void {
+  runDuel(input: Parameters<FixedFiveRunnerPort['runDuel']>[0]): void {
     this.duelRuns.push(input);
   }
   verify(): void {}
@@ -95,7 +80,7 @@ function createFakeRepository(): FakeRepository {
 interface Harness {
   transport: FixedFiveMultiplayerTransport;
   repository: FakeRepository;
-  memberships: StoredFixedFiveMembership[];
+  memberships: FixedFiveRoomMembership[];
   runners: FakeRunner[];
   deps: FixedFiveRoomSessionDeps;
   createRoom(options?: {
@@ -112,7 +97,7 @@ function createHarness(overrides: Partial<FixedFiveRoomSessionDeps> = {}): Harne
     seed: 'fixed-five-room-session-test',
   });
   const repository = createFakeRepository();
-  const memberships: StoredFixedFiveMembership[] = [];
+  const memberships: FixedFiveRoomMembership[] = [];
   const runners: FakeRunner[] = [];
   const deps: FixedFiveRoomSessionDeps = {
     roomId: 'pending-room',
@@ -133,9 +118,24 @@ function createHarness(overrides: Partial<FixedFiveRoomSessionDeps> = {}): Harne
       throw new Error('unexpected lobby remove');
     },
     now: () => clock.now,
+    newCommandId: () => 'command-id-1',
+    friendlyError: (error) => (error instanceof Error ? error.message : String(error)),
+    buildTeam: (_manifest, teamId, displayName, refs) =>
+      Promise.resolve({
+        teamId,
+        displayName,
+        players: refs.map((ref) => ({
+          playerId: ref.playerId,
+          displayName: `Player ${ref.playerId}`,
+        })),
+      } as unknown as FixedFiveWorkerTeam),
     loadActivityAt: () => null,
     saveActivityNow: () => {},
     prefersReducedMotion: () => false,
+    guardStorage: {
+      load: () => null,
+      save: () => {},
+    },
     ...overrides,
   };
   return {
@@ -180,11 +180,11 @@ function sandboxCandidate(index: number): FixedFiveCandidate {
   };
 }
 
-function sandboxAssets(pool: FixedFiveCandidate[]): FixedFiveAssets {
+function sandboxAssets(pool: FixedFiveCandidate[]): FixedFiveSessionAssets {
   return {
     pool,
     poolById: new Map(pool.map((candidate) => [candidate.playerId, candidate])),
-  } as unknown as FixedFiveAssets;
+  } as unknown as FixedFiveSessionAssets;
 }
 
 async function fillSandboxDraft(
@@ -313,8 +313,8 @@ describe('FixedFiveRoomSession', () => {
 
   it('drops late asset loads and clears timers after dispose', async () => {
     vi.useFakeTimers();
-    let resolveAssets: (value: FixedFiveAssets | null) => void = () => {};
-    const assetsPromise = new Promise<FixedFiveAssets | null>((resolve) => {
+    let resolveAssets: (value: FixedFiveSessionAssets | null) => void = () => {};
+    const assetsPromise = new Promise<FixedFiveSessionAssets | null>((resolve) => {
       resolveAssets = resolve;
     });
     const harness = createHarness({ loadAssets: () => assetsPromise });

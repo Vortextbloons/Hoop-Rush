@@ -4,7 +4,7 @@ import {
   type CollectionPlayPhase,
   type CollectionPlaySessionDeps,
   type CollectionPrepareInput,
-} from './collection-play-session.ts';
+} from '@hoop-rush/application/collection';
 
 export class CollectionPlayPresenter {
   playState = $state.raw<CollectionPlayState | null>(null);

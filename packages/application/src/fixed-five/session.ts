@@ -3,52 +3,54 @@ import {
   contentHashSchema,
   idSchema,
   playerVersionId,
+  type ClassicDraftCatalog,
   type CommandId,
   type ContentHash,
+  type EraSimulationProfile,
   type FixedFiveCommand,
   type FixedFiveCommandPayload,
   type FixedFiveCompetitionResult,
   type FixedFiveCompetitionRun,
   type FixedFiveMultiplayerTransport,
   type FixedFiveParticipantId,
+  type FixedFiveRoomMembership,
   type FixedFiveRoomPhase,
   type FixedFiveRoomSnapshot,
   type FixedFiveVerificationReceipt,
   type FixedFiveWorkerResultEntry,
   type FixedFiveWorkerTeam,
+  type HoopRushManifest,
   type Id,
+  type OpponentBracket,
+  type OpponentBracketCore,
+  type PlayersIndex,
   type PlayersIndexEntry,
   type Seed,
   type SimulationPlayer,
   type SlotIndex,
 } from '@hoop-rush/data-contracts';
 import { z } from 'zod';
-import { submitFixedFiveCommand } from './fixed-five-command-submit';
-import { friendlyFixedFiveJoinError, type StoredFixedFiveMembership } from './fixed-five-identity';
-import type { FixedFiveRunner, FixedFiveRunnerEvent } from './fixed-five-runner';
-import {
-  FixedFiveSimulationGate,
-  type FixedFiveSimulationReason,
-} from './fixed-five-simulation-gate';
 import {
   assembleCompetitionRun,
   buildFixedFiveVerificationInput,
-  buildSimulationTeam,
   computeCompetitionDigest,
   computeDueAutopick,
   deriveEffectivePhase,
   isFixedFiveDraftTurn,
   mergeFixedFiveCommands,
-  refsForParticipant,
   replayFixedFiveLog,
   restoreFixedFiveCommandSyncState,
   roomLogFacts,
   summarizeWorkerEntries,
   type DraftReplay,
-  type FixedFiveAssets,
-  type PickRef,
+  type EngineContext,
+  type FixedFiveCandidate,
+  type FixedFivePickRef,
+  type FixedFiveVerificationInput,
   type RoomLogFacts,
-} from './fixed-five-room-state';
+} from '@hoop-rush/engine';
+import { submitFixedFiveCommand } from './command-submit.ts';
+import { FixedFiveSimulationGate, type FixedFiveSimulationReason } from './simulation-gate.ts';
 
 const SIM_SHOWDOWN_MIN_MS = 7000;
 const SIM_SHOWDOWN_REDUCED_MS = 400;
@@ -60,11 +62,11 @@ export interface FixedFiveLocalResult {
   result: FixedFiveCompetitionResult;
   digest: ContentHash;
   p1: {
-    refs: PickRef[];
+    refs: FixedFivePickRef[];
     players: SimulationPlayer[];
   };
   p2: {
-    refs: PickRef[];
+    refs: FixedFivePickRef[];
     players: SimulationPlayer[];
   };
   weakestReplacedOpponentId: string | null;
@@ -81,7 +83,7 @@ export interface FixedFiveRoomSessionSnapshot {
   room: FixedFiveRoomSnapshot | null;
   commands: FixedFiveCommand[];
   replay: DraftReplay | null;
-  assets: FixedFiveAssets | null;
+  assets: FixedFiveSessionAssets | null;
   assetsError: string | null;
   selfId: FixedFiveParticipantId;
   lobbyId: string | null;
@@ -113,10 +115,66 @@ export interface FixedFiveRoomSessionSnapshot {
   rematchBusy: boolean;
 }
 
-export type FixedFiveRunnerLike = Pick<
-  FixedFiveRunner,
-  'runShared82' | 'runDuel' | 'verify' | 'dispose'
->;
+export type FixedFiveRunnerEvent =
+  | {
+      kind: 'progress';
+      completedGames: number;
+      totalGames: number;
+    }
+  | {
+      kind: 'results';
+      entries: FixedFiveWorkerResultEntry[];
+    }
+  | {
+      kind: 'complete';
+      gamesDelivered: number;
+    }
+  | {
+      kind: 'verified';
+      receipt: FixedFiveVerificationReceipt;
+    }
+  | {
+      kind: 'verification-failed';
+      failures: string[];
+    }
+  | {
+      kind: 'error';
+      message: string;
+    };
+
+export interface FixedFiveRunnerPort {
+  runShared82(input: {
+    rootSeed: Seed;
+    p1Team: FixedFiveWorkerTeam;
+    p2Team: FixedFiveWorkerTeam;
+    bracket: OpponentBracketCore;
+    profile: EraSimulationProfile;
+    dataVersion: string;
+    engineVersion: string;
+    startGameNumber?: number;
+  }): void;
+  runDuel(input: {
+    rootSeed: Seed;
+    p1Team: FixedFiveWorkerTeam;
+    p2Team: FixedFiveWorkerTeam;
+    profile: EraSimulationProfile;
+    dataVersion: string;
+    engineVersion: string;
+  }): void;
+  verify(input: FixedFiveVerificationInput): void;
+  dispose(): void;
+}
+
+export interface FixedFiveSessionAssets {
+  catalog: ClassicDraftCatalog;
+  pool: FixedFiveCandidate[];
+  poolById: Map<string, FixedFiveCandidate>;
+  context: EngineContext;
+  manifest: HoopRushManifest;
+  profile: EraSimulationProfile;
+  bracket: OpponentBracket;
+  index: PlayersIndex;
+}
 
 export interface FixedFiveRoomRepositoryPort {
   listCommands(roomId: string): Promise<FixedFiveCommand[]>;
@@ -135,16 +193,28 @@ export interface FixedFiveRoomSessionDeps {
   roomId: string;
   transport: FixedFiveMultiplayerTransport;
   repository: FixedFiveRoomRepositoryPort;
-  createRunner: (onEvent: (event: FixedFiveRunnerEvent) => void) => FixedFiveRunnerLike;
-  loadAssets: () => Promise<FixedFiveAssets | null>;
-  loadMembership: (roomId: string) => StoredFixedFiveMembership | null;
-  saveMembership: (membership: StoredFixedFiveMembership) => void;
+  createRunner: (onEvent: (event: FixedFiveRunnerEvent) => void) => FixedFiveRunnerPort;
+  loadAssets: () => Promise<FixedFiveSessionAssets | null>;
+  buildTeam: (
+    manifest: HoopRushManifest,
+    teamId: string,
+    displayName: string,
+    refs: FixedFivePickRef[],
+  ) => Promise<FixedFiveWorkerTeam>;
+  loadMembership: (roomId: string) => FixedFiveRoomMembership | null;
+  saveMembership: (membership: FixedFiveRoomMembership) => void;
   loadLobbyId: (roomId: string) => string | null;
   removeLobbyGuest: (lobbyId: string) => Promise<unknown>;
   now: () => number;
+  newCommandId: () => string;
+  friendlyError: (error: unknown) => string;
   loadActivityAt: (roomId: string) => number | null;
   saveActivityNow: (roomId: string) => void;
   prefersReducedMotion: () => boolean;
+  guardStorage: {
+    load(key: string): string | null;
+    save(key: string, value: string): void;
+  };
 }
 
 interface VerificationOutcome {
@@ -154,8 +224,8 @@ interface VerificationOutcome {
 }
 
 interface SimulationContext {
-  p1Refs: PickRef[];
-  p2Refs: PickRef[];
+  p1Refs: FixedFivePickRef[];
+  p2Refs: FixedFivePickRef[];
   p1Team: FixedFiveWorkerTeam;
   p2Team: FixedFiveWorkerTeam;
 }
@@ -173,6 +243,85 @@ function isMissingFunctionError(e: unknown): boolean {
   if (/schema cache|PGRST202|404/.test(message)) return true;
   const code = typeof e === 'object' && e !== null ? (e as { code?: unknown }).code : null;
   return code === 'PGRST202';
+}
+
+function sandboxCandidateForPick(
+  assets: FixedFiveSessionAssets,
+  playerId: string,
+  versionId?: string,
+): FixedFiveCandidate {
+  const candidate =
+    (versionId ? assets.pool.find((entry) => entry.playerVersionId === versionId) : null) ??
+    assets.poolById.get(playerId);
+  if (!candidate || candidate.playerId !== playerId) {
+    throw new Error(`sandbox pick ${playerId} has no matching pool record`);
+  }
+  return candidate;
+}
+
+export function refsForParticipant(
+  replay: DraftReplay,
+  assets: FixedFiveSessionAssets,
+  participant: FixedFiveParticipantId,
+): FixedFivePickRef[] {
+  if (replay.mode === 'duel') {
+    return replay.state.picks
+      .filter((p) => p.participantId === participant)
+      .map((p) => ({
+        playerId: p.playerId,
+        franchiseId: p.franchiseId,
+        eraId: p.eraId,
+        slotIndex: p.slotIndex,
+      }));
+  }
+  if (replay.mode === 'sandbox-duel') {
+    return replay.state.picks
+      .filter((p) => p.participantId === participant)
+      .map((pick) => {
+        const candidate = sandboxCandidateForPick(assets, pick.playerId, pick.playerVersionId);
+        return {
+          playerId: pick.playerId,
+          franchiseId: candidate.franchiseId,
+          eraId: candidate.eraId,
+          slotIndex: pick.slotIndex,
+          playerVersionId: candidate.playerVersionId,
+        };
+      });
+  }
+  if (replay.mode === 'sandbox-shared-82') {
+    if (replay.draftStyle === 'snake') {
+      return replay.state.picks
+        .filter((p) => p.participantId === participant)
+        .map((pick) => {
+          const candidate = sandboxCandidateForPick(assets, pick.playerId, pick.playerVersionId);
+          return {
+            playerId: pick.playerId,
+            franchiseId: candidate.franchiseId,
+            eraId: candidate.eraId,
+            slotIndex: pick.slotIndex,
+            playerVersionId: candidate.playerVersionId,
+          };
+        });
+    }
+    const builder = participant === 'p1' ? replay.p1 : replay.p2;
+    return builder.placements.map((placement) => {
+      const candidate = assets.poolById.get(placement.playerId);
+      if (!candidate) throw new Error(`sandbox pick ${placement.playerId} has no pool record`);
+      return {
+        playerId: placement.playerId,
+        franchiseId: candidate.franchiseId,
+        eraId: candidate.eraId,
+        slotIndex: placement.slotIndex,
+      };
+    });
+  }
+  const draft = participant === 'p1' ? replay.p1 : replay.p2;
+  return draft.picks.map((pick) => ({
+    playerId: pick.playerId,
+    franchiseId: pick.franchiseId,
+    eraId: pick.eraId,
+    slotIndex: pick.slotIndex,
+  }));
 }
 
 export class FixedFiveRoomSession {
@@ -193,7 +342,7 @@ export class FixedFiveRoomSession {
   private commands: FixedFiveCommand[] = [];
   private replay: DraftReplay | null = null;
   private facts: RoomLogFacts = roomLogFacts([]);
-  private assets: FixedFiveAssets | null = null;
+  private assets: FixedFiveSessionAssets | null = null;
   private assetsError: string | null = null;
   private selfId: FixedFiveParticipantId = 'p1';
   private lobbyId: string | null = null;
@@ -211,9 +360,9 @@ export class FixedFiveRoomSession {
   private statsBuilding = false;
   private statsRebuildStarted = false;
   private localResult: FixedFiveLocalResult | null = null;
-  private runner: FixedFiveRunnerLike | null = null;
-  private statsRunner: FixedFiveRunnerLike | null = null;
-  private verificationRunner: FixedFiveRunnerLike | null = null;
+  private runner: FixedFiveRunnerPort | null = null;
+  private statsRunner: FixedFiveRunnerPort | null = null;
+  private verificationRunner: FixedFiveRunnerPort | null = null;
 
   private submittedPropose: ContentHash | null = null;
   private confirmedFor: ContentHash | null = null;
@@ -514,7 +663,7 @@ export class FixedFiveRoomSession {
       this.notice = 'Server verification is available — continuing with receipt flow.';
     } catch (e) {
       if (!isMissingFunctionError(e) && !this.isDisposed()) {
-        this.error = friendlyFixedFiveJoinError(e);
+        this.error = this.deps.friendlyError(e);
       }
       this.completedPairKey = null;
       this.completeNotReady = false;
@@ -535,7 +684,7 @@ export class FixedFiveRoomSession {
       await this.deps.transport.leave(this.roomId, this.selfId);
       return true;
     } catch (e) {
-      if (!this.isDisposed()) this.error = friendlyFixedFiveJoinError(e);
+      if (!this.isDisposed()) this.error = this.deps.friendlyError(e);
       return false;
     } finally {
       if (!this.isDisposed()) {
@@ -567,7 +716,7 @@ export class FixedFiveRoomSession {
       this.publish();
     } catch (e) {
       if (!this.isDisposed()) {
-        this.error = friendlyFixedFiveJoinError(e);
+        this.error = this.deps.friendlyError(e);
       }
     } finally {
       if (!this.isDisposed()) {
@@ -597,7 +746,7 @@ export class FixedFiveRoomSession {
       this.publish();
       return null;
     } catch (e) {
-      if (!this.isDisposed()) this.error = friendlyFixedFiveJoinError(e);
+      if (!this.isDisposed()) this.error = this.deps.friendlyError(e);
       this.publish();
       return null;
     } finally {
@@ -614,7 +763,7 @@ export class FixedFiveRoomSession {
       this.deps.saveMembership({ roomId: next.roomId, participantId: this.selfId, code });
       return { roomId: next.roomId };
     } catch (e) {
-      if (!this.isDisposed()) this.error = friendlyFixedFiveJoinError(e);
+      if (!this.isDisposed()) this.error = this.deps.friendlyError(e);
       this.publish();
       return null;
     }
@@ -708,12 +857,12 @@ export class FixedFiveRoomSession {
           await this.sync(this.lastOrdinal);
         } catch (e) {
           if (!isMissingFunctionError(e) && !this.isDisposed()) {
-            this.error = friendlyFixedFiveJoinError(e);
+            this.error = this.deps.friendlyError(e);
           }
         }
       }
     } catch (e) {
-      if (!this.isDisposed()) this.error = friendlyFixedFiveJoinError(e);
+      if (!this.isDisposed()) this.error = this.deps.friendlyError(e);
     } finally {
       if (!this.isDisposed()) {
         this.loading = false;
@@ -798,7 +947,7 @@ export class FixedFiveRoomSession {
       const room = this.room;
       await this.deps.repository.saveActiveSnapshot(room, this.lastOrdinal + 1).catch(() => {});
     } catch (e) {
-      if (!this.isDisposed()) this.error = friendlyFixedFiveJoinError(e);
+      if (!this.isDisposed()) this.error = this.deps.friendlyError(e);
     } finally {
       if (!this.isDisposed()) {
         this.syncing = false;
@@ -1005,14 +1154,14 @@ export class FixedFiveRoomSession {
         throw new Error('both lineups must be complete before simulating');
       }
       const pending = await this.deps.repository.loadPendingResult(this.roomId).catch(() => null);
-      const p1Team: FixedFiveWorkerTeam = await buildSimulationTeam(
+      const p1Team: FixedFiveWorkerTeam = await this.deps.buildTeam(
         assets.manifest,
         'p1',
         'Player 1',
         p1Refs,
       );
       if (this.isDisposed()) return;
-      const p2Team: FixedFiveWorkerTeam = await buildSimulationTeam(
+      const p2Team: FixedFiveWorkerTeam = await this.deps.buildTeam(
         assets.manifest,
         'p2',
         'Player 2',
@@ -1203,13 +1352,13 @@ export class FixedFiveRoomSession {
     this.publish();
     try {
       const rootSeed: Seed = room.rootSeed;
-      const p1Team: FixedFiveWorkerTeam = await buildSimulationTeam(
+      const p1Team: FixedFiveWorkerTeam = await this.deps.buildTeam(
         assets.manifest,
         'p1',
         'Player 1',
         localResult.p1.refs,
       );
-      const p2Team: FixedFiveWorkerTeam = await buildSimulationTeam(
+      const p2Team: FixedFiveWorkerTeam = await this.deps.buildTeam(
         assets.manifest,
         'p2',
         'Player 2',
@@ -1337,7 +1486,7 @@ export class FixedFiveRoomSession {
       return true;
     } catch (e) {
       if (!this.isDisposed()) {
-        this.error = friendlyFixedFiveJoinError(e);
+        this.error = this.deps.friendlyError(e);
         this.publish();
       }
       return false;
@@ -1395,7 +1544,7 @@ export class FixedFiveRoomSession {
       await this.sync(this.lastOrdinal);
       return out.completed;
     } catch (e) {
-      if (!this.isDisposed()) this.error = friendlyFixedFiveJoinError(e);
+      if (!this.isDisposed()) this.error = this.deps.friendlyError(e);
       return false;
     } finally {
       if (!this.isDisposed()) {
@@ -1429,7 +1578,7 @@ export class FixedFiveRoomSession {
       await this.sync(this.lastOrdinal);
       return out.failed;
     } catch (e) {
-      if (!this.isDisposed()) this.error = friendlyFixedFiveJoinError(e);
+      if (!this.isDisposed()) this.error = this.deps.friendlyError(e);
       return false;
     } finally {
       if (!this.isDisposed()) {
@@ -1487,7 +1636,7 @@ export class FixedFiveRoomSession {
   }
 
   private runVerification(
-    input: Parameters<FixedFiveRunnerLike['verify']>[0],
+    input: Parameters<FixedFiveRunnerPort['verify']>[0],
   ): Promise<VerificationOutcome> {
     return new Promise((resolve) => {
       const active = this.deps.createRunner((event) => {
@@ -1648,14 +1797,16 @@ export class FixedFiveRoomSession {
         return;
       }
       if (!this.isDisposed()) {
-        this.error = friendlyFixedFiveJoinError(e);
+        this.error = this.deps.friendlyError(e);
         this.publish();
       }
     }
   }
 
   private newCommandId(provided?: string): CommandId {
-    return provided ? commandIdSchema.parse(provided) : commandIdSchema.parse(crypto.randomUUID());
+    return provided
+      ? commandIdSchema.parse(provided)
+      : commandIdSchema.parse(this.deps.newCommandId());
   }
 
   private brandedRoomId(): Id {
@@ -1668,7 +1819,7 @@ export class FixedFiveRoomSession {
 
   private saveVerifyGuards(): void {
     try {
-      localStorage.setItem(
+      this.deps.guardStorage.save(
         this.verifyGuardStorageKey(),
         JSON.stringify({
           submittedPropose: this.submittedPropose,
@@ -1683,7 +1834,7 @@ export class FixedFiveRoomSession {
 
   private restoreVerifyGuards(): void {
     try {
-      const raw = localStorage.getItem(this.verifyGuardStorageKey());
+      const raw = this.deps.guardStorage.load(this.verifyGuardStorageKey());
       if (!raw) return;
       const parsed: unknown = JSON.parse(raw);
       const result = verifyGuardSchema.safeParse(parsed);

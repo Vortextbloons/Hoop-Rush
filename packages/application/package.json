@@ -7,6 +7,9 @@
   "exports": {
     ".": "./src/index.ts",
     "./challenge": "./src/challenge/index.ts",
+    "./collection": "./src/collection/index.ts",
+    "./draft-duel": "./src/draft-duel/index.ts",
+    "./fixed-five": "./src/fixed-five/index.ts",
     "./havoc": "./src/havoc/index.ts",
     "./season": "./src/season/index.ts"
   },
@@ -19,7 +22,8 @@
   "dependencies": {
     "@hoop-rush/data-contracts": "workspace:*",
     "@hoop-rush/engine": "workspace:*",
-    "@hoop-rush/persistence": "workspace:*"
+    "@hoop-rush/persistence": "workspace:*",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@hoop-rush/test-fixtures": "workspace:*",

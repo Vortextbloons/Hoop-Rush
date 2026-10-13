@@ -222,19 +222,48 @@ paths change (stages 2, 4, and 6).
   navigation/UI-only state. Command shapes, seeds, digests, retry policy,
   timers, and verification flow unchanged; 6 new session/controller tests.
 
-## Stage 5 status (2026-10-12)
+- 2026-10-12, stage 6a: transport protocol pins added
+  (`fixed-five-transport.test.ts`, `draft-duel-transport.test.ts`, 16 tests)
+  against a fake Supabase client (`apps/web/src/lib/fake-supabase-client.ts`),
+  plus a two-connection storage harness test. Code-size baseline re-captured:
+  maintained source 230,209 physical (runtime 182,365; web production 93,196,
+  engine production 61,743, application production 5,231, persistence
+  production 9,111).
+- 2026-10-12, stage 6b: `packages/persistence/src/repositories/support.ts`
+  shares envelopes, parse helpers, scoped reads/deletes, receipt comparison,
+  and revision/digest guards; fixed-five, draft-duel, havoc, collection, and
+  season repositories delegate. `support.test.ts` (6 tests). Persistence
+  production 9,111 → 8,998 lines (pre-6c snapshot).
+- 2026-10-12, stage 6c: IndexedDB namespace moved to `hoop-rush-saves-v2`
+  (single Dexie `version(1)`); the v1→v22 chain, Collection legacy read
+  unions/migrations, stale-record cleanup, and engine `migrateCollection*`
+  exports deleted; web composes one database instance. 19 files changed,
+  +117/−756. Persistence production measured after 6c: 8,838 lines.
+- 2026-10-12, stage 6d: `modes/fixed-five/log.ts` and
+  `modes/draft-duel/log.ts` now own command-log replay and deterministic
+  transitions; web `fixed-five-room-state.ts` keeps asset loading,
+  player-ref resolution, and snapshot overlay. New `log.test.ts` (6 tests) and
+  `replayDraftDuelLog` coverage in `draft-duel.test.ts`.
+- 2026-10-12, stage 6e: `apps/web/src/lib/supabase-runtime.ts` (client cache,
+  anonymous auth, env validation, realtime room registry, transient broadcast)
+  and `multiplayer-membership.ts` replace per-mode copies; both transports
+  declare only tables, RPCs, and row mapping. 12 files changed, +572/−597.
+- 2026-10-12, stage 6f: `CollectionPlaySession`, `DraftDuelSession`, and
+  `FixedFiveRoomSession` moved into `@hoop-rush/application` behind ports;
+  web keeps presenters, controllers, composition, and browser adapters.
+  `fixed-five-command-submit` and the fixed-five policies moved too.
 
-Complete. Every mode has a typed session/task lifecycle with
-`getSnapshot`/`subscribe`/cancel/dispose semantics and explicit ports:
+## Stage 6 status (2026-10-12)
 
-- Classic/Sandbox: `@hoop-rush/application/challenge` (`ChallengeSession`).
-- Hoop Havoc: `@hoop-rush/application/havoc` (`HavocSession`).
-- Collection: `CollectionPlaySession` + presenter (web feature).
-- Draft Duel: `DraftDuelSession` + presenter (web feature).
-- Multiplayer: `FixedFiveRoomSession` + controller (web feature).
-- Season: `@hoop-rush/application/season` (`SeasonSession`, stages 2-3).
+Complete. Storage and multiplayer adapters are shared:
+`hoop-rush-saves-v2` is the only save namespace, repository plumbing is
+centralized in `support.ts`, multiplayer replay lives in the engine, Supabase
+plumbing is shared, and every mode session lives in `@hoop-rush/application`
+behind ports. Web keeps views, presenters/controllers, composition, and
+browser adapters. Remaining: stage 7 (tooling consolidation and deletion).
 
-Views, presenters, and selectors are co-located under
-`apps/web/src/lib/features/<mode>/`; shared UI primitives remain in
-`lib/components/`. Remaining follow-ups: move the web-side Collection/Draft
-Duel/multiplayer sessions behind application ports, and stages 6-7.
+Measured after stage 6f: maintained source 230,329 physical (runtime 182,490;
+web production 89,563, engine production 62,466, application production 8,534,
+persistence production 8,838). The session/engine moves are line-neutral
+relocations; the storage slice removed ~750 runtime lines, and the remaining
+net reduction lands with stage 7's tooling consolidation.

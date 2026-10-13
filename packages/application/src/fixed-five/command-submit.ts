@@ -7,11 +7,8 @@ import type {
   Id,
   CommandId,
 } from '@hoop-rush/data-contracts';
-import {
-  FIXED_FIVE_COMMAND_POLICY,
-  FIXED_FIVE_SINGLE_ATTEMPT_POLICY,
-  runSubmission,
-} from '$lib/submit';
+import { runSubmission } from '../submission.ts';
+import { FIXED_FIVE_COMMAND_POLICY, FIXED_FIVE_SINGLE_ATTEMPT_POLICY } from './policies.ts';
 
 const STALE_RETRY_SAFE_KINDS: ReadonlySet<FixedFiveCommandPayload['kind']> = new Set([
   'ready',

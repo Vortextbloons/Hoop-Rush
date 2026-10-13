@@ -5,10 +5,7 @@ import type {
   CollectionGameWorkerCompleteMessage,
   CollectionPlayState,
 } from '@hoop-rush/data-contracts';
-import {
-  CollectionPlaySession,
-  type CollectionPlaySessionDeps,
-} from './collection-play-session.ts';
+import { CollectionPlaySession, type CollectionPlaySessionDeps } from './play-session.ts';
 
 function playStateWith(pending: 'v1' | 'v3' | null): CollectionPlayState {
   return {

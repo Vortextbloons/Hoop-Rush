@@ -6,10 +6,7 @@ import {
   type FixedFiveCommandPayload,
   type FixedFiveCommandReceipt,
 } from '@hoop-rush/data-contracts';
-import {
-  submitFixedFiveCommand,
-  type SubmitFixedFiveCommandInput,
-} from './fixed-five-command-submit';
+import { submitFixedFiveCommand, type SubmitFixedFiveCommandInput } from './command-submit.ts';
 
 const roomId = idSchema.parse('room-1');
 const commandId = commandIdSchema.parse('cmd-1');

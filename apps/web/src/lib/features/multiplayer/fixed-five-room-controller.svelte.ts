@@ -12,7 +12,12 @@ import {
 } from '@hoop-rush/data-contracts';
 import { arenaWin } from '$lib/arena-sound';
 import { presentationForVariant } from '$lib/draft-presentation';
-import { loadFixedFiveMembership, saveFixedFiveMembership } from './fixed-five-identity';
+import { newRequestId } from '$lib/ids';
+import {
+  friendlyFixedFiveJoinError,
+  loadFixedFiveMembership,
+  saveFixedFiveMembership,
+} from './fixed-five-identity';
 import {
   aggregateFixedFivePlayerStats,
   type FixedFivePlayerStats,
@@ -35,7 +40,8 @@ import {
   type FixedFiveLocalResult,
   type FixedFiveRoomSessionDeps,
   type FixedFiveRoomSessionSnapshot,
-} from './fixed-five-room-session';
+} from '@hoop-rush/application/fixed-five';
+import { buildSimulationTeam } from './fixed-five-room-state';
 import { getFixedFiveTransport } from './fixed-five-transport';
 import { lobbyCommand, loadLobbyId } from './multiplayer-lobby';
 
@@ -54,6 +60,8 @@ function defaultSessionDeps(roomId: string): FixedFiveRoomSessionDeps {
     repository: fixedFiveRepository,
     createRunner: (onEvent) => new FixedFiveRunner(onEvent),
     loadAssets: () => loadFixedFiveAssets(),
+    buildTeam: (manifest, teamId, displayName, refs) =>
+      buildSimulationTeam(manifest, teamId, displayName, refs),
     loadMembership: (id) => loadFixedFiveMembership(id),
     saveMembership: (membership) => {
       saveFixedFiveMembership(membership);
@@ -61,6 +69,8 @@ function defaultSessionDeps(roomId: string): FixedFiveRoomSessionDeps {
     loadLobbyId: (id) => loadLobbyId(id),
     removeLobbyGuest: (lobbyId) => lobbyCommand({ kind: 'remove-guest', lobbyId }),
     now: () => Date.now(),
+    newCommandId: () => newRequestId(),
+    friendlyError: (error) => friendlyFixedFiveJoinError(error),
     loadActivityAt: (id) => loadActivityAt(id),
     saveActivityNow: (id) => {
       saveActivityNow(id);
@@ -75,6 +85,20 @@ function defaultSessionDeps(roomId: string): FixedFiveRoomSessionDeps {
       } catch {
         return false;
       }
+    },
+    guardStorage: {
+      load: (key) => {
+        try {
+          return localStorage.getItem(key);
+        } catch {
+          return null;
+        }
+      },
+      save: (key, value) => {
+        try {
+          localStorage.setItem(key, value);
+        } catch {}
+      },
     },
   };
 }

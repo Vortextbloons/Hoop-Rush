@@ -5,40 +5,14 @@ import {
   type EraSimulationProfile,
   type FixedFiveWorkerMessage,
   type FixedFiveWorkerRequest,
-  type FixedFiveWorkerResultEntry,
   type FixedFiveWorkerTeam,
-  type FixedFiveVerificationReceipt,
   type OpponentBracketCore,
   type Seed,
 } from '@hoop-rush/data-contracts';
 import type { FixedFiveVerificationInput } from '@hoop-rush/engine';
+import type { FixedFiveRunnerEvent } from '@hoop-rush/application/fixed-five';
 import { newRequestId } from '$lib/ids';
-export type FixedFiveRunnerEvent =
-  | {
-      kind: 'progress';
-      completedGames: number;
-      totalGames: number;
-    }
-  | {
-      kind: 'results';
-      entries: FixedFiveWorkerResultEntry[];
-    }
-  | {
-      kind: 'complete';
-      gamesDelivered: number;
-    }
-  | {
-      kind: 'verified';
-      receipt: FixedFiveVerificationReceipt;
-    }
-  | {
-      kind: 'verification-failed';
-      failures: string[];
-    }
-  | {
-      kind: 'error';
-      message: string;
-    };
+export type { FixedFiveRunnerEvent } from '@hoop-rush/application/fixed-five';
 export class FixedFiveRunner {
   private worker: Worker | null = null;
   private requestId: string | null = null;
