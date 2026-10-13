@@ -526,6 +526,11 @@ export class FixedFiveRoomSession {
           return;
         }
         if (replay.draftStyle === 'snake') {
+          const own = replay.state.picks.filter((p) => p.participantId === this.selfId);
+          if (own.some((p) => p.playerId === playerId)) {
+            await this.sendCommand({ kind: 'sandbox-reposition', playerId, slotIndex: slot });
+            return;
+          }
           if (!isFixedFiveDraftTurn(replay, this.selfId)) {
             this.draftError = 'Wait for your opponent to finish this pick.';
             this.publish();
@@ -564,6 +569,11 @@ export class FixedFiveRoomSession {
       }
       if (mode === 'duel') {
         if (replay.mode === 'sandbox-duel') {
+          const own = replay.state.picks.filter((p) => p.participantId === this.selfId);
+          if (own.some((p) => p.playerId === playerId)) {
+            await this.sendCommand({ kind: 'duel-reposition', playerId, slotIndex: slot });
+            return;
+          }
           if (!isFixedFiveDraftTurn(replay, this.selfId)) {
             this.draftError = 'Wait for your opponent to finish this pick.';
             this.publish();
@@ -580,6 +590,11 @@ export class FixedFiveRoomSession {
         if (replay.mode !== 'duel' || !replay.state.currentRoll) {
           this.draftError = 'No active duel roll.';
           this.publish();
+          return;
+        }
+        const own = replay.state.picks.filter((p) => p.participantId === this.selfId);
+        if (own.some((p) => p.playerId === playerId)) {
+          await this.sendCommand({ kind: 'duel-reposition', playerId, slotIndex: slot });
           return;
         }
         if (!isFixedFiveDraftTurn(replay, this.selfId)) {

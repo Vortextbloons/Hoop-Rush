@@ -1250,7 +1250,3 @@ function teamInBonus(foulsInPeriod: number, overtime: boolean): boolean {
     : ENGINE_CONSTANTS.bonusFoulsRegulation;
   return foulsInPeriod >= limit;
 }
-.bonusFoulsOvertime
-    : ENGINE_CONSTANTS.bonusFoulsRegulation;
-  return foulsInPeriod >= limit;
-}

@@ -112,6 +112,11 @@ export const fixedFiveDuelClaimPayloadSchema = z.object({
   franchiseId: franchiseIdSchema,
   eraId: z.string().min(1).max(64),
 });
+export const fixedFiveDuelRepositionPayloadSchema = z.object({
+  kind: z.literal('duel-reposition'),
+  playerId: playerIdSchema,
+  slotIndex: z.number().int().min(0).max(4),
+});
 export const fixedFiveSandboxPlacePayloadSchema = z.object({
   kind: z.literal('sandbox-place'),
   playerId: playerIdSchema,
@@ -167,6 +172,7 @@ export const fixedFiveCommandPayloadSchema = z.discriminatedUnion('kind', [
   fixedFiveClassicPickPayloadSchema,
   fixedFiveClassicRepositionPayloadSchema,
   fixedFiveDuelClaimPayloadSchema,
+  fixedFiveDuelRepositionPayloadSchema,
   fixedFiveSandboxPlacePayloadSchema,
   fixedFiveSandboxRepositionPayloadSchema,
   fixedFiveSandboxRemovePayloadSchema,

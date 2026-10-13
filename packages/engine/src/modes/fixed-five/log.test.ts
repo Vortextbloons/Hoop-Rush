@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  LINEUP_STRUCTURE,
   contentHashSchema,
   eraIdSchema,
   fixedFiveCommandSchema,
@@ -15,10 +16,31 @@ import {
   type Position,
 } from '@hoop-rush/data-contracts';
 import { createEngineContext } from '../../sim/kernel.ts';
-import { createParticipantClassicDraft } from '../classic/draft.ts';
-import { claimDuelPlayer, createDuelDraft, duelCurrentPicker } from './duel.ts';
+import {
+  applyClassicBuilderCommand,
+  createParticipantClassicDraft,
+  repositionClassicPlayer,
+} from '../classic/draft.ts';
+const LINEUP_TARGET = LINEUP_STRUCTURE;
+import {
+  claimDuelPlayer,
+  createDuelDraft,
+  duelCurrentPicker,
+  repositionDuelPlayer,
+} from './duel.ts';
+import {
+  claimSandboxDuelPlayer,
+  createSandboxDuelDraft,
+  repositionSandboxDuelPlayer,
+  sandboxDuelPicker,
+} from './sandbox-duel.ts';
 import { fixedFiveDraftSeed } from './seeds.ts';
-import { enumerateClassicSafeMoves, enumerateDuelSafeMoves, chooseAutopick } from './timeout.ts';
+import {
+  enumerateClassicSafeMoves,
+  enumerateDuelSafeMoves,
+  enumerateSandboxDuelSafeMoves,
+  chooseAutopick,
+} from './timeout.ts';
 import type { FixedFiveCandidate } from './sandbox-builder.ts';
 import {
   computeDueAutopick,
@@ -290,6 +312,200 @@ describe('replayFixedFiveLog', () => {
     expect(deriveEffectivePhase('drafting', replay, false)).toBe('lobby');
     expect(deriveEffectivePhase('completed', replay, false)).toBe('completed');
     expect(deriveEffectivePhase('integrity-failed', replay, true)).toBe('integrity-failed');
+  });
+
+  it('applies duel repositions only for reposition-aware versions', () => {
+    const { pool, byId } = poolFixture();
+    const catalog = catalogFixture();
+    let state = createDuelDraft(ROOT, catalog, byId, context);
+    const actor = duelCurrentPicker(state);
+    const commands: FixedFiveCommand[] = [commandOf(0, 'p1', { kind: 'start' })];
+    let ordinal = 1;
+    let reposition: { playerId: PlayerId; slotIndex: 0 | 1 | 2 | 3 | 4 } | null = null;
+    while (reposition === null && state.status === 'drafting') {
+      const picker = duelCurrentPicker(state);
+      const move = enumerateDuelSafeMoves(catalog, byId, state)[0];
+      if (!move) throw new Error('fixture has no duel safe move');
+      const candidate = byId.get(move.playerId);
+      commands.push(
+        commandOf(ordinal, picker, {
+          kind: 'duel-claim',
+          playerId: move.playerId,
+          slotIndex: move.slotIndex,
+          franchiseId: candidate?.franchiseId ?? fid('lakers'),
+          eraId: candidate?.eraId ?? '1990s',
+        }),
+      );
+      ordinal += 1;
+      state = claimDuelPlayer(
+        state,
+        catalog,
+        byId,
+        { playerId: move.playerId, slotIndex: move.slotIndex, actor: picker },
+        context,
+      );
+      for (const pick of state.picks.filter((entry) => entry.participantId === actor)) {
+        for (const slot of [0, 1, 2, 3, 4] as const) {
+          if (slot === pick.slotIndex) continue;
+          try {
+            repositionDuelPlayer(state, catalog, byId, {
+              playerId: pick.playerId,
+              slotIndex: slot,
+              actor,
+            });
+            reposition = { playerId: pick.playerId, slotIndex: slot };
+            break;
+          } catch {
+            continue;
+          }
+        }
+        if (reposition !== null) break;
+      }
+    }
+    if (reposition === null) throw new Error('fixture has no repositionable duel pick');
+    commands.push(
+      commandOf(ordinal, actor, {
+        kind: 'duel-reposition',
+        playerId: reposition.playerId,
+        slotIndex: reposition.slotIndex,
+      }),
+    );
+    const expected = repositionDuelPlayer(state, catalog, byId, {
+      playerId: reposition.playerId,
+      slotIndex: reposition.slotIndex,
+      actor,
+    });
+    const assets = { catalog, pool, poolById: byId, context };
+    const modern = replayFixedFiveLog(
+      'duel',
+      ROOM_ID,
+      ROOT,
+      'data-v1',
+      'ratings',
+      assets,
+      commands,
+      'classic',
+      'fixed-five-multiplayer-v4',
+    );
+    expect(modern.mode).toBe('duel');
+    if (modern.mode !== 'duel') throw new Error('unexpected replay mode');
+    expect(modern.state.picks).toEqual(expected.picks);
+    expect(modern.state.pickOrdinal).toBe(expected.pickOrdinal);
+    const legacy = replayFixedFiveLog(
+      'duel',
+      ROOM_ID,
+      ROOT,
+      'data-v1',
+      'ratings',
+      assets,
+      commands,
+      'classic',
+      'fixed-five-multiplayer-v3',
+    );
+    expect(legacy.mode).toBe('duel');
+    if (legacy.mode !== 'duel') throw new Error('unexpected replay mode');
+    expect(legacy.state.picks).toEqual(state.picks);
+  });
+
+  it('applies sandbox snake repositions only for reposition-aware versions', () => {
+    const { pool: basePool } = poolFixture();
+    const pool = basePool.map((candidate, index) => ({
+      ...candidate,
+      playerVersionId: `pv-${(index + 1).toString(16).padStart(32, '0')}`,
+      ...(candidate.playerId === 'c-g3' ? { selectionScore: 100 } : {}),
+    }));
+    const assets = {
+      catalog: catalogFixture(),
+      pool,
+      poolById: new Map(pool.map((candidate) => [candidate.playerId, candidate])),
+      context,
+    };
+    const initial = createSandboxDuelDraft(ROOT);
+    const first = initial.firstPicker;
+    const other = first === 'p1' ? 'p2' : 'p1';
+    const move0 = enumerateSandboxDuelSafeMoves(pool, initial)[0];
+    if (!move0) throw new Error('fixture has no sandbox safe move');
+    expect(move0.playerId).toBe('c-g3');
+    const claimed = claimSandboxDuelPlayer(initial, pool, {
+      playerId: move0.playerId,
+      playerVersionId: move0.playerVersionId,
+      slotIndex: move0.slotIndex,
+      actor: first,
+    });
+    const moved = repositionSandboxDuelPlayer(claimed, pool, {
+      playerId: pid('c-g3'),
+      slotIndex: 1,
+      actor: first,
+    });
+    expect(moved.picks[0]?.slotIndex).toBe(1);
+    expect(moved.pickOrdinal).toBe(claimed.pickOrdinal);
+    const move1 = enumerateSandboxDuelSafeMoves(pool, moved)[0];
+    if (!move1) throw new Error('fixture has no follow-up sandbox safe move');
+    const expected = claimSandboxDuelPlayer(moved, pool, {
+      playerId: move1.playerId,
+      playerVersionId: move1.playerVersionId,
+      slotIndex: move1.slotIndex,
+      actor: other,
+    });
+    const legacyExpected = claimSandboxDuelPlayer(claimed, pool, {
+      playerId: move1.playerId,
+      playerVersionId: move1.playerVersionId,
+      slotIndex: move1.slotIndex,
+      actor: other,
+    });
+    const commands: FixedFiveCommand[] = [
+      commandOf(0, 'p1', { kind: 'start' }),
+      commandOf(1, first, {
+        kind: 'sandbox-place',
+        playerId: move0.playerId,
+        playerVersionId: move0.playerVersionId,
+        slotIndex: move0.slotIndex,
+      }),
+      commandOf(2, first, {
+        kind: 'sandbox-reposition',
+        playerId: pid('c-g3'),
+        slotIndex: 1,
+      }),
+      commandOf(3, other, {
+        kind: 'sandbox-place',
+        playerId: move1.playerId,
+        playerVersionId: move1.playerVersionId,
+        slotIndex: move1.slotIndex,
+      }),
+    ];
+    const modern = replayFixedFiveLog(
+      'sandbox-shared-82',
+      ROOM_ID,
+      ROOT,
+      'data-v1',
+      'ratings',
+      assets,
+      commands,
+      'sandbox',
+      'fixed-five-multiplayer-v4',
+    );
+    expect(modern.mode).toBe('sandbox-shared-82');
+    if (modern.mode !== 'sandbox-shared-82' || modern.draftStyle !== 'snake') {
+      throw new Error('unexpected replay style');
+    }
+    expect(modern.skipped).toBe(0);
+    expect(modern.state.picks).toEqual(expected.picks);
+    const legacy = replayFixedFiveLog(
+      'sandbox-shared-82',
+      ROOM_ID,
+      ROOT,
+      'data-v1',
+      'ratings',
+      assets,
+      commands,
+      'sandbox',
+      'fixed-five-multiplayer-v3',
+    );
+    expect(legacy.mode).toBe('sandbox-shared-82');
+    if (legacy.mode !== 'sandbox-shared-82' || legacy.draftStyle !== 'snake') {
+      throw new Error('unexpected replay style');
+    }
+    expect(legacy.state.picks).toEqual(legacyExpected.picks);
   });
 
   it('computes a deterministic due autopick from the replay', () => {

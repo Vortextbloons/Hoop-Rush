@@ -294,6 +294,8 @@ select is(
   (select value::jsonb->>'rejectionCode' from public.dd_pgtap_ctx where name = 'settings_guest'),
   'membership', 'only the host may change settings');
 
+update public.draft_duel_room_members set online = false
+where room_id = (select value::uuid from public.dd_pgtap_ctx where name = 'room_a') and participant_id = 'p2';
 set local role authenticated;
 select public.dd_pgtap_claim(public.dd_pgtap_uid('p1', 'uid_a1', 'uid_a2'));
 insert into public.dd_pgtap_ctx (name, value)
@@ -303,7 +305,9 @@ select 'start_early', public.draft_duel_command_submit(
 reset role;
 select is(
   (select value::jsonb->>'rejectionCode' from public.dd_pgtap_ctx where name = 'start_early'),
-  'not-ready', 'start before both ready is rejected');
+  'not-ready', 'start while the opponent is offline is rejected');
+update public.draft_duel_room_members set online = true
+where room_id = (select value::uuid from public.dd_pgtap_ctx where name = 'room_a') and participant_id = 'p2';
 
 set local role authenticated;
 select public.dd_pgtap_claim(public.dd_pgtap_uid('p2', 'uid_a1', 'uid_a2'));
@@ -381,6 +385,8 @@ select is(
   (select value::jsonb->>'accepted' from public.dd_pgtap_ctx where name = 'ready_a2'),
   'true', 'guest ready accepted');
 
+update public.draft_duel_room_members set ready = false
+where room_id = (select value::uuid from public.dd_pgtap_ctx where name = 'room_a');
 set local role authenticated;
 select public.dd_pgtap_claim(public.dd_pgtap_uid('p1', 'uid_a1', 'uid_a2'));
 insert into public.dd_pgtap_ctx (name, value)
@@ -390,7 +396,7 @@ select 'start_a1', public.draft_duel_command_submit(
 reset role;
 select is(
   (select value::jsonb->>'accepted' from public.dd_pgtap_ctx where name = 'start_a1'),
-  'true', 'start accepted once both seats are ready');
+  'true', 'start accepted with two online seats and neither ready');
 select is(
   (select phase from public.draft_duel_rooms where id = (select value::uuid from public.dd_pgtap_ctx where name = 'room_a')),
   'drafting', 'start moves the room to drafting');

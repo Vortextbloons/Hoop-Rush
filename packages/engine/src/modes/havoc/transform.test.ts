@@ -27,9 +27,9 @@ function sourceWith(
 describe('havoc mutation transform', () => {
   it('applies positive floors but keeps an already higher rating', () => {
     const raised = applyHavocMutationPackage(sourceWith(), [{ mutationId: 'super-soldier' }]);
-    expect(raised.ratings.speed).toBe(99);
-    expect(raised.ratings.strength).toBe(99);
-    expect(raised.ratings.vertical).toBe(99);
+    expect(raised.ratings.speed).toBe(90);
+    expect(raised.ratings.strength).toBe(90);
+    expect(raised.ratings.vertical).toBe(90);
     const alreadyHigher = applyHavocMutationPackage(
       sourceWith({ ratings: { speed: 99, strength: 100, vertical: 99 } }),
       [{ mutationId: 'super-soldier' }],
@@ -169,12 +169,12 @@ describe('havoc mutation transform', () => {
   it('applies Sniper Gene and Point God channels and values', () => {
     const sniper = applyHavocMutationPackage(sourceWith(), [{ mutationId: 'sniper-gene' }]);
     expect(sniper.ratings.threePoint).toBe(97);
-    expect(sniper.tendencies.threePointRate).toBe(90);
+    expect(sniper.tendencies.threePointRate).toBe(80);
     expect(sniper.authoritativeChannels).toEqual(['three-point-accuracy', 'three-point-volume']);
     const pointGod = applyHavocMutationPackage(sourceWith(), [{ mutationId: 'point-god' }]);
     expect(pointGod.ratings.passing).toBe(99);
     expect(pointGod.ratings.ballHandling).toBe(99);
-    expect(pointGod.tendencies.passRate).toBe(95);
+    expect(pointGod.tendencies.passRate).toBe(85);
     expect(pointGod.authoritativeChannels).toEqual(['assist-anchor']);
   });
 

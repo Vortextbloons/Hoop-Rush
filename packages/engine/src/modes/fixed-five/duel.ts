@@ -9,6 +9,10 @@ import type {
 import { CLASSIC_ROLL_VERSION } from '@hoop-rush/data-contracts';
 import { canPlay } from '../../domain/positions.ts';
 import { slotRequirement } from '../../domain/lineup.ts';
+import {
+  planLineupReposition,
+  type LineupRepositionPlayer,
+} from '../../domain/lineup-reposition.ts';
 import type { EngineContext } from '../../sim/kernel.ts';
 import { classicRollSeed, sortClassicCatalog } from '../classic/draft.ts';
 import { fixedFiveFirstPicker } from './seeds.ts';
@@ -59,6 +63,40 @@ function participantSlotUsage(state: DuelDraftState, participantId: 'p1' | 'p2')
   return new Set(
     state.picks.filter((p) => p.participantId === participantId).map((p) => p.slotIndex),
   );
+}
+function participantLineupPlayers(
+  state: DuelDraftState,
+  participantId: 'p1' | 'p2',
+  catalog: ClassicDraftCatalog,
+  poolById: ReadonlyMap<string, FixedFiveCandidate>,
+): LineupRepositionPlayer[] {
+  return state.picks
+    .filter((pick) => pick.participantId === participantId)
+    .map((pick) => {
+      const candidate = poolById.get(pick.playerId);
+      const entry = catalog.find(
+        (e) => e.franchiseId === pick.franchiseId && e.eraId === pick.eraId,
+      );
+      const positions =
+        candidate?.positions ?? entry?.players.find((p) => p.playerId === pick.playerId)?.positions;
+      if (!positions) throw new Error(`${pick.playerId} has no catalog record`);
+      return { playerId: pick.playerId, positions, slotIndex: pick.slotIndex };
+    });
+}
+function applyPlanToParticipantPicks(
+  state: DuelDraftState,
+  participantId: 'p1' | 'p2',
+  placements: ReadonlyArray<{ playerId: PlayerId; slotIndex: SlotIndex }>,
+): DuelDraftPick[] {
+  const slotByPlayerId = new Map(
+    placements.map((placement) => [placement.playerId, placement.slotIndex]),
+  );
+  return state.picks.map((pick) => {
+    if (pick.participantId !== participantId) return pick;
+    const slotIndex = slotByPlayerId.get(pick.playerId);
+    if (slotIndex === undefined) throw new Error(`no planned slot for ${pick.playerId}`);
+    return { ...pick, slotIndex };
+  });
 }
 export function duelRollCandidates(
   catalog: ClassicDraftCatalog,
@@ -184,12 +222,18 @@ export interface DuelClaimInput {
   slotIndex: SlotIndex;
   actor: 'p1' | 'p2';
 }
+export interface DuelRepositionInput {
+  playerId: PlayerId;
+  slotIndex: SlotIndex;
+  actor: 'p1' | 'p2';
+}
 export function claimDuelPlayer(
   state: DuelDraftState,
   catalog: ClassicDraftCatalog,
   poolById: ReadonlyMap<string, FixedFiveCandidate>,
   input: DuelClaimInput,
   context: EngineContext,
+  options?: { allowDisplacement?: boolean },
 ): DuelDraftState {
   if (state.status !== 'drafting') throw new Error('duel draft is not active');
   const picker = duelCurrentPicker(state);
@@ -212,9 +256,24 @@ export function claimDuelPlayer(
   if (!canPlay(positions, slotRequirement(input.slotIndex))) {
     throw new Error(`${input.playerId} cannot play slot ${String(input.slotIndex)}`);
   }
+  const allowDisplacement = options?.allowDisplacement ?? false;
   const usedSlots = participantSlotUsage(state, picker);
-  if (usedSlots.has(input.slotIndex)) {
+  if (!allowDisplacement && usedSlots.has(input.slotIndex)) {
     throw new Error(`slot ${String(input.slotIndex)} is already filled for ${picker}`);
+  }
+  let picks = [...state.picks];
+  if (allowDisplacement) {
+    const plan = planLineupReposition(
+      participantLineupPlayers(state, picker, catalog, poolById),
+      { playerId: input.playerId, positions },
+      input.slotIndex,
+    );
+    if (plan === null) {
+      throw new Error(
+        `no legal placement for ${input.playerId} at slot ${String(input.slotIndex)}`,
+      );
+    }
+    picks = applyPlanToParticipantPicks(state, picker, plan.placements);
   }
   const pick: DuelDraftPick = {
     pickOrdinal: state.pickOrdinal,
@@ -225,7 +284,7 @@ export function claimDuelPlayer(
     eraId: roll.eraId,
     slotIndex: input.slotIndex,
   };
-  const picks = [...state.picks, pick];
+  picks = [...picks, pick];
   const claimedPairs = [...state.claimedPairs, pairKey(roll.franchiseId, roll.eraId)];
   const claimedVersionIds = [...state.claimedVersionIds, versionId];
   const nextOrdinal = state.pickOrdinal + 1;
@@ -251,6 +310,41 @@ export function claimDuelPlayer(
   const candidates = duelRollCandidates(catalog, poolById, interim, 'initial');
   const nextRoll = rollPair(state.rootSeed, nextOrdinal, 'initial', candidates, context);
   return { ...interim, currentRoll: nextRoll };
+}
+export function repositionDuelPlayer(
+  state: DuelDraftState,
+  catalog: ClassicDraftCatalog,
+  poolById: ReadonlyMap<string, FixedFiveCandidate>,
+  input: DuelRepositionInput,
+): DuelDraftState {
+  if (state.status !== 'drafting') {
+    throw new Error(`duel reposition requires a drafting state (got ${state.status})`);
+  }
+  const pick = state.picks.find(
+    (entry) => entry.participantId === input.actor && entry.playerId === input.playerId,
+  );
+  if (!pick) {
+    throw new Error(`player ${input.playerId} is not on ${input.actor}'s five`);
+  }
+  if (pick.slotIndex === input.slotIndex) return state;
+  const candidate = poolById.get(input.playerId);
+  const entry = catalog.find((e) => e.franchiseId === pick.franchiseId && e.eraId === pick.eraId);
+  const positions =
+    candidate?.positions ?? entry?.players.find((p) => p.playerId === input.playerId)?.positions;
+  if (!positions) throw new Error(`${input.playerId} has no catalog record`);
+  if (!canPlay(positions, slotRequirement(input.slotIndex))) {
+    throw new Error(`${input.playerId} cannot play slot ${String(input.slotIndex)}`);
+  }
+  const plan = planLineupReposition(
+    participantLineupPlayers(state, input.actor, catalog, poolById),
+    { playerId: input.playerId, positions },
+    input.slotIndex,
+  );
+  if (plan === null) {
+    throw new Error(`no legal reposition for ${input.playerId} to slot ${String(input.slotIndex)}`);
+  }
+  const picks = applyPlanToParticipantPicks(state, input.actor, plan.placements);
+  return { ...state, picks };
 }
 export function isDuelComplete(state: DuelDraftState): boolean {
   return state.status === 'complete' && state.picks.length === 10;

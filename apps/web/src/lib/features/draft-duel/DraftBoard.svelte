@@ -76,10 +76,10 @@
     </span>
   </header>
   <div class="dd-board-grid">
-    {#each offers as pick (pick.slot)}
+    {#each offers as pick (`${round}:${pick.slot}:${pick.card.cardId}`)}
       <div
-        class="dd-board-slot draft-card-enter"
-        style:--draft-index={pick.slot}
+        class="dd-board-slot"
+        style:--reveal-delay="{pick.slot * 85}ms"
         data-slot={pick.slot}
         data-state={slotState(pick)}
       >
@@ -196,6 +196,8 @@
   .dd-board-slot {
     min-width: 0;
     touch-action: manipulation;
+    transform-origin: center bottom;
+    animation: dd-reveal 520ms cubic-bezier(0.22, 1, 0.36, 1) var(--reveal-delay) both;
   }
 
   .dd-board-slot[data-state='picked'] {
@@ -205,6 +207,19 @@
   .dd-board-slot[data-state='considering'] {
     border-radius: 14px;
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 35%, transparent);
+  }
+
+  @keyframes dd-reveal {
+    from {
+      opacity: 0;
+      transform: perspective(900px) translateY(24px) rotateY(-75deg) scale(0.94);
+      filter: brightness(1.5);
+    }
+    to {
+      opacity: 1;
+      transform: perspective(900px) translateY(0) rotateY(0) scale(1);
+      filter: brightness(1);
+    }
   }
 
   @keyframes dd-picked {

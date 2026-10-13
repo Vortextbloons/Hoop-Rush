@@ -173,6 +173,90 @@ export function assignSlots(cards: readonly DraftDuelCard[]): number[] | null {
   return search(0) ? assignment : null;
 }
 
+const SLOT_RANGE: readonly number[] = Array.from({ length: LINEUP_SIZE }, (_, index) => index);
+
+interface PlacementScore {
+  changed: number;
+  distance: number;
+  key: string;
+}
+
+function compareCardIds(a: DraftDuelCard, b: DraftDuelCard): number {
+  if (a.playerVersionId === b.playerVersionId) return 0;
+  return a.playerVersionId < b.playerVersionId ? -1 : 1;
+}
+
+function scorePlacements(
+  prior: readonly DraftDuelSlotPlacement[],
+  assignment: readonly DraftDuelSlotPlacement[],
+): PlacementScore {
+  const priorSlots = new Map(prior.map((slot) => [slot.card.playerVersionId, slot.slotIndex]));
+  let changed = 0;
+  let distance = 0;
+  const keyParts: string[] = [];
+  for (const placement of [...assignment].sort((a, b) => compareCardIds(a.card, b.card))) {
+    const from = priorSlots.get(placement.card.playerVersionId);
+    if (from !== undefined && from !== placement.slotIndex) {
+      changed += 1;
+      distance += Math.abs(from - placement.slotIndex);
+    }
+    keyParts.push(`${placement.card.playerVersionId}:${String(placement.slotIndex)}`);
+  }
+  return { changed, distance, key: keyParts.join('|') };
+}
+
+function isBetterScore(next: PlacementScore, current: PlacementScore | null): boolean {
+  if (current === null) return true;
+  if (next.changed !== current.changed) return next.changed < current.changed;
+  if (next.distance !== current.distance) return next.distance < current.distance;
+  return next.key < current.key;
+}
+
+export function draftDuelRepositionPlan(
+  placements: readonly DraftDuelSlotPlacement[],
+  subject: DraftDuelCard,
+  targetSlot: number,
+): DraftDuelSlotPlacement[] | null {
+  if (!isRecordedSlot(targetSlot)) return null;
+  if (!draftDuelCardPlayableAtSlot(subject, targetSlot)) return null;
+  const others = placements
+    .filter((placement) => placement.card.playerVersionId !== subject.playerVersionId)
+    .map((placement) => placement.card)
+    .sort(compareCardIds);
+  if (others.length + 1 > LINEUP_SIZE) return null;
+  const used = new Array<boolean>(LINEUP_SIZE).fill(false);
+  used[targetSlot] = true;
+  const assignment: DraftDuelSlotPlacement[] = [{ slotIndex: targetSlot, card: subject }];
+  const best: DraftDuelSlotPlacement[][] = [];
+  let bestScore: PlacementScore | null = null;
+  function search(index: number): void {
+    if (index === others.length) {
+      const candidate = assignment.map((placement) => ({ ...placement }));
+      const score = scorePlacements(placements, candidate);
+      if (isBetterScore(score, bestScore)) {
+        best.length = 0;
+        best.push(candidate);
+        bestScore = score;
+      }
+      return;
+    }
+    const card = others[index];
+    if (card === undefined) return;
+    for (const slot of SLOT_RANGE) {
+      if (used[slot]) continue;
+      if (!draftDuelCardPlayableAtSlot(card, slot)) continue;
+      used[slot] = true;
+      assignment.push({ slotIndex: slot, card });
+      search(index + 1);
+      assignment.pop();
+      used[slot] = false;
+    }
+  }
+  search(0);
+  const chosen = best[0];
+  return chosen === undefined ? null : [...chosen].sort((a, b) => a.slotIndex - b.slotIndex);
+}
+
 export function draftDuelFallbackPlacements(
   placed: readonly DraftDuelSlotPlacement[],
   unplaced: readonly DraftDuelCard[],
@@ -478,16 +562,55 @@ function afterDraftDuelPlacement(
   };
 }
 
+function afterDraftDuelDisplacement(
+  input: DraftDuelSafetyInput,
+  picker: DraftDuelParticipantId,
+  card: DraftDuelCard,
+  placements: readonly DraftDuelSlotPlacement[],
+): DraftDuelSafetyInput {
+  const mask = input.profileMaskByPlayerId.get(card.playerId) ?? draftDuelCardProfileMask(card);
+  const claimedPlayerIds = new Set(input.claimedPlayerIds);
+  claimedPlayerIds.add(card.playerId);
+  const nextPlacements =
+    picker === 'p1'
+      ? { ...input.placements, p1: placements }
+      : { ...input.placements, p2: placements };
+  const rosters =
+    picker === 'p1'
+      ? { ...input.rosters, p1: [...input.rosters.p1, card] }
+      : { ...input.rosters, p2: [...input.rosters.p2, card] };
+  return {
+    ...input,
+    currentPicker: otherDraftDuelParticipant(picker),
+    rosters,
+    placements: nextPlacements,
+    claimedPlayerIds,
+    unclaimedProfileCounts: removePlayerFromPoolCounts(input.unclaimedProfileCounts, mask),
+  };
+}
+
 function placementReason(
   input: DraftDuelSafetyInput,
   picker: DraftDuelParticipantId,
   card: DraftDuelCard,
   slotIndex: number,
+  allowDisplacement: boolean,
 ): DraftDuelUnavailableReason | null {
   if (input.claimedPlayerIds.has(card.playerId)) return 'claimed';
   if (!isRecordedSlot(slotIndex)) return 'position';
-  if (input.placements[picker].some((slot) => slot.slotIndex === slotIndex)) return 'position';
   if (!draftDuelCardPlayableAtSlot(card, slotIndex)) return 'position';
+  const occupied = input.placements[picker].some((slot) => slot.slotIndex === slotIndex);
+  if (occupied) {
+    if (!allowDisplacement) return 'position';
+    const plan = draftDuelRepositionPlan(input.placements[picker], card, slotIndex);
+    if (plan === null) return 'position';
+    const after = afterDraftDuelDisplacement(input, picker, card, plan);
+    if (!draftDuelParticipantCompletionPossible(after, picker)) return 'completion';
+    if (!draftDuelParticipantCompletionPossible(after, otherDraftDuelParticipant(picker))) {
+      return 'completion';
+    }
+    return null;
+  }
   const after = afterDraftDuelPlacement(input, picker, card, slotIndex);
   if (!draftDuelParticipantCompletionPossible(after, picker)) return 'completion';
   if (!draftDuelParticipantCompletionPossible(after, otherDraftDuelParticipant(picker))) {
@@ -501,14 +624,28 @@ function placementLegal(
   picker: DraftDuelParticipantId,
   card: DraftDuelCard,
   slotIndex: number,
+  allowDisplacement: boolean,
 ): boolean {
-  if (placementReason(input, picker, card, slotIndex) !== null) return false;
+  if (placementReason(input, picker, card, slotIndex, allowDisplacement) !== null) return false;
   if (picker !== input.firstPicker) return true;
-  const after = afterDraftDuelPlacement(input, picker, card, slotIndex);
+  const occupied = input.placements[picker].some((slot) => slot.slotIndex === slotIndex);
+  const after = occupied
+    ? afterDraftDuelDisplacement(
+        input,
+        picker,
+        card,
+        draftDuelRepositionPlan(input.placements[picker], card, slotIndex) ?? [],
+      )
+    : afterDraftDuelPlacement(input, picker, card, slotIndex);
   const opponent = otherDraftDuelParticipant(picker);
   for (const candidate of after.offered[opponent]) {
-    for (const opponentSlot of draftDuelOpenSlots(after, opponent)) {
-      if (placementReason(after, opponent, candidate, opponentSlot) === null) return true;
+    const opponentSlots = allowDisplacement
+      ? SLOT_RANGE.filter((slot) => draftDuelCardPlayableAtSlot(candidate, slot))
+      : draftDuelOpenSlots(after, opponent);
+    for (const opponentSlot of opponentSlots) {
+      if (placementReason(after, opponent, candidate, opponentSlot, allowDisplacement) === null) {
+        return true;
+      }
     }
   }
   return false;
@@ -516,7 +653,9 @@ function placementLegal(
 export function assessDraftDuelOffers(
   input: DraftDuelSafetyInput,
   picker: DraftDuelParticipantId,
+  options?: { allowDisplacement?: boolean },
 ): DraftDuelOfferedPick[] {
+  const allowDisplacement = options?.allowDisplacement ?? false;
   const offers = input.offered[picker];
   const markAll = (reason: DraftDuelUnavailableReason): DraftDuelOfferedPick[] =>
     offers.map((card, slot) => ({ slot, card, available: false, reason, legalSlots: [] }));
@@ -527,14 +666,14 @@ export function assessDraftDuelOffers(
     if (input.claimedPlayerIds.has(card.playerId)) {
       return { slot, card, available: false, reason: 'claimed', legalSlots: [] };
     }
-    const compatibleSlots = openSlots.filter((candidate) =>
-      draftDuelCardPlayableAtSlot(card, candidate),
-    );
-    if (compatibleSlots.length === 0) {
+    const candidateSlots = allowDisplacement
+      ? SLOT_RANGE.filter((candidate) => draftDuelCardPlayableAtSlot(card, candidate))
+      : openSlots.filter((candidate) => draftDuelCardPlayableAtSlot(card, candidate));
+    if (candidateSlots.length === 0) {
       return { slot, card, available: false, reason: 'position', legalSlots: [] };
     }
-    const legalSlots = compatibleSlots.filter((candidate) =>
-      placementLegal(input, picker, card, candidate),
+    const legalSlots = candidateSlots.filter((candidate) =>
+      placementLegal(input, picker, card, candidate, allowDisplacement),
     );
     if (legalSlots.length === 0) {
       return { slot, card, available: false, reason: 'completion', legalSlots: [] };
@@ -543,8 +682,38 @@ export function assessDraftDuelOffers(
   });
 }
 
-export function draftDuelRoundSafetyHolds(input: DraftDuelSafetyInput): boolean {
+export function draftDuelRepositionSlots(
+  state: DraftDuelDraft,
+  catalog: DraftDuelCatalog,
+  participantId: DraftDuelParticipantId,
+  playerVersionId: string,
+): number[] {
+  const base = buildDraftDuelSafetyBase(state, catalog);
+  if (base.unplaced[participantId].length > 0) return [];
+  const placements = base.placements[participantId];
+  const subject = placements.find(
+    (placement) => placement.card.playerVersionId === playerVersionId,
+  );
+  if (!subject) return [];
+  const slots: number[] = [];
+  for (const slot of SLOT_RANGE) {
+    if (slot === subject.slotIndex) continue;
+    const plan = draftDuelRepositionPlan(placements, subject.card, slot);
+    if (plan === null) continue;
+    const after: DraftDuelSafetyBase = {
+      ...base,
+      placements: { ...base.placements, [participantId]: plan },
+    };
+    if (draftDuelParticipantCompletionPossible(after, participantId)) slots.push(slot);
+  }
+  return slots;
+}
+
+export function draftDuelRoundSafetyHolds(
+  input: DraftDuelSafetyInput,
+  options?: { allowDisplacement?: boolean },
+): boolean {
   if (input.pickOrdinal >= 10) return false;
   const first = draftDuelPickerForOrdinal(input.firstPicker, input.pickOrdinal);
-  return assessDraftDuelOffers(input, first).some((option) => option.available);
+  return assessDraftDuelOffers(input, first, options).some((option) => option.available);
 }

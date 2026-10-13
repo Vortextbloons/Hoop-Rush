@@ -128,6 +128,10 @@ export class DraftDuelPresenter {
       reason: 'turn',
     }));
   });
+  visiblePicks = $derived.by<DraftDuelOfferedPick[]>(() => {
+    if (!this.draft || !this.assets || !this.currentPicker) return [];
+    return draftDuelLegalPicks(this.draft, this.assets.catalog);
+  });
   rivalPool = $derived.by<DraftDuelCard[]>(() => {
     if (!this.draft || !this.participantId) return [];
     const round = this.draft.rounds[this.roundIndex];

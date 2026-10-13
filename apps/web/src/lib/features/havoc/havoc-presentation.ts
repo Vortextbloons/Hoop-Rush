@@ -13,7 +13,7 @@ import type {
 } from '@hoop-rush/data-contracts';
 import type { HavocLineupSlotView, HavocRunView } from '@hoop-rush/application/havoc';
 import { HAVOC_GAME_COUNT } from '@hoop-rush/data-contracts';
-import { havocMutationDefinitionOf } from '@hoop-rush/engine';
+import { havocMutationDefinitionOf, havocMutationIsTeamExclusive } from '@hoop-rush/engine';
 
 export const HAVOC_TIER_COLORS: Record<HavocTier, string> = {
   1: '#37B7CC',
@@ -428,6 +428,18 @@ export function havocFieldLabel(field: string): string {
 
 export function mutationEntriesSummary(entries: readonly HavocMutationEntry[]): string {
   return entries.map((entry) => mutationNameOf(entry.mutationId)).join(', ');
+}
+
+export function havocOwnedExclusiveMutationIds(
+  picks: readonly HavocDraftPick[],
+): ReadonlySet<HavocMutationId> {
+  const owned = new Set<HavocMutationId>();
+  for (const pick of picks) {
+    for (const entry of pick.card.mutations) {
+      if (havocMutationIsTeamExclusive(entry.mutationId)) owned.add(entry.mutationId);
+    }
+  }
+  return owned;
 }
 
 export function havocDeltaTitle(winsGained: number): string {

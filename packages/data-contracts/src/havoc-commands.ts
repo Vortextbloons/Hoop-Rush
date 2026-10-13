@@ -112,6 +112,7 @@ export const havocCommandRejectionCodeSchema = z.enum([
   'illegal-position',
   'reroll-spent',
   'incomplete-lineup',
+  'mutation-taken',
   'cursor-mismatch',
   'phase-mismatch',
   'digest-mismatch',

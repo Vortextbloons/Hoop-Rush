@@ -245,10 +245,18 @@ export const GenerateHavocOffer: GenerateHavocOfferSignature = (
     return playersRng.pick(eligible);
   });
 
+  const ownedExclusive = new Set(input.ownedTeamExclusiveMutationIds ?? []);
   const bundlesByTier = new Map<HavocTier, readonly HavocCompatibleBundle[]>([
     [1, enumerateHavocBundles(environment.definitions, 1)],
     [2, enumerateHavocBundles(environment.definitions, 2)],
-    [3, enumerateHavocBundles(environment.definitions, 3)],
+    [
+      3,
+      enumerateHavocBundles(environment.definitions, 3).filter(
+        (bundle) =>
+          ownedExclusive.size === 0 ||
+          bundle.mutationIds.every((mutationId) => !ownedExclusive.has(mutationId)),
+      ),
+    ],
   ]);
 
   const cardIds: string[] = [];

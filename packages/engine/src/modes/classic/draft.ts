@@ -308,7 +308,11 @@ export function repositionClassicPlayer(
   state: ClassicDraftState,
   catalog: ClassicDraftCatalog,
   input: ClassicRepositionInput,
+  options?: { requireDrafting?: boolean },
 ): ClassicDraftState {
+  if (options?.requireDrafting === true && state.status !== 'drafting') {
+    throw new Error(`classic reposition requires a drafting state (got ${state.status})`);
+  }
   const pick = state.picks.find((p) => p.playerId === input.playerId);
   if (!pick) {
     throw new Error(`player ${input.playerId} is not drafted`);
@@ -382,6 +386,7 @@ export function applyClassicBuilderCommand(
   command: ClassicBuilderCommand,
   context: EngineContext,
   eligibility?: PoolEligibilityPolicy,
+  options?: { requireDrafting?: boolean },
 ): ClassicDraftState {
   const effectiveCatalog = eligibility ? catalog.filter(eligibility) : catalog;
   if (command.kind === 'reroll') {
@@ -390,7 +395,7 @@ export function applyClassicBuilderCommand(
       : rerollClassicEra(state, effectiveCatalog, context);
   }
   if (command.kind === 'classic-reposition') {
-    return repositionClassicPlayer(state, effectiveCatalog, command);
+    return repositionClassicPlayer(state, effectiveCatalog, command, options);
   }
   return draftClassicPlayer(
     state,

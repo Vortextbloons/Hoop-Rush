@@ -27,18 +27,18 @@ const TIER_ONE_OPERATIONS: Record<
     { op: 'raise-rating', field: 'ballHandling', value: 99 },
   ],
   'super-soldier': [
-    { op: 'raise-rating', field: 'speed', value: 99 },
-    { op: 'raise-rating', field: 'strength', value: 99 },
-    { op: 'raise-rating', field: 'vertical', value: 99 },
+    { op: 'raise-rating', field: 'speed', value: 90 },
+    { op: 'raise-rating', field: 'strength', value: 90 },
+    { op: 'raise-rating', field: 'vertical', value: 90 },
   ],
   'sniper-gene': [
     { op: 'raise-rating', field: 'threePoint', value: 97 },
-    { op: 'raise-tendency', field: 'threePointRate', value: 90 },
+    { op: 'raise-tendency', field: 'threePointRate', value: 80 },
   ],
   'point-god': [
     { op: 'raise-rating', field: 'passing', value: 99 },
     { op: 'raise-rating', field: 'ballHandling', value: 99 },
-    { op: 'raise-tendency', field: 'passRate', value: 95 },
+    { op: 'raise-tendency', field: 'passRate', value: 85 },
   ],
   'brick-wall': [
     { op: 'raise-rating', field: 'interiorDefense', value: 99 },
@@ -49,7 +49,7 @@ const TIER_ONE_OPERATIONS: Record<
   'glass-eater': [
     { op: 'raise-rating', field: 'offensiveRebound', value: 99 },
     { op: 'raise-rating', field: 'defensiveRebound', value: 99 },
-    { op: 'raise-tendency', field: 'crashOffensiveGlassRate', value: 90 },
+    { op: 'raise-tendency', field: 'crashOffensiveGlassRate', value: 80 },
   ],
   'trigger-happy': [
     { op: 'raise-rating', field: 'insideScoring', value: 99 },

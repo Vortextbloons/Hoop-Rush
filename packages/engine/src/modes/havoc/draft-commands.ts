@@ -6,6 +6,7 @@ import type {
   HavocDraftState,
   HavocLockLineupCommand,
   HavocMutationDefinition,
+  HavocMutationId,
   HavocPickCardCommand,
   HavocRerollOfferCommand,
   HavocRunState,
@@ -24,7 +25,7 @@ import {
 import { createRng, type Rng } from '../../sim/rng.ts';
 import type { HavocCommandOutcome, HavocDraftEnvironment, HavocLockSources } from './api.ts';
 import { assertHavocCatalogSourceMatches } from './catalog.ts';
-import { HAVOC_MUTATION_DEFINITIONS } from './mutations.ts';
+import { HAVOC_MUTATION_DEFINITIONS, teamExclusiveMutationIdsOf } from './mutations.ts';
 import { GenerateHavocOffer } from './offers.ts';
 import { buildHavocLockedInputs } from './opponents.ts';
 import { zeroHavocSeasonAggregate } from './aggregate.ts';
@@ -110,6 +111,22 @@ function draftedClaimKeysOf(draft: HavocDraftState): string[] {
   return draft.picks.map((pick) =>
     havocClaimKeyOf(pick.claimKey.playerId, pick.claimKey.seasonKey),
   );
+}
+
+function ownedTeamExclusiveOfPicks(
+  picks: readonly HavocDraftPick[],
+  definitions: readonly HavocMutationDefinition[],
+): HavocMutationId[] {
+  const exclusive = teamExclusiveMutationIdsOf(definitions);
+  const owned: HavocMutationId[] = [];
+  for (const pick of picks) {
+    for (const entry of pick.card.mutations) {
+      if (exclusive.has(entry.mutationId) && !owned.includes(entry.mutationId)) {
+        owned.push(entry.mutationId);
+      }
+    }
+  }
+  return owned;
 }
 
 export function CreateHavocRunState(
@@ -200,6 +217,10 @@ function applyRerollOffer(
       offerIndex,
       draftedClaimKeys: draftedClaimKeysOf(draft),
       rerollUsed: true,
+      ownedTeamExclusiveMutationIds: ownedTeamExclusiveOfPicks(
+        draft.picks,
+        environment.definitions,
+      ),
     },
     environment,
   );
@@ -272,6 +293,16 @@ function applyPickCard(
       `claim ${card.source.playerId}::${seasonKey} is already drafted`,
     );
   }
+  const ownedExclusive = ownedTeamExclusiveOfPicks(draft.picks, environment.definitions);
+  const takenExclusive = card.mutations.find((entry) => ownedExclusive.includes(entry.mutationId));
+  if (takenExclusive !== undefined) {
+    return rejectHavocCommand(
+      state,
+      command,
+      'mutation-taken',
+      `${takenExclusive.mutationId} is already owned by another drafted player and cannot be drafted twice`,
+    );
+  }
   const pick: HavocDraftPick = {
     pickOrdinal: draft.picks.length,
     slot: draft.slot,
@@ -300,6 +331,7 @@ function applyPickCard(
           havocClaimKeyOf(entry.claimKey.playerId, entry.claimKey.seasonKey),
         ),
         rerollUsed: draft.rerollUsed,
+        ownedTeamExclusiveMutationIds: ownedTeamExclusiveOfPicks(picks, environment.definitions),
       },
       environment,
     );

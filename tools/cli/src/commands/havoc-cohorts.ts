@@ -604,7 +604,7 @@ export const HAVOC_CLI_MECHANISMS: readonly HavocCliMechanismDefinition[] = [
         'SG',
         (starter) =>
           starter.effective.ratings.threePoint >= 97 &&
-          starter.effective.tendencies.threePointRate >= 90,
+          starter.effective.tendencies.threePointRate >= 80,
         'the sniper three-point floor',
       ),
   },
@@ -622,7 +622,7 @@ export const HAVOC_CLI_MECHANISMS: readonly HavocCliMechanismDefinition[] = [
         onRuns,
         'PG',
         (starter) =>
-          starter.effective.ratings.passing >= 99 && starter.effective.tendencies.passRate >= 95,
+          starter.effective.ratings.passing >= 99 && starter.effective.tendencies.passRate >= 85,
         'the point-god passing floor',
       ),
   },
@@ -660,7 +660,7 @@ export const HAVOC_CLI_MECHANISMS: readonly HavocCliMechanismDefinition[] = [
         'PF',
         (starter) =>
           starter.effective.ratings.offensiveRebound >= 99 &&
-          starter.effective.tendencies.crashOffensiveGlassRate >= 90,
+          starter.effective.tendencies.crashOffensiveGlassRate >= 80,
         'the glass-eater rebounding floor',
       ),
   },

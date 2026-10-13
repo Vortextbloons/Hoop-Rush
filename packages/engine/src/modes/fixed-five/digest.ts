@@ -23,6 +23,7 @@ const DIGESTED_COMMAND_KINDS: ReadonlySet<FixedFiveCommand['payload']['kind']> =
   'classic-pick',
   'classic-reposition',
   'duel-claim',
+  'duel-reposition',
   'sandbox-place',
   'sandbox-reposition',
   'sandbox-remove',

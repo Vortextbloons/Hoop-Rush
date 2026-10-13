@@ -449,7 +449,10 @@ export function createInMemoryDraftDuelTransport(options?: {
       if (actor !== 'p1') {
         return rejection(command.roomId, commandId, 'membership', record.snapshot.revision);
       }
-      if (!record.snapshot.members.every((member) => member.ready)) {
+      if (
+        record.snapshot.members.length !== 2 ||
+        !record.snapshot.members.every((member) => member.online)
+      ) {
         return rejection(command.roomId, commandId, 'not-ready', record.snapshot.revision);
       }
       const firstPicker = draftDuelFirstPickerFor(record.snapshot.rootSeed ?? '');

@@ -54,11 +54,6 @@
     controller.dispose();
   });
 
-  const localMember = $derived(
-    controller.snapshot?.members.find(
-      (member) => member.participantId === controller.participantId,
-    ) ?? null,
-  );
   const rivalMember = $derived(
     controller.snapshot?.members.find(
       (member) => member.participantId !== controller.participantId,
@@ -68,10 +63,11 @@
   const onlineCount = $derived(
     controller.snapshot?.members.filter((member) => member.online).length ?? 0,
   );
-  const bothReady = $derived(
-    controller.snapshot !== null &&
-      controller.snapshot.members.every((member) => member.online && member.ready),
+  const bothOnline = $derived(
+    controller.snapshot?.members.length === 2 &&
+      controller.snapshot.members.every((member) => member.online),
   );
+  const localPicking = $derived(controller.currentPicker === controller.participantId);
   const settingsName = $derived(
     `${
       controller.snapshot?.settings.presentation === 'ball-knowledge' ? 'Ball Knowledge' : 'Ratings'
@@ -274,7 +270,7 @@
             <h2>{isHost ? 'Your table. Your invite.' : 'The matchup is set.'}</h2>
             <p>
               {isHost
-                ? 'Share this code or send an invite link. The draft begins when both players are ready and you start it.'
+                ? 'Share this code or send an invite link. Start the draft once your opponent joins.'
                 : 'Stay in this room. The draft opens for both players when the host starts it.'}
             </p>
             {#if controller.snapshot.code}
@@ -311,9 +307,6 @@
                 <span class="seat-state">
                   <span class="seat-dot" class:online={member.online}></span>
                   {member.online ? 'Online' : 'Away'}
-                  <span class="seat-ready" class:joined={member.ready}>
-                    {member.ready ? 'Ready' : 'Not ready'}
-                  </span>
                 </span>
               </div>
             {/each}
@@ -349,28 +342,17 @@
             <span class:joined={rivalMember?.online}></span>
             <p>
               {isHost
-                ? rivalMember?.online
-                  ? bothReady
-                    ? 'Both players are ready. Start the draft.'
-                    : 'Your opponent is here. Ready up when you are.'
+                ? bothOnline
+                  ? 'Your opponent is here. Start the draft.'
                   : 'Waiting for your opponent to join.'
-                : localMember?.ready
-                  ? 'Waiting for the host to start the draft.'
-                  : 'Ready up to lock in your settings.'}
+                : 'Waiting for the host to start the draft.'}
             </p>
           </div>
-          <button
-            type="button"
-            onclick={() => controller.setReady(!localMember?.ready)}
-            disabled={controller.busy}
-            class="room-primary start-draft"
-            >{localMember?.ready ? 'Ready — waiting' : 'Ready'}</button
-          >
           {#if isHost}
             <button
               type="button"
               onclick={() => controller.startDraft()}
-              disabled={controller.busy || !bothReady}
+              disabled={controller.busy || !bothOnline}
               class="room-primary start-draft"
               >{controller.busy ? 'Starting draft…' : 'Start draft'}<ArrowRight
                 size={18}
@@ -394,7 +376,7 @@
         <div class="stage-header">
           <div>
             <span class="stage-eyebrow">Round {(controller.roundIndex ?? 0) + 1} of 5</span>
-            <h2>{controller.activeTurn ? 'Your pick' : 'Opponent picking'}</h2>
+            <h2>{localPicking ? 'Your pick' : 'Opponent picking'}</h2>
           </div>
           <div class="pick-clock" class:urgent={pickSecondsLeft !== null && pickSecondsLeft <= 10}>
             {pickSecondsLeft === null ? '—' : `${pickSecondsLeft}s`}
@@ -403,9 +385,9 @@
         <RivalConsideration consideration={controller.consideration} />
         <div class="board-solo">
           <div class="board-column">
-            <h3>Your offers</h3>
+            <h3>{localPicking ? 'Your offers' : 'Opponent offers'}</h3>
             <DraftBoard
-              offers={controller.localPicks}
+              offers={controller.visiblePicks}
               active={controller.activeTurn}
               round={(controller.roundIndex ?? 0) + 1}
               presentation={controller.snapshot.settings.presentation}
@@ -865,13 +847,6 @@
   }
   .seat-dot.online {
     background: var(--color-positive);
-  }
-  .seat-ready {
-    color: var(--color-muted-foreground);
-  }
-  .seat-ready.joined {
-    color: var(--color-positive);
-    font-weight: 600;
   }
   .lobby-rules {
     margin: 24px 0;

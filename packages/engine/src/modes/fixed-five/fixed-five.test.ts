@@ -59,13 +59,19 @@ import {
   duelAlternationHolds,
   duelCurrentPicker,
   isDuelComplete,
+  repositionDuelPlayer,
   rerollDuel,
+  type DuelDraftPick,
+  type DuelDraftState,
 } from './duel.ts';
 import {
   claimSandboxDuelPlayer,
   createSandboxDuelDraft,
+  repositionSandboxDuelPlayer,
   sandboxDuelPicker,
   sandboxDuelSnakeOrderHolds,
+  type SandboxDuelPick,
+  type SandboxDuelState,
 } from './sandbox-duel.ts';
 import {
   chooseAutopick,
@@ -663,6 +669,263 @@ describe('sandbox snake draft', () => {
         actor: sandboxDuelPicker(claimed),
       }),
     ).toThrow(/already claimed/);
+  });
+});
+describe('multiplayer repositioning', () => {
+  const chainPlayers: Array<{ playerId: PlayerId; positions: Position[] }> = [
+    { playerId: pid('r-a'), positions: ['PG', 'SF'] },
+    { playerId: pid('r-e'), positions: ['SG'] },
+    { playerId: pid('r-b'), positions: ['SF', 'PF'] },
+    { playerId: pid('r-c'), positions: ['PF', 'C'] },
+    { playerId: pid('r-d'), positions: ['C', 'PG'] },
+  ];
+  function chainAssets(): {
+    catalog: ClassicDraftCatalog;
+    byId: Map<string, FixedFiveCandidate>;
+  } {
+    const catalog: ClassicDraftCatalog = [
+      { franchiseId: fid('lakers'), eraId: eid('1990s'), players: chainPlayers },
+    ];
+    const pool: FixedFiveCandidate[] = chainPlayers.map((player, index) => ({
+      playerId: player.playerId,
+      playerVersionId: `pv-${player.playerId}`,
+      positions: player.positions,
+      selectionScore: 90 - index,
+      franchiseId: fid('lakers'),
+      eraId: eid('1990s'),
+    }));
+    return { catalog, byId: new Map(pool.map((candidate) => [candidate.playerId, candidate])) };
+  }
+  function duelPick(
+    ordinal: number,
+    participantId: 'p1' | 'p2',
+    playerId: string,
+    slotIndex: 0 | 1 | 2 | 3 | 4,
+  ): DuelDraftPick {
+    return {
+      pickOrdinal: ordinal,
+      participantId,
+      playerId: pid(playerId),
+      playerVersionId: `pv-${playerId}`,
+      franchiseId: fid('lakers'),
+      eraId: eid('1990s'),
+      slotIndex,
+    };
+  }
+  function sandboxPick(
+    ordinal: number,
+    participantId: 'p1' | 'p2',
+    playerId: string,
+    slotIndex: 0 | 1 | 2 | 3 | 4,
+  ): SandboxDuelPick {
+    return {
+      pickOrdinal: ordinal,
+      participantId,
+      playerId: pid(playerId),
+      playerVersionId: `pv-${playerId}`,
+      slotIndex,
+    };
+  }
+  const rerollTokens = { franchiseSpent: false, eraSpent: false };
+  it('repositions a duel player through a deep chain without changing the turn', () => {
+    const { catalog, byId } = chainAssets();
+    const state: DuelDraftState = {
+      rootSeed: ROOT,
+      firstPicker: 'p1',
+      pickOrdinal: 5,
+      currentRoll: null,
+      picks: [
+        duelPick(0, 'p1', 'r-a', 0),
+        duelPick(1, 'p2', 'r-e', 1),
+        duelPick(2, 'p1', 'r-b', 2),
+        duelPick(3, 'p2', 'r-c', 3),
+        duelPick(4, 'p1', 'r-d', 4),
+      ],
+      claimedPairs: [],
+      claimedVersionIds: chainPlayers.map((player) => `pv-${player.playerId}`),
+      rerolls: { p1: { ...rerollTokens }, p2: { ...rerollTokens } },
+      status: 'drafting',
+    };
+    expect(duelCurrentPicker(state)).toBe('p2');
+    const moved = repositionDuelPlayer(state, catalog, byId, {
+      playerId: pid('r-a'),
+      slotIndex: 2,
+      actor: 'p1',
+    });
+    expect(moved.picks.map((pick) => [pick.playerId, pick.slotIndex])).toEqual([
+      [pid('r-a'), 2],
+      [pid('r-e'), 1],
+      [pid('r-b'), 3],
+      [pid('r-c'), 3],
+      [pid('r-d'), 4],
+    ]);
+    expect(moved.pickOrdinal).toBe(5);
+    expect(moved.currentRoll).toBeNull();
+    expect(moved.status).toBe('drafting');
+    expect(duelAlternationHolds(moved)).toBe(true);
+  });
+  it('rejects duel repositions that are not owned, illegal, or locked', () => {
+    const { catalog, byId } = chainAssets();
+    const state: DuelDraftState = {
+      rootSeed: ROOT,
+      firstPicker: 'p1',
+      pickOrdinal: 2,
+      currentRoll: null,
+      picks: [duelPick(0, 'p1', 'r-a', 0), duelPick(1, 'p2', 'r-e', 1)],
+      claimedPairs: [],
+      claimedVersionIds: ['pv-r-a', 'pv-r-e'],
+      rerolls: { p1: { ...rerollTokens }, p2: { ...rerollTokens } },
+      status: 'drafting',
+    };
+    expect(() =>
+      repositionDuelPlayer(state, catalog, byId, {
+        playerId: pid('r-e'),
+        slotIndex: 3,
+        actor: 'p1',
+      }),
+    ).toThrow(/not on p1's five/);
+    expect(() =>
+      repositionDuelPlayer(state, catalog, byId, {
+        playerId: pid('r-a'),
+        slotIndex: 1,
+        actor: 'p1',
+      }),
+    ).toThrow(/cannot play slot/);
+    expect(() =>
+      repositionDuelPlayer({ ...state, status: 'complete' }, catalog, byId, {
+        playerId: pid('r-a'),
+        slotIndex: 2,
+        actor: 'p1',
+      }),
+    ).toThrow(/requires a drafting state/);
+  });
+  it('allows a duel claim to displace and rejects it under legacy semantics', () => {
+    const catalog: ClassicDraftCatalog = [
+      {
+        franchiseId: fid('lakers'),
+        eraId: eid('1990s'),
+        players: [
+          { playerId: pid('r-a'), positions: ['PG', 'SG'] },
+          { playerId: pid('r-x'), positions: ['PG'] },
+        ],
+      },
+      {
+        franchiseId: fid('celtics'),
+        eraId: eid('1990s'),
+        players: [{ playerId: pid('r-y'), positions: ['SG'] }],
+      },
+    ];
+    const byId = new Map<string, FixedFiveCandidate>(
+      [
+        { playerId: 'r-a', positions: ['PG', 'SG'] as Position[], franchiseId: 'lakers' },
+        { playerId: 'r-x', positions: ['PG'] as Position[], franchiseId: 'lakers' },
+        { playerId: 'r-y', positions: ['SG'] as Position[], franchiseId: 'celtics' },
+      ].map((def) => [
+        def.playerId,
+        {
+          playerId: pid(def.playerId),
+          playerVersionId: `pv-${def.playerId}`,
+          positions: def.positions,
+          selectionScore: 80,
+          franchiseId: fid(def.franchiseId),
+          eraId: eid('1990s'),
+        },
+      ]),
+    );
+    const state: DuelDraftState = {
+      rootSeed: ROOT,
+      firstPicker: 'p1',
+      pickOrdinal: 0,
+      currentRoll: { franchiseId: fid('lakers'), eraId: eid('1990s') },
+      picks: [duelPick(0, 'p1', 'r-a', 0)],
+      claimedPairs: [],
+      claimedVersionIds: ['pv-r-a'],
+      rerolls: { p1: { ...rerollTokens }, p2: { ...rerollTokens } },
+      status: 'drafting',
+    };
+    const claimed = claimDuelPlayer(
+      state,
+      catalog,
+      byId,
+      { playerId: pid('r-x'), slotIndex: 0, actor: 'p1' },
+      context,
+      { allowDisplacement: true },
+    );
+    expect(claimed.picks.map((pick) => [pick.playerId, pick.slotIndex])).toEqual([
+      [pid('r-a'), 1],
+      [pid('r-x'), 0],
+    ]);
+    const legacyState: DuelDraftState = { ...state, claimedVersionIds: ['pv-r-a'] };
+    expect(() =>
+      claimDuelPlayer(
+        legacyState,
+        catalog,
+        byId,
+        { playerId: pid('r-x'), slotIndex: 0, actor: 'p1' },
+        context,
+        { allowDisplacement: false },
+      ),
+    ).toThrow(/already filled/);
+  });
+  it('repositions and displaces sandbox snake picks while preserving feasibility', () => {
+    const pool = candidatePool();
+    const state: SandboxDuelState = {
+      rootSeed: ROOT,
+      firstPicker: 'p1',
+      order: 'snake',
+      pickOrdinal: 5,
+      picks: [
+        sandboxPick(0, 'p1', 'p-g3', 0),
+        sandboxPick(1, 'p2', 'p-g1', 0),
+        sandboxPick(2, 'p2', 'p-f1', 2),
+        sandboxPick(3, 'p1', 'p-f2', 3),
+        sandboxPick(4, 'p1', 'p-c1', 4),
+      ],
+      status: 'drafting',
+    };
+    const moved = repositionSandboxDuelPlayer(state, pool, {
+      playerId: pid('p-g3'),
+      slotIndex: 1,
+      actor: 'p1',
+    });
+    expect(moved.picks.map((pick) => [pick.playerId, pick.slotIndex])).toEqual([
+      [pid('p-g3'), 1],
+      [pid('p-g1'), 0],
+      [pid('p-f1'), 2],
+      [pid('p-f2'), 3],
+      [pid('p-c1'), 4],
+    ]);
+    expect(moved.pickOrdinal).toBe(5);
+    const claimed = claimSandboxDuelPlayer(
+      { ...state, pickOrdinal: 0, firstPicker: 'p1', picks: [sandboxPick(0, 'p1', 'p-g3', 0)] },
+      pool,
+      { playerId: pid('p-g1'), slotIndex: 0, actor: 'p1' },
+      { allowDisplacement: true },
+    );
+    expect(claimed.picks.map((pick) => [pick.playerId, pick.slotIndex])).toEqual([
+      [pid('p-g3'), 1],
+      [pid('p-g1'), 0],
+    ]);
+  });
+  it('rejects sandbox snake repositions that lose completion feasibility', () => {
+    const tinyPool = candidatePool().filter((candidate) =>
+      ['p-g3', 'p-f1', 'p-c1'].includes(candidate.playerId),
+    );
+    const state: SandboxDuelState = {
+      rootSeed: ROOT,
+      firstPicker: 'p1',
+      order: 'snake',
+      pickOrdinal: 2,
+      picks: [sandboxPick(0, 'p1', 'p-g3', 1), sandboxPick(1, 'p1', 'p-f1', 2)],
+      status: 'drafting',
+    };
+    expect(() =>
+      repositionSandboxDuelPlayer(state, tinyPool, {
+        playerId: pid('p-g3'),
+        slotIndex: 0,
+        actor: 'p1',
+      }),
+    ).toThrow(/no legal completion/);
   });
 });
 describe('timeout autopick', () => {

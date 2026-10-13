@@ -4,7 +4,7 @@
   import { Shuffle, Rocket } from '@lucide/svelte';
   import HavocDraftCard from './HavocDraftCard.svelte';
   import HavocLineupLock from './HavocLineupLock.svelte';
-  import { lineupSlotsFromPicks } from './havoc-presentation';
+  import { havocOwnedExclusiveMutationIds, lineupSlotsFromPicks } from './havoc-presentation';
   let {
     draft,
     busy,
@@ -26,6 +26,9 @@
   const complete = $derived(draft.status === 'complete');
   const slots = $derived(lineupSlotsFromPicks(draft.picks));
   const positions = ['PG', 'SG', 'SF', 'PF', 'C'];
+  const ownedExclusive = $derived(havocOwnedExclusiveMutationIds(draft.picks));
+  const cardUnavailable = (card: HavocDraftState['cards'][number]): boolean =>
+    card.mutations.some((entry) => ownedExclusive.has(entry.mutationId));
 </script>
 
 <div data-havoc-draft-board>
@@ -67,7 +70,14 @@
     <section aria-label="Current offer">
       <ul class="h-cards">
         {#each draft.cards as card (card.cardId)}<li class="flex min-w-0">
-            <HavocDraftCard {card} {mode} {busy} {franchiseName} {onPick} />
+            <HavocDraftCard
+              {card}
+              {mode}
+              {busy}
+              {franchiseName}
+              {onPick}
+              unavailable={cardUnavailable(card)}
+            />
           </li>{/each}
       </ul>
     </section>

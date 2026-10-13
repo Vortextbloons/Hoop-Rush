@@ -186,18 +186,18 @@ export function effectiveFor(
         height += entry.sampledHeightDelta ?? 8;
         break;
       case 'super-soldier':
-        ratings.speed = 99;
-        ratings.strength = 99;
-        ratings.vertical = 99;
+        ratings.speed = 90;
+        ratings.strength = 90;
+        ratings.vertical = 90;
         break;
       case 'point-god':
         ratings.passing = 99;
         ratings.ballHandling = 99;
-        tendencies.passRate = 95;
+        tendencies.passRate = 85;
         break;
       case 'sniper-gene':
         ratings.threePoint = 97;
-        tendencies.threePointRate = 90;
+        tendencies.threePointRate = 80;
         break;
       case 'trigger-happy':
         ratings.insideScoring = 99;
@@ -483,8 +483,8 @@ export function buildFakeGameResult(summary: HavocGameSummary): HavocGameResult 
     variant: summary.variant,
     seed: summary.seed,
     engineVersion: 'm3-engine-v24',
-    rulesVersion: 'havoc-rules-v3',
-    mutationCatalogVersion: 'havoc-mutations-v3',
+    rulesVersion: 'havoc-rules-v4',
+    mutationCatalogVersion: 'havoc-mutations-v4',
     profileVersion: 'm2-2010s-fixture-v1',
     dataVersion: 'data-v1',
     humanSide: summary.humanSide,
@@ -1010,8 +1010,8 @@ export function buildCloneGameResult(gameNumber = 1): HavocGameResult {
     variant: 'havoc',
     seed: seedFromString(`havoc-fake-clone-${String(gameNumber)}`),
     engineVersion: 'm3-engine-v24',
-    rulesVersion: 'havoc-rules-v3',
-    mutationCatalogVersion: 'havoc-mutations-v3',
+    rulesVersion: 'havoc-rules-v4',
+    mutationCatalogVersion: 'havoc-mutations-v4',
     profileVersion: 'm2-2010s-fixture-v1',
     dataVersion: 'data-v1',
     humanSide: 'home',

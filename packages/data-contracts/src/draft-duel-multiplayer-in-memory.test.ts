@@ -160,6 +160,31 @@ async function playDraft(
 }
 
 describe('in-memory Draft Duel transport', () => {
+  it('lets the host start with two online players without ready commands', async () => {
+    const transport = createInMemoryDraftDuelTransport({ seed: 'no-ready' });
+    const { roomId } = await createAndJoin(transport);
+    expect((await snapshot(transport, roomId)).members.every((member) => !member.ready)).toBe(true);
+    const guest = await submit(transport, roomId, 'guest-start', 'p2', { kind: 'start' });
+    expect(guest.rejectionCode).toBe('membership');
+    const started = await submit(transport, roomId, 'host-start', 'p1', { kind: 'start' });
+    expect(started.accepted).toBe(true);
+    expect((await snapshot(transport, roomId)).phase).toBe('drafting');
+  });
+
+  it('keeps the draft in the lobby while the opponent is absent', async () => {
+    const transport = createInMemoryDraftDuelTransport({ seed: 'missing-opponent' });
+    const created = await transport.create({
+      fairness: 'fair',
+      presentation: 'ratings',
+      versions: locks(),
+    });
+    const started = await submit(transport, created.snapshot.roomId, 'host-start', 'p1', {
+      kind: 'start',
+    });
+    expect(started.rejectionCode).toBe('not-ready');
+    expect((await snapshot(transport, created.snapshot.roomId)).phase).toBe('lobby');
+  });
+
   it('derives first picker and home winner from seed bytes like the engine', () => {
     expect(draftDuelFirstPickerFor('0123456789abcdef0123456789abcdef')).toBe('p2');
     expect(draftDuelHomeWinnerFor('0123456789abcdef0123456789abcdef')).toBe('p2');

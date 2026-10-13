@@ -15,12 +15,15 @@ import { catalogEntryForVersion } from './catalog.ts';
 import type { DraftDuelCatalog } from './catalog.ts';
 import {
   assessDraftDuelOffers,
+  buildDraftDuelSafetyBase,
   buildDraftDuelSafetyInput,
   draftDuelCardPlayableAtSlot,
   draftDuelClaimedPlayerIds,
   draftDuelFallbackPlacements,
   draftDuelOccupiedSlotIndexes,
+  draftDuelParticipantCompletionPossible,
   draftDuelPickerForOrdinal,
+  draftDuelRepositionPlan,
   otherDraftDuelParticipant,
   type DraftDuelRoundOffers,
   type DraftDuelSlotPlacement,
@@ -30,7 +33,7 @@ import { createRng } from '../../sim/rng.ts';
 import { draftDuelFirstPicker, draftDuelTimeoutSeed, draftDuelTimeoutSeedPath } from './seeds.ts';
 
 export type DraftDuelDraftErrorCode =
-  'turn' | 'not-offered' | 'claimed' | 'slot' | 'position' | 'illegal' | 'phase';
+  'turn' | 'not-offered' | 'claimed' | 'slot' | 'position' | 'completion' | 'illegal' | 'phase';
 
 export class DraftDuelDraftError extends Error {
   readonly code: DraftDuelDraftErrorCode;
@@ -120,6 +123,7 @@ export function isDraftDuelComplete(state: DraftDuelDraft): boolean {
 export function draftDuelLegalPicks(
   state: DraftDuelDraft,
   catalog: DraftDuelCatalog,
+  options?: { allowDisplacement?: boolean },
 ): DraftDuelOfferedPick[] {
   if (state.status === 'complete') {
     const finalRound = state.rounds[state.rounds.length - 1];
@@ -141,7 +145,47 @@ export function draftDuelLegalPicks(
       `no round offers for pick ordinal ${String(state.pickOrdinal)}`,
     );
   }
-  return assessDraftDuelOffers(buildDraftDuelSafetyInput(state, catalog, round.offers), picker);
+  return assessDraftDuelOffers(
+    buildDraftDuelSafetyInput(state, catalog, round.offers),
+    picker,
+    options,
+  );
+}
+
+function participantPlacements(
+  state: DraftDuelDraft,
+  participantId: DraftDuelParticipantId,
+): DraftDuelSlotPlacement[] {
+  const placements: DraftDuelSlotPlacement[] = [];
+  for (const round of state.rounds) {
+    for (const pick of round.picks) {
+      if (pick.participantId !== participantId) continue;
+      if (pick.slotIndex === undefined) continue;
+      placements.push({ slotIndex: pick.slotIndex, card: pick.card });
+    }
+  }
+  return placements;
+}
+
+function rewriteParticipantSlots(
+  state: DraftDuelDraft,
+  participantId: DraftDuelParticipantId,
+  placements: readonly DraftDuelSlotPlacement[],
+): DraftDuelDraft {
+  const slotByVersion = new Map(
+    placements.map((placement) => [placement.card.playerVersionId, placement.slotIndex]),
+  );
+  return {
+    ...state,
+    rounds: state.rounds.map((round) => ({
+      ...round,
+      picks: round.picks.map((pick) => {
+        if (pick.participantId !== participantId) return pick;
+        const slotIndex = slotByVersion.get(pick.card.playerVersionId);
+        return slotIndex === undefined ? pick : { ...pick, slotIndex };
+      }),
+    })),
+  };
 }
 
 export function draftDuelRoster(
@@ -198,7 +242,9 @@ export function applyDraftDuelPick(
   state: DraftDuelDraft,
   catalog: DraftDuelCatalog,
   input: DraftDuelPickInput,
+  options?: { allowDisplacement?: boolean },
 ): DraftDuelDraft {
+  const allowDisplacement = options?.allowDisplacement ?? false;
   if (state.status !== 'drafting' || state.pickOrdinal >= 10) {
     throw new DraftDuelDraftError('phase', 'draft duel is not drafting');
   }
@@ -233,7 +279,7 @@ export function applyDraftDuelPick(
       `${input.playerId}/${input.playerVersionId} is missing from the offers`,
     );
   }
-  const assessed = draftDuelLegalPicks(state, catalog)[slot];
+  const assessed = draftDuelLegalPicks(state, catalog, options)[slot];
   let slotIndex: number;
   if (input.slotIndex !== undefined) {
     const requested = input.slotIndex;
@@ -243,7 +289,7 @@ export function applyDraftDuelPick(
         `slot ${String(requested)} is outside the lineup range 0..4`,
       );
     }
-    if (draftDuelOccupiedSlotIndexes(state, picker).has(requested)) {
+    if (draftDuelOccupiedSlotIndexes(state, picker).has(requested) && !allowDisplacement) {
       throw new DraftDuelDraftError(
         'slot',
         `slot ${String(requested)} is already occupied for ${picker}`,
@@ -273,6 +319,17 @@ export function applyDraftDuelPick(
     }
     slotIndex = Math.min(...legalSlots);
   }
+  let base = state;
+  if (allowDisplacement && draftDuelOccupiedSlotIndexes(state, picker).has(slotIndex)) {
+    const plan = draftDuelRepositionPlan(participantPlacements(state, picker), card, slotIndex);
+    if (plan === null) {
+      throw new DraftDuelDraftError(
+        'illegal',
+        `pick ${input.playerId}/${input.playerVersionId} at slot ${String(slotIndex)} cannot be repositioned`,
+      );
+    }
+    base = rewriteParticipantSlots(state, picker, plan);
+  }
   const pick: DraftDuelPick = {
     pickOrdinal: state.pickOrdinal,
     round: round.round,
@@ -283,9 +340,9 @@ export function applyDraftDuelPick(
   };
   const pickOrdinal = state.pickOrdinal + 1;
   const next: DraftDuelDraft = {
-    ...state,
+    ...base,
     pickOrdinal,
-    rounds: state.rounds.map((entry, index) =>
+    rounds: base.rounds.map((entry, index) =>
       index === roundIndex ? { ...entry, picks: [...entry.picks, pick] } : entry,
     ),
     status: pickOrdinal === 10 ? 'complete' : 'drafting',
@@ -306,12 +363,13 @@ export function applyDraftDuelPick(
 export function draftDuelTimeoutPick(
   state: DraftDuelDraft,
   catalog: DraftDuelCatalog,
+  options?: { allowDisplacement?: boolean },
 ): DraftDuelTimeoutPick {
   if (state.status !== 'drafting') {
     throw new DraftDuelDraftError('phase', 'draft duel is not drafting');
   }
   const picker = draftDuelCurrentPicker(state);
-  const legal = draftDuelLegalPicks(state, catalog).filter(
+  const legal = draftDuelLegalPicks(state, catalog, options).filter(
     (option) => option.available && (option.legalSlots?.length ?? 0) > 0,
   );
   const optionsByPlayer = new Map<string, DraftDuelOfferedPick[]>();
@@ -328,8 +386,8 @@ export function draftDuelTimeoutPick(
     );
   }
   const rng = createRng(draftDuelTimeoutSeed(state.rootSeed, picker, state.pickOrdinal));
-  const options = rng.pick(players);
-  const option = options.length === 1 ? options[0] : rng.pick(options);
+  const choices = rng.pick(players);
+  const option = choices.length === 1 ? choices[0] : rng.pick(choices);
   if (!option) {
     throw new DraftDuelDraftError('illegal', 'timeout pick lost its card');
   }
@@ -344,4 +402,62 @@ export function draftDuelTimeoutPick(
     slotIndex: Math.min(...legalSlots),
     seedPath: draftDuelTimeoutSeedPath(picker, state.pickOrdinal),
   };
+}
+
+export interface DraftDuelRepositionInput {
+  participantId: DraftDuelParticipantId;
+  playerVersionId: string;
+  slotIndex: number;
+}
+
+export function repositionDraftDuelCard(
+  state: DraftDuelDraft,
+  catalog: DraftDuelCatalog,
+  input: DraftDuelRepositionInput,
+): DraftDuelDraft {
+  if (state.status !== 'drafting') {
+    throw new DraftDuelDraftError('phase', 'draft duel is not drafting');
+  }
+  const placements = participantPlacements(state, input.participantId);
+  const subject = placements.find(
+    (placement) => placement.card.playerVersionId === input.playerVersionId,
+  );
+  if (!subject) {
+    throw new DraftDuelDraftError(
+      'illegal',
+      `${input.playerVersionId} is not placed on ${input.participantId}'s five`,
+    );
+  }
+  if (subject.slotIndex === input.slotIndex) return state;
+  if (!Number.isInteger(input.slotIndex) || input.slotIndex < 0 || input.slotIndex > 4) {
+    throw new DraftDuelDraftError(
+      'slot',
+      `slot ${String(input.slotIndex)} is outside the lineup range 0..4`,
+    );
+  }
+  if (!draftDuelCardPlayableAtSlot(subject.card, input.slotIndex)) {
+    throw new DraftDuelDraftError(
+      'position',
+      `${subject.card.playerId}/${subject.card.playerVersionId} cannot play slot ${String(input.slotIndex)}`,
+    );
+  }
+  const plan = draftDuelRepositionPlan(placements, subject.card, input.slotIndex);
+  if (plan === null) {
+    throw new DraftDuelDraftError(
+      'illegal',
+      `no legal reposition for ${input.playerVersionId} to slot ${String(input.slotIndex)}`,
+    );
+  }
+  const base = buildDraftDuelSafetyBase(state, catalog);
+  const after: typeof base = {
+    ...base,
+    placements: { ...base.placements, [input.participantId]: plan },
+  };
+  if (!draftDuelParticipantCompletionPossible(after, input.participantId)) {
+    throw new DraftDuelDraftError(
+      'completion',
+      `repositioning ${input.playerVersionId} to slot ${String(input.slotIndex)} leaves no legal completion`,
+    );
+  }
+  return rewriteParticipantSlots(state, input.participantId, plan);
 }

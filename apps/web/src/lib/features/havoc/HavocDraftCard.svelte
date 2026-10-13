@@ -17,12 +17,14 @@
     busy,
     franchiseName = (id: string) => id,
     onPick,
+    unavailable = false,
   }: {
     card: HavocDraftCard;
     mode: 'effective' | 'original';
     busy: boolean;
     franchiseName?: (id: string) => string;
     onPick: (id: string) => void;
+    unavailable?: boolean;
   } = $props();
   const physical = $derived(card.effective.physical);
   const affectedRatings = $derived(
@@ -152,12 +154,17 @@
         {/each}
       </details>
     </div>
+    {#if unavailable}<p class="h-copy text-xs mt-2" data-havoc-exclusive-taken>
+        One per roster — this power is already on your team.
+      </p>{/if}
     <button
       class="h-button"
-      disabled={busy}
+      disabled={busy || unavailable}
       onclick={() => onPick(card.cardId)}
       aria-label="Draft {card.source.displayName} — {card.nickname}"
-      >Draft {card.source.displayName.split(' ').at(-1)}</button
+      >{unavailable
+        ? 'Power already drafted'
+        : `Draft ${card.source.displayName.split(' ').at(-1)}`}</button
     >
   </div>
 </article>

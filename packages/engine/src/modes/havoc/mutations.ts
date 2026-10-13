@@ -43,12 +43,12 @@ export const HAVOC_MUTATION_DEFINITIONS: readonly HavocMutationDefinition[] = [
     mutationId: 'super-soldier',
     tier: 1,
     name: 'Super Soldier',
-    description: 'Raises speed, strength, and vertical to 99.',
+    description: 'Raises speed, strength, and vertical to 90.',
     downside: '',
     operations: [
-      { op: 'raise-rating', field: 'speed', value: 99 },
-      { op: 'raise-rating', field: 'strength', value: 99 },
-      { op: 'raise-rating', field: 'vertical', value: 99 },
+      { op: 'raise-rating', field: 'speed', value: 90 },
+      { op: 'raise-rating', field: 'strength', value: 90 },
+      { op: 'raise-rating', field: 'vertical', value: 90 },
     ],
     eventRules: [],
   }),
@@ -56,11 +56,11 @@ export const HAVOC_MUTATION_DEFINITIONS: readonly HavocMutationDefinition[] = [
     mutationId: 'sniper-gene',
     tier: 1,
     name: 'Sniper Gene',
-    description: 'Raises three-point rating to 97 and three-point shot rate to 90.',
+    description: 'Raises three-point rating to 97 and three-point shot rate to 80.',
     downside: '',
     operations: [
       { op: 'raise-rating', field: 'threePoint', value: 97 },
-      { op: 'raise-tendency', field: 'threePointRate', value: 90 },
+      { op: 'raise-tendency', field: 'threePointRate', value: 80 },
     ],
     eventRules: [],
   }),
@@ -68,12 +68,12 @@ export const HAVOC_MUTATION_DEFINITIONS: readonly HavocMutationDefinition[] = [
     mutationId: 'point-god',
     tier: 1,
     name: 'Point God',
-    description: 'Raises passing and ball handling to 99 and pass rate to 95.',
+    description: 'Raises passing and ball handling to 99 and pass rate to 85.',
     downside: '',
     operations: [
       { op: 'raise-rating', field: 'passing', value: 99 },
       { op: 'raise-rating', field: 'ballHandling', value: 99 },
-      { op: 'raise-tendency', field: 'passRate', value: 95 },
+      { op: 'raise-tendency', field: 'passRate', value: 85 },
     ],
     eventRules: [],
   }),
@@ -96,12 +96,12 @@ export const HAVOC_MUTATION_DEFINITIONS: readonly HavocMutationDefinition[] = [
     tier: 1,
     name: 'Glass Eater',
     description:
-      'Raises offensive and defensive rebounding to 99 and offensive glass crash rate to 90.',
+      'Raises offensive and defensive rebounding to 99 and offensive glass crash rate to 80.',
     downside: '',
     operations: [
       { op: 'raise-rating', field: 'offensiveRebound', value: 99 },
       { op: 'raise-rating', field: 'defensiveRebound', value: 99 },
-      { op: 'raise-tendency', field: 'crashOffensiveGlassRate', value: 90 },
+      { op: 'raise-tendency', field: 'crashOffensiveGlassRate', value: 80 },
     ],
     eventRules: [],
   }),
@@ -327,6 +327,7 @@ export const HAVOC_MUTATION_DEFINITIONS: readonly HavocMutationDefinition[] = [
       "Ends when the owner fouls out; rebound resets stay bounded by each side's active limit.",
     operations: [],
     eventRules: ['time-lord'],
+    teamExclusive: true,
   }),
   defineHavocMutation({
     mutationId: 'body-snatcher',
@@ -347,6 +348,7 @@ export const HAVOC_MUTATION_DEFINITIONS: readonly HavocMutationDefinition[] = [
     downside: 'Three-pointers are worth two less.',
     operations: [],
     eventRules: ['reverse-basketball'],
+    teamExclusive: true,
   }),
   defineHavocMutation({
     mutationId: 'double-or-nothing',
@@ -367,6 +369,7 @@ export const HAVOC_MUTATION_DEFINITIONS: readonly HavocMutationDefinition[] = [
       'Does not cap dimensions, tendencies, or original Overall; ends when the owner leaves.',
     operations: [],
     eventRules: ['the-great-equalizer'],
+    teamExclusive: true,
   }),
 ];
 
@@ -380,4 +383,18 @@ export function havocMutationDefinitionOf(mutationId: HavocMutationId): HavocMut
     throw new Error(`unknown havoc mutation definition ${mutationId}`);
   }
   return definition;
+}
+
+export function teamExclusiveMutationIdsOf(
+  definitions: readonly HavocMutationDefinition[],
+): ReadonlySet<HavocMutationId> {
+  return new Set(
+    definitions
+      .filter((definition) => definition.teamExclusive === true)
+      .map((definition) => definition.mutationId),
+  );
+}
+
+export function havocMutationIsTeamExclusive(mutationId: HavocMutationId): boolean {
+  return havocMutationDefinitionOf(mutationId).teamExclusive === true;
 }

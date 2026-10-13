@@ -16,6 +16,7 @@ const STALE_RETRY_SAFE_KINDS: ReadonlySet<FixedFiveCommandPayload['kind']> = new
   'classic-pick',
   'classic-reposition',
   'duel-claim',
+  'duel-reposition',
   'sandbox-place',
   'sandbox-reposition',
   'sandbox-remove',

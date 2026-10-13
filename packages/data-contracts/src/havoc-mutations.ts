@@ -207,6 +207,7 @@ export const havocMutationDefinitionSchema = z
     downside: z.string().max(320),
     operations: z.array(havocProfileOperationSchema).max(10),
     eventRules: z.array(havocEventRuleIdSchema).max(1),
+    teamExclusive: z.boolean().optional(),
   })
   .superRefine((definition, ctx) => {
     if (definition.tier === 1) {

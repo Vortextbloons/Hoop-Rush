@@ -13,6 +13,7 @@ import type {
   HavocGameTape,
   HavocLockedInputs,
   HavocMutationDefinition,
+  HavocMutationId,
   HavocReport,
   HavocRunState,
   HavocSeasonAggregate,
@@ -56,6 +57,8 @@ export interface GenerateHavocOfferInput {
   readonly offerIndex: number;
   readonly draftedClaimKeys: readonly string[];
   readonly rerollUsed: boolean;
+  /** Team-exclusive mutations already owned by drafted picks; offered bundles omit them. */
+  readonly ownedTeamExclusiveMutationIds?: readonly HavocMutationId[];
 }
 
 export type GenerateHavocOffer = (

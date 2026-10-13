@@ -1,6 +1,6 @@
 export const DRAFT_DUEL_ROOM_SCHEMA_VERSION = 1;
 export const DRAFT_DUEL_ROOM_PROTOCOL_VERSION = 1;
-export const DRAFT_DUEL_MULTIPLAYER_VERSION = 'draft-duel-multiplayer-v1';
+export const DRAFT_DUEL_MULTIPLAYER_VERSION = 'draft-duel-multiplayer-v2';
 export const DRAFT_DUEL_AUTOPICK_VERSION = 'draft-duel-autopick-v1';
 export const DRAFT_DUEL_WORKER_WIRE_VERSION = 1;
 export const DRAFT_DUEL_ENVELOPE_MAX_BYTES = 32 * 1024;

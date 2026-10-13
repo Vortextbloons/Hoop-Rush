@@ -821,6 +821,7 @@ export class DraftDuelSession {
         fairness: snapshot.settings.fairness,
         catalog: assets.catalog,
         commands: this.commands,
+        multiplayerVersion: snapshot.settings.versions.multiplayerVersion,
       });
       this.publish();
     } catch (error) {

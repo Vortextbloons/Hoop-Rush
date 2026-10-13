@@ -206,6 +206,12 @@ export const draftDuelPickPayloadSchema = z.object({
   playerVersionId: playerVersionIdSchema,
   slotIndex: z.number().int().min(0).max(4).optional(),
 });
+export const draftDuelRepositionPayloadSchema = z.object({
+  kind: z.literal('reposition'),
+  playerId: playerIdSchema,
+  playerVersionId: playerVersionIdSchema,
+  slotIndex: z.number().int().min(0).max(4),
+});
 export const draftDuelTimeoutAutopickPayloadSchema = z.object({
   kind: z.literal('timeout-autopick'),
   pickOrdinal: z.number().int().min(0).max(9),
@@ -256,6 +262,7 @@ export const draftDuelCommandPayloadSchema = z.discriminatedUnion('kind', [
   draftDuelSettingsPayloadSchema,
   draftDuelStartPayloadSchema,
   draftDuelPickPayloadSchema,
+  draftDuelRepositionPayloadSchema,
   draftDuelTimeoutAutopickPayloadSchema,
   draftDuelReadyNextGamePayloadSchema,
   draftDuelBroadcastStartPayloadSchema,

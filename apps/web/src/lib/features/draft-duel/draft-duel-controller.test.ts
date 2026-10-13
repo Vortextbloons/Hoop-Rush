@@ -594,6 +594,26 @@ describe('Draft Duel ready check progression', () => {
     },
   );
 
+  it('shows the current picker offers to both viewers and keeps spectators inactive', () => {
+    const lifecycle = session as unknown as SessionLifecycle;
+    lifecycle.assets = { catalog: {} } as DraftDuelAssets;
+    lifecycle.draft = { status: 'drafting', pickOrdinal: 0 } as DraftDuelDraft;
+    vi.spyOn(engine, 'draftDuelCurrentPicker').mockReturnValue('p2');
+    const offers = [{ slot: 0, card: { cardId: 'opponent-card' }, available: true }];
+    vi.spyOn(engine, 'draftDuelLegalPicks').mockReturnValue(
+      offers as ReturnType<typeof engine.draftDuelLegalPicks>,
+    );
+    const current = lifecycle.snapshot;
+    if (!current) throw new Error('Room snapshot is missing');
+    lifecycle.applySnapshot({ ...current, phase: 'drafting' });
+    expect(controller.visiblePicks).toEqual(offers);
+    expect(controller.activeTurn).toBe(false);
+    lifecycle.participantId = 'p2';
+    lifecycle.publish();
+    expect(controller.visiblePicks).toEqual(offers);
+    expect(controller.activeTurn).toBe(true);
+  });
+
   it('displays an opponent consideration and clears it after two seconds', () => {
     const lifecycle = session as unknown as SessionLifecycle;
     const playerVersionId = playerVersionIdSchema.parse(`pv-${'7'.repeat(32)}`);

@@ -338,14 +338,7 @@
       : myCourtRows,
   );
   const pickedCount = $derived(activeCourtRows.filter((p) => p !== null).length);
-  const allowDisplacement = $derived(
-    mode !== 'duel' &&
-      !(
-        mode === 'sandbox-shared-82' &&
-        replay.mode === 'sandbox-shared-82' &&
-        replay.draftStyle === 'snake'
-      ),
-  );
+  const allowDisplacement = true;
   const rollManifest = $derived(assets.manifest);
   const rollFranchise = $derived(
     rollView && !rollView.complete
@@ -630,15 +623,8 @@
     onPick(player, slotIndex as SlotIndex);
   }
   function openPickerForCourt(player: PlayersIndexEntry) {
-    if (
-      mode === 'classic-shared-82' ||
-      (mode === 'sandbox-shared-82' &&
-        replay.mode === 'sandbox-shared-82' &&
-        replay.draftStyle === 'legacy')
-    ) {
-      openPicker(player);
-      return;
-    }
+    if (rollView?.complete || sandboxDuelView?.complete || sandboxLocked) return;
+    openPicker(player);
   }
   const takeover = $derived.by(
     (): {
@@ -775,31 +761,28 @@
           onRerollFranchise={() => onReroll('franchise')}
           onRerollEra={() => onReroll('era')}
         />
-        <details class="roll-reveal">
-          <summary>View the draft roll</summary>
-          <ClassicRollReel
-            manifest={assets.manifest}
-            franchiseId={rollView.franchiseId}
-            eraId={rollView.eraId}
-            {franchiseOptions}
-            {eraOptions}
-            axis={rollAxis}
-            spinKey={rollNonce}
-            spinId={reelSpinId}
-            spotlight={reelSpotlight}
-            announceText={mode === 'duel'
-              ? rollView.turn
-                ? `Your roll: ${rollView.label}, ${rollFranchiseDisplayName ?? rollView.franchiseId}, ${rollEraLabel}`
-                : `Rival's roll: ${rollView.label}, ${rollFranchiseDisplayName ?? rollView.franchiseId}, ${rollEraLabel}`
-              : `${rollView.label}: ${rollView.franchiseId} ${rollView.eraId}`}
-            roundLabel={mode === 'duel'
-              ? rollView.turn
-                ? `Your roll · ${rollView.label}`
-                : `Rival's roll · ${rollView.label}`
-              : rollView.label}
-            onSettled={() => {}}
-          />
-        </details>
+        <ClassicRollReel
+          manifest={assets.manifest}
+          franchiseId={rollView.franchiseId}
+          eraId={rollView.eraId}
+          {franchiseOptions}
+          {eraOptions}
+          axis={rollAxis}
+          spinKey={rollNonce}
+          spinId={reelSpinId}
+          spotlight={reelSpotlight}
+          announceText={mode === 'duel'
+            ? rollView.turn
+              ? `Your roll: ${rollView.label}, ${rollFranchiseDisplayName ?? rollView.franchiseId}, ${rollEraLabel}`
+              : `Rival's roll: ${rollView.label}, ${rollFranchiseDisplayName ?? rollView.franchiseId}, ${rollEraLabel}`
+            : `${rollView.label}: ${rollView.franchiseId} ${rollView.eraId}`}
+          roundLabel={mode === 'duel'
+            ? rollView.turn
+              ? `Your roll · ${rollView.label}`
+              : `Rival's roll · ${rollView.label}`
+            : rollView.label}
+          onSettled={() => {}}
+        />
         {#if mode === 'duel' && !rollView.turn}
           <p class="rival-watch" role="status">Watching live — your pool opens on your turn.</p>
         {/if}
@@ -975,7 +958,7 @@
         manifest={assets.manifest}
         ready={sandboxLocked}
         allowRemove={!sandboxLocked}
-        onmove={openPicker}
+        onmove={openPickerForCourt}
         onremove={(index) => onRemove(index as SlotIndex)}
       />
       <DraftValuePanel
@@ -1067,11 +1050,6 @@
     font-size: 12px;
     color: var(--color-muted-foreground);
   }
-  .roll-reveal {
-    color: var(--color-muted-foreground);
-    font-size: 11px;
-  }
-  .roll-reveal summary,
   .autopick-details summary {
     cursor: pointer;
     margin-bottom: 8px;

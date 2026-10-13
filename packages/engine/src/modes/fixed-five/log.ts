@@ -42,12 +42,14 @@ import {
   claimDuelPlayer,
   createDuelDraft,
   duelCurrentPicker,
+  repositionDuelPlayer,
   rerollDuel,
   type DuelDraftState,
 } from './duel.ts';
 import {
   claimSandboxDuelPlayer,
   createSandboxDuelDraft,
+  repositionSandboxDuelPlayer,
   sandboxDuelPicker,
   type SandboxDuelState,
 } from './sandbox-duel.ts';
@@ -130,10 +132,19 @@ function draftIdFor(roomId: string, participant: FixedFiveParticipantId): string
   return `${roomId.slice(0, 48)}:${participant}`;
 }
 
+const SNAKE_MULTIPLAYER_VERSIONS: ReadonlySet<string> = new Set([
+  'fixed-five-multiplayer-v3',
+  FIXED_FIVE_MULTIPLAYER_VERSION,
+]);
+const REPOSITION_MULTIPLAYER_VERSIONS: ReadonlySet<string> = new Set([
+  FIXED_FIVE_MULTIPLAYER_VERSION,
+]);
+
 function applyClassicPayload(
   state: ClassicDraftState,
   assets: FixedFiveDraftLogInputs,
   payload: FixedFiveCommandPayload,
+  options: { requireDrafting: boolean },
 ): ClassicDraftState {
   if (payload.kind === 'reroll') {
     const command: ClassicBuilderCommand = { kind: 'reroll', axis: payload.axis };
@@ -149,7 +160,14 @@ function applyClassicPayload(
       playerId: payload.playerId,
       slotIndex: payload.slotIndex,
     };
-    return applyClassicBuilderCommand(state, assets.catalog, command, assets.context);
+    return applyClassicBuilderCommand(
+      state,
+      assets.catalog,
+      command,
+      assets.context,
+      undefined,
+      options,
+    );
   }
   return state;
 }
@@ -187,9 +205,17 @@ function applyDuelPayload(
   assets: FixedFiveDraftLogInputs,
   actor: FixedFiveParticipantId,
   payload: FixedFiveCommandPayload,
+  options: { allowDisplacement: boolean; allowReposition: boolean },
 ): DuelDraftState {
   if (payload.kind === 'reroll') {
     return rerollDuel(state, assets.catalog, assets.poolById, payload.axis, actor, assets.context);
+  }
+  if (payload.kind === 'duel-reposition') {
+    return repositionDuelPlayer(state, assets.catalog, assets.poolById, {
+      playerId: payload.playerId,
+      slotIndex: payload.slotIndex,
+      actor,
+    });
   }
   if (
     payload.kind === 'duel-claim' ||
@@ -202,6 +228,7 @@ function applyDuelPayload(
       assets.poolById,
       { playerId: payload.playerId, slotIndex: payload.slotIndex, actor },
       assets.context,
+      { allowDisplacement: options.allowDisplacement },
     );
   }
   return state;
@@ -211,15 +238,28 @@ function applySandboxDuelPayload(
   state: SandboxDuelState,
   assets: FixedFiveDraftLogInputs,
   command: FixedFiveCommand,
+  options: { allowDisplacement: boolean; allowReposition: boolean },
 ): SandboxDuelState {
   const payload = command.payload;
-  if (payload.kind === 'sandbox-place' || payload.kind === 'timeout-autopick') {
-    return claimSandboxDuelPlayer(state, assets.pool, {
+  if (payload.kind === 'sandbox-reposition') {
+    return repositionSandboxDuelPlayer(state, assets.pool, {
       playerId: payload.playerId,
-      playerVersionId: payload.playerVersionId,
       slotIndex: payload.slotIndex,
       actor: command.actorParticipantId,
     });
+  }
+  if (payload.kind === 'sandbox-place' || payload.kind === 'timeout-autopick') {
+    return claimSandboxDuelPlayer(
+      state,
+      assets.pool,
+      {
+        playerId: payload.playerId,
+        playerVersionId: payload.playerVersionId,
+        slotIndex: payload.slotIndex,
+        actor: command.actorParticipantId,
+      },
+      { allowDisplacement: options.allowDisplacement },
+    );
   }
   return state;
 }
@@ -227,22 +267,37 @@ function applySandboxDuelPayload(
 function isDraftPayload(
   mode: FixedFiveRoomMode,
   kind: FixedFiveCommandPayload['kind'],
-  sandboxDuel = false,
-  sandboxSnake = false,
+  options: {
+    sandboxDuel?: boolean;
+    sandboxSnake?: boolean;
+    allowReposition?: boolean;
+  } = {},
 ): boolean {
+  const { sandboxDuel = false, sandboxSnake = false, allowReposition = false } = options;
   if (mode === 'duel') {
     if (sandboxDuel) {
-      return kind === 'sandbox-place' || kind === 'timeout-autopick';
+      return (
+        kind === 'sandbox-place' ||
+        kind === 'timeout-autopick' ||
+        (allowReposition && kind === 'sandbox-reposition')
+      );
     }
     return (
       kind === 'reroll' ||
       kind === 'duel-claim' ||
       kind === 'classic-pick' ||
-      kind === 'timeout-autopick'
+      kind === 'timeout-autopick' ||
+      (allowReposition && kind === 'duel-reposition')
     );
   }
   if (mode === 'sandbox-shared-82') {
-    if (sandboxSnake) return kind === 'sandbox-place' || kind === 'timeout-autopick';
+    if (sandboxSnake) {
+      return (
+        kind === 'sandbox-place' ||
+        kind === 'timeout-autopick' ||
+        (allowReposition && kind === 'sandbox-reposition')
+      );
+    }
     return (
       kind === 'sandbox-place' ||
       kind === 'sandbox-reposition' ||
@@ -272,14 +327,25 @@ export function replayFixedFiveLog(
 ): DraftReplay {
   const ordered = [...commands].sort((a, b) => a.ordinal - b.ordinal);
   const hasStart = ordered.some((c) => c.payload.kind === 'start');
+  const snake = SNAKE_MULTIPLAYER_VERSIONS.has(multiplayerVersion);
+  const allowReposition = REPOSITION_MULTIPLAYER_VERSIONS.has(multiplayerVersion);
   if (mode === 'duel' && sourceMode === 'sandbox') {
-    const snake = multiplayerVersion === FIXED_FIVE_MULTIPLAYER_VERSION;
     let state = createSandboxDuelDraft(rootSeed, undefined, snake ? 'snake' : 'alternating');
     let skipped = 0;
     for (const command of ordered) {
-      if (!isDraftPayload(mode, command.payload.kind, true)) continue;
+      if (
+        !isDraftPayload(mode, command.payload.kind, {
+          sandboxDuel: true,
+          allowReposition,
+        })
+      ) {
+        continue;
+      }
       try {
-        state = applySandboxDuelPayload(state, assets, command);
+        state = applySandboxDuelPayload(state, assets, command, {
+          allowDisplacement: allowReposition,
+          allowReposition,
+        });
       } catch {
         skipped += 1;
       }
@@ -290,9 +356,12 @@ export function replayFixedFiveLog(
     let state = createDuelDraft(rootSeed, assets.catalog, assets.poolById, assets.context);
     let skipped = 0;
     for (const command of ordered) {
-      if (!isDraftPayload(mode, command.payload.kind)) continue;
+      if (!isDraftPayload(mode, command.payload.kind, { allowReposition })) continue;
       try {
-        state = applyDuelPayload(state, assets, command.actorParticipantId, command.payload);
+        state = applyDuelPayload(state, assets, command.actorParticipantId, command.payload, {
+          allowDisplacement: allowReposition,
+          allowReposition,
+        });
       } catch {
         skipped += 1;
       }
@@ -300,13 +369,23 @@ export function replayFixedFiveLog(
     return { mode, hasStart, state, skipped };
   }
   if (mode === 'sandbox-shared-82') {
-    if (multiplayerVersion === FIXED_FIVE_MULTIPLAYER_VERSION) {
+    if (snake) {
       let state = createSandboxDuelDraft(rootSeed);
       let skipped = 0;
       for (const command of ordered) {
-        if (!isDraftPayload(mode, command.payload.kind, false, true)) continue;
+        if (
+          !isDraftPayload(mode, command.payload.kind, {
+            sandboxSnake: true,
+            allowReposition,
+          })
+        ) {
+          continue;
+        }
         try {
-          state = applySandboxDuelPayload(state, assets, command);
+          state = applySandboxDuelPayload(state, assets, command, {
+            allowDisplacement: allowReposition,
+            allowReposition,
+          });
         } catch {
           skipped += 1;
         }
@@ -348,12 +427,16 @@ export function replayFixedFiveLog(
   );
   let skipped = 0;
   for (const command of ordered) {
-    if (!isDraftPayload(mode, command.payload.kind)) continue;
+    if (!isDraftPayload(mode, command.payload.kind, { allowReposition })) continue;
     try {
       if (command.actorParticipantId === 'p1') {
-        p1 = applyClassicPayload(p1, assets, command.payload);
+        p1 = applyClassicPayload(p1, assets, command.payload, {
+          requireDrafting: allowReposition,
+        });
       } else {
-        p2 = applyClassicPayload(p2, assets, command.payload);
+        p2 = applyClassicPayload(p2, assets, command.payload, {
+          requireDrafting: allowReposition,
+        });
       }
     } catch {
       skipped += 1;

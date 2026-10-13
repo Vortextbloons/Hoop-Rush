@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import type { HavocLockLineupCommand, HavocRunState } from '@hoop-rush/data-contracts';
+import type {
+  HavocLockLineupCommand,
+  HavocMutationId,
+  HavocRunState,
+  Position,
+} from '@hoop-rush/data-contracts';
 import {
   HAVOC_DRAFT_ROUNDS,
   HAVOC_SCHEMA_VERSION,
@@ -26,6 +31,7 @@ import type { HavocLockSources } from './api.ts';
 import { HavocCatalogCoverageError } from './api.ts';
 import { AdaptHavocCatalog } from './catalog.ts';
 import { CreateHavocRunState } from './draft-commands.ts';
+import { HAVOC_MUTATION_DEFINITIONS, teamExclusiveMutationIdsOf } from './mutations.ts';
 import { ApplyHavocCommand } from './run-commands.ts';
 import { HavocStateDigest } from './state-digest.ts';
 import {
@@ -373,6 +379,142 @@ describe('havoc draft command flow', () => {
     const outcome = ApplyHavocCommand(state, command, environment, lockSources);
     expect(outcome.result.status).toBe('rejected');
     expect(outcome.result.rejection?.code).toBe('illegal-position');
+  });
+
+  it('rejects picking a card whose team-exclusive mutation is already drafted', () => {
+    const offerId = `hvo-${'c'.repeat(32)}`;
+    const priorPick = buildHavocDraftPick(0, {
+      card: buildHavocCard({
+        slot: 'PG',
+        offerId,
+        cardId: `hvc-${'1'.repeat(32)}`,
+        tier: 3,
+        mutations: [{ mutationId: 'time-lord' }],
+        source: buildHavocSourcePlayer({
+          playerId: playerIdSchema.parse('p-time-lord-owner'),
+        }),
+      }),
+    });
+    const blockedCard = buildHavocCard({
+      slot: 'SG',
+      offerId,
+      cardId: `hvc-${'2'.repeat(32)}`,
+      tier: 3,
+      mutations: [{ mutationId: 'time-lord' }],
+      source: buildHavocSourcePlayer({
+        playerId: playerIdSchema.parse('p-time-lord-blocked'),
+        positions: ['SG'],
+      }),
+    });
+    const draft = buildHavocDraftState({
+      offerId,
+      round: 2,
+      slot: 'SG',
+      offerIndex: 0,
+      rerollUsed: false,
+      picks: [priorPick],
+      cards: [
+        blockedCard,
+        buildHavocCard({ slot: 'SG', offerId, cardId: `hvc-${'3'.repeat(32)}` }),
+        buildHavocCard({ slot: 'SG', offerId, cardId: `hvc-${'4'.repeat(32)}` }),
+      ],
+    });
+    const state = buildHavocRunState({ draft });
+    const command = havocPickCardCommandSchema.parse({
+      schemaVersion: HAVOC_SCHEMA_VERSION,
+      commandId: 'cmd-exclusive-taken',
+      runId: state.runId,
+      expectedRevision: state.revision,
+      command: 'pick-havoc-card',
+      offerId,
+      cardId: blockedCard.cardId,
+    });
+    const outcome = ApplyHavocCommand(state, command, environment, lockSources);
+    expect(outcome.result.status).toBe('rejected');
+    expect(outcome.result.rejection?.code).toBe('mutation-taken');
+    expect(outcome.state).toBe(state);
+    expect(HavocStateDigest(outcome.state)).toBe(HavocStateDigest(state));
+  });
+
+  it('still allows two cards sharing a non-exclusive mutation', () => {
+    const offerId = `hvo-${'d'.repeat(32)}`;
+    const cloneCard = (slot: Position, cardIndex: string, playerId: string) =>
+      buildHavocCard({
+        slot,
+        offerId,
+        cardId: `hvc-${cardIndex}`,
+        tier: 3,
+        mutations: [{ mutationId: 'clone-army' }],
+        source: buildHavocSourcePlayer({
+          playerId: playerIdSchema.parse(playerId),
+          positions: [slot],
+        }),
+      });
+    const priorPick = buildHavocDraftPick(0, {
+      card: cloneCard('PG', '1'.repeat(32), 'p-clone-one'),
+    });
+    const secondClone = cloneCard('SG', '2'.repeat(32), 'p-clone-two');
+    const draft = buildHavocDraftState({
+      offerId,
+      round: 2,
+      slot: 'SG',
+      offerIndex: 0,
+      rerollUsed: false,
+      catalog: fixture.source,
+      picks: [priorPick],
+      cards: [
+        secondClone,
+        buildHavocCard({ slot: 'SG', offerId, cardId: `hvc-${'3'.repeat(32)}` }),
+        buildHavocCard({ slot: 'SG', offerId, cardId: `hvc-${'4'.repeat(32)}` }),
+      ],
+    });
+    const state = buildHavocRunState({ draft });
+    const outcome = ApplyHavocCommand(
+      state,
+      pickCommand(state, secondClone.cardId),
+      environment,
+      lockSources,
+    );
+    expect(outcome.result.status).toBe('accepted');
+    expect(outcome.state.draft?.picks).toHaveLength(2);
+  });
+
+  it('never offers a team-exclusive mutation that a pick already owns', () => {
+    const exclusive = teamExclusiveMutationIdsOf(HAVOC_MUTATION_DEFINITIONS);
+    const seeds = [
+      'havoc-exclusivity-a',
+      'havoc-exclusivity-b',
+      'havoc-exclusivity-c',
+      'havoc-exclusivity-d',
+      'havoc-exclusivity-e',
+      'havoc-exclusivity-f',
+      'havoc-exclusivity-g',
+      'havoc-exclusivity-h',
+      'havoc-exclusivity-i',
+      'havoc-exclusivity-j',
+      'havoc-exclusivity-k',
+      'havoc-exclusivity-l',
+    ];
+    for (const seed of seeds) {
+      let state = createDraftState(seed);
+      while (state.draft !== null && state.draft.status === 'drafting') {
+        const draft = state.draft;
+        const owned = new Set<string>();
+        for (const pick of draft.picks) {
+          for (const entry of pick.card.mutations) owned.add(entry.mutationId);
+        }
+        for (const card of draft.cards) {
+          for (const entry of card.mutations) {
+            if (exclusive.has(entry.mutationId)) {
+              expect(owned.has(entry.mutationId), `${seed} offered ${entry.mutationId} twice`).toBe(
+                false,
+              );
+            }
+          }
+        }
+        state = pickFirstCard(state);
+      }
+    }
   });
 
   it('locks the completed lineup into schema-valid frozen inputs', () => {
