@@ -39,12 +39,8 @@ import {
 import { getPersistence } from '$lib/persistence';
 import { getManifest } from '$lib/data';
 import { resolveAssetUrl } from '$lib/asset-url';
-import {
-  COLLECTION_COMMAND_POLICY,
-  COLLECTION_PACK_PURCHASE_POLICY,
-  runSubmission,
-  type SubmissionPolicy,
-} from '$lib/submit';
+import { runSubmission, type SubmissionPolicy } from '@hoop-rush/application';
+import { COLLECTION_COMMAND_POLICY, COLLECTION_PACK_PURCHASE_POLICY } from '$lib/submit/policies';
 import {
   loadCollectionCatalog,
   loadCollectionGameRules,

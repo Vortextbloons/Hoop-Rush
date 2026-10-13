@@ -60,10 +60,19 @@ Landed:
    `apps/web/src/lib/season/season-session-ports.ts`; the old web hub and
    cache modules are deleted, and `session.test.ts` (23 tests) runs here.
 
-Next:
+Stage 7 status: tooling consolidated and dead code removed.
 
-1. Stage 7: consolidate tooling, finish deletion, and land the remaining net
-   source reduction.
+- The CLI is a typed command registry (`tools/cli/src/registry/`) with pinned
+  command surface and help fixtures; calibration artifacts, cohorts, and gate
+  reporting share one package.
+- The importer manifest schema and IO moved to a leaf module, removing the
+  pools <-> manifest cycle.
+- Unreferenced runtime exports and retired paths were deleted across every
+  package; web test doubles live under `testing/` directories; the quick test
+  gate has a checked-in exclusion manifest with a staleness guard.
+- Per-package READMEs are tracked (this file, engine, data-contracts,
+  persistence, importer, test-fixtures, web, cli) and are the architecture
+  reference. Local `Docs/` remains the long-form working documentation.
 
 Stage 5a landed: Classic/Sandbox challenge orchestration moved into
 `ChallengeSession` (`src/challenge/`). The web `ChallengeRunner` is replaced

@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import { seasonRotationSchema } from './season-rotation.ts';
 export const PROJECTION_WORKER_WIRE_SCHEMA_VERSION = 2 as const;
-export const PROJECTION_WORKER_WIRE_SCHEMA_VERSION_V1 = 1 as const;
 const requestIdSchema = z.string().min(1).max(64);
 const urlSchema = z.string().min(1).max(512);
 const hashSchema = z.string().min(1).max(512);

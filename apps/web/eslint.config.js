@@ -19,6 +19,23 @@ export default tseslint.config(
       '@typescript-eslint/no-misused-promises': ['error', { checksVoidReturn: false }],
     },
   },
+  {
+    files: ['src/**/*.ts', 'src/**/*.svelte', 'src/**/*.svelte.ts'],
+    ignores: ['src/**/*.test.ts', 'src/**/testing/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/testing/**', '**/fake-*', '**/*-fake-*'],
+              message: 'Test doubles live under testing/ and may only be imported by test files.',
+            },
+          ],
+        },
+      ],
+    },
+  },
   ...eslintPluginSvelte.configs['flat/recommended'],
   {
     files: ['**/*.svelte', '**/*.svelte.ts'],

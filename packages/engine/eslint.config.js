@@ -25,8 +25,25 @@ export default tseslint.config(
     },
   },
   {
+    files: ['src/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/*-test-support*', '**/test-helpers*', '**/testing/**'],
+              message: 'Engine test support modules may only be imported by test files.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ['src/**/*.test.ts'],
     rules: {
+      'no-restricted-imports': 'off',
       'no-restricted-properties': [
         'error',
         {

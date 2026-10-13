@@ -137,7 +137,19 @@ packages/persistence    → local saves
 | `pnpm verify` | Full check before release |
 | `pnpm hoop-rush` | CLI — sim, audit, data tools (`pnpm hoop-rush help`) |
 
-See **AGENTS.md** and local **Docs/** for architecture and contribution expectations.
+See **AGENTS.md** and local **Docs/** for contribution expectations. The
+per-package architecture guides are checked in:
+
+```
+packages/application/README.md   application sessions and submission runtime
+packages/engine/README.md        basketball and mode rules, boundary rules
+packages/data-contracts/README.md  schemas, versions, protocols
+packages/persistence/README.md   IndexedDB adapters and storage rules
+packages/importer/README.md      data pipeline stages
+packages/test-fixtures/README.md deterministic test builders
+apps/web/README.md               SvelteKit client layout and composition
+tools/cli/README.md              command registry and calibration tooling
+```
 
 </details>
 

@@ -1,4 +1,4 @@
-import type { SubmissionIntent, SubmissionPolicy } from '@hoop-rush/application';
+import type { SubmissionPolicy } from '@hoop-rush/application';
 import {
   FIXED_FIVE_COMMAND_POLICY,
   FIXED_FIVE_SINGLE_ATTEMPT_POLICY,
@@ -36,18 +36,3 @@ export const COLLECTION_COMMAND_POLICY: SubmissionPolicy = {
   maxAttempts: 1,
   requiresDigest: true,
 };
-
-export function submissionPolicyFor(intent: SubmissionIntent): SubmissionPolicy {
-  switch (intent) {
-    case 'fixed-five-command':
-      return FIXED_FIVE_COMMAND_POLICY;
-    case 'season-command':
-      return SEASON_COMMAND_POLICY;
-    case 'season-block':
-      return SEASON_BLOCK_POLICY;
-    case 'collection-command':
-      return COLLECTION_COMMAND_POLICY;
-    case 'collection-pack-purchase':
-      return COLLECTION_PACK_PURCHASE_POLICY;
-  }
-}

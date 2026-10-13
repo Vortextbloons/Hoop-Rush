@@ -138,6 +138,30 @@ reducing; the refactor's net reduction lands with stages 7e/7f.
   40,410; engine production 62,466 → 61,526; web production 88,835;
   importer production 9,455; data-contracts 21,762; persistence 8,797.
 
+- 2026-10-12, stage 7e: web test doubles moved out of production paths —
+  `havoc-fake-service.ts` is now `features/havoc/testing/havoc-fake-service.ts`
+  and the Supabase harness is `src/lib/testing/fake-supabase-client.ts`; both
+  are imported by tests only. Scope correction: the "in-memory multiplayer"
+  modules in data-contracts are **not** test doubles — they are the production
+  fallback transports when Supabase is not configured
+  (`createDraftDuelTransport`/`createFixedFiveTransport` return them), so they
+  stay in the runtime surface. Also repaired pre-existing mojibake in five
+  collection/season source files (`â€¦`-style sequences in user-visible strings).
+- 2026-10-12, stage 7g: per-package READMEs are tracked and are the architecture
+  reference (`packages/{application,engine,data-contracts,persistence,importer,test-fixtures}`,
+  `apps/web`, `tools/cli`); `.gitignore` now un-ignores those files. Boundary
+  cleanup: the broad `"./src/*"` export maps were removed from data-contracts,
+  persistence, and test-fixtures (no consumer used them), and the
+  `$lib/submit` index shim is gone (collection code imports `runSubmission`
+  from `@hoop-rush/application` and its policies from `$lib/submit/policies`).
+  Remaining runtime dead exports after the sweep: 0 (the reference scan reports
+  no unreferenced exported function/const/class/enum outside test files).
+
+Final stage 7 measurement: maintained source 227,065 physical (runtime
+179,229) from 230,319 (runtime 182,480) at stage 7a — a net reduction of 3,254
+maintained lines. Test lines grew (43,887 → 44,117) from the registry and
+calibration reporting suites.
+
 ## Baseline log
 
 - 2026-10-12, stage 7a: baselines re-verified at `802e4819` with a clean tree.
