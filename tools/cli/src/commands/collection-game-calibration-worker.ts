@@ -1,7 +1,7 @@
 import { workerData } from 'node:worker_threads';
 import { loadCollectionCatalog } from './collection.ts';
 import { loadCollectionGameRules } from './collection-game.ts';
-import { postWorkerFacts } from '../calibration-harness.ts';
+import { postWorkerFacts } from '../calibration/index.ts';
 import {
   projectCollectionGameJob,
   type CollectionGameProjectionJob,

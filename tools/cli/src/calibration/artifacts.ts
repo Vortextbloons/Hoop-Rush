@@ -2,8 +2,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { Worker } from 'node:worker_threads';
 import { z } from 'zod';
-import { sha256Hex, readJson, atomicWriteFileSync } from './io.ts';
-import { makeReport, type CliReport } from './report.ts';
+import { sha256Hex, readJson, atomicWriteFileSync } from '../io.ts';
+import { makeReport, type CliReport } from '../report.ts';
 export function commitTargetsArtifact(args: {
   outPath: string;
   defaultTargetsPath: string;

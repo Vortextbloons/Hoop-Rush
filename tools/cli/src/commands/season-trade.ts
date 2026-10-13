@@ -23,7 +23,13 @@ import {
 import { makeReport, type CliReport } from '../report.ts';
 import { seasonTradeCalibrateReportSchema } from '../report-schemas.ts';
 import { DEFAULT_MANIFEST, DEFAULT_SEASON_DIR, readJsonFile } from './season-data.ts';
-import { resolveCalibrationArgs } from '../calibration-harness.ts';
+import {
+  calibrationGateFailures,
+  commitTargetsArtifact,
+  resolveCalibrationArgs,
+  targetsDetail,
+  validateTargetsArtifact,
+} from '../calibration/index.ts';
 import {
   gateValue,
   gateSummary,
@@ -34,7 +40,6 @@ import {
   type M25Gate,
 } from './season-calibration.ts';
 import { runSeasonM25, type SeasonM25SeasonFacts } from './season-m25-core.ts';
-import { commitTargetsArtifact, validateTargetsArtifact } from '../artifact.ts';
 export const DEFAULT_TRADE_TARGETS = resolve(DEFAULT_SEASON_DIR, 'trade-targets.json');
 export const SEASON_TRADE_CALIBRATION_SEED_COUNT = 8;
 export const SEASON_TRADE_VALIDATION_SEED_COUNT = 4;
@@ -965,21 +970,9 @@ export function seasonTradeCalibrate(args: SeasonTradeArgs): CliReport {
     `illegal rosters ${String(measured.illegalRosterFailures)} · duplicate ownership ${String(measured.duplicateOwnershipFailures)} · value-band failures ${String(measured.valueBandFailures)}`,
     `chemistry pairs ${String(measured.chemistryPairs)} (${String(SEASON_TRADE_PAIRS_LEAGUE)} per season) · pair failures ${String(measured.chemistryPairFailures)} · zero-state new-pair failures ${String(measured.zeroStateNewPairFailures)}`,
     `deterministic offer generation ${String(measured.deterministicOffers)}`,
-    `targets ${targetsWritten ? `written to ${targetsPath ?? '?'}` : 'NOT written'}`,
+    targetsDetail({ targetsWritten, targetsPath }),
   ];
-  if (skippedGates.length > 0) {
-    gateFailures.push(`gates skipped (insufficient sample): ${skippedGates.join(', ')}`);
-  }
-  if (!pass) {
-    for (const metric of metrics) {
-      if (!metric.pass) {
-        gateFailures.push(
-          `gate ${metric.key}: observed ${String(metric.observed)} (${metric.status})`,
-        );
-      }
-    }
-  }
-  if (pass && !targetsWritten) gateFailures.push('targets artifact was not written');
+  gateFailures.push(...calibrationGateFailures({ pass, targetsWritten, skippedGates, metrics }));
   return makeReport(
     'season trade calibrate',
     { seedFrom: from, seedTo: to, workers },

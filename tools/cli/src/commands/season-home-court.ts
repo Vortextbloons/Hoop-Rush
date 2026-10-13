@@ -26,11 +26,12 @@ import {
 import { seasonCalibrationSeed } from './season-calibration.ts';
 import { DEFAULT_MANIFEST, DEFAULT_SEASON_DIR, readJsonFile } from './season-data.ts';
 import {
+  commitTargetsArtifact,
   createFixtureCohortRunner,
   resolveCalibrationArgs,
   runCalibratedSeeds,
-} from '../calibration-harness.ts';
-import { commitTargetsArtifact } from '../artifact.ts';
+  targetsDetail,
+} from '../calibration/index.ts';
 export const SEASON_HOME_COURT_CALIBRATION_SEED_COUNT = 1024;
 export const SEASON_HOME_COURT_VALIDATION_SEED_COUNT = 256;
 export const SEASON_HOME_COURT_SEED_TOTAL =
@@ -406,7 +407,7 @@ export async function seasonHomeCourtCalibrate(
     `neutral home win rate ${(neutralHomeWinRate * 100).toFixed(1)}% (baseline ≈ 50%, gate ±${(baselineTolerance * 100).toFixed(1)}pp at 3σ)`,
     `achieved home win rate ${(achievedHomeWinRate * 100).toFixed(1)}% vs target ${(SEASON_HOME_WIN_RATE_TARGET * 100).toFixed(1)}% (gate ±${(targetTolerance * 100).toFixed(1)}pp at max(1pp, 2σ))`,
     `gates: neutral ${String(neutralBaseline)} · tolerance ${String(withinTolerance)} · possessions ${String(possessionStable)} · monotonic ${String(monotonic)}`,
-    `targets ${targetsWritten ? `written to ${targetsPath ?? '?'}` : 'NOT written'}`,
+    targetsDetail({ targetsWritten, targetsPath }),
   ];
   if (!neutralBaseline) {
     gateFailures.push(

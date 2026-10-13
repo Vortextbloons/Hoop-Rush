@@ -32,8 +32,12 @@ import {
 } from './season-data.ts';
 import { rosterCalibrationSeed } from './season-rosters.ts';
 import { lowerMedian, percentile } from '../stats.ts';
-import { commitTargetsArtifact } from '../artifact.ts';
-import { createSeedChunkRunner, resolveCountCalibrationArgs } from '../calibration-harness.ts';
+import {
+  commitTargetsArtifact,
+  createSeedChunkRunner,
+  resolveCountCalibrationArgs,
+  targetsDetail,
+} from '../calibration/index.ts';
 export const DEFAULT_OFFER_TARGETS = resolve(DEFAULT_SEASON_DIR, 'offer-targets.json');
 export interface SeasonDraftCalibrationRun {
   seed: Seed;
@@ -658,7 +662,7 @@ export async function seasonDraftCalibrate(args: {
     `script guarantee min star offers ${String(minStarOffers)} (need 2) · min floor offers ${String(minFloorOffers)} (need 3) · misses ${String(scriptMisses)}`,
     `held-out pass share ${(heldOutPassShare * 100).toFixed(1)}% (≥ 95% required)`,
     `gates: minSafe ${String(minSafeGate)} · duplicates ${String(zeroDuplicates)} · generation ${String(zeroGenerationFailures)} · script ${String(scriptGate)}`,
-    `targets ${targetsWritten ? `written to ${targetsPath ?? '?'}` : 'NOT written'}`,
+    targetsDetail({ targetsWritten, targetsPath }),
   ];
   if (draftFailures > 0) {
     details.push(

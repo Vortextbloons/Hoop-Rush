@@ -18,8 +18,11 @@ import {
 import { ENGINE_VERSION } from '@hoop-rush/engine';
 import { makeReport, type CliReport } from '../report.ts';
 import { collectionGameCalibrateReportSchema } from '../report-schemas.ts';
-import { validateTargetsArtifact } from '../artifact.ts';
-import { createSeedChunkRunner, resolveCountCalibrationArgs } from '../calibration-harness.ts';
+import {
+  createSeedChunkRunner,
+  resolveCountCalibrationArgs,
+  validateTargetsArtifact,
+} from '../calibration/index.ts';
 import { DEFAULT_MANIFEST, readJsonFile, sha256Hex } from './season-data.ts';
 import { loadCollectionCatalog } from './collection.ts';
 import { loadCollectionGameRules } from './collection-game.ts';

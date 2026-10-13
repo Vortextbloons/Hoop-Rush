@@ -29,7 +29,13 @@ import {
   seasonRostersCalibrateReportSchema,
   seasonRostersGenerateReportSchema,
 } from '../report-schemas.ts';
-import { createSeedChunkRunner, resolveCountCalibrationArgs } from '../calibration-harness.ts';
+import {
+  commitTargetsArtifact,
+  createSeedChunkRunner,
+  resolveCountCalibrationArgs,
+  runWorkerChunk,
+  targetsDetail,
+} from '../calibration/index.ts';
 import { seasonCalibrationSeed } from './season-calibration.ts';
 import { lowerMedian } from '../stats.ts';
 import {
@@ -44,7 +50,6 @@ import {
   roleTierThresholdsOf,
 } from './season-data.ts';
 import type { RosterCalibrationWorkerRun } from './rosters-calibration-worker.ts';
-import { commitTargetsArtifact, runWorkerChunk } from '../artifact.ts';
 export const rosterCalibrationSeed = seasonCalibrationSeed;
 export const ORDER_INVARIANCE_SEED_COUNT = 2;
 function humanRostersOf(state: SeasonDraftState): Array<{
@@ -1034,7 +1039,7 @@ export async function seasonRostersCalibrate(
     `pool legality failures ${String(poolLegalityFailures)} · selection failures ${String(selectionFailures)} · order-invariance failures ${String(orderInvarianceFailures)}`,
     `held-out pass share ${(heldOutPassShare * 100).toFixed(1)}% (≥ ${String(gates.heldOutPassShare * 100)}% required)`,
     `gates: failureRate ${String(gateResults.failureRate)} · separation ${String(gateResults.minBandSeparation)} · anchors ${String(gateResults.anchorFulfillment)} · extraElite ${String(gateResults.extraEliteWithinTolerance)} · superTeams ${String(gateResults.superTeamIncidence)} · orderInvariance ${String(gateResults.orderInvariance)} · heldOut ${String(gateResults.heldOutPass)}`,
-    `targets ${targetsWritten ? `written to ${targetsPath ?? '?'}` : 'NOT written'}`,
+    targetsDetail({ targetsWritten, targetsPath }),
   ];
   if (failureCount > 0) gateFailures.push(`${String(failureCount)} generation failures`);
   if (!orderedBandMedians) gateFailures.push('band medians are not strictly ordered');

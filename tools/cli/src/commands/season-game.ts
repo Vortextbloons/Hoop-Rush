@@ -29,12 +29,13 @@ import {
 } from '../report-schemas.ts';
 import { DEFAULT_MANIFEST, DEFAULT_SEASON_DIR, readJsonFile } from './season-data.ts';
 import { seasonCalibrationSeed } from './season-calibration.ts';
-import { commitTargetsArtifact } from '../artifact.ts';
 import {
+  commitTargetsArtifact,
   createFixtureCohortRunner,
   resolveCalibrationArgs,
   runCalibratedSeeds,
-} from '../calibration-harness.ts';
+  targetsDetail,
+} from '../calibration/index.ts';
 import { lowerMedian, percentile } from '../stats.ts';
 export const SEASON_GAME_CALIBRATION_SEED_COUNT = 1024;
 export const SEASON_GAME_VALIDATION_SEED_COUNT = 256;
@@ -713,7 +714,7 @@ export async function seasonGameCalibrate(
     `bench medians: bench-heavy ${formatMedian(benchHeavy?.benchSecondsMedian)} > balanced ${formatMedian(balanced?.benchSecondsMedian)} > tight ${formatMedian(tight?.benchSecondsMedian)}`,
     `held-out pass share ${(heldOutPassShare * 100).toFixed(1)}% (≥ 95% required)`,
     `gates: zeroFailures ${String(zeroFailures)} · starterOrdering ${String(starterOrdering)} · benchOrdering ${String(benchOrdering)} · benchRoles ${String(benchRoleNonIncreasing)} · chunking ${String(chunkingIndependent)}`,
-    `targets ${targetsWritten ? `written to ${targetsPath ?? '?'}` : 'NOT written'}`,
+    targetsDetail({ targetsWritten, targetsPath }),
   ];
   if (!zeroFailures) {
     gateFailures.push('accounting, legality, ownership, or determinism failure observed');

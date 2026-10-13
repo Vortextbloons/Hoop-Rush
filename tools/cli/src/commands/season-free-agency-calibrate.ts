@@ -70,14 +70,19 @@ import {
   auditSeasonFreeAgencyFacts,
   type SeasonFreeAgencyAuditCounts,
 } from './season-free-agency-audit.ts';
-import { commitTargetsArtifact, validateTargetsArtifact } from '../artifact.ts';
+import {
+  calibrationGateFailures,
+  commitTargetsArtifact,
+  resolveCalibrationArgs,
+  targetsDetail,
+  validateTargetsArtifact,
+} from '../calibration/index.ts';
 import {
   createSeasonBlockRunner,
   runnerBlockCommand,
   runnerPipelineInput,
   type SeasonBlockRunnerState,
 } from './season-block.ts';
-import { resolveCalibrationArgs } from '../calibration-harness.ts';
 import { m25FreshRun, m25RunStateFacts, M25_TRADE_WINDOW_BLOCKS } from './season-m25-core.ts';
 export const DEFAULT_FREE_AGENCY_TARGETS = resolve(DEFAULT_SEASON_DIR, 'free-agency-targets.json');
 export const SEASON_FREE_AGENCY_CALIBRATION_SEED_COUNT = 8;
@@ -1560,21 +1565,9 @@ export function seasonFreeAgencyCalibrate(
     `elite-exclusion failures ${String(calibrationFacts.eliteExclusionFailures)} · one-outlier failures ${String(calibrationFacts.oneOutlierFailures)} · rich-get-richer failures ${String(calibrationFacts.richGetRicherFailures)}`,
     `signed above drafted median ${(calibrationFacts.signedAboveDraftedMedianShare * 100).toFixed(1)}% · ownership rows ${String(calibrationFacts.ownershipRows)}`,
     `determinism probe ${String(calibrationFacts.determinismProbe.identical)} · summary identity probe ${summaryIdentity.probed ? (summaryIdentity.identical ? 'identical' : 'DIVERGED') : 'not probed (no zero-signing season)'}`,
-    `targets ${targetsWritten ? `written to ${targetsPath ?? '?'}` : 'NOT written'}`,
+    targetsDetail({ targetsWritten, targetsPath }),
   ];
-  if (skippedGates.length > 0) {
-    gateFailures.push(`gates skipped (insufficient sample): ${skippedGates.join(', ')}`);
-  }
-  if (!pass) {
-    for (const metric of metrics) {
-      if (!metric.pass) {
-        gateFailures.push(
-          `gate ${metric.key}: observed ${String(metric.observed)} (${metric.status})`,
-        );
-      }
-    }
-  }
-  if (pass && !targetsWritten) gateFailures.push('targets artifact was not written');
+  gateFailures.push(...calibrationGateFailures({ pass, targetsWritten, skippedGates, metrics }));
   return makeReport(
     'season free-agency calibrate',
     { seedFrom: from, seedTo: to, workers },

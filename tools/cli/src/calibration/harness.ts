@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { parentPort } from 'node:worker_threads';
 import { z } from 'zod';
-import { parseCount, parseSeedRange, parseWorkers } from './args.ts';
-import { runWorkerChunks } from './artifact.ts';
-import { seedIndexRange } from './commands/season-calibration.ts';
+import { parseCount, parseSeedRange, parseWorkers } from '../args.ts';
+import { runWorkerChunks } from './artifacts.ts';
+import { seedIndexRange } from '../commands/season-calibration.ts';
 
 export type SeedRangeSplitMode = 'split' | 'append';
 

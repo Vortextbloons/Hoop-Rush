@@ -13,7 +13,13 @@ import { reconstructSeasonGames, reduceSeasonStandings } from '@hoop-rush/engine
 import { makeReport, type CliReport } from '../report.ts';
 import { seasonChallengesCalibrateReportSchema } from '../report-schemas.ts';
 import { DEFAULT_MANIFEST, DEFAULT_SEASON_DIR } from './season-data.ts';
-import { resolveCalibrationArgs } from '../calibration-harness.ts';
+import {
+  calibrationGateFailures,
+  commitTargetsArtifact,
+  resolveCalibrationArgs,
+  targetsDetail,
+  validateTargetsArtifact,
+} from '../calibration/index.ts';
 import {
   gateValue,
   gateSummary,
@@ -24,7 +30,6 @@ import {
   type M25Gate,
 } from './season-calibration.ts';
 import { runSeasonM25, type SeasonM25SeasonFacts } from './season-m25-core.ts';
-import { commitTargetsArtifact, validateTargetsArtifact } from '../artifact.ts';
 
 export const DEFAULT_CHALLENGE_TARGETS = resolve(DEFAULT_SEASON_DIR, 'challenge-targets.json');
 export const SEASON_CHALLENGES_CALIBRATION_SEED_COUNT = 12;
@@ -546,21 +551,9 @@ export function seasonChallengesCalibrate(args: SeasonChallengesArgs): CliReport
     `${String(calibrationCohort.seasonsSimulated)} calibration + ${String(heldOutCohort.seasonsSimulated)} held-out seasons in ${String(Date.now() - started)}ms (${String(workers)} workers)`,
     `blocks dealt ${String(calibrationCohort.blocksDealt)}/${String(calibrationCohort.blocksDealt + heldOutCohort.blocksDealt)} · completeness ${(calibrationCohort.dealCompleteness * 100).toFixed(1)}% · canonical ${(calibrationCohort.canonicalOrderShare * 100).toFixed(1)}% · replay ${(calibrationCohort.replayStabilityShare * 100).toFixed(1)}%`,
     `hard-feasible ${(calibrationCohort.hardFeasibleShare * 100).toFixed(1)}% · earned/block ${calibrationCohort.expectedEarnedPerBlock === null ? 'n/a' : calibrationCohort.expectedEarnedPerBlock.toFixed(2)} · 3PA sufficient ${calibrationCohort.threePointSufficiency === null ? 'n/a' : `${(calibrationCohort.threePointSufficiency * 100).toFixed(1)}%`} over ${String(calibrationCohort.threePointEvaluations)} 3P evaluations`,
-    `targets ${targetsWritten ? `written to ${targetsPath ?? '?'}` : 'NOT written'}`,
+    targetsDetail({ targetsWritten, targetsPath }),
   ];
-  if (skippedGates.length > 0) {
-    gateFailures.push(`gates skipped (insufficient sample): ${skippedGates.join(', ')}`);
-  }
-  if (!pass) {
-    for (const metric of metrics) {
-      if (!metric.pass) {
-        gateFailures.push(
-          `gate ${metric.key}: observed ${String(metric.observed)} (${metric.status})`,
-        );
-      }
-    }
-  }
-  if (pass && !targetsWritten) gateFailures.push('targets artifact was not written');
+  gateFailures.push(...calibrationGateFailures({ pass, targetsWritten, skippedGates, metrics }));
   return makeReport(
     'season challenges calibrate',
     { seedFrom: from, seedTo: to, workers },

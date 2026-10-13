@@ -6,7 +6,7 @@ import {
 } from '@hoop-rush/engine';
 import { seasonGameSimulationInputSchema } from '@hoop-rush/data-contracts';
 import { seasonGameFixtureSchema } from '../fixture-schema.ts';
-import { postWorkerFacts, readWorkerFixture } from '../calibration-harness.ts';
+import { postWorkerFacts, readWorkerFixture } from '../calibration/index.ts';
 import { seasonGameCalibrationSeed, simulateSeasonGameFacts } from './season-game.ts';
 
 interface SeasonGameWorkerInput {

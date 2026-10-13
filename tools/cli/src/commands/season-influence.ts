@@ -11,7 +11,13 @@ import { createEngineContext } from '@hoop-rush/engine';
 import { makeReport, type CliReport } from '../report.ts';
 import { seasonInfluenceCalibrateReportSchema } from '../report-schemas.ts';
 import { DEFAULT_MANIFEST, DEFAULT_SEASON_DIR } from './season-data.ts';
-import { resolveCalibrationArgs } from '../calibration-harness.ts';
+import {
+  calibrationGateFailures,
+  commitTargetsArtifact,
+  resolveCalibrationArgs,
+  targetsDetail,
+  validateTargetsArtifact,
+} from '../calibration/index.ts';
 import {
   gateValue,
   gateSummary,
@@ -22,7 +28,6 @@ import {
   type M25Gate,
 } from './season-calibration.ts';
 import { runSeasonM25, type SeasonM25SeasonFacts } from './season-m25-core.ts';
-import { commitTargetsArtifact, validateTargetsArtifact } from '../artifact.ts';
 export const DEFAULT_INFLUENCE_TARGETS = resolve(DEFAULT_SEASON_DIR, 'influence-targets.json');
 export const SEASON_INFLUENCE_CALIBRATION_SEED_COUNT = 12;
 export const SEASON_INFLUENCE_VALIDATION_SEED_COUNT = 4;
@@ -709,21 +714,9 @@ export function seasonInfluenceCalibrate(args: SeasonInfluenceArgs): CliReport {
     `objective success ${calibrationCohort.objectiveSuccessRate === null ? 'n/a' : `${(calibrationCohort.objectiveSuccessRate * 100).toFixed(1)}%`} over ${String(calibrationCohort.objectiveEvaluations)} evaluations (gate [${String(SEASON_INFLUENCE_OBJECTIVE_SUCCESS_MIN * 100)}%, ${String(SEASON_INFLUENCE_OBJECTIVE_SUCCESS_MAX * 100)}%])`,
     `challenge earned/block ${calibrationCohort.expectedEarnedPerBlock === null ? 'n/a' : calibrationCohort.expectedEarnedPerBlock.toFixed(2)} (gate [${String(SEASON_INFLUENCE_EXPECTED_EARNED_MIN)}, ${String(SEASON_INFLUENCE_EXPECTED_EARNED_MAX)}]) · cap-clamped ${calibrationCohort.capClampedShare === null ? 'n/a' : `${(calibrationCohort.capClampedShare * 100).toFixed(1)}%`} (gate ≤ ${(SEASON_INFLUENCE_CAP_CLAMPED_MAX * 100).toFixed(0)}%) over ${String(calibrationCohort.challengeEvaluations)} challenge evaluations`,
     `extra-offer spend share ${(calibrationCohort.extraOfferSpendShare * 100).toFixed(1)}% · rehab spend share ${(calibrationCohort.rehabSpendShare * 100).toFixed(1)}%`,
-    `targets ${targetsWritten ? `written to ${targetsPath ?? '?'}` : 'NOT written'}`,
+    targetsDetail({ targetsWritten, targetsPath }),
   ];
-  if (skippedGates.length > 0) {
-    gateFailures.push(`gates skipped (insufficient sample): ${skippedGates.join(', ')}`);
-  }
-  if (!pass) {
-    for (const metric of metrics) {
-      if (!metric.pass) {
-        gateFailures.push(
-          `gate ${metric.key}: observed ${String(metric.observed)} (${metric.status})`,
-        );
-      }
-    }
-  }
-  if (pass && !targetsWritten) gateFailures.push('targets artifact was not written');
+  gateFailures.push(...calibrationGateFailures({ pass, targetsWritten, skippedGates, metrics }));
   return makeReport(
     'season influence calibrate',
     { seedFrom: from, seedTo: to, workers },

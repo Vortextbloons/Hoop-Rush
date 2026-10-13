@@ -27,7 +27,7 @@ import { makeReport, type CliReport } from '../report.ts';
 import { DEFAULT_MANIFEST, DEFAULT_SEASON_DIR, readJsonFile } from './season-data.ts';
 import { parseSeedRange } from '../args.ts';
 import { seasonCalibrationSeed, seedIndexRange } from './season-calibration.ts';
-import { commitTargetsArtifact, validateTargetsArtifact } from '../artifact.ts';
+import { commitTargetsArtifact, validateTargetsArtifact } from '../calibration/index.ts';
 import { loadSeasonGameFixture, SEASON_GAME_PRESET_FIXTURES } from './season-game.ts';
 
 export const DEFAULT_EVOLUTION_TARGETS = resolve(

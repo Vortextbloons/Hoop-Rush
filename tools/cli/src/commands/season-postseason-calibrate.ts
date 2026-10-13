@@ -15,7 +15,11 @@ import { createEngineContext, deriveSeasonAwards, handleSeasonRunCommand } from 
 import { makeReport, type CliReport } from '../report.ts';
 import { seasonPostseasonCalibrateReportSchema } from '../report-schemas.ts';
 import { DEFAULT_MANIFEST, DEFAULT_SEASON_DIR, readJsonFile } from './season-data.ts';
-import { resolveCalibrationArgs } from '../calibration-harness.ts';
+import {
+  commitTargetsArtifact,
+  resolveCalibrationArgs,
+  targetsDetail,
+} from '../calibration/index.ts';
 import {
   gateSummary,
   m25RangeGate,
@@ -25,7 +29,6 @@ import {
   type M25Gate,
 } from './season-calibration.ts';
 import { runSeasonM25, type SeasonM25SeasonFacts } from './season-m25-core.ts';
-import { commitTargetsArtifact } from '../artifact.ts';
 import { loadPackagedData, PackagedData } from './data-loader.ts';
 export const DEFAULT_POSTSEASON_TARGETS = resolve(DEFAULT_SEASON_DIR, 'postseason-targets.json');
 export const SEASON_POSTSEASON_CALIBRATION_SEED_COUNT = 8;
@@ -580,7 +583,7 @@ export function seasonPostseasonCalibrate(
     `series length mean ${calibration.seriesLengthMean.toFixed(2)} · upset rate ${(calibration.upsetRate * 100).toFixed(1)}% · home advantage ${(calibration.homeAdvantage * 100).toFixed(1)}%`,
     `advancement by strength ${(calibration.advancementByStrength * 100).toFixed(1)}% · award plausibility ${(calibration.awardPlausibility * 100).toFixed(1)}%`,
     `champions ${String(calibration.champions)}/${String(calibration.seasonsSimulated)} · forfeits ${String(calibration.forfeits)} · integrity failures ${String(calibration.integrityFailures)} · both-invalid games ${String(calibration.bothInvalidGames)}`,
-    `targets ${targetsWritten ? `written to ${targetsPath ?? '?'}` : writeRequested ? 'NOT written' : 'not written (no --write)'}`,
+    targetsDetail({ targetsWritten, targetsPath }),
   ];
   if (!pass) {
     for (const metric of [...calibrationGates, ...validationGates]) {

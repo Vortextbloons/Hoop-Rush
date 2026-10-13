@@ -6,7 +6,7 @@ import {
   seedSchema,
 } from '@hoop-rush/data-contracts';
 import { runSeasonDraftCalibrationSeeds } from './season-draft-calibrate.ts';
-import { postWorkerFacts, readWorkerFixture } from '../calibration-harness.ts';
+import { postWorkerFacts, readWorkerFixture } from '../calibration/index.ts';
 
 interface WorkerInput {
   catalogPath: string;

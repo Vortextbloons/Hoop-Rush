@@ -16,7 +16,13 @@ import {
 import { makeReport, type CliReport } from '../report.ts';
 import { seasonHealthCalibrateReportSchema } from '../report-schemas.ts';
 import { DEFAULT_MANIFEST, DEFAULT_SEASON_DIR } from './season-data.ts';
-import { resolveCalibrationArgs } from '../calibration-harness.ts';
+import {
+  calibrationGateFailures,
+  commitTargetsArtifact,
+  resolveCalibrationArgs,
+  targetsDetail,
+  validateTargetsArtifact,
+} from '../calibration/index.ts';
 import {
   m25ToleranceGate,
   m25LiftGate,
@@ -30,7 +36,6 @@ import {
   type M25Gate,
 } from './season-calibration.ts';
 import { runSeasonM25, type SeasonM25SeasonFacts } from './season-m25-core.ts';
-import { commitTargetsArtifact, validateTargetsArtifact } from '../artifact.ts';
 export const DEFAULT_INJURY_TARGETS = resolve(DEFAULT_SEASON_DIR, 'injury-targets.json');
 export const SEASON_HEALTH_CALIBRATION_SEED_COUNT = 16;
 export const SEASON_HEALTH_VALIDATION_SEED_COUNT = 4;
@@ -834,21 +839,9 @@ export function seasonHealthCalibrate(args: SeasonHealthArgs): CliReport {
     `same-game return ${(calibrationCohort.sameGameReturnRate * 100).toFixed(1)}% (gate ±${String(SEASON_HEALTH_SAME_GAME_RETURN_TOLERANCE_PP)}pp) · recurrence gap ${probes.recurrence.gapBp.toFixed(1)}bp (gate ≥ ${String(SEASON_HEALTH_RECURRENCE_MIN_GAP_BP)}bp)`,
     `standings gap ${calibrationCohort.standingsGapBp.toFixed(1)}bp (gate ≤ ${String(SEASON_HEALTH_STANDINGS_MAX_GAP_BP)}bp)`,
     `monotonic minutes ${probes.minutes.highIncidenceBp.toFixed(1)}>${probes.minutes.lowIncidenceBp.toFixed(1)} · fatigue ${probes.fatigue.highIncidenceBp.toFixed(1)}>${probes.fatigue.lowIncidenceBp.toFixed(1)} · durability ${probes.durability.lowIncidenceBp.toFixed(1)}>${probes.durability.highIncidenceBp.toFixed(1)}`,
-    `targets ${targetsWritten ? `written to ${targetsPath ?? '?'}` : 'NOT written'}`,
+    targetsDetail({ targetsWritten, targetsPath }),
   ];
-  if (skippedGates.length > 0) {
-    gateFailures.push(`gates skipped (insufficient sample): ${skippedGates.join(', ')}`);
-  }
-  if (!pass) {
-    for (const metric of metrics) {
-      if (!metric.pass) {
-        gateFailures.push(
-          `gate ${metric.key}: observed ${String(metric.observed)} (${metric.status})`,
-        );
-      }
-    }
-  }
-  if (pass && !targetsWritten) gateFailures.push('targets artifact was not written');
+  gateFailures.push(...calibrationGateFailures({ pass, targetsWritten, skippedGates, metrics }));
   return makeReport(
     'season health calibrate',
     { seedFrom: from, seedTo: to, workers },

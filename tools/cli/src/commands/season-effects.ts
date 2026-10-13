@@ -45,9 +45,13 @@ import {
 } from './season-game.ts';
 import { DEFAULT_MANIFEST, DEFAULT_SEASON_DIR, readJsonFile } from './season-data.ts';
 import { seedIndexRange } from './season-calibration.ts';
-import { createFixtureCohortRunner } from '../calibration-harness.ts';
+import {
+  commitTargetsArtifact,
+  createFixtureCohortRunner,
+  targetsDetail,
+  validateTargetsArtifact,
+} from '../calibration/index.ts';
 import { median } from '../stats.ts';
-import { commitTargetsArtifact, validateTargetsArtifact } from '../artifact.ts';
 export const SEASON_EFFECTS_CALIBRATION_SEED_COUNT = 256;
 export const SEASON_EFFECTS_VALIDATION_SEED_COUNT = 64;
 export const SEASON_EFFECTS_PRESET_FIXTURES = [
@@ -909,7 +913,7 @@ export async function seasonEffectsCalibrate(
     `held-out envelope share ${(heldOutWithinEnvelopeShare * 100).toFixed(1)}% (gate ≥ ${String(SEASON_EFFECTS_HELD_OUT_PASS_SHARE * 100)}%)`,
     `rotation ordering ${rolesPayload.starterOrderingPass ? 'pass' : 'fail'} · bench ${rolesPayload.benchOrderingPass ? 'pass' : 'fail'}`,
     `chemistry separation ${String(chemistry.separationBp)}bp (gate ≥ ${String(SEASON_EFFECTS_CHEMISTRY_SEPARATION_BP)}bp)`,
-    `targets ${targetsWritten ? `written to ${targetsPath ?? '?'}` : 'NOT written'}`,
+    targetsDetail({ targetsWritten, targetsPath }),
   ];
   if (!zeroFailures) gateFailures.push('accounting/invariant failures in the cohort');
   if (!determinism) gateFailures.push('determinism failures in the cohort');
