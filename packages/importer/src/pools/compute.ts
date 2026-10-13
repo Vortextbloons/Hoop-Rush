@@ -63,7 +63,11 @@ import { positionOverrideFor } from '../positions/overrides.ts';
 import { primaryPositionForSource } from '../positions/normalize.ts';
 import { canonicalPlayerName } from '../identity.ts';
 import { derivePlayerRecord } from '../ratings/v2.ts';
-import { loadOverallEvidence } from '../ratings/overall-evidence.ts';
+import {
+  loadOverallEvidence,
+  loadTeamRecords,
+  observedTeamRecord,
+} from '../ratings/overall-evidence.ts';
 import { getEra } from '../ratings/era.ts';
 import { loadRatingsModelArtifact } from '../ratings/artifact.ts';
 export { POSITION_LABEL_MAP, buildPlayerPositions, normalizePositionLabels } from './positions.ts';
@@ -253,6 +257,7 @@ function refreshedFallbackPlayer(
     typeof height === 'number' && Number.isFinite(height) ? Math.trunc(height) : 78;
   const derived = derivePlayerRecord({
     season,
+    teamWinPct: observedTeamRecord(stats, player.teamExternalId, loadTeamRecords(season)),
     position,
     heightInches,
     stats: {
@@ -463,6 +468,7 @@ function sanitizeShootingFamily(
   made: number | null,
   attempted: number | null,
 ): { made: number | null; attempted: number | null } {
+  if (made === 0 && attempted === 0) return { made, attempted };
   // Made > attempted means partial coverage, not hot shooting: capping fgm
   // 973 to a partial fga 883 would invent a 1.000 efg (1961-62 Bellamy).
   // Null the family so derivation estimates instead of trusting fiction.

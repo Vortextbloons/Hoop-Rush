@@ -48,6 +48,11 @@ export interface HavocFoulResult {
   technicalFreeThrows: number;
   /** Technical free throw is taken by the non-fouling side (offensive foul). */
   technicalForDefense: boolean;
+  /**
+   * Extra attempts appended after the ordinary attempts for the non-fouling
+   * side while the fouling team fields an active Double or Nothing owner.
+   */
+  doubleOrNothingFreeThrows: number;
 }
 
 export interface HavocRuntimeHooks {

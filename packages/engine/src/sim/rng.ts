@@ -17,6 +17,21 @@ export function buildWeightedPickTable(weights: readonly number[]): WeightedPick
   }
   return { weights: clamped, total };
 }
+/**
+ * Table builder for weights the caller derived itself (all finite, non-negative
+ * by construction). Keeps the clamp so totals match `buildWeightedPickTable`
+ * exactly, and skips the per-weight validation branch.
+ */
+export function buildTrustedWeightedPickTable(weights: readonly number[]): WeightedPickTable {
+  const clamped: number[] = [];
+  let total = 0;
+  for (const weight of weights) {
+    const value = Math.max(0, weight);
+    clamped.push(value);
+    total += value;
+  }
+  return { weights: clamped, total };
+}
 function isWeightedPickTable(
   value: readonly number[] | WeightedPickTable,
 ): value is WeightedPickTable {
@@ -24,15 +39,10 @@ function isWeightedPickTable(
     typeof value === 'object' && !Array.isArray(value) && 'total' in value && 'weights' in value
   );
 }
-function weightedPickFromTable<T>(
-  items: readonly T[],
-  table: WeightedPickTable,
-  draw: () => number,
-  pickUniform: () => T,
-): T {
+function weightedPickFromTable<T>(items: readonly T[], table: WeightedPickTable, rng: Rng): T {
   if (items.length === 0) throw new Error('weightedPick: cannot pick from an empty list');
-  if (table.total <= 0) return pickUniform();
-  let roll = draw() * table.total;
+  if (table.total <= 0) return rng.pick(items);
+  let roll = rng.next() * table.total;
   for (let i = 0; i < items.length; i += 1) {
     const w = table.weights[i] ?? 0;
     if (roll < w) {
@@ -56,6 +66,7 @@ export interface Rng {
   nextInt(min: number, max: number): number;
   pick<T>(items: readonly T[]): T;
   weightedPick<T>(items: readonly T[], weights: readonly number[] | WeightedPickTable): T;
+  weightedPickTable<T>(items: readonly T[], table: WeightedPickTable): T;
 }
 export function swapAt(values: unknown[], a: number, b: number): void {
   const va = values[a];
@@ -85,24 +96,23 @@ function mulberry32(seed: number): () => number {
 export function createRng(seed: string, position = 0): Rng {
   const next = mulberry32(fnv1a32(seed));
   for (let i = 0; i < position; i += 1) next();
-  function draw(): number {
-    return next();
-  }
-  return {
-    next: draw,
+  const api: Rng = {
+    next() {
+      return next();
+    },
     chance(probability) {
       if (probability <= 0) return false;
       if (probability >= 1) return true;
-      return draw() < probability;
+      return next() < probability;
     },
     nextInt(min, max) {
       if (max < min) throw new Error(`nextInt: max (${String(max)}) < min (${String(min)})`);
       if (max === min) return min;
-      return Math.floor(draw() * (max - min + 1)) + min;
+      return Math.floor(next() * (max - min + 1)) + min;
     },
     pick(items) {
       if (items.length === 0) throw new Error('pick: cannot pick from an empty list');
-      const item = items[this.nextInt(0, items.length - 1)];
+      const item = items[api.nextInt(0, items.length - 1)];
       if (item === undefined) {
         throw new Error('pick: index out of range');
       }
@@ -111,16 +121,19 @@ export function createRng(seed: string, position = 0): Rng {
     weightedPick(items, weights) {
       if (items.length === 0) throw new Error('weightedPick: cannot pick from an empty list');
       if (isWeightedPickTable(weights)) {
-        return weightedPickFromTable(items, weights, draw, () => this.pick(items));
+        return weightedPickFromTable(items, weights, api);
       }
       if (items.length !== weights.length) {
         throw new Error(
           `weightedPick: items (${String(items.length)}) and weights (${String(weights.length)}) length mismatch`,
         );
       }
-      return weightedPickFromTable(items, buildWeightedPickTable(weights), draw, () =>
-        this.pick(items),
-      );
+      return weightedPickFromTable(items, buildWeightedPickTable(weights), api);
+    },
+    weightedPickTable(items, table) {
+      if (items.length === 0) throw new Error('weightedPick: cannot pick from an empty list');
+      return weightedPickFromTable(items, table, api);
     },
   };
+  return api;
 }

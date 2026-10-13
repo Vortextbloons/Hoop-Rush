@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   HAVOC_GAME_COUNT,
+  HAVOC_MUTATION_CATALOG_VERSION,
+  HAVOC_RULES_VERSION,
   HAVOC_SAVE_SCHEMA_VERSION,
   POSITIONS,
   canonicalJson,
@@ -1230,8 +1232,8 @@ describe('DexieHavocRepository', () => {
     if (raw === undefined) throw new Error('expected an active row');
     const v1State = JSON.parse(
       JSON.stringify(raw.state)
-        .replaceAll('havoc-rules-v2', 'havoc-rules-v1')
-        .replaceAll('havoc-mutations-v2', 'havoc-mutations-v1'),
+        .replaceAll(HAVOC_RULES_VERSION, 'havoc-rules-v1')
+        .replaceAll(HAVOC_MUTATION_CATALOG_VERSION, 'havoc-mutations-v1'),
     ) as typeof raw.state;
     await db.havocActiveRuns.put({ ...raw, state: v1State });
     const error = await expectHavocLoadError(repo.loadActiveRun(), 'unsupported');

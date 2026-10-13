@@ -171,6 +171,8 @@ export function havocEventMutationIdOf(event: HavocEvent): HavocMutationId | nul
       return 'second-chance-jackpot';
     case 'and-one-bonus':
       return 'and-one-machine';
+    case 'double-or-nothing-foul':
+      return 'double-or-nothing';
     case 'turnover-cancelled':
       return 'possession-refund';
     case 'possession-refund':
@@ -253,6 +255,8 @@ export function havocEventTextOf(event: HavocEvent, context: HavocEventNameConte
       return `Second Chance Jackpot ${event.outcome}`;
     case 'and-one-bonus':
       return `${name(event.shooterInstanceId)} and-one: +${String(event.bonusFreeThrows)} bonus free throw${event.bonusFreeThrows === 1 ? '' : 's'}`;
+    case 'double-or-nothing-foul':
+      return `${name(event.ownerInstanceId)} Double or Nothing: opponent granted ${String(event.freeThrowsGranted)} free throw${event.freeThrowsGranted === 1 ? '' : 's'} on the foul`;
     case 'possession-refund':
       return `${name(event.ownerInstanceId)} possession refund — turnover cancelled`;
     case 'rebound-loop':
@@ -286,7 +290,7 @@ export function havocScoringTextOf(
     parts.push(`${havocScoringSourceLabel(addend.source)} ${formatSignedPoints(addend.points)}`);
   }
   for (const multiplier of entry.multipliers) {
-    parts.push(`${havocScoringSourceLabel(multiplier.source)} ×2`);
+    parts.push(`${havocScoringSourceLabel(multiplier.source)} ×${String(multiplier.factor)}`);
   }
   for (const addend of dunkAddends) {
     parts.push(`${havocScoringSourceLabel(addend.source)} ${formatSignedPoints(addend.points)}`);

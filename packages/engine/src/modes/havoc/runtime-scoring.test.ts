@@ -141,6 +141,24 @@ describe('havoc field-goal value resolution', () => {
     expect(value.multipliers.map((entry) => entry.source)).toEqual(['heat-check']);
   });
 
+  it('triples a bounty make and accounts its contribution exactly', () => {
+    const value = havocFieldGoalValue({
+      nominal: 2,
+      three: false,
+      roulette: null,
+      fourPointDunk: false,
+      reverseBasketball: false,
+      heatCheck: false,
+      putback: false,
+      bounty: true,
+      doubleOrNothing: true,
+    });
+    expect(value.points).toBe(6);
+    expect(value.multipliers).toEqual([{ source: 'the-bounty', factor: 3 }]);
+    const contributions = value.contributions.reduce((sum, entry) => sum + entry.points, 0);
+    expect(contributions).toBe(value.points - 2);
+  });
+
   it('handles negative roulette results and reverse threes', () => {
     const negative = havocFieldGoalValue({
       nominal: 2,
@@ -243,7 +261,7 @@ describe('havoc scoring mutations in simulation', () => {
     const base =
       entry.nominalPoints + entry.addends.reduce((sum, addend) => sum + addend.points, 0);
     expect(entry.points).toBe(base * 2);
-    // four consecutive made field goals precede the arming
+    // three consecutive made field goals precede the arming
     const shooterInstanceId = consumed.ownerInstanceId;
     const makesBefore = run.tape.events.filter(
       (event, index) =>
@@ -251,8 +269,8 @@ describe('havoc scoring mutations in simulation', () => {
         event.shooterInstanceId === shooterInstanceId &&
         index < run.tape.events.indexOf(consumed),
     );
-    const lastFour = makesBefore.slice(-4);
-    expect(lastFour.every((event) => event.kind === 'shot-attempt' && event.made)).toBe(true);
+    const lastThree = makesBefore.slice(-3);
+    expect(lastThree.every((event) => event.kind === 'shot-attempt' && event.made)).toBe(true);
   });
 
   it('doubles an immediate own-rebound putback', () => {
@@ -298,7 +316,7 @@ describe('havoc scoring mutations in simulation', () => {
     }
   });
 
-  it('rolls basketball roulette on every seventh official attempt', () => {
+  it('rolls basketball roulette on every fifth official attempt', () => {
     const rouletteHuman = buildScenarioTeam('human', [
       slot('PG', ['basketball-roulette']),
       slot('SG', []),
@@ -320,7 +338,7 @@ describe('havoc scoring mutations in simulation', () => {
     const rolls = run.tape.events.filter((event) => event.kind === 'roulette');
     expect(rolls.length).toBeGreaterThan(0);
     for (const roll of rolls) {
-      expect(roll.attemptOrdinal % 7).toBe(0);
+      expect(roll.attemptOrdinal % 5).toBe(0);
       expect(roll.rolled).toBeGreaterThanOrEqual(1);
       expect(roll.rolled).toBeLessThanOrEqual(4);
       if (roll.scoringSequence !== null) {
@@ -388,7 +406,7 @@ describe('havoc scoring mutations in simulation', () => {
         event.assisterInstanceId === first.assisterInstanceId &&
         index < run.tape.events.indexOf(first),
     );
-    expect(assistsBefore.length % 4).toBe(0);
+    expect(assistsBefore.length % 3).toBe(0);
   });
 
   it('expires unused rebound-loop extra possessions at game end', () => {

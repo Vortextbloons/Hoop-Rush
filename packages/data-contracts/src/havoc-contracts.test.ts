@@ -146,8 +146,8 @@ describe('havoc mutation catalog', () => {
   it('keeps the version set literal', () => {
     const parsed = havocVersionSetSchema.safeParse({
       schemaVersion: HAVOC_SCHEMA_VERSION,
-      rulesVersion: 'havoc-rules-v2',
-      mutationCatalogVersion: 'havoc-mutations-v2',
+      rulesVersion: 'havoc-rules-v3',
+      mutationCatalogVersion: 'havoc-mutations-v3',
       seedDerivationVersion: 'havoc-seeds-v1',
       engineVersion: 'm3-engine-v24',
       profileVersion: 'p',

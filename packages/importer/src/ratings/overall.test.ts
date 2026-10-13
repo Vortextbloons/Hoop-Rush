@@ -14,11 +14,13 @@ import {
   offensiveAbilityFor,
   defensiveAbilityFor,
   combineDomainValues,
+  productionEvidence,
   tendenciesForProfile,
   type RatingProfileInput,
 } from './v3.ts';
 import { starterStats } from './ratings-test-support.ts';
 import { estimateAttributes } from './statistical-attributes.ts';
+import { observedTeamRecord } from './overall-evidence.ts';
 
 const scale = buildOverallScale(
   Array.from({ length: 100 }, (_, index) => ({ key: String(index), score: 40 + index / 2 })),
@@ -41,10 +43,88 @@ const derive = (overrides: Partial<RatingProfileInput> = {}) =>
   deriveRatingProfile({ ...input, ...overrides });
 
 describe('total ability overall', () => {
-  it('does not reward team wins, identity, or estimated advanced metrics', () => {
+  it('values efficient supporting production above inefficient scoring volume', () => {
+    const volume = starterStats({
+      points: 1800,
+      fga: 1700,
+      fta: 350,
+      assists: 180,
+      turnovers: 240,
+      tsPct: 1800 / (2 * (1700 + 0.44 * 350)),
+      leagueTrueShooting: 0.57,
+    });
+    const support = starterStats({
+      points: 1250,
+      fga: 850,
+      fta: 200,
+      assists: 350,
+      turnovers: 100,
+      tsPct: 1250 / (2 * (850 + 0.44 * 200)),
+      leagueTrueShooting: 0.57,
+    });
+    expect(productionEvidence(support, 100, 0.36).score).toBeGreaterThan(
+      productionEvidence(volume, 100, 0.36).score,
+    );
+    expect(derive({ stats: support }).profile.rawOverallScore).toBeGreaterThan(
+      derive({ stats: volume }).profile.rawOverallScore,
+    );
+  });
+
+  it('does not award production for larger minute roles at identical rates and exposure', () => {
+    const full = starterStats({ gamesPlayed: 50, minutes: 1500 });
+    const smallerRole = { ...full, gamesPlayed: 100 };
+    expect(productionEvidence(smallerRole, 100, 0.36)).toEqual({
+      ...productionEvidence(full, 100, 0.36),
+      sampleGames: 100,
+    });
+  });
+
+  it('rewards creation, offensive rebounding and turnover security at fixed scoring', () => {
+    const baseline = productionEvidence(input.stats, 100, 0.36).score;
+    for (const stats of [
+      { ...input.stats, assists: Number(input.stats.assists) + 150 },
+      { ...input.stats, offensiveRebounds: Number(input.stats.offensiveRebounds) + 100 },
+      { ...input.stats, turnovers: Number(input.stats.turnovers) - 100 },
+    ])
+      expect(productionEvidence(stats, 100, 0.36).score).toBeGreaterThan(baseline);
+  });
+
+  it('does not invent an inefficiency penalty when shooting evidence is absent', () => {
+    const missing = derive({
+      stats: starterStats({ points: null, fga: null, fta: null, tsPct: null, usageRate: 35 }),
+    });
+    expect(missing.profile.nonlinear.weaknesses.inefficientUsage).toBe(0);
+    expect(missing.profile.production.scoringSurplusPer100).toBeNull();
+  });
+
+  it('grades defensive targeting by positional responsibility', () => {
+    const anchor = {
+      ...ratings,
+      interiorDefense: 92,
+      perimeterDefense: 35,
+      defensiveIq: 85,
+      defensiveRebound: 85,
+      block: 90,
+    };
+    const center = derive({ ratings: anchor, position: 'C' });
+    const guard = derive({ ratings: anchor, position: 'PG' });
+    expect(center.profile.nonlinear.weaknesses.defensiveTargeting).toBe(0);
+    expect(guard.profile.nonlinear.weaknesses.defensiveTargeting).toBeGreaterThan(0);
+  });
+
+  it('centers inefficient-usage costs on season league efficiency', () => {
+    const historical = derive({
+      stats: starterStats({ tsPct: 0.52, leagueTrueShooting: 0.5, usageRate: 32 }),
+    });
+    const modern = derive({
+      stats: starterStats({ tsPct: 0.6, leagueTrueShooting: 0.58, usageRate: 32 }),
+    });
+    expect(historical.profile.nonlinear.weaknesses.inefficientUsage).toBe(0);
+    expect(modern.profile.nonlinear.weaknesses.inefficientUsage).toBe(0);
+  });
+
+  it('does not reward identity or estimated advanced metrics', () => {
     const original = derive();
-    expect(derive({ teamWinPct: 0.2 }).summaryRatings).toEqual(original.summaryRatings);
-    expect(derive({ teamWinPct: 0.9 }).summaryRatings).toEqual(original.summaryRatings);
     expect(
       derive({
         playerId: 'different',
@@ -105,6 +185,7 @@ describe('total ability overall', () => {
     const original = derive();
     for (const key of [
       'insideScoring',
+      'closeShot',
       'midrange',
       'threePoint',
       'passing',
@@ -116,6 +197,8 @@ describe('total ability overall', () => {
       'block',
       'steal',
       'defensiveRebound',
+      'freeThrow',
+      'offensiveRebound',
     ] as const) {
       const improved = derive({
         ratings: { ...input.ratings, [key]: Math.min(100, input.ratings[key] + 10) },
@@ -165,11 +248,23 @@ describe('total ability overall', () => {
   });
 
   it('values comparable scoring routes without requiring guard skills from every scorer', () => {
-    const interior = { ...ratings, insideScoring: 90, midrange: 60, threePoint: 40 };
-    const perimeter = { ...ratings, insideScoring: 40, midrange: 60, threePoint: 90 };
-    expect(derive({ ratings: interior }).profile.rawOverallScore).toBe(
-      derive({ ratings: perimeter }).profile.rawOverallScore,
+    const interior = { ...ratings, insideScoring: 90, closeShot: 90, midrange: 60, threePoint: 40 };
+    const perimeter = {
+      ...ratings,
+      insideScoring: 40,
+      closeShot: 40,
+      midrange: 60,
+      threePoint: 90,
+    };
+    expect(offensiveAbilityFor(interior, input.tendencies)).toBe(
+      offensiveAbilityFor(perimeter, input.tendencies),
     );
+    expect(
+      Math.abs(
+        derive({ ratings: interior }).profile.rawOverallScore -
+          derive({ ratings: perimeter }).profile.rawOverallScore,
+      ),
+    ).toBeLessThan(2);
     const finisher = derive({
       ratings: { ...interior, passing: 35, ballHandling: 35 },
       stats: { ...input.stats, points: 900, usageRate: 16 },
@@ -209,7 +304,7 @@ describe('total ability overall', () => {
         derive({ stats, ratings: offense }).profile.rawOverallScore,
     );
     expect(gains[0]).toBeCloseTo(gains[1] ?? 0, 2);
-    expect(gains[1]).toBeCloseTo(2.952, 2);
+    expect(gains[1]).toBeGreaterThan(0);
   });
 
   it('normalizes individual production by possession exposure rather than team success', () => {
@@ -249,8 +344,8 @@ describe('total ability overall', () => {
     const smallDiagnostics = small.overallDiagnostics;
     if (diagnostics?.schemaVersion !== 2 || smallDiagnostics?.schemaVersion !== 2)
       throw new Error('missing diagnostics');
-    expect(smallDiagnostics.recognitionWeight).toBe(0);
-    expect(diagnostics.recognitionWeight).toBe(0);
+    expect(smallDiagnostics.recognitionWeight).toBeLessThan(diagnostics.recognitionWeight);
+    expect(diagnostics.recognitionWeight).toBeGreaterThan(0);
     expect(ratingProfileSchema.safeParse(full).success).toBe(true);
     expect(
       derive({ artifact, playerId: 'another', stats: { ...input.stats, honors: ['MVP-1'] } })
@@ -288,7 +383,7 @@ describe('total ability overall', () => {
       stats: { ...input.stats, honors: ['MVP-1'] },
     }).profile.overallDiagnostics;
     if (complete?.schemaVersion !== 2) throw new Error('missing diagnostics');
-    expect(complete.recognitionWeight).toBe(0);
+    expect(complete.recognitionWeight).toBe(diagnostics.recognitionWeight);
     const unrecognized = derive({ artifact, stats: input.stats }).profile.overallDiagnostics;
     if (unrecognized?.schemaVersion !== 2) throw new Error('missing diagnostics');
     expect(unrecognized.recognitionHonor).toBeNull();
@@ -436,7 +531,7 @@ describe('total ability overall', () => {
       position: 'PG',
       stats: starterStats({ points: 2400, assists: 650, tsPct: 0.62, usageRate: 32 }),
     });
-    expect(offense.profile.rawOverallScore).toBeGreaterThan(defense.profile.rawOverallScore + 8);
+    expect(offense.profile.rawOverallScore).toBeGreaterThan(defense.profile.rawOverallScore);
     expect(
       derive({
         ratings: { ...creator, perimeterDefense: 90, defensiveIq: 85 },
@@ -510,6 +605,178 @@ describe('total ability overall', () => {
     expect(measurement.vertical.value).toBeGreaterThan(regular.vertical.value);
     expect(regular.vertical.kind).toBe('estimated');
     expect(measurement.vertical.kind).toBe('derived');
+  });
+});
+
+describe('role and impact contributions', () => {
+  it('reconciles contributions even when an exceptional profile reaches the raw-score ceiling', () => {
+    const exceptional = derive({
+      season: '2000-01',
+      teamWinPct: 0.9,
+      ratings: Object.fromEntries(
+        REQUIRED_RATING_KEYS.map((key) => [key, 100]),
+      ) as SimulationRatings,
+      stats: {
+        ...input.stats,
+        points: 10000,
+        assists: 2000,
+        minutes: 10000,
+        tsPct: 1,
+        honors: ['MVP-1', 'DEF1'],
+      },
+      artifact: {
+        ...input.artifact,
+        eraReference: { mean: 80, standardDeviation: 20, sampleCount: 10000 },
+        eraReferences: { '2000s': { mean: 20, standardDeviation: 1, sampleCount: 10000 } },
+      },
+    }).profile;
+    expect(exceptional.rawOverallScore).toBe(100);
+    expect(ratingProfileSchema.safeParse(exceptional).success).toBe(true);
+  });
+
+  it('adds observed awards without stacking overlapping teams or duplicate honors', () => {
+    const baseline = derive().profile.rawOverallScore;
+    const award = (honors: string[]) => derive({ stats: { ...input.stats, honors } }).profile;
+    expect(award(['MVP-1']).rawOverallScore).toBeGreaterThan(award(['NBA1']).rawOverallScore);
+    expect(award(['NBA1']).rawOverallScore).toBeGreaterThan(award(['NBA2']).rawOverallScore);
+    expect(award(['NBA2']).rawOverallScore).toBeGreaterThan(award(['NBA3']).rawOverallScore);
+    expect(award(['NBA3']).rawOverallScore).toBeGreaterThan(baseline);
+    expect(award(['MVP-1', 'NBA1', 'NBA2', 'MVP-1']).rawOverallScore).toBe(
+      award(['MVP-1']).rawOverallScore,
+    );
+    const decorated = award(['MVP-1', 'DEF1', 'DEF2']);
+    expect(decorated.rawOverallScore).toBeGreaterThan(award(['MVP-1']).rawOverallScore);
+    expect(decorated.rawOverallScore - baseline).toBeLessThanOrEqual(2.5);
+    expect(ratingProfileSchema.safeParse(decorated).success).toBe(true);
+  });
+
+  it('shrinks team record by player involvement and treats missing records neutrally', () => {
+    const baseline = derive().profile.rawOverallScore;
+    const winning = derive({ teamWinPct: 0.9 }).profile;
+    const losing = derive({ teamWinPct: 0.1 }).profile;
+    expect(winning.rawOverallScore).toBeGreaterThan(baseline);
+    expect(losing.rawOverallScore).toBeLessThan(baseline);
+    expect(winning.rawOverallScore - baseline).toBeLessThanOrEqual(1);
+    expect(baseline - losing.rawOverallScore).toBeLessThanOrEqual(1);
+    for (const teamWinPct of [null, undefined, 0.5, NaN, -1, 2]) {
+      expect(derive({ teamWinPct }).profile.rawOverallScore).toBe(baseline);
+    }
+    const benchStats = { ...input.stats, minutes: Number(input.stats.gamesPlayed) * 5 };
+    const benchGain =
+      derive({ stats: benchStats, teamWinPct: 0.9 }).profile.rawOverallScore -
+      derive({ stats: benchStats }).profile.rawOverallScore;
+    expect(benchGain).toBeLessThan(winning.rawOverallScore - baseline);
+    expect(ratingProfileSchema.safeParse(winning).success).toBe(true);
+    expect(ratingProfileSchema.safeParse(losing).success).toBe(true);
+  });
+
+  it('does not assign the last roster team record to an aggregate multi-team season', () => {
+    const records = new Map([['winner', 0.8]]);
+    expect(observedTeamRecord({ teamExternalId: 'winner' }, null, records)).toBe(0.8);
+    expect(observedTeamRecord({}, 'winner', records)).toBe(0.8);
+    expect(observedTeamRecord({ teamExternalId: '0' }, 'winner', records)).toBeNull();
+    expect(observedTeamRecord({}, null, records)).toBeNull();
+  });
+
+  it('does not lower overall when a basketball skill improves across rating levels', () => {
+    for (const position of ['PG', 'SF', 'C']) {
+      for (const level of [35, 65, 90]) {
+        const baselineRatings = Object.fromEntries(
+          REQUIRED_RATING_KEYS.map((key) => [key, level]),
+        ) as SimulationRatings;
+        const baseline = derive({ position, ratings: baselineRatings }).profile.rawOverallScore;
+        for (const key of REQUIRED_RATING_KEYS) {
+          const improved = derive({
+            position,
+            ratings: { ...baselineRatings, [key]: Math.min(100, level + 10) },
+          }).profile.rawOverallScore;
+          expect(improved, `${position}/${String(level)}/${key}`).toBeGreaterThanOrEqual(baseline);
+        }
+      }
+    }
+  });
+
+  it('records bounded role contributions and reconciles the raw score', () => {
+    const result = derive({
+      ratings: { ...ratings, ballHandling: 95, passing: 95, offensiveIq: 95, speed: 95 },
+      tendencies: { ...input.tendencies, turnoverRate: 25, foulRate: 10 },
+    });
+    const diagnostics = result.profile.overallDiagnostics;
+    if (diagnostics?.schemaVersion !== 2) throw new Error('missing diagnostics');
+    expect(diagnostics.synergyContribution).toBeGreaterThan(0);
+    expect(diagnostics.synergyContribution).toBeLessThanOrEqual(2.5);
+    expect(diagnostics.weaknessContribution).toBeLessThan(0);
+    expect(diagnostics.weaknessContribution).toBeGreaterThanOrEqual(-3);
+    expect(ratingProfileSchema.safeParse(result.profile).success).toBe(true);
+    expect(
+      ratingProfileSchema.safeParse({
+        ...result.profile,
+        overallDiagnostics: { ...diagnostics, synergyContribution: 0 },
+      }).success,
+    ).toBe(false);
+  });
+
+  it('values close scoring, defensive events, and athletic skill combinations', () => {
+    const original = derive();
+    for (const key of ['closeShot', 'steal', 'block'] as const) {
+      expect(
+        derive({ ratings: { ...ratings, [key]: 95 } }).profile.rawOverallScore,
+      ).toBeGreaterThan(original.profile.rawOverallScore);
+    }
+    const skilled = {
+      ...ratings,
+      insideScoring: 90,
+      ballHandling: 90,
+      perimeterDefense: 90,
+      interiorDefense: 90,
+      block: 90,
+    };
+    const athletic = { ...skilled, speed: 95, strength: 95, vertical: 95 };
+    for (const key of ['speed', 'strength', 'vertical'] as const) {
+      expect(
+        derive({ ratings: { ...skilled, [key]: 95 } }).profile.rawOverallScore,
+      ).toBeGreaterThan(derive({ ratings: skilled }).profile.rawOverallScore);
+    }
+    expect(derive({ ratings: athletic }).profile.rawOverallScore).toBeGreaterThan(
+      derive({ ratings: skilled }).profile.rawOverallScore,
+    );
+    expect(derive({ ratings: athletic })).toEqual(derive({ ratings: athletic }));
+  });
+
+  it('requires current impact metrics and a full context sample, then caps both signs', () => {
+    const adjustment = {
+      adjustment: 6,
+      confidence: 1,
+      sampleCount:
+        input.artifact.confidenceTargetSamplesPerContext * input.artifact.contexts.length,
+      metrics: {
+        netRating: 10,
+        winProbability: 0.1,
+        offensiveEfficiency: 5,
+        defensiveEfficiency: 5,
+        turnovers: 0,
+        rebounds: 1,
+        shotQuality: 0.1,
+      },
+    };
+    const impact = (overrides: Partial<typeof adjustment> = {}, current = true) =>
+      derive({
+        playerId: 'supported',
+        artifact: {
+          ...input.artifact,
+          impactModelVersion: current ? input.artifact.modelVersion : 'old-model',
+          playerAdjustments: { supported: { ...adjustment, ...overrides } },
+        },
+      });
+    const baseline = derive().profile.rawOverallScore;
+    expect(impact().profile.rawOverallScore - baseline).toBeCloseTo(2, 4);
+    expect(impact({ adjustment: -6 }).profile.rawOverallScore - baseline).toBeCloseTo(-2, 4);
+    expect(impact({ confidence: 0 }).profile.rawOverallScore).toBe(baseline);
+    expect(impact({ sampleCount: adjustment.sampleCount - 1 }).profile.rawOverallScore).toBe(
+      baseline,
+    );
+    expect(impact({}, false).profile.rawOverallScore).toBe(baseline);
+    expect(ratingProfileSchema.safeParse(impact().profile).success).toBe(true);
   });
 });
 

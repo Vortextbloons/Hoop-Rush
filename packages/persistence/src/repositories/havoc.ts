@@ -242,7 +242,7 @@ function parseStored<T>(schema: z.ZodType<T>, row: unknown, label: string): T {
     const stale = [...new Set(seen)].filter((version) => !current.has(version));
     if (stale.length > 0) {
       throw new HavocLoadError('unsupported', [
-        `${label}: stored version ${stale.join(', ')} does not match current ${HAVOC_RULES_VERSION}/${HAVOC_MUTATION_CATALOG_VERSION}; the v2 balance patch changed scoring so v1 runs cannot be replayed — discard the stale active run to start fresh (${parsed.error.message})`,
+        `${label}: stored version ${stale.join(', ')} does not match current ${HAVOC_RULES_VERSION}/${HAVOC_MUTATION_CATALOG_VERSION}; a balance patch changed scoring so older runs cannot be replayed — discard the stale active run to start fresh (${parsed.error.message})`,
       ]);
     }
     throw new HavocLoadError('corrupt', [`${label}: ${parsed.error.message}`]);

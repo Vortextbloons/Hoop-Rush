@@ -153,6 +153,13 @@ export const rosterDetailsEntrySchema = z.object({
   heightInches: z.number().int().min(60).max(96).nullable(),
   weightLbs: z.number().int().min(120).max(400).nullable(),
   stats: playerSeasonStatsSchema,
+  statSources: z
+    .object({
+      per: z.url().optional(),
+      boxPlusMinus: z.url().optional(),
+      usageRate: z.url().optional(),
+    })
+    .optional(),
 });
 export type RosterDetailsEntry = z.infer<typeof rosterDetailsEntrySchema>;
 export const rosterDetailsSchema = z.object({

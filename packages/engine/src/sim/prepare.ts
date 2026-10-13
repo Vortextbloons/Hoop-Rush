@@ -6,11 +6,13 @@ import type {
 import {
   ACTION_TYPES,
   actionWeights,
+  buildActionStartTables,
   defenderBase,
   passProbability,
   teamInitiatorWeights,
-  teammateShotWeights,
+  teammateShotWeightsFor,
   zonePrep,
+  type ActionStartTables,
   type DefenderBase,
   type TeammateShots,
   type ZonePrep,
@@ -53,6 +55,7 @@ export interface TeamPrep {
   initiatorWeights: number[];
   initiatorPickTable: WeightedPickTable;
   actionWeights: Map<string, number[]>;
+  actionPickTables: Map<string, ActionStartTables>;
   teammateShots: Map<string, TeammateShots>;
   rebounderWeights: [number[], number[]];
   rebounderPickTables: [WeightedPickTable, WeightedPickTable];
@@ -84,6 +87,7 @@ export function prepareTeam(
   const evidenceOf = options.evidenceOf;
   const slotByPlayerId = new Map<string, number>();
   const actionWeightsByPlayer = new Map<string, number[]>();
+  const actionPickTablesByPlayer = new Map<string, ActionStartTables>();
   const teammateShotsByPlayer = new Map<string, TeammateShots>();
   const zonePrepByPlayer = new Map<string, ZonePrep>();
   const twoPointAnchorByPlayer = new Map<string, number | null>();
@@ -100,7 +104,9 @@ export function prepareTeam(
     const positionModifiers = responsibilityModifiersForSlot(responsibilitySlot);
     positionModifiersByPlayer.set(key, positionModifiers);
     positionModifiersByPlayer.set(player.playerId, positionModifiers);
-    actionWeightsByPlayer.set(key, actionWeights(player, positionModifiers));
+    const weights = actionWeights(player, positionModifiers);
+    actionWeightsByPlayer.set(key, weights);
+    actionPickTablesByPlayer.set(key, buildActionStartTables(weights));
     freeThrowP.push(freeThrowProbability(player, profile, evidence));
     const prep = zonePrep(player, profile, evidence);
     zonePrepByPlayer.set(key, prep);
@@ -115,12 +121,20 @@ export function prepareTeam(
       demands[index]?.attemptsPer36 ?? ENGINE_CONSTANTS.offensiveAllocation.minimumDemand,
     ]),
   );
+  const teammateListsByKey = new Map<string, SimulationPlayer[]>();
+  for (const player of players) {
+    const key = keyOf(player);
+    teammateListsByKey.set(
+      key,
+      players.filter((other) => keyOf(other) !== key),
+    );
+  }
   players.forEach((player, index) => {
     const key = keyOf(player);
+    const teammates = teammateListsByKey.get(key) ?? [];
     const byAction = ACTION_TYPES.map((action) =>
-      teammateShotWeights(
-        team,
-        player,
+      teammateShotWeightsFor(
+        teammates,
         action,
         positionModifiersByPlayer,
         keyOf,
@@ -138,7 +152,7 @@ export function prepareTeam(
             Math.max(1, players.length - 1) *
             (1 - stylePass)) /
           stylePass;
-        const peers = byAction[actionIndex]?.weights.reduce((sum, weight) => sum + weight, 0) ?? 0;
+        const peers = byAction[actionIndex]?.pickTable.total ?? 0;
         return peers / Math.max(1e-9, self + peers);
       }),
     );
@@ -158,7 +172,7 @@ export function prepareTeam(
       const pass = passPByPlayer.get(key)?.[actionIndex] ?? 0;
       shotShares[index] = (shotShares[index] ?? 0) + mass * (1 - pass);
       const receivers = teammateShotsByPlayer.get(key)?.byAction[actionIndex];
-      const receiverTotal = receivers?.weights.reduce((sum, weight) => sum + weight, 0) ?? 0;
+      const receiverTotal = receivers?.pickTable.total ?? 0;
       receivers?.teammates.forEach((receiver, receiverIndex) => {
         const slot = slotByPlayerId.get(keyOf(receiver));
         if (slot === undefined) return;
@@ -194,6 +208,7 @@ export function prepareTeam(
     initiatorWeights,
     initiatorPickTable: buildWeightedPickTable(initiatorWeights),
     actionWeights: actionWeightsByPlayer,
+    actionPickTables: actionPickTablesByPlayer,
     teammateShots: teammateShotsByPlayer,
     rebounderWeights: [offensiveRebounderWeights, defensiveRebounderWeights],
     rebounderPickTables: [

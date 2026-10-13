@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
 import { sortedJsonFiles } from '../shared/fs.ts';
+import { rosterAdvancedLoader } from './roster-advanced.ts';
 import { PUBLIC_DATA } from '../config.ts';
 import { fileExists, readJson, sha256File, sha256Hex, writeJsonRetry } from '../json.ts';
 import {
@@ -107,12 +108,13 @@ export function rebuildRosterDetails(
   const poolsDir = join(dataDir, 'pools');
   const poolFiles = sortedJsonFiles(poolsDir);
   const detailPlayers: ReturnType<typeof peakPlayerToRosterDetails>[] = [];
+  const recoverAdvanced = rosterAdvancedLoader();
   for (const name of poolFiles) {
     try {
       const raw = preloaded?.get(name) ?? readJson(join(poolsDir, name));
       const validated = parsePool(raw);
       for (const player of validated.players) {
-        detailPlayers.push(peakPlayerToRosterDetails(player));
+        detailPlayers.push({ ...peakPlayerToRosterDetails(player), ...recoverAdvanced(player) });
       }
     } catch (error) {
       throw new Error(

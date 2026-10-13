@@ -5,7 +5,7 @@ import type {
   SimulationTeam,
 } from '@hoop-rush/data-contracts';
 import type { Rng, WeightedPickTable } from './rng.ts';
-import { buildWeightedPickTable } from './rng.ts';
+import { buildTrustedWeightedPickTable, buildWeightedPickTable } from './rng.ts';
 import type { HavocEvidence } from './havoc-runtime.ts';
 import { ENGINE_CONSTANTS, type PositionResponsibilityModifiers } from './constants.ts';
 import { sameGroupMatchWeight } from './position-responsibilities.ts';
@@ -85,19 +85,49 @@ export function actionWeights(
   ];
   return weights.some((weight) => weight > 0) ? weights : ACTION_TYPES.map(() => 1);
 }
+export interface ActionStartTables {
+  readonly byStart: Record<PossessionStartType, WeightedPickTable>;
+}
+const ACTION_START_TYPES: readonly PossessionStartType[] = [
+  'neutral',
+  'madeBasket',
+  'deadBall',
+  'liveTurnover',
+  'defensiveRebound',
+  'offensiveRebound',
+];
+export function scaledActionWeights(
+  weights: readonly number[],
+  start: PossessionStartType,
+): number[] {
+  const transitionIndex = ACTION_INDEX.transition;
+  const scale = ENGINE_CONSTANTS.transitionStartMultiplier[start];
+  return ACTION_TYPES.map((_, i) => {
+    const raw = weights[i] ?? 0;
+    return Math.max(0, i === transitionIndex ? raw * scale : raw);
+  });
+}
+export function buildActionStartTables(weights: readonly number[]): ActionStartTables {
+  const byStart = {} as Record<PossessionStartType, WeightedPickTable>;
+  for (const start of ACTION_START_TYPES) {
+    byStart[start] = buildWeightedPickTable(scaledActionWeights(weights, start));
+  }
+  return { byStart };
+}
+export function pickPreparedAction(
+  tables: ActionStartTables,
+  rng: Rng,
+  start: PossessionStartType,
+): ActionType {
+  return rng.weightedPickTable(ACTION_TYPES, tables.byStart[start]);
+}
 export function pickAction(
   initiator: SimulationPlayer,
   weights: readonly number[],
   rng: Rng,
   start: PossessionStartType = 'neutral',
 ): ActionType {
-  const transitionIndex = ACTION_INDEX.transition;
-  const scale = ENGINE_CONSTANTS.transitionStartMultiplier[start];
-  const scaled = ACTION_TYPES.map((_, i) => {
-    const raw = weights[i] ?? 0;
-    return Math.max(0, i === transitionIndex ? raw * scale : raw);
-  });
-  return rng.weightedPick(ACTION_TYPES, scaled);
+  return pickPreparedAction(buildActionStartTables(weights), rng, start);
 }
 export function passProbability(initiator: SimulationPlayer, action: ActionType): number {
   const actionBase =
@@ -132,6 +162,15 @@ export function teammateShotWeights(
 ): TeammateShotWeights {
   const initiatorKey = keyOf(initiator);
   const teammates = team.players.filter((p) => keyOf(p) !== initiatorKey);
+  return teammateShotWeightsFor(teammates, action, positionModifiers, keyOf, demandOf);
+}
+export function teammateShotWeightsFor(
+  teammates: SimulationPlayer[],
+  action: ActionType,
+  positionModifiers: ReadonlyMap<string, PositionResponsibilityModifiers>,
+  keyOf: (player: SimulationPlayer) => string,
+  demandOf: (player: SimulationPlayer) => number,
+): TeammateShotWeights {
   const weights = teammates.map(
     (p) =>
       demandOf(p) *
@@ -145,7 +184,7 @@ export function teammateShotWeights(
           ? 0.6 + 0.4 * interiorScoringScore(p)
           : spacingWeight(p)),
   );
-  return { teammates, weights, pickTable: buildWeightedPickTable(weights) };
+  return { teammates, weights, pickTable: buildTrustedWeightedPickTable(weights) };
 }
 export function pickShot(
   shots: TeammateShots,
@@ -165,7 +204,7 @@ export function pickShot(
   if (selected === undefined) throw new Error(`missing finishing distribution for ${action}`);
   if (selected.teammates.length === 0) return { shooter: initiator, initiator, passed: false };
   return {
-    shooter: rng.weightedPick(selected.teammates, selected.pickTable),
+    shooter: rng.weightedPickTable(selected.teammates, selected.pickTable),
     initiator,
     passed: true,
   };
@@ -221,7 +260,7 @@ export function defenderBase(
         const rim = interior ? (rimProtection[defenderSlot] ?? 1) : 1;
         return (zoneWeights[defenderSlot] ?? 0) * match * rim;
       });
-      zoneTables.push(buildWeightedPickTable(slotWeights));
+      zoneTables.push(buildTrustedWeightedPickTable(slotWeights));
     }
     pickTables.push(zoneTables);
   }
@@ -242,7 +281,7 @@ export function pickDefender(
   const zoneIndex = ZONE_INDEX[zone];
   const table = base.pickTables[zoneIndex]?.[shooterSlot];
   if (table === undefined) return rng.pick(team.players);
-  return rng.weightedPick(team.players, table);
+  return rng.weightedPickTable(team.players, table);
 }
 const ZONE_INDEX = Object.fromEntries(SHOT_ZONES.map((zone, index) => [zone, index])) as Record<
   ShotZone,
@@ -356,7 +395,7 @@ export function zonePrep(
   const actionPickTables = Object.fromEntries(
     ACTION_TYPES.map((action) => [
       action,
-      buildWeightedPickTable(applyZonePulls(action, base, driveRate)),
+      buildTrustedWeightedPickTable(applyZonePulls(action, base, driveRate)),
     ]),
   ) as Record<ActionType, WeightedPickTable>;
   return {
@@ -389,7 +428,7 @@ export function applyZonePulls(
   return weights;
 }
 export function pickZone(action: ActionType, prep: ZonePrep, rng: Rng): ShotZone {
-  return rng.weightedPick(SHOT_ZONES, prep.actionPickTables[action]);
+  return rng.weightedPickTable(SHOT_ZONES, prep.actionPickTables[action]);
 }
 export function isThreePointZone(zone: ShotZone): boolean {
   return zone === 'cornerThree' || zone === 'aboveBreakThree';

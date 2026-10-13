@@ -26,6 +26,8 @@ import {
   loadOverallEvidence,
   loadOverallTracking,
   loadPostseasonEvidence,
+  loadTeamRecords,
+  observedTeamRecord,
 } from './overall-evidence.ts';
 import { primaryPositionForSource } from '../positions/normalize.ts';
 import { positionOverrideFor } from '../positions/overrides.ts';
@@ -187,6 +189,7 @@ export function calibrateOverallScale(
     const tracking = loadOverallTracking(season);
     const overlays = loadEvidenceMap(directory);
     const postseason = loadPostseasonEvidence(season);
+    const teamRecords = loadTeamRecords(season);
     for (const player of roster) {
       const id = player.externalId ?? '';
       const row = byId.get(id);
@@ -195,6 +198,7 @@ export function calibrateOverallScale(
         season,
         playerId: `p-${id}`,
         stats: { ...row, ...overlays.get(id), ...tracking.get(id), ...evidence.get(id) },
+        teamWinPct: observedTeamRecord(row, player.teamExternalId, teamRecords),
         position:
           positionOverrideFor(id)?.primary ?? primaryPositionForSource(player.position ?? 'SF'),
         heightInches: player.heightInches ?? null,
@@ -212,7 +216,13 @@ export function calibrateOverallScale(
       samples.set(`${id}|${season}`, {
         id,
         season,
-        base: diagnostics.rawBeforeRecognition,
+        base:
+          diagnostics.rawBeforeRecognition +
+          (diagnostics.synergyContribution ?? 0) +
+          (diagnostics.weaknessContribution ?? 0) +
+          (diagnostics.impactContribution ?? 0) +
+          diagnostics.recognitionContribution +
+          (diagnostics.teamRecordContribution ?? 0),
         postseason: diagnostics.postseasonContribution ?? 0,
         replacement: minutesPerGame >= 6 && minutesPerGame <= 15,
       });
@@ -270,7 +280,7 @@ export function calibrateOverallScale(
     modelVersion: RATING_MODEL_VERSION,
     ratingsVersion: RATINGS_VERSION,
     overallScale: scale,
-    generatedAt: '2026-10-12T00:00:00.000Z',
+    generatedAt: '2026-10-13T00:00:00.000Z',
   });
   writeJsonRetry(output, artifact);
   return scale;

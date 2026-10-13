@@ -108,7 +108,7 @@
       case 'PER':
         return optional(stats.per);
       case 'Usage':
-        return stats.usageRate === null ? '—' : percentOneDecimal(stats.usageRate);
+        return stats.usageRate === null ? '—' : `${oneDecimal(stats.usageRate)}%`;
       default:
         return '—';
     }

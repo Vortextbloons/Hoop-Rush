@@ -193,7 +193,7 @@ export const havocScoringEntrySchema = z.object({
     .array(
       z.object({
         source: havocScoringSourceSchema,
-        factor: z.literal(2),
+        factor: z.union([z.literal(2), z.literal(3)]),
       }),
     )
     .max(4),
@@ -370,6 +370,13 @@ export const havocEventSchema = z.discriminatedUnion('kind', [
     side: havocSideSchema,
     foulSequence: z.number().int().nonnegative(),
     bonusFreeThrows: z.number().int().min(1).max(2),
+  }),
+  havocEventBase.extend({
+    kind: z.literal('double-or-nothing-foul'),
+    ownerInstanceId: havocInstanceIdSchema,
+    side: havocSideSchema,
+    foulSequence: z.number().int().nonnegative(),
+    freeThrowsGranted: z.number().int().min(1).max(1),
   }),
   havocEventBase.extend({
     kind: z.literal('possession-refund'),

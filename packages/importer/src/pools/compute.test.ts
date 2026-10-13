@@ -516,6 +516,14 @@ afterAll(() => {
   }
 });
 describe('buildStats', () => {
+  it('preserves observed zero shot attempts separately from absent historical totals', () => {
+    const observed = buildStats({ gamesPlayed: 80, minutes: 3000, tpm: 0, tpa: 0 });
+    expect(observed.threesMade).toBe(0);
+    expect(observed.threesAttempted).toBe(0);
+    const absent = buildStats({ gamesPlayed: 80, minutes: 3000, tpm: null, tpa: null });
+    expect(absent.threesMade).toBeNull();
+    expect(absent.threesAttempted).toBeNull();
+  });
   it('truncates floats to ints like Python int() and maps keys', () => {
     const stats = buildStats(
       statsRow('1991-92', '9', {

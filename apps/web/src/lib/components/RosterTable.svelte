@@ -94,6 +94,10 @@
         return player.seasonKey;
       case 'overall':
         return String(player.overall);
+      case 'games':
+        return String(player.stats.gamesPlayed);
+      case 'usage':
+        return player.stats.usageRate === null ? '—' : `${formatDecimal(player.stats.usageRate)}%`;
       case 'points':
         return formatPerGame(perGame(player.stats, 'points'));
       case 'rebounds':
@@ -101,9 +105,9 @@
       case 'assists':
         return formatPerGame(perGame(player.stats, 'assists'));
       case 'ts':
-        return formatPct(player.stats.tsPct ?? 0);
+        return formatPct(player.stats.tsPct);
       case 'per':
-        return formatDecimal(player.stats.per ?? 0);
+        return formatDecimal(player.stats.per);
       default:
         return '';
     }
@@ -309,7 +313,15 @@
               </span>
             </span>
           </div>
-          <div class="mt-3 grid grid-cols-4 gap-1 rounded-md bg-surface-1 p-2 text-center text-xs">
+          <div class="mt-3 grid grid-cols-3 gap-1 rounded-md bg-surface-1 p-2 text-center text-xs">
+            <span class="rounded px-1 py-0.5">
+              <span class="block text-[10px] text-muted-foreground uppercase">Games</span>
+              <span class="text-stat block font-bold">{cellValue(player, 'games')}</span>
+            </span>
+            <span class="rounded px-1 py-0.5">
+              <span class="block text-[10px] text-muted-foreground uppercase">USG%</span>
+              <span class="text-stat block font-bold">{cellValue(player, 'usage')}</span>
+            </span>
             <span class="rounded px-1 py-0.5">
               <span class="block text-[10px] text-muted-foreground uppercase">O</span>
               <span class="text-stat block font-bold">{player.overall}</span>

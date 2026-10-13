@@ -405,6 +405,8 @@ function checkTape(
   const cloneEntered = new Set<string>();
   const cloneExited = new Set<string>();
   const grantCounts = new Map<string, number>();
+  const foulOwners = new Map<number, { side: HavocSide; hasDoubleOwner: boolean }>();
+  const doubleGiftCounts = new Map<number, number>();
   const increment = (key: string): void => {
     counts.set(key, (counts.get(key) ?? 0) + 1);
   };
@@ -525,6 +527,15 @@ function checkTape(
         }
         increment(`${event.foulerInstanceId}:fouls`);
         increment(`${event.side}:fouls`);
+        const foulSideIndex = sideIndexBySide.get(event.side);
+        const hasDoubleOwner =
+          foulSideIndex !== undefined &&
+          [...active.values()].some(
+            (participant) =>
+              participant.sideIndex === foulSideIndex &&
+              participant.mutations.has('double-or-nothing'),
+          );
+        foulOwners.set(event.sequence, { side: event.side, hasDoubleOwner });
         break;
       }
       case 'foul-relief': {
@@ -669,6 +680,33 @@ function checkTape(
         requireActive(event.shooterInstanceId, 'actor-eligibility');
         break;
       }
+      case 'double-or-nothing-foul': {
+        const foul = foulOwners.get(event.foulSequence);
+        if (foul === undefined) {
+          fail('double-or-nothing', 'extra free throw references no recorded foul');
+        } else {
+          if (foul.side !== event.side) {
+            fail('double-or-nothing', 'extra free throw side differs from its foul');
+          }
+          if (!foul.hasDoubleOwner) {
+            fail('double-or-nothing', 'extra free throw without an active Double or Nothing owner');
+          }
+        }
+        const owner = requireActive(event.ownerInstanceId, 'actor-eligibility');
+        if (owner !== undefined) {
+          if (!owner.mutations.has('double-or-nothing')) {
+            fail('double-or-nothing', 'extra free throw owner does not own Double or Nothing');
+          }
+          if (owner.sideIndex !== sideIndexBySide.get(event.side)) {
+            fail('double-or-nothing', 'extra free throw owner is not on the fouling side');
+          }
+        }
+        doubleGiftCounts.set(
+          event.foulSequence,
+          (doubleGiftCounts.get(event.foulSequence) ?? 0) + 1,
+        );
+        break;
+      }
       case 'golden-assist': {
         requireActive(event.assisterInstanceId, 'actor-eligibility');
         break;
@@ -687,6 +725,20 @@ function checkTape(
   }
 
   // foul replays against the final lines
+  for (const [sequence, foul] of foulOwners) {
+    const gifts = doubleGiftCounts.get(sequence) ?? 0;
+    if (foul.hasDoubleOwner && gifts !== 1) {
+      fail(
+        'double-or-nothing',
+        `foul ${String(sequence)} should grant exactly one extra free throw`,
+      );
+    } else if (!foul.hasDoubleOwner && gifts !== 0) {
+      fail(
+        'double-or-nothing',
+        `foul ${String(sequence)} grants extra free throws without a Double or Nothing owner`,
+      );
+    }
+  }
   for (const [instanceId, state] of foulReplay) {
     const line = findLine(result, instanceId);
     if (line === undefined) continue;

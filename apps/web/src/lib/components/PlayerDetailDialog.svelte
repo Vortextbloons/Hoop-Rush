@@ -37,17 +37,17 @@
       ppg: perGame(s, 'points'),
       rpg: perGame(s, 'rebounds'),
       apg: perGame(s, 'assists'),
-      spg: perGame(s, 'steals'),
-      bpg: perGame(s, 'blocks'),
-      topg: perGame(s, 'turnovers'),
+      spg: s.steals === null ? null : perGame(s, 'steals'),
+      bpg: s.blocks === null ? null : perGame(s, 'blocks'),
+      topg: s.turnovers === null ? null : perGame(s, 'turnovers'),
       fgPct: shotPct(s.fieldGoalsMade, s.fieldGoalsAttempted),
       threePct: shotPct(s.threesMade, s.threesAttempted),
       ftPct: shotPct(s.freeThrowsMade, s.freeThrowsAttempted),
-      ts: s.tsPct ?? 0,
-      efg: s.efgPct ?? 0,
-      per: s.per ?? 0,
-      bpm: s.boxPlusMinus ?? 0,
-      usage: s.usageRate ?? 0,
+      ts: s.tsPct,
+      efg: s.efgPct,
+      per: s.per,
+      bpm: s.boxPlusMinus,
+      usage: s.usageRate,
     };
   }
   function heightLabel(row: RosterDetailRow): string {
@@ -189,6 +189,10 @@
             </div>
           {/each}
         </div>
+        <p class="mt-3 text-xs text-muted-foreground">
+          — means unavailable in the historical source. Some stats were not recorded in older
+          seasons.
+        </p>
       {/if}
     </Dialog.Content>
   </Dialog.Portal>

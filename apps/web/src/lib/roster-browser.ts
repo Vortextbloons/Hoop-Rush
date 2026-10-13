@@ -185,17 +185,20 @@ export function perGame(stats: PlayerSeasonStats, key: keyof PlayerSeasonStats):
   if (typeof value !== 'number') return 0;
   return value / stats.gamesPlayed;
 }
-export function shotPct(made: number | null, attempted: number | null): number {
-  if (made === null || attempted === null || attempted <= 0) return 0;
+export function shotPct(made: number | null, attempted: number | null): number | null {
+  if (made === null || attempted === null || attempted <= 0) return null;
   return made / attempted;
 }
-export function formatPct(value: number): string {
+export function formatPct(value: number | null): string {
+  if (value === null) return '—';
   if (value === 0) return '0%';
   return percentOneDecimal(value);
 }
-export function formatPerGame(value: number): string {
+export function formatPerGame(value: number | null): string {
+  if (value === null) return '—';
   return oneDecimal(value);
 }
-export function formatDecimal(value: number): string {
+export function formatDecimal(value: number | null): string {
+  if (value === null) return '—';
   return oneDecimal(value);
 }

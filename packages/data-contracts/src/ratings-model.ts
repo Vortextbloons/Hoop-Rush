@@ -57,6 +57,11 @@ export const nonlinearComponentsSchema = z.object({
 });
 export type NonlinearComponents = z.infer<typeof nonlinearComponentsSchema>;
 export const productionEvidenceSchema = z.object({
+  pointsPer100: z.number().nonnegative().optional(),
+  creationPer100: z.number().nonnegative().optional(),
+  offensiveReboundsPer100: z.number().nonnegative().optional(),
+  scoringSurplusPer100: z.number().nullable().optional(),
+  turnoverSecurity: z.number().min(-5).max(5).optional(),
   creationPer36: z.number().nonnegative().optional(),
   score: z.number().min(0).max(100),
   weight: z.number().min(0).max(1),
@@ -108,6 +113,11 @@ export const overallDiagnosticsSchema = z.union([
     postseasonSourceAvailable: z.boolean().optional(),
     valueAboveReplacement: z.number().optional(),
     eraContribution: z.number().min(-4).max(4).optional(),
+    synergyContribution: z.number().min(0).max(2.5).optional(),
+    weaknessContribution: z.number().min(-3).max(0).optional(),
+    impactContribution: z.number().min(-2).max(2).optional(),
+    teamRecordContribution: z.number().min(-1).max(1).optional(),
+    clampContribution: z.number().min(-20).max(20).optional(),
   }),
 ]);
 export const ratingProfileSchema = z
@@ -153,7 +163,12 @@ export const ratingProfileSchema = z
             (diagnostics.schemaVersion === 2
               ? diagnostics.recognitionContribution +
                 (diagnostics.postseasonContribution ?? 0) +
-                (diagnostics.eraContribution ?? 0)
+                (diagnostics.eraContribution ?? 0) +
+                (diagnostics.synergyContribution ?? 0) +
+                (diagnostics.weaknessContribution ?? 0) +
+                (diagnostics.impactContribution ?? 0) +
+                (diagnostics.teamRecordContribution ?? 0) +
+                (diagnostics.clampContribution ?? 0)
               : 0),
         ) > 0.021 ||
         Math.abs(diagnostics.confidenceWeight - profile.production.weight) > 0.00001)

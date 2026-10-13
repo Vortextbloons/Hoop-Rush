@@ -250,6 +250,8 @@
     { key: 'decade', label: 'Decade', sort: 'decade', hideBelow: 'lg' },
     { key: 'season', label: 'Season', sort: 'season', hideBelow: 'md' },
     { key: 'overall', label: 'O', sort: 'overall', numeric: true },
+    { key: 'games', label: 'Games', numeric: true },
+    { key: 'usage', label: 'USG%', numeric: true },
     { key: 'points', label: 'PTS', sort: 'points', numeric: true },
     { key: 'rebounds', label: 'REB', hideBelow: 'lg', numeric: true },
     { key: 'assists', label: 'AST', hideBelow: 'lg', numeric: true },

@@ -77,14 +77,15 @@ const HAVOC_FINISH_HEIGHT_POINTS = 0.015;
 const HAVOC_WINGSPAN_REBOUND_WEIGHT = 0.1;
 const HAVOC_EQUALIZER_CAP = 85;
 const HAVOC_HIGHLIGHT_LIMIT = 16;
-const HAVOC_HEAT_STREAK_ARMS_AT = 4;
+const HAVOC_HEAT_STREAK_ARMS_AT = 3;
 const HAVOC_HEAT_EXPIRY_POSSESSIONS = 3;
-const HAVOC_BOUNTY_EXPIRY_POSSESSIONS = 2;
-const HAVOC_ROULETTE_EVERY_ATTEMPTS = 7;
+const HAVOC_BOUNTY_EXPIRY_POSSESSIONS = 3;
+const HAVOC_ROULETTE_EVERY_ATTEMPTS = 5;
 const HAVOC_ROULETTE_MIN = 1;
 const HAVOC_ROULETTE_MAX = 4;
-const HAVOC_REBOUND_LOOP_EVERY = 5;
-const HAVOC_GOLDEN_ASSIST_EVERY = 4;
+const HAVOC_REBOUND_LOOP_EVERY = 4;
+const HAVOC_GOLDEN_ASSIST_EVERY = 3;
+const HAVOC_DOUBLE_OR_NOTHING_FOUL_FREE_THROWS = 1;
 const HAVOC_DOUBLE_MISS_PENALTY = -1;
 const HAVOC_EXTRA_POSSESSION_RUSH_SECONDS = 12;
 
@@ -125,7 +126,7 @@ export interface HavocFieldGoalContribution {
 
 export interface HavocFieldGoalValue {
   addends: Array<{ source: HavocScoringSource; points: number }>;
-  multipliers: Array<{ source: HavocScoringSource; factor: 2 }>;
+  multipliers: Array<{ source: HavocScoringSource; factor: 2 | 3 }>;
   points: number;
   contributions: HavocFieldGoalContribution[];
 }
@@ -133,11 +134,12 @@ export interface HavocFieldGoalValue {
 /**
  * Exact `(nominal + Σ pre-addends) × Π multipliers + dunk bonus` resolution in
  * the stable evidence order. Roulette and reverse-basketball apply before
- * multipliers. At most one doubling multiplier applies per make: the first
- * active source in stable order (heat-check, putback, bounty, double-or-nothing)
- * wins. The four-point-dunk bonus applies after multipliers so doublings never
- * multiply it. `contributions` are the incremental score deltas at the
- * point each component applies; they sum to `points - nominal`.
+ * multipliers. At most one multiplier applies per make: the first active source
+ * in stable order (heat-check, putback, bounty, double-or-nothing) wins; The
+ * Bounty triples while the others double. The four-point-dunk bonus applies
+ * after multipliers so multipliers never multiply it. `contributions` are the
+ * incremental score deltas at the point each component applies; they sum to
+ * `points - nominal`.
  */
 export function havocFieldGoalValue(input: HavocFieldGoalValueInput): HavocFieldGoalValue {
   const addends: HavocFieldGoalValue['addends'] = [];
@@ -151,15 +153,15 @@ export function havocFieldGoalValue(input: HavocFieldGoalValueInput): HavocField
   };
   if (input.roulette !== null) add('roulette', input.roulette - input.nominal);
   if (input.reverseBasketball) add('reverse-basketball', input.three ? -2 : 1);
-  const multiply = (source: HavocScoringSource): void => {
-    multipliers.push({ source, factor: 2 });
-    contributions.push({ source, points: value });
-    value *= 2;
+  const multiply = (source: HavocScoringSource, factor: 2 | 3): void => {
+    multipliers.push({ source, factor });
+    contributions.push({ source, points: value * (factor - 1) });
+    value *= factor;
   };
-  if (input.heatCheck) multiply('heat-check');
-  else if (input.putback) multiply('second-chance-jackpot');
-  else if (input.bounty) multiply('the-bounty');
-  else if (input.doubleOrNothing) multiply('double-or-nothing');
+  if (input.heatCheck) multiply('heat-check', 2);
+  else if (input.putback) multiply('second-chance-jackpot', 2);
+  else if (input.bounty) multiply('the-bounty', 3);
+  else if (input.doubleOrNothing) multiply('double-or-nothing', 2);
   if (input.fourPointDunk) add('four-point-dunk', 1);
   return { addends, multipliers, points: value, contributions };
 }
@@ -1216,6 +1218,9 @@ class HavocGameRuntime implements HavocRuntimeHooks {
     const foulerTeam = this.teams[args.foulerSide];
     fouler.committedFouls += 1;
     fouler.chargedFouls += 1;
+    const doubleOwners = this.activeOwners(args.foulerSide, 'double-or-nothing');
+    const doubleOrNothingFreeThrows =
+      doubleOwners.length > 0 ? HAVOC_DOUBLE_OR_NOTHING_FOUL_FREE_THROWS : 0;
     let freeThrowsAwarded = 0;
     let bonusAttempts = 0;
     let andOneShooter: ParticipantState | null = null;
@@ -1263,6 +1268,23 @@ class HavocGameRuntime implements HavocRuntimeHooks {
         bonusFreeThrows: 1,
       });
     }
+    if (doubleOrNothingFreeThrows > 0) {
+      const owner = doubleOwners[0];
+      if (owner !== undefined) {
+        const counters = this.rollupFor(owner, 'double-or-nothing');
+        if (counters !== undefined) {
+          counters.triggers += 1;
+          counters.freeThrowsGranted += doubleOrNothingFreeThrows;
+        }
+        this.pushEvent({
+          kind: 'double-or-nothing-foul',
+          ownerInstanceId: owner.instanceId,
+          side: foulerTeam.side,
+          foulSequence,
+          freeThrowsGranted: doubleOrNothingFreeThrows,
+        });
+      }
+    }
     if (args.shooting && args.shooter !== null) {
       const shooter = this.requireParticipant(args.shooter);
       if (shooter.mutations.has('foul-thief')) {
@@ -1286,6 +1308,7 @@ class HavocGameRuntime implements HavocRuntimeHooks {
       bonusAttempts,
       technicalFreeThrows,
       technicalForDefense: args.foulerSide === args.offenseSide && !args.shooting,
+      doubleOrNothingFreeThrows,
     };
   }
 

@@ -3,7 +3,24 @@ import { overallSeasonEvidenceSchema, type OverallSeasonEvidence } from '@hoop-r
 import { fileExists, readJson } from '../json.ts';
 import { NBA_ROOT } from '../config.ts';
 import { z } from 'zod';
+import type { StatsRow } from './stats.ts';
 import { postseasonEvidenceSchema, type PostseasonPlayerStats } from '@hoop-rush/data-contracts';
+
+export function loadTeamRecords(season: string): Map<string, number> {
+  const path = join(NBA_ROOT, season, 'standings.json');
+  if (!fileExists(path)) return new Map();
+  const records = z.record(z.string().min(1), z.number().min(0).max(1)).parse(readJson(path));
+  return new Map(Object.entries(records));
+}
+
+export function observedTeamRecord(
+  stats: StatsRow,
+  rosterTeamId: unknown,
+  records: ReadonlyMap<string, number>,
+): number | null {
+  const teamId = typeof stats.teamExternalId === 'string' ? stats.teamExternalId : rosterTeamId;
+  return typeof teamId === 'string' ? (records.get(teamId) ?? null) : null;
+}
 
 export function loadPostseasonEvidence(season: string): {
   players: Map<string, PostseasonPlayerStats>;

@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { HavocGameResult, HavocGameTape } from '@hoop-rush/data-contracts';
 import { auditHavocGame } from './audit.ts';
-import { buildScenarioTeam, runScenario, type ScenarioRun } from './runtime-test-support.ts';
+import {
+  buildScenarioTeam,
+  runScenario,
+  searchScenario,
+  type ScenarioRun,
+} from './runtime-test-support.ts';
 
 function corruptedRun(seedText = 'havoc-audit'): ScenarioRun {
   const human = buildScenarioTeam('human', [
@@ -118,5 +123,34 @@ describe('havoc audit', () => {
     const audit = auditHavocGame(run.input, run.result, tape);
     expect(audit.ok).toBe(false);
     expect(audit.findings.some((finding) => finding.code === 'event-order')).toBe(true);
+  });
+
+  it('detects a missing double or nothing foul gift', () => {
+    const human = buildScenarioTeam('human', [
+      { slot: 'PG', mutations: ['double-or-nothing'] },
+      { slot: 'SG', mutations: [] },
+      { slot: 'SF', mutations: [] },
+      { slot: 'PF', mutations: [] },
+      { slot: 'C', mutations: [] },
+    ]);
+    const away = buildScenarioTeam('opponent', [
+      { slot: 'PG', mutations: [] },
+      { slot: 'SG', mutations: [] },
+      { slot: 'SF', mutations: [] },
+      { slot: 'PF', mutations: [] },
+      { slot: 'C', mutations: [] },
+    ]);
+    const run = searchScenario(48, human, away, (candidate) =>
+      candidate.tape.events.some((event) => event.kind === 'double-or-nothing-foul'),
+    );
+    expect(run, 'expected a double or nothing foul gift').not.toBeNull();
+    if (run === null) return;
+    const tape = cloneTape(run.tape);
+    const index = tape.events.findIndex((event) => event.kind === 'double-or-nothing-foul');
+    expect(index).toBeGreaterThanOrEqual(0);
+    tape.events.splice(index, 1);
+    const audit = auditHavocGame(run.input, run.result, tape);
+    expect(audit.ok).toBe(false);
+    expect(audit.findings.some((finding) => finding.code === 'double-or-nothing')).toBe(true);
   });
 });

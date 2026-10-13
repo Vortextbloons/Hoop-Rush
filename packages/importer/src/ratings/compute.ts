@@ -8,7 +8,7 @@ import {
   simulationTendenciesSchema,
   summaryRatingsSchema,
 } from '@hoop-rush/data-contracts';
-import { DEFAULT_SEASONS, RAW_CACHE, ensureOutputDir } from '../config.ts';
+import { DEFAULT_SEASONS, ensureOutputDir } from '../config.ts';
 import { clamp, fileExists, parseJsonLoose, readJson, safeFloat, writeJsonRetry } from '../json.ts';
 import { chunkList, defaultWorkerCount, runWorker } from '../shared/worker-pool.ts';
 import { join } from 'node:path';
@@ -25,6 +25,8 @@ import {
   loadOverallEvidence,
   loadOverallTracking,
   loadPostseasonEvidence,
+  loadTeamRecords,
+  observedTeamRecord,
 } from './overall-evidence.ts';
 import { loadThreePointReconstructionArtifact } from '../reconstruction/artifact.ts';
 import { seasonStatsEvidenceSchema } from './season-evidence.ts';
@@ -92,16 +94,6 @@ const ratingsStatsRowSchema = z.looseObject({
   statsSource: z.unknown().optional(),
 });
 type RatingsStatsRow = z.infer<typeof ratingsStatsRowSchema>;
-const winPctRowSchema = z.looseObject({
-  PLAYER_ID: z.unknown().optional(),
-  playerExternalId: z.unknown().optional(),
-  W_PCT: z.unknown().optional(),
-  wPct: z.unknown().optional(),
-  winPct: z.unknown().optional(),
-});
-const winPctFileSchema = z.looseObject({
-  rows: z.array(winPctRowSchema).optional(),
-});
 export { parseJsonLoose };
 export function readJsonLoose(path: string): unknown {
   return parseJsonLoose(readFileSync(path, 'utf8'));
@@ -119,42 +111,6 @@ export function loadEvidenceMap(outDir: string): Map<string, Record<string, unkn
   if (!fileExists(path)) return new Map();
   const data = z.record(z.string().min(1), seasonStatsEvidenceSchema).parse(readJson(path));
   return new Map(Object.entries(data));
-}
-function loadPlayerWinPctMap(season: string): Map<string, number> {
-  const map = new Map<string, number>();
-  const candidates = [
-    join(RAW_CACHE, `league_dash_player_stats_measure__measure=Advanced_season=${season}.json`),
-    join(RAW_CACHE, `league_dash_player_stats__season=${season}.json`),
-  ];
-  for (const path of candidates) {
-    if (!fileExists(path)) continue;
-    try {
-      const data = readJson(path);
-      const fileParsed = winPctFileSchema.safeParse(data);
-      let rows: z.infer<typeof winPctRowSchema>[] = [];
-      if (fileParsed.success && Array.isArray(fileParsed.data.rows)) {
-        rows = fileParsed.data.rows;
-      } else if (Array.isArray(data)) {
-        const arrayParsed = z.array(winPctRowSchema).safeParse(data);
-        if (arrayParsed.success) rows = arrayParsed.data;
-      }
-      for (const row of rows) {
-        const rawId = row.PLAYER_ID ?? row.playerExternalId ?? '';
-        const pid =
-          typeof rawId === 'string' || typeof rawId === 'number' || typeof rawId === 'boolean'
-            ? String(rawId)
-            : '';
-        if (!pid) continue;
-        const wPctRaw = row.W_PCT ?? row.wPct ?? row.winPct;
-        const wPct = typeof wPctRaw === 'number' && Number.isFinite(wPctRaw) ? wPctRaw : null;
-        if (wPct != null) {
-          map.set(pid, clamp(wPct, 0, 1));
-        }
-      }
-      if (map.size > 0) break;
-    } catch {}
-  }
-  return map;
 }
 export function estimateTeamWinPctMap(statsList: readonly RatingsStatsRow[]): Map<string, number> {
   const teamBuckets = new Map<
@@ -202,16 +158,6 @@ export function estimateTeamWinPctMap(statsList: readonly RatingsStatsRow[]): Ma
     }
   }
   return out;
-}
-function teamWinPctForPlayer(
-  stats: RatingsStatsRow,
-  rosterTeamId: string | null,
-  winMap: Map<string, number>,
-): number | null {
-  const statTeam = typeof stats.teamExternalId === 'string' ? stats.teamExternalId : null;
-  const key = statTeam ?? rosterTeamId;
-  if (!key) return null;
-  return winMap.get(key) ?? null;
 }
 export function resolveTeamWinPct(
   playerWinPct: number | null,
@@ -355,6 +301,7 @@ export function computeForSeason(season: string, force = false, overallOnly = fa
     }
   }
   if (overallOnly) {
+    const teamRecords = loadTeamRecords(season);
     const artifact = loadRatingsModelArtifact();
     if (!artifact.overallScale) throw new Error('Overall rebuild requires calibrate overall');
     const era = seasonContext(season);
@@ -375,6 +322,7 @@ export function computeForSeason(season: string, force = false, overallOnly = fa
         tendencies,
         abilityProvenance: player.provenance,
         stats,
+        teamWinPct: observedTeamRecord(stats, player.teamExternalId, teamRecords),
         position:
           positionOverrideFor(player.externalId ?? '')?.primary ??
           primaryPositionForSource(player.position ?? 'SF'),
@@ -403,9 +351,7 @@ export function computeForSeason(season: string, force = false, overallOnly = fa
   const artifact = loadRatingsModelArtifact();
   if (!artifact.overallScale) throw new Error('Rating generation requires calibrate overall');
   const threePointReconstruction = loadThreePointReconstructionArtifact();
-  const teamWinPctMap = estimateTeamWinPctMap(statsList);
-  const playerWinPctMap = loadPlayerWinPctMap(season);
-  const standingsWinPctMap = loadStandingsMap(out);
+  const teamRecords = loadTeamRecords(season);
   const overallEvidence = loadOverallEvidence(season, artifact.schemaVersion === 4);
   const overallTracking = loadOverallTracking(season);
   const postseason = loadPostseasonEvidence(season);
@@ -465,11 +411,7 @@ export function computeForSeason(season: string, force = false, overallOnly = fa
       ...overallTracking.get(extId),
       ...overallEvidence.get(extId),
     };
-    const rosterTeamId = typeof player.teamExternalId === 'string' ? player.teamExternalId : null;
-    const playerWinPct = extId ? (playerWinPctMap.get(extId) ?? null) : null;
-    const standingsWinPct = teamWinPctForPlayer(stats, rosterTeamId, standingsWinPctMap);
-    const fallbackTeamWinPct = teamWinPctForPlayer(stats, rosterTeamId, teamWinPctMap);
-    const teamWinPct = resolveTeamWinPct(playerWinPct, standingsWinPct, fallbackTeamWinPct);
+    const teamWinPct = observedTeamRecord(stats, player.teamExternalId, teamRecords);
     const derived = derivePlayerRecord({
       season,
       playerId: extId !== '' ? `p-${extId}` : (player.id ?? undefined),

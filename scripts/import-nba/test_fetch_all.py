@@ -93,6 +93,12 @@ def make_modules(
         _write(raw_cache / "bbref_ids.json", "" if empty == "bbref" else "{}")
         return {}
 
+    def roster_advanced_run(selected):
+        if fail == "roster-advanced":
+            raise RuntimeError("roster advanced boom")
+        if list(selected) != seasons:
+            raise ValueError("incorrect selected seasons")
+
     return {
         "config": FakeConfig(nba_root, raw_cache, seasons),
         "fetch_rosters": types.SimpleNamespace(run=roster_run),
@@ -100,6 +106,7 @@ def make_modules(
         "fetch_season_stats": types.SimpleNamespace(run=stats_run),
         "fetch_schedule": types.SimpleNamespace(run=schedule_run),
         "fetch_bbref_ids": types.SimpleNamespace(run=bbref_run),
+        "fetch_roster_advanced": types.SimpleNamespace(run=roster_advanced_run),
         "util": types.SimpleNamespace(
             import_metrics=lambda: {"networkRequests": 0, "cacheHits": 0}
         ),
@@ -140,6 +147,14 @@ class FetchAllFailureTests(unittest.TestCase):
     def test_all_success_returns_zero(self):
         code, output = self.run_main(["--seasons", "2024-25", "--workers", "1"])
         self.assertEqual(code, 0, output)
+
+    def test_roster_advanced_fetch_is_optional_and_reports_source_failures(self):
+        argv = ["--seasons", "2024-25", "--workers", "1", "--include-roster-advanced"]
+        code, output = self.run_main(argv)
+        self.assertEqual(code, 0, output)
+        code, output = self.run_main(argv, fail="roster-advanced")
+        self.assertEqual(code, 1, output)
+        self.assertIn("Roster advanced stats fetch failed", output)
 
     def test_stage_failure_returns_nonzero(self):
         code, output = self.run_main(["--seasons", "2024-25", "--workers", "1"], fail="stints")

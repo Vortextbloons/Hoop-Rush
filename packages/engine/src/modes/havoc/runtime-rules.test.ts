@@ -159,7 +159,7 @@ describe('havoc tier-2 rules', () => {
     if (run === null) return;
     const loop = eventsOf(run, 'rebound-loop')[0];
     if (loop?.kind !== 'rebound-loop') throw new Error('missing rebound loop');
-    expect(loop.reboundOrdinal % 5).toBe(0);
+    expect(loop.reboundOrdinal % 4).toBe(0);
     expect(loop.granted).toBeGreaterThanOrEqual(1);
     const started = run.tape.events.find(
       (event) => event.kind === 'extra-possession' && event.outcome === 'started',
@@ -244,7 +244,7 @@ describe('havoc tier-2 rules', () => {
     );
     if (consumed?.kind === 'bounty') {
       const entry = entryOf(run, consumed.scoringSequence);
-      expect(entry?.multipliers).toContainEqual({ source: 'the-bounty', factor: 2 });
+      expect(entry?.multipliers).toContainEqual({ source: 'the-bounty', factor: 3 });
     }
   });
 
@@ -583,6 +583,39 @@ describe('havoc overtime and free throws', () => {
       if (entry.kind !== 'free-throw') continue;
       expect(entry.points).toBe(1);
       expect(entry.multipliers).toEqual([]);
+    }
+  });
+
+  it('grants the opponent an extra free throw on double or nothing fouls', () => {
+    const human = buildScenarioTeam('human', humanSlotMutation('PG', 'double-or-nothing'));
+    const ownerInstanceId = human.starters[0]?.instanceId ?? '';
+    const run = searchScenario(
+      48,
+      human,
+      buildScenarioTeam('opponent', plainSlots()),
+      (candidate) => candidate.tape.events.some((event) => event.kind === 'double-or-nothing-foul'),
+    );
+    expect(run, 'expected a double or nothing foul gift').not.toBeNull();
+    if (run === null) return;
+    const gifts = eventsOf(run, 'double-or-nothing-foul');
+    expect(gifts.length).toBeGreaterThan(0);
+    for (const gift of gifts) {
+      if (gift.kind !== 'double-or-nothing-foul') continue;
+      expect(gift.ownerInstanceId).toBe(ownerInstanceId);
+      expect(gift.freeThrowsGranted).toBe(1);
+      const foul = run.tape.events.find((event) => event.sequence === gift.foulSequence);
+      if (foul?.kind !== 'foul') throw new Error('missing foul');
+      expect(foul.side).toBe(gift.side);
+      const attempts = run.tape.events.filter(
+        (event) =>
+          event.kind === 'free-throw-attempt' &&
+          event.side !== foul.side &&
+          event.possessionId === foul.possessionId &&
+          event.sequence > foul.sequence,
+      );
+      expect(attempts.length).toBeGreaterThanOrEqual(
+        foul.freeThrowsAwarded + foul.technicalFreeThrows + 1,
+      );
     }
   });
 
