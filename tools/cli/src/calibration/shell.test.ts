@@ -20,7 +20,18 @@ function gate(
   pass: boolean,
   status: M25Gate['status'] = pass ? 'pass' : 'fail',
 ): M25Gate {
-  return { key, observed: 1, target: 1, tolerance: 0, min: null, max: null, status, pass };
+  return {
+    key,
+    observed: 1,
+    target: 1,
+    tolerance: 0,
+    min: null,
+    max: null,
+    status,
+    pass,
+    sample: 10,
+    minimumSample: 1,
+  };
 }
 
 const payloadSchema = z.object({ schemaVersion: z.literal(1), command: z.string() }).strict();
@@ -65,7 +76,7 @@ function options(
 
 describe('calibration shell', () => {
   it('writes the artifact and reports a passing calibration', async () => {
-    await withTmpDir(async (tmp) => {
+    await withTmpDir((tmp) => {
       const report = runCalibrationShell(options(tmp, {}));
       expect(report.ok).toBe(true);
       expect(report.exitCode).toBe(0);
@@ -77,7 +88,7 @@ describe('calibration shell', () => {
   });
 
   it('does not build the artifact when a gate fails', async () => {
-    await withTmpDir(async (tmp) => {
+    await withTmpDir((tmp) => {
       const targets = vi.fn(() => ({ content: true }));
       const report = runCalibrationShell(
         options(tmp, { metrics: [gate('alpha', false)], targets }),
@@ -90,7 +101,7 @@ describe('calibration shell', () => {
   });
 
   it('reports skipped gates as failures', async () => {
-    await withTmpDir(async (tmp) => {
+    await withTmpDir((tmp) => {
       const report = runCalibrationShell(
         options(tmp, { metrics: [gate('alpha', false, 'skippedInsufficientSample')] }),
       );
@@ -102,7 +113,7 @@ describe('calibration shell', () => {
   });
 
   it('reports a cohort failure with exit code 2', async () => {
-    await withTmpDir(async (tmp) => {
+    await withTmpDir((tmp) => {
       const report = runCalibrationShell(
         options(tmp, {
           measure: () => {
@@ -116,7 +127,7 @@ describe('calibration shell', () => {
   });
 
   it('short-circuits to validate without measuring', async () => {
-    await withTmpDir(async (tmp) => {
+    await withTmpDir((tmp) => {
       const measure = vi.fn(() => ({
         metrics: [] as M25Gate[],
         gates: {},
@@ -134,7 +145,7 @@ describe('calibration shell', () => {
   });
 
   it('reports a commit error before the gate epilogue', async () => {
-    await withTmpDir(async (tmp) => {
+    await withTmpDir((tmp) => {
       const broken = options(tmp, {});
       // Point the artifact at a path that cannot be written (a directory).
       broken.artifact = { ...broken.artifact, outPath: tmp };
