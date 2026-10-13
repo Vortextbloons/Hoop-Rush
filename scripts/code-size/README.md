@@ -89,6 +89,32 @@ Performance: existing benchmark reports live in `Docs/quality/benchmarks/`
 (local-only). Re-run and compare the CLI benchmarks when execution or storage
 paths change (stages 2, 4, and 6).
 
+- 2026-10-12, stage 7c: `artifact.ts` and `calibration-harness.ts` merged into
+  `tools/cli/src/calibration/` (`artifacts.ts`, `harness.ts`, `report.ts`,
+  `index.ts`). The shared gate epilogue (`targetsDetail`,
+  `calibrationGateFailures`) replaces the duplicated per-command gate loops in
+  the five season calibrations that share that shape. Verified: CLI check/lint,
+  CLI suite 7 files / 38 tests, `data validate`, and `--validate` runs for the
+  challenge/influence/free-agency targets. `season health calibrate --validate`
+  and `season trade calibrate --validate` fail on pre-existing packaged-artifact
+  drift (the packaged targets files carry older target versions than the
+  schemas expect) — unrelated to this stage.
+- 2026-10-12, stage 7d: the manifest schema and I/O moved from
+  `pools/compute.ts` + `manifest/index.ts` into
+  `packages/importer/src/shared/manifest.ts`, removing the pools↔manifest
+  circular import. The pool manifest schema is now
+  `importerManifestSchema.extend({ ... })` instead of a duplicated object;
+  `readJsonTolerant` and the duplicated JSON serialization in
+  `writeJson`/`writeJsonRetry` are gone. Verified: importer check/lint, importer
+  suite 2 files / 41 tests, `data validate`, and a byte-identical
+  `import manifest` cross-check against the pre-refactor importer (both produce
+  SHA-256 `c284c27c…`).
+
+Measured after stage 7c+7d: maintained source 230,356 physical (tools/cli
+production 40,666; packages/importer production 10,415). Both slices are
+structural (shared modules and schema single-sourcing) rather than line
+reducing; the refactor's net reduction lands with stages 7e/7f.
+
 ## Baseline log
 
 - 2026-10-12, stage 7a: baselines re-verified at `802e4819` with a clean tree.
