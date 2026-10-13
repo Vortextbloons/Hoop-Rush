@@ -11,11 +11,6 @@ import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.
 import { bracketAuditReportSchema } from '../report-schemas.ts';
 import { readJson, sha256Hex } from '../io.ts';
 import { median } from '../stats.ts';
-export const BRACKET_AUDIT_OPTIONS: Record<string, boolean> = {
-  input: true,
-  format: true,
-  verbose: false,
-};
 function openingOpponentUnchanged(bracket: OpponentBracket, previewPath: string): string[] {
   const failures: string[] = [];
   const preview = readJson(previewPath);

@@ -43,12 +43,6 @@ import { auditSeasonFreeAgencyFacts } from './season-free-agency-audit.ts';
 import { sha256Hex } from '../io.ts';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-export const SEASON_RUN_REPRODUCE_OPTIONS: Record<string, boolean> = {
-  input: true,
-  manifest: true,
-  profile: true,
-  format: true,
-};
 export interface SeasonRunReplayDivergence {
   ordinal: number | null;
   commandId: string;

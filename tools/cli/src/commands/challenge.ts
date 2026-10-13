@@ -28,16 +28,6 @@ import { simChallengeReportSchema } from '../report-schemas.ts';
 import { loadPackagedData, PackagedData, loadBracketFile, loadProfileFile } from './data-loader.ts';
 import { loadFixture } from './sim.ts';
 export { FIXED_SANDBOX_ERA };
-export const SIM_CHALLENGE_OPTIONS: Record<string, boolean> = {
-  lineup: true,
-  seed: true,
-  reruns: true,
-  era: true,
-  profile: true,
-  bracket: true,
-  format: true,
-  verbose: false,
-};
 export function resolveUserTeam(lineup: string): SimulationTeam {
   if (lineup.endsWith('.json') || lineup.includes('/') || lineup.includes('\\')) {
     const path = isAbsolute(lineup) ? lineup : resolve(lineup);

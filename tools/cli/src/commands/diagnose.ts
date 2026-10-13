@@ -5,20 +5,6 @@ import { simDiagnoseReportSchema, simSeasonReportSchema } from '../report-schema
 import { buildInput, fixtureSeed, loadFixture, runSingleGame, UsageError } from './sim.ts';
 import { loadPackagedData, PackagedData } from './data-loader.ts';
 import { parseCount } from '../args.ts';
-export const DIAGNOSE_OPTIONS: Record<string, boolean> = {
-  fixture: true,
-  samples: true,
-  profile: true,
-  format: true,
-  verbose: false,
-};
-export const SEASON_OPTIONS: Record<string, boolean> = {
-  fixture: true,
-  samples: true,
-  profile: true,
-  format: true,
-  verbose: false,
-};
 function loadProfile(): {
   profile: ReturnType<PackagedData['eraProfile']>;
   packaged: ReturnType<typeof loadPackagedData>;

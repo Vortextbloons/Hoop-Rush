@@ -16,7 +16,7 @@ import {
 import { makeReport, type CliReport } from '../report.ts';
 import { seasonHealthCalibrateReportSchema } from '../report-schemas.ts';
 import { DEFAULT_MANIFEST, DEFAULT_SEASON_DIR } from './season-data.ts';
-import { resolveCalibrationArgs, seedRangeCalibrateOptions } from '../calibration-harness.ts';
+import { resolveCalibrationArgs } from '../calibration-harness.ts';
 import {
   m25ToleranceGate,
   m25LiftGate,
@@ -31,10 +31,6 @@ import {
 } from './season-calibration.ts';
 import { runSeasonM25, type SeasonM25SeasonFacts } from './season-m25-core.ts';
 import { commitTargetsArtifact, validateTargetsArtifact } from '../artifact.ts';
-export const SEASON_HEALTH_CALIBRATE_OPTIONS: Record<string, boolean> = seedRangeCalibrateOptions({
-  input: true,
-  validate: true,
-});
 export const DEFAULT_INJURY_TARGETS = resolve(DEFAULT_SEASON_DIR, 'injury-targets.json');
 export const SEASON_HEALTH_CALIBRATION_SEED_COUNT = 16;
 export const SEASON_HEALTH_VALIDATION_SEED_COUNT = 4;

@@ -77,10 +77,8 @@ import {
   runnerPipelineInput,
   type SeasonBlockRunnerState,
 } from './season-block.ts';
-import { resolveCalibrationArgs, seedRangeCalibrateOptions } from '../calibration-harness.ts';
+import { resolveCalibrationArgs } from '../calibration-harness.ts';
 import { m25FreshRun, m25RunStateFacts, M25_TRADE_WINDOW_BLOCKS } from './season-m25-core.ts';
-export const SEASON_FREE_AGENCY_CALIBRATE_OPTIONS: Record<string, boolean> =
-  seedRangeCalibrateOptions({ input: true, validate: true });
 export const DEFAULT_FREE_AGENCY_TARGETS = resolve(DEFAULT_SEASON_DIR, 'free-agency-targets.json');
 export const SEASON_FREE_AGENCY_CALIBRATION_SEED_COUNT = 8;
 export const SEASON_FREE_AGENCY_VALIDATION_SEED_COUNT = 4;

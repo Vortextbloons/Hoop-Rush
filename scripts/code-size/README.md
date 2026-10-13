@@ -91,6 +91,25 @@ paths change (stages 2, 4, and 6).
 
 ## Baseline log
 
+- 2026-10-12, stage 7a: baselines re-verified at `802e4819` with a clean tree.
+  `pnpm static` 0 errors (1 pre-existing a11y warning in `AwardsSection.svelte`);
+  `pnpm test:quick` 111 files / 1,054 passed + 1 skipped; `pnpm test:run`
+  123 files / 1,118 passed + 1 skipped; maintained source 230,319 physical
+  (runtime 182,480). `pnpm hoop-rush help` captured to
+  `tools/cli/src/fixtures/help.txt` as the CLI behavior contract, and the
+  declared option surface of all 87 commands captured to
+  `tools/cli/src/fixtures/command-options.json`.
+- 2026-10-12, stage 7b: CLI dispatch, the 77 per-command `*_OPTIONS` maps, and
+  the `commands/help.ts` help table were replaced by a typed command registry
+  (`tools/cli/src/registry/`: one module per area plus `core.ts`; `src/index.ts`
+  is dispatch and reporting only). The command surface and help text are pinned
+  by `registry.test.ts` against the two fixtures. Intentional differences:
+  `--format`/`--verbose` are now accepted by every command, the stale
+  `season game simulate --profile <eraId>` help line is gone, and the 20
+  commands without help entries render a generated fallback instead of
+  `add one to COMMAND_HELP`. tools/cli production 40,645 → 40,637 lines;
+  maintained source 230,319 → 230,311.
+
 - 2026-10-11, stage 1: baseline captured before any refactor stage. Full test
   run recorded above; the one timeout was repro'd isolated, then its ceiling
   was raised to 120 s.

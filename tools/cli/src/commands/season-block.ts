@@ -59,26 +59,6 @@ import {
   loadSeasonSchedule,
   readJsonFile,
 } from './season-data.ts';
-export const SEASON_BLOCK_SIMULATE_OPTIONS: Record<string, boolean> = {
-  input: true,
-  block: true,
-  manifest: true,
-  profile: true,
-  format: true,
-};
-export const SEASON_BLOCK_AUDIT_OPTIONS: Record<string, boolean> = {
-  input: true,
-  run: true,
-  manifest: true,
-  profile: true,
-  format: true,
-};
-export const SEASON_FULL_SIMULATE_OPTIONS: Record<string, boolean> = {
-  input: true,
-  manifest: true,
-  profile: true,
-  format: true,
-};
 export const DEFAULT_RUN_FIXTURE = resolve(
   new URL('../fixtures/', import.meta.url).pathname
     .replace(/^\/([A-Za-z]:)/, '$1')

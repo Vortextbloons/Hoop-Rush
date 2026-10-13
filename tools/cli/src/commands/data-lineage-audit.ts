@@ -7,12 +7,6 @@ import {
 } from '@hoop-rush/data-contracts';
 import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.ts';
 import { DEFAULT_MANIFEST } from './data-loader.ts';
-export const DATA_LINEAGE_AUDIT_OPTIONS: Record<string, boolean> = {
-  input: true,
-  format: true,
-  verbose: false,
-  'verify-logos': false,
-};
 interface LineageAuditPayload {
   dataVersion: string;
   slotCount: number;

@@ -76,14 +76,6 @@ export function manifestErrorReport(
 ): CliReport {
   return makeReport(command, input, { failures: [failure], exitCode: EXIT_USAGE_OR_DATA_ERROR });
 }
-export const DATA_OVERALLS_OPTIONS: Record<string, boolean> = {
-  input: true,
-  franchise: true,
-  era: true,
-  player: true,
-  limit: true,
-  format: true,
-};
 interface DataOverallsOptions {
   input: string;
   franchise?: string;

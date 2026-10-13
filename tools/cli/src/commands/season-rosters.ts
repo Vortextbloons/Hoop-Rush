@@ -29,11 +29,7 @@ import {
   seasonRostersCalibrateReportSchema,
   seasonRostersGenerateReportSchema,
 } from '../report-schemas.ts';
-import {
-  createSeedChunkRunner,
-  resolveCountCalibrationArgs,
-  seedCountCalibrateOptions,
-} from '../calibration-harness.ts';
+import { createSeedChunkRunner, resolveCountCalibrationArgs } from '../calibration-harness.ts';
 import { seasonCalibrationSeed } from './season-calibration.ts';
 import { lowerMedian } from '../stats.ts';
 import {
@@ -49,23 +45,6 @@ import {
 } from './season-data.ts';
 import type { RosterCalibrationWorkerRun } from './rosters-calibration-worker.ts';
 import { commitTargetsArtifact, runWorkerChunk } from '../artifact.ts';
-export const SEASON_ROSTERS_GENERATE_OPTIONS: Record<string, boolean> = {
-  seed: true,
-  draft: true,
-  out: true,
-  manifest: true,
-  format: true,
-};
-export const SEASON_ROSTERS_AUDIT_OPTIONS: Record<string, boolean> = {
-  input: true,
-  manifest: true,
-  'human-franchises': true,
-  format: true,
-};
-export const SEASON_ROSTERS_CALIBRATE_OPTIONS: Record<string, boolean> = seedCountCalibrateOptions({
-  targets: true,
-  validate: false,
-});
 export const rosterCalibrationSeed = seasonCalibrationSeed;
 export const ORDER_INVARIANCE_SEED_COUNT = 2;
 function humanRostersOf(state: SeasonDraftState): Array<{

@@ -28,13 +28,6 @@ import { collectionProgressionAuditReportSchema } from '../report-schemas.ts';
 import { DEFAULT_MANIFEST, readJsonFile, sha256Hex } from './season-data.ts';
 import { loadCollectionCatalog } from './collection.ts';
 
-export const COLLECTION_PROGRESSION_AUDIT_OPTIONS: Record<string, boolean> = {
-  manifest: true,
-  player: true,
-  input: true,
-  format: true,
-};
-
 export const COLLECTION_PROGRESSION_AUDIT_PLAYER_SAMPLES = 8;
 
 export function loadCollectionProgressionRules(manifestPath: string = DEFAULT_MANIFEST): {

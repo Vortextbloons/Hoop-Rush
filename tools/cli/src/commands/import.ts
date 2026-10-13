@@ -22,14 +22,6 @@ function usageFailure(command: string, input: Record<string, unknown>, message: 
     exitCode: EXIT_USAGE_OR_DATA_ERROR,
   });
 }
-export const IMPORT_RATINGS_OPTIONS: Record<string, boolean> = {
-  seasons: true,
-  'force-ratings': false,
-  'overall-only': false,
-  workers: true,
-  format: true,
-  verbose: false,
-};
 function parseWorkerCount(raw: string | null | undefined): number | undefined {
   if (raw === null || raw === undefined || raw === '') return undefined;
   const n = Number(raw);
@@ -67,14 +59,6 @@ export async function importRatings(args: {
     },
   );
 }
-export const IMPORT_POOLS_OPTIONS: Record<string, boolean> = {
-  pools: true,
-  all: false,
-  'no-assets': false,
-  workers: true,
-  format: true,
-  verbose: false,
-};
 export async function importPools(args: {
   pools?: string | null;
   all?: boolean;
@@ -113,11 +97,6 @@ export async function importPools(args: {
     { details: ['pool build complete'] },
   );
 }
-export const IMPORT_ERA_PROFILE_OPTIONS: Record<string, boolean> = {
-  era: true,
-  format: true,
-  verbose: false,
-};
 export function importEraProfile(args: { era?: string | null }): CliReport {
   const eras = splitList(args.era ?? null) ?? undefined;
   try {
@@ -133,10 +112,6 @@ export function importEraProfile(args: { era?: string | null }): CliReport {
     },
   );
 }
-export const IMPORT_MANIFEST_OPTIONS: Record<string, boolean> = {
-  format: true,
-  verbose: false,
-};
 export function importManifest(): CliReport {
   try {
     manifest.run();
@@ -145,10 +120,6 @@ export function importManifest(): CliReport {
   }
   return makeReport('import manifest', {}, { details: ['manifest content hashes refreshed'] });
 }
-export const IMPORT_OPPONENT_OPTIONS: Record<string, boolean> = {
-  format: true,
-  verbose: false,
-};
 export function importOpponent(): CliReport {
   try {
     opponent.run();
@@ -163,12 +134,6 @@ export function importOpponent(): CliReport {
     },
   );
 }
-export const IMPORT_FREEZE_OPTIONS: Record<string, boolean> = {
-  report: true,
-  era: true,
-  format: true,
-  verbose: false,
-};
 export function importFreeze(args: { report?: string | null; era?: string | null }): CliReport {
   const reportPath = args.report ?? null;
   if (reportPath === null || reportPath === '') {
@@ -187,17 +152,6 @@ export function importFreeze(args: { report?: string | null; era?: string | null
     },
   );
 }
-export const IMPORT_RUN_ALL_OPTIONS: Record<string, boolean> = {
-  seasons: true,
-  'include-schedule': false,
-  'force-stints': false,
-  'force-ratings': false,
-  workers: true,
-  'skip-bbref': false,
-  pools: true,
-  format: true,
-  verbose: false,
-};
 export async function importRunAll(args: {
   seasons?: string | null;
   includeSchedule?: boolean;

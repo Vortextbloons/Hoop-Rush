@@ -33,14 +33,7 @@ import {
 import { rosterCalibrationSeed } from './season-rosters.ts';
 import { lowerMedian, percentile } from '../stats.ts';
 import { commitTargetsArtifact } from '../artifact.ts';
-import {
-  createSeedChunkRunner,
-  resolveCountCalibrationArgs,
-  seedCountCalibrateOptions,
-} from '../calibration-harness.ts';
-export const SEASON_DRAFT_CALIBRATE_OPTIONS: Record<string, boolean> = seedCountCalibrateOptions(
-  {},
-);
+import { createSeedChunkRunner, resolveCountCalibrationArgs } from '../calibration-harness.ts';
 export const DEFAULT_OFFER_TARGETS = resolve(DEFAULT_SEASON_DIR, 'offer-targets.json');
 export interface SeasonDraftCalibrationRun {
   seed: Seed;

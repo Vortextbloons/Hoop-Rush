@@ -32,14 +32,6 @@ import {
 } from '../havoc-cli-support.ts';
 import { createHavocCommandEnvironment, HavocStateDigest } from '@hoop-rush/engine';
 
-export const HAVOC_SIMULATE_OPTIONS: Record<string, boolean> = {
-  seed: true,
-  picks: true,
-  comparison: false,
-  manifest: true,
-  format: true,
-};
-
 export interface HavocCliSimulationOptions {
   readonly seed: Seed;
   readonly plan: HavocCliDraftPlan;

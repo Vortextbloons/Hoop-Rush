@@ -11,10 +11,6 @@ import {
 import { makeReport, type CliReport } from '../report.ts';
 import { seasonPostseasonAuditReportSchema } from '../report-schemas.ts';
 import { readJsonFile } from './season-data.ts';
-export const SEASON_POSTSEASON_AUDIT_OPTIONS: Record<string, boolean> = {
-  input: true,
-  format: true,
-};
 export const seasonPostseasonAuditFixtureSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('season postseason audit fixture'),

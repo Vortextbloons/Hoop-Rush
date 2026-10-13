@@ -69,11 +69,6 @@ import {
 } from '../collection-specials.ts';
 import { DEFAULT_MANIFEST } from './data-loader.ts';
 import { collectionGameTargetsSchema } from './collection-game-calibrate.ts';
-export const DATA_VALIDATE_OPTIONS: Record<string, boolean> = {
-  input: true,
-  format: true,
-  verbose: false,
-};
 interface AuditResult {
   ok: boolean;
   details: string[];

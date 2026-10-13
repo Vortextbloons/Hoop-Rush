@@ -13,7 +13,7 @@ import { reconstructSeasonGames, reduceSeasonStandings } from '@hoop-rush/engine
 import { makeReport, type CliReport } from '../report.ts';
 import { seasonChallengesCalibrateReportSchema } from '../report-schemas.ts';
 import { DEFAULT_MANIFEST, DEFAULT_SEASON_DIR } from './season-data.ts';
-import { resolveCalibrationArgs, seedRangeCalibrateOptions } from '../calibration-harness.ts';
+import { resolveCalibrationArgs } from '../calibration-harness.ts';
 import {
   gateValue,
   gateSummary,
@@ -26,8 +26,6 @@ import {
 import { runSeasonM25, type SeasonM25SeasonFacts } from './season-m25-core.ts';
 import { commitTargetsArtifact, validateTargetsArtifact } from '../artifact.ts';
 
-export const SEASON_CHALLENGES_CALIBRATE_OPTIONS: Record<string, boolean> =
-  seedRangeCalibrateOptions({ input: true, validate: true });
 export const DEFAULT_CHALLENGE_TARGETS = resolve(DEFAULT_SEASON_DIR, 'challenge-targets.json');
 export const SEASON_CHALLENGES_CALIBRATION_SEED_COUNT = 12;
 export const SEASON_CHALLENGES_VALIDATION_SEED_COUNT = 4;

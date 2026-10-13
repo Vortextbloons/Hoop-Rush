@@ -977,15 +977,6 @@ function auditFailuresOf(runs: readonly HavocCohortRun[]): number {
   return runs.reduce((sum, run) => sum + run.auditFindings, 0);
 }
 
-export const HAVOC_CALIBRATE_OPTIONS: Record<string, boolean> = {
-  'seed-count': true,
-  'holdout-count': true,
-  mechanism: true,
-  games: true,
-  manifest: true,
-  format: true,
-};
-
 export interface HavocCalibrateArgs {
   'seed-count': string | null;
   'holdout-count': string | null;

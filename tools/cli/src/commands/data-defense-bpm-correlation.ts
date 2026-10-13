@@ -7,10 +7,6 @@ import {
 import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.ts';
 import { defenseBpmCorrelationReportSchema } from '../report-schemas.ts';
 import { tryReadJson } from '../io.ts';
-export const DATA_DEFENSE_BPM_CORRELATION_OPTIONS: Record<string, boolean> = {
-  input: true,
-  format: true,
-};
 interface DefenseBpmCorrelationOptions {
   input: string;
 }

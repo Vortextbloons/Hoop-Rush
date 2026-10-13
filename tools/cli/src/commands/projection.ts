@@ -50,50 +50,6 @@ import {
   loadSeasonRosterTargets,
 } from './season-data.ts';
 import type { SeasonProjection } from '@hoop-rush/data-contracts';
-export const PROJECTION_BASE_OPTIONS = {
-  fixture: true,
-  'seed-from': true,
-  'seed-to': true,
-  samples: true,
-  workers: true,
-  profile: true,
-  manifest: true,
-  model: true,
-  era: true,
-  reference: true,
-  format: true,
-  verbose: false,
-};
-export const PROJECTION_BUILD_OPTIONS = {
-  manifest: true,
-  out: true,
-  write: false,
-  format: true,
-  verbose: false,
-};
-export const PROJECTION_CALIBRATE_OPTIONS = {
-  manifest: true,
-  model: true,
-  targets: true,
-  'seed-from': true,
-  'seed-to': true,
-  samples: true,
-  workers: true,
-  era: true,
-  out: true,
-  validate: false,
-  'write-model': false,
-  format: true,
-  verbose: false,
-};
-export const PROJECTION_BENCHMARK_OPTIONS = {
-  manifest: true,
-  model: true,
-  era: true,
-  samples: true,
-  format: true,
-  verbose: false,
-};
 const STATIC_DATA = resolve(REPO_ROOT, 'apps/web/static/data');
 const PROJECTION_DIR = resolve(STATIC_DATA, 'projection');
 const MANIFEST_PATH = resolve(STATIC_DATA, 'manifest.json');
@@ -635,22 +591,6 @@ export function buildProjectionTargets(): ProjectionTargets {
     },
   };
 }
-export const PROJECTION_SEASON_OPTIONS = {
-  fixture: true,
-  manifest: true,
-  model: true,
-  era: true,
-  format: true,
-  verbose: false,
-};
-export const PROJECTION_AI_SHADOW_OPTIONS = {
-  manifest: true,
-  model: true,
-  era: true,
-  seed: true,
-  format: true,
-  verbose: false,
-};
 export function projectionAiShadow(input: {
   manifest: string | null | undefined;
   model: string | null | undefined;

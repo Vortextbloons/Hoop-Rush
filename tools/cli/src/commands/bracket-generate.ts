@@ -27,16 +27,6 @@ import { opponent, pools } from '@hoop-rush/importer';
 import { UsageError } from './sim.ts';
 import { parseCount } from '../args.ts';
 import { readJson, sha256Hex } from '../io.ts';
-export const BRACKET_GENERATE_OPTIONS: Record<string, boolean> = {
-  seed: true,
-  proposals: true,
-  samples: true,
-  'min-score': true,
-  'data-version': true,
-  out: true,
-  format: true,
-  verbose: false,
-};
 const COMMITTED_GENERATION_SEED: Seed = seedSchema.parse('8f2c1d4e6a9b7c3d8f2c1d4e6a9b7c3d');
 const GENERATION_VERSION = 'bracket-m3-v4';
 const SINGLE_DIFFICULTY: DifficultyProfile = {

@@ -1,0 +1,678 @@
+{
+  "help": {},
+  "calibrate overall": {
+    "output": "string",
+    "format": "string"
+  },
+  "data validate": {
+    "input": "string",
+    "format": "string",
+    "verbose": "flag"
+  },
+  "data overalls-compare": {
+    "input": "string",
+    "baseline": "string",
+    "output": "string",
+    "format": "string",
+    "allow-input-changes": "flag"
+  },
+  "data overalls": {
+    "input": "string",
+    "franchise": "string",
+    "era": "string",
+    "player": "string",
+    "limit": "string",
+    "format": "string"
+  },
+  "data overalls-distribution": {
+    "input": "string",
+    "format": "string"
+  },
+  "data overalls-audit": {
+    "input": "string",
+    "format": "string"
+  },
+  "data positions-coverage": {
+    "input": "string",
+    "format": "string"
+  },
+  "data defense-bpm-correlation": {
+    "input": "string",
+    "format": "string"
+  },
+  "data coverage": {
+    "input": "string",
+    "franchise": "string",
+    "era": "string",
+    "status": "string",
+    "format": "string",
+    "verbose": "flag"
+  },
+  "data lineage-audit": {
+    "input": "string",
+    "format": "string",
+    "verbose": "flag",
+    "verify-logos": "flag"
+  },
+  "data derive": {
+    "player": "string",
+    "season": "string",
+    "franchise": "string",
+    "format": "string",
+    "verbose": "flag"
+  },
+  "havoc simulate": {
+    "seed": "string",
+    "picks": "string",
+    "comparison": "flag",
+    "manifest": "string",
+    "format": "string"
+  },
+  "havoc audit": {
+    "input": "string",
+    "manifest": "string",
+    "format": "string"
+  },
+  "havoc calibrate": {
+    "seed-count": "string",
+    "holdout-count": "string",
+    "mechanism": "string",
+    "games": "string",
+    "manifest": "string",
+    "format": "string"
+  },
+  "sim game": {
+    "input": "string",
+    "seed": "string",
+    "seed-from": "string",
+    "seed-to": "string",
+    "samples": "string",
+    "workers": "string",
+    "fixture": "string",
+    "profile": "string",
+    "format": "string",
+    "verbose": "flag"
+  },
+  "sim batch": {
+    "input": "string",
+    "seed": "string",
+    "seed-from": "string",
+    "seed-to": "string",
+    "samples": "string",
+    "workers": "string",
+    "fixture": "string",
+    "profile": "string",
+    "format": "string",
+    "verbose": "flag"
+  },
+  "sim diagnose": {
+    "fixture": "string",
+    "samples": "string",
+    "profile": "string",
+    "format": "string",
+    "verbose": "flag"
+  },
+  "sim season": {
+    "fixture": "string",
+    "samples": "string",
+    "profile": "string",
+    "format": "string",
+    "verbose": "flag"
+  },
+  "sim challenge": {
+    "lineup": "string",
+    "seed": "string",
+    "reruns": "string",
+    "era": "string",
+    "profile": "string",
+    "bracket": "string",
+    "format": "string",
+    "verbose": "flag"
+  },
+  "sim challenge-average": {
+    "lineup": "string",
+    "seed": "string",
+    "reruns": "string",
+    "era": "string",
+    "profile": "string",
+    "bracket": "string",
+    "format": "string",
+    "verbose": "flag"
+  },
+  "bracket audit": {
+    "input": "string",
+    "format": "string",
+    "verbose": "flag"
+  },
+  "bracket generate": {
+    "seed": "string",
+    "proposals": "string",
+    "samples": "string",
+    "min-score": "string",
+    "data-version": "string",
+    "out": "string",
+    "format": "string",
+    "verbose": "flag"
+  },
+  "benchmark": {
+    "fixture": "string",
+    "samples": "string",
+    "seed-from": "string",
+    "seed-to": "string",
+    "workers": "string",
+    "profile": "string",
+    "baseline": "string",
+    "write-baseline": "string",
+    "format": "string",
+    "verbose": "flag"
+  },
+  "benchmark draft-fit": {
+    "manifest": "string",
+    "seed": "string",
+    "samples": "string",
+    "games": "string",
+    "refine-top": "string",
+    "era": "string",
+    "franchise": "string",
+    "format": "string",
+    "verbose": "flag"
+  },
+  "replay": {
+    "input": "string",
+    "expected": "string",
+    "format": "string",
+    "verbose": "flag"
+  },
+  "calibrate run": {
+    "samples": "string",
+    "seed-from": "string",
+    "workers": "string",
+    "fixture": "string",
+    "profile": "string",
+    "era": "string",
+    "challenge-samples": "string",
+    "opponent-games": "string",
+    "allow-skipped": "flag",
+    "format": "string",
+    "verbose": "flag"
+  },
+  "calibrate sensitivity": {
+    "samples": "string",
+    "seed-from": "string",
+    "workers": "string",
+    "fixture": "string",
+    "profile": "string",
+    "era": "string",
+    "challenge-samples": "string",
+    "opponent-games": "string",
+    "allow-skipped": "flag",
+    "format": "string",
+    "verbose": "flag"
+  },
+  "calibrate ratings": {
+    "player": "string",
+    "report": "string",
+    "samples": "string",
+    "workers": "string",
+    "output": "string",
+    "manifest": "string",
+    "format": "string",
+    "verbose": "flag"
+  },
+  "calibrate three-point": {
+    "write": "flag",
+    "format": "string",
+    "manifest": "string",
+    "output": "string"
+  },
+  "combine docs": {
+    "input": "string",
+    "output": "string",
+    "exceptions": "string",
+    "format": "string"
+  },
+  "season schedule generate": {
+    "out": "string",
+    "league": "string",
+    "seed": "string",
+    "manifest": "string",
+    "format": "string"
+  },
+  "season schedule audit": {
+    "schedule": "string",
+    "league": "string",
+    "manifest": "string",
+    "verbose": "flag",
+    "format": "string"
+  },
+  "season draft reproduce": {
+    "input": "string",
+    "manifest": "string",
+    "format": "string"
+  },
+  "collection pack-audit": {
+    "manifest": "string",
+    "format": "string"
+  },
+  "collection pull-reproduce": {
+    "input": "string",
+    "manifest": "string",
+    "format": "string"
+  },
+  "collection pack-calibrate": {
+    "samples": "string",
+    "starter-seeds": "string",
+    "out": "string",
+    "manifest": "string",
+    "validate": "string",
+    "format": "string"
+  },
+  "collection game-audit": {
+    "manifest": "string",
+    "games": "string",
+    "format": "string"
+  },
+  "collection game-reproduce": {
+    "input": "string",
+    "manifest": "string",
+    "format": "string"
+  },
+  "collection game-calibrate": {
+    "workers": "string",
+    "calibration-seeds": "string",
+    "validation-seeds": "string",
+    "out": "string",
+    "manifest": "string",
+    "format": "string",
+    "validate": "string"
+  },
+  "collection progression-audit": {
+    "manifest": "string",
+    "player": "string",
+    "input": "string",
+    "format": "string"
+  },
+  "collection progression-calibrate": {
+    "workers": "string",
+    "calibration-seeds": "string",
+    "validation-seeds": "string",
+    "out": "string",
+    "manifest": "string",
+    "format": "string",
+    "validate": "string"
+  },
+  "season rosters generate": {
+    "seed": "string",
+    "draft": "string",
+    "out": "string",
+    "manifest": "string",
+    "format": "string"
+  },
+  "season rosters audit": {
+    "input": "string",
+    "manifest": "string",
+    "human-franchises": "string",
+    "format": "string"
+  },
+  "season rosters calibrate": {
+    "workers": "string",
+    "calibration-seeds": "string",
+    "validation-seeds": "string",
+    "out": "string",
+    "manifest": "string",
+    "format": "string",
+    "targets": "string",
+    "validate": "flag"
+  },
+  "season draft calibrate": {
+    "workers": "string",
+    "calibration-seeds": "string",
+    "validation-seeds": "string",
+    "out": "string",
+    "manifest": "string",
+    "format": "string"
+  },
+  "season game simulate": {
+    "input": "string",
+    "seed": "string",
+    "format": "string"
+  },
+  "season game calibrate": {
+    "seed-from": "string",
+    "seed-to": "string",
+    "workers": "string",
+    "out": "string",
+    "manifest": "string",
+    "format": "string",
+    "fixture": "string",
+    "effects": "string"
+  },
+  "season block simulate": {
+    "input": "string",
+    "block": "string",
+    "manifest": "string",
+    "profile": "string",
+    "format": "string"
+  },
+  "season block audit": {
+    "input": "string",
+    "run": "string",
+    "manifest": "string",
+    "profile": "string",
+    "format": "string"
+  },
+  "season full simulate": {
+    "input": "string",
+    "manifest": "string",
+    "profile": "string",
+    "format": "string"
+  },
+  "season home-court calibrate": {
+    "seed-from": "string",
+    "seed-to": "string",
+    "workers": "string",
+    "out": "string",
+    "manifest": "string",
+    "format": "string",
+    "fixture": "string",
+    "constants": "string",
+    "validate": "string"
+  },
+  "season effects sensitivity": {
+    "seed-from": "string",
+    "seed-to": "string",
+    "workers": "string",
+    "out": "string",
+    "manifest": "string",
+    "format": "string",
+    "fixture": "string",
+    "validate": "string"
+  },
+  "season effects distribution": {
+    "seed-from": "string",
+    "seed-to": "string",
+    "workers": "string",
+    "out": "string",
+    "manifest": "string",
+    "format": "string",
+    "fixture": "string",
+    "validate": "string"
+  },
+  "season effects roles": {
+    "seed-from": "string",
+    "seed-to": "string",
+    "workers": "string",
+    "out": "string",
+    "manifest": "string",
+    "format": "string",
+    "fixture": "string",
+    "validate": "string"
+  },
+  "season effects calibrate": {
+    "seed-from": "string",
+    "seed-to": "string",
+    "workers": "string",
+    "out": "string",
+    "manifest": "string",
+    "format": "string",
+    "fixture": "string",
+    "validate": "string"
+  },
+  "season health calibrate": {
+    "seed-from": "string",
+    "seed-to": "string",
+    "workers": "string",
+    "out": "string",
+    "manifest": "string",
+    "format": "string",
+    "input": "string",
+    "validate": "string"
+  },
+  "season trade audit": {
+    "input": "string",
+    "manifest": "string",
+    "format": "string"
+  },
+  "season trade calibrate": {
+    "seed-from": "string",
+    "seed-to": "string",
+    "workers": "string",
+    "out": "string",
+    "manifest": "string",
+    "format": "string",
+    "input": "string",
+    "validate": "string",
+    "write": "flag"
+  },
+  "season influence calibrate": {
+    "seed-from": "string",
+    "seed-to": "string",
+    "workers": "string",
+    "out": "string",
+    "manifest": "string",
+    "format": "string",
+    "input": "string",
+    "validate": "string",
+    "write": "flag"
+  },
+  "season challenges calibrate": {
+    "seed-from": "string",
+    "seed-to": "string",
+    "workers": "string",
+    "out": "string",
+    "manifest": "string",
+    "format": "string",
+    "input": "string",
+    "validate": "string",
+    "write": "flag"
+  },
+  "season evolution calibrate": {
+    "fixture": "string",
+    "seed-from": "string",
+    "seed-to": "string",
+    "out": "string",
+    "manifest": "string",
+    "validate": "string",
+    "format": "string",
+    "write": "flag"
+  },
+  "season evolution validate": {
+    "out": "string",
+    "manifest": "string",
+    "format": "string"
+  },
+  "season evolution benchmark": {
+    "fixture": "string",
+    "manifest": "string",
+    "format": "string"
+  },
+  "season free-agency audit": {
+    "input": "string",
+    "manifest": "string",
+    "format": "string"
+  },
+  "season free-agency calibrate": {
+    "seed-from": "string",
+    "seed-to": "string",
+    "workers": "string",
+    "out": "string",
+    "manifest": "string",
+    "format": "string",
+    "input": "string",
+    "validate": "string"
+  },
+  "season run reproduce": {
+    "input": "string",
+    "manifest": "string",
+    "profile": "string",
+    "format": "string"
+  },
+  "season postseason audit": {
+    "input": "string",
+    "format": "string"
+  },
+  "season postseason calibrate": {
+    "seed-from": "string",
+    "seed-to": "string",
+    "workers": "string",
+    "out": "string",
+    "manifest": "string",
+    "format": "string",
+    "input": "string",
+    "validate": "string",
+    "write": "flag"
+  },
+  "season benchmark block": {
+    "input": "string",
+    "manifest": "string",
+    "profile": "string",
+    "samples": "string",
+    "out": "string",
+    "format": "string"
+  },
+  "season benchmark full": {
+    "input": "string",
+    "manifest": "string",
+    "profile": "string",
+    "samples": "string",
+    "out": "string",
+    "format": "string"
+  },
+  "season benchmark determinism": {
+    "input": "string",
+    "manifest": "string",
+    "profile": "string",
+    "samples": "string",
+    "out": "string",
+    "format": "string"
+  },
+  "season benchmark persistence": {
+    "input": "string",
+    "manifest": "string",
+    "profile": "string",
+    "samples": "string",
+    "out": "string",
+    "format": "string"
+  },
+  "projection base": {
+    "fixture": "string",
+    "seed-from": "string",
+    "seed-to": "string",
+    "samples": "string",
+    "workers": "string",
+    "profile": "string",
+    "manifest": "string",
+    "model": "string",
+    "era": "string",
+    "reference": "string",
+    "format": "string",
+    "verbose": "flag"
+  },
+  "projection season": {
+    "fixture": "string",
+    "manifest": "string",
+    "model": "string",
+    "era": "string",
+    "format": "string",
+    "verbose": "flag"
+  },
+  "projection build": {
+    "manifest": "string",
+    "out": "string",
+    "write": "flag",
+    "format": "string",
+    "verbose": "flag"
+  },
+  "projection calibrate-base": {
+    "manifest": "string",
+    "model": "string",
+    "targets": "string",
+    "seed-from": "string",
+    "seed-to": "string",
+    "samples": "string",
+    "workers": "string",
+    "era": "string",
+    "out": "string",
+    "validate": "flag",
+    "write-model": "flag",
+    "format": "string",
+    "verbose": "flag"
+  },
+  "projection validate": {
+    "manifest": "string",
+    "model": "string",
+    "targets": "string",
+    "seed-from": "string",
+    "seed-to": "string",
+    "samples": "string",
+    "workers": "string",
+    "era": "string",
+    "out": "string",
+    "validate": "flag",
+    "write-model": "flag",
+    "format": "string",
+    "verbose": "flag"
+  },
+  "projection benchmark": {
+    "manifest": "string",
+    "model": "string",
+    "era": "string",
+    "samples": "string",
+    "format": "string",
+    "verbose": "flag"
+  },
+  "projection ai-shadow": {
+    "manifest": "string",
+    "model": "string",
+    "era": "string",
+    "seed": "string",
+    "format": "string",
+    "verbose": "flag"
+  },
+  "import ratings": {
+    "seasons": "string",
+    "force-ratings": "flag",
+    "overall-only": "flag",
+    "workers": "string",
+    "format": "string",
+    "verbose": "flag"
+  },
+  "import pools": {
+    "pools": "string",
+    "all": "flag",
+    "no-assets": "flag",
+    "workers": "string",
+    "format": "string",
+    "verbose": "flag"
+  },
+  "import era-profile": {
+    "era": "string",
+    "format": "string",
+    "verbose": "flag"
+  },
+  "import manifest": {
+    "format": "string",
+    "verbose": "flag"
+  },
+  "import opponent": {
+    "format": "string",
+    "verbose": "flag"
+  },
+  "import freeze": {
+    "report": "string",
+    "era": "string",
+    "format": "string",
+    "verbose": "flag"
+  },
+  "import run-all": {
+    "seasons": "string",
+    "include-schedule": "flag",
+    "force-stints": "flag",
+    "force-ratings": "flag",
+    "workers": "string",
+    "skip-bbref": "flag",
+    "pools": "string",
+    "format": "string",
+    "verbose": "flag"
+  }
+}

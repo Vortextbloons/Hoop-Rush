@@ -45,13 +45,9 @@ import {
 } from './season-game.ts';
 import { DEFAULT_MANIFEST, DEFAULT_SEASON_DIR, readJsonFile } from './season-data.ts';
 import { seedIndexRange } from './season-calibration.ts';
-import { createFixtureCohortRunner, seedRangeCalibrateOptions } from '../calibration-harness.ts';
+import { createFixtureCohortRunner } from '../calibration-harness.ts';
 import { median } from '../stats.ts';
 import { commitTargetsArtifact, validateTargetsArtifact } from '../artifact.ts';
-export const SEASON_EFFECTS_OPTIONS: Record<string, boolean> = seedRangeCalibrateOptions({
-  fixture: true,
-  validate: true,
-});
 export const SEASON_EFFECTS_CALIBRATION_SEED_COUNT = 256;
 export const SEASON_EFFECTS_VALIDATION_SEED_COUNT = 64;
 export const SEASON_EFFECTS_PRESET_FIXTURES = [

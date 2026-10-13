@@ -5,34 +5,6 @@ import { parseCount, parseSeedRange, parseWorkers } from './args.ts';
 import { runWorkerChunks } from './artifact.ts';
 import { seedIndexRange } from './commands/season-calibration.ts';
 
-export function seedRangeCalibrateOptions(
-  extra: Record<string, boolean> = {},
-): Record<string, boolean> {
-  return {
-    'seed-from': true,
-    'seed-to': true,
-    workers: true,
-    out: true,
-    manifest: true,
-    format: true,
-    ...extra,
-  };
-}
-
-export function seedCountCalibrateOptions(
-  extra: Record<string, boolean> = {},
-): Record<string, boolean> {
-  return {
-    workers: true,
-    'calibration-seeds': true,
-    'validation-seeds': true,
-    out: true,
-    manifest: true,
-    format: true,
-    ...extra,
-  };
-}
-
 export type SeedRangeSplitMode = 'split' | 'append';
 
 export interface SeedRangeCalibration {

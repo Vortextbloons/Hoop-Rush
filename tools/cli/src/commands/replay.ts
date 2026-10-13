@@ -10,12 +10,6 @@ import {
 import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.ts';
 import { replayReportSchema } from '../report-schemas.ts';
 import { UsageError } from './sim.ts';
-export const REPLAY_OPTIONS: Record<string, boolean> = {
-  input: true,
-  expected: true,
-  format: true,
-  verbose: false,
-};
 function readInputJson<T>(
   path: string,
   schema: {

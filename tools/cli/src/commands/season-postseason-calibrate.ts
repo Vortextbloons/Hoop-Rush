@@ -15,7 +15,7 @@ import { createEngineContext, deriveSeasonAwards, handleSeasonRunCommand } from 
 import { makeReport, type CliReport } from '../report.ts';
 import { seasonPostseasonCalibrateReportSchema } from '../report-schemas.ts';
 import { DEFAULT_MANIFEST, DEFAULT_SEASON_DIR, readJsonFile } from './season-data.ts';
-import { resolveCalibrationArgs, seedRangeCalibrateOptions } from '../calibration-harness.ts';
+import { resolveCalibrationArgs } from '../calibration-harness.ts';
 import {
   gateSummary,
   m25RangeGate,
@@ -27,8 +27,6 @@ import {
 import { runSeasonM25, type SeasonM25SeasonFacts } from './season-m25-core.ts';
 import { commitTargetsArtifact } from '../artifact.ts';
 import { loadPackagedData, PackagedData } from './data-loader.ts';
-export const SEASON_POSTSEASON_CALIBRATE_OPTIONS: Record<string, boolean> =
-  seedRangeCalibrateOptions({ input: true, validate: true, write: false });
 export const DEFAULT_POSTSEASON_TARGETS = resolve(DEFAULT_SEASON_DIR, 'postseason-targets.json');
 export const SEASON_POSTSEASON_CALIBRATION_SEED_COUNT = 8;
 export const SEASON_POSTSEASON_VALIDATION_SEED_COUNT = 4;

@@ -10,16 +10,6 @@ import { makeReport, type CliReport } from '../report.ts';
 import { simChallengeAverageReportSchema } from '../report-schemas.ts';
 import { prepareChallenge } from './challenge.ts';
 export const CHALLENGE_AVERAGE_ATTEMPTS = 10;
-export const SIM_CHALLENGE_AVERAGE_OPTIONS: Record<string, boolean> = {
-  lineup: true,
-  seed: true,
-  reruns: true,
-  era: true,
-  profile: true,
-  bracket: true,
-  format: true,
-  verbose: false,
-};
 interface Spread {
   mean: number;
   min: number;

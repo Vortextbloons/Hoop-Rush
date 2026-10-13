@@ -14,11 +14,6 @@ import {
 import { makeReport, type CliReport } from '../report.ts';
 import { seasonFreeAgencyAuditReportSchema } from '../report-schemas.ts';
 import { loadSeasonRunFixture } from './season-block.ts';
-export const SEASON_FREE_AGENCY_AUDIT_OPTIONS: Record<string, boolean> = {
-  input: true,
-  manifest: true,
-  format: true,
-};
 export interface SeasonFreeAgencyAuditCounts {
   windowOrderFailures: number;
   candidateUniquenessFailures: number;

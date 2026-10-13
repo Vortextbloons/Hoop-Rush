@@ -20,11 +20,6 @@ import {
   loadSeasonRosterTargets,
   readJsonFile,
 } from './season-data.ts';
-export const SEASON_DRAFT_REPRODUCE_OPTIONS: Record<string, boolean> = {
-  input: true,
-  manifest: true,
-  format: true,
-};
 export const seasonDraftReproduceInputSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('season draft reproduce'),

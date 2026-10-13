@@ -3,11 +3,6 @@ import { makeReport, type CliReport } from '../report.ts';
 import { overallsAuditReportSchema } from '../report-schemas.ts';
 import { loadOverallRows, manifestErrorReport } from './data-overalls.ts';
 
-export const DATA_OVERALLS_AUDIT_OPTIONS: Record<string, boolean> = {
-  input: true,
-  format: true,
-};
-
 interface DataOverallsAuditOptions {
   input: string;
 }

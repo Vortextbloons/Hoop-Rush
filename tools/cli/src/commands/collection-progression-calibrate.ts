@@ -63,11 +63,7 @@ import { median } from '../stats.ts';
 import { collectionProgressionCalibrateReportSchema } from '../report-schemas.ts';
 import { validateTargetsArtifact } from '../artifact.ts';
 import { atomicWriteFileSync } from '../io.ts';
-import {
-  createSeedChunkRunner,
-  resolveCountCalibrationArgs,
-  seedCountCalibrateOptions,
-} from '../calibration-harness.ts';
+import { createSeedChunkRunner, resolveCountCalibrationArgs } from '../calibration-harness.ts';
 import { DEFAULT_MANIFEST, readJsonFile, sha256Hex } from './season-data.ts';
 import { loadCollectionCatalog } from './collection.ts';
 import { loadCollectionGameRules } from './collection-game.ts';
@@ -94,9 +90,6 @@ import {
   type ProgressionPurchaseResult,
   type ProgressionStandardJob,
 } from '../collection-progression-calibration.ts';
-
-export const COLLECTION_PROGRESSION_CALIBRATE_OPTIONS: Record<string, boolean> =
-  seedCountCalibrateOptions({ validate: true });
 
 export const DEFAULT_COLLECTION_PROGRESSION_TARGETS = resolve(
   dirname(DEFAULT_MANIFEST),

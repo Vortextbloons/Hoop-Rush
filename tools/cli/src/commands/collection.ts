@@ -25,17 +25,6 @@ import {
 } from '../report-schemas.ts';
 import { DEFAULT_MANIFEST, readJsonFile, sha256Hex } from './season-data.ts';
 
-export const COLLECTION_PACK_AUDIT_OPTIONS: Record<string, boolean> = {
-  manifest: true,
-  format: true,
-};
-
-export const COLLECTION_PULL_REPRODUCE_OPTIONS: Record<string, boolean> = {
-  input: true,
-  manifest: true,
-  format: true,
-};
-
 export function loadCollectionCatalog(
   manifestPath: string = DEFAULT_MANIFEST,
   catalogPath?: string,

@@ -6,10 +6,6 @@ import {
 import { makeReport, type CliReport } from '../report.ts';
 import { overallsDistributionReportSchema } from '../report-schemas.ts';
 import { loadOverallRows, manifestErrorReport } from './data-overalls.ts';
-export const DATA_OVERALLS_DISTRIBUTION_OPTIONS: Record<string, boolean> = {
-  input: true,
-  format: true,
-};
 interface DataOverallsDistributionOptions {
   input: string;
 }

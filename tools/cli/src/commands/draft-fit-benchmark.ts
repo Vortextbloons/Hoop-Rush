@@ -28,18 +28,6 @@ import { makeReport, type CliReport } from '../report.ts';
 import { draftFitBenchmarkReportSchema } from '../report-schemas.ts';
 import { loadPackagedData, PackagedData } from './data-loader.ts';
 
-export const DRAFT_FIT_BENCHMARK_OPTIONS: Record<string, boolean> = {
-  manifest: true,
-  seed: true,
-  samples: true,
-  games: true,
-  'refine-top': true,
-  era: true,
-  franchise: true,
-  format: true,
-  verbose: false,
-};
-
 type OverallLineup = [
   PeakPlayerSeason,
   PeakPlayerSeason,

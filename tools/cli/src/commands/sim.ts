@@ -20,18 +20,6 @@ import { simFixtureSchema, type SimFixture } from '../fixture-schema.ts';
 import { parseCount, UsageError } from '../args.ts';
 import { loadPackagedData, PackagedData, loadProfileFile } from './data-loader.ts';
 export { UsageError };
-export const SIM_OPTIONS: Record<string, boolean> = {
-  input: true,
-  seed: true,
-  'seed-from': true,
-  'seed-to': true,
-  samples: true,
-  workers: true,
-  fixture: true,
-  profile: true,
-  format: true,
-  verbose: false,
-};
 const FIXTURES_DIR = new URL('../fixtures/', import.meta.url).pathname
   .replace(/^\/([A-Za-z]:)/, '$1')
   .replace(/%20/g, ' ');

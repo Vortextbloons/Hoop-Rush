@@ -12,14 +12,6 @@ import {
   runnerPipelineInput,
   type SeasonBlockRunnerState,
 } from './season-block.ts';
-export const SEASON_BENCHMARK_OPTIONS: Record<string, boolean> = {
-  input: true,
-  manifest: true,
-  profile: true,
-  samples: true,
-  out: true,
-  format: true,
-};
 export const SEASON_BUDGET_NORMAL_BLOCK_MS = 3000;
 export const SEASON_BUDGET_FINAL_BLOCK_MS = 1000;
 export const SEASON_BUDGET_FULL_SEASON_MS = 30000;

@@ -10,14 +10,6 @@ import { NBA_ROOT, REPO_ROOT, ratings, readJson, writeJsonRetry } from '@hoop-ru
 import { makeReport, type CliReport } from '../report.ts';
 import { loadOverallRows } from './data-overalls.ts';
 
-export const DATA_OVERALLS_COMPARE_OPTIONS: Record<string, boolean> = {
-  input: true,
-  baseline: true,
-  output: true,
-  format: true,
-  'allow-input-changes': false,
-};
-
 const baselineSchema = z.object({
   rows: z.array(peakPlayerSeasonSchema),
   fingerprints: z

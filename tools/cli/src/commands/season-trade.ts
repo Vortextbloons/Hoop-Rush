@@ -23,7 +23,7 @@ import {
 import { makeReport, type CliReport } from '../report.ts';
 import { seasonTradeCalibrateReportSchema } from '../report-schemas.ts';
 import { DEFAULT_MANIFEST, DEFAULT_SEASON_DIR, readJsonFile } from './season-data.ts';
-import { resolveCalibrationArgs, seedRangeCalibrateOptions } from '../calibration-harness.ts';
+import { resolveCalibrationArgs } from '../calibration-harness.ts';
 import {
   gateValue,
   gateSummary,
@@ -35,15 +35,6 @@ import {
 } from './season-calibration.ts';
 import { runSeasonM25, type SeasonM25SeasonFacts } from './season-m25-core.ts';
 import { commitTargetsArtifact, validateTargetsArtifact } from '../artifact.ts';
-export const SEASON_TRADE_CALIBRATE_OPTIONS: Record<string, boolean> = seedRangeCalibrateOptions({
-  input: true,
-  validate: true,
-});
-export const SEASON_TRADE_AUDIT_OPTIONS: Record<string, boolean> = {
-  input: true,
-  manifest: true,
-  format: true,
-};
 export const DEFAULT_TRADE_TARGETS = resolve(DEFAULT_SEASON_DIR, 'trade-targets.json');
 export const SEASON_TRADE_CALIBRATION_SEED_COUNT = 8;
 export const SEASON_TRADE_VALIDATION_SEED_COUNT = 4;

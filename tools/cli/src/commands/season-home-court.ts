@@ -29,11 +29,8 @@ import {
   createFixtureCohortRunner,
   resolveCalibrationArgs,
   runCalibratedSeeds,
-  seedRangeCalibrateOptions,
 } from '../calibration-harness.ts';
 import { commitTargetsArtifact } from '../artifact.ts';
-export const SEASON_HOME_COURT_CALIBRATE_OPTIONS: Record<string, boolean> =
-  seedRangeCalibrateOptions({ fixture: true, constants: true, validate: true });
 export const SEASON_HOME_COURT_CALIBRATION_SEED_COUNT = 1024;
 export const SEASON_HOME_COURT_VALIDATION_SEED_COUNT = 256;
 export const SEASON_HOME_COURT_SEED_TOTAL =

@@ -52,18 +52,6 @@ import { COLLECTION_GAME_CPU_LEGACY_WEIGHTS } from '../collection-game-constants
 import { DEFAULT_MANIFEST, readJsonFile, sha256Hex } from './season-data.ts';
 import { loadCollectionCatalog } from './collection.ts';
 
-export const COLLECTION_GAME_AUDIT_OPTIONS: Record<string, boolean> = {
-  manifest: true,
-  games: true,
-  format: true,
-};
-
-export const COLLECTION_GAME_REPRODUCE_OPTIONS: Record<string, boolean> = {
-  input: true,
-  manifest: true,
-  format: true,
-};
-
 const FIXED_ROOT_SEED = 'c04c3c71061eca4c71061eca4c71061e';
 const HELD_OUT_ROOT_SEED = '9a9e3e771061eca4c71061eca4c71061e';
 export const COLLECTION_GAME_AUDIT_DIFFICULTIES: CollectionDifficultyId[] = [

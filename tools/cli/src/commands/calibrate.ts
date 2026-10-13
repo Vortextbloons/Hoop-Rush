@@ -32,19 +32,6 @@ import { buildInput, fixtureSeed, loadFixture, runSingleGame, UsageError } from 
 import { lineupForTeam } from './challenge.ts';
 import { loadPackagedData, PackagedData, loadProfileFile } from './data-loader.ts';
 import { parseCount } from '../args.ts';
-export const CALIBRATE_OPTIONS: Record<string, boolean> = {
-  samples: true,
-  'seed-from': true,
-  workers: true,
-  fixture: true,
-  profile: true,
-  era: true,
-  'challenge-samples': true,
-  'opponent-games': true,
-  'allow-skipped': false,
-  format: true,
-  verbose: false,
-};
 export function leagueAverageTeam(pool: FranchiseEraPool): SimulationTeam {
   const usage = pool.players.map((p) => Math.max(0.01, p.tendencies.usageRate));
   const totalUsage = usage.reduce((a, b) => a + b, 0);

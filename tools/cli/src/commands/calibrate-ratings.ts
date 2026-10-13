@@ -278,16 +278,6 @@ function pairImpact(args: {
       replacementAcc.shotQuality / Math.max(1, samples),
   };
 }
-export const CALIBRATE_RATINGS_OPTIONS: Record<string, boolean> = {
-  player: true,
-  report: true,
-  samples: true,
-  workers: true,
-  output: true,
-  manifest: true,
-  format: true,
-  verbose: false,
-};
 export function calibrateRatings(args: {
   player?: string;
   report?: string;

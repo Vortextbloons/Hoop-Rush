@@ -3,12 +3,6 @@ import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.ts';
 import { REPO_ROOT } from './data-loader.ts';
 import { UsageError } from '../args.ts';
-export const COMBINE_DOCS_OPTIONS: Record<string, boolean> = {
-  input: true,
-  output: true,
-  exceptions: true,
-  format: true,
-};
 export const DEFAULT_DOCS_DIR = resolve(REPO_ROOT, 'Docs');
 export const DEFAULT_EXCEPTIONS_FILE = 'combine-exceptions.txt';
 export const DEFAULT_COMBINED_OUTPUT = 'combined.md';

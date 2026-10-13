@@ -30,25 +30,6 @@ import { seasonCalibrationSeed, seedIndexRange } from './season-calibration.ts';
 import { commitTargetsArtifact, validateTargetsArtifact } from '../artifact.ts';
 import { loadSeasonGameFixture, SEASON_GAME_PRESET_FIXTURES } from './season-game.ts';
 
-export const SEASON_EVOLUTION_CALIBRATE_OPTIONS: Record<string, boolean> = {
-  fixture: true,
-  'seed-from': true,
-  'seed-to': true,
-  out: true,
-  manifest: true,
-  validate: true,
-  format: true,
-};
-export const SEASON_EVOLUTION_VALIDATE_OPTIONS: Record<string, boolean> = {
-  out: true,
-  manifest: true,
-  format: true,
-};
-export const SEASON_EVOLUTION_BENCHMARK_OPTIONS: Record<string, boolean> = {
-  fixture: true,
-  manifest: true,
-  format: true,
-};
 export const DEFAULT_EVOLUTION_TARGETS = resolve(
   DEFAULT_SEASON_DIR,
   'franchise-evolution-targets.json',

@@ -37,15 +37,6 @@ import { atomicWriteFileSync } from '../io.ts';
 import { DEFAULT_MANIFEST, readJsonFile, sha256Hex } from './season-data.ts';
 import { loadCollectionCatalog } from './collection.ts';
 
-export const COLLECTION_PACK_CALIBRATE_OPTIONS: Record<string, boolean> = {
-  samples: true,
-  'starter-seeds': true,
-  out: true,
-  manifest: true,
-  validate: true,
-  format: true,
-};
-
 export const DEFAULT_COLLECTION_TARGETS = resolve(
   dirname(DEFAULT_MANIFEST),
   'collection/pack-targets.json',

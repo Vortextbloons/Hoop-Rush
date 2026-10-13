@@ -16,13 +16,6 @@ import {
   resolveHistoricalIdentity,
 } from '@hoop-rush/importer';
 import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.ts';
-export const DATA_DERIVE_OPTIONS: Record<string, boolean> = {
-  player: true,
-  season: true,
-  franchise: true,
-  format: true,
-  verbose: false,
-};
 const stintRowSchema = z.looseObject({
   playerExternalId: z.unknown().optional(),
   teamExternalId: z.unknown().optional(),

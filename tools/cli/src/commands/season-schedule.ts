@@ -27,20 +27,6 @@ import {
   resolveArtifact,
   resolveSeasonArtifact,
 } from './season-data.ts';
-export const SEASON_SCHEDULE_GENERATE_OPTIONS: Record<string, boolean> = {
-  out: true,
-  league: true,
-  seed: true,
-  manifest: true,
-  format: true,
-};
-export const SEASON_SCHEDULE_AUDIT_OPTIONS: Record<string, boolean> = {
-  schedule: true,
-  league: true,
-  manifest: true,
-  verbose: false,
-  format: true,
-};
 function serializeSchedule(schedule: SeasonSchedule): string {
   return `${JSON.stringify(schedule)}\n`;
 }

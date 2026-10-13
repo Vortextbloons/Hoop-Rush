@@ -7,14 +7,6 @@ import {
 import { FIELD_AVAILABILITY } from '@hoop-rush/importer';
 import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.ts';
 import { DEFAULT_MANIFEST } from './data-loader.ts';
-export const DATA_COVERAGE_OPTIONS: Record<string, boolean> = {
-  input: true,
-  franchise: true,
-  era: true,
-  status: true,
-  format: true,
-  verbose: false,
-};
 interface CoverageRow {
   franchiseId: string;
   eraId: string;

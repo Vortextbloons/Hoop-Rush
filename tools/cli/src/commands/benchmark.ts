@@ -9,18 +9,6 @@ import { loadPackagedData, PackagedData, REPO_ROOT } from './data-loader.ts';
 import { lineupForTeam, resolveUserTeam } from './challenge.ts';
 import { buildInput, chunkRange, fixtureSeed, loadFixture, runSingleGame } from './sim.ts';
 import { parseCount } from '../args.ts';
-export const BENCHMARK_OPTIONS: Record<string, boolean> = {
-  fixture: true,
-  samples: true,
-  'seed-from': true,
-  'seed-to': true,
-  workers: true,
-  profile: true,
-  baseline: true,
-  'write-baseline': true,
-  format: true,
-  verbose: false,
-};
 function stats(samples: readonly number[]): {
   medianMs: number;
   p95Ms: number;

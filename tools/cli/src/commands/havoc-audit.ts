@@ -28,12 +28,6 @@ import {
   type HavocSimulateReport,
 } from '../havoc-cli-support.ts';
 
-export const HAVOC_AUDIT_OPTIONS: Record<string, boolean> = {
-  input: true,
-  manifest: true,
-  format: true,
-};
-
 function sameJson(left: unknown, right: unknown): boolean {
   return canonicalJson(left) === canonicalJson(right);
 }

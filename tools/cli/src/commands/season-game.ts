@@ -34,17 +34,8 @@ import {
   createFixtureCohortRunner,
   resolveCalibrationArgs,
   runCalibratedSeeds,
-  seedRangeCalibrateOptions,
 } from '../calibration-harness.ts';
 import { lowerMedian, percentile } from '../stats.ts';
-export const SEASON_GAME_SIMULATE_OPTIONS: Record<string, boolean> = {
-  input: true,
-  seed: true,
-  format: true,
-};
-export const SEASON_GAME_CALIBRATE_OPTIONS: Record<string, boolean> = seedRangeCalibrateOptions({
-  fixture: true,
-});
 export const SEASON_GAME_CALIBRATION_SEED_COUNT = 1024;
 export const SEASON_GAME_VALIDATION_SEED_COUNT = 256;
 export const SEASON_GAME_CALIBRATION_SEED_TOTAL =

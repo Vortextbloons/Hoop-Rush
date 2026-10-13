@@ -13,12 +13,6 @@ import {
 import { makeReport, type CliReport } from '../report.ts';
 import { loadPackagedData } from './data-loader.ts';
 import { threePointCalibrateReportSchema } from '../report-schemas.ts';
-export const CALIBRATE_THREE_POINT_OPTIONS: Record<string, boolean> = {
-  write: false,
-  format: true,
-  manifest: true,
-  output: true,
-};
 export function calibrateThreePoint(args: {
   write?: boolean;
   format?: string;

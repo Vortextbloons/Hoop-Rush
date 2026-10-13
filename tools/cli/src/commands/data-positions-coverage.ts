@@ -8,11 +8,6 @@ import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.
 import { positionsCoverageReportSchema } from '../report-schemas.ts';
 import { tryReadJson } from '../io.ts';
 
-export const DATA_POSITIONS_COVERAGE_OPTIONS: Record<string, boolean> = {
-  input: true,
-  format: true,
-};
-
 interface DataPositionsCoverageOptions {
   input: string;
 }
