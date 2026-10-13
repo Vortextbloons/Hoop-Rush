@@ -13,13 +13,12 @@ import {
   rollSeasonInjuryForPlayer,
   type SeasonInjuryRollInput,
 } from '@hoop-rush/engine';
-import { makeReport, type CliReport } from '../report.ts';
+import { type CliReport } from '../report.ts';
 import { seasonHealthCalibrateReportSchema } from '../report-schemas.ts';
 import { DEFAULT_MANIFEST, DEFAULT_SEASON_DIR } from './season-data.ts';
 import {
-  calibrationGateFailures,
-  commitTargetsArtifact,
   resolveCalibrationArgs,
+  runCalibrationShell,
   targetsDetail,
   validateTargetsArtifact,
 } from '../calibration/index.ts';
@@ -28,7 +27,6 @@ import {
   m25LiftGate,
   m25GapGate,
   gateValue,
-  gateSummary,
   mean,
   rateBasisPoints,
   seasonCalibrationSeed,
@@ -692,159 +690,156 @@ export function seasonHealthCalibrate(args: SeasonHealthArgs): CliReport {
   const probeRootSeed = seasonCalibrationSeed(
     SEASON_HEALTH_CALIBRATION_SEED_COUNT + SEASON_HEALTH_VALIDATION_SEED_COUNT,
   );
-  if (validateOnly) {
-    return validateSeasonInjuryTargets(args, resolve(args.validate ?? outPath));
-  }
-  let calibrationCohort: ReturnType<typeof foldSeasonCohort>;
-  let heldOutCohort: ReturnType<typeof foldSeasonCohort>;
-  let probes: ReturnType<typeof runSeasonHealthCohort>['probes'];
-  try {
-    const calibration = runSeasonHealthCohort(args, calibrationIndices, probeRootSeed);
-    probes = calibration.probes;
-    calibrationCohort = foldSeasonCohort(calibration.seasons);
-    const heldOut = runSeasonHealthCohort(args, validationIndices, probeRootSeed);
-    heldOutCohort = foldSeasonCohort(heldOut.seasons);
-  } catch (error) {
-    return makeReport(
-      'season health calibrate',
-      { seedFrom: from, seedTo: to, workers },
-      { failures: [`calibration cohort failed: ${(error as Error).message}`], exitCode: 2 },
-    );
-  }
-  const metrics = evaluateHealthGates({
-    calibration: calibrationCohort,
-    heldOut: heldOutCohort,
-    probes,
-  });
-  const { skippedGates, pass } = gateSummary(metrics);
-  const gates = {
-    incidence: gateValue(metrics, 'incidence'),
-    severityDistribution:
-      gateValue(metrics, 'severity.minor') &&
-      gateValue(metrics, 'severity.moderate') &&
-      gateValue(metrics, 'severity.major'),
-    durationMeans:
-      gateValue(metrics, 'duration.minor') &&
-      gateValue(metrics, 'duration.moderate') &&
-      gateValue(metrics, 'duration.major'),
-    sameGameReturn: gateValue(metrics, 'sameGameReturn'),
-    recurrenceLift: gateValue(metrics, 'recurrenceLift'),
-    seasonEndingRate: gateValue(metrics, 'seasonEndingRate'),
-    monotonicMinutes: gateValue(metrics, 'monotonic.minutes'),
-    monotonicFatigue: gateValue(metrics, 'monotonic.fatigue'),
-    monotonicDurability: gateValue(metrics, 'monotonic.durability'),
-    standingsIndependent: gateValue(metrics, 'standingsIndependent'),
-    heldOut: gateValue(metrics, 'heldOut.incidence') && gateValue(metrics, 'heldOut.seasonEnding'),
-  };
-  let targetsWritten = false;
-  let targetsPath: string | null = null;
-  const gateFailures: string[] = [];
-  if (pass) {
-    const targets: SeasonInjuryTargets = {
-      schemaVersion: 1,
-      targetsVersion: SEASON_INJURY_TARGETS_VERSION,
-      profile: {
-        baseRiskBasisPoints: 80,
-        riskClamp: [20, 220],
-        severityShares: { minor: 0.6, moderate: 0.28, major: 0.1, seasonEnding: 0.02 },
-        recoveryRanges: { minor: [1, 2], moderate: [3, 6], major: [7, 18] },
-        sameGameReturnRate: 0.35,
-        recurrenceBonusBasisPoints: 60,
-        recurrenceWindowTeamGames: 10,
-      },
-      cohort: { seedFrom: from, seedTo: to },
-      heldOut: { seedFrom: to + 1, seedTo: to + SEASON_HEALTH_VALIDATION_SEED_COUNT },
-      measured: {
-        calibration: {
-          seasonsSimulated: calibrationCohort.seasonsSimulated,
-          exposures: calibrationCohort.exposures,
-          injuries: calibrationCohort.injuries,
-          meanRiskBasisPoints: calibrationCohort.meanRiskBasisPoints,
-          severityShares: calibrationCohort.severityShares,
-          durationMeans: calibrationCohort.durationMeans,
-          sameGameReturnRate: calibrationCohort.sameGameReturnRate,
-          recurrence: probes.recurrence,
-          seasonEndingRate: calibrationCohort.seasonEndingRate,
-          standings: {
-            strongTeamIncidenceBp: calibrationCohort.strongTeamIncidenceBp,
-            weakTeamIncidenceBp: calibrationCohort.weakTeamIncidenceBp,
-            gapBp: calibrationCohort.standingsGapBp,
-          },
-        },
-        monotonicity: {
-          minutes: probes.minutes,
-          fatigue: probes.fatigue,
-          durability: probes.durability,
-        },
-        heldOut: {
-          seasonsSimulated: heldOutCohort.seasonsSimulated,
-          exposures: heldOutCohort.exposures,
-          injuries: heldOutCohort.injuries,
-          meanRiskBasisPoints: heldOutCohort.meanRiskBasisPoints,
-          severityShares: heldOutCohort.severityShares,
-        },
-      },
-      gates,
-      engineVersion: createEngineContext().engineVersion,
-      gameVersion: SEASON_GAME_VERSION,
-      gameTargetsVersion: SEASON_GAME_TARGETS_VERSION,
-      generatedAtIso: new Date().toISOString(),
-    };
-    seasonInjuryTargetsSchema.parse(targets);
-    const commit = commitTargetsArtifact({
+  return runCalibrationShell({
+    command: 'season health calibrate',
+    argsForReport: { seedFrom: from, seedTo: to, workers },
+    plan: { from, to, workers, calibrationIndices, validationIndices },
+    startedAt: started,
+    validate: validateOnly
+      ? () => validateSeasonInjuryTargets(args, resolve(args.validate ?? outPath))
+      : null,
+    artifact: {
       outPath,
       defaultTargetsPath: DEFAULT_INJURY_TARGETS,
       manifestPath: args.manifest ?? DEFAULT_MANIFEST,
       manifestKey: 'injuryTargets',
       manifestUrl: 'season/injury-targets.json',
-      content: targets,
-    });
-    targetsWritten = commit.written;
-    targetsPath = commit.path;
-    if (commit.error !== null) gateFailures.push(commit.error);
-  }
-  const payload = seasonHealthCalibrateReportSchema.parse({
-    schemaVersion: 1,
-    command: 'season health calibrate',
-    targetsVersion: SEASON_INJURY_TARGETS_VERSION,
-    calibrationSeeds: calibrationIndices.length,
-    validationSeeds: validationIndices.length,
-    seasonsSimulated: calibrationCohort.seasonsSimulated + heldOutCohort.seasonsSimulated,
-    exposures: calibrationCohort.exposures,
-    injuries: calibrationCohort.injuries,
-    meanRiskBasisPoints: calibrationCohort.meanRiskBasisPoints,
-    severityShares: calibrationCohort.severityShares,
-    durationMeans: calibrationCohort.durationMeans,
-    sameGameReturnRate: calibrationCohort.sameGameReturnRate,
-    recurrenceGapBp: probes.recurrence.gapBp,
-    seasonEndingRate: calibrationCohort.seasonEndingRate,
-    standingsGapBp: calibrationCohort.standingsGapBp,
-    monotonic: {
-      minutes: probes.minutes.highIncidenceBp > probes.minutes.lowIncidenceBp,
-      fatigue: probes.fatigue.highIncidenceBp > probes.fatigue.lowIncidenceBp,
-      durability: probes.durability.lowIncidenceBp > probes.durability.highIncidenceBp,
     },
-    gates,
-    metrics,
-    skippedGates,
-    targetsWritten,
-    targetsPath,
-    durationMs: Date.now() - started,
+    payloadSchema: seasonHealthCalibrateReportSchema,
+    measure: () => {
+      const calibration = runSeasonHealthCohort(args, calibrationIndices, probeRootSeed);
+      const probes = calibration.probes;
+      const calibrationCohort = foldSeasonCohort(calibration.seasons);
+      const heldOut = runSeasonHealthCohort(args, validationIndices, probeRootSeed);
+      const heldOutCohort = foldSeasonCohort(heldOut.seasons);
+      const metrics = evaluateHealthGates({
+        calibration: calibrationCohort,
+        heldOut: heldOutCohort,
+        probes,
+      });
+      const gates = {
+        incidence: gateValue(metrics, 'incidence'),
+        severityDistribution:
+          gateValue(metrics, 'severity.minor') &&
+          gateValue(metrics, 'severity.moderate') &&
+          gateValue(metrics, 'severity.major'),
+        durationMeans:
+          gateValue(metrics, 'duration.minor') &&
+          gateValue(metrics, 'duration.moderate') &&
+          gateValue(metrics, 'duration.major'),
+        sameGameReturn: gateValue(metrics, 'sameGameReturn'),
+        recurrenceLift: gateValue(metrics, 'recurrenceLift'),
+        seasonEndingRate: gateValue(metrics, 'seasonEndingRate'),
+        monotonicMinutes: gateValue(metrics, 'monotonic.minutes'),
+        monotonicFatigue: gateValue(metrics, 'monotonic.fatigue'),
+        monotonicDurability: gateValue(metrics, 'monotonic.durability'),
+        standingsIndependent: gateValue(metrics, 'standingsIndependent'),
+        heldOut:
+          gateValue(metrics, 'heldOut.incidence') && gateValue(metrics, 'heldOut.seasonEnding'),
+      };
+      return {
+        metrics,
+        gates,
+        extra: { calibrationCohort, heldOutCohort, probes },
+        targets: () => {
+          const targets: SeasonInjuryTargets = {
+            schemaVersion: 1,
+            targetsVersion: SEASON_INJURY_TARGETS_VERSION,
+            profile: {
+              baseRiskBasisPoints: 80,
+              riskClamp: [20, 220],
+              severityShares: { minor: 0.6, moderate: 0.28, major: 0.1, seasonEnding: 0.02 },
+              recoveryRanges: { minor: [1, 2], moderate: [3, 6], major: [7, 18] },
+              sameGameReturnRate: 0.35,
+              recurrenceBonusBasisPoints: 60,
+              recurrenceWindowTeamGames: 10,
+            },
+            cohort: { seedFrom: from, seedTo: to },
+            heldOut: { seedFrom: to + 1, seedTo: to + SEASON_HEALTH_VALIDATION_SEED_COUNT },
+            measured: {
+              calibration: {
+                seasonsSimulated: calibrationCohort.seasonsSimulated,
+                exposures: calibrationCohort.exposures,
+                injuries: calibrationCohort.injuries,
+                meanRiskBasisPoints: calibrationCohort.meanRiskBasisPoints,
+                severityShares: calibrationCohort.severityShares,
+                durationMeans: calibrationCohort.durationMeans,
+                sameGameReturnRate: calibrationCohort.sameGameReturnRate,
+                recurrence: probes.recurrence,
+                seasonEndingRate: calibrationCohort.seasonEndingRate,
+                standings: {
+                  strongTeamIncidenceBp: calibrationCohort.strongTeamIncidenceBp,
+                  weakTeamIncidenceBp: calibrationCohort.weakTeamIncidenceBp,
+                  gapBp: calibrationCohort.standingsGapBp,
+                },
+              },
+              monotonicity: {
+                minutes: probes.minutes,
+                fatigue: probes.fatigue,
+                durability: probes.durability,
+              },
+              heldOut: {
+                seasonsSimulated: heldOutCohort.seasonsSimulated,
+                exposures: heldOutCohort.exposures,
+                injuries: heldOutCohort.injuries,
+                meanRiskBasisPoints: heldOutCohort.meanRiskBasisPoints,
+                severityShares: heldOutCohort.severityShares,
+              },
+            },
+            gates,
+            engineVersion: createEngineContext().engineVersion,
+            gameVersion: SEASON_GAME_VERSION,
+            gameTargetsVersion: SEASON_GAME_TARGETS_VERSION,
+            generatedAtIso: new Date().toISOString(),
+          };
+          seasonInjuryTargetsSchema.parse(targets);
+          return targets;
+        },
+      };
+    },
+    report: (state) => {
+      const { calibrationCohort, heldOutCohort, probes } = state.extra;
+      const { gates, metrics, skippedGates, targetsWritten, targetsPath } = state;
+      const started = state.startedAt;
+      const payload = {
+        schemaVersion: 1,
+        command: 'season health calibrate',
+        targetsVersion: SEASON_INJURY_TARGETS_VERSION,
+        calibrationSeeds: calibrationIndices.length,
+        validationSeeds: validationIndices.length,
+        seasonsSimulated: calibrationCohort.seasonsSimulated + heldOutCohort.seasonsSimulated,
+        exposures: calibrationCohort.exposures,
+        injuries: calibrationCohort.injuries,
+        meanRiskBasisPoints: calibrationCohort.meanRiskBasisPoints,
+        severityShares: calibrationCohort.severityShares,
+        durationMeans: calibrationCohort.durationMeans,
+        sameGameReturnRate: calibrationCohort.sameGameReturnRate,
+        recurrenceGapBp: probes.recurrence.gapBp,
+        seasonEndingRate: calibrationCohort.seasonEndingRate,
+        standingsGapBp: calibrationCohort.standingsGapBp,
+        monotonic: {
+          minutes: probes.minutes.highIncidenceBp > probes.minutes.lowIncidenceBp,
+          fatigue: probes.fatigue.highIncidenceBp > probes.fatigue.lowIncidenceBp,
+          durability: probes.durability.lowIncidenceBp > probes.durability.highIncidenceBp,
+        },
+        gates,
+        metrics,
+        skippedGates,
+        targetsWritten,
+        targetsPath,
+        durationMs: Date.now() - started,
+      };
+      const details = [
+        `calibration ${String(calibrationCohort.seasonsSimulated)} seasons (${String(calibrationCohort.exposures)} exposures, ${String(calibrationCohort.injuries)} injuries) · held-out ${String(heldOutCohort.seasonsSimulated)} seasons · ${String(workers)} workers`,
+        `mean risk ${calibrationCohort.meanRiskBasisPoints.toFixed(1)}bp (gate ±${String(SEASON_HEALTH_RISK_ENVELOPE_BP)}bp around ${String(SEASON_HEALTH_BASE_RISK_BP)}bp)`,
+        `severity minor ${(calibrationCohort.severityShares.minor * 100).toFixed(1)}% · moderate ${(calibrationCohort.severityShares.moderate * 100).toFixed(1)}% · major ${(calibrationCohort.severityShares.major * 100).toFixed(1)}% · season-ending ${(calibrationCohort.seasonEndingRate * 100).toFixed(2)}%`,
+        `duration means minor ${calibrationCohort.durationMeans.minor.toFixed(2)} · moderate ${calibrationCohort.durationMeans.moderate.toFixed(2)} · major ${calibrationCohort.durationMeans.major.toFixed(2)} (gate ±${String(SEASON_HEALTH_DURATION_TOLERANCE_GAMES)} game)`,
+        `same-game return ${(calibrationCohort.sameGameReturnRate * 100).toFixed(1)}% (gate ±${String(SEASON_HEALTH_SAME_GAME_RETURN_TOLERANCE_PP)}pp) · recurrence gap ${probes.recurrence.gapBp.toFixed(1)}bp (gate ≥ ${String(SEASON_HEALTH_RECURRENCE_MIN_GAP_BP)}bp)`,
+        `standings gap ${calibrationCohort.standingsGapBp.toFixed(1)}bp (gate ≤ ${String(SEASON_HEALTH_STANDINGS_MAX_GAP_BP)}bp)`,
+        `monotonic minutes ${probes.minutes.highIncidenceBp.toFixed(1)}>${probes.minutes.lowIncidenceBp.toFixed(1)} · fatigue ${probes.fatigue.highIncidenceBp.toFixed(1)}>${probes.fatigue.lowIncidenceBp.toFixed(1)} · durability ${probes.durability.lowIncidenceBp.toFixed(1)}>${probes.durability.highIncidenceBp.toFixed(1)}`,
+        targetsDetail({ targetsWritten, targetsPath }),
+      ];
+      return { details, payload };
+    },
   });
-  const details = [
-    `calibration ${String(calibrationCohort.seasonsSimulated)} seasons (${String(calibrationCohort.exposures)} exposures, ${String(calibrationCohort.injuries)} injuries) · held-out ${String(heldOutCohort.seasonsSimulated)} seasons · ${String(workers)} workers`,
-    `mean risk ${calibrationCohort.meanRiskBasisPoints.toFixed(1)}bp (gate ±${String(SEASON_HEALTH_RISK_ENVELOPE_BP)}bp around ${String(SEASON_HEALTH_BASE_RISK_BP)}bp)`,
-    `severity minor ${(calibrationCohort.severityShares.minor * 100).toFixed(1)}% · moderate ${(calibrationCohort.severityShares.moderate * 100).toFixed(1)}% · major ${(calibrationCohort.severityShares.major * 100).toFixed(1)}% · season-ending ${(calibrationCohort.seasonEndingRate * 100).toFixed(2)}%`,
-    `duration means minor ${calibrationCohort.durationMeans.minor.toFixed(2)} · moderate ${calibrationCohort.durationMeans.moderate.toFixed(2)} · major ${calibrationCohort.durationMeans.major.toFixed(2)} (gate ±${String(SEASON_HEALTH_DURATION_TOLERANCE_GAMES)} game)`,
-    `same-game return ${(calibrationCohort.sameGameReturnRate * 100).toFixed(1)}% (gate ±${String(SEASON_HEALTH_SAME_GAME_RETURN_TOLERANCE_PP)}pp) · recurrence gap ${probes.recurrence.gapBp.toFixed(1)}bp (gate ≥ ${String(SEASON_HEALTH_RECURRENCE_MIN_GAP_BP)}bp)`,
-    `standings gap ${calibrationCohort.standingsGapBp.toFixed(1)}bp (gate ≤ ${String(SEASON_HEALTH_STANDINGS_MAX_GAP_BP)}bp)`,
-    `monotonic minutes ${probes.minutes.highIncidenceBp.toFixed(1)}>${probes.minutes.lowIncidenceBp.toFixed(1)} · fatigue ${probes.fatigue.highIncidenceBp.toFixed(1)}>${probes.fatigue.lowIncidenceBp.toFixed(1)} · durability ${probes.durability.lowIncidenceBp.toFixed(1)}>${probes.durability.highIncidenceBp.toFixed(1)}`,
-    targetsDetail({ targetsWritten, targetsPath }),
-  ];
-  gateFailures.push(...calibrationGateFailures({ pass, targetsWritten, skippedGates, metrics }));
-  return makeReport(
-    'season health calibrate',
-    { seedFrom: from, seedTo: to, workers },
-    { details, failures: gateFailures, payload },
-  );
 }

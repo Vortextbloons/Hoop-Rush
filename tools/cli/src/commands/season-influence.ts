@@ -8,19 +8,17 @@ import {
   SEASON_INFLUENCE_TARGETS_VERSION,
 } from '@hoop-rush/data-contracts';
 import { createEngineContext } from '@hoop-rush/engine';
-import { makeReport, type CliReport } from '../report.ts';
+import { type CliReport } from '../report.ts';
 import { seasonInfluenceCalibrateReportSchema } from '../report-schemas.ts';
 import { DEFAULT_MANIFEST, DEFAULT_SEASON_DIR } from './season-data.ts';
 import {
-  calibrationGateFailures,
-  commitTargetsArtifact,
   resolveCalibrationArgs,
+  runCalibrationShell,
   targetsDetail,
   validateTargetsArtifact,
 } from '../calibration/index.ts';
 import {
   gateValue,
-  gateSummary,
   m25RangeGate,
   m25ToleranceGate,
   seasonCalibrationSeed,
@@ -528,13 +526,8 @@ export function seasonInfluenceCalibrate(args: SeasonInfluenceArgs): CliReport {
   );
   const outPath = args.out ?? DEFAULT_INFLUENCE_TARGETS;
   const validateOnly = args['validate'] !== null;
-  if (validateOnly) {
-    return validateSeasonInfluenceTargets(args, resolve(args.validate ?? outPath));
-  }
-  let calibration: SeasonM25SeasonFacts[];
-  let heldOut: SeasonM25SeasonFacts[];
-  try {
-    calibration = calibrationIndices.map((index) =>
+  const runFacts = (indices: number[]): SeasonM25SeasonFacts[] =>
+    indices.map((index) =>
       runSeasonM25({
         runPath: args.input,
         manifestPath: args.manifest,
@@ -543,183 +536,177 @@ export function seasonInfluenceCalibrate(args: SeasonInfluenceArgs): CliReport {
         pickObjectives: true,
       }),
     );
-    heldOut = validationIndices.map((index) =>
-      runSeasonM25({
-        runPath: args.input,
-        manifestPath: args.manifest,
-        rootSeed: seasonCalibrationSeed(index),
-        driveWindows: true,
-        pickObjectives: true,
-      }),
-    );
-  } catch (error) {
-    return makeReport(
-      'season influence calibrate',
-      { seedFrom: from, seedTo: to, workers },
-      { failures: [`calibration cohort failed: ${(error as Error).message}`], exitCode: 2 },
-    );
-  }
-  const calibrationCohort = foldInfluenceCohort(calibration);
-  const heldOutCohort = foldInfluenceCohort(heldOut);
-  const metrics = evaluateInfluenceGates({
-    calibration: calibrationCohort,
-    heldOut: heldOutCohort,
-  });
-  const { skippedGates, pass } = gateSummary(metrics);
-  const gates = {
-    ledgerReconciliation: gateValue(metrics, 'ledgerReconciliation'),
-    incomeIdentity: gateValue(metrics, 'incomeIdentity'),
-    debtFrequency: gateValue(metrics, 'debtFrequency'),
-    zeroCapViolations: gateValue(metrics, 'zeroCapViolations'),
-    objectiveSuccessRate: gateValue(metrics, 'objectiveSuccessRate'),
-    expectedEarnedPerBlock: gateValue(metrics, 'expectedEarnedPerBlock'),
-    capClampedShare: gateValue(metrics, 'capClampedShare'),
-    extraOfferSpendRate: gateValue(metrics, 'extraOfferSpendRate'),
-    rehabSpendRate: gateValue(metrics, 'rehabSpendRate'),
-    heldOut:
-      gateValue(metrics, 'heldOut.reconciliation') &&
-      gateValue(metrics, 'heldOut.incomeIdentity') &&
-      gateValue(metrics, 'heldOut.debtFrequency') &&
-      gateValue(metrics, 'heldOut.objectiveSuccessRate'),
-  };
-  let targetsWritten = false;
-  let targetsPath: string | null = null;
-  const gateFailures: string[] = [];
-  if (pass) {
-    const targets: SeasonInfluenceTargets = {
-      schemaVersion: 1,
-      targetsVersion: SEASON_INFLUENCE_TARGETS_VERSION,
-      policy: {
-        initialGrant: SEASON_INFLUENCE_INITIAL_GRANT,
-        blockGrant: SEASON_INFLUENCE_BLOCK_GRANT,
-        objectiveReward: 1,
-        challengeRewardStandard: 1,
-        challengeRewardHard: 2,
-        cap: SEASON_INFLUENCE_CAP,
-        floor: SEASON_INFLUENCE_FLOOR,
-        objectiveSuccessEnvelope: [
-          SEASON_INFLUENCE_OBJECTIVE_SUCCESS_MIN,
-          SEASON_INFLUENCE_OBJECTIVE_SUCCESS_MAX,
-        ],
-        expectedEarnedPerBlockEnvelope: [
-          SEASON_INFLUENCE_EXPECTED_EARNED_MIN,
-          SEASON_INFLUENCE_EXPECTED_EARNED_MAX,
-        ],
-        capClampedShareMax: SEASON_INFLUENCE_CAP_CLAMPED_MAX,
-        debtFrequencyMax: SEASON_INFLUENCE_DEBT_FREQUENCY_MAX,
-        extraOfferSpendRateMax: SEASON_INFLUENCE_EXTRA_OFFER_SPEND_MAX,
-        rehabSpendRateMax: SEASON_INFLUENCE_REHAB_SPEND_MAX,
-      },
-      cohort: { seedFrom: from, seedTo: to },
-      heldOut: { seedFrom: to + 1, seedTo: to + SEASON_INFLUENCE_VALIDATION_SEED_COUNT },
-      measured: {
-        calibration: {
-          seasonsSimulated: calibrationCohort.seasonsSimulated,
-          balanceChecks: calibrationCohort.balanceChecks,
-          reconciliationFailures: calibrationCohort.reconciliationFailures,
-          incomeIdentityFailures: calibrationCohort.incomeIdentityFailures,
-          debtFrequency: calibrationCohort.debtFrequency,
-          debtBoundaries: calibrationCohort.debtBoundaries,
-          capViolations: calibrationCohort.capViolations,
-          objectiveEvaluations: calibrationCohort.objectiveEvaluations,
-          objectiveSuccessRate: calibrationCohort.objectiveSuccessRate,
-          challengeEvaluations: calibrationCohort.challengeEvaluations,
-          challengeSuccessRate: calibrationCohort.challengeSuccessRate,
-          expectedEarnedPerBlock: calibrationCohort.expectedEarnedPerBlock,
-          capClampedShare: calibrationCohort.capClampedShare,
-          extraOfferSpendShare: calibrationCohort.extraOfferSpendShare,
-          extraOfferWindows: calibrationCohort.extraOfferWindows,
-          rehabSpendShare: calibrationCohort.rehabSpendShare,
-          rehabInjuries: calibrationCohort.rehabInjuries,
-        },
-        heldOut: {
-          seasonsSimulated: heldOutCohort.seasonsSimulated,
-          balanceChecks: heldOutCohort.balanceChecks,
-          reconciliationFailures: heldOutCohort.reconciliationFailures,
-          incomeIdentityFailures: heldOutCohort.incomeIdentityFailures,
-          debtFrequency: heldOutCohort.debtFrequency,
-          capViolations: heldOutCohort.capViolations,
-          objectiveEvaluations: heldOutCohort.objectiveEvaluations,
-          objectiveSuccessRate: heldOutCohort.objectiveSuccessRate,
-          challengeEvaluations: heldOutCohort.challengeEvaluations,
-          challengeSuccessRate: heldOutCohort.challengeSuccessRate,
-          expectedEarnedPerBlock: heldOutCohort.expectedEarnedPerBlock,
-          capClampedShare: heldOutCohort.capClampedShare,
-        },
-      },
-      gates,
-      engineVersion: createEngineContext().engineVersion,
-      gameVersion: SEASON_GAME_VERSION,
-      gameTargetsVersion: SEASON_GAME_TARGETS_VERSION,
-      generatedAtIso: new Date().toISOString(),
-    };
-    seasonInfluenceTargetsSchema.parse(targets);
-    const commit = commitTargetsArtifact({
+  return runCalibrationShell({
+    command: 'season influence calibrate',
+    argsForReport: { seedFrom: from, seedTo: to, workers },
+    plan: { from, to, workers, calibrationIndices, validationIndices },
+    startedAt: started,
+    validate: validateOnly
+      ? () => validateSeasonInfluenceTargets(args, resolve(args.validate ?? outPath))
+      : null,
+    artifact: {
       outPath,
       defaultTargetsPath: DEFAULT_INFLUENCE_TARGETS,
       manifestPath: args.manifest ?? DEFAULT_MANIFEST,
       manifestKey: 'influenceTargets',
       manifestUrl: 'season/influence-targets.json',
-      content: targets,
-    });
-    targetsWritten = commit.written;
-    targetsPath = commit.path;
-    if (commit.error !== null) gateFailures.push(commit.error);
-  }
-  const payload = seasonInfluenceCalibrateReportSchema.parse({
-    schemaVersion: 1,
-    command: 'season influence calibrate',
-    targetsVersion: SEASON_INFLUENCE_TARGETS_VERSION,
-    calibrationSeeds: calibrationIndices.length,
-    validationSeeds: validationIndices.length,
-    seasonsSimulated: calibrationCohort.seasonsSimulated + heldOutCohort.seasonsSimulated,
-    balanceChecks: calibrationCohort.balanceChecks,
-    reconciliationFailures: calibrationCohort.reconciliationFailures,
-    incomeIdentityFailures: calibrationCohort.incomeIdentityFailures,
-    debtFrequency: calibrationCohort.debtFrequency,
-    debtBoundaries: calibrationCohort.debtBoundaries,
-    capViolations: calibrationCohort.capViolations,
-    objectiveEvaluations: calibrationCohort.objectiveEvaluations,
-    objectiveSuccessRate: calibrationCohort.objectiveSuccessRate,
-    challengeEvaluations: calibrationCohort.challengeEvaluations,
-    challengeSuccessRate: calibrationCohort.challengeSuccessRate,
-    expectedEarnedPerBlock: calibrationCohort.expectedEarnedPerBlock,
-    capClampedShare: calibrationCohort.capClampedShare,
-    extraOfferSpendShare: calibrationCohort.extraOfferSpendShare,
-    extraOfferWindows: calibrationCohort.extraOfferWindows,
-    rehabSpendShare: calibrationCohort.rehabSpendShare,
-    rehabInjuries: calibrationCohort.rehabInjuries,
-    gates: {
-      ledgerReconciliation: gates.ledgerReconciliation,
-      incomeIdentity: gates.incomeIdentity,
-      debtFrequency: gates.debtFrequency,
-      zeroCapViolations: gates.zeroCapViolations,
-      objectiveSuccessRate: gates.objectiveSuccessRate,
-      expectedEarnedPerBlock: gates.expectedEarnedPerBlock,
-      capClampedShare: gates.capClampedShare,
-      extraOfferSpendRate: gates.extraOfferSpendRate,
-      rehabSpendRate: gates.rehabSpendRate,
-      heldOut: gates.heldOut,
     },
-    metrics,
-    skippedGates,
-    targetsWritten,
-    targetsPath,
-    durationMs: Date.now() - started,
+    payloadSchema: seasonInfluenceCalibrateReportSchema,
+    measure: () => {
+      const calibrationCohort = foldInfluenceCohort(runFacts(calibrationIndices));
+      const heldOutCohort = foldInfluenceCohort(runFacts(validationIndices));
+      const metrics = evaluateInfluenceGates({
+        calibration: calibrationCohort,
+        heldOut: heldOutCohort,
+      });
+      const gates = {
+        ledgerReconciliation: gateValue(metrics, 'ledgerReconciliation'),
+        incomeIdentity: gateValue(metrics, 'incomeIdentity'),
+        debtFrequency: gateValue(metrics, 'debtFrequency'),
+        zeroCapViolations: gateValue(metrics, 'zeroCapViolations'),
+        objectiveSuccessRate: gateValue(metrics, 'objectiveSuccessRate'),
+        expectedEarnedPerBlock: gateValue(metrics, 'expectedEarnedPerBlock'),
+        capClampedShare: gateValue(metrics, 'capClampedShare'),
+        extraOfferSpendRate: gateValue(metrics, 'extraOfferSpendRate'),
+        rehabSpendRate: gateValue(metrics, 'rehabSpendRate'),
+        heldOut:
+          gateValue(metrics, 'heldOut.reconciliation') &&
+          gateValue(metrics, 'heldOut.incomeIdentity') &&
+          gateValue(metrics, 'heldOut.debtFrequency') &&
+          gateValue(metrics, 'heldOut.objectiveSuccessRate'),
+      };
+      return {
+        metrics,
+        gates,
+        extra: { calibrationCohort, heldOutCohort },
+        targets: () => {
+          const targets: SeasonInfluenceTargets = {
+            schemaVersion: 1,
+            targetsVersion: SEASON_INFLUENCE_TARGETS_VERSION,
+            policy: {
+              initialGrant: SEASON_INFLUENCE_INITIAL_GRANT,
+              blockGrant: SEASON_INFLUENCE_BLOCK_GRANT,
+              objectiveReward: 1,
+              challengeRewardStandard: 1,
+              challengeRewardHard: 2,
+              cap: SEASON_INFLUENCE_CAP,
+              floor: SEASON_INFLUENCE_FLOOR,
+              objectiveSuccessEnvelope: [
+                SEASON_INFLUENCE_OBJECTIVE_SUCCESS_MIN,
+                SEASON_INFLUENCE_OBJECTIVE_SUCCESS_MAX,
+              ],
+              expectedEarnedPerBlockEnvelope: [
+                SEASON_INFLUENCE_EXPECTED_EARNED_MIN,
+                SEASON_INFLUENCE_EXPECTED_EARNED_MAX,
+              ],
+              capClampedShareMax: SEASON_INFLUENCE_CAP_CLAMPED_MAX,
+              debtFrequencyMax: SEASON_INFLUENCE_DEBT_FREQUENCY_MAX,
+              extraOfferSpendRateMax: SEASON_INFLUENCE_EXTRA_OFFER_SPEND_MAX,
+              rehabSpendRateMax: SEASON_INFLUENCE_REHAB_SPEND_MAX,
+            },
+            cohort: { seedFrom: from, seedTo: to },
+            heldOut: { seedFrom: to + 1, seedTo: to + SEASON_INFLUENCE_VALIDATION_SEED_COUNT },
+            measured: {
+              calibration: {
+                seasonsSimulated: calibrationCohort.seasonsSimulated,
+                balanceChecks: calibrationCohort.balanceChecks,
+                reconciliationFailures: calibrationCohort.reconciliationFailures,
+                incomeIdentityFailures: calibrationCohort.incomeIdentityFailures,
+                debtFrequency: calibrationCohort.debtFrequency,
+                debtBoundaries: calibrationCohort.debtBoundaries,
+                capViolations: calibrationCohort.capViolations,
+                objectiveEvaluations: calibrationCohort.objectiveEvaluations,
+                objectiveSuccessRate: calibrationCohort.objectiveSuccessRate,
+                challengeEvaluations: calibrationCohort.challengeEvaluations,
+                challengeSuccessRate: calibrationCohort.challengeSuccessRate,
+                expectedEarnedPerBlock: calibrationCohort.expectedEarnedPerBlock,
+                capClampedShare: calibrationCohort.capClampedShare,
+                extraOfferSpendShare: calibrationCohort.extraOfferSpendShare,
+                extraOfferWindows: calibrationCohort.extraOfferWindows,
+                rehabSpendShare: calibrationCohort.rehabSpendShare,
+                rehabInjuries: calibrationCohort.rehabInjuries,
+              },
+              heldOut: {
+                seasonsSimulated: heldOutCohort.seasonsSimulated,
+                balanceChecks: heldOutCohort.balanceChecks,
+                reconciliationFailures: heldOutCohort.reconciliationFailures,
+                incomeIdentityFailures: heldOutCohort.incomeIdentityFailures,
+                debtFrequency: heldOutCohort.debtFrequency,
+                capViolations: heldOutCohort.capViolations,
+                objectiveEvaluations: heldOutCohort.objectiveEvaluations,
+                objectiveSuccessRate: heldOutCohort.objectiveSuccessRate,
+                challengeEvaluations: heldOutCohort.challengeEvaluations,
+                challengeSuccessRate: heldOutCohort.challengeSuccessRate,
+                expectedEarnedPerBlock: heldOutCohort.expectedEarnedPerBlock,
+                capClampedShare: heldOutCohort.capClampedShare,
+              },
+            },
+            gates,
+            engineVersion: createEngineContext().engineVersion,
+            gameVersion: SEASON_GAME_VERSION,
+            gameTargetsVersion: SEASON_GAME_TARGETS_VERSION,
+            generatedAtIso: new Date().toISOString(),
+          };
+          seasonInfluenceTargetsSchema.parse(targets);
+          return targets;
+        },
+      };
+    },
+    report: (state) => {
+      const { calibrationCohort, heldOutCohort } = state.extra;
+      const { gates, metrics, skippedGates, targetsWritten, targetsPath } = state;
+      const started = state.startedAt;
+      const payload = {
+        schemaVersion: 1,
+        command: 'season influence calibrate',
+        targetsVersion: SEASON_INFLUENCE_TARGETS_VERSION,
+        calibrationSeeds: calibrationIndices.length,
+        validationSeeds: validationIndices.length,
+        seasonsSimulated: calibrationCohort.seasonsSimulated + heldOutCohort.seasonsSimulated,
+        balanceChecks: calibrationCohort.balanceChecks,
+        reconciliationFailures: calibrationCohort.reconciliationFailures,
+        incomeIdentityFailures: calibrationCohort.incomeIdentityFailures,
+        debtFrequency: calibrationCohort.debtFrequency,
+        debtBoundaries: calibrationCohort.debtBoundaries,
+        capViolations: calibrationCohort.capViolations,
+        objectiveEvaluations: calibrationCohort.objectiveEvaluations,
+        objectiveSuccessRate: calibrationCohort.objectiveSuccessRate,
+        challengeEvaluations: calibrationCohort.challengeEvaluations,
+        challengeSuccessRate: calibrationCohort.challengeSuccessRate,
+        expectedEarnedPerBlock: calibrationCohort.expectedEarnedPerBlock,
+        capClampedShare: calibrationCohort.capClampedShare,
+        extraOfferSpendShare: calibrationCohort.extraOfferSpendShare,
+        extraOfferWindows: calibrationCohort.extraOfferWindows,
+        rehabSpendShare: calibrationCohort.rehabSpendShare,
+        rehabInjuries: calibrationCohort.rehabInjuries,
+        gates: {
+          ledgerReconciliation: gates.ledgerReconciliation,
+          incomeIdentity: gates.incomeIdentity,
+          debtFrequency: gates.debtFrequency,
+          zeroCapViolations: gates.zeroCapViolations,
+          objectiveSuccessRate: gates.objectiveSuccessRate,
+          expectedEarnedPerBlock: gates.expectedEarnedPerBlock,
+          capClampedShare: gates.capClampedShare,
+          extraOfferSpendRate: gates.extraOfferSpendRate,
+          rehabSpendRate: gates.rehabSpendRate,
+          heldOut: gates.heldOut,
+        },
+        metrics,
+        skippedGates,
+        targetsWritten,
+        targetsPath,
+        durationMs: Date.now() - started,
+      };
+      const details = [
+        `${String(calibrationCohort.seasonsSimulated)} calibration + ${String(heldOutCohort.seasonsSimulated)} held-out seasons in ${String(Date.now() - started)}ms (${String(workers)} workers)`,
+        `balance checks ${String(calibrationCohort.balanceChecks)} · reconciliation failures ${String(calibrationCohort.reconciliationFailures)} · income identity failures ${String(calibrationCohort.incomeIdentityFailures)} · cap violations ${String(calibrationCohort.capViolations)}`,
+        `debt frequency ${(calibrationCohort.debtFrequency * 100).toFixed(2)}% (gate ≤ ${String(SEASON_INFLUENCE_DEBT_FREQUENCY_MAX * 100)}%)`,
+        `objective success ${calibrationCohort.objectiveSuccessRate === null ? 'n/a' : `${(calibrationCohort.objectiveSuccessRate * 100).toFixed(1)}%`} over ${String(calibrationCohort.objectiveEvaluations)} evaluations (gate [${String(SEASON_INFLUENCE_OBJECTIVE_SUCCESS_MIN * 100)}%, ${String(SEASON_INFLUENCE_OBJECTIVE_SUCCESS_MAX * 100)}%])`,
+        `challenge earned/block ${calibrationCohort.expectedEarnedPerBlock === null ? 'n/a' : calibrationCohort.expectedEarnedPerBlock.toFixed(2)} (gate [${String(SEASON_INFLUENCE_EXPECTED_EARNED_MIN)}, ${String(SEASON_INFLUENCE_EXPECTED_EARNED_MAX)}]) · cap-clamped ${calibrationCohort.capClampedShare === null ? 'n/a' : `${(calibrationCohort.capClampedShare * 100).toFixed(1)}%`} (gate ≤ ${(SEASON_INFLUENCE_CAP_CLAMPED_MAX * 100).toFixed(0)}%) over ${String(calibrationCohort.challengeEvaluations)} challenge evaluations`,
+        `extra-offer spend share ${(calibrationCohort.extraOfferSpendShare * 100).toFixed(1)}% · rehab spend share ${(calibrationCohort.rehabSpendShare * 100).toFixed(1)}%`,
+        targetsDetail({ targetsWritten, targetsPath }),
+      ];
+      return { details, payload };
+    },
   });
-  const details = [
-    `${String(calibrationCohort.seasonsSimulated)} calibration + ${String(heldOutCohort.seasonsSimulated)} held-out seasons in ${String(Date.now() - started)}ms (${String(workers)} workers)`,
-    `balance checks ${String(calibrationCohort.balanceChecks)} · reconciliation failures ${String(calibrationCohort.reconciliationFailures)} · income identity failures ${String(calibrationCohort.incomeIdentityFailures)} · cap violations ${String(calibrationCohort.capViolations)}`,
-    `debt frequency ${(calibrationCohort.debtFrequency * 100).toFixed(2)}% (gate ≤ ${String(SEASON_INFLUENCE_DEBT_FREQUENCY_MAX * 100)}%)`,
-    `objective success ${calibrationCohort.objectiveSuccessRate === null ? 'n/a' : `${(calibrationCohort.objectiveSuccessRate * 100).toFixed(1)}%`} over ${String(calibrationCohort.objectiveEvaluations)} evaluations (gate [${String(SEASON_INFLUENCE_OBJECTIVE_SUCCESS_MIN * 100)}%, ${String(SEASON_INFLUENCE_OBJECTIVE_SUCCESS_MAX * 100)}%])`,
-    `challenge earned/block ${calibrationCohort.expectedEarnedPerBlock === null ? 'n/a' : calibrationCohort.expectedEarnedPerBlock.toFixed(2)} (gate [${String(SEASON_INFLUENCE_EXPECTED_EARNED_MIN)}, ${String(SEASON_INFLUENCE_EXPECTED_EARNED_MAX)}]) · cap-clamped ${calibrationCohort.capClampedShare === null ? 'n/a' : `${(calibrationCohort.capClampedShare * 100).toFixed(1)}%`} (gate ≤ ${(SEASON_INFLUENCE_CAP_CLAMPED_MAX * 100).toFixed(0)}%) over ${String(calibrationCohort.challengeEvaluations)} challenge evaluations`,
-    `extra-offer spend share ${(calibrationCohort.extraOfferSpendShare * 100).toFixed(1)}% · rehab spend share ${(calibrationCohort.rehabSpendShare * 100).toFixed(1)}%`,
-    targetsDetail({ targetsWritten, targetsPath }),
-  ];
-  gateFailures.push(...calibrationGateFailures({ pass, targetsWritten, skippedGates, metrics }));
-  return makeReport(
-    'season influence calibrate',
-    { seedFrom: from, seedTo: to, workers },
-    { details, failures: gateFailures, payload },
-  );
 }

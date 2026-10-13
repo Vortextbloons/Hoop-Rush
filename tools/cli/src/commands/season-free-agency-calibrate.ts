@@ -48,7 +48,7 @@ import {
   type SeasonBlockSimulationInput,
   type SeasonRosterMemberInput,
 } from '@hoop-rush/engine';
-import { makeReport, type CliReport } from '../report.ts';
+import type { CliReport } from '../report.ts';
 import { seasonFreeAgencyCalibrateReportSchema } from '../report-schemas.ts';
 import {
   DEFAULT_MANIFEST,
@@ -58,7 +58,6 @@ import {
 } from './season-data.ts';
 import {
   gateValue,
-  gateSummary,
   m25RangeGate,
   m25ToleranceGate,
   mean,
@@ -71,9 +70,8 @@ import {
   type SeasonFreeAgencyAuditCounts,
 } from './season-free-agency-audit.ts';
 import {
-  calibrationGateFailures,
-  commitTargetsArtifact,
   resolveCalibrationArgs,
+  runCalibrationShell,
   targetsDetail,
   validateTargetsArtifact,
 } from '../calibration/index.ts';
@@ -1356,222 +1354,220 @@ export function seasonFreeAgencyCalibrate(
   );
   const outPath = args.out ?? DEFAULT_FREE_AGENCY_TARGETS;
   const validateOnly = args.validate !== null;
-  if (validateOnly) {
-    return validateSeasonFreeAgencyTargets(args, resolve(args.validate ?? outPath));
-  }
   const manifestPath = args.manifest ?? DEFAULT_MANIFEST;
   const runSeason = deps.runSeason ?? defaultRunner(manifestPath);
-  let calibration: SeasonFreeAgencySeasonFacts[];
-  let heldOut: SeasonFreeAgencySeasonFacts[];
-  try {
-    calibration = calibrationIndices.map((index) =>
-      runSeason(seasonCalibrationSeed(index), {
-        driveFreeAgency: true,
-        probeWindow: index === from,
-      }),
-    );
-    heldOut = validationIndices.map((index) =>
-      runSeason(seasonCalibrationSeed(index), {
-        driveFreeAgency: true,
-        probeWindow: index === to + 1,
-      }),
-    );
-  } catch (error) {
-    return makeReport(
-      'season free-agency calibrate',
-      { seedFrom: from, seedTo: to, workers },
-      { failures: [`calibration cohort failed: ${(error as Error).message}`], exitCode: 2 },
-    );
-  }
-  const draftedMedian =
-    calibration.length > 0 && calibration[0] !== undefined
-      ? draftedMedianOverallOf(calibration[0])
-      : 0;
-  const calibrationFacts = foldFreeAgencyCohort(calibration, draftedMedian);
-  const heldOutFacts = foldFreeAgencyCohort(heldOut, draftedMedian);
-  const zeroSigning = calibration.find(
-    (season) =>
-      season.run.freeAgency.windows.reduce((sum, window) => sum + window.signings.length, 0) === 0,
-  );
-  let summaryIdentity: {
-    probed: boolean;
-    identical: boolean;
-  } = {
-    probed: false,
-    identical: true,
-  };
-  if (zeroSigning !== undefined) {
-    const baseline = runSeason(zeroSigning.rootSeed, {
-      driveFreeAgency: false,
-      probeWindow: false,
-    });
-    summaryIdentity = {
-      probed: true,
-      identical: JSON.stringify(baseline.summaries) === JSON.stringify(zeroSigning.summaries),
-    };
-    calibrationFacts.summaryIdentityProbe = summaryIdentity;
-  }
-  const metrics = evaluateFreeAgencyGates(calibrationFacts, heldOutFacts, { summaryIdentity });
-  const { skippedGates, pass } = gateSummary(metrics);
-  const gates = {
-    windowsOpened: gateValue(metrics, 'windowsOpened'),
-    bandSigningCaps: gateValue(metrics, 'bandSigningCaps'),
-    threeSigningsPerSeason: gateValue(metrics, 'threeSigningsPerSeason'),
-    sixInfluencePerSeason: gateValue(metrics, 'sixInfluencePerSeason'),
-    linkReconciliation: gateValue(metrics, 'linkReconciliation'),
-    traceAudit: gateValue(metrics, 'traceAudit'),
-    effectsInvariants: gateValue(metrics, 'effectsInvariants'),
-    rosterLegality: gateValue(metrics, 'rosterLegality'),
-    ownershipRows: gateValue(metrics, 'ownershipRows'),
-    eliteExclusion: gateValue(metrics, 'eliteExclusion'),
-    oneOutlierCeiling: gateValue(metrics, 'oneOutlierCeiling'),
-    noRichGetRicher: gateValue(metrics, 'noRichGetRicher'),
-    influenceTieBreak: gateValue(metrics, 'influenceTieBreak'),
-    determinismProbe: gateValue(metrics, 'determinismProbe'),
-    candidateQuality: gateValue(metrics, 'candidateQuality'),
-    interestActivity: gateValue(metrics, 'interestActivity'),
-    summaryIdentity: gateValue(metrics, 'summaryIdentity'),
-    heldOut:
-      gateValue(metrics, 'heldOut.windowsOpened') &&
-      gateValue(metrics, 'heldOut.bandSigningCaps') &&
-      gateValue(metrics, 'heldOut.linkReconciliation') &&
-      gateValue(metrics, 'heldOut.effectsInvariants') &&
-      gateValue(metrics, 'heldOut.rosterLegality') &&
-      gateValue(metrics, 'heldOut.traceAudit') &&
-      gateValue(metrics, 'heldOut.determinism'),
-  };
-  let targetsWritten = false;
-  let targetsPath: string | null = null;
-  const gateFailures: string[] = [];
-  if (pass) {
-    const targets: SeasonFreeAgencyTargets = {
-      schemaVersion: 1,
-      targetsVersion: SEASON_FREE_AGENCY_TARGETS_VERSION,
-      policy: {
-        bandSigningCaps: {
-          contender: 1,
-          playoff: 2,
-          average: 3,
-          weaker: 3,
-        },
-        maxSigningsPerSeason: SEASON_FREE_AGENCY_MAX_SIGNINGS,
-        maxSeasonSpend: SEASON_FREE_AGENCY_MAX_SEASON_SPEND,
-        windowComposition: {
-          featured: 2,
-          role: 5,
-          development: 3,
-          emergency: 2,
-        },
-        maxCandidates: 12,
-        minWindowsPerSeason: 3,
-        ownershipRows: [SEASON_FREE_AGENCY_OWNERSHIP_MIN, SEASON_FREE_AGENCY_OWNERSHIP_MAX],
-        activeEffects: [300, 1350],
-        aboveDraftedShareEnvelope: [
-          SEASON_FREE_AGENCY_ABOVE_DRAFTED_MIN,
-          SEASON_FREE_AGENCY_ABOVE_DRAFTED_MAX,
-        ],
-        skipShareMax: SEASON_FREE_AGENCY_SKIP_SHARE_MAX,
-        minSeasons: SEASON_FREE_AGENCY_MIN_SEASONS,
-      },
-      cohort: { seedFrom: from, seedTo: to },
-      heldOut: { seedFrom: to + 1, seedTo: to + SEASON_FREE_AGENCY_VALIDATION_SEED_COUNT },
-      measured: {
-        calibration: freeAgencyMeasuredOf(calibrationFacts),
-        heldOut: {
-          seasonsSimulated: heldOutFacts.seasonsSimulated,
-          windowsOpened: heldOutFacts.windowsOpened,
-          windowsComplete: heldOutFacts.windowsComplete,
-          signings: heldOutFacts.signings,
-          bandCapViolations: heldOutFacts.bandCapViolations,
-          signingCapViolations: heldOutFacts.signingCapViolations,
-          spendCapViolations: heldOutFacts.spendCapViolations,
-          linkFailures: heldOutFacts.linkFailures,
-          traceAuditFailures: heldOutFacts.traceAuditFailures,
-          effectsFailures: heldOutFacts.effectsFailures,
-          rosterIllegal: heldOutFacts.rosterIllegal,
-          rotationIllegal: heldOutFacts.rotationIllegal,
-          influenceDecideFailures: heldOutFacts.influenceDecideFailures,
-          eliteExclusionFailures: heldOutFacts.eliteExclusionFailures,
-          oneOutlierFailures: heldOutFacts.oneOutlierFailures,
-          richGetRicherFailures: heldOutFacts.richGetRicherFailures,
-          ownershipRows: heldOutFacts.ownershipRows,
-          determinismProbe: { ...heldOutFacts.determinismProbe },
-          summaryIdentityProbe: { ...heldOutFacts.summaryIdentityProbe },
-        },
-      },
-      gates,
-      engineVersion: createEngineContext().engineVersion,
-      gameVersion: SEASON_GAME_VERSION,
-      gameTargetsVersion: SEASON_GAME_TARGETS_VERSION,
-      generatedAtIso: new Date().toISOString(),
-    };
-    seasonFreeAgencyTargetsSchema.parse(targets);
-    const commit = commitTargetsArtifact({
+  return runCalibrationShell({
+    command: 'season free-agency calibrate',
+    argsForReport: { seedFrom: from, seedTo: to, workers },
+    plan: { from, to, workers, calibrationIndices, validationIndices },
+    startedAt: started,
+    validate: validateOnly
+      ? () => validateSeasonFreeAgencyTargets(args, resolve(args.validate ?? outPath))
+      : null,
+    artifact: {
       outPath,
       defaultTargetsPath: DEFAULT_FREE_AGENCY_TARGETS,
       manifestPath,
       manifestKey: 'freeAgencyTargets',
       manifestUrl: 'season/free-agency-targets.json',
-      content: targets,
-    });
-    targetsWritten = commit.written;
-    targetsPath = commit.path;
-    if (commit.error !== null) gateFailures.push(commit.error);
-  }
-  const payload = seasonFreeAgencyCalibrateReportSchema.parse({
-    schemaVersion: 1,
-    command: 'season free-agency calibrate',
-    targetsVersion: SEASON_FREE_AGENCY_TARGETS_VERSION,
-    calibrationSeeds: calibrationIndices.length,
-    validationSeeds: validationIndices.length,
-    seasonsSimulated: calibrationFacts.seasonsSimulated + heldOutFacts.seasonsSimulated,
-    windowsOpened: calibrationFacts.windowsOpened + heldOutFacts.windowsOpened,
-    signings: calibrationFacts.signings + heldOutFacts.signings,
-    uniqueIdentities: calibrationFacts.uniqueIdentities,
-    canonicalReuse: calibrationFacts.canonicalReuse,
-    candidateTotal: calibrationFacts.candidateTotal,
-    candidateShortfalls: calibrationFacts.candidateShortfalls,
-    declaredTargets: calibrationFacts.declaredTargets,
-    signingsByBand: { ...calibrationFacts.signingsByBand },
-    interestByBand: { ...calibrationFacts.interestByBand },
-    winsByBand: { ...calibrationFacts.winsByBand },
-    skipShare: calibrationFacts.skipShare,
-    bandCapViolations: calibrationFacts.bandCapViolations,
-    signingCapViolations: calibrationFacts.signingCapViolations,
-    spendCapViolations: calibrationFacts.spendCapViolations,
-    linkFailures: calibrationFacts.linkFailures,
-    traceAuditFailures: calibrationFacts.traceAuditFailures,
-    effectsFailures: calibrationFacts.effectsFailures,
-    influenceDecideFailures: calibrationFacts.influenceDecideFailures,
-    eliteExclusionFailures: calibrationFacts.eliteExclusionFailures,
-    oneOutlierFailures: calibrationFacts.oneOutlierFailures,
-    richGetRicherFailures: calibrationFacts.richGetRicherFailures,
-    signedAboveDraftedMedianShare: calibrationFacts.signedAboveDraftedMedianShare,
-    determinismProbe: { ...calibrationFacts.determinismProbe },
-    summaryIdentityProbe: { ...summaryIdentity },
-    gates,
-    metrics,
-    skippedGates,
-    targetsWritten,
-    targetsPath,
-    durationMs: Date.now() - started,
+    },
+    payloadSchema: seasonFreeAgencyCalibrateReportSchema,
+    measure: () => {
+      const calibration = calibrationIndices.map((index) =>
+        runSeason(seasonCalibrationSeed(index), {
+          driveFreeAgency: true,
+          probeWindow: index === from,
+        }),
+      );
+      const heldOut = validationIndices.map((index) =>
+        runSeason(seasonCalibrationSeed(index), {
+          driveFreeAgency: true,
+          probeWindow: index === to + 1,
+        }),
+      );
+      const draftedMedian =
+        calibration.length > 0 && calibration[0] !== undefined
+          ? draftedMedianOverallOf(calibration[0])
+          : 0;
+      const calibrationFacts = foldFreeAgencyCohort(calibration, draftedMedian);
+      const heldOutFacts = foldFreeAgencyCohort(heldOut, draftedMedian);
+      const zeroSigning = calibration.find(
+        (season) =>
+          season.run.freeAgency.windows.reduce((sum, window) => sum + window.signings.length, 0) ===
+          0,
+      );
+      let summaryIdentity: {
+        probed: boolean;
+        identical: boolean;
+      } = {
+        probed: false,
+        identical: true,
+      };
+      if (zeroSigning !== undefined) {
+        const baseline = runSeason(zeroSigning.rootSeed, {
+          driveFreeAgency: false,
+          probeWindow: false,
+        });
+        summaryIdentity = {
+          probed: true,
+          identical: JSON.stringify(baseline.summaries) === JSON.stringify(zeroSigning.summaries),
+        };
+        calibrationFacts.summaryIdentityProbe = summaryIdentity;
+      }
+      const metrics = evaluateFreeAgencyGates(calibrationFacts, heldOutFacts, { summaryIdentity });
+      const gates = {
+        windowsOpened: gateValue(metrics, 'windowsOpened'),
+        bandSigningCaps: gateValue(metrics, 'bandSigningCaps'),
+        threeSigningsPerSeason: gateValue(metrics, 'threeSigningsPerSeason'),
+        sixInfluencePerSeason: gateValue(metrics, 'sixInfluencePerSeason'),
+        linkReconciliation: gateValue(metrics, 'linkReconciliation'),
+        traceAudit: gateValue(metrics, 'traceAudit'),
+        effectsInvariants: gateValue(metrics, 'effectsInvariants'),
+        rosterLegality: gateValue(metrics, 'rosterLegality'),
+        ownershipRows: gateValue(metrics, 'ownershipRows'),
+        eliteExclusion: gateValue(metrics, 'eliteExclusion'),
+        oneOutlierCeiling: gateValue(metrics, 'oneOutlierCeiling'),
+        noRichGetRicher: gateValue(metrics, 'noRichGetRicher'),
+        influenceTieBreak: gateValue(metrics, 'influenceTieBreak'),
+        determinismProbe: gateValue(metrics, 'determinismProbe'),
+        candidateQuality: gateValue(metrics, 'candidateQuality'),
+        interestActivity: gateValue(metrics, 'interestActivity'),
+        summaryIdentity: gateValue(metrics, 'summaryIdentity'),
+        heldOut:
+          gateValue(metrics, 'heldOut.windowsOpened') &&
+          gateValue(metrics, 'heldOut.bandSigningCaps') &&
+          gateValue(metrics, 'heldOut.linkReconciliation') &&
+          gateValue(metrics, 'heldOut.effectsInvariants') &&
+          gateValue(metrics, 'heldOut.rosterLegality') &&
+          gateValue(metrics, 'heldOut.traceAudit') &&
+          gateValue(metrics, 'heldOut.determinism'),
+      };
+      return {
+        metrics,
+        gates,
+        extra: { calibration, heldOut, calibrationFacts, heldOutFacts, summaryIdentity },
+        targets: () => {
+          const targets: SeasonFreeAgencyTargets = {
+            schemaVersion: 1,
+            targetsVersion: SEASON_FREE_AGENCY_TARGETS_VERSION,
+            policy: {
+              bandSigningCaps: {
+                contender: 1,
+                playoff: 2,
+                average: 3,
+                weaker: 3,
+              },
+              maxSigningsPerSeason: SEASON_FREE_AGENCY_MAX_SIGNINGS,
+              maxSeasonSpend: SEASON_FREE_AGENCY_MAX_SEASON_SPEND,
+              windowComposition: {
+                featured: 2,
+                role: 5,
+                development: 3,
+                emergency: 2,
+              },
+              maxCandidates: 12,
+              minWindowsPerSeason: 3,
+              ownershipRows: [SEASON_FREE_AGENCY_OWNERSHIP_MIN, SEASON_FREE_AGENCY_OWNERSHIP_MAX],
+              activeEffects: [300, 1350],
+              aboveDraftedShareEnvelope: [
+                SEASON_FREE_AGENCY_ABOVE_DRAFTED_MIN,
+                SEASON_FREE_AGENCY_ABOVE_DRAFTED_MAX,
+              ],
+              skipShareMax: SEASON_FREE_AGENCY_SKIP_SHARE_MAX,
+              minSeasons: SEASON_FREE_AGENCY_MIN_SEASONS,
+            },
+            cohort: { seedFrom: from, seedTo: to },
+            heldOut: { seedFrom: to + 1, seedTo: to + SEASON_FREE_AGENCY_VALIDATION_SEED_COUNT },
+            measured: {
+              calibration: freeAgencyMeasuredOf(calibrationFacts),
+              heldOut: {
+                seasonsSimulated: heldOutFacts.seasonsSimulated,
+                windowsOpened: heldOutFacts.windowsOpened,
+                windowsComplete: heldOutFacts.windowsComplete,
+                signings: heldOutFacts.signings,
+                bandCapViolations: heldOutFacts.bandCapViolations,
+                signingCapViolations: heldOutFacts.signingCapViolations,
+                spendCapViolations: heldOutFacts.spendCapViolations,
+                linkFailures: heldOutFacts.linkFailures,
+                traceAuditFailures: heldOutFacts.traceAuditFailures,
+                effectsFailures: heldOutFacts.effectsFailures,
+                rosterIllegal: heldOutFacts.rosterIllegal,
+                rotationIllegal: heldOutFacts.rotationIllegal,
+                influenceDecideFailures: heldOutFacts.influenceDecideFailures,
+                eliteExclusionFailures: heldOutFacts.eliteExclusionFailures,
+                oneOutlierFailures: heldOutFacts.oneOutlierFailures,
+                richGetRicherFailures: heldOutFacts.richGetRicherFailures,
+                ownershipRows: heldOutFacts.ownershipRows,
+                determinismProbe: { ...heldOutFacts.determinismProbe },
+                summaryIdentityProbe: { ...heldOutFacts.summaryIdentityProbe },
+              },
+            },
+            gates,
+            engineVersion: createEngineContext().engineVersion,
+            gameVersion: SEASON_GAME_VERSION,
+            gameTargetsVersion: SEASON_GAME_TARGETS_VERSION,
+            generatedAtIso: new Date().toISOString(),
+          };
+          seasonFreeAgencyTargetsSchema.parse(targets);
+          return targets;
+        },
+      };
+    },
+    report: (state) => {
+      const { calibration, heldOut, calibrationFacts, heldOutFacts, summaryIdentity } = state.extra;
+      const { gates, metrics, skippedGates, targetsWritten, targetsPath } = state;
+      const started = state.startedAt;
+      const payload = {
+        schemaVersion: 1,
+        command: 'season free-agency calibrate',
+        targetsVersion: SEASON_FREE_AGENCY_TARGETS_VERSION,
+        calibrationSeeds: calibrationIndices.length,
+        validationSeeds: validationIndices.length,
+        seasonsSimulated: calibrationFacts.seasonsSimulated + heldOutFacts.seasonsSimulated,
+        windowsOpened: calibrationFacts.windowsOpened + heldOutFacts.windowsOpened,
+        signings: calibrationFacts.signings + heldOutFacts.signings,
+        uniqueIdentities: calibrationFacts.uniqueIdentities,
+        canonicalReuse: calibrationFacts.canonicalReuse,
+        candidateTotal: calibrationFacts.candidateTotal,
+        candidateShortfalls: calibrationFacts.candidateShortfalls,
+        declaredTargets: calibrationFacts.declaredTargets,
+        signingsByBand: { ...calibrationFacts.signingsByBand },
+        interestByBand: { ...calibrationFacts.interestByBand },
+        winsByBand: { ...calibrationFacts.winsByBand },
+        skipShare: calibrationFacts.skipShare,
+        bandCapViolations: calibrationFacts.bandCapViolations,
+        signingCapViolations: calibrationFacts.signingCapViolations,
+        spendCapViolations: calibrationFacts.spendCapViolations,
+        linkFailures: calibrationFacts.linkFailures,
+        traceAuditFailures: calibrationFacts.traceAuditFailures,
+        effectsFailures: calibrationFacts.effectsFailures,
+        influenceDecideFailures: calibrationFacts.influenceDecideFailures,
+        eliteExclusionFailures: calibrationFacts.eliteExclusionFailures,
+        oneOutlierFailures: calibrationFacts.oneOutlierFailures,
+        richGetRicherFailures: calibrationFacts.richGetRicherFailures,
+        signedAboveDraftedMedianShare: calibrationFacts.signedAboveDraftedMedianShare,
+        determinismProbe: { ...calibrationFacts.determinismProbe },
+        summaryIdentityProbe: { ...summaryIdentity },
+        gates,
+        metrics,
+        skippedGates,
+        targetsWritten,
+        targetsPath,
+        durationMs: Date.now() - started,
+      };
+      const details = [
+        `${String(calibration.length)} calibration + ${String(heldOut.length)} held-out seasons in ${String(Date.now() - started)}ms (${String(workers)} workers)`,
+        `windows ${String(calibrationFacts.windowsOpened)} · candidates ${String(calibrationFacts.candidateTotal)} (shortfalls ${String(calibrationFacts.candidateShortfalls)}) · unique identities ${String(calibrationFacts.uniqueIdentities)} · canonical reuse ${String(calibrationFacts.canonicalReuse)}`,
+        `signings ${String(calibrationFacts.signings)} (${String(calibrationFacts.signingFranchises)} franchises) · declared targets ${String(calibrationFacts.declaredTargets)} · skip share ${(calibrationFacts.skipShare * 100).toFixed(1)}%`,
+        `signings by band ${JSON.stringify(calibrationFacts.signingsByBand)} · band-cap violations ${String(calibrationFacts.bandCapViolations)} · spend-cap violations ${String(calibrationFacts.spendCapViolations)}`,
+        `link failures ${String(calibrationFacts.linkFailures)} · trace failures ${String(calibrationFacts.traceAuditFailures)} · influence tie-break failures ${String(calibrationFacts.influenceDecideFailures)}`,
+        `elite-exclusion failures ${String(calibrationFacts.eliteExclusionFailures)} · one-outlier failures ${String(calibrationFacts.oneOutlierFailures)} · rich-get-richer failures ${String(calibrationFacts.richGetRicherFailures)}`,
+        `signed above drafted median ${(calibrationFacts.signedAboveDraftedMedianShare * 100).toFixed(1)}% · ownership rows ${String(calibrationFacts.ownershipRows)}`,
+        `determinism probe ${String(calibrationFacts.determinismProbe.identical)} · summary identity probe ${summaryIdentity.probed ? (summaryIdentity.identical ? 'identical' : 'DIVERGED') : 'not probed (no zero-signing season)'}`,
+        targetsDetail({ targetsWritten, targetsPath }),
+      ];
+      return { details, payload };
+    },
   });
-  const details = [
-    `${String(calibration.length)} calibration + ${String(heldOut.length)} held-out seasons in ${String(Date.now() - started)}ms (${String(workers)} workers)`,
-    `windows ${String(calibrationFacts.windowsOpened)} · candidates ${String(calibrationFacts.candidateTotal)} (shortfalls ${String(calibrationFacts.candidateShortfalls)}) · unique identities ${String(calibrationFacts.uniqueIdentities)} · canonical reuse ${String(calibrationFacts.canonicalReuse)}`,
-    `signings ${String(calibrationFacts.signings)} (${String(calibrationFacts.signingFranchises)} franchises) · declared targets ${String(calibrationFacts.declaredTargets)} · skip share ${(calibrationFacts.skipShare * 100).toFixed(1)}%`,
-    `signings by band ${JSON.stringify(calibrationFacts.signingsByBand)} · band-cap violations ${String(calibrationFacts.bandCapViolations)} · spend-cap violations ${String(calibrationFacts.spendCapViolations)}`,
-    `link failures ${String(calibrationFacts.linkFailures)} · trace failures ${String(calibrationFacts.traceAuditFailures)} · influence tie-break failures ${String(calibrationFacts.influenceDecideFailures)}`,
-    `elite-exclusion failures ${String(calibrationFacts.eliteExclusionFailures)} · one-outlier failures ${String(calibrationFacts.oneOutlierFailures)} · rich-get-richer failures ${String(calibrationFacts.richGetRicherFailures)}`,
-    `signed above drafted median ${(calibrationFacts.signedAboveDraftedMedianShare * 100).toFixed(1)}% · ownership rows ${String(calibrationFacts.ownershipRows)}`,
-    `determinism probe ${String(calibrationFacts.determinismProbe.identical)} · summary identity probe ${summaryIdentity.probed ? (summaryIdentity.identical ? 'identical' : 'DIVERGED') : 'not probed (no zero-signing season)'}`,
-    targetsDetail({ targetsWritten, targetsPath }),
-  ];
-  gateFailures.push(...calibrationGateFailures({ pass, targetsWritten, skippedGates, metrics }));
-  return makeReport(
-    'season free-agency calibrate',
-    { seedFrom: from, seedTo: to, workers },
-    { details, failures: gateFailures, payload },
-  );
 }
 void BANDS;

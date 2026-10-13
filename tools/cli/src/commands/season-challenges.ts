@@ -10,19 +10,17 @@ import {
 } from '@hoop-rush/data-contracts';
 import { createEngineContext, dealSeasonBlockChallenges } from '@hoop-rush/engine';
 import { reconstructSeasonGames, reduceSeasonStandings } from '@hoop-rush/engine';
-import { makeReport, type CliReport } from '../report.ts';
+import { type CliReport } from '../report.ts';
 import { seasonChallengesCalibrateReportSchema } from '../report-schemas.ts';
 import { DEFAULT_MANIFEST, DEFAULT_SEASON_DIR } from './season-data.ts';
 import {
-  calibrationGateFailures,
-  commitTargetsArtifact,
   resolveCalibrationArgs,
+  runCalibrationShell,
   targetsDetail,
   validateTargetsArtifact,
 } from '../calibration/index.ts';
 import {
   gateValue,
-  gateSummary,
   m25RangeGate,
   m25ToleranceGate,
   seasonCalibrationSeed,
@@ -409,13 +407,8 @@ export function seasonChallengesCalibrate(args: SeasonChallengesArgs): CliReport
   );
   const outPath = args.out ?? DEFAULT_CHALLENGE_TARGETS;
   const validateOnly = args['validate'] !== null;
-  if (validateOnly) {
-    return validateSeasonChallengeTargets(args, resolve(args.validate ?? outPath));
-  }
-  let calibration: SeasonM25SeasonFacts[];
-  let heldOut: SeasonM25SeasonFacts[];
-  try {
-    calibration = calibrationIndices.map((index) =>
+  const runFacts = (indices: number[]): SeasonM25SeasonFacts[] =>
+    indices.map((index) =>
       runSeasonM25({
         runPath: args.input,
         manifestPath: args.manifest,
@@ -424,141 +417,135 @@ export function seasonChallengesCalibrate(args: SeasonChallengesArgs): CliReport
         pickObjectives: true,
       }),
     );
-    heldOut = validationIndices.map((index) =>
-      runSeasonM25({
-        runPath: args.input,
-        manifestPath: args.manifest,
-        rootSeed: seasonCalibrationSeed(index),
-        driveWindows: true,
-        pickObjectives: true,
-      }),
-    );
-  } catch (error) {
-    return makeReport(
-      'season challenges calibrate',
-      { seedFrom: from, seedTo: to, workers },
-      { failures: [`calibration cohort failed: ${(error as Error).message}`], exitCode: 2 },
-    );
-  }
-  const calibrationCohort = foldChallengeCohort(calibration);
-  const heldOutCohort = foldChallengeCohort(heldOut);
-  const metrics = evaluateChallengeGates({
-    calibration: calibrationCohort,
-    heldOut: heldOutCohort,
-  });
-  const { skippedGates, pass } = gateSummary(metrics);
-  const gates = {
-    dealCompleteness: gateValue(metrics, 'dealCompleteness'),
-    canonicalOrder: gateValue(metrics, 'canonicalOrder'),
-    replayStability: gateValue(metrics, 'replayStability'),
-    threePointSufficiency: gateValue(metrics, 'threePointSufficiency'),
-    heldOut: gateValue(metrics, 'heldOut.dealCompleteness'),
-  };
-  let targetsWritten = false;
-  let targetsPath: string | null = null;
-  const gateFailures: string[] = [];
-  if (pass) {
-    const targets: SeasonChallengeTargets = {
-      schemaVersion: 1,
-      targetsVersion: SEASON_CHALLENGE_TARGETS_VERSION,
-      policy: {
-        catalogVersion: SEASON_CHALLENGE_VERSION,
-        standardReward: 1,
-        hardReward: 2,
-        threePointPct: 0.35,
-        threePointMinAttempts: 20,
-        takeCareMaxPerGame: 13.0,
-        winSixWins: 6,
-        winSixMinGames: 8,
-        statementMinGames: 4,
-        threePointSufficiencyMin: SEASON_CHALLENGES_THREE_PA_SUFFICIENCY_MIN,
-      },
-      cohort: { seedFrom: from, seedTo: to },
-      heldOut: { seedFrom: to + 1, seedTo: to + SEASON_CHALLENGES_VALIDATION_SEED_COUNT },
-      measured: {
-        calibration: {
-          seasonsSimulated: calibrationCohort.seasonsSimulated,
-          blocksDealt: calibrationCohort.blocksDealt,
-          dealCompleteness: calibrationCohort.dealCompleteness,
-          canonicalOrderShare: calibrationCohort.canonicalOrderShare,
-          replayStabilityShare: calibrationCohort.replayStabilityShare,
-          hardFeasibleShare: calibrationCohort.hardFeasibleShare,
-          dealFrequency: calibrationCohort.dealFrequency,
-          completionRate: calibrationCohort.completionRate,
-          expectedEarnedPerBlock: calibrationCohort.expectedEarnedPerBlock,
-          threePointSufficiency: calibrationCohort.threePointSufficiency,
-          threePointEvaluations: calibrationCohort.threePointEvaluations,
-        },
-        heldOut: {
-          seasonsSimulated: heldOutCohort.seasonsSimulated,
-          blocksDealt: heldOutCohort.blocksDealt,
-          dealCompleteness: heldOutCohort.dealCompleteness,
-          completionRate: heldOutCohort.completionRate,
-          expectedEarnedPerBlock: heldOutCohort.expectedEarnedPerBlock,
-          threePointSufficiency: heldOutCohort.threePointSufficiency,
-        },
-      },
-      gates,
-      engineVersion: createEngineContext().engineVersion,
-      gameVersion: SEASON_GAME_VERSION,
-      gameTargetsVersion: SEASON_GAME_TARGETS_VERSION,
-      generatedAtIso: new Date().toISOString(),
-    };
-    seasonChallengeTargetsSchema.parse(targets);
-    const commit = commitTargetsArtifact({
+  return runCalibrationShell({
+    command: 'season challenges calibrate',
+    argsForReport: { seedFrom: from, seedTo: to, workers },
+    plan: { from, to, workers, calibrationIndices, validationIndices },
+    startedAt: started,
+    validate: validateOnly
+      ? () => validateSeasonChallengeTargets(args, resolve(args.validate ?? outPath))
+      : null,
+    artifact: {
       outPath,
       defaultTargetsPath: DEFAULT_CHALLENGE_TARGETS,
       manifestPath: args.manifest ?? DEFAULT_MANIFEST,
       manifestKey: 'challengeTargets',
       manifestUrl: 'season/challenge-targets.json',
-      content: targets,
-    });
-    targetsWritten = commit.written;
-    targetsPath = commit.path;
-    if (commit.error !== null) gateFailures.push(commit.error);
-  }
-  const payload = seasonChallengesCalibrateReportSchema.parse({
-    schemaVersion: 1,
-    command: 'season challenges calibrate',
-    targetsVersion: SEASON_CHALLENGE_TARGETS_VERSION,
-    calibrationSeeds: calibrationIndices.length,
-    validationSeeds: validationIndices.length,
-    seasonsSimulated: calibrationCohort.seasonsSimulated + heldOutCohort.seasonsSimulated,
-    blocksDealt: calibrationCohort.blocksDealt,
-    dealCompleteness: calibrationCohort.dealCompleteness,
-    canonicalOrderShare: calibrationCohort.canonicalOrderShare,
-    replayStabilityShare: calibrationCohort.replayStabilityShare,
-    hardFeasibleShare: calibrationCohort.hardFeasibleShare,
-    dealFrequency: calibrationCohort.dealFrequency,
-    completionRate: calibrationCohort.completionRate,
-    expectedEarnedPerBlock: calibrationCohort.expectedEarnedPerBlock,
-    threePointSufficiency: calibrationCohort.threePointSufficiency,
-    threePointEvaluations: calibrationCohort.threePointEvaluations,
-    gates: {
-      dealCompleteness: gates.dealCompleteness,
-      canonicalOrder: gates.canonicalOrder,
-      replayStability: gates.replayStability,
-      threePointSufficiency: gates.threePointSufficiency,
-      heldOut: gates.heldOut,
     },
-    metrics,
-    skippedGates,
-    targetsWritten,
-    targetsPath,
-    durationMs: Date.now() - started,
+    payloadSchema: seasonChallengesCalibrateReportSchema,
+    measure: () => {
+      const calibrationCohort = foldChallengeCohort(runFacts(calibrationIndices));
+      const heldOutCohort = foldChallengeCohort(runFacts(validationIndices));
+      const metrics = evaluateChallengeGates({
+        calibration: calibrationCohort,
+        heldOut: heldOutCohort,
+      });
+      const gates = {
+        dealCompleteness: gateValue(metrics, 'dealCompleteness'),
+        canonicalOrder: gateValue(metrics, 'canonicalOrder'),
+        replayStability: gateValue(metrics, 'replayStability'),
+        threePointSufficiency: gateValue(metrics, 'threePointSufficiency'),
+        heldOut: gateValue(metrics, 'heldOut.dealCompleteness'),
+      };
+      return {
+        metrics,
+        gates,
+        extra: { calibrationCohort, heldOutCohort },
+        targets: () => {
+          const targets: SeasonChallengeTargets = {
+            schemaVersion: 1,
+            targetsVersion: SEASON_CHALLENGE_TARGETS_VERSION,
+            policy: {
+              catalogVersion: SEASON_CHALLENGE_VERSION,
+              standardReward: 1,
+              hardReward: 2,
+              threePointPct: 0.35,
+              threePointMinAttempts: 20,
+              takeCareMaxPerGame: 13.0,
+              winSixWins: 6,
+              winSixMinGames: 8,
+              statementMinGames: 4,
+              threePointSufficiencyMin: SEASON_CHALLENGES_THREE_PA_SUFFICIENCY_MIN,
+            },
+            cohort: { seedFrom: from, seedTo: to },
+            heldOut: { seedFrom: to + 1, seedTo: to + SEASON_CHALLENGES_VALIDATION_SEED_COUNT },
+            measured: {
+              calibration: {
+                seasonsSimulated: calibrationCohort.seasonsSimulated,
+                blocksDealt: calibrationCohort.blocksDealt,
+                dealCompleteness: calibrationCohort.dealCompleteness,
+                canonicalOrderShare: calibrationCohort.canonicalOrderShare,
+                replayStabilityShare: calibrationCohort.replayStabilityShare,
+                hardFeasibleShare: calibrationCohort.hardFeasibleShare,
+                dealFrequency: calibrationCohort.dealFrequency,
+                completionRate: calibrationCohort.completionRate,
+                expectedEarnedPerBlock: calibrationCohort.expectedEarnedPerBlock,
+                threePointSufficiency: calibrationCohort.threePointSufficiency,
+                threePointEvaluations: calibrationCohort.threePointEvaluations,
+              },
+              heldOut: {
+                seasonsSimulated: heldOutCohort.seasonsSimulated,
+                blocksDealt: heldOutCohort.blocksDealt,
+                dealCompleteness: heldOutCohort.dealCompleteness,
+                completionRate: heldOutCohort.completionRate,
+                expectedEarnedPerBlock: heldOutCohort.expectedEarnedPerBlock,
+                threePointSufficiency: heldOutCohort.threePointSufficiency,
+              },
+            },
+            gates,
+            engineVersion: createEngineContext().engineVersion,
+            gameVersion: SEASON_GAME_VERSION,
+            gameTargetsVersion: SEASON_GAME_TARGETS_VERSION,
+            generatedAtIso: new Date().toISOString(),
+          };
+          seasonChallengeTargetsSchema.parse(targets);
+          return targets;
+        },
+      };
+    },
+    report: (state) => {
+      const { calibrationCohort, heldOutCohort } = state.extra;
+      const { gates, metrics, skippedGates, targetsWritten, targetsPath } = state;
+      const started = state.startedAt;
+      const payload = {
+        schemaVersion: 1,
+        command: 'season challenges calibrate',
+        targetsVersion: SEASON_CHALLENGE_TARGETS_VERSION,
+        calibrationSeeds: calibrationIndices.length,
+        validationSeeds: validationIndices.length,
+        seasonsSimulated: calibrationCohort.seasonsSimulated + heldOutCohort.seasonsSimulated,
+        blocksDealt: calibrationCohort.blocksDealt,
+        dealCompleteness: calibrationCohort.dealCompleteness,
+        canonicalOrderShare: calibrationCohort.canonicalOrderShare,
+        replayStabilityShare: calibrationCohort.replayStabilityShare,
+        hardFeasibleShare: calibrationCohort.hardFeasibleShare,
+        dealFrequency: calibrationCohort.dealFrequency,
+        completionRate: calibrationCohort.completionRate,
+        expectedEarnedPerBlock: calibrationCohort.expectedEarnedPerBlock,
+        threePointSufficiency: calibrationCohort.threePointSufficiency,
+        threePointEvaluations: calibrationCohort.threePointEvaluations,
+        gates: {
+          dealCompleteness: gates.dealCompleteness,
+          canonicalOrder: gates.canonicalOrder,
+          replayStability: gates.replayStability,
+          threePointSufficiency: gates.threePointSufficiency,
+          heldOut: gates.heldOut,
+        },
+        metrics,
+        skippedGates,
+        targetsWritten,
+        targetsPath,
+        durationMs: Date.now() - started,
+      };
+      const details = [
+        `${String(calibrationCohort.seasonsSimulated)} calibration + ${String(heldOutCohort.seasonsSimulated)} held-out seasons in ${String(Date.now() - started)}ms (${String(workers)} workers)`,
+        `blocks dealt ${String(calibrationCohort.blocksDealt)}/${String(calibrationCohort.blocksDealt + heldOutCohort.blocksDealt)} · completeness ${(calibrationCohort.dealCompleteness * 100).toFixed(1)}% · canonical ${(calibrationCohort.canonicalOrderShare * 100).toFixed(1)}% · replay ${(calibrationCohort.replayStabilityShare * 100).toFixed(1)}%`,
+        `hard-feasible ${(calibrationCohort.hardFeasibleShare * 100).toFixed(1)}% · earned/block ${calibrationCohort.expectedEarnedPerBlock === null ? 'n/a' : calibrationCohort.expectedEarnedPerBlock.toFixed(2)} · 3PA sufficient ${calibrationCohort.threePointSufficiency === null ? 'n/a' : `${(calibrationCohort.threePointSufficiency * 100).toFixed(1)}%`} over ${String(calibrationCohort.threePointEvaluations)} 3P evaluations`,
+        targetsDetail({ targetsWritten, targetsPath }),
+      ];
+      return { details, payload };
+    },
   });
-  const details = [
-    `${String(calibrationCohort.seasonsSimulated)} calibration + ${String(heldOutCohort.seasonsSimulated)} held-out seasons in ${String(Date.now() - started)}ms (${String(workers)} workers)`,
-    `blocks dealt ${String(calibrationCohort.blocksDealt)}/${String(calibrationCohort.blocksDealt + heldOutCohort.blocksDealt)} · completeness ${(calibrationCohort.dealCompleteness * 100).toFixed(1)}% · canonical ${(calibrationCohort.canonicalOrderShare * 100).toFixed(1)}% · replay ${(calibrationCohort.replayStabilityShare * 100).toFixed(1)}%`,
-    `hard-feasible ${(calibrationCohort.hardFeasibleShare * 100).toFixed(1)}% · earned/block ${calibrationCohort.expectedEarnedPerBlock === null ? 'n/a' : calibrationCohort.expectedEarnedPerBlock.toFixed(2)} · 3PA sufficient ${calibrationCohort.threePointSufficiency === null ? 'n/a' : `${(calibrationCohort.threePointSufficiency * 100).toFixed(1)}%`} over ${String(calibrationCohort.threePointEvaluations)} 3P evaluations`,
-    targetsDetail({ targetsWritten, targetsPath }),
-  ];
-  gateFailures.push(...calibrationGateFailures({ pass, targetsWritten, skippedGates, metrics }));
-  return makeReport(
-    'season challenges calibrate',
-    { seedFrom: from, seedTo: to, workers },
-    { details, failures: gateFailures, payload },
-  );
 }
 
 export type { SeasonChallengeId };

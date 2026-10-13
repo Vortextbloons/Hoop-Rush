@@ -24,15 +24,13 @@ import { makeReport, type CliReport } from '../report.ts';
 import { seasonTradeCalibrateReportSchema } from '../report-schemas.ts';
 import { DEFAULT_MANIFEST, DEFAULT_SEASON_DIR, readJsonFile } from './season-data.ts';
 import {
-  calibrationGateFailures,
-  commitTargetsArtifact,
   resolveCalibrationArgs,
+  runCalibrationShell,
   targetsDetail,
   validateTargetsArtifact,
 } from '../calibration/index.ts';
 import {
   gateValue,
-  gateSummary,
   m25RangeGate,
   m25ToleranceGate,
   mean,
@@ -776,205 +774,205 @@ export function seasonTradeCalibrate(args: SeasonTradeArgs): CliReport {
   );
   const outPath = args.out ?? DEFAULT_TRADE_TARGETS;
   const validateOnly = args['validate'] !== null;
-  if (validateOnly) {
-    return validateSeasonTradeTargets(args, resolve(args.validate ?? outPath));
-  }
-  let calibration: SeasonM25SeasonFacts[];
-  let heldOut: SeasonM25SeasonFacts[];
-  try {
-    calibration = calibrationIndices.map((index) =>
-      runSeasonM25({
-        runPath: args.input,
-        manifestPath: args.manifest,
-        rootSeed: seasonCalibrationSeed(index),
-        driveWindows: true,
-        pickObjectives: false,
-        probeWindow: index === from,
-      }),
-    );
-    heldOut = validationIndices.map((index) =>
-      runSeasonM25({
-        runPath: args.input,
-        manifestPath: args.manifest,
-        rootSeed: seasonCalibrationSeed(index),
-        driveWindows: true,
-        pickObjectives: false,
-      }),
-    );
-  } catch (error) {
-    return makeReport(
-      'season trade calibrate',
-      { seedFrom: from, seedTo: to, workers },
-      { failures: [`calibration cohort failed: ${(error as Error).message}`], exitCode: 2 },
-    );
-  }
-  const { metrics, measured } = evaluateTradeGates({ calibration, heldOut });
-  const { skippedGates, pass } = gateSummary(metrics);
-  const gates = {
-    aiTradesPerSeason: gateValue(metrics, 'aiTradesPerSeason'),
-    zeroIllegal: gateValue(metrics, 'zeroIllegal'),
-    zeroDuplicateOwnership: gateValue(metrics, 'zeroDuplicateOwnership'),
-    valueBands: gateValue(metrics, 'valueBands'),
-    deterministicOffers: gateValue(metrics, 'deterministicOffers'),
-    chemistryInvariants:
-      gateValue(metrics, 'chemistryPairs') &&
-      gateValue(metrics, 'chemistryPairFailures') &&
-      gateValue(metrics, 'zeroStateNewPairFailures'),
-    packageMix: gateValue(metrics, 'packageMix'),
-    zeroInfluenceOnly: gateValue(metrics, 'zeroInfluenceOnly'),
-    cashCaps: gateValue(metrics, 'cashPerProposal') && gateValue(metrics, 'cashPerWindow'),
-    noNegativeBalance: gateValue(metrics, 'noNegativeBalance'),
-    cashReconciliation: gateValue(metrics, 'cashReconciliation'),
-    inquiryExchangeLimits:
-      gateValue(metrics, 'inquiryLimit') &&
-      gateValue(metrics, 'exchangeLimit') &&
-      gateValue(metrics, 'duplicateQuota'),
-    noDuplicateQuota: gateValue(metrics, 'duplicateQuota'),
-    influenceNeverBypass: gateValue(metrics, 'influenceBypass'),
-    heldOut: gateValue(metrics, 'heldOut.aiTradesPerSeason'),
-  } as unknown as SeasonTradeTargets['gates'];
-  let targetsWritten = false;
-  let targetsPath: string | null = null;
-  const gateFailures: string[] = [];
-  if (pass) {
-    const targets: SeasonTradeTargets = {
-      schemaVersion: 1,
-      targetsVersion: SEASON_TRADE_TARGETS_VERSION,
-      policy: {
-        aiTradesPerSeason: {
-          min: SEASON_TRADE_MIN_AI_TRADES_PER_SEASON,
-          max: SEASON_TRADE_MAX_AI_TRADES_PER_SEASON,
-        },
-        windows: [2, 4, 5],
-        valueBands: {
-          '1-1': [SEASON_TRADE_VALUE_BANDS['1-1'].min, SEASON_TRADE_VALUE_BANDS['1-1'].max],
-          multi: [SEASON_TRADE_VALUE_BANDS.multi.min, SEASON_TRADE_VALUE_BANDS.multi.max],
-        },
-        chemistryPairsPerRoster: SEASON_TRADE_PAIRS_PER_ROSTER,
-        chemistryPairsTotal: SEASON_TRADE_PAIRS_LEAGUE,
-        inquiryAllowance: { base: 3, max: 5 },
-        cashCaps: { perProposal: 2, perWindow: 2 },
-        exchangeMax: 3,
-      },
-      cohort: { seedFrom: from, seedTo: to },
-      heldOut: { seedFrom: to + 1, seedTo: to + SEASON_TRADE_VALIDATION_SEED_COUNT },
-      measured: {
-        calibration: {
-          seasonsSimulated: calibration.length,
-          aiTradesMean: measured.aiTradesMean,
-          aiTradesMin: measured.aiTradesMin,
-          aiTradesMax: measured.aiTradesMax,
-          acceptedTrades: measured.acceptedTrades,
-          packageMix: { ...measured.packageMix },
-          illegalRosterFailures: measured.illegalRosterFailures,
-          duplicateOwnershipFailures: measured.duplicateOwnershipFailures,
-          valueBandFailures: measured.valueBandFailures,
-          chemistryPairs: measured.chemistryPairs,
-          chemistryPairFailures: measured.chemistryPairFailures,
-          zeroStateNewPairFailures: measured.zeroStateNewPairFailures,
-          deterministicOffers: measured.deterministicOffers,
-          influenceOnlyFailures: measured.influenceOnlyFailures,
-          cashPerProposalFailures: measured.cashPerProposalFailures,
-          cashPerWindowFailures: measured.cashPerWindowFailures,
-          negativeBalanceFailures: measured.negativeBalanceFailures,
-          cashReconciliationFailures: measured.cashReconciliationFailures,
-          inquiryLimitFailures: measured.inquiryLimitFailures,
-          exchangeLimitFailures: measured.exchangeLimitFailures,
-          duplicateQuotaFailures: measured.duplicateQuotaFailures,
-          influenceBypassFailures: measured.influenceBypassFailures,
-        },
-        heldOut: {
-          seasonsSimulated: heldOut.length,
-          aiTradesMean: mean(heldOut.map(aiTradesOf)),
-          illegalRosterFailures: heldOut.reduce(
-            (sum, season) => sum + rosterAuditFailuresOf(season).illegal,
-            0,
-          ),
-          duplicateOwnershipFailures: heldOut.reduce(
-            (sum, season) => sum + rosterAuditFailuresOf(season).duplicateOwnership,
-            0,
-          ),
-          valueBandFailures: heldOut.reduce((sum, season) => sum + valueBandFailuresOf(season), 0),
-          packageMix: heldOut.reduce<Record<SeasonTradePackageKind, number>>(
-            (mix, season) => {
-              const seasonMix = packageMixOf(season);
-              mix['1-1'] += seasonMix['1-1'];
-              mix['2-2'] += seasonMix['2-2'];
-              mix['1-2'] += seasonMix['1-2'];
-              mix['2-1'] += seasonMix['2-1'];
-              return mix;
-            },
-            { '1-1': 0, '2-2': 0, '1-2': 0, '2-1': 0 },
-          ),
-        },
-      },
-      gates,
-      engineVersion: createEngineContext().engineVersion,
-      gameVersion: SEASON_GAME_VERSION,
-      gameTargetsVersion: SEASON_GAME_TARGETS_VERSION,
-      generatedAtIso: new Date().toISOString(),
-    };
-    seasonTradeTargetsSchema.parse(targets);
-    const commit = commitTargetsArtifact({
+  return runCalibrationShell({
+    command: 'season trade calibrate',
+    argsForReport: { seedFrom: from, seedTo: to, workers },
+    plan: { from, to, workers, calibrationIndices, validationIndices },
+    startedAt: started,
+    validate: validateOnly
+      ? () => validateSeasonTradeTargets(args, resolve(args.validate ?? outPath))
+      : null,
+    artifact: {
       outPath,
       defaultTargetsPath: DEFAULT_TRADE_TARGETS,
       manifestPath: args.manifest ?? DEFAULT_MANIFEST,
       manifestKey: 'tradeTargets',
       manifestUrl: 'season/trade-targets.json',
-      content: targets,
-    });
-    targetsWritten = commit.written;
-    targetsPath = commit.path;
-    if (commit.error !== null) gateFailures.push(commit.error);
-  }
-  const payload = seasonTradeCalibrateReportSchema.parse({
-    schemaVersion: 1,
-    command: 'season trade calibrate',
-    targetsVersion: SEASON_TRADE_TARGETS_VERSION,
-    calibrationSeeds: calibrationIndices.length,
-    validationSeeds: validationIndices.length,
-    seasonsSimulated: calibration.length + heldOut.length,
-    aiTradesMean: measured.aiTradesMean,
-    aiTradesMin: measured.aiTradesMin,
-    aiTradesMax: measured.aiTradesMax,
-    acceptedTrades: measured.acceptedTrades,
-    packageMix: { ...measured.packageMix },
-    illegalRosterFailures: measured.illegalRosterFailures,
-    duplicateOwnershipFailures: measured.duplicateOwnershipFailures,
-    valueBandFailures: measured.valueBandFailures,
-    chemistryPairs: measured.chemistryPairs,
-    chemistryPairFailures: measured.chemistryPairFailures,
-    zeroStateNewPairFailures: measured.zeroStateNewPairFailures,
-    deterministicOffers: measured.deterministicOffers,
-    gates: {
-      aiTradesPerSeason: gates.aiTradesPerSeason,
-      zeroIllegal: gates.zeroIllegal,
-      zeroDuplicateOwnership: gates.zeroDuplicateOwnership,
-      valueBands: gates.valueBands,
-      deterministicOffers: gates.deterministicOffers,
-      chemistryInvariants: gates.chemistryInvariants,
-      packageMix: gates.packageMix,
-      heldOut: gates.heldOut,
     },
-    metrics,
-    skippedGates,
-    targetsWritten,
-    targetsPath,
-    durationMs: Date.now() - started,
+    payloadSchema: seasonTradeCalibrateReportSchema,
+    measure: () => {
+      const calibration = calibrationIndices.map((index) =>
+        runSeasonM25({
+          runPath: args.input,
+          manifestPath: args.manifest,
+          rootSeed: seasonCalibrationSeed(index),
+          driveWindows: true,
+          pickObjectives: false,
+          probeWindow: index === from,
+        }),
+      );
+      const heldOut = validationIndices.map((index) =>
+        runSeasonM25({
+          runPath: args.input,
+          manifestPath: args.manifest,
+          rootSeed: seasonCalibrationSeed(index),
+          driveWindows: true,
+          pickObjectives: false,
+        }),
+      );
+      const { metrics, measured } = evaluateTradeGates({ calibration, heldOut });
+      const gates = {
+        aiTradesPerSeason: gateValue(metrics, 'aiTradesPerSeason'),
+        zeroIllegal: gateValue(metrics, 'zeroIllegal'),
+        zeroDuplicateOwnership: gateValue(metrics, 'zeroDuplicateOwnership'),
+        valueBands: gateValue(metrics, 'valueBands'),
+        deterministicOffers: gateValue(metrics, 'deterministicOffers'),
+        chemistryInvariants:
+          gateValue(metrics, 'chemistryPairs') &&
+          gateValue(metrics, 'chemistryPairFailures') &&
+          gateValue(metrics, 'zeroStateNewPairFailures'),
+        packageMix: gateValue(metrics, 'packageMix'),
+        zeroInfluenceOnly: gateValue(metrics, 'zeroInfluenceOnly'),
+        cashCaps: gateValue(metrics, 'cashPerProposal') && gateValue(metrics, 'cashPerWindow'),
+        noNegativeBalance: gateValue(metrics, 'noNegativeBalance'),
+        cashReconciliation: gateValue(metrics, 'cashReconciliation'),
+        inquiryExchangeLimits:
+          gateValue(metrics, 'inquiryLimit') &&
+          gateValue(metrics, 'exchangeLimit') &&
+          gateValue(metrics, 'duplicateQuota'),
+        noDuplicateQuota: gateValue(metrics, 'duplicateQuota'),
+        influenceNeverBypass: gateValue(metrics, 'influenceBypass'),
+        heldOut: gateValue(metrics, 'heldOut.aiTradesPerSeason'),
+      } as unknown as SeasonTradeTargets['gates'];
+      return {
+        metrics,
+        gates,
+        extra: { calibration, heldOut, measured },
+        targets: () => {
+          const targets: SeasonTradeTargets = {
+            schemaVersion: 1,
+            targetsVersion: SEASON_TRADE_TARGETS_VERSION,
+            policy: {
+              aiTradesPerSeason: {
+                min: SEASON_TRADE_MIN_AI_TRADES_PER_SEASON,
+                max: SEASON_TRADE_MAX_AI_TRADES_PER_SEASON,
+              },
+              windows: [2, 4, 5],
+              valueBands: {
+                '1-1': [SEASON_TRADE_VALUE_BANDS['1-1'].min, SEASON_TRADE_VALUE_BANDS['1-1'].max],
+                multi: [SEASON_TRADE_VALUE_BANDS.multi.min, SEASON_TRADE_VALUE_BANDS.multi.max],
+              },
+              chemistryPairsPerRoster: SEASON_TRADE_PAIRS_PER_ROSTER,
+              chemistryPairsTotal: SEASON_TRADE_PAIRS_LEAGUE,
+              inquiryAllowance: { base: 3, max: 5 },
+              cashCaps: { perProposal: 2, perWindow: 2 },
+              exchangeMax: 3,
+            },
+            cohort: { seedFrom: from, seedTo: to },
+            heldOut: { seedFrom: to + 1, seedTo: to + SEASON_TRADE_VALIDATION_SEED_COUNT },
+            measured: {
+              calibration: {
+                seasonsSimulated: calibration.length,
+                aiTradesMean: measured.aiTradesMean,
+                aiTradesMin: measured.aiTradesMin,
+                aiTradesMax: measured.aiTradesMax,
+                acceptedTrades: measured.acceptedTrades,
+                packageMix: { ...measured.packageMix },
+                illegalRosterFailures: measured.illegalRosterFailures,
+                duplicateOwnershipFailures: measured.duplicateOwnershipFailures,
+                valueBandFailures: measured.valueBandFailures,
+                chemistryPairs: measured.chemistryPairs,
+                chemistryPairFailures: measured.chemistryPairFailures,
+                zeroStateNewPairFailures: measured.zeroStateNewPairFailures,
+                deterministicOffers: measured.deterministicOffers,
+                influenceOnlyFailures: measured.influenceOnlyFailures,
+                cashPerProposalFailures: measured.cashPerProposalFailures,
+                cashPerWindowFailures: measured.cashPerWindowFailures,
+                negativeBalanceFailures: measured.negativeBalanceFailures,
+                cashReconciliationFailures: measured.cashReconciliationFailures,
+                inquiryLimitFailures: measured.inquiryLimitFailures,
+                exchangeLimitFailures: measured.exchangeLimitFailures,
+                duplicateQuotaFailures: measured.duplicateQuotaFailures,
+                influenceBypassFailures: measured.influenceBypassFailures,
+              },
+              heldOut: {
+                seasonsSimulated: heldOut.length,
+                aiTradesMean: mean(heldOut.map(aiTradesOf)),
+                illegalRosterFailures: heldOut.reduce(
+                  (sum, season) => sum + rosterAuditFailuresOf(season).illegal,
+                  0,
+                ),
+                duplicateOwnershipFailures: heldOut.reduce(
+                  (sum, season) => sum + rosterAuditFailuresOf(season).duplicateOwnership,
+                  0,
+                ),
+                valueBandFailures: heldOut.reduce(
+                  (sum, season) => sum + valueBandFailuresOf(season),
+                  0,
+                ),
+                packageMix: heldOut.reduce<Record<SeasonTradePackageKind, number>>(
+                  (mix, season) => {
+                    const seasonMix = packageMixOf(season);
+                    mix['1-1'] += seasonMix['1-1'];
+                    mix['2-2'] += seasonMix['2-2'];
+                    mix['1-2'] += seasonMix['1-2'];
+                    mix['2-1'] += seasonMix['2-1'];
+                    return mix;
+                  },
+                  { '1-1': 0, '2-2': 0, '1-2': 0, '2-1': 0 },
+                ),
+              },
+            },
+            gates,
+            engineVersion: createEngineContext().engineVersion,
+            gameVersion: SEASON_GAME_VERSION,
+            gameTargetsVersion: SEASON_GAME_TARGETS_VERSION,
+            generatedAtIso: new Date().toISOString(),
+          };
+          seasonTradeTargetsSchema.parse(targets);
+          return targets;
+        },
+      };
+    },
+    report: (state) => {
+      const { calibration, heldOut, measured } = state.extra;
+      const { gates, metrics, skippedGates, targetsWritten, targetsPath } = state;
+      const started = state.startedAt;
+      const payload = {
+        schemaVersion: 1,
+        command: 'season trade calibrate',
+        targetsVersion: SEASON_TRADE_TARGETS_VERSION,
+        calibrationSeeds: calibrationIndices.length,
+        validationSeeds: validationIndices.length,
+        seasonsSimulated: calibration.length + heldOut.length,
+        aiTradesMean: measured.aiTradesMean,
+        aiTradesMin: measured.aiTradesMin,
+        aiTradesMax: measured.aiTradesMax,
+        acceptedTrades: measured.acceptedTrades,
+        packageMix: { ...measured.packageMix },
+        illegalRosterFailures: measured.illegalRosterFailures,
+        duplicateOwnershipFailures: measured.duplicateOwnershipFailures,
+        valueBandFailures: measured.valueBandFailures,
+        chemistryPairs: measured.chemistryPairs,
+        chemistryPairFailures: measured.chemistryPairFailures,
+        zeroStateNewPairFailures: measured.zeroStateNewPairFailures,
+        deterministicOffers: measured.deterministicOffers,
+        gates: {
+          aiTradesPerSeason: gates.aiTradesPerSeason,
+          zeroIllegal: gates.zeroIllegal,
+          zeroDuplicateOwnership: gates.zeroDuplicateOwnership,
+          valueBands: gates.valueBands,
+          deterministicOffers: gates.deterministicOffers,
+          chemistryInvariants: gates.chemistryInvariants,
+          packageMix: gates.packageMix,
+          heldOut: gates.heldOut,
+        },
+        metrics,
+        skippedGates,
+        targetsWritten,
+        targetsPath,
+        durationMs: Date.now() - started,
+      };
+      const details = [
+        `${String(calibration.length)} calibration + ${String(heldOut.length)} held-out seasons in ${String(Date.now() - started)}ms (${String(workers)} workers)`,
+        `AI trades per season mean ${measured.aiTradesMean.toFixed(2)} (min ${String(measured.aiTradesMin)} · max ${String(measured.aiTradesMax)}; gate [${String(SEASON_TRADE_MIN_AI_TRADES_PER_SEASON)}, ${String(SEASON_TRADE_MAX_AI_TRADES_PER_SEASON)}])`,
+        `accepted package mix 1-1 ${String(measured.packageMix['1-1'])} · 2-2 ${String(measured.packageMix['2-2'])} · 1-2 ${String(measured.packageMix['1-2'])} · 2-1 ${String(measured.packageMix['2-1'])}`,
+        `illegal rosters ${String(measured.illegalRosterFailures)} · duplicate ownership ${String(measured.duplicateOwnershipFailures)} · value-band failures ${String(measured.valueBandFailures)}`,
+        `chemistry pairs ${String(measured.chemistryPairs)} (${String(SEASON_TRADE_PAIRS_LEAGUE)} per season) · pair failures ${String(measured.chemistryPairFailures)} · zero-state new-pair failures ${String(measured.zeroStateNewPairFailures)}`,
+        `deterministic offer generation ${String(measured.deterministicOffers)}`,
+        targetsDetail({ targetsWritten, targetsPath }),
+      ];
+      return { details, payload };
+    },
   });
-  const details = [
-    `${String(calibration.length)} calibration + ${String(heldOut.length)} held-out seasons in ${String(Date.now() - started)}ms (${String(workers)} workers)`,
-    `AI trades per season mean ${measured.aiTradesMean.toFixed(2)} (min ${String(measured.aiTradesMin)} · max ${String(measured.aiTradesMax)}; gate [${String(SEASON_TRADE_MIN_AI_TRADES_PER_SEASON)}, ${String(SEASON_TRADE_MAX_AI_TRADES_PER_SEASON)}])`,
-    `accepted package mix 1-1 ${String(measured.packageMix['1-1'])} · 2-2 ${String(measured.packageMix['2-2'])} · 1-2 ${String(measured.packageMix['1-2'])} · 2-1 ${String(measured.packageMix['2-1'])}`,
-    `illegal rosters ${String(measured.illegalRosterFailures)} · duplicate ownership ${String(measured.duplicateOwnershipFailures)} · value-band failures ${String(measured.valueBandFailures)}`,
-    `chemistry pairs ${String(measured.chemistryPairs)} (${String(SEASON_TRADE_PAIRS_LEAGUE)} per season) · pair failures ${String(measured.chemistryPairFailures)} · zero-state new-pair failures ${String(measured.zeroStateNewPairFailures)}`,
-    `deterministic offer generation ${String(measured.deterministicOffers)}`,
-    targetsDetail({ targetsWritten, targetsPath }),
-  ];
-  gateFailures.push(...calibrationGateFailures({ pass, targetsWritten, skippedGates, metrics }));
-  return makeReport(
-    'season trade calibrate',
-    { seedFrom: from, seedTo: to, workers },
-    { details, failures: gateFailures, payload },
-  );
 }
