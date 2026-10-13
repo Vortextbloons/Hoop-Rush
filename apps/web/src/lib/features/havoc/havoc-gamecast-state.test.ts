@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { HavocGamecastState } from './havoc-gamecast-state.svelte.ts';
 import {
-  FakeHavocService,
   buildCloneGameResult,
   buildMutationTape,
   buildNegativeScoreTape,
-} from './testing/havoc-fake-service.ts';
+} from './testing/havoc-fixtures.ts';
+import { FakeHavocService } from './testing/havoc-service-double.ts';
 
 async function createLockedRun(service: FakeHavocService): Promise<void> {
   await service.createDraft();

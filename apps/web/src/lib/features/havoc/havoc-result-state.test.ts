@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { HavocResultState } from './havoc-result-state.svelte.ts';
 import {
-  FakeHavocService,
   buildCompleteRunState,
   buildFakeComparison,
   buildPendingComparisonRunState,
-} from './testing/havoc-fake-service.ts';
+} from './testing/havoc-fixtures.ts';
+import { FakeHavocService } from './testing/havoc-service-double.ts';
 
 describe('HavocResultState', () => {
   it('keeps baseline numbers hidden while the normal season is pending', async () => {

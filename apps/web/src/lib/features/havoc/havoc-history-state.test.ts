@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { HavocHistoryState } from './havoc-history-state.svelte.ts';
-import { FakeHavocService } from './testing/havoc-fake-service.ts';
+import { FakeHavocService } from './testing/havoc-service-double.ts';
 
 describe('HavocHistoryState', () => {
   it('lists completed and abandoned runs, preserving unsuccessful runs', async () => {

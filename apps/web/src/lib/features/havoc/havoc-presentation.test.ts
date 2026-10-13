@@ -18,7 +18,7 @@ import {
   buildFakeTape,
   buildNegativeScoreTape,
   buildPendingComparisonRunState,
-} from './testing/havoc-fake-service.ts';
+} from './testing/havoc-fixtures.ts';
 
 function summaryOf(gameNumber: number, humanScore: number, opponentScore: number) {
   return havocGameSummarySchema.parse({
