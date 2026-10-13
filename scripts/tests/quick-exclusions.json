@@ -1,0 +1,38 @@
+{
+  "comment": "Patterns excluded from `pnpm test:quick`. The `test:quick` script in the root package.json is the command source of truth; scripts/tests/check-quick-exclusions.mjs enforces parity, flags stale patterns, and prints the excluded file count.",
+  "exclusions": [
+    {
+      "pattern": "**/cli-season-reproduce*",
+      "reason": "Full-run replay through the CLI entry point (spawns node, replays a whole season)."
+    },
+    {
+      "pattern": "**/*generator*",
+      "reason": "Bracket generator percentile cohorts."
+    },
+    {
+      "pattern": "**/season/block*",
+      "reason": "Season block golden/iteration suites (seeded full-block simulations)."
+    },
+    {
+      "pattern": "**/season/ai*",
+      "reason": "AI league generation and reachability cohorts."
+    },
+    {
+      "pattern": "**/projection/candidate-search*",
+      "reason": "Projection candidate search sweep."
+    },
+    {
+      "pattern": "**/season-postseason-runner*",
+      "reason": "Web postseason runner transport simulation."
+    },
+    {
+      "pattern": "**/*history*",
+      "reason": "Web havoc history state suite."
+    },
+    {
+      "pattern": "**/*integration*",
+      "reason": "CLI integration tiers (league generation, draft duel catalog)."
+    }
+  ],
+  "allowEmpty": []
+}

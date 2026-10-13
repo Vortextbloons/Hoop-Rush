@@ -115,6 +115,29 @@ production 40,666; packages/importer production 10,415). Both slices are
 structural (shared modules and schema single-sourcing) rather than line
 reducing; the refactor's net reduction lands with stages 7e/7f.
 
+- 2026-10-12, stage 7f (part 1): scripts and dead code deleted across every
+  package. Removed: the retired Playwright/E2E seam in `season-repo.ts` (window
+  runner hooks) and both unused season/postseason fake runners, the unused
+  collection game runner, `cli-season-rosters-test-support.ts`, unused
+  `cli-test-helpers.ts` helpers, the `commands/retired.ts` re-export, and 196
+  unreferenced runtime exports plus their cascaded helpers and imports found by
+  a reference scan (engine, data-contracts, importer, persistence,
+  test-fixtures, CLI, web). `packages/persistence`'s Season Run benchmark moved
+  off the runtime index to the `@hoop-rush/persistence/benchmark` entry point.
+  `fake-season-block-runner.ts` is now a test-only module under
+  `apps/web/src/lib/season/testing/`.
+  Also fixed a latent gate bug: `apps/web check` ran `svelte-check
+  --incremental`, whose cache hid 8 pre-existing type errors in
+  `challenge-run-view.svelte` and `routes/season/run/+page.svelte`; the check is
+  now a full, cache-free run and those errors are fixed (`humanFranchiseId` is
+  typed `FranchiseId`, the block-submit failure view uses a helper function, and
+  `freeAgencyUnresolvedWindowIndex` receives a defined state).
+  Verified: `pnpm static`, `pnpm test:run` 125 files / 1,128 passed + 1 skipped,
+  `pnpm build`, `pnpm hoop-rush data validate`. Maintained source
+  230,356 → 227,106 physical (runtime 182,526 → 179,264); tools/cli 40,666 →
+  40,410; engine production 62,466 → 61,526; web production 88,835;
+  importer production 9,455; data-contracts 21,762; persistence 8,797.
+
 ## Baseline log
 
 - 2026-10-12, stage 7a: baselines re-verified at `802e4819` with a clean tree.
