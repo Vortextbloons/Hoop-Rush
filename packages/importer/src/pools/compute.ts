@@ -55,7 +55,10 @@ import {
   writeJsonRetry,
 } from '../json.ts';
 import { defaultWorkerCount, runWorker } from '../shared/worker-pool.ts';
-import { sortedJsonFiles } from '../shared/manifest.ts';
+import { sortedJsonFiles } from '../shared/fs.ts';
+import { loadManifest, manifestPath, type PoolManifest as Manifest } from '../shared/manifest.ts';
+export { loadManifest, manifestPath } from '../shared/manifest.ts';
+export type { EraEntry, PoolIndexEntry, PoolManifest as Manifest } from '../shared/manifest.ts';
 import { buildPlayerPositions } from './positions.ts';
 import { positionOverrideFor } from '../positions/overrides.ts';
 import { primaryPositionForSource } from '../positions/normalize.ts';
@@ -136,29 +139,8 @@ const rawAnchorsSchema = z.looseObject({
   freeThrowAttemptRate: z.unknown().optional(),
 });
 type RawAnchors = z.infer<typeof rawAnchorsSchema>;
-const poolManifestEraSchema = z.looseObject({
-  eraId: z.string(),
-  label: z.string(),
-  fromSeasonKey: z.string(),
-  toSeasonKey: z.string(),
-});
-const poolManifestEntrySchema = z.looseObject({
-  franchiseId: z.string(),
-  eraId: z.string(),
-  url: z.string(),
-  contentHash: z.string(),
-});
-const poolManifestSchema = z.looseObject({
-  schemaVersion: z.number(),
-  dataVersion: z.string(),
-  eras: z.array(poolManifestEraSchema),
-  pools: z.array(poolManifestEntrySchema),
-});
 export function poolDir(): string {
   return join(PUBLIC_DATA, 'pools');
-}
-export function manifestPath(): string {
-  return join(PUBLIC_DATA, 'manifest.json');
 }
 export const SCHEMA_VERSION = POOL_SCHEMA_VERSION;
 export const MIN_TEAM_GAMES = 40;
@@ -224,19 +206,8 @@ export function loadCareerPositionLabels(): Map<string, Set<string>> {
   console.log(`  [OK] career position labels for ${String(labelsByPlayer.size)} players (cached)`);
   return labelsByPlayer;
 }
-export type EraEntry = z.infer<typeof poolManifestEraSchema>;
-export type PoolIndexEntry = z.infer<typeof poolManifestEntrySchema>;
-export type Manifest = z.infer<typeof poolManifestSchema>;
 const careerLabelsSchema = z.record(z.string(), z.array(z.string()));
 const bbrefIdsSchema = z.record(z.string(), z.string());
-export function loadManifest(): Manifest {
-  const raw = readJsonLoose(manifestPath());
-  const parsed = poolManifestSchema.safeParse(raw);
-  if (!parsed.success) {
-    throw new Error(`invalid manifest: ${parsed.error.issues[0]?.message ?? 'unknown'}`);
-  }
-  return parsed.data;
-}
 export type SeasonData = {
   rosterByExtId: Record<string, RosterInput>;
   stintsByTeam: Record<string, StintInput[]>;

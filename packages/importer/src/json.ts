@@ -10,10 +10,12 @@ export function fileExists(path: string): boolean {
 export function readJson(path: string): unknown {
   return JSON.parse(readFileSync(path, 'utf8')) as unknown;
 }
+function jsonText(value: unknown, newline: boolean): string {
+  return JSON.stringify(value, null, 2) + (newline ? '\n' : '');
+}
 export function writeJson(path: string, value: unknown, newline = false): void {
   ensureDir(dirname(path));
-  const text = JSON.stringify(value, null, 2) + (newline ? '\n' : '');
-  writeFileSync(path, text, 'utf8');
+  writeFileSync(path, jsonText(value, newline), 'utf8');
 }
 function retrySync<T>(fn: () => T, attempts = 12): T {
   for (let attempt = 0; attempt < attempts; attempt += 1) {
@@ -28,7 +30,7 @@ function retrySync<T>(fn: () => T, attempts = 12): T {
 }
 export function writeJsonRetry(path: string, value: unknown, newline = false): void {
   ensureDir(dirname(path));
-  const text = JSON.stringify(value, null, 2) + (newline ? '\n' : '');
+  const text = jsonText(value, newline);
   retrySync(() => {
     writeFileSync(path, text, 'utf8');
   });
@@ -54,9 +56,6 @@ export function parseJsonLoose(text: string): unknown {
 }
 export function readJsonLoose(path: string): unknown {
   return parseJsonLoose(readFileSync(path, 'utf8'));
-}
-export function readJsonTolerant(path: string): unknown {
-  return readJsonLoose(path);
 }
 export function safeFloat(value: unknown, fallback = 0): number {
   if (value === null || value === undefined || value === '') return fallback;

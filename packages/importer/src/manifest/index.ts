@@ -1,13 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
-import { sortedJsonFiles } from '../shared/manifest.ts';
+import { sortedJsonFiles } from '../shared/fs.ts';
 import { PUBLIC_DATA } from '../config.ts';
 import { fileExists, readJson, sha256File, sha256Hex, writeJsonRetry } from '../json.ts';
 import {
   LINEAGE_RULE_VERSION,
   MANIFEST_SCHEMA_VERSION,
-  hoopRushManifestSchema,
   parsePool,
   parsePlayersIndex,
   parseRosterDetails,
@@ -18,80 +17,20 @@ import {
 import { LINEAGE_SEGMENTS, MODERN_SLOTS } from '../lineage.ts';
 import { DATA_VERSION } from '../data-version.ts';
 export { DATA_VERSION };
-import { classifyUnattempted, loadCoverageReport, loadManifest } from '../pools/compute.ts';
-const manifestEraSchema = z.looseObject({
-  eraId: z.string(),
-  label: z.string().optional(),
-  fromSeasonKey: z.string(),
-  toSeasonKey: z.string(),
-});
-const manifestPoolEntrySchema = z.looseObject({
-  franchiseId: z.string(),
-  eraId: z.string(),
-  url: z.string(),
-  contentHash: z.string(),
-});
-const manifestAssetRefSchema = z.looseObject({
-  url: z.string(),
-  contentHash: z.string(),
-});
-const manifestSimProfileSchema = z.looseObject({
-  eraId: z.string(),
-});
-type ManifestSimIndexEntry = {
-  eraId: string;
-  url: string;
-  contentHash: string;
-};
-const seasonArtifactsSchema = z.looseObject({
-  league: manifestAssetRefSchema.optional(),
-  schedule: manifestAssetRefSchema.optional(),
-  draftCatalog: manifestAssetRefSchema.optional(),
-  rosterTargets: manifestAssetRefSchema.optional(),
-  freeAgencyIndex: manifestAssetRefSchema.optional(),
-  freeAgencyTargets: manifestAssetRefSchema.optional(),
-  sponsorsIndex: manifestAssetRefSchema.optional(),
-});
-type SeasonArtifacts = z.infer<typeof seasonArtifactsSchema>;
-const importerManifestSchema = z.looseObject({
-  schemaVersion: z.number(),
-  dataVersion: z.string(),
-  modernFranchiseSlots: z.array(z.unknown()).optional(),
-  franchiseLineage: z.array(z.unknown()).optional(),
-  eras: z.array(manifestEraSchema),
-  pools: z.array(manifestPoolEntrySchema).optional(),
-  availability: z.array(z.unknown()).optional(),
-  eraSimulationProfiles: z.array(z.unknown()).optional(),
-  bracket: manifestAssetRefSchema.optional(),
-  playersIndex: manifestAssetRefSchema.optional(),
-  rosterDetails: manifestAssetRefSchema.optional(),
-  season: seasonArtifactsSchema.optional(),
-  collection: z
-    .looseObject({
-      catalog: manifestAssetRefSchema,
-      index: manifestAssetRefSchema,
-      packTargets: manifestAssetRefSchema.optional(),
-    })
-    .optional(),
-  assets: z
-    .looseObject({
-      source: z.string().optional(),
-      cacheVersion: z.string().optional(),
-    })
-    .optional(),
-});
-export type Manifest = z.infer<typeof importerManifestSchema>;
-export const MANIFEST_PATH = join(PUBLIC_DATA, 'manifest.json');
-function writeManifestValidated(path: string, manifest: Manifest): void {
-  const validated = hoopRushManifestSchema.safeParse(manifest);
-  if (!validated.success) {
-    const issue = validated.error.issues[0];
-    throw new Error(
-      `manifest fails validation: ${issue?.path.join('.') || '(root)'} ${issue?.message ?? 'unknown'}`,
-    );
-  }
-  writeJsonRetry(path, manifest, true);
-}
+import { classifyUnattempted, loadCoverageReport } from '../pools/compute.ts';
+import {
+  MANIFEST_PATH,
+  importerManifestSchema,
+  loadManifest,
+  manifestPoolEntrySchema,
+  manifestSimProfileSchema,
+  writeManifestValidated,
+  type Manifest,
+  type ManifestSimIndexEntry,
+  type SeasonArtifacts,
+} from '../shared/manifest.ts';
+export { MANIFEST_PATH };
+export type { Manifest };
 function peakPlayerToDraftEntry(player: ReturnType<typeof parsePool>['players'][number]) {
   return {
     playerId: player.playerId,
