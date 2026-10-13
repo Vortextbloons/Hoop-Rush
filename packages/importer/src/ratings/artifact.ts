@@ -68,5 +68,10 @@ function loadRatingsModelArtifactUncached(path: string): RatingsModelArtifact {
       `ratings model artifact ${path} requires the current frozen overall scale; run calibrate overall`,
     );
   }
+  if (parsed.data.eraReference === undefined || parsed.data.eraReferences === undefined) {
+    throw new Error(
+      `ratings model artifact ${path} requires frozen era references; run calibrate overall`,
+    );
+  }
   return parsed.data;
 }

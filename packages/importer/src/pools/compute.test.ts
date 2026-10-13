@@ -612,9 +612,9 @@ describe('buildStats', () => {
   });
 });
 describe('selectionScore', () => {
-  it('ranks peaks raw-first with a modest availability adjustment', () => {
-    expect(selectionScore(90, 85, 80, 25, 2400, 80)).toBe(90.512);
-    expect(selectionScore(90, 30, 99, 25, 2400, 80)).toBe(90.512);
+  it('ranks peaks by value without an availability bonus', () => {
+    expect(selectionScore(90, 85, 80, 25, 2400, 80)).toBe(90);
+    expect(selectionScore(90, 30, 99, 25, 1200, 40)).toBe(90);
   });
 });
 describe('rawOverallScoreFor', () => {
@@ -631,19 +631,17 @@ describe('rawOverallScoreFor', () => {
   });
 });
 describe('overallBandForPercentile', () => {
-  it('assigns the exact band endpoints', () => {
+  it('keeps the peak distribution generous with a thinning upper tail', () => {
     expect(overallBandForPercentile(0)).toBe(99);
-    expect(overallBandForPercentile(0.003)).toBe(96);
-    expect(overallBandForPercentile(0.013)).toBe(93);
-    expect(overallBandForPercentile(0.038)).toBe(89);
-    expect(overallBandForPercentile(0.123)).toBe(85);
-    expect(overallBandForPercentile(0.25)).toBe(81);
-    expect(overallBandForPercentile(0.42)).toBe(77);
-    expect(overallBandForPercentile(0.5)).toBe(75);
-    expect(overallBandForPercentile(0.57)).toBe(73);
-    expect(overallBandForPercentile(0.7)).toBe(70);
-    expect(overallBandForPercentile(0.72)).toBe(69);
-    expect(overallBandForPercentile(0.86)).toBe(64);
+    expect(overallBandForPercentile(0.0045)).toBe(96);
+    expect(overallBandForPercentile(0.023)).toBe(93);
+    expect(overallBandForPercentile(0.078)).toBe(89);
+    expect(overallBandForPercentile(0.188)).toBe(85);
+    expect(overallBandForPercentile(0.34)).toBe(81);
+    expect(overallBandForPercentile(0.53)).toBe(77);
+    expect(overallBandForPercentile(0.7)).toBe(73);
+    expect(overallBandForPercentile(0.83)).toBe(69);
+    expect(overallBandForPercentile(0.93)).toBe(64);
     expect(overallBandForPercentile(1)).toBe(40);
   });
   it('gives higher overalls a thinner share inside the top bands', () => {
@@ -740,7 +738,7 @@ describe('computePool (fixture)', () => {
     const byId = new Map(p.players.map((player) => [player.playerExternalId, player]));
     const alpha = byId.get('1');
     expect(alpha?.seasonKey).toBe('1992-93');
-    expect(alpha?.selectionScore).toBe(60.731);
+    expect(alpha?.selectionScore).toBe(60);
     expect(alpha?.eligibility).toEqual({ minimumTeamGames: 40, teamGames: 80, teamMinutes: 3160 });
     expect(alpha?.altIds).toEqual({ bbref: 'alpha01' });
     expect(alpha?.playerId).toBe('p-1');
@@ -762,7 +760,7 @@ describe('computePool (fixture)', () => {
     });
     const bravo = byId.get('2');
     expect(bravo?.seasonKey).toBe('1991-92');
-    expect(bravo?.selectionScore).toBe(59.752);
+    expect(bravo?.selectionScore).toBe(60);
     expect(bravo?.eligibility.teamGames).toBe(60);
     expect(bravo?.eligibility.teamMinutes).toBe(1200);
     expect(bravo?.altIds).toEqual({ bbref: 'bravo01' });
@@ -771,7 +769,7 @@ describe('computePool (fixture)', () => {
     expect(bravo?.source.dataVersion).toBe(DATA_VERSION);
     const echo = byId.get('5');
     expect(echo?.seasonKey).toBe('1991-92');
-    expect(echo?.selectionScore).toBe(59.752);
+    expect(echo?.selectionScore).toBe(60);
     expect(echo?.positions).toEqual({
       primary: 'C',
       secondary: [],
@@ -788,7 +786,7 @@ describe('computePool (fixture)', () => {
     expect(echo?.stats.efgPct).toBeNull();
     const foxtrot = byId.get('6');
     expect(foxtrot?.seasonKey).toBe('1991-92');
-    expect(foxtrot?.selectionScore).toBe(54.805);
+    expect(foxtrot?.selectionScore).toBe(55);
     expect(foxtrot?.eligibility.teamMinutes).toBe(1200);
     expect(foxtrot?.altIds).toBeNull();
     expect(foxtrot?.positions).toEqual({
@@ -800,11 +798,11 @@ describe('computePool (fixture)', () => {
     });
     const golf = byId.get('7');
     expect(golf?.seasonKey).toBe('1991-92');
-    expect(golf?.selectionScore).toBe(54.805);
+    expect(golf?.selectionScore).toBe(55);
     expect(golf?.stats.usageRate).toBeNull();
     const hotel = byId.get('8');
     expect(hotel?.seasonKey).toBe('1991-92');
-    expect(hotel?.selectionScore).toBe(54.805);
+    expect(hotel?.selectionScore).toBe(55);
     expect(hotel?.eligibility.teamGames).toBe(60);
     expect(hotel?.eligibility.teamMinutes).toBe(1200);
     expect(Object.keys(alpha?.detailedRatings ?? {})).toHaveLength(18);

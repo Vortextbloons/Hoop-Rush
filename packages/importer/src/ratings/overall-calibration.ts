@@ -8,28 +8,32 @@ import {
   overallBandForPercentile,
   overallScaleSchema,
   ratingsModelArtifactSchema,
-  simulationRatingsSchema,
-  simulationTendenciesSchema,
   type OverallScale,
   recognitionPriorsSchema,
   individualHonorSchema,
-  provenanceMapSchema,
   type IndividualHonor,
   type RecognitionPriors,
 } from '@hoop-rush/data-contracts';
-import { NBA_ROOT, PUBLIC_DATA, REPO_ROOT } from '../config.ts';
-import { fileExists, readJson, writeJsonRetry } from '../json.ts';
+import { NBA_ROOT, PUBLIC_DATA, REPO_ROOT, DEFAULT_SEASONS } from '../config.ts';
+import { readJson, writeJsonRetry } from '../json.ts';
 import { DEFAULT_RATINGS_MODEL_ARTIFACT } from './artifact.ts';
 import { getEra } from './era.ts';
-import { deriveRatingProfile, defensiveAbilityFor } from './v3.ts';
-import { loadOverallEvidence, loadOverallTracking } from './overall-evidence.ts';
+import { derivePlayerRecord } from './v2.ts';
+import { eraAdjustmentFor } from './v3.ts';
+import { loadThreePointReconstructionArtifact } from '../reconstruction/artifact.ts';
+import { loadEvidenceMap } from './compute.ts';
+import {
+  loadOverallEvidence,
+  loadOverallTracking,
+  loadPostseasonEvidence,
+} from './overall-evidence.ts';
 import { primaryPositionForSource } from '../positions/normalize.ts';
 import { positionOverrideFor } from '../positions/overrides.ts';
 
 const referenceStatsSchema = z.looseObject({
   playerExternalId: z.string().min(1),
   gamesPlayed: z.number().int().nonnegative(),
-  minutes: z.number().nonnegative(),
+  minutes: z.number().nonnegative().nullable(),
   ...Object.fromEntries(
     [
       'points',
@@ -51,7 +55,8 @@ const referenceRosterSchema = z.looseObject({
   heightInches: z.number().nullable().optional(),
   ratings: z.unknown().optional(),
   tendencies: z.unknown().optional(),
-  provenance: provenanceMapSchema.optional(),
+  weightLbs: z.number().nullable().optional(),
+  age: z.number().nullable().optional(),
 });
 export function fitRecognitionPriors(
   samples: readonly {
@@ -110,6 +115,7 @@ export function fitRecognitionPriors(
 
 export function buildOverallScale(
   samples: readonly { key: string; score: number }[],
+  reference: Partial<OverallScale['reference']> = {},
 ): OverallScale {
   const unique = new Map<string, number>();
   for (const sample of samples) {
@@ -151,6 +157,7 @@ export function buildOverallScale(
       minimumMinutes: 1500,
       sampleCount: population.length,
       contentHash: createHash('sha256').update(JSON.stringify(population)).digest('hex'),
+      ...reference,
     },
     knots,
   });
@@ -160,10 +167,15 @@ export function calibrateOverallScale(
   output = join(PUBLIC_DATA, 'ratings-model.json'),
 ): OverallScale {
   output = resolve(REPO_ROOT, output);
-  const samples: { key: string; score: number }[] = [];
-  const inputs: { key: string; input: Parameters<typeof deriveRatingProfile>[0] }[] = [];
-  for (let year = 1996; year <= 2024; year += 1) {
-    const season = `${String(year)}-${String((year + 1) % 100).padStart(2, '0')}`;
+  const peaks = new Map<string, { key: string; score: number }>();
+  const samples = new Map<
+    string,
+    { id: string; season: string; base: number; postseason: number; replacement: boolean }
+  >();
+  const eraSamples = new Map<string, number[]>();
+  const threePointReconstruction = loadThreePointReconstructionArtifact();
+  const seasons = [...DEFAULT_SEASONS].sort();
+  for (const season of seasons) {
     const directory = join(NBA_ROOT, season);
     const stats = z
       .array(referenceStatsSchema)
@@ -173,66 +185,92 @@ export function calibrateOverallScale(
     const era = getEra(season);
     const evidence = loadOverallEvidence(season, true);
     const tracking = loadOverallTracking(season);
+    const overlays = loadEvidenceMap(directory);
+    const postseason = loadPostseasonEvidence(season);
     for (const player of roster) {
-      const row = byId.get(player.externalId ?? '');
-      if (!row || row.gamesPlayed < 50 || row.minutes < 1500) continue;
-      const key = `${player.externalId ?? ''}|${season}`;
-      const input: Parameters<typeof deriveRatingProfile>[0] = {
-        ratings: simulationRatingsSchema.parse(player.ratings),
-        tendencies: simulationTendenciesSchema.parse(player.tendencies),
-        stats: {
-          ...row,
-          ...tracking.get(player.externalId ?? ''),
-          ...evidence.get(player.externalId ?? ''),
-        },
-        abilityProvenance: player.provenance,
+      const id = player.externalId ?? '';
+      const row = byId.get(id);
+      if (!row || row.minutes === null || row.minutes < 400) continue;
+      const derived = derivePlayerRecord({
+        season,
+        playerId: `p-${id}`,
+        stats: { ...row, ...overlays.get(id), ...tracking.get(id), ...evidence.get(id) },
         position:
-          positionOverrideFor(player.externalId ?? '')?.primary ??
-          primaryPositionForSource(player.position ?? 'SF'),
+          positionOverrideFor(id)?.primary ?? primaryPositionForSource(player.position ?? 'SF'),
         heightInches: player.heightInches ?? null,
+        weightLbs: player.weightLbs ?? null,
+        age: player.age ?? null,
         artifact: DEFAULT_RATINGS_MODEL_ARTIFACT,
-        eraPace: era.pace,
-        eraThreeRate: era.league3PARate,
-      };
-      inputs.push({ key, input });
+        era,
+        threePointReconstruction,
+        postseason: postseason.players.get(id),
+        postseasonEvidenceAvailable: postseason.available && !postseason.missingPlayers.has(id),
+      });
+      const diagnostics = derived.ratingProfile.overallDiagnostics;
+      if (diagnostics?.schemaVersion !== 2) throw new Error('Missing value diagnostics');
+      const minutesPerGame = row.gamesPlayed > 0 ? row.minutes / row.gamesPlayed : 0;
+      samples.set(`${id}|${season}`, {
+        id,
+        season,
+        base: diagnostics.rawBeforeRecognition,
+        postseason: diagnostics.postseasonContribution ?? 0,
+        replacement: minutesPerGame >= 6 && minutesPerGame <= 15,
+      });
     }
   }
-  const recognitionPriors = fitRecognitionPriors(
-    inputs.map(({ key, input }) => {
-      const profile = deriveRatingProfile(input).profile;
-      return {
-        key,
-        score: profile.rawOverallScore,
-        defense:
-          profile.overallDiagnostics?.schemaVersion === 2
-            ? profile.overallDiagnostics.defensiveValue
-            : defensiveAbilityFor(input.ratings, input.position),
-        honors: z.array(individualHonorSchema).parse(input.stats.honors ?? []),
-      };
-    }),
+  for (const sample of samples.values()) {
+    const decade = `${String(Math.floor(Number(sample.season.slice(0, 4)) / 10) * 10)}s`;
+    const group = eraSamples.get(decade) ?? [];
+    group.push(sample.base);
+    eraSamples.set(decade, group);
+  }
+  const referenceFor = (scores: readonly number[]) => {
+    const mean = scores.reduce((sum, score) => sum + score, 0) / scores.length;
+    const variance =
+      scores.reduce((sum, score) => sum + (score - mean) ** 2, 0) / Math.max(1, scores.length - 1);
+    return {
+      mean,
+      standardDeviation: Math.sqrt(Math.max(1, variance)),
+      sampleCount: scores.length,
+    };
+  };
+  const eraReference = referenceFor([...samples.values()].map((sample) => sample.base));
+  const eraReferences = Object.fromEntries(
+    [...eraSamples].map(([decade, scores]) => [decade, referenceFor(scores)]),
   );
-  for (const { key, input } of inputs)
-    samples.push({
-      key,
-      score: deriveRatingProfile({ ...input, artifact: { ...input.artifact, recognitionPriors } })
-        .profile.rawOverallScore,
-    });
-  const scale = buildOverallScale(samples);
-  const existing = fileExists(output) ? ratingsModelArtifactSchema.parse(readJson(output)) : null;
+  const referenceArtifact = { ...DEFAULT_RATINGS_MODEL_ARTIFACT, eraReference, eraReferences };
+  const replacementSamples: number[] = [];
+  for (const [key, sample] of samples) {
+    const score =
+      Math.round(
+        (sample.base +
+          eraAdjustmentFor(sample.base, sample.season, referenceArtifact) +
+          sample.postseason) *
+          10000,
+      ) / 10000;
+    const previous = peaks.get(sample.id);
+    if (!previous || score > previous.score) peaks.set(sample.id, { key, score });
+    if (sample.replacement) replacementSamples.push(score);
+  }
+  const scale = buildOverallScale([...peaks.values()], {
+    firstSeason: seasons[0],
+    lastSeason: seasons.at(-1),
+    minimumGames: 0,
+    minimumMinutes: 400,
+    population: 'unique-player-peaks',
+  });
+  if (replacementSamples.length === 0) throw new Error('No replacement-reference evidence');
   const artifact = ratingsModelArtifactSchema.parse({
     ...DEFAULT_RATINGS_MODEL_ARTIFACT,
-    ...(existing
-      ? {
-          playerAdjustments: existing.playerAdjustments,
-          impactModelVersion: existing.impactModelVersion ?? existing.modelVersion,
-        }
-      : {}),
-    schemaVersion: 4,
-    recognitionPriors,
+    schemaVersion: 3,
+    eraReference,
+    eraReferences,
+    replacementReferenceScore:
+      replacementSamples.reduce((sum, score) => sum + score, 0) / replacementSamples.length,
     modelVersion: RATING_MODEL_VERSION,
     ratingsVersion: RATINGS_VERSION,
     overallScale: scale,
-    generatedAt: '2026-10-05T00:00:00.000Z',
+    generatedAt: '2026-10-12T00:00:00.000Z',
   });
   writeJsonRetry(output, artifact);
   return scale;

@@ -40,6 +40,8 @@ const RATING_CHANNELS: Partial<Record<HavocRatingField, HavocAuthoritativeChanne
 };
 
 const TENDENCY_CHANNELS: Partial<Record<HavocTendencyField, HavocAuthoritativeChannel>> = {
+  usageRate: 'offensive-allocation',
+  shotRate: 'offensive-allocation',
   threePointRate: 'three-point-volume',
   cornerThreeFrequency: 'three-point-volume',
   aboveBreakThreeFrequency: 'three-point-volume',
@@ -58,6 +60,7 @@ const AUTHORITATIVE_CHANNEL_ORDER: readonly HavocAuthoritativeChannel[] = [
   'assist-anchor',
   'rebound-weights',
   'turnover-blend',
+  'offensive-allocation',
 ];
 
 export function applyHavocMutationPackage(

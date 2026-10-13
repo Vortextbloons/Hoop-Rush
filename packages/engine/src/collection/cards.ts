@@ -11,6 +11,8 @@ import {
 } from '@hoop-rush/data-contracts';
 import { collectionCardIdSchema } from '@hoop-rush/data-contracts';
 import { COLLECTION_OVERLAY_VERSION } from '@hoop-rush/data-contracts';
+import { finishingDemand } from '../sim/offense.ts';
+import { ENGINE_CONSTANTS } from '../sim/constants.ts';
 
 export function collectionCardId(
   kind: 'base' | 'special',
@@ -84,10 +86,10 @@ export function toCollectionSimulationPlayer(
   resolved: ResolvedCollectionCard,
   source: Pick<
     CollectionCatalogCard,
-    'heightInches' | 'weightLbs' | 'anchors' | 'reconstructedThreePoint'
+    'heightInches' | 'weightLbs' | 'anchors' | 'reconstructedThreePoint' | 'tendencies'
   >,
 ): SimulationPlayer {
-  return {
+  const player: SimulationPlayer = {
     playerId: resolved.playerId as SimulationPlayer['playerId'],
     displayName: resolved.displayName,
     positions: resolved.positions as SimulationPlayer['positions'],
@@ -98,6 +100,21 @@ export function toCollectionSimulationPlayer(
     anchors: source.anchors,
     reconstructedThreePoint: source.reconstructedThreePoint,
   };
+  const shotDelta = resolved.tendencies.shotRate - source.tendencies.shotRate;
+  const usageDelta = resolved.tendencies.usageRate - source.tendencies.usageRate;
+  if (shotDelta !== 0 || usageDelta !== 0) {
+    const base = finishingDemand({ ...player, tendencies: source.tendencies });
+    const minutes = source.anchors?.minutesPerGame || 48;
+    player.offensiveLoad = {
+      ...base,
+      source: 'derived-attempts',
+      attemptsPer36: Math.max(
+        ENGINE_CONSTANTS.offensiveAllocation.minimumDemand,
+        base.attemptsPer36 + (((shotDelta * 48) / 100) * 36) / minutes + usageDelta * 0.5,
+      ),
+    };
+  }
+  return player;
 }
 
 export function collectionStateDigest(facts: {

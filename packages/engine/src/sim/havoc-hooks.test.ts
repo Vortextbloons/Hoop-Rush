@@ -211,8 +211,8 @@ describe('havoc sim hooks: physical and aggregation options', () => {
     if (third === undefined) throw new Error('missing player');
     const shots = identityPrep.teammateShots.get('inst-c');
     expect(shots).toBeDefined();
-    expect(shots?.pass.teammates).toHaveLength(4);
-    expect(shots?.roll.teammates).toHaveLength(4);
+    expect(shots?.byAction).toHaveLength(7);
+    for (const action of shots?.byAction ?? []) expect(action.teammates).toHaveLength(4);
   });
 
   it('keeps the recorder five-slot path strict and allows variable units', () => {

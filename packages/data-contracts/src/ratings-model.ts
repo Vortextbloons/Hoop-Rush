@@ -86,6 +86,7 @@ export const overallDiagnosticsSchema = z.union([
   legacyOverallDiagnosticsSchema,
   legacyOverallDiagnosticsSchema.extend({
     schemaVersion: z.literal(2),
+    confidenceWeight: z.number().min(0).max(0.75),
     offensiveAbility: z.number().min(0).max(100),
     offensiveValue: z.number().min(0).max(100),
     defensiveValue: z.number().min(0).max(100),
@@ -101,6 +102,12 @@ export const overallDiagnosticsSchema = z.union([
     paceUsed: z.number().min(50).max(160),
     paceSource: z.enum(['team-totals-possession-estimate', 'league-era']),
     effectiveDefenseWeight: z.number().min(0).max(1),
+    offensiveWeight: z.number().min(0).max(1).optional(),
+    postseasonContribution: z.number().min(-1.8).max(1.8).optional(),
+    postseasonWeight: z.number().min(0).max(0.12).optional(),
+    postseasonSourceAvailable: z.boolean().optional(),
+    valueAboveReplacement: z.number().optional(),
+    eraContribution: z.number().min(-4).max(4).optional(),
   }),
 ]);
 export const ratingProfileSchema = z
@@ -143,7 +150,11 @@ export const ratingProfileSchema = z
           diagnostics.abilityContribution +
             diagnostics.productionContribution -
             diagnostics.rawScore +
-            (diagnostics.schemaVersion === 2 ? diagnostics.recognitionContribution : 0),
+            (diagnostics.schemaVersion === 2
+              ? diagnostics.recognitionContribution +
+                (diagnostics.postseasonContribution ?? 0) +
+                (diagnostics.eraContribution ?? 0)
+              : 0),
         ) > 0.021 ||
         Math.abs(diagnostics.confidenceWeight - profile.production.weight) > 0.00001)
     ) {
@@ -159,6 +170,24 @@ export const ratingsModelArtifactSchema = z
   .object({
     schemaVersion: z.union([z.literal(2), z.literal(3), z.literal(4)]),
     recognitionPriors: recognitionPriorsSchema.optional(),
+    replacementReferenceScore: z.number().min(0).max(100).optional(),
+    eraReference: z
+      .object({
+        mean: z.number().min(0).max(100),
+        standardDeviation: z.number().positive(),
+        sampleCount: z.number().int().positive(),
+      })
+      .optional(),
+    eraReferences: z
+      .record(
+        z.string().regex(/^\d{3}0s$/),
+        z.object({
+          mean: z.number().min(0).max(100),
+          standardDeviation: z.number().positive(),
+          sampleCount: z.number().int().positive(),
+        }),
+      )
+      .optional(),
     overallScale: overallScaleSchema.optional(),
     impactModelVersion: z.string().min(1).max(64).optional(),
     modelVersion: z.string().min(1).max(64),

@@ -10,7 +10,6 @@ import { meanTripSeconds, sampleTripSeconds } from './clock.ts';
 import {
   pickAction,
   pickDefender,
-  pickAssister,
   pickShot,
   pickZone,
   isThreePointZone,
@@ -211,6 +210,7 @@ export class PossessionStepper {
   private finalStep: PossessionStep | null = null;
   private handlerVersion: string | undefined;
   private handlerSlot = 0;
+  private handlerKey: string | undefined;
   private shooterVersion: string | undefined;
   private defenderVersion: string | undefined;
   private rushMakePenalty = 0;
@@ -387,6 +387,7 @@ export class PossessionStepper {
     const defensePrep = preps[defense];
     const handler = rng.weightedPick(team.players, teamPrep.initiatorPickTable);
     const handlerSlot = slotOf(teamPrep, handler);
+    this.handlerKey = teamPrep.keyOf(handler);
     this.handlerVersion = handler.playerVersionId;
     this.handlerSlot = handlerSlot >= 0 ? handlerSlot : 0;
     const awayTurnoverPressure =
@@ -498,7 +499,11 @@ export class PossessionStepper {
     if (inBonus) {
       const team = teams[offense];
       const teamPrep = preps[offense];
-      const shooter = rng.weightedPick(team.players, teamPrep.freeThrowShooterPickTable);
+      const slot =
+        this.handlerKey === undefined ? undefined : teamPrep.slotByPlayerId.get(this.handlerKey);
+      const shooter =
+        (slot === undefined ? undefined : team.players[slot]) ??
+        rng.weightedPick(team.players, teamPrep.initiatorPickTable);
       const shooterSlot = slotOf(teamPrep, shooter);
       this.ctx.possessionStart = 'deadBall';
       const technical = awards?.technicalFreeThrows ?? 0;
@@ -547,6 +552,7 @@ export class PossessionStepper {
       this.deadBall,
       this.tripRebounds,
       this.rushMakePenalty,
+      this.continuations === 0 ? this.handlerKey : undefined,
     );
     this.shooterVersion = outcome.shooterVersion;
     this.defenderVersion = outcome.defenderVersion;
@@ -700,7 +706,7 @@ export function assistProbabilityPure(
     Math.max(
       0.05,
       profile.parameters.assistRate *
-        1.01 *
+        ENGINE_CONSTANTS.assistCreditScale *
         roleFactor *
         creation *
         actionFactor *
@@ -714,7 +720,7 @@ export function assistProbabilityPure(
 function creditAssist(
   ctx: TripContext,
   offenseSide: SideIndex,
-  team: SimulationTeam,
+  _team: SimulationTeam,
   shooter: SimulationPlayer,
   initiator: SimulationPlayer,
   action: ActionType,
@@ -722,13 +728,7 @@ function creditAssist(
   passed: boolean,
 ): void {
   if (!passed) return;
-  const teamPrep = ctx.preps[offenseSide];
-  const assisterPrep = teamPrep.assisterByPair.get(
-    `${teamPrep.keyOf(shooter)}\u0000${teamPrep.keyOf(initiator)}`,
-  );
-  if (assisterPrep === undefined) return;
-  const passer = pickAssister(assisterPrep, ctx.rng);
-  if (!passer) return;
+  const passer = initiator;
   const slot = slotOf(ctx.preps[offenseSide], passer);
   if (slot < 0) return;
   ctx.recorder.assistOpportunity(offenseSide, slot);
@@ -869,6 +869,7 @@ function resolveShot(
   deadBall: boolean,
   reboundCounter: [number, number],
   rushMakePenalty = 0,
+  handlerKey?: string,
 ): ShotOutcome {
   const { rng, recorder, state, profile } = ctx;
   const havoc = ctx.havoc;
@@ -876,7 +877,11 @@ function resolveShot(
   const teamPrep = ctx.preps[offenseSide];
   const defense = ctx.teams[defenseSide];
   const defensePrep = ctx.preps[defenseSide];
-  const initiator = rng.weightedPick(team.players, teamPrep.initiatorPickTable);
+  const handlerSlot =
+    handlerKey === undefined ? undefined : teamPrep.slotByPlayerId.get(handlerKey);
+  const initiator =
+    (handlerSlot === undefined ? undefined : team.players[handlerSlot]) ??
+    rng.weightedPick(team.players, teamPrep.initiatorPickTable);
   const actionWeights = teamPrep.actionWeights.get(teamPrep.keyOf(initiator));
   if (actionWeights === undefined) {
     throw new Error(`possession: no action weights for ${teamPrep.keyOf(initiator)}`);

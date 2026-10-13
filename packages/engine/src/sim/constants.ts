@@ -10,10 +10,16 @@ export interface PositionResponsibilityModifiers {
   rimProtection: number;
 }
 
-export const ENGINE_VERSION = 'm3-engine-v24';
+export const ENGINE_VERSION = 'm3-engine-v25';
 
 export const ENGINE_CONSTANTS = {
   version: ENGINE_VERSION,
+  offensiveAllocation: {
+    minimumDemand: 0.5,
+    evidenceMinutes: 1000,
+    neutralAttemptsPer36: 12,
+    fallbackShotWeight: 0.65,
+  },
 
   zoneBaseMake: {
     rim: 0.62,
@@ -50,21 +56,13 @@ export const ENGINE_CONSTANTS = {
   eraZoneMixBlend: 0.55,
   observedThreePointBlend: 0.55,
   anchoredThreePointSkillRange: 0.06,
-  threePointCalibrationOffset: -0.003,
+  threePointCalibrationOffset: -0.012,
   threePointEvidenceMinimum: 0.02,
   threePointLowVolumeThreshold: 0.06,
   threePointLowVolumeCap: 0.08,
   threePointLowVolumeEraPull: 0.05,
   threePointEraPull: 0.3,
 
-  usageExponent: 1.6,
-  usageRoleReference: 20,
-  initiatorRoleExponent: 1.6,
-  finisherRoleExponent: 1.25,
-  initiatorRoleMin: 0.65,
-  initiatorRoleMax: 2.05,
-  finisherRoleMin: 0.7,
-  finisherRoleMax: 1.72,
   twoPointAnchorMin: 0.82,
   twoPointAnchorMax: 1.32,
   twoPointAnchorSkillScale: 0.3,
@@ -97,7 +95,8 @@ export const ENGINE_CONSTANTS = {
   blockAnchorScale: 0.025,
   blockAnchorMax: 0.06,
 
-  shootingFoulScale: 1.56,
+  shootingFoulScale: 1.75,
+  assistCreditScale: 1.1,
   fouledShotMakeScale: 0.95,
   observedFoulDrawBlend: 0.7,
   offensiveFoulShare: 0.32,

@@ -43,6 +43,7 @@ function teamInput(
       ratings: ratingsOverride?.get(cardId) ?? sim.ratings,
       tendencies: sim.tendencies,
       ...(sim.anchors !== undefined ? { anchors: sim.anchors } : {}),
+      ...(sim.offensiveLoad !== undefined ? { offensiveLoad: sim.offensiveLoad } : {}),
       overall: card.summarySource?.overallRating ?? 60,
     };
     return player;

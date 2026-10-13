@@ -50,7 +50,7 @@ describe('havoc runtime smoke', () => {
     }
   });
 
-  it('keeps default 24/24 digests byte-identical to the pre-Time-Lord-fix baseline', () => {
+  it('pins default 24/24 results and tapes under engine v25', () => {
     const context = createEngineContext();
     const fixture = simulateHavocGame(buildFixtureGameInput(), context);
     expect(havocGameResultDigest(fixture.result)).toBe(DEFAULT_HAVOC_RESULT_DIGEST);
@@ -75,13 +75,9 @@ describe('havoc runtime smoke', () => {
   });
 });
 
-// Captured after the foul-avoidance calibration; default 24/24 games must not drift
-// again without an explicit behavior change. Recaptured for the v2 balance patch
-// (single-multiplier cap, retuned point buffs); tapes are byte-identical, only the
-// embedded rules/catalog version in results changed the result digests.
-const DEFAULT_HAVOC_RESULT_DIGEST = '717ae3c484f962c028079d06b6dc01f4';
-const DEFAULT_HAVOC_TAPE_DIGEST = '4dcada61bfa5b995ed96cf237bf8e3b1';
-const LOCKED_HAVOC_RESULT_DIGEST = '1bab18d054aa2b1c2d6923d23918d580';
-const LOCKED_HAVOC_TAPE_DIGEST = 'f246ced818f50974ec7a84925edd6f08';
-const LOCKED_NORMAL_RESULT_DIGEST = '3c83a06caf52b268c4085dd6e08cb8fc';
-const LOCKED_NORMAL_TAPE_DIGEST = 'c903a35e900ef912423b7c6cbee5b4ee';
+const DEFAULT_HAVOC_RESULT_DIGEST = '0a53f662f0244b6ef45187904b5350d2';
+const DEFAULT_HAVOC_TAPE_DIGEST = '9f8bd3d106f82f25be45f7277e4bfea1';
+const LOCKED_HAVOC_RESULT_DIGEST = '0c7b60ba46fbf36e8688bcc40fc7d1ea';
+const LOCKED_HAVOC_TAPE_DIGEST = '7a0469ab4fb58a8784c87a71565093bb';
+const LOCKED_NORMAL_RESULT_DIGEST = 'af9869fc61fc3c80f1c591bed27a9b4c';
+const LOCKED_NORMAL_TAPE_DIGEST = '27f2ff970b885e5b12f167098aa36a47';

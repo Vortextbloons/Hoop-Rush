@@ -13,8 +13,31 @@
     <link rel="apple-touch-icon" sizes="180x180" href="%sveltekit.assets%/apple-touch-icon.png" />
     <script>
       (function () {
+        try {
+          var nav = navigator;
+          var manual = null;
+          try {
+            manual = localStorage.getItem('hoop-rush:lite-mode');
+          } catch (e) {}
+          var lite;
+          if (manual === 'on') {
+            lite = true;
+          } else if (manual === 'off') {
+            lite = false;
+          } else {
+            var conn = nav.connection || nav.mozConnection || nav.webkitConnection || {};
+            var hw = nav.hardwareConcurrency || 0;
+            var mem = nav.deviceMemory || 0;
+            var reduced =
+              typeof window.matchMedia === 'function' &&
+              window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            lite = conn.saveData === true || (mem > 0 && mem < 4) || (hw > 0 && hw <= 4) || reduced;
+          }
+          if (lite) document.documentElement.setAttribute('data-lite', '');
+        } catch (e) {}
         var path = location.pathname.replace(/\/+$/, '');
         if (/\/multiplayer$/.test(path)) return;
+        if (document.documentElement.hasAttribute('data-lite')) return;
         var link = document.createElement('link');
         link.rel = 'preload';
         link.href = '%sveltekit.assets%/data/manifest.json';

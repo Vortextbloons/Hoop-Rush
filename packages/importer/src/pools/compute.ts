@@ -1,5 +1,4 @@
 import { readdirSync } from 'node:fs';
-import { overallWithBoost } from '../ratings/overall-boosts.ts';
 import { basename, join } from 'node:path';
 import { z } from 'zod';
 import { hoopRushManifestSchema, parsePool } from '@hoop-rush/data-contracts';
@@ -581,19 +580,10 @@ export function rawOverallScoreFor(
 }
 export function selectionScore(
   peakScore: number,
-  _offenseRating: number,
-  _defenseRating: number,
-  _usageRate: number | null,
-  teamMinutes: number,
-  teamGames: number,
+  ...legacyInputs: [number, number, number | null, number, number]
 ): number {
-  const mpg = Math.min(teamMinutes / Math.max(1, teamGames), 48.0);
-  const availability = 0.96 + 0.04 * Math.min(Math.max(teamGames, 0) / 82, 1);
-  // Rank peaks by holistic evidence first: three-point-era offense ratings
-  // used to outvote MVP production (1989-90 Magic over 1986-87). The peak
-  // score below carries the season; offense/defense break ties.
-  const raw = peakScore + 0.02 * mpg;
-  return Math.round(raw * availability * 1000) / 1000;
+  void legacyInputs;
+  return Math.round(peakScore * 10000) / 10000;
 }
 export type Candidate = {
   season: string;
@@ -702,14 +692,12 @@ export function normalizePoolOveralls(
       scale && profile && (profile.schemaVersion ?? 0) >= 3 && hasRawOverallScore(row)
         ? overallForScore(profile.rawOverallScore as number, scale)
         : null;
-    row.summaryRatings.overallRating = overallWithBoost(
-      row.playerId,
-      row.seasonKey,
+    row.summaryRatings.overallRating =
+      mapped?.overall ??
       minutesFloorOverall(
-        mapped?.overall ?? profile?.canonicalOverall ?? row.summaryRatings.overallRating,
+        profile?.canonicalOverall ?? row.summaryRatings.overallRating,
         minutesOf(row),
-      ),
-    );
+      );
     if (mapped && profile && scale) {
       profile.canonicalOverall = row.summaryRatings.overallRating;
       profile.overallPercentile = mapped.percentile;

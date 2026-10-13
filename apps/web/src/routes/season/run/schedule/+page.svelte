@@ -224,6 +224,7 @@
                 {@const box = boxFor(row)}
                 <li
                   data-season-schedule-row
+                  data-virtual-row
                   data-result={row.won === null ? 'pending' : row.won ? 'win' : 'loss'}
                   class="sr-gamecard"
                 >
@@ -311,6 +312,7 @@
                 {@const box = boxFor(row)}
                 <li
                   data-season-schedule-row
+                  data-virtual-row
                   data-result={row.won === null ? 'pending' : row.won ? 'win' : 'loss'}
                   class="sr-gamecard"
                 >

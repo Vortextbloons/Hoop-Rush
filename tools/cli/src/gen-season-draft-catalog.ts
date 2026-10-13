@@ -1,3 +1,4 @@
+import { writeJsonRetry } from '@hoop-rush/importer';
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -218,7 +219,7 @@ function main(): void {
       url: 'season/draft-catalog.json',
       contentHash: sha256Hex(content),
     };
-    atomicWriteFileSync(MANIFEST_PATH, `${JSON.stringify(seasonManifest, null, 2)}\n`);
+    writeJsonRetry(MANIFEST_PATH, seasonManifest, true);
   }
   console.log(
     `wrote ${target} (${String(content.length)} bytes, ${String(candidates.size)} candidates, ${String(pools.length)} pools from ${String(sourceCount)} pool artifacts)`,

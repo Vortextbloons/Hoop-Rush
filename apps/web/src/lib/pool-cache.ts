@@ -1,5 +1,6 @@
 import Dexie, { type EntityTable } from 'dexie';
 import { franchiseEraPoolSchema, type FranchiseEraPool } from '@hoop-rush/data-contracts';
+import { isLiteMode } from './device-capabilities';
 interface CachedPoolRecord {
   key: string;
   contentHash: string;
@@ -11,13 +12,32 @@ interface CachedAssetRecord {
   value: unknown;
   savedAt: number;
 }
-export const POOL_CACHE_MAX_POOLS = 60;
-export const POOL_CACHE_MAX_ASSETS = 24;
+const POOL_CACHE_MAX_POOLS_DEFAULT = 60;
+const POOL_CACHE_MAX_POOLS_LITE = 10;
+const POOL_CACHE_MAX_ASSETS_DEFAULT = 24;
+const POOL_CACHE_MAX_ASSETS_LITE = 8;
+export function poolCacheMaxPools(): number {
+  return isLiteMode() ? POOL_CACHE_MAX_POOLS_LITE : POOL_CACHE_MAX_POOLS_DEFAULT;
+}
+export function poolCacheMaxAssets(): number {
+  return isLiteMode() ? POOL_CACHE_MAX_ASSETS_LITE : POOL_CACHE_MAX_ASSETS_DEFAULT;
+}
 type HoopRushCacheDb = Dexie & {
   pools: EntityTable<CachedPoolRecord, 'key'>;
   assets: EntityTable<CachedAssetRecord, 'key'>;
 };
 let dbInstance: HoopRushCacheDb | null = null;
+const parsedPoolCache = new Map<string, { hash: string; pool: FranchiseEraPool }>();
+const PARSED_POOL_CACHE_MAX = 16;
+function rememberParsedPool(key: string, hash: string, pool: FranchiseEraPool): void {
+  parsedPoolCache.delete(key);
+  parsedPoolCache.set(key, { hash, pool });
+  while (parsedPoolCache.size > PARSED_POOL_CACHE_MAX) {
+    const oldest = parsedPoolCache.keys().next().value;
+    if (oldest === undefined) break;
+    parsedPoolCache.delete(oldest);
+  }
+}
 function getDb(): HoopRushCacheDb {
   if (!dbInstance) {
     const db = new Dexie('hoop-rush') as HoopRushCacheDb;
@@ -49,7 +69,15 @@ export async function readCachedPool(
       );
       return null;
     }
-    return franchiseEraPoolSchema.parse(record.pool);
+    const remembered = parsedPoolCache.get(key);
+    if (remembered && remembered.hash === expectedHash) {
+      parsedPoolCache.delete(key);
+      parsedPoolCache.set(key, remembered);
+      return remembered.pool;
+    }
+    const pool = franchiseEraPoolSchema.parse(record.pool);
+    rememberParsedPool(key, expectedHash, pool);
+    return pool;
   } catch (error) {
     console.warn('[pool-cache] readCachedPool failed', error);
     return null;
@@ -63,9 +91,11 @@ export async function writeCachedPool(
   try {
     const db = getDb();
     await db.pools.put({ key, contentHash, pool, savedAt: Date.now() });
+    rememberParsedPool(key, contentHash, pool);
     const count = await db.pools.count();
-    if (count > POOL_CACHE_MAX_POOLS) {
-      const excess = count - POOL_CACHE_MAX_POOLS;
+    const max = poolCacheMaxPools();
+    if (count > max) {
+      const excess = count - max;
       const victims = await db.pools.orderBy('savedAt').limit(excess).primaryKeys();
       if (victims.length > 0) await db.pools.bulkDelete(victims);
     }
@@ -91,8 +121,9 @@ export async function writeCachedAsset(contentHash: string, value: unknown): Pro
     const db = getDb();
     await db.assets.put({ key: contentHash, value, savedAt: Date.now() });
     const count = await db.assets.count();
-    if (count > POOL_CACHE_MAX_ASSETS) {
-      const excess = count - POOL_CACHE_MAX_ASSETS;
+    const max = poolCacheMaxAssets();
+    if (count > max) {
+      const excess = count - max;
       const victims = await db.assets.orderBy('savedAt').limit(excess).primaryKeys();
       if (victims.length > 0) await db.assets.bulkDelete(victims);
     }

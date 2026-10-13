@@ -293,13 +293,19 @@ describe('havoc fouls and replacements', () => {
     const away = buildScenarioTeam('opponent', plainSlots());
     const run = searchScenario(96, human, away, (candidate) =>
       candidate.tape.events.some(
-        (event) => event.kind === 'substitution' && event.reason === 'foul-out',
+        (event) =>
+          event.kind === 'substitution' &&
+          event.reason === 'foul-out' &&
+          human.starters.some((starter) => starter.instanceId === event.outInstanceId),
       ),
     );
     expect(run, 'expected a six-foul substitution').not.toBeNull();
     if (run === null) return;
     const substitution = eventsOf(run, 'substitution').find(
-      (event) => event.kind === 'substitution' && event.reason === 'foul-out',
+      (event) =>
+        event.kind === 'substitution' &&
+        event.reason === 'foul-out' &&
+        human.starters.some((starter) => starter.instanceId === event.outInstanceId),
     );
     if (substitution?.kind !== 'substitution') throw new Error('missing substitution');
     const replacement = run.input.home.replacements.find(

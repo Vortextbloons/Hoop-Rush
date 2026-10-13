@@ -13,7 +13,6 @@ import { clamp, fileExists, parseJsonLoose, readJson, safeFloat, writeJsonRetry 
 import { chunkList, defaultWorkerCount, runWorker } from '../shared/worker-pool.ts';
 import { join } from 'node:path';
 import { deriveRatingProfile } from './v3.ts';
-import { overallWithBoost } from './overall-boosts.ts';
 import { deriveTraits } from './traits.ts';
 import { deriveContract } from './contracts.ts';
 import { derivePlayerRecord, fieldPublished, positionGroup, type SeasonContext } from './v2.ts';
@@ -22,8 +21,13 @@ import { canonicalPlayerName } from '../identity.ts';
 import { positionOverrideFor } from '../positions/overrides.ts';
 import { primaryPositionForSource } from '../positions/normalize.ts';
 import { loadRatingsModelArtifact } from './artifact.ts';
-import { loadOverallEvidence, loadOverallTracking } from './overall-evidence.ts';
+import {
+  loadOverallEvidence,
+  loadOverallTracking,
+  loadPostseasonEvidence,
+} from './overall-evidence.ts';
 import { loadThreePointReconstructionArtifact } from '../reconstruction/artifact.ts';
+import { seasonStatsEvidenceSchema } from './season-evidence.ts';
 const rosterPlayerSchema = z.looseObject({
   externalId: z.string().nullable().optional(),
   position: z.string().nullable().optional(),
@@ -59,6 +63,7 @@ const rosterPlayerSchema = z.looseObject({
 });
 export type RosterPlayer = z.infer<typeof rosterPlayerSchema>;
 const ratingsStatsRowSchema = z.looseObject({
+  ...seasonStatsEvidenceSchema.shape,
   playerExternalId: z.unknown().optional(),
   teamExternalId: z.unknown().optional(),
   minutes: z.unknown().optional(),
@@ -109,21 +114,11 @@ function seasonContext(season: string): SeasonContext {
   const era = getEra(season);
   return { leaguePpg: era.leaguePpg, league3PARate: era.league3PARate, pace: era.pace };
 }
-function loadEvidenceMap(outDir: string): Map<string, Record<string, unknown>> {
-  const map = new Map<string, Record<string, unknown>>();
+export function loadEvidenceMap(outDir: string): Map<string, Record<string, unknown>> {
   const path = join(outDir, 'evidence.json');
-  if (!fileExists(path)) return map;
-  try {
-    const raw = readJson(path);
-    if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return map;
-    for (const [pid, patch] of Object.entries(raw)) {
-      if (pid === '' || patch === null || typeof patch !== 'object' || Array.isArray(patch)) {
-        continue;
-      }
-      map.set(pid, patch as Record<string, unknown>);
-    }
-  } catch {}
-  return map;
+  if (!fileExists(path)) return new Map();
+  const data = z.record(z.string().min(1), seasonStatsEvidenceSchema).parse(readJson(path));
+  return new Map(Object.entries(data));
 }
 function loadPlayerWinPctMap(season: string): Map<string, number> {
   const map = new Map<string, number>();
@@ -338,7 +333,9 @@ export function computeForSeason(season: string, force = false, overallOnly = fa
   const roster = overallOnly
     ? (rosterRaw as RosterPlayer[])
     : (rosterParsed.data as RosterPlayer[]);
-  const statsList = statsParsed.success ? statsParsed.data : [];
+  if (!statsParsed.success)
+    throw new Error(`invalid ${season} stats: ${statsParsed.error.message}`);
+  const statsList = statsParsed.data.map((row) => seasonStatsEvidenceSchema.parse(row));
   if (roster.length === 0) {
     console.log(`  ! ${season}: empty roster, skipping`);
     return;
@@ -363,6 +360,7 @@ export function computeForSeason(season: string, force = false, overallOnly = fa
     const era = seasonContext(season);
     const overallEvidence = loadOverallEvidence(season, artifact.schemaVersion === 4);
     const overallTracking = loadOverallTracking(season);
+    const postseason = loadPostseasonEvidence(season);
     for (const player of roster) {
       const ratings = simulationRatingsSchema.parse(player.ratings);
       const tendencies = simulationTendenciesSchema.parse(player.tendencies);
@@ -372,6 +370,7 @@ export function computeForSeason(season: string, force = false, overallOnly = fa
         ...overallEvidence.get(player.externalId ?? ''),
       };
       const derived = deriveRatingProfile({
+        season,
         ratings,
         tendencies,
         abilityProvenance: player.provenance,
@@ -384,13 +383,10 @@ export function computeForSeason(season: string, force = false, overallOnly = fa
         artifact,
         eraPace: era.pace,
         eraThreeRate: era.league3PARate,
+        postseason: postseason.players.get(player.externalId ?? ''),
+        postseasonEvidenceAvailable:
+          postseason.available && !postseason.missingPlayers.has(player.externalId ?? ''),
       });
-      derived.summaryRatings.overallRating = overallWithBoost(
-        player.externalId ? `p-${player.externalId}` : (player.id ?? ''),
-        season,
-        derived.summaryRatings.overallRating,
-      );
-      derived.profile.canonicalOverall = derived.summaryRatings.overallRating;
       player.ratingProfile = ratingProfileSchema.parse(derived.profile);
       player.summaryRatings = derived.summaryRatings;
       player.contract = deriveContract(
@@ -407,12 +403,12 @@ export function computeForSeason(season: string, force = false, overallOnly = fa
   const artifact = loadRatingsModelArtifact();
   if (!artifact.overallScale) throw new Error('Rating generation requires calibrate overall');
   const threePointReconstruction = loadThreePointReconstructionArtifact();
-  const ratePriorsByGroup = pooledRatePriors(roster, statsList);
   const teamWinPctMap = estimateTeamWinPctMap(statsList);
   const playerWinPctMap = loadPlayerWinPctMap(season);
   const standingsWinPctMap = loadStandingsMap(out);
   const overallEvidence = loadOverallEvidence(season, artifact.schemaVersion === 4);
   const overallTracking = loadOverallTracking(season);
+  const postseason = loadPostseasonEvidence(season);
   let computed = 0;
   for (const player of roster) {
     const extId = player.externalId ?? '';
@@ -484,19 +480,14 @@ export function computeForSeason(season: string, force = false, overallOnly = fa
       stats,
       era: context,
       artifact,
-      ratePriors: ratePriorsByGroup.get(positionGroup(pos)),
       threePointReconstruction,
       teamWinPct,
+      postseason: postseason.players.get(extId),
+      postseasonEvidenceAvailable: postseason.available && !postseason.missingPlayers.has(extId),
     });
     player.ratings = derived.ratings;
     player.tendencies = derived.tendencies;
     player.summaryRatings = derived.summaryRatings;
-    player.summaryRatings.overallRating = overallWithBoost(
-      extId ? `p-${extId}` : (player.id ?? ''),
-      season,
-      player.summaryRatings.overallRating,
-    );
-    derived.ratingProfile.canonicalOverall = player.summaryRatings.overallRating;
     player.anchors = derived.anchors;
     player.reconstructedThreePoint = derived.reconstructedThreePoint;
     player.provenance = derived.provenance;
@@ -509,7 +500,7 @@ export function computeForSeason(season: string, force = false, overallOnly = fa
     player.importMeta = {
       snapshotSeason: season,
       statsSource: stats.statsSource === 'stints-derived' ? 'stints-derived' : 'nba_api',
-      lastUpdated: '2026-08-02T00:00:00Z',
+      lastUpdated: '2026-10-12T00:00:00Z',
     };
     computed += 1;
   }

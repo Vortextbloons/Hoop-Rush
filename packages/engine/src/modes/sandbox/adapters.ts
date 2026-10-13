@@ -8,7 +8,11 @@ export function toSimulationPlayer(player: PeakPlayerSeason): SimulationPlayer {
     weightLbs: player.weightLbs,
     ratings: player.detailedRatings,
     tendencies: player.tendencies,
-    anchors: player.anchors,
+    anchors: {
+      ...player.anchors,
+      fieldGoalAttemptsPerGame:
+        player.stats.fieldGoalsAttempted / Math.max(1, player.stats.gamesPlayed),
+    },
     reconstructedThreePoint: player.reconstructedThreePoint,
     overall: player.summaryRatings.overallRating,
     ratingProfile: player.ratingProfile,

@@ -184,7 +184,7 @@ describe('season low fixes', () => {
       },
     };
     let raced = false;
-    for (const seedName of ['ot-probe-18', 'ot-probe-38', 'ot-probe-49', 'ot-probe-79']) {
+    for (const seedName of Array.from({ length: 128 }, (_, index) => `ot-probe-${String(index)}`)) {
       seen.length = 0;
       const input = buildInput(seedName, { gameRule: 'first-to-seven-overtime' });
       const result = simulateSeasonGame(input, spy);
@@ -199,7 +199,7 @@ describe('season low fixes', () => {
   });
 
   it('audits with-effects results against an effects replay instead of a neutral one', () => {
-    const input = withStamina(buildInput('fx-probe-1'));
+    const input = withStamina(buildInput('fx-probe-2'));
     const state = fatiguedState(input);
     const context = createEngineContext();
     const first = simulateSeasonGameWithEffects(input, context, state);

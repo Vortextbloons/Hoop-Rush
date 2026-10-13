@@ -20,6 +20,7 @@ import {
   twentySecondClockPressure,
 } from '../sim/evolution-rules.ts';
 import { projectExpectedLedger } from './expected-ledger.ts';
+import { threePointTarget } from '../sim/usage.ts';
 
 export const EVOLUTION_PROJECTION_ADAPTER_VERSION = SEASON_COURT_INNOVATION_VERSION;
 
@@ -57,10 +58,17 @@ export function adjustLedgerForDeepFour(input: {
       facts: { movedAttempts: 0 },
     };
   }
-  const usageTotal = unit.reduce((sum, p) => sum + Math.max(0.5, p.tendencies.usageRate), 0);
+  const prep = prepareTeam(
+    { teamId: 'deep-four', displayName: 'Deep Four', players: [...unit] },
+    profile,
+  );
+  const weights = unit.map(
+    (player, index) => (prep.offense.shotShares[index] ?? 0) * threePointTarget(player, profile),
+  );
+  const usageTotal = weights.reduce((sum, weight) => sum + weight, 0);
   let foulShare = 0;
-  for (const shooter of unit) {
-    const usageWeight = Math.max(0.5, shooter.tendencies.usageRate) / Math.max(1e-9, usageTotal);
+  for (const [index, shooter] of unit.entries()) {
+    const usageWeight = (weights[index] ?? 0) / Math.max(1e-9, usageTotal);
     let defenderMean = 0;
     for (const defender of opponent) {
       defenderMean += shootingFoulProbability(shooter, defender, 'aboveBreakThree', profile);

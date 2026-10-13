@@ -80,6 +80,7 @@ export const simulationAnchorsSchema = z.object({
   gamesPlayed: z.number().int().nonnegative(),
   minutesPerGame: z.number().min(0).max(60),
   pointsPerGame: z.number().nonnegative(),
+  fieldGoalAttemptsPerGame: z.number().nonnegative().optional(),
   reboundsPerGame: z.number().nonnegative(),
   offensiveReboundsPerGame: z.number().nonnegative(),
   defensiveReboundsPerGame: z.number().nonnegative(),
@@ -99,6 +100,12 @@ export const simulationAnchorsSchema = z.object({
   rateShrinkAttempts: z.number().int().nonnegative().optional(),
 });
 export type SimulationAnchors = z.infer<typeof simulationAnchorsSchema>;
+export const offensiveLoadSchema = z.object({
+  attemptsPer36: z.number().min(0).max(120),
+  observedAttemptsPer36: z.number().min(0).max(120).optional(),
+  source: z.enum(['observed-attempts', 'derived-attempts', 'tendency']),
+  confidence: z.number().min(0).max(1),
+});
 export const reconstructedThreePointProfileSchema = z.object({
   modelVersion: z.literal(THREE_POINT_RECONSTRUCTION_VERSION),
   accuracyConservative: z.number().min(0).max(1),
@@ -129,6 +136,7 @@ export const simulationPlayerSchema = z.object({
   ratings: simulationRatingsSchema,
   tendencies: simulationTendenciesSchema,
   anchors: simulationAnchorsSchema.optional(),
+  offensiveLoad: offensiveLoadSchema.optional(),
   reconstructedThreePoint: reconstructedThreePointProfileSchema.optional(),
   overall: z.number().int().min(0).max(100).optional(),
   ratingProfile: ratingProfileSchema.optional(),

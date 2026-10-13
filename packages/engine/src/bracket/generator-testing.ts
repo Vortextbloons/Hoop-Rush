@@ -127,7 +127,7 @@ export function generationOptions(
     difficulty,
     candidates: FRANCHISES.map(candidatesFor),
     proposalsPerFranchise: 12,
-    samplesPerBenchmark: 8,
+    samplesPerBenchmark: 32,
     minPlayerScore: 45,
     engineContext: createEngineContext(),
     ...overrides,

@@ -11,6 +11,7 @@ import {
   type SeasonRun,
 } from '@hoop-rush/data-contracts';
 import { applySponsorBoosts } from '../sponsors.ts';
+import { finishingDemand } from '../../sim/offense.ts';
 
 export function emptyFreeAgencyStateOf(
   run: SeasonRun | SeasonBlockRunContext,
@@ -56,6 +57,16 @@ export function expandSeasonRunRosters(
         weightLbs: candidate.weightLbs,
         ratings: applySponsorBoosts(candidate.detailedRatings, applied[playerVersionId]),
         tendencies: candidate.tendencies,
+        offensiveLoad: finishingDemand({
+          playerId: candidate.playerId,
+          displayName: candidate.displayName,
+          positions: candidate.positions.playable,
+          heightInches: candidate.heightInches,
+          weightLbs: candidate.weightLbs,
+          ratings: candidate.detailedRatings,
+          tendencies: candidate.tendencies,
+          anchors: candidate.anchors,
+        }),
         stamina: {
           schemaVersion: 1,
           playerVersionId,

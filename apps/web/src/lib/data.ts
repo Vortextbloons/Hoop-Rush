@@ -15,6 +15,7 @@ import {
   type RosterDetails,
 } from '@hoop-rush/data-contracts';
 import { resolveAssetUrl } from './asset-url';
+import { isLiteMode } from './device-capabilities';
 import { readCachedPool, writeCachedPool } from './pool-cache';
 import {
   clearManifestAssetCaches,
@@ -32,16 +33,31 @@ function cacheBustedUrl(url: string): string {
   return `${url}${separator}v=${String(Date.now())}`;
 }
 const poolCache = new Map<string, Promise<FranchiseEraPool>>();
+const POOL_MEMORY_MAX_DEFAULT = 8;
+const POOL_MEMORY_MAX_LITE = 3;
+function poolMemoryMax(): number {
+  return isLiteMode() ? POOL_MEMORY_MAX_LITE : POOL_MEMORY_MAX_DEFAULT;
+}
+function rememberPool(key: string, promise: Promise<FranchiseEraPool>): void {
+  poolCache.delete(key);
+  poolCache.set(key, promise);
+  const max = poolMemoryMax();
+  while (poolCache.size > max) {
+    const oldest = poolCache.keys().next().value;
+    if (oldest === undefined) break;
+    poolCache.delete(oldest);
+  }
+}
 export function getPool(entry: PoolIndexEntry): Promise<FranchiseEraPool> {
   const key = `${entry.franchiseId}/${entry.eraId}`;
   let promise = poolCache.get(key);
   if (!promise) {
     promise = loadPoolForKey(entry.franchiseId, entry.eraId, key);
-    poolCache.set(key, promise);
     promise.catch(() => {
       poolCache.delete(key);
     });
   }
+  rememberPool(key, promise);
   return promise;
 }
 function findPoolEntry(
@@ -122,15 +138,12 @@ export function getPlayersIndex(): Promise<PlayersIndex> {
 
 export function warmManifest(): void {
   if (typeof window === 'undefined') return;
+  if (isLiteMode()) return;
   void getManifest().catch(() => {});
 }
 export function warmPlayersIndex(): void {
   if (typeof window === 'undefined') return;
-  if (
-    typeof navigator !== 'undefined' &&
-    (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData === true
-  )
-    return;
+  if (isLiteMode()) return;
   void getPlayersIndex().catch(() => {});
 }
 

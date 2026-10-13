@@ -972,7 +972,7 @@
           class="ur-card-grid mt-3 grid grid-cols-2 gap-3 min-[480px]:grid-cols-3 min-[768px]:grid-cols-4 min-[1100px]:grid-cols-5"
         >
           {#each paged.pageItems as item (item.entry.cardId)}
-            <li>
+            <li data-virtual-row>
               <CollectionCard
                 {item}
                 {catalog}

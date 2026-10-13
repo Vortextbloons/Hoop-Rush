@@ -256,6 +256,7 @@ function accumulate(
   return checkGameResult(result).length;
 }
 export function calibrateRun(args: {
+  manifest?: string;
   samples?: string;
   'seed-from'?: string;
   workers?: string;
@@ -270,7 +271,7 @@ export function calibrateRun(args: {
   const challengeSamples = parseCount(args['challenge-samples'], '--challenge-samples', 25);
   const opponentGames = parseCount(args['opponent-games'], '--opponent-games', 60);
   const allowSkipped = args['allow-skipped'] === true;
-  const packaged = loadPackagedData();
+  const packaged = loadPackagedData(args.manifest);
   const data = new PackagedData(packaged.manifest, packaged.dir);
   const profile = args.profile
     ? loadProfileFile(args.profile)
@@ -618,12 +619,13 @@ const SENSITIVITY_FAMILIES: Array<{
   { id: 'sens-shot-mix', direction: 'three-point share up', pass: (b, c) => c > b * 1.1 },
 ];
 export function calibrateSensitivity(args: {
+  manifest?: string;
   samples?: string;
   profile?: string;
   era?: string;
 }): CliReport {
   const samples = parseCount(args.samples, '--samples', 200);
-  const packaged = loadPackagedData();
+  const packaged = loadPackagedData(args.manifest);
   const data = new PackagedData(packaged.manifest, packaged.dir);
   const profile = args.profile
     ? loadProfileFile(args.profile)

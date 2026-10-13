@@ -9,7 +9,7 @@ export function calibrateOverall(output?: string): CliReport {
       { output: output ?? 'packaged ratings-model.json' },
       {
         details: [
-          `froze ${scale.version}: ${String(scale.reference.sampleCount)} unique qualified seasons, ${String(scale.knots.length)} score thresholds`,
+          `froze ${scale.version}: ${String(scale.reference.sampleCount)} unique player peaks, ${String(scale.knots.length)} score thresholds`,
         ],
       },
     );

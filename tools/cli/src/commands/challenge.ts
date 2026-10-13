@@ -268,6 +268,7 @@ export interface ChallengeSetup {
 }
 export function prepareChallenge(
   args: {
+    manifest?: string;
     lineup?: string;
     seed?: string;
     era?: string;
@@ -288,7 +289,7 @@ export function prepareChallenge(
   if (!parsedSeed.success) throw new UsageError(`--seed must be hex (got "${rawSeed}")`);
   const seed = parsedSeed.data;
   const eraId = args.era ?? FIXED_SANDBOX_ERA;
-  const packaged = loadPackagedData();
+  const packaged = loadPackagedData(args.manifest);
   const data = new PackagedData(packaged.manifest, packaged.dir);
   const profile = args.profile ? loadProfileFile(args.profile) : data.eraProfile(eraId);
   const bracket = args.bracket ? loadBracketFile(args.bracket) : data.bracket();

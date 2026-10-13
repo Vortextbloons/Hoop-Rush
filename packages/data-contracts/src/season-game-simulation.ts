@@ -4,6 +4,7 @@ import { positionUnionSchema } from './positions.ts';
 import { eraSimulationProfileSchema } from './era-sim-profile.ts';
 import {
   simulationAnchorsSchema,
+  offensiveLoadSchema,
   simulationRatingsSchema,
   simulationTendenciesSchema,
 } from './simulation.ts';
@@ -119,6 +120,7 @@ export const seasonGamePlayerInputSchema = z
     ratings: simulationRatingsSchema,
     tendencies: simulationTendenciesSchema,
     anchors: simulationAnchorsSchema.optional(),
+    offensiveLoad: offensiveLoadSchema.optional(),
     overall: z.number().int().min(0).max(100).optional(),
     ratingProfile: ratingProfileSchema.optional(),
     stamina: seasonStaminaInputSchema.optional(),

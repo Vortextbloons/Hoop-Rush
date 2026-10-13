@@ -7,6 +7,7 @@
     isArenaMuted,
     toggleArenaMuted,
   } from '$lib/arena-sound';
+  import { LITE_TOGGLE_EVENT } from '$lib/device-capabilities';
 
   let { className = '' }: { className?: string } = $props();
   let muted = $state(false);
@@ -26,9 +27,11 @@
       if (event.key === 'hoop-rush:arena-muted') sync();
     };
     window.addEventListener(ARENA_MUTED_EVENT, onChange);
+    window.addEventListener(LITE_TOGGLE_EVENT, onChange);
     window.addEventListener('storage', onStorage);
     return () => {
       window.removeEventListener(ARENA_MUTED_EVENT, onChange);
+      window.removeEventListener(LITE_TOGGLE_EVENT, onChange);
       window.removeEventListener('storage', onStorage);
     };
   });
@@ -49,13 +52,13 @@
   onclick={toggle}
   aria-pressed={!muted}
   title={muted ? 'Unmute arena sound' : 'Mute arena sound'}
-  class="inline-flex min-w-[7.5rem] items-center justify-center gap-1.5 rounded-full border border-line-soft bg-card px-3 py-1.5 font-mono text-[11px] font-bold tracking-widest uppercase text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring {className}"
+  class="sr-hide-lite inline-flex min-w-10 items-center justify-center gap-1.5 rounded-full border border-line-soft bg-card px-3 py-1.5 font-mono text-[11px] font-bold tracking-widest uppercase text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring sm:min-w-[7.5rem] {className}"
 >
   {#if muted}
     <VolumeX class="h-3.5 w-3.5" aria-hidden="true" />
-    <span>Muted</span>
+    <span class="hidden sm:inline">Muted</span>
   {:else}
     <Volume2 class="h-3.5 w-3.5" aria-hidden="true" />
-    <span>Sound on</span>
+    <span class="hidden sm:inline">Sound on</span>
   {/if}
 </button>

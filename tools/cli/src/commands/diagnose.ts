@@ -13,6 +13,9 @@ function loadProfile(): {
   return { profile: new PackagedData(packaged.manifest, packaged.dir).eraProfile(), packaged };
 }
 interface PlayerAccumulator {
+  side: 'home' | 'away';
+  teamId: string;
+  teamUsage: number;
   playerId: string;
   displayName: string;
   archetype: string;
@@ -38,8 +41,15 @@ interface PlayerAccumulator {
   zoneAttempts: Record<string, number>;
   zoneMakes: Record<string, number>;
 }
-function newPlayerAccumulator(player: SimulationPlayer): PlayerAccumulator {
+function newPlayerAccumulator(
+  player: SimulationPlayer,
+  teamId: string,
+  side: 'home' | 'away',
+): PlayerAccumulator {
   return {
+    side,
+    teamId,
+    teamUsage: 0,
     playerId: player.playerId,
     displayName: player.displayName,
     archetype: classifyArchetype(player),
@@ -80,6 +90,10 @@ function foldPlayer(
   opponent: GameResult['away'],
 ): void {
   acc.games += 1;
+  acc.teamUsage += team.players.reduce(
+    (sum, p) => sum + p.fieldGoals.attempted + 0.44 * p.freeThrows.attempted + p.turnovers,
+    0,
+  );
   acc.points += box.points;
   acc.fieldGoalMakes += box.fieldGoals.made;
   acc.fieldGoalAttempts += box.fieldGoals.attempted;
@@ -118,11 +132,6 @@ export function simDiagnose(args: {
   const { profile } = loadProfile();
   const fixture = loadFixture(fixtureId);
   const players = new Map<string, PlayerAccumulator>();
-  const fixturePlayers = new Map<string, SimulationPlayer>();
-  for (const p of [...fixture.home.players, ...fixture.away.players]) {
-    fixturePlayers.set(p.playerId, p);
-  }
-  let teamUsage = 0;
   let teamPossessions = 0;
   let teamPoints = 0;
   let teamMisses = 0;
@@ -133,18 +142,16 @@ export function simDiagnose(args: {
       const team = result[side];
       const opponent = result[side === 'home' ? 'away' : 'home'];
       for (const box of team.players) {
-        const source = fixturePlayers.get(box.playerId);
+        const source = fixture[side].players.find((p) => p.playerId === box.playerId);
         if (!source) continue;
-        const acc = players.get(box.playerId) ?? newPlayerAccumulator(source);
+        const key = `${side}:${source.playerVersionId ?? box.playerId}`;
+        const acc = players.get(key) ?? newPlayerAccumulator(source, team.teamId, side);
         foldPlayer(acc, box, team, opponent);
-        players.set(box.playerId, acc);
+        players.set(key, acc);
       }
       teamPossessions += team.box.possessions;
       teamPoints += team.box.points;
       teamMisses += sideMisses(team);
-      for (const box of team.players) {
-        if (box.diagnostics) teamUsage += box.diagnostics.usage;
-      }
     }
   }
   const rows = [...players.values()]
@@ -152,13 +159,15 @@ export function simDiagnose(args: {
       const games = Math.max(1, acc.games);
       const usage = acc.fieldGoalAttempts + acc.freeThrowAttempts * 0.44 + acc.turnovers;
       return {
+        side: acc.side,
+        teamId: acc.teamId,
         playerId: acc.playerId,
         displayName: acc.displayName,
         archetype: acc.archetype,
         games: acc.games,
         pointsPerGame: round1(acc.points / games),
         usagePerGame: round1(usage / games),
-        usageShare: round3(usage / Math.max(1, teamUsage)),
+        usageShare: round3(usage / Math.max(1, acc.teamUsage)),
         fieldGoalPct: round3(acc.fieldGoalMakes / Math.max(1, acc.fieldGoalAttempts)),
         threePointRate: round3(acc.threeAttempts / Math.max(1, acc.fieldGoalAttempts)),
         freeThrowRate: round3(acc.freeThrowAttempts / Math.max(1, acc.fieldGoalAttempts)),
@@ -191,7 +200,7 @@ export function simDiagnose(args: {
     profileVersion: profile.profileVersion,
     players: rows,
     team: {
-      averagePointsPerGame: round1(teamPoints / Math.max(1, samples)),
+      averagePointsPerGame: round1(teamPoints / Math.max(1, samples * 2)),
       averagePossessionsPerGame: round1(teamPossessions / Math.max(1, samples * 2)),
       averageTeamMissesPerGame: round1(teamMisses / Math.max(1, samples * 2)),
     },
@@ -203,7 +212,7 @@ export function simDiagnose(args: {
     `usage spread (top:last usage ratio) ${payload.spread.topToLastUsageRatio.toFixed(2)}`,
     ...payload.players.map(
       (p) =>
-        `  ${p.playerId} [${p.archetype}]: usg ${(p.usageShare * 100).toFixed(1)}% · ${String(p.pointsPerGame)} ppg · 3P ${p.threePointRate.toFixed(3)} · FTR ${p.freeThrowRate.toFixed(3)} · ast conv ${p.assistConversion.toFixed(3)} (${String(p.assistOpportunitiesPerGame)} opp/g) · OReb% ${p.offensiveReboundPct.toFixed(3)} · DReb% ${p.defensiveReboundPct.toFixed(3)} · ${String(p.contestedPerGame)} contest/g · top zone ${p.topZone}`,
+        `  ${p.side}:${p.playerId} [${p.archetype}]: usg ${(p.usageShare * 100).toFixed(1)}% · ${String(p.pointsPerGame)} ppg · 3P ${p.threePointRate.toFixed(3)} · FTR ${p.freeThrowRate.toFixed(3)} · ast conv ${p.assistConversion.toFixed(3)} (${String(p.assistOpportunitiesPerGame)} opp/g) · OReb% ${p.offensiveReboundPct.toFixed(3)} · DReb% ${p.defensiveReboundPct.toFixed(3)} · ${String(p.contestedPerGame)} contest/g · top zone ${p.topZone}`,
     ),
   ];
   return makeReport('sim diagnose', { fixture: fixtureId, samples }, { details, payload });

@@ -189,3 +189,4 @@ export * from './havoc-worker.ts';
 export * from './league-worker.ts';
 export * from './havoc-comparison.ts';
 export * from './multiplayer-lobby.ts';
+export * from './postseason-evidence.ts';

@@ -28,13 +28,7 @@ import {
   shotQualityBonus,
   type ShotPrep,
 } from '../sim/shooting.ts';
-import {
-  ACTION_TYPES,
-  applyZonePulls,
-  assisterWeights,
-  passProbability,
-  type ActionType,
-} from '../sim/usage.ts';
+import { ACTION_TYPES, applyZonePulls, type ActionType } from '../sim/usage.ts';
 const ZONES: readonly ShotZone[] = SHOT_ZONES;
 const REGULATION_START_SECONDS = REGULATION_PERIOD_SECONDS;
 export interface LedgerPlayerFacts {
@@ -45,6 +39,7 @@ export interface LedgerPlayerFacts {
   creationShare: number;
   spacingContribution: number;
   expectedShots: number;
+  expectedFreeThrowAttempts: number;
   expectedMakes: number;
   expectedPoints: number;
   expectedAssists: number;
@@ -91,6 +86,7 @@ interface LedgerInternal {
 }
 interface PlayerAgg {
   shots: number;
+  freeThrowAttempts: number;
   makes: number;
   points: number;
   turnovers: number;
@@ -196,33 +192,28 @@ function computeSide(input: {
   for (let index = 0; index < playerCount; index += 1) {
     const player = players[index];
     if (player === undefined) continue;
-    if (!playerIdToIndex.has(player.playerId)) playerIdToIndex.set(player.playerId, index);
+    playerIdToIndex.set(engineKey(player), index);
   }
   for (let initiatorIndex = 0; initiatorIndex < playerCount; initiatorIndex += 1) {
     const initiator = players[initiatorIndex];
     if (initiator === undefined) continue;
     const initiatorKey = engineKey(initiator);
-    const initiatorShare = initiatorShares[initiatorIndex] ?? 0;
+    const initiatorShare =
+      ((initiatorShares[initiatorIndex] ?? 0) * (1 - (turnoverRates[initiatorIndex] ?? 0))) /
+      Math.max(1e-9, noTurnover);
     const actionTable = prep.actionWeights.get(initiatorKey);
     if (actionTable === undefined) continue;
     const actionShares = normalizedWeights(actionTable);
     const teammateShots = prep.teammateShots.get(initiatorKey);
-    const normalizedRollShots =
-      teammateShots === undefined
-        ? undefined
-        : normalizeTeammateShots(teammateShots.roll, playerIdToIndex);
-    const normalizedPassShots =
-      teammateShots === undefined
-        ? undefined
-        : normalizeTeammateShots(teammateShots.pass, playerIdToIndex);
     for (let actionIndex = 0; actionIndex < actionCount; actionIndex += 1) {
       const action = ACTION_TYPES[actionIndex];
       if (action === undefined) continue;
       const actionShare = actionShares[actionIndex] ?? 0;
       if (actionShare <= 0) continue;
-      const passP = passProbability(initiator, action);
+      const passP = prep.passP.get(initiatorKey)?.[actionIndex] ?? 0;
+      const shotTable = teammateShots?.byAction[actionIndex];
       const selectedShots =
-        action === 'pickAndRollRoll' ? normalizedRollShots : normalizedPassShots;
+        shotTable === undefined ? undefined : normalizeTeammateShots(shotTable, playerIdToIndex);
       const shooterShares = shooterSharesFor(players, initiatorIndex, passP, selectedShots);
       for (let shooterIndex = 0; shooterIndex < playerCount; shooterIndex += 1) {
         const shooterShare = shooterShares[shooterIndex] ?? 0;
@@ -313,6 +304,7 @@ function computeSide(input: {
   };
   const playerAgg = players.map((): PlayerAgg => ({
     shots: 0,
+    freeThrowAttempts: 0,
     makes: 0,
     points: 0,
     turnovers: 0,
@@ -352,9 +344,6 @@ function computeSide(input: {
   const assistPSeen = new Uint8Array(playerCount * actionCount * zoneCount * playerCount);
   const assisterFlat = new Float64Array(playerCount * actionCount * zoneCount * playerCount);
   const assisterSeen = new Uint8Array(playerCount * actionCount * zoneCount);
-  const assisterWeightByPair: Array<number[] | undefined> = new Array<number[] | undefined>(
-    playerCount * playerCount,
-  );
   for (const keyIndex of keyOrder) {
     const actionIndex = keyIndex % actionCount;
     const zoneIndex = Math.floor(keyIndex / actionCount) % zoneCount;
@@ -458,12 +447,8 @@ function computeSide(input: {
         ((shooterIndex * actionCount + actionIndex) * zoneCount + zoneIndex) * playerCount;
       if (assisterSeen[assisterSlot / playerCount] === 0) {
         const distribution = initiatorWeightedAssisterDistribution(
-          side,
-          shooter,
-          players,
           passedByInitiatorByKey.subarray(keyIndex * playerCount, (keyIndex + 1) * playerCount),
           totalPassed,
-          assisterWeightByPair,
         );
         for (let passerIndex = 0; passerIndex < playerCount; passerIndex += 1) {
           assisterFlat[assisterSlot + passerIndex] = distribution[passerIndex] ?? 0;
@@ -510,6 +495,7 @@ function computeSide(input: {
     const agg = playerAgg[shooterIndex];
     if (agg === undefined) continue;
     agg.shots += mass;
+    agg.freeThrowAttempts += ftaMass;
     agg.makes += mass * makeProb;
     agg.points += mass * (three ? 3 : 2) * makeProb + ftmMass;
     agg.fouls += mass * foulP;
@@ -580,6 +566,11 @@ function computeSide(input: {
     expectedSteals: securityTurnovers * stealShare,
     expectedOther: ledger.turnovers - securityTurnovers * stealShare,
   };
+  const usageTotal = playerAgg.reduce(
+    (sum, player) =>
+      sum + (player.shots + 0.44 * player.freeThrowAttempts) * scale + player.turnovers,
+    0,
+  );
   return {
     ledger,
     turnoverCauses,
@@ -596,11 +587,15 @@ function computeSide(input: {
     players: players.map((player, index) => ({
       slotIndex: index,
       player,
-      usageShare: (shooterTotals[index] ?? 0) / Math.max(1e-9, shotMass),
+      usageShare:
+        ((playerAggAt(index).shots + 0.44 * playerAggAt(index).freeThrowAttempts) * scale +
+          playerAggAt(index).turnovers) /
+        Math.max(1e-9, usageTotal),
       initiatorShare: initiatorShares[index] ?? 0,
       creationShare: creationScore(player) * 100,
       spacingContribution: spacingScore(player) * 100,
       expectedShots: playerAggAt(index).shots * scale,
+      expectedFreeThrowAttempts: playerAggAt(index).freeThrowAttempts * scale,
       expectedMakes: playerAggAt(index).makes * scale,
       expectedPoints: playerAggAt(index).points * scale,
       expectedAssists: (playerAssists[index] ?? 0) * scale,
@@ -703,7 +698,7 @@ function normalizeTeammateShots(
   for (let index = 0; index < shots.teammates.length; index += 1) {
     const teammate = shots.teammates[index];
     if (teammate === undefined) continue;
-    const teamIndex = playerIdToIndex.get(teammate.playerId);
+    const teamIndex = playerIdToIndex.get(engineKey(teammate));
     if (teamIndex === undefined) continue;
     shares[teamIndex] = (shares[teamIndex] ?? 0) + (probs[index] ?? 0);
   }
@@ -731,34 +726,10 @@ function shooterSharesFor(
   return shares;
 }
 function initiatorWeightedAssisterDistribution(
-  team: SimulationTeam,
-  shooter: SimulationPlayer,
-  players: readonly SimulationPlayer[],
   passedByInitiator: Float64Array,
   totalPassed: number,
-  assisterWeightByPair: Array<number[] | undefined>,
 ): number[] {
-  const perIndex = new Array<number>(team.players.length).fill(0);
-  const shooterIndex = players.findIndex((player) => player.playerId === shooter.playerId);
-  for (let initiatorIndex = 0; initiatorIndex < players.length; initiatorIndex += 1) {
-    const share = (passedByInitiator[initiatorIndex] ?? 0) / Math.max(1e-9, totalPassed);
-    if (share <= 0) continue;
-    const initiator = players[initiatorIndex];
-    if (initiator === undefined) continue;
-    const pairKey = shooterIndex * players.length + initiatorIndex;
-    let normalized = assisterWeightByPair[pairKey];
-    if (normalized === undefined) {
-      normalized = normalizedWeights(assisterWeights(team, shooter, initiator));
-      assisterWeightByPair[pairKey] = normalized;
-    }
-    let candidateIndex = 0;
-    for (let index = 0; index < team.players.length; index += 1) {
-      if (team.players[index]?.playerId === shooter.playerId) continue;
-      perIndex[index] = (perIndex[index] ?? 0) + share * (normalized[candidateIndex] ?? 0);
-      candidateIndex += 1;
-    }
-  }
-  return perIndex;
+  return Array.from(passedByInitiator, (mass) => mass / Math.max(1e-9, totalPassed));
 }
 function defensiveContributionOf(player: SimulationPlayer): number {
   const pressure =

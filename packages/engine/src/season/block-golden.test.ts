@@ -24,7 +24,7 @@ describe('season block pipeline golden pins', () => {
     const checkpoint = simulateSeasonBlock(input);
     expect(auditSeasonBlock(checkpoint, input)).toEqual([]);
     expect(checkpoint.completedRounds).toBe(10);
-    expect(checkpoint.digest).toMatchInlineSnapshot(`"5ca91d146a8e1438bdc83c6e5360e584"`);
+    expect(checkpoint.digest).toMatchInlineSnapshot(`"679da9d4b9eba95852bb65d28107d0a4"`);
 
     const replayed = simulateSeasonBlock(input);
     expect(replayed.digest).toBe(checkpoint.digest);
@@ -44,7 +44,7 @@ describe('season block pipeline golden pins', () => {
       humanFranchiseId: 'lakers',
       evolutionData,
     });
-    expect(stateFacts.stateDigest).toMatchInlineSnapshot(`"f9b47db8d9efe4d4f1ffa02e6ffa6fa8"`);
+    expect(stateFacts.stateDigest).toMatchInlineSnapshot(`"c217911ecc80894231e4b570eb26c82e"`);
 
     const committed = completeSeasonBlockCommit({
       run,
@@ -57,7 +57,7 @@ describe('season block pipeline golden pins', () => {
       schedule,
       priorSummaries: [],
     });
-    expect(committed.stateDigest).toMatchInlineSnapshot(`"b95dc8c352e7b54f0ccad391768fe5f3"`);
+    expect(committed.stateDigest).toMatchInlineSnapshot(`"1f52d1b2e097f286356cd0e0382966a2"`);
     expect(committed.window).toBeNull();
     expect(committed.freeAgencyWindow).toBeNull();
     expect(committed.checkpointState.commandId).toBe(input.command.commandId);
@@ -118,7 +118,7 @@ describe('season block pipeline golden pins', () => {
     if ('interruption' in second) throw new Error('unexpected interruption');
     expect(JSON.stringify(second.summary)).toBe(JSON.stringify(first.summary));
     expect(seasonDigestHex(JSON.stringify(first.summary))).toMatchInlineSnapshot(
-      `"81b86d2ccd14ad885a868c625b433c9c"`,
+      `"81856928bcdcbe2ca6264a1e98ff2a98"`,
     );
   });
 });

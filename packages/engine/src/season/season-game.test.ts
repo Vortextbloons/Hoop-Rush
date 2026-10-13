@@ -404,7 +404,7 @@ describe('season game controller (M2.2)', () => {
     expect(earlyEvent?.secondsRemaining).toBeLessThanOrEqual(600);
     expect(lateEvent?.secondsRemaining).toBeLessThanOrEqual(120);
   });
-  it('applies bench injury immediately and prevents court exposure', () => {
+  it('applies bench injury at a dead ball and prevents court exposure', () => {
     const away = buildSeasonTeam('away');
     const benchPlayer = away.players[9];
     if (benchPlayer === undefined) throw new Error('fixture missing bench player');
@@ -427,7 +427,7 @@ describe('season game controller (M2.2)', () => {
     );
     expect(event).toBeDefined();
     expect(event?.secondsRemaining).toBeLessThanOrEqual(700);
-    expect(event?.secondsRemaining).toBeGreaterThanOrEqual(680);
+    expect(event?.secondsRemaining).toMatchInlineSnapshot(`649`);
     const player = result.away.players.find(
       (row) => row.playerVersionId === benchPlayer.playerVersionId,
     );

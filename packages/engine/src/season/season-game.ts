@@ -1412,6 +1412,18 @@ function assertFiniteSeasonGameInput(input: SeasonGameSimulationInput): void {
         assertFiniteNumber(player.heightInches, `${prefix}.heightInches`);
       if (player.weightLbs !== null) assertFiniteNumber(player.weightLbs, `${prefix}.weightLbs`);
       if (player.overall !== undefined) assertFiniteNumber(player.overall, `${prefix}.overall`);
+      if (player.offensiveLoad !== undefined) {
+        assertFiniteNumber(
+          player.offensiveLoad.attemptsPer36,
+          `${prefix}.offensiveLoad.attemptsPer36`,
+        );
+        assertFiniteNumber(player.offensiveLoad.confidence, `${prefix}.offensiveLoad.confidence`);
+        if (player.offensiveLoad.observedAttemptsPer36 !== undefined)
+          assertFiniteNumber(
+            player.offensiveLoad.observedAttemptsPer36,
+            `${prefix}.offensiveLoad.observedAttemptsPer36`,
+          );
+      }
       if (player.stamina !== undefined) {
         assertFiniteNumber(player.stamina.rating, `${prefix}.stamina.rating`);
         assertFiniteNumber(player.stamina.historicalMpg, `${prefix}.stamina.historicalMpg`);
@@ -1435,6 +1447,7 @@ function toSimulationPlayer(player: SeasonGamePlayerInput): SimulationPlayer {
     weightLbs: player.weightLbs,
     ratings: player.ratings,
     tendencies: player.tendencies,
+    ...(player.offensiveLoad === undefined ? {} : { offensiveLoad: player.offensiveLoad }),
     ...(player.anchors !== undefined ? { anchors: player.anchors } : {}),
     ...(player.overall !== undefined ? { overall: player.overall } : {}),
     ...(player.ratingProfile !== undefined ? { ratingProfile: player.ratingProfile } : {}),

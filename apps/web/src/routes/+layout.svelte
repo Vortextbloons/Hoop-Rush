@@ -6,9 +6,11 @@
   import { ArrowLeft, Home, Users, Swords } from '@lucide/svelte';
   import '../app.css';
   import { ModeWatcher } from 'mode-watcher';
-  import { Toaster } from 'svelte-sonner';
-  import BottomNav from '$lib/components/BottomNav.svelte';
   import ArenaSoundToggle from '$lib/components/ArenaSoundToggle.svelte';
+  import BottomNav from '$lib/components/BottomNav.svelte';
+  import LiteModeToggle from '$lib/components/LiteModeToggle.svelte';
+  import { initArenaSoundForLiteMode } from '$lib/arena-sound';
+  import { deferIdle, initLiteMode, isLiteMode } from '$lib/device-capabilities';
   import { isNavItemActive, type NavItem } from '$lib/nav-items';
   let { children } = $props();
   const homeHref = resolve('/');
@@ -25,13 +27,22 @@
     routeId === '/' || routeId === '/roster' || routeId === '/multiplayer',
   );
   $effect(() => {
+    if (!browser) return;
+    initLiteMode();
+    initArenaSoundForLiteMode();
+  });
+  $effect(() => {
     if (!browser || isMultiplayerLobby) return;
-    void import('$lib/data').then(({ warmManifest }) => warmManifest());
+    if (isLiteMode()) return;
+    deferIdle(() => {
+      void import('$lib/data').then(({ warmManifest }) => warmManifest());
+    });
   });
   function isActive(item: NavItem): boolean {
     return isNavItemActive(item, routeId);
   }
   function warmForRoster(itemId: string): void {
+    if (isLiteMode()) return;
     if (itemId === 'roster') {
       void import('$lib/data').then(({ warmPlayersIndex }) => warmPlayersIndex());
     }
@@ -67,6 +78,7 @@
       </a>
       <div class="flex shrink-0 items-center gap-2">
         <ArenaSoundToggle />
+        <LiteModeToggle />
         {#if isUltimate}
           <a
             href={homeHref}
@@ -107,8 +119,6 @@
 {#if showBottomNav}
   <BottomNav items={navItems} label="Main navigation" onNavigate={warmForRoster} />
 {/if}
-
-<Toaster richColors closeButton theme="system" />
 
 <style>
   .havoc-header {

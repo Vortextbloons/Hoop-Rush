@@ -174,6 +174,7 @@ export const havocAuthoritativeChannelSchema = z.enum([
   'assist-anchor',
   'rebound-weights',
   'turnover-blend',
+  'offensive-allocation',
 ]);
 export type HavocAuthoritativeChannel = z.infer<typeof havocAuthoritativeChannelSchema>;
 

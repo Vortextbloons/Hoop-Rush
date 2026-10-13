@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { untrack } from 'svelte';
+  import { untrack, onDestroy } from 'svelte';
   import { resolve } from '$app/paths';
   import { Dialog } from 'bits-ui';
   import { X } from '@lucide/svelte';
@@ -15,6 +15,8 @@
   import { buildBlockLiveViewModel } from '$lib/season/season-block-live';
   import LiveSimModal from '$lib/components/season/LiveSimModal.svelte';
   import { SIM_BAR_FILL_MS } from '$lib/components/season/live-sim-animation';
+  import { DataThrottle, progressTickIntervalMs } from '$lib/throttle';
+  import { isLiteMode } from '$lib/device-capabilities';
   import { arenaBlockComplete, arenaError, arenaGameResult, arenaSimTick } from '$lib/arena-sound';
   const LEAGUE_FEED_SIZE = 3;
   let {
@@ -104,6 +106,27 @@
       ? Math.min(100, Math.round((block.gamesCompleted / block.gamesTotal) * 100))
       : 0,
   );
+  const simThrottle = new DataThrottle<number>((value) => {
+    displayPercent = value;
+  }, progressTickIntervalMs(isLiteMode()));
+  let displayPercent = $state(0);
+  let displayPhase = $state<BlockRunState['phase']>('idle');
+  $effect(() => {
+    const value = percent;
+    const phase = block.phase;
+    if (phase !== displayPhase) {
+      simThrottle.cancel();
+      displayPercent = value;
+      displayPhase = phase;
+      return;
+    }
+    if (phase !== 'running') {
+      displayPercent = value;
+    } else {
+      simThrottle.push(value);
+    }
+  });
+  onDestroy(() => simThrottle.cancel());
   const wins = $derived(block.humanRecordInBlock.wins);
   const losses = $derived(block.humanRecordInBlock.losses);
   const blockNum = $derived(block.blockIndex !== null ? block.blockIndex + 1 : null);
@@ -545,13 +568,13 @@
               ? `${String(block.gamesCompleted)} / ${String(block.gamesTotal)} games`
               : 'Starting…'}
           </span>
-          <span class="sr-number font-bold">{percent}%</span>
+          <span class="sr-number font-bold">{displayPercent}%</span>
         </div>
         <div class="sim-bar mt-2" aria-hidden="true">
           <div
             class="sim-bar-fill"
             data-active={isRunning}
-            style="width: {percent}%; transition: width {SIM_BAR_FILL_MS}ms linear"
+            style="width: {displayPercent}%; transition: width {SIM_BAR_FILL_MS}ms linear"
           ></div>
         </div>
         {#if live !== null && live.roundCompletion.length > 0}

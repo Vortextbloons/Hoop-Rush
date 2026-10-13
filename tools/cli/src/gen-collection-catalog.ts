@@ -1,3 +1,4 @@
+import { writeJsonRetry } from '@hoop-rush/importer';
 import { mkdirSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -8,6 +9,16 @@ import {
   collectionCatalogSchema,
   collectionIndexSchema,
   seasonDigestHex,
+  playerVersionId,
+  simulationRatingsSchema,
+  simulationTendenciesSchema,
+  simulationAnchorsSchema,
+  summaryRatingsSchema,
+  playerIdSchema,
+  franchiseIdSchema,
+  eraIdSchema,
+  seasonKeySchema,
+  reconstructedThreePointProfileSchema,
   type CollectionCatalog,
   type CollectionCardDefinition,
   type CollectionPackDefinition,
@@ -25,9 +36,11 @@ import {
   summaryRatingsOfRatings,
 } from '@hoop-rush/data-contracts';
 import { readJson, atomicWriteFileSync, sha256Hex } from './io.ts';
+import { z } from 'zod';
 import {
   COLLECTION_SPECIALS,
   COLLECTION_SPECIALS_VERSION as AUTHORED_SPECIALS_VERSION,
+  type AuthoredSpecial,
 } from './collection-specials.ts';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../');
@@ -36,6 +49,53 @@ const COLLECTION_DIR = resolve(STATIC_DATA, 'collection');
 const MANIFEST_PATH = resolve(STATIC_DATA, 'manifest.json');
 const IS_ENTRY =
   process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+function archivedSpecialSource(
+  special: AuthoredSpecial,
+  candidates: readonly SeasonDraftCandidate[],
+): SeasonDraftCandidate {
+  const sourceIdentity = z
+    .object({
+      playerId: playerIdSchema,
+      franchiseId: franchiseIdSchema,
+      eraId: eraIdSchema,
+      seasonKey: seasonKeySchema,
+    })
+    .parse(special.source);
+  const candidate = candidates.find(
+    (row) =>
+      row.playerId === special.source.playerId &&
+      row.franchiseId === special.source.franchiseId &&
+      row.eraId === special.source.eraId,
+  );
+  if (!candidate)
+    throw new Error(`No source identity for special ${special.sourcePlayerVersionId}`);
+  const identity = playerVersionId(
+    sourceIdentity.playerId,
+    sourceIdentity.franchiseId,
+    sourceIdentity.eraId,
+    sourceIdentity.seasonKey,
+  );
+  if (identity !== special.sourcePlayerVersionId)
+    throw new Error(`Special source identity mismatch ${special.sourcePlayerVersionId}`);
+  const roster = z
+    .array(z.looseObject({ externalId: z.string().nullable().optional() }))
+    .parse(readJson(resolve(REPO_ROOT, 'raw-data/nba', special.source.seasonKey, 'roster.json')));
+  const source = roster.find((row) => row.externalId === candidate.playerExternalId);
+  if (!source) throw new Error(`Missing archived special source ${special.sourcePlayerVersionId}`);
+  return {
+    ...candidate,
+    ...sourceIdentity,
+    playerVersionId: identity,
+    detailedRatings: simulationRatingsSchema.parse(source.ratings),
+    tendencies: simulationTendenciesSchema.parse(source.tendencies),
+    anchors: simulationAnchorsSchema.parse(source.anchors),
+    summaryRatings: summaryRatingsSchema.parse(source.summaryRatings),
+    reconstructedThreePoint: reconstructedThreePointProfileSchema
+      .optional()
+      .parse(source.reconstructedThreePoint),
+  };
+}
 
 export function rarityForOverall(overall: number): CollectionRarity {
   if (overall < 72) return 'Ember';
@@ -265,12 +325,10 @@ function main(): void {
     ...COLLECTION_SPECIALS.map((special) => ({ ...special, availability: 'active' as const })),
   ];
   for (const special of authoredSpecials) {
-    const source = sourceOverallByVersion.get(special.sourcePlayerVersionId);
-    if (source === undefined) {
-      throw new Error(
-        `special ${special.family}/${special.rarity} references missing source ${special.sourcePlayerVersionId}`,
-      );
-    }
+    const source =
+      sourceOverallByVersion.get(special.sourcePlayerVersionId) ??
+      archivedSpecialSource(special, candidates);
+    byVersion.set(source.playerVersionId, source);
     if (byVersion.get(special.sourcePlayerVersionId)?.playerId !== source.playerId) {
       throw new Error(`inconsistent identity for ${special.sourcePlayerVersionId}`);
     }
@@ -399,7 +457,7 @@ function main(): void {
     catalog: { url: 'collection/catalog.json', contentHash: catalogHash },
     index: { url: 'collection/index.json', contentHash: sha256Hex(indexContent) },
   };
-  atomicWriteFileSync(MANIFEST_PATH, `${JSON.stringify(fullManifest, null, 2)}\n`);
+  writeJsonRetry(MANIFEST_PATH, fullManifest, true);
   console.log(
     `wrote collection catalog (${String(parsed.data.cards.length)} cards, ${String(sets.length)} sets) hash ${catalogHash}`,
   );

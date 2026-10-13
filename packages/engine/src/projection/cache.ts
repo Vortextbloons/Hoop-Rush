@@ -1,4 +1,5 @@
 import { canonicalJson, seasonDigestHex } from '@hoop-rush/data-contracts';
+import { ENGINE_VERSION } from '../sim/constants.ts';
 import type {
   BaseFiveProjection,
   EraSimulationProfile,
@@ -74,6 +75,7 @@ export class ProjectionCache {
   }): string {
     return seasonDigestHex(
       JSON.stringify([
+        ENGINE_VERSION,
         input.eraId,
         input.modelVersion,
         input.referenceId,

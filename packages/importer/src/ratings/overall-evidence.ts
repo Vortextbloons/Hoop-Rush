@@ -3,6 +3,23 @@ import { overallSeasonEvidenceSchema, type OverallSeasonEvidence } from '@hoop-r
 import { fileExists, readJson } from '../json.ts';
 import { NBA_ROOT } from '../config.ts';
 import { z } from 'zod';
+import { postseasonEvidenceSchema, type PostseasonPlayerStats } from '@hoop-rush/data-contracts';
+
+export function loadPostseasonEvidence(season: string): {
+  players: Map<string, PostseasonPlayerStats>;
+  available: boolean;
+  missingPlayers: Set<string>;
+} {
+  const path = join(NBA_ROOT, season, 'postseason-stats.json');
+  if (!fileExists(path)) return { players: new Map(), available: false, missingPlayers: new Set() };
+  const evidence = postseasonEvidenceSchema.parse(readJson(path));
+  if (evidence.season !== season) throw new Error('Postseason evidence season mismatch');
+  return {
+    players: new Map(evidence.players.map((player) => [player.playerExternalId, player])),
+    available: evidence.status === 'available',
+    missingPlayers: new Set(evidence.coverage?.missingPlayerIds ?? []),
+  };
+}
 
 const trackingEvidenceSchema = z.object({
   defFgPct: z.number().min(0).max(1).nullable().optional(),

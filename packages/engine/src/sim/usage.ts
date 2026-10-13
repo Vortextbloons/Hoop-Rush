@@ -11,6 +11,7 @@ import { ENGINE_CONSTANTS, type PositionResponsibilityModifiers } from './consta
 import { sameGroupMatchWeight } from './position-responsibilities.ts';
 import { creationScore, interiorScoringScore, spacingScore } from '../domain/archetypes.ts';
 import { SHOT_ZONES } from '../domain/zones.ts';
+import { creationResponsibility } from './offense.ts';
 export type ActionType =
   'isolation' | 'pickAndRoll' | 'pickAndRollRoll' | 'postUp' | 'spotUp' | 'cut' | 'transition';
 export type PossessionStartType =
@@ -38,56 +39,11 @@ export interface ShotSelection {
   initiator: SimulationPlayer;
   passed: boolean;
 }
-export function lineupMeanUsage(team: SimulationTeam): number {
-  if (team.players.length === 0) return 10;
-  const total = team.players.reduce((sum, p) => sum + Math.max(0.5, p.tendencies.usageRate), 0);
-  return total / team.players.length;
-}
-const HIGH_USAGE_THRESHOLD = 23;
-const CONGESTION_GAP_SLOPE = 0.5;
-const CONGESTION_FLOOR = 0.7;
-export function usageCongestionScale(player: SimulationPlayer, team: SimulationTeam): number {
-  const highUsage = team.players.filter((p) => p.tendencies.usageRate >= HIGH_USAGE_THRESHOLD);
-  if (highUsage.length < 2 || player.tendencies.usageRate < HIGH_USAGE_THRESHOLD) return 1;
-  let top = 0;
-  for (const peer of highUsage) top = Math.max(top, peer.tendencies.usageRate);
-  if (!(top > 0)) return 1;
-  const gap = Math.max(0, (top - player.tendencies.usageRate) / top);
-  return Math.max(CONGESTION_FLOOR, 1 - CONGESTION_GAP_SLOPE * gap);
-}
-export function relativeUsage(player: SimulationPlayer, team: SimulationTeam): number {
-  const base =
-    Math.max(0.5, player.tendencies.usageRate) /
-    Math.max(1e-9, ENGINE_CONSTANTS.usageRoleReference);
-  return base * usageCongestionScale(player, team);
-}
-export function initiatorRole(player: SimulationPlayer, team: SimulationTeam): number {
-  const curved = Math.pow(
-    Math.max(1e-9, relativeUsage(player, team)),
-    ENGINE_CONSTANTS.initiatorRoleExponent,
-  );
-  return Math.min(
-    ENGINE_CONSTANTS.initiatorRoleMax,
-    Math.max(ENGINE_CONSTANTS.initiatorRoleMin, curved),
-  );
-}
-export function finisherRole(player: SimulationPlayer, team: SimulationTeam): number {
-  const curved = Math.pow(
-    Math.max(1e-9, relativeUsage(player, team)),
-    ENGINE_CONSTANTS.finisherRoleExponent,
-  );
-  return Math.min(
-    ENGINE_CONSTANTS.finisherRoleMax,
-    Math.max(ENGINE_CONSTANTS.finisherRoleMin, curved),
-  );
-}
 export function initiatorWeight(
   player: SimulationPlayer,
-  team: SimulationTeam,
   modifiers: PositionResponsibilityModifiers,
 ): number {
-  const creationMod = 0.7 + 0.6 * creationScore(player);
-  return initiatorRole(player, team) * creationMod * modifiers.initiation;
+  return creationResponsibility(player) * modifiers.initiation;
 }
 export function teamInitiatorWeights(
   team: SimulationTeam,
@@ -97,7 +53,6 @@ export function teamInitiatorWeights(
   return team.players.map((p) =>
     initiatorWeight(
       p,
-      team,
       positionModifiers.get(keyOf(p)) ?? positionModifiers.get(p.playerId) ?? identityModifiers,
     ),
   );
@@ -118,21 +73,17 @@ export function actionWeights(
   modifiers: PositionResponsibilityModifiers,
 ): number[] {
   const t = initiator.tendencies;
-  const ballDominance = Math.min(1, t.usageRate / 36);
   const transitionWeight = t.transitionRate * (0.5 + initiator.ratings.speed / 100);
-  const iso = t.isolationRate * (1 + 0.6 * ballDominance);
-  const pnr = t.pickAndRollBallHandlerRate * (1 + 0.5 * ballDominance) * modifiers.pnrHandler;
-  const post = t.postUpRate * (1 + 0.4 * ballDominance) * modifiers.postUp;
-  const passiveScale = 1 - 0.3 * ballDominance;
-  return [
-    iso,
-    pnr,
+  const weights = [
+    t.isolationRate,
+    t.pickAndRollBallHandlerRate * modifiers.pnrHandler,
     t.pickAndRollRollManRate * modifiers.rollMan,
-    post,
-    t.spotUpRate * passiveScale,
-    t.cutRate * passiveScale,
-    transitionWeight * passiveScale,
+    t.postUpRate * modifiers.postUp,
+    t.spotUpRate,
+    t.cutRate,
+    transitionWeight,
   ];
+  return weights.some((weight) => weight > 0) ? weights : ACTION_TYPES.map(() => 1);
 }
 export function pickAction(
   initiator: SimulationPlayer,
@@ -161,11 +112,7 @@ export function passProbability(initiator: SimulationPlayer, action: ActionType)
             : 0.17;
   const passingFactor =
     0.65 + initiator.tendencies.passRate / 100 + creationScore(initiator) * 0.15;
-  const creationFactor = 1.15 - initiator.tendencies.usageRate / 150;
-  return Math.min(
-    0.97,
-    Math.max(0.05, actionBase * 1.2 * passingFactor * Math.max(0.7, creationFactor)),
-  );
+  return Math.min(0.97, Math.max(0.05, actionBase * 1.2 * passingFactor));
 }
 export interface TeammateShotWeights {
   teammates: SimulationPlayer[];
@@ -173,8 +120,7 @@ export interface TeammateShotWeights {
   pickTable: WeightedPickTable;
 }
 export interface TeammateShots {
-  roll: TeammateShotWeights;
-  pass: TeammateShotWeights;
+  byAction: TeammateShotWeights[];
 }
 export function teammateShotWeights(
   team: SimulationTeam,
@@ -182,18 +128,22 @@ export function teammateShotWeights(
   action: ActionType,
   positionModifiers: ReadonlyMap<string, PositionResponsibilityModifiers>,
   keyOf: (player: SimulationPlayer) => string = (player) => player.playerId,
+  demandOf: (player: SimulationPlayer) => number,
 ): TeammateShotWeights {
   const initiatorKey = keyOf(initiator);
   const teammates = team.players.filter((p) => keyOf(p) !== initiatorKey);
-  const weights = teammates.map((p) =>
-    action === 'pickAndRollRoll'
-      ? Math.max(0.5, p.tendencies.pickAndRollRollManRate) *
-        (0.6 + 0.8 * interiorScoringScore(p)) *
-        (positionModifiers.get(keyOf(p))?.rollMan ??
-          positionModifiers.get(p.playerId)?.rollMan ??
-          1) *
-        finisherRole(p, team)
-      : Math.max(0.3, p.tendencies.shotRate * spacingWeight(p) * finisherRole(p, team)),
+  const weights = teammates.map(
+    (p) =>
+      demandOf(p) *
+      (action === 'pickAndRollRoll'
+        ? (0.5 + p.tendencies.pickAndRollRollManRate / 50) *
+          (0.6 + 0.4 * interiorScoringScore(p)) *
+          (positionModifiers.get(keyOf(p))?.rollMan ??
+            positionModifiers.get(p.playerId)?.rollMan ??
+            1)
+        : action === 'postUp'
+          ? 0.6 + 0.4 * interiorScoringScore(p)
+          : spacingWeight(p)),
   );
   return { teammates, weights, pickTable: buildWeightedPickTable(weights) };
 }
@@ -211,71 +161,14 @@ export function pickShot(
   if (!rng.chance(pass)) {
     return { shooter: initiator, initiator, passed: false };
   }
-  const selected = action === 'pickAndRollRoll' ? shots.roll : shots.pass;
+  const selected = shots.byAction[ACTION_INDEX[action]];
+  if (selected === undefined) throw new Error(`missing finishing distribution for ${action}`);
   if (selected.teammates.length === 0) return { shooter: initiator, initiator, passed: false };
   return {
     shooter: rng.weightedPick(selected.teammates, selected.pickTable),
     initiator,
     passed: true,
   };
-}
-function assisterCandidatesOf(
-  team: SimulationTeam,
-  shooter: SimulationPlayer,
-  keyOf: (player: SimulationPlayer) => string,
-): SimulationPlayer[] {
-  const shooterKey = keyOf(shooter);
-  return team.players.filter((p) => keyOf(p) !== shooterKey);
-}
-function assisterWeightOf(
-  p: SimulationPlayer,
-  initiator: SimulationPlayer,
-  keyOf: (player: SimulationPlayer) => string,
-  evidence?: HavocEvidence,
-): number {
-  const observedCreation = evidence?.isAuthoritative('assist-anchor')
-    ? undefined
-    : p.anchors?.assistsPerGame;
-  const roleWeight =
-    observedCreation === undefined
-      ? Math.max(0.5, p.tendencies.passRate / 5)
-      : Math.max(0.5, observedCreation + 1);
-  const passingWeight = 0.7 + p.ratings.passing / 100;
-  const creationMod = 0.75 + 0.5 * creationScore(p);
-  const initiatorBonus = keyOf(p) === keyOf(initiator) ? 1.35 : 1;
-  return roleWeight * passingWeight * creationMod * initiatorBonus;
-}
-export function assisterWeights(
-  team: SimulationTeam,
-  shooter: SimulationPlayer,
-  initiator: SimulationPlayer,
-  keyOf: (player: SimulationPlayer) => string = (player) => player.playerId,
-  evidenceOf?: (player: SimulationPlayer) => HavocEvidence | undefined,
-): number[] {
-  return assisterCandidatesOf(team, shooter, keyOf).map((p) =>
-    assisterWeightOf(p, initiator, keyOf, evidenceOf?.(p)),
-  );
-}
-export interface AssisterPickPrep {
-  candidates: SimulationPlayer[];
-  pickTable: WeightedPickTable;
-}
-export function assisterPickPrep(
-  team: SimulationTeam,
-  shooter: SimulationPlayer,
-  initiator: SimulationPlayer,
-  keyOf: (player: SimulationPlayer) => string = (player) => player.playerId,
-  evidenceOf?: (player: SimulationPlayer) => HavocEvidence | undefined,
-): AssisterPickPrep {
-  const candidates = assisterCandidatesOf(team, shooter, keyOf);
-  return {
-    candidates,
-    pickTable: buildWeightedPickTable(assisterWeights(team, shooter, initiator, keyOf, evidenceOf)),
-  };
-}
-export function pickAssister(prep: AssisterPickPrep, rng: Rng): SimulationPlayer | null {
-  if (prep.candidates.length === 0) return null;
-  return rng.weightedPick(prep.candidates, prep.pickTable);
 }
 function defenderWeight(defender: SimulationPlayer, zone: ShotZone): number {
   const zoneRating =

@@ -11,8 +11,8 @@ export const calibrateCommands: CommandSpec[] = [
   {
     name: 'calibrate overall',
     options: { output: 'string' },
-    help: `  calibrate overall      Freeze the total-ability Overall scale from qualified
-                         1996�97 through 2024�25 source seasons.
+    help: `  calibrate overall      Freeze the Overall scale from unique player peaks
+                         across all supported NBA seasons.
                           --output <path>  Ratings model artifact`,
     run: (args) => calibrateOverall(s(args, 'output')),
   },

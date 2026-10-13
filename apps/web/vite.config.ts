@@ -39,6 +39,16 @@ export default defineConfig({
     include: ['bits-ui', '@supabase/supabase-js', 'dexie'],
     exclude: ['@hoop-rush/engine', '@hoop-rush/data-contracts', '@hoop-rush/persistence'],
   },
+  environments: {
+    // SSR dep optimization has dependency discovery disabled, so a barrel package
+    // like @lucide/svelte must be listed explicitly or every icon module (~2000)
+    // is resolved and transformed on the first SSR request.
+    ssr: {
+      optimizeDeps: {
+        include: ['@lucide/svelte'],
+      },
+    },
+  },
   build: {
     rollupOptions: {
       output: {

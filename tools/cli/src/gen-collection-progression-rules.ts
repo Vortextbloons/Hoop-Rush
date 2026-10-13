@@ -1,3 +1,4 @@
+import { writeJsonRetry } from '@hoop-rush/importer';
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -76,7 +77,7 @@ export function main(): void {
     ...fullManifest.collection,
     progressionRules: { url: 'collection/progression-rules.json', contentHash: hash },
   };
-  atomicWriteFileSync(MANIFEST_PATH, `${JSON.stringify(fullManifest, null, 2)}\n`);
+  writeJsonRetry(MANIFEST_PATH, fullManifest, true);
   console.log(
     `wrote collection progression rules (${rules.progressionVersion}) · ${String(rules.challenges.length)} challenges · ${String(rules.setRewards.length)} set rewards · catalog ${catalogHash} · hash ${hash}`,
   );

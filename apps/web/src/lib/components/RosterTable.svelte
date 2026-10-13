@@ -183,6 +183,7 @@
                 }
               }}
               class="cursor-pointer border-b border-border/40 transition-colors last:border-b-0 hover:bg-surface-2 group"
+              data-virtual-row
             >
               <td class="sticky left-0 z-10 bg-card px-2 py-3 group-hover:bg-surface-2">
                 <label class="flex cursor-pointer items-center justify-center">
@@ -253,7 +254,7 @@
     {:else}
       {@const player = item.player}
       {@const mobileTeamExternalId = teamSlotFor(player)}
-      <li>
+      <li data-virtual-row>
         <div
           role="button"
           tabindex="0"

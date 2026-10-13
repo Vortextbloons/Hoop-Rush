@@ -6,13 +6,11 @@ import type {
 import {
   ACTION_TYPES,
   actionWeights,
-  assisterPickPrep,
   defenderBase,
   passProbability,
   teamInitiatorWeights,
   teammateShotWeights,
   zonePrep,
-  type AssisterPickPrep,
   type DefenderBase,
   type TeammateShots,
   type ZonePrep,
@@ -24,7 +22,8 @@ import { defenderPressure, stealerWeights } from './security.ts';
 import { rebounderWeights, teamMean } from './rebounding.ts';
 import { foulerWeights, freeThrowProbability, freeThrowShooterWeights } from './fouls.ts';
 import { responsibilityModifiersForSlot } from './position-responsibilities.ts';
-import { type PositionResponsibilityModifiers } from './constants.ts';
+import { ENGINE_CONSTANTS, type PositionResponsibilityModifiers } from './constants.ts';
+import { finishingDemand, OFFENSIVE_ALLOCATION_VERSION, type FinishingDemand } from './offense.ts';
 export function enginePlayerKey(player: SimulationPlayer): string {
   return player.playerVersionId ?? player.playerId;
 }
@@ -43,13 +42,18 @@ export interface TeamPrepOptions {
   reboundMeanReach?: (player: SimulationPlayer) => number;
 }
 export interface TeamPrep {
+  offense: {
+    version: string;
+    demands: FinishingDemand[];
+    creatorShares: number[];
+    shotShares: number[];
+  };
   slotByPlayerId: Map<string, number>;
   keyOf: (player: SimulationPlayer) => string;
   initiatorWeights: number[];
   initiatorPickTable: WeightedPickTable;
   actionWeights: Map<string, number[]>;
   teammateShots: Map<string, TeammateShots>;
-  assisterByPair: Map<string, AssisterPickPrep>;
   rebounderWeights: [number[], number[]];
   rebounderPickTables: [WeightedPickTable, WeightedPickTable];
   foulerWeights: number[];
@@ -85,7 +89,6 @@ export function prepareTeam(
   const twoPointAnchorByPlayer = new Map<string, number | null>();
   const passPByPlayer = new Map<string, number[]>();
   const positionModifiersByPlayer = new Map<string, PositionResponsibilityModifiers>();
-  const assisterByPair = new Map<string, AssisterPickPrep>();
   const freeThrowP: number[] = [];
   let pressureTotal = 0;
   let stealTotal = 0;
@@ -98,32 +101,73 @@ export function prepareTeam(
     positionModifiersByPlayer.set(key, positionModifiers);
     positionModifiersByPlayer.set(player.playerId, positionModifiers);
     actionWeightsByPlayer.set(key, actionWeights(player, positionModifiers));
-    passPByPlayer.set(
-      key,
-      ACTION_TYPES.map((action) => passProbability(player, action)),
-    );
     freeThrowP.push(freeThrowProbability(player, profile, evidence));
-    teammateShotsByPlayer.set(key, {
-      roll: teammateShotWeights(team, player, 'pickAndRollRoll', positionModifiersByPlayer, keyOf),
-      pass: teammateShotWeights(team, player, 'spotUp', positionModifiersByPlayer, keyOf),
-    });
     const prep = zonePrep(player, profile, evidence);
     zonePrepByPlayer.set(key, prep);
     twoPointAnchorByPlayer.set(key, twoPointAnchorFactor(player, profile, prep.blend, evidence));
     pressureTotal += defenderPressure(player);
     stealTotal += player.ratings.steal;
   });
-  for (const shooter of players) {
-    for (const initiator of players) {
-      if (keyOf(shooter) === keyOf(initiator)) continue;
-      assisterByPair.set(
-        `${keyOf(shooter)}\u0000${keyOf(initiator)}`,
-        assisterPickPrep(team, shooter, initiator, keyOf, evidenceOf),
-      );
-    }
-  }
+  const demands = players.map((player) => finishingDemand(player, evidenceOf?.(player)));
+  const demandByKey = new Map(
+    players.map((player, index) => [
+      keyOf(player),
+      demands[index]?.attemptsPer36 ?? ENGINE_CONSTANTS.offensiveAllocation.minimumDemand,
+    ]),
+  );
+  players.forEach((player, index) => {
+    const key = keyOf(player);
+    const byAction = ACTION_TYPES.map((action) =>
+      teammateShotWeights(
+        team,
+        player,
+        action,
+        positionModifiersByPlayer,
+        keyOf,
+        (receiver) =>
+          demandByKey.get(keyOf(receiver)) ?? ENGINE_CONSTANTS.offensiveAllocation.minimumDemand,
+      ),
+    );
+    teammateShotsByPlayer.set(key, { byAction });
+    passPByPlayer.set(
+      key,
+      ACTION_TYPES.map((action, actionIndex) => {
+        const stylePass = passProbability(player, action);
+        const self =
+          ((demands[index]?.attemptsPer36 ?? 0.5) *
+            Math.max(1, players.length - 1) *
+            (1 - stylePass)) /
+          stylePass;
+        const peers = byAction[actionIndex]?.weights.reduce((sum, weight) => sum + weight, 0) ?? 0;
+        return peers / Math.max(1e-9, self + peers);
+      }),
+    );
+  });
   const divisor = options.aggregateDivisor ?? players.length;
   const initiatorWeights = teamInitiatorWeights(team, positionModifiersByPlayer, keyOf);
+  const creatorTotal = initiatorWeights.reduce((sum, weight) => sum + weight, 0);
+  const creatorShares = initiatorWeights.map((weight) => weight / Math.max(1e-9, creatorTotal));
+  const shotShares = players.map(() => 0);
+  players.forEach((player, index) => {
+    const key = keyOf(player);
+    const actions = actionWeightsByPlayer.get(key) ?? [];
+    const total = actions.reduce((sum, weight) => sum + weight, 0);
+    ACTION_TYPES.forEach((_, actionIndex) => {
+      const mass =
+        ((creatorShares[index] ?? 0) * (actions[actionIndex] ?? 0)) / Math.max(1e-9, total);
+      const pass = passPByPlayer.get(key)?.[actionIndex] ?? 0;
+      shotShares[index] = (shotShares[index] ?? 0) + mass * (1 - pass);
+      const receivers = teammateShotsByPlayer.get(key)?.byAction[actionIndex];
+      const receiverTotal = receivers?.weights.reduce((sum, weight) => sum + weight, 0) ?? 0;
+      receivers?.teammates.forEach((receiver, receiverIndex) => {
+        const slot = slotByPlayerId.get(keyOf(receiver));
+        if (slot === undefined) return;
+        shotShares[slot] =
+          (shotShares[slot] ?? 0) +
+          (mass * pass * (receivers.weights[receiverIndex] ?? 0)) / Math.max(1e-9, receiverTotal);
+      });
+    });
+  });
   const offensiveRebounderWeights = rebounderWeights(
     team,
     true,
@@ -144,13 +188,13 @@ export function prepareTeam(
   const teamFreeThrowShooterWeights = freeThrowShooterWeights(team);
   const teamStealerWeights = stealerWeights(team);
   return {
+    offense: { version: OFFENSIVE_ALLOCATION_VERSION, demands, creatorShares, shotShares },
     slotByPlayerId,
     keyOf,
     initiatorWeights,
     initiatorPickTable: buildWeightedPickTable(initiatorWeights),
     actionWeights: actionWeightsByPlayer,
     teammateShots: teammateShotsByPlayer,
-    assisterByPair,
     rebounderWeights: [offensiveRebounderWeights, defensiveRebounderWeights],
     rebounderPickTables: [
       buildWeightedPickTable(offensiveRebounderWeights),

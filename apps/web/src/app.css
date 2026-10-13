@@ -650,3 +650,48 @@
     transition: none !important;
   }
 }
+
+/* Lite mode: engaged on low-end devices (see src/lib/device-capabilities.ts)
+   or via the manual toggle. It drops compositor-heavy effects that cost real
+   frames on low-end GPUs: backdrop filters, large soft shadows, and ambient
+   looping animations. Layout and color are unchanged. */
+[data-lite] [class*='backdrop-blur'] {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+[data-lite] [class*='shadow-'] {
+  box-shadow: none !important;
+}
+
+[data-lite] [class*='animate-'] {
+  animation: none !important;
+}
+
+[data-lite] .sim-live-dot,
+[data-lite] .sim-bar-fill,
+[data-lite] .draft-card-enter,
+[data-lite] .draft-jumbo,
+[data-lite] .draft-roster-enter,
+[data-lite] .draft-just-picked,
+[data-lite] .sim-ticker-card,
+[data-lite] .sim-spot-badge {
+  animation: none !important;
+}
+
+[data-lite] .sim-bar-fill {
+  transition: none !important;
+}
+
+[data-lite] {
+  scroll-behavior: auto;
+}
+
+[data-lite] [data-virtual-row] {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 4.5rem;
+}
+
+[data-lite] .sr-hide-lite {
+  display: none !important;
+}

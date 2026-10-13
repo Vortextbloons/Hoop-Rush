@@ -23,6 +23,7 @@ import { projectExpectedLedger, type LedgerSide } from './expected-ledger.ts';
 import { resolveReference } from './reference-lineups.ts';
 import { identifyWeaknesses } from './weaknesses.ts';
 import { normalizeValue } from './normalize.ts';
+import { ENGINE_VERSION } from '../sim/constants.ts';
 const referenceTeamCache = new WeakMap<readonly SimulationPlayer[], SimulationTeam>();
 function referenceTeamOf(reference: ProjectionReferenceFive): SimulationTeam {
   let team = referenceTeamCache.get(reference.players);
@@ -221,6 +222,7 @@ function inputMaterial(input: BaseFiveProjectionInput, referenceId: string): str
     .sort((a, b) => (a.slot < b.slot ? -1 : 1));
   return JSON.stringify({
     modelVersion: input.model.modelVersion,
+    engineVersion: ENGINE_VERSION,
     referenceId,
     eraId: input.eraProfile.eraId,
     eraProfileVersion: input.eraProfile.profileVersion,

@@ -84,6 +84,8 @@ export const simDiagnoseReportSchema = z.object({
       pointsPerGame: z.number(),
       usagePerGame: z.number(),
       usageShare: z.number(),
+      teamId: z.string().min(1).max(64),
+      side: z.enum(['home', 'away']),
       fieldGoalPct: z.number(),
       threePointRate: z.number(),
       freeThrowRate: z.number(),
