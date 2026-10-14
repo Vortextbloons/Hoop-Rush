@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Dialog } from 'bits-ui';
   import GameScoreboard from '#lib/components/GameScoreboard.svelte';
-  import LiveSimModal from '#lib/components/season/LiveSimModal.svelte';
+  import LiveSimModal from '#lib/components/LiveSimModal.svelte';
   import type { CollectionGameRecordUnion } from '@hoop-rush/data-contracts';
   import GamecastCourt from './GamecastCourt.svelte';
   import { clockLabel, quickCastEvents, QUICK_CAST_BEAT_MS } from './collection-gamecast';

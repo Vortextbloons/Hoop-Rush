@@ -25,7 +25,8 @@ import {
 } from '@hoop-rush/engine';
 import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.ts';
 import { collectionProgressionAuditReportSchema } from '../report-schemas.ts';
-import { DEFAULT_MANIFEST, readJsonFile, sha256Hex } from './season-data.ts';
+import { DEFAULT_MANIFEST } from './data-loader.ts';
+import { readJson as readJsonFile, sha256Hex } from '../io.ts';
 import { loadCollectionCatalog } from './collection.ts';
 
 export const COLLECTION_PROGRESSION_AUDIT_PLAYER_SAMPLES = 8;

@@ -9,7 +9,7 @@ const RETRY_POLICY: SubmissionPolicy = {
 };
 
 const SURFACE_POLICY: SubmissionPolicy = {
-  intent: 'season-command',
+  intent: 'collection-command',
   conflict: 'surface',
   maxAttempts: 1,
   requiresDigest: true,

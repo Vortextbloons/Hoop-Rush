@@ -53,17 +53,7 @@ export const hoopRushManifestSchema = z.object({
   bracket: opponentIndexEntrySchema.optional(),
   playersIndex: playersIndexAssetSchema.optional(),
   rosterDetails: playersIndexAssetSchema.optional(),
-  season: z
-    .object({
-      league: seasonArtifactIndexEntrySchema,
-      schedule: seasonArtifactIndexEntrySchema,
-      draftCatalog: seasonArtifactIndexEntrySchema,
-      rosterTargets: seasonArtifactIndexEntrySchema,
-      freeAgencyIndex: seasonArtifactIndexEntrySchema.optional(),
-      freeAgencyTargets: seasonArtifactIndexEntrySchema.optional(),
-      sponsorsIndex: seasonArtifactIndexEntrySchema.optional(),
-    })
-    .optional(),
+  draftCatalog: seasonArtifactIndexEntrySchema.optional(),
   projection: z
     .object({
       model: seasonArtifactIndexEntrySchema,

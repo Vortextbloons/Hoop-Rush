@@ -3,12 +3,11 @@
   import { asset, resolve } from '$app/paths';
   import type { RouteId } from '$app/types';
   import type { ClassicDraftState, HoopRushManifest } from '@hoop-rush/data-contracts';
-  import type { SeasonActiveRunIndex } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
   import { getManifest, warmPlayersIndex } from '#lib/data.js';
-  import SeasonTierBadge from '#lib/components/SeasonTierBadge.svelte';
+  import TierBadge from '#lib/components/TierBadge.svelte';
   import { variantLabel } from '#lib/draft-presentation.js';
-  import { eraName } from '#lib/season/season-branding.js';
+  import { eraName } from '#lib/branding.js';
   import type { ActiveRunCheckpoint, CompletedRunIndex } from '@hoop-rush/persistence';
   const sandboxHref = resolve('sandbox/');
   const historyHref = resolve('sandbox/history/');
@@ -40,14 +39,6 @@
     },
     {
       code: '04',
-      name: 'Season Run',
-      line: '10-round draft. Build 10, then play 82 games.',
-      status: 'available',
-      cta: 'Start season run',
-      href: '/season' as any,
-    },
-    {
-      code: '05',
       name: 'Ultimate Run',
       line: 'Claim a starter, open seeded packs, grow one permanent collection.',
       status: 'available',
@@ -59,8 +50,7 @@
   let active = $state.raw<ActiveRunCheckpoint | null>(null);
   let classicDraft = $state.raw<ClassicDraftState | null>(null);
   let recent = $state.raw<CompletedRunIndex[]>([]);
-  let seasonRun = $state.raw<SeasonActiveRunIndex | null>(null);
-  const playersIndexHrefs = new Set(['/classic', '/sandbox', '/season']);
+  const playersIndexHrefs = new Set(['/classic', '/sandbox']);
   function warmPlayersIndexForMode(modeHref: string): void {
     if (!playersIndexHrefs.has(modeHref)) return;
     if (
@@ -106,13 +96,6 @@
           },
           () => {},
         );
-      import('#lib/season/season-repo.js')
-        .then(({ getSeasonRunRepository }) => getSeasonRunRepository())
-        .then((repo) => repo.loadActiveRunIndex())
-        .then((index) => {
-          if (!cancelled) seasonRun = index;
-        })
-        .catch(() => {});
     });
     return () => {
       cancelled = true;
@@ -168,14 +151,6 @@
         class="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-6 py-3 font-semibold transition-colors hover:border-line-strong"
       >
         Continue draft · R{classicDraft.round}/5
-      </a>
-    {/if}
-    {#if seasonRun}
-      <a
-        href={resolve('season/run/')}
-        class="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-6 py-3 font-semibold transition-colors hover:border-line-strong"
-      >
-        Continue season · {seasonRun.humanWins}–{seasonRun.humanLosses}
       </a>
     {/if}
   </div>
@@ -283,7 +258,7 @@
                 <span class="text-stat text-3xl font-extrabold tracking-tight">
                   {row.wins}<span class="text-muted-foreground">–</span>{row.losses}
                 </span>
-                <SeasonTierBadge wins={row.wins} />
+                <TierBadge wins={row.wins} />
               </span></a
             >
           </li>

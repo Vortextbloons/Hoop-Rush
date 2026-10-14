@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { HoopRushManifest } from '@hoop-rush/data-contracts';
-  import { teamLabelFor, teamNameFor } from '#lib/season/season-branding.js';
+  import { teamLabelFor, teamNameFor } from '#lib/branding.js';
   import type { RosterDetailRow } from '#lib/roster-browser.js';
   import { formatPositions } from '#lib/player-positions.js';
   import { oneDecimal, percentOneDecimal } from '#lib/format.js';

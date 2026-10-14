@@ -7,7 +7,7 @@
   import type { HoopRushManifest } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
   import { variantLabel } from '#lib/draft-presentation.js';
-  import { eraName } from '#lib/season/season-branding.js';
+  import { eraName } from '#lib/branding.js';
   let {
     manifest,
     rows,

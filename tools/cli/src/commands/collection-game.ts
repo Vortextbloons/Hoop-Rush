@@ -49,7 +49,8 @@ import {
   collectionGameReproduceReportSchema,
 } from '../report-schemas.ts';
 import { COLLECTION_GAME_CPU_LEGACY_WEIGHTS } from '../collection-game-constants.ts';
-import { DEFAULT_MANIFEST, readJsonFile, sha256Hex } from './season-data.ts';
+import { DEFAULT_MANIFEST } from './data-loader.ts';
+import { readJson as readJsonFile, sha256Hex } from '../io.ts';
 import { loadCollectionCatalog } from './collection.ts';
 
 const FIXED_ROOT_SEED = 'c04c3c71061eca4c71061eca4c71061e';

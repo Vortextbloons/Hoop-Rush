@@ -15,7 +15,7 @@ import { getManifest } from '#lib/data.js';
 import { newRequestId, newSeasonId, seasonRootSeed } from '#lib/ids.js';
 import { getPersistence } from '#lib/persistence.js';
 import { loadRunPreamble } from '#lib/run-preamble.js';
-import { loadSeasonDraftCatalog } from '#lib/season/season-assets.js';
+import { loadDraftCatalog } from '#lib/data-assets.js';
 import { HavocRunner } from './havoc-runner';
 
 export interface CreateHavocServiceOptions {
@@ -33,7 +33,7 @@ export function createHavocService(options: CreateHavocServiceOptions = {}): Hav
     repository: options.repository ?? getPersistence().havocRepository,
     runner: options.runner ?? new HavocRunner(),
     assets: {
-      loadCatalog: options.loadCatalog ?? loadSeasonDraftCatalog,
+      loadCatalog: options.loadCatalog ?? loadDraftCatalog,
       loadPreamble: options.loadPreamble ?? loadRunPreamble,
       loadManifest: options.loadManifest ?? getManifest,
     },

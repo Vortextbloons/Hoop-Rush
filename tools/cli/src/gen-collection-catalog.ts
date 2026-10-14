@@ -269,13 +269,11 @@ function specialSummaryRatings(
 function main(): void {
   const manifest = readJson(MANIFEST_PATH) as {
     dataVersion: string;
-    season?: {
-      draftCatalog?: { url?: string; contentHash?: string };
-    };
+    draftCatalog?: { url?: string; contentHash?: string };
   };
-  const draftRef = manifest.season?.draftCatalog;
+  const draftRef = manifest.draftCatalog;
   if (draftRef?.url === undefined || draftRef.contentHash === undefined) {
-    throw new Error('manifest is missing season.draftCatalog; run the season pipeline first');
+    throw new Error('manifest is missing draftCatalog; run the import pipeline first');
   }
   const draftPath = resolve(dirname(MANIFEST_PATH), draftRef.url);
   const draftRaw = readJson(draftPath) as { candidates?: SeasonDraftCandidate[] };

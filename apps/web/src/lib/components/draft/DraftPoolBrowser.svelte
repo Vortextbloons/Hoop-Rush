@@ -9,7 +9,7 @@
   import { untrack } from 'svelte';
   import { Search } from '@lucide/svelte';
   import { lowercaseName } from '#lib/roster-browser.js';
-  import { teamLabelFor } from '#lib/season/season-branding.js';
+  import { teamLabelFor } from '#lib/branding.js';
   import {
     FIT_NEED_META,
     FIT_TIER_META,

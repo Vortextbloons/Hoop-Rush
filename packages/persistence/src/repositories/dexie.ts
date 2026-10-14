@@ -18,22 +18,6 @@ import {
   type CompletedRunIndex,
   type StoredRunRecord,
 } from '../schemas/run-record.ts';
-import type { StoredSeasonDraft } from '../schemas/season-draft-record.ts';
-import type {
-  StoredSeasonAcceptedBlockRow,
-  StoredSeasonActiveRunIndex,
-  StoredSeasonAlmanacRow,
-  StoredSeasonCommandLogRow,
-  StoredSeasonCompletedIndex,
-  StoredSeasonCompletedRunRow,
-  StoredSeasonDetailRow,
-  StoredSeasonPendingBlockRow,
-  StoredSeasonPlayerSliceRow,
-  StoredSeasonPostseasonDetailRow,
-  StoredSeasonPostseasonSummaryRow,
-  StoredSeasonRunRecord,
-  StoredSeasonSummaryRow,
-} from '../schemas/season-run-record.ts';
 import type {
   StoredFixedFiveActive,
   StoredFixedFiveCommandRow,
@@ -125,20 +109,6 @@ export class HoopRushDatabase extends Dexie {
   completed!: EntityTable<StoredRunRecord, 'recordId'>;
   history!: EntityTable<CompletedRunIndex, 'recordId'>;
   classicDrafts!: EntityTable<StoredClassicDraft, 'recordId'>;
-  seasonDrafts!: EntityTable<StoredSeasonDraft, 'recordId'>;
-  seasonRuns!: EntityTable<StoredSeasonRunRecord, 'recordId'>;
-  seasonRunSummaries!: Table<StoredSeasonSummaryRow, [string, string]>;
-  seasonRunDetails!: Table<StoredSeasonDetailRow, [string, string]>;
-  seasonRunBlocks!: Table<StoredSeasonAcceptedBlockRow, [string, number]>;
-  seasonRunIndex!: EntityTable<StoredSeasonActiveRunIndex, 'recordId'>;
-  seasonPendingBlocks!: EntityTable<StoredSeasonPendingBlockRow, 'runId'>;
-  seasonPostseasonSummaries!: Table<StoredSeasonPostseasonSummaryRow, [string, string]>;
-  seasonPostseasonDetails!: Table<StoredSeasonPostseasonDetailRow, [string, string]>;
-  seasonCommandLog!: Table<StoredSeasonCommandLogRow, [string, number]>;
-  seasonAlmanacs!: EntityTable<StoredSeasonAlmanacRow, 'runId'>;
-  seasonCompletedRuns!: EntityTable<StoredSeasonCompletedRunRow, 'runId'>;
-  seasonCompletedIndex!: EntityTable<StoredSeasonCompletedIndex, 'recordId'>;
-  seasonRunPlayerSlices!: EntityTable<StoredSeasonPlayerSliceRow, 'runId'>;
   fixedFiveActive!: EntityTable<StoredFixedFiveActive, 'roomId'>;
   fixedFiveCommands!: Table<StoredFixedFiveCommandRow, [string, number]>;
   fixedFivePendingResults!: EntityTable<StoredFixedFivePendingResult, 'roomId'>;

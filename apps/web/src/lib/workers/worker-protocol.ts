@@ -1,8 +1,3 @@
-import {
-  SEASON_WORKER_WIRE_SCHEMA_VERSION,
-  type SeasonWorkerErrorMessage,
-} from '@hoop-rush/data-contracts';
-
 export function postWorkerMessage<Output>(
   schema: { parse: (value: unknown) => Output },
   message: Output,
@@ -24,20 +19,4 @@ export function normalizeShared82SimulationError(message: string): string {
     /^shared82 (?:p1|p2) game (\d+) failed invariants$/,
     'shared82 game $1 failed invariants',
   );
-}
-
-export function seasonWorkerInternalError(
-  requestId: string,
-  message: string,
-): SeasonWorkerErrorMessage {
-  return {
-    schemaVersion: SEASON_WORKER_WIRE_SCHEMA_VERSION,
-    type: 'season-block-error',
-    requestId,
-    code: 'internal',
-    message: message.slice(0, 512),
-    seed: null,
-    gameId: null,
-    blockIndex: null,
-  };
 }

@@ -23,7 +23,8 @@ import {
   collectionPackAuditReportSchema,
   collectionPullReproduceReportSchema,
 } from '../report-schemas.ts';
-import { DEFAULT_MANIFEST, readJsonFile, sha256Hex } from './season-data.ts';
+import { DEFAULT_MANIFEST } from './data-loader.ts';
+import { readJson as readJsonFile, sha256Hex } from '../io.ts';
 
 export function loadCollectionCatalog(
   manifestPath: string = DEFAULT_MANIFEST,

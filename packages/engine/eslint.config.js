@@ -61,9 +61,9 @@ export default tseslint.config(
   },
   {
     files: [
-      'src/season/**',
       'src/sim/**',
       'src/domain/**',
+      'src/game/**',
       'src/projection/**',
       'src/modes/**',
       'src/bracket/**',

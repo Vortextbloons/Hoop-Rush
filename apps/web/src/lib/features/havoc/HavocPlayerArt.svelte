@@ -4,7 +4,7 @@
   import { getManifest, getPlayersIndex } from '#lib/data.js';
   import PlayerFace from '#lib/components/PlayerFace.svelte';
   import TeamLogo from '#lib/components/TeamLogo.svelte';
-  import { initialsOf } from '#lib/season/season-branding.js';
+  import { initialsOf } from '#lib/branding.js';
 
   let {
     playerId,

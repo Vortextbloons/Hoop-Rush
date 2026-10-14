@@ -13,7 +13,7 @@
   import { challengeRepository } from './challenge-repo';
   import { loadRunPlayersById } from './sandbox-lineup';
   import { arenaBlockComplete } from '#lib/arena-sound.js';
-  import SeasonReport from '#lib/components/SeasonReport.svelte';
+  import ChallengeReport from '#lib/components/ChallengeReport.svelte';
   import AsyncState from '#lib/components/AsyncState.svelte';
   let {
     mode,
@@ -180,7 +180,7 @@
       <AsyncState kind="loading" title="Loading result" message="Reading the completed run…" />
     </div>
   {:else}
-    <SeasonReport
+    <ChallengeReport
       {manifest}
       {run}
       {byId}

@@ -739,7 +739,7 @@ export class HavocSession implements HavocService {
 
   private async buildAssets(): Promise<HavocAssets> {
     const manifest = await this.assets.loadManifest();
-    const catalogEntry = manifest.season?.draftCatalog;
+    const catalogEntry = manifest.draftCatalog;
     const profileEntry = manifest.eraSimulationProfiles.find((entry) => entry.eraId === '2010s');
     const bracketEntry = manifest.bracket;
     if (catalogEntry === undefined || profileEntry === undefined || bracketEntry === undefined) {

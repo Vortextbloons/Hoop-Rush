@@ -15,7 +15,7 @@ import {
   REGULATION_PERIOD_SECONDS,
   REGULATION_TOTAL_SECONDS,
 } from '../sim/clock.ts';
-import { sameUnit } from '../season/season-game.ts';
+import { sameUnit } from '../game/controller.ts';
 import { verifyDifficultyRatingAdjustments } from './difficulty.ts';
 import {
   collectionGameEventDigest,

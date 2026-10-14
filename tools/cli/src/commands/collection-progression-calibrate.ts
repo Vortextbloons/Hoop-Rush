@@ -66,8 +66,8 @@ import {
   resolveCountCalibrationArgs,
   validateTargetsArtifact,
 } from '../calibration/index.ts';
-import { atomicWriteFileSync } from '../io.ts';
-import { DEFAULT_MANIFEST, readJsonFile, sha256Hex } from './season-data.ts';
+import { DEFAULT_MANIFEST } from './data-loader.ts';
+import { atomicWriteFileSync, readJson as readJsonFile, sha256Hex } from '../io.ts';
 import { loadCollectionCatalog } from './collection.ts';
 import { loadCollectionGameRules } from './collection-game.ts';
 import { loadCollectionProgressionRules } from './collection-progression.ts';

@@ -11,7 +11,7 @@
     type RosterDetailRow,
   } from '#lib/roster-browser.js';
   import { formatPositions } from '#lib/player-positions.js';
-  import { teamNameFor } from '#lib/season/season-branding.js';
+  import { teamNameFor } from '#lib/branding.js';
   import PlayerFace from './PlayerFace.svelte';
   let {
     player,

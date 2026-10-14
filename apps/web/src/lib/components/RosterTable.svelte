@@ -12,7 +12,7 @@
     type RosterSortDirection,
     type RosterSortId,
   } from '#lib/roster-browser.js';
-  import { teamLabelFor } from '#lib/season/season-branding.js';
+  import { teamLabelFor } from '#lib/branding.js';
   import { formatPositions } from '#lib/player-positions.js';
   import PlayerFace from './PlayerFace.svelte';
   import TeamLogo from './TeamLogo.svelte';

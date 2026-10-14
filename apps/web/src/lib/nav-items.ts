@@ -8,8 +8,6 @@ export type NavItem = {
   }>;
 };
 const ACTIVE_ALIASES: Readonly<Record<string, readonly string[]>> = {
-  '/season/run': ['/season/run/checkpoint'],
-  '/season/run/league': ['/season/run/teams'],
   '/collection': ['/collection/packs'],
 };
 function normalizeRouteId(routeId: string): string {

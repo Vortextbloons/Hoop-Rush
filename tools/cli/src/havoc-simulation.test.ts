@@ -67,16 +67,10 @@ function writeFixtureManifest(dir: string): string {
   const draftCatalog = write('draft-catalog.json', buildSeasonDraftCatalog());
   const bracket = write('bracket.json', buildFixtureBracket());
   const profile = write('era-2010s.json', buildHavocEraProfile());
-  const placeholder = write('placeholder.json', {});
   const manifest = buildManifest({
     eraSimulationProfiles: [{ eraId: eraIdSchema.parse('2010s'), ...profile }],
     bracket,
-    season: {
-      league: placeholder,
-      schedule: placeholder,
-      draftCatalog,
-      rosterTargets: placeholder,
-    },
+    draftCatalog,
   });
   const manifestPath = join(dir, 'manifest.json');
   writeFileSync(manifestPath, JSON.stringify(manifest));

@@ -248,9 +248,7 @@ class EngineRunner implements HavocRunnerPort {
 }
 
 const MANIFEST = {
-  season: {
-    draftCatalog: { url: '/data/season/draft-catalog.json', contentHash: 'a'.repeat(64) },
-  },
+  draftCatalog: { url: '/data/season/draft-catalog.json', contentHash: 'a'.repeat(64) },
   eraSimulationProfiles: [
     { eraId: '2010s', url: '/data/era-2010s.json', contentHash: 'b'.repeat(64) },
   ],

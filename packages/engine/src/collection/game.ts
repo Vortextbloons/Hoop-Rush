@@ -34,7 +34,7 @@ import {
   type EraSimulationProfile,
 } from '@hoop-rush/data-contracts';
 import { createEngineContext } from '../sim/kernel.ts';
-import { simulateSeasonGame, type RotationGameFact } from '../season/season-game.ts';
+import { simulateGame, type RotationGameFact } from '../game/controller.ts';
 import { validateCollectionActiveTeam } from './active-team.ts';
 import {
   COLLECTION_CPU_TEAM_ID,
@@ -577,7 +577,7 @@ export function simulateCollectionGame(
   }
   const input = toControllerInput(prepared, catalog, profile);
   const facts: RotationGameFact[] = [];
-  const raw = simulateSeasonGame(input, createEngineContext(), {
+  const raw = simulateGame(input, createEngineContext(), {
     hooks: {
       minimumFiveFoulException: true,
       onGameFact: (fact) => {

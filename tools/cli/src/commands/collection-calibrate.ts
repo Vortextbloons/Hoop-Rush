@@ -33,8 +33,8 @@ import {
 import { makeReport, type CliReport } from '../report.ts';
 import { collectionPackCalibrateReportSchema } from '../report-schemas.ts';
 import { validateTargetsArtifact } from '../calibration/index.ts';
-import { atomicWriteFileSync } from '../io.ts';
-import { DEFAULT_MANIFEST, readJsonFile, sha256Hex } from './season-data.ts';
+import { DEFAULT_MANIFEST } from './data-loader.ts';
+import { atomicWriteFileSync, readJson as readJsonFile, sha256Hex } from '../io.ts';
 import { loadCollectionCatalog } from './collection.ts';
 
 export const DEFAULT_COLLECTION_TARGETS = resolve(

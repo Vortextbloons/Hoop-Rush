@@ -42,8 +42,8 @@ import { prepareTeam, type TeamPrep } from './prepare.ts';
 import type { HavocRuntimeHooks, HavocEvidence } from './havoc-runtime.ts';
 import { ENGINE_CONSTANTS } from './constants.ts';
 import { creationScore } from '../domain/archetypes.ts';
-import type { SeasonHomeCourtMechanisms } from '../season/home-court.ts';
-import type { SeasonEffectsHook } from '../season/effects.ts';
+import type { HomeCourtMechanisms } from '../game/home-court.ts';
+import type { EffectsHook } from '../game/effects.ts';
 
 const HAVOC_RUSH_MAX_VIOLATION = 0.25;
 const HAVOC_RUSH_VIOLATION_SCALE = 0.35;
@@ -109,8 +109,8 @@ export interface TripContext {
   gameRule?: import('@hoop-rush/data-contracts').SeasonGameRule;
   shotClock?: { remaining: number };
   race?: { home: number; away: number; target: number; decided: 'home' | 'away' | null };
-  homeCourt?: SeasonHomeCourtMechanisms;
-  effects?: SeasonEffectsHook;
+  homeCourt?: HomeCourtMechanisms;
+  effects?: EffectsHook;
   havoc?: HavocRuntimeHooks;
 }
 export function createTripContext(
@@ -119,8 +119,8 @@ export function createTripContext(
   state: GameState,
   profile: EraSimulationProfile,
   teams: [SimulationTeam, SimulationTeam],
-  homeCourt?: SeasonHomeCourtMechanisms,
-  effects?: SeasonEffectsHook,
+  homeCourt?: HomeCourtMechanisms,
+  effects?: EffectsHook,
 ): TripContext {
   return {
     rng,

@@ -4,7 +4,7 @@ import {
   type CollectionDifficultyRotationPolicy,
 } from '@hoop-rush/data-contracts';
 import { CollectionCommandError } from './packs.ts';
-import { minuteQualityOf, minuteReliefOf } from '../season/minute-plan.ts';
+import { minuteQualityOf, minuteReliefOf } from '../game/minute-plan.ts';
 
 export type CollectionMinuteStrategy = 'tight' | 'balanced' | 'deep';
 

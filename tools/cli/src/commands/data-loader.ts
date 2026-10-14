@@ -8,6 +8,7 @@ import {
   hoopRushManifestSchema,
   opponentBracketSchema,
   parseProjectionModelArtifact,
+  parseSeasonDraftCatalog,
   playersIndexSchema,
   type EraSimulationProfile,
   type FranchiseEraPool,
@@ -15,6 +16,7 @@ import {
   type OpponentBracket,
   type PlayersIndex,
   type ProjectionModelArtifact,
+  type SeasonDraftCatalog,
 } from '@hoop-rush/data-contracts';
 import { UsageError } from '../args.ts';
 import { sha256Hex } from '../io.ts';
@@ -64,6 +66,7 @@ export class PackagedData {
   private projectionModelCache: ProjectionModelArtifact | null = null;
   private bracketCache: OpponentBracket | null = null;
   private indexCache: PlayersIndex | null = null;
+  private draftCatalogCache: SeasonDraftCatalog | null = null;
   private readonly poolEntries: Map<string, HoopRushManifest['pools'][number]>;
   constructor(manifest: HoopRushManifest, dir: string) {
     this.manifest = manifest;
@@ -136,6 +139,15 @@ export class PackagedData {
     if (!parsed.success) throw new Error(`bracket ${path} fails validation`);
     this.bracketCache = parsed.data;
     return parsed.data;
+  }
+  draftCatalog(): SeasonDraftCatalog {
+    if (this.draftCatalogCache) return this.draftCatalogCache;
+    const entry = this.manifest.draftCatalog;
+    if (!entry) throw new Error('no draft catalog packaged in the manifest');
+    const { path, bytes } = this.artifact(entry.url);
+    verifyHash(path, bytes, entry.contentHash);
+    this.draftCatalogCache = parseSeasonDraftCatalog(parseJson(path, bytes));
+    return this.draftCatalogCache;
   }
 }
 export function loadProfileFile(path: string): EraSimulationProfile {

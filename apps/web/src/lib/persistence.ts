@@ -4,13 +4,9 @@ import {
   DexieDraftDuelRepository,
   DexieFixedFiveRepository,
   DexieHavocRepository,
-  DexieSeasonRunRepository,
   HoopRushDatabase,
   type DexieCollectionRepositoryOptions,
-  type SeasonPostseasonRepository,
-  type SeasonRunRepository,
 } from '@hoop-rush/persistence';
-import type { SeasonSchedule } from '@hoop-rush/data-contracts';
 
 export interface Persistence {
   db: HoopRushDatabase;
@@ -19,9 +15,6 @@ export interface Persistence {
   havocRepository: DexieHavocRepository;
   draftDuelRepository: DexieDraftDuelRepository;
   collectionRepository(options: DexieCollectionRepositoryOptions): DexieCollectionRepository;
-  seasonRunRepository(options: {
-    schedule?: SeasonSchedule;
-  }): SeasonRunRepository & SeasonPostseasonRepository;
 }
 
 let cached: Persistence | null = null;
@@ -36,7 +29,6 @@ export function getPersistence(): Persistence {
       havocRepository: new DexieHavocRepository(db),
       draftDuelRepository: new DexieDraftDuelRepository(db),
       collectionRepository: (options) => new DexieCollectionRepository(db, options),
-      seasonRunRepository: (options) => new DexieSeasonRunRepository(db, options),
     };
   }
   return cached;

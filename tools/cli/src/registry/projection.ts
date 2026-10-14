@@ -1,12 +1,10 @@
 import { n } from './core.ts';
 import { hasOption } from '../args.ts';
 import {
-  projectionAiShadow,
   projectionBase,
   projectionBenchmark,
   projectionBuild,
   projectionCalibrateBase,
-  projectionSeason,
 } from '../commands/projection.ts';
 
 import type { CommandSpec } from './core.ts';
@@ -33,18 +31,6 @@ export const projectionCommands: CommandSpec[] = [
         model: n(args, 'model'),
         era: n(args, 'era'),
         reference: n(args, 'reference'),
-        verbose: hasOption(args, 'verbose'),
-      }),
-  },
-  {
-    name: 'projection season',
-    options: { fixture: 'string', manifest: 'string', model: 'string', era: 'string' },
-    run: (args) =>
-      projectionSeason({
-        fixture: n(args, 'fixture'),
-        manifest: n(args, 'manifest'),
-        model: n(args, 'model'),
-        era: n(args, 'era'),
         verbose: hasOption(args, 'verbose'),
       }),
   },
@@ -130,18 +116,6 @@ export const projectionCommands: CommandSpec[] = [
         model: n(args, 'model'),
         era: n(args, 'era'),
         samples: n(args, 'samples'),
-        verbose: hasOption(args, 'verbose'),
-      }),
-  },
-  {
-    name: 'projection ai-shadow',
-    options: { manifest: 'string', model: 'string', era: 'string', seed: 'string' },
-    run: (args) =>
-      projectionAiShadow({
-        manifest: n(args, 'manifest'),
-        model: n(args, 'model'),
-        era: n(args, 'era'),
-        seed: n(args, 'seed'),
         verbose: hasOption(args, 'verbose'),
       }),
   },

@@ -15,7 +15,7 @@ import {
 } from '@hoop-rush/engine';
 export type { DraftFitNeed, DraftFitReport, DraftFitScore, DraftFitTier } from '@hoop-rush/engine';
 import { getEraSimulationProfile, getPool } from '#lib/data.js';
-import { loadSeasonProjectionModel } from '#lib/season/season-assets.js';
+import { loadProjectionModel } from '#lib/data-assets.js';
 
 export interface DraftFitContext {
   eraProfile: EraSimulationProfile;
@@ -33,7 +33,7 @@ export async function loadDraftFitContext(
     if (!profileEntry) return null;
     const [eraProfile, model] = await Promise.all([
       getEraSimulationProfile(profileEntry),
-      loadSeasonProjectionModel(),
+      loadProjectionModel(),
     ]);
     return { eraProfile, model };
   } catch {

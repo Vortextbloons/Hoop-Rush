@@ -3,7 +3,6 @@ import { dataCommands } from './data.ts';
 import { havocCommands } from './havoc.ts';
 import { simCommands } from './sim.ts';
 import { docsCommands } from './docs.ts';
-import { seasonCommands } from './season.ts';
 import { collectionCommands } from './collection.ts';
 import { projectionCommands } from './projection.ts';
 import { importCommands } from './import.ts';
@@ -19,7 +18,6 @@ for (const commands of [
   havocCommands,
   simCommands,
   docsCommands,
-  seasonCommands,
   collectionCommands,
   projectionCommands,
   importCommands,
@@ -62,9 +60,6 @@ calibrate sensitivity
 calibrate ratings
 calibrate three-point
 combine docs
-season schedule generate
-season schedule audit
-season draft reproduce
 collection pack-audit
 collection pull-reproduce
 collection pack-calibrate
@@ -73,44 +68,11 @@ collection game-reproduce
 collection game-calibrate
 collection progression-audit
 collection progression-calibrate
-season rosters generate
-season rosters audit
-season rosters calibrate
-season draft calibrate
-season game simulate
-season game calibrate
-season block simulate
-season block audit
-season full simulate
-season home-court calibrate
-season effects sensitivity
-season effects distribution
-season effects roles
-season effects calibrate
-season health calibrate
-season trade audit
-season trade calibrate
-season influence calibrate
-season challenges calibrate
-season evolution calibrate
-season evolution validate
-season evolution benchmark
-season free-agency audit
-season free-agency calibrate
-season run reproduce
-season postseason audit
-season postseason calibrate
-season benchmark block
-season benchmark full
-season benchmark determinism
-season benchmark persistence
 projection base
-projection season
 projection build
 projection calibrate-base
 projection validate
 projection benchmark
-projection ai-shadow
 import ratings
 import pools
 import era-profile

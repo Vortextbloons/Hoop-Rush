@@ -90,7 +90,6 @@ import {
   type HavocStoredGame,
 } from '@hoop-rush/engine';
 import { DEFAULT_MANIFEST, PackagedData, loadPackagedData } from './commands/data-loader.ts';
-import { loadSeasonDraftCatalog, resolveSeasonArtifact } from './commands/season-data.ts';
 
 export const HAVOC_CLI_ERA_ID = '2010s';
 export const HAVOC_CLI_REPORT_DIGEST_PREFIX = 'havoc-cli-report-v1';
@@ -168,10 +167,13 @@ export function havocVersionSetOf(input: {
 export function loadHavocCliAssets(manifestPath: string = DEFAULT_MANIFEST): HavocCliAssets {
   const packaged = loadPackagedData(manifestPath);
   const data = new PackagedData(packaged.manifest, packaged.dir);
-  const catalog = loadSeasonDraftCatalog(manifestPath);
+  const catalog = data.draftCatalog();
   const bracket = data.bracket();
   const profile = data.eraProfile(HAVOC_CLI_ERA_ID);
-  const catalogRef = resolveSeasonArtifact(manifestPath, 'draftCatalog');
+  const catalogEntry = packaged.manifest.draftCatalog;
+  if (catalogEntry === undefined) {
+    throw new HavocCliError('assets', `manifest ${manifestPath} has no draft catalog entry`);
+  }
   const bracketRef = packaged.manifest.bracket;
   if (bracketRef === undefined) {
     throw new HavocCliError('assets', `manifest ${manifestPath} has no bracket entry`);
@@ -185,10 +187,10 @@ export function loadHavocCliAssets(manifestPath: string = DEFAULT_MANIFEST): Hav
       `manifest ${manifestPath} has no ${HAVOC_CLI_ERA_ID} era simulation profile`,
     );
   }
-  const source = havocCatalogSourceOf(catalog, catalogRef.contentHash);
+  const source = havocCatalogSourceOf(catalog, catalogEntry.contentHash);
   const versionSet = havocVersionSetOf({
     catalog,
-    catalogHash: catalogRef.contentHash,
+    catalogHash: catalogEntry.contentHash,
     bracketHash: bracketRef.contentHash,
     profile,
     profileHash: profileRef.contentHash,

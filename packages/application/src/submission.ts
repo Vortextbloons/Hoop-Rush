@@ -1,9 +1,5 @@
 export type SubmissionIntent =
-  | 'fixed-five-command'
-  | 'season-command'
-  | 'season-block'
-  | 'collection-command'
-  | 'collection-pack-purchase';
+  'fixed-five-command' | 'collection-command' | 'collection-pack-purchase';
 
 export type SubmissionDisposition = 'accepted' | 'stale' | 'rejected';
 

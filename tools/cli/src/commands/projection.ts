@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+﻿import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
 import {
@@ -9,13 +9,10 @@ import {
   contentHashSchema,
   eraIdSchema,
   fnv1a32,
-  franchiseIdSchema,
   parseProjectionModelArtifact,
   playerIdSchema,
-  seasonRotationSchema,
   seedFromString,
   seedSchema,
-  simulationPlayerSchema,
   simulationRatingsSchema,
   simulationTeamSchema,
   simulationTendenciesSchema,
@@ -31,25 +28,16 @@ import {
 import {
   createEngineContext,
   ENGINE_VERSION,
-  generateAiLeague,
   projectBaseFive,
-  projectSeasonRoster,
   simulateGame,
   toSimulationPlayer,
   type EngineContext,
 } from '@hoop-rush/engine';
 import { parseCount, parseWorkers } from '../args.ts';
 import { makeReport, type CliReport } from '../report.ts';
-import { PackagedData, REPO_ROOT, DEFAULT_MANIFEST, loadPackagedData } from './data-loader.ts';
+import { PackagedData, REPO_ROOT, loadPackagedData } from './data-loader.ts';
 import { readJson, sha256Hex } from '../io.ts';
 import { mean } from '../stats.ts';
-import {
-  fixtureHumanRoster,
-  loadSeasonDraftCatalog,
-  loadSeasonLeague,
-  loadSeasonRosterTargets,
-} from './season-data.ts';
-import type { SeasonProjection } from '@hoop-rush/data-contracts';
 const STATIC_DATA = resolve(REPO_ROOT, 'apps/web/static/data');
 const PROJECTION_DIR = resolve(STATIC_DATA, 'projection');
 const MANIFEST_PATH = resolve(STATIC_DATA, 'manifest.json');
@@ -91,11 +79,6 @@ const manifestProjectionSchema = z.looseObject({
     })
     .optional(),
 });
-const seasonFixtureSchema = z.looseObject({
-  roster: z.array(simulationPlayerSchema).optional(),
-  rotation: seasonRotationSchema.optional(),
-  players: z.array(simulationPlayerSchema).optional(),
-});
 const baseFixtureSchema = z.looseObject({
   home: simulationTeamSchema.optional(),
   away: simulationTeamSchema.optional(),
@@ -103,7 +86,6 @@ const baseFixtureSchema = z.looseObject({
 });
 const manifestWriteSchema = z.looseObject({
   projection: z.unknown().optional(),
-  season: z.unknown().optional(),
 });
 function loadModel(
   manifestPath: string | null | undefined,
@@ -590,180 +572,6 @@ export function buildProjectionTargets(): ProjectionTargets {
       heldOutPassRate: 0,
     },
   };
-}
-export function projectionAiShadow(input: {
-  manifest: string | null | undefined;
-  model: string | null | undefined;
-  era: string | null | undefined;
-  seed: string | null | undefined;
-  verbose: boolean;
-}): CliReport {
-  const { manifest, model: modelPath, era, seed } = input;
-  const data = loadData(manifest);
-  const model = loadModel(manifest, modelPath);
-  const rawEraId = era ?? '2010s';
-  const eraId = eraIdSchema.parse(rawEraId);
-  const profile = data.eraProfile(rawEraId);
-  const runSeed = seedSchema.parse(seed ?? 'd00d2026a1b2c3d4e5f60718293a4b5c6');
-  const manifestPath = manifest ?? DEFAULT_MANIFEST;
-  let catalog: import('@hoop-rush/data-contracts').SeasonDraftCatalog;
-  try {
-    catalog = loadSeasonDraftCatalog(manifestPath);
-  } catch (error) {
-    return makeReport(
-      'projection ai-shadow',
-      { manifest: manifestPath },
-      { failures: [(error as Error).message] },
-    );
-  }
-  let league: import('@hoop-rush/data-contracts').SeasonLeague;
-  try {
-    league = loadSeasonLeague();
-  } catch (error) {
-    return makeReport(
-      'projection ai-shadow',
-      { manifest: manifestPath },
-      { failures: [(error as Error).message] },
-    );
-  }
-  let targets: import('@hoop-rush/data-contracts').SeasonRosterTargets;
-  try {
-    targets = loadSeasonRosterTargets(manifestPath);
-  } catch (error) {
-    return makeReport(
-      'projection ai-shadow',
-      { manifest: manifestPath },
-      { failures: [(error as Error).message] },
-    );
-  }
-  const lakersFranchiseId = franchiseIdSchema.parse('lakers');
-  const humanRosters = [
-    { franchiseId: lakersFranchiseId, playerVersionIds: fixtureHumanRoster(catalog) },
-  ];
-  let generation: import('@hoop-rush/data-contracts').SeasonLeagueGenerationResult;
-  try {
-    generation = generateAiLeague({
-      seed: runSeed,
-      catalog,
-      league,
-      humanFranchiseIds: [lakersFranchiseId],
-      humanRosters,
-      targets,
-      projection: { eraProfile: profile, model },
-    });
-  } catch (error) {
-    return makeReport(
-      'projection ai-shadow',
-      { seed: runSeed, era: eraId },
-      { failures: [(error as Error).message] },
-    );
-  }
-  const summaries = generation.evaluations.filter(
-    (evaluation) => evaluation.projectionSummary !== undefined,
-  );
-  const different = summaries.filter(
-    (evaluation) => evaluation.projectionSummary?.selectedIsBest === false,
-  );
-  const gaps = summaries
-    .map((evaluation) => {
-      const summary = evaluation.projectionSummary;
-      if (summary === undefined || summary.bestNetRating === null) return null;
-      return summary.bestNetRating - summary.selectedNetRating;
-    })
-    .filter((gap): gap is number => gap !== null);
-  const meanGap = gaps.length > 0 ? gaps.reduce((sum, gap) => sum + gap, 0) / gaps.length : 0;
-  const details = [
-    `league generated with projection shadow mode (${String(summaries.length)} AI evaluations)`,
-    `selection differs from the projection-best in ${String(different.length)} of ${String(summaries.length)} pools`,
-    `mean best-minus-selected net-rating gap: ${meanGap.toFixed(2)} (${String(gaps.length)} pools with a best candidate)`,
-    `generation digest: ${generation.digest}`,
-  ];
-  return makeReport(
-    'projection ai-shadow',
-    { seed: runSeed, era: eraId },
-    {
-      details,
-      payload: {
-        digest: generation.digest,
-        differentPools: different.length,
-        totalPools: summaries.length,
-        meanNetGap: meanGap,
-      },
-    },
-  );
-}
-export function projectionSeason(input: {
-  fixture: string | null | undefined;
-  manifest: string | null | undefined;
-  model: string | null | undefined;
-  era: string | null | undefined;
-  verbose: boolean;
-}): CliReport {
-  const { fixture, manifest, model: modelPath, era, verbose } = input;
-  if (fixture === null || fixture === undefined) {
-    return makeReport('projection season', {}, { failures: ['--fixture is required'] });
-  }
-  const data = loadData(manifest);
-  const model = loadModel(manifest, modelPath);
-  const eraId = era ?? '2010s';
-  const profile = data.eraProfile(eraId);
-  const fixtureRaw = readJson(fixture);
-  const fixtureParsed = seasonFixtureSchema.safeParse(fixtureRaw);
-  if (!fixtureParsed.success) {
-    return makeReport(
-      'projection season',
-      { fixture },
-      { failures: [`fixture ${fixture} is invalid`] },
-    );
-  }
-  const fixtureValue = fixtureParsed.data;
-  const roster = fixtureValue.roster ?? fixtureValue.players;
-  const rotation = fixtureValue.rotation;
-  if (roster === undefined || rotation === undefined) {
-    return makeReport(
-      'projection season',
-      { fixture },
-      { failures: [`fixture ${fixture} must carry a roster and a rotation`] },
-    );
-  }
-  let projection: SeasonProjection;
-  try {
-    projection = projectSeasonRoster({
-      roster: roster.map((player) => ({ player })),
-      rotation,
-      eraProfile: profile,
-      model,
-    });
-  } catch (error) {
-    return makeReport(
-      'projection season',
-      { fixture, era: eraId },
-      { failures: [(error as Error).message] },
-    );
-  }
-  const details = [
-    `roster: ${roster.map((player) => player.displayName).join(' | ')}`,
-    `weighted offensive rating: ${projection.metrics.offensiveRating.toFixed(1)}`,
-    `weighted defensive rating allowed: ${projection.metrics.defensiveRatingAllowed.toFixed(1)}`,
-    `weighted net rating: ${projection.metrics.netRating.toFixed(1)}`,
-    `units: ${String(projection.units.length)} (${String(projection.units.filter((unit) => unit.kind === 'trace').length)} trace, ${String(projection.units.filter((unit) => unit.kind === 'contingency').length)} contingency, ${String(projection.units.filter((unit) => unit.kind === 'matchup').length)} matchup)`,
-    `starting quality: ${projection.metrics.startingQuality.toFixed(1)} | closing: ${projection.metrics.closingQuality.toFixed(1)} | bench: ${projection.metrics.benchQuality.toFixed(1)}`,
-    `minute deviation: ${projection.metrics.minuteDeviation.toFixed(1)}`,
-    `continuity: creation ${projection.metrics.creationContinuity.toFixed(1)} / spacing ${projection.metrics.spacingContinuity.toFixed(1)}`,
-    `contingency depth: ${projection.metrics.contingencyDepth.toFixed(1)} | foul resilience: ${projection.metrics.foulResilience.toFixed(1)}`,
-    `matchup mean: ${projection.metrics.matchupMean.toFixed(1)} | worst: ${projection.metrics.matchupWorstCase.toFixed(1)}`,
-    `redundancy: ${projection.metrics.redundancy.toFixed(1)}`,
-    `weaknesses: ${projection.weaknesses.map((w) => `${w.code}(${w.severity})`).join(', ') || 'none'}`,
-    `projection digest: ${projection.digest}`,
-  ];
-  if (verbose) {
-    for (const row of projection.minutes) {
-      details.push(
-        `  ${row.playerVersionId}: target ${String(row.targetMinutes)} / trace ${String(row.traceMinutes)} min (dev ${String(row.deviation)})`,
-      );
-    }
-  }
-  return makeReport('projection season', { fixture, era: eraId }, { details, payload: projection });
 }
 export function projectionBuild(input: {
   manifest?: string | null;

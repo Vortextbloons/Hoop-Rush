@@ -1,52 +1,8 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { Worker } from 'node:worker_threads';
+import { parentPort, Worker } from 'node:worker_threads';
 import { z } from 'zod';
-import { sha256Hex, readJson, atomicWriteFileSync } from '../io.ts';
+import { parseCount } from '../args.ts';
+import { readJson } from '../io.ts';
 import { makeReport, type CliReport } from '../report.ts';
-export function commitTargetsArtifact(args: {
-  outPath: string;
-  defaultTargetsPath: string;
-  manifestPath: string;
-  manifestKey: string;
-  manifestUrl: string;
-  content: unknown;
-}): {
-  written: boolean;
-  path: string | null;
-  error: string | null;
-} {
-  try {
-    const target = resolve(args.outPath);
-    atomicWriteFileSync(target, `${JSON.stringify(args.content, null, 2)}\n`);
-    if (resolve(args.outPath) === resolve(args.defaultTargetsPath)) {
-      const manifestPathResolved = resolve(args.manifestPath);
-      const manifest = JSON.parse(readFileSync(manifestPathResolved, 'utf8')) as {
-        season?: Record<
-          string,
-          {
-            url?: string;
-            contentHash?: string;
-          }
-        >;
-      };
-      if (manifest.season !== undefined) {
-        manifest.season[args.manifestKey] = {
-          url: args.manifestUrl,
-          contentHash: sha256Hex(readFileSync(target)),
-        };
-        atomicWriteFileSync(manifestPathResolved, `${JSON.stringify(manifest, null, 2)}\n`);
-      }
-    }
-    return { written: true, path: target, error: null };
-  } catch (error) {
-    return {
-      written: false,
-      path: null,
-      error: `cannot write targets: ${(error as Error).message}`,
-    };
-  }
-}
 export function validateTargetsArtifact<T>(args: {
   outPath: string;
   schema: z.ZodType<T>;
@@ -144,4 +100,66 @@ export function runWorkerChunks<TItem, TResult>(args: {
       }),
     ),
   ).then((results) => results.flat());
+}
+
+export interface SeedCountCalibration {
+  calibrationCount: number;
+  validationCount: number;
+  workers: number;
+}
+
+export function resolveCountCalibrationArgs(
+  args: {
+    workers?: string | null;
+    'calibration-seeds'?: string | null;
+    'validation-seeds'?: string | null;
+  },
+  opts: {
+    calibrationDefault: number;
+    validationDefault: number;
+    workersDefault?: number;
+    clampWorkers?: boolean;
+  },
+): SeedCountCalibration {
+  const calibrationCount = parseCount(
+    args['calibration-seeds'] ?? undefined,
+    '--calibration-seeds',
+    opts.calibrationDefault,
+  );
+  const validationCount = parseCount(
+    args['validation-seeds'] ?? undefined,
+    '--validation-seeds',
+    opts.validationDefault,
+  );
+  const rawWorkers = parseCount(args.workers ?? undefined, '--workers', opts.workersDefault ?? 4);
+  return {
+    calibrationCount,
+    validationCount,
+    workers: opts.clampWorkers === true ? Math.max(1, rawWorkers) : rawWorkers,
+  };
+}
+
+export function createSeedChunkRunner<TSeed, TResult>(opts: {
+  workerUrl: URL;
+  payloadKey: string;
+  buildWorkerData: (chunk: TSeed[], extra?: Record<string, unknown>) => unknown;
+}): (
+  seeds: readonly TSeed[],
+  workers: number,
+  extra?: Record<string, unknown>,
+) => Promise<TResult[]> {
+  return (seeds, workers, extra) =>
+    runWorkerChunks<TSeed, TResult>({
+      workerUrl: opts.workerUrl,
+      workerData: (chunk) => opts.buildWorkerData(chunk, extra),
+      items: seeds,
+      workers,
+      payloadKey: opts.payloadKey,
+    });
+}
+
+export function postWorkerFacts(payloadKey: string, facts: unknown): void {
+  void Promise.resolve(facts).then((resolved) => {
+    parentPort?.postMessage({ [payloadKey]: resolved });
+  });
 }

@@ -28,7 +28,6 @@ import {
   writeManifestValidated,
   type Manifest,
   type ManifestSimIndexEntry,
-  type SeasonArtifacts,
 } from '../shared/manifest.ts';
 export { MANIFEST_PATH };
 export type { Manifest };
@@ -293,24 +292,12 @@ export function run(dataDir = PUBLIC_DATA): void {
       contentHash: sha256File(join(opponentsDir, 'bracket.json')),
     };
   }
-  const seasonDir = join(dataDir, 'season');
-  const seasonRefs: SeasonArtifacts = {};
-  for (const [key, name] of [
-    ['league', 'league.json'],
-    ['schedule', 'schedule.json'],
-    ['draftCatalog', 'draft-catalog.json'],
-    ['rosterTargets', 'roster-targets.json'],
-    ['freeAgencyIndex', 'free-agency-index.json'],
-    ['freeAgencyTargets', 'free-agency-targets.json'],
-    ['sponsorsIndex', 'sponsors-index.json'],
-  ] as const) {
-    const path = join(seasonDir, name);
-    if (fileExists(path)) {
-      seasonRefs[key] = { url: `season/${name}`, contentHash: sha256File(path) };
-    }
-  }
-  if (Object.keys(seasonRefs).length > 0) {
-    manifest.season = seasonRefs;
+  const draftCatalogPath = join(dataDir, 'draft-catalog.json');
+  if (fileExists(draftCatalogPath)) {
+    manifest.draftCatalog = {
+      url: 'draft-catalog.json',
+      contentHash: sha256File(draftCatalogPath),
+    };
   }
   if (previousCollection !== undefined) {
     manifest.collection = previousCollection;

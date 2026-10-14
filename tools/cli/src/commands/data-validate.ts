@@ -1,4 +1,4 @@
-import { readFile, stat } from 'node:fs/promises';
+﻿import { readFile, stat } from 'node:fs/promises';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import {
   validateBracketContent,
@@ -14,7 +14,6 @@ import {
   playersIndexSchema,
   rosterDetailsSchema,
   REQUIRED_RATING_KEYS,
-  SEASON_DRAFT_CATALOG_VERSION,
   SELECTION_SCORE_VERSION,
   COLLECTION_CATALOG_VERSION,
   COLLECTION_DIFFICULTY_ORDER,
@@ -43,10 +42,6 @@ import {
   collectionProgressionRulesSchema,
   collectionProgressionTargetsSchema,
   collectionScaleRewardCoins,
-  seasonFreeAgencyIndexSchema,
-  seasonGameTargetsSchema,
-  seasonSponsorsIndexSchema,
-  SEASON_SPONSOR_GEAR_CATALOG,
   unavailabilityReasonSchema,
   POSITIONS,
   POSITION_NORMALIZATION_VERSION,
@@ -123,7 +118,7 @@ function auditLineage(manifest: HoopRushManifest): AuditResult {
     }
   }
   details.push(
-    `lineage: ${String(manifest.modernFranchiseSlots.length)} slots · ${String(manifest.franchiseLineage.length)} segments`,
+    `lineage: ${String(manifest.modernFranchiseSlots.length)} slots Â· ${String(manifest.franchiseLineage.length)} segments`,
   );
   return { ok: failures.length === 0, details, failures };
 }
@@ -514,7 +509,7 @@ function auditPoolContent(
     (p) => p.altIds?.bbref != null || p.altIds?.photoUrl != null,
   ).length;
   details.push(
-    `pools: ${key} fallback coverage ${String(withFallback)}/${String(pool.players.length)} · band ${pool.coverageSummary.coverageBand} · lowConfidence ${String(pool.coverageSummary.lowConfidenceShare)}`,
+    `pools: ${key} fallback coverage ${String(withFallback)}/${String(pool.players.length)} Â· band ${pool.coverageSummary.coverageBand} Â· lowConfidence ${String(pool.coverageSummary.lowConfidenceShare)}`,
   );
   if (manifest.assets.headshotUrlTemplate) {
     const missingMarker = pool.players.filter((p) => p.altIds?.nbaHeadshotAvailable == null);
@@ -622,7 +617,7 @@ async function auditBracket(
       const sorted = [...percentiles].sort((a, b) => a - b);
       const median = sorted[Math.floor(sorted.length / 2)] ?? 0;
       details.push(
-        `${label}: ${String(bracket.opponents.length)} opponents · ${String(bracket.schedule.length)} games · median pct ${median.toFixed(3)} · version ${bracket.bracketVersion}`,
+        `${label}: ${String(bracket.opponents.length)} opponents Â· ${String(bracket.schedule.length)} games Â· median pct ${median.toFixed(3)} Â· version ${bracket.bracketVersion}`,
       );
     } catch {
       failures.push(`${label}: asset missing (${assetPath})`);
@@ -775,76 +770,6 @@ async function auditGlobalAssets(
       }
     }
   }
-  return { ok: failures.length === 0, details, failures };
-}
-async function auditSeasonFreeAgencyIndex(
-  manifest: HoopRushManifest,
-  manifestDir: string,
-  verbose: boolean,
-): Promise<AuditResult> {
-  const failures: string[] = [];
-  const details: string[] = [];
-  const entry = manifest.season?.freeAgencyIndex;
-  if (entry === undefined) {
-    details.push('free-agency-index: none packaged');
-    return { ok: true, details, failures };
-  }
-  const assetPath = isAbsolute(entry.url) ? entry.url : resolve(manifestDir, entry.url);
-  let content: Buffer;
-  try {
-    const info = await stat(assetPath);
-    if (!info.isFile()) {
-      failures.push(`free-agency-index: asset is not a file (${assetPath})`);
-      return { ok: false, details, failures };
-    }
-    content = await readFile(assetPath);
-  } catch {
-    failures.push(`free-agency-index: asset missing (${assetPath})`);
-    return { ok: false, details, failures };
-  }
-  const actualHash = sha256Hex(content);
-  if (actualHash !== entry.contentHash) {
-    failures.push(`free-agency-index: content hash mismatch (${assetPath})`);
-  } else if (verbose) {
-    details.push(`free-agency-index: hash verified (${assetPath})`);
-  }
-  let raw: unknown;
-  try {
-    raw = JSON.parse(content.toString('utf8')) as unknown;
-  } catch {
-    failures.push('free-agency-index: artifact is not valid JSON');
-    return { ok: false, details, failures };
-  }
-  const parsed = seasonFreeAgencyIndexSchema.safeParse(raw);
-  if (!parsed.success) {
-    failures.push(
-      `free-agency-index: artifact fails the index schema: ${parsed.error.issues[0]?.path.join('.') ?? '(root)'} ${parsed.error.issues[0]?.message ?? 'unknown'}`,
-    );
-    return { ok: failures.length === 0, details, failures };
-  }
-  const index = parsed.data;
-  const draftEntry = manifest.season?.draftCatalog;
-  if (draftEntry === undefined) {
-    failures.push('free-agency-index: manifest has no season.draftCatalog entry to pin against');
-  } else if (index.catalogRef.contentHash !== draftEntry.contentHash) {
-    failures.push(
-      `free-agency-index: catalogRef content hash ${index.catalogRef.contentHash} does not match the packaged draft catalog ${draftEntry.contentHash}`,
-    );
-  } else if (index.catalogRef.catalogVersion !== SEASON_DRAFT_CATALOG_VERSION) {
-    failures.push(
-      `free-agency-index: unexpected catalogVersion ${index.catalogRef.catalogVersion}`,
-    );
-  }
-  const bandCounts = { featured: 0, role: 0, development: 0, emergency: 0 } as Record<
-    'featured' | 'role' | 'development' | 'emergency',
-    number
-  >;
-  for (const candidate of index.candidates) {
-    bandCounts[candidate.band] += 1;
-  }
-  details.push(
-    `free-agency-index: ${String(index.candidates.length)} candidates · ${String(Object.keys(index.groupedVersions).length)} identities · featured ${String(bandCounts.featured)} / role ${String(bandCounts.role)} / development ${String(bandCounts.development)} / emergency ${String(bandCounts.emergency)} · ${String(content.length)} bytes`,
-  );
   return { ok: failures.length === 0, details, failures };
 }
 function compareLaunchCollectionProgression(
@@ -1004,7 +929,7 @@ async function auditCollectionProgression(
   }
   failures.push(...compareLaunchCollectionProgression(rules, catalog));
   details.push(
-    `collection-progression: ${rules.progressionVersion} · ${String(rules.challenges.length)} challenges · ${String(rules.setRewards.length)} set rewards · multiplier ${String(rules.targetMultiplierBp)} bp · ${String(content.length)} bytes`,
+    `collection-progression: ${rules.progressionVersion} Â· ${String(rules.challenges.length)} challenges Â· ${String(rules.setRewards.length)} set rewards Â· multiplier ${String(rules.targetMultiplierBp)} bp Â· ${String(content.length)} bytes`,
   );
 
   const targetsRef = entry.progressionTargets;
@@ -1066,7 +991,7 @@ async function auditCollectionProgression(
     details.push('collection-progression-targets: all recorded gates pass');
   }
   details.push(
-    `collection-progression-targets: ${targets.targetsVersion} · ${String(targets.fixtures.length)} fixtures · ${String(Object.keys(targets.gates).length)} gates`,
+    `collection-progression-targets: ${targets.targetsVersion} Â· ${String(targets.fixtures.length)} fixtures Â· ${String(Object.keys(targets.gates).length)} gates`,
   );
   return { ok: failures.length === 0, details, failures };
 }
@@ -1163,9 +1088,9 @@ async function auditCollectionCatalog(
   if (index.catalogHash !== entry.catalog.contentHash) {
     failures.push('collection-index: catalogHash does not match the packaged catalog');
   }
-  const draftEntry = manifest.season?.draftCatalog;
+  const draftEntry = manifest.draftCatalog;
   if (draftEntry === undefined) {
-    failures.push('collection-catalog: manifest has no season.draftCatalog entry to pin against');
+    failures.push('collection-catalog: manifest has no draftCatalog entry to pin against');
   } else if (catalog.sourceCatalogHash !== draftEntry.contentHash) {
     failures.push(
       'collection-catalog: sourceCatalogHash does not match the packaged draft catalog',
@@ -1247,7 +1172,7 @@ async function auditCollectionCatalog(
   }
   void COLLECTION_ECONOMY_VERSION;
   details.push(
-    `collection: ${String(catalog.cards.length)} cards (${String(baseCount)} base + ${String(activeSpecialCount)} specials) · ${String(catalog.sets.length)} sets · ${String(catalog.packs.length)} packs · ${String(catalogContent.length)} bytes`,
+    `collection: ${String(catalog.cards.length)} cards (${String(baseCount)} base + ${String(activeSpecialCount)} specials) Â· ${String(catalog.sets.length)} sets Â· ${String(catalog.packs.length)} packs Â· ${String(catalogContent.length)} bytes`,
   );
   const progression = await auditCollectionProgression(
     entry,
@@ -1498,7 +1423,7 @@ export async function auditCollectionGameRules(
     }
   }
   details.push(
-    `collection-game-rules: ${rules.rulesVersion} · ${String(rules.difficulties.length)} difficulties · ${String(rules.objectives.length)} objectives · repeat maxima ${rules.difficulties.map((profile) => `${profile.difficultyId} ${String(collectionMaxRepeatReward(profile.rewardMultiplierBp))}`).join(' / ')} · ${String(content.length)} bytes`,
+    `collection-game-rules: ${rules.rulesVersion} Â· ${String(rules.difficulties.length)} difficulties Â· ${String(rules.objectives.length)} objectives Â· repeat maxima ${rules.difficulties.map((profile) => `${profile.difficultyId} ${String(collectionMaxRepeatReward(profile.rewardMultiplierBp))}`).join(' / ')} Â· ${String(content.length)} bytes`,
   );
 
   const targetsRef = (
@@ -1562,130 +1487,9 @@ export async function auditCollectionGameRules(
       details.push('collection-game-targets: all recorded gates pass');
     }
     details.push(
-      `collection-game-targets: ${targets.targetsVersion} · ${String(targets.fixtures.length)} fixtures · ${String(Object.keys(targets.gates).length)} gates`,
+      `collection-game-targets: ${targets.targetsVersion} Â· ${String(targets.fixtures.length)} fixtures Â· ${String(Object.keys(targets.gates).length)} gates`,
     );
   }
-  return { ok: failures.length === 0, details, failures };
-}
-async function auditSeasonGameTargets(manifestDir: string, verbose: boolean): Promise<AuditResult> {
-  const failures: string[] = [];
-  const details: string[] = [];
-  const assetPath = resolve(manifestDir, 'season/game-targets.json');
-  let content: Buffer;
-  try {
-    const info = await stat(assetPath);
-    if (!info.isFile()) {
-      details.push('game-targets: none packaged');
-      return { ok: true, details, failures };
-    }
-    content = await readFile(assetPath);
-  } catch {
-    details.push('game-targets: none packaged');
-    return { ok: true, details, failures };
-  }
-  let raw: unknown;
-  try {
-    raw = JSON.parse(content.toString('utf8')) as unknown;
-  } catch {
-    failures.push('game-targets: artifact is not valid JSON');
-    return { ok: false, details, failures };
-  }
-  const parsed = seasonGameTargetsSchema.safeParse(raw);
-  if (!parsed.success) {
-    failures.push(
-      `game-targets: artifact fails the game targets schema: ${parsed.error.issues[0]?.path.join('.') ?? '(root)'} ${parsed.error.issues[0]?.message ?? 'unknown'}`,
-    );
-    return { ok: failures.length === 0, details, failures };
-  }
-  const targets = parsed.data;
-  if (verbose) {
-    details.push(
-      `game-targets: rotationVersion ${targets.rotationVersion} verified (${assetPath})`,
-    );
-  }
-  details.push(
-    `game-targets: ${String(targets.fixtures.length)} fixtures · rotationVersion ${targets.rotationVersion}`,
-  );
-  return { ok: failures.length === 0, details, failures };
-}
-async function auditSponsorGear(
-  manifest: HoopRushManifest,
-  manifestDir: string,
-  verbose: boolean,
-): Promise<AuditResult> {
-  const failures: string[] = [];
-  const details: string[] = [];
-  const entry = manifest.season?.sponsorsIndex;
-  if (entry === undefined) {
-    details.push('sponsor-gear: no packaged sponsors index');
-    return { ok: true, details, failures };
-  }
-  const assetPath = isAbsolute(entry.url) ? entry.url : resolve(manifestDir, entry.url);
-  let content: Buffer;
-  try {
-    const info = await stat(assetPath);
-    if (!info.isFile()) {
-      failures.push(`sponsor-gear: asset is not a file (${assetPath})`);
-      return { ok: false, details, failures };
-    }
-    content = await readFile(assetPath);
-  } catch {
-    failures.push(`sponsor-gear: asset missing (${assetPath})`);
-    return { ok: false, details, failures };
-  }
-  if (sha256Hex(content) !== entry.contentHash) {
-    failures.push(`sponsor-gear: content hash mismatch (${assetPath})`);
-  } else if (verbose) {
-    details.push(`sponsor-gear: hash verified (${assetPath})`);
-  }
-  let raw: unknown;
-  try {
-    raw = JSON.parse(content.toString('utf8')) as unknown;
-  } catch {
-    failures.push('sponsor-gear: artifact is not valid JSON');
-    return { ok: false, details, failures };
-  }
-  const parsed = seasonSponsorsIndexSchema.safeParse(raw);
-  if (!parsed.success) {
-    failures.push(
-      `sponsor-gear: artifact fails the sponsors index schema: ${parsed.error.issues[0]?.path.join('.') ?? '(root)'} ${parsed.error.issues[0]?.message ?? 'unknown'}`,
-    );
-    return { ok: failures.length === 0, details, failures };
-  }
-  const index = parsed.data;
-  const catalogFamilies = new Set(SEASON_SPONSOR_GEAR_CATALOG.map((item) => item.brandFamily));
-  const indexFamilies = new Set(index.logos.map((logo) => logo.family));
-  for (const family of catalogFamilies) {
-    if (!indexFamilies.has(family)) {
-      failures.push(`sponsor-gear: catalog family ${family} has no packaged logo`);
-    }
-  }
-  for (const family of indexFamilies) {
-    if (!catalogFamilies.has(family)) {
-      failures.push(`sponsor-gear: packaged logo ${family} matches no catalog family`);
-    }
-  }
-  for (const logo of index.logos) {
-    const logoPath = isAbsolute(logo.file) ? logo.file : resolve(manifestDir, logo.file);
-    let logoBytes: Buffer;
-    try {
-      const info = await stat(logoPath);
-      if (!info.isFile()) {
-        failures.push(`sponsor-gear: logo is not a file (${logoPath})`);
-        continue;
-      }
-      logoBytes = await readFile(logoPath);
-    } catch {
-      failures.push(`sponsor-gear: logo missing (${logoPath})`);
-      continue;
-    }
-    if (sha256Hex(logoBytes) !== logo.contentHash) {
-      failures.push(`sponsor-gear: logo hash mismatch (${logoPath})`);
-    }
-  }
-  details.push(
-    `sponsor-gear: ${String(index.logos.length)} logos · gearVersion ${index.gearVersion}`,
-  );
   return { ok: failures.length === 0, details, failures };
 }
 export async function dataValidate(inputPath: string, verbose: boolean): Promise<CliReport> {
@@ -1732,9 +1536,6 @@ export async function dataValidate(inputPath: string, verbose: boolean): Promise
     await auditEraSimulationProfiles(manifest, manifestDir, verbose),
     await auditBracket(manifest, manifestDir, verbose),
     await auditGlobalAssets(manifest, manifestDir, verbose),
-    await auditSeasonFreeAgencyIndex(manifest, manifestDir, verbose),
-    await auditSponsorGear(manifest, manifestDir, verbose),
-    await auditSeasonGameTargets(manifestDir, verbose),
     await auditCollectionCatalog(manifest, manifestDir, verbose),
     await auditCollectionGameRules(manifest, manifestDir, verbose, parsed),
     auditAssets(manifest),

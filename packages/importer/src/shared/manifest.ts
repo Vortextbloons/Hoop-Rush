@@ -34,16 +34,6 @@ export type ManifestSimIndexEntry = {
   url: string;
   contentHash: string;
 };
-const seasonArtifactsSchema = z.looseObject({
-  league: manifestAssetRefSchema.optional(),
-  schedule: manifestAssetRefSchema.optional(),
-  draftCatalog: manifestAssetRefSchema.optional(),
-  rosterTargets: manifestAssetRefSchema.optional(),
-  freeAgencyIndex: manifestAssetRefSchema.optional(),
-  freeAgencyTargets: manifestAssetRefSchema.optional(),
-  sponsorsIndex: manifestAssetRefSchema.optional(),
-});
-export type SeasonArtifacts = z.infer<typeof seasonArtifactsSchema>;
 export const importerManifestSchema = z.looseObject({
   schemaVersion: z.number(),
   dataVersion: z.string(),
@@ -56,7 +46,7 @@ export const importerManifestSchema = z.looseObject({
   bracket: manifestAssetRefSchema.optional(),
   playersIndex: manifestAssetRefSchema.optional(),
   rosterDetails: manifestAssetRefSchema.optional(),
-  season: seasonArtifactsSchema.optional(),
+  draftCatalog: manifestAssetRefSchema.optional(),
   collection: z
     .looseObject({
       catalog: manifestAssetRefSchema,
