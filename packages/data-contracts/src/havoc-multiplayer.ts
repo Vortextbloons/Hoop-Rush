@@ -19,6 +19,7 @@ import {
   HAVOC_MULTIPLAYER_SERIES_GAMES,
   HAVOC_MULTIPLAYER_SERIES_WINS,
   HAVOC_MULTIPLAYER_TURNS,
+  HAVOC_MULTIPLAYER_VERSION,
 } from './havoc-multiplayer-versions.ts';
 
 export const havocMultiplayerParticipantIdSchema = z.enum(['p1', 'p2']);
@@ -40,6 +41,7 @@ export type HavocMultiplayerPhase = z.infer<typeof havocMultiplayerPhaseSchema>;
 
 export const havocMultiplayerVersionLocksSchema = z.object({
   schemaVersion: z.literal(HAVOC_MULTIPLAYER_SAVE_SCHEMA_VERSION),
+  multiplayerVersion: z.literal(HAVOC_MULTIPLAYER_VERSION),
   engineVersion: z.string().min(1).max(64),
   rulesVersion: z.string().min(1).max(64),
   mutationCatalogVersion: z.string().min(1).max(64),
@@ -53,7 +55,10 @@ export type HavocMultiplayerVersionLocks = z.infer<typeof havocMultiplayerVersio
 
 export function defaultHavocMultiplayerVersionLocks(
   overrides: Partial<
-    Omit<HavocMultiplayerVersionLocks, 'schemaVersion' | 'catalogHash' | 'profileHash'>
+    Omit<
+      HavocMultiplayerVersionLocks,
+      'schemaVersion' | 'multiplayerVersion' | 'catalogHash' | 'profileHash'
+    >
   > & {
     catalogHash: string;
     profileHash: string;
@@ -61,6 +66,7 @@ export function defaultHavocMultiplayerVersionLocks(
 ): HavocMultiplayerVersionLocks {
   return {
     schemaVersion: HAVOC_MULTIPLAYER_SAVE_SCHEMA_VERSION,
+    multiplayerVersion: HAVOC_MULTIPLAYER_VERSION,
     engineVersion: overrides.engineVersion ?? 'unknown',
     rulesVersion: overrides.rulesVersion ?? HAVOC_RULES_VERSION,
     mutationCatalogVersion: overrides.mutationCatalogVersion ?? HAVOC_MUTATION_CATALOG_VERSION,
@@ -278,6 +284,10 @@ export const havocMultiplayerRematchConfirmPayloadSchema = z.object({
 export const havocMultiplayerLeavePayloadSchema = z.object({
   kind: z.literal('leave'),
 });
+export const havocMultiplayerRemoveGuestPayloadSchema = z.object({
+  kind: z.literal('remove-guest'),
+  targetParticipantId: havocMultiplayerParticipantIdSchema,
+});
 export const havocMultiplayerCommandPayloadSchema = z.discriminatedUnion('kind', [
   havocMultiplayerReadyPayloadSchema,
   havocMultiplayerStartPayloadSchema,
@@ -291,6 +301,7 @@ export const havocMultiplayerCommandPayloadSchema = z.discriminatedUnion('kind',
   havocMultiplayerRematchRequestPayloadSchema,
   havocMultiplayerRematchConfirmPayloadSchema,
   havocMultiplayerLeavePayloadSchema,
+  havocMultiplayerRemoveGuestPayloadSchema,
 ]);
 export type HavocMultiplayerCommandPayload = z.infer<typeof havocMultiplayerCommandPayloadSchema>;
 export type HavocMultiplayerCommandKind = HavocMultiplayerCommandPayload['kind'];
