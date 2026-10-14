@@ -14,9 +14,11 @@ import {
 } from './havoc-multiplayer-versions.ts';
 import {
   defaultHavocMultiplayerVersionLocks,
+  havocMultiplayerBroadcastSchema,
   havocMultiplayerCommandPayloadSchema,
   havocMultiplayerCommandReceiptSchema,
   havocMultiplayerCommandSchema,
+  havocMultiplayerDeadlineSchema,
   havocMultiplayerDraftStateSchema,
   havocMultiplayerRoomSnapshotSchema,
   havocMultiplayerSeriesSnapshotSchema,
@@ -508,6 +510,25 @@ describe('havoc multiplayer room snapshots', () => {
   const locks = defaultHavocMultiplayerVersionLocks({
     catalogHash: 'a'.repeat(64),
     profileHash: 'b'.repeat(64),
+  });
+
+  it('accepts PostgREST offset datetimes for deadlines and broadcasts', () => {
+    const postgrestTimestamp = '2026-10-14T14:31:00.123456+00:00';
+    expect(
+      havocMultiplayerDeadlineSchema.parse({
+        at: postgrestTimestamp,
+        cursor: 't0',
+        participantId: 'p1',
+        fallback: null,
+      }).at,
+    ).toBe(postgrestTimestamp);
+    expect(
+      havocMultiplayerBroadcastSchema.parse({
+        gameNumber: 1,
+        durationMs: 8000,
+        startedAt: postgrestTimestamp,
+      }).startedAt,
+    ).toBe(postgrestTimestamp);
   });
 
   it('defaults the version locks', () => {

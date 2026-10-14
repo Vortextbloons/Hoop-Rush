@@ -363,7 +363,7 @@ export const havocMultiplayerMemberSnapshotSchema = z.object({
 export type HavocMultiplayerMemberSnapshot = z.infer<typeof havocMultiplayerMemberSnapshotSchema>;
 
 export const havocMultiplayerDeadlineSchema = z.object({
-  at: z.iso.datetime(),
+  at: z.iso.datetime({ offset: true }),
   cursor: z.string().min(1).max(128),
   participantId: havocMultiplayerParticipantIdSchema,
   fallback: havocMultiplayerCommandPayloadSchema.nullable(),
@@ -373,7 +373,7 @@ export type HavocMultiplayerDeadline = z.infer<typeof havocMultiplayerDeadlineSc
 export const havocMultiplayerBroadcastSchema = z.object({
   gameNumber: z.number().int().min(1).max(HAVOC_MULTIPLAYER_SERIES_GAMES),
   durationMs: z.number().int().positive(),
-  startedAt: z.iso.datetime(),
+  startedAt: z.iso.datetime({ offset: true }),
 });
 export type HavocMultiplayerBroadcast = z.infer<typeof havocMultiplayerBroadcastSchema>;
 
