@@ -1,6 +1,11 @@
 import Dexie from 'dexie';
 import { afterEach, describe, expect, it } from 'vitest';
-import { HOOP_RUSH_DATABASE_NAME, HOOP_RUSH_DATABASE_STORES, HoopRushDatabase } from './dexie.ts';
+import {
+  HOOP_RUSH_DATABASE_NAME,
+  HOOP_RUSH_DATABASE_STORES,
+  HOOP_RUSH_DATABASE_V2_STORES,
+  HoopRushDatabase,
+} from './dexie.ts';
 import {
   resetIndexedDb,
   restoreIndexedDb,
@@ -12,15 +17,20 @@ const LEGACY_DATABASE_NAME = 'hoop-rush-saves';
 afterEach(restoreIndexedDb);
 
 describe('storage namespace', () => {
-  it('opens the new namespace at version 1 with every store', async () => {
+  it('opens the new namespace at version 2 with every store', async () => {
     resetIndexedDb();
     const db = new HoopRushDatabase(testDatabaseName('namespace-new'));
     await db.open();
     expect(HOOP_RUSH_DATABASE_NAME).toBe('hoop-rush-saves-v2');
     expect(db.name).not.toBe(LEGACY_DATABASE_NAME);
-    expect(db.verno).toBe(1);
+    expect(db.verno).toBe(2);
     const tableNames = db.tables.map((table) => table.name).sort();
-    expect(tableNames).toEqual(Object.keys(HOOP_RUSH_DATABASE_STORES).sort());
+    expect(tableNames).toEqual(
+      [
+        ...Object.keys(HOOP_RUSH_DATABASE_STORES),
+        ...Object.keys(HOOP_RUSH_DATABASE_V2_STORES),
+      ].sort(),
+    );
     db.close();
   });
 

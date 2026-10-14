@@ -68,6 +68,13 @@ import type {
   StoredHavocHistoryRow,
   StoredHavocRetainedTape,
 } from '../schemas/havoc-record.ts';
+import type {
+  StoredHavocMultiplayerActive,
+  StoredHavocMultiplayerCommandRow,
+  StoredHavocMultiplayerCompleted,
+  StoredHavocMultiplayerHistoryIndex,
+  StoredHavocMultiplayerResultRow,
+} from '../schemas/havoc-multiplayer-record.ts';
 import { listCompletedHistory } from './support.ts';
 const ACTIVE_RECORD_ID = 'active';
 const CLASSIC_DRAFT_RECORD_ID = 'classic-draft';
@@ -120,6 +127,14 @@ export const HOOP_RUSH_DATABASE_STORES: Record<string, string> = {
   havocCompletedRuns: 'runId',
   havocHistory: 'runId, updatedAtIso',
 };
+
+export const HOOP_RUSH_DATABASE_V2_STORES: Record<string, string> = {
+  havocMultiplayerActive: 'roomId',
+  havocMultiplayerCommands: '[roomId+ordinal], roomId',
+  havocMultiplayerResults: '[roomId+gameNumber], roomId',
+  havocMultiplayerCompleted: 'roomId',
+  havocMultiplayerHistory: 'recordId, completedAtIso',
+};
 export class HoopRushDatabase extends Dexie {
   active!: EntityTable<ActiveRunCheckpoint, 'recordId'>;
   activeGames!: Table<ActiveGameRow, [string, number]>;
@@ -164,9 +179,15 @@ export class HoopRushDatabase extends Dexie {
   havocRetainedTapes!: Table<StoredHavocRetainedTape, [string, number]>;
   havocCompletedRuns!: EntityTable<StoredHavocCompletedRun, 'runId'>;
   havocHistory!: EntityTable<StoredHavocHistoryRow, 'runId'>;
+  havocMultiplayerActive!: EntityTable<StoredHavocMultiplayerActive, 'roomId'>;
+  havocMultiplayerCommands!: Table<StoredHavocMultiplayerCommandRow, [string, number]>;
+  havocMultiplayerResults!: Table<StoredHavocMultiplayerResultRow, [string, number]>;
+  havocMultiplayerCompleted!: EntityTable<StoredHavocMultiplayerCompleted, 'roomId'>;
+  havocMultiplayerHistory!: EntityTable<StoredHavocMultiplayerHistoryIndex, 'recordId'>;
   constructor(name = HOOP_RUSH_DATABASE_NAME) {
     super(name);
     this.version(1).stores(HOOP_RUSH_DATABASE_STORES);
+    this.version(2).stores(HOOP_RUSH_DATABASE_V2_STORES);
   }
 }
 export class DexieChallengeRepository {
