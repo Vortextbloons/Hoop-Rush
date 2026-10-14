@@ -234,4 +234,3 @@ export async function dataLineageAudit(args: {
   };
   return makeReport('data lineage-audit', { input: inputPath }, { details, failures, payload });
 }
-export { DEFAULT_MANIFEST };

@@ -2,15 +2,9 @@ import { ChallengeSession, type ChallengePhase } from '@hoop-rush/application/ch
 import type { ChallengeRun } from '@hoop-rush/data-contracts';
 import { getEraSimulationProfile, getManifest } from '#lib/data.js';
 import { sleep } from '#lib/sleep.js';
+import { prefersReducedMotion } from '#lib/device-capabilities.js';
 import { challengeRepository } from './challenge-repo';
 import { ChallengeWorkerJob } from './challenge-job';
-
-function prefersReducedMotion(): boolean {
-  return (
-    typeof window.matchMedia === 'function' &&
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  );
-}
 
 export class ChallengeRunPresenter {
   run = $state.raw<ChallengeRun | null>(null);

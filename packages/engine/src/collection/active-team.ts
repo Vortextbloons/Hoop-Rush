@@ -22,7 +22,7 @@ import {
 
 const STARTER_SLOTS: SlotIndex[] = [0, 1, 2, 3, 4];
 
-function overallOf(card: CollectionCatalogCard): number {
+export function overallOf(card: CollectionCatalogCard): number {
   return card.summarySource?.overallRating ?? 60;
 }
 

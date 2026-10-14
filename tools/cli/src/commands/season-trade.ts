@@ -25,10 +25,10 @@ import { makeReport, type CliReport } from '../report.ts';
 import { seasonTradeCalibrateReportSchema } from '../report-schemas.ts';
 import { DEFAULT_MANIFEST, DEFAULT_SEASON_DIR, readJsonFile } from './season-data.ts';
 import {
+  makeTargetsValidator,
   resolveCalibrationArgs,
   runCalibrationShell,
   targetsDetail,
-  validateTargetsArtifact,
 } from '../calibration/index.ts';
 import {
   gateValue,
@@ -744,18 +744,11 @@ export function evaluateTradeGates(args: {
     },
   };
 }
-export function validateSeasonTradeTargets(args: SeasonTradeArgs, outPath: string): CliReport {
-  void args;
-  return validateTargetsArtifact({
-    outPath,
-    schema: seasonTradeTargetsSchema,
-    command: 'season trade calibrate --validate',
-    extraChecks: () => ({
-      details: [`AI trade band matches the frozen [8, 15]`],
-      failures: [],
-    }),
-  });
-}
+export const validateSeasonTradeTargets = makeTargetsValidator({
+  schema: seasonTradeTargetsSchema,
+  command: 'season trade calibrate --validate',
+  detail: 'AI trade band matches the frozen [8, 15]',
+});
 export function seasonTradeCalibrate(args: SeasonTradeArgs): CliReport {
   const started = Date.now();
   const { from, to, workers, calibrationIndices, validationIndices } = resolveCalibrationArgs(

@@ -11,17 +11,9 @@ interface NavigatorWithHints extends Navigator {
   connection?: { saveData?: boolean; effectiveType?: string };
 }
 
-export interface DeviceSnapshot {
-  hardwareConcurrency: number;
-  deviceMemory: number;
-  saveData: boolean;
-  prefersReducedMotion: boolean;
-  lowEnd: boolean;
-}
-
 export type LiteModePreference = 'auto' | 'on' | 'off';
 
-function prefersReducedMotion(): boolean {
+export function prefersReducedMotion(): boolean {
   try {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
     return window.matchMedia(LITE_MEDIA_QUERY).matches;
@@ -52,17 +44,6 @@ export function detectLowEndDevice(): boolean {
   } catch {
     return false;
   }
-}
-
-export function getDeviceSnapshot(): DeviceSnapshot {
-  const nav = (typeof navigator === 'undefined' ? null : (navigator as NavigatorWithHints)) ?? null;
-  return {
-    hardwareConcurrency: nav?.hardwareConcurrency ?? 0,
-    deviceMemory: nav?.deviceMemory ?? 0,
-    saveData: nav?.connection?.saveData === true,
-    prefersReducedMotion: prefersReducedMotion(),
-    lowEnd: detectLowEndDevice(),
-  };
 }
 
 export function readLiteModePreference(): LiteModePreference {

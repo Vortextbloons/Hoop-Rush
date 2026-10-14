@@ -20,6 +20,7 @@
   import { formatPositions } from '#lib/player-positions.js';
   import type { DraftPresentation } from '#lib/draft-presentation.js';
   import type { FixedFivePlayerStats } from '#lib/features/multiplayer/fixed-five-player-stats.js';
+  import { perGameText } from '#lib/format.js';
   let {
     mode,
     result,
@@ -76,11 +77,8 @@
     const lines = stats ? (statsPid === 'p1' ? stats.p1 : stats.p2) : [];
     return new Map(lines.map((line) => [line.playerId, line]));
   });
-  function perGame(value: number, games: number): string {
-    return (value / Math.max(1, games)).toFixed(1);
-  }
   function statValue(value: number, games: number): string {
-    return statsTotals ? String(value) : perGame(value, games);
+    return statsTotals ? String(value) : perGameText(value, games);
   }
   function pctStr(made: number, attempted: number): string {
     if (attempted <= 0) return '—';
@@ -515,19 +513,19 @@
             <div class="mt-3 grid grid-cols-3 divide-x divide-border/60">
               <div>
                 <p class="font-display text-2xl font-extrabold text-primary tabular-nums">
-                  {perGame(mvp.line.points, mvp.line.games)}
+                  {perGameText(mvp.line.points, mvp.line.games)}
                 </p>
                 <p class="font-mono text-[10px] text-muted-foreground uppercase">PPG</p>
               </div>
               <div>
                 <p class="font-display text-2xl font-extrabold text-primary tabular-nums">
-                  {perGame(mvp.line.rebounds, mvp.line.games)}
+                  {perGameText(mvp.line.rebounds, mvp.line.games)}
                 </p>
                 <p class="font-mono text-[10px] text-muted-foreground uppercase">REB</p>
               </div>
               <div>
                 <p class="font-display text-2xl font-extrabold text-primary tabular-nums">
-                  {perGame(mvp.line.assists, mvp.line.games)}
+                  {perGameText(mvp.line.assists, mvp.line.games)}
                 </p>
                 <p class="font-mono text-[10px] text-muted-foreground uppercase">AST</p>
               </div>
@@ -569,11 +567,11 @@
               <tbody class="divide-y divide-border/50 tabular-nums">
                 <tr>
                   <td class="py-2 text-left font-bold"
-                    >{perGame(comparison.you.points, comparison.games)}</td
+                    >{perGameText(comparison.you.points, comparison.games)}</td
                   >
                   <td class="py-2 text-center text-xs text-muted-foreground">Points per game</td>
                   <td class="py-2 text-right font-bold"
-                    >{perGame(comparison.opp.points, comparison.games)}</td
+                    >{perGameText(comparison.opp.points, comparison.games)}</td
                   >
                 </tr>
                 <tr>
@@ -596,20 +594,20 @@
                 </tr>
                 <tr>
                   <td class="py-2 text-left font-bold"
-                    >{perGame(comparison.you.reb, comparison.games)}</td
+                    >{perGameText(comparison.you.reb, comparison.games)}</td
                   >
                   <td class="py-2 text-center text-xs text-muted-foreground">Rebounds per game</td>
                   <td class="py-2 text-right font-bold"
-                    >{perGame(comparison.opp.reb, comparison.games)}</td
+                    >{perGameText(comparison.opp.reb, comparison.games)}</td
                   >
                 </tr>
                 <tr>
                   <td class="py-2 text-left font-bold"
-                    >{perGame(comparison.you.tov, comparison.games)}</td
+                    >{perGameText(comparison.you.tov, comparison.games)}</td
                   >
                   <td class="py-2 text-center text-xs text-muted-foreground">Turnovers per game</td>
                   <td class="py-2 text-right font-bold"
-                    >{perGame(comparison.opp.tov, comparison.games)}</td
+                    >{perGameText(comparison.opp.tov, comparison.games)}</td
                   >
                 </tr>
               </tbody>
@@ -1092,11 +1090,11 @@
               <tbody class="divide-y divide-border/50 tabular-nums">
                 <tr>
                   <td class="py-2 text-left font-bold"
-                    >{perGame(comparison.you.points, comparison.games)}</td
+                    >{perGameText(comparison.you.points, comparison.games)}</td
                   >
                   <td class="py-2 text-center text-xs text-muted-foreground">Points per game</td>
                   <td class="py-2 text-right font-bold"
-                    >{perGame(comparison.opp.points, comparison.games)}</td
+                    >{perGameText(comparison.opp.points, comparison.games)}</td
                   >
                 </tr>
                 <tr>
@@ -1119,20 +1117,20 @@
                 </tr>
                 <tr>
                   <td class="py-2 text-left font-bold"
-                    >{perGame(comparison.you.reb, comparison.games)}</td
+                    >{perGameText(comparison.you.reb, comparison.games)}</td
                   >
                   <td class="py-2 text-center text-xs text-muted-foreground">Rebounds per game</td>
                   <td class="py-2 text-right font-bold"
-                    >{perGame(comparison.opp.reb, comparison.games)}</td
+                    >{perGameText(comparison.opp.reb, comparison.games)}</td
                   >
                 </tr>
                 <tr>
                   <td class="py-2 text-left font-bold"
-                    >{perGame(comparison.you.tov, comparison.games)}</td
+                    >{perGameText(comparison.you.tov, comparison.games)}</td
                   >
                   <td class="py-2 text-center text-xs text-muted-foreground">Turnovers per game</td>
                   <td class="py-2 text-right font-bold"
-                    >{perGame(comparison.opp.tov, comparison.games)}</td
+                    >{perGameText(comparison.opp.tov, comparison.games)}</td
                   >
                 </tr>
               </tbody>

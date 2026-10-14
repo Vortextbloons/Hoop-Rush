@@ -172,3 +172,40 @@ export function initialsOf(displayName: string): string {
   const initials = `${firstChar(parts[0])}${firstChar(parts[parts.length - 1])}`.toUpperCase();
   return initials === '' ? '?' : initials;
 }
+export function eraLabelOf(
+  manifest: HoopRushManifest,
+  franchiseId: string,
+  eraId: string,
+): string | null {
+  return eraIdentityOf(manifest, franchiseId, eraId).displayLabel;
+}
+export function faceOf(
+  faces: ReadonlyMap<string, SeasonFaceRef> | null | undefined,
+  playerVersionId: string,
+): SeasonFaceRef | null {
+  return faces?.get(playerVersionId) ?? null;
+}
+export function teamLabelFor(
+  manifest: HoopRushManifest,
+  franchiseId: string,
+  eraId: string,
+): string {
+  const identity = resolveEraTeamIdentity(manifest, franchiseId, eraId);
+  return identity.abbreviationLabel ?? franchiseAbbreviation(franchiseId);
+}
+export function teamNameFor(
+  manifest: HoopRushManifest,
+  franchiseNames: ReadonlyMap<string, string>,
+  franchiseId: string,
+  eraId: string,
+): string {
+  const identity = resolveEraTeamIdentity(manifest, franchiseId, eraId);
+  return identity.displayLabel ?? franchiseNames.get(franchiseId) ?? franchiseId;
+}
+export function teamExternalIdOf(manifest: HoopRushManifest | null, franchiseId: string): string {
+  if (manifest === null) return '';
+  return franchiseIdentityOf(manifest, franchiseId)?.teamExternalId ?? '';
+}
+export function eraName(manifest: HoopRushManifest | null, eraId: string): string {
+  return manifest?.eras.find((era) => era.eraId === eraId)?.label ?? eraId;
+}

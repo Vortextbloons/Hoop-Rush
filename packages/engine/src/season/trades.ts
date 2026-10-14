@@ -55,9 +55,7 @@ import {
   type SeasonTradeCatalogFacts,
   type SeasonTradePackageKind,
 } from './trade-valuation.ts';
-export { seasonEconomyRunOf, type SeasonEconomyRun } from './trade-valuation.ts';
-export type { TradeBackfillFill, TradeBackfillSelection } from './trade-valuation.ts';
-export { selectTradeBackfill } from './trade-valuation.ts';
+export type { SeasonEconomyRun } from './trade-valuation.ts';
 export const WINDOW_BLOCK_INDEX_TO_INDEX: Readonly<Record<number, number>> = {
   2: 0,
   4: 1,

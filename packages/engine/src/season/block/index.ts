@@ -1,4 +1,3 @@
-export { seasonRunStateDigestFactsOf } from '../state-digest.ts';
 export {
   SeasonBlockCancelledError,
   SeasonBlockInvariantError,
@@ -24,7 +23,6 @@ export {
   defaultSeasonBlockGameSharedOptions,
   rosterByFranchiseScopedToRotations,
   seasonBlockGameSteps,
-  seasonBlockSkipRecoveryTick,
   type SeasonBlockGameStepEvent,
   type SeasonBlockIterationAccumulator,
 } from './iteration.ts';
@@ -34,11 +32,8 @@ export {
   simulateSeasonBlock,
 } from './run.ts';
 export type {
-  AssembleSeasonBlockCandidateArgs,
   SeasonBlockGameOutcome,
-  SeasonBlockGameSimulationOptions,
   SeasonBlockSimulationInput,
   SeasonBlockSimulationOptions,
   SeasonSubmitBlockCommandInput,
-  SimulateSeasonBlockGameArgs,
 } from './types.ts';

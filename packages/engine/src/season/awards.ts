@@ -5,6 +5,13 @@ import {
   type SeasonGameSummary,
   type SeasonRoster,
 } from '@hoop-rush/data-contracts';
+import {
+  DEFENSE_WEIGHTS,
+  PLAYMAKING_ASSIST_WEIGHT,
+  TEAM_BONUS,
+  shotsUsedOf,
+  trueShootingOf,
+} from './box-score-metrics.ts';
 export interface SeasonAwardsInput {
   runId: string;
   rosters: SeasonRoster[];
@@ -13,9 +20,6 @@ export interface SeasonAwardsInput {
 export const SEASON_AWARD_MIN_GAME_SHARE = 0.7;
 export const SEASON_AWARD_FULL_SEASON_GAMES = 82;
 const CONSISTENCY_PENALTY = 0.08;
-const DEFENSE_WEIGHTS = { steal: 0.6, block: 0.6, defensiveRebound: 0.15 } as const;
-const PLAYMAKING_ASSIST_WEIGHT = 0.5;
-const TEAM_BONUS = { win: 0.75, loss: -0.75 } as const;
 const DPOY = { steal: 2.0, block: 2.0, defensiveRebound: 0.5, advantage: 3.0 } as const;
 interface PlayerTotals {
   playerVersionId: string;
@@ -47,17 +51,6 @@ interface TeamFacts {
   pointsAgainst: number;
   possessions: number;
   seconds: number;
-}
-function shotsUsedOf(line: { fieldGoalsAttempted: number; freeThrowsAttempted: number }): number {
-  return line.fieldGoalsAttempted + 0.44 * line.freeThrowsAttempted;
-}
-function trueShootingOf(line: {
-  points: number;
-  fieldGoalsAttempted: number;
-  freeThrowsAttempted: number;
-}): number {
-  const shots = shotsUsedOf(line);
-  return shots <= 0 ? 0 : line.points / (2 * shots);
 }
 function gameScoreOf(line: {
   points: number;

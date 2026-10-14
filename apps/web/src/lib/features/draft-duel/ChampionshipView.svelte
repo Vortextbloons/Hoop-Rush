@@ -13,6 +13,7 @@
   } from '@hoop-rush/data-contracts';
   import PlayerFace from '#lib/components/PlayerFace.svelte';
   import { SLOT_LABELS } from '#lib/player-positions.js';
+  import { perGameText, ratioPct } from '#lib/format.js';
 
   let {
     series,
@@ -154,14 +155,6 @@
     return game.homeParticipantId === localParticipantId ? game.result.away : game.result.home;
   }
 
-  function perGame(total: number, gamesPlayed: number): string {
-    return (total / Math.max(1, gamesPlayed)).toFixed(1);
-  }
-
-  function pct(made: number, attempted: number): string {
-    return attempted === 0 ? '—' : `${((made / attempted) * 100).toFixed(1)}%`;
-  }
-
   function emptyTotals(): SideTotals {
     return {
       games: 0,
@@ -240,7 +233,7 @@
       playerId: best.playerId,
       name: nameOf(best.playerId),
       total: best[key],
-      perGame: perGame(best[key], best.games),
+      perGame: perGameText(best[key], best.games),
     };
   }
 
@@ -363,9 +356,9 @@
       ? null
       : {
           games: mvp.games,
-          ppg: perGame(mvp.points, mvp.games),
-          rpg: perGame(mvp.rebounds, mvp.games),
-          apg: perGame(mvp.assists, mvp.games),
+          ppg: perGameText(mvp.points, mvp.games),
+          rpg: perGameText(mvp.rebounds, mvp.games),
+          apg: perGameText(mvp.assists, mvp.games),
           points: mvp.points,
           rebounds: mvp.rebounds,
           assists: mvp.assists,
@@ -473,39 +466,41 @@
           </thead>
           <tbody>
             <tr>
-              <td>{perGame(comparison.local.points, comparison.local.games)}</td>
+              <td>{perGameText(comparison.local.points, comparison.local.games)}</td>
               <th scope="row">Points per game</th>
-              <td>{perGame(comparison.opponent.points, comparison.opponent.games)}</td>
+              <td>{perGameText(comparison.opponent.points, comparison.opponent.games)}</td>
             </tr>
             <tr>
-              <td>{pct(comparison.local.fieldGoalMakes, comparison.local.fieldGoalAttempts)}</td>
+              <td
+                >{ratioPct(comparison.local.fieldGoalMakes, comparison.local.fieldGoalAttempts)}</td
+              >
               <th scope="row">FG%</th>
               <td
-                >{pct(
+                >{ratioPct(
                   comparison.opponent.fieldGoalMakes,
                   comparison.opponent.fieldGoalAttempts,
                 )}</td
               >
             </tr>
             <tr>
-              <td>{pct(comparison.local.threeMakes, comparison.local.threeAttempts)}</td>
+              <td>{ratioPct(comparison.local.threeMakes, comparison.local.threeAttempts)}</td>
               <th scope="row">3P%</th>
-              <td>{pct(comparison.opponent.threeMakes, comparison.opponent.threeAttempts)}</td>
+              <td>{ratioPct(comparison.opponent.threeMakes, comparison.opponent.threeAttempts)}</td>
             </tr>
             <tr>
-              <td>{perGame(comparison.local.rebounds, comparison.local.games)}</td>
+              <td>{perGameText(comparison.local.rebounds, comparison.local.games)}</td>
               <th scope="row">Rebounds per game</th>
-              <td>{perGame(comparison.opponent.rebounds, comparison.opponent.games)}</td>
+              <td>{perGameText(comparison.opponent.rebounds, comparison.opponent.games)}</td>
             </tr>
             <tr>
-              <td>{perGame(comparison.local.assists, comparison.local.games)}</td>
+              <td>{perGameText(comparison.local.assists, comparison.local.games)}</td>
               <th scope="row">Assists per game</th>
-              <td>{perGame(comparison.opponent.assists, comparison.opponent.games)}</td>
+              <td>{perGameText(comparison.opponent.assists, comparison.opponent.games)}</td>
             </tr>
             <tr>
-              <td>{perGame(comparison.local.turnovers, comparison.local.games)}</td>
+              <td>{perGameText(comparison.local.turnovers, comparison.local.games)}</td>
               <th scope="row">Turnovers per game</th>
-              <td>{perGame(comparison.opponent.turnovers, comparison.opponent.games)}</td>
+              <td>{perGameText(comparison.opponent.turnovers, comparison.opponent.games)}</td>
             </tr>
           </tbody>
         </table>
@@ -656,9 +651,9 @@
                 <td>{statValue(row.steals, row.games)}</td>
                 <td>{statValue(row.blocks, row.games)}</td>
                 <td>{statValue(row.turnovers, row.games)}</td>
-                <td>{pct(row.fieldGoalMakes, row.fieldGoalAttempts)}</td>
-                <td>{pct(row.threeMakes, row.threeAttempts)}</td>
-                <td>{pct(row.freeThrowMakes, row.freeThrowAttempts)}</td>
+                <td>{ratioPct(row.fieldGoalMakes, row.fieldGoalAttempts)}</td>
+                <td>{ratioPct(row.threeMakes, row.threeAttempts)}</td>
+                <td>{ratioPct(row.freeThrowMakes, row.freeThrowAttempts)}</td>
               </tr>
             {/each}
           </tbody>

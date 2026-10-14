@@ -8,7 +8,8 @@
   import { formatPositions } from '#lib/player-positions.js';
   import type { SeasonPlayerStatsRow } from '#lib/season/season-player-stats-view.js';
   import type { TradePlayerViewModel } from '#lib/season/season-trade-view.js';
-  import { oneDecimal, percentOneDecimal } from '#lib/format.js';
+  import { oneDecimal } from '#lib/format.js';
+  import { formatPct } from '#lib/roster-browser.js';
   let {
     player,
     manifest,
@@ -28,11 +29,6 @@
   const eraLabel = $derived(
     player === null ? null : eraIdentityOf(manifest, player.franchiseId, player.eraId).displayLabel,
   );
-  function pct(value: number | null): string {
-    if (value === null) return '—';
-    if (value === 0) return '0%';
-    return percentOneDecimal(value);
-  }
 </script>
 
 <DialogShell
@@ -113,13 +109,13 @@
           <div>
             <dt class="text-xs text-muted-foreground">FG%</dt>
             <dd class="sr-number font-mono text-sm font-semibold">
-              {pct(candidate.anchors.fieldGoalPct)}
+              {formatPct(candidate.anchors.fieldGoalPct)}
             </dd>
           </div>
           <div>
             <dt class="text-xs text-muted-foreground">3P%</dt>
             <dd class="sr-number font-mono text-sm font-semibold">
-              {pct(candidate.anchors.threePointPct)}
+              {formatPct(candidate.anchors.threePointPct)}
             </dd>
           </div>
         </dl>
@@ -160,13 +156,13 @@
           <div>
             <dt class="text-xs text-muted-foreground">FG%</dt>
             <dd class="sr-number font-mono text-sm font-semibold">
-              {pct(runStats.fieldGoalPct)}
+              {formatPct(runStats.fieldGoalPct)}
             </dd>
           </div>
           <div>
             <dt class="text-xs text-muted-foreground">3P%</dt>
             <dd class="sr-number font-mono text-sm font-semibold">
-              {pct(runStats.threePointPct)}
+              {formatPct(runStats.threePointPct)}
             </dd>
           </div>
         </dl>

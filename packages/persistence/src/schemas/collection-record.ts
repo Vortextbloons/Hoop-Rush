@@ -10,8 +10,8 @@ import {
   collectionGameRecordV3Schema,
   collectionLedgerEntrySchema,
   collectionOwnedCardSchema,
-  collectionPlayStateV3Schema,
-  collectionPullRecordUnionSchema,
+  collectionPlayStateSchema,
+  collectionPullRecordSchema,
   collectionSetClaimReceiptSchema,
   collectionStateV2Schema,
   contentHashSchema,
@@ -49,7 +49,7 @@ export type StoredCollectionOwnershipRow = z.infer<typeof storedCollectionOwners
 export const storedCollectionPullSchema = z.object({
   collectionId: z.string().min(1).max(64),
   pullSequence: z.number().int().nonnegative(),
-  pull: collectionPullRecordUnionSchema,
+  pull: collectionPullRecordSchema,
 });
 export type StoredCollectionPullRow = z.infer<typeof storedCollectionPullSchema>;
 
@@ -93,7 +93,7 @@ const storedCollectionPlayStateRowBaseSchema = z.object({
 
 export const storedCollectionPlayStateSchema = storedCollectionPlayStateRowBaseSchema.extend({
   saveSchemaVersion: z.literal(COLLECTION_PLAY_SAVE_VERSION),
-  playState: collectionPlayStateV3Schema,
+  playState: collectionPlayStateSchema,
 });
 
 export type StoredCollectionPlayStateRow = z.infer<typeof storedCollectionPlayStateSchema>;
@@ -116,15 +116,13 @@ export const storedCollectionGameV3Schema = storedCollectionGameRowBaseSchema.ex
   record: collectionGameRecordV3Schema,
 });
 
-export const storedCollectionGameUnionSchema = z.union([
+export const storedCollectionGameSchema = z.union([
   storedCollectionGameV3Schema,
   storedCollectionGameV2Schema,
   storedCollectionGameV1Schema,
 ]);
 
-export const storedCollectionGameSchema = storedCollectionGameUnionSchema;
-
-export type StoredCollectionGameRow = z.infer<typeof storedCollectionGameUnionSchema>;
+export type StoredCollectionGameRow = z.infer<typeof storedCollectionGameSchema>;
 export type StoredCollectionGameV2Row = z.infer<typeof storedCollectionGameV2Schema>;
 export type StoredCollectionGameV3Row = z.infer<typeof storedCollectionGameV3Schema>;
 

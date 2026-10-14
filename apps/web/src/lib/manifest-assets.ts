@@ -54,7 +54,7 @@ export function clearManifestCache(): void {
   manifestPromise = null;
 }
 
-export function isContentHashMismatch(error: unknown): boolean {
+function isContentHashMismatch(error: unknown): boolean {
   return error instanceof Error && CONTENT_HASH_MISMATCH.test(error.message);
 }
 

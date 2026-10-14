@@ -219,6 +219,27 @@ function allocateGroup(
   }
   return result;
 }
+export function minuteQualityOf<T>(
+  rows: readonly T[],
+  minutesOf: (row: T) => number,
+  valueOf: (row: T) => number,
+): number {
+  const total = rows.reduce((sum, row) => sum + minutesOf(row), 0);
+  return rows.reduce((sum, row) => sum + minutesOf(row) * valueOf(row), 0) / Math.max(1, total);
+}
+export function minuteReliefOf<T>(
+  rows: readonly T[],
+  minutesOf: (row: T) => number,
+  valueOf: (row: T) => number,
+  inBenchOf: (row: T) => boolean,
+): number {
+  const total = rows.reduce((sum, row) => sum + minutesOf(row) * valueOf(row), 0);
+  const carried = rows.reduce(
+    (sum, row) => (inBenchOf(row) ? sum + minutesOf(row) * valueOf(row) : sum),
+    0,
+  );
+  return Math.max(0, Math.min(1, total <= 0 ? 0 : carried / total));
+}
 export function planQualityOf(
   targetMinutes: readonly {
     playerVersionId: string;
@@ -226,12 +247,10 @@ export function planQualityOf(
   }[],
   qualityByVersion: ReadonlyMap<string, number>,
 ): number {
-  const total = targetMinutes.reduce((sum, row) => sum + row.minutes, 0);
-  return (
-    targetMinutes.reduce(
-      (sum, row) => sum + row.minutes * (qualityByVersion.get(row.playerVersionId) ?? 0),
-      0,
-    ) / Math.max(1, total)
+  return minuteQualityOf(
+    targetMinutes,
+    (row) => row.minutes,
+    (row) => qualityByVersion.get(row.playerVersionId) ?? 0,
   );
 }
 export function benchReliefOf(
@@ -243,18 +262,12 @@ export function benchReliefOf(
   qualityByVersion: ReadonlyMap<string, number>,
 ): number {
   const bench = new Set(benchOrder);
-  const total = targetMinutes.reduce(
-    (sum, row) => sum + row.minutes * (qualityByVersion.get(row.playerVersionId) ?? 0),
-    0,
+  return minuteReliefOf(
+    targetMinutes,
+    (row) => row.minutes,
+    (row) => qualityByVersion.get(row.playerVersionId) ?? 0,
+    (row) => bench.has(row.playerVersionId),
   );
-  const carried = targetMinutes.reduce(
-    (sum, row) =>
-      bench.has(row.playerVersionId)
-        ? sum + row.minutes * (qualityByVersion.get(row.playerVersionId) ?? 0)
-        : sum,
-    0,
-  );
-  return Math.max(0, Math.min(1, total <= 0 ? 0 : carried / total));
 }
 export function riskScoreOf(input: {
   quality: number;

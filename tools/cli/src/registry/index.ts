@@ -9,15 +9,8 @@ import { projectionCommands } from './projection.ts';
 import { importCommands } from './import.ts';
 import { helpReport, type CommandSpec } from './core.ts';
 
-export {
-  COMMON_OPTIONS,
-  buildHelpText,
-  declaredOptions,
-  helpReport,
-  makeCommandArgs,
-  usageError,
-} from './core.ts';
-export type { CommandArgs, CommandSpec, OptionKind } from './core.ts';
+export { buildHelpText, declaredOptions, helpReport, makeCommandArgs, usageError } from './core.ts';
+export type { CommandSpec } from './core.ts';
 
 const AREA_COMMANDS: Record<string, CommandSpec> = {};
 for (const commands of [

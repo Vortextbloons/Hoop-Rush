@@ -18,6 +18,7 @@ import {
   seasonDigestHex,
 } from '@hoop-rush/data-contracts';
 import { canPlay } from '../domain/positions.ts';
+import { mean } from '../domain/math.ts';
 import { prepareTeam, type TeamPrep } from '../sim/prepare.ts';
 import { projectExpectedLedger, type LedgerSide } from './expected-ledger.ts';
 import { resolveReference } from './reference-lineups.ts';
@@ -64,9 +65,6 @@ function normalize(
   const min = scale?.min ?? 0;
   const max = scale?.max ?? 100;
   return normalizeValue(raw, baseline, perPoint, min, max);
-}
-function mean(values: readonly number[]): number {
-  return values.reduce((sum, value) => sum + value, 0) / Math.max(1, values.length);
 }
 function ratingMean(
   players: readonly SimulationPlayer[],

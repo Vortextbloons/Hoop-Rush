@@ -1,4 +1,3 @@
-import { PROJECTION_WORKER_WIRE_SCHEMA_VERSION } from '@hoop-rush/data-contracts';
 import type {
   ProjectionRosterBuildRequest as ContractRosterBuildRequest,
   ProjectionRotationLoadRow as ContractLoadRow,
@@ -12,7 +11,6 @@ import type {
   SearchLens,
 } from '@hoop-rush/engine';
 
-export { PROJECTION_WORKER_WIRE_SCHEMA_VERSION };
 export type ProjectionRotationLoadRow = ContractLoadRow;
 export type ProjectionRosterBuildRequest = Omit<ContractRosterBuildRequest, 'lens'> & {
   lens?: SearchLens;

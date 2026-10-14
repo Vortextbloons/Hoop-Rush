@@ -7,7 +7,7 @@ import {
   type GameResult,
   type GameSimulationInput,
 } from '@hoop-rush/data-contracts';
-import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.ts';
+import { makeReport, type CliReport } from '../report.ts';
 import { replayReportSchema } from '../report-schemas.ts';
 import { UsageError } from './sim.ts';
 function readInputJson<T>(
@@ -85,4 +85,3 @@ export function replay(args: { input?: string; expected?: string }): CliReport {
     { details, failures, payload },
   );
 }
-export { EXIT_USAGE_OR_DATA_ERROR };

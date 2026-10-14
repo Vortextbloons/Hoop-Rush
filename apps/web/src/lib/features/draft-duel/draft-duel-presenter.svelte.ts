@@ -32,10 +32,10 @@ import {
 } from '@hoop-rush/application/draft-duel';
 import { createDraftDuelSession } from './draft-duel-session';
 import {
-  draftDuelVisibleEventCount,
-  draftDuelVisibleState,
-  type DraftDuelVisibleState,
-} from './draft-duel-playback';
+  gamecastVisibleEventCount,
+  gamecastVisibleState,
+  type GamecastVisibleState,
+} from '#lib/features/multiplayer/gamecast/gamecast-playback.js';
 import { draftDuelFeedLines, type DraftDuelFeedLine } from './draft-duel-broadcast-view';
 
 const CONSIDERATION_CLEAR_MS = 2000;
@@ -156,10 +156,10 @@ export class DraftDuelPresenter {
       !this.busy,
   );
   visibleCount = $derived(
-    this.currentOutput ? draftDuelVisibleEventCount(this.currentOutput.tape, this.progress) : 0,
+    this.currentOutput ? gamecastVisibleEventCount(this.currentOutput.tape, this.progress) : 0,
   );
-  visible = $derived.by<DraftDuelVisibleState | null>(() =>
-    this.currentOutput ? draftDuelVisibleState(this.currentOutput, this.visibleCount) : null,
+  visible = $derived.by<GamecastVisibleState | null>(() =>
+    this.currentOutput ? gamecastVisibleState(this.currentOutput, this.visibleCount) : null,
   );
   feed = $derived.by<DraftDuelFeedLine[]>(() =>
     this.currentOutput ? draftDuelFeedLines(this.currentOutput, this.visibleCount) : [],

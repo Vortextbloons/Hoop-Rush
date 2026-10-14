@@ -12,6 +12,7 @@
     type RosterSortDirection,
     type RosterSortId,
   } from '#lib/roster-browser.js';
+  import { teamLabelFor } from '#lib/season/season-branding.js';
   import { formatPositions } from '#lib/player-positions.js';
   import PlayerFace from './PlayerFace.svelte';
   import TeamLogo from './TeamLogo.svelte';
@@ -61,10 +62,6 @@
   function groupLabel(franchiseId: string, eraId: string): string {
     const identity = resolveEraTeamIdentity(manifest, franchiseId, eraId);
     return identity.displayLabel ?? franchiseAbbreviation(franchiseId);
-  }
-  function teamLabelFor(player: RosterDetailRow): string {
-    const identity = resolveEraTeamIdentity(manifest, player.franchiseId, player.eraId);
-    return identity.abbreviationLabel ?? franchiseAbbreviation(player.franchiseId);
   }
   function teamSlotFor(player: RosterDetailRow): string | null {
     return (
@@ -224,7 +221,9 @@
                           className="h-4 w-4"
                         />
                       {/if}
-                      <span class="truncate">{teamLabelFor(player)}</span>
+                      <span class="truncate"
+                        >{teamLabelFor(manifest, player.franchiseId, player.eraId)}</span
+                      >
                     </span>
                   </span>
                 </div>
@@ -307,7 +306,9 @@
                   />
                 {/if}
                 <span class="min-w-0 truncate">
-                  {teamLabelFor(player)} · {eraLabel.get(player.eraId) ?? player.eraId} · {player.seasonKey}
+                  {teamLabelFor(manifest, player.franchiseId, player.eraId)} · {eraLabel.get(
+                    player.eraId,
+                  ) ?? player.eraId} · {player.seasonKey}
                   · {formatPositions(player.positionsPlayable)}
                 </span>
               </span>

@@ -136,4 +136,3 @@ export async function dataCoverage(args: {
     { details, payload },
   );
 }
-export { DEFAULT_MANIFEST };

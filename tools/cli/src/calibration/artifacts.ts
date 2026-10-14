@@ -82,6 +82,21 @@ export function validateTargetsArtifact<T>(args: {
   }
   return makeReport(args.command, {}, { details, failures: failuresList });
 }
+export function makeTargetsValidator<T>(opts: {
+  schema: z.ZodType<T>;
+  command: string;
+  detail: string;
+}): (args: unknown, outPath: string) => CliReport {
+  return (args, outPath) => {
+    void args;
+    return validateTargetsArtifact({
+      outPath,
+      schema: opts.schema,
+      command: opts.command,
+      extraChecks: () => ({ details: [opts.detail], failures: [] }),
+    });
+  };
+}
 export function runWorkerChunk<TResult>(args: {
   workerUrl: URL;
   workerData: unknown;

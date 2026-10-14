@@ -15,6 +15,7 @@ import {
 import { franchiseIdSchema } from '@hoop-rush/data-contracts';
 import { seasonNamespaceSeed, seasonDigestHex } from '@hoop-rush/data-contracts';
 import { createRng } from '../sim/rng.ts';
+import { mean } from '../domain/math.ts';
 export const FRONT_OFFICE_BASE_REHAB_COST = 2;
 export const FRONT_OFFICE_MIN_REHAB_COST = 1;
 export const SPONSOR_WRAP_PROBABILITY = 0.5;
@@ -235,10 +236,6 @@ function teamRatesOf(
     threesAllowedPerGame: threesAllowed / games,
     pointsAllowedPerGame: pointsAllowed / games,
   };
-}
-function mean(values: readonly number[]): number {
-  if (values.length === 0) return 0;
-  return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 function standardDeviation(values: readonly number[], center: number): number {
   if (values.length === 0) return 1;

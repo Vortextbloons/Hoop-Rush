@@ -3,7 +3,7 @@
   import { resolveHistoricalIdentitySpans } from '@hoop-rush/data-contracts';
   import SeasonPlayerFace from '#lib/components/season/SeasonPlayerFace.svelte';
   import SeasonTeamLogo from '#lib/components/season/SeasonTeamLogo.svelte';
-  import { eraIdentityOf, type SeasonFaceRef } from '#lib/season/season-branding.js';
+  import { eraIdentityOf, faceOf, type SeasonFaceRef } from '#lib/season/season-branding.js';
   import {
     FIVE_COVERAGE_TARGETS,
     coverageNeeds,
@@ -164,9 +164,6 @@
   const progressDots = $derived(draft ? Array.from({ length: 10 }, (_, index) => index + 1) : []);
   function candidateOf(playerVersionId: string) {
     return catalog.candidates.find((c) => c.playerVersionId === playerVersionId) ?? null;
-  }
-  function faceOf(playerVersionId: string): SeasonFaceRef | null {
-    return faces.get(playerVersionId) ?? null;
   }
   function pickRoundLabel(pickOrdinal: number): string {
     return `R${String(pickOrdinal)}`;
@@ -369,9 +366,9 @@
                     <span class="draft-ball" aria-hidden="true"
                       >{String(index + 1).padStart(2, '0')}</span
                     >
-                    {#if faceOf(card.playerVersionId)}
+                    {#if faceOf(faces, card.playerVersionId)}
                       <SeasonPlayerFace
-                        face={faceOf(card.playerVersionId)!}
+                        face={faceOf(faces, card.playerVersionId)!}
                         {manifest}
                         size="md"
                         eager={card.selectable}

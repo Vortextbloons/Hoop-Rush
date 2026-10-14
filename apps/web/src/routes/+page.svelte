@@ -8,6 +8,7 @@
   import { getManifest, warmPlayersIndex } from '#lib/data.js';
   import SeasonTierBadge from '#lib/components/SeasonTierBadge.svelte';
   import { variantLabel } from '#lib/draft-presentation.js';
+  import { eraName } from '#lib/season/season-branding.js';
   import type { ActiveRunCheckpoint, CompletedRunIndex } from '@hoop-rush/persistence';
   const sandboxHref = resolve('sandbox/');
   const historyHref = resolve('sandbox/history/');
@@ -122,9 +123,6 @@
       manifest?.modernFranchiseSlots.find((e) => e.franchiseId === franchiseId)?.displayName ??
       franchiseId
     );
-  }
-  function eraName(eraId: string): string {
-    return manifest?.eras.find((e) => e.eraId === eraId)?.label ?? eraId;
   }
 </script>
 
@@ -271,9 +269,9 @@
                   {#if row.mode === 'classic'}
                     Classic · {variantLabel(row.variant ?? 'ratings')}
                   {:else if row.franchiseId !== null}
-                    {franchiseName(row.franchiseId)} · {eraName(row.eraId)}
+                    {franchiseName(row.franchiseId)} · {eraName(manifest, row.eraId)}
                   {:else}
-                    {eraName(row.eraId)} · 5-player lineup
+                    {eraName(manifest, row.eraId)} · 5-player lineup
                   {/if}
                 </span>
                 <span class="mt-0.5 block text-xs text-muted-foreground">

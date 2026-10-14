@@ -86,7 +86,6 @@ export const RECONSTRUCTION_FEATURE_NAMES = [
   'age',
   'seasonIndex',
 ] as const;
-export type ReconstructionFeatureName = (typeof RECONSTRUCTION_FEATURE_NAMES)[number];
 function numberOrNull(value: unknown): number | null {
   if (value === null || value === undefined) return null;
   const n = Number(value);

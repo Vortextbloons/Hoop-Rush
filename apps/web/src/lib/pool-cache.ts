@@ -16,10 +16,10 @@ const POOL_CACHE_MAX_POOLS_DEFAULT = 60;
 const POOL_CACHE_MAX_POOLS_LITE = 10;
 const POOL_CACHE_MAX_ASSETS_DEFAULT = 24;
 const POOL_CACHE_MAX_ASSETS_LITE = 8;
-export function poolCacheMaxPools(): number {
+function poolCacheMaxPools(): number {
   return isLiteMode() ? POOL_CACHE_MAX_POOLS_LITE : POOL_CACHE_MAX_POOLS_DEFAULT;
 }
-export function poolCacheMaxAssets(): number {
+function poolCacheMaxAssets(): number {
   return isLiteMode() ? POOL_CACHE_MAX_ASSETS_LITE : POOL_CACHE_MAX_ASSETS_DEFAULT;
 }
 type HoopRushCacheDb = Dexie & {

@@ -17,7 +17,7 @@ import {
 import { assignLineup, canFillSlot } from '../domain/lineup.ts';
 import { evaluateLineupBalance } from '../challenge/lineup-eval.ts';
 import { createRng, type Rng } from '../sim/rng.ts';
-import { allocateDefaultMinutes, COMPLETION_PROBE_SCAN_CAP } from './active-team.ts';
+import { allocateDefaultMinutes, COMPLETION_PROBE_SCAN_CAP, overallOf } from './active-team.ts';
 import {
   planCollectionMinutes,
   policyWeightOf,
@@ -35,10 +35,6 @@ import {
 
 const STARTER_SLOTS: SlotIndex[] = [0, 1, 2, 3, 4];
 const BENCH_COUNT = COLLECTION_GAME_CPU_ROSTER_SIZE - STARTER_SLOTS.length;
-
-function overallOf(card: CollectionCatalogCard): number {
-  return card.summarySource?.overallRating ?? 60;
-}
 
 export function cpuPerCardWeights(
   catalog: CollectionCatalog,

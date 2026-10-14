@@ -16,25 +16,9 @@ export function candidateOf(
 ): SeasonDraftCandidate | null {
   return catalog === null ? null : (catalogCandidateMap(catalog).get(playerVersionId) ?? null);
 }
-export function playablePositionsOf(
-  catalog: SeasonDraftCatalog | null,
-  playerVersionId: string,
-): readonly string[] {
-  return candidateOf(catalog, playerVersionId)?.positions.playable ?? [];
-}
 export function overallRatingOf(
   catalog: SeasonDraftCatalog | null,
   playerVersionId: string,
 ): number | null {
   return candidateOf(catalog, playerVersionId)?.summaryRatings.overallRating ?? null;
-}
-export function summaryRatingsOf(
-  catalog: SeasonDraftCatalog | null,
-  playerVersionId: string,
-): {
-  overallRating: number;
-  offenseRating: number;
-  defenseRating: number;
-} | null {
-  return candidateOf(catalog, playerVersionId)?.summaryRatings ?? null;
 }

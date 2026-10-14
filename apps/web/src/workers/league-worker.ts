@@ -4,16 +4,12 @@ import {
   leagueWorkerRequestSchema,
   type LeagueWorkerMessage,
 } from '@hoop-rush/data-contracts';
+import { postWorkerMessage, workerErrorMessage } from '../lib/workers/worker-protocol';
 import { sleep } from '../lib/sleep';
 
 const CHUNK_GAMES = 96;
 let currentRequestId: string | null = null;
 let requestToken = 0;
-
-function post(message: LeagueWorkerMessage): void {
-  leagueWorkerMessageSchema.parse(message);
-  self.postMessage(message);
-}
 
 function postError(requestId: string, message: string): void {
   const payload: LeagueWorkerMessage = {
@@ -46,7 +42,7 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
         { seed: request.seed, bracket: request.bracket, profile: request.profile },
         context,
       );
-      post({
+      postWorkerMessage(leagueWorkerMessageSchema, {
         schemaVersion: 1,
         type: 'progress',
         requestId: request.requestId,
@@ -55,7 +51,7 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
       });
       while (simulation.gamesDone < simulation.gamesTotal && token === requestToken) {
         simulation.advance(CHUNK_GAMES);
-        post({
+        postWorkerMessage(leagueWorkerMessageSchema, {
           schemaVersion: 1,
           type: 'progress',
           requestId: request.requestId,
@@ -65,14 +61,14 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
         await sleep(0);
       }
       if (token !== requestToken) return;
-      post({
+      postWorkerMessage(leagueWorkerMessageSchema, {
         schemaVersion: 1,
         type: 'result',
         requestId: request.requestId,
         record: simulation.finish(),
       });
     } catch (error) {
-      postError(request.requestId, error instanceof Error ? error.message : String(error));
+      postError(request.requestId, workerErrorMessage(error));
     }
   })();
 };

@@ -34,6 +34,7 @@ import {
   parseRoomCode,
   publishTransientPayload,
   readSupabaseEnv,
+  rpcRoomPayload,
   stringField,
   subscribeTransientPayloads,
   supabaseClient,
@@ -82,22 +83,7 @@ interface DraftDuelCommandRow {
   payload: unknown;
 }
 
-interface RpcRoomPayload {
-  room_id: Id;
-  code: DraftDuelRoomCode | null;
-  participant_id?: DraftDuelParticipantId;
-}
-
-function rpcPayload(value: unknown): RpcRoomPayload {
-  const record = value as Record<string, unknown>;
-  const participantRaw = record['participant_id'];
-  const rawCode = record['code'];
-  return {
-    room_id: idSchema.parse(stringField(record, 'room_id')),
-    code: typeof rawCode === 'string' ? draftDuelRoomCodeSchema.parse(rawCode) : null,
-    participant_id: participantRaw === 'p1' || participantRaw === 'p2' ? participantRaw : undefined,
-  };
-}
+const rpcPayload = (value: unknown) => rpcRoomPayload(value, draftDuelRoomCodeSchema);
 
 interface RpcCommandPayload {
   accepted: boolean;

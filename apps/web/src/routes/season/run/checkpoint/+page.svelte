@@ -24,6 +24,7 @@
     deriveBlockRecap,
     ordinal,
     progressLabel,
+    summariesDigest,
   } from '#lib/season/season-presentation.js';
   import { availabilityStripRows } from '#lib/season/season-health-view.js';
   const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
@@ -138,16 +139,6 @@
         summary.awayFranchiseId === humanFranchiseId,
     ),
   );
-  function summariesDigest(summaries: readonly SeasonGameSummary[]): string {
-    let hash = 2166136261;
-    for (const summary of summaries) {
-      const id = summary.gameId;
-      for (let i = 0; i < id.length; i += 1) hash = Math.imul(hash ^ id.charCodeAt(i), 16777619);
-      hash = Math.imul(hash ^ summary.homeScore, 16777619);
-      hash = Math.imul(hash ^ summary.awayScore, 16777619);
-    }
-    return `${String(summaries.length)}:${String(hash >>> 0)}`;
-  }
   const recapCache = new Map<string, ReturnType<typeof deriveBlockRecap>>();
   function memoizedRecap(
     input: Parameters<typeof deriveBlockRecap>[0],

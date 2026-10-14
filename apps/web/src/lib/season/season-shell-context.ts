@@ -49,16 +49,6 @@ export function idleBlockRunState(): BlockRunState {
     startInput: null,
   };
 }
-export function idlePostseasonProgress(): HubPostseasonProgress {
-  return {
-    phase: 'idle',
-    gamesCompleted: 0,
-    gamesTotal: 0,
-    latestGameId: null,
-    latestResult: null,
-    error: null,
-  };
-}
 export interface SeasonRunShellData {
   ready: boolean;
   error: SeasonRunLoadDiagnostic | null;

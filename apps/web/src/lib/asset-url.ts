@@ -1,7 +1,7 @@
 import { asset, resolve } from '$app/paths';
 import type { AssetPath } from '$app/types';
 
-export function siteRoot(): string {
+function siteRoot(): string {
   return resolve('/');
 }
 

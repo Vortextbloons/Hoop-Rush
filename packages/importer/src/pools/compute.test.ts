@@ -14,7 +14,7 @@ import {
 import { parsePool } from '@hoop-rush/data-contracts';
 import { MANIFEST_SCHEMA_VERSION } from '@hoop-rush/data-contracts';
 import { readJson, sha256File, writeJson } from '../json.ts';
-import { normalizePositionLabels } from './positions.ts';
+import { normalizePositionLabels } from '../positions/normalize.ts';
 import {
   CONFIDENCE_POLICY_VERSION,
   DATA_VERSION,

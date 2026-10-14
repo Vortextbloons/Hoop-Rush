@@ -28,7 +28,7 @@
   import GameStrip from '#lib/components/GameStrip.svelte';
   import PlayerFace from '#lib/components/PlayerFace.svelte';
   import SeasonTierBadge from '#lib/components/SeasonTierBadge.svelte';
-  import { oneDecimal, percentOneDecimal } from '#lib/format.js';
+  import { oneDecimal, percentOneDecimal, ratioPct } from '#lib/format.js';
   import { SLOT_LABELS } from '#lib/player-positions.js';
   type PeakPlayer = PeakPlayerSeason;
   let {
@@ -182,9 +182,6 @@
       case 'overtime':
         return `${team} won the overtime period ${String(evidence.homeOvertimePoints)}–${String(evidence.awayOvertimePoints)}.`;
     }
-  }
-  function pct(made: number, attempted: number): string {
-    return attempted === 0 ? '—' : percentOneDecimal(made / attempted);
   }
   const netRatingLabel = $derived(
     explanation.netRatingPer100 >= 0
@@ -505,20 +502,20 @@
               </tr>
               <tr>
                 <td class="py-2 text-left font-bold"
-                  >{pct(record.fieldGoals.made, record.fieldGoals.attempted)}</td
+                  >{ratioPct(record.fieldGoals.made, record.fieldGoals.attempted)}</td
                 >
                 <td class="py-2 text-center text-xs text-muted-foreground">FG%</td>
                 <td class="py-2 text-right font-bold"
-                  >{pct(opponentTotals.fgm, opponentTotals.fga)}</td
+                  >{ratioPct(opponentTotals.fgm, opponentTotals.fga)}</td
                 >
               </tr>
               <tr>
                 <td class="py-2 text-left font-bold"
-                  >{pct(record.threes.made, record.threes.attempted)}</td
+                  >{ratioPct(record.threes.made, record.threes.attempted)}</td
                 >
                 <td class="py-2 text-center text-xs text-muted-foreground">3P%</td>
                 <td class="py-2 text-right font-bold"
-                  >{pct(opponentTotals.tpm, opponentTotals.tpa)}</td
+                  >{ratioPct(opponentTotals.tpm, opponentTotals.tpa)}</td
                 >
               </tr>
               <tr>
@@ -753,19 +750,19 @@
                     {formatAggregateStat(aggregate.fieldGoals.attempted)}
                   </td>
                   <td class="px-2 py-2 text-right font-mono">
-                    {pct(raw.fieldGoals.made, raw.fieldGoals.attempted)}
+                    {ratioPct(raw.fieldGoals.made, raw.fieldGoals.attempted)}
                   </td>
                   <td class="px-2 py-2 text-right font-mono">
                     {formatAggregateStat(aggregate.threes.attempted)}
                   </td>
                   <td class="px-2 py-2 text-right font-mono">
-                    {pct(raw.threes.made, raw.threes.attempted)}
+                    {ratioPct(raw.threes.made, raw.threes.attempted)}
                   </td>
                   <td class="px-2 py-2 text-right font-mono">
                     {formatAggregateStat(aggregate.freeThrows.attempted)}
                   </td>
                   <td class="px-2 py-2 text-right font-mono">
-                    {pct(raw.freeThrows.made, raw.freeThrows.attempted)}
+                    {ratioPct(raw.freeThrows.made, raw.freeThrows.attempted)}
                   </td>
                   <td class="px-2 py-2 text-right font-mono">
                     {trueShootingPct(
@@ -877,19 +874,19 @@
                   <div class="flex items-center justify-between gap-2 py-1.5">
                     <span class="text-muted-foreground">FG%</span>
                     <span class="font-semibold text-foreground">
-                      {pct(raw.fieldGoals.made, raw.fieldGoals.attempted)}
+                      {ratioPct(raw.fieldGoals.made, raw.fieldGoals.attempted)}
                     </span>
                   </div>
                   <div class="flex items-center justify-between gap-2 py-1.5">
                     <span class="text-muted-foreground">3P%</span>
                     <span class="font-semibold text-foreground">
-                      {pct(raw.threes.made, raw.threes.attempted)}
+                      {ratioPct(raw.threes.made, raw.threes.attempted)}
                     </span>
                   </div>
                   <div class="flex items-center justify-between gap-2 py-1.5">
                     <span class="text-muted-foreground">FT%</span>
                     <span class="font-semibold text-foreground">
-                      {pct(raw.freeThrows.made, raw.freeThrows.attempted)}
+                      {ratioPct(raw.freeThrows.made, raw.freeThrows.attempted)}
                     </span>
                   </div>
                   <div class="flex items-center justify-between gap-2 py-1.5">
@@ -978,15 +975,15 @@
           <div class="mt-3 grid gap-2 font-mono text-xs sm:grid-cols-4">
             <p>
               <span class="text-muted-foreground">FG</span>
-              {pct(record.fieldGoals.made, record.fieldGoals.attempted)}
+              {ratioPct(record.fieldGoals.made, record.fieldGoals.attempted)}
             </p>
             <p>
               <span class="text-muted-foreground">3P</span>
-              {pct(record.threes.made, record.threes.attempted)}
+              {ratioPct(record.threes.made, record.threes.attempted)}
             </p>
             <p>
               <span class="text-muted-foreground">FT</span>
-              {pct(record.freeThrows.made, record.freeThrows.attempted)}
+              {ratioPct(record.freeThrows.made, record.freeThrows.attempted)}
             </p>
             <p>
               <span class="text-muted-foreground">TOV/G</span>

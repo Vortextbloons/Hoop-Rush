@@ -1,8 +1,7 @@
 import { canonicalJson } from '@hoop-rush/data-contracts';
+import { compareStrings } from '../domain/math.ts';
 
-export function compareStrings(a: string, b: string): number {
-  return a < b ? -1 : a > b ? 1 : 0;
-}
+export { compareStrings };
 
 export function sortedBy<T>(items: readonly T[], keyOf: (item: T) => string): T[] {
   return [...items].sort((a, b) => compareStrings(keyOf(a), keyOf(b)));

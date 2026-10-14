@@ -56,7 +56,7 @@ function scorePlan(
   return { changed, distance, key: keyParts.join('|') };
 }
 
-function isBetterScore(
+export function isBetterScore(
   next: { changed: number; distance: number; key: string },
   current: { changed: number; distance: number; key: string } | null,
 ): boolean {

@@ -5,7 +5,7 @@
     DraftDuelParticipantId,
     HoopRushManifest,
   } from '@hoop-rush/data-contracts';
-  import type { DraftDuelVisibleState } from '#lib/features/draft-duel/draft-duel-playback.js';
+  import type { GamecastVisibleState } from '#lib/features/multiplayer/gamecast/gamecast-playback.js';
   import type { DraftDuelFeedLine } from '#lib/features/draft-duel/draft-duel-broadcast-view.js';
   import GamecastBroadcast from '#lib/features/multiplayer/gamecast/GamecastBroadcast.svelte';
   import type { GamecastPlayer } from '#lib/features/multiplayer/gamecast/gamecast-types.js';
@@ -20,7 +20,7 @@
     manifest = null,
   }: {
     output: DraftDuelGameOutput;
-    visible: DraftDuelVisibleState;
+    visible: GamecastVisibleState;
     progress: number;
     localParticipantId: DraftDuelParticipantId;
     feed: DraftDuelFeedLine[];

@@ -15,6 +15,7 @@ import { planLineupReposition } from '../domain/lineup-reposition.ts';
 import { projectBaseFive } from '../projection/base.ts';
 import { archetypeReferences, neutralReference } from '../projection/reference-lineups.ts';
 import { evaluateLineupFit } from './contextual-value.ts';
+import { mean } from '../domain/math.ts';
 
 export type DraftFitTier = 'best' | 'strong' | 'solid' | 'situational' | 'poor';
 export type DraftFitNeed = 'spacing' | 'creation' | 'defense' | 'rebounding' | 'balance';
@@ -135,10 +136,6 @@ function fillWithReference(
 
 function round1(value: number): number {
   return Math.round(value * 10) / 10;
-}
-
-function mean(values: readonly number[]): number {
-  return values.reduce((sum, value) => sum + value, 0) / Math.max(1, values.length);
 }
 
 function playerKey(player: SimulationPlayer): string {

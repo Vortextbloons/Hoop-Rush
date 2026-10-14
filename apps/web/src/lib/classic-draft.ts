@@ -16,9 +16,7 @@ const franchiseEraBucketCache = new WeakMap<
   PlayersIndex,
   ReadonlyMap<string, PlayersIndexEntry[]>
 >();
-export function buildFranchiseEraBuckets(
-  index: PlayersIndex,
-): ReadonlyMap<string, PlayersIndexEntry[]> {
+function buildFranchiseEraBuckets(index: PlayersIndex): ReadonlyMap<string, PlayersIndexEntry[]> {
   const cached = franchiseEraBucketCache.get(index);
   if (cached) return cached;
   const mutable = new Map<string, PlayersIndexEntry[]>();

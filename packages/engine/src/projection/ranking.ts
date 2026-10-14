@@ -5,6 +5,7 @@ import type {
 } from '@hoop-rush/data-contracts';
 import { weaknessPenalty } from './weaknesses.ts';
 import { normalizeValue } from './normalize.ts';
+import { mean } from '../domain/math.ts';
 export interface RankingGates {
   legal: boolean;
   legalStartersAndClosers: boolean;
@@ -103,9 +104,6 @@ export function normalizeComponent(
   const higherIsBetter = scale?.higherIsBetter ?? fallback.higherIsBetter;
   const oriented = higherIsBetter ? raw : 2 * baseline - raw;
   return normalizeValue(oriented, baseline, perPoint, min, max);
-}
-function mean(values: readonly number[]): number {
-  return values.reduce((sum, value) => sum + value, 0) / Math.max(1, values.length);
 }
 export function rankingVectorOf(
   model: ProjectionModelArtifact,

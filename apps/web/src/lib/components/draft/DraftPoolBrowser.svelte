@@ -6,10 +6,10 @@
     SlotIndex,
   } from '@hoop-rush/data-contracts';
   import type { DraftFitNeed, DraftFitTier, LineupRepositionPlan } from '@hoop-rush/engine';
-  import { franchiseAbbreviation, resolveEraTeamIdentity } from '@hoop-rush/data-contracts';
   import { untrack } from 'svelte';
   import { Search } from '@lucide/svelte';
   import { lowercaseName } from '#lib/roster-browser.js';
+  import { teamLabelFor } from '#lib/season/season-branding.js';
   import {
     FIT_NEED_META,
     FIT_TIER_META,
@@ -77,10 +77,6 @@
   let positionFilter = $state<SlotIndex | null>(null);
   let visibleCount = $state(PAGE_SIZE);
   const eraLabel = $derived(new Map(manifest.eras.map((e) => [e.eraId, e.label])));
-  function teamLabelFor(player: IndexRow): string {
-    const identity = resolveEraTeamIdentity(manifest, player.franchiseId, player.eraId);
-    return identity.abbreviationLabel ?? franchiseAbbreviation(player.franchiseId);
-  }
   $effect(() => {
     const raw = searchInput;
     const timeout = setTimeout(() => {
@@ -270,7 +266,7 @@
               <span
                 class="block truncate font-mono text-[10px] leading-tight text-muted-foreground"
               >
-                {player.seasonKey} · {teamLabelFor(player)}
+                {player.seasonKey} · {teamLabelFor(manifest, player.franchiseId, player.eraId)}
               </span>
               <span
                 class="block truncate font-mono text-[10px] leading-tight text-muted-foreground"

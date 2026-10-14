@@ -5,7 +5,6 @@ export {
   BAND_ORDER,
   IDENTITIES,
   DEFAULT_IDENTITY_PRIORITY_ROLES,
-  POOL_COMPOSITION_TARGETS,
   identityPriorityRolesOf,
 } from './ai/constants.ts';
 export { SeasonAiGenerationError } from './ai/state.ts';

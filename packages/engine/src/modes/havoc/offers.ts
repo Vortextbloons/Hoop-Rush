@@ -25,6 +25,7 @@ import {
   seasonDigestHex,
 } from '@hoop-rush/data-contracts';
 import { swapAt, type Rng } from '../../sim/rng.ts';
+import { compareStrings } from '../../domain/math.ts';
 import { HavocCatalogCoverageError } from './api.ts';
 import type {
   GenerateHavocOffer as GenerateHavocOfferSignature,
@@ -73,10 +74,6 @@ interface HavocClaimGroup {
   readonly seasonKey: string;
   readonly versions: readonly HavocAdaptedCandidate[];
   readonly playableSlots: readonly Position[];
-}
-
-function compareStrings(left: string, right: string): number {
-  return left < right ? -1 : left > right ? 1 : 0;
 }
 
 function buildClaimGroups(

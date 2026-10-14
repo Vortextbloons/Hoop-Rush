@@ -5,6 +5,7 @@ import {
   SEARCH_LENSES,
   type SearchLens,
 } from '@hoop-rush/engine';
+import { workerErrorMessage } from '../lib/workers/worker-protocol';
 import {
   loadEraSimulationProfile,
   loadProjectionModelArtifact,
@@ -117,10 +118,6 @@ async function loadRecommendAssets(request: {
   return [catalog, model, eraProfile];
 }
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
 function searchLensOf(value: unknown): SearchLens | null {
   if (typeof value !== 'string') return null;
   const lenses = SEARCH_LENSES as readonly string[];
@@ -152,7 +149,7 @@ self.addEventListener('message', (event: MessageEvent<unknown>) => {
       respond({
         type: 'error',
         requestId: request.requestId,
-        message: errorMessage(error),
+        message: workerErrorMessage(error),
       });
     }
   })();

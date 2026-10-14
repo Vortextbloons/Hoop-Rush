@@ -4,6 +4,7 @@ import {
   type CollectionDifficultyRotationPolicy,
 } from '@hoop-rush/data-contracts';
 import { CollectionCommandError } from './packs.ts';
+import { minuteQualityOf, minuteReliefOf } from '../season/minute-plan.ts';
 
 export type CollectionMinuteStrategy = 'tight' | 'balanced' | 'deep';
 
@@ -157,36 +158,6 @@ function allocateGroup(
   return result;
 }
 
-function qualityOf(
-  targetMinutes: ReadonlyArray<{ cardId: string; minutes: number }>,
-  overallById: ReadonlyMap<string, number>,
-): number {
-  const total = targetMinutes.reduce((sum, row) => sum + row.minutes, 0);
-  if (total <= 0) return 0;
-  return (
-    targetMinutes.reduce((sum, row) => sum + row.minutes * (overallById.get(row.cardId) ?? 0), 0) /
-    total
-  );
-}
-
-function reliefOf(
-  targetMinutes: ReadonlyArray<{ cardId: string; minutes: number }>,
-  benchIds: ReadonlySet<string>,
-  overallById: ReadonlyMap<string, number>,
-): number {
-  const total = targetMinutes.reduce(
-    (sum, row) => sum + row.minutes * (overallById.get(row.cardId) ?? 0),
-    0,
-  );
-  if (total <= 0) return 0;
-  const carried = targetMinutes.reduce(
-    (sum, row) =>
-      benchIds.has(row.cardId) ? sum + row.minutes * (overallById.get(row.cardId) ?? 0) : sum,
-    0,
-  );
-  return Math.max(0, Math.min(1, carried / total));
-}
-
 function ensureStarterFloor(
   targetMinutes: Array<{ cardId: string; minutes: number }>,
   starterIds: ReadonlySet<string>,
@@ -255,8 +226,17 @@ export function planCollectionMinutes(
     strategy,
     targetMinutes,
     starterTotal,
-    quality: qualityOf(targetMinutes, overallById),
-    relief: reliefOf(targetMinutes, benchIds, overallById),
+    quality: minuteQualityOf(
+      targetMinutes,
+      (row) => row.minutes,
+      (row) => overallById.get(row.cardId) ?? 0,
+    ),
+    relief: minuteReliefOf(
+      targetMinutes,
+      (row) => row.minutes,
+      (row) => overallById.get(row.cardId) ?? 0,
+      (row) => benchIds.has(row.cardId),
+    ),
   };
 }
 
@@ -323,7 +303,16 @@ export function tryCollectionMinuteDnp(
     starterTotal: next
       .filter((row) => entries.find((entry) => entry.cardId === row.cardId)?.starter === true)
       .reduce((sum, row) => sum + row.minutes, 0),
-    quality: qualityOf(next, overallById),
-    relief: reliefOf(next, benchIds, overallById),
+    quality: minuteQualityOf(
+      next,
+      (row) => row.minutes,
+      (row) => overallById.get(row.cardId) ?? 0,
+    ),
+    relief: minuteReliefOf(
+      next,
+      (row) => row.minutes,
+      (row) => overallById.get(row.cardId) ?? 0,
+      (row) => benchIds.has(row.cardId),
+    ),
   };
 }

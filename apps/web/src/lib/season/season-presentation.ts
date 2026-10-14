@@ -105,11 +105,6 @@ export function ordinal(n: number): string {
       return `${String(n)}th`;
   }
 }
-export function formatClock(totalSeconds: number): string {
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${String(minutes)}:${String(seconds).padStart(2, '0')}`;
-}
 function streakOfGames(
   games: readonly SeasonGameSummary[],
   franchiseId: string,
@@ -339,6 +334,41 @@ export function foldSeasonAggregates(summaries: readonly SeasonGameSummary[]): {
   const result = foldEngineSeasonAggregates(summaries);
   aggregateFoldCache.set(summaries, result);
   return result;
+}
+export function summariesDigest(summaries: readonly SeasonGameSummary[]): string {
+  let hash = 2166136261;
+  for (const summary of summaries) {
+    const id = summary.gameId;
+    for (let i = 0; i < id.length; i += 1) hash = Math.imul(hash ^ id.charCodeAt(i), 16777619);
+    hash = Math.imul(hash ^ summary.homeScore, 16777619);
+    hash = Math.imul(hash ^ summary.awayScore, 16777619);
+  }
+  return `${String(summaries.length)}:${String(hash >>> 0)}`;
+}
+const memoizedFoldWeak = new WeakMap<
+  readonly SeasonGameSummary[],
+  ReturnType<typeof foldSeasonAggregates>
+>();
+const memoizedFoldByDigest = new Map<string, ReturnType<typeof foldSeasonAggregates>>();
+export function memoizedSeasonFold(
+  summaries: readonly SeasonGameSummary[],
+): ReturnType<typeof foldSeasonAggregates> {
+  const weakHit = memoizedFoldWeak.get(summaries);
+  if (weakHit !== undefined) return weakHit;
+  const digest = summariesDigest(summaries);
+  const digestHit = memoizedFoldByDigest.get(digest);
+  if (digestHit !== undefined) {
+    memoizedFoldWeak.set(summaries, digestHit);
+    return digestHit;
+  }
+  const folded = foldSeasonAggregates(summaries);
+  memoizedFoldWeak.set(summaries, folded);
+  memoizedFoldByDigest.set(digest, folded);
+  if (memoizedFoldByDigest.size > 4) {
+    const oldest = memoizedFoldByDigest.keys().next().value;
+    if (oldest !== undefined) memoizedFoldByDigest.delete(oldest);
+  }
+  return folded;
 }
 export function rebaseStandingsBefore(
   standings: SeasonStandings,

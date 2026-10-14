@@ -71,10 +71,10 @@ import {
   type SeasonFreeAgencyAuditCounts,
 } from './season-free-agency-audit.ts';
 import {
+  makeTargetsValidator,
   resolveCalibrationArgs,
   runCalibrationShell,
   targetsDetail,
-  validateTargetsArtifact,
 } from '../calibration/index.ts';
 import {
   createSeasonBlockRunner,
@@ -1292,21 +1292,11 @@ export interface SeasonFreeAgencyArgs {
   validate: string | null;
   format?: string | null;
 }
-export function validateSeasonFreeAgencyTargets(
-  args: SeasonFreeAgencyArgs,
-  outPath: string,
-): CliReport {
-  void args;
-  return validateTargetsArtifact({
-    outPath,
-    schema: seasonFreeAgencyTargetsSchema,
-    command: 'season free-agency calibrate --validate',
-    extraChecks: () => ({
-      details: ['band caps / composition match the frozen 1/2/3/3 and 2/5/3/2 policy'],
-      failures: [],
-    }),
-  });
-}
+export const validateSeasonFreeAgencyTargets = makeTargetsValidator({
+  schema: seasonFreeAgencyTargetsSchema,
+  command: 'season free-agency calibrate --validate',
+  detail: 'band caps / composition match the frozen 1/2/3/3 and 2/5/3/2 policy',
+});
 export type SeasonFreeAgencySeasonRunner = (
   rootSeed: Seed,
   options: {

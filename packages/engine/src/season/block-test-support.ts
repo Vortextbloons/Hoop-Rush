@@ -374,9 +374,3 @@ export function pipelineInput(
     transactions: run.transactions,
   };
 }
-export interface RunnerState {
-  run: SeasonRun;
-  catalog: SeasonDraftCatalog;
-  summaries: SeasonGameSummary[];
-  effects: SeasonEffectsState;
-}

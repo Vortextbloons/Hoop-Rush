@@ -48,7 +48,6 @@ export const simGameReportSchema = z.object({
   invariants: z.array(z.string()),
   timingMs: z.number().nonnegative(),
 });
-export type SimGameReport = z.infer<typeof simGameReportSchema>;
 export const simBatchReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('sim batch'),
@@ -67,7 +66,6 @@ export const simBatchReportSchema = z.object({
   averageMargin: z.number(),
   invariantFailures: z.number().int().nonnegative(),
 });
-export type SimBatchReport = z.infer<typeof simBatchReportSchema>;
 export const simDiagnoseReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('sim diagnose'),
@@ -115,7 +113,6 @@ export const simDiagnoseReportSchema = z.object({
   }),
   spread: z.object({ topToLastUsageRatio: z.number() }),
 });
-export type SimDiagnoseReport = z.infer<typeof simDiagnoseReportSchema>;
 export const simSeasonReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('sim season'),
@@ -149,7 +146,6 @@ export const simSeasonReportSchema = z.object({
     }),
   ),
 });
-export type SimSeasonReport = z.infer<typeof simSeasonReportSchema>;
 export const replayReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('replay'),
@@ -160,9 +156,7 @@ export const replayReportSchema = z.object({
   expectedValue: z.unknown().nullable(),
   actualValue: z.unknown().nullable(),
 });
-export type ReplayReport = z.infer<typeof replayReportSchema>;
-export const calibrationMetricStatusSchema = z.enum(['pass', 'fail', 'skippedInsufficientSample']);
-export type CalibrationMetricStatus = z.infer<typeof calibrationMetricStatusSchema>;
+const calibrationMetricStatusSchema = z.enum(['pass', 'fail', 'skippedInsufficientSample']);
 export const calibrationMetricSchema = z.object({
   key: z.string().min(1).max(64),
   target: z.number(),
@@ -173,7 +167,6 @@ export const calibrationMetricSchema = z.object({
   sample: z.number().int().nonnegative(),
   minimumSample: z.number().int().nonnegative(),
 });
-export type CalibrationMetric = z.infer<typeof calibrationMetricSchema>;
 export const calibrateRunReportSchema = z.object({
   schemaVersion: z.literal(2),
   command: z.literal('calibrate run'),
@@ -199,8 +192,7 @@ export const calibrateRunReportSchema = z.object({
   challengeRuns: z.number().int().nonnegative(),
   invariantFailures: z.number().int().nonnegative(),
 });
-export type CalibrateRunReport = z.infer<typeof calibrateRunReportSchema>;
-export const sensitivityMetricSchema = z.object({
+const sensitivityMetricSchema = z.object({
   family: z.string().min(1).max(64),
   direction: z.string().min(1).max(64),
   baseValue: z.number(),
@@ -208,7 +200,6 @@ export const sensitivityMetricSchema = z.object({
   relativeShift: z.number(),
   pass: z.boolean(),
 });
-export type SensitivityMetric = z.infer<typeof sensitivityMetricSchema>;
 export const calibrateSensitivityReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('calibrate sensitivity'),
@@ -217,7 +208,6 @@ export const calibrateSensitivityReportSchema = z.object({
   pass: z.boolean(),
   metrics: z.array(sensitivityMetricSchema),
 });
-export type CalibrateSensitivityReport = z.infer<typeof calibrateSensitivityReportSchema>;
 export const threePointCalibrateReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('calibrate three-point'),
@@ -261,7 +251,6 @@ export const threePointCalibrateReportSchema = z.object({
   holdout: reconstructionHoldoutSchema,
   generatedBy: z.string().min(1).max(256),
 });
-export type ThreePointCalibrateReport = z.infer<typeof threePointCalibrateReportSchema>;
 export const simChallengeReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('sim challenge'),
@@ -312,7 +301,6 @@ export const simChallengeReportSchema = z.object({
   timingMs: z.number().nonnegative(),
   invariantFailures: z.number().int().nonnegative(),
 });
-export type SimChallengeReport = z.infer<typeof simChallengeReportSchema>;
 const cliSpreadSchema = z.object({
   mean: z.number().nonnegative(),
   min: z.number().nonnegative(),
@@ -369,7 +357,6 @@ export const simChallengeAverageReportSchema = z.object({
   timingMs: z.number().nonnegative(),
   invariantFailures: z.number().int().nonnegative(),
 });
-export type SimChallengeAverageReport = z.infer<typeof simChallengeAverageReportSchema>;
 export const bracketAuditReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('bracket audit'),
@@ -397,7 +384,6 @@ export const bracketAuditReportSchema = z.object({
   openingOpponentUnchanged: z.boolean(),
   pass: z.boolean(),
 });
-export type BracketAuditReport = z.infer<typeof bracketAuditReportSchema>;
 const benchmarkRegressionSchema = z.object({
   metric: z.enum(['medianMs', 'p95Ms']),
   measurement: z.enum(['poolCold', 'poolCached', 'singleGame', 'challenge82']),
@@ -510,7 +496,6 @@ export const draftFitBenchmarkReportSchema = z.object({
     winner: z.enum(['highest-overall', 'suggested', 'tie']),
   }),
 });
-export type DraftFitBenchmarkReport = z.infer<typeof draftFitBenchmarkReportSchema>;
 export const bracketGenerateReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('bracket generate'),
@@ -531,7 +516,6 @@ export const bracketGenerateReportSchema = z.object({
   ),
   schedule: z.array(z.string().min(1).max(64)),
 });
-export type BracketGenerateReport = z.infer<typeof bracketGenerateReportSchema>;
 export const seasonScheduleGenerateReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('season schedule generate'),
@@ -548,7 +532,6 @@ export const seasonScheduleGenerateReportSchema = z.object({
   published: z.boolean(),
   pass: z.boolean(),
 });
-export type SeasonScheduleGenerateReport = z.infer<typeof seasonScheduleGenerateReportSchema>;
 export const seasonScheduleAuditReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('season schedule audit'),
@@ -563,7 +546,6 @@ export const seasonScheduleAuditReportSchema = z.object({
   manifestVerified: z.boolean().nullable(),
   pass: z.boolean(),
 });
-export type SeasonScheduleAuditReport = z.infer<typeof seasonScheduleAuditReportSchema>;
 export const seasonDraftReproduceReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('season draft reproduce'),
@@ -612,7 +594,6 @@ export const seasonDraftReproduceReportSchema = z.object({
   divergences: z.array(z.string().min(1)),
   pass: z.boolean(),
 });
-export type SeasonDraftReproduceReport = z.infer<typeof seasonDraftReproduceReportSchema>;
 export const seasonRostersGenerateReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('season rosters generate'),
@@ -633,7 +614,6 @@ export const seasonRostersGenerateReportSchema = z.object({
   outPath: z.string().nullable(),
   pass: z.boolean(),
 });
-export type SeasonRostersGenerateReport = z.infer<typeof seasonRostersGenerateReportSchema>;
 export const seasonRostersAuditReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('season rosters audit'),
@@ -656,7 +636,6 @@ export const seasonRostersAuditReportSchema = z.object({
   auditFailures: z.number().int().nonnegative(),
   pass: z.boolean(),
 });
-export type SeasonRostersAuditReport = z.infer<typeof seasonRostersAuditReportSchema>;
 const distributionEntrySchema = z.object({
   median: z.number().min(0).max(100),
   range: z.tuple([z.number().min(0).max(100), z.number().min(0).max(100)]),
@@ -714,7 +693,6 @@ export const seasonRostersCalibrateReportSchema = z.object({
   validateOnly: z.boolean(),
   pass: z.boolean(),
 });
-export type SeasonRostersCalibrateReport = z.infer<typeof seasonRostersCalibrateReportSchema>;
 export const seasonDraftCalibrateReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('season draft calibrate'),
@@ -757,8 +735,7 @@ export const seasonDraftCalibrateReportSchema = z.object({
   ...targetsArtifactFields,
   pass: z.boolean(),
 });
-export type SeasonDraftCalibrateReport = z.infer<typeof seasonDraftCalibrateReportSchema>;
-export const overallsDistributionBandSchema = z.object({
+const overallsDistributionBandSchema = z.object({
   label: z.string().min(1),
   targetPercent: z.number().min(0).max(100),
   count: z.number().int().nonnegative(),
@@ -767,7 +744,7 @@ export const overallsDistributionBandSchema = z.object({
   min: z.number().min(0).max(100),
   max: z.number().min(0).max(100),
 });
-export const overallsDistributionEraSchema = z.object({
+const overallsDistributionEraSchema = z.object({
   count: z.number().int().nonnegative(),
   bands: z.array(overallsDistributionBandSchema),
 });
@@ -787,8 +764,7 @@ export const overallsDistributionReportSchema = z.object({
   bands: z.array(overallsDistributionBandSchema),
   perEra: z.record(z.string().min(1), overallsDistributionEraSchema),
 });
-export type OverallsDistributionReport = z.infer<typeof overallsDistributionReportSchema>;
-export const defenseBpmEraSchema = z.object({
+const defenseBpmEraSchema = z.object({
   eraId: z.string().min(1),
   sample: z.number().int().nonnegative(),
   correlation: z.number().min(-1).max(1).nullable(),
@@ -804,7 +780,6 @@ export const defenseBpmCorrelationReportSchema = z.object({
   pass: z.boolean(),
   perEra: z.array(defenseBpmEraSchema),
 });
-export type DefenseBpmCorrelationReport = z.infer<typeof defenseBpmCorrelationReportSchema>;
 const seasonGamePlayerMinutesSchema = z.object({
   side: z.enum(['home', 'away']),
   playerVersionId: playerVersionIdSchema,
@@ -890,7 +865,6 @@ export const seasonGameCalibrateReportSchema = z.object({
   ...targetsArtifactFields,
   pass: z.boolean(),
 });
-export type SeasonGameCalibrateReport = z.infer<typeof seasonGameCalibrateReportSchema>;
 export const seasonBlockSimulateReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('season block simulate'),
@@ -910,7 +884,6 @@ export const seasonBlockSimulateReportSchema = z.object({
   rejection: z.string().nullable(),
   pass: z.boolean(),
 });
-export type SeasonBlockSimulateReport = z.infer<typeof seasonBlockSimulateReportSchema>;
 export const seasonBlockAuditReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('season block audit'),
@@ -921,7 +894,6 @@ export const seasonBlockAuditReportSchema = z.object({
   auditFailures: z.array(z.string()),
   pass: z.boolean(),
 });
-export type SeasonBlockAuditReport = z.infer<typeof seasonBlockAuditReportSchema>;
 export const seasonFullSimulateReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('season full simulate'),
@@ -947,7 +919,6 @@ export const seasonFullSimulateReportSchema = z.object({
   auditFailures: z.array(z.string()),
   pass: z.boolean(),
 });
-export type SeasonFullSimulateReport = z.infer<typeof seasonFullSimulateReportSchema>;
 export const seasonBenchmarkReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.enum([
@@ -976,7 +947,6 @@ export const seasonBenchmarkReportSchema = z.object({
   outPath: z.string().nullable(),
   pass: z.boolean(),
 });
-export type SeasonBenchmarkReport = z.infer<typeof seasonBenchmarkReportSchema>;
 export const seasonHomeCourtCalibrateReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('season home-court calibrate'),
@@ -1001,7 +971,6 @@ export const seasonHomeCourtCalibrateReportSchema = z.object({
   ...targetsArtifactFields,
   pass: z.boolean(),
 });
-export type SeasonHomeCourtCalibrateReport = z.infer<typeof seasonHomeCourtCalibrateReportSchema>;
 export const seasonEffectsSensitivityReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('season effects sensitivity'),
@@ -1020,7 +989,6 @@ export const seasonEffectsSensitivityReportSchema = z.object({
   ),
   durationMs: z.number().nonnegative(),
 });
-export type SeasonEffectsSensitivityReport = z.infer<typeof seasonEffectsSensitivityReportSchema>;
 export const seasonEffectsDistributionReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('season effects distribution'),
@@ -1039,7 +1007,6 @@ export const seasonEffectsDistributionReportSchema = z.object({
   determinismFailures: z.number().int().nonnegative(),
   durationMs: z.number().nonnegative(),
 });
-export type SeasonEffectsDistributionReport = z.infer<typeof seasonEffectsDistributionReportSchema>;
 export const seasonEffectsRolesReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('season effects roles'),
@@ -1054,7 +1021,6 @@ export const seasonEffectsRolesReportSchema = z.object({
   benchOrderingPass: z.boolean(),
   durationMs: z.number().nonnegative(),
 });
-export type SeasonEffectsRolesReport = z.infer<typeof seasonEffectsRolesReportSchema>;
 export const seasonEffectsCalibrateReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('season effects calibrate'),
@@ -1085,8 +1051,7 @@ export const seasonEffectsCalibrateReportSchema = z.object({
   ...targetsArtifactFields,
   durationMs: z.number().nonnegative(),
 });
-export type SeasonEffectsCalibrateReport = z.infer<typeof seasonEffectsCalibrateReportSchema>;
-export const seasonM25GateSchema = z.object({
+const seasonM25GateSchema = z.object({
   key: z.string().min(1).max(64),
   observed: z.number(),
   target: z.number(),
@@ -1098,7 +1063,6 @@ export const seasonM25GateSchema = z.object({
   sample: z.number().int().nonnegative(),
   minimumSample: z.number().int().nonnegative(),
 });
-export type SeasonM25GateReport = z.infer<typeof seasonM25GateSchema>;
 const m25CalibrateTailFields = {
   metrics: z.array(seasonM25GateSchema),
   skippedGates: z.array(z.string().min(1)),
@@ -1149,7 +1113,6 @@ export const seasonHealthCalibrateReportSchema = z.object({
   }),
   ...m25CalibrateTailFields,
 });
-export type SeasonHealthCalibrateReport = z.infer<typeof seasonHealthCalibrateReportSchema>;
 export const seasonTradeCalibrateReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('season trade calibrate'),
@@ -1192,7 +1155,6 @@ export const seasonTradeCalibrateReportSchema = z.object({
   }),
   ...m25CalibrateTailFields,
 });
-export type SeasonTradeCalibrateReport = z.infer<typeof seasonTradeCalibrateReportSchema>;
 export const seasonInfluenceCalibrateReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('season influence calibrate'),
@@ -1233,7 +1195,6 @@ export const seasonInfluenceCalibrateReportSchema = z.object({
   }),
   ...m25CalibrateTailFields,
 });
-export type SeasonInfluenceCalibrateReport = z.infer<typeof seasonInfluenceCalibrateReportSchema>;
 export const seasonChallengesCalibrateReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('season challenges calibrate'),
@@ -1259,7 +1220,6 @@ export const seasonChallengesCalibrateReportSchema = z.object({
   }),
   ...m25CalibrateTailFields,
 });
-export type SeasonChallengesCalibrateReport = z.infer<typeof seasonChallengesCalibrateReportSchema>;
 export const seasonRunReproduceReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('season run reproduce'),
@@ -1309,7 +1269,6 @@ export const seasonRunReproduceReportSchema = z.object({
   divergences: z.array(z.string().min(1)).max(50),
   pass: z.boolean(),
 });
-export type SeasonRunReproduceReport = z.infer<typeof seasonRunReproduceReportSchema>;
 export const seasonPostseasonAuditReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('season postseason audit'),
@@ -1329,7 +1288,6 @@ export const seasonPostseasonAuditReportSchema = z.object({
   }),
   pass: z.boolean(),
 });
-export type SeasonPostseasonAuditReport = z.infer<typeof seasonPostseasonAuditReportSchema>;
 export const seasonPostseasonCalibrateReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('season postseason calibrate'),
@@ -1370,8 +1328,7 @@ export const seasonPostseasonCalibrateReportSchema = z.object({
   ...m25CalibrateTailFields,
   pass: z.boolean(),
 });
-export type SeasonPostseasonCalibrateReport = z.infer<typeof seasonPostseasonCalibrateReportSchema>;
-export const seasonFreeAgencyAuditCountsSchema = z.object({
+const seasonFreeAgencyAuditCountsSchema = z.object({
   windowOrderFailures: z.number().int().nonnegative(),
   candidateUniquenessFailures: z.number().int().nonnegative(),
   featuredFailures: z.number().int().nonnegative(),
@@ -1386,7 +1343,6 @@ export const seasonFreeAgencyAuditCountsSchema = z.object({
   ownershipFailures: z.number().int().nonnegative(),
   effectsFailures: z.number().int().nonnegative(),
 });
-export type SeasonFreeAgencyAuditCountsReport = z.infer<typeof seasonFreeAgencyAuditCountsSchema>;
 export const seasonFreeAgencyAuditReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('season free-agency audit'),
@@ -1399,7 +1355,6 @@ export const seasonFreeAgencyAuditReportSchema = z.object({
   failures: z.array(z.string().min(1)).max(200),
   pass: z.boolean(),
 });
-export type SeasonFreeAgencyAuditReport = z.infer<typeof seasonFreeAgencyAuditReportSchema>;
 export const seasonFreeAgencyCalibrateReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('season free-agency calibrate'),
@@ -1470,8 +1425,6 @@ export const seasonFreeAgencyCalibrateReportSchema = z.object({
   }),
   ...m25CalibrateTailFields,
 });
-export type SeasonFreeAgencyCalibrateReport = z.infer<typeof seasonFreeAgencyCalibrateReportSchema>;
-
 export const collectionPackAuditReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('collection pack-audit'),
@@ -1491,7 +1444,6 @@ export const collectionPackAuditReportSchema = z.object({
     }),
   ),
 });
-export type CollectionPackAuditReport = z.infer<typeof collectionPackAuditReportSchema>;
 export const collectionPullReproduceReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('collection pull-reproduce'),
@@ -1500,8 +1452,6 @@ export const collectionPullReproduceReportSchema = z.object({
   ok: z.boolean(),
   failures: z.array(z.string().min(1)),
 });
-export type CollectionPullReproduceReport = z.infer<typeof collectionPullReproduceReportSchema>;
-
 export const collectionPackCalibrateReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('collection pack-calibrate'),
@@ -1512,9 +1462,7 @@ export const collectionPackCalibrateReportSchema = z.object({
   ...targetsArtifactFields,
   durationMs: z.number().nonnegative(),
 });
-export type CollectionPackCalibrateReport = z.infer<typeof collectionPackCalibrateReportSchema>;
-
-export const collectionGameAuditDifficultySchema = z.object({
+const collectionGameAuditDifficultySchema = z.object({
   difficultyId: z.string().min(1).max(32),
   games: z.number().int().nonnegative(),
   wins: z.number().int().nonnegative(),
@@ -1530,9 +1478,7 @@ export const collectionGameAuditDifficultySchema = z.object({
   objectiveSuccesses: z.number().int().nonnegative(),
   maxReward: z.number().int().nonnegative(),
 });
-export type CollectionGameAuditDifficulty = z.infer<typeof collectionGameAuditDifficultySchema>;
-
-export const collectionGameAuditObjectiveSchema = z.object({
+const collectionGameAuditObjectiveSchema = z.object({
   objectiveId: z.string().min(1).max(64),
   threshold: z.number().int(),
   offered: z.number().int().nonnegative(),
@@ -1542,8 +1488,6 @@ export const collectionGameAuditObjectiveSchema = z.object({
   minActualValue: z.number().int().nullable(),
   maxActualValue: z.number().int().nullable(),
 });
-export type CollectionGameAuditObjective = z.infer<typeof collectionGameAuditObjectiveSchema>;
-
 export const collectionGameAuditReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('collection game-audit'),
@@ -1569,8 +1513,6 @@ export const collectionGameAuditReportSchema = z.object({
   adjustmentChecks: z.number().int().nonnegative(),
   rewardChecks: z.number().int().nonnegative(),
 });
-export type CollectionGameAuditReport = z.infer<typeof collectionGameAuditReportSchema>;
-
 export const collectionGameReproduceReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('collection game-reproduce'),
@@ -1589,8 +1531,6 @@ export const collectionGameReproduceReportSchema = z.object({
   rewardTransactionId: z.string().min(1).max(128),
   failures: z.array(z.string().min(1)),
 });
-export type CollectionGameReproduceReport = z.infer<typeof collectionGameReproduceReportSchema>;
-
 export const collectionGameCalibrateReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('collection game-calibrate'),
@@ -1620,9 +1560,7 @@ export const collectionGameCalibrateReportSchema = z.object({
   targetsPath: z.string().nullable(),
   durationMs: z.number().nonnegative(),
 });
-export type CollectionGameCalibrateReport = z.infer<typeof collectionGameCalibrateReportSchema>;
-
-export const collectionProgressionAuditChallengeSchema = z.object({
+const collectionProgressionAuditChallengeSchema = z.object({
   challengeId: z.string().min(1).max(64),
   displayName: z.string().min(1).max(48),
   difficultyId: z.string().min(1).max(32),
@@ -1637,11 +1575,7 @@ export const collectionProgressionAuditChallengeSchema = z.object({
   feasible: z.boolean(),
   feasibilityFailures: z.array(z.string().min(1)),
 });
-export type CollectionProgressionAuditChallenge = z.infer<
-  typeof collectionProgressionAuditChallengeSchema
->;
-
-export const collectionProgressionAuditTargetSchema = z.object({
+const collectionProgressionAuditTargetSchema = z.object({
   playerId: z.string().min(1).max(64),
   packs: z.array(
     z.object({
@@ -1652,11 +1586,7 @@ export const collectionProgressionAuditTargetSchema = z.object({
     }),
   ),
 });
-export type CollectionProgressionAuditTarget = z.infer<
-  typeof collectionProgressionAuditTargetSchema
->;
-
-export const collectionProgressionAuditSetSchema = z.object({
+const collectionProgressionAuditSetSchema = z.object({
   setId: z.string().min(1).max(32),
   title: z.string().min(1).max(96),
   ownedCount: z.number().int().nonnegative(),
@@ -1667,9 +1597,7 @@ export const collectionProgressionAuditSetSchema = z.object({
   rewardCurrency: z.literal('Exchange'),
   rewardAmount: z.number().int().positive(),
 });
-export type CollectionProgressionAuditSet = z.infer<typeof collectionProgressionAuditSetSchema>;
-
-export const collectionProgressionAuditStateSchema = z.object({
+const collectionProgressionAuditStateSchema = z.object({
   collectionId: z.string().min(1).max(64),
   revision: z.number().int().nonnegative(),
   activeTargetPlayerId: z.string().nullable(),
@@ -1678,8 +1606,6 @@ export const collectionProgressionAuditStateSchema = z.object({
   failures: z.array(z.string().min(1)),
   firstClearFailures: z.array(z.string().min(1)),
 });
-export type CollectionProgressionAuditState = z.infer<typeof collectionProgressionAuditStateSchema>;
-
 export const collectionProgressionAuditReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('collection progression-audit'),
@@ -1693,10 +1619,6 @@ export const collectionProgressionAuditReportSchema = z.object({
   state: collectionProgressionAuditStateSchema.nullable(),
   pass: z.boolean(),
 });
-export type CollectionProgressionAuditReport = z.infer<
-  typeof collectionProgressionAuditReportSchema
->;
-
 export const collectionProgressionCalibrateReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('collection progression-calibrate'),
@@ -1718,11 +1640,7 @@ export const collectionProgressionCalibrateReportSchema = z.object({
   pinned: z.boolean(),
   durationMs: z.number().nonnegative(),
 });
-export type CollectionProgressionCalibrateReport = z.infer<
-  typeof collectionProgressionCalibrateReportSchema
->;
-
-export const overallsAuditFlagSchema = z.object({
+const overallsAuditFlagSchema = z.object({
   displayName: z.string().min(1).max(96),
   playerExternalId: z.string().min(1).max(64),
   seasonKey: z.string().min(1).max(16),
@@ -1737,7 +1655,7 @@ export const overallsAuditFlagSchema = z.object({
   productionWeight: z.number().nullable(),
   productionConfidence: z.string().min(1).max(16).nullable(),
 });
-export const overallsAuditYoyFlagSchema = overallsAuditFlagSchema.extend({
+const overallsAuditYoyFlagSchema = overallsAuditFlagSchema.extend({
   previousSeasonKey: z.string().min(1).max(16),
   previousOverall: z.number().int().min(0).max(100),
   delta: z.number().int(),
@@ -1765,8 +1683,6 @@ export const overallsAuditReportSchema = z.object({
   canonStretch: z.array(overallsAuditFlagSchema.extend({ stretch: z.number().int() })),
   yoyCliffs: z.array(overallsAuditYoyFlagSchema),
 });
-export type OverallsAuditReport = z.infer<typeof overallsAuditReportSchema>;
-
 export const positionsCoverageReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('data positions-coverage'),
@@ -1783,4 +1699,3 @@ export const positionsCoverageReportSchema = z.object({
     }),
   ),
 });
-export type PositionsCoverageReport = z.infer<typeof positionsCoverageReportSchema>;

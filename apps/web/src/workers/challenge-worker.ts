@@ -9,22 +9,13 @@ import type { GameResult } from '@hoop-rush/data-contracts';
 import {
   workerMessageSchema,
   workerRequestSchema,
-  type WorkerCompleteMessage,
   type WorkerErrorMessage,
-  type WorkerResultsMessage,
-  type WorkerStartResultMessage,
 } from '@hoop-rush/data-contracts';
+import { postWorkerMessage, workerErrorMessage } from '../lib/workers/worker-protocol';
 import { sleep } from '../lib/sleep';
 const BATCH_SIZE = 4;
 let currentRequestId: string | null = null;
 let requestToken = 0;
-function post(
-  message:
-    WorkerResultsMessage | WorkerErrorMessage | WorkerCompleteMessage | WorkerStartResultMessage,
-): void {
-  workerMessageSchema.parse(message);
-  self.postMessage(message);
-}
 function postError(requestId: string, message: string): void {
   const payload: WorkerErrorMessage = {
     schemaVersion: 1,
@@ -55,7 +46,7 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
     try {
       const chosen = chooseBestRunSeed(request.run, request.profile, context);
       if (token !== requestToken) return;
-      post({
+      postWorkerMessage(workerMessageSchema, {
         schemaVersion: 1,
         type: 'start-result',
         requestId: request.requestId,
@@ -65,7 +56,7 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
         chosenDifferential: chosen.chosenDifferential,
       });
     } catch (error) {
-      postError(request.requestId, error instanceof Error ? error.message : String(error));
+      postError(request.requestId, workerErrorMessage(error));
     }
     return;
   }
@@ -85,7 +76,7 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
           delivered += 1;
         }
         if (token !== requestToken) break;
-        post({
+        postWorkerMessage(workerMessageSchema, {
           schemaVersion: 1,
           type: 'results',
           requestId: request.requestId,
@@ -95,7 +86,7 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
         await sleep(0);
       }
       if (token === requestToken) {
-        post({
+        postWorkerMessage(workerMessageSchema, {
           schemaVersion: 1,
           type: 'complete',
           requestId: request.requestId,
@@ -104,7 +95,7 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
         });
       }
     } catch (error) {
-      postError(request.requestId, error instanceof Error ? error.message : String(error));
+      postError(request.requestId, workerErrorMessage(error));
     }
   })();
 };

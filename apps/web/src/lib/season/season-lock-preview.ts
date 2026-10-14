@@ -9,7 +9,6 @@ import {
   type SeasonGame,
   type SeasonGameRule,
   type SeasonRotation,
-  type SeasonUpcomingHumanGame,
 } from '@hoop-rush/data-contracts';
 import { rotationRoleOf } from './season-rotation-editor';
 import { FATIGUE_BAND_LABEL, projectedFatigueBand } from './season-effects-view';
@@ -201,4 +200,3 @@ export function pendingRotationSetDigest(
   );
   return seasonRotationSetDigest(merged);
 }
-export type { SeasonUpcomingHumanGame };

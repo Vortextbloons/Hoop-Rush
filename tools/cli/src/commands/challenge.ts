@@ -27,7 +27,6 @@ import { makeReport, type CliReport } from '../report.ts';
 import { simChallengeReportSchema } from '../report-schemas.ts';
 import { loadPackagedData, PackagedData, loadBracketFile, loadProfileFile } from './data-loader.ts';
 import { loadFixture } from './sim.ts';
-export { FIXED_SANDBOX_ERA };
 export function resolveUserTeam(lineup: string): SimulationTeam {
   if (lineup.endsWith('.json') || lineup.includes('/') || lineup.includes('\\')) {
     const path = isAbsolute(lineup) ? lineup : resolve(lineup);

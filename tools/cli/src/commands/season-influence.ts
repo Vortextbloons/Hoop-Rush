@@ -13,20 +13,19 @@ import { type CliReport } from '../report.ts';
 import { seasonInfluenceCalibrateReportSchema } from '../report-schemas.ts';
 import { DEFAULT_MANIFEST, DEFAULT_SEASON_DIR } from './season-data.ts';
 import {
+  makeTargetsValidator,
   resolveCalibrationArgs,
   runCalibrationShell,
   targetsDetail,
-  validateTargetsArtifact,
 } from '../calibration/index.ts';
 import {
   gateValue,
   m25RangeGate,
   m25ToleranceGate,
-  seasonCalibrationSeed,
   share,
   type M25Gate,
 } from './season-calibration.ts';
-import { runSeasonM25, type SeasonM25SeasonFacts } from './season-m25-core.ts';
+import { m25FactsRunner, type SeasonM25SeasonFacts } from './season-m25-core.ts';
 export const DEFAULT_INFLUENCE_TARGETS = resolve(DEFAULT_SEASON_DIR, 'influence-targets.json');
 export const SEASON_INFLUENCE_CALIBRATION_SEED_COUNT = 12;
 export const SEASON_INFLUENCE_VALIDATION_SEED_COUNT = 4;
@@ -493,21 +492,11 @@ export interface SeasonInfluenceArgs {
   validate: string | null;
   format?: string | null;
 }
-export function validateSeasonInfluenceTargets(
-  args: SeasonInfluenceArgs,
-  outPath: string,
-): CliReport {
-  void args;
-  return validateTargetsArtifact({
-    outPath,
-    schema: seasonInfluenceTargetsSchema,
-    command: 'season influence calibrate --validate',
-    extraChecks: () => ({
-      details: ['cap/floor match the frozen +8/-3 bounds'],
-      failures: [],
-    }),
-  });
-}
+export const validateSeasonInfluenceTargets = makeTargetsValidator({
+  schema: seasonInfluenceTargetsSchema,
+  command: 'season influence calibrate --validate',
+  detail: 'cap/floor match the frozen +8/-3 bounds',
+});
 export function seasonInfluenceCalibrate(args: SeasonInfluenceArgs): CliReport {
   const started = Date.now();
   const { from, to, workers, calibrationIndices, validationIndices } = resolveCalibrationArgs(
@@ -521,16 +510,7 @@ export function seasonInfluenceCalibrate(args: SeasonInfluenceArgs): CliReport {
   );
   const outPath = args.out ?? DEFAULT_INFLUENCE_TARGETS;
   const validateOnly = args['validate'] !== null;
-  const runFacts = (indices: number[]): SeasonM25SeasonFacts[] =>
-    indices.map((index) =>
-      runSeasonM25({
-        runPath: args.input,
-        manifestPath: args.manifest,
-        rootSeed: seasonCalibrationSeed(index),
-        driveWindows: true,
-        pickObjectives: true,
-      }),
-    );
+  const runFacts = m25FactsRunner({ runPath: args.input, manifestPath: args.manifest });
   return runCalibrationShell({
     command: 'season influence calibrate',
     argsForReport: { seedFrom: from, seedTo: to, workers },

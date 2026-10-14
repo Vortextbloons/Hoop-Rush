@@ -4,7 +4,7 @@
   import { X } from '@lucide/svelte';
   import type { HubPostseasonProgress } from '#lib/season/season-postseason-presentation.js';
   import type { HoopRushManifest, SeasonPostseasonScoreline } from '@hoop-rush/data-contracts';
-  import { franchiseIdentityOf } from '#lib/season/season-branding.js';
+  import { teamExternalIdOf } from '#lib/season/season-branding.js';
   import { franchiseColor } from '#lib/season/franchise-colors.js';
   import SeasonTeamLogo from '#lib/components/season/SeasonTeamLogo.svelte';
   import LiveSimModal from '#lib/components/season/LiveSimModal.svelte';
@@ -54,12 +54,8 @@
     if (humanFranchiseId === null) return false;
     return line.homeFranchiseId === humanFranchiseId || line.awayFranchiseId === humanFranchiseId;
   }
-  function teamExternalIdOf(franchiseId: string): string {
-    if (manifest === null) return '';
-    return franchiseIdentityOf(manifest, franchiseId)?.teamExternalId ?? '';
-  }
   const humanExternalId = $derived(
-    humanFranchiseId === null ? '' : teamExternalIdOf(humanFranchiseId),
+    humanFranchiseId === null ? '' : teamExternalIdOf(manifest, humanFranchiseId),
   );
   function headlineOf(line: SeasonPostseasonScoreline): string {
     const away = franchiseAbbrev(line.awayFranchiseId);
@@ -189,8 +185,8 @@
           <ul class="mt-2 grid gap-2 sm:grid-cols-3" aria-label="Latest postseason finals">
             {#each feed as entry (entry.gameId)}
               {@const spot = progress.latestGameId === entry.gameId && involvesHuman(entry)}
-              {@const awayExternalId = teamExternalIdOf(entry.awayFranchiseId)}
-              {@const homeExternalId = teamExternalIdOf(entry.homeFranchiseId)}
+              {@const awayExternalId = teamExternalIdOf(manifest, entry.awayFranchiseId)}
+              {@const homeExternalId = teamExternalIdOf(manifest, entry.homeFranchiseId)}
               <li
                 class="sr-gamecard px-3 py-2.5 {spot ? 'ring-1 ring-primary/50' : ''}"
                 data-spot={spot}

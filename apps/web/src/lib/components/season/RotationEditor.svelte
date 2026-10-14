@@ -8,7 +8,7 @@
   } from '@hoop-rush/data-contracts';
   import SeasonPlayerFace from '#lib/components/season/SeasonPlayerFace.svelte';
   import type { SeasonFaceRef } from '#lib/season/season-branding.js';
-  import { eraIdentityOf } from '#lib/season/season-branding.js';
+  import { eraIdentityOf, faceOf } from '#lib/season/season-branding.js';
   import {
     FATIGUE_BAND_BADGE,
     FATIGUE_BAND_LABEL,
@@ -408,9 +408,6 @@
       window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     el.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'center' });
   }
-  function faceOf(playerVersionId: string): SeasonFaceRef | null {
-    return faces?.get(playerVersionId) ?? null;
-  }
   function fatigueOf(row: (typeof rows)[number]): {
     label: string;
     badge: string;
@@ -743,8 +740,8 @@
               : `Show ${row?.member.displayName ?? playerVersionId} in Active 10`}
             class="sr-chip min-h-11! gap-1.5! py-1! pr-3! pl-1! text-xs! outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3! motion-reduce:transition-none"
           >
-            {#if manifest !== null && faceOf(playerVersionId) !== null}
-              <SeasonPlayerFace face={faceOf(playerVersionId)!} {manifest} size="sm" />
+            {#if manifest !== null && faceOf(faces, playerVersionId) !== null}
+              <SeasonPlayerFace face={faceOf(faces, playerVersionId)!} {manifest} size="sm" />
             {/if}
             <span class="text-muted-foreground">{CLOSING_SLOT_LABELS[slotIndex]}</span>
             <span class="max-w-40 truncate">{row?.member.displayName ?? playerVersionId}</span>
@@ -839,9 +836,9 @@
 {#snippet activePlayerIdentity(row: (typeof activeOrdered)[number])}
   {@const isCloser = row.closingIndex !== -1}
   {@const fatigue = fatigueOf(row)}
-  {#if manifest !== null && faceOf(row.member.playerVersionId) !== null}
+  {#if manifest !== null && faceOf(faces, row.member.playerVersionId) !== null}
     <SeasonPlayerFace
-      face={faceOf(row.member.playerVersionId)!}
+      face={faceOf(faces, row.member.playerVersionId)!}
       {manifest}
       size="sm"
       eager={row.activePos <= 2}
@@ -896,8 +893,8 @@
 
 {#snippet inactivePlayerIdentity(member: RotationMember)}
   {@const eraLabel = eraLabelOf(member)}
-  {#if manifest !== null && faceOf(member.playerVersionId) !== null}
-    <SeasonPlayerFace face={faceOf(member.playerVersionId)!} {manifest} size="sm" />
+  {#if manifest !== null && faceOf(faces, member.playerVersionId) !== null}
+    <SeasonPlayerFace face={faceOf(faces, member.playerVersionId)!} {manifest} size="sm" />
   {/if}
   <div class="min-w-0 flex-1">
     <p class="text-sm font-semibold leading-snug">{member.displayName}</p>

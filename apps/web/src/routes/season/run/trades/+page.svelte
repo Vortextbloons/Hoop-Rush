@@ -11,6 +11,7 @@
   import { overallRatingOf, candidateOf } from '#lib/season/season-catalog-index.js';
   import { overallRatingOfSlice } from '#lib/season/season-player-slice.js';
   import { boostedOverallForPlayer } from '#lib/season/sponsor-gear-view.js';
+  import { faceOf } from '#lib/season/season-branding.js';
   const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
   let mounted = $state(true);
   $effect(() => {
@@ -92,9 +93,6 @@
   });
   const tradeBusy = $derived(busy || blockedMessage !== null);
   const summaries = $derived(shell.snapshot?.summaries ?? []);
-  function faceOf(playerVersionId: string) {
-    return shell.facesByVersion.get(playerVersionId) ?? null;
-  }
   function overallOf(playerVersionId: string): number | null {
     const base =
       overallRatingOf(shell.catalog, playerVersionId) ??
@@ -226,7 +224,7 @@
     playerName={playerNameOf}
     {playableOf}
     {availableOf}
-    {faceOf}
+    faceOf={(playerVersionId) => faceOf(shell.facesByVersion, playerVersionId)}
     {overallOf}
     {summaries}
   />

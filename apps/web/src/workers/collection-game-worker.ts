@@ -22,6 +22,7 @@ import {
   collectionGameResultDigest,
   simulateCollectionGame,
 } from '@hoop-rush/engine';
+import { postWorkerMessage } from '../lib/workers/worker-protocol';
 
 let currentRequestId: string | null = null;
 let cancelled = false;
@@ -46,8 +47,7 @@ function postError(
     message: message.slice(0, 512),
     seed,
   };
-  collectionGameWorkerMessageSchema.parse(payload);
-  self.postMessage(payload);
+  postWorkerMessage(collectionGameWorkerMessageSchema, payload);
 }
 
 const catalogCache = new Map<string, CollectionCatalog>();

@@ -42,6 +42,7 @@ import {
   SeasonBlockInvariantError,
   type SeasonBlockSimulationInput,
 } from '@hoop-rush/engine';
+import { workerErrorMessage } from '#lib/workers/worker-protocol.js';
 const PROGRESS_MIN_INTERVAL_MS = 250;
 const YIELD_GAME_BATCH = 4;
 const YIELD_TIME_BUDGET_MS = 12;
@@ -270,9 +271,6 @@ export function blockLiveFactsOf(
     leaguePulse: { closest, blowout, highestScoring: highest },
   };
 }
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
 function buildErrorMessage(
   requestId: string,
   code: 'invariant-failure' | 'cancelled' | 'internal',
@@ -320,7 +318,7 @@ export function describeSeasonBlockJobError(
       blockIndex: request.blockIndex,
     });
   }
-  return buildErrorMessage(request.requestId, 'internal', errorMessage(error), {
+  return buildErrorMessage(request.requestId, 'internal', workerErrorMessage(error), {
     seed: request.rootSeed,
     blockIndex: request.blockIndex,
   });
@@ -342,7 +340,7 @@ export async function runSeasonBlockJob(
       overrides?.profile ?? loadProfileCached(request.profileUrl, request.profileHash),
     ]);
   } catch (error) {
-    io.post(buildErrorMessage(request.requestId, 'internal', errorMessage(error)));
+    io.post(buildErrorMessage(request.requestId, 'internal', workerErrorMessage(error)));
     return;
   }
   const expectedStateRevision = request.expectedStateRevision;
@@ -568,6 +566,6 @@ export async function warmSeasonBlockJob(
       overrides?.profile ?? loadProfileCached(request.profileUrl, request.profileHash),
     ]);
   } catch (error) {
-    throw new Error(`worker prewarm failed: ${errorMessage(error)}`);
+    throw new Error(`worker prewarm failed: ${workerErrorMessage(error)}`);
   }
 }

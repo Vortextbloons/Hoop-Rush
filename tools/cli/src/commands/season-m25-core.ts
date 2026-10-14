@@ -38,6 +38,7 @@ import {
   runBlockThroughHandler,
   type SeasonBlockRunnerState,
 } from './season-block.ts';
+import { seasonCalibrationSeed } from './season-calibration.ts';
 export function m25EmptyHealthState(): SeasonHealthState {
   return seasonHealthStateSchema.parse({
     schemaVersion: 1,
@@ -308,4 +309,19 @@ export function runSeasonM25(options: SeasonM25DriverOptions): SeasonM25SeasonFa
     catalog: state.catalog,
     summaries: state.summaries,
   };
+}
+export function m25FactsRunner(args: {
+  runPath?: string | null;
+  manifestPath?: string | null;
+}): (indices: number[]) => SeasonM25SeasonFacts[] {
+  return (indices) =>
+    indices.map((index) =>
+      runSeasonM25({
+        runPath: args.runPath,
+        manifestPath: args.manifestPath,
+        rootSeed: seasonCalibrationSeed(index),
+        driveWindows: true,
+        pickObjectives: true,
+      }),
+    );
 }

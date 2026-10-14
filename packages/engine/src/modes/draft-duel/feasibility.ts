@@ -7,6 +7,7 @@ import type {
   SlotGroup,
 } from '@hoop-rush/data-contracts';
 import { LINEUP_STRUCTURE, slotGroupOf } from '@hoop-rush/data-contracts';
+import { isBetterScore } from '../../domain/lineup-reposition.ts';
 import { cardPlayableAt } from './catalog.ts';
 import type { DraftDuelCatalog } from './catalog.ts';
 
@@ -203,13 +204,6 @@ function scorePlacements(
     keyParts.push(`${placement.card.playerVersionId}:${String(placement.slotIndex)}`);
   }
   return { changed, distance, key: keyParts.join('|') };
-}
-
-function isBetterScore(next: PlacementScore, current: PlacementScore | null): boolean {
-  if (current === null) return true;
-  if (next.changed !== current.changed) return next.changed < current.changed;
-  if (next.distance !== current.distance) return next.distance < current.distance;
-  return next.key < current.key;
 }
 
 export function draftDuelRepositionPlan(

@@ -40,11 +40,7 @@ import {
   setClaimReceiptFor,
 } from './set-rewards.ts';
 import { validateCollectionProgressionRules } from './progression.ts';
-import {
-  compileTargetSnapshot,
-  describeCollectionTargetOdds,
-  drawCollectionPackSlotsTargeted,
-} from './targeting.ts';
+import { compileTargetSnapshot, drawCollectionPackSlotsTargeted } from './targeting.ts';
 
 export const WELCOME_COIN_GRANT = 0;
 
@@ -347,8 +343,6 @@ export function describeCollectionPackOdds(
     duplicateExchange: { ...pack.duplicateExchange },
   };
 }
-
-export { describeCollectionTargetOdds };
 
 function ledgerTxnId(commandId: string, pullSequence: number, index: number): string {
   return `txn-${seasonDigestHex(`collection-txn\u0000${commandId}\u0000${String(pullSequence)}\u0000${String(index)}`)}`;

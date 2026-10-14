@@ -15,25 +15,22 @@ import {
   draftDuelWorkerResponseSchema,
   type DraftDuelGameOutput,
   type DraftDuelParticipantId,
-  type DraftDuelWorkerResponse,
 } from '@hoop-rush/data-contracts';
+import {
+  normalizeSimulationError,
+  postWorkerMessage,
+  workerErrorMessage,
+} from '../lib/workers/worker-protocol';
 let currentRequestId: string | null = null;
 let requestToken = 0;
-function post(message: DraftDuelWorkerResponse): void {
-  draftDuelWorkerResponseSchema.parse(message);
-  self.postMessage(message);
-}
 function postError(requestId: string, code: string, message: string): void {
-  post({
+  postWorkerMessage(draftDuelWorkerResponseSchema, {
     schemaVersion: DRAFT_DUEL_WORKER_WIRE_VERSION,
     kind: 'draft-duel-error',
     requestId,
     code,
     message: message.slice(0, 512),
   });
-}
-function normalizeSimulationError(message: string): string {
-  return message.replace(/ failed invariants: [\s\S]*$/, ' failed invariants');
 }
 function participantIdFromTeamId(teamId: string): DraftDuelParticipantId {
   const match = /(?:^|[:._-])(p[12])$/.exec(teamId);
@@ -92,7 +89,7 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
         tapeDigest: draftDuelGameTapeDigest(recorded.tape),
       });
       if (token !== requestToken) return;
-      post({
+      postWorkerMessage(draftDuelWorkerResponseSchema, {
         schemaVersion: DRAFT_DUEL_WORKER_WIRE_VERSION,
         kind: 'draft-duel-game',
         requestId: request.requestId,
@@ -100,7 +97,7 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
       });
     } catch (error) {
       if (token !== requestToken) return;
-      const message = error instanceof Error ? error.message : String(error);
+      const message = workerErrorMessage(error);
       postError(request.requestId, 'simulation-failed', normalizeSimulationError(message));
     }
   })();

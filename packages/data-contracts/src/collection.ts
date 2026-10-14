@@ -172,13 +172,11 @@ export const collectionPullRecordV2Schema = collectionPullRecordV1Schema
   .strict();
 export type CollectionPullRecordV2 = z.infer<typeof collectionPullRecordV2Schema>;
 
-export const collectionPullRecordUnionSchema = z.union([
+export const collectionPullRecordSchema = z.union([
   collectionPullRecordV2Schema,
   collectionPullRecordV1Schema,
 ]);
-export const collectionPullRecordSchema = collectionPullRecordUnionSchema;
-export type CollectionPullRecord = z.infer<typeof collectionPullRecordUnionSchema>;
-export type CollectionPullRecordUnion = CollectionPullRecord;
+export type CollectionPullRecord = z.infer<typeof collectionPullRecordSchema>;
 
 export const collectionLedgerReasonSchema = z.enum([
   'welcome-grant',

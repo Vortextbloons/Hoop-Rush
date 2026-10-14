@@ -1014,7 +1014,7 @@ export const collectionPlayStateV2Schema = z
   });
 export type CollectionPlayStateV2 = z.infer<typeof collectionPlayStateV2Schema>;
 
-export const collectionPlayStateV3Schema = z
+export const collectionPlayStateSchema = z
   .object({
     saveVersion: z.literal(COLLECTION_PLAY_SAVE_VERSION),
     schemaVersion: z.literal(COLLECTION_SCHEMA_VERSION),
@@ -1047,15 +1047,12 @@ export const collectionPlayStateV3Schema = z
       previous = challengeId;
     }
   });
-export type CollectionPlayStateV3 = z.infer<typeof collectionPlayStateV3Schema>;
-
-export const collectionPlayStateSchema = collectionPlayStateV3Schema;
-export type CollectionPlayState = CollectionPlayStateV3;
+export type CollectionPlayState = z.infer<typeof collectionPlayStateSchema>;
 
 export const collectionPlayStateUnionSchema = z.union([
   collectionPlayStateV1Schema,
   collectionPlayStateV2Schema,
-  collectionPlayStateV3Schema,
+  collectionPlayStateSchema,
 ]);
 export type CollectionPlayStateUnion = z.infer<typeof collectionPlayStateUnionSchema>;
 
@@ -1324,7 +1321,7 @@ const OBJECTIVE_CONDITION_KIND: Record<string, string> = {
   'obj-box-score-star-v1': 'player-double-stat',
 };
 
-export const collectionGameRulesV2Schema = z
+export const collectionGameRulesSchema = z
   .object({
     rulesVersion: z.literal(COLLECTION_GAME_RULES_VERSION),
     gameVersion: z.literal(COLLECTION_GAME_V2_VERSION),
@@ -1394,7 +1391,4 @@ export const collectionGameRulesV2Schema = z
       }
     }
   });
-export type CollectionGameRulesV2 = z.infer<typeof collectionGameRulesV2Schema>;
-
-export const collectionGameRulesSchema = collectionGameRulesV2Schema;
-export type CollectionGameRules = CollectionGameRulesV2;
+export type CollectionGameRules = z.infer<typeof collectionGameRulesSchema>;

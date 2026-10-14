@@ -12,7 +12,7 @@ import {
   COLLECTION_OBJECTIVE_VERSION,
   COLLECTION_REWARD_VERSION,
   COLLECTION_TEAM_VERSION,
-  collectionGameRulesV2Schema,
+  collectionGameRulesSchema,
 } from '@hoop-rush/data-contracts';
 import { ENGINE_VERSION } from '@hoop-rush/engine';
 import {
@@ -56,7 +56,7 @@ export function buildCollectionGameRules(): unknown {
 }
 
 export function main(): void {
-  const parsed = collectionGameRulesV2Schema.safeParse(buildCollectionGameRules());
+  const parsed = collectionGameRulesSchema.safeParse(buildCollectionGameRules());
   if (!parsed.success) {
     throw new Error(
       `derived collection game rules fail the schema: ${parsed.error.issues[0]?.message ?? 'unknown'}`,

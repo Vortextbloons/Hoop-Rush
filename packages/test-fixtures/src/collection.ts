@@ -4,7 +4,7 @@ import {
   collectionCatalogSchema,
   collectionChallengeDefinitionSchema,
   collectionDifficultyProfileSchema,
-  collectionGameRulesV2Schema,
+  collectionGameRulesSchema,
   collectionProgressionRulesDigest,
   collectionProgressionRulesSchema,
   seasonDigestHex,
@@ -271,7 +271,7 @@ export function buildCollectionGameRulesFixture(
   overrides: Partial<CollectionGameRules> = {},
 ): CollectionGameRules {
   const difficulties = buildCollectionDifficultyProfiles();
-  return collectionGameRulesV2Schema.parse({
+  return collectionGameRulesSchema.parse({
     rulesVersion: COLLECTION_GAME_RULES_VERSION,
     gameVersion: COLLECTION_GAME_V2_VERSION,
     teamVersion: 'collection-team-v1',

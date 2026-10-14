@@ -17,33 +17,19 @@ import {
   fixedFiveWorkerMessageSchema,
   fixedFiveWorkerRequestSchema,
   type FixedFiveDuelGameOutput,
-  type FixedFiveWorkerComplete,
-  type FixedFiveWorkerDuelGameMessage,
   type FixedFiveWorkerError,
-  type FixedFiveWorkerProgress,
   type FixedFiveWorkerResultEntry,
-  type FixedFiveWorkerResults,
-  type FixedFiveWorkerVerificationFailed,
-  type FixedFiveWorkerVerified,
   type OpponentBracket,
 } from '@hoop-rush/data-contracts';
+import {
+  normalizeShared82SimulationError,
+  postWorkerMessage,
+  workerErrorMessage,
+} from '../lib/workers/worker-protocol';
 const BATCH = 4;
 let currentRequestId: string | null = null;
 let requestToken = 0;
 let lastProgressAt = 0;
-function post(
-  message:
-    | FixedFiveWorkerProgress
-    | FixedFiveWorkerResults
-    | FixedFiveWorkerDuelGameMessage
-    | FixedFiveWorkerComplete
-    | FixedFiveWorkerError
-    | FixedFiveWorkerVerified
-    | FixedFiveWorkerVerificationFailed,
-): void {
-  fixedFiveWorkerMessageSchema.parse(message);
-  self.postMessage(message);
-}
 function postError(requestId: string, message: string): void {
   self.postMessage({
     schemaVersion: FIXED_FIVE_WORKER_WIRE_VERSION,
@@ -61,21 +47,13 @@ function maybeProgress(
   const now = Date.now();
   if (!force && now - lastProgressAt < 250) return;
   lastProgressAt = now;
-  post({
+  postWorkerMessage(fixedFiveWorkerMessageSchema, {
     schemaVersion: FIXED_FIVE_WORKER_WIRE_VERSION,
     type: 'fixed-five-progress',
     requestId,
     completedGames,
     totalGames,
   });
-}
-function normalizeSimulationError(message: string): string {
-  return message
-    .replace(/ failed invariants: [\s\S]*$/, ' failed invariants')
-    .replace(
-      /^shared82 (?:p1|p2) game (\d+) failed invariants$/,
-      'shared82 game $1 failed invariants',
-    );
 }
 self.onmessage = (event: MessageEvent<unknown>): void => {
   const parsed = fixedFiveWorkerRequestSchema.safeParse(event.data);
@@ -99,7 +77,7 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
     const pending: FixedFiveWorkerResultEntry[] = [];
     function flush(requestId: string): void {
       if (pending.length === 0) return;
-      post({
+      postWorkerMessage(fixedFiveWorkerMessageSchema, {
         schemaVersion: FIXED_FIVE_WORKER_WIRE_VERSION,
         type: 'fixed-five-results',
         requestId,
@@ -127,14 +105,14 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
         );
         if (token !== requestToken) return;
         if (outcome.ok) {
-          post({
+          postWorkerMessage(fixedFiveWorkerMessageSchema, {
             schemaVersion: FIXED_FIVE_WORKER_WIRE_VERSION,
             type: 'fixed-five-verified',
             requestId: request.requestId,
             receipt: outcome.receipt,
           });
         } else {
-          post({
+          postWorkerMessage(fixedFiveWorkerMessageSchema, {
             schemaVersion: FIXED_FIVE_WORKER_WIRE_VERSION,
             type: 'fixed-five-verification-failed',
             requestId: request.requestId,
@@ -168,7 +146,7 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
           resultDigest: fixedFiveDuelGameResultDigest(recorded.result),
           tapeDigest: fixedFiveDuelGameTapeDigest(recorded.tape),
         };
-        post({
+        postWorkerMessage(fixedFiveWorkerMessageSchema, {
           schemaVersion: FIXED_FIVE_WORKER_WIRE_VERSION,
           type: 'fixed-five-duel-game',
           requestId: request.requestId,
@@ -211,7 +189,7 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
         }
         if (token !== requestToken) return;
         flush(request.requestId);
-        post({
+        postWorkerMessage(fixedFiveWorkerMessageSchema, {
           schemaVersion: FIXED_FIVE_WORKER_WIRE_VERSION,
           type: 'fixed-five-complete',
           requestId: request.requestId,
@@ -255,7 +233,7 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
       if (token !== requestToken) return;
       flush(request.requestId);
       maybeProgress(request.requestId, delivered, total, true);
-      post({
+      postWorkerMessage(fixedFiveWorkerMessageSchema, {
         schemaVersion: FIXED_FIVE_WORKER_WIRE_VERSION,
         type: 'fixed-five-complete',
         requestId: request.requestId,
@@ -264,10 +242,10 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
       });
     } catch (error) {
       if (token !== requestToken) return;
-      const message = error instanceof Error ? error.message : String(error);
+      const message = workerErrorMessage(error);
       postError(
         request.requestId,
-        request.type === 'fixed-five-verify' ? message : normalizeSimulationError(message),
+        request.type === 'fixed-five-verify' ? message : normalizeShared82SimulationError(message),
       );
     }
   })();

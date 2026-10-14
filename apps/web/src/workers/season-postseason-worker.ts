@@ -14,10 +14,9 @@ import {
   type PostseasonGameId,
 } from '@hoop-rush/data-contracts';
 import { SeasonPostseasonInvariantError } from '@hoop-rush/engine';
-import {
-  seasonPostseasonScorelineOf,
-  simulateSeasonPostseasonCommand,
-} from '../lib/season/season-postseason-simulation';
+import { seasonPostseasonScorelineOf } from '@hoop-rush/application/season';
+import { workerErrorMessage } from '../lib/workers/worker-protocol';
+import { simulateSeasonPostseasonCommand } from '../lib/season/season-postseason-simulation';
 let currentRequestId: string | null = null;
 let cancelled = false;
 const catalogCache = new Map<string, SeasonDraftCatalog>();
@@ -89,7 +88,11 @@ async function runPostseason(request: SeasonPostseasonWorkerStartRequest): Promi
       loadProfileCached(request.profileUrl, request.profileHash),
     ]);
   } catch (error) {
-    postError(request.requestId, 'internal', `worker asset load failed: ${errorMessage(error)}`);
+    postError(
+      request.requestId,
+      'internal',
+      `worker asset load failed: ${workerErrorMessage(error)}`,
+    );
     return;
   }
   throwIfCancelled();
@@ -175,7 +178,11 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
           requestId: request.requestId,
         });
       } catch (error) {
-        postError(request.requestId, 'internal', `worker prewarm failed: ${errorMessage(error)}`);
+        postError(
+          request.requestId,
+          'internal',
+          `worker prewarm failed: ${workerErrorMessage(error)}`,
+        );
       }
     })();
     return;
@@ -200,12 +207,9 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
       });
       return;
     }
-    postError(request.requestId, 'internal', errorMessage(error), {
+    postError(request.requestId, 'internal', workerErrorMessage(error), {
       seed: request.rootSeed,
       gameId: request.targetGameId,
     });
   });
 };
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}

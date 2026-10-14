@@ -4,7 +4,7 @@
   import type { HoopRushManifest } from '@hoop-rush/data-contracts';
   import SeasonPlayerIdentity from '#lib/components/season/SeasonPlayerIdentity.svelte';
   import SeasonTeamLogo from '#lib/components/season/SeasonTeamLogo.svelte';
-  import { eraIdentityOf, franchiseIdentityOf } from '#lib/season/season-branding.js';
+  import { eraLabelOf, faceOf, franchiseIdentityOf } from '#lib/season/season-branding.js';
   import type { SeasonRunShellData } from '#lib/season/season-shell-context.js';
   import { oneDecimal } from '#lib/format.js';
   import type {
@@ -39,12 +39,6 @@
     { key: 'blocksPerGame', label: 'BPG' },
     { key: 'turnoversPerGame', label: 'TOPG' },
   ];
-  function faceOf(playerVersionId: string) {
-    return shell.facesByVersion.get(playerVersionId) ?? null;
-  }
-  function eraLabelOf(playerVersionId: string, franchiseId: string, eraId: string) {
-    return eraIdentityOf(manifest, franchiseId, eraId).displayLabel;
-  }
   function statValue(
     row: SeasonTeamPlayerRow,
     key: keyof Omit<SeasonTeamPlayerStats, 'gamesPlayed'>,
@@ -162,8 +156,8 @@
     </p>
     <ul class="mt-2 flex flex-col gap-2">
       {#each [...detail.starters, ...detail.bench] as row (row.playerVersionId)}
-        {@const face = faceOf(row.playerVersionId)}
-        {@const eraLabel = eraLabelOf(row.playerVersionId, row.franchiseId, row.eraId)}
+        {@const face = faceOf(shell.facesByVersion, row.playerVersionId)}
+        {@const eraLabel = eraLabelOf(manifest, row.franchiseId, row.eraId)}
         <li class="sr-panel-quiet p-3">
           <div class="flex min-w-0 items-start gap-3">
             <div class="min-w-0 flex-1">

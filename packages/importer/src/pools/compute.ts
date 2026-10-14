@@ -60,7 +60,11 @@ export { loadManifest, manifestPath } from '../shared/manifest.ts';
 export type { EraEntry, PoolIndexEntry, PoolManifest as Manifest } from '../shared/manifest.ts';
 import { buildPlayerPositions } from './positions.ts';
 import { positionOverrideFor } from '../positions/overrides.ts';
-import { primaryPositionForSource } from '../positions/normalize.ts';
+import {
+  POSITION_LABEL_MAP,
+  normalizePositionLabels,
+  primaryPositionForSource,
+} from '../positions/normalize.ts';
 import { canonicalPlayerName } from '../identity.ts';
 import { derivePlayerRecord } from '../ratings/v2.ts';
 import {
@@ -70,7 +74,7 @@ import {
 } from '../ratings/overall-evidence.ts';
 import { getEra } from '../ratings/era.ts';
 import { loadRatingsModelArtifact } from '../ratings/artifact.ts';
-export { POSITION_LABEL_MAP, buildPlayerPositions, normalizePositionLabels } from './positions.ts';
+export { POSITION_LABEL_MAP, buildPlayerPositions, normalizePositionLabels };
 import {
   LINEAGE_SEGMENTS,
   MODERN_SLOTS,

@@ -16,11 +16,28 @@ function fieldIndex(field: TapeStatField): number {
   return GAME_TAPE_STAT_FIELDS.indexOf(field);
 }
 
-const POINTS = fieldIndex('points');
-const OFFENSIVE_REBOUNDS = fieldIndex('offensiveRebounds');
-const DEFENSIVE_REBOUNDS = fieldIndex('defensiveRebounds');
-const TURNOVERS = fieldIndex('turnovers');
-const TEAM_REBOUNDS = fieldIndex('teamRebounds');
+export const TAPE_STAT_INDEXES = {
+  points: fieldIndex('points'),
+  fieldGoalMakes: fieldIndex('fieldGoalMakes'),
+  fieldGoalAttempts: fieldIndex('fieldGoalAttempts'),
+  threeMakes: fieldIndex('threeMakes'),
+  threeAttempts: fieldIndex('threeAttempts'),
+  freeThrowMakes: fieldIndex('freeThrowMakes'),
+  freeThrowAttempts: fieldIndex('freeThrowAttempts'),
+  offensiveRebounds: fieldIndex('offensiveRebounds'),
+  defensiveRebounds: fieldIndex('defensiveRebounds'),
+  assists: fieldIndex('assists'),
+  turnovers: fieldIndex('turnovers'),
+  teamRebounds: fieldIndex('teamRebounds'),
+} as const;
+
+const {
+  points: POINTS,
+  offensiveRebounds: OFFENSIVE_REBOUNDS,
+  defensiveRebounds: DEFENSIVE_REBOUNDS,
+  turnovers: TURNOVERS,
+  teamRebounds: TEAM_REBOUNDS,
+} = TAPE_STAT_INDEXES;
 
 function pointsText(points: number): string {
   return `${String(points)} pt${points === 1 ? '' : 's'}`;

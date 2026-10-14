@@ -15,11 +15,11 @@ import {
   seedFromString,
 } from '@hoop-rush/test-fixtures';
 import {
-  draftDuelPlaybackPositionMs,
-  draftDuelPlaybackWeights,
-  draftDuelVisibleEventCount,
-  draftDuelVisibleState,
-} from './draft-duel-playback';
+  gamecastPlaybackPositionMs,
+  gamecastPlaybackWeights,
+  gamecastVisibleEventCount,
+  gamecastVisibleState,
+} from '#lib/features/multiplayer/gamecast/gamecast-playback.js';
 
 function integerSecondsTape(tape: readonly DraftDuelTapeEvent[]): DraftDuelTapeEvent[] {
   return tape.map((event) =>
@@ -64,9 +64,9 @@ function buildOutput(seed: string): DraftDuelGameOutput {
 
 const output = buildOutput('dd-playback-tape');
 
-describe('draftDuelPlaybackWeights', () => {
+describe('gamecastPlaybackWeights', () => {
   it('is cumulative, monotonic, and ends at 1', () => {
-    const weights = draftDuelPlaybackWeights(output.tape);
+    const weights = gamecastPlaybackWeights(output.tape);
     expect(weights).toHaveLength(output.tape.length);
     expect(weights.at(-1)).toBe(1);
     for (let index = 0; index < weights.length; index += 1) {
@@ -77,7 +77,7 @@ describe('draftDuelPlaybackWeights', () => {
   });
 
   it('holds period events at the previous cumulative weight', () => {
-    const weights = draftDuelPlaybackWeights(output.tape);
+    const weights = gamecastPlaybackWeights(output.tape);
     for (let index = 0; index < output.tape.length; index += 1) {
       if (output.tape[index]?.kind !== 'period') continue;
       expect(weights[index]).toBe(weights[index - 1] ?? 0);
@@ -88,7 +88,7 @@ describe('draftDuelPlaybackWeights', () => {
     const trip = output.tape.find((event): event is DraftDuelTapeTrip => event.kind === 'trip');
     expect(trip).toBeDefined();
     if (trip === undefined) return;
-    const weights = draftDuelPlaybackWeights([
+    const weights = gamecastPlaybackWeights([
       { ...trip, secondsElapsed: 0 },
       { ...trip, secondsElapsed: 24 },
       { ...trip, secondsElapsed: 2 },
@@ -97,37 +97,37 @@ describe('draftDuelPlaybackWeights', () => {
   });
 });
 
-describe('draftDuelVisibleEventCount', () => {
+describe('gamecastVisibleEventCount', () => {
   it('is monotonic, bounded, and complete at progress 1', () => {
     let previous = 0;
     for (let step = 0; step <= 200; step += 1) {
-      const count = draftDuelVisibleEventCount(output.tape, step / 200);
+      const count = gamecastVisibleEventCount(output.tape, step / 200);
       expect(count).toBeGreaterThanOrEqual(previous);
       expect(count).toBeLessThanOrEqual(output.tape.length);
       previous = count;
     }
-    expect(draftDuelVisibleEventCount(output.tape, 0)).toBe(0);
-    expect(draftDuelVisibleEventCount(output.tape, 1)).toBe(output.tape.length);
-    expect(draftDuelVisibleEventCount(output.tape, -1)).toBe(0);
-    expect(draftDuelVisibleEventCount(output.tape, 2)).toBe(output.tape.length);
-    expect(draftDuelVisibleEventCount(output.tape, Number.NaN)).toBe(0);
-    expect(draftDuelVisibleEventCount([], 1)).toBe(0);
+    expect(gamecastVisibleEventCount(output.tape, 0)).toBe(0);
+    expect(gamecastVisibleEventCount(output.tape, 1)).toBe(output.tape.length);
+    expect(gamecastVisibleEventCount(output.tape, -1)).toBe(0);
+    expect(gamecastVisibleEventCount(output.tape, 2)).toBe(output.tape.length);
+    expect(gamecastVisibleEventCount(output.tape, Number.NaN)).toBe(0);
+    expect(gamecastVisibleEventCount([], 1)).toBe(0);
   });
 
   it('reveals a period boundary exactly when its cumulative weight is crossed', () => {
-    const weights = draftDuelPlaybackWeights(output.tape);
+    const weights = gamecastPlaybackWeights(output.tape);
     for (let index = 0; index < output.tape.length; index += 1) {
       if (output.tape[index]?.kind !== 'period') continue;
       const boundary = weights[index] ?? Number.NaN;
-      expect(draftDuelVisibleEventCount(output.tape, boundary)).toBe(index + 1);
-      expect(draftDuelVisibleEventCount(output.tape, boundary - 1e-9)).toBeLessThan(index + 1);
+      expect(gamecastVisibleEventCount(output.tape, boundary)).toBe(index + 1);
+      expect(gamecastVisibleEventCount(output.tape, boundary - 1e-9)).toBeLessThan(index + 1);
     }
   });
 });
 
-describe('draftDuelVisibleState', () => {
+describe('gamecastVisibleState', () => {
   it('reconstructs the final box score and lines from the full prefix', () => {
-    const state = draftDuelVisibleState(output, output.tape.length);
+    const state = gamecastVisibleState(output, output.tape.length);
     expect(state.homeScore).toBe(output.result.home.box.points);
     expect(state.awayScore).toBe(output.result.away.box.points);
     const linesBySide = [state.homePlayerLines, state.awayPlayerLines] as const;
@@ -161,7 +161,7 @@ describe('draftDuelVisibleState', () => {
     let previousHome = 0;
     let previousAway = 0;
     for (let count = 0; count <= output.tape.length; count += 1) {
-      const state = draftDuelVisibleState(output, count);
+      const state = gamecastVisibleState(output, count);
       expect(state.homeScore).toBeGreaterThanOrEqual(previousHome);
       expect(state.awayScore).toBeGreaterThanOrEqual(previousAway);
       previousHome = state.homeScore;
@@ -171,10 +171,10 @@ describe('draftDuelVisibleState', () => {
 
   it('exposes only the visible period boundaries', () => {
     const half = Math.floor(output.tape.length / 2);
-    const state = draftDuelVisibleState(output, half);
+    const state = gamecastVisibleState(output, half);
     const visiblePeriods = output.tape.slice(0, half).filter((event) => event.kind === 'period');
     expect(state.periods).toHaveLength(visiblePeriods.length);
-    const full = draftDuelVisibleState(output, output.tape.length);
+    const full = gamecastVisibleState(output, output.tape.length);
     const tapePeriods = output.tape.filter((event) => event.kind === 'period');
     expect(full.periods).toHaveLength(tapePeriods.length);
     full.periods.forEach((period, index) => {
@@ -186,26 +186,26 @@ describe('draftDuelVisibleState', () => {
   });
 
   it('clamps visible counts to the tape bounds', () => {
-    const empty = draftDuelVisibleState(output, 0);
+    const empty = gamecastVisibleState(output, 0);
     expect(empty.homeScore).toBe(0);
     expect(empty.awayScore).toBe(0);
     expect(empty.periods).toEqual([]);
-    const negative = draftDuelVisibleState(output, -5);
+    const negative = gamecastVisibleState(output, -5);
     expect(negative).toEqual(empty);
-    const clamped = draftDuelVisibleState(output, Number.NaN);
+    const clamped = gamecastVisibleState(output, Number.NaN);
     expect(clamped).toEqual(empty);
-    const oversized = draftDuelVisibleState(output, output.tape.length + 10);
+    const oversized = gamecastVisibleState(output, output.tape.length + 10);
     expect(oversized.homeScore).toBe(output.result.home.box.points);
     expect(oversized.awayScore).toBe(output.result.away.box.points);
   });
 });
 
-describe('draftDuelPlaybackPositionMs', () => {
+describe('gamecastPlaybackPositionMs', () => {
   const startedAtIso = '2026-01-01T00:00:00.000Z';
   const startMs = Date.parse(startedAtIso);
   it('tracks elapsed time with server clock offsets', () => {
     expect(
-      draftDuelPlaybackPositionMs({
+      gamecastPlaybackPositionMs({
         startedAtIso,
         durationMs: DRAFT_DUEL_BROADCAST_MS,
         serverOffsetMs: 0,
@@ -213,7 +213,7 @@ describe('draftDuelPlaybackPositionMs', () => {
       }),
     ).toBe(5000);
     expect(
-      draftDuelPlaybackPositionMs({
+      gamecastPlaybackPositionMs({
         startedAtIso,
         durationMs: DRAFT_DUEL_BROADCAST_MS,
         serverOffsetMs: 2000,
@@ -221,7 +221,7 @@ describe('draftDuelPlaybackPositionMs', () => {
       }),
     ).toBe(7000);
     expect(
-      draftDuelPlaybackPositionMs({
+      gamecastPlaybackPositionMs({
         startedAtIso,
         durationMs: DRAFT_DUEL_BROADCAST_MS,
         serverOffsetMs: -3000,
@@ -232,7 +232,7 @@ describe('draftDuelPlaybackPositionMs', () => {
 
   it('clamps to the broadcast window', () => {
     expect(
-      draftDuelPlaybackPositionMs({
+      gamecastPlaybackPositionMs({
         startedAtIso,
         durationMs: DRAFT_DUEL_BROADCAST_MS,
         serverOffsetMs: 0,
@@ -240,7 +240,7 @@ describe('draftDuelPlaybackPositionMs', () => {
       }),
     ).toBe(0);
     expect(
-      draftDuelPlaybackPositionMs({
+      gamecastPlaybackPositionMs({
         startedAtIso,
         durationMs: DRAFT_DUEL_BROADCAST_MS,
         serverOffsetMs: 0,
@@ -248,7 +248,7 @@ describe('draftDuelPlaybackPositionMs', () => {
       }),
     ).toBe(DRAFT_DUEL_BROADCAST_MS);
     expect(
-      draftDuelPlaybackPositionMs({
+      gamecastPlaybackPositionMs({
         startedAtIso,
         durationMs: DRAFT_DUEL_BROADCAST_MS,
         serverOffsetMs: 0,
@@ -259,7 +259,7 @@ describe('draftDuelPlaybackPositionMs', () => {
 
   it('returns 0 for invalid input', () => {
     expect(
-      draftDuelPlaybackPositionMs({
+      gamecastPlaybackPositionMs({
         startedAtIso: 'not-a-date',
         durationMs: DRAFT_DUEL_BROADCAST_MS,
         serverOffsetMs: 0,
@@ -267,7 +267,7 @@ describe('draftDuelPlaybackPositionMs', () => {
       }),
     ).toBe(0);
     expect(
-      draftDuelPlaybackPositionMs({
+      gamecastPlaybackPositionMs({
         startedAtIso,
         durationMs: 0,
         serverOffsetMs: 0,
@@ -275,7 +275,7 @@ describe('draftDuelPlaybackPositionMs', () => {
       }),
     ).toBe(0);
     expect(
-      draftDuelPlaybackPositionMs({
+      gamecastPlaybackPositionMs({
         startedAtIso,
         durationMs: DRAFT_DUEL_BROADCAST_MS,
         serverOffsetMs: 0,

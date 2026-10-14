@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { HoopRushManifest } from '@hoop-rush/data-contracts';
   import SeasonPlayerFace from '#lib/components/season/SeasonPlayerFace.svelte';
-  import { eraIdentityOf, type SeasonFaceRef } from '#lib/season/season-branding.js';
+  import { eraLabelOf, type SeasonFaceRef } from '#lib/season/season-branding.js';
   import type {
     SeasonPlayerStatsMeasure,
     SeasonPlayerStatsRow,
@@ -69,9 +69,6 @@
     const value = row[key];
     return typeof value === 'number' ? oneDecimal(value) : '—';
   }
-  function eraLabelOf(playerVersionId: string, franchiseId: string, eraId: string) {
-    return eraIdentityOf(manifest, franchiseId, eraId).displayLabel;
-  }
 </script>
 
 <table class="sr-table min-w-[44rem] text-sm">
@@ -123,7 +120,7 @@
   <tbody>
     {#each rows as row (row.playerVersionId)}
       {@const face = faceOf(row.playerVersionId)}
-      {@const eraLabel = eraLabelOf(row.playerVersionId, row.franchiseId, row.eraId)}
+      {@const eraLabel = eraLabelOf(manifest, row.franchiseId, row.eraId)}
       <tr>
         <th scope="row" class="px-3 py-1.5 text-left">
           <div class="flex min-w-0 items-center gap-2">

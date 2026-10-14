@@ -12,14 +12,11 @@ import {
   havocGameSeed,
 } from '@hoop-rush/data-contracts';
 import type { BuildHavocGameInputInput } from './api.ts';
+import { compareStrings } from '../../domain/math.ts';
 
 export interface HavocCapabilityTargets {
   readonly bodySnatcher: ReadonlyMap<string, string>;
   readonly bounty: string | null;
-}
-
-function compareStrings(a: string, b: string): number {
-  return a < b ? -1 : a > b ? 1 : 0;
 }
 
 function opponentTeam(input: HavocGameInput): HavocTeamInput {

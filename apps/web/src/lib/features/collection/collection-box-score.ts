@@ -2,6 +2,7 @@ import type {
   CollectionGameRecordUnion,
   CollectionGameResultUnion,
 } from '@hoop-rush/data-contracts';
+import { percentOneDecimal } from '#lib/format.js';
 
 export type CollectionCompletedResult = Extract<
   CollectionGameResultUnion,
@@ -112,10 +113,6 @@ function splitOf(split: ShootingSplit): ShootingSplit {
 
 export function percentOf(made: number, attempted: number): number {
   return attempted > 0 ? made / attempted : 0;
-}
-
-export function percentText(value: number): string {
-  return `${(value * 100).toFixed(1)}%`;
 }
 
 export function trueShootingOf(
@@ -232,7 +229,7 @@ function statRow(input: {
 function shootingCell(split: ShootingSplit): TeamStatCell {
   if (split.attempted === 0) return { primary: '—', detail: null };
   return {
-    primary: percentText(percentOf(split.made, split.attempted)),
+    primary: percentOneDecimal(percentOf(split.made, split.attempted)),
     detail: `${String(split.made)}-${String(split.attempted)}`,
   };
 }
@@ -276,8 +273,8 @@ export function teamComparisonOf(home: TeamBoxView, away: TeamBoxView): TeamStat
       label: 'True shooting',
       homeValue: homeTrueShooting,
       awayValue: awayTrueShooting,
-      home: { primary: percentText(homeTrueShooting), detail: null },
-      away: { primary: percentText(awayTrueShooting), detail: null },
+      home: { primary: percentOneDecimal(homeTrueShooting), detail: null },
+      away: { primary: percentOneDecimal(awayTrueShooting), detail: null },
     }),
   );
   rows.push(

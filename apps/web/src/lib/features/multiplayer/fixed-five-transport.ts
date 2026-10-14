@@ -28,6 +28,7 @@ import {
   isUsableSupabaseUrl,
   parseRoomCode,
   readSupabaseEnv,
+  rpcRoomPayload,
   stringField,
   supabaseClient,
 } from '#lib/supabase-runtime.js';
@@ -78,22 +79,7 @@ interface FixedFiveCommandRow {
   payload: unknown;
 }
 
-interface RpcRoomPayload {
-  room_id: Id;
-  code: FixedFiveRoomCode | null;
-  participant_id?: FixedFiveParticipantId;
-}
-
-function rpcPayload(value: unknown): RpcRoomPayload {
-  const record = value as Record<string, unknown>;
-  const participantRaw = record['participant_id'];
-  const rawCode = record['code'];
-  return {
-    room_id: idSchema.parse(stringField(record, 'room_id')),
-    code: typeof rawCode === 'string' ? fixedFiveRoomCodeSchema.parse(rawCode) : null,
-    participant_id: participantRaw === 'p1' || participantRaw === 'p2' ? participantRaw : undefined,
-  };
-}
+const rpcPayload = (value: unknown) => rpcRoomPayload(value, fixedFiveRoomCodeSchema);
 
 interface RpcCommandPayload {
   accepted: boolean;

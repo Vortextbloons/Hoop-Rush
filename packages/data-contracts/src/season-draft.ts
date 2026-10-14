@@ -51,5 +51,3 @@ export const seasonDraftStateSchema = z.object({
     .optional(),
 });
 export type SeasonDraftState = z.infer<typeof seasonDraftStateSchema>;
-export const storedSeasonDraftStateSchema = seasonDraftStateSchema;
-export type StoredSeasonDraftState = z.infer<typeof storedSeasonDraftStateSchema>;

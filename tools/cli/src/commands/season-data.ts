@@ -4,7 +4,6 @@ import {
   seasonDraftCatalogSchema,
   seasonFreeAgencyIndexSchema,
   seasonLeagueSchema,
-  seasonRosterRoleSchema,
   seasonRosterTargetsSchema,
   seasonScheduleSchema,
   type SeasonAiPool,
@@ -263,7 +262,6 @@ export function pickBestSelectable(
   }
   return candidates[0] as SeasonDraftCandidate;
 }
-export const ROSTER_ROLES: readonly SeasonRosterRole[] = seasonRosterRoleSchema.options;
 export function canonicalNonHumanCandidates(
   catalog: SeasonDraftCatalog,
   humanVersionIds: ReadonlySet<string>,

@@ -2,7 +2,7 @@ import { buildEmptyChallengeState } from '@hoop-rush/data-contracts';
 import type { StoredSeasonRunRecord } from '../schemas/season-run-record.ts';
 import { storedEvolutionOf } from '../schemas/season-run-record.ts';
 import type { SeasonRunEngineSeam } from './engine-seam-types.ts';
-export type ReplayDivergenceKind =
+type ReplayDivergenceKind =
   | 'campaign-offers'
   | 'campaign-evaluations'
   | 'campaign-branch-state'

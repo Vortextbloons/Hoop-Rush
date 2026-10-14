@@ -1,21 +1,6 @@
 export { projectBaseFive, type LedgerSide } from './base.ts';
 export { projectExpectedLedger, expectedStealShare } from './expected-ledger.ts';
-export {
-  EVOLUTION_PROJECTION_ADAPTER_VERSION,
-  adjustLedgerForDeepFour,
-  adjustLedgerForTwentySecondClock,
-  estimateFirstToSevenRace,
-  projectGameWithRule,
-  scoringDistributionOf,
-  twentySecondExpectedMultiplier,
-  twentySecondViolationRate,
-  winProbabilityFromDiff,
-  type DeepFourAdjustment,
-  type FirstToSevenEstimate,
-  type PossessionScoring,
-  type RuleGameProjection,
-  type TwentySecondAdjustment,
-} from './evolution.ts';
+export { estimateFirstToSevenRace, projectGameWithRule } from './evolution.ts';
 export {
   neutralReference,
   archetypeReference,
@@ -24,33 +9,15 @@ export {
 } from './reference-lineups.ts';
 export { identifyWeaknesses, weaknessPenalty } from './weaknesses.ts';
 export { ProjectionCache, type ProjectionCacheStats } from './cache.ts';
-export {
-  traceRotationNormal,
-  traceRotationClose,
-  traceContext,
-  type RotationTraceResult,
-  type RotationTraceUnit,
-} from './rotation-trace.ts';
-export { projectSeasonRoster, type SeasonProjectionOptions } from './season.ts';
+export { traceRotationNormal, traceRotationClose } from './rotation-trace.ts';
+export { projectSeasonRoster } from './season.ts';
 export {
   projectedQualityWeights,
   optimizeSeasonRotation,
   type MinutePlanOptimizationResult,
   type OptimizedMinutePlan,
 } from './minute-plan-quality.ts';
-export {
-  rankCandidates,
-  rankingVectorOf,
-  normalizeComponent,
-  hardGateReasons,
-  paretoFilter,
-  redundancyPenaltyValue,
-  type RankingGates,
-  type RankingResult,
-  type RankingVector,
-  type RankedCandidate,
-  type RejectedCandidate,
-} from './ranking.ts';
+export { rankCandidates, type RankedCandidate } from './ranking.ts';
 export {
   searchRosterRotationCandidates,
   buildHumanSeasonRoster,

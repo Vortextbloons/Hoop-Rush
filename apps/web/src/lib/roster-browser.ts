@@ -144,11 +144,6 @@ export function filterRoster(rows: RosterDetailRow[], filters: RosterFilters): R
       (!query || lowercaseName(row).includes(query)),
   );
 }
-export interface RosterGroup {
-  franchiseId: string;
-  eraId: string;
-  players: RosterDetailRow[];
-}
 export function paginateGroupedRows<T extends PlayersIndexEntry>(
   rows: T[],
   count: number,

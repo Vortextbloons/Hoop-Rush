@@ -16,6 +16,7 @@ import {
   type SeasonBlockTransport,
 } from '#lib/season/season-block-runner.js';
 import type { SeasonArtifactUrls } from '../season-assets';
+import { seasonWorkerInternalError, workerErrorMessage } from '#lib/workers/worker-protocol.js';
 import {
   describeSeasonBlockJobError,
   runSeasonBlockJob,
@@ -38,23 +39,6 @@ const IN_PROCESS_ARTIFACTS: SeasonArtifactUrls = {
 
 function inProcessArtifacts(): Promise<SeasonArtifactUrls> {
   return Promise.resolve({ ...IN_PROCESS_ARTIFACTS });
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
-function internalError(requestId: string, message: string): SeasonWorkerErrorMessage {
-  return {
-    schemaVersion: SEASON_WORKER_WIRE_SCHEMA_VERSION,
-    type: 'season-block-error',
-    requestId,
-    code: 'internal',
-    message: message.slice(0, 512),
-    seed: null,
-    gameId: null,
-    blockIndex: null,
-  };
 }
 
 function createInProcessTransport(deps: FakeSeasonBlockRunnerDeps): SeasonBlockTransport {
@@ -103,7 +87,7 @@ function createInProcessTransport(deps: FakeSeasonBlockRunnerDeps): SeasonBlockT
       deliver(ack);
     } catch (error) {
       if (terminated) return;
-      postError(internalError(request.requestId, errorMessage(error)));
+      postError(seasonWorkerInternalError(request.requestId, workerErrorMessage(error)));
     }
   }
   function start(request: SeasonWorkerStartRequest): void {
@@ -115,7 +99,7 @@ function createInProcessTransport(deps: FakeSeasonBlockRunnerDeps): SeasonBlockT
       try {
         postError(describeSeasonBlockJobError(error, request));
       } catch (describeError) {
-        fail(errorMessage(describeError));
+        fail(workerErrorMessage(describeError));
       }
     });
   }

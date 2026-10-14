@@ -7,6 +7,7 @@
   import type { HoopRushManifest } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
   import { variantLabel } from '#lib/draft-presentation.js';
+  import { eraName } from '#lib/season/season-branding.js';
   let {
     manifest,
     rows,
@@ -38,9 +39,6 @@
   function franchiseLabel(franchiseId: string | null): string {
     return franchiseId ? franchiseAbbreviation(franchiseId) : 'Mixed';
   }
-  function eraName(eraId: string): string {
-    return manifest?.eras.find((e) => e.eraId === eraId)?.label ?? eraId;
-  }
   function formatTime(iso: string): string {
     const date = new Date(iso);
     return Number.isNaN(date.getTime()) ? iso : date.toLocaleString();
@@ -68,7 +66,7 @@
     >
       <p class="font-display text-lg font-extrabold tracking-tight uppercase">Active challenge</p>
       <p class="mt-1 text-sm text-muted-foreground">
-        {franchiseName(active.franchiseId)} · {eraName(active.eraId)} · game
+        {franchiseName(active.franchiseId)} · {eraName(manifest, active.eraId)} · game
         {(active.gamesPlayed ?? 0) + 1} of 82 · {active.aggregates.team.wins}-
         {active.aggregates.team.losses}
       </p>
@@ -101,7 +99,7 @@
               {#if isClassic}
                 Classic · {variantLabel(row.variant ?? 'ratings')}
               {:else}
-                {franchiseName(row.franchiseId)} · {eraName(row.eraId)}
+                {franchiseName(row.franchiseId)} · {eraName(manifest, row.eraId)}
               {/if}
             </span>
             <span class="block font-mono text-[10px] text-muted-foreground">

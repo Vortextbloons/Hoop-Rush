@@ -1,8 +1,9 @@
 import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js';
+import { idSchema, type Id } from '@hoop-rush/data-contracts';
 
 let supabaseModulePromise: Promise<typeof import('@supabase/supabase-js')> | null = null;
 
-export function loadSupabaseModule(): Promise<typeof import('@supabase/supabase-js')> {
+function loadSupabaseModule(): Promise<typeof import('@supabase/supabase-js')> {
   if (!supabaseModulePromise) supabaseModulePromise = import('@supabase/supabase-js');
   return supabaseModulePromise;
 }
@@ -139,6 +140,26 @@ export function parseRoomCode<T>(
 export function stringField(record: Record<string, unknown>, key: string, fallback = ''): string {
   const value = record[key];
   return typeof value === 'string' ? value : fallback;
+}
+
+export interface RpcRoomPayload<Code> {
+  room_id: Id;
+  code: Code | null;
+  participant_id: 'p1' | 'p2' | undefined;
+}
+
+export function rpcRoomPayload<Code>(
+  value: unknown,
+  codeSchema: { parse(value: string): Code },
+): RpcRoomPayload<Code> {
+  const record = value as Record<string, unknown>;
+  const participantRaw = record['participant_id'];
+  const rawCode = record['code'];
+  return {
+    room_id: idSchema.parse(stringField(record, 'room_id')),
+    code: typeof rawCode === 'string' ? codeSchema.parse(rawCode) : null,
+    participant_id: participantRaw === 'p1' || participantRaw === 'p2' ? participantRaw : undefined,
+  };
 }
 
 export interface RealtimeRoomRegistryOptions<TSnapshot> {

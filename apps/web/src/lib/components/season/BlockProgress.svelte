@@ -9,7 +9,7 @@
     SeasonSchedule,
     SeasonScoreline,
   } from '@hoop-rush/data-contracts';
-  import { franchiseIdentityOf } from '#lib/season/season-branding.js';
+  import { teamExternalIdOf } from '#lib/season/season-branding.js';
   import { franchiseColor } from '#lib/season/franchise-colors.js';
   import SeasonTeamLogo from '#lib/components/season/SeasonTeamLogo.svelte';
   import { buildBlockLiveViewModel } from '#lib/season/season-block-live.js';
@@ -76,11 +76,9 @@
     visible = isLivePhase || showTerminal;
   });
   const effectiveHuman = $derived(humanFranchiseId ?? block.startInput?.humanFranchiseId ?? null);
-  function teamExternalIdOf(franchiseId: string): string {
-    if (manifest === null) return '';
-    return franchiseIdentityOf(manifest, franchiseId)?.teamExternalId ?? '';
-  }
-  const humanExternalId = $derived(effectiveHuman === null ? '' : teamExternalIdOf(effectiveHuman));
+  const humanExternalId = $derived(
+    effectiveHuman === null ? '' : teamExternalIdOf(manifest, effectiveHuman),
+  );
   const live = $derived.by(() => {
     if (schedule !== null && block.blockIndex !== null) {
       try {
@@ -409,7 +407,7 @@
                 {#if chip.status === 'final' && chip.result !== null && chip.humanWon !== null}
                   {@const split = humanSplit(chip.result, effectiveHuman)}
                   {@const opp = franchiseAbbrev(chip.opponentFranchiseId)}
-                  {@const oppExternalId = teamExternalIdOf(chip.opponentFranchiseId)}
+                  {@const oppExternalId = teamExternalIdOf(manifest, chip.opponentFranchiseId)}
                   <span class="flex items-center gap-1.5">
                     {#if manifest !== null && effectiveHuman !== null && humanExternalId !== ''}
                       <SeasonTeamLogo
@@ -448,7 +446,7 @@
                     <span class="sr-chip shrink-0">{chip.isHome ? 'HOME' : 'AWAY'}</span>
                   </span>
                 {:else}
-                  {@const pendingExternalId = teamExternalIdOf(chip.opponentFranchiseId)}
+                  {@const pendingExternalId = teamExternalIdOf(manifest, chip.opponentFranchiseId)}
                   <span class="flex items-center gap-1.5">
                     {#if manifest !== null && pendingExternalId !== ''}
                       <SeasonTeamLogo
@@ -490,8 +488,8 @@
         {#if leagueFeed.length > 0}
           <ul class="mt-2 grid gap-2 sm:grid-cols-3" aria-label="Latest league finals">
             {#each leagueFeed as entry (entry.gameId)}
-              {@const awayExternalId = teamExternalIdOf(entry.awayFranchiseId)}
-              {@const homeExternalId = teamExternalIdOf(entry.homeFranchiseId)}
+              {@const awayExternalId = teamExternalIdOf(manifest, entry.awayFranchiseId)}
+              {@const homeExternalId = teamExternalIdOf(manifest, entry.homeFranchiseId)}
               <li
                 class="sr-gamecard px-3 py-2.5"
                 data-spot="false"
@@ -542,7 +540,7 @@
         {#if nextText !== null}
           {@const nextExternalId =
             live?.nextOpponent.franchiseId !== null && live?.nextOpponent.franchiseId !== undefined
-              ? teamExternalIdOf(live.nextOpponent.franchiseId)
+              ? teamExternalIdOf(manifest, live.nextOpponent.franchiseId)
               : ''}
           <p class="mt-1 flex items-center gap-1.5 font-mono text-[11px] font-bold text-primary">
             {#if manifest !== null && live?.nextOpponent.franchiseId != null && nextExternalId !== ''}

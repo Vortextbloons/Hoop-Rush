@@ -21,7 +21,7 @@ import { z } from 'zod';
 import { buildClassicCatalog } from '#lib/classic-draft.js';
 import { getPlayersIndex } from '#lib/data.js';
 import { resolvePlayerRefs } from '#lib/player-refs.js';
-import { FIXED_SANDBOX_ERA, loadRunPreamble } from '#lib/run-preamble.js';
+import { loadRunPreamble } from '#lib/run-preamble.js';
 
 export type FixedFiveAssets = FixedFiveSessionAssets;
 
@@ -118,13 +118,10 @@ export function saveActivityNow(roomId: string): void {
   } catch {}
 }
 
-export { FIXED_SANDBOX_ERA };
-export type { FixedFiveCandidate };
 export {
   deriveEffectivePhase,
   isFixedFiveDraftTurn,
   roomLogFacts,
-  timeoutMsFor,
   type DraftReplay,
   type RoomLogFacts,
 } from '@hoop-rush/engine';

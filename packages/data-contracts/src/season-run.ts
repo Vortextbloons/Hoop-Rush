@@ -102,7 +102,7 @@ export const seasonRunCompletionSchema = z.object({
   finalizedAtStateRevision: z.number().int().nonnegative(),
 });
 export type SeasonRunCompletion = z.infer<typeof seasonRunCompletionSchema>;
-export const seasonGlobalDraftFactsSchema = z.object({
+export const seasonDraftFactsSchema = z.object({
   draftVersion: z.literal(SEASON_DRAFT_VERSION),
   participants: z.array(
     z.object({
@@ -134,8 +134,6 @@ export const seasonGlobalDraftFactsSchema = z.object({
     }),
   ),
 });
-export type SeasonGlobalDraftFacts = z.infer<typeof seasonGlobalDraftFactsSchema>;
-export const seasonDraftFactsSchema = seasonGlobalDraftFactsSchema;
 export type SeasonDraftFacts = z.infer<typeof seasonDraftFactsSchema>;
 export const seasonGenerationAuditSchema = z.object({
   seed: seedSchema,

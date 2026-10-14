@@ -50,7 +50,7 @@ import {
   SEASON_TEAM_COUNT,
 } from '@hoop-rush/data-contracts';
 export const SEASON_RUN_RECORD_ID = 'season-run';
-export const seasonRunRecordFieldsSchema = z.object({
+const seasonRunRecordFieldsSchema = z.object({
   recordId: z.literal(SEASON_RUN_RECORD_ID),
   saveSchemaVersion: z.literal(SEASON_RUN_SAVE_SCHEMA_VERSION),
   run: z.object(seasonRunSchema.shape).omit({ games: true }),

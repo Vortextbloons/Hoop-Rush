@@ -18,10 +18,10 @@ import { type CliReport } from '../report.ts';
 import { seasonHealthCalibrateReportSchema } from '../report-schemas.ts';
 import { DEFAULT_MANIFEST, DEFAULT_SEASON_DIR } from './season-data.ts';
 import {
+  makeTargetsValidator,
   resolveCalibrationArgs,
   runCalibrationShell,
   targetsDetail,
-  validateTargetsArtifact,
 } from '../calibration/index.ts';
 import {
   m25ToleranceGate,
@@ -657,18 +657,11 @@ export function runSeasonHealthCohort(
     },
   };
 }
-export function validateSeasonInjuryTargets(args: SeasonHealthArgs, outPath: string): CliReport {
-  void args;
-  return validateTargetsArtifact({
-    outPath,
-    schema: seasonInjuryTargetsSchema,
-    command: 'season health calibrate --validate',
-    extraChecks: () => ({
-      details: [`base risk matches the frozen ${String(SEASON_HEALTH_BASE_RISK_BP)} bp profile`],
-      failures: [],
-    }),
-  });
-}
+export const validateSeasonInjuryTargets = makeTargetsValidator({
+  schema: seasonInjuryTargetsSchema,
+  command: 'season health calibrate --validate',
+  detail: `base risk matches the frozen ${String(SEASON_HEALTH_BASE_RISK_BP)} bp profile`,
+});
 export function seasonHealthCalibrate(args: SeasonHealthArgs): CliReport {
   const started = Date.now();
   const { from, to, workers, calibrationIndices, validationIndices } = resolveCalibrationArgs(

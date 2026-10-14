@@ -152,18 +152,6 @@ export interface TeammateShotWeights {
 export interface TeammateShots {
   byAction: TeammateShotWeights[];
 }
-export function teammateShotWeights(
-  team: SimulationTeam,
-  initiator: SimulationPlayer,
-  action: ActionType,
-  positionModifiers: ReadonlyMap<string, PositionResponsibilityModifiers>,
-  keyOf: (player: SimulationPlayer) => string = (player) => player.playerId,
-  demandOf: (player: SimulationPlayer) => number,
-): TeammateShotWeights {
-  const initiatorKey = keyOf(initiator);
-  const teammates = team.players.filter((p) => keyOf(p) !== initiatorKey);
-  return teammateShotWeightsFor(teammates, action, positionModifiers, keyOf, demandOf);
-}
 export function teammateShotWeightsFor(
   teammates: SimulationPlayer[],
   action: ActionType,

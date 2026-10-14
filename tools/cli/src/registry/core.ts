@@ -1,4 +1,4 @@
-import { getOptionString, UsageError, type ParsedArgs } from '../args.ts';
+import { getOptionString, type ParsedArgs } from '../args.ts';
 import { listFixtureIds } from '../commands/sim.ts';
 import { EXIT_USAGE_OR_DATA_ERROR, makeReport, type CliReport } from '../report.ts';
 
@@ -85,8 +85,6 @@ export const seedRange = (args: ParsedArgs): SeedRangeCliArgs => ({
   manifest: n(args, 'manifest'),
   validate: n(args, 'validate'),
 });
-
-export { UsageError };
 
 const HEADER = `hoop-rush — developer CLI for the Hoop Rush engine and data
 

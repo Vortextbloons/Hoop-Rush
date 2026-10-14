@@ -1,6 +1,5 @@
 <script lang="ts">
   import type { GameTapeStatLine, HoopRushManifest } from '@hoop-rush/data-contracts';
-  import { GAME_TAPE_STAT_FIELDS } from '@hoop-rush/data-contracts';
   import type { GamecastVisibleState } from './gamecast-playback';
   import type {
     GamecastParticipantId,
@@ -11,7 +10,12 @@
   import GameScoreboard from '#lib/components/GameScoreboard.svelte';
   import TeamLogo from '#lib/components/TeamLogo.svelte';
   import { SLOT_LABELS } from '#lib/player-positions.js';
-  import { gamecastPeriodLabel, type GamecastFeedLine } from './gamecast-broadcast-view';
+  import { formatClock } from '#lib/format.js';
+  import {
+    TAPE_STAT_INDEXES,
+    gamecastPeriodLabel,
+    type GamecastFeedLine,
+  } from './gamecast-broadcast-view';
 
   let {
     output,
@@ -31,15 +35,17 @@
     manifest?: HoopRushManifest | null;
   } = $props();
 
-  const POINTS = GAME_TAPE_STAT_FIELDS.indexOf('points');
-  const FIELD_GOAL_MAKES = GAME_TAPE_STAT_FIELDS.indexOf('fieldGoalMakes');
-  const FIELD_GOAL_ATTEMPTS = GAME_TAPE_STAT_FIELDS.indexOf('fieldGoalAttempts');
-  const THREE_MAKES = GAME_TAPE_STAT_FIELDS.indexOf('threeMakes');
-  const THREE_ATTEMPTS = GAME_TAPE_STAT_FIELDS.indexOf('threeAttempts');
-  const OFFENSIVE_REBOUNDS = GAME_TAPE_STAT_FIELDS.indexOf('offensiveRebounds');
-  const DEFENSIVE_REBOUNDS = GAME_TAPE_STAT_FIELDS.indexOf('defensiveRebounds');
-  const ASSISTS = GAME_TAPE_STAT_FIELDS.indexOf('assists');
-  const TURNOVERS = GAME_TAPE_STAT_FIELDS.indexOf('turnovers');
+  const {
+    points: POINTS,
+    fieldGoalMakes: FIELD_GOAL_MAKES,
+    fieldGoalAttempts: FIELD_GOAL_ATTEMPTS,
+    threeMakes: THREE_MAKES,
+    threeAttempts: THREE_ATTEMPTS,
+    offensiveRebounds: OFFENSIVE_REBOUNDS,
+    defensiveRebounds: DEFENSIVE_REBOUNDS,
+    assists: ASSISTS,
+    turnovers: TURNOVERS,
+  } = TAPE_STAT_INDEXES;
 
   interface PlayerRow {
     key: string;
@@ -61,13 +67,6 @@
     label: string;
     score: number;
     rows: PlayerRow[];
-  }
-
-  function formatClock(clockSeconds: number): string {
-    const total = Math.max(0, Math.floor(clockSeconds));
-    const minutes = Math.floor(total / 60);
-    const seconds = total % 60;
-    return `${String(minutes)}:${String(seconds).padStart(2, '0')}`;
   }
 
   function playerOf(playerId: string | undefined): GamecastPlayer | null {
@@ -133,7 +132,9 @@
   const periodLabel = $derived(
     gamecastPeriodLabel(lastTrip?.period ?? visible.periods.at(-1)?.period ?? 1),
   );
-  const clockLabel = $derived(lastTrip === null ? '—' : formatClock(lastTrip.clockSeconds));
+  const clockLabel = $derived(
+    lastTrip === null ? '—' : formatClock(Math.max(0, Math.floor(lastTrip.clockSeconds))),
+  );
   const progressPct = $derived(
     Math.round(Math.min(1, Math.max(0, Number.isNaN(progress) ? 0 : progress)) * 100),
   );
@@ -313,7 +314,7 @@
           >
             <span class="bc-feed-clock">
               {gamecastPeriodLabel(line.period)}
-              {formatClock(line.clockSeconds)}
+              {formatClock(Math.max(0, Math.floor(line.clockSeconds)))}
             </span>
             <span
               class="bc-feed-team"

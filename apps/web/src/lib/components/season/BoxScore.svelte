@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { HoopRushManifest } from '@hoop-rush/data-contracts';
   import type { BoxScore, BoxScoreRow } from '#lib/season/season-presentation.js';
-  import { formatClock } from '#lib/season/season-presentation.js';
+  import { formatClock } from '#lib/format.js';
   import { franchiseIdentityOf } from '#lib/season/season-branding.js';
   import PlayerStatsTable from '#lib/components/PlayerStatsTable.svelte';
   import type { PlayerStatColumn, PlayerStatsTotals } from '#lib/components/player-stats-table.js';

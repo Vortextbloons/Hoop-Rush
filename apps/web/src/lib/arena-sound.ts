@@ -1,4 +1,4 @@
-import { isLiteMode } from './device-capabilities';
+import { isLiteMode, prefersReducedMotion } from './device-capabilities';
 
 let ctx: AudioContext | null = null;
 let muted = false;
@@ -13,11 +13,7 @@ export function isArenaMuted(): boolean {
   return muted;
 }
 
-export function arenaSoundDisabled(): boolean {
-  return isLiteMode();
-}
-
-export function setArenaMuted(value: boolean): void {
+function setArenaMuted(value: boolean): void {
   muted = value;
   try {
     localStorage.setItem('hoop-rush:arena-muted', value ? '1' : '0');
@@ -41,15 +37,6 @@ export function initArenaSoundForLiteMode(): void {
     if (localStorage.getItem('hoop-rush:arena-muted') === '0') return;
   } catch {}
   if (!muted) setArenaMuted(true);
-}
-
-function prefersReducedMotion(): boolean {
-  try {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
-    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  } catch {
-    return false;
-  }
 }
 
 function ac(): AudioContext | null {

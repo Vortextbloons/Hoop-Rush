@@ -17,6 +17,7 @@ import {
   havocScoringTextOf,
 } from './havoc-presentation';
 import { errorMessageOf } from './havoc-state-util.ts';
+import { prefersReducedMotion } from '#lib/device-capabilities.js';
 
 export type HavocPlaybackSpeed = 1 | 2 | 4 | 8;
 
@@ -65,16 +66,6 @@ const BASE_INTERVAL_MS = 260;
 
 function fallbackName(instanceId: string): string {
   return `Instance ${instanceId.slice(-4)}`;
-}
-
-function prefersReducedMotion(): boolean {
-  if (typeof window === 'undefined') return false;
-  if (typeof window.matchMedia !== 'function') return false;
-  try {
-    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  } catch {
-    return false;
-  }
 }
 
 export class HavocGamecastState {

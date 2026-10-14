@@ -15,20 +15,19 @@ import { type CliReport } from '../report.ts';
 import { seasonChallengesCalibrateReportSchema } from '../report-schemas.ts';
 import { DEFAULT_MANIFEST, DEFAULT_SEASON_DIR } from './season-data.ts';
 import {
+  makeTargetsValidator,
   resolveCalibrationArgs,
   runCalibrationShell,
   targetsDetail,
-  validateTargetsArtifact,
 } from '../calibration/index.ts';
 import {
   gateValue,
   m25RangeGate,
   m25ToleranceGate,
-  seasonCalibrationSeed,
   share,
   type M25Gate,
 } from './season-calibration.ts';
-import { runSeasonM25, type SeasonM25SeasonFacts } from './season-m25-core.ts';
+import { m25FactsRunner, type SeasonM25SeasonFacts } from './season-m25-core.ts';
 
 export const DEFAULT_CHALLENGE_TARGETS = resolve(DEFAULT_SEASON_DIR, 'challenge-targets.json');
 export const SEASON_CHALLENGES_CALIBRATION_SEED_COUNT = 12;
@@ -373,21 +372,11 @@ export interface SeasonChallengesArgs {
   format?: string | null;
 }
 
-export function validateSeasonChallengeTargets(
-  args: SeasonChallengesArgs,
-  outPath: string,
-): CliReport {
-  void args;
-  return validateTargetsArtifact({
-    outPath,
-    schema: seasonChallengeTargetsSchema,
-    command: 'season challenges calibrate --validate',
-    extraChecks: () => ({
-      details: ['catalog holds the frozen 8 challenges with +1/+2 pricing'],
-      failures: [],
-    }),
-  });
-}
+export const validateSeasonChallengeTargets = makeTargetsValidator({
+  schema: seasonChallengeTargetsSchema,
+  command: 'season challenges calibrate --validate',
+  detail: 'catalog holds the frozen 8 challenges with +1/+2 pricing',
+});
 
 export function seasonChallengesCalibrate(args: SeasonChallengesArgs): CliReport {
   const started = Date.now();
@@ -402,16 +391,7 @@ export function seasonChallengesCalibrate(args: SeasonChallengesArgs): CliReport
   );
   const outPath = args.out ?? DEFAULT_CHALLENGE_TARGETS;
   const validateOnly = args['validate'] !== null;
-  const runFacts = (indices: number[]): SeasonM25SeasonFacts[] =>
-    indices.map((index) =>
-      runSeasonM25({
-        runPath: args.input,
-        manifestPath: args.manifest,
-        rootSeed: seasonCalibrationSeed(index),
-        driveWindows: true,
-        pickObjectives: true,
-      }),
-    );
+  const runFacts = m25FactsRunner({ runPath: args.input, manifestPath: args.manifest });
   return runCalibrationShell({
     command: 'season challenges calibrate',
     argsForReport: { seedFrom: from, seedTo: to, workers },

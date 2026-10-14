@@ -1,5 +1,5 @@
 export const DETAILED_POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C'] as const;
-export const DETAILED_POSITION_NAMES = [
+const DETAILED_POSITION_NAMES = [
   'Point Guard',
   'Shooting Guard',
   'Small Forward',

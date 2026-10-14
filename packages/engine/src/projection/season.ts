@@ -38,7 +38,7 @@ import {
   type RotationTraceResult,
 } from './rotation-trace.ts';
 import { identifyWeaknesses } from './weaknesses.ts';
-const SLOT_ORDER = ['PG', 'SG', 'SF', 'PF', 'C'] as const;
+export const SLOT_ORDER = ['PG', 'SG', 'SF', 'PF', 'C'] as const;
 export interface SeasonProjectionOptions {
   cache?: ProjectionCache;
   fingerprints?: ProjectionFingerprints;
@@ -50,7 +50,7 @@ interface UnitDraft {
   weight: number;
   base: ReturnType<typeof projectBaseFive>;
 }
-function unitKeyOf(players: readonly string[]): string {
+export function unitKeyOf(players: readonly string[]): string {
   return [...players].sort().join(',');
 }
 export function projectUnit(input: {
@@ -90,7 +90,7 @@ export function projectUnit(input: {
   cache.set(key, projection);
   return projection;
 }
-function missingPlayer(versionId: string): SimulationPlayer {
+export function missingPlayer(versionId: string): SimulationPlayer {
   throw new Error(`projection: roster missing playerVersionId ${versionId}`);
 }
 type BaseFiveProjectionInputTuple = BaseFiveProjectionInput['lineup'];

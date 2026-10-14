@@ -5,7 +5,7 @@ import {
   type DraftDuelUnavailableReason,
 } from '@hoop-rush/data-contracts';
 
-export const DRAFT_DUEL_ELITE_OVERALL = 95;
+const DRAFT_DUEL_ELITE_OVERALL = 95;
 
 export const DRAFT_DUEL_REASON_LABELS: Readonly<Record<DraftDuelUnavailableReason, string>> = {
   claimed: 'Already drafted',

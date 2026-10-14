@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  DRAFT_DUEL_TAPE_STAT_FIELDS,
   DRAFT_DUEL_TAPE_VERSION,
   draftDuelGameOutputSchema,
   seedSchema,
@@ -15,7 +14,8 @@ import {
   buildLegalSimulationTeam,
   seedFromString,
 } from '@hoop-rush/test-fixtures';
-import { draftDuelVisibleState } from './draft-duel-playback';
+import { gamecastVisibleState } from '#lib/features/multiplayer/gamecast/gamecast-playback.js';
+import { TAPE_STAT_INDEXES } from '#lib/features/multiplayer/gamecast/gamecast-broadcast-view.js';
 import {
   draftDuelFeedLines,
   draftDuelPeriodLabel,
@@ -23,11 +23,13 @@ import {
   type DraftDuelFeedLine,
 } from './draft-duel-broadcast-view';
 
-const POINTS = DRAFT_DUEL_TAPE_STAT_FIELDS.indexOf('points');
-const OFFENSIVE_REBOUNDS = DRAFT_DUEL_TAPE_STAT_FIELDS.indexOf('offensiveRebounds');
-const DEFENSIVE_REBOUNDS = DRAFT_DUEL_TAPE_STAT_FIELDS.indexOf('defensiveRebounds');
-const TURNOVERS = DRAFT_DUEL_TAPE_STAT_FIELDS.indexOf('turnovers');
-const TEAM_REBOUNDS = DRAFT_DUEL_TAPE_STAT_FIELDS.indexOf('teamRebounds');
+const {
+  points: POINTS,
+  offensiveRebounds: OFFENSIVE_REBOUNDS,
+  defensiveRebounds: DEFENSIVE_REBOUNDS,
+  turnovers: TURNOVERS,
+  teamRebounds: TEAM_REBOUNDS,
+} = TAPE_STAT_INDEXES;
 
 function integerSecondsTape(tape: readonly DraftDuelTapeEvent[]): DraftDuelTapeEvent[] {
   return tape.map((event) =>
@@ -300,7 +302,7 @@ describe('draftDuelFeedLines', () => {
     expect(homePoints).toBe(output.result.home.box.points);
     expect(awayPoints).toBe(output.result.away.box.points);
 
-    const visible = draftDuelVisibleState(output, output.tape.length);
+    const visible = gamecastVisibleState(output, output.tape.length);
     expect(visible.homeScore).toBe(output.result.home.box.points);
     expect(visible.awayScore).toBe(output.result.away.box.points);
     const linesBySide = [visible.homePlayerLines, visible.awayPlayerLines] as const;

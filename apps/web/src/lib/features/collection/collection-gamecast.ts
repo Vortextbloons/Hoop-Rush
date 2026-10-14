@@ -6,8 +6,8 @@ import type {
 } from '@hoop-rush/data-contracts';
 
 export type WatchMode = 'fast' | 'standard' | 'slow';
-export const STANDARD_EVENT_MS = 900;
-export const SLOW_EVENT_MS = 1400;
+const STANDARD_EVENT_MS = 900;
+const SLOW_EVENT_MS = 1400;
 export const QUICK_CAST_BEAT_MS = 800;
 
 export function quickCastEvents(events: readonly CollectionGameEvent[]): CollectionGameEvent[] {

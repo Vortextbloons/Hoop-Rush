@@ -13,6 +13,13 @@ import {
   type SeasonTradeGradeLog,
 } from '@hoop-rush/data-contracts';
 import { foldSeasonPlayerAggregates, foldSeasonTeamAggregates } from './aggregates.ts';
+import {
+  DEFENSE_WEIGHTS,
+  PLAYMAKING_ASSIST_WEIGHT,
+  TEAM_BONUS,
+  shotsUsedOf,
+  trueShootingOf,
+} from './box-score-metrics.ts';
 
 export const SEASON_TRADE_GRADE_MIN_SAMPLE = 5;
 export const SEASON_TRADE_GRADE_NEUTRAL_SCORE = 50;
@@ -26,9 +33,6 @@ export const SEASON_TRADE_GRADE_WEIGHTS = {
 } as const;
 const MINUTES_FULL_GAME = 48;
 const STARTS_FULL_GAME = 5;
-const DEFENSE_WEIGHTS = { steal: 0.6, block: 0.6, defensiveRebound: 0.15 } as const;
-const PLAYMAKING_ASSIST_WEIGHT = 0.5;
-const TEAM_BONUS = { win: 0.75, loss: -0.75 } as const;
 const CONSISTENCY_REFERENCE_EPSILON = 1e-9;
 export interface SeasonTradeGradesInput {
   runId: string;
@@ -43,17 +47,6 @@ interface PlayerProduction {
   wins: boolean[];
 }
 type FoldLine = SeasonGameSummary['homePlayers'][number];
-function shotsUsedOf(line: { fieldGoalsAttempted: number; freeThrowsAttempted: number }): number {
-  return line.fieldGoalsAttempted + 0.44 * line.freeThrowsAttempted;
-}
-function trueShootingOf(line: {
-  points: number;
-  fieldGoalsAttempted: number;
-  freeThrowsAttempted: number;
-}): number {
-  const shots = shotsUsedOf(line);
-  return shots <= 0 ? 0 : line.points / (2 * shots);
-}
 function mvpValueBaseOf(line: {
   points: number;
   fieldGoalsMade: number;

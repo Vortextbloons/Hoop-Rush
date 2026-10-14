@@ -67,7 +67,6 @@ import {
   COLLECTION_SPECIALS,
   COLLECTION_SPECIALS_VERSION as AUTHORED_SPECIALS_VERSION,
 } from '../collection-specials.ts';
-import { DEFAULT_MANIFEST } from './data-loader.ts';
 import { collectionGameTargetsSchema } from './collection-game-calibrate.ts';
 interface AuditResult {
   ok: boolean;
@@ -1751,4 +1750,3 @@ export async function dataValidate(inputPath: string, verbose: boolean): Promise
     },
   );
 }
-export { DEFAULT_MANIFEST };

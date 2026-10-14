@@ -9,8 +9,6 @@ import {
   type CollectionSeedNamespace,
 } from '@hoop-rush/data-contracts';
 
-export { COLLECTION_SEED_NAMESPACES, type CollectionSeedNamespace };
-
 export function collectionNamespaceSeed(
   rootSeed: string,
   namespace: CollectionSeedNamespace,

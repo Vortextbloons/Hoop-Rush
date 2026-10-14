@@ -9,6 +9,11 @@ import {
 } from '@hoop-rush/data-contracts';
 import { sleep } from '../lib/sleep';
 import {
+  postWorkerMessage,
+  seasonWorkerInternalError,
+  workerErrorMessage,
+} from '../lib/workers/worker-protocol';
+import {
   describeSeasonBlockJobError,
   runSeasonBlockJob,
   warmSeasonBlockJob,
@@ -30,22 +35,6 @@ function post(
   }
   self.postMessage(message);
 }
-function postError(payload: SeasonWorkerErrorMessage): void {
-  seasonWorkerMessageSchema.parse(payload);
-  post(payload);
-}
-function internalError(requestId: string, message: string): SeasonWorkerErrorMessage {
-  return {
-    schemaVersion: SEASON_WORKER_WIRE_SCHEMA_VERSION,
-    type: 'season-block-error',
-    requestId,
-    code: 'internal',
-    message: message.slice(0, 512),
-    seed: null,
-    gameId: null,
-    blockIndex: null,
-  };
-}
 if (typeof self !== 'undefined') {
   const io: SeasonBlockJobIo = {
     post,
@@ -64,7 +53,10 @@ if (typeof self !== 'undefined') {
           ? (event.data as { requestId: string }).requestId
           : null;
       if (rawId !== null && rawId.length > 0) {
-        postError(internalError(rawId.slice(0, 64), 'season block wire mismatch'));
+        postWorkerMessage(
+          seasonWorkerMessageSchema,
+          seasonWorkerInternalError(rawId.slice(0, 64), 'season block wire mismatch'),
+        );
       }
       return;
     }
@@ -79,7 +71,10 @@ if (typeof self !== 'undefined') {
             requestId: request.requestId,
           });
         } catch (error) {
-          postError(internalError(request.requestId, errorMessage(error)));
+          postWorkerMessage(
+            seasonWorkerMessageSchema,
+            seasonWorkerInternalError(request.requestId, workerErrorMessage(error)),
+          );
         }
       })();
       return;
@@ -93,10 +88,7 @@ if (typeof self !== 'undefined') {
     currentRequestId = request.requestId;
     cancelled = false;
     void runSeasonBlockJob(request, io).catch((error: unknown) => {
-      postError(describeSeasonBlockJobError(error, request));
+      postWorkerMessage(seasonWorkerMessageSchema, describeSeasonBlockJobError(error, request));
     });
   };
-}
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

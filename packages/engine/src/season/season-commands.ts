@@ -36,7 +36,6 @@ import {
 import { handleForfeitInterruptedGame, handleResumeSeasonBlock } from './commands/blocks.ts';
 export { SeasonRunCommandNotImplementedError };
 export type { SeasonRunCommandContext, SeasonRunCommandResult, SeasonRunCommandOutput };
-export { SeasonFreeAgencyFactsError } from './commands/free-agency.ts';
 function dispatchSeasonRunCommand(
   command: SeasonRunCommandInput,
   context: SeasonRunCommandContext,

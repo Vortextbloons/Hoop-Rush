@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { HoopRushManifest } from '@hoop-rush/data-contracts';
-  import { franchiseAbbreviation, resolveEraTeamIdentity } from '@hoop-rush/data-contracts';
+  import { teamLabelFor, teamNameFor } from '#lib/season/season-branding.js';
   import type { RosterDetailRow } from '#lib/roster-browser.js';
   import { formatPositions } from '#lib/player-positions.js';
   import { oneDecimal, percentOneDecimal } from '#lib/format.js';
@@ -48,14 +48,6 @@
   }
   function isSelected(player: RosterDetailRow): boolean {
     return selected.some((entry) => entry.playerId === player.playerId);
-  }
-  function teamLabelFor(player: RosterDetailRow): string {
-    const identity = resolveEraTeamIdentity(manifest, player.franchiseId, player.eraId);
-    return identity.abbreviationLabel ?? franchiseAbbreviation(player.franchiseId);
-  }
-  function teamNameFor(player: RosterDetailRow): string {
-    const identity = resolveEraTeamIdentity(manifest, player.franchiseId, player.eraId);
-    return identity.displayLabel ?? franchiseName.get(player.franchiseId) ?? player.franchiseId;
   }
   function optional(value: number | null | undefined, digits = 1): string {
     return typeof value === 'number' && Number.isFinite(value) ? value.toFixed(digits) : '—';
@@ -222,7 +214,9 @@
               <div class="min-w-0">
                 <h3 class="truncate text-sm font-bold">{displayName(player)}</h3>
                 <p class="font-mono text-[10px] text-muted-foreground">
-                  {teamLabelFor(player)} · {eraLabel.get(player.eraId) ?? player.eraId}
+                  {teamLabelFor(manifest, player.franchiseId, player.eraId)} · {eraLabel.get(
+                    player.eraId,
+                  ) ?? player.eraId}
                 </p>
               </div>
             </div>
@@ -237,7 +231,7 @@
               <div class="flex justify-between gap-2">
                 <dt class="text-muted-foreground">Franchise</dt>
                 <dd class="text-right font-semibold">
-                  {teamNameFor(player)}
+                  {teamNameFor(manifest, franchiseName, player.franchiseId, player.eraId)}
                 </dd>
               </div>
               <div class="flex justify-between gap-2">

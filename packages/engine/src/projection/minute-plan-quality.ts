@@ -24,14 +24,7 @@ import {
   type ProjectionFingerprints,
 } from './cache.ts';
 import { projectBaseFive } from './base.ts';
-import { projectSeasonRoster } from './season.ts';
-const SLOT_ORDER = ['PG', 'SG', 'SF', 'PF', 'C'] as const;
-function unitKeyOf(players: readonly string[]): string {
-  return [...players].sort().join(',');
-}
-function missingPlayer(versionId: string): SimulationPlayer {
-  throw new Error(`projection: roster missing playerVersionId ${versionId}`);
-}
+import { missingPlayer, projectSeasonRoster, SLOT_ORDER, unitKeyOf } from './season.ts';
 function projectStructureUnit(input: {
   players: readonly string[];
   byVersion: ReadonlyMap<string, SimulationPlayer>;

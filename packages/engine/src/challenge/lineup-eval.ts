@@ -9,6 +9,7 @@ import type { EngineContext } from '../sim/kernel.ts';
 import { simulateGame } from '../sim/game.ts';
 import { seedFromString } from './seeds.ts';
 import { BENCHMARK_WEIGHTS } from './benchmarks.ts';
+import { mean } from '../domain/math.ts';
 export interface LineupBalance {
   creation: number;
   shooting: number;
@@ -18,12 +19,6 @@ export interface LineupBalance {
   ok: boolean;
 }
 export const BALANCE_FLOOR = 52;
-function mean(values: readonly number[]): number {
-  if (values.length === 0) return 0;
-  let total = 0;
-  for (const v of values) total += v;
-  return total / values.length;
-}
 export function evaluateLineupBalance(team: SimulationTeam): LineupBalance {
   const creationValues: number[] = [];
   const shootingValues: number[] = [];
