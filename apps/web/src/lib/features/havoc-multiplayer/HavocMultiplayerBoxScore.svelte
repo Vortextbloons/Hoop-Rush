@@ -1,0 +1,205 @@
+<script lang="ts">
+  import { havocParticipantKindLabel } from '$lib/features/havoc/havoc-presentation';
+  import type { HavocMultiplayerSideBox } from './havoc-multiplayer-playback-view';
+
+  let {
+    boxes,
+    localSide,
+  }: { boxes: readonly HavocMultiplayerSideBox[]; localSide: 'home' | 'away' } = $props();
+
+  function labelOf(side: 'home' | 'away'): string {
+    return side === localSide ? 'You' : 'Opponent';
+  }
+</script>
+
+<div class="hm-boxes" data-havoc-multiplayer-boxes>
+  {#each boxes as box (box.side)}
+    <section class="hm-box" data-side={box.side} aria-label={`${labelOf(box.side)} box score`}>
+      <header class="hm-box-head">
+        <span class="hm-box-label" data-side={box.side}>{labelOf(box.side)}</span>
+        {#if box.bonusPoints !== 0}
+          <span class="hm-box-bonus" data-negative={box.bonusPoints < 0}
+            >Team bonus {box.bonusPoints > 0 ? `+${box.bonusPoints}` : box.bonusPoints}</span
+          >
+        {/if}
+        <strong class="hm-box-score" data-negative={box.score < 0}>{box.score}</strong>
+      </header>
+      <div class="hm-box-scroll">
+        <table>
+          <caption class="sr-only">{labelOf(box.side)} participant lines</caption>
+          <thead>
+            <tr>
+              <th scope="col">Player</th>
+              <th scope="col">Role</th>
+              <th scope="col">Pts</th>
+              <th scope="col">FG</th>
+              <th scope="col">FT</th>
+              <th scope="col">Reb</th>
+              <th scope="col">Ast</th>
+              <th scope="col">Stl</th>
+              <th scope="col">Blk</th>
+              <th scope="col">TO</th>
+              <th scope="col">PF</th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each box.lines as line (line.instanceId)}
+              <tr data-kind={line.kind} data-negative={line.points < 0}>
+                <th scope="row" class="hm-player">
+                  <span class="hm-player-name">{line.displayName}</span>
+                  <span class="hm-player-slot">{line.slot}</span>
+                </th>
+                <td class="hm-role">{havocParticipantKindLabel(line.kind)}</td>
+                <td class="hm-pts" data-negative={line.points < 0}>{line.points}</td>
+                <td>{line.fieldGoalsMade}/{line.fieldGoalsAttempted}</td>
+                <td>{line.freeThrowsMade}/{line.freeThrowsAttempted}</td>
+                <td>{line.rebounds}</td>
+                <td>{line.assists}</td>
+                <td>{line.steals}</td>
+                <td>{line.blocks}</td>
+                <td>{line.turnovers}</td>
+                <td>{line.fouls}</td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  {/each}
+</div>
+
+<style>
+  .hm-boxes {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: 1fr;
+  }
+  @media (min-width: 900px) {
+    .hm-boxes {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      align-items: start;
+    }
+  }
+  .hm-box {
+    min-width: 0;
+    overflow: clip;
+    border: 1px solid #465273;
+    border-radius: 16px;
+    background: #20294c;
+  }
+  .hm-box-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-bottom: 1px solid #3c486b;
+  }
+  .hm-box-label {
+    font-family: var(--font-display);
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .hm-box-label[data-side='home'] {
+    color: #679dff;
+  }
+  .hm-box-label[data-side='away'] {
+    color: #f290c5;
+  }
+  .hm-box-bonus {
+    padding: 2px 8px;
+    border: 1px solid #465273;
+    border-radius: 999px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #ffd782;
+  }
+  .hm-box-bonus[data-negative='true'] {
+    color: #f290c5;
+  }
+  .hm-box-score {
+    margin-left: auto;
+    font-family: var(--font-display);
+    font-size: 26px;
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+  }
+  .hm-box-score[data-negative='true'] {
+    color: #f290c5;
+  }
+  .hm-box-scroll {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+  }
+  table {
+    width: 100%;
+    min-width: 34rem;
+    border-collapse: collapse;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+  th,
+  td {
+    padding: 7px 9px;
+    text-align: right;
+    white-space: nowrap;
+  }
+  thead th {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #aab9db;
+    border-bottom: 1px solid #3c486b;
+  }
+  tbody tr {
+    border-top: 1px solid rgb(60 72 107 / 55%);
+  }
+  tbody tr:first-child {
+    border-top: 0;
+  }
+  tbody tr[data-kind='replacement'] {
+    background: rgb(103 157 255 / 7%);
+  }
+  tbody tr[data-kind='clone'] {
+    background: rgb(242 144 197 / 7%);
+  }
+  .hm-player {
+    max-width: 13rem;
+    overflow: hidden;
+    text-align: left;
+  }
+  .hm-player-name {
+    display: block;
+    overflow: hidden;
+    font-weight: 700;
+    text-overflow: ellipsis;
+  }
+  .hm-player-slot {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    color: #aab9db;
+  }
+  .hm-role {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #aab9db;
+  }
+  .hm-pts {
+    font-family: var(--font-display);
+    font-size: 15px;
+    font-weight: 800;
+  }
+  .hm-pts[data-negative='true'] {
+    color: #f290c5;
+  }
+</style>
