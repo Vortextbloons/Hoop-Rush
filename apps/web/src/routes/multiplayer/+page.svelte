@@ -7,6 +7,7 @@
     Swords,
     Zap,
     Trophy,
+    Flame,
     LogIn,
     ArrowRight,
     Users,
@@ -40,6 +41,7 @@
     friendlyFixedFiveJoinError,
     loadLastFixedFiveRoomId,
   } from '#lib/features/multiplayer/fixed-five-identity.js';
+  import { loadHavocMultiplayerVersionLocks } from '#lib/features/havoc-multiplayer/havoc-multiplayer-assets.js';
   import { loadRunPreamble } from '#lib/run-preamble.js';
   import {
     lobbyCommand,
@@ -49,13 +51,17 @@
     rememberLobby,
     loadLobbyId,
     resumeMultiplayerGame,
+    multiplayerGameKindLabels,
+    multiplayerGameRoomRouteId,
+    type MultiplayerGameKind,
   } from '#lib/features/multiplayer/multiplayer-lobby.js';
   type View = 'choose' | 'create' | 'join';
+  type MatchFormat = 'season' | 'duel' | 'draft-duel' | 'havoc';
   let view = $state<View>('choose');
   let lobby = $state<MultiplayerLobby | null>(null);
   let lastLobbyId = $state<string | null>(null);
   let mounted = false;
-  let matchFormat = $state<'season' | 'duel' | 'draft-duel'>('season');
+  let matchFormat = $state<MatchFormat>('season');
   let sourceMode = $state<FixedFiveSourceMode>('classic');
   let ddFairness = $state<'fair' | 'unfair'>('fair');
   const draftDuelController = new DraftDuelController();
@@ -105,9 +111,19 @@
         'Five rounds, eight cards, one pick each round. Both tables reveal together, then a best-of-seven broadcast settles it.',
       format: 'Best of 7',
     },
+    {
+      id: 'havoc',
+      name: 'Hoop Havoc',
+      category: '5 rounds · Bo7',
+      icon: Flame,
+      image: '/images/multiplayer/draft-duel.png',
+      description:
+        'Draft five mutated freaks, one per position, then let a best-of-seven broadcast decide whose powers survive.',
+      format: 'Best of 7',
+    },
   ] as const;
   const selectedFormat = $derived(formats.find((item) => item.id === matchFormat)!);
-  function selectFormat(nextFormat: 'season' | 'duel' | 'draft-duel') {
+  function selectFormat(nextFormat: MatchFormat) {
     matchFormat = nextFormat;
     view = 'create';
     error = null;
@@ -135,14 +151,16 @@
       autopickVersion: FIXED_FIVE_AUTOPICK_VERSION,
     });
   }
-  async function openGame(kind: 'fixed-five' | 'draft-duel', roomId: string) {
+  async function openGame(kind: MultiplayerGameKind, roomId: string) {
     await resumeMultiplayerGame(kind, roomId);
     if (!mounted) return;
-    await goto(
-      kind === 'draft-duel'
-        ? resolve('/draft-duel/room/[roomId]', { roomId })
-        : resolve('/multiplayer/room/[roomId]', { roomId }),
-    );
+    if (kind === 'draft-duel') {
+      await goto(resolve(multiplayerGameRoomRouteId('draft-duel'), { roomId }));
+    } else if (kind === 'havoc') {
+      await goto(resolve(multiplayerGameRoomRouteId('havoc'), { roomId }));
+    } else {
+      await goto(resolve(multiplayerGameRoomRouteId('fixed-five'), { roomId }));
+    }
   }
   async function refreshLobby(lobbyId: string) {
     try {
@@ -162,6 +180,11 @@
     lastRoomId = loadLastFixedFiveRoomId();
     lastLobbyId = loadLobbyId();
     const params = new URLSearchParams(window.location.search);
+    const formatParam = formats.find((item) => item.id === params.get('format'));
+    if (formatParam) {
+      matchFormat = formatParam.id;
+      view = 'create';
+    }
     const lobbyParam = params.get('lobby');
     if (lobbyParam) {
       view = 'create';
@@ -199,13 +222,18 @@
               variant,
               versions: { ...(await draftDuelController.roomVersions()) },
             }
-          : {
-              gameKind: 'fixed-five' as const,
-              mode: mode!,
-              sourceMode,
-              variant,
-              versions: { ...(await versions()) },
-            };
+          : matchFormat === 'havoc'
+            ? {
+                gameKind: 'havoc' as const,
+                versions: { ...(await loadHavocMultiplayerVersionLocks()) },
+              }
+            : {
+                gameKind: 'fixed-five' as const,
+                mode: mode!,
+                sourceMode,
+                variant,
+                versions: { ...(await versions()) },
+              };
       const current = lobby ?? multiplayerLobbySchema.parse(await lobbyCommand({ kind: 'create' }));
       if (!mounted) return;
       lobby = current;
@@ -246,7 +274,7 @@
       const result = await previewMultiplayerRoom(code);
       if (!mounted) return;
       preview = result.legacy
-        ? `${result.gameKind === 'draft-duel' ? 'Draft Duel' : 'Season / Duel'} room`
+        ? `${multiplayerGameKindLabels[result.gameKind]} room`
         : `Shared lobby · ${result.guestJoined ? '2 players' : 'Waiting for an opponent'}`;
     } catch (e) {
       if (mounted) {
@@ -275,7 +303,7 @@
         if (!result.canStart && result.gameKind && result.gameRoomId) {
           await openGame(result.gameKind, result.gameRoomId);
         } else {
-          await goto(resolve(`multiplayer/?lobby=${result.id}`));
+          await goto(resolve(`/multiplayer?lobby=${result.id}`));
           lobby = result;
           view = 'create';
         }
@@ -288,7 +316,7 @@
   }
   async function resumeLast() {
     if (lastLobbyId) {
-      await goto(resolve(`multiplayer/?lobby=${lastLobbyId}`));
+      await goto(resolve(`/multiplayer?lobby=${lastLobbyId}`));
       view = 'create';
       await refreshLobby(lastLobbyId);
       return;
@@ -306,7 +334,7 @@
       lobby = null;
       lastLobbyId = null;
       view = 'choose';
-      await goto(resolve('multiplayer/'));
+      await goto(resolve('/multiplayer'));
     } catch (e) {
       if (mounted) error = friendlyFixedFiveJoinError(e);
     } finally {
@@ -314,6 +342,8 @@
     }
   }
 </script>
+
+﻿
 
 <svelte:head>
   <title>Multiplayer — Hoop Rush</title>
@@ -332,11 +362,15 @@
               ? 'Join a room'
               : 'Choose your match'}
       </h1>
+      <p class="intro">One room. Every mode. Play again with the same opponent.</p>
     </div>
     {#if lastRoomId || lastLobbyId}
       <div class="resume-room">
         <Users size={24} aria-hidden="true" />
-        <span class="eyebrow">Your last room</span>
+        <div>
+          <span class="eyebrow">Your last room</span>
+          <p>Get back in the game</p>
+        </div>
         <button type="button" onclick={resumeLast} class="resume-button"
           >Resume <ArrowRight size={16} /></button
         >
@@ -373,6 +407,10 @@
   >
     {#if view === 'create' && (!lobby || lobby.participantId === 'p1')}
       <div class="mode-selection">
+        <div class="section-heading">
+          <h2>Match format</h2>
+          <span><Users size={14} aria-hidden="true" /> 2 players · head to head</span>
+        </div>
         <div class="mode-grid">
           {#each formats as item (item.id)}
             <button
@@ -416,7 +454,7 @@
         </div>
         <div class="court-note">
           <LockKeyhole size={17} aria-hidden="true" />
-          <p>Every room uses a private 4-digit invite code.</p>
+          <p>Just you and your opponent. Every room uses a private 4-digit invite code.</p>
         </div>
       </div>
     {/if}
@@ -459,7 +497,8 @@
           <p class="eyebrow">Same room · Next match</p>
           <h2>Waiting for your host</h2>
           <p class="join-description">
-            Your host can choose Season, Duel, or Draft Duel. You’ll enter the next match together.
+            Your host can choose Season, Duel, Draft Duel, or Hoop Havoc. You’ll enter the next
+            match together.
           </p>
         {:else if view === 'create'}
           <p class="eyebrow">Configure your match</p>
@@ -479,31 +518,22 @@
                   aria-pressed={ddFairness === 'fair'}
                   class={['option', { active: ddFairness === 'fair' }]}
                   onclick={() => (ddFairness = 'fair')}
+                  ><Scale size={21} aria-hidden="true" /><span
+                    ><strong>Fair</strong><small>Shared strength bands</small></span
+                  ></button
                 >
-                  <Scale size={21} aria-hidden="true" />
-
-                  <span>
-                    <strong>Fair</strong>
-                    <small>Shared strength bands</small>
-                  </span>
-                </button>
-
                 <button
                   type="button"
                   aria-pressed={ddFairness === 'unfair'}
                   class={['option', { active: ddFairness === 'unfair' }]}
                   onclick={() => (ddFairness = 'unfair')}
+                  ><Shuffle size={21} aria-hidden="true" /><span
+                    ><strong>Unfair</strong><small>Equal player odds</small></span
+                  ></button
                 >
-                  <Shuffle size={21} aria-hidden="true" />
-
-                  <span>
-                    <strong>Unfair</strong>
-                    <small>Equal player odds</small>
-                  </span>
-                </button>
               </div>
             </fieldset>
-          {:else}
+          {:else if matchFormat !== 'havoc'}
             <fieldset disabled={busy} class="draft-source">
               <legend class="field-label">Draft source</legend>
               <div class="knowledge-options">
@@ -512,65 +542,65 @@
                   aria-pressed={sourceMode === 'classic'}
                   class={['option', { active: sourceMode === 'classic' }]}
                   onclick={() => selectSource('classic')}
+                  ><Swords size={21} aria-hidden="true" /><span
+                    ><strong>Classic</strong><small>Roll Draft</small></span
+                  ></button
                 >
-                  <Swords size={21} aria-hidden="true" />
-                  <span><strong>Classic</strong><small>Roll Draft</small></span>
-                </button>
-
                 <button
                   type="button"
                   aria-pressed={sourceMode === 'sandbox'}
                   class={['option', { active: sourceMode === 'sandbox' }]}
                   onclick={() => selectSource('sandbox')}
+                  ><Zap size={21} aria-hidden="true" /><span
+                    ><strong>Sandbox</strong><small>Snake Draft</small></span
+                  ></button
                 >
-                  <Zap size={21} aria-hidden="true" />
-                  <span><strong>Sandbox</strong><small>Snake Draft</small></span>
-                </button>
               </div>
             </fieldset>
           {/if}
-          <fieldset disabled={busy}>
-            <legend class="field-label">Knowledge setting</legend>
-            <div class="knowledge-options">
-              <button
-                type="button"
-                aria-pressed={variant === 'ratings'}
-                class={['option', { active: variant === 'ratings' }]}
-                onclick={() => (variant = 'ratings')}
-              >
-                <ChartNoAxesColumn size={21} aria-hidden="true" />
-
-                <span>
-                  <strong>Ratings</strong>
-                  <small>See player ratings</small>
-                </span>
-              </button>
-
-              <button
-                type="button"
-                aria-pressed={variant === 'ball-knowledge'}
-                class={['option', { active: variant === 'ball-knowledge' }]}
-                onclick={() => (variant = 'ball-knowledge')}
-              >
-                <Brain size={21} aria-hidden="true" />
-
-                <span>
-                  <strong>Ball Knowledge</strong>
-                  <small>Draft from memory</small>
-                </span>
-              </button>
-            </div>
-          </fieldset>
+          {#if matchFormat !== 'havoc'}
+            <fieldset disabled={busy}>
+              <legend class="field-label">Knowledge setting</legend>
+              <div class="knowledge-options">
+                <button
+                  type="button"
+                  aria-pressed={variant === 'ratings'}
+                  class={['option', { active: variant === 'ratings' }]}
+                  onclick={() => (variant = 'ratings')}
+                  ><ChartNoAxesColumn size={21} aria-hidden="true" /><span
+                    ><strong>Ratings</strong><small>See player ratings</small></span
+                  ></button
+                >
+                <button
+                  type="button"
+                  aria-pressed={variant === 'ball-knowledge'}
+                  class={['option', { active: variant === 'ball-knowledge' }]}
+                  onclick={() => (variant = 'ball-knowledge')}
+                  ><Brain size={21} aria-hidden="true" /><span
+                    ><strong>Ball Knowledge</strong><small>Draft from memory</small></span
+                  ></button
+                >
+              </div>
+            </fieldset>
+          {/if}
           <dl class="match-rules">
+            <div>
+              <dt><CalendarDays size={15} aria-hidden="true" /> Match format</dt>
+              <dd>{selectedFormat.format}</dd>
+            </div>
             <div>
               <dt><Clock size={15} aria-hidden="true" /> Pick timer</dt>
               <dd>
-                {matchFormat === 'draft-duel'
+                {matchFormat === 'draft-duel' || matchFormat === 'havoc'
                   ? '60s picks'
                   : mode === 'sandbox-shared-82'
                     ? '5m picks'
                     : '90s picks'}
               </dd>
+            </div>
+            <div>
+              <dt><LockKeyhole size={15} aria-hidden="true" /> Room access</dt>
+              <dd>Invite only</dd>
             </div>
           </dl>
           <button
@@ -578,11 +608,14 @@
             onclick={startCreate}
             disabled={busy || (lobby !== null && !lobby.canStart)}
             class="primary-action"
+            >{busy ? 'Creating room…' : 'Create room'}<ArrowRight
+              size={18}
+              aria-hidden="true"
+            /></button
           >
-            {busy ? 'Creating room…' : 'Create room'}
-            <ArrowRight size={18} aria-hidden="true" />
-          </button>
+          <p class="action-note">Keep this room code to play every mode with the same opponent.</p>
         {:else}
+          <p class="eyebrow">Meet on the court</p>
           <h2 class="join-title">Join your opponent</h2>
           <p class="join-description">
             Enter your host’s 4-digit code. The game mode is picked automatically.
@@ -613,11 +646,12 @@
                 disabled={busy || code.length !== 4}
                 class="secondary-action">Preview room</button
               >
-
-              <button type="submit" disabled={busy || code.length !== 4} class="primary-action">
-                {busy ? 'Please wait…' : 'Join room'}
-                <ArrowRight size={16} aria-hidden="true" />
-              </button>
+              <button type="submit" disabled={busy || code.length !== 4} class="primary-action"
+                >{busy ? 'Please wait…' : 'Join room'}<ArrowRight
+                  size={16}
+                  aria-hidden="true"
+                /></button
+              >
             </div>
           </form>
           {#if preview}<p class="room-preview" role="status">{preview}</p>{/if}
@@ -665,6 +699,12 @@
     letter-spacing: -0.015em;
     text-transform: uppercase;
   }
+  .intro {
+    color: var(--color-muted-foreground);
+    font-size: 14px;
+    line-height: 1.7;
+    max-width: 580px;
+  }
   .resume-room {
     display: flex;
     align-items: center;
@@ -680,6 +720,12 @@
   }
   .resume-room .eyebrow {
     font-size: 9px;
+  }
+  .resume-room p {
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
+    margin-top: 3px;
   }
   .resume-button {
     display: flex;
@@ -730,6 +776,25 @@
     grid-template-columns: minmax(0, 1fr) 370px;
     gap: 24px;
     align-items: start;
+  }
+  .section-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 0 0 18px;
+  }
+  .section-heading h2 {
+    font-size: 17px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .section-heading > span {
+    display: flex;
+    gap: 7px;
+    align-items: center;
+    font-size: 11px;
+    color: var(--color-muted-foreground);
   }
   .mode-grid {
     display: grid;
@@ -1010,6 +1075,13 @@
   .resume-button:hover {
     filter: brightness(1.08);
   }
+  .action-note {
+    text-align: center;
+    color: var(--color-muted-foreground);
+    font-size: 10px;
+    line-height: 1.5;
+    margin-top: 12px;
+  }
   .join-title {
     font-size: 32px;
     margin-top: 18px;
@@ -1117,6 +1189,9 @@
     .card-copy h3 {
       font-size: 27px;
     }
+    .resume-room p {
+      white-space: normal;
+    }
     .panel-body {
       padding: 18px;
     }
@@ -1150,6 +1225,9 @@
     }
     .mode-card {
       min-height: 210px;
+    }
+    .section-heading > span {
+      font-size: 10px;
     }
     .panel-body {
       padding: 22px;

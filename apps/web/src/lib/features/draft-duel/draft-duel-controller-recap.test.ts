@@ -13,7 +13,7 @@ import {
   storedDraftDuelCompletedSchema,
   type StoredDraftDuelCompleted,
 } from '@hoop-rush/persistence';
-import { DraftDuelController } from './draft-duel-controller.svelte';
+import { DraftDuelController } from './draft-duel-controller.svelte.js';
 import { createDraftDuelSession } from './draft-duel-session';
 
 type SessionInternals = {

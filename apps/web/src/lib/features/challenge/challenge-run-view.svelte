@@ -13,7 +13,7 @@
     arenaStreak,
   } from '#lib/arena-sound.js';
   import { loadRunPlayersById } from './sandbox-lineup';
-  import { ChallengeRunPresenter } from './challenge-session.svelte';
+  import { ChallengeRunPresenter } from './challenge-session.svelte.js';
   import ChallengeOverlay from './challenge-overlay.svelte';
   import AsyncState from '#lib/components/AsyncState.svelte';
   let {

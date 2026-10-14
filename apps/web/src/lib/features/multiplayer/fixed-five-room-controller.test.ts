@@ -24,7 +24,7 @@ import type {
   FixedFiveRoomSessionDeps,
   FixedFiveSessionAssets,
 } from '@hoop-rush/application/fixed-five';
-import { FixedFiveRoomController } from './fixed-five-room-controller.svelte';
+import { FixedFiveRoomController } from './fixed-five-room-controller.svelte.js';
 
 const goto = vi.hoisted(() => vi.fn());
 vi.mock('$app/navigation', () => ({ goto }));

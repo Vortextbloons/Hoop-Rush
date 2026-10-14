@@ -1,6 +1,6 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
-  import type { HavocHistoryState } from './havoc-history-state.svelte';
+  import type { HavocHistoryState } from './havoc-history-state.svelte.js';
   import HavocComparisonView from './HavocComparisonView.svelte';
   import HavocReportView from './HavocReportView.svelte';
   import HavocTierBadge from './HavocTierBadge.svelte';

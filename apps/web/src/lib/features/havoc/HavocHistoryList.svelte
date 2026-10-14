@@ -1,7 +1,7 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
   import AsyncState from '#lib/components/AsyncState.svelte';
-  import type { HavocHistoryState } from './havoc-history-state.svelte';
+  import type { HavocHistoryState } from './havoc-history-state.svelte.js';
   import { havocCompletionStateLabel, havocRecordLabel } from './havoc-presentation';
 
   let { state }: { state: HavocHistoryState } = $props();

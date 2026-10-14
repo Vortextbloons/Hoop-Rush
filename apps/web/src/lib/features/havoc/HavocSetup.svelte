@@ -1,7 +1,7 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
   import { Zap, ArrowRight } from '@lucide/svelte';
-  import type { HavocDraftController } from './havoc-draft-state.svelte';
+  import type { HavocDraftController } from './havoc-draft-state.svelte.js';
   import HavocDraftBoard from './HavocDraftBoard.svelte';
   let {
     controller,

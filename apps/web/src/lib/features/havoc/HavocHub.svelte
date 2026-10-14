@@ -1,7 +1,7 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
   import { Rocket } from '@lucide/svelte';
-  import type { HavocHubState } from './havoc-hub-state.svelte';
+  import type { HavocHubState } from './havoc-hub-state.svelte.js';
   import HavocLineupLock from './HavocLineupLock.svelte';
   let {
     hub,

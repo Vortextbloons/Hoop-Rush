@@ -1,13 +1,25 @@
 import { z } from 'zod';
 import {
+  HAVOC_MULTIPLAYER_SERIES_GAMES,
+  HAVOC_MULTIPLAYER_SERIES_WINS,
   POSITIONS,
   havocMutationIdSchema,
   seedFromString,
   seedSchema,
+  type HavocBattleMutationRollup,
+  type HavocBattleResult,
+  type HavocBattleTape,
+  type HavocBattleTeamInput,
   type HavocCatalog,
   type HavocCatalogSource,
+  type HavocDraftCard,
+  type HavocDraftOffer,
+  type HavocHomeAway,
   type HavocLockedInputs,
   type HavocMutationId,
+  type HavocMultiplayerDraftState,
+  type HavocMultiplayerParticipantId,
+  type HavocMultiplayerSeriesGame,
   type HavocTeamInput,
   type HavocVersionSet,
   type EraSimulationProfile,
@@ -17,9 +29,26 @@ import {
   type Seed,
 } from '@hoop-rush/data-contracts';
 import {
+  HavocSimulationExhaustedError,
+  applyHavocMultiplayerDraftCommand,
+  auditHavocBattleGame,
+  buildHavocMultiplayerGameInput,
+  buildHavocMultiplayerTeam,
+  createEngineContext,
   createHavocCommandEnvironment,
+  createHavocMultiplayerDraft,
+  createHavocMultiplayerSeries,
+  generateHavocMultiplayerOffer,
+  havocBattleGameInputDigest,
+  havocBattleGameResultDigest,
+  havocBattleGameTapeDigest,
+  havocMultiplayerSeriesMvp,
+  recordHavocMultiplayerGame,
+  simulateHavocBattleGame,
   type HavocCommandEnvironment,
   type HavocLockSources,
+  type HavocMultiplayerDraftCommandPayload,
+  type HavocMultiplayerSeriesMvpResult,
 } from '@hoop-rush/engine';
 import { parseCount, UsageError } from '../args.ts';
 import { EXIT_USAGE_OR_DATA_ERROR, makeReport, type CliReport } from '../report.ts';
@@ -48,6 +77,8 @@ export type HavocCliLineupKind =
 
 export const HAVOC_CLI_COHORT_LINEUPS = ['ordinary', 'risky', 'extreme'] as const;
 export type HavocCliCohortLineup = (typeof HAVOC_CLI_COHORT_LINEUPS)[number];
+
+// ------------------------------------------------------------- statistics
 
 export const havocCliDistributionSchema = z.object({
   count: z.number().int().nonnegative(),
@@ -148,10 +179,23 @@ export const havocCliLineupStatsSchema = z.object({
 });
 export type HavocCliLineupStats = z.infer<typeof havocCliLineupStatsSchema>;
 
-function mutationAggregatesOf(facts: readonly HavocCliGameFacts[]): HavocCliMutationAggregate[] {
+interface HavocCliRollupSource {
+  readonly mutationId: HavocMutationId;
+  readonly triggers: number;
+  readonly pointsDelta: number;
+  readonly freeThrowsGranted: number;
+  readonly turnoversCancelled: number;
+  readonly extraPossessionsEarned: number;
+  readonly extraPossessionsUsed: number;
+  readonly extraPossessionsExpired: number;
+}
+
+function mutationAggregatesOf(
+  sources: readonly { readonly rollups: readonly HavocCliRollupSource[] }[],
+): HavocCliMutationAggregate[] {
   const byMutation = new Map<string, HavocCliMutationAggregate>();
-  for (const fact of facts) {
-    for (const rollup of fact.rollups) {
+  for (const source of sources) {
+    for (const rollup of source.rollups) {
       const existing = byMutation.get(rollup.mutationId) ?? {
         mutationId: rollup.mutationId,
         triggers: 0,
@@ -241,6 +285,8 @@ export function havocLineupStatsOf(
     typedFailures,
   });
 }
+
+// --------------------------------------------------------------- cohorts
 
 export interface HavocCohortSource {
   readonly catalog: SeasonDraftCatalog;
@@ -484,6 +530,483 @@ export function pairedTotalsOf(
     winsGained: havoc.wins - normal.wins,
     differentialDelta: havoc.differential - normal.differential,
   };
+}
+
+// ------------------------------------------------------------- multiplayer
+
+export const HAVOC_CLI_MULTIPLAYER_DRAFT_POLICY =
+  'greedy highest originalOverall with card-id tie-break; spend the single reroll on the first offer whose rerolled best card is strictly better';
+
+export interface HavocMultiplayerGameFacts {
+  readonly gameNumber: number;
+  readonly winner: HavocMultiplayerParticipantId;
+  readonly p1Score: number;
+  readonly p2Score: number;
+  readonly margin: number;
+  readonly totalPoints: number;
+  readonly overtimePeriods: number;
+  readonly cloneInstances: number;
+  readonly cloneSeconds: number;
+  readonly clonePoints: number;
+  readonly cloneRebounds: number;
+  readonly cloneAssists: number;
+  readonly rollups: readonly HavocBattleMutationRollup[];
+}
+
+export interface HavocMultiplayerSeriesRun {
+  readonly seed: Seed;
+  readonly firstPicker: HavocMultiplayerParticipantId;
+  readonly champion: HavocMultiplayerParticipantId | null;
+  readonly gamesPlayed: number;
+  readonly p1Overall: number;
+  readonly p2Overall: number;
+  readonly rerollsUsed: number;
+  readonly mvp: HavocMultiplayerSeriesMvpResult | null;
+  readonly facts: readonly HavocMultiplayerGameFacts[];
+  readonly failures: readonly HavocCliFailure[];
+  readonly auditFindings: number;
+}
+
+function betterCardOf(left: HavocDraftCard, right: HavocDraftCard): boolean {
+  if (left.source.originalOverall !== right.source.originalOverall) {
+    return left.source.originalOverall > right.source.originalOverall;
+  }
+  return left.cardId < right.cardId;
+}
+
+function bestCardOf(offer: HavocDraftOffer): HavocDraftCard {
+  let best: HavocDraftCard | null = null;
+  for (const card of offer.cards) {
+    if (best === null || betterCardOf(card, best)) best = card;
+  }
+  if (best === null) {
+    throw new HavocCliError('multiplayer-draft', 'multiplayer offer has no cards');
+  }
+  return best;
+}
+
+function requireMultiplayerOffer(
+  state: HavocMultiplayerDraftState,
+): NonNullable<HavocMultiplayerDraftState['offer']> {
+  if (state.offer === null) {
+    throw new HavocCliError('multiplayer-draft', 'drafting state has no active offer');
+  }
+  return state.offer;
+}
+
+function requireMultiplayerParticipant(
+  state: HavocMultiplayerDraftState,
+): HavocMultiplayerParticipantId {
+  if (state.activeParticipantId === null) {
+    throw new HavocCliError('multiplayer-draft', 'drafting state has no active participant');
+  }
+  return state.activeParticipantId;
+}
+
+function applyMultiplayerDraftCommandOrThrow(
+  state: HavocMultiplayerDraftState,
+  payload: HavocMultiplayerDraftCommandPayload,
+  catalog: HavocCatalog,
+  environment: HavocCommandEnvironment,
+): HavocMultiplayerDraftState {
+  const outcome = applyHavocMultiplayerDraftCommand(state, payload, catalog, environment);
+  if (!outcome.receipt.accepted) {
+    throw new HavocCliError(
+      'multiplayer-draft',
+      `multiplayer ${payload.kind} at turn ${String(payload.turnOrdinal)} was rejected: ${String(outcome.receipt.rejectionCode)}`,
+    );
+  }
+  return outcome.state;
+}
+
+export interface HavocMultiplayerDraftOutcome {
+  readonly state: HavocMultiplayerDraftState;
+  readonly rerollsUsed: number;
+}
+
+export function runHavocMultiplayerDraft(input: {
+  readonly rootSeed: Seed;
+  readonly catalog: HavocCatalog;
+  readonly environment: HavocCommandEnvironment;
+}): HavocMultiplayerDraftOutcome {
+  let state = createHavocMultiplayerDraft(input.rootSeed, input.catalog, input.environment);
+  let rerollsUsed = 0;
+  while (state.status === 'drafting') {
+    const offer = requireMultiplayerOffer(state);
+    const participantId = requireMultiplayerParticipant(state);
+    if (state.rerollsUsed[participantId] === 0) {
+      const rerolled = generateHavocMultiplayerOffer(
+        {
+          catalog: input.catalog,
+          rootSeed: state.rootSeed,
+          participantId,
+          turnOrdinal: state.turnOrdinal,
+          offerIndex: 1,
+          claimedPlayerIds: state.claimedPlayerIds,
+          picks: state.picks,
+        },
+        input.environment,
+      );
+      if (betterCardOf(bestCardOf(rerolled), bestCardOf(offer))) {
+        state = applyMultiplayerDraftCommandOrThrow(
+          state,
+          { kind: 'reroll', turnOrdinal: state.turnOrdinal, offerId: offer.offerId },
+          input.catalog,
+          input.environment,
+        );
+        rerollsUsed += 1;
+      }
+    }
+    const activeOffer = requireMultiplayerOffer(state);
+    const card = bestCardOf(activeOffer);
+    const seasonKey = card.source.seasonKey;
+    if (seasonKey === null) {
+      throw new HavocCliError('multiplayer-draft', `card ${card.cardId} has no season key`);
+    }
+    state = applyMultiplayerDraftCommandOrThrow(
+      state,
+      {
+        kind: 'pick',
+        turnOrdinal: state.turnOrdinal,
+        offerId: activeOffer.offerId,
+        cardId: card.cardId,
+        claimKey: { playerId: card.source.playerId, seasonKey },
+      },
+      input.catalog,
+      input.environment,
+    );
+  }
+  return { state, rerollsUsed };
+}
+
+function havocMultiplayerTeamOf(input: {
+  readonly participantId: HavocMultiplayerParticipantId;
+  readonly side: HavocHomeAway;
+  readonly state: HavocMultiplayerDraftState;
+  readonly rootSeed: Seed;
+}): HavocBattleTeamInput {
+  return buildHavocMultiplayerTeam({
+    participantId: input.participantId,
+    side: input.side,
+    teamId: `havoc-mp-${input.participantId}`,
+    displayName: input.participantId === 'p1' ? 'Player One' : 'Player Two',
+    picks: input.state.picks,
+    rootSeed: input.rootSeed,
+  });
+}
+
+function havocMultiplayerLineupOverallOf(
+  state: HavocMultiplayerDraftState,
+  participantId: HavocMultiplayerParticipantId,
+): number {
+  const picks = state.picks.filter((pick) => pick.participantId === participantId);
+  if (picks.length === 0) return 0;
+  return mean(picks.map((pick) => pick.card.source.originalOverall));
+}
+
+function havocMultiplayerGameFactsOf(
+  seriesGame: HavocMultiplayerSeriesGame,
+  winner: HavocMultiplayerParticipantId,
+  result: HavocBattleResult,
+): HavocMultiplayerGameFacts {
+  const p1IsHome = seriesGame.homeParticipantId === 'p1';
+  const p1Score = p1IsHome ? result.home.points : result.away.points;
+  const p2Score = p1IsHome ? result.away.points : result.home.points;
+  let cloneInstances = 0;
+  let cloneSeconds = 0;
+  let clonePoints = 0;
+  let cloneRebounds = 0;
+  let cloneAssists = 0;
+  for (const team of [result.home, result.away]) {
+    for (const line of team.participants) {
+      if (line.kind !== 'clone') continue;
+      cloneInstances += 1;
+      cloneSeconds += line.secondsPlayed;
+      clonePoints += line.points;
+      cloneRebounds += line.rebounds.total;
+      cloneAssists += line.assists;
+    }
+  }
+  return {
+    gameNumber: seriesGame.gameNumber,
+    winner,
+    p1Score,
+    p2Score,
+    margin: p1Score - p2Score,
+    totalPoints: p1Score + p2Score,
+    overtimePeriods: result.overtimePeriods,
+    cloneInstances,
+    cloneSeconds,
+    clonePoints,
+    cloneRebounds,
+    cloneAssists,
+    rollups: result.rollups.map((rollup) => ({ ...rollup })),
+  };
+}
+
+export function runHavocMultiplayerSeries(
+  context: HavocCohortContext,
+  seed: Seed,
+): HavocMultiplayerSeriesRun {
+  const draft = runHavocMultiplayerDraft({
+    rootSeed: seed,
+    catalog: context.catalog,
+    environment: context.environment,
+  });
+  const state = draft.state;
+  const engineContext = createEngineContext();
+  let series = createHavocMultiplayerSeries(seed);
+  const results: HavocBattleResult[] = [];
+  const facts: HavocMultiplayerGameFacts[] = [];
+  const failures: HavocCliFailure[] = [];
+  let auditFindings = 0;
+  for (let gameNumber = 1; gameNumber <= HAVOC_MULTIPLAYER_SERIES_GAMES; gameNumber += 1) {
+    if (series.champion !== null) break;
+    const seriesGame = series.games[gameNumber - 1];
+    if (seriesGame === undefined) {
+      throw new HavocCliError('multiplayer-series', `series has no game ${String(gameNumber)}`);
+    }
+    const input = buildHavocMultiplayerGameInput({
+      rootSeed: seed,
+      gameNumber,
+      homeTeam: havocMultiplayerTeamOf({
+        participantId: seriesGame.homeParticipantId,
+        side: 'home',
+        state,
+        rootSeed: seed,
+      }),
+      awayTeam: havocMultiplayerTeamOf({
+        participantId: seriesGame.awayParticipantId,
+        side: 'away',
+        state,
+        rootSeed: seed,
+      }),
+      profile: context.source.profile,
+      versionSet: context.source.versionSet,
+    });
+    let result: HavocBattleResult;
+    let tape: HavocBattleTape;
+    try {
+      ({ result, tape } = simulateHavocBattleGame(input, engineContext));
+    } catch (error) {
+      if (error instanceof HavocSimulationExhaustedError) {
+        failures.push({
+          variant: 'havoc',
+          gameNumber,
+          code: error.code,
+          message: error.message.slice(0, 512),
+        });
+        break;
+      }
+      throw error;
+    }
+    const audit = auditHavocBattleGame(input, result, tape);
+    if (!audit.ok) {
+      for (const finding of audit.findings) {
+        failures.push({
+          variant: 'havoc',
+          gameNumber,
+          code: `audit:${finding.code}`.slice(0, 64),
+          message: finding.message.slice(0, 512),
+        });
+      }
+      auditFindings += audit.findings.length;
+    }
+    const winner =
+      result.winner === 'home' ? seriesGame.homeParticipantId : seriesGame.awayParticipantId;
+    series = recordHavocMultiplayerGame(series, gameNumber, winner, {
+      inputDigest: havocBattleGameInputDigest(input),
+      resultDigest: havocBattleGameResultDigest(result),
+      tapeDigest: havocBattleGameTapeDigest(tape),
+    });
+    results.push(result);
+    facts.push(havocMultiplayerGameFactsOf(seriesGame, winner, result));
+  }
+  const champion = series.champion;
+  return {
+    seed,
+    firstPicker: state.firstPicker,
+    champion,
+    gamesPlayed: facts.length,
+    p1Overall: round4(havocMultiplayerLineupOverallOf(state, 'p1')),
+    p2Overall: round4(havocMultiplayerLineupOverallOf(state, 'p2')),
+    rerollsUsed: draft.rerollsUsed,
+    mvp: champion === null ? null : havocMultiplayerSeriesMvp(series, results),
+    facts,
+    failures,
+    auditFindings,
+  };
+}
+
+export interface HavocMultiplayerCohortResult {
+  readonly train: readonly HavocMultiplayerSeriesRun[];
+  readonly holdout: readonly HavocMultiplayerSeriesRun[];
+  readonly trainSeeds: readonly Seed[];
+  readonly holdoutSeeds: readonly Seed[];
+}
+
+export function runHavocMultiplayerCalibration(options: {
+  readonly source: HavocCohortSource;
+  readonly seedCount: number;
+  readonly holdoutCount: number;
+}): HavocMultiplayerCohortResult {
+  const context = createHavocCohortContext(options.source);
+  const trainSeeds = Array.from({ length: options.seedCount }, (_value, index) =>
+    havocCalibrationSeed('multiplayer-train', index),
+  );
+  const holdoutSeeds = Array.from({ length: options.holdoutCount }, (_value, index) =>
+    havocCalibrationSeed('multiplayer-holdout', index),
+  );
+  return {
+    train: trainSeeds.map((seed) => runHavocMultiplayerSeries(context, seed)),
+    holdout: holdoutSeeds.map((seed) => runHavocMultiplayerSeries(context, seed)),
+    trainSeeds,
+    holdoutSeeds,
+  };
+}
+
+function pearsonCorrelation(xs: readonly number[], ys: readonly number[]): number | null {
+  if (xs.length !== ys.length || xs.length < 2) return null;
+  const meanX = mean(xs);
+  const meanY = mean(ys);
+  let covariance = 0;
+  let varianceX = 0;
+  let varianceY = 0;
+  for (let index = 0; index < xs.length; index += 1) {
+    const dx = (xs[index] ?? 0) - meanX;
+    const dy = (ys[index] ?? 0) - meanY;
+    covariance += dx * dy;
+    varianceX += dx * dx;
+    varianceY += dy * dy;
+  }
+  if (varianceX === 0 || varianceY === 0) return null;
+  return round4(covariance / Math.sqrt(varianceX * varianceY));
+}
+
+export const havocCliMultiplayerSweepsSchema = z.object({
+  '4-0': z.number().int().nonnegative(),
+  '4-1': z.number().int().nonnegative(),
+  '4-2': z.number().int().nonnegative(),
+  '4-3': z.number().int().nonnegative(),
+});
+
+export const havocCliMultiplayerStatsSchema = z.object({
+  series: z.number().int().nonnegative(),
+  decidedSeries: z.number().int().nonnegative(),
+  games: z.number().int().nonnegative(),
+  averageGamesPerSeries: z.number(),
+  auditFailures: z.number().int().nonnegative(),
+  typedFailures: z.number().int().nonnegative(),
+  p1Score: havocCliDistributionSchema,
+  p2Score: havocCliDistributionSchema,
+  margin: havocCliDistributionSchema,
+  totalPoints: havocCliDistributionSchema,
+  overtimeGames: z.number().int().nonnegative(),
+  clones: z.object({
+    gamesWithClone: z.number().int().nonnegative(),
+    instances: z.number().int().nonnegative(),
+    seconds: havocCliDistributionSchema,
+    points: havocCliDistributionSchema,
+    rebounds: havocCliDistributionSchema,
+    assists: havocCliDistributionSchema,
+  }),
+  mutations: z.array(havocCliMutationAggregateSchema),
+  rerollsUsed: z.number().int().nonnegative(),
+  seriesWithReroll: z.number().int().nonnegative(),
+  firstPicker: z.object({
+    series: z.number().int().nonnegative(),
+    wins: z.number().int().nonnegative(),
+    winRate: z.number().nullable(),
+  }),
+  ratingSensitivity: z.object({
+    meanP1Overall: z.number(),
+    meanP2Overall: z.number(),
+    higherRatedSeries: z.number().int().nonnegative(),
+    higherRatedWins: z.number().int().nonnegative(),
+    higherRatedWinRate: z.number().nullable(),
+    /** Pearson r between the p1-minus-p2 lineup overall gap and a p1 series win (1/0). */
+    correlation: z.number().nullable(),
+  }),
+  sweeps: havocCliMultiplayerSweepsSchema,
+  mvpSlots: z.record(z.string(), z.number().int().nonnegative()),
+});
+export type HavocCliMultiplayerStats = z.infer<typeof havocCliMultiplayerStatsSchema>;
+
+export const havocCliMultiplayerCohortSchema = z.object({
+  train: havocCliMultiplayerStatsSchema,
+  holdout: havocCliMultiplayerStatsSchema,
+});
+export type HavocCliMultiplayerCohort = z.infer<typeof havocCliMultiplayerCohortSchema>;
+
+export function havocMultiplayerStatsOf(
+  runs: readonly HavocMultiplayerSeriesRun[],
+): HavocCliMultiplayerStats {
+  const facts = runs.flatMap((run) => run.facts);
+  const decided = runs.filter((run) => run.champion !== null);
+  const cloneFacts = facts.filter((fact) => fact.cloneInstances > 0);
+  const sweeps: Record<'4-0' | '4-1' | '4-2' | '4-3', number> = {
+    '4-0': 0,
+    '4-1': 0,
+    '4-2': 0,
+    '4-3': 0,
+  };
+  for (const run of decided) {
+    const loserWins = run.gamesPlayed - HAVOC_MULTIPLAYER_SERIES_WINS;
+    if (loserWins < 0 || loserWins > 3) continue;
+    sweeps[`4-${String(loserWins)}` as keyof typeof sweeps] += 1;
+  }
+  const firstPickerWins = decided.filter((run) => run.champion === run.firstPicker).length;
+  const higherRated = decided.filter((run) => run.p1Overall !== run.p2Overall);
+  const higherRatedWins = higherRated.filter((run) =>
+    run.p1Overall > run.p2Overall ? run.champion === 'p1' : run.champion === 'p2',
+  ).length;
+  const overallGaps = decided.map((run) => run.p1Overall - run.p2Overall);
+  const p1Outcomes = decided.map((run) => (run.champion === 'p1' ? 1 : 0));
+  const mvpSlots: Record<string, number> = {};
+  for (const slot of POSITIONS) mvpSlots[slot] = 0;
+  for (const run of decided) {
+    if (run.mvp === null) continue;
+    mvpSlots[run.mvp.slot] = (mvpSlots[run.mvp.slot] ?? 0) + 1;
+  }
+  return havocCliMultiplayerStatsSchema.parse({
+    series: runs.length,
+    decidedSeries: decided.length,
+    games: facts.length,
+    averageGamesPerSeries: runs.length === 0 ? 0 : round4(facts.length / runs.length),
+    auditFailures: runs.reduce((sum, run) => sum + run.auditFindings, 0),
+    typedFailures: runs.reduce((sum, run) => sum + run.failures.length, 0),
+    p1Score: distributionOf(facts.map((fact) => fact.p1Score)),
+    p2Score: distributionOf(facts.map((fact) => fact.p2Score)),
+    margin: distributionOf(facts.map((fact) => fact.margin)),
+    totalPoints: distributionOf(facts.map((fact) => fact.totalPoints)),
+    overtimeGames: facts.filter((fact) => fact.overtimePeriods > 0).length,
+    clones: {
+      gamesWithClone: cloneFacts.length,
+      instances: facts.reduce((sum, fact) => sum + fact.cloneInstances, 0),
+      seconds: distributionOf(facts.map((fact) => fact.cloneSeconds)),
+      points: distributionOf(facts.map((fact) => fact.clonePoints)),
+      rebounds: distributionOf(facts.map((fact) => fact.cloneRebounds)),
+      assists: distributionOf(facts.map((fact) => fact.cloneAssists)),
+    },
+    mutations: mutationAggregatesOf(facts),
+    rerollsUsed: runs.reduce((sum, run) => sum + run.rerollsUsed, 0),
+    seriesWithReroll: runs.filter((run) => run.rerollsUsed > 0).length,
+    firstPicker: {
+      series: decided.length,
+      wins: firstPickerWins,
+      winRate: ratioOf(firstPickerWins, decided.length),
+    },
+    ratingSensitivity: {
+      meanP1Overall: runs.length === 0 ? 0 : round4(mean(runs.map((run) => run.p1Overall))),
+      meanP2Overall: runs.length === 0 ? 0 : round4(mean(runs.map((run) => run.p2Overall))),
+      higherRatedSeries: higherRated.length,
+      higherRatedWins,
+      higherRatedWinRate: ratioOf(higherRatedWins, higherRated.length),
+      correlation: pearsonCorrelation(overallGaps, p1Outcomes),
+    },
+    sweeps,
+    mvpSlots,
+  });
 }
 
 export type HavocCliMechanismMetricId =
@@ -920,6 +1443,8 @@ export function runHavocMechanismSensitivity(options: {
   return { definition, on, off, report };
 }
 
+// ------------------------------------------------------------ report schema
+
 export const havocCliCohortSchema = z.object({
   seeds: z.number().int().nonnegative(),
   lineups: z.object({
@@ -933,7 +1458,7 @@ export const havocCalibrateReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('havoc calibrate'),
   baseSeed: seedSchema,
-  mode: z.enum(['cohorts', 'mechanism']),
+  mode: z.enum(['cohorts', 'mechanism', 'multiplayer']),
   gamesPerSeason: z.number().int().min(1).max(82),
   seedCount: z.number().int().nonnegative(),
   holdoutCount: z.number().int().nonnegative(),
@@ -953,19 +1478,28 @@ export const havocCalibrateReportSchema = z.object({
     })
     .nullable(),
   mechanism: havocCliMechanismReportSchema.nullable(),
+  multiplayer: z
+    .object({
+      draftPolicy: z.string().min(1).max(512),
+      train: havocCliMultiplayerStatsSchema,
+      holdout: havocCliMultiplayerStatsSchema,
+    })
+    .nullable(),
   typedFailures: z.array(havocCliFailureSchema).max(200),
   auditFailures: z.number().int().nonnegative(),
   pass: z.boolean(),
 });
 export type HavocCalibrateReport = z.infer<typeof havocCalibrateReportSchema>;
 
-function typedFailuresOf(runs: readonly HavocCohortRun[]): HavocCliFailure[] {
+function typedFailuresOf(
+  runs: readonly { readonly failures: readonly HavocCliFailure[] }[],
+): HavocCliFailure[] {
   const failures: HavocCliFailure[] = [];
   for (const run of runs) failures.push(...run.failures);
   return failures.slice(0, 200);
 }
 
-function auditFailuresOf(runs: readonly HavocCohortRun[]): number {
+function auditFailuresOf(runs: readonly { readonly auditFindings: number }[]): number {
   return runs.reduce((sum, run) => sum + run.auditFindings, 0);
 }
 
@@ -974,6 +1508,7 @@ export interface HavocCalibrateArgs {
   'holdout-count': string | null;
   mechanism: string | null;
   games: string | null;
+  multiplayer: boolean;
   manifest: string | null;
 }
 
@@ -995,16 +1530,30 @@ function renderLineupStats(label: string, stats: HavocCliLineupStats): string {
   return `${label}: ${String(stats.wins)}-${String(stats.losses)} (${(stats.winRate * 100).toFixed(1)}%) · score mean ${stats.score.mean.toFixed(1)} · turnovers ${stats.humanTurnovers.mean.toFixed(1)}/${stats.opponentTurnovers.mean.toFixed(1)} · rebounds ${stats.humanRebounds.mean.toFixed(1)}/${stats.opponentRebounds.mean.toFixed(1)} · fouls ${stats.humanFouls.mean.toFixed(1)}/${stats.opponentFouls.mean.toFixed(1)} · adjustments ${stats.adjustments.mean.toFixed(1)} · clone seconds ${stats.clones.seconds.mean.toFixed(1)} · OT ${String(stats.overtimeGames)} · audit ${String(stats.auditFailures)} · typed ${String(stats.typedFailures)}`;
 }
 
+function renderRate(value: number | null): string {
+  return value === null ? 'n/a' : `${(value * 100).toFixed(1)}%`;
+}
+
+function renderMultiplayerStats(label: string, stats: HavocCliMultiplayerStats): string {
+  const correlation = stats.ratingSensitivity.correlation;
+  return `${label}: ${String(stats.series)} series (${String(stats.decidedSeries)} decided) · ${String(stats.games)} games (${stats.averageGamesPerSeries.toFixed(2)}/series) · p1 ${stats.p1Score.mean.toFixed(1)} - p2 ${stats.p2Score.mean.toFixed(1)} · margin ${stats.margin.mean.toFixed(1)} · total ${stats.totalPoints.mean.toFixed(1)} · OT ${String(stats.overtimeGames)} · first-picker ${renderRate(stats.firstPicker.winRate)} · higher-rated ${renderRate(stats.ratingSensitivity.higherRatedWinRate)} (n ${String(stats.ratingSensitivity.higherRatedSeries)}) · r ${correlation === null ? 'n/a' : correlation.toFixed(2)} · rerolls ${String(stats.rerollsUsed)} · sweeps ${String(stats.sweeps['4-0'])}/${String(stats.sweeps['4-1'])}/${String(stats.sweeps['4-2'])}/${String(stats.sweeps['4-3'])} · clone seconds ${stats.clones.seconds.mean.toFixed(1)} · audit ${String(stats.auditFailures)} · typed ${String(stats.typedFailures)}`;
+}
+
 export function havocCalibrate(args: HavocCalibrateArgs, deps: HavocCalibrateDeps = {}): CliReport {
   const input = {
     seedCount: args['seed-count'],
     holdoutCount: args['holdout-count'],
     mechanism: args.mechanism,
     games: args.games,
+    multiplayer: args.multiplayer,
     manifest: args.manifest,
   };
   try {
     const mechanismId = args.mechanism;
+    const multiplayer = args.multiplayer;
+    if (multiplayer && mechanismId !== null) {
+      throw new UsageError('--multiplayer cannot be combined with --mechanism');
+    }
     const seedCount = parseCount(
       args['seed-count'] ?? undefined,
       '--seed-count',
@@ -1019,6 +1568,46 @@ export function havocCalibrate(args: HavocCalibrateArgs, deps: HavocCalibrateDep
     const assets = deps.assets ?? loadHavocCliAssets(args.manifest ?? undefined);
     const source = cohortSourceOf(assets);
     const baseSeed = seedSchema.parse(seedFromString(HAVOC_CLI_CALIBRATION_BASE));
+    if (multiplayer) {
+      const result = runHavocMultiplayerCalibration({ source, seedCount, holdoutCount });
+      const runs = [...result.train, ...result.holdout];
+      const train = havocMultiplayerStatsOf(result.train);
+      const holdout = havocMultiplayerStatsOf(result.holdout);
+      const typedFailures = typedFailuresOf(runs);
+      const auditFailures = auditFailuresOf(runs);
+      const report = havocCalibrateReportSchema.parse({
+        schemaVersion: 1,
+        command: 'havoc calibrate',
+        baseSeed,
+        mode: 'multiplayer',
+        gamesPerSeason: HAVOC_MULTIPLAYER_SERIES_GAMES,
+        seedCount,
+        holdoutCount,
+        cohorts: null,
+        paired: null,
+        mechanism: null,
+        multiplayer: { draftPolicy: HAVOC_CLI_MULTIPLAYER_DRAFT_POLICY, train, holdout },
+        typedFailures,
+        auditFailures,
+        pass: auditFailures === 0 && typedFailures.length === 0,
+      });
+      const failures: string[] = [];
+      if (report.auditFailures > 0) {
+        failures.push(`accounting audit failures: ${String(report.auditFailures)}`);
+      }
+      if (report.typedFailures.length > 0) {
+        failures.push(`typed simulation failures: ${String(report.typedFailures.length)}`);
+      }
+      const details = [
+        `multiplayer cohorts: ${String(seedCount)} train + ${String(holdoutCount)} holdout series (best of ${String(HAVOC_MULTIPLAYER_SERIES_GAMES)}, first to ${String(HAVOC_MULTIPLAYER_SERIES_WINS)})`,
+        `draft policy: ${HAVOC_CLI_MULTIPLAYER_DRAFT_POLICY}`,
+        renderMultiplayerStats('train', train),
+        renderMultiplayerStats('holdout', holdout),
+        `audit failures ${String(report.auditFailures)} · typed failures ${String(report.typedFailures.length)}`,
+      ];
+      details.push(...failures.slice(0, 20));
+      return makeReport('havoc calibrate', input, { details, failures, payload: report });
+    }
     if (mechanismId !== null) {
       const result = runHavocMechanismSensitivity({
         source,
@@ -1037,6 +1626,7 @@ export function havocCalibrate(args: HavocCalibrateArgs, deps: HavocCalibrateDep
         cohorts: null,
         paired: null,
         mechanism: result.report,
+        multiplayer: null,
         typedFailures: typedFailuresOf([...result.on, ...result.off]),
         auditFailures: auditFailuresOf([...result.on, ...result.off]),
         pass: result.report.pass,
@@ -1109,6 +1699,7 @@ export function havocCalibrate(args: HavocCalibrateArgs, deps: HavocCalibrateDep
         differentialDelta: paired.differentialDelta,
       },
       mechanism: null,
+      multiplayer: null,
       typedFailures: typedFailuresOf([...cohorts.train, ...cohorts.holdout, ...cohorts.normal]),
       auditFailures: auditFailuresOf([...cohorts.train, ...cohorts.holdout, ...cohorts.normal]),
       pass:

@@ -51,6 +51,7 @@ export const havocCommands: CommandSpec[] = [
       'holdout-count': 'string',
       mechanism: 'string',
       games: 'string',
+      multiplayer: 'flag',
       manifest: 'string',
     },
     run: (args) =>
@@ -59,6 +60,7 @@ export const havocCommands: CommandSpec[] = [
         'holdout-count': n(args, 'holdout-count'),
         mechanism: n(args, 'mechanism'),
         games: n(args, 'games'),
+        multiplayer: hasOption(args, 'multiplayer'),
         manifest: n(args, 'manifest'),
       }),
   },

@@ -615,6 +615,280 @@ export type Database = {
           },
         ]
       }
+      havoc_multiplayer_deadline_commitments: {
+        Row: {
+          cursor: string
+          participant_id: string
+          payload: Json
+          pick_ordinal: number
+          room_id: string
+          updated_at: string
+        }
+        Insert: {
+          cursor: string
+          participant_id: string
+          payload: Json
+          pick_ordinal: number
+          room_id: string
+          updated_at?: string
+        }
+        Update: {
+          cursor?: string
+          participant_id?: string
+          payload?: Json
+          pick_ordinal?: number
+          room_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "havoc_multiplayer_deadline_commitments_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "havoc_multiplayer_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      havoc_multiplayer_join_attempts: {
+        Row: {
+          code: string | null
+          created_at: string
+          id: string
+          uid: string | null
+        }
+        Insert: {
+          code?: string | null
+          created_at?: string
+          id?: string
+          uid?: string | null
+        }
+        Update: {
+          code?: string | null
+          created_at?: string
+          id?: string
+          uid?: string | null
+        }
+        Relationships: []
+      }
+      havoc_multiplayer_room_commands: {
+        Row: {
+          actor_participant_id: string
+          command_id: string
+          created_at: string
+          ordinal: number
+          payload: Json
+          room_id: string
+        }
+        Insert: {
+          actor_participant_id: string
+          command_id: string
+          created_at?: string
+          ordinal: number
+          payload: Json
+          room_id: string
+        }
+        Update: {
+          actor_participant_id?: string
+          command_id?: string
+          created_at?: string
+          ordinal?: number
+          payload?: Json
+          room_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "havoc_multiplayer_room_commands_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "havoc_multiplayer_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      havoc_multiplayer_room_members: {
+        Row: {
+          created_at: string
+          last_seen_at: string
+          locked: boolean
+          next_game_ready: number
+          online: boolean
+          participant_id: string
+          ready: boolean
+          room_id: string
+          uid: string
+        }
+        Insert: {
+          created_at?: string
+          last_seen_at?: string
+          locked?: boolean
+          next_game_ready?: number
+          online?: boolean
+          participant_id: string
+          ready?: boolean
+          room_id: string
+          uid: string
+        }
+        Update: {
+          created_at?: string
+          last_seen_at?: string
+          locked?: boolean
+          next_game_ready?: number
+          online?: boolean
+          participant_id?: string
+          ready?: boolean
+          room_id?: string
+          uid?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "havoc_multiplayer_room_members_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "havoc_multiplayer_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      havoc_multiplayer_rooms: {
+        Row: {
+          broadcast: Json | null
+          code: string | null
+          code_active: boolean
+          code_expires_at: string | null
+          command_count: number
+          confirmed_digest: string | null
+          created_at: string
+          deadline_at: string | null
+          deadline_cursor: string | null
+          deadline_fallback: Json | null
+          deadline_participant: string | null
+          deadline_pick_ordinal: number | null
+          digest: string | null
+          draft_state: Json
+          expires_at: string
+          game_state: Json
+          id: string
+          phase: string
+          result_digest: string | null
+          revision: number
+          root_seed: string
+          series: Json | null
+          successor_room_id: string | null
+          updated_at: string
+          versions: Json
+        }
+        Insert: {
+          broadcast?: Json | null
+          code?: string | null
+          code_active?: boolean
+          code_expires_at?: string | null
+          command_count?: number
+          confirmed_digest?: string | null
+          created_at?: string
+          deadline_at?: string | null
+          deadline_cursor?: string | null
+          deadline_fallback?: Json | null
+          deadline_participant?: string | null
+          deadline_pick_ordinal?: number | null
+          digest?: string | null
+          draft_state?: Json
+          expires_at?: string
+          game_state?: Json
+          id?: string
+          phase?: string
+          result_digest?: string | null
+          revision?: number
+          root_seed: string
+          series?: Json | null
+          successor_room_id?: string | null
+          updated_at?: string
+          versions: Json
+        }
+        Update: {
+          broadcast?: Json | null
+          code?: string | null
+          code_active?: boolean
+          code_expires_at?: string | null
+          command_count?: number
+          confirmed_digest?: string | null
+          created_at?: string
+          deadline_at?: string | null
+          deadline_cursor?: string | null
+          deadline_fallback?: Json | null
+          deadline_participant?: string | null
+          deadline_pick_ordinal?: number | null
+          digest?: string | null
+          draft_state?: Json
+          expires_at?: string
+          game_state?: Json
+          id?: string
+          phase?: string
+          result_digest?: string | null
+          revision?: number
+          root_seed?: string
+          series?: Json | null
+          successor_room_id?: string | null
+          updated_at?: string
+          versions?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "havoc_multiplayer_rooms_successor_room_id_fkey"
+            columns: ["successor_room_id"]
+            isOneToOne: false
+            referencedRelation: "havoc_multiplayer_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      havoc_multiplayer_server_versions: {
+        Row: {
+          key: string
+          value: string
+        }
+        Insert: {
+          key: string
+          value: string
+        }
+        Update: {
+          key?: string
+          value?: string
+        }
+        Relationships: []
+      }
+      havoc_multiplayer_verification_receipts: {
+        Row: {
+          created_at: string
+          participant_id: string
+          receipt: Json
+          receipt_id: string
+          room_id: string
+        }
+        Insert: {
+          created_at?: string
+          participant_id: string
+          receipt: Json
+          receipt_id: string
+          room_id: string
+        }
+        Update: {
+          created_at?: string
+          participant_id?: string
+          receipt?: Json
+          receipt_id?: string
+          room_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "havoc_multiplayer_verification_receipts_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "havoc_multiplayer_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       multiplayer_lobbies: {
         Row: {
           code: string
@@ -775,6 +1049,82 @@ export type Database = {
         Returns: Json
       }
       fixed_five_versions_valid: {
+        Args: { p_versions: Json }
+        Returns: boolean
+      }
+      havoc_multiplayer_command_submit: {
+        Args: {
+          p_command_id: string
+          p_expected_revision: number
+          p_payload: Json
+          p_room_id: string
+        }
+        Returns: Json
+      }
+      havoc_multiplayer_commit_fallback: {
+        Args: {
+          p_cursor: string
+          p_expected_revision: number
+          p_payload: Json
+          p_room_id: string
+        }
+        Returns: Json
+      }
+      havoc_multiplayer_complete: {
+        Args: { p_receipt_id: string; p_room_id: string }
+        Returns: Json
+      }
+      havoc_multiplayer_cron_tick: { Args: never; Returns: undefined }
+      havoc_multiplayer_fail: { Args: { p_room_id: string }; Returns: Json }
+      havoc_multiplayer_first_picker: {
+        Args: { p_root_seed: string }
+        Returns: string
+      }
+      havoc_multiplayer_home_court: {
+        Args: { p_root_seed: string }
+        Returns: string
+      }
+      havoc_multiplayer_is_member: {
+        Args: { p_room_id: string }
+        Returns: boolean
+      }
+      havoc_multiplayer_leave: {
+        Args: { p_room_id: string }
+        Returns: undefined
+      }
+      havoc_multiplayer_random_code: { Args: never; Returns: string }
+      havoc_multiplayer_rematch: { Args: { p_room_id: string }; Returns: Json }
+      havoc_multiplayer_room_create: {
+        Args: { p_versions: Json }
+        Returns: Json
+      }
+      havoc_multiplayer_room_join: { Args: { p_code: string }; Returns: Json }
+      havoc_multiplayer_room_preview: {
+        Args: { p_code: string }
+        Returns: Json
+      }
+      havoc_multiplayer_timeout_apply: {
+        Args: { p_room_id: string }
+        Returns: Json
+      }
+      havoc_multiplayer_timeout_resolve: {
+        Args: { p_room_id: string }
+        Returns: Json
+      }
+      havoc_multiplayer_verification_challenge: {
+        Args: { p_room_id: string }
+        Returns: string
+      }
+      havoc_multiplayer_verification_submit: {
+        Args: {
+          p_expected_revision: number
+          p_receipt: Json
+          p_receipt_id: string
+          p_room_id: string
+        }
+        Returns: Json
+      }
+      havoc_multiplayer_versions_valid: {
         Args: { p_versions: Json }
         Returns: boolean
       }

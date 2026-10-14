@@ -23,7 +23,7 @@ import { createEngineContext, simulateRecordedGame } from '@hoop-rush/engine';
 import * as engine from '@hoop-rush/engine';
 import { buildLegalSimulationTeam, DEFAULT_ERA_SIM_PROFILE } from '@hoop-rush/test-fixtures';
 import type { DraftDuelAssets } from './draft-duel-assets';
-import { DraftDuelController } from './draft-duel-controller.svelte';
+import { DraftDuelController } from './draft-duel-controller.svelte.js';
 import { createDraftDuelSession, type DraftDuelSession } from './draft-duel-session';
 
 type SessionLifecycle = {
