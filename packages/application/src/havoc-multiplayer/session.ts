@@ -2,6 +2,7 @@ import {
   HAVOC_MULTIPLAYER_GAME_READY_TIMEOUT_MS,
   HAVOC_MULTIPLAYER_GAME_RESULTS_HOLD_MS,
   HAVOC_MULTIPLAYER_SAVE_SCHEMA_VERSION,
+  HAVOC_MULTIPLAYER_VERSION,
   canonicalJson,
   commandIdSchema,
   contentHashSchema,
@@ -30,6 +31,7 @@ import {
   type HavocMultiplayerSeriesSnapshot,
   type HavocMultiplayerTransientEvent,
   type HavocMultiplayerTransport,
+  type HavocMultiplayerVariant,
   type HavocMultiplayerVerificationReceipt,
   type HavocMultiplayerVersionLocks,
   type HavocMultiplayerWorkerGameOutput,
@@ -392,13 +394,15 @@ export class HavocMultiplayerSession {
     }
   }
 
-  async createRoom(): Promise<{ roomId: Id; code: HavocMultiplayerRoomCode } | null> {
+  async createRoom(
+    variant: HavocMultiplayerVariant = 'standard',
+  ): Promise<{ roomId: Id; code: HavocMultiplayerRoomCode } | null> {
     this.busy = true;
     this.error = null;
     this.publish();
     try {
       await this.loadAssets();
-      const created = await this.deps.transport.create({ versions: this.versionLocks() });
+      const created = await this.deps.transport.create({ variant, versions: this.versionLocks() });
       this.deps.saveMembership(created.membership);
       return { roomId: created.snapshot.roomId, code: created.code };
     } catch (error) {
@@ -701,6 +705,7 @@ export class HavocMultiplayerSession {
     const locks = snapshot.settings.versions;
     const versions = assets.versionSet;
     const matches =
+      locks.multiplayerVersion === HAVOC_MULTIPLAYER_VERSION &&
       locks.engineVersion === versions.engineVersion &&
       locks.rulesVersion === versions.rulesVersion &&
       locks.mutationCatalogVersion === versions.mutationCatalogVersion &&
@@ -891,6 +896,10 @@ export class HavocMultiplayerSession {
         rootSeed: serverDraft.rootSeed,
         catalog: assets.catalog,
         environment,
+        settings: {
+          variant: snapshot.settings.variant,
+          rulesVersion: snapshot.settings.versions.rulesVersion,
+        },
         commands: this.commands.map((command) => command.payload),
       });
     } catch {

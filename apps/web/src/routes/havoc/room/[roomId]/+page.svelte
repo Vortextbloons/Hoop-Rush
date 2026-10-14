@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onDestroy, onMount } from 'svelte';
+  import { onDestroy, onMount, tick } from 'svelte';
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
@@ -27,6 +27,12 @@
   import HavocMultiplayerLineupRail from '#lib/features/havoc-multiplayer/HavocMultiplayerLineupRail.svelte';
   import HavocMultiplayerSeriesTracker from '#lib/features/havoc-multiplayer/HavocMultiplayerSeriesTracker.svelte';
   import {
+    HAVOC_MULTIPLAYER_REVEAL_SELECTION_MS,
+    HAVOC_MULTIPLAYER_REVEAL_STAGGER_MS,
+    HavocMultiplayerRevealDirector,
+    type HavocMultiplayerRevealAttempt,
+  } from '#lib/features/havoc-multiplayer/havoc-multiplayer-reveal.js';
+  import {
     HAVOC_MULTIPLAYER_STAGE_LABELS,
     havocMultiplayerLineupSlots,
     havocMultiplayerLocalSide,
@@ -53,6 +59,15 @@
   let showdownReady = $state(false);
   let showdownSecondsLeft = $state(0);
   let followingRematch = false;
+  const revealContext = new Map<
+    number,
+    { card: HavocDraftCard; source: HTMLElement; sourceRect: DOMRect }
+  >();
+  const revealFlyers = new Map<number, { clone: HTMLElement; animation: Animation }>();
+  const revealDirector = new HavocMultiplayerRevealDirector({
+    reducedMotion: () => reducedMotion,
+    cancel: cancelSelectionTransition,
+  });
 
   onMount(() => {
     void controller.attach(roomId);
@@ -74,6 +89,7 @@
     };
   });
   onDestroy(() => {
+    revealDirector.cancelAll();
     controller.dispose();
   });
 
@@ -131,6 +147,9 @@
       controller.currentOutput?.gameNumber ?? null,
     ),
   );
+  const roomVariantLabel = $derived(
+    controller.snapshot?.settings.variant === 'curated' ? 'Curated' : 'Standard',
+  );
 
   $effect(() => {
     if (phase !== 'lineup-showdown') {
@@ -154,6 +173,14 @@
       clearInterval(interval);
       clearTimeout(timer);
     };
+  });
+
+  $effect(() => {
+    revealDirector.setOffer(offer?.offerId ?? null);
+  });
+
+  $effect(() => {
+    if (phase !== 'drafting') revealDirector.cancelAll();
   });
 
   $effect(() => {
@@ -190,8 +217,109 @@
   }
 
   async function pickCard(card: HavocDraftCard): Promise<void> {
+    const draft = controller.draft;
+    const currentOffer = controller.offer;
+    if (!draft || !currentOffer || controller.busy || !controller.activeTurn) return;
+    const attempt = revealDirector.beginSelection({
+      offerId: currentOffer.offerId,
+      cardId: card.cardId,
+    });
+    if (attempt !== null) {
+      const source = document.querySelector(`[data-havoc-card="${card.cardId}"]`);
+      if (source instanceof HTMLElement) {
+        revealContext.set(attempt.attempt, {
+          card,
+          source,
+          sourceRect: source.getBoundingClientRect(),
+        });
+      }
+    }
     selectedCardId = null;
+    const picksBefore = draft.picks.length;
     await controller.pickCard(card);
+    if (attempt === null) return;
+    const nextDraft = controller.draft;
+    const accepted = (nextDraft?.picks.length ?? 0) > picksBefore;
+    const settlement = revealDirector.settleSelection(attempt, {
+      accepted,
+      offerId: nextDraft?.offer?.offerId ?? null,
+    });
+    if (settlement !== 'played') {
+      revealContext.delete(attempt.attempt);
+      return;
+    }
+    void playSelectionTransition(attempt);
+  }
+
+  async function playSelectionTransition(attempt: HavocMultiplayerRevealAttempt): Promise<void> {
+    const context = revealContext.get(attempt.attempt);
+    revealContext.delete(attempt.attempt);
+    if (context === undefined || reducedMotion) return;
+    await tick();
+    const target = document.querySelector(
+      `[data-havoc-my-lineup] [data-havoc-lineup-slot="${context.card.slot}"]`,
+    );
+    if (!(target instanceof HTMLElement)) {
+      revealDirector.finishSelection(attempt);
+      return;
+    }
+    const targetRect = target.getBoundingClientRect();
+    const source = context.sourceRect;
+    const clone = context.source.cloneNode(true) as HTMLElement;
+    clone.removeAttribute('data-havoc-card');
+    clone.querySelectorAll('button').forEach((button) => button.remove());
+    clone.style.width = '100%';
+    clone.style.height = '100%';
+    const flyer = document.createElement('div');
+    flyer.className = `havoc-world hm-reveal-flyer-${attempt.attempt}`;
+    flyer.setAttribute('aria-hidden', 'true');
+    flyer.style.position = 'fixed';
+    flyer.style.left = `${source.left}px`;
+    flyer.style.top = `${source.top}px`;
+    flyer.style.width = `${source.width}px`;
+    flyer.style.height = `${source.height}px`;
+    flyer.style.margin = '0';
+    flyer.style.zIndex = '60';
+    flyer.style.pointerEvents = 'none';
+    flyer.appendChild(clone);
+    document.body.appendChild(flyer);
+    const deltaX = targetRect.left + targetRect.width / 2 - (source.left + source.width / 2);
+    const deltaY = targetRect.top + targetRect.height / 2 - (source.top + source.height / 2);
+    const scale = Math.max(0.2, Math.min(1, targetRect.width / Math.max(1, source.width)));
+    const animation = flyer.animate(
+      [
+        { transform: 'translate(0, 0) scale(1)', opacity: 1 },
+        { transform: `translate(${deltaX}px, ${deltaY}px) scale(${scale})`, opacity: 0.12 },
+      ],
+      {
+        duration: HAVOC_MULTIPLAYER_REVEAL_SELECTION_MS,
+        easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+        fill: 'forwards',
+      },
+    );
+    revealFlyers.set(attempt.attempt, { clone: flyer, animation });
+    target.setAttribute('data-arriving', 'true');
+    window.setTimeout(() => {
+      target.removeAttribute('data-arriving');
+    }, HAVOC_MULTIPLAYER_REVEAL_SELECTION_MS);
+    void animation.finished
+      .catch(() => {})
+      .finally(() => {
+        flyer.remove();
+        revealFlyers.delete(attempt.attempt);
+        revealDirector.finishSelection(attempt);
+      });
+  }
+
+  function cancelSelectionTransition(attempt: HavocMultiplayerRevealAttempt): void {
+    revealContext.delete(attempt.attempt);
+    const flyer = revealFlyers.get(attempt.attempt);
+    if (flyer === undefined) return;
+    revealFlyers.delete(attempt.attempt);
+    try {
+      flyer.animation.cancel();
+    } catch {}
+    flyer.clone.remove();
   }
 
   async function copyCode(): Promise<void> {
@@ -268,7 +396,7 @@
         <p class="h-eyebrow">Hoop Havoc · Multiplayer</p>
         <h1 class="h-title">Havoc room</h1>
         <p class="hm-subtitle">
-          Best of seven · {phaseLabel} · Room {controller.snapshot.code}
+          Best of seven · {roomVariantLabel} · {phaseLabel} · Room {controller.snapshot.code}
         </p>
       </div>
       {#if phase !== 'lobby' && phase !== 'expired' && phase !== 'integrity-failed'}
@@ -330,6 +458,20 @@
             >
           </div>
           <p class="hm-footnote">Room codes expire after 15 minutes.</p>
+          <dl class="hm-rules">
+            <div>
+              <dt>Draft rules</dt>
+              <dd data-havoc-variant={controller.snapshot.settings.variant}>{roomVariantLabel}</dd>
+            </div>
+            <div>
+              <dt>Draft</dt>
+              <dd>5 rounds · one per position</dd>
+            </div>
+            <div>
+              <dt>Pick timer</dt>
+              <dd>60 seconds</dd>
+            </div>
+          </dl>
         </div>
 
         <div class="h-panel hm-seats">
@@ -412,7 +554,7 @@
       {/if}
 
       <div class="hm-arena">
-        <div class="hm-rail-col">
+        <div class="hm-rail-col" data-havoc-my-lineup>
           <HavocMultiplayerLineupRail
             picks={myPicks}
             title="Your five"
@@ -452,19 +594,25 @@
               {/if}
 
               {#if offer}
-                <ul class="h-cards hm-offer">
-                  {#each offer.cards as card, index (card.cardId)}
-                    <li class="hm-offer-card" data-selected={card.cardId === selectedCardId}>
-                      <span class="hm-offer-key" aria-hidden="true">{index + 1}</span>
-                      <HavocDraftCardView
-                        {card}
-                        mode="effective"
-                        busy={controller.busy || !controller.activeTurn}
-                        onPick={() => void pickCard(card)}
-                      />
-                    </li>
-                  {/each}
-                </ul>
+                {#key offer.offerId}
+                  <ul class="h-cards hm-offer">
+                    {#each offer.cards as card, index (card.cardId)}
+                      <li
+                        class="hm-offer-card"
+                        data-selected={card.cardId === selectedCardId}
+                        style="--hm-reveal-delay: {index * HAVOC_MULTIPLAYER_REVEAL_STAGGER_MS}ms"
+                      >
+                        <span class="hm-offer-key" aria-hidden="true">{index + 1}</span>
+                        <HavocDraftCardView
+                          {card}
+                          mode="effective"
+                          busy={controller.busy || !controller.activeTurn}
+                          onPick={() => void pickCard(card)}
+                        />
+                      </li>
+                    {/each}
+                  </ul>
+                {/key}
                 <p class="hm-keys">
                   Press <kbd>1</kbd>–<kbd>3</kbd> to choose a card, <kbd>Enter</kbd> to draft it.
                 </p>
@@ -807,6 +955,28 @@
     font-size: 11px;
     color: #aab9db;
   }
+  .hm-rules {
+    display: grid;
+    gap: 8px;
+    margin: 8px 0 0;
+    padding-top: 12px;
+    border-top: 1px solid #3c486b;
+  }
+  .hm-rules > div {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 12px;
+  }
+  .hm-rules dt {
+    color: #aab9db;
+  }
+  .hm-rules dd {
+    margin: 0;
+    font-weight: 700;
+    color: #f2f4ff;
+  }
   .hm-seats {
     display: grid;
     gap: 14px;
@@ -977,11 +1147,36 @@
     position: relative;
     display: flex;
     min-width: 0;
+    animation: hm-offer-flip 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation-delay: var(--hm-reveal-delay, 0ms);
+  }
+  @keyframes hm-offer-flip {
+    from {
+      opacity: 0;
+      transform: perspective(900px) translateY(16px) rotateY(-72deg) scale(0.94);
+    }
+    to {
+      opacity: 1;
+      transform: perspective(900px) translateY(0) rotateY(0deg) scale(1);
+    }
   }
   .hm-offer-card[data-selected='true'] {
     border-radius: 24px;
     outline: 3px solid #f290c5;
     outline-offset: 4px;
+  }
+  :global(li[data-arriving='true']) {
+    animation: hm-lineup-arrive 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  @keyframes hm-lineup-arrive {
+    from {
+      transform: scale(1.04);
+      box-shadow: 0 0 0 2px #ffd782;
+    }
+    to {
+      transform: scale(1);
+      box-shadow: 0 0 0 0 rgb(255 215 130 / 0%);
+    }
   }
   .hm-offer-key {
     position: absolute;

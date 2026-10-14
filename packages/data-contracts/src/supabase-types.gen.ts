@@ -776,6 +776,7 @@ export type Database = {
           series: Json | null
           successor_room_id: string | null
           updated_at: string
+          variant: string
           versions: Json
         }
         Insert: {
@@ -803,6 +804,7 @@ export type Database = {
           series?: Json | null
           successor_room_id?: string | null
           updated_at?: string
+          variant?: string
           versions: Json
         }
         Update: {
@@ -830,6 +832,7 @@ export type Database = {
           series?: Json | null
           successor_room_id?: string | null
           updated_at?: string
+          variant?: string
           versions?: Json
         }
         Relationships: [
@@ -1095,7 +1098,7 @@ export type Database = {
       havoc_multiplayer_random_code: { Args: never; Returns: string }
       havoc_multiplayer_rematch: { Args: { p_room_id: string }; Returns: Json }
       havoc_multiplayer_room_create: {
-        Args: { p_versions: Json }
+        Args: { p_variant?: string; p_versions: Json }
         Returns: Json
       }
       havoc_multiplayer_room_join: { Args: { p_code: string }; Returns: Json }

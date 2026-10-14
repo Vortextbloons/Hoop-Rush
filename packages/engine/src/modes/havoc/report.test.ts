@@ -119,7 +119,7 @@ function syntheticStoredGame(
     variant,
     seed: havocGameSeed(locked.runSeed, gameNumber),
     engineVersion: 'm3-engine-v24',
-    rulesVersion: 'havoc-rules-v5',
+    rulesVersion: 'havoc-rules-v6',
     mutationCatalogVersion: 'havoc-mutations-v5',
     profileVersion: locked.profile.profileVersion,
     dataVersion: locked.versionSet.dataVersion,

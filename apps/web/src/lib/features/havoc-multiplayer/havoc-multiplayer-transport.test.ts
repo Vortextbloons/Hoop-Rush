@@ -17,6 +17,7 @@ import {
   HAVOC_MUTATION_DEFINITIONS,
   createHavocCommandEnvironment,
   createRng,
+  defaultHavocMultiplayerDraftSettings,
   replayHavocMultiplayerDraft,
   type HavocCommandEnvironment,
 } from '@hoop-rush/engine';
@@ -55,7 +56,7 @@ vi.mock('@supabase/supabase-js', () => ({
 const ROOM_ID = 'hm-room-1';
 const roomId = idSchema.parse(ROOM_ID);
 const ROOM_COLUMNS =
-  'id, code, code_active, versions, root_seed, phase, revision, command_count, result_digest, confirmed_digest, successor_room_id, deadline_at, deadline_cursor, deadline_participant, deadline_fallback, deadline_pick_ordinal, draft_state, series, broadcast, game_state, created_at, expires_at';
+  'id, code, code_active, variant, versions, root_seed, phase, revision, command_count, result_digest, confirmed_digest, successor_room_id, deadline_at, deadline_cursor, deadline_participant, deadline_fallback, deadline_pick_ordinal, draft_state, series, broadcast, game_state, created_at, expires_at';
 const versions = defaultHavocMultiplayerVersionLocks({
   dataVersion: 'data-v1',
   catalogHash: 'e'.repeat(64),
@@ -110,6 +111,7 @@ function roomRow(overrides: Record<string, unknown> = {}): Record<string, unknow
     id: ROOM_ID,
     code: '4321',
     code_active: true,
+    variant: 'standard',
     versions,
     root_seed: 'a'.repeat(32),
     phase: 'lobby',
@@ -158,10 +160,13 @@ describe('havoc multiplayer supabase transport protocol pins', () => {
     harness.setRpc('havoc_multiplayer_room_create', () => ({ room_id: ROOM_ID, code: '4321' }));
     seedRoom(harness);
 
-    const created = await transport.create({ versions });
+    const created = await transport.create({ variant: 'standard', versions });
 
     expect(harness.rpcCalls).toEqual([
-      { name: 'havoc_multiplayer_room_create', args: { p_versions: versions } },
+      {
+        name: 'havoc_multiplayer_room_create',
+        args: { p_versions: versions, p_variant: 'standard' },
+      },
     ]);
     expect(harness.selectQueries[0]).toMatchObject({
       table: 'havoc_multiplayer_rooms',
@@ -178,10 +183,27 @@ describe('havoc multiplayer supabase transport protocol pins', () => {
     expect(created.code).toBe('4321');
     expect(created.membership).toEqual({ roomId: ROOM_ID, participantId: 'p1', code: '4321' });
     expect(created.snapshot.settings.versions).toEqual(versions);
+    expect(created.snapshot.settings.variant).toBe('standard');
     expect(created.snapshot.members.map((member) => member.participantId)).toEqual(['p1', 'p2']);
     expect(created.snapshot.members[0]?.displayName).toBe('Host');
     expect(created.snapshot.draft).toBeNull();
     expect(created.snapshot.series).toBeNull();
+  });
+
+  it('creates curated rooms with the variant RPC arg', async () => {
+    const { harness, transport } = setupTransport();
+    harness.setRpc('havoc_multiplayer_room_create', () => ({ room_id: ROOM_ID, code: '4321' }));
+    seedRoom(harness, { variant: 'curated' });
+
+    const created = await transport.create({ variant: 'curated', versions });
+
+    expect(harness.rpcCalls).toEqual([
+      {
+        name: 'havoc_multiplayer_room_create',
+        args: { p_versions: versions, p_variant: 'curated' },
+      },
+    ]);
+    expect(created.snapshot.settings.variant).toBe('curated');
   });
 
   it('preview and join keep their RPC names and args', async () => {
@@ -190,6 +212,7 @@ describe('havoc multiplayer supabase transport protocol pins', () => {
       room_id: ROOM_ID,
       phase: 'lobby',
       revision: 1,
+      variant: 'curated',
       versions,
       expires_at: '2026-10-15T12:00:00.000Z',
       created_at: '2026-10-14T11:00:00.000Z',
@@ -203,6 +226,7 @@ describe('havoc multiplayer supabase transport protocol pins', () => {
     const preview = await transport.preview('4321');
     expect(preview.code).toBe('4321');
     expect(preview.phase).toBe('lobby');
+    expect(preview.settings.variant).toBe('curated');
     const joined = await transport.join('4321');
     expect(joined.membership.participantId).toBe('p2');
     expect(joined.membership.code).toBe('4321');
@@ -553,15 +577,31 @@ describe('havoc multiplayer supabase transport protocol pins', () => {
     const rootSeed = 'a'.repeat(32);
     const firstPicker = havocMultiplayerFirstPickerFor(rootSeed);
     const assets = fixtureDraftAssets();
+    const settings = defaultHavocMultiplayerDraftSettings();
     const draft = replayHavocMultiplayerDraft({
       rootSeed: seedSchema.parse(rootSeed),
       catalog: assets.catalog,
       environment: assets.environment,
+      settings,
       commands: [],
     });
     const offer = must(draft.offer, 'generated offer');
     const card = must(offer.cards[0], 'generated card');
     const seasonKey = must(card.source.seasonKey, 'card season');
+    const payload = {
+      kind: 'pick' as const,
+      turnOrdinal: 0,
+      offerId: offer.offerId,
+      cardId: card.cardId,
+      claimKey: { playerId: card.source.playerId, seasonKey },
+    };
+    const expected = replayHavocMultiplayerDraft({
+      rootSeed: seedSchema.parse(rootSeed),
+      catalog: assets.catalog,
+      environment: assets.environment,
+      settings,
+      commands: [payload],
+    });
     seedRoom(harness, {
       phase: 'drafting',
       root_seed: rootSeed,
@@ -573,22 +613,18 @@ describe('havoc multiplayer supabase transport protocol pins', () => {
         command_id: 'pick-0',
         ordinal: 0,
         actor_participant_id: firstPicker,
-        payload: {
-          kind: 'pick',
-          turnOrdinal: 0,
-          offerId: offer.offerId,
-          cardId: card.cardId,
-          claimKey: { playerId: card.source.playerId, seasonKey },
-        },
+        payload,
       },
     ]);
 
     const resumed = await transport.resume(ROOM_ID);
 
+    expect(resumed.snapshot.settings.variant).toBe('standard');
     expect(resumed.snapshot.draft?.turnOrdinal).toBe(1);
     expect(resumed.snapshot.draft?.status).toBe('drafting');
     expect(resumed.snapshot.draft?.picks).toHaveLength(1);
     expect(resumed.snapshot.draft?.offer?.cards).toHaveLength(3);
+    expect(resumed.snapshot.draft?.offer?.offerId).toBe(expected.offer?.offerId);
     expect(harness.selectQueries).toContainEqual(
       expect.objectContaining({
         table: 'havoc_multiplayer_room_commands',

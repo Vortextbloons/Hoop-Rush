@@ -14,6 +14,8 @@ import {
 } from './havoc-draft.ts';
 import { havocClaimKeySchema } from './havoc-profile.ts';
 import {
+  HAVOC_CURATED_RATING_BANDS,
+  HAVOC_CURATED_RATING_BAND_NAMES,
   HAVOC_MULTIPLAYER_REROLLS_PER_PARTICIPANT,
   HAVOC_MULTIPLAYER_SAVE_SCHEMA_VERSION,
   HAVOC_MULTIPLAYER_SERIES_GAMES,
@@ -21,6 +23,19 @@ import {
   HAVOC_MULTIPLAYER_TURNS,
   HAVOC_MULTIPLAYER_VERSION,
 } from './havoc-multiplayer-versions.ts';
+
+export const havocMultiplayerVariantSchema = z.enum(['standard', 'curated']);
+export type HavocMultiplayerVariant = z.infer<typeof havocMultiplayerVariantSchema>;
+export const havocCuratedRatingBandSchema = z.enum(HAVOC_CURATED_RATING_BAND_NAMES);
+export type HavocCuratedRatingBand = z.infer<typeof havocCuratedRatingBandSchema>;
+
+export function havocOverallInCuratedBand(
+  originalOverall: number,
+  band: HavocCuratedRatingBand,
+): boolean {
+  const bounds = HAVOC_CURATED_RATING_BANDS[band];
+  return originalOverall >= bounds.minOverall && originalOverall <= bounds.maxOverall;
+}
 
 export const havocMultiplayerParticipantIdSchema = z.enum(['p1', 'p2']);
 export type HavocMultiplayerParticipantId = z.infer<typeof havocMultiplayerParticipantIdSchema>;
@@ -41,7 +56,7 @@ export type HavocMultiplayerPhase = z.infer<typeof havocMultiplayerPhaseSchema>;
 
 export const havocMultiplayerVersionLocksSchema = z.object({
   schemaVersion: z.literal(HAVOC_MULTIPLAYER_SAVE_SCHEMA_VERSION),
-  multiplayerVersion: z.literal(HAVOC_MULTIPLAYER_VERSION),
+  multiplayerVersion: z.string().min(1).max(64),
   engineVersion: z.string().min(1).max(64),
   rulesVersion: z.string().min(1).max(64),
   mutationCatalogVersion: z.string().min(1).max(64),
@@ -80,6 +95,7 @@ export function defaultHavocMultiplayerVersionLocks(
 
 export const havocMultiplayerRoomSettingsSchema = z.object({
   schemaVersion: z.literal(HAVOC_MULTIPLAYER_SAVE_SCHEMA_VERSION),
+  variant: havocMultiplayerVariantSchema.default('standard'),
   versions: havocMultiplayerVersionLocksSchema,
 });
 export type HavocMultiplayerRoomSettings = z.infer<typeof havocMultiplayerRoomSettingsSchema>;

@@ -4,6 +4,7 @@ import type {
   HavocBattleInput,
   HavocBattleTeamInput,
   HavocCatalog,
+  HavocCuratedRatingBand,
   HavocDraftCard,
   HavocDraftOffer,
   HavocHomeAway,
@@ -13,6 +14,7 @@ import type {
   HavocMultiplayerDraftState,
   HavocMultiplayerOfferStream,
   HavocMultiplayerParticipantId,
+  HavocMultiplayerVariant,
   HavocMutationDefinition,
   HavocMutationId,
   HavocTier,
@@ -26,6 +28,7 @@ import {
   HAVOC_MULTIPLAYER_TURNS,
   HAVOC_MUTATION_CATALOG_VERSION,
   HAVOC_OFFER_SIZE,
+  HAVOC_OFFER_TARGET_RADIUS,
   HAVOC_RULES_VERSION,
   HAVOC_SCHEMA_VERSION,
   POSITIONS,
@@ -41,6 +44,7 @@ import {
   havocMultiplayerOfferSeed,
   havocMultiplayerRerollSeed,
   havocMultiplayerTimeoutSeed,
+  havocOverallInCuratedBand,
   seasonDigestHex,
 } from '@hoop-rush/data-contracts';
 import { compareStrings } from '../../../domain/math.ts';
@@ -51,9 +55,24 @@ import type { HavocCompatibleBundle } from '../compatibility.ts';
 import { enumerateHavocBundles } from '../compatibility.ts';
 import { teamExclusiveMutationIdsOf } from '../mutations.ts';
 import { generateHavocNickname } from '../nicknames.ts';
-import { drawHavocCardTier, materializeHavocBundle } from '../offers.ts';
+import {
+  drawHavocCardTier,
+  enumerateHavocOverallWindows,
+  havocOverallInWindow,
+  materializeHavocBundle,
+} from '../offers.ts';
 import { applyHavocMutationPackage } from '../transform.ts';
+import {
+  havocMultiplayerCuratedAssignments,
+  matchRequirements,
+  personFillsRequirement,
+  type HavocMultiplayerDraftRequirement,
+  type HavocMultiplayerPersonGroup,
+  type HavocMultiplayerSeasonUnit,
+} from './curated.ts';
 import { havocMultiplayerByteDraw } from './seed-parity.ts';
+
+export { havocMultiplayerCuratedAssignments };
 
 export type HavocMultiplayerDraftEnvironment = HavocDraftEnvironment;
 
@@ -73,24 +92,42 @@ export interface HavocMultiplayerDraftCommandOutcome {
   readonly receipt: HavocMultiplayerDraftReceipt;
 }
 
-interface HavocMultiplayerSeasonUnit {
-  readonly seasonKey: string;
-  readonly claimKey: string;
-  readonly playableSlots: readonly Position[];
-  readonly variants: readonly HavocAdaptedCandidate[];
-}
-
-interface HavocMultiplayerPersonGroup {
-  readonly playerId: string;
-  readonly playableSlots: readonly Position[];
-  readonly units: readonly HavocMultiplayerSeasonUnit[];
-}
-
 function pickerFor(
   firstPicker: HavocMultiplayerParticipantId,
   turnOrdinal: number,
 ): HavocMultiplayerParticipantId {
   return turnOrdinal % 2 === 0 ? firstPicker : firstPicker === 'p1' ? 'p2' : 'p1';
+}
+
+function otherParticipant(
+  participantId: HavocMultiplayerParticipantId,
+): HavocMultiplayerParticipantId {
+  return participantId === 'p1' ? 'p2' : 'p1';
+}
+
+export type HavocMultiplayerDraftLogic = 'legacy' | 'balanced';
+
+const HAVOC_MULTIPLAYER_LEGACY_RULES_VERSION = 'havoc-rules-v5';
+
+/**
+ * Rooms created before the balanced-offer release carry the legacy rules
+ * version and must keep the offer algorithm they were drafted under.
+ */
+export function havocMultiplayerDraftLogicOf(rulesVersion: string): HavocMultiplayerDraftLogic {
+  if (rulesVersion === HAVOC_RULES_VERSION) return 'balanced';
+  if (rulesVersion === HAVOC_MULTIPLAYER_LEGACY_RULES_VERSION) return 'legacy';
+  throw new Error(`unsupported havoc multiplayer draft rules version ${rulesVersion}`);
+}
+
+export interface HavocMultiplayerDraftSettings {
+  readonly variant: HavocMultiplayerVariant;
+  readonly rulesVersion: string;
+}
+
+export function defaultHavocMultiplayerDraftSettings(
+  variant: HavocMultiplayerVariant = 'standard',
+): HavocMultiplayerDraftSettings {
+  return { variant, rulesVersion: HAVOC_RULES_VERSION };
 }
 
 function buildPersonGroups(
@@ -232,9 +269,23 @@ export interface GenerateHavocMultiplayerOfferInput {
   readonly offerIndex: number;
   readonly claimedPlayerIds: readonly string[];
   readonly picks: readonly HavocMultiplayerDraftPick[];
+  readonly settings: HavocMultiplayerDraftSettings;
 }
 
 export function generateHavocMultiplayerOffer(
+  input: GenerateHavocMultiplayerOfferInput,
+  environment: HavocMultiplayerDraftEnvironment,
+): HavocDraftOffer {
+  if (havocMultiplayerDraftLogicOf(input.settings.rulesVersion) === 'legacy') {
+    if (input.settings.variant !== 'standard') {
+      throw new Error('the curated havoc draft requires the balanced draft rules');
+    }
+    return generateLegacyHavocMultiplayerOffer(input, environment);
+  }
+  return generateBalancedHavocMultiplayerOffer(input, environment);
+}
+
+function generateLegacyHavocMultiplayerOffer(
   input: GenerateHavocMultiplayerOfferInput,
   environment: HavocMultiplayerDraftEnvironment,
 ): HavocDraftOffer {
@@ -399,10 +450,256 @@ export function generateHavocMultiplayerOffer(
   });
 }
 
+function generateBalancedHavocMultiplayerOffer(
+  input: GenerateHavocMultiplayerOfferInput,
+  environment: HavocMultiplayerDraftEnvironment,
+): HavocDraftOffer {
+  const { catalog, rootSeed, participantId, turnOrdinal, offerIndex, claimedPlayerIds, picks } =
+    input;
+  const { variant } = input.settings;
+  if (!Number.isInteger(turnOrdinal) || turnOrdinal < 0 || turnOrdinal >= HAVOC_MULTIPLAYER_TURNS) {
+    throw new Error(
+      `havoc multiplayer offer turn must be an integer in 0..${String(HAVOC_MULTIPLAYER_TURNS - 1)} (got ${String(turnOrdinal)})`,
+    );
+  }
+  if (!Number.isInteger(offerIndex) || offerIndex < 0 || offerIndex > 1) {
+    throw new Error(`havoc multiplayer offer index must be 0 or 1 (got ${String(offerIndex)})`);
+  }
+  const roundIndex = Math.floor(turnOrdinal / 2);
+  const round = roundIndex + 1;
+  const slot = POSITIONS[roundIndex];
+  if (slot === undefined) {
+    throw new Error(`havoc multiplayer turn ${String(turnOrdinal)} has no draft slot`);
+  }
+
+  const firstPicker = turnOrdinal % 2 === 0 ? participantId : otherParticipant(participantId);
+  const assignments =
+    variant === 'curated' ? havocMultiplayerCuratedAssignments(rootSeed, environment) : null;
+  const bandFor = (
+    participant: HavocMultiplayerParticipantId,
+    draftRoundIndex: number,
+  ): HavocCuratedRatingBand | null => {
+    if (assignments === null) return null;
+    return assignments[participant][draftRoundIndex] ?? null;
+  };
+  const currentBand = bandFor(participantId, roundIndex);
+
+  const persons = buildPersonGroups(catalog, new Set(claimedPlayerIds));
+  const remainingRequirements: HavocMultiplayerDraftRequirement[] = [];
+  for (let turn = turnOrdinal + 1; turn < HAVOC_MULTIPLAYER_TURNS; turn += 1) {
+    const picker = pickerFor(firstPicker, turn);
+    const futureRoundIndex = Math.floor(turn / 2);
+    const futureSlot = POSITIONS[futureRoundIndex];
+    if (futureSlot === undefined) continue;
+    remainingRequirements.push({ slot: futureSlot, band: bandFor(picker, futureRoundIndex) });
+  }
+
+  const fillCache = persons.map((person) => [
+    personFillsRequirement(person, { slot, band: currentBand }),
+    ...remainingRequirements.map((requirement) => personFillsRequirement(person, requirement)),
+  ]);
+  const fills = (personIndex: number, requirementIndex: number): boolean =>
+    fillCache[personIndex]?.[requirementIndex + 1] === true;
+
+  const candidates: {
+    readonly person: HavocMultiplayerPersonGroup;
+    readonly overalls: readonly number[];
+  }[] = [];
+  persons.forEach((person, personIndex) => {
+    if (fillCache[personIndex]?.[0] !== true) return;
+    if (!matchRequirements(remainingRequirements, persons, fills, personIndex)) return;
+    const overalls: number[] = [];
+    for (const unit of person.units) {
+      for (const version of unit.variants) {
+        if (!version.positions.includes(slot)) continue;
+        if (
+          currentBand !== null &&
+          !havocOverallInCuratedBand(version.originalOverall, currentBand)
+        ) {
+          continue;
+        }
+        overalls.push(version.originalOverall);
+      }
+    }
+    if (overalls.length === 0) return;
+    candidates.push({ person, overalls });
+  });
+
+  const bandLabel = currentBand === null ? '' : `${currentBand} `;
+  if (candidates.length < HAVOC_OFFER_SIZE) {
+    throw new HavocCatalogCoverageError(
+      slot,
+      `only ${String(candidates.length)} eligible ${bandLabel}people preserve two-team completion`,
+    );
+  }
+
+  const windows = enumerateHavocOverallWindows(candidates.map((candidate) => candidate.overalls));
+  if (windows.length === 0) {
+    throw new HavocCatalogCoverageError(
+      slot,
+      `no ±${String(HAVOC_OFFER_TARGET_RADIUS)} target window holds ${String(HAVOC_OFFER_SIZE)} eligible ${bandLabel}claims`,
+    );
+  }
+  const windowRng = environment.rngFactory(
+    offerStreamSeed(rootSeed, participantId, turnOrdinal, offerIndex, 'window'),
+  );
+  const selectedWindow = windowRng.pick(windows);
+
+  const inOfferRange = (originalOverall: number): boolean =>
+    havocOverallInWindow(originalOverall, selectedWindow) &&
+    (currentBand === null || havocOverallInCuratedBand(originalOverall, currentBand));
+
+  const playersRng = environment.rngFactory(
+    offerStreamSeed(rootSeed, participantId, turnOrdinal, offerIndex, 'players'),
+  );
+  const versionRng = environment.rngFactory(
+    offerStreamSeed(rootSeed, participantId, turnOrdinal, offerIndex, 'version'),
+  );
+  const tierRng = environment.rngFactory(
+    offerStreamSeed(rootSeed, participantId, turnOrdinal, offerIndex, 'tier'),
+  );
+  const mutationsRng = environment.rngFactory(
+    offerStreamSeed(rootSeed, participantId, turnOrdinal, offerIndex, 'mutations'),
+  );
+  const physicalRng = environment.rngFactory(
+    offerStreamSeed(rootSeed, participantId, turnOrdinal, offerIndex, 'physical'),
+  );
+  const specialistRng = environment.rngFactory(
+    offerStreamSeed(rootSeed, participantId, turnOrdinal, offerIndex, 'specialist'),
+  );
+  const nicknameRng = environment.rngFactory(
+    offerStreamSeed(rootSeed, participantId, turnOrdinal, offerIndex, 'nickname'),
+  );
+
+  const pool = candidates.filter((candidate) =>
+    candidate.overalls.some((originalOverall) =>
+      havocOverallInWindow(originalOverall, selectedWindow),
+    ),
+  );
+  if (pool.length < HAVOC_OFFER_SIZE) {
+    throw new Error('havoc multiplayer offer candidate pool underflow');
+  }
+  const chosen: {
+    readonly person: HavocMultiplayerPersonGroup;
+    readonly unit: HavocMultiplayerSeasonUnit;
+    readonly version: HavocAdaptedCandidate;
+  }[] = [];
+  for (let cardIndex = 0; cardIndex < HAVOC_OFFER_SIZE; cardIndex += 1) {
+    const swapIndex = playersRng.nextInt(cardIndex, pool.length - 1);
+    swapAt(pool, cardIndex, swapIndex);
+    const candidate = pool[cardIndex];
+    if (candidate === undefined) {
+      throw new Error('havoc multiplayer offer person pool underflow');
+    }
+    const units = candidate.person.units.filter((unit) =>
+      unit.variants.some(
+        (version) => version.positions.includes(slot) && inOfferRange(version.originalOverall),
+      ),
+    );
+    if (units.length === 0) {
+      throw new Error(
+        `havoc multiplayer offer has no ${slot} season for ${candidate.person.playerId}`,
+      );
+    }
+    const unit = playersRng.pick(units);
+    const variants = unit.variants.filter(
+      (version) => version.positions.includes(slot) && inOfferRange(version.originalOverall),
+    );
+    if (variants.length === 0) {
+      throw new Error(`havoc multiplayer offer has no ${slot} variant for ${unit.claimKey}`);
+    }
+    chosen.push({ person: candidate.person, unit, version: versionRng.pick(variants) });
+  }
+
+  const ownedExclusive = ownedTeamExclusiveMutationIdsOfPicks(
+    picks,
+    participantId,
+    environment.definitions,
+  );
+  const bundlesByTier = new Map<HavocTier, readonly HavocCompatibleBundle[]>([
+    [1, enumerateHavocBundles(environment.definitions, 1)],
+    [2, enumerateHavocBundles(environment.definitions, 2)],
+    [
+      3,
+      enumerateHavocBundles(environment.definitions, 3).filter(
+        (bundle) =>
+          ownedExclusive.length === 0 ||
+          bundle.mutationIds.every((mutationId) => !ownedExclusive.includes(mutationId)),
+      ),
+    ],
+  ]);
+
+  const prepared: Array<Omit<HavocDraftCard, 'offerId'>> = [];
+  for (let cardIndex = 0; cardIndex < HAVOC_OFFER_SIZE; cardIndex += 1) {
+    const choice = chosen[cardIndex];
+    if (choice === undefined) throw new Error('havoc multiplayer offer card choice underflow');
+    const tier = drawHavocCardTier(tierRng);
+    const bundles = bundlesByTier.get(tier) ?? [];
+    if (bundles.length === 0) {
+      throw new Error(`no compatible havoc mutation bundles are defined for tier ${String(tier)}`);
+    }
+    const bundle = mutationsRng.pick(bundles);
+    const mutations = materializeHavocBundle(
+      bundle,
+      physicalRng,
+      specialistRng,
+      environment.definitions,
+    );
+    const nickname = generateHavocNickname({ slot, tier, mutations }, nicknameRng);
+    const effective = applyHavocMutationPackage(choice.version, mutations, { slot });
+    const cardId = `hvc-${seasonDigestHex(
+      canonicalJson({
+        rootSeed,
+        participantId,
+        turnOrdinal,
+        offerIndex,
+        cardIndex,
+        slot,
+        variant,
+        playerId: choice.person.playerId,
+        seasonKey: choice.unit.seasonKey,
+        playerVersionId: choice.version.playerVersionId,
+        tier,
+        mutations,
+      }),
+    )}`;
+    prepared.push({
+      cardId,
+      cardIndex,
+      slot,
+      tier,
+      source: choice.version,
+      mutations,
+      effective,
+      nickname,
+    });
+  }
+
+  const offerId = `hvo-${seasonDigestHex(
+    canonicalJson({
+      rootSeed,
+      participantId,
+      turnOrdinal,
+      offerIndex,
+      slot,
+      variant,
+      cardIds: prepared.map((card) => card.cardId),
+    }),
+  )}`;
+  return havocDraftOfferSchema.parse({
+    offerId,
+    offerIndex,
+    round,
+    slot,
+    cards: prepared.map((card) => ({ ...card, offerId })),
+  });
+}
+
 export function createHavocMultiplayerDraft(
   rootSeed: Seed,
   catalog: HavocCatalog,
   environment: HavocMultiplayerDraftEnvironment,
+  settings: HavocMultiplayerDraftSettings,
 ): HavocMultiplayerDraftState {
   const firstPicker = havocMultiplayerByteDraw(rootSeed, 0);
   const offer = generateHavocMultiplayerOffer(
@@ -414,6 +711,7 @@ export function createHavocMultiplayerDraft(
       offerIndex: 0,
       claimedPlayerIds: [],
       picks: [],
+      settings,
     },
     environment,
   );
@@ -454,6 +752,7 @@ function applyPick(
   payload: Extract<HavocMultiplayerDraftCommandPayload, { kind: 'pick' | 'timeout-pick' }>,
   catalog: HavocCatalog,
   environment: HavocMultiplayerDraftEnvironment,
+  settings: HavocMultiplayerDraftSettings,
 ): HavocMultiplayerDraftCommandOutcome {
   const offer = state.offer;
   const activeParticipantId = state.activeParticipantId;
@@ -506,6 +805,7 @@ function applyPick(
       offerIndex: 0,
       claimedPlayerIds,
       picks,
+      settings,
     },
     environment,
   );
@@ -527,6 +827,7 @@ function applyReroll(
   payload: Extract<HavocMultiplayerDraftCommandPayload, { kind: 'reroll' }>,
   catalog: HavocCatalog,
   environment: HavocMultiplayerDraftEnvironment,
+  settings: HavocMultiplayerDraftSettings,
 ): HavocMultiplayerDraftCommandOutcome {
   const offer = state.offer;
   const activeParticipantId = state.activeParticipantId;
@@ -543,6 +844,7 @@ function applyReroll(
       offerIndex: 1,
       claimedPlayerIds: state.claimedPlayerIds,
       picks: state.picks,
+      settings,
     },
     environment,
   );
@@ -565,6 +867,7 @@ export function applyHavocMultiplayerDraftCommand(
   payload: HavocMultiplayerCommandPayload,
   catalog: HavocCatalog,
   environment: HavocMultiplayerDraftEnvironment,
+  settings: HavocMultiplayerDraftSettings,
 ): HavocMultiplayerDraftCommandOutcome {
   if (payload.kind !== 'pick' && payload.kind !== 'reroll' && payload.kind !== 'timeout-pick') {
     return reject(state, 'unknown-command');
@@ -575,22 +878,28 @@ export function applyHavocMultiplayerDraftCommand(
     return reject(state, 'offer-mismatch');
   }
   if (payload.kind === 'reroll') {
-    return applyReroll(state, payload, catalog, environment);
+    return applyReroll(state, payload, catalog, environment, settings);
   }
-  return applyPick(state, payload, catalog, environment);
+  return applyPick(state, payload, catalog, environment, settings);
 }
 
 export interface HavocMultiplayerDraftReplayInput {
   readonly rootSeed: Seed;
   readonly catalog: HavocCatalog;
   readonly environment: HavocMultiplayerDraftEnvironment;
+  readonly settings: HavocMultiplayerDraftSettings;
   readonly commands: readonly HavocMultiplayerCommandPayload[];
 }
 
 export function replayHavocMultiplayerDraft(
   input: HavocMultiplayerDraftReplayInput,
 ): HavocMultiplayerDraftState {
-  let state = createHavocMultiplayerDraft(input.rootSeed, input.catalog, input.environment);
+  let state = createHavocMultiplayerDraft(
+    input.rootSeed,
+    input.catalog,
+    input.environment,
+    input.settings,
+  );
   for (const payload of input.commands) {
     if (payload.kind !== 'pick' && payload.kind !== 'reroll' && payload.kind !== 'timeout-pick') {
       continue;
@@ -600,6 +909,7 @@ export function replayHavocMultiplayerDraft(
       payload,
       input.catalog,
       input.environment,
+      input.settings,
     );
     if (!outcome.receipt.accepted) {
       throw new Error(

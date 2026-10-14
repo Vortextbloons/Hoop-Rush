@@ -280,6 +280,7 @@ async function createHarness(options?: {
   rng?: () => number;
   seed?: string;
   lockOverrides?: Partial<HavocMultiplayerVersionLocks>;
+  variant?: 'standard' | 'curated';
 }): Promise<Harness> {
   let now = START_MS;
   const transport = createInMemoryHavocMultiplayerTransport({
@@ -289,7 +290,10 @@ async function createHarness(options?: {
   });
   const assets = buildAssets();
   const locks = { ...locksFor(assets.versionSet), ...options?.lockOverrides };
-  const created = await transport.create({ versions: locks });
+  const created = await transport.create({
+    variant: options?.variant ?? 'standard',
+    versions: locks,
+  });
   await transport.join(created.code);
   const repository = new FakeHavocMultiplayerRepository();
   const runner = new FakeHavocRunner();
@@ -573,6 +577,33 @@ describe('HavocMultiplayerSession lifecycle', () => {
       'This room was created with different engine or data versions.',
     );
     expect(refetch).not.toHaveBeenCalled();
+    h.session.dispose();
+  });
+
+  it('refuses rooms from a previous multiplayer version', async () => {
+    const h = await createHarness({
+      seed: ROOM_SEED,
+      lockOverrides: { multiplayerVersion: 'havoc-multiplayer-v1' },
+    });
+
+    await h.session.attach(h.roomId);
+
+    expect(h.session.getSnapshot().error).toBe(
+      'This room was created with different engine or data versions.',
+    );
+    h.session.dispose();
+  });
+
+  it('creates curated rooms through the session', async () => {
+    const h = await createHarness({ seed: ROOM_SEED });
+
+    const created = await h.session.createRoom('curated');
+
+    expect(created).not.toBeNull();
+    if (created === null) return;
+    const resumed = await h.transport.resume(created.roomId);
+    expect(resumed.snapshot.settings.variant).toBe('curated');
+    expect(resumed.snapshot.settings.versions.multiplayerVersion).toBe('havoc-multiplayer-v2');
     h.session.dispose();
   });
 });

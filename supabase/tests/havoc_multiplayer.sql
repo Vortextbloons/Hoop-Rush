@@ -7,7 +7,7 @@
 -- scratch table, so pgTAP state is never role-switched.
 
 begin;
-select plan(191);
+select plan(199);
 
 create function public.hm_pgtap_has_policy(p_schema text, p_table text, p_policy text)
 returns boolean
@@ -30,6 +30,7 @@ select has_table('public', 'havoc_multiplayer_verification_receipts', 'verificat
 select has_table('public', 'havoc_multiplayer_server_versions', 'server versions exists');
 
 select col_type_is('public', 'havoc_multiplayer_rooms', 'code', 'text', 'code is text preserving leading zeroes');
+select col_type_is('public', 'havoc_multiplayer_rooms', 'variant', 'text', 'variant is text');
 select col_type_is('public', 'havoc_multiplayer_rooms', 'draft_state', 'jsonb', 'draft_state is jsonb');
 select col_type_is('public', 'havoc_multiplayer_room_members', 'next_game_ready', 'smallint', 'next_game_ready is smallint');
 select col_type_is('public', 'havoc_multiplayer_server_versions', 'value', 'text', 'server version values are text');
@@ -52,6 +53,15 @@ select ok(
       and c.conname = 'havoc_multiplayer_rooms_phase_check' and c.contype = 'c'
   ),
   'phase check');
+select ok(
+  exists (
+    select 1 from pg_constraint c
+    join pg_class t on t.oid = c.conrelid
+    join pg_namespace n on n.oid = t.relnamespace
+    where n.nspname = 'public' and t.relname = 'havoc_multiplayer_rooms'
+      and c.conname = 'havoc_multiplayer_rooms_variant_check' and c.contype = 'c'
+  ),
+  'variant check');
 
 select has_index('public', 'havoc_multiplayer_rooms', 'havoc_multiplayer_rooms_active_code_uidx', 'partial unique active code index exists');
 select has_index('public', 'havoc_multiplayer_room_commands', 'havoc_multiplayer_room_commands_room_ordinal_idx', 'command ordinal index exists');
@@ -105,7 +115,7 @@ select is(
   (select relrowsecurity from pg_class where oid = 'public.havoc_multiplayer_server_versions'::regclass),
   true, 'server versions have RLS enabled');
 
-select has_function('public', 'havoc_multiplayer_room_create', array['jsonb'], 'create exists');
+select has_function('public', 'havoc_multiplayer_room_create', array['jsonb','text'], 'create exists');
 select has_function('public', 'havoc_multiplayer_room_preview', array['text'], 'preview exists');
 select has_function('public', 'havoc_multiplayer_room_join', array['text'], 'join exists');
 select has_function('public', 'havoc_multiplayer_command_submit', array['uuid','text','integer','jsonb'], 'command submit exists');
@@ -124,16 +134,16 @@ select has_function('public', 'havoc_multiplayer_cron_tick', array[]::text[], 'c
 select has_function('public', 'havoc_multiplayer_random_code', array[]::text[], 'cryptographic room-code generator exists');
 
 select is(
-  has_function_privilege('authenticated', 'public.havoc_multiplayer_room_create(jsonb)', 'EXECUTE'),
+  has_function_privilege('authenticated', 'public.havoc_multiplayer_room_create(jsonb, text)', 'EXECUTE'),
   true, 'authenticated can create havoc rooms');
 select is(
-  has_function_privilege('anon', 'public.havoc_multiplayer_room_create(jsonb)', 'EXECUTE'),
+  has_function_privilege('anon', 'public.havoc_multiplayer_room_create(jsonb, text)', 'EXECUTE'),
   false, 'anon cannot create havoc rooms');
 select is(
   (select count(*)::int
    from pg_proc p
    cross join lateral aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) acl
-   where p.oid = 'public.havoc_multiplayer_room_create(jsonb)'::regprocedure
+   where p.oid = 'public.havoc_multiplayer_room_create(jsonb, text)'::regprocedure
      and acl.grantee = 0
      and acl.privilege_type = 'EXECUTE'),
   0, 'room creation is not executable by PUBLIC');
@@ -172,7 +182,7 @@ select is(
   'p2', 'home court derivation matches the frozen root seed byte parity');
 select is(
   (select value from public.havoc_multiplayer_server_versions where key = 'multiplayerVersion'),
-  'havoc-multiplayer-v1', 'server pins havoc-multiplayer-v1');
+  'havoc-multiplayer-v2', 'server pins havoc-multiplayer-v2');
 
 -- 2. Behavioral harness.
 create table public.hm_pgtap_ctx (name text primary key, value text);
@@ -221,7 +231,7 @@ as $$
 $$;
 
 insert into public.hm_pgtap_ctx (name, value) values
-  ('versions', '{"schemaVersion":1,"engineVersion":"engine-v1","rulesVersion":"havoc-rules-v5","mutationCatalogVersion":"havoc-mutations-v5","profileVersion":"profile-v1","dataVersion":"data-v1","catalogVersion":"catalog-v1","catalogHash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","profileHash":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","multiplayerVersion":"havoc-multiplayer-v1"}'),
+  ('versions', '{"schemaVersion":1,"engineVersion":"engine-v1","rulesVersion":"havoc-rules-v6","mutationCatalogVersion":"havoc-mutations-v5","profileVersion":"profile-v1","dataVersion":"data-v1","catalogVersion":"catalog-v1","catalogHash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","profileHash":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","multiplayerVersion":"havoc-multiplayer-v2"}'),
   ('uid_a1', '00000000-0000-4000-8000-000000000001'),
   ('uid_a2', '00000000-0000-4000-8000-000000000002'),
   ('uid_b1', '00000000-0000-4000-8000-000000000003'),
@@ -241,7 +251,8 @@ begin
     jsonb_set(
       (select value::jsonb from public.hm_pgtap_ctx where name = 'versions'),
       '{multiplayerVersion}', '"havoc-multiplayer-v9"'
-    )
+    ),
+    'standard'
   );
   insert into public.hm_pgtap_ctx (name, value) values ('create_lock_error', 'none');
 exception when others then
@@ -253,12 +264,31 @@ select is(
   '22023',
   'unsupported multiplayerVersion lock is rejected at create');
 
+set local role authenticated;
+select public.hm_pgtap_claim((select value from public.hm_pgtap_ctx where name = 'uid_a1'));
+do $$
+begin
+  perform public.havoc_multiplayer_room_create(
+    (select value::jsonb from public.hm_pgtap_ctx where name = 'versions'),
+    'bogus'
+  );
+  insert into public.hm_pgtap_ctx (name, value) values ('create_variant_error', 'none');
+exception when others then
+  insert into public.hm_pgtap_ctx (name, value) values ('create_variant_error', sqlstate);
+end $$;
+reset role;
+select is(
+  (select value from public.hm_pgtap_ctx where name = 'create_variant_error'),
+  '22023',
+  'an unknown draft variant is rejected at create');
+
 -- 4. Valid create -> preview -> join -> rejoin -> seat limit.
 set local role authenticated;
 select public.hm_pgtap_claim((select value from public.hm_pgtap_ctx where name = 'uid_a1'));
 with created as (
   select public.havoc_multiplayer_room_create(
-    (select value::jsonb from public.hm_pgtap_ctx where name = 'versions')
+    (select value::jsonb from public.hm_pgtap_ctx where name = 'versions'),
+    'curated'
   ) as r
 )
 insert into public.hm_pgtap_ctx (name, value)
@@ -269,17 +299,24 @@ reset role;
 select ok(
   (select value from public.hm_pgtap_ctx where name = 'room_a') is not null,
   'room A is created with server-locked versions');
+select is(
+  (select variant from public.havoc_multiplayer_rooms
+    where id = (select value::uuid from public.hm_pgtap_ctx where name = 'room_a')),
+  'curated', 'room A keeps the curated draft variant');
 
 set local role authenticated;
 select public.hm_pgtap_claim((select value from public.hm_pgtap_ctx where name = 'uid_a2'));
 insert into public.hm_pgtap_ctx (name, value)
 select 'preview_a', public.havoc_multiplayer_room_preview(
-  (select value from public.hm_pgtap_ctx where name = 'code_a'))->>'room_id';
+  (select value from public.hm_pgtap_ctx where name = 'code_a'))::text;
 reset role;
 select is(
-  (select value from public.hm_pgtap_ctx where name = 'preview_a'),
+  (select value::jsonb->>'room_id' from public.hm_pgtap_ctx where name = 'preview_a'),
   (select value from public.hm_pgtap_ctx where name = 'room_a'),
   'preview returns the room without granting access');
+select is(
+  (select value::jsonb->>'variant' from public.hm_pgtap_ctx where name = 'preview_a'),
+  'curated', 'preview reports the draft variant');
 
 set local role authenticated;
 select public.hm_pgtap_claim((select value from public.hm_pgtap_ctx where name = 'uid_stranger'));
@@ -971,13 +1008,18 @@ select is(
   (select count(*)::int from public.havoc_multiplayer_room_members
     where room_id = (select value::uuid from public.hm_pgtap_ctx where name = 'room_s')),
   1, 'only the rematching seat is carried into the successor');
+select is(
+  (select variant from public.havoc_multiplayer_rooms
+    where id = (select value::uuid from public.hm_pgtap_ctx where name = 'room_s')),
+  'curated', 'the successor keeps the draft variant');
 
 -- 13. Mismatching proposals fail the room (room B).
 set local role authenticated;
 select public.hm_pgtap_claim((select value from public.hm_pgtap_ctx where name = 'uid_b1'));
 with created as (
   select public.havoc_multiplayer_room_create(
-    (select value::jsonb from public.hm_pgtap_ctx where name = 'versions')
+    (select value::jsonb from public.hm_pgtap_ctx where name = 'versions'),
+    'standard'
   ) as r
 )
 insert into public.hm_pgtap_ctx (name, value)
@@ -1046,7 +1088,8 @@ set local role authenticated;
 select public.hm_pgtap_claim((select value from public.hm_pgtap_ctx where name = 'uid_c1'));
 with created as (
   select public.havoc_multiplayer_room_create(
-    (select value::jsonb from public.hm_pgtap_ctx where name = 'versions')
+    (select value::jsonb from public.hm_pgtap_ctx where name = 'versions'),
+    'standard'
   ) as r
 )
 insert into public.hm_pgtap_ctx (name, value)
@@ -1127,7 +1170,8 @@ set local role authenticated;
 select public.hm_pgtap_claim((select value from public.hm_pgtap_ctx where name = 'uid_c1'));
 with created as (
   select public.havoc_multiplayer_room_create(
-    (select value::jsonb from public.hm_pgtap_ctx where name = 'versions')
+    (select value::jsonb from public.hm_pgtap_ctx where name = 'versions'),
+    'standard'
   ) as r
 )
 insert into public.hm_pgtap_ctx (name, value)
@@ -1160,6 +1204,13 @@ select is(
 select is(
   (select value::jsonb->>'gameKind' from public.hm_pgtap_ctx where name = 'legacy_c'),
   'havoc', 'the legacy lookup reports the havoc game kind');
+select is(
+  (select value::jsonb->>'variant' from public.hm_pgtap_ctx where name = 'legacy_c'),
+  (
+    select variant from public.havoc_multiplayer_rooms
+    where id = (select value::uuid from public.hm_pgtap_ctx where name = 'room_c')
+  ),
+  'the legacy lookup reports the draft variant');
 select is(
   (select value::jsonb->>'gameRoomId' from public.hm_pgtap_ctx where name = 'legacy_c'),
   (select value from public.hm_pgtap_ctx where name = 'room_c'),
@@ -1259,6 +1310,7 @@ with started as (
     'expectedRevision', 1,
     'settings', jsonb_build_object(
       'gameKind', 'havoc',
+      'variant', 'curated',
       'versions', (select value::jsonb from public.hm_pgtap_ctx where name = 'versions')))) as r
 )
 insert into public.hm_pgtap_ctx (name, value)
@@ -1267,6 +1319,10 @@ reset role;
 select is(
   (select value::jsonb->>'gameKind' from public.hm_pgtap_ctx where name = 'lobby_start_e'),
   'havoc', 'the lobby switches to the havoc game kind');
+select is(
+  (select variant from public.havoc_multiplayer_rooms
+    where id = ((select value::jsonb->>'gameRoomId' from public.hm_pgtap_ctx where name = 'lobby_start_e')::uuid)),
+  'curated', 'the lobby carries the havoc draft variant');
 select is(
   (select value::jsonb->>'code' from public.hm_pgtap_ctx where name = 'lobby_start_e'),
   (select value from public.hm_pgtap_ctx where name = 'lobby_code_e'),

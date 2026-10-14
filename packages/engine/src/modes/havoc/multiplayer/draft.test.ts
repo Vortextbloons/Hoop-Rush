@@ -10,6 +10,7 @@ import type {
   Seed,
 } from '@hoop-rush/data-contracts';
 import {
+  HAVOC_OFFER_TARGET_RADIUS,
   PLAYER_VERSION_ID_VERSION,
   POSITION_NORMALIZATION_VERSION,
   POSITIONS,
@@ -20,6 +21,7 @@ import {
   canonicalJson,
   havocMultiplayerDraftStateSchema,
   havocMultiplayerGameSeed,
+  havocOverallInCuratedBand,
   playerIdSchema,
   playerVersionId,
   seasonDraftCatalogSchema,
@@ -36,6 +38,7 @@ import {
   buildSeasonDraftCandidate,
 } from '@hoop-rush/test-fixtures';
 import { AdaptHavocCatalog } from '../catalog.ts';
+import { HavocCatalogCoverageError } from '../api.ts';
 import {
   HAVOC_TEST_RUN_SEED,
   buildHavocCatalogFixture,
@@ -46,19 +49,24 @@ import {
 import type {
   HavocMultiplayerDraftCommandPayload,
   HavocMultiplayerDraftEnvironment,
+  HavocMultiplayerDraftSettings,
 } from './draft.ts';
 import {
   applyHavocMultiplayerDraftCommand,
   buildHavocMultiplayerGameInput,
   buildHavocMultiplayerTeam,
   createHavocMultiplayerDraft,
+  defaultHavocMultiplayerDraftSettings,
   generateHavocMultiplayerOffer,
+  havocMultiplayerCuratedAssignments,
+  havocMultiplayerDraftLogicOf,
   havocMultiplayerTimeoutPick,
   replayHavocMultiplayerDraft,
 } from './draft.ts';
 
 const fixture = buildHavocCatalogFixture();
 const environment = buildHavocEnvironmentFixture(fixture.adapted);
+const SETTINGS = defaultHavocMultiplayerDraftSettings();
 
 function testSeed(value: string): Seed {
   return seedSchema.parse(seedFromString(value));
@@ -196,12 +204,24 @@ function personFixtureCandidates(): SeasonDraftCandidate[] {
       playable: ['PG', 'SG', 'SF', 'PF', 'C'],
       overall: 72,
     }),
+    customCandidate({
+      playerId: 'p-wing',
+      seasonKey: '1995-96',
+      franchiseId: 'bulls',
+      index: 4,
+      playable: ['PG', 'SG', 'SF', 'PF', 'C'],
+      overall: 71,
+    }),
+    customCandidate({
+      playerId: 'p-anchor',
+      seasonKey: '1995-96',
+      franchiseId: 'heat',
+      index: 5,
+      playable: ['PG', 'SG', 'SF', 'PF', 'C'],
+      overall: 71,
+    }),
     ...fillerCandidates('p-fill', POSITION_FILLERS, 10, 60),
   ];
-}
-
-function draftablePersonFixtureCandidates(): SeasonDraftCandidate[] {
-  return [...personFixtureCandidates(), ...fillerCandidates('p-more', POSITION_FILLERS, 40, 75)];
 }
 
 function lowOverallCandidates(): SeasonDraftCandidate[] {
@@ -217,6 +237,81 @@ function lowOverallCandidates(): SeasonDraftCandidate[] {
     ...fillerCandidates('p-fill', POSITION_FILLERS, 10, 60),
   ];
 }
+
+const CURATED_POSITIONS: readonly Position[] = ['PG', 'SG', 'SF', 'PF', 'C'];
+
+function curatedBandCandidates(overalls: readonly number[]): SeasonDraftCandidate[] {
+  const candidates: SeasonDraftCandidate[] = [];
+  let index = 0;
+  for (const position of CURATED_POSITIONS) {
+    for (const overall of overalls) {
+      candidates.push(
+        customCandidate({
+          playerId: `p-${position.toLowerCase()}-${String(overall)}-${String(index)}`,
+          seasonKey: '1995-96',
+          franchiseId: index % 2 === 0 ? 'lakers' : 'celtics',
+          index,
+          playable: [position],
+          overall,
+        }),
+      );
+      index += 1;
+    }
+  }
+  return candidates;
+}
+
+function curatedCandidates(): SeasonDraftCandidate[] {
+  return curatedBandCandidates([95, 95, 95, 95, 85, 85, 85, 85, 75, 75, 75, 75]);
+}
+
+function curatedThinCandidates(): SeasonDraftCandidate[] {
+  return curatedBandCandidates([55, 55, 55, 55, 55, 55, 55, 55]);
+}
+
+function exclusionCandidates(): SeasonDraftCandidate[] {
+  const candidates: SeasonDraftCandidate[] = [];
+  let index = 0;
+  for (const position of CURATED_POSITIONS) {
+    for (const overall of [60, 61, 62, 63, 75, 76, 77, 78]) {
+      candidates.push(
+        customCandidate({
+          playerId: `p-${position.toLowerCase()}-fill-${String(overall)}`,
+          seasonKey: '1995-96',
+          franchiseId: index % 2 === 0 ? 'lakers' : 'celtics',
+          index,
+          playable: [position],
+          overall,
+        }),
+      );
+      index += 1;
+    }
+  }
+  candidates.push(
+    customCandidate({
+      playerId: 'p-shared',
+      seasonKey: '1995-96',
+      franchiseId: 'lakers',
+      index,
+      playable: ['PG', 'SG', 'SF', 'PF', 'C'],
+      overall: 76,
+    }),
+  );
+  index += 1;
+  candidates.push(
+    customCandidate({
+      playerId: 'p-shared',
+      seasonKey: '1996-97',
+      franchiseId: 'celtics',
+      index,
+      playable: ['PG', 'SG', 'SF', 'PF', 'C'],
+      overall: 77,
+    }),
+  );
+  return candidates;
+}
+
+const curatedFixture = adaptedFixture(customCatalog(curatedCandidates()));
 
 type MultiplayerPickPayload = Extract<HavocMultiplayerCommandPayload, { kind: 'pick' }>;
 
@@ -239,12 +334,13 @@ function playFullDraft(
   rootSeed: Seed,
   catalog: HavocCatalog,
   draftEnvironment: HavocMultiplayerDraftEnvironment,
+  settings: HavocMultiplayerDraftSettings = SETTINGS,
 ): {
   readonly state: HavocMultiplayerDraftState;
   readonly commands: HavocMultiplayerDraftCommandPayload[];
   readonly offers: HavocDraftOffer[];
 } {
-  let state = createHavocMultiplayerDraft(rootSeed, catalog, draftEnvironment);
+  let state = createHavocMultiplayerDraft(rootSeed, catalog, draftEnvironment, settings);
   const commands: HavocMultiplayerDraftCommandPayload[] = [];
   const offers: HavocDraftOffer[] = [];
   while (state.status === 'drafting') {
@@ -252,7 +348,13 @@ function playFullDraft(
     if (offer === null) throw new Error('drafting state has no offer');
     offers.push(offer);
     const payload = firstCardPayload(state);
-    const outcome = applyHavocMultiplayerDraftCommand(state, payload, catalog, draftEnvironment);
+    const outcome = applyHavocMultiplayerDraftCommand(
+      state,
+      payload,
+      catalog,
+      draftEnvironment,
+      settings,
+    );
     expect(outcome.receipt.accepted).toBe(true);
     commands.push(payload);
     state = outcome.state;
@@ -262,8 +364,18 @@ function playFullDraft(
 
 describe('havoc multiplayer draft', () => {
   it('creates a deterministic alternating draft with per-turn offers', () => {
-    const first = createHavocMultiplayerDraft(HAVOC_TEST_RUN_SEED, fixture.adapted, environment);
-    const second = createHavocMultiplayerDraft(HAVOC_TEST_RUN_SEED, fixture.adapted, environment);
+    const first = createHavocMultiplayerDraft(
+      HAVOC_TEST_RUN_SEED,
+      fixture.adapted,
+      environment,
+      SETTINGS,
+    );
+    const second = createHavocMultiplayerDraft(
+      HAVOC_TEST_RUN_SEED,
+      fixture.adapted,
+      environment,
+      SETTINGS,
+    );
     expect(canonicalJson(first)).toBe(canonicalJson(second));
     expect(first.status).toBe('drafting');
     expect(first.turnOrdinal).toBe(0);
@@ -278,6 +390,7 @@ describe('havoc multiplayer draft', () => {
       HAVOC_TEST_RUN_SEED,
       fixture.adapted,
       environment,
+      SETTINGS,
     );
     expect(state.status).toBe('complete');
     expect(state.turnOrdinal).toBe(10);
@@ -322,7 +435,12 @@ describe('havoc multiplayer draft', () => {
   });
 
   it('rejects commands that do not match the active turn, offer, card, or phase', () => {
-    const state = createHavocMultiplayerDraft(HAVOC_TEST_RUN_SEED, fixture.adapted, environment);
+    const state = createHavocMultiplayerDraft(
+      HAVOC_TEST_RUN_SEED,
+      fixture.adapted,
+      environment,
+      SETTINGS,
+    );
     const offer = state.offer;
     if (offer === null) throw new Error('draft has no offer');
     const payload = firstCardPayload(state);
@@ -332,6 +450,7 @@ describe('havoc multiplayer draft', () => {
       { ...payload, turnOrdinal: state.turnOrdinal + 1 },
       fixture.adapted,
       environment,
+      SETTINGS,
     );
     expect(wrongTurn.receipt).toEqual({
       accepted: false,
@@ -345,6 +464,7 @@ describe('havoc multiplayer draft', () => {
       { ...payload, offerId: `hvo-${'0'.repeat(32)}` },
       fixture.adapted,
       environment,
+      SETTINGS,
     );
     expect(wrongOffer.receipt.rejectionCode).toBe('offer-mismatch');
     expect(wrongOffer.state).toBe(state);
@@ -354,6 +474,7 @@ describe('havoc multiplayer draft', () => {
       { ...payload, cardId: `hvc-${'0'.repeat(32)}` },
       fixture.adapted,
       environment,
+      SETTINGS,
     );
     expect(unknownCard.receipt.rejectionCode).toBe('card-unavailable');
     expect(unknownCard.state).toBe(state);
@@ -369,6 +490,7 @@ describe('havoc multiplayer draft', () => {
       },
       fixture.adapted,
       environment,
+      SETTINGS,
     );
     expect(wrongClaim.receipt.rejectionCode).toBe('offer-mismatch');
     expect(wrongClaim.state).toBe(state);
@@ -378,6 +500,7 @@ describe('havoc multiplayer draft', () => {
       { kind: 'ready' },
       fixture.adapted,
       environment,
+      SETTINGS,
     );
     expect(notDraftCommand.receipt.rejectionCode).toBe('unknown-command');
     expect(notDraftCommand.state).toBe(state);
@@ -388,13 +511,19 @@ describe('havoc multiplayer draft', () => {
       { ...payload, turnOrdinal: 0, offerId: offer.offerId },
       fixture.adapted,
       environment,
+      SETTINGS,
     );
     expect(afterComplete.receipt.rejectionCode).toBe('invalid-phase');
     expect(afterComplete.state).toBe(complete);
   });
 
   it('enforces one reroll per participant and rerolls to a different offer', () => {
-    const state = createHavocMultiplayerDraft(HAVOC_TEST_RUN_SEED, fixture.adapted, environment);
+    const state = createHavocMultiplayerDraft(
+      HAVOC_TEST_RUN_SEED,
+      fixture.adapted,
+      environment,
+      SETTINGS,
+    );
     const active = state.activeParticipantId;
     const offer = state.offer;
     if (active === null || offer === null) throw new Error('draft has no active offer');
@@ -403,7 +532,13 @@ describe('havoc multiplayer draft', () => {
       turnOrdinal: state.turnOrdinal,
       offerId: offer.offerId,
     };
-    const rerolled = applyHavocMultiplayerDraftCommand(state, reroll, fixture.adapted, environment);
+    const rerolled = applyHavocMultiplayerDraftCommand(
+      state,
+      reroll,
+      fixture.adapted,
+      environment,
+      SETTINGS,
+    );
     expect(rerolled.receipt.accepted).toBe(true);
     expect(rerolled.state.revision).toBe(state.revision + 1);
     expect(rerolled.state.rerollsUsed[active]).toBe(1);
@@ -418,6 +553,7 @@ describe('havoc multiplayer draft', () => {
       { ...reroll, offerId: rerolled.state.offer?.offerId ?? offer.offerId },
       fixture.adapted,
       environment,
+      SETTINGS,
     );
     expect(second.receipt.rejectionCode).toBe('reroll-unavailable');
     expect(second.state).toBe(rerolled.state);
@@ -427,6 +563,7 @@ describe('havoc multiplayer draft', () => {
       firstCardPayload(rerolled.state),
       fixture.adapted,
       environment,
+      SETTINGS,
     );
     expect(picked.receipt.accepted).toBe(true);
     const nextActive = picked.state.activeParticipantId;
@@ -438,6 +575,7 @@ describe('havoc multiplayer draft', () => {
       { kind: 'reroll', turnOrdinal: picked.state.turnOrdinal, offerId: nextOffer.offerId },
       fixture.adapted,
       environment,
+      SETTINGS,
     );
     expect(otherReroll.receipt.accepted).toBe(true);
     expect(otherReroll.state.rerollsUsed[nextActive]).toBe(1);
@@ -445,7 +583,12 @@ describe('havoc multiplayer draft', () => {
   });
 
   it('replays the accepted command log to identical deterministic state', () => {
-    let state = createHavocMultiplayerDraft(HAVOC_TEST_RUN_SEED, fixture.adapted, environment);
+    let state = createHavocMultiplayerDraft(
+      HAVOC_TEST_RUN_SEED,
+      fixture.adapted,
+      environment,
+      SETTINGS,
+    );
     const commands: HavocMultiplayerDraftCommandPayload[] = [];
     const offer = state.offer;
     if (offer === null) throw new Error('draft has no offer');
@@ -454,7 +597,13 @@ describe('havoc multiplayer draft', () => {
       turnOrdinal: state.turnOrdinal,
       offerId: offer.offerId,
     };
-    const rerolled = applyHavocMultiplayerDraftCommand(state, reroll, fixture.adapted, environment);
+    const rerolled = applyHavocMultiplayerDraftCommand(
+      state,
+      reroll,
+      fixture.adapted,
+      environment,
+      SETTINGS,
+    );
     expect(rerolled.receipt.accepted).toBe(true);
     commands.push(reroll);
     state = rerolled.state;
@@ -465,6 +614,7 @@ describe('havoc multiplayer draft', () => {
         payload,
         fixture.adapted,
         environment,
+        SETTINGS,
       );
       expect(outcome.receipt.accepted).toBe(true);
       commands.push(payload);
@@ -479,12 +629,14 @@ describe('havoc multiplayer draft', () => {
       rootSeed: HAVOC_TEST_RUN_SEED,
       catalog: fixture.adapted,
       environment,
+      settings: SETTINGS,
       commands: roomLog,
     });
     const replayAgain = replayHavocMultiplayerDraft({
       rootSeed: HAVOC_TEST_RUN_SEED,
       catalog: fixture.adapted,
       environment,
+      settings: SETTINGS,
       commands: roomLog,
     });
     expect(canonicalJson(replay)).toBe(canonicalJson(state));
@@ -495,7 +647,12 @@ describe('havoc multiplayer draft', () => {
   });
 
   it('resolves timeout picks deterministically from the current offer', () => {
-    const state = createHavocMultiplayerDraft(HAVOC_TEST_RUN_SEED, fixture.adapted, environment);
+    const state = createHavocMultiplayerDraft(
+      HAVOC_TEST_RUN_SEED,
+      fixture.adapted,
+      environment,
+      SETTINGS,
+    );
     const first = havocMultiplayerTimeoutPick(state, fixture.adapted, environment);
     const second = havocMultiplayerTimeoutPick(state, fixture.adapted, environment);
     expect(first).toEqual(second);
@@ -507,7 +664,13 @@ describe('havoc multiplayer draft', () => {
       offerId: state.offer?.offerId ?? '',
       cardId: first.cardId,
     };
-    const outcome = applyHavocMultiplayerDraftCommand(state, payload, fixture.adapted, environment);
+    const outcome = applyHavocMultiplayerDraftCommand(
+      state,
+      payload,
+      fixture.adapted,
+      environment,
+      SETTINGS,
+    );
     expect(outcome.receipt.accepted).toBe(true);
     expect(outcome.state.turnOrdinal).toBe(state.turnOrdinal + 1);
     expect(outcome.state.picks[0]?.card.cardId).toBe(first.cardId);
@@ -516,19 +679,21 @@ describe('havoc multiplayer draft', () => {
 
   it('excludes every season of a drafted person globally', () => {
     const { adapted, environment: customEnvironment } = adaptedFixture(
-      customCatalog(personFixtureCandidates()),
+      customCatalog(exclusionCandidates()),
     );
     let sawSharedUnclaimed = false;
     for (let index = 0; index < 120; index += 1) {
+      const seed = testSeed(`havoc-mp-exclusion-${String(index)}`);
       const offer = generateHavocMultiplayerOffer(
         {
           catalog: adapted,
-          rootSeed: testSeed(`havoc-mp-exclusion-${String(index)}`),
+          rootSeed: seed,
           participantId: 'p1',
           turnOrdinal: 0,
           offerIndex: 0,
           claimedPlayerIds: ['p-shared'],
           picks: [],
+          settings: SETTINGS,
         },
         customEnvironment,
       );
@@ -539,12 +704,13 @@ describe('havoc multiplayer draft', () => {
       const unclaimed = generateHavocMultiplayerOffer(
         {
           catalog: adapted,
-          rootSeed: testSeed(`havoc-mp-exclusion-${String(index)}`),
+          rootSeed: seed,
           participantId: 'p1',
           turnOrdinal: 0,
           offerIndex: 0,
           claimedPlayerIds: [],
           picks: [],
+          settings: SETTINGS,
         },
         customEnvironment,
       );
@@ -554,23 +720,24 @@ describe('havoc multiplayer draft', () => {
     }
     expect(sawSharedUnclaimed).toBe(true);
 
-    const draftable = adaptedFixture(customCatalog(draftablePersonFixtureCandidates()));
-    let found: { seed: Seed; state: HavocMultiplayerDraftState } | null = null;
-    for (let index = 0; index < 80 && found === null; index += 1) {
-      const seed = testSeed(`havoc-mp-drafted-person-${String(index)}`);
-      const state = createHavocMultiplayerDraft(seed, draftable.adapted, draftable.environment);
-      if (state.offer?.cards.some((card) => card.source.playerId === 'p-shared')) {
-        found = { seed, state };
+    let state: HavocMultiplayerDraftState | null = null;
+    for (let index = 0; index < 80 && state === null; index += 1) {
+      const candidate = createHavocMultiplayerDraft(
+        testSeed(`havoc-mp-drafted-person-${String(index)}`),
+        adapted,
+        customEnvironment,
+        SETTINGS,
+      );
+      if (candidate.offer?.cards.some((card) => card.source.playerId === 'p-shared')) {
+        state = candidate;
       }
     }
-    expect(found).not.toBeNull();
-    if (found === null) return;
-    const card = found.state.offer?.cards.find(
-      (candidate) => candidate.source.playerId === 'p-shared',
-    );
-    if (card === undefined || card.source.seasonKey === null)
+    expect(state).not.toBeNull();
+    if (state === null) return;
+    const card = state.offer?.cards.find((entry) => entry.source.playerId === 'p-shared');
+    if (card === undefined || card.source.seasonKey === null) {
       throw new Error('missing shared card');
-    let state = found.state;
+    }
     const picked = applyHavocMultiplayerDraftCommand(
       state,
       {
@@ -580,8 +747,9 @@ describe('havoc multiplayer draft', () => {
         cardId: card.cardId,
         claimKey: { playerId: card.source.playerId, seasonKey: card.source.seasonKey },
       },
-      draftable.adapted,
-      draftable.environment,
+      adapted,
+      customEnvironment,
+      SETTINGS,
     );
     expect(picked.receipt.accepted).toBe(true);
     state = picked.state;
@@ -594,8 +762,9 @@ describe('havoc multiplayer draft', () => {
       const outcome = applyHavocMultiplayerDraftCommand(
         state,
         firstCardPayload(state),
-        draftable.adapted,
-        draftable.environment,
+        adapted,
+        customEnvironment,
+        SETTINGS,
       );
       expect(outcome.receipt.accepted).toBe(true);
       state = outcome.state;
@@ -619,6 +788,7 @@ describe('havoc multiplayer draft', () => {
           offerIndex: 0,
           claimedPlayerIds: [],
           picks: [],
+          settings: SETTINGS,
         },
         customEnvironment,
       );
@@ -636,10 +806,28 @@ describe('havoc multiplayer draft', () => {
     for (const variant of variants) expect(variant).toMatch(/^pv-/);
   });
 
-  it('samples the full eligible pool without rating bands', () => {
+  it('keeps balanced standard offers inside a target ±3 overall window', () => {
+    for (const seedString of [
+      'havoc-mp-window-0',
+      'havoc-mp-window-1',
+      'havoc-mp-window-2',
+      'havoc-mp-window-3',
+    ]) {
+      const { offers } = playFullDraft(testSeed(seedString), fixture.adapted, environment);
+      for (const offer of offers) {
+        const overalls = offer.cards.map((card) => card.source.originalOverall);
+        expect(Math.max(...overalls) - Math.min(...overalls)).toBeLessThanOrEqual(
+          HAVOC_OFFER_TARGET_RADIUS * 2,
+        );
+      }
+    }
+  });
+
+  it('keeps the legacy offer pool for pre-v6 rooms', () => {
     const { adapted, environment: customEnvironment } = adaptedFixture(
       customCatalog(lowOverallCandidates()),
     );
+    const legacy = { variant: 'standard', rulesVersion: 'havoc-rules-v5' } as const;
     let found: HavocDraftOffer | null = null;
     for (let index = 0; index < 60 && found === null; index += 1) {
       const offer = generateHavocMultiplayerOffer(
@@ -651,6 +839,7 @@ describe('havoc multiplayer draft', () => {
           offerIndex: 0,
           claimedPlayerIds: [],
           picks: [],
+          settings: legacy,
         },
         customEnvironment,
       );
@@ -659,10 +848,160 @@ describe('havoc multiplayer draft', () => {
     expect(found).not.toBeNull();
     if (found === null) return;
     const overalls = found.cards.map((card) => card.source.originalOverall);
-    expect(Math.max(...overalls) - Math.min(...overalls)).toBeGreaterThan(3);
-    const low = found.cards.find((card) => card.source.playerId === 'p-low');
-    expect(low?.slot).toBe('PG');
-    expect(low?.source.positions).toContain('PG');
+    expect(Math.max(...overalls) - Math.min(...overalls)).toBeGreaterThan(
+      HAVOC_OFFER_TARGET_RADIUS * 2,
+    );
+    expect(havocMultiplayerDraftLogicOf('havoc-rules-v5')).toBe('legacy');
+    expect(havocMultiplayerDraftLogicOf('havoc-rules-v6')).toBe('balanced');
+    expect(() => havocMultiplayerDraftLogicOf('havoc-rules-v99')).toThrow(
+      'unsupported havoc multiplayer draft rules version',
+    );
+  });
+
+  it('assigns curated rating tiers independently and keeps the recipe exact', () => {
+    const assignments = havocMultiplayerCuratedAssignments(
+      testSeed('curated-bands-0'),
+      environment,
+    );
+    for (const participantId of ['p1', 'p2'] as const) {
+      const bands = assignments[participantId];
+      expect(bands).toHaveLength(5);
+      expect(bands.filter((band) => band === '90-plus')).toHaveLength(2);
+      expect(bands.filter((band) => band === '80-89')).toHaveLength(1);
+      expect(bands.filter((band) => band === 'under-80')).toHaveLength(2);
+    }
+    const again = havocMultiplayerCuratedAssignments(testSeed('curated-bands-0'), environment);
+    expect(again).toEqual(assignments);
+    let independent = false;
+    for (let index = 0; index < 40 && !independent; index += 1) {
+      const other = havocMultiplayerCuratedAssignments(
+        testSeed(`curated-bands-other-${String(index)}`),
+        environment,
+      );
+      if (
+        other.p1.join(',') !== assignments.p1.join(',') ||
+        other.p2.join(',') !== assignments.p2.join(',')
+      ) {
+        independent = true;
+      }
+    }
+    expect(independent).toBe(true);
+  });
+
+  it('keeps every curated offer inside its assigned tier and the ±3 window', () => {
+    const curated = defaultHavocMultiplayerDraftSettings('curated');
+    for (const seedString of [
+      'curated-window-0',
+      'curated-window-1',
+      'curated-window-2',
+      'curated-window-3',
+    ]) {
+      const seed = testSeed(seedString);
+      const assignments = havocMultiplayerCuratedAssignments(seed, curatedFixture.environment);
+      const { state, offers } = playFullDraft(
+        seed,
+        curatedFixture.adapted,
+        curatedFixture.environment,
+        curated,
+      );
+      for (const offer of offers) {
+        const overalls = offer.cards.map((card) => card.source.originalOverall);
+        expect(Math.max(...overalls) - Math.min(...overalls)).toBeLessThanOrEqual(
+          HAVOC_OFFER_TARGET_RADIUS * 2,
+        );
+      }
+      const pickerOfRound = (index: number): 'p1' | 'p2' =>
+        index % 2 === 0 ? state.firstPicker : state.firstPicker === 'p1' ? 'p2' : 'p1';
+      state.picks.forEach((pick, index) => {
+        const roundIndex = Math.floor(index / 2);
+        const participantId = pickerOfRound(index);
+        const bands = assignments[participantId];
+        const band = bands[roundIndex];
+        if (band === undefined) throw new Error('missing curated band');
+        expect(
+          havocOverallInCuratedBand(pick.card.source.originalOverall, band),
+          `${seedString} pick ${String(index)} ${participantId} R${String(roundIndex + 1)} ${pick.slot} expected ${band} got ${String(pick.card.source.originalOverall)} (${pick.card.source.playerId})`,
+        ).toBe(true);
+      });
+    }
+  });
+
+  it('keeps curated rerolls inside the assigned tier and window', () => {
+    const curated = defaultHavocMultiplayerDraftSettings('curated');
+    const seed = testSeed('curated-reroll-0');
+    const assignments = havocMultiplayerCuratedAssignments(seed, curatedFixture.environment);
+    const state = createHavocMultiplayerDraft(
+      seed,
+      curatedFixture.adapted,
+      curatedFixture.environment,
+      curated,
+    );
+    const offer = state.offer;
+    if (offer === null) throw new Error('draft has no offer');
+    const active = state.activeParticipantId;
+    if (active === null) throw new Error('draft has no active participant');
+    const band = assignments[active][0];
+    if (band === undefined) throw new Error('missing curated band');
+    const rerolled = applyHavocMultiplayerDraftCommand(
+      state,
+      { kind: 'reroll', turnOrdinal: 0, offerId: offer.offerId },
+      curatedFixture.adapted,
+      curatedFixture.environment,
+      curated,
+    );
+    expect(rerolled.receipt.accepted).toBe(true);
+    const next = rerolled.state.offer;
+    if (next === null) throw new Error('reroll produced no offer');
+    expect(next.offerId).not.toBe(offer.offerId);
+    for (const card of next.cards) {
+      expect(havocOverallInCuratedBand(card.source.originalOverall, band)).toBe(true);
+    }
+    expect(Math.max(...next.cards.map((card) => card.source.originalOverall))).toBeLessThanOrEqual(
+      Math.min(...next.cards.map((card) => card.source.originalOverall)) +
+        HAVOC_OFFER_TARGET_RADIUS * 2,
+    );
+  });
+
+  it('finishes curated drafts with two 90+, one 80-89, and two below-80 picks per lineup', () => {
+    const curated = defaultHavocMultiplayerDraftSettings('curated');
+    for (const seedString of [
+      'curated-counts-0',
+      'curated-counts-1',
+      'curated-counts-2',
+      'curated-counts-3',
+    ]) {
+      const { state } = playFullDraft(
+        testSeed(seedString),
+        curatedFixture.adapted,
+        curatedFixture.environment,
+        curated,
+      );
+      expect(state.status).toBe('complete');
+      expect(state.picks).toHaveLength(10);
+      for (const participantId of ['p1', 'p2'] as const) {
+        const picks = state.picks.filter((pick) => pick.participantId === participantId);
+        expect(picks).toHaveLength(5);
+        const overalls = picks.map((pick) => pick.card.source.originalOverall);
+        expect(overalls.filter((overall) => overall >= 90)).toHaveLength(2);
+        expect(overalls.filter((overall) => overall >= 80 && overall <= 89)).toHaveLength(1);
+        expect(overalls.filter((overall) => overall <= 79)).toHaveLength(2);
+      }
+    }
+  });
+
+  it('reports catalog coverage instead of relaxing curated guarantees', () => {
+    const curated = defaultHavocMultiplayerDraftSettings('curated');
+    const { adapted, environment: customEnvironment } = adaptedFixture(
+      customCatalog(curatedThinCandidates()),
+    );
+    expect(() =>
+      createHavocMultiplayerDraft(
+        testSeed('curated-coverage-0'),
+        adapted,
+        customEnvironment,
+        curated,
+      ),
+    ).toThrow(HavocCatalogCoverageError);
   });
 
   it('completes ten picks with valid slot coverage across seeds', () => {

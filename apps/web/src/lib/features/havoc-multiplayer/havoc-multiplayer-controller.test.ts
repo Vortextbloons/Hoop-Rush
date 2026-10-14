@@ -428,7 +428,7 @@ describe('havoc multiplayer presenter flow', () => {
     expect(h.presenter.phase).toBe('lobby');
     expect(h.presenter.members).toHaveLength(2);
     const versions = await h.presenter.roomVersions();
-    expect(versions.multiplayerVersion).toBe('havoc-multiplayer-v1');
+    expect(versions.multiplayerVersion).toBe('havoc-multiplayer-v2');
 
     await startDraft(h);
     await completeDraft(h);

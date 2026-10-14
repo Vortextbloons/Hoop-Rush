@@ -9,6 +9,7 @@ import type {
   HavocMultiplayerRoomSnapshot,
   HavocMultiplayerSeriesGame,
   HavocMultiplayerTransientEvent,
+  HavocMultiplayerVariant,
   HavocMultiplayerVersionLocks,
   Id,
 } from '@hoop-rush/data-contracts';
@@ -149,8 +150,10 @@ export class HavocMultiplayerPresenter {
     return this.session.attach(roomId);
   }
 
-  createRoom(): Promise<{ roomId: Id; code: HavocMultiplayerRoomCode } | null> {
-    return this.session.createRoom();
+  createRoom(
+    variant: HavocMultiplayerVariant = 'standard',
+  ): Promise<{ roomId: Id; code: HavocMultiplayerRoomCode } | null> {
+    return this.session.createRoom(variant);
   }
 
   roomVersions(): Promise<HavocMultiplayerVersionLocks> {

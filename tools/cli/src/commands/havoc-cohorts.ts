@@ -38,6 +38,7 @@ import {
   createHavocCommandEnvironment,
   createHavocMultiplayerDraft,
   createHavocMultiplayerSeries,
+  defaultHavocMultiplayerDraftSettings,
   generateHavocMultiplayerOffer,
   havocBattleGameInputDigest,
   havocBattleGameResultDigest,
@@ -48,6 +49,7 @@ import {
   type HavocCommandEnvironment,
   type HavocLockSources,
   type HavocMultiplayerDraftCommandPayload,
+  type HavocMultiplayerDraftSettings,
   type HavocMultiplayerSeriesMvpResult,
 } from '@hoop-rush/engine';
 import { parseCount, UsageError } from '../args.ts';
@@ -608,8 +610,9 @@ function applyMultiplayerDraftCommandOrThrow(
   payload: HavocMultiplayerDraftCommandPayload,
   catalog: HavocCatalog,
   environment: HavocCommandEnvironment,
+  settings: HavocMultiplayerDraftSettings,
 ): HavocMultiplayerDraftState {
-  const outcome = applyHavocMultiplayerDraftCommand(state, payload, catalog, environment);
+  const outcome = applyHavocMultiplayerDraftCommand(state, payload, catalog, environment, settings);
   if (!outcome.receipt.accepted) {
     throw new HavocCliError(
       'multiplayer-draft',
@@ -628,8 +631,15 @@ export function runHavocMultiplayerDraft(input: {
   readonly rootSeed: Seed;
   readonly catalog: HavocCatalog;
   readonly environment: HavocCommandEnvironment;
+  readonly settings?: HavocMultiplayerDraftSettings;
 }): HavocMultiplayerDraftOutcome {
-  let state = createHavocMultiplayerDraft(input.rootSeed, input.catalog, input.environment);
+  const settings = input.settings ?? defaultHavocMultiplayerDraftSettings();
+  let state = createHavocMultiplayerDraft(
+    input.rootSeed,
+    input.catalog,
+    input.environment,
+    settings,
+  );
   let rerollsUsed = 0;
   while (state.status === 'drafting') {
     const offer = requireMultiplayerOffer(state);
@@ -644,6 +654,7 @@ export function runHavocMultiplayerDraft(input: {
           offerIndex: 1,
           claimedPlayerIds: state.claimedPlayerIds,
           picks: state.picks,
+          settings,
         },
         input.environment,
       );
@@ -653,6 +664,7 @@ export function runHavocMultiplayerDraft(input: {
           { kind: 'reroll', turnOrdinal: state.turnOrdinal, offerId: offer.offerId },
           input.catalog,
           input.environment,
+          settings,
         );
         rerollsUsed += 1;
       }
@@ -674,6 +686,7 @@ export function runHavocMultiplayerDraft(input: {
       },
       input.catalog,
       input.environment,
+      settings,
     );
   }
   return { state, rerollsUsed };

@@ -641,6 +641,7 @@ export function createInMemoryHavocMultiplayerTransport(options?: {
     createTimestamps.push(now);
     const settings = havocMultiplayerRoomSettingsSchema.parse({
       schemaVersion: settingsInput.schemaVersion ?? HAVOC_MULTIPLAYER_SAVE_SCHEMA_VERSION,
+      variant: settingsInput.variant,
       versions: settingsInput.versions,
     });
     const roomId = randomRoomIdWith(rng, useCrypto);
@@ -1035,7 +1036,10 @@ export function createInMemoryHavocMultiplayerTransport(options?: {
       }
       if (record.snapshot.successorRoomId === null) {
         const successor = createRoomRecord(
-          { versions: record.snapshot.settings.versions },
+          {
+            variant: record.snapshot.settings.variant,
+            versions: record.snapshot.settings.versions,
+          },
           {
             p1:
               record.snapshot.members.find((member) => member.participantId === 'p1')?.online ??
@@ -1331,7 +1335,10 @@ export function createInMemoryHavocMultiplayerTransport(options?: {
         return { snapshot: successor.snapshot, code: successor.code };
       }
       const created = createRoomRecord(
-        { versions: record.snapshot.settings.versions },
+        {
+          variant: record.snapshot.settings.variant,
+          versions: record.snapshot.settings.versions,
+        },
         {
           p1:
             record.snapshot.members.find((member) => member.participantId === 'p1')?.online ?? true,

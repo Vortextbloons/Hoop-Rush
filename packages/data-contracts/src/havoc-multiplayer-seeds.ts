@@ -62,7 +62,7 @@ export function havocMultiplayerFirstPickerSeed(rootSeed: Seed): Seed {
 }
 
 export type HavocMultiplayerOfferStream =
-  'players' | 'version' | 'tier' | 'mutations' | 'physical' | 'nickname' | 'specialist';
+  'players' | 'version' | 'tier' | 'mutations' | 'physical' | 'nickname' | 'specialist' | 'window';
 
 export function havocMultiplayerOfferSeed(
   rootSeed: Seed,
@@ -83,6 +83,14 @@ export function havocMultiplayerRerollSeed(
   assertParticipantId(participantId);
   assertTurnOrdinal(turnOrdinal);
   return havocMultiplayerSeed(rootSeed, 'draft', 'reroll', participantId, turnOrdinal);
+}
+
+export function havocMultiplayerCuratedBandsSeed(
+  rootSeed: Seed,
+  participantId: HavocMultiplayerParticipantId,
+): Seed {
+  assertParticipantId(participantId);
+  return havocMultiplayerSeed(rootSeed, 'draft', 'curated-bands', participantId);
 }
 
 export function havocMultiplayerTimeoutSeed(

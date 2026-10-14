@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  HAVOC_CURATED_RECIPE,
   HAVOC_MULTIPLAYER_CODE_TTL_MS,
   HAVOC_MULTIPLAYER_PICK_TIMEOUT_MS,
   HAVOC_MULTIPLAYER_ROOM_RETENTION_MS,
@@ -14,7 +15,9 @@ import {
   havocMultiplayerFirstPickerFor,
   havocMultiplayerHomeForGame,
   havocMultiplayerHomeWinnerFor,
+  havocMultiplayerRoomSettingsSchema,
   havocMultiplayerSeriesSnapshotSchema,
+  havocOverallInCuratedBand,
   seasonKeySchema,
   seedSchema,
   type HavocDraftCard,
@@ -40,8 +43,11 @@ function otherParticipant(
   return participantId === 'p1' ? 'p2' : 'p1';
 }
 
-async function createAndJoin(transport: InMemoryHavocMultiplayerTransport) {
-  const created = await transport.create({ versions: locks() });
+async function createAndJoin(
+  transport: InMemoryHavocMultiplayerTransport,
+  variant: 'standard' | 'curated' = 'standard',
+) {
+  const created = await transport.create({ variant, versions: locks() });
   const joined = await transport.join(created.code);
   return { created, joined, roomId: created.snapshot.roomId };
 }
@@ -249,7 +255,7 @@ describe('in-memory Havoc multiplayer transport', () => {
 
   it('starts only from the host with both seats online', async () => {
     const transport = createInMemoryHavocMultiplayerTransport({ seed: 'start-rules' });
-    const created = await transport.create({ versions: locks() });
+    const created = await transport.create({ variant: 'standard', versions: locks() });
     const roomId = created.snapshot.roomId;
     expect(created.membership.participantId).toBe('p1');
 
@@ -741,7 +747,8 @@ describe('in-memory Havoc multiplayer transport', () => {
 
   it('rematches into a successor room with a fresh seed and fresh draft', async () => {
     const transport = createInMemoryHavocMultiplayerTransport({ seed: 'rematch' });
-    const { roomId } = await createAndJoin(transport);
+    const { created, roomId } = await createAndJoin(transport, 'curated');
+    expect(created.snapshot.settings.variant).toBe('curated');
     const parent = await startDraft(transport, roomId);
     const parentSeed = requireDraft(parent).rootSeed;
     const early = await submit(transport, roomId, 'rematch-early', 'p1', {
@@ -756,7 +763,7 @@ describe('in-memory Havoc multiplayer transport', () => {
     let current = await snapshot(transport, roomId);
     expect(current.phase).toBe('championship');
 
-    const fresh = await transport.create({ versions: locks() });
+    const fresh = await transport.create({ variant: 'standard', versions: locks() });
     await expect(transport.rematch(fresh.snapshot.roomId)).rejects.toThrow('phase');
 
     const requested = await submit(transport, roomId, 'rematch-request', 'p1', {
@@ -780,6 +787,7 @@ describe('in-memory Havoc multiplayer transport', () => {
     const rematch = await transport.rematch(roomId);
     expect(rematch.snapshot.roomId).toBe(successorId);
     expect(rematch.snapshot.phase).toBe('lobby');
+    expect(rematch.snapshot.settings.variant).toBe('curated');
     expect(rematch.snapshot.draft).toBeNull();
     expect(rematch.snapshot.series).toBeNull();
 
@@ -856,8 +864,8 @@ describe('in-memory Havoc multiplayer transport', () => {
 
   it('delivers transient events only to subscribers of the owning room', async () => {
     const transport = createInMemoryHavocMultiplayerTransport({ seed: 'transient' });
-    const roomA = await transport.create({ versions: locks() });
-    const roomB = await transport.create({ versions: locks() });
+    const roomA = await transport.create({ variant: 'standard', versions: locks() });
+    const roomB = await transport.create({ variant: 'standard', versions: locks() });
     const receivedA: string[] = [];
     const receivedB: string[] = [];
     const subscriptionA = transport.subscribeTransient(roomA.snapshot.roomId, (event) => {
@@ -921,7 +929,7 @@ describe('in-memory Havoc multiplayer transport', () => {
 
   it('manages seats: idempotent join, resume, leave, and guest removal', async () => {
     const transport = createInMemoryHavocMultiplayerTransport({ seed: 'seats' });
-    const created = await transport.create({ versions: locks() });
+    const created = await transport.create({ variant: 'standard', versions: locks() });
     const roomId = created.snapshot.roomId;
     const firstJoin = await transport.join(created.code);
     const secondJoin = await transport.join(created.code);
@@ -954,7 +962,7 @@ describe('in-memory Havoc multiplayer transport', () => {
       seed: 'expiry',
       clock: () => now,
     });
-    const created = await transport.create({ versions: locks() });
+    const created = await transport.create({ variant: 'standard', versions: locks() });
     const roomId = created.snapshot.roomId;
     expect((await transport.preview(created.code)).phase).toBe('lobby');
 
@@ -1001,5 +1009,28 @@ describe('in-memory Havoc multiplayer transport', () => {
     expect(left.created.code).toBe(right.created.code);
     expect(left.created.snapshot).toEqual(right.created.snapshot);
     expect(left.snapshot).toEqual(right.snapshot);
+  });
+});
+
+describe('havoc multiplayer room settings schema', () => {
+  it('defaults a missing variant to standard for older snapshots', () => {
+    const settings = havocMultiplayerRoomSettingsSchema.parse({
+      schemaVersion: HAVOC_MULTIPLAYER_SAVE_SCHEMA_VERSION,
+      versions: locks(),
+    });
+    expect(settings.variant).toBe('standard');
+  });
+
+  it('keeps the curated recipe and band boundaries exact', () => {
+    expect(HAVOC_CURATED_RECIPE.filter((band) => band === '90-plus')).toHaveLength(2);
+    expect(HAVOC_CURATED_RECIPE.filter((band) => band === '80-89')).toHaveLength(1);
+    expect(HAVOC_CURATED_RECIPE.filter((band) => band === 'under-80')).toHaveLength(2);
+    expect(havocOverallInCuratedBand(79, 'under-80')).toBe(true);
+    expect(havocOverallInCuratedBand(80, 'under-80')).toBe(false);
+    expect(havocOverallInCuratedBand(80, '80-89')).toBe(true);
+    expect(havocOverallInCuratedBand(89, '80-89')).toBe(true);
+    expect(havocOverallInCuratedBand(90, '80-89')).toBe(false);
+    expect(havocOverallInCuratedBand(90, '90-plus')).toBe(true);
+    expect(havocOverallInCuratedBand(100, '90-plus')).toBe(true);
   });
 });
