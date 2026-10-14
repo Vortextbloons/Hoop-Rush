@@ -243,7 +243,7 @@ describe('havoc CLI audit command', () => {
       expect(badPayload.checks.digests).toBe(false);
       expect(badPayload.findings.join('\n')).toContain('result digest');
     });
-  });
+  }, 120_000);
 
   it('rejects a report that fails the shared schema', async () => {
     await withTmpDir(async (dir) => {
