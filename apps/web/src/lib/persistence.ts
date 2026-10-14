@@ -3,6 +3,7 @@ import {
   DexieCollectionRepository,
   DexieDraftDuelRepository,
   DexieFixedFiveRepository,
+  DexieHavocMultiplayerRepository,
   DexieHavocRepository,
   DexieSeasonRunRepository,
   HoopRushDatabase,
@@ -18,6 +19,7 @@ export interface Persistence {
   fixedFiveRepository: DexieFixedFiveRepository;
   havocRepository: DexieHavocRepository;
   draftDuelRepository: DexieDraftDuelRepository;
+  havocMultiplayerRepository: DexieHavocMultiplayerRepository;
   collectionRepository(options: DexieCollectionRepositoryOptions): DexieCollectionRepository;
   seasonRunRepository(options: {
     schedule?: SeasonSchedule;
@@ -35,6 +37,7 @@ export function getPersistence(): Persistence {
       fixedFiveRepository: new DexieFixedFiveRepository(db),
       havocRepository: new DexieHavocRepository(db),
       draftDuelRepository: new DexieDraftDuelRepository(db),
+      havocMultiplayerRepository: new DexieHavocMultiplayerRepository(db),
       collectionRepository: (options) => new DexieCollectionRepository(db, options),
       seasonRunRepository: (options) => new DexieSeasonRunRepository(db, options),
     };
