@@ -652,12 +652,25 @@ function checkTape(
         break;
       }
       case 'time-lord': {
-        const hasOwner = [...participants.values()].some((participant) =>
-          participant.mutations.has('time-lord'),
+        const sideIndex = sideIndexBySide.get(event.side);
+        if (sideIndex === undefined) {
+          fail('time-lord', 'time-lord event side is unknown');
+          break;
+        }
+        const ownOwner = [...active.values()].some(
+          (participant) =>
+            participant.sideIndex === sideIndex && participant.mutations.has('time-lord'),
         );
-        if (!hasOwner) fail('time-lord', 'time-lord event without an owner anywhere');
-        if (event.fullSeconds !== 30 && event.fullSeconds !== 12 && event.fullSeconds !== 24) {
-          fail('time-lord', 'unexpected time-lord full clock');
+        const opposingOwner = [...active.values()].some(
+          (participant) =>
+            participant.sideIndex !== sideIndex && participant.mutations.has('time-lord'),
+        );
+        const expected = ownOwner ? 30 : opposingOwner ? 12 : 24;
+        if (event.fullSeconds !== expected) {
+          fail(
+            'time-lord',
+            `${event.side} time-lord clock ${String(event.fullSeconds)} != expected ${String(expected)} (own owner ${String(ownOwner)}, opposing owner ${String(opposingOwner)})`,
+          );
         }
         break;
       }

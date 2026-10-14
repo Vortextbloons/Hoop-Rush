@@ -378,8 +378,8 @@ class HavocBattleRuntime implements HavocRuntimeHooks {
   private readonly bodySnatcherTargets: ReadonlyMap<string, string>;
   private readonly bountyTargets: readonly [string | null, string | null];
   private lastTimeLord: [number, number];
-  private lastCapped: string[] = [];
-  private equalizerApplied = false;
+  private lastCapped: [string[], string[]] = [[], []];
+  private equalizerApplied: [boolean, boolean] = [false, false];
   private rushedExtraSide: SideIndex | null = null;
   private darwinismDirty = false;
   private tripContext: TripContext | null = null;
@@ -1721,35 +1721,30 @@ class HavocBattleRuntime implements HavocRuntimeHooks {
   }
 
   private recomputeEqualizer(tipoff: boolean): boolean {
-    const capped: ParticipantState[] = [];
-    for (const team of this.teams) {
-      const sample = team.active[0] ?? team.participants[0];
-      if (sample === undefined || team.active.length === 0) continue;
-      if (!this.equalizerApplies(sample)) continue;
-      for (const participant of team.active) capped.push(participant);
+    let changed = false;
+    for (const sideIndex of [0, 1] as const) {
+      const owners = this.activeOwners(sideIndex, 'the-great-equalizer');
+      if (owners.length === 0) continue;
+      const cappedIds = this.teams[(1 - sideIndex) as SideIndex].active
+        .map((participant) => participant.instanceId)
+        .sort();
+      if (!tipoff && cappedIds.join(',') === this.lastCapped[sideIndex].join(',')) continue;
+      this.lastCapped[sideIndex] = cappedIds;
+      changed = true;
+      const owner = owners[0];
+      if (owner === undefined) continue;
+      const counters = this.rollupFor(owner, 'the-great-equalizer');
+      if (counters !== undefined) counters.triggers += 1;
+      this.pushEvent({
+        kind: 'great-equalizer',
+        outcome: this.equalizerApplied[sideIndex] ? 'updated' : 'applied',
+        ownerInstanceId: owner.instanceId,
+        cappedInstanceIds: cappedIds.slice(0, 10),
+      });
+      this.equalizerApplied[sideIndex] = true;
     }
-    const ids = capped.map((participant) => participant.instanceId).sort();
-    if (!tipoff && ids.join(',') === this.lastCapped.join(',')) return false;
-    this.lastCapped = ids;
-    const ownerTeam = this.teams.find(
-      (team) => this.activeOwners(team.sideIndex, 'the-great-equalizer').length > 0,
-    );
-    const owner =
-      ownerTeam === undefined
-        ? null
-        : this.activeOwners(ownerTeam.sideIndex, 'the-great-equalizer')[0];
-    if (owner === null || owner === undefined) return false;
-    const counters = this.rollupFor(owner, 'the-great-equalizer');
-    if (counters !== undefined) counters.triggers += 1;
-    this.pushEvent({
-      kind: 'great-equalizer',
-      outcome: this.equalizerApplied ? 'updated' : 'applied',
-      ownerInstanceId: owner.instanceId,
-      cappedInstanceIds: ids.slice(0, 10),
-    });
-    this.equalizerApplied = true;
-    if (!tipoff) this.rebuildBattleProfiles();
-    return true;
+    if (!tipoff && changed) this.rebuildBattleProfiles();
+    return changed;
   }
 
   private recomputeTimeLord(source: 'tipoff' | 'owner-exit'): boolean {
