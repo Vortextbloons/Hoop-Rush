@@ -190,6 +190,7 @@ export * from './havoc-errors.ts';
 export * from './havoc-worker.ts';
 export * from './havoc-multiplayer-versions.ts';
 export * from './havoc-multiplayer.ts';
+export * from './havoc-multiplayer-in-memory.ts';
 export * from './havoc-multiplayer-seeds.ts';
 export * from './havoc-multiplayer-worker.ts';
 export * from './league-worker.ts';
