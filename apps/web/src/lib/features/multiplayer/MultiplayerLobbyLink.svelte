@@ -9,6 +9,7 @@
     loadLobbyId,
     rememberLobby,
     resumeMultiplayerGame,
+    multiplayerGameRoomRouteId,
   } from '$lib/features/multiplayer/multiplayer-lobby';
 
   let { roomId, completed = false }: { roomId: string; completed?: boolean } = $props();
@@ -31,11 +32,17 @@
           if (!next.canStart && next.gameKind && next.gameRoomId && next.gameRoomId !== roomId) {
             await resumeMultiplayerGame(next.gameKind, next.gameRoomId);
             if (!mounted) return;
-            await goto(
-              next.gameKind === 'draft-duel'
-                ? resolve('/draft-duel/room/[roomId]', { roomId: next.gameRoomId })
-                : resolve('/multiplayer/room/[roomId]', { roomId: next.gameRoomId }),
-            );
+            if (next.gameKind === 'draft-duel') {
+              await goto(
+                resolve(multiplayerGameRoomRouteId('draft-duel'), { roomId: next.gameRoomId }),
+              );
+            } else if (next.gameKind === 'havoc') {
+              await goto(resolve(multiplayerGameRoomRouteId('havoc'), { roomId: next.gameRoomId }));
+            } else {
+              await goto(
+                resolve(multiplayerGameRoomRouteId('fixed-five'), { roomId: next.gameRoomId }),
+              );
+            }
           }
         })
         .catch(() => {

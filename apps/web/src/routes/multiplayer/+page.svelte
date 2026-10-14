@@ -6,6 +6,7 @@
     Swords,
     Zap,
     Trophy,
+    Flame,
     LogIn,
     ArrowRight,
     Users,
@@ -39,6 +40,7 @@
     friendlyFixedFiveJoinError,
     loadLastFixedFiveRoomId,
   } from '$lib/features/multiplayer/fixed-five-identity';
+  import { loadHavocMultiplayerVersionLocks } from '$lib/features/havoc-multiplayer/havoc-multiplayer-assets';
   import { loadRunPreamble } from '$lib/run-preamble';
   import {
     lobbyCommand,
@@ -48,13 +50,17 @@
     rememberLobby,
     loadLobbyId,
     resumeMultiplayerGame,
+    multiplayerGameKindLabels,
+    multiplayerGameRoomRouteId,
+    type MultiplayerGameKind,
   } from '$lib/features/multiplayer/multiplayer-lobby';
   type View = 'choose' | 'create' | 'join';
+  type MatchFormat = 'season' | 'duel' | 'draft-duel' | 'havoc';
   let view = $state<View>('choose');
   let lobby = $state<MultiplayerLobby | null>(null);
   let lastLobbyId = $state<string | null>(null);
   let mounted = false;
-  let matchFormat = $state<'season' | 'duel' | 'draft-duel'>('season');
+  let matchFormat = $state<MatchFormat>('season');
   let sourceMode = $state<FixedFiveSourceMode>('classic');
   let ddFairness = $state<'fair' | 'unfair'>('fair');
   const draftDuelController = new DraftDuelController();
@@ -104,9 +110,19 @@
         'Five rounds, eight cards, one pick each round. Both tables reveal together, then a best-of-seven broadcast settles it.',
       format: 'Best of 7',
     },
+    {
+      id: 'havoc',
+      name: 'Hoop Havoc',
+      category: '5 rounds · Bo7',
+      icon: Flame,
+      image: '/images/multiplayer/draft-duel.png',
+      description:
+        'Draft five mutated freaks, one per position, then let a best-of-seven broadcast decide whose powers survive.',
+      format: 'Best of 7',
+    },
   ] as const;
   const selectedFormat = $derived(formats.find((item) => item.id === matchFormat)!);
-  function selectFormat(nextFormat: 'season' | 'duel' | 'draft-duel') {
+  function selectFormat(nextFormat: MatchFormat) {
     matchFormat = nextFormat;
     view = 'create';
     error = null;
@@ -134,14 +150,16 @@
       autopickVersion: FIXED_FIVE_AUTOPICK_VERSION,
     });
   }
-  async function openGame(kind: 'fixed-five' | 'draft-duel', roomId: string) {
+  async function openGame(kind: MultiplayerGameKind, roomId: string) {
     await resumeMultiplayerGame(kind, roomId);
     if (!mounted) return;
-    await goto(
-      kind === 'draft-duel'
-        ? resolve('/draft-duel/room/[roomId]', { roomId })
-        : resolve('/multiplayer/room/[roomId]', { roomId }),
-    );
+    if (kind === 'draft-duel') {
+      await goto(resolve(multiplayerGameRoomRouteId('draft-duel'), { roomId }));
+    } else if (kind === 'havoc') {
+      await goto(resolve(multiplayerGameRoomRouteId('havoc'), { roomId }));
+    } else {
+      await goto(resolve(multiplayerGameRoomRouteId('fixed-five'), { roomId }));
+    }
   }
   async function refreshLobby(lobbyId: string) {
     try {
@@ -161,6 +179,11 @@
     lastRoomId = loadLastFixedFiveRoomId();
     lastLobbyId = loadLobbyId();
     const params = new URLSearchParams(window.location.search);
+    const formatParam = formats.find((item) => item.id === params.get('format'));
+    if (formatParam) {
+      matchFormat = formatParam.id;
+      view = 'create';
+    }
     const lobbyParam = params.get('lobby');
     if (lobbyParam) {
       view = 'create';
@@ -198,13 +221,18 @@
               variant,
               versions: { ...(await draftDuelController.roomVersions()) },
             }
-          : {
-              gameKind: 'fixed-five' as const,
-              mode: mode!,
-              sourceMode,
-              variant,
-              versions: { ...(await versions()) },
-            };
+          : matchFormat === 'havoc'
+            ? {
+                gameKind: 'havoc' as const,
+                versions: { ...(await loadHavocMultiplayerVersionLocks()) },
+              }
+            : {
+                gameKind: 'fixed-five' as const,
+                mode: mode!,
+                sourceMode,
+                variant,
+                versions: { ...(await versions()) },
+              };
       const current = lobby ?? multiplayerLobbySchema.parse(await lobbyCommand({ kind: 'create' }));
       if (!mounted) return;
       lobby = current;
@@ -245,7 +273,7 @@
       const result = await previewMultiplayerRoom(code);
       if (!mounted) return;
       preview = result.legacy
-        ? `${result.gameKind === 'draft-duel' ? 'Draft Duel' : 'Season / Duel'} room`
+        ? `${multiplayerGameKindLabels[result.gameKind]} room`
         : `Shared lobby · ${result.guestJoined ? '2 players' : 'Waiting for an opponent'}`;
     } catch (e) {
       if (mounted) {
@@ -468,7 +496,8 @@
           <p class="eyebrow">Same room · Next match</p>
           <h2>Waiting for your host</h2>
           <p class="join-description">
-            Your host can choose Season, Duel, or Draft Duel. You’ll enter the next match together.
+            Your host can choose Season, Duel, Draft Duel, or Hoop Havoc. You’ll enter the next
+            match together.
           </p>
         {:else if view === 'create'}
           <p class="eyebrow">Configure your match</p>
@@ -503,7 +532,7 @@
                 >
               </div>
             </fieldset>
-          {:else}
+          {:else if matchFormat !== 'havoc'}
             <fieldset disabled={busy} class="draft-source">
               <legend class="field-label">Draft source</legend>
               <div class="knowledge-options">
@@ -528,29 +557,31 @@
               </div>
             </fieldset>
           {/if}
-          <fieldset disabled={busy}>
-            <legend class="field-label">Knowledge setting</legend>
-            <div class="knowledge-options">
-              <button
-                type="button"
-                aria-pressed={variant === 'ratings'}
-                class={['option', { active: variant === 'ratings' }]}
-                onclick={() => (variant = 'ratings')}
-                ><ChartNoAxesColumn size={21} aria-hidden="true" /><span
-                  ><strong>Ratings</strong><small>See player ratings</small></span
-                ></button
-              >
-              <button
-                type="button"
-                aria-pressed={variant === 'ball-knowledge'}
-                class={['option', { active: variant === 'ball-knowledge' }]}
-                onclick={() => (variant = 'ball-knowledge')}
-                ><Brain size={21} aria-hidden="true" /><span
-                  ><strong>Ball Knowledge</strong><small>Draft from memory</small></span
-                ></button
-              >
-            </div>
-          </fieldset>
+          {#if matchFormat !== 'havoc'}
+            <fieldset disabled={busy}>
+              <legend class="field-label">Knowledge setting</legend>
+              <div class="knowledge-options">
+                <button
+                  type="button"
+                  aria-pressed={variant === 'ratings'}
+                  class={['option', { active: variant === 'ratings' }]}
+                  onclick={() => (variant = 'ratings')}
+                  ><ChartNoAxesColumn size={21} aria-hidden="true" /><span
+                    ><strong>Ratings</strong><small>See player ratings</small></span
+                  ></button
+                >
+                <button
+                  type="button"
+                  aria-pressed={variant === 'ball-knowledge'}
+                  class={['option', { active: variant === 'ball-knowledge' }]}
+                  onclick={() => (variant = 'ball-knowledge')}
+                  ><Brain size={21} aria-hidden="true" /><span
+                    ><strong>Ball Knowledge</strong><small>Draft from memory</small></span
+                  ></button
+                >
+              </div>
+            </fieldset>
+          {/if}
           <dl class="match-rules">
             <div>
               <dt><CalendarDays size={15} aria-hidden="true" /> Match format</dt>
@@ -559,7 +590,7 @@
             <div>
               <dt><Clock size={15} aria-hidden="true" /> Pick timer</dt>
               <dd>
-                {matchFormat === 'draft-duel'
+                {matchFormat === 'draft-duel' || matchFormat === 'havoc'
                   ? '60s picks'
                   : mode === 'sandbox-shared-82'
                     ? '5m picks'

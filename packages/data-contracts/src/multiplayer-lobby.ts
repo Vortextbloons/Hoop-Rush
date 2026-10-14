@@ -5,8 +5,9 @@ import {
   fixedFiveSourceModeSchema,
 } from './fixed-five-multiplayer.ts';
 import { draftDuelVersionLocksSchema } from './draft-duel.ts';
+import { havocMultiplayerVersionLocksSchema } from './havoc-multiplayer.ts';
 
-const gameKindSchema = z.enum(['fixed-five', 'draft-duel']);
+const gameKindSchema = z.enum(['fixed-five', 'draft-duel', 'havoc']);
 export const multiplayerLobbySchema = z.object({
   id: z.uuid(),
   code: z.string().regex(/^\d{4}$/),
@@ -51,6 +52,10 @@ export const multiplayerLobbyCommandSchema = z.union([
         fairness: z.enum(['fair', 'unfair']),
         variant: z.enum(['ratings', 'ball-knowledge']),
         versions: draftDuelVersionLocksSchema,
+      }),
+      z.object({
+        gameKind: z.literal('havoc'),
+        versions: havocMultiplayerVersionLocksSchema,
       }),
     ]),
   }),

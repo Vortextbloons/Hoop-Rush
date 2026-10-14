@@ -57,5 +57,23 @@
     </div>
   </section>
 {:else if controller !== null}
+  <div class="multiplayer-entry">
+    <a class="h-button secondary" href={resolve('/multiplayer?format=havoc')}>Play multiplayer</a>
+  </div>
   <HavocSetup {controller} {franchiseName} onLocked={() => void goto(resolve('/havoc/run'))} />
 {/if}
+
+<style>
+  .multiplayer-entry {
+    display: flex;
+    justify-content: flex-end;
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 16px 24px 0;
+  }
+  @media (max-width: 760px) {
+    .multiplayer-entry {
+      padding: 12px 16px 0;
+    }
+  }
+</style>

@@ -8,9 +8,31 @@ import {
 } from '@hoop-rush/data-contracts';
 import { getFixedFiveTransport } from './fixed-five-transport';
 import { getDraftDuelTransport } from '$lib/features/draft-duel/draft-duel-transport';
+import { getHavocMultiplayerTransport } from '$lib/features/havoc-multiplayer/havoc-multiplayer-transport';
 import { saveFixedFiveMembership } from './fixed-five-identity';
 import { saveDraftDuelMembership } from '$lib/features/draft-duel/draft-duel-identity';
+import { saveHavocMultiplayerMembership } from '$lib/features/havoc-multiplayer/havoc-multiplayer-identity';
 import { getMultiplayerClient } from '$lib/supabase-runtime';
+
+export type MultiplayerGameKind = NonNullable<MultiplayerLobby['gameKind']>;
+
+export const multiplayerGameKindLabels = {
+  'fixed-five': 'Season / Duel',
+  'draft-duel': 'Draft Duel',
+  havoc: 'Hoop Havoc',
+} as const satisfies Record<MultiplayerGameKind, string>;
+
+const multiplayerGameRoomRouteIds = {
+  'fixed-five': '/multiplayer/room/[roomId]',
+  'draft-duel': '/draft-duel/room/[roomId]',
+  havoc: '/havoc/room/[roomId]',
+} as const satisfies Record<MultiplayerGameKind, string>;
+
+export function multiplayerGameRoomRouteId<T extends MultiplayerGameKind>(
+  kind: T,
+): (typeof multiplayerGameRoomRouteIds)[T] {
+  return multiplayerGameRoomRouteIds[kind];
+}
 
 export async function lobbyCommand(command: MultiplayerLobbyCommand): Promise<unknown> {
   const client = await getMultiplayerClient();
@@ -48,12 +70,15 @@ export function loadLobbyId(roomId?: string): string | null {
   }
 }
 export async function resumeMultiplayerGame(
-  gameKind: 'fixed-five' | 'draft-duel',
+  gameKind: MultiplayerGameKind,
   roomId: string,
 ): Promise<void> {
   if (gameKind === 'draft-duel') {
     const { membership } = await getDraftDuelTransport().resume(roomId);
     saveDraftDuelMembership(membership);
+  } else if (gameKind === 'havoc') {
+    const { membership } = await getHavocMultiplayerTransport().resume(roomId);
+    saveHavocMultiplayerMembership(membership);
   } else {
     const { membership } = await getFixedFiveTransport().resume(roomId);
     saveFixedFiveMembership(membership);

@@ -3,8 +3,10 @@ import {
   HAVOC_RULES_VERSION,
   HAVOC_SCHEMA_VERSION,
   HAVOC_SEED_DERIVATION_VERSION,
+  defaultHavocMultiplayerVersionLocks,
   type HavocCatalog,
   type HavocCatalogSource,
+  type HavocMultiplayerVersionLocks,
   type HavocVersionSet,
 } from '@hoop-rush/data-contracts';
 import {
@@ -86,4 +88,18 @@ export function loadHavocMultiplayerDraftAssets(): Promise<HavocMultiplayerDraft
     }),
   }));
   return draftAssetsPromise;
+}
+
+export async function loadHavocMultiplayerVersionLocks(): Promise<HavocMultiplayerVersionLocks> {
+  const assets = await loadHavocMultiplayerAssets();
+  return defaultHavocMultiplayerVersionLocks({
+    engineVersion: assets.versionSet.engineVersion,
+    rulesVersion: assets.versionSet.rulesVersion,
+    mutationCatalogVersion: assets.versionSet.mutationCatalogVersion,
+    profileVersion: assets.versionSet.profileVersion,
+    dataVersion: assets.versionSet.dataVersion,
+    catalogVersion: assets.versionSet.catalogVersion,
+    catalogHash: assets.versionSet.catalogHash,
+    profileHash: assets.versionSet.profileHash,
+  });
 }
