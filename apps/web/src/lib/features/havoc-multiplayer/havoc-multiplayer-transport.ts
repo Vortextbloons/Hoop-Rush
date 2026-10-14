@@ -17,6 +17,7 @@ import {
   havocMultiplayerRoomSnapshotSchema,
   havocMultiplayerSeriesSnapshotSchema,
   havocMultiplayerTransientEventSchema,
+  havocMultiplayerVariantSchema,
   havocMultiplayerVersionLocksSchema,
   havocMultiplayerVerificationReceiptSchema,
   idSchema,
@@ -60,6 +61,7 @@ interface HavocMultiplayerRoomRow {
   code: string | null;
   code_active: boolean;
   versions: unknown;
+  variant: unknown;
   root_seed: string;
   phase: string;
   revision: number;
@@ -115,7 +117,7 @@ interface ServerSeries {
 }
 
 const ROOM_COLUMNS =
-  'id, code, code_active, versions, root_seed, phase, revision, command_count, result_digest, confirmed_digest, successor_room_id, deadline_at, deadline_cursor, deadline_participant, deadline_fallback, deadline_pick_ordinal, draft_state, series, broadcast, game_state, created_at, expires_at';
+  'id, code, code_active, versions, variant, root_seed, phase, revision, command_count, result_digest, confirmed_digest, successor_room_id, deadline_at, deadline_cursor, deadline_participant, deadline_fallback, deadline_pick_ordinal, draft_state, series, broadcast, game_state, created_at, expires_at';
 const MEMBER_COLUMNS = 'participant_id, online, ready, next_game_ready, locked, last_seen_at';
 const COMMAND_COLUMNS = 'command_id, ordinal, actor_participant_id, payload';
 
@@ -263,6 +265,7 @@ function roomRowToSnapshot(
   const versions = havocMultiplayerVersionLocksSchema.parse(row.versions);
   const settings = havocMultiplayerRoomSettingsSchema.parse({
     schemaVersion: HAVOC_MULTIPLAYER_SAVE_SCHEMA_VERSION,
+    variant: row.variant,
     versions,
   });
   let broadcast: HavocMultiplayerRoomSnapshot['broadcast'] = null;
@@ -436,6 +439,7 @@ export function createHavocMultiplayerTransport(
       Array.isArray(commandData) ? commandData : []
     ) as HavocMultiplayerCommandRow[];
     const assets = await loadDraftAssets();
+    const versions = havocMultiplayerVersionLocksSchema.parse(row.versions);
     return replayHavocMultiplayerDraft({
       rootSeed: seedSchema.parse(row.root_seed),
       catalog: assets.catalog,
@@ -443,6 +447,10 @@ export function createHavocMultiplayerTransport(
       commands: commandRows.map((command) =>
         havocMultiplayerCommandPayloadSchema.parse(command.payload),
       ),
+      settings: {
+        variant: havocMultiplayerVariantSchema.parse(row.variant ?? 'standard'),
+        rulesVersion: versions.rulesVersion,
+      },
     });
   }
   async function fetchSnapshot(roomId: string): Promise<HavocMultiplayerRoomSnapshot> {
@@ -487,6 +495,7 @@ export function createHavocMultiplayerTransport(
       await ensureAnonymous(client);
       const response = await client.rpc('havoc_multiplayer_room_create', {
         p_versions: settingsInput.versions,
+        p_variant: settingsInput.variant ?? 'standard',
       });
       if (response.error || !response.data) {
         throw new Error(`create failed: ${response.error?.message ?? 'unknown'}`);
@@ -509,6 +518,7 @@ export function createHavocMultiplayerTransport(
         throw new Error(`invalid-code: ${response.error?.message ?? code}`);
       const record = response.data as unknown as Record<string, unknown>;
       const versions = havocMultiplayerVersionLocksSchema.parse(record['versions']);
+      const variant = havocMultiplayerVariantSchema.parse(record['variant'] ?? 'standard');
       const phase = havocMultiplayerPhaseSchema.parse(
         typeof record['phase'] === 'string' ? record['phase'] : 'lobby',
       );
@@ -520,6 +530,7 @@ export function createHavocMultiplayerTransport(
         revision,
         settings: havocMultiplayerRoomSettingsSchema.parse({
           schemaVersion: HAVOC_MULTIPLAYER_SAVE_SCHEMA_VERSION,
+          variant,
           versions,
         }),
         members: [memberFallback('p1'), memberFallback('p2')],

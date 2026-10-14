@@ -42,6 +42,7 @@ import {
   buildHavocMultiplayerGameInput,
   buildHavocMultiplayerTeam,
   createHavocMultiplayerDraft,
+  defaultHavocMultiplayerDraftSettings,
 } from './draft.ts';
 import {
   createHavocMultiplayerSeries,
@@ -80,13 +81,19 @@ function playFullDraft(
   catalog: ReturnType<typeof buildHavocCatalogFixture>['adapted'],
   environment: ReturnType<typeof buildHavocEnvironmentFixture>,
 ): HavocMultiplayerDraftState {
-  let state = createHavocMultiplayerDraft(rootSeed, catalog, environment);
+  let state = createHavocMultiplayerDraft(
+    rootSeed,
+    catalog,
+    environment,
+    defaultHavocMultiplayerDraftSettings(),
+  );
   while (state.status === 'drafting') {
     const outcome = applyHavocMultiplayerDraftCommand(
       state,
       firstCardPayload(state),
       catalog,
       environment,
+      defaultHavocMultiplayerDraftSettings(),
     );
     expect(outcome.receipt.accepted).toBe(true);
     state = outcome.state;

@@ -11,7 +11,7 @@ import type {
 } from '@hoop-rush/data-contracts';
 import {
   HAVOC_OFFER_SIZE,
-  HAVOC_OVERALL_WINDOW_WIDTH,
+  HAVOC_OFFER_TARGET_RADIUS,
   HAVOC_REROLL_LIMIT,
   HAVOC_TIER_PROBABILITIES,
   POSITIONS,
@@ -38,6 +38,44 @@ import { applyHavocMutationPackage } from './transform.ts';
 
 const GROWTH_SPURT_MIN_INCHES = 6;
 const GROWTH_SPURT_MAX_INCHES = 12;
+
+export interface HavocOverallWindow {
+  readonly target: number;
+  readonly minOverall: number;
+  readonly maxOverall: number;
+}
+
+export function havocOverallInWindow(
+  originalOverall: number,
+  window: Pick<HavocOverallWindow, 'minOverall' | 'maxOverall'>,
+): boolean {
+  return originalOverall >= window.minOverall && originalOverall <= window.maxOverall;
+}
+
+/**
+ * Enumerates every integer target Overall whose inclusive ±radius window holds
+ * at least HAVOC_OFFER_SIZE eligible items. Each item contributes the original
+ * Overall values it can be offered at; callers filter by position eligibility
+ * (and, in Curated multiplayer, by rating tier) beforehand.
+ */
+export function enumerateHavocOverallWindows(
+  eligibleOveralls: readonly (readonly number[])[],
+): readonly HavocOverallWindow[] {
+  const windows: HavocOverallWindow[] = [];
+  for (let target = 0; target <= 100; target += 1) {
+    const minOverall = Math.max(0, target - HAVOC_OFFER_TARGET_RADIUS);
+    const maxOverall = Math.min(100, target + HAVOC_OFFER_TARGET_RADIUS);
+    let count = 0;
+    for (const overalls of eligibleOveralls) {
+      if (overalls.some((overall) => overall >= minOverall && overall <= maxOverall)) {
+        count += 1;
+        if (count >= HAVOC_OFFER_SIZE) break;
+      }
+    }
+    if (count >= HAVOC_OFFER_SIZE) windows.push({ target, minOverall, maxOverall });
+  }
+  return windows;
+}
 
 export function drawHavocCardTier(rng: Rng): HavocTier {
   const roll = rng.next();
@@ -201,31 +239,30 @@ export const GenerateHavocOffer: GenerateHavocOfferSignature = (
     }
   }
 
-  const windows: { readonly minOverall: number; readonly claims: readonly HavocClaimGroup[] }[] =
-    [];
-  for (let minOverall = 0; minOverall <= 100 - HAVOC_OVERALL_WINDOW_WIDTH; minOverall += 1) {
-    const maxOverall = minOverall + HAVOC_OVERALL_WINDOW_WIDTH;
-    const claims = completable.filter((group) =>
-      group.versions.some(
-        (version) =>
-          version.positions.includes(slot) &&
-          version.originalOverall >= minOverall &&
-          version.originalOverall <= maxOverall,
-      ),
-    );
-    if (claims.length >= HAVOC_OFFER_SIZE) windows.push({ minOverall, claims });
-  }
+  const windows = enumerateHavocOverallWindows(
+    completable.map((group) =>
+      group.versions
+        .filter((version) => version.positions.includes(slot))
+        .map((version) => version.originalOverall),
+    ),
+  );
   if (windows.length === 0) {
     throw new HavocCatalogCoverageError(
       slot,
-      `no ${String(HAVOC_OVERALL_WINDOW_WIDTH)}-point overall window holds ${String(HAVOC_OFFER_SIZE)} eligible claims`,
+      `no ±${String(HAVOC_OFFER_TARGET_RADIUS)} target window holds ${String(HAVOC_OFFER_SIZE)} eligible claims`,
     );
   }
 
   const windowRng = environment.rngFactory(havocDraftWindowSeed(runSeed, round, offerIndex));
   const selectedWindow = windowRng.pick(windows);
   const playersRng = environment.rngFactory(havocDraftPlayersSeed(runSeed, round, offerIndex));
-  const pool = [...selectedWindow.claims];
+  const pool = completable.filter((group) =>
+    group.versions.some(
+      (version) =>
+        version.positions.includes(slot) &&
+        havocOverallInWindow(version.originalOverall, selectedWindow),
+    ),
+  );
   if (pool.length < HAVOC_OFFER_SIZE) {
     throw new Error('havoc offer claim pool underflow');
   }
@@ -242,8 +279,7 @@ export const GenerateHavocOffer: GenerateHavocOfferSignature = (
     const eligible = group.versions.filter(
       (version) =>
         version.positions.includes(slot) &&
-        version.originalOverall >= selectedWindow.minOverall &&
-        version.originalOverall <= selectedWindow.minOverall + HAVOC_OVERALL_WINDOW_WIDTH,
+        havocOverallInWindow(version.originalOverall, selectedWindow),
     );
     if (eligible.length === 0) {
       throw new Error(`havoc offer version pool underflow for claim ${group.claimKey}`);

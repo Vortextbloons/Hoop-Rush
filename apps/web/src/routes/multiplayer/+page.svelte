@@ -33,6 +33,7 @@
     type FixedFiveRoomMode,
     type FixedFiveSourceMode,
     type FixedFiveVersionLocks,
+    type HavocMultiplayerVariant,
   } from '@hoop-rush/data-contracts';
   import { ENGINE_VERSION } from '@hoop-rush/engine';
   import { DraftDuelController } from '#lib/features/draft-duel/draft-duel-controller.svelte.js';
@@ -64,6 +65,7 @@
   let matchFormat = $state<MatchFormat>('season');
   let sourceMode = $state<FixedFiveSourceMode>('classic');
   let ddFairness = $state<'fair' | 'unfair'>('fair');
+  let hvVariant = $state<HavocMultiplayerVariant>('standard');
   const draftDuelController = new DraftDuelController();
   const mode = $derived<FixedFiveRoomMode | null>(
     matchFormat === 'duel'
@@ -225,6 +227,7 @@
           : matchFormat === 'havoc'
             ? {
                 gameKind: 'havoc' as const,
+                variant: hvVariant,
                 versions: { ...(await loadHavocMultiplayerVersionLocks()) },
               }
             : {
@@ -274,7 +277,9 @@
       const result = await previewMultiplayerRoom(code);
       if (!mounted) return;
       preview = result.legacy
-        ? `${multiplayerGameKindLabels[result.gameKind]} room`
+        ? result.gameKind === 'havoc'
+          ? `${multiplayerGameKindLabels[result.gameKind]} · ${result.variant === 'curated' ? 'Curated' : 'Standard'} room`
+          : `${multiplayerGameKindLabels[result.gameKind]} room`
         : `Shared lobby · ${result.guestJoined ? '2 players' : 'Waiting for an opponent'}`;
     } catch (e) {
       if (mounted) {
@@ -533,7 +538,31 @@
                 >
               </div>
             </fieldset>
-          {:else if matchFormat !== 'havoc'}
+          {:else if matchFormat === 'havoc'}
+            <fieldset disabled={busy}>
+              <legend class="field-label">Mode</legend>
+              <div class="knowledge-options">
+                <button
+                  type="button"
+                  aria-pressed={hvVariant === 'standard'}
+                  class={['option', { active: hvVariant === 'standard' }]}
+                  onclick={() => (hvVariant = 'standard')}
+                  ><Swords size={21} aria-hidden="true" /><span
+                    ><strong>Standard</strong><small>Open draft board</small></span
+                  ></button
+                >
+                <button
+                  type="button"
+                  aria-pressed={hvVariant === 'curated'}
+                  class={['option', { active: hvVariant === 'curated' }]}
+                  onclick={() => (hvVariant = 'curated')}
+                  ><Sparkles size={21} aria-hidden="true" /><span
+                    ><strong>Curated</strong><small>Guaranteed lineup shape</small></span
+                  ></button
+                >
+              </div>
+            </fieldset>
+          {:else}
             <fieldset disabled={busy} class="draft-source">
               <legend class="field-label">Draft source</legend>
               <div class="knowledge-options">

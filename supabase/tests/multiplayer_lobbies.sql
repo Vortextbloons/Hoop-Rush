@@ -74,6 +74,26 @@ begin
   assert not (v_next->>'guestJoined')::boolean, 'removing opponent clears lobby seat';
   assert v_next->>'code' <> v_code, 'removing opponent rotates invite code';
   assert not exists(select 1 from public.draft_duel_room_members where room_id = (v_next->>'gameRoomId')::uuid and uid = v_guest), 'removed opponent loses game seat';
+  update public.draft_duel_rooms set phase = 'championship' where id = (v_next->>'gameRoomId')::uuid;
+  select jsonb_object_agg(key, value) into v_versions from public.havoc_multiplayer_server_versions;
+  v_versions := jsonb_build_object(
+    'schemaVersion', 1,
+    'engineVersion', 'm3-engine-v25',
+    'rulesVersion', 'havoc-rules-v6',
+    'mutationCatalogVersion', 'havoc-mutations-v5',
+    'profileVersion', '2010s-fixed-v1',
+    'dataVersion', 'data-v1',
+    'catalogVersion', 'catalog-v1',
+    'catalogHash', repeat('a',64),
+    'profileHash', repeat('b',64)) || v_versions;
+  v_settings := jsonb_build_object('gameKind', 'havoc', 'variant', 'curated', 'versions', v_versions);
+  v_next := public.multiplayer_lobby_command(jsonb_build_object(
+    'kind', 'start', 'lobbyId', v_lobby->>'id',
+    'expectedRevision', (select revision from public.multiplayer_lobbies where id = (v_lobby->>'id')::uuid),
+    'settings', v_settings));
+  assert v_next->>'gameKind' = 'havoc', 'draft-duel switches to Hoop Havoc';
+  assert (select variant from public.havoc_multiplayer_rooms where id = (v_next->>'gameRoomId')::uuid) = 'curated', 'lobby passes the curated variant into the room';
+  assert exists(select 1 from public.havoc_multiplayer_room_members where room_id = (v_next->>'gameRoomId')::uuid and uid = v_host and participant_id = 'p1'), 'havoc host seat transfers';
 end $$;
 select pass('multiplayer lobby integration assertions passed');
 select * from finish();

@@ -6,6 +6,7 @@ import type {
   Seed,
 } from '@hoop-rush/data-contracts';
 import {
+  HAVOC_OFFER_TARGET_RADIUS,
   PLAYER_VERSION_ID_VERSION,
   POSITION_NORMALIZATION_VERSION,
   RATINGS_VERSION,
@@ -34,7 +35,7 @@ import {
   buildHavocEnvironmentFixture,
 } from './havoc-test-support.ts';
 import { havocMutationDefinitionOf } from './mutations.ts';
-import { GenerateHavocOffer, drawHavocCardTier } from './offers.ts';
+import { GenerateHavocOffer, drawHavocCardTier, enumerateHavocOverallWindows } from './offers.ts';
 
 const fixture = buildHavocCatalogFixture();
 const environment = buildHavocEnvironmentFixture(fixture.adapted);
@@ -163,7 +164,7 @@ function allTierClaims(): SeasonDraftCandidate[] {
 }
 
 describe('havoc offer generation', () => {
-  it('generates a schema-valid, deterministic offer with a bounded overall window', () => {
+  it('generates a schema-valid, deterministic offer inside a target ±3 window', () => {
     const first = generateOffer({});
     const second = generateOffer({});
     expect(first).toEqual(second);
@@ -178,7 +179,9 @@ describe('havoc offer generation', () => {
     );
     expect(new Set(claimKeys).size).toBe(3);
     const overalls = first.cards.map((card) => card.source.originalOverall);
-    expect(Math.max(...overalls) - Math.min(...overalls)).toBeLessThanOrEqual(3);
+    expect(Math.max(...overalls) - Math.min(...overalls)).toBeLessThanOrEqual(
+      2 * HAVOC_OFFER_TARGET_RADIUS,
+    );
     first.cards.forEach((card, index) => {
       expect(card.cardId).toMatch(/^hvc-[0-9a-f]{32}$/);
       expect(card.offerId).toBe(first.offerId);
@@ -191,6 +194,30 @@ describe('havoc offer generation', () => {
       expect(card.effective.physical.heightInches).toBeGreaterThanOrEqual(50);
       expect(card.effective.physical.heightInches).toBeLessThanOrEqual(108);
     });
+  });
+
+  it('enumerates ±3 integer target windows with clamped edges', () => {
+    const low = enumerateHavocOverallWindows([[0], [1], [2], [100]]);
+    expect(low.length).toBeGreaterThan(0);
+    for (const window of low) {
+      expect(window.minOverall).toBe(0);
+      expect(window.maxOverall - window.minOverall).toBeLessThanOrEqual(
+        2 * HAVOC_OFFER_TARGET_RADIUS,
+      );
+      expect(window.target).toBeGreaterThanOrEqual(window.minOverall);
+      expect(window.target).toBeLessThanOrEqual(window.maxOverall);
+    }
+    expect(low.some((window) => window.target === 0)).toBe(true);
+
+    const high = enumerateHavocOverallWindows([[97], [98], [99]]);
+    expect(high.length).toBeGreaterThan(0);
+    expect(
+      high.some(
+        (window) => window.target === 100 && window.minOverall === 97 && window.maxOverall === 100,
+      ),
+    ).toBe(true);
+
+    expect(enumerateHavocOverallWindows([[0], [100]])).toEqual([]);
   });
 
   it('keeps every card playable at the drafted slot across all five rounds', () => {

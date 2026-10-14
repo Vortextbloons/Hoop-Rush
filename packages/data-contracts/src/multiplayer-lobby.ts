@@ -5,9 +5,18 @@ import {
   fixedFiveSourceModeSchema,
 } from './fixed-five-multiplayer.ts';
 import { draftDuelVersionLocksSchema } from './draft-duel.ts';
-import { havocMultiplayerVersionLocksSchema } from './havoc-multiplayer.ts';
+import {
+  havocMultiplayerVariantSchema,
+  havocMultiplayerVersionLocksSchema,
+} from './havoc-multiplayer.ts';
 
 const gameKindSchema = z.enum(['fixed-five', 'draft-duel', 'havoc']);
+const legacyRoomSchema = z.object({
+  legacy: z.literal(true),
+  gameKind: gameKindSchema,
+  gameRoomId: z.uuid(),
+  variant: havocMultiplayerVariantSchema.optional(),
+});
 export const multiplayerLobbySchema = z.object({
   id: z.uuid(),
   code: z.string().regex(/^\d{4}$/),
@@ -19,17 +28,14 @@ export const multiplayerLobbySchema = z.object({
   canStart: z.boolean(),
 });
 export type MultiplayerLobby = z.infer<typeof multiplayerLobbySchema>;
-export const multiplayerRoomLookupSchema = z.union([
-  multiplayerLobbySchema,
-  z.object({ legacy: z.literal(true), gameKind: gameKindSchema, gameRoomId: z.uuid() }),
-]);
+export const multiplayerRoomLookupSchema = z.union([multiplayerLobbySchema, legacyRoomSchema]);
 export const multiplayerRoomPreviewSchema = z.union([
   z.object({
     legacy: z.literal(false),
     code: z.string().regex(/^\d{4}$/),
     guestJoined: z.boolean(),
   }),
-  z.object({ legacy: z.literal(true), gameKind: gameKindSchema, gameRoomId: z.uuid() }),
+  legacyRoomSchema,
 ]);
 export const multiplayerLobbyCommandSchema = z.union([
   z.object({ kind: z.literal('create') }),
@@ -55,6 +61,7 @@ export const multiplayerLobbyCommandSchema = z.union([
       }),
       z.object({
         gameKind: z.literal('havoc'),
+        variant: havocMultiplayerVariantSchema,
         versions: havocMultiplayerVersionLocksSchema,
       }),
     ]),

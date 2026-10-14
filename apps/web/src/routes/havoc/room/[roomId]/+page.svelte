@@ -15,14 +15,14 @@
     UserMinus,
     Users,
   } from '@lucide/svelte';
-  import { HAVOC_MULTIPLAYER_SHOWDOWN_MS, type HavocDraftCard } from '@hoop-rush/data-contracts';
+  import { HAVOC_MULTIPLAYER_SHOWDOWN_MS } from '@hoop-rush/data-contracts';
   import type { ReactionKey } from '@hoop-rush/application/havoc-multiplayer';
-  import HavocDraftCardView from '#lib/features/havoc/HavocDraftCard.svelte';
   import HavocLineupLock from '#lib/features/havoc/HavocLineupLock.svelte';
   import { HavocMultiplayerController } from '#lib/features/havoc-multiplayer/havoc-multiplayer-controller.svelte.js';
   import { inviteLinkForHavocMultiplayerCode } from '#lib/features/havoc-multiplayer/havoc-multiplayer-identity.js';
   import HavocMultiplayerBroadcast from '#lib/features/havoc-multiplayer/HavocMultiplayerBroadcast.svelte';
   import HavocMultiplayerChampionship from '#lib/features/havoc-multiplayer/HavocMultiplayerChampionship.svelte';
+  import HavocMultiplayerDraftBoard from '#lib/features/havoc-multiplayer/HavocMultiplayerDraftBoard.svelte';
   import HavocMultiplayerGameResults from '#lib/features/havoc-multiplayer/HavocMultiplayerGameResults.svelte';
   import HavocMultiplayerLineupRail from '#lib/features/havoc-multiplayer/HavocMultiplayerLineupRail.svelte';
   import HavocMultiplayerSeriesTracker from '#lib/features/havoc-multiplayer/HavocMultiplayerSeriesTracker.svelte';
@@ -49,7 +49,6 @@
   let wideLayout = $state(false);
   let copiedCode = $state(false);
   let copiedLink = $state(false);
-  let selectedCardId = $state<string | null>(null);
   let showdownReady = $state(false);
   let showdownSecondsLeft = $state(0);
   let followingRematch = false;
@@ -79,6 +78,7 @@
 
   const phase = $derived(controller.phase);
   const phaseLabel = $derived(havocMultiplayerPhaseLabel(phase));
+  const variantLabel = $derived(controller.variant === 'curated' ? 'Curated' : 'Standard');
   const stageIndex = $derived(havocMultiplayerStageIndex(phase));
   const me = $derived(
     controller.members.find((member) => member.participantId === controller.participantId) ?? null,
@@ -101,9 +101,6 @@
   const myLineupSlots = $derived(havocMultiplayerLineupSlots(myPicks));
   const rivalLineupSlots = $derived(havocMultiplayerLineupSlots(rivalPicks));
   const offer = $derived(controller.offer);
-  const selectedCard = $derived(
-    offer?.cards.find((card) => card.cardId === selectedCardId) ?? null,
-  );
   const pickSecondsLeft = $derived(havocMultiplayerSecondsLeft(controller.deadlineMsLeft));
   const urgentPick = $derived(pickSecondsLeft !== null && pickSecondsLeft <= 10);
   const rerollsUsed = $derived(
@@ -169,31 +166,6 @@
     });
   });
 
-  function onKeydown(event: KeyboardEvent): void {
-    if (phase !== 'drafting' || !controller.activeTurn) return;
-    const cards = offer?.cards ?? [];
-    if (event.key === '1' || event.key === '2' || event.key === '3') {
-      const card = cards[Number(event.key) - 1];
-      if (!card) return;
-      selectedCardId = card.cardId;
-      event.preventDefault();
-      return;
-    }
-    if (event.key === 'Enter' && selectedCard !== null) {
-      event.preventDefault();
-      void pickCard(selectedCard);
-      return;
-    }
-    if (event.key === 'Escape') {
-      selectedCardId = null;
-    }
-  }
-
-  async function pickCard(card: HavocDraftCard): Promise<void> {
-    selectedCardId = null;
-    await controller.pickCard(card);
-  }
-
   async function copyCode(): Promise<void> {
     const code = controller.snapshot?.code;
     if (!code) return;
@@ -238,8 +210,6 @@
   <title>Havoc room · Hoop Rush</title>
 </svelte:head>
 
-<svelte:window onkeydown={onKeydown} />
-
 <section class="h-shell hm-room">
   <div class="hm-nav">
     <a href={resolve('/multiplayer')}><ArrowLeft size={15} aria-hidden="true" /> Multiplayer</a>
@@ -268,7 +238,7 @@
         <p class="h-eyebrow">Hoop Havoc · Multiplayer</p>
         <h1 class="h-title">Havoc room</h1>
         <p class="hm-subtitle">
-          Best of seven · {phaseLabel} · Room {controller.snapshot.code}
+          Best of seven · {variantLabel} · {phaseLabel} · Room {controller.snapshot.code}
         </p>
       </div>
       {#if phase !== 'lobby' && phase !== 'expired' && phase !== 'integrity-failed'}
@@ -329,7 +299,9 @@
                 /> Copy invite link{/if}</button
             >
           </div>
-          <p class="hm-footnote">Room codes expire after 15 minutes.</p>
+          <p class="hm-footnote">
+            Hoop Havoc · {variantLabel} · Room codes expire after 15 minutes.
+          </p>
         </div>
 
         <div class="h-panel hm-seats">
@@ -419,6 +391,7 @@
             eyebrow={me?.displayName ?? 'You'}
             active={drafting && controller.draft?.activeParticipantId === controller.participantId}
             collapsible={!wideLayout}
+            side="local"
             emptyLabel={drafting ? 'Your first pick is coming up.' : 'No lineup recorded.'}
           />
         </div>
@@ -452,19 +425,16 @@
               {/if}
 
               {#if offer}
-                <ul class="h-cards hm-offer">
-                  {#each offer.cards as card, index (card.cardId)}
-                    <li class="hm-offer-card" data-selected={card.cardId === selectedCardId}>
-                      <span class="hm-offer-key" aria-hidden="true">{index + 1}</span>
-                      <HavocDraftCardView
-                        {card}
-                        mode="effective"
-                        busy={controller.busy || !controller.activeTurn}
-                        onPick={() => void pickCard(card)}
-                      />
-                    </li>
-                  {/each}
-                </ul>
+                <HavocMultiplayerDraftBoard
+                  cards={offer.cards}
+                  offerId={offer.offerId}
+                  revision={controller.draft?.revision ?? 0}
+                  active={controller.activeTurn}
+                  busy={controller.busy}
+                  {reducedMotion}
+                  lineupSide="local"
+                  onpick={(card) => controller.pickCard(card)}
+                />
                 <p class="hm-keys">
                   Press <kbd>1</kbd>–<kbd>3</kbd> to choose a card, <kbd>Enter</kbd> to draft it.
                 </p>
@@ -654,6 +624,7 @@
             eyebrow={rival?.displayName ?? 'Opponent'}
             active={drafting && controller.draft?.activeParticipantId !== controller.participantId}
             collapsible={!wideLayout}
+            side="rival"
             emptyLabel="Their picks show up here as they draft."
           />
         </div>
@@ -967,38 +938,6 @@
     margin: 0;
     font-size: 12px;
     color: #f290c5;
-  }
-  .hm-offer {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-  .hm-offer-card {
-    position: relative;
-    display: flex;
-    min-width: 0;
-  }
-  .hm-offer-card[data-selected='true'] {
-    border-radius: 24px;
-    outline: 3px solid #f290c5;
-    outline-offset: 4px;
-  }
-  .hm-offer-key {
-    position: absolute;
-    z-index: 2;
-    top: -12px;
-    left: 50%;
-    transform: translateX(-50%);
-    display: grid;
-    place-items: center;
-    width: 26px;
-    height: 26px;
-    border-radius: 999px;
-    background: #ffd782;
-    color: #141b39;
-    font-family: var(--font-mono);
-    font-size: 12px;
-    font-weight: 800;
   }
   .hm-keys {
     margin: 0;

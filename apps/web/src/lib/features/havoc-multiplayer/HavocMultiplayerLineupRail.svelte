@@ -11,6 +11,7 @@
     eyebrow,
     active = false,
     collapsible = false,
+    side = '',
     emptyLabel = 'No picks yet.',
   }: {
     picks: readonly HavocMultiplayerDraftPick[];
@@ -18,6 +19,7 @@
     eyebrow: string;
     active?: boolean;
     collapsible?: boolean;
+    side?: string;
     emptyLabel?: string;
   } = $props();
 
@@ -30,7 +32,7 @@
   {:else}
     <ul class="hm-rail-list">
       {#each slots as slot (slot.slot)}
-        <li data-havoc-lineup-slot={slot.slot}>
+        <li data-havoc-lineup-slot={slot.slot} data-havoc-lineup-side={side}>
           <HavocPlayerArt
             playerId={slot.playerId}
             playerVersionId={slot.playerVersionId}

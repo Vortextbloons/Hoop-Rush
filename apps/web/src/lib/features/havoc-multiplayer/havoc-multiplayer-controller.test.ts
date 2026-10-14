@@ -3,6 +3,7 @@ import {
   HAVOC_MULTIPLAYER_BROADCAST_MS,
   HAVOC_MULTIPLAYER_SAVE_SCHEMA_VERSION,
   HAVOC_MULTIPLAYER_TURNS,
+  HAVOC_MULTIPLAYER_VERSION,
   contentHashSchema,
   createInMemoryHavocMultiplayerTransport,
   eraSimulationProfileSchema,
@@ -428,7 +429,7 @@ describe('havoc multiplayer presenter flow', () => {
     expect(h.presenter.phase).toBe('lobby');
     expect(h.presenter.members).toHaveLength(2);
     const versions = await h.presenter.roomVersions();
-    expect(versions.multiplayerVersion).toBe('havoc-multiplayer-v1');
+    expect(versions.multiplayerVersion).toBe(HAVOC_MULTIPLAYER_VERSION);
 
     await startDraft(h);
     await completeDraft(h);

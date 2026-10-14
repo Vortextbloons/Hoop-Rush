@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { contentHashSchema } from './ids.ts';
 
 export const HAVOC_SCHEMA_VERSION = 1;
-export const HAVOC_RULES_VERSION = 'havoc-rules-v5';
+export const HAVOC_RULES_VERSION = 'havoc-rules-v6';
 export const HAVOC_MUTATION_CATALOG_VERSION = 'havoc-mutations-v5';
 export const HAVOC_SEED_DERIVATION_VERSION = 'havoc-seeds-v1';
 export const HAVOC_COMPARISON_VERSION = 'havoc-comparison-v1';
@@ -14,7 +14,7 @@ export const HAVOC_GAME_COUNT = 82;
 export const HAVOC_DRAFT_ROUNDS = 5;
 export const HAVOC_OFFER_SIZE = 3;
 export const HAVOC_REROLL_LIMIT = 1;
-export const HAVOC_OVERALL_WINDOW_WIDTH = 3;
+export const HAVOC_OFFER_TARGET_RADIUS = 3;
 export const HAVOC_PERSONAL_FOUL_LIMIT = 6;
 export const HAVOC_SEED_ROOT = 'havoc-v1';
 export const HAVOC_TIER_PROBABILITIES = {

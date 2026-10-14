@@ -11,6 +11,7 @@ import type {
 } from '@hoop-rush/data-contracts';
 import {
   HAVOC_MVP_INDEX_WEIGHTS,
+  HAVOC_RULES_VERSION,
   canonicalJson,
   havocGameResultSchema,
   havocGameSeed,
@@ -148,7 +149,7 @@ function syntheticStoredGame(
     variant,
     seed: havocGameSeed(locked.runSeed, gameNumber),
     engineVersion: 'm3-engine-v24',
-    rulesVersion: 'havoc-rules-v5',
+    rulesVersion: HAVOC_RULES_VERSION,
     mutationCatalogVersion: 'havoc-mutations-v5',
     profileVersion: locked.profile.profileVersion,
     dataVersion: locked.versionSet.dataVersion,

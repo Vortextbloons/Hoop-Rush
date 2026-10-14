@@ -9,6 +9,7 @@ import type {
   HavocMultiplayerRoomSnapshot,
   HavocMultiplayerSeriesGame,
   HavocMultiplayerTransientEvent,
+  HavocMultiplayerVariant,
   HavocMultiplayerVersionLocks,
   Id,
 } from '@hoop-rush/data-contracts';
@@ -98,6 +99,7 @@ export class HavocMultiplayerPresenter {
   }
 
   phase = $derived<HavocMultiplayerPhase>(this.snapshot?.phase ?? 'lobby');
+  variant = $derived<HavocMultiplayerVariant>(this.snapshot?.settings.variant ?? 'standard');
   members = $derived<readonly HavocMultiplayerMemberSnapshot[]>(this.snapshot?.members ?? []);
   series = $derived(this.snapshot?.series ?? null);
   offer = $derived(this.draft?.offer ?? null);
@@ -149,8 +151,10 @@ export class HavocMultiplayerPresenter {
     return this.session.attach(roomId);
   }
 
-  createRoom(): Promise<{ roomId: Id; code: HavocMultiplayerRoomCode } | null> {
-    return this.session.createRoom();
+  createRoom(
+    variant: HavocMultiplayerVariant = 'standard',
+  ): Promise<{ roomId: Id; code: HavocMultiplayerRoomCode } | null> {
+    return this.session.createRoom(variant);
   }
 
   roomVersions(): Promise<HavocMultiplayerVersionLocks> {
@@ -169,11 +173,11 @@ export class HavocMultiplayerPresenter {
     return this.session.startDraft();
   }
 
-  pickCard(card: HavocDraftCard): Promise<void> {
+  pickCard(card: HavocDraftCard): Promise<boolean> {
     return this.session.pickCard(card);
   }
 
-  rerollOffer(): Promise<void> {
+  rerollOffer(): Promise<boolean> {
     return this.session.rerollOffer();
   }
 

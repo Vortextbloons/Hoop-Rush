@@ -811,6 +811,33 @@ describe('in-memory Havoc multiplayer transport', () => {
     expect(reclaimed.accepted).toBe(true);
   });
 
+  it('defaults rooms to standard and keeps the curated variant through rematches', async () => {
+    const transport = createInMemoryHavocMultiplayerTransport({ seed: 'variant-rematch' });
+    const standard = await transport.create({ versions: locks() });
+    expect(standard.snapshot.settings.variant).toBe('standard');
+
+    const created = await transport.create({ variant: 'curated', versions: locks() });
+    expect(created.snapshot.settings.variant).toBe('curated');
+    await transport.join(created.code);
+    const roomId = created.snapshot.roomId;
+    await playChampionship(transport, roomId);
+    const current = await snapshot(transport, roomId);
+    expect(current.phase).toBe('championship');
+
+    const requested = await submit(transport, roomId, 'variant-rematch-request', 'p1', {
+      kind: 'rematch-request',
+    });
+    expect(requested.accepted).toBe(true);
+    const confirmed = await submit(transport, roomId, 'variant-rematch-confirm', 'p2', {
+      kind: 'rematch-confirm',
+    });
+    expect(confirmed.accepted).toBe(true);
+
+    const successor = await transport.rematch(roomId);
+    expect(successor.snapshot.phase).toBe('lobby');
+    expect(successor.snapshot.settings.variant).toBe('curated');
+  });
+
   it('issues a 64-hex verification challenge and completes with two matching receipts', async () => {
     const transport = createInMemoryHavocMultiplayerTransport({ seed: 'verification' });
     const { roomId } = await createAndJoin(transport);

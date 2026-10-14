@@ -1,6 +1,7 @@
 import {
   HAVOC_MULTIPLAYER_GAME_READY_TIMEOUT_MS,
   HAVOC_MULTIPLAYER_GAME_RESULTS_HOLD_MS,
+  HAVOC_MULTIPLAYER_LEGACY_RULES_VERSION,
   HAVOC_MULTIPLAYER_SAVE_SCHEMA_VERSION,
   canonicalJson,
   commandIdSchema,
@@ -30,6 +31,7 @@ import {
   type HavocMultiplayerSeriesSnapshot,
   type HavocMultiplayerTransientEvent,
   type HavocMultiplayerTransport,
+  type HavocMultiplayerVariant,
   type HavocMultiplayerVerificationReceipt,
   type HavocMultiplayerVersionLocks,
   type HavocMultiplayerWorkerGameOutput,
@@ -392,13 +394,18 @@ export class HavocMultiplayerSession {
     }
   }
 
-  async createRoom(): Promise<{ roomId: Id; code: HavocMultiplayerRoomCode } | null> {
+  async createRoom(
+    variant: HavocMultiplayerVariant = 'standard',
+  ): Promise<{ roomId: Id; code: HavocMultiplayerRoomCode } | null> {
     this.busy = true;
     this.error = null;
     this.publish();
     try {
       await this.loadAssets();
-      const created = await this.deps.transport.create({ versions: this.versionLocks() });
+      const created = await this.deps.transport.create({
+        variant,
+        versions: this.versionLocks(),
+      });
       this.deps.saveMembership(created.membership);
       return { roomId: created.snapshot.roomId, code: created.code };
     } catch (error) {
@@ -441,26 +448,26 @@ export class HavocMultiplayerSession {
     await this.submit({ kind: 'start' });
   }
 
-  async pickCard(card: HavocDraftCard): Promise<void> {
+  async pickCard(card: HavocDraftCard): Promise<boolean> {
     const draft = this.draft;
-    if (!draft || draft.status !== 'drafting' || draft.offer === null) return;
+    if (!draft || draft.status !== 'drafting' || draft.offer === null) return false;
     if (!this.activeTurn()) {
       this.notice = 'It is not your turn.';
       this.publish();
-      return;
+      return false;
     }
     if (card.offerId !== draft.offer.offerId) {
       this.notice = 'That card is not part of the current offer.';
       this.publish();
-      return;
+      return false;
     }
     const seasonKey = card.source.seasonKey;
     if (seasonKey === null) {
       this.notice = 'That card cannot be picked right now.';
       this.publish();
-      return;
+      return false;
     }
-    await this.submit({
+    return this.submit({
       kind: 'pick',
       turnOrdinal: draft.turnOrdinal,
       offerId: draft.offer.offerId,
@@ -469,15 +476,15 @@ export class HavocMultiplayerSession {
     });
   }
 
-  async rerollOffer(): Promise<void> {
+  async rerollOffer(): Promise<boolean> {
     const draft = this.draft;
-    if (!draft || draft.status !== 'drafting' || draft.offer === null) return;
+    if (!draft || draft.status !== 'drafting' || draft.offer === null) return false;
     if (!this.activeTurn()) {
       this.notice = 'It is not your turn.';
       this.publish();
-      return;
+      return false;
     }
-    await this.submit({
+    return this.submit({
       kind: 'reroll',
       turnOrdinal: draft.turnOrdinal,
       offerId: draft.offer.offerId,
@@ -700,9 +707,15 @@ export class HavocMultiplayerSession {
     if (!assets || !snapshot) return true;
     const locks = snapshot.settings.versions;
     const versions = assets.versionSet;
+    const rulesSupported =
+      locks.rulesVersion === versions.rulesVersion ||
+      locks.rulesVersion === HAVOC_MULTIPLAYER_LEGACY_RULES_VERSION;
+    const variantSupported =
+      snapshot.settings.variant !== 'curated' || locks.rulesVersion === versions.rulesVersion;
     const matches =
+      rulesSupported &&
+      variantSupported &&
       locks.engineVersion === versions.engineVersion &&
-      locks.rulesVersion === versions.rulesVersion &&
       locks.mutationCatalogVersion === versions.mutationCatalogVersion &&
       locks.profileVersion === versions.profileVersion &&
       locks.dataVersion === versions.dataVersion &&
@@ -892,6 +905,10 @@ export class HavocMultiplayerSession {
         catalog: assets.catalog,
         environment,
         commands: this.commands.map((command) => command.payload),
+        settings: {
+          variant: snapshot.settings.variant,
+          rulesVersion: snapshot.settings.versions.rulesVersion,
+        },
       });
     } catch {
       replayed = null;

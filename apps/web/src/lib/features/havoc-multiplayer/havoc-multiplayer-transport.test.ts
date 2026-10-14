@@ -17,6 +17,7 @@ import {
   HAVOC_MUTATION_DEFINITIONS,
   createHavocCommandEnvironment,
   createRng,
+  defaultHavocMultiplayerDraftSettings,
   replayHavocMultiplayerDraft,
   type HavocCommandEnvironment,
 } from '@hoop-rush/engine';
@@ -55,7 +56,7 @@ vi.mock('@supabase/supabase-js', () => ({
 const ROOM_ID = 'hm-room-1';
 const roomId = idSchema.parse(ROOM_ID);
 const ROOM_COLUMNS =
-  'id, code, code_active, versions, root_seed, phase, revision, command_count, result_digest, confirmed_digest, successor_room_id, deadline_at, deadline_cursor, deadline_participant, deadline_fallback, deadline_pick_ordinal, draft_state, series, broadcast, game_state, created_at, expires_at';
+  'id, code, code_active, versions, variant, root_seed, phase, revision, command_count, result_digest, confirmed_digest, successor_room_id, deadline_at, deadline_cursor, deadline_participant, deadline_fallback, deadline_pick_ordinal, draft_state, series, broadcast, game_state, created_at, expires_at';
 const versions = defaultHavocMultiplayerVersionLocks({
   dataVersion: 'data-v1',
   catalogHash: 'e'.repeat(64),
@@ -111,6 +112,7 @@ function roomRow(overrides: Record<string, unknown> = {}): Record<string, unknow
     code: '4321',
     code_active: true,
     versions,
+    variant: 'standard',
     root_seed: 'a'.repeat(32),
     phase: 'lobby',
     revision: 2,
@@ -161,7 +163,10 @@ describe('havoc multiplayer supabase transport protocol pins', () => {
     const created = await transport.create({ versions });
 
     expect(harness.rpcCalls).toEqual([
-      { name: 'havoc_multiplayer_room_create', args: { p_versions: versions } },
+      {
+        name: 'havoc_multiplayer_room_create',
+        args: { p_versions: versions, p_variant: 'standard' },
+      },
     ]);
     expect(harness.selectQueries[0]).toMatchObject({
       table: 'havoc_multiplayer_rooms',
@@ -178,6 +183,7 @@ describe('havoc multiplayer supabase transport protocol pins', () => {
     expect(created.code).toBe('4321');
     expect(created.membership).toEqual({ roomId: ROOM_ID, participantId: 'p1', code: '4321' });
     expect(created.snapshot.settings.versions).toEqual(versions);
+    expect(created.snapshot.settings.variant).toBe('standard');
     expect(created.snapshot.members.map((member) => member.participantId)).toEqual(['p1', 'p2']);
     expect(created.snapshot.members[0]?.displayName).toBe('Host');
     expect(created.snapshot.draft).toBeNull();
@@ -191,6 +197,7 @@ describe('havoc multiplayer supabase transport protocol pins', () => {
       phase: 'lobby',
       revision: 1,
       versions,
+      variant: 'curated',
       expires_at: '2026-10-15T12:00:00.000Z',
       created_at: '2026-10-14T11:00:00.000Z',
     }));
@@ -203,6 +210,7 @@ describe('havoc multiplayer supabase transport protocol pins', () => {
     const preview = await transport.preview('4321');
     expect(preview.code).toBe('4321');
     expect(preview.phase).toBe('lobby');
+    expect(preview.settings.variant).toBe('curated');
     const joined = await transport.join('4321');
     expect(joined.membership.participantId).toBe('p2');
     expect(joined.membership.code).toBe('4321');
@@ -558,6 +566,7 @@ describe('havoc multiplayer supabase transport protocol pins', () => {
       catalog: assets.catalog,
       environment: assets.environment,
       commands: [],
+      settings: defaultHavocMultiplayerDraftSettings(),
     });
     const offer = must(draft.offer, 'generated offer');
     const card = must(offer.cards[0], 'generated card');
