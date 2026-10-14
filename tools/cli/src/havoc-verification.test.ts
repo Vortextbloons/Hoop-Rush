@@ -51,6 +51,7 @@ describe('havoc calibration cohorts', () => {
         'holdout-count': '2',
         mechanism: null,
         games: '2',
+        multiplayer: false,
         manifest: null,
       },
       { assets: fixtureAssets(source) },
@@ -116,6 +117,7 @@ describe('havoc calibration cohorts', () => {
       'holdout-count': '1',
       mechanism: null,
       games: '2',
+      multiplayer: false,
       manifest: null,
     };
     const first = havocCalibrate(options, { assets: fixtureAssets(source) });
