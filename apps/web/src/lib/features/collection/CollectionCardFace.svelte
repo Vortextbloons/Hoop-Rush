@@ -6,8 +6,8 @@
     HoopRushManifest,
   } from '@hoop-rush/data-contracts';
   import type { Snippet } from 'svelte';
-  import { asset } from '$app/paths';
-  import PlayerFace from '$lib/components/PlayerFace.svelte';
+  import { staticAsset } from '#lib/asset-url.js';
+  import PlayerFace from '#lib/components/PlayerFace.svelte';
   import { collectionCardArtOf } from './collection-card-art.ts';
   import type { CollectionCardView } from './collection-card-view.ts';
 
@@ -74,7 +74,7 @@
 
 <span class="ur-card-face {toneClass}">
   {#if resolvedArtwork}
-    <img class="ur-special-art" src={asset(resolvedArtwork)} alt="" {loading} />
+    <img class="ur-special-art" src={staticAsset(resolvedArtwork)} alt="" {loading} />
   {:else if player && manifest}
     <PlayerFace {player} {manifest} {size} fallbackInitials={initials} />
   {:else if fallback}

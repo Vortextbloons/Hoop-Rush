@@ -6,12 +6,12 @@
     SeasonFreeAgencyRoleExpectation,
   } from '@hoop-rush/data-contracts';
   import { franchiseIdSchema } from '@hoop-rush/data-contracts';
-  import FreeAgencyDeclarationPanel from '$lib/components/season/free-agency/FreeAgencyDeclarationPanel.svelte';
+  import FreeAgencyDeclarationPanel from '#lib/components/season/free-agency/FreeAgencyDeclarationPanel.svelte';
   import FreeAgencyMarketOverview, {
     type FreeAgencyCardView,
-  } from '$lib/components/season/free-agency/FreeAgencyMarketOverview.svelte';
-  import FreeAgencyResolvedPanel from '$lib/components/season/free-agency/FreeAgencyResolvedPanel.svelte';
-  import FreeAgencyReviewPanel from '$lib/components/season/free-agency/FreeAgencyReviewPanel.svelte';
+  } from '#lib/components/season/free-agency/FreeAgencyMarketOverview.svelte';
+  import FreeAgencyResolvedPanel from '#lib/components/season/free-agency/FreeAgencyResolvedPanel.svelte';
+  import FreeAgencyReviewPanel from '#lib/components/season/free-agency/FreeAgencyReviewPanel.svelte';
   import {
     bestFitOrder,
     candidateFitFacts,
@@ -21,14 +21,14 @@
     nextFreePriority,
     openFreeAgencyWindowOf,
     validateDeclaration,
-  } from '$lib/components/season/free-agency/free-agency-view';
-  import { overallRatingOf } from '$lib/season/season-catalog-index';
-  import { mergeFreeAgencyFaces } from '$lib/season/season-branding';
+  } from '#lib/components/season/free-agency/free-agency-view.js';
+  import { overallRatingOf } from '#lib/season/season-catalog-index.js';
+  import { mergeFreeAgencyFaces } from '#lib/season/season-branding.js';
   import { describeCommandRejection } from '@hoop-rush/application/season';
   import {
     SEASON_RUN_SHELL_CONTEXT,
     type SeasonRunShellData,
-  } from '$lib/season/season-shell-context';
+  } from '#lib/season/season-shell-context.js';
   const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
   const freeAgency = $derived(shell.freeAgency);
   const run = $derived(shell.run);

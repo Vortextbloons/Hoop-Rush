@@ -7,7 +7,7 @@
     SeasonPendingBlockCandidate,
   } from '@hoop-rush/data-contracts';
   import type { SeasonRunCommandError } from '@hoop-rush/application/season';
-  import type { InfluenceSpendAffordance } from '$lib/season/season-influence-view';
+  import type { InfluenceSpendAffordance } from '#lib/season/season-influence-view.js';
   let {
     interruption,
     pending,
@@ -79,12 +79,10 @@
         <p class="font-semibold">Fix your lineup</p>
         <p class="mt-1 text-muted-foreground">Swap a healthy player in on the Rotation tab.</p>
         <a
-          href={resolve('/season/run/team')}
+          href={resolve('season/run/team/')}
           class="mt-2 inline-flex min-h-11 items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring hover:border-line-strong"
+          >Open Rotation <span aria-hidden="true">→</span></a
         >
-          Open Rotation
-          <span aria-hidden="true">&rarr;</span>
-        </a>
       </li>
       <li class="sr-panel-quiet p-3">
         <p class="text-xs font-semibold">

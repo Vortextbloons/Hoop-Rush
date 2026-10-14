@@ -12,19 +12,19 @@
     recapChallengeView,
     recordLabel,
     streakLabel,
-  } from '$lib/season/season-presentation';
+  } from '#lib/season/season-presentation.js';
   import {
     eraIdentityOf,
     franchiseIdentityOf,
     type SeasonFaceRef,
-  } from '$lib/season/season-branding';
+  } from '#lib/season/season-branding.js';
   import {
     deltaToPp,
     MECHANISM_LABEL,
     type BlockMechanismEvidenceRow,
-  } from '$lib/season/season-effects-view';
-  import type { SeasonInnovationImpact } from '$lib/season/season-innovation-impact-view';
-  import type { AvailabilityStripRow } from '$lib/season/season-health-view';
+  } from '#lib/season/season-effects-view.js';
+  import type { SeasonInnovationImpact } from '#lib/season/season-innovation-impact-view.js';
+  import type { AvailabilityStripRow } from '#lib/season/season-health-view.js';
   import CourtInnovationImpact from './CourtInnovationImpact.svelte';
   import HealthStrip from './HealthStrip.svelte';
   import SeasonPlayerFace from './SeasonPlayerFace.svelte';

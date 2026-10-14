@@ -5,18 +5,18 @@
   import { resolve } from '$app/paths';
   import { Briefcase, LogOut, RefreshCw, Trophy, Users, X, Zap } from '@lucide/svelte';
   import { Dialog } from 'bits-ui';
-  import { ordinal, provisionalRanking, recordLabel } from '$lib/season/season-presentation';
-  import { SeasonRunShell } from '$lib/season/season-shell-state.svelte';
-  import { SEASON_RUN_SHELL_CONTEXT } from '$lib/season/season-shell-context';
-  import { isNavItemActive } from '$lib/nav-items';
+  import { ordinal, provisionalRanking, recordLabel } from '#lib/season/season-presentation.js';
+  import { SeasonRunShell } from '#lib/season/season-shell-state.svelte.js';
+  import { SEASON_RUN_SHELL_CONTEXT } from '#lib/season/season-shell-context.js';
+  import { isNavItemActive } from '#lib/nav-items.js';
   import {
     buildSeasonNavGroups,
     seasonMobileNavOf,
     type SeasonNavGroup,
-  } from '$lib/season/season-nav';
-  import BottomNav from '$lib/components/BottomNav.svelte';
-  import SeasonMasthead from '$lib/components/season/SeasonMasthead.svelte';
-  import '$lib/season/season-theme.css';
+  } from '#lib/season/season-nav.js';
+  import BottomNav from '#lib/components/BottomNav.svelte';
+  import SeasonMasthead from '#lib/components/season/SeasonMasthead.svelte';
+  import '#lib/season/season-theme.css';
   let { children } = $props();
   const shell = new SeasonRunShell();
   setContext(SEASON_RUN_SHELL_CONTEXT, shell);
@@ -70,7 +70,7 @@
         shell.hub !== null
           ? await shell.hub.clearSeasonData()
           : await (async () => {
-              const { clearAllSeasonData } = await import('$lib/season/season-data-recovery');
+              const { clearAllSeasonData } = await import('#lib/season/season-data-recovery.js');
               await clearAllSeasonData();
               return { ok: true, error: null };
             })();
@@ -81,7 +81,7 @@
       clearOpen = false;
       shell.error = null;
       shell.hubError = null;
-      await goto(resolve('/season'));
+      await goto(resolve('season/'));
     } catch (error) {
       clearError = error instanceof Error ? error.message : String(error);
     } finally {
@@ -99,7 +99,7 @@
         return;
       }
       quitOpen = false;
-      await goto(resolve('/season'));
+      await goto(resolve('season/'));
     } finally {
       quitting = false;
     }
@@ -221,6 +221,7 @@
                 <summary class="sr-section-label cursor-pointer"
                   >Validation details ({seasonLoadError.failures.length})</summary
                 >
+
                 <ul class="mt-2 list-disc space-y-1 pl-4 text-xs text-muted-foreground">
                   {#each seasonLoadError.failures as failure (failure)}
                     <li class="break-words">{failure}</li>
@@ -231,10 +232,11 @@
           </div>
         {/if}
         <div class="mt-5 flex flex-wrap items-center gap-3">
-          <button type="button" onclick={() => (clearOpen = true)} class="sr-btn-danger">
-            Restart season
-          </button>
-          <a href={resolve('/season')} class="sr-btn-ghost">Back to Season setup</a>
+          <button type="button" onclick={() => (clearOpen = true)} class="sr-btn-danger"
+            >Restart season</button
+          >
+
+          <a href={resolve('season/')} class="sr-btn-ghost">Back to Season setup</a>
         </div>
         {#if clearError !== null}
           <p class="mt-3 text-sm text-destructive" role="alert">{clearError}</p>
@@ -279,7 +281,7 @@
           Create a franchise, draft ten players, and generate the league to open your command
           center.
         </p>
-        <a href={resolve('/season')} class="sr-btn mt-5">Start a Season Run</a>
+        <a href={resolve('season/')} class="sr-btn mt-5">Start a Season Run</a>
       </div>
     </div>
   {:else}

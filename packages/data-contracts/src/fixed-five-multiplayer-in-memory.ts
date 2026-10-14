@@ -577,6 +577,16 @@ export function createInMemoryFixedFiveTransport(options?: {
         membership: { roomId: record.snapshot.roomId, participantId: 'p1', code: record.code },
       };
     },
+    async snapshot(roomId) {
+      await Promise.resolve();
+      const record = rooms.get(roomId);
+      if (!record)
+        throw Object.assign(new Error('authorization'), {
+          code: 'authorization',
+          retryable: false,
+        });
+      return record.snapshot;
+    },
     subscribe(roomId, handler) {
       const record = rooms.get(roomId);
       if (!record) return { unsubscribe: () => {} };

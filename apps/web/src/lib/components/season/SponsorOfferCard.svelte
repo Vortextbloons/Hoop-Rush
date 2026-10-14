@@ -1,12 +1,12 @@
 <script lang="ts">
-  import SponsorMark from '$lib/components/season/SponsorMark.svelte';
-  import { sponsorBrandColorOf, sponsorBrandSiteUrlOf } from '$lib/season/sponsor-brand-meta';
+  import SponsorMark from '#lib/components/season/SponsorMark.svelte';
+  import { sponsorBrandColorOf, sponsorBrandSiteUrlOf } from '#lib/season/sponsor-brand-meta.js';
   import {
     SPONSOR_RATING_LONG_LABELS,
     SPONSOR_SLOT_ICONS,
     SPONSOR_SLOT_LABELS,
     type SponsorOfferCard as SponsorOffer,
-  } from '$lib/season/sponsor-gear-view';
+  } from '#lib/season/sponsor-gear-view.js';
 
   const TIER_TONE: Record<SponsorOffer['tier'], 'hardwood' | 'warn' | undefined> = {
     BUZZ: undefined,

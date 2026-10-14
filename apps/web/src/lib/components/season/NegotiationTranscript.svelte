@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { SeasonTradeNegotiation } from '@hoop-rush/data-contracts';
-  import { humanizeTradeRejection } from '$lib/season/season-presentation';
+  import { humanizeTradeRejection } from '#lib/season/season-presentation.js';
   let {
     negotiation,
     inquiryAllowance = 3,

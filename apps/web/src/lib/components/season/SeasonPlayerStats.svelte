@@ -1,13 +1,13 @@
 <script lang="ts">
   import type { HoopRushManifest } from '@hoop-rush/data-contracts';
-  import SeasonPlayerStatsMobileList from '$lib/components/season/SeasonPlayerStatsMobileList.svelte';
-  import SeasonPlayerStatsTable from '$lib/components/season/SeasonPlayerStatsTable.svelte';
+  import SeasonPlayerStatsMobileList from '#lib/components/season/SeasonPlayerStatsMobileList.svelte';
+  import SeasonPlayerStatsTable from '#lib/components/season/SeasonPlayerStatsTable.svelte';
   import type {
     SeasonPlayerStatsMeasure,
     SeasonPlayerStatsSortKey,
     SeasonPlayerStatsView,
-  } from '$lib/season/season-player-stats-view';
-  import type { SeasonRunShellData } from '$lib/season/season-shell-context';
+  } from '#lib/season/season-player-stats-view.js';
+  import type { SeasonRunShellData } from '#lib/season/season-shell-context.js';
   let {
     view,
     manifest,

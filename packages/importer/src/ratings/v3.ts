@@ -204,8 +204,6 @@ const DEFENSE_ABILITY_SHARES: Record<
     rebound: number;
   }
 > = {
-  // Guard and center weights are mirrors, so an interior anchor and a
-  // perimeter stopper with the same skill profile grade the same.
   C: { perimeter: 0.06, interior: 0.56, steal: 0.02, block: 0.06, iq: 0.12, rebound: 0.18 },
   F: { perimeter: 0.31, interior: 0.31, steal: 0.04, block: 0.04, iq: 0.12, rebound: 0.18 },
   G: { perimeter: 0.56, interior: 0.06, steal: 0.06, block: 0.02, iq: 0.12, rebound: 0.18 },

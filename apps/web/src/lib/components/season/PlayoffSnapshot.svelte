@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { PlayoffSnapshot } from '$lib/season/season-playoff-hub-view';
+  import type { PlayoffSnapshot } from '#lib/season/season-playoff-hub-view.js';
   let {
     snapshot,
     humanFranchiseId,

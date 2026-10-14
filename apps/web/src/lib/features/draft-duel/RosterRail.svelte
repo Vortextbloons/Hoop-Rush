@@ -6,9 +6,9 @@
     HoopRushManifest,
   } from '@hoop-rush/data-contracts';
   import { LINEUP_STRUCTURE, resolveEraTeamIdentity } from '@hoop-rush/data-contracts';
-  import PlayerFace from '$lib/components/PlayerFace.svelte';
-  import TeamLogo from '$lib/components/TeamLogo.svelte';
-  import { SLOT_NAMES } from '$lib/player-positions';
+  import PlayerFace from '#lib/components/PlayerFace.svelte';
+  import TeamLogo from '#lib/components/TeamLogo.svelte';
+  import { SLOT_NAMES } from '#lib/player-positions.js';
   import { draftDuelCardView } from './draft-duel-card-view.ts';
 
   let {

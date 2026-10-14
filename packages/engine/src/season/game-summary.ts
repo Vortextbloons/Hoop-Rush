@@ -129,7 +129,10 @@ function sortedLines(lines: readonly SeasonCompactPlayerLine[]): SeasonCompactPl
     a.playerVersionId < b.playerVersionId ? -1 : a.playerVersionId > b.playerVersionId ? 1 : 0,
   );
 }
-function zeroTeamBox(franchiseId: string): SeasonTeamBox {
+export function zeroSeasonTeamBox(
+  franchiseId: string,
+  shotClockViolations?: number,
+): SeasonTeamBox {
   return {
     franchiseId: franchiseIdSchema.parse(franchiseId),
     points: 0,
@@ -147,7 +150,7 @@ function zeroTeamBox(franchiseId: string): SeasonTeamBox {
     turnovers: 0,
     fouls: 0,
     possessions: 0,
-    shotClockViolations: 0,
+    ...(shotClockViolations === undefined ? {} : { shotClockViolations }),
   };
 }
 function openingStartersOf(result: SeasonGameSimulationResult, side: 'home' | 'away'): Set<string> {
@@ -190,8 +193,8 @@ export function seasonGameSummaryFromResult(
       homeScore: result.homeScore,
       awayScore: result.awayScore,
       forfeitLoserFranchiseId: result.losingFranchiseId,
-      homeBox: zeroTeamBox(game.homeFranchiseId),
-      awayBox: zeroTeamBox(game.awayFranchiseId),
+      homeBox: zeroSeasonTeamBox(game.homeFranchiseId, 0),
+      awayBox: zeroSeasonTeamBox(game.awayFranchiseId, 0),
       homePlayers: [],
       awayPlayers: [],
       ...(result.gameRule !== undefined ? { gameRule: result.gameRule } : {}),

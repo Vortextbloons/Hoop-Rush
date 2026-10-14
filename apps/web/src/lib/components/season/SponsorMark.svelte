@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { sponsorBrandTileOf } from '$lib/season/sponsor-brand-meta';
+  import { sponsorBrandTileOf } from '#lib/season/sponsor-brand-meta.js';
   let {
     family,
     displayName,

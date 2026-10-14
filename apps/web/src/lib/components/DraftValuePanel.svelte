@@ -11,8 +11,8 @@
     type DraftFitNeed,
     type DraftFitScore,
   } from '@hoop-rush/engine';
-  import type { DraftPresentation } from '$lib/draft-presentation';
-  import { FIT_NEED_META, FIT_TIER_META, formatNetDelta } from '$lib/draft-fit';
+  import type { DraftPresentation } from '#lib/draft-presentation.js';
+  import { FIT_NEED_META, FIT_TIER_META, formatNetDelta } from '#lib/draft-fit.js';
   let {
     players,
     opponent = null,

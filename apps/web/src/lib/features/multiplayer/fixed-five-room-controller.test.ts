@@ -28,7 +28,9 @@ import { FixedFiveRoomController } from './fixed-five-room-controller.svelte';
 
 const goto = vi.hoisted(() => vi.fn());
 vi.mock('$app/navigation', () => ({ goto }));
-vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
+vi.mock('$app/paths', () => ({
+  resolve: (path: string) => (path.startsWith('/') ? path : `/${path}`),
+}));
 vi.mock('./fixed-five-repo', () => ({ fixedFiveRepository: {} }));
 
 class FakeRunner {
@@ -199,7 +201,7 @@ describe('FixedFiveRoomController', () => {
     expect(controller.clockText).toMatch(/^Pick clock: /);
 
     await controller.leaveRoom();
-    expect(goto).toHaveBeenCalledWith('/multiplayer');
+    expect(goto).toHaveBeenCalledWith('/multiplayer/');
 
     const before = controller.roomSnapshot;
     controller.dispose();

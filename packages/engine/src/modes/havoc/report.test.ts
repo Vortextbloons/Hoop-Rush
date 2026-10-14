@@ -220,8 +220,6 @@ describe('deriveHavocReport pending comparison', () => {
     expect(report.normal).toBeNull();
     expect(report.mvp).toBeNull();
     expect(report.comparison).toBeNull();
-    // Documented choice: paired differences need the normal season, so the
-    // pending report carries empty gain/loss lists instead of fabricated data.
     expect(report.topGains).toEqual([]);
     expect(report.topLosses).toEqual([]);
     expect(report.havoc).toEqual(havocSeasonTotalsOf(havocGames));

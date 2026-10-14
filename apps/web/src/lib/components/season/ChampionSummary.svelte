@@ -2,7 +2,7 @@
   import { resolve } from '$app/paths';
   import type { RouteId } from '$app/types';
   import type { HoopRushManifest, SeasonRunCompletion } from '@hoop-rush/data-contracts';
-  import { postseasonStageLabel } from '$lib/season/season-postseason-presentation';
+  import { postseasonStageLabel } from '#lib/season/season-postseason-presentation.js';
   let {
     championFranchiseId,
     franchiseName,

@@ -13,7 +13,6 @@ import {
   type SeasonPendingBlockCandidate,
   type SeasonRetainedGameDetail,
   type SeasonRun,
-  type SeasonTeamBox,
 } from '@hoop-rush/data-contracts';
 import { foldSeasonPlayerAggregates, foldSeasonTeamAggregates } from './aggregates.ts';
 import {
@@ -24,6 +23,7 @@ import {
 } from './injuries.ts';
 import { chooseInitialUnit, type PlannerRotationContext } from './rotation-planner.ts';
 import { reduceSeasonStandings } from './standings.ts';
+import { zeroSeasonTeamBox } from './game-summary.ts';
 export type { SeasonInvalidRosterInterruption } from '@hoop-rush/data-contracts';
 export type HealthRunView = Pick<
   SeasonRun,
@@ -300,26 +300,6 @@ export function assembleSeasonPendingBlock(input: {
     rotationDigest: input.rotationDigest,
   };
 }
-function zeroTeamBox(franchiseId: string): SeasonTeamBox {
-  return {
-    franchiseId: franchiseIdSchema.parse(franchiseId),
-    points: 0,
-    fieldGoalsMade: 0,
-    fieldGoalsAttempted: 0,
-    threePointersMade: 0,
-    threePointersAttempted: 0,
-    freeThrowsMade: 0,
-    freeThrowsAttempted: 0,
-    offensiveRebounds: 0,
-    defensiveRebounds: 0,
-    assists: 0,
-    steals: 0,
-    blocks: 0,
-    turnovers: 0,
-    fouls: 0,
-    possessions: 0,
-  };
-}
 export function seasonForfeitSummaryForGame(
   run: SeasonRun,
   gameId: string,
@@ -347,8 +327,8 @@ export function seasonForfeitSummaryForGame(
     homeScore: humanIsHome ? 0 : 2,
     awayScore: humanIsHome ? 2 : 0,
     forfeitLoserFranchiseId: franchiseIdSchema.parse(humanFranchiseId),
-    homeBox: zeroTeamBox(game.homeFranchiseId),
-    awayBox: zeroTeamBox(game.awayFranchiseId),
+    homeBox: zeroSeasonTeamBox(game.homeFranchiseId),
+    awayBox: zeroSeasonTeamBox(game.awayFranchiseId),
     homePlayers: [],
     awayPlayers: [],
     injuryEvents: [],

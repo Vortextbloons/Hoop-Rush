@@ -2,10 +2,10 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
-  import HavocSetup from '$lib/features/havoc/HavocSetup.svelte';
-  import { getManifest } from '$lib/data';
-  import { HavocDraftController } from '$lib/features/havoc/havoc-draft-state.svelte';
-  import { getHavocService } from '$lib/features/havoc/havoc-service';
+  import HavocSetup from '#lib/features/havoc/HavocSetup.svelte';
+  import { getManifest } from '#lib/data.js';
+  import { HavocDraftController } from '#lib/features/havoc/havoc-draft-state.svelte.js';
+  import { getHavocService } from '#lib/features/havoc/havoc-service.js';
 
   let controller = $state<HavocDraftController | null>(null);
   let serviceError = $state<string | null>(null);
@@ -57,5 +57,5 @@
     </div>
   </section>
 {:else if controller !== null}
-  <HavocSetup {controller} {franchiseName} onLocked={() => void goto(resolve('/havoc/run'))} />
+  <HavocSetup {controller} {franchiseName} onLocked={() => void goto(resolve('havoc/run/'))} />
 {/if}

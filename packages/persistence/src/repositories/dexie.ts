@@ -112,7 +112,6 @@ export const HOOP_RUSH_DATABASE_STORES: Record<string, string> = {
   collectionPlayState: 'collectionId',
   collectionGames: '[collectionId+gameId], collectionId',
   collectionGameCommands: '[collectionId+commandId], collectionId',
-  // havocActiveRuns is a singleton store keyed by the fixed 'active' record id.
   havocActiveRuns: 'recordId',
   havocCommands: 'commandId, runId',
   havocGames: '[runId+variant+gameNumber], runId, [runId+variant]',

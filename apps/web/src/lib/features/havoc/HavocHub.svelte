@@ -31,7 +31,7 @@
     </p>
   {:else if run === null || run.phase === 'draft'}<div class="h-panel">
       <h1 class="h-title">Your squad awaits.</h1>
-      <a class="h-button mt-6" href={resolve('/havoc')}>Continue to draft</a>
+      <a class="h-button mt-6" href={resolve('havoc/')}>Continue to draft</a>
     </div>
   {:else}
     <header class="h-header">
@@ -95,8 +95,11 @@
         class="h-link mt-6"
         data-havoc-abandon
         onclick={() => (abandonOpen = true)}>Retire this squad</button
-      >{/if}
-    {#if abandonOpen}<div class="h-panel mt-4" role="group" aria-label="Retire squad confirmation">
+      >
+    {/if}
+
+    {#if abandonOpen}
+      <div class="h-panel mt-4" role="group" aria-label="Retire squad confirmation">
         <h2 class="h-subtitle">Retire this squad?</h2>
         <p class="h-copy mt-2">
           This ends the run. The games you've played stay in the Hall of Freaks.

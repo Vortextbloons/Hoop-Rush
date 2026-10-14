@@ -1,10 +1,10 @@
 <script lang="ts">
   import { Clock, ShieldAlert, ShieldCheck } from '@lucide/svelte';
   import type { HoopRushManifest, PlayerBoxScore, TeamResult } from '@hoop-rush/data-contracts';
-  import PlayerFace from '$lib/components/PlayerFace.svelte';
-  import PlayerStatsTable from '$lib/components/PlayerStatsTable.svelte';
-  import type { PlayerStatColumn, PlayerStatsTotals } from '$lib/components/player-stats-table';
-  import { SLOT_LABELS } from '$lib/player-positions';
+  import PlayerFace from '#lib/components/PlayerFace.svelte';
+  import PlayerStatsTable from '#lib/components/PlayerStatsTable.svelte';
+  import type { PlayerStatColumn, PlayerStatsTotals } from '#lib/components/player-stats-table.js';
+  import { SLOT_LABELS } from '#lib/player-positions.js';
   import { gamecastTeamOf } from './gamecast-broadcast-view';
   import type {
     GamecastParticipantId,

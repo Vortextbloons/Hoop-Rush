@@ -3,4 +3,4 @@ export {
   gamecastPeriodLabel as draftDuelPeriodLabel,
   gamecastTeamOf as draftDuelTeamOf,
   type GamecastFeedLine as DraftDuelFeedLine,
-} from '$lib/features/multiplayer/gamecast/gamecast-broadcast-view';
+} from '#lib/features/multiplayer/gamecast/gamecast-broadcast-view.js';

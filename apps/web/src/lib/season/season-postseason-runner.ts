@@ -12,7 +12,7 @@ import type {
   SeasonPostseasonJobOutcome,
 } from '@hoop-rush/application/season';
 import type { SeasonArtifactUrls } from './season-assets';
-import { newRequestId } from '$lib/ids';
+import { newRequestId } from '#lib/ids.js';
 export type { SeasonPostseasonJob, SeasonPostseasonJobOutcome };
 export type SeasonPostseasonSimulatorFn = (
   request: SeasonPostseasonWorkerStartRequest,

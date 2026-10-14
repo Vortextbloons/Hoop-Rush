@@ -2,14 +2,19 @@
   import { untrack } from 'svelte';
   import { Dialog } from 'bits-ui';
   import { X } from '@lucide/svelte';
-  import type { HubPostseasonProgress } from '$lib/season/season-postseason-presentation';
+  import type { HubPostseasonProgress } from '#lib/season/season-postseason-presentation.js';
   import type { HoopRushManifest, SeasonPostseasonScoreline } from '@hoop-rush/data-contracts';
-  import { franchiseIdentityOf } from '$lib/season/season-branding';
-  import { franchiseColor } from '$lib/season/franchise-colors';
-  import SeasonTeamLogo from '$lib/components/season/SeasonTeamLogo.svelte';
-  import LiveSimModal from '$lib/components/season/LiveSimModal.svelte';
-  import { SIM_BAR_FILL_MS } from '$lib/components/season/live-sim-animation';
-  import { arenaBlockComplete, arenaError, arenaGameResult, arenaSimTick } from '$lib/arena-sound';
+  import { franchiseIdentityOf } from '#lib/season/season-branding.js';
+  import { franchiseColor } from '#lib/season/franchise-colors.js';
+  import SeasonTeamLogo from '#lib/components/season/SeasonTeamLogo.svelte';
+  import LiveSimModal from '#lib/components/season/LiveSimModal.svelte';
+  import { SIM_BAR_FILL_MS } from '#lib/components/season/live-sim-animation.js';
+  import {
+    arenaBlockComplete,
+    arenaError,
+    arenaGameResult,
+    arenaSimTick,
+  } from '#lib/arena-sound.js';
   const RECENT_SIZE = 3;
   let {
     progress,

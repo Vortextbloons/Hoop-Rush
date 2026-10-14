@@ -1,8 +1,8 @@
 import type { SeasonPostseasonRepository, SeasonRunRepository } from '@hoop-rush/persistence';
 import type { SeasonSchedule } from '@hoop-rush/data-contracts';
-import { getPersistence } from '$lib/persistence';
-import type { SeasonBlockRunner, SeasonBlockStartInput } from '$lib/season/season-block-runner';
-import type { SeasonPostseasonJob } from '$lib/season/season-postseason-runner';
+import { getPersistence } from '#lib/persistence.js';
+import type { SeasonBlockRunner, SeasonBlockStartInput } from '#lib/season/season-block-runner.js';
+import type { SeasonPostseasonJob } from '#lib/season/season-postseason-runner.js';
 let repoPlainPromise: Promise<SeasonRunRepository & SeasonPostseasonRepository> | null = null;
 let repoSchedulePromise: Promise<SeasonRunRepository & SeasonPostseasonRepository> | null = null;
 export function resetSeasonRepositories(): void {
@@ -38,7 +38,7 @@ let runnerPromise: Promise<SeasonBlockRunner> | null = null;
 export function getSeasonBlockRunner(): Promise<SeasonBlockRunner> {
   if (runnerPromise === null) {
     runnerPromise = (async () => {
-      const module = await import('$lib/season/season-block-runner');
+      const module = await import('#lib/season/season-block-runner.js');
       return module.createSeasonBlockRunner();
     })();
     runnerPromise.catch(() => {
@@ -50,7 +50,7 @@ export function getSeasonBlockRunner(): Promise<SeasonBlockRunner> {
 let postseasonJobPromise: Promise<SeasonPostseasonJob> | null = null;
 export function getSeasonPostseasonJob(): Promise<SeasonPostseasonJob> {
   if (postseasonJobPromise === null) {
-    postseasonJobPromise = import('$lib/season/season-postseason-runner').then((module) =>
+    postseasonJobPromise = import('#lib/season/season-postseason-runner.js').then((module) =>
       module.getSeasonPostseasonJob(),
     );
     postseasonJobPromise.catch(() => {

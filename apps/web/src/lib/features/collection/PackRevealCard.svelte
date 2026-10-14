@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { CollectionRarity, HoopRushManifest } from '@hoop-rush/data-contracts';
-  import { formatPositions } from '$lib/player-positions';
+  import { formatPositions } from '#lib/player-positions.js';
   import CollectionCardFace from './CollectionCardFace.svelte';
   import type { CollectionCardView } from './collection-card-view.ts';
 

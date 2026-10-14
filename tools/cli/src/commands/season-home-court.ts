@@ -1,5 +1,6 @@
 import { resolve } from 'node:path';
 import { z } from 'zod';
+import { seedWindowSchema } from '../seed-window.ts';
 import {
   SEASON_HOME_COURT_VERSION,
   SEASON_HOME_WIN_RATE_TARGET,
@@ -57,10 +58,7 @@ export const seasonHomeCourtTargetsSchema = z.object({
     seedFrom: z.number().int().nonnegative(),
     seedTo: z.number().int().nonnegative(),
   }),
-  heldOut: z.object({
-    seedFrom: z.number().int().nonnegative(),
-    seedTo: z.number().int().nonnegative(),
-  }),
+  heldOut: seedWindowSchema,
   achievedHomeWinRate: z.number().min(0).max(1),
   gamesSimulated: z.number().int().positive(),
   engineVersion: z.string().min(1).max(64),
@@ -401,15 +399,15 @@ export async function seasonHomeCourtCalibrate(
     pass,
   });
   const details = [
-    `fixtures ${fixtureIds.join(', ')} · ${String(calibrationIndices.length)} calibration + ${String(validationIndices.length)} held-out seeds in ${String(durationMs)}ms (${String(workers)} workers)`,
-    `neutral home win rate ${(neutralHomeWinRate * 100).toFixed(1)}% (baseline ≈ 50%, gate ±${(baselineTolerance * 100).toFixed(1)}pp at 3σ)`,
-    `achieved home win rate ${(achievedHomeWinRate * 100).toFixed(1)}% vs target ${(SEASON_HOME_WIN_RATE_TARGET * 100).toFixed(1)}% (gate ±${(targetTolerance * 100).toFixed(1)}pp at max(1pp, 2σ))`,
-    `gates: neutral ${String(neutralBaseline)} · tolerance ${String(withinTolerance)} · possessions ${String(possessionStable)} · monotonic ${String(monotonic)}`,
+    `fixtures ${fixtureIds.join(', ')} Â· ${String(calibrationIndices.length)} calibration + ${String(validationIndices.length)} held-out seeds in ${String(durationMs)}ms (${String(workers)} workers)`,
+    `neutral home win rate ${(neutralHomeWinRate * 100).toFixed(1)}% (baseline â‰ˆ 50%, gate Â±${(baselineTolerance * 100).toFixed(1)}pp at 3Ïƒ)`,
+    `achieved home win rate ${(achievedHomeWinRate * 100).toFixed(1)}% vs target ${(SEASON_HOME_WIN_RATE_TARGET * 100).toFixed(1)}% (gate Â±${(targetTolerance * 100).toFixed(1)}pp at max(1pp, 2Ïƒ))`,
+    `gates: neutral ${String(neutralBaseline)} Â· tolerance ${String(withinTolerance)} Â· possessions ${String(possessionStable)} Â· monotonic ${String(monotonic)}`,
     targetsDetail({ targetsWritten, targetsPath }),
   ];
   if (!neutralBaseline) {
     gateFailures.push(
-      `neutral home win rate ${(neutralHomeWinRate * 100).toFixed(1)}% is outside the ${(baselineTolerance * 100).toFixed(1)}pp 3σ baseline gate`,
+      `neutral home win rate ${(neutralHomeWinRate * 100).toFixed(1)}% is outside the ${(baselineTolerance * 100).toFixed(1)}pp 3Ïƒ baseline gate`,
     );
   }
   if (!withinTolerance) {

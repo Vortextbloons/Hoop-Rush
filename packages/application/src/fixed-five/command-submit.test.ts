@@ -49,7 +49,7 @@ function inputFor(
     actorParticipantId,
     payload,
     expectedRevision: 3,
-    resync: vi.fn(() => Promise.resolve()),
+    resync: vi.fn(() => Promise.resolve(undefined)),
     ...overrides,
   };
   return { input, submitCommand };
@@ -113,5 +113,21 @@ describe('submitFixedFiveCommand', () => {
     expect(result.retried).toBe(false);
     expect(submitCommand).toHaveBeenCalledTimes(1);
     expect(input.resync).not.toHaveBeenCalled();
+  });
+
+  it('retries a stale command against the resynced revision when it is newer than the receipt', async () => {
+    const { input, submitCommand } = inputFor(
+      safePayload,
+      [receiptOf(false, 4), receiptOf(false, 6), receiptOf(true, 7)],
+      { resync: () => Promise.resolve(6) },
+    );
+    const result = await submitFixedFiveCommand(input);
+    expect(result.retried).toBe(true);
+    expect(result.receipt.accepted).toBe(true);
+    expect(submitCommand).toHaveBeenCalledTimes(3);
+    const secondCall = submitCommand.mock.calls[1]?.[0] as { expectedRevision?: number };
+    const thirdCall = submitCommand.mock.calls[2]?.[0] as { expectedRevision?: number };
+    expect(secondCall.expectedRevision).toBe(6);
+    expect(thirdCall.expectedRevision).toBe(6);
   });
 });

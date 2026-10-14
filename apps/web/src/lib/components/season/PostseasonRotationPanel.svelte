@@ -6,9 +6,9 @@
     SeasonGameSummary,
     SeasonRotation,
   } from '@hoop-rush/data-contracts';
-  import type { RotationEditor as RotationEditorType } from '$lib/season/season-rotation-editor';
-  import type { RiskyRehabOption } from '$lib/season/season-postseason-presentation';
-  import type { SeasonFaceRef } from '$lib/season/season-branding';
+  import type { RotationEditor as RotationEditorType } from '#lib/season/season-rotation-editor.js';
+  import type { RiskyRehabOption } from '#lib/season/season-postseason-presentation.js';
+  import type { SeasonFaceRef } from '#lib/season/season-branding.js';
   import RotationEditor from './RotationEditor.svelte';
   let {
     editor,

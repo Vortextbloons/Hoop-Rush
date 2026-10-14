@@ -24,7 +24,7 @@ import {
   type DraftDuelTransientEvent,
   type Id,
 } from '@hoop-rush/data-contracts';
-import { randomUUID } from '$lib/ids';
+import { randomUUID } from '#lib/ids.js';
 import {
   createRealtimeRoomRegistry,
   ensureAnonymous,
@@ -37,7 +37,7 @@ import {
   stringField,
   subscribeTransientPayloads,
   supabaseClient,
-} from '$lib/supabase-runtime';
+} from '#lib/supabase-runtime.js';
 
 type DraftDuelClient = SupabaseClient;
 

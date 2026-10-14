@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import {
@@ -17,24 +17,24 @@
     Sparkles,
     Users,
   } from '@lucide/svelte';
-  import ArenaSoundToggle from '$lib/components/ArenaSoundToggle.svelte';
-  import MultiplayerLobbyLink from '$lib/features/multiplayer/MultiplayerLobbyLink.svelte';
+  import ArenaSoundToggle from '#lib/components/ArenaSoundToggle.svelte';
+  import MultiplayerLobbyLink from '#lib/features/multiplayer/MultiplayerLobbyLink.svelte';
   import type { DraftDuelCard, DraftDuelOfferedPick } from '@hoop-rush/data-contracts';
-  import { DraftDuelController } from '$lib/features/draft-duel/draft-duel-controller.svelte';
-  import DraftBoard from '$lib/features/draft-duel/DraftBoard.svelte';
-  import DraftSlotDialog from '$lib/features/draft-duel/DraftSlotDialog.svelte';
-  import RosterRail from '$lib/features/draft-duel/RosterRail.svelte';
-  import ReactionBar from '$lib/features/draft-duel/ReactionBar.svelte';
-  import RivalConsideration from '$lib/features/draft-duel/RivalConsideration.svelte';
-  import SeriesTracker from '$lib/features/draft-duel/SeriesTracker.svelte';
-  import BroadcastView from '$lib/features/draft-duel/BroadcastView.svelte';
-  import GameResultsPanel from '$lib/features/draft-duel/GameResultsPanel.svelte';
-  import ChampionshipView from '$lib/features/draft-duel/ChampionshipView.svelte';
-  import { inviteLinkForDraftDuelCode } from '$lib/features/draft-duel/draft-duel-identity';
-  import { loadLobbyId, lobbyCommand } from '$lib/features/multiplayer/multiplayer-lobby';
-  import { SLOT_LABELS } from '$lib/player-positions';
+  import { DraftDuelController } from '#lib/features/draft-duel/draft-duel-controller.svelte.js';
+  import DraftBoard from '#lib/features/draft-duel/DraftBoard.svelte';
+  import DraftSlotDialog from '#lib/features/draft-duel/DraftSlotDialog.svelte';
+  import RosterRail from '#lib/features/draft-duel/RosterRail.svelte';
+  import ReactionBar from '#lib/features/draft-duel/ReactionBar.svelte';
+  import RivalConsideration from '#lib/features/draft-duel/RivalConsideration.svelte';
+  import SeriesTracker from '#lib/features/draft-duel/SeriesTracker.svelte';
+  import BroadcastView from '#lib/features/draft-duel/BroadcastView.svelte';
+  import GameResultsPanel from '#lib/features/draft-duel/GameResultsPanel.svelte';
+  import ChampionshipView from '#lib/features/draft-duel/ChampionshipView.svelte';
+  import { inviteLinkForDraftDuelCode } from '#lib/features/draft-duel/draft-duel-identity.js';
+  import { loadLobbyId, lobbyCommand } from '#lib/features/multiplayer/multiplayer-lobby.js';
+  import { SLOT_LABELS } from '#lib/player-positions.js';
 
-  const roomId = $derived($page.params.roomId as string);
+  const roomId = $derived(page.params.roomId as string);
   const controller = new DraftDuelController();
   let lobbyId = $state<string | null>(null);
   let copiedCode = $state(false);
@@ -49,9 +49,11 @@
   const activeMoveCard = $derived(
     movingCard && controller.draft?.status === 'drafting' ? movingCard : null,
   );
+
   const moveSlots = $derived(
     activeMoveCard ? controller.repositionSlots(activeMoveCard) : ([] as number[]),
   );
+
   const moveLabels = $derived.by(() => {
     const card = activeMoveCard;
     if (!card) return {} as Record<number, string>;
@@ -148,6 +150,7 @@
   const resultVerification = $derived.by<'pending' | 'verified' | 'mismatch'>(() => {
     const gameNumber = controller.currentOutput?.gameNumber;
     if (gameNumber === undefined) return 'pending';
+
     return (
       controller.verification.find((entry) => entry.gameNumber === gameNumber)?.status ?? 'pending'
     );
@@ -201,7 +204,7 @@
 
   async function leaveRoom(): Promise<void> {
     await controller.leaveRoom();
-    await goto(resolve('/draft-duel'));
+    await goto(resolve('draft-duel/'));
   }
   async function removeOpponent(): Promise<void> {
     if (!lobbyId) {
@@ -222,8 +225,12 @@
 
 <section class="room-page">
   <div class="room-nav">
-    <a href={resolve('/draft-duel')}><ArrowLeft size={15} aria-hidden="true" /> Draft Duel</a
-    ><ArenaSoundToggle />
+    <a href={resolve('draft-duel/')}>
+      <ArrowLeft size={15} aria-hidden="true" />
+      Draft Duel
+    </a>
+
+    <ArenaSoundToggle />
   </div>
 
   {#if !controller.snapshot && !controller.error}
@@ -236,9 +243,11 @@
     <div class="room-empty">
       <h1>Couldn’t open this room</h1>
       <p role="alert">{controller.error}</p>
-      <a href={resolve('/draft-duel')} class="room-primary"
-        >Back to Draft Duel <ArrowRight size={16} aria-hidden="true" /></a
-      >
+
+      <a href={resolve('draft-duel/')} class="room-primary">
+        Back to Draft Duel
+        <ArrowRight size={16} aria-hidden="true" />
+      </a>
     </div>
   {:else}
     <header class="room-header">
@@ -249,7 +258,10 @@
           {settingsName} · Best of 7 · Room {controller.snapshot.code ?? 'closed'}
         </p>
       </div>
-      {#if controller.phase !== 'championship'}<MultiplayerLobbyLink {roomId} />{/if}
+
+      {#if controller.phase !== 'championship'}
+        <MultiplayerLobbyLink {roomId} />
+      {/if}
     </header>
 
     <ol class="room-stages" aria-label="Match progress">
@@ -266,9 +278,18 @@
       {/each}
     </ol>
 
-    {#if controller.phase === 'championship'}<MultiplayerLobbyLink {roomId} completed />{/if}
-    {#if controller.error}<p class="room-alert" role="alert">{controller.error}</p>{/if}
-    {#if controller.notice}<p class="room-connection" role="status">{controller.notice}</p>{/if}
+    {#if controller.phase === 'championship'}
+      <MultiplayerLobbyLink {roomId} completed />
+    {/if}
+
+    {#if controller.error}
+      <p class="room-alert" role="alert">{controller.error}</p>
+    {/if}
+
+    {#if controller.notice}
+      <p class="room-connection" role="status">{controller.notice}</p>
+    {/if}
+
     {#if rivalMember && !rivalMember.online && controller.phase !== 'lobby'}
       <p class="room-connection" role="status">
         Your opponent is offline. Their place in the room is kept.
@@ -301,18 +322,22 @@
                 {controller.snapshot.code}
               </div>
               <div class="invite-actions">
-                <button type="button" onclick={copyCode} class="room-secondary"
-                  >{#if copiedCode}<Check size={16} aria-hidden="true" /> Copied{:else}<Copy
-                      size={16}
-                      aria-hidden="true"
-                    /> Copy code{/if}</button
-                >
-                <button type="button" onclick={copyInviteLink} class="room-primary"
-                  >{#if copiedLink}<Check size={16} aria-hidden="true" /> Copied{:else}<Link
-                      size={16}
-                      aria-hidden="true"
-                    /> Copy invite link{/if}</button
-                >
+                <button type="button" onclick={copyCode} class="room-secondary">
+                  {#if copiedCode}
+                    <Check size={16} aria-hidden="true" />Copied
+                  {:else}
+                    <Copy size={16} aria-hidden="true" />Copy code
+                  {/if}
+                </button>
+
+                <button type="button" onclick={copyInviteLink} class="room-primary">
+                  {#if copiedLink}
+                    <Check size={16} aria-hidden="true" />Copied
+                  {:else}
+                    <Link size={16} aria-hidden="true" />
+                    Copy invite link
+                  {/if}
+                </button>
               </div>
               <p class="invite-footnote">Room codes expire after 15 minutes.</p>
             {/if}
@@ -377,11 +402,10 @@
               onclick={() => controller.startDraft()}
               disabled={controller.busy || !bothOnline}
               class="room-primary start-draft"
-              >{controller.busy ? 'Starting draft…' : 'Start draft'}<ArrowRight
-                size={18}
-                aria-hidden="true"
-              /></button
             >
+              {controller.busy ? 'Starting draft…' : 'Start draft'}
+              <ArrowRight size={18} aria-hidden="true" />
+            </button>
           {/if}
           <div class="lobby-manage">
             {#if isHost && rivalMember}
@@ -586,17 +610,21 @@
       <div class="room-empty">
         <h1>Room expired</h1>
         <p>Your local saves are kept. Create a new room to play again.</p>
-        <a class="room-primary" href={resolve('/draft-duel')}
-          >New Draft Duel <ArrowRight size={16} aria-hidden="true" /></a
-        >
+
+        <a class="room-primary" href={resolve('draft-duel/')}>
+          New Draft Duel
+          <ArrowRight size={16} aria-hidden="true" />
+        </a>
       </div>
     {:else if controller.phase === 'integrity-failed'}
       <div class="room-empty">
         <h1>Results could not be verified</h1>
         <p>The two simulations disagreed. Neither result has been accepted.</p>
-        <a class="room-primary" href={resolve('/draft-duel')}
-          >New Draft Duel <ArrowRight size={16} aria-hidden="true" /></a
-        >
+
+        <a class="room-primary" href={resolve('draft-duel/')}>
+          New Draft Duel
+          <ArrowRight size={16} aria-hidden="true" />
+        </a>
       </div>
     {/if}
 

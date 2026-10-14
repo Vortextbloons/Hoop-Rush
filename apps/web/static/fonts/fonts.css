@@ -1,8 +1,3 @@
-﻿/* Latin-only subsets for the fonts the UI actually uses.
-   Non-Latin subsets are intentionally omitted: the app renders English copy,
-   and each @font-face with an unused unicode-range only adds forgot requests on
-   low-end devices. Keep this list in sync with `--font-*` in src/app.css. */
-
 @font-face {
   font-family: 'Barlow Condensed';
   font-style: normal;

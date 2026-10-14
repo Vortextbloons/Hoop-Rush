@@ -36,7 +36,6 @@ export interface HavocCliSimulationOptions {
   readonly seed: Seed;
   readonly plan: HavocCliDraftPlan;
   readonly comparison: boolean;
-  /** Defaults to all 82 games; the calibration machinery and tests use smaller counts. */
   readonly games?: number;
   readonly assets?: HavocCliAssets;
 }

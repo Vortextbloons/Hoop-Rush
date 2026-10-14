@@ -143,7 +143,6 @@ export interface ScenarioRun {
 }
 
 export interface ScenarioOptions {
-  /** Overrides the era profile pace (used to force clock scenarios). */
   pace?: number;
 }
 

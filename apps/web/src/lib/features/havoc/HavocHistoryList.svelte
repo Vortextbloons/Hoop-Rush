@@ -1,6 +1,6 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
-  import AsyncState from '$lib/components/AsyncState.svelte';
+  import AsyncState from '#lib/components/AsyncState.svelte';
   import type { HavocHistoryState } from './havoc-history-state.svelte';
   import { havocCompletionStateLabel, havocRecordLabel } from './havoc-presentation';
 
@@ -36,7 +36,7 @@
         message="Draft a lineup and play the 82-game challenge."
       >
         {#snippet actions()}
-          <a href={resolve('/havoc')} class="h-button">Start a Havoc run</a>
+          <a href={resolve('havoc/')} class="h-button">Start a Havoc run</a>
         {/snippet}
       </AsyncState>
     </div>

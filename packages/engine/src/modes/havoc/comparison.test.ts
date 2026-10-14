@@ -442,7 +442,6 @@ describe('compareHavocSeasons slots and MVP', () => {
       gain: havocIndex - normalIndex,
     });
     expect(pg?.productionIndex.gain).toBe(82 * (266 - 40));
-    // zero-attempt lines stay integer counts rather than divisions
     for (const slot of comparison.slots) {
       expect(Number.isFinite(slot.deltas.points)).toBe(true);
       expect(slot.deltas.fieldGoalsMade).toBe(

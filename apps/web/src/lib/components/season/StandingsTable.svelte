@@ -9,9 +9,9 @@
     recordLabel,
     streakLabel,
     winPct,
-  } from '$lib/season/season-presentation';
+  } from '#lib/season/season-presentation.js';
   import type { SeasonStandingsRow } from '@hoop-rush/data-contracts';
-  import { franchiseIdentityOf } from '$lib/season/season-branding';
+  import { franchiseIdentityOf } from '#lib/season/season-branding.js';
   import SeasonTeamLogo from './SeasonTeamLogo.svelte';
   let {
     standings,

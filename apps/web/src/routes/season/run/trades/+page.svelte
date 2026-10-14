@@ -4,13 +4,13 @@
   import {
     SEASON_RUN_SHELL_CONTEXT,
     type SeasonRunShellData,
-  } from '$lib/season/season-shell-context';
-  import TradeBoardWorkspace from '$lib/components/season/TradeBoardWorkspace.svelte';
+  } from '#lib/season/season-shell-context.js';
+  import TradeBoardWorkspace from '#lib/components/season/TradeBoardWorkspace.svelte';
   import { tradeBoardViewModel } from '@hoop-rush/application/season';
-  import type { TradePackageDraft } from '$lib/season/season-presentation';
-  import { overallRatingOf, candidateOf } from '$lib/season/season-catalog-index';
-  import { overallRatingOfSlice } from '$lib/season/season-player-slice';
-  import { boostedOverallForPlayer } from '$lib/season/sponsor-gear-view';
+  import type { TradePackageDraft } from '#lib/season/season-presentation.js';
+  import { overallRatingOf, candidateOf } from '#lib/season/season-catalog-index.js';
+  import { overallRatingOfSlice } from '#lib/season/season-player-slice.js';
+  import { boostedOverallForPlayer } from '#lib/season/sponsor-gear-view.js';
   const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
   let mounted = $state(true);
   $effect(() => {

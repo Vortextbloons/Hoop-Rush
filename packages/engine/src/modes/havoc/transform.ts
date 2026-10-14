@@ -26,8 +26,6 @@ export interface ApplyHavocMutationOptions {
   readonly slot?: Position;
 }
 
-// Documented field -> authoritative channel map. Written fields disable the
-// historical blend for that channel only; unmapped fields keep ordinary evidence.
 const RATING_CHANNELS: Partial<Record<HavocRatingField, HavocAuthoritativeChannel>> = {
   insideScoring: 'two-point-accuracy',
   closeShot: 'two-point-accuracy',

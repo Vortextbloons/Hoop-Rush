@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { SeasonInnovationImpact } from '$lib/season/season-innovation-impact-view';
+  import type { SeasonInnovationImpact } from '#lib/season/season-innovation-impact-view.js';
   import RuleBadge from './RuleBadge.svelte';
 
   let {

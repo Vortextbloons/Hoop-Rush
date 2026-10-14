@@ -9,7 +9,7 @@ import type {
   ChallengeJobPort,
   ChallengeJobSimulationInput,
 } from '@hoop-rush/application/challenge';
-import { newRequestId } from '$lib/ids';
+import { newRequestId } from '#lib/ids.js';
 
 export class ChallengeWorkerJob implements ChallengeJobPort {
   private worker: Worker | null = null;

@@ -4,7 +4,7 @@
 >
   import type { HoopRushManifest, PeakPlayerSeason } from '@hoop-rush/data-contracts';
   import PlayerFace from './PlayerFace.svelte';
-  import { SLOT_LABELS, SLOT_INDEXES } from '$lib/player-positions';
+  import { SLOT_LABELS, SLOT_INDEXES } from '#lib/player-positions.js';
   const SLOT_POSITIONS = [
     { left: 50, top: 77 },
     { left: 22, top: 55 },

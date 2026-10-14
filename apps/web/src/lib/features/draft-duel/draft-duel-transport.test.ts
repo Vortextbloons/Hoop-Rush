@@ -11,7 +11,7 @@ import {
 import {
   createFakeSupabaseHarness,
   type FakeSupabaseHarness,
-} from '$lib/testing/fake-supabase-client';
+} from '#lib/testing/fake-supabase-client.js';
 import { createDraftDuelTransport } from './draft-duel-transport';
 
 const mockState = vi.hoisted(() => {

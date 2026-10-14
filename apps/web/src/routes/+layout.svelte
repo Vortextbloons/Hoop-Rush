@@ -1,17 +1,17 @@
-﻿<script lang="ts">
-  import { browser } from '$app/environment';
+<script lang="ts">
+  import { browser } from '$app/env';
   import { asset, resolve } from '$app/paths';
   import { page } from '$app/state';
   import type { RouteId } from '$app/types';
   import { ArrowLeft, Home, Users, Swords } from '@lucide/svelte';
   import '../app.css';
   import { ModeWatcher } from 'mode-watcher';
-  import ArenaSoundToggle from '$lib/components/ArenaSoundToggle.svelte';
-  import BottomNav from '$lib/components/BottomNav.svelte';
-  import LiteModeToggle from '$lib/components/LiteModeToggle.svelte';
-  import { initArenaSoundForLiteMode } from '$lib/arena-sound';
-  import { deferIdle, initLiteMode, isLiteMode } from '$lib/device-capabilities';
-  import { isNavItemActive, type NavItem } from '$lib/nav-items';
+  import ArenaSoundToggle from '#lib/components/ArenaSoundToggle.svelte';
+  import BottomNav from '#lib/components/BottomNav.svelte';
+  import LiteModeToggle from '#lib/components/LiteModeToggle.svelte';
+  import { initArenaSoundForLiteMode } from '#lib/arena-sound.js';
+  import { deferIdle, initLiteMode, isLiteMode } from '#lib/device-capabilities.js';
+  import { isNavItemActive, type NavItem } from '#lib/nav-items.js';
   let { children } = $props();
   const homeHref = resolve('/');
   const navItems: NavItem[] = [
@@ -35,7 +35,7 @@
     if (!browser || isMultiplayerLobby) return;
     if (isLiteMode()) return;
     deferIdle(() => {
-      void import('$lib/data').then(({ warmManifest }) => warmManifest());
+      void import('#lib/data.js').then(({ warmManifest }) => warmManifest());
     });
   });
   function isActive(item: NavItem): boolean {
@@ -44,7 +44,7 @@
   function warmForRoster(itemId: string): void {
     if (isLiteMode()) return;
     if (itemId === 'roster') {
-      void import('$lib/data').then(({ warmPlayersIndex }) => warmPlayersIndex());
+      void import('#lib/data.js').then(({ warmPlayersIndex }) => warmPlayersIndex());
     }
   }
 </script>
@@ -64,7 +64,7 @@
         class="flex items-center gap-2.5 text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <img
-          src={isUltimate ? asset('/ultimate/logo.png') : asset('/app-icon-96.png')}
+          src={isUltimate ? asset('ultimate/logo.png') : asset('app-icon-96.png')}
           alt=""
           class="h-9 w-9 rounded-lg object-contain"
           width="36"

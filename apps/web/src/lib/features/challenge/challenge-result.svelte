@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { browser } from '$app/environment';
+  import { browser } from '$app/env';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
   import type {
@@ -8,13 +8,13 @@
     PeakPlayerSeason,
     PlayersIndexEntry,
   } from '@hoop-rush/data-contracts';
-  import type { SandboxHref } from '$lib/sandbox-url';
-  import { clearDataLoaderCaches, getManifest, getPlayersIndex } from '$lib/data';
+  import type { SandboxHref } from '#lib/sandbox-url.js';
+  import { clearDataLoaderCaches, getManifest, getPlayersIndex } from '#lib/data.js';
   import { challengeRepository } from './challenge-repo';
   import { loadRunPlayersById } from './sandbox-lineup';
-  import { arenaBlockComplete } from '$lib/arena-sound';
-  import SeasonReport from '$lib/components/SeasonReport.svelte';
-  import AsyncState from '$lib/components/AsyncState.svelte';
+  import { arenaBlockComplete } from '#lib/arena-sound.js';
+  import SeasonReport from '#lib/components/SeasonReport.svelte';
+  import AsyncState from '#lib/components/AsyncState.svelte';
   let {
     mode,
     eyebrow,
@@ -169,7 +169,7 @@
     <div class="mt-8 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm">
       <AsyncState kind="error" title="Result unavailable" message={error} retry={retryResult} />
       <a
-        href={resolve(`/${mode}/history`)}
+        href={resolve(`${mode}/history/`)}
         class="mt-3 inline-flex rounded-lg bg-primary px-4 py-2 font-semibold text-primary-foreground"
       >
         Challenge history

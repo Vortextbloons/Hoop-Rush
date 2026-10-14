@@ -3,7 +3,7 @@ import type {
   HoopRushManifest,
   OpponentBracket,
 } from '@hoop-rush/data-contracts';
-import { getBracket, getEraSimulationProfile, getManifest } from '$lib/data';
+import { getBracket, getEraSimulationProfile, getManifest } from '#lib/data.js';
 export const FIXED_SANDBOX_ERA = '2010s';
 export async function loadRunPreamble(): Promise<{
   manifest: HoopRushManifest;

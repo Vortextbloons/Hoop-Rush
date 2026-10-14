@@ -11,11 +11,11 @@ import {
   type OpponentBracket,
   type SeasonDraftCatalog,
 } from '@hoop-rush/data-contracts';
-import { getManifest } from '$lib/data';
-import { newRequestId, newSeasonId, seasonRootSeed } from '$lib/ids';
-import { getPersistence } from '$lib/persistence';
-import { loadRunPreamble } from '$lib/run-preamble';
-import { loadSeasonDraftCatalog } from '$lib/season/season-assets';
+import { getManifest } from '#lib/data.js';
+import { newRequestId, newSeasonId, seasonRootSeed } from '#lib/ids.js';
+import { getPersistence } from '#lib/persistence.js';
+import { loadRunPreamble } from '#lib/run-preamble.js';
+import { loadSeasonDraftCatalog } from '#lib/season/season-assets.js';
 import { HavocRunner } from './havoc-runner';
 
 export interface CreateHavocServiceOptions {

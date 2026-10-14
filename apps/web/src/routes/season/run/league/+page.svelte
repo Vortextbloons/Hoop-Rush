@@ -4,24 +4,24 @@
   import { resolve } from '$app/paths';
   import type { RouteId } from '$app/types';
   import type { SeasonGameSummary, SeasonTeamAggregate } from '@hoop-rush/data-contracts';
-  import StandingsTable from '$lib/components/season/StandingsTable.svelte';
-  import SeasonTeamLogo from '$lib/components/season/SeasonTeamLogo.svelte';
-  import TiebreakExplanations from '$lib/components/season/TiebreakExplanations.svelte';
+  import StandingsTable from '#lib/components/season/StandingsTable.svelte';
+  import SeasonTeamLogo from '#lib/components/season/SeasonTeamLogo.svelte';
+  import TiebreakExplanations from '#lib/components/season/TiebreakExplanations.svelte';
   import {
     SEASON_RUN_SHELL_CONTEXT,
     type SeasonRunShellData,
-  } from '$lib/season/season-shell-context';
+  } from '#lib/season/season-shell-context.js';
   import {
     foldSeasonAggregates,
     franchiseStreaks,
     pointDifferential,
-  } from '$lib/season/season-presentation';
+  } from '#lib/season/season-presentation.js';
   import {
     postseasonRankingsOf,
     rankedEntriesOf,
-  } from '$lib/season/season-postseason-presentation';
-  import { franchiseIdentityOf } from '$lib/season/season-branding';
-  import { oneDecimal } from '$lib/format';
+  } from '#lib/season/season-postseason-presentation.js';
+  import { franchiseIdentityOf } from '#lib/season/season-branding.js';
+  import { oneDecimal } from '#lib/format.js';
   const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
   const foldWeak = new WeakMap<
     readonly SeasonGameSummary[],

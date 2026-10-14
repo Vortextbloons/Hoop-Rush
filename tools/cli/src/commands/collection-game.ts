@@ -1344,9 +1344,7 @@ export function collectionGameAudit(args: {
           rulesHash,
         });
         failures.push('objective feasibility: infeasible bench spark selection was accepted');
-      } catch {
-        // expected rejection
-      }
+      } catch {}
     } catch (error) {
       failures.push(`objective feasibility check failed: ${(error as Error).message}`);
     }

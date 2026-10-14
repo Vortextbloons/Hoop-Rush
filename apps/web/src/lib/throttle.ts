@@ -1,12 +1,3 @@
-/**
- * Coalesces high-frequency progress updates down to a target frame rate.
- *
- * Simulation runners emit progress on every completed game (often dozens per
- * second). Writing each tick straight into reactive state forces a Svelte
- * re-render and a CSS transition restart per tick, which dominates frame time
- * on low-end devices. This drops intermediate values and only surfaces the
- * latest one every `intervalMs`.
- */
 export class DataThrottle<T> {
   #last = Number.NEGATIVE_INFINITY;
   #pending: T | undefined;
@@ -50,7 +41,6 @@ export class DataThrottle<T> {
   }
 }
 
-/** Higher is smoother but heavier; low-end devices get a coarser cadence. */
 export function progressTickIntervalMs(lite: boolean): number {
   return lite ? 400 : 120;
 }

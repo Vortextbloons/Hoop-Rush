@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { browser } from '$app/environment';
+  import { browser } from '$app/env';
   import { resolve } from '$app/paths';
   import type { ActiveRunCheckpoint, CompletedRunIndex } from '@hoop-rush/persistence';
   import type { HoopRushManifest } from '@hoop-rush/data-contracts';
-  import { clearDataLoaderCaches, getManifest } from '$lib/data';
+  import { clearDataLoaderCaches, getManifest } from '#lib/data.js';
   import { challengeRepository } from './challenge-repo';
-  import AsyncState from '$lib/components/AsyncState.svelte';
+  import AsyncState from '#lib/components/AsyncState.svelte';
   import HistoryList from './challenge-history-list.svelte';
   let {
     mode,

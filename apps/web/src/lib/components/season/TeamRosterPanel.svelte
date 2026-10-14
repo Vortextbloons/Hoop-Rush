@@ -6,10 +6,10 @@
     SeasonRoster,
     SeasonRun,
   } from '@hoop-rush/data-contracts';
-  import SeasonPlayerStats from '$lib/components/season/SeasonPlayerStats.svelte';
-  import SeasonRosterList from '$lib/components/season/SeasonRosterList.svelte';
-  import type { SeasonPlayerStatsView } from '$lib/season/season-player-stats-view';
-  import type { SeasonRunShellData } from '$lib/season/season-shell-context';
+  import SeasonPlayerStats from '#lib/components/season/SeasonPlayerStats.svelte';
+  import SeasonRosterList from '#lib/components/season/SeasonRosterList.svelte';
+  import type { SeasonPlayerStatsView } from '#lib/season/season-player-stats-view.js';
+  import type { SeasonRunShellData } from '#lib/season/season-shell-context.js';
   type RosterPanelView = 'roster' | 'stats';
   let {
     roster,

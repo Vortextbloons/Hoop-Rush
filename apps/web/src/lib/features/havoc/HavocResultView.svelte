@@ -25,12 +25,12 @@
   {#if resultState.loading}<p class="h-copy" aria-live="polite">Opening your season report…</p>
   {:else if run === null || run.phase === 'draft'}<div class="h-panel">
       <h1 class="h-title">Your story starts here.</h1>
-      <a class="h-button mt-6" href={resolve('/havoc')}>Draft your squad</a>
+      <a class="h-button mt-6" href={resolve('havoc/')}>Draft your squad</a>
     </div>
   {:else if !resultState.havocSeasonComplete}<div class="h-panel">
       <h1 class="h-title">Season in progress.</h1>
       <p class="h-copy mt-4">Your report arrives after all 82 games.</p>
-      <a class="h-button mt-6" href={resolve('/havoc/run')}>Continue season</a>
+      <a class="h-button mt-6" href={resolve('havoc/run/')}>Continue season</a>
     </div>
   {:else if !resultState.comparisonComplete && run.comparisonStatus !== 'unsupported'}
     <div class="h-panel" data-havoc-comparison-pending>
@@ -49,6 +49,7 @@
       >
         <div style:width={`${(completed / 82) * 100}%`}></div>
       </div>
+
       <p class="h-copy" data-havoc-comparison-progress>{completed} / 82</p>
       {#if !resultState.busy}<button
           class="h-button mt-4"
@@ -170,13 +171,17 @@
       </details>
     {:else}<div class="mt-6"><HavocLineupLock slots={run.lineup} /></div>{/if}
     <div class="h-actions mt-6">
-      <a class="h-button" href={resolve('/havoc')}>Draft another squad <ArrowRight size={18} /></a
-      ><a class="h-link" href={resolve('/havoc/history')}>Hall of Freaks</a>
+      <a class="h-button" href={resolve('havoc/')}>Draft another squad <ArrowRight size={18} /></a>
+      <a class="h-link" href={resolve('havoc/history/')}>Hall of Freaks</a>
     </div>
-    {#if comparison !== null && resultState.comparisonComplete}<details class="h-panel mt-8">
-        <summary>Explore the box scores, powers & game-by-game comparison</summary
-        ><HavocComparisonView {comparison} showChart={false} />
-      </details>{/if}
+
+    {#if comparison !== null && resultState.comparisonComplete}
+      <details class="h-panel mt-8">
+        <summary>Explore the box scores, powers & game-by-game comparison</summary>
+        <HavocComparisonView {comparison} showChart={false} />
+      </details>
+    {/if}
+
     <a
       class="h-link mt-6 inline-block"
       href={resolve('/havoc/history/[runId]', { runId: run.runId })}>Open full saved report</a
@@ -194,13 +199,14 @@
           class="h-button secondary">Close</Dialog.Close
         >
       </header>
+
       <Dialog.Description class="h-copy text-xs"
         >The same matchup, with and without powers.</Dialog.Description
       >
-      {#if comparison !== null && selectedGame !== null}<HavocGameDetail
-          {comparison}
-          gameNumber={selectedGame}
-        />{/if}
+
+      {#if comparison !== null && selectedGame !== null}
+        <HavocGameDetail {comparison} gameNumber={selectedGame} />
+      {/if}
     </Dialog.Content>
   </Dialog.Portal>
 </Dialog.Root>

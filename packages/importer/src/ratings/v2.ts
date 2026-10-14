@@ -518,8 +518,6 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
     3,
     35,
   );
-  // Observed drives beat the formula: tracking counts real rim attacks while
-  // the formula guesses from foul pressure and role.
   const driveRate = drivesPer36 !== null ? clamp(drivesPer36, 3, 35) : driveRateFormula;
   const postUpRate = clamp(
     3 + interiorRole * 18 + (1 - threeRate) * (position === 'C' ? 7 : 2),

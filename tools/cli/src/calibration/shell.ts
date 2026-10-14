@@ -6,7 +6,6 @@ import type { SeedRangeCalibration } from './harness.ts';
 import { calibrationGateFailures } from './report.ts';
 
 export interface CalibrationMeasurement<TExtra> {
-  /** Artifact content, built lazily so failed calibrations never validate or write it. */
   targets: (() => unknown) | null;
   metrics: M25Gate[];
   gates: Record<string, boolean>;
@@ -31,7 +30,6 @@ export interface CalibrationShellOptions<TExtra> {
   argsForReport: Record<string, unknown>;
   plan: SeedRangeCalibration;
   startedAt: number;
-  /** Non-null when the command was invoked with `--validate`. */
   validate: (() => CliReport) | null;
   measure: () => CalibrationMeasurement<TExtra>;
   report: (state: CalibrationShellState<TExtra>) => { details: string[]; payload: unknown };
@@ -45,12 +43,6 @@ export interface CalibrationShellOptions<TExtra> {
   };
 }
 
-/**
- * Shared season-calibration flow: resolve-and-validate short circuit, cohort
- * measurement, gate summary, artifact commit, epilogue, and report assembly.
- * Basketball metrics, artifact schemas, and report payloads stay with the
- * command.
- */
 export function runCalibrationShell<TExtra>(options: CalibrationShellOptions<TExtra>): CliReport {
   if (options.validate !== null) return options.validate();
   let measured: CalibrationMeasurement<TExtra>;

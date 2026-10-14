@@ -5,11 +5,12 @@
   import { Dialog } from 'bits-ui';
   import { blockRoundRange, type SeasonBlockRecap } from '@hoop-rush/data-contracts';
   import type { SeasonCompletedRunIndexEntry, SeasonCompletedSeason } from '@hoop-rush/persistence';
-  import { getSeasonRunRepository } from '$lib/season/season-repo';
+  import { getSeasonRunRepository } from '#lib/season/season-repo.js';
   import {
     SEASON_RUN_SHELL_CONTEXT,
     type SeasonRunShellData,
-  } from '$lib/season/season-shell-context';
+  } from '#lib/season/season-shell-context.js';
+
   import {
     deriveBlockRecap,
     displayPlayerName,
@@ -17,23 +18,24 @@
     LEADER_CATEGORY_LABELS,
     recordLabel,
     tradeGradeViewModel,
-  } from '$lib/season/season-presentation';
-  import { engineOrderLeaderTables, LEADER_CATEGORIES } from '$lib/season/season-leaders-view';
-  import { humanInjuryTimeline, INJURY_SEVERITY_LABEL } from '$lib/season/season-health-view';
+  } from '#lib/season/season-presentation.js';
+  import { engineOrderLeaderTables, LEADER_CATEGORIES } from '#lib/season/season-leaders-view.js';
+  import { humanInjuryTimeline, INJURY_SEVERITY_LABEL } from '#lib/season/season-health-view.js';
   import {
     postseasonRankingsOf,
     postseasonSummaryRow,
     rankedEntriesOf,
-  } from '$lib/season/season-postseason-presentation';
+  } from '#lib/season/season-postseason-presentation.js';
+
   import {
     buildCompletedSeasonRunReplayExport,
     deriveCompletedSeasonTradeGrades,
-  } from '$lib/season/season-completed-export';
-  import AwardsSection from '$lib/components/season/AwardsSection.svelte';
-  import ChampionSummary from '$lib/components/season/ChampionSummary.svelte';
-  import PostseasonBracket from '$lib/components/season/PostseasonBracket.svelte';
-  import StandingsTable from '$lib/components/season/StandingsTable.svelte';
-  import TiebreakExplanations from '$lib/components/season/TiebreakExplanations.svelte';
+  } from '#lib/season/season-completed-export.js';
+  import AwardsSection from '#lib/components/season/AwardsSection.svelte';
+  import ChampionSummary from '#lib/components/season/ChampionSummary.svelte';
+  import PostseasonBracket from '#lib/components/season/PostseasonBracket.svelte';
+  import StandingsTable from '#lib/components/season/StandingsTable.svelte';
+  import TiebreakExplanations from '#lib/components/season/TiebreakExplanations.svelte';
   const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
   let {
     runId,
@@ -70,11 +72,13 @@
     void loadResult();
   });
   const run = $derived(completed?.run ?? null);
+
   const humanFranchiseId = $derived(
     run !== null
       ? (run.league.teams.find((entry) => entry.control === 'human')?.franchiseId ?? null)
       : null,
   );
+
   const rankings = $derived(run !== null ? postseasonRankingsOf(run) : null);
   const rankedEntries = $derived(
     run !== null && rankings !== null ? rankedEntriesOf(rankings, run.standings) : [],
@@ -236,7 +240,7 @@
       const repo = await getSeasonRunRepository();
       await repo.deleteCompletedSeason(runId);
       deleteOpen = false;
-      await goto(resolve('/season/run/history'));
+      await goto(resolve('season/run/history/'));
     } catch (error) {
       deleteError = error instanceof Error ? error.message : String(error);
     } finally {
@@ -264,11 +268,10 @@
             loadedRunId = null;
             void loadResult();
           }}
-          class="sr-btn-danger"
+          class="sr-btn-danger">Try again</button
         >
-          Try again
-        </button>
-        <a href={resolve('/season/run/history')} class="sr-btn-ghost"> Back to history </a>
+
+        <a href={resolve('season/run/history/')} class="sr-btn-ghost">Back to history</a>
       </div>
     </div>
   </section>
@@ -295,9 +298,9 @@
         <details class="mt-3 rounded-lg border border-border bg-surface-2 px-4 py-3">
           <summary
             class="sr-section-label inline-flex min-h-11 cursor-pointer items-center outline-none [&::-webkit-details-marker]:hidden"
+            >Export details</summary
           >
-            Export details
-          </summary>
+
           <dl class="mt-2 flex flex-col gap-1 font-mono text-xs text-muted-foreground">
             <div class="flex flex-wrap gap-x-2">
               <dt class="font-bold uppercase">Run</dt>
@@ -329,7 +332,8 @@
         </details>
       </div>
       <div class="flex shrink-0 flex-wrap gap-2">
-        <a href={resolve('/season/run/history')} class="sr-btn-ghost"> Back to history </a>
+        <a href={resolve('season/run/history/')} class="sr-btn-ghost">Back to history</a>
+
         <button
           type="button"
           data-season-history-delete
@@ -409,9 +413,9 @@
                 class="sr-number shrink-0 font-mono text-xs font-bold {row.humanWon === true
                   ? 'text-positive'
                   : ''}"
+                >{row.humanGame ? (row.humanWon === true ? 'W ' : 'L ') : ''}{row.scoreLabel}</span
               >
-                {row.humanGame ? (row.humanWon === true ? 'W ' : 'L ') : ''}{row.scoreLabel}
-              </span>
+
               <button
                 type="button"
                 data-season-history-export={row.summary.gameId}

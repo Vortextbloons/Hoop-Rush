@@ -1,5 +1,6 @@
 import { resolve } from 'node:path';
 import { z } from 'zod';
+import { seedWindowSchema } from '../seed-window.ts';
 import {
   SEASON_GAME_TARGETS_VERSION,
   SEASON_GAME_VERSION,
@@ -90,14 +91,8 @@ export const seasonTradeTargetsSchema = z.object({
     cashCaps: z.object({ perProposal: z.literal(2), perWindow: z.literal(2) }),
     exchangeMax: z.literal(3),
   }),
-  cohort: z.object({
-    seedFrom: z.number().int().nonnegative(),
-    seedTo: z.number().int().nonnegative(),
-  }),
-  heldOut: z.object({
-    seedFrom: z.number().int().nonnegative(),
-    seedTo: z.number().int().nonnegative(),
-  }),
+  cohort: seedWindowSchema,
+  heldOut: seedWindowSchema,
   measured: z.object({
     calibration: z.object({
       seasonsSimulated: z.number().int().nonnegative(),
@@ -385,10 +380,10 @@ export function seasonTradeAudit(args: {
     if (ie.exchange > 0) failures.push(`exchange limit ${String(ie.exchange)}`);
     const pass = failures.length === 0;
     const details = [
-      `run ${run.runId} · trade windows ${String(run.trade?.windows.length ?? 0)}`,
-      `illegal ${String(illegal)} · duplicate ${String(dup)} · valueBand ${String(valueFails)} · chemPairs ${String(chem.pairs)}`,
-      `influenceOnly ${String(influenceOnly)} · cashWin ${String(cashWin)} · negBal ${String(negBal)} · cashRecon ${String(cashRecon)}`,
-      `inquiry ${String(ie.inquiry)} · exchange ${String(ie.exchange)} · duplicateQuota ${String(ie.duplicateQuota)}`,
+      `run ${run.runId} Â· trade windows ${String(run.trade?.windows.length ?? 0)}`,
+      `illegal ${String(illegal)} Â· duplicate ${String(dup)} Â· valueBand ${String(valueFails)} Â· chemPairs ${String(chem.pairs)}`,
+      `influenceOnly ${String(influenceOnly)} Â· cashWin ${String(cashWin)} Â· negBal ${String(negBal)} Â· cashRecon ${String(cashRecon)}`,
+      `inquiry ${String(ie.inquiry)} Â· exchange ${String(ie.exchange)} Â· duplicateQuota ${String(ie.duplicateQuota)}`,
     ];
     return makeReport(
       'season trade audit',
@@ -965,10 +960,10 @@ export function seasonTradeCalibrate(args: SeasonTradeArgs): CliReport {
       };
       const details = [
         `${String(calibration.length)} calibration + ${String(heldOut.length)} held-out seasons in ${String(Date.now() - started)}ms (${String(workers)} workers)`,
-        `AI trades per season mean ${measured.aiTradesMean.toFixed(2)} (min ${String(measured.aiTradesMin)} · max ${String(measured.aiTradesMax)}; gate [${String(SEASON_TRADE_MIN_AI_TRADES_PER_SEASON)}, ${String(SEASON_TRADE_MAX_AI_TRADES_PER_SEASON)}])`,
-        `accepted package mix 1-1 ${String(measured.packageMix['1-1'])} · 2-2 ${String(measured.packageMix['2-2'])} · 1-2 ${String(measured.packageMix['1-2'])} · 2-1 ${String(measured.packageMix['2-1'])}`,
-        `illegal rosters ${String(measured.illegalRosterFailures)} · duplicate ownership ${String(measured.duplicateOwnershipFailures)} · value-band failures ${String(measured.valueBandFailures)}`,
-        `chemistry pairs ${String(measured.chemistryPairs)} (${String(SEASON_TRADE_PAIRS_LEAGUE)} per season) · pair failures ${String(measured.chemistryPairFailures)} · zero-state new-pair failures ${String(measured.zeroStateNewPairFailures)}`,
+        `AI trades per season mean ${measured.aiTradesMean.toFixed(2)} (min ${String(measured.aiTradesMin)} Â· max ${String(measured.aiTradesMax)}; gate [${String(SEASON_TRADE_MIN_AI_TRADES_PER_SEASON)}, ${String(SEASON_TRADE_MAX_AI_TRADES_PER_SEASON)}])`,
+        `accepted package mix 1-1 ${String(measured.packageMix['1-1'])} Â· 2-2 ${String(measured.packageMix['2-2'])} Â· 1-2 ${String(measured.packageMix['1-2'])} Â· 2-1 ${String(measured.packageMix['2-1'])}`,
+        `illegal rosters ${String(measured.illegalRosterFailures)} Â· duplicate ownership ${String(measured.duplicateOwnershipFailures)} Â· value-band failures ${String(measured.valueBandFailures)}`,
+        `chemistry pairs ${String(measured.chemistryPairs)} (${String(SEASON_TRADE_PAIRS_LEAGUE)} per season) Â· pair failures ${String(measured.chemistryPairFailures)} Â· zero-state new-pair failures ${String(measured.zeroStateNewPairFailures)}`,
         `deterministic offer generation ${String(measured.deterministicOffers)}`,
         targetsDetail({ targetsWritten, targetsPath }),
       ];

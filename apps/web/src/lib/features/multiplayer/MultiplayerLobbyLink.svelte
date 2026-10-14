@@ -9,7 +9,7 @@
     loadLobbyId,
     rememberLobby,
     resumeMultiplayerGame,
-  } from '$lib/features/multiplayer/multiplayer-lobby';
+  } from '#lib/features/multiplayer/multiplayer-lobby.js';
 
   let { roomId, completed = false }: { roomId: string; completed?: boolean } = $props();
   let lobbyId = $state<string | null>(null);
@@ -68,16 +68,19 @@
             >
           </div>{/if}
       </div>
-      <a class="next-action" href={resolve(`/multiplayer?lobby=${lobbyId}`)}
-        >{lobby?.participantId === 'p2' ? 'Return to lobby' : 'Choose next game'}
-        <ArrowRight size={18} aria-hidden="true" /></a
-      >
-      {#if error}<p class="connection" role="status">{error}</p>{/if}
+      <a class="next-action" href={resolve(`multiplayer/?lobby=${lobbyId}`)}>
+        {lobby?.participantId === 'p2' ? 'Return to lobby' : 'Choose next game'}
+        <ArrowRight size={18} aria-hidden="true" />
+      </a>
+
+      {#if error}
+        <p class="connection" role="status">{error}</p>
+      {/if}
     </section>
   {:else}
     <a
       class="room-control"
-      href={resolve(`/multiplayer?lobby=${lobbyId}`)}
+      href={resolve(`multiplayer/?lobby=${lobbyId}`)}
       aria-label="Back to room lobby"
     >
       <Users size={17} aria-hidden="true" />

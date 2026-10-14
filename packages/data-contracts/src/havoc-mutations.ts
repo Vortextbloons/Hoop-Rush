@@ -98,10 +98,6 @@ export const havocMutationIdSchema = z.enum([
 ]);
 export type HavocMutationId = z.infer<typeof havocMutationIdSchema>;
 
-/**
- * Mutations limited to one owner per team. Must mirror the `teamExclusive` flags
- * in the engine catalog definitions.
- */
 export const HAVOC_TEAM_EXCLUSIVE_MUTATION_IDS: readonly HavocMutationId[] = [
   'time-lord',
   'reverse-basketball',
@@ -143,7 +139,6 @@ export type HavocRatingField = z.infer<typeof havocRatingFieldSchema>;
 export const havocTendencyFieldSchema = z.enum(HAVOC_TENDENCY_FIELDS);
 export type HavocTendencyField = z.infer<typeof havocTendencyFieldSchema>;
 
-/** The Specialist's rating groups, in the canonical sampling order. */
 export const HAVOC_SPECIALIST_CATEGORY_IDS = [
   'scoring',
   'playmaking',
@@ -164,7 +159,6 @@ export const HAVOC_SPECIALIST_CATEGORY_RATINGS: Readonly<
   athleticism: ['speed', 'strength', 'vertical'],
 };
 
-/** The five scoring ratings degraded by Basketball Darwinism, in canonical order. */
 export const HAVOC_SCORING_RATING_FIELDS: readonly HavocRatingField[] =
   HAVOC_SPECIALIST_CATEGORY_RATINGS.scoring;
 

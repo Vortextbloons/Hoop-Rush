@@ -1,5 +1,5 @@
 <script lang="ts">
-  import ChallengeRunView from '$lib/features/challenge/challenge-run-view.svelte';
+  import ChallengeRunView from '#lib/features/challenge/challenge-run-view.svelte';
 </script>
 
 <svelte:head>

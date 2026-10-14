@@ -52,20 +52,10 @@ const HAVOC_RUSH_MAKE_PENALTY_SCALE = 0.3;
 const HAVOC_RUSH_MAX_MAKE_PENALTY = 0.1;
 
 export interface HavocRushResolution {
-  /** The shortened clock expired before any attempt. */
   violation: boolean;
-  /** Make-probability penalty charged to the hurried attempt (fractions). */
   makePenalty: number;
 }
 
-/**
- * Resolve a possession whose natural duration exceeds its active shot clock.
- *
- * The overrun fraction (`(natural - limit) / natural`) drives both outcomes: a
- * calibrated share of possessions still expires without a shot, and the rest
- * attempt a hurried shot at reduced quality. This replaces the old behaviour
- * that turned every shortened-clock possession into a violation.
- */
 export function resolveHavocRushedPossession(
   rng: Rng,
   naturalSeconds: number,
@@ -327,9 +317,6 @@ export class PossessionStepper {
     const offense = this.offenseSide;
     const full = havoc.fullShotClock(offense);
     const raw = this.ctx.meanTripSeconds * (0.6 + rng.next() * 0.8);
-    // A side clock limits natural possessions; it does not rescale them. Keep
-    // the historical expression at the default 24s limit because x*24/24 is
-    // not an exact IEEE-754 identity and default games must stay byte-identical.
     const planned =
       full === ENGINE_CONSTANTS.shotClockSeconds
         ? Math.max(
@@ -338,10 +325,6 @@ export class PossessionStepper {
           )
         : Math.max(raw, ENGINE_CONSTANTS.minimumTripSeconds);
     if (planned > clock.remaining && planned <= state.secondsRemaining) {
-      // The active clock is shorter than this possession would naturally run.
-      // Resolve it as a rushed possession instead of an automatic violation: a
-      // calibrated share still expires, the rest burn the clock and attempt a
-      // hurried shot at reduced quality.
       const rush = resolveHavocRushedPossession(rng, planned, clock.remaining);
       if (rush.violation) {
         const team = teams[offense];

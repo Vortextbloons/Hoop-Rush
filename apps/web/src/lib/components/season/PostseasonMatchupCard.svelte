@@ -3,10 +3,10 @@
   import type {
     PlayInGameCardViewModel,
     SeriesCardViewModel,
-  } from '$lib/season/season-postseason-presentation';
+  } from '#lib/season/season-postseason-presentation.js';
   import SeasonTeamLogo from './SeasonTeamLogo.svelte';
-  import { franchiseIdentityOf } from '$lib/season/season-branding';
-  import { franchiseColor } from '$lib/season/franchise-colors';
+  import { franchiseIdentityOf } from '#lib/season/season-branding.js';
+  import { franchiseColor } from '#lib/season/franchise-colors.js';
   let {
     series = null,
     playInCard = null,

@@ -2,7 +2,7 @@ import {
   fixedFiveRoomMembershipSchema,
   type FixedFiveRoomMembership,
 } from '@hoop-rush/data-contracts';
-import { createMembershipStore } from '$lib/multiplayer-membership';
+import { createMembershipStore } from '#lib/multiplayer-membership.js';
 export function friendlyFixedFiveJoinError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
   const lower = message.toLowerCase();

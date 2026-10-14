@@ -18,9 +18,9 @@ import {
   toSimulationPlayer,
   type ChallengeCreation,
 } from '@hoop-rush/engine';
-import { randomUUID } from '$lib/ids';
-import { resolvePlayerRefs } from '$lib/player-refs';
-import { FIXED_SANDBOX_ERA, loadRunPreamble } from '$lib/run-preamble';
+import { randomUUID } from '#lib/ids.js';
+import { resolvePlayerRefs } from '#lib/player-refs.js';
+import { FIXED_SANDBOX_ERA, loadRunPreamble } from '#lib/run-preamble.js';
 import { challengeRepository } from './challenge-repo';
 import { setClassicGuardBypass } from './classic-nav-guard';
 import { leaguePrecompute } from './league-precompute';
@@ -83,7 +83,7 @@ export async function startClassicRun(draft: ClassicDraftState, runSeed: Seed): 
     draft.draftId,
   );
   setClassicGuardBypass(true);
-  void goto(resolve('/classic/challenge'));
+  void goto(resolve('classic/challenge/'));
 }
 
 export async function startSandboxRun(players: PeakPlayerSeason[], seed: Seed): Promise<void> {
@@ -126,10 +126,7 @@ export async function startSandboxRun(players: PeakPlayerSeason[], seed: Seed): 
     ...(league ? { league } : {}),
   };
   const run = createChallenge({ ...creation, runSeed: seed });
-  await challengeRepository.saveActiveRun({
-    recordId: 'active',
-    saveSchemaVersion: 2,
-    run,
-  });
-  void goto(resolve('/sandbox/challenge'));
+
+  await challengeRepository.saveActiveRun({ recordId: 'active', saveSchemaVersion: 2, run });
+  void goto(resolve('sandbox/challenge/'));
 }

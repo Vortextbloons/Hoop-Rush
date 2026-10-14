@@ -49,8 +49,6 @@ export type HavocCliLineupKind =
 export const HAVOC_CLI_COHORT_LINEUPS = ['ordinary', 'risky', 'extreme'] as const;
 export type HavocCliCohortLineup = (typeof HAVOC_CLI_COHORT_LINEUPS)[number];
 
-// ------------------------------------------------------------- statistics
-
 export const havocCliDistributionSchema = z.object({
   count: z.number().int().nonnegative(),
   min: z.number(),
@@ -243,8 +241,6 @@ export function havocLineupStatsOf(
     typedFailures,
   });
 }
-
-// --------------------------------------------------------------- cohorts
 
 export interface HavocCohortSource {
   readonly catalog: SeasonDraftCatalog;
@@ -489,8 +485,6 @@ export function pairedTotalsOf(
     differentialDelta: havoc.differential - normal.differential,
   };
 }
-
-// ------------------------------------------------------------- mechanisms
 
 export type HavocCliMechanismMetricId =
   | 'reboundShare'
@@ -925,8 +919,6 @@ export function runHavocMechanismSensitivity(options: {
   });
   return { definition, on, off, report };
 }
-
-// ------------------------------------------------------------ report schema
 
 export const havocCliCohortSchema = z.object({
   seeds: z.number().int().nonnegative(),

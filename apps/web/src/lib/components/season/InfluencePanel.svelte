@@ -5,7 +5,7 @@
     SeasonInfluenceLedgerEntry,
     SeasonInfluenceSource,
   } from '@hoop-rush/data-contracts';
-  import type { InfluenceSpendAffordance } from '$lib/season/season-influence-view';
+  import type { InfluenceSpendAffordance } from '#lib/season/season-influence-view.js';
   const SOURCE_LABEL: Record<SeasonInfluenceSource, string> = {
     'initial-grant': 'Starting Influence',
     'block-grant': 'Played block',

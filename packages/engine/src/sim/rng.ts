@@ -17,11 +17,6 @@ export function buildWeightedPickTable(weights: readonly number[]): WeightedPick
   }
   return { weights: clamped, total };
 }
-/**
- * Table builder for weights the caller derived itself (all finite, non-negative
- * by construction). Keeps the clamp so totals match `buildWeightedPickTable`
- * exactly, and skips the per-weight validation branch.
- */
 export function buildTrustedWeightedPickTable(weights: readonly number[]): WeightedPickTable {
   const clamped: number[] = [];
   let total = 0;

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { resolveLogoUrlsWithHistorical, type HoopRushManifest } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
-  import { useImageFallback } from '$lib/use-image-fallback.svelte';
+  import { useImageFallback } from '#lib/use-image-fallback.svelte.js';
   let {
     manifest,
     franchiseId,

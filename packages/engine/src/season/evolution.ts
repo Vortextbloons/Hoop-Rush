@@ -252,9 +252,6 @@ function winProbabilityFromEdge(edge: number): number {
 const AI_OVERTIME_TIE_PROBABILITY = 0.06;
 const AI_OVERTIME_MEAN_WIN = 0.5;
 
-// The race score blends regulation edge with a league-mean overtime term. The
-// mean opponent reuses the AI's own rates, so both race distributions match and
-// the overtime term is exactly one half by symmetry; no DP run is needed.
 function overtimeMeanWinProbability(): number {
   return AI_OVERTIME_MEAN_WIN;
 }

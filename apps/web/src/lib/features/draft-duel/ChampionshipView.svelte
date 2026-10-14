@@ -11,8 +11,8 @@
     PlayerId,
     TeamResult,
   } from '@hoop-rush/data-contracts';
-  import PlayerFace from '$lib/components/PlayerFace.svelte';
-  import { SLOT_LABELS } from '$lib/player-positions';
+  import PlayerFace from '#lib/components/PlayerFace.svelte';
+  import { SLOT_LABELS } from '#lib/player-positions.js';
 
   let {
     series,
@@ -712,7 +712,6 @@
 
   {#if showRematch}<section class="rematch" aria-label="Rematch">
       {#if onlobby}
-        <p class="rematch-state">Play again with the same opponent.</p>
         <button type="button" class="rematch-btn" onclick={onlobby}>Back to lobby</button>
       {:else if rematchConfirmed}
         <p class="rematch-state" data-state="confirmed">

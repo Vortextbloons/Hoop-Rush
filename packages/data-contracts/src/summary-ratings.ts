@@ -34,10 +34,6 @@ export function offenseDefenseOf(
     0.08 * ratings.offensiveIq +
     0.04 * ratings.offensiveRebound;
   const foulDiscipline = Math.max(0, Math.min(100, 100 - tendencies.foulRate * 8));
-  // Positional responsibility: a drop-coverage center is graded on rim
-  // protection, not switch containment. Without this, every paint anchor
-  // (Shaq pd 48, Duncan pd 56) donates ~2 defense points to wings for a job
-  // that was never theirs.
   const perimeterShare = positionGroup === 'C' ? 0.14 : positionGroup === 'F' ? 0.19 : 0.24;
   const interiorShare = positionGroup === 'C' ? 0.32 : positionGroup === 'F' ? 0.27 : 0.22;
   const defense =

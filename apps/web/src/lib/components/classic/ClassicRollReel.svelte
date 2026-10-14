@@ -12,7 +12,7 @@
     arenaReelSpin,
     arenaReelTick,
     type ArenaSpotlight,
-  } from '$lib/arena-sound';
+  } from '#lib/arena-sound.js';
   const REEL_ROW_HEIGHT_PX = 108;
   const TRAVEL_ROWS = 30;
   const SPIN_MS = 1750;

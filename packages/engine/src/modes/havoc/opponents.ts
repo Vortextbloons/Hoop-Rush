@@ -76,8 +76,6 @@ function opponentSourceOf(
     displayName: player.displayName,
     franchiseId: opponent.teamId,
     eraId: profile.eraId,
-    // The bracket team season is not authoritative evidence of a mixed-lineup
-    // player's own season, so the opponent source claims no player season key.
     seasonKey: null,
     positions: [...player.positions],
     originalOverall: catalogOverall === undefined ? fallback.overallRating : catalogOverall,

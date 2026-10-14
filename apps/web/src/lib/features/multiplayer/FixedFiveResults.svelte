@@ -16,10 +16,10 @@
     HoopRushManifest,
     PlayersIndexEntry,
   } from '@hoop-rush/data-contracts';
-  import PlayerFace from '$lib/components/PlayerFace.svelte';
-  import { formatPositions } from '$lib/player-positions';
-  import type { DraftPresentation } from '$lib/draft-presentation';
-  import type { FixedFivePlayerStats } from '$lib/features/multiplayer/fixed-five-player-stats';
+  import PlayerFace from '#lib/components/PlayerFace.svelte';
+  import { formatPositions } from '#lib/player-positions.js';
+  import type { DraftPresentation } from '#lib/draft-presentation.js';
+  import type { FixedFivePlayerStats } from '#lib/features/multiplayer/fixed-five-player-stats.js';
   let {
     mode,
     result,
@@ -145,12 +145,15 @@
       });
     },
   );
+
   const youWins = $derived(
     duel ? (selfId === 'p1' ? duel.p1Wins : duel.p2Wins) : (youShared?.wins ?? 0),
   );
+
   const oppWins = $derived(
     duel ? (selfId === 'p1' ? duel.p2Wins : duel.p1Wins) : (oppShared?.wins ?? 0),
   );
+
   const gamesPlayedLabel = $derived(
     duel
       ? `after ${duel.stoppedAtGame} game${duel.stoppedAtGame === 1 ? '' : 's'}`
@@ -298,6 +301,7 @@
         <div class="rounded-xl border border-primary/25 bg-surface-1 p-3 text-center sm:p-4">
           <div class="flex items-center justify-between">
             <span class="font-mono text-[11px] text-muted-foreground">G{g.gameNumber}</span>
+
             <span
               class="font-mono text-[11px] font-bold tracking-widest uppercase {g.won
                 ? 'text-positive'
@@ -364,15 +368,17 @@
         onclick={onRematch}
         disabled={rematchBusy || rematchWaiting}
         class="rematch-main"
-        >{rematchBusy ? 'Preparing rematch…' : rematchLabel}<ArrowRight
-          size={16}
-          aria-hidden="true"
-        /></button
       >
-      <a href={resolve('/multiplayer')} class="new-match">Choose another match</a>
-      <button type="button" onclick={viewMatchStats} class="stats-shortcut"
-        >View match stats <ArrowRight size={14} aria-hidden="true" /></button
-      >
+        {rematchBusy ? 'Preparing rematch…' : rematchLabel}
+        <ArrowRight size={16} aria-hidden="true" />
+      </button>
+
+      <a href={resolve('multiplayer/')} class="new-match">Choose another match</a>
+
+      <button type="button" onclick={viewMatchStats} class="stats-shortcut">
+        View match stats
+        <ArrowRight size={14} aria-hidden="true" />
+      </button>
     </div>
   {/if}
 
@@ -625,31 +631,38 @@
               <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface-3"
                 ><Calendar class="h-4 w-4 text-muted-foreground" /></span
               >
-              <span
-                ><span class="block font-mono text-[10px] text-muted-foreground uppercase"
-                  >Date</span
-                ><span class="font-semibold">{summaryDate}</span></span
-              >
+
+              <span>
+                <span class="block font-mono text-[10px] text-muted-foreground uppercase">Date</span
+                >
+
+                <span class="font-semibold">{summaryDate}</span>
+              </span>
             </li>
             <li class="flex items-center gap-3">
               <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface-3"
                 ><Gamepad2 class="h-4 w-4 text-muted-foreground" /></span
               >
-              <span
-                ><span class="block font-mono text-[10px] text-muted-foreground uppercase"
-                  >Mode</span
-                ><span class="font-semibold">{modeDetailLabel}</span></span
-              >
+
+              <span>
+                <span class="block font-mono text-[10px] text-muted-foreground uppercase">Mode</span
+                >
+
+                <span class="font-semibold">{modeDetailLabel}</span>
+              </span>
             </li>
             <li class="flex items-center gap-3">
               <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface-3"
                 ><Clock class="h-4 w-4 text-muted-foreground" /></span
               >
-              <span
-                ><span class="block font-mono text-[10px] text-muted-foreground uppercase"
+
+              <span>
+                <span class="block font-mono text-[10px] text-muted-foreground uppercase"
                   >Games</span
-                ><span class="font-semibold"
-                  >{duel
+                >
+
+                <span class="font-semibold">
+                  {duel
                     ? `${duel.stoppedAtGame} played · first to 4`
                     : '82 per side · H2H mirrored'}</span
                 ></span
@@ -659,11 +672,14 @@
               <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface-3"
                 ><Trophy class="h-4 w-4 text-muted-foreground" /></span
               >
-              <span
-                ><span class="block font-mono text-[10px] text-muted-foreground uppercase"
+
+              <span>
+                <span class="block font-mono text-[10px] text-muted-foreground uppercase"
                   >Winner</span
-                ><span class="font-semibold"
-                  >{youWon
+                >
+
+                <span class="font-semibold">
+                  {youWon
                     ? `You (${youWins}–${oppWins})`
                     : `Opponent (${oppWins}–${youWins})`}</span
                 ></span

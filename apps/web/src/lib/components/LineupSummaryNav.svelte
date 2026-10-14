@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { SLOT_LABELS, SLOT_NAMES } from '$lib/player-positions';
+  import { SLOT_LABELS, SLOT_NAMES } from '#lib/player-positions.js';
   let {
     slots,
     pickedCount,

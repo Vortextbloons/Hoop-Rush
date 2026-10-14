@@ -22,14 +22,14 @@
     RunAggregates,
   } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation, playerIdSchema } from '@hoop-rush/data-contracts';
-  import type { SandboxHref } from '$lib/sandbox-url';
+  import type { SandboxHref } from '#lib/sandbox-url.js';
   import { explainSeason, leagueMvp, perGamePlayer, selectMemorableGames } from '@hoop-rush/engine';
   import { resolve } from '$app/paths';
-  import GameStrip from '$lib/components/GameStrip.svelte';
-  import PlayerFace from '$lib/components/PlayerFace.svelte';
-  import SeasonTierBadge from '$lib/components/SeasonTierBadge.svelte';
-  import { oneDecimal, percentOneDecimal } from '$lib/format';
-  import { SLOT_LABELS } from '$lib/player-positions';
+  import GameStrip from '#lib/components/GameStrip.svelte';
+  import PlayerFace from '#lib/components/PlayerFace.svelte';
+  import SeasonTierBadge from '#lib/components/SeasonTierBadge.svelte';
+  import { oneDecimal, percentOneDecimal } from '#lib/format.js';
+  import { SLOT_LABELS } from '#lib/player-positions.js';
   type PeakPlayer = PeakPlayerSeason;
   let {
     manifest,

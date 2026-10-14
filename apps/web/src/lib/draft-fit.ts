@@ -14,8 +14,8 @@ import {
   type DraftFitTier,
 } from '@hoop-rush/engine';
 export type { DraftFitNeed, DraftFitReport, DraftFitScore, DraftFitTier } from '@hoop-rush/engine';
-import { getEraSimulationProfile, getPool } from '$lib/data';
-import { loadSeasonProjectionModel } from '$lib/season/season-assets';
+import { getEraSimulationProfile, getPool } from '#lib/data.js';
+import { loadSeasonProjectionModel } from '#lib/season/season-assets.js';
 
 export interface DraftFitContext {
   eraProfile: EraSimulationProfile;

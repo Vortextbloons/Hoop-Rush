@@ -9,23 +9,23 @@
     SeasonRosterEntry,
   } from '@hoop-rush/data-contracts';
   import { blockRoundRange } from '@hoop-rush/data-contracts';
-  import CheckpointRecap from '$lib/components/season/CheckpointRecap.svelte';
-  import SeasonTeamLogo from '$lib/components/season/SeasonTeamLogo.svelte';
+  import CheckpointRecap from '#lib/components/season/CheckpointRecap.svelte';
+  import SeasonTeamLogo from '#lib/components/season/SeasonTeamLogo.svelte';
   import {
     SEASON_RUN_SHELL_CONTEXT,
     type SeasonRunShellData,
-  } from '$lib/season/season-shell-context';
-  import { franchiseIdentityOf } from '$lib/season/season-branding';
-  import { aggregateMechanismEvidence } from '$lib/season/season-effects-view';
-  import { homeRuleOf } from '$lib/season/season-evolution-view';
-  import { seasonInnovationImpactOf } from '$lib/season/season-innovation-impact-view';
+  } from '#lib/season/season-shell-context.js';
+  import { franchiseIdentityOf } from '#lib/season/season-branding.js';
+  import { aggregateMechanismEvidence } from '#lib/season/season-effects-view.js';
+  import { homeRuleOf } from '#lib/season/season-evolution-view.js';
+  import { seasonInnovationImpactOf } from '#lib/season/season-innovation-impact-view.js';
   import {
     boxScoreFromSummary,
     deriveBlockRecap,
     ordinal,
     progressLabel,
-  } from '$lib/season/season-presentation';
-  import { availabilityStripRows } from '$lib/season/season-health-view';
+  } from '#lib/season/season-presentation.js';
+  import { availabilityStripRows } from '#lib/season/season-health-view.js';
   const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
   let blockSummaries = $state<SeasonGameSummary[]>([]);
   let retainedGameIds = $state<string[]>([]);
@@ -38,10 +38,10 @@
     if (!event.currentTarget.open || openedBoxScores.has(gameId)) return;
     openedBoxScores = new Set([...openedBoxScores, gameId]);
   }
-  let boxScoreModule: Promise<typeof import('$lib/components/season/BoxScore.svelte')> | null =
+  let boxScoreModule: Promise<typeof import('#lib/components/season/BoxScore.svelte')> | null =
     null;
-  function loadBoxScore(): Promise<typeof import('$lib/components/season/BoxScore.svelte')> {
-    boxScoreModule ??= import('$lib/components/season/BoxScore.svelte');
+  function loadBoxScore(): Promise<typeof import('#lib/components/season/BoxScore.svelte')> {
+    boxScoreModule ??= import('#lib/components/season/BoxScore.svelte');
     return boxScoreModule;
   }
   const requestedBlock = $derived.by(() => {

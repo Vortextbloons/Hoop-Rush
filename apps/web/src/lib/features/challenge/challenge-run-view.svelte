@@ -1,21 +1,21 @@
-﻿<script lang="ts">
-  import { browser } from '$app/environment';
+<script lang="ts">
+  import { browser } from '$app/env';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import type { ChallengeRun, HoopRushManifest, PeakPlayerSeason } from '@hoop-rush/data-contracts';
   import type { RouteId } from '$app/types';
-  import { clearDataLoaderCaches, getManifest } from '$lib/data';
+  import { clearDataLoaderCaches, getManifest } from '#lib/data.js';
   import {
     arenaBlockComplete,
     arenaError,
     arenaGameResult,
     arenaSimTick,
     arenaStreak,
-  } from '$lib/arena-sound';
+  } from '#lib/arena-sound.js';
   import { loadRunPlayersById } from './sandbox-lineup';
   import { ChallengeRunPresenter } from './challenge-session.svelte';
   import ChallengeOverlay from './challenge-overlay.svelte';
-  import AsyncState from '$lib/components/AsyncState.svelte';
+  import AsyncState from '#lib/components/AsyncState.svelte';
   let {
     mode,
     modeLabelFor,

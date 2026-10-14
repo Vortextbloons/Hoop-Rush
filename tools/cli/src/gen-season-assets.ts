@@ -54,6 +54,7 @@ import {
   SEASON_TRADE_TARGETS_VERSION,
   SEASON_TRADE_VERSION,
   buildInitialPostseasonState,
+  createEmptyStandings,
   seasonDraftCatalogSchema,
   seasonDraftStateSchema,
   seasonLeagueSchema,
@@ -177,29 +178,7 @@ function buildInitialFixtureChallenges(
 ) {
   const base = buildEmptyChallengeState();
   if (humanFranchiseId === null) return base;
-  const standings = {
-    schemaVersion: 1 as const,
-    standingsVersion: 'standings-v1' as const,
-    rows: league.teams.map((team) => ({
-      franchiseId: team.franchiseId,
-      wins: 0,
-      losses: 0,
-      gamesPlayed: 0,
-      homeWins: 0,
-      homeLosses: 0,
-      awayWins: 0,
-      awayLosses: 0,
-      conferenceWins: 0,
-      conferenceLosses: 0,
-      divisionWins: 0,
-      divisionLosses: 0,
-      pointsFor: 0,
-      pointsAgainst: 0,
-      headToHead: league.teams
-        .filter((other) => other.franchiseId !== team.franchiseId)
-        .map((other) => ({ franchiseId: other.franchiseId, wins: 0, losses: 0 })),
-    })),
-  };
+  const standings = createEmptyStandings(league);
   const deal = dealSeasonBlockChallenges(rootSeed, 0, {
     league,
     schedule,
@@ -309,29 +288,7 @@ function buildRun(
       awayScore: null,
       forfeitLoserFranchiseId: null,
     })),
-    standings: {
-      schemaVersion: 1,
-      standingsVersion: 'standings-v1',
-      rows: correctedLeague.teams.map((team) => ({
-        franchiseId: team.franchiseId,
-        wins: 0,
-        losses: 0,
-        gamesPlayed: 0,
-        homeWins: 0,
-        homeLosses: 0,
-        awayWins: 0,
-        awayLosses: 0,
-        conferenceWins: 0,
-        conferenceLosses: 0,
-        divisionWins: 0,
-        divisionLosses: 0,
-        pointsFor: 0,
-        pointsAgainst: 0,
-        headToHead: correctedLeague.teams
-          .filter((other) => other.franchiseId !== team.franchiseId)
-          .map((other) => ({ franchiseId: other.franchiseId, wins: 0, losses: 0 })),
-      })),
-    },
+    standings: createEmptyStandings(correctedLeague),
     cursor: { schemaVersion: 1, completedRounds: 0 },
     stage: 'regular-season',
     postseason: buildInitialPostseasonState(seedSchema.parse(SEASON_COMMITTED_DRAFT_SEED)),

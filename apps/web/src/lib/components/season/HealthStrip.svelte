@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { AvailabilityStripRow } from '$lib/season/season-health-view';
+  import type { AvailabilityStripRow } from '#lib/season/season-health-view.js';
   let {
     rows,
     title = 'Health',

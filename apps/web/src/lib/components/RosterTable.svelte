@@ -11,8 +11,8 @@
     type RosterListItem,
     type RosterSortDirection,
     type RosterSortId,
-  } from '$lib/roster-browser';
-  import { formatPositions } from '$lib/player-positions';
+  } from '#lib/roster-browser.js';
+  import { formatPositions } from '#lib/player-positions.js';
   import PlayerFace from './PlayerFace.svelte';
   import TeamLogo from './TeamLogo.svelte';
   let {

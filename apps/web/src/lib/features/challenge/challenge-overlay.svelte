@@ -5,8 +5,8 @@
   import type { ChallengeRun, HoopRushManifest } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
   import type { ChallengePhase } from '@hoop-rush/application/challenge';
-  import GameStrip from '$lib/components/GameStrip.svelte';
-  import TeamLogo from '$lib/components/TeamLogo.svelte';
+  import GameStrip from '#lib/components/GameStrip.svelte';
+  import TeamLogo from '#lib/components/TeamLogo.svelte';
   let {
     manifest,
     run,

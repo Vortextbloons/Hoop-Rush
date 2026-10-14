@@ -40,7 +40,6 @@ describe('havoc audit', () => {
     const audit = auditHavocGame(run.input, run.result, run.tape);
     expect(audit.findings).toEqual([]);
     expect(audit.ok).toBe(true);
-    // the result alone is internally consistent too
     expect(auditHavocGame(run.input, run.result).ok).toBe(true);
   });
 

@@ -1,3 +1,17 @@
+export interface LineageLogoCandidate {
+  url: string;
+  source: string;
+  attribution?: string;
+}
+
+function nbaCdnLogo(historicalTeamId: string): LineageLogoCandidate {
+  return {
+    url: `https://cdn.nba.com/logos/nba/${historicalTeamId}/global/L/logo.svg`,
+    source: 'nba-cdn',
+    attribution: 'NBA.com',
+  };
+}
+
 export interface LineageSegment {
   modernFranchiseId: string;
   historicalTeamId: string;
@@ -6,11 +20,7 @@ export interface LineageSegment {
   displayName: string;
   city: string;
   abbreviation?: string;
-  logoCandidates?: Array<{
-    url: string;
-    source: string;
-    attribution?: string;
-  }>;
+  logoCandidates?: LineageLogoCandidate[];
 }
 export interface ModernSlot {
   franchiseId: string;
@@ -68,11 +78,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
         source: 'sportslogos',
         attribution: 'SportsLogos.net',
       },
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612737/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
+      nbaCdnLogo('1610612737'),
     ],
   },
   {
@@ -89,11 +95,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
         source: 'sportslogos',
         attribution: 'SportsLogos.net',
       },
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612737/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
+      nbaCdnLogo('1610612737'),
     ],
   },
   {
@@ -110,11 +112,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
         source: 'sportslogos',
         attribution: 'SportsLogos.net',
       },
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612737/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
+      nbaCdnLogo('1610612737'),
     ],
   },
   {
@@ -124,13 +122,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
     displayName: 'Atlanta Hawks',
     city: 'Atlanta',
     abbreviation: 'ATL',
-    logoCandidates: [
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612737/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
-    ],
+    logoCandidates: [nbaCdnLogo('1610612737')],
   },
   {
     modernFranchiseId: 'celtics',
@@ -139,13 +131,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
     displayName: 'Boston Celtics',
     city: 'Boston',
     abbreviation: 'BOS',
-    logoCandidates: [
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612738/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
-    ],
+    logoCandidates: [nbaCdnLogo('1610612738')],
   },
   {
     modernFranchiseId: 'nets',
@@ -161,11 +147,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
         source: 'sportslogos',
         attribution: 'SportsLogos.net',
       },
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612751/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
+      nbaCdnLogo('1610612751'),
     ],
   },
   {
@@ -182,11 +164,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
         source: 'sportslogos',
         attribution: 'SportsLogos.net',
       },
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612751/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
+      nbaCdnLogo('1610612751'),
     ],
   },
   {
@@ -196,13 +174,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
     displayName: 'Brooklyn Nets',
     city: 'Brooklyn',
     abbreviation: 'BKN',
-    logoCandidates: [
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612751/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
-    ],
+    logoCandidates: [nbaCdnLogo('1610612751')],
   },
   {
     modernFranchiseId: 'hornets',
@@ -218,11 +190,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
         source: 'sportslogos',
         attribution: 'SportsLogos.net',
       },
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612766/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
+      nbaCdnLogo('1610612766'),
     ],
   },
   {
@@ -239,11 +207,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
         source: 'sportslogos',
         attribution: 'SportsLogos.net',
       },
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612766/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
+      nbaCdnLogo('1610612766'),
     ],
   },
   {
@@ -253,13 +217,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
     displayName: 'Charlotte Hornets',
     city: 'Charlotte',
     abbreviation: 'CHA',
-    logoCandidates: [
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612766/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
-    ],
+    logoCandidates: [nbaCdnLogo('1610612766')],
   },
   {
     modernFranchiseId: 'bulls',
@@ -268,13 +226,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
     displayName: 'Chicago Bulls',
     city: 'Chicago',
     abbreviation: 'CHI',
-    logoCandidates: [
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612741/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
-    ],
+    logoCandidates: [nbaCdnLogo('1610612741')],
   },
   {
     modernFranchiseId: 'cavaliers',
@@ -283,13 +235,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
     displayName: 'Cleveland Cavaliers',
     city: 'Cleveland',
     abbreviation: 'CLE',
-    logoCandidates: [
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612739/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
-    ],
+    logoCandidates: [nbaCdnLogo('1610612739')],
   },
   {
     modernFranchiseId: 'mavericks',
@@ -298,13 +244,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
     displayName: 'Dallas Mavericks',
     city: 'Dallas',
     abbreviation: 'DAL',
-    logoCandidates: [
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612742/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
-    ],
+    logoCandidates: [nbaCdnLogo('1610612742')],
   },
   {
     modernFranchiseId: 'nuggets',
@@ -313,13 +253,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
     displayName: 'Denver Nuggets',
     city: 'Denver',
     abbreviation: 'DEN',
-    logoCandidates: [
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612743/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
-    ],
+    logoCandidates: [nbaCdnLogo('1610612743')],
   },
   {
     modernFranchiseId: 'pistons',
@@ -335,11 +269,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
         source: 'sportslogos',
         attribution: 'SportsLogos.net',
       },
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612765/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
+      nbaCdnLogo('1610612765'),
     ],
   },
   {
@@ -349,13 +279,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
     displayName: 'Detroit Pistons',
     city: 'Detroit',
     abbreviation: 'DET',
-    logoCandidates: [
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612765/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
-    ],
+    logoCandidates: [nbaCdnLogo('1610612765')],
   },
   {
     modernFranchiseId: 'warriors',
@@ -371,11 +295,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
         source: 'sportslogos',
         attribution: 'SportsLogos.net',
       },
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612744/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
+      nbaCdnLogo('1610612744'),
     ],
   },
   {
@@ -392,11 +312,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
         source: 'sportslogos',
         attribution: 'SportsLogos.net',
       },
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612744/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
+      nbaCdnLogo('1610612744'),
     ],
   },
   {
@@ -406,13 +322,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
     displayName: 'Golden State Warriors',
     city: 'Golden State',
     abbreviation: 'GSW',
-    logoCandidates: [
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612744/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
-    ],
+    logoCandidates: [nbaCdnLogo('1610612744')],
   },
   {
     modernFranchiseId: 'rockets',
@@ -428,11 +338,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
         source: 'sportslogos',
         attribution: 'SportsLogos.net',
       },
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612745/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
+      nbaCdnLogo('1610612745'),
     ],
   },
   {
@@ -442,13 +348,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
     displayName: 'Houston Rockets',
     city: 'Houston',
     abbreviation: 'HOU',
-    logoCandidates: [
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612745/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
-    ],
+    logoCandidates: [nbaCdnLogo('1610612745')],
   },
   {
     modernFranchiseId: 'pacers',
@@ -457,13 +357,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
     displayName: 'Indiana Pacers',
     city: 'Indiana',
     abbreviation: 'IND',
-    logoCandidates: [
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612754/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
-    ],
+    logoCandidates: [nbaCdnLogo('1610612754')],
   },
   {
     modernFranchiseId: 'clippers',
@@ -479,11 +373,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
         source: 'sportslogos',
         attribution: 'SportsLogos.net',
       },
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612746/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
+      nbaCdnLogo('1610612746'),
     ],
   },
   {
@@ -500,11 +390,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
         source: 'sportslogos',
         attribution: 'SportsLogos.net',
       },
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612746/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
+      nbaCdnLogo('1610612746'),
     ],
   },
   {
@@ -514,13 +400,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
     displayName: 'Los Angeles Clippers',
     city: 'Los Angeles',
     abbreviation: 'LAC',
-    logoCandidates: [
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612746/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
-    ],
+    logoCandidates: [nbaCdnLogo('1610612746')],
   },
   {
     modernFranchiseId: 'lakers',
@@ -536,11 +416,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
         source: 'sportslogos',
         attribution: 'SportsLogos.net',
       },
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612747/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
+      nbaCdnLogo('1610612747'),
     ],
   },
   {
@@ -550,13 +426,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
     displayName: 'Los Angeles Lakers',
     city: 'Los Angeles',
     abbreviation: 'LAL',
-    logoCandidates: [
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612747/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
-    ],
+    logoCandidates: [nbaCdnLogo('1610612747')],
   },
   {
     modernFranchiseId: 'grizzlies',
@@ -572,11 +442,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
         source: 'sportslogos',
         attribution: 'SportsLogos.net',
       },
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612763/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
+      nbaCdnLogo('1610612763'),
     ],
   },
   {
@@ -586,13 +452,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
     displayName: 'Memphis Grizzlies',
     city: 'Memphis',
     abbreviation: 'MEM',
-    logoCandidates: [
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612763/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
-    ],
+    logoCandidates: [nbaCdnLogo('1610612763')],
   },
   {
     modernFranchiseId: 'heat',
@@ -601,13 +461,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
     displayName: 'Miami Heat',
     city: 'Miami',
     abbreviation: 'MIA',
-    logoCandidates: [
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612748/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
-    ],
+    logoCandidates: [nbaCdnLogo('1610612748')],
   },
   {
     modernFranchiseId: 'bucks',
@@ -616,13 +470,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
     displayName: 'Milwaukee Bucks',
     city: 'Milwaukee',
     abbreviation: 'MIL',
-    logoCandidates: [
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612749/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
-    ],
+    logoCandidates: [nbaCdnLogo('1610612749')],
   },
   {
     modernFranchiseId: 'timberwolves',
@@ -631,13 +479,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
     displayName: 'Minnesota Timberwolves',
     city: 'Minneapolis',
     abbreviation: 'MIN',
-    logoCandidates: [
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612750/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
-    ],
+    logoCandidates: [nbaCdnLogo('1610612750')],
   },
   {
     modernFranchiseId: 'pelicans',
@@ -653,11 +495,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
         source: 'sportslogos',
         attribution: 'SportsLogos.net',
       },
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612740/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
+      nbaCdnLogo('1610612740'),
     ],
   },
   {
@@ -667,13 +505,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
     displayName: 'New Orleans Pelicans',
     city: 'New Orleans',
     abbreviation: 'NOP',
-    logoCandidates: [
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612740/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
-    ],
+    logoCandidates: [nbaCdnLogo('1610612740')],
   },
   {
     modernFranchiseId: 'knicks',
@@ -682,13 +514,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
     displayName: 'New York Knicks',
     city: 'New York',
     abbreviation: 'NYK',
-    logoCandidates: [
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612752/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
-    ],
+    logoCandidates: [nbaCdnLogo('1610612752')],
   },
   {
     modernFranchiseId: 'thunder',
@@ -704,11 +530,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
         source: 'sportslogos',
         attribution: 'SportsLogos.net',
       },
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612760/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
+      nbaCdnLogo('1610612760'),
     ],
   },
   {
@@ -718,13 +540,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
     displayName: 'Oklahoma City Thunder',
     city: 'Oklahoma City',
     abbreviation: 'OKC',
-    logoCandidates: [
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612760/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
-    ],
+    logoCandidates: [nbaCdnLogo('1610612760')],
   },
   {
     modernFranchiseId: 'magic',
@@ -733,13 +549,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
     displayName: 'Orlando Magic',
     city: 'Orlando',
     abbreviation: 'ORL',
-    logoCandidates: [
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612753/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
-    ],
+    logoCandidates: [nbaCdnLogo('1610612753')],
   },
   {
     modernFranchiseId: 'sixers',
@@ -755,11 +565,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
         source: 'sportslogos',
         attribution: 'SportsLogos.net',
       },
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612755/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
+      nbaCdnLogo('1610612755'),
     ],
   },
   {
@@ -769,13 +575,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
     displayName: 'Philadelphia 76ers',
     city: 'Philadelphia',
     abbreviation: 'PHI',
-    logoCandidates: [
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612755/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
-    ],
+    logoCandidates: [nbaCdnLogo('1610612755')],
   },
   {
     modernFranchiseId: 'suns',
@@ -784,13 +584,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
     displayName: 'Phoenix Suns',
     city: 'Phoenix',
     abbreviation: 'PHX',
-    logoCandidates: [
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612756/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
-    ],
+    logoCandidates: [nbaCdnLogo('1610612756')],
   },
   {
     modernFranchiseId: 'blazers',
@@ -799,13 +593,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
     displayName: 'Portland Trail Blazers',
     city: 'Portland',
     abbreviation: 'POR',
-    logoCandidates: [
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612757/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
-    ],
+    logoCandidates: [nbaCdnLogo('1610612757')],
   },
   {
     modernFranchiseId: 'kings',
@@ -821,11 +609,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
         source: 'sportslogos',
         attribution: 'SportsLogos.net',
       },
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612758/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
+      nbaCdnLogo('1610612758'),
     ],
   },
   {
@@ -842,11 +626,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
         source: 'sportslogos',
         attribution: 'SportsLogos.net',
       },
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612758/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
+      nbaCdnLogo('1610612758'),
     ],
   },
   {
@@ -863,11 +643,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
         source: 'sportslogos',
         attribution: 'SportsLogos.net',
       },
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612758/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
+      nbaCdnLogo('1610612758'),
     ],
   },
   {
@@ -884,11 +660,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
         source: 'sportslogos',
         attribution: 'SportsLogos.net',
       },
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612758/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
+      nbaCdnLogo('1610612758'),
     ],
   },
   {
@@ -898,13 +670,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
     displayName: 'Sacramento Kings',
     city: 'Sacramento',
     abbreviation: 'SAC',
-    logoCandidates: [
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612758/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
-    ],
+    logoCandidates: [nbaCdnLogo('1610612758')],
   },
   {
     modernFranchiseId: 'spurs',
@@ -913,13 +679,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
     displayName: 'San Antonio Spurs',
     city: 'San Antonio',
     abbreviation: 'SAS',
-    logoCandidates: [
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612759/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
-    ],
+    logoCandidates: [nbaCdnLogo('1610612759')],
   },
   {
     modernFranchiseId: 'raptors',
@@ -928,13 +688,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
     displayName: 'Toronto Raptors',
     city: 'Toronto',
     abbreviation: 'TOR',
-    logoCandidates: [
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612761/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
-    ],
+    logoCandidates: [nbaCdnLogo('1610612761')],
   },
   {
     modernFranchiseId: 'jazz',
@@ -950,11 +704,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
         source: 'sportslogos',
         attribution: 'SportsLogos.net',
       },
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612762/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
+      nbaCdnLogo('1610612762'),
     ],
   },
   {
@@ -964,13 +714,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
     displayName: 'Utah Jazz',
     city: 'Utah',
     abbreviation: 'UTA',
-    logoCandidates: [
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612762/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
-    ],
+    logoCandidates: [nbaCdnLogo('1610612762')],
   },
   {
     modernFranchiseId: 'wizards',
@@ -980,13 +724,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
     displayName: 'Chicago Packers',
     city: 'Chicago',
     abbreviation: 'CHP',
-    logoCandidates: [
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612764/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
-    ],
+    logoCandidates: [nbaCdnLogo('1610612764')],
   },
   {
     modernFranchiseId: 'wizards',
@@ -996,13 +734,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
     displayName: 'Chicago Zephyrs',
     city: 'Chicago',
     abbreviation: 'CHZ',
-    logoCandidates: [
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612764/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
-    ],
+    logoCandidates: [nbaCdnLogo('1610612764')],
   },
   {
     modernFranchiseId: 'wizards',
@@ -1012,13 +744,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
     displayName: 'Baltimore Bullets',
     city: 'Baltimore',
     abbreviation: 'BAL',
-    logoCandidates: [
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612764/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
-    ],
+    logoCandidates: [nbaCdnLogo('1610612764')],
   },
   {
     modernFranchiseId: 'wizards',
@@ -1034,11 +760,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
         source: 'sportslogos',
         attribution: 'SportsLogos.net',
       },
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612764/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
+      nbaCdnLogo('1610612764'),
     ],
   },
   {
@@ -1055,11 +777,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
         source: 'sportslogos',
         attribution: 'SportsLogos.net',
       },
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612764/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
+      nbaCdnLogo('1610612764'),
     ],
   },
   {
@@ -1069,13 +787,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
     displayName: 'Washington Wizards',
     city: 'Washington',
     abbreviation: 'WAS',
-    logoCandidates: [
-      {
-        url: 'https://cdn.nba.com/logos/nba/1610612764/global/L/logo.svg',
-        source: 'nba-cdn',
-        attribution: 'NBA.com',
-      },
-    ],
+    logoCandidates: [nbaCdnLogo('1610612764')],
   },
 ];
 export function firstSupportedSeason(franchiseId: string): string | null {

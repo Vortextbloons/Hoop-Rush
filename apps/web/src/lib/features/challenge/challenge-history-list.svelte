@@ -2,11 +2,11 @@
   import { resolve } from '$app/paths';
   import type { RouteId } from '$app/types';
   import { Trophy } from '@lucide/svelte';
-  import AsyncState from '$lib/components/AsyncState.svelte';
+  import AsyncState from '#lib/components/AsyncState.svelte';
   import type { ActiveRunCheckpoint, CompletedRunIndex } from '@hoop-rush/persistence';
   import type { HoopRushManifest } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
-  import { variantLabel } from '$lib/draft-presentation';
+  import { variantLabel } from '#lib/draft-presentation.js';
   let {
     manifest,
     rows,

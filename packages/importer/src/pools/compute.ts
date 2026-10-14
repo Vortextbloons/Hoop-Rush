@@ -151,10 +151,6 @@ export const CONFIDENCE_POLICY_VERSION = 'policy-v2';
 export const MAX_LOW_CONFIDENCE_SHARE = 0.4;
 export const MAX_LOW_CONFIDENCE_PLAYER_SHARE = 0.25;
 export function maxLowConfidenceShareFor(coverageBand: CoverageSummary['coverageBand']): number {
-  // Pre-1974 seasons never observed steals, blocks, rebound splits,
-  // turnovers, or threes, so ~half of all fields are low-confidence by
-  // construction even with complete box scores. The tripwire follows the
-  // evidence era instead of vetoing whole decades for honesty.
   if (coverageBand === 'reconstructed') return 0.65;
   if (coverageBand === 'late-historical') return 0.5;
   return MAX_LOW_CONFIDENCE_SHARE;
@@ -469,9 +465,6 @@ function sanitizeShootingFamily(
   attempted: number | null,
 ): { made: number | null; attempted: number | null } {
   if (made === 0 && attempted === 0) return { made, attempted };
-  // Made > attempted means partial coverage, not hot shooting: capping fgm
-  // 973 to a partial fga 883 would invent a 1.000 efg (1961-62 Bellamy).
-  // Null the family so derivation estimates instead of trusting fiction.
   if (made !== null && (attempted === null || attempted <= 0 || made < 0 || made > attempted)) {
     return { made: null, attempted: null };
   }
@@ -493,9 +486,6 @@ export function buildStats(seasonStats: unknown): PoolStats {
   const gamesPlayed = Math.trunc(numFrom(input.gamesPlayed));
   let minutes: number | null = truncNullable(input.minutes);
   const points = Math.trunc(numFrom(input.points));
-  // Magnitude sanity: no real season exceeds ~1.1 points per minute (Wilt's
-  // peak is ~1.04). Past 1.5 the minutes column is corrupt, not the scoring
-  // line, so minutes go while points stay for per-game use.
   if (minutes !== null && minutes > 0 && points / minutes > 1.5) {
     minutes = null;
   }
@@ -510,10 +500,6 @@ export function buildStats(seasonStats: unknown): PoolStats {
     offensiveRebounds = null;
     defensiveRebounds = null;
   }
-  // Shooting rates without attempts are fiction (stale ts 0.991 on nulled
-  // fga): the family being unobserved nulls the rate too. Nulled counting
-  // families fall back to 0/0 downstream, which derivation reads as
-  // unobserved (priors + low confidence) rather than as a real zero game.
   const tsPct = fieldGoals.attempted === null ? null : clampUnitInterval(nullableFrom(input.tsPct));
   const efgPct =
     fieldGoals.attempted === null ? null : clampUnitInterval(nullableFrom(input.efgPct));
@@ -953,9 +939,6 @@ function asNumberOrNull(value: unknown): number | null {
   return null;
 }
 function minutesUnobservedForPolicy(player: PoolPlayer): boolean {
-  // buildStats nulls corrupt minutes to 0 while keeping games: a real
-  // rotation player always logs minutes, so 0 with games played means the
-  // minutes column was quarantined (1961-62 Bellamy class).
   return player.stats.minutes <= 0 && player.stats.gamesPlayed > 0;
 }
 function playerLowConfidenceShare(player: PoolPlayer): number {
@@ -1292,17 +1275,6 @@ export function computePool(
   const policyFailures = playersOut.filter(
     (p) => !minutesUnobservedForPolicy(p) && playerLowConfidenceShare(p) > tripThreshold,
   );
-  // policy-v2: per-player honesty (derive-v11 labels sub-200-minute and
-  // prior-only evidence as low) must not let a thin tail veto an otherwise
-  // evidence-backed pool. Players with unobserved minutes are excluded from
-  // the tripwire: every one of their fields is low-confidence by
-  // construction, and their ratings already collapse to shrunk priors with
-  // ~0 production weight — self-quarantined, with nothing left to veto.
-  // The pool fails only when trippers are more than a quarter of the
-  // minutes-observed membership; a pool with no observed minutes at all
-  // still fails outside the reconstructed era (modern minutes always exist).
-  // Inside it, the pool builds honestly shrunk — an expansion-era roster of
-  // priors with a loud warning beats a stale file of fabricated stars.
   const policyDenominator = playersOut.filter((p) => !minutesUnobservedForPolicy(p)).length;
   if (policyDenominator === 0 && coverageSummary.coverageBand !== 'reconstructed') {
     return failure(
@@ -1362,8 +1334,6 @@ export function parsePoolTargets(raw: readonly string[]): Array<[string, string]
       targets.push([slash[0], slash[1]]);
       continue;
     }
-    // Accept the filename-style dash form (franchise-era) too: no published
-    // franchise or era id contains a dash, so the last dash is unambiguous.
     const dash = item.lastIndexOf('-');
     if (dash > 0) {
       const franchiseId = item.slice(0, dash);

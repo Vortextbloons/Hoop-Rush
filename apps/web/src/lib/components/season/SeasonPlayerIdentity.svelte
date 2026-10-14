@@ -2,8 +2,8 @@
   import type { HoopRushManifest } from '@hoop-rush/data-contracts';
   import type { Snippet } from 'svelte';
   import SeasonPlayerFace from './SeasonPlayerFace.svelte';
-  import { formatPositions } from '$lib/player-positions';
-  import type { SeasonFaceRef } from '$lib/season/season-branding';
+  import { formatPositions } from '#lib/player-positions.js';
+  import type { SeasonFaceRef } from '#lib/season/season-branding.js';
   let {
     face,
     manifest,

@@ -1,5 +1,6 @@
 import { resolve } from 'node:path';
 import { z } from 'zod';
+import { seedWindowSchema } from '../seed-window.ts';
 import {
   SEASON_BLOCK_COUNT,
   SEASON_FREE_AGENCY_TARGETS_VERSION,
@@ -1115,14 +1116,8 @@ export const seasonFreeAgencyTargetsSchema = z.object({
     skipShareMax: z.literal(SEASON_FREE_AGENCY_SKIP_SHARE_MAX),
     minSeasons: z.literal(4),
   }),
-  cohort: z.object({
-    seedFrom: z.number().int().nonnegative(),
-    seedTo: z.number().int().nonnegative(),
-  }),
-  heldOut: z.object({
-    seedFrom: z.number().int().nonnegative(),
-    seedTo: z.number().int().nonnegative(),
-  }),
+  cohort: seedWindowSchema,
+  heldOut: seedWindowSchema,
   measured: z.object({
     calibration: z.object({
       seasonsSimulated: z.number().int().nonnegative(),
@@ -1557,13 +1552,13 @@ export function seasonFreeAgencyCalibrate(
       };
       const details = [
         `${String(calibration.length)} calibration + ${String(heldOut.length)} held-out seasons in ${String(Date.now() - started)}ms (${String(workers)} workers)`,
-        `windows ${String(calibrationFacts.windowsOpened)} · candidates ${String(calibrationFacts.candidateTotal)} (shortfalls ${String(calibrationFacts.candidateShortfalls)}) · unique identities ${String(calibrationFacts.uniqueIdentities)} · canonical reuse ${String(calibrationFacts.canonicalReuse)}`,
-        `signings ${String(calibrationFacts.signings)} (${String(calibrationFacts.signingFranchises)} franchises) · declared targets ${String(calibrationFacts.declaredTargets)} · skip share ${(calibrationFacts.skipShare * 100).toFixed(1)}%`,
-        `signings by band ${JSON.stringify(calibrationFacts.signingsByBand)} · band-cap violations ${String(calibrationFacts.bandCapViolations)} · spend-cap violations ${String(calibrationFacts.spendCapViolations)}`,
-        `link failures ${String(calibrationFacts.linkFailures)} · trace failures ${String(calibrationFacts.traceAuditFailures)} · influence tie-break failures ${String(calibrationFacts.influenceDecideFailures)}`,
-        `elite-exclusion failures ${String(calibrationFacts.eliteExclusionFailures)} · one-outlier failures ${String(calibrationFacts.oneOutlierFailures)} · rich-get-richer failures ${String(calibrationFacts.richGetRicherFailures)}`,
-        `signed above drafted median ${(calibrationFacts.signedAboveDraftedMedianShare * 100).toFixed(1)}% · ownership rows ${String(calibrationFacts.ownershipRows)}`,
-        `determinism probe ${String(calibrationFacts.determinismProbe.identical)} · summary identity probe ${summaryIdentity.probed ? (summaryIdentity.identical ? 'identical' : 'DIVERGED') : 'not probed (no zero-signing season)'}`,
+        `windows ${String(calibrationFacts.windowsOpened)} Â· candidates ${String(calibrationFacts.candidateTotal)} (shortfalls ${String(calibrationFacts.candidateShortfalls)}) Â· unique identities ${String(calibrationFacts.uniqueIdentities)} Â· canonical reuse ${String(calibrationFacts.canonicalReuse)}`,
+        `signings ${String(calibrationFacts.signings)} (${String(calibrationFacts.signingFranchises)} franchises) Â· declared targets ${String(calibrationFacts.declaredTargets)} Â· skip share ${(calibrationFacts.skipShare * 100).toFixed(1)}%`,
+        `signings by band ${JSON.stringify(calibrationFacts.signingsByBand)} Â· band-cap violations ${String(calibrationFacts.bandCapViolations)} Â· spend-cap violations ${String(calibrationFacts.spendCapViolations)}`,
+        `link failures ${String(calibrationFacts.linkFailures)} Â· trace failures ${String(calibrationFacts.traceAuditFailures)} Â· influence tie-break failures ${String(calibrationFacts.influenceDecideFailures)}`,
+        `elite-exclusion failures ${String(calibrationFacts.eliteExclusionFailures)} Â· one-outlier failures ${String(calibrationFacts.oneOutlierFailures)} Â· rich-get-richer failures ${String(calibrationFacts.richGetRicherFailures)}`,
+        `signed above drafted median ${(calibrationFacts.signedAboveDraftedMedianShare * 100).toFixed(1)}% Â· ownership rows ${String(calibrationFacts.ownershipRows)}`,
+        `determinism probe ${String(calibrationFacts.determinismProbe.identical)} Â· summary identity probe ${summaryIdentity.probed ? (summaryIdentity.identical ? 'identical' : 'DIVERGED') : 'not probed (no zero-signing season)'}`,
         targetsDetail({ targetsWritten, targetsPath }),
       ];
       return { details, payload };

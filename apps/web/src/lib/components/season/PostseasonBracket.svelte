@@ -3,7 +3,7 @@
   import {
     bracketColumnsOf,
     mobileBracketCardsOf,
-  } from '$lib/season/season-postseason-presentation';
+  } from '#lib/season/season-postseason-presentation.js';
   import SeriesCard from './SeriesCard.svelte';
   import PlayInCard from './PlayInCard.svelte';
   let {

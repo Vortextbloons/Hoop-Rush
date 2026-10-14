@@ -1,14 +1,14 @@
 <script lang="ts">
   import type { HoopRushManifest, SeasonDraftCatalog } from '@hoop-rush/data-contracts';
   import { Dialog } from 'bits-ui';
-  import DialogShell from '$lib/components/DialogShell.svelte';
-  import SeasonPlayerFace from '$lib/components/season/SeasonPlayerFace.svelte';
-  import { eraIdentityOf, type SeasonFaceRef } from '$lib/season/season-branding';
-  import { candidateOf } from '$lib/season/season-catalog-index';
-  import { formatPositions } from '$lib/player-positions';
-  import type { SeasonPlayerStatsRow } from '$lib/season/season-player-stats-view';
-  import type { TradePlayerViewModel } from '$lib/season/season-trade-view';
-  import { oneDecimal, percentOneDecimal } from '$lib/format';
+  import DialogShell from '#lib/components/DialogShell.svelte';
+  import SeasonPlayerFace from '#lib/components/season/SeasonPlayerFace.svelte';
+  import { eraIdentityOf, type SeasonFaceRef } from '#lib/season/season-branding.js';
+  import { candidateOf } from '#lib/season/season-catalog-index.js';
+  import { formatPositions } from '#lib/player-positions.js';
+  import type { SeasonPlayerStatsRow } from '#lib/season/season-player-stats-view.js';
+  import type { TradePlayerViewModel } from '#lib/season/season-trade-view.js';
+  import { oneDecimal, percentOneDecimal } from '#lib/format.js';
   let {
     player,
     manifest,

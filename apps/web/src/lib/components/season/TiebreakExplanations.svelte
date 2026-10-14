@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { SeasonTiebreakResolution } from '@hoop-rush/data-contracts';
-  import { tiebreakResolutionViewModel } from '$lib/season/season-postseason-presentation';
+  import { tiebreakResolutionViewModel } from '#lib/season/season-postseason-presentation.js';
   let {
     resolutions,
     franchiseName,

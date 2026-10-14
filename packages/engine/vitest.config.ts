@@ -7,8 +7,6 @@ export default defineConfig({
     root: path.dirname(fileURLToPath(import.meta.url)),
     testTimeout: 45000,
     retry: 1,
-    experimental: {
-      fsModuleCache: true,
-    },
+    fsModuleCache: true,
   },
 });

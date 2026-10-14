@@ -1,7 +1,7 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
-  import type { PlayoffPrepSummary } from '$lib/season/season-playoff-hub-view';
-  import type { AvailabilityStripRow } from '$lib/season/season-health-view';
+  import type { PlayoffPrepSummary } from '#lib/season/season-playoff-hub-view.js';
+  import type { AvailabilityStripRow } from '#lib/season/season-health-view.js';
   let {
     prep,
     healthRows,

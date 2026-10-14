@@ -6,16 +6,16 @@
     SeasonEffectsState,
     SeasonGameSummary,
   } from '@hoop-rush/data-contracts';
-  import SeasonPlayerFace from '$lib/components/season/SeasonPlayerFace.svelte';
-  import type { SeasonFaceRef } from '$lib/season/season-branding';
-  import { eraIdentityOf } from '$lib/season/season-branding';
+  import SeasonPlayerFace from '#lib/components/season/SeasonPlayerFace.svelte';
+  import type { SeasonFaceRef } from '#lib/season/season-branding.js';
+  import { eraIdentityOf } from '#lib/season/season-branding.js';
   import {
     FATIGUE_BAND_BADGE,
     FATIGUE_BAND_LABEL,
     fatigueBand,
     fatiguePercent,
     loadStateOf,
-  } from '$lib/season/season-effects-view';
+  } from '#lib/season/season-effects-view.js';
   import {
     CLOSING_SLOT_LABELS,
     displayRotationFailures,
@@ -25,8 +25,8 @@
     type MinuteAdjustment,
     type RotationEditor,
     type RotationMember,
-  } from '$lib/season/season-rotation-editor';
-  import { formatPositions } from '$lib/player-positions';
+  } from '#lib/season/season-rotation-editor.js';
+  import { formatPositions } from '#lib/player-positions.js';
   let {
     editor,
     disabled,

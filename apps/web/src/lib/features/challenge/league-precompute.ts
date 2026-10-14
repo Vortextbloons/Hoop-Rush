@@ -4,8 +4,8 @@ import {
   leagueWorkerRequestSchema,
   type OpponentBracketCore,
 } from '@hoop-rush/data-contracts';
-import { newRequestId } from '$lib/ids';
-import { loadRunPreamble } from '$lib/run-preamble';
+import { newRequestId } from '#lib/ids.js';
+import { loadRunPreamble } from '#lib/run-preamble.js';
 
 export interface LeaguePrecomputeDeps {
   createWorker: () => Worker;

@@ -1,9 +1,9 @@
 <script lang="ts">
   import type { HoopRushManifest } from '@hoop-rush/data-contracts';
-  import type { SeriesCardViewModel } from '$lib/season/season-postseason-presentation';
+  import type { SeriesCardViewModel } from '#lib/season/season-postseason-presentation.js';
   import SeasonTeamLogo from './SeasonTeamLogo.svelte';
-  import { franchiseIdentityOf } from '$lib/season/season-branding';
-  import { franchiseColor } from '$lib/season/franchise-colors';
+  import { franchiseIdentityOf } from '#lib/season/season-branding.js';
+  import { franchiseColor } from '#lib/season/franchise-colors.js';
   let {
     card,
     franchiseName,

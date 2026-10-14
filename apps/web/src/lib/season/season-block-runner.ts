@@ -21,7 +21,7 @@ import {
   type SeasonBlockTransport,
   type SeasonRunnerEvent,
 } from '@hoop-rush/application/season';
-import { newRequestId } from '$lib/ids';
+import { newRequestId } from '#lib/ids.js';
 export { acceptWorkerResult, buildWorkerRequest };
 export type {
   SeasonBlockResumeInput,
@@ -171,8 +171,6 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       return;
     }
     if (parsed.data.requestId !== currentRequestId) {
-      // Stale but well-formed envelopes are expected during cancel/resume races and must
-      // not fail the live request, so they stay a warn-and-drop.
       console.warn(
         `[season-block-runner] dropped message for stale requestId ${parsed.data.requestId} (expected ${String(currentRequestId)})`,
       );

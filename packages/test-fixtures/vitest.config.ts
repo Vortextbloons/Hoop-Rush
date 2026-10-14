@@ -5,8 +5,6 @@ export default defineConfig({
   test: {
     name: '@hoop-rush/test-fixtures',
     root: path.dirname(fileURLToPath(import.meta.url)),
-    experimental: {
-      fsModuleCache: true,
-    },
+    fsModuleCache: true,
   },
 });

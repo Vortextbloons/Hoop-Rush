@@ -413,7 +413,6 @@ function checkTape(
     }
   }
 
-  // ---- counting statistics and actor eligibility ---------------------------
   const counts = new Map<string, number>();
   const active = new Map<string, AuditParticipant>();
   for (const starter of input.home.starters) {
@@ -797,7 +796,6 @@ function checkTape(
     }
   }
 
-  // foul replays against the final lines
   for (const [sequence, foul] of foulOwners) {
     const gifts = doubleGiftCounts.get(sequence) ?? 0;
     if (foul.hasDoubleOwner && gifts !== 1) {
@@ -834,7 +832,6 @@ function checkTape(
     }
   }
 
-  // counting reconciliations
   for (const side of [0, 1] as const) {
     const team = side === 0 ? result.home : result.away;
     const sideName = side === 0 ? input.home.side : input.away.side;

@@ -51,6 +51,7 @@ import {
   buildEmptyChallengeState,
   buildInitialPostseasonState,
   contentHashSchema,
+  createEmptyStandings,
   franchiseIdSchema,
   idSchema,
   seasonGameIdSchema,
@@ -273,29 +274,7 @@ export function buildEconomyTestRun(
       forfeitLoserFranchiseId: null,
     };
   });
-  const standings: SeasonRun['standings'] = {
-    schemaVersion: 1,
-    standingsVersion: SEASON_STANDINGS_VERSION,
-    rows: league.teams.map((team) => ({
-      franchiseId: team.franchiseId,
-      wins: 0,
-      losses: 0,
-      gamesPlayed: 0,
-      homeWins: 0,
-      homeLosses: 0,
-      awayWins: 0,
-      awayLosses: 0,
-      conferenceWins: 0,
-      conferenceLosses: 0,
-      divisionWins: 0,
-      divisionLosses: 0,
-      pointsFor: 0,
-      pointsAgainst: 0,
-      headToHead: league.teams
-        .filter((other) => other.franchiseId !== team.franchiseId)
-        .map((other) => ({ franchiseId: other.franchiseId, wins: 0, losses: 0 })),
-    })),
-  };
+  const standings: SeasonRun['standings'] = createEmptyStandings(league);
   const postseason = buildInitialPostseasonState(seed);
   const franchiseIds = league.teams.map((team) => team.franchiseId);
   const run: SeasonRun = {

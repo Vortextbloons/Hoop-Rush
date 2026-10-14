@@ -34,13 +34,17 @@ import {
 } from '@hoop-rush/engine';
 import {
   CollectionCommandStaleError,
+  type CollectionCommandOutcome,
   type CollectionGameCommandApplier,
 } from '@hoop-rush/persistence';
-import { getPersistence } from '$lib/persistence';
-import { getManifest } from '$lib/data';
-import { resolveAssetUrl } from '$lib/asset-url';
+import { getPersistence } from '#lib/persistence.js';
+import { getManifest } from '#lib/data.js';
+import { resolveAssetUrl } from '#lib/asset-url.js';
 import { runSubmission, type SubmissionPolicy } from '@hoop-rush/application';
-import { COLLECTION_COMMAND_POLICY, COLLECTION_PACK_PURCHASE_POLICY } from '$lib/submit/policies';
+import {
+  COLLECTION_COMMAND_POLICY,
+  COLLECTION_PACK_PURCHASE_POLICY,
+} from '#lib/submit/policies.js';
 import {
   loadCollectionCatalog,
   loadCollectionGameRules,
@@ -133,16 +137,49 @@ async function progressionCommandArgs(): Promise<ProgressionCommandArgs> {
   }
 }
 
+interface CollectionCommandRun {
+  outcome: CollectionCommandOutcome;
+  catalog: CollectionCatalog;
+}
+
+async function runCollectionCommand(
+  input: Record<string, unknown>,
+  nowIso: string,
+  options: {
+    policy?: SubmissionPolicy;
+    mapStale?: (error: unknown) => Error;
+  } = {},
+): Promise<CollectionCommandRun> {
+  const repo = getCollectionRepo();
+  const catalog = await loadCollectionCatalog();
+  const command = collectionCommandSchema.parse(input);
+  const catalogHash = await collectionCatalogHash();
+  const progression = await progressionCommandArgs();
+  const outcome = await applyCollectionOutcome(
+    options.policy ?? COLLECTION_COMMAND_POLICY,
+    command,
+    (current) =>
+      repo.applyCollectionCommand({
+        command: current,
+        catalog,
+        catalogHash,
+        ...progression,
+        recordedAtIso: nowIso,
+      }),
+    options.mapStale ?? rethrowCollectionStale,
+  );
+  return { outcome, catalog };
+}
+
 export interface ClaimOutcome {
   state: CollectionState;
   pull: CollectionPullRecord;
   exchange: number;
-  ledgerEntries: import('@hoop-rush/data-contracts').CollectionLedgerEntry[];
+  ledgerEntries: CollectionLedgerEntry[];
 }
 
 export async function claimWelcomeStarter(nowIso: string): Promise<ClaimOutcome> {
   const repo = getCollectionRepo();
-  const catalog = await loadCollectionCatalog();
   const snapshot = await repo.loadCollection(COLLECTION_ID);
   const state =
     snapshot?.state ??
@@ -153,30 +190,18 @@ export async function claimWelcomeStarter(nowIso: string): Promise<ClaimOutcome>
       progressionHash: await collectionProgressionHash(),
       createdAtIso: nowIso,
     }));
-  const command = collectionCommandSchema.parse({
-    schemaVersion: COLLECTION_STATE_SCHEMA_VERSION,
-    commandVersion: COLLECTION_COMMAND_VERSION,
-    commandId: crypto.randomUUID(),
-    collectionId: COLLECTION_ID,
-    expectedRevision: state.revision,
-    expectedDigest: state.digest,
-    command: 'claim-welcome',
-    acquiredAtIso: nowIso,
-  });
-  const catalogHash = await collectionCatalogHash();
-  const progression = await progressionCommandArgs();
-  const outcome = await applyCollectionOutcome(
-    COLLECTION_COMMAND_POLICY,
-    command,
-    (current) =>
-      repo.applyCollectionCommand({
-        command: current,
-        catalog,
-        catalogHash,
-        ...progression,
-        recordedAtIso: nowIso,
-      }),
-    rethrowCollectionStale,
+  const { outcome } = await runCollectionCommand(
+    {
+      schemaVersion: COLLECTION_STATE_SCHEMA_VERSION,
+      commandVersion: COLLECTION_COMMAND_VERSION,
+      commandId: crypto.randomUUID(),
+      collectionId: COLLECTION_ID,
+      expectedRevision: state.revision,
+      expectedDigest: state.digest,
+      command: 'claim-welcome',
+      acquiredAtIso: nowIso,
+    },
+    nowIso,
   );
   if (!outcome.pull) throw new Error('The starter claim did not produce cards.');
   return {
@@ -231,36 +256,24 @@ export async function openPack(
   preview?: CollectionPreview,
 ): Promise<PackOutcome> {
   const repo = getCollectionRepo();
-  const catalog = await loadCollectionCatalog();
   const parsedPackId = collectionPackIdSchema.parse(packId);
   const snapshot = await repo.loadCollection(COLLECTION_ID);
   if (!snapshot) throw new Error('Claim the starter before opening packs.');
   assertPreviewCurrent(snapshot.state, preview);
-  const command = collectionCommandSchema.parse({
-    schemaVersion: COLLECTION_STATE_SCHEMA_VERSION,
-    commandVersion: COLLECTION_COMMAND_VERSION,
-    commandId: crypto.randomUUID(),
-    collectionId: COLLECTION_ID,
-    expectedRevision: snapshot.state.revision,
-    expectedDigest: snapshot.state.digest,
-    command: 'open-pack',
-    packId: parsedPackId,
-    acquiredAtIso: nowIso,
-  });
-  const catalogHash = await collectionCatalogHash();
-  const progression = await progressionCommandArgs();
-  const outcome = await applyCollectionOutcome(
-    COLLECTION_PACK_PURCHASE_POLICY,
-    command,
-    (current) =>
-      repo.applyCollectionCommand({
-        command: current,
-        catalog,
-        catalogHash,
-        ...progression,
-        recordedAtIso: nowIso,
-      }),
-    () => new StaleCollectionPreviewError(),
+  const { outcome, catalog } = await runCollectionCommand(
+    {
+      schemaVersion: COLLECTION_STATE_SCHEMA_VERSION,
+      commandVersion: COLLECTION_COMMAND_VERSION,
+      commandId: crypto.randomUUID(),
+      collectionId: COLLECTION_ID,
+      expectedRevision: snapshot.state.revision,
+      expectedDigest: snapshot.state.digest,
+      command: 'open-pack',
+      packId: parsedPackId,
+      acquiredAtIso: nowIso,
+    },
+    nowIso,
+    { policy: COLLECTION_PACK_PURCHASE_POLICY, mapStale: () => new StaleCollectionPreviewError() },
   );
   if (!outcome.pull) throw new Error('The pack did not produce cards.');
   return {
@@ -276,33 +289,20 @@ export async function setTargetPlayer(
   nowIso: string,
 ): Promise<CollectionState> {
   const repo = getCollectionRepo();
-  const catalog = await loadCollectionCatalog();
   const snapshot = await repo.loadCollection(COLLECTION_ID);
   if (!snapshot) throw new Error('Claim the starter before targeting a player.');
-  const command = collectionCommandSchema.parse({
-    schemaVersion: COLLECTION_STATE_SCHEMA_VERSION,
-    commandVersion: COLLECTION_COMMAND_VERSION,
-    commandId: crypto.randomUUID(),
-    collectionId: COLLECTION_ID,
-    expectedRevision: snapshot.state.revision,
-    expectedDigest: snapshot.state.digest,
-    command: 'set-target-player',
-    playerId,
-  });
-  const catalogHash = await collectionCatalogHash();
-  const progression = await progressionCommandArgs();
-  const outcome = await applyCollectionOutcome(
-    COLLECTION_COMMAND_POLICY,
-    command,
-    (current) =>
-      repo.applyCollectionCommand({
-        command: current,
-        catalog,
-        catalogHash,
-        ...progression,
-        recordedAtIso: nowIso,
-      }),
-    rethrowCollectionStale,
+  const { outcome } = await runCollectionCommand(
+    {
+      schemaVersion: COLLECTION_STATE_SCHEMA_VERSION,
+      commandVersion: COLLECTION_COMMAND_VERSION,
+      commandId: crypto.randomUUID(),
+      collectionId: COLLECTION_ID,
+      expectedRevision: snapshot.state.revision,
+      expectedDigest: snapshot.state.digest,
+      command: 'set-target-player',
+      playerId,
+    },
+    nowIso,
   );
   return outcome.state;
 }
@@ -315,34 +315,21 @@ export interface SetClaimOutcome {
 
 export async function claimSetReward(setId: string, nowIso: string): Promise<SetClaimOutcome> {
   const repo = getCollectionRepo();
-  const catalog = await loadCollectionCatalog();
   const snapshot = await repo.loadCollection(COLLECTION_ID);
   if (!snapshot) throw new Error('Claim the starter before claiming a set.');
-  const command = collectionCommandSchema.parse({
-    schemaVersion: COLLECTION_STATE_SCHEMA_VERSION,
-    commandVersion: COLLECTION_COMMAND_VERSION,
-    commandId: crypto.randomUUID(),
-    collectionId: COLLECTION_ID,
-    expectedRevision: snapshot.state.revision,
-    expectedDigest: snapshot.state.digest,
-    command: 'claim-set-reward',
-    setId,
-    claimedAtIso: nowIso,
-  });
-  const catalogHash = await collectionCatalogHash();
-  const progression = await progressionCommandArgs();
-  const outcome = await applyCollectionOutcome(
-    COLLECTION_COMMAND_POLICY,
-    command,
-    (current) =>
-      repo.applyCollectionCommand({
-        command: current,
-        catalog,
-        catalogHash,
-        ...progression,
-        recordedAtIso: nowIso,
-      }),
-    rethrowCollectionStale,
+  const { outcome } = await runCollectionCommand(
+    {
+      schemaVersion: COLLECTION_STATE_SCHEMA_VERSION,
+      commandVersion: COLLECTION_COMMAND_VERSION,
+      commandId: crypto.randomUUID(),
+      collectionId: COLLECTION_ID,
+      expectedRevision: snapshot.state.revision,
+      expectedDigest: snapshot.state.digest,
+      command: 'claim-set-reward',
+      setId,
+      claimedAtIso: nowIso,
+    },
+    nowIso,
   );
   return {
     state: outcome.state,
@@ -433,8 +420,6 @@ function gameCommandBase(
   };
 }
 
-// Frozen M4.1/M4.2 CPU rarity weights. The v2 rules artifact has no v1 weights,
-// but the shared command input still requires them for legacy v1 replay paths.
 export const LEGACY_COLLECTION_CPU_WEIGHTS: CollectionCpuRarityWeights = {
   Ember: 70,
   Eruption: 23,

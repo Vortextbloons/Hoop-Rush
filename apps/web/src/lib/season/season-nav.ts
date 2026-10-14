@@ -1,5 +1,5 @@
 import type { Component } from 'svelte';
-import type { NavItem } from '$lib/nav-items';
+import type { NavItem } from '#lib/nav-items.js';
 
 export type SeasonNavStage = 'regular-season' | 'play-in' | 'playoffs' | 'completed' | null;
 

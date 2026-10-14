@@ -5,15 +5,15 @@
     SeasonLeaderEntry,
     SeasonRosterEntry,
   } from '@hoop-rush/data-contracts';
-  import { LEADER_CATEGORY_LABELS } from '$lib/season/season-presentation';
+  import { LEADER_CATEGORY_LABELS } from '#lib/season/season-presentation.js';
   import {
     eraIdentityOf,
     franchiseIdentityOf,
     type SeasonFaceRef,
-  } from '$lib/season/season-branding';
+  } from '#lib/season/season-branding.js';
   import SeasonPlayerFace from './SeasonPlayerFace.svelte';
   import SeasonTeamLogo from './SeasonTeamLogo.svelte';
-  import { oneDecimal } from '$lib/format';
+  import { oneDecimal } from '#lib/format.js';
   let {
     category,
     entries,

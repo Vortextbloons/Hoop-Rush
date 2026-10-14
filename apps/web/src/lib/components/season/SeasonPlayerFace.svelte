@@ -4,8 +4,8 @@
     resolveHeadshotUrls,
     type HoopRushManifest,
   } from '@hoop-rush/data-contracts';
-  import PlayerFace from '$lib/components/PlayerFace.svelte';
-  import type { SeasonFaceRef } from '$lib/season/season-branding';
+  import PlayerFace from '#lib/components/PlayerFace.svelte';
+  import type { SeasonFaceRef } from '#lib/season/season-branding.js';
   let {
     face,
     manifest,

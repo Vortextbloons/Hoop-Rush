@@ -6,4 +6,4 @@ export {
   type GamecastPlaybackPositionInput as DraftDuelPlaybackPositionInput,
   type GamecastVisiblePeriod as DraftDuelVisiblePeriod,
   type GamecastVisibleState as DraftDuelVisibleState,
-} from '$lib/features/multiplayer/gamecast/gamecast-playback';
+} from '#lib/features/multiplayer/gamecast/gamecast-playback.js';

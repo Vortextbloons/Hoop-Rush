@@ -121,7 +121,6 @@ describe('havoc tier-2 rules', () => {
     expect(turnover?.kind).toBe('turnover');
     const refund = eventsOf(run, 'possession-refund')[0];
     expect(refund?.kind).toBe('possession-refund');
-    // no steal is attributed to the canceled turnover: the possession continued
     const after = run.tape.events.filter((event) => event.sequence > cancellation.sequence);
     const nextPossession = after.find((event) => event.kind === 'possession-start');
     const samePossessionEvents = after.filter(
@@ -130,7 +129,6 @@ describe('havoc tier-2 rules', () => {
     );
     expect(nextPossession).toBeDefined();
     expect(samePossessionEvents.length).toBeGreaterThan(0);
-    // turnover counts are official (cancellation suppressed in stats)
     const line = run.result.home.participants.find(
       (participant) => participant.instanceId === cancellation.playerInstanceId,
     );
@@ -376,7 +374,6 @@ describe('havoc tier-3 rules', () => {
     expect(cloneInstances.size).toBe(
       run.result.home.participants.length + run.result.away.participants.length,
     );
-    // clones never initiate assists to themselves
     for (const assist of run.tape.events) {
       if (assist.kind !== 'assist') continue;
       expect(assist.assisterInstanceId).not.toBe(assist.scorerInstanceId);
@@ -427,8 +424,6 @@ describe('havoc tier-3 rules', () => {
       }
       opponentPoints += run.result.away.points;
     }
-    // The 12-second side must mostly get shots away rather than letting the
-    // clock expire, and its offense must not collapse toward zero.
     expect(opponentAttempts).toBeGreaterThan(opponentViolations * 4);
     expect(opponentPoints / seeds).toBeGreaterThan(50);
   });

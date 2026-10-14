@@ -1,5 +1,5 @@
 import type { HoopRushManifest, PeakPlayerSeason } from '@hoop-rush/data-contracts';
-import { getPool } from '$lib/data';
+import { getPool } from '#lib/data.js';
 export interface PlayerRef {
   playerId: string;
   franchiseId: string;

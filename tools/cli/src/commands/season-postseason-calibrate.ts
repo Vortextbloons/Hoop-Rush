@@ -1,5 +1,6 @@
 import { resolve } from 'node:path';
 import { z } from 'zod';
+import { seedWindowSchema } from '../seed-window.ts';
 import {
   SEASON_POSTSEASON_TARGETS_VERSION,
   SEASON_RUN_SCHEMA_VERSION,
@@ -71,14 +72,8 @@ export const seasonPostseasonTargetsSchema = z.object({
     forfeitsPerSeasonMax: z.literal(2),
     minSeasons: z.literal(4),
   }),
-  cohort: z.object({
-    seedFrom: z.number().int().nonnegative(),
-    seedTo: z.number().int().nonnegative(),
-  }),
-  heldOut: z.object({
-    seedFrom: z.number().int().nonnegative(),
-    seedTo: z.number().int().nonnegative(),
-  }),
+  cohort: seedWindowSchema,
+  heldOut: seedWindowSchema,
   measured: z.object({
     calibration: seasonPostseasonMeasuredSchema,
     heldOut: seasonPostseasonMeasuredSchema,
@@ -580,9 +575,9 @@ export function seasonPostseasonCalibrate(
   });
   const details = [
     `cohort ${String(calibrationIndices.length)} + ${String(validationIndices.length)} held-out seasons in ${String(durationMs)}ms`,
-    `series length mean ${calibration.seriesLengthMean.toFixed(2)} · upset rate ${(calibration.upsetRate * 100).toFixed(1)}% · home advantage ${(calibration.homeAdvantage * 100).toFixed(1)}%`,
-    `advancement by strength ${(calibration.advancementByStrength * 100).toFixed(1)}% · award plausibility ${(calibration.awardPlausibility * 100).toFixed(1)}%`,
-    `champions ${String(calibration.champions)}/${String(calibration.seasonsSimulated)} · forfeits ${String(calibration.forfeits)} · integrity failures ${String(calibration.integrityFailures)} · both-invalid games ${String(calibration.bothInvalidGames)}`,
+    `series length mean ${calibration.seriesLengthMean.toFixed(2)} Â· upset rate ${(calibration.upsetRate * 100).toFixed(1)}% Â· home advantage ${(calibration.homeAdvantage * 100).toFixed(1)}%`,
+    `advancement by strength ${(calibration.advancementByStrength * 100).toFixed(1)}% Â· award plausibility ${(calibration.awardPlausibility * 100).toFixed(1)}%`,
+    `champions ${String(calibration.champions)}/${String(calibration.seasonsSimulated)} Â· forfeits ${String(calibration.forfeits)} Â· integrity failures ${String(calibration.integrityFailures)} Â· both-invalid games ${String(calibration.bothInvalidGames)}`,
     targetsDetail({ targetsWritten, targetsPath }),
   ];
   if (!pass) {

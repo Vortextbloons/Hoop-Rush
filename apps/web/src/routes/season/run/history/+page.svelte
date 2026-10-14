@@ -3,14 +3,14 @@
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
   import type { SeasonCompletedRunIndexEntry } from '@hoop-rush/persistence';
-  import { getSeasonRunRepository } from '$lib/season/season-repo';
-  import AsyncState from '$lib/components/AsyncState.svelte';
+  import { getSeasonRunRepository } from '#lib/season/season-repo.js';
+  import AsyncState from '#lib/components/AsyncState.svelte';
   import {
     SEASON_RUN_SHELL_CONTEXT,
     type SeasonRunShellData,
-  } from '$lib/season/season-shell-context';
-  import CompletedSeasonResult from '$lib/components/season/CompletedSeasonResult.svelte';
-  import { franchiseColor } from '$lib/season/franchise-colors';
+  } from '#lib/season/season-shell-context.js';
+  import CompletedSeasonResult from '#lib/components/season/CompletedSeasonResult.svelte';
+  import { franchiseColor } from '#lib/season/franchise-colors.js';
   const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
   const selectedRunId = $derived(page.url.searchParams.get('runId'));
   let entries = $state<SeasonCompletedRunIndexEntry[] | null>(null);
@@ -73,7 +73,7 @@
           message="Finish a Season Run through the champion to see it here — results, awards, and the final bracket are preserved on this device."
         >
           {#snippet actions()}
-            <a href={resolve('/season/run')} class="sr-btn-ghost">Back to the hub</a>
+            <a href={resolve('season/run/')} class="sr-btn-ghost">Back to the hub</a>
           {/snippet}
         </AsyncState>
       </div>
@@ -83,7 +83,7 @@
         {#each entries as entry (entry.runId)}
           <li>
             <a
-              href={resolve(`/season/run/history?runId=${entry.runId}`)}
+              href={resolve(`season/run/history/?runId=${entry.runId}`)}
               data-season-history-entry={entry.runId}
               class="sr-gamecard flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 transition-colors hover:bg-surface-2"
               style="--sr-accent: {franchiseColor(entry.championFranchiseId)}"
@@ -104,7 +104,8 @@
                   day: 'numeric',
                 })}
               </span>
-              <span class="shrink-0 font-mono text-xs font-bold text-primary">View &rarr;</span>
+
+              <span class="shrink-0 font-mono text-xs font-bold text-primary">View →</span>
             </a>
           </li>
         {/each}

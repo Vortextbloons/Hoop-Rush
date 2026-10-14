@@ -5,8 +5,8 @@
     HoopRushManifest,
   } from '@hoop-rush/data-contracts';
   import { resolveEraTeamIdentity } from '@hoop-rush/data-contracts';
-  import { formatPositions } from '$lib/player-positions';
-  import TeamLogo from '$lib/components/TeamLogo.svelte';
+  import { formatPositions } from '#lib/player-positions.js';
+  import TeamLogo from '#lib/components/TeamLogo.svelte';
   import { asset } from '$app/paths';
   import CollectionCardFace from './CollectionCardFace.svelte';
   import { collectionCardArtOf } from './collection-card-art.ts';
@@ -65,15 +65,17 @@
         stroke="currentColor"
         stroke-width="1.5"
         stroke-linejoin="round"
-      />
+      ></path>
     </svg>
   </span>
   <span class="ur-card-hero">
     <CollectionCardFace {view} {manifest} size="xl" {artwork} loading="lazy" />
-    <span class="ur-card-owned" class:ur-card-owned--yes={view.owned}>
-      {view.owned ? 'Owned' : 'Catalog'}
-    </span>
+
+    <span class="ur-card-owned" class:ur-card-owned--yes={view.owned}
+      >{view.owned ? 'Owned' : 'Catalog'}</span
+    >
   </span>
+
   <span class="ur-card-nameplate">
     <span class="ur-card-name">{view.name}</span>
     <span class="ur-card-sub">
@@ -93,7 +95,7 @@
         {#if artwork}
           <img
             class="ur-collection-emblem"
-            src={asset('/ultimate/cards/heat-check/emblem.png')}
+            src={asset('ultimate/cards/heat-check/emblem.png')}
             alt=""
             loading="lazy"
           />

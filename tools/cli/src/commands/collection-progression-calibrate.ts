@@ -1280,7 +1280,6 @@ async function generateProgressionTargets(input: GenerateInput): Promise<CliRepo
     measured[`tuning/set/${reward.setId}/amount`] = reward.amount;
   }
 
-  // Targeting report — analytic sweep over every catalog player × pack.
   const analytics = buildPackAnalytics(catalog);
   const playerIds = [...new Set(catalog.cards.map((card) => card.playerId))].sort();
   let eligiblePairs = 0;
@@ -1350,7 +1349,6 @@ async function generateProgressionTargets(input: GenerateInput): Promise<CliRepo
   measured['targeting/sweep-mismatches'] = sweepMismatches;
   measured['targeting/sweep-samples'] = sweepSample.length * analytics.length;
 
-  // Rarity draws must be bit-identical with and without an active target.
   let rarityPairs = 0;
   let rarityMismatches = 0;
   let targetedReplayFailures = 0;
@@ -1420,7 +1418,6 @@ async function generateProgressionTargets(input: GenerateInput): Promise<CliRepo
     `targeting rarity draws: ${String(rarityPairs)} paired pack draws · ${String(rarityMismatches)} rarity mismatches · ${String(targetedReplayFailures)} targeted replay failures`,
   );
 
-  // No-target draws must remain byte-identical to the M4.1 path.
   let noTargetSamples = 0;
   let noTargetFailures = 0;
   for (const pack of catalog.packs) {
@@ -1457,7 +1454,6 @@ async function generateProgressionTargets(input: GenerateInput): Promise<CliRepo
   measured['targeting/no-target-samples'] = noTargetSamples;
   measured['targeting/no-target-failures'] = noTargetFailures;
 
-  // Full-ownership duplicate Exchange must equal the frozen M4.1 expectation.
   let exchangeMismatches = 0;
   let exchangeComparisons = 0;
   const packTargetsPath = resolve(dirname(input.manifestPath), 'collection/pack-targets.json');
@@ -1489,9 +1485,6 @@ async function generateProgressionTargets(input: GenerateInput): Promise<CliRepo
     `full-ownership Exchange: ${String(exchangeComparisons)} pack expectations matched the M4.1 artifact`,
   );
 
-  // Simulated targeted slot draws across tuning and disjoint held-out seeds.
-  // Jobs are ordered pull-block first so contiguous worker chunks mix every pack
-  // and stay balanced regardless of worker count.
   const tuningDrawSeeds = Array.from({ length: calibrationSeeds }, (_value, index) =>
     progressionTuningSeed(index),
   );
@@ -1579,7 +1572,6 @@ async function generateProgressionTargets(input: GenerateInput): Promise<CliRepo
     `targeted draws: ${String(tuningAggregate.ordinarySlots)} tuning + ${String(heldOutAggregate.ordinarySlots)} held-out ordinary targeted slot draws (${String(ordinarySlotDraws)} total) across ${String(tuningAggregate.pulls + heldOutAggregate.pulls)} pulls`,
   );
 
-  // Acquisition quantiles and ownership independence through the production purchase path.
   const acquisitionPacks = catalog.packs
     .filter((pack) => pack.priceCurrency === 'Coins')
     .slice(0, 2);
@@ -1735,7 +1727,6 @@ async function generateProgressionTargets(input: GenerateInput): Promise<CliRepo
     `acquisition: ${String(acquisitionPairs)} pack/target classes · ${String(acquisitionMismatches)} owned/unowned divergences · ${String(acquisitionHits)} hits / ${String(acquisitionCensored)} censored`,
   );
 
-  // Challenge report — deterministic legal cohort teams for all nine challenges.
   const challengeTeams = new Map<string, BuiltCohortTeam>();
   const cohortBaseTeams = new Map<string, BuiltCohortTeam>();
   let teamFailures = 0;
@@ -1982,13 +1973,6 @@ async function generateProgressionTargets(input: GenerateInput): Promise<CliRepo
     }
   }
 
-  // M4.3 standard envelope, frozen from the tuning cohort before the held-out
-  // rates are read. The envelope is the best *allowed* standard repeat reward:
-  // win + objective + margin cap scaled by each challenge difficulty's reward
-  // multiplier (the M4.3 reward table), converted to a per-minute ceiling with
-  // the 240-minute regulation game. Standard pro/legend games are still run
-  // with the same cohort teams; their observed rates are recorded and must stay
-  // at or below the allowed ceiling.
   let standardFailures = 0;
   const observedStandardByGroup = new Map<string, ChallengeAggregate>();
   for (const result of standardResults) {
@@ -2064,7 +2048,6 @@ async function generateProgressionTargets(input: GenerateInput): Promise<CliRepo
   gates['challenge.held-out-repeat-envelope'] = envelopeViolations === 0;
   measured['challenge/envelope-violations'] = envelopeViolations;
 
-  // Risk/reward ordering: harder family challenges pay more per win and stay harder.
   const idsFor = (kind: 'era-core' | 'franchise-core' | 'set-family-core'): string[] =>
     progression.challenges
       .filter((challenge) => challenge.requirement.kind === kind)
@@ -2126,14 +2109,12 @@ async function generateProgressionTargets(input: GenerateInput): Promise<CliRepo
     `risk/reward: family win ${(combinedWinRate(familyIds) * 100).toFixed(1)}% vs era ${(combinedWinRate(eraIds) * 100).toFixed(1)}% · repeat coins/win family ${combinedCoinsPerWin(familyIds).toFixed(1)} > franchise ${combinedCoinsPerWin(franchiseIds).toFixed(1)} > era ${combinedCoinsPerWin(eraIds).toFixed(1)}`,
   );
 
-  // Set report.
   const setReport = runSetReport({ catalog, catalogHash, progression, progressionHash });
   Object.assign(gates, setReport.gates);
   Object.assign(measured, setReport.measured);
   failures.push(...setReport.failures);
   details.push(...setReport.details);
 
-  // Worker/chunk invariance: the artifact content is a pure fold over job results.
   const drawSampleJobs = tuningDrawJobs.slice(0, 8).map((job) => ({
     ...job,
     pullCount: Math.min(job.pullCount, 25),
@@ -2193,7 +2174,6 @@ async function generateProgressionTargets(input: GenerateInput): Promise<CliRepo
     `worker chunk invariance: draws ${chunkDrawEqual ? 'equal' : 'DIVERGED'} · games ${chunkGameEqual ? 'equal' : 'DIVERGED'} · order ${chunkOrderEqual ? 'equal' : 'DIVERGED'} with ${String(workers)} workers`,
   );
 
-  // Held-out seeds are frozen and disjoint from the tuning range.
   const tuningSeedIntersection = [...tuningSeedSet].filter((seed) => heldOutSeedSet.has(seed));
   gates['calibration.held-out-disjoint'] =
     tuningSeedIntersection.length === 0 &&

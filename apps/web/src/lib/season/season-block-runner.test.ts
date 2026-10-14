@@ -772,7 +772,6 @@ describe('season block runner (transport)', () => {
     await flush();
     const error = events.find((event) => event.type === 'error');
     expect(error).toMatchObject({ code: 'invariant-failure', requestId });
-    // The corrupt envelope fails the request fast: a late valid message is ignored.
     worker?.emit({
       schemaVersion: SEASON_WORKER_WIRE_SCHEMA_VERSION,
       type: 'season-block-complete',

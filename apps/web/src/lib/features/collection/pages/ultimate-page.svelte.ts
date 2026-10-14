@@ -8,8 +8,8 @@ import type {
 import {
   ULTIMATE_RUN_SHELL_CONTEXT,
   type UltimateRunShell,
-} from '$lib/features/collection/ultimate-shell.svelte';
-import { loadCollectionProgression } from '$lib/features/collection/collection-assets.ts';
+} from '#lib/features/collection/ultimate-shell.svelte.js';
+import { loadCollectionProgression } from '#lib/features/collection/collection-assets.ts';
 
 export type UltimatePagePhase = 'loading' | 'error' | 'ready';
 

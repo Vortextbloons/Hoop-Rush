@@ -1,5 +1,6 @@
 import { resolve } from 'node:path';
 import { z } from 'zod';
+import { seedWindowSchema } from '../seed-window.ts';
 import {
   SEASON_GAME_VERSION,
   SEASON_GAME_TARGETS_VERSION,
@@ -79,14 +80,8 @@ export const seasonInjuryTargetsSchema = z.object({
     recurrenceBonusBasisPoints: z.literal(60),
     recurrenceWindowTeamGames: z.literal(10),
   }),
-  cohort: z.object({
-    seedFrom: z.number().int().nonnegative(),
-    seedTo: z.number().int().nonnegative(),
-  }),
-  heldOut: z.object({
-    seedFrom: z.number().int().nonnegative(),
-    seedTo: z.number().int().nonnegative(),
-  }),
+  cohort: seedWindowSchema,
+  heldOut: seedWindowSchema,
   measured: z.object({
     calibration: z.object({
       seasonsSimulated: z.number().int().nonnegative(),
@@ -830,13 +825,13 @@ export function seasonHealthCalibrate(args: SeasonHealthArgs): CliReport {
         durationMs: Date.now() - started,
       };
       const details = [
-        `calibration ${String(calibrationCohort.seasonsSimulated)} seasons (${String(calibrationCohort.exposures)} exposures, ${String(calibrationCohort.injuries)} injuries) · held-out ${String(heldOutCohort.seasonsSimulated)} seasons · ${String(workers)} workers`,
-        `mean risk ${calibrationCohort.meanRiskBasisPoints.toFixed(1)}bp (gate ±${String(SEASON_HEALTH_RISK_ENVELOPE_BP)}bp around ${String(SEASON_HEALTH_BASE_RISK_BP)}bp)`,
-        `severity minor ${(calibrationCohort.severityShares.minor * 100).toFixed(1)}% · moderate ${(calibrationCohort.severityShares.moderate * 100).toFixed(1)}% · major ${(calibrationCohort.severityShares.major * 100).toFixed(1)}% · season-ending ${(calibrationCohort.seasonEndingRate * 100).toFixed(2)}%`,
-        `duration means minor ${calibrationCohort.durationMeans.minor.toFixed(2)} · moderate ${calibrationCohort.durationMeans.moderate.toFixed(2)} · major ${calibrationCohort.durationMeans.major.toFixed(2)} (gate ±${String(SEASON_HEALTH_DURATION_TOLERANCE_GAMES)} game)`,
-        `same-game return ${(calibrationCohort.sameGameReturnRate * 100).toFixed(1)}% (gate ±${String(SEASON_HEALTH_SAME_GAME_RETURN_TOLERANCE_PP)}pp) · recurrence gap ${probes.recurrence.gapBp.toFixed(1)}bp (gate ≥ ${String(SEASON_HEALTH_RECURRENCE_MIN_GAP_BP)}bp)`,
-        `standings gap ${calibrationCohort.standingsGapBp.toFixed(1)}bp (gate ≤ ${String(SEASON_HEALTH_STANDINGS_MAX_GAP_BP)}bp)`,
-        `monotonic minutes ${probes.minutes.highIncidenceBp.toFixed(1)}>${probes.minutes.lowIncidenceBp.toFixed(1)} · fatigue ${probes.fatigue.highIncidenceBp.toFixed(1)}>${probes.fatigue.lowIncidenceBp.toFixed(1)} · durability ${probes.durability.lowIncidenceBp.toFixed(1)}>${probes.durability.highIncidenceBp.toFixed(1)}`,
+        `calibration ${String(calibrationCohort.seasonsSimulated)} seasons (${String(calibrationCohort.exposures)} exposures, ${String(calibrationCohort.injuries)} injuries) Â· held-out ${String(heldOutCohort.seasonsSimulated)} seasons Â· ${String(workers)} workers`,
+        `mean risk ${calibrationCohort.meanRiskBasisPoints.toFixed(1)}bp (gate Â±${String(SEASON_HEALTH_RISK_ENVELOPE_BP)}bp around ${String(SEASON_HEALTH_BASE_RISK_BP)}bp)`,
+        `severity minor ${(calibrationCohort.severityShares.minor * 100).toFixed(1)}% Â· moderate ${(calibrationCohort.severityShares.moderate * 100).toFixed(1)}% Â· major ${(calibrationCohort.severityShares.major * 100).toFixed(1)}% Â· season-ending ${(calibrationCohort.seasonEndingRate * 100).toFixed(2)}%`,
+        `duration means minor ${calibrationCohort.durationMeans.minor.toFixed(2)} Â· moderate ${calibrationCohort.durationMeans.moderate.toFixed(2)} Â· major ${calibrationCohort.durationMeans.major.toFixed(2)} (gate Â±${String(SEASON_HEALTH_DURATION_TOLERANCE_GAMES)} game)`,
+        `same-game return ${(calibrationCohort.sameGameReturnRate * 100).toFixed(1)}% (gate Â±${String(SEASON_HEALTH_SAME_GAME_RETURN_TOLERANCE_PP)}pp) Â· recurrence gap ${probes.recurrence.gapBp.toFixed(1)}bp (gate â‰¥ ${String(SEASON_HEALTH_RECURRENCE_MIN_GAP_BP)}bp)`,
+        `standings gap ${calibrationCohort.standingsGapBp.toFixed(1)}bp (gate â‰¤ ${String(SEASON_HEALTH_STANDINGS_MAX_GAP_BP)}bp)`,
+        `monotonic minutes ${probes.minutes.highIncidenceBp.toFixed(1)}>${probes.minutes.lowIncidenceBp.toFixed(1)} Â· fatigue ${probes.fatigue.highIncidenceBp.toFixed(1)}>${probes.fatigue.lowIncidenceBp.toFixed(1)} Â· durability ${probes.durability.lowIncidenceBp.toFixed(1)}>${probes.durability.highIncidenceBp.toFixed(1)}`,
         targetsDetail({ targetsWritten, targetsPath }),
       ];
       return { details, payload };

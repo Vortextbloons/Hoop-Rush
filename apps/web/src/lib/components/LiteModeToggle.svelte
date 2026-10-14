@@ -7,7 +7,7 @@
     readLiteModePreference,
     setLiteModePreference,
     type LiteModePreference,
-  } from '$lib/device-capabilities';
+  } from '#lib/device-capabilities.js';
 
   let { className = '' }: { className?: string } = $props();
   let active = $state(false);

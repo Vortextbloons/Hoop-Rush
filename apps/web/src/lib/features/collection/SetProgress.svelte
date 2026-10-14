@@ -1,6 +1,6 @@
 <script lang="ts">
   import { ArrowUpRight, Check, ChevronDown, Layers, LockKeyhole } from '@lucide/svelte';
-  import { asset } from '$app/paths';
+  import { staticAsset } from '#lib/asset-url.js';
   import CurrencyIcon from './CurrencyIcon.svelte';
   import type { SetProgressView } from './collection-progression-view.ts';
 
@@ -124,7 +124,7 @@
                   </div>
                   <div class="card-mark" aria-hidden="true">
                     {#if artwork}
-                      <img class="card-art" src={asset(artwork)} alt="" loading="lazy" />
+                      <img class="card-art" src={staticAsset(artwork)} alt="" loading="lazy" />
                     {:else}
                       {playerName
                         .split(' ')

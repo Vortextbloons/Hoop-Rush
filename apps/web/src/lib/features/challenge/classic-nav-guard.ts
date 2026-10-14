@@ -14,6 +14,7 @@ export function registerClassicDraftNavigationGuard(
 ): () => void {
   let active = true;
   beforeNavigate((nav) => {
+    if (nav.shallow && nav.type === 'goto') return;
     if (!active) return;
     if (bypass) {
       bypass = false;

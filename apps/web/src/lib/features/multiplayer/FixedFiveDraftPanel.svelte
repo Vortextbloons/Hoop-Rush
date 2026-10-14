@@ -11,16 +11,16 @@
     playerVersionId,
     resolveEraTeamIdentity,
   } from '@hoop-rush/data-contracts';
-  import ClassicRollReel from '$lib/components/classic/ClassicRollReel.svelte';
-  import DraftPoolBrowser from '$lib/components/draft/DraftPoolBrowser.svelte';
-  import DraftRoundCard from '$lib/components/draft/DraftRoundCard.svelte';
-  import LineupCourt from '$lib/components/LineupCourt.svelte';
-  import PlayerFace from '$lib/components/PlayerFace.svelte';
-  import DraftValuePanel from '$lib/components/DraftValuePanel.svelte';
-  import { classicPoolRows } from '$lib/classic-draft';
-  import FixedFiveTurnTakeover from '$lib/features/multiplayer/FixedFiveTurnTakeover.svelte';
-  import { arenaPickSlam } from '$lib/arena-sound';
-  import { poolSortLabel, sortDraftRows, type DraftPresentation } from '$lib/draft-presentation';
+  import ClassicRollReel from '#lib/components/classic/ClassicRollReel.svelte';
+  import DraftPoolBrowser from '#lib/components/draft/DraftPoolBrowser.svelte';
+  import DraftRoundCard from '#lib/components/draft/DraftRoundCard.svelte';
+  import LineupCourt from '#lib/components/LineupCourt.svelte';
+  import PlayerFace from '#lib/components/PlayerFace.svelte';
+  import DraftValuePanel from '#lib/components/DraftValuePanel.svelte';
+  import { classicPoolRows } from '#lib/classic-draft.js';
+  import FixedFiveTurnTakeover from '#lib/features/multiplayer/FixedFiveTurnTakeover.svelte';
+  import { arenaPickSlam } from '#lib/arena-sound.js';
+  import { poolSortLabel, sortDraftRows, type DraftPresentation } from '#lib/draft-presentation.js';
   import {
     heuristicDraftPoolReport,
     loadDraftFitContext,
@@ -29,17 +29,17 @@
     resolveDraftPoolDetails,
     scoreDraftPoolMemo,
     type DraftFitContext,
-  } from '$lib/draft-fit';
-  import type { RollAnimationAxis } from '$lib/features/multiplayer/fixed-five-roll-animation';
-  import { stableRollAnimationId } from '$lib/features/multiplayer/fixed-five-roll-animation';
-  import { formatPositions } from '$lib/player-positions';
-  import { resolvePlayerRefs } from '$lib/player-refs';
+  } from '#lib/draft-fit.js';
+  import type { RollAnimationAxis } from '#lib/features/multiplayer/fixed-five-roll-animation.js';
+  import { stableRollAnimationId } from '#lib/features/multiplayer/fixed-five-roll-animation.js';
+  import { formatPositions } from '#lib/player-positions.js';
+  import { resolvePlayerRefs } from '#lib/player-refs.js';
   import type { PeakPlayerSeason } from '@hoop-rush/data-contracts';
   import {
     isFixedFiveDraftTurn,
     type DraftReplay,
     type FixedFiveAssets,
-  } from '$lib/features/multiplayer/fixed-five-room-state';
+  } from '#lib/features/multiplayer/fixed-five-room-state.js';
   let {
     mode,
     selfId,
@@ -77,12 +77,12 @@
     onLock: () => void;
   } = $props();
   let slotPickerModule: Promise<
-    typeof import('$lib/components/draft/SlotPickerDialog.svelte')
+    typeof import('#lib/components/draft/SlotPickerDialog.svelte')
   > | null = null;
   function loadSlotPickerDialog(): Promise<
-    typeof import('$lib/components/draft/SlotPickerDialog.svelte')
+    typeof import('#lib/components/draft/SlotPickerDialog.svelte')
   > {
-    slotPickerModule ??= import('$lib/components/draft/SlotPickerDialog.svelte');
+    slotPickerModule ??= import('#lib/components/draft/SlotPickerDialog.svelte');
     return slotPickerModule;
   }
   let pickerPlayer = $state<PlayersIndexEntry | null>(null);

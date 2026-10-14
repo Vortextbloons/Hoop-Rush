@@ -16,10 +16,10 @@
     Users,
   } from '@lucide/svelte';
   import type { DraftDuelFairness, DraftDuelPresentation } from '@hoop-rush/data-contracts';
-  import { DraftDuelController } from '$lib/features/draft-duel/draft-duel-controller.svelte';
-  import { getDraftDuelTransport } from '$lib/features/draft-duel/draft-duel-transport';
-  import { loadLastDraftDuelRoomId } from '$lib/features/draft-duel/draft-duel-identity';
-  import { isMultiplayerConfigured } from '$lib/supabase-runtime';
+  import { DraftDuelController } from '#lib/features/draft-duel/draft-duel-controller.svelte.js';
+  import { getDraftDuelTransport } from '#lib/features/draft-duel/draft-duel-transport.js';
+  import { loadLastDraftDuelRoomId } from '#lib/features/draft-duel/draft-duel-identity.js';
+  import { isMultiplayerConfigured } from '#lib/supabase-runtime.js';
 
   type View = 'create' | 'join';
   const controller = new DraftDuelController();
@@ -111,21 +111,14 @@
 <section class="match-page">
   <header class="match-header">
     <div>
-      <a class="back-link" href={resolve('/multiplayer')}>← All game modes</a>
+      <a class="back-link" href={resolve('multiplayer/')}>← All game modes</a>
       <p class="eyebrow">Multiplayer · Private rooms</p>
       <h1>Draft Duel</h1>
-      <p class="intro">
-        Five rounds, eight cards, one shared stage. Draft a starting five, then settle it in a
-        best-of-seven broadcast.
-      </p>
     </div>
     {#if lastRoomId}
       <div class="resume-room">
         <Users size={24} aria-hidden="true" />
-        <div>
-          <span class="eyebrow">Your last room</span>
-          <p>Get back to the draft</p>
-        </div>
+        <span class="eyebrow">Your last room</span>
         <button type="button" onclick={resumeLast} class="resume-button"
           >Resume <ArrowRight size={16} aria-hidden="true" /></button
         >
@@ -135,10 +128,6 @@
 
   <div class="match-layout">
     <div class="mode-selection">
-      <div class="section-heading">
-        <h2>The showdown</h2>
-        <span><Users size={14} aria-hidden="true" /> 2 players · head to head</span>
-      </div>
       <article class="mode-card" aria-label="Draft Duel">
         <img
           class="mode-image"
@@ -165,7 +154,7 @@
       </article>
       <div class="court-note">
         <LockKeyhole size={17} aria-hidden="true" />
-        <p>Just you and your opponent. Every room uses a private 4-digit invite code.</p>
+        <p>Every room uses a private 4-digit invite code.</p>
       </div>
     </div>
 
@@ -205,19 +194,28 @@
                 aria-pressed={fairness === 'fair'}
                 class={['option', { active: fairness === 'fair' }]}
                 onclick={() => (fairness = 'fair')}
-                ><Scale size={21} aria-hidden="true" /><span
-                  ><strong>Fair</strong><small>Shared strength bands</small></span
-                ></button
               >
+                <Scale size={21} aria-hidden="true" />
+
+                <span>
+                  <strong>Fair</strong>
+                  <small>Shared strength bands</small>
+                </span>
+              </button>
+
               <button
                 type="button"
                 aria-pressed={fairness === 'unfair'}
                 class={['option', { active: fairness === 'unfair' }]}
                 onclick={() => (fairness = 'unfair')}
-                ><Shuffle size={21} aria-hidden="true" /><span
-                  ><strong>Unfair</strong><small>Equal player odds</small></span
-                ></button
               >
+                <Shuffle size={21} aria-hidden="true" />
+
+                <span>
+                  <strong>Unfair</strong>
+                  <small>Equal player odds</small>
+                </span>
+              </button>
             </div>
           </fieldset>
           <fieldset disabled={controller.busy}>
@@ -228,48 +226,40 @@
                 aria-pressed={presentation === 'ratings'}
                 class={['option', { active: presentation === 'ratings' }]}
                 onclick={() => (presentation = 'ratings')}
-                ><ChartNoAxesColumn size={21} aria-hidden="true" /><span
-                  ><strong>Ratings</strong><small>See player ratings</small></span
-                ></button
               >
+                <ChartNoAxesColumn size={21} aria-hidden="true" />
+
+                <span>
+                  <strong>Ratings</strong>
+                  <small>See player ratings</small>
+                </span>
+              </button>
+
               <button
                 type="button"
                 aria-pressed={presentation === 'ball-knowledge'}
                 class={['option', { active: presentation === 'ball-knowledge' }]}
                 onclick={() => (presentation = 'ball-knowledge')}
-                ><Brain size={21} aria-hidden="true" /><span
-                  ><strong>Ball Knowledge</strong><small>Draft from memory</small></span
-                ></button
               >
+                <Brain size={21} aria-hidden="true" />
+
+                <span>
+                  <strong>Ball Knowledge</strong>
+                  <small>Draft from memory</small>
+                </span>
+              </button>
             </div>
           </fieldset>
-          <dl class="match-rules">
-            <div>
-              <dt><CalendarDays size={15} aria-hidden="true" /> Match format</dt>
-              <dd>Best of 7</dd>
-            </div>
-            <div>
-              <dt><Clock size={15} aria-hidden="true" /> Pick timer</dt>
-              <dd>60s picks</dd>
-            </div>
-            <div>
-              <dt><LockKeyhole size={15} aria-hidden="true" /> Room access</dt>
-              <dd>Invite only</dd>
-            </div>
-          </dl>
           <button
             type="button"
             onclick={createRoom}
             disabled={controller.busy}
             class="primary-action"
-            >{controller.busy ? 'Creating room…' : 'Create room'}<ArrowRight
-              size={18}
-              aria-hidden="true"
-            /></button
           >
-          <p class="action-note">Share your room code after creating the room.</p>
+            {controller.busy ? 'Creating room…' : 'Create room'}
+            <ArrowRight size={18} aria-hidden="true" />
+          </button>
         {:else}
-          <p class="eyebrow">Meet at the table</p>
           <h2 class="join-title">Join your opponent</h2>
           <p class="join-description">Enter the 4-digit code shared by your room host.</p>
           <form
@@ -302,11 +292,10 @@
                 type="submit"
                 disabled={controller.busy || codeInput.length !== 4}
                 class="primary-action"
-                >{controller.busy ? 'Please wait…' : 'Join room'}<ArrowRight
-                  size={16}
-                  aria-hidden="true"
-                /></button
               >
+                {controller.busy ? 'Please wait…' : 'Join room'}
+                <ArrowRight size={16} aria-hidden="true" />
+              </button>
             </div>
           </form>
           {#if preview}<p class="room-preview" role="status">{preview}</p>{/if}
@@ -364,12 +353,6 @@
     letter-spacing: -0.015em;
     text-transform: uppercase;
   }
-  .intro {
-    color: var(--color-muted-foreground);
-    font-size: 14px;
-    line-height: 1.7;
-    max-width: 580px;
-  }
   .resume-room {
     display: flex;
     align-items: center;
@@ -385,12 +368,6 @@
   }
   .resume-room .eyebrow {
     font-size: 9px;
-  }
-  .resume-room p {
-    font-size: 14px;
-    font-weight: 600;
-    white-space: nowrap;
-    margin-top: 3px;
   }
   .resume-button {
     display: flex;
@@ -408,25 +385,6 @@
     grid-template-columns: minmax(0, 1fr) 370px;
     gap: 24px;
     align-items: start;
-  }
-  .section-heading {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    margin: 0 0 18px;
-  }
-  .section-heading h2 {
-    font-size: 17px;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-  }
-  .section-heading > span {
-    display: flex;
-    gap: 7px;
-    align-items: center;
-    font-size: 11px;
-    color: var(--color-muted-foreground);
   }
   .mode-card {
     position: relative;
@@ -636,28 +594,6 @@
   .option.active > :global(svg) {
     color: var(--color-primary);
   }
-  .match-rules {
-    border-top: 1px solid var(--color-line-soft);
-    margin: 22px 0;
-    padding-top: 16px;
-  }
-  .match-rules > div {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 12px;
-    font-size: 11px;
-  }
-  .match-rules dt {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    color: var(--color-muted-foreground);
-  }
-  .match-rules dd {
-    font-weight: 600;
-  }
   .primary-action {
     display: flex;
     justify-content: center;
@@ -674,13 +610,6 @@
   .primary-action:hover:not(:disabled),
   .resume-button:hover {
     filter: brightness(1.08);
-  }
-  .action-note {
-    text-align: center;
-    color: var(--color-muted-foreground);
-    font-size: 10px;
-    line-height: 1.5;
-    margin-top: 12px;
   }
   .join-title {
     font-size: 32px;
@@ -786,9 +715,6 @@
     .card-copy h3 {
       font-size: 27px;
     }
-    .resume-room p {
-      white-space: normal;
-    }
     .panel-body {
       padding: 18px;
     }
@@ -822,9 +748,6 @@
     }
     .mode-card {
       min-height: 210px;
-    }
-    .section-heading > span {
-      font-size: 10px;
     }
     .panel-body {
       padding: 22px;

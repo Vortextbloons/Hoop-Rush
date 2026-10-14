@@ -1,8 +1,8 @@
 <script lang="ts">
   import type { CollectionCatalogCard, HoopRushManifest } from '@hoop-rush/data-contracts';
-  import PlayerFace from '$lib/components/PlayerFace.svelte';
-  import PlayerStatsTable from '$lib/components/PlayerStatsTable.svelte';
-  import type { PlayerStatColumn, PlayerStatsTotals } from '$lib/components/player-stats-table';
+  import PlayerFace from '#lib/components/PlayerFace.svelte';
+  import PlayerStatsTable from '#lib/components/PlayerStatsTable.svelte';
+  import type { PlayerStatColumn, PlayerStatsTotals } from '#lib/components/player-stats-table.js';
   import type { GameExplanationFacts } from './collection-gamecast';
   import {
     teamBoxViewOf,

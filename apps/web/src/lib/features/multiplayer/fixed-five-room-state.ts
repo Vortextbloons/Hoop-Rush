@@ -18,10 +18,10 @@ import {
 } from '@hoop-rush/engine';
 import type { FixedFiveSessionAssets } from '@hoop-rush/application/fixed-five';
 import { z } from 'zod';
-import { buildClassicCatalog } from '$lib/classic-draft';
-import { getPlayersIndex } from '$lib/data';
-import { resolvePlayerRefs } from '$lib/player-refs';
-import { FIXED_SANDBOX_ERA, loadRunPreamble } from '$lib/run-preamble';
+import { buildClassicCatalog } from '#lib/classic-draft.js';
+import { getPlayersIndex } from '#lib/data.js';
+import { resolvePlayerRefs } from '#lib/player-refs.js';
+import { FIXED_SANDBOX_ERA, loadRunPreamble } from '#lib/run-preamble.js';
 
 export type FixedFiveAssets = FixedFiveSessionAssets;
 

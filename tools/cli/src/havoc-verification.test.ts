@@ -91,7 +91,6 @@ describe('havoc calibration cohorts', () => {
     expect(paired.havoc.wins + paired.havoc.losses).toBe(8);
     expect(paired.havoc.winRate).toBeGreaterThanOrEqual(0);
     expect(paired.havoc.winRate).toBeLessThanOrEqual(1);
-    // Cohort totals are not capped at one 82-game season (128-seed regression guard).
     expect(
       havocCliCohortTotalsSchema.safeParse({
         seeds: 128,

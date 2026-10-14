@@ -25,8 +25,8 @@ import {
   type SeasonAiGenerationProgress,
 } from '@hoop-rush/engine';
 import { recordFromState, type SeasonDraftRepository } from '@hoop-rush/persistence';
-import { newSeasonId } from '$lib/ids';
-import { sleep } from '$lib/sleep';
+import { newSeasonId } from '#lib/ids.js';
+import { sleep } from '#lib/sleep.js';
 import {
   GENERATION_WORKER_WIRE_SCHEMA_VERSION,
   type GenerationWorkerRequest,

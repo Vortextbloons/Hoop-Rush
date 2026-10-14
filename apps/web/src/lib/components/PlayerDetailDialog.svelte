@@ -2,7 +2,7 @@
   import type { HoopRushManifest } from '@hoop-rush/data-contracts';
   import { resolveEraTeamIdentity } from '@hoop-rush/data-contracts';
   import { Dialog } from 'bits-ui';
-  import DialogShell from '$lib/components/DialogShell.svelte';
+  import DialogShell from '#lib/components/DialogShell.svelte';
   import {
     formatDecimal,
     formatPct,
@@ -10,8 +10,8 @@
     perGame,
     shotPct,
     type RosterDetailRow,
-  } from '$lib/roster-browser';
-  import { formatPositions } from '$lib/player-positions';
+  } from '#lib/roster-browser.js';
+  import { formatPositions } from '#lib/player-positions.js';
   import PlayerFace from './PlayerFace.svelte';
   let {
     player,

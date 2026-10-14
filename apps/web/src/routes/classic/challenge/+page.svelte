@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { ChallengeRun } from '@hoop-rush/data-contracts';
-  import { variantLabel } from '$lib/draft-presentation';
-  import ChallengeRunView from '$lib/features/challenge/challenge-run-view.svelte';
+  import { variantLabel } from '#lib/draft-presentation.js';
+  import ChallengeRunView from '#lib/features/challenge/challenge-run-view.svelte';
 </script>
 
 <svelte:head>

@@ -15,12 +15,12 @@
     LINEUP_STRUCTURE,
   } from '@hoop-rush/data-contracts';
   import { validateLineup } from '@hoop-rush/engine';
-  import { clearDataLoaderCaches, getManifest, getPlayersIndex, getPool } from '$lib/data';
-  import { resolvePlayerRefs } from '$lib/player-refs';
-  import { generateSeed, parseSandboxUrl } from '$lib/sandbox-url';
-  import { startSandboxRun } from '$lib/features/challenge/start-challenge-run';
-  import { leaguePrecompute } from '$lib/features/challenge/league-precompute';
-  import { sortDraftRows } from '$lib/draft-presentation';
+  import { clearDataLoaderCaches, getManifest, getPlayersIndex, getPool } from '#lib/data.js';
+  import { resolvePlayerRefs } from '#lib/player-refs.js';
+  import { generateSeed, parseSandboxUrl } from '#lib/sandbox-url.js';
+  import { startSandboxRun } from '#lib/features/challenge/start-challenge-run.js';
+  import { leaguePrecompute } from '#lib/features/challenge/league-precompute.js';
+  import { sortDraftRows } from '#lib/draft-presentation.js';
   import {
     heuristicDraftPoolReport,
     DRAFT_FIT_SLOT_ORDER,
@@ -32,23 +32,23 @@
     type DraftFitScore,
     type DraftFitNeed,
     type DraftFitTier,
-  } from '$lib/draft-fit';
-  import TeamLogo from '$lib/components/TeamLogo.svelte';
-  import LineupCourt from '$lib/components/LineupCourt.svelte';
-  import LineupSummaryNav from '$lib/components/LineupSummaryNav.svelte';
-  import DraftValuePanel from '$lib/components/DraftValuePanel.svelte';
-  import DraftPoolBrowser from '$lib/components/draft/DraftPoolBrowser.svelte';
-  import AsyncState from '$lib/components/AsyncState.svelte';
+  } from '#lib/draft-fit.js';
+  import TeamLogo from '#lib/components/TeamLogo.svelte';
+  import LineupCourt from '#lib/components/LineupCourt.svelte';
+  import LineupSummaryNav from '#lib/components/LineupSummaryNav.svelte';
+  import DraftValuePanel from '#lib/components/DraftValuePanel.svelte';
+  import DraftPoolBrowser from '#lib/components/draft/DraftPoolBrowser.svelte';
+  import AsyncState from '#lib/components/AsyncState.svelte';
   let slotPickerModule: Promise<
-    typeof import('$lib/components/draft/SlotPickerDialog.svelte')
+    typeof import('#lib/components/draft/SlotPickerDialog.svelte')
   > | null = null;
   function loadSlotPickerDialog(): Promise<
-    typeof import('$lib/components/draft/SlotPickerDialog.svelte')
+    typeof import('#lib/components/draft/SlotPickerDialog.svelte')
   > {
-    slotPickerModule ??= import('$lib/components/draft/SlotPickerDialog.svelte');
+    slotPickerModule ??= import('#lib/components/draft/SlotPickerDialog.svelte');
     return slotPickerModule;
   }
-  import { planPlayerMove } from '$lib/draft-slots';
+  import { planPlayerMove } from '#lib/draft-slots.js';
   type IndexRow = PlayersIndexEntry;
   type SlotRef = {
     playerId: string;
@@ -485,9 +485,6 @@
       >
         Draft any five
       </h1>
-      <p class="mt-3 max-w-xl text-sm text-muted-foreground">
-        Five players, any team, any era. Build your five and chase 82–0.
-      </p>
     </div>
     <div class="flex shrink-0 items-center gap-3">
       <a

@@ -13,15 +13,8 @@ import {
 } from '@hoop-rush/data-contracts';
 import type { BuildHavocGameInputInput } from './api.ts';
 
-/**
- * The frozen `havocGameInputSchema` carries no capability-target field, so the
- * per-game target assignment is a pure function of the input and is derived
- * independently by the runtime. Both sides use this function.
- */
 export interface HavocCapabilityTargets {
-  /** Body Snatcher owner instance id -> opponent starter instance id. */
   readonly bodySnatcher: ReadonlyMap<string, string>;
-  /** The Bounty target: highest-ranked opponent starter instance id. */
   readonly bounty: string | null;
 }
 
@@ -37,7 +30,6 @@ function humanTeam(input: HavocGameInput): HavocTeamInput {
   return input.humanSide === 'home' ? input.home : input.away;
 }
 
-/** Opponent starters ranked by frozen original Overall, source version id, source player id. */
 export function rankedHavocOpponentStarters(input: HavocGameInput): HavocParticipant[] {
   return [...opponentTeam(input).starters].sort((a, b) => {
     const overall = b.source.originalOverall - a.source.originalOverall;

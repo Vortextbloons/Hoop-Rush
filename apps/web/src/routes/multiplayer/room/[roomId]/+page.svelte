@@ -1,8 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import MultiplayerLobbyLink from '$lib/features/multiplayer/MultiplayerLobbyLink.svelte';
-  import { page } from '$app/stores';
-  import { asset, resolve } from '$app/paths';
+  import MultiplayerLobbyLink from '#lib/features/multiplayer/MultiplayerLobbyLink.svelte';
+  import { page } from '$app/state';
+  import { resolve } from '$app/paths';
+  import { staticAsset } from '#lib/asset-url.js';
   import {
     Check,
     Copy,
@@ -15,21 +16,21 @@
     LogOut,
     ShieldCheck,
   } from '@lucide/svelte';
-  import FixedFiveScoreboard from '$lib/features/multiplayer/FixedFiveScoreboard.svelte';
-  import FixedFiveDraftPanel from '$lib/features/multiplayer/FixedFiveDraftPanel.svelte';
-  import FixedFiveSimShow from '$lib/features/multiplayer/FixedFiveSimShow.svelte';
-  import FixedFiveResults from '$lib/features/multiplayer/FixedFiveResults.svelte';
-  import GamecastBroadcast from '$lib/features/multiplayer/gamecast/GamecastBroadcast.svelte';
-  import GamecastRecap from '$lib/features/multiplayer/gamecast/GamecastRecap.svelte';
-  import GamecastSeriesTracker from '$lib/features/multiplayer/gamecast/GamecastSeriesTracker.svelte';
-  import { gamecastFeedLines } from '$lib/features/multiplayer/gamecast/gamecast-broadcast-view';
+  import FixedFiveScoreboard from '#lib/features/multiplayer/FixedFiveScoreboard.svelte';
+  import FixedFiveDraftPanel from '#lib/features/multiplayer/FixedFiveDraftPanel.svelte';
+  import FixedFiveSimShow from '#lib/features/multiplayer/FixedFiveSimShow.svelte';
+  import FixedFiveResults from '#lib/features/multiplayer/FixedFiveResults.svelte';
+  import GamecastBroadcast from '#lib/features/multiplayer/gamecast/GamecastBroadcast.svelte';
+  import GamecastRecap from '#lib/features/multiplayer/gamecast/GamecastRecap.svelte';
+  import GamecastSeriesTracker from '#lib/features/multiplayer/gamecast/GamecastSeriesTracker.svelte';
+  import { gamecastFeedLines } from '#lib/features/multiplayer/gamecast/gamecast-broadcast-view.js';
   import {
     gamecastVisibleEventCount,
     gamecastVisibleState,
-  } from '$lib/features/multiplayer/gamecast/gamecast-playback';
-  import ArenaSoundToggle from '$lib/components/ArenaSoundToggle.svelte';
-  import { FixedFiveRoomController } from '$lib/features/multiplayer/fixed-five-room-controller.svelte';
-  const roomId = $page.params.roomId as string;
+  } from '#lib/features/multiplayer/gamecast/gamecast-playback.js';
+  import ArenaSoundToggle from '#lib/components/ArenaSoundToggle.svelte';
+  import { FixedFiveRoomController } from '#lib/features/multiplayer/fixed-five-room-controller.svelte.js';
+  const roomId = page.params.roomId as string;
   const controller = new FixedFiveRoomController({ roomId });
   const snapshot = $derived(controller.roomSnapshot);
   const display = $derived(controller.display);
@@ -53,6 +54,7 @@
         controller.awaitingContinue &&
         controller.duelRecapGame !== null),
   );
+
   const readyCountdownLabel = $derived.by((): string | null => {
     const ms = controller.readyCountdownMs;
     if (ms === null) return null;
@@ -71,8 +73,12 @@
 
 <section class="room-page">
   <div class="room-nav">
-    <a href={resolve('/multiplayer')}><ArrowLeft size={15} aria-hidden="true" /> Multiplayer</a
-    ><ArenaSoundToggle />
+    <a href={resolve('multiplayer/')}>
+      <ArrowLeft size={15} aria-hidden="true" />
+      Multiplayer
+    </a>
+
+    <ArenaSoundToggle />
   </div>
   {#if controller.loading}
     <div class="room-empty" role="status">
@@ -84,7 +90,7 @@
     <div class="room-empty">
       <h1>Couldn’t open this room</h1>
       <p role="alert">{controller.error}</p>
-      <a href={resolve('/multiplayer')} class="room-primary"
+      <a href={resolve('multiplayer/')} class="room-primary"
         >Back to multiplayer <ArrowRight size={16} /></a
       >
     </div>
@@ -102,10 +108,17 @@
             'closed'}
         </p>
       </div>
-      {#if phase !== 'completed'}<MultiplayerLobbyLink {roomId} />{/if}
-      {#if controller.resultVerified}<span class="verified-pill"
-          ><ShieldCheck size={15} aria-hidden="true" /> Result verified</span
-        >{/if}
+
+      {#if phase !== 'completed'}
+        <MultiplayerLobbyLink {roomId} />
+      {/if}
+
+      {#if controller.resultVerified}
+        <span class="verified-pill">
+          <ShieldCheck size={15} aria-hidden="true" />
+          Result verified
+        </span>
+      {/if}
     </header>
     {#if phase !== 'expired' && phase !== 'integrity-failed'}
       <ol class="room-stages" aria-label="Match progress">
@@ -123,17 +136,27 @@
         {/each}
       </ol>
     {/if}
-    {#if phase === 'completed'}<MultiplayerLobbyLink {roomId} completed />{/if}
-    {#if controller.error}<p class="room-alert" role="alert">{controller.error}</p>{/if}
-    {#if controller.reconnecting || controller.syncing}<p class="room-connection" role="status">
+
+    {#if phase === 'completed'}
+      <MultiplayerLobbyLink {roomId} completed />
+    {/if}
+
+    {#if controller.error}
+      <p class="room-alert" role="alert">{controller.error}</p>
+    {/if}
+
+    {#if controller.reconnecting || controller.syncing}
+      <p class="room-connection" role="status">
         {controller.reconnecting ? 'Reconnecting to your room…' : 'Updating your room…'}
-      </p>{/if}
-    {#if controller.opponent && !controller.opponent.online && phase !== 'lobby' && phase !== 'completed'}<p
-        class="room-connection"
-        role="status"
-      >
+      </p>
+    {/if}
+
+    {#if controller.opponent && !controller.opponent.online && phase !== 'lobby' && phase !== 'completed'}
+      <p class="room-connection" role="status">
         Your opponent is offline. Their place in the room is kept.
-      </p>{/if}
+      </p>
+    {/if}
+
     {#if controller.notice || (replay && replay.skipped > 0)}
       <details class="room-activity">
         <summary>Room activity</summary>{#if controller.notice}<p>
@@ -144,17 +167,16 @@
           </p>{/if}
       </details>
     {/if}
-    {#if phase !== 'lobby' && phase !== 'completed' && phase !== 'awaiting-confirmation' && phase !== 'integrity-failed' && phase !== 'expired'}<div
-        class="room-players"
-      >
-        <FixedFiveScoreboard snapshot={display} {selfId} />
-      </div>{/if}
+
+    {#if phase !== 'lobby' && phase !== 'completed' && phase !== 'awaiting-confirmation' && phase !== 'integrity-failed' && phase !== 'expired'}
+      <div class="room-players"><FixedFiveScoreboard snapshot={display} {selfId} /></div>
+    {/if}
 
     {#if phase === 'lobby'}
       <div class="lobby-layout">
         <div class="invite-panel">
           <div class="lobby-photo">
-            <img src={asset(controller.roomImage)} alt="" width="1536" height="1024" /><span
+            <img src={staticAsset(controller.roomImage)} alt="" width="1536" height="1024" /><span
               class="photo-caption">{controller.roomName} · Head to head</span
             >
           </div>
@@ -181,9 +203,13 @@
                   type="button"
                   onclick={() => void controller.copyInviteLink()}
                   class="room-primary"
-                  >{#if controller.copiedInvite}<Check size={16} /> Copied{:else}<Link size={16} /> Copy
-                    invite link{/if}</button
                 >
+                  {#if controller.copiedInvite}
+                    <Check size={16} />Copied
+                  {:else}
+                    <Link size={16} />Copy invite link
+                  {/if}
+                </button>
               </div>
               <p class="invite-footnote">Room codes expire after 15 minutes.</p>
             {/if}
@@ -250,10 +276,10 @@
               type="button"
               onclick={() => void controller.leaveRoom()}
               disabled={controller.leaveBusy}
-              ><LogOut size={14} aria-hidden="true" />{controller.leaveBusy
-                ? 'Leaving…'
-                : 'Leave room'}</button
             >
+              <LogOut size={14} aria-hidden="true" />
+              {controller.leaveBusy ? 'Leaving…' : 'Leave room'}
+            </button>
           </div>
         </div>
       </div>
@@ -571,10 +597,12 @@
     {:else if phase === 'expired'}
       <div class="mt-6 rounded-2xl bg-surface-1 p-6">
         <h2 class="font-display text-2xl font-extrabold uppercase">Room expired</h2>
+
         <p class="mt-1 text-xs text-muted-foreground">
           Your local saves are kept. Create a new room to play again.
         </p>
-        <a class="room-primary mt-4" href={resolve('/multiplayer')}
+
+        <a class="room-primary mt-4" href={resolve('multiplayer/')}
           >Choose a match <ArrowRight size={16} /></a
         >
       </div>

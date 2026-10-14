@@ -66,7 +66,6 @@ describe('seasonBlockRejection', () => {
 
   it('rejects an open free-agency window before the next block', () => {
     const input = validInput();
-    // Only `status` and `windowIndex` are read by the rejection; the window is not parsed here.
     const openWindow = {
       windowIndex: 0,
       blockIndex: 2,

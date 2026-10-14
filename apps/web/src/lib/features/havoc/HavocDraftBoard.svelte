@@ -36,11 +36,6 @@
     <div>
       <p class="h-eyebrow">Hoop Havoc · Draft night</p>
       <h1 class="h-title mt-2">{complete ? 'Meet your freaks.' : `Pick your ${draft.slot}.`}</h1>
-      <p class="h-copy mt-3">
-        {complete
-          ? 'Your five are ready. Launch the season and let them loose.'
-          : 'Three legends. Three twists. Who gets the spot?'}
-      </p>
     </div>
     <ol class="h-draft-progress" aria-label="Draft progress">
       {#each positions as position, i (position)}<li
@@ -52,20 +47,15 @@
     </ol>
   </header>
   {#if !complete}
-    <div class="h-header">
-      <p class="h-copy text-xs">
-        Powers come with tradeoffs. Tier means rarity, not guaranteed strength.
-      </p>
-      <div class="h-actions">
-        <button
-          class="h-button secondary"
-          data-havoc-reroll
-          onclick={onReroll}
-          disabled={busy || draft.rerollUsed}><Shuffle size={16} />New choices</button
-        ><span class="h-copy text-xs" data-havoc-rerolls-remaining
-          >{draft.rerollUsed ? 0 : 1} of {HAVOC_REROLL_LIMIT} reroll{draft.rerollUsed ? 's' : ''} left</span
-        >
-      </div>
+    <div class="h-actions">
+      <button
+        class="h-button secondary"
+        data-havoc-reroll
+        onclick={onReroll}
+        disabled={busy || draft.rerollUsed}><Shuffle size={16} />New choices</button
+      ><span class="h-copy text-xs" data-havoc-rerolls-remaining
+        >{draft.rerollUsed ? 0 : 1} of {HAVOC_REROLL_LIMIT} reroll{draft.rerollUsed ? 's' : ''} left</span
+      >
     </div>
     <section aria-label="Current offer">
       <ul class="h-cards">

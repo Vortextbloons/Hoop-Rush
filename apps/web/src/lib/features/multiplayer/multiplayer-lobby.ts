@@ -7,10 +7,10 @@ import {
   type MultiplayerLobbyCommand,
 } from '@hoop-rush/data-contracts';
 import { getFixedFiveTransport } from './fixed-five-transport';
-import { getDraftDuelTransport } from '$lib/features/draft-duel/draft-duel-transport';
+import { getDraftDuelTransport } from '#lib/features/draft-duel/draft-duel-transport.js';
 import { saveFixedFiveMembership } from './fixed-five-identity';
-import { saveDraftDuelMembership } from '$lib/features/draft-duel/draft-duel-identity';
-import { getMultiplayerClient } from '$lib/supabase-runtime';
+import { saveDraftDuelMembership } from '#lib/features/draft-duel/draft-duel-identity.js';
+import { getMultiplayerClient } from '#lib/supabase-runtime.js';
 
 export async function lobbyCommand(command: MultiplayerLobbyCommand): Promise<unknown> {
   const client = await getMultiplayerClient();

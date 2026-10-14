@@ -5,8 +5,6 @@ export default defineConfig({
   test: {
     name: '@hoop-rush/data-contracts',
     root: path.dirname(fileURLToPath(import.meta.url)),
-    experimental: {
-      fsModuleCache: true,
-    },
+    fsModuleCache: true,
   },
 });

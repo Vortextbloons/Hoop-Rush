@@ -95,7 +95,6 @@ import { loadSeasonDraftCatalog, resolveSeasonArtifact } from './commands/season
 export const HAVOC_CLI_ERA_ID = '2010s';
 export const HAVOC_CLI_REPORT_DIGEST_PREFIX = 'havoc-cli-report-v1';
 export const HAVOC_CLI_CALIBRATION_BASE = 'hoop-rush/havoc/calibrate-v1';
-/** Matches ENGINE_CONSTANTS.shotClockSeconds; only used to label an unobserved full clock. */
 export const HAVOC_CLI_DEFAULT_FULL_SHOT_CLOCK_SECONDS = 24;
 
 export class HavocCliError extends Error {
@@ -107,7 +106,6 @@ export class HavocCliError extends Error {
   }
 }
 
-/** JSON file reader that tolerates a UTF-8 BOM (common on Windows editors). */
 export function readHavocJsonFile(path: string): unknown {
   let text: string;
   try {
@@ -121,8 +119,6 @@ export function readHavocJsonFile(path: string): unknown {
     throw new Error(`cannot read ${path}: ${(error as Error).message}`);
   }
 }
-
-// ---------------------------------------------------------------- assets
 
 export interface HavocCliAssets {
   readonly manifestPath: string;
@@ -211,17 +207,13 @@ export function havocCliLockSourcesOf(assets: HavocCliAssets): HavocLockSources 
   return { bracket: assets.bracket, profile: assets.profile };
 }
 
-// ----------------------------------------------------------------- draft
-
 export interface HavocCliDraftPin {
   readonly slot: Position;
   readonly playerVersionId: string;
 }
 
 export interface HavocCliDraftPlan {
-  /** Null selects the first card of every offer (the default auto-pick policy). */
   readonly pins: readonly HavocCliDraftPin[] | null;
-  /** Null lets a pinned pick spend the single reroll only when it is required. */
   readonly rerollRound: number | null;
 }
 
@@ -397,8 +389,6 @@ export function havocCliLineupOf(picks: readonly HavocDraftPick[]): HavocCliLine
   }));
 }
 
-// ---------------------------------------------------- constructed lineups
-
 export interface HavocCliConstructedSlot {
   readonly slot: Position;
   readonly tier: 1 | 2 | 3;
@@ -516,8 +506,6 @@ export function buildConstructedHavocLockedInputs(input: {
   });
 }
 
-// ------------------------------------------------------------ simulation
-
 export interface HavocCliGameEntry {
   readonly gameNumber: number;
   readonly opponentId: string;
@@ -582,7 +570,6 @@ export interface HavocCliVariantRun {
   readonly facts: readonly HavocCliGameFacts[];
   readonly failures: readonly HavocCliFailure[];
   readonly auditFindings: number;
-  /** Full results for the canonical comparison; empty unless `retainResults` was requested. */
   readonly results: readonly HavocStoredGame[];
 }
 
@@ -613,7 +600,6 @@ function shotClockViolationsOf(tape: HavocGameTape, side: 'human' | 'opponent'):
   return count;
 }
 
-/** First observed full clock for a side: the tipoff time-lord application, before any owner exit. */
 function fullShotClockOf(tape: HavocGameTape, side: 'human' | 'opponent'): number | null {
   for (const event of tape.events) {
     if (event.kind === 'time-lord' && event.side === side) return event.fullSeconds;
@@ -761,8 +747,6 @@ export function simulateHavocCliVariant(input: {
   return { variant: input.variant, games, aggregate, facts, failures, auditFindings, results };
 }
 
-// ------------------------------------------------- comparison and report
-
 function havocCliAcceptCommandId(seed: Seed, suffix: string): string {
   return commandIdSchema.parse(`havoc-cli-${seed.slice(0, 8)}-${suffix}`);
 }
@@ -834,8 +818,6 @@ export function canonicalHavocReportOf(input: {
     comparison: input.comparison,
   });
 }
-
-// ------------------------------------------------------- report schemas
 
 export const havocCliLineupEntrySchema = z.object({
   slot: positionSchema,
@@ -945,8 +927,6 @@ export function lockedInputsDigest(locked: HavocLockedInputs): string {
   return seasonDigestHex(canonicalJson(locked));
 }
 
-// ---------------------------------------------------------------- picks
-
 export const havocCliPicksSchema = z.object({
   schemaVersion: z.literal(1),
   picks: z
@@ -968,8 +948,6 @@ export function havocCliDraftPlanOf(picks: HavocCliPicks | null): HavocCliDraftP
     rerollRound: picks.rerollRound ?? null,
   };
 }
-
-// -------------------------------------------------------------- auditing
 
 export interface HavocCliReplayedRun {
   readonly locked: HavocLockedInputs;

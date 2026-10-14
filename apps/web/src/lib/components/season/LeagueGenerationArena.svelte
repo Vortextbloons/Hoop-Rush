@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { SeasonLeague } from '@hoop-rush/data-contracts';
-  import type { SeasonDraftGenerationProgress } from '$lib/season/season-draft-flow';
+  import type { SeasonDraftGenerationProgress } from '#lib/season/season-draft-flow.js';
   let {
     progress = null,
     league = null,

@@ -9,22 +9,22 @@
   import { franchiseAbbreviation, resolveEraTeamIdentity } from '@hoop-rush/data-contracts';
   import { untrack } from 'svelte';
   import { Search } from '@lucide/svelte';
-  import { lowercaseName } from '$lib/roster-browser';
+  import { lowercaseName } from '#lib/roster-browser.js';
   import {
     FIT_NEED_META,
     FIT_TIER_META,
     DRAFT_POOL_PAGE_SIZE,
     formatNetDelta,
     poolRowKey,
-  } from '$lib/draft-fit';
+  } from '#lib/draft-fit.js';
   import {
     ratingBadges,
     type DraftPresentation,
     type RatingBadgeLabel,
-  } from '$lib/draft-presentation';
-  import { SLOT_INDEXES, SLOT_LABELS, canFillSlot, planPlayerMove } from '$lib/draft-slots';
-  import { formatPositions } from '$lib/player-positions';
-  import PlayerFace from '$lib/components/PlayerFace.svelte';
+  } from '#lib/draft-presentation.js';
+  import { SLOT_INDEXES, SLOT_LABELS, canFillSlot, planPlayerMove } from '#lib/draft-slots.js';
+  import { formatPositions } from '#lib/player-positions.js';
+  import PlayerFace from '#lib/components/PlayerFace.svelte';
   type IndexRow = PlayersIndexEntry;
   const PAGE_SIZE = DRAFT_POOL_PAGE_SIZE;
   const SEARCH_DEBOUNCE_MS = 80;
@@ -147,8 +147,6 @@
     (): ReadonlyMap<string, PoolCardInfo> =>
       new Map(visibleRows.map((player) => [rowKey(player), poolCardInfoFor(player)])),
   );
-  // Fit map is keyed by franchise/era/player so global pools with repeat
-  // playerIds still resolve to the right row.
   const showFit = $derived(presentation !== 'ball-knowledge' && fitByRow !== null);
   let lastVisibleKey = '';
   $effect(() => {

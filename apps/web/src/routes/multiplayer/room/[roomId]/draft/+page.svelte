@@ -1,9 +1,9 @@
-﻿<script lang="ts">
-  import { page } from '$app/stores';
+<script lang="ts">
+  import { page } from '$app/state';
   import { resolve } from '$app/paths';
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
-  let roomId = $derived($page.params.roomId as string);
+  let roomId = $derived(page.params.roomId as string);
   onMount(() => {
     void goto(resolve('/multiplayer/room/[roomId]', { roomId }));
   });

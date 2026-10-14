@@ -6,7 +6,7 @@ import {
   type DraftDuelWorkerRequest,
   type GameSimulationInput,
 } from '@hoop-rush/data-contracts';
-import { newRequestId } from '$lib/ids';
+import { newRequestId } from '#lib/ids.js';
 export interface DraftDuelRunnerInput {
   roomId: string;
   input: GameSimulationInput;

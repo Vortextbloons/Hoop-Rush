@@ -18,8 +18,8 @@ import {
   type SeasonSchedule,
 } from '@hoop-rush/data-contracts';
 import { SEASON_HOME_COURT_PROFILE } from '@hoop-rush/engine';
-import { memoized, resolveAssetUrl } from '$lib/asset-url';
-import { getManifest, loadManifestAsset } from '$lib/manifest-assets';
+import { memoized, resolveAssetUrl } from '#lib/asset-url.js';
+import { getManifest, loadManifestAsset } from '#lib/manifest-assets.js';
 import type { SeasonArtifactUrls } from '@hoop-rush/application/season';
 export type { SeasonArtifactUrls };
 const FIXED_SEASON_ERA = '2010s';

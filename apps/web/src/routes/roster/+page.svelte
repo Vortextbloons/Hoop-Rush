@@ -11,8 +11,13 @@
     RosterDetailsEntry,
   } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation, resolveEraTeamIdentity } from '@hoop-rush/data-contracts';
-  import { clearDataLoaderCaches, getManifest, getPlayersIndex, getRosterDetails } from '$lib/data';
-  import { DETAILED_POSITIONS } from '$lib/player-positions';
+  import {
+    clearDataLoaderCaches,
+    getManifest,
+    getPlayersIndex,
+    getRosterDetails,
+  } from '#lib/data.js';
+  import { DETAILED_POSITIONS } from '#lib/player-positions.js';
   import {
     defaultDirection,
     filterRoster,
@@ -23,18 +28,18 @@
     type RosterListItem,
     type RosterSortDirection,
     type RosterSortId,
-  } from '$lib/roster-browser';
-  import TeamLogo from '$lib/components/TeamLogo.svelte';
-  import AsyncState from '$lib/components/AsyncState.svelte';
-  import RosterComparison from '$lib/components/RosterComparison.svelte';
-  import RosterTable from '$lib/components/RosterTable.svelte';
+  } from '#lib/roster-browser.js';
+  import TeamLogo from '#lib/components/TeamLogo.svelte';
+  import AsyncState from '#lib/components/AsyncState.svelte';
+  import RosterComparison from '#lib/components/RosterComparison.svelte';
+  import RosterTable from '#lib/components/RosterTable.svelte';
   let playerDetailModule: Promise<
-    typeof import('$lib/components/PlayerDetailDialog.svelte')
+    typeof import('#lib/components/PlayerDetailDialog.svelte')
   > | null = null;
   function loadPlayerDetailDialog(): Promise<
-    typeof import('$lib/components/PlayerDetailDialog.svelte')
+    typeof import('#lib/components/PlayerDetailDialog.svelte')
   > {
-    playerDetailModule ??= import('$lib/components/PlayerDetailDialog.svelte');
+    playerDetailModule ??= import('#lib/components/PlayerDetailDialog.svelte');
     return playerDetailModule;
   }
   type IndexRow = RosterDetailRow;
@@ -276,12 +281,9 @@
       >
         Player database
       </h1>
-      <p class="mt-3 max-w-xl text-sm text-muted-foreground">
-        Browse every peak season by team, decade and stats.
-      </p>
     </div>
     <a
-      href={resolve('/sandbox')}
+      href={resolve('sandbox/')}
       class="hidden shrink-0 items-center gap-1.5 font-mono text-xs text-muted-foreground underline-offset-4 hover:underline sm:inline-flex"
     >
       Draft a lineup <ArrowRight class="h-3.5 w-3.5" />
@@ -410,6 +412,7 @@
         >
           Decade
         </h2>
+
         <Select.Root type="single" value={eraId} onValueChange={selectEra} items={eraItems}>
           <Select.Trigger
             aria-labelledby="roster-decade-label"

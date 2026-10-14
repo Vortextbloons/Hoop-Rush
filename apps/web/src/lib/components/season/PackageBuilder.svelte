@@ -19,17 +19,17 @@
     chemistryFootnote,
     humanizeTradeRejection,
     packageConsequenceFacts,
-  } from '$lib/season/season-presentation';
+  } from '#lib/season/season-presentation.js';
   import { ChevronRight } from '@lucide/svelte';
   import SeasonPlayerFace from './SeasonPlayerFace.svelte';
   import TradePlayerDetailDialog from './TradePlayerDetailDialog.svelte';
-  import type { SeasonFaceRef } from '$lib/season/season-branding';
-  import { candidateOf, overallRatingOf } from '$lib/season/season-catalog-index';
+  import type { SeasonFaceRef } from '#lib/season/season-branding.js';
+  import { candidateOf, overallRatingOf } from '#lib/season/season-catalog-index.js';
   import {
     playerSeasonStatsRow,
     type SeasonPlayerStatsRow,
-  } from '$lib/season/season-player-stats-view';
-  import type { TradePlayerViewModel } from '$lib/season/season-trade-view';
+  } from '#lib/season/season-player-stats-view.js';
+  import type { TradePlayerViewModel } from '#lib/season/season-trade-view.js';
 
   interface PlayerLite {
     playerVersionId: string;

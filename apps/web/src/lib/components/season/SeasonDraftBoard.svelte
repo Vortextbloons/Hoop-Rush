@@ -1,19 +1,24 @@
 <script lang="ts">
   import type { HoopRushManifest, SeasonDraftCatalog } from '@hoop-rush/data-contracts';
   import { resolveHistoricalIdentitySpans } from '@hoop-rush/data-contracts';
-  import SeasonPlayerFace from '$lib/components/season/SeasonPlayerFace.svelte';
-  import SeasonTeamLogo from '$lib/components/season/SeasonTeamLogo.svelte';
-  import { eraIdentityOf, type SeasonFaceRef } from '$lib/season/season-branding';
+  import SeasonPlayerFace from '#lib/components/season/SeasonPlayerFace.svelte';
+  import SeasonTeamLogo from '#lib/components/season/SeasonTeamLogo.svelte';
+  import { eraIdentityOf, type SeasonFaceRef } from '#lib/season/season-branding.js';
   import {
     FIVE_COVERAGE_TARGETS,
     coverageNeeds,
     humanizeCoverageReason,
     SOLO_PARTICIPANT_ID,
     type SeasonDraftFlowState,
-  } from '$lib/season/season-draft-flow';
-  import { formatPositions } from '$lib/player-positions';
+  } from '#lib/season/season-draft-flow.js';
+  import { formatPositions } from '#lib/player-positions.js';
   import { frontOfficeEntryOf } from '@hoop-rush/data-contracts';
-  import { arenaDraftDraw, arenaDraftFinalize, arenaDraftPick, arenaError } from '$lib/arena-sound';
+  import {
+    arenaDraftDraw,
+    arenaDraftFinalize,
+    arenaDraftPick,
+    arenaError,
+  } from '#lib/arena-sound.js';
   let {
     flow,
     catalog,

@@ -6,6 +6,9 @@ export function sharedEslintBase(tsconfigRootDir) {
     {
       files: ['**/*.ts'],
       extends: [tseslint.configs.strictTypeChecked],
+      rules: {
+        '@typescript-eslint/no-meaningless-void-operator': 'off',
+      },
       languageOptions: {
         parserOptions: {
           projectService: {

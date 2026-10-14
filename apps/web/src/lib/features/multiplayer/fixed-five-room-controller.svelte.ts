@@ -11,9 +11,9 @@ import {
   type PlayersIndexEntry,
   type SlotIndex,
 } from '@hoop-rush/data-contracts';
-import { arenaWin } from '$lib/arena-sound';
-import { presentationForVariant } from '$lib/draft-presentation';
-import { newRequestId } from '$lib/ids';
+import { arenaWin } from '#lib/arena-sound.js';
+import { presentationForVariant } from '#lib/draft-presentation.js';
+import { newRequestId } from '#lib/ids.js';
 import {
   friendlyFixedFiveJoinError,
   loadFixedFiveMembership,
@@ -166,6 +166,7 @@ export class FixedFiveRoomController {
       ? deriveEffectivePhase(this.roomSnapshot.phase, this.replay, this.simDone)
       : (this.roomSnapshot?.phase ?? 'lobby'),
   );
+
   display = $derived(
     this.roomSnapshot && this.replay
       ? overlaySnapshotProgress(this.roomSnapshot, this.replay, this.facts)
@@ -306,6 +307,7 @@ export class FixedFiveRoomController {
     if (this.roomSnapshot.phase === 'completed') return true;
     if (this.receiptsUnsupported)
       return this.roomSnapshot.confirmedDigest === this.localResult.digest;
+
     return (
       this.verificationReceipt !== null &&
       this.verificationReceipt.resultDigest === this.localResult.digest &&
@@ -403,8 +405,9 @@ export class FixedFiveRoomController {
     this.error = null;
     try {
       await navigator.clipboard.writeText(
-        new URL(`${resolve('/multiplayer')}?code=${code}`, window.location.origin).href,
+        new URL(`${resolve('multiplayer/')}?code=${code}`, window.location.origin).href,
       );
+
       if (this.disposed) return;
       this.copiedInvite = true;
       this.scheduleCopyReset('invite');
@@ -504,7 +507,7 @@ export class FixedFiveRoomController {
   async leaveRoom(): Promise<void> {
     const ok = await this.session.leaveRoom();
     if (!ok || this.disposed) return;
-    await goto(resolve('/multiplayer'));
+    await goto(resolve('multiplayer/'));
   }
 
   async rematchAction(): Promise<void> {

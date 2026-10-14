@@ -1,8 +1,8 @@
 <script lang="ts">
   import type { HoopRushManifest } from '@hoop-rush/data-contracts';
-  import SeasonPlayerIdentity from '$lib/components/season/SeasonPlayerIdentity.svelte';
-  import SeasonTeamLogo from '$lib/components/season/SeasonTeamLogo.svelte';
-  import type { SeasonFaceRef } from '$lib/season/season-branding';
+  import SeasonPlayerIdentity from '#lib/components/season/SeasonPlayerIdentity.svelte';
+  import SeasonTeamLogo from '#lib/components/season/SeasonTeamLogo.svelte';
+  import type { SeasonFaceRef } from '#lib/season/season-branding.js';
   let {
     playerVersionId,
     displayName,

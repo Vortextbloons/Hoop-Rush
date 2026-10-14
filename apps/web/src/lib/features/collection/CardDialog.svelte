@@ -9,9 +9,9 @@
   import { resolveEraTeamIdentity } from '@hoop-rush/data-contracts';
   import { Dialog } from 'bits-ui';
   import { X } from '@lucide/svelte';
-  import { formatPositions } from '$lib/player-positions';
-  import PlayerFace from '$lib/components/PlayerFace.svelte';
-  import TeamLogo from '$lib/components/TeamLogo.svelte';
+  import { formatPositions } from '#lib/player-positions.js';
+  import PlayerFace from '#lib/components/PlayerFace.svelte';
+  import TeamLogo from '#lib/components/TeamLogo.svelte';
   import CollectionCardFace from './CollectionCardFace.svelte';
   import { collectionCardArtOf } from './collection-card-art.ts';
 

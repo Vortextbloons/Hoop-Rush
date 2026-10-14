@@ -5,10 +5,10 @@
     SeasonFreeAgencyCandidate,
     SeasonFreeAgencyRoleExpectation,
   } from '@hoop-rush/data-contracts';
-  import { formatPositions } from '$lib/player-positions';
-  import type { SeasonFaceRef } from '$lib/season/season-branding';
-  import { initialsOf } from '$lib/season/season-branding';
-  import SeasonPlayerFace from '$lib/components/season/SeasonPlayerFace.svelte';
+  import { formatPositions } from '#lib/player-positions.js';
+  import type { SeasonFaceRef } from '#lib/season/season-branding.js';
+  import { initialsOf } from '#lib/season/season-branding.js';
+  import SeasonPlayerFace from '#lib/components/season/SeasonPlayerFace.svelte';
   import type { CandidateFitFacts, InterestedTeam } from './free-agency-view';
   import {
     FREE_AGENCY_BAND_BLURB,

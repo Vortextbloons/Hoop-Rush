@@ -3,20 +3,20 @@
   import { page } from '$app/state';
   import { resolve } from '$app/paths';
   import type { RouteId } from '$app/types';
-  import TeamDetailView from '$lib/components/season/TeamDetailView.svelte';
+  import TeamDetailView from '#lib/components/season/TeamDetailView.svelte';
   import {
     SEASON_RUN_SHELL_CONTEXT,
     type SeasonRunShellData,
-  } from '$lib/season/season-shell-context';
-  import { seasonTeamDetail } from '$lib/season/season-team-detail-view';
-  import { homeRuleOf } from '$lib/season/season-evolution-view';
-  import { candidateOf } from '$lib/season/season-catalog-index';
-  import { boostedOverallForPlayer } from '$lib/season/sponsor-gear-view';
+  } from '#lib/season/season-shell-context.js';
+  import { seasonTeamDetail } from '#lib/season/season-team-detail-view.js';
+  import { homeRuleOf } from '#lib/season/season-evolution-view.js';
+  import { candidateOf } from '#lib/season/season-catalog-index.js';
+  import { boostedOverallForPlayer } from '#lib/season/sponsor-gear-view.js';
   import {
     overallRatingOfSlice,
     playablePositionsOfSlice,
     summaryRatingsOfSlice,
-  } from '$lib/season/season-player-slice';
+  } from '#lib/season/season-player-slice.js';
   const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
   const franchiseId = $derived(page.url.searchParams.get('franchiseId') ?? '');
   const detail = $derived.by(() => {
@@ -40,6 +40,7 @@
         const base = overallRatingOfSlice(slice, playerVersionId);
         const candidate = candidateOf(shell.catalog, playerVersionId);
         if (candidate === null) return base;
+
         return (
           boostedOverallForPlayer(run, playerVersionId, {
             overall: candidate.summaryRatings.overallRating,
@@ -68,7 +69,7 @@
 >
   <div class="sr-arrive flex min-w-0 items-center justify-between gap-3">
     <a
-      href={resolve('/season/run/league')}
+      href={resolve('season/run/league/')}
       data-season-team-detail-back
       class="font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground outline-none transition-colors hover:text-foreground motion-reduce:transition-none"
     >
@@ -94,7 +95,8 @@
             ? 'No active Season Run is loaded.'
             : `${shell.franchiseName(franchiseId)} is not part of this run.`}
         </p>
-        <a href={resolve('/season/run/league')} class="sr-btn-ghost mt-4"> Back to League </a>
+
+        <a href={resolve('season/run/league/')} class="sr-btn-ghost mt-4">Back to League</a>
       </div>
     </section>
   {:else}

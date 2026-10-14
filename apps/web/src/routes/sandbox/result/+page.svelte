@@ -2,12 +2,12 @@
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import type { ChallengeRun, PeakPlayerSeason, Seed } from '@hoop-rush/data-contracts';
-  import type { SandboxHref } from '$lib/sandbox-url';
-  import { lineupPlayersFromRun } from '$lib/features/challenge/sandbox-lineup';
-  import { startSandboxRun } from '$lib/features/challenge/start-challenge-run';
-  import { leaguePrecompute } from '$lib/features/challenge/league-precompute';
-  import { buildSandboxHref, generateSeed } from '$lib/sandbox-url';
-  import ResultPage from '$lib/features/challenge/challenge-result.svelte';
+  import type { SandboxHref } from '#lib/sandbox-url.js';
+  import { lineupPlayersFromRun } from '#lib/features/challenge/sandbox-lineup.js';
+  import { startSandboxRun } from '#lib/features/challenge/start-challenge-run.js';
+  import { leaguePrecompute } from '#lib/features/challenge/league-precompute.js';
+  import { buildSandboxHref, generateSeed } from '#lib/sandbox-url.js';
+  import ResultPage from '#lib/features/challenge/challenge-result.svelte';
   let retrySeed = $state<Seed | null>(null);
   $effect(() => {
     if (retrySeed !== null) return;
@@ -16,7 +16,7 @@
     leaguePrecompute.prime(seed);
   });
   async function runAgain() {
-    void goto(resolve('/sandbox'));
+    void goto(resolve('sandbox/'));
   }
   async function retrySameTeam(
     currentRun: ChallengeRun,

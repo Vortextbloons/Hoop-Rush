@@ -1,16 +1,16 @@
-﻿<script lang="ts">
-  import { browser } from '$app/environment';
+<script lang="ts">
+  import { browser } from '$app/env';
   import { asset, resolve } from '$app/paths';
   import type { RouteId } from '$app/types';
   import type { ClassicDraftState, HoopRushManifest } from '@hoop-rush/data-contracts';
   import type { SeasonActiveRunIndex } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
-  import { getManifest, warmPlayersIndex } from '$lib/data';
-  import SeasonTierBadge from '$lib/components/SeasonTierBadge.svelte';
-  import { variantLabel } from '$lib/draft-presentation';
+  import { getManifest, warmPlayersIndex } from '#lib/data.js';
+  import SeasonTierBadge from '#lib/components/SeasonTierBadge.svelte';
+  import { variantLabel } from '#lib/draft-presentation.js';
   import type { ActiveRunCheckpoint, CompletedRunIndex } from '@hoop-rush/persistence';
-  const sandboxHref = resolve('/sandbox');
-  const historyHref = resolve('/sandbox/history');
+  const sandboxHref = resolve('sandbox/');
+  const historyHref = resolve('sandbox/history/');
   const road = Array.from({ length: 82 }, (_, i) => i);
   const modes = [
     {
@@ -88,7 +88,7 @@
     );
     deferIdle(() => {
       if (cancelled) return;
-      import('$lib/features/challenge/challenge-repo')
+      import('#lib/features/challenge/challenge-repo.js')
         .then(({ challengeRepository }) =>
           Promise.all([
             challengeRepository.loadActiveRunCheckpoint(),
@@ -105,7 +105,7 @@
           },
           () => {},
         );
-      import('$lib/season/season-repo')
+      import('#lib/season/season-repo.js')
         .then(({ getSeasonRunRepository }) => getSeasonRunRepository())
         .then((repo) => repo.loadActiveRunIndex())
         .then((index) => {
@@ -157,8 +157,8 @@
     {#if active && active.status === 'active'}
       <a
         href={active.mode === 'classic'
-          ? resolve('/classic/challenge')
-          : resolve('/sandbox/challenge')}
+          ? resolve('classic/challenge/')
+          : resolve('sandbox/challenge/')}
         class="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-6 py-3 font-semibold transition-colors hover:border-line-strong"
       >
         Continue · Game {(active.gamesPlayed ?? 0) + 1} · {active.aggregates.team.wins}–{active
@@ -166,7 +166,7 @@
       </a>
     {:else if classicDraft && classicDraft.status === 'drafting'}
       <a
-        href={resolve('/classic')}
+        href={resolve('classic/')}
         class="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-6 py-3 font-semibold transition-colors hover:border-line-strong"
       >
         Continue draft · R{classicDraft.round}/5
@@ -174,7 +174,7 @@
     {/if}
     {#if seasonRun}
       <a
-        href={resolve('/season/run')}
+        href={resolve('season/run/')}
         class="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-6 py-3 font-semibold transition-colors hover:border-line-strong"
       >
         Continue season · {seasonRun.humanWins}–{seasonRun.humanLosses}
@@ -197,7 +197,7 @@
         >
           {#if mode.href === '/ultimate/run'}
             <img
-              src={asset('/ultimate/logo.png')}
+              src={asset('ultimate/logo.png')}
               alt=""
               aria-hidden="true"
               class="h-10 w-10 rounded-lg"
@@ -217,7 +217,7 @@
             <span
               aria-hidden="true"
               class="transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none"
-              >&rarr;</span
+              >→</span
             >
           </span>
         </a>
@@ -260,8 +260,8 @@
           <li>
             <a
               href={row.mode === 'classic'
-                ? resolve(`/classic/result?runId=${encodeURIComponent(row.runId)}`)
-                : resolve(`/sandbox/result?runId=${encodeURIComponent(row.runId)}`)}
+                ? resolve(`classic/result/?runId=${encodeURIComponent(row.runId)}`)
+                : resolve(`sandbox/result/?runId=${encodeURIComponent(row.runId)}`)}
               class="scoreboard-panel flex flex-wrap items-center gap-x-4 gap-y-2 p-4 transition-colors hover:bg-surface-2"
             >
               <span class="min-w-0 flex-1">

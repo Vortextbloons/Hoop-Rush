@@ -37,7 +37,6 @@ export function havocOpponentTeamOf(result: HavocGameResult): HavocTeamResult {
   return result.humanSide === 'home' ? result.away : result.home;
 }
 
-/** Documented production index: 10*points + 12*rebounds + 15*assists + 30*steals + 30*blocks - 10*turnovers. */
 export function havocProductionIndex(line: HavocStatLine): number {
   return (
     MVP_WEIGHTS.points * line.points +
@@ -49,7 +48,6 @@ export function havocProductionIndex(line: HavocStatLine): number {
   );
 }
 
-/** Season totals from the human perspective; scores may be negative. */
 export function havocSeasonTotalsOf(games: readonly HavocStoredGame[]): HavocSeasonTotals {
   let wins = 0;
   let losses = 0;

@@ -3,7 +3,7 @@ import {
   draftDuelRoomMembershipSchema,
   type DraftDuelRoomMembership,
 } from '@hoop-rush/data-contracts';
-import { createMembershipStore } from '$lib/multiplayer-membership';
+import { createMembershipStore } from '#lib/multiplayer-membership.js';
 
 export function inviteLinkForDraftDuelCode(code: string): string {
   const parsed = draftDuelRoomCodeSchema.parse(code);

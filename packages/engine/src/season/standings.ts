@@ -1,6 +1,6 @@
 import {
   SEASON_STANDINGS_VERSION,
-  franchiseIdSchema,
+  createEmptyStandings,
   type FranchiseId,
   type SeasonGame,
   type SeasonLeague,
@@ -122,32 +122,9 @@ export function reduceSeasonStandings(
   games: readonly SeasonGame[],
 ): SeasonStandings {
   const teams = new Map(league.teams.map((team) => [team.franchiseId, team]));
-  const franchiseIds = league.teams.map((team) => team.franchiseId);
-  function emptyRow(franchiseId: string): SeasonStandingsRow {
-    return {
-      franchiseId: franchiseIdSchema.parse(franchiseId),
-      wins: 0,
-      losses: 0,
-      gamesPlayed: 0,
-      homeWins: 0,
-      homeLosses: 0,
-      awayWins: 0,
-      awayLosses: 0,
-      conferenceWins: 0,
-      conferenceLosses: 0,
-      divisionWins: 0,
-      divisionLosses: 0,
-      pointsFor: 0,
-      pointsAgainst: 0,
-      headToHead: franchiseIds
-        .filter((other) => other !== franchiseId)
-        .map((other) => ({ franchiseId: other, wins: 0, losses: 0 })),
-    };
-  }
-  const rows = new Map<string, SeasonStandingsRow>();
-  for (const franchiseId of franchiseIds) {
-    rows.set(franchiseId, emptyRow(franchiseId));
-  }
+  const rows = new Map<string, SeasonStandingsRow>(
+    createEmptyStandings(league).rows.map((row) => [row.franchiseId, row]),
+  );
   for (const game of games) {
     if (game.status === 'scheduled') continue;
     const home = teams.get(game.homeFranchiseId);

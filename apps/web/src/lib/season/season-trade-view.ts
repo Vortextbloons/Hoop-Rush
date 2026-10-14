@@ -5,8 +5,8 @@ import type {
   SeasonTradeState,
   SeasonTradeWindowState,
 } from '@hoop-rush/data-contracts';
-import { formatPositions } from '$lib/player-positions';
-import { candidateOf } from '$lib/season/season-catalog-index';
+import { formatPositions } from '#lib/player-positions.js';
+import { candidateOf } from '#lib/season/season-catalog-index.js';
 export interface TradePlayerViewModel {
   playerVersionId: string;
   displayName: string;

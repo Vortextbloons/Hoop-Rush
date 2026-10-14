@@ -1,14 +1,14 @@
 <script lang="ts">
   import type { HoopRushManifest } from '@hoop-rush/data-contracts';
-  import SeasonPlayerFace from '$lib/components/season/SeasonPlayerFace.svelte';
-  import { eraIdentityOf, type SeasonFaceRef } from '$lib/season/season-branding';
+  import SeasonPlayerFace from '#lib/components/season/SeasonPlayerFace.svelte';
+  import { eraIdentityOf, type SeasonFaceRef } from '#lib/season/season-branding.js';
   import type {
     SeasonPlayerStatsMeasure,
     SeasonPlayerStatsRow,
     SeasonPlayerStatsSortKey,
-  } from '$lib/season/season-player-stats-view';
-  import { formatPositions } from '$lib/player-positions';
-  import { oneDecimal, percentOneDecimal } from '$lib/format';
+  } from '#lib/season/season-player-stats-view.js';
+  import { formatPositions } from '#lib/player-positions.js';
+  import { oneDecimal, percentOneDecimal } from '#lib/format.js';
   let {
     rows,
     measure,

@@ -1,5 +1,6 @@
 import { resolve } from 'node:path';
 import { z } from 'zod';
+import { seedWindowSchema } from '../seed-window.ts';
 import {
   SEASON_EFFECT_TARGETS_LEGACY_VERSION,
   SEASON_EFFECT_TARGETS_VERSION,
@@ -88,14 +89,8 @@ export const seasonEffectTargetsSchema = z.object({
     assistRateDeltaMax: z.number().min(0).max(0.5),
   }),
   chemistrySeparationBp: z.number().int().nonnegative(),
-  cohort: z.object({
-    seedFrom: z.number().int().nonnegative(),
-    seedTo: z.number().int().nonnegative(),
-  }),
-  heldOut: z.object({
-    seedFrom: z.number().int().nonnegative(),
-    seedTo: z.number().int().nonnegative(),
-  }),
+  cohort: seedWindowSchema,
+  heldOut: seedWindowSchema,
   measured: z.object({
     calibration: z.object({
       scoringDeltaMedian: z.number(),
@@ -513,7 +508,7 @@ export function seasonEffectsSensitivity(
   });
   const details = rows.map(
     (row) =>
-      `fatigue ${String(row.fatigueBp).padStart(5)}bp · shooter ${String(row.shooterDelta)} · handler ${String(row.handlerDelta)} · defense ${String(row.defenseDelta)} · security ${String(row.securityDelta)} · assist ${String(row.assistDelta)} · help ${String(row.helpDelta)} (millionths)`,
+      `fatigue ${String(row.fatigueBp).padStart(5)}bp Â· shooter ${String(row.shooterDelta)} Â· handler ${String(row.handlerDelta)} Â· defense ${String(row.defenseDelta)} Â· security ${String(row.securityDelta)} Â· assist ${String(row.assistDelta)} Â· help ${String(row.helpDelta)} (millionths)`,
   );
   return makeReport('season effects sensitivity', { fixture: fixtureId }, { details, payload });
 }
@@ -570,9 +565,9 @@ export async function seasonEffectsDistribution(
   });
   const details = [
     `${String(facts.length)} games (${String(completed.length)} completed) in ${String(Date.now() - started)}ms`,
-    `scoring delta median ${payload.scoringDeltaMedian.toFixed(3)}% (gate ±${String(SEASON_EFFECTS_SCORING_ENVELOPE * 100)}%)`,
-    `turnover delta median ${payload.turnoverDeltaMedian.toFixed(3)}% (gate ±${String(SEASON_EFFECTS_TURNOVER_ENVELOPE * 100)}%)`,
-    `assist delta median ${payload.assistDeltaMedian.toFixed(3)}% (gate ±${String(SEASON_EFFECTS_ASSIST_ENVELOPE * 100)}%)`,
+    `scoring delta median ${payload.scoringDeltaMedian.toFixed(3)}% (gate Â±${String(SEASON_EFFECTS_SCORING_ENVELOPE * 100)}%)`,
+    `turnover delta median ${payload.turnoverDeltaMedian.toFixed(3)}% (gate Â±${String(SEASON_EFFECTS_TURNOVER_ENVELOPE * 100)}%)`,
+    `assist delta median ${payload.assistDeltaMedian.toFixed(3)}% (gate Â±${String(SEASON_EFFECTS_ASSIST_ENVELOPE * 100)}%)`,
   ];
   const failuresList: string[] = [];
   if (failures.length > 0)
@@ -638,7 +633,7 @@ export function seasonEffectsRoles(
   });
   const details = rows.map(
     (row) =>
-      `${row.fixtureId}: starter median ${String(row.starterMedianFatigue)}bp · bench median ${String(row.benchMedianFatigue)}bp`,
+      `${row.fixtureId}: starter median ${String(row.starterMedianFatigue)}bp Â· bench median ${String(row.benchMedianFatigue)}bp`,
   );
   const failuresList: string[] = [];
   if (!starterOrdering)
@@ -886,11 +881,11 @@ export async function seasonEffectsCalibrate(
     durationMs: Date.now() - started,
   });
   const details = [
-    `calibration ${String(calibration.games)} games · held-out ${String(heldOut.games)} games (${String(workers)} workers)`,
-    `scoring delta ${calibration.scoringMedian.toFixed(3)}% · turnover ${calibration.turnoverMedian.toFixed(3)}% · assist ${calibration.assistMedian.toFixed(3)}%`,
-    `held-out envelope share ${(heldOutWithinEnvelopeShare * 100).toFixed(1)}% (gate ≥ ${String(SEASON_EFFECTS_HELD_OUT_PASS_SHARE * 100)}%)`,
-    `rotation ordering ${rolesPayload.starterOrderingPass ? 'pass' : 'fail'} · bench ${rolesPayload.benchOrderingPass ? 'pass' : 'fail'}`,
-    `chemistry separation ${String(chemistry.separationBp)}bp (gate ≥ ${String(SEASON_EFFECTS_CHEMISTRY_SEPARATION_BP)}bp)`,
+    `calibration ${String(calibration.games)} games Â· held-out ${String(heldOut.games)} games (${String(workers)} workers)`,
+    `scoring delta ${calibration.scoringMedian.toFixed(3)}% Â· turnover ${calibration.turnoverMedian.toFixed(3)}% Â· assist ${calibration.assistMedian.toFixed(3)}%`,
+    `held-out envelope share ${(heldOutWithinEnvelopeShare * 100).toFixed(1)}% (gate â‰¥ ${String(SEASON_EFFECTS_HELD_OUT_PASS_SHARE * 100)}%)`,
+    `rotation ordering ${rolesPayload.starterOrderingPass ? 'pass' : 'fail'} Â· bench ${rolesPayload.benchOrderingPass ? 'pass' : 'fail'}`,
+    `chemistry separation ${String(chemistry.separationBp)}bp (gate â‰¥ ${String(SEASON_EFFECTS_CHEMISTRY_SEPARATION_BP)}bp)`,
     targetsDetail({ targetsWritten, targetsPath }),
   ];
   if (!zeroFailures) gateFailures.push('accounting/invariant failures in the cohort');

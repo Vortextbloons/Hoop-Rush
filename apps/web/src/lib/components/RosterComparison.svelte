@@ -1,9 +1,9 @@
 <script lang="ts">
   import type { HoopRushManifest } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation, resolveEraTeamIdentity } from '@hoop-rush/data-contracts';
-  import type { RosterDetailRow } from '$lib/roster-browser';
-  import { formatPositions } from '$lib/player-positions';
-  import { oneDecimal, percentOneDecimal } from '$lib/format';
+  import type { RosterDetailRow } from '#lib/roster-browser.js';
+  import { formatPositions } from '#lib/player-positions.js';
+  import { oneDecimal, percentOneDecimal } from '#lib/format.js';
   import { X } from '@lucide/svelte';
   import { Dialog } from 'bits-ui';
   import PlayerFace from './PlayerFace.svelte';

@@ -4,7 +4,7 @@ import type {
   HoopRushManifest,
 } from '@hoop-rush/data-contracts';
 import type { LoadedCollection } from '@hoop-rush/persistence';
-import { getManifest } from '$lib/data';
+import { getManifest } from '#lib/data.js';
 import { getCollectionRepo, ensureCollection } from './collection-hub.ts';
 import { loadCollectionCatalog } from './collection-assets.ts';
 

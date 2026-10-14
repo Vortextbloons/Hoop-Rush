@@ -279,12 +279,6 @@ class SideState {
     this.checkpointIndex = 0;
   }
 }
-// Participant-ID-neutral rotation controller shared by Season Run and
-// Collection games. Roster IDs are opaque strings throughout: Season Run
-// passes player-version IDs, Collection games pass exact card IDs. Season
-// behavior is pinned by the season-game fixtures; collection-only extensions
-// (foul-limit exception, trip snapshots) stay behind hooks that default to
-// off/absent.
 class RotationGameController {
   private readonly input: SeasonGameSimulationInput;
   private readonly context: EngineContext;

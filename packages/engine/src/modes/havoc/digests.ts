@@ -12,10 +12,6 @@ import {
   seasonDigestHex,
 } from '@hoop-rush/data-contracts';
 
-/**
- * Digest prefixes are part of the frozen digest discipline: a value written by
- * one prefix must never collide with another. Version them with the rules.
- */
 export const HAVOC_INPUT_DIGEST_PREFIX = 'havoc-input-v1:';
 export const HAVOC_RESULT_DIGEST_PREFIX = 'havoc-result-v1:';
 export const HAVOC_TAPE_DIGEST_PREFIX = 'havoc-tape-v1:';

@@ -7,10 +7,10 @@
     GamecastPlayer,
     GamecastRecordedGame,
   } from './gamecast-types';
-  import PlayerFace from '$lib/components/PlayerFace.svelte';
-  import GameScoreboard from '$lib/components/GameScoreboard.svelte';
-  import TeamLogo from '$lib/components/TeamLogo.svelte';
-  import { SLOT_LABELS } from '$lib/player-positions';
+  import PlayerFace from '#lib/components/PlayerFace.svelte';
+  import GameScoreboard from '#lib/components/GameScoreboard.svelte';
+  import TeamLogo from '#lib/components/TeamLogo.svelte';
+  import { SLOT_LABELS } from '#lib/player-positions.js';
   import { gamecastPeriodLabel, type GamecastFeedLine } from './gamecast-broadcast-view';
 
   let {

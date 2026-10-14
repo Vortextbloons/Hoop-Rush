@@ -1,5 +1,6 @@
 import { resolve } from 'node:path';
 import { z } from 'zod';
+import { seedWindowSchema } from '../seed-window.ts';
 import {
   SEASON_COURT_INNOVATION_VERSION,
   SEASON_EVOLUTION_TARGETS_VERSION,
@@ -43,14 +44,8 @@ export const seasonEvolutionTargetsSchema = z.object({
   targetsVersion: z.literal(SEASON_EVOLUTION_TARGETS_VERSION),
   frontOfficeVersion: z.literal(SEASON_FRONT_OFFICE_VERSION),
   courtInnovationVersion: z.literal(SEASON_COURT_INNOVATION_VERSION),
-  cohort: z.object({
-    seedFrom: z.number().int().nonnegative(),
-    seedTo: z.number().int().nonnegative(),
-  }),
-  heldOut: z.object({
-    seedFrom: z.number().int().nonnegative(),
-    seedTo: z.number().int().nonnegative(),
-  }),
+  cohort: seedWindowSchema,
+  heldOut: seedWindowSchema,
   measured: z.object({
     gamesPerRule: z.record(z.string(), z.number().int().nonnegative()),
     accountingViolations: z.number().int().nonnegative(),

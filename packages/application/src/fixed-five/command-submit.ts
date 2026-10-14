@@ -36,7 +36,7 @@ export interface SubmitFixedFiveCommandInput {
   actorParticipantId: FixedFiveParticipantId;
   payload: FixedFiveCommandPayload;
   expectedRevision?: number;
-  resync: () => Promise<void>;
+  resync: () => Promise<number | undefined>;
   retry?: boolean;
   retryAfterResync?: () => boolean;
 }
@@ -59,6 +59,7 @@ export async function submitFixedFiveCommand(
   };
   const policy =
     input.retry === false ? FIXED_FIVE_SINGLE_ATTEMPT_POLICY : FIXED_FIVE_COMMAND_POLICY;
+  let resyncedRevision: number | undefined;
   const report = await runSubmission(policy, command, {
     submit: (current) => input.submitCommand(current),
     classify: (receipt) =>
@@ -69,8 +70,14 @@ export async function submitFixedFiveCommand(
           : 'rejected',
     canRetry: () =>
       STALE_RETRY_SAFE_KINDS.has(input.payload.kind) || input.retryAfterResync?.() === true,
-    revise: (current, receipt) => ({ ...current, expectedRevision: receipt.revision }),
-    resync: input.resync,
+    revise: (current, receipt) => ({
+      ...current,
+      expectedRevision: Math.max(resyncedRevision ?? receipt.revision, receipt.revision),
+    }),
+    resync: async () => {
+      const fresh = await input.resync();
+      if (typeof fresh === 'number') resyncedRevision = fresh;
+    },
   });
   if (report.receipt === null) throw report.error;
   return { receipt: report.receipt, retried: report.retried };

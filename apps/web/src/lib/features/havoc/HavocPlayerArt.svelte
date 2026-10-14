@@ -1,10 +1,10 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import type { HoopRushManifest, PlayersIndex } from '@hoop-rush/data-contracts';
-  import { getManifest, getPlayersIndex } from '$lib/data';
-  import PlayerFace from '$lib/components/PlayerFace.svelte';
-  import TeamLogo from '$lib/components/TeamLogo.svelte';
-  import { initialsOf } from '$lib/season/season-branding';
+  import { getManifest, getPlayersIndex } from '#lib/data.js';
+  import PlayerFace from '#lib/components/PlayerFace.svelte';
+  import TeamLogo from '#lib/components/TeamLogo.svelte';
+  import { initialsOf } from '#lib/season/season-branding.js';
 
   let {
     playerId,

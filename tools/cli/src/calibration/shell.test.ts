@@ -147,7 +147,6 @@ describe('calibration shell', () => {
   it('reports a commit error before the gate epilogue', async () => {
     await withTmpDir((tmp) => {
       const broken = options(tmp, {});
-      // Point the artifact at a path that cannot be written (a directory).
       broken.artifact = { ...broken.artifact, outPath: tmp };
       const report = runCalibrationShell(broken);
       expect(report.ok).toBe(false);

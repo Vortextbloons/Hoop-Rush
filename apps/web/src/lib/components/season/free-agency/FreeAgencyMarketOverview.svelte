@@ -4,7 +4,7 @@
     SeasonFreeAgencyCandidate,
     SeasonFreeAgencyRoleExpectation,
   } from '@hoop-rush/data-contracts';
-  import type { SeasonFaceRef } from '$lib/season/season-branding';
+  import type { SeasonFaceRef } from '#lib/season/season-branding.js';
   import FreeAgencyCandidateCard from './FreeAgencyCandidateCard.svelte';
   import type { CandidateFitFacts, InterestedTeam } from './free-agency-view';
   export interface FreeAgencyCardView {

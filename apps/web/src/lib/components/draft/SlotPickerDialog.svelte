@@ -3,22 +3,22 @@
   import type { LineupRepositionMove, LineupRepositionPlan } from '@hoop-rush/engine';
   import { ArrowRight, Check, Lock, Plus } from '@lucide/svelte';
   import { Dialog } from 'bits-ui';
-  import DialogShell from '$lib/components/DialogShell.svelte';
-  import PositionOptionRow from '$lib/components/PositionOptionRow.svelte';
+  import DialogShell from '#lib/components/DialogShell.svelte';
+  import PositionOptionRow from '#lib/components/PositionOptionRow.svelte';
   import {
     ratingBadges,
     type DraftPresentation,
     type RatingBadgeLabel,
-  } from '$lib/draft-presentation';
+  } from '#lib/draft-presentation.js';
   import {
     SLOT_INDEXES,
     SLOT_LABELS,
     SLOT_NAMES,
     canFillSlot,
     planPlayerMove,
-  } from '$lib/draft-slots';
-  import { formatPositions } from '$lib/player-positions';
-  import PlayerFace from '$lib/components/PlayerFace.svelte';
+  } from '#lib/draft-slots.js';
+  import { formatPositions } from '#lib/player-positions.js';
+  import PlayerFace from '#lib/components/PlayerFace.svelte';
   type IndexRow = PlayersIndexEntry;
   const BADGE_TITLES: Record<RatingBadgeLabel, string> = {
     O: 'Overall',

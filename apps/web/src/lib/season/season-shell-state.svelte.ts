@@ -24,7 +24,7 @@ import {
   type SeasonSessionOptions,
   type SeasonTradeReceipt,
 } from '@hoop-rush/application/season';
-import { getManifest, getPlayersIndex } from '$lib/data';
+import { getManifest, getPlayersIndex } from '#lib/data.js';
 import { catalogCandidateMap } from './season-catalog-index';
 import {
   buildVersionFaceIndex,

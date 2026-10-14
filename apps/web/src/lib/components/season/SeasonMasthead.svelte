@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { HoopRushManifest } from '@hoop-rush/data-contracts';
-  import { franchiseIdentityOf } from '$lib/season/season-branding';
-  import SeasonTeamLogo from '$lib/components/season/SeasonTeamLogo.svelte';
+  import { franchiseIdentityOf } from '#lib/season/season-branding.js';
+  import SeasonTeamLogo from '#lib/components/season/SeasonTeamLogo.svelte';
   let {
     manifest,
     franchiseId,

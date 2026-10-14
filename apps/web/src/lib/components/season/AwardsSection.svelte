@@ -6,13 +6,13 @@
     SeasonRosterEntry,
   } from '@hoop-rush/data-contracts';
   import { Info, ShieldCheck, Trophy, Zap } from '@lucide/svelte';
-  import { awardsViewModel } from '$lib/season/season-postseason-presentation';
+  import { awardsViewModel } from '#lib/season/season-postseason-presentation.js';
   import {
     eraIdentityOf,
     franchiseIdentityOf,
     type SeasonFaceRef,
-  } from '$lib/season/season-branding';
-  import { awardStatLine, honorsLineOf } from '$lib/season/season-honors-view';
+  } from '#lib/season/season-branding.js';
+  import { awardStatLine, honorsLineOf } from '#lib/season/season-honors-view.js';
   import SeasonPlayerFace from './SeasonPlayerFace.svelte';
   import SeasonTeamLogo from './SeasonTeamLogo.svelte';
   let {

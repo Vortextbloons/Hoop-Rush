@@ -10,7 +10,7 @@
     HoopRushManifest,
   } from '@hoop-rush/data-contracts';
   import { franchiseIdSchema } from '@hoop-rush/data-contracts';
-  import type { SeasonFaceRef } from '$lib/season/season-branding';
+  import type { SeasonFaceRef } from '#lib/season/season-branding.js';
   import {
     formatTradeNeeds,
     formatTradePriority,
@@ -18,13 +18,13 @@
     inquiryCounterLabel,
     tradeTalksLabel,
     type TradeWorkspaceStep,
-  } from '$lib/season/season-presentation';
+  } from '#lib/season/season-presentation.js';
   import PackageBuilder from './PackageBuilder.svelte';
   import NegotiationTranscript from './NegotiationTranscript.svelte';
   import SeasonTeamLogo from './SeasonTeamLogo.svelte';
-  import { franchiseIdentityOf } from '$lib/season/season-branding';
-  import { franchiseColor } from '$lib/season/franchise-colors';
-  import { inquiryAllowanceView } from '$lib/season/season-evolution-view';
+  import { franchiseIdentityOf } from '#lib/season/season-branding.js';
+  import { franchiseColor } from '#lib/season/franchise-colors.js';
+  import { inquiryAllowanceView } from '#lib/season/season-evolution-view.js';
 
   let {
     run,

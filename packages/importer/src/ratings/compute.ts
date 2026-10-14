@@ -164,8 +164,6 @@ export function resolveTeamWinPct(
   standingsWinPct: number | null,
   fallbackWinPct: number | null,
 ): number | null {
-  // Real per-player win% first, then real standings, then the BPM estimate.
-  // Standings are the only team context available before 1996-97.
   return playerWinPct ?? standingsWinPct ?? fallbackWinPct;
 }
 export function loadStandingsMap(outDir: string): Map<string, number> {

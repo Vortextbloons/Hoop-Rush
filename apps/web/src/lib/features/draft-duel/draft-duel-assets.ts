@@ -9,9 +9,9 @@ import {
   type DraftDuelCatalog,
   type EngineContext,
 } from '@hoop-rush/engine';
-import { getManifest } from '$lib/data';
-import { loadCollectionCatalog } from '$lib/features/collection/collection-assets';
-import { loadCollectionProfile } from '$lib/features/collection/collection-hub';
+import { getManifest } from '#lib/data.js';
+import { loadCollectionCatalog } from '#lib/features/collection/collection-assets.js';
+import { loadCollectionProfile } from '#lib/features/collection/collection-hub.js';
 
 export interface DraftDuelAssets {
   catalog: DraftDuelCatalog;

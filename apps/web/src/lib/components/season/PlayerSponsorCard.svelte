@@ -2,10 +2,10 @@
   import { resolve } from '$app/paths';
   import { Dialog } from 'bits-ui';
   import { X } from '@lucide/svelte';
-  import SponsorMark from '$lib/components/season/SponsorMark.svelte';
-  import SeasonPlayerFace from '$lib/components/season/SeasonPlayerFace.svelte';
-  import { formatPositions } from '$lib/player-positions';
-  import { eraIdentityOf, type SeasonFaceRef } from '$lib/season/season-branding';
+  import SponsorMark from '#lib/components/season/SponsorMark.svelte';
+  import SeasonPlayerFace from '#lib/components/season/SeasonPlayerFace.svelte';
+  import { formatPositions } from '#lib/player-positions.js';
+  import { eraIdentityOf, type SeasonFaceRef } from '#lib/season/season-branding.js';
   import {
     SPONSOR_RATING_GROUPS,
     SPONSOR_RATING_LONG_LABELS,
@@ -17,7 +17,7 @@
     previewGearDeltas,
     type PlayerSponsorCardModel,
     type SponsorVaultEntry,
-  } from '$lib/season/sponsor-gear-view';
+  } from '#lib/season/sponsor-gear-view.js';
   import type { HoopRushManifest, SeasonSponsorSlot } from '@hoop-rush/data-contracts';
   const SLOT_ORDER: SeasonSponsorSlot[] = ['shoe', 'apparel', 'fuel'];
   const TIER_CHIP: Record<string, string> = {

@@ -7,15 +7,15 @@
     SeasonLeaderCategory,
     SeasonRosterEntry,
   } from '@hoop-rush/data-contracts';
-  import AwardsSection from '$lib/components/season/AwardsSection.svelte';
-  import LeadersTable from '$lib/components/season/LeadersTable.svelte';
+  import AwardsSection from '#lib/components/season/AwardsSection.svelte';
+  import LeadersTable from '#lib/components/season/LeadersTable.svelte';
   import {
     SEASON_RUN_SHELL_CONTEXT,
     type SeasonRunShellData,
-  } from '$lib/season/season-shell-context';
-  import { foldSeasonAggregates, LEADER_CATEGORY_LABELS } from '$lib/season/season-presentation';
-  import { engineOrderLeaderTables, LEADER_CATEGORIES } from '$lib/season/season-leaders-view';
-  import { oneDecimal } from '$lib/format';
+  } from '#lib/season/season-shell-context.js';
+  import { foldSeasonAggregates, LEADER_CATEGORY_LABELS } from '#lib/season/season-presentation.js';
+  import { engineOrderLeaderTables, LEADER_CATEGORIES } from '#lib/season/season-leaders-view.js';
+  import { oneDecimal } from '#lib/format.js';
   const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
   let activeCategory = $state<SeasonLeaderCategory>('points');
   const foldWeak = new WeakMap<
@@ -106,9 +106,6 @@
       <div class="min-w-0 max-w-3xl lg:max-w-none">
         <p class="sr-eyebrow">Season Run · League Honors</p>
         <h1 id="leaders-heading" class="sr-page-title mt-1">League Honors</h1>
-        <p class="mt-2 max-w-2xl text-[15px] leading-relaxed text-muted-foreground lg:max-w-3xl">
-          Every award and category champion from the regular season.
-        </p>
       </div>
       <div
         role="group"
@@ -202,8 +199,10 @@
               The regular season, decided — take it into the postseason.
             </p>
           </div>
-          <a href={resolve('/season/run/postseason')} class="sr-btn">
+
+          <a href={resolve('season/run/postseason/')} class="sr-btn">
             {seasonComplete ? 'View champion & Finals awards' : 'View playoff bracket'}
+
             <ArrowRight class="h-4 w-4" aria-hidden="true" />
           </a>
         </div>

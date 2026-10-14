@@ -1,10 +1,5 @@
 import { canonicalJson } from '@hoop-rush/data-contracts';
 
-// Shared canonicalization primitives for season digests and checkpoints.
-// All helpers preserve insertion-independent ordering: object keys are handled
-// by canonicalJson, array order is normalized here. Do not change comparators
-// without bumping the corresponding digest version.
-
 export function compareStrings(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
 }

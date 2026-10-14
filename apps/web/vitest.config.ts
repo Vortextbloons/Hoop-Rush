@@ -22,8 +22,6 @@ export default defineConfig({
     css: false,
     passWithNoTests: true,
     isolate: false,
-    experimental: {
-      fsModuleCache: true,
-    },
+    fsModuleCache: true,
   },
 });

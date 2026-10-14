@@ -16,6 +16,9 @@ export default tseslint.config(
       },
     },
     rules: {
+      // Same rationale as eslint.base.config.js: the `void x;` unused marker
+      // idiom is used throughout the codebase.
+      '@typescript-eslint/no-meaningless-void-operator': 'off',
       '@typescript-eslint/no-misused-promises': ['error', { checksVoidReturn: false }],
     },
   },

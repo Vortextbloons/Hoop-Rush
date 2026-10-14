@@ -5,7 +5,7 @@ import {
   type CollectionPlayState,
 } from '@hoop-rush/data-contracts';
 import type { CollectionGameCommandInput, CollectionGameCommandResult } from '@hoop-rush/engine';
-import { newRequestId } from '$lib/ids';
+import { newRequestId } from '#lib/ids.js';
 import type { CollectionGameWorkerAssets } from './collection-hub';
 import { runCollectionWorker } from './collection-worker-runner.ts';
 

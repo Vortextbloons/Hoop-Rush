@@ -2,8 +2,8 @@
   import { ChevronDown, Trophy, X } from '@lucide/svelte';
   import type { HoopRushManifest, SeasonFreeAgencyWindowState } from '@hoop-rush/data-contracts';
   import type { SeasonFreeAgencyTraceStep } from '@hoop-rush/data-contracts';
-  import SeasonPlayerFace from '$lib/components/season/SeasonPlayerFace.svelte';
-  import type { SeasonFaceRef } from '$lib/season/season-branding';
+  import SeasonPlayerFace from '#lib/components/season/SeasonPlayerFace.svelte';
+  import type { SeasonFaceRef } from '#lib/season/season-branding.js';
   import {
     CRITERION_LABEL,
     FREE_AGENCY_BAND_LABEL,

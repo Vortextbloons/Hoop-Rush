@@ -569,21 +569,16 @@ describe('buildStats', () => {
       tsPct: 1.026,
       efgPct: 1.081,
     });
-    // Capping fgm 294 to a partial fga 272 would invent elite efficiency;
-    // the family is unobserved instead (derivation estimates from priors).
     expect(stats.fieldGoalsMade).toBe(0);
     expect(stats.fieldGoalsAttempted).toBe(0);
     expect(stats.threesMade).toBeNull();
     expect(stats.threesAttempted).toBeNull();
     expect(stats.tsPct).toBeNull();
     expect(stats.efgPct).toBeNull();
-    // Valid families pass through untouched.
     expect(stats.freeThrowsMade).toBe(151);
     expect(stats.freeThrowsAttempted).toBe(200);
   });
   it('nulls corrupt minutes while keeping the scoring line for per-game use', () => {
-    // 1961-62 Bellamy class: 2495 points in 322 minutes is 7.7 pts/min
-    // (Wilt's peak is ~1.04); the minutes column is corrupt, not the points.
     const stats = buildStats({
       gamesPlayed: 79,
       minutes: 322,

@@ -2,9 +2,9 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
-  import HavocHub from '$lib/features/havoc/HavocHub.svelte';
-  import { HavocHubState } from '$lib/features/havoc/havoc-hub-state.svelte';
-  import { getHavocService } from '$lib/features/havoc/havoc-service';
+  import HavocHub from '#lib/features/havoc/HavocHub.svelte';
+  import { HavocHubState } from '#lib/features/havoc/havoc-hub-state.svelte.js';
+  import { getHavocService } from '#lib/features/havoc/havoc-service.js';
 
   let hub = $state<HavocHubState | null>(null);
   let serviceError = $state<string | null>(null);
@@ -22,7 +22,7 @@
     void instance.load().then(async () => {
       if (!mounted || instance.error !== null) return;
       if (await instance.playSeason()) {
-        if (mounted) await goto(resolve('/havoc/result'));
+        if (mounted) await goto(resolve('havoc/result/'));
       }
     });
     return () => {
@@ -48,7 +48,7 @@
 {:else if hub !== null}
   <HavocHub
     {hub}
-    onOpenResult={() => void goto(resolve('/havoc/result'))}
-    onAbandoned={() => void goto(resolve('/havoc'))}
+    onOpenResult={() => void goto(resolve('havoc/result/'))}
+    onAbandoned={() => void goto(resolve('havoc/'))}
   />
 {/if}

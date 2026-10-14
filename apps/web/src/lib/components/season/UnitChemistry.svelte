@@ -1,10 +1,10 @@
 <script lang="ts">
   import type { SeasonEffectsState, SeasonRoster } from '@hoop-rush/data-contracts';
-  import type { SeasonRunShellData } from '$lib/season/season-shell-context';
+  import type { SeasonRunShellData } from '#lib/season/season-shell-context.js';
   import {
     activeLineupChemistryBp,
     strongestAndWeakestPairs,
-  } from '$lib/season/season-effects-view';
+  } from '#lib/season/season-effects-view.js';
   let {
     roster,
     effects,

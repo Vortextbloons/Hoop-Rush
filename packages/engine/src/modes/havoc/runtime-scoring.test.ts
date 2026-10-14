@@ -267,7 +267,6 @@ describe('havoc scoring mutations in simulation', () => {
     const base =
       entry.nominalPoints + entry.addends.reduce((sum, addend) => sum + addend.points, 0);
     expect(entry.points).toBe(base * 2);
-    // three consecutive made field goals precede the arming
     const shooterInstanceId = consumed.ownerInstanceId;
     const makesBefore = run.tape.events.filter(
       (event, index) =>
@@ -357,7 +356,6 @@ describe('havoc scoring mutations in simulation', () => {
         });
       }
     }
-    // missed seventh attempts retain the roll with a null scoring reference
     const missedRoll = rolls.find((roll) => roll.scoringSequence === null);
     if (missedRoll !== undefined) {
       expect(missedRoll.rolled).toBeGreaterThanOrEqual(1);

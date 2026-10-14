@@ -329,97 +329,39 @@ export function baseValidation(
   const authority = authorityOfContext(context, run);
   const actorPid = context?.actorParticipantId ?? null;
   const actorFid = context?.actorFranchiseId ?? null;
+  const rejectRunMismatch = () =>
+    rejectedCommand(command, { code: 'run-mismatch', expectedRunId: run.runId }, run, pending);
+  const directFid =
+    'franchiseId' in command && typeof command.franchiseId === 'string'
+      ? command.franchiseId
+      : undefined;
+  const directFidMismatch = directFid !== undefined && actorFid !== null && directFid !== actorFid;
   if (authority !== null) {
     if (authority.kind === 'season-multiplayer') {
       if (actorPid !== null) {
         const expectedFid = franchiseForParticipant(authority, actorPid);
         if (expectedFid === null || (actorFid !== null && expectedFid !== actorFid)) {
-          return rejectedCommand(
-            command,
-            {
-              code: 'run-mismatch',
-              expectedRunId: run.runId,
-            },
-            run,
-            pending,
-          );
+          return rejectRunMismatch();
         }
       } else if (actorFid !== null) {
         const pid = authorityForFranchise(authority, actorFid);
         if (pid === null) {
-          return rejectedCommand(
-            command,
-            {
-              code: 'run-mismatch',
-              expectedRunId: run.runId,
-            },
-            run,
-            pending,
-          );
+          return rejectRunMismatch();
         }
       }
-      const directFid =
-        'franchiseId' in command && typeof command.franchiseId === 'string'
-          ? command.franchiseId
-          : undefined;
-      if (directFid !== undefined && actorFid !== null && directFid !== actorFid) {
-        return rejectedCommand(
-          command,
-          {
-            code: 'run-mismatch',
-            expectedRunId: run.runId,
-          },
-          run,
-          pending,
-        );
-      }
-    } else {
-      if (
-        actorFid !== null &&
-        authority.soloFranchiseId !== null &&
-        actorFid !== authority.soloFranchiseId
-      ) {
-        return rejectedCommand(
-          command,
-          {
-            code: 'run-mismatch',
-            expectedRunId: run.runId,
-          },
-          run,
-          pending,
-        );
-      }
-      const directFid =
-        'franchiseId' in command && typeof command.franchiseId === 'string'
-          ? command.franchiseId
-          : undefined;
-      if (directFid !== undefined && actorFid !== null && directFid !== actorFid) {
-        return rejectedCommand(
-          command,
-          {
-            code: 'run-mismatch',
-            expectedRunId: run.runId,
-          },
-          run,
-          pending,
-        );
-      }
+    } else if (
+      actorFid !== null &&
+      authority.soloFranchiseId !== null &&
+      actorFid !== authority.soloFranchiseId
+    ) {
+      return rejectRunMismatch();
+    }
+    if (directFidMismatch) {
+      return rejectRunMismatch();
     }
   } else if (context?.actorFranchiseId) {
-    const targetFranchiseId =
-      'franchiseId' in command && typeof command.franchiseId === 'string'
-        ? command.franchiseId
-        : null;
-    if (targetFranchiseId !== null && targetFranchiseId !== context.actorFranchiseId) {
-      return rejectedCommand(
-        command,
-        {
-          code: 'run-mismatch',
-          expectedRunId: run.runId,
-        },
-        run,
-        pending,
-      );
+    if (directFid !== undefined && directFid !== context.actorFranchiseId) {
+      return rejectRunMismatch();
     }
   }
   return null;

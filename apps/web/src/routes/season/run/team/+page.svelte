@@ -8,48 +8,48 @@
     type SeasonGameSummary,
   } from '@hoop-rush/data-contracts';
   import { minutePlanHorizonGames } from '@hoop-rush/engine';
-  import InjuryTimeline from '$lib/components/season/InjuryTimeline.svelte';
-  import AutoRotationPanel from '$lib/components/season/AutoRotationPanel.svelte';
-  import PlayerSponsorCard from '$lib/components/season/PlayerSponsorCard.svelte';
-  import TeamRosterPanel from '$lib/components/season/TeamRosterPanel.svelte';
-  import RotationEditor from '$lib/components/season/RotationEditor.svelte';
-  import SeasonPlayerStats from '$lib/components/season/SeasonPlayerStats.svelte';
-  import UnitChemistry from '$lib/components/season/UnitChemistry.svelte';
+  import InjuryTimeline from '#lib/components/season/InjuryTimeline.svelte';
+  import AutoRotationPanel from '#lib/components/season/AutoRotationPanel.svelte';
+  import PlayerSponsorCard from '#lib/components/season/PlayerSponsorCard.svelte';
+  import TeamRosterPanel from '#lib/components/season/TeamRosterPanel.svelte';
+  import RotationEditor from '#lib/components/season/RotationEditor.svelte';
+  import SeasonPlayerStats from '#lib/components/season/SeasonPlayerStats.svelte';
+  import UnitChemistry from '#lib/components/season/UnitChemistry.svelte';
   import {
     displayRotationFailures,
     indexRotationFailures,
-  } from '$lib/season/season-rotation-editor';
+  } from '#lib/season/season-rotation-editor.js';
   import {
     buildLeagueProjectionBaselines,
     normalizeTeamProjection,
     rawSeasonTeamRatings,
     seasonLeagueTeamProjections,
-  } from '$lib/season/season-team-detail-view';
+  } from '#lib/season/season-team-detail-view.js';
   import {
     SEASON_RUN_SHELL_CONTEXT,
     type SeasonRunShellData,
-  } from '$lib/season/season-shell-context';
-  import { humanInjuryTimeline } from '$lib/season/season-health-view';
-  import { activeInjuriesOf } from '$lib/season/season-health-view';
-  import { humanSeasonPlayerStats } from '$lib/season/season-player-stats-view';
-  import { gamesToLockForBlock } from '$lib/season/season-lock-preview';
+  } from '#lib/season/season-shell-context.js';
+  import { humanInjuryTimeline } from '#lib/season/season-health-view.js';
+  import { activeInjuriesOf } from '#lib/season/season-health-view.js';
+  import { humanSeasonPlayerStats } from '#lib/season/season-player-stats-view.js';
+  import { gamesToLockForBlock } from '#lib/season/season-lock-preview.js';
   import {
     durabilityRatingOfSlice,
     overallRatingOfSlice,
     playablePositionsOfSlice,
     staminaRatingOfSlice,
     summaryRatingsOfSlice,
-  } from '$lib/season/season-player-slice';
+  } from '#lib/season/season-player-slice.js';
   import {
     FATIGUE_BAND_LABEL,
     fatigueBand,
     fatiguePercent,
     loadStateOf,
-  } from '$lib/season/season-effects-view';
-  import { candidateOf } from '$lib/season/season-catalog-index';
-  import { resolveAssetUrl } from '$lib/asset-url';
-  import { franchiseColor } from '$lib/season/franchise-colors';
-  import { loadSponsorsIndex } from '$lib/season/season-assets';
+  } from '#lib/season/season-effects-view.js';
+  import { candidateOf } from '#lib/season/season-catalog-index.js';
+  import { resolveAssetUrl } from '#lib/asset-url.js';
+  import { franchiseColor } from '#lib/season/franchise-colors.js';
+  import { loadSponsorsIndex } from '#lib/season/season-assets.js';
   import {
     boostedOverallDeltaForPlayer,
     boostedOverallForPlayer,
@@ -58,7 +58,7 @@
     gearPointsOf,
     sponsorSlotsOf,
     type SponsorVaultEntry,
-  } from '$lib/season/sponsor-gear-view';
+  } from '#lib/season/sponsor-gear-view.js';
   import type { SeasonSponsorSlot } from '@hoop-rush/data-contracts';
   const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
   let mounted = $state(true);
@@ -390,9 +390,6 @@
           <div class="min-w-0">
             <p class="sr-eyebrow">Your team</p>
             <h2 id="workspace-heading" class="sr-page-title mt-1">Rotation</h2>
-            <p class="mt-1.5 text-xs text-muted-foreground">
-              Who starts? How many minutes? Who closes?
-            </p>
           </div>
 
           {#if teamProjection !== null}

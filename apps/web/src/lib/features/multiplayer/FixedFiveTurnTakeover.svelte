@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { arenaRivalTurn, arenaYourTurn } from '$lib/arena-sound';
+  import { arenaRivalTurn, arenaYourTurn } from '#lib/arena-sound.js';
   let {
     turn,
     label = '',

@@ -19,7 +19,7 @@ import {
   type FixedFiveRoomSnapshot,
   type Id,
 } from '@hoop-rush/data-contracts';
-import { randomUUID } from '$lib/ids';
+import { randomUUID } from '#lib/ids.js';
 import {
   createRealtimeRoomRegistry,
   ensureAnonymous,
@@ -30,7 +30,7 @@ import {
   readSupabaseEnv,
   stringField,
   supabaseClient,
-} from '$lib/supabase-runtime';
+} from '#lib/supabase-runtime.js';
 
 type FixedFiveClient = SupabaseClient;
 
@@ -405,6 +405,11 @@ export function createFixedFiveTransport(options?: {
           code: snapshot.code ?? fixedFiveRoomCodeSchema.parse('0000'),
         },
       };
+    },
+    async snapshot(roomId) {
+      const client = await getClient();
+      await ensureAnonymous(client);
+      return fetchSnapshot(roomId);
     },
     subscribe(roomId, handler) {
       return registry.subscribe(roomId, handler);

@@ -17,11 +17,6 @@ export {
   canResubmitBlock,
 };
 
-/**
- * Buying a pack spends currency and advances the collection revision, so a
- * stale digest surfaces as a "review the refreshed odds" error instead of
- * re-purchasing.
- */
 export const COLLECTION_PACK_PURCHASE_POLICY: SubmissionPolicy = {
   intent: 'collection-pack-purchase',
   conflict: 'surface',
@@ -29,7 +24,6 @@ export const COLLECTION_PACK_PURCHASE_POLICY: SubmissionPolicy = {
   requiresDigest: true,
 };
 
-/** Non-purchase collection mutations carry the same revision/digest guard. */
 export const COLLECTION_COMMAND_POLICY: SubmissionPolicy = {
   intent: 'collection-command',
   conflict: 'surface',

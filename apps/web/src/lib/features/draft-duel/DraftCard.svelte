@@ -6,8 +6,8 @@
     HoopRushManifest,
   } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
-  import PlayerFace from '$lib/components/PlayerFace.svelte';
-  import { formatPositions } from '$lib/player-positions';
+  import PlayerFace from '#lib/components/PlayerFace.svelte';
+  import { formatPositions } from '#lib/player-positions.js';
   import { DRAFT_DUEL_REASON_LABELS, draftDuelCardView } from './draft-duel-card-view.ts';
 
   let {

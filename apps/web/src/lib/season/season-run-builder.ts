@@ -49,6 +49,7 @@ import {
   SEASON_TRADE_VERSION,
   PLAYER_VERSION_ID_VERSION,
   buildInitialPostseasonState,
+  createEmptyStandings,
   seasonRunSchema,
   sha256Hex as sha256Bytes,
   contentHashSchema,
@@ -74,29 +75,7 @@ function buildInitialChallenges(
 ): SeasonRun['challenges'] {
   const base = buildEmptyChallengeState();
   if (humanFranchiseId === null) return base;
-  const standings: import('@hoop-rush/data-contracts').SeasonStandings = {
-    schemaVersion: 1 as const,
-    standingsVersion: SEASON_STANDINGS_VERSION,
-    rows: league.teams.map((team) => ({
-      franchiseId: team.franchiseId,
-      wins: 0,
-      losses: 0,
-      gamesPlayed: 0,
-      homeWins: 0,
-      homeLosses: 0,
-      awayWins: 0,
-      awayLosses: 0,
-      conferenceWins: 0,
-      conferenceLosses: 0,
-      divisionWins: 0,
-      divisionLosses: 0,
-      pointsFor: 0,
-      pointsAgainst: 0,
-      headToHead: league.teams
-        .filter((other) => other.franchiseId !== team.franchiseId)
-        .map((other) => ({ franchiseId: other.franchiseId, wins: 0, losses: 0 })),
-    })),
-  };
+  const standings = createEmptyStandings(league);
   const deal = dealSeasonBlockChallenges(rootSeed, 0, {
     league,
     schedule,
@@ -221,29 +200,7 @@ export function buildSeasonRunFromGeneration(input: BuildSeasonRunInput): Season
       awayScore: null,
       forfeitLoserFranchiseId: null,
     })),
-    standings: {
-      schemaVersion: 1,
-      standingsVersion: SEASON_STANDINGS_VERSION,
-      rows: correctedLeague.teams.map((team) => ({
-        franchiseId: team.franchiseId,
-        wins: 0,
-        losses: 0,
-        gamesPlayed: 0,
-        homeWins: 0,
-        homeLosses: 0,
-        awayWins: 0,
-        awayLosses: 0,
-        conferenceWins: 0,
-        conferenceLosses: 0,
-        divisionWins: 0,
-        divisionLosses: 0,
-        pointsFor: 0,
-        pointsAgainst: 0,
-        headToHead: correctedLeague.teams
-          .filter((other) => other.franchiseId !== team.franchiseId)
-          .map((other) => ({ franchiseId: other.franchiseId, wins: 0, losses: 0 })),
-      })),
-    },
+    standings: createEmptyStandings(correctedLeague),
     cursor: { schemaVersion: 1, completedRounds: 0 },
     stage: 'regular-season',
     postseason: emptyPostseason(rootSeed),

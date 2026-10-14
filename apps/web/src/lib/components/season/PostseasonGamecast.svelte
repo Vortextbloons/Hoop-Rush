@@ -1,12 +1,12 @@
 <script lang="ts">
   import { Dialog } from 'bits-ui';
-  import GameScoreboard from '$lib/components/GameScoreboard.svelte';
+  import GameScoreboard from '#lib/components/GameScoreboard.svelte';
   import type { HoopRushManifest, SeasonPostseasonSummary } from '@hoop-rush/data-contracts';
   import LiveSimModal from './LiveSimModal.svelte';
   import SeasonTeamLogo from './SeasonTeamLogo.svelte';
-  import { franchiseIdentityOf } from '$lib/season/season-branding';
-  import { franchiseColor } from '$lib/season/franchise-colors';
-  import { arenaBuzzer, arenaConfirm } from '$lib/arena-sound';
+  import { franchiseIdentityOf } from '#lib/season/season-branding.js';
+  import { franchiseColor } from '#lib/season/franchise-colors.js';
+  import { arenaBuzzer, arenaConfirm } from '#lib/arena-sound.js';
 
   let {
     open,

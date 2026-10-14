@@ -249,7 +249,6 @@ export function drawCollectionPackSlotsTargeted(input: {
   for (const [slotIndex] of pack.slots.entries()) {
     const distribution = slotRarityDistribution(pack, slotIndex, catalog);
     const rarity = drawRarityFrom(distribution, rng.next());
-    // mirror the untargeted path's per-slot draw consumption so rarity rolls stay identical
     void rng.next();
     const seed = collectionTargetingSlotSeedFromPath(
       rootSeed,

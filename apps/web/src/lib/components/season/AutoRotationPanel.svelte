@@ -4,7 +4,7 @@
   import {
     createProjectionRunner,
     type ProjectionRunner,
-  } from '$lib/season/season-projection-runner';
+  } from '#lib/season/season-projection-runner.js';
   import {
     AutoUndoState,
     autoUndoKeyOf,
@@ -14,9 +14,9 @@
     hasDnp,
     swapPairsOf,
     type AutoScopeOption,
-  } from '$lib/season/season-auto-rotation';
-  import type { ProjectionRotationLoadRow } from '$lib/season/season-projection-wire';
-  import type { RotationEditor } from '$lib/season/season-rotation-editor';
+  } from '#lib/season/season-auto-rotation.js';
+  import type { ProjectionRotationLoadRow } from '#lib/season/season-projection-wire.js';
+  import type { RotationEditor } from '#lib/season/season-rotation-editor.js';
 
   let {
     editor,

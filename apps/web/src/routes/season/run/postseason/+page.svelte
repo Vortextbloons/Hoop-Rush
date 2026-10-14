@@ -5,9 +5,9 @@
   import {
     SEASON_RUN_SHELL_CONTEXT,
     type SeasonRunShellData,
-  } from '$lib/season/season-shell-context';
-  import { postseasonStageLabel } from '$lib/season/season-postseason-presentation';
-  import PostseasonBracket from '$lib/components/season/PostseasonBracket.svelte';
+  } from '#lib/season/season-shell-context.js';
+  import { postseasonStageLabel } from '#lib/season/season-postseason-presentation.js';
+  import PostseasonBracket from '#lib/components/season/PostseasonBracket.svelte';
   const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
   const run = $derived(shell.run);
   const humanFranchiseId = $derived(shell.humanFranchiseId);

@@ -56,7 +56,6 @@ export interface FakeHavocCompletedRun {
 }
 
 export interface FakeHavocServiceOptions {
-  /** Per-game havoc outcomes; defaults to a win for every game. */
   outcomes?: readonly ('win' | 'loss')[];
   history?: readonly HavocHistoryView[];
   completedRuns?: readonly FakeHavocCompletedRun[];

@@ -1,5 +1,5 @@
 import type { SeasonRunAnnouncement, SeasonRunMutation } from '@hoop-rush/application/season';
-import { newRequestId } from '$lib/ids';
+import { newRequestId } from '#lib/ids.js';
 export type { SeasonRunAnnouncement, SeasonRunMutation } from '@hoop-rush/application/season';
 export const SEASON_RUN_CHANNEL_NAME = 'hoop-rush:season-run';
 function isSeasonRunMutation(value: unknown): value is SeasonRunMutation {

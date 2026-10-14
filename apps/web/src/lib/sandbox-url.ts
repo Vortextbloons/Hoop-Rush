@@ -13,7 +13,7 @@ import {
   seedSchema,
 } from '@hoop-rush/data-contracts';
 import { validateLineup } from '@hoop-rush/engine';
-import { randomHex } from '$lib/ids';
+import { randomHex } from '#lib/ids.js';
 export interface SandboxUrlState {
   slots: RunPlayerSelection[];
   seed?: Seed;

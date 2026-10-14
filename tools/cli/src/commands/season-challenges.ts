@@ -1,5 +1,6 @@
 import { resolve } from 'node:path';
 import { z } from 'zod';
+import { seedWindowSchema } from '../seed-window.ts';
 import {
   SEASON_CHALLENGE_CATALOG,
   SEASON_CHALLENGE_TARGETS_VERSION,
@@ -51,14 +52,8 @@ export const seasonChallengeTargetsSchema = z.object({
     statementMinGames: z.literal(4),
     threePointSufficiencyMin: z.literal(SEASON_CHALLENGES_THREE_PA_SUFFICIENCY_MIN),
   }),
-  cohort: z.object({
-    seedFrom: z.number().int().nonnegative(),
-    seedTo: z.number().int().nonnegative(),
-  }),
-  heldOut: z.object({
-    seedFrom: z.number().int().nonnegative(),
-    seedTo: z.number().int().nonnegative(),
-  }),
+  cohort: seedWindowSchema,
+  heldOut: seedWindowSchema,
   measured: z.object({
     calibration: z.object({
       seasonsSimulated: z.number().int().nonnegative(),
@@ -539,8 +534,8 @@ export function seasonChallengesCalibrate(args: SeasonChallengesArgs): CliReport
       };
       const details = [
         `${String(calibrationCohort.seasonsSimulated)} calibration + ${String(heldOutCohort.seasonsSimulated)} held-out seasons in ${String(Date.now() - started)}ms (${String(workers)} workers)`,
-        `blocks dealt ${String(calibrationCohort.blocksDealt)}/${String(calibrationCohort.blocksDealt + heldOutCohort.blocksDealt)} · completeness ${(calibrationCohort.dealCompleteness * 100).toFixed(1)}% · canonical ${(calibrationCohort.canonicalOrderShare * 100).toFixed(1)}% · replay ${(calibrationCohort.replayStabilityShare * 100).toFixed(1)}%`,
-        `hard-feasible ${(calibrationCohort.hardFeasibleShare * 100).toFixed(1)}% · earned/block ${calibrationCohort.expectedEarnedPerBlock === null ? 'n/a' : calibrationCohort.expectedEarnedPerBlock.toFixed(2)} · 3PA sufficient ${calibrationCohort.threePointSufficiency === null ? 'n/a' : `${(calibrationCohort.threePointSufficiency * 100).toFixed(1)}%`} over ${String(calibrationCohort.threePointEvaluations)} 3P evaluations`,
+        `blocks dealt ${String(calibrationCohort.blocksDealt)}/${String(calibrationCohort.blocksDealt + heldOutCohort.blocksDealt)} Â· completeness ${(calibrationCohort.dealCompleteness * 100).toFixed(1)}% Â· canonical ${(calibrationCohort.canonicalOrderShare * 100).toFixed(1)}% Â· replay ${(calibrationCohort.replayStabilityShare * 100).toFixed(1)}%`,
+        `hard-feasible ${(calibrationCohort.hardFeasibleShare * 100).toFixed(1)}% Â· earned/block ${calibrationCohort.expectedEarnedPerBlock === null ? 'n/a' : calibrationCohort.expectedEarnedPerBlock.toFixed(2)} Â· 3PA sufficient ${calibrationCohort.threePointSufficiency === null ? 'n/a' : `${(calibrationCohort.threePointSufficiency * 100).toFixed(1)}%`} over ${String(calibrationCohort.threePointEvaluations)} 3P evaluations`,
         targetsDetail({ targetsWritten, targetsPath }),
       ];
       return { details, payload };

@@ -1,30 +1,30 @@
 ﻿<script lang="ts">
   import { getContext } from 'svelte';
   import { resolve } from '$app/paths';
-  import BlockProgress from '$lib/components/season/BlockProgress.svelte';
-  import CourtInnovationPicker from '$lib/components/season/CourtInnovationPicker.svelte';
-  import RuleBadge from '$lib/components/season/RuleBadge.svelte';
-  import ChampionSummary from '$lib/components/season/ChampionSummary.svelte';
-  import HealthStrip from '$lib/components/season/HealthStrip.svelte';
-  import InfluencePanel from '$lib/components/season/InfluencePanel.svelte';
-  import InterruptionPanel from '$lib/components/season/InterruptionPanel.svelte';
-  import ChallengesPanel from '$lib/components/season/ChallengesPanel.svelte';
-  import SponsorShopModal from '$lib/components/season/SponsorShopModal.svelte';
-  import LeaguePulse from '$lib/components/season/LeaguePulse.svelte';
-  import PostseasonMatchupCard from '$lib/components/season/PostseasonMatchupCard.svelte';
-  import PlayoffSnapshot from '$lib/components/season/PlayoffSnapshot.svelte';
-  import PlayoffGamePrep from '$lib/components/season/PlayoffGamePrep.svelte';
-  import PostseasonProgress from '$lib/components/season/PostseasonProgress.svelte';
-  import PostseasonGamecast from '$lib/components/season/PostseasonGamecast.svelte';
-  import PostseasonRotationPanel from '$lib/components/season/PostseasonRotationPanel.svelte';
-  import SeasonTape from '$lib/components/season/SeasonTape.svelte';
-  import SeasonTeamLogo from '$lib/components/season/SeasonTeamLogo.svelte';
-  import { franchiseIdentityOf } from '$lib/season/season-branding';
-  import { franchiseColor } from '$lib/season/franchise-colors';
+  import BlockProgress from '#lib/components/season/BlockProgress.svelte';
+  import CourtInnovationPicker from '#lib/components/season/CourtInnovationPicker.svelte';
+  import RuleBadge from '#lib/components/season/RuleBadge.svelte';
+  import ChampionSummary from '#lib/components/season/ChampionSummary.svelte';
+  import HealthStrip from '#lib/components/season/HealthStrip.svelte';
+  import InfluencePanel from '#lib/components/season/InfluencePanel.svelte';
+  import InterruptionPanel from '#lib/components/season/InterruptionPanel.svelte';
+  import ChallengesPanel from '#lib/components/season/ChallengesPanel.svelte';
+  import SponsorShopModal from '#lib/components/season/SponsorShopModal.svelte';
+  import LeaguePulse from '#lib/components/season/LeaguePulse.svelte';
+  import PostseasonMatchupCard from '#lib/components/season/PostseasonMatchupCard.svelte';
+  import PlayoffSnapshot from '#lib/components/season/PlayoffSnapshot.svelte';
+  import PlayoffGamePrep from '#lib/components/season/PlayoffGamePrep.svelte';
+  import PostseasonProgress from '#lib/components/season/PostseasonProgress.svelte';
+  import PostseasonGamecast from '#lib/components/season/PostseasonGamecast.svelte';
+  import PostseasonRotationPanel from '#lib/components/season/PostseasonRotationPanel.svelte';
+  import SeasonTape from '#lib/components/season/SeasonTape.svelte';
+  import SeasonTeamLogo from '#lib/components/season/SeasonTeamLogo.svelte';
+  import { franchiseIdentityOf } from '#lib/season/season-branding.js';
+  import { franchiseColor } from '#lib/season/franchise-colors.js';
   import {
     SEASON_RUN_SHELL_CONTEXT,
     type SeasonRunShellData,
-  } from '$lib/season/season-shell-context';
+  } from '#lib/season/season-shell-context.js';
   import {
     blockPhaseAllowsSubmit,
     buildSubmitBlockEnvelope,
@@ -32,14 +32,14 @@
     isInnovationRequired,
     seasonBlockReadinessOf,
     type SubmitBlockFailureCode,
-  } from '$lib/season/season-block-submit';
+  } from '#lib/season/season-block-submit.js';
   import { freeAgencyUnresolvedWindowIndex } from '@hoop-rush/engine';
   import {
     buildLockPreview,
     gamesToLockForBlock,
     pendingRotationSetDigest,
     type LockPreview,
-  } from '$lib/season/season-lock-preview';
+  } from '#lib/season/season-lock-preview.js';
   import {
     blockOneLiner,
     didWin,
@@ -49,25 +49,25 @@
     provisionalRanking,
     recordLabel,
     recordRankOutLabel,
-  } from '$lib/season/season-presentation';
+  } from '#lib/season/season-presentation.js';
   import {
     influenceViewModel,
     type InfluenceSpendAffordance,
-  } from '$lib/season/season-influence-view';
-  import { challengesViewModel } from '$lib/season/season-challenges-view';
+  } from '#lib/season/season-influence-view.js';
+  import { challengesViewModel } from '#lib/season/season-challenges-view.js';
   import {
     sponsorBoardHistoryOf,
     sponsorShopOf,
     sponsorVaultOf,
-  } from '$lib/season/sponsor-gear-view';
-  import { loadSponsorsIndex } from '$lib/season/season-assets';
-  import { resolveAssetUrl } from '$lib/asset-url';
-  import { availabilityStripRows } from '$lib/season/season-health-view';
+  } from '#lib/season/sponsor-gear-view.js';
+  import { loadSponsorsIndex } from '#lib/season/season-assets.js';
+  import { resolveAssetUrl } from '#lib/asset-url.js';
+  import { availabilityStripRows } from '#lib/season/season-health-view.js';
   import {
     openWindowOf,
     tradeOfferViewModel,
     humanTradeOffersOf,
-  } from '$lib/season/season-trade-view';
+  } from '#lib/season/season-trade-view.js';
   import {
     describePostseasonRejection,
     humanEliminated,
@@ -79,10 +79,10 @@
     postseasonRankingsOf,
     postseasonStageLabel,
     riskyRehabOptionsOf,
-  } from '$lib/season/season-postseason-presentation';
-  import { homeRuleOf } from '$lib/season/season-evolution-view';
-  import { seasonInnovationImpactOf } from '$lib/season/season-innovation-impact-view';
-  import { playoffPrepSummaryOf, playoffSnapshotOf } from '$lib/season/season-playoff-hub-view';
+  } from '#lib/season/season-postseason-presentation.js';
+  import { homeRuleOf } from '#lib/season/season-evolution-view.js';
+  import { seasonInnovationImpactOf } from '#lib/season/season-innovation-impact-view.js';
+  import { playoffPrepSummaryOf, playoffSnapshotOf } from '#lib/season/season-playoff-hub-view.js';
   import {
     blockRoundRange,
     parsePlayoffGameId,

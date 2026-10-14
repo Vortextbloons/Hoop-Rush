@@ -3,13 +3,13 @@
   import { asset, resolve } from '$app/paths';
   import { page } from '$app/state';
   import { BookOpen, Home, Layers, Package, Play, Users } from '@lucide/svelte';
-  import ArenaSoundToggle from '$lib/components/ArenaSoundToggle.svelte';
+  import ArenaSoundToggle from '#lib/components/ArenaSoundToggle.svelte';
   import {
     UltimateRunShell,
     ULTIMATE_RUN_SHELL_CONTEXT,
-  } from '$lib/features/collection/ultimate-shell.svelte';
-  import { isNavItemActive, type NavItem } from '$lib/nav-items';
-  import '$lib/features/collection/ultimate-theme.css';
+  } from '#lib/features/collection/ultimate-shell.svelte.js';
+  import { isNavItemActive, type NavItem } from '#lib/nav-items.js';
+  import '#lib/features/collection/ultimate-theme.css';
 
   let { children } = $props();
   const shell = new UltimateRunShell();
@@ -44,9 +44,9 @@
 <div class="ultimate-root min-h-[100svh]">
   <header class="ur-shell-header">
     <div class="ur-topbar">
-      <a class="ur-brand" href={resolve('/ultimate/run')} aria-label="Ultimate Run hub">
+      <a class="ur-brand" href={resolve('ultimate/run/')} aria-label="Ultimate Run hub">
         <img
-          src={asset('/ultimate/logo.png')}
+          src={asset('ultimate/logo.png')}
           alt=""
           width="32"
           height="32"

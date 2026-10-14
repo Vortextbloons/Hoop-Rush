@@ -3,10 +3,10 @@
   import { ArrowRight, Check, Plus, Lock } from '@lucide/svelte';
   import { Dialog } from 'bits-ui';
   import { canPlay, slotRequirement } from '@hoop-rush/engine';
-  import DialogShell from '$lib/components/DialogShell.svelte';
-  import PlayerFace from '$lib/components/PlayerFace.svelte';
-  import PositionOptionRow from '$lib/components/PositionOptionRow.svelte';
-  import { SLOT_INDEXES, SLOT_LABELS, SLOT_NAMES, formatPositions } from '$lib/player-positions';
+  import DialogShell from '#lib/components/DialogShell.svelte';
+  import PlayerFace from '#lib/components/PlayerFace.svelte';
+  import PositionOptionRow from '#lib/components/PositionOptionRow.svelte';
+  import { SLOT_INDEXES, SLOT_LABELS, SLOT_NAMES, formatPositions } from '#lib/player-positions.js';
 
   let {
     card,

@@ -24,7 +24,7 @@
 
 <section class="h-shell" data-havoc-run-detail>
   <a
-    href={resolve('/havoc/history')}
+    href={resolve('havoc/history/')}
     class="font-mono text-xs text-muted-foreground underline-offset-4 hover:underline"
   >
     ← Hall of Freaks
@@ -66,10 +66,12 @@
       {/if}
     </header>
 
-    {#if comparisonComplete && comparison !== null}<HavocSquadReport
-        {comparison}
-        lineup={run.lineup}
-      />{:else}<div class="mt-6"><HavocLineupLock slots={run.lineup} /></div>{/if}
+    {#if comparisonComplete && comparison !== null}
+      <HavocSquadReport {comparison} lineup={run.lineup} />
+    {:else}
+      <div class="mt-6"><HavocLineupLock slots={run.lineup} /></div>
+    {/if}
+
     <details class="h-panel mt-6">
       <summary>Full season report & game details</summary>
       <div class="mt-4 grid gap-4 lg:grid-cols-2">
@@ -101,9 +103,9 @@
             <details class="mt-3">
               <summary
                 class="cursor-pointer font-mono text-[10px] font-bold tracking-[0.12em] text-muted-foreground uppercase outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >Seed & version identifiers</summary
               >
-                Seed & version identifiers
-              </summary>
+
               <dl class="mt-2 grid gap-1 font-mono text-[11px] text-muted-foreground">
                 <div class="flex flex-wrap gap-x-2">
                   <dt class="font-bold uppercase">Run</dt>

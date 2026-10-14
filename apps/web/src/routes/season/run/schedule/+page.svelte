@@ -3,24 +3,24 @@
   import { resolve } from '$app/paths';
   import type { RouteId } from '$app/types';
   import type { HoopRushManifest, SeasonGameSummary } from '@hoop-rush/data-contracts';
-  import SeasonTeamLogo from '$lib/components/season/SeasonTeamLogo.svelte';
-  import RuleBadge from '$lib/components/season/RuleBadge.svelte';
+  import SeasonTeamLogo from '#lib/components/season/SeasonTeamLogo.svelte';
+  import RuleBadge from '#lib/components/season/RuleBadge.svelte';
   import {
     SEASON_RUN_SHELL_CONTEXT,
     type SeasonRunShellData,
-  } from '$lib/season/season-shell-context';
-  import { franchiseIdentityOf } from '$lib/season/season-branding';
-  import { boxScoreFromSummary } from '$lib/season/season-presentation';
-  import { homeRuleOf } from '$lib/season/season-evolution-view';
-  import { postseasonSummaryRow } from '$lib/season/season-postseason-presentation';
-  import { getSeasonRunRepository } from '$lib/season/season-repo';
+  } from '#lib/season/season-shell-context.js';
+  import { franchiseIdentityOf } from '#lib/season/season-branding.js';
+  import { boxScoreFromSummary } from '#lib/season/season-presentation.js';
+  import { homeRuleOf } from '#lib/season/season-evolution-view.js';
+  import { postseasonSummaryRow } from '#lib/season/season-postseason-presentation.js';
+  import { getSeasonRunRepository } from '#lib/season/season-repo.js';
   import type { SeasonPostseasonSummary } from '@hoop-rush/data-contracts';
   import {
     playedScheduleCount,
     scheduleBlockGroups,
     scheduleBlockRows,
     type ScheduleBlockRow,
-  } from '$lib/season/season-schedule-view';
+  } from '#lib/season/season-schedule-view.js';
   const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
   type ScheduleFilter = 'all' | 'played' | 'upcoming';
   const FILTERS: ReadonlyArray<{
@@ -38,10 +38,10 @@
     if (!event.currentTarget.open || openedBoxScores.has(gameId)) return;
     openedBoxScores = new Set([...openedBoxScores, gameId]);
   }
-  let boxScoreModule: Promise<typeof import('$lib/components/season/BoxScore.svelte')> | null =
+  let boxScoreModule: Promise<typeof import('#lib/components/season/BoxScore.svelte')> | null =
     null;
-  function loadBoxScore(): Promise<typeof import('$lib/components/season/BoxScore.svelte')> {
-    boxScoreModule ??= import('$lib/components/season/BoxScore.svelte');
+  function loadBoxScore(): Promise<typeof import('#lib/components/season/BoxScore.svelte')> {
+    boxScoreModule ??= import('#lib/components/season/BoxScore.svelte');
     return boxScoreModule;
   }
   const rows = $derived(

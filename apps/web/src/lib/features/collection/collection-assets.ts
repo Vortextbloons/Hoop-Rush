@@ -8,7 +8,7 @@ import {
   type CollectionIndex,
   type CollectionProgressionRules,
 } from '@hoop-rush/data-contracts';
-import { loadManifestAsset } from '$lib/manifest-assets';
+import { loadManifestAsset } from '#lib/manifest-assets.js';
 
 export function loadCollectionIndex(): Promise<CollectionIndex> {
   return loadManifestAsset({

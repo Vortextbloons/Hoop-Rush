@@ -1,11 +1,3 @@
-/*
- * Broadcast Gameday — the Season Run mode identity.
- * Scoped like ultimate-theme.css: everything hangs off `.season-root`
- * (or `.sr-dialog` for portaled bits-ui content). Global Tailwind token
- * variables are re-mapped inside the scope so existing utility classes
- * repaint coherently regardless of the app-wide light/dark mode.
- */
-
 .season-root,
 .sr-dialog {
   --sr-bg: #0c1015;
@@ -17,9 +9,6 @@
   --sr-ink: #e9e7e0;
   --sr-paper: #f4f1e8;
   --sr-muted: #98a4b0;
-  /* Mode accent = the app's orange (hsl(13 100% 62%)), not Ultimate Run's gold.
-     Names keep the "hardwood" prefix for compatibility; the court-wood maple
-     stays a separate, literal surface color below. */
   --sr-hardwood: hsl(13 100% 62%);
   --sr-hardwood-bright: #ff945f;
   --sr-hardwood-ink: #2b0f02;
@@ -106,8 +95,6 @@
   outline-offset: 2px;
 }
 
-/* ---------- typography ---------- */
-
 .sr-eyebrow {
   color: var(--sr-hardwood-bright);
   font-family: var(--font-mono);
@@ -142,8 +129,6 @@
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
 }
-
-/* ---------- panels ---------- */
 
 .sr-panel {
   position: relative;
@@ -188,8 +173,6 @@
   );
 }
 
-/* ---------- stat tiles ---------- */
-
 .sr-stat-tile {
   padding: 0.85rem 1rem;
   border: 1px solid var(--sr-line);
@@ -229,8 +212,6 @@
 .sr-stat-tile[data-tone='live'] strong {
   color: var(--sr-hardwood-bright);
 }
-
-/* ---------- badges and chips ---------- */
 
 .sr-badge {
   display: inline-flex;
@@ -295,8 +276,6 @@
   text-transform: uppercase;
   white-space: nowrap;
 }
-
-/* ---------- buttons ---------- */
 
 .sr-btn {
   display: inline-flex;
@@ -421,8 +400,6 @@
   transform: translateY(1px) scale(0.99);
 }
 
-/* ---------- navigation ---------- */
-
 .sr-nav-primary {
   position: sticky;
   top: 0;
@@ -516,8 +493,6 @@
   color: var(--sr-hardwood-bright);
 }
 
-/* ---------- gameday board ---------- */
-
 .sr-gameday {
   position: relative;
   overflow: hidden;
@@ -592,8 +567,6 @@
   letter-spacing: -0.01em;
 }
 
-/* ---------- tables ---------- */
-
 .sr-table {
   width: 100%;
   border-collapse: collapse;
@@ -626,8 +599,6 @@
   background: rgb(255 255 255 / 3%);
 }
 
-/* ---------- dialog ---------- */
-
 .sr-dialog {
   position: fixed;
   left: 50%;
@@ -650,8 +621,6 @@
   background: rgb(4 6 9 / 72%);
   backdrop-filter: blur(3px);
 }
-
-/* ---------- motion ---------- */
 
 @keyframes sr-arrive {
   from {

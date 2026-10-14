@@ -1,4 +1,4 @@
-import { browser } from '$app/environment';
+import { browser } from '$app/env';
 if (browser && import.meta.hot) {
   let reloaded = false;
   window.addEventListener('vite:preloadError', (event) => {

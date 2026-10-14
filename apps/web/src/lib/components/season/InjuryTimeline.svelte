@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { INJURY_TYPE_LABEL, type InjuryTimelinePlayer } from '$lib/season/season-health-view';
+  import { INJURY_TYPE_LABEL, type InjuryTimelinePlayer } from '#lib/season/season-health-view.js';
   let {
     players,
   }: {

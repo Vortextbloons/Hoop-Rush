@@ -4,7 +4,7 @@ import {
   type CollectionGameWorkerCompleteMessage,
   type CollectionPreparedGameUnion,
 } from '@hoop-rush/data-contracts';
-import { newRequestId } from '$lib/ids';
+import { newRequestId } from '#lib/ids.js';
 import { runCollectionWorker } from './collection-worker-runner.ts';
 
 export interface CollectionGameRunInput {

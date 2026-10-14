@@ -49,15 +49,18 @@
           >{/if}<a
           class="h-button secondary"
           href={resolve(run.havocCursor >= 82 ? '/havoc/result' : '/havoc/run')}
-          >{run.havocCursor >= 82 ? 'See season report' : 'Continue season'}
-          <ArrowRight size={18} /></a
-        ><a class="h-link" href={resolve('/havoc/history')}>Hall of Freaks</a>
+        >
+          {run.havocCursor >= 82 ? 'See season report' : 'Continue season'}
+          <ArrowRight size={18} />
+        </a>
+
+        <a class="h-link" href={resolve('havoc/history/')}>Hall of Freaks</a>
       </div>
     </div>
   {:else}
     <div class="h-header">
       <p class="h-eyebrow">Hoop Havoc · Anything but ordinary</p>
-      <a class="h-link" href={resolve('/havoc/history')}>Hall of Freaks</a>
+      <a class="h-link" href={resolve('havoc/history/')}>Hall of Freaks</a>
     </div>
     <div class="h-intro">
       <div>
@@ -72,8 +75,10 @@
             data-havoc-start
             disabled={controller.busy}
             onclick={() => void controller.createDraft()}
-            ><Zap size={18} />{controller.busy ? 'Opening draft…' : 'Draft your squad'}</button
           >
+            <Zap size={18} />
+            {controller.busy ? 'Opening draft…' : 'Draft your squad'}
+          </button>
         </div>
       </div>
     </div>

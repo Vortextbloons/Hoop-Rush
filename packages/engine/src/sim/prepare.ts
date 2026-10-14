@@ -30,17 +30,11 @@ export function enginePlayerKey(player: SimulationPlayer): string {
   return player.playerVersionId ?? player.playerId;
 }
 export interface TeamPrepOptions {
-  /** Runtime participant identity (Havoc); defaults to source identity. */
   keyOf?: (player: SimulationPlayer) => string;
-  /** Base slot used for position responsibilities; defaults to the array index. */
   responsibilitySlotOf?: (player: SimulationPlayer, index: number) => number;
-  /** Authoritative-channel evidence flags; defaults to none. */
   evidenceOf?: (player: SimulationPlayer) => HavocEvidence | undefined;
-  /** Divisor for team aggregates (pressure, steal ability). */
   aggregateDivisor?: number;
-  /** Individual rebounder weight multiplier (wingspan reach). */
   rebounderWeightScale?: (player: SimulationPlayer) => number;
-  /** Additive reach contribution to team rebound strength. */
   reboundMeanReach?: (player: SimulationPlayer) => number;
 }
 export interface TeamPrep {

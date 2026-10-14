@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { franchiseIdSchema } from './ids.ts';
+import type { SeasonLeague } from './season-league.ts';
 import { SEASON_STANDINGS_VERSION, SEASON_TEAM_COUNT } from './season-versions.ts';
 export const seasonHeadToHeadRecordSchema = z.object({
   franchiseId: franchiseIdSchema,
@@ -31,3 +32,37 @@ export const seasonStandingsSchema = z.object({
   rows: z.array(seasonStandingsRowSchema).length(SEASON_TEAM_COUNT),
 });
 export type SeasonStandings = z.infer<typeof seasonStandingsSchema>;
+
+export function createEmptyStandingsRow(
+  franchiseId: string,
+  franchiseIds: readonly string[],
+): SeasonStandingsRow {
+  return {
+    franchiseId: franchiseIdSchema.parse(franchiseId),
+    wins: 0,
+    losses: 0,
+    gamesPlayed: 0,
+    homeWins: 0,
+    homeLosses: 0,
+    awayWins: 0,
+    awayLosses: 0,
+    conferenceWins: 0,
+    conferenceLosses: 0,
+    divisionWins: 0,
+    divisionLosses: 0,
+    pointsFor: 0,
+    pointsAgainst: 0,
+    headToHead: franchiseIds
+      .filter((other) => other !== franchiseId)
+      .map((other) => ({ franchiseId: franchiseIdSchema.parse(other), wins: 0, losses: 0 })),
+  };
+}
+
+export function createEmptyStandings(league: SeasonLeague): SeasonStandings {
+  const franchiseIds = league.teams.map((team) => team.franchiseId);
+  return {
+    schemaVersion: 1,
+    standingsVersion: SEASON_STANDINGS_VERSION,
+    rows: franchiseIds.map((franchiseId) => createEmptyStandingsRow(franchiseId, franchiseIds)),
+  };
+}

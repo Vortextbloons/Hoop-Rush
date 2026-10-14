@@ -62,6 +62,7 @@ const SIM_SHOWDOWN_REDUCED_MS = 400;
 const RESYNC_INTERVAL_MS = 15_000;
 const CLOCK_INTERVAL_MS = 1_000;
 const DUEL_AUTO_START_RETRY_MS = 5000;
+const NOTICE_TTL_MS = 6_000;
 const VERIFY_GUARD_PREFIX = 'hoop-rush:fixed-five:verify:';
 
 export type DuelGameVerification = 'pending' | 'verified' | 'mismatch';
@@ -376,9 +377,12 @@ export class FixedFiveRoomSession {
   private loading = true;
   private error: string | null = null;
   private notice: string | null = null;
+  private noticeAtMs = 0;
   private draftError: string | null = null;
   private reconnecting = false;
   private syncing = false;
+  private submissionsInFlight = 0;
+  private autoFlowsDeferred = false;
   private room: FixedFiveRoomSnapshot | null = null;
   private commands: FixedFiveCommand[] = [];
   private replay: DraftReplay | null = null;
@@ -526,6 +530,7 @@ export class FixedFiveRoomSession {
         .catch(() => {});
     }, RESYNC_INTERVAL_MS);
     this.clockTimer = setInterval(() => {
+      this.maybeExpireNotice();
       this.tickDuel();
       void this.resolveOverdue();
     }, CLOCK_INTERVAL_MS);
@@ -809,7 +814,7 @@ export class FixedFiveRoomSession {
       this.completedPairKey = null;
       this.completeNotReady = false;
       this.saveVerifyGuards();
-      this.notice = 'Server verification is available — continuing with receipt flow.';
+      this.setNotice('Server verification is available — continuing with receipt flow.');
     } catch (e) {
       if (!isMissingFunctionError(e) && !this.isDisposed()) {
         this.error = this.deps.friendlyError(e);
@@ -893,7 +898,7 @@ export class FixedFiveRoomSession {
       if (this.canRematchNow()) {
         return await this.createRematch();
       }
-      this.notice = 'Rematch requested — it starts once your opponent hits rematch too.';
+      this.setNotice('Rematch requested — it starts once your opponent hits rematch too.');
       this.publish();
       return null;
     } catch (e) {
@@ -946,11 +951,16 @@ export class FixedFiveRoomSession {
     if (this.isDisposed()) return;
     this.reconnecting = true;
     this.publish();
-    void this.sync(this.lastOrdinal).finally(() => {
-      if (this.isDisposed()) return;
-      this.reconnecting = false;
-      this.publish();
-    });
+    void this.sync(this.lastOrdinal)
+      .then(() => {
+        if (this.isDisposed()) return;
+        if (this.error === null) this.setNotice('Back in sync with the room.');
+      })
+      .finally(() => {
+        if (this.isDisposed()) return;
+        this.reconnecting = false;
+        this.publish();
+      });
   }
 
   private async boot(): Promise<void> {
@@ -1004,7 +1014,7 @@ export class FixedFiveRoomSession {
           this.completedPairKey = null;
           this.completeNotReady = false;
           this.saveVerifyGuards();
-          this.notice = 'Server verification is available — continuing with receipt flow.';
+          this.setNotice('Server verification is available — continuing with receipt flow.');
           await this.sync(this.lastOrdinal);
         } catch (e) {
           if (!isMissingFunctionError(e) && !this.isDisposed()) {
@@ -1070,6 +1080,18 @@ export class FixedFiveRoomSession {
         : (this.room?.phase ?? 'lobby');
   }
 
+  private setNotice(message: string | null): void {
+    this.notice = message;
+    this.noticeAtMs = message === null ? 0 : this.deps.now();
+  }
+
+  private maybeExpireNotice(): void {
+    if (this.notice === null || this.noticeAtMs === 0) return;
+    if (this.deps.now() - this.noticeAtMs < NOTICE_TTL_MS) return;
+    this.setNotice(null);
+    this.publish();
+  }
+
   private async sync(afterOrdinal: number): Promise<void> {
     if (this.isDisposed() || !this.room) return;
     this.syncing = true;
@@ -1079,7 +1101,6 @@ export class FixedFiveRoomSession {
       if (this.isDisposed()) return;
       if (fresh.length > 0) {
         const merged = mergeFixedFiveCommands(this.commands, fresh);
-        const addedCount = merged.length - this.commands.length;
         this.commands = merged;
         const byOrdinal = new Map(merged.map((c) => [c.ordinal, c] as const));
         let contiguous = this.lastOrdinal;
@@ -1092,7 +1113,6 @@ export class FixedFiveRoomSession {
         }
         if (this.isDisposed()) return;
         this.deps.saveActivityNow(this.roomId);
-        if (addedCount > 0) this.notice = 'Room is up to date.';
         this.refreshDerived();
       }
       const room = this.room;
@@ -1111,6 +1131,11 @@ export class FixedFiveRoomSession {
 
   private runAutoFlows(): void {
     if (this.isDisposed()) return;
+    if (this.submissionsInFlight > 0) {
+      this.autoFlowsDeferred = true;
+      return;
+    }
+    this.autoFlowsDeferred = false;
     this.maybeStartDuelPipeline();
     this.maybeFinalizeDuelSeries();
     this.maybeProposeOrConfirmGame();
@@ -1649,7 +1674,7 @@ export class FixedFiveRoomSession {
         if (this.isDisposed()) return;
         if (!failed) {
           this.failSent = false;
-          this.notice = 'Mismatch recorded — will retry marking the room once synced.';
+          this.setNotice('Mismatch recorded — will retry marking the room once synced.');
           this.publish();
         }
       });
@@ -1950,6 +1975,40 @@ export class FixedFiveRoomSession {
   ): Promise<boolean> {
     this.error = null;
     const commandId = this.newCommandId(options?.commandId);
+    this.submissionsInFlight += 1;
+    try {
+      return await this.dispatchCommand(payload, commandId, options);
+    } finally {
+      this.submissionsInFlight -= 1;
+      this.flushDeferredAutoFlows();
+    }
+  }
+
+  private flushDeferredAutoFlows(): void {
+    if (this.submissionsInFlight > 0 || !this.autoFlowsDeferred) return;
+    this.autoFlowsDeferred = false;
+    this.runAutoFlows();
+  }
+
+  private async resyncForRetry(): Promise<void> {
+    try {
+      const fresh = await this.deps.transport.snapshot(this.roomId);
+      if (this.isDisposed()) return;
+      this.applyRoomSnapshot(fresh);
+    } catch {}
+    await this.sync(this.lastOrdinal);
+  }
+
+  private async dispatchCommand(
+    payload: FixedFiveCommandPayload,
+    commandId: CommandId,
+    options?: {
+      actor?: FixedFiveParticipantId;
+      commandId?: string;
+      retry?: boolean;
+      quiet?: boolean;
+    },
+  ): Promise<boolean> {
     try {
       const result = await submitFixedFiveCommand({
         submitCommand: (command) => this.deps.transport.submitCommand(command),
@@ -1958,7 +2017,7 @@ export class FixedFiveRoomSession {
         actorParticipantId: options?.actor ?? this.selfId,
         payload,
         expectedRevision: this.room?.revision,
-        resync: () => this.sync(this.lastOrdinal),
+        resync: () => this.resyncForRetry().then(() => this.room?.revision),
         retry: options?.retry,
         retryAfterResync: () => {
           if (payload.kind === 'propose-result') {
@@ -1989,11 +2048,11 @@ export class FixedFiveRoomSession {
         this.room = { ...this.room, revision: receipt.revision };
       }
       if (result.retried && receipt.accepted) {
-        this.notice = 'Room changed while sending — resynced and recovered.';
+        this.setNotice('Room changed while sending — resynced and recovered.');
       }
       if (!receipt.accepted && receipt.rejectionCode === 'stale-revision') {
         if (!options?.quiet) {
-          this.notice = 'Stale command — resyncing once before a single retry.';
+          this.setNotice('Stale command — resyncing before a retry.');
           this.error = result.retried
             ? 'The room changed again during the retry. The command was not applied.'
             : 'The room changed and invalidated this command. It was not applied.';
@@ -2065,7 +2124,7 @@ export class FixedFiveRoomSession {
       const out = await this.deps.transport.complete(this.roomId, receiptId);
       if (this.isDisposed()) return false;
       if (!out.completed) {
-        this.notice = 'Completion not ready yet — waiting for the matching confirmation.';
+        this.setNotice('Completion not ready yet — waiting for the matching confirmation.');
         this.publish();
       }
       await this.sync(this.lastOrdinal);
@@ -2223,7 +2282,9 @@ export class FixedFiveRoomSession {
         this.verificationReceipt = null;
         this.verificationError = null;
         if (!this.isDisposed()) {
-          this.notice = 'Verification receipt was rejected — rebuilding it from the accepted log.';
+          this.setNotice(
+            'Verification receipt was rejected — rebuilding it from the accepted log.',
+          );
         }
       } else if (rejection.rejectionCode === 'invalid-receipt') {
         if (!this.isDisposed()) {
@@ -2233,8 +2294,9 @@ export class FixedFiveRoomSession {
       } else if (isMissingFunctionError(e)) {
         this.markReceiptsUnsupported();
       } else if (!this.isDisposed()) {
-        this.notice =
-          'Verification receipt is ready but not stored yet — retrying after the next sync.';
+        this.setNotice(
+          'Verification receipt is ready but not stored yet — retrying after the next sync.',
+        );
       }
       this.publish();
       if (!this.isDisposed()) void this.sync(this.lastOrdinal);
@@ -2249,7 +2311,7 @@ export class FixedFiveRoomSession {
     this.verificationError = null;
     this.saveVerifyGuards();
     if (!this.isDisposed()) {
-      this.notice = 'Checking that both players have the same result.';
+      this.setNotice('Checking that both players have the same result.');
       this.publish();
       this.runAutoFlows();
     }

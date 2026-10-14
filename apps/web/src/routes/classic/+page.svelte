@@ -1,6 +1,6 @@
 ﻿<script lang="ts">
   import { goto } from '$app/navigation';
-  import { base, resolve } from '$app/paths';
+  import { resolve } from '$app/paths';
   import type { RouteId } from './$types';
   import { X } from '@lucide/svelte';
   import type {
@@ -16,7 +16,7 @@
   import { franchiseAbbreviation, resolveEraTeamIdentity } from '@hoop-rush/data-contracts';
   import { classic, createEngineContext } from '@hoop-rush/engine';
   import { Dialog } from 'bits-ui';
-  import { clearDataLoaderCaches, getManifest, getPlayersIndex } from '$lib/data';
+  import { clearDataLoaderCaches, getManifest, getPlayersIndex } from '#lib/data.js';
   import {
     buildClassicCatalog,
     classicDraftSeed,
@@ -24,17 +24,17 @@
     clearClassicDraftState,
     loadClassicDraftState,
     saveClassicDraftState,
-  } from '$lib/classic-draft';
+  } from '#lib/classic-draft.js';
   import {
     registerClassicDraftNavigationGuard,
     setClassicGuardBypass,
     type ClassicGuardTarget,
-  } from '$lib/features/challenge/classic-nav-guard';
-  import { startClassicRun } from '$lib/features/challenge/start-challenge-run';
-  import { leaguePrecompute } from '$lib/features/challenge/league-precompute';
-  import { randomUUID } from '$lib/ids';
-  import { resolvePlayerRefs } from '$lib/player-refs';
-  import { poolSortLabel, presentationForVariant, variantLabel } from '$lib/draft-presentation';
+  } from '#lib/features/challenge/classic-nav-guard.js';
+  import { startClassicRun } from '#lib/features/challenge/start-challenge-run.js';
+  import { leaguePrecompute } from '#lib/features/challenge/league-precompute.js';
+  import { randomUUID } from '#lib/ids.js';
+  import { resolvePlayerRefs } from '#lib/player-refs.js';
+  import { poolSortLabel, presentationForVariant, variantLabel } from '#lib/draft-presentation.js';
   import {
     loadDraftFitContext,
     DRAFT_FIT_SLOT_ORDER,
@@ -42,24 +42,24 @@
     resolveDraftPoolDetails,
     scoreDraftPoolMemo,
     type DraftFitContext,
-  } from '$lib/draft-fit';
-  import { formatPositions } from '$lib/player-positions';
-  import PlayerFace from '$lib/components/PlayerFace.svelte';
-  import LineupCourt from '$lib/components/LineupCourt.svelte';
-  import LineupSummaryNav from '$lib/components/LineupSummaryNav.svelte';
-  import DraftValuePanel from '$lib/components/DraftValuePanel.svelte';
-  import DraftPoolBrowser from '$lib/components/draft/DraftPoolBrowser.svelte';
-  import DraftRoundCard from '$lib/components/draft/DraftRoundCard.svelte';
-  import ClassicRollReel from '$lib/components/classic/ClassicRollReel.svelte';
-  import AsyncState from '$lib/components/AsyncState.svelte';
-  import { arenaDraftPick, arenaError } from '$lib/arena-sound';
+  } from '#lib/draft-fit.js';
+  import { formatPositions } from '#lib/player-positions.js';
+  import PlayerFace from '#lib/components/PlayerFace.svelte';
+  import LineupCourt from '#lib/components/LineupCourt.svelte';
+  import LineupSummaryNav from '#lib/components/LineupSummaryNav.svelte';
+  import DraftValuePanel from '#lib/components/DraftValuePanel.svelte';
+  import DraftPoolBrowser from '#lib/components/draft/DraftPoolBrowser.svelte';
+  import DraftRoundCard from '#lib/components/draft/DraftRoundCard.svelte';
+  import ClassicRollReel from '#lib/components/classic/ClassicRollReel.svelte';
+  import AsyncState from '#lib/components/AsyncState.svelte';
+  import { arenaDraftPick, arenaError } from '#lib/arena-sound.js';
   let slotPickerModule: Promise<
-    typeof import('$lib/components/draft/SlotPickerDialog.svelte')
+    typeof import('#lib/components/draft/SlotPickerDialog.svelte')
   > | null = null;
   function loadSlotPickerDialog(): Promise<
-    typeof import('$lib/components/draft/SlotPickerDialog.svelte')
+    typeof import('#lib/components/draft/SlotPickerDialog.svelte')
   > {
-    slotPickerModule ??= import('$lib/components/draft/SlotPickerDialog.svelte');
+    slotPickerModule ??= import('#lib/components/draft/SlotPickerDialog.svelte');
     return slotPickerModule;
   }
   type IndexRow = PlayersIndexEntry;
@@ -171,17 +171,21 @@
   );
   const presentation = $derived(presentationForVariant(draft?.variant ?? 'ratings'));
   const roll = $derived(draft?.roll ?? null);
+
   const rollFranchise = $derived(
     roll
       ? (manifest?.modernFranchiseSlots.find((e) => e.franchiseId === roll.franchiseId) ?? null)
       : null,
   );
+
   const rollEra = $derived(
     roll ? (manifest?.eras.find((e) => e.eraId === roll.eraId) ?? null) : null,
   );
+
   const rollIdentity = $derived(
     manifest && roll ? resolveEraTeamIdentity(manifest, roll.franchiseId, roll.eraId) : null,
   );
+
   const rollRows = $derived(index && roll ? classicPoolRows(index, roll, presentation) : []);
   const poolHeading = $derived(
     roll && rollFranchise && rollEra && rollIdentity
@@ -189,11 +193,13 @@
       : 'Draft pool',
   );
   const countLabel = $derived(`${rollRows.length} players · ${poolSortLabel(presentation)}`);
+
   const reelAnnouncement = $derived(
     roll
       ? `Round ${draft!.round} of 5 · ${rollIdentity?.displayLabel ?? rollFranchise?.displayName ?? roll.franchiseId} · ${rollEra?.label ?? roll.eraId}`
       : '',
   );
+
   const rowByPickKey = $derived(
     index
       ? new Map(index.players.map((p) => [`${p.playerId}|${p.franchiseId}|${p.eraId}`, p] as const))
@@ -469,7 +475,9 @@
     setClassicGuardBypass(true);
     await clearClassicDraftState();
     const raw = target ? `${target.pathname}${target.search}` : '/';
-    void goto(resolve((raw.startsWith(base) ? raw.slice(base.length) : raw) as any));
+    void goto(
+      resolve((raw.startsWith(resolve('/')) ? raw.slice(resolve('/').length) : raw) as any),
+    );
   }
 </script>
 
@@ -487,18 +495,12 @@
         >
           Classic · {variantLabel(draft.variant)}
         </h1>
-        <p class="mt-3 max-w-xl text-sm text-muted-foreground">
-          Five rounds, one franchise and decade per round. One franchise reroll and one era reroll.
-        </p>
       {:else}
         <h1
           class="font-display mt-2 text-3xl font-extrabold tracking-tight uppercase sm:text-4xl md:text-5xl"
         >
           Five draft rounds
         </h1>
-        <p class="mt-3 max-w-xl text-sm text-muted-foreground">
-          Five rounds, one franchise and decade per round. Choose how you see players.
-        </p>
       {/if}
     </div>
     <div class="flex shrink-0 items-center gap-3">
@@ -571,7 +573,7 @@
               <span
                 aria-hidden="true"
                 class="transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none"
-                >&rarr;</span
+                >→</span
               >
             </span>
           </button>
@@ -591,7 +593,7 @@
               <span
                 aria-hidden="true"
                 class="transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none"
-                >&rarr;</span
+                >→</span
               >
             </span>
           </button>
@@ -696,13 +698,15 @@
                       size="sm"
                       fallbackInitials={row.firstName[0]! + row.lastName[0]!}
                     />
-                    <span class="min-w-0 flex-1 truncate text-sm font-bold">
-                      {row.displayName}
-                    </span>
+
+                    <span class="min-w-0 flex-1 truncate text-sm font-bold">{row.displayName}</span>
+
                     <span class="shrink-0 font-mono text-[10px] text-muted-foreground">
-                      {row.seasonKey} · {formatPositions(row.positionsPlayable)} ·
-                      {resolveEraTeamIdentity(manifest!, row.franchiseId, row.eraId)
-                        .abbreviationLabel ?? franchiseAbbreviation(row.franchiseId)}
+                      {row.seasonKey} · {formatPositions(row.positionsPlayable)} · {resolveEraTeamIdentity(
+                        manifest!,
+                        row.franchiseId,
+                        row.eraId,
+                      ).abbreviationLabel ?? franchiseAbbreviation(row.franchiseId)}
                     </span>
                   {:else}
                     <span class="min-w-0 flex-1 truncate text-sm font-bold">

@@ -1,7 +1,7 @@
 import { ChallengeSession, type ChallengePhase } from '@hoop-rush/application/challenge';
 import type { ChallengeRun } from '@hoop-rush/data-contracts';
-import { getEraSimulationProfile, getManifest } from '$lib/data';
-import { sleep } from '$lib/sleep';
+import { getEraSimulationProfile, getManifest } from '#lib/data.js';
+import { sleep } from '#lib/sleep.js';
 import { challengeRepository } from './challenge-repo';
 import { ChallengeWorkerJob } from './challenge-job';
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { LeaguePulseEntry } from '$lib/season/season-presentation';
+  import type { LeaguePulseEntry } from '#lib/season/season-presentation.js';
   let { entries }: { entries: LeaguePulseEntry[] } = $props();
   const kindLabel: Record<LeaguePulseEntry['kind'], string> = {
     threat: 'Threat',

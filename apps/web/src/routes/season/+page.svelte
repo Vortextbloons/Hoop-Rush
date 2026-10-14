@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { browser } from '$app/environment';
+  import { browser } from '$app/env';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { Dialog } from 'bits-ui';
-  import '$lib/season/season-theme.css';
+  import '#lib/season/season-theme.css';
   import type {
     HoopRushManifest,
     PlayersIndex,
@@ -14,32 +14,32 @@
     SeasonSchedule,
   } from '@hoop-rush/data-contracts';
   import type { SeasonRunPlayerSliceEntry } from '@hoop-rush/persistence';
-  import SeasonDraftBoard from '$lib/components/season/SeasonDraftBoard.svelte';
-  import FrontOfficePicker from '$lib/components/season/FrontOfficePicker.svelte';
-  import LeagueGenerationArena from '$lib/components/season/LeagueGenerationArena.svelte';
+  import SeasonDraftBoard from '#lib/components/season/SeasonDraftBoard.svelte';
+  import FrontOfficePicker from '#lib/components/season/FrontOfficePicker.svelte';
+  import LeagueGenerationArena from '#lib/components/season/LeagueGenerationArena.svelte';
   import type {
     SeasonDraftFlow,
     SeasonDraftFlowState,
     SeasonDraftGenerationProgress,
-  } from '$lib/season/season-draft-flow';
+  } from '#lib/season/season-draft-flow.js';
   import {
     draftStageOf,
     humanizeDraftError,
     humanizeDraftGenerationError,
-  } from '$lib/season/season-draft-flow';
-  import { buildVersionFaceIndex, type SeasonFaceRef } from '$lib/season/season-branding';
+  } from '#lib/season/season-draft-flow.js';
+  import { buildVersionFaceIndex, type SeasonFaceRef } from '#lib/season/season-branding.js';
   import {
     loadSeasonDraftCatalog,
     loadSeasonLeague,
     loadSeasonRosterTargets,
     loadSeasonSchedule,
-  } from '$lib/season/season-assets';
-  import { getManifest } from '$lib/data';
+  } from '#lib/season/season-assets.js';
+  import { getManifest } from '#lib/data.js';
   import { DexieSeasonDraftRepository } from '@hoop-rush/persistence';
-  import { getSeasonRunRepository } from '$lib/season/season-repo';
-  import { clearAllSeasonData } from '$lib/season/season-data-recovery';
-  import { seasonRootSeed } from '$lib/ids';
-  import { buildSeasonRunFromGeneration, sha256Hex } from '$lib/season/season-run-builder';
+  import { getSeasonRunRepository } from '#lib/season/season-repo.js';
+  import { clearAllSeasonData } from '#lib/season/season-data-recovery.js';
+  import { seasonRootSeed } from '#lib/ids.js';
+  import { buildSeasonRunFromGeneration, sha256Hex } from '#lib/season/season-run-builder.js';
   let manifest = $state<HoopRushManifest | null>(null);
   let league = $state<SeasonLeague | null>(null);
   let schedule = $state<SeasonSchedule | null>(null);
@@ -124,7 +124,7 @@
             try {
               const snapshot = await repo.loadActiveRun();
               if (snapshot !== null) {
-                resumeHref = resolve('/season/run');
+                resumeHref = resolve('season/run/');
               } else {
                 brokenRunError =
                   'A saved season was found but its checkpoint is missing. Restart to clear the broken save and start fresh.';
@@ -156,7 +156,7 @@
     if (flow !== null) return flow;
     const catalog = await loadSeasonDraftCatalog();
     const targets = rosterTargets ?? (await loadSeasonRosterTargets());
-    const { SeasonDraftFlow } = await import('$lib/season/season-draft-flow');
+    const { SeasonDraftFlow } = await import('#lib/season/season-draft-flow.js');
     const instance = new SeasonDraftFlow(new DexieSeasonDraftRepository(), catalog, targets);
     instance.onPhaseChange = () => {
       if (flow !== null) board = flow.state();
@@ -166,7 +166,7 @@
       if (flow !== null) board = flow.state();
     };
     if (playersIndex === null) {
-      const { getPlayersIndex } = await import('$lib/data');
+      const { getPlayersIndex } = await import('#lib/data.js');
       playersIndex = await getPlayersIndex();
     }
     faces = buildVersionFaceIndex(
@@ -183,6 +183,7 @@
     flow = instance;
     return instance;
   }
+
   const draftStatus = $derived(
     board?.draft?.status === 'drafting' ||
       board?.draft?.status === 'finalized' ||
@@ -190,6 +191,7 @@
       ? board.draft.status
       : ('none' as const),
   );
+
   const draftStage = $derived(
     draftStageOf({
       draftStatus,
@@ -317,9 +319,11 @@
       const draftRepo = new DexieSeasonDraftRepository();
       const stored = await draftRepo.loadSeasonDraft();
       if (!stored) throw new Error('The completed draft record is missing.');
+
       const scheduleContentHash =
         (await sha256Hex(`${JSON.stringify(schedule)}\n`)) ??
         manifest?.season?.schedule?.contentHash;
+
       if (!scheduleContentHash) {
         throw new Error('Unable to determine the schedule content hash.');
       }
@@ -334,7 +338,7 @@
       });
       const slice = buildPlayerSlice(run, flow.catalog);
       await repo.promoteSeasonDraftToRun(stored, run, slice);
-      await goto(resolve('/season/run'));
+      await goto(resolve('season/run/'));
     } catch (error) {
       promoteError = error instanceof Error ? error.message : String(error);
     } finally {
@@ -391,9 +395,6 @@
       <div class="min-w-0">
         <p class="sr-eyebrow">Season Run</p>
         <h1 class="sr-page-title sr-arrive mt-2 break-words">Draft 10. Coach 82.</h1>
-        <p class="mt-3 max-w-xl text-xs text-muted-foreground">
-          Choose an executive, then build your roster.
-        </p>
         <p class="mt-1 font-mono text-[11px] tracking-wide text-muted-foreground">
           30 teams • 82 games • 10-player roster • 1 champion
         </p>
@@ -429,9 +430,9 @@
         </h2>
         <p class="mt-2 text-xs text-muted-foreground">{brokenRunError}</p>
         <div class="mt-4 flex flex-wrap gap-2">
-          <button type="button" onclick={() => (clearOpen = true)} class="sr-btn-danger">
-            Restart season
-          </button>
+          <button type="button" onclick={() => (clearOpen = true)} class="sr-btn-danger"
+            >Restart season</button
+          >
         </div>
         {#if clearError}
           <p role="alert" class="mt-3 text-xs text-destructive">{clearError}</p>
@@ -443,8 +444,7 @@
         <h2 class="font-display mt-2 text-xl font-extrabold uppercase tracking-tight">
           Back to your season
         </h2>
-        <p class="mt-2 text-xs text-muted-foreground">Pick up right where you left off.</p>
-        <a href={resolve('/season/run')} class="sr-btn mt-4">Continue season</a>
+        <a href={resolve('season/run/')} class="sr-btn mt-4">Continue season</a>
       </div>
     {:else if draftStage === 'executive'}
       <div class="mx-auto mt-6 flex w-full max-w-3xl flex-col pb-10">
@@ -453,9 +453,6 @@
           <h2 class="font-display mt-2 text-xl font-extrabold uppercase tracking-tight">
             Pick your executive
           </h2>
-          <p class="mt-2 max-w-xl text-xs text-muted-foreground">
-            Choose one for the season. Their ability and drawback affect your run.
-          </p>
           <div class="mt-5">
             <FrontOfficePicker
               value={executiveId}

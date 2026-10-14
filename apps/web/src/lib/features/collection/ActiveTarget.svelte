@@ -2,7 +2,7 @@
   import { resolve } from '$app/paths';
   import type { ComponentProps } from 'svelte';
   import type { HoopRushManifest } from '@hoop-rush/data-contracts';
-  import PlayerFace from '$lib/components/PlayerFace.svelte';
+  import PlayerFace from '#lib/components/PlayerFace.svelte';
 
   let {
     playerName,

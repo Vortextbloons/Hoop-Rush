@@ -16,14 +16,14 @@ const mocks = vi.hoisted(() => ({
 vi.mock('./fixed-five-transport', () => ({
   getFixedFiveTransport: () => ({ resume: mocks.fixedResume }),
 }));
-vi.mock('$lib/supabase-runtime', () => ({
+vi.mock('#lib/supabase-runtime.js', () => ({
   getMultiplayerClient: () => Promise.resolve({ rpc: mocks.rpc }),
 }));
 vi.mock('./fixed-five-identity', () => ({ saveFixedFiveMembership: mocks.saveFixed }));
-vi.mock('$lib/features/draft-duel/draft-duel-transport', () => ({
+vi.mock('#lib/features/draft-duel/draft-duel-transport.js', () => ({
   getDraftDuelTransport: () => ({ resume: mocks.draftResume }),
 }));
-vi.mock('$lib/features/draft-duel/draft-duel-identity', () => ({
+vi.mock('#lib/features/draft-duel/draft-duel-identity.js', () => ({
   saveDraftDuelMembership: mocks.saveDraft,
 }));
 

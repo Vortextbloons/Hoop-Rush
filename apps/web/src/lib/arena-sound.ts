@@ -35,7 +35,6 @@ export function toggleArenaMuted(): boolean {
   return next;
 }
 
-/** Default to muted on low-end devices so we never spin up an AudioContext there. */
 export function initArenaSoundForLiteMode(): void {
   if (!isLiteMode()) return;
   try {

@@ -2,16 +2,16 @@
   import type { SeasonGameRule } from '@hoop-rush/data-contracts';
   import RuleBadge from './RuleBadge.svelte';
   import type { HoopRushManifest } from '@hoop-rush/data-contracts';
-  import SeasonPlayerIdentity from '$lib/components/season/SeasonPlayerIdentity.svelte';
-  import SeasonTeamLogo from '$lib/components/season/SeasonTeamLogo.svelte';
-  import { eraIdentityOf, franchiseIdentityOf } from '$lib/season/season-branding';
-  import type { SeasonRunShellData } from '$lib/season/season-shell-context';
-  import { oneDecimal } from '$lib/format';
+  import SeasonPlayerIdentity from '#lib/components/season/SeasonPlayerIdentity.svelte';
+  import SeasonTeamLogo from '#lib/components/season/SeasonTeamLogo.svelte';
+  import { eraIdentityOf, franchiseIdentityOf } from '#lib/season/season-branding.js';
+  import type { SeasonRunShellData } from '#lib/season/season-shell-context.js';
+  import { oneDecimal } from '#lib/format.js';
   import type {
     SeasonTeamDetail,
     SeasonTeamPlayerRow,
     SeasonTeamPlayerStats,
-  } from '$lib/season/season-team-detail-view';
+  } from '#lib/season/season-team-detail-view.js';
   let {
     detail,
     manifest,

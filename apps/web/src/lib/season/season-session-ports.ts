@@ -1,8 +1,8 @@
 import type { SeasonSessionOptions } from '@hoop-rush/application/season';
 import type { SeasonSchedule } from '@hoop-rush/data-contracts';
 import { DexieSeasonDraftRepository } from '@hoop-rush/persistence';
-import { newSeasonId } from '$lib/ids';
-import { sleep } from '$lib/sleep';
+import { newSeasonId } from '#lib/ids.js';
+import { sleep } from '#lib/sleep.js';
 import {
   loadSeasonDraftCatalog,
   loadSeasonEraProfile,

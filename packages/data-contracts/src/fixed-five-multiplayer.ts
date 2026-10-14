@@ -459,6 +459,7 @@ export interface FixedFiveMultiplayerTransport {
     snapshot: FixedFiveRoomSnapshot;
     membership: FixedFiveRoomMembership;
   }>;
+  snapshot(roomId: string): Promise<FixedFiveRoomSnapshot>;
   subscribe(
     roomId: string,
     handler: (snapshot: FixedFiveRoomSnapshot) => void,

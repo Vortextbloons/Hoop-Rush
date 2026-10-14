@@ -6,8 +6,8 @@
     arenaConfirm,
     isArenaMuted,
     toggleArenaMuted,
-  } from '$lib/arena-sound';
-  import { LITE_TOGGLE_EVENT } from '$lib/device-capabilities';
+  } from '#lib/arena-sound.js';
+  import { LITE_TOGGLE_EVENT } from '#lib/device-capabilities.js';
 
   let { className = '' }: { className?: string } = $props();
   let muted = $state(false);

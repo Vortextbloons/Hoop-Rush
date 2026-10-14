@@ -1,7 +1,7 @@
 <script lang="ts">
-  import HavocHistoryList from '$lib/features/havoc/HavocHistoryList.svelte';
-  import { HavocHistoryState } from '$lib/features/havoc/havoc-history-state.svelte';
-  import { getHavocService } from '$lib/features/havoc/havoc-service';
+  import HavocHistoryList from '#lib/features/havoc/HavocHistoryList.svelte';
+  import { HavocHistoryState } from '#lib/features/havoc/havoc-history-state.svelte.js';
+  import { getHavocService } from '#lib/features/havoc/havoc-service.js';
 
   let historyState = $state<HavocHistoryState | null>(null);
   let serviceError = $state<string | null>(null);

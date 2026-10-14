@@ -1,16 +1,16 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
   import { Dialog } from 'bits-ui';
-  import DialogShell from '$lib/components/DialogShell.svelte';
-  import SponsorMark from '$lib/components/season/SponsorMark.svelte';
-  import SponsorOfferCard from '$lib/components/season/SponsorOfferCard.svelte';
+  import DialogShell from '#lib/components/DialogShell.svelte';
+  import SponsorMark from '#lib/components/season/SponsorMark.svelte';
+  import SponsorOfferCard from '#lib/components/season/SponsorOfferCard.svelte';
   import {
     SPONSOR_SLOT_LABELS,
     sponsorHistorySummary,
     type SponsorBoardHistoryEntry,
     type SponsorOfferCard as SponsorOffer,
     type SponsorVaultEntry,
-  } from '$lib/season/sponsor-gear-view';
+  } from '#lib/season/sponsor-gear-view.js';
   import type { SeasonSponsorSlot } from '@hoop-rush/data-contracts';
 
   const SLOT_FILTERS: readonly { value: SeasonSponsorSlot | 'all'; label: string }[] = [

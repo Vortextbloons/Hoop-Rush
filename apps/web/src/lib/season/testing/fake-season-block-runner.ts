@@ -14,7 +14,7 @@ import {
   createSeasonBlockRunner,
   type SeasonBlockRunner,
   type SeasonBlockTransport,
-} from '$lib/season/season-block-runner';
+} from '#lib/season/season-block-runner.js';
 import type { SeasonArtifactUrls } from '../season-assets';
 import {
   describeSeasonBlockJobError,

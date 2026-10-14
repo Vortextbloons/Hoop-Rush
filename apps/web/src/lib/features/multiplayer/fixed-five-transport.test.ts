@@ -9,7 +9,7 @@ import {
 import {
   createFakeSupabaseHarness,
   type FakeSupabaseHarness,
-} from '$lib/testing/fake-supabase-client';
+} from '#lib/testing/fake-supabase-client.js';
 import { createFixedFiveTransport } from './fixed-five-transport';
 
 const mockState = vi.hoisted(() => {

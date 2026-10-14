@@ -6,18 +6,18 @@
     CollectionProgressionRules,
   } from '@hoop-rush/data-contracts';
   import { validateCollectionActiveTeam } from '@hoop-rush/engine';
-  import AsyncState from '$lib/components/AsyncState.svelte';
-  import CollectionCardFace from '$lib/features/collection/CollectionCardFace.svelte';
-  import CurrencyIcon from '$lib/features/collection/CurrencyIcon.svelte';
+  import AsyncState from '#lib/components/AsyncState.svelte';
+  import CollectionCardFace from '#lib/features/collection/CollectionCardFace.svelte';
+  import CurrencyIcon from '#lib/features/collection/CurrencyIcon.svelte';
   import {
     ensurePlayStateSnapshot,
     loadCommittedGame,
-  } from '$lib/features/collection/collection-hub.ts';
+  } from '#lib/features/collection/collection-hub.ts';
   import {
     humanizeIdentifier,
     setProgressViews,
-  } from '$lib/features/collection/collection-progression-view.ts';
-  import { ultimateNextActionOf } from '$lib/features/collection/ultimate-hub.ts';
+  } from '#lib/features/collection/collection-progression-view.ts';
+  import { ultimateNextActionOf } from '#lib/features/collection/ultimate-hub.ts';
   import { createUltimatePageShell } from './ultimate-page.svelte.ts';
 
   const pageShell = createUltimatePageShell({
@@ -76,6 +76,7 @@
   const affordablePack = $derived.by(() => {
     const state = collectionState;
     if (!state?.claimedWelcome || !catalog) return null;
+
     return (
       catalog.packs.find((pack) => state.balances[pack.priceCurrency] >= pack.priceAmount)
         ?.packId ?? null
@@ -265,7 +266,7 @@
               stroke-width="1.8"
               stroke-linecap="round"
               stroke-linejoin="round"
-            />
+            ></path>
           </svg>
         </a>
         <div class="ur-hub-scoreline" aria-label="Collection totals">
@@ -280,13 +281,13 @@
                 fill="none"
                 stroke="currentColor"
                 stroke-width="1.6"
-              />
+              ></rect>
               <path
                 d="M5.5 5.5V4a1.5 1.5 0 0 1 1.5-1.5h8A1.5 1.5 0 0 1 16.5 4v9"
                 fill="none"
                 stroke="currentColor"
                 stroke-width="1.6"
-              />
+              ></path>
             </svg>
             <strong class="ur-number">{fmt(ownedCount)}</strong>
             <span>Cards owned</span>
@@ -306,14 +307,14 @@
                 stroke="currentColor"
                 stroke-width="1.6"
                 stroke-linejoin="round"
-              />
+              ></path>
               <path
                 d="m2.5 10 7.5 4 7.5-4M2.5 13.5 10 17.5l7.5-4"
                 fill="none"
                 stroke="currentColor"
                 stroke-width="1.6"
                 stroke-linejoin="round"
-              />
+              ></path>
             </svg>
             <strong class="ur-number">{totalCount > 0 ? fmt(totalCount) : '—'}</strong>
             <span>In the collection</span>
@@ -350,7 +351,7 @@
                 stroke="currentColor"
                 stroke-width="1.4"
                 stroke-linejoin="round"
-              />
+              ></path>
             </svg>
             {savedTeam ? 'Edit lineup' : 'Build team'}
           </a>
@@ -382,8 +383,8 @@
                   <img
                     src={asset(
                       card?.family === 'Heat Check'
-                        ? '/ultimate/cards/heat-check/emblem.png'
-                        : '/ultimate/logo.png',
+                        ? 'ultimate/cards/heat-check/emblem.png'
+                        : 'ultimate/logo.png',
                     )}
                     alt=""
                     width="18"
@@ -455,14 +456,14 @@
                   stroke="currentColor"
                   stroke-width="1.6"
                   stroke-linejoin="round"
-                />
+                ></path>
                 <path
                   d="m2.5 10 7.5 4 7.5-4M2.5 13.5 10 17.5l7.5-4"
                   fill="none"
                   stroke="currentColor"
                   stroke-width="1.6"
                   stroke-linejoin="round"
-                />
+                ></path>
               </svg>
               <strong>{objectiveSummaryOf(recentGame)}</strong>
               <span>Objective</span>
@@ -496,6 +497,7 @@
             <ul class="ur-set-progress-list">
               {#each chaseSets as set (set.setId)}
                 {@const tone = setTone(set.title, set.setId)}
+
                 {@const pct =
                   set.requiredCount > 0
                     ? Math.round((set.ownedCount / set.requiredCount) * 100)
@@ -528,7 +530,7 @@
             <div class="ur-pack-art" aria-hidden="true">
               <div class="ur-pack ur-pack--back">
                 <img
-                  src={asset('/ultimate/logo.png')}
+                  src={asset('ultimate/logo.png')}
                   alt=""
                   width="40"
                   height="40"
@@ -538,7 +540,7 @@
               </div>
               <div class="ur-pack ur-pack--front">
                 <img
-                  src={asset('/ultimate/logo.png')}
+                  src={asset('ultimate/logo.png')}
                   alt=""
                   width="52"
                   height="52"
@@ -571,7 +573,7 @@
                     aria-hidden="true"
                   >
                     <img
-                      src={asset('/ultimate/logo.png')}
+                      src={asset('ultimate/logo.png')}
                       alt=""
                       width="26"
                       height="26"
@@ -610,19 +612,19 @@
                 fill="none"
                 stroke="currentColor"
                 stroke-width="1.6"
-              />
+              ></rect>
               <path
                 d="M2.5 4.5h15V7.5h-15zM10 4.5v13"
                 fill="none"
                 stroke="currentColor"
                 stroke-width="1.6"
-              />
+              ></path>
               <path
                 d="M10 4.5C7.5 4.5 5.5 4 5.5 2.8 5.5 1.9 6.2 1.5 7 1.5c1.6 0 3 3 3 3Zm0 0c2.5 0 4.5-.5 4.5-1.7 0-.9-.7-1.3-1.5-1.3-1.6 0-3 3-3 3Z"
                 fill="none"
                 stroke="currentColor"
                 stroke-width="1.3"
-              />
+              ></path>
             </svg>
           </span>
           <span class="ur-receipt-copy">

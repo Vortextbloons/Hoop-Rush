@@ -1,6 +1,6 @@
 import { DraftDuelSession, type DraftDuelSessionDeps } from '@hoop-rush/application/draft-duel';
-import { newRequestId } from '$lib/ids';
-import { getPersistence } from '$lib/persistence';
+import { newRequestId } from '#lib/ids.js';
+import { getPersistence } from '#lib/persistence.js';
 import { getDraftDuelTransport } from './draft-duel-transport';
 import { DraftDuelRunner } from './draft-duel-runner';
 import {

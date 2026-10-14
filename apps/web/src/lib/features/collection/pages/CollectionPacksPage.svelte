@@ -1,6 +1,6 @@
 <script lang="ts">
   import { asset, resolve } from '$app/paths';
-  import '$lib/features/collection/ultimate-theme.css';
+  import '#lib/features/collection/ultimate-theme.css';
   import type {
     CollectionIndexEntry,
     CollectionProgressionRules,
@@ -9,18 +9,18 @@
   import { COLLECTION_RARITY_ORDER } from '@hoop-rush/data-contracts';
   import { z } from 'zod';
   import { describeCollectionPackOdds, describeCollectionTargetOdds } from '@hoop-rush/engine';
-  import AsyncState from '$lib/components/AsyncState.svelte';
+  import AsyncState from '#lib/components/AsyncState.svelte';
   import { createUltimatePageShell } from './ultimate-page.svelte.ts';
-  import ActiveTarget from '$lib/features/collection/ActiveTarget.svelte';
-  import CurrencyIcon from '$lib/features/collection/CurrencyIcon.svelte';
-  import { loadCollectionIndex } from '$lib/features/collection/collection-assets.ts';
+  import ActiveTarget from '#lib/features/collection/ActiveTarget.svelte';
+  import CurrencyIcon from '#lib/features/collection/CurrencyIcon.svelte';
+  import { loadCollectionIndex } from '#lib/features/collection/collection-assets.ts';
   import {
     openPack,
     setTargetPlayer,
     StaleCollectionPreviewError,
-  } from '$lib/features/collection/collection-hub.ts';
-  import { getCollectionRepo } from '$lib/features/collection/collection-hub.ts';
-  import { collectionErrorMessage } from '$lib/features/collection/collection-errors.ts';
+  } from '#lib/features/collection/collection-hub.ts';
+  import { getCollectionRepo } from '#lib/features/collection/collection-hub.ts';
+  import { collectionErrorMessage } from '#lib/features/collection/collection-errors.ts';
   import {
     isTargetedPullSlot,
     packTargetOddsView,
@@ -30,11 +30,11 @@
     targetedSummaryForPlayer,
     type PackTargetOddsView,
     type TargetedReceiptFacts,
-  } from '$lib/features/collection/collection-targeting-view.ts';
-  import { arenaDuplicate, arenaError, arenaPackOpen, arenaPackReveal } from '$lib/arena-sound';
-  import PackOpenTheater from '$lib/features/collection/PackOpenTheater.svelte';
-  import { collectionCardViewOf } from '$lib/features/collection/collection-card-view.ts';
-  import { packRevealPlanOf } from '$lib/features/collection/pack-reveal-plan.ts';
+  } from '#lib/features/collection/collection-targeting-view.ts';
+  import { arenaDuplicate, arenaError, arenaPackOpen, arenaPackReveal } from '#lib/arena-sound.js';
+  import PackOpenTheater from '#lib/features/collection/PackOpenTheater.svelte';
+  import { collectionCardViewOf } from '#lib/features/collection/collection-card-view.ts';
+  import { packRevealPlanOf } from '#lib/features/collection/pack-reveal-plan.ts';
 
   const page = createUltimatePageShell({
     failureMessage: 'Could not load the packs.',
@@ -91,14 +91,14 @@
   };
 
   const PACK_COVER_ART: Record<string, string> = {
-    'tip-off': asset('/ultimate/packs/tip-off.jpg'),
-    'fast-break': asset('/ultimate/packs/fast-break.jpg'),
-    'full-court': asset('/ultimate/packs/full-court.jpg'),
-    'main-event': asset('/ultimate/packs/main-event.jpg'),
+    'tip-off': asset('ultimate/packs/tip-off.jpg'),
+    'fast-break': asset('ultimate/packs/fast-break.jpg'),
+    'full-court': asset('ultimate/packs/full-court.jpg'),
+    'main-event': asset('ultimate/packs/main-event.jpg'),
   };
   const SPECIAL_PACK_COVER_ART: Record<string, string> = {
-    'Heat Check': asset('/ultimate/packs/spotlight-heat-check.jpg'),
-    'Arm Guard': asset('/ultimate/cards/arm-guard/luka-doncic.png'),
+    'Heat Check': asset('ultimate/packs/spotlight-heat-check.jpg'),
+    'Arm Guard': asset('ultimate/cards/arm-guard/luka-doncic.png'),
   };
 
   const activeSpecialFamily = $derived.by(() =>
@@ -106,6 +106,7 @@
       ? 'Arm Guard'
       : (catalog?.cards.find((card) => card.family !== 'Base')?.family ?? 'Featured Special'),
   );
+
   const activeSpecialCoverArt = $derived(SPECIAL_PACK_COVER_ART[activeSpecialFamily] ?? null);
 
   function formatChance(probability: number): string {
@@ -157,9 +158,7 @@
         }),
       };
       animateReceipt = false;
-    } catch {
-      // A missing receipt simply means nothing to restore.
-    }
+    } catch {}
   }
 
   const balances = $derived(collectionState?.balances ?? { Coins: 0, Exchange: 0 });
@@ -262,9 +261,7 @@
           'collection-last-receipt',
           JSON.stringify({ pullSequence: outcome.pull.pullSequence }),
         );
-      } catch {
-        // Receipt restore is best-effort.
-      }
+      } catch {}
       announcement = [
         `Pack opened. ${receipt.cardsAdded} new cards, plus ${receipt.exchangeGained} Exchange.`,
         targeting?.summary ?? '',
@@ -323,9 +320,7 @@
   function takeReceipt(): void {
     try {
       sessionStorage.removeItem('collection-last-receipt');
-    } catch {
-      // Receipt recovery is best-effort.
-    }
+    } catch {}
     receipt = null;
     animateReceipt = false;
   }
@@ -472,8 +467,8 @@
               <span class="foil-name"
                 >{pack.packId === 'spotlight'
                   ? activeSpecialFamily
-                  : (PACK_LABELS[pack.packId] ?? pack.packId)}</span
-              >
+                  : (PACK_LABELS[pack.packId] ?? pack.packId)}
+              </span>
               <span class="foil-count ur-number">{pack.slots.length}</span>
               <span class="foil-unit">{pack.slots.length === 1 ? 'CARD' : 'CARDS'}</span>
             </div>

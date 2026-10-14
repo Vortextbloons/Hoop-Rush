@@ -143,16 +143,6 @@ export interface HavocFieldGoalValue {
   contributions: HavocFieldGoalContribution[];
 }
 
-/**
- * Exact `(nominal + Σ pre-addends) × Π multipliers + dunk bonus` resolution in
- * the stable evidence order. Roulette and reverse-basketball apply before
- * multipliers. At most one multiplier applies per make: the first active source
- * in stable order (heat-check, putback, bounty, double-or-nothing,
- * buzzer-bandit) wins; The Bounty triples while the others double. The
- * four-point-dunk bonus applies after multipliers so multipliers never multiply
- * it. `contributions` are the incremental score deltas at the point each
- * component applies; they sum to `points - nominal`.
- */
 export function havocFieldGoalValue(input: HavocFieldGoalValueInput): HavocFieldGoalValue {
   const addends: HavocFieldGoalValue['addends'] = [];
   const multipliers: HavocFieldGoalValue['multipliers'] = [];
@@ -327,11 +317,6 @@ export interface HavocCoverageAssignment {
   helpInstanceIds: string[];
 }
 
-/**
- * Deterministic per-trip primary defender assignment. Each defender covers at
- * most one offensive actor; when the offense has more actors than the defense,
- * the surplus attackers are uncovered.
- */
 export function havocCoverageAssignment(
   offenseInstanceIds: readonly string[],
   defenseInstanceIds: readonly string[],
@@ -480,8 +465,6 @@ class HavocGameRuntime implements HavocRuntimeHooks {
     return team;
   }
 
-  // ---------------------------------------------------------------- identity
-
   keyOf(player: SimulationPlayer): string {
     return this.playerInstance.get(player)?.instanceId ?? `unknown:${player.playerId}`;
   }
@@ -573,8 +556,6 @@ class HavocGameRuntime implements HavocRuntimeHooks {
     }
   }
 
-  // ------------------------------------------------------------------ clock
-
   fullShotClock(side: SideIndex): number {
     return this.fullShotClockOf(side);
   }
@@ -602,8 +583,6 @@ class HavocGameRuntime implements HavocRuntimeHooks {
       limitSeconds: Math.max(1, Math.round(limitSeconds)),
     });
   }
-
-  // -------------------------------------------------------------- turnovers
 
   cancelTurnover(offense: SideIndex, handler: SimulationPlayer): boolean {
     const participant = this.participantOf(handler);
@@ -654,8 +633,6 @@ class HavocGameRuntime implements HavocRuntimeHooks {
       side: this.teams[defense].side,
     });
   }
-
-  // ----------------------------------------------------------------- shots
 
   planShot(args: {
     offense: SideIndex;
@@ -1470,8 +1447,6 @@ class HavocGameRuntime implements HavocRuntimeHooks {
     };
   }
 
-  // -------------------------------------------------------------- lifecycle
-
   beginPossession(offense: SideIndex, possessionId: number): void {
     this.possessionId = possessionId;
     this.shotKindOrdinal = 0;
@@ -1932,8 +1907,6 @@ class HavocGameRuntime implements HavocRuntimeHooks {
     return { ownerInstanceId: grant.ownerInstanceId };
   }
 
-  // ----------------------------------------------------------- tape writing
-
   private clock(): number {
     const seconds = this.tripContext?.state.secondsRemaining ?? 0;
     return Math.max(0, Math.round(seconds));
@@ -1967,8 +1940,6 @@ class HavocGameRuntime implements HavocRuntimeHooks {
     this.scoreSeq += 1;
     return sequence;
   }
-
-  // -------------------------------------------------------------- results
 
   rollupsOf(): HavocMutationRollup[] {
     const rollups: HavocMutationRollup[] = [];

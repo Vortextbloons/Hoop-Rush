@@ -298,12 +298,6 @@ export function auditPlayerStatSanity(
   key: string,
   displayName: string,
 ): string[] {
-  // Impossible box-score shapes mean a partial family leaked through as a
-  // total. Low minutes alone are NOT corruption — end-of-bench players really
-  // do play 40+ games at 4 mpg — and a zero-minutes row means unobserved (the
-  // pool schema has no null for minutes), so this fires only on
-  // contradictions: makes above attempts, and scoring volume no logged
-  // minutes could physically produce.
   const failures: string[] = [];
   const finite = (value: unknown): value is number =>
     typeof value === 'number' && Number.isFinite(value);

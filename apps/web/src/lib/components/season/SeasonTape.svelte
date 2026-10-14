@@ -6,7 +6,7 @@
     type SeasonAcceptedBlock,
     type SeasonGameSummary,
   } from '@hoop-rush/data-contracts';
-  import { didWin, recordLabel } from '$lib/season/season-presentation';
+  import { didWin, recordLabel } from '#lib/season/season-presentation.js';
   let {
     acceptedBlocks,
     nextBlockIndex,

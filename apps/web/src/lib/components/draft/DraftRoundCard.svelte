@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { HoopRushManifest } from '@hoop-rush/data-contracts';
-  import TeamLogo from '$lib/components/TeamLogo.svelte';
+  import TeamLogo from '#lib/components/TeamLogo.svelte';
   let {
     label,
     round,

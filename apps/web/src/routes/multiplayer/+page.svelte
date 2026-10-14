@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
-  import { asset, resolve } from '$app/paths';
+  import { resolve } from '$app/paths';
+  import { staticAsset } from '#lib/asset-url.js';
   import {
     Swords,
     Zap,
@@ -33,13 +34,13 @@
     type FixedFiveVersionLocks,
   } from '@hoop-rush/data-contracts';
   import { ENGINE_VERSION } from '@hoop-rush/engine';
-  import { DraftDuelController } from '$lib/features/draft-duel/draft-duel-controller.svelte';
-  import { isMultiplayerConfigured } from '$lib/supabase-runtime';
+  import { DraftDuelController } from '#lib/features/draft-duel/draft-duel-controller.svelte.js';
+  import { isMultiplayerConfigured } from '#lib/supabase-runtime.js';
   import {
     friendlyFixedFiveJoinError,
     loadLastFixedFiveRoomId,
-  } from '$lib/features/multiplayer/fixed-five-identity';
-  import { loadRunPreamble } from '$lib/run-preamble';
+  } from '#lib/features/multiplayer/fixed-five-identity.js';
+  import { loadRunPreamble } from '#lib/run-preamble.js';
   import {
     lobbyCommand,
     getLobby,
@@ -48,7 +49,7 @@
     rememberLobby,
     loadLobbyId,
     resumeMultiplayerGame,
-  } from '$lib/features/multiplayer/multiplayer-lobby';
+  } from '#lib/features/multiplayer/multiplayer-lobby.js';
   type View = 'choose' | 'create' | 'join';
   let view = $state<View>('choose');
   let lobby = $state<MultiplayerLobby | null>(null);
@@ -274,7 +275,7 @@
         if (!result.canStart && result.gameKind && result.gameRoomId) {
           await openGame(result.gameKind, result.gameRoomId);
         } else {
-          await goto(resolve(`/multiplayer?lobby=${result.id}`));
+          await goto(resolve(`multiplayer/?lobby=${result.id}`));
           lobby = result;
           view = 'create';
         }
@@ -287,7 +288,7 @@
   }
   async function resumeLast() {
     if (lastLobbyId) {
-      await goto(resolve(`/multiplayer?lobby=${lastLobbyId}`));
+      await goto(resolve(`multiplayer/?lobby=${lastLobbyId}`));
       view = 'create';
       await refreshLobby(lastLobbyId);
       return;
@@ -305,7 +306,7 @@
       lobby = null;
       lastLobbyId = null;
       view = 'choose';
-      await goto(resolve('/multiplayer'));
+      await goto(resolve('multiplayer/'));
     } catch (e) {
       if (mounted) error = friendlyFixedFiveJoinError(e);
     } finally {
@@ -313,8 +314,6 @@
     }
   }
 </script>
-
-﻿
 
 <svelte:head>
   <title>Multiplayer — Hoop Rush</title>
@@ -333,15 +332,11 @@
               ? 'Join a room'
               : 'Choose your match'}
       </h1>
-      <p class="intro">One room. Every mode. Play again with the same opponent.</p>
     </div>
     {#if lastRoomId || lastLobbyId}
       <div class="resume-room">
         <Users size={24} aria-hidden="true" />
-        <div>
-          <span class="eyebrow">Your last room</span>
-          <p>Get back in the game</p>
-        </div>
+        <span class="eyebrow">Your last room</span>
         <button type="button" onclick={resumeLast} class="resume-button"
           >Resume <ArrowRight size={16} /></button
         >
@@ -378,10 +373,6 @@
   >
     {#if view === 'create' && (!lobby || lobby.participantId === 'p1')}
       <div class="mode-selection">
-        <div class="section-heading">
-          <h2>Match format</h2>
-          <span><Users size={14} aria-hidden="true" /> 2 players · head to head</span>
-        </div>
         <div class="mode-grid">
           {#each formats as item (item.id)}
             <button
@@ -392,7 +383,7 @@
               onclick={() => selectFormat(item.id)}
             >
               <img
-                src={asset(
+                src={staticAsset(
                   item.id === 'season' && sourceMode === 'sandbox'
                     ? '/images/multiplayer/sandbox-season.jpg'
                     : item.image,
@@ -425,7 +416,7 @@
         </div>
         <div class="court-note">
           <LockKeyhole size={17} aria-hidden="true" />
-          <p>Just you and your opponent. Every room uses a private 4-digit invite code.</p>
+          <p>Every room uses a private 4-digit invite code.</p>
         </div>
       </div>
     {/if}
@@ -488,19 +479,28 @@
                   aria-pressed={ddFairness === 'fair'}
                   class={['option', { active: ddFairness === 'fair' }]}
                   onclick={() => (ddFairness = 'fair')}
-                  ><Scale size={21} aria-hidden="true" /><span
-                    ><strong>Fair</strong><small>Shared strength bands</small></span
-                  ></button
                 >
+                  <Scale size={21} aria-hidden="true" />
+
+                  <span>
+                    <strong>Fair</strong>
+                    <small>Shared strength bands</small>
+                  </span>
+                </button>
+
                 <button
                   type="button"
                   aria-pressed={ddFairness === 'unfair'}
                   class={['option', { active: ddFairness === 'unfair' }]}
                   onclick={() => (ddFairness = 'unfair')}
-                  ><Shuffle size={21} aria-hidden="true" /><span
-                    ><strong>Unfair</strong><small>Equal player odds</small></span
-                  ></button
                 >
+                  <Shuffle size={21} aria-hidden="true" />
+
+                  <span>
+                    <strong>Unfair</strong>
+                    <small>Equal player odds</small>
+                  </span>
+                </button>
               </div>
             </fieldset>
           {:else}
@@ -512,19 +512,20 @@
                   aria-pressed={sourceMode === 'classic'}
                   class={['option', { active: sourceMode === 'classic' }]}
                   onclick={() => selectSource('classic')}
-                  ><Swords size={21} aria-hidden="true" /><span
-                    ><strong>Classic</strong><small>Roll Draft</small></span
-                  ></button
                 >
+                  <Swords size={21} aria-hidden="true" />
+                  <span><strong>Classic</strong><small>Roll Draft</small></span>
+                </button>
+
                 <button
                   type="button"
                   aria-pressed={sourceMode === 'sandbox'}
                   class={['option', { active: sourceMode === 'sandbox' }]}
                   onclick={() => selectSource('sandbox')}
-                  ><Zap size={21} aria-hidden="true" /><span
-                    ><strong>Sandbox</strong><small>Snake Draft</small></span
-                  ></button
                 >
+                  <Zap size={21} aria-hidden="true" />
+                  <span><strong>Sandbox</strong><small>Snake Draft</small></span>
+                </button>
               </div>
             </fieldset>
           {/if}
@@ -536,26 +537,31 @@
                 aria-pressed={variant === 'ratings'}
                 class={['option', { active: variant === 'ratings' }]}
                 onclick={() => (variant = 'ratings')}
-                ><ChartNoAxesColumn size={21} aria-hidden="true" /><span
-                  ><strong>Ratings</strong><small>See player ratings</small></span
-                ></button
               >
+                <ChartNoAxesColumn size={21} aria-hidden="true" />
+
+                <span>
+                  <strong>Ratings</strong>
+                  <small>See player ratings</small>
+                </span>
+              </button>
+
               <button
                 type="button"
                 aria-pressed={variant === 'ball-knowledge'}
                 class={['option', { active: variant === 'ball-knowledge' }]}
                 onclick={() => (variant = 'ball-knowledge')}
-                ><Brain size={21} aria-hidden="true" /><span
-                  ><strong>Ball Knowledge</strong><small>Draft from memory</small></span
-                ></button
               >
+                <Brain size={21} aria-hidden="true" />
+
+                <span>
+                  <strong>Ball Knowledge</strong>
+                  <small>Draft from memory</small>
+                </span>
+              </button>
             </div>
           </fieldset>
           <dl class="match-rules">
-            <div>
-              <dt><CalendarDays size={15} aria-hidden="true" /> Match format</dt>
-              <dd>{selectedFormat.format}</dd>
-            </div>
             <div>
               <dt><Clock size={15} aria-hidden="true" /> Pick timer</dt>
               <dd>
@@ -566,24 +572,17 @@
                     : '90s picks'}
               </dd>
             </div>
-            <div>
-              <dt><LockKeyhole size={15} aria-hidden="true" /> Room access</dt>
-              <dd>Invite only</dd>
-            </div>
           </dl>
           <button
             type="button"
             onclick={startCreate}
             disabled={busy || (lobby !== null && !lobby.canStart)}
             class="primary-action"
-            >{busy ? 'Creating room…' : 'Create room'}<ArrowRight
-              size={18}
-              aria-hidden="true"
-            /></button
           >
-          <p class="action-note">Keep this room code to play every mode with the same opponent.</p>
+            {busy ? 'Creating room…' : 'Create room'}
+            <ArrowRight size={18} aria-hidden="true" />
+          </button>
         {:else}
-          <p class="eyebrow">Meet on the court</p>
           <h2 class="join-title">Join your opponent</h2>
           <p class="join-description">
             Enter your host’s 4-digit code. The game mode is picked automatically.
@@ -614,12 +613,11 @@
                 disabled={busy || code.length !== 4}
                 class="secondary-action">Preview room</button
               >
-              <button type="submit" disabled={busy || code.length !== 4} class="primary-action"
-                >{busy ? 'Please wait…' : 'Join room'}<ArrowRight
-                  size={16}
-                  aria-hidden="true"
-                /></button
-              >
+
+              <button type="submit" disabled={busy || code.length !== 4} class="primary-action">
+                {busy ? 'Please wait…' : 'Join room'}
+                <ArrowRight size={16} aria-hidden="true" />
+              </button>
             </div>
           </form>
           {#if preview}<p class="room-preview" role="status">{preview}</p>{/if}
@@ -667,12 +665,6 @@
     letter-spacing: -0.015em;
     text-transform: uppercase;
   }
-  .intro {
-    color: var(--color-muted-foreground);
-    font-size: 14px;
-    line-height: 1.7;
-    max-width: 580px;
-  }
   .resume-room {
     display: flex;
     align-items: center;
@@ -688,12 +680,6 @@
   }
   .resume-room .eyebrow {
     font-size: 9px;
-  }
-  .resume-room p {
-    font-size: 14px;
-    font-weight: 600;
-    white-space: nowrap;
-    margin-top: 3px;
   }
   .resume-button {
     display: flex;
@@ -744,25 +730,6 @@
     grid-template-columns: minmax(0, 1fr) 370px;
     gap: 24px;
     align-items: start;
-  }
-  .section-heading {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    margin: 0 0 18px;
-  }
-  .section-heading h2 {
-    font-size: 17px;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-  }
-  .section-heading > span {
-    display: flex;
-    gap: 7px;
-    align-items: center;
-    font-size: 11px;
-    color: var(--color-muted-foreground);
   }
   .mode-grid {
     display: grid;
@@ -1043,13 +1010,6 @@
   .resume-button:hover {
     filter: brightness(1.08);
   }
-  .action-note {
-    text-align: center;
-    color: var(--color-muted-foreground);
-    font-size: 10px;
-    line-height: 1.5;
-    margin-top: 12px;
-  }
   .join-title {
     font-size: 32px;
     margin-top: 18px;
@@ -1157,9 +1117,6 @@
     .card-copy h3 {
       font-size: 27px;
     }
-    .resume-room p {
-      white-space: normal;
-    }
     .panel-body {
       padding: 18px;
     }
@@ -1193,9 +1150,6 @@
     }
     .mode-card {
       min-height: 210px;
-    }
-    .section-heading > span {
-      font-size: 10px;
     }
     .panel-body {
       padding: 22px;

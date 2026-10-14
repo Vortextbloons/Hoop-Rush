@@ -1,22 +1,22 @@
 <script lang="ts">
   import type { HoopRushManifest, SeasonRoster } from '@hoop-rush/data-contracts';
-  import SeasonRosterRow from '$lib/components/season/SeasonRosterRow.svelte';
-  import { eraIdentityOf, franchiseIdentityOf } from '$lib/season/season-branding';
-  import type { SeasonRunShellData } from '$lib/season/season-shell-context';
+  import SeasonRosterRow from '#lib/components/season/SeasonRosterRow.svelte';
+  import { eraIdentityOf, franchiseIdentityOf } from '#lib/season/season-branding.js';
+  import type { SeasonRunShellData } from '#lib/season/season-shell-context.js';
   import {
     FATIGUE_BAND_BADGE,
     FATIGUE_BAND_LABEL,
     fatigueBand,
     fatiguePercent,
     loadStateOf,
-  } from '$lib/season/season-effects-view';
+  } from '#lib/season/season-effects-view.js';
   import type { SeasonEffectsState, SeasonGameSummary } from '@hoop-rush/data-contracts';
-  import { candidateOf } from '$lib/season/season-catalog-index';
+  import { candidateOf } from '#lib/season/season-catalog-index.js';
   import {
     boostedOverallDeltaForPlayer,
     gearPointsOf,
     sponsorSlotsOf,
-  } from '$lib/season/sponsor-gear-view';
+  } from '#lib/season/sponsor-gear-view.js';
   import type { SeasonRun } from '@hoop-rush/data-contracts';
   let {
     roster,

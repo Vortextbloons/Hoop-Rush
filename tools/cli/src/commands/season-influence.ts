@@ -1,5 +1,6 @@
 import { resolve } from 'node:path';
 import { z } from 'zod';
+import { seedWindowSchema } from '../seed-window.ts';
 import {
   SEASON_GAME_TARGETS_VERSION,
   SEASON_GAME_VERSION,
@@ -65,14 +66,8 @@ export const seasonInfluenceTargetsSchema = z.object({
     extraOfferSpendRateMax: z.literal(0.5),
     rehabSpendRateMax: z.literal(0.4),
   }),
-  cohort: z.object({
-    seedFrom: z.number().int().nonnegative(),
-    seedTo: z.number().int().nonnegative(),
-  }),
-  heldOut: z.object({
-    seedFrom: z.number().int().nonnegative(),
-    seedTo: z.number().int().nonnegative(),
-  }),
+  cohort: seedWindowSchema,
+  heldOut: seedWindowSchema,
   measured: z.object({
     calibration: z.object({
       seasonsSimulated: z.number().int().nonnegative(),
@@ -699,11 +694,11 @@ export function seasonInfluenceCalibrate(args: SeasonInfluenceArgs): CliReport {
       };
       const details = [
         `${String(calibrationCohort.seasonsSimulated)} calibration + ${String(heldOutCohort.seasonsSimulated)} held-out seasons in ${String(Date.now() - started)}ms (${String(workers)} workers)`,
-        `balance checks ${String(calibrationCohort.balanceChecks)} · reconciliation failures ${String(calibrationCohort.reconciliationFailures)} · income identity failures ${String(calibrationCohort.incomeIdentityFailures)} · cap violations ${String(calibrationCohort.capViolations)}`,
-        `debt frequency ${(calibrationCohort.debtFrequency * 100).toFixed(2)}% (gate ≤ ${String(SEASON_INFLUENCE_DEBT_FREQUENCY_MAX * 100)}%)`,
+        `balance checks ${String(calibrationCohort.balanceChecks)} Â· reconciliation failures ${String(calibrationCohort.reconciliationFailures)} Â· income identity failures ${String(calibrationCohort.incomeIdentityFailures)} Â· cap violations ${String(calibrationCohort.capViolations)}`,
+        `debt frequency ${(calibrationCohort.debtFrequency * 100).toFixed(2)}% (gate â‰¤ ${String(SEASON_INFLUENCE_DEBT_FREQUENCY_MAX * 100)}%)`,
         `objective success ${calibrationCohort.objectiveSuccessRate === null ? 'n/a' : `${(calibrationCohort.objectiveSuccessRate * 100).toFixed(1)}%`} over ${String(calibrationCohort.objectiveEvaluations)} evaluations (gate [${String(SEASON_INFLUENCE_OBJECTIVE_SUCCESS_MIN * 100)}%, ${String(SEASON_INFLUENCE_OBJECTIVE_SUCCESS_MAX * 100)}%])`,
-        `challenge earned/block ${calibrationCohort.expectedEarnedPerBlock === null ? 'n/a' : calibrationCohort.expectedEarnedPerBlock.toFixed(2)} (gate [${String(SEASON_INFLUENCE_EXPECTED_EARNED_MIN)}, ${String(SEASON_INFLUENCE_EXPECTED_EARNED_MAX)}]) · cap-clamped ${calibrationCohort.capClampedShare === null ? 'n/a' : `${(calibrationCohort.capClampedShare * 100).toFixed(1)}%`} (gate ≤ ${(SEASON_INFLUENCE_CAP_CLAMPED_MAX * 100).toFixed(0)}%) over ${String(calibrationCohort.challengeEvaluations)} challenge evaluations`,
-        `extra-offer spend share ${(calibrationCohort.extraOfferSpendShare * 100).toFixed(1)}% · rehab spend share ${(calibrationCohort.rehabSpendShare * 100).toFixed(1)}%`,
+        `challenge earned/block ${calibrationCohort.expectedEarnedPerBlock === null ? 'n/a' : calibrationCohort.expectedEarnedPerBlock.toFixed(2)} (gate [${String(SEASON_INFLUENCE_EXPECTED_EARNED_MIN)}, ${String(SEASON_INFLUENCE_EXPECTED_EARNED_MAX)}]) Â· cap-clamped ${calibrationCohort.capClampedShare === null ? 'n/a' : `${(calibrationCohort.capClampedShare * 100).toFixed(1)}%`} (gate â‰¤ ${(SEASON_INFLUENCE_CAP_CLAMPED_MAX * 100).toFixed(0)}%) over ${String(calibrationCohort.challengeEvaluations)} challenge evaluations`,
+        `extra-offer spend share ${(calibrationCohort.extraOfferSpendShare * 100).toFixed(1)}% Â· rehab spend share ${(calibrationCohort.rehabSpendShare * 100).toFixed(1)}%`,
         targetsDetail({ targetsWritten, targetsPath }),
       ];
       return { details, payload };

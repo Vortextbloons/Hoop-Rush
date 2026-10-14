@@ -12,7 +12,7 @@ import {
 } from '@hoop-rush/data-contracts';
 import type { FixedFiveVerificationInput } from '@hoop-rush/engine';
 import type { FixedFiveRunnerEvent } from '@hoop-rush/application/fixed-five';
-import { newRequestId } from '$lib/ids';
+import { newRequestId } from '#lib/ids.js';
 export type { FixedFiveRunnerEvent } from '@hoop-rush/application/fixed-five';
 export class FixedFiveRunner {
   private worker: Worker | null = null;

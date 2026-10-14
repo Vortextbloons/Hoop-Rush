@@ -48,25 +48,15 @@ const allowEmpty = new Set(manifest.allowEmpty ?? []);
 
 const packageJson = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
 const quickScript = packageJson.scripts['test:quick'] ?? '';
-const scriptPatterns = [...quickScript.matchAll(/--exclude="([^"]+)"/g)].map(
-  (match) => match[1],
-);
+const scriptPatterns = [...quickScript.matchAll(/--exclude="([^"]+)"/g)].map((match) => match[1]);
 
-const missingFromScript = manifestPatterns.filter(
-  (pattern) => !scriptPatterns.includes(pattern),
-);
-const missingFromManifest = scriptPatterns.filter(
-  (pattern) => !manifestPatterns.includes(pattern),
-);
+const missingFromScript = manifestPatterns.filter((pattern) => !scriptPatterns.includes(pattern));
+const missingFromManifest = scriptPatterns.filter((pattern) => !manifestPatterns.includes(pattern));
 if (missingFromScript.length > 0) {
-  failures.push(
-    `manifest patterns missing from test:quick: ${missingFromScript.join(', ')}`,
-  );
+  failures.push(`manifest patterns missing from test:quick: ${missingFromScript.join(', ')}`);
 }
 if (missingFromManifest.length > 0) {
-  failures.push(
-    `test:quick patterns missing from the manifest: ${missingFromManifest.join(', ')}`,
-  );
+  failures.push(`test:quick patterns missing from the manifest: ${missingFromManifest.join(', ')}`);
 }
 
 const testFiles = collectTestFiles();

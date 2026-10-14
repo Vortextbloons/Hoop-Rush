@@ -2,12 +2,12 @@
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import type { ChallengeRun } from '@hoop-rush/data-contracts';
-  import { variantLabel } from '$lib/draft-presentation';
-  import { clearClassicDraftState } from '$lib/classic-draft';
-  import ResultPage from '$lib/features/challenge/challenge-result.svelte';
+  import { variantLabel } from '#lib/draft-presentation.js';
+  import { clearClassicDraftState } from '#lib/classic-draft.js';
+  import ResultPage from '#lib/features/challenge/challenge-result.svelte';
   async function runAgain() {
     await clearClassicDraftState();
-    void goto(resolve('/classic'));
+    void goto(resolve('classic/'));
   }
 </script>
 

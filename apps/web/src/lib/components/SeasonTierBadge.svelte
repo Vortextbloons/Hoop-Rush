@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Trophy } from '@lucide/svelte';
-  import { seasonTierFromWins } from '$lib/season-tier';
+  import { seasonTierFromWins } from '#lib/season-tier.js';
   interface Props {
     wins: number;
     size?: 'default' | 'large';
