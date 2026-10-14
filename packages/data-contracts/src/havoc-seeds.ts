@@ -45,7 +45,7 @@ export function havocDraftPlayersSeed(runSeed: Seed, round: number, offerIndex: 
   return havocSeed(runSeed, 'draft', round, 'offer', offerIndex, 'players');
 }
 
-export type HavocDraftCardStream = 'tier' | 'mutations' | 'physical' | 'nickname';
+export type HavocDraftCardStream = 'tier' | 'mutations' | 'physical' | 'nickname' | 'specialist';
 
 export function havocDraftCardSeed(
   runSeed: Seed,

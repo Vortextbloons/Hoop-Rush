@@ -8,6 +8,7 @@ import type {
   Position,
 } from '@hoop-rush/data-contracts';
 import {
+  HAVOC_SPECIALIST_CATEGORY_RATINGS,
   HAVOC_TENDENCY_FIELDS,
   REQUIRED_RATING_KEYS,
   havocEffectiveProfileSchema,
@@ -63,12 +64,40 @@ const AUTHORITATIVE_CHANNEL_ORDER: readonly HavocAuthoritativeChannel[] = [
   'offensive-allocation',
 ];
 
+const RATING_KEY_ORDER: ReadonlyMap<HavocRatingField, number> = new Map(
+  REQUIRED_RATING_KEYS.map((field, index) => [field, index]),
+);
+
+function swapExtremeRatingBases(
+  ratings: HavocSourcePlayer['profile']['ratings'],
+  count: number,
+): Map<HavocRatingField, number> {
+  const byKeyOrder = (a: HavocRatingField, b: HavocRatingField): number =>
+    (RATING_KEY_ORDER.get(a) ?? 0) - (RATING_KEY_ORDER.get(b) ?? 0);
+  const strongestFirst = [...REQUIRED_RATING_KEYS].sort(
+    (a, b) => ratings[b] - ratings[a] || byKeyOrder(a, b),
+  );
+  const weakestFirst = [...REQUIRED_RATING_KEYS].sort(
+    (a, b) => ratings[a] - ratings[b] || byKeyOrder(a, b),
+  );
+  const swapped = new Map<HavocRatingField, number>();
+  for (let index = 0; index < count; index += 1) {
+    const strong = strongestFirst[index];
+    const weak = weakestFirst[index];
+    if (strong === undefined || weak === undefined || strong === weak) break;
+    swapped.set(strong, ratings[weak]);
+    swapped.set(weak, ratings[strong]);
+  }
+  return swapped;
+}
+
 export function applyHavocMutationPackage(
   source: HavocSourcePlayer,
   mutationPackage: HavocMutationPackage,
   options: ApplyHavocMutationOptions = {},
 ): HavocEffectiveProfile {
   const ratingAdds = new Map<HavocRatingField, number>();
+  const ratingSets = new Map<HavocRatingField, number>();
   const ratingFloors = new Map<HavocRatingField, number>();
   const ratingCaps = new Map<HavocRatingField, number>();
   const tendencyAdds = new Map<HavocTendencyField, number>();
@@ -76,6 +105,7 @@ export function applyHavocMutationPackage(
   const tendencyCaps = new Map<HavocTendencyField, number>();
   const channels = new Set<HavocAuthoritativeChannel>();
 
+  let swapExtremeCount = 0;
   let heightAddInches = 0;
   let heightSetInches: number | null = null;
   let heightSubtractInches = 0;
@@ -152,8 +182,53 @@ export function applyHavocMutationPackage(
           wingspanDeltaInches += operation.inches;
           break;
         }
+        case 'set-rating': {
+          ratingSets.set(operation.field, operation.value);
+          const channel = RATING_CHANNELS[operation.field];
+          if (channel !== undefined) channels.add(channel);
+          break;
+        }
+        case 'swap-extreme-ratings': {
+          swapExtremeCount = operation.count;
+          break;
+        }
+        case 'set-category-ratings': {
+          const category = entry.specialistCategory;
+          if (category === undefined) {
+            throw new Error(`mutation ${entry.mutationId} requires a sampled specialist category`);
+          }
+          for (const field of HAVOC_SPECIALIST_CATEGORY_RATINGS[category]) {
+            ratingSets.set(field, operation.value);
+            const channel = RATING_CHANNELS[field];
+            if (channel !== undefined) channels.add(channel);
+          }
+          break;
+        }
+        case 'cap-category-ratings': {
+          const category = entry.specialistCategory;
+          if (category === undefined) {
+            throw new Error(`mutation ${entry.mutationId} requires a sampled specialist category`);
+          }
+          const specialistFields = new Set(HAVOC_SPECIALIST_CATEGORY_RATINGS[category]);
+          for (const field of REQUIRED_RATING_KEYS) {
+            if (specialistFields.has(field)) continue;
+            ratingCaps.set(field, Math.min(ratingCaps.get(field) ?? 100, operation.value));
+            const channel = RATING_CHANNELS[field];
+            if (channel !== undefined) channels.add(channel);
+          }
+          break;
+        }
       }
     }
+  }
+
+  const ratingSwapBases =
+    swapExtremeCount > 0
+      ? swapExtremeRatingBases(source.profile.ratings, swapExtremeCount)
+      : new Map<HavocRatingField, number>();
+  for (const field of ratingSwapBases.keys()) {
+    const channel = RATING_CHANNELS[field];
+    if (channel !== undefined) channels.add(channel);
   }
 
   const baseline =
@@ -187,7 +262,10 @@ export function applyHavocMutationPackage(
 
   const ratings = { ...source.profile.ratings };
   for (const field of REQUIRED_RATING_KEYS) {
-    let value = ratings[field] + (ratingAdds.get(field) ?? 0);
+    const set = ratingSets.get(field);
+    const swap = ratingSwapBases.get(field);
+    let value = set !== undefined ? set : (swap ?? ratings[field]);
+    value += ratingAdds.get(field) ?? 0;
     const floor = ratingFloors.get(field);
     if (floor !== undefined) value = Math.max(value, floor);
     const cap = ratingCaps.get(field);

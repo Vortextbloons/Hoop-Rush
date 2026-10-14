@@ -674,11 +674,11 @@ describe('havoc team-wide powers and physical mechanisms', () => {
   it('keeps a team-wide power active while another owner remains', () => {
     const foulProne: Partial<SimulationTendencies> = { ...FOUL_MAGNET, foulRate: 20 };
     const human = buildScenarioTeam('human', [
-      scenarioSlot('PG', ['reverse-basketball'], {
+      scenarioSlot('PG', ['double-or-nothing'], {
         ratings: { ...RIM_ATTACK, strength: 99, interiorDefense: 99, defensiveIq: 10 },
         tendencies: foulProne,
       }),
-      scenarioSlot('SG', ['reverse-basketball']),
+      scenarioSlot('SG', ['double-or-nothing']),
       ...plainSlots().slice(2),
     ]);
     const away = buildScenarioTeam('opponent', plainSlots());
@@ -690,12 +690,12 @@ describe('havoc team-wide powers and physical mechanisms', () => {
       if (substitution === undefined) return false;
       return candidate.tape.scoring.some(
         (entry) =>
-          entry.addends.some((addend) => addend.source === 'reverse-basketball') &&
+          entry.multipliers.some((multiplier) => multiplier.source === 'double-or-nothing') &&
           entry.originalEventSequence !== null &&
           entry.originalEventSequence > substitution.sequence,
       );
     });
-    expect(run, 'expected a game where one reverse owner exits').not.toBeNull();
+    expect(run, 'expected a game where one double owner exits').not.toBeNull();
     if (run === null) return;
     const substitution = run.tape.events.find(
       (event) => event.kind === 'substitution' && event.outInstanceId === pgInstanceId,
@@ -703,7 +703,7 @@ describe('havoc team-wide powers and physical mechanisms', () => {
     if (substitution === undefined) return;
     const laterEntries = run.tape.scoring.filter(
       (entry) =>
-        entry.addends.some((addend) => addend.source === 'reverse-basketball') &&
+        entry.multipliers.some((multiplier) => multiplier.source === 'double-or-nothing') &&
         entry.originalEventSequence !== null &&
         entry.originalEventSequence > substitution.sequence,
     );

@@ -16,7 +16,11 @@ import {
   havocInstanceIdSchema,
   havocSourcePlayerSchema,
 } from './havoc-profile.ts';
-import { havocMutationIdSchema, havocMutationPackageSchema } from './havoc-mutations.ts';
+import {
+  HAVOC_TEAM_EXCLUSIVE_MUTATION_IDS,
+  havocMutationIdSchema,
+  havocMutationPackageSchema,
+} from './havoc-mutations.ts';
 
 export const havocSideSchema = z.enum(['human', 'opponent']);
 export type HavocSide = z.infer<typeof havocSideSchema>;
@@ -112,6 +116,23 @@ export const havocTeamInputSchema = z
       }
       seen.add(participant.instanceId);
     }
+    const teamExclusiveOwners = new Map<string, Set<string>>();
+    for (const participant of team.starters) {
+      for (const entry of participant.mutationPackage) {
+        if (!HAVOC_TEAM_EXCLUSIVE_MUTATION_IDS.includes(entry.mutationId)) continue;
+        const owners = teamExclusiveOwners.get(entry.mutationId) ?? new Set<string>();
+        owners.add(participant.instanceId);
+        teamExclusiveOwners.set(entry.mutationId, owners);
+      }
+    }
+    for (const [mutationId, owners] of teamExclusiveOwners) {
+      if (owners.size > 1) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `team-exclusive mutation ${mutationId} has ${String(owners.size)} owners`,
+        });
+      }
+    }
   });
 export type HavocTeamInput = z.infer<typeof havocTeamInputSchema>;
 
@@ -167,6 +188,8 @@ export const havocScoringSourceSchema = z.enum([
   'heat-check',
   'second-chance-jackpot',
   'the-bounty',
+  'buzzer-bandit',
+  'charity-casino',
 ]);
 export type HavocScoringSource = z.infer<typeof havocScoringSourceSchema>;
 
@@ -177,7 +200,7 @@ export const havocScoringEntrySchema = z.object({
   clockSeconds: z.number().int().min(0).max(3600),
   possessionId: z.number().int().nonnegative(),
   side: havocSideSchema,
-  kind: z.enum(['field-goal', 'free-throw', 'adjustment']),
+  kind: z.enum(['field-goal', 'free-throw', 'adjustment', 'bonus']),
   actorInstanceId: havocInstanceIdSchema,
   beneficiaryInstanceId: havocInstanceIdSchema.nullable(),
   nominalPoints: z.number().int().min(-3).max(3),
@@ -416,6 +439,37 @@ export const havocEventSchema = z.discriminatedUnion('kind', [
     scoringSequence: z.number().int().nonnegative().nullable(),
   }),
   havocEventBase.extend({
+    kind: z.literal('buzzer-bandit'),
+    outcome: z.enum(['doubled', 'penalized']),
+    ownerInstanceId: havocInstanceIdSchema,
+    shooterInstanceId: havocInstanceIdSchema,
+    side: havocSideSchema,
+    shotClockTenths: z.number().int().min(0).max(2400),
+    scoringSequence: z.number().int().nonnegative().nullable(),
+  }),
+  havocEventBase.extend({
+    kind: z.literal('charity-casino'),
+    outcome: z.enum(['made', 'missed']),
+    ownerInstanceId: havocInstanceIdSchema,
+    side: havocSideSchema,
+    scoringSequence: z.number().int().nonnegative().nullable(),
+    bonusSequence: z.number().int().nonnegative().nullable(),
+  }),
+  havocEventBase.extend({
+    kind: z.literal('fusion-dance'),
+    outcome: z.enum(['applied', 'ended']),
+    ownerInstanceId: havocInstanceIdSchema,
+    donorInstanceId: havocInstanceIdSchema,
+    side: havocSideSchema,
+  }),
+  havocEventBase.extend({
+    kind: z.literal('darwinism'),
+    ownerInstanceId: havocInstanceIdSchema,
+    side: havocSideSchema,
+    shooterInstanceId: havocInstanceIdSchema,
+    shooterReductionsAfter: z.number().int().positive(),
+  }),
+  havocEventBase.extend({
     kind: z.literal('game-end'),
     homeScore: z.number().int(),
     awayScore: z.number().int(),
@@ -505,6 +559,7 @@ export const havocTeamResultSchema = z.object({
   turnovers: z.number().int().nonnegative(),
   fouls: z.number().int().nonnegative(),
   adjustments: z.number().int(),
+  teamBonusPoints: z.number().int(),
   periods: z.array(z.number().int()).min(4).max(30),
   courtSeconds: z.number().int().nonnegative(),
   participants: z.array(havocParticipantLineSchema).min(5).max(15),
@@ -525,6 +580,7 @@ export const havocMutationRollupSchema = z.object({
   swapSeconds: z.number().int().nonnegative(),
   capSeconds: z.number().int().nonnegative(),
   activeSeconds: z.number().int().nonnegative(),
+  ratingChanges: z.number().int().nonnegative(),
 });
 export type HavocMutationRollup = z.infer<typeof havocMutationRollupSchema>;
 

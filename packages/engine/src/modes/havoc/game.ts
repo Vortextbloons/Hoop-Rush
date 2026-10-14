@@ -26,7 +26,9 @@ import {
   HAVOC_PERSONAL_FOUL_LIMIT,
   HAVOC_RULES_VERSION,
   HAVOC_SCHEMA_VERSION,
+  HAVOC_SCORING_RATING_FIELDS,
   POSITIONS,
+  REQUIRED_RATING_KEYS,
   havocAuthoritativeChannelSchema,
   havocGameInputSchema,
   havocGameResultSchema,
@@ -88,6 +90,15 @@ const HAVOC_GOLDEN_ASSIST_EVERY = 3;
 const HAVOC_DOUBLE_OR_NOTHING_FOUL_FREE_THROWS = 1;
 const HAVOC_DOUBLE_MISS_PENALTY = -1;
 const HAVOC_EXTRA_POSSESSION_RUSH_SECONDS = 12;
+const HAVOC_BUZZER_WINDOW_TENTHS = 30;
+const HAVOC_BUZZER_MISS_PENALTY = -1;
+const HAVOC_FUSION_DONOR_RATING = 40;
+const HAVOC_DARWINISM_REDUCTION = 5;
+const HAVOC_DARWINISM_CHANNELS: ReadonlySet<string> = new Set([
+  'two-point-accuracy',
+  'three-point-accuracy',
+  'free-throw-accuracy',
+]);
 
 export class HavocSimulationExhaustedError extends Error {
   readonly code = 'havoc-overtime-exhausted';
@@ -117,6 +128,7 @@ export interface HavocFieldGoalValueInput {
   putback: boolean;
   bounty: boolean;
   doubleOrNothing: boolean;
+  buzzerBandit: boolean;
 }
 
 export interface HavocFieldGoalContribution {
@@ -135,11 +147,11 @@ export interface HavocFieldGoalValue {
  * Exact `(nominal + Σ pre-addends) × Π multipliers + dunk bonus` resolution in
  * the stable evidence order. Roulette and reverse-basketball apply before
  * multipliers. At most one multiplier applies per make: the first active source
- * in stable order (heat-check, putback, bounty, double-or-nothing) wins; The
- * Bounty triples while the others double. The four-point-dunk bonus applies
- * after multipliers so multipliers never multiply it. `contributions` are the
- * incremental score deltas at the point each component applies; they sum to
- * `points - nominal`.
+ * in stable order (heat-check, putback, bounty, double-or-nothing,
+ * buzzer-bandit) wins; The Bounty triples while the others double. The
+ * four-point-dunk bonus applies after multipliers so multipliers never multiply
+ * it. `contributions` are the incremental score deltas at the point each
+ * component applies; they sum to `points - nominal`.
  */
 export function havocFieldGoalValue(input: HavocFieldGoalValueInput): HavocFieldGoalValue {
   const addends: HavocFieldGoalValue['addends'] = [];
@@ -162,6 +174,7 @@ export function havocFieldGoalValue(input: HavocFieldGoalValueInput): HavocField
   else if (input.putback) multiply('second-chance-jackpot', 2);
   else if (input.bounty) multiply('the-bounty', 3);
   else if (input.doubleOrNothing) multiply('double-or-nothing', 2);
+  else if (input.buzzerBandit) multiply('buzzer-bandit', 2);
   if (input.fourPointDunk) add('four-point-dunk', 1);
   return { addends, multipliers, points: value, contributions };
 }
@@ -174,6 +187,7 @@ interface RollupCounters {
   extraPossessionsEarned: number;
   extraPossessionsUsed: number;
   extraPossessionsExpired: number;
+  ratingChanges: number;
 }
 
 interface ParticipantState {
@@ -207,6 +221,9 @@ interface ParticipantState {
   bountyArmed: boolean;
   bountyArmedAt: number | null;
   activeSeconds: number;
+  darwinismReductions: number;
+  fusionDonorInstanceId: string | null;
+  fusionOwnerInstanceId: string | null;
   simPlayer: SimulationPlayer;
   evidence: HavocEvidence | undefined;
   rollup: Map<HavocMutationId, RollupCounters>;
@@ -248,6 +265,8 @@ const SCORING_SOURCE_MUTATION: Record<HavocScoringSource, HavocMutationId> = {
   'heat-check': 'heat-check',
   'second-chance-jackpot': 'second-chance-jackpot',
   'the-bounty': 'the-bounty',
+  'buzzer-bandit': 'buzzer-bandit',
+  'charity-casino': 'charity-casino',
 };
 export { SCORING_SOURCE_MUTATION as HAVOC_SCORING_SOURCE_MUTATION };
 
@@ -262,6 +281,7 @@ function zeroRollup(): RollupCounters {
     extraPossessionsEarned: 0,
     extraPossessionsUsed: 0,
     extraPossessionsExpired: 0,
+    ratingChanges: 0,
   };
 }
 
@@ -361,6 +381,7 @@ class HavocGameRuntime implements HavocRuntimeHooks {
   private lastCapped: string[] = [];
   private equalizerApplied = false;
   private rushedExtraSide: SideIndex | null = null;
+  private darwinismDirty = false;
   private tripContext: TripContext | null = null;
   private readonly input: HavocGameInput;
   private readonly context: EngineContext;
@@ -427,6 +448,9 @@ class HavocGameRuntime implements HavocRuntimeHooks {
         bountyArmed: false,
         bountyArmedAt: null,
         activeSeconds: 0,
+        darwinismReductions: 0,
+        fusionDonorInstanceId: null,
+        fusionOwnerInstanceId: null,
         simPlayer: undefined as unknown as SimulationPlayer,
         evidence: undefined,
         rollup: new Map(),
@@ -471,6 +495,22 @@ class HavocGameRuntime implements HavocRuntimeHooks {
     if (participant === undefined) return undefined;
     if (participant.swapWith !== null || participant.swappedBy !== null) {
       return { isAuthoritative: (channel) => ALL_AUTHORITATIVE.has(channel) };
+    }
+    if (participant.fusionDonorInstanceId !== null) {
+      return { isAuthoritative: (channel) => ALL_AUTHORITATIVE.has(channel) };
+    }
+    if (participant.fusionOwnerInstanceId !== null) {
+      const owner = this.globalById(participant.fusionOwnerInstanceId);
+      if (owner !== null && owner.active) {
+        return { isAuthoritative: (channel) => ALL_AUTHORITATIVE.has(channel) };
+      }
+    }
+    if (participant.darwinismReductions > 0) {
+      return {
+        isAuthoritative: (channel) =>
+          participant.effective.authoritativeChannels.includes(channel) ||
+          HAVOC_DARWINISM_CHANNELS.has(channel),
+      };
     }
     return participant.evidence;
   }
@@ -812,6 +852,14 @@ class HavocGameRuntime implements HavocRuntimeHooks {
       args.made && args.shotKind === 'dunk' && shooter.mutations.has('four-point-dunk');
     const reverseOwners = this.activeOwners(args.offense, 'reverse-basketball');
     const doubleOwners = this.activeOwners(args.offense, 'double-or-nothing');
+    const shotClockRemaining = this.tripContext?.shotClock?.remaining;
+    const shotClockTenths =
+      shotClockRemaining === undefined ? null : Math.round(shotClockRemaining * 10);
+    const buzzerQualifies =
+      shooter.active &&
+      shooter.mutations.has('buzzer-bandit') &&
+      shotClockTenths !== null &&
+      shotClockTenths <= HAVOC_BUZZER_WINDOW_TENTHS;
     let roulette: { owner: ParticipantState; rolled: number; ordinal: number } | null = null;
     if (shooter.mutations.has('basketball-roulette')) {
       shooter.fgaCount += 1;
@@ -838,6 +886,7 @@ class HavocGameRuntime implements HavocRuntimeHooks {
         putback: putbackValid,
         bounty: bountyBefore,
         doubleOrNothing: doubleOwners.length > 0,
+        buzzerBandit: buzzerQualifies,
       });
       const attributions: Attribution[] = [];
       const ownerIds: string[] = [];
@@ -860,7 +909,7 @@ class HavocGameRuntime implements HavocRuntimeHooks {
             : contribution.source === 'second-chance-jackpot' ||
                 contribution.source === 'the-bounty'
               ? [shooter]
-              : contribution.source === 'heat-check'
+              : contribution.source === 'heat-check' || contribution.source === 'buzzer-bandit'
                 ? [shooter]
                 : doubleOwners;
         const primary = owners[0];
@@ -892,6 +941,19 @@ class HavocGameRuntime implements HavocRuntimeHooks {
         originalEventSequence: shotSequence,
       });
       this.attribute(attributions);
+      if (buzzerQualifies) {
+        const counters = this.rollupFor(shooter, 'buzzer-bandit');
+        if (counters !== undefined) counters.triggers += 1;
+        this.pushEvent({
+          kind: 'buzzer-bandit',
+          outcome: 'doubled',
+          ownerInstanceId: shooter.instanceId,
+          shooterInstanceId: shooter.instanceId,
+          side: team.side,
+          shotClockTenths: shotClockTenths,
+          scoringSequence,
+        });
+      }
     } else {
       const penaltyOwner = doubleOwners[0];
       if (penaltyOwner !== undefined) {
@@ -914,6 +976,59 @@ class HavocGameRuntime implements HavocRuntimeHooks {
             points: HAVOC_DOUBLE_MISS_PENALTY,
           },
         ]);
+      }
+      if (buzzerQualifies) {
+        const penaltySequence = this.pushScoring({
+          side: team.side,
+          kind: 'adjustment',
+          actorInstanceId: shooter.instanceId,
+          beneficiaryInstanceId: null,
+          nominalPoints: 0,
+          addends: [{ source: 'buzzer-bandit', points: HAVOC_BUZZER_MISS_PENALTY }],
+          multipliers: [],
+          points: HAVOC_BUZZER_MISS_PENALTY,
+          owners: [shooter.instanceId],
+          originalEventSequence: shotSequence,
+        });
+        const counters = this.rollupFor(shooter, 'buzzer-bandit');
+        if (counters !== undefined) {
+          counters.triggers += 1;
+          counters.pointsDelta += HAVOC_BUZZER_MISS_PENALTY;
+        }
+        this.pushEvent({
+          kind: 'buzzer-bandit',
+          outcome: 'penalized',
+          ownerInstanceId: shooter.instanceId,
+          shooterInstanceId: shooter.instanceId,
+          side: team.side,
+          shotClockTenths: shotClockTenths,
+          scoringSequence: penaltySequence,
+        });
+      }
+    }
+    if (args.made) {
+      const darwinismOwners = [
+        ...this.activeOwners(0, 'basketball-darwinism'),
+        ...this.activeOwners(1, 'basketball-darwinism'),
+      ];
+      const primary = darwinismOwners[0];
+      if (primary !== undefined) {
+        shooter.darwinismReductions += 1;
+        for (const owner of darwinismOwners) {
+          const counters = this.rollupFor(owner, 'basketball-darwinism');
+          if (counters !== undefined) {
+            counters.triggers += 1;
+            counters.ratingChanges += HAVOC_DARWINISM_REDUCTION;
+          }
+        }
+        this.pushEvent({
+          kind: 'darwinism',
+          ownerInstanceId: primary.instanceId,
+          side: this.teams[primary.sideIndex].side,
+          shooterInstanceId: shooter.instanceId,
+          shooterReductionsAfter: shooter.darwinismReductions,
+        });
+        this.darwinismDirty = true;
       }
     }
     const mutate = (participant: ParticipantState, mutationId: HavocMutationId): void => {
@@ -1052,37 +1167,80 @@ class HavocGameRuntime implements HavocRuntimeHooks {
       bonus: args.bonus,
     });
     const doubleOwners = this.activeOwners(args.side, 'double-or-nothing');
+    const charityOwner = shooter.active && shooter.mutations.has('charity-casino') ? shooter : null;
     if (args.made) {
-      this.pushScoring({
+      const scoringSequence = this.pushScoring({
         side: team.side,
         kind: 'free-throw',
         actorInstanceId: shooter.instanceId,
         beneficiaryInstanceId: null,
         nominalPoints: 1,
-        addends: [],
+        addends: charityOwner !== null ? [{ source: 'charity-casino', points: 2 }] : [],
         multipliers: [],
-        points: 1,
-        owners: [],
+        points: charityOwner !== null ? 3 : 1,
+        owners: charityOwner !== null ? [shooter.instanceId] : [],
         originalEventSequence: attemptSequence,
       });
-    } else if (doubleOwners.length > 0) {
-      const primary = doubleOwners[0];
-      if (primary !== undefined) {
-        this.pushScoring({
+      if (charityOwner !== null) {
+        const counters = this.rollupFor(charityOwner, 'charity-casino');
+        if (counters !== undefined) counters.triggers += 1;
+        this.attribute([{ owner: charityOwner, mutationId: 'charity-casino', points: 2 }]);
+        this.pushEvent({
+          kind: 'charity-casino',
+          outcome: 'made',
+          ownerInstanceId: charityOwner.instanceId,
           side: team.side,
-          kind: 'adjustment',
-          actorInstanceId: shooter.instanceId,
+          scoringSequence,
+          bonusSequence: null,
+        });
+      }
+    } else {
+      if (doubleOwners.length > 0) {
+        const primary = doubleOwners[0];
+        if (primary !== undefined) {
+          this.pushScoring({
+            side: team.side,
+            kind: 'adjustment',
+            actorInstanceId: shooter.instanceId,
+            beneficiaryInstanceId: null,
+            nominalPoints: 0,
+            addends: [{ source: 'double-or-nothing', points: HAVOC_DOUBLE_MISS_PENALTY }],
+            multipliers: [],
+            points: HAVOC_DOUBLE_MISS_PENALTY,
+            owners: doubleOwners.map((owner) => owner.instanceId),
+            originalEventSequence: attemptSequence,
+          });
+          this.attribute([
+            { owner: primary, mutationId: 'double-or-nothing', points: HAVOC_DOUBLE_MISS_PENALTY },
+          ]);
+        }
+      }
+      if (charityOwner !== null) {
+        const bonusSequence = this.pushScoring({
+          side: this.teams[(1 - args.side) as SideIndex].side,
+          kind: 'bonus',
+          actorInstanceId: charityOwner.instanceId,
           beneficiaryInstanceId: null,
           nominalPoints: 0,
-          addends: [{ source: 'double-or-nothing', points: HAVOC_DOUBLE_MISS_PENALTY }],
+          addends: [{ source: 'charity-casino', points: 2 }],
           multipliers: [],
-          points: HAVOC_DOUBLE_MISS_PENALTY,
-          owners: doubleOwners.map((owner) => owner.instanceId),
+          points: 2,
+          owners: [charityOwner.instanceId],
           originalEventSequence: attemptSequence,
         });
-        this.attribute([
-          { owner: primary, mutationId: 'double-or-nothing', points: HAVOC_DOUBLE_MISS_PENALTY },
-        ]);
+        const counters = this.rollupFor(charityOwner, 'charity-casino');
+        if (counters !== undefined) {
+          counters.triggers += 1;
+          counters.pointsDelta -= 2;
+        }
+        this.pushEvent({
+          kind: 'charity-casino',
+          outcome: 'missed',
+          ownerInstanceId: charityOwner.instanceId,
+          side: team.side,
+          scoringSequence: null,
+          bonusSequence,
+        });
       }
     }
   }
@@ -1391,6 +1549,35 @@ class HavocGameRuntime implements HavocRuntimeHooks {
         });
       }
     }
+    for (const team of this.teams) {
+      const owner = team.participants.find(
+        (participant) =>
+          participant.kind === 'starter' && participant.mutations.has('fusion-dance'),
+      );
+      if (owner === undefined) continue;
+      const donor = team.participants
+        .filter(
+          (participant) =>
+            participant.kind === 'starter' && participant.instanceId !== owner.instanceId,
+        )
+        .sort(
+          (left, right) =>
+            right.source.originalOverall - left.source.originalOverall ||
+            left.slotIndex - right.slotIndex,
+        )[0];
+      if (donor === undefined) continue;
+      owner.fusionDonorInstanceId = donor.instanceId;
+      donor.fusionOwnerInstanceId = owner.instanceId;
+      const counters = this.rollupFor(owner, 'fusion-dance');
+      if (counters !== undefined) counters.triggers += 1;
+      this.pushEvent({
+        kind: 'fusion-dance',
+        outcome: 'applied',
+        ownerInstanceId: owner.instanceId,
+        donorInstanceId: donor.instanceId,
+        side: team.side,
+      });
+    }
     for (const [ownerId, targetId] of this.bodySnatcherTargets) {
       const owner = this.teams[0].byId.get(ownerId) ?? this.teams[1].byId.get(ownerId);
       const target = this.teams[0].byId.get(targetId) ?? this.teams[1].byId.get(targetId);
@@ -1448,7 +1635,9 @@ class HavocGameRuntime implements HavocRuntimeHooks {
     }
     const equalizerChanged = this.recomputeEqualizer(false);
     const timeLordChanged = this.recomputeTimeLord('owner-exit');
-    if (changed || equalizerChanged || timeLordChanged) {
+    const darwinismChanged = this.darwinismDirty;
+    this.darwinismDirty = false;
+    if (changed || equalizerChanged || timeLordChanged || darwinismChanged) {
       this.rebuildBattleProfiles();
       this.rebuildActiveTeams();
     }
@@ -1461,6 +1650,19 @@ class HavocGameRuntime implements HavocRuntimeHooks {
     participant.bountyArmed = false;
     participant.bountyArmedAt = null;
     participant.putbackArmedAt = null;
+    if (participant.fusionDonorInstanceId !== null) {
+      const donorId = participant.fusionDonorInstanceId;
+      const donor = this.globalById(donorId);
+      participant.fusionDonorInstanceId = null;
+      if (donor !== null) donor.fusionOwnerInstanceId = null;
+      this.pushEvent({
+        kind: 'fusion-dance',
+        outcome: 'ended',
+        ownerInstanceId: participant.instanceId,
+        donorInstanceId: donorId,
+        side: this.teams[participant.sideIndex].side,
+      });
+    }
     if (participant.swapWith !== null) {
       const target = this.globalById(participant.swapWith);
       const targetId = participant.swapWith;
@@ -1578,6 +1780,22 @@ class HavocGameRuntime implements HavocRuntimeHooks {
       for (const participant of team.participants) {
         let ratings = { ...participant.effective.ratings };
         let tendencies = { ...participant.effective.tendencies };
+        if (participant.fusionDonorInstanceId !== null) {
+          const donor = this.globalById(participant.fusionDonorInstanceId);
+          if (donor !== null && participant.active) {
+            for (const field of REQUIRED_RATING_KEYS) {
+              ratings[field] = Math.max(ratings[field], donor.effective.ratings[field]);
+            }
+            tendencies.usageRate = 99;
+          }
+        } else if (participant.fusionOwnerInstanceId !== null) {
+          const owner = this.globalById(participant.fusionOwnerInstanceId);
+          if (owner !== null && owner.active) {
+            for (const field of REQUIRED_RATING_KEYS) {
+              ratings[field] = HAVOC_FUSION_DONOR_RATING;
+            }
+          }
+        }
         if (participant.swapWith !== null) {
           const target = this.globalById(participant.swapWith);
           if (target !== null) {
@@ -1589,6 +1807,14 @@ class HavocGameRuntime implements HavocRuntimeHooks {
           if (owner !== null) {
             ratings = { ...owner.source.profile.ratings };
             tendencies = { ...owner.source.profile.tendencies };
+          }
+        }
+        if (participant.darwinismReductions > 0) {
+          for (const field of HAVOC_SCORING_RATING_FIELDS) {
+            ratings[field] = Math.max(
+              0,
+              ratings[field] - HAVOC_DARWINISM_REDUCTION * participant.darwinismReductions,
+            );
           }
         }
         if (this.equalizerApplies(participant)) {
@@ -1763,9 +1989,11 @@ class HavocGameRuntime implements HavocRuntimeHooks {
             extraPossessionsEarned: counters.extraPossessionsEarned,
             extraPossessionsUsed: counters.extraPossessionsUsed,
             extraPossessionsExpired: counters.extraPossessionsExpired,
-            swapSeconds: mutationId === 'body-snatcher' ? activeSeconds : 0,
+            swapSeconds:
+              mutationId === 'body-snatcher' || mutationId === 'fusion-dance' ? activeSeconds : 0,
             capSeconds: mutationId === 'the-great-equalizer' ? activeSeconds : 0,
             activeSeconds,
+            ratingChanges: counters.ratingChanges,
           });
         }
       }
@@ -1848,7 +2076,14 @@ class HavocGameRuntime implements HavocRuntimeHooks {
 
   participantPoints(instanceId: string): number {
     return this.scoring
-      .filter((entry) => entry.actorInstanceId === instanceId)
+      .filter((entry) => entry.actorInstanceId === instanceId && entry.kind !== 'bonus')
+      .reduce((sum, entry) => sum + entry.points, 0);
+  }
+
+  teamBonusPoints(sideIndex: SideIndex): number {
+    const side = this.teams[sideIndex].side;
+    return this.scoring
+      .filter((entry) => entry.side === side && entry.kind === 'bonus')
       .reduce((sum, entry) => sum + entry.points, 0);
   }
 
@@ -2106,6 +2341,7 @@ class HavocGameController {
       turnovers: recorderSide.turnovers,
       fouls: recorderSide.fouls,
       adjustments: points - nominal,
+      teamBonusPoints: this.runtime.teamBonusPoints(sideIndex),
       periods: teamPeriods,
       courtSeconds: 5 * gameSeconds + cloneSeconds,
       participants: lines,

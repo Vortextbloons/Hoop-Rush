@@ -305,6 +305,7 @@ interface MutationAggregate {
   extraPossessionsExpired: number;
   swapSeconds: number;
   capSeconds: number;
+  ratingChanges: number;
 }
 
 function buildMutations(games: readonly HavocStoredGame[]): HavocMutationStat[] {
@@ -324,6 +325,7 @@ function buildMutations(games: readonly HavocStoredGame[]): HavocMutationStat[] 
           extraPossessionsExpired: 0,
           swapSeconds: 0,
           capSeconds: 0,
+          ratingChanges: 0,
         };
         aggregates.set(rollup.mutationId, aggregate);
       }
@@ -337,6 +339,7 @@ function buildMutations(games: readonly HavocStoredGame[]): HavocMutationStat[] 
       aggregate.extraPossessionsExpired += rollup.extraPossessionsExpired;
       aggregate.swapSeconds += rollup.swapSeconds;
       aggregate.capSeconds += rollup.capSeconds;
+      aggregate.ratingChanges += rollup.ratingChanges;
     }
   }
   const stats: HavocMutationStat[] = [];
@@ -355,6 +358,7 @@ function buildMutations(games: readonly HavocStoredGame[]): HavocMutationStat[] 
       extraPossessionsExpired: aggregate.extraPossessionsExpired,
       swapSeconds: aggregate.swapSeconds,
       capSeconds: aggregate.capSeconds,
+      ratingChanges: aggregate.ratingChanges,
     });
   }
   return stats;

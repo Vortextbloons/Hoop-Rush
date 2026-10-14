@@ -26,10 +26,10 @@ const runSeed = seedSchema.parse(seedFromString('havoc-test-run'));
 
 describe('havoc mutation catalog', () => {
   it('ships the launch tier counts', () => {
-    expect(HAVOC_TIER_ONE_MUTATION_IDS).toHaveLength(14);
-    expect(HAVOC_TIER_TWO_MUTATION_IDS).toHaveLength(10);
-    expect(HAVOC_TIER_THREE_MUTATION_IDS).toHaveLength(6);
-    expect(new Set(HAVOC_MUTATION_IDS).size).toBe(30);
+    expect(HAVOC_TIER_ONE_MUTATION_IDS).toHaveLength(19);
+    expect(HAVOC_TIER_TWO_MUTATION_IDS).toHaveLength(12);
+    expect(HAVOC_TIER_THREE_MUTATION_IDS).toHaveLength(8);
+    expect(new Set(HAVOC_MUTATION_IDS).size).toBe(39);
   });
 
   it('rejects tier-1 definitions with event rules or no operations', () => {
@@ -146,8 +146,8 @@ describe('havoc mutation catalog', () => {
   it('keeps the version set literal', () => {
     const parsed = havocVersionSetSchema.safeParse({
       schemaVersion: HAVOC_SCHEMA_VERSION,
-      rulesVersion: 'havoc-rules-v4',
-      mutationCatalogVersion: 'havoc-mutations-v4',
+      rulesVersion: 'havoc-rules-v5',
+      mutationCatalogVersion: 'havoc-mutations-v5',
       seedDerivationVersion: 'havoc-seeds-v1',
       engineVersion: 'm3-engine-v24',
       profileVersion: 'p',

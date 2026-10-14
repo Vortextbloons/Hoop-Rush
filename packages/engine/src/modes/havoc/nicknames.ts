@@ -27,6 +27,11 @@ const HAVOC_MUTATION_TAGS: Record<HavocMutationId, string> = {
   'freak-athlete': 'Freakish',
   'the-statue': 'Immovable',
   'reverse-evolution': 'Shrinking',
+  'opposite-day': 'Flipped',
+  'tiny-titan': 'Titanic',
+  'mr-everything': 'Well-Rounded',
+  'foul-merchant': 'Flopping',
+  'the-specialist': 'Specialized',
   'four-point-dunk': 'Slam',
   'golden-assist': 'Golden',
   'heat-check': 'Blazing',
@@ -37,12 +42,16 @@ const HAVOC_MUTATION_TAGS: Record<HavocMutationId, string> = {
   'the-bounty': 'Bounty-Hunting',
   'foul-thief': 'Slippery',
   'basketball-roulette': 'Roulette',
+  'buzzer-bandit': 'Buzzer',
+  'charity-casino': 'Charity',
   'clone-army': 'Doubled',
   'time-lord': 'Timeless',
   'body-snatcher': 'Swapped',
   'reverse-basketball': 'Backwards',
   'double-or-nothing': 'All-In',
   'the-great-equalizer': 'Leveling',
+  'fusion-dance': 'Fused',
+  'basketball-darwinism': 'Evolving',
 };
 
 const HAVOC_SLOT_NOUNS: Record<Position, readonly string[]> = {

@@ -111,6 +111,7 @@ export const havocMutationStatSchema = z.object({
   extraPossessionsExpired: z.number().int().nonnegative(),
   swapSeconds: z.number().int().nonnegative(),
   capSeconds: z.number().int().nonnegative(),
+  ratingChanges: z.number().int().nonnegative(),
 });
 export type HavocMutationStat = z.infer<typeof havocMutationStatSchema>;
 

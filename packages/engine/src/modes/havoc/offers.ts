@@ -3,6 +3,7 @@ import type {
   HavocCatalog,
   HavocDraftCard,
   HavocDraftOffer,
+  HavocMutationDefinition,
   HavocMutationEntry,
   HavocMutationId,
   HavocTier,
@@ -30,7 +31,7 @@ import type {
   GenerateHavocOfferInput,
 } from './api.ts';
 import type { HavocCompatibleBundle } from './compatibility.ts';
-import { enumerateHavocBundles } from './compatibility.ts';
+import { enumerateHavocBundles, havocBundleSpecialistCategories } from './compatibility.ts';
 import { generateHavocNickname } from './nicknames.ts';
 import { applyHavocMutationPackage } from './transform.ts';
 
@@ -47,15 +48,23 @@ export function drawHavocCardTier(rng: Rng): HavocTier {
 export function materializeHavocBundle(
   bundle: HavocCompatibleBundle,
   physicalRng: Rng,
+  specialistRng: Rng,
+  definitions: readonly HavocMutationDefinition[],
 ): HavocMutationEntry[] {
-  return bundle.mutationIds.map((mutationId: HavocMutationId) =>
-    mutationId === 'growth-spurt'
-      ? {
-          mutationId,
-          sampledHeightDelta: physicalRng.nextInt(GROWTH_SPURT_MIN_INCHES, GROWTH_SPURT_MAX_INCHES),
-        }
-      : { mutationId },
-  );
+  return bundle.mutationIds.map((mutationId: HavocMutationId) => {
+    if (mutationId === 'growth-spurt') {
+      return {
+        mutationId,
+        sampledHeightDelta: physicalRng.nextInt(GROWTH_SPURT_MIN_INCHES, GROWTH_SPURT_MAX_INCHES),
+      };
+    }
+    if (mutationId === 'the-specialist') {
+      const categories = havocBundleSpecialistCategories(bundle, definitions);
+      const category = specialistRng.pick([...categories]);
+      return { mutationId, specialistCategory: category };
+    }
+    return { mutationId };
+  });
 }
 
 interface HavocClaimGroup {
@@ -283,7 +292,15 @@ export const GenerateHavocOffer: GenerateHavocOfferSignature = (
     const physicalRng = environment.rngFactory(
       havocDraftCardSeed(runSeed, round, offerIndex, cardIndex, 'physical'),
     );
-    const mutations = materializeHavocBundle(bundle, physicalRng);
+    const specialistRng = environment.rngFactory(
+      havocDraftCardSeed(runSeed, round, offerIndex, cardIndex, 'specialist'),
+    );
+    const mutations = materializeHavocBundle(
+      bundle,
+      physicalRng,
+      specialistRng,
+      environment.definitions,
+    );
     const nicknameRng = environment.rngFactory(
       havocDraftCardSeed(runSeed, round, offerIndex, cardIndex, 'nickname'),
     );

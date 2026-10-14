@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { HavocMutationId, HavocProfileOperation } from '@hoop-rush/data-contracts';
+import { REQUIRED_RATING_KEYS } from '@hoop-rush/data-contracts';
 import { HAVOC_MUTATION_DEFINITIONS, havocMutationDefinitionOf } from './mutations.ts';
 
 const TIER_ONE_OPERATIONS: Record<
@@ -16,7 +17,12 @@ const TIER_ONE_OPERATIONS: Record<
   | 'butterfingers'
   | 'freak-athlete'
   | 'the-statue'
-  | 'reverse-evolution',
+  | 'reverse-evolution'
+  | 'opposite-day'
+  | 'tiny-titan'
+  | 'mr-everything'
+  | 'foul-merchant'
+  | 'the-specialist',
   HavocProfileOperation[]
 > = {
   'growth-spurt': [{ op: 'height-add', minInches: 6, maxInches: 12 }],
@@ -95,6 +101,33 @@ const TIER_ONE_OPERATIONS: Record<
     { op: 'raise-rating', field: 'steal', value: 99 },
     { op: 'raise-tendency', field: 'stealAttemptRate', value: 20 },
   ],
+  'opposite-day': [{ op: 'swap-extreme-ratings', count: 5 }],
+  'tiny-titan': [
+    { op: 'height-set', inches: 62 },
+    { op: 'raise-rating', field: 'strength', value: 99 },
+    { op: 'raise-rating', field: 'block', value: 99 },
+    { op: 'raise-rating', field: 'vertical', value: 99 },
+    { op: 'raise-rating', field: 'offensiveRebound', value: 99 },
+    { op: 'raise-rating', field: 'defensiveRebound', value: 99 },
+    { op: 'cap-rating', field: 'speed', value: 40 },
+  ],
+  'mr-everything': REQUIRED_RATING_KEYS.map((field) => ({
+    op: 'set-rating' as const,
+    field,
+    value: 88,
+  })),
+  'foul-merchant': [
+    { op: 'raise-rating', field: 'freeThrow', value: 99 },
+    { op: 'raise-rating', field: 'ballHandling', value: 99 },
+    { op: 'raise-rating', field: 'offensiveIq', value: 99 },
+    { op: 'raise-tendency', field: 'driveRate', value: 95 },
+    { op: 'raise-tendency', field: 'freeThrowRate', value: 95 },
+    { op: 'cap-rating', field: 'threePoint', value: 30 },
+  ],
+  'the-specialist': [
+    { op: 'set-category-ratings', value: 99 },
+    { op: 'cap-category-ratings', value: 45 },
+  ],
 };
 
 const TIER_TWO_RULES: Record<
@@ -107,7 +140,9 @@ const TIER_TWO_RULES: Record<
   | 'rebound-loop'
   | 'the-bounty'
   | 'foul-thief'
-  | 'basketball-roulette',
+  | 'basketball-roulette'
+  | 'buzzer-bandit'
+  | 'charity-casino',
   string
 > = {
   'four-point-dunk': 'four-point-dunk',
@@ -120,6 +155,8 @@ const TIER_TWO_RULES: Record<
   'the-bounty': 'the-bounty',
   'foul-thief': 'foul-thief',
   'basketball-roulette': 'basketball-roulette',
+  'buzzer-bandit': 'buzzer-bandit',
+  'charity-casino': 'charity-casino',
 };
 
 const TIER_TWO_DOWNSIDE_OPERATIONS: Record<string, HavocProfileOperation[]> = {
@@ -144,7 +181,9 @@ const TIER_THREE_RULES: Record<
   | 'body-snatcher'
   | 'reverse-basketball'
   | 'double-or-nothing'
-  | 'the-great-equalizer',
+  | 'the-great-equalizer'
+  | 'fusion-dance'
+  | 'basketball-darwinism',
   string
 > = {
   'clone-army': 'clone-army',
@@ -153,14 +192,16 @@ const TIER_THREE_RULES: Record<
   'reverse-basketball': 'reverse-basketball',
   'double-or-nothing': 'double-or-nothing',
   'the-great-equalizer': 'the-great-equalizer',
+  'fusion-dance': 'fusion-dance',
+  'basketball-darwinism': 'basketball-darwinism',
 };
 
 describe('havoc mutation catalog', () => {
-  it('ships 14 tier-1, 10 tier-2, and 6 tier-3 definitions', () => {
+  it('ships 19 tier-1, 12 tier-2, and 8 tier-3 definitions', () => {
     const byTier = { 1: 0, 2: 0, 3: 0 };
     for (const definition of HAVOC_MUTATION_DEFINITIONS) byTier[definition.tier] += 1;
-    expect(byTier).toEqual({ 1: 14, 2: 10, 3: 6 });
-    expect(new Set(HAVOC_MUTATION_DEFINITIONS.map((d) => d.mutationId)).size).toBe(30);
+    expect(byTier).toEqual({ 1: 19, 2: 12, 3: 8 });
+    expect(new Set(HAVOC_MUTATION_DEFINITIONS.map((d) => d.mutationId)).size).toBe(39);
   });
 
   it('authors player-facing names, descriptions, and downsides within limits', () => {

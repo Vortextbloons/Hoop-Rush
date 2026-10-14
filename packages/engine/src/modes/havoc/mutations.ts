@@ -1,9 +1,15 @@
 import type { HavocMutationDefinition, HavocMutationId } from '@hoop-rush/data-contracts';
-import { havocMutationDefinitionSchema } from '@hoop-rush/data-contracts';
+import { REQUIRED_RATING_KEYS, havocMutationDefinitionSchema } from '@hoop-rush/data-contracts';
 
 function defineHavocMutation(definition: HavocMutationDefinition): HavocMutationDefinition {
   return havocMutationDefinitionSchema.parse(definition);
 }
+
+const MR_EVERYTHING_RATING_OPERATIONS = REQUIRED_RATING_KEYS.map((field) => ({
+  op: 'set-rating' as const,
+  field,
+  value: 88,
+}));
 
 export const HAVOC_MUTATION_DEFINITIONS: readonly HavocMutationDefinition[] = [
   defineHavocMutation({
@@ -201,6 +207,73 @@ export const HAVOC_MUTATION_DEFINITIONS: readonly HavocMutationDefinition[] = [
     eventRules: [],
   }),
   defineHavocMutation({
+    mutationId: 'opposite-day',
+    tier: 1,
+    name: 'Opposite Day',
+    description:
+      'Swaps the five highest ratings with the five lowest, strongest becomes weakest and weakest becomes strongest.',
+    downside: '',
+    operations: [{ op: 'swap-extreme-ratings', count: 5 }],
+    eventRules: [],
+  }),
+  defineHavocMutation({
+    mutationId: 'tiny-titan',
+    tier: 1,
+    name: 'Tiny Titan',
+    description:
+      'Sets height to 62 inches and raises strength, block, vertical, and both rebounding ratings to 99.',
+    downside: 'Caps speed at 40.',
+    operations: [
+      { op: 'height-set', inches: 62 },
+      { op: 'raise-rating', field: 'strength', value: 99 },
+      { op: 'raise-rating', field: 'block', value: 99 },
+      { op: 'raise-rating', field: 'vertical', value: 99 },
+      { op: 'raise-rating', field: 'offensiveRebound', value: 99 },
+      { op: 'raise-rating', field: 'defensiveRebound', value: 99 },
+      { op: 'cap-rating', field: 'speed', value: 40 },
+    ],
+    eventRules: [],
+  }),
+  defineHavocMutation({
+    mutationId: 'mr-everything',
+    tier: 1,
+    name: 'Mr. Everything',
+    description: 'Sets every rating to exactly 88.',
+    downside: '',
+    operations: MR_EVERYTHING_RATING_OPERATIONS,
+    eventRules: [],
+  }),
+  defineHavocMutation({
+    mutationId: 'foul-merchant',
+    tier: 1,
+    name: 'Foul Merchant',
+    description:
+      'Raises free throw, ball handling, and offensive IQ to 99, and drive rate and free-throw rate to 95.',
+    downside: 'Caps three-point at 30.',
+    operations: [
+      { op: 'raise-rating', field: 'freeThrow', value: 99 },
+      { op: 'raise-rating', field: 'ballHandling', value: 99 },
+      { op: 'raise-rating', field: 'offensiveIq', value: 99 },
+      { op: 'raise-tendency', field: 'driveRate', value: 95 },
+      { op: 'raise-tendency', field: 'freeThrowRate', value: 95 },
+      { op: 'cap-rating', field: 'threePoint', value: 30 },
+    ],
+    eventRules: [],
+  }),
+  defineHavocMutation({
+    mutationId: 'the-specialist',
+    tier: 1,
+    name: 'The Specialist',
+    description:
+      'Sets every rating in the sampled category to 99 and caps every other rating at 45.',
+    downside: 'All ratings outside the sampled category are capped at 45.',
+    operations: [
+      { op: 'set-category-ratings', value: 99 },
+      { op: 'cap-category-ratings', value: 45 },
+    ],
+    eventRules: [],
+  }),
+  defineHavocMutation({
     mutationId: 'four-point-dunk',
     tier: 2,
     name: 'Four-Point Dunk',
@@ -308,6 +381,26 @@ export const HAVOC_MUTATION_DEFINITIONS: readonly HavocMutationDefinition[] = [
     eventRules: ['basketball-roulette'],
   }),
   defineHavocMutation({
+    mutationId: 'buzzer-bandit',
+    tier: 2,
+    name: 'Buzzer Bandit',
+    description:
+      "Makes with three seconds or less left on the shot clock score double; the owner's misses with three seconds or less subtract one point.",
+    downside: "The owner's own quick misses subtract one point each.",
+    operations: [],
+    eventRules: ['buzzer-bandit'],
+  }),
+  defineHavocMutation({
+    mutationId: 'charity-casino',
+    tier: 2,
+    name: 'Charity Casino',
+    description:
+      "The owner's made free throws score three; their missed free throws award the opposing team two points.",
+    downside: 'Missed free throws gift the opposing team two points each.',
+    operations: [],
+    eventRules: ['charity-casino'],
+  }),
+  defineHavocMutation({
     mutationId: 'clone-army',
     tier: 3,
     name: 'Clone Army',
@@ -370,6 +463,29 @@ export const HAVOC_MUTATION_DEFINITIONS: readonly HavocMutationDefinition[] = [
     operations: [],
     eventRules: ['the-great-equalizer'],
     teamExclusive: true,
+  }),
+  defineHavocMutation({
+    mutationId: 'fusion-dance',
+    tier: 3,
+    name: 'Fusion Dance',
+    description:
+      'At tipoff, fuses the owner with their highest-rated teammate: the owner plays with the better of each fused rating and 99 usage while the donor plays at 40 across the board.',
+    downside:
+      'The pairing is fixed at tipoff; the donor stays at 40 while the owner is active, and only one owner per team may fuse.',
+    operations: [],
+    eventRules: ['fusion-dance'],
+    teamExclusive: true,
+  }),
+  defineHavocMutation({
+    mutationId: 'basketball-darwinism',
+    tier: 3,
+    name: 'Basketball Darwinism',
+    description:
+      "After each made field goal by any shooter, the shooter's five scoring ratings drop by five.",
+    downside:
+      'Every made field goal degrades scoring toward zero, including the owners\u2019 own makes; the decay resets each game.',
+    operations: [],
+    eventRules: ['basketball-darwinism'],
   }),
 ];
 

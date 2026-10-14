@@ -1,6 +1,11 @@
 <script lang="ts">
   import type { HavocMutationEntry } from '@hoop-rush/data-contracts';
-  import { mutationDescriptionOf, mutationDownsideOf, mutationNameOf } from './havoc-presentation';
+  import {
+    havocSpecialistCategoryLabel,
+    mutationDescriptionOf,
+    mutationDownsideOf,
+    mutationNameOf,
+  } from './havoc-presentation';
   let {
     mutations,
     compact = false,
@@ -21,6 +26,16 @@
     'freak-athlete': 'Elite leaping and finishing, at the cost of outside shooting.',
     'the-statue': 'Elite strength and post scoring, but painfully slow.',
     'reverse-evolution': 'Shrinks in size while gaining elite perimeter defense and steals.',
+    'opposite-day': 'The five best ratings swap places with the five worst. Everything flips.',
+    'tiny-titan': 'A 62-inch frame with elite strength, blocking, leaping, and rebounding.',
+    'mr-everything': 'Every rating set to exactly 88. No weakness, no standout.',
+    'foul-merchant': 'Elite free throws, handles, and IQ, hunting drives and contact.',
+    'the-specialist': 'One sampled category rises to 99 while everything else caps at 45.',
+    'buzzer-bandit': 'Late-clock makes count double, but quick misses cost a point.',
+    'charity-casino': 'Made free throws worth 3; missed ones gift the opponent 2.',
+    'fusion-dance':
+      'Fuses with the best teammate: better ratings and 99 usage; the teammate plays at 40.',
+    'basketball-darwinism': 'Every made shot degrades the shooter\u2019s scoring ratings by 5.',
   };
 </script>
 
@@ -32,6 +47,11 @@
         {#if entry.sampledHeightDelta !== undefined}
           <span class="font-mono text-[10px] text-muted-foreground"
             >+{entry.sampledHeightDelta} in sampled</span
+          >
+        {/if}
+        {#if entry.specialistCategory !== undefined}
+          <span class="font-mono text-[10px] text-muted-foreground"
+            >{havocSpecialistCategoryLabel(entry.specialistCategory)}</span
           >
         {/if}
       </p>

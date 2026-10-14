@@ -53,8 +53,8 @@ function instanceId(index: number): string {
 export function buildHavocVersionSet(overrides: Partial<HavocVersionSet> = {}): HavocVersionSet {
   return havocVersionSetSchema.parse({
     schemaVersion: HAVOC_SCHEMA_VERSION,
-    rulesVersion: 'havoc-rules-v4',
-    mutationCatalogVersion: 'havoc-mutations-v4',
+    rulesVersion: 'havoc-rules-v5',
+    mutationCatalogVersion: 'havoc-mutations-v5',
     seedDerivationVersion: 'havoc-seeds-v1',
     engineVersion: 'm3-engine-v24',
     profileVersion: 'm2-1990s-fixture-v1',
@@ -416,8 +416,8 @@ export function buildHavocRunStateLocked(overrides: Partial<HavocRunState> = {})
 export function buildHavocGameInput(overrides: Partial<HavocGameInput> = {}): HavocGameInput {
   return havocGameInputSchema.parse({
     schemaVersion: HAVOC_SCHEMA_VERSION,
-    rulesVersion: 'havoc-rules-v4',
-    mutationCatalogVersion: 'havoc-mutations-v4',
+    rulesVersion: 'havoc-rules-v5',
+    mutationCatalogVersion: 'havoc-mutations-v5',
     gameNumber: 1,
     variant: 'havoc',
     seed: seedFromString('havoc-game-1'),
@@ -496,8 +496,8 @@ export function buildHavocGameResult(overrides: Partial<HavocGameResult> = {}): 
     variant: 'havoc',
     seed: seedFromString('havoc-game-1'),
     engineVersion: 'm3-engine-v24',
-    rulesVersion: 'havoc-rules-v4',
-    mutationCatalogVersion: 'havoc-mutations-v4',
+    rulesVersion: 'havoc-rules-v5',
+    mutationCatalogVersion: 'havoc-mutations-v5',
     profileVersion: 'm2-2010s-fixture-v1',
     dataVersion: 'data-v1',
     humanSide: 'home',
@@ -516,6 +516,7 @@ export function buildHavocGameResult(overrides: Partial<HavocGameResult> = {}): 
       turnovers: 12,
       fouls: 18,
       adjustments: 0,
+      teamBonusPoints: 0,
       periods,
       courtSeconds: 5 * 48 * 60,
       participants: homeLines,
@@ -535,6 +536,7 @@ export function buildHavocGameResult(overrides: Partial<HavocGameResult> = {}): 
       turnovers: 14,
       fouls: 20,
       adjustments: 0,
+      teamBonusPoints: 0,
       periods: awayPeriods,
       courtSeconds: 5 * 48 * 60,
       participants: awayLines,

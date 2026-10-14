@@ -16,6 +16,11 @@ export const HAVOC_TIER_ONE_MUTATION_IDS = [
   'freak-athlete',
   'the-statue',
   'reverse-evolution',
+  'opposite-day',
+  'tiny-titan',
+  'mr-everything',
+  'foul-merchant',
+  'the-specialist',
 ] as const;
 
 export const HAVOC_TIER_TWO_MUTATION_IDS = [
@@ -29,6 +34,8 @@ export const HAVOC_TIER_TWO_MUTATION_IDS = [
   'the-bounty',
   'foul-thief',
   'basketball-roulette',
+  'buzzer-bandit',
+  'charity-casino',
 ] as const;
 
 export const HAVOC_TIER_THREE_MUTATION_IDS = [
@@ -38,6 +45,8 @@ export const HAVOC_TIER_THREE_MUTATION_IDS = [
   'reverse-basketball',
   'double-or-nothing',
   'the-great-equalizer',
+  'fusion-dance',
+  'basketball-darwinism',
 ] as const;
 
 export const HAVOC_MUTATION_IDS = [
@@ -61,6 +70,11 @@ export const havocMutationIdSchema = z.enum([
   'freak-athlete',
   'the-statue',
   'reverse-evolution',
+  'opposite-day',
+  'tiny-titan',
+  'mr-everything',
+  'foul-merchant',
+  'the-specialist',
   'four-point-dunk',
   'golden-assist',
   'heat-check',
@@ -71,14 +85,29 @@ export const havocMutationIdSchema = z.enum([
   'the-bounty',
   'foul-thief',
   'basketball-roulette',
+  'buzzer-bandit',
+  'charity-casino',
   'clone-army',
   'time-lord',
   'body-snatcher',
   'reverse-basketball',
   'double-or-nothing',
   'the-great-equalizer',
+  'fusion-dance',
+  'basketball-darwinism',
 ]);
 export type HavocMutationId = z.infer<typeof havocMutationIdSchema>;
+
+/**
+ * Mutations limited to one owner per team. Must mirror the `teamExclusive` flags
+ * in the engine catalog definitions.
+ */
+export const HAVOC_TEAM_EXCLUSIVE_MUTATION_IDS: readonly HavocMutationId[] = [
+  'time-lord',
+  'reverse-basketball',
+  'the-great-equalizer',
+  'fusion-dance',
+];
 
 export const havocTierSchema = z.union([z.literal(1), z.literal(2), z.literal(3)]);
 export type HavocTier = z.infer<typeof havocTierSchema>;
@@ -113,6 +142,31 @@ export const havocRatingFieldSchema = z.enum(REQUIRED_RATING_KEYS);
 export type HavocRatingField = z.infer<typeof havocRatingFieldSchema>;
 export const havocTendencyFieldSchema = z.enum(HAVOC_TENDENCY_FIELDS);
 export type HavocTendencyField = z.infer<typeof havocTendencyFieldSchema>;
+
+/** The Specialist's rating groups, in the canonical sampling order. */
+export const HAVOC_SPECIALIST_CATEGORY_IDS = [
+  'scoring',
+  'playmaking',
+  'defense',
+  'rebounding',
+  'athleticism',
+] as const;
+export const havocSpecialistCategorySchema = z.enum(HAVOC_SPECIALIST_CATEGORY_IDS);
+export type HavocSpecialistCategory = z.infer<typeof havocSpecialistCategorySchema>;
+
+export const HAVOC_SPECIALIST_CATEGORY_RATINGS: Readonly<
+  Record<HavocSpecialistCategory, readonly HavocRatingField[]>
+> = {
+  scoring: ['insideScoring', 'closeShot', 'midrange', 'threePoint', 'freeThrow'],
+  playmaking: ['ballHandling', 'passing', 'offensiveIq'],
+  defense: ['perimeterDefense', 'interiorDefense', 'steal', 'block', 'defensiveIq'],
+  rebounding: ['offensiveRebound', 'defensiveRebound'],
+  athleticism: ['speed', 'strength', 'vertical'],
+};
+
+/** The five scoring ratings degraded by Basketball Darwinism, in canonical order. */
+export const HAVOC_SCORING_RATING_FIELDS: readonly HavocRatingField[] =
+  HAVOC_SPECIALIST_CATEGORY_RATINGS.scoring;
 
 export const havocProfileOperationSchema = z.discriminatedUnion('op', [
   z.object({
@@ -162,6 +216,23 @@ export const havocProfileOperationSchema = z.discriminatedUnion('op', [
     op: z.literal('reach-add'),
     inches: z.number().int().min(1).max(36),
   }),
+  z.object({
+    op: z.literal('set-rating'),
+    field: havocRatingFieldSchema,
+    value: z.number().int().min(0).max(100),
+  }),
+  z.object({
+    op: z.literal('swap-extreme-ratings'),
+    count: z.number().int().min(1).max(9),
+  }),
+  z.object({
+    op: z.literal('set-category-ratings'),
+    value: z.number().int().min(0).max(100),
+  }),
+  z.object({
+    op: z.literal('cap-category-ratings'),
+    value: z.number().int().min(0).max(100),
+  }),
 ]);
 export type HavocProfileOperation = z.infer<typeof havocProfileOperationSchema>;
 
@@ -195,6 +266,10 @@ export const havocEventRuleIdSchema = z.enum([
   'reverse-basketball',
   'double-or-nothing',
   'the-great-equalizer',
+  'buzzer-bandit',
+  'charity-casino',
+  'fusion-dance',
+  'basketball-darwinism',
 ]);
 export type HavocEventRuleId = z.infer<typeof havocEventRuleIdSchema>;
 
@@ -205,7 +280,7 @@ export const havocMutationDefinitionSchema = z
     name: z.string().min(1).max(64),
     description: z.string().min(1).max(320),
     downside: z.string().max(320),
-    operations: z.array(havocProfileOperationSchema).max(10),
+    operations: z.array(havocProfileOperationSchema).max(18),
     eventRules: z.array(havocEventRuleIdSchema).max(1),
     teamExclusive: z.boolean().optional(),
   })
@@ -238,18 +313,27 @@ export const havocMutationEntrySchema = z
   .object({
     mutationId: havocMutationIdSchema,
     sampledHeightDelta: z.number().int().min(6).max(12).optional(),
+    specialistCategory: havocSpecialistCategorySchema.optional(),
   })
   .superRefine((entry, ctx) => {
     if (entry.mutationId === 'growth-spurt') {
       if (entry.sampledHeightDelta === undefined) {
         ctx.addIssue({ code: 'custom', message: 'growth-spurt requires a sampled height delta' });
       }
-      return;
-    }
-    if (entry.sampledHeightDelta !== undefined) {
+    } else if (entry.sampledHeightDelta !== undefined) {
       ctx.addIssue({
         code: 'custom',
         message: `sampled height delta is only valid for growth-spurt (${entry.mutationId})`,
+      });
+    }
+    if (entry.mutationId === 'the-specialist') {
+      if (entry.specialistCategory === undefined) {
+        ctx.addIssue({ code: 'custom', message: 'the-specialist requires a sampled category' });
+      }
+    } else if (entry.specialistCategory !== undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        message: `specialist category is only valid for the-specialist (${entry.mutationId})`,
       });
     }
   });

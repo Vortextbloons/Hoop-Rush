@@ -70,6 +70,10 @@
                   <dt>Ratings capped</dt>
                   <dd>{power.capSeconds}s</dd>
                 </div>{/if}
+              {#if power.ratingChanges > 0}<div>
+                  <dt>Rating changes</dt>
+                  <dd>{power.ratingChanges}</dd>
+                </div>{/if}
             </dl>
           {/if}
         </li>

@@ -292,7 +292,7 @@ export class HavocGamecastState {
         }
       }
       const scoring = item.scoring;
-      if (scoring !== null) {
+      if (scoring !== null && scoring.kind !== 'bonus') {
         ensure(scoring.actorInstanceId).points += scoring.points;
       }
     }

@@ -102,6 +102,7 @@ describe('havoc field-goal value resolution', () => {
       putback: false,
       bounty: false,
       doubleOrNothing: false,
+      buzzerBandit: false,
     });
     expect(four.points).toBe(4);
     expect(four.addends).toEqual([
@@ -118,6 +119,7 @@ describe('havoc field-goal value resolution', () => {
       putback: false,
       bounty: false,
       doubleOrNothing: true,
+      buzzerBandit: false,
     });
     expect(seven.points).toBe(7);
     expect(seven.multipliers).toEqual([{ source: 'double-or-nothing', factor: 2 }]);
@@ -134,6 +136,7 @@ describe('havoc field-goal value resolution', () => {
       putback: false,
       bounty: true,
       doubleOrNothing: true,
+      buzzerBandit: false,
     });
     expect(value.points).toBe((3 + 1 - 2) * 2);
     const contributions = value.contributions.reduce((sum, entry) => sum + entry.points, 0);
@@ -152,6 +155,7 @@ describe('havoc field-goal value resolution', () => {
       putback: false,
       bounty: true,
       doubleOrNothing: true,
+      buzzerBandit: false,
     });
     expect(value.points).toBe(6);
     expect(value.multipliers).toEqual([{ source: 'the-bounty', factor: 3 }]);
@@ -170,6 +174,7 @@ describe('havoc field-goal value resolution', () => {
       putback: false,
       bounty: false,
       doubleOrNothing: false,
+      buzzerBandit: false,
     });
     expect(negative.points).toBe(1);
     const three = havocFieldGoalValue({
@@ -182,6 +187,7 @@ describe('havoc field-goal value resolution', () => {
       putback: false,
       bounty: false,
       doubleOrNothing: true,
+      buzzerBandit: false,
     });
     expect(three.points).toBe(-2);
   });

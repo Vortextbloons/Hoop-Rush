@@ -2,24 +2,37 @@ import type {
   HavocMutationDefinition,
   HavocMutationId,
   HavocProfileOperation,
+  HavocSpecialistCategory,
   HavocTier,
+} from '@hoop-rush/data-contracts';
+import {
+  HAVOC_SPECIALIST_CATEGORY_IDS,
+  HAVOC_SPECIALIST_CATEGORY_RATINGS,
 } from '@hoop-rush/data-contracts';
 
 export interface HavocCompatibleBundle {
   readonly tier: HavocTier;
   readonly mutationIds: readonly HavocMutationId[];
+  readonly specialistCategories?: readonly HavocSpecialistCategory[];
 }
 
-function isFloorOperation(
-  operation: HavocProfileOperation,
-): operation is Extract<HavocProfileOperation, { op: 'raise-rating' } | { op: 'raise-tendency' }> {
+type FloorOperation = Extract<
+  HavocProfileOperation,
+  { op: 'raise-rating' } | { op: 'raise-tendency' }
+>;
+type CapOperation = Extract<HavocProfileOperation, { op: 'cap-rating' } | { op: 'cap-tendency' }>;
+type SetOperation = Extract<HavocProfileOperation, { op: 'set-rating' }>;
+
+function isFloorOperation(operation: HavocProfileOperation): operation is FloorOperation {
   return operation.op === 'raise-rating' || operation.op === 'raise-tendency';
 }
 
-function isCapOperation(
-  operation: HavocProfileOperation,
-): operation is Extract<HavocProfileOperation, { op: 'cap-rating' } | { op: 'cap-tendency' }> {
+function isCapOperation(operation: HavocProfileOperation): operation is CapOperation {
   return operation.op === 'cap-rating' || operation.op === 'cap-tendency';
+}
+
+function isSetOperation(operation: HavocProfileOperation): operation is SetOperation {
+  return operation.op === 'set-rating';
 }
 
 function isHeightOperation(
@@ -40,6 +53,7 @@ function operationField(operation: HavocProfileOperation): string | null {
     case 'raise-rating':
     case 'cap-rating':
     case 'add-rating':
+    case 'set-rating':
       return `rating:${operation.field}`;
     case 'raise-tendency':
     case 'cap-tendency':
@@ -63,6 +77,10 @@ export function havocOperationsConflict(
   if (leftField === null || rightField === null || leftField !== rightField) return false;
   if (isFloorOperation(left) && isCapOperation(right) && right.value < left.value) return true;
   if (isCapOperation(left) && isFloorOperation(right) && left.value < right.value) return true;
+  if (isFloorOperation(left) && isSetOperation(right) && right.value < left.value) return true;
+  if (isSetOperation(left) && isFloorOperation(right) && left.value < right.value) return true;
+  if (isCapOperation(left) && isSetOperation(right) && right.value > left.value) return true;
+  if (isSetOperation(left) && isCapOperation(right) && left.value > right.value) return true;
   return false;
 }
 
@@ -97,6 +115,58 @@ function canonicalDefinitionsByTier(
   return canonical;
 }
 
+function partnerOperationsAllowCategory(
+  operations: readonly HavocProfileOperation[],
+  category: HavocSpecialistCategory,
+): boolean {
+  const specialistFields = new Set<string>(HAVOC_SPECIALIST_CATEGORY_RATINGS[category]);
+  for (const operation of operations) {
+    switch (operation.op) {
+      case 'raise-rating': {
+        if (!specialistFields.has(operation.field) && operation.value > 45) return false;
+        break;
+      }
+      case 'cap-rating': {
+        if (specialistFields.has(operation.field) ? operation.value < 99 : operation.value < 45) {
+          return false;
+        }
+        break;
+      }
+      case 'add-rating': {
+        if (specialistFields.has(operation.field)) return false;
+        break;
+      }
+      case 'set-rating': {
+        if (
+          specialistFields.has(operation.field) ? operation.value !== 99 : operation.value !== 45
+        ) {
+          return false;
+        }
+        break;
+      }
+      default:
+        break;
+    }
+  }
+  return true;
+}
+
+export function havocBundleSpecialistCategories(
+  bundle: HavocCompatibleBundle,
+  definitions: readonly HavocMutationDefinition[],
+): readonly HavocSpecialistCategory[] {
+  if (!bundle.mutationIds.includes('the-specialist')) return HAVOC_SPECIALIST_CATEGORY_IDS;
+  const byId = new Map(definitions.map((definition) => [definition.mutationId, definition]));
+  const partnerOperations = bundle.mutationIds
+    .filter((mutationId) => mutationId !== 'the-specialist')
+    .map((mutationId) => byId.get(mutationId))
+    .filter((definition): definition is HavocMutationDefinition => definition !== undefined)
+    .flatMap((definition) => definition.operations);
+  return HAVOC_SPECIALIST_CATEGORY_IDS.filter((category) =>
+    partnerOperationsAllowCategory(partnerOperations, category),
+  );
+}
+
 export function enumerateHavocBundles(
   definitions: readonly HavocMutationDefinition[],
   tier: HavocTier,
@@ -111,7 +181,13 @@ export function enumerateHavocBundles(
     for (const tierTwo of tierPool) {
       for (const tierOne of tierOnePool) {
         if (havocDefinitionsConflict(tierTwo, tierOne)) continue;
-        bundles.push({ tier, mutationIds: [tierTwo.mutationId, tierOne.mutationId] });
+        const bundle: HavocCompatibleBundle = {
+          tier,
+          mutationIds: [tierTwo.mutationId, tierOne.mutationId],
+        };
+        const categories = havocBundleSpecialistCategories(bundle, definitions);
+        if (categories.length === 0) continue;
+        bundles.push({ ...bundle, specialistCategories: categories });
       }
     }
     return bundles;
@@ -127,10 +203,13 @@ export function enumerateHavocBundles(
         if (havocDefinitionsConflict(left, middle)) continue;
         if (havocDefinitionsConflict(left, right)) continue;
         if (havocDefinitionsConflict(middle, right)) continue;
-        bundles.push({
+        const bundle: HavocCompatibleBundle = {
           tier,
           mutationIds: [left.mutationId, middle.mutationId, right.mutationId],
-        });
+        };
+        const categories = havocBundleSpecialistCategories(bundle, definitions);
+        if (categories.length === 0) continue;
+        bundles.push({ ...bundle, specialistCategories: categories });
       }
     }
   }
@@ -167,5 +246,6 @@ export function havocBundleIsCompatible(
       if (havocDefinitionsConflict(left, right)) return false;
     }
   }
+  if (havocBundleSpecialistCategories(bundle, definitions).length === 0) return false;
   return true;
 }

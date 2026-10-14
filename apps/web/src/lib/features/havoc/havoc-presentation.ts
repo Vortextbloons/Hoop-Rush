@@ -76,6 +76,8 @@ const HAVOC_SCORING_SOURCE_LABELS: Record<string, string> = {
   'heat-check': 'Heat Check',
   'second-chance-jackpot': 'Second Chance Jackpot',
   'the-bounty': 'The Bounty',
+  'buzzer-bandit': 'Buzzer Bandit',
+  'charity-casino': 'Charity Casino',
 };
 
 export function havocScoringSourceLabel(source: string): string {
@@ -193,6 +195,14 @@ export function havocEventMutationIdOf(event: HavocEvent): HavocMutationId | nul
       return 'body-snatcher';
     case 'great-equalizer':
       return 'the-great-equalizer';
+    case 'buzzer-bandit':
+      return 'buzzer-bandit';
+    case 'charity-casino':
+      return 'charity-casino';
+    case 'fusion-dance':
+      return 'fusion-dance';
+    case 'darwinism':
+      return 'basketball-darwinism';
     default:
       return null;
   }
@@ -270,6 +280,16 @@ export function havocEventTextOf(event: HavocEvent, context: HavocEventNameConte
       return `${name(event.ownerInstanceId)} foul relief — charged fouls now ${String(event.chargedFoulsAfter)}`;
     case 'roulette':
       return `${name(event.ownerInstanceId)} Basketball Roulette #${String(event.attemptOrdinal)}: rolled ${String(event.rolled)} on a ${String(event.nominal)}-point attempt`;
+    case 'buzzer-bandit':
+      return `Buzzer Bandit ${event.outcome}: ${name(event.ownerInstanceId)} with ${String(event.shotClockTenths / 10)}s on the clock`;
+    case 'charity-casino':
+      return event.outcome === 'made'
+        ? `Charity Casino: ${name(event.ownerInstanceId)} made free throw worth 3`
+        : `Charity Casino: ${name(event.ownerInstanceId)} missed free throw gifts the opponent 2 points`;
+    case 'fusion-dance':
+      return `Fusion Dance ${event.outcome}: ${name(event.ownerInstanceId)} fuses with ${name(event.donorInstanceId)}`;
+    case 'darwinism':
+      return `Basketball Darwinism: ${name(event.shooterInstanceId)} scoring ratings decay (reduction #${String(event.shooterReductionsAfter)})`;
     case 'game-end':
       return `Final: ${context.homeName} ${String(event.homeScore)}, ${context.awayName} ${String(event.awayScore)}`;
   }
@@ -300,7 +320,9 @@ export function havocScoringTextOf(
       ? 'field goal'
       : entry.kind === 'free-throw'
         ? 'free throw'
-        : 'adjustment';
+        : entry.kind === 'bonus'
+          ? 'team bonus'
+          : 'adjustment';
   const detail = parts.length > 0 ? ` (${parts.join(', ')})` : '';
   return `${actor} ${formatSignedPoints(entry.points)} pts — ${label}${detail}`;
 }
@@ -428,6 +450,18 @@ export function havocFieldLabel(field: string): string {
 
 export function mutationEntriesSummary(entries: readonly HavocMutationEntry[]): string {
   return entries.map((entry) => mutationNameOf(entry.mutationId)).join(', ');
+}
+
+const HAVOC_SPECIALIST_CATEGORY_LABELS: Record<string, string> = {
+  scoring: 'Scoring',
+  playmaking: 'Playmaking',
+  defense: 'Defense',
+  rebounding: 'Rebounding',
+  athleticism: 'Athleticism',
+};
+
+export function havocSpecialistCategoryLabel(category: string): string {
+  return HAVOC_SPECIALIST_CATEGORY_LABELS[category] ?? category;
 }
 
 export function havocOwnedExclusiveMutationIds(

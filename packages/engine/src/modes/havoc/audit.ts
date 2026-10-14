@@ -194,10 +194,10 @@ function checkResultInternals(
       );
     }
     const participantPoints = team.participants.reduce((sum, line) => sum + line.points, 0);
-    if (participantPoints !== team.points) {
+    if (participantPoints + team.teamBonusPoints !== team.points) {
       fail(
         'points-ledger',
-        `${team.side} participant points ${String(participantPoints)} != team points ${String(team.points)}`,
+        `${team.side} participant points ${String(participantPoints)} + bonus ${String(team.teamBonusPoints)} != team points ${String(team.points)}`,
       );
     }
     for (const line of team.participants) {
@@ -267,6 +267,19 @@ function checkTape(
     Array.from({ length: result.home.periods.length }, () => 0),
   ];
   const actorPoints = new Map<string, number>();
+  const freeThrowAttempts = new Map<
+    number,
+    { made: boolean; shooterInstanceId: string; side: HavocSide }
+  >();
+  for (const event of tape.events) {
+    if (event.kind === 'free-throw-attempt') {
+      freeThrowAttempts.set(event.sequence, {
+        made: event.made,
+        shooterInstanceId: event.shooterInstanceId,
+        side: event.side,
+      });
+    }
+  }
   let lastEvent = -1;
   let lastScore = -1;
   for (const entry of tape.scoring) {
@@ -284,7 +297,21 @@ function checkTape(
       );
       continue;
     }
-    if (sideIndex === undefined || actor.sideIndex !== sideIndex) {
+    const isBonus = entry.kind === 'bonus';
+    if (isBonus) {
+      if (sideIndex === undefined || actor.sideIndex === sideIndex) {
+        fail('actor-eligibility', 'bonus scoring actor is not opposing the scoring side');
+      }
+      const attempt =
+        entry.originalEventSequence === null
+          ? undefined
+          : freeThrowAttempts.get(entry.originalEventSequence);
+      if (attempt === undefined) {
+        fail('scoring-entry', 'bonus scoring entry references no free-throw attempt');
+      } else if (attempt.made || attempt.shooterInstanceId !== entry.actorInstanceId) {
+        fail('scoring-entry', 'bonus scoring entry does not reference its own missed free throw');
+      }
+    } else if (sideIndex === undefined || actor.sideIndex !== sideIndex) {
       fail(
         'actor-eligibility',
         `scoring entry actor ${entry.actorInstanceId} is on the wrong side`,
@@ -331,7 +358,11 @@ function checkTape(
           `owner ${ownerId} does not own any scoring source on entry ${String(entry.sequence)}`,
         );
       }
-      if (owner.sideIndex !== sideIndex)
+      if (isBonus) {
+        if (owner.sideIndex !== actor.sideIndex) {
+          fail('scoring-entry', `bonus owner ${ownerId} is not on the actor's side`);
+        }
+      } else if (owner.sideIndex !== sideIndex)
         fail('scoring-entry', `owner ${ownerId} is not on the scoring side`);
     }
     if (sources.length > 0 && entry.owners.length === 0) {
@@ -348,10 +379,12 @@ function checkTape(
     } else {
       fail('period-ledger', `scoring entry ${String(entry.sequence)} period out of range`);
     }
-    actorPoints.set(
-      entry.actorInstanceId,
-      (actorPoints.get(entry.actorInstanceId) ?? 0) + entry.points,
-    );
+    if (!isBonus) {
+      actorPoints.set(
+        entry.actorInstanceId,
+        (actorPoints.get(entry.actorInstanceId) ?? 0) + entry.points,
+      );
+    }
   }
   for (const side of [0, 1] as const) {
     const team = side === 0 ? result.home : result.away;
@@ -717,6 +750,46 @@ function checkTape(
       case 'bounty':
       case 'roulette': {
         requireActive(event.ownerInstanceId, 'actor-eligibility');
+        break;
+      }
+      case 'buzzer-bandit': {
+        const owner = requireActive(event.ownerInstanceId, 'actor-eligibility');
+        requireActive(event.shooterInstanceId, 'actor-eligibility');
+        if (owner !== null && !owner.mutations.has('buzzer-bandit')) {
+          fail('buzzer-bandit', 'buzzer bandit event without the mutation');
+        }
+        if (event.ownerInstanceId !== event.shooterInstanceId) {
+          fail('buzzer-bandit', 'buzzer bandit event does not reference its owner');
+        }
+        break;
+      }
+      case 'charity-casino': {
+        const owner = requireActive(event.ownerInstanceId, 'actor-eligibility');
+        if (owner !== null && !owner.mutations.has('charity-casino')) {
+          fail('charity-casino', 'charity casino event without the mutation');
+        }
+        break;
+      }
+      case 'fusion-dance': {
+        const owner = participants.get(event.ownerInstanceId);
+        if (owner === undefined || !owner.mutations.has('fusion-dance')) {
+          fail('fusion-dance', 'fusion dance owner does not own the mutation');
+        }
+        const donor = participants.get(event.donorInstanceId);
+        if (donor === undefined || donor.kind !== 'starter') {
+          fail('fusion-dance', 'fusion dance donor is not a starter');
+        }
+        if (owner !== undefined && donor !== undefined && owner.sideIndex !== donor.sideIndex) {
+          fail('fusion-dance', 'fusion dance donor is not a teammate');
+        }
+        break;
+      }
+      case 'darwinism': {
+        const owner = requireActive(event.ownerInstanceId, 'actor-eligibility');
+        if (owner !== null && !owner.mutations.has('basketball-darwinism')) {
+          fail('darwinism', 'darwinism event without the mutation');
+        }
+        requireActive(event.shooterInstanceId, 'actor-eligibility');
         break;
       }
       default:
