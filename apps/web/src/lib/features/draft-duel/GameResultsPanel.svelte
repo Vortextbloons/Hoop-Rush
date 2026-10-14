@@ -6,11 +6,8 @@
     DraftDuelSeriesSnapshot,
     HoopRushManifest,
   } from '@hoop-rush/data-contracts';
-  import GamecastRecap from '#lib/features/multiplayer/gamecast/GamecastRecap.svelte';
-  import type {
-    GamecastPlayer,
-    GamecastVerification,
-  } from '#lib/features/multiplayer/gamecast/gamecast-types.js';
+  import GamecastRecap from '#lib/gamecast/GamecastRecap.svelte';
+  import type { GamecastPlayer, GamecastVerification } from '#lib/gamecast/gamecast-types.js';
 
   let {
     output,

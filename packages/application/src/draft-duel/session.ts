@@ -43,10 +43,20 @@ import {
   type EngineContext,
 } from '@hoop-rush/engine';
 import type {
-  DexieDraftDuelRepository,
+  DraftDuelActiveState,
   DraftDuelCompletionRecap,
+  StoredDraftDuelActive,
   StoredDraftDuelCompleted,
+  StoredDraftDuelResultRow,
 } from '@hoop-rush/persistence';
+import {
+  CoalescedTask,
+  PlaybackProgress,
+  SessionEvents,
+  TickLoop,
+  intervalTickScheduler,
+  type TickScheduler,
+} from '../runtime/index.ts';
 
 const TICK_MS = 250;
 const AUTO_START_RETRY_MS = 5000;
@@ -99,19 +109,20 @@ export interface DraftDuelSessionView {
   deadlineMsLeft: number | null;
 }
 
+export interface DraftDuelSessionRepository {
+  loadActive(roomId: string): Promise<StoredDraftDuelActive | null>;
+  loadCompleted(roomId: string): Promise<StoredDraftDuelCompleted | null>;
+  loadResults(roomId: string): Promise<StoredDraftDuelResultRow[]>;
+  appendCommands(roomId: string, commands: readonly DraftDuelCommand[]): Promise<void>;
+  saveResult(output: DraftDuelGameOutput): Promise<void>;
+  saveVerification(roomId: string, entries: readonly DraftDuelPartiallyVerified[]): Promise<void>;
+  saveActive(state: DraftDuelActiveState): Promise<void>;
+  complete(recap: DraftDuelCompletionRecap): Promise<void>;
+}
+
 export interface DraftDuelSessionDeps {
   transport: DraftDuelMultiplayerTransport;
-  repository: Pick<
-    DexieDraftDuelRepository,
-    | 'loadActive'
-    | 'loadCompleted'
-    | 'loadResults'
-    | 'appendCommands'
-    | 'saveResult'
-    | 'saveVerification'
-    | 'saveActive'
-    | 'complete'
-  >;
+  repository: DraftDuelSessionRepository;
   runner: DraftDuelRunnerPort;
   loadAssets: () => Promise<DraftDuelSessionAssets>;
   now: () => number;
@@ -119,6 +130,7 @@ export interface DraftDuelSessionDeps {
   friendlyError: (error: unknown) => string;
   loadMembership: (roomId: string) => DraftDuelRoomMembership | null;
   saveMembership: (membership: DraftDuelRoomMembership) => void;
+  scheduleTick?: TickScheduler;
 }
 
 export function draftDuelPlayedGames(
@@ -182,14 +194,12 @@ function otherParticipant(participantId: DraftDuelParticipantId): DraftDuelParti
   return participantId === 'p1' ? 'p2' : 'p1';
 }
 
-function clamp01(value: number): number {
-  return Math.min(1, Math.max(0, value));
-}
-
 export class DraftDuelSession {
   private readonly deps: DraftDuelSessionDeps;
-  private readonly listeners = new Set<() => void>();
-  private readonly transientListeners = new Set<(event: DraftDuelTransientEvent) => void>();
+  private readonly events = new SessionEvents<DraftDuelTransientEvent>();
+  private readonly playback = new PlaybackProgress();
+  private readonly syncTask: CoalescedTask;
+  private readonly tickLoop: TickLoop;
   private assets: DraftDuelSessionAssets | null = null;
   private snapshot: DraftDuelRoomSnapshot | null = null;
   private participantId: DraftDuelParticipantId | null = null;
@@ -204,17 +214,10 @@ export class DraftDuelSession {
   private integrityFailed = false;
   private progress = 0;
   private now: number;
-  private subscriptions: Array<{ unsubscribe: () => void }> = [];
-  private tickTimer: ReturnType<typeof setInterval> | null = null;
-  private playbackElapsedMs = 0;
-  private playbackDoneAtMs: number | null = null;
-  private continueApprovedGame: number | null = null;
   private resolvedCursor: string | null = null;
   private deadlineResolving = false;
   private deadlineRetryAtMs = 0;
   private rematchRetryAtMs = 0;
-  private syncing = false;
-  private syncQueued = false;
   private preparingSinceMs: number | null = null;
   private lastAutoAttemptMs = 0;
   private resultRetryAtMs = 0;
@@ -228,6 +231,12 @@ export class DraftDuelSession {
   constructor(deps: DraftDuelSessionDeps) {
     this.deps = deps;
     this.now = deps.now();
+    this.syncTask = new CoalescedTask(() => this.runSync());
+    this.tickLoop = new TickLoop(deps.scheduleTick ?? intervalTickScheduler, TICK_MS, () => {
+      this.now = this.deps.now();
+      this.publish();
+      this.tick();
+    });
   }
 
   getSnapshot(): DraftDuelSessionView {
@@ -254,17 +263,11 @@ export class DraftDuelSession {
   }
 
   subscribe(listener: () => void): () => void {
-    this.listeners.add(listener);
-    return () => {
-      this.listeners.delete(listener);
-    };
+    return this.events.subscribe(listener);
   }
 
   subscribeTransient(listener: (event: DraftDuelTransientEvent) => void): () => void {
-    this.transientListeners.add(listener);
-    return () => {
-      this.transientListeners.delete(listener);
-    };
+    return this.events.subscribeTransient(listener);
   }
 
   async attach(roomId: string): Promise<void> {
@@ -297,13 +300,13 @@ export class DraftDuelSession {
         for (const row of rows) outputs[row.gameNumber] = row.output;
         this.outputs = { ...this.outputs, ...outputs };
       }
-      this.subscriptions.push(
+      this.events.track(
         this.deps.transport.subscribe(roomId, (snapshot) => {
           this.applySnapshot(snapshot);
           void this.syncFromServer();
         }),
       );
-      this.subscriptions.push(
+      this.events.track(
         this.deps.transport.subscribeTransient(roomId, (event) => {
           this.emitTransient(event);
         }),
@@ -527,31 +530,24 @@ export class DraftDuelSession {
     if (this.disposed) return;
     const broadcast = this.broadcastOf();
     if (!broadcast) return;
-    const startedAt = Date.parse(broadcast.startedAtIso);
-    const duration = broadcast.durationMs;
-    this.playbackElapsedMs = clamp01((this.deps.now() - startedAt) / duration) * duration;
+    this.playback.begin(this.deps.now(), Date.parse(broadcast.startedAtIso), broadcast.durationMs);
   }
 
   advancePlayback(deltaMs: number): void {
     if (this.disposed) return;
     const broadcast = this.broadcastOf();
     if (!broadcast) return;
-    this.playbackElapsedMs += deltaMs;
-    const progress = clamp01(this.playbackElapsedMs / broadcast.durationMs);
-    this.progress = progress;
-    if (progress >= 1 && this.playbackDoneAtMs === null) {
-      this.playbackDoneAtMs = this.deps.now();
-      this.continueApprovedGame = null;
-    }
+    const outcome = this.playback.advance(deltaMs, broadcast.durationMs, this.deps.now());
+    this.progress = outcome.progress;
     this.publish();
-    if (progress >= 1) this.maybeProposeOrConfirm();
+    if (outcome.completed) this.maybeProposeOrConfirm();
   }
 
   continueAfterGame(): void {
     if (this.disposed) return;
     const output = this.currentOutput();
     if (!output) return;
-    this.continueApprovedGame = output.gameNumber;
+    this.playback.approve(output.gameNumber);
     this.maybeProposeOrConfirm();
   }
 
@@ -561,25 +557,17 @@ export class DraftDuelSession {
 
   dispose(): void {
     this.disposed = true;
-    if (this.tickTimer !== null) {
-      clearInterval(this.tickTimer);
-      this.tickTimer = null;
-    }
-    for (const subscription of this.subscriptions) {
-      subscription.unsubscribe();
-    }
-    this.subscriptions = [];
-    this.listeners.clear();
-    this.transientListeners.clear();
+    this.tickLoop.dispose();
+    this.events.dispose();
     this.deps.runner.dispose();
   }
 
   private publish(): void {
-    for (const listener of this.listeners) listener();
+    this.events.publish();
   }
 
   private emitTransient(event: DraftDuelTransientEvent): void {
-    for (const listener of this.transientListeners) listener(event);
+    this.events.emitTransient(event);
   }
 
   private phase(): DraftDuelRoomSnapshot['phase'] {
@@ -683,19 +671,13 @@ export class DraftDuelSession {
     const broadcastGame = snapshot.broadcast?.gameNumber ?? null;
     if (broadcastGame !== null && broadcastGame !== previousBroadcastGame) {
       this.progress = 0;
-      this.playbackDoneAtMs = null;
-      this.continueApprovedGame = null;
+      this.playback.reset();
     }
     this.publish();
   }
 
   private startTimers(): void {
-    if (this.tickTimer !== null) return;
-    this.tickTimer = setInterval(() => {
-      this.now = this.deps.now();
-      this.publish();
-      this.tick();
-    }, TICK_MS);
+    this.tickLoop.start();
   }
 
   private tick(): void {
@@ -779,13 +761,13 @@ export class DraftDuelSession {
     }
   }
 
-  private async syncFromServer(): Promise<void> {
+  private syncFromServer(): Promise<void> {
+    if (this.disposed || !this.roomId || !this.assets) return Promise.resolve();
+    return this.syncTask.request();
+  }
+
+  private async runSync(): Promise<void> {
     if (this.disposed || !this.roomId || !this.assets) return;
-    if (this.syncing) {
-      this.syncQueued = true;
-      return;
-    }
-    this.syncing = true;
     const isDisposed = () => this.disposed;
     try {
       const resumed = await this.deps.transport.resume(this.roomId);
@@ -808,12 +790,6 @@ export class DraftDuelSession {
     } catch (error) {
       this.error = this.deps.friendlyError(error);
       this.publish();
-    } finally {
-      this.syncing = false;
-      if (this.syncQueued) {
-        this.syncQueued = false;
-        void this.syncFromServer();
-      }
     }
   }
 
@@ -932,9 +908,7 @@ export class DraftDuelSession {
   }
 
   private continueApproved(gameNumber: number): boolean {
-    if (this.continueApprovedGame === gameNumber) return true;
-    if (this.playbackDoneAtMs === null) return true;
-    return this.deps.now() - this.playbackDoneAtMs >= GAME_RESULTS_HOLD_MS;
+    return this.playback.continueApproved(gameNumber, GAME_RESULTS_HOLD_MS, this.deps.now());
   }
 
   private awaitingContinue(): boolean {

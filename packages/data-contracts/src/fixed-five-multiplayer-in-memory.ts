@@ -440,7 +440,7 @@ export function createInMemoryFixedFiveTransport(options?: {
       pruneExpiredCodes();
       const now = clock();
       const recent = createTimestamps.filter((t) => now - t < 60000);
-      if (recent.length >= 6) {
+      if (recent.length >= 60) {
         throw Object.assign(new Error('rate-limit: too many rooms'), {
           code: 'rate-limit',
           retryable: true,

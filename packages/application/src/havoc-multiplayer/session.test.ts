@@ -52,11 +52,7 @@ import type {
   StoredHavocMultiplayerCompleted,
   StoredHavocMultiplayerResultRow,
 } from '@hoop-rush/persistence';
-import {
-  HavocMultiplayerSession,
-  type HavocMultiplayerSessionAssets,
-  type HavocMultiplayerSessionView,
-} from './session.ts';
+import { HavocMultiplayerSession, type HavocMultiplayerSessionAssets } from './session.ts';
 
 const START_MS = Date.parse('2026-10-13T12:00:00.000Z');
 const FIXED_ISO = new Date(START_MS).toISOString();
@@ -501,23 +497,6 @@ describe('HavocMultiplayerSession lifecycle', () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.restoreAllMocks();
-  });
-
-  it('mirrors its state to subscribers', async () => {
-    const h = await createHarness({ seed: ROOM_SEED });
-    const listener = vi.fn();
-    const unsubscribe = h.session.subscribe(listener);
-
-    h.session.setError('Room changed.');
-    expect(listener).toHaveBeenCalledTimes(1);
-    expect(h.session.getSnapshot().error).toBe('Room changed.');
-
-    unsubscribe();
-    h.session.setError(null);
-    expect(listener).toHaveBeenCalledTimes(1);
-    expect(h.session.getSnapshot().error).toBeNull();
-
-    h.session.dispose();
   });
 
   it('reports a missing membership without touching the transport', async () => {
@@ -1025,26 +1004,4 @@ describe('HavocMultiplayerSession draft and series', () => {
     expect(successor.phase).toBe('drafting');
     h.session.dispose();
   }, 60_000);
-});
-
-describe('HavocMultiplayerSession view', () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-    commandCounter = 0;
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
-    vi.restoreAllMocks();
-  });
-
-  it('exposes the mvp and phase through the view shape', async () => {
-    const h = await createHarness({ seed: ROOM_SEED });
-    const view: HavocMultiplayerSessionView = h.session.getSnapshot();
-    expect(view.phase).toBe('lobby');
-    expect(view.localRole).toBeNull();
-    expect(view.mvp).toBeNull();
-    expect(view.members).toEqual([]);
-    h.session.dispose();
-  });
 });

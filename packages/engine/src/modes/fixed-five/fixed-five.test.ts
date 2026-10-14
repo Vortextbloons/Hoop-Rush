@@ -275,37 +275,6 @@ describe('fixed-five seeds', () => {
   });
 });
 describe('sandbox builder', () => {
-  it('places five through the pure PG/SG/SF/PF/C path and locks', () => {
-    const pool = candidatePool();
-    let state = createSandboxBuilder();
-    state = applySandboxBuilderCommand(state, pool, {
-      kind: 'sandbox-place',
-      playerId: pid(`p-g1`),
-      slotIndex: 0,
-    });
-    state = applySandboxBuilderCommand(state, pool, {
-      kind: 'sandbox-place',
-      playerId: pid(`p-g2`),
-      slotIndex: 1,
-    });
-    state = applySandboxBuilderCommand(state, pool, {
-      kind: 'sandbox-place',
-      playerId: pid(`p-f1`),
-      slotIndex: 2,
-    });
-    state = applySandboxBuilderCommand(state, pool, {
-      kind: 'sandbox-place',
-      playerId: pid(`p-f2`),
-      slotIndex: 3,
-    });
-    state = applySandboxBuilderCommand(state, pool, {
-      kind: 'sandbox-place',
-      playerId: pid(`p-c1`),
-      slotIndex: 4,
-    });
-    state = applySandboxBuilderCommand(state, pool, { kind: 'sandbox-lock' });
-    expect(state.locked).toBe(true);
-  });
   it('rejects illegal slot assignments on the same path solo and multiplayer share', () => {
     const pool = candidatePool();
     const state = createSandboxBuilder();

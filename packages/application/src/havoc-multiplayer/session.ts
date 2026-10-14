@@ -54,13 +54,23 @@ import {
   type HavocCommandEnvironment,
 } from '@hoop-rush/engine';
 import type {
+  HavocMultiplayerActiveState,
+  HavocMultiplayerCommandEntry,
   HavocMultiplayerCompletionRecap,
   HavocMultiplayerGameOutput,
-  HavocMultiplayerRepository,
   HavocMultiplayerSeriesMvp,
+  StoredHavocMultiplayerActive,
   StoredHavocMultiplayerCompleted,
   StoredHavocMultiplayerResultRow,
 } from '@hoop-rush/persistence';
+import {
+  CoalescedTask,
+  PlaybackProgress,
+  SessionEvents,
+  TickLoop,
+  intervalTickScheduler,
+  type TickScheduler,
+} from '../runtime/index.ts';
 
 const TICK_MS = 250;
 const AUTO_START_RETRY_MS = 5000;
@@ -128,19 +138,23 @@ export interface HavocMultiplayerSessionView {
   deadlineMsLeft: number | null;
 }
 
+export interface HavocMultiplayerSessionRepository {
+  loadActive(roomId: string): Promise<StoredHavocMultiplayerActive | null>;
+  loadCompleted(roomId: string): Promise<StoredHavocMultiplayerCompleted | null>;
+  loadResults(roomId: string): Promise<StoredHavocMultiplayerResultRow[]>;
+  appendCommands(roomId: string, entries: readonly HavocMultiplayerCommandEntry[]): Promise<void>;
+  saveResult(output: HavocMultiplayerGameOutput): Promise<void>;
+  saveVerification(
+    roomId: string,
+    entries: readonly HavocMultiplayerVerificationReceipt[],
+  ): Promise<void>;
+  saveActive(state: HavocMultiplayerActiveState): Promise<void>;
+  complete(recap: HavocMultiplayerCompletionRecap): Promise<void>;
+}
+
 export interface HavocMultiplayerSessionDeps {
   transport: HavocMultiplayerTransport;
-  repository: Pick<
-    HavocMultiplayerRepository,
-    | 'loadActive'
-    | 'loadCompleted'
-    | 'loadResults'
-    | 'appendCommands'
-    | 'saveResult'
-    | 'saveVerification'
-    | 'saveActive'
-    | 'complete'
-  >;
+  repository: HavocMultiplayerSessionRepository;
   runner: HavocMultiplayerRunnerPort;
   loadAssets: () => Promise<HavocMultiplayerSessionAssets>;
   now: () => number;
@@ -148,16 +162,13 @@ export interface HavocMultiplayerSessionDeps {
   friendlyError: (error: unknown) => string;
   loadMembership: (roomId: string) => HavocMultiplayerRoomMembership | null;
   saveMembership: (membership: HavocMultiplayerRoomMembership) => void;
+  scheduleTick?: TickScheduler;
 }
 
 function otherParticipant(
   participantId: HavocMultiplayerParticipantId,
 ): HavocMultiplayerParticipantId {
   return participantId === 'p1' ? 'p2' : 'p1';
-}
-
-function clamp01(value: number): number {
-  return Math.min(1, Math.max(0, value));
 }
 
 function havocMultiplayerReceiptDigest(
@@ -239,8 +250,10 @@ export function havocMultiplayerSeriesMvpOf(
 
 export class HavocMultiplayerSession {
   private readonly deps: HavocMultiplayerSessionDeps;
-  private readonly listeners = new Set<() => void>();
-  private readonly transientListeners = new Set<(event: HavocMultiplayerTransientEvent) => void>();
+  private readonly events = new SessionEvents<HavocMultiplayerTransientEvent>();
+  private readonly playback = new PlaybackProgress();
+  private readonly syncTask: CoalescedTask;
+  private readonly tickLoop: TickLoop;
   private assets: HavocMultiplayerSessionAssets | null = null;
   private environment: HavocCommandEnvironment | null = null;
   private snapshot: HavocMultiplayerRoomSnapshot | null = null;
@@ -257,17 +270,10 @@ export class HavocMultiplayerSession {
   private integrityFailed = false;
   private progress = 0;
   private now: number;
-  private subscriptions: Array<{ unsubscribe: () => void }> = [];
-  private tickTimer: ReturnType<typeof setInterval> | null = null;
-  private playbackElapsedMs = 0;
-  private playbackDoneAtMs: number | null = null;
-  private continueApprovedGame: number | null = null;
   private resolvedCursor: string | null = null;
   private deadlineResolving = false;
   private deadlineRetryAtMs = 0;
   private rematchRetryAtMs = 0;
-  private syncing = false;
-  private syncQueued = false;
   private preparingSinceMs: number | null = null;
   private lastAutoAttemptMs = 0;
   private resultRetryAtMs = 0;
@@ -281,6 +287,12 @@ export class HavocMultiplayerSession {
   constructor(deps: HavocMultiplayerSessionDeps) {
     this.deps = deps;
     this.now = deps.now();
+    this.syncTask = new CoalescedTask(() => this.runSync());
+    this.tickLoop = new TickLoop(deps.scheduleTick ?? intervalTickScheduler, TICK_MS, () => {
+      this.now = this.deps.now();
+      this.publish();
+      this.tick();
+    });
   }
 
   getSnapshot(): HavocMultiplayerSessionView {
@@ -319,17 +331,11 @@ export class HavocMultiplayerSession {
   }
 
   subscribe(listener: () => void): () => void {
-    this.listeners.add(listener);
-    return () => {
-      this.listeners.delete(listener);
-    };
+    return this.events.subscribe(listener);
   }
 
   subscribeTransient(listener: (event: HavocMultiplayerTransientEvent) => void): () => void {
-    this.transientListeners.add(listener);
-    return () => {
-      this.transientListeners.delete(listener);
-    };
+    return this.events.subscribeTransient(listener);
   }
 
   async attach(roomId: string): Promise<void> {
@@ -366,13 +372,13 @@ export class HavocMultiplayerSession {
         for (const row of rows) outputs[row.gameNumber] = storedResultToOutput(row);
         this.outputs = { ...this.outputs, ...outputs };
       }
-      this.subscriptions.push(
+      this.events.track(
         this.deps.transport.subscribe(roomId, (snapshot) => {
           this.applySnapshot(snapshot);
           void this.syncFromServer();
         }),
       );
-      this.subscriptions.push(
+      this.events.track(
         this.deps.transport.subscribeTransient(roomId, (event) => {
           this.emitTransient(event);
         }),
@@ -568,31 +574,24 @@ export class HavocMultiplayerSession {
     if (this.disposed) return;
     const broadcast = this.broadcastOf();
     if (!broadcast) return;
-    const startedAt = Date.parse(broadcast.startedAt);
-    const duration = broadcast.durationMs;
-    this.playbackElapsedMs = clamp01((this.deps.now() - startedAt) / duration) * duration;
+    this.playback.begin(this.deps.now(), Date.parse(broadcast.startedAt), broadcast.durationMs);
   }
 
   advancePlayback(deltaMs: number): void {
     if (this.disposed) return;
     const broadcast = this.broadcastOf();
     if (!broadcast) return;
-    this.playbackElapsedMs += deltaMs;
-    const progress = clamp01(this.playbackElapsedMs / broadcast.durationMs);
-    this.progress = progress;
-    if (progress >= 1 && this.playbackDoneAtMs === null) {
-      this.playbackDoneAtMs = this.deps.now();
-      this.continueApprovedGame = null;
-    }
+    const outcome = this.playback.advance(deltaMs, broadcast.durationMs, this.deps.now());
+    this.progress = outcome.progress;
     this.publish();
-    if (progress >= 1) this.maybeProposeOrConfirm();
+    if (outcome.completed) this.maybeProposeOrConfirm();
   }
 
   continueAfterGame(): void {
     if (this.disposed) return;
     const output = this.currentOutput();
     if (!output) return;
-    this.continueApprovedGame = output.gameNumber;
+    this.playback.approve(output.gameNumber);
     this.maybeProposeOrConfirm();
   }
 
@@ -602,25 +601,17 @@ export class HavocMultiplayerSession {
 
   dispose(): void {
     this.disposed = true;
-    if (this.tickTimer !== null) {
-      clearInterval(this.tickTimer);
-      this.tickTimer = null;
-    }
-    for (const subscription of this.subscriptions) {
-      subscription.unsubscribe();
-    }
-    this.subscriptions = [];
-    this.listeners.clear();
-    this.transientListeners.clear();
+    this.tickLoop.dispose();
+    this.events.dispose();
     this.deps.runner.dispose();
   }
 
   private publish(): void {
-    for (const listener of this.listeners) listener();
+    this.events.publish();
   }
 
   private emitTransient(event: HavocMultiplayerTransientEvent): void {
-    for (const listener of this.transientListeners) listener(event);
+    this.events.emitTransient(event);
   }
 
   private phase(): HavocMultiplayerPhase {
@@ -739,8 +730,7 @@ export class HavocMultiplayerSession {
     const broadcastGame = snapshot.broadcast?.gameNumber ?? null;
     if (broadcastGame !== null && broadcastGame !== previousBroadcastGame) {
       this.progress = 0;
-      this.playbackDoneAtMs = null;
-      this.continueApprovedGame = null;
+      this.playback.reset();
     }
     if (snapshot.phase === 'integrity-failed') {
       this.integrityFailed = true;
@@ -749,12 +739,7 @@ export class HavocMultiplayerSession {
   }
 
   private startTimers(): void {
-    if (this.tickTimer !== null) return;
-    this.tickTimer = setInterval(() => {
-      this.now = this.deps.now();
-      this.publish();
-      this.tick();
-    }, TICK_MS);
+    this.tickLoop.start();
   }
 
   private tick(): void {
@@ -841,13 +826,13 @@ export class HavocMultiplayerSession {
     }
   }
 
-  private async syncFromServer(): Promise<void> {
+  private syncFromServer(): Promise<void> {
+    if (this.disposed || !this.roomId || !this.assets) return Promise.resolve();
+    return this.syncTask.request();
+  }
+
+  private async runSync(): Promise<void> {
     if (this.disposed || !this.roomId || !this.assets) return;
-    if (this.syncing) {
-      this.syncQueued = true;
-      return;
-    }
-    this.syncing = true;
     const isDisposed = () => this.disposed;
     try {
       const resumed = await this.deps.transport.resume(this.roomId);
@@ -876,12 +861,6 @@ export class HavocMultiplayerSession {
     } catch (error) {
       this.error = this.deps.friendlyError(error);
       this.publish();
-    } finally {
-      this.syncing = false;
-      if (this.syncQueued) {
-        this.syncQueued = false;
-        void this.syncFromServer();
-      }
     }
   }
 
@@ -1049,9 +1028,7 @@ export class HavocMultiplayerSession {
   }
 
   private continueApproved(gameNumber: number): boolean {
-    if (this.continueApprovedGame === gameNumber) return true;
-    if (this.playbackDoneAtMs === null) return true;
-    return this.deps.now() - this.playbackDoneAtMs >= GAME_RESULTS_HOLD_MS;
+    return this.playback.continueApproved(gameNumber, GAME_RESULTS_HOLD_MS, this.deps.now());
   }
 
   private awaitingContinue(): boolean {

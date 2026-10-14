@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { DraftDuelParticipantId, DraftDuelSeriesSnapshot } from '@hoop-rush/data-contracts';
-  import GamecastSeriesTracker from '#lib/features/multiplayer/gamecast/GamecastSeriesTracker.svelte';
+  import GamecastSeriesTracker from '#lib/gamecast/GamecastSeriesTracker.svelte';
 
   let {
     series,

@@ -35,7 +35,7 @@ import {
   gamecastVisibleEventCount,
   gamecastVisibleState,
   type GamecastVisibleState,
-} from '#lib/features/multiplayer/gamecast/gamecast-playback.js';
+} from '#lib/gamecast/gamecast-playback.js';
 import { draftDuelFeedLines, type DraftDuelFeedLine } from './draft-duel-broadcast-view';
 
 const CONSIDERATION_CLEAR_MS = 2000;

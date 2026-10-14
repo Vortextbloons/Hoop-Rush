@@ -116,7 +116,7 @@
       name: 'Hoop Havoc',
       category: '5 rounds · Bo7',
       icon: Flame,
-      image: '/images/multiplayer/draft-duel.png',
+      image: '/images/multiplayer/hoop-havoc.png',
       description:
         'Draft five mutated freaks, one per position, then let a best-of-seven broadcast decide whose powers survive.',
       format: 'Best of 7',

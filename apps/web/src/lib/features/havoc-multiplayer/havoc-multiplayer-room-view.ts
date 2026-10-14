@@ -8,10 +8,7 @@ import type {
 } from '@hoop-rush/data-contracts';
 import type { HavocLineupSlotView } from '@hoop-rush/application/havoc';
 import type { HavocMultiplayerSeriesMvp } from '@hoop-rush/persistence';
-import type {
-  GamecastSeries,
-  GamecastSeriesGame,
-} from '#lib/features/multiplayer/gamecast/gamecast-types.js';
+import type { GamecastSeries, GamecastSeriesGame } from '#lib/gamecast/gamecast-types.js';
 
 /**
  * Pure view helpers for the Havoc multiplayer room: phase labels/steps, the series tracker

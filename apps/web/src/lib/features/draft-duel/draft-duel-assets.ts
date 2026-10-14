@@ -9,9 +9,9 @@ import {
   type DraftDuelCatalog,
   type EngineContext,
 } from '@hoop-rush/engine';
+import { loadEraProfile } from '#lib/assets/era-profile.js';
+import { loadPlayerCatalog } from '#lib/assets/player-catalog.js';
 import { getManifest } from '#lib/data.js';
-import { loadCollectionCatalog } from '#lib/features/collection/collection-assets.js';
-import { loadCollectionProfile } from '#lib/features/collection/collection-hub.js';
 
 export interface DraftDuelAssets {
   catalog: DraftDuelCatalog;
@@ -23,8 +23,8 @@ let assetsPromise: Promise<DraftDuelAssets> | null = null;
 export function loadDraftDuelAssets(): Promise<DraftDuelAssets> {
   assetsPromise ??= (async () => {
     const [catalog, profile, manifest] = await Promise.all([
-      loadCollectionCatalog(),
-      loadCollectionProfile(),
+      loadPlayerCatalog(),
+      loadEraProfile('2020s'),
       getManifest(),
     ]);
     return {

@@ -3,7 +3,7 @@
     HavocMultiplayerParticipantId,
     HavocMultiplayerSeriesSnapshot,
   } from '@hoop-rush/data-contracts';
-  import GamecastSeriesTracker from '#lib/features/multiplayer/gamecast/GamecastSeriesTracker.svelte';
+  import GamecastSeriesTracker from '#lib/gamecast/GamecastSeriesTracker.svelte';
   import { havocMultiplayerGamecastSeries } from './havoc-multiplayer-room-view';
 
   let {

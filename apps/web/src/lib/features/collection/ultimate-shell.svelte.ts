@@ -6,7 +6,7 @@ import type {
 import type { LoadedCollection } from '@hoop-rush/persistence';
 import { getManifest } from '#lib/data.js';
 import { getCollectionRepo, ensureCollection } from './collection-hub.ts';
-import { loadCollectionCatalog } from './collection-assets.ts';
+import { loadPlayerCatalog } from '#lib/assets/player-catalog.js';
 
 export const ULTIMATE_RUN_SHELL_CONTEXT = 'hoop-rush:ultimate-run-shell';
 
@@ -117,7 +117,7 @@ export class UltimateRunShell {
     try {
       const [state, catalogResult, manifest] = await Promise.all([
         ensureCollection(new Date().toISOString()),
-        loadCollectionCatalog().then(
+        loadPlayerCatalog().then(
           (value) => ({ ok: true as const, value }),
           (failure: unknown) => ({ ok: false as const, failure }),
         ),

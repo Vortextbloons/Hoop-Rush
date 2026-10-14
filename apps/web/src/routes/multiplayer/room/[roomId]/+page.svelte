@@ -20,14 +20,14 @@
   import FixedFiveDraftPanel from '#lib/features/multiplayer/FixedFiveDraftPanel.svelte';
   import FixedFiveSimShow from '#lib/features/multiplayer/FixedFiveSimShow.svelte';
   import FixedFiveResults from '#lib/features/multiplayer/FixedFiveResults.svelte';
-  import GamecastBroadcast from '#lib/features/multiplayer/gamecast/GamecastBroadcast.svelte';
-  import GamecastRecap from '#lib/features/multiplayer/gamecast/GamecastRecap.svelte';
-  import GamecastSeriesTracker from '#lib/features/multiplayer/gamecast/GamecastSeriesTracker.svelte';
-  import { gamecastFeedLines } from '#lib/features/multiplayer/gamecast/gamecast-broadcast-view.js';
+  import GamecastBroadcast from '#lib/gamecast/GamecastBroadcast.svelte';
+  import GamecastRecap from '#lib/gamecast/GamecastRecap.svelte';
+  import GamecastSeriesTracker from '#lib/gamecast/GamecastSeriesTracker.svelte';
+  import { gamecastFeedLines } from '#lib/gamecast/gamecast-broadcast-view.js';
   import {
     gamecastVisibleEventCount,
     gamecastVisibleState,
-  } from '#lib/features/multiplayer/gamecast/gamecast-playback.js';
+  } from '#lib/gamecast/gamecast-playback.js';
   import ArenaSoundToggle from '#lib/components/ArenaSoundToggle.svelte';
   import { FixedFiveRoomController } from '#lib/features/multiplayer/fixed-five-room-controller.svelte.js';
   const roomId = page.params.roomId as string;

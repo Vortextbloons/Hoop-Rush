@@ -6,7 +6,6 @@ import {
   collectionCommandSchema,
   collectionGameCommandSchema,
   collectionPackIdSchema,
-  loadEraSimulationProfile,
   type CollectionActiveTeam,
   type CollectionCatalog,
   type CollectionCpuRarityWeights,
@@ -24,7 +23,6 @@ import {
   type CollectionPullRecord,
   type CollectionSetClaimReceipt,
   type CollectionState,
-  type EraSimulationProfile,
 } from '@hoop-rush/data-contracts';
 import {
   applyCollectionGameCommand as applyEngineGameCommand,
@@ -45,11 +43,9 @@ import {
   COLLECTION_COMMAND_POLICY,
   COLLECTION_PACK_PURCHASE_POLICY,
 } from '#lib/submit/policies.js';
-import {
-  loadCollectionCatalog,
-  loadCollectionGameRules,
-  loadCollectionProgression,
-} from './collection-assets.ts';
+import { loadCollectionGameRules, loadCollectionProgression } from './collection-assets.ts';
+import { loadPlayerCatalog } from '#lib/assets/player-catalog.js';
+import { loadEraProfile } from '#lib/assets/era-profile.js';
 import { runCollectionGameVerification } from './collection-verify-runner.ts';
 
 export const COLLECTION_ID = 'collection-1';
@@ -151,7 +147,7 @@ async function runCollectionCommand(
   } = {},
 ): Promise<CollectionCommandRun> {
   const repo = getCollectionRepo();
-  const catalog = await loadCollectionCatalog();
+  const catalog = await loadPlayerCatalog();
   const command = collectionCommandSchema.parse(input);
   const catalogHash = await collectionCatalogHash();
   const progression = await progressionCommandArgs();
@@ -345,7 +341,7 @@ export interface CollectionPlaySnapshot {
 
 export async function ensurePlayStateSnapshot(nowIso: string): Promise<CollectionPlaySnapshot> {
   const repo = getCollectionRepo();
-  const catalog = await loadCollectionCatalog();
+  const catalog = await loadPlayerCatalog();
   const loaded = await repo.ensurePlayState({
     collectionId: COLLECTION_ID,
     catalog,
@@ -432,10 +428,10 @@ export const LEGACY_COLLECTION_CPU_WEIGHTS: CollectionCpuRarityWeights = {
 async function gameCommandArgs(recordedAtIso: string) {
   const [catalog, rules, catalogHash, profile, profileHash, rulesHash, progression] =
     await Promise.all([
-      loadCollectionCatalog(),
+      loadPlayerCatalog(),
       loadCollectionGameRules(),
       collectionCatalogHash(),
-      loadCollectionProfile(),
+      loadEraProfile('2020s'),
       collectionProfileHash(),
       collectionGameRulesHash(),
       progressionCommandArgs(),
@@ -635,13 +631,6 @@ export async function collectionGameRulesHash(): Promise<string> {
   const entry = manifest.collection?.gameRules;
   if (!entry) throw new Error('The collection game rules are unavailable.');
   return entry.contentHash;
-}
-
-export async function loadCollectionProfile(): Promise<EraSimulationProfile> {
-  const manifest = await getManifest();
-  const entry = manifest.eraSimulationProfiles.find((profile) => profile.eraId === '2020s');
-  if (!entry) throw new Error('The 2020s simulation profile is unavailable.');
-  return loadEraSimulationProfile(resolveAssetUrl(entry.url), entry.contentHash);
 }
 
 export async function collectionProfileHash(): Promise<string> {

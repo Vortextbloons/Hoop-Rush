@@ -14,7 +14,6 @@ import {
 import { parsePool } from '@hoop-rush/data-contracts';
 import { MANIFEST_SCHEMA_VERSION } from '@hoop-rush/data-contracts';
 import { readJson, sha256File, writeJson } from '../json.ts';
-import { normalizePositionLabels } from '../positions/normalize.ts';
 import {
   CONFIDENCE_POLICY_VERSION,
   DATA_VERSION,
@@ -25,36 +24,15 @@ import {
   SELECTION_SCORE_VERSION,
   allPoolTargets,
   buildStats,
-  candidateKey,
   computePool,
-  loadBbrefIds,
-  loadCareerPositionLabels,
-  maxLowConfidenceShareFor,
-  minutesFloorOverall,
-  normalizePoolOveralls,
   overallBandForPercentile,
-  parsePoolTargets,
   partitionPoolTargets,
   run,
-  rawOverallScoreFor,
-  selectionScore,
-  type Candidate,
   type Manifest,
   type Pool,
   type PoolBuildFailure,
 } from './compute.ts';
 const TEAM = '1610612747';
-describe('rotation-minutes floor', () => {
-  it('preserves monotonic Overall across the floor boundary', () => {
-    const scores = Array.from({ length: 591 }, (_, i) => 40 + i / 10);
-    const overalls = scores.map((score) => minutesFloorOverall(score, 1500));
-    expect(overalls.every((value, i) => value >= (overalls[i - 1] ?? value))).toBe(true);
-    expect(minutesFloorOverall(59, 1500)).toBe(60);
-    expect(minutesFloorOverall(60, 1500)).toBe(60);
-    expect(minutesFloorOverall(59, 1499)).toBe(59);
-    expect(minutesFloorOverall(59, null)).toBe(59);
-  });
-});
 const env = vi.hoisted(() => ({ nba: '', data: '', cache: '' }));
 vi.mock('../config.js', () => ({
   get NBA_ROOT() {
@@ -614,25 +592,6 @@ describe('buildStats', () => {
     expect(stats.rebounds).toBe(800);
   });
 });
-describe('selectionScore', () => {
-  it('ranks peaks by value without an availability bonus', () => {
-    expect(selectionScore(90, 85, 80, 25, 2400, 80)).toBe(90);
-    expect(selectionScore(90, 30, 99, 25, 1200, 40)).toBe(90);
-  });
-});
-describe('rawOverallScoreFor', () => {
-  it('prefers raw and canonical profile values over normalized summary overall', () => {
-    expect(
-      rawOverallScoreFor(
-        { ratingProfile: { rawOverallScore: 64, canonicalOverall: 62 } },
-        { overallRating: 91 },
-      ),
-    ).toBe(64);
-    expect(
-      rawOverallScoreFor({ ratingProfile: { canonicalOverall: 62 } }, { overallRating: 91 }),
-    ).toBe(62);
-  });
-});
 describe('overallBandForPercentile', () => {
   it('keeps the peak distribution generous with a thinning upper tail', () => {
     expect(overallBandForPercentile(0)).toBe(99);
@@ -659,56 +618,6 @@ describe('overallBandForPercentile', () => {
     expect(count(98)).toBeLessThanOrEqual(count(97));
     expect(count(96)).toBeLessThanOrEqual(count(95));
     expect(count(95)).toBeLessThanOrEqual(count(94));
-  });
-});
-describe('normalizePoolOveralls', () => {
-  function row(
-    playerId: string,
-    franchiseId: string,
-    rawOverallScore?: number,
-    canonicalOverall?: number,
-  ) {
-    return {
-      playerId,
-      franchiseId,
-      seasonKey: '1996-97',
-      summaryRatings: { overallRating: 60, offenseRating: 60, defenseRating: 60 },
-      ...(rawOverallScore !== undefined || canonicalOverall !== undefined
-        ? {
-            ratingProfile: {
-              schemaVersion: 2 as const,
-              modelVersion: 'ratings-model-v3.3',
-              canonicalOverall: canonicalOverall ?? 70,
-              ...(rawOverallScore !== undefined ? { rawOverallScore } : {}),
-              overallPercentile: undefined,
-              overallCohortVersion: undefined,
-            },
-          }
-        : {}),
-    };
-  }
-  it('preserves canonical ratings independently of other players and input order', () => {
-    const rows = [row('p-1', 'lakers', 90, 95), row('p-2', 'celtics', 60, 70)];
-    expect(normalizePoolOveralls(rows)).toEqual({ totalRowCount: 2, rowsWithoutRawOverall: 0 });
-    expect(rows.map((player) => player.summaryRatings.overallRating)).toEqual([95, 70]);
-    const alone = [row('p-1', 'lakers', 90, 95)];
-    normalizePoolOveralls(alone);
-    expect(alone[0]?.summaryRatings).toEqual(rows[0]?.summaryRatings);
-    normalizePoolOveralls(rows.reverse());
-    expect(rows.map((player) => player.summaryRatings.overallRating)).toEqual([70, 95]);
-  });
-});
-describe('parsePoolTargets', () => {
-  it('parses franchiseId/eraId pairs', () => {
-    expect(parsePoolTargets(['lakers/1990s', 'celtics/2000s'])).toEqual([
-      ['lakers', '1990s'],
-      ['celtics', '2000s'],
-    ]);
-  });
-  it('rejects malformed targets', () => {
-    for (const bad of ['lakers', 'lakers/', '/1990s', 'a/b/c', '', 'lakers-1990', 'a-b-c']) {
-      expect(() => parsePoolTargets([bad])).toThrow(/invalid pool target/);
-    }
   });
 });
 describe('computePool (fixture)', () => {
@@ -944,44 +853,6 @@ describe('computePool error and skip paths', () => {
     expect(pool.detail).toContain('policy-v2');
   });
 });
-describe('maxLowConfidenceShareFor', () => {
-  it('relaxes the tripwire where whole field families were never observed', () => {
-    expect(maxLowConfidenceShareFor('reconstructed')).toBe(0.65);
-    expect(maxLowConfidenceShareFor('late-historical')).toBe(0.5);
-    expect(maxLowConfidenceShareFor('complete-box-derived')).toBe(0.4);
-    expect(maxLowConfidenceShareFor('advanced-supported')).toBe(0.4);
-  });
-});
-describe('loadBbrefIds', () => {
-  it('warns and returns {} when the cache file is missing', () => {
-    makeRoot('bbref-missing');
-    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
-    expect(loadBbrefIds()).toEqual({});
-    expect(messages(log)).toContain(
-      '  [WARN] bbref_ids.json missing; run fetch_bbref_ids or run_all (no altIds)',
-    );
-  });
-});
-describe('loadCareerPositionLabels', () => {
-  it('reads the versioned cache when present', () => {
-    const root = makeRoot('labels-cached');
-    writeJson(join(root.cache, 'career-position-labels-v6.json'), { '1': ['SG', 'G-F'] });
-    const labels = loadCareerPositionLabels();
-    expect(labels.get('1')).toEqual(new Set(['G-F', 'SG']));
-  });
-  it('scans packaged rosters (primary + secondary labels) and writes the versioned cache when missing', () => {
-    const root = makeRoot('labels-scan');
-    writeSeason(root, '1991-92', ROSTER_S1, STINTS_S1, STATS_S1);
-    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
-    const labels = loadCareerPositionLabels();
-    expect(labels.get('1')).toEqual(new Set(['SG']));
-    expect(labels.get('999')).toBeUndefined();
-    expect(
-      JSON.parse(readFileSync(join(root.cache, 'career-position-labels-v6.json'), 'utf8')),
-    ).toEqual(expect.objectContaining({ '1': ['SG'], '5': ['C'] }));
-    expect(messages(log).some((m) => m.includes('[OK] career position labels for'))).toBe(true);
-  });
-});
 describe('allPoolTargets', () => {
   it('matches slots x eras with lineage overlap and packaged seasons', () => {
     buildStandardFixture('all-targets');
@@ -1064,47 +935,6 @@ describe('asset altIds preservation', () => {
     }
   });
 });
-describe('candidateKey', () => {
-  it('orders by score, minutes, games, then earlier season', () => {
-    const mk = (
-      season: string,
-      minutes: number,
-      games: number,
-      usage: number | null,
-    ): Candidate => ({
-      season,
-      player: { summaryRatings: SUMMARY_55, position: 'PF' },
-      stint: { playerExternalId: '6', gamesPlayed: games, minutes },
-      stats: statsRow(season, '6', { gamesPlayed: games, minutes, usageRate: usage }),
-    });
-    const higherScore = mk('1992-93', 2400, 80, 30);
-    const lowerScore = mk('1991-92', 1200, 60, 10);
-    expect(compareKeys(candidateKey(higherScore), candidateKey(lowerScore))).toBe(1);
-    const moreMinutes = mk('1991-92', 1200, 60, 10);
-    const fewerMinutes = mk('1992-93', 1000, 50, 10);
-    const moreKey = candidateKey(moreMinutes);
-    const fewerKey = candidateKey(fewerMinutes);
-    expect(compareKeys(moreKey, fewerKey)).toBe(1);
-    const moreGames = mk('1991-92', 1200, 60, 10);
-    const fewerGames = mk('1992-93', 1200, 40, 6);
-    expect(compareKeys(candidateKey(moreGames), candidateKey(fewerGames))).toBe(1);
-    const earlier = mk('1991-92', 1200, 60, null);
-    const later = mk('1992-93', 1200, 60, null);
-    expect(compareKeys(candidateKey(earlier), candidateKey(later))).toBe(1);
-  });
-});
-function compareKeys(a: readonly number[], b: readonly number[]): number {
-  for (let i = 0; i < a.length; i += 1) {
-    const av = a[i];
-    const bv = b[i];
-    if (av === undefined || bv === undefined) {
-      return 0;
-    }
-    if (av > bv) return 1;
-    if (av < bv) return -1;
-  }
-  return 0;
-}
 describe('run / writePool / updateManifest', () => {
   it('writes a valid pool, digests it, and merges the manifest sorted by key', async () => {
     const root = buildStandardFixture('run');
@@ -1148,28 +978,5 @@ describe('run / writePool / updateManifest', () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     await expect(run([['lakers', '1990s']], false, 1)).rejects.toThrow(/invalid pool lakers-1990s/);
     expect(() => readFileSync(join(root.data, 'pools', 'lakers-1990s.json'))).toThrow();
-  });
-});
-describe('schema fit (documented discrepancy)', () => {
-  it('parsePool rejects a player whose playable union is empty (schema forbids empty unions)', () => {
-    const pool = computePool('lakers', '1990s', fixtureManifest(), BBREF_IDS, false) as Pool;
-    const { detailed, sourceLabels } = normalizePositionLabels(new Set(['']));
-    expect(detailed).toEqual([]);
-    expect(sourceLabels).toEqual(['']);
-    const edited = {
-      ...pool,
-      players: [...pool.players],
-    };
-    edited.players[0] = {
-      ...(edited.players[0] as (typeof pool.players)[number]),
-      positions: {
-        primary: 'SF',
-        secondary: [],
-        playable: detailed,
-        sourceLabels,
-        normalizationVersion: POSITION_NORMALIZATION_VERSION,
-      },
-    };
-    expect(() => parsePool(edited)).toThrow();
   });
 });

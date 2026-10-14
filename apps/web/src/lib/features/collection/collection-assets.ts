@@ -1,9 +1,7 @@
 import {
   collectionGameRulesSchema,
   collectionProgressionRulesSchema,
-  parseCollectionCatalog,
   parseCollectionIndex,
-  type CollectionCatalog,
   type CollectionGameRules,
   type CollectionIndex,
   type CollectionProgressionRules,
@@ -17,16 +15,6 @@ export function loadCollectionIndex(): Promise<CollectionIndex> {
     parse: parseCollectionIndex,
     find: (manifest) => manifest.collection?.index ?? null,
     missingMessage: 'The collection index is unavailable.',
-  });
-}
-
-export function loadCollectionCatalog(): Promise<CollectionCatalog> {
-  return loadManifestAsset({
-    key: 'collection/catalog',
-    label: 'collection catalog',
-    parse: parseCollectionCatalog,
-    find: (manifest) => manifest.collection?.catalog ?? null,
-    missingMessage: 'The collection catalog is unavailable.',
   });
 }
 

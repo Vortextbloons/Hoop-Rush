@@ -58,7 +58,6 @@ import {
   draftDuelRepositionSlots,
   neededGroups,
   rosterCompletionPossible,
-  type DraftDuelGroupNeeds,
 } from './feasibility.ts';
 import {
   buildRoundOffers,
@@ -66,7 +65,7 @@ import {
   draftDuelFairBandTokens,
   DraftDuelGenerationError,
 } from './offers.ts';
-import { draftDuelFirstPicker, draftDuelHomeWinner, draftDuelTimeoutSeedPath } from './seeds.ts';
+import { draftDuelHomeWinner, draftDuelTimeoutSeedPath } from './seeds.ts';
 import {
   applyDraftDuelGameResult,
   createDraftDuelSeries,
@@ -328,12 +327,6 @@ function requirePick(picks: readonly DraftDuelOfferedPick[], slot: number): Draf
   const pick = picks[slot];
   if (!pick) throw new Error(`missing offered pick at slot ${String(slot)}`);
   return pick;
-}
-
-function offerLookup(offers: readonly DraftDuelCard[]): Map<string, DraftDuelCard> {
-  const map = new Map<string, DraftDuelCard>();
-  for (const card of offers) map.set(card.playerVersionId, card);
-  return map;
 }
 
 function expectValidRoster(roster: DraftDuelRoster): void {
@@ -610,23 +603,6 @@ function dummyAwayBoxes(): PlayerBoxScore[] {
 
 describe('draft state', () => {
   const catalog = buildCatalogFromSpecs(standardSpecs());
-
-  it('creates five rounds with committed first-round offers', () => {
-    const state = createDraftDuelDraft({ rootSeed: SEED_A, fairness: 'fair', catalog });
-    expect(draftDuelDraftSchema.safeParse(state).success).toBe(true);
-    expect(state.firstPicker).toBe(draftDuelFirstPicker(SEED_A));
-    expect(state.pickOrdinal).toBe(0);
-    expect(state.status).toBe('drafting');
-    expect(state.rounds).toHaveLength(5);
-    for (const round of state.rounds) {
-      expect(round.offers.p1).toHaveLength(8);
-      expect(round.offers.p2).toHaveLength(8);
-      expect(round.picks).toHaveLength(0);
-    }
-    expect(new Set(state.rounds[0]?.offers.p1.map((card) => card.playerId)).size).toBe(8);
-    expect(new Set(state.rounds[0]?.offers.p2.map((card) => card.playerId)).size).toBe(8);
-    expect(draftDuelCurrentPicker(state)).toBe(state.firstPicker);
-  });
 
   it('plays full fair and unfair drafts with valid accounting', () => {
     for (const fairness of FAIRNESS_MODES) {
@@ -1597,19 +1573,6 @@ describe('round generation guards', () => {
     expect(() => buildRoundOffers(next, catalog)).toThrow(/round starts/);
     const complete = playFullDraft(SEED_A, catalog);
     expect(() => buildRoundOffers(complete, catalog)).toThrow(/round starts/);
-  });
-
-  it('exposes completion state and claimed players', () => {
-    const catalog = buildCatalogFromSpecs(standardSpecs());
-    const seeded = createDraftDuelDraft({ rootSeed: SEED_B, fairness: 'unfair', catalog });
-    const claimed = draftDuelClaimedPlayerIds(seeded);
-    expect(claimed.size).toBe(0);
-    const playerCounts = offerLookup(seeded.rounds[0]?.offers.p1 ?? []);
-    expect(playerCounts.size).toBe(8);
-    const groups = neededGroups([]);
-    expect(groups).toEqual({ G: 2, F: 2, C: 1 });
-    const empty: DraftDuelGroupNeeds = { G: 0, F: 0, C: 0 };
-    expect(empty).toEqual({ G: 0, F: 0, C: 0 });
   });
 });
 

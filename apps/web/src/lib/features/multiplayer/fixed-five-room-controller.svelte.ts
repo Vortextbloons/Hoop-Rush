@@ -46,7 +46,7 @@ import {
 import { buildSimulationTeam } from './fixed-five-room-state';
 import { getFixedFiveTransport } from './fixed-five-transport';
 import { lobbyCommand, loadLobbyId } from './multiplayer-lobby';
-import type { GamecastPlayer } from './gamecast/gamecast-types';
+import type { GamecastPlayer } from '#lib/gamecast/gamecast-types.js';
 
 const TICK_MS = 1000;
 const COPY_FEEDBACK_MS = 1500;

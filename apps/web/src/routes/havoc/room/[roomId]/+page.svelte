@@ -672,7 +672,9 @@
 </section>
 
 <style>
-  .hm-room {
+  .h-shell.hm-room {
+    width: 100%;
+    max-width: none;
     min-width: 0;
   }
   .hm-nav {

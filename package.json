@@ -15,7 +15,7 @@
     "test": "vitest",
     "test:run": "vitest run",
     "//test:quick": "Fast PR gate. The exclude list is mirrored in scripts/tests/quick-exclusions.json and checked by `pnpm check:test-exclusions` (parity, stale patterns, and quick != run). Rationale per pattern lives in the manifest.",
-    "test:quick": "vitest run --exclude=\"**/*generator*\" --exclude=\"**/*history*\" --exclude=\"**/*integration*\"",
+    "test:quick": "vitest run --exclude=\"**/*generator*\" --exclude=\"**/*integration*\"",
     "test:import-nba": "python -m unittest discover -s scripts/import-nba -p \"test_*.py\"",
     "static": "pnpm --parallel -r run \"/^(check|lint)$/\"",
     "check:test-exclusions": "node scripts/tests/check-quick-exclusions.mjs",

@@ -5,10 +5,10 @@
     DraftDuelParticipantId,
     HoopRushManifest,
   } from '@hoop-rush/data-contracts';
-  import type { GamecastVisibleState } from '#lib/features/multiplayer/gamecast/gamecast-playback.js';
+  import type { GamecastVisibleState } from '#lib/gamecast/gamecast-playback.js';
   import type { DraftDuelFeedLine } from '#lib/features/draft-duel/draft-duel-broadcast-view.js';
-  import GamecastBroadcast from '#lib/features/multiplayer/gamecast/GamecastBroadcast.svelte';
-  import type { GamecastPlayer } from '#lib/features/multiplayer/gamecast/gamecast-types.js';
+  import GamecastBroadcast from '#lib/gamecast/GamecastBroadcast.svelte';
+  import type { GamecastPlayer } from '#lib/gamecast/gamecast-types.js';
 
   let {
     output,

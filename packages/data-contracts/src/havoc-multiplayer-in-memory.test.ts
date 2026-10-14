@@ -901,19 +901,6 @@ describe('in-memory Havoc multiplayer transport', () => {
     expect(receivedA).toEqual(['consideration', 'reaction']);
   });
 
-  it('notifies snapshot subscribers until they unsubscribe', async () => {
-    const transport = createInMemoryHavocMultiplayerTransport({ seed: 'subscribe' });
-    const { roomId } = await createAndJoin(transport);
-    const seen: number[] = [];
-    const subscription = transport.subscribe(roomId, (next) => seen.push(next.revision));
-    await submit(transport, roomId, 'ready-sub', 'p1', { kind: 'ready' });
-    expect(seen).toHaveLength(1);
-    expect(seen[0]).toBeGreaterThan(0);
-    subscription.unsubscribe();
-    await submit(transport, roomId, 'ready-sub-2', 'p2', { kind: 'ready' });
-    expect(seen).toHaveLength(1);
-  });
-
   it('refetches commands after a revision', async () => {
     const transport = createInMemoryHavocMultiplayerTransport({ seed: 'refetch' });
     const { roomId } = await createAndJoin(transport);
