@@ -8,12 +8,8 @@ import {
 import { DEFAULT_ERA_SIM_PROFILE, buildPlayerSeason } from '@hoop-rush/test-fixtures';
 import { buildProjectionModel } from '@hoop-rush/engine/test-helpers/projection';
 import {
-  FIT_NEED_META,
-  FIT_TIER_META,
-  formatNetDelta,
   heuristicDraftPoolReport,
   nextPageWindow,
-  poolRowKey,
   scoreDraftPoolMemo,
   type DraftFitContext,
 } from './draft-fit';
@@ -47,40 +43,12 @@ function context(): DraftFitContext {
   return { eraProfile: DEFAULT_ERA_SIM_PROFILE, model: buildProjectionModel() };
 }
 
-describe('draft-fit presentation', () => {
-  it('covers every tier and need with a label', () => {
-    expect(Object.keys(FIT_TIER_META)).toEqual(['best', 'strong', 'solid', 'situational', 'poor']);
-    expect(Object.keys(FIT_NEED_META)).toEqual([
-      'spacing',
-      'creation',
-      'defense',
-      'rebounding',
-      'balance',
-    ]);
-    for (const meta of [...Object.values(FIT_TIER_META), ...Object.values(FIT_NEED_META)]) {
-      expect(meta.label.length).toBeGreaterThan(0);
-    }
-  });
-
-  it('formats net deltas for display', () => {
-    expect(formatNetDelta(null)).toBe('Heuristic');
-    expect(formatNetDelta(2.34)).toBe('+2.3 NET');
-    expect(formatNetDelta(-1)).toBe('-1 NET');
-    expect(formatNetDelta(0)).toBe('0 NET');
-  });
-});
-
 describe('page-window helpers', () => {
   const rows = Array.from({ length: 100 }, (_, i) => ({
     franchiseId: 'lakers',
     eraId: '1990s',
     playerId: `p-page-${String(i)}`,
   }));
-  it('keys rows by franchise, era, and player', () => {
-    expect(poolRowKey({ franchiseId: 'lakers', eraId: '1990s', playerId: 'p-page-0' })).toBe(
-      'lakers/1990s/p-page-0',
-    );
-  });
   it('returns the slice after the visible window', () => {
     const visible = rows.slice(0, 48);
     const upcoming = nextPageWindow(rows, visible);

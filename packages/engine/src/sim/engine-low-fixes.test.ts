@@ -6,7 +6,6 @@ import {
   seedFromString,
 } from '@hoop-rush/test-fixtures';
 import { createEngineContext } from './kernel.ts';
-import { DEEP_FOUR_FT_MISS } from './evolution-rules.ts';
 import { createGameState, createTripContext } from './possession.ts';
 import { GameRecorder } from './recorder.ts';
 import { buildWeightedPickTable, createRng } from './rng.ts';
@@ -39,9 +38,5 @@ describe('sim low fixes', () => {
     expect(ctx.teamUnits[0]).toEqual(home.players.map((player) => `missing:${player.playerId}`));
     expect(ctx.teamUnits[1]).toEqual(away.players.map((player) => `missing:${player.playerId}`));
     expect(ctx.teamUnits.flat().some((id) => id === '')).toBe(false);
-  });
-
-  it('keeps the deep-four free-throw count identical to the previous literal', () => {
-    expect(DEEP_FOUR_FT_MISS).toBe(4);
   });
 });

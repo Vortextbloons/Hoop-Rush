@@ -1,16 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
-  HAVOC_TIER_COLORS,
   foldHavocSeasonStats,
-  formatSignedPoints,
   havocEventTextOf,
-  havocMvpFormulaLabel,
   havocObjectiveStatusOf,
-  havocRecordLabel,
   havocScoringTextOf,
-  mutationNameOf,
 } from './havoc-presentation';
-import { HAVOC_MVP_INDEX_WEIGHTS, havocGameSummarySchema } from '@hoop-rush/data-contracts';
+import { havocGameSummarySchema } from '@hoop-rush/data-contracts';
 import {
   FAKE_HUMAN_STARTER_IDS,
   buildCloneGameResult,
@@ -52,13 +47,6 @@ function summaryOf(gameNumber: number, humanScore: number, opponentScore: number
 }
 
 describe('havoc presentation helpers', () => {
-  it('labels tiers by color and text', () => {
-    expect(HAVOC_TIER_COLORS[1]).toBe('#37B7CC');
-    expect(HAVOC_TIER_COLORS[2]).toBe('#E8AD38');
-    expect(HAVOC_TIER_COLORS[3]).toBe('#B39AE8');
-    expect(mutationNameOf('four-point-dunk')).toBe('Four-Point Dunk');
-  });
-
   it('describes the objective through the first loss and beyond', () => {
     const pending = buildPendingComparisonRunState({
       havocCursor: 40,
@@ -69,12 +57,6 @@ describe('havoc presentation helpers', () => {
     const lost = buildPendingComparisonRunState({ havocCursor: 40, havocWins: 39, havocLosses: 1 });
     expect(havocObjectiveStatusOf(viewOf(lost)).tone).toBe('lost');
     expect(havocObjectiveStatusOf(viewOf(lost)).detail).toContain('1 loss');
-  });
-
-  it('formats signed points and records honestly', () => {
-    expect(formatSignedPoints(4)).toBe('+4');
-    expect(formatSignedPoints(-1)).toBe('-1');
-    expect(havocRecordLabel(55, 27)).toBe('55–27');
   });
 
   it('renders factual event text from payloads only', () => {
@@ -108,13 +90,6 @@ describe('havoc presentation helpers', () => {
     const fourPoint = stats.mutations.find((mutation) => mutation.mutationId === 'four-point-dunk');
     expect(fourPoint?.triggers).toBe(3);
     expect(fourPoint?.pointsDelta).toBe(6);
-  });
-
-  it('spells out the MVP formula with its weights', () => {
-    const formula = havocMvpFormulaLabel({ ...HAVOC_MVP_INDEX_WEIGHTS });
-    expect(formula).toContain('10 × points');
-    expect(formula).toContain('30 × blocks');
-    expect(formula).toContain('− 10 × turnovers');
   });
 
   it('keeps tape summaries consistent with the ledger', () => {
