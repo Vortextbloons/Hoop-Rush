@@ -663,9 +663,13 @@ export {
 export {
   simulateDuelSeries,
   duelGameEvents,
+  duelGameSimulationInput,
+  duelHomeParticipantId,
+  simulateRecordedDuelGame,
   type DuelGameEvent,
   type DuelSimulationInput,
   type DuelSimulationOutput,
+  type RecordedDuelGame,
 } from './modes/fixed-five/duel-sim.ts';
 export {
   summarizeShared82Games,
@@ -680,6 +684,9 @@ export {
   canonicalFixedFiveDigestPayload,
   isFixedFiveGameInputCommand,
   gameInputCommands,
+  fixedFiveDuelGameInputDigest,
+  fixedFiveDuelGameResultDigest,
+  fixedFiveDuelGameTapeDigest,
 } from './modes/fixed-five/digest.ts';
 export {
   verifyFixedFiveCompetition,
@@ -916,6 +923,7 @@ export {
   type DraftDuelGroupNeeds,
   type DraftDuelRoundOffers,
   type DraftDuelSafetyInput,
+  type DraftDuelSlotPlacement,
 } from './modes/draft-duel/feasibility.ts';
 export {
   createDraftDuelSeries,

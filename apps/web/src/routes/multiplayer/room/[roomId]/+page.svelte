@@ -19,6 +19,14 @@
   import FixedFiveDraftPanel from '$lib/features/multiplayer/FixedFiveDraftPanel.svelte';
   import FixedFiveSimShow from '$lib/features/multiplayer/FixedFiveSimShow.svelte';
   import FixedFiveResults from '$lib/features/multiplayer/FixedFiveResults.svelte';
+  import GamecastBroadcast from '$lib/features/multiplayer/gamecast/GamecastBroadcast.svelte';
+  import GamecastRecap from '$lib/features/multiplayer/gamecast/GamecastRecap.svelte';
+  import GamecastSeriesTracker from '$lib/features/multiplayer/gamecast/GamecastSeriesTracker.svelte';
+  import { gamecastFeedLines } from '$lib/features/multiplayer/gamecast/gamecast-broadcast-view';
+  import {
+    gamecastVisibleEventCount,
+    gamecastVisibleState,
+  } from '$lib/features/multiplayer/gamecast/gamecast-playback';
   import ArenaSoundToggle from '$lib/components/ArenaSoundToggle.svelte';
   import { FixedFiveRoomController } from '$lib/features/multiplayer/fixed-five-room-controller.svelte';
   const roomId = $page.params.roomId as string;
@@ -31,6 +39,26 @@
   const facts = $derived(controller.facts);
   const selfId = $derived(controller.selfId);
   const assets = $derived(controller.assets);
+  const duelOutput = $derived(controller.currentDuelOutput);
+  const duelVisibleCount = $derived(
+    duelOutput ? gamecastVisibleEventCount(duelOutput.tape, controller.broadcastProgress) : 0,
+  );
+  const duelVisible = $derived(
+    duelOutput ? gamecastVisibleState(duelOutput, duelVisibleCount) : null,
+  );
+  const duelFeed = $derived(duelOutput ? gamecastFeedLines(duelOutput, duelVisibleCount) : []);
+  const showDuelRecap = $derived(
+    phase === 'game-results' ||
+      (phase === 'awaiting-confirmation' &&
+        controller.awaitingContinue &&
+        controller.duelRecapGame !== null),
+  );
+  const readyCountdownLabel = $derived.by((): string | null => {
+    const ms = controller.readyCountdownMs;
+    if (ms === null) return null;
+    const total = Math.max(0, Math.ceil(ms / 1000));
+    return `${String(Math.floor(total / 60))}:${String(total % 60).padStart(2, '0')}`;
+  });
   onMount(() => {
     void controller.start();
     return () => controller.dispose();
@@ -294,6 +322,104 @@
           />
         {/if}
       </div>
+    {:else if phase === 'preparing-game'}
+      {#if controller.duelSeries}
+        <div class="mt-6 flex flex-col gap-4">
+          <GamecastSeriesTracker
+            series={controller.duelSeries}
+            localParticipantId={selfId}
+            homeFormat="alternating"
+          />
+          <div class="rounded-2xl bg-surface-1 p-6">
+            <h2 class="font-display text-sm font-extrabold uppercase">
+              Game {controller.duelCurrentGameNumber ?? 1} · Ready check
+            </h2>
+            <p class="mt-2 text-sm text-muted-foreground">
+              {controller.localReady
+                ? "You're ready. Waiting for your opponent…"
+                : 'Both players need to be ready before the broadcast starts.'}
+            </p>
+            {#if controller.duelSimError}
+              <p class="mt-2 text-sm text-destructive" role="alert">{controller.duelSimError}</p>
+              <button
+                type="button"
+                onclick={() => controller.retryDuelGame()}
+                class="mt-3 rounded-xl border border-line-soft bg-card px-4 py-2 text-sm font-semibold"
+              >
+                Retry game
+              </button>
+            {:else if controller.duelSimulatingGame !== null}
+              <p class="mt-2 text-xs text-muted-foreground" role="status">
+                Simulating this game locally…
+              </p>
+            {/if}
+            <div class="mt-4 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                disabled={controller.localReady || controller.busyAction !== null}
+                onclick={() => void controller.readyForNextGame()}
+                class="room-primary"
+              >
+                {controller.localReady
+                  ? 'Ready'
+                  : `Ready for Game ${controller.duelCurrentGameNumber ?? 1}`}
+              </button>
+              {#if readyCountdownLabel}
+                <span class="text-xs text-muted-foreground">
+                  Auto-start in {readyCountdownLabel}
+                </span>
+              {/if}
+            </div>
+          </div>
+        </div>
+      {/if}
+    {:else if phase === 'broadcasting'}
+      {#if duelOutput && duelVisible}
+        <div class="mt-6">
+          <GamecastBroadcast
+            output={duelOutput}
+            visible={duelVisible}
+            progress={controller.broadcastProgress}
+            localParticipantId={selfId}
+            feed={duelFeed}
+            players={controller.duelPlayers}
+            manifest={assets?.manifest ?? null}
+          />
+        </div>
+      {:else}
+        <div class="room-empty">
+          <h2>Preparing the broadcast</h2>
+          <p role="status">{controller.duelSimError ?? 'Simulating this game locally…'}</p>
+          {#if controller.duelSimError}
+            <button type="button" class="room-secondary" onclick={() => controller.retryDuelGame()}>
+              Retry game
+            </button>
+          {/if}
+        </div>
+      {/if}
+    {:else if showDuelRecap}
+      {#if duelOutput && controller.duelSeries}
+        <div class="mt-6 flex flex-col gap-4">
+          <GamecastSeriesTracker
+            series={controller.duelSeries}
+            localParticipantId={selfId}
+            homeFormat="alternating"
+          />
+          <GamecastRecap
+            output={duelOutput}
+            series={controller.duelSeries}
+            localParticipantId={selfId}
+            verification={controller.duelVerification}
+            readyCountdownMs={controller.readyCountdownMs}
+            localReady={controller.localReady}
+            onready={() => void controller.readyForNextGame()}
+            awaitingContinue={controller.awaitingContinue}
+            oncontinue={() => controller.continueAfterGame()}
+            players={controller.duelPlayers}
+            manifest={assets?.manifest ?? null}
+          />
+        </div>
+      {/if}
     {:else if phase === 'awaiting-confirmation'}
       {@const rivalProposal = facts.proposals.find((p) => p.actor !== selfId) ?? null}
       {@const digestsMatch =

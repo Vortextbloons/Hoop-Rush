@@ -37,7 +37,7 @@ vi.mock('@supabase/supabase-js', () => ({
 const ROOM_ID = 'room-1';
 const roomId = idSchema.parse(ROOM_ID);
 const ROOM_COLUMNS =
-  'id, code, code_active, mode, source_mode, variant, versions, phase, revision, command_count, digest, result_digest, confirmed_digest, successor_room_id, root_seed, deadline_at, deadline_cursor, deadline_participant, deadline_fallback, deadline_pick_ordinal, expires_at, created_at';
+  'id, code, code_active, mode, source_mode, variant, versions, phase, revision, command_count, digest, result_digest, confirmed_digest, successor_room_id, series, broadcast, root_seed, deadline_at, deadline_cursor, deadline_participant, deadline_fallback, deadline_pick_ordinal, expires_at, created_at';
 const versions = defaultFixedFiveVersionLocks({ dataVersion: 'data-v1' });
 
 let transportCounter = 0;
@@ -135,7 +135,8 @@ describe('fixed-five supabase transport protocol pins', () => {
     });
     expect(harness.selectQueries[1]).toMatchObject({
       table: 'fixed_five_room_members',
-      columns: 'participant_id, online, ready, picks_committed, locked, last_seen_at',
+      columns:
+        'participant_id, online, ready, picks_committed, locked, next_game_ready, last_seen_at',
       filters: [{ op: 'eq', column: 'room_id', value: ROOM_ID }],
       single: false,
     });

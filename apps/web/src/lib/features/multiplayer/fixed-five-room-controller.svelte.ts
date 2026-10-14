@@ -4,6 +4,7 @@ import {
   fixedFiveTimeoutMsForMode,
   playerVersionId,
   type ContentHash,
+  type FixedFiveDuelGameOutput,
   type FixedFiveRoomSnapshot,
   type FixedFiveVerificationReceipt,
   type FixedFiveWorkerResultEntry,
@@ -37,6 +38,7 @@ import { rollAnimationFor } from './fixed-five-roll-animation';
 import { FixedFiveRunner } from './fixed-five-runner';
 import {
   FixedFiveRoomSession,
+  type DuelGameVerification,
   type FixedFiveLocalResult,
   type FixedFiveRoomSessionDeps,
   type FixedFiveRoomSessionSnapshot,
@@ -44,6 +46,7 @@ import {
 import { buildSimulationTeam } from './fixed-five-room-state';
 import { getFixedFiveTransport } from './fixed-five-transport';
 import { lobbyCommand, loadLobbyId } from './multiplayer-lobby';
+import type { GamecastPlayer } from './gamecast/gamecast-types';
 
 const TICK_MS = 1000;
 const COPY_FEEDBACK_MS = 1500;
@@ -129,6 +132,17 @@ export class FixedFiveRoomController {
   statsEntries = $state.raw<FixedFiveWorkerResultEntry[]>([]);
   statsBuilding = $state(false);
   localResult = $state.raw<FixedFiveLocalResult | null>(null);
+  duelBroadcast = $state(false);
+  duelOutputs = $state.raw<Record<number, FixedFiveDuelGameOutput>>({});
+  duelSimError = $state<string | null>(null);
+  duelSimulatingGame = $state<number | null>(null);
+  broadcastProgress = $state(0);
+  duelVerification = $state<DuelGameVerification>('pending');
+  localReady = $state(false);
+  opponentReady = $state(false);
+  readyCountdownMs = $state<number | null>(null);
+  awaitingContinue = $state(false);
+  duelRecapGame = $state<number | null>(null);
   receiptsUnsupported = $state(false);
   verificationReceipt = $state.raw<FixedFiveVerificationReceipt | null>(null);
   verificationError = $state<string | null>(null);
@@ -199,6 +213,32 @@ export class FixedFiveRoomController {
   statsState = $derived<'ready' | 'building' | 'empty'>(
     this.playerStats ? 'ready' : this.statsBuilding ? 'building' : 'empty',
   );
+  duelSeries = $derived(this.roomSnapshot?.series ?? null);
+  duelCurrentGameNumber = $derived(this.roomSnapshot?.series?.currentGameNumber ?? null);
+  duelBroadcastGame = $derived(this.roomSnapshot?.broadcast?.gameNumber ?? null);
+  currentDuelOutput = $derived.by((): FixedFiveDuelGameOutput | null => {
+    const gameNumber = this.duelBroadcastGame ?? this.duelRecapGame ?? this.duelCurrentGameNumber;
+    if (gameNumber === null) return null;
+    return this.duelOutputs[gameNumber] ?? null;
+  });
+  duelPlayers = $derived.by((): Record<string, GamecastPlayer> => {
+    const output = this.currentDuelOutput;
+    const mapped: Record<string, GamecastPlayer> = {};
+    if (!output) return mapped;
+    for (const player of [...output.result.home.players, ...output.result.away.players]) {
+      const entry = this.indexById.get(player.playerId);
+      if (!entry) continue;
+      mapped[player.playerId] = {
+        playerId: entry.playerId,
+        displayName: entry.displayName,
+        seasonKey: entry.seasonKey,
+        franchiseId: entry.franchiseId,
+        playerExternalId: entry.playerExternalId,
+        altIds: entry.altIds,
+      };
+    }
+    return mapped;
+  });
   opponent = $derived(this.display?.members.find((m) => m.participantId !== this.selfId) ?? null);
   timeoutMs = $derived(
     this.roomSnapshot ? fixedFiveTimeoutMsForMode(this.roomSnapshot.settings.mode) : 90 * 1000,
@@ -290,13 +330,19 @@ export class FixedFiveRoomController {
         ? 'Draft'
         : this.phase === 'simulating'
           ? 'Playing'
-          : this.phase === 'awaiting-confirmation'
-            ? 'Checking results'
-            : this.phase === 'completed'
-              ? 'Final'
-              : this.phase === 'expired'
-                ? 'Room expired'
-                : 'Result mismatch',
+          : this.phase === 'preparing-game'
+            ? 'Pre-game'
+            : this.phase === 'broadcasting'
+              ? 'Broadcast'
+              : this.phase === 'game-results'
+                ? 'Game recap'
+                : this.phase === 'awaiting-confirmation'
+                  ? 'Checking results'
+                  : this.phase === 'completed'
+                    ? 'Final'
+                    : this.phase === 'expired'
+                      ? 'Room expired'
+                      : 'Result mismatch',
   );
 
   private readonly deps: FixedFiveRoomControllerDeps;
@@ -307,6 +353,9 @@ export class FixedFiveRoomController {
   private winPlayed = false;
   private tickTimer: ReturnType<typeof setInterval> | null = null;
   private copyTimer: ReturnType<typeof setTimeout> | null = null;
+  private playbackRaf: number | null = null;
+  private playbackLastFrameMs = 0;
+  private lastBroadcastGame: number | null = null;
 
   constructor(deps: FixedFiveRoomControllerDeps) {
     this.deps = deps;
@@ -342,6 +391,7 @@ export class FixedFiveRoomController {
       clearTimeout(this.copyTimer);
       this.copyTimer = null;
     }
+    this.stopPlayback();
     this.unsubscribe?.();
     this.unsubscribe = null;
     this.session.dispose();
@@ -403,6 +453,38 @@ export class FixedFiveRoomController {
     this.session.retrySimulation();
   }
 
+  retryDuelGame(): void {
+    this.session.retryDuelGame();
+  }
+
+  async readyForNextGame(): Promise<void> {
+    await this.session.readyForNextGame();
+  }
+
+  continueAfterGame(): void {
+    this.session.continueAfterGame();
+  }
+
+  startPlayback(): void {
+    if (this.disposed) return;
+    this.stopPlayback();
+    this.session.beginPlayback();
+    if (typeof requestAnimationFrame !== 'function') return;
+    this.playbackLastFrameMs = typeof performance === 'undefined' ? 0 : performance.now();
+    const frame = (now: number): void => {
+      if (this.disposed) return;
+      const delta = Math.max(0, now - this.playbackLastFrameMs);
+      this.playbackLastFrameMs = now;
+      this.session.advancePlayback(delta);
+      if (this.broadcastProgress >= 1) {
+        this.stopPlayback();
+        return;
+      }
+      this.playbackRaf = requestAnimationFrame(frame);
+    };
+    this.playbackRaf = requestAnimationFrame(frame);
+  }
+
   requestStatsRebuild(): void {
     this.session.requestStatsRebuild();
   }
@@ -454,6 +536,17 @@ export class FixedFiveRoomController {
     this.statsEntries = next.statsEntries;
     this.statsBuilding = next.statsBuilding;
     this.localResult = next.localResult;
+    this.duelBroadcast = next.duelBroadcast;
+    this.duelOutputs = next.duelOutputs;
+    this.duelSimError = next.duelSimError;
+    this.duelSimulatingGame = next.duelSimulatingGame;
+    this.broadcastProgress = next.broadcastProgress;
+    this.duelVerification = next.duelVerification;
+    this.localReady = next.localReady;
+    this.opponentReady = next.opponentReady;
+    this.readyCountdownMs = next.readyCountdownMs;
+    this.awaitingContinue = next.awaitingContinue;
+    this.duelRecapGame = next.duelRecapGame;
     this.receiptsUnsupported = next.receiptsUnsupported;
     this.verificationReceipt = next.verificationReceipt;
     this.verificationError = next.verificationError;
@@ -467,9 +560,24 @@ export class FixedFiveRoomController {
     this.busyAction = next.busyAction;
     this.leaveBusy = next.leaveBusy;
     this.rematchBusy = next.rematchBusy;
+    const broadcastGame = next.room?.broadcast?.gameNumber ?? null;
+    if (broadcastGame !== null && broadcastGame !== this.lastBroadcastGame) {
+      this.lastBroadcastGame = broadcastGame;
+      this.startPlayback();
+    } else if (broadcastGame === null && this.lastBroadcastGame !== null) {
+      this.lastBroadcastGame = null;
+      this.stopPlayback();
+    }
     if (this.phase === 'completed' && this.localResult && !this.winPlayed) {
       this.winPlayed = true;
       arenaWin();
+    }
+  }
+
+  private stopPlayback(): void {
+    if (this.playbackRaf !== null) {
+      cancelAnimationFrame(this.playbackRaf);
+      this.playbackRaf = null;
     }
   }
 

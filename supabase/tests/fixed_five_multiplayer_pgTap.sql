@@ -7,7 +7,18 @@
 -- scratch table, so pgTAP state is never role-switched.
 
 begin;
-select plan(127);
+select plan(182);
+
+create function public.pgtap_has_policy(p_schema text, p_table text, p_policy text)
+returns boolean
+language sql
+stable
+as $$
+  select exists (
+    select 1 from pg_policies
+    where schemaname = p_schema and tablename = p_table and policyname = p_policy
+  );
+$$;
 
 -- 1. Schema.
 select has_table('public', 'fixed_five_rooms', 'fixed_five_rooms exists');
@@ -19,9 +30,33 @@ select has_table('public', 'fixed_five_server_versions', 'server versions exists
 select has_table('public', 'fixed_five_verification_receipts', 'verification receipts exists');
 
 select col_type_is('public', 'fixed_five_rooms', 'code', 'text', 'code is text preserving leading zeroes');
-select has_check('public', 'fixed_five_rooms', 'fixed_five_rooms_code_check', 'code check enforces four digits');
-select has_check('public', 'fixed_five_rooms', 'fixed_five_rooms_mode_check', 'mode check');
-select has_check('public', 'fixed_five_rooms', 'fixed_five_rooms_phase_check', 'phase check');
+select ok(
+  exists (
+    select 1 from pg_constraint c
+    join pg_class t on t.oid = c.conrelid
+    join pg_namespace n on n.oid = t.relnamespace
+    where n.nspname = 'public' and t.relname = 'fixed_five_rooms'
+      and c.conname = 'fixed_five_rooms_code_check' and c.contype = 'c'
+  ),
+  'code check enforces four digits');
+select ok(
+  exists (
+    select 1 from pg_constraint c
+    join pg_class t on t.oid = c.conrelid
+    join pg_namespace n on n.oid = t.relnamespace
+    where n.nspname = 'public' and t.relname = 'fixed_five_rooms'
+      and c.conname = 'fixed_five_rooms_mode_check' and c.contype = 'c'
+  ),
+  'mode check');
+select ok(
+  exists (
+    select 1 from pg_constraint c
+    join pg_class t on t.oid = c.conrelid
+    join pg_namespace n on n.oid = t.relnamespace
+    where n.nspname = 'public' and t.relname = 'fixed_five_rooms'
+      and c.conname = 'fixed_five_rooms_phase_check' and c.contype = 'c'
+  ),
+  'phase check');
 
 select has_index('public', 'fixed_five_rooms', 'fixed_five_rooms_active_code_uidx', 'partial unique active code index exists');
 select has_index('public', 'fixed_five_room_commands', 'fixed_five_room_commands_room_ordinal_idx', 'command ordinal index exists');
@@ -29,10 +64,10 @@ select has_pk('public', 'fixed_five_deadline_commitments', 'deadline commitments
 select has_pk('public', 'fixed_five_verification_receipts', 'verification receipts primary key exists');
 select col_is_pk('public', 'fixed_five_server_versions', 'key', 'server versions key is the primary key');
 
-select has_policy('public', 'fixed_five_rooms', 'ff members read their room');
-select has_policy('public', 'fixed_five_room_commands', 'ff members read their commands');
-select has_policy('public', 'fixed_five_deadline_commitments', 'ff members read deadline commitments');
-select has_policy('public', 'fixed_five_verification_receipts', 'ff members read verification receipts');
+select ok(public.pgtap_has_policy('public', 'fixed_five_rooms', 'ff members read their room'), 'ff members read their room');
+select ok(public.pgtap_has_policy('public', 'fixed_five_room_commands', 'ff members read their commands'), 'ff members read their commands');
+select ok(public.pgtap_has_policy('public', 'fixed_five_deadline_commitments', 'ff members read deadline commitments'), 'ff members read deadline commitments');
+select ok(public.pgtap_has_policy('public', 'fixed_five_verification_receipts', 'ff members read verification receipts'), 'ff members read verification receipts');
 
 -- No direct-write policies: only select policies should exist for anon/authenticated.
 select is(
@@ -72,7 +107,7 @@ select has_function('public', 'fixed_five_guest_remove', array['uuid','text'], '
 select has_function('public', 'fixed_five_is_member', array['uuid'], 'membership helper exists');
 select has_function('public', 'fixed_five_versions_valid', array['jsonb'], 'version lock helper exists');
 select has_function('public', 'fixed_five_cron_tick', array[]::text[], 'cron exists');
-select has_policy('public', 'fixed_five_room_members', 'ff members read room membership');
+select ok(public.pgtap_has_policy('public', 'fixed_five_room_members', 'ff members read room membership'), 'ff members read room membership');
 select col_type_is('public', 'fixed_five_server_versions', 'value', 'text', 'server version values are text');
 select has_function('public', 'fixed_five_random_code', array[]::text[], 'cryptographic room-code generator exists');
 select is(
@@ -161,7 +196,7 @@ as $$
 $$;
 
 insert into public.ff_pgtap_ctx (name, value) values
-  ('versions', '{"dataVersion":"data-v1","ratingVersion":"ratings-v3.12","positionNormalizationVersion":"position-v4","engineVersion":"m3-engine-v25","bracketVersion":"bracket-m3-v4","scheduleVersion":"schedule-v1","seedDerivationVersion":"seed-v1","classicRollVersion":"classic-roll-v1","profileVersion":"2010s-fixed-v1","multiplayerVersion":"fixed-five-multiplayer-v3","autopickVersion":"fixed-five-autopick-v1"}'),
+  ('versions', '{"dataVersion":"data-v1","ratingVersion":"ratings-v3.12","positionNormalizationVersion":"position-v4","engineVersion":"m3-engine-v25","bracketVersion":"bracket-m3-v4","scheduleVersion":"schedule-v1","seedDerivationVersion":"seed-v1","classicRollVersion":"classic-roll-v1","profileVersion":"2010s-fixed-v1","multiplayerVersion":"fixed-five-multiplayer-v5","autopickVersion":"fixed-five-autopick-v1"}'),
   ('uid_a1', '00000000-0000-4000-8000-000000000001'),
   ('uid_a2', '00000000-0000-4000-8000-000000000002'),
   ('uid_b1', '00000000-0000-4000-8000-000000000003'),
@@ -223,7 +258,7 @@ select public.ff_pgtap_claim((select value from public.ff_pgtap_ctx where name =
 insert into public.ff_pgtap_ctx (name, value)
 select 'ready_a1', public.fixed_five_command_submit(
   (select value::uuid from public.ff_pgtap_ctx where name = 'room_a'),
-  'ready-a1', null, 'p1', '{"kind":"ready","ready":true}'::jsonb)->>'accepted';
+  'ready-a1', null, 'p1', '{"kind":"ready","ready":true}'::jsonb)::text;
 reset role;
 select is((select value::jsonb->>'accepted' from public.ff_pgtap_ctx where name = 'ready_a1'), 'true', 'host ready accepted');
 
@@ -639,7 +674,7 @@ select 'verify_b_bad_seed', public.fixed_five_verification_submit(
       (select value::uuid from public.ff_pgtap_ctx where name = 'room_b'),
       (select value from public.ff_pgtap_ctx where name = 'challenge_b'),
       repeat('a', 64), repeat('b', 64)),
-    '{rootSeed}', to_jsonb('forged-seed')),
+    '{rootSeed}', to_jsonb('forged-seed'::text)),
   null)::text;
 reset role;
 select is(
@@ -823,6 +858,574 @@ select is(
 select is(
   (select phase from public.fixed_five_rooms where id = (select value::uuid from public.ff_pgtap_ctx where name = 'room_c')),
   'integrity-failed', 'receipt disagreement sets integrity-failed');
+
+-- 12. v4 reposition commands: duel repositions are off-turn and version gated;
+-- snake rooms accept sandbox-reposition without moving the pick clock and let
+-- a placement displace the actor's own earlier slot.
+set local role authenticated;
+select public.ff_pgtap_claim((select value from public.ff_pgtap_ctx where name = 'uid_a1'));
+with created as (
+  select public.fixed_five_room_create(
+    'duel', 'classic', 'ratings',
+    (select value::jsonb from public.ff_pgtap_ctx where name = 'versions')
+  ) as r
+)
+insert into public.ff_pgtap_ctx (name, value)
+select 'room_d', r->>'room_id' from created
+union all
+select 'code_d', r->>'code' from created;
+reset role;
+select ok(
+  (select value from public.ff_pgtap_ctx where name = 'room_d') is not null,
+  'v4 duel room is created');
+
+set local role authenticated;
+select public.ff_pgtap_claim((select value from public.ff_pgtap_ctx where name = 'uid_a2'));
+insert into public.ff_pgtap_ctx (name, value)
+select 'join_d', public.fixed_five_room_join(
+  (select value from public.ff_pgtap_ctx where name = 'code_d'))->>'participant_id';
+reset role;
+select is((select value from public.ff_pgtap_ctx where name = 'join_d'), 'p2', 'v4 duel guest joins');
+
+set local role authenticated;
+select public.ff_pgtap_claim((select value from public.ff_pgtap_ctx where name = 'uid_a1'));
+insert into public.ff_pgtap_ctx (name, value)
+select 'start_d', public.fixed_five_command_submit(
+  (select value::uuid from public.ff_pgtap_ctx where name = 'room_d'),
+  'd-start', null, 'p1',
+  jsonb_build_object('kind', 'start'))::text;
+reset role;
+select is(
+  (select value::jsonb->>'accepted' from public.ff_pgtap_ctx where name = 'start_d'),
+  'true', 'v4 duel start accepted');
+
+set local role authenticated;
+select public.ff_pgtap_claim((select value from public.ff_pgtap_ctx where name = 'uid_a1'));
+insert into public.ff_pgtap_ctx (name, value)
+select 'claim_d', public.fixed_five_command_submit(
+  (select value::uuid from public.ff_pgtap_ctx where name = 'room_d'),
+  'd-claim-0', null, 'p1',
+  jsonb_build_object(
+    'kind', 'duel-claim', 'playerId', 'duel-player-0', 'slotIndex', 0,
+    'franchiseId', 'lakers', 'eraId', '1990s'))::text;
+reset role;
+select is(
+  (select value::jsonb->>'accepted' from public.ff_pgtap_ctx where name = 'claim_d'),
+  'true', 'v4 duel claim accepted');
+
+set local role authenticated;
+select public.ff_pgtap_claim((select value from public.ff_pgtap_ctx where name = 'uid_a2'));
+insert into public.ff_pgtap_ctx (name, value)
+select 'reposition_d', public.fixed_five_command_submit(
+  (select value::uuid from public.ff_pgtap_ctx where name = 'room_d'),
+  'd-move-0', null, 'p2',
+  jsonb_build_object(
+    'kind', 'duel-reposition', 'playerId', 'duel-player-0', 'slotIndex', 2))::text;
+reset role;
+select is(
+  (select value::jsonb->>'accepted' from public.ff_pgtap_ctx where name = 'reposition_d'),
+  'true', 'v4 duel reposition is accepted without the turn');
+
+set local role authenticated;
+select public.ff_pgtap_claim((select value from public.ff_pgtap_ctx where name = 'uid_a2'));
+insert into public.ff_pgtap_ctx (name, value)
+select 'reposition_d_bad', public.fixed_five_command_submit(
+  (select value::uuid from public.ff_pgtap_ctx where name = 'room_d'),
+  'd-move-bad', null, 'p2',
+  jsonb_build_object('kind', 'duel-reposition', 'playerId', 'duel-player-0'))::text;
+reset role;
+select is(
+  (select value::jsonb->>'rejection_code' from public.ff_pgtap_ctx where name = 'reposition_d_bad'),
+  'illegal-move', 'duel reposition requires a slot in range');
+
+set local role authenticated;
+select public.ff_pgtap_claim((select value from public.ff_pgtap_ctx where name = 'uid_a1'));
+insert into public.ff_pgtap_ctx (name, value)
+select 'reposition_wrong_mode', public.fixed_five_command_submit(
+  (select value::uuid from public.ff_pgtap_ctx where name = 'room_a'),
+  'a-move-wrong', null, 'p1',
+  jsonb_build_object('kind', 'duel-reposition', 'playerId', 'x', 'slotIndex', 0))::text;
+reset role;
+select is(
+  (select value::jsonb->>'rejection_code' from public.ff_pgtap_ctx where name = 'reposition_wrong_mode'),
+  'illegal-move', 'duel reposition is rejected outside duel rooms');
+
+set local role authenticated;
+select public.ff_pgtap_claim((select value from public.ff_pgtap_ctx where name = 'uid_a1'));
+with created as (
+  select public.fixed_five_room_create(
+    'sandbox-shared-82', 'sandbox', 'ratings',
+    (select value::jsonb from public.ff_pgtap_ctx where name = 'versions')
+  ) as r
+)
+insert into public.ff_pgtap_ctx (name, value)
+select 'room_s', r->>'room_id' from created
+union all
+select 'code_s', r->>'code' from created;
+reset role;
+select ok(
+  (select value from public.ff_pgtap_ctx where name = 'room_s') is not null,
+  'v4 snake room is created');
+
+set local role authenticated;
+select public.ff_pgtap_claim((select value from public.ff_pgtap_ctx where name = 'uid_a2'));
+insert into public.ff_pgtap_ctx (name, value)
+select 'join_s', public.fixed_five_room_join(
+  (select value from public.ff_pgtap_ctx where name = 'code_s'))->>'participant_id';
+reset role;
+select is((select value from public.ff_pgtap_ctx where name = 'join_s'), 'p2', 'v4 snake guest joins');
+
+set local role authenticated;
+select public.ff_pgtap_claim((select value from public.ff_pgtap_ctx where name = 'uid_a1'));
+insert into public.ff_pgtap_ctx (name, value)
+select 'start_s', public.fixed_five_command_submit(
+  (select value::uuid from public.ff_pgtap_ctx where name = 'room_s'),
+  's-start', null, 'p1',
+  jsonb_build_object('kind', 'start'))::text;
+reset role;
+select is(
+  (select value::jsonb->>'accepted' from public.ff_pgtap_ctx where name = 'start_s'),
+  'true', 'v4 snake start accepted');
+
+do $$
+declare
+  v_room uuid := (select value::uuid from public.ff_pgtap_ctx where name = 'room_s');
+  v_actor text;
+  v_uid text;
+  v_ordinal integer := 0;
+  v_slot integer;
+  v_players text[] := array['s-0', 's-1', 's-2', 's-3'];
+  v_slots integer[] := array[0, 0, 1, 0];
+begin
+  while v_ordinal < 4 loop
+    select deadline_participant into v_actor from public.fixed_five_rooms where id = v_room;
+    v_uid := case v_actor
+      when 'p1' then (select value from public.ff_pgtap_ctx where name = 'uid_a1')
+      else (select value from public.ff_pgtap_ctx where name = 'uid_a2')
+    end;
+    v_slot := v_slots[v_ordinal + 1];
+    perform set_config('request.jwt.claims', json_build_object('sub', v_uid)::text, true);
+    perform set_config('request.jwt.claim.sub', v_uid, true);
+    insert into public.ff_pgtap_ctx (name, value)
+    select 's_place_' || v_ordinal::text, public.fixed_five_command_submit(
+      v_room,
+      's-place-' || v_ordinal::text, null, v_actor,
+      jsonb_build_object(
+        'kind', 'sandbox-place', 'playerId', v_players[v_ordinal + 1], 'slotIndex', v_slot))::text;
+    v_ordinal := v_ordinal + 1;
+  end loop;
+end $$;
+select is(
+  (select value::jsonb->>'accepted' from public.ff_pgtap_ctx where name = 's_place_0'),
+  'true', 'v4 snake first placement accepted');
+select is(
+  (select value::jsonb->>'accepted' from public.ff_pgtap_ctx where name = 's_place_1'),
+  'true', 'v4 snake second placement accepted');
+select is(
+  (select value::jsonb->>'accepted' from public.ff_pgtap_ctx where name = 's_place_2'),
+  'true', 'v4 snake third placement accepted');
+select is(
+  (select value::jsonb->>'accepted' from public.ff_pgtap_ctx where name = 's_place_3'),
+  'true', 'v4 snake placement may displace an earlier own slot');
+
+set local role authenticated;
+select public.ff_pgtap_claim(
+  case (select deadline_participant from public.fixed_five_rooms
+        where id = (select value::uuid from public.ff_pgtap_ctx where name = 'room_s'))
+    when 'p1' then (select value from public.ff_pgtap_ctx where name = 'uid_a2')
+    else (select value from public.ff_pgtap_ctx where name = 'uid_a1')
+  end);
+insert into public.ff_pgtap_ctx (name, value)
+select 's_move', public.fixed_five_command_submit(
+  (select value::uuid from public.ff_pgtap_ctx where name = 'room_s'),
+  's-move-0', null,
+  case (select deadline_participant from public.fixed_five_rooms
+        where id = (select value::uuid from public.ff_pgtap_ctx where name = 'room_s'))
+    when 'p1' then 'p2'
+    else 'p1'
+  end,
+  jsonb_build_object(
+    'kind', 'sandbox-reposition', 'playerId', 's-1', 'slotIndex', 2))::text;
+reset role;
+select is(
+  (select value::jsonb->>'accepted' from public.ff_pgtap_ctx where name = 's_move'),
+  'true', 'v4 snake reposition accepted off-turn');
+select is(
+  (select deadline_cursor from public.fixed_five_rooms
+    where id = (select value::uuid from public.ff_pgtap_ctx where name = 'room_s')),
+  't4', 'snake reposition leaves the pick cursor alone');
+select is(
+  (select deadline_pick_ordinal from public.fixed_five_rooms
+    where id = (select value::uuid from public.ff_pgtap_ctx where name = 'room_s')),
+  4, 'snake reposition leaves the pick ordinal alone');
+
+-- 13. v5 duel broadcast protocol: draft completion, readiness, broadcast
+-- timestamps, per-game digest agreement, clinch, and version/mode gates.
+select has_column('public', 'fixed_five_rooms', 'series', 'rooms store the duel series');
+select has_column('public', 'fixed_five_rooms', 'broadcast', 'rooms store the broadcast window');
+select has_column('public', 'fixed_five_room_members', 'next_game_ready', 'members store per-game readiness');
+
+set local role authenticated;
+select public.ff_pgtap_claim((select value from public.ff_pgtap_ctx where name = 'uid_b1'));
+with created as (
+  select public.fixed_five_room_create(
+    'duel', 'classic', 'ratings',
+    (select value::jsonb from public.ff_pgtap_ctx where name = 'versions')
+  ) as r
+)
+insert into public.ff_pgtap_ctx (name, value)
+select 'room_e', r->>'room_id' from created
+union all
+select 'code_e', r->>'code' from created;
+reset role;
+select ok(
+  (select value from public.ff_pgtap_ctx where name = 'room_e') is not null,
+  'v5 duel room is created');
+
+set local role authenticated;
+select public.ff_pgtap_claim((select value from public.ff_pgtap_ctx where name = 'uid_b2'));
+insert into public.ff_pgtap_ctx (name, value)
+select 'join_e', public.fixed_five_room_join(
+  (select value from public.ff_pgtap_ctx where name = 'code_e'))->>'participant_id';
+reset role;
+select is((select value from public.ff_pgtap_ctx where name = 'join_e'), 'p2', 'v5 duel guest joins');
+
+set local role authenticated;
+select public.ff_pgtap_claim((select value from public.ff_pgtap_ctx where name = 'uid_b1'));
+insert into public.ff_pgtap_ctx (name, value)
+select 'start_e', public.fixed_five_command_submit(
+  (select value::uuid from public.ff_pgtap_ctx where name = 'room_e'),
+  'e-start', null, 'p1',
+  jsonb_build_object('kind', 'start'))::text;
+reset role;
+select is(
+  (select value::jsonb->>'accepted' from public.ff_pgtap_ctx where name = 'start_e'),
+  'true', 'v5 duel start accepted');
+
+do $$
+declare
+  v_room uuid := (select value::uuid from public.ff_pgtap_ctx where name = 'room_e');
+  v_actor text;
+  v_uid text;
+  v_index integer := 0;
+begin
+  while v_index < 10 loop
+    v_actor := case when v_index % 2 = 0 then 'p1' else 'p2' end;
+    v_uid := case v_actor
+      when 'p1' then (select value from public.ff_pgtap_ctx where name = 'uid_b1')
+      else (select value from public.ff_pgtap_ctx where name = 'uid_b2')
+    end;
+    perform set_config('request.jwt.claims', json_build_object('sub', v_uid)::text, true);
+    perform set_config('request.jwt.claim.sub', v_uid, true);
+    insert into public.ff_pgtap_ctx (name, value)
+    select 'e_pick_' || v_index::text, public.fixed_five_command_submit(
+      v_room,
+      'e-pick-' || v_index::text, null, v_actor,
+      jsonb_build_object(
+        'kind', 'duel-claim',
+        'playerId', 'e-player-' || v_index::text,
+        'slotIndex', v_index % 5,
+        'franchiseId', 'lakers',
+        'eraId', '1990s'))::text;
+    v_index := v_index + 1;
+  end loop;
+end $$;
+
+select is(
+  (select phase from public.fixed_five_rooms
+    where id = (select value::uuid from public.ff_pgtap_ctx where name = 'room_e')),
+  'preparing-game', 'ten picks open the ready check');
+select is(
+  (select series->>'currentGameNumber' from public.fixed_five_rooms
+    where id = (select value::uuid from public.ff_pgtap_ctx where name = 'room_e')),
+  '1', 'series starts at game one');
+select is(
+  (select series->>'p1Wins' from public.fixed_five_rooms
+    where id = (select value::uuid from public.ff_pgtap_ctx where name = 'room_e')),
+  '0', 'series starts without wins');
+select is(
+  (select next_game_ready::integer from public.fixed_five_room_members
+    where room_id = (select value::uuid from public.ff_pgtap_ctx where name = 'room_e')
+      and participant_id = 'p1'),
+  null, 'nobody is ready before the first ready command');
+
+set local role authenticated;
+select public.ff_pgtap_claim((select value from public.ff_pgtap_ctx where name = 'uid_b1'));
+insert into public.ff_pgtap_ctx (name, value)
+select 'e_ready_1_p1', public.fixed_five_command_submit(
+  (select value::uuid from public.ff_pgtap_ctx where name = 'room_e'),
+  'e-ready-1-p1', null, 'p1',
+  jsonb_build_object('kind', 'ready-next-game', 'gameNumber', 1, 'ready', true))::text;
+reset role;
+select is(
+  (select value::jsonb->>'accepted' from public.ff_pgtap_ctx where name = 'e_ready_1_p1'),
+  'true', 'host ready for game one');
+select is(
+  (select next_game_ready::integer from public.fixed_five_room_members
+    where room_id = (select value::uuid from public.ff_pgtap_ctx where name = 'room_e')
+      and participant_id = 'p1'),
+  1, 'host readiness is stored for the current game');
+
+set local role authenticated;
+select public.ff_pgtap_claim((select value from public.ff_pgtap_ctx where name = 'uid_b1'));
+insert into public.ff_pgtap_ctx (name, value)
+select 'e_early_broadcast', public.fixed_five_command_submit(
+  (select value::uuid from public.ff_pgtap_ctx where name = 'room_e'),
+  'e-broadcast-early', null, 'p1',
+  jsonb_build_object('kind', 'broadcast-start', 'gameNumber', 1))::text;
+reset role;
+select is(
+  (select value::jsonb->>'rejection_code' from public.ff_pgtap_ctx where name = 'e_early_broadcast'),
+  'not-ready', 'broadcast requires both players');
+
+set local role authenticated;
+select public.ff_pgtap_claim((select value from public.ff_pgtap_ctx where name = 'uid_b2'));
+insert into public.ff_pgtap_ctx (name, value)
+select 'e_ready_1_p2', public.fixed_five_command_submit(
+  (select value::uuid from public.ff_pgtap_ctx where name = 'room_e'),
+  'e-ready-1-p2', null, 'p2',
+  jsonb_build_object('kind', 'ready-next-game', 'gameNumber', 1, 'ready', true))::text;
+reset role;
+select is(
+  (select value::jsonb->>'accepted' from public.ff_pgtap_ctx where name = 'e_ready_1_p2'),
+  'true', 'guest ready for game one');
+
+set local role authenticated;
+select public.ff_pgtap_claim((select value from public.ff_pgtap_ctx where name = 'uid_b1'));
+insert into public.ff_pgtap_ctx (name, value)
+select 'e_broadcast_1', public.fixed_five_command_submit(
+  (select value::uuid from public.ff_pgtap_ctx where name = 'room_e'),
+  'e-broadcast-1', null, 'p1',
+  jsonb_build_object('kind', 'broadcast-start', 'gameNumber', 1))::text;
+reset role;
+select is(
+  (select value::jsonb->>'accepted' from public.ff_pgtap_ctx where name = 'e_broadcast_1'),
+  'true', 'both ready starts the broadcast');
+select is(
+  (select phase from public.fixed_five_rooms
+    where id = (select value::uuid from public.ff_pgtap_ctx where name = 'room_e')),
+  'broadcasting', 'broadcast phase is set');
+select is(
+  (select broadcast->>'gameNumber' from public.fixed_five_rooms
+    where id = (select value::uuid from public.ff_pgtap_ctx where name = 'room_e')),
+  '1', 'broadcast targets the current game');
+select is(
+  (select broadcast->>'durationMs' from public.fixed_five_rooms
+    where id = (select value::uuid from public.ff_pgtap_ctx where name = 'room_e')),
+  '10000', 'broadcast runs ten seconds');
+select ok(
+  (select broadcast->>'startedAtIso' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T'
+    from public.fixed_five_rooms
+    where id = (select value::uuid from public.ff_pgtap_ctx where name = 'room_e')),
+  'broadcast carries a server timestamp');
+select is(
+  (select next_game_ready::integer from public.fixed_five_room_members
+    where room_id = (select value::uuid from public.ff_pgtap_ctx where name = 'room_e')
+      and participant_id = 'p1'),
+  null, 'broadcast consumes readiness');
+
+set local role authenticated;
+select public.ff_pgtap_claim((select value from public.ff_pgtap_ctx where name = 'uid_b1'));
+insert into public.ff_pgtap_ctx (name, value)
+select 'e_propose_1_p1', public.fixed_five_command_submit(
+  (select value::uuid from public.ff_pgtap_ctx where name = 'room_e'),
+  'e-propose-1-p1', null, 'p1',
+  jsonb_build_object(
+    'kind', 'propose-game-result', 'gameNumber', 1, 'winner', 'p1',
+    'resultDigest', repeat('a', 64),
+    'tapeDigest', repeat('a', 64),
+    'inputDigest', repeat('a', 64)))::text;
+reset role;
+select is(
+  (select value::jsonb->>'accepted' from public.ff_pgtap_ctx where name = 'e_propose_1_p1'),
+  'true', 'host proposal accepted');
+select is(
+  (select phase from public.fixed_five_rooms
+    where id = (select value::uuid from public.ff_pgtap_ctx where name = 'room_e')),
+  'game-results', 'proposal opens the recap');
+
+set local role authenticated;
+select public.ff_pgtap_claim((select value from public.ff_pgtap_ctx where name = 'uid_b2'));
+insert into public.ff_pgtap_ctx (name, value)
+select 'e_confirm_1_orphan', public.fixed_five_command_submit(
+  (select value::uuid from public.ff_pgtap_ctx where name = 'room_e'),
+  'e-confirm-1-orphan', null, 'p2',
+  jsonb_build_object(
+    'kind', 'confirm-game-result', 'gameNumber', 1,
+    'resultDigest', repeat('b', 64), 'verified', true))::text;
+reset role;
+select is(
+  (select value::jsonb->>'rejection_code' from public.ff_pgtap_ctx where name = 'e_confirm_1_orphan'),
+  'illegal-move', 'confirmation needs a matching proposal');
+
+set local role authenticated;
+select public.ff_pgtap_claim((select value from public.ff_pgtap_ctx where name = 'uid_b2'));
+insert into public.ff_pgtap_ctx (name, value)
+select 'e_propose_1_p2', public.fixed_five_command_submit(
+  (select value::uuid from public.ff_pgtap_ctx where name = 'room_e'),
+  'e-propose-1-p2', null, 'p2',
+  jsonb_build_object(
+    'kind', 'propose-game-result', 'gameNumber', 1, 'winner', 'p1',
+    'resultDigest', repeat('a', 64),
+    'tapeDigest', repeat('a', 64),
+    'inputDigest', repeat('a', 64)))::text;
+reset role;
+select is(
+  (select value::jsonb->>'accepted' from public.ff_pgtap_ctx where name = 'e_propose_1_p2'),
+  'true', 'guest proposal accepted');
+
+set local role authenticated;
+select public.ff_pgtap_claim((select value from public.ff_pgtap_ctx where name = 'uid_b1'));
+insert into public.ff_pgtap_ctx (name, value)
+select 'e_confirm_1_p1', public.fixed_five_command_submit(
+  (select value::uuid from public.ff_pgtap_ctx where name = 'room_e'),
+  'e-confirm-1-p1', null, 'p1',
+  jsonb_build_object(
+    'kind', 'confirm-game-result', 'gameNumber', 1,
+    'resultDigest', repeat('a', 64), 'verified', true))::text;
+reset role;
+select is(
+  (select value::jsonb->>'accepted' from public.ff_pgtap_ctx where name = 'e_confirm_1_p1'),
+  'true', 'host confirmation accepted');
+
+set local role authenticated;
+select public.ff_pgtap_claim((select value from public.ff_pgtap_ctx where name = 'uid_b2'));
+insert into public.ff_pgtap_ctx (name, value)
+select 'e_confirm_1_p2', public.fixed_five_command_submit(
+  (select value::uuid from public.ff_pgtap_ctx where name = 'room_e'),
+  'e-confirm-1-p2', null, 'p2',
+  jsonb_build_object(
+    'kind', 'confirm-game-result', 'gameNumber', 1,
+    'resultDigest', repeat('a', 64), 'verified', true))::text;
+reset role;
+select is(
+  (select value::jsonb->>'accepted' from public.ff_pgtap_ctx where name = 'e_confirm_1_p2'),
+  'true', 'guest confirmation advances the series');
+select is(
+  (select series->>'p1Wins' from public.fixed_five_rooms
+    where id = (select value::uuid from public.ff_pgtap_ctx where name = 'room_e')),
+  '1', 'series records the first win');
+select is(
+  (select series->>'currentGameNumber' from public.fixed_five_rooms
+    where id = (select value::uuid from public.ff_pgtap_ctx where name = 'room_e')),
+  '2', 'series moves to game two');
+select is(
+  (select phase from public.fixed_five_rooms
+    where id = (select value::uuid from public.ff_pgtap_ctx where name = 'room_e')),
+  'preparing-game', 'next game returns to the ready check');
+select is(
+  (select broadcast from public.fixed_five_rooms
+    where id = (select value::uuid from public.ff_pgtap_ctx where name = 'room_e')),
+  null, 'broadcast clears between games');
+
+set local role authenticated;
+select public.ff_pgtap_claim((select value from public.ff_pgtap_ctx where name = 'uid_b1'));
+insert into public.ff_pgtap_ctx (name, value)
+select 'e_ready_wrong_game', public.fixed_five_command_submit(
+  (select value::uuid from public.ff_pgtap_ctx where name = 'room_e'),
+  'e-ready-wrong-game', null, 'p1',
+  jsonb_build_object('kind', 'ready-next-game', 'gameNumber', 3, 'ready', true))::text;
+reset role;
+select is(
+  (select value::jsonb->>'rejection_code' from public.ff_pgtap_ctx where name = 'e_ready_wrong_game'),
+  'turn', 'readiness must target the current game');
+
+do $$
+declare
+  v_room uuid := (select value::uuid from public.ff_pgtap_ctx where name = 'room_e');
+  v_game integer := 2;
+  v_digest text := repeat('c', 64);
+  v_uid1 text := (select value from public.ff_pgtap_ctx where name = 'uid_b1');
+  v_uid2 text := (select value from public.ff_pgtap_ctx where name = 'uid_b2');
+begin
+  while v_game <= 4 loop
+    perform set_config('request.jwt.claims', json_build_object('sub', v_uid1)::text, true);
+    perform set_config('request.jwt.claim.sub', v_uid1, true);
+    perform public.fixed_five_command_submit(
+      v_room, 'e-ready-' || v_game::text || '-p1', null, 'p1',
+      jsonb_build_object('kind', 'ready-next-game', 'gameNumber', v_game, 'ready', true));
+    perform set_config('request.jwt.claims', json_build_object('sub', v_uid2)::text, true);
+    perform set_config('request.jwt.claim.sub', v_uid2, true);
+    perform public.fixed_five_command_submit(
+      v_room, 'e-ready-' || v_game::text || '-p2', null, 'p2',
+      jsonb_build_object('kind', 'ready-next-game', 'gameNumber', v_game, 'ready', true));
+    perform set_config('request.jwt.claims', json_build_object('sub', v_uid1)::text, true);
+    perform set_config('request.jwt.claim.sub', v_uid1, true);
+    perform public.fixed_five_command_submit(
+      v_room, 'e-broadcast-' || v_game::text, null, 'p1',
+      jsonb_build_object('kind', 'broadcast-start', 'gameNumber', v_game));
+    perform public.fixed_five_command_submit(
+      v_room, 'e-propose-' || v_game::text || '-p1', null, 'p1',
+      jsonb_build_object(
+        'kind', 'propose-game-result', 'gameNumber', v_game, 'winner', 'p1',
+        'resultDigest', v_digest, 'tapeDigest', v_digest, 'inputDigest', v_digest));
+    perform set_config('request.jwt.claims', json_build_object('sub', v_uid2)::text, true);
+    perform set_config('request.jwt.claim.sub', v_uid2, true);
+    perform public.fixed_five_command_submit(
+      v_room, 'e-propose-' || v_game::text || '-p2', null, 'p2',
+      jsonb_build_object(
+        'kind', 'propose-game-result', 'gameNumber', v_game, 'winner', 'p1',
+        'resultDigest', v_digest, 'tapeDigest', v_digest, 'inputDigest', v_digest));
+    perform public.fixed_five_command_submit(
+      v_room, 'e-confirm-' || v_game::text || '-p2', null, 'p2',
+      jsonb_build_object(
+        'kind', 'confirm-game-result', 'gameNumber', v_game,
+        'resultDigest', v_digest, 'verified', true));
+    perform set_config('request.jwt.claims', json_build_object('sub', v_uid1)::text, true);
+    perform set_config('request.jwt.claim.sub', v_uid1, true);
+    perform public.fixed_five_command_submit(
+      v_room, 'e-confirm-' || v_game::text || '-p1', null, 'p1',
+      jsonb_build_object(
+        'kind', 'confirm-game-result', 'gameNumber', v_game,
+        'resultDigest', v_digest, 'verified', true));
+    v_game := v_game + 1;
+  end loop;
+end $$;
+
+select is(
+  (select series->>'p1Wins' from public.fixed_five_rooms
+    where id = (select value::uuid from public.ff_pgtap_ctx where name = 'room_e')),
+  '4', 'series clinches at four wins');
+select is(
+  (select series->>'champion' from public.fixed_five_rooms
+    where id = (select value::uuid from public.ff_pgtap_ctx where name = 'room_e')),
+  'p1', 'champion recorded');
+select is(
+  (select (series->>'currentGameNumber') is null from public.fixed_five_rooms
+    where id = (select value::uuid from public.ff_pgtap_ctx where name = 'room_e')),
+  true, 'no next game after the clinch');
+select is(
+  (select phase from public.fixed_five_rooms
+    where id = (select value::uuid from public.ff_pgtap_ctx where name = 'room_e')),
+  'awaiting-confirmation', 'clinch hands off to result confirmation');
+
+set local role authenticated;
+select public.ff_pgtap_claim((select value from public.ff_pgtap_ctx where name = 'uid_b1'));
+insert into public.ff_pgtap_ctx (name, value)
+select 'e_final_propose', public.fixed_five_command_submit(
+  (select value::uuid from public.ff_pgtap_ctx where name = 'room_e'),
+  'e-final-propose', null, 'p1',
+  jsonb_build_object('kind', 'propose-result', 'resultDigest', repeat('e', 64)))::text;
+reset role;
+select is(
+  (select value::jsonb->>'accepted' from public.ff_pgtap_ctx where name = 'e_final_propose'),
+  'true', 'final competition digest accepted');
+select is(
+  (select confirmed_digest from public.fixed_five_rooms
+    where id = (select value::uuid from public.ff_pgtap_ctx where name = 'room_e')),
+  null, 'completion still waits for the matching receipts');
+
+set local role authenticated;
+select public.ff_pgtap_claim((select value from public.ff_pgtap_ctx where name = 'uid_a1'));
+insert into public.ff_pgtap_ctx (name, value)
+select 'e_wrong_mode', public.fixed_five_command_submit(
+  (select value::uuid from public.ff_pgtap_ctx where name = 'room_a'),
+  'e-wrong-mode', null, 'p1',
+  jsonb_build_object('kind', 'broadcast-start', 'gameNumber', 1))::text;
+reset role;
+select is(
+  (select value::jsonb->>'rejection_code' from public.ff_pgtap_ctx where name = 'e_wrong_mode'),
+  'illegal-move', 'broadcast commands stay duel-only');
 
 select * from finish();
 rollback;

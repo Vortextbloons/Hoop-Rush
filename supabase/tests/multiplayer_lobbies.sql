@@ -1,4 +1,5 @@
 begin;
+select plan(1);
 do $$
 declare
   v_host uuid := gen_random_uuid();
@@ -74,5 +75,6 @@ begin
   assert v_next->>'code' <> v_code, 'removing opponent rotates invite code';
   assert not exists(select 1 from public.draft_duel_room_members where room_id = (v_next->>'gameRoomId')::uuid and uid = v_guest), 'removed opponent loses game seat';
 end $$;
-select 'Multiplayer lobby integration assertions passed' as result;
+select pass('multiplayer lobby integration assertions passed');
+select * from finish();
 rollback;

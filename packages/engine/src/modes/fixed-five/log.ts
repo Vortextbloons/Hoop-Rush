@@ -134,9 +134,11 @@ function draftIdFor(roomId: string, participant: FixedFiveParticipantId): string
 
 const SNAKE_MULTIPLAYER_VERSIONS: ReadonlySet<string> = new Set([
   'fixed-five-multiplayer-v3',
+  'fixed-five-multiplayer-v4',
   FIXED_FIVE_MULTIPLAYER_VERSION,
 ]);
 const REPOSITION_MULTIPLAYER_VERSIONS: ReadonlySet<string> = new Set([
+  'fixed-five-multiplayer-v4',
   FIXED_FIVE_MULTIPLAYER_VERSION,
 ]);
 
@@ -520,6 +522,18 @@ export interface RoomLogFacts {
     digest: ContentHash;
     verified: boolean;
   }>;
+  gameProposals: Array<{
+    actor: FixedFiveParticipantId;
+    gameNumber: number;
+    digest: ContentHash;
+    winner: FixedFiveParticipantId;
+  }>;
+  gameConfirms: Array<{
+    actor: FixedFiveParticipantId;
+    gameNumber: number;
+    digest: ContentHash;
+    verified: boolean;
+  }>;
 }
 
 export function mergeFixedFiveCommands(
@@ -571,6 +585,8 @@ export function roomLogFacts(commands: FixedFiveCommand[]): RoomLogFacts {
     rematchConfirmed: { p1: false, p2: false },
     proposals: [],
     confirms: [],
+    gameProposals: [],
+    gameConfirms: [],
   };
   for (const command of [...commands].sort((a, b) => a.ordinal - b.ordinal)) {
     const payload = command.payload;
@@ -587,20 +603,39 @@ export function roomLogFacts(commands: FixedFiveCommand[]): RoomLogFacts {
         digest: payload.resultDigest,
         verified: payload.verified,
       });
+    if (payload.kind === 'propose-game-result')
+      facts.gameProposals.push({
+        actor: command.actorParticipantId,
+        gameNumber: payload.gameNumber,
+        digest: payload.resultDigest,
+        winner: payload.winner,
+      });
+    if (payload.kind === 'confirm-game-result')
+      facts.gameConfirms.push({
+        actor: command.actorParticipantId,
+        gameNumber: payload.gameNumber,
+        digest: payload.resultDigest,
+        verified: payload.verified,
+      });
   }
   return facts;
 }
+
+const SERVER_DRIVEN_PHASES: ReadonlySet<FixedFiveRoomPhase> = new Set([
+  'completed',
+  'integrity-failed',
+  'expired',
+  'preparing-game',
+  'broadcasting',
+  'game-results',
+]);
 
 export function deriveEffectivePhase(
   serverPhase: FixedFiveRoomPhase,
   replay: DraftReplay,
   localSimDone: boolean,
 ): FixedFiveRoomPhase {
-  if (
-    serverPhase === 'completed' ||
-    serverPhase === 'integrity-failed' ||
-    serverPhase === 'expired'
-  ) {
+  if (SERVER_DRIVEN_PHASES.has(serverPhase)) {
     return serverPhase;
   }
   if (!replay.hasStart) return 'lobby';

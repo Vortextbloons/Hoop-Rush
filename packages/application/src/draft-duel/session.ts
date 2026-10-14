@@ -1,5 +1,6 @@
 import {
   DRAFT_DUEL_AUTOPICK_VERSION,
+  DRAFT_DUEL_MULTIPLAYER_VERSION,
   commandIdSchema,
   defaultDraftDuelVersionLocks,
   idSchema,
@@ -407,6 +408,27 @@ export class DraftDuelSession {
       pickOrdinal: draft.pickOrdinal,
       playerId: pick.card.playerId,
       playerVersionId: pick.card.playerVersionId,
+      slotIndex,
+    });
+  }
+
+  async repositionCard(card: DraftDuelCard, slotIndex: number): Promise<void> {
+    const draft = this.draft;
+    if (!draft || draft.status !== 'drafting') return;
+    if (this.snapshot?.settings.versions.multiplayerVersion !== DRAFT_DUEL_MULTIPLAYER_VERSION) {
+      this.notice = 'This room does not support moving drafted players.';
+      this.publish();
+      return;
+    }
+    if (slotIndex < 0 || slotIndex > 4 || !Number.isInteger(slotIndex)) {
+      this.notice = 'Choose a position for this player.';
+      this.publish();
+      return;
+    }
+    await this.submit({
+      kind: 'reposition',
+      playerId: card.playerId,
+      playerVersionId: card.playerVersionId,
       slotIndex,
     });
   }

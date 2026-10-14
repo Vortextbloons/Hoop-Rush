@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { DraftDuelCard, HoopRushManifest } from '@hoop-rush/data-contracts';
-  import { Plus, Lock } from '@lucide/svelte';
+  import { ArrowRight, Check, Plus, Lock } from '@lucide/svelte';
   import { Dialog } from 'bits-ui';
   import { canPlay, slotRequirement } from '@hoop-rush/engine';
   import DialogShell from '$lib/components/DialogShell.svelte';
@@ -13,6 +13,8 @@
     manifest,
     roster,
     legalSlots,
+    moving = false,
+    moveLabels = {},
     onplace,
     onclose,
   }: {
@@ -20,6 +22,8 @@
     manifest: HoopRushManifest | null;
     roster: (DraftDuelCard | null)[];
     legalSlots: number[];
+    moving?: boolean;
+    moveLabels?: Record<number, string>;
     onplace: (slotIndex: number) => void;
     onclose: () => void;
   } = $props();
@@ -28,7 +32,7 @@
     index: number;
     label: string;
     incumbent: DraftDuelCard | null;
-    state: 'open' | 'occupied' | 'cant-play' | 'unsafe';
+    state: 'open' | 'move' | 'occupied' | 'cant-play' | 'unsafe' | 'self';
     ariaLabel: string;
   };
 
@@ -39,6 +43,15 @@
       const label = SLOT_LABELS[index];
       const slotName = `${SLOT_NAMES[index]} slot ${index + 1}`;
       const incumbent = roster[index] ?? null;
+      if (incumbent?.playerVersionId === subject.playerVersionId) {
+        return {
+          index,
+          label,
+          incumbent,
+          state: 'self' as const,
+          ariaLabel: `${subject.displayName} already at ${slotName}`,
+        };
+      }
       if (!canPlay(subject.positions, slotRequirement(index))) {
         return {
           index,
@@ -48,6 +61,24 @@
           ariaLabel: `${subject.displayName} cannot play ${slotName}`,
         };
       }
+      if (legalSlots.includes(index)) {
+        if (incumbent) {
+          return {
+            index,
+            label,
+            incumbent,
+            state: 'move' as const,
+            ariaLabel: `Move ${subject.displayName} to ${slotName}, moving ${incumbent.displayName}`,
+          };
+        }
+        return {
+          index,
+          label,
+          incumbent: null,
+          state: 'open' as const,
+          ariaLabel: `${moving ? 'Move' : 'Place'} ${subject.displayName} at ${slotName}`,
+        };
+      }
       if (incumbent) {
         return {
           index,
@@ -55,15 +86,6 @@
           incumbent,
           state: 'occupied' as const,
           ariaLabel: `${slotName} is occupied by ${incumbent.displayName}`,
-        };
-      }
-      if (legalSlots.includes(index)) {
-        return {
-          index,
-          label,
-          incumbent: null,
-          state: 'open' as const,
-          ariaLabel: `Place ${subject.displayName} at ${slotName}`,
         };
       }
       return {
@@ -89,11 +111,19 @@
   function stateText(state: SlotOption['state']): string {
     if (state === 'occupied') return 'Occupied';
     if (state === 'cant-play') return "Can't play";
+    if (state === 'self') return 'Current';
     return "Can't complete";
   }
 
-  function toneOf(state: SlotOption['state']): 'open' | 'muted' {
-    return state === 'open' ? 'open' : 'muted';
+  function toneOf(state: SlotOption['state']): 'open' | 'move' | 'self' | 'muted' {
+    if (state === 'open') return 'open';
+    if (state === 'move') return 'move';
+    if (state === 'self') return 'self';
+    return 'muted';
+  }
+
+  function selectable(state: SlotOption['state']): boolean {
+    return state === 'open' || state === 'move';
   }
 </script>
 
@@ -145,7 +175,7 @@
 
   {#if card}
     <p class="mt-3 font-mono text-[10px] tracking-wide text-muted-foreground uppercase">
-      Choose a position
+      {moving ? 'Move to a position' : 'Choose a position'}
     </p>
 
     <div class="mt-2 flex flex-col gap-2">
@@ -153,7 +183,7 @@
         <PositionOptionRow
           slotLabel={option.label}
           ariaLabel={option.ariaLabel}
-          disabled={option.state !== 'open'}
+          disabled={!selectable(option.state)}
           tone={toneOf(option.state)}
           incumbent={option.incumbent === null
             ? null
@@ -167,7 +197,15 @@
           onSelect={() => onplace(option.index)}
         >
           {#snippet trailing()}
-            {#if option.state === 'open'}
+            {#if option.state === 'self'}
+              <Check class="h-4 w-4 text-primary" />
+              <span class="font-mono text-[10px] tracking-wide uppercase">Current</span>
+            {:else if option.state === 'move'}
+              <ArrowRight class="h-4 w-4 shrink-0 text-accent" />
+              <span class="font-mono text-[10px] tracking-wide uppercase text-accent">
+                {moveLabels[option.index] ?? 'Move'}
+              </span>
+            {:else if option.state === 'open'}
               <Plus class="h-4 w-4 text-primary" />
             {:else if option.state === 'occupied'}
               <Lock class="h-4 w-4" />

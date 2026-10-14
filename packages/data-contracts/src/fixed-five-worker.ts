@@ -8,6 +8,7 @@ import { FIXED_FIVE_WORKER_WIRE_VERSION } from './fixed-five-versions.ts';
 import {
   fixedFiveCommandSchema,
   fixedFiveCompetitionResultSchema,
+  fixedFiveDuelGameOutputSchema,
   fixedFiveLineupEntrySchema,
   fixedFiveVerificationReceiptSchema,
   fixedFiveVersionLocksSchema,
@@ -44,6 +45,20 @@ export const fixedFiveWorkerDuelRequestSchema = z.object({
   engineVersion: z.string().min(1).max(64),
 });
 export type FixedFiveWorkerDuelRequest = z.infer<typeof fixedFiveWorkerDuelRequestSchema>;
+export const fixedFiveWorkerDuelGameRequestSchema = z.object({
+  schemaVersion: z.literal(FIXED_FIVE_WORKER_WIRE_VERSION),
+  type: z.literal('fixed-five-duel-game'),
+  requestId: z.string().min(1).max(64),
+  roomId: idSchema,
+  gameNumber: z.number().int().min(1).max(7),
+  rootSeed: seedSchema,
+  p1Team: fixedFiveWorkerTeamSchema,
+  p2Team: fixedFiveWorkerTeamSchema,
+  profile: eraSimulationProfileSchema,
+  dataVersion: z.string().min(1).max(64),
+  engineVersion: z.string().min(1).max(64),
+});
+export type FixedFiveWorkerDuelGameRequest = z.infer<typeof fixedFiveWorkerDuelGameRequestSchema>;
 export const fixedFiveWorkerCancelSchema = z.object({
   schemaVersion: z.literal(FIXED_FIVE_WORKER_WIRE_VERSION),
   type: z.literal('fixed-five-cancel'),
@@ -74,6 +89,7 @@ export type FixedFiveWorkerVerifyRequest = z.infer<typeof fixedFiveWorkerVerifyR
 export const fixedFiveWorkerRequestSchema = z.discriminatedUnion('type', [
   fixedFiveWorkerShared82RequestSchema,
   fixedFiveWorkerDuelRequestSchema,
+  fixedFiveWorkerDuelGameRequestSchema,
   fixedFiveWorkerVerifyRequestSchema,
   fixedFiveWorkerCancelSchema,
 ]);
@@ -100,6 +116,13 @@ export const fixedFiveWorkerResultsSchema = z.object({
   entries: z.array(fixedFiveWorkerResultEntrySchema).min(1).max(8),
 });
 export type FixedFiveWorkerResults = z.infer<typeof fixedFiveWorkerResultsSchema>;
+export const fixedFiveWorkerDuelGameMessageSchema = z.object({
+  schemaVersion: z.literal(FIXED_FIVE_WORKER_WIRE_VERSION),
+  type: z.literal('fixed-five-duel-game'),
+  requestId: z.string().min(1).max(64),
+  output: fixedFiveDuelGameOutputSchema,
+});
+export type FixedFiveWorkerDuelGameMessage = z.infer<typeof fixedFiveWorkerDuelGameMessageSchema>;
 export const fixedFiveWorkerCompleteSchema = z.object({
   schemaVersion: z.literal(FIXED_FIVE_WORKER_WIRE_VERSION),
   type: z.literal('fixed-five-complete'),
@@ -134,6 +157,7 @@ export type FixedFiveWorkerVerificationFailed = z.infer<
 export const fixedFiveWorkerMessageSchema = z.discriminatedUnion('type', [
   fixedFiveWorkerProgressSchema,
   fixedFiveWorkerResultsSchema,
+  fixedFiveWorkerDuelGameMessageSchema,
   fixedFiveWorkerCompleteSchema,
   fixedFiveWorkerErrorSchema,
   fixedFiveWorkerVerifiedSchema,

@@ -2,6 +2,7 @@ import {
   FIXED_FIVE_WORKER_WIRE_VERSION,
   fixedFiveWorkerMessageSchema,
   fixedFiveWorkerRequestSchema,
+  idSchema,
   type EraSimulationProfile,
   type FixedFiveWorkerMessage,
   type FixedFiveWorkerRequest,
@@ -54,6 +55,30 @@ export class FixedFiveRunner {
       schemaVersion: FIXED_FIVE_WORKER_WIRE_VERSION,
       type: 'fixed-five-duel',
       requestId: newRequestId(),
+      rootSeed: input.rootSeed,
+      p1Team: input.p1Team,
+      p2Team: input.p2Team,
+      profile: input.profile,
+      dataVersion: input.dataVersion,
+      engineVersion: input.engineVersion,
+    });
+  }
+  runDuelGame(input: {
+    roomId: string;
+    gameNumber: number;
+    rootSeed: Seed;
+    p1Team: FixedFiveWorkerTeam;
+    p2Team: FixedFiveWorkerTeam;
+    profile: EraSimulationProfile;
+    dataVersion: string;
+    engineVersion: string;
+  }): void {
+    this.start({
+      schemaVersion: FIXED_FIVE_WORKER_WIRE_VERSION,
+      type: 'fixed-five-duel-game',
+      requestId: newRequestId(),
+      roomId: idSchema.parse(input.roomId),
+      gameNumber: input.gameNumber,
       rootSeed: input.rootSeed,
       p1Team: input.p1Team,
       p2Team: input.p2Team,
@@ -125,6 +150,8 @@ export class FixedFiveRunner {
         });
       } else if (message.type === 'fixed-five-results') {
         this.onEvent({ kind: 'results', entries: message.entries });
+      } else if (message.type === 'fixed-five-duel-game') {
+        this.onEvent({ kind: 'duel-game', output: message.output });
       } else if (message.type === 'fixed-five-complete') {
         this.onEvent({ kind: 'complete', gamesDelivered: message.gamesDelivered });
       } else if (message.type === 'fixed-five-verified') {

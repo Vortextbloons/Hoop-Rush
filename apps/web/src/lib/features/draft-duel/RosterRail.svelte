@@ -1,5 +1,6 @@
 <script lang="ts">
   import type {
+    DraftDuelCard,
     DraftDuelPresentation,
     DraftDuelRoster,
     HoopRushManifest,
@@ -16,12 +17,14 @@
     manifest = null,
     active = false,
     compact = false,
+    onmove = null,
   }: {
     roster: DraftDuelRoster;
     presentation: DraftDuelPresentation;
     manifest?: HoopRushManifest | null;
     active?: boolean;
     compact?: boolean;
+    onmove?: ((card: DraftDuelCard) => void) | null;
   } = $props();
 
   const slots = $derived(
@@ -74,36 +77,34 @@
   </header>
   <ol class="dd-rail-slots">
     {#each slots as slot (slot.position)}
+      {@const filledCard = slot.card}
       <li class="dd-rail-slot" data-slot={slot.position} data-filled={slot.view !== null}>
         <span class="dd-rail-chip" aria-hidden="true">{slot.position}</span>
-        {#if slot.view && slot.card}
-          <span class="dd-rail-player">
-            {#if manifest && slot.card.playerExternalId}
-              <PlayerFace
-                player={{
-                  playerId: slot.card.playerId,
-                  playerExternalId: slot.card.playerExternalId,
-                  altIds: null,
-                }}
-                {manifest}
-                size="sm"
-                fallbackInitials={initialsOf(slot.view.displayName)}
-              />
-            {/if}
-            <span class="dd-rail-text">
-              <span class="dd-rail-name">{slot.view.displayName}</span>
-              <span class="dd-rail-meta">{slot.view.seasonKey} · {slot.name}</span>
+        {#if filledCard && slot.view}
+          {#if onmove && active}
+            <button
+              type="button"
+              class="dd-rail-player dd-rail-player--move"
+              aria-label={`Move ${slot.view.displayName} to another position`}
+              onclick={() => onmove(filledCard)}
+            >
+              {@render playerBody(
+                filledCard,
+                slot.name,
+                slot.view.displayName,
+                slot.view.seasonKey,
+              )}
+            </button>
+          {:else}
+            <span class="dd-rail-player">
+              {@render playerBody(
+                filledCard,
+                slot.name,
+                slot.view.displayName,
+                slot.view.seasonKey,
+              )}
             </span>
-            {#if manifest && franchiseSlotOf(slot.card.franchiseId)}
-              <TeamLogo
-                {manifest}
-                franchiseId={slot.card.franchiseId}
-                teamExternalId={franchiseSlotOf(slot.card.franchiseId)?.teamExternalId ?? ''}
-                logoCandidates={logoCandidatesOf(slot.card.franchiseId, slot.card.eraId)}
-                className="h-4 w-4"
-              />
-            {/if}
-          </span>
+          {/if}
         {:else}
           <span class="dd-rail-empty">
             <span class="dd-rail-need">Open</span>
@@ -114,6 +115,34 @@
     {/each}
   </ol>
 </section>
+
+{#snippet playerBody(card: DraftDuelCard, slotName: string, displayName: string, seasonKey: string)}
+  {#if manifest && card.playerExternalId}
+    <PlayerFace
+      player={{
+        playerId: card.playerId,
+        playerExternalId: card.playerExternalId,
+        altIds: null,
+      }}
+      {manifest}
+      size="sm"
+      fallbackInitials={initialsOf(displayName)}
+    />
+  {/if}
+  <span class="dd-rail-text">
+    <span class="dd-rail-name">{displayName}</span>
+    <span class="dd-rail-meta">{seasonKey} · {slotName}</span>
+  </span>
+  {#if manifest && franchiseSlotOf(card.franchiseId)}
+    <TeamLogo
+      {manifest}
+      franchiseId={card.franchiseId}
+      teamExternalId={franchiseSlotOf(card.franchiseId)?.teamExternalId ?? ''}
+      logoCandidates={logoCandidatesOf(card.franchiseId, card.eraId)}
+      className="h-4 w-4"
+    />
+  {/if}
+{/snippet}
 
 <style>
   .dd-rail {
@@ -204,6 +233,28 @@
     flex: 1;
     align-items: center;
     gap: 0.5rem;
+  }
+
+  .dd-rail-player--move {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    outline: none;
+  }
+
+  .dd-rail-player--move:hover {
+    background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+  }
+
+  .dd-rail-player--move:focus-visible {
+    box-shadow: 0 0 0 2px var(--color-ring);
   }
 
   .dd-rail-text {

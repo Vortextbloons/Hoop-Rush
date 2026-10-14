@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildFixtureBracket,
   buildLegalSimulationTeam,
+  buildRolesTeam,
   seedFromString,
 } from '@hoop-rush/test-fixtures';
 import type {
@@ -35,6 +36,7 @@ import {
   applyClassicBuilderCommand,
   createClassicDraft,
   createParticipantClassicDraft,
+  repositionClassicPlayer,
 } from '../classic/draft.ts';
 import {
   FIXED_FIVE_TIEBREAK_PATH,
@@ -85,8 +87,19 @@ import {
   shared82GameEvents,
   simulateShared82,
 } from './shared82.ts';
-import { duelGameEvents, simulateDuelSeries } from './duel-sim.ts';
-import { fixedFiveResultDigest } from './digest.ts';
+import {
+  duelGameEvents,
+  duelGameSimulationInput,
+  duelHomeParticipantId,
+  simulateDuelSeries,
+  simulateRecordedDuelGame,
+} from './duel-sim.ts';
+import {
+  fixedFiveDuelGameInputDigest,
+  fixedFiveDuelGameResultDigest,
+  fixedFiveDuelGameTapeDigest,
+  fixedFiveResultDigest,
+} from './digest.ts';
 import { verifyFixedFiveCompetition } from './verification.ts';
 const context = createEngineContext();
 const ROOT = seedSchema.parse(seedFromString('fixed-five-golden'));
@@ -736,9 +749,9 @@ describe('multiplayer repositioning', () => {
       currentRoll: null,
       picks: [
         duelPick(0, 'p1', 'r-a', 0),
-        duelPick(1, 'p2', 'r-e', 1),
+        duelPick(1, 'p1', 'r-e', 1),
         duelPick(2, 'p1', 'r-b', 2),
-        duelPick(3, 'p2', 'r-c', 3),
+        duelPick(3, 'p1', 'r-c', 3),
         duelPick(4, 'p1', 'r-d', 4),
       ],
       claimedPairs: [],
@@ -756,13 +769,14 @@ describe('multiplayer repositioning', () => {
       [pid('r-a'), 2],
       [pid('r-e'), 1],
       [pid('r-b'), 3],
-      [pid('r-c'), 3],
-      [pid('r-d'), 4],
+      [pid('r-c'), 4],
+      [pid('r-d'), 0],
     ]);
+    expect(moved.picks).toHaveLength(5);
+    expect(new Set(moved.picks.map((pick) => pick.playerId)).size).toBe(5);
     expect(moved.pickOrdinal).toBe(5);
     expect(moved.currentRoll).toBeNull();
     expect(moved.status).toBe('drafting');
-    expect(duelAlternationHolds(moved)).toBe(true);
   });
   it('rejects duel repositions that are not owned, illegal, or locked', () => {
     const { catalog, byId } = chainAssets();
@@ -905,6 +919,76 @@ describe('multiplayer repositioning', () => {
     expect(claimed.picks.map((pick) => [pick.playerId, pick.slotIndex])).toEqual([
       [pid('p-g3'), 1],
       [pid('p-g1'), 0],
+    ]);
+  });
+  it('locks classic repositions once the draft is complete', () => {
+    const { catalog } = chainAssets();
+    const state: ClassicDraftState = {
+      schemaVersion: 1,
+      draftId: 'classic-lock',
+      variant: 'ratings',
+      seed: fixedFiveDraftSeed(ROOT, 'p1'),
+      dataVersion: 'data-v1',
+      round: 5,
+      status: 'complete',
+      roll: null,
+      rerolls: { franchiseSpent: false, eraSpent: false },
+      picks: [
+        {
+          round: 1,
+          playerId: pid('r-a'),
+          franchiseId: fid('lakers'),
+          eraId: eid('1990s'),
+          slotIndex: 0,
+        },
+        {
+          round: 2,
+          playerId: pid('r-e'),
+          franchiseId: fid('lakers'),
+          eraId: eid('1990s'),
+          slotIndex: 1,
+        },
+        {
+          round: 3,
+          playerId: pid('r-b'),
+          franchiseId: fid('lakers'),
+          eraId: eid('1990s'),
+          slotIndex: 2,
+        },
+        {
+          round: 4,
+          playerId: pid('r-c'),
+          franchiseId: fid('lakers'),
+          eraId: eid('1990s'),
+          slotIndex: 3,
+        },
+        {
+          round: 5,
+          playerId: pid('r-d'),
+          franchiseId: fid('lakers'),
+          eraId: eid('1990s'),
+          slotIndex: 4,
+        },
+      ],
+    };
+    expect(() =>
+      repositionClassicPlayer(
+        state,
+        catalog,
+        { playerId: pid('r-a'), slotIndex: 2 },
+        { requireDrafting: true },
+      ),
+    ).toThrow(/requires a drafting state/);
+    const moved = repositionClassicPlayer(state, catalog, {
+      playerId: pid('r-a'),
+      slotIndex: 2,
+    });
+    expect(moved.picks.map((pick) => [pick.playerId, pick.slotIndex])).toEqual([
+      [pid('r-a'), 2],
+      [pid('r-e'), 1],
+      [pid('r-b'), 3],
+      [pid('r-c'), 4],
+      [pid('r-d'), 0],
     ]);
   });
   it('rejects sandbox snake repositions that lose completion feasibility', () => {
@@ -1060,6 +1144,59 @@ describe('duel series', () => {
       context,
     );
     expect(JSON.stringify(out.result)).toBe(JSON.stringify(again.result));
+  });
+});
+describe('recorded duel games', () => {
+  it('records each played game identically to the bulk series for both draft styles', () => {
+    const configs: Array<{
+      label: string;
+      p1Team: SimulationPlayer[];
+      p2Team: SimulationPlayer[];
+    }> = [
+      {
+        label: 'classic',
+        p1Team: buildLegalSimulationTeam({ teamId: 'p1', displayName: 'P1' }).players,
+        p2Team: buildLegalSimulationTeam({ teamId: 'p2', displayName: 'P2' }).players,
+      },
+      {
+        label: 'sandbox',
+        p1Team: buildRolesTeam({ teamId: 'p1', displayName: 'P1' }).players,
+        p2Team: buildLegalSimulationTeam({ teamId: 'p2', displayName: 'P2' }).players,
+      },
+    ];
+    for (const config of configs) {
+      const input = {
+        p1Team: { teamId: 'p1', displayName: 'P1', players: config.p1Team },
+        p2Team: { teamId: 'p2', displayName: 'P2', players: config.p2Team },
+        profile: DEFAULT_ERA_SIM_PROFILE,
+        rootSeed: ROOT,
+        dataVersion: 'data-v1',
+      };
+      const bulk = [...duelGameEvents(input, context)].map((event) => event.game);
+      expect(bulk.length).toBeGreaterThanOrEqual(4);
+      for (const game of bulk) {
+        const recorded = simulateRecordedDuelGame(input, game.gameNumber, context);
+        expect(recorded.result).toStrictEqual(game);
+        expect(recorded.seed).toBe(fixedFiveDuelGameSeed(ROOT, game.gameNumber));
+        expect(recorded.homeParticipantId).toBe(duelHomeParticipantId(game.gameNumber));
+        expect(recorded.result.home.teamId).toBe(recorded.homeParticipantId);
+        expect(recorded.result.away.teamId).toBe(recorded.awayParticipantId);
+        expect(recorded.tape.length).toBeGreaterThan(0);
+        const inputDigest = fixedFiveDuelGameInputDigest(
+          duelGameSimulationInput(input, game.gameNumber),
+        );
+        const repeat = simulateRecordedDuelGame(input, game.gameNumber, context);
+        expect(fixedFiveDuelGameInputDigest(duelGameSimulationInput(input, game.gameNumber))).toBe(
+          inputDigest,
+        );
+        expect(fixedFiveDuelGameResultDigest(repeat.result)).toBe(
+          fixedFiveDuelGameResultDigest(recorded.result),
+        );
+        expect(fixedFiveDuelGameTapeDigest(repeat.tape)).toBe(
+          fixedFiveDuelGameTapeDigest(recorded.tape),
+        );
+      }
+    }
   });
 });
 describe('fixed-five generator parity', () => {

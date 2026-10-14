@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type {
-  HavocLockLineupCommand,
-  HavocMutationId,
-  HavocRunState,
-  Position,
-} from '@hoop-rush/data-contracts';
+import type { HavocLockLineupCommand, HavocRunState, Position } from '@hoop-rush/data-contracts';
 import {
   HAVOC_DRAFT_ROUNDS,
   HAVOC_SCHEMA_VERSION,

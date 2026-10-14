@@ -1,16 +1,24 @@
 import {
   createEngineContext,
   duelGameEvents,
+  duelGameSimulationInput,
   findWeakestOpponent,
+  fixedFiveDuelGameInputDigest,
+  fixedFiveDuelGameResultDigest,
+  fixedFiveDuelGameTapeDigest,
   shared82GameEvents,
+  simulateRecordedDuelGame,
   verifyFixedFiveCompetition,
   type EngineContext,
 } from '@hoop-rush/engine';
 import {
+  FIXED_FIVE_DUEL_TAPE_VERSION,
   FIXED_FIVE_WORKER_WIRE_VERSION,
   fixedFiveWorkerMessageSchema,
   fixedFiveWorkerRequestSchema,
+  type FixedFiveDuelGameOutput,
   type FixedFiveWorkerComplete,
+  type FixedFiveWorkerDuelGameMessage,
   type FixedFiveWorkerError,
   type FixedFiveWorkerProgress,
   type FixedFiveWorkerResultEntry,
@@ -27,6 +35,7 @@ function post(
   message:
     | FixedFiveWorkerProgress
     | FixedFiveWorkerResults
+    | FixedFiveWorkerDuelGameMessage
     | FixedFiveWorkerComplete
     | FixedFiveWorkerError
     | FixedFiveWorkerVerified
@@ -132,6 +141,39 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
             failures: outcome.failures,
           });
         }
+        return;
+      }
+      if (request.type === 'fixed-five-duel-game') {
+        const simulationInput = {
+          p1Team: request.p1Team,
+          p2Team: request.p2Team,
+          profile: request.profile,
+          rootSeed: request.rootSeed,
+          dataVersion: request.dataVersion,
+        };
+        const recorded = simulateRecordedDuelGame(simulationInput, request.gameNumber, context);
+        if (token !== requestToken) return;
+        const output: FixedFiveDuelGameOutput = {
+          schemaVersion: FIXED_FIVE_DUEL_TAPE_VERSION,
+          roomId: request.roomId,
+          gameNumber: recorded.gameNumber,
+          homeParticipantId: recorded.homeParticipantId,
+          awayParticipantId: recorded.awayParticipantId,
+          seed: recorded.seed,
+          result: recorded.result,
+          tape: recorded.tape,
+          inputDigest: fixedFiveDuelGameInputDigest(
+            duelGameSimulationInput(simulationInput, request.gameNumber),
+          ),
+          resultDigest: fixedFiveDuelGameResultDigest(recorded.result),
+          tapeDigest: fixedFiveDuelGameTapeDigest(recorded.tape),
+        };
+        post({
+          schemaVersion: FIXED_FIVE_WORKER_WIRE_VERSION,
+          type: 'fixed-five-duel-game',
+          requestId: request.requestId,
+          output,
+        });
         return;
       }
       if (request.type === 'fixed-five-duel') {

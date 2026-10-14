@@ -1,6 +1,7 @@
 export {
   FixedFiveRoomSession,
   refsForParticipant,
+  type DuelGameVerification,
   type FixedFiveLocalResult,
   type FixedFiveRoomRepositoryPort,
   type FixedFiveRoomSessionDeps,

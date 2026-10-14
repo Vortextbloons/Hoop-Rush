@@ -70,6 +70,20 @@ describe('submitFixedFiveCommand', () => {
     expect(input.resync).toHaveBeenCalledTimes(1);
   });
 
+  it('resyncs and retries a stale duel readiness command', async () => {
+    const readyNext = {
+      kind: 'ready-next-game',
+      gameNumber: 1,
+      ready: true,
+    } as FixedFiveCommandPayload;
+    const { input, submitCommand } = inputFor(readyNext, [receiptOf(false, 4), receiptOf(true, 5)]);
+    const result = await submitFixedFiveCommand(input);
+    expect(result.retried).toBe(true);
+    expect(result.receipt.accepted).toBe(true);
+    expect(submitCommand).toHaveBeenCalledTimes(2);
+    expect(input.resync).toHaveBeenCalledTimes(1);
+  });
+
   it('does not retry a stale non-retry-safe command without a fresh recheck', async () => {
     const { input, submitCommand } = inputFor(unsafePayload, [receiptOf(false, 4)]);
     const result = await submitFixedFiveCommand(input);

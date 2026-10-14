@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  LINEUP_STRUCTURE,
   contentHashSchema,
   eraIdSchema,
   fixedFiveCommandSchema,
@@ -16,12 +15,7 @@ import {
   type Position,
 } from '@hoop-rush/data-contracts';
 import { createEngineContext } from '../../sim/kernel.ts';
-import {
-  applyClassicBuilderCommand,
-  createParticipantClassicDraft,
-  repositionClassicPlayer,
-} from '../classic/draft.ts';
-const LINEUP_TARGET = LINEUP_STRUCTURE;
+import { createParticipantClassicDraft } from '../classic/draft.ts';
 import {
   claimDuelPlayer,
   createDuelDraft,
@@ -32,7 +26,6 @@ import {
   claimSandboxDuelPlayer,
   createSandboxDuelDraft,
   repositionSandboxDuelPlayer,
-  sandboxDuelPicker,
 } from './sandbox-duel.ts';
 import { fixedFiveDraftSeed } from './seeds.ts';
 import {
@@ -315,8 +308,44 @@ describe('replayFixedFiveLog', () => {
   });
 
   it('applies duel repositions only for reposition-aware versions', () => {
-    const { pool, byId } = poolFixture();
-    const catalog = catalogFixture();
+    const franchises = ['lakers', 'celtics', 'bulls', 'heat', 'spurs', 'suns', 'knicks', 'nets'];
+    const eras = ['1990s', '2000s'];
+    const defs: Array<{ positions: Position[] }> = [
+      { positions: ['PG', 'SG'] },
+      { positions: ['SF', 'PF'] },
+      { positions: ['C', 'PF'] },
+      { positions: ['SG', 'SF'] },
+      { positions: ['PG', 'SF'] },
+    ];
+    const catalog: ClassicDraftCatalog = [];
+    const pool: FixedFiveCandidate[] = [];
+    let fixtureIndex = 0;
+    for (const franchiseId of franchises) {
+      for (const eraId of eras) {
+        fixtureIndex += 1;
+        const entryPlayers = defs.map((def, defIndex) => ({
+          playerId: pid(`rd-${String(fixtureIndex)}-${String(defIndex)}`),
+          positions: def.positions,
+        }));
+        catalog.push({
+          franchiseId: fid(franchiseId),
+          eraId: eid(eraId),
+          players: entryPlayers,
+        });
+        for (const [defIndex, def] of defs.entries()) {
+          const playerId = pid(`rd-${String(fixtureIndex)}-${String(defIndex)}`);
+          pool.push({
+            playerId,
+            playerVersionId: `pv-${(pool.length + 1).toString(16).padStart(32, '0')}`,
+            positions: def.positions,
+            selectionScore: 90 - defIndex,
+            franchiseId: fid(franchiseId),
+            eraId: eid(eraId),
+          });
+        }
+      }
+    }
+    const byId = new Map(pool.map((candidate) => [candidate.playerId, candidate]));
     let state = createDuelDraft(ROOT, catalog, byId, context);
     const actor = duelCurrentPicker(state);
     const commands: FixedFiveCommand[] = [commandOf(0, 'p1', { kind: 'start' })];
@@ -332,8 +361,8 @@ describe('replayFixedFiveLog', () => {
           kind: 'duel-claim',
           playerId: move.playerId,
           slotIndex: move.slotIndex,
-          franchiseId: candidate?.franchiseId ?? fid('lakers'),
-          eraId: candidate?.eraId ?? '1990s',
+          franchiseId: fid(candidate?.franchiseId ?? 'lakers'),
+          eraId: eid(candidate?.eraId ?? '1990s'),
         }),
       );
       ordinal += 1;
@@ -391,6 +420,18 @@ describe('replayFixedFiveLog', () => {
     if (modern.mode !== 'duel') throw new Error('unexpected replay mode');
     expect(modern.state.picks).toEqual(expected.picks);
     expect(modern.state.pickOrdinal).toBe(expected.pickOrdinal);
+    const again = replayFixedFiveLog(
+      'duel',
+      ROOM_ID,
+      ROOT,
+      'data-v1',
+      'ratings',
+      assets,
+      commands,
+      'classic',
+      'fixed-five-multiplayer-v4',
+    );
+    expect(again).toEqual(modern);
     const legacy = replayFixedFiveLog(
       'duel',
       ROOM_ID,

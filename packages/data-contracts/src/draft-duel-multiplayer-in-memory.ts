@@ -494,6 +494,14 @@ export function createInMemoryDraftDuelTransport(options?: {
         claimedPlayers: [...draftState.claimedPlayers, payload.playerId],
       };
       advancePick(record);
+    } else if (payload.kind === 'reposition') {
+      const draftState = record.draftState;
+      if (phase !== 'drafting' || !draftState) {
+        return rejection(command.roomId, commandId, 'phase', record.snapshot.revision);
+      }
+      if (!draftState.claimedPlayers.includes(payload.playerId)) {
+        return rejection(command.roomId, commandId, 'illegal-move', record.snapshot.revision);
+      }
     } else if (payload.kind === 'timeout-autopick') {
       const draftState = record.draftState;
       const deadline = record.snapshot.deadline;

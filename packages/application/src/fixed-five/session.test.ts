@@ -3,6 +3,7 @@ import {
   commandIdSchema,
   createInMemoryFixedFiveTransport,
   defaultFixedFiveVersionLocks,
+  franchiseIdSchema,
   playerIdSchema,
   type FixedFiveCommand,
   type FixedFiveCommandPayload,
@@ -30,6 +31,7 @@ class FakeRunner implements FixedFiveRunnerPort {
   readonly events: FixedFiveRunnerEvent[] = [];
   readonly sharedRuns: Parameters<FixedFiveRunnerPort['runShared82']>[0][] = [];
   readonly duelRuns: Parameters<FixedFiveRunnerPort['runDuel']>[0][] = [];
+  readonly duelGameRuns: Parameters<FixedFiveRunnerPort['runDuelGame']>[0][] = [];
   disposed = false;
   private readonly onEvent: (event: FixedFiveRunnerEvent) => void;
   constructor(onEvent: (event: FixedFiveRunnerEvent) => void) {
@@ -40,6 +42,9 @@ class FakeRunner implements FixedFiveRunnerPort {
   }
   runDuel(input: Parameters<FixedFiveRunnerPort['runDuel']>[0]): void {
     this.duelRuns.push(input);
+  }
+  runDuelGame(input: Parameters<FixedFiveRunnerPort['runDuelGame']>[0]): void {
+    this.duelGameRuns.push(input);
   }
   verify(): void {}
   dispose(): void {
@@ -92,6 +97,7 @@ interface Harness {
 
 function createHarness(overrides: Partial<FixedFiveRoomSessionDeps> = {}): Harness {
   const clock = { now: 1_700_000_000_000 };
+  let commandSequence = 0;
   const transport = createInMemoryFixedFiveTransport({
     clock: () => clock.now,
     seed: 'fixed-five-room-session-test',
@@ -118,7 +124,7 @@ function createHarness(overrides: Partial<FixedFiveRoomSessionDeps> = {}): Harne
       throw new Error('unexpected lobby remove');
     },
     now: () => clock.now,
-    newCommandId: () => 'command-id-1',
+    newCommandId: () => `command-id-${String((commandSequence += 1))}`,
     friendlyError: (error) => (error instanceof Error ? error.message : String(error)),
     buildTeam: (_manifest, teamId, displayName, refs) =>
       Promise.resolve({
@@ -232,6 +238,33 @@ async function waitFor(predicate: () => boolean): Promise<void> {
     await Promise.resolve();
   }
   throw new Error('condition was never met');
+}
+
+async function fillDuelDraft(transport: FixedFiveMultiplayerTransport, roomId: Id): Promise<void> {
+  const submit = (
+    commandId: string,
+    actor: 'p1' | 'p2',
+    payload: FixedFiveCommandPayload,
+  ): Promise<FixedFiveCommandReceipt> =>
+    transport.submitCommand({
+      schemaVersion: 1,
+      roomId,
+      commandId: commandIdSchema.parse(commandId),
+      actorParticipantId: actor,
+      payload,
+    });
+  const startReceipt = await submit('duel-start', 'p1', { kind: 'start' });
+  expect(startReceipt.accepted).toBe(true);
+  for (let index = 0; index < 10; index += 1) {
+    const receipt = await submit(`duel-pick-${String(index)}`, index % 2 === 0 ? 'p1' : 'p2', {
+      kind: 'duel-claim',
+      playerId: playerIdSchema.parse(`duel-player-${String(index)}`),
+      slotIndex: index % 5,
+      franchiseId: franchiseIdSchema.parse('lakers'),
+      eraId: '1990s',
+    });
+    expect(receipt.accepted).toBe(true);
+  }
 }
 
 afterEach(() => {
@@ -370,5 +403,55 @@ describe('FixedFiveRoomSession', () => {
     runner.emit({ kind: 'complete', gamesDelivered: 9 });
     expect(session.getSnapshot().progress).toEqual({ completed: 4, total: 161 });
     expect(session.getSnapshot().localResult).toBeNull();
+  });
+
+  it('coordinates a duel broadcast from readiness through the recap hold', async () => {
+    const harness = createHarness();
+    const created = await harness.createRoom({ mode: 'duel', sourceMode: 'classic' });
+    await fillDuelDraft(harness.transport, created.snapshot.roomId);
+
+    const session = harness.session();
+    await session.start();
+    let state = session.getSnapshot();
+    expect(state.phase).toBe('preparing-game');
+    expect(state.duelBroadcast).toBe(true);
+    expect(state.room?.series?.currentGameNumber).toBe(1);
+
+    await session.readyForNextGame();
+    expect(session.getSnapshot().localReady).toBe(true);
+    expect(session.getSnapshot().opponentReady).toBe(false);
+
+    const p2Ready = await harness.transport.submitCommand({
+      schemaVersion: 1,
+      roomId: created.snapshot.roomId,
+      commandId: commandIdSchema.parse('duel-ready-p2'),
+      actorParticipantId: 'p2',
+      payload: { kind: 'ready-next-game', gameNumber: 1, ready: true },
+    });
+    expect(p2Ready.accepted).toBe(true);
+    await session.refresh();
+    state = session.getSnapshot();
+    expect(state.opponentReady).toBe(true);
+    expect(state.readyCountdownMs).toBeNull();
+
+    await session.startBroadcast();
+    state = session.getSnapshot();
+    expect(state.room?.phase).toBe('broadcasting');
+    expect(state.room?.broadcast?.durationMs).toBe(10_000);
+
+    session.beginPlayback();
+    session.advancePlayback(5000);
+    expect(session.getSnapshot().broadcastProgress).toBeGreaterThan(0.4);
+    session.advancePlayback(5000);
+    state = session.getSnapshot();
+    expect(state.broadcastProgress).toBe(1);
+    expect(state.duelRecapGame).toBe(1);
+    expect(state.awaitingContinue).toBe(true);
+
+    session.continueAfterGame();
+    state = session.getSnapshot();
+    expect(state.awaitingContinue).toBe(false);
+
+    session.dispose();
   });
 });

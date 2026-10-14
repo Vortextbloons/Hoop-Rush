@@ -1,6 +1,8 @@
 import {
   FIXED_FIVE_CODE_TTL_MS,
+  FIXED_FIVE_DUEL_BROADCAST_MS,
   FIXED_FIVE_ENVELOPE_MAX_BYTES,
+  FIXED_FIVE_MULTIPLAYER_VERSION,
   FIXED_FIVE_ROOM_SCHEMA_VERSION,
   fixedFiveCommandPayloadSchema,
   fixedFiveCommandSchema,
@@ -52,6 +54,33 @@ function isSandboxSnakeRoom(settings: FixedFiveRoomSettings): boolean {
     settings.mode === 'sandbox-shared-82' ||
     (settings.mode === 'duel' && settings.sourceMode === 'sandbox')
   );
+}
+const FIXED_FIVE_SNAKE_ROOM_VERSIONS: ReadonlySet<string> = new Set([
+  'fixed-five-multiplayer-v3',
+  'fixed-five-multiplayer-v4',
+  FIXED_FIVE_MULTIPLAYER_VERSION,
+]);
+const FIXED_FIVE_REPOSITION_VERSIONS: ReadonlySet<string> = new Set([
+  'fixed-five-multiplayer-v4',
+  FIXED_FIVE_MULTIPLAYER_VERSION,
+]);
+const FIXED_FIVE_DUEL_BROADCAST_VERSIONS: ReadonlySet<string> = new Set([
+  FIXED_FIVE_MULTIPLAYER_VERSION,
+]);
+function isRepositionAwareRoom(settings: FixedFiveRoomSettings): boolean {
+  return FIXED_FIVE_REPOSITION_VERSIONS.has(settings.versions.multiplayerVersion);
+}
+function isDuelBroadcastRoom(settings: FixedFiveRoomSettings): boolean {
+  return (
+    settings.mode === 'duel' &&
+    FIXED_FIVE_DUEL_BROADCAST_VERSIONS.has(settings.versions.multiplayerVersion)
+  );
+}
+function duelHomeForGame(gameNumber: number): FixedFiveParticipantId {
+  return gameNumber % 2 === 1 ? 'p1' : 'p2';
+}
+function otherParticipantId(participantId: FixedFiveParticipantId): FixedFiveParticipantId {
+  return participantId === 'p1' ? 'p2' : 'p1';
 }
 function sandboxPicker(rootSeed: string, pickOrdinal: number): FixedFiveParticipantId {
   const first = Number.parseInt(rootSeed.slice(0, 2), 16) % 2 === 0 ? 'p1' : 'p2';
@@ -125,16 +154,37 @@ interface FallbackCommitment {
   pickOrdinal: number;
   payload: FixedFiveCommandPayload;
 }
+interface DuelGameProposal {
+  gameNumber: number;
+  resultDigest: string;
+  tapeDigest: string;
+  inputDigest: string;
+  winner: FixedFiveParticipantId;
+}
+interface DuelGameConfirmation {
+  gameNumber: number;
+  resultDigest: string;
+  verified: boolean;
+}
+interface DuelGameState {
+  proposals: Partial<Record<FixedFiveParticipantId, DuelGameProposal>>;
+  confirmations: Partial<Record<FixedFiveParticipantId, DuelGameConfirmation>>;
+}
 interface RoomRecord {
   snapshot: FixedFiveRoomSnapshot;
   commands: FixedFiveCommand[];
   commandIds: Set<string>;
   code: FixedFiveRoomCode;
   codeExpiresAt: number;
+  updatedAt: number;
   subscribers: Set<(snapshot: FixedFiveRoomSnapshot) => void>;
   verificationChallenge: string | null;
   receipts: Map<string, FixedFiveVerificationReceipt>;
   fallback: FallbackCommitment | null;
+  gameState: DuelGameState;
+}
+function emptyDuelGameState(): DuelGameState {
+  return { proposals: {}, confirmations: {} };
 }
 export function createInMemoryFixedFiveTransport(options?: {
   clock?: () => number;
@@ -219,6 +269,171 @@ export function createInMemoryFixedFiveTransport(options?: {
       return;
     }
   }
+  function isDuelPickPayload(payload: FixedFiveCommandPayload): boolean {
+    return (
+      payload.kind === 'duel-claim' ||
+      payload.kind === 'classic-pick' ||
+      payload.kind === 'sandbox-place' ||
+      payload.kind === 'timeout-autopick'
+    );
+  }
+  function duelDraftPickCount(commands: FixedFiveCommand[]): number {
+    return commands.filter((command) => isDuelPickPayload(command.payload)).length;
+  }
+  function initializeDuelSeries(record: RoomRecord): void {
+    record.snapshot = {
+      ...record.snapshot,
+      phase: 'preparing-game',
+      series: { games: [], p1Wins: 0, p2Wins: 0, currentGameNumber: 1, champion: null },
+      broadcast: null,
+      deadline: null,
+      members: record.snapshot.members.map((member) => ({ ...member, nextGameReady: null })),
+    };
+    record.gameState = emptyDuelGameState();
+  }
+  function duelBroadcastRejection(record: RoomRecord, command: FixedFiveCommand): string | null {
+    const payload = command.payload;
+    const broadcastKind =
+      payload.kind === 'ready-next-game' ||
+      payload.kind === 'broadcast-start' ||
+      payload.kind === 'propose-game-result' ||
+      payload.kind === 'confirm-game-result';
+    if (!broadcastKind) return null;
+    if (!isDuelBroadcastRoom(record.snapshot.settings)) return 'illegal-move';
+    const series = record.snapshot.series;
+    if (!series) return 'phase';
+    if (payload.kind === 'ready-next-game') {
+      if (record.snapshot.phase !== 'preparing-game') return 'phase';
+      if (payload.gameNumber !== series.currentGameNumber) return 'turn';
+      return null;
+    }
+    if (payload.kind === 'broadcast-start') {
+      if (record.snapshot.phase !== 'preparing-game') return 'phase';
+      if (payload.gameNumber !== series.currentGameNumber) return 'turn';
+      const readyCount = record.snapshot.members.filter(
+        (member) => member.nextGameReady === payload.gameNumber,
+      ).length;
+      if (readyCount < 2) {
+        if (payload.auto !== true || clock() - record.updatedAt < 60_000) return 'not-ready';
+      }
+      return null;
+    }
+    if (payload.kind === 'propose-game-result') {
+      if (record.snapshot.phase !== 'broadcasting' && record.snapshot.phase !== 'game-results') {
+        return 'phase';
+      }
+      if (payload.gameNumber !== series.currentGameNumber) return 'turn';
+      const home = duelHomeForGame(payload.gameNumber);
+      if (payload.winner !== home && payload.winner !== otherParticipantId(home)) {
+        return 'illegal-move';
+      }
+      return null;
+    }
+    if (record.snapshot.phase !== 'broadcasting' && record.snapshot.phase !== 'game-results') {
+      return 'phase';
+    }
+    if (payload.gameNumber !== series.currentGameNumber) return 'turn';
+    const matching = Object.values(record.gameState.proposals).some(
+      (proposal) =>
+        proposal.gameNumber === payload.gameNumber &&
+        proposal.resultDigest === payload.resultDigest,
+    );
+    if (!matching) return 'illegal-move';
+    return null;
+  }
+  function applyDuelBroadcastCommand(record: RoomRecord, command: FixedFiveCommand): void {
+    if (!isDuelBroadcastRoom(record.snapshot.settings)) return;
+    const payload = command.payload;
+    if (payload.kind === 'ready-next-game') {
+      record.snapshot = {
+        ...record.snapshot,
+        members: record.snapshot.members.map((member) =>
+          member.participantId === command.actorParticipantId
+            ? { ...member, nextGameReady: payload.ready ? payload.gameNumber : null }
+            : member,
+        ),
+      };
+      return;
+    }
+    if (payload.kind === 'broadcast-start') {
+      const gameNumber = payload.gameNumber;
+      let members = record.snapshot.members;
+      const readyCount = members.filter((member) => member.nextGameReady === gameNumber).length;
+      if (readyCount < 2) {
+        members = members.map((member) => ({ ...member, nextGameReady: gameNumber }));
+      }
+      record.snapshot = {
+        ...record.snapshot,
+        phase: 'broadcasting',
+        broadcast: {
+          gameNumber,
+          startedAtIso: nowIsoWith(clock),
+          durationMs: FIXED_FIVE_DUEL_BROADCAST_MS,
+        },
+        members: members.map((member) => ({ ...member, nextGameReady: null })),
+      };
+      return;
+    }
+    if (payload.kind === 'propose-game-result') {
+      record.gameState.proposals[command.actorParticipantId] = {
+        gameNumber: payload.gameNumber,
+        resultDigest: payload.resultDigest,
+        tapeDigest: payload.tapeDigest,
+        inputDigest: payload.inputDigest,
+        winner: payload.winner,
+      };
+      record.snapshot = { ...record.snapshot, phase: 'game-results' };
+      return;
+    }
+    if (payload.kind === 'confirm-game-result') {
+      record.gameState.confirmations[command.actorParticipantId] = {
+        gameNumber: payload.gameNumber,
+        resultDigest: payload.resultDigest,
+        verified: payload.verified,
+      };
+      const p1 = record.gameState.confirmations.p1;
+      const p2 = record.gameState.confirmations.p2;
+      if (
+        !p1 ||
+        !p2 ||
+        p1.gameNumber !== p2.gameNumber ||
+        p1.resultDigest !== p2.resultDigest ||
+        !p1.verified ||
+        !p2.verified
+      ) {
+        return;
+      }
+      const gameNumber = p1.gameNumber;
+      const winner = Object.values(record.gameState.proposals).find(
+        (proposal) =>
+          proposal.gameNumber === gameNumber && proposal.resultDigest === p1.resultDigest,
+      )?.winner;
+      const series = record.snapshot.series;
+      if (!winner || !series) return;
+      const home = duelHomeForGame(gameNumber);
+      const away = otherParticipantId(home);
+      const p1Wins = series.p1Wins + (winner === 'p1' ? 1 : 0);
+      const p2Wins = series.p2Wins + (winner === 'p2' ? 1 : 0);
+      const champion = p1Wins >= 4 ? 'p1' : p2Wins >= 4 ? 'p2' : null;
+      record.snapshot = {
+        ...record.snapshot,
+        phase: champion ? 'awaiting-confirmation' : 'preparing-game',
+        series: {
+          games: [
+            ...series.games,
+            { gameNumber, homeParticipantId: home, awayParticipantId: away, winner },
+          ],
+          p1Wins,
+          p2Wins,
+          currentGameNumber: champion ? null : gameNumber + 1,
+          champion,
+        },
+        broadcast: null,
+        members: record.snapshot.members.map((member) => ({ ...member, nextGameReady: null })),
+      };
+      record.gameState = emptyDuelGameState();
+    }
+  }
   return {
     async create(settingsInput) {
       await Promise.resolve();
@@ -262,6 +477,7 @@ export function createInMemoryFixedFiveTransport(options?: {
             ready: false,
             picksCommitted: 0,
             locked: false,
+            nextGameReady: null,
             lastSeenAt: createdAt,
           },
           {
@@ -270,6 +486,7 @@ export function createInMemoryFixedFiveTransport(options?: {
             ready: false,
             picksCommitted: 0,
             locked: false,
+            nextGameReady: null,
             lastSeenAt: null,
           },
         ],
@@ -282,6 +499,8 @@ export function createInMemoryFixedFiveTransport(options?: {
           fallback: { kind: 'ready', ready: true },
           pickOrdinal: 0,
         },
+        series: null,
+        broadcast: null,
         resultDigest: null,
         confirmedDigest: null,
         successorRoomId: null,
@@ -294,10 +513,12 @@ export function createInMemoryFixedFiveTransport(options?: {
         commandIds: new Set(),
         code,
         codeExpiresAt: now + FIXED_FIVE_CODE_TTL_MS,
+        updatedAt: now,
         subscribers: new Set(),
         verificationChallenge: null,
         receipts: new Map(),
         fallback: null,
+        gameState: emptyDuelGameState(),
       };
       rooms.set(roomId, record);
       codeIndex.set(code, roomId);
@@ -336,6 +557,7 @@ export function createInMemoryFixedFiveTransport(options?: {
         members: updated,
         revision: record.snapshot.revision + 1,
       };
+      record.updatedAt = clock();
       emit(record);
       return {
         snapshot: record.snapshot,
@@ -443,7 +665,33 @@ export function createInMemoryFixedFiveTransport(options?: {
           revision: record.snapshot.revision,
         };
       }
-      const sandboxSnake = isSandboxSnakeRoom(record.snapshot.settings);
+      const sandboxSnake =
+        isSandboxSnakeRoom(record.snapshot.settings) &&
+        FIXED_FIVE_SNAKE_ROOM_VERSIONS.has(record.snapshot.settings.versions.multiplayerVersion);
+      const repositionAware = isRepositionAwareRoom(record.snapshot.settings);
+      if (
+        parsed.data.payload.kind === 'duel-reposition' &&
+        (record.snapshot.settings.mode !== 'duel' || !repositionAware)
+      ) {
+        return {
+          roomId: command.roomId,
+          commandId: command.commandId,
+          ordinal: -1,
+          accepted: false,
+          rejectionCode: 'illegal-move',
+          revision: record.snapshot.revision,
+        };
+      }
+      if (parsed.data.payload.kind === 'sandbox-reposition' && sandboxSnake && !repositionAware) {
+        return {
+          roomId: command.roomId,
+          commandId: command.commandId,
+          ordinal: -1,
+          accepted: false,
+          rejectionCode: 'illegal-move',
+          revision: record.snapshot.revision,
+        };
+      }
       const pickedPayload =
         parsed.data.payload.kind === 'sandbox-place' ||
         parsed.data.payload.kind === 'timeout-autopick'
@@ -462,10 +710,11 @@ export function createInMemoryFixedFiveTransport(options?: {
             ) {
               return false;
             }
+            if (entry.payload.playerId === pickedPayload.playerId) return true;
             return (
-              entry.payload.playerId === pickedPayload.playerId ||
-              (entry.actorParticipantId === parsed.data.actorParticipantId &&
-                entry.payload.slotIndex === pickedPayload.slotIndex)
+              !repositionAware &&
+              entry.actorParticipantId === parsed.data.actorParticipantId &&
+              entry.payload.slotIndex === pickedPayload.slotIndex
             );
           })
         ) {
@@ -494,6 +743,17 @@ export function createInMemoryFixedFiveTransport(options?: {
           revision: record.snapshot.revision,
         };
       }
+      const broadcastRejection = duelBroadcastRejection(record, parsed.data);
+      if (broadcastRejection !== null) {
+        return {
+          roomId: command.roomId,
+          commandId: command.commandId,
+          ordinal: -1,
+          accepted: false,
+          rejectionCode: broadcastRejection,
+          revision: record.snapshot.revision,
+        };
+      }
       record.commands.push(parsed.data);
       record.commandIds.add(command.commandId);
       record.snapshot = {
@@ -503,6 +763,15 @@ export function createInMemoryFixedFiveTransport(options?: {
         digest: null,
       };
       touchDeadline(record, parsed.data.payload);
+      record.updatedAt = clock();
+      if (
+        isDuelBroadcastRoom(record.snapshot.settings) &&
+        record.snapshot.series === null &&
+        duelDraftPickCount(record.commands) >= 10
+      ) {
+        initializeDuelSeries(record);
+      }
+      applyDuelBroadcastCommand(record, parsed.data);
       emit(record);
       return {
         roomId: command.roomId,
@@ -660,6 +929,7 @@ export function createInMemoryFixedFiveTransport(options?: {
         ),
         revision: record.snapshot.revision + 1,
       };
+      record.updatedAt = clock();
       emit(record);
     },
     async rematch(roomId) {
@@ -739,7 +1009,17 @@ export function createInMemoryFixedFiveTransport(options?: {
       const denied = record.commands.some(
         (c) => c.payload.kind === 'confirm-result' && !c.payload.verified,
       );
-      if (digests.size < 2 || !denied) return { failed: false, phase: record.snapshot.phase };
+      const gameDigests = new Set(
+        record.commands
+          .filter((c) => c.payload.kind === 'propose-game-result')
+          .map((c) => (c.payload.kind === 'propose-game-result' ? c.payload.resultDigest : '')),
+      );
+      const gameDenied = record.commands.some(
+        (c) => c.payload.kind === 'confirm-game-result' && !c.payload.verified,
+      );
+      if ((digests.size < 2 || !denied) && (gameDigests.size < 2 || !gameDenied)) {
+        return { failed: false, phase: record.snapshot.phase };
+      }
       record.snapshot = {
         ...record.snapshot,
         phase: 'integrity-failed',

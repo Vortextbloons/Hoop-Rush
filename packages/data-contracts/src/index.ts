@@ -143,6 +143,7 @@ export type {
   SeasonMultiplayerTransport,
   SeasonRoomStartEvent,
 } from './season-multiplayer-protocol.ts';
+export * from './game-tape.ts';
 export * from './fixed-five-versions.ts';
 export * from './fixed-five-multiplayer.ts';
 export * from './fixed-five-multiplayer-in-memory.ts';

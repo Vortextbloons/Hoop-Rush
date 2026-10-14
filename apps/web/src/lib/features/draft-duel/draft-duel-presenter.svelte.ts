@@ -13,7 +13,14 @@ import type {
   DraftDuelVersionLocks,
   Id,
 } from '@hoop-rush/data-contracts';
-import { draftDuelCurrentPicker, draftDuelLegalPicks, draftDuelRoster } from '@hoop-rush/engine';
+import { DRAFT_DUEL_MULTIPLAYER_VERSION } from '@hoop-rush/data-contracts';
+import {
+  draftDuelCurrentPicker,
+  draftDuelLegalPicks,
+  draftDuelRepositionPlan,
+  draftDuelRepositionSlots,
+  draftDuelRoster,
+} from '@hoop-rush/engine';
 import type { StoredDraftDuelCompleted } from '@hoop-rush/persistence';
 import {
   draftDuelPlayedGames,
@@ -128,9 +135,14 @@ export class DraftDuelPresenter {
       reason: 'turn',
     }));
   });
+  allowDisplacement = $derived(
+    this.snapshot?.settings.versions.multiplayerVersion === DRAFT_DUEL_MULTIPLAYER_VERSION,
+  );
   visiblePicks = $derived.by<DraftDuelOfferedPick[]>(() => {
     if (!this.draft || !this.assets || !this.currentPicker) return [];
-    return draftDuelLegalPicks(this.draft, this.assets.catalog);
+    return draftDuelLegalPicks(this.draft, this.assets.catalog, {
+      allowDisplacement: this.allowDisplacement,
+    });
   });
   rivalPool = $derived.by<DraftDuelCard[]>(() => {
     if (!this.draft || !this.participantId) return [];
@@ -223,6 +235,46 @@ export class DraftDuelPresenter {
 
   pickOffer(pick: DraftDuelOfferedPick, slotIndex: number): Promise<void> {
     return this.session.pickOffer(pick, slotIndex);
+  }
+
+  repositionCard(card: DraftDuelCard, slotIndex: number): Promise<void> {
+    return this.session.repositionCard(card, slotIndex);
+  }
+
+  repositionSlots(card: DraftDuelCard): number[] {
+    if (!this.draft || !this.assets || !this.participantId) return [];
+    if (this.draft.status !== 'drafting') return [];
+    try {
+      return draftDuelRepositionSlots(
+        this.draft,
+        this.assets.catalog,
+        this.participantId,
+        card.playerVersionId,
+      );
+    } catch {
+      return [];
+    }
+  }
+
+  repositionMoves(
+    card: DraftDuelCard,
+    slotIndex: number,
+  ): Array<{ displayName: string; toSlot: number }> {
+    if (!this.draft || !this.assets || !this.participantId) return [];
+    try {
+      const roster = draftDuelRoster(this.draft, this.assets.catalog, this.participantId);
+      const plan = draftDuelRepositionPlan(roster.slots, card, slotIndex);
+      return (
+        plan
+          ?.filter((placement) => placement.card.playerVersionId !== card.playerVersionId)
+          .map((placement) => ({
+            displayName: placement.card.displayName,
+            toSlot: placement.slotIndex,
+          })) ?? []
+      );
+    } catch {
+      return [];
+    }
   }
 
   readyForNextGame(): Promise<void> {

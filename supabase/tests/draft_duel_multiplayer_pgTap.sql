@@ -7,7 +7,18 @@
 -- scratch table, so pgTAP state is never role-switched.
 
 begin;
-select plan(174);
+select plan(180);
+
+create function public.pgtap_has_policy(p_schema text, p_table text, p_policy text)
+returns boolean
+language sql
+stable
+as $$
+  select exists (
+    select 1 from pg_policies
+    where schemaname = p_schema and tablename = p_table and policyname = p_policy
+  );
+$$;
 
 -- 1. Schema.
 select has_table('public', 'draft_duel_rooms', 'draft_duel_rooms exists');
@@ -19,9 +30,33 @@ select has_table('public', 'draft_duel_verification_receipts', 'verification rec
 select has_table('public', 'draft_duel_server_versions', 'server versions exists');
 
 select col_type_is('public', 'draft_duel_rooms', 'code', 'text', 'code is text preserving leading zeroes');
-select has_check('public', 'draft_duel_rooms', 'draft_duel_rooms_code_check', 'code check enforces four digits');
-select has_check('public', 'draft_duel_rooms', 'draft_duel_rooms_fairness_check', 'fairness check');
-select has_check('public', 'draft_duel_rooms', 'draft_duel_rooms_phase_check', 'phase check');
+select ok(
+  exists (
+    select 1 from pg_constraint c
+    join pg_class t on t.oid = c.conrelid
+    join pg_namespace n on n.oid = t.relnamespace
+    where n.nspname = 'public' and t.relname = 'draft_duel_rooms'
+      and c.conname = 'draft_duel_rooms_code_check' and c.contype = 'c'
+  ),
+  'code check enforces four digits');
+select ok(
+  exists (
+    select 1 from pg_constraint c
+    join pg_class t on t.oid = c.conrelid
+    join pg_namespace n on n.oid = t.relnamespace
+    where n.nspname = 'public' and t.relname = 'draft_duel_rooms'
+      and c.conname = 'draft_duel_rooms_fairness_check' and c.contype = 'c'
+  ),
+  'fairness check');
+select ok(
+  exists (
+    select 1 from pg_constraint c
+    join pg_class t on t.oid = c.conrelid
+    join pg_namespace n on n.oid = t.relnamespace
+    where n.nspname = 'public' and t.relname = 'draft_duel_rooms'
+      and c.conname = 'draft_duel_rooms_phase_check' and c.contype = 'c'
+  ),
+  'phase check');
 select has_column('public', 'draft_duel_rooms', 'draft_state', 'draft_state column exists');
 select has_column('public', 'draft_duel_rooms', 'series', 'series column exists');
 select has_column('public', 'draft_duel_rooms', 'broadcast', 'broadcast column exists');
@@ -35,13 +70,13 @@ select has_pk('public', 'draft_duel_deadline_commitments', 'deadline commitments
 select has_pk('public', 'draft_duel_verification_receipts', 'verification receipts primary key exists');
 select col_is_pk('public', 'draft_duel_server_versions', 'key', 'server versions key is the primary key');
 
-select has_policy('public', 'draft_duel_rooms', 'dd members read their room');
-select has_policy('public', 'draft_duel_room_members', 'dd members read room membership');
-select has_policy('public', 'draft_duel_room_commands', 'dd members read their commands');
-select has_policy('public', 'draft_duel_deadline_commitments', 'dd members read deadline commitments');
-select has_policy('public', 'draft_duel_verification_receipts', 'dd members read verification receipts');
-select has_policy('realtime', 'messages', 'dd members read room transient channel');
-select has_policy('realtime', 'messages', 'dd members send room transient channel');
+select ok(public.pgtap_has_policy('public', 'draft_duel_rooms', 'dd members read their room'), 'dd members read their room');
+select ok(public.pgtap_has_policy('public', 'draft_duel_room_members', 'dd members read room membership'), 'dd members read room membership');
+select ok(public.pgtap_has_policy('public', 'draft_duel_room_commands', 'dd members read their commands'), 'dd members read their commands');
+select ok(public.pgtap_has_policy('public', 'draft_duel_deadline_commitments', 'dd members read deadline commitments'), 'dd members read deadline commitments');
+select ok(public.pgtap_has_policy('public', 'draft_duel_verification_receipts', 'dd members read verification receipts'), 'dd members read verification receipts');
+select ok(public.pgtap_has_policy('realtime', 'messages', 'dd members read room transient channel'), 'dd members read room transient channel');
+select ok(public.pgtap_has_policy('realtime', 'messages', 'dd members send room transient channel'), 'dd members send room transient channel');
 
 select is(
   (select count(*)::int from pg_policies where schemaname = 'public' and tablename = 'draft_duel_rooms' and cmd <> 'SELECT'),
@@ -130,7 +165,8 @@ select is(
   (select count(distinct public.draft_duel_random_code()) > 100 from generate_series(1, 128)),
   true, 'generated room codes have broad sample diversity');
 select ok(
-  position('extensions.gen_random_bytes' in pg_get_functiondef('public.draft_duel_random_code()'::regprocedure)) > 0,
+  position('fixed_five_random_code' in pg_get_functiondef('public.draft_duel_random_code()'::regprocedure)) > 0
+  and position('extensions.gen_random_bytes' in pg_get_functiondef('public.fixed_five_random_code()'::regprocedure)) > 0,
   'room-code entropy comes from pgcrypto');
 select is(
   position('random()' in pg_get_functiondef('public.draft_duel_random_code()'::regprocedure)),
@@ -198,7 +234,7 @@ as $$
 $$;
 
 insert into public.dd_pgtap_ctx (name, value) values
-  ('versions', '{"dataVersion":"data-v1","ratingsVersion":"ratings-v1","catalogVersion":"catalog-v1","catalogHash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","playerVersionIdVersion":"pv-v1","positionNormalizationVersion":"position-v3","engineVersion":"engine-v1","profileVersion":"profile-v1","seedDerivationVersion":"draft-duel-seed-v1","multiplayerVersion":"draft-duel-multiplayer-v1","autopickVersion":"draft-duel-autopick-v1"}'),
+  ('versions', '{"dataVersion":"data-v1","ratingsVersion":"ratings-v1","catalogVersion":"catalog-v1","catalogHash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","playerVersionIdVersion":"pv-v1","positionNormalizationVersion":"position-v3","engineVersion":"engine-v1","profileVersion":"profile-v1","seedDerivationVersion":"draft-duel-seed-v1","multiplayerVersion":"draft-duel-multiplayer-v2","autopickVersion":"draft-duel-autopick-v1"}'),
   ('uid_a1', '00000000-0000-4000-8000-000000000001'),
   ('uid_a2', '00000000-0000-4000-8000-000000000002'),
   ('uid_b1', '00000000-0000-4000-8000-000000000003'),
@@ -495,6 +531,70 @@ select is(
 select is(
   (select value::jsonb->>'rejectionCode' from public.dd_pgtap_ctx where name = 'pick_a_claim_taken'),
   'claim-taken', 're-claiming a claimed player is rejected');
+
+-- 6b. v2 repositions: own cards only, off-turn, no deadline movement.
+set local role authenticated;
+do $$
+declare
+  v_room uuid := (select value::uuid from public.dd_pgtap_ctx where name = 'room_a');
+  v_first text := (select draft_state->>'first_picker' from public.draft_duel_rooms where id = v_room);
+  v_other text := case when v_first = 'p1' then 'p2' else 'p1' end;
+  v_receipt jsonb;
+begin
+  perform public.dd_pgtap_claim(public.dd_pgtap_uid(v_other, 'uid_a1', 'uid_a2'));
+  v_receipt := public.draft_duel_command_submit(
+    v_room, 'reposition-a-foreign', null,
+    jsonb_build_object('kind', 'reposition', 'playerId', 'pick-a-0',
+      'playerVersionId', 'pv-' || repeat('a', 32), 'slotIndex', 3));
+  insert into public.dd_pgtap_ctx (name, value) values ('reposition_a_foreign', v_receipt::text);
+
+  perform public.dd_pgtap_claim(public.dd_pgtap_uid(v_first, 'uid_a1', 'uid_a2'));
+  v_receipt := public.draft_duel_command_submit(
+    v_room, 'reposition-a-own', null,
+    jsonb_build_object('kind', 'reposition', 'playerId', 'pick-a-0',
+      'playerVersionId', 'pv-' || repeat('a', 32), 'slotIndex', 3));
+  insert into public.dd_pgtap_ctx (name, value) values ('reposition_a_own', v_receipt::text);
+
+  v_receipt := public.draft_duel_command_submit(
+    v_room, 'reposition-a-unclaimed', null,
+    jsonb_build_object('kind', 'reposition', 'playerId', 'pick-a-unclaimed',
+      'playerVersionId', 'pv-' || repeat('d', 32), 'slotIndex', 1));
+  insert into public.dd_pgtap_ctx (name, value) values ('reposition_a_unclaimed', v_receipt::text);
+
+  v_receipt := public.draft_duel_command_submit(
+    v_room, 'reposition-a-bad-slot', null,
+    jsonb_build_object('kind', 'reposition', 'playerId', 'pick-a-0',
+      'playerVersionId', 'pv-' || repeat('a', 32), 'slotIndex', 9));
+  insert into public.dd_pgtap_ctx (name, value) values ('reposition_a_bad_slot', v_receipt::text);
+
+  insert into public.dd_pgtap_ctx (name, value)
+  select 'reposition_a_cursor', deadline_cursor from public.draft_duel_rooms where id = v_room;
+  insert into public.dd_pgtap_ctx (name, value)
+  select 'reposition_a_ordinal', draft_state->>'pick_ordinal' from public.draft_duel_rooms where id = v_room;
+end $$;
+reset role;
+select is(
+  (select value::jsonb->>'rejectionCode' from public.dd_pgtap_ctx where name = 'reposition_a_foreign'),
+  'illegal-move', 'a reposition for another seat''s card is rejected');
+select is(
+  (select value::jsonb->>'accepted' from public.dd_pgtap_ctx where name = 'reposition_a_own'),
+  'true', 'the owner repositions their own claimed card off-turn');
+select is(
+  (select value::jsonb->>'rejectionCode' from public.dd_pgtap_ctx where name = 'reposition_a_unclaimed'),
+  'illegal-move', 'a reposition for an unclaimed player is rejected');
+select is(
+  (select value::jsonb->>'rejectionCode' from public.dd_pgtap_ctx where name = 'reposition_a_bad_slot'),
+  'illegal-move', 'a reposition outside the lineup range is rejected');
+select is(
+  (select deadline_cursor from public.draft_duel_rooms
+    where id = (select value::uuid from public.dd_pgtap_ctx where name = 'room_a')),
+  (select value from public.dd_pgtap_ctx where name = 'reposition_a_cursor'),
+  'a reposition leaves the pick cursor alone');
+select is(
+  (select draft_state->>'pick_ordinal' from public.draft_duel_rooms
+    where id = (select value::uuid from public.dd_pgtap_ctx where name = 'room_a')),
+  (select value from public.dd_pgtap_ctx where name = 'reposition_a_ordinal'),
+  'a reposition leaves the pick ordinal alone');
 
 -- 7. Deadline fallback commit and timeout application.
 set local role authenticated;

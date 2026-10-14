@@ -8,11 +8,16 @@ import {
   seedSchema,
 } from './ids.ts';
 import { classicVariantSchema } from './classic.ts';
+import { gameResultSchema } from './result.ts';
+import { gameTapeEventSchema } from './game-tape.ts';
 import { lineupSchema } from './lineup.ts';
 import { simulationPlayerSchema } from './simulation.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
 import { CLASSIC_ROLL_VERSION } from './versions.ts';
-import { FIXED_FIVE_MULTIPLAYER_VERSION } from './fixed-five-versions.ts';
+import {
+  FIXED_FIVE_DUEL_TAPE_VERSION,
+  FIXED_FIVE_MULTIPLAYER_VERSION,
+} from './fixed-five-versions.ts';
 export {
   FIXED_FIVE_ROOM_SCHEMA_VERSION,
   FIXED_FIVE_ROOM_PROTOCOL_VERSION,
@@ -25,6 +30,10 @@ export {
   FIXED_FIVE_CLASSIC_PICK_TIMEOUT_MS,
   FIXED_FIVE_DUEL_PICK_TIMEOUT_MS,
   FIXED_FIVE_SANDBOX_BUILD_TIMEOUT_MS,
+  FIXED_FIVE_DUEL_BROADCAST_MS,
+  FIXED_FIVE_DUEL_GAME_READY_TIMEOUT_MS,
+  FIXED_FIVE_DUEL_GAME_RESULTS_HOLD_MS,
+  FIXED_FIVE_DUEL_TAPE_VERSION,
 } from './fixed-five-versions.ts';
 export const fixedFiveRoomModeSchema = z.enum(['classic-shared-82', 'sandbox-shared-82', 'duel']);
 export type FixedFiveRoomMode = z.infer<typeof fixedFiveRoomModeSchema>;
@@ -34,6 +43,9 @@ export const fixedFiveRoomPhaseSchema = z.enum([
   'lobby',
   'drafting',
   'simulating',
+  'preparing-game',
+  'broadcasting',
+  'game-results',
   'awaiting-confirmation',
   'completed',
   'integrity-failed',
@@ -143,6 +155,30 @@ export const fixedFiveTimeoutAutopickPayloadSchema = z.object({
   pickOrdinal: z.number().int().nonnegative(),
   seedPath: z.string().min(1).max(256),
 });
+export const fixedFiveReadyNextGamePayloadSchema = z.object({
+  kind: z.literal('ready-next-game'),
+  gameNumber: z.number().int().min(1).max(7),
+  ready: z.boolean(),
+});
+export const fixedFiveBroadcastStartPayloadSchema = z.object({
+  kind: z.literal('broadcast-start'),
+  gameNumber: z.number().int().min(1).max(7),
+  auto: z.boolean().optional(),
+});
+export const fixedFiveProposeGameResultPayloadSchema = z.object({
+  kind: z.literal('propose-game-result'),
+  gameNumber: z.number().int().min(1).max(7),
+  winner: fixedFiveParticipantIdSchema,
+  resultDigest: contentHashSchema,
+  tapeDigest: contentHashSchema,
+  inputDigest: contentHashSchema,
+});
+export const fixedFiveConfirmGameResultPayloadSchema = z.object({
+  kind: z.literal('confirm-game-result'),
+  gameNumber: z.number().int().min(1).max(7),
+  resultDigest: contentHashSchema,
+  verified: z.boolean(),
+});
 export const fixedFiveProposeResultPayloadSchema = z.object({
   kind: z.literal('propose-result'),
   resultDigest: contentHashSchema,
@@ -178,6 +214,10 @@ export const fixedFiveCommandPayloadSchema = z.discriminatedUnion('kind', [
   fixedFiveSandboxRemovePayloadSchema,
   fixedFiveSandboxLockPayloadSchema,
   fixedFiveTimeoutAutopickPayloadSchema,
+  fixedFiveReadyNextGamePayloadSchema,
+  fixedFiveBroadcastStartPayloadSchema,
+  fixedFiveProposeGameResultPayloadSchema,
+  fixedFiveConfirmGameResultPayloadSchema,
   fixedFiveProposeResultPayloadSchema,
   fixedFiveConfirmResultPayloadSchema,
   fixedFiveRematchRequestPayloadSchema,
@@ -211,6 +251,7 @@ export const fixedFiveMemberSnapshotSchema = z.object({
   ready: z.boolean(),
   picksCommitted: z.number().int().min(0).max(10),
   locked: z.boolean(),
+  nextGameReady: z.number().int().min(0).max(7).nullable().default(null),
   lastSeenAt: z.string().min(1).max(64).nullable(),
 });
 export type FixedFiveMemberSnapshot = z.infer<typeof fixedFiveMemberSnapshotSchema>;
@@ -223,6 +264,27 @@ export const fixedFiveDeadlineSchema = z.object({
   pickOrdinal: z.number().int().nonnegative(),
 });
 export type FixedFiveDeadline = z.infer<typeof fixedFiveDeadlineSchema>;
+export const fixedFiveDuelSeriesGameSchema = z.object({
+  gameNumber: z.number().int().min(1).max(7),
+  homeParticipantId: fixedFiveParticipantIdSchema,
+  awayParticipantId: fixedFiveParticipantIdSchema,
+  winner: fixedFiveParticipantIdSchema,
+});
+export type FixedFiveDuelSeriesGame = z.infer<typeof fixedFiveDuelSeriesGameSchema>;
+export const fixedFiveDuelSeriesSchema = z.object({
+  games: z.array(fixedFiveDuelSeriesGameSchema).max(7),
+  p1Wins: z.number().int().min(0).max(4),
+  p2Wins: z.number().int().min(0).max(4),
+  currentGameNumber: z.number().int().min(1).max(7).nullable(),
+  champion: fixedFiveParticipantIdSchema.nullable(),
+});
+export type FixedFiveDuelSeries = z.infer<typeof fixedFiveDuelSeriesSchema>;
+export const fixedFiveBroadcastSchema = z.object({
+  gameNumber: z.number().int().min(1).max(7),
+  startedAtIso: z.string().min(1).max(64),
+  durationMs: z.number().int().positive(),
+});
+export type FixedFiveBroadcast = z.infer<typeof fixedFiveBroadcastSchema>;
 export const fixedFiveRoomSnapshotSchema = z.object({
   roomId: idSchema,
   code: fixedFiveRoomCodeSchema.nullable(),
@@ -235,6 +297,8 @@ export const fixedFiveRoomSnapshotSchema = z.object({
   members: z.array(fixedFiveMemberSnapshotSchema).length(2),
   rootSeed: seedSchema.nullable(),
   deadline: fixedFiveDeadlineSchema.nullable(),
+  series: fixedFiveDuelSeriesSchema.nullable().default(null),
+  broadcast: fixedFiveBroadcastSchema.nullable().default(null),
   resultDigest: contentHashSchema.nullable(),
   confirmedDigest: contentHashSchema.nullable(),
   successorRoomId: idSchema.nullable(),
@@ -289,6 +353,20 @@ export const fixedFiveDuelResultSchema = z.object({
   stoppedAtGame: z.number().int().min(4).max(7),
 });
 export type FixedFiveDuelResult = z.infer<typeof fixedFiveDuelResultSchema>;
+export const fixedFiveDuelGameOutputSchema = z.object({
+  schemaVersion: z.literal(FIXED_FIVE_DUEL_TAPE_VERSION),
+  roomId: idSchema,
+  gameNumber: z.number().int().min(1).max(7),
+  homeParticipantId: fixedFiveParticipantIdSchema,
+  awayParticipantId: fixedFiveParticipantIdSchema,
+  seed: seedSchema,
+  result: gameResultSchema,
+  tape: z.array(gameTapeEventSchema).min(1),
+  inputDigest: contentHashSchema,
+  resultDigest: contentHashSchema,
+  tapeDigest: contentHashSchema,
+});
+export type FixedFiveDuelGameOutput = z.infer<typeof fixedFiveDuelGameOutputSchema>;
 export const fixedFiveCompetitionResultSchema = z.discriminatedUnion('competition', [
   fixedFiveShared82ResultSchema,
   fixedFiveDuelResultSchema,

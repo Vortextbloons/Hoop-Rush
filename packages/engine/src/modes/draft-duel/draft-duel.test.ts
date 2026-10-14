@@ -45,6 +45,7 @@ import {
   draftDuelRoster,
   draftDuelTimeoutPick,
   isDraftDuelComplete,
+  repositionDraftDuelCard,
   DraftDuelDraftError,
   type DraftDuelPickInput,
 } from './draft.ts';
@@ -54,6 +55,7 @@ import {
   buildDraftDuelSafetyInput,
   completionFeasible,
   draftDuelParticipantCompletionPossible,
+  draftDuelRepositionSlots,
   neededGroups,
   rosterCompletionPossible,
   type DraftDuelGroupNeeds,
@@ -1611,6 +1613,191 @@ describe('round generation guards', () => {
   });
 });
 
+describe('draft duel repositioning', () => {
+  function stateWithPicks(
+    catalog: DraftDuelCatalog,
+    picks: Array<{ card: DraftDuelCard; slotIndex: number }>,
+    options?: { pickOrdinal?: number },
+  ): DraftDuelDraft {
+    const filler = catalog.entries[0]?.card;
+    if (!filler) throw new Error('fixture catalog has no entries');
+    const offers = {
+      p1: Array.from({ length: 8 }, () => filler),
+      p2: Array.from({ length: 8 }, () => filler),
+    };
+    const rounds: DraftDuelRound[] = Array.from({ length: 5 }, (_, index) => ({
+      round: index + 1,
+      offers,
+      picks:
+        index === 0
+          ? picks.map((pick, pickIndex) => ({
+              pickOrdinal: pickIndex,
+              round: 1,
+              slot: pickIndex,
+              participantId: 'p1' as const,
+              card: pick.card,
+              slotIndex: pick.slotIndex,
+            }))
+          : [],
+    }));
+    return {
+      schemaVersion: 1,
+      rootSeed: SEED_A,
+      fairness: 'fair',
+      firstPicker: 'p1',
+      pickOrdinal: options?.pickOrdinal ?? picks.length,
+      rounds,
+      status: 'drafting',
+    };
+  }
+  function cardMatching(
+    catalog: DraftDuelCatalog,
+    predicate: (positions: readonly Position[]) => boolean,
+  ): DraftDuelCard {
+    const entry = catalog.entries.find((candidate) => predicate(candidate.card.positions));
+    if (!entry) throw new Error('fixture catalog has no matching card');
+    return entry.card;
+  }
+  it('repositions an own card deterministically without changing the turn', () => {
+    const catalog = buildCatalogFromSpecs([
+      { id: 'rr-g', positions: ['PG', 'SG'], band: 5 },
+      { id: 'rr-sg', positions: ['SG'], band: 5 },
+      { id: 'rr-f', positions: ['SF', 'PF'], band: 5 },
+      { id: 'rr-pf', positions: ['PF', 'C'], band: 5 },
+      { id: 'rr-c', positions: ['C'], band: 5 },
+    ]);
+    const state = stateWithPicks(catalog, [
+      { card: cardOf(catalog, 'rr-g'), slotIndex: 0 },
+      { card: cardOf(catalog, 'rr-sg'), slotIndex: 1 },
+      { card: cardOf(catalog, 'rr-f'), slotIndex: 2 },
+    ]);
+    const subject = cardOf(catalog, 'rr-f');
+    expect(draftDuelRepositionSlots(state, catalog, 'p1', subject.playerVersionId)).toContain(3);
+    const moved = repositionDraftDuelCard(state, catalog, {
+      participantId: 'p1',
+      playerVersionId: subject.playerVersionId,
+      slotIndex: 3,
+    });
+    expect(moved.pickOrdinal).toBe(state.pickOrdinal);
+    expect(moved.status).toBe('drafting');
+    expect(moved.rounds[0]?.picks.map((pick) => [pick.card.playerId, pick.slotIndex])).toEqual([
+      ['rr-g', 0],
+      ['rr-sg', 1],
+      ['rr-f', 3],
+    ]);
+    const roster = draftDuelRoster(moved, catalog, 'p1');
+    expect(roster.slots.map((slot) => [slot.card.playerId, slot.slotIndex])).toEqual([
+      ['rr-g', 0],
+      ['rr-sg', 1],
+      ['rr-f', 3],
+    ]);
+  });
+  it('rejects repositions for other participants, illegal positions, and completed drafts', () => {
+    const catalog = buildCatalogFromSpecs([
+      { id: 'rr-g', positions: ['PG', 'SG'], band: 5 },
+      { id: 'rr-f', positions: ['SF', 'PF'], band: 5 },
+    ]);
+    const state = stateWithPicks(catalog, [{ card: cardOf(catalog, 'rr-f'), slotIndex: 2 }]);
+    const subject = cardOf(catalog, 'rr-f');
+    expect(() =>
+      repositionDraftDuelCard(state, catalog, {
+        participantId: 'p2',
+        playerVersionId: subject.playerVersionId,
+        slotIndex: 3,
+      }),
+    ).toThrow(/not placed/);
+    expect(() =>
+      repositionDraftDuelCard(state, catalog, {
+        participantId: 'p1',
+        playerVersionId: subject.playerVersionId,
+        slotIndex: 1,
+      }),
+    ).toThrow(/cannot play slot/);
+    expect(() =>
+      repositionDraftDuelCard({ ...state, status: 'complete' }, catalog, {
+        participantId: 'p1',
+        playerVersionId: subject.playerVersionId,
+        slotIndex: 3,
+      }),
+    ).toThrow(/not drafting/);
+  });
+  it('rejects repositions that would prevent completing the draft', () => {
+    const catalog = buildCatalogFromSpecs([
+      { id: 'rc-c', positions: ['PF', 'C'], band: 5 },
+      { id: 'rc-g1', positions: ['PG'], band: 5 },
+      { id: 'rc-g2', positions: ['SG'], band: 5 },
+      { id: 'rc-f1', positions: ['SF'], band: 5 },
+      { id: 'rc-f2', positions: ['PF'], band: 5 },
+    ]);
+    const state = stateWithPicks(catalog, [
+      { card: cardOf(catalog, 'rc-g1'), slotIndex: 0 },
+      { card: cardOf(catalog, 'rc-g2'), slotIndex: 1 },
+      { card: cardOf(catalog, 'rc-c'), slotIndex: 4 },
+    ]);
+    const subject = cardOf(catalog, 'rc-c');
+    expect(draftDuelRepositionSlots(state, catalog, 'p1', subject.playerVersionId)).toEqual([]);
+    expect(() =>
+      repositionDraftDuelCard(state, catalog, {
+        participantId: 'p1',
+        playerVersionId: subject.playerVersionId,
+        slotIndex: 3,
+      }),
+    ).toThrow(/no legal completion/);
+  });
+  it('displaces own cards when picking into an occupied slot', () => {
+    const catalog = buildCatalogFromSpecs(standardSpecs());
+    const subject = cardMatching(
+      catalog,
+      (positions) => positions.includes('SF') && positions.includes('PF'),
+    );
+    const offered = cardMatching(
+      catalog,
+      (positions) => positions.includes('PF') && positions.includes('C'),
+    );
+    const base = stateWithPicks(catalog, [{ card: subject, slotIndex: 2 }], { pickOrdinal: 0 });
+    const offers = Array.from({ length: 8 }, (_, index) => (index === 0 ? offered : subject));
+    const state: DraftDuelDraft = {
+      ...base,
+      rounds: base.rounds.map((round, index) =>
+        index === 0 ? { ...round, offers: { ...round.offers, p1: offers } } : round,
+      ),
+    };
+    const legacyPicks = draftDuelLegalPicks(state, catalog, { allowDisplacement: false });
+    expect(legacyPicks[0]?.legalSlots).toEqual([3, 4]);
+    const displacementPicks = draftDuelLegalPicks(state, catalog, { allowDisplacement: true });
+    expect(displacementPicks[0]?.available).toBe(true);
+    expect(displacementPicks[0]?.legalSlots).toEqual([2, 3, 4]);
+    const picked = applyDraftDuelPick(
+      state,
+      catalog,
+      {
+        participantId: 'p1',
+        playerId: offered.playerId,
+        playerVersionId: offered.playerVersionId,
+        slotIndex: 2,
+      },
+      { allowDisplacement: true },
+    );
+    expect(picked.rounds[0]?.picks.map((pick) => [pick.card.playerId, pick.slotIndex])).toEqual([
+      [subject.playerId, 3],
+      [offered.playerId, 2],
+    ]);
+    expect(() =>
+      applyDraftDuelPick(
+        state,
+        catalog,
+        {
+          participantId: 'p1',
+          playerId: offered.playerId,
+          playerVersionId: offered.playerVersionId,
+          slotIndex: 2,
+        },
+        { allowDisplacement: false },
+      ),
+    ).toThrow(/already occupied/);
+  });
+});
+
 describe('replayDraftDuelLog', () => {
   function commandLogFor(
     rootSeed: Seed,
@@ -1703,5 +1890,105 @@ describe('replayDraftDuelLog', () => {
     expect(
       replayDraftDuelLog({ rootSeed: SEED_B, fairness: 'unfair', catalog, commands: withNoise }),
     ).toEqual(expected);
+  });
+
+  it('applies repositions only for reposition-aware multiplayer versions', () => {
+    const catalog = buildCatalogFromSpecs(standardSpecs());
+    let state = createDraftDuelDraft({ rootSeed: SEED_C, fairness: 'fair', catalog });
+    const commands: DraftDuelCommand[] = [
+      draftDuelCommandSchema.parse({
+        schemaVersion: 1,
+        roomId: 'dd-room',
+        commandId: 'cmd-0',
+        ordinal: 0,
+        actorParticipantId: 'p1',
+        payload: { kind: 'start' },
+      }),
+    ];
+    let ordinal = 1;
+    let reposition: { card: DraftDuelCard; slotIndex: number } | null = null;
+    const actor = draftDuelCurrentPicker(state);
+    while (reposition === null && state.status === 'drafting') {
+      const picker = draftDuelCurrentPicker(state);
+      const option = draftDuelLegalPicks(state, catalog).find(
+        (entry) => entry.available && (entry.legalSlots?.length ?? 0) > 0,
+      );
+      if (!option) throw new Error('reposition replay fixture has no legal pick');
+      const slotIndex = Math.min(...(option.legalSlots ?? []));
+      commands.push(
+        draftDuelCommandSchema.parse({
+          schemaVersion: 1,
+          roomId: 'dd-room',
+          commandId: `cmd-${String(ordinal)}`,
+          ordinal,
+          actorParticipantId: picker,
+          payload: {
+            kind: 'pick',
+            pickOrdinal: state.pickOrdinal,
+            playerId: option.card.playerId,
+            playerVersionId: option.card.playerVersionId,
+            slotIndex,
+          },
+        }),
+      );
+      ordinal += 1;
+      state = applyDraftDuelPick(state, catalog, pickInput(picker, option.card, slotIndex));
+      for (const pick of state.rounds
+        .flatMap((round) => round.picks)
+        .filter((entry) => entry.participantId === actor)) {
+        const slots = draftDuelRepositionSlots(state, catalog, actor, pick.card.playerVersionId);
+        if (slots.length > 0) {
+          reposition = { card: pick.card, slotIndex: slots[0] as number };
+          break;
+        }
+      }
+    }
+    if (reposition === null) throw new Error('reposition replay fixture has no target');
+    commands.push(
+      draftDuelCommandSchema.parse({
+        schemaVersion: 1,
+        roomId: 'dd-room',
+        commandId: `cmd-${String(ordinal)}`,
+        ordinal,
+        actorParticipantId: actor,
+        payload: {
+          kind: 'reposition',
+          playerId: reposition.card.playerId,
+          playerVersionId: reposition.card.playerVersionId,
+          slotIndex: reposition.slotIndex,
+        },
+      }),
+    );
+    const modernExpected = repositionDraftDuelCard(state, catalog, {
+      participantId: actor,
+      playerVersionId: reposition.card.playerVersionId,
+      slotIndex: reposition.slotIndex,
+    });
+    const modern = replayDraftDuelLog({
+      rootSeed: SEED_C,
+      fairness: 'fair',
+      catalog,
+      commands,
+      multiplayerVersion: 'draft-duel-multiplayer-v2',
+    });
+    expect(modern.rounds).toEqual(modernExpected.rounds);
+    expect(modern.pickOrdinal).toBe(modernExpected.pickOrdinal);
+    const again = replayDraftDuelLog({
+      rootSeed: SEED_C,
+      fairness: 'fair',
+      catalog,
+      commands,
+      multiplayerVersion: 'draft-duel-multiplayer-v2',
+    });
+    expect(again).toEqual(modern);
+    const legacy = replayDraftDuelLog({
+      rootSeed: SEED_C,
+      fairness: 'fair',
+      catalog,
+      commands,
+      multiplayerVersion: 'draft-duel-multiplayer-v1',
+    });
+    expect(legacy.rounds).toEqual(state.rounds);
+    expect(legacy.pickOrdinal).toBe(state.pickOrdinal);
   });
 });

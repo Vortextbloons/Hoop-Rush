@@ -49,6 +49,8 @@ interface FixedFiveRoomRow {
   result_digest: FixedFiveRoomSnapshot['resultDigest'];
   confirmed_digest: FixedFiveRoomSnapshot['confirmedDigest'];
   successor_room_id: FixedFiveRoomSnapshot['successorRoomId'];
+  series: unknown;
+  broadcast: unknown;
   root_seed: NonNullable<FixedFiveRoomSnapshot['rootSeed']>;
   deadline_at: string | null;
   deadline_cursor: string | null;
@@ -65,6 +67,7 @@ interface FixedFiveMemberRow {
   ready: boolean;
   picks_committed: number;
   locked: boolean;
+  next_game_ready: number | null;
   last_seen_at: string | null;
 }
 
@@ -159,6 +162,7 @@ export function createFixedFiveTransport(options?: {
       ready: false,
       picksCommitted: 0,
       locked: false,
+      nextGameReady: null,
       lastSeenAt: null,
     };
   }
@@ -170,6 +174,12 @@ export function createFixedFiveTransport(options?: {
       ready: row.ready,
       picksCommitted: row.picks_committed,
       locked: row.locked,
+      nextGameReady:
+        typeof row.next_game_ready === 'number' &&
+        row.next_game_ready >= 1 &&
+        row.next_game_ready <= 7
+          ? row.next_game_ready
+          : null,
       lastSeenAt: row.last_seen_at,
     };
   }
@@ -219,6 +229,8 @@ export function createFixedFiveTransport(options?: {
       members,
       rootSeed: row.root_seed,
       deadline,
+      series: row.series ?? null,
+      broadcast: row.broadcast ?? null,
       resultDigest: row.result_digest,
       confirmedDigest: row.confirmed_digest,
       successorRoomId: row.successor_room_id,
@@ -231,7 +243,7 @@ export function createFixedFiveTransport(options?: {
     const roomResponse = await client
       .from('fixed_five_rooms')
       .select(
-        'id, code, code_active, mode, source_mode, variant, versions, phase, revision, command_count, digest, result_digest, confirmed_digest, successor_room_id, root_seed, deadline_at, deadline_cursor, deadline_participant, deadline_fallback, deadline_pick_ordinal, expires_at, created_at',
+        'id, code, code_active, mode, source_mode, variant, versions, phase, revision, command_count, digest, result_digest, confirmed_digest, successor_room_id, series, broadcast, root_seed, deadline_at, deadline_cursor, deadline_participant, deadline_fallback, deadline_pick_ordinal, expires_at, created_at',
       )
       .eq('id', roomId)
       .single();
@@ -240,7 +252,9 @@ export function createFixedFiveTransport(options?: {
     if (roomData == null) throw new Error('authorization: cannot read room');
     const memberResponse = await client
       .from('fixed_five_room_members')
-      .select('participant_id, online, ready, picks_committed, locked, last_seen_at')
+      .select(
+        'participant_id, online, ready, picks_committed, locked, next_game_ready, last_seen_at',
+      )
       .eq('room_id', roomId);
     if (
       memberResponse.error ||
@@ -332,6 +346,8 @@ export function createFixedFiveTransport(options?: {
         members: [memberFallback('p1'), memberFallback('p2')],
         rootSeed: null,
         deadline: null,
+        series: null,
+        broadcast: null,
         resultDigest: null,
         confirmedDigest: null,
         successorRoomId: null,

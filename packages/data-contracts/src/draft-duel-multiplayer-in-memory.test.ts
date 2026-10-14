@@ -296,6 +296,46 @@ describe('in-memory Draft Duel transport', () => {
     expect(duplicateClaim.rejectionCode).toBe('claim-taken');
   });
 
+  it('accepts a reposition for a claimed card without moving the deadline', async () => {
+    const transport = createInMemoryDraftDuelTransport({ seed: 'draft-duel-reposition' });
+    const { roomId } = await createAndJoin(transport);
+    const current = await readyBothAndStart(transport, roomId);
+    const rootSeed = current.rootSeed;
+    if (!rootSeed) throw new Error('draft duel room is missing a root seed');
+    const first = draftDuelFirstPickerFor(rootSeed);
+
+    const pick = await submit(transport, roomId, 'reposition-pick', first, {
+      kind: 'pick',
+      pickOrdinal: 0,
+      playerId: playerIdSchema.parse('move-player'),
+      playerVersionId: playerVersion('a'),
+      slotIndex: 0,
+    });
+    expect(pick.accepted).toBe(true);
+    const beforeDeadline = (await snapshot(transport, roomId)).deadline;
+
+    const unclaimed = await submit(transport, roomId, 'reposition-unclaimed', first, {
+      kind: 'reposition',
+      playerId: playerIdSchema.parse('not-drafted'),
+      playerVersionId: playerVersion('b'),
+      slotIndex: 1,
+    });
+    expect(unclaimed.rejectionCode).toBe('illegal-move');
+
+    const moved = await submit(transport, roomId, 'reposition-move', first, {
+      kind: 'reposition',
+      playerId: playerIdSchema.parse('move-player'),
+      playerVersionId: playerVersion('a'),
+      slotIndex: 2,
+    });
+    expect(moved.accepted).toBe(true);
+    const after = await snapshot(transport, roomId);
+    expect(after.deadline?.cursor).toBe(beforeDeadline?.cursor);
+    expect(after.deadline?.pickOrdinal).toBe(beforeDeadline?.pickOrdinal);
+    expect(after.deadline?.participantId).toBe(beforeDeadline?.participantId);
+    expect(after.commandCount).toBeGreaterThan(current.commandCount + 1);
+  });
+
   it('commits a fallback and resolves an overdue deadline with an injectable clock', async () => {
     let now = 1_000_000;
     const transport = createInMemoryDraftDuelTransport({

@@ -1219,7 +1219,14 @@ function resolveTechnicalFreeThrow(
   offenseSide: SideIndex,
   defenseSide: SideIndex,
 ): void {
-  resolveGrantedFreeThrow(ctx, offenseSide, defenseSide, true);
+  const { rng } = ctx;
+  const team = ctx.teams[offenseSide];
+  const teamPrep = ctx.preps[offenseSide];
+  const shooter = rng.weightedPickTable(team.players, teamPrep.freeThrowShooterPickTable);
+  const shooterSlot = slotOf(teamPrep, shooter);
+  resolveFreeThrows(ctx, offenseSide, defenseSide, shooterSlot, 1, true, [0, 0], {
+    bonusAttempts: 1,
+  });
 }
 function resolveGrantedFreeThrow(
   ctx: TripContext,

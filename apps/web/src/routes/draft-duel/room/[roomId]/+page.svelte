@@ -32,6 +32,7 @@
   import ChampionshipView from '$lib/features/draft-duel/ChampionshipView.svelte';
   import { inviteLinkForDraftDuelCode } from '$lib/features/draft-duel/draft-duel-identity';
   import { loadLobbyId, lobbyCommand } from '$lib/features/multiplayer/multiplayer-lobby';
+  import { SLOT_LABELS } from '$lib/player-positions';
 
   const roomId = $derived($page.params.roomId as string);
   const controller = new DraftDuelController();
@@ -44,6 +45,28 @@
       ? (pendingSelection?.pick ?? null)
       : null,
   );
+  let movingCard = $state<DraftDuelCard | null>(null);
+  const activeMoveCard = $derived(
+    movingCard && controller.draft?.status === 'drafting' ? movingCard : null,
+  );
+  const moveSlots = $derived(
+    activeMoveCard ? controller.repositionSlots(activeMoveCard) : ([] as number[]),
+  );
+  const moveLabels = $derived.by(() => {
+    const card = activeMoveCard;
+    if (!card) return {} as Record<number, string>;
+    const labels: Record<number, string> = {};
+    for (const slot of moveSlots) {
+      const moves = controller.repositionMoves(card, slot);
+      labels[slot] =
+        moves.length > 0
+          ? `Moves ${moves.length} player${moves.length === 1 ? '' : 's'}: ${moves
+              .map((move) => `${move.displayName} → ${SLOT_LABELS[move.toSlot]}`)
+              .join(', ')}`
+          : 'Move';
+    }
+    return labels;
+  });
   let followingRematch = false;
 
   onMount(() => {
@@ -406,6 +429,7 @@
                 presentation={controller.snapshot.settings.presentation}
                 manifest={controller.assets?.manifest ?? null}
                 active
+                onmove={controller.allowDisplacement ? (card) => (movingCard = card) : null}
               />
             {/if}
           </div>
@@ -416,16 +440,27 @@
           onmute={(muted) => controller.setMuted(muted)}
         />
         <DraftSlotDialog
-          card={pendingPick?.card ?? null}
+          card={pendingPick?.card ?? activeMoveCard}
           manifest={controller.assets?.manifest ?? null}
           roster={rosterCards}
-          legalSlots={pendingPick?.legalSlots ?? []}
+          legalSlots={pendingPick ? (pendingPick.legalSlots ?? []) : moveSlots}
+          moving={pendingPick === null && activeMoveCard !== null}
+          moveLabels={pendingPick === null ? moveLabels : {}}
           onplace={(slotIndex) => {
-            const pick = pendingPick;
-            pendingSelection = null;
-            if (pick) void controller.pickOffer(pick, slotIndex);
+            if (pendingPick) {
+              const pick = pendingPick;
+              pendingSelection = null;
+              void controller.pickOffer(pick, slotIndex);
+              return;
+            }
+            const card = activeMoveCard;
+            movingCard = null;
+            if (card) void controller.repositionCard(card, slotIndex);
           }}
-          onclose={() => (pendingSelection = null)}
+          onclose={() => {
+            pendingSelection = null;
+            movingCard = null;
+          }}
         />
       </section>
     {:else if controller.phase === 'lineup-showdown'}

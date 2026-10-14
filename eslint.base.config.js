@@ -2,7 +2,7 @@ import tseslint from 'typescript-eslint';
 
 export function sharedEslintBase(tsconfigRootDir) {
   return tseslint.config(
-    { ignores: ['dist/'] },
+    { ignores: ['dist/', '**/*.gen.ts'] },
     {
       files: ['**/*.ts'],
       extends: [tseslint.configs.strictTypeChecked],
