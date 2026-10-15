@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { LobbyCoordinator } from './lobby-context.svelte';
+import { LobbyCoordinator, initialLobbyView } from './lobby-context.svelte';
+import { lobbyCommand } from './multiplayer-lobby';
+import {
+  defaultDraftDuelVersionLocks,
+  type MultiplayerMatchSettings,
+} from '@hoop-rush/data-contracts';
 
 const lobby = {
   id: '00000000-0000-4000-8000-000000000001',
@@ -21,6 +26,53 @@ vi.mock('./multiplayer-lobby', () => ({
 afterEach(() => vi.useRealTimers());
 
 describe('layout lobby coordinator', () => {
+  it('opens an existing lobby as setup or guest waiting when returning without query parameters', () => {
+    expect(
+      initialLobbyView({ hasLobby: true, hasCode: false, hasFormat: false, showChooser: true }),
+    ).toBe('create');
+    expect(
+      initialLobbyView({ hasLobby: false, hasCode: false, hasFormat: false, showChooser: true }),
+    ).toBe('choose');
+    expect(
+      initialLobbyView({ hasLobby: false, hasCode: true, hasFormat: false, showChooser: true }),
+    ).toBe('join');
+  });
+
+  it.each(['unmounted', 'disposed', 'replaced'] as const)(
+    'does not create a match after deferred version loading when the entry is %s',
+    async (change) => {
+      vi.useFakeTimers();
+      const coordinator = new LobbyCoordinator(vi.fn(() => Promise.resolve()));
+      await coordinator.session.create();
+      vi.mocked(lobbyCommand).mockClear();
+      let current = true;
+      let resolveSettings: (settings: MultiplayerMatchSettings) => void = () => {};
+      const preparation = coordinator.prepareMatch(
+        () =>
+          new Promise<MultiplayerMatchSettings>((resolve) => {
+            resolveSettings = resolve;
+          }),
+        () => current,
+      );
+      if (change === 'unmounted') current = false;
+      else if (change === 'disposed') coordinator.dispose();
+      else {
+        const replacementId = '00000000-0000-4000-8000-000000000002';
+        vi.mocked(lobbyCommand).mockResolvedValueOnce({ ...lobby, id: replacementId });
+        await coordinator.session.attach(replacementId);
+      }
+      resolveSettings({
+        gameKind: 'draft-duel',
+        fairness: 'fair',
+        variant: 'ratings',
+        versions: defaultDraftDuelVersionLocks({ catalogHash: 'a'.repeat(64) }),
+      });
+      await preparation;
+      expect(lobbyCommand).not.toHaveBeenCalledWith(expect.objectContaining({ kind: 'start' }));
+      coordinator.dispose();
+    },
+  );
+
   it('retains a failed navigation for recovery and coalesces duplicate notifications', async () => {
     vi.useFakeTimers();
     const navigate = vi

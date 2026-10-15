@@ -43,6 +43,7 @@ export class LobbySession {
   private attachment: RoomAttachment | null = null;
   private lobby: MultiplayerLobby | null = null;
   private roomPreview: MultiplayerRoomPreview | null = null;
+  private previewGeneration = 0;
   private busy = false;
   private error: string | null = null;
   private navigation: LobbyNavigation | null = null;
@@ -119,12 +120,24 @@ export class LobbySession {
   }
 
   async preview(code: string): Promise<void> {
+    const generation = ++this.previewGeneration;
     await this.perform(async (current) => {
-      const preview = multiplayerRoomPreviewSchema.parse(
-        await this.deps.command({ kind: 'preview', code }),
-      );
-      if (current()) this.roomPreview = preview;
+      try {
+        const preview = multiplayerRoomPreviewSchema.parse(
+          await this.deps.command({ kind: 'preview', code }),
+        );
+        if (current() && generation === this.previewGeneration) this.roomPreview = preview;
+      } catch (error) {
+        if (generation === this.previewGeneration) throw error;
+      }
     });
+  }
+
+  clearPreview(): void {
+    this.previewGeneration += 1;
+    this.roomPreview = null;
+    this.error = null;
+    this.events.publish();
   }
 
   async join(code: string): Promise<void> {

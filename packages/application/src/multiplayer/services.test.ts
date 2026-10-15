@@ -57,6 +57,34 @@ function harness(command: LobbySessionDeps['command'] = vi.fn(() => Promise.reso
 }
 
 describe('lobby orchestration', () => {
+  it.each(['success', 'error'] as const)(
+    'clears room previews on code edits and ignores delayed %s responses',
+    async (result) => {
+      const firstPreview = { legacy: false, code: '1234', guestJoined: false };
+      const nextPreview = { legacy: false, code: '5678', guestJoined: true };
+      const pending = deferred<unknown>();
+      const command = vi
+        .fn<LobbySessionDeps['command']>()
+        .mockResolvedValueOnce(firstPreview)
+        .mockReturnValueOnce(pending.promise)
+        .mockResolvedValueOnce(nextPreview);
+      const h = harness(command);
+      await h.session.preview('1234');
+      expect(h.session.getSnapshot().preview).toEqual(firstPreview);
+      h.session.clearPreview();
+      expect(h.session.getSnapshot().preview).toBeNull();
+      const refresh = h.session.preview('1234');
+      h.session.clearPreview();
+      if (result === 'success') pending.resolve(firstPreview);
+      else pending.reject(new Error('invalid-code'));
+      await refresh;
+      expect(h.session.getSnapshot()).toMatchObject({ preview: null, error: null, busy: false });
+      await h.session.preview('5678');
+      expect(h.session.getSnapshot().preview).toEqual(nextPreview);
+      h.session.dispose();
+    },
+  );
+
   it('creates and remembers one validated lobby and publishes a navigation intent', async () => {
     const h = harness();
     await h.session.create();

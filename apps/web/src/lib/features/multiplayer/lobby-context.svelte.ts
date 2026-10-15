@@ -3,6 +3,7 @@ import {
   LobbySession,
   type LobbyNavigation,
   type LobbySessionSnapshot,
+  type MultiplayerStartSettings,
 } from '@hoop-rush/application/multiplayer';
 import {
   lobbyCommand,
@@ -16,6 +17,18 @@ import type {
   MultiplayerGameKind,
   MultiplayerSetup,
 } from '@hoop-rush/data-contracts';
+
+export type LobbyView = 'choose' | 'create' | 'join';
+
+export function initialLobbyView(options: {
+  hasLobby: boolean;
+  hasCode: boolean;
+  hasFormat: boolean;
+  showChooser: boolean;
+}): LobbyView {
+  if (options.hasCode) return 'join';
+  return options.hasLobby || options.hasFormat || !options.showChooser ? 'create' : 'choose';
+}
 
 export class LobbyCoordinator {
   localFormat: MultiplayerFormatId | null = null;
@@ -92,6 +105,19 @@ export class LobbyCoordinator {
 
   refresh(): void {
     if (this.active) void this.active.reconnect();
+  }
+
+  async prepareMatch(
+    prepareSettings: () => Promise<MultiplayerStartSettings>,
+    current: () => boolean,
+  ): Promise<void> {
+    const session = this.session;
+    const lobbyId = session.getSnapshot().lobby?.id;
+    if (!lobbyId || !current()) return;
+    const settings = await prepareSettings();
+    if (!current() || this.active !== session || session.getSnapshot().lobby?.id !== lobbyId)
+      return;
+    await session.startMatch(settings);
   }
 
   async resumeRoom(

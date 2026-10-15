@@ -61,9 +61,24 @@ describe('mode catalog', () => {
       expect(adapter.resume).toBeTypeOf('function');
       expect(adapter.createRoomSession).toBeTypeOf('function');
       expect(adapter.inviteLink('1234')).toBe('/multiplayer?code=1234');
-      expect(adapter.pickTimer(adapter.defaults)).toMatch(/picks$/);
+      expect(adapter.pickTimer(adapter.defaults, mode.formats[0]?.id ?? 'season')).toMatch(
+        /picks$/,
+      );
     },
     20_000,
+  );
+
+  it.each([
+    { format: 'season', sourceMode: 'classic', timer: '90s picks' },
+    { format: 'season', sourceMode: 'sandbox', timer: '5m picks' },
+    { format: 'duel', sourceMode: 'classic', timer: '90s picks' },
+    { format: 'duel', sourceMode: 'sandbox', timer: '90s picks' },
+  ] as const)(
+    'shows the authoritative $sourceMode $format timer',
+    async ({ format, sourceMode, timer }) => {
+      const adapter = await multiplayerMode('fixed-five').load();
+      expect(adapter.pickTimer({ ...adapter.defaults, sourceMode }, format)).toBe(timer);
+    },
   );
 
   it('integrates a test mode through registration without changing discovery or lobby selectors', async () => {

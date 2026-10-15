@@ -6,6 +6,10 @@ import {
   RATINGS_VERSION,
   defaultFixedFiveVersionLocks,
   fixedFiveSetupSchema,
+  fixedFiveTimeoutMsForMode,
+  type FixedFiveRoomMode,
+  type MultiplayerFormatId,
+  type MultiplayerSetup,
 } from '@hoop-rush/data-contracts';
 import { ENGINE_VERSION } from '@hoop-rush/engine';
 import { loadRunPreamble } from '#lib/run-preamble.js';
@@ -32,6 +36,14 @@ async function loadVersions() {
   });
 }
 
+function roomMode(format: MultiplayerFormatId, settings: MultiplayerSetup): FixedFiveRoomMode {
+  return format === 'duel'
+    ? 'duel'
+    : settings.sourceMode === 'sandbox'
+      ? 'sandbox-shared-82'
+      : 'classic-shared-82';
+}
+
 export const fixedFiveModeAdapter: MultiplayerModeAdapter = {
   defaults: { sourceMode: 'classic', variant: 'ratings' },
   Settings,
@@ -44,12 +56,7 @@ export const fixedFiveModeAdapter: MultiplayerModeAdapter = {
     return {
       gameKind: 'fixed-five',
       ...settings,
-      mode:
-        format === 'duel'
-          ? 'duel'
-          : settings.sourceMode === 'sandbox'
-            ? 'sandbox-shared-82'
-            : 'classic-shared-82',
+      mode: roomMode(format, settings),
       versions: await loadVersions(),
     };
   },
@@ -59,5 +66,10 @@ export const fixedFiveModeAdapter: MultiplayerModeAdapter = {
   },
   inviteLink: multiplayerInviteLink,
   createRoomSession: (roomId) => new FixedFiveRoomController({ roomId }),
-  pickTimer: (settings) => (settings.sourceMode === 'sandbox' ? '5m picks' : '90s picks'),
+  pickTimer: (settings, format) => {
+    const timeoutMs = fixedFiveTimeoutMsForMode(roomMode(format, settings));
+    return timeoutMs % 60_000 === 0
+      ? `${String(timeoutMs / 60_000)}m picks`
+      : `${String(timeoutMs / 1000)}s picks`;
+  },
 };

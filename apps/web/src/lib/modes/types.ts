@@ -33,7 +33,7 @@ export interface MultiplayerModeAdapter {
   resume: (roomId: string) => Promise<void>;
   inviteLink: (code: string) => string;
   createRoomSession: (roomId: string) => { dispose(): void };
-  pickTimer: (settings: MultiplayerSetup) => string;
+  pickTimer: (settings: MultiplayerSetup, format: MultiplayerFormatId) => string;
 }
 export interface MultiplayerFormatDefinition {
   id: MultiplayerFormatId;

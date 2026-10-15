@@ -19,10 +19,13 @@
     loadLobbyId,
     multiplayerGameKindLabels,
   } from '#lib/features/multiplayer/multiplayer-lobby.js';
-  import { getLobbyCoordinator } from '#lib/features/multiplayer/lobby-context.svelte.js';
+  import {
+    getLobbyCoordinator,
+    initialLobbyView,
+    type LobbyView,
+  } from '#lib/features/multiplayer/lobby-context.svelte.js';
   import { multiplayerFormats } from '#lib/modes/catalog.js';
   import type { MultiplayerModeAdapter } from '#lib/modes/types.js';
-  type View = 'choose' | 'create' | 'join';
   let {
     initialFormat,
     showChooser = true,
@@ -41,7 +44,7 @@
         : `Shared lobby · ${result.guestJoined ? '2 players' : 'Waiting for an opponent'}`
       : null;
   });
-  let view = $state<View>('choose');
+  let view = $state<LobbyView>('choose');
   let lastLobbyId = $state<string | null>(null);
   let lastRoomId = $state<string | null>(null);
   let matchFormat = $state<MultiplayerFormatId>('season');
@@ -51,6 +54,7 @@
   const formats = multiplayerFormats();
   const selectedFormat = $derived(formats.find((item) => item.id === matchFormat)!);
   let selectionGeneration = 0;
+  let mounted = false;
   async function selectFormat(nextFormat: MultiplayerFormatId) {
     const generation = ++selectionGeneration;
     matchFormat = nextFormat;
@@ -74,7 +78,7 @@
       if (generation === selectionGeneration) loadingSettings = false;
     }
   }
-  function switchView(nextView: View) {
+  function switchView(nextView: LobbyView) {
     view = nextView;
     localError = null;
   }
@@ -83,15 +87,17 @@
     coordinator.localSettings.set(selectedFormat.mode.multiplayer!.gameKind, { ...value });
   }
   onMount(() => {
+    mounted = true;
     lastLobbyId = loadLobbyId();
     const params = new URLSearchParams(window.location.search);
     const formatParam = formats.find((item) => item.id === params.get('format'));
-    void selectFormat(formatParam?.id ?? initialFormat ?? coordinator.localFormat ?? 'season').then(
-      () => {
-        if (!formatParam && !params.has('lobby'))
-          view = params.has('code') ? 'join' : showChooser ? 'choose' : 'create';
-      },
-    );
+    void selectFormat(formatParam?.id ?? initialFormat ?? coordinator.localFormat ?? 'season');
+    view = initialLobbyView({
+      hasLobby: lobby !== null || params.has('lobby'),
+      hasCode: params.has('code'),
+      hasFormat: formatParam !== undefined,
+      showChooser,
+    });
     const lobbyParam = params.get('lobby');
     if (lobbyParam) {
       view = 'create';
@@ -103,28 +109,39 @@
       view = 'join';
     }
     return () => {
+      mounted = false;
       selectionGeneration++;
     };
   });
   async function createRoom() {
     await coordinator.session.create();
-    view = 'create';
+    if (mounted) view = 'create';
   }
   async function startCreate() {
     if (!adapter || !lobby) return;
     localError = null;
     loadingSettings = true;
+    const generation = selectionGeneration;
+    const current = () => mounted && generation === selectionGeneration;
+    const selectedAdapter = adapter;
+    const selectedSettings = { ...settings };
+    const format = matchFormat;
     try {
-      await coordinator.session.startMatch(await adapter.startSettings(matchFormat, settings));
+      await coordinator.prepareMatch(
+        () => selectedAdapter.startSettings(format, selectedSettings),
+        current,
+      );
     } catch (cause) {
-      localError = cause instanceof Error ? cause.message : 'Could not create the match.';
+      if (current())
+        localError = cause instanceof Error ? cause.message : 'Could not create the match.';
     } finally {
-      loadingSettings = false;
+      if (current()) loadingSettings = false;
     }
   }
   function cleanCode() {
     code = code.replace(/\D/g, '').slice(0, 4);
     localError = null;
+    coordinator.session.clearPreview();
   }
   async function doPreview() {
     cleanCode();
@@ -134,7 +151,7 @@
     cleanCode();
     if (code.length === 4) {
       await coordinator.session.join(code);
-      view = 'create';
+      if (mounted) view = 'create';
     }
   }
   async function resumeLast() {
@@ -146,6 +163,7 @@
   }
   async function leaveLobby() {
     await coordinator.session.leave();
+    if (!mounted) return;
     if (!coordinator.snapshot.lobby) {
       localStorage.removeItem('hoop-rush:multiplayer:last-lobby');
       lastLobbyId = null;
@@ -338,7 +356,7 @@
             <div>
               <dt><Clock size={15} aria-hidden="true" /> Pick timer</dt>
               <dd>
-                {adapter?.pickTimer(settings) ?? 'Loading…'}
+                {adapter?.pickTimer(settings, matchFormat) ?? 'Loading…'}
               </dd>
             </div>
             <div>
