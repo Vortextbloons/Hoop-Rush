@@ -10,7 +10,7 @@
   import GameScoreboard from '#lib/components/GameScoreboard.svelte';
   import TeamLogo from '#lib/components/TeamLogo.svelte';
   import { SLOT_LABELS } from '#lib/player-positions.js';
-  import { formatClock } from '#lib/format.js';
+  import { formatClock, ratioPct } from '#lib/format.js';
   import {
     TAPE_STAT_INDEXES,
     gamecastPeriodLabel,
@@ -115,19 +115,20 @@
         rebounds: (line[OFFENSIVE_REBOUNDS] ?? 0) + (line[DEFENSIVE_REBOUNDS] ?? 0),
         assists: line[ASSISTS] ?? 0,
         turnovers: line[TURNOVERS] ?? 0,
-        fieldGoals: `${String(line[FIELD_GOAL_MAKES] ?? 0)}-${String(line[FIELD_GOAL_ATTEMPTS] ?? 0)}`,
-        threes: `${String(line[THREE_MAKES] ?? 0)}-${String(line[THREE_ATTEMPTS] ?? 0)}`,
+        fieldGoals: ratioPct(line[FIELD_GOAL_MAKES] ?? 0, line[FIELD_GOAL_ATTEMPTS] ?? 0),
+        threes: ratioPct(line[THREE_MAKES] ?? 0, line[THREE_ATTEMPTS] ?? 0),
         hot: false,
       };
     });
-    const best = rows.reduce((top, row) => (row.points > top ? row.points : top), 0);
-    for (const row of rows) row.hot = best > 0 && row.points === best;
     return rows;
   }
 
   const localSide = $derived(output.homeParticipantId === localParticipantId ? 'home' : 'away');
   const localScore = $derived(localSide === 'home' ? visible.homeScore : visible.awayScore);
   const opponentScore = $derived(localSide === 'home' ? visible.awayScore : visible.homeScore);
+  const leader = $derived(
+    localScore === opponentScore ? null : localScore > opponentScore ? 'local' : 'opponent',
+  );
   const lastTrip = $derived(feed.length > 0 ? (feed[feed.length - 1] ?? null) : null);
   const periodLabel = $derived(
     gamecastPeriodLabel(lastTrip?.period ?? visible.periods.at(-1)?.period ?? 1),
@@ -151,7 +152,7 @@
   const sides = $derived.by((): SideView[] => {
     const order: readonly ('home' | 'away')[] =
       localSide === 'home' ? ['home', 'away'] : ['away', 'home'];
-    return order.map((key) => {
+    const panels = order.map((key) => {
       const lines = key === 'home' ? visible.homePlayerLines : visible.awayPlayerLines;
       const ids = (key === 'home' ? output.result.home : output.result.away).players.map(
         (player) => player.playerId,
@@ -163,6 +164,11 @@
         rows: playerRowsOf(lines, ids),
       };
     });
+    const best = Math.max(0, ...panels.flatMap((panel) => panel.rows.map((row) => row.points)));
+    for (const panel of panels) {
+      for (const row of panel.rows) row.hot = best > 0 && row.points === best;
+    }
+    return panels;
   });
 
   function feedTag(line: GamecastFeedLine): string {
@@ -192,8 +198,13 @@
     class="bc-board"
   >
     {#snippet team(entry)}
-      <div class={entry.key === 'local' ? 'bc-team you' : 'bc-team opp'}>
+      <div
+        class={entry.key === 'local' ? 'bc-team you' : 'bc-team opp'}
+        data-leading={entry.key === leader}
+      >
         <span class="bc-team-label">{entry.label}</span>
+        {#if entry.key === leader}<span class="bc-leader">{complete ? 'Winner' : 'Leading'}</span
+          >{/if}
         {#key entry.score}
           <span class="bc-score" data-score={entry.key === 'local' ? 'local' : 'opponent'}>
             {entry.score}
@@ -245,8 +256,8 @@
           <span>REB</span>
           <span>AST</span>
           <span>TO</span>
-          <span>FG</span>
-          <span>3P</span>
+          <span>FG%</span>
+          <span>3P%</span>
         </div>
         <ul class="bc-rows">
           {#each side.rows as row (row.key)}
@@ -279,7 +290,7 @@
                       />
                     {/if}
                     {row.position}
-                    {#if row.hot}<span class="bc-hot">Leading</span>{/if}
+                    {#if row.hot}<span class="bc-hot">Top scorer</span>{/if}
                   </span>
                 </span>
               </span>
@@ -390,12 +401,14 @@
     color: var(--color-muted-foreground);
   }
 
-  .bc-team.you .bc-team-label {
+  .bc-team[data-leading='true'] .bc-team-label {
     color: var(--color-primary);
   }
 
-  .bc-team.opp .bc-team-label {
-    color: var(--dd-opp);
+  .bc-leader {
+    color: var(--color-primary);
+    font-family: var(--font-mono);
+    font-size: 10px;
   }
 
   .bc-score {
@@ -407,12 +420,12 @@
     animation: bc-score-pop 340ms cubic-bezier(0.22, 1, 0.36, 1);
   }
 
-  .bc-team.you .bc-score {
+  .bc-team[data-leading='true'] .bc-score {
     color: var(--color-primary);
     text-shadow: 0 0 32px color-mix(in srgb, var(--color-primary) 45%, transparent);
   }
 
-  .bc-team.opp .bc-score {
+  .bc-team[data-leading='false'] .bc-score {
     color: #f5f3ef;
   }
 

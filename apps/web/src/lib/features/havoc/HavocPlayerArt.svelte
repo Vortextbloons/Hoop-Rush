@@ -13,6 +13,7 @@
     franchiseId,
     seasonKey,
     large = false,
+    compact = false,
   }: {
     playerId?: string;
     playerVersionId?: string | null;
@@ -20,6 +21,7 @@
     franchiseId?: string | null;
     seasonKey?: string | null;
     large?: boolean;
+    compact?: boolean;
   } = $props();
   let manifest = $state.raw<HoopRushManifest | null>(null);
   let index = $state.raw<PlayersIndex | null>(null);
@@ -52,13 +54,18 @@
   });
 </script>
 
-<div class="h-player-art" class:large data-player-version={playerVersionId}>
+<div class="h-player-art" class:large class:compact data-player-version={playerVersionId}>
   {#if manifest && player}
-    <PlayerFace {manifest} {player} size="xl" fallbackInitials={initialsOf(displayName)} />
+    <PlayerFace
+      {manifest}
+      {player}
+      size={compact ? 'sm' : 'xl'}
+      fallbackInitials={initialsOf(displayName)}
+    />
   {:else}
     <span class="h-initials" aria-hidden="true">{initialsOf(displayName)}</span>
   {/if}
-  {#if manifest && team}
+  {#if manifest && team && !compact}
     <span class="h-team-crest">
       <TeamLogo
         {manifest}
@@ -89,6 +96,13 @@
   .large {
     width: 100%;
     height: 160px;
+  }
+  .compact {
+    width: 36px;
+    height: 36px;
+  }
+  .compact .h-initials {
+    font-size: 0.875rem;
   }
   .large :global(img) {
     object-fit: contain;

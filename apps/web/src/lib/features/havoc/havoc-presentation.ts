@@ -2,6 +2,7 @@ import type {
   HavocComparison,
   HavocDraftPick,
   HavocEvent,
+  HavocBattleEvent,
   HavocGameResult,
   HavocHomeAway,
   HavocMutationEntry,
@@ -154,14 +155,18 @@ export interface HavocEventNameContext {
   humanSide: HavocHomeAway;
 }
 
-function sideTeamNameOf(context: HavocEventNameContext, side: HavocSide): string {
+function sideTeamNameOf(context: HavocEventNameContext, side: HavocSide | HavocHomeAway): string {
+  if (side === 'home') return context.homeName;
+  if (side === 'away') return context.awayName;
   if (side === 'human') {
     return context.humanSide === 'home' ? context.homeName : context.awayName;
   }
   return context.humanSide === 'home' ? context.awayName : context.homeName;
 }
 
-export function havocEventMutationIdOf(event: HavocEvent): HavocMutationId | null {
+export function havocEventMutationIdOf(
+  event: HavocEvent | HavocBattleEvent,
+): HavocMutationId | null {
   switch (event.kind) {
     case 'four-point-dunk':
       return 'four-point-dunk';
@@ -208,7 +213,10 @@ export function havocEventMutationIdOf(event: HavocEvent): HavocMutationId | nul
   }
 }
 
-export function havocEventTextOf(event: HavocEvent, context: HavocEventNameContext): string {
+export function havocEventTextOf(
+  event: HavocEvent | HavocBattleEvent,
+  context: HavocEventNameContext,
+): string {
   const name = (instanceId: string): string => context.playerName(instanceId);
   switch (event.kind) {
     case 'period-start':

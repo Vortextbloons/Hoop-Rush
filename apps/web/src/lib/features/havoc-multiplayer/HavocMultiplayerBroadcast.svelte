@@ -12,6 +12,7 @@
   import { havocMultiplayerLiveBoxes } from './havoc-multiplayer-playback-view';
   import { havocMultiplayerLocalSide } from './havoc-multiplayer-room-view';
   import HavocMultiplayerBoxScore from './HavocMultiplayerBoxScore.svelte';
+  import { havocMultiplayerAbilityLines } from './havoc-multiplayer-playback';
 
   let {
     output,
@@ -38,6 +39,14 @@
   const localBox = $derived(boxes.find((box) => box.side === localSide));
   const opponentBox = $derived(boxes.find((box) => box.side !== localSide));
   const complete = $derived(progress >= 1);
+  const leader = $derived(
+    localBox?.score === opponentBox?.score
+      ? null
+      : (localBox?.score ?? 0) > (opponentBox?.score ?? 0)
+        ? 'local'
+        : 'opponent',
+  );
+  const abilities = $derived(havocMultiplayerAbilityLines(output.result, visible.events));
   const progressPct = $derived(
     Math.round(Math.min(1, Math.max(0, Number.isNaN(progress) ? 0 : progress)) * 100),
   );
@@ -58,8 +67,9 @@
   aria-label={`Game ${output.gameNumber} broadcast`}
 >
   <header class="hm-scoreboard">
-    <div class="hm-team" data-align="start">
+    <div class="hm-team" data-align="start" data-leading={leader === 'local'}>
       <span class="hm-team-label" data-side="local">You</span>
+      {#if leader === 'local'}<span class="hm-leader">{complete ? 'Winner' : 'Leading'}</span>{/if}
       {#key localBox?.score}
         <span class="hm-score" data-negative={(localBox?.score ?? 0) < 0}
           >{localBox?.score ?? 0}</span
@@ -87,8 +97,10 @@
       </span>
       <span class="hm-plays">{visible.events.length + visible.scoring.length} plays shown</span>
     </div>
-    <div class="hm-team" data-align="end">
+    <div class="hm-team" data-align="end" data-leading={leader === 'opponent'}>
       <span class="hm-team-label" data-side="opponent">Opponent</span>
+      {#if leader === 'opponent'}<span class="hm-leader">{complete ? 'Winner' : 'Leading'}</span
+        >{/if}
       {#key opponentBox?.score}
         <span class="hm-score" data-negative={(opponentBox?.score ?? 0) < 0}
           >{opponentBox?.score ?? 0}</span
@@ -103,6 +115,35 @@
   {#if !minimal}
     <HavocMultiplayerBoxScore {boxes} {localSide} />
   {/if}
+
+  <section class="hm-feed" aria-label="Ability activations">
+    <header class="hm-feed-head">
+      <h3>Ability activations</h3>
+      <span>{abilities.length} events</span>
+    </header>
+    {#if abilities.length === 0}
+      <p class="hm-feed-empty">No ability activations yet.</p>
+    {:else}
+      <ol class="hm-feed-list" aria-live="polite">
+        {#each [...abilities].reverse() as line (line.key)}
+          <li
+            class="hm-feed-line hm-ability-line"
+            data-side={line.side === localSide ? 'local' : 'opponent'}
+          >
+            <span class="hm-feed-clock"
+              >{havocPeriodLabel(line.period)} {formatHavocClock(line.clockSeconds)}</span
+            >
+            <span class="hm-feed-team"
+              >{line.side === null ? 'Game' : line.side === localSide ? 'You' : 'Opp'}</span
+            >
+            <div class="hm-ability-detail">
+              <strong>{line.ability}</strong><span>{line.summary}</span>
+            </div>
+          </li>
+        {/each}
+      </ol>
+    {/if}
+  </section>
 
   <section class="hm-feed" aria-label="Scoring feed">
     <header class="hm-feed-head">
@@ -170,11 +211,16 @@
     letter-spacing: 0.2em;
     text-transform: uppercase;
   }
-  .hm-team-label[data-side='local'] {
+  .hm-team[data-leading='true'] .hm-team-label {
     color: #ffd782;
   }
-  .hm-team-label[data-side='opponent'] {
-    color: #f290c5;
+  .hm-team[data-leading='false'] .hm-team-label {
+    color: #aab9db;
+  }
+  .hm-leader {
+    color: #ffd782;
+    font-family: var(--font-mono);
+    font-size: 10px;
   }
   .hm-score {
     font-family: var(--font-display);
@@ -184,14 +230,14 @@
     font-variant-numeric: tabular-nums;
     animation: hm-score-pop 340ms cubic-bezier(0.22, 1, 0.36, 1);
   }
-  .hm-team[data-align='start'] .hm-score {
+  .hm-team[data-leading='true'] .hm-score {
     color: #ffd782;
     text-shadow: 0 0 30px rgb(255 215 130 / 35%);
   }
-  .hm-team[data-align='end'] .hm-score {
+  .hm-team[data-leading='false'] .hm-score {
     color: #f2f4ff;
   }
-  .hm-score[data-negative='true'] {
+  .hm-team[data-leading='false'] .hm-score[data-negative='true'] {
     color: #f290c5;
   }
   .hm-team-bonus {
@@ -344,6 +390,18 @@
     font-size: 12px;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  .hm-ability-line {
+    grid-template-columns: auto auto minmax(0, 1fr);
+  }
+  .hm-ability-detail {
+    display: grid;
+    gap: 3px;
+    font-size: 12px;
+    overflow-wrap: anywhere;
+  }
+  .hm-ability-detail strong {
+    color: #ffd782;
   }
   .hm-feed-points {
     font-family: var(--font-display);

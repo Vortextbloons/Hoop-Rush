@@ -20,6 +20,7 @@ import type { HavocMultiplayerVisibleState } from './havoc-multiplayer-playback'
 
 export interface HavocMultiplayerParticipantLine {
   instanceId: string;
+  sourcePlayerId?: string;
   displayName: string;
   kind: HavocParticipantKind;
   slot: Position;
@@ -49,13 +50,15 @@ export interface HavocMultiplayerSideBox {
 type ParticipantSource = Pick<
   HavocParticipantLine,
   'instanceId' | 'displayName' | 'kind' | 'slot' | 'ownerInstanceId'
->;
+> &
+  Partial<Pick<HavocParticipantLine, 'sourcePlayerId'>>;
 
 const SIDES: readonly HavocHomeAway[] = ['home', 'away'];
 
 function blankLine(participant: ParticipantSource): HavocMultiplayerParticipantLine {
   return {
     instanceId: participant.instanceId,
+    sourcePlayerId: participant.sourcePlayerId,
     displayName: participant.displayName,
     kind: participant.kind,
     slot: participant.slot,

@@ -34,6 +34,7 @@
       {#each slots as slot (slot.slot)}
         <li data-havoc-lineup-slot={slot.slot} data-havoc-lineup-side={side}>
           <HavocPlayerArt
+            compact
             playerId={slot.playerId}
             playerVersionId={slot.playerVersionId}
             displayName={slot.displayName}
@@ -41,11 +42,17 @@
             seasonKey={slot.seasonKey}
           />
           <div class="hm-rail-body">
-            <span class="hm-rail-slot">{slot.slot}</span>
+            <div class="hm-rail-meta">
+              <span class="hm-rail-slot">{slot.slot}</span><HavocTierBadge
+                tier={slot.tier}
+                size="sm"
+              />
+            </div>
             <span class="hm-rail-name">{slot.displayName}</span>
-            <span class="hm-rail-mutations">{mutationEntriesSummary(slot.mutations)}</span>
+            <span class="hm-rail-mutations" title={mutationEntriesSummary(slot.mutations)}
+              >{mutationEntriesSummary(slot.mutations)}</span
+            >
           </div>
-          <HavocTierBadge tier={slot.tier} size="sm" />
         </li>
       {/each}
     </ul>
@@ -124,7 +131,7 @@
   }
   .hm-rail-list li {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-columns: 44px minmax(0, 1fr);
     align-items: center;
     gap: 10px;
     padding: 8px;
@@ -148,14 +155,20 @@
     letter-spacing: 0.12em;
     color: #aab9db;
   }
+  .hm-rail-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+  }
   .hm-rail-name {
     overflow: hidden;
     font-family: var(--font-display);
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 800;
     line-height: 1.1;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
   }
   .hm-rail-mutations {
     overflow: hidden;

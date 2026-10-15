@@ -1,80 +1,116 @@
 <script lang="ts">
+  import HavocPlayerArt from '#lib/features/havoc/HavocPlayerArt.svelte';
+  import { ratioPct, perGameText } from '#lib/format.js';
   import { havocParticipantKindLabel } from '#lib/features/havoc/havoc-presentation.js';
   import type { HavocMultiplayerSideBox } from './havoc-multiplayer-playback-view';
 
   let {
     boxes,
     localSide,
-  }: { boxes: readonly HavocMultiplayerSideBox[]; localSide: 'home' | 'away' } = $props();
+    perGame = false,
+    games = 1,
+  }: {
+    boxes: readonly HavocMultiplayerSideBox[];
+    localSide: 'home' | 'away';
+    perGame?: boolean;
+    games?: number;
+  } = $props();
+
+  function statOf(value: number): string {
+    return perGame ? perGameText(value, games) : String(value);
+  }
 
   function labelOf(side: 'home' | 'away'): string {
     return side === localSide ? 'You' : 'Opponent';
   }
 </script>
 
-<div class="hm-boxes" data-havoc-multiplayer-boxes>
-  {#each boxes as box (box.side)}
-    <section class="hm-box" data-side={box.side} aria-label={`${labelOf(box.side)} box score`}>
-      <header class="hm-box-head">
-        <span class="hm-box-label" data-side={box.side}>{labelOf(box.side)}</span>
-        {#if box.bonusPoints !== 0}
-          <span class="hm-box-bonus" data-negative={box.bonusPoints < 0}
-            >Team bonus {box.bonusPoints > 0 ? `+${box.bonusPoints}` : box.bonusPoints}</span
-          >
-        {/if}
-        <strong class="hm-box-score" data-negative={box.score < 0}>{box.score}</strong>
-      </header>
-      <div class="hm-box-scroll">
-        <table>
-          <caption class="sr-only">{labelOf(box.side)} participant lines</caption>
-          <thead>
-            <tr>
-              <th scope="col">Player</th>
-              <th scope="col">Role</th>
-              <th scope="col">Pts</th>
-              <th scope="col">FG</th>
-              <th scope="col">FT</th>
-              <th scope="col">Reb</th>
-              <th scope="col">Ast</th>
-              <th scope="col">Stl</th>
-              <th scope="col">Blk</th>
-              <th scope="col">TO</th>
-              <th scope="col">PF</th>
-            </tr>
-          </thead>
-          <tbody>
-            {#each box.lines as line (line.instanceId)}
-              <tr data-kind={line.kind} data-negative={line.points < 0}>
-                <th scope="row" class="hm-player">
-                  <span class="hm-player-name">{line.displayName}</span>
-                  <span class="hm-player-slot">{line.slot}</span>
-                </th>
-                <td class="hm-role">{havocParticipantKindLabel(line.kind)}</td>
-                <td class="hm-pts" data-negative={line.points < 0}>{line.points}</td>
-                <td>{line.fieldGoalsMade}/{line.fieldGoalsAttempted}</td>
-                <td>{line.freeThrowsMade}/{line.freeThrowsAttempted}</td>
-                <td>{line.rebounds}</td>
-                <td>{line.assists}</td>
-                <td>{line.steals}</td>
-                <td>{line.blocks}</td>
-                <td>{line.turnovers}</td>
-                <td>{line.fouls}</td>
+<div class="hm-boxes-container">
+  <div class="hm-boxes" data-havoc-multiplayer-boxes>
+    {#each boxes as box (box.side)}
+      {@const topPoints = Math.max(0, ...box.lines.map((line) => line.points))}
+      <section class="hm-box" data-side={box.side} aria-label={`${labelOf(box.side)} box score`}>
+        <header class="hm-box-head">
+          <span class="hm-box-label" data-side={box.side}>{labelOf(box.side)}</span>
+          {#if box.bonusPoints !== 0}
+            <span class="hm-box-bonus" data-negative={box.bonusPoints < 0}
+              >Team bonus {box.bonusPoints > 0 ? `+${box.bonusPoints}` : box.bonusPoints}</span
+            >
+          {/if}
+          <strong class="hm-box-score" data-negative={box.score < 0}>{statOf(box.score)}</strong>
+        </header>
+        <div class="hm-box-scroll">
+          <table>
+            <caption class="sr-only">{labelOf(box.side)} participant lines</caption>
+            <thead>
+              <tr>
+                <th scope="col">Player</th>
+                <th scope="col">Role</th>
+                <th scope="col">Pts</th>
+                <th scope="col">FG%</th>
+                <th scope="col">FT%</th>
+                <th scope="col">Reb</th>
+                <th scope="col">Ast</th>
+                <th scope="col">Stl</th>
+                <th scope="col">Blk</th>
+                <th scope="col">TO</th>
+                <th scope="col">PF</th>
               </tr>
-            {/each}
-          </tbody>
-        </table>
-      </div>
-    </section>
-  {/each}
+            </thead>
+            <tbody>
+              {#each box.lines as line (line.instanceId)}
+                <tr
+                  data-kind={line.kind}
+                  data-negative={line.points < 0}
+                  data-top-scorer={topPoints > 0 && line.points === topPoints}
+                >
+                  <th scope="row" class="hm-player">
+                    <div class="hm-player-identity">
+                      <HavocPlayerArt
+                        playerId={line.sourcePlayerId}
+                        displayName={line.displayName}
+                        compact
+                      />
+                      <div class="hm-player-detail">
+                        <span class="hm-player-name">{line.displayName}</span>
+                        <span class="hm-player-slot">{line.slot}</span>
+                        {#if topPoints > 0 && line.points === topPoints}<span class="hm-top-scorer"
+                            >Top scorer</span
+                          >{/if}
+                      </div>
+                    </div>
+                  </th>
+                  <td class="hm-role">{havocParticipantKindLabel(line.kind)}</td>
+                  <td class="hm-pts" data-negative={line.points < 0}>{statOf(line.points)}</td>
+                  <td>{ratioPct(line.fieldGoalsMade, line.fieldGoalsAttempted)}</td>
+                  <td>{ratioPct(line.freeThrowsMade, line.freeThrowsAttempted)}</td>
+                  <td>{statOf(line.rebounds)}</td>
+                  <td>{statOf(line.assists)}</td>
+                  <td>{statOf(line.steals)}</td>
+                  <td>{statOf(line.blocks)}</td>
+                  <td>{statOf(line.turnovers)}</td>
+                  <td>{statOf(line.fouls)}</td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    {/each}
+  </div>
 </div>
 
 <style>
+  .hm-boxes-container {
+    container: havoc-boxes / inline-size;
+    min-width: 0;
+  }
   .hm-boxes {
     display: grid;
     gap: 12px;
     grid-template-columns: 1fr;
   }
-  @media (min-width: 900px) {
+  @container havoc-boxes (min-width: 76rem) {
     .hm-boxes {
       grid-template-columns: repeat(2, minmax(0, 1fr));
       align-items: start;
@@ -174,11 +210,26 @@
     overflow: hidden;
     text-align: left;
   }
+  tbody tr[data-top-scorer='true'] {
+    background: rgb(255 215 130 / 12%);
+  }
+  .hm-top-scorer {
+    color: #ffd782;
+    font-size: 9px;
+  }
   .hm-player-name {
     display: block;
     overflow: hidden;
     font-weight: 700;
     text-overflow: ellipsis;
+  }
+  .hm-player-identity {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .hm-player-detail {
+    min-width: 0;
   }
   .hm-player-slot {
     display: block;

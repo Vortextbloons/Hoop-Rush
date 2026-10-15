@@ -5,6 +5,48 @@ import type {
   HavocBattleTape,
   HavocHomeAway,
 } from '@hoop-rush/data-contracts';
+import {
+  havocEventMutationIdOf,
+  havocEventTextOf,
+  mutationNameOf,
+} from '#lib/features/havoc/havoc-presentation.js';
+
+export function havocMultiplayerAbilityLines(
+  result: Pick<HavocBattleResult, 'home' | 'away'>,
+  events: readonly HavocBattleEvent[],
+) {
+  const names = new Map<string, string>();
+  const sides = new Map<string, HavocHomeAway>();
+  for (const side of ['home', 'away'] as const) {
+    for (const participant of result[side].participants) {
+      names.set(participant.instanceId, participant.displayName);
+      sides.set(participant.instanceId, side);
+    }
+  }
+  return events.flatMap((event) => {
+    const mutationId = havocEventMutationIdOf(event);
+    if (mutationId === null || event.kind === 'turnover-cancelled') return [];
+    const owner = 'ownerInstanceId' in event ? event.ownerInstanceId : null;
+    const side = 'side' in event ? event.side : owner ? sides.get(owner) : undefined;
+    const summary = havocEventTextOf(event, {
+      playerName: (id) => names.get(id) ?? 'Unknown player',
+      homeName: result.home.displayName,
+      awayName: result.away.displayName,
+      humanSide: 'home',
+    });
+    const ownerName = owner ? names.get(owner) : undefined;
+    return [
+      {
+        key: `ability-${String(event.sequence)}`,
+        period: event.period,
+        clockSeconds: event.clockSeconds,
+        side: side ?? null,
+        ability: mutationNameOf(mutationId),
+        summary: ownerName && !summary.includes(ownerName) ? `${ownerName}: ${summary}` : summary,
+      },
+    ];
+  });
+}
 
 export interface HavocMultiplayerPlaybackItem {
   key: string;
