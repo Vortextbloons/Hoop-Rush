@@ -140,6 +140,10 @@ packages/persistence    → local saves
 See **AGENTS.md** and local **Docs/** for contribution expectations. The
 per-package architecture guides are checked in:
 
+See [Adding a game mode](ADDING_MODES.md) for mode registration and shared
+multiplayer composition, and [multiplayer operations](supabase/README.md) for
+compatible migration and release checks.
+
 ```
 packages/application/README.md   application sessions and submission runtime
 packages/engine/README.md        basketball and mode rules, boundary rules

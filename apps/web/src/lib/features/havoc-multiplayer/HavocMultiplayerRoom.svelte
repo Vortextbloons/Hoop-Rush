@@ -1,7 +1,9 @@
 <script lang="ts">
+  import RoomShell from '#lib/features/multiplayer/RoomShell.svelte';
+  import { getLobbyCoordinator } from '#lib/features/multiplayer/lobby-context.svelte.js';
   import { onDestroy, onMount } from 'svelte';
   import MultiplayerLobbyLink from '#lib/features/multiplayer/MultiplayerLobbyLink.svelte';
-  import { loadLobbyId, lobbyCommand } from '#lib/features/multiplayer/multiplayer-lobby.js';
+  import { loadLobbyId } from '#lib/features/multiplayer/multiplayer-lobby.js';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import {
@@ -47,6 +49,7 @@
   let { roomId }: { roomId: string } = $props();
   let lobbyId = $state<string | null>(null);
   const controller = new HavocMultiplayerController();
+  const lobbyCoordinator = getLobbyCoordinator();
   let reducedMotion = $state(false);
   let wideLayout = $state(false);
   let copiedCode = $state(false);
@@ -207,7 +210,7 @@
   async function removeOpponent(): Promise<void> {
     if (lobbyId) {
       try {
-        await lobbyCommand({ kind: 'remove-guest', lobbyId });
+        await lobbyCoordinator.session.removeOpponent();
       } catch (error) {
         controller.error = error instanceof Error ? error.message : 'Could not remove opponent.';
       }
@@ -220,6 +223,8 @@
     return REACTIONS.find((entry) => entry.key === key)?.glyph ?? '👀';
   }
 </script>
+
+<svelte:window onfocus={() => controller.refresh()} ononline={() => controller.refresh()} />
 
 <svelte:head>
   <title>Havoc room · Hoop Rush</title>
@@ -248,35 +253,36 @@
       >
     </div>
   {:else}
-    <header class="hm-header">
-      <div>
-        <p class="h-eyebrow">Hoop Havoc · Multiplayer</p>
-        <h1 class="h-title">Havoc room</h1>
-        <p class="hm-subtitle">
-          Best of seven · {variantLabel} · {phaseLabel} · Room {controller.snapshot.code}
-        </p>
-      </div>
-      {#if phase !== 'lobby' && phase !== 'expired' && phase !== 'integrity-failed'}
-        <ol class="hm-stages" aria-label="Match progress">
-          {#each HAVOC_MULTIPLAYER_STAGE_LABELS as label, index (label)}
-            <li
-              class:current={index === stageIndex}
-              class:finished={index < stageIndex}
-              aria-current={index === stageIndex ? 'step' : undefined}
-            >
-              <span
-                >{#if index < stageIndex}<Check size={12} aria-hidden="true" />{:else}{index +
-                    1}{/if}</span
-              >{label}
-            </li>
-          {/each}
-        </ol>
-      {/if}
-    </header>
+    <RoomShell
+      {roomId}
+      title="Havoc room"
+      phase={phaseLabel}
+      summary={`Best of seven · ${variantLabel}`}
+      code={controller.snapshot.code}
+      participantId={controller.participantId}
+      members={controller.members}
+      connection={controller.connection}
+      error={controller.error}
+    />
+    {#if phase !== 'lobby' && phase !== 'expired' && phase !== 'integrity-failed'}
+      <ol class="hm-stages" aria-label="Match progress">
+        {#each HAVOC_MULTIPLAYER_STAGE_LABELS as label, index (label)}
+          <li
+            class:current={index === stageIndex}
+            class:finished={index < stageIndex}
+            aria-current={index === stageIndex ? 'step' : undefined}
+          >
+            <span
+              >{#if index < stageIndex}<Check size={12} aria-hidden="true" />{:else}{index +
+                  1}{/if}</span
+            >{label}
+          </li>
+        {/each}
+      </ol>
+    {/if}
 
     <MultiplayerLobbyLink {roomId} completed={phase === 'championship'} />
 
-    {#if controller.error}<p class="hm-alert" role="alert">{controller.error}</p>{/if}
     {#if controller.notice}<p class="hm-notice" role="status">{controller.notice}</p>{/if}
     {#if rival && !rival.online && phase !== 'lobby' && phase !== 'expired'}
       <p class="hm-notice" role="status">
@@ -697,18 +703,7 @@
     letter-spacing: 0.12em;
     color: #ffd782;
   }
-  .hm-header {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 20px;
-    flex-wrap: wrap;
-  }
-  .hm-subtitle {
-    margin-top: 10px;
-    font-size: 13px;
-    color: #c1cae4;
-  }
+
   .hm-stages {
     display: flex;
     flex-wrap: wrap;

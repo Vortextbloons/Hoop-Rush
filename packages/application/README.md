@@ -24,10 +24,20 @@ gathers intent, the engine owns basketball rules, adapters own I/O.
 @hoop-rush/application/draft-duel draft duel room session (transport/repository ports)
 @hoop-rush/application/fixed-five fixed-five room session + command policy/retry helpers
 @hoop-rush/application/havoc    havoc session + run/history view contract
-@hoop-rush/application/season   season block wire/acceptance + season policies
+@hoop-rush/application/havoc-multiplayer havoc room session and ports
+@hoop-rush/application/multiplayer lobby, room lifecycle, commands, and series coordination
 ```
 
 ## Current exports
+
+- `LobbySession` owns lobby commands, one coalesced two-second refresh loop,
+  validated snapshots, membership recovery ports, and navigation intents.
+  `RoomLifecycle` scopes delayed work and subscriptions with attachment
+  generations. `SeriesCoordinator` shares readiness, playback, game jobs, and
+  proposal/confirmation tracking across Draft Duel, Havoc, and Fixed Five Duel.
+  Their adapters retain deterministic replay, inputs, digests, audits, timeout
+  selection, recaps, and protocol-specific transitions. See
+  [the mode extension guide](../../ADDING_MODES.md).
 
 - `runSubmission` and submission policies/report types: the retry and
   conflict policy runtime shared by every mode (`src/submission.ts`).

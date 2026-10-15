@@ -135,10 +135,10 @@ select is(
   (select count(distinct public.fixed_five_random_code()) > 100 from generate_series(1, 128)),
   true, 'generated room codes have broad sample diversity');
 select ok(
-  position('extensions.gen_random_bytes' in pg_get_functiondef('public.fixed_five_random_code()'::regprocedure)) > 0,
+  position('extensions.gen_random_bytes' in pg_get_functiondef('multiplayer_private.allocate_code()'::regprocedure)) > 0,
   'room-code entropy comes from pgcrypto');
 select is(
-  position('random()' in pg_get_functiondef('public.fixed_five_random_code()'::regprocedure)),
+  position('random()' in pg_get_functiondef('multiplayer_private.allocate_code()'::regprocedure)),
   0, 'room-code generator does not use PostgreSQL random()');
 select is(
   (select count(*)::int from pg_policies where schemaname = 'public' and tablename = 'fixed_five_room_members' and cmd <> 'SELECT'),

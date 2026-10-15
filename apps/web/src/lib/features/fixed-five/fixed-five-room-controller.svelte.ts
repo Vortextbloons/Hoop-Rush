@@ -45,7 +45,8 @@ import {
 } from '@hoop-rush/application/fixed-five';
 import { buildSimulationTeam } from './fixed-five-room-state';
 import { getFixedFiveTransport } from './fixed-five-transport';
-import { lobbyCommand, loadLobbyId } from './multiplayer-lobby';
+import { lobbyCommand, loadLobbyId } from '../multiplayer/multiplayer-lobby';
+import { multiplayerInviteLink } from '../multiplayer/invite-link';
 import type { GamecastPlayer } from '#lib/gamecast/gamecast-types.js';
 
 const TICK_MS = 1000;
@@ -405,7 +406,7 @@ export class FixedFiveRoomController {
     this.error = null;
     try {
       await navigator.clipboard.writeText(
-        new URL(`${resolve('multiplayer/')}?code=${code}`, window.location.origin).href,
+        new URL(resolve(multiplayerInviteLink(code)), window.location.origin).href,
       );
 
       if (this.disposed) return;

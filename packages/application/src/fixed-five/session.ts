@@ -54,6 +54,8 @@ import {
   type FixedFiveVerificationInput,
   type RoomLogFacts,
 } from '@hoop-rush/engine';
+import { SeriesCoordinator } from '../multiplayer/series-coordinator.ts';
+import { RoomLifecycle, type RoomAttachment } from '../multiplayer/room-lifecycle.ts';
 import { submitFixedFiveCommand } from './command-submit.ts';
 import { FixedFiveSimulationGate, type FixedFiveSimulationReason } from './simulation-gate.ts';
 
@@ -413,16 +415,11 @@ export class FixedFiveRoomSession {
   private duelRunner: FixedFiveRunnerPort | null = null;
   private duelSimulatingGame: number | null = null;
   private duelSimError: string | null = null;
-  private duelProposalSent = new Set<number>();
-  private duelConfirmSent = new Set<number>();
-  private duelResultRetryAtMs = 0;
-  private playbackElapsedMs = 0;
+  private readonly seriesFlow: SeriesCoordinator;
+  private readonly lifecycle = new RoomLifecycle();
+  private attachment: RoomAttachment | null = null;
   private broadcastProgress = 0;
-  private playbackDoneAtMs: number | null = null;
-  private continueApprovedGame: number | null = null;
   private duelRecapGame: number | null = null;
-  private preparingSinceMs: number | null = null;
-  private lastAutoAttemptMs = 0;
 
   private submittedPropose: ContentHash | null = null;
   private confirmedFor: ContentHash | null = null;
@@ -453,6 +450,8 @@ export class FixedFiveRoomSession {
 
   constructor(deps: FixedFiveRoomSessionDeps) {
     this.deps = deps;
+    this.seriesFlow = new SeriesCoordinator(deps.now, DUEL_AUTO_START_RETRY_MS);
+    this.seriesFlow.holdMs = FIXED_FIVE_DUEL_GAME_RESULTS_HOLD_MS;
     this.roomId = deps.roomId;
   }
 
@@ -517,7 +516,8 @@ export class FixedFiveRoomSession {
   }
 
   async start(): Promise<void> {
-    if (this.isDisposed()) return;
+    if (this.isDisposed() || this.attachment?.current()) return;
+    this.attachment = this.lifecycle.begin(this.roomId);
     this.lobbyId = this.deps.loadLobbyId(this.roomId);
     this.restoreVerifyGuards();
     const membership = this.deps.loadMembership(this.roomId);
@@ -540,6 +540,7 @@ export class FixedFiveRoomSession {
   dispose(): void {
     if (this.isDisposed()) return;
     this.disposed = true;
+    this.lifecycle.dispose();
     this.unsubscribeTransport?.();
     this.unsubscribeTransport = null;
     this.runner?.dispose();
@@ -762,9 +763,8 @@ export class FixedFiveRoomSession {
     const broadcast = this.duelBroadcastOf();
     if (!broadcast) return;
     const startedAt = Date.parse(broadcast.startedAtIso);
-    this.playbackElapsedMs =
-      clamp01((this.deps.now() - startedAt) / broadcast.durationMs) * broadcast.durationMs;
-    this.broadcastProgress = clamp01(this.playbackElapsedMs / broadcast.durationMs);
+    this.seriesFlow.playback.begin(this.deps.now(), startedAt, broadcast.durationMs);
+    this.broadcastProgress = clamp01((this.deps.now() - startedAt) / broadcast.durationMs);
     this.publish();
   }
 
@@ -772,14 +772,13 @@ export class FixedFiveRoomSession {
     if (this.isDisposed()) return;
     const broadcast = this.duelBroadcastOf();
     if (!broadcast) return;
-    this.playbackElapsedMs += deltaMs;
-    this.broadcastProgress = clamp01(this.playbackElapsedMs / broadcast.durationMs);
-    if (this.broadcastProgress >= 1 && this.playbackDoneAtMs === null) {
-      this.playbackDoneAtMs = this.deps.now();
-      this.continueApprovedGame = null;
-      const gameNumber = broadcast.gameNumber;
-      this.duelRecapGame = gameNumber;
-    }
+    const outcome = this.seriesFlow.playback.advance(
+      deltaMs,
+      broadcast.durationMs,
+      this.deps.now(),
+    );
+    this.broadcastProgress = outcome.progress;
+    if (outcome.completed) this.duelRecapGame = broadcast.gameNumber;
     this.publish();
     if (this.broadcastProgress >= 1) this.maybeProposeOrConfirmGame();
   }
@@ -788,7 +787,7 @@ export class FixedFiveRoomSession {
     if (this.isDisposed()) return;
     const gameNumber = this.duelRecapGame ?? this.duelCurrentGameNumber();
     if (gameNumber === null) return;
-    this.continueApprovedGame = gameNumber;
+    this.seriesFlow.playback.approve(gameNumber);
     this.publish();
     this.maybeProposeOrConfirmGame();
   }
@@ -1174,43 +1173,39 @@ export class FixedFiveRoomSession {
   }
 
   private duelMemberReady(participantId: FixedFiveParticipantId): boolean {
-    const room = this.room;
-    const gameNumber = this.duelCurrentGameNumber();
-    if (!room || gameNumber === null) return false;
-    const member = room.members.find((entry) => entry.participantId === participantId);
-    return member?.nextGameReady === gameNumber;
+    return this.seriesFlow.memberReady(
+      this.room?.members ?? [],
+      participantId,
+      this.duelCurrentGameNumber(),
+    );
   }
 
   private duelLocalReady(): boolean {
     return this.duelMemberReady(this.selfId);
   }
-
   private duelOpponentReady(): boolean {
     return this.duelMemberReady(otherParticipant(this.selfId));
   }
 
   private duelReadyCountdownMs(): number | null {
-    if (!this.isDuelBroadcast() || this.room?.phase !== 'preparing-game') return null;
-    if (this.preparingSinceMs === null) return null;
-    if (this.duelOpponentReady()) return null;
-    return Math.max(
-      0,
-      this.preparingSinceMs + FIXED_FIVE_DUEL_GAME_READY_TIMEOUT_MS - this.deps.now(),
+    if (!this.isDuelBroadcast()) return null;
+    return this.seriesFlow.readyCountdown(
+      this.duelOpponentReady(),
+      FIXED_FIVE_DUEL_GAME_READY_TIMEOUT_MS,
     );
   }
 
   private duelAwaitingContinue(): boolean {
-    const gameNumber = this.duelRecapGame;
-    if (gameNumber === null) return false;
-    if (this.continueApprovedGame === gameNumber) return false;
-    if (this.playbackDoneAtMs === null) return true;
-    return this.deps.now() - this.playbackDoneAtMs < FIXED_FIVE_DUEL_GAME_RESULTS_HOLD_MS;
+    const game = this.duelRecapGame;
+    return game !== null && !this.duelContinueApproved(game);
   }
 
   private duelContinueApproved(gameNumber: number): boolean {
-    if (this.continueApprovedGame === gameNumber) return true;
-    if (this.playbackDoneAtMs === null) return true;
-    return this.deps.now() - this.playbackDoneAtMs >= FIXED_FIVE_DUEL_GAME_RESULTS_HOLD_MS;
+    return this.seriesFlow.playback.continueApproved(
+      gameNumber,
+      FIXED_FIVE_DUEL_GAME_RESULTS_HOLD_MS,
+      this.deps.now(),
+    );
   }
 
   private duelVerification(): DuelGameVerification {
@@ -1415,82 +1410,57 @@ export class FixedFiveRoomSession {
   }
 
   private maybeProposeOrConfirmGame(): void {
-    if (this.isDisposed() || !this.isDuelBroadcast()) return;
-    if (this.busyAction !== null) return;
-    if (this.deps.now() < this.duelResultRetryAtMs) return;
+    if (this.isDisposed() || !this.isDuelBroadcast() || this.busyAction !== null) return;
     const room = this.room;
-    const series = room?.series;
-    if (!room || !series) return;
+    const gameNumber = room?.series?.currentGameNumber;
+    if (!room || gameNumber === null || gameNumber === undefined) return;
     if (room.phase !== 'broadcasting' && room.phase !== 'game-results') return;
-    const gameNumber = series.currentGameNumber;
-    if (gameNumber === null) return;
     const output = this.duelOutputs[gameNumber];
-    if (!output) return;
-    if (this.broadcastProgress < 1 && room.phase === 'broadcasting') return;
-    if (!this.duelProposalSent.has(gameNumber)) {
-      this.duelProposalSent.add(gameNumber);
-      void this.sendCommand({
-        kind: 'propose-game-result',
-        gameNumber,
-        winner: this.duelWinnerOf(output),
-        resultDigest: output.resultDigest,
-        tapeDigest: output.tapeDigest,
-        inputDigest: output.inputDigest,
-      }).then((accepted) => {
-        if (!accepted && !this.isDisposed()) {
-          this.duelProposalSent.delete(gameNumber);
-          this.duelResultRetryAtMs = this.deps.now() + DUEL_AUTO_START_RETRY_MS;
-        }
-      });
-      return;
-    }
-    const mine = this.facts.gameProposals.find(
-      (proposal) => proposal.actor === this.selfId && proposal.gameNumber === gameNumber,
-    );
-    if (!mine || mine.digest !== output.resultDigest) return;
-    const rival = this.facts.gameProposals.find(
-      (proposal) => proposal.actor !== this.selfId && proposal.gameNumber === gameNumber,
-    );
-    if (!rival || this.duelConfirmSent.has(gameNumber)) return;
-    if (rival.digest === output.resultDigest && !this.duelContinueApproved(gameNumber)) return;
-    this.duelConfirmSent.add(gameNumber);
-    if (rival.digest === output.resultDigest) {
-      void this.sendCommand({
-        kind: 'confirm-game-result',
-        gameNumber,
-        resultDigest: output.resultDigest,
-        verified: true,
-      }).then((accepted) => {
-        if (!accepted && !this.isDisposed()) {
-          this.duelConfirmSent.delete(gameNumber);
-          this.duelResultRetryAtMs = this.deps.now() + DUEL_AUTO_START_RETRY_MS;
-        }
-      });
-    } else {
-      void this.sendCommand({
-        kind: 'confirm-game-result',
-        gameNumber,
-        resultDigest: output.resultDigest,
-        verified: false,
-      }).then(() => {
+    if (!output || (this.broadcastProgress < 1 && room.phase === 'broadcasting')) return;
+    this.seriesFlow.coordinate({
+      gameNumber,
+      localDigest: output.resultDigest,
+      ownProposal: this.facts.gameProposals.find(
+        (p) => p.actor === this.selfId && p.gameNumber === gameNumber,
+      )?.digest,
+      peerProposal: this.facts.gameProposals.find(
+        (p) => p.actor !== this.selfId && p.gameNumber === gameNumber,
+      )?.digest,
+      current: () => !this.isDisposed(),
+      propose: () =>
+        this.sendCommand({
+          kind: 'propose-game-result',
+          gameNumber,
+          winner: this.duelWinnerOf(output),
+          resultDigest: output.resultDigest,
+          tapeDigest: output.tapeDigest,
+          inputDigest: output.inputDigest,
+        }),
+      confirm: (verified) =>
+        this.sendCommand({
+          kind: 'confirm-game-result',
+          gameNumber,
+          resultDigest: output.resultDigest,
+          verified,
+        }),
+      mismatch: () => {
         void this.deps.transport.fail(this.roomId).catch(() => {});
-      });
-    }
+      },
+    });
   }
 
   private tickDuel(): void {
     if (this.isDisposed() || !this.isDuelBroadcast()) return;
     this.maybeProposeOrConfirmGame();
     if (this.room?.phase !== 'preparing-game') return;
-    const now = this.deps.now();
-    const bothReady = this.duelLocalReady() && this.duelOpponentReady();
-    const countdownExpired = this.duelReadyCountdownMs() === 0 && !this.duelOpponentReady();
     if (
-      (bothReady || countdownExpired) &&
-      now - this.lastAutoAttemptMs >= DUEL_AUTO_START_RETRY_MS
+      this.seriesFlow.shouldAutoStart(
+        this.duelLocalReady(),
+        this.duelOpponentReady(),
+        FIXED_FIVE_DUEL_GAME_READY_TIMEOUT_MS,
+      )
     ) {
-      this.lastAutoAttemptMs = now;
-      void this.startBroadcast(!bothReady);
+      void this.startBroadcast(!(this.duelLocalReady() && this.duelOpponentReady()));
     }
   }
 
@@ -1498,26 +1468,15 @@ export class FixedFiveRoomSession {
     if (this.isDisposed()) return;
     const previous = this.room;
     if (previous && snapshot.revision < previous.revision) return;
-    const previousPhase = previous?.phase ?? null;
-    const previousBroadcastGame = previous?.broadcast?.gameNumber ?? null;
     this.room = snapshot;
-    if (snapshot.phase === 'preparing-game' && previousPhase !== 'preparing-game') {
-      this.preparingSinceMs = this.deps.now();
-      this.lastAutoAttemptMs = 0;
-    }
-    if (snapshot.phase !== 'preparing-game') {
-      this.preparingSinceMs = null;
-    }
-    const broadcastGame = snapshot.broadcast?.gameNumber ?? null;
-    if (broadcastGame !== null && broadcastGame !== previousBroadcastGame) {
-      this.playbackElapsedMs = 0;
+    if (this.seriesFlow.observe(snapshot.phase, snapshot.broadcast?.gameNumber ?? null)) {
       this.broadcastProgress = 0;
-      this.playbackDoneAtMs = null;
-      this.continueApprovedGame = null;
       this.duelRecapGame = null;
-      this.duelProposalSent.delete(broadcastGame);
-      this.duelConfirmSent.delete(broadcastGame);
-      this.duelResultRetryAtMs = 0;
+      const game = snapshot.broadcast?.gameNumber;
+      if (game !== undefined) {
+        this.seriesFlow.proposals.delete(game);
+        this.seriesFlow.confirmations.delete(game);
+      }
     }
     if (snapshot.phase === 'preparing-game' && this.duelRecapGame !== null) {
       this.duelRecapGame = null;

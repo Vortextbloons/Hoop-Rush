@@ -1,9 +1,7 @@
 <script lang="ts">
   import { page } from '$app/state';
-  import HavocMultiplayerRoom from '#lib/features/havoc-multiplayer/HavocMultiplayerRoom.svelte';
+  import RegisteredRoom from '#lib/features/multiplayer/RegisteredRoom.svelte';
   const roomId = $derived(page.params.roomId ?? '');
 </script>
 
-{#key roomId}
-  <HavocMultiplayerRoom {roomId} />
-{/key}
+<RegisteredRoom gameKind="havoc" {roomId} />

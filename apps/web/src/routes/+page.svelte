@@ -1,7 +1,8 @@
 <script lang="ts">
+  import { homeModes } from '#lib/modes/catalog.js';
   import { browser } from '$app/env';
-  import { asset, resolve } from '$app/paths';
-  import type { RouteId } from '$app/types';
+  import { resolve } from '$app/paths';
+  import { staticAsset } from '#lib/asset-url.js';
   import type { ClassicDraftState, HoopRushManifest } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
   import { getManifest, warmPlayersIndex } from '#lib/data.js';
@@ -9,50 +10,21 @@
   import { variantLabel } from '#lib/draft-presentation.js';
   import { eraName } from '#lib/branding.js';
   import type { ActiveRunCheckpoint, CompletedRunIndex } from '@hoop-rush/persistence';
-  const sandboxHref = resolve('sandbox/');
   const historyHref = resolve('sandbox/history/');
   const road = Array.from({ length: 82 }, (_, i) => i);
-  const modes = [
-    {
-      code: '01',
-      name: 'Classic',
-      line: '5 rounds. Each assigns a franchise + decade. One reroll each, then build.',
-      status: 'available',
-      cta: 'Start classic',
-      href: '/classic' as any,
-    },
-    {
-      code: '02',
-      name: 'Sandbox',
-      line: 'Pick any 5 peak seasons, then play all 30 teams.',
-      status: 'available',
-      cta: 'Start sandbox',
-      href: '/sandbox' as any,
-    },
-    {
-      code: '03',
-      name: 'Hoop Havoc',
-      line: 'Draft five mutated freaks, then chase 82-0 against the frozen gauntlet.',
-      status: 'available',
-      cta: 'Start Havoc',
-      href: '/havoc' as any,
-    },
-    {
-      code: '04',
-      name: 'Ultimate Run',
-      line: 'Claim a starter, open seeded packs, grow one permanent collection.',
-      status: 'available',
-      cta: 'Open collection',
-      href: '/ultimate/run' as any,
-    },
-  ] as const;
+  const modes = homeModes();
   let manifest = $state<HoopRushManifest | null>(null);
   let active = $state.raw<ActiveRunCheckpoint | null>(null);
   let classicDraft = $state.raw<ClassicDraftState | null>(null);
   let recent = $state.raw<CompletedRunIndex[]>([]);
-  const playersIndexHrefs = new Set(['/classic', '/sandbox']);
+  const playersIndexHrefs = new Set(
+    modes.filter((mode) => mode.solo?.warmPlayersIndex).map((mode) => mode.solo!.href),
+  );
   function warmPlayersIndexForMode(modeHref: string): void {
-    if (!playersIndexHrefs.has(modeHref)) return;
+    if (
+      !modes.some((mode) => mode.solo?.href === modeHref && playersIndexHrefs.has(mode.solo.href))
+    )
+      return;
     if (
       typeof navigator !== 'undefined' &&
       (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData ===
@@ -156,21 +128,21 @@
   </div>
 
   <div class="grid gap-4 sm:grid-cols-2">
-    {#each modes as mode (mode.code)}
-      {#if mode.status === 'available'}
+    {#each modes as mode (mode.id)}
+      {#if mode.solo}
         <a
-          href={resolve(mode.href)}
+          href={resolve(mode.solo!.href)}
           data-sveltekit-preload-code="hover"
-          onpointerenter={() => warmPlayersIndexForMode(mode.href)}
-          onfocus={() => warmPlayersIndexForMode(mode.href)}
-          class="group flex h-full flex-col rounded-xl bg-card p-6 outline-none transition-colors hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-ring sm:p-7 {mode.href ===
-          '/ultimate/run'
+          onpointerenter={() => warmPlayersIndexForMode(mode.solo!.href)}
+          onfocus={() => warmPlayersIndexForMode(mode.solo!.href)}
+          class="group flex h-full flex-col rounded-xl bg-card p-6 outline-none transition-colors hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-ring sm:p-7 {mode
+            .discovery.accent
             ? 'border border-accent/60'
             : ''}"
         >
-          {#if mode.href === '/ultimate/run'}
+          {#if mode.discovery.artwork}
             <img
-              src={asset('ultimate/logo.png')}
+              src={staticAsset(`/${mode.discovery.artwork!}`)}
               alt=""
               aria-hidden="true"
               class="h-10 w-10 rounded-lg"
@@ -182,11 +154,13 @@
             />
           {/if}
           <h2 class="font-display mt-5 text-4xl font-extrabold tracking-tight uppercase">
-            {mode.name}
+            {mode.label}
           </h2>
-          <p class="mt-3 flex-1 text-sm leading-relaxed text-muted-foreground">{mode.line}</p>
+          <p class="mt-3 flex-1 text-sm leading-relaxed text-muted-foreground">
+            {mode.description}
+          </p>
           <span class="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-primary">
-            {mode.cta}
+            {mode.discovery.cta}
             <span
               aria-hidden="true"
               class="transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none"
@@ -199,13 +173,15 @@
           <h2
             class="font-display mt-5 text-4xl font-extrabold tracking-tight text-muted-foreground uppercase"
           >
-            {mode.name}
+            {mode.label}
           </h2>
-          <p class="mt-3 flex-1 text-sm leading-relaxed text-muted-foreground/80">{mode.line}</p>
+          <p class="mt-3 flex-1 text-sm leading-relaxed text-muted-foreground/80">
+            {mode.description}
+          </p>
           <span
             class="mt-6 inline-flex items-center gap-2 font-mono text-xs font-semibold text-muted-foreground"
           >
-            {mode.cta}
+            {mode.discovery.cta}
           </span>
         </div>
       {/if}

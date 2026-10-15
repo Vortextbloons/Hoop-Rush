@@ -92,3 +92,4 @@ export * from './fixed-five-worker.ts';
 export * from './havoc-comparison.ts';
 export * from './multiplayer-lobby.ts';
 export * from './postseason-evidence.ts';
+export * from './mode-catalog.ts';

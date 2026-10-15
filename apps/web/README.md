@@ -11,11 +11,17 @@ routes/ and lib/features/<mode>/  ->  @hoop-rush/application sessions  ->  engin
 ```
 
 - Mode code lives under `src/lib/features/<mode>/` (challenge, havoc,
-  collection, draft-duel, multiplayer); Season Run code lives in
-  `src/lib/season/` (runners, presenters, selectors) with its views under
-  `src/routes/season/`.
-- Mode sessions (`ChallengeSession`, `HavocSession`, `SeasonSession`,
-  `CollectionPlaySession`, `DraftDuelSession`, `FixedFiveRoomSession`) live in
+  collection, draft-duel, fixed-five, havoc-multiplayer). Shared room and lobby
+  infrastructure lives in `src/lib/features/multiplayer/`.
+- `src/lib/modes/catalog.ts` registers discovery, formats, preserved routes,
+  and lazy settings/room adapters. Add modes through this catalog and their
+  validated data-contracts settings; shared lobby and shell views stay generic.
+- The root layout owns one lobby coordinator. It consumes application lobby
+  snapshots/navigation intents, polls through one non-overlapping scheduler,
+  and refreshes on focus/reconnection. Room layouts scope mode sessions.
+- Mode sessions (`ChallengeSession`, `HavocSession`,
+  `CollectionPlaySession`, `DraftDuelSession`, `FixedFiveRoomSession`,
+  `HavocMultiplayerSession`) live in
   `@hoop-rush/application` behind ports. Web composes them with browser
   adapters; do not reintroduce Dexie, workers, or localStorage into the
   application package.
@@ -25,7 +31,7 @@ routes/ and lib/features/<mode>/  ->  @hoop-rush/application sessions  ->  engin
 - Workers live in `src/workers/`; their messages are validated with Zod at both
   ends and must match `@hoop-rush/data-contracts` worker schemas.
 - Test doubles stay under `testing/` directories (`src/lib/testing/`,
-  `src/lib/features/havoc/testing/`, `src/lib/features/season/testing/`) and are
+  `src/lib/features/havoc/testing/`) and are
   imported only by tests.
 
 ## Persistence and data
@@ -48,6 +54,6 @@ pnpm exec vitest run --project @hoop-rush/web <path>
 pnpm build
 ```
 
-Journeys that need a browser (classic draft into a run, Season Run block
-commit/resume, collection play, havoc run, multiplayer room) are manual smoke
+Journeys that need a browser (classic draft into a run, collection play,
+havoc run, multiplayer room) are manual smoke
 checks; browser automation has been removed.

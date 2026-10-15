@@ -1,5 +1,5 @@
 export type SubmissionIntent =
-  'fixed-five-command' | 'collection-command' | 'collection-pack-purchase';
+  'fixed-five-command' | 'multiplayer-command' | 'collection-command' | 'collection-pack-purchase';
 
 export type SubmissionDisposition = 'accepted' | 'stale' | 'rejected';
 

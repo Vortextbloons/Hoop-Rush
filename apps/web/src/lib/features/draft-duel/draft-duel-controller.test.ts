@@ -22,11 +22,14 @@ import {
 import { createEngineContext, simulateRecordedGame } from '@hoop-rush/engine';
 import * as engine from '@hoop-rush/engine';
 import { buildLegalSimulationTeam, DEFAULT_ERA_SIM_PROFILE } from '@hoop-rush/test-fixtures';
+import type { RoomAttachment, RoomLifecycle } from '@hoop-rush/application/multiplayer';
 import type { DraftDuelAssets } from './draft-duel-assets';
 import { DraftDuelController } from './draft-duel-controller.svelte.js';
 import { createDraftDuelSession, type DraftDuelSession } from './draft-duel-session';
 
 type SessionLifecycle = {
+  attachment: RoomAttachment | null;
+  lifecycle: RoomLifecycle;
   roomId: Id;
   participantId: DraftDuelParticipantId | null;
   snapshot: DraftDuelRoomSnapshot | null;
@@ -114,6 +117,7 @@ describe('Draft Duel ready check progression', () => {
     const lifecycle = session as unknown as SessionLifecycle;
     lifecycle.participantId = 'p1';
     lifecycle.roomId = roomId;
+    lifecycle.attachment = lifecycle.lifecycle.begin(roomId);
     lifecycle.applySnapshot((await transport.resume(roomId)).snapshot);
     unsubscribe = transport.subscribe(roomId, (snapshot) => {
       lifecycle.applySnapshot(snapshot);
@@ -266,6 +270,7 @@ describe('Draft Duel ready check progression', () => {
       });
       roomId = created.snapshot.roomId;
       lifecycle.roomId = roomId;
+      lifecycle.attachment = lifecycle.lifecycle.begin(roomId);
       await transport.join(created.code);
       await submit('p1', { kind: 'ready', ready: true });
       await submit('p2', { kind: 'ready', ready: true });

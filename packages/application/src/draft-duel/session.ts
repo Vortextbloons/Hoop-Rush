@@ -51,12 +51,18 @@ import type {
 } from '@hoop-rush/persistence';
 import {
   CoalescedTask,
-  PlaybackProgress,
   SessionEvents,
   TickLoop,
   intervalTickScheduler,
   type TickScheduler,
 } from '../runtime/index.ts';
+import {
+  RoomLifecycle,
+  type RoomAttachment,
+  type RoomConnection,
+} from '../multiplayer/room-lifecycle.ts';
+import { SeriesCoordinator } from '../multiplayer/series-coordinator.ts';
+import { CommandRecovery, executeMultiplayerCommand } from '../multiplayer/command-execution.ts';
 
 const TICK_MS = 250;
 const AUTO_START_RETRY_MS = 5000;
@@ -89,6 +95,7 @@ export interface DraftDuelSeriesFacts {
 }
 
 export interface DraftDuelSessionView {
+  connection: RoomConnection;
   assets: DraftDuelSessionAssets | null;
   snapshot: DraftDuelRoomSnapshot | null;
   participantId: DraftDuelParticipantId | null;
@@ -197,7 +204,12 @@ function otherParticipant(participantId: DraftDuelParticipantId): DraftDuelParti
 export class DraftDuelSession {
   private readonly deps: DraftDuelSessionDeps;
   private readonly events = new SessionEvents<DraftDuelTransientEvent>();
-  private readonly playback = new PlaybackProgress();
+  private readonly lifecycle = new RoomLifecycle(() => {
+    this.publish();
+  });
+  private attachment: RoomAttachment | null = null;
+  private readonly seriesFlow: SeriesCoordinator;
+  private readonly commandRecovery = new CommandRecovery();
   private readonly syncTask: CoalescedTask;
   private readonly tickLoop: TickLoop;
   private assets: DraftDuelSessionAssets | null = null;
@@ -218,18 +230,14 @@ export class DraftDuelSession {
   private deadlineResolving = false;
   private deadlineRetryAtMs = 0;
   private rematchRetryAtMs = 0;
-  private preparingSinceMs: number | null = null;
-  private lastAutoAttemptMs = 0;
-  private resultRetryAtMs = 0;
-  private proposalSent = new Set<number>();
-  private confirmSent = new Set<number>();
-  private simulating = new Set<number>();
   private completedPersisted = false;
   private disposed = false;
   private roomId: Id | null = null;
 
   constructor(deps: DraftDuelSessionDeps) {
     this.deps = deps;
+    this.seriesFlow = new SeriesCoordinator(deps.now, AUTO_START_RETRY_MS);
+    this.seriesFlow.holdMs = GAME_RESULTS_HOLD_MS;
     this.now = deps.now();
     this.syncTask = new CoalescedTask(() => this.runSync());
     this.tickLoop = new TickLoop(deps.scheduleTick ?? intervalTickScheduler, TICK_MS, () => {
@@ -241,6 +249,7 @@ export class DraftDuelSession {
 
   getSnapshot(): DraftDuelSessionView {
     return {
+      connection: this.lifecycle.getConnection(),
       assets: this.assets,
       snapshot: this.snapshot,
       participantId: this.participantId,
@@ -270,11 +279,39 @@ export class DraftDuelSession {
     return this.events.subscribeTransient(listener);
   }
 
+  refresh(): Promise<void> {
+    return this.lifecycle.reconnect();
+  }
+
   async attach(roomId: string): Promise<void> {
     if (this.disposed) return;
+    if (this.attachment?.roomId === roomId && this.attachment.current()) return;
+    const attachment = this.lifecycle.begin(roomId);
+    this.attachment = attachment;
+    this.tickLoop.dispose();
+    this.seriesFlow.reset();
+    this.commandRecovery.reset();
+    this.snapshot = null;
+    this.participantId = null;
+    this.draft = null;
+    this.outputs = {};
+    this.verification = [];
+    this.commands = [];
+    this.completedRecap = null;
+    this.completedPersisted = false;
+    this.progress = 0;
+    this.busy = false;
+    this.error = null;
+    this.notice = null;
+    this.integrityFailed = false;
+    this.resolvedCursor = null;
+    this.deadlineResolving = false;
+    this.deadlineRetryAtMs = 0;
+    this.rematchRetryAtMs = 0;
     this.roomId = idSchema.parse(roomId);
     try {
       await this.loadAssets();
+      if (!attachment.current()) return;
       const membership = this.deps.loadMembership(roomId);
       if (!membership) {
         this.error = 'You are not a member of this room. Join from the Draft Duel lobby.';
@@ -282,39 +319,57 @@ export class DraftDuelSession {
         return;
       }
       const resumed = await this.deps.transport.resume(roomId);
+      if (!attachment.current()) return;
       this.participantId = resumed.membership.participantId;
       this.deps.saveMembership(resumed.membership);
       this.applySnapshot(resumed.snapshot);
       const restored = await this.deps.repository.loadActive(roomId);
+      if (!attachment.current()) return;
       if (restored) {
         this.verification = restored.verification;
       }
       const completed = await this.deps.repository.loadCompleted(roomId);
+      if (!attachment.current()) return;
       if (completed) {
         this.completedRecap = completed;
         this.completedPersisted = true;
       }
       const rows = await this.deps.repository.loadResults(roomId);
+      if (!attachment.current()) return;
       if (rows.length > 0) {
         const outputs: Record<number, DraftDuelGameOutput> = {};
         for (const row of rows) outputs[row.gameNumber] = row.output;
         this.outputs = { ...this.outputs, ...outputs };
       }
-      this.events.track(
+      this.lifecycle.track(
+        attachment,
         this.deps.transport.subscribe(roomId, (snapshot) => {
+          if (!attachment.current()) return;
           this.applySnapshot(snapshot);
           void this.syncFromServer();
-        }),
+        }).unsubscribe,
       );
-      this.events.track(
+      this.lifecycle.track(
+        attachment,
         this.deps.transport.subscribeTransient(roomId, (event) => {
+          if (!attachment.current()) return;
           this.emitTransient(event);
-        }),
+        }).unsubscribe,
       );
       await this.syncFromServer();
+      if (!attachment.current()) return;
+      this.lifecycle.connected(attachment);
+      this.lifecycle.configureRefresh(
+        attachment,
+        () => this.syncFromServer(),
+        this.deps.scheduleTick ?? intervalTickScheduler,
+        15_000,
+      );
       this.startTimers();
       this.publish();
     } catch (error) {
+      if (!attachment.current()) return;
+      this.lifecycle.failed(attachment);
       this.error = this.deps.friendlyError(error);
       this.publish();
     }
@@ -530,14 +585,22 @@ export class DraftDuelSession {
     if (this.disposed) return;
     const broadcast = this.broadcastOf();
     if (!broadcast) return;
-    this.playback.begin(this.deps.now(), Date.parse(broadcast.startedAtIso), broadcast.durationMs);
+    this.seriesFlow.playback.begin(
+      this.deps.now(),
+      Date.parse(broadcast.startedAtIso),
+      broadcast.durationMs,
+    );
   }
 
   advancePlayback(deltaMs: number): void {
     if (this.disposed) return;
     const broadcast = this.broadcastOf();
     if (!broadcast) return;
-    const outcome = this.playback.advance(deltaMs, broadcast.durationMs, this.deps.now());
+    const outcome = this.seriesFlow.playback.advance(
+      deltaMs,
+      broadcast.durationMs,
+      this.deps.now(),
+    );
     this.progress = outcome.progress;
     this.publish();
     if (outcome.completed) this.maybeProposeOrConfirm();
@@ -547,7 +610,7 @@ export class DraftDuelSession {
     if (this.disposed) return;
     const output = this.currentOutput();
     if (!output) return;
-    this.playback.approve(output.gameNumber);
+    this.seriesFlow.playback.approve(output.gameNumber);
     this.maybeProposeOrConfirm();
   }
 
@@ -557,13 +620,14 @@ export class DraftDuelSession {
 
   dispose(): void {
     this.disposed = true;
+    this.lifecycle.dispose();
     this.tickLoop.dispose();
     this.events.dispose();
     this.deps.runner.dispose();
   }
 
   private publish(): void {
-    this.events.publish();
+    if (!this.disposed) this.events.publish();
   }
 
   private emitTransient(event: DraftDuelTransientEvent): void {
@@ -589,26 +653,23 @@ export class DraftDuelSession {
   }
 
   private localReady(): boolean {
-    const me = this.snapshot?.members.find((member) => member.participantId === this.participantId);
-    const game = this.currentGameNumber();
-    if (!me || game === null) return false;
-    return me.nextGameReady === game;
+    return this.seriesFlow.memberReady(
+      this.snapshot?.members ?? [],
+      this.participantId,
+      this.currentGameNumber(),
+    );
   }
 
   private opponentReady(): boolean {
-    const me = this.participantId;
-    const game = this.currentGameNumber();
-    if (!me || game === null) return false;
-    const rival = otherParticipant(me);
-    const member = this.snapshot?.members.find((entry) => entry.participantId === rival);
-    return member?.nextGameReady === game;
+    return this.seriesFlow.memberReady(
+      this.snapshot?.members ?? [],
+      this.participantId ? otherParticipant(this.participantId) : null,
+      this.currentGameNumber(),
+    );
   }
 
   private readyCountdownMs(): number | null {
-    if (this.phase() !== 'preparing-game') return null;
-    if (this.preparingSinceMs === null) return null;
-    if (this.opponentReady()) return null;
-    return Math.max(0, this.preparingSinceMs + GAME_READY_WINDOW_MS - this.now);
+    return this.seriesFlow.readyCountdown(this.opponentReady(), GAME_READY_WINDOW_MS, this.now);
   }
 
   private deadlineMsLeft(): number | null {
@@ -657,21 +718,15 @@ export class DraftDuelSession {
   }
 
   private applySnapshot(snapshot: DraftDuelRoomSnapshot): void {
-    if (this.disposed || (this.snapshot && snapshot.revision < this.snapshot.revision)) return;
-    const previousPhase = this.snapshot?.phase ?? null;
-    const previousBroadcastGame = this.snapshot?.broadcast?.gameNumber ?? null;
+    if (
+      this.disposed ||
+      snapshot.roomId !== this.roomId ||
+      (this.snapshot && snapshot.revision < this.snapshot.revision)
+    )
+      return;
     this.snapshot = snapshot;
-    if (snapshot.phase === 'preparing-game' && previousPhase !== 'preparing-game') {
-      this.preparingSinceMs = this.deps.now();
-      this.lastAutoAttemptMs = 0;
-    }
-    if (snapshot.phase !== 'preparing-game') {
-      this.preparingSinceMs = null;
-    }
-    const broadcastGame = snapshot.broadcast?.gameNumber ?? null;
-    if (broadcastGame !== null && broadcastGame !== previousBroadcastGame) {
+    if (this.seriesFlow.observe(snapshot.phase, snapshot.broadcast?.gameNumber ?? null)) {
       this.progress = 0;
-      this.playback.reset();
     }
     this.publish();
   }
@@ -695,12 +750,13 @@ export class DraftDuelSession {
       void this.resolveDeadline(deadline.cursor, deadline.pickOrdinal);
     }
     if (
-      this.phase() === 'preparing-game' &&
-      ((this.localReady() && this.opponentReady()) ||
-        (this.readyCountdownMs() === 0 && !this.opponentReady())) &&
-      this.now - this.lastAutoAttemptMs >= AUTO_START_RETRY_MS
+      this.seriesFlow.shouldAutoStart(
+        this.localReady(),
+        this.opponentReady(),
+        GAME_READY_WINDOW_MS,
+        this.now,
+      )
     ) {
-      this.lastAutoAttemptMs = this.now;
       void this.startBroadcast(!(this.localReady() && this.opponentReady()));
     }
   }
@@ -709,6 +765,9 @@ export class DraftDuelSession {
     if (this.deadlineResolving || !this.roomId || !this.participantId) return;
     if (!this.draft || !this.assets || this.draft.status !== 'drafting') return;
     if (this.draft.pickOrdinal !== pickOrdinal) return;
+    const attachment = this.attachment;
+    if (!attachment?.current()) return;
+    const roomId = attachment.roomId;
     this.deadlineResolving = true;
     try {
       const timeoutPick = draftDuelTimeoutPick(this.draft, this.assets.catalog);
@@ -720,44 +779,67 @@ export class DraftDuelSession {
         slotIndex: timeoutPick.slotIndex,
         seedPath: timeoutPick.seedPath,
       };
-      await this.deps.transport.commitFallback(this.roomId, cursor, payload);
-      const receipt = await this.deps.transport.resolveTimeout(this.roomId);
+      await this.deps.transport.commitFallback(roomId, cursor, payload);
+      if (!attachment.current()) return;
+      const receipt = await this.deps.transport.resolveTimeout(roomId);
+      if (!attachment.current()) return;
       if (receipt?.accepted) this.resolvedCursor = cursor;
       else this.deadlineRetryAtMs = this.deps.now() + AUTO_START_RETRY_MS;
       await this.syncFromServer();
     } catch {
+      if (!attachment.current()) return;
       this.deadlineRetryAtMs = this.deps.now() + AUTO_START_RETRY_MS;
     } finally {
-      this.deadlineResolving = false;
+      if (attachment.current()) this.deadlineResolving = false;
     }
   }
 
   private async submit(payload: DraftDuelCommand['payload']): Promise<boolean> {
-    if (!this.roomId || !this.participantId) return false;
+    const attachment = this.attachment;
+    if (!attachment?.current() || !this.roomId || !this.participantId) return false;
     if (this.busy) return false;
     this.busy = true;
     this.error = null;
     this.publish();
     try {
-      const receipt = await this.deps.transport.submitCommand({
-        schemaVersion: 1,
-        roomId: this.roomId,
-        commandId: commandIdSchema.parse(this.deps.newCommandId()),
-        actorParticipantId: this.participantId,
-        payload,
-      });
-      if (!receipt.accepted) {
-        throw new Error(`Draft Duel command rejected: ${receipt.rejectionCode ?? 'unknown'}`);
+      const report = await executeMultiplayerCommand(
+        {
+          schemaVersion: 1,
+          roomId: this.roomId,
+          commandId: commandIdSchema.parse(
+            this.commandRecovery.id(payload, () => this.deps.newCommandId()),
+          ),
+          actorParticipantId: this.participantId,
+          payload,
+        },
+        {
+          submit: (command) => this.deps.transport.submitCommand(command),
+          classify: (receipt) =>
+            receipt.accepted
+              ? 'accepted'
+              : receipt.rejectionCode === 'stale-revision'
+                ? 'stale'
+                : 'rejected',
+        },
+      );
+      if (!attachment.current()) return false;
+      const receipt = report.receipt;
+      if (receipt) this.commandRecovery.settled(payload);
+      if (!receipt?.accepted) {
+        throw new Error(`Draft Duel command rejected: ${receipt?.rejectionCode ?? 'unknown'}`);
       }
       await this.syncFromServer();
       return true;
     } catch (error) {
+      if (!attachment.current()) return false;
       this.error = this.deps.friendlyError(error);
       return false;
     } finally {
-      this.busy = false;
-      this.maybeProposeOrConfirm();
-      this.publish();
+      if (attachment.current()) {
+        this.busy = false;
+        this.maybeProposeOrConfirm();
+        this.publish();
+      }
     }
   }
 
@@ -768,26 +850,41 @@ export class DraftDuelSession {
 
   private async runSync(): Promise<void> {
     if (this.disposed || !this.roomId || !this.assets) return;
-    const isDisposed = () => this.disposed;
+    const attachment = this.attachment;
+    if (!attachment?.current()) return;
+    const roomId = attachment.roomId;
+    const isDisposed = () => !attachment.current();
     try {
-      const resumed = await this.deps.transport.resume(this.roomId);
+      const resumed = await this.deps.transport.resume(roomId);
       if (isDisposed()) return;
+      this.lifecycle.connected(attachment);
+      this.error = null;
       this.applySnapshot(resumed.snapshot);
-      const commands = await this.deps.transport.refetch(this.roomId, -1);
+      const commands = await this.deps.transport.refetch(roomId, -1);
       if (isDisposed()) return;
+      if (this.snapshot && resumed.snapshot.revision < this.snapshot.revision) {
+        void this.syncFromServer();
+        return;
+      }
       this.commands = commands;
       if (this.shouldCreateRematch()) {
         this.rematchRetryAtMs = this.deps.now() + AUTO_START_RETRY_MS;
-        await this.deps.transport.rematch(this.roomId);
-        this.applySnapshot((await this.deps.transport.resume(this.roomId)).snapshot);
+        await this.deps.transport.rematch(roomId);
+        const rematched = await this.deps.transport.resume(roomId);
+        if (isDisposed()) return;
+        this.applySnapshot(rematched.snapshot);
       }
-      await this.deps.repository.appendCommands(this.roomId, commands);
+      await this.deps.repository.appendCommands(roomId, commands);
+      if (isDisposed()) return;
       this.rebuildDraft();
       await this.ensureGamePipeline();
+      if (isDisposed()) return;
       this.maybeProposeOrConfirm();
       await this.persistActive();
       this.publish();
     } catch (error) {
+      if (isDisposed()) return;
+      this.lifecycle.failed(attachment);
       this.error = this.deps.friendlyError(error);
       this.publish();
     }
@@ -832,27 +929,33 @@ export class DraftDuelSession {
   }
 
   private async ensureGamePipeline(): Promise<void> {
+    const attachment = this.attachment;
+    if (!attachment?.current()) return;
     const snapshot = this.snapshot;
     const series = snapshot?.series;
     if (!snapshot || !series || !this.assets || !this.roomId) return;
     const gameNumber = series.currentGameNumber;
     if (gameNumber === null) return;
     if (snapshot.phase !== 'preparing-game' && snapshot.phase !== 'broadcasting') return;
-    if (this.outputs[gameNumber] || this.simulating.has(gameNumber)) return;
-    this.simulating.add(gameNumber);
+    if (this.outputs[gameNumber] || this.seriesFlow.jobs.has(gameNumber)) return;
     try {
-      const output = await this.simulateGame(gameNumber, series.homeWinner);
-      this.outputs = { ...this.outputs, [gameNumber]: output };
-      await this.deps.repository.saveResult(output);
-      this.publish();
+      await this.seriesFlow.runGame(
+        gameNumber,
+        attachment.current,
+        () => this.simulateGame(gameNumber, series.homeWinner),
+        async (output) => {
+          this.outputs = { ...this.outputs, [gameNumber]: output };
+          await this.deps.repository.saveResult(output);
+          if (attachment.current()) this.publish();
+        },
+      );
     } catch (error) {
+      if (!attachment.current()) return;
       this.error =
         error instanceof Error
           ? `Game simulation failed: ${error.message.slice(0, 200)}`
           : 'Game simulation failed.';
       this.publish();
-    } finally {
-      this.simulating.delete(gameNumber);
     }
   }
 
@@ -908,7 +1011,11 @@ export class DraftDuelSession {
   }
 
   private continueApproved(gameNumber: number): boolean {
-    return this.playback.continueApproved(gameNumber, GAME_RESULTS_HOLD_MS, this.deps.now());
+    return this.seriesFlow.playback.continueApproved(
+      gameNumber,
+      GAME_RESULTS_HOLD_MS,
+      this.deps.now(),
+    );
   }
 
   private awaitingContinue(): boolean {
@@ -917,70 +1024,59 @@ export class DraftDuelSession {
     if (!snapshot || !output) return false;
     if (snapshot.phase !== 'game-results') return false;
     const gameNumber = output.gameNumber;
-    if (this.confirmSent.has(gameNumber)) return false;
+    if (this.seriesFlow.confirmations.has(gameNumber)) return false;
     return !this.continueApproved(gameNumber);
   }
 
   private maybeProposeOrConfirm(): void {
-    if (this.disposed || this.busy || this.deps.now() < this.resultRetryAtMs) return;
+    const attachment = this.attachment;
+    if (!attachment?.current() || this.busy) return;
     const snapshot = this.snapshot;
-    const series = snapshot?.series;
     const output = this.currentOutput();
-    if (!snapshot || !series || !output || !this.participantId) return;
-    const gameNumber = output.gameNumber;
+    if (!snapshot || !output || !this.participantId) return;
     if (snapshot.phase !== 'broadcasting' && snapshot.phase !== 'game-results') return;
     if (this.progress < 1 && snapshot.phase === 'broadcasting') return;
-    if (!this.proposalSent.has(gameNumber)) {
-      this.proposalSent.add(gameNumber);
-      void this.submit({
-        kind: 'propose-result',
-        gameNumber,
-        winner: this.winnerOf(output),
-        resultDigest: output.resultDigest,
-        tapeDigest: output.tapeDigest,
-        inputDigest: output.inputDigest,
-      }).then((accepted) => {
-        if (!accepted) {
-          this.proposalSent.delete(gameNumber);
-          this.resultRetryAtMs = this.deps.now() + AUTO_START_RETRY_MS;
-        }
-      });
-      return;
-    }
+    const gameNumber = output.gameNumber;
     const { byParticipant } = this.proposalOf(gameNumber);
-    if (byParticipant[this.participantId] !== output.resultDigest) return;
-    const rivalId = otherParticipant(this.participantId);
-    const rivalDigest = byParticipant[rivalId];
-    if (rivalDigest === undefined || this.confirmSent.has(gameNumber)) return;
-    if (rivalDigest === output.resultDigest && !this.continueApproved(gameNumber)) return;
-    this.confirmSent.add(gameNumber);
-    if (rivalDigest === output.resultDigest) {
-      void this.submit({
-        kind: 'confirm-result',
-        gameNumber,
-        resultDigest: output.resultDigest,
-        verified: true,
-      }).then((accepted) => {
-        if (accepted) {
-          this.recordVerification(gameNumber, output.resultDigest, rivalDigest, 'verified');
-        } else {
-          this.confirmSent.delete(gameNumber);
-          this.resultRetryAtMs = this.deps.now() + AUTO_START_RETRY_MS;
+    const roomId = attachment.roomId;
+    this.seriesFlow.coordinate({
+      gameNumber,
+      localDigest: output.resultDigest,
+      ownProposal: byParticipant[this.participantId],
+      peerProposal: byParticipant[otherParticipant(this.participantId)],
+      current: attachment.current,
+      propose: () =>
+        this.submit({
+          kind: 'propose-result',
+          gameNumber,
+          winner: this.winnerOf(output),
+          resultDigest: output.resultDigest,
+          tapeDigest: output.tapeDigest,
+          inputDigest: output.inputDigest,
+        }),
+      confirm: (verified) =>
+        this.submit({
+          kind: 'confirm-result',
+          gameNumber,
+          resultDigest: output.resultDigest,
+          verified,
+        }),
+      verification: (verified, peerDigest) => {
+        this.recordVerification(
+          gameNumber,
+          output.resultDigest,
+          peerDigest,
+          verified ? 'verified' : 'mismatch',
+        );
+        if (!verified) {
+          this.integrityFailed = true;
+          this.publish();
         }
-      });
-    } else {
-      this.recordVerification(gameNumber, output.resultDigest, rivalDigest, 'mismatch');
-      this.integrityFailed = true;
-      this.publish();
-      void this.submit({
-        kind: 'confirm-result',
-        gameNumber,
-        resultDigest: output.resultDigest,
-        verified: false,
-      }).then(() => {
-        if (this.roomId) void this.deps.transport.fail(this.roomId).catch(() => {});
-      });
-    }
+      },
+      mismatch: () => {
+        void this.deps.transport.fail(roomId).catch(() => {});
+      },
+    });
   }
 
   private winnerOf(output: DraftDuelGameOutput): DraftDuelParticipantId {

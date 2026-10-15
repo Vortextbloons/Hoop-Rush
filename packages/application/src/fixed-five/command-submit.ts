@@ -7,7 +7,7 @@ import type {
   Id,
   CommandId,
 } from '@hoop-rush/data-contracts';
-import { runSubmission } from '../submission.ts';
+import { executeMultiplayerCommand } from '../multiplayer/command-execution.ts';
 import { FIXED_FIVE_COMMAND_POLICY, FIXED_FIVE_SINGLE_ATTEMPT_POLICY } from './policies.ts';
 
 const STALE_RETRY_SAFE_KINDS: ReadonlySet<FixedFiveCommandPayload['kind']> = new Set([
@@ -60,25 +60,29 @@ export async function submitFixedFiveCommand(
   const policy =
     input.retry === false ? FIXED_FIVE_SINGLE_ATTEMPT_POLICY : FIXED_FIVE_COMMAND_POLICY;
   let resyncedRevision: number | undefined;
-  const report = await runSubmission(policy, command, {
-    submit: (current) => input.submitCommand(current),
-    classify: (receipt) =>
-      receipt.accepted
-        ? 'accepted'
-        : receipt.rejectionCode === 'stale-revision'
-          ? 'stale'
-          : 'rejected',
-    canRetry: () =>
-      STALE_RETRY_SAFE_KINDS.has(input.payload.kind) || input.retryAfterResync?.() === true,
-    revise: (current, receipt) => ({
-      ...current,
-      expectedRevision: Math.max(resyncedRevision ?? receipt.revision, receipt.revision),
-    }),
-    resync: async () => {
-      const fresh = await input.resync();
-      if (typeof fresh === 'number') resyncedRevision = fresh;
+  const report = await executeMultiplayerCommand(
+    command,
+    {
+      submit: (current) => input.submitCommand(current),
+      classify: (receipt) =>
+        receipt.accepted
+          ? 'accepted'
+          : receipt.rejectionCode === 'stale-revision'
+            ? 'stale'
+            : 'rejected',
+      canRetry: () =>
+        STALE_RETRY_SAFE_KINDS.has(input.payload.kind) || input.retryAfterResync?.() === true,
+      revise: (current, receipt) => ({
+        ...current,
+        expectedRevision: Math.max(resyncedRevision ?? receipt.revision, receipt.revision),
+      }),
+      resync: async () => {
+        const fresh = await input.resync();
+        if (typeof fresh === 'number') resyncedRevision = fresh;
+      },
     },
-  });
+    policy,
+  );
   if (report.receipt === null) throw report.error;
   return { receipt: report.receipt, retried: report.retried };
 }

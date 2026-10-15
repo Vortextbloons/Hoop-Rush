@@ -25,6 +25,7 @@ import type {
   ReactionKey,
 } from '@hoop-rush/application/havoc-multiplayer';
 import { createHavocMultiplayerSession } from './havoc-multiplayer-session';
+import type { RoomConnection } from '@hoop-rush/application/multiplayer';
 import {
   havocMultiplayerFeedLines,
   havocMultiplayerPlaybackItems,
@@ -58,6 +59,7 @@ export class HavocMultiplayerPresenter {
   verification = $state.raw<HavocMultiplayerGameVerification[]>([]);
   mvp = $state.raw<HavocMultiplayerSeriesMvp | null>(null);
   busy = $state(false);
+  connection = $state<RoomConnection>('idle');
   notice = $state<string | null>(null);
   integrityFailed = $state(false);
   progress = $state(0);
@@ -149,6 +151,10 @@ export class HavocMultiplayerPresenter {
 
   attach(roomId: string): Promise<void> {
     return this.session.attach(roomId);
+  }
+
+  refresh(): Promise<void> {
+    return this.session.refresh();
   }
 
   createRoom(
@@ -262,6 +268,7 @@ export class HavocMultiplayerPresenter {
     this.commands = view.commands;
     this.completedRecap = view.completedRecap;
     this.busy = view.busy;
+    this.connection = view.connection;
     this.errorState = view.error;
     this.notice = view.notice;
     this.integrityFailed = view.integrityFailed;

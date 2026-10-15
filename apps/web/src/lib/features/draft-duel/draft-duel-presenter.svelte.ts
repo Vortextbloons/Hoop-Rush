@@ -31,6 +31,7 @@ import {
   type ReactionKey,
 } from '@hoop-rush/application/draft-duel';
 import { createDraftDuelSession } from './draft-duel-session';
+import type { RoomConnection } from '@hoop-rush/application/multiplayer';
 import {
   gamecastVisibleEventCount,
   gamecastVisibleState,
@@ -54,6 +55,7 @@ export class DraftDuelPresenter {
   outputs = $state.raw<Record<number, DraftDuelGameOutput>>({});
   verification = $state.raw<DraftDuelPartiallyVerified[]>([]);
   busy = $state(false);
+  connection = $state<RoomConnection>('idle');
   notice = $state<string | null>(null);
   integrityFailed = $state(false);
   progress = $state(0);
@@ -201,6 +203,10 @@ export class DraftDuelPresenter {
 
   attach(roomId: string): Promise<void> {
     return this.session.attach(roomId);
+  }
+
+  refresh(): Promise<void> {
+    return this.session.refresh();
   }
 
   createRoom(
@@ -357,6 +363,7 @@ export class DraftDuelPresenter {
     this.commands = view.commands;
     this.completedRecap = view.completedRecap;
     this.busy = view.busy;
+    this.connection = view.connection;
     this.errorState = view.error;
     this.notice = view.notice;
     this.integrityFailed = view.integrityFailed;

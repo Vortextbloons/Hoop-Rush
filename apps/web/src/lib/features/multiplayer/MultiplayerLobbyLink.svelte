@@ -1,63 +1,19 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { ArrowRight, Users } from '@lucide/svelte';
-  import type { MultiplayerLobby } from '@hoop-rush/data-contracts';
-  import {
-    getLobby,
-    loadLobbyId,
-    rememberLobby,
-    resumeMultiplayerGame,
-    multiplayerGameRoomRouteId,
-  } from '#lib/features/multiplayer/multiplayer-lobby.js';
-
+  import { loadLobbyId } from './multiplayer-lobby';
+  import { getLobbyCoordinator } from './lobby-context.svelte';
   let { roomId, completed = false }: { roomId: string; completed?: boolean } = $props();
+  const coordinator = getLobbyCoordinator();
   let lobbyId = $state<string | null>(null);
-  let lobby = $state<MultiplayerLobby | null>(null);
-  let error = $state<string | null>(null);
+  const lobby = $derived(
+    coordinator.snapshot.lobby?.id === lobbyId ? coordinator.snapshot.lobby : null,
+  );
+  const error = $derived(coordinator.snapshot.error);
   onMount(() => {
-    let mounted = true;
-    let refreshing = false;
     lobbyId = loadLobbyId(roomId);
-    function refresh() {
-      if (!lobbyId || refreshing) return;
-      refreshing = true;
-      void getLobby(lobbyId)
-        .then(async (next) => {
-          if (!mounted) return;
-          lobby = next;
-          rememberLobby(next);
-          error = null;
-          if (!next.canStart && next.gameKind && next.gameRoomId && next.gameRoomId !== roomId) {
-            await resumeMultiplayerGame(next.gameKind, next.gameRoomId);
-            if (!mounted) return;
-            if (next.gameKind === 'draft-duel') {
-              await goto(
-                resolve(multiplayerGameRoomRouteId('draft-duel'), { roomId: next.gameRoomId }),
-              );
-            } else if (next.gameKind === 'havoc') {
-              await goto(resolve(multiplayerGameRoomRouteId('havoc'), { roomId: next.gameRoomId }));
-            } else {
-              await goto(
-                resolve(multiplayerGameRoomRouteId('fixed-five'), { roomId: next.gameRoomId }),
-              );
-            }
-          }
-        })
-        .catch(() => {
-          if (mounted) error = 'Lobby connection interrupted. Reconnecting…';
-        })
-        .finally(() => {
-          refreshing = false;
-        });
-    }
-    refresh();
-    const timer = setInterval(refresh, 2000);
-    return () => {
-      mounted = false;
-      clearInterval(timer);
-    };
+    coordinator.attachRoom(roomId);
   });
 </script>
 
@@ -67,8 +23,14 @@
       <div class="room-mark"><Users size={24} aria-hidden="true" /></div>
       <div class="next-copy">
         <p class="eyebrow">Same room · Next game</p>
-        <h2>Keep the matchup going.</h2>
-        <p>Return to your lobby to pick another mode. Your opponent stays with you.</p>
+        <h2>
+          {lobby?.participantId === 'p2' ? 'Waiting for your host' : 'Keep the matchup going.'}
+        </h2>
+        <p>
+          {lobby?.participantId === 'p2'
+            ? 'Your host chooses the next match. You’ll enter together.'
+            : 'Return to your lobby to pick another mode. Your opponent stays with you.'}
+        </p>
         {#if lobby}<div class="room-facts">
             <span>ROOM <strong>{lobby.code}</strong></span><span
               >{lobby.guestJoined ? '2 players in room' : 'Waiting for your opponent'}</span

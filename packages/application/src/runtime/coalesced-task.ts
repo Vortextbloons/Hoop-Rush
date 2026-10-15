@@ -1,5 +1,5 @@
 export class CoalescedTask {
-  private running = false;
+  private running: Promise<void> | null = null;
   private queued = false;
   private readonly task: () => Promise<void>;
 
@@ -7,18 +7,23 @@ export class CoalescedTask {
     this.task = task;
   }
 
+  private hasQueued(): boolean {
+    return this.queued;
+  }
+
   request(): Promise<void> {
-    if (this.running) {
+    if (this.running !== null) {
       this.queued = true;
-      return Promise.resolve();
+      return this.running;
     }
-    this.running = true;
-    return this.task().finally(() => {
-      this.running = false;
-      if (this.queued) {
+    this.running = (async () => {
+      do {
         this.queued = false;
-        void this.request();
-      }
+        await this.task();
+      } while (this.hasQueued());
+    })().finally(() => {
+      this.running = null;
     });
+    return this.running;
   }
 }

@@ -158,8 +158,8 @@ select is(
   true, 'generated room codes have broad sample diversity');
 select ok(
   position('fixed_five_random_code' in pg_get_functiondef('public.havoc_multiplayer_random_code()'::regprocedure)) > 0
-  and position('extensions.gen_random_bytes' in pg_get_functiondef('public.fixed_five_random_code()'::regprocedure)) > 0
-  and position('havoc_multiplayer_rooms' in pg_get_functiondef('public.fixed_five_random_code()'::regprocedure)) > 0,
+  and position('extensions.gen_random_bytes' in pg_get_functiondef('multiplayer_private.allocate_code()'::regprocedure)) > 0
+  and position('havoc_multiplayer_rooms' in pg_get_functiondef('multiplayer_private.allocate_code()'::regprocedure)) > 0,
   'room-code entropy comes from pgcrypto and the namespace includes havoc');
 select is(
   position('random()' in pg_get_functiondef('public.havoc_multiplayer_random_code()'::regprocedure)),

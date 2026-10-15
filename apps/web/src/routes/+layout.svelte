@@ -2,7 +2,6 @@
   import { browser } from '$app/env';
   import { asset, resolve } from '$app/paths';
   import { page } from '$app/state';
-  import type { RouteId } from '$app/types';
   import { ArrowLeft, Home, Users, Swords } from '@lucide/svelte';
   import '../app.css';
   import { ModeWatcher } from 'mode-watcher';
@@ -12,7 +11,24 @@
   import { initArenaSoundForLiteMode } from '#lib/arena-sound.js';
   import { deferIdle, initLiteMode, isLiteMode } from '#lib/device-capabilities.js';
   import { isNavItemActive, type NavItem } from '#lib/nav-items.js';
+  import { goto } from '$app/navigation';
+  import { onDestroy } from 'svelte';
+  import {
+    LobbyCoordinator,
+    setLobbyCoordinator,
+  } from '#lib/features/multiplayer/lobby-context.svelte.js';
+  import { multiplayerMode, modeNavigation } from '#lib/modes/catalog.js';
   let { children } = $props();
+  const lobbyCoordinator = new LobbyCoordinator(async (intent) => {
+    if (intent.kind === 'game') {
+      if (page.params.roomId === intent.roomId) return;
+      await goto(resolve(multiplayerMode(intent.gameKind).routeId, { roomId: intent.roomId }));
+    } else {
+      await goto(resolve(`/multiplayer?lobby=${intent.lobbyId}`));
+    }
+  });
+  setLobbyCoordinator(lobbyCoordinator);
+  onDestroy(() => lobbyCoordinator.dispose());
   const homeHref = resolve('/');
   const navItems: NavItem[] = [
     { id: 'home', label: 'Home', href: '/', icon: Home },
@@ -20,9 +36,12 @@
     { id: 'multiplayer', label: 'Multiplayer', href: '/multiplayer', icon: Swords },
   ];
   const routeId = $derived(page.route.id);
+  const currentMode = $derived(
+    modeNavigation().find((mode) => mode.solo && routeId?.startsWith(mode.solo.href)),
+  );
   const isMultiplayerLobby = $derived(routeId === '/multiplayer');
-  const isHavoc = $derived(routeId?.startsWith('/havoc') === true);
-  const isUltimate = $derived(routeId?.startsWith('/ultimate/run') === true);
+  const isHavoc = $derived(currentMode?.id === 'havoc');
+  const isUltimate = $derived(currentMode?.id === 'ultimate-run');
   const showBottomNav = $derived(
     routeId === '/' || routeId === '/roster' || routeId === '/multiplayer',
   );
@@ -48,6 +67,11 @@
     }
   }
 </script>
+
+<svelte:window
+  onfocus={() => lobbyCoordinator.refresh()}
+  ononline={() => lobbyCoordinator.refresh()}
+/>
 
 <svelte:head>
   <meta name="color-scheme" content="dark light" />

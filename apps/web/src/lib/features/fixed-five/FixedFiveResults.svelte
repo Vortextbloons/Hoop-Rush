@@ -19,7 +19,7 @@
   import PlayerFace from '#lib/components/PlayerFace.svelte';
   import { formatPositions } from '#lib/player-positions.js';
   import type { DraftPresentation } from '#lib/draft-presentation.js';
-  import type { FixedFivePlayerStats } from '#lib/features/multiplayer/fixed-five-player-stats.js';
+  import type { FixedFivePlayerStats } from '#lib/features/fixed-five/fixed-five-player-stats.js';
   import { perGameText } from '#lib/format.js';
   let {
     mode,
