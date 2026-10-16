@@ -4,13 +4,11 @@ import {
   HAVOC_MULTIPLAYER_SERIES_GAMES,
   HAVOC_MULTIPLAYER_SERIES_WINS,
   commandIdSchema,
-  createInMemoryHavocMultiplayerTransport,
   havocMultiplayerBroadcastSchema,
   havocMultiplayerCommandPayloadSchema,
   havocMultiplayerCommandRejectionCodeSchema,
   havocMultiplayerCommandSchema,
   havocMultiplayerDeadlineSchema,
-  havocMultiplayerHomeForGame,
   havocMultiplayerPhaseSchema,
   havocMultiplayerRoomCodeSchema,
   havocMultiplayerRoomSettingsSchema,
@@ -34,8 +32,12 @@ import {
   type HavocMultiplayerTransport,
   type Id,
 } from '@hoop-rush/data-contracts';
+import { randomBytes, randomUUID } from '#lib/ids.js';
+import {
+  createInMemoryHavocMultiplayerTransport,
+  havocMultiplayerHomeForGame,
+} from '@hoop-rush/application/havoc-multiplayer';
 import { replayHavocMultiplayerDraft } from '@hoop-rush/engine';
-import { randomUUID } from '#lib/ids.js';
 import {
   createRealtimeRoomRegistry,
   ensureAnonymous,
@@ -407,7 +409,10 @@ export function createHavocMultiplayerTransport(
     !isUsableSupabaseUrl(candidateUrl) ||
     !isUsablePublishableKey(candidateKey)
   ) {
-    return createInMemoryHavocMultiplayerTransport();
+    return createInMemoryHavocMultiplayerTransport({
+      clock: Date.now,
+      random: { bytes: randomBytes },
+    });
   }
   let clientPromise: Promise<HavocMultiplayerClient> | null = null;
   const transportUrl = candidateUrl;

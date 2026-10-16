@@ -7,7 +7,6 @@ import {
   HAVOC_MULTIPLAYER_SAVE_SCHEMA_VERSION,
   HAVOC_MULTIPLAYER_TURNS,
   contentHashSchema,
-  createInMemoryHavocMultiplayerTransport,
   defaultHavocMultiplayerVersionLocks,
   eraSimulationProfileSchema,
   havocMultiplayerCommandSchema,
@@ -26,8 +25,11 @@ import {
   type HavocMultiplayerWorkerGameOutput,
   type HavocVersionSet,
   type Id,
-  type InMemoryHavocMultiplayerTransport,
 } from '@hoop-rush/data-contracts';
+import {
+  createInMemoryHavocMultiplayerTransport,
+  type InMemoryHavocMultiplayerTransport,
+} from './in-memory-transport.ts';
 import {
   AdaptHavocCatalog,
   HAVOC_MUTATION_DEFINITIONS,
@@ -288,8 +290,10 @@ async function createHarness(options?: {
   let now = START_MS;
   const transport = createInMemoryHavocMultiplayerTransport({
     clock: () => now,
-    ...(options?.rng !== undefined ? { rng: options.rng } : {}),
-    ...(options?.seed !== undefined ? { seed: options.seed } : {}),
+    random:
+      options?.rng !== undefined
+        ? { rng: options.rng }
+        : { seed: options?.seed ?? 'havoc-session' },
   });
   const assets = buildAssets();
   const locks = { ...locksFor(assets.versionSet), ...options?.lockOverrides };

@@ -30,6 +30,15 @@ gathers intent, the engine owns basketball rules, adapters own I/O.
 
 ## Current exports
 
+- In-memory multiplayer transports and picker/home-side protocol helpers live
+  in each mode's `in-memory-transport.ts`, exported through `fixed-five`,
+  `draft-duel`, and `havoc-multiplayer`. Callers inject the clock and either a
+  seed, RNG, or secure byte source; these implementations perform no browser I/O.
+- `FixedFiveRoomSession` composes `FixedFiveCompetitionFlow` (batch simulation,
+  saved-result recovery, stats rebuilding) and `FixedFiveVerificationFlow`
+  (proposals, confirmations, mismatch recovery, receipts, completion). Each flow
+  owns its state; the session owns room synchronization, drafting, and Duel playback.
+
 - `LobbySession` owns lobby commands, one coalesced two-second refresh loop,
   validated snapshots, membership recovery ports, and navigation intents.
   `RoomLifecycle` scopes delayed work and subscriptions with attachment

@@ -10,3 +10,11 @@ export {
   type DraftDuelSessionView,
   type ReactionKey,
 } from './session.ts';
+
+export {
+  draftDuelFirstPickerFor,
+  draftDuelHomeWinnerFor,
+  draftDuelHomeForGameFor,
+  type InMemoryDraftDuelTransport,
+  createInMemoryDraftDuelTransport,
+} from './in-memory-transport.ts';

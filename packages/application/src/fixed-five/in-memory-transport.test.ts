@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest';
 import {
   commandIdSchema,
   contentHashSchema,
-  createInMemoryFixedFiveTransport,
   defaultFixedFiveVersionLocks,
   franchiseIdSchema,
   idSchema,
   playerIdSchema,
-} from './index.ts';
+} from '@hoop-rush/data-contracts';
+import { createInMemoryFixedFiveTransport } from './in-memory-transport.ts';
 
 describe('in-memory Fixed-Five duel broadcast', () => {
   const DIGEST_A = contentHashSchema.parse('a'.repeat(64));
@@ -15,8 +15,8 @@ describe('in-memory Fixed-Five duel broadcast', () => {
 
   async function duelRoom(clock?: () => number) {
     const transport = createInMemoryFixedFiveTransport({
-      seed: 'duel-broadcast',
-      ...(clock ? { clock } : {}),
+      random: { seed: 'duel-broadcast' },
+      clock: clock ?? (() => 1_700_000_000_000),
     });
     const created = await transport.create({
       mode: 'duel',
@@ -197,7 +197,7 @@ describe('in-memory Fixed-Five duel broadcast', () => {
   });
 
   it('auto-starts a broadcast after sixty idle seconds and clinches at four wins', async () => {
-    let now = Date.now();
+    let now = 1_700_000_000_000;
     const clock = () => now;
     const { transport, created } = await duelRoom(clock);
     let snapshot = await completeDraft(transport, created);
@@ -349,7 +349,10 @@ describe('in-memory Fixed-Five duel broadcast', () => {
 
 describe('in-memory Fixed-Five sandbox deadlines', () => {
   it('advances a seeded snake deadline and rejects canonical duplicates', async () => {
-    const transport = createInMemoryFixedFiveTransport({ seed: 'sandbox-snake-test' });
+    const transport = createInMemoryFixedFiveTransport({
+      clock: () => 1_700_000_000_000,
+      random: { seed: 'sandbox-snake-test' },
+    });
     const created = await transport.create({
       mode: 'sandbox-shared-82',
       sourceMode: 'sandbox',
@@ -434,7 +437,10 @@ describe('in-memory Fixed-Five sandbox deadlines', () => {
   });
 
   it('accepts v4 snake displacement and off-turn repositions without moving the clock', async () => {
-    const transport = createInMemoryFixedFiveTransport({ seed: 'sandbox-snake-reposition' });
+    const transport = createInMemoryFixedFiveTransport({
+      clock: () => 1_700_000_000_000,
+      random: { seed: 'sandbox-snake-reposition' },
+    });
     const created = await transport.create({
       mode: 'sandbox-shared-82',
       sourceMode: 'sandbox',

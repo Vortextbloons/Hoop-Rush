@@ -3,7 +3,6 @@ import {
   FIXED_FIVE_DUEL_GAME_RESULTS_HOLD_MS,
   FIXED_FIVE_MULTIPLAYER_VERSION,
   commandIdSchema,
-  contentHashSchema,
   idSchema,
   playerVersionId,
   type ClassicDraftCatalog,
@@ -34,10 +33,8 @@ import {
   type SimulationPlayer,
   type SlotIndex,
 } from '@hoop-rush/data-contracts';
-import { z } from 'zod';
 import {
   assembleCompetitionRun,
-  buildFixedFiveVerificationInput,
   computeCompetitionDigest,
   computeDueAutopick,
   deriveEffectivePhase,
@@ -57,15 +54,15 @@ import {
 import { SeriesCoordinator } from '../multiplayer/series-coordinator.ts';
 import { RoomLifecycle, type RoomAttachment } from '../multiplayer/room-lifecycle.ts';
 import { submitFixedFiveCommand } from './command-submit.ts';
-import { FixedFiveSimulationGate, type FixedFiveSimulationReason } from './simulation-gate.ts';
+import { FixedFiveCompetitionFlow } from './competition-flow.ts';
+import { FixedFiveVerificationFlow, isMissingFunctionError } from './verification-flow.ts';
+import { refsForParticipant } from './pick-refs.ts';
+export { refsForParticipant } from './pick-refs.ts';
 
-const SIM_SHOWDOWN_MIN_MS = 7000;
-const SIM_SHOWDOWN_REDUCED_MS = 400;
 const RESYNC_INTERVAL_MS = 15_000;
 const CLOCK_INTERVAL_MS = 1_000;
 const DUEL_AUTO_START_RETRY_MS = 5000;
 const NOTICE_TTL_MS = 6_000;
-const VERIFY_GUARD_PREFIX = 'hoop-rush:fixed-five:verify:';
 
 export type DuelGameVerification = 'pending' | 'verified' | 'mismatch';
 
@@ -253,34 +250,6 @@ export interface FixedFiveRoomSessionDeps {
   };
 }
 
-interface VerificationOutcome {
-  ok: boolean;
-  receipt: FixedFiveVerificationReceipt | null;
-  failures: string[];
-}
-
-interface SimulationContext {
-  p1Refs: FixedFivePickRef[];
-  p2Refs: FixedFivePickRef[];
-  p1Team: FixedFiveWorkerTeam;
-  p2Team: FixedFiveWorkerTeam;
-}
-
-const verifyGuardSchema = z.object({
-  submittedPropose: contentHashSchema.nullable().optional(),
-  confirmedFor: contentHashSchema.nullable().optional(),
-  reranMismatch: z.boolean().optional(),
-  mismatchReported: z.boolean().optional(),
-  receiptsUnsupported: z.boolean().optional(),
-});
-
-function isMissingFunctionError(e: unknown): boolean {
-  const message = e instanceof Error ? e.message : String(e);
-  if (/schema cache|PGRST202|404/.test(message)) return true;
-  const code = typeof e === 'object' && e !== null ? (e as { code?: unknown }).code : null;
-  return code === 'PGRST202';
-}
-
 function clamp01(value: number): number {
   return Math.min(1, Math.max(0, value));
 }
@@ -289,90 +258,17 @@ function otherParticipant(participantId: FixedFiveParticipantId): FixedFiveParti
   return participantId === 'p1' ? 'p2' : 'p1';
 }
 
-function sandboxCandidateForPick(
-  assets: FixedFiveSessionAssets,
-  playerId: string,
-  versionId?: string,
-): FixedFiveCandidate {
-  const candidate =
-    (versionId ? assets.pool.find((entry) => entry.playerVersionId === versionId) : null) ??
-    assets.poolById.get(playerId);
-  if (!candidate || candidate.playerId !== playerId) {
-    throw new Error(`sandbox pick ${playerId} has no matching pool record`);
-  }
-  return candidate;
-}
-
-export function refsForParticipant(
-  replay: DraftReplay,
-  assets: FixedFiveSessionAssets,
-  participant: FixedFiveParticipantId,
-): FixedFivePickRef[] {
-  if (replay.mode === 'duel') {
-    return replay.state.picks
-      .filter((p) => p.participantId === participant)
-      .map((p) => ({
-        playerId: p.playerId,
-        franchiseId: p.franchiseId,
-        eraId: p.eraId,
-        slotIndex: p.slotIndex,
-      }));
-  }
-  if (replay.mode === 'sandbox-duel') {
-    return replay.state.picks
-      .filter((p) => p.participantId === participant)
-      .map((pick) => {
-        const candidate = sandboxCandidateForPick(assets, pick.playerId, pick.playerVersionId);
-        return {
-          playerId: pick.playerId,
-          franchiseId: candidate.franchiseId,
-          eraId: candidate.eraId,
-          slotIndex: pick.slotIndex,
-          playerVersionId: candidate.playerVersionId,
-        };
-      });
-  }
-  if (replay.mode === 'sandbox-shared-82') {
-    if (replay.draftStyle === 'snake') {
-      return replay.state.picks
-        .filter((p) => p.participantId === participant)
-        .map((pick) => {
-          const candidate = sandboxCandidateForPick(assets, pick.playerId, pick.playerVersionId);
-          return {
-            playerId: pick.playerId,
-            franchiseId: candidate.franchiseId,
-            eraId: candidate.eraId,
-            slotIndex: pick.slotIndex,
-            playerVersionId: candidate.playerVersionId,
-          };
-        });
-    }
-    const builder = participant === 'p1' ? replay.p1 : replay.p2;
-    return builder.placements.map((placement) => {
-      const candidate = assets.poolById.get(placement.playerId);
-      if (!candidate) throw new Error(`sandbox pick ${placement.playerId} has no pool record`);
-      return {
-        playerId: placement.playerId,
-        franchiseId: candidate.franchiseId,
-        eraId: candidate.eraId,
-        slotIndex: placement.slotIndex,
-      };
-    });
-  }
-  const draft = participant === 'p1' ? replay.p1 : replay.p2;
-  return draft.picks.map((pick) => ({
-    playerId: pick.playerId,
-    franchiseId: pick.franchiseId,
-    eraId: pick.eraId,
-    slotIndex: pick.slotIndex,
-  }));
-}
+export type FixedFiveFlowContext = Pick<
+  FixedFiveRoomSessionSnapshot,
+  'room' | 'assets' | 'replay' | 'commands' | 'selfId' | 'phase'
+>;
 
 export class FixedFiveRoomSession {
+  private readonly competition: FixedFiveCompetitionFlow;
+  private readonly verification: FixedFiveVerificationFlow;
   private readonly deps: FixedFiveRoomSessionDeps;
   private readonly roomId: string;
   private readonly listeners = new Set<(snapshot: FixedFiveRoomSessionSnapshot) => void>();
-  private readonly simulationGate = new FixedFiveSimulationGate();
   private readonly submittedTimeouts = new Set<string>();
 
   private disposed = false;
@@ -396,21 +292,6 @@ export class FixedFiveRoomSession {
   private phase: FixedFiveRoomPhase = 'lobby';
   private lastOrdinal = -1;
 
-  private simulationReason: FixedFiveSimulationReason = 'initial';
-  private simStarted = false;
-  private simStartAt = 0;
-  private simDone = false;
-  private simError: string | null = null;
-  private progress: { completed: number; total: number } | null = null;
-  private simEntries: FixedFiveWorkerResultEntry[] = [];
-  private statsEntries: FixedFiveWorkerResultEntry[] = [];
-  private statsBuilding = false;
-  private statsRebuildStarted = false;
-  private localResult: FixedFiveLocalResult | null = null;
-  private runner: FixedFiveRunnerPort | null = null;
-  private statsRunner: FixedFiveRunnerPort | null = null;
-  private verificationRunner: FixedFiveRunnerPort | null = null;
-
   private duelOutputs: Record<number, FixedFiveDuelGameOutput> = {};
   private duelRunner: FixedFiveRunnerPort | null = null;
   private duelSimulatingGame: number | null = null;
@@ -420,22 +301,6 @@ export class FixedFiveRoomSession {
   private attachment: RoomAttachment | null = null;
   private broadcastProgress = 0;
   private duelRecapGame: number | null = null;
-
-  private submittedPropose: ContentHash | null = null;
-  private confirmedFor: ContentHash | null = null;
-  private reranMismatch = false;
-  private mismatchReported = false;
-  private completedPairKey: string | null = null;
-  private completeNotReady = false;
-  private completeInFlight = false;
-  private failSent = false;
-  private verificationReceipt: FixedFiveVerificationReceipt | null = null;
-  private verificationError: string | null = null;
-  private verificationInFlight = false;
-  private submittedReceipt: string | null = null;
-  private receiptSubmitInFlight = false;
-  private receiptRebuilds = 0;
-  private receiptsUnsupported = false;
 
   private busyAction: string | null = null;
   private leaveBusy = false;
@@ -453,10 +318,58 @@ export class FixedFiveRoomSession {
     this.seriesFlow = new SeriesCoordinator(deps.now, DUEL_AUTO_START_RETRY_MS);
     this.seriesFlow.holdMs = FIXED_FIVE_DUEL_GAME_RESULTS_HOLD_MS;
     this.roomId = deps.roomId;
+    this.competition = new FixedFiveCompetitionFlow(deps, {
+      context: () => this.flowContext(),
+      isDisposed: () => this.isDisposed(),
+      publish: () => {
+        this.publish();
+      },
+      recomputePhase: () => {
+        this.recomputePhase();
+      },
+      runAutoFlows: () => {
+        this.runAutoFlows();
+      },
+      resetVerification: () => {
+        this.verification.resetResult();
+      },
+      sync: () => this.sync(this.lastOrdinal),
+    });
+    this.verification = new FixedFiveVerificationFlow(deps, {
+      context: () => ({
+        ...this.flowContext(),
+        facts: this.facts,
+        localResult: this.competition.getSnapshot().localResult,
+      }),
+      isDisposed: () => this.isDisposed(),
+      publish: () => {
+        this.publish();
+      },
+      runAutoFlows: () => {
+        this.runAutoFlows();
+      },
+      sync: () => this.sync(this.lastOrdinal),
+      rerunSimulation: () => this.competition.rerun(),
+      setBusyAction: (action) => {
+        this.busyAction = action;
+      },
+      setError: (message) => {
+        this.error = message;
+      },
+      setNotice: (message) => {
+        this.setNotice(message);
+      },
+      advanceRevision: (revision) => {
+        if (this.room && revision > this.room.revision) this.room = { ...this.room, revision };
+      },
+      sendCommand: (payload) => this.sendCommand(payload),
+    });
   }
 
   getSnapshot(): FixedFiveRoomSessionSnapshot {
     return {
+      ...this.competition.getSnapshot(),
+      ...this.verification.getSnapshot(),
       roomId: this.roomId,
       loading: this.loading,
       error: this.error,
@@ -473,14 +386,6 @@ export class FixedFiveRoomSession {
       lobbyId: this.lobbyId,
       phase: this.phase,
       canRematch: this.canRematchNow(),
-      simStarted: this.simStarted,
-      simDone: this.simDone,
-      simError: this.simError,
-      progress: this.progress,
-      simEntries: this.simEntries,
-      statsEntries: this.statsEntries,
-      statsBuilding: this.statsBuilding,
-      localResult: this.localResult,
       duelBroadcast: this.isDuelBroadcast(),
       duelOutputs: this.duelOutputs,
       duelSimError: this.duelSimError,
@@ -492,16 +397,6 @@ export class FixedFiveRoomSession {
       readyCountdownMs: this.duelReadyCountdownMs(),
       awaitingContinue: this.duelAwaitingContinue(),
       duelRecapGame: this.duelRecapGame,
-      receiptsUnsupported: this.receiptsUnsupported,
-      verificationReceipt: this.verificationReceipt,
-      verificationError: this.verificationError,
-      verificationInFlight: this.verificationInFlight,
-      submittedReceipt: this.submittedReceipt,
-      submittedPropose: this.submittedPropose,
-      confirmedFor: this.confirmedFor,
-      reranMismatch: this.reranMismatch,
-      mismatchReported: this.mismatchReported,
-      completeNotReady: this.completeNotReady,
       busyAction: this.busyAction,
       leaveBusy: this.leaveBusy,
       rematchBusy: this.rematchBusy,
@@ -519,7 +414,7 @@ export class FixedFiveRoomSession {
     if (this.isDisposed() || this.attachment?.current()) return;
     this.attachment = this.lifecycle.begin(this.roomId);
     this.lobbyId = this.deps.loadLobbyId(this.roomId);
-    this.restoreVerifyGuards();
+    this.verification.restore();
     const membership = this.deps.loadMembership(this.roomId);
     if (membership) this.selfId = membership.participantId;
     this.attachWakeHandlers();
@@ -543,12 +438,8 @@ export class FixedFiveRoomSession {
     this.lifecycle.dispose();
     this.unsubscribeTransport?.();
     this.unsubscribeTransport = null;
-    this.runner?.dispose();
-    this.runner = null;
-    this.statsRunner?.dispose();
-    this.statsRunner = null;
-    this.verificationRunner?.dispose();
-    this.verificationRunner = null;
+    this.competition.dispose();
+    this.verification.dispose();
     this.duelRunner?.dispose();
     this.duelRunner = null;
     this.detachWakeHandlers();
@@ -561,6 +452,33 @@ export class FixedFiveRoomSession {
       this.clockTimer = null;
     }
     this.listeners.clear();
+  }
+
+  retrySimulation(): void {
+    this.competition.retry();
+  }
+
+  requestStatsRebuild(): void {
+    this.competition.requestStatsRebuild();
+  }
+
+  retryVerification(): void {
+    this.verification.retry();
+  }
+
+  retryFinishing(): Promise<void> {
+    return this.verification.retryFinishing();
+  }
+
+  private flowContext(): FixedFiveFlowContext {
+    return {
+      room: this.room,
+      assets: this.assets,
+      replay: this.replay,
+      commands: this.commands,
+      selfId: this.selfId,
+      phase: this.phase,
+    };
   }
 
   async refresh(): Promise<void> {
@@ -722,14 +640,6 @@ export class FixedFiveRoomSession {
     await this.sendCommand({ kind: 'sandbox-lock' }, { retry: false });
   }
 
-  retrySimulation(): void {
-    if (this.isDisposed()) return;
-    this.simStarted = false;
-    this.simError = null;
-    this.publish();
-    this.maybeAutoStartSimulation();
-  }
-
   retryDuelGame(): void {
     if (this.isDisposed()) return;
     this.duelSimError = null;
@@ -792,48 +702,12 @@ export class FixedFiveRoomSession {
     this.maybeProposeOrConfirmGame();
   }
 
-  requestStatsRebuild(): void {
-    this.statsRebuildStarted = true;
-    void this.rebuildStatsEntries();
-  }
-
-  retryVerification(): void {
-    if (this.isDisposed()) return;
-    this.verificationError = null;
-    this.publish();
-    this.maybePrepareReceipt();
-  }
-
-  async retryFinishing(): Promise<void> {
-    if (this.isDisposed()) return;
-    try {
-      await this.deps.transport.verificationChallenge(this.roomId);
-      if (this.isDisposed()) return;
-      this.receiptsUnsupported = false;
-      this.completedPairKey = null;
-      this.completeNotReady = false;
-      this.saveVerifyGuards();
-      this.setNotice('Server verification is available — continuing with receipt flow.');
-    } catch (e) {
-      if (!isMissingFunctionError(e) && !this.isDisposed()) {
-        this.error = this.deps.friendlyError(e);
-      }
-      this.completedPairKey = null;
-      this.completeNotReady = false;
-    }
-    if (this.isDisposed()) return;
-    this.publish();
-    this.runAutoFlows();
-    await this.sync(this.lastOrdinal);
-  }
-
   async leaveRoom(): Promise<boolean> {
     if (this.isDisposed()) return false;
     this.leaveBusy = true;
     this.publish();
     try {
-      this.runner?.dispose();
-      this.runner = null;
+      this.competition.stopSimulation();
       this.duelRunner?.dispose();
       this.duelRunner = null;
       await this.deps.transport.leave(this.roomId, this.selfId);
@@ -1005,15 +879,11 @@ export class FixedFiveRoomSession {
         void this.sync(this.lastOrdinal);
       }).unsubscribe;
       await this.sync(this.lastOrdinal);
-      if (this.receiptsUnsupported) {
+      if (this.verification.getSnapshot().receiptsUnsupported) {
         try {
           await transport.verificationChallenge(this.roomId);
           if (this.isDisposed()) return;
-          this.receiptsUnsupported = false;
-          this.completedPairKey = null;
-          this.completeNotReady = false;
-          this.saveVerifyGuards();
-          this.setNotice('Server verification is available — continuing with receipt flow.');
+          this.verification.enableReceipts();
           await this.sync(this.lastOrdinal);
         } catch (e) {
           if (!isMissingFunctionError(e) && !this.isDisposed()) {
@@ -1039,10 +909,6 @@ export class FixedFiveRoomSession {
 
   private isDisposed(): boolean {
     return this.disposed;
-  }
-
-  private currentLocalResult(): FixedFiveLocalResult | null {
-    return this.localResult;
   }
 
   private refreshDerived(): void {
@@ -1075,7 +941,7 @@ export class FixedFiveRoomSession {
   private recomputePhase(): void {
     this.phase =
       this.room && this.replay
-        ? deriveEffectivePhase(this.room.phase, this.replay, this.simDone)
+        ? deriveEffectivePhase(this.room.phase, this.replay, this.competition.getSnapshot().simDone)
         : (this.room?.phase ?? 'lobby');
   }
 
@@ -1138,21 +1004,9 @@ export class FixedFiveRoomSession {
     this.maybeStartDuelPipeline();
     this.maybeFinalizeDuelSeries();
     this.maybeProposeOrConfirmGame();
-    this.maybeAutoStartSimulation();
-    this.maybeRebuildStats();
-    this.maybeAutoVerify();
-    this.maybeReportMismatch();
-    this.maybePrepareReceipt();
-    this.maybeStoreReceipt();
-    this.maybeComplete();
-    this.maybeFail();
-  }
-
-  private maybeAutoStartSimulation(): void {
-    if (this.isDisposed()) return;
-    if (this.phase === 'simulating' && !this.simStarted && !this.simError && this.room?.rootSeed) {
-      void this.startSimulation(this.simulationReason);
-    }
+    this.competition.maybeStart();
+    this.competition.maybeRebuildStats();
+    this.verification.tick();
   }
 
   private isDuelBroadcast(): boolean {
@@ -1251,8 +1105,7 @@ export class FixedFiveRoomSession {
       .sort((a, b) => a.gameNumber - b.gameNumber)
       .map((output) => ({ tag: 'duel' as const, game: output.result }));
     if (entries.length === 0) return;
-    this.simEntries = entries;
-    this.progress = { completed: entries.length, total: 7 };
+    this.competition.setDuelEntries(entries);
   }
 
   private maybeStartDuelPipeline(): void {
@@ -1332,7 +1185,7 @@ export class FixedFiveRoomSession {
     const series = room?.series;
     if (!room || !series || !series.champion) return;
     if (room.phase !== 'awaiting-confirmation') return;
-    if (this.localResult) return;
+    if (this.competition.getSnapshot().localResult) return;
     if (this.duelPipelineTarget() !== null) return;
     const played = series.games.map((game) => this.duelOutputs[game.gameNumber]);
     if (played.some((output) => output === undefined)) return;
@@ -1385,20 +1238,19 @@ export class FixedFiveRoomSession {
       });
       await this.deps.repository.savePendingResult(this.roomId, run, this.selfId);
       if (this.isDisposed()) return;
-      this.localResult = {
+      this.competition.acceptDuelResult({
         result: summary.result,
         digest,
         p1: { refs: p1Refs, players: [...p1Team.players] },
         p2: { refs: p2Refs, players: [...p2Team.players] },
         weakestReplacedOpponentId: summary.weakestReplacedOpponentId,
-      };
-      this.simDone = true;
+      });
       this.recomputePhase();
       this.publish();
       this.runAutoFlows();
     } catch (error) {
       if (this.isDisposed()) return;
-      this.simError = error instanceof Error ? error.message : String(error);
+      this.competition.setError(error instanceof Error ? error.message : String(error));
       this.publish();
     }
   }
@@ -1483,446 +1335,6 @@ export class FixedFiveRoomSession {
     }
   }
 
-  private maybeRebuildStats(): void {
-    if (!this.localResult || !this.room) return;
-    if (this.phase !== 'awaiting-confirmation' && this.phase !== 'completed') return;
-    if (this.statsSource().length > 0 || this.statsBuilding || this.statsRebuildStarted) return;
-    this.statsRebuildStarted = true;
-    void this.rebuildStatsEntries();
-  }
-
-  private statsSource(): FixedFiveWorkerResultEntry[] {
-    return this.statsEntries.length > 0 ? this.statsEntries : this.simEntries;
-  }
-
-  private maybeAutoVerify(): void {
-    if (this.isDisposed() || !this.localResult || !this.room) return;
-    if (this.phase !== 'awaiting-confirmation') return;
-    const myDigest = this.localResult.digest;
-    const proposals = this.facts.proposals;
-    const foreign = proposals.filter((p) => p.actor !== this.selfId);
-    const iProposed = proposals.some((p) => p.actor === this.selfId && p.digest === myDigest);
-    const matchingProposal = proposals.some((p) => p.digest === myDigest);
-    const iConfirmed = this.facts.confirms.some(
-      (c) => c.actor === this.selfId && c.digest === myDigest && c.verified,
-    );
-    if (iProposed && this.submittedPropose !== myDigest) {
-      this.submittedPropose = myDigest;
-      this.saveVerifyGuards();
-    }
-    if (iConfirmed && this.confirmedFor !== myDigest) {
-      this.confirmedFor = myDigest;
-      this.saveVerifyGuards();
-    }
-    this.publish();
-    if (iConfirmed) return;
-    if (foreign.length === 0) {
-      if (!matchingProposal && this.submittedPropose !== myDigest) {
-        void this.proposeDigest(myDigest);
-      } else if (matchingProposal && this.confirmedFor !== myDigest) {
-        void this.confirmDigest(myDigest, true);
-      }
-      return;
-    }
-    const match = foreign.some((p) => p.digest === myDigest);
-    if (match) {
-      if (this.confirmedFor !== myDigest) void this.confirmDigest(myDigest, true);
-      return;
-    }
-    if (!this.reranMismatch) {
-      this.reranMismatch = true;
-      this.saveVerifyGuards();
-      void this.rerunSimulation();
-    }
-  }
-
-  private maybeReportMismatch(): void {
-    if (this.isDisposed() || !this.localResult || !this.room) return;
-    if (!this.reranMismatch || this.mismatchReported) return;
-    if (this.phase !== 'awaiting-confirmation') return;
-    const myDigest = this.localResult.digest;
-    const foreign = this.facts.proposals.filter((p) => p.actor !== this.selfId);
-    if (foreign.some((p) => p.digest === myDigest)) return;
-    if (foreign.length === 0) return;
-    this.mismatchReported = true;
-    this.saveVerifyGuards();
-    this.publish();
-    const first = foreign[0];
-    const iDenied = first
-      ? this.facts.confirms.some(
-          (c) => c.actor === this.selfId && c.digest === first.digest && !c.verified,
-        )
-      : true;
-    void (async () => {
-      if (this.submittedPropose !== myDigest) await this.proposeDigest(myDigest);
-      if (first && !iDenied) await this.confirmDigest(first.digest, false);
-    })();
-  }
-
-  private maybePrepareReceipt(): void {
-    if (
-      this.isDisposed() ||
-      !this.room ||
-      !this.assets ||
-      !this.localResult ||
-      !this.room.rootSeed
-    ) {
-      return;
-    }
-    if (this.phase !== 'awaiting-confirmation') return;
-    if (this.receiptsUnsupported) return;
-    if (this.verificationReceipt || this.verificationError || this.verificationInFlight) return;
-    const myDigest = this.localResult.digest;
-    const ownConfirmed = this.facts.confirms.some(
-      (c) => c.actor === this.selfId && c.digest === myDigest && c.verified,
-    );
-    const foreignConfirmed = this.facts.confirms.some(
-      (c) => c.actor !== this.selfId && c.digest === myDigest && c.verified,
-    );
-    if (!ownConfirmed || !foreignConfirmed) return;
-    void this.prepareReceipt();
-  }
-
-  private maybeStoreReceipt(): void {
-    if (!this.verificationReceipt) return;
-    if (this.submittedReceipt === this.verificationReceipt.receiptDigest) return;
-    void this.storeReceipt(this.verificationReceipt);
-  }
-
-  private maybeComplete(): void {
-    if (this.isDisposed() || !this.room || !this.localResult) return;
-    if (this.phase !== 'awaiting-confirmation') return;
-    if (!this.receiptsUnsupported) {
-      const receipt = this.verificationReceipt;
-      if (!receipt || receipt.resultDigest !== this.localResult.digest) return;
-      if (this.submittedReceipt !== receipt.receiptDigest) return;
-      if (this.confirmedFor !== receipt.resultDigest) return;
-      const foreignVerified = this.facts.confirms.filter(
-        (c) => c.actor !== this.selfId && c.digest === receipt.resultDigest && c.verified,
-      );
-      if (foreignVerified.length === 0) return;
-      const pairKey = `receipt:${receipt.resultDigest}:${String(foreignVerified.length)}`;
-      if (this.completedPairKey === pairKey) return;
-      void this.runCompleteOnce(receipt.receiptDigest, pairKey);
-      return;
-    }
-    if (!this.confirmedFor) return;
-    const foreignVerified = this.facts.confirms.filter(
-      (c) => c.actor !== this.selfId && c.digest === this.confirmedFor && c.verified,
-    );
-    if (foreignVerified.length === 0) return;
-    const pairKey = `${this.confirmedFor}:${String(foreignVerified.length)}`;
-    if (this.completedPairKey === pairKey) return;
-    void this.runCompleteOnce(this.confirmedFor, pairKey);
-  }
-
-  private maybeFail(): void {
-    if (this.isDisposed() || !this.room || this.failSent) return;
-    if (
-      this.phase === 'completed' ||
-      this.phase === 'integrity-failed' ||
-      this.phase === 'expired'
-    ) {
-      return;
-    }
-    const digests = new Set(this.facts.proposals.map((p) => p.digest));
-    const denied = this.facts.confirms.some((c) => !c.verified);
-    if (digests.size >= 2 && denied) {
-      this.failSent = true;
-      void this.attemptFail().then((failed) => {
-        if (this.isDisposed()) return;
-        if (!failed) {
-          this.failSent = false;
-          this.setNotice('Mismatch recorded — will retry marking the room once synced.');
-          this.publish();
-        }
-      });
-    }
-  }
-
-  private async startSimulation(reason: FixedFiveSimulationReason): Promise<void> {
-    if (this.isDisposed()) return;
-    if (this.simStarted || !this.room || !this.assets || !this.room.rootSeed || !this.replay)
-      return;
-    if (!this.simulationGate.tryStart(reason)) return;
-    this.simStarted = true;
-    this.simError = null;
-    this.publish();
-    try {
-      const room = this.room;
-      const assets = this.assets;
-      const replay = this.replay;
-      if (!room.rootSeed) throw new Error('the room is not ready to simulate');
-      const rootSeed: Seed = room.rootSeed;
-      const p1Refs = refsForParticipant(replay, assets, 'p1');
-      const p2Refs = refsForParticipant(replay, assets, 'p2');
-      if (p1Refs.length !== 5 || p2Refs.length !== 5) {
-        throw new Error('both lineups must be complete before simulating');
-      }
-      const pending = await this.deps.repository.loadPendingResult(this.roomId).catch(() => null);
-      const p1Team: FixedFiveWorkerTeam = await this.deps.buildTeam(
-        assets.manifest,
-        'p1',
-        'Player 1',
-        p1Refs,
-      );
-      if (this.isDisposed()) return;
-      const p2Team: FixedFiveWorkerTeam = await this.deps.buildTeam(
-        assets.manifest,
-        'p2',
-        'Player 2',
-        p2Refs,
-      );
-      if (this.isDisposed()) return;
-      if (pending) {
-        this.localResult = {
-          result: pending.run.result,
-          digest: pending.run.resultDigest,
-          p1: { refs: p1Refs, players: [...p1Team.players] },
-          p2: { refs: p2Refs, players: [...p2Team.players] },
-          weakestReplacedOpponentId: pending.run.authorityFacts.weakestReplacedOpponentId,
-        };
-        this.simulationGate.finish();
-        this.simDone = true;
-        this.recomputePhase();
-        this.publish();
-        this.runAutoFlows();
-        return;
-      }
-      this.simEntries = [];
-      this.progress = { completed: 0, total: room.settings.mode === 'duel' ? 7 : 161 };
-      this.simStartAt = this.deps.now();
-      this.publish();
-      const simulationContext: SimulationContext = { p1Refs, p2Refs, p1Team, p2Team };
-      const active = this.deps.createRunner((event) => {
-        if (this.isDisposed()) return;
-        if (event.kind === 'progress') {
-          this.progress = { completed: event.completedGames, total: event.totalGames };
-          this.publish();
-        } else if (event.kind === 'results') {
-          this.simEntries = [...this.simEntries, ...event.entries];
-          this.progress = {
-            completed: this.simEntries.length,
-            total: this.progress?.total ?? this.simEntries.length,
-          };
-          this.publish();
-        } else if (event.kind === 'complete') {
-          void this.finalizeSimulation(simulationContext);
-        } else if (event.kind === 'error') {
-          this.simulationGate.fail();
-          this.simError = event.message;
-          this.publish();
-        }
-      });
-      this.runner = active;
-      const versions = room.settings.versions;
-      if (room.settings.mode === 'duel') {
-        active.runDuel({
-          rootSeed,
-          p1Team,
-          p2Team,
-          profile: assets.profile,
-          dataVersion: versions.dataVersion,
-          engineVersion: versions.engineVersion,
-        });
-      } else {
-        active.runShared82({
-          rootSeed,
-          p1Team,
-          p2Team,
-          bracket: assets.bracket,
-          profile: assets.profile,
-          dataVersion: versions.dataVersion,
-          engineVersion: versions.engineVersion,
-        });
-      }
-    } catch (e) {
-      this.simulationGate.fail();
-      if (this.isDisposed()) return;
-      this.simError = e instanceof Error ? e.message : String(e);
-      this.simStarted = false;
-      this.publish();
-    }
-  }
-
-  private async finalizeSimulation(context: SimulationContext): Promise<void> {
-    if (this.isDisposed()) return;
-    const room = this.room;
-    const assets = this.assets;
-    if (!room || !assets || !room.rootSeed) return;
-    try {
-      const rootSeed: Seed = room.rootSeed;
-      const summary = summarizeWorkerEntries({
-        mode: room.settings.mode,
-        bracket: assets.bracket,
-        rootSeed,
-        p1TeamId: 'p1',
-        p2TeamId: 'p2',
-        p1PlayerIds: context.p1Team.players.map((player) => player.playerId),
-        p2PlayerIds: context.p2Team.players.map((player) => player.playerId),
-        entries: this.simEntries,
-      });
-      const digest = computeCompetitionDigest({
-        rootSeed,
-        versions: room.settings.versions,
-        p1: { refs: context.p1Refs, players: [...context.p1Team.players] },
-        p2: { refs: context.p2Refs, players: [...context.p2Team.players] },
-        commands: this.commands,
-        result: summary.result,
-      });
-      const run = assembleCompetitionRun({
-        roomId: this.roomId,
-        sourceMode: room.settings.sourceMode,
-        competition: room.settings.mode === 'duel' ? 'duel' : 'shared-82',
-        rootSeed,
-        versions: room.settings.versions,
-        commands: this.commands,
-        p1: { refs: context.p1Refs, players: [...context.p1Team.players] },
-        p2: { refs: context.p2Refs, players: [...context.p2Team.players] },
-        result: summary.result,
-        resultDigest: digest,
-        weakestReplacedOpponentId: summary.weakestReplacedOpponentId,
-      });
-      await this.deps.repository.savePendingResult(this.roomId, run, this.selfId);
-      if (this.isDisposed()) return;
-      const minShow = this.deps.prefersReducedMotion()
-        ? SIM_SHOWDOWN_REDUCED_MS
-        : SIM_SHOWDOWN_MIN_MS;
-      const waitMs = Math.max(0, this.simStartAt + minShow - this.deps.now());
-      if (waitMs > 0) await new Promise((resolve) => setTimeout(resolve, waitMs));
-      if (this.isDisposed()) return;
-      this.localResult = {
-        result: summary.result,
-        digest,
-        p1: { refs: context.p1Refs, players: [...context.p1Team.players] },
-        p2: { refs: context.p2Refs, players: [...context.p2Team.players] },
-        weakestReplacedOpponentId: summary.weakestReplacedOpponentId,
-      };
-      this.simulationGate.finish();
-      this.simDone = true;
-      this.recomputePhase();
-      this.publish();
-      this.runAutoFlows();
-    } catch (e) {
-      this.simulationGate.fail();
-      if (this.isDisposed()) return;
-      this.simError = e instanceof Error ? e.message : String(e);
-      this.publish();
-    }
-  }
-
-  private async rerunSimulation(): Promise<void> {
-    try {
-      this.simulationReason = 'mismatch-rerun';
-      if (!this.simulationGate.canStart(this.simulationReason)) return;
-      this.runner?.dispose();
-      this.runner = null;
-      this.statsRunner?.dispose();
-      this.statsRunner = null;
-      await this.deps.repository.clearPendingResult(this.roomId).catch(() => {});
-      if (this.isDisposed()) return;
-      this.verificationReceipt = null;
-      this.verificationError = null;
-      this.submittedReceipt = null;
-      this.receiptRebuilds = 0;
-      this.simStarted = false;
-      this.simDone = false;
-      this.localResult = null;
-      this.simEntries = [];
-      this.statsEntries = [];
-      this.statsBuilding = false;
-      this.statsRebuildStarted = false;
-      this.progress = null;
-      this.simError = null;
-      this.recomputePhase();
-      this.publish();
-      await this.sync(this.lastOrdinal);
-      if (this.isDisposed()) return;
-      void this.startSimulation(this.simulationReason);
-    } catch (e) {
-      if (!this.isDisposed()) {
-        this.simError = e instanceof Error ? e.message : String(e);
-        this.publish();
-      }
-    }
-  }
-
-  private async rebuildStatsEntries(): Promise<void> {
-    const room = this.room;
-    const assets = this.assets;
-    const localResult = this.localResult;
-    if (this.statsBuilding || !room || !assets || !room.rootSeed || !this.replay || !localResult) {
-      return;
-    }
-    this.statsBuilding = true;
-    this.publish();
-    try {
-      const rootSeed: Seed = room.rootSeed;
-      const p1Team: FixedFiveWorkerTeam = await this.deps.buildTeam(
-        assets.manifest,
-        'p1',
-        'Player 1',
-        localResult.p1.refs,
-      );
-      const p2Team: FixedFiveWorkerTeam = await this.deps.buildTeam(
-        assets.manifest,
-        'p2',
-        'Player 2',
-        localResult.p2.refs,
-      );
-      if (this.isDisposed()) {
-        this.statsBuilding = false;
-        return;
-      }
-      this.statsRunner?.dispose();
-      const collected: FixedFiveWorkerResultEntry[] = [];
-      const active = this.deps.createRunner((event) => {
-        if (this.isDisposed()) return;
-        if (event.kind === 'results') {
-          for (const entry of event.entries) collected.push(entry);
-        } else if (event.kind === 'complete') {
-          this.statsEntries = collected;
-          this.statsBuilding = false;
-          this.statsRunner?.dispose();
-          this.statsRunner = null;
-          this.publish();
-        } else if (event.kind === 'error') {
-          this.statsBuilding = false;
-          this.statsRunner?.dispose();
-          this.statsRunner = null;
-          this.publish();
-        }
-      });
-      this.statsRunner = active;
-      const versions = room.settings.versions;
-      if (room.settings.mode === 'duel') {
-        active.runDuel({
-          rootSeed,
-          p1Team,
-          p2Team,
-          profile: assets.profile,
-          dataVersion: versions.dataVersion,
-          engineVersion: versions.engineVersion,
-        });
-      } else {
-        active.runShared82({
-          rootSeed,
-          p1Team,
-          p2Team,
-          bracket: assets.bracket,
-          profile: assets.profile,
-          dataVersion: versions.dataVersion,
-          engineVersion: versions.engineVersion,
-        });
-      }
-    } catch {
-      if (!this.isDisposed()) {
-        this.statsBuilding = false;
-        this.publish();
-      }
-    }
-  }
-
   private async sendCommand(
     payload: FixedFiveCommandPayload,
     options?: {
@@ -1978,28 +1390,7 @@ export class FixedFiveRoomSession {
         expectedRevision: this.room?.revision,
         resync: () => this.resyncForRetry().then(() => this.room?.revision),
         retry: options?.retry,
-        retryAfterResync: () => {
-          if (payload.kind === 'propose-result') {
-            return this.localResult?.digest === payload.resultDigest;
-          }
-          const currentResult = this.localResult;
-          if (payload.kind !== 'confirm-result' || !currentResult) return false;
-          const freshForeign = this.facts.proposals.filter(
-            (proposal) => proposal.actor !== this.selfId,
-          );
-          if (payload.verified) {
-            return (
-              currentResult.digest === payload.resultDigest &&
-              freshForeign.some((proposal) => proposal.digest === payload.resultDigest)
-            );
-          }
-          return (
-            this.reranMismatch &&
-            currentResult.digest !== payload.resultDigest &&
-            freshForeign.some((proposal) => proposal.digest === payload.resultDigest) &&
-            !freshForeign.some((proposal) => proposal.digest === currentResult.digest)
-          );
-        },
+        retryAfterResync: () => this.verification.canRetry(payload),
       });
       if (this.isDisposed()) return false;
       const receipt = result.receipt;
@@ -2035,244 +1426,6 @@ export class FixedFiveRoomSession {
         this.publish();
       }
       return false;
-    }
-  }
-
-  private async proposeDigest(digest: ContentHash): Promise<void> {
-    this.busyAction = 'propose';
-    this.publish();
-    try {
-      const ok = await this.sendCommand({ kind: 'propose-result', resultDigest: digest });
-      if (ok && !this.isDisposed()) {
-        this.submittedPropose = digest;
-        this.saveVerifyGuards();
-        this.publish();
-        this.runAutoFlows();
-      }
-    } finally {
-      if (!this.isDisposed()) {
-        this.busyAction = null;
-        this.publish();
-      }
-    }
-  }
-
-  private async confirmDigest(digest: ContentHash, verified: boolean): Promise<void> {
-    this.busyAction = 'confirm';
-    this.publish();
-    try {
-      const ok = await this.sendCommand({ kind: 'confirm-result', resultDigest: digest, verified });
-      if (ok && verified && !this.isDisposed()) {
-        this.confirmedFor = digest;
-        this.saveVerifyGuards();
-        this.publish();
-        this.runAutoFlows();
-      }
-    } finally {
-      if (!this.isDisposed()) {
-        this.busyAction = null;
-        this.publish();
-      }
-    }
-  }
-
-  private async attemptComplete(receiptId: string): Promise<boolean> {
-    this.busyAction = 'complete';
-    this.publish();
-    try {
-      const out = await this.deps.transport.complete(this.roomId, receiptId);
-      if (this.isDisposed()) return false;
-      if (!out.completed) {
-        this.setNotice('Completion not ready yet — waiting for the matching confirmation.');
-        this.publish();
-      }
-      await this.sync(this.lastOrdinal);
-      return out.completed;
-    } catch (e) {
-      if (!this.isDisposed()) this.error = this.deps.friendlyError(e);
-      return false;
-    } finally {
-      if (!this.isDisposed()) {
-        this.busyAction = null;
-        this.publish();
-      }
-    }
-  }
-
-  private async runCompleteOnce(receiptId: string, pairKey: string | null): Promise<void> {
-    if (this.completeInFlight || this.isDisposed()) return;
-    this.completeInFlight = true;
-    if (pairKey) this.completedPairKey = pairKey;
-    this.completeNotReady = false;
-    this.publish();
-    try {
-      const done = await this.attemptComplete(receiptId);
-      if (this.isDisposed()) return;
-      this.completeNotReady = !done;
-      this.publish();
-    } finally {
-      this.completeInFlight = false;
-    }
-  }
-
-  private async attemptFail(): Promise<boolean> {
-    this.busyAction = 'fail';
-    this.publish();
-    try {
-      const out = await this.deps.transport.fail(this.roomId);
-      await this.sync(this.lastOrdinal);
-      return out.failed;
-    } catch (e) {
-      if (!this.isDisposed()) this.error = this.deps.friendlyError(e);
-      return false;
-    } finally {
-      if (!this.isDisposed()) {
-        this.busyAction = null;
-        this.publish();
-      }
-    }
-  }
-
-  private async prepareReceipt(): Promise<void> {
-    if (this.verificationInFlight || !this.room || !this.assets || !this.localResult) return;
-    if (!this.room.rootSeed) return;
-    this.verificationInFlight = true;
-    this.verificationError = null;
-    this.publish();
-    try {
-      const challenge = await this.deps.transport.verificationChallenge(this.roomId);
-      if (this.isDisposed()) return;
-      const current = this.currentLocalResult();
-      if (!current) return;
-      const input = buildFixedFiveVerificationInput({
-        roomId: this.roomId,
-        competition: this.room.settings.mode === 'duel' ? 'duel' : 'shared-82',
-        rootSeed: this.room.rootSeed,
-        versions: this.room.settings.versions,
-        challenge,
-        commands: this.commands,
-        bracket: this.assets.bracket,
-        profile: this.assets.profile,
-        result: current.result,
-        resultDigest: current.digest,
-        p1: current.p1,
-        p2: current.p2,
-      });
-      const outcome = await this.runVerification(input);
-      if (this.isDisposed()) return;
-      if (!outcome.ok || !outcome.receipt) {
-        this.verificationError = outcome.failures.join('; ');
-        this.publish();
-        return;
-      }
-      this.verificationReceipt = outcome.receipt;
-      this.publish();
-      void this.storeReceipt(outcome.receipt);
-    } catch (e) {
-      if (isMissingFunctionError(e)) {
-        this.markReceiptsUnsupported();
-      } else if (!this.isDisposed()) {
-        this.verificationError = e instanceof Error ? e.message : String(e);
-      }
-    } finally {
-      this.verificationInFlight = false;
-      if (!this.isDisposed()) this.publish();
-    }
-  }
-
-  private runVerification(
-    input: Parameters<FixedFiveRunnerPort['verify']>[0],
-  ): Promise<VerificationOutcome> {
-    return new Promise((resolve) => {
-      const active = this.deps.createRunner((event) => {
-        if (
-          event.kind === 'progress' ||
-          event.kind === 'results' ||
-          event.kind === 'duel-game' ||
-          event.kind === 'complete'
-        ) {
-          return;
-        }
-        active.dispose();
-        if (this.verificationRunner === active) this.verificationRunner = null;
-        if (event.kind === 'verified') {
-          resolve({ ok: true, receipt: event.receipt, failures: [] });
-        } else if (event.kind === 'verification-failed') {
-          resolve({ ok: false, receipt: null, failures: event.failures });
-        } else {
-          resolve({ ok: false, receipt: null, failures: [event.message] });
-        }
-      });
-      this.verificationRunner = active;
-      active.verify(input);
-    });
-  }
-
-  private async storeReceipt(receipt: FixedFiveVerificationReceipt): Promise<void> {
-    if (this.receiptSubmitInFlight || this.submittedReceipt === receipt.receiptDigest) return;
-    this.receiptSubmitInFlight = true;
-    try {
-      const out = await this.deps.transport.submitVerification(
-        this.roomId,
-        receipt,
-        this.room?.revision,
-      );
-      if (this.isDisposed()) return;
-      this.submittedReceipt = out.receiptId;
-      if (this.room && out.revision > this.room.revision) {
-        this.room = { ...this.room, revision: out.revision };
-      }
-      this.publish();
-      this.runAutoFlows();
-    } catch (e) {
-      const rejection = e as {
-        rejectionCode?: unknown;
-        revision?: unknown;
-      };
-      if (
-        typeof rejection.revision === 'number' &&
-        this.room &&
-        rejection.revision > this.room.revision
-      ) {
-        this.room = { ...this.room, revision: rejection.revision };
-      }
-      if (rejection.rejectionCode === 'invalid-receipt' && this.receiptRebuilds < 2) {
-        this.receiptRebuilds += 1;
-        this.verificationReceipt = null;
-        this.verificationError = null;
-        if (!this.isDisposed()) {
-          this.setNotice(
-            'Verification receipt was rejected — rebuilding it from the accepted log.',
-          );
-        }
-      } else if (rejection.rejectionCode === 'invalid-receipt') {
-        if (!this.isDisposed()) {
-          this.verificationError =
-            'The server rejected the verification receipt for this accepted command log.';
-        }
-      } else if (isMissingFunctionError(e)) {
-        this.markReceiptsUnsupported();
-      } else if (!this.isDisposed()) {
-        this.setNotice(
-          'Verification receipt is ready but not stored yet — retrying after the next sync.',
-        );
-      }
-      this.publish();
-      if (!this.isDisposed()) void this.sync(this.lastOrdinal);
-    } finally {
-      this.receiptSubmitInFlight = false;
-    }
-  }
-
-  private markReceiptsUnsupported(): void {
-    if (this.receiptsUnsupported) return;
-    this.receiptsUnsupported = true;
-    this.verificationError = null;
-    this.saveVerifyGuards();
-    if (!this.isDisposed()) {
-      this.setNotice('Checking that both players have the same result.');
-      this.publish();
-      this.runAutoFlows();
     }
   }
 
@@ -2334,7 +1487,7 @@ export class FixedFiveRoomSession {
     } catch (e) {
       this.submittedTimeouts.delete(key);
       if (isMissingFunctionError(e)) {
-        this.markReceiptsUnsupported();
+        this.verification.markReceiptsUnsupported();
         this.submittedTimeouts.add(key);
         void this.sendCommand(
           {
@@ -2364,38 +1517,5 @@ export class FixedFiveRoomSession {
 
   private brandedRoomId(): Id {
     return idSchema.parse(this.roomId);
-  }
-
-  private verifyGuardStorageKey(): string {
-    return `${VERIFY_GUARD_PREFIX}${this.roomId}`;
-  }
-
-  private saveVerifyGuards(): void {
-    try {
-      this.deps.guardStorage.save(
-        this.verifyGuardStorageKey(),
-        JSON.stringify({
-          submittedPropose: this.submittedPropose,
-          confirmedFor: this.confirmedFor,
-          reranMismatch: this.reranMismatch,
-          mismatchReported: this.mismatchReported,
-          receiptsUnsupported: this.receiptsUnsupported,
-        }),
-      );
-    } catch {}
-  }
-
-  private restoreVerifyGuards(): void {
-    try {
-      const raw = this.deps.guardStorage.load(this.verifyGuardStorageKey());
-      if (!raw) return;
-      const parsed: unknown = JSON.parse(raw);
-      const result = verifyGuardSchema.safeParse(parsed);
-      if (!result.success) return;
-      if (result.data.submittedPropose) this.submittedPropose = result.data.submittedPropose;
-      if (result.data.confirmedFor) this.confirmedFor = result.data.confirmedFor;
-      if (result.data.reranMismatch === true) this.reranMismatch = true;
-      if (result.data.mismatchReported === true) this.mismatchReported = true;
-    } catch {}
   }
 }

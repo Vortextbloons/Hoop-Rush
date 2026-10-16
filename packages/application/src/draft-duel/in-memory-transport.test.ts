@@ -1,12 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
-  createInMemoryDraftDuelTransport,
   commandIdSchema,
   contentHashSchema,
   defaultDraftDuelVersionLocks,
-  draftDuelFirstPickerFor,
-  draftDuelHomeForGameFor,
-  draftDuelHomeWinnerFor,
   playerIdSchema,
   playerVersionIdSchema,
   type DraftDuelCommandPayload,
@@ -14,8 +10,14 @@ import {
   type DraftDuelParticipantId,
   type DraftDuelRoomSnapshot,
   type Id,
+} from '@hoop-rush/data-contracts';
+import {
+  createInMemoryDraftDuelTransport,
+  draftDuelFirstPickerFor,
+  draftDuelHomeForGameFor,
+  draftDuelHomeWinnerFor,
   type InMemoryDraftDuelTransport,
-} from './index.ts';
+} from './in-memory-transport.ts';
 
 function locks() {
   return defaultDraftDuelVersionLocks({ catalogHash: contentHashSchema.parse('a'.repeat(64)) });
@@ -161,7 +163,10 @@ async function playDraft(
 
 describe('in-memory Draft Duel transport', () => {
   it('lets the host start with two online players without ready commands', async () => {
-    const transport = createInMemoryDraftDuelTransport({ seed: 'no-ready' });
+    const transport = createInMemoryDraftDuelTransport({
+      clock: () => 1_700_000_000_000,
+      random: { seed: 'no-ready' },
+    });
     const { roomId } = await createAndJoin(transport);
     expect((await snapshot(transport, roomId)).members.every((member) => !member.ready)).toBe(true);
     const guest = await submit(transport, roomId, 'guest-start', 'p2', { kind: 'start' });
@@ -172,7 +177,10 @@ describe('in-memory Draft Duel transport', () => {
   });
 
   it('keeps the draft in the lobby while the opponent is absent', async () => {
-    const transport = createInMemoryDraftDuelTransport({ seed: 'missing-opponent' });
+    const transport = createInMemoryDraftDuelTransport({
+      clock: () => 1_700_000_000_000,
+      random: { seed: 'missing-opponent' },
+    });
     const created = await transport.create({
       fairness: 'fair',
       presentation: 'ratings',
@@ -193,7 +201,10 @@ describe('in-memory Draft Duel transport', () => {
   });
 
   it('joins two clients and plays a strict alternating pick flow', async () => {
-    const transport = createInMemoryDraftDuelTransport({ seed: 'draft-duel-flow' });
+    const transport = createInMemoryDraftDuelTransport({
+      clock: () => 1_700_000_000_000,
+      random: { seed: 'draft-duel-flow' },
+    });
     const { created, joined, roomId } = await createAndJoin(transport);
     expect(created.membership.participantId).toBe('p1');
     expect(joined.membership.participantId).toBe('p2');
@@ -242,7 +253,10 @@ describe('in-memory Draft Duel transport', () => {
   });
 
   it('accepts an identical duplicate command idempotently and rejects a changed payload', async () => {
-    const transport = createInMemoryDraftDuelTransport({ seed: 'draft-duel-duplicate' });
+    const transport = createInMemoryDraftDuelTransport({
+      clock: () => 1_700_000_000_000,
+      random: { seed: 'draft-duel-duplicate' },
+    });
     const { roomId } = await createAndJoin(transport);
     const first = await submit(transport, roomId, 'ready-dup', 'p1', {
       kind: 'ready',
@@ -272,7 +286,10 @@ describe('in-memory Draft Duel transport', () => {
   });
 
   it('rejects re-claiming a player already claimed in the draft', async () => {
-    const transport = createInMemoryDraftDuelTransport({ seed: 'draft-duel-claims' });
+    const transport = createInMemoryDraftDuelTransport({
+      clock: () => 1_700_000_000_000,
+      random: { seed: 'draft-duel-claims' },
+    });
     const { roomId } = await createAndJoin(transport);
     const current = await readyBothAndStart(transport, roomId);
     const rootSeed = current.rootSeed;
@@ -297,7 +314,10 @@ describe('in-memory Draft Duel transport', () => {
   });
 
   it('accepts a reposition for a claimed card without moving the deadline', async () => {
-    const transport = createInMemoryDraftDuelTransport({ seed: 'draft-duel-reposition' });
+    const transport = createInMemoryDraftDuelTransport({
+      clock: () => 1_700_000_000_000,
+      random: { seed: 'draft-duel-reposition' },
+    });
     const { roomId } = await createAndJoin(transport);
     const current = await readyBothAndStart(transport, roomId);
     const rootSeed = current.rootSeed;
@@ -339,7 +359,7 @@ describe('in-memory Draft Duel transport', () => {
   it('commits a fallback and resolves an overdue deadline with an injectable clock', async () => {
     let now = 1_000_000;
     const transport = createInMemoryDraftDuelTransport({
-      seed: 'draft-duel-deadline',
+      random: { seed: 'draft-duel-deadline' },
       clock: () => now,
     });
     const { roomId } = await createAndJoin(transport);
@@ -378,7 +398,10 @@ describe('in-memory Draft Duel transport', () => {
   });
 
   it('delivers transient events only to subscribers of the owning room', async () => {
-    const transport = createInMemoryDraftDuelTransport({ seed: 'draft-duel-transient' });
+    const transport = createInMemoryDraftDuelTransport({
+      clock: () => 1_700_000_000_000,
+      random: { seed: 'draft-duel-transient' },
+    });
     const roomA = await transport.create({
       fairness: 'fair',
       presentation: 'ratings',
@@ -431,7 +454,10 @@ describe('in-memory Draft Duel transport', () => {
   });
 
   it('rematches into a successor room with a fresh seed and no carry-over claims', async () => {
-    const transport = createInMemoryDraftDuelTransport({ seed: 'draft-duel-rematch' });
+    const transport = createInMemoryDraftDuelTransport({
+      clock: () => 1_700_000_000_000,
+      random: { seed: 'draft-duel-rematch' },
+    });
     const { roomId } = await createAndJoin(transport);
     let current = await readyBothAndStart(transport, roomId);
     const parentSeed = current.rootSeed;
@@ -511,7 +537,10 @@ describe('in-memory Draft Duel transport', () => {
   });
 
   it('labels game 6 home/away opposite to the home-winner seat', async () => {
-    const transport = createInMemoryDraftDuelTransport({ seed: 'draft-duel-game-six' });
+    const transport = createInMemoryDraftDuelTransport({
+      clock: () => 1_700_000_000_000,
+      random: { seed: 'draft-duel-game-six' },
+    });
     const { roomId } = await createAndJoin(transport);
     const started = await readyBothAndStart(transport, roomId);
     const rootSeed = started.rootSeed;
@@ -546,7 +575,7 @@ describe('in-memory Draft Duel transport', () => {
   it('auto-starts after 60 seconds of idleness and readies the absent seat', async () => {
     let now = 7_000_000;
     const transport = createInMemoryDraftDuelTransport({
-      seed: 'draft-duel-auto-start',
+      random: { seed: 'draft-duel-auto-start' },
       clock: () => now,
     });
     const { roomId } = await createAndJoin(transport);

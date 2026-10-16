@@ -5,7 +5,6 @@ import {
   HAVOC_MULTIPLAYER_TURNS,
   HAVOC_MULTIPLAYER_VERSION,
   contentHashSchema,
-  createInMemoryHavocMultiplayerTransport,
   eraSimulationProfileSchema,
   havocMultiplayerCommandSchema,
   type HavocBattleInput,
@@ -19,8 +18,11 @@ import {
   type HavocMultiplayerVerificationReceipt,
   type HavocMultiplayerWorkerGameOutput,
   type Id,
-  type InMemoryHavocMultiplayerTransport,
 } from '@hoop-rush/data-contracts';
+import {
+  createInMemoryHavocMultiplayerTransport,
+  type InMemoryHavocMultiplayerTransport,
+} from '@hoop-rush/application/havoc-multiplayer';
 import {
   AdaptHavocCatalog,
   createEngineContext,
@@ -268,7 +270,7 @@ function tickFrame(): void {
 
 async function createHarness(seed: string): Promise<Harness> {
   now = START_MS;
-  const transport = createInMemoryHavocMultiplayerTransport({ seed, clock: () => now });
+  const transport = createInMemoryHavocMultiplayerTransport({ random: { seed }, clock: () => now });
   const assets = buildAssets();
   const repository = new FakeHavocMultiplayerRepository();
   const runner = new FakeHavocRunner();

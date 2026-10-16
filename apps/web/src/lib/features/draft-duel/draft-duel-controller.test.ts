@@ -4,9 +4,7 @@ import {
   contentHashSchema,
   DRAFT_DUEL_BROADCAST_MS,
   DRAFT_DUEL_TAPE_VERSION,
-  createInMemoryDraftDuelTransport,
   defaultDraftDuelVersionLocks,
-  draftDuelFirstPickerFor,
   playerIdSchema,
   playerVersionIdSchema,
   seedSchema,
@@ -19,6 +17,10 @@ import {
   type DraftDuelTransientEvent,
   type Id,
 } from '@hoop-rush/data-contracts';
+import {
+  createInMemoryDraftDuelTransport,
+  draftDuelFirstPickerFor,
+} from '@hoop-rush/application/draft-duel';
 import { createEngineContext, simulateRecordedGame } from '@hoop-rush/engine';
 import * as engine from '@hoop-rush/engine';
 import { buildLegalSimulationTeam, DEFAULT_ERA_SIM_PROFILE } from '@hoop-rush/test-fixtures';
@@ -87,7 +89,10 @@ describe('Draft Duel ready check progression', () => {
       vi.fn(() => 1),
     );
     vi.stubGlobal('cancelAnimationFrame', vi.fn());
-    transport = createInMemoryDraftDuelTransport({ seed: 'ready-check', clock: () => Date.now() });
+    transport = createInMemoryDraftDuelTransport({
+      random: { seed: 'ready-check' },
+      clock: () => Date.now(),
+    });
     commandNumber = 0;
     const created = await transport.create({
       fairness: 'unfair',

@@ -9,8 +9,6 @@ import {
   HAVOC_MULTIPLAYER_SERIES_GAMES,
   HAVOC_MULTIPLAYER_SERIES_WINS,
   HAVOC_MULTIPLAYER_TURNS,
-} from './havoc-multiplayer-versions.ts';
-import {
   havocMultiplayerCommandPayloadSchema,
   havocMultiplayerDraftStateSchema,
   havocMultiplayerRoomCodeSchema,
@@ -37,30 +35,27 @@ import {
   type HavocMultiplayerTransientEvent,
   type HavocMultiplayerTransport,
   type HavocMultiplayerVerificationReceipt,
-} from './havoc-multiplayer.ts';
-import {
   havocCardIdSchema,
   havocDraftOfferSchema,
   havocOfferIdSchema,
   type HavocDraftCard,
   type HavocDraftOffer,
-} from './havoc-draft.ts';
-import { HAVOC_TENDENCY_FIELDS } from './havoc-mutations.ts';
-import { POSITIONS, type Position } from './positions.ts';
-import {
+  HAVOC_TENDENCY_FIELDS,
+  POSITIONS,
+  type Position,
   REQUIRED_RATING_KEYS,
   type SimulationRatings,
   type SimulationTendencies,
-} from './simulation.ts';
-import {
   commandIdSchema,
   idSchema,
   playerIdSchema,
   seasonKeySchema,
   seedSchema,
   type Id,
-} from './ids.ts';
-import { canonicalJson, fnv1a32, seasonDigestHex } from './season-hash.ts';
+  canonicalJson,
+  fnv1a32,
+  seasonDigestHex,
+} from '@hoop-rush/data-contracts';
 
 function mulberry32Seed(seed: number): () => number {
   let a = seed | 0;
@@ -70,12 +65,6 @@ function mulberry32Seed(seed: number): () => number {
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
-}
-
-function cryptoRng(): number {
-  const word = new Uint32Array(1);
-  crypto.getRandomValues(word);
-  return (word[0] as number) / 4294967296;
 }
 
 function nowIsoWith(clock: () => number): string {
@@ -125,10 +114,14 @@ export function havocMultiplayerHomeForGame(
   return HAVOC_HOME_GAMES.has(gameNumber) ? homeWinner : otherParticipant(homeWinner);
 }
 
-function randomBytesWith(rng: () => number, useCrypto: boolean, length: number): Uint8Array {
+function randomBytesWith(
+  rng: () => number,
+  randomBytes: ((length: number) => Uint8Array) | undefined,
+  length: number,
+): Uint8Array {
   const bytes = new Uint8Array(length);
-  if (useCrypto) {
-    crypto.getRandomValues(bytes);
+  if (randomBytes) {
+    bytes.set(randomBytes(bytes.length));
   } else {
     for (let i = 0; i < bytes.length; i += 1) {
       bytes[i] = Math.floor(rng() * 256);
@@ -137,8 +130,11 @@ function randomBytesWith(rng: () => number, useCrypto: boolean, length: number):
   return bytes;
 }
 
-function randomSeedWith(rng: () => number, useCrypto: boolean): string {
-  return [...randomBytesWith(rng, useCrypto, 16)]
+function randomSeedWith(
+  rng: () => number,
+  randomBytes: ((length: number) => Uint8Array) | undefined,
+): string {
+  return [...randomBytesWith(rng, randomBytes, 16)]
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
 }
@@ -152,9 +148,12 @@ function randomCodeWith(existing: Set<string>, rng: () => number): HavocMultipla
   throw new Error('in-memory havoc multiplayer: code space exhausted');
 }
 
-function randomRoomIdWith(rng: () => number, useCrypto: boolean): Id {
+function randomRoomIdWith(
+  rng: () => number,
+  randomBytes: ((length: number) => Uint8Array) | undefined,
+): Id {
   return idSchema.parse(
-    `hm-${[...randomBytesWith(rng, useCrypto, 12)]
+    `hm-${[...randomBytesWith(rng, randomBytes, 12)]
       .map((b) => b.toString(36))
       .join('')
       .slice(0, 12)
@@ -163,8 +162,11 @@ function randomRoomIdWith(rng: () => number, useCrypto: boolean): Id {
   );
 }
 
-function randomChallengeWith(rng: () => number, useCrypto: boolean): string {
-  return [...randomBytesWith(rng, useCrypto, 32)]
+function randomChallengeWith(
+  rng: () => number,
+  randomBytes: ((length: number) => Uint8Array) | undefined,
+): string {
+  return [...randomBytesWith(rng, randomBytes, 32)]
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
 }
@@ -393,15 +395,22 @@ export interface InMemoryHavocMultiplayerTransport extends HavocMultiplayerTrans
   expireRooms(): Promise<HavocMultiplayerRoomSnapshot[]>;
 }
 
-export function createInMemoryHavocMultiplayerTransport(options?: {
-  clock?: () => number;
-  seed?: string;
-  rng?: () => number;
+export function createInMemoryHavocMultiplayerTransport(options: {
+  clock: () => number;
+  random: { seed: string } | { rng: () => number } | { bytes: (length: number) => Uint8Array };
 }): InMemoryHavocMultiplayerTransport {
-  const clock = options?.clock ?? Date.now;
-  const seededRng = options?.seed !== undefined ? mulberry32Seed(fnv1a32(options.seed)) : null;
-  const rng = options?.rng ?? seededRng ?? cryptoRng;
-  const useCrypto = options?.rng === undefined && options?.seed === undefined;
+  const clock = options.clock;
+  const random = options.random;
+  const randomBytes = 'bytes' in random ? random.bytes : undefined;
+  const rng =
+    'rng' in random
+      ? random.rng
+      : 'seed' in random
+        ? mulberry32Seed(fnv1a32(random.seed))
+        : () => {
+            const bytes = new Uint8Array(random.bytes(4));
+            return new DataView(bytes.buffer).getUint32(0, true) / 4294967296;
+          };
   const rooms = new Map<string, RoomRecord>();
   const codeIndex = new Map<string, string>();
   const createTimestamps: number[] = [];
@@ -643,9 +652,9 @@ export function createInMemoryHavocMultiplayerTransport(options?: {
       variant: settingsInput.variant,
       versions: settingsInput.versions,
     });
-    const roomId = randomRoomIdWith(rng, useCrypto);
+    const roomId = randomRoomIdWith(rng, randomBytes);
     const code = randomCodeWith(new Set(codeIndex.keys()), rng);
-    const rootSeed = randomSeedWith(rng, useCrypto);
+    const rootSeed = randomSeedWith(rng, randomBytes);
     const snapshot = havocMultiplayerRoomSnapshotSchema.parse({
       roomId,
       code,
@@ -1190,7 +1199,7 @@ export function createInMemoryHavocMultiplayerTransport(options?: {
     async verificationChallenge(roomId) {
       await Promise.resolve();
       const record = recordFor(roomId);
-      record.verificationChallenge ??= randomChallengeWith(rng, useCrypto);
+      record.verificationChallenge ??= randomChallengeWith(rng, randomBytes);
       return record.verificationChallenge;
     },
     async submitVerification(roomId, receipt, expectedRevision) {

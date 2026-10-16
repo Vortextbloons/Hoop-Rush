@@ -9,3 +9,11 @@ export {
   type HavocMultiplayerSessionView,
   type ReactionKey,
 } from './session.ts';
+
+export {
+  havocMultiplayerFirstPickerFor,
+  havocMultiplayerHomeWinnerFor,
+  havocMultiplayerHomeForGame,
+  type InMemoryHavocMultiplayerTransport,
+  createInMemoryHavocMultiplayerTransport,
+} from './in-memory-transport.ts';

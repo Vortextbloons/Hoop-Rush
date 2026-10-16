@@ -8,12 +8,8 @@ import {
   HAVOC_MULTIPLAYER_TURNS,
   commandIdSchema,
   contentHashSchema,
-  createInMemoryHavocMultiplayerTransport,
   defaultHavocMultiplayerVersionLocks,
   havocDigestSchema,
-  havocMultiplayerFirstPickerFor,
-  havocMultiplayerHomeForGame,
-  havocMultiplayerHomeWinnerFor,
   havocMultiplayerSeriesSnapshotSchema,
   seasonKeySchema,
   seedSchema,
@@ -24,8 +20,14 @@ import {
   type HavocMultiplayerRoomSnapshot,
   type HavocMultiplayerTransientEvent,
   type Id,
+} from '@hoop-rush/data-contracts';
+import {
+  createInMemoryHavocMultiplayerTransport,
+  havocMultiplayerFirstPickerFor,
+  havocMultiplayerHomeForGame,
+  havocMultiplayerHomeWinnerFor,
   type InMemoryHavocMultiplayerTransport,
-} from './index.ts';
+} from './in-memory-transport.ts';
 
 function locks() {
   return defaultHavocMultiplayerVersionLocks({
@@ -248,7 +250,10 @@ describe('in-memory Havoc multiplayer transport', () => {
   });
 
   it('starts only from the host with both seats online', async () => {
-    const transport = createInMemoryHavocMultiplayerTransport({ seed: 'start-rules' });
+    const transport = createInMemoryHavocMultiplayerTransport({
+      clock: () => 1_700_000_000_000,
+      random: { seed: 'start-rules' },
+    });
     const created = await transport.create({ versions: locks() });
     const roomId = created.snapshot.roomId;
     expect(created.membership.participantId).toBe('p1');
@@ -270,7 +275,10 @@ describe('in-memory Havoc multiplayer transport', () => {
   });
 
   it('joins two clients and plays a strict alternating pick flow with rejections', async () => {
-    const transport = createInMemoryHavocMultiplayerTransport({ seed: 'draft-flow' });
+    const transport = createInMemoryHavocMultiplayerTransport({
+      clock: () => 1_700_000_000_000,
+      random: { seed: 'draft-flow' },
+    });
     const { created, joined, roomId } = await createAndJoin(transport);
     expect(joined.snapshot.roomId).toBe(roomId);
     expect((await transport.preview(created.code)).roomId).toBe(roomId);
@@ -375,7 +383,10 @@ describe('in-memory Havoc multiplayer transport', () => {
   });
 
   it('accepts an identical duplicate command idempotently and rejects changed payloads', async () => {
-    const transport = createInMemoryHavocMultiplayerTransport({ seed: 'duplicate' });
+    const transport = createInMemoryHavocMultiplayerTransport({
+      clock: () => 1_700_000_000_000,
+      random: { seed: 'duplicate' },
+    });
     const { roomId } = await createAndJoin(transport);
     const first = await submit(transport, roomId, 'ready-dup', 'p1', { kind: 'ready' });
     expect(first.accepted).toBe(true);
@@ -401,7 +412,10 @@ describe('in-memory Havoc multiplayer transport', () => {
   });
 
   it('rejects re-claiming a person even through a different season card', async () => {
-    const transport = createInMemoryHavocMultiplayerTransport({ seed: 'claims' });
+    const transport = createInMemoryHavocMultiplayerTransport({
+      clock: () => 1_700_000_000_000,
+      random: { seed: 'claims' },
+    });
     const { roomId } = await createAndJoin(transport);
     const started = await startDraft(transport, roomId);
     const draft = requireDraft(started);
@@ -444,7 +458,10 @@ describe('in-memory Havoc multiplayer transport', () => {
   });
 
   it('allows one reroll per participant and keeps the deadline', async () => {
-    const transport = createInMemoryHavocMultiplayerTransport({ seed: 'reroll' });
+    const transport = createInMemoryHavocMultiplayerTransport({
+      clock: () => 1_700_000_000_000,
+      random: { seed: 'reroll' },
+    });
     const { roomId } = await createAndJoin(transport);
     const started = await startDraft(transport, roomId);
     const draft = requireDraft(started);
@@ -499,7 +516,7 @@ describe('in-memory Havoc multiplayer transport', () => {
   it('commits a fallback and resolves an overdue deadline with an injectable clock', async () => {
     let now = 1_000_000;
     const transport = createInMemoryHavocMultiplayerTransport({
-      seed: 'deadline',
+      random: { seed: 'deadline' },
       clock: () => now,
     });
     const { roomId } = await createAndJoin(transport);
@@ -535,7 +552,7 @@ describe('in-memory Havoc multiplayer transport', () => {
   it('invalidates a committed fallback on reroll while keeping the deadline', async () => {
     let now = 3_000_000;
     const transport = createInMemoryHavocMultiplayerTransport({
-      seed: 'reroll-fallback',
+      random: { seed: 'reroll-fallback' },
       clock: () => now,
     });
     const { roomId } = await createAndJoin(transport);
@@ -583,7 +600,10 @@ describe('in-memory Havoc multiplayer transport', () => {
   });
 
   it('plays a full draft and advances the series to a championship at four wins', async () => {
-    const transport = createInMemoryHavocMultiplayerTransport({ seed: 'series' });
+    const transport = createInMemoryHavocMultiplayerTransport({
+      clock: () => 1_700_000_000_000,
+      random: { seed: 'series' },
+    });
     const { created, roomId } = await createAndJoin(transport);
     await startDraft(transport, roomId);
     const claimed = await playDraft(transport, roomId, 'series-');
@@ -667,7 +687,10 @@ describe('in-memory Havoc multiplayer transport', () => {
   });
 
   it('fails the room when confirmations disagree', async () => {
-    const transport = createInMemoryHavocMultiplayerTransport({ seed: 'mismatch' });
+    const transport = createInMemoryHavocMultiplayerTransport({
+      clock: () => 1_700_000_000_000,
+      random: { seed: 'mismatch' },
+    });
     const { roomId } = await createAndJoin(transport);
     await startDraft(transport, roomId);
     await playDraft(transport, roomId, 'mismatch-');
@@ -740,7 +763,10 @@ describe('in-memory Havoc multiplayer transport', () => {
   });
 
   it('rematches into a successor room with a fresh seed and fresh draft', async () => {
-    const transport = createInMemoryHavocMultiplayerTransport({ seed: 'rematch' });
+    const transport = createInMemoryHavocMultiplayerTransport({
+      clock: () => 1_700_000_000_000,
+      random: { seed: 'rematch' },
+    });
     const { roomId } = await createAndJoin(transport);
     const parent = await startDraft(transport, roomId);
     const parentSeed = requireDraft(parent).rootSeed;
@@ -812,7 +838,10 @@ describe('in-memory Havoc multiplayer transport', () => {
   });
 
   it('defaults rooms to standard and keeps the curated variant through rematches', async () => {
-    const transport = createInMemoryHavocMultiplayerTransport({ seed: 'variant-rematch' });
+    const transport = createInMemoryHavocMultiplayerTransport({
+      clock: () => 1_700_000_000_000,
+      random: { seed: 'variant-rematch' },
+    });
     const standard = await transport.create({ versions: locks() });
     expect(standard.snapshot.settings.variant).toBe('standard');
 
@@ -839,7 +868,10 @@ describe('in-memory Havoc multiplayer transport', () => {
   });
 
   it('issues a 64-hex verification challenge and completes with two matching receipts', async () => {
-    const transport = createInMemoryHavocMultiplayerTransport({ seed: 'verification' });
+    const transport = createInMemoryHavocMultiplayerTransport({
+      clock: () => 1_700_000_000_000,
+      random: { seed: 'verification' },
+    });
     const { roomId } = await createAndJoin(transport);
     await playChampionship(transport, roomId);
     expect((await snapshot(transport, roomId)).phase).toBe('championship');
@@ -882,7 +914,10 @@ describe('in-memory Havoc multiplayer transport', () => {
   });
 
   it('delivers transient events only to subscribers of the owning room', async () => {
-    const transport = createInMemoryHavocMultiplayerTransport({ seed: 'transient' });
+    const transport = createInMemoryHavocMultiplayerTransport({
+      clock: () => 1_700_000_000_000,
+      random: { seed: 'transient' },
+    });
     const roomA = await transport.create({ versions: locks() });
     const roomB = await transport.create({ versions: locks() });
     const receivedA: string[] = [];
@@ -929,7 +964,10 @@ describe('in-memory Havoc multiplayer transport', () => {
   });
 
   it('refetches commands after a revision', async () => {
-    const transport = createInMemoryHavocMultiplayerTransport({ seed: 'refetch' });
+    const transport = createInMemoryHavocMultiplayerTransport({
+      clock: () => 1_700_000_000_000,
+      random: { seed: 'refetch' },
+    });
     const { roomId } = await createAndJoin(transport);
     await startDraft(transport, roomId);
     const afterStart = await snapshot(transport, roomId);
@@ -947,7 +985,10 @@ describe('in-memory Havoc multiplayer transport', () => {
   });
 
   it('manages seats: idempotent join, resume, leave, and guest removal', async () => {
-    const transport = createInMemoryHavocMultiplayerTransport({ seed: 'seats' });
+    const transport = createInMemoryHavocMultiplayerTransport({
+      clock: () => 1_700_000_000_000,
+      random: { seed: 'seats' },
+    });
     const created = await transport.create({ versions: locks() });
     const roomId = created.snapshot.roomId;
     const firstJoin = await transport.join(created.code);
@@ -978,7 +1019,7 @@ describe('in-memory Havoc multiplayer transport', () => {
   it('expires codes and rooms on the expiry tick', async () => {
     let now = 5_000_000;
     const transport = createInMemoryHavocMultiplayerTransport({
-      seed: 'expiry',
+      random: { seed: 'expiry' },
       clock: () => now,
     });
     const created = await transport.create({ versions: locks() });
@@ -1020,10 +1061,10 @@ describe('in-memory Havoc multiplayer transport', () => {
 
     const clock = () => 9_000_000;
     const left = await script(
-      createInMemoryHavocMultiplayerTransport({ seed: 'deterministic', clock }),
+      createInMemoryHavocMultiplayerTransport({ random: { seed: 'deterministic' }, clock }),
     );
     const right = await script(
-      createInMemoryHavocMultiplayerTransport({ seed: 'deterministic', clock }),
+      createInMemoryHavocMultiplayerTransport({ random: { seed: 'deterministic' }, clock }),
     );
     expect(left.created.code).toBe(right.created.code);
     expect(left.created.snapshot).toEqual(right.created.snapshot);

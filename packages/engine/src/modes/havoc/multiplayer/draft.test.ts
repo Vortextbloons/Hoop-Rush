@@ -21,7 +21,6 @@ import {
   SEASON_STAMINA_VERSION,
   canonicalJson,
   havocMultiplayerDraftStateSchema,
-  havocMultiplayerFirstPickerFor,
   havocMultiplayerGameSeed,
   havocOverallInCuratedBand,
   playerIdSchema,
@@ -33,6 +32,7 @@ import {
   seedFromString,
   seedSchema,
 } from '@hoop-rush/data-contracts';
+import { havocMultiplayerByteDraw } from './seed-parity.ts';
 import {
   buildHavocCard,
   buildHavocSourcePlayer,
@@ -938,7 +938,7 @@ describe('havoc multiplayer draft', () => {
     for (let index = 0; index < 200; index += 1) {
       const seed = testSeed(`havoc-mp-curated-boundary-${String(index)}`);
       const assignments = havocMultiplayerCuratedAssignments(seed, customEnvironment.rngFactory);
-      const firstPicker = havocMultiplayerFirstPickerFor(seed);
+      const firstPicker = havocMultiplayerByteDraw(seed, 0);
       if (assignments[firstPicker][0] !== '80-89') continue;
       const state = createHavocMultiplayerDraft(seed, adapted, customEnvironment, CURATED);
       const offer = state.offer;
@@ -1003,7 +1003,7 @@ describe('havoc multiplayer draft', () => {
     for (let index = 0; index < 200 && found === null; index += 1) {
       const seed = testSeed(`havoc-mp-curated-missing-${String(index)}`);
       const assignments = havocMultiplayerCuratedAssignments(seed, customEnvironment.rngFactory);
-      const firstPicker = havocMultiplayerFirstPickerFor(seed);
+      const firstPicker = havocMultiplayerByteDraw(seed, 0);
       if (assignments[firstPicker][0] === '90-plus') found = seed;
     }
     expect(found).not.toBeNull();

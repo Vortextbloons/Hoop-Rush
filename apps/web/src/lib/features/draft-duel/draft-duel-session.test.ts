@@ -1,9 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import {
-  createInMemoryDraftDuelTransport,
-  idSchema,
-  type DraftDuelRoomSnapshot,
-} from '@hoop-rush/data-contracts';
+import { idSchema, type DraftDuelRoomSnapshot } from '@hoop-rush/data-contracts';
+import { createInMemoryDraftDuelTransport } from '@hoop-rush/application/draft-duel';
 import type { DraftDuelAssets } from './draft-duel-assets';
 import { createDraftDuelSession } from './draft-duel-session';
 
@@ -23,7 +20,12 @@ describe('DraftDuelSession lifecycle', () => {
   });
 
   it('mirrors its state to subscribers', () => {
-    const session = createDraftDuelSession({ transport: createInMemoryDraftDuelTransport() });
+    const session = createDraftDuelSession({
+      transport: createInMemoryDraftDuelTransport({
+        clock: Date.now,
+        random: { seed: 'transport-session-test' },
+      }),
+    });
     const listener = vi.fn();
     const unsubscribe = session.subscribe(listener);
 
@@ -41,7 +43,12 @@ describe('DraftDuelSession lifecycle', () => {
 
   it('stops ticking and drops late playback frames after dispose', async () => {
     vi.useFakeTimers();
-    const session = createDraftDuelSession({ transport: createInMemoryDraftDuelTransport() });
+    const session = createDraftDuelSession({
+      transport: createInMemoryDraftDuelTransport({
+        clock: Date.now,
+        random: { seed: 'transport-session-test' },
+      }),
+    });
     const internals = session as unknown as SessionInternals;
     const listener = vi.fn();
     session.subscribe(listener);
@@ -64,7 +71,10 @@ describe('DraftDuelSession lifecycle', () => {
   });
 
   it('refuses to attach, sync, or apply snapshots after dispose', async () => {
-    const transport = createInMemoryDraftDuelTransport();
+    const transport = createInMemoryDraftDuelTransport({
+      clock: Date.now,
+      random: { seed: 'transport-session-test' },
+    });
     const resume = vi.spyOn(transport, 'resume');
     const refetch = vi.spyOn(transport, 'refetch');
     const session = createDraftDuelSession({ transport });
@@ -81,7 +91,10 @@ describe('DraftDuelSession lifecycle', () => {
   });
 
   it('reports a missing membership without touching the transport', async () => {
-    const transport = createInMemoryDraftDuelTransport();
+    const transport = createInMemoryDraftDuelTransport({
+      clock: Date.now,
+      random: { seed: 'transport-session-test' },
+    });
     const resume = vi.spyOn(transport, 'resume');
     const session = createDraftDuelSession({
       transport,

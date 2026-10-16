@@ -3,7 +3,6 @@ import {
   commandIdSchema,
   contentHashSchema,
   defaultHavocMultiplayerVersionLocks,
-  havocMultiplayerFirstPickerFor,
   havocMultiplayerTransientEventSchema,
   havocMultiplayerVerificationReceiptSchema,
   idSchema,
@@ -12,6 +11,7 @@ import {
   type HavocMultiplayerCommandRejectionCode,
   type HavocMultiplayerTransport,
 } from '@hoop-rush/data-contracts';
+import { havocMultiplayerFirstPickerFor } from '@hoop-rush/application/havoc-multiplayer';
 import {
   AdaptHavocCatalog,
   HAVOC_MUTATION_DEFINITIONS,

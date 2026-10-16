@@ -1,7 +1,18 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  buildEraSimulationProfile,
+  buildFixtureBracket,
+  buildManifest,
+  buildSimulationPlayer,
+} from '@hoop-rush/test-fixtures';
+import {
+  createEngineContext,
+  shared82GameEvents,
+  verifyFixedFiveCompetition,
+} from '@hoop-rush/engine';
+import type { FixedFiveCompetitionRun, Position } from '@hoop-rush/data-contracts';
+import { afterEach, assert, describe, expect, it, vi } from 'vitest';
 import {
   commandIdSchema,
-  createInMemoryFixedFiveTransport,
   defaultFixedFiveVersionLocks,
   franchiseIdSchema,
   playerIdSchema,
@@ -16,6 +27,7 @@ import {
   type FixedFiveWorkerTeam,
   type Id,
 } from '@hoop-rush/data-contracts';
+import { createInMemoryFixedFiveTransport } from './in-memory-transport.ts';
 import {
   FixedFiveRoomSession,
   type FixedFiveRoomRepositoryPort,
@@ -46,7 +58,10 @@ class FakeRunner implements FixedFiveRunnerPort {
   runDuelGame(input: Parameters<FixedFiveRunnerPort['runDuelGame']>[0]): void {
     this.duelGameRuns.push(input);
   }
-  verify(): void {}
+  readonly verifications: Parameters<FixedFiveRunnerPort['verify']>[0][] = [];
+  verify(input: Parameters<FixedFiveRunnerPort['verify']>[0]): void {
+    this.verifications.push(input);
+  }
   dispose(): void {
     this.disposed = true;
   }
@@ -59,6 +74,7 @@ class FakeRunner implements FixedFiveRunnerPort {
 interface FakeRepository extends FixedFiveRoomRepositoryPort {
   rows: Map<number, FixedFiveCommand>;
   snapshotCursor: number;
+  pending: FixedFiveCompetitionRun | null;
 }
 
 function createFakeRepository(): FakeRepository {
@@ -66,6 +82,7 @@ function createFakeRepository(): FakeRepository {
   const repository: FakeRepository = {
     rows,
     snapshotCursor: -1,
+    pending: null,
     listCommands: () => Promise.resolve([...rows.values()].sort((a, b) => a.ordinal - b.ordinal)),
     appendCommand: (command) => {
       rows.set(command.ordinal, command);
@@ -75,9 +92,16 @@ function createFakeRepository(): FakeRepository {
       repository.snapshotCursor = commandCursor;
       return Promise.resolve();
     },
-    loadPendingResult: () => Promise.resolve(null),
-    savePendingResult: () => Promise.resolve(),
-    clearPendingResult: () => Promise.resolve(),
+    loadPendingResult: () =>
+      Promise.resolve(repository.pending ? { run: repository.pending } : null),
+    savePendingResult: (_roomId, run) => {
+      repository.pending = run;
+      return Promise.resolve();
+    },
+    clearPendingResult: () => {
+      repository.pending = null;
+      return Promise.resolve();
+    },
   };
   return repository;
 }
@@ -100,7 +124,7 @@ function createHarness(overrides: Partial<FixedFiveRoomSessionDeps> = {}): Harne
   let commandSequence = 0;
   const transport = createInMemoryFixedFiveTransport({
     clock: () => clock.now,
-    seed: 'fixed-five-room-session-test',
+    random: { seed: 'fixed-five-room-session-test' },
   });
   const repository = createFakeRepository();
   const memberships: FixedFiveRoomMembership[] = [];
@@ -397,12 +421,137 @@ describe('FixedFiveRoomSession', () => {
     runner.emit({ kind: 'progress', completedGames: 4, totalGames: 161 });
     expect(session.getSnapshot().progress).toEqual({ completed: 4, total: 161 });
 
+    runner.emit({ kind: 'error', message: 'worker failed' });
+    expect(session.getSnapshot().simError).toBe('worker failed');
+    session.retrySimulation();
+    await waitFor(() => harness.runners.length === 2);
+    const retryRunner = harness.runners[1];
+    expect(retryRunner?.sharedRuns[0]).toEqual(run);
+    retryRunner?.emit({ kind: 'progress', completedGames: 4, totalGames: 161 });
+
     session.dispose();
-    expect(runner.disposed).toBe(true);
+    expect(retryRunner?.disposed).toBe(true);
     runner.emit({ kind: 'progress', completedGames: 9, totalGames: 161 });
     runner.emit({ kind: 'complete', gamesDelivered: 9 });
     expect(session.getSnapshot().progress).toEqual({ completed: 4, total: 161 });
     expect(session.getSnapshot().localResult).toBeNull();
+  });
+
+  it('recovers a saved season, rebuilds stats, and retries verification before completing once', async () => {
+    vi.useFakeTimers();
+    const pool = Array.from({ length: 12 }, (_, index) => sandboxCandidate(index));
+    const assets = {
+      ...sandboxAssets(pool),
+      manifest: buildManifest(),
+      bracket: buildFixtureBracket(),
+      profile: buildEraSimulationProfile(),
+    };
+    const slots: Position[] = ['PG', 'SG', 'SF', 'PF', 'C'];
+    const harness = createHarness({
+      loadAssets: () => Promise.resolve(assets),
+      buildTeam: (_manifest, teamId, displayName, refs) =>
+        Promise.resolve({
+          teamId,
+          displayName,
+          players: refs.map((ref) => {
+            const position = slots[ref.slotIndex];
+            assert(position);
+            return buildSimulationPlayer({
+              playerId: playerIdSchema.parse(ref.playerId),
+              positions: [position],
+            });
+          }),
+        }),
+    });
+    const created = await harness.createRoom({ mode: 'sandbox-shared-82', sourceMode: 'sandbox' });
+    await fillSandboxDraft(harness.transport, created.snapshot.roomId, pool);
+    const firstSession = harness.session();
+    await firstSession.start();
+    await waitFor(() => harness.runners.length === 1);
+    const runner = harness.runners[0];
+    assert(runner);
+    const input = runner.sharedRuns[0];
+    assert(input);
+    const context = createEngineContext();
+    const entries = [...shared82GameEvents({ ...input, bracket: assets.bracket }, context)];
+    runner.emit({ kind: 'results', entries });
+    runner.emit({ kind: 'complete', gamesDelivered: entries.length });
+    await waitFor(() => harness.repository.pending !== null);
+    await vi.advanceTimersByTimeAsync(7000);
+    const originalResult = firstSession.getSnapshot().localResult;
+    expect(originalResult).not.toBeNull();
+    expect(harness.repository.pending?.resultDigest).toBe(originalResult?.digest);
+    firstSession.dispose();
+
+    const session = harness.session();
+    await session.start();
+    await waitFor(() => session.getSnapshot().simDone && harness.runners.length === 2);
+    expect(session.getSnapshot().localResult).toEqual(originalResult);
+    expect(session.getSnapshot().simEntries).toEqual([]);
+    expect(session.getSnapshot().statsBuilding).toBe(true);
+    session.requestStatsRebuild();
+    expect(harness.runners).toHaveLength(2);
+    const statsRunner = harness.runners[1];
+    assert(statsRunner);
+    statsRunner.emit({ kind: 'results', entries });
+    statsRunner.emit({ kind: 'complete', gamesDelivered: entries.length });
+    expect(session.getSnapshot().statsBuilding).toBe(false);
+    expect(session.getSnapshot().statsEntries).toEqual(entries);
+    assert(originalResult);
+    const digest = originalResult.digest;
+    for (const payload of [
+      { kind: 'propose-result', resultDigest: digest },
+      { kind: 'confirm-result', resultDigest: digest, verified: true },
+    ] satisfies FixedFiveCommandPayload[]) {
+      const receipt = await harness.transport.submitCommand({
+        schemaVersion: 1,
+        roomId: created.snapshot.roomId,
+        commandId: commandIdSchema.parse(`peer-${payload.kind}`),
+        actorParticipantId: 'p2',
+        payload,
+      });
+      expect(receipt.accepted).toBe(true);
+      await session.refresh();
+    }
+    await waitFor(() => harness.runners.some((job) => job.verifications.length > 0));
+    const failedJob = harness.runners.find((job) => job.verifications.length > 0);
+    assert(failedJob);
+    failedJob.emit({ kind: 'verification-failed', failures: ['verification interrupted'] });
+    await waitFor(() => session.getSnapshot().verificationError !== null);
+    expect(session.getSnapshot().verificationReceipt).toBeNull();
+    session.retryVerification();
+    await waitFor(() => harness.runners.filter((job) => job.verifications.length > 0).length === 2);
+    const verificationJob = harness.runners.at(-1);
+    assert(verificationJob);
+    const verificationInput = verificationJob.verifications[0];
+    assert(verificationInput);
+    const verification = verifyFixedFiveCompetition(verificationInput, context);
+    expect(verification.ok).toBe(true);
+    if (!verification.ok) throw new Error(verification.failures.join('; '));
+    const complete = vi.spyOn(harness.transport, 'complete');
+    const submitVerification = vi.spyOn(harness.transport, 'submitVerification');
+    session.dispose();
+    verificationJob.emit({ kind: 'verified', receipt: verification.receipt });
+    await flush();
+    expect(submitVerification).not.toHaveBeenCalled();
+    expect(complete).not.toHaveBeenCalled();
+
+    const resumed = harness.session();
+    await resumed.start();
+    await waitFor(() => harness.runners.filter((job) => job.verifications.length > 0).length === 3);
+    const resumedJob = harness.runners.findLast((job) => job.verifications.length > 0);
+    assert(resumedJob);
+    const resumedInput = resumedJob.verifications[0];
+    assert(resumedInput);
+    const resumedVerification = verifyFixedFiveCompetition(resumedInput, context);
+    expect(resumedVerification.ok).toBe(true);
+    if (!resumedVerification.ok) throw new Error(resumedVerification.failures.join('; '));
+    resumedJob.emit({ kind: 'verified', receipt: resumedVerification.receipt });
+    await waitFor(() => resumed.getSnapshot().room?.phase === 'completed');
+    expect(resumed.getSnapshot().submittedReceipt).toBe(resumedVerification.receipt.receiptDigest);
+    await resumed.refresh();
+    expect(complete).toHaveBeenCalledTimes(1);
+    resumed.dispose();
   });
 
   it('coordinates a duel broadcast from readiness through the recap hold', async () => {

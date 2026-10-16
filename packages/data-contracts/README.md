@@ -8,6 +8,8 @@ workers embed.
 ## Boundary rules
 
 - May import `zod` only. No I/O, no framework imports.
+- In-memory transport implementations live in `@hoop-rush/application`; this
+  package retains their schemas and transport interfaces.
 - Storage record wrappers belong in `@hoop-rush/persistence`; worker messages,
   multiplayer protocols, and simulation artifacts belong here.
 - Version literals live in `src/versions.ts` (1.0 surface) and

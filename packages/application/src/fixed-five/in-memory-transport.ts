@@ -18,9 +18,13 @@ import {
   type FixedFiveRoomSettings,
   type FixedFiveRoomSnapshot,
   type FixedFiveVerificationReceipt,
-} from './fixed-five-multiplayer.ts';
-import { canonicalJson } from './season-hash.ts';
-import { commandIdSchema, contentHashSchema, idSchema, seedSchema } from './ids.ts';
+  canonicalJson,
+  commandIdSchema,
+  contentHashSchema,
+  idSchema,
+  seedSchema,
+} from '@hoop-rush/data-contracts';
+
 function fnv1a32Seed(input: string): number {
   let h = 0x811c9dc5;
   for (let i = 0; i < input.length; i += 1) {
@@ -41,11 +45,7 @@ function mulberry32Seed(seed: number): () => number {
 function createSeededRng(seed: string): () => number {
   return mulberry32Seed(fnv1a32Seed(seed));
 }
-function cryptoRng(): number {
-  const word = new Uint32Array(1);
-  crypto.getRandomValues(word);
-  return (word[0] as number) / 4294967296;
-}
+
 function nowIsoWith(clock: () => number): string {
   return new Date(clock()).toISOString();
 }
@@ -95,10 +95,13 @@ function sandboxPickerForSnapshot(
   if (!snapshot.rootSeed) throw new Error('sandbox snake room is missing a root seed');
   return sandboxPicker(snapshot.rootSeed, pickOrdinal);
 }
-function randomSeedWith(rng: () => number, useCrypto: boolean): string {
-  if (useCrypto) {
+function randomSeedWith(
+  rng: () => number,
+  randomBytes: ((length: number) => Uint8Array) | undefined,
+): string {
+  if (randomBytes) {
     const bytes = new Uint8Array(16);
-    crypto.getRandomValues(bytes);
+    bytes.set(randomBytes(bytes.length));
     return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
   }
   const bytes = new Uint8Array(16);
@@ -115,10 +118,13 @@ function randomCodeWith(existing: Set<string>, rng: () => number): FixedFiveRoom
   }
   throw new Error('in-memory fixed-five: code space exhausted');
 }
-function randomRoomIdWith(rng: () => number, useCrypto: boolean): string {
-  if (useCrypto) {
+function randomRoomIdWith(
+  rng: () => number,
+  randomBytes: ((length: number) => Uint8Array) | undefined,
+): string {
+  if (randomBytes) {
     const bytes = new Uint8Array(12);
-    crypto.getRandomValues(bytes);
+    bytes.set(randomBytes(bytes.length));
     return `ff-${[...bytes]
       .map((b) => b.toString(36))
       .join('')
@@ -137,10 +143,13 @@ function randomRoomIdWith(rng: () => number, useCrypto: boolean): string {
     .toLowerCase()
     .replace(/[^a-z0-9._:-]/g, 'a');
 }
-function randomChallengeWith(rng: () => number, useCrypto: boolean): string {
+function randomChallengeWith(
+  rng: () => number,
+  randomBytes: ((length: number) => Uint8Array) | undefined,
+): string {
   const bytes = new Uint8Array(24);
-  if (useCrypto) {
-    crypto.getRandomValues(bytes);
+  if (randomBytes) {
+    bytes.set(randomBytes(bytes.length));
   } else {
     for (let i = 0; i < bytes.length; i += 1) {
       bytes[i] = Math.floor(rng() * 256);
@@ -186,15 +195,22 @@ interface RoomRecord {
 function emptyDuelGameState(): DuelGameState {
   return { proposals: {}, confirmations: {} };
 }
-export function createInMemoryFixedFiveTransport(options?: {
-  clock?: () => number;
-  seed?: string;
-  rng?: () => number;
+export function createInMemoryFixedFiveTransport(options: {
+  clock: () => number;
+  random: { seed: string } | { rng: () => number } | { bytes: (length: number) => Uint8Array };
 }): FixedFiveMultiplayerTransport {
-  const clock = options?.clock ?? Date.now;
-  const seededRng = options?.seed !== undefined ? createSeededRng(options.seed) : null;
-  const rng = options?.rng ?? seededRng ?? cryptoRng;
-  const useCrypto = options?.rng === undefined && options?.seed === undefined;
+  const clock = options.clock;
+  const random = options.random;
+  const randomBytes = 'bytes' in random ? random.bytes : undefined;
+  const rng =
+    'rng' in random
+      ? random.rng
+      : 'seed' in random
+        ? createSeededRng(random.seed)
+        : () => {
+            const bytes = new Uint8Array(random.bytes(4));
+            return new DataView(bytes.buffer).getUint32(0, true) / 4294967296;
+          };
   const rooms = new Map<string, RoomRecord>();
   const codeIndex = new Map<string, string>();
   const createTimestamps: number[] = [];
@@ -453,10 +469,10 @@ export function createInMemoryFixedFiveTransport(options?: {
         ...settingsInput,
         versions: settingsInput.versions,
       };
-      const roomId = idSchema.parse(randomRoomIdWith(rng, useCrypto));
+      const roomId = idSchema.parse(randomRoomIdWith(rng, randomBytes));
       const codes = new Set(codeIndex.keys());
       const code = randomCodeWith(codes, rng);
-      const rootSeed = seedSchema.parse(randomSeedWith(rng, useCrypto));
+      const rootSeed = seedSchema.parse(randomSeedWith(rng, randomBytes));
       const timeoutMs = fixedFiveTimeoutMsForMode(settings.mode);
       const createdAt = new Date(now).toISOString();
       const expiresAt = new Date(now + 24 * 60 * 60 * 1000).toISOString();
@@ -800,7 +816,7 @@ export function createInMemoryFixedFiveTransport(options?: {
           code: 'authorization',
           retryable: false,
         });
-      record.verificationChallenge ??= randomChallengeWith(rng, useCrypto);
+      record.verificationChallenge ??= randomChallengeWith(rng, randomBytes);
       return record.verificationChallenge;
     },
     async submitVerification(roomId, receipt, expectedRevision) {

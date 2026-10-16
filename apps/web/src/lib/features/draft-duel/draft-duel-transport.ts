@@ -1,7 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   commandIdSchema,
-  createInMemoryDraftDuelTransport,
   DRAFT_DUEL_AUTOPICK_VERSION,
   draftDuelBroadcastSchema,
   draftDuelCommandPayloadSchema,
@@ -24,7 +23,8 @@ import {
   type DraftDuelTransientEvent,
   type Id,
 } from '@hoop-rush/data-contracts';
-import { randomUUID } from '#lib/ids.js';
+import { randomBytes, randomUUID } from '#lib/ids.js';
+import { createInMemoryDraftDuelTransport } from '@hoop-rush/application/draft-duel';
 import {
   createRealtimeRoomRegistry,
   ensureAnonymous,
@@ -136,7 +136,7 @@ export function createDraftDuelTransport(options?: {
     !isUsableSupabaseUrl(candidateUrl) ||
     !isUsablePublishableKey(candidateKey)
   ) {
-    return createInMemoryDraftDuelTransport();
+    return createInMemoryDraftDuelTransport({ clock: Date.now, random: { bytes: randomBytes } });
   }
   let clientPromise: Promise<DraftDuelClient> | null = null;
   const transportUrl = candidateUrl;

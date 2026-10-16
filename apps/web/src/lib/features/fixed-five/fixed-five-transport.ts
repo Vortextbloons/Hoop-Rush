@@ -1,7 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   commandIdSchema,
-  createInMemoryFixedFiveTransport,
   fixedFiveCommandPayloadSchema,
   fixedFiveCommandSchema,
   fixedFiveRoomCodeSchema,
@@ -19,7 +18,8 @@ import {
   type FixedFiveRoomSnapshot,
   type Id,
 } from '@hoop-rush/data-contracts';
-import { randomUUID } from '#lib/ids.js';
+import { randomBytes, randomUUID } from '#lib/ids.js';
+import { createInMemoryFixedFiveTransport } from '@hoop-rush/application/fixed-five';
 import {
   createRealtimeRoomRegistry,
   ensureAnonymous,
@@ -130,7 +130,7 @@ export function createFixedFiveTransport(options?: {
     !isUsableSupabaseUrl(candidateUrl) ||
     !isUsablePublishableKey(candidateKey)
   ) {
-    return createInMemoryFixedFiveTransport();
+    return createInMemoryFixedFiveTransport({ clock: Date.now, random: { bytes: randomBytes } });
   }
   let clientPromise: Promise<FixedFiveClient> | null = null;
   const transportUrl = candidateUrl;

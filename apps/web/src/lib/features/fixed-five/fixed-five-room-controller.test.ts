@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   commandIdSchema,
-  createInMemoryFixedFiveTransport,
   defaultFixedFiveVersionLocks,
   franchiseIdSchema,
   playerIdSchema,
@@ -13,6 +12,7 @@ import {
   type FixedFiveWorkerTeam,
   type PlayersIndexEntry,
 } from '@hoop-rush/data-contracts';
+import { createInMemoryFixedFiveTransport } from '@hoop-rush/application/fixed-five';
 import {
   createEngineContext,
   fixedFiveSandboxFirstPicker,
@@ -74,7 +74,10 @@ function createHarness(): {
     sourceMode?: FixedFiveRoomSnapshot['settings']['sourceMode'];
   }): Promise<{ snapshot: FixedFiveRoomSnapshot; code: string }>;
 } {
-  const transport = createInMemoryFixedFiveTransport({ seed: 'fixed-five-controller-test' });
+  const transport = createInMemoryFixedFiveTransport({
+    clock: Date.now,
+    random: { seed: 'fixed-five-controller-test' },
+  });
   const memberships: FixedFiveRoomMembership[] = [];
   let commandSequence = 0;
   const deps: FixedFiveRoomSessionDeps = {

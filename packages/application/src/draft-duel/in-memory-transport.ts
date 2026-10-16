@@ -25,9 +25,14 @@ import {
   type DraftDuelSeriesSnapshot,
   type DraftDuelTransientEvent,
   type DraftDuelVerificationReceipt,
-} from './draft-duel.ts';
-import { commandIdSchema, contentHashSchema, idSchema, seedSchema, type Id } from './ids.ts';
-import { canonicalJson, fnv1a32 } from './season-hash.ts';
+  commandIdSchema,
+  contentHashSchema,
+  idSchema,
+  seedSchema,
+  type Id,
+  canonicalJson,
+  fnv1a32,
+} from '@hoop-rush/data-contracts';
 
 function mulberry32Seed(seed: number): () => number {
   let a = seed | 0;
@@ -74,20 +79,17 @@ export function draftDuelHomeForGameFor(
   return DRAFT_DUEL_HOME_GAMES.has(gameNumber) ? homeWinner : otherParticipant(homeWinner);
 }
 
-function cryptoRng(): number {
-  const word = new Uint32Array(1);
-  crypto.getRandomValues(word);
-  return (word[0] as number) / 4294967296;
-}
-
 function nowIsoWith(clock: () => number): string {
   return new Date(clock()).toISOString();
 }
 
-function randomSeedWith(rng: () => number, useCrypto: boolean): string {
+function randomSeedWith(
+  rng: () => number,
+  randomBytes: ((length: number) => Uint8Array) | undefined,
+): string {
   const bytes = new Uint8Array(16);
-  if (useCrypto) {
-    crypto.getRandomValues(bytes);
+  if (randomBytes) {
+    bytes.set(randomBytes(bytes.length));
   } else {
     for (let i = 0; i < bytes.length; i += 1) {
       bytes[i] = Math.floor(rng() * 256);
@@ -105,10 +107,13 @@ function randomCodeWith(existing: Set<string>, rng: () => number): DraftDuelRoom
   throw new Error('in-memory draft-duel: code space exhausted');
 }
 
-function randomRoomIdWith(rng: () => number, useCrypto: boolean): Id {
+function randomRoomIdWith(
+  rng: () => number,
+  randomBytes: ((length: number) => Uint8Array) | undefined,
+): Id {
   const bytes = new Uint8Array(12);
-  if (useCrypto) {
-    crypto.getRandomValues(bytes);
+  if (randomBytes) {
+    bytes.set(randomBytes(bytes.length));
   } else {
     for (let i = 0; i < bytes.length; i += 1) {
       bytes[i] = Math.floor(rng() * 256);
@@ -124,10 +129,13 @@ function randomRoomIdWith(rng: () => number, useCrypto: boolean): Id {
   );
 }
 
-function randomChallengeWith(rng: () => number, useCrypto: boolean): string {
+function randomChallengeWith(
+  rng: () => number,
+  randomBytes: ((length: number) => Uint8Array) | undefined,
+): string {
   const bytes = new Uint8Array(24);
-  if (useCrypto) {
-    crypto.getRandomValues(bytes);
+  if (randomBytes) {
+    bytes.set(randomBytes(bytes.length));
   } else {
     for (let i = 0; i < bytes.length; i += 1) {
       bytes[i] = Math.floor(rng() * 256);
@@ -210,15 +218,22 @@ export interface InMemoryDraftDuelTransport extends DraftDuelMultiplayerTranspor
   publishTransient(roomId: string, event: DraftDuelTransientEvent): Promise<boolean>;
 }
 
-export function createInMemoryDraftDuelTransport(options?: {
-  clock?: () => number;
-  seed?: string;
-  rng?: () => number;
+export function createInMemoryDraftDuelTransport(options: {
+  clock: () => number;
+  random: { seed: string } | { rng: () => number } | { bytes: (length: number) => Uint8Array };
 }): InMemoryDraftDuelTransport {
-  const clock = options?.clock ?? Date.now;
-  const seededRng = options?.seed !== undefined ? mulberry32Seed(fnv1a32(options.seed)) : null;
-  const rng = options?.rng ?? seededRng ?? cryptoRng;
-  const useCrypto = options?.rng === undefined && options?.seed === undefined;
+  const clock = options.clock;
+  const random = options.random;
+  const randomBytes = 'bytes' in random ? random.bytes : undefined;
+  const rng =
+    'rng' in random
+      ? random.rng
+      : 'seed' in random
+        ? mulberry32Seed(fnv1a32(random.seed))
+        : () => {
+            const bytes = new Uint8Array(random.bytes(4));
+            return new DataView(bytes.buffer).getUint32(0, true) / 4294967296;
+          };
   const rooms = new Map<string, RoomRecord>();
   const codeIndex = new Map<string, string>();
   const createTimestamps: number[] = [];
@@ -742,10 +757,10 @@ export function createInMemoryDraftDuelTransport(options?: {
         retryable: false,
       });
     }
-    const roomId = randomRoomIdWith(rng, useCrypto);
+    const roomId = randomRoomIdWith(rng, randomBytes);
     const codes = new Set(codeIndex.keys());
     const code = randomCodeWith(codes, rng);
-    const rootSeed = seedSchema.parse(randomSeedWith(rng, useCrypto));
+    const rootSeed = seedSchema.parse(randomSeedWith(rng, randomBytes));
     const createdAt = new Date(now).toISOString();
     const expiresAt = new Date(now + DRAFT_DUEL_ROOM_RETENTION_MS).toISOString();
     const snapshot: DraftDuelRoomSnapshot = {
@@ -926,7 +941,7 @@ export function createInMemoryDraftDuelTransport(options?: {
     async verificationChallenge(roomId) {
       await Promise.resolve();
       const record = recordFor(roomId);
-      record.verificationChallenge ??= randomChallengeWith(rng, useCrypto);
+      record.verificationChallenge ??= randomChallengeWith(rng, randomBytes);
       return record.verificationChallenge;
     },
     async submitVerification(roomId, receipt, expectedRevision) {
