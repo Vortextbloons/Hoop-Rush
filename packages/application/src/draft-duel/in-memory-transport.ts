@@ -31,18 +31,8 @@ import {
   seedSchema,
   type Id,
   canonicalJson,
-  fnv1a32,
 } from '@hoop-rush/data-contracts';
-
-function mulberry32Seed(seed: number): () => number {
-  let a = seed | 0;
-  return () => {
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
+import { createSeededRng } from '../runtime/seeded-rng.ts';
 
 export function draftDuelFirstPickerFor(rootSeed: string): DraftDuelParticipantId {
   return seedByteParity(rootSeed, 0) ? 'p1' : 'p2';
@@ -229,7 +219,7 @@ export function createInMemoryDraftDuelTransport(options: {
     'rng' in random
       ? random.rng
       : 'seed' in random
-        ? mulberry32Seed(fnv1a32(random.seed))
+        ? createSeededRng(random.seed)
         : () => {
             const bytes = new Uint8Array(random.bytes(4));
             return new DataView(bytes.buffer).getUint32(0, true) / 4294967296;

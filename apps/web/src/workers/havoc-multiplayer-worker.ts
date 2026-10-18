@@ -13,6 +13,7 @@ import {
   havocBattleGameTapeDigest,
   simulateHavocBattleGame,
 } from '@hoop-rush/engine';
+import { normalizeSimulationError } from '../lib/workers/worker-protocol';
 
 let currentRequestId: string | null = null;
 let requestToken = 0;
@@ -30,10 +31,6 @@ function postError(requestId: string, code: string, message: string): void {
     code,
     message: message.slice(0, 512),
   });
-}
-
-function normalizeSimulationError(message: string): string {
-  return message.replace(/ failed invariants: [\s\S]*$/, ' failed invariants');
 }
 
 self.onmessage = (event: MessageEvent<unknown>): void => {

@@ -451,7 +451,7 @@ export class PossessionStepper {
         recorder.turnover(offense, foulerSlot >= 0 ? foulerSlot : 0);
       }
       if (awards !== undefined && awards.technicalFreeThrows > 0 && awards.technicalForDefense) {
-        resolveTechnicalFreeThrow(this.ctx, defense, offense);
+        resolveGrantedFreeThrow(this.ctx, defense, offense, true);
       }
       if (awards !== undefined) {
         for (let i = 0; i < awards.doubleOrNothingFreeThrows; i += 1) {
@@ -1196,20 +1196,6 @@ function reboundShotClockOf(ctx: TripContext, side: SideIndex): number {
   const havoc = ctx.havoc;
   if (havoc === undefined) return 14;
   return Math.min(14, havoc.reboundShotClock(side));
-}
-function resolveTechnicalFreeThrow(
-  ctx: TripContext,
-  offenseSide: SideIndex,
-  defenseSide: SideIndex,
-): void {
-  const { rng } = ctx;
-  const team = ctx.teams[offenseSide];
-  const teamPrep = ctx.preps[offenseSide];
-  const shooter = rng.weightedPickTable(team.players, teamPrep.freeThrowShooterPickTable);
-  const shooterSlot = slotOf(teamPrep, shooter);
-  resolveFreeThrows(ctx, offenseSide, defenseSide, shooterSlot, 1, true, [0, 0], {
-    bonusAttempts: 1,
-  });
 }
 function resolveGrantedFreeThrow(
   ctx: TripContext,

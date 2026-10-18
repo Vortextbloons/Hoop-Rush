@@ -219,12 +219,7 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
       loadCatalogCached(request.catalogUrl, request.catalogHash),
       loadProfileCached(request.profileUrl, request.profileHash),
     ]).then(() => {
-      collectionGameWorkerMessageSchema.parse({
-        wireVersion: COLLECTION_GAME_WORKER_WIRE_VERSION,
-        type: 'collection-game-warm-ack',
-        requestId: request.requestId,
-      });
-      self.postMessage({
+      postWorkerMessage(collectionGameWorkerMessageSchema, {
         wireVersion: COLLECTION_GAME_WORKER_WIRE_VERSION,
         type: 'collection-game-warm-ack',
         requestId: request.requestId,

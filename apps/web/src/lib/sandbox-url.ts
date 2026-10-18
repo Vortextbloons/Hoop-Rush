@@ -62,10 +62,11 @@ export function parseSandboxUrl(
   let seed: Seed | undefined;
   const seedParam = url.searchParams.get('seed');
   if (seedParam !== null) {
-    if (!seedSchema.safeParse(seedParam).success) {
+    const parsedSeed = seedSchema.safeParse(seedParam);
+    if (!parsedSeed.success) {
       return { ok: false, state: null, error: 'The seed in the URL is invalid.' };
     }
-    seed = seedSchema.parse(seedParam);
+    seed = parsedSeed.data;
   }
   if (manifest !== null) {
     for (const slot of slots) {

@@ -52,6 +52,7 @@ import {
   type RoomLogFacts,
 } from '@hoop-rush/engine';
 import { SeriesCoordinator } from '../multiplayer/series-coordinator.ts';
+import { clamp01 } from '../runtime/index.ts';
 import { RoomLifecycle, type RoomAttachment } from '../multiplayer/room-lifecycle.ts';
 import { submitFixedFiveCommand } from './command-submit.ts';
 import { FixedFiveCompetitionFlow } from './competition-flow.ts';
@@ -248,10 +249,6 @@ export interface FixedFiveRoomSessionDeps {
     load(key: string): string | null;
     save(key: string, value: string): void;
   };
-}
-
-function clamp01(value: number): number {
-  return Math.min(1, Math.max(0, value));
 }
 
 function otherParticipant(participantId: FixedFiveParticipantId): FixedFiveParticipantId {
