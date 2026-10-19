@@ -3,10 +3,7 @@ import {
   type CollectionGameWorkerMessage,
 } from '@hoop-rush/data-contracts';
 
-const COLLECTION_GAME_WORKER_URL = new URL(
-  '../../../workers/collection-game-worker.ts',
-  import.meta.url,
-);
+import COLLECTION_GAME_WORKER_URL from '../../../workers/collection-game-worker.ts?worker&url';
 
 export interface CollectionWorkerRunOptions<TResult> {
   request: unknown;

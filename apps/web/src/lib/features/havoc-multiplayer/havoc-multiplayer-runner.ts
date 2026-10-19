@@ -11,6 +11,7 @@ import {
   OneShotWorkerRunner,
   type OneShotWorkerErrorMessages,
 } from '#lib/workers/one-shot-worker.js';
+import workerUrl from '../../../workers/havoc-multiplayer-worker.ts?worker&url';
 
 export interface HavocMultiplayerRunnerInput {
   roomId: string;
@@ -23,10 +24,7 @@ export interface HavocMultiplayerRunnerOptions {
   createWorker?: (url: URL) => Worker;
 }
 
-const HAVOC_MULTIPLAYER_WORKER_URL = new URL(
-  '../../../workers/havoc-multiplayer-worker.ts',
-  import.meta.url,
-);
+const HAVOC_MULTIPLAYER_WORKER_URL = new URL(workerUrl, import.meta.url);
 
 const HAVOC_MULTIPLAYER_RUNNER_ERRORS: OneShotWorkerErrorMessages = {
   superseded: 'the havoc multiplayer run was superseded',

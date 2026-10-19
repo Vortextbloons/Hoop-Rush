@@ -11,6 +11,7 @@ import {
   OneShotWorkerRunner,
   type OneShotWorkerErrorMessages,
 } from '#lib/workers/one-shot-worker.js';
+import workerUrl from '../../../workers/draft-duel-game-worker.ts?worker&url';
 
 export interface DraftDuelRunnerInput {
   roomId: string;
@@ -22,10 +23,7 @@ export interface DraftDuelRunnerOptions {
   createWorker?: (url: URL) => Worker;
 }
 
-const DRAFT_DUEL_WORKER_URL = new URL(
-  '../../../workers/draft-duel-game-worker.ts',
-  import.meta.url,
-);
+const DRAFT_DUEL_WORKER_URL = new URL(workerUrl, import.meta.url);
 
 const DRAFT_DUEL_RUNNER_ERRORS: OneShotWorkerErrorMessages = {
   superseded: 'the draft duel run was superseded',
