@@ -557,7 +557,7 @@
           </button>
         </div>
       </section>
-    {:else if controller.phase === 'broadcasting' && controller.currentOutput && controller.visible}
+    {:else if controller.showingBroadcast && controller.currentOutput && controller.visible}
       <section class="panel broadcast-panel" aria-label="Broadcast">
         <BroadcastView
           output={controller.currentOutput}
@@ -569,22 +569,62 @@
           manifest={controller.assets?.manifest ?? null}
         />
       </section>
-    {:else if controller.phase === 'game-results' && controller.currentOutput && controller.series}
-      <section class="panel" aria-label="Game results">
-        <GameResultsPanel
-          output={controller.currentOutput}
-          series={controller.series}
-          localParticipantId={controller.participantId ?? 'p1'}
-          verification={resultVerification}
-          readyCountdownMs={controller.readyCountdownMs}
-          localReady={controller.localReady}
-          onready={() => controller.readyForNextGame()}
-          awaitingContinue={controller.awaitingContinue}
-          oncontinue={() => controller.continueAfterGame()}
-          cards={playerCards}
-          manifest={controller.assets?.manifest ?? null}
-        />
+    {:else if controller.phase === 'broadcasting'}
+      <section class="panel" aria-label="Broadcast loading">
+        <h2>
+          Preparing Game {controller.currentBroadcast?.gameNumber ??
+            controller.currentGameNumber ??
+            '—'}
+        </h2>
+        <p class="panel-hint" role="status">
+          Both players simulate the game locally. The tape starts as soon as your simulation lands.
+        </p>
+        {#if controller.error}
+          <p class="panel-hint" role="alert">{controller.error}</p>
+          <div class="panel-actions">
+            <button type="button" class="room-secondary" onclick={() => void controller.refresh()}>
+              Retry simulation
+            </button>
+          </div>
+        {/if}
       </section>
+    {:else if controller.phase === 'game-results' && controller.series}
+      {#if controller.currentOutput}
+        <section class="panel" aria-label="Game results">
+          <GameResultsPanel
+            output={controller.currentOutput}
+            series={controller.series}
+            localParticipantId={controller.participantId ?? 'p1'}
+            verification={resultVerification}
+            readyCountdownMs={controller.readyCountdownMs}
+            localReady={controller.localReady}
+            onready={() => controller.readyForNextGame()}
+            awaitingContinue={controller.awaitingContinue}
+            oncontinue={() => controller.continueAfterGame()}
+            cards={playerCards}
+            manifest={controller.assets?.manifest ?? null}
+          />
+        </section>
+      {:else}
+        <section class="panel" aria-label="Game results loading">
+          <h2>Preparing Game {controller.currentGameNumber ?? '—'} results</h2>
+          <p class="panel-hint" role="status">
+            Rebuilding this game from the room's seed and accepted commands.
+          </p>
+          {#if controller.error}
+            <p class="panel-hint" role="alert">{controller.error}</p>
+            <div class="panel-actions">
+              <button
+                type="button"
+                class="room-secondary"
+                onclick={() => void controller.refresh()}
+              >
+                Retry simulation
+              </button>
+            </div>
+          {/if}
+        </section>
+      {/if}
     {:else if controller.phase === 'championship' && controller.series}
       <section class="panel" aria-label="Championship">
         <ChampionshipView

@@ -13,6 +13,7 @@ import type { FixedFiveCompetitionRun, Position } from '@hoop-rush/data-contract
 import { afterEach, assert, describe, expect, it, vi } from 'vitest';
 import {
   commandIdSchema,
+  contentHashSchema,
   defaultFixedFiveVersionLocks,
   franchiseIdSchema,
   playerIdSchema,
@@ -198,6 +199,14 @@ async function flush(): Promise<void> {
   await Promise.resolve();
 }
 
+function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
+  let resolve: (value: T) => void = () => {};
+  const promise = new Promise<T>((settle) => {
+    resolve = settle;
+  });
+  return { promise, resolve };
+}
+
 function sandboxCandidate(index: number): FixedFiveCandidate {
   const playerId = playerIdSchema.parse(`player-${String(index).padStart(2, '0')}`);
   return {
@@ -348,6 +357,288 @@ describe('FixedFiveRoomSession', () => {
     expect(harness.repository.rows.get(0)?.commandId).toBe('cmd-from-p2');
 
     session.dispose();
+  });
+
+  it('recovers commands and readiness after a missed realtime notification', async () => {
+    vi.useFakeTimers();
+    const harness = createHarness();
+    const created = await harness.createRoom({ mode: 'duel', sourceMode: 'classic' });
+    await harness.transport.join(created.code);
+    await fillDuelDraft(harness.transport, created.snapshot.roomId);
+    vi.spyOn(harness.transport, 'subscribe').mockReturnValue({ unsubscribe: () => {} });
+    const session = harness.session();
+    try {
+      await session.start();
+      expect(session.getSnapshot().opponentReady).toBe(false);
+      const receipt = await harness.transport.submitCommand({
+        schemaVersion: 1,
+        roomId: created.snapshot.roomId,
+        commandId: commandIdSchema.parse('missed-ready'),
+        actorParticipantId: 'p2',
+        payload: { kind: 'ready-next-game', gameNumber: 1, ready: true },
+      });
+      expect(receipt.accepted).toBe(true);
+
+      await vi.advanceTimersByTimeAsync(15_000);
+
+      const state = session.getSnapshot();
+      expect(state.commands.some((command) => command.commandId === 'missed-ready')).toBe(true);
+      expect(state.opponentReady).toBe(true);
+      expect(
+        state.room?.members.find((member) => member.participantId === 'p2')?.nextGameReady,
+      ).toBe(1);
+    } finally {
+      session.dispose();
+    }
+  });
+
+  it('recovers room state on focus after a missed realtime notification', async () => {
+    const handlers = new Map<string, () => void>();
+    vi.stubGlobal('window', {
+      addEventListener: (type: string, handler: () => void) => {
+        handlers.set(type, handler);
+      },
+      removeEventListener: (type: string) => {
+        handlers.delete(type);
+      },
+    });
+    const harness = createHarness();
+    const created = await harness.createRoom({ mode: 'duel', sourceMode: 'classic' });
+    await harness.transport.join(created.code);
+    await fillDuelDraft(harness.transport, created.snapshot.roomId);
+    vi.spyOn(harness.transport, 'subscribe').mockReturnValue({ unsubscribe: () => {} });
+    const session = harness.session();
+    try {
+      await session.start();
+      const receipt = await harness.transport.submitCommand({
+        schemaVersion: 1,
+        roomId: created.snapshot.roomId,
+        commandId: commandIdSchema.parse('wake-ready'),
+        actorParticipantId: 'p2',
+        payload: { kind: 'ready-next-game', gameNumber: 1, ready: true },
+      });
+      expect(receipt.accepted).toBe(true);
+
+      handlers.get('focus')?.();
+
+      await vi.waitFor(() => {
+        expect(session.getSnapshot().commands.some((c) => c.commandId === 'wake-ready')).toBe(true);
+        expect(session.getSnapshot().opponentReady).toBe(true);
+      });
+      expect(session.getSnapshot().reconnecting).toBe(false);
+    } finally {
+      session.dispose();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('recomputes phase from an authoritative snapshot with no new commands', async () => {
+    vi.useFakeTimers();
+    const harness = createHarness();
+    const created = await harness.createRoom({ mode: 'duel', sourceMode: 'classic' });
+    await harness.transport.join(created.code);
+    await fillDuelDraft(harness.transport, created.snapshot.roomId);
+    vi.spyOn(harness.transport, 'subscribe').mockReturnValue({ unsubscribe: () => {} });
+    const session = harness.session();
+    try {
+      await session.start();
+      const roomId = created.snapshot.roomId;
+      for (const [commandId, actor, payload] of [
+        ['phase-ready-p1', 'p1', { kind: 'ready-next-game', gameNumber: 1, ready: true }],
+        ['phase-ready-p2', 'p2', { kind: 'ready-next-game', gameNumber: 1, ready: true }],
+        ['phase-broadcast', 'p1', { kind: 'broadcast-start', gameNumber: 1 }],
+      ] as const) {
+        const receipt = await harness.transport.submitCommand({
+          schemaVersion: 1,
+          roomId,
+          commandId: commandIdSchema.parse(commandId),
+          actorParticipantId: actor,
+          payload,
+        });
+        expect(receipt.accepted).toBe(true);
+      }
+      const realSnapshot = harness.transport.snapshot.bind(harness.transport);
+      const authoritative = await realSnapshot(roomId);
+      expect(authoritative.phase).toBe('broadcasting');
+      const commandCount = session.getSnapshot().commands.length;
+      vi.spyOn(harness.transport, 'refetch').mockResolvedValue([]);
+      const snapshot = vi.spyOn(harness.transport, 'snapshot').mockResolvedValue(authoritative);
+
+      await vi.advanceTimersByTimeAsync(15_000);
+
+      let state = session.getSnapshot();
+      expect(state.phase).toBe('broadcasting');
+      expect(state.room?.broadcast?.gameNumber).toBe(1);
+      expect(state.commands).toHaveLength(commandCount);
+
+      const digest = contentHashSchema.parse('d'.repeat(64));
+      for (const [commandId, actor, payload] of [
+        [
+          'phase-propose-p1',
+          'p1',
+          {
+            kind: 'propose-game-result',
+            gameNumber: 1,
+            winner: 'p1',
+            resultDigest: digest,
+            tapeDigest: digest,
+            inputDigest: digest,
+          },
+        ],
+        [
+          'phase-propose-p2',
+          'p2',
+          {
+            kind: 'propose-game-result',
+            gameNumber: 1,
+            winner: 'p1',
+            resultDigest: digest,
+            tapeDigest: digest,
+            inputDigest: digest,
+          },
+        ],
+        [
+          'phase-confirm-p1',
+          'p1',
+          { kind: 'confirm-game-result', gameNumber: 1, resultDigest: digest, verified: true },
+        ],
+        [
+          'phase-confirm-p2',
+          'p2',
+          { kind: 'confirm-game-result', gameNumber: 1, resultDigest: digest, verified: true },
+        ],
+      ] as const) {
+        const receipt = await harness.transport.submitCommand({
+          schemaVersion: 1,
+          roomId,
+          commandId: commandIdSchema.parse(commandId),
+          actorParticipantId: actor,
+          payload,
+        });
+        expect(receipt.accepted).toBe(true);
+      }
+      const advanced = await realSnapshot(roomId);
+      expect(advanced.series?.currentGameNumber).toBe(2);
+      snapshot.mockResolvedValue(advanced);
+
+      await vi.advanceTimersByTimeAsync(15_000);
+
+      state = session.getSnapshot();
+      expect(state.phase).toBe('preparing-game');
+      expect(state.room?.series?.currentGameNumber).toBe(2);
+      expect(state.commands).toHaveLength(commandCount);
+    } finally {
+      session.dispose();
+    }
+  });
+
+  it('reconciles commands accepted between snapshot and log reads without realtime', async () => {
+    const harness = createHarness();
+    const created = await harness.createRoom();
+    await harness.transport.join(created.code);
+    vi.spyOn(harness.transport, 'subscribe').mockReturnValue({ unsubscribe: () => {} });
+    const session = harness.session();
+    try {
+      await session.start();
+      const readSnapshot = harness.transport.snapshot.bind(harness.transport);
+      vi.spyOn(harness.transport, 'snapshot').mockImplementationOnce(async (roomId) => {
+        const snapshot = await readSnapshot(roomId);
+        await harness.transport.submitCommand({
+          schemaVersion: 1,
+          roomId: created.snapshot.roomId,
+          commandId: commandIdSchema.parse('between-reads'),
+          actorParticipantId: 'p1',
+          payload: { kind: 'start' },
+        });
+        return snapshot;
+      });
+      const updates: FixedFiveRoomSessionSnapshot[] = [];
+      session.subscribe((state) => updates.push(state));
+      await session.refresh();
+      const state = session.getSnapshot();
+      expect(state.commands).toHaveLength(1);
+      expect(state.room?.phase).toBe('drafting');
+      expect(updates.every((update) => update.room?.commandCount === update.commands.length)).toBe(
+        true,
+      );
+    } finally {
+      session.dispose();
+    }
+  });
+
+  it('keeps realtime snapshots private until their commands have been fetched', async () => {
+    const harness = createHarness();
+    const created = await harness.createRoom();
+    await harness.transport.join(created.code);
+    const session = harness.session();
+    try {
+      await session.start();
+      const updates: FixedFiveRoomSessionSnapshot[] = [];
+      session.subscribe((state) => updates.push(state));
+      const receipt = await harness.transport.submitCommand({
+        schemaVersion: 1,
+        roomId: created.snapshot.roomId,
+        commandId: commandIdSchema.parse('coherent-ready'),
+        actorParticipantId: 'p2',
+        payload: { kind: 'ready', ready: true },
+      });
+      expect(receipt.accepted).toBe(true);
+      await session.refresh();
+      expect(session.getSnapshot().commands).toHaveLength(1);
+      expect(
+        updates.every((state) => (state.room?.commandCount ?? 0) <= state.commands.length),
+      ).toBe(true);
+    } finally {
+      session.dispose();
+    }
+  });
+
+  it('coalesces overlapping syncs and publishes snapshot and commands together', async () => {
+    const harness = createHarness();
+    const created = await harness.createRoom();
+    await harness.transport.join(created.code);
+    vi.spyOn(harness.transport, 'subscribe').mockReturnValue({ unsubscribe: () => {} });
+    const session = harness.session();
+    try {
+      await session.start();
+      const roomId = created.snapshot.roomId;
+      const receipt = await harness.transport.submitCommand({
+        schemaVersion: 1,
+        roomId,
+        commandId: commandIdSchema.parse('concurrent-ready'),
+        actorParticipantId: 'p2',
+        payload: { kind: 'ready', ready: true },
+      });
+      expect(receipt.accepted).toBe(true);
+      const realSnapshot = harness.transport.snapshot.bind(harness.transport);
+      const authoritative = await realSnapshot(roomId);
+      const pending = deferred<FixedFiveRoomSnapshot>();
+      const snapshot = vi
+        .spyOn(harness.transport, 'snapshot')
+        .mockImplementationOnce(() => pending.promise)
+        .mockImplementation(realSnapshot);
+      const refetch = vi.spyOn(harness.transport, 'refetch');
+
+      const first = session.refresh();
+      await vi.waitFor(() => {
+        expect(snapshot).toHaveBeenCalledTimes(1);
+      });
+      const second = session.refresh();
+      await flush();
+      expect(snapshot).toHaveBeenCalledTimes(1);
+      expect(refetch).not.toHaveBeenCalled();
+
+      pending.resolve(authoritative);
+      await Promise.all([first, second]);
+
+      expect(refetch).toHaveBeenCalledTimes(2);
+      expect(snapshot).toHaveBeenCalledTimes(2);
+      const state = session.getSnapshot();
+      expect(state.commands.some((command) => command.commandId === 'concurrent-ready')).toBe(true);
+      expect(state.room?.revision).toBe(authoritative.revision);
+    } finally {
+      session.dispose();
+    }
   });
 
   it('removes the guest seat and leaves the room through the transport', async () => {
@@ -602,5 +893,130 @@ describe('FixedFiveRoomSession', () => {
     expect(state.awaitingContinue).toBe(false);
 
     session.dispose();
+  });
+
+  it('keeps partial playback through repeated peer results snapshots', async () => {
+    const harness = createHarness();
+    const created = await harness.createRoom({ mode: 'duel', sourceMode: 'classic' });
+    await harness.transport.join(created.code);
+    await fillDuelDraft(harness.transport, created.snapshot.roomId);
+    const session = harness.session();
+    try {
+      await session.start();
+      await session.readyForNextGame();
+      const roomId = created.snapshot.roomId;
+      const submit = (commandId: string, payload: FixedFiveCommandPayload) =>
+        harness.transport.submitCommand({
+          schemaVersion: 1,
+          roomId,
+          commandId: commandIdSchema.parse(commandId),
+          actorParticipantId: 'p2',
+          payload,
+        });
+      await submit('peer-first-ready', { kind: 'ready-next-game', gameNumber: 1, ready: true });
+      await session.startBroadcast();
+      session.beginPlayback();
+      session.advancePlayback(5000);
+      const digest = contentHashSchema.parse('c'.repeat(64));
+      await submit('peer-first-proposal', {
+        kind: 'propose-game-result',
+        gameNumber: 1,
+        winner: 'p1',
+        resultDigest: digest,
+        tapeDigest: digest,
+        inputDigest: digest,
+      });
+      await session.refresh();
+      await session.refresh();
+      expect(session.getSnapshot().phase).toBe('game-results');
+      expect(session.getSnapshot().broadcastProgress).toBe(0.5);
+      expect(session.getSnapshot().duelRecapGame).toBeNull();
+      session.advancePlayback(5000);
+      expect(session.getSnapshot().awaitingContinue).toBe(true);
+      session.continueAfterGame();
+      expect(session.getSnapshot().awaitingContinue).toBe(false);
+      for (const actor of ['p1', 'p2'] as const) {
+        const receipt = await harness.transport.submitCommand({
+          schemaVersion: 1,
+          roomId,
+          commandId: commandIdSchema.parse(`peer-first-confirm-${actor}`),
+          actorParticipantId: actor,
+          payload: {
+            kind: 'confirm-game-result',
+            gameNumber: 1,
+            resultDigest: digest,
+            verified: true,
+          },
+        });
+        expect(receipt.accepted).toBe(true);
+      }
+      await session.refresh();
+      await waitFor(() => session.getSnapshot().localReady);
+      expect(session.getSnapshot().room?.series?.currentGameNumber).toBe(2);
+      const commands = await harness.transport.refetch(roomId, -1);
+      expect(
+        commands.filter(
+          (command) =>
+            command.actorParticipantId === 'p1' &&
+            command.payload.kind === 'ready-next-game' &&
+            command.payload.gameNumber === 2,
+        ),
+      ).toHaveLength(1);
+    } finally {
+      session.dispose();
+    }
+  });
+
+  it('completes an elapsed broadcast on late reconnect so the review is not skipped', async () => {
+    const harness = createHarness();
+    const created = await harness.createRoom({ mode: 'duel', sourceMode: 'classic' });
+    await harness.transport.join(created.code);
+    await fillDuelDraft(harness.transport, created.snapshot.roomId);
+    const roomId = created.snapshot.roomId;
+    const submit = (commandId: string, actor: 'p1' | 'p2', payload: FixedFiveCommandPayload) =>
+      harness.transport.submitCommand({
+        schemaVersion: 1,
+        roomId,
+        commandId: commandIdSchema.parse(commandId),
+        actorParticipantId: actor,
+        payload,
+      });
+    for (const [commandId, actor, payload] of [
+      ['late-ready-p1', 'p1', { kind: 'ready-next-game', gameNumber: 1, ready: true }],
+      ['late-ready-p2', 'p2', { kind: 'ready-next-game', gameNumber: 1, ready: true }],
+      ['late-broadcast', 'p1', { kind: 'broadcast-start', gameNumber: 1 }],
+    ] as const) {
+      const receipt = await submit(commandId, actor, payload);
+      expect(receipt.accepted).toBe(true);
+    }
+    const digest = contentHashSchema.parse('c'.repeat(64));
+    const proposal = await submit('late-propose', 'p2', {
+      kind: 'propose-game-result',
+      gameNumber: 1,
+      winner: 'p1',
+      resultDigest: digest,
+      tapeDigest: digest,
+      inputDigest: digest,
+    });
+    expect(proposal.accepted).toBe(true);
+
+    let now = 1_700_000_000_000;
+    harness.deps.now = () => now;
+    const authoritative = await harness.transport.snapshot(roomId);
+    expect(authoritative.phase).toBe('game-results');
+    now = Date.parse(authoritative.broadcast?.startedAtIso ?? '') + 10_000;
+    vi.spyOn(harness.transport, 'subscribe').mockReturnValue({ unsubscribe: () => {} });
+
+    const session = harness.session();
+    try {
+      await session.start();
+      const state = session.getSnapshot();
+      expect(state.phase).toBe('game-results');
+      expect(state.broadcastProgress).toBe(1);
+      expect(state.duelRecapGame).toBe(1);
+      expect(state.awaitingContinue).toBe(true);
+    } finally {
+      session.dispose();
+    }
   });
 });

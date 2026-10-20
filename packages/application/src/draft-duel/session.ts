@@ -230,6 +230,9 @@ export class DraftDuelSession {
   private deadlineResolving = false;
   private deadlineRetryAtMs = 0;
   private rematchRetryAtMs = 0;
+  private pendingReadyGame: number | null = null;
+  private pendingReadyRetryAtMs = 0;
+  private seenBroadcastGame: number | null = null;
   private completedPersisted = false;
   private disposed = false;
   private roomId: Id | null = null;
@@ -308,6 +311,9 @@ export class DraftDuelSession {
     this.deadlineResolving = false;
     this.deadlineRetryAtMs = 0;
     this.rematchRetryAtMs = 0;
+    this.pendingReadyGame = null;
+    this.pendingReadyRetryAtMs = 0;
+    this.seenBroadcastGame = null;
     this.roomId = idSchema.parse(roomId);
     try {
       await this.loadAssets();
@@ -343,9 +349,8 @@ export class DraftDuelSession {
       }
       this.lifecycle.track(
         attachment,
-        this.deps.transport.subscribe(roomId, (snapshot) => {
+        this.deps.transport.subscribe(roomId, () => {
           if (!attachment.current()) return;
-          this.applySnapshot(snapshot);
           void this.syncFromServer();
         }).unsubscribe,
       );
@@ -492,6 +497,7 @@ export class DraftDuelSession {
   }
 
   async readyForNextGame(): Promise<void> {
+    if (this.phase() !== 'lineup-showdown' && this.phase() !== 'preparing-game') return;
     const gameNumber = this.currentGameNumber();
     if (gameNumber === null) return;
     await this.submit({ kind: 'ready-next-game', gameNumber, ready: true });
@@ -611,6 +617,9 @@ export class DraftDuelSession {
     const output = this.currentOutput();
     if (!output) return;
     this.seriesFlow.playback.approve(output.gameNumber);
+    this.pendingReadyGame = output.gameNumber + 1;
+    this.pendingReadyRetryAtMs = 0;
+    this.maybeReadyNextGame();
     this.maybeProposeOrConfirm();
   }
 
@@ -717,18 +726,27 @@ export class DraftDuelSession {
     }
   }
 
-  private applySnapshot(snapshot: DraftDuelRoomSnapshot): void {
+  private applySnapshot(snapshot: DraftDuelRoomSnapshot, publish = true): void {
     if (
       this.disposed ||
       snapshot.roomId !== this.roomId ||
       (this.snapshot && snapshot.revision < this.snapshot.revision)
     )
       return;
+    const broadcastGame = snapshot.broadcast?.gameNumber ?? null;
+    const resumedAtResults =
+      snapshot.phase === 'game-results' &&
+      broadcastGame !== null &&
+      this.seenBroadcastGame !== broadcastGame;
     this.snapshot = snapshot;
-    if (this.seriesFlow.observe(snapshot.phase, snapshot.broadcast?.gameNumber ?? null)) {
+    if (this.seriesFlow.observe(snapshot.phase, broadcastGame)) {
       this.progress = 0;
     }
-    this.publish();
+    if (broadcastGame !== null) this.seenBroadcastGame = broadcastGame;
+    if (resumedAtResults) {
+      this.seriesFlow.playback.resumeReview(this.deps.now());
+    }
+    if (publish) this.publish();
   }
 
   private startTimers(): void {
@@ -739,6 +757,7 @@ export class DraftDuelSession {
     if (this.disposed || this.busy) return;
     if (this.shouldCreateRematch()) void this.syncFromServer();
     this.maybeProposeOrConfirm();
+    this.maybeReadyNextGame();
     const deadline = this.snapshot?.deadline;
     if (
       this.phase() === 'drafting' &&
@@ -838,6 +857,7 @@ export class DraftDuelSession {
       if (attachment.current()) {
         this.busy = false;
         this.maybeProposeOrConfirm();
+        this.maybeReadyNextGame();
         this.publish();
       }
     }
@@ -859,14 +879,19 @@ export class DraftDuelSession {
       if (isDisposed()) return;
       this.lifecycle.connected(attachment);
       this.error = null;
-      this.applySnapshot(resumed.snapshot);
       const commands = await this.deps.transport.refetch(roomId, -1);
       if (isDisposed()) return;
+      if (commands.length > resumed.snapshot.commandCount) {
+        void this.syncFromServer();
+        return;
+      }
       if (this.snapshot && resumed.snapshot.revision < this.snapshot.revision) {
         void this.syncFromServer();
         return;
       }
       this.commands = commands;
+      this.applySnapshot(resumed.snapshot, false);
+      this.rebuildDraft();
       if (this.shouldCreateRematch()) {
         this.rematchRetryAtMs = this.deps.now() + AUTO_START_RETRY_MS;
         await this.deps.transport.rematch(roomId);
@@ -876,10 +901,10 @@ export class DraftDuelSession {
       }
       await this.deps.repository.appendCommands(roomId, commands);
       if (isDisposed()) return;
-      this.rebuildDraft();
       await this.ensureGamePipeline();
       if (isDisposed()) return;
       this.maybeProposeOrConfirm();
+      this.maybeReadyNextGame();
       await this.persistActive();
       this.publish();
     } catch (error) {
@@ -936,7 +961,13 @@ export class DraftDuelSession {
     if (!snapshot || !series || !this.assets || !this.roomId) return;
     const gameNumber = series.currentGameNumber;
     if (gameNumber === null) return;
-    if (snapshot.phase !== 'preparing-game' && snapshot.phase !== 'broadcasting') return;
+    if (
+      snapshot.phase !== 'preparing-game' &&
+      snapshot.phase !== 'broadcasting' &&
+      snapshot.phase !== 'game-results'
+    ) {
+      return;
+    }
     if (this.outputs[gameNumber] || this.seriesFlow.jobs.has(gameNumber)) return;
     try {
       await this.seriesFlow.runGame(
@@ -1028,6 +1059,33 @@ export class DraftDuelSession {
     return !this.continueApproved(gameNumber);
   }
 
+  private maybeReadyNextGame(): void {
+    const target = this.pendingReadyGame;
+    if (target === null || this.disposed || this.busy) return;
+    const phase = this.phase();
+    if (phase === 'championship' || phase === 'integrity-failed' || phase === 'expired') {
+      this.pendingReadyGame = null;
+      return;
+    }
+    if (phase !== 'preparing-game') return;
+    const current = this.currentGameNumber();
+    if (current === null) {
+      this.pendingReadyGame = null;
+      return;
+    }
+    if (current !== target) {
+      if (current > target) this.pendingReadyGame = null;
+      return;
+    }
+    if (this.localReady()) {
+      this.pendingReadyGame = null;
+      return;
+    }
+    if (this.deps.now() < this.pendingReadyRetryAtMs) return;
+    this.pendingReadyRetryAtMs = this.deps.now() + AUTO_START_RETRY_MS;
+    void this.readyForNextGame();
+  }
+
   private maybeProposeOrConfirm(): void {
     const attachment = this.attachment;
     if (!attachment?.current() || this.busy) return;
@@ -1035,7 +1093,7 @@ export class DraftDuelSession {
     const output = this.currentOutput();
     if (!snapshot || !output || !this.participantId) return;
     if (snapshot.phase !== 'broadcasting' && snapshot.phase !== 'game-results') return;
-    if (this.progress < 1 && snapshot.phase === 'broadcasting') return;
+    if (this.progress < 1) return;
     const gameNumber = output.gameNumber;
     const { byParticipant } = this.proposalOf(gameNumber);
     const roomId = attachment.roomId;

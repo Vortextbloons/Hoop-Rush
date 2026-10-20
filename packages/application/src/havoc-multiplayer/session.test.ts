@@ -896,6 +896,7 @@ describe('HavocMultiplayerSession draft and series', () => {
     const viewB = sessionB.getSnapshot();
     expect(viewB.phase).toBe('game-results');
     expect(viewB.outputs[gameNumber]?.resultDigest).toBe(output.resultDigest);
+    expect(viewB.awaitingContinue).toBe(true);
     expect(
       viewB.commands.some(
         (command) =>

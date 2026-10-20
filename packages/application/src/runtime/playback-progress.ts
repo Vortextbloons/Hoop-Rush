@@ -32,9 +32,16 @@ export class PlaybackProgress {
     this.approvedGame = gameNumber;
   }
 
+  resumeReview(nowMs: number): void {
+    if (this.completedAtMs === null) {
+      this.completedAtMs = nowMs;
+      this.approvedGame = null;
+    }
+  }
+
   continueApproved(gameNumber: number, holdMs: number, nowMs: number): boolean {
     if (this.approvedGame === gameNumber) return true;
-    if (this.completedAtMs === null) return true;
+    if (this.completedAtMs === null) return false;
     return nowMs - this.completedAtMs >= holdMs;
   }
 

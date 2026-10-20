@@ -164,8 +164,8 @@
         rows: playerRowsOf(lines, ids),
       };
     });
-    const best = Math.max(0, ...panels.flatMap((panel) => panel.rows.map((row) => row.points)));
     for (const panel of panels) {
+      const best = Math.max(0, ...panel.rows.map((row) => row.points));
       for (const row of panel.rows) row.hot = best > 0 && row.points === best;
     }
     return panels;

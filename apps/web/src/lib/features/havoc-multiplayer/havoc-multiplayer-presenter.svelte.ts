@@ -113,6 +113,11 @@ export class HavocMultiplayerPresenter {
     this.currentGameNumber !== null ? (this.outputs[this.currentGameNumber] ?? null) : null,
   );
   currentBroadcast = $derived(this.snapshot?.broadcast ?? null);
+  showingBroadcast = $derived(
+    this.currentOutput !== null &&
+      this.currentBroadcast !== null &&
+      (this.phase === 'broadcasting' || (this.phase === 'game-results' && this.progress < 1)),
+  );
   playbackItems = $derived(
     this.currentOutput ? havocMultiplayerPlaybackItems(this.currentOutput.tape) : [],
   );
@@ -282,19 +287,20 @@ export class HavocMultiplayerPresenter {
     if (broadcastGame !== null && broadcastGame !== previousBroadcastGame) {
       this.startPlayback();
     }
-    if (view.snapshot?.phase !== 'broadcasting' && this.rafId !== null) {
+    if (view.snapshot?.broadcast == null && this.rafId !== null) {
       cancelAnimationFrame(this.rafId);
       this.rafId = null;
     }
   }
 
   private startPlayback(): void {
-    if (this.rafId !== null || this.disposed) return;
+    if (this.disposed) return;
     if (!this.currentBroadcast) return;
-    this.session.beginPlayback();
     this.playbackLastFrameMs = null;
+    if (this.rafId !== null) return;
+    this.session.beginPlayback();
     const loop = () => {
-      if (this.disposed || this.phase !== 'broadcasting') {
+      if (this.disposed || !this.currentBroadcast) {
         this.rafId = null;
         return;
       }

@@ -288,6 +288,9 @@ export class HavocMultiplayerSession {
   private deadlineResolving = false;
   private deadlineRetryAtMs = 0;
   private rematchRetryAtMs = 0;
+  private pendingReadyGame: number | null = null;
+  private pendingReadyRetryAtMs = 0;
+  private seenBroadcastGame: number | null = null;
   private completedPersisted = false;
   private disposed = false;
   private roomId: Id | null = null;
@@ -378,6 +381,9 @@ export class HavocMultiplayerSession {
     this.deadlineResolving = false;
     this.deadlineRetryAtMs = 0;
     this.rematchRetryAtMs = 0;
+    this.pendingReadyGame = null;
+    this.pendingReadyRetryAtMs = 0;
+    this.seenBroadcastGame = null;
     this.challenge = null;
     this.roomId = idSchema.parse(roomId);
     try {
@@ -418,9 +424,8 @@ export class HavocMultiplayerSession {
       }
       this.lifecycle.track(
         attachment,
-        this.deps.transport.subscribe(roomId, (snapshot) => {
+        this.deps.transport.subscribe(roomId, () => {
           if (!attachment.current()) return;
-          this.applySnapshot(snapshot);
           void this.syncFromServer();
         }).unsubscribe,
       );
@@ -548,6 +553,7 @@ export class HavocMultiplayerSession {
   }
 
   async readyForNextGame(): Promise<void> {
+    if (this.phase() !== 'lineup-showdown' && this.phase() !== 'preparing-game') return;
     const gameNumber = this.currentGameNumber();
     if (gameNumber === null) return;
     await this.submit({ kind: 'ready-next-game', gameNumber });
@@ -663,6 +669,9 @@ export class HavocMultiplayerSession {
     const output = this.currentOutput();
     if (!output) return;
     this.seriesFlow.playback.approve(output.gameNumber);
+    this.pendingReadyGame = output.gameNumber + 1;
+    this.pendingReadyRetryAtMs = 0;
+    this.maybeReadyNextGame();
     this.maybeProposeOrConfirm();
   }
 
@@ -789,21 +798,30 @@ export class HavocMultiplayerSession {
     return matches;
   }
 
-  private applySnapshot(snapshot: HavocMultiplayerRoomSnapshot): void {
+  private applySnapshot(snapshot: HavocMultiplayerRoomSnapshot, publish = true): void {
     if (
       this.disposed ||
       snapshot.roomId !== this.roomId ||
       (this.snapshot && snapshot.revision < this.snapshot.revision)
     )
       return;
+    const broadcastGame = snapshot.broadcast?.gameNumber ?? null;
+    const resumedAtResults =
+      snapshot.phase === 'game-results' &&
+      broadcastGame !== null &&
+      this.seenBroadcastGame !== broadcastGame;
     this.snapshot = snapshot;
-    if (this.seriesFlow.observe(snapshot.phase, snapshot.broadcast?.gameNumber ?? null)) {
+    if (this.seriesFlow.observe(snapshot.phase, broadcastGame)) {
       this.progress = 0;
+    }
+    if (broadcastGame !== null) this.seenBroadcastGame = broadcastGame;
+    if (resumedAtResults) {
+      this.seriesFlow.playback.resumeReview(this.deps.now());
     }
     if (snapshot.phase === 'integrity-failed') {
       this.integrityFailed = true;
     }
-    this.publish();
+    if (publish) this.publish();
   }
 
   private startTimers(): void {
@@ -814,6 +832,7 @@ export class HavocMultiplayerSession {
     if (this.disposed || this.busy) return;
     if (this.shouldCreateRematch()) void this.syncFromServer();
     this.maybeProposeOrConfirm();
+    this.maybeReadyNextGame();
     const deadline = this.snapshot?.deadline;
     if (
       this.phase() === 'drafting' &&
@@ -916,6 +935,7 @@ export class HavocMultiplayerSession {
       if (attachment.current()) {
         this.busy = false;
         this.maybeProposeOrConfirm();
+        this.maybeReadyNextGame();
         this.publish();
       }
     }
@@ -937,15 +957,22 @@ export class HavocMultiplayerSession {
       if (isDisposed()) return;
       this.lifecycle.connected(attachment);
       this.error = null;
-      this.applySnapshot(resumed.snapshot);
-      if (!this.assertRoomVersions()) return;
       const commands = await this.deps.transport.refetch(roomId, -1);
       if (isDisposed()) return;
+      const latest = await this.deps.transport.resume(roomId);
+      if (isDisposed()) return;
+      if (latest.snapshot.revision !== resumed.snapshot.revision) {
+        void this.syncFromServer();
+        return;
+      }
       if (this.snapshot && resumed.snapshot.revision < this.snapshot.revision) {
         void this.syncFromServer();
         return;
       }
       this.commands = commands;
+      this.applySnapshot(resumed.snapshot, false);
+      if (!this.assertRoomVersions()) return;
+      if (!this.completedPersisted) this.rebuildDraft();
       if (this.shouldCreateRematch()) {
         this.rematchRetryAtMs = this.deps.now() + AUTO_START_RETRY_MS;
         await this.deps.transport.rematch(roomId);
@@ -959,13 +986,13 @@ export class HavocMultiplayerSession {
           commands.map((command, ordinal) => ({ ordinal, command })),
         );
         if (isDisposed()) return;
-        this.rebuildDraft();
         await this.ensureGamePipeline();
         if (isDisposed()) return;
         await this.persistActive();
       }
       if (isDisposed()) return;
       this.maybeProposeOrConfirm();
+      this.maybeReadyNextGame();
       this.publish();
     } catch (error) {
       if (isDisposed()) return;
@@ -1162,6 +1189,33 @@ export class HavocMultiplayerSession {
     return !this.continueApproved(output.gameNumber);
   }
 
+  private maybeReadyNextGame(): void {
+    const target = this.pendingReadyGame;
+    if (target === null || this.disposed || this.busy) return;
+    const phase = this.phase();
+    if (phase === 'championship' || phase === 'integrity-failed' || phase === 'expired') {
+      this.pendingReadyGame = null;
+      return;
+    }
+    if (phase !== 'preparing-game') return;
+    const current = this.currentGameNumber();
+    if (current === null) {
+      this.pendingReadyGame = null;
+      return;
+    }
+    if (current !== target) {
+      if (current > target) this.pendingReadyGame = null;
+      return;
+    }
+    if (this.localReady()) {
+      this.pendingReadyGame = null;
+      return;
+    }
+    if (this.deps.now() < this.pendingReadyRetryAtMs) return;
+    this.pendingReadyRetryAtMs = this.deps.now() + AUTO_START_RETRY_MS;
+    void this.readyForNextGame();
+  }
+
   private maybeProposeOrConfirm(): void {
     const attachment = this.attachment;
     if (!attachment?.current() || this.busy) return;
@@ -1169,7 +1223,7 @@ export class HavocMultiplayerSession {
     const output = this.currentOutput();
     if (!snapshot || !output || !this.participantId) return;
     if (snapshot.phase !== 'broadcasting' && snapshot.phase !== 'game-results') return;
-    if (this.progress < 1 && snapshot.phase === 'broadcasting') return;
+    if (this.progress < 1) return;
     const gameNumber = output.gameNumber;
     const { byParticipant } = this.proposalOf(gameNumber);
     const roomId = attachment.roomId;

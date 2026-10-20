@@ -52,7 +52,7 @@ import {
   type RoomLogFacts,
 } from '@hoop-rush/engine';
 import { SeriesCoordinator } from '../multiplayer/series-coordinator.ts';
-import { clamp01 } from '../runtime/index.ts';
+import { clamp01, CoalescedTask } from '../runtime/index.ts';
 import { RoomLifecycle, type RoomAttachment } from '../multiplayer/room-lifecycle.ts';
 import { submitFixedFiveCommand } from './command-submit.ts';
 import { FixedFiveCompetitionFlow } from './competition-flow.ts';
@@ -306,6 +306,9 @@ export class FixedFiveRoomSession {
   private unsubscribeTransport: (() => void) | null = null;
   private resyncTimer: ReturnType<typeof setInterval> | null = null;
   private clockTimer: ReturnType<typeof setInterval> | null = null;
+  private readonly reconcileTask = new CoalescedTask(() => this.reconcile());
+  private pendingReadyGame: number | null = null;
+  private pendingReadyRetryAtMs = 0;
   private readonly wakeHandler = (): void => {
     this.wake();
   };
@@ -330,7 +333,7 @@ export class FixedFiveRoomSession {
       resetVerification: () => {
         this.verification.resetResult();
       },
-      sync: () => this.sync(this.lastOrdinal),
+      sync: () => this.sync(),
     });
     this.verification = new FixedFiveVerificationFlow(deps, {
       context: () => ({
@@ -345,7 +348,7 @@ export class FixedFiveRoomSession {
       runAutoFlows: () => {
         this.runAutoFlows();
       },
-      sync: () => this.sync(this.lastOrdinal),
+      sync: () => this.sync(),
       rerunSimulation: () => this.competition.rerun(),
       setBusyAction: (action) => {
         this.busyAction = action;
@@ -418,7 +421,8 @@ export class FixedFiveRoomSession {
     this.resyncTimer = setInterval(() => {
       void this.deps.transport
         .resolveTimeout(this.roomId)
-        .then(() => this.sync(this.lastOrdinal))
+        .catch(() => null)
+        .then(() => this.sync())
         .catch(() => {});
     }, RESYNC_INTERVAL_MS);
     this.clockTimer = setInterval(() => {
@@ -479,7 +483,7 @@ export class FixedFiveRoomSession {
   }
 
   async refresh(): Promise<void> {
-    await this.sync(this.lastOrdinal);
+    await this.sync();
   }
 
   async startDraft(): Promise<void> {
@@ -645,7 +649,7 @@ export class FixedFiveRoomSession {
   }
 
   async readyForNextGame(): Promise<void> {
-    if (!this.isDuelBroadcast()) return;
+    if (!this.isDuelBroadcast() || this.room?.phase !== 'preparing-game') return;
     const gameNumber = this.duelCurrentGameNumber();
     if (gameNumber === null) return;
     await this.sendCommand({ kind: 'ready-next-game', gameNumber, ready: true }, { quiet: true });
@@ -695,6 +699,8 @@ export class FixedFiveRoomSession {
     const gameNumber = this.duelRecapGame ?? this.duelCurrentGameNumber();
     if (gameNumber === null) return;
     this.seriesFlow.playback.approve(gameNumber);
+    this.pendingReadyGame = gameNumber + 1;
+    this.pendingReadyRetryAtMs = 0;
     this.publish();
     this.maybeProposeOrConfirmGame();
   }
@@ -821,7 +827,7 @@ export class FixedFiveRoomSession {
     if (this.isDisposed()) return;
     this.reconnecting = true;
     this.publish();
-    void this.sync(this.lastOrdinal)
+    void this.sync()
       .then(() => {
         if (this.isDisposed()) return;
         if (this.error === null) this.setNotice('Back in sync with the room.');
@@ -867,21 +873,18 @@ export class FixedFiveRoomSession {
       await this.deps.repository.saveActiveSnapshot(room, this.lastOrdinal + 1).catch(() => {});
       if (this.isDisposed()) return;
       this.publish();
-      this.unsubscribeTransport = transport.subscribe(this.roomId, (next) => {
+      this.unsubscribeTransport = transport.subscribe(this.roomId, () => {
         if (this.isDisposed()) return;
-        this.applyRoomSnapshot(next);
         this.reconnecting = false;
-        this.recomputePhase();
-        this.publish();
-        void this.sync(this.lastOrdinal);
+        void this.sync();
       }).unsubscribe;
-      await this.sync(this.lastOrdinal);
+      await this.sync();
       if (this.verification.getSnapshot().receiptsUnsupported) {
         try {
           await transport.verificationChallenge(this.roomId);
           if (this.isDisposed()) return;
           this.verification.enableReceipts();
-          await this.sync(this.lastOrdinal);
+          await this.sync();
         } catch (e) {
           if (!isMissingFunctionError(e) && !this.isDisposed()) {
             this.error = this.deps.friendlyError(e);
@@ -954,15 +957,26 @@ export class FixedFiveRoomSession {
     this.publish();
   }
 
-  private async sync(afterOrdinal: number): Promise<void> {
+  private sync(): Promise<void> {
+    return this.reconcileTask.request();
+  }
+
+  private async reconcile(): Promise<void> {
     if (this.isDisposed() || !this.room) return;
     this.syncing = true;
     this.publish();
     try {
-      const fresh = await this.deps.transport.refetch(this.roomId, afterOrdinal);
+      const snapshot = await this.deps.transport.snapshot(this.roomId);
       if (this.isDisposed()) return;
+      const fresh = await this.deps.transport.refetch(this.roomId, this.lastOrdinal);
+      if (this.isDisposed()) return;
+      const merged = mergeFixedFiveCommands(this.commands, fresh);
+      if (merged.length > snapshot.commandCount) {
+        void this.sync();
+        return;
+      }
+      this.applyRoomSnapshot(snapshot);
       if (fresh.length > 0) {
-        const merged = mergeFixedFiveCommands(this.commands, fresh);
         this.commands = merged;
         const byOrdinal = new Map(merged.map((c) => [c.ordinal, c] as const));
         let contiguous = this.lastOrdinal;
@@ -976,6 +990,8 @@ export class FixedFiveRoomSession {
         if (this.isDisposed()) return;
         this.deps.saveActivityNow(this.roomId);
         this.refreshDerived();
+      } else {
+        this.recomputePhase();
       }
       const room = this.room;
       await this.deps.repository.saveActiveSnapshot(room, this.lastOrdinal + 1).catch(() => {});
@@ -1001,6 +1017,7 @@ export class FixedFiveRoomSession {
     this.maybeStartDuelPipeline();
     this.maybeFinalizeDuelSeries();
     this.maybeProposeOrConfirmGame();
+    this.maybeReadyNextGame();
     this.competition.maybeStart();
     this.competition.maybeRebuildStats();
     this.verification.tick();
@@ -1265,7 +1282,7 @@ export class FixedFiveRoomSession {
     if (!room || gameNumber === null || gameNumber === undefined) return;
     if (room.phase !== 'broadcasting' && room.phase !== 'game-results') return;
     const output = this.duelOutputs[gameNumber];
-    if (!output || (this.broadcastProgress < 1 && room.phase === 'broadcasting')) return;
+    if (!output || this.broadcastProgress < 1) return;
     this.seriesFlow.coordinate({
       gameNumber,
       localDigest: output.resultDigest,
@@ -1301,6 +1318,7 @@ export class FixedFiveRoomSession {
   private tickDuel(): void {
     if (this.isDisposed() || !this.isDuelBroadcast()) return;
     this.maybeProposeOrConfirmGame();
+    this.maybeReadyNextGame();
     if (this.room?.phase !== 'preparing-game') return;
     if (
       this.seriesFlow.shouldAutoStart(
@@ -1330,6 +1348,64 @@ export class FixedFiveRoomSession {
     if (snapshot.phase === 'preparing-game' && this.duelRecapGame !== null) {
       this.duelRecapGame = null;
     }
+    if (
+      this.isDuelBroadcast() &&
+      snapshot.phase === 'game-results' &&
+      snapshot.broadcast !== null &&
+      previous?.broadcast?.gameNumber !== snapshot.broadcast.gameNumber
+    ) {
+      this.seriesFlow.playback.resumeReview(this.deps.now());
+      if (this.duelRecapGame === null) {
+        this.duelRecapGame = snapshot.broadcast.gameNumber;
+        this.broadcastProgress = 1;
+      }
+    }
+    this.completeElapsedBroadcast();
+  }
+
+  private maybeReadyNextGame(): void {
+    const target = this.pendingReadyGame;
+    if (target === null || this.isDisposed() || this.submissionsInFlight > 0) return;
+    const room = this.room;
+    if (
+      !room ||
+      room.phase === 'awaiting-confirmation' ||
+      room.phase === 'completed' ||
+      room.phase === 'integrity-failed' ||
+      room.phase === 'expired'
+    ) {
+      this.pendingReadyGame = null;
+      return;
+    }
+    if (room.phase !== 'preparing-game') return;
+    const current = this.duelCurrentGameNumber();
+    if (current !== target) {
+      if (current === null || current > target) this.pendingReadyGame = null;
+      return;
+    }
+    if (this.duelLocalReady()) {
+      this.pendingReadyGame = null;
+      return;
+    }
+    if (this.deps.now() < this.pendingReadyRetryAtMs) return;
+    this.pendingReadyRetryAtMs = this.deps.now() + DUEL_AUTO_START_RETRY_MS;
+    void this.readyForNextGame();
+  }
+
+  private completeElapsedBroadcast(): void {
+    const room = this.room;
+    const broadcast = room?.broadcast;
+    if (!broadcast || !this.isDuelBroadcast()) return;
+    if (room.phase !== 'broadcasting' && room.phase !== 'game-results') return;
+    if (this.duelRecapGame === broadcast.gameNumber) return;
+    const startedAt = Date.parse(broadcast.startedAtIso);
+    if (!Number.isFinite(startedAt)) return;
+    const now = this.deps.now();
+    if (now < startedAt + broadcast.durationMs) return;
+    this.seriesFlow.playback.begin(now, startedAt, broadcast.durationMs);
+    this.seriesFlow.playback.advance(0, broadcast.durationMs, now);
+    this.broadcastProgress = 1;
+    this.duelRecapGame = broadcast.gameNumber;
   }
 
   private async sendCommand(
@@ -1364,7 +1440,7 @@ export class FixedFiveRoomSession {
       if (this.isDisposed()) return;
       this.applyRoomSnapshot(fresh);
     } catch {}
-    await this.sync(this.lastOrdinal);
+    await this.sync();
   }
 
   private async dispatchCommand(
@@ -1415,7 +1491,7 @@ export class FixedFiveRoomSession {
         return false;
       }
       this.deps.saveActivityNow(this.roomId);
-      await this.sync(this.lastOrdinal);
+      await this.sync();
       return true;
     } catch (e) {
       if (!this.isDisposed()) {
@@ -1480,7 +1556,7 @@ export class FixedFiveRoomSession {
         return;
       }
       await this.deps.transport.resolveTimeout(this.roomId);
-      await this.sync(this.lastOrdinal);
+      await this.sync();
     } catch (e) {
       this.submittedTimeouts.delete(key);
       if (isMissingFunctionError(e)) {

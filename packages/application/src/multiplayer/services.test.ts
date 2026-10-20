@@ -372,6 +372,10 @@ describe('series coordination', () => {
   it('deduplicates proposals and confirmations, verifies recorded peer facts, and retries only after the delay', async () => {
     let now = 10_000;
     const series = new SeriesCoordinator(() => now, 5000);
+    series.observe('broadcasting', 1);
+    series.playback.begin(now, now, 1000);
+    series.playback.advance(1000, 1000, now);
+    series.playback.approve(1);
     const propose = vi.fn().mockResolvedValueOnce(false).mockResolvedValue(true);
     const confirm = vi.fn(() => Promise.resolve(true));
     const verification = vi.fn();
@@ -397,6 +401,45 @@ describe('series coordination', () => {
     await flush();
     expect(confirm).toHaveBeenCalledOnce();
     expect(verification).toHaveBeenCalledWith(true, 'a');
+  });
+  it('waits for local review before confirming a matching peer result', async () => {
+    let now = 10_000;
+    const series = new SeriesCoordinator(() => now, 5000);
+    series.holdMs = 60_000;
+    series.proposals.add(1);
+    const confirm = vi.fn(() => Promise.resolve(true));
+    const input = {
+      gameNumber: 1,
+      localDigest: 'a',
+      ownProposal: 'a',
+      peerProposal: 'a',
+      current: () => true,
+      propose: () => Promise.resolve(true),
+      confirm,
+    };
+    series.coordinate(input);
+    await flush();
+    expect(confirm).not.toHaveBeenCalled();
+    series.playback.resumeReview(now);
+    series.coordinate(input);
+    await flush();
+    expect(confirm).not.toHaveBeenCalled();
+    now += 60_000;
+    series.coordinate(input);
+    await flush();
+    expect(confirm).toHaveBeenCalledOnce();
+  });
+  it('requires a completion or an explicit review resume before continuing', () => {
+    let now = 10_000;
+    const series = new SeriesCoordinator(() => now, 5000);
+    series.holdMs = 60_000;
+    series.observe('game-results', 1);
+    expect(series.playback.continueApproved(1, 60_000, now)).toBe(false);
+    series.playback.resumeReview(now);
+    now += 59_999;
+    expect(series.playback.continueApproved(1, 60_000, now)).toBe(false);
+    now += 1;
+    expect(series.playback.continueApproved(1, 60_000, now)).toBe(true);
   });
   it('reports a mismatch immediately without waiting for the result hold', async () => {
     const series = new SeriesCoordinator(() => 10_000, 5000);

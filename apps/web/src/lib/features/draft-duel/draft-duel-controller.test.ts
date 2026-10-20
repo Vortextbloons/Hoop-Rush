@@ -45,6 +45,10 @@ type SessionLifecycle = {
   maybeProposeOrConfirm: () => void;
   rebuildDraft: () => void;
   ensureGamePipeline: () => Promise<void>;
+  simulateGame: (
+    gameNumber: number,
+    homeWinner: DraftDuelParticipantId,
+  ) => Promise<DraftDuelGameOutput>;
   persistActive: () => Promise<void>;
   resolveDeadline: (cursor: string, pickOrdinal: number) => Promise<void>;
   syncFromServer: () => Promise<void>;
@@ -52,6 +56,7 @@ type SessionLifecycle = {
     repository: {
       appendCommands: (...args: unknown[]) => Promise<void>;
       saveVerification: (...args: unknown[]) => Promise<void>;
+      saveResult: (...args: unknown[]) => Promise<void>;
     };
   };
 };
@@ -154,6 +159,25 @@ describe('Draft Duel ready check progression', () => {
     await controller.readyForNextGame();
     expect(controller.phase).toBe('preparing-game');
     expect(controller.localReady).toBe(true);
+  });
+
+  it('publishes matching snapshots and commands when a command arrives during refresh', async () => {
+    const lifecycle = isolateSync();
+    unsubscribe();
+    await lifecycle.syncFromServer();
+    const resume = transport.resume.bind(transport);
+    vi.spyOn(transport, 'resume').mockImplementationOnce(async (id) => {
+      const prior = await resume(id);
+      await submit('p2', { kind: 'ready-next-game', gameNumber: 1, ready: true });
+      return prior;
+    });
+    const updates: ReturnType<DraftDuelSession['getSnapshot']>[] = [];
+    session.subscribe(() => updates.push(session.getSnapshot()));
+    await lifecycle.syncFromServer();
+    expect(controller.opponentReady).toBe(true);
+    expect(updates.every((state) => state.snapshot?.commandCount === state.commands.length)).toBe(
+      true,
+    );
   });
 
   it.each(['p1', 'p2'] as const)(
@@ -366,7 +390,7 @@ describe('Draft Duel ready check progression', () => {
     expect(controller.phase).toBe('broadcasting');
   });
 
-  async function prepareSecondGame() {
+  async function prepareSecondGame(options: { peerResult?: boolean; progress?: number } = {}) {
     const digest = contentHashSchema.parse('b'.repeat(64));
     await controller.readyForNextGame();
     await submit('p2', { kind: 'ready-next-game', gameNumber: 1, ready: true });
@@ -421,27 +445,54 @@ describe('Draft Duel ready check progression', () => {
         inputDigest: digest,
       },
     };
-    lifecycle.progress = 1;
+    lifecycle.progress = options.progress ?? 1;
     lifecycle.assets = {} as DraftDuelAssets;
     vi.spyOn(lifecycle, 'rebuildDraft').mockImplementation(() => {});
     vi.spyOn(lifecycle, 'ensureGamePipeline').mockResolvedValue();
     vi.spyOn(lifecycle, 'persistActive').mockResolvedValue();
     vi.spyOn(lifecycle.deps.repository, 'appendCommands').mockResolvedValue();
     vi.spyOn(lifecycle.deps.repository, 'saveVerification').mockResolvedValue();
-    await submit('p2', {
-      kind: 'propose-result',
-      gameNumber: 2,
-      winner: recorded.result.winner === 'home' ? 'p1' : 'p2',
-      resultDigest: digest,
-      tapeDigest: digest,
-      inputDigest: digest,
-    });
+    if (options.peerResult !== false) {
+      await submit('p2', {
+        kind: 'propose-result',
+        gameNumber: 2,
+        winner: recorded.result.winner === 'home' ? 'p1' : 'p2',
+        resultDigest: digest,
+        tapeDigest: digest,
+        inputDigest: digest,
+      });
+    }
     return { lifecycle, digest };
   }
 
-  it('submits Game 2 confirmation after publishing its result while the opponent result is already present', async () => {
+  it('waits for local playback and review before confirming Game 2 with the opponent result present', async () => {
     const { lifecycle, digest } = await prepareSecondGame();
+    session.beginPlayback();
+    session.advancePlayback(DRAFT_DUEL_BROADCAST_MS);
     lifecycle.maybeProposeOrConfirm();
+    await vi.waitFor(async () => {
+      const commands = await transport.refetch(roomId, -1);
+      expect(
+        commands.some(
+          (command) =>
+            command.actorParticipantId === 'p1' &&
+            command.payload.kind === 'propose-result' &&
+            command.payload.gameNumber === 2,
+        ),
+      ).toBe(true);
+    });
+    const beforeContinue = await transport.refetch(roomId, -1);
+    expect(
+      beforeContinue.some(
+        (command) =>
+          command.actorParticipantId === 'p1' &&
+          command.payload.kind === 'confirm-result' &&
+          command.payload.gameNumber === 2,
+      ),
+    ).toBe(false);
+    expect(controller.awaitingContinue).toBe(true);
+
+    controller.continueAfterGame();
     await vi.waitFor(async () => {
       const commands = await transport.refetch(roomId, -1);
       expect(
@@ -461,8 +512,6 @@ describe('Draft Duel ready check progression', () => {
     });
     expect(controller.phase).toBe('preparing-game');
     expect(controller.currentGameNumber).toBe(3);
-    await controller.readyForNextGame();
-    expect(controller.localReady).toBe(true);
   });
 
   it('holds the Game 2 results screen until continue is approved', async () => {
@@ -552,6 +601,117 @@ describe('Draft Duel ready check progression', () => {
     expect(controller.phase).toBe('preparing-game');
   });
 
+  it('keeps the local tape running when the opponent result arrives first and holds review until Continue', async () => {
+    const { lifecycle, digest } = await prepareSecondGame({
+      peerResult: false,
+      progress: 0,
+    });
+    (controller as unknown as { stopPlayback: () => void }).stopPlayback();
+    const cancel = vi.fn();
+    vi.stubGlobal('cancelAnimationFrame', cancel);
+    const tick = stubManualRaf();
+    (controller as unknown as { startPlayback: () => void }).startPlayback();
+    tick();
+    for (let frame = 0; frame < 3; frame++) {
+      vi.advanceTimersByTime(1000);
+      tick();
+    }
+    expect(controller.progress).toBeCloseTo(0.375, 5);
+
+    const output = lifecycle.outputs[2];
+    if (!output) throw new Error('Missing game output');
+    await submit('p2', {
+      kind: 'propose-result',
+      gameNumber: 2,
+      winner: output.result.winner === 'home' ? 'p1' : 'p2',
+      resultDigest: digest,
+      tapeDigest: digest,
+      inputDigest: digest,
+    });
+    await vi.waitFor(() => {
+      expect(controller.phase).toBe('game-results');
+    });
+    expect(controller.showingBroadcast).toBe(true);
+    expect(cancel).not.toHaveBeenCalled();
+    expect(controller.awaitingContinue).toBe(true);
+
+    for (let frame = 0; frame < 5; frame++) {
+      vi.advanceTimersByTime(1000);
+      tick();
+    }
+    expect(controller.progress).toBe(1);
+    await vi.waitFor(async () => {
+      const commands = await transport.refetch(roomId, -1);
+      expect(
+        commands.some(
+          (command) =>
+            command.actorParticipantId === 'p1' &&
+            command.payload.kind === 'propose-result' &&
+            command.payload.gameNumber === 2,
+        ),
+      ).toBe(true);
+    });
+    const beforeContinue = await transport.refetch(roomId, -1);
+    expect(
+      beforeContinue.some(
+        (command) =>
+          command.actorParticipantId === 'p1' &&
+          command.payload.kind === 'confirm-result' &&
+          command.payload.gameNumber === 2,
+      ),
+    ).toBe(false);
+    expect(controller.showingBroadcast).toBe(false);
+    expect(controller.awaitingContinue).toBe(true);
+
+    controller.continueAfterGame();
+    await vi.waitFor(async () => {
+      const commands = await transport.refetch(roomId, -1);
+      expect(
+        commands.some(
+          (command) =>
+            command.actorParticipantId === 'p1' &&
+            command.payload.kind === 'confirm-result' &&
+            command.payload.gameNumber === 2,
+        ),
+      ).toBe(true);
+    });
+    await submit('p2', {
+      kind: 'confirm-result',
+      gameNumber: 2,
+      resultDigest: digest,
+      verified: true,
+    });
+    await vi.waitFor(async () => {
+      const commands = await transport.refetch(roomId, -1);
+      expect(
+        commands.some(
+          (command) =>
+            command.actorParticipantId === 'p1' &&
+            command.payload.kind === 'ready-next-game' &&
+            command.payload.gameNumber === 3,
+        ),
+      ).toBe(true);
+    });
+    expect(controller.phase).toBe('preparing-game');
+    expect(controller.currentGameNumber).toBe(3);
+    expect(controller.localReady).toBe(true);
+  });
+
+  it('reconstructs a missing Game 2 output while the room is at results', async () => {
+    const { lifecycle } = await prepareSecondGame();
+    const output = lifecycle.outputs[2];
+    if (!output) throw new Error('Missing game output');
+    lifecycle.outputs = {};
+    const pipeline = vi.mocked(lifecycle.ensureGamePipeline);
+    pipeline.mockRestore();
+    const simulate = vi.spyOn(lifecycle, 'simulateGame').mockResolvedValue(output);
+    const save = vi.spyOn(lifecycle.deps.repository, 'saveResult').mockResolvedValue();
+    await lifecycle.ensureGamePipeline();
+    expect(simulate).toHaveBeenCalledWith(2, expect.any(String));
+    expect(lifecycle.outputs[2]).toEqual(output);
+    expect(save).toHaveBeenCalledWith(output);
+  });
+
   it.each([
     ['propose-result', 'network'],
     ['confirm-result', 'network'],
@@ -580,6 +740,9 @@ describe('Draft Duel ready check progression', () => {
         }
         return originalSubmit(command);
       });
+      session.beginPlayback();
+      session.advancePlayback(DRAFT_DUEL_BROADCAST_MS);
+      controller.continueAfterGame();
       lifecycle.maybeProposeOrConfirm();
       await vi.advanceTimersByTimeAsync(0);
       expect(failed).toBe(true);

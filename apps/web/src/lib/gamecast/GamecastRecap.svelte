@@ -71,6 +71,7 @@
     side: 'home' | 'away';
     team: TeamResult;
     won: boolean;
+    topPoints: number;
   }
 
   const localSide = $derived(gamecastTeamOf(output, localParticipantId));
@@ -83,13 +84,21 @@
   const seriesOver = $derived(series.champion !== null);
 
   const panels = $derived.by((): TeamPanel[] => [
-    { key: 'local', label: 'You', side: localSide, team: localTeam, won: localWon },
+    {
+      key: 'local',
+      label: 'You',
+      side: localSide,
+      team: localTeam,
+      won: localWon,
+      topPoints: Math.max(0, ...localTeam.players.map((player) => player.points)),
+    },
     {
       key: 'opponent',
       label: 'Opponent',
       side: localSide === 'home' ? 'away' : 'home',
       team: opponentTeam,
       won: !localWon,
+      topPoints: Math.max(0, ...opponentTeam.players.map((player) => player.points)),
     },
   ]);
 
@@ -163,19 +172,28 @@
     if (series.champion !== null) {
       return championIsLocal ? 'You won the series.' : 'Opponent won the series.';
     }
-    if (series.currentGameNumber !== null) return `Game ${series.currentGameNumber} is next.`;
+    if (verification === 'mismatch') return 'This result cannot be accepted.';
+    if (series.currentGameNumber !== null && series.currentGameNumber > output.gameNumber) {
+      return `Game ${series.currentGameNumber} is next.`;
+    }
+    if (awaitingContinue) return `Game ${output.gameNumber} is under review.`;
+    if (series.currentGameNumber !== null) {
+      return `Waiting for opponent to accept Game ${output.gameNumber}.`;
+    }
     return 'Waiting for the series to update.';
   });
 
   const countdownLabel = $derived(
     readyCountdownMs === null ? null : formatCountdown(readyCountdownMs),
   );
-  const nextGameNumber = $derived(series.currentGameNumber ?? Math.min(7, output.gameNumber + 1));
-  const canReady = $derived(
-    verification === 'verified' && !seriesOver && nextGameNumber > output.gameNumber,
+  const nextGameNumber = $derived(
+    series.currentGameNumber !== null && series.currentGameNumber > output.gameNumber
+      ? series.currentGameNumber
+      : null,
   );
+  const canReady = $derived(verification === 'verified' && nextGameNumber !== null);
   const readyLabel = $derived(
-    localReady ? 'Ready' : seriesOver ? 'Ready' : `Ready for Game ${nextGameNumber}`,
+    localReady ? 'Ready' : nextGameNumber !== null ? `Ready for Game ${nextGameNumber}` : 'Ready',
   );
 
   function statLine(player: PlayerBoxScore): string {
@@ -268,7 +286,12 @@
                 {/if}
                 <span class="player-text">
                   <span class="player-name">{nameOf(row.playerId)}</span>
-                  <span class="player-pos">{SLOT_LABELS[row.slotIndex] ?? ''}</span>
+                  <span class="player-meta">
+                    <span class="player-pos">{SLOT_LABELS[row.slotIndex] ?? ''}</span>
+                    {#if panel.topPoints > 0 && row.points === panel.topPoints}<span
+                        class="player-hot">Top scorer</span
+                      >{/if}
+                  </span>
                 </span>
               </span>
             {/snippet}
@@ -284,7 +307,9 @@
         <p class="ready-line">Review the box score, then continue when ready.</p>
       </div>
       <button type="button" onclick={oncontinue}>Continue</button>
-    {:else}
+    {:else if seriesOver}
+      <p class="ready-line">Series complete.</p>
+    {:else if nextGameNumber !== null}
       <div class="ready-copy">
         <p class="ready-line">
           {localReady ? "You're ready for the next game." : 'Ready to continue?'}
@@ -299,6 +324,8 @@
       <button type="button" disabled={localReady || !canReady} onclick={onready}>
         {readyLabel}
       </button>
+    {:else}
+      <p class="ready-line">The next game opens once this result is accepted.</p>
     {/if}
   </footer>
 </section>
@@ -559,6 +586,12 @@
     white-space: nowrap;
   }
 
+  .player-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
   .player-pos {
     font-family: var(--font-mono);
     font-size: 0.5rem;
@@ -566,6 +599,18 @@
     letter-spacing: 0.1em;
     text-transform: uppercase;
     color: var(--color-muted-foreground);
+  }
+
+  .player-hot {
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--color-primary) 16%, transparent);
+    color: var(--color-primary);
+    font-family: var(--font-mono);
+    font-size: 0.5rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
   }
 
   :global(.results tbody td.is-strong) {

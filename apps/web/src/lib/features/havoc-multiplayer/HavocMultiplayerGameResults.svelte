@@ -45,9 +45,25 @@
   const localWon = $derived(output.winner === localParticipantId);
   const countdown = $derived(havocMultiplayerSecondsLeft(readyCountdownMs));
   const seriesOver = $derived(series.champion !== null);
+  const currentGameNumber = $derived(havocMultiplayerCurrentGameNumber(series));
   const nextGameNumber = $derived(
-    havocMultiplayerCurrentGameNumber(series) ?? Math.min(7, output.gameNumber + 1),
+    currentGameNumber !== null && currentGameNumber > output.gameNumber ? currentGameNumber : null,
   );
+
+  const seriesMessage = $derived.by(() => {
+    if (seriesOver) {
+      return series.champion === localParticipantId
+        ? 'You won the series.'
+        : 'Opponent won the series.';
+    }
+    if (verification === 'mismatch') return 'This result cannot be accepted.';
+    if (nextGameNumber !== null) return `Game ${nextGameNumber} is next.`;
+    if (awaitingContinue) return `Game ${output.gameNumber} is under review.`;
+    if (currentGameNumber !== null) {
+      return `Waiting for opponent to accept Game ${output.gameNumber}.`;
+    }
+    return 'Waiting for the series to update.';
+  });
 
   const verificationView = $derived.by(() => {
     if (verification === 'verified') {
@@ -98,7 +114,7 @@
     <p class="hm-series-line">
       Series: You {localParticipantId === 'p1' ? series.wins.p1 : series.wins.p2}
       <span aria-hidden="true">–</span>
-      {localParticipantId === 'p1' ? series.wins.p2 : series.wins.p1} Opp
+      {localParticipantId === 'p1' ? series.wins.p2 : series.wins.p1} Opp · {seriesMessage}
     </p>
     <div class="hm-badge" data-tone={verificationView.tone}>
       {#if verificationView.tone === 'verified'}
@@ -121,7 +137,9 @@
       <button type="button" class="h-button" data-havoc-multiplayer-continue onclick={oncontinue}>
         Continue
       </button>
-    {:else}
+    {:else if seriesOver}
+      <p class="hm-ready-line">Series complete.</p>
+    {:else if nextGameNumber !== null}
       <div class="hm-ready-copy">
         <p class="hm-ready-line">
           {localReady ? "You're ready for the next game." : 'Ready to continue?'}
@@ -133,17 +151,17 @@
           </p>
         {/if}
       </div>
-      {#if !seriesOver}
-        <button
-          type="button"
-          class="h-button"
-          data-havoc-multiplayer-ready
-          disabled={localReady}
-          onclick={onready}
-        >
-          {localReady ? 'Ready' : `Ready for Game ${nextGameNumber}`}
-        </button>
-      {/if}
+      <button
+        type="button"
+        class="h-button"
+        data-havoc-multiplayer-ready
+        disabled={localReady}
+        onclick={onready}
+      >
+        {localReady ? 'Ready' : `Ready for Game ${nextGameNumber}`}
+      </button>
+    {:else}
+      <p class="hm-ready-line">The next game opens once this result is accepted.</p>
     {/if}
   </footer>
 </section>

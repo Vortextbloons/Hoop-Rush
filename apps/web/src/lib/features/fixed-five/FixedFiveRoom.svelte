@@ -134,11 +134,13 @@
       <p class="room-alert" role="alert">{controller.error}</p>
     {/if}
 
-    {#if controller.reconnecting || controller.syncing}
-      <p class="room-connection" role="status">
-        {controller.reconnecting ? 'Reconnecting to your room…' : 'Updating your room…'}
-      </p>
-    {/if}
+    <p class="room-connection" role="status" aria-live="polite">
+      {#if controller.reconnecting}
+        Reconnecting to your room…
+      {:else if controller.syncing}
+        Updating your room…
+      {/if}
+    </p>
 
     {#if controller.opponent && !controller.opponent.online && phase !== 'lobby' && phase !== 'completed'}
       <p class="room-connection" role="status">
@@ -388,7 +390,7 @@
           </div>
         </div>
       {/if}
-    {:else if phase === 'broadcasting'}
+    {:else if phase === 'broadcasting' || (phase === 'game-results' && controller.broadcastProgress < 1)}
       {#if duelOutput && duelVisible}
         <div class="mt-6">
           <GamecastBroadcast
@@ -433,6 +435,16 @@
             players={controller.duelPlayers}
             manifest={assets?.manifest ?? null}
           />
+        </div>
+      {:else}
+        <div class="room-empty">
+          <h2>Preparing game results</h2>
+          <p role="status">{controller.duelSimError ?? 'Rebuilding this game locally…'}</p>
+          {#if controller.duelSimError}
+            <button type="button" class="room-secondary" onclick={() => controller.retryDuelGame()}>
+              Retry game
+            </button>
+          {/if}
         </div>
       {/if}
     {:else if phase === 'awaiting-confirmation'}
@@ -705,8 +717,10 @@
     line-height: 1.7;
   }
   .room-connection {
+    min-height: 1.5em;
     color: var(--color-muted-foreground);
     font-size: 12px;
+    line-height: 1.5;
     margin: 14px 0;
   }
   .room-activity {

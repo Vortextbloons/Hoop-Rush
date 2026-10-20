@@ -576,29 +576,33 @@
                 </button>
               </div>
             </section>
+          {:else if controller.showingBroadcast && controller.currentOutput && controller.visible}
+            <HavocMultiplayerBroadcast
+              output={controller.currentOutput}
+              visible={controller.visible}
+              feed={controller.feed}
+              progress={controller.progress}
+              localParticipantId={controller.participantId ?? 'p1'}
+              series={controller.series}
+              minimal={reducedMotion}
+            />
           {:else if phase === 'broadcasting'}
-            {#if controller.currentOutput && controller.visible}
-              <HavocMultiplayerBroadcast
-                output={controller.currentOutput}
-                visible={controller.visible}
-                feed={controller.feed}
-                progress={controller.progress}
-                localParticipantId={controller.participantId ?? 'p1'}
-                series={controller.series}
-                minimal={reducedMotion}
-              />
-            {:else}
-              <section class="h-panel hm-wait" aria-label="Broadcast loading">
-                <p class="h-eyebrow">Broadcast</p>
-                <h2 class="h-subtitle">
-                  Simulating Game {controller.currentBroadcast?.gameNumber ?? '—'}…
-                </h2>
-                <p class="h-copy" role="status">
-                  Both sides run the same game locally. The tape starts as soon as your simulation
-                  lands.
-                </p>
-              </section>
-            {/if}
+            <section class="h-panel hm-wait" aria-label="Broadcast loading">
+              <p class="h-eyebrow">Broadcast</p>
+              <h2 class="h-subtitle">
+                Simulating Game {controller.currentBroadcast?.gameNumber ?? '—'}…
+              </h2>
+              <p class="h-copy" role="status">
+                Both sides run the same game locally. The tape starts as soon as your simulation
+                lands.
+              </p>
+              {#if controller.error}
+                <p class="h-copy" role="alert">{controller.error}</p>
+                <button type="button" class="h-button" onclick={() => void controller.refresh()}>
+                  Retry simulation
+                </button>
+              {/if}
+            </section>
           {:else if phase === 'game-results'}
             {#if controller.currentOutput && controller.series}
               <HavocMultiplayerGameResults
@@ -615,6 +619,12 @@
             {:else}
               <section class="h-panel hm-wait" aria-label="Game results loading">
                 <p class="h-copy" role="status">Loading the game result…</p>
+                {#if controller.error}
+                  <p class="h-copy" role="alert">{controller.error}</p>
+                  <button type="button" class="h-button" onclick={() => void controller.refresh()}>
+                    Retry simulation
+                  </button>
+                {/if}
               </section>
             {/if}
           {:else if phase === 'championship'}

@@ -197,7 +197,7 @@ export function createRealtimeRoomRegistry<TSnapshot>(
     for (const handler of record.handlers) handler(snapshot);
   }
 
-  async function refresh(roomId: string): Promise<void> {
+  async function refreshOnce(roomId: string): Promise<void> {
     try {
       const snapshot = await options.fetchSnapshot(roomId);
       emit(roomId, snapshot);
@@ -209,6 +209,28 @@ export function createRealtimeRoomRegistry<TSnapshot>(
         errorType: error instanceof Error ? error.name : 'UnknownError',
       });
     }
+  }
+
+  const refreshes = new Map<string, { running: Promise<void>; queued: boolean }>();
+
+  function refresh(roomId: string): Promise<void> {
+    const pending = refreshes.get(roomId);
+    if (pending) {
+      pending.queued = true;
+      return pending.running;
+    }
+    const state = { running: Promise.resolve(), queued: false };
+    const hasQueued = (): boolean => state.queued;
+    state.running = (async () => {
+      do {
+        state.queued = false;
+        await refreshOnce(roomId);
+      } while (hasQueued());
+    })().finally(() => {
+      if (refreshes.get(roomId) === state) refreshes.delete(roomId);
+    });
+    refreshes.set(roomId, state);
+    return state.running;
   }
 
   return {

@@ -341,6 +341,32 @@ describe('fixed-five supabase transport protocol pins', () => {
     });
   });
 
+  it('coalesces overlapping realtime invalidations into one trailing refresh', async () => {
+    const { harness, transport } = setupTransport();
+    seedRoom(harness);
+    const subscription = transport.subscribe(ROOM_ID, () => {});
+
+    await vi.waitFor(() => {
+      expect(harness.channels).toHaveLength(1);
+    });
+    const channel = harness.channels[0];
+    channel?.triggerPostgresChange();
+    channel?.triggerPostgresChange();
+    channel?.triggerPostgresChange();
+
+    await vi.waitFor(() => {
+      expect(
+        harness.selectQueries.filter((query) => query.table === 'fixed_five_rooms'),
+      ).toHaveLength(2);
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(
+      harness.selectQueries.filter((query) => query.table === 'fixed_five_rooms'),
+    ).toHaveLength(2);
+
+    subscription.unsubscribe();
+  });
+
   it('verification, fallback, timeout, and guest removal keep their RPC shapes', async () => {
     const { harness, transport } = setupTransport();
     harness.setRpc('fixed_five_verification_challenge', () => 'challenge-1');

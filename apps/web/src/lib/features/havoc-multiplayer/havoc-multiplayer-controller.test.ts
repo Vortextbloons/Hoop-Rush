@@ -425,6 +425,35 @@ describe('havoc multiplayer presenter flow', () => {
     vi.restoreAllMocks();
   });
 
+  it('publishes matching readiness and commands when a command arrives during refresh', async () => {
+    const h = await createHarness('refresh-race');
+    try {
+      const resume = h.transport.resume.bind(h.transport);
+      vi.spyOn(h.transport, 'resume').mockImplementationOnce(async (id) => {
+        const prior = await resume(id);
+        await h.submit('p2', { kind: 'ready' });
+        return prior;
+      });
+      const updates: ReturnType<HavocMultiplayerSession['getSnapshot']>[] = [];
+      h.session.subscribe(() => updates.push(h.session.getSnapshot()));
+      await h.sync();
+      expect(
+        h.presenter.snapshot?.members.find((member) => member.participantId === 'p2')?.ready,
+      ).toBe(true);
+      expect(
+        updates.every(
+          (state) =>
+            state.snapshot?.members.find((member) => member.participantId === 'p2')?.ready ===
+            state.commands.some(
+              (command) => command.actorParticipantId === 'p2' && command.payload.kind === 'ready',
+            ),
+        ),
+      ).toBe(true);
+    } finally {
+      h.presenter.dispose();
+    }
+  });
+
   it('creates, joins, drafts, plays back, and verifies the first game', async () => {
     const h = await createHarness('web-flow');
     expect(h.presenter.participantId).toBe('p1');
@@ -493,6 +522,88 @@ describe('havoc multiplayer presenter flow', () => {
     await h.presenter.readyForNextGame();
     await h.submit('p2', { kind: 'ready-next-game', gameNumber: 2 });
     await waitFor(() => h.presenter.localReady && h.presenter.opponentReady);
+  });
+
+  it('keeps the local tape and review when the opponent proposes results first', async () => {
+    const h = await createHarness('web-peer-first');
+    await startDraft(h);
+    await completeDraft(h);
+    await reachBroadcast(h, 1);
+    const output = must(h.presenter.currentOutput, 'game one output');
+    tickFrame();
+    await flushMicrotasks();
+    for (let frame = 0; frame < 4; frame += 1) {
+      vi.advanceTimersByTime(1000);
+      tickFrame();
+      await flushMicrotasks();
+    }
+    expect(h.presenter.progress).toBeCloseTo(0.5, 5);
+
+    await h.submit('p2', {
+      kind: 'propose-result',
+      gameNumber: 1,
+      winner: output.winner,
+      resultDigest: output.resultDigest,
+      inputDigest: output.inputDigest,
+      tapeDigest: output.tapeDigest,
+    });
+    await waitFor(() => h.presenter.phase === 'game-results');
+    expect(h.presenter.showingBroadcast).toBe(true);
+    expect(h.presenter.awaitingContinue).toBe(true);
+    expect(
+      await hasCommand(
+        h,
+        (command) =>
+          command.payload.kind === 'confirm-result' && command.actorParticipantId === 'p1',
+      ),
+    ).toBe(false);
+
+    await finishPlayback(h);
+    await waitFor(() =>
+      hasCommand(
+        h,
+        (command) =>
+          command.payload.kind === 'propose-result' && command.actorParticipantId === 'p1',
+      ),
+    );
+    expect(h.presenter.showingBroadcast).toBe(false);
+    expect(
+      await hasCommand(
+        h,
+        (command) =>
+          command.payload.kind === 'confirm-result' && command.actorParticipantId === 'p1',
+      ),
+    ).toBe(false);
+    expect(h.presenter.awaitingContinue).toBe(true);
+
+    h.presenter.continueAfterGame();
+    await waitFor(() =>
+      hasCommand(
+        h,
+        (command) =>
+          command.payload.kind === 'confirm-result' && command.actorParticipantId === 'p1',
+      ),
+    );
+    await h.submit('p2', {
+      kind: 'confirm-result',
+      gameNumber: 1,
+      verified: true,
+      resultDigest: output.resultDigest,
+      inputDigest: output.inputDigest,
+      tapeDigest: output.tapeDigest,
+    });
+    await waitFor(() => h.presenter.currentGameNumber === 2);
+    await waitFor(() => h.presenter.localReady);
+    expect(h.presenter.phase).toBe('preparing-game');
+    expect(
+      await hasCommand(
+        h,
+        (command) =>
+          command.payload.kind === 'ready-next-game' &&
+          command.actorParticipantId === 'p1' &&
+          command.payload.gameNumber === 2,
+      ),
+    ).toBe(true);
   });
 
   it('flags a mismatched rival result and fails the room', async () => {

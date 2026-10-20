@@ -107,6 +107,11 @@ export class DraftDuelPresenter {
     this.currentGameNumber !== null ? (this.outputs[this.currentGameNumber] ?? null) : null,
   );
   currentBroadcast = $derived(this.snapshot?.broadcast ?? null);
+  showingBroadcast = $derived(
+    this.currentOutput !== null &&
+      this.currentBroadcast !== null &&
+      (this.phase === 'broadcasting' || (this.phase === 'game-results' && this.progress < 1)),
+  );
   roundIndex = $derived(this.draft ? Math.min(4, Math.floor(this.draft.pickOrdinal / 2)) : 0);
   currentPicker = $derived(
     this.draft && this.draft.status === 'drafting' ? draftDuelCurrentPicker(this.draft) : null,
@@ -377,19 +382,20 @@ export class DraftDuelPresenter {
     if (broadcastGame !== null && broadcastGame !== previousBroadcastGame) {
       this.startPlayback();
     }
-    if (view.snapshot?.phase !== 'broadcasting' && this.rafId !== null) {
+    if (view.snapshot?.broadcast == null && this.rafId !== null) {
       cancelAnimationFrame(this.rafId);
       this.rafId = null;
     }
   }
 
   private startPlayback(): void {
-    if (this.rafId !== null || this.disposed) return;
+    if (this.disposed) return;
     if (!this.snapshot?.broadcast) return;
-    this.session.beginPlayback();
     this.playbackLastFrameMs = null;
+    if (this.rafId !== null) return;
+    this.session.beginPlayback();
     const loop = () => {
-      if (this.disposed || this.snapshot?.phase !== 'broadcasting') {
+      if (this.disposed || !this.snapshot?.broadcast) {
         this.rafId = null;
         return;
       }
