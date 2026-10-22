@@ -7,9 +7,7 @@ export type NavItem = {
     class?: string;
   }>;
 };
-const ACTIVE_ALIASES: Readonly<Record<string, readonly string[]>> = {
-  '/collection': ['/collection/packs'],
-};
+const ACTIVE_ALIASES: Readonly<Record<string, readonly string[]>> = {};
 function normalizeRouteId(routeId: string): string {
   return routeId.length > 1 && routeId.endsWith('/') ? routeId.slice(0, -1) : routeId;
 }

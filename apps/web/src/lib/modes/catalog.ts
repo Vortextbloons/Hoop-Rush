@@ -81,19 +81,6 @@ export const modeCatalog: readonly ModeDefinition[] = [
     },
   },
   {
-    id: 'ultimate-run',
-    label: 'Ultimate Run',
-    description: 'Claim a starter, open seeded packs, grow one permanent collection.',
-    discovery: {
-      homeOrder: 4,
-      navigationOrder: 4,
-      cta: 'Open collection',
-      artwork: 'ultimate/logo.png',
-      accent: true,
-    },
-    solo: { href: '/ultimate/run' },
-  },
-  {
     id: 'draft-duel',
     label: 'Draft Duel',
     description:

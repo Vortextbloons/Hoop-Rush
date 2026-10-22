@@ -1,12 +1,10 @@
 import {
   DexieChallengeRepository,
-  DexieCollectionRepository,
   DexieDraftDuelRepository,
   DexieFixedFiveRepository,
   DexieHavocMultiplayerRepository,
   DexieHavocRepository,
   HoopRushDatabase,
-  type DexieCollectionRepositoryOptions,
 } from '@hoop-rush/persistence';
 
 export interface Persistence {
@@ -16,7 +14,6 @@ export interface Persistence {
   havocRepository: DexieHavocRepository;
   draftDuelRepository: DexieDraftDuelRepository;
   havocMultiplayerRepository: DexieHavocMultiplayerRepository;
-  collectionRepository(options: DexieCollectionRepositoryOptions): DexieCollectionRepository;
 }
 
 let cached: Persistence | null = null;
@@ -31,7 +28,6 @@ export function getPersistence(): Persistence {
       havocRepository: new DexieHavocRepository(db),
       draftDuelRepository: new DexieDraftDuelRepository(db),
       havocMultiplayerRepository: new DexieHavocMultiplayerRepository(db),
-      collectionRepository: (options) => new DexieCollectionRepository(db, options),
     };
   }
   return cached;

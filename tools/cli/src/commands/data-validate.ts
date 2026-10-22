@@ -1,10 +1,6 @@
-﻿import { readFile, stat } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import { dirname, isAbsolute, resolve } from 'node:path';
-import {
-  validateBracketContent,
-  scheduleInvariants,
-  validateCollectionProgressionRules,
-} from '@hoop-rush/engine';
+import { validateBracketContent, scheduleInvariants } from '@hoop-rush/engine';
 import { pools } from '@hoop-rush/importer';
 import {
   eraSimulationProfileSchema,
@@ -16,53 +12,26 @@ import {
   REQUIRED_RATING_KEYS,
   SELECTION_SCORE_VERSION,
   COLLECTION_CATALOG_VERSION,
-  COLLECTION_DIFFICULTY_ORDER,
-  COLLECTION_DIFFICULTY_VERSION,
   COLLECTION_ECONOMY_VERSION,
-  COLLECTION_GAME_FIRST_CLEAR_COINS,
-  COLLECTION_GAME_REWARD_LOSS_COINS,
-  COLLECTION_GAME_REWARD_MARGIN_CAP_POINTS,
-  COLLECTION_GAME_REWARD_MARGIN_COIN_PER_POINT,
-  COLLECTION_GAME_REWARD_OBJECTIVE_COINS,
-  COLLECTION_GAME_REWARD_WIN_COINS,
-  COLLECTION_GAME_RULES_VERSION,
-  COLLECTION_GAME_V2_REPLAY_VERSION,
-  COLLECTION_GAME_V2_VERSION,
-  COLLECTION_OBJECTIVE_VERSION,
   COLLECTION_OVERLAY_VERSION,
   COLLECTION_SPECIALS_VERSION,
   COLLECTION_PACK_RULES_VERSION,
-  COLLECTION_RARITY_ORDER,
-  COLLECTION_REWARD_V2_VERSION,
-  COLLECTION_TEAM_VERSION,
   canonicalJson,
   collectionCatalogSchema,
-  collectionGameRulesSchema,
   collectionIndexSchema,
-  collectionProgressionRulesSchema,
-  collectionProgressionTargetsSchema,
-  collectionScaleRewardCoins,
   unavailabilityReasonSchema,
   POSITIONS,
   POSITION_NORMALIZATION_VERSION,
   playableSlotGroups,
-  type CollectionCatalog,
-  type CollectionProgressionRules,
   type HoopRushManifest,
   type OpponentIndexEntry,
 } from '@hoop-rush/data-contracts';
 import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.ts';
 import { sha256Hex } from '../io.ts';
 import {
-  COLLECTION_LAUNCH_CHALLENGES,
-  COLLECTION_TARGET_MULTIPLIER_BP,
-  collectionLaunchSetRewardDefinitions,
-} from '../collection-progression-constants.ts';
-import {
   COLLECTION_SPECIALS,
   COLLECTION_SPECIALS_VERSION as AUTHORED_SPECIALS_VERSION,
 } from '../collection-specials.ts';
-import { collectionGameTargetsSchema } from './collection-game-calibrate.ts';
 interface AuditResult {
   ok: boolean;
   details: string[];
@@ -118,7 +87,7 @@ function auditLineage(manifest: HoopRushManifest): AuditResult {
     }
   }
   details.push(
-    `lineage: ${String(manifest.modernFranchiseSlots.length)} slots Â· ${String(manifest.franchiseLineage.length)} segments`,
+    `lineage: ${String(manifest.modernFranchiseSlots.length)} slots · ${String(manifest.franchiseLineage.length)} segments`,
   );
   return { ok: failures.length === 0, details, failures };
 }
@@ -509,7 +478,7 @@ function auditPoolContent(
     (p) => p.altIds?.bbref != null || p.altIds?.photoUrl != null,
   ).length;
   details.push(
-    `pools: ${key} fallback coverage ${String(withFallback)}/${String(pool.players.length)} Â· band ${pool.coverageSummary.coverageBand} Â· lowConfidence ${String(pool.coverageSummary.lowConfidenceShare)}`,
+    `pools: ${key} fallback coverage ${String(withFallback)}/${String(pool.players.length)} · band ${pool.coverageSummary.coverageBand} · lowConfidence ${String(pool.coverageSummary.lowConfidenceShare)}`,
   );
   if (manifest.assets.headshotUrlTemplate) {
     const missingMarker = pool.players.filter((p) => p.altIds?.nbaHeadshotAvailable == null);
@@ -617,7 +586,7 @@ async function auditBracket(
       const sorted = [...percentiles].sort((a, b) => a - b);
       const median = sorted[Math.floor(sorted.length / 2)] ?? 0;
       details.push(
-        `${label}: ${String(bracket.opponents.length)} opponents Â· ${String(bracket.schedule.length)} games Â· median pct ${median.toFixed(3)} Â· version ${bracket.bracketVersion}`,
+        `${label}: ${String(bracket.opponents.length)} opponents · ${String(bracket.schedule.length)} games · median pct ${median.toFixed(3)} · version ${bracket.bracketVersion}`,
       );
     } catch {
       failures.push(`${label}: asset missing (${assetPath})`);
@@ -772,230 +741,6 @@ async function auditGlobalAssets(
   }
   return { ok: failures.length === 0, details, failures };
 }
-function compareLaunchCollectionProgression(
-  rules: CollectionProgressionRules,
-  catalog: CollectionCatalog,
-): string[] {
-  const failures: string[] = [];
-  if (rules.targetMultiplierBp !== COLLECTION_TARGET_MULTIPLIER_BP) {
-    failures.push(
-      `collection-progression: targetMultiplierBp ${String(rules.targetMultiplierBp)} != ${String(COLLECTION_TARGET_MULTIPLIER_BP)}`,
-    );
-  }
-  if (rules.challenges.length !== COLLECTION_LAUNCH_CHALLENGES.length) {
-    failures.push(
-      `collection-progression: ${String(rules.challenges.length)} challenges, want ${String(COLLECTION_LAUNCH_CHALLENGES.length)}`,
-    );
-  }
-  for (let index = 0; index < COLLECTION_LAUNCH_CHALLENGES.length; index += 1) {
-    const expected = COLLECTION_LAUNCH_CHALLENGES[index];
-    if (expected === undefined) continue;
-    const actual = rules.challenges[index];
-    if (actual === undefined || actual.challengeId !== expected.challengeId) {
-      failures.push(
-        `collection-progression: challenge ${String(index)} is ${actual?.challengeId ?? 'missing'}, want ${expected.challengeId}`,
-      );
-      continue;
-    }
-    if (actual.displayName !== expected.displayName) {
-      failures.push(
-        `collection-progression: challenge ${expected.challengeId} display name ${actual.displayName} unexpected`,
-      );
-    }
-    if (actual.difficultyId !== expected.difficultyId) {
-      failures.push(
-        `collection-progression: challenge ${expected.challengeId} difficulty ${actual.difficultyId} != ${expected.difficultyId}`,
-      );
-    }
-    if (
-      actual.firstClearCoins !== expected.firstClearCoins ||
-      actual.repeatWinCoins !== expected.repeatWinCoins
-    ) {
-      failures.push(
-        `collection-progression: challenge ${expected.challengeId} coins ${String(actual.firstClearCoins)}/${String(actual.repeatWinCoins)} != ${String(expected.firstClearCoins)}/${String(expected.repeatWinCoins)}`,
-      );
-    }
-    if (canonicalJson(actual.requirement) !== canonicalJson(expected.requirement)) {
-      failures.push(
-        `collection-progression: challenge ${expected.challengeId} requirement does not match the launch definition`,
-      );
-    }
-  }
-  const launchChallengeIds = new Set(
-    COLLECTION_LAUNCH_CHALLENGES.map((entry) => entry.challengeId),
-  );
-  for (const actual of rules.challenges) {
-    if (!launchChallengeIds.has(actual.challengeId)) {
-      failures.push(`collection-progression: unexpected challenge ${actual.challengeId}`);
-    }
-  }
-  const expectedRewards = collectionLaunchSetRewardDefinitions(catalog);
-  if (rules.setRewards.length !== expectedRewards.length) {
-    failures.push(
-      `collection-progression: ${String(rules.setRewards.length)} set rewards, want ${String(expectedRewards.length)}`,
-    );
-  }
-  for (let index = 0; index < expectedRewards.length; index += 1) {
-    const expected = expectedRewards[index];
-    if (expected === undefined) continue;
-    const actual = rules.setRewards[index];
-    if (actual === undefined || actual.setId !== expected.setId) {
-      failures.push(
-        `collection-progression: set reward ${String(index)} is ${actual?.setId ?? 'missing'}, want ${expected.setId}`,
-      );
-      continue;
-    }
-    if (canonicalJson(actual) !== canonicalJson(expected)) {
-      failures.push(
-        `collection-progression: set reward ${expected.setId} does not match the launch definition`,
-      );
-    }
-  }
-  const launchSetIds = new Set(expectedRewards.map((entry) => entry.setId));
-  for (const actual of rules.setRewards) {
-    if (!launchSetIds.has(actual.setId)) {
-      failures.push(`collection-progression: unexpected set reward ${actual.setId}`);
-    }
-  }
-  return failures;
-}
-
-async function auditCollectionProgression(
-  entry: NonNullable<HoopRushManifest['collection']>,
-  catalog: CollectionCatalog,
-  catalogHash: string,
-  manifestDir: string,
-  verbose: boolean,
-): Promise<AuditResult> {
-  const failures: string[] = [];
-  const details: string[] = [];
-  const ref = entry.progressionRules;
-  if (ref === undefined) {
-    details.push('collection-progression: none packaged (run gen-collection-progression-rules)');
-    return { ok: true, details, failures };
-  }
-  const assetPath = isAbsolute(ref.url) ? ref.url : resolve(manifestDir, ref.url);
-  let content: Buffer;
-  try {
-    const info = await stat(assetPath);
-    if (!info.isFile()) {
-      failures.push(`collection-progression: asset is not a file (${assetPath})`);
-      return { ok: false, details, failures };
-    }
-    content = await readFile(assetPath);
-  } catch {
-    failures.push(`collection-progression: asset missing (${assetPath})`);
-    return { ok: false, details, failures };
-  }
-  const rulesHash = sha256Hex(content);
-  if (rulesHash !== ref.contentHash) {
-    failures.push(`collection-progression: content hash mismatch (${assetPath})`);
-  } else if (verbose) {
-    details.push(`collection-progression: hash verified (${assetPath})`);
-  }
-  let raw: unknown;
-  try {
-    raw = JSON.parse(content.toString('utf8')) as unknown;
-  } catch {
-    failures.push('collection-progression: artifact is not valid JSON');
-    return { ok: false, details, failures };
-  }
-  const parsed = collectionProgressionRulesSchema.safeParse(raw);
-  if (!parsed.success) {
-    failures.push(
-      `collection-progression: schema failure: ${parsed.error.issues[0]?.path.join('.') ?? '(root)'} ${parsed.error.issues[0]?.message ?? 'unknown'}`,
-    );
-    return { ok: false, details, failures };
-  }
-  const rules = parsed.data;
-  try {
-    validateCollectionProgressionRules({
-      progression: rules,
-      progressionHash: rulesHash,
-      catalog,
-      verifyFeasibility: true,
-    });
-  } catch (error) {
-    failures.push(`collection-progression: ${(error as Error).message}`);
-  }
-  if (rules.sourceCatalogHash !== catalogHash) {
-    failures.push('collection-progression: sourceCatalogHash does not match the pinned catalog');
-  }
-  const sourceCatalogVersion: string = rules.sourceCatalogVersion;
-  if (sourceCatalogVersion !== COLLECTION_CATALOG_VERSION) {
-    failures.push(
-      `collection-progression: sourceCatalogVersion ${sourceCatalogVersion} unexpected`,
-    );
-  }
-  failures.push(...compareLaunchCollectionProgression(rules, catalog));
-  details.push(
-    `collection-progression: ${rules.progressionVersion} Â· ${String(rules.challenges.length)} challenges Â· ${String(rules.setRewards.length)} set rewards Â· multiplier ${String(rules.targetMultiplierBp)} bp Â· ${String(content.length)} bytes`,
-  );
-
-  const targetsRef = entry.progressionTargets;
-  if (targetsRef === undefined) {
-    details.push('collection-progression-targets: none packaged (calibration not frozen)');
-    return { ok: failures.length === 0, details, failures };
-  }
-  const targetsPath = isAbsolute(targetsRef.url)
-    ? targetsRef.url
-    : resolve(manifestDir, targetsRef.url);
-  let targetsContent: Buffer;
-  try {
-    const info = await stat(targetsPath);
-    if (!info.isFile()) {
-      failures.push(`collection-progression-targets: asset is not a file (${targetsPath})`);
-      return { ok: false, details, failures };
-    }
-    targetsContent = await readFile(targetsPath);
-  } catch {
-    failures.push(`collection-progression-targets: asset missing (${targetsPath})`);
-    return { ok: false, details, failures };
-  }
-  if (sha256Hex(targetsContent) !== targetsRef.contentHash) {
-    failures.push(`collection-progression-targets: content hash mismatch (${targetsPath})`);
-  } else if (verbose) {
-    details.push(`collection-progression-targets: hash verified (${targetsPath})`);
-  }
-  let targetsRaw: unknown;
-  try {
-    targetsRaw = JSON.parse(targetsContent.toString('utf8')) as unknown;
-  } catch {
-    failures.push('collection-progression-targets: artifact is not valid JSON');
-    return { ok: false, details, failures };
-  }
-  const targetsParsed = collectionProgressionTargetsSchema.safeParse(targetsRaw);
-  if (!targetsParsed.success) {
-    failures.push(
-      `collection-progression-targets: schema failure: ${targetsParsed.error.issues[0]?.path.join('.') ?? '(root)'} ${targetsParsed.error.issues[0]?.message ?? 'unknown'}`,
-    );
-    return { ok: false, details, failures };
-  }
-  const targets = targetsParsed.data;
-  if (targets.progressionRulesHash !== ref.contentHash) {
-    failures.push(
-      'collection-progression-targets: progressionRulesHash does not match the packaged progression rules',
-    );
-  }
-  if (targets.catalogHash !== catalogHash) {
-    failures.push(
-      'collection-progression-targets: catalogHash does not match the packaged catalog',
-    );
-  }
-  const failedGates = Object.entries(targets.gates)
-    .filter(([, pass]) => !pass)
-    .map(([name]) => name);
-  if (failedGates.length > 0) {
-    failures.push(`collection-progression-targets: failed gates ${failedGates.join(', ')}`);
-  } else if (verbose) {
-    details.push('collection-progression-targets: all recorded gates pass');
-  }
-  details.push(
-    `collection-progression-targets: ${targets.targetsVersion} Â· ${String(targets.fixtures.length)} fixtures Â· ${String(Object.keys(targets.gates).length)} gates`,
-  );
-  return { ok: failures.length === 0, details, failures };
-}
-
 async function auditCollectionCatalog(
   manifest: HoopRushManifest,
   manifestDir: string,
@@ -1172,324 +917,8 @@ async function auditCollectionCatalog(
   }
   void COLLECTION_ECONOMY_VERSION;
   details.push(
-    `collection: ${String(catalog.cards.length)} cards (${String(baseCount)} base + ${String(activeSpecialCount)} specials) Â· ${String(catalog.sets.length)} sets Â· ${String(catalog.packs.length)} packs Â· ${String(catalogContent.length)} bytes`,
+    `collection: ${String(catalog.cards.length)} cards (${String(baseCount)} base + ${String(activeSpecialCount)} specials) · ${String(catalog.sets.length)} sets · ${String(catalog.packs.length)} packs · ${String(catalogContent.length)} bytes`,
   );
-  const progression = await auditCollectionProgression(
-    entry,
-    catalog,
-    entry.catalog.contentHash,
-    manifestDir,
-    verbose,
-  );
-  failures.push(...progression.failures);
-  details.push(...progression.details);
-  return { ok: failures.length === 0, details, failures };
-}
-const COLLECTION_EXPECTED_OBJECTIVE_THRESHOLDS: Record<string, number> = {
-  'obj-three-barrage-v1': 12,
-  'obj-lock-score-v1': 105,
-  'obj-bench-spark-v1': 25,
-  'obj-ball-pressure-v1': 14,
-  'obj-own-glass-v1': 10,
-  'obj-box-score-star-v1': 10,
-};
-const COLLECTION_EXPECTED_REPEAT_MAX: Record<string, number> = {
-  street: 150,
-  pro: 203,
-  legend: 263,
-};
-function collectionMaxRepeatReward(multiplierBp: number): number {
-  const outcome = collectionScaleRewardCoins(COLLECTION_GAME_REWARD_WIN_COINS, multiplierBp);
-  const objective = collectionScaleRewardCoins(
-    COLLECTION_GAME_REWARD_OBJECTIVE_COINS,
-    multiplierBp,
-  );
-  const margin = collectionScaleRewardCoins(
-    COLLECTION_GAME_REWARD_MARGIN_COIN_PER_POINT * COLLECTION_GAME_REWARD_MARGIN_CAP_POINTS,
-    multiplierBp,
-  );
-  return outcome + objective + margin;
-}
-export async function auditCollectionGameRules(
-  manifest: HoopRushManifest,
-  manifestDir: string,
-  verbose: boolean,
-  rawManifest: unknown,
-): Promise<AuditResult> {
-  const failures: string[] = [];
-  const details: string[] = [];
-  const entry = manifest.collection;
-  if (entry === undefined) {
-    details.push('collection-game-rules: none packaged');
-    return { ok: true, details, failures };
-  }
-  const ref = entry.gameRules;
-  if (ref === undefined) {
-    failures.push('collection-game-rules: manifest collection is missing the gameRules entry');
-    return { ok: false, details, failures };
-  }
-  const assetPath = isAbsolute(ref.url) ? ref.url : resolve(manifestDir, ref.url);
-  let content: Buffer;
-  try {
-    const info = await stat(assetPath);
-    if (!info.isFile()) {
-      failures.push(`collection-game-rules: asset is not a file (${assetPath})`);
-      return { ok: false, details, failures };
-    }
-    content = await readFile(assetPath);
-  } catch {
-    failures.push(`collection-game-rules: asset missing (${assetPath})`);
-    return { ok: false, details, failures };
-  }
-  const actualHash = sha256Hex(content);
-  if (actualHash !== ref.contentHash) {
-    failures.push(`collection-game-rules: content hash mismatch (${assetPath})`);
-  } else if (verbose) {
-    details.push(`collection-game-rules: hash verified (${assetPath})`);
-  }
-  let raw: unknown;
-  try {
-    raw = JSON.parse(content.toString('utf8')) as unknown;
-  } catch {
-    failures.push('collection-game-rules: artifact is not valid JSON');
-    return { ok: false, details, failures };
-  }
-  const parsed = collectionGameRulesSchema.safeParse(raw);
-  if (!parsed.success) {
-    failures.push(
-      `collection-game-rules: schema failure: ${parsed.error.issues[0]?.path.join('.') ?? '(root)'} ${parsed.error.issues[0]?.message ?? 'unknown'}`,
-    );
-    return { ok: false, details, failures };
-  }
-  const rules = parsed.data;
-  const versions: Array<[string, string, string]> = [
-    ['rulesVersion', rules.rulesVersion, COLLECTION_GAME_RULES_VERSION],
-    ['gameVersion', rules.gameVersion, COLLECTION_GAME_V2_VERSION],
-    ['teamVersion', rules.teamVersion, COLLECTION_TEAM_VERSION],
-    ['rewardVersion', rules.rewardVersion, COLLECTION_REWARD_V2_VERSION],
-    ['replayVersion', rules.replayVersion, COLLECTION_GAME_V2_REPLAY_VERSION],
-    ['difficultyVersion', rules.difficultyVersion, COLLECTION_DIFFICULTY_VERSION],
-    ['objectiveVersion', rules.objectiveVersion, COLLECTION_OBJECTIVE_VERSION],
-  ];
-  for (const [label, value, expected] of versions) {
-    if (value !== expected) {
-      failures.push(`collection-game-rules: ${label} ${value} unexpected (want ${expected})`);
-    }
-  }
-  const cpuRosterSize: number = rules.cpuRosterSize;
-  if (cpuRosterSize !== 12) {
-    failures.push(`collection-game-rules: cpuRosterSize ${String(cpuRosterSize)} != 12`);
-  }
-  const eligibleScope: string = rules.eligibleScope;
-  if (eligibleScope !== 'full-catalog') {
-    failures.push('collection-game-rules: eligibleScope must be full-catalog');
-  }
-  const environmentEraId: string = rules.environmentEraId;
-  if (environmentEraId !== '2020s') {
-    failures.push(`collection-game-rules: environmentEraId ${environmentEraId} != 2020s`);
-  }
-  const homeCourtPolicy: string = rules.homeCourtPolicy;
-  if (homeCourtPolicy !== 'neutral-home-court') {
-    failures.push('collection-game-rules: homeCourtPolicy must be neutral-home-court');
-  }
-  for (let index = 0; index < COLLECTION_DIFFICULTY_ORDER.length; index += 1) {
-    const expectedId = COLLECTION_DIFFICULTY_ORDER[index];
-    if (rules.difficulties[index]?.difficultyId !== expectedId) {
-      failures.push('collection-game-rules: difficulties must be ordered street, pro, legend');
-      break;
-    }
-  }
-  const rarityIndex = new Map<string, number>(
-    COLLECTION_RARITY_ORDER.map((rarity, index) => [rarity, index]),
-  );
-  for (const profile of rules.difficulties) {
-    const profileVersion: string = profile.difficultyVersion;
-    const rulesDifficultyVersion: string = rules.difficultyVersion;
-    if (profileVersion !== rulesDifficultyVersion) {
-      failures.push(
-        `collection-game-rules: ${profile.difficultyId} difficultyVersion does not match the rules`,
-      );
-    }
-    let total = 0;
-    const seen = new Set<string>();
-    for (const entry of profile.rarityWeightsBp) {
-      total += entry.weightBp;
-      seen.add(entry.rarity);
-      const low = rarityIndex.get(profile.rarityBand.floor) ?? 0;
-      const high = rarityIndex.get(profile.rarityBand.ceiling) ?? 0;
-      const index = rarityIndex.get(entry.rarity) ?? -1;
-      if (index < low || index > high) {
-        failures.push(
-          `collection-game-rules: ${profile.difficultyId} weight ${entry.rarity} is outside the band`,
-        );
-      }
-    }
-    if (total !== 10_000) {
-      failures.push(
-        `collection-game-rules: ${profile.difficultyId} rarity weights sum to ${String(total)} bp`,
-      );
-    }
-    for (const rarity of COLLECTION_RARITY_ORDER) {
-      const low = rarityIndex.get(profile.rarityBand.floor) ?? 0;
-      const high = rarityIndex.get(profile.rarityBand.ceiling) ?? 0;
-      const index = rarityIndex.get(rarity) ?? -1;
-      if (index >= low && index <= high && !seen.has(rarity)) {
-        failures.push(
-          `collection-game-rules: ${profile.difficultyId} is missing band weight ${rarity}`,
-        );
-      }
-    }
-  }
-  for (let index = 1; index < rules.difficulties.length; index += 1) {
-    const previous = rules.difficulties[index - 1];
-    const current = rules.difficulties[index];
-    if (previous === undefined || current === undefined) continue;
-    if (current.ratingShift <= previous.ratingShift) {
-      failures.push('collection-game-rules: rating shifts must strictly increase with difficulty');
-    }
-    if (current.rewardMultiplierBp <= previous.rewardMultiplierBp) {
-      failures.push(
-        'collection-game-rules: reward multipliers must strictly increase with difficulty',
-      );
-    }
-  }
-  const objectiveIds = new Set<string>();
-  for (const objective of rules.objectives) {
-    if (objectiveIds.has(objective.objectiveId)) {
-      failures.push(`collection-game-rules: duplicate objective ${objective.objectiveId}`);
-    }
-    objectiveIds.add(objective.objectiveId);
-    const objectiveVersion: string = objective.objectiveVersion;
-    const rulesObjectiveVersion: string = rules.objectiveVersion;
-    if (objectiveVersion !== rulesObjectiveVersion) {
-      failures.push(
-        `collection-game-rules: objective ${objective.objectiveId} version does not match the rules`,
-      );
-    }
-    const expected = COLLECTION_EXPECTED_OBJECTIVE_THRESHOLDS[objective.objectiveId];
-    if (expected === undefined) {
-      failures.push(`collection-game-rules: unexpected objective ${objective.objectiveId}`);
-    } else if (objective.threshold !== expected) {
-      failures.push(
-        `collection-game-rules: threshold for ${objective.objectiveId} is ${String(objective.threshold)}, want ${String(expected)}`,
-      );
-    }
-  }
-  for (const objectiveId of Object.keys(COLLECTION_EXPECTED_OBJECTIVE_THRESHOLDS)) {
-    if (!objectiveIds.has(objectiveId)) {
-      failures.push(`collection-game-rules: missing objective definition ${objectiveId}`);
-    }
-  }
-  if (rules.objectives.length !== Object.keys(COLLECTION_EXPECTED_OBJECTIVE_THRESHOLDS).length) {
-    failures.push(
-      `collection-game-rules: ${String(rules.objectives.length)} objectives, want ${String(Object.keys(COLLECTION_EXPECTED_OBJECTIVE_THRESHOLDS).length)}`,
-    );
-  }
-  const reward = rules.rewardTable;
-  const winCoins: number = reward.winCoins;
-  const lossCoins: number = reward.lossCoins;
-  const objectiveCoins: number = reward.objectiveCoins;
-  const marginCoinPerPoint: number = reward.marginCoinPerPoint;
-  const marginCapPoints: number = reward.marginCapPoints;
-  if (
-    winCoins !== COLLECTION_GAME_REWARD_WIN_COINS ||
-    lossCoins !== COLLECTION_GAME_REWARD_LOSS_COINS
-  ) {
-    failures.push(
-      `collection-game-rules: reward table outcome must be win ${String(COLLECTION_GAME_REWARD_WIN_COINS)} / loss ${String(COLLECTION_GAME_REWARD_LOSS_COINS)}`,
-    );
-  }
-  if (
-    objectiveCoins !== COLLECTION_GAME_REWARD_OBJECTIVE_COINS ||
-    marginCoinPerPoint !== COLLECTION_GAME_REWARD_MARGIN_COIN_PER_POINT ||
-    marginCapPoints !== COLLECTION_GAME_REWARD_MARGIN_CAP_POINTS
-  ) {
-    failures.push('collection-game-rules: reward table objective/margin values unexpected');
-  }
-  for (const difficultyId of COLLECTION_DIFFICULTY_ORDER) {
-    if (reward.firstClearCoins[difficultyId] !== COLLECTION_GAME_FIRST_CLEAR_COINS[difficultyId]) {
-      failures.push(
-        `collection-game-rules: first clear for ${difficultyId} must be ${String(COLLECTION_GAME_FIRST_CLEAR_COINS[difficultyId])}`,
-      );
-    }
-  }
-  for (const profile of rules.difficulties) {
-    const maximum = collectionMaxRepeatReward(profile.rewardMultiplierBp);
-    const expected = COLLECTION_EXPECTED_REPEAT_MAX[profile.difficultyId];
-    if (expected === undefined || maximum !== expected) {
-      failures.push(
-        `collection-game-rules: ${profile.difficultyId} repeat maximum ${String(maximum)} != ${String(expected ?? -1)}`,
-      );
-    }
-  }
-  details.push(
-    `collection-game-rules: ${rules.rulesVersion} Â· ${String(rules.difficulties.length)} difficulties Â· ${String(rules.objectives.length)} objectives Â· repeat maxima ${rules.difficulties.map((profile) => `${profile.difficultyId} ${String(collectionMaxRepeatReward(profile.rewardMultiplierBp))}`).join(' / ')} Â· ${String(content.length)} bytes`,
-  );
-
-  const targetsRef = (
-    rawManifest as {
-      collection?: { gameTargets?: { url?: string; contentHash?: string } };
-    }
-  ).collection?.gameTargets;
-  if (targetsRef?.url === undefined || targetsRef.contentHash === undefined) {
-    details.push('collection-game-targets: none packaged (calibration not frozen)');
-  } else {
-    const targetsPath = isAbsolute(targetsRef.url)
-      ? targetsRef.url
-      : resolve(manifestDir, targetsRef.url);
-    let targetsContent: Buffer;
-    try {
-      const info = await stat(targetsPath);
-      if (!info.isFile()) {
-        failures.push(`collection-game-targets: asset is not a file (${targetsPath})`);
-        return { ok: false, details, failures };
-      }
-      targetsContent = await readFile(targetsPath);
-    } catch {
-      failures.push(`collection-game-targets: asset missing (${targetsPath})`);
-      return { ok: false, details, failures };
-    }
-    if (sha256Hex(targetsContent) !== targetsRef.contentHash) {
-      failures.push(`collection-game-targets: content hash mismatch (${targetsPath})`);
-    } else if (verbose) {
-      details.push(`collection-game-targets: hash verified (${targetsPath})`);
-    }
-    let targetsRaw: unknown;
-    try {
-      targetsRaw = JSON.parse(targetsContent.toString('utf8')) as unknown;
-    } catch {
-      failures.push('collection-game-targets: artifact is not valid JSON');
-      return { ok: false, details, failures };
-    }
-    const targetsParsed = collectionGameTargetsSchema.safeParse(targetsRaw);
-    if (!targetsParsed.success) {
-      failures.push(
-        `collection-game-targets: schema failure: ${targetsParsed.error.issues[0]?.path.join('.') ?? '(root)'} ${targetsParsed.error.issues[0]?.message ?? 'unknown'}`,
-      );
-      return { ok: false, details, failures };
-    }
-    const targets = targetsParsed.data;
-    if (targets.rulesHash !== actualHash) {
-      failures.push('collection-game-targets: rulesHash does not match the packaged game rules');
-    }
-    if (targets.catalogHash !== entry.catalog.contentHash) {
-      failures.push('collection-game-targets: catalogHash does not match the packaged catalog');
-    }
-    if (targets.fixtures.length < 4) {
-      failures.push('collection-game-targets: fewer than four collection-strength fixtures');
-    }
-    const failedGates = Object.entries(targets.gates)
-      .filter(([, pass]) => !pass)
-      .map(([name]) => name);
-    if (failedGates.length > 0) {
-      failures.push(`collection-game-targets: failed gates ${failedGates.join(', ')}`);
-    } else if (verbose) {
-      details.push('collection-game-targets: all recorded gates pass');
-    }
-    details.push(
-      `collection-game-targets: ${targets.targetsVersion} Â· ${String(targets.fixtures.length)} fixtures Â· ${String(Object.keys(targets.gates).length)} gates`,
-    );
-  }
   return { ok: failures.length === 0, details, failures };
 }
 export async function dataValidate(inputPath: string, verbose: boolean): Promise<CliReport> {
@@ -1537,7 +966,6 @@ export async function dataValidate(inputPath: string, verbose: boolean): Promise
     await auditBracket(manifest, manifestDir, verbose),
     await auditGlobalAssets(manifest, manifestDir, verbose),
     await auditCollectionCatalog(manifest, manifestDir, verbose),
-    await auditCollectionGameRules(manifest, manifestDir, verbose, parsed),
     auditAssets(manifest),
   ];
   const details = [`dataVersion ${manifest.dataVersion}`, ...audits.flatMap((a) => a.details)];

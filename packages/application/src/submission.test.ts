@@ -9,17 +9,17 @@ const RETRY_POLICY: SubmissionPolicy = {
 };
 
 const SURFACE_POLICY: SubmissionPolicy = {
-  intent: 'collection-command',
+  intent: 'multiplayer-command',
   conflict: 'surface',
   maxAttempts: 1,
   requiresDigest: true,
 };
 
-const PACK_PURCHASE_POLICY: SubmissionPolicy = {
-  intent: 'collection-pack-purchase',
+const SURFACE_ERROR_POLICY: SubmissionPolicy = {
+  intent: 'multiplayer-command',
   conflict: 'surface',
   maxAttempts: 1,
-  requiresDigest: true,
+  requiresDigest: false,
 };
 
 interface FakeReceipt {
@@ -157,9 +157,9 @@ describe('runSubmission', () => {
   });
 
   it('classifies thrown stale errors via classifyError', async () => {
-    const stale = new Error('stale collection state');
+    const stale = new Error('stale multiplayer state');
     const report = await runSubmission(
-      PACK_PURCHASE_POLICY,
+      SURFACE_ERROR_POLICY,
       {},
       {
         submit: () => Promise.reject(stale),
@@ -176,7 +176,7 @@ describe('runSubmission', () => {
     const fatal = new Error('boom');
     await expect(
       runSubmission(
-        PACK_PURCHASE_POLICY,
+        SURFACE_ERROR_POLICY,
         {},
         {
           submit: () => Promise.reject(fatal),

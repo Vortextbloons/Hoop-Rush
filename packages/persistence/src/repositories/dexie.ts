@@ -33,18 +33,6 @@ import type {
   StoredDraftDuelResultRow,
 } from '../schemas/draft-duel-record.ts';
 import type {
-  StoredCollectionCommandRow,
-  StoredCollectionLedgerRow,
-  StoredCollectionOwnershipRow,
-  StoredCollectionPullRow,
-  StoredCollectionStateRow,
-} from '../schemas/collection-record.ts';
-import type {
-  StoredCollectionGameCommandRow,
-  StoredCollectionGameRow,
-  StoredCollectionPlayStateRow,
-} from '../schemas/collection-record.ts';
-import type {
   StoredHavocActiveRun,
   StoredHavocCommandRow,
   StoredHavocCompletedRun,
@@ -95,14 +83,6 @@ export const HOOP_RUSH_DATABASE_STORES: Record<string, string> = {
   draftDuelResults: '[roomId+gameNumber], roomId',
   draftDuelCompleted: 'roomId',
   draftDuelHistory: 'recordId, completedAtIso',
-  collectionState: 'collectionId',
-  collectionOwnership: '[collectionId+cardId], collectionId',
-  collectionPulls: '[collectionId+pullSequence], collectionId',
-  collectionLedger: '[collectionId+transactionId], collectionId',
-  collectionCommands: '[collectionId+commandId], collectionId',
-  collectionPlayState: 'collectionId',
-  collectionGames: '[collectionId+gameId], collectionId',
-  collectionGameCommands: '[collectionId+commandId], collectionId',
   havocActiveRuns: 'recordId',
   havocCommands: 'commandId, runId',
   havocGames: '[runId+variant+gameNumber], runId, [runId+variant]',
@@ -118,6 +98,14 @@ export const HOOP_RUSH_DATABASE_V2_STORES: Record<string, string> = {
   havocMultiplayerCompleted: 'roomId',
   havocMultiplayerHistory: 'recordId, completedAtIso',
 };
+
+const COLLECTION_STORE_PREFIX = 'collection';
+
+export const HOOP_RUSH_DATABASE_V3_STORES: Record<string, string> = Object.fromEntries(
+  Object.entries({ ...HOOP_RUSH_DATABASE_STORES, ...HOOP_RUSH_DATABASE_V2_STORES }).filter(
+    ([name]) => !name.startsWith(COLLECTION_STORE_PREFIX),
+  ),
+);
 export class HoopRushDatabase extends Dexie {
   active!: EntityTable<ActiveRunCheckpoint, 'recordId'>;
   activeGames!: Table<ActiveGameRow, [string, number]>;
@@ -134,14 +122,6 @@ export class HoopRushDatabase extends Dexie {
   draftDuelResults!: Table<StoredDraftDuelResultRow, [string, number]>;
   draftDuelCompleted!: EntityTable<StoredDraftDuelCompleted, 'roomId'>;
   draftDuelHistory!: EntityTable<StoredDraftDuelHistoryIndex, 'recordId'>;
-  collectionState!: EntityTable<StoredCollectionStateRow, 'collectionId'>;
-  collectionOwnership!: Table<StoredCollectionOwnershipRow, [string, string]>;
-  collectionPulls!: Table<StoredCollectionPullRow, [string, number]>;
-  collectionLedger!: Table<StoredCollectionLedgerRow, [string, string]>;
-  collectionCommands!: Table<StoredCollectionCommandRow, [string, string]>;
-  collectionPlayState!: EntityTable<StoredCollectionPlayStateRow, 'collectionId'>;
-  collectionGames!: Table<StoredCollectionGameRow, [string, string]>;
-  collectionGameCommands!: Table<StoredCollectionGameCommandRow, [string, string]>;
   havocActiveRuns!: EntityTable<StoredHavocActiveRun, 'recordId'>;
   havocCommands!: EntityTable<StoredHavocCommandRow, 'commandId'>;
   havocGames!: Table<StoredHavocGameRow, [string, string, number]>;
@@ -157,6 +137,7 @@ export class HoopRushDatabase extends Dexie {
     super(name);
     this.version(1).stores(HOOP_RUSH_DATABASE_STORES);
     this.version(2).stores(HOOP_RUSH_DATABASE_V2_STORES);
+    this.version(3).stores(HOOP_RUSH_DATABASE_V3_STORES);
   }
 }
 export class DexieChallengeRepository {

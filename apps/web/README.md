@@ -10,8 +10,8 @@ routes/ and lib/features/<mode>/  ->  @hoop-rush/application sessions  ->  engin
                                        ^ persistence, workers, assets are ports
 ```
 
-- Mode code lives under `src/lib/features/<mode>/` (challenge, havoc,
-  collection, draft-duel, fixed-five, havoc-multiplayer). Shared room and lobby
+- Mode code lives under `src/lib/features/<mode>/` (challenge, havoc, draft-duel,
+  fixed-five, havoc-multiplayer). Shared room and lobby
   infrastructure lives in `src/lib/features/multiplayer/`.
 - `src/lib/modes/catalog.ts` registers discovery, formats, preserved routes,
   and lazy settings/room adapters. Add modes through this catalog and their
@@ -19,9 +19,8 @@ routes/ and lib/features/<mode>/  ->  @hoop-rush/application sessions  ->  engin
 - The root layout owns one lobby coordinator. It consumes application lobby
   snapshots/navigation intents, polls through one non-overlapping scheduler,
   and refreshes on focus/reconnection. Room layouts scope mode sessions.
-- Mode sessions (`ChallengeSession`, `HavocSession`,
-  `CollectionPlaySession`, `DraftDuelSession`, `FixedFiveRoomSession`,
-  `HavocMultiplayerSession`) live in
+- Mode sessions (`ChallengeSession`, `HavocSession`, `DraftDuelSession`,
+  `FixedFiveRoomSession`, `HavocMultiplayerSession`) live in
   `@hoop-rush/application` behind ports. Web composes them with browser
   adapters; do not reintroduce Dexie, workers, or localStorage into the
   application package.
@@ -54,6 +53,6 @@ pnpm exec vitest run --project @hoop-rush/web <path>
 pnpm build
 ```
 
-Journeys that need a browser (classic draft into a run, collection play,
-havoc run, multiplayer room) are manual smoke
+Journeys that need a browser (classic draft into a run, havoc run, multiplayer
+room) are manual smoke
 checks; browser automation has been removed.

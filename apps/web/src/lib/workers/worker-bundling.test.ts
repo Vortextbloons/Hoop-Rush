@@ -15,7 +15,6 @@ describe('worker bundling', () => {
           input: [
             'src/lib/features/havoc-multiplayer/havoc-multiplayer-runner.ts',
             'src/lib/features/draft-duel/draft-duel-runner.ts',
-            'src/lib/features/collection/collection-worker-runner.ts',
           ],
         },
       },
@@ -29,11 +28,7 @@ describe('worker bundling', () => {
       expect(item.fileName).not.toMatch(/\.ts$/);
       if (item.type === 'chunk') expect(item.code).not.toContain('data:video/mp2t');
     }
-    for (const worker of [
-      'havoc-multiplayer-worker',
-      'draft-duel-game-worker',
-      'collection-game-worker',
-    ]) {
+    for (const worker of ['havoc-multiplayer-worker', 'draft-duel-game-worker']) {
       expect(
         output.some(
           (item) => item.fileName.includes(`${worker}-`) && item.fileName.endsWith('.js'),

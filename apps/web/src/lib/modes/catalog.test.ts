@@ -31,7 +31,6 @@ describe('mode catalog', () => {
       ['Classic', '/classic'],
       ['Sandbox', '/sandbox'],
       ['Hoop Havoc', '/havoc'],
-      ['Ultimate Run', '/ultimate/run'],
     ]);
     expect(modeNavigation().map((mode) => mode.id)).toEqual(homeModes().map((mode) => mode.id));
     expect(multiplayerFormats().map((format) => format.id)).toEqual([

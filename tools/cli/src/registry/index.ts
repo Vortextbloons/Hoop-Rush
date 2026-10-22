@@ -3,7 +3,6 @@ import { dataCommands } from './data.ts';
 import { havocCommands } from './havoc.ts';
 import { simCommands } from './sim.ts';
 import { docsCommands } from './docs.ts';
-import { collectionCommands } from './collection.ts';
 import { projectionCommands } from './projection.ts';
 import { importCommands } from './import.ts';
 import { helpReport, type CommandSpec } from './core.ts';
@@ -18,7 +17,6 @@ for (const commands of [
   havocCommands,
   simCommands,
   docsCommands,
-  collectionCommands,
   projectionCommands,
   importCommands,
 ]) {
@@ -60,14 +58,6 @@ calibrate sensitivity
 calibrate ratings
 calibrate three-point
 combine docs
-collection pack-audit
-collection pull-reproduce
-collection pack-calibrate
-collection game-audit
-collection game-reproduce
-collection game-calibrate
-collection progression-audit
-collection progression-calibrate
 projection base
 projection build
 projection calibrate-base
