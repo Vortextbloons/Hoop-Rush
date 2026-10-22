@@ -157,7 +157,7 @@ describe('havoc tier-2 rules', () => {
     if (run === null) return;
     const loop = eventsOf(run, 'rebound-loop')[0];
     if (loop?.kind !== 'rebound-loop') throw new Error('missing rebound loop');
-    expect(loop.reboundOrdinal % 4).toBe(0);
+    expect(loop.reboundOrdinal % 3).toBe(0);
     expect(loop.granted).toBeGreaterThanOrEqual(1);
     const started = run.tape.events.find(
       (event) => event.kind === 'extra-possession' && event.outcome === 'started',

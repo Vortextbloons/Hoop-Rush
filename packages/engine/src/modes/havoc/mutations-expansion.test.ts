@@ -132,6 +132,11 @@ function eventsOf(run: ScenarioRun, kind: HavocEvent['kind']): HavocEvent[] {
   return run.tape.events.filter((event) => event.kind === kind);
 }
 
+function decayDeltaOf(run: ScenarioRun, shooterInstanceId: string): number {
+  const human = run.input.home.side === 'human' ? run.input.home : run.input.away;
+  return human.starters.some((participant) => participant.instanceId === shooterInstanceId) ? 3 : 5;
+}
+
 function entryOf(run: ScenarioRun, sequence: number | null): HavocScoringEntry | undefined {
   if (sequence === null) return undefined;
   return run.tape.scoring.find((entry) => entry.sequence === sequence);
@@ -157,7 +162,7 @@ function sourceWith(
 }
 
 describe('new tier-1 transformations', () => {
-  it('swaps the five strongest and weakest ratings with key-order tie breaks', () => {
+  it('shifts the five strongest ratings down and the five weakest up with key-order tie breaks', () => {
     const flipped = applyHavocMutationPackage(
       sourceWith({
         ratings: {
@@ -183,35 +188,36 @@ describe('new tier-1 transformations', () => {
       }),
       [{ mutationId: 'opposite-day' }],
     );
-    expect(flipped.ratings.insideScoring).toBe(0);
-    expect(flipped.ratings.closeShot).toBe(0);
-    expect(flipped.ratings.midrange).toBe(0);
-    expect(flipped.ratings.threePoint).toBe(0);
-    expect(flipped.ratings.vertical).toBe(5);
-    expect(flipped.ratings.perimeterDefense).toBe(100);
-    expect(flipped.ratings.interiorDefense).toBe(100);
-    expect(flipped.ratings.steal).toBe(90);
-    expect(flipped.ratings.block).toBe(80);
-    expect(flipped.ratings.defensiveRebound).toBe(75);
+    expect(flipped.ratings.insideScoring).toBe(85);
+    expect(flipped.ratings.closeShot).toBe(85);
+    expect(flipped.ratings.midrange).toBe(75);
+    expect(flipped.ratings.threePoint).toBe(65);
+    expect(flipped.ratings.vertical).toBe(60);
+    expect(flipped.ratings.perimeterDefense).toBe(20);
+    expect(flipped.ratings.interiorDefense).toBe(20);
+    expect(flipped.ratings.steal).toBe(20);
+    expect(flipped.ratings.block).toBe(20);
+    expect(flipped.ratings.defensiveRebound).toBe(25);
     expect(flipped.ratings.freeThrow).toBe(70);
     expect(flipped.ratings.ballHandling).toBe(60);
     expect(flipped.ratings.passing).toBe(55);
     expect(flipped.ratings.offensiveIq).toBe(45);
+    expect(flipped.ratings.offensiveRebound).toBe(10);
     expect(flipped.ratings.defensiveIq).toBe(35);
     expect(flipped.ratings.speed).toBe(65);
     expect(flipped.ratings.strength).toBe(25);
   });
 
-  it('builds Tiny Titan at 62 inches with giant interior ratings and capped speed', () => {
+  it('builds Tiny Titan 12 inches shorter with 90 interior ratings and capped speed', () => {
     const titan = applyHavocMutationPackage(sourceWith({ heightInches: 79 }), [
       { mutationId: 'tiny-titan' },
     ]);
-    expect(titan.physical.heightInches).toBe(62);
-    expect(titan.ratings.strength).toBe(99);
-    expect(titan.ratings.block).toBe(99);
-    expect(titan.ratings.vertical).toBe(99);
-    expect(titan.ratings.offensiveRebound).toBe(99);
-    expect(titan.ratings.defensiveRebound).toBe(99);
+    expect(titan.physical.heightInches).toBe(67);
+    expect(titan.ratings.strength).toBe(90);
+    expect(titan.ratings.block).toBe(90);
+    expect(titan.ratings.vertical).toBe(90);
+    expect(titan.ratings.offensiveRebound).toBe(90);
+    expect(titan.ratings.defensiveRebound).toBe(90);
     expect(titan.ratings.speed).toBe(40);
     const slowerSource = applyHavocMutationPackage(sourceWith({ ratings: { speed: 35 } }), [
       { mutationId: 'tiny-titan' },
@@ -219,15 +225,25 @@ describe('new tier-1 transformations', () => {
     expect(slowerSource.ratings.speed).toBe(35);
   });
 
-  it('sets every rating to exactly 88 under Mr. Everything', () => {
-    const everything = applyHavocMutationPackage(sourceWith(), [{ mutationId: 'mr-everything' }]);
+  it('adds 15 to every rating and tendency under Mr. Everything', () => {
+    const source = sourceWith();
+    const everything = applyHavocMutationPackage(source, [{ mutationId: 'mr-everything' }]);
     for (const field of REQUIRED_RATING_KEYS) {
-      expect(everything.ratings[field]).toBe(88);
+      expect(everything.ratings[field], field).toBe(
+        Math.min(100, source.profile.ratings[field] + 15),
+      );
+    }
+    for (const field of Object.keys(
+      source.profile.tendencies,
+    ) as (keyof typeof everything.tendencies)[]) {
+      expect(everything.tendencies[field], field).toBe(
+        Math.min(100, source.profile.tendencies[field] + 15),
+      );
     }
     expect(everything.physical.heightInches).toBe(76);
   });
 
-  it('raises Foul Merchant free-throw channels and caps three-point', () => {
+  it('raises Foul Merchant free-throw channels and subtracts 30 from three-point', () => {
     const merchant = applyHavocMutationPackage(
       sourceWith({
         ratings: { threePoint: 95 },
@@ -235,15 +251,15 @@ describe('new tier-1 transformations', () => {
       }),
       [{ mutationId: 'foul-merchant' }],
     );
-    expect(merchant.ratings.freeThrow).toBe(99);
-    expect(merchant.ratings.ballHandling).toBe(99);
-    expect(merchant.ratings.offensiveIq).toBe(99);
+    expect(merchant.ratings.freeThrow).toBe(100);
+    expect(merchant.ratings.ballHandling).toBe(100);
+    expect(merchant.ratings.offensiveIq).toBe(100);
     expect(merchant.tendencies.driveRate).toBe(95);
     expect(merchant.tendencies.freeThrowRate).toBe(95);
-    expect(merchant.ratings.threePoint).toBe(30);
+    expect(merchant.ratings.threePoint).toBe(65);
   });
 
-  it('specializes the sampled category at 99 and caps everything else at 45', () => {
+  it('specializes the sampled category at 99 and subtracts 45 from everything else', () => {
     const categories: readonly HavocSpecialistCategory[] = [
       'scoring',
       'playmaking',
@@ -252,14 +268,17 @@ describe('new tier-1 transformations', () => {
       'athleticism',
     ];
     for (const category of categories) {
-      const effective = applyHavocMutationPackage(sourceWith(), [
+      const source = sourceWith();
+      const effective = applyHavocMutationPackage(source, [
         { mutationId: 'the-specialist', specialistCategory: category },
       ]);
       for (const field of REQUIRED_RATING_KEYS) {
         if (SPECIALIST_CATEGORY_FIELDS[category].includes(field)) {
           expect(effective.ratings[field], `${category} ${field}`).toBe(99);
         } else {
-          expect(effective.ratings[field], `${category} ${field}`).toBeLessThanOrEqual(45);
+          expect(effective.ratings[field], `${category} ${field}`).toBe(
+            Math.max(0, source.profile.ratings[field] - 45),
+          );
         }
       }
     }
@@ -444,7 +463,7 @@ describe('buzzer bandit and charity casino', () => {
     expect(eventsOf(run, 'buzzer-bandit').length).toBeGreaterThan(0);
     for (const event of eventsOf(run, 'buzzer-bandit')) {
       if (event.kind !== 'buzzer-bandit') continue;
-      expect(event.shotClockTenths).toBeLessThanOrEqual(30);
+      expect(event.shotClockTenths).toBeLessThanOrEqual(50);
       expect(event.ownerInstanceId).toBe(event.shooterInstanceId);
       if (event.outcome === 'doubled') {
         const entry = entryOf(run, event.scoringSequence);
@@ -692,17 +711,28 @@ describe('basketball darwinism runtime', () => {
     for (const event of events) {
       if (event.kind !== 'darwinism') continue;
       const previous = reductions.get(event.shooterInstanceId) ?? 0;
-      expect(event.shooterReductionsAfter).toBe(previous + 1);
-      reductions.set(event.shooterInstanceId, event.shooterReductionsAfter);
+      const delta = decayDeltaOf(run, event.shooterInstanceId);
+      expect(event.shooterDecayAfter).toBe(previous + delta);
+      reductions.set(event.shooterInstanceId, event.shooterDecayAfter);
     }
+    const expectedChanges = events.reduce(
+      (sum, event) =>
+        sum + (event.kind === 'darwinism' ? decayDeltaOf(run, event.shooterInstanceId) : 0),
+      0,
+    );
     const rollup = run.result.rollups.filter(
       (entry) => entry.mutationId === 'basketball-darwinism',
     );
     expect(rollup).toHaveLength(2);
     for (const entry of rollup) {
       expect(entry.triggers).toBeGreaterThan(0);
-      expect(entry.ratingChanges).toBe(entry.triggers * 5);
+      expect(entry.ratingChanges).toBeGreaterThanOrEqual(entry.triggers * 3);
+      expect(entry.ratingChanges).toBeLessThanOrEqual(entry.triggers * 5);
     }
+    const wholeGame = rollup.find((entry) => entry.triggers === events.length);
+    expect(wholeGame?.ratingChanges, 'owner active for every make decays the full sum').toBe(
+      expectedChanges,
+    );
   });
 
   it('stops new reductions when the owner exits and resets next game', () => {
@@ -738,7 +768,7 @@ describe('basketball darwinism runtime', () => {
     expect(sequelEvents.length).toBeGreaterThan(0);
     const first = sequelEvents[0];
     if (first?.kind !== 'darwinism') throw new Error('missing darwinism');
-    expect(first.shooterReductionsAfter).toBe(1);
+    expect(first.shooterDecayAfter).toBe(decayDeltaOf(sequel, first.shooterInstanceId));
   });
 
   it('keeps degraded scoring monotonic across recomputation and changes outcomes', () => {
@@ -757,8 +787,8 @@ describe('basketball darwinism runtime', () => {
     for (const event of eventsOf(run, 'darwinism')) {
       if (event.kind !== 'darwinism') continue;
       const previous = shooterReductions.get(event.shooterInstanceId) ?? 0;
-      expect(event.shooterReductionsAfter).toBe(previous + 1);
-      shooterReductions.set(event.shooterInstanceId, event.shooterReductionsAfter);
+      expect(event.shooterDecayAfter).toBe(previous + decayDeltaOf(run, event.shooterInstanceId));
+      shooterReductions.set(event.shooterInstanceId, event.shooterDecayAfter);
     }
     expect(shooterReductions.size).toBeGreaterThan(0);
   });

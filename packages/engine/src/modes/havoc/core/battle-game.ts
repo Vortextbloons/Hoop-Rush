@@ -81,19 +81,20 @@ const HAVOC_EQUALIZER_CAP = 85;
 const HAVOC_HIGHLIGHT_LIMIT = 16;
 const HAVOC_HEAT_STREAK_ARMS_AT = 3;
 const HAVOC_HEAT_EXPIRY_POSSESSIONS = 3;
-const HAVOC_BOUNTY_EXPIRY_POSSESSIONS = 3;
-const HAVOC_ROULETTE_EVERY_ATTEMPTS = 5;
+const HAVOC_BOUNTY_EXPIRY_POSSESSIONS = 5;
+const HAVOC_ROULETTE_EVERY_ATTEMPTS = 4;
 const HAVOC_ROULETTE_MIN = 1;
 const HAVOC_ROULETTE_MAX = 4;
-const HAVOC_REBOUND_LOOP_EVERY = 4;
+const HAVOC_REBOUND_LOOP_EVERY = 3;
 const HAVOC_GOLDEN_ASSIST_EVERY = 3;
 const HAVOC_DOUBLE_OR_NOTHING_FOUL_FREE_THROWS = 1;
 const HAVOC_DOUBLE_MISS_PENALTY = -1;
 const HAVOC_EXTRA_POSSESSION_RUSH_SECONDS = 12;
-const HAVOC_BUZZER_WINDOW_TENTHS = 30;
+const HAVOC_BUZZER_WINDOW_TENTHS = 50;
 const HAVOC_BUZZER_MISS_PENALTY = -1;
 const HAVOC_FUSION_DONOR_RATING = 40;
-const HAVOC_DARWINISM_REDUCTION = 5;
+const HAVOC_DARWINISM_OWN_TEAM_REDUCTION = 3;
+const HAVOC_DARWINISM_OPPONENT_REDUCTION = 5;
 const HAVOC_DARWINISM_CHANNELS: ReadonlySet<string> = new Set([
   'two-point-accuracy',
   'three-point-accuracy',
@@ -177,6 +178,7 @@ interface RollupCounters {
   extraPossessionsEarned: number;
   extraPossessionsUsed: number;
   extraPossessionsExpired: number;
+  swapPoints: number;
   ratingChanges: number;
 }
 
@@ -205,13 +207,13 @@ interface ParticipantState {
   fgaCount: number;
   assistCount: number;
   shootingFoulsDrawn: number;
-  refundUsed: [boolean, boolean];
+  refundUsed: boolean[];
   reboundLoopCount: number;
   putbackArmedAt: number | null;
   bountyArmed: boolean;
   bountyArmedAt: number | null;
   activeSeconds: number;
-  darwinismReductions: number;
+  darwinismDecayPoints: number;
   fusionDonorInstanceId: string | null;
   fusionOwnerInstanceId: string | null;
   simPlayer: SimulationPlayer;
@@ -271,6 +273,7 @@ function zeroRollup(): RollupCounters {
     extraPossessionsEarned: 0,
     extraPossessionsUsed: 0,
     extraPossessionsExpired: 0,
+    swapPoints: 0,
     ratingChanges: 0,
   };
 }
@@ -432,13 +435,13 @@ class HavocBattleRuntime implements HavocRuntimeHooks {
         fgaCount: 0,
         assistCount: 0,
         shootingFoulsDrawn: 0,
-        refundUsed: [false, false],
+        refundUsed: [],
         reboundLoopCount: 0,
         putbackArmedAt: null,
         bountyArmed: false,
         bountyArmedAt: null,
         activeSeconds: 0,
-        darwinismReductions: 0,
+        darwinismDecayPoints: 0,
         fusionDonorInstanceId: null,
         fusionOwnerInstanceId: null,
         simPlayer: undefined as unknown as SimulationPlayer,
@@ -493,7 +496,7 @@ class HavocBattleRuntime implements HavocRuntimeHooks {
         return { isAuthoritative: (channel) => ALL_AUTHORITATIVE.has(channel) };
       }
     }
-    if (participant.darwinismReductions > 0) {
+    if (participant.darwinismDecayPoints > 0) {
       return {
         isAuthoritative: (channel) =>
           participant.effective.authoritativeChannels.includes(channel) ||
@@ -592,9 +595,9 @@ class HavocBattleRuntime implements HavocRuntimeHooks {
   cancelTurnover(offense: SideIndex, handler: SimulationPlayer): boolean {
     const participant = this.participantOf(handler);
     if (participant === null || !participant.mutations.has('possession-refund')) return false;
-    const half = this.period <= 2 ? 0 : 1;
-    if (participant.refundUsed[half]) return false;
-    participant.refundUsed[half] = true;
+    const period = this.period;
+    if (participant.refundUsed[period] === true) return false;
+    participant.refundUsed[period] = true;
     const counters = this.rollupFor(participant, 'possession-refund');
     if (counters !== undefined) {
       counters.triggers += 1;
@@ -995,12 +998,15 @@ class HavocBattleRuntime implements HavocRuntimeHooks {
       ];
       const primary = darwinismOwners[0];
       if (primary !== undefined) {
-        shooter.darwinismReductions += 1;
+        const reduction = darwinismOwners.some((owner) => owner.sideIndex === shooter.sideIndex)
+          ? HAVOC_DARWINISM_OWN_TEAM_REDUCTION
+          : HAVOC_DARWINISM_OPPONENT_REDUCTION;
+        shooter.darwinismDecayPoints += reduction;
         for (const owner of darwinismOwners) {
           const counters = this.rollupFor(owner, 'basketball-darwinism');
           if (counters !== undefined) {
             counters.triggers += 1;
-            counters.ratingChanges += HAVOC_DARWINISM_REDUCTION;
+            counters.ratingChanges += reduction;
           }
         }
         this.pushEvent({
@@ -1008,7 +1014,7 @@ class HavocBattleRuntime implements HavocRuntimeHooks {
           ownerInstanceId: primary.instanceId,
           side: this.teams[primary.sideIndex].side,
           shooterInstanceId: shooter.instanceId,
-          shooterReductionsAfter: shooter.darwinismReductions,
+          shooterDecayAfter: shooter.darwinismDecayPoints,
         });
         this.darwinismDirty = true;
       }
@@ -1785,12 +1791,9 @@ class HavocBattleRuntime implements HavocRuntimeHooks {
             tendencies = { ...owner.source.profile.tendencies };
           }
         }
-        if (participant.darwinismReductions > 0) {
+        if (participant.darwinismDecayPoints > 0) {
           for (const field of HAVOC_SCORING_RATING_FIELDS) {
-            ratings[field] = Math.max(
-              0,
-              ratings[field] - HAVOC_DARWINISM_REDUCTION * participant.darwinismReductions,
-            );
+            ratings[field] = Math.max(0, ratings[field] - participant.darwinismDecayPoints);
           }
         }
         if (this.equalizerApplies(participant)) {
@@ -1939,6 +1942,15 @@ class HavocBattleRuntime implements HavocRuntimeHooks {
     this.scoring.push(full);
     const sequence = this.scoreSeq;
     this.scoreSeq += 1;
+    const scorer = this.globalById(full.actorInstanceId);
+    if (
+      scorer !== null &&
+      scorer.swapWith !== null &&
+      (full.kind === 'field-goal' || full.kind === 'free-throw')
+    ) {
+      const counters = this.rollupFor(scorer, 'body-snatcher');
+      if (counters !== undefined) counters.swapPoints += full.points;
+    }
     return sequence;
   }
 
@@ -1961,6 +1973,7 @@ class HavocBattleRuntime implements HavocRuntimeHooks {
             extraPossessionsEarned: counters.extraPossessionsEarned,
             extraPossessionsUsed: counters.extraPossessionsUsed,
             extraPossessionsExpired: counters.extraPossessionsExpired,
+            swapPoints: counters.swapPoints,
             swapSeconds:
               mutationId === 'body-snatcher' || mutationId === 'fusion-dance' ? activeSeconds : 0,
             capSeconds: mutationId === 'the-great-equalizer' ? activeSeconds : 0,

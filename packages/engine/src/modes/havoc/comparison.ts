@@ -301,6 +301,7 @@ interface MutationAggregate {
   extraPossessionsEarned: number;
   extraPossessionsUsed: number;
   extraPossessionsExpired: number;
+  swapPoints: number;
   swapSeconds: number;
   capSeconds: number;
   ratingChanges: number;
@@ -321,6 +322,7 @@ function buildMutations(games: readonly HavocStoredGame[]): HavocMutationStat[] 
           extraPossessionsEarned: 0,
           extraPossessionsUsed: 0,
           extraPossessionsExpired: 0,
+          swapPoints: 0,
           swapSeconds: 0,
           capSeconds: 0,
           ratingChanges: 0,
@@ -335,6 +337,7 @@ function buildMutations(games: readonly HavocStoredGame[]): HavocMutationStat[] 
       aggregate.extraPossessionsEarned += rollup.extraPossessionsEarned;
       aggregate.extraPossessionsUsed += rollup.extraPossessionsUsed;
       aggregate.extraPossessionsExpired += rollup.extraPossessionsExpired;
+      aggregate.swapPoints += rollup.swapPoints;
       aggregate.swapSeconds += rollup.swapSeconds;
       aggregate.capSeconds += rollup.capSeconds;
       aggregate.ratingChanges += rollup.ratingChanges;
@@ -354,6 +357,7 @@ function buildMutations(games: readonly HavocStoredGame[]): HavocMutationStat[] 
       extraPossessionsEarned: aggregate.extraPossessionsEarned,
       extraPossessionsUsed: aggregate.extraPossessionsUsed,
       extraPossessionsExpired: aggregate.extraPossessionsExpired,
+      swapPoints: aggregate.swapPoints,
       swapSeconds: aggregate.swapSeconds,
       capSeconds: aggregate.capSeconds,
       ratingChanges: aggregate.ratingChanges,

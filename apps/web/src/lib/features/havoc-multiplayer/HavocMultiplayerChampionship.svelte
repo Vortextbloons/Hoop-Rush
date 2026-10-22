@@ -295,8 +295,8 @@
               ><th scope="col">Points Δ</th><th scope="col">FT granted</th><th scope="col"
                 >TO canceled</th
               ><th scope="col">Extra poss. earned</th><th scope="col">Extra poss. used</th><th
-                scope="col">Active seconds</th
-              ><th scope="col">Rating changes</th></tr
+                scope="col">Points in swap</th
+              ><th scope="col">Active seconds</th><th scope="col">Rating changes</th></tr
             ></thead
           >
           <tbody>
@@ -308,9 +308,9 @@
                   >{formatSignedPoints(ability.pointsDelta)}</td
                 ><td>{ability.freeThrowsGranted}</td><td>{ability.turnoversCancelled}</td><td
                   >{ability.extraPossessionsEarned}</td
-                ><td>{ability.extraPossessionsUsed}</td><td>{ability.activeSeconds}</td><td
-                  >{ability.ratingChanges}</td
-                ></tr
+                ><td>{ability.extraPossessionsUsed}</td><td
+                  >{formatSignedPoints(ability.swapPoints)}</td
+                ><td>{ability.activeSeconds}</td><td>{ability.ratingChanges}</td></tr
               >
             {/each}
           </tbody>

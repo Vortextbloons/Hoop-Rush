@@ -321,7 +321,7 @@ describe('havoc scoring mutations in simulation', () => {
     }
   });
 
-  it('rolls basketball roulette on every fifth official attempt', () => {
+  it('rolls basketball roulette on every fourth official attempt', () => {
     const rouletteHuman = buildScenarioTeam('human', [
       slot('PG', ['basketball-roulette']),
       slot('SG', []),
@@ -343,7 +343,7 @@ describe('havoc scoring mutations in simulation', () => {
     const rolls = run.tape.events.filter((event) => event.kind === 'roulette');
     expect(rolls.length).toBeGreaterThan(0);
     for (const roll of rolls) {
-      expect(roll.attemptOrdinal % 5).toBe(0);
+      expect(roll.attemptOrdinal % 4).toBe(0);
       expect(roll.rolled).toBeGreaterThanOrEqual(1);
       expect(roll.rolled).toBeLessThanOrEqual(4);
       if (roll.scoringSequence !== null) {

@@ -232,6 +232,9 @@
                     possessions used · {power.extraPossessionsExpired} expired · {power.swapSeconds}s
                     ratings swapped · {power.capSeconds}s ratings capped.
                   </p>
+                  {#if power.swapPoints !== 0}<p class="h-copy text-xs">
+                      {formatSignedPoints(power.swapPoints)} points scored in the stolen body.
+                    </p>{/if}
                   {#if power.ownerCount > 1}<p class="h-copy text-xs">
                       Shared ability: these are combined totals for all {power.ownerCount} owners.
                     </p>{/if}

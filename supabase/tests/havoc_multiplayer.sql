@@ -221,7 +221,7 @@ as $$
 $$;
 
 insert into public.hm_pgtap_ctx (name, value) values
-  ('versions', '{"schemaVersion":1,"engineVersion":"engine-v1","rulesVersion":"havoc-rules-v6","mutationCatalogVersion":"havoc-mutations-v5","profileVersion":"profile-v1","dataVersion":"data-v1","catalogVersion":"catalog-v1","catalogHash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","profileHash":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","multiplayerVersion":"havoc-multiplayer-v2"}'),
+  ('versions', '{"schemaVersion":1,"engineVersion":"engine-v1","rulesVersion":"havoc-rules-v7","mutationCatalogVersion":"havoc-mutations-v6","profileVersion":"profile-v1","dataVersion":"data-v1","catalogVersion":"catalog-v1","catalogHash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","profileHash":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","multiplayerVersion":"havoc-multiplayer-v2"}'),
   ('uid_a1', '00000000-0000-4000-8000-000000000001'),
   ('uid_a2', '00000000-0000-4000-8000-000000000002'),
   ('uid_b1', '00000000-0000-4000-8000-000000000003'),

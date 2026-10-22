@@ -66,9 +66,11 @@ const RATING_KEY_ORDER: ReadonlyMap<HavocRatingField, number> = new Map(
   REQUIRED_RATING_KEYS.map((field, index) => [field, index]),
 );
 
-function swapExtremeRatingBases(
+function extremeRatingShifts(
   ratings: HavocSourcePlayer['profile']['ratings'],
   count: number,
+  bestDelta: number,
+  worstDelta: number,
 ): Map<HavocRatingField, number> {
   const byKeyOrder = (a: HavocRatingField, b: HavocRatingField): number =>
     (RATING_KEY_ORDER.get(a) ?? 0) - (RATING_KEY_ORDER.get(b) ?? 0);
@@ -78,15 +80,15 @@ function swapExtremeRatingBases(
   const weakestFirst = [...REQUIRED_RATING_KEYS].sort(
     (a, b) => ratings[a] - ratings[b] || byKeyOrder(a, b),
   );
-  const swapped = new Map<HavocRatingField, number>();
+  const shifts = new Map<HavocRatingField, number>();
   for (let index = 0; index < count; index += 1) {
     const strong = strongestFirst[index];
     const weak = weakestFirst[index];
     if (strong === undefined || weak === undefined || strong === weak) break;
-    swapped.set(strong, ratings[weak]);
-    swapped.set(weak, ratings[strong]);
+    shifts.set(strong, bestDelta);
+    shifts.set(weak, worstDelta);
   }
-  return swapped;
+  return shifts;
 }
 
 export function applyHavocMutationPackage(
@@ -103,7 +105,7 @@ export function applyHavocMutationPackage(
   const tendencyCaps = new Map<HavocTendencyField, number>();
   const channels = new Set<HavocAuthoritativeChannel>();
 
-  let swapExtremeCount = 0;
+  let extremeShift: { count: number; bestDelta: number; worstDelta: number } | null = null;
   let heightAddInches = 0;
   let heightSetInches: number | null = null;
   let heightSubtractInches = 0;
@@ -186,8 +188,12 @@ export function applyHavocMutationPackage(
           if (channel !== undefined) channels.add(channel);
           break;
         }
-        case 'swap-extreme-ratings': {
-          swapExtremeCount = operation.count;
+        case 'shift-extreme-ratings': {
+          extremeShift = {
+            count: operation.count,
+            bestDelta: operation.bestDelta,
+            worstDelta: operation.worstDelta,
+          };
           break;
         }
         case 'set-category-ratings': {
@@ -202,7 +208,7 @@ export function applyHavocMutationPackage(
           }
           break;
         }
-        case 'cap-category-ratings': {
+        case 'add-outside-category-ratings': {
           const category = entry.specialistCategory;
           if (category === undefined) {
             throw new Error(`mutation ${entry.mutationId} requires a sampled specialist category`);
@@ -210,7 +216,7 @@ export function applyHavocMutationPackage(
           const specialistFields = new Set(HAVOC_SPECIALIST_CATEGORY_RATINGS[category]);
           for (const field of REQUIRED_RATING_KEYS) {
             if (specialistFields.has(field)) continue;
-            ratingCaps.set(field, Math.min(ratingCaps.get(field) ?? 100, operation.value));
+            ratingAdds.set(field, (ratingAdds.get(field) ?? 0) + operation.value);
             const channel = RATING_CHANNELS[field];
             if (channel !== undefined) channels.add(channel);
           }
@@ -220,11 +226,16 @@ export function applyHavocMutationPackage(
     }
   }
 
-  const ratingSwapBases =
-    swapExtremeCount > 0
-      ? swapExtremeRatingBases(source.profile.ratings, swapExtremeCount)
-      : new Map<HavocRatingField, number>();
-  for (const field of ratingSwapBases.keys()) {
+  const ratingExtremeShifts =
+    extremeShift === null
+      ? new Map<HavocRatingField, number>()
+      : extremeRatingShifts(
+          source.profile.ratings,
+          extremeShift.count,
+          extremeShift.bestDelta,
+          extremeShift.worstDelta,
+        );
+  for (const field of ratingExtremeShifts.keys()) {
     const channel = RATING_CHANNELS[field];
     if (channel !== undefined) channels.add(channel);
   }
@@ -261,9 +272,8 @@ export function applyHavocMutationPackage(
   const ratings = { ...source.profile.ratings };
   for (const field of REQUIRED_RATING_KEYS) {
     const set = ratingSets.get(field);
-    const swap = ratingSwapBases.get(field);
-    let value = set !== undefined ? set : (swap ?? ratings[field]);
-    value += ratingAdds.get(field) ?? 0;
+    let value = set !== undefined ? set : ratings[field];
+    value += (ratingAdds.get(field) ?? 0) + (ratingExtremeShifts.get(field) ?? 0);
     const floor = ratingFloors.get(field);
     if (floor !== undefined) value = Math.max(value, floor);
     const cap = ratingCaps.get(field);

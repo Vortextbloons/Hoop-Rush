@@ -18,6 +18,7 @@ describe('Havoc championship stats', () => {
     extraPossessionsEarned: 0,
     extraPossessionsUsed: 0,
     extraPossessionsExpired: 0,
+    swapPoints: 0,
     swapSeconds: 0,
     capSeconds: 0,
     activeSeconds: 0,

@@ -62,6 +62,12 @@
                   <dt>Extra possessions expired</dt>
                   <dd>{power.extraPossessionsExpired}</dd>
                 </div>{/if}
+              {#if power.swapPoints !== 0}<div>
+                  <dt>Points in stolen body</dt>
+                  <dd class:negative={power.swapPoints < 0}>
+                    {formatSignedPoints(power.swapPoints)}
+                  </dd>
+                </div>{/if}
               {#if power.swapSeconds > 0}<div>
                   <dt>Ratings swapped</dt>
                   <dd>{power.swapSeconds}s</dd>

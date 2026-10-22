@@ -79,8 +79,8 @@ begin
   v_versions := jsonb_build_object(
     'schemaVersion', 1,
     'engineVersion', 'm3-engine-v25',
-    'rulesVersion', 'havoc-rules-v6',
-    'mutationCatalogVersion', 'havoc-mutations-v5',
+    'rulesVersion', 'havoc-rules-v7',
+    'mutationCatalogVersion', 'havoc-mutations-v6',
     'profileVersion', '2010s-fixed-v1',
     'dataVersion', 'data-v1',
     'catalogVersion', 'catalog-v1',

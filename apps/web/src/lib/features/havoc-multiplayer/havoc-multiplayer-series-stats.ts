@@ -43,6 +43,7 @@ export function havocMultiplayerSeriesStats(
       turnoversCancelled: number;
       extraPossessionsEarned: number;
       extraPossessionsUsed: number;
+      swapPoints: number;
       activeSeconds: number;
       ratingChanges: number;
     }
@@ -105,6 +106,7 @@ export function havocMultiplayerSeriesStats(
           turnoversCancelled: 0,
           extraPossessionsEarned: 0,
           extraPossessionsUsed: 0,
+          swapPoints: 0,
           activeSeconds: 0,
           ratingChanges: 0,
         };
@@ -117,6 +119,7 @@ export function havocMultiplayerSeriesStats(
         'turnoversCancelled',
         'extraPossessionsEarned',
         'extraPossessionsUsed',
+        'swapPoints',
         'activeSeconds',
         'ratingChanges',
       ] as const)

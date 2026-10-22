@@ -186,12 +186,12 @@ export const havocProfileOperationSchema = z.discriminatedUnion('op', [
   z.object({
     op: z.literal('add-rating'),
     field: havocRatingFieldSchema,
-    value: z.number().int().min(1).max(100),
+    value: z.number().int().min(-100).max(100),
   }),
   z.object({
     op: z.literal('add-tendency'),
     field: havocTendencyFieldSchema,
-    value: z.number().min(1).max(100),
+    value: z.number().min(-100).max(100),
   }),
   z.object({
     op: z.literal('height-add'),
@@ -216,16 +216,18 @@ export const havocProfileOperationSchema = z.discriminatedUnion('op', [
     value: z.number().int().min(0).max(100),
   }),
   z.object({
-    op: z.literal('swap-extreme-ratings'),
+    op: z.literal('shift-extreme-ratings'),
     count: z.number().int().min(1).max(9),
+    bestDelta: z.number().int().min(-100).max(100),
+    worstDelta: z.number().int().min(-100).max(100),
   }),
   z.object({
     op: z.literal('set-category-ratings'),
     value: z.number().int().min(0).max(100),
   }),
   z.object({
-    op: z.literal('cap-category-ratings'),
-    value: z.number().int().min(0).max(100),
+    op: z.literal('add-outside-category-ratings'),
+    value: z.number().int().min(-100).max(100),
   }),
 ]);
 export type HavocProfileOperation = z.infer<typeof havocProfileOperationSchema>;
@@ -274,7 +276,7 @@ export const havocMutationDefinitionSchema = z
     name: z.string().min(1).max(64),
     description: z.string().min(1).max(320),
     downside: z.string().max(320),
-    operations: z.array(havocProfileOperationSchema).max(18),
+    operations: z.array(havocProfileOperationSchema).max(48),
     eventRules: z.array(havocEventRuleIdSchema).max(1),
     teamExclusive: z.boolean().optional(),
   })

@@ -297,7 +297,7 @@ export function havocEventTextOf(
     case 'fusion-dance':
       return `Fusion Dance ${event.outcome}: ${name(event.ownerInstanceId)} fuses with ${name(event.donorInstanceId)}`;
     case 'darwinism':
-      return `Basketball Darwinism: ${name(event.shooterInstanceId)} scoring ratings decay (reduction #${String(event.shooterReductionsAfter)})`;
+      return `Basketball Darwinism: ${name(event.shooterInstanceId)} scoring ratings decay (−${String(event.shooterDecayAfter)})`;
     case 'game-end':
       return `Final: ${context.homeName} ${String(event.homeScore)}, ${context.awayName} ${String(event.awayScore)}`;
   }

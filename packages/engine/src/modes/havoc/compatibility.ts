@@ -122,26 +122,12 @@ function partnerOperationsAllowCategory(
   const specialistFields = new Set<string>(HAVOC_SPECIALIST_CATEGORY_RATINGS[category]);
   for (const operation of operations) {
     switch (operation.op) {
-      case 'raise-rating': {
-        if (!specialistFields.has(operation.field) && operation.value > 45) return false;
-        break;
-      }
       case 'cap-rating': {
-        if (specialistFields.has(operation.field) ? operation.value < 99 : operation.value < 45) {
-          return false;
-        }
-        break;
-      }
-      case 'add-rating': {
-        if (specialistFields.has(operation.field)) return false;
+        if (specialistFields.has(operation.field) && operation.value < 99) return false;
         break;
       }
       case 'set-rating': {
-        if (
-          specialistFields.has(operation.field) ? operation.value !== 99 : operation.value !== 45
-        ) {
-          return false;
-        }
+        if (specialistFields.has(operation.field) && operation.value !== 99) return false;
         break;
       }
       default:

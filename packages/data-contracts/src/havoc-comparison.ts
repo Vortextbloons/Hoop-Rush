@@ -109,6 +109,7 @@ export const havocMutationStatSchema = z.object({
   extraPossessionsEarned: z.number().int().nonnegative(),
   extraPossessionsUsed: z.number().int().nonnegative(),
   extraPossessionsExpired: z.number().int().nonnegative(),
+  swapPoints: z.number().int(),
   swapSeconds: z.number().int().nonnegative(),
   capSeconds: z.number().int().nonnegative(),
   ratingChanges: z.number().int().nonnegative(),

@@ -864,9 +864,9 @@ describe('havoc battle opposing powers', () => {
       const count = (seenPerShooter.get(event.shooterInstanceId) ?? 0) + 1;
       seenPerShooter.set(event.shooterInstanceId, count);
       expect(
-        event.shooterReductionsAfter,
-        `${scenario} seed ${seed} shooter ${event.shooterInstanceId} reduction ordinal`,
-      ).toBe(count);
+        event.shooterDecayAfter,
+        `${scenario} seed ${seed} shooter ${event.shooterInstanceId} own-team decay`,
+      ).toBe(3 * count);
     }
     for (const [shooterId, count] of seenPerShooter) {
       const makes = madeShots.filter((event) => event.shooterInstanceId === shooterId).length;
@@ -885,7 +885,7 @@ describe('havoc battle opposing powers', () => {
         darwinism.length,
       );
       expect(rollup?.ratingChanges, `${scenario} seed ${seed} ${ownerId} rating changes`).toBe(
-        5 * darwinism.length,
+        3 * darwinism.length,
       );
     }
     const homeShooters = new Set(starterIds(home));

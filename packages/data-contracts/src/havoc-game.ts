@@ -476,7 +476,7 @@ export function buildHavocEventSchema<TSide extends string>(sideSchema: z.ZodTyp
       ownerInstanceId: havocInstanceIdSchema,
       side: sideSchema,
       shooterInstanceId: havocInstanceIdSchema,
-      shooterReductionsAfter: z.number().int().positive(),
+      shooterDecayAfter: z.number().int().positive(),
     }),
     havocEventBase.extend({
       kind: z.literal('game-end'),
@@ -596,6 +596,7 @@ export function buildHavocMutationRollupSchema<TSide extends string>(sideSchema:
     extraPossessionsEarned: z.number().int().nonnegative(),
     extraPossessionsUsed: z.number().int().nonnegative(),
     extraPossessionsExpired: z.number().int().nonnegative(),
+    swapPoints: z.number().int(),
     swapSeconds: z.number().int().nonnegative(),
     capSeconds: z.number().int().nonnegative(),
     activeSeconds: z.number().int().nonnegative(),
