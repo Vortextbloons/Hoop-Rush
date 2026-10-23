@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, mock, vi } from 'bun:test';
 import { LobbyCoordinator, initialLobbyView } from './lobby-context.svelte';
 import { lobbyCommand } from './multiplayer-lobby';
 import {
@@ -16,11 +16,15 @@ const lobby = {
   gameRoomId: null,
   canStart: true,
 };
-vi.mock('./multiplayer-lobby', () => ({
-  lobbyCommand: vi.fn(() => Promise.resolve(lobby)),
-  loadLobbyId: vi.fn(() => null),
-  rememberLobby: vi.fn(),
-  resumeMultiplayerGame: vi.fn(() => Promise.resolve()),
+function mocked<T>(value: T): T & ReturnType<typeof mock> {
+  return value as T & ReturnType<typeof mock>;
+}
+
+void mock.module('./multiplayer-lobby', () => ({
+  lobbyCommand: mock(() => Promise.resolve(lobby)),
+  loadLobbyId: mock(() => null),
+  rememberLobby: mock(),
+  resumeMultiplayerGame: mock(() => Promise.resolve()),
 }));
 
 afterEach(() => vi.useRealTimers());
@@ -44,7 +48,7 @@ describe('layout lobby coordinator', () => {
       vi.useFakeTimers();
       const coordinator = new LobbyCoordinator(vi.fn(() => Promise.resolve()));
       await coordinator.session.create();
-      vi.mocked(lobbyCommand).mockClear();
+      mocked(lobbyCommand).mockClear();
       let current = true;
       let resolveSettings: (settings: MultiplayerMatchSettings) => void = () => {};
       const preparation = coordinator.prepareMatch(
@@ -58,7 +62,7 @@ describe('layout lobby coordinator', () => {
       else if (change === 'disposed') coordinator.dispose();
       else {
         const replacementId = '00000000-0000-4000-8000-000000000002';
-        vi.mocked(lobbyCommand).mockResolvedValueOnce({ ...lobby, id: replacementId });
+        mocked(lobbyCommand).mockResolvedValueOnce({ ...lobby, id: replacementId });
         await coordinator.session.attach(replacementId);
       }
       resolveSettings({

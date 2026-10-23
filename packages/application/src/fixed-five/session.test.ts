@@ -6,11 +6,23 @@ import {
 } from '@hoop-rush/test-fixtures';
 import {
   createEngineContext,
+  findWeakestOpponent,
+  fixedFiveDuelGameInputDigest,
+  fixedFiveDuelGameResultDigest,
+  fixedFiveDuelGameTapeDigest,
+  h2hGameNumbersFor,
+  shared82H2HGameInput,
   shared82GameEvents,
+  simulateRecordedShared82H2HGame,
   verifyFixedFiveCompetition,
 } from '@hoop-rush/engine';
-import type { FixedFiveCompetitionRun, Position } from '@hoop-rush/data-contracts';
-import { afterEach, assert, describe, expect, it, vi } from 'vitest';
+import type {
+  FixedFiveCompetitionRun,
+  FixedFiveShared82H2HGameOutput,
+  FixedFiveWorkerResultEntry,
+  Position,
+} from '@hoop-rush/data-contracts';
+import { afterEach, describe, expect, it, vi } from 'bun:test';
 import {
   commandIdSchema,
   contentHashSchema,
@@ -40,9 +52,14 @@ import {
 } from './session.ts';
 import type { FixedFiveCandidate } from '@hoop-rush/engine';
 
+function assert(condition: unknown): asserts condition {
+  if (!condition) throw new Error('assertion failed');
+}
+
 class FakeRunner implements FixedFiveRunnerPort {
   readonly events: FixedFiveRunnerEvent[] = [];
   readonly sharedRuns: Parameters<FixedFiveRunnerPort['runShared82']>[0][] = [];
+  readonly shared82H2HGameRuns: Parameters<FixedFiveRunnerPort['runShared82H2HGame']>[0][] = [];
   readonly duelRuns: Parameters<FixedFiveRunnerPort['runDuel']>[0][] = [];
   readonly duelGameRuns: Parameters<FixedFiveRunnerPort['runDuelGame']>[0][] = [];
   disposed = false;
@@ -58,6 +75,9 @@ class FakeRunner implements FixedFiveRunnerPort {
   }
   runDuelGame(input: Parameters<FixedFiveRunnerPort['runDuelGame']>[0]): void {
     this.duelGameRuns.push(input);
+  }
+  runShared82H2HGame(input: Parameters<FixedFiveRunnerPort['runShared82H2HGame']>[0]): void {
+    this.shared82H2HGameRuns.push(input);
   }
   readonly verifications: Parameters<FixedFiveRunnerPort['verify']>[0][] = [];
   verify(input: Parameters<FixedFiveRunnerPort['verify']>[0]): void {
@@ -354,7 +374,7 @@ describe('FixedFiveRoomSession', () => {
     expect(state.commands).toHaveLength(1);
     expect(state.commands[0]?.actorParticipantId).toBe('p2');
     expect(state.commands[0]?.payload.kind).toBe('ready');
-    expect(harness.repository.rows.get(0)?.commandId).toBe('cmd-from-p2');
+    expect(harness.repository.rows.get(0)?.commandId).toBe(commandIdSchema.parse('cmd-from-p2'));
 
     session.dispose();
   });
@@ -379,7 +399,8 @@ describe('FixedFiveRoomSession', () => {
       });
       expect(receipt.accepted).toBe(true);
 
-      await vi.advanceTimersByTimeAsync(15_000);
+      vi.advanceTimersByTime(15_000);
+      await flush();
 
       const state = session.getSnapshot();
       expect(state.commands.some((command) => command.commandId === 'missed-ready')).toBe(true);
@@ -394,14 +415,15 @@ describe('FixedFiveRoomSession', () => {
 
   it('recovers room state on focus after a missed realtime notification', async () => {
     const handlers = new Map<string, () => void>();
-    vi.stubGlobal('window', {
+    const originalWindow = (globalThis as { window?: unknown }).window;
+    (globalThis as { window?: unknown }).window = {
       addEventListener: (type: string, handler: () => void) => {
         handlers.set(type, handler);
       },
       removeEventListener: (type: string) => {
         handlers.delete(type);
       },
-    });
+    };
     const harness = createHarness();
     const created = await harness.createRoom({ mode: 'duel', sourceMode: 'classic' });
     await harness.transport.join(created.code);
@@ -421,14 +443,30 @@ describe('FixedFiveRoomSession', () => {
 
       handlers.get('focus')?.();
 
-      await vi.waitFor(() => {
-        expect(session.getSnapshot().commands.some((c) => c.commandId === 'wake-ready')).toBe(true);
-        expect(session.getSnapshot().opponentReady).toBe(true);
-      });
+      for (let attempt = 0; attempt < 100; attempt += 1) {
+        try {
+          expect(session.getSnapshot().commands.some((c) => c.commandId === 'wake-ready')).toBe(
+            true,
+          );
+          expect(session.getSnapshot().opponentReady).toBe(true);
+          break;
+        } catch {
+          await flush();
+        }
+        if (attempt === 99) {
+          expect(session.getSnapshot().commands.some((c) => c.commandId === 'wake-ready')).toBe(
+            true,
+          );
+          expect(session.getSnapshot().opponentReady).toBe(true);
+        }
+      }
+      for (let attempt = 0; attempt < 100 && session.getSnapshot().reconnecting; attempt += 1) {
+        await flush();
+      }
       expect(session.getSnapshot().reconnecting).toBe(false);
     } finally {
       session.dispose();
-      vi.unstubAllGlobals();
+      (globalThis as { window?: unknown }).window = originalWindow;
     }
   });
 
@@ -464,7 +502,8 @@ describe('FixedFiveRoomSession', () => {
       vi.spyOn(harness.transport, 'refetch').mockResolvedValue([]);
       const snapshot = vi.spyOn(harness.transport, 'snapshot').mockResolvedValue(authoritative);
 
-      await vi.advanceTimersByTimeAsync(15_000);
+      vi.advanceTimersByTime(15_000);
+      await flush();
 
       let state = session.getSnapshot();
       expect(state.phase).toBe('broadcasting');
@@ -521,7 +560,8 @@ describe('FixedFiveRoomSession', () => {
       expect(advanced.series?.currentGameNumber).toBe(2);
       snapshot.mockResolvedValue(advanced);
 
-      await vi.advanceTimersByTimeAsync(15_000);
+      vi.advanceTimersByTime(15_000);
+      await flush();
 
       state = session.getSnapshot();
       expect(state.phase).toBe('preparing-game');
@@ -620,9 +660,17 @@ describe('FixedFiveRoomSession', () => {
       const refetch = vi.spyOn(harness.transport, 'refetch');
 
       const first = session.refresh();
-      await vi.waitFor(() => {
-        expect(snapshot).toHaveBeenCalledTimes(1);
-      });
+      for (let attempt = 0; attempt < 100; attempt += 1) {
+        try {
+          expect(snapshot).toHaveBeenCalledTimes(1);
+          break;
+        } catch {
+          await flush();
+        }
+        if (attempt === 99) {
+          expect(snapshot).toHaveBeenCalledTimes(1);
+        }
+      }
       const second = session.refresh();
       await flush();
       expect(snapshot).toHaveBeenCalledTimes(1);
@@ -705,7 +753,9 @@ describe('FixedFiveRoomSession', () => {
     expect(runner.sharedRuns).toHaveLength(1);
     const run = runner.sharedRuns[0];
     if (!run) throw new Error('shared-82 run was not started');
-    expect(run.rootSeed).toBe(created.snapshot.rootSeed);
+    const rootSeed = created.snapshot.rootSeed;
+    if (!rootSeed) throw new Error('fixed-five room is missing a root seed');
+    expect(run.rootSeed).toBe(rootSeed);
     expect(run.p1Team.players).toHaveLength(5);
     expect(run.p2Team.players).toHaveLength(5);
 
@@ -726,6 +776,212 @@ describe('FixedFiveRoomSession', () => {
     runner.emit({ kind: 'complete', gamesDelivered: 9 });
     expect(session.getSnapshot().progress).toEqual({ completed: 4, total: 161 });
     expect(session.getSnapshot().localResult).toBeNull();
+  });
+
+  it('holds revealed records at each H2H until its synchronized broadcast completes', async () => {
+    vi.useFakeTimers();
+    const pool = Array.from({ length: 12 }, (_, index) => sandboxCandidate(index));
+    const assets = {
+      ...sandboxAssets(pool),
+      manifest: buildManifest(),
+      bracket: buildFixtureBracket(),
+      profile: buildEraSimulationProfile(),
+    };
+    const slots: Position[] = ['PG', 'SG', 'SF', 'PF', 'C'];
+    const harness = createHarness({
+      loadAssets: () => Promise.resolve(assets),
+      buildTeam: (_manifest, teamId, displayName, refs) =>
+        Promise.resolve({
+          teamId,
+          displayName,
+          players: refs.map((ref) => {
+            const position = slots[ref.slotIndex];
+            assert(position);
+            return buildSimulationPlayer({
+              playerId: playerIdSchema.parse(ref.playerId),
+              positions: [position],
+            });
+          }),
+        }),
+    });
+    const created = await harness.createRoom({ mode: 'sandbox-shared-82', sourceMode: 'sandbox' });
+    await harness.transport.join(created.code);
+    await fillSandboxDraft(harness.transport, created.snapshot.roomId, pool);
+    for (const actor of ['p1', 'p2'] as const) {
+      const receipt = await harness.transport.submitCommand({
+        schemaVersion: 1,
+        roomId: created.snapshot.roomId,
+        commandId: commandIdSchema.parse(`lock-${actor}`),
+        actorParticipantId: actor,
+        payload: { kind: 'sandbox-lock' },
+      });
+      expect(receipt.accepted).toBe(true);
+    }
+
+    let session = harness.session();
+    try {
+      await session.start();
+      await waitFor(() => harness.runners.length === 1);
+      const runner = harness.runners[0];
+      assert(runner);
+      const run = runner.sharedRuns[0];
+      assert(run);
+      const input = { ...run, bracket: assets.bracket };
+      const engineContext = createEngineContext({ engineVersion: 'test-engine' });
+      const events = [...shared82GameEvents(input, engineContext, 1, { recordH2H: true })];
+      const entries: FixedFiveWorkerResultEntry[] = events.map((event) =>
+        event.tag === 'h2h'
+          ? { tag: 'h2h', game: event.game, ...(event.tape ? { tape: event.tape } : {}) }
+          : { tag: event.tag, game: event.game },
+      );
+      const weakest = findWeakestOpponent(assets.bracket);
+      const eligibleGameNumbers = h2hGameNumbersFor(assets.bracket, weakest.opponentId);
+      const firstGame = eligibleGameNumbers[0];
+      assert(firstGame);
+      const recorded = simulateRecordedShared82H2HGame(input, firstGame, engineContext);
+      const gameInput = shared82H2HGameInput(input, firstGame);
+      let output: FixedFiveShared82H2HGameOutput = {
+        schemaVersion: 1,
+        gameNumber: firstGame,
+        homeParticipantId: 'p1',
+        awayParticipantId: 'p2',
+        seed: recorded.seed,
+        result: recorded.result,
+        tape: recorded.tape,
+        inputDigest: fixedFiveDuelGameInputDigest(gameInput),
+        resultDigest: fixedFiveDuelGameResultDigest(recorded.result),
+        tapeDigest: fixedFiveDuelGameTapeDigest(recorded.tape),
+      };
+      runner.emit({ kind: 'results', entries });
+      runner.emit({ kind: 'shared82-h2h-game', output });
+      runner.emit({ kind: 'complete', gamesDelivered: entries.length });
+      await waitFor(() => harness.repository.pending !== null);
+      vi.advanceTimersByTime(7000);
+      await flush();
+      await waitFor(() => session.getSnapshot().room?.broadcast?.gameNumber === firstGame);
+
+      let state = session.getSnapshot();
+      expect(state.revealedThroughGameNumber).toBe(firstGame - 1);
+      expect(state.revealedEntries.some((entry) => entry.tag === 'h2h')).toBe(false);
+      expect(state.simDone).toBe(false);
+      expect(state.localResult).toBeNull();
+
+      const originalOutput = output;
+      session.dispose();
+      let reconnectNowMs = 1_700_000_004_000;
+      harness.deps.now = () => reconnectNowMs;
+      session = harness.session();
+      await session.start();
+      await waitFor(() =>
+        harness.runners.some(
+          (candidate) => candidate !== runner && candidate.sharedRuns.length > 0,
+        ),
+      );
+      const resumedRunner = harness.runners.find(
+        (candidate) => candidate !== runner && candidate.sharedRuns.length > 0,
+      );
+      assert(resumedRunner);
+      vi.advanceTimersByTime(240);
+      await flush();
+      await waitFor(() =>
+        harness.runners.some((candidate) =>
+          candidate.shared82H2HGameRuns.some((game) => game.gameNumber === firstGame),
+        ),
+      );
+      const tapeRunner = harness.runners.find((candidate) =>
+        candidate.shared82H2HGameRuns.some((game) => game.gameNumber === firstGame),
+      );
+      assert(tapeRunner);
+      const tapeRun = tapeRunner.shared82H2HGameRuns[0];
+      assert(tapeRun);
+      expect(tapeRun.rootSeed).toBe(run.rootSeed);
+      expect(tapeRun.gameNumber).toBe(firstGame);
+      const resumedInput = {
+        p1Team: tapeRun.p1Team,
+        p2Team: tapeRun.p2Team,
+        bracket: tapeRun.bracket,
+        profile: tapeRun.profile,
+        rootSeed: tapeRun.rootSeed,
+        dataVersion: tapeRun.dataVersion,
+      };
+      const resumedRecorded = simulateRecordedShared82H2HGame(
+        resumedInput,
+        firstGame,
+        engineContext,
+      );
+      const resumedGameInput = shared82H2HGameInput(resumedInput, firstGame);
+      output = {
+        schemaVersion: 1,
+        gameNumber: firstGame,
+        homeParticipantId: 'p1',
+        awayParticipantId: 'p2',
+        seed: resumedRecorded.seed,
+        result: resumedRecorded.result,
+        tape: resumedRecorded.tape,
+        inputDigest: fixedFiveDuelGameInputDigest(resumedGameInput),
+        resultDigest: fixedFiveDuelGameResultDigest(resumedRecorded.result),
+        tapeDigest: fixedFiveDuelGameTapeDigest(resumedRecorded.tape),
+      };
+      expect(output).toStrictEqual(originalOutput);
+      tapeRunner.emit({ kind: 'shared82-h2h-game', output });
+      resumedRunner.emit({ kind: 'results', entries });
+      expect(session.getSnapshot().shared82H2HOutputs[firstGame]).toEqual(output);
+      session.beginPlayback();
+      expect(session.getSnapshot().broadcastProgress).toBeCloseTo(0.4, 1);
+      reconnectNowMs += 6_000;
+      session.advancePlayback(6_000);
+      const peerPropose = await harness.transport.submitCommand({
+        schemaVersion: 1,
+        roomId: created.snapshot.roomId,
+        commandId: commandIdSchema.parse('peer-season-proposal'),
+        actorParticipantId: 'p2',
+        payload: {
+          kind: 'propose-game-result',
+          gameNumber: firstGame,
+          winner: output.result.winner === 'home' ? 'p1' : 'p2',
+          resultDigest: output.resultDigest,
+          tapeDigest: output.tapeDigest,
+          inputDigest: output.inputDigest,
+        },
+      });
+      expect(peerPropose.accepted).toBe(true);
+      await session.refresh();
+      const peerConfirm = await harness.transport.submitCommand({
+        schemaVersion: 1,
+        roomId: created.snapshot.roomId,
+        commandId: commandIdSchema.parse('peer-season-confirmation'),
+        actorParticipantId: 'p2',
+        payload: {
+          kind: 'confirm-game-result',
+          gameNumber: firstGame,
+          resultDigest: output.resultDigest,
+          verified: true,
+        },
+      });
+      expect(peerConfirm.accepted).toBe(true);
+      await waitFor(() =>
+        session
+          .getSnapshot()
+          .commands.some(
+            (command) =>
+              command.actorParticipantId === 'p1' &&
+              command.payload.kind === 'confirm-game-result' &&
+              command.payload.gameNumber === firstGame,
+          ),
+      );
+      await session.refresh();
+      state = session.getSnapshot();
+      expect(state.room?.seasonBroadcast?.lastCompletedGameNumber).toBe(firstGame);
+      expect(
+        state.revealedEntries.filter(
+          (entry) => entry.tag === 'h2h' && entry.game.gameNumber === firstGame,
+        ),
+      ).toHaveLength(1);
+      expect(state.simDone).toBe(false);
+      expect(state.localResult).toBeNull();
+    } finally {
+      session.dispose();
+    }
   });
 
   it('recovers a saved season, rebuilds stats, and retries verification before completing once', async () => {
@@ -756,6 +1012,16 @@ describe('FixedFiveRoomSession', () => {
     });
     const created = await harness.createRoom({ mode: 'sandbox-shared-82', sourceMode: 'sandbox' });
     await fillSandboxDraft(harness.transport, created.snapshot.roomId, pool);
+    for (const actor of ['p1', 'p2'] as const) {
+      const receipt = await harness.transport.submitCommand({
+        schemaVersion: 1,
+        roomId: created.snapshot.roomId,
+        commandId: commandIdSchema.parse(`recovery-lock-${actor}`),
+        actorParticipantId: actor,
+        payload: { kind: 'sandbox-lock' },
+      });
+      expect(receipt.accepted).toBe(true);
+    }
     const firstSession = harness.session();
     await firstSession.start();
     await waitFor(() => harness.runners.length === 1);
@@ -764,11 +1030,98 @@ describe('FixedFiveRoomSession', () => {
     const input = runner.sharedRuns[0];
     assert(input);
     const context = createEngineContext();
-    const entries = [...shared82GameEvents({ ...input, bracket: assets.bracket }, context)];
-    runner.emit({ kind: 'results', entries });
+    const simulationInput = { ...input, bracket: assets.bracket };
+    const entries = [...shared82GameEvents(simulationInput, context)];
+    const recordedEvents = [
+      ...shared82GameEvents(simulationInput, context, 1, { recordH2H: true }),
+    ];
+    const recordedEntries: FixedFiveWorkerResultEntry[] = recordedEvents.map((event) =>
+      event.tag === 'h2h'
+        ? { tag: 'h2h', game: event.game, ...(event.tape ? { tape: event.tape } : {}) }
+        : { tag: event.tag, game: event.game },
+    );
+    const eligibleGameNumbers = h2hGameNumbersFor(
+      assets.bracket,
+      findWeakestOpponent(assets.bracket).opponentId,
+    );
+    const h2hOutputs = new Map<number, FixedFiveShared82H2HGameOutput>();
+    for (const gameNumber of eligibleGameNumbers) {
+      const recorded = simulateRecordedShared82H2HGame(simulationInput, gameNumber, context);
+      const gameInput = shared82H2HGameInput(simulationInput, gameNumber);
+      h2hOutputs.set(gameNumber, {
+        schemaVersion: 1,
+        gameNumber,
+        homeParticipantId: 'p1',
+        awayParticipantId: 'p2',
+        seed: recorded.seed,
+        result: recorded.result,
+        tape: recorded.tape,
+        inputDigest: fixedFiveDuelGameInputDigest(gameInput),
+        resultDigest: fixedFiveDuelGameResultDigest(recorded.result),
+        tapeDigest: fixedFiveDuelGameTapeDigest(recorded.tape),
+      });
+    }
+    runner.emit({ kind: 'results', entries: recordedEntries });
+    for (const output of h2hOutputs.values()) {
+      runner.emit({ kind: 'shared82-h2h-game', output });
+    }
     runner.emit({ kind: 'complete', gamesDelivered: entries.length });
     await waitFor(() => harness.repository.pending !== null);
-    await vi.advanceTimersByTimeAsync(7000);
+    for (const gameNumber of eligibleGameNumbers) {
+      vi.advanceTimersByTime(10_000);
+      await flush();
+      await waitFor(() => firstSession.getSnapshot().room?.broadcast?.gameNumber === gameNumber);
+      firstSession.beginPlayback();
+      firstSession.advancePlayback(10_000);
+      await waitFor(() =>
+        firstSession
+          .getSnapshot()
+          .commands.some(
+            (command) =>
+              command.actorParticipantId === 'p1' &&
+              command.payload.kind === 'propose-game-result' &&
+              command.payload.gameNumber === gameNumber,
+          ),
+      );
+      const output = h2hOutputs.get(gameNumber);
+      assert(output);
+      const peerPropose = await harness.transport.submitCommand({
+        schemaVersion: 1,
+        roomId: created.snapshot.roomId,
+        commandId: commandIdSchema.parse(`recovery-propose-${String(gameNumber)}`),
+        actorParticipantId: 'p2',
+        payload: {
+          kind: 'propose-game-result',
+          gameNumber,
+          winner: output.result.winner === 'home' ? 'p1' : 'p2',
+          resultDigest: output.resultDigest,
+          tapeDigest: output.tapeDigest,
+          inputDigest: output.inputDigest,
+        },
+      });
+      expect(peerPropose.accepted).toBe(true);
+      await firstSession.refresh();
+      const peerConfirm = await harness.transport.submitCommand({
+        schemaVersion: 1,
+        roomId: created.snapshot.roomId,
+        commandId: commandIdSchema.parse(`recovery-confirm-${String(gameNumber)}`),
+        actorParticipantId: 'p2',
+        payload: {
+          kind: 'confirm-game-result',
+          gameNumber,
+          resultDigest: output.resultDigest,
+          verified: true,
+        },
+      });
+      expect(peerConfirm.accepted).toBe(true);
+      await waitFor(
+        () =>
+          firstSession.getSnapshot().room?.seasonBroadcast?.lastCompletedGameNumber === gameNumber,
+      );
+    }
+    vi.advanceTimersByTime(2000);
+    await flush();
+    await waitFor(() => firstSession.getSnapshot().localResult !== null);
     const originalResult = firstSession.getSnapshot().localResult;
     expect(originalResult).not.toBeNull();
     expect(harness.repository.pending?.resultDigest).toBe(originalResult?.digest);

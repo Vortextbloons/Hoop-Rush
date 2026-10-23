@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import {
   commandIdSchema,
   contentHashSchema,
@@ -26,6 +26,36 @@ describe('in-memory Fixed-Five duel broadcast', () => {
     });
     await transport.join(created.code);
     return { transport, created };
+  }
+
+  async function shared82Room(clock?: () => number) {
+    const transport = createInMemoryFixedFiveTransport({
+      random: { seed: 'shared82-broadcast' },
+      clock: clock ?? (() => 1_700_000_000_000),
+    });
+    const created = await transport.create({
+      mode: 'classic-shared-82',
+      sourceMode: 'classic',
+      variant: 'ratings',
+      versions: defaultFixedFiveVersionLocks({}),
+    });
+    await transport.join(created.code);
+    let snapshot = (await transport.resume(created.snapshot.roomId)).snapshot;
+    ({ snapshot } = await submit(transport, snapshot, 'season-start', 'p1', { kind: 'start' }));
+    for (let index = 0; index < 10; index += 1) {
+      ({ snapshot } = await submit(
+        transport,
+        snapshot,
+        `season-pick-${String(index)}`,
+        index % 2 === 0 ? 'p1' : 'p2',
+        {
+          kind: 'classic-pick',
+          playerId: playerIdSchema.parse(`season-player-${String(index)}`),
+          slotIndex: index % 5,
+        },
+      ));
+    }
+    return { transport, created, snapshot };
   }
 
   async function submit(
@@ -293,6 +323,112 @@ describe('in-memory Fixed-Five duel broadcast', () => {
     expect(snapshot.series?.champion).toBe('p1');
     expect(snapshot.series?.currentGameNumber).toBeNull();
     expect(snapshot.phase).toBe('awaiting-confirmation');
+  });
+
+  it('holds the season at the next eligible H2H and advances once after both confirmations', async () => {
+    const { transport, snapshot: drafted } = await shared82Room();
+    const eligibleGameNumbers = [18, 55, 77];
+    const normalSeasonGame = await submit(transport, drafted, 'season-normal-game', 'p1', {
+      kind: 'broadcast-start',
+      gameNumber: 17,
+      eligibleGameNumbers,
+    });
+    expect(normalSeasonGame.receipt.accepted).toBe(false);
+    expect(normalSeasonGame.receipt.rejectionCode).toBe('turn');
+
+    const skipped = await submit(transport, drafted, 'season-skip-h2h', 'p1', {
+      kind: 'broadcast-start',
+      gameNumber: 55,
+      eligibleGameNumbers,
+    });
+    expect(skipped.receipt.accepted).toBe(false);
+    expect(skipped.receipt.rejectionCode).toBe('turn');
+
+    let { snapshot } = await submit(transport, drafted, 'season-broadcast-18', 'p1', {
+      kind: 'broadcast-start',
+      gameNumber: 18,
+      eligibleGameNumbers,
+    });
+    const startedAt = snapshot.broadcast?.startedAtIso;
+    expect(snapshot.phase).toBe('broadcasting');
+    expect(snapshot.broadcast?.durationMs).toBe(10_000);
+    expect(snapshot.seasonBroadcast).toEqual({
+      eligibleGameNumbers,
+      lastCompletedGameNumber: null,
+    });
+
+    ({ snapshot } = await submit(transport, snapshot, 'season-broadcast-18-duplicate', 'p2', {
+      kind: 'broadcast-start',
+      gameNumber: 18,
+      eligibleGameNumbers,
+    }));
+    expect(snapshot.broadcast?.startedAtIso).toBe(startedAt);
+
+    const prematureNext = await submit(transport, snapshot, 'season-broadcast-77-early', 'p1', {
+      kind: 'broadcast-start',
+      gameNumber: 77,
+      eligibleGameNumbers,
+    });
+    expect(prematureNext.receipt.accepted).toBe(false);
+    expect(prematureNext.receipt.rejectionCode).toBe('turn');
+
+    for (const actor of ['p1', 'p2'] as const) {
+      ({ snapshot } = await submit(transport, snapshot, `season-propose-${actor}`, actor, {
+        kind: 'propose-game-result',
+        gameNumber: 18,
+        winner: 'p1',
+        resultDigest: DIGEST_A,
+        tapeDigest: DIGEST_A,
+        inputDigest: DIGEST_A,
+      }));
+    }
+    ({ snapshot } = await submit(transport, snapshot, 'season-confirm-p1', 'p1', {
+      kind: 'confirm-game-result',
+      gameNumber: 18,
+      resultDigest: DIGEST_A,
+      verified: true,
+    }));
+    expect(snapshot.broadcast?.gameNumber).toBe(18);
+    ({ snapshot } = await submit(transport, snapshot, 'season-confirm-p2', 'p2', {
+      kind: 'confirm-game-result',
+      gameNumber: 18,
+      resultDigest: DIGEST_A,
+      verified: true,
+    }));
+    expect(snapshot.phase).toBe('simulating');
+    expect(snapshot.broadcast).toBeNull();
+    expect(snapshot.seasonBroadcast?.lastCompletedGameNumber).toBe(18);
+
+    const duplicateCompletion = await submit(
+      transport,
+      snapshot,
+      'season-confirm-p2-duplicate',
+      'p2',
+      {
+        kind: 'confirm-game-result',
+        gameNumber: 18,
+        resultDigest: DIGEST_A,
+        verified: true,
+      },
+    );
+    expect(duplicateCompletion.receipt.accepted).toBe(false);
+    expect(duplicateCompletion.snapshot.seasonBroadcast?.lastCompletedGameNumber).toBe(18);
+
+    const changedSchedule = await submit(transport, snapshot, 'season-changed-schedule', 'p1', {
+      kind: 'broadcast-start',
+      gameNumber: 55,
+      eligibleGameNumbers: [18, 56, 77],
+    });
+    expect(changedSchedule.receipt.accepted).toBe(false);
+    expect(changedSchedule.receipt.rejectionCode).toBe('illegal-move');
+
+    const nextEligible = await submit(transport, snapshot, 'season-broadcast-55', 'p1', {
+      kind: 'broadcast-start',
+      gameNumber: 55,
+      eligibleGameNumbers,
+    });
+    expect(nextEligible.receipt.accepted).toBe(true);
+    expect(nextEligible.snapshot.broadcast?.gameNumber).toBe(55);
   });
 
   it('records a mismatch denial and fails the room', async () => {

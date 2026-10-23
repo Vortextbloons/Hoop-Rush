@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import type { HavocGameResult, HavocGameTape } from '@hoop-rush/data-contracts';
 import { auditHavocGame } from './audit.ts';
 import {

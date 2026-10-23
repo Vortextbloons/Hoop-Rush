@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, mock, vi } from 'bun:test';
 import {
   commandIdSchema,
   defaultFixedFiveVersionLocks,
@@ -24,14 +24,17 @@ import type {
   FixedFiveRoomSessionDeps,
   FixedFiveSessionAssets,
 } from '@hoop-rush/application/fixed-five';
-import { FixedFiveRoomController } from './fixed-five-room-controller.svelte.js';
 
-const goto = vi.hoisted(() => vi.fn());
-vi.mock('$app/navigation', () => ({ goto }));
-vi.mock('$app/paths', () => ({
+const goto = mock();
+void mock.module('$app/navigation', () => ({ goto }));
+void mock.module('$app/paths', () => ({
   resolve: (path: string) => (path.startsWith('/') ? path : `/${path}`),
+  base: '',
+  assets: '',
+  asset: (path: string) => path,
 }));
-vi.mock('./fixed-five-repo', () => ({ fixedFiveRepository: {} }));
+void mock.module('./fixed-five-repo', () => ({ fixedFiveRepository: {} }));
+const { FixedFiveRoomController } = await import('./fixed-five-room-controller.svelte.js');
 
 class FakeRunner {
   disposed = false;
@@ -42,6 +45,7 @@ class FakeRunner {
   runShared82(): void {}
   runDuel(): void {}
   runDuelGame(): void {}
+  runShared82H2HGame(): void {}
   verify(): void {}
   dispose(): void {
     this.disposed = true;
@@ -362,6 +366,58 @@ describe('FixedFiveRoomController', () => {
     expect(controller.localReady).toBe(true);
     expect(controller.opponentReady).toBe(false);
 
+    controller.dispose();
+  });
+
+  it('mirrors scheduled shared-82 broadcasts without enabling Duel state', async () => {
+    const harness = createHarness();
+    const created = await harness.createRoom({ mode: 'classic-shared-82', sourceMode: 'classic' });
+    await harness.transport.join(created.code);
+    const started = await harness.transport.submitCommand({
+      schemaVersion: 1,
+      roomId: created.snapshot.roomId,
+      commandId: commandIdSchema.parse('season-start'),
+      actorParticipantId: 'p1',
+      payload: { kind: 'start' },
+    });
+    expect(started.accepted).toBe(true);
+    for (let index = 0; index < 10; index += 1) {
+      const receipt = await harness.transport.submitCommand({
+        schemaVersion: 1,
+        roomId: created.snapshot.roomId,
+        commandId: commandIdSchema.parse(`season-pick-${String(index)}`),
+        actorParticipantId: index % 2 === 0 ? 'p1' : 'p2',
+        payload: {
+          kind: 'classic-pick',
+          playerId: playerIdSchema.parse(`season-player-${String(index)}`),
+          slotIndex: index % 5,
+        },
+      });
+      expect(receipt.accepted).toBe(true);
+    }
+    const broadcast = await harness.transport.submitCommand({
+      schemaVersion: 1,
+      roomId: created.snapshot.roomId,
+      commandId: commandIdSchema.parse('season-broadcast'),
+      actorParticipantId: 'p1',
+      payload: {
+        kind: 'broadcast-start',
+        gameNumber: 18,
+        eligibleGameNumbers: [18, 55, 77],
+      },
+    });
+    expect(broadcast.accepted).toBe(true);
+
+    const controller = new FixedFiveRoomController({
+      roomId: created.snapshot.roomId,
+      session: harness.deps,
+    });
+    await controller.start();
+    expect(controller.shared82Broadcast).toBe(true);
+    expect(controller.duelBroadcast).toBe(false);
+    expect(controller.roomSnapshot?.broadcast?.gameNumber).toBe(18);
+    expect(controller.phase).toBe('broadcasting');
+    expect(controller.revealedEntries).toEqual([]);
     controller.dispose();
   });
 });

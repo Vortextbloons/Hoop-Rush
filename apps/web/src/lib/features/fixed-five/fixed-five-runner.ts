@@ -7,6 +7,7 @@ import {
   type FixedFiveWorkerMessage,
   type FixedFiveWorkerRequest,
   type FixedFiveWorkerTeam,
+  type OpponentBracket,
   type OpponentBracketCore,
   type Seed,
 } from '@hoop-rush/data-contracts';
@@ -28,6 +29,7 @@ export class FixedFiveRunner {
     dataVersion: string;
     engineVersion: string;
     startGameNumber?: number;
+    recordH2H?: boolean;
   }): void {
     this.start({
       schemaVersion: FIXED_FIVE_WORKER_WIRE_VERSION,
@@ -41,6 +43,7 @@ export class FixedFiveRunner {
       dataVersion: input.dataVersion,
       engineVersion: input.engineVersion,
       startGameNumber: input.startGameNumber ?? 1,
+      recordH2H: input.recordH2H ?? false,
     });
   }
   runDuel(input: {
@@ -82,6 +85,32 @@ export class FixedFiveRunner {
       rootSeed: input.rootSeed,
       p1Team: input.p1Team,
       p2Team: input.p2Team,
+      profile: input.profile,
+      dataVersion: input.dataVersion,
+      engineVersion: input.engineVersion,
+    });
+  }
+  runShared82H2HGame(input: {
+    roomId: string;
+    gameNumber: number;
+    rootSeed: Seed;
+    p1Team: FixedFiveWorkerTeam;
+    p2Team: FixedFiveWorkerTeam;
+    bracket: OpponentBracket;
+    profile: EraSimulationProfile;
+    dataVersion: string;
+    engineVersion: string;
+  }): void {
+    this.start({
+      schemaVersion: FIXED_FIVE_WORKER_WIRE_VERSION,
+      type: 'fixed-five-shared82-h2h-game',
+      requestId: newRequestId(),
+      roomId: idSchema.parse(input.roomId),
+      gameNumber: input.gameNumber,
+      rootSeed: input.rootSeed,
+      p1Team: input.p1Team,
+      p2Team: input.p2Team,
+      bracket: input.bracket,
       profile: input.profile,
       dataVersion: input.dataVersion,
       engineVersion: input.engineVersion,
@@ -152,6 +181,8 @@ export class FixedFiveRunner {
         this.onEvent({ kind: 'results', entries: message.entries });
       } else if (message.type === 'fixed-five-duel-game') {
         this.onEvent({ kind: 'duel-game', output: message.output });
+      } else if (message.type === 'fixed-five-shared82-h2h-game') {
+        this.onEvent({ kind: 'shared82-h2h-game', output: message.output });
       } else if (message.type === 'fixed-five-complete') {
         this.onEvent({ kind: 'complete', gamesDelivered: message.gamesDelivered });
       } else if (message.type === 'fixed-five-verified') {

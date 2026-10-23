@@ -13,6 +13,7 @@ import {
   stabilizedRate,
   effectiveTrueShooting,
   usageFor,
+  fieldPossessionExposure,
 } from './season-evidence.ts';
 import type { DerivationInput } from './v2.ts';
 
@@ -133,9 +134,13 @@ export function estimateAttributes(
   const rebound = (key: string, chances: string, prior: number, slope: number) => {
     const chance = observed(stats, chances);
     const collected = observed(stats, key);
+    const tracked = observed(
+      stats,
+      key === 'offensiveRebounds' ? 'trackedOffensiveRebounds' : 'trackedDefensiveRebounds',
+    );
     const chanceAdjustment =
-      chance !== null && collected !== null && chance > 0
-        ? clamp((collected / chance - (key === 'offensiveRebounds' ? 0.45 : 0.65)) * 15, -5, 5)
+      chance !== null && tracked !== null && chance > 0
+        ? clamp((tracked / chance - (key === 'offensiveRebounds' ? 0.45 : 0.65)) * 15, -5, 5)
         : 0;
     const fallback =
       (ratePer100(stats, 'rebounds', pace) ?? 9) * (key === 'offensiveRebounds' ? 0.25 : 0.75);
@@ -169,16 +174,22 @@ export function estimateAttributes(
   const deflections = ratePer100(stats, 'deflections', pace);
   const contests = ratePer100(stats, 'contestedShots3pt', pace);
   const hasPerimeter = deflections !== null || contests !== null;
+  const perimeterPrior = 59 + clamp((steals - 1.5) * 8, -10, 16);
+  const hustleExposure = fieldPossessionExposure(stats, 'deflections', pace);
+  const hustleWeight = hustleExposure / (hustleExposure + 400);
   const perimeter = hasPerimeter
-    ? 60 +
-      clamp(((deflections ?? 2.5) - 2.5) * 5, -10, 14) +
-      clamp(((contests ?? 3) - 3) * 2, -6, 8)
-    : 59 + clamp((steals - 1.5) * 8, -10, 16);
+    ? perimeterPrior +
+      hustleWeight *
+        (60 +
+          clamp(((deflections ?? 2.5) - 2.5) * 5, -10, 14) +
+          clamp(((contests ?? 3) - 3) * 2, -6, 8) -
+          perimeterPrior)
+    : perimeterPrior;
   const boxouts = ratePer100(stats, 'boxOuts', pace);
   const defensiveDiscipline =
     72 +
     clamp((3.8 - fouls) * 3, -12, 8) +
-    (boxouts === null ? 0 : clamp((boxouts - 1.5) * 2, -3, 6));
+    (boxouts === null ? 0 : clamp((boxouts - 1.5) * 2, -3, 6) * hustleWeight);
   const drives = ratePer100(stats, 'drives', pace);
   const speed = observed(stats, 'avgSpeed');
   const height = input.heightInches ?? 78;

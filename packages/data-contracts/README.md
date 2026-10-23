@@ -27,15 +27,17 @@ workers embed.
 - Domain groups: `run.ts`, `bracket.ts`, `classic.ts`, `player-season.ts`,
   `season-*.ts` (hash, identity, seeds, versions, plus the shared game wire:
   game simulation, rotation, home court, effects, evolution, draft catalog),
-  `havoc-*.ts`, `draft-duel*.ts`, `fixed-five*.ts`, `collection*.ts`,
+  `havoc-*.ts`, `draft-duel*.ts`, `fixed-five*.ts`, `collection*.ts` (player
+  catalog artifacts; not the removed Ultimate Run mode),
   `projection*.ts`, `worker.ts`, `league-worker.ts`.
-- `src/loaders/` — packaged-artifact parsing helpers used by the web client.
+- `src/loaders/` — packaged-artifact parsing helpers used by the web client
+  (`collection-catalog.ts` for `static/data/collection/`).
 
 ## Verification
 
 ```text
-pnpm exec vitest run --project @hoop-rush/data-contracts <path>
-pnpm --filter @hoop-rush/data-contracts test:run
+bun test <path>
+bun run --filter @hoop-rush/data-contracts test:run
 ```
 
 Changing a schema or version constant requires updating every consumer in the

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import type {
   DraftDuelCard,
   DraftDuelCatalogEntry,
@@ -47,6 +47,7 @@ import {
   isDraftDuelComplete,
   repositionDraftDuelCard,
   DraftDuelDraftError,
+  type DraftDuelDraftErrorCode,
   type DraftDuelPickInput,
 } from './draft.ts';
 import {
@@ -312,7 +313,7 @@ function playFullDraftWithSlots(
   return state;
 }
 
-function expectDraftError(run: () => unknown, code: string): void {
+function expectDraftError(run: () => unknown, code: DraftDuelDraftErrorCode): void {
   let thrown: unknown;
   try {
     run();
@@ -985,7 +986,10 @@ describe('slot selection', () => {
     });
     const roster = draftDuelRoster(state, handCatalog, 'p1');
     expect(roster.slots.map((slot) => slot.slotIndex)).toEqual([0, 1]);
-    expect(roster.slots.map((slot) => slot.card.playerId)).toEqual(['x-g1', 'x-g2']);
+    expect(roster.slots.map((slot) => slot.card.playerId)).toEqual([
+      playerIdSchema.parse('x-g1'),
+      playerIdSchema.parse('x-g2'),
+    ]);
   });
 });
 
@@ -1481,7 +1485,7 @@ describe('series', () => {
       zero('mvp-e'),
     ]);
     const pointsMvp = draftDuelSeriesMvp(catalog, rosters, pointsGames, 'p1');
-    expect(pointsMvp?.playerId).toBe('mvp-b');
+    expect(pointsMvp?.playerId).toBe(playerIdSchema.parse('mvp-b'));
     expect(pointsMvp?.games).toBe(4);
     expect(pointsMvp?.points).toBe(88);
     expect(pointsMvp?.displayName).toBe('Player mvp-b v1');
@@ -1493,7 +1497,9 @@ describe('series', () => {
       zero('mvp-d'),
       zero('mvp-e'),
     ]);
-    expect(draftDuelSeriesMvp(catalog, rosters, assistGames, 'p1')?.playerId).toBe('mvp-a');
+    expect(draftDuelSeriesMvp(catalog, rosters, assistGames, 'p1')?.playerId).toBe(
+      playerIdSchema.parse('mvp-a'),
+    );
 
     const reboundGames = gamesWith(() => [
       buildBox('mvp-a', { points: 20, fgm: 10, fga: 20, assists: 3, rebounds: 6 }),
@@ -1502,7 +1508,9 @@ describe('series', () => {
       zero('mvp-d'),
       zero('mvp-e'),
     ]);
-    expect(draftDuelSeriesMvp(catalog, rosters, reboundGames, 'p1')?.playerId).toBe('mvp-b');
+    expect(draftDuelSeriesMvp(catalog, rosters, reboundGames, 'p1')?.playerId).toBe(
+      playerIdSchema.parse('mvp-b'),
+    );
 
     const idGames = gamesWith(() => [
       buildBox('mvp-a', { points: 10, fgm: 5, fga: 10 }),
@@ -1511,7 +1519,9 @@ describe('series', () => {
       zero('mvp-d'),
       zero('mvp-e'),
     ]);
-    expect(draftDuelSeriesMvp(catalog, rosters, idGames, 'p1')?.playerId).toBe('mvp-a');
+    expect(draftDuelSeriesMvp(catalog, rosters, idGames, 'p1')?.playerId).toBe(
+      playerIdSchema.parse('mvp-a'),
+    );
     expect(draftDuelSeriesMvp(catalog, rosters, [], 'p1')).toBeNull();
   });
 
@@ -1556,11 +1566,11 @@ describe('series', () => {
     const standouts = draftDuelStandouts(catalog, rosters, [game1, game2]);
     expect(standouts).toHaveLength(2);
     expect(standouts[0]?.participantId).toBe('p1');
-    expect(standouts[0]?.playerId).toBe('sd-b');
+    expect(standouts[0]?.playerId).toBe(playerIdSchema.parse('sd-b'));
     expect(standouts[0]?.assists).toBe(5);
     expect(standouts[0]?.displayName).toBe('Player sd-b v1');
     expect(standouts[1]?.participantId).toBe('p2');
-    expect(standouts[1]?.playerId).toBe('sd-y');
+    expect(standouts[1]?.playerId).toBe(playerIdSchema.parse('sd-y'));
     expect(standouts[1]?.rebounds).toBe(10);
   });
 });
@@ -1643,13 +1653,19 @@ describe('draft duel repositioning', () => {
     });
     expect(moved.pickOrdinal).toBe(state.pickOrdinal);
     expect(moved.status).toBe('drafting');
-    expect(moved.rounds[0]?.picks.map((pick) => [pick.card.playerId, pick.slotIndex])).toEqual([
+    expect(
+      moved.rounds[0]?.picks.map(
+        (pick) => [pick.card.playerId, pick.slotIndex] as (string | number)[],
+      ),
+    ).toEqual([
       ['rr-g', 0],
       ['rr-sg', 1],
       ['rr-f', 3],
     ]);
     const roster = draftDuelRoster(moved, catalog, 'p1');
-    expect(roster.slots.map((slot) => [slot.card.playerId, slot.slotIndex])).toEqual([
+    expect(
+      roster.slots.map((slot) => [slot.card.playerId, slot.slotIndex] as (string | number)[]),
+    ).toEqual([
       ['rr-g', 0],
       ['rr-sg', 1],
       ['rr-f', 3],

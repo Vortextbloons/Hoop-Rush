@@ -33,7 +33,7 @@ jobs:
             https://*.supabase.co) ;;
             *) echo "VITE_SUPABASE_URL must look like https://<ref>.supabase.co (got: $VITE_SUPABASE_URL)"; exit 1 ;;
           esac
-          pnpm build
+          bun run build
 
       - name: Add GitHub Pages SPA fallback
         run: cp apps/web/build/index.html apps/web/build/404.html

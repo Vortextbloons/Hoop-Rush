@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, setSystemTime, vi } from 'bun:test';
 import {
   HAVOC_MULTIPLAYER_BROADCAST_MS,
   HAVOC_MULTIPLAYER_SAVE_SCHEMA_VERSION,
@@ -403,24 +403,36 @@ async function hasCommand(
   return commands.some(predicate);
 }
 
+const stubbedGlobals: Array<[string, unknown]> = [];
+
+function stubGlobal(name: string, value: unknown): void {
+  stubbedGlobals.push([name, (globalThis as Record<string, unknown>)[name]]);
+  (globalThis as Record<string, unknown>)[name] = value;
+}
+
+function unstubAllGlobals(): void {
+  for (const [name, original] of stubbedGlobals.splice(0))
+    (globalThis as Record<string, unknown>)[name] = original;
+}
+
 describe('havoc multiplayer presenter flow', () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date(START_MS));
+    setSystemTime(new Date(START_MS));
     commandCounter = 0;
     scheduledFrames = [];
-    vi.stubGlobal(
+    stubGlobal(
       'requestAnimationFrame',
       vi.fn((callback: FrameRequestCallback) => {
         scheduledFrames.push(callback);
         return scheduledFrames.length;
       }),
     );
-    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+    stubGlobal('cancelAnimationFrame', vi.fn());
   });
 
   afterEach(() => {
-    vi.unstubAllGlobals();
+    unstubAllGlobals();
     vi.useRealTimers();
     vi.restoreAllMocks();
   });

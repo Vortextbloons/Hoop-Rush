@@ -1,6 +1,6 @@
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { contentHashSchema, eraIdSchema } from '@hoop-rush/data-contracts';
 import {
   buildFixtureBracket,

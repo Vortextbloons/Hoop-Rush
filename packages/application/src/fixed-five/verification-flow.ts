@@ -535,6 +535,7 @@ export class FixedFiveVerificationFlow {
           event.kind === 'progress' ||
           event.kind === 'results' ||
           event.kind === 'duel-game' ||
+          event.kind === 'shared82-h2h-game' ||
           event.kind === 'complete'
         ) {
           return;

@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -47,16 +47,70 @@ const manifestPatterns = manifest.exclusions.map((entry) => entry.pattern);
 const allowEmpty = new Set(manifest.allowEmpty ?? []);
 
 const packageJson = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
-const quickScript = packageJson.scripts['test:quick'] ?? '';
-const scriptPatterns = [...quickScript.matchAll(/--exclude="([^"]+)"/g)].map((match) => match[1]);
-
-const missingFromScript = manifestPatterns.filter((pattern) => !scriptPatterns.includes(pattern));
-const missingFromManifest = scriptPatterns.filter((pattern) => !manifestPatterns.includes(pattern));
-if (missingFromScript.length > 0) {
-  failures.push(`manifest patterns missing from test:quick: ${missingFromScript.join(', ')}`);
+const rootQuick = packageJson.scripts['test:quick'] ?? '';
+if (rootQuick.includes('--path-ignore-patterns')) {
+  failures.push(
+    'root test:quick must delegate to workspace test:quick scripts; exclusion patterns live in each workspace package.json',
+  );
 }
-if (missingFromManifest.length > 0) {
-  failures.push(`test:quick patterns missing from the manifest: ${missingFromManifest.join(', ')}`);
+if (!rootQuick.includes('test:quick') || !rootQuick.includes('--filter')) {
+  failures.push('root test:quick must fan out to workspace test:quick scripts');
+}
+
+function extractPatterns(script) {
+  return [
+    ...script.matchAll(/--path-ignore-patterns[=\s]+"([^"]+)"/g),
+    ...script.matchAll(/--path-ignore-patterns[=\s]+'([^']+)'/g),
+  ].map((match) => match[1]);
+}
+
+const workspaceGlobs = packageJson.workspaces?.packages ?? [];
+let quickScripts = 0;
+for (const glob of workspaceGlobs) {
+  const [parent, child] = glob.split('/');
+  if (child !== '*') continue;
+  let entries;
+  try {
+    entries = readdirSync(join(ROOT, parent), { withFileTypes: true });
+  } catch {
+    continue;
+  }
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const dir = `${parent}/${entry.name}`;
+    const packagePath = join(ROOT, dir, 'package.json');
+    if (!existsSync(packagePath)) continue;
+    const pkg = JSON.parse(readFileSync(packagePath, 'utf8'));
+    if (!pkg.scripts?.['test:run']) continue;
+    quickScripts += 1;
+    const script = pkg.scripts?.['test:quick'] ?? '';
+    if (!script) {
+      failures.push(
+        `${dir}: missing test:quick script (required: mirror test:run plus the manifest exclusions)`,
+      );
+      continue;
+    }
+    const scriptPatterns = extractPatterns(script);
+    const missingFromScript = manifestPatterns.filter(
+      (pattern) => !scriptPatterns.includes(pattern),
+    );
+    const missingFromManifest = scriptPatterns.filter(
+      (pattern) => !manifestPatterns.includes(pattern),
+    );
+    if (missingFromScript.length > 0) {
+      failures.push(
+        `${dir}: test:quick missing manifest patterns: ${missingFromScript.join(', ')}`,
+      );
+    }
+    if (missingFromManifest.length > 0) {
+      failures.push(
+        `${dir}: test:quick patterns missing from the manifest: ${missingFromManifest.join(', ')}`,
+      );
+    }
+  }
+}
+if (quickScripts === 0) {
+  failures.push('no workspace test:quick scripts found');
 }
 
 const testFiles = collectTestFiles();
@@ -83,6 +137,6 @@ if (failures.length > 0) {
   process.exitCode = 1;
 } else {
   process.stdout.write(
-    `quick exclusions: ${String(manifestPatterns.length)} patterns, ${String(excluded.size)} of ${String(testFiles.length)} test files excluded\n`,
+    `quick exclusions: ${String(manifestPatterns.length)} patterns across ${String(quickScripts)} workspace scripts, ${String(excluded.size)} of ${String(testFiles.length)} test files excluded\n`,
   );
 }

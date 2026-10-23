@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { buildGameSimulationInput, seedFromString } from '@hoop-rush/test-fixtures';
 import { seedSchema } from '@hoop-rush/data-contracts';
 import type { GameSimulationInput } from '@hoop-rush/data-contracts';

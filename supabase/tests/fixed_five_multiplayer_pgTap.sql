@@ -7,7 +7,7 @@
 -- scratch table, so pgTAP state is never role-switched.
 
 begin;
-select plan(182);
+select plan(193);
 
 create function public.pgtap_has_policy(p_schema text, p_table text, p_policy text)
 returns boolean
@@ -1417,15 +1417,165 @@ select is(
 
 set local role authenticated;
 select public.ff_pgtap_claim((select value from public.ff_pgtap_ctx where name = 'uid_a1'));
+reset role;
+update public.fixed_five_rooms
+  set phase = 'simulating',
+      game_state = jsonb_set(
+        coalesce(game_state, '{}'::jsonb), '{season}',
+        jsonb_build_object(
+          'eligibleGameNumbers', '[18,55,77]'::jsonb,
+          'lastCompletedGameNumber', null), true)
+  where id = (select value::uuid from public.ff_pgtap_ctx where name = 'room_a');
+set local role authenticated;
+select public.ff_pgtap_claim((select value from public.ff_pgtap_ctx where name = 'uid_a1'));
 insert into public.ff_pgtap_ctx (name, value)
-select 'e_wrong_mode', public.fixed_five_command_submit(
+select 'shared82_early_game', public.fixed_five_command_submit(
   (select value::uuid from public.ff_pgtap_ctx where name = 'room_a'),
-  'e-wrong-mode', null, 'p1',
-  jsonb_build_object('kind', 'broadcast-start', 'gameNumber', 1))::text;
+  'shared82-early-game', null, 'p1',
+  jsonb_build_object(
+    'kind', 'broadcast-start', 'gameNumber', 55,
+    'eligibleGameNumbers', '[18,55,77]'::jsonb))::text;
 reset role;
 select is(
-  (select value::jsonb->>'rejection_code' from public.ff_pgtap_ctx where name = 'e_wrong_mode'),
-  'illegal-move', 'broadcast commands stay duel-only');
+  (select value::jsonb->>'rejection_code' from public.ff_pgtap_ctx where name = 'shared82_early_game'),
+  'turn', 'Shared82 broadcasts must target the next scheduled matchup');
+
+set local role authenticated;
+select public.ff_pgtap_claim((select value from public.ff_pgtap_ctx where name = 'uid_a1'));
+insert into public.ff_pgtap_ctx (name, value)
+select 'shared82_broadcast_18', public.fixed_five_command_submit(
+  (select value::uuid from public.ff_pgtap_ctx where name = 'room_a'),
+  'shared82-broadcast-18', null, 'p1',
+  jsonb_build_object(
+    'kind', 'broadcast-start', 'gameNumber', 18,
+    'eligibleGameNumbers', '[18,55,77]'::jsonb))::text;
+reset role;
+select is(
+  (select value::jsonb->>'accepted' from public.ff_pgtap_ctx where name = 'shared82_broadcast_18'),
+  'true', 'Shared82 starts its next scheduled matchup');
+select is(
+  (select phase from public.fixed_five_rooms
+    where id = (select value::uuid from public.ff_pgtap_ctx where name = 'room_a')),
+  'broadcasting', 'Shared82 enters the broadcast phase');
+select ok(
+  (select broadcast->>'startedAtIso' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T'
+    from public.fixed_five_rooms
+    where id = (select value::uuid from public.ff_pgtap_ctx where name = 'room_a')),
+  'Shared82 broadcast start uses the server timestamp');
+insert into public.ff_pgtap_ctx (name, value)
+select 'shared82_started_at', broadcast->>'startedAtIso'
+  from public.fixed_five_rooms
+  where id = (select value::uuid from public.ff_pgtap_ctx where name = 'room_a');
+
+set local role authenticated;
+select public.ff_pgtap_claim((select value from public.ff_pgtap_ctx where name = 'uid_a1'));
+insert into public.ff_pgtap_ctx (name, value)
+select 'shared82_duplicate_start', public.fixed_five_command_submit(
+  (select value::uuid from public.ff_pgtap_ctx where name = 'room_a'),
+  'shared82-duplicate-start', null, 'p1',
+  jsonb_build_object(
+    'kind', 'broadcast-start', 'gameNumber', 18,
+    'eligibleGameNumbers', '[18,55,77]'::jsonb))::text;
+reset role;
+select is(
+  (select value::jsonb->>'accepted' from public.ff_pgtap_ctx where name = 'shared82_duplicate_start'),
+  'true', 'duplicate Shared82 broadcast start is harmless');
+select is(
+  (select broadcast->>'startedAtIso' from public.fixed_five_rooms
+    where id = (select value::uuid from public.ff_pgtap_ctx where name = 'room_a')),
+  (select value from public.ff_pgtap_ctx where name = 'shared82_started_at'),
+  'duplicate Shared82 start preserves the original timestamp');
+
+set local role authenticated;
+select public.ff_pgtap_claim((select value from public.ff_pgtap_ctx where name = 'uid_a1'));
+select public.fixed_five_command_submit(
+  (select value::uuid from public.ff_pgtap_ctx where name = 'room_a'),
+  'shared82-propose-18-p1', null, 'p1',
+  jsonb_build_object(
+    'kind', 'propose-game-result', 'gameNumber', 18, 'winner', 'p1',
+    'resultDigest', repeat('c', 64), 'tapeDigest', repeat('d', 64), 'inputDigest', repeat('e', 64)));
+reset role;
+set local role authenticated;
+select public.ff_pgtap_claim((select value from public.ff_pgtap_ctx where name = 'uid_a2'));
+select public.fixed_five_command_submit(
+  (select value::uuid from public.ff_pgtap_ctx where name = 'room_a'),
+  'shared82-propose-18-p2', null, 'p2',
+  jsonb_build_object(
+    'kind', 'propose-game-result', 'gameNumber', 18, 'winner', 'p1',
+    'resultDigest', repeat('c', 64), 'tapeDigest', repeat('d', 64), 'inputDigest', repeat('e', 64)));
+reset role;
+set local role authenticated;
+select public.ff_pgtap_claim((select value from public.ff_pgtap_ctx where name = 'uid_a1'));
+select public.fixed_five_command_submit(
+  (select value::uuid from public.ff_pgtap_ctx where name = 'room_a'),
+  'shared82-confirm-18-p1', null, 'p1',
+  jsonb_build_object(
+    'kind', 'confirm-game-result', 'gameNumber', 18,
+    'resultDigest', repeat('c', 64), 'verified', true));
+reset role;
+set local role authenticated;
+select public.ff_pgtap_claim((select value from public.ff_pgtap_ctx where name = 'uid_a2'));
+insert into public.ff_pgtap_ctx (name, value)
+select 'shared82_confirm_18_p2', public.fixed_five_command_submit(
+  (select value::uuid from public.ff_pgtap_ctx where name = 'room_a'),
+  'shared82-confirm-18-p2', null, 'p2',
+  jsonb_build_object(
+    'kind', 'confirm-game-result', 'gameNumber', 18,
+    'resultDigest', repeat('c', 64), 'verified', true))::text;
+reset role;
+select is(
+  (select value::jsonb->>'accepted' from public.ff_pgtap_ctx where name = 'shared82_confirm_18_p2'),
+  'true', 'Shared82 matching confirmations complete the broadcast');
+select is(
+  (select game_state->'season'->>'lastCompletedGameNumber' from public.fixed_five_rooms
+    where id = (select value::uuid from public.ff_pgtap_ctx where name = 'room_a')),
+  '18', 'Shared82 completion advances the schedule cursor once');
+
+set local role authenticated;
+select public.ff_pgtap_claim((select value from public.ff_pgtap_ctx where name = 'uid_a2'));
+insert into public.ff_pgtap_ctx (name, value)
+select 'shared82_duplicate_completion', public.fixed_five_command_submit(
+  (select value::uuid from public.ff_pgtap_ctx where name = 'room_a'),
+  'shared82-confirm-18-p2', null, 'p2',
+  jsonb_build_object(
+    'kind', 'confirm-game-result', 'gameNumber', 18,
+    'resultDigest', repeat('c', 64), 'verified', true))::text;
+reset role;
+select is(
+  (select value::jsonb->>'accepted' from public.ff_pgtap_ctx where name = 'shared82_duplicate_completion'),
+  'true', 'duplicate Shared82 completion is harmless');
+select is(
+  (select game_state->'season'->>'lastCompletedGameNumber' from public.fixed_five_rooms
+    where id = (select value::uuid from public.ff_pgtap_ctx where name = 'room_a')),
+  '18', 'duplicate Shared82 completion does not skip a matchup');
+
+set local role authenticated;
+select public.ff_pgtap_claim((select value from public.ff_pgtap_ctx where name = 'uid_a1'));
+insert into public.ff_pgtap_ctx (name, value)
+select 'shared82_skip_game', public.fixed_five_command_submit(
+  (select value::uuid from public.ff_pgtap_ctx where name = 'room_a'),
+  'shared82-skip-game', null, 'p1',
+  jsonb_build_object(
+    'kind', 'broadcast-start', 'gameNumber', 77,
+    'eligibleGameNumbers', '[18,55,77]'::jsonb))::text;
+reset role;
+select is(
+  (select value::jsonb->>'rejection_code' from public.ff_pgtap_ctx where name = 'shared82_skip_game'),
+  'turn', 'Shared82 cannot skip the next scheduled matchup');
+
+set local role authenticated;
+select public.ff_pgtap_claim((select value from public.ff_pgtap_ctx where name = 'uid_a1'));
+insert into public.ff_pgtap_ctx (name, value)
+select 'shared82_broadcast_55', public.fixed_five_command_submit(
+  (select value::uuid from public.ff_pgtap_ctx where name = 'room_a'),
+  'shared82-broadcast-55', null, 'p1',
+  jsonb_build_object(
+    'kind', 'broadcast-start', 'gameNumber', 55,
+    'eligibleGameNumbers', '[18,55,77]'::jsonb))::text;
+reset role;
+select is(
+  (select value::jsonb->>'accepted' from public.ff_pgtap_ctx where name = 'shared82_broadcast_55'),
+  'true', 'Shared82 proceeds to the next matchup after confirmation');
 
 select * from finish();
 rollback;

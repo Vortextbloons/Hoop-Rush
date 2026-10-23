@@ -1,5 +1,5 @@
 import Dexie from 'dexie';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'bun:test';
 import {
   HAVOC_MULTIPLAYER_SAVE_SCHEMA_VERSION,
   HAVOC_MULTIPLAYER_SERIES_WINS,
@@ -210,7 +210,7 @@ describe('DexieHavocMultiplayerRepository', () => {
     await repo.appendCommands(ROOM_ID, [second, first]);
     await repo.appendCommands(ROOM_ID, [first, second]);
     const commands = await repo.loadCommands(ROOM_ID);
-    expect(commands.map((command) => command.commandId)).toEqual(['cmd-0', 'cmd-1']);
+    expect(commands.map((command) => command.commandId as string)).toEqual(['cmd-0', 'cmd-1']);
     expect(commands.map((command) => command.payload.kind)).toEqual(['ready', 'start']);
     const rows = await db.havocMultiplayerCommands
       .where('roomId')
@@ -330,7 +330,7 @@ describe('DexieHavocMultiplayerRepository', () => {
     await repo.saveResult(buildGameOutput(ROOM_ID_2, 2));
     await repo.complete(buildRecap(ROOM_ID));
     expect(await repo.loadActive(ROOM_ID)).toBeNull();
-    expect((await repo.loadActive(ROOM_ID_2))?.snapshot.roomId).toBe(ROOM_ID_2);
+    expect((await repo.loadActive(ROOM_ID_2))?.snapshot.roomId as string).toBe(ROOM_ID_2);
     expect(await repo.loadCommands(ROOM_ID)).toEqual([]);
     expect(await repo.loadCommands(ROOM_ID_2)).toHaveLength(2);
     expect(await repo.loadResults(ROOM_ID)).toHaveLength(1);
@@ -420,11 +420,11 @@ describe('DexieHavocMultiplayerRepository', () => {
     expect(db.verno).toBe(3);
     const tableNames = db.tables.map((table) => table.name).sort();
     expect(tableNames).toEqual(Object.keys(HOOP_RUSH_DATABASE_V3_STORES).sort());
-    expect(await db.completed.get('legacy-run')).toEqual(completedRecord);
-    expect(await db.history.get('legacy-run')).toEqual(historyRecord);
+    expect((await db.completed.get('legacy-run')) as unknown).toEqual(completedRecord);
+    expect((await db.history.get('legacy-run')) as unknown).toEqual(historyRecord);
     await repo.saveActive(buildActiveState());
     await repo.appendCommands(ROOM_ID, [buildCommandEntry(ROOM_ID, 0)]);
-    expect((await repo.loadActive(ROOM_ID))?.snapshot.roomId).toBe(ROOM_ID);
+    expect((await repo.loadActive(ROOM_ID))?.snapshot.roomId as string).toBe(ROOM_ID);
     expect(await repo.loadCommands(ROOM_ID)).toHaveLength(1);
     db.close();
   });

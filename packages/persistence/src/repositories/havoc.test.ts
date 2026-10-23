@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'bun:test';
 import {
   HAVOC_GAME_COUNT,
   HAVOC_MUTATION_CATALOG_VERSION,
@@ -797,7 +797,9 @@ describe('DexieHavocRepository', () => {
     expect((await repo.loadActiveRun())?.revision).toBe(5);
     expect(await repo.listRunGames(RUN_ID, 'havoc')).toHaveLength(1);
     const winner = fulfilled[0]?.value;
-    expect([first.commandId, second.commandId]).toContain(winner?.commandId);
+    expect([first.commandId, second.commandId]).toContain(
+      winner?.commandId as typeof first.commandId,
+    );
     expect(await repo.readRunGame(RUN_ID, 'havoc', 1)).not.toBeNull();
     expect(await repo.listRunGames(RUN_ID, 'normal')).toHaveLength(0);
     db.close();

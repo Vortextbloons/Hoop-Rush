@@ -1,27 +1,17 @@
 name: Setup repository
-description: Pin pnpm and Node, and install dependencies for CI jobs.
-
-inputs:
-  node-version:
-    description: Node.js version to install
-    required: false
-    default: '22'
-  pnpm-version:
-    description: pnpm version to use (kept in sync with packageManager in package.json)
-    required: false
-    default: '11.11.0'
+description: Install the pinned Bun runtime and dependencies for CI jobs.
 
 runs:
   using: composite
   steps:
-    - uses: pnpm/action-setup@v4
-      with:
-        version: ${{ inputs.pnpm-version }}
+    - uses: oven-sh/setup-bun@v2
 
-    - uses: actions/setup-node@v4
+    - uses: actions/cache@v4
       with:
-        node-version: ${{ inputs.node-version }}
-        cache: pnpm
+        path: ~/.bun/install/cache
+        key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+        restore-keys: |
+          bun-${{ runner.os }}-
 
-    - run: pnpm install --frozen-lockfile
+    - run: bun ci
       shell: bash

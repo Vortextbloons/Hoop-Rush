@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import {
   buildFixtureBracket,
   buildLegalSimulationTeam,
@@ -84,6 +84,7 @@ import {
 import {
   findWeakestOpponent,
   h2hGameNumbersFor,
+  simulateRecordedShared82H2HGame,
   shared82GameEvents,
   simulateShared82,
 } from './shared82.ts';
@@ -986,7 +987,7 @@ describe('timeout autopick', () => {
     const single = [
       { playerId: pid('c'), playerVersionId: 'pv-c', slotIndex: 0 as const, selectionScore: 90 },
     ];
-    expect(chooseAutopick(ROOT, 'duel', 'p1', 0, single).playerId).toBe('c');
+    expect(chooseAutopick(ROOT, 'duel', 'p1', 0, single).playerId).toBe(pid('c'));
     const candidates = [
       { playerId: pid('a'), playerVersionId: 'pv-b', slotIndex: 1 as const, selectionScore: 80 },
       { playerId: pid('b'), playerVersionId: 'pv-a', slotIndex: 0 as const, selectionScore: 80 },
@@ -1201,6 +1202,37 @@ describe('fixed-five generator parity', () => {
       if (event.tag !== 'h2h') continue;
       expect(event.game.home.teamId).toBe('p1');
       expect(event.game.away.teamId).toBe('p2');
+    }
+  });
+  it('records each scheduled H2H tape without changing its seeded result', () => {
+    const bracket = buildFixtureBracket();
+    const p1Team = buildLegalSimulationTeam({ teamId: 'p1', displayName: 'P1' });
+    const p2Team = buildLegalSimulationTeam({ teamId: 'p2', displayName: 'P2' });
+    const input = {
+      p1Team,
+      p2Team,
+      bracket,
+      profile: DEFAULT_ERA_SIM_PROFILE,
+      rootSeed: ROOT,
+      dataVersion: 'data-v1',
+    };
+    const ordinary = [...shared82GameEvents(input, context)];
+    const recorded = [...shared82GameEvents(input, context, 1, { recordH2H: true })];
+    expect(recorded.map((event) => event.game)).toStrictEqual(ordinary.map((event) => event.game));
+    expect(
+      recorded.filter((event) => event.tag !== 'h2h').every((event) => !('tape' in event)),
+    ).toBe(true);
+    const h2hNumbers = h2hGameNumbersFor(bracket, findWeakestOpponent(bracket).opponentId);
+    for (const gameNumber of h2hNumbers) {
+      const event = recorded.find(
+        (entry) => entry.tag === 'h2h' && entry.game.gameNumber === gameNumber,
+      );
+      expect(event?.tag).toBe('h2h');
+      if (!event || event.tag !== 'h2h') throw new Error(`missing H2H game ${String(gameNumber)}`);
+      expect(event.tape?.length).toBeGreaterThan(0);
+      expect(simulateRecordedShared82H2HGame(input, gameNumber, context).result).toStrictEqual(
+        event.game,
+      );
     }
   });
   it('yields duel games that rebuild the bulk series including the early stop', () => {

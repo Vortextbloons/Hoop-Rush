@@ -1,4 +1,6 @@
 import type {
+  FixedFiveCompetitionRun,
+  FixedFiveShared82H2HGameOutput,
   FixedFiveWorkerResultEntry,
   FixedFiveWorkerTeam,
   Seed,
@@ -6,6 +8,8 @@ import type {
 import {
   assembleCompetitionRun,
   computeCompetitionDigest,
+  findWeakestOpponent,
+  h2hGameNumbersFor,
   summarizeWorkerEntries,
   type FixedFivePickRef,
 } from '@hoop-rush/engine';
@@ -29,6 +33,8 @@ type CompetitionSnapshot = Pick<
   | 'simError'
   | 'progress'
   | 'simEntries'
+  | 'revealedEntries'
+  | 'revealedThroughGameNumber'
   | 'statsEntries'
   | 'statsBuilding'
   | 'localResult'
@@ -40,6 +46,7 @@ interface CompetitionHost {
   publish(): void;
   recomputePhase(): void;
   runAutoFlows(): void;
+  shared82H2HGame(output: FixedFiveShared82H2HGameOutput): void;
   resetVerification(): void;
   sync(): Promise<void>;
 }
@@ -60,6 +67,10 @@ export class FixedFiveCompetitionFlow {
   private simError: string | null = null;
   private progress: { completed: number; total: number } | null = null;
   private simEntries: FixedFiveWorkerResultEntry[] = [];
+  private revealedThroughGameNumber = 0;
+  private pendingRun: FixedFiveCompetitionRun | null = null;
+  private seasonResult: FixedFiveLocalResult | null = null;
+  private seasonWorkerComplete = false;
   private statsEntries: FixedFiveWorkerResultEntry[] = [];
   private statsState: 'idle' | 'requested' | 'running' | 'settled' = 'idle';
   private localResult: FixedFiveLocalResult | null = null;
@@ -112,6 +123,10 @@ export class FixedFiveCompetitionFlow {
       simError: this.simError,
       progress: this.progress,
       simEntries: this.simEntries,
+      revealedEntries: this.simEntries.filter(
+        (entry) => entry.game.gameNumber <= this.revealedThroughGameNumber,
+      ),
+      revealedThroughGameNumber: this.revealedThroughGameNumber,
       statsEntries: this.statsEntries,
       statsBuilding: this.statsState === 'running',
       localResult: this.localResult,
@@ -158,9 +173,76 @@ export class FixedFiveCompetitionFlow {
 
   maybeStart(): void {
     if (this.host.isDisposed()) return;
-    if (this.phase === 'simulating' && !this.simStarted && !this.simError && this.room?.rootSeed) {
+    const shared82 = this.room?.settings.mode !== 'duel';
+    const canSimulate =
+      this.phase === 'simulating' ||
+      (shared82 && (this.phase === 'broadcasting' || this.phase === 'game-results'));
+    if (canSimulate && !this.simStarted && !this.simError && this.room?.rootSeed) {
       void this.startSimulation(this.simulationReason);
     }
+  }
+
+  advanceSeasonReveal(): number | null {
+    const room = this.room;
+    const assets = this.assets;
+    if (!room || room.settings.mode === 'duel' || !assets) return null;
+    const gameNumbers = h2hGameNumbersFor(
+      assets.bracket,
+      findWeakestOpponent(assets.bracket).opponentId,
+    );
+    const lastCompleted = room.seasonBroadcast?.lastCompletedGameNumber ?? 0;
+    const activeGameNumber = room.broadcast?.gameNumber ?? null;
+    const before = this.revealedThroughGameNumber;
+    if (activeGameNumber !== null) {
+      this.advanceRevealThrough(activeGameNumber - 1, gameNumbers);
+      if (before !== this.revealedThroughGameNumber) this.host.publish();
+      return activeGameNumber;
+    }
+    this.advanceRevealThrough(lastCompleted, gameNumbers);
+    let h2hTarget: number | null = null;
+    for (let count = 0; count < 4 && this.revealedThroughGameNumber < 82; count += 1) {
+      const gameNumber = this.revealedThroughGameNumber + 1;
+      if (gameNumbers.includes(gameNumber) && gameNumber > lastCompleted) {
+        h2hTarget = gameNumber;
+        break;
+      }
+      if (!this.hasCompleteEntry(gameNumber, gameNumbers)) break;
+      this.revealedThroughGameNumber = gameNumber;
+    }
+    if (before !== this.revealedThroughGameNumber) {
+      this.finishShared82IfReady();
+      this.host.publish();
+    }
+    return h2hTarget;
+  }
+
+  revealSeasonBroadcast(gameNumber: number): void {
+    if (this.host.isDisposed()) return;
+    const room = this.room;
+    const assets = this.assets;
+    if (!room || room.settings.mode === 'duel' || !assets) return;
+    const gameNumbers = h2hGameNumbersFor(
+      assets.bracket,
+      findWeakestOpponent(assets.bracket).opponentId,
+    );
+    this.advanceRevealThrough(gameNumber, gameNumbers);
+    this.finishShared82IfReady();
+    this.host.publish();
+  }
+
+  private advanceRevealThrough(targetGameNumber: number, h2hGameNumbers: number[]): void {
+    while (this.revealedThroughGameNumber < targetGameNumber) {
+      const gameNumber = this.revealedThroughGameNumber + 1;
+      if (!this.hasCompleteEntry(gameNumber, h2hGameNumbers)) return;
+      this.revealedThroughGameNumber = gameNumber;
+    }
+  }
+
+  private hasCompleteEntry(gameNumber: number, h2hGameNumbers: number[]): boolean {
+    const entryCount = this.simEntries.filter(
+      (entry) => entry.game.gameNumber === gameNumber,
+    ).length;
+    return entryCount >= (h2hGameNumbers.includes(gameNumber) ? 1 : 2);
   }
 
   maybeRebuildStats(): void {
@@ -210,21 +292,41 @@ export class FixedFiveCompetitionFlow {
       );
       if (this.host.isDisposed()) return;
       if (pending) {
-        this.localResult = {
+        this.pendingRun = pending.run;
+        const pendingResult: FixedFiveLocalResult = {
           result: pending.run.result,
           digest: pending.run.resultDigest,
           p1: { refs: p1Refs, players: [...p1Team.players] },
           p2: { refs: p2Refs, players: [...p2Team.players] },
           weakestReplacedOpponentId: pending.run.authorityFacts.weakestReplacedOpponentId,
         };
-        this.simulationGate.finish();
-        this.simDone = true;
-        this.host.recomputePhase();
-        this.host.publish();
-        this.host.runAutoFlows();
-        return;
+        const h2hGameNumbers =
+          room.settings.mode === 'duel'
+            ? []
+            : h2hGameNumbersFor(assets.bracket, findWeakestOpponent(assets.bracket).opponentId);
+        const broadcastsComplete =
+          h2hGameNumbers.length > 0 &&
+          h2hGameNumbers.every(
+            (gameNumber) => gameNumber <= (room.seasonBroadcast?.lastCompletedGameNumber ?? 0),
+          );
+        if (room.settings.mode === 'duel' || (room.broadcast === null && broadcastsComplete)) {
+          this.localResult = pendingResult;
+          if (room.settings.mode !== 'duel') this.revealedThroughGameNumber = 82;
+          this.simulationGate.finish();
+          this.simDone = true;
+          this.host.recomputePhase();
+          this.host.publish();
+          this.host.runAutoFlows();
+          return;
+        }
       }
       this.simEntries = [];
+      this.seasonResult = null;
+      this.seasonWorkerComplete = false;
+      this.revealedThroughGameNumber = Math.max(
+        this.revealedThroughGameNumber,
+        room.seasonBroadcast?.lastCompletedGameNumber ?? 0,
+      );
       this.progress = { completed: 0, total: room.settings.mode === 'duel' ? 7 : 161 };
       this.simStartAt = this.deps.now();
       this.host.publish();
@@ -241,6 +343,8 @@ export class FixedFiveCompetitionFlow {
             total: this.progress?.total ?? this.simEntries.length,
           };
           this.host.publish();
+        } else if (event.kind === 'shared82-h2h-game') {
+          this.host.shared82H2HGame(event.output);
         } else if (event.kind === 'complete') {
           void this.finalizeSimulation(simulationContext);
         } else if (event.kind === 'error') {
@@ -269,6 +373,7 @@ export class FixedFiveCompetitionFlow {
           profile: assets.profile,
           dataVersion: versions.dataVersion,
           engineVersion: versions.engineVersion,
+          recordH2H: true,
         });
       }
     } catch (e) {
@@ -318,7 +423,11 @@ export class FixedFiveCompetitionFlow {
         resultDigest: digest,
         weakestReplacedOpponentId: summary.weakestReplacedOpponentId,
       });
-      await this.deps.repository.savePendingResult(this.roomId, run, this.selfId);
+      if (this.pendingRun && this.pendingRun.resultDigest !== digest) {
+        throw new Error('the saved season result does not match the reconstructed games');
+      }
+      if (!this.pendingRun)
+        await this.deps.repository.savePendingResult(this.roomId, run, this.selfId);
       if (this.host.isDisposed()) return;
       const minShow = this.deps.prefersReducedMotion()
         ? SIM_SHOWDOWN_REDUCED_MS
@@ -326,7 +435,7 @@ export class FixedFiveCompetitionFlow {
       const waitMs = Math.max(0, this.simStartAt + minShow - this.deps.now());
       if (waitMs > 0) await new Promise((resolve) => setTimeout(resolve, waitMs));
       if (this.host.isDisposed()) return;
-      this.localResult = {
+      const localResult: FixedFiveLocalResult = {
         result: summary.result,
         digest,
         p1: { refs: context.p1Refs, players: [...context.p1Team.players] },
@@ -334,16 +443,43 @@ export class FixedFiveCompetitionFlow {
         weakestReplacedOpponentId: summary.weakestReplacedOpponentId,
       };
       this.simulationGate.finish();
-      this.simDone = true;
-      this.host.recomputePhase();
-      this.host.publish();
-      this.host.runAutoFlows();
+      if (room.settings.mode === 'duel') {
+        this.localResult = localResult;
+        this.simDone = true;
+        this.host.recomputePhase();
+        this.host.publish();
+        this.host.runAutoFlows();
+      } else {
+        this.seasonResult = localResult;
+        this.seasonWorkerComplete = true;
+        this.finishShared82IfReady();
+        this.host.publish();
+      }
     } catch (e) {
       this.simulationGate.fail();
       if (this.host.isDisposed()) return;
       this.simError = e instanceof Error ? e.message : String(e);
       this.host.publish();
     }
+  }
+
+  private finishShared82IfReady(): void {
+    if (!this.seasonWorkerComplete || this.revealedThroughGameNumber < 82 || !this.seasonResult) {
+      return;
+    }
+    const room = this.room;
+    const assets = this.assets;
+    if (!room || !assets) return;
+    const gameNumbers = h2hGameNumbersFor(
+      assets.bracket,
+      findWeakestOpponent(assets.bracket).opponentId,
+    );
+    const lastCompleted = room.seasonBroadcast?.lastCompletedGameNumber ?? 0;
+    if (gameNumbers.some((gameNumber) => gameNumber > lastCompleted)) return;
+    this.localResult = this.seasonResult;
+    this.simDone = true;
+    this.host.recomputePhase();
+    this.host.runAutoFlows();
   }
 
   async rerun(): Promise<void> {
@@ -361,6 +497,9 @@ export class FixedFiveCompetitionFlow {
       this.simDone = false;
       this.localResult = null;
       this.simEntries = [];
+      this.pendingRun = null;
+      this.seasonResult = null;
+      this.seasonWorkerComplete = false;
       this.statsEntries = [];
       this.statsState = 'idle';
       this.progress = null;

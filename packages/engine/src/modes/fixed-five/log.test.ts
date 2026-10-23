@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import {
   contentHashSchema,
   eraIdSchema,
@@ -466,7 +466,7 @@ describe('replayFixedFiveLog', () => {
     const other = first === 'p1' ? 'p2' : 'p1';
     const move0 = enumerateSandboxDuelSafeMoves(pool, initial)[0];
     if (!move0) throw new Error('fixture has no sandbox safe move');
-    expect(move0.playerId).toBe('c-g3');
+    expect(move0.playerId).toBe(pid('c-g3'));
     const claimed = claimSandboxDuelPlayer(initial, pool, {
       playerId: move0.playerId,
       playerVersionId: move0.playerVersionId,

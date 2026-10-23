@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import type { HavocBattleEvent } from '@hoop-rush/data-contracts';
 import { buildHavocGameResult } from '@hoop-rush/test-fixtures';
 import { havocMultiplayerAbilityLines } from './havoc-multiplayer-playback';

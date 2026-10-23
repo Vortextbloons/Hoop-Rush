@@ -1,6 +1,7 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'bun:test';
 import {
   commandIdSchema,
+  contentHashSchema,
   fixedFiveParticipantIdSchema,
   idSchema,
   type FixedFiveCommandPayload,
@@ -82,6 +83,29 @@ describe('submitFixedFiveCommand', () => {
     expect(result.receipt.accepted).toBe(true);
     expect(submitCommand).toHaveBeenCalledTimes(2);
     expect(input.resync).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries stale per-game result proposals and confirmations', async () => {
+    const digest = contentHashSchema.parse('a'.repeat(64));
+    const payloads: FixedFiveCommandPayload[] = [
+      {
+        kind: 'propose-game-result',
+        gameNumber: 18,
+        winner: 'p1',
+        resultDigest: digest,
+        tapeDigest: digest,
+        inputDigest: digest,
+      },
+      { kind: 'confirm-game-result', gameNumber: 18, resultDigest: digest, verified: true },
+    ];
+    for (const payload of payloads) {
+      const { input, submitCommand } = inputFor(payload, [receiptOf(false, 4), receiptOf(true, 5)]);
+      const result = await submitFixedFiveCommand(input);
+      expect(result.retried).toBe(true);
+      expect(result.receipt.accepted).toBe(true);
+      expect(submitCommand).toHaveBeenCalledTimes(2);
+      expect(input.resync).toHaveBeenCalledTimes(1);
+    }
   });
 
   it('does not retry a stale non-retry-safe command without a fresh recheck', async () => {

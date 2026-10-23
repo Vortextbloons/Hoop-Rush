@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import type { HavocLockLineupCommand, HavocRunState, Position } from '@hoop-rush/data-contracts';
 import {
   HAVOC_DRAFT_ROUNDS,
@@ -269,7 +269,7 @@ describe('havoc draft command flow', () => {
     expect(draft?.picks).toHaveLength(1);
     expect(draft?.picks[0]?.claimKey).toEqual({
       playerId: card.source.playerId,
-      seasonKey: card.source.seasonKey,
+      seasonKey: card.source.seasonKey as NonNullable<typeof card.source.seasonKey>,
     });
     for (const next of draft?.cards ?? []) {
       expect(havocClaimKeyOf(next.source.playerId, next.source.seasonKey ?? '')).not.toBe(

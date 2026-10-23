@@ -43,6 +43,7 @@ const trackingEvidenceSchema = z.object({
   defRimFga: z.number().nonnegative().nullable().optional(),
   secondaryAssists: z.number().nonnegative().nullable().optional(),
   potentialAssists: z.number().nonnegative().nullable().optional(),
+  passingMinutes: z.number().nonnegative().nullable().optional(),
 });
 
 type OverallTracking = z.infer<typeof trackingEvidenceSchema> & { leagueRimFgPct: number | null };

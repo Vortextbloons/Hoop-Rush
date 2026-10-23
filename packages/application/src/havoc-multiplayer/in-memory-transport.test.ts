@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import {
   HAVOC_MULTIPLAYER_CODE_TTL_MS,
   HAVOC_MULTIPLAYER_PICK_TIMEOUT_MS,
@@ -20,6 +20,7 @@ import {
   type HavocMultiplayerRoomSnapshot,
   type HavocMultiplayerTransientEvent,
   type Id,
+  type PlayerId,
 } from '@hoop-rush/data-contracts';
 import {
   createInMemoryHavocMultiplayerTransport,
@@ -130,8 +131,8 @@ async function playDraft(
   transport: InMemoryHavocMultiplayerTransport,
   roomId: Id,
   prefix: string,
-): Promise<string[]> {
-  const claimed: string[] = [];
+): Promise<PlayerId[]> {
+  const claimed: PlayerId[] = [];
   for (let turn = 0; turn < HAVOC_MULTIPLAYER_TURNS; turn += 1) {
     const current = await snapshot(transport, roomId);
     const draft = requireDraft(current);
@@ -540,7 +541,7 @@ describe('in-memory Havoc multiplayer transport', () => {
 
     const receipt = await transport.resolveTimeout(roomId);
     expect(receipt?.accepted).toBe(true);
-    expect(receipt?.commandId).toBe(`timeout-${deadline.cursor}`);
+    expect(receipt?.commandId).toBe(commandIdSchema.parse(`timeout-${deadline.cursor}`));
 
     const after = await snapshot(transport, roomId);
     expect(after.deadline?.cursor).toBe('t1');
@@ -878,7 +879,7 @@ describe('in-memory Havoc multiplayer transport', () => {
 
     const challenge = contentHashSchema.parse(await transport.verificationChallenge(roomId));
     expect(challenge).toMatch(/^[0-9a-f]{64}$/);
-    expect(challenge).toBe(await transport.verificationChallenge(roomId));
+    expect(challenge).toBe(contentHashSchema.parse(await transport.verificationChallenge(roomId)));
 
     const receiptDigest = contentHashSchema.parse('e'.repeat(64));
     const receipt = {

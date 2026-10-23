@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import type {
   HavocCatalog,
   HavocDraftOffer,
@@ -368,7 +368,7 @@ describe('havoc multiplayer draft', () => {
       expect(offer.cards).toHaveLength(3);
       expect(new Set(offer.cards.map((card) => card.source.playerId)).size).toBe(3);
       const roundIndex = Math.floor(offer.round - 1);
-      expect(offer.slot).toBe(POSITIONS[roundIndex]);
+      expect(offer.slot).toBe(POSITIONS[roundIndex] as Position);
       offer.cards.forEach((card, cardIndex) => {
         expect(card.cardId).toMatch(/^hvc-[0-9a-f]{32}$/);
         expect(card.offerId).toBe(offer.offerId);
@@ -384,7 +384,7 @@ describe('havoc multiplayer draft', () => {
         index % 2 === 0 ? state.firstPicker : state.firstPicker === 'p1' ? 'p2' : 'p1';
       expect(pick.participantId).toBe(expectedPicker);
       expect(pick.turnOrdinal).toBe(index);
-      expect(pick.slot).toBe(POSITIONS[Math.floor(index / 2)]);
+      expect(pick.slot).toBe(POSITIONS[Math.floor(index / 2)] as Position);
     });
     for (const participantId of ['p1', 'p2'] as const) {
       const slots = state.picks
@@ -733,7 +733,7 @@ describe('havoc multiplayer draft', () => {
       expect(outcome.receipt.accepted).toBe(true);
       state = outcome.state;
     }
-    expect(state.claimedPlayerIds).toContain('p-shared');
+    expect(state.claimedPlayerIds).toContain(playerIdSchema.parse('p-shared'));
   });
 
   it('groups traded variants of one person-season as a single sampling unit', () => {
@@ -950,7 +950,7 @@ describe('havoc multiplayer draft', () => {
         if (card.source.playerId === 'p-boundary') {
           sawBoundary = true;
           expect(card.source.originalOverall).toBe(85);
-          expect(card.source.seasonKey).toBe('1996-97');
+          expect(card.source.seasonKey).toBe(seasonKeySchema.parse('1996-97'));
         }
       }
     }
@@ -1093,7 +1093,7 @@ describe('havoc multiplayer draft', () => {
     p1a.starters.forEach((starter, index) => {
       const pick = p1Picks[index];
       if (pick === undefined) throw new Error('missing p1 pick');
-      expect(starter.slot).toBe(POSITIONS[index]);
+      expect(starter.slot).toBe(POSITIONS[index] as Position);
       expect(starter.kind).toBe('starter');
       expect(starter.ownerInstanceId).toBeNull();
       expect(starter.source.playerId).toBe(pick.card.source.playerId);
@@ -1104,8 +1104,10 @@ describe('havoc multiplayer draft', () => {
       const starter = p1a.starters.find((entry) => entry.slot === replacement.slot);
       expect(replacement.kind).toBe('replacement');
       expect(replacement.mutationPackage).toEqual([]);
-      expect(replacement.ownerInstanceId).toBe(starter?.instanceId);
-      expect(replacement.source.playerId).toBe(starter?.source.playerId);
+      expect(replacement.ownerInstanceId).toBe(starter?.instanceId as string | null);
+      expect(replacement.source.playerId).toBe(
+        starter?.source.playerId as typeof replacement.source.playerId,
+      );
     });
 
     const input = buildHavocMultiplayerGameInput({

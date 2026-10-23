@@ -280,7 +280,7 @@ export function calibrateOverallScale(
     modelVersion: RATING_MODEL_VERSION,
     ratingsVersion: RATINGS_VERSION,
     overallScale: scale,
-    generatedAt: '2026-10-13T00:00:00.000Z',
+    generatedAt: '2026-10-23T00:00:00.000Z',
   });
   writeJsonRetry(output, artifact);
   return scale;

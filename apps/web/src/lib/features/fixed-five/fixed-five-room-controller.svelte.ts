@@ -6,6 +6,7 @@ import {
   type ContentHash,
   type FixedFiveDuelGameOutput,
   type FixedFiveRoomSnapshot,
+  type FixedFiveShared82H2HGameOutput,
   type FixedFiveVerificationReceipt,
   type FixedFiveWorkerResultEntry,
   type PlayersIndexEntry,
@@ -130,11 +131,17 @@ export class FixedFiveRoomController {
     total: number;
   } | null>(null);
   simEntries = $state.raw<FixedFiveWorkerResultEntry[]>([]);
+  revealedEntries = $state.raw<FixedFiveWorkerResultEntry[]>([]);
+  revealedThroughGameNumber = $state(0);
   statsEntries = $state.raw<FixedFiveWorkerResultEntry[]>([]);
   statsBuilding = $state(false);
   localResult = $state.raw<FixedFiveLocalResult | null>(null);
   duelBroadcast = $state(false);
   duelOutputs = $state.raw<Record<number, FixedFiveDuelGameOutput>>({});
+  shared82Broadcast = $state(false);
+  shared82H2HOutputs = $state.raw<Record<number, FixedFiveShared82H2HGameOutput>>({});
+  shared82H2HSimError = $state<string | null>(null);
+  shared82H2HSimulatingGame = $state<number | null>(null);
   duelSimError = $state<string | null>(null);
   duelSimulatingGame = $state<number | null>(null);
   broadcastProgress = $state(0);
@@ -218,11 +225,16 @@ export class FixedFiveRoomController {
   duelSeries = $derived(this.roomSnapshot?.series ?? null);
   duelCurrentGameNumber = $derived(this.roomSnapshot?.series?.currentGameNumber ?? null);
   duelBroadcastGame = $derived(this.roomSnapshot?.broadcast?.gameNumber ?? null);
-  currentDuelOutput = $derived.by((): FixedFiveDuelGameOutput | null => {
-    const gameNumber = this.duelBroadcastGame ?? this.duelRecapGame ?? this.duelCurrentGameNumber;
-    if (gameNumber === null) return null;
-    return this.duelOutputs[gameNumber] ?? null;
-  });
+  currentDuelOutput = $derived.by(
+    (): FixedFiveDuelGameOutput | FixedFiveShared82H2HGameOutput | null => {
+      const isDuel = this.roomSnapshot?.settings.mode === 'duel';
+      const gameNumber = this.duelBroadcastGame ?? this.duelRecapGame ?? this.duelCurrentGameNumber;
+      if (gameNumber === null) return null;
+      return isDuel
+        ? (this.duelOutputs[gameNumber] ?? null)
+        : (this.shared82H2HOutputs[gameNumber] ?? null);
+    },
+  );
   duelPlayers = $derived.by((): Record<string, GamecastPlayer> => {
     const output = this.currentDuelOutput;
     const mapped: Record<string, GamecastPlayer> = {};
@@ -461,6 +473,10 @@ export class FixedFiveRoomController {
     this.session.retryDuelGame();
   }
 
+  retryShared82H2HGame(): void {
+    this.session.retryShared82H2HGame();
+  }
+
   async readyForNextGame(): Promise<void> {
     await this.session.readyForNextGame();
   }
@@ -537,11 +553,17 @@ export class FixedFiveRoomController {
     this.simError = next.simError;
     this.progress = next.progress;
     this.simEntries = next.simEntries;
+    this.revealedEntries = next.revealedEntries;
+    this.revealedThroughGameNumber = next.revealedThroughGameNumber;
     this.statsEntries = next.statsEntries;
     this.statsBuilding = next.statsBuilding;
     this.localResult = next.localResult;
     this.duelBroadcast = next.duelBroadcast;
     this.duelOutputs = next.duelOutputs;
+    this.shared82Broadcast = next.shared82Broadcast;
+    this.shared82H2HOutputs = next.shared82H2HOutputs;
+    this.shared82H2HSimError = next.shared82H2HSimError;
+    this.shared82H2HSimulatingGame = next.shared82H2HSimulatingGame;
     this.duelSimError = next.duelSimError;
     this.duelSimulatingGame = next.duelSimulatingGame;
     this.broadcastProgress = next.broadcastProgress;

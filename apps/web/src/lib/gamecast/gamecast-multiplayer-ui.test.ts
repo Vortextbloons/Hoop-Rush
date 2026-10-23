@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, mock } from 'bun:test';
 import { render } from 'svelte/server';
 import {
   HAVOC_SCHEMA_VERSION,
@@ -21,13 +21,13 @@ import GamecastBroadcast from './GamecastBroadcast.svelte';
 import GamecastRecap from './GamecastRecap.svelte';
 import HavocMultiplayerGameResults from '../features/havoc-multiplayer/HavocMultiplayerGameResults.svelte';
 
-vi.mock('@lucide/svelte', () => ({
+void mock.module('@lucide/svelte', () => ({
   Clock: () => {},
   ShieldAlert: () => {},
   ShieldCheck: () => {},
 }));
 
-vi.mock('#lib/features/havoc/HavocPlayerArt.svelte', () => ({ default: () => {} }));
+void mock.module('#lib/features/havoc/HavocPlayerArt.svelte', () => ({ default: () => {} }));
 
 function buildGamecastOutput(gameNumber = 2): GamecastRecordedGame {
   const seed = seedSchema.parse('a'.repeat(16));

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { havocObjectiveStatusOf } from './havoc-presentation';
 import { HavocHubState } from './havoc-hub-state.svelte.ts';
 import { FakeHavocService } from './testing/havoc-service-double.ts';

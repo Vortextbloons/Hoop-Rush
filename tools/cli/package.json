@@ -7,12 +7,13 @@
   },
   "scripts": {
     "check": "tsc --noEmit --incremental",
-    "lint": "prettier --cache --check src vitest.config.ts eslint.config.js && eslint --cache src vitest.config.ts eslint.config.js",
-    "test": "vitest",
-    "test:run": "vitest run",
-    "hoop-rush": "node src/index.ts",
-    "gen-fixtures": "tsx src/gen-fixtures.ts",
-    "gen-collection-catalog": "tsx src/gen-collection-catalog.ts"
+    "lint": "prettier --cache --check src eslint.config.js && eslint --cache src eslint.config.js",
+    "test": "bun test --watch --isolate --timeout 30000",
+    "test:run": "bun test --isolate --timeout 30000",
+    "test:quick": "bun test --isolate --timeout 30000 --path-ignore-patterns \"**/*generator*\" --path-ignore-patterns \"**/*integration*\"",
+    "hoop-rush": "bun src/index.ts",
+    "gen-fixtures": "bun src/gen-fixtures.ts",
+    "gen-collection-catalog": "bun src/gen-collection-catalog.ts"
   },
   "dependencies": {
     "@hoop-rush/data-contracts": "workspace:*",
@@ -23,12 +24,11 @@
   },
   "devDependencies": {
     "@hoop-rush/test-fixtures": "workspace:*",
+    "@types/bun": "catalog:",
     "@types/node": "catalog:",
     "dexie": "^4.4.6",
     "eslint": "catalog:",
     "fake-indexeddb": "catalog:",
-    "tsx": "catalog:",
-    "typescript": "catalog:",
-    "vitest": "catalog:"
+    "typescript": "catalog:"
   }
 }

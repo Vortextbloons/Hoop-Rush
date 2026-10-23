@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { seedSchema } from '@hoop-rush/data-contracts';
 import { deriveGameSeed } from './seeds.ts';
 describe('deriveGameSeed (spec/01 per-game seeds)', () => {

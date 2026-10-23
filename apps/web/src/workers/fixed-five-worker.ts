@@ -6,6 +6,8 @@ import {
   fixedFiveDuelGameInputDigest,
   fixedFiveDuelGameResultDigest,
   fixedFiveDuelGameTapeDigest,
+  shared82H2HGameInput,
+  simulateRecordedShared82H2HGame,
   shared82GameEvents,
   simulateRecordedDuelGame,
   verifyFixedFiveCompetition,
@@ -17,6 +19,7 @@ import {
   fixedFiveWorkerMessageSchema,
   fixedFiveWorkerRequestSchema,
   type FixedFiveDuelGameOutput,
+  type FixedFiveShared82H2HGameOutput,
   type FixedFiveWorkerError,
   type FixedFiveWorkerResultEntry,
   type OpponentBracket,
@@ -155,6 +158,43 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
         });
         return;
       }
+      if (request.type === 'fixed-five-shared82-h2h-game') {
+        const simulationInput = {
+          p1Team: request.p1Team,
+          p2Team: request.p2Team,
+          bracket: request.bracket,
+          profile: request.profile,
+          rootSeed: request.rootSeed,
+          dataVersion: request.dataVersion,
+        };
+        const recorded = simulateRecordedShared82H2HGame(
+          simulationInput,
+          request.gameNumber,
+          context,
+        );
+        if (token !== requestToken) return;
+        const output: FixedFiveShared82H2HGameOutput = {
+          schemaVersion: FIXED_FIVE_DUEL_TAPE_VERSION,
+          gameNumber: recorded.gameNumber,
+          homeParticipantId: recorded.homeParticipantId,
+          awayParticipantId: recorded.awayParticipantId,
+          seed: recorded.seed,
+          result: recorded.result,
+          tape: recorded.tape,
+          inputDigest: fixedFiveDuelGameInputDigest(
+            shared82H2HGameInput(simulationInput, request.gameNumber),
+          ),
+          resultDigest: fixedFiveDuelGameResultDigest(recorded.result),
+          tapeDigest: fixedFiveDuelGameTapeDigest(recorded.tape),
+        };
+        postWorkerMessage(fixedFiveWorkerMessageSchema, {
+          schemaVersion: FIXED_FIVE_WORKER_WIRE_VERSION,
+          type: 'fixed-five-shared82-h2h-game',
+          requestId: request.requestId,
+          output,
+        });
+        return;
+      }
       if (request.type === 'fixed-five-duel') {
         let p1Wins = 0;
         let p2Wins = 0;
@@ -217,12 +257,42 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
         },
         context,
         request.startGameNumber,
+        { recordH2H: request.recordH2H },
       );
       for (;;) {
         if (token !== requestToken) return;
         const next = events.next();
         if (next.done) break;
         const event = next.value;
+        if (event.tag === 'h2h' && event.tape) {
+          const input = {
+            p1Team: request.p1Team,
+            p2Team: request.p2Team,
+            bracket: request.bracket as OpponentBracket,
+            profile: request.profile,
+            rootSeed: request.rootSeed,
+            dataVersion: request.dataVersion,
+          };
+          const gameInput = shared82H2HGameInput(input, event.game.gameNumber);
+          const output: FixedFiveShared82H2HGameOutput = {
+            schemaVersion: FIXED_FIVE_DUEL_TAPE_VERSION,
+            gameNumber: event.game.gameNumber,
+            homeParticipantId: 'p1',
+            awayParticipantId: 'p2',
+            seed: gameInput.seed,
+            result: event.game,
+            tape: event.tape,
+            inputDigest: fixedFiveDuelGameInputDigest(gameInput),
+            resultDigest: fixedFiveDuelGameResultDigest(event.game),
+            tapeDigest: fixedFiveDuelGameTapeDigest(event.tape),
+          };
+          postWorkerMessage(fixedFiveWorkerMessageSchema, {
+            schemaVersion: FIXED_FIVE_WORKER_WIRE_VERSION,
+            type: 'fixed-five-shared82-h2h-game',
+            requestId: request.requestId,
+            output,
+          });
+        }
         pending.push(event);
         delivered += 1;
         if (event.tag === 'p1') continue;

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'bun:test';
 import { idSchema, type DraftDuelRoomSnapshot } from '@hoop-rush/data-contracts';
 import { createInMemoryDraftDuelTransport } from '@hoop-rush/application/draft-duel';
 import type { DraftDuelAssets } from './draft-duel-assets';
@@ -12,6 +12,11 @@ type SessionInternals = {
 };
 
 const ROOM_ID = idSchema.parse('dd-session-room');
+
+async function advanceTimers(milliseconds: number): Promise<void> {
+  vi.advanceTimersByTime(milliseconds);
+  await Promise.resolve();
+}
 
 describe('DraftDuelSession lifecycle', () => {
   afterEach(() => {
@@ -55,7 +60,7 @@ describe('DraftDuelSession lifecycle', () => {
 
     internals.startTimers();
     expect(vi.getTimerCount()).toBe(1);
-    await vi.advanceTimersByTimeAsync(500);
+    await advanceTimers(500);
     expect(listener.mock.calls.length).toBeGreaterThan(0);
 
     internals.progress = 0.25;
@@ -63,7 +68,7 @@ describe('DraftDuelSession lifecycle', () => {
     expect(vi.getTimerCount()).toBe(0);
     const callsAfterDispose = listener.mock.calls.length;
 
-    await vi.advanceTimersByTimeAsync(1000);
+    await advanceTimers(1000);
     session.advancePlayback(5000);
 
     expect(listener.mock.calls.length).toBe(callsAfterDispose);

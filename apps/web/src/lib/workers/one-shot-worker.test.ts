@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
+/* eslint-disable @typescript-eslint/await-thenable, @typescript-eslint/no-confusing-void-expression -- bun-types@1.4.4 declares .resolves/.rejects matchers as void; Bun docs require awaiting them */
+import { describe, expect, it, vi } from 'bun:test';
 import {
   OneShotWorkerRunner,
   type OneShotWorkerErrorMessages,
@@ -97,6 +98,11 @@ function requestIdOf(worker: FakeWorker): string {
   return (worker.posted[0] as { requestId: string }).requestId;
 }
 
+async function advanceTimers(milliseconds: number): Promise<void> {
+  vi.advanceTimersByTime(milliseconds);
+  await Promise.resolve();
+}
+
 describe('OneShotWorkerRunner', () => {
   it('posts the built request under a fresh correlation id and resolves the mapped output', async () => {
     const { spec, workers } = stubSpec();
@@ -180,7 +186,7 @@ describe('OneShotWorkerRunner', () => {
       const runner = new OneShotWorkerRunner(spec);
       const pending = runner.run({ value: 1 });
       const timedOut = expect(pending).rejects.toThrow(ERRORS.timeout);
-      await vi.advanceTimersByTimeAsync(1_000);
+      await advanceTimers(1_000);
       await timedOut;
       expect(workerAt(workers, 0).terminated).toBe(true);
     } finally {

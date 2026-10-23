@@ -26,6 +26,12 @@ const countFields = [
   'midFga',
   'offRebChances',
   'defRebChances',
+  'trackedOffensiveRebounds',
+  'trackedDefensiveRebounds',
+  'passingMinutes',
+  'drivesMinutes',
+  'hustleMinutes',
+  'hustleGamesPlayed',
   'defRimFga',
   'passes',
   'secondaryAssists',
@@ -73,7 +79,7 @@ export function possessionExposure(stats: StatsRow, eraPace = 100): number {
 
 export function ratePer100(stats: StatsRow, key: string, eraPace = 100): number | null {
   const value = observed(stats, key);
-  const exposure = possessionExposure(stats, eraPace);
+  const exposure = fieldPossessionExposure(stats, key, eraPace);
   return value !== null && exposure > 0 ? (value * 100) / exposure : null;
 }
 
@@ -85,10 +91,29 @@ export function stabilizedRate(
   priorPossessions = 150,
 ): number {
   const value = observed(stats, key);
-  const exposure = possessionExposure(stats, eraPace);
+  const exposure = fieldPossessionExposure(stats, key, eraPace);
   return value !== null && exposure > 0
     ? (value * 100 + prior * priorPossessions) / (exposure + priorPossessions)
     : prior;
+}
+
+export function fieldPossessionExposure(stats: StatsRow, key: string, eraPace = 100): number {
+  const sampleMinutes: Record<string, string> = {
+    secondaryAssists: 'passingMinutes',
+    potentialAssists: 'passingMinutes',
+    passes: 'passingMinutes',
+    drives: 'drivesMinutes',
+    contestedShots: 'hustleMinutes',
+    contestedShots2pt: 'hustleMinutes',
+    contestedShots3pt: 'hustleMinutes',
+    deflections: 'hustleMinutes',
+    screenAssists: 'hustleMinutes',
+    boxOuts: 'hustleMinutes',
+  };
+  const field = sampleMinutes[key];
+  return field === undefined
+    ? possessionExposure(stats, eraPace)
+    : possessionExposure({ ...stats, minutes: observed(stats, field) }, eraPace);
 }
 
 export function shootingRate(

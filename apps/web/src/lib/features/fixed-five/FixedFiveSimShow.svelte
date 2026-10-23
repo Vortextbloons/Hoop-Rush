@@ -1,9 +1,6 @@
 <script lang="ts">
   import type { FixedFiveRoomMode, FixedFiveWorkerResultEntry } from '@hoop-rush/data-contracts';
   import { arenaGameResult, arenaLeaderChange, arenaStreak } from '#lib/arena-sound.js';
-  const SHOW_TICK_MS = 240;
-  const DUEL_REVEAL_EVERY = 4;
-  const SHARED_REVEAL_DIVISOR = 25;
   let {
     mode,
     progress = null,
@@ -20,30 +17,8 @@
   } = $props();
   const isDuel = $derived(mode === 'duel');
   const total = $derived(progress?.total ?? (isDuel ? 7 : 161));
-  let shownCount = $state(0);
-  let duelTick = $state(0);
-  $effect(() => {
-    shownCount = 0;
-    duelTick = 0;
-  });
-  $effect(() => {
-    const target = entries.length;
-    if (shownCount >= target) return;
-    const step = isDuel
-      ? 1
-      : Math.max(2, Math.ceil(Math.max(target, total) / SHARED_REVEAL_DIVISOR));
-    const timer = setInterval(() => {
-      duelTick += 1;
-      shownCount = Math.min(
-        target,
-        shownCount + (isDuel && duelTick % DUEL_REVEAL_EVERY !== 0 ? 0 : step),
-      );
-      if (shownCount >= entries.length) clearInterval(timer);
-    }, SHOW_TICK_MS);
-    return () => clearInterval(timer);
-  });
-  const visible = $derived(entries.slice(0, shownCount));
-  const completed = $derived(shownCount);
+  const visible = $derived(entries);
+  const completed = $derived(visible.length);
   const pct = $derived(Math.min(100, (completed / Math.max(1, total)) * 100));
   let lastSoundFor = $state(0);
   $effect(() => {

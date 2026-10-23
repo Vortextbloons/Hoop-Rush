@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 /* eslint-disable @typescript-eslint/require-await -- the in-memory fake mirrors async repository methods without I/O */
 import {
   HAVOC_GAME_COUNT,

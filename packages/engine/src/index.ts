@@ -201,9 +201,12 @@ export {
 export {
   findWeakestOpponent,
   h2hGameNumbersFor,
+  shared82H2HGameInput,
+  simulateRecordedShared82H2HGame,
   simulateShared82,
   shared82GameEvents,
   type Shared82GameEvent,
+  type RecordedShared82H2HGame,
   type Shared82SimulationInput,
   type Shared82SimulationOutput,
 } from './modes/fixed-five/shared82.ts';

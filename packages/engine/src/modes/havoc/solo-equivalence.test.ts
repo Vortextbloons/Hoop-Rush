@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import type {
   HavocEvent,
   HavocMutationEntry,
@@ -831,7 +831,7 @@ describe('havoc solo equivalence', () => {
     expect(
       rows.map((row) => row.pinned),
       'pinned drafts',
-    ).toEqual(PINNED_DRAFTS);
+    ).toEqual([...PINNED_DRAFTS]);
   });
 
   it('pins locked-input games 1, 41, and 82 for both variants', () => {
@@ -877,7 +877,7 @@ describe('havoc solo equivalence', () => {
       emitCapture('pinnedGameOneSummaryDigests', summaries);
       return;
     }
-    expect(rows, 'locked-input games').toEqual(PINNED_LOCKED_GAMES);
+    expect(rows, 'locked-input games').toEqual([...PINNED_LOCKED_GAMES]);
     expect(summaries, 'game 1 summary digests').toEqual(PINNED_GAME_ONE_SUMMARY_DIGESTS);
   });
 
@@ -906,7 +906,7 @@ describe('havoc solo equivalence', () => {
     for (const row of rows) {
       const pinned = PINNED_SCENARIOS.find((candidate) => candidate.key === row.key);
       expect(pinned, `${row.key} pinned scenario`).toBeDefined();
-      expect(row, row.key).toEqual(pinned);
+      expect(row, row.key).toEqual(pinned as PinnedScenario);
     }
   });
 

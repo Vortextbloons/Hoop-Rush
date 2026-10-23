@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'bun:test';
 import {
   DRAFT_DUEL_AUTOPICK_VERSION,
   DRAFT_DUEL_TAPE_VERSION,
@@ -240,14 +240,14 @@ describe('DexieDraftDuelRepository', () => {
     await repo.appendCommands(ROOM_ID, [first, second]);
     const commands = await repo.loadCommands(ROOM_ID);
     expect(commands.map((command) => command.ordinal)).toEqual([0, 1]);
-    expect(commands.map((command) => command.commandId)).toEqual(['cmd-0', 'cmd-1']);
+    expect(commands.map((command) => command.commandId as string)).toEqual(['cmd-0', 'cmd-1']);
     const conflicting = buildCommand(1, 'cmd-other');
     await expect(repo.appendCommands(ROOM_ID, [conflicting])).rejects.toThrow(
       /conflicting command at ordinal 1/,
     );
     const afterConflict = await repo.loadCommands(ROOM_ID);
     expect(afterConflict).toHaveLength(2);
-    expect(afterConflict[1]?.commandId).toBe('cmd-1');
+    expect(afterConflict[1]?.commandId as string).toBe('cmd-1');
     await expect(repo.appendCommands('dd-other-room', [buildCommand(2)])).rejects.toThrow(
       /does not belong to room/,
     );
@@ -302,7 +302,7 @@ describe('DexieDraftDuelRepository', () => {
     const results = await repo.loadResults(ROOM_ID);
     expect(results).toHaveLength(1);
     expect(results[0]?.gameNumber).toBe(1);
-    expect(results[0]?.output.resultDigest).toBe('b'.repeat(64));
+    expect(results[0]?.output.resultDigest as string).toBe('b'.repeat(64));
     const completed = await repo.loadCompleted(ROOM_ID);
     expect(completed?.champion).toBe('p1');
     expect(completed?.games).toBe(6);

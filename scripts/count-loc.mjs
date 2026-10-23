@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { extname, join, relative, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -53,7 +53,7 @@ for (const arg of args) {
     if (list.length > 0) exts = new Set(list);
   } else if (arg === '--help' || arg === '-h') {
     process.stdout.write(
-      `Usage: node scripts/count-loc.mjs [paths...] [options]\n\nCounts physical lines plus normalized LOC where ${60} chars = 1 line.\n\nOptions:\n  --chars-per-line=N  chars per normalized line (default 60)\n  --ext=.ts,.js       file extensions to include (default ts,tsx,mts,cts,js,mjs,cjs,svelte,css)\n  --top=N             show N largest files by normalized LOC (default 10, 0 to hide)\n  --no-top            hide largest-files list\n  --per-file          list every file\n`,
+      `Usage: bun run scripts/count-loc.mjs [paths...] [options]\n\nCounts physical lines plus normalized LOC where ${60} chars = 1 line.\n\nOptions:\n  --chars-per-line=N  chars per normalized line (default 60)\n  --ext=.ts,.js       file extensions to include (default ts,tsx,mts,cts,js,mjs,cjs,svelte,css)\n  --top=N             show N largest files by normalized LOC (default 10, 0 to hide)\n  --no-top            hide largest-files list\n  --per-file          list every file\n`,
     );
     process.exit(0);
   } else if (!arg.startsWith('-')) paths.push(arg);

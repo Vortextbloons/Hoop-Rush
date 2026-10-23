@@ -49,10 +49,17 @@
   );
   const duelFeed = $derived(duelOutput ? gamecastFeedLines(duelOutput, duelVisibleCount) : []);
   const showDuelRecap = $derived(
-    phase === 'game-results' ||
-      (phase === 'awaiting-confirmation' &&
-        controller.awaitingContinue &&
-        controller.duelRecapGame !== null),
+    controller.duelBroadcast &&
+      (phase === 'game-results' ||
+        (phase === 'awaiting-confirmation' &&
+          controller.awaitingContinue &&
+          controller.duelRecapGame !== null)),
+  );
+  const showShared82H2HRecap = $derived(
+    controller.shared82Broadcast && phase === 'game-results' && controller.broadcastProgress >= 1,
+  );
+  const broadcastSimulationError = $derived(
+    controller.shared82Broadcast ? controller.shared82H2HSimError : controller.duelSimError,
   );
 
   const readyCountdownLabel = $derived.by((): string | null => {
@@ -334,7 +341,7 @@
           <FixedFiveSimShow
             mode={snapshot.settings.mode}
             progress={controller.progress}
-            entries={controller.simEntries}
+            entries={controller.revealedEntries}
             {selfId}
           />
         {/if}
@@ -406,9 +413,16 @@
       {:else}
         <div class="room-empty">
           <h2>Preparing the broadcast</h2>
-          <p role="status">{controller.duelSimError ?? 'Simulating this game locally…'}</p>
-          {#if controller.duelSimError}
-            <button type="button" class="room-secondary" onclick={() => controller.retryDuelGame()}>
+          <p role="status">{broadcastSimulationError ?? 'Simulating this game locally…'}</p>
+          {#if broadcastSimulationError}
+            <button
+              type="button"
+              class="room-secondary"
+              onclick={() =>
+                controller.shared82Broadcast
+                  ? controller.retryShared82H2HGame()
+                  : controller.retryDuelGame()}
+            >
               Retry game
             </button>
           {/if}
@@ -442,6 +456,38 @@
           <p role="status">{controller.duelSimError ?? 'Rebuilding this game locally…'}</p>
           {#if controller.duelSimError}
             <button type="button" class="room-secondary" onclick={() => controller.retryDuelGame()}>
+              Retry game
+            </button>
+          {/if}
+        </div>
+      {/if}
+    {:else if showShared82H2HRecap}
+      {#if duelOutput}
+        <div class="mt-6">
+          <GamecastRecap
+            output={duelOutput}
+            seasonBroadcast
+            localParticipantId={selfId}
+            verification={controller.duelVerification}
+            readyCountdownMs={null}
+            localReady={false}
+            onready={() => {}}
+            awaitingContinue={false}
+            oncontinue={() => {}}
+            players={controller.duelPlayers}
+            manifest={assets?.manifest ?? null}
+          />
+        </div>
+      {:else}
+        <div class="room-empty">
+          <h2>Preparing head-to-head result</h2>
+          <p role="status">{broadcastSimulationError ?? 'Rebuilding this game locally…'}</p>
+          {#if broadcastSimulationError}
+            <button
+              type="button"
+              class="room-secondary"
+              onclick={() => controller.retryShared82H2HGame()}
+            >
               Retry game
             </button>
           {/if}

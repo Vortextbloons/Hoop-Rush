@@ -1,6 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import { build } from 'vite';
-import { assert, describe, expect, it } from 'vitest';
+import assert from 'node:assert';
+import { describe, expect, it } from 'bun:test';
 
 describe('worker bundling', () => {
   it('compiles workers used through runner helpers into JavaScript assets', async () => {
@@ -21,7 +22,7 @@ describe('worker bundling', () => {
     });
     const output = (Array.isArray(result) ? result : [result]).flatMap((item) => {
       assert('output' in item);
-      return item.output;
+      return 'output' in item ? item.output : [];
     });
 
     for (const item of output) {

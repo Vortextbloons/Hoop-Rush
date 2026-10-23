@@ -5,9 +5,11 @@
 !apps/*/README.md
 !tools/*/README.md
 !scripts/*/README.md
+!apps/*/AGENTS.md
+!packages/*/AGENTS.md
 *.mdc
 
-AGENTS.md
+/AGENTS.md
 plans/
 plans/*
 plans/
@@ -44,9 +46,9 @@ __pycache__/
 *.py[cod]
 .raw_nba_cache/
 npm-debug.log*
-pnpm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+.pnpm-store/
 .cache/
 .turbo/
 coverage/
@@ -76,8 +78,6 @@ Desktop.ini
 agent-transcripts/*
 .cursor/
 
-# pnpm local content store (created when no global store is configured)
-.pnpm-store/
 Docs/
 strip-comments.mjs
 Guide/

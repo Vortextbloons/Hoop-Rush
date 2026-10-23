@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import {
   ratingProfileSchema,
   ratingsModelArtifactSchema,
@@ -21,6 +21,7 @@ import {
 import { starterStats } from './ratings-test-support.ts';
 import { estimateAttributes } from './statistical-attributes.ts';
 import { observedTeamRecord } from './overall-evidence.ts';
+import { ratePer100 } from './season-evidence.ts';
 
 const scale = buildOverallScale(
   Array.from({ length: 100 }, (_, index) => ({ key: String(index), score: 40 + index / 2 })),
@@ -43,6 +44,51 @@ const derive = (overrides: Partial<RatingProfileInput> = {}) =>
   deriveRatingProfile({ ...input, ...overrides });
 
 describe('total ability overall', () => {
+  it('does not turn a two-game hustle sample into season-long defensive weakness', () => {
+    const stats = starterStats({ minutes: 2700, gamesPlayed: 79, steals: 166 });
+    const estimate = (evidence: Record<string, unknown>) =>
+      estimateAttributes({
+        season: '2015-16',
+        position: 'PG',
+        heightInches: 75,
+        stats: { ...stats, ...evidence },
+        era: { pace: 98, league3PARate: 0.27, leaguePpg: 102.7 },
+      });
+    const missing = estimate({}).perimeterDefense.value;
+    const partial = estimate({
+      deflections: 9,
+      contestedShots3pt: 0,
+      hustleMinutes: 78,
+      hustleGamesPlayed: 2,
+    }).perimeterDefense.value;
+    expect(partial).toBeGreaterThan(missing - 5);
+    expect(estimate({ deflections: 0, contestedShots3pt: 0 }).perimeterDefense.value).toBe(missing);
+  });
+
+  it('uses tracking minutes for rates and matching tracked rebounds for chance conversion', () => {
+    const stats = starterStats({
+      minutes: 3000,
+      potentialAssists: 50,
+      passingMinutes: 300,
+      offensiveRebounds: 100,
+      offRebChances: 20,
+      trackedOffensiveRebounds: 10,
+    });
+    expect(ratePer100(stats, 'potentialAssists', 100)).toBeCloseTo(8, 8);
+    const estimate = (overrides: Record<string, unknown>) =>
+      estimateAttributes({
+        season: '2015-16',
+        position: 'PG',
+        heightInches: 75,
+        stats: { ...stats, ...overrides },
+        era: { pace: 100, league3PARate: 0.27, leaguePpg: 102.7 },
+      }).offensiveRebound.value;
+    const withChances = estimate({});
+    const withoutChances = estimate({ offRebChances: null });
+    expect(withChances - withoutChances).toBeCloseTo(0.75, 8);
+    expect(estimate({ trackedOffensiveRebounds: null })).toBe(withoutChances);
+  });
+
   it('keeps each domain contribution independent of which domain is stronger', () => {
     const defensiveGains = [30, 60, 90].map(
       (offense) => combineDomainValues(offense, 85).score - combineDomainValues(offense, 65).score,

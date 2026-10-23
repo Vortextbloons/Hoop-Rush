@@ -23,6 +23,6 @@ to players.
 ## Verification
 
 ```text
-pnpm exec vitest run --project @hoop-rush/test-fixtures
-pnpm test:run
+bun test <path>
+bun run test:run
 ```

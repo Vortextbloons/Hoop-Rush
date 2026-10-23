@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import type { HavocRunState } from '@hoop-rush/data-contracts';
 import {
   HAVOC_GAME_COUNT,

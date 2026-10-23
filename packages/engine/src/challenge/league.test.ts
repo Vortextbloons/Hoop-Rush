@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import {
   buildFixtureBracket,
   buildGameSimulationInput,
@@ -108,13 +108,13 @@ describe('challenge league', () => {
     expect(first.gamesSimulated).toBe(leagueGamesSimulated(bracket));
     const quotas = leagueQuotas(bracket);
     for (const [index, team] of first.teams.entries()) {
-      expect(team.gamesPlayed).toBe(quotas[index]);
+      expect(team.gamesPlayed).toBe(quotas[index] as number);
       expect(team.wins + team.losses).toBe(team.gamesPlayed);
     }
     for (const player of first.players) {
       const index = bracket.opponents.findIndex((opponent) => opponent.teamId === player.teamId);
       expect(index).toBeGreaterThanOrEqual(0);
-      expect(player.games).toBe(quotas[index]);
+      expect(player.games).toBe(quotas[index] as number);
     }
     const sim = createLeagueSimulation({ seed: SEED_A, bracket, profile }, context);
     expect(sim.gamesDone).toBe(0);

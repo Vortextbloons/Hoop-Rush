@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import type { GameResult, PlayerBoxScore, TeamResult } from '@hoop-rush/data-contracts';
 import { playerIdSchema } from '@hoop-rush/data-contracts';
 import { buildFacts } from './facts.ts';
@@ -127,7 +127,7 @@ describe('buildFacts usage fact', () => {
     );
     const result = buildFacts(game(home, away, 'home'));
     const usageFact = result.find((fact) => fact.kind === 'usage');
-    expect(usageFact?.playerIds).toEqual(['p-workhorse']);
+    expect(usageFact?.playerIds).toEqual([playerIdSchema.parse('p-workhorse')]);
     expect(usageFact?.evidence.usageShare).toBeCloseTo(25 / 35, 6);
     expect(usageFact?.evidence.playerUsage).toBe(25);
     expect(usageFact?.evidence.teamUsage).toBe(35);

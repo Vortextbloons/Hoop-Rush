@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
+/* eslint-disable @typescript-eslint/await-thenable, @typescript-eslint/no-confusing-void-expression -- bun-types@1.4.4 declares .resolves/.rejects matchers as void; Bun docs require awaiting them */
+import { describe, expect, it, mock } from 'bun:test';
 import {
   DRAFT_DUEL_AUTOPICK_VERSION,
   commandIdSchema,
@@ -6,7 +7,9 @@ import {
   draftDuelTransientEventSchema,
   draftDuelVerificationReceiptSchema,
   idSchema,
+  type CommandId,
   type DraftDuelMultiplayerTransport,
+  type Id,
 } from '@hoop-rush/data-contracts';
 import {
   createFakeSupabaseHarness,
@@ -14,13 +17,24 @@ import {
 } from '#lib/testing/fake-supabase-client.js';
 import { createDraftDuelTransport } from './draft-duel-transport';
 
-const mockState = vi.hoisted(() => {
-  const state = { harness: null as FakeSupabaseHarness | null };
-  (globalThis as { __hoopRushFakeSupabase?: typeof state }).__hoopRushFakeSupabase = state;
-  return state;
-});
+const mockState: { harness: FakeSupabaseHarness | null } = { harness: null };
+(globalThis as { __hoopRushFakeSupabase?: typeof mockState }).__hoopRushFakeSupabase = mockState;
 
-vi.mock('@supabase/supabase-js', () => ({
+async function waitFor(callback: () => void | Promise<void>): Promise<void> {
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt < 1000; attempt += 1) {
+    try {
+      await callback();
+      return;
+    } catch (error) {
+      lastError = error;
+      await Promise.resolve();
+    }
+  }
+  throw lastError;
+}
+
+void mock.module('@supabase/supabase-js', () => ({
   createClient: (url: string, key: string, options?: unknown) => {
     const state = (
       globalThis as { __hoopRushFakeSupabase?: { harness: FakeSupabaseHarness | null } }
@@ -139,7 +153,11 @@ describe('draft-duel supabase transport protocol pins', () => {
       single: false,
     });
     expect(created.code).toBe('4321');
-    expect(created.membership).toEqual({ roomId: ROOM_ID, participantId: 'p1', code: '4321' });
+    expect(created.membership).toEqual({
+      roomId: ROOM_ID as Id,
+      participantId: 'p1',
+      code: '4321',
+    });
     expect(created.snapshot.settings.timerPolicyVersion).toBe(DRAFT_DUEL_AUTOPICK_VERSION);
     expect(created.snapshot.members.map((member) => member.participantId)).toEqual(['p1', 'p2']);
     expect(created.snapshot.series).toBeNull();
@@ -205,8 +223,8 @@ describe('draft-duel supabase transport protocol pins', () => {
       },
     });
     expect(accepted).toEqual({
-      roomId: ROOM_ID,
-      commandId: 'cmd-9',
+      roomId: ROOM_ID as Id,
+      commandId: 'cmd-9' as CommandId,
       ordinal: 4,
       accepted: true,
       rejectionCode: null,
@@ -250,7 +268,7 @@ describe('draft-duel supabase transport protocol pins', () => {
       ],
       order: { column: 'ordinal', ascending: true },
     });
-    expect(commands.map((command) => command.commandId)).toEqual(['cmd-1']);
+    expect(commands.map((command) => command.commandId)).toEqual(['cmd-1' as CommandId]);
   });
 
   it('subscribe opens one realtime channel and tears it down with the last handler', async () => {
@@ -261,7 +279,7 @@ describe('draft-duel supabase transport protocol pins', () => {
       snapshots.push(snapshot);
     });
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(harness.channels).toHaveLength(1);
     });
     const channel = harness.channels[0];
@@ -272,12 +290,12 @@ describe('draft-duel supabase transport protocol pins', () => {
     ]);
 
     channel?.triggerPostgresChange();
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(snapshots.length).toBeGreaterThan(0);
     });
 
     subscription.unsubscribe();
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(channel?.unsubscribed).toBe(true);
       expect(harness.removedChannels).toContain(`draft-duel-room-${ROOM_ID}`);
     });
@@ -289,7 +307,7 @@ describe('draft-duel supabase transport protocol pins', () => {
     const subscription = transport.subscribeTransient(ROOM_ID, (event) => {
       events.push(event);
     });
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(harness.channels).toHaveLength(1);
     });
     const channel = harness.channels[0];
@@ -318,7 +336,7 @@ describe('draft-duel supabase transport protocol pins', () => {
     expect(events).toEqual([event]);
 
     subscription.unsubscribe();
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(channel?.unsubscribed).toBe(true);
     });
   });
@@ -373,8 +391,8 @@ describe('draft-duel supabase transport protocol pins', () => {
 
     const timeout = await transport.resolveTimeout(ROOM_ID);
     expect(timeout).toEqual({
-      roomId: ROOM_ID,
-      commandId: 'timeout-cmd',
+      roomId: ROOM_ID as Id,
+      commandId: 'timeout-cmd' as CommandId,
       ordinal: 7,
       accepted: true,
       rejectionCode: null,
@@ -382,7 +400,7 @@ describe('draft-duel supabase transport protocol pins', () => {
     });
 
     const snapshot = await transport.removeGuest(ROOM_ID, 'p2');
-    expect(snapshot.roomId).toBe(ROOM_ID);
+    expect(snapshot.roomId).toBe(ROOM_ID as Id);
 
     expect(harness.rpcCalls.slice(0, 4).map((call) => [call.name, call.args])).toEqual([
       ['draft_duel_verification_challenge', { p_room_id: ROOM_ID }],

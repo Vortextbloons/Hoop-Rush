@@ -9,18 +9,19 @@
   },
   "scripts": {
     "check": "tsc --noEmit --incremental",
-    "test": "vitest",
-    "test:run": "vitest run",
-    "lint": "prettier --cache --check src vitest.config.ts eslint.config.js && eslint --cache ."
+    "test": "bun test --watch --isolate",
+    "test:run": "bun test --isolate",
+    "test:quick": "bun test --isolate --path-ignore-patterns \"**/*generator*\" --path-ignore-patterns \"**/*integration*\"",
+    "lint": "prettier --cache --check src eslint.config.js && eslint --cache ."
   },
   "dependencies": {
     "@hoop-rush/data-contracts": "workspace:*",
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@types/bun": "catalog:",
     "@types/node": "catalog:",
     "eslint": "catalog:",
-    "typescript": "catalog:",
-    "vitest": "catalog:"
+    "typescript": "catalog:"
   }
 }

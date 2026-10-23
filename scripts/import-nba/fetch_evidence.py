@@ -166,6 +166,8 @@ def merge_evidence(season: str) -> dict[str, dict[str, Any]]:
                     {
                         "offRebChances": row.get("OREB_CHANCES"),
                         "defRebChances": row.get("DREB_CHANCES"),
+                        "trackedOffensiveRebounds": row.get("OREB"),
+                        "trackedDefensiveRebounds": row.get("DREB"),
                         "rebChances": row.get("REB_CHANCES"),
                         "contestedReb": row.get("REB_CONTESTED"),
                     },
@@ -183,6 +185,7 @@ def merge_evidence(season: str) -> dict[str, dict[str, Any]]:
                     pid,
                     {
                         "passes": row.get("PASSES_MADE"),
+                        "passingMinutes": row.get("MIN"),
                         "secondaryAssists": row.get("SECONDARY_AST"),
                         "potentialAssists": row.get("POTENTIAL_AST"),
                         "assistPoints": row.get("AST_PTS_CREATED"),
@@ -197,18 +200,22 @@ def merge_evidence(season: str) -> dict[str, dict[str, Any]]:
                     },
                 )
             elif measure == "Drives":
-                put(pid, {"drives": row.get("DRIVES")})
-    for row in fetch_hustle(season):
+                put(pid, {"drives": row.get("DRIVES"), "drivesMinutes": row.get("MIN")})
+    hustle = fetch_hustle(season)
+    boxouts_available = any((_num(row.get("BOX_OUTS")) or 0) > 0 for row in hustle)
+    for row in hustle:
         pid = str(row.get("PLAYER_ID", ""))
         put(
             pid,
             {
+                "hustleGamesPlayed": row.get("G"),
+                "hustleMinutes": row.get("MIN"),
                 "contestedShots": row.get("CONTESTED_SHOTS"),
                 "contestedShots2pt": row.get("CONTESTED_SHOTS_2PT"),
                 "contestedShots3pt": row.get("CONTESTED_SHOTS_3PT"),
                 "deflections": row.get("DEFLECTIONS"),
                 "screenAssists": row.get("SCREEN_ASSISTS"),
-                "boxOuts": row.get("BOX_OUTS"),
+                "boxOuts": row.get("BOX_OUTS") if boxouts_available else None,
             },
         )
     return merged

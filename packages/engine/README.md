@@ -2,8 +2,7 @@
 
 Pure TypeScript basketball and mode rules. This package owns every simulation
 decision: possession resolution, ratings effects, season orchestration, drafts,
-trades, free agency, injuries, the postseason, havoc runs, and collection game
-play.
+trades, free agency, injuries, the postseason, and havoc runs.
 
 ## Boundary rules
 
@@ -29,7 +28,6 @@ play.
 - `src/modes/` — `havoc/`, `draft-duel/` (incl. command-log replay),
   `fixed-five/` (incl. sandbox builder and command-log replay).
 - `src/challenge/` — the fixed-five challenge aggregate and seeds.
-- `src/collection/` — pack draws, targeting, game commands, minute plans.
 - `src/projection/`, `src/bracket/` — projection model and the frozen bracket.
 - `src/index.ts` — the package export surface; `src/season/commands/shared.ts`
   holds command handler contracts and the retired-command handler.
@@ -37,11 +35,11 @@ play.
 ## Verification
 
 ```text
-pnpm exec vitest run --project @hoop-rush/engine <path>
-pnpm --filter @hoop-rush/engine test:run
-pnpm hoop-rush season block audit --input <checkpoint.json> --run <run.json>
-pnpm hoop-rush season run reproduce --input <export.json>
-pnpm hoop-rush calibrate run
+bun test <path>
+bun run --filter @hoop-rush/engine test:run
+bun run hoop-rush season block audit --input <checkpoint.json> --run <run.json>
+bun run hoop-rush season run reproduce --input <export.json>
+bun run hoop-rush calibrate run
 ```
 
 Simulation changes must keep accounting invariants (`src/sim/invariants.ts`),

@@ -20,6 +20,52 @@ module = importlib.import_module(f"{PACKAGE_NAME}.fetch_season_stats")
 
 
 class SeasonTotalsTests(unittest.TestCase):
+    def test_dashboard_requests_totals_with_a_distinct_cache_key(self):
+        import pandas as pd
+        writes = []
+        with patch.object(module, "read_cache", return_value=None), patch.object(
+            module, "write_cache", side_effect=lambda *args, **kwargs: writes.append((args, kwargs))
+        ), patch.object(module, "with_retry", side_effect=lambda fn: fn()), patch.object(
+            module.leaguedashplayerstats, "LeagueDashPlayerStats"
+        ) as endpoint:
+            endpoint.return_value.get_data_frames.return_value = [pd.DataFrame([self.row()])]
+            result = module.fetch_league_dash("2015-16")
+        self.assertEqual(endpoint.call_args_list[0].kwargs["per_mode_detailed"], "Totals")
+        self.assertEqual(result[0]["rows"][0]["PTS"], 1800)
+        base_write = next(kwargs for args, kwargs in writes if kwargs.get("measure") == "Base")
+        self.assertEqual(base_write["per_mode"], "Totals")
+
+    def test_dashboard_totals_are_not_multiplied_by_games_and_missing_fields_stay_missing(self):
+        base = {**self.row(), "FG3M": 100, "FG3A": 300, "PTS": 1900, "STL": 80}
+        result = module.to_player_season_stats([
+            {"measureType": "Base", "rows": [base]},
+            {"measureType": "Advanced", "rows": []},
+        ], "2015-16", [])[0]
+        self.assertEqual(result["minutes"], 3000)
+        self.assertEqual(result["points"], 1900)
+        self.assertEqual(result["tpm"], 100)
+        self.assertEqual(result["steals"], 80)
+        self.assertIsNone(result["blocks"])
+
+    def test_exact_dashboard_totals_repair_single_team_stints_and_keep_aggregate_team_identity(self):
+        payload = [{"measureType": "Base", "rows": [{**self.row(), "TEAM_ID": 0}]}]
+        rows = module.to_player_season_stats(payload, "2015-16", [{"externalId": "7", "teamExternalId": "winner"}])
+        self.assertEqual(rows[0]["teamExternalId"], "0")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "stints.json").write_text(json.dumps([
+                {"playerExternalId": "7", "teamExternalId": "1", "gamesPlayed": 80,
+                 "minutes": 2999, "points": 1799}
+            ]), encoding="utf-8")
+            with patch.object(module, "ensure_output_dir", return_value=root), patch.object(
+                module, "fetch_league_dash", return_value=payload
+            ):
+                module.run("2015-16", [])
+            stint = json.loads((root / "stints.json").read_text(encoding="utf-8"))[0]
+            self.assertEqual(stint["points"], 1800)
+            self.assertEqual(stint["minutes"], 3000)
+            self.assertIsNone(stint["blocks"])
+
     def test_partial_coverage_is_not_a_full_season_total(self):
         self.assertFalse(module._coverage_ok({"minutes": 60}, "minutes", 80))
         self.assertFalse(module._coverage_ok({"fga": 79}, "fga", 80))

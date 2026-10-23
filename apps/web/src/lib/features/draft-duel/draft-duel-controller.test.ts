@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, mock, setSystemTime, vi } from 'bun:test';
 import {
   commandIdSchema,
   contentHashSchema,
@@ -28,6 +28,41 @@ import type { RoomAttachment, RoomLifecycle } from '@hoop-rush/application/multi
 import type { DraftDuelAssets } from './draft-duel-assets';
 import { DraftDuelController } from './draft-duel-controller.svelte.js';
 import { createDraftDuelSession, type DraftDuelSession } from './draft-duel-session';
+
+const stubbedGlobals: Array<[string, unknown]> = [];
+
+function stubGlobal(name: string, value: unknown): void {
+  stubbedGlobals.push([name, (globalThis as Record<string, unknown>)[name]]);
+  (globalThis as Record<string, unknown>)[name] = value;
+}
+
+function unstubAllGlobals(): void {
+  for (const [name, original] of stubbedGlobals.splice(0))
+    (globalThis as Record<string, unknown>)[name] = original;
+}
+
+async function waitFor(callback: () => void | Promise<void>): Promise<void> {
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt < 1000; attempt += 1) {
+    try {
+      await callback();
+      return;
+    } catch (error) {
+      lastError = error;
+      await Promise.resolve();
+    }
+  }
+  throw lastError;
+}
+
+function mocked<T>(value: T): T & ReturnType<typeof mock> {
+  return value as T & ReturnType<typeof mock>;
+}
+
+async function advanceTimers(milliseconds: number): Promise<void> {
+  vi.advanceTimersByTime(milliseconds);
+  await Promise.resolve();
+}
 
 type SessionLifecycle = {
   attachment: RoomAttachment | null;
@@ -88,12 +123,12 @@ describe('Draft Duel ready check progression', () => {
 
   beforeEach(async () => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-10-10T12:00:00Z'));
-    vi.stubGlobal(
+    setSystemTime(new Date('2026-10-10T12:00:00Z'));
+    stubGlobal(
       'requestAnimationFrame',
       vi.fn(() => 1),
     );
-    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+    stubGlobal('cancelAnimationFrame', vi.fn());
     transport = createInMemoryDraftDuelTransport({
       random: { seed: 'ready-check' },
       clock: () => Date.now(),
@@ -138,7 +173,7 @@ describe('Draft Duel ready check progression', () => {
   afterEach(() => {
     unsubscribe();
     controller.dispose();
-    vi.unstubAllGlobals();
+    unstubAllGlobals();
     vi.useRealTimers();
     vi.restoreAllMocks();
   });
@@ -221,8 +256,8 @@ describe('Draft Duel ready check progression', () => {
       const successor = controller.successorRoomId;
       expect(successor).not.toBeNull();
       expect(controller.error).toBeNull();
-      expect(await controller.followRematch()).toBe(successor);
-      expect((await transport.rematch(roomId)).snapshot.roomId).toBe(successor);
+      expect(await controller.followRematch()).toBe(successor as Id);
+      expect((await transport.rematch(roomId)).snapshot.roomId).toBe(successor as Id);
     },
   );
 
@@ -236,7 +271,7 @@ describe('Draft Duel ready check progression', () => {
 
   function stubManualRaf(): () => void {
     const scheduled: FrameRequestCallback[] = [];
-    vi.stubGlobal(
+    stubGlobal(
       'requestAnimationFrame',
       vi.fn((callback: FrameRequestCallback) => {
         scheduled.push(callback);
@@ -320,7 +355,7 @@ describe('Draft Duel ready check progression', () => {
         slotIndex: 0,
         seedPath: 'draft-duel/timeout/0',
       });
-      vi.setSystemTime(new Date(deadline.deadlineAt));
+      setSystemTime(new Date(deadline.deadlineAt));
       if (failFirst)
         vi.spyOn(transport, 'commitFallback').mockRejectedValueOnce(new Error('network'));
       await lifecycle.resolveDeadline(deadline.cursor, 0);
@@ -330,7 +365,7 @@ describe('Draft Duel ready check progression', () => {
             (c) => c.payload.kind === 'timeout-autopick',
           ),
         ).toHaveLength(0);
-        await vi.advanceTimersByTimeAsync(5000);
+        await advanceTimers(5000);
       }
       const commands = await transport.refetch(roomId, -1);
       const timeout = commands.filter((command) => command.payload.kind === 'timeout-autopick');
@@ -351,7 +386,7 @@ describe('Draft Duel ready check progression', () => {
     expect(controller.localReady).toBe(true);
     expect(controller.opponentReady).toBe(true);
 
-    await vi.advanceTimersByTimeAsync(250);
+    await advanceTimers(250);
 
     expect(controller.phase).toBe('broadcasting');
     expect(controller.currentBroadcast?.gameNumber).toBe(1);
@@ -359,10 +394,10 @@ describe('Draft Duel ready check progression', () => {
 
   it('waits for the opponent until the 60-second fallback', async () => {
     await controller.readyForNextGame();
-    await vi.advanceTimersByTimeAsync(59_750);
+    await advanceTimers(59_750);
     expect(controller.phase).toBe('preparing-game');
 
-    await vi.advanceTimersByTimeAsync(250);
+    await advanceTimers(250);
 
     expect(controller.phase).toBe('broadcasting');
     expect(controller.currentBroadcast?.gameNumber).toBe(1);
@@ -371,7 +406,7 @@ describe('Draft Duel ready check progression', () => {
   it('does not start while only the opponent is ready', async () => {
     await submit('p2', { kind: 'ready-next-game', gameNumber: 1, ready: true });
 
-    await vi.advanceTimersByTimeAsync(250);
+    await advanceTimers(250);
 
     expect(controller.phase).toBe('preparing-game');
     expect(controller.localReady).toBe(false);
@@ -383,9 +418,9 @@ describe('Draft Duel ready check progression', () => {
     await submit('p2', { kind: 'ready-next-game', gameNumber: 1, ready: true });
     vi.spyOn(transport, 'submitCommand').mockRejectedValueOnce(new Error('temporary failure'));
 
-    await vi.advanceTimersByTimeAsync(250);
+    await advanceTimers(250);
     expect(controller.phase).toBe('preparing-game');
-    await vi.advanceTimersByTimeAsync(5000);
+    await advanceTimers(5000);
 
     expect(controller.phase).toBe('broadcasting');
   });
@@ -470,7 +505,7 @@ describe('Draft Duel ready check progression', () => {
     session.beginPlayback();
     session.advancePlayback(DRAFT_DUEL_BROADCAST_MS);
     lifecycle.maybeProposeOrConfirm();
-    await vi.waitFor(async () => {
+    await waitFor(async () => {
       const commands = await transport.refetch(roomId, -1);
       expect(
         commands.some(
@@ -493,7 +528,7 @@ describe('Draft Duel ready check progression', () => {
     expect(controller.awaitingContinue).toBe(true);
 
     controller.continueAfterGame();
-    await vi.waitFor(async () => {
+    await waitFor(async () => {
       const commands = await transport.refetch(roomId, -1);
       expect(
         commands.some(
@@ -518,7 +553,7 @@ describe('Draft Duel ready check progression', () => {
     const { lifecycle, digest } = await prepareSecondGame();
     session.advancePlayback(DRAFT_DUEL_BROADCAST_MS);
     lifecycle.maybeProposeOrConfirm();
-    await vi.waitFor(async () => {
+    await waitFor(async () => {
       const commands = await transport.refetch(roomId, -1);
       expect(
         commands.some(
@@ -541,7 +576,7 @@ describe('Draft Duel ready check progression', () => {
     expect(controller.awaitingContinue).toBe(true);
 
     controller.continueAfterGame();
-    await vi.waitFor(async () => {
+    await waitFor(async () => {
       const commands = await transport.refetch(roomId, -1);
       expect(
         commands.some(
@@ -567,7 +602,7 @@ describe('Draft Duel ready check progression', () => {
     const { lifecycle, digest } = await prepareSecondGame();
     session.advancePlayback(DRAFT_DUEL_BROADCAST_MS);
     lifecycle.maybeProposeOrConfirm();
-    await vi.waitFor(async () => {
+    await waitFor(async () => {
       const commands = await transport.refetch(roomId, -1);
       expect(
         commands.some(
@@ -580,8 +615,8 @@ describe('Draft Duel ready check progression', () => {
     });
     expect(controller.awaitingContinue).toBe(true);
 
-    await vi.advanceTimersByTimeAsync(60_000);
-    await vi.waitFor(async () => {
+    await advanceTimers(60_000);
+    await waitFor(async () => {
       const commands = await transport.refetch(roomId, -1);
       expect(
         commands.some(
@@ -608,7 +643,7 @@ describe('Draft Duel ready check progression', () => {
     });
     (controller as unknown as { stopPlayback: () => void }).stopPlayback();
     const cancel = vi.fn();
-    vi.stubGlobal('cancelAnimationFrame', cancel);
+    stubGlobal('cancelAnimationFrame', cancel);
     const tick = stubManualRaf();
     (controller as unknown as { startPlayback: () => void }).startPlayback();
     tick();
@@ -628,7 +663,7 @@ describe('Draft Duel ready check progression', () => {
       tapeDigest: digest,
       inputDigest: digest,
     });
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(controller.phase).toBe('game-results');
     });
     expect(controller.showingBroadcast).toBe(true);
@@ -640,7 +675,7 @@ describe('Draft Duel ready check progression', () => {
       tick();
     }
     expect(controller.progress).toBe(1);
-    await vi.waitFor(async () => {
+    await waitFor(async () => {
       const commands = await transport.refetch(roomId, -1);
       expect(
         commands.some(
@@ -664,7 +699,7 @@ describe('Draft Duel ready check progression', () => {
     expect(controller.awaitingContinue).toBe(true);
 
     controller.continueAfterGame();
-    await vi.waitFor(async () => {
+    await waitFor(async () => {
       const commands = await transport.refetch(roomId, -1);
       expect(
         commands.some(
@@ -681,7 +716,7 @@ describe('Draft Duel ready check progression', () => {
       resultDigest: digest,
       verified: true,
     });
-    await vi.waitFor(async () => {
+    await waitFor(async () => {
       const commands = await transport.refetch(roomId, -1);
       expect(
         commands.some(
@@ -702,7 +737,7 @@ describe('Draft Duel ready check progression', () => {
     const output = lifecycle.outputs[2];
     if (!output) throw new Error('Missing game output');
     lifecycle.outputs = {};
-    const pipeline = vi.mocked(lifecycle.ensureGamePipeline);
+    const pipeline = mocked(lifecycle.ensureGamePipeline);
     pipeline.mockRestore();
     const simulate = vi.spyOn(lifecycle, 'simulateGame').mockResolvedValue(output);
     const save = vi.spyOn(lifecycle.deps.repository, 'saveResult').mockResolvedValue();
@@ -744,14 +779,14 @@ describe('Draft Duel ready check progression', () => {
       session.advancePlayback(DRAFT_DUEL_BROADCAST_MS);
       controller.continueAfterGame();
       lifecycle.maybeProposeOrConfirm();
-      await vi.advanceTimersByTimeAsync(0);
+      await advanceTimers(0);
       expect(failed).toBe(true);
       expect(
         controller.verification.some(
           (entry) => entry.gameNumber === 2 && entry.status === 'verified',
         ),
       ).toBe(false);
-      await vi.advanceTimersByTimeAsync(5000);
+      await advanceTimers(5000);
       const commands = await transport.refetch(roomId, -1);
       expect(
         commands.filter(
@@ -779,11 +814,11 @@ describe('Draft Duel ready check progression', () => {
     const current = lifecycle.snapshot;
     if (!current) throw new Error('Room snapshot is missing');
     lifecycle.applySnapshot({ ...current, phase: 'drafting' });
-    expect(controller.visiblePicks).toEqual(offers);
+    expect(controller.visiblePicks).toEqual(offers as typeof controller.visiblePicks);
     expect(controller.activeTurn).toBe(false);
     lifecycle.participantId = 'p2';
     lifecycle.publish();
-    expect(controller.visiblePicks).toEqual(offers);
+    expect(controller.visiblePicks).toEqual(offers as typeof controller.visiblePicks);
     expect(controller.activeTurn).toBe(true);
   });
 

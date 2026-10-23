@@ -1,4 +1,4 @@
-﻿import { describe, expect, it } from 'vitest';
+﻿import { describe, expect, it } from 'bun:test';
 import type { HavocMutationId, SimulationRatings } from '@hoop-rush/data-contracts';
 import { POSITIONS } from '@hoop-rush/data-contracts';
 import { createRng } from '../../sim/rng.ts';

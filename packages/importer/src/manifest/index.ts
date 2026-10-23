@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
 import { sortedJsonFiles } from '../shared/fs.ts';
@@ -13,6 +13,14 @@ import {
   parseRosterDetails,
   PLAYERS_INDEX_SCHEMA_VERSION,
   RATING_MODEL_VERSION,
+  RATINGS_VERSION,
+  POSITION_NORMALIZATION_VERSION,
+  PLAYER_VERSION_ID_VERSION,
+  SEASON_DRAFT_CATALOG_VERSION,
+  SEASON_STAMINA_VERSION,
+  SEASON_DURABILITY_VERSION,
+  playerVersionId,
+  seasonDraftCatalogSchema,
   type FranchiseEraPool,
 } from '@hoop-rush/data-contracts';
 import { LINEAGE_SEGMENTS, MODERN_SLOTS } from '../lineage.ts';
@@ -31,6 +39,74 @@ import {
 } from '../shared/manifest.ts';
 export { MANIFEST_PATH };
 export type { Manifest };
+function rebuildDraftCatalog(pools: readonly FranchiseEraPool[], dataDir: string) {
+  const candidates = pools
+    .flatMap((pool) =>
+      pool.players.map((player) => {
+        const historicalMpg = player.stats.minutes / Math.max(1, player.stats.gamesPlayed);
+        const gamesPlayed = player.stats.gamesPlayed;
+        const teamGames = player.eligibility.teamGames;
+        return {
+          playerVersionId: playerVersionId(
+            player.playerId,
+            player.franchiseId,
+            player.eraId,
+            player.seasonKey,
+          ),
+          playerId: player.playerId,
+          franchiseId: player.franchiseId,
+          eraId: player.eraId,
+          seasonKey: player.seasonKey,
+          displayName: player.displayName,
+          playerExternalId: player.playerExternalId,
+          positions: player.positions,
+          heightInches: player.heightInches,
+          weightLbs: player.weightLbs,
+          summaryRatings: player.summaryRatings,
+          detailedRatings: player.detailedRatings,
+          tendencies: player.tendencies,
+          stamina: {
+            rating: Math.round(Math.min(95, Math.max(45, 45 + 1.25 * historicalMpg))),
+            historicalMpg,
+            derivationVersion: SEASON_STAMINA_VERSION,
+          },
+          durability: {
+            rating: Math.round(
+              Math.min(95, Math.max(45, 45 + (50 * gamesPlayed) / Math.max(1, teamGames))),
+            ),
+            derivationVersion: SEASON_DURABILITY_VERSION,
+          },
+          anchors: player.anchors,
+          reconstructedThreePoint: player.reconstructedThreePoint,
+        };
+      }),
+    )
+    .sort((a, b) => a.playerVersionId.localeCompare(b.playerVersionId));
+  const catalog = seasonDraftCatalogSchema.parse({
+    schemaVersion: 1,
+    catalogVersion: SEASON_DRAFT_CATALOG_VERSION,
+    dataVersion: DATA_VERSION,
+    ratingsVersion: RATINGS_VERSION,
+    positionNormalizationVersion: POSITION_NORMALIZATION_VERSION,
+    playerVersionIdVersion: PLAYER_VERSION_ID_VERSION,
+    staminaVersion: SEASON_STAMINA_VERSION,
+    durabilityVersion: SEASON_DURABILITY_VERSION,
+    pools: pools.map((pool) => ({
+      franchiseId: pool.franchiseId,
+      eraId: pool.eraId,
+      playerVersionIds: pool.players.map((player) =>
+        playerVersionId(player.playerId, player.franchiseId, player.eraId, player.seasonKey),
+      ),
+    })),
+    candidates,
+  });
+  const path = join(dataDir, 'draft-catalog.json');
+  const temporaryPath = `${path}.tmp-${String(process.pid)}`;
+  writeFileSync(temporaryPath, `${JSON.stringify(catalog)}\n`, 'utf8');
+  renameSync(temporaryPath, path);
+  return { url: 'draft-catalog.json', contentHash: sha256File(path) };
+}
+
 function peakPlayerToDraftEntry(player: ReturnType<typeof parsePool>['players'][number]) {
   return {
     playerId: player.playerId,
@@ -292,13 +368,8 @@ export function run(dataDir = PUBLIC_DATA): void {
       contentHash: sha256File(join(opponentsDir, 'bracket.json')),
     };
   }
-  const draftCatalogPath = join(dataDir, 'draft-catalog.json');
-  if (fileExists(draftCatalogPath)) {
-    manifest.draftCatalog = {
-      url: 'draft-catalog.json',
-      contentHash: sha256File(draftCatalogPath),
-    };
-  }
+  if (poolByKey.size > 0)
+    manifest.draftCatalog = rebuildDraftCatalog([...poolByKey.values()], dataDir);
   if (previousCollection !== undefined) {
     manifest.collection = previousCollection;
   }

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { canonicalJson, seasonDigestHex } from '@hoop-rush/data-contracts';
 import { buildHavocRunState, buildHavocRunStateLocked } from '@hoop-rush/test-fixtures';
 import { HAVOC_STATE_DIGEST_PREFIX, HavocStateDigest } from './state-digest.ts';

@@ -83,8 +83,8 @@ That discipline is why seeds, replays, and “run it again” comparisons matter
 ## Play locally
 
 ```bash
-pnpm install
-pnpm dev
+bun install
+bun run dev
 ```
 
 Open **http://localhost:5173**, choose a mode, and draft.
@@ -96,7 +96,7 @@ Open **http://localhost:5173**, choose a mode, and draft.
 
 <br />
 
-**Stack:** SvelteKit client · TypeScript simulation engine · IndexedDB saves · Web Workers for long sims · Vitest.
+**Stack:** SvelteKit client · TypeScript simulation engine · IndexedDB saves · Web Workers for long sims · Bun test runner.
 
 ```
 apps/web                → game UI (mode code under src/lib/features/<mode>)
@@ -108,20 +108,21 @@ packages/persistence    → local saves
 
 | Command | Purpose |
 | --- | --- |
-| `pnpm dev` | Run the web app |
-| `pnpm check` / `pnpm lint` | Typecheck & lint |
-| `pnpm test:quick` | Fast test gate |
-| `pnpm verify` | Full check before release |
-| `pnpm hoop-rush` | CLI — sim, audit, data tools (`pnpm hoop-rush help`) |
+| `bun run dev` | Run the web app |
+| `bun run check` / `bun run lint` | Typecheck & lint |
+| `bun run test:quick` | Fast test gate |
+| `bun run verify` | Full check before release |
+| `bun run hoop-rush` | CLI — sim, audit, data tools (`bun run hoop-rush help`) |
 
-See **AGENTS.md** and local **Docs/** for contribution expectations. The
-per-package architecture guides are checked in:
-
-See [Adding a game mode](ADDING_MODES.md) for mode registration and shared
-multiplayer composition, and [multiplayer operations](supabase/README.md) for
-compatible migration and release checks.
+See the local root **AGENTS.md** (agent defaults), checked-in scoped guides
+(`apps/web/AGENTS.md`, `packages/persistence/AGENTS.md`), and local **Docs/**
+for contribution expectations. [Adding a game mode](ADDING_MODES.md) covers mode registration and
+shared multiplayer composition; [multiplayer operations](supabase/README.md)
+covers compatible migration and release checks. Per-package architecture guides:
 
 ```
+apps/web/AGENTS.md               web client mode layout, workers, high-risk files
+packages/persistence/AGENTS.md   Dexie namespace, record envelopes, storage rules
 packages/application/README.md   application sessions and submission runtime
 packages/engine/README.md        basketball and mode rules, boundary rules
 packages/data-contracts/README.md  schemas, versions, protocols

@@ -1,6 +1,6 @@
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import {
   contentHashSchema,
   eraIdSchema,
@@ -171,11 +171,12 @@ describe('havoc CLI simulation determinism', () => {
     expect(comparison.normal.games).toBe(82);
     for (const pair of comparison.games) {
       expect(pair.havoc.humanScore).toBe(
-        report.havoc.games.find((game) => game.gameNumber === pair.gameNumber)?.summary.humanScore,
+        report.havoc.games.find((game) => game.gameNumber === pair.gameNumber)?.summary
+          .humanScore as number,
       );
       expect(pair.normal.humanScore).toBe(
         report.normal?.games.find((game) => game.gameNumber === pair.gameNumber)?.summary
-          .humanScore,
+          .humanScore as number,
       );
     }
     const derived = report.report;

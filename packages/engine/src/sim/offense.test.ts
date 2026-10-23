@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { buildGameSimulationInput, buildLegalSimulationTeam } from '@hoop-rush/test-fixtures';
 import { prepareTeam } from './prepare.ts';
 import { ACTION_TYPES } from './usage.ts';

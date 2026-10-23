@@ -8,10 +8,11 @@
     "preview": "vite preview",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --incremental --watch --tsconfig ./tsconfig.json",
-    "lint": "prettier --cache --check src vitest.config.ts eslint.config.js && eslint --cache .",
-    "test": "vitest",
-    "test:run": "vitest run",
-    "test:unit": "vitest run --config vitest.config.ts src/lib"
+    "lint": "prettier --cache --check src eslint.config.js && eslint --cache .",
+    "test": "bun test --watch --preload ./bun-test-preload.ts",
+    "test:run": "bun test --preload ./bun-test-preload.ts",
+    "test:quick": "bun test --preload ./bun-test-preload.ts --path-ignore-patterns \"**/*generator*\" --path-ignore-patterns \"**/*integration*\"",
+    "test:unit": "bun test --preload ./bun-test-preload.ts src/lib"
   },
   "dependencies": {
     "@hoop-rush/application": "workspace:*",
@@ -39,8 +40,7 @@
     "tailwindcss": "^4.3.3",
     "typescript": "catalog:",
     "typescript-eslint": "catalog:",
-    "vite": "^8.3.4",
-    "vitest": "catalog:"
+    "vite": "^8.3.4"
   },
   "imports": {
     "#lib": "./src/lib/index.js",

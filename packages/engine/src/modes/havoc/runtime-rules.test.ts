@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import type {
   HavocEvent,
   HavocScoringEntry,
@@ -172,7 +172,7 @@ describe('havoc tier-2 rules', () => {
         expect(possessionStart.offenseSide).toBe(started.side);
       }
     }
-    expect(loop.ownerInstanceId).toBe(run.input.home.starters[0]?.instanceId);
+    expect(loop.ownerInstanceId).toBe(run.input.home.starters[0]?.instanceId as string);
   });
 
   it('grants two free throws on an and-one', () => {
@@ -235,7 +235,7 @@ describe('havoc tier-2 rules', () => {
     );
     for (const event of armed) {
       if (event.kind !== 'bounty') continue;
-      expect(event.blockedInstanceId).toBe(topTarget?.instanceId);
+      expect(event.blockedInstanceId).toBe(topTarget?.instanceId as string | null);
     }
     const consumed = run.tape.events.find(
       (event) => event.kind === 'bounty' && event.outcome === 'consumed',
@@ -480,7 +480,7 @@ describe('havoc tier-3 rules', () => {
     const firstApplied = applied[0];
     if (firstApplied?.kind !== 'body-snatcher') throw new Error('missing applied event');
     const target = away.starters.find((starter) => starter.source.originalOverall === 95);
-    expect(firstApplied.targetInstanceId).toBe(target?.instanceId);
+    expect(firstApplied.targetInstanceId).toBe(target?.instanceId as string);
     const targetId = firstApplied.targetInstanceId;
     const targetReplaced = run.tape.events.some(
       (event) => event.kind === 'substitution' && event.outInstanceId === targetId,

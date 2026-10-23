@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'bun:test';
 import {
   HAVOC_MULTIPLAYER_BROADCAST_MS,
   HAVOC_MULTIPLAYER_LEGACY_RULES_VERSION,
@@ -344,7 +344,7 @@ async function createHarness(options?: {
     createSession,
     async advance(ms: number): Promise<void> {
       now += ms;
-      await vi.advanceTimersByTimeAsync(ms);
+      vi.advanceTimersByTime(ms);
       await flushMicrotasks();
     },
     flush: flushMicrotasks,
@@ -553,7 +553,8 @@ describe('HavocMultiplayerSession lifecycle', () => {
     h.session.subscribe(listener);
     h.internals().startTimers();
     expect(vi.getTimerCount()).toBe(1);
-    await vi.advanceTimersByTimeAsync(500);
+    vi.advanceTimersByTime(500);
+    await flushMicrotasks();
     expect(listener.mock.calls.length).toBeGreaterThan(0);
 
     h.internals().progress = 0.25;
@@ -561,7 +562,8 @@ describe('HavocMultiplayerSession lifecycle', () => {
     expect(vi.getTimerCount()).toBe(0);
     const callsAfterDispose = listener.mock.calls.length;
 
-    await vi.advanceTimersByTimeAsync(1000);
+    vi.advanceTimersByTime(1000);
+    await flushMicrotasks();
     h.session.advancePlayback(5000);
 
     expect(listener.mock.calls.length).toBe(callsAfterDispose);
@@ -656,7 +658,7 @@ describe('HavocMultiplayerSession draft and series', () => {
     expect(view.verification.every((entry) => entry.status === 'verified')).toBe(true);
     expect(h.repository.recaps).toHaveLength(1);
     const recap = must(h.repository.recaps[0], 'recap');
-    expect(recap.champion).toBe(series?.champion);
+    expect(recap.champion).toBe(must(series?.champion, 'champion'));
     expect(recap.games).toHaveLength(series?.games.length ?? 0);
     expect(recap.mvp).not.toBeNull();
     expect(h.repository.completed?.mvp).toEqual(recap.mvp);
@@ -915,11 +917,12 @@ describe('HavocMultiplayerSession draft and series', () => {
     const gameNumber = await reachBroadcasting(h);
     await verifyCurrentGame(h);
     const view = h.session.getSnapshot();
+    const output = must(view.outputs[gameNumber], 'game output');
     expect(view.verification).toEqual([
       {
         gameNumber,
-        localResultDigest: view.outputs[gameNumber]?.resultDigest,
-        peerResultDigest: view.outputs[gameNumber]?.resultDigest,
+        localResultDigest: output.resultDigest,
+        peerResultDigest: output.resultDigest,
         status: 'verified',
       },
     ]);
@@ -929,12 +932,12 @@ describe('HavocMultiplayerSession draft and series', () => {
     const sessionB = h.createSession(h.repository, runnerB);
     await sessionB.attach(h.roomId);
     const viewB = sessionB.getSnapshot();
-    expect(viewB.outputs[gameNumber]?.resultDigest).toBe(view.outputs[gameNumber]?.resultDigest);
+    expect(viewB.outputs[gameNumber]?.resultDigest).toBe(output.resultDigest);
     expect(viewB.verification).toEqual([
       {
         gameNumber,
-        localResultDigest: view.outputs[gameNumber]?.resultDigest,
-        peerResultDigest: view.outputs[gameNumber]?.resultDigest,
+        localResultDigest: output.resultDigest,
+        peerResultDigest: output.resultDigest,
         status: 'verified',
       },
     ]);

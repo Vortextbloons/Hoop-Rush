@@ -52,6 +52,7 @@ interface FixedFiveRoomRow {
   successor_room_id: FixedFiveRoomSnapshot['successorRoomId'];
   series: unknown;
   broadcast: unknown;
+  game_state: unknown;
   root_seed: NonNullable<FixedFiveRoomSnapshot['rootSeed']>;
   deadline_at: string | null;
   deadline_cursor: string | null;
@@ -217,6 +218,10 @@ export function createFixedFiveTransport(options?: {
       deadline,
       series: row.series ?? null,
       broadcast: row.broadcast ?? null,
+      seasonBroadcast:
+        row.game_state && typeof row.game_state === 'object' && 'season' in row.game_state
+          ? (row.game_state as { season: FixedFiveRoomSnapshot['seasonBroadcast'] }).season
+          : null,
       resultDigest: row.result_digest,
       confirmedDigest: row.confirmed_digest,
       successorRoomId: row.successor_room_id,
@@ -229,7 +234,7 @@ export function createFixedFiveTransport(options?: {
     const roomResponse = await client
       .from('fixed_five_rooms')
       .select(
-        'id, code, code_active, mode, source_mode, variant, versions, phase, revision, command_count, digest, result_digest, confirmed_digest, successor_room_id, series, broadcast, root_seed, deadline_at, deadline_cursor, deadline_participant, deadline_fallback, deadline_pick_ordinal, expires_at, created_at',
+        'id, code, code_active, mode, source_mode, variant, versions, phase, revision, command_count, digest, result_digest, confirmed_digest, successor_room_id, series, broadcast, game_state, root_seed, deadline_at, deadline_cursor, deadline_participant, deadline_fallback, deadline_pick_ordinal, expires_at, created_at',
       )
       .eq('id', roomId)
       .single();
@@ -334,6 +339,7 @@ export function createFixedFiveTransport(options?: {
         deadline: null,
         series: null,
         broadcast: null,
+        seasonBroadcast: null,
         resultDigest: null,
         confirmedDigest: null,
         successorRoomId: null,

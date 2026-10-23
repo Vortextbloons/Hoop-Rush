@@ -89,7 +89,7 @@ export const seedRange = (args: ParsedArgs): SeedRangeCliArgs => ({
 const HEADER = `hoop-rush — developer CLI for the Hoop Rush engine and data
 
 Usage:
-  pnpm hoop-rush <command> [options]
+  bun run hoop-rush <command> [options]
 
 Commands:`;
 

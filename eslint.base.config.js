@@ -11,11 +11,17 @@ export function sharedEslintBase(tsconfigRootDir) {
       },
       languageOptions: {
         parserOptions: {
-          projectService: {
-            allowDefaultProject: ['vitest.config.ts'],
-          },
+          projectService: {},
           tsconfigRootDir,
         },
+      },
+    },
+    {
+      files: ['**/*.test.ts'],
+      rules: {
+        // Bun 1.4.4 types `.rejects`/`.resolves` as synchronous, but their runtime assertions are async.
+        '@typescript-eslint/await-thenable': 'off',
+        '@typescript-eslint/no-confusing-void-expression': 'off',
       },
     },
   );

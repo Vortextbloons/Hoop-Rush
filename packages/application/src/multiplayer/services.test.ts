@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'bun:test';
 import { defaultFixedFiveVersionLocks } from '@hoop-rush/data-contracts';
 import { LobbySession, type LobbySessionDeps } from './lobby-session.ts';
 import { RoomLifecycle } from './room-lifecycle.ts';
@@ -60,8 +60,8 @@ describe('lobby orchestration', () => {
   it.each(['success', 'error'] as const)(
     'clears room previews on code edits and ignores delayed %s responses',
     async (result) => {
-      const firstPreview = { legacy: false, code: '1234', guestJoined: false };
-      const nextPreview = { legacy: false, code: '5678', guestJoined: true };
+      const firstPreview = { legacy: false, code: '1234', guestJoined: false } as const;
+      const nextPreview = { legacy: false, code: '5678', guestJoined: true } as const;
       const pending = deferred<unknown>();
       const command = vi
         .fn<LobbySessionDeps['command']>()
@@ -98,7 +98,7 @@ describe('lobby orchestration', () => {
     h.session.acknowledgeNavigation();
     expect(h.session.getSnapshot().navigation).toBeNull();
     h.session.dispose();
-    expect(h.stop).toHaveBeenCalledOnce();
+    expect(h.stop).toHaveBeenCalledTimes(1);
   });
   it('never overlaps refreshes and coalesces duplicate events', async () => {
     const pending = deferred<unknown>();
@@ -313,10 +313,10 @@ describe('room attachment lifecycle', () => {
     lifecycle.track(first, stop);
     const second = lifecycle.begin(room2);
     expect(first.current()).toBe(false);
-    expect(stop).toHaveBeenCalledOnce();
+    expect(stop).toHaveBeenCalledTimes(1);
     const late = vi.fn();
     lifecycle.track(first, late);
-    expect(late).toHaveBeenCalledOnce();
+    expect(late).toHaveBeenCalledTimes(1);
     lifecycle.connected(second);
     expect(lifecycle.getConnection()).toBe('connected');
     lifecycle.dispose();
@@ -366,7 +366,7 @@ describe('series coordination', () => {
     active = false;
     pending.resolve(42);
     await first;
-    expect(run).toHaveBeenCalledOnce();
+    expect(run).toHaveBeenCalledTimes(1);
     expect(accept).not.toHaveBeenCalled();
   });
   it('deduplicates proposals and confirmations, verifies recorded peer facts, and retries only after the delay', async () => {
@@ -399,7 +399,7 @@ describe('series coordination', () => {
     series.coordinate(input);
     series.coordinate(input);
     await flush();
-    expect(confirm).toHaveBeenCalledOnce();
+    expect(confirm).toHaveBeenCalledTimes(1);
     expect(verification).toHaveBeenCalledWith(true, 'a');
   });
   it('waits for local review before confirming a matching peer result', async () => {
@@ -427,7 +427,7 @@ describe('series coordination', () => {
     now += 60_000;
     series.coordinate(input);
     await flush();
-    expect(confirm).toHaveBeenCalledOnce();
+    expect(confirm).toHaveBeenCalledTimes(1);
   });
   it('requires a completion or an explicit review resume before continuing', () => {
     let now = 10_000;
@@ -463,7 +463,7 @@ describe('series coordination', () => {
     expect(verification).toHaveBeenCalledWith(false, 'b');
     await flush();
     expect(confirm).toHaveBeenCalledWith(false);
-    expect(mismatch).toHaveBeenCalledOnce();
+    expect(mismatch).toHaveBeenCalledTimes(1);
   });
 });
 

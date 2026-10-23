@@ -30,7 +30,7 @@ raw-data / .raw_nba_cache
 
 - Generated artifact contents are part of the product: after any importer
   change, regenerating must produce byte-identical files
-  (`pnpm hoop-rush import manifest` and `data validate` must stay green).
+  (`bun run hoop-rush import manifest` and `data validate` must stay green).
 - Artifacts are validated with data-contracts schemas before writing; the
   manifest is validated with `hoopRushManifestSchema` on every write.
 - Importer stages must not read the database, the browser, or Supabase.
@@ -38,11 +38,11 @@ raw-data / .raw_nba_cache
 ## Verification
 
 ```text
-pnpm --filter @hoop-rush/importer test:run
-pnpm hoop-rush import manifest
-pnpm hoop-rush data validate
+bun run --filter @hoop-rush/importer test:run
+bun run hoop-rush import manifest
+bun run hoop-rush data validate
 ```
 
 `pools/compute.test.ts` covers pool derivation and manifest updates;
 `ratings/overall.test.ts` the Overall scale. `scripts/import-nba` holds the
-Python fetch layer (`pnpm test:import-nba`).
+Python fetch layer (`bun run test:import-nba`).

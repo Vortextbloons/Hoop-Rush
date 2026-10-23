@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import type { HavocBattleInput } from '@hoop-rush/data-contracts';
 import { havocBattleInputSchema } from '@hoop-rush/data-contracts';
 import { buildHavocLockedInputs } from '@hoop-rush/test-fixtures';

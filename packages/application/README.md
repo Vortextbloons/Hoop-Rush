@@ -20,7 +20,6 @@ gathers intent, the engine owns basketball rules, adapters own I/O.
 ```text
 @hoop-rush/application          shared submission runtime (runSubmission + types)
 @hoop-rush/application/challenge  challenge run session (classic/sandbox job lifecycle)
-@hoop-rush/application/collection collection play session (prep, execution, acceptance)
 @hoop-rush/application/draft-duel draft duel room session (transport/repository ports)
 @hoop-rush/application/fixed-five fixed-five room session + command policy/retry helpers
 @hoop-rush/application/havoc    havoc session + run/history view contract
@@ -107,10 +106,11 @@ presenters, and views moved under `apps/web/src/lib/features/havoc/`;
 `HavocLoadError` moved to data-contracts (persistence re-exports it).
 
 Stages 5c-5f landed: every mode's code is co-located under
-`apps/web/src/lib/features/<mode>/`, and Collection, Draft Duel, and fixed-five
-multiplayer gained web-side sessions with presenters
-(`CollectionPlaySession`, `DraftDuelSession`, `FixedFiveRoomSession`) that own
-preparation/execution/acceptance/retries and drop late results after dispose.
+`apps/web/src/lib/features/<mode>/`, and Draft Duel and fixed-five multiplayer
+gained web-side sessions with presenters (`DraftDuelSession`,
+`FixedFiveRoomSession`) that own preparation/execution/acceptance/retries and
+drop late results after dispose. (Collection / Ultimate Run was removed on
+2026-10-22.)
 
 Stage 6 landed: storage and multiplayer adapters simplified.
 
@@ -129,11 +129,10 @@ Stage 6 landed: storage and multiplayer adapters simplified.
   broadcast plumbing; `multiplayer-membership.ts` shares membership storage.
   Deployed RPC names/arguments and payload shapes are pinned by
   `*-transport.test.ts` conformance suites.
-- 6f: `CollectionPlaySession`, `DraftDuelSession`, and `FixedFiveRoomSession`
-  moved into this package behind ports (transport, repository, runner, assets,
-  clock, ids, membership, notice, guard storage). Web keeps presenters,
-  controllers, composition, and browser adapters; `createDraftDuelSession`
-  stays in web as composition.
+- 6f: `DraftDuelSession` and `FixedFiveRoomSession` moved into this package
+  behind ports (transport, repository, runner, assets, clock, ids, membership,
+  notice, guard storage). Web keeps presenters, controllers, composition, and
+  browser adapters; `createDraftDuelSession` stays in web as composition.
 
 Stage 4 landed: engine season orchestration is split and de-duplicated.
 `postseason.ts` (1,911 lines) became `postseason/{schedule,state,play-in,

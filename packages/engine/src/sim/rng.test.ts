@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { createRng } from './rng.ts';
 describe('seeded rng', () => {
   it('is deterministic for the same seed', () => {

@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
+/* eslint-disable @typescript-eslint/await-thenable, @typescript-eslint/no-confusing-void-expression -- bun-types@1.4.4 declares .resolves/.rejects matchers as void; Bun docs require awaiting them */
+import { describe, expect, it, mock } from 'bun:test';
 import {
   commandIdSchema,
   contentHashSchema,
@@ -7,9 +8,11 @@ import {
   havocMultiplayerVerificationReceiptSchema,
   idSchema,
   seedSchema,
+  type CommandId,
   type HavocCatalog,
   type HavocMultiplayerCommandRejectionCode,
   type HavocMultiplayerTransport,
+  type Id,
 } from '@hoop-rush/data-contracts';
 import { havocMultiplayerFirstPickerFor } from '@hoop-rush/application/havoc-multiplayer';
 import {
@@ -25,19 +28,31 @@ import { buildSeasonDraftCatalog } from '@hoop-rush/test-fixtures';
 import {
   createFakeSupabaseHarness,
   type FakeSupabaseHarness,
+  type RecordedSelectQuery,
 } from '#lib/testing/fake-supabase-client.js';
 import {
   createHavocMultiplayerTransport,
   type HavocMultiplayerTransportOptions,
 } from './havoc-multiplayer-transport';
 
-const mockState = vi.hoisted(() => {
-  const state = { harness: null as FakeSupabaseHarness | null };
-  (globalThis as { __hoopRushFakeSupabase?: typeof state }).__hoopRushFakeSupabase = state;
-  return state;
-});
+const mockState: { harness: FakeSupabaseHarness | null } = { harness: null };
+(globalThis as { __hoopRushFakeSupabase?: typeof mockState }).__hoopRushFakeSupabase = mockState;
 
-vi.mock('@supabase/supabase-js', () => ({
+async function waitFor(callback: () => void | Promise<void>): Promise<void> {
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt < 1000; attempt += 1) {
+    try {
+      await callback();
+      return;
+    } catch (error) {
+      lastError = error;
+      await Promise.resolve();
+    }
+  }
+  throw lastError;
+}
+
+void mock.module('@supabase/supabase-js', () => ({
   createClient: (url: string, key: string, options?: unknown) => {
     const state = (
       globalThis as { __hoopRushFakeSupabase?: { harness: FakeSupabaseHarness | null } }
@@ -181,7 +196,11 @@ describe('havoc multiplayer supabase transport protocol pins', () => {
       single: false,
     });
     expect(created.code).toBe('4321');
-    expect(created.membership).toEqual({ roomId: ROOM_ID, participantId: 'p1', code: '4321' });
+    expect(created.membership).toEqual({
+      roomId: ROOM_ID as Id,
+      participantId: 'p1',
+      code: '4321',
+    });
     expect(created.snapshot.settings.versions).toEqual(versions);
     expect(created.snapshot.settings.variant).toBe('standard');
     expect(created.snapshot.members.map((member) => member.participantId)).toEqual(['p1', 'p2']);
@@ -265,8 +284,8 @@ describe('havoc multiplayer supabase transport protocol pins', () => {
       },
     });
     expect(accepted).toEqual({
-      roomId: ROOM_ID,
-      commandId: 'cmd-9',
+      roomId: ROOM_ID as Id,
+      commandId: 'cmd-9' as CommandId,
       accepted: true,
       rejectionCode: null,
       revision: 5,
@@ -325,7 +344,7 @@ describe('havoc multiplayer supabase transport protocol pins', () => {
       ],
       order: { column: 'ordinal', ascending: true },
     });
-    expect(commands.map((command) => command.commandId)).toEqual(['cmd-1']);
+    expect(commands.map((command) => command.commandId)).toEqual(['cmd-1' as CommandId]);
   });
 
   it('subscribe opens one realtime channel and tears it down with the last handler', async () => {
@@ -336,7 +355,7 @@ describe('havoc multiplayer supabase transport protocol pins', () => {
       snapshots.push(snapshot);
     });
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(harness.channels).toHaveLength(1);
     });
     const channel = harness.channels[0];
@@ -347,12 +366,12 @@ describe('havoc multiplayer supabase transport protocol pins', () => {
     ]);
 
     channel?.triggerPostgresChange();
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(snapshots.length).toBeGreaterThan(0);
     });
 
     subscription.unsubscribe();
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(channel?.unsubscribed).toBe(true);
       expect(harness.removedChannels).toContain(`havoc-multiplayer-room-${ROOM_ID}`);
     });
@@ -364,7 +383,7 @@ describe('havoc multiplayer supabase transport protocol pins', () => {
     const subscription = transport.subscribeTransient(ROOM_ID, (event) => {
       events.push(event);
     });
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(harness.channels).toHaveLength(1);
     });
     const channel = harness.channels[0];
@@ -392,7 +411,7 @@ describe('havoc multiplayer supabase transport protocol pins', () => {
     expect(events).toEqual([event]);
 
     subscription.unsubscribe();
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(channel?.unsubscribed).toBe(true);
     });
   });
@@ -445,8 +464,8 @@ describe('havoc multiplayer supabase transport protocol pins', () => {
 
     const timeout = await transport.resolveTimeout(ROOM_ID);
     expect(timeout).toEqual({
-      roomId: ROOM_ID,
-      commandId: 'timeout-t1-1',
+      roomId: ROOM_ID as Id,
+      commandId: 'timeout-t1-1' as CommandId,
       accepted: true,
       rejectionCode: null,
       revision: 3,
@@ -508,7 +527,7 @@ describe('havoc multiplayer supabase transport protocol pins', () => {
     }));
     seedRoom(harness);
     const snapshot = await transport.removeGuest(ROOM_ID, 'p2');
-    expect(snapshot.roomId).toBe(ROOM_ID);
+    expect(snapshot.roomId).toBe(ROOM_ID as Id);
     const call = harness.rpcCalls[0];
     expect(call?.name).toBe('havoc_multiplayer_command_submit');
     expect(call?.args).toMatchObject({
@@ -602,7 +621,7 @@ describe('havoc multiplayer supabase transport protocol pins', () => {
       expect.objectContaining({
         table: 'havoc_multiplayer_room_commands',
         order: { column: 'ordinal', ascending: true },
-      }),
+      }) as RecordedSelectQuery,
     );
   });
 

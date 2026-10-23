@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import type {
   HavocBattleEvent,
   HavocBattleInput,
@@ -366,7 +366,7 @@ describe('havoc battle opposing powers', () => {
     expect(
       update.cappedInstanceIds,
       `${scenario} seed ${seed} update contains the replacement`,
-    ).toContain(replacement?.instanceId);
+    ).toContain(replacement?.instanceId as string);
     expect(
       update.cappedInstanceIds,
       `${scenario} seed ${seed} update drops the substituted starter`,
@@ -536,10 +536,10 @@ describe('havoc battle opposing powers', () => {
 
     const targets = havocBattleCapabilityTargets(run.input);
     expect(targets.bounty[0], `${scenario} seed ${seed} home target ranking`).toBe(
-      away.starters[4]?.instanceId,
+      away.starters[4]?.instanceId as string | null,
     );
     expect(targets.bounty[1], `${scenario} seed ${seed} away target ranking`).toBe(
-      home.starters[4]?.instanceId,
+      home.starters[4]?.instanceId as string | null,
     );
     const bounty = eventsOf(run, 'bounty');
     for (const [ownerId, targetId] of [

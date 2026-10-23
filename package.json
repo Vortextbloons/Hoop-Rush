@@ -3,44 +3,63 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "pnpm --filter @hoop-rush/web dev",
-    "build": "pnpm --filter @hoop-rush/web build",
-    "preview": "pnpm --filter @hoop-rush/web preview",
-    "hoop-rush": "pnpm --filter @hoop-rush/cli hoop-rush",
-    "check": "pnpm --parallel -r check",
-    "lint": "pnpm --parallel -r lint",
+    "dev": "bun run --filter @hoop-rush/web dev",
+    "build": "bun run --filter @hoop-rush/web build",
+    "preview": "bun run --filter @hoop-rush/web preview",
+    "hoop-rush": "bun run --filter @hoop-rush/cli hoop-rush",
+    "check": "bun run --parallel --filter '*' check",
+    "lint": "bun run --parallel --filter '*' lint",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "code-size": "python scripts/code-size/measure.py",
-    "test": "vitest",
-    "test:run": "vitest run",
-    "//test:quick": "Fast PR gate. The exclude list is mirrored in scripts/tests/quick-exclusions.json and checked by `pnpm check:test-exclusions` (parity, stale patterns, and quick != run). Rationale per pattern lives in the manifest.",
-    "test:quick": "vitest run --exclude=\"**/*generator*\" --exclude=\"**/*integration*\"",
+    "test": "bun run --parallel --filter '*' test",
+    "test:run": "bun run --parallel --filter '*' test:run",
+    "//test:quick": "Fast PR gate. Each workspace test:quick script mirrors its test:run plus the exclusions in scripts/tests/quick-exclusions.json, checked by `bun run check:test-exclusions` (parity per script, stale patterns, and quick != run). Rationale per pattern lives in the manifest.",
+    "test:quick": "bun run --parallel --filter '*' test:quick",
     "test:import-nba": "python -m unittest discover -s scripts/import-nba -p \"test_*.py\"",
-    "static": "pnpm --parallel -r run \"/^(check|lint)$/\"",
-    "check:test-exclusions": "node scripts/tests/check-quick-exclusions.mjs",
-    "verify:quick": "pnpm static && pnpm check:test-exclusions && pnpm test:quick",
-    "verify": "pnpm static && pnpm test:run && pnpm build",
-    "verify:changed": "pnpm --filter \"...[HEAD]\" --filter \"!hoop-rush\" --parallel --if-present run \"/^(check|lint)$/\" && pnpm --filter \"...[HEAD]\" --filter \"!hoop-rush\" --parallel --if-present test:run",
-    "check:watch:web": "pnpm --filter @hoop-rush/web check:watch",
-    "test:watch:web": "vitest watch --project @hoop-rush/web",
-    "test:watch:engine": "vitest watch --project @hoop-rush/engine",
+    "static": "bun run --parallel --filter '*' check lint",
+    "check:test-exclusions": "bun scripts/tests/check-quick-exclusions.mjs",
+    "verify:quick": "bun run static && bun run check:test-exclusions && bun run test:quick",
+    "verify": "bun run static && bun run test:run && bun run build",
+    "verify:changed": "bun scripts/verify-changed.mjs",
+    "check:watch:web": "bun run --filter @hoop-rush/web check:watch",
+    "test:watch:web": "bun run --filter @hoop-rush/web test",
+    "test:watch:engine": "bun run --filter @hoop-rush/engine test",
     "prepare": "husky"
   },
   "engines": {
-    "node": ">=22.18"
+    "bun": ">=1.4.4"
   },
-  "packageManager": "pnpm@11.11.0",
+  "packageManager": "bun@1.4.4",
+  "trustedDependencies": [
+    "esbuild"
+  ],
   "lint-staged": {
     "*.{ts,js,svelte,json,css,html,yml,yaml}": "prettier --write"
   },
   "devDependencies": {
     "@sveltejs/mcp": "^0.1.26",
+    "@types/bun": "catalog:",
+    "@types/node": "catalog:",
     "husky": "^9.1.7",
     "lint-staged": "^17.6.0",
     "prettier": "^3.9.10",
     "prettier-plugin-svelte": "^4.1.1",
-    "typescript-eslint": "catalog:",
-    "vitest": "catalog:"
+    "typescript-eslint": "catalog:"
+  },
+  "workspaces": {
+    "packages": [
+      "apps/*",
+      "packages/*",
+      "tools/*"
+    ],
+    "catalog": {
+      "@types/bun": "1.4.4",
+      "@types/node": "^26.6.5",
+      "eslint": "^10.12.0",
+      "fake-indexeddb": "^6.2.5",
+      "typescript": "^6.0.3",
+      "typescript-eslint": "^8.71.2"
+    }
   }
 }

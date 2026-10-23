@@ -9,16 +9,16 @@
   },
   "scripts": {
     "check": "tsc --noEmit --incremental",
-    "lint": "prettier --cache --check src vitest.config.ts eslint.config.js && eslint --cache .",
-    "test": "vitest",
-    "test:run": "vitest run"
+    "lint": "prettier --cache --check src eslint.config.js && eslint --cache .",
+    "test": "bun test --watch --isolate",
+    "test:run": "bun test --isolate --pass-with-no-tests",
+    "test:quick": "bun test --isolate --pass-with-no-tests --path-ignore-patterns \"**/*generator*\" --path-ignore-patterns \"**/*integration*\""
   },
   "dependencies": {
     "@hoop-rush/data-contracts": "workspace:*"
   },
   "devDependencies": {
     "eslint": "catalog:",
-    "typescript": "catalog:",
-    "vitest": "catalog:"
+    "typescript": "catalog:"
   }
 }

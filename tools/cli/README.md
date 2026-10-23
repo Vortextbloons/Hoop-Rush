@@ -1,6 +1,6 @@
 # @hoop-rush/cli
 
-The developer CLI (`pnpm hoop-rush <command>`) for simulation, audits,
+The developer CLI (`bun run hoop-rush <command>`) for simulation, audits,
 calibration, data tools, and artifact generation. It calls the same engine,
 contracts, and importer packages the web app uses; there is no second
 simulation implementation.
@@ -13,7 +13,7 @@ simulation implementation.
 - `src/registry/` — the typed command registry. `core.ts` owns option kinds,
   common options (`--format`, `--verbose`), arg accessors, usage errors, and
   help rendering; one module per area (`data.ts`, `sim.ts`, `calibrate.ts`,
-  `havoc.ts`, `season.ts`, `collection.ts`, `projection.ts`, `import.ts`,
+  `havoc.ts`, `season.ts`, `projection.ts`, `import.ts`,
   `docs.ts`) declares each command's name, options, help text, and handler.
   `index.ts` fixes the help order.
 - `src/calibration/` — shared calibration infrastructure: `harness.ts` (seed and
@@ -25,7 +25,9 @@ simulation implementation.
 - `src/commands/` — the handlers and their basketball metrics. Calibration
   gates, cohort definitions, and artifact schemas stay with each command.
 - `src/gen-*.ts` — standalone generators run through package scripts
-  (`gen-fixtures`, `gen-season-assets`, ...), not through the command registry.
+  (`gen-fixtures`, `gen-season-assets`, `gen-collection-catalog` for
+  `static/data/collection/` player catalog artifacts, ...), not through the
+  command registry.
 
 ## Adding a command
 
@@ -40,13 +42,13 @@ simulation implementation.
 
 `src/fixtures/` also holds the committed fixtures (`season-run.json`,
 `season-draft-commands.json`, `season-game-*.json`, ...) used by audits and
-reproduction tests. `pnpm hoop-rush help` prints the in-tool help.
+reproduction tests. `bun run hoop-rush help` prints the in-tool help.
 
 ## Verification
 
 ```text
-pnpm --filter @hoop-rush/cli check
-pnpm --filter @hoop-rush/cli lint
-pnpm --filter @hoop-rush/cli test:run
-pnpm hoop-rush data validate
+bun run --filter @hoop-rush/cli check
+bun run --filter @hoop-rush/cli lint
+bun run --filter @hoop-rush/cli test:run
+bun run hoop-rush data validate
 ```

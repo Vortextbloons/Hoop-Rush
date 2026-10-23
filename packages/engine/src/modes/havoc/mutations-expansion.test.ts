@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import type {
   HavocEvent,
   HavocPickCardCommand,
@@ -350,7 +350,7 @@ describe('specialist bundles and offers', () => {
     );
     expect(replayed.length).toBeGreaterThan(0);
     for (const entry of replayed) {
-      expect(entry.specialistCategory).toBe(replayCategory);
+      expect(entry.specialistCategory).toBe(replayCategory as HavocSpecialistCategory | undefined);
     }
     expect(seen.size).toBeGreaterThan(1);
   });
@@ -590,8 +590,8 @@ describe('fusion dance runtime', () => {
       expect(applied).toHaveLength(1);
       const event = applied[0];
       if (event?.kind !== 'fusion-dance') throw new Error('missing fusion application');
-      expect(event.ownerInstanceId).toBe(human.starters[0]?.instanceId);
-      expect(event.donorInstanceId).toBe(donor?.instanceId);
+      expect(event.ownerInstanceId).toBe(human.starters[0]?.instanceId as string);
+      expect(event.donorInstanceId).toBe(donor?.instanceId as string);
     }
   });
 
@@ -609,7 +609,7 @@ describe('fusion dance runtime', () => {
       (event) => event.kind === 'fusion-dance' && event.outcome === 'applied',
     );
     if (applied?.kind !== 'fusion-dance') throw new Error('missing fusion application');
-    expect(applied.donorInstanceId).toBe(donor?.instanceId);
+    expect(applied.donorInstanceId).toBe(donor?.instanceId as string);
   });
 
   it('keeps fusion through a donor exit and ends it when the owner exits', () => {

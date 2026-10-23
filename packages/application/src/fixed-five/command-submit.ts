@@ -22,6 +22,8 @@ const STALE_RETRY_SAFE_KINDS: ReadonlySet<FixedFiveCommandPayload['kind']> = new
   'sandbox-remove',
   'ready-next-game',
   'broadcast-start',
+  'propose-game-result',
+  'confirm-game-result',
 ]);
 
 type FixedFiveOutboundCommand = Omit<FixedFiveCommand, 'ordinal'> & {

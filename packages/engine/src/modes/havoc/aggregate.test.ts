@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { HAVOC_MVP_INDEX_WEIGHTS } from '@hoop-rush/data-contracts';
 import { buildHavocGameSummary, buildHavocStatLine } from '@hoop-rush/test-fixtures';
 import {

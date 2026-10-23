@@ -1,10 +1,13 @@
-import { describe, expect, it, vi } from 'vitest';
+/* eslint-disable @typescript-eslint/await-thenable, @typescript-eslint/no-confusing-void-expression -- bun-types@1.4.4 declares .resolves/.rejects matchers as void; Bun docs require awaiting them */
+import { describe, expect, it, mock } from 'bun:test';
 import {
   commandIdSchema,
   defaultFixedFiveVersionLocks,
   fixedFiveVerificationReceiptSchema,
   idSchema,
+  type CommandId,
   type FixedFiveMultiplayerTransport,
+  type Id,
 } from '@hoop-rush/data-contracts';
 import {
   createFakeSupabaseHarness,
@@ -12,13 +15,24 @@ import {
 } from '#lib/testing/fake-supabase-client.js';
 import { createFixedFiveTransport } from './fixed-five-transport';
 
-const mockState = vi.hoisted(() => {
-  const state = { harness: null as FakeSupabaseHarness | null };
-  (globalThis as { __hoopRushFakeSupabase?: typeof state }).__hoopRushFakeSupabase = state;
-  return state;
-});
+const mockState: { harness: FakeSupabaseHarness | null } = { harness: null };
+(globalThis as { __hoopRushFakeSupabase?: typeof mockState }).__hoopRushFakeSupabase = mockState;
 
-vi.mock('@supabase/supabase-js', () => ({
+async function waitFor(callback: () => void | Promise<void>): Promise<void> {
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt < 1000; attempt += 1) {
+    try {
+      await callback();
+      return;
+    } catch (error) {
+      lastError = error;
+      await Promise.resolve();
+    }
+  }
+  throw lastError;
+}
+
+void mock.module('@supabase/supabase-js', () => ({
   createClient: (url: string, key: string, options?: unknown) => {
     const state = (
       globalThis as { __hoopRushFakeSupabase?: { harness: FakeSupabaseHarness | null } }
@@ -37,7 +51,7 @@ vi.mock('@supabase/supabase-js', () => ({
 const ROOM_ID = 'room-1';
 const roomId = idSchema.parse(ROOM_ID);
 const ROOM_COLUMNS =
-  'id, code, code_active, mode, source_mode, variant, versions, phase, revision, command_count, digest, result_digest, confirmed_digest, successor_room_id, series, broadcast, root_seed, deadline_at, deadline_cursor, deadline_participant, deadline_fallback, deadline_pick_ordinal, expires_at, created_at';
+  'id, code, code_active, mode, source_mode, variant, versions, phase, revision, command_count, digest, result_digest, confirmed_digest, successor_room_id, series, broadcast, game_state, root_seed, deadline_at, deadline_cursor, deadline_participant, deadline_fallback, deadline_pick_ordinal, expires_at, created_at';
 const versions = defaultFixedFiveVersionLocks({ dataVersion: 'data-v1' });
 
 let transportCounter = 0;
@@ -142,7 +156,7 @@ describe('fixed-five supabase transport protocol pins', () => {
     });
     expect(created.code).toBe('1234');
     expect(created.membership).toEqual({
-      roomId: ROOM_ID,
+      roomId: ROOM_ID as Id,
       participantId: 'p1',
       code: '1234',
     });
@@ -241,8 +255,8 @@ describe('fixed-five supabase transport protocol pins', () => {
       },
     });
     expect(accepted).toEqual({
-      roomId: ROOM_ID,
-      commandId: 'cmd-1',
+      roomId: ROOM_ID as Id,
+      commandId: 'cmd-1' as CommandId,
       ordinal: 5,
       accepted: true,
       rejectionCode: null,
@@ -295,7 +309,10 @@ describe('fixed-five supabase transport protocol pins', () => {
       ],
       order: { column: 'ordinal', ascending: true },
     });
-    expect(commands.map((command) => command.commandId)).toEqual(['cmd-1', 'cmd-2']);
+    expect(commands.map((command) => command.commandId)).toEqual([
+      'cmd-1' as CommandId,
+      'cmd-2' as CommandId,
+    ]);
 
     harness.setRows('fixed_five_room_commands', [
       {
@@ -317,7 +334,7 @@ describe('fixed-five supabase transport protocol pins', () => {
       snapshots.push(snapshot);
     });
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(harness.channels).toHaveLength(1);
     });
     const channel = harness.channels[0];
@@ -330,12 +347,12 @@ describe('fixed-five supabase transport protocol pins', () => {
     expect(channel?.postgresHandlers[0]?.filter).toBe(`id=eq.${ROOM_ID}`);
 
     channel?.triggerPostgresChange();
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(snapshots.length).toBeGreaterThan(0);
     });
 
     subscription.unsubscribe();
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(channel?.unsubscribed).toBe(true);
       expect(harness.removedChannels).toContain(`fixed-five-room-${ROOM_ID}`);
     });
@@ -346,7 +363,7 @@ describe('fixed-five supabase transport protocol pins', () => {
     seedRoom(harness);
     const subscription = transport.subscribe(ROOM_ID, () => {});
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(harness.channels).toHaveLength(1);
     });
     const channel = harness.channels[0];
@@ -354,7 +371,7 @@ describe('fixed-five supabase transport protocol pins', () => {
     channel?.triggerPostgresChange();
     channel?.triggerPostgresChange();
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(
         harness.selectQueries.filter((query) => query.table === 'fixed_five_rooms'),
       ).toHaveLength(2);
@@ -410,10 +427,10 @@ describe('fixed-five supabase transport protocol pins', () => {
     expect(fallback).toEqual({ stored: true, revision: 2 });
 
     const timeout = await transport.resolveTimeout(ROOM_ID);
-    expect(timeout?.commandId).toBe('timeout-cmd');
+    expect(timeout?.commandId).toBe('timeout-cmd' as CommandId);
 
     const snapshot = await transport.removeGuest(ROOM_ID, 'p2');
-    expect(snapshot.roomId).toBe(ROOM_ID);
+    expect(snapshot.roomId).toBe(ROOM_ID as Id);
 
     expect(harness.rpcCalls.map((call) => [call.name, call.args])).toEqual([
       ['fixed_five_verification_challenge', { p_room_id: ROOM_ID }],

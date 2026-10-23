@@ -1,7 +1,8 @@
 # @hoop-rush/web
 
 The SvelteKit client. Views render authoritative snapshots and gather intent;
-they never re-implement basketball rules or persistence policy.
+they never re-implement basketball rules or persistence policy. See **AGENTS.md**
+in this package for mode layout, worker boundaries, and high-risk files.
 
 ## Layer rules
 
@@ -40,17 +41,19 @@ routes/ and lib/features/<mode>/  ->  @hoop-rush/application sessions  ->  engin
   `hoop-rush-saves-v2` namespace. The only other direct Dexie use is the
   content-addressed asset cache (`src/lib/pool-cache.ts`).
 - `static/data/**` is generated. Never edit it by hand; regenerate with the CLI
-  (`pnpm hoop-rush import ...`, package `gen-*` scripts) and run
-  `pnpm hoop-rush data validate`.
+  (`bun run hoop-rush import ...`, package `gen-*` scripts) and run
+  `bun run hoop-rush data validate`. `static/data/collection/` is the packaged
+  **player catalog** (`collection*` schemas in data-contracts), not the removed
+  Ultimate Run mode.
 
 ## Verification
 
 ```text
-pnpm --filter @hoop-rush/web check        # svelte-check (full, no cache)
-pnpm --filter @hoop-rush/web lint
-pnpm --filter @hoop-rush/web test:run
-pnpm exec vitest run --project @hoop-rush/web <path>
-pnpm build
+bun run --filter @hoop-rush/web check        # svelte-check (full, no cache)
+bun run --filter @hoop-rush/web lint
+bun run --filter @hoop-rush/web test:run
+bun test <path>
+bun run build
 ```
 
 Journeys that need a browser (classic draft into a run, havoc run, multiplayer

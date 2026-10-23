@@ -15,6 +15,7 @@ import {
   type FixedFiveCompetitionResult,
   type FixedFiveCompetitionRun,
   type FixedFiveDuelGameOutput,
+  type FixedFiveShared82H2HGameOutput,
   type FixedFiveMultiplayerTransport,
   type FixedFiveParticipantId,
   type FixedFiveRoomMembership,
@@ -38,6 +39,8 @@ import {
   computeCompetitionDigest,
   computeDueAutopick,
   deriveEffectivePhase,
+  findWeakestOpponent,
+  h2hGameNumbersFor,
   isFixedFiveDraftTurn,
   mergeFixedFiveCommands,
   replayFixedFiveLog,
@@ -62,6 +65,7 @@ export { refsForParticipant } from './pick-refs.ts';
 
 const RESYNC_INTERVAL_MS = 15_000;
 const CLOCK_INTERVAL_MS = 1_000;
+const REVEAL_INTERVAL_MS = 240;
 const DUEL_AUTO_START_RETRY_MS = 5000;
 const NOTICE_TTL_MS = 6_000;
 
@@ -106,11 +110,17 @@ export interface FixedFiveRoomSessionSnapshot {
     total: number;
   } | null;
   simEntries: FixedFiveWorkerResultEntry[];
+  revealedEntries: FixedFiveWorkerResultEntry[];
+  revealedThroughGameNumber: number;
   statsEntries: FixedFiveWorkerResultEntry[];
   statsBuilding: boolean;
   localResult: FixedFiveLocalResult | null;
   duelBroadcast: boolean;
   duelOutputs: Record<number, FixedFiveDuelGameOutput>;
+  shared82Broadcast: boolean;
+  shared82H2HOutputs: Record<number, FixedFiveShared82H2HGameOutput>;
+  shared82H2HSimError: string | null;
+  shared82H2HSimulatingGame: number | null;
   duelSimError: string | null;
   duelSimulatingGame: number | null;
   broadcastProgress: number;
@@ -150,6 +160,10 @@ export type FixedFiveRunnerEvent =
       output: FixedFiveDuelGameOutput;
     }
   | {
+      kind: 'shared82-h2h-game';
+      output: FixedFiveShared82H2HGameOutput;
+    }
+  | {
       kind: 'complete';
       gamesDelivered: number;
     }
@@ -176,6 +190,7 @@ export interface FixedFiveRunnerPort {
     dataVersion: string;
     engineVersion: string;
     startGameNumber?: number;
+    recordH2H?: boolean;
   }): void;
   runDuel(input: {
     rootSeed: Seed;
@@ -191,6 +206,17 @@ export interface FixedFiveRunnerPort {
     rootSeed: Seed;
     p1Team: FixedFiveWorkerTeam;
     p2Team: FixedFiveWorkerTeam;
+    profile: EraSimulationProfile;
+    dataVersion: string;
+    engineVersion: string;
+  }): void;
+  runShared82H2HGame(input: {
+    roomId: string;
+    gameNumber: number;
+    rootSeed: Seed;
+    p1Team: FixedFiveWorkerTeam;
+    p2Team: FixedFiveWorkerTeam;
+    bracket: OpponentBracket;
     profile: EraSimulationProfile;
     dataVersion: string;
     engineVersion: string;
@@ -291,6 +317,11 @@ export class FixedFiveRoomSession {
 
   private duelOutputs: Record<number, FixedFiveDuelGameOutput> = {};
   private duelRunner: FixedFiveRunnerPort | null = null;
+  private shared82H2HOutputs: Record<number, FixedFiveShared82H2HGameOutput> = {};
+  private shared82H2HRunner: FixedFiveRunnerPort | null = null;
+  private shared82H2HSimulatingGame: number | null = null;
+  private shared82H2HSimError: string | null = null;
+  private broadcastStartPending: number | null = null;
   private duelSimulatingGame: number | null = null;
   private duelSimError: string | null = null;
   private readonly seriesFlow: SeriesCoordinator;
@@ -306,6 +337,7 @@ export class FixedFiveRoomSession {
   private unsubscribeTransport: (() => void) | null = null;
   private resyncTimer: ReturnType<typeof setInterval> | null = null;
   private clockTimer: ReturnType<typeof setInterval> | null = null;
+  private revealTimer: ReturnType<typeof setInterval> | null = null;
   private readonly reconcileTask = new CoalescedTask(() => this.reconcile());
   private pendingReadyGame: number | null = null;
   private pendingReadyRetryAtMs = 0;
@@ -334,6 +366,20 @@ export class FixedFiveRoomSession {
         this.verification.resetResult();
       },
       sync: () => this.sync(),
+      shared82H2HGame: (output) => {
+        this.shared82H2HOutputs = {
+          ...this.shared82H2HOutputs,
+          [output.gameNumber]: output,
+        };
+        if (this.shared82H2HSimulatingGame === output.gameNumber) {
+          this.shared82H2HRunner?.dispose();
+          this.shared82H2HRunner = null;
+          this.shared82H2HSimulatingGame = null;
+        }
+        this.shared82H2HSimError = null;
+        this.publish();
+        this.tickShared82Reveal();
+      },
     });
     this.verification = new FixedFiveVerificationFlow(deps, {
       context: () => ({
@@ -388,6 +434,10 @@ export class FixedFiveRoomSession {
       canRematch: this.canRematchNow(),
       duelBroadcast: this.isDuelBroadcast(),
       duelOutputs: this.duelOutputs,
+      shared82Broadcast: this.isShared82Broadcast(),
+      shared82H2HOutputs: this.shared82H2HOutputs,
+      shared82H2HSimError: this.shared82H2HSimError,
+      shared82H2HSimulatingGame: this.shared82H2HSimulatingGame,
       duelSimError: this.duelSimError,
       duelSimulatingGame: this.duelSimulatingGame,
       broadcastProgress: this.broadcastProgress,
@@ -430,6 +480,9 @@ export class FixedFiveRoomSession {
       this.tickDuel();
       void this.resolveOverdue();
     }, CLOCK_INTERVAL_MS);
+    this.revealTimer = setInterval(() => {
+      this.tickShared82Reveal();
+    }, REVEAL_INTERVAL_MS);
     await this.boot();
   }
 
@@ -443,6 +496,8 @@ export class FixedFiveRoomSession {
     this.verification.dispose();
     this.duelRunner?.dispose();
     this.duelRunner = null;
+    this.shared82H2HRunner?.dispose();
+    this.shared82H2HRunner = null;
     this.detachWakeHandlers();
     if (this.resyncTimer !== null) {
       clearInterval(this.resyncTimer);
@@ -451,6 +506,10 @@ export class FixedFiveRoomSession {
     if (this.clockTimer !== null) {
       clearInterval(this.clockTimer);
       this.clockTimer = null;
+    }
+    if (this.revealTimer !== null) {
+      clearInterval(this.revealTimer);
+      this.revealTimer = null;
     }
     this.listeners.clear();
   }
@@ -648,6 +707,20 @@ export class FixedFiveRoomSession {
     this.maybeStartDuelPipeline();
   }
 
+  retryShared82H2HGame(): void {
+    if (!this.isShared82Broadcast()) return;
+    const gameNumber = this.room?.broadcast?.gameNumber ?? this.competition.advanceSeasonReveal();
+    if (gameNumber === null) return;
+    this.shared82H2HOutputs = Object.fromEntries(
+      Object.entries(this.shared82H2HOutputs).filter(([key]) => Number(key) !== gameNumber),
+    );
+    this.shared82H2HSimError = null;
+    this.shared82H2HRunner?.dispose();
+    this.shared82H2HRunner = null;
+    this.shared82H2HSimulatingGame = null;
+    this.maybeStartShared82H2HGame(gameNumber);
+  }
+
   async readyForNextGame(): Promise<void> {
     if (!this.isDuelBroadcast() || this.room?.phase !== 'preparing-game') return;
     const gameNumber = this.duelCurrentGameNumber();
@@ -656,17 +729,38 @@ export class FixedFiveRoomSession {
   }
 
   async startBroadcast(auto = false): Promise<void> {
-    if (!this.isDuelBroadcast()) return;
-    const gameNumber = this.duelCurrentGameNumber();
-    if (gameNumber === null) return;
-    await this.sendCommand(
-      {
-        kind: 'broadcast-start',
-        gameNumber,
-        ...(auto ? { auto: true } : {}),
-      },
-      { quiet: true },
-    );
+    if (this.isDuelBroadcast()) {
+      const gameNumber = this.duelCurrentGameNumber();
+      if (gameNumber === null) return;
+      await this.sendCommand(
+        {
+          kind: 'broadcast-start',
+          gameNumber,
+          ...(auto ? { auto: true } : {}),
+        },
+        { quiet: true },
+      );
+      return;
+    }
+    if (!this.isShared82Broadcast() || this.broadcastStartPending !== null) return;
+    const gameNumber = this.competition.advanceSeasonReveal();
+    const room = this.room;
+    if (gameNumber === null || !room || room.broadcast) return;
+    if (!this.shared82H2HOutputs[gameNumber]) {
+      this.maybeStartShared82H2HGame(gameNumber);
+      return;
+    }
+    const eligibleGameNumbers = this.shared82H2HGameNumbers();
+    if (eligibleGameNumbers.length === 0) return;
+    this.broadcastStartPending = gameNumber;
+    try {
+      await this.sendCommand(
+        { kind: 'broadcast-start', gameNumber, eligibleGameNumbers },
+        { quiet: true },
+      );
+    } finally {
+      if (this.broadcastStartPending === gameNumber) this.broadcastStartPending = null;
+    }
   }
 
   beginPlayback(): void {
@@ -1032,6 +1126,121 @@ export class FixedFiveRoomSession {
     );
   }
 
+  private isShared82Broadcast(): boolean {
+    const room = this.room;
+    return (
+      room !== null &&
+      room.settings.mode !== 'duel' &&
+      room.settings.versions.multiplayerVersion === FIXED_FIVE_MULTIPLAYER_VERSION
+    );
+  }
+
+  private isGamecastBroadcast(): boolean {
+    return this.isDuelBroadcast() || this.isShared82Broadcast();
+  }
+
+  private shared82H2HGameNumbers(): number[] {
+    if (!this.assets) return [];
+    const weakest = findWeakestOpponent(this.assets.bracket);
+    return h2hGameNumbersFor(this.assets.bracket, weakest.opponentId);
+  }
+
+  private tickShared82Reveal(): void {
+    if (this.isDisposed() || !this.isShared82Broadcast()) return;
+    const target = this.competition.advanceSeasonReveal();
+    this.maybeProposeOrConfirmGame();
+    if (target === null) return;
+    if (this.room?.broadcast?.gameNumber === target) {
+      this.maybeStartShared82H2HGame(target);
+      return;
+    }
+    if (this.room?.broadcast) return;
+    if (this.shared82H2HOutputs[target]) void this.startBroadcast();
+    else this.maybeStartShared82H2HGame(target);
+  }
+
+  private maybeStartShared82H2HGame(gameNumber: number): void {
+    if (
+      this.isDisposed() ||
+      !this.isShared82Broadcast() ||
+      this.shared82H2HOutputs[gameNumber] ||
+      this.shared82H2HSimulatingGame !== null
+    ) {
+      return;
+    }
+    const room = this.room;
+    const assets = this.assets;
+    const replay = this.replay;
+    if (!room?.rootSeed || !assets || !replay) return;
+    const rootSeed: Seed = room.rootSeed;
+    this.shared82H2HSimulatingGame = gameNumber;
+    this.shared82H2HSimError = null;
+    this.publish();
+    void (async () => {
+      try {
+        const p1Refs = refsForParticipant(replay, assets, 'p1');
+        const p2Refs = refsForParticipant(replay, assets, 'p2');
+        if (p1Refs.length !== 5 || p2Refs.length !== 5) {
+          throw new Error('both lineups must be complete before simulating');
+        }
+        const p1Team: FixedFiveWorkerTeam = await this.deps.buildTeam(
+          assets.manifest,
+          'p1',
+          'Player 1',
+          p1Refs,
+        );
+        if (this.isDisposed()) return;
+        const p2Team: FixedFiveWorkerTeam = await this.deps.buildTeam(
+          assets.manifest,
+          'p2',
+          'Player 2',
+          p2Refs,
+        );
+        if (this.isDisposed()) return;
+        const active = this.deps.createRunner((event) => {
+          if (this.isDisposed() || this.shared82H2HSimulatingGame !== gameNumber) return;
+          if (event.kind === 'shared82-h2h-game') {
+            this.shared82H2HOutputs = {
+              ...this.shared82H2HOutputs,
+              [gameNumber]: event.output,
+            };
+            this.shared82H2HSimError = null;
+            this.shared82H2HRunner?.dispose();
+            this.shared82H2HRunner = null;
+            this.shared82H2HSimulatingGame = null;
+            this.publish();
+            this.tickShared82Reveal();
+          } else if (event.kind === 'error') {
+            this.shared82H2HSimError = event.message;
+            this.shared82H2HRunner?.dispose();
+            this.shared82H2HRunner = null;
+            this.shared82H2HSimulatingGame = null;
+            this.publish();
+          }
+        });
+        this.shared82H2HRunner = active;
+        active.runShared82H2HGame({
+          roomId: this.roomId,
+          gameNumber,
+          rootSeed,
+          p1Team,
+          p2Team,
+          bracket: assets.bracket,
+          profile: assets.profile,
+          dataVersion: room.settings.versions.dataVersion,
+          engineVersion: room.settings.versions.engineVersion,
+        });
+      } catch (error) {
+        if (this.isDisposed()) return;
+        this.shared82H2HSimError = error instanceof Error ? error.message : String(error);
+        this.shared82H2HSimulatingGame = null;
+        this.shared82H2HRunner?.dispose();
+        this.shared82H2HRunner = null;
+        this.publish();
+      }
+    })();
+  }
+
   private duelCurrentGameNumber(): number | null {
     return this.room?.series?.currentGameNumber ?? null;
   }
@@ -1269,20 +1478,27 @@ export class FixedFiveRoomSession {
     }
   }
 
-  private duelWinnerOf(output: FixedFiveDuelGameOutput): FixedFiveParticipantId {
+  private duelWinnerOf(
+    output: FixedFiveDuelGameOutput | FixedFiveShared82H2HGameOutput,
+  ): FixedFiveParticipantId {
     return output.result.winner === 'home'
       ? output.homeParticipantId
       : otherParticipant(output.homeParticipantId);
   }
 
   private maybeProposeOrConfirmGame(): void {
-    if (this.isDisposed() || !this.isDuelBroadcast() || this.busyAction !== null) return;
+    if (this.isDisposed() || !this.isGamecastBroadcast() || this.busyAction !== null) return;
     const room = this.room;
-    const gameNumber = room?.series?.currentGameNumber;
-    if (!room || gameNumber === null || gameNumber === undefined) return;
+    const gameNumber = this.isDuelBroadcast()
+      ? (room?.series?.currentGameNumber ?? null)
+      : (room?.broadcast?.gameNumber ?? null);
+    if (!room || gameNumber === null) return;
     if (room.phase !== 'broadcasting' && room.phase !== 'game-results') return;
-    const output = this.duelOutputs[gameNumber];
+    const output = this.isDuelBroadcast()
+      ? this.duelOutputs[gameNumber]
+      : this.shared82H2HOutputs[gameNumber];
     if (!output || this.broadcastProgress < 1) return;
+    this.seriesFlow.holdMs = this.isDuelBroadcast() ? FIXED_FIVE_DUEL_GAME_RESULTS_HOLD_MS : 0;
     this.seriesFlow.coordinate({
       gameNumber,
       localDigest: output.resultDigest,
@@ -1360,6 +1576,15 @@ export class FixedFiveRoomSession {
         this.broadcastProgress = 1;
       }
     }
+    if (
+      this.isShared82Broadcast() &&
+      snapshot.seasonBroadcast?.lastCompletedGameNumber !== null &&
+      snapshot.seasonBroadcast?.lastCompletedGameNumber !== undefined &&
+      previous?.seasonBroadcast?.lastCompletedGameNumber !==
+        snapshot.seasonBroadcast.lastCompletedGameNumber
+    ) {
+      this.competition.revealSeasonBroadcast(snapshot.seasonBroadcast.lastCompletedGameNumber);
+    }
     this.completeElapsedBroadcast();
   }
 
@@ -1395,7 +1620,7 @@ export class FixedFiveRoomSession {
   private completeElapsedBroadcast(): void {
     const room = this.room;
     const broadcast = room?.broadcast;
-    if (!broadcast || !this.isDuelBroadcast()) return;
+    if (!broadcast || !this.isGamecastBroadcast()) return;
     if (room.phase !== 'broadcasting' && room.phase !== 'game-results') return;
     if (this.duelRecapGame === broadcast.gameNumber) return;
     const startedAt = Date.parse(broadcast.startedAtIso);
@@ -1406,6 +1631,7 @@ export class FixedFiveRoomSession {
     this.seriesFlow.playback.advance(0, broadcast.durationMs, now);
     this.broadcastProgress = 1;
     this.duelRecapGame = broadcast.gameNumber;
+    this.maybeProposeOrConfirmGame();
   }
 
   private async sendCommand(

@@ -16,7 +16,8 @@
 
   let {
     output,
-    series,
+    series = null,
+    seasonBroadcast = false,
     localParticipantId,
     verification,
     readyCountdownMs,
@@ -28,7 +29,8 @@
     manifest = null,
   }: {
     output: GamecastRecordedGame;
-    series: GamecastSeries;
+    series?: GamecastSeries | null;
+    seasonBroadcast?: boolean;
     localParticipantId: GamecastParticipantId;
     verification: GamecastVerification;
     readyCountdownMs: number | null;
@@ -78,10 +80,14 @@
   const localTeam = $derived(localSide === 'home' ? output.result.home : output.result.away);
   const opponentTeam = $derived(localSide === 'home' ? output.result.away : output.result.home);
   const localWon = $derived(output.result.winner === localSide);
-  const localSeriesWins = $derived(localParticipantId === 'p1' ? series.p1Wins : series.p2Wins);
-  const opponentSeriesWins = $derived(localParticipantId === 'p1' ? series.p2Wins : series.p1Wins);
-  const championIsLocal = $derived(series.champion === localParticipantId);
-  const seriesOver = $derived(series.champion !== null);
+  const localSeriesWins = $derived(
+    series === null ? 0 : localParticipantId === 'p1' ? series.p1Wins : series.p2Wins,
+  );
+  const opponentSeriesWins = $derived(
+    series === null ? 0 : localParticipantId === 'p1' ? series.p2Wins : series.p1Wins,
+  );
+  const championIsLocal = $derived(series?.champion === localParticipantId);
+  const seriesOver = $derived(!seasonBroadcast && series?.champion != null);
 
   const panels = $derived.by((): TeamPanel[] => [
     {
@@ -169,6 +175,8 @@
   });
 
   const seriesMessage = $derived.by((): string => {
+    if (seasonBroadcast) return 'The season resumes automatically.';
+    if (!series) return 'Waiting for the series to update.';
     if (series.champion !== null) {
       return championIsLocal ? 'You won the series.' : 'Opponent won the series.';
     }
@@ -187,7 +195,9 @@
     readyCountdownMs === null ? null : formatCountdown(readyCountdownMs),
   );
   const nextGameNumber = $derived(
-    series.currentGameNumber !== null && series.currentGameNumber > output.gameNumber
+    series?.currentGameNumber !== null &&
+      series?.currentGameNumber !== undefined &&
+      series.currentGameNumber > output.gameNumber
       ? series.currentGameNumber
       : null,
   );
@@ -212,7 +222,9 @@
 <section class="results" data-verification={verification}>
   <header class="head">
     <p class="eyebrow">
-      Game {output.gameNumber} · {verification === 'verified'
+      {seasonBroadcast
+        ? `Head-to-head · Game ${String(output.gameNumber)}`
+        : `Game ${String(output.gameNumber)}`} · {verification === 'verified'
         ? 'verified result'
         : 'provisional result'}
     </p>
@@ -230,10 +242,12 @@
       <span class="score-dash" aria-hidden="true">–</span>
       <span data-score="opponent">{opponentTeam.box.points}</span>
     </p>
-    <p class="series">
-      Series: You {localSeriesWins} <span aria-hidden="true">–</span>
-      {opponentSeriesWins} Opp · {seriesMessage}
-    </p>
+    {#if !seasonBroadcast}
+      <p class="series">
+        Series: You {localSeriesWins} <span aria-hidden="true">–</span>
+        {opponentSeriesWins} Opp · {seriesMessage}
+      </p>
+    {/if}
 
     <div class="badge" data-tone={verificationView.tone} data-verification={verificationView.tone}>
       {#if verificationView.tone === 'verified'}
@@ -302,7 +316,9 @@
   </div>
 
   <footer class="ready">
-    {#if awaitingContinue}
+    {#if seasonBroadcast}
+      <p class="ready-line">Season resumes automatically.</p>
+    {:else if awaitingContinue}
       <div class="ready-copy">
         <p class="ready-line">Review the box score, then continue when ready.</p>
       </div>

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { contentHashSchema, idSchema, seedSchema } from './ids.ts';
 import { eraSimulationProfileSchema } from './era-sim-profile.ts';
 import { gameResultSchema } from './result.ts';
+import { gameTapeEventSchema } from './game-tape.ts';
 import { simulationPlayerSchema } from './simulation.ts';
 import { opponentBracketCoreSchema, opponentBracketSchema } from './bracket.ts';
 import { FIXED_FIVE_WORKER_WIRE_VERSION } from './fixed-five-versions.ts';
@@ -9,6 +10,7 @@ import {
   fixedFiveCommandSchema,
   fixedFiveCompetitionResultSchema,
   fixedFiveDuelGameOutputSchema,
+  fixedFiveShared82H2HGameOutputSchema,
   fixedFiveLineupEntrySchema,
   fixedFiveVerificationReceiptSchema,
   fixedFiveVersionLocksSchema,
@@ -31,6 +33,7 @@ export const fixedFiveWorkerShared82RequestSchema = z.object({
   dataVersion: z.string().min(1).max(64),
   engineVersion: z.string().min(1).max(64),
   startGameNumber: z.number().int().min(1).max(82).default(1),
+  recordH2H: z.boolean().default(false),
 });
 export type FixedFiveWorkerShared82Request = z.infer<typeof fixedFiveWorkerShared82RequestSchema>;
 export const fixedFiveWorkerDuelRequestSchema = z.object({
@@ -59,6 +62,23 @@ export const fixedFiveWorkerDuelGameRequestSchema = z.object({
   engineVersion: z.string().min(1).max(64),
 });
 export type FixedFiveWorkerDuelGameRequest = z.infer<typeof fixedFiveWorkerDuelGameRequestSchema>;
+export const fixedFiveWorkerShared82H2HGameRequestSchema = z.object({
+  schemaVersion: z.literal(FIXED_FIVE_WORKER_WIRE_VERSION),
+  type: z.literal('fixed-five-shared82-h2h-game'),
+  requestId: z.string().min(1).max(64),
+  roomId: idSchema,
+  gameNumber: z.number().int().min(1).max(82),
+  rootSeed: seedSchema,
+  p1Team: fixedFiveWorkerTeamSchema,
+  p2Team: fixedFiveWorkerTeamSchema,
+  bracket: opponentBracketSchema,
+  profile: eraSimulationProfileSchema,
+  dataVersion: z.string().min(1).max(64),
+  engineVersion: z.string().min(1).max(64),
+});
+export type FixedFiveWorkerShared82H2HGameRequest = z.infer<
+  typeof fixedFiveWorkerShared82H2HGameRequestSchema
+>;
 export const fixedFiveWorkerCancelSchema = z.object({
   schemaVersion: z.literal(FIXED_FIVE_WORKER_WIRE_VERSION),
   type: z.literal('fixed-five-cancel'),
@@ -90,6 +110,7 @@ export const fixedFiveWorkerRequestSchema = z.discriminatedUnion('type', [
   fixedFiveWorkerShared82RequestSchema,
   fixedFiveWorkerDuelRequestSchema,
   fixedFiveWorkerDuelGameRequestSchema,
+  fixedFiveWorkerShared82H2HGameRequestSchema,
   fixedFiveWorkerVerifyRequestSchema,
   fixedFiveWorkerCancelSchema,
 ]);
@@ -104,10 +125,16 @@ export const fixedFiveWorkerProgressSchema = z.object({
 export type FixedFiveWorkerProgress = z.infer<typeof fixedFiveWorkerProgressSchema>;
 export const fixedFiveWorkerResultTagSchema = z.enum(['p1', 'p2', 'h2h', 'duel']);
 export type FixedFiveWorkerResultTag = z.infer<typeof fixedFiveWorkerResultTagSchema>;
-export const fixedFiveWorkerResultEntrySchema = z.object({
-  tag: fixedFiveWorkerResultTagSchema,
-  game: gameResultSchema,
-});
+export const fixedFiveWorkerResultEntrySchema = z.discriminatedUnion('tag', [
+  z.object({
+    tag: z.literal('h2h'),
+    game: gameResultSchema,
+    tape: z.array(gameTapeEventSchema).min(1).optional(),
+  }),
+  z.object({ tag: z.literal('p1'), game: gameResultSchema }),
+  z.object({ tag: z.literal('p2'), game: gameResultSchema }),
+  z.object({ tag: z.literal('duel'), game: gameResultSchema }),
+]);
 export type FixedFiveWorkerResultEntry = z.infer<typeof fixedFiveWorkerResultEntrySchema>;
 export const fixedFiveWorkerResultsSchema = z.object({
   schemaVersion: z.literal(FIXED_FIVE_WORKER_WIRE_VERSION),
@@ -123,6 +150,15 @@ export const fixedFiveWorkerDuelGameMessageSchema = z.object({
   output: fixedFiveDuelGameOutputSchema,
 });
 export type FixedFiveWorkerDuelGameMessage = z.infer<typeof fixedFiveWorkerDuelGameMessageSchema>;
+export const fixedFiveWorkerShared82H2HGameMessageSchema = z.object({
+  schemaVersion: z.literal(FIXED_FIVE_WORKER_WIRE_VERSION),
+  type: z.literal('fixed-five-shared82-h2h-game'),
+  requestId: z.string().min(1).max(64),
+  output: fixedFiveShared82H2HGameOutputSchema,
+});
+export type FixedFiveWorkerShared82H2HGameMessage = z.infer<
+  typeof fixedFiveWorkerShared82H2HGameMessageSchema
+>;
 export const fixedFiveWorkerCompleteSchema = z.object({
   schemaVersion: z.literal(FIXED_FIVE_WORKER_WIRE_VERSION),
   type: z.literal('fixed-five-complete'),
@@ -158,6 +194,7 @@ export const fixedFiveWorkerMessageSchema = z.discriminatedUnion('type', [
   fixedFiveWorkerProgressSchema,
   fixedFiveWorkerResultsSchema,
   fixedFiveWorkerDuelGameMessageSchema,
+  fixedFiveWorkerShared82H2HGameMessageSchema,
   fixedFiveWorkerCompleteSchema,
   fixedFiveWorkerErrorSchema,
   fixedFiveWorkerVerifiedSchema,

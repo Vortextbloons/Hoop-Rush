@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import {
   HAVOC_REVEAL_FLIP_MS,
   HAVOC_REVEAL_SELECTION_MS,

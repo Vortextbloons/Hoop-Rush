@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { seedSchema, type ChallengeRun, type GameResult } from '@hoop-rush/data-contracts';
 import {
   acceptGameResult,
@@ -218,7 +218,7 @@ describe('ChallengeSession', () => {
 
   it('chooses an attempt seed, persists it, and reveals games in order', async () => {
     const run = fixtureRun({ runId: 'run-reveal' });
-    const chosenSeed = 'ffffffffffffffffffffffffffffffff';
+    const chosenSeed = seedSchema.parse('ffffffffffffffffffffffffffffffff');
     const chosenRun = fixtureRun({ runId: 'run-reveal', runSeed: seedSchema.parse(chosenSeed) });
     const results = resultsUntilFinished(chosenRun);
     const { repository, job, session } = setup(run);

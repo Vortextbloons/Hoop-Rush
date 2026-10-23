@@ -2,12 +2,15 @@ import type {
   BracketOpponent,
   EraSimulationProfile,
   GameResult,
+  GameSimulationInput,
+  GameTapeEvent,
   OpponentBracket,
   Seed,
   SimulationTeam,
 } from '@hoop-rush/data-contracts';
 import { checkGameResult } from '../../sim/invariants.ts';
 import { simulateGame } from '../../sim/game.ts';
+import { simulateRecordedGame } from '../../sim/tape.ts';
 import type { EngineContext } from '../../sim/kernel.ts';
 import { fixedFiveH2HSeed, fixedFiveSharedGameSeed } from './seeds.ts';
 import { summarizeShared82Games, type Shared82Summary } from './results.ts';
@@ -49,19 +52,67 @@ export interface Shared82SimulationOutput extends Shared82Summary {
   uniqueSimulations: number;
   weakestReplacedOpponentId: string;
 }
+export interface RecordedShared82H2HGame {
+  gameNumber: number;
+  seed: Seed;
+  homeParticipantId: 'p1';
+  awayParticipantId: 'p2';
+  result: GameResult;
+  tape: GameTapeEvent[];
+}
 function opponentById(bracket: OpponentBracket, opponentId: string): BracketOpponent {
   const opponent = bracket.opponents.find((o) => o.opponentId === opponentId);
   if (!opponent) throw new Error(`unknown opponent ${opponentId}`);
   return opponent;
 }
 export type Shared82GameEvent =
-  | { tag: 'h2h'; game: GameResult }
+  | { tag: 'h2h'; game: GameResult; tape?: GameTapeEvent[] }
   | { tag: 'p1'; game: GameResult }
   | { tag: 'p2'; game: GameResult };
+
+export function shared82H2HGameInput(
+  input: Shared82SimulationInput,
+  gameNumber: number,
+): GameSimulationInput {
+  const weakest = findWeakestOpponent(input.bracket);
+  if (!h2hGameNumbersFor(input.bracket, weakest.opponentId).includes(gameNumber)) {
+    throw new Error(`game ${String(gameNumber)} is not a scheduled H2H matchup`);
+  }
+  return {
+    schemaVersion: 2,
+    seed: fixedFiveH2HSeed(input.rootSeed, gameNumber),
+    gameNumber,
+    dataVersion: input.dataVersion,
+    profile: input.profile,
+    home: input.p1Team,
+    away: input.p2Team,
+  };
+}
+
+export function simulateRecordedShared82H2HGame(
+  input: Shared82SimulationInput,
+  gameNumber: number,
+  context: EngineContext,
+): RecordedShared82H2HGame {
+  const simulationInput = shared82H2HGameInput(input, gameNumber);
+  const { result, tape } = simulateRecordedGame(simulationInput, context);
+  const failures = checkGameResult(result);
+  if (failures.length > 0)
+    throw new Error(`H2H game ${String(gameNumber)} failed invariants: ${failures.join('; ')}`);
+  return {
+    gameNumber,
+    seed: simulationInput.seed,
+    homeParticipantId: 'p1',
+    awayParticipantId: 'p2',
+    result,
+    tape,
+  };
+}
 export function* shared82GameEvents(
   input: Shared82SimulationInput,
   context: EngineContext,
   startGameNumber = 1,
+  options: { recordH2H?: boolean } = {},
 ): Generator<Shared82GameEvent, void, undefined> {
   const weakest = findWeakestOpponent(input.bracket);
   const h2hNumbers = h2hGameNumbersFor(input.bracket, weakest.opponentId);
@@ -70,23 +121,18 @@ export function* shared82GameEvents(
     const entry = input.bracket.schedule[gameNumber - 1];
     if (!entry) throw new Error(`schedule missing game ${String(gameNumber)}`);
     if (h2hSet.has(gameNumber)) {
-      const seed = fixedFiveH2HSeed(input.rootSeed, gameNumber);
-      const result = simulateGame(
-        {
-          schemaVersion: 2,
-          seed,
-          gameNumber,
-          dataVersion: input.dataVersion,
-          profile: input.profile,
-          home: input.p1Team,
-          away: input.p2Team,
-        },
-        context,
-      );
-      const failures = checkGameResult(result);
-      if (failures.length > 0)
-        throw new Error(`H2H game ${String(gameNumber)} failed invariants: ${failures.join('; ')}`);
-      yield { tag: 'h2h', game: result };
+      if (options.recordH2H) {
+        const recorded = simulateRecordedShared82H2HGame(input, gameNumber, context);
+        yield { tag: 'h2h', game: recorded.result, tape: recorded.tape };
+      } else {
+        const result = simulateGame(shared82H2HGameInput(input, gameNumber), context);
+        const failures = checkGameResult(result);
+        if (failures.length > 0)
+          throw new Error(
+            `H2H game ${String(gameNumber)} failed invariants: ${failures.join('; ')}`,
+          );
+        yield { tag: 'h2h', game: result };
+      }
       continue;
     }
     const opponent = opponentById(input.bracket, entry.opponentId);

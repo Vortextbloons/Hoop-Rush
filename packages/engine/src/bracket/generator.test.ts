@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { buildOpeningOpponent, seedFromString } from '@hoop-rush/test-fixtures';
+import { seedSchema } from '@hoop-rush/data-contracts';
 import { playableSlotGroups } from '../domain/positions.ts';
 import { generateBracket } from './generator.ts';
 import { fixtureBracket, generationOptions } from './generator-testing.ts';
@@ -14,7 +15,7 @@ describe('generateBracket (propose-review-freeze)', () => {
     expect(validateBracketContent(bracket)).toEqual([]);
     expect(scheduleInvariants(bracket.schedule)).toEqual([]);
     expect(bracket.schedule[0]?.opponentId).toBe('lakers-1990s-opening');
-    expect(bracket.generation.seed).toBe(seedFromString('fixture-bracket'));
+    expect(bracket.generation.seed).toBe(seedSchema.parse(seedFromString('fixture-bracket')));
   }, 40000);
   it('keeps the opening opponent unchanged', () => {
     const opening = buildOpeningOpponent();

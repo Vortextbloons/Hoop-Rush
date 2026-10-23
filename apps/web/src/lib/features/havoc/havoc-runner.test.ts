@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+/* eslint-disable @typescript-eslint/await-thenable, @typescript-eslint/no-confusing-void-expression -- bun-types@1.4.4 declares .resolves/.rejects matchers as void; Bun docs require awaiting them */
+import { describe, expect, it } from 'bun:test';
 import {
   HAVOC_WORKER_WIRE_SCHEMA_VERSION,
   havocWorkerSimulateRequestSchema,

@@ -63,9 +63,9 @@ def fetch_league_dash(season: str) -> list[dict[str, Any]]:
     """Fetch only datasets consumed by rating derivation.
 
     Each measure is cached independently so a later failure never forces already
-    successful requests to be repeated. The old aggregate cache remains readable.
+    successful requests to be repeated. Totals use separate keys from averages.
     """
-    cached = read_cache("league_dash_player_stats", season=season)
+    cached = read_cache("league_dash_player_stats", season=season, per_mode="Totals")
     if cached is not None:
         by_type = {item.get("measureType"): item for item in cached}
         if all(measure in by_type for measure in REQUIRED_MEASURE_TYPES):
@@ -77,6 +77,7 @@ def fetch_league_dash(season: str) -> list[dict[str, Any]]:
             "league_dash_player_stats_measure",
             season=season,
             measure=measure_type,
+            **({"per_mode": "Totals"} if measure_type == "Base" else {}),
         )
         if measure_cached is not None:
             out.append(measure_cached)
@@ -86,7 +87,7 @@ def fetch_league_dash(season: str) -> list[dict[str, Any]]:
             resp = leaguedashplayerstats.LeagueDashPlayerStats(
                 season=season,
                 measure_type_detailed_defense=measure,
-                per_mode_detailed="PerGame",
+                per_mode_detailed="Totals" if measure == "Base" else "PerGame",
             )
             df = resp.get_data_frames()[0]
             return {
@@ -100,10 +101,11 @@ def fetch_league_dash(season: str) -> list[dict[str, Any]]:
             result,
             season=season,
             measure=measure_type,
+            **({"per_mode": "Totals"} if measure_type == "Base" else {}),
         )
         out.append(result)
 
-    write_cache("league_dash_player_stats", out, season=season)
+    write_cache("league_dash_player_stats", out, season=season, per_mode="Totals")
     return out
 
 
@@ -190,65 +192,63 @@ def to_player_season_stats(payload: list[dict[str, Any]], season: str, roster: l
         for r in (adv["rows"] if adv else [])
         if r.get("PLAYER_ID") is not None and not (isinstance(r.get("PLAYER_ID"), float) and math.isnan(r["PLAYER_ID"]))
     }
-    roster_by_id = {str(p["externalId"]): p for p in roster}
-
     out: list[dict[str, Any]] = []
     for ext_id, b in base_by_id.items():
         a = adv_by_id.get(ext_id, {})
-        rp = roster_by_id.get(ext_id, {})
         gp = _safe_int(b.get("GP"))
+        totals = totals_from_leaders([b], season)[0]
         row = {
                 "playerExternalId": ext_id,
                 "season": season,
-                "teamExternalId": str(b.get("TEAM_ID") or (rp.get("teamExternalId") or "")) or None,
+                "teamExternalId": str(b["TEAM_ID"]) if b.get("TEAM_ID") else "0",
                 "gamesPlayed": gp,
-                "minutes": _safe_float(b.get("MIN")) * gp,
+                "minutes": totals["minutes"],
                 "starts": _safe_int(b.get("GS")),
-                "points": _safe_float(b.get("PTS")) * gp,
-                "rebounds": _safe_float(b.get("REB")) * gp,
-                "offensiveRebounds": _safe_float(b.get("OREB")) * gp,
-                "defensiveRebounds": _safe_float(b.get("DREB")) * gp,
-                "assists": _safe_float(b.get("AST")) * gp,
-                "steals": _safe_float(b.get("STL")) * gp,
-                "blocks": _safe_float(b.get("BLK")) * gp,
-                "turnovers": _safe_float(b.get("TOV")) * gp,
-                "fouls": _safe_float(b.get("PF")) * gp,
-                "fgm": _safe_float(b.get("FGM")) * gp,
-                "fga": _safe_float(b.get("FGA")) * gp,
-                "tpm": _safe_float(b.get("FG3M")) * gp,
-                "tpa": _safe_float(b.get("FG3A")) * gp,
-                "ftm": _safe_float(b.get("FTM")) * gp,
-                "fta": _safe_float(b.get("FTA")) * gp,
+                "points": totals["points"],
+                "rebounds": totals["rebounds"],
+                "offensiveRebounds": totals["offensiveRebounds"],
+                "defensiveRebounds": totals["defensiveRebounds"],
+                "assists": totals["assists"],
+                "steals": totals["steals"],
+                "blocks": totals["blocks"],
+                "turnovers": totals["turnovers"],
+                "fouls": totals["fouls"],
+                "fgm": totals["fgm"],
+                "fga": totals["fga"],
+                "tpm": totals["tpm"],
+                "tpa": totals["tpa"],
+                "ftm": totals["ftm"],
+                "fta": totals["fta"],
                 "tsPct": _nullable(a.get("TS_PCT")),
                 "efgPct": _nullable(a.get("EFG_PCT")),
                 "per": _safe_float(a.get("PER")) or estimate_per(
-                    _safe_float(b.get("PTS")) * gp,
-                    _safe_float(b.get("REB")) * gp,
-                    _safe_float(b.get("AST")) * gp,
-                    _safe_float(b.get("STL")) * gp,
-                    _safe_float(b.get("BLK")) * gp,
-                    _safe_float(b.get("TOV")) * gp,
-                    _safe_float(b.get("FGA")) * gp,
-                    _safe_float(b.get("FTA")) * gp,
-                    _safe_float(b.get("OREB")) * gp,
+                    _safe_float(b.get("PTS")),
+                    _safe_float(b.get("REB")),
+                    _safe_float(b.get("AST")),
+                    _safe_float(b.get("STL")),
+                    _safe_float(b.get("BLK")),
+                    _safe_float(b.get("TOV")),
+                    _safe_float(b.get("FGA")),
+                    _safe_float(b.get("FTA")),
+                    _safe_float(b.get("OREB")),
                     gp,
                 ),
                 "usageRate": _nullable(a.get("USG_PCT")) * 100 if a.get("USG_PCT") is not None else None,
                 "winShares": _safe_float(a.get("WS")),
                 "boxPlusMinus": _safe_float(a.get("BPM")) or estimate_bpm(
-                    _safe_float(b.get("PTS")) * gp,
-                    _safe_float(b.get("REB")) * gp,
-                    _safe_float(b.get("AST")) * gp,
-                    _safe_float(b.get("STL")) * gp,
-                    _safe_float(b.get("BLK")) * gp,
-                    _safe_float(b.get("TOV")) * gp,
-                    _safe_float(b.get("FGA")) * gp,
-                    _safe_float(b.get("FTA")) * gp,
+                    _safe_float(b.get("PTS")),
+                    _safe_float(b.get("REB")),
+                    _safe_float(b.get("AST")),
+                    _safe_float(b.get("STL")),
+                    _safe_float(b.get("BLK")),
+                    _safe_float(b.get("TOV")),
+                    _safe_float(b.get("FGA")),
+                    _safe_float(b.get("FTA")),
                     gp,
                 ),
                 "vorp": _safe_float(a.get("VORP")),
+                "statsSource": "nba-dashboard-totals",
         }
-        sanitize_shooting_totals(row)
         out.append(row)
     return out
 
@@ -597,5 +597,18 @@ def run(season: str, roster: list[dict[str, Any]]) -> None:
         rows = stats_from_stints(season)
         if rows:
             print(f"  [WARN] league dash empty for {season}; using stint-derived stats")
+    stint_path = out / "stints.json"
+    if stint_path.exists():
+        stints = json.loads(stint_path.read_text(encoding="utf-8"))
+        counts: dict[str, int] = {}
+        for stint in stints:
+            identity = stint["playerExternalId"]
+            counts[identity] = counts.get(identity, 0) + 1
+        by_player = {row["playerExternalId"]: row for row in rows}
+        for stint in stints:
+            total = by_player.get(stint["playerExternalId"])
+            if total and counts[stint["playerExternalId"]] == 1 and total["gamesPlayed"] == stint["gamesPlayed"]:
+                repair_stint(stint, total)
+        write_json(stint_path, stints)
     write_json(out / "season-stats.json", rows)
     print(f"  [OK] wrote season-stats.json ({len(rows)} players)")

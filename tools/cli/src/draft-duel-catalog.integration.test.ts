@@ -1,9 +1,12 @@
 import { readFileSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import {
   buildDraftDuelCatalogSource,
   collectionCatalogSchema,
   seedSchema,
+  playerVersionId,
+  parsePool,
+  seasonDraftCatalogSchema,
   type DraftDuelFairness,
   type DraftDuelParticipantId,
   type Seed,
@@ -69,6 +72,40 @@ function offerBandHistogram(
   return counts;
 }
 describe('draft duel production catalog integration', () => {
+  it('uses the current pool peaks and ratings in the draft and base player catalogs', () => {
+    const manifestUrl = new URL('../../../apps/web/static/data/manifest.json', import.meta.url);
+    const manifest = JSON.parse(readFileSync(manifestUrl, 'utf8')) as {
+      pools: Array<{ url: string }>;
+      draftCatalog: { url: string };
+    };
+    const draft = seasonDraftCatalogSchema.parse(
+      JSON.parse(readFileSync(new URL(manifest.draftCatalog.url, manifestUrl), 'utf8')),
+    );
+    const candidates = new Map(
+      draft.candidates.map((candidate) => [candidate.playerVersionId, candidate]),
+    );
+    const cards = new Map(
+      collection.cards
+        .filter((card) => card.family === 'Base')
+        .map((card) => [card.sourcePlayerVersionId, card]),
+    );
+    for (const entry of manifest.pools) {
+      const pool = parsePool(JSON.parse(readFileSync(new URL(entry.url, manifestUrl), 'utf8')));
+      for (const player of pool.players) {
+        const id = playerVersionId(
+          player.playerId,
+          player.franchiseId,
+          player.eraId,
+          player.seasonKey,
+        );
+        const candidate = candidates.get(id);
+        expect(candidate?.summaryRatings).toEqual(player.summaryRatings);
+        expect(candidate?.detailedRatings).toEqual(player.detailedRatings);
+        expect(cards.get(id)?.summarySource).toEqual(player.summaryRatings);
+      }
+    }
+  });
+
   it('loads exactly the validated base catalog', () => {
     expect(catalog.entries.length).toBe(7943);
     expect(catalog.playerIds.length).toBe(2998);

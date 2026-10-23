@@ -9,9 +9,10 @@
   },
   "scripts": {
     "check": "tsc --noEmit --incremental",
-    "lint": "prettier --cache --check src vitest.config.ts eslint.config.js && eslint --cache .",
-    "test": "vitest",
-    "test:run": "vitest run"
+    "lint": "prettier --cache --check src eslint.config.js && eslint --cache .",
+    "test": "bun test --watch --isolate --preload ./src/test-setup.ts",
+    "test:run": "bun test --isolate --preload ./src/test-setup.ts",
+    "test:quick": "bun test --isolate --preload ./src/test-setup.ts --path-ignore-patterns \"**/*generator*\" --path-ignore-patterns \"**/*integration*\""
   },
   "dependencies": {
     "@hoop-rush/data-contracts": "workspace:*",
@@ -24,7 +25,6 @@
     "eslint": "catalog:",
     "fake-indexeddb": "catalog:",
     "typescript": "catalog:",
-    "typescript-eslint": "catalog:",
-    "vitest": "catalog:"
+    "typescript-eslint": "catalog:"
   }
 }

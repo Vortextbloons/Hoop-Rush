@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import type { SimulationPlayer, SimulationTeam } from '@hoop-rush/data-contracts';
 import { playerIdSchema, seedSchema } from '@hoop-rush/data-contracts';
 import {

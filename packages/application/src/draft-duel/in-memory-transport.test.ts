@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import {
   commandIdSchema,
   contentHashSchema,
@@ -219,7 +219,9 @@ describe('in-memory Draft Duel transport', () => {
     const rootSeed = current.rootSeed;
     if (!rootSeed) throw new Error('draft duel room is missing a root seed');
     const first = draftDuelFirstPickerFor(rootSeed);
-    expect(draftDuelHomeWinnerFor(rootSeed)).toBe(current.series?.homeWinner);
+    const homeWinner = current.series?.homeWinner;
+    if (homeWinner === undefined) throw new Error('draft duel series is missing a home winner');
+    expect(draftDuelHomeWinnerFor(rootSeed)).toBe(homeWinner);
     expect(current.deadline?.participantId).toBe(first);
 
     const wrongTurn = await submit(transport, roomId, 'pick-wrong-turn', otherParticipant(first), {
@@ -388,7 +390,7 @@ describe('in-memory Draft Duel transport', () => {
 
     const receipt = await transport.resolveTimeout(roomId);
     expect(receipt?.accepted).toBe(true);
-    expect(receipt?.commandId).toBe(`timeout-${deadline.cursor}-0`);
+    expect(receipt?.commandId).toBe(commandIdSchema.parse(`timeout-${deadline.cursor}-0`));
 
     const after = await snapshot(transport, roomId);
     expect(after.deadline?.cursor).toBe('t1');

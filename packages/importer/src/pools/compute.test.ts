@@ -8,9 +8,10 @@ import {
   describe,
   expect,
   it,
-  vi,
-  type MockInstance,
-} from 'vitest';
+  mock,
+  spyOn,
+  type Mock,
+} from 'bun:test';
 import { parsePool } from '@hoop-rush/data-contracts';
 import { MANIFEST_SCHEMA_VERSION } from '@hoop-rush/data-contracts';
 import { readJson, sha256File, writeJson } from '../json.ts';
@@ -33,8 +34,8 @@ import {
   type PoolBuildFailure,
 } from './compute.ts';
 const TEAM = '1610612747';
-const env = vi.hoisted(() => ({ nba: '', data: '', cache: '' }));
-vi.mock('../config.js', () => ({
+const env = { nba: '', data: '', cache: '' };
+await mock.module('../config.ts', () => ({
   get NBA_ROOT() {
     return env.nba;
   },
@@ -488,7 +489,7 @@ function messages(spy: {
   return spy.mock.calls.map((call) => String(call[0]));
 }
 afterAll(() => {
-  vi.restoreAllMocks();
+  mock.restore();
   for (const root of roots) {
     rmSync(root, { recursive: true, force: true });
   }
@@ -622,9 +623,9 @@ describe('overallBandForPercentile', () => {
 });
 describe('computePool (fixture)', () => {
   let root: FixtureRoot;
-  let log: MockInstance<typeof console.log>;
+  let log: Mock<typeof console.log>;
   beforeAll(() => {
-    log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    log = spyOn(console, 'log').mockImplementation(() => {});
   });
   afterEach(() => {
     log.mockClear();
@@ -920,7 +921,7 @@ describe('asset altIds preservation', () => {
       ],
     };
     writeJson(join(root.data, 'pools', 'lakers-1990s.json'), previous);
-    vi.spyOn(console, 'log').mockImplementation(() => {});
+    spyOn(console, 'log').mockImplementation(() => {});
     const pool = computePool('lakers', '1990s', fixtureManifest(), BBREF_IDS, false) as Pool;
     const byId = new Map(pool.players.map((player) => [player.playerExternalId, player.altIds]));
     expect(byId.get('1')).toEqual({
@@ -938,7 +939,7 @@ describe('asset altIds preservation', () => {
 describe('run / writePool / updateManifest', () => {
   it('writes a valid pool, digests it, and merges the manifest sorted by key', async () => {
     const root = buildStandardFixture('run');
-    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const log = spyOn(console, 'log').mockImplementation(() => {});
     await run([['lakers', '1990s']], false, 1);
     const poolPath = join(root.data, 'pools', 'lakers-1990s.json');
     const written = JSON.parse(readFileSync(poolPath, 'utf8')) as Pool;
@@ -975,7 +976,7 @@ describe('run / writePool / updateManifest', () => {
     if (echo === undefined) throw new Error('fixture player 5 is missing');
     echo.position = '';
     writeJson(rosterPath, roster);
-    vi.spyOn(console, 'log').mockImplementation(() => {});
+    spyOn(console, 'log').mockImplementation(() => {});
     await expect(run([['lakers', '1990s']], false, 1)).rejects.toThrow(/invalid pool lakers-1990s/);
     expect(() => readFileSync(join(root.data, 'pools', 'lakers-1990s.json'))).toThrow();
   });

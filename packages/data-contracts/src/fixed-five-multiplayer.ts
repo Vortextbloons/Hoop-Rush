@@ -162,12 +162,13 @@ export const fixedFiveReadyNextGamePayloadSchema = z.object({
 });
 export const fixedFiveBroadcastStartPayloadSchema = z.object({
   kind: z.literal('broadcast-start'),
-  gameNumber: z.number().int().min(1).max(7),
+  gameNumber: z.number().int().min(1).max(82),
+  eligibleGameNumbers: z.array(z.number().int().min(1).max(82)).min(1).max(82).optional(),
   auto: z.boolean().optional(),
 });
 export const fixedFiveProposeGameResultPayloadSchema = z.object({
   kind: z.literal('propose-game-result'),
-  gameNumber: z.number().int().min(1).max(7),
+  gameNumber: z.number().int().min(1).max(82),
   winner: fixedFiveParticipantIdSchema,
   resultDigest: contentHashSchema,
   tapeDigest: contentHashSchema,
@@ -175,7 +176,7 @@ export const fixedFiveProposeGameResultPayloadSchema = z.object({
 });
 export const fixedFiveConfirmGameResultPayloadSchema = z.object({
   kind: z.literal('confirm-game-result'),
-  gameNumber: z.number().int().min(1).max(7),
+  gameNumber: z.number().int().min(1).max(82),
   resultDigest: contentHashSchema,
   verified: z.boolean(),
 });
@@ -280,11 +281,33 @@ export const fixedFiveDuelSeriesSchema = z.object({
 });
 export type FixedFiveDuelSeries = z.infer<typeof fixedFiveDuelSeriesSchema>;
 export const fixedFiveBroadcastSchema = z.object({
-  gameNumber: z.number().int().min(1).max(7),
+  gameNumber: z.number().int().min(1).max(82),
   startedAtIso: z.string().min(1).max(64),
   durationMs: z.number().int().positive(),
 });
 export type FixedFiveBroadcast = z.infer<typeof fixedFiveBroadcastSchema>;
+export const fixedFiveShared82BroadcastStateSchema = z
+  .object({
+    eligibleGameNumbers: z.array(z.number().int().min(1).max(82)).min(1).max(82),
+    lastCompletedGameNumber: z.number().int().min(1).max(82).nullable(),
+  })
+  .superRefine((state, context) => {
+    for (let index = 1; index < state.eligibleGameNumbers.length; index += 1) {
+      const previous = state.eligibleGameNumbers[index - 1];
+      const current = state.eligibleGameNumbers[index];
+      if (previous === undefined || current === undefined || previous >= current) {
+        context.addIssue({ code: 'custom', message: 'eligible game numbers must be ordered' });
+        break;
+      }
+    }
+    if (
+      state.lastCompletedGameNumber !== null &&
+      !state.eligibleGameNumbers.includes(state.lastCompletedGameNumber)
+    ) {
+      context.addIssue({ code: 'custom', message: 'last completed game must be eligible' });
+    }
+  });
+export type FixedFiveShared82BroadcastState = z.infer<typeof fixedFiveShared82BroadcastStateSchema>;
 export const fixedFiveRoomSnapshotSchema = z.object({
   roomId: idSchema,
   code: fixedFiveRoomCodeSchema.nullable(),
@@ -299,6 +322,7 @@ export const fixedFiveRoomSnapshotSchema = z.object({
   deadline: fixedFiveDeadlineSchema.nullable(),
   series: fixedFiveDuelSeriesSchema.nullable().default(null),
   broadcast: fixedFiveBroadcastSchema.nullable().default(null),
+  seasonBroadcast: fixedFiveShared82BroadcastStateSchema.nullable().default(null),
   resultDigest: contentHashSchema.nullable(),
   confirmedDigest: contentHashSchema.nullable(),
   successorRoomId: idSchema.nullable(),
@@ -367,6 +391,19 @@ export const fixedFiveDuelGameOutputSchema = z.object({
   tapeDigest: contentHashSchema,
 });
 export type FixedFiveDuelGameOutput = z.infer<typeof fixedFiveDuelGameOutputSchema>;
+export const fixedFiveShared82H2HGameOutputSchema = z.object({
+  schemaVersion: z.literal(FIXED_FIVE_DUEL_TAPE_VERSION),
+  gameNumber: z.number().int().min(1).max(82),
+  homeParticipantId: z.literal('p1'),
+  awayParticipantId: z.literal('p2'),
+  seed: seedSchema,
+  result: gameResultSchema,
+  tape: z.array(gameTapeEventSchema).min(1),
+  inputDigest: contentHashSchema,
+  resultDigest: contentHashSchema,
+  tapeDigest: contentHashSchema,
+});
+export type FixedFiveShared82H2HGameOutput = z.infer<typeof fixedFiveShared82H2HGameOutputSchema>;
 export const fixedFiveCompetitionResultSchema = z.discriminatedUnion('competition', [
   fixedFiveShared82ResultSchema,
   fixedFiveDuelResultSchema,

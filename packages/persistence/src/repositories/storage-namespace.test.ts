@@ -1,5 +1,5 @@
 import Dexie from 'dexie';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'bun:test';
 import {
   HOOP_RUSH_DATABASE_NAME,
   HOOP_RUSH_DATABASE_V3_STORES,

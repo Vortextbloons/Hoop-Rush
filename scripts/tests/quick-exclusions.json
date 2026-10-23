@@ -1,5 +1,5 @@
 {
-  "comment": "Patterns excluded from `pnpm test:quick`. The `test:quick` script in the root package.json is the command source of truth; scripts/tests/check-quick-exclusions.mjs enforces parity, flags stale patterns, and prints the excluded file count.",
+  "comment": "Patterns excluded from `bun run test:quick`. Each workspace `test:quick` script is a source of truth; the root `test:quick` fans out to them; scripts/tests/check-quick-exclusions.mjs enforces parity, flags stale patterns, and prints the excluded file count.",
   "exclusions": [
     {
       "pattern": "**/*generator*",
