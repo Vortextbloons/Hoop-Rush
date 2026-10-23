@@ -1418,14 +1418,31 @@ select is(
 set local role authenticated;
 select public.ff_pgtap_claim((select value from public.ff_pgtap_ctx where name = 'uid_a1'));
 reset role;
-update public.fixed_five_rooms
-  set phase = 'simulating',
-      game_state = jsonb_set(
-        coalesce(game_state, '{}'::jsonb), '{season}',
-        jsonb_build_object(
-          'eligibleGameNumbers', '[18,55,77]'::jsonb,
-          'lastCompletedGameNumber', null), true)
-  where id = (select value::uuid from public.ff_pgtap_ctx where name = 'room_a');
+with prepared_room as (
+  update public.fixed_five_rooms
+    set phase = 'drafting',
+        command_count = command_count + 10,
+        revision = revision + 10,
+        game_state = jsonb_set(
+          coalesce(game_state, '{}'::jsonb), '{season}',
+          jsonb_build_object(
+            'eligibleGameNumbers', '[18,55,77]'::jsonb,
+            'lastCompletedGameNumber', null), true)
+    where id = (select value::uuid from public.ff_pgtap_ctx where name = 'room_a')
+    returning id, command_count - 10 as first_ordinal
+)
+insert into public.fixed_five_room_commands
+  (room_id, command_id, ordinal, actor_participant_id, payload)
+select id,
+       'shared82-draft-pick-' || pick,
+       first_ordinal + pick,
+       case when pick % 2 = 0 then 'p1' else 'p2' end,
+       jsonb_build_object('kind', 'classic-pick')
+  from prepared_room cross join generate_series(0, 9) as picks(pick);
+select is(
+  (select phase from public.fixed_five_rooms
+    where id = (select value::uuid from public.ff_pgtap_ctx where name = 'room_a')),
+  'drafting', 'Shared82 keeps the room drafting after the local season simulation begins');
 set local role authenticated;
 select public.ff_pgtap_claim((select value from public.ff_pgtap_ctx where name = 'uid_a1'));
 insert into public.ff_pgtap_ctx (name, value)

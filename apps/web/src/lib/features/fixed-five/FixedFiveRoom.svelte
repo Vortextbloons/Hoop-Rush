@@ -59,7 +59,7 @@
     controller.shared82Broadcast && phase === 'game-results' && controller.broadcastProgress >= 1,
   );
   const broadcastSimulationError = $derived(
-    controller.shared82Broadcast ? controller.shared82H2HSimError : controller.duelSimError,
+    controller.shared82Broadcast ? controller.shared82H2HError : controller.duelSimError,
   );
 
   const readyCountdownLabel = $derived.by((): string | null => {
@@ -342,6 +342,9 @@
             mode={snapshot.settings.mode}
             progress={controller.progress}
             entries={controller.revealedEntries}
+            h2hError={controller.shared82H2HError}
+            h2hSimulatingGame={controller.shared82H2HSimulatingGame}
+            onRetryH2H={() => controller.retryShared82H2HGame()}
             {selfId}
           />
         {/if}

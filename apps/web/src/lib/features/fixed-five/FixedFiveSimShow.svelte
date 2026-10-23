@@ -6,6 +6,9 @@
     progress = null,
     entries = [],
     selfId = 'p1',
+    h2hError = null,
+    h2hSimulatingGame = null,
+    onRetryH2H,
   }: {
     mode: FixedFiveRoomMode;
     progress?: {
@@ -14,6 +17,9 @@
     } | null;
     entries?: FixedFiveWorkerResultEntry[];
     selfId?: 'p1' | 'p2';
+    h2hError?: string | null;
+    h2hSimulatingGame?: number | null;
+    onRetryH2H?: () => void;
   } = $props();
   const isDuel = $derived(mode === 'duel');
   const total = $derived(progress?.total ?? (isDuel ? 7 : 161));
@@ -330,6 +336,31 @@
         <div class="sim-bar-fill" style={`width: ${pct}%`}></div>
       </div>
     </div>
+
+    {#if h2hError || h2hSimulatingGame !== null}
+      <div
+        class={`mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3 ${
+          h2hError ? 'border-destructive/30 bg-destructive/5' : 'border-line-soft bg-surface-1'
+        }`}
+      >
+        {#if h2hError}
+          <p class="text-sm text-destructive" role="alert">{h2hError}</p>
+        {:else}
+          <p class="text-sm text-muted-foreground" role="status">
+            Preparing head-to-head game {h2hSimulatingGame}…
+          </p>
+        {/if}
+        {#if onRetryH2H}
+          <button
+            type="button"
+            class="rounded-xl border border-line-soft bg-card px-3 py-2 text-sm font-semibold"
+            onclick={onRetryH2H}
+          >
+            Retry head-to-head game
+          </button>
+        {/if}
+      </div>
+    {/if}
 
     {#if ticker.length > 0}
       <ul class="mt-4 grid gap-2 sm:grid-cols-3" aria-label="Latest games">

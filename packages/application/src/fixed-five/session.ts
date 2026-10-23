@@ -119,7 +119,7 @@ export interface FixedFiveRoomSessionSnapshot {
   duelOutputs: Record<number, FixedFiveDuelGameOutput>;
   shared82Broadcast: boolean;
   shared82H2HOutputs: Record<number, FixedFiveShared82H2HGameOutput>;
-  shared82H2HSimError: string | null;
+  shared82H2HError: string | null;
   shared82H2HSimulatingGame: number | null;
   duelSimError: string | null;
   duelSimulatingGame: number | null;
@@ -320,7 +320,7 @@ export class FixedFiveRoomSession {
   private shared82H2HOutputs: Record<number, FixedFiveShared82H2HGameOutput> = {};
   private shared82H2HRunner: FixedFiveRunnerPort | null = null;
   private shared82H2HSimulatingGame: number | null = null;
-  private shared82H2HSimError: string | null = null;
+  private shared82H2HError: string | null = null;
   private broadcastStartPending: number | null = null;
   private duelSimulatingGame: number | null = null;
   private duelSimError: string | null = null;
@@ -376,7 +376,7 @@ export class FixedFiveRoomSession {
           this.shared82H2HRunner = null;
           this.shared82H2HSimulatingGame = null;
         }
-        this.shared82H2HSimError = null;
+        this.shared82H2HError = null;
         this.publish();
         this.tickShared82Reveal();
       },
@@ -436,7 +436,7 @@ export class FixedFiveRoomSession {
       duelOutputs: this.duelOutputs,
       shared82Broadcast: this.isShared82Broadcast(),
       shared82H2HOutputs: this.shared82H2HOutputs,
-      shared82H2HSimError: this.shared82H2HSimError,
+      shared82H2HError: this.shared82H2HError,
       shared82H2HSimulatingGame: this.shared82H2HSimulatingGame,
       duelSimError: this.duelSimError,
       duelSimulatingGame: this.duelSimulatingGame,
@@ -714,7 +714,7 @@ export class FixedFiveRoomSession {
     this.shared82H2HOutputs = Object.fromEntries(
       Object.entries(this.shared82H2HOutputs).filter(([key]) => Number(key) !== gameNumber),
     );
-    this.shared82H2HSimError = null;
+    this.shared82H2HError = null;
     this.shared82H2HRunner?.dispose();
     this.shared82H2HRunner = null;
     this.shared82H2HSimulatingGame = null;
@@ -754,10 +754,15 @@ export class FixedFiveRoomSession {
     if (eligibleGameNumbers.length === 0) return;
     this.broadcastStartPending = gameNumber;
     try {
-      await this.sendCommand(
-        { kind: 'broadcast-start', gameNumber, eligibleGameNumbers },
-        { quiet: true },
-      );
+      const accepted = await this.sendCommand({
+        kind: 'broadcast-start',
+        gameNumber,
+        eligibleGameNumbers,
+      });
+      if (!accepted && !this.isDisposed() && this.room?.broadcast?.gameNumber !== gameNumber) {
+        this.shared82H2HError = 'The head-to-head broadcast could not be started.';
+        this.publish();
+      }
     } finally {
       if (this.broadcastStartPending === gameNumber) this.broadcastStartPending = null;
     }
@@ -1149,7 +1154,7 @@ export class FixedFiveRoomSession {
     if (this.isDisposed() || !this.isShared82Broadcast()) return;
     const target = this.competition.advanceSeasonReveal();
     this.maybeProposeOrConfirmGame();
-    if (target === null) return;
+    if (target === null || this.shared82H2HError !== null) return;
     if (this.room?.broadcast?.gameNumber === target) {
       this.maybeStartShared82H2HGame(target);
       return;
@@ -1174,7 +1179,7 @@ export class FixedFiveRoomSession {
     if (!room?.rootSeed || !assets || !replay) return;
     const rootSeed: Seed = room.rootSeed;
     this.shared82H2HSimulatingGame = gameNumber;
-    this.shared82H2HSimError = null;
+    this.shared82H2HError = null;
     this.publish();
     void (async () => {
       try {
@@ -1204,14 +1209,14 @@ export class FixedFiveRoomSession {
               ...this.shared82H2HOutputs,
               [gameNumber]: event.output,
             };
-            this.shared82H2HSimError = null;
+            this.shared82H2HError = null;
             this.shared82H2HRunner?.dispose();
             this.shared82H2HRunner = null;
             this.shared82H2HSimulatingGame = null;
             this.publish();
             this.tickShared82Reveal();
           } else if (event.kind === 'error') {
-            this.shared82H2HSimError = event.message;
+            this.shared82H2HError = event.message;
             this.shared82H2HRunner?.dispose();
             this.shared82H2HRunner = null;
             this.shared82H2HSimulatingGame = null;
@@ -1232,7 +1237,7 @@ export class FixedFiveRoomSession {
         });
       } catch (error) {
         if (this.isDisposed()) return;
-        this.shared82H2HSimError = error instanceof Error ? error.message : String(error);
+        this.shared82H2HError = error instanceof Error ? error.message : String(error);
         this.shared82H2HSimulatingGame = null;
         this.shared82H2HRunner?.dispose();
         this.shared82H2HRunner = null;

@@ -781,10 +781,25 @@ describe('FixedFiveRoomSession', () => {
   it('holds revealed records at each H2H until its synchronized broadcast completes', async () => {
     vi.useFakeTimers();
     const pool = Array.from({ length: 12 }, (_, index) => sandboxCandidate(index));
+    const fixtureBracket = buildFixtureBracket();
+    const weakestOpponentId = findWeakestOpponent(fixtureBracket).opponentId;
+    const fixtureH2H = h2hGameNumbersFor(fixtureBracket, weakestOpponentId);
+    const firstFixtureH2H = fixtureH2H[0];
+    assert(firstFixtureH2H !== undefined);
+    const existingFirstMatchup = fixtureBracket.schedule[firstFixtureH2H - 1];
+    const gameFortyMatchup = fixtureBracket.schedule[39];
+    assert(existingFirstMatchup);
+    assert(gameFortyMatchup);
+    const schedule = [...fixtureBracket.schedule];
+    schedule[firstFixtureH2H - 1] = {
+      ...existingFirstMatchup,
+      opponentId: gameFortyMatchup.opponentId,
+    };
+    schedule[39] = { ...gameFortyMatchup, opponentId: weakestOpponentId };
     const assets = {
       ...sandboxAssets(pool),
       manifest: buildManifest(),
-      bracket: buildFixtureBracket(),
+      bracket: { ...fixtureBracket, schedule },
       profile: buildEraSimulationProfile(),
     };
     const slots: Position[] = ['PG', 'SG', 'SF', 'PF', 'C'];
@@ -853,14 +868,69 @@ describe('FixedFiveRoomSession', () => {
         tapeDigest: fixedFiveDuelGameTapeDigest(recorded.tape),
       };
       runner.emit({ kind: 'results', entries });
-      runner.emit({ kind: 'shared82-h2h-game', output });
       runner.emit({ kind: 'complete', gamesDelivered: entries.length });
       await waitFor(() => harness.repository.pending !== null);
+      vi.advanceTimersByTime(Math.ceil(firstGame / 4) * 240);
+      await flush();
+      await waitFor(() => harness.runners.length === 2);
+      const failedTapeRunner = harness.runners[1];
+      assert(failedTapeRunner);
+      expect(
+        failedTapeRunner.shared82H2HGameRuns.some((game) => game.gameNumber === firstGame),
+      ).toBe(true);
+      failedTapeRunner.emit({ kind: 'error', message: 'the fixed-five worker crashed' });
+
+      let state = session.getSnapshot();
+      expect(state.revealedEntries).toHaveLength(78);
+      expect(state.room?.broadcast).toBeNull();
+      expect(state.shared82H2HError).toBe('the fixed-five worker crashed');
+      vi.advanceTimersByTime(960);
+      await flush();
+      expect(harness.runners).toHaveLength(2);
+      expect(session.getSnapshot().shared82H2HError).toBe('the fixed-five worker crashed');
+
+      const submitCommand = harness.transport.submitCommand.bind(harness.transport);
+      let rejectBroadcastStart = true;
+      vi.spyOn(harness.transport, 'submitCommand').mockImplementation(async (command) => {
+        if (rejectBroadcastStart && command.payload.kind === 'broadcast-start') {
+          rejectBroadcastStart = false;
+          return {
+            roomId: command.roomId,
+            commandId: command.commandId,
+            ordinal: 0,
+            accepted: false,
+            rejectionCode: 'turn',
+            revision: 0,
+          };
+        }
+        return submitCommand(command);
+      });
+
+      session.retryShared82H2HGame();
+      await waitFor(() => harness.runners.length === 3);
+      const retryTapeRunner = harness.runners[2];
+      assert(retryTapeRunner);
+      retryTapeRunner.emit({ kind: 'shared82-h2h-game', output });
+      await waitFor(() => session.getSnapshot().shared82H2HError !== null);
+      expect(session.getSnapshot().shared82H2HError).toBe(
+        'The head-to-head broadcast could not be started.',
+      );
+      expect(session.getSnapshot().error).toBe('Command rejected: turn');
+      expect(session.getSnapshot().room?.broadcast).toBeNull();
+      vi.advanceTimersByTime(960);
+      await flush();
+      expect(harness.runners).toHaveLength(3);
+
+      session.retryShared82H2HGame();
+      await waitFor(() => harness.runners.length === 4);
+      const acceptedTapeRunner = harness.runners[3];
+      assert(acceptedTapeRunner);
+      acceptedTapeRunner.emit({ kind: 'shared82-h2h-game', output });
       vi.advanceTimersByTime(7000);
       await flush();
       await waitFor(() => session.getSnapshot().room?.broadcast?.gameNumber === firstGame);
 
-      let state = session.getSnapshot();
+      state = session.getSnapshot();
       expect(state.revealedThroughGameNumber).toBe(firstGame - 1);
       expect(state.revealedEntries.some((entry) => entry.tag === 'h2h')).toBe(false);
       expect(state.simDone).toBe(false);
@@ -888,8 +958,12 @@ describe('FixedFiveRoomSession', () => {
           candidate.shared82H2HGameRuns.some((game) => game.gameNumber === firstGame),
         ),
       );
-      const tapeRunner = harness.runners.find((candidate) =>
-        candidate.shared82H2HGameRuns.some((game) => game.gameNumber === firstGame),
+      const tapeRunner = harness.runners.find(
+        (candidate) =>
+          candidate !== failedTapeRunner &&
+          candidate !== retryTapeRunner &&
+          candidate !== acceptedTapeRunner &&
+          candidate.shared82H2HGameRuns.some((game) => game.gameNumber === firstGame),
       );
       assert(tapeRunner);
       const tapeRun = tapeRunner.shared82H2HGameRuns[0];

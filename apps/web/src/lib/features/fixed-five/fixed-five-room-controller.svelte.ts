@@ -140,7 +140,7 @@ export class FixedFiveRoomController {
   duelOutputs = $state.raw<Record<number, FixedFiveDuelGameOutput>>({});
   shared82Broadcast = $state(false);
   shared82H2HOutputs = $state.raw<Record<number, FixedFiveShared82H2HGameOutput>>({});
-  shared82H2HSimError = $state<string | null>(null);
+  shared82H2HError = $state<string | null>(null);
   shared82H2HSimulatingGame = $state<number | null>(null);
   duelSimError = $state<string | null>(null);
   duelSimulatingGame = $state<number | null>(null);
@@ -562,7 +562,7 @@ export class FixedFiveRoomController {
     this.duelOutputs = next.duelOutputs;
     this.shared82Broadcast = next.shared82Broadcast;
     this.shared82H2HOutputs = next.shared82H2HOutputs;
-    this.shared82H2HSimError = next.shared82H2HSimError;
+    this.shared82H2HError = next.shared82H2HError;
     this.shared82H2HSimulatingGame = next.shared82H2HSimulatingGame;
     this.duelSimError = next.duelSimError;
     this.duelSimulatingGame = next.duelSimulatingGame;
