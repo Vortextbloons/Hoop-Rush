@@ -872,6 +872,15 @@ describe('FixedFiveRoomSession', () => {
       await waitFor(() => harness.repository.pending !== null);
       vi.advanceTimersByTime(Math.ceil(firstGame / 4) * 240);
       await flush();
+      await waitFor(() => session.getSnapshot().shared82H2HPendingGame === firstGame);
+      expect(session.getSnapshot().shared82H2HSimulatingGame).toBeNull();
+      expect(harness.runners).toHaveLength(1);
+      vi.advanceTimersByTime(960);
+      await flush();
+      expect(session.getSnapshot().shared82H2HPendingGame).toBe(firstGame);
+      expect(harness.runners).toHaveLength(1);
+
+      session.continueShared82H2HGame();
       await waitFor(() => harness.runners.length === 2);
       const failedTapeRunner = harness.runners[1];
       assert(failedTapeRunner);
@@ -1144,6 +1153,8 @@ describe('FixedFiveRoomSession', () => {
     for (const gameNumber of eligibleGameNumbers) {
       vi.advanceTimersByTime(10_000);
       await flush();
+      await waitFor(() => firstSession.getSnapshot().shared82H2HPendingGame === gameNumber);
+      firstSession.continueShared82H2HGame();
       await waitFor(() => firstSession.getSnapshot().room?.broadcast?.gameNumber === gameNumber);
       firstSession.beginPlayback();
       firstSession.advancePlayback(10_000);

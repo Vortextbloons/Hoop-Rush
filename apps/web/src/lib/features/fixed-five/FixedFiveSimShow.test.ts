@@ -54,11 +54,13 @@ describe('FixedFiveSimShow', () => {
         progress: { completed: 78, total: 161 },
         entries,
         selfId: 'p1',
-        h2hSimulatingGame: 40,
+        h2hPendingGame: 40,
+        onContinueH2H: () => {},
         onRetryH2H: () => {},
       },
     }).body;
-    expect(pendingHtml).toContain('Preparing head-to-head game 40');
-    expect(pendingHtml).toContain('Retry head-to-head game');
+    expect(pendingHtml).toContain('Head-to-head game 40 is next');
+    expect(pendingHtml).toContain('Continue to head-to-head game');
+    expect(pendingHtml).not.toContain('Retry head-to-head game');
   });
 });

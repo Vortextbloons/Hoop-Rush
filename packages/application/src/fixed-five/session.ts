@@ -119,6 +119,7 @@ export interface FixedFiveRoomSessionSnapshot {
   duelOutputs: Record<number, FixedFiveDuelGameOutput>;
   shared82Broadcast: boolean;
   shared82H2HOutputs: Record<number, FixedFiveShared82H2HGameOutput>;
+  shared82H2HPendingGame: number | null;
   shared82H2HError: string | null;
   shared82H2HSimulatingGame: number | null;
   duelSimError: string | null;
@@ -318,6 +319,8 @@ export class FixedFiveRoomSession {
   private duelOutputs: Record<number, FixedFiveDuelGameOutput> = {};
   private duelRunner: FixedFiveRunnerPort | null = null;
   private shared82H2HOutputs: Record<number, FixedFiveShared82H2HGameOutput> = {};
+  private shared82H2HPendingGame: number | null = null;
+  private shared82H2HConfirmedGame: number | null = null;
   private shared82H2HRunner: FixedFiveRunnerPort | null = null;
   private shared82H2HSimulatingGame: number | null = null;
   private shared82H2HError: string | null = null;
@@ -436,6 +439,7 @@ export class FixedFiveRoomSession {
       duelOutputs: this.duelOutputs,
       shared82Broadcast: this.isShared82Broadcast(),
       shared82H2HOutputs: this.shared82H2HOutputs,
+      shared82H2HPendingGame: this.shared82H2HPendingGame,
       shared82H2HError: this.shared82H2HError,
       shared82H2HSimulatingGame: this.shared82H2HSimulatingGame,
       duelSimError: this.duelSimError,
@@ -711,6 +715,8 @@ export class FixedFiveRoomSession {
     if (!this.isShared82Broadcast()) return;
     const gameNumber = this.room?.broadcast?.gameNumber ?? this.competition.advanceSeasonReveal();
     if (gameNumber === null) return;
+    this.shared82H2HConfirmedGame = gameNumber;
+    this.shared82H2HPendingGame = null;
     this.shared82H2HOutputs = Object.fromEntries(
       Object.entries(this.shared82H2HOutputs).filter(([key]) => Number(key) !== gameNumber),
     );
@@ -719,6 +725,17 @@ export class FixedFiveRoomSession {
     this.shared82H2HRunner = null;
     this.shared82H2HSimulatingGame = null;
     this.maybeStartShared82H2HGame(gameNumber);
+  }
+
+  continueShared82H2HGame(): void {
+    if (!this.isShared82Broadcast()) return;
+    const gameNumber = this.shared82H2HPendingGame;
+    if (gameNumber === null || this.room?.broadcast) return;
+    this.shared82H2HConfirmedGame = gameNumber;
+    this.shared82H2HPendingGame = null;
+    this.publish();
+    if (this.shared82H2HOutputs[gameNumber]) void this.startBroadcast();
+    else this.maybeStartShared82H2HGame(gameNumber);
   }
 
   async readyForNextGame(): Promise<void> {
@@ -751,7 +768,7 @@ export class FixedFiveRoomSession {
       return;
     }
     const eligibleGameNumbers = this.shared82H2HGameNumbers();
-    if (eligibleGameNumbers.length === 0) return;
+    if (eligibleGameNumbers.length === 0 || this.shared82H2HConfirmedGame !== gameNumber) return;
     this.broadcastStartPending = gameNumber;
     try {
       const accepted = await this.sendCommand({
@@ -1154,12 +1171,29 @@ export class FixedFiveRoomSession {
     if (this.isDisposed() || !this.isShared82Broadcast()) return;
     const target = this.competition.advanceSeasonReveal();
     this.maybeProposeOrConfirmGame();
-    if (target === null || this.shared82H2HError !== null) return;
+    if (target === null) {
+      if (this.shared82H2HPendingGame !== null) {
+        this.shared82H2HPendingGame = null;
+        this.publish();
+      }
+      return;
+    }
     if (this.room?.broadcast?.gameNumber === target) {
+      this.shared82H2HPendingGame = null;
+      this.shared82H2HConfirmedGame = target;
       this.maybeStartShared82H2HGame(target);
       return;
     }
     if (this.room?.broadcast) return;
+    if (this.shared82H2HError !== null) return;
+    if (this.shared82H2HConfirmedGame !== target) {
+      if (this.shared82H2HPendingGame !== target) {
+        this.shared82H2HPendingGame = target;
+        this.publish();
+      }
+      return;
+    }
+    this.shared82H2HPendingGame = null;
     if (this.shared82H2HOutputs[target]) void this.startBroadcast();
     else this.maybeStartShared82H2HGame(target);
   }

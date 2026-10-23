@@ -342,8 +342,10 @@
             mode={snapshot.settings.mode}
             progress={controller.progress}
             entries={controller.revealedEntries}
+            h2hPendingGame={controller.shared82H2HPendingGame}
             h2hError={controller.shared82H2HError}
             h2hSimulatingGame={controller.shared82H2HSimulatingGame}
+            onContinueH2H={() => controller.continueShared82H2HGame()}
             onRetryH2H={() => controller.retryShared82H2HGame()}
             {selfId}
           />

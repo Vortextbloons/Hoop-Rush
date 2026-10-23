@@ -6,8 +6,10 @@
     progress = null,
     entries = [],
     selfId = 'p1',
+    h2hPendingGame = null,
     h2hError = null,
     h2hSimulatingGame = null,
+    onContinueH2H,
     onRetryH2H,
   }: {
     mode: FixedFiveRoomMode;
@@ -17,8 +19,10 @@
     } | null;
     entries?: FixedFiveWorkerResultEntry[];
     selfId?: 'p1' | 'p2';
+    h2hPendingGame?: number | null;
     h2hError?: string | null;
     h2hSimulatingGame?: number | null;
+    onContinueH2H?: () => void;
     onRetryH2H?: () => void;
   } = $props();
   const isDuel = $derived(mode === 'duel');
@@ -337,7 +341,24 @@
       </div>
     </div>
 
-    {#if h2hError || h2hSimulatingGame !== null}
+    {#if h2hPendingGame !== null}
+      <div
+        class="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/30 bg-primary/5 p-3"
+      >
+        <p class="text-sm text-muted-foreground" role="status">
+          Head-to-head game {h2hPendingGame} is next. Continue when you’re ready.
+        </p>
+        {#if onContinueH2H}
+          <button
+            type="button"
+            class="rounded-xl border border-primary/40 bg-primary/10 px-3 py-2 text-sm font-semibold"
+            onclick={onContinueH2H}
+          >
+            Continue to head-to-head game
+          </button>
+        {/if}
+      </div>
+    {:else if h2hError || h2hSimulatingGame !== null}
       <div
         class={`mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3 ${
           h2hError ? 'border-destructive/30 bg-destructive/5' : 'border-line-soft bg-surface-1'
