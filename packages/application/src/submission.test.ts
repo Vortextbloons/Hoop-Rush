@@ -5,21 +5,18 @@ const RETRY_POLICY: SubmissionPolicy = {
   intent: 'fixed-five-command',
   conflict: 'resync-retry',
   maxAttempts: 3,
-  requiresDigest: false,
 };
 
 const SURFACE_POLICY: SubmissionPolicy = {
   intent: 'multiplayer-command',
   conflict: 'surface',
   maxAttempts: 1,
-  requiresDigest: true,
 };
 
 const SURFACE_ERROR_POLICY: SubmissionPolicy = {
   intent: 'multiplayer-command',
   conflict: 'surface',
   maxAttempts: 1,
-  requiresDigest: false,
 };
 
 interface FakeReceipt {

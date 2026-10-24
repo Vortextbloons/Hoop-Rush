@@ -31,7 +31,6 @@ export const MULTIPLAYER_SINGLE_ATTEMPT_POLICY = {
   intent: 'multiplayer-command',
   conflict: 'surface',
   maxAttempts: 1,
-  requiresDigest: false,
 } as const satisfies SubmissionPolicy;
 
 export async function executeMultiplayerCommand<

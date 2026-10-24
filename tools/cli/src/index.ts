@@ -1,5 +1,12 @@
 import { getOptionString, parseArgs, UsageError, type ParsedArgs } from './args.ts';
-import { EXIT_OK, renderJson, renderText, type CliReport } from './report.ts';
+import {
+  EXIT_OK,
+  EXIT_USAGE_OR_DATA_ERROR,
+  makeReport,
+  renderJson,
+  renderText,
+  type CliReport,
+} from './report.ts';
 import {
   COMMANDS,
   declaredOptions,
@@ -72,7 +79,18 @@ async function main(argv: string[]): Promise<{
     if (error instanceof UsageError) {
       return { report: usageError(error.message), format: 'text' };
     }
-    throw error;
+    const message = error instanceof Error ? error.message : String(error);
+    return {
+      report: makeReport(
+        spec.name,
+        {},
+        {
+          failures: [message],
+          exitCode: EXIT_USAGE_OR_DATA_ERROR,
+        },
+      ),
+      format,
+    };
   }
 }
 

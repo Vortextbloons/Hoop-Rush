@@ -498,7 +498,6 @@ describe('command execution', () => {
           intent: 'multiplayer-command',
           conflict: 'resync-retry',
           maxAttempts: 2,
-          requiresDigest: false,
         },
       ),
     ).rejects.toThrow('retain its command ID');

@@ -474,6 +474,7 @@
     guardOpen = false;
     setClassicGuardBypass(true);
     await clearClassicDraftState();
+    if (!mounted) return;
     const raw = target ? `${target.pathname}${target.search}` : '/';
     void goto(
       resolve((raw.startsWith(resolve('/')) ? raw.slice(resolve('/').length) : raw) as any),

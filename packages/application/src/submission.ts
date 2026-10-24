@@ -6,7 +6,6 @@ export interface SubmissionPolicy {
   readonly intent: SubmissionIntent;
   readonly conflict: 'resync-retry' | 'surface';
   readonly maxAttempts: number;
-  readonly requiresDigest: boolean;
 }
 
 export interface SubmissionAttempt<TCommand, TReceipt> {

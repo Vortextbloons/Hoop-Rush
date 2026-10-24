@@ -1,8 +1,11 @@
 export class UsageError extends Error {}
 export function parseCount(value: string | undefined, option: string, fallback: number): number {
   if (value === undefined) return fallback;
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isFinite(parsed) || parsed < 0) {
+  if (!/^\d+$/.test(value)) {
+    throw new UsageError(`${option} must be a nonnegative integer (got "${value}")`);
+  }
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed)) {
     throw new UsageError(`${option} must be a nonnegative integer (got "${value}")`);
   }
   return parsed;

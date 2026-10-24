@@ -34,6 +34,7 @@ const globalChanges = new Set([
   'bunfig.toml',
   'tsconfig.base.json',
   'eslint.config.js',
+  'eslint.base.config.js',
 ]);
 const allPackagesChanged = changedPaths.some((path) => globalChanges.has(path));
 const selected = new Set(

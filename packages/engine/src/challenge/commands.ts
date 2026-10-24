@@ -405,6 +405,16 @@ export function createGameInput(
   profile: EraSimulationProfile,
   gameNumber: number,
 ): GameSimulationInput {
+  if (profile.dataVersion !== run.versions.dataVersion) {
+    throw new Error(
+      `era profile data version ${profile.dataVersion} does not match run data version ${run.versions.dataVersion}`,
+    );
+  }
+  if (profile.profileVersion !== run.eraProfileVersion) {
+    throw new Error(
+      `era profile version ${profile.profileVersion} does not match run era profile version ${run.eraProfileVersion}`,
+    );
+  }
   const opponent = opponentForGame(run, gameNumber);
   const home: SimulationTeam = {
     teamId: 'user',
