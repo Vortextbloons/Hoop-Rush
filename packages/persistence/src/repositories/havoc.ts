@@ -42,6 +42,7 @@ import {
   type StoredHavocCompletedRun,
 } from '../schemas/havoc-record.ts';
 import { HoopRushDatabase } from './dexie.ts';
+import { DexieProfileRepository } from './profile.ts';
 import {
   assertSaveSchemaVersion,
   commandReceiptMatches,
@@ -193,6 +194,9 @@ function HAVOC_SCOPED_TABLES(db: HoopRushDatabase): Table<unknown>[] {
     db.havocRetainedTapes,
     db.havocCompletedRuns,
     db.havocHistory,
+    db.profileBindings,
+    db.profileGames,
+    db.profiles,
   ] as Table<unknown>[];
 }
 
@@ -614,6 +618,19 @@ export class DexieHavocRepository implements HavocRepository {
             `game ${String(game.result.gameNumber)}`,
           );
           await this.db.havocGames.put(gameRow);
+          const bindingId = `havoc:${result.runId}`;
+          if (game.result.variant === 'havoc' && (await this.db.profileBindings.get(bindingId))) {
+            const side = game.result.humanSide;
+            await new DexieProfileRepository(this.db).recordGame(
+              bindingId,
+              String(game.result.gameNumber),
+              {
+                won: game.result.winner === side,
+                multiplayer: false,
+                players: game.result[side].participants,
+              },
+            );
+          }
         }
         if (tape !== null) {
           const tapeRow = parseInput(

@@ -5,6 +5,7 @@ import { sleep } from '#lib/sleep.js';
 import { prefersReducedMotion } from '#lib/device-capabilities.js';
 import { challengeRepository } from './challenge-repo';
 import { ChallengeWorkerJob } from './challenge-job';
+import { profileRepository, selectedProfile } from '#lib/features/profile/profile.js';
 
 export class ChallengeRunPresenter {
   run = $state.raw<ChallengeRun | null>(null);
@@ -37,7 +38,7 @@ export class ChallengeRunPresenter {
       this.mirror();
     });
     this.mirror();
-    void session.load();
+    void this.load(session);
   }
   dispose(): void {
     this.unsubscribe?.();
@@ -47,7 +48,7 @@ export class ChallengeRunPresenter {
   }
   reload(): void {
     this.loadError = null;
-    void this.session?.load();
+    if (this.session) void this.load(this.session);
   }
   start(): void {
     this.session?.start({ reducedMotion: prefersReducedMotion() });
@@ -67,5 +68,16 @@ export class ChallengeRunPresenter {
     this.phase = snapshot.phase;
     this.error = snapshot.error;
     this.loadError = snapshot.loadError;
+  }
+  private async load(session: ChallengeSession): Promise<void> {
+    try {
+      await selectedProfile();
+      const record = await challengeRepository.loadActiveRun();
+      if (record) await profileRepository().bind(`challenge:${record.run.runId}`);
+      if (this.session === session) await session.load();
+    } catch (error) {
+      if (this.session === session)
+        this.loadError = error instanceof Error ? error.message : String(error);
+    }
   }
 }

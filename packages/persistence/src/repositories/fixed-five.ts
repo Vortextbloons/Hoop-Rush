@@ -3,6 +3,7 @@ import {
   type FixedFiveCommand,
   type FixedFiveCompetitionRun,
   type FixedFiveRoomSnapshot,
+  profileBindingSchema,
 } from '@hoop-rush/data-contracts';
 import {
   storedFixedFiveActiveSchema,
@@ -16,6 +17,7 @@ import {
   type StoredFixedFivePendingResult,
 } from '../schemas/fixed-five-record.ts';
 import type { HoopRushDatabase } from './dexie.ts';
+import { DexieProfileRepository } from './profile.ts';
 import { deleteWhereEquals, listCompletedHistory } from './support.ts';
 export class DexieFixedFiveRepository {
   private readonly db: HoopRushDatabase;
@@ -109,12 +111,33 @@ export class DexieFixedFiveRepository {
     });
     await this.db.transaction(
       'rw',
-      this.db.fixedFiveActive,
-      this.db.fixedFiveCommands,
-      this.db.fixedFivePendingResults,
-      this.db.fixedFiveCompleted,
-      this.db.fixedFiveHistory,
+      [
+        this.db.fixedFiveActive,
+        this.db.fixedFiveCommands,
+        this.db.fixedFivePendingResults,
+        this.db.fixedFiveCompleted,
+        this.db.fixedFiveHistory,
+        this.db.profileBindings,
+        this.db.profileGames,
+        this.db.profiles,
+      ],
       async () => {
+        const bindingId = `fixed-five:${roomId}`;
+        const bindingRow = await this.db.profileBindings.get(bindingId);
+        const participant = bindingRow
+          ? profileBindingSchema.parse(bindingRow).participantId
+          : undefined;
+        if (participant && run.result.competition === 'duel') {
+          const profileRepo = new DexieProfileRepository(this.db);
+          for (const game of run.result.games) {
+            await profileRepo.recordGame(bindingId, String(game.gameNumber), {
+              won: game.winner === participant,
+              multiplayer: true,
+              players: [],
+            });
+          }
+          await profileRepo.recordMatch(bindingId, run.result.winner === participant);
+        }
         await this.db.fixedFiveCompleted.put(completed);
         await this.db.fixedFiveHistory.put(index);
         await this.db.fixedFivePendingResults.delete(roomId);
@@ -132,3 +155,4 @@ export class DexieFixedFiveRepository {
     return listCompletedHistory(this.db.fixedFiveHistory);
   }
 }
+export type FixedFiveRepository = DexieFixedFiveRepository;

@@ -297,6 +297,25 @@ async function draftFivePicks(service: HavocService): Promise<void> {
 }
 
 describe('HavocService integration', () => {
+  it('reports every saved game, including the starting cursor when resuming', async () => {
+    const { service } = buildService();
+    await service.createDraft();
+    await draftFivePicks(service);
+    await service.lockLineup();
+    await service.simulateRange({ variant: 'havoc', count: 2 });
+    const completed: number[] = [];
+    service.subscribe((event) => {
+      if (event.type === 'progress') {
+        completed.push(event.progress.gamesCompleted);
+        expect(event.progress.gamesTotal).toBe(82);
+        expect(service.getSnapshot().run?.havocCursor).toBe(event.progress.gamesCompleted);
+      }
+    });
+    await service.simulateRange({ variant: 'havoc', count: 2 });
+    expect(completed).toEqual([2, 3, 4]);
+    service.dispose();
+  });
+
   it('drafts, rerolls once, locks, plays, watches, and finalizes a matched comparison', async () => {
     const { service } = buildService();
     expect((await service.loadActive()).run).toBeNull();

@@ -1,6 +1,7 @@
 export * from './schemas/classic-draft-record.ts';
 export * from './schemas/run-record.ts';
 export * from './repositories/dexie.ts';
+export * from './repositories/profile.ts';
 export * from './schemas/fixed-five-record.ts';
 export * from './repositories/fixed-five.ts';
 export * from './schemas/draft-duel-record.ts';

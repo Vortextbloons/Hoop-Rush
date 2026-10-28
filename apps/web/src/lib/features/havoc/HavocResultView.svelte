@@ -8,6 +8,7 @@
   import HavocSquadReport from './HavocSquadReport.svelte';
   import HavocComparisonChart from './HavocComparisonChart.svelte';
   import HavocGameDetail from './HavocGameDetail.svelte';
+  import AchievementReveal from '#lib/features/profile/AchievementReveal.svelte';
   import { havocRecordLabel, havocDeltaTitle, formatSignedPoints } from './havoc-presentation';
   let { state: resultState }: { state: HavocResultState } = $props();
   const run = $derived(resultState.run);
@@ -29,7 +30,10 @@
     </div>
   {:else if !resultState.havocSeasonComplete}<div class="h-panel">
       <h1 class="h-title">Season in progress.</h1>
-      <p class="h-copy mt-4">Your report arrives after all 82 games.</p>
+      <p class="h-copy mt-4">
+        Your report arrives after both 82-game seasons: with powers, then the same schedule without
+        them.
+      </p>
       <a class="h-button mt-6" href={resolve('havoc/run/')}>Continue season</a>
     </div>
   {:else if !resultState.comparisonComplete && run.comparisonStatus !== 'unsupported'}
@@ -64,6 +68,7 @@
         >{/if}
     </div>
   {:else}
+    <AchievementReveal bindingId={`havoc:${run.runId}`} />
     <header class="h-panel h-result-hero">
       <p class="h-eyebrow">Hoop Havoc · Season report</p>
       <h1 class="h-subtitle mt-2">

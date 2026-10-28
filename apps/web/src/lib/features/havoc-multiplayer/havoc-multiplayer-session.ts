@@ -12,13 +12,40 @@ import {
   loadHavocMultiplayerMembership,
   saveHavocMultiplayerMembership,
 } from './havoc-multiplayer-identity';
+import {
+  profileRepository,
+  selectedProfile,
+  withRepositoryHooks,
+} from '#lib/features/profile/profile.js';
+
+function profileAwareHavocMultiplayerRepository(
+  repository: HavocMultiplayerSessionDeps['repository'],
+): HavocMultiplayerSessionDeps['repository'] {
+  return withRepositoryHooks(repository, {
+    saveActive: async (state) => {
+      const membership = loadHavocMultiplayerMembership(state.roomId);
+      if (membership) {
+        await selectedProfile();
+        await profileRepository().bind(
+          `havoc-multiplayer:${state.roomId}`,
+          membership.participantId,
+        );
+      }
+      return repository.saveActive(state);
+    },
+  });
+}
 
 export function createHavocMultiplayerSession(
   overrides: Partial<HavocMultiplayerSessionDeps> = {},
 ): HavocMultiplayerSession {
+  const baseRepository = overrides.repository ?? getPersistence().havocMultiplayerRepository;
+  const repository = overrides.repository
+    ? baseRepository
+    : profileAwareHavocMultiplayerRepository(baseRepository);
   return new HavocMultiplayerSession({
     transport: overrides.transport ?? getHavocMultiplayerTransport(),
-    repository: overrides.repository ?? getPersistence().havocMultiplayerRepository,
+    repository,
     runner: overrides.runner ?? new HavocMultiplayerRunner(),
     loadAssets: overrides.loadAssets ?? (() => loadHavocMultiplayerAssets()),
     now: overrides.now ?? (() => Date.now()),

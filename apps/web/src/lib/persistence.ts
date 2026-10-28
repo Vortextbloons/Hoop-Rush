@@ -4,6 +4,7 @@ import {
   DexieFixedFiveRepository,
   DexieHavocMultiplayerRepository,
   DexieHavocRepository,
+  DexieProfileRepository,
   HoopRushDatabase,
 } from '@hoop-rush/persistence';
 
@@ -14,6 +15,7 @@ export interface Persistence {
   havocRepository: DexieHavocRepository;
   draftDuelRepository: DexieDraftDuelRepository;
   havocMultiplayerRepository: DexieHavocMultiplayerRepository;
+  profileRepository: DexieProfileRepository;
 }
 
 let cached: Persistence | null = null;
@@ -28,6 +30,7 @@ export function getPersistence(): Persistence {
       havocRepository: new DexieHavocRepository(db),
       draftDuelRepository: new DexieDraftDuelRepository(db),
       havocMultiplayerRepository: new DexieHavocMultiplayerRepository(db),
+      profileRepository: new DexieProfileRepository(db),
     };
   }
   return cached;

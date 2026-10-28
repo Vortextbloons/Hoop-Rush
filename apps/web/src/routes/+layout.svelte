@@ -2,7 +2,7 @@
   import { browser } from '$app/env';
   import { asset, resolve } from '$app/paths';
   import { page } from '$app/state';
-  import { Home, Users, Swords } from '@lucide/svelte';
+  import { Home, Users, Swords, CircleUserRound } from '@lucide/svelte';
   import '../app.css';
   import { ModeWatcher } from 'mode-watcher';
   import ArenaSoundToggle from '#lib/components/ArenaSoundToggle.svelte';
@@ -34,6 +34,7 @@
     { id: 'home', label: 'Home', href: '/', icon: Home },
     { id: 'roster', label: 'Roster', href: '/roster', icon: Users },
     { id: 'multiplayer', label: 'Multiplayer', href: '/multiplayer', icon: Swords },
+    { id: 'profile', label: 'Profile', href: '/profile', icon: CircleUserRound },
   ];
   const routeId = $derived(page.route.id);
   const currentMode = $derived(
@@ -42,7 +43,10 @@
   const isMultiplayerLobby = $derived(routeId === '/multiplayer');
   const isHavoc = $derived(currentMode?.id === 'havoc');
   const showBottomNav = $derived(
-    routeId === '/' || routeId === '/roster' || routeId === '/multiplayer',
+    routeId === '/' ||
+      routeId === '/roster' ||
+      routeId === '/multiplayer' ||
+      routeId === '/profile',
   );
   $effect(() => {
     if (!browser) return;

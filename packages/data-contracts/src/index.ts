@@ -1,4 +1,5 @@
 export * from './ids.ts';
+export * from './profile.ts';
 export * from './positions.ts';
 export * from './franchise.ts';
 export * from './historical-identity.ts';

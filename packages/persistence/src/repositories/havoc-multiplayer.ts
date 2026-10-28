@@ -4,6 +4,7 @@ import {
   havocMultiplayerVerificationReceiptSchema,
   type HavocMultiplayerCommand,
   type HavocMultiplayerVerificationReceipt,
+  profileBindingSchema,
 } from '@hoop-rush/data-contracts';
 import {
   havocMultiplayerCompletionRecapSchema,
@@ -24,6 +25,7 @@ import {
   type StoredHavocMultiplayerResultRow,
 } from '../schemas/havoc-multiplayer-record.ts';
 import { HoopRushDatabase } from './dexie.ts';
+import { DexieProfileRepository } from './profile.ts';
 import {
   commandReceiptMatches,
   deleteWhereEquals,
@@ -183,8 +185,7 @@ export class DexieHavocMultiplayerRepository {
     const verification = havocMultiplayerVerificationReceiptSchema.array().parse(entries);
     await this.db.transaction(
       'rw',
-      this.db.havocMultiplayerActive,
-      this.db.havocMultiplayerResults,
+      [this.db.havocMultiplayerActive, this.db.havocMultiplayerResults],
       async () => {
         const active = await this.db.havocMultiplayerActive.get(roomId);
         if (active !== undefined) {
@@ -229,11 +230,38 @@ export class DexieHavocMultiplayerRepository {
       });
     await this.db.transaction(
       'rw',
-      this.db.havocMultiplayerActive,
-      this.db.havocMultiplayerCommands,
-      this.db.havocMultiplayerCompleted,
-      this.db.havocMultiplayerHistory,
+      [
+        this.db.havocMultiplayerActive,
+        this.db.havocMultiplayerCommands,
+        this.db.havocMultiplayerCompleted,
+        this.db.havocMultiplayerHistory,
+        this.db.havocMultiplayerResults,
+        this.db.profileBindings,
+        this.db.profileGames,
+        this.db.profiles,
+      ],
       async () => {
+        const bindingId = `havoc-multiplayer:${validated.roomId}`;
+        const binding = await this.db.profileBindings.get(bindingId);
+        const participant = binding ? profileBindingSchema.parse(binding).participantId : undefined;
+        if (participant) {
+          const profileRepo = new DexieProfileRepository(this.db);
+          for (const game of validated.games) {
+            if (game.winner === null) continue;
+            const row = await this.db.havocMultiplayerResults.get([
+              validated.roomId,
+              game.gameNumber,
+            ]);
+            const result = row ? storedHavocMultiplayerResultRowSchema.parse(row).result : null;
+            const side = game.homeParticipantId === participant ? 'home' : 'away';
+            await profileRepo.recordGame(bindingId, String(game.gameNumber), {
+              won: game.winner === participant,
+              multiplayer: true,
+              players: result?.[side].participants ?? [],
+            });
+          }
+          await profileRepo.recordMatch(bindingId, validated.champion === participant);
+        }
         await this.db.havocMultiplayerCompleted.put(completed);
         await this.db.havocMultiplayerHistory.put(index);
         await this.db.havocMultiplayerActive.delete(validated.roomId);

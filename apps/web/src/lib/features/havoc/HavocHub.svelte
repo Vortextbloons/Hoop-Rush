@@ -1,6 +1,7 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
   import { Rocket } from '@lucide/svelte';
+  import { HAVOC_GAME_COUNT } from '@hoop-rush/data-contracts';
   import type { HavocHubState } from './havoc-hub-state.svelte.js';
   import HavocLineupLock from './HavocLineupLock.svelte';
   let {
@@ -10,9 +11,12 @@
   }: { hub: HavocHubState; onOpenResult: () => void; onAbandoned: () => void } = $props();
   let abandonOpen = $state(false);
   const run = $derived(hub.run);
-  const baseline = $derived(hub.progress?.variant === 'normal' || (run?.havocCursor ?? 0) >= 82);
-  const completed = $derived(
-    hub.progress?.gamesCompleted ?? (baseline ? run?.normalCursor : run?.havocCursor) ?? 0,
+  const baseline = $derived((run?.havocCursor ?? 0) >= HAVOC_GAME_COUNT);
+  const completed = $derived((run?.havocCursor ?? 0) + (run?.normalCursor ?? 0));
+  const total = HAVOC_GAME_COUNT * 2;
+  const finalizing = $derived(completed === total && run?.comparisonStatus !== 'complete');
+  const comparisonSeason = $derived(
+    baseline && !finalizing && ((run?.normalCursor ?? 0) > 0 || hub.progress?.variant === 'normal'),
   );
   async function resume() {
     if (await hub.playSeason()) onOpenResult();
@@ -37,36 +41,56 @@
     <header class="h-header">
       <div>
         <p class="h-eyebrow">
-          Hoop Havoc · {baseline ? 'Preparing your report' : 'Season in motion'}
+          Hoop Havoc · {finalizing
+            ? 'Preparing your report'
+            : comparisonSeason
+              ? 'Comparison season'
+              : baseline
+                ? 'Havoc season complete'
+                : 'Season in motion'}
         </p>
         <h1 class="h-title mt-3">
           {baseline ? 'What did the powers change?' : 'Let the freaks cook.'}
         </h1>
         <p class="h-copy mt-4">
-          {baseline
-            ? 'Playing the same season without mutations to reveal the difference. Your full report is up next.'
-            : 'Your starting five are taking on the league. All 82 games play automatically.'}
+          {finalizing
+            ? 'All games are saved. Crunching your comparison and MVP next.'
+            : comparisonSeason
+              ? 'Playing the same season without mutations to reveal the difference. Your full report is up next.'
+              : baseline
+                ? 'Continue to replay the schedule without powers, then reveal the full comparison.'
+                : 'Your starting five are taking on the league. All 82 havoc games play automatically, then the same schedule replays without powers.'}
         </p>
       </div>
       <Rocket size={64} color="#ffd782" strokeWidth={1.25} />
     </header>
     <section class="h-panel" aria-label="Season progress" aria-busy={hub.busy}>
       <div class="flex flex-wrap items-center justify-between gap-3">
-        <h2 class="h-subtitle">{baseline ? 'Building the final report' : 'Playing your season'}</h2>
-        <span class="h-eyebrow" data-havoc-progress-label>{completed} / 82</span>
+        <h2 class="h-subtitle">
+          {finalizing
+            ? 'Finishing your report'
+            : baseline
+              ? 'Playing the comparison season'
+              : 'Playing your season'}
+        </h2>
+        <span class="h-eyebrow" data-havoc-progress-label>{completed} / {total}</span>
       </div>
       <div
         class="h-meter"
         role="progressbar"
-        aria-label={baseline ? 'Comparison season progress' : 'Havoc season progress'}
+        aria-label="Saved games across both seasons"
         aria-valuemin={0}
-        aria-valuemax={82}
+        aria-valuemax={total}
         aria-valuenow={completed}
       >
-        <div style:width={`${Math.min(100, (completed / 82) * 100)}%`}></div>
+        <div style:width={`${Math.min(100, (completed / total) * 100)}%`}></div>
       </div>
       <p class="h-copy text-xs">
-        {hub.busy ? 'Games are saved as they finish.' : 'Your progress is saved.'}
+        {finalizing && hub.busy
+          ? 'All games are saved. Preparing your comparison and MVP.'
+          : hub.busy
+            ? 'Games are saved as they finish. Progress includes both 82-game seasons.'
+            : 'Your progress is saved.'}
       </p>
       {#if hub.busy}<button
           class="h-link mt-4"

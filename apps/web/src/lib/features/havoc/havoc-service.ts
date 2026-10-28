@@ -17,6 +17,11 @@ import { getPersistence } from '#lib/persistence.js';
 import { loadRunPreamble } from '#lib/run-preamble.js';
 import { loadDraftCatalog } from '#lib/data-assets.js';
 import { HavocRunner } from './havoc-runner';
+import {
+  profileRepository,
+  selectedProfile,
+  withRepositoryHooks,
+} from '#lib/features/profile/profile.js';
 
 export interface CreateHavocServiceOptions {
   repository?: HavocRunRepositoryPort;
@@ -28,9 +33,33 @@ export interface CreateHavocServiceOptions {
   newCommandId?: () => string;
 }
 
+function profileAwareHavocRepository(repository: HavocRunRepositoryPort): HavocRunRepositoryPort {
+  return withRepositoryHooks(repository, {
+    applyOutcome: async (input) => {
+      if (input.command?.command === 'create-havoc-draft') {
+        await selectedProfile();
+        await profileRepository().bind(`havoc:${input.outcome.state.runId}`);
+      }
+      return repository.applyOutcome(input);
+    },
+    loadActiveRun: async () => {
+      const run = await repository.loadActiveRun();
+      if (run) {
+        await selectedProfile();
+        await profileRepository().bind(`havoc:${run.runId}`);
+      }
+      return run;
+    },
+  });
+}
+
 export function createHavocService(options: CreateHavocServiceOptions = {}): HavocService {
+  const baseRepository = options.repository ?? getPersistence().havocRepository;
+  const repository = options.repository
+    ? baseRepository
+    : profileAwareHavocRepository(baseRepository);
   return new HavocSession({
-    repository: options.repository ?? getPersistence().havocRepository,
+    repository,
     runner: options.runner ?? new HavocRunner(),
     assets: {
       loadCatalog: options.loadCatalog ?? loadDraftCatalog,

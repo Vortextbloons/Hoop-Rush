@@ -9,13 +9,34 @@ import {
   saveDraftDuelMembership,
 } from './draft-duel-identity';
 import { loadDraftDuelAssets } from './draft-duel-assets';
+import {
+  profileRepository,
+  selectedProfile,
+  withRepositoryHooks,
+} from '#lib/features/profile/profile.js';
+
+function profileAwareDraftDuelRepository(
+  repository: DraftDuelSessionDeps['repository'],
+): DraftDuelSessionDeps['repository'] {
+  return withRepositoryHooks(repository, {
+    saveActive: async (state) => {
+      await selectedProfile();
+      await profileRepository().bind(`draft-duel:${state.roomId}`);
+      return repository.saveActive(state);
+    },
+  });
+}
 
 export function createDraftDuelSession(
   overrides: Partial<DraftDuelSessionDeps> = {},
 ): DraftDuelSession {
+  const baseRepository = overrides.repository ?? getPersistence().draftDuelRepository;
+  const repository = overrides.repository
+    ? baseRepository
+    : profileAwareDraftDuelRepository(baseRepository);
   return new DraftDuelSession({
     transport: overrides.transport ?? getDraftDuelTransport(),
-    repository: overrides.repository ?? getPersistence().draftDuelRepository,
+    repository,
     runner: overrides.runner ?? new DraftDuelRunner(),
     loadAssets: overrides.loadAssets ?? (() => loadDraftDuelAssets()),
     now: overrides.now ?? (() => Date.now()),

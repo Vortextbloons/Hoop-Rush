@@ -43,6 +43,7 @@ export class HavocHubState {
     if (this.isDestroyed()) return;
     if (event.type === 'progress') {
       this.progress = event.progress;
+      this.run = this.service.getSnapshot().run;
     } else if (event.type === 'error') {
       this.error = event.message;
     }

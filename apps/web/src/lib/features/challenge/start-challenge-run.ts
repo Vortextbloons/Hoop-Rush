@@ -24,6 +24,7 @@ import { FIXED_SANDBOX_ERA, loadRunPreamble } from '#lib/run-preamble.js';
 import { challengeRepository } from './challenge-repo';
 import { setClassicGuardBypass } from './classic-nav-guard';
 import { leaguePrecompute } from './league-precompute';
+import { profileRepository, selectedProfile } from '#lib/features/profile/profile.js';
 
 interface ChallengeRunPreamble {
   manifest: HoopRushManifest;
@@ -78,6 +79,8 @@ export async function startClassicRun(draft: ClassicDraftState, runSeed: Seed): 
     ...(league ? { league } : {}),
   });
   const run = createChallenge(creation);
+  await selectedProfile();
+  await profileRepository().bind(`challenge:${run.runId}`);
   await challengeRepository.promoteClassicDraftToRun(
     { recordId: 'active', saveSchemaVersion: 2, run },
     draft.draftId,
@@ -127,6 +130,8 @@ export async function startSandboxRun(players: PeakPlayerSeason[], seed: Seed): 
   };
   const run = createChallenge({ ...creation, runSeed: seed });
 
+  await selectedProfile();
+  await profileRepository().bind(`challenge:${run.runId}`);
   await challengeRepository.saveActiveRun({ recordId: 'active', saveSchemaVersion: 2, run });
   void goto(resolve('sandbox/challenge/'));
 }

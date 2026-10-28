@@ -21,6 +21,7 @@ import {
   type StoredDraftDuelResultRow,
 } from '../schemas/draft-duel-record.ts';
 import { HoopRushDatabase } from './dexie.ts';
+import { DexieProfileRepository } from './profile.ts';
 import {
   commandReceiptMatches,
   deleteWhereEquals,
@@ -118,25 +119,29 @@ export class DexieDraftDuelRepository {
     entries: readonly DraftDuelPartiallyVerified[],
   ): Promise<void> {
     const verification = draftDuelPartiallyVerifiedSchema.array().parse(entries);
-    await this.db.transaction('rw', this.db.draftDuelActive, this.db.draftDuelResults, async () => {
-      const active = await this.db.draftDuelActive.get(roomId);
-      if (active !== undefined) {
-        const parsed = storedDraftDuelActiveSchema.parse(active);
-        await this.db.draftDuelActive.put({
-          ...parsed,
-          verification,
-          updatedAtIso: new Date().toISOString(),
-        });
-      }
-      for (const entry of verification) {
-        const row = await this.db.draftDuelResults.get([roomId, entry.gameNumber]);
-        if (row === undefined) continue;
-        const parsedRow = storedDraftDuelResultRowSchema.parse(row);
-        const verified = entry.status === 'verified';
-        if (parsedRow.verified === verified) continue;
-        await this.db.draftDuelResults.put({ ...parsedRow, verified });
-      }
-    });
+    await this.db.transaction(
+      'rw',
+      [this.db.draftDuelActive, this.db.draftDuelResults],
+      async () => {
+        const active = await this.db.draftDuelActive.get(roomId);
+        if (active !== undefined) {
+          const parsed = storedDraftDuelActiveSchema.parse(active);
+          await this.db.draftDuelActive.put({
+            ...parsed,
+            verification,
+            updatedAtIso: new Date().toISOString(),
+          });
+        }
+        for (const entry of verification) {
+          const row = await this.db.draftDuelResults.get([roomId, entry.gameNumber]);
+          if (row === undefined) continue;
+          const parsedRow = storedDraftDuelResultRowSchema.parse(row);
+          const verified = entry.status === 'verified';
+          if (parsedRow.verified === verified) continue;
+          await this.db.draftDuelResults.put({ ...parsedRow, verified });
+        }
+      },
+    );
   }
   async complete(recap: DraftDuelCompletionRecap): Promise<void> {
     const validated = draftDuelCompletionRecapSchema.parse(recap);
@@ -161,11 +166,34 @@ export class DexieDraftDuelRepository {
     });
     await this.db.transaction(
       'rw',
-      this.db.draftDuelActive,
-      this.db.draftDuelCommands,
-      this.db.draftDuelCompleted,
-      this.db.draftDuelHistory,
+      [
+        this.db.draftDuelActive,
+        this.db.draftDuelCommands,
+        this.db.draftDuelCompleted,
+        this.db.draftDuelHistory,
+        this.db.draftDuelResults,
+        this.db.profileBindings,
+        this.db.profileGames,
+        this.db.profiles,
+      ],
       async () => {
+        const active = await this.db.draftDuelActive.get(validated.roomId);
+        const bindingId = `draft-duel:${validated.roomId}`;
+        if (active && (await this.db.profileBindings.get(bindingId))) {
+          const participant = storedDraftDuelActiveSchema.parse(active).localParticipantId;
+          const profileRepo = new DexieProfileRepository(this.db);
+          for (const game of validated.series.games) {
+            const row = await this.db.draftDuelResults.get([validated.roomId, game.gameNumber]);
+            const output = row ? storedDraftDuelResultRowSchema.parse(row).output : null;
+            const side = game.homeParticipantId === participant ? 'home' : 'away';
+            await profileRepo.recordGame(bindingId, String(game.gameNumber), {
+              won: game.winner === participant,
+              multiplayer: true,
+              players: output?.result[side].players ?? [],
+            });
+          }
+          await profileRepo.recordMatch(bindingId, validated.champion === participant);
+        }
         await this.db.draftDuelCompleted.put(completed);
         await this.db.draftDuelHistory.put(index);
         await this.db.draftDuelActive.delete(validated.roomId);

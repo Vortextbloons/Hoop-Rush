@@ -54,7 +54,8 @@ export const modeCatalog: readonly ModeDefinition[] = [
   {
     id: 'havoc',
     label: 'Hoop Havoc',
-    description: 'Draft five mutated freaks, then chase 82-0 against the frozen gauntlet.',
+    description:
+      'Draft five mutated freaks, run an automatic 82-game season, then replay it without powers to see what changed.',
     discovery: { homeOrder: 3, navigationOrder: 3, cta: 'Start Havoc' },
     solo: { href: '/havoc' },
     multiplayer: {

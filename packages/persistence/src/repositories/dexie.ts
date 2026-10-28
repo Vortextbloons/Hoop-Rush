@@ -1,4 +1,10 @@
 import Dexie, { type EntityTable, type Table } from 'dexie';
+import type {
+  PlayerProfile,
+  ProfileBinding,
+  ProfileGame,
+  ProfileSelection,
+} from '@hoop-rush/data-contracts';
 import { SAVE_SCHEMA_VERSION } from '@hoop-rush/data-contracts';
 import { challengeRunProgressDigest } from '@hoop-rush/engine';
 import {
@@ -48,6 +54,7 @@ import type {
   StoredHavocMultiplayerResultRow,
 } from '../schemas/havoc-multiplayer-record.ts';
 import { listCompletedHistory } from './support.ts';
+import { DexieProfileRepository } from './profile.ts';
 const ACTIVE_RECORD_ID = 'active';
 const CLASSIC_DRAFT_RECORD_ID = 'classic-draft';
 
@@ -106,7 +113,18 @@ export const HOOP_RUSH_DATABASE_V3_STORES: Record<string, string> = Object.fromE
     ([name]) => !name.startsWith(COLLECTION_STORE_PREFIX),
   ),
 );
+export const HOOP_RUSH_DATABASE_V4_STORES: Record<string, string> = {
+  ...HOOP_RUSH_DATABASE_V3_STORES,
+  profiles: 'id',
+  profileBindings: 'id',
+  profileGames: 'id',
+  profileSelection: 'id',
+};
 export class HoopRushDatabase extends Dexie {
+  profiles!: EntityTable<PlayerProfile, 'id'>;
+  profileBindings!: EntityTable<ProfileBinding, 'id'>;
+  profileGames!: EntityTable<ProfileGame, 'id'>;
+  profileSelection!: EntityTable<ProfileSelection, 'id'>;
   active!: EntityTable<ActiveRunCheckpoint, 'recordId'>;
   activeGames!: Table<ActiveGameRow, [string, number]>;
   completed!: EntityTable<StoredRunRecord, 'recordId'>;
@@ -138,6 +156,7 @@ export class HoopRushDatabase extends Dexie {
     this.version(1).stores(HOOP_RUSH_DATABASE_STORES);
     this.version(2).stores(HOOP_RUSH_DATABASE_V2_STORES);
     this.version(3).stores(HOOP_RUSH_DATABASE_V3_STORES);
+    this.version(4).stores(HOOP_RUSH_DATABASE_V4_STORES);
   }
 }
 export class DexieChallengeRepository {
@@ -181,17 +200,35 @@ export class DexieChallengeRepository {
       .pick({ status: true, firstLossGameNumber: true, gamesPlayed: true, aggregates: true })
       .parse({ ...input, gamesPlayed: input.gameNumber });
     const updatedAtIso = new Date().toISOString();
-    await this.db.transaction('rw', this.db.active, this.db.activeGames, async () => {
-      const checkpoint = await this.db.active.get(ACTIVE_RECORD_ID);
-      if (checkpoint === undefined) {
-        throw new Error('appendActiveGame: no active run checkpoint to update');
-      }
-      if (checkpoint.runId !== row.runId) {
-        throw new Error('appendActiveGame: runId does not match the active checkpoint');
-      }
-      await this.db.activeGames.put({ ...row, updatedAtIso });
-      await this.db.active.put({ ...checkpoint, ...checkpointUpdate, updatedAtIso });
-    });
+    await this.db.transaction(
+      'rw',
+      [
+        this.db.active,
+        this.db.activeGames,
+        this.db.profileBindings,
+        this.db.profileGames,
+        this.db.profiles,
+      ],
+      async () => {
+        const checkpoint = await this.db.active.get(ACTIVE_RECORD_ID);
+        if (checkpoint === undefined) {
+          throw new Error('appendActiveGame: no active run checkpoint to update');
+        }
+        if (checkpoint.runId !== row.runId) {
+          throw new Error('appendActiveGame: runId does not match the active checkpoint');
+        }
+        await this.db.activeGames.put({ ...row, updatedAtIso });
+        await this.db.active.put({ ...checkpoint, ...checkpointUpdate, updatedAtIso });
+        const bindingId = `challenge:${row.runId}`;
+        if (await this.db.profileBindings.get(bindingId)) {
+          await new DexieProfileRepository(this.db).recordGame(bindingId, String(row.gameNumber), {
+            won: row.result.winner === 'home',
+            multiplayer: false,
+            players: row.result.home.players,
+          });
+        }
+      },
+    );
   }
   async loadActiveRun(): Promise<StoredRunRecord | null> {
     const checkpoint = await this.db.active.get(ACTIVE_RECORD_ID);

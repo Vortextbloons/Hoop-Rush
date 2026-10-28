@@ -58,7 +58,6 @@ import {
   type HavocRunView,
   type HavocService,
   type HavocServiceEvent,
-  type HavocSimulationProgress,
   type HavocWatchSession,
 } from './contract.ts';
 import type {
@@ -317,6 +316,18 @@ export class HavocSession implements HavocService {
         locked: state.locked,
       });
       let accepted = 0;
+      const publishProgress = () => {
+        this.emit({
+          type: 'progress',
+          progress: {
+            variant: input.variant,
+            gamesCompleted: cursor + accepted,
+            gamesTotal: HAVOC_GAME_COUNT,
+            latestGameNumber: cursor + accepted || null,
+          },
+        });
+      };
+      publishProgress();
       const handlers: HavocBatchHandlers = {
         onGame: async (message) => {
           const recomputed = havocGameResultDigest(message.result);
@@ -329,15 +340,7 @@ export class HavocSession implements HavocService {
           await this.acceptStreamedGame(message);
           accepted += 1;
           this.emit({ type: 'game-accepted', summary: message.summary });
-        },
-        onProgress: (message) => {
-          const progress: HavocSimulationProgress = {
-            variant: message.variant,
-            gamesCompleted: message.gamesCompleted,
-            gamesTotal: message.gamesTotal,
-            latestGameNumber: null,
-          };
-          this.emit({ type: 'progress', progress });
+          publishProgress();
         },
         onError: (message) => {
           this.emit({
