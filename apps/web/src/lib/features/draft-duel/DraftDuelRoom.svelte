@@ -1,4 +1,5 @@
 <script lang="ts">
+  import AchievementReveal from '#lib/features/profile/AchievementReveal.svelte';
   import RoomShell from '#lib/features/multiplayer/RoomShell.svelte';
   import { getLobbyCoordinator } from '#lib/features/multiplayer/lobby-context.svelte.js';
   import { onDestroy, onMount } from 'svelte';
@@ -255,6 +256,7 @@
     </div>
   {:else}
     <RoomShell
+      profileKind="draft-duel"
       {roomId}
       title="Draft Duel"
       phase={phaseLabel}
@@ -626,6 +628,7 @@
         </section>
       {/if}
     {:else if controller.phase === 'championship' && controller.series}
+      <AchievementReveal bindingId={`draft-duel:${roomId}`} />
       <section class="panel" aria-label="Championship">
         <ChampionshipView
           series={controller.series}

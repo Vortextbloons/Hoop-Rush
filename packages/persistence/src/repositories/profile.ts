@@ -9,19 +9,16 @@ import {
 import { applyProfileGame, type ProfileGameFacts } from '@hoop-rush/engine';
 import type { HoopRushDatabase } from './dexie.ts';
 
-export type ProfileCommand =
-  | { kind: 'create'; id: string; name: string }
-  | { kind: 'select'; id: string }
-  | {
-      kind: 'customize';
-      id: string;
-      name: string;
-      avatar: PlayerProfile['avatar'];
-      border: PlayerProfile['border'];
-      nameColor: PlayerProfile['nameColor'];
-      title: PlayerProfile['title'];
-      featuredAchievement: PlayerProfile['featuredAchievement'];
-    };
+export type ProfileCommand = {
+  kind: 'customize';
+  id: string;
+  name: string;
+  avatar: PlayerProfile['avatar'];
+  border: PlayerProfile['border'];
+  nameColor: PlayerProfile['nameColor'];
+  title: PlayerProfile['title'];
+  featuredAchievement: PlayerProfile['featuredAchievement'];
+};
 
 export class DexieProfileRepository {
   private readonly db: HoopRushDatabase;
@@ -31,63 +28,75 @@ export class DexieProfileRepository {
   }
 
   async initialize(defaultId: string): Promise<PlayerProfile> {
-    return this.db.transaction('rw', this.db.profiles, this.db.profileSelection, async () => {
-      const selected = await this.db.profileSelection.get('selected');
-      if (selected) {
-        const selection = profileSelectionSchema.parse(selected);
-        const profile = await this.db.profiles.get(selection.profileId);
-        if (!profile) throw new Error('Selected profile is missing');
-        return playerProfileSchema.parse(profile);
-      }
-      const profile = this.newProfile(defaultId, 'Player');
-      await this.db.profiles.add(profile);
-      await this.db.profileSelection.add(
-        profileSelectionSchema.parse({
-          saveSchemaVersion: PROFILE_SAVE_SCHEMA_VERSION,
-          id: 'selected',
-          profileId: profile.id,
-        }),
-      );
-      return profile;
-    });
+    return this.db.transaction(
+      'rw',
+      this.db.profiles,
+      this.db.profileSelection,
+      this.db.archivedProfiles,
+      async () => {
+        const selected = await this.db.profileSelection.get('selected');
+        if (selected) {
+          const selection = profileSelectionSchema.parse(selected);
+          const profile = await this.db.profiles.get(selection.profileId);
+          if (!profile) throw new Error('Selected profile is missing');
+          const retained = playerProfileSchema.parse(profile);
+          const others = (await this.db.profiles.toArray())
+            .filter((row) => row.id !== retained.id)
+            .map((row) => playerProfileSchema.parse(row));
+          if (others.length) {
+            await this.db.archivedProfiles.bulkAdd(others);
+            await this.db.profiles.bulkDelete(others.map((row) => row.id));
+          }
+          return retained;
+        }
+        if ((await this.db.profiles.count()) > 0) throw new Error('Selected profile is missing');
+        const profile = this.newProfile(defaultId, 'Player');
+        await this.db.profiles.add(profile);
+        await this.db.profileSelection.add(
+          profileSelectionSchema.parse({
+            saveSchemaVersion: PROFILE_SAVE_SCHEMA_VERSION,
+            id: 'selected',
+            profileId: profile.id,
+          }),
+        );
+        return profile;
+      },
+    );
   }
 
   async list(): Promise<PlayerProfile[]> {
     return (await this.db.profiles.toArray()).map((row) => playerProfileSchema.parse(row));
   }
 
+  async loadBound(bindingId: string): Promise<PlayerProfile | null> {
+    const row = await this.db.profileBindings.get(bindingId);
+    if (!row) return null;
+    const binding = profileBindingSchema.parse(row);
+    const profile = await this.db.profiles.get(binding.profileId);
+    if (profile) return playerProfileSchema.parse(profile);
+    playerProfileSchema.parse(await this.db.archivedProfiles.get(binding.profileId));
+    return null;
+  }
+
   async listUnlocks(bindingId: string) {
+    const profile = await this.loadBound(bindingId);
+    if (!profile) return [];
     const rows = await this.db.profileGames.where('id').startsWith(`${bindingId}:`).toArray();
-    return rows.flatMap((row) => profileGameSchema.parse(row).unlocked);
+    return rows.flatMap((row) => {
+      const receipt = profileGameSchema.parse(row);
+      return receipt.profileId === profile.id ? receipt.unlocked : [];
+    });
   }
 
   async dispatch(command: ProfileCommand): Promise<PlayerProfile> {
     return this.db.transaction('rw', this.db.profiles, this.db.profileSelection, async () => {
-      if (command.kind === 'create') {
-        const profile = this.newProfile(command.id, command.name);
-        await this.db.profiles.add(profile);
-        await this.db.profileSelection.put(
-          profileSelectionSchema.parse({
-            saveSchemaVersion: PROFILE_SAVE_SCHEMA_VERSION,
-            id: 'selected',
-            profileId: profile.id,
-          }),
-        );
-        return profile;
-      }
+      const selection = profileSelectionSchema.parse(
+        await this.db.profileSelection.get('selected'),
+      );
+      if (selection.profileId !== command.id) throw new Error('Profile not found');
       const row = await this.db.profiles.get(command.id);
       if (!row) throw new Error('Profile not found');
       const profile = playerProfileSchema.parse(row);
-      if (command.kind === 'select') {
-        await this.db.profileSelection.put(
-          profileSelectionSchema.parse({
-            saveSchemaVersion: PROFILE_SAVE_SCHEMA_VERSION,
-            id: 'selected',
-            profileId: profile.id,
-          }),
-        );
-        return profile;
-      }
       if (
         command.featuredAchievement &&
         !profile.achievements.includes(command.featuredAchievement)
@@ -148,12 +157,14 @@ export class DexieProfileRepository {
       this.db.profileBindings,
       this.db.profileGames,
       this.db.profiles,
+      this.db.archivedProfiles,
       async () => {
-        const binding = profileBindingSchema.parse(await this.db.profileBindings.get(bindingId));
+        profileBindingSchema.parse(await this.db.profileBindings.get(bindingId));
+        const profile = await this.loadBound(bindingId);
+        if (!profile) return [];
         const id = `${bindingId}:${gameId}`;
         const prior = await this.db.profileGames.get(id);
         if (prior) return profileGameSchema.parse(prior).unlocked;
-        const profile = playerProfileSchema.parse(await this.db.profiles.get(binding.profileId));
         const result = applyProfileGame(profile, facts);
         await this.db.profiles.put(playerProfileSchema.parse(result.profile));
         await this.db.profileGames.add(
@@ -175,12 +186,14 @@ export class DexieProfileRepository {
       this.db.profileBindings,
       this.db.profileGames,
       this.db.profiles,
+      this.db.archivedProfiles,
       async () => {
-        const binding = profileBindingSchema.parse(await this.db.profileBindings.get(bindingId));
+        profileBindingSchema.parse(await this.db.profileBindings.get(bindingId));
+        const profile = await this.loadBound(bindingId);
+        if (!profile) return [];
         const id = `${bindingId}:match`;
         const prior = await this.db.profileGames.get(id);
         if (prior) return profileGameSchema.parse(prior).unlocked;
-        const profile = playerProfileSchema.parse(await this.db.profiles.get(binding.profileId));
         const multiplayerStreak = won ? profile.multiplayerStreak + 1 : 0;
         const unlocked =
           multiplayerStreak >= 5 && !profile.achievements.includes('built-different')
@@ -202,6 +215,24 @@ export class DexieProfileRepository {
           }),
         );
         return unlocked;
+      },
+    );
+  }
+
+  async recordCompletedMatch(
+    bindingId: string,
+    games: readonly { gameId: string; facts: ProfileGameFacts }[],
+    won: boolean,
+  ): Promise<void> {
+    await this.db.transaction(
+      'rw',
+      this.db.profileBindings,
+      this.db.profileGames,
+      this.db.profiles,
+      this.db.archivedProfiles,
+      async () => {
+        for (const game of games) await this.recordGame(bindingId, game.gameId, game.facts);
+        await this.recordMatch(bindingId, won);
       },
     );
   }

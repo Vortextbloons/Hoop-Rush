@@ -1,18 +1,16 @@
 <script lang="ts">
   import type { AchievementId } from '@hoop-rush/data-contracts';
+  import { liveQuery } from 'dexie';
   import { achievements, profileRepository } from './profile.js';
   let { bindingId }: { bindingId: string } = $props();
   let unlocked = $state<AchievementId[]>([]);
   $effect(() => {
-    let cancelled = false;
-    void profileRepository()
-      .listUnlocks(bindingId)
-      .then((items) => {
-        if (!cancelled) unlocked = items;
-      });
-    return () => {
-      cancelled = true;
-    };
+    const subscription = liveQuery(() => profileRepository().listUnlocks(bindingId)).subscribe({
+      next: (items) => {
+        unlocked = items;
+      },
+    });
+    return () => subscription.unsubscribe();
   });
 </script>
 

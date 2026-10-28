@@ -120,8 +120,13 @@ export const HOOP_RUSH_DATABASE_V4_STORES: Record<string, string> = {
   profileGames: 'id',
   profileSelection: 'id',
 };
+export const HOOP_RUSH_DATABASE_V5_STORES: Record<string, string> = {
+  ...HOOP_RUSH_DATABASE_V4_STORES,
+  archivedProfiles: 'id',
+};
 export class HoopRushDatabase extends Dexie {
   profiles!: EntityTable<PlayerProfile, 'id'>;
+  archivedProfiles!: EntityTable<PlayerProfile, 'id'>;
   profileBindings!: EntityTable<ProfileBinding, 'id'>;
   profileGames!: EntityTable<ProfileGame, 'id'>;
   profileSelection!: EntityTable<ProfileSelection, 'id'>;
@@ -157,6 +162,7 @@ export class HoopRushDatabase extends Dexie {
     this.version(2).stores(HOOP_RUSH_DATABASE_V2_STORES);
     this.version(3).stores(HOOP_RUSH_DATABASE_V3_STORES);
     this.version(4).stores(HOOP_RUSH_DATABASE_V4_STORES);
+    this.version(5).stores(HOOP_RUSH_DATABASE_V5_STORES);
   }
 }
 export class DexieChallengeRepository {
@@ -208,6 +214,7 @@ export class DexieChallengeRepository {
         this.db.profileBindings,
         this.db.profileGames,
         this.db.profiles,
+        this.db.archivedProfiles,
       ],
       async () => {
         const checkpoint = await this.db.active.get(ACTIVE_RECORD_ID);

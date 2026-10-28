@@ -175,6 +175,7 @@ export class DexieDraftDuelRepository {
         this.db.profileBindings,
         this.db.profileGames,
         this.db.profiles,
+        this.db.archivedProfiles,
       ],
       async () => {
         const active = await this.db.draftDuelActive.get(validated.roomId);

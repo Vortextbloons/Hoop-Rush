@@ -5,6 +5,8 @@
   import { getLobbyCoordinator } from './lobby-context.svelte';
   import { loadLobbyId } from './multiplayer-lobby';
   import { multiplayerInviteLink } from './invite-link';
+  import RoomProfiles from '#lib/features/profile/RoomProfiles.svelte';
+  import type { PublicProfile } from '@hoop-rush/data-contracts';
   let {
     roomId,
     title,
@@ -17,6 +19,8 @@
     error = null,
     children,
     lobbyId: suppliedLobbyId = null,
+    profileKind = null,
+    onProfilesChange,
   }: {
     roomId: string;
     title: string;
@@ -29,6 +33,8 @@
     error?: string | null;
     children?: Snippet;
     lobbyId?: string | null;
+    profileKind?: 'fixed-five' | 'draft-duel' | 'havoc-multiplayer' | null;
+    onProfilesChange?: (players: PublicProfile[]) => void;
   } = $props();
   const coordinator = getLobbyCoordinator();
   let lobbyId = $state<string | null>(null);
@@ -110,6 +116,21 @@
     {#if lobbyId}<a href={resolve(`/multiplayer?lobby=${lobbyId}`)}>Room lobby →</a>{/if}
     {@render children?.()}
   </div>
+  {#if suppliedLobbyId}
+    <RoomProfiles
+      topic={`profile-lobby:${suppliedLobbyId}`}
+      bindingId={null}
+      {participantId}
+      {onProfilesChange}
+    />
+  {:else if profileKind}
+    <RoomProfiles
+      topic={`profile-${profileKind}:${roomId}`}
+      bindingId={`${profileKind}:${roomId}`}
+      {participantId}
+      {onProfilesChange}
+    />
+  {/if}
   {#if error || copyError || (lobbyId && coordinator.snapshot.error)}<p class="error" role="alert">
       {error ?? copyError ?? coordinator.snapshot.error}
     </p>{/if}

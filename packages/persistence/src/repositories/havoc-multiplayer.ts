@@ -239,6 +239,7 @@ export class DexieHavocMultiplayerRepository {
         this.db.profileBindings,
         this.db.profileGames,
         this.db.profiles,
+        this.db.archivedProfiles,
       ],
       async () => {
         const bindingId = `havoc-multiplayer:${validated.roomId}`;

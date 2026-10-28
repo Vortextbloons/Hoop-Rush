@@ -20,6 +20,7 @@
   import FixedFiveDraftPanel from '#lib/features/fixed-five/FixedFiveDraftPanel.svelte';
   import FixedFiveSimShow from '#lib/features/fixed-five/FixedFiveSimShow.svelte';
   import FixedFiveResults from '#lib/features/fixed-five/FixedFiveResults.svelte';
+  import FixedFiveCareer from '#lib/features/fixed-five/FixedFiveCareer.svelte';
   import GamecastBroadcast from '#lib/gamecast/GamecastBroadcast.svelte';
   import GamecastRecap from '#lib/gamecast/GamecastRecap.svelte';
   import GamecastSeriesTracker from '#lib/gamecast/GamecastSeriesTracker.svelte';
@@ -30,7 +31,9 @@
   } from '#lib/gamecast/gamecast-playback.js';
   import ArenaSoundToggle from '#lib/components/ArenaSoundToggle.svelte';
   import { FixedFiveRoomController } from '#lib/features/fixed-five/fixed-five-room-controller.svelte.js';
+  import type { PublicProfile } from '@hoop-rush/data-contracts';
   let { roomId }: { roomId: string } = $props();
+  let roomProfiles = $state<PublicProfile[]>([]);
   const controller = new FixedFiveRoomController({ roomId: untrack(() => roomId) });
   const snapshot = $derived(controller.roomSnapshot);
   const display = $derived(controller.display);
@@ -103,6 +106,10 @@
     </div>
   {:else if snapshot && display}
     <RoomShell
+      profileKind="fixed-five"
+      onProfilesChange={(players) => {
+        roomProfiles = players;
+      }}
       {roomId}
       title={controller.roomName}
       phase={controller.phaseLabel}
@@ -117,6 +124,15 @@
         >{/if}
     </RoomShell>
     {#if phase !== 'expired' && phase !== 'integrity-failed'}
+      {#if localResult && snapshot.phase === 'completed'}
+        <FixedFiveCareer
+          {roomId}
+          participant={selfId}
+          result={localResult.result}
+          entries={controller.statsSource}
+          verified={snapshot.phase === 'completed'}
+        />
+      {/if}
       <ol class="room-stages" aria-label="Match progress">
         {#each ['Lobby', 'Draft your five', 'Play', 'Results'] as label, i (label)}
           <li
@@ -167,7 +183,9 @@
     {/if}
 
     {#if phase !== 'lobby' && phase !== 'completed' && phase !== 'awaiting-confirmation' && phase !== 'integrity-failed' && phase !== 'expired'}
-      <div class="room-players"><FixedFiveScoreboard snapshot={display} {selfId} /></div>
+      <div class="room-players">
+        <FixedFiveScoreboard snapshot={display} {selfId} profiles={roomProfiles} />
+      </div>
     {/if}
 
     {#if phase === 'lobby'}
@@ -218,7 +236,7 @@
             <h2>Your matchup</h2>
             <span><Users size={14} aria-hidden="true" /> {display.members.length}/2</span>
           </div>
-          <FixedFiveScoreboard snapshot={display} {selfId} />
+          <FixedFiveScoreboard snapshot={display} {selfId} profiles={roomProfiles} />
           <dl class="lobby-rules">
             <div>
               <dt>Draft source</dt>

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import AchievementReveal from '#lib/features/profile/AchievementReveal.svelte';
   import RoomShell from '#lib/features/multiplayer/RoomShell.svelte';
   import { getLobbyCoordinator } from '#lib/features/multiplayer/lobby-context.svelte.js';
   import { onDestroy, onMount } from 'svelte';
@@ -254,6 +255,7 @@
     </div>
   {:else}
     <RoomShell
+      profileKind="havoc-multiplayer"
       {roomId}
       title="Havoc room"
       phase={phaseLabel}
@@ -628,6 +630,7 @@
               </section>
             {/if}
           {:else if phase === 'championship'}
+            <AchievementReveal bindingId={`havoc-multiplayer:${roomId}`} />
             {#if controller.series}
               <HavocMultiplayerChampionship
                 series={controller.series}

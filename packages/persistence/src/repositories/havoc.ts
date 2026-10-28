@@ -197,6 +197,7 @@ function HAVOC_SCOPED_TABLES(db: HoopRushDatabase): Table<unknown>[] {
     db.profileBindings,
     db.profileGames,
     db.profiles,
+    db.archivedProfiles,
   ] as Table<unknown>[];
 }
 

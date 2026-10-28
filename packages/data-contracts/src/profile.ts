@@ -29,6 +29,21 @@ export const playerProfileSchema = z.object({
 });
 export type PlayerProfile = z.infer<typeof playerProfileSchema>;
 
+export const publicProfileSchema = playerProfileSchema
+  .pick({
+    name: true,
+    avatar: true,
+    border: true,
+    nameColor: true,
+    title: true,
+    featuredAchievement: true,
+    games: true,
+    wins: true,
+    bestStreak: true,
+  })
+  .extend({ participantId: z.enum(['p1', 'p2']) });
+export type PublicProfile = z.infer<typeof publicProfileSchema>;
+
 export const profileBindingSchema = z.object({
   saveSchemaVersion: z.literal(PROFILE_SAVE_SCHEMA_VERSION),
   id: z.string().min(1).max(128),

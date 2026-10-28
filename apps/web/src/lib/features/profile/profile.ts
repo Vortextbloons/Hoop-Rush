@@ -33,7 +33,7 @@ export const achievements: Record<
   },
   'built-different': {
     name: 'Built Different',
-    description: 'Win 5 multiplayer games in a row.',
+    description: 'Win 5 multiplayer matches in a row.',
     reward: 'Crown avatar and gold border',
   },
 };

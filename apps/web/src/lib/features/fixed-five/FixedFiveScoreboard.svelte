@@ -1,8 +1,15 @@
 <script lang="ts">
   import { UserRound, Check, Users } from '@lucide/svelte';
-  import type { FixedFiveRoomSnapshot } from '@hoop-rush/data-contracts';
-  let { snapshot, selfId = 'p1' }: { snapshot: FixedFiveRoomSnapshot; selfId?: 'p1' | 'p2' } =
-    $props();
+  import type { FixedFiveRoomSnapshot, PublicProfile } from '@hoop-rush/data-contracts';
+  let {
+    snapshot,
+    selfId = 'p1',
+    profiles = [],
+  }: {
+    snapshot: FixedFiveRoomSnapshot;
+    selfId?: 'p1' | 'p2';
+    profiles?: PublicProfile[];
+  } = $props();
   const seats = $derived([selfId, selfId === 'p1' ? 'p2' : 'p1'] as const);
   const drafting = $derived(snapshot.phase === 'drafting');
 </script>
@@ -10,16 +17,25 @@
 <div class="player-seats" aria-label="Players in this room">
   {#each seats as id (id)}
     {@const member = snapshot.members.find((item) => item.participantId === id)}
+    {@const profile = profiles.find((item) => item.participantId === id)}
     <div class={['player-seat', { yours: id === selfId, empty: !member }]}>
       <div class="seat-top">
         <span class="player-avatar"
-          >{#if member}<UserRound size={21} aria-hidden="true" />{:else}<Users
+          >{#if profile}{profile.avatar === 'ball'
+              ? '🏀'
+              : profile.avatar === 'crown'
+                ? '👑'
+                : profile.name.slice(0, 2).toUpperCase()}{:else if member}<UserRound
               size={21}
               aria-hidden="true"
-            />{/if}</span
+            />{:else}<Users size={21} aria-hidden="true" />{/if}</span
         >
         <div class="player-name">
-          <strong>{id === selfId ? 'You' : member ? 'Opponent' : 'Open seat'}</strong><small
+          <strong
+            class:profile-blue={profile?.nameColor === 'blue'}
+            class:profile-orange={profile?.nameColor === 'orange'}
+            >{profile?.name ?? (id === selfId ? 'You' : member ? 'Opponent' : 'Open seat')}</strong
+          ><small
             >{id === 'p1' ? 'Room host' : member ? 'Challenger' : 'Waiting for a challenger'}</small
           >
         </div>
@@ -48,6 +64,12 @@
 </div>
 
 <style>
+  .profile-blue {
+    color: #60a5fa;
+  }
+  .profile-orange {
+    color: #fb923c;
+  }
   .player-seats {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
