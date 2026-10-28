@@ -13,6 +13,8 @@ import {
   havocGameTapeSchema,
   havocReportSchema,
   havocRunStateSchema,
+  havocRunProgressSchema,
+  havocLockedInputsSchema,
   havocVariantSchema,
   idSchema,
 } from '@hoop-rush/data-contracts';
@@ -22,6 +24,25 @@ export const HAVOC_ACTIVE_RECORD_ID = 'active';
 export const havocDigestTextSchema = z.string().min(1).max(64);
 const isoDateSchema = z.iso.datetime();
 
+const storedHavocProgressSchema = havocRunProgressSchema.safeExtend({
+  locked: z.object({ runId: idSchema, digest: havocDigestSchema }).strict().nullable(),
+});
+const storedHavocStateSchema = z.union([storedHavocProgressSchema, havocRunStateSchema]);
+export type StoredHavocState = z.infer<typeof storedHavocStateSchema>;
+export const storedHavocLockedInputsSchema = z
+  .object({
+    saveSchemaVersion: z.literal(HAVOC_SAVE_SCHEMA_VERSION),
+    runId: idSchema,
+    digest: havocDigestSchema,
+    locked: havocLockedInputsSchema,
+  })
+  .superRefine((row, ctx) => {
+    if (row.runId !== row.locked.runId) {
+      ctx.addIssue({ code: 'custom', message: 'stored locked inputs belong to another run' });
+    }
+  });
+export type StoredHavocLockedInputs = z.infer<typeof storedHavocLockedInputsSchema>;
+
 export const storedHavocActiveRunSchema = z
   .object({
     saveSchemaVersion: z.literal(HAVOC_SAVE_SCHEMA_VERSION),
@@ -29,7 +50,7 @@ export const storedHavocActiveRunSchema = z
     runId: idSchema,
     revision: z.number().int().nonnegative(),
     stateDigest: havocDigestSchema,
-    state: havocRunStateSchema,
+    state: storedHavocStateSchema,
     createdAtIso: isoDateSchema,
     updatedAtIso: isoDateSchema,
   })
@@ -120,7 +141,7 @@ export const storedHavocCompletedRunSchema = z
   .object({
     saveSchemaVersion: z.literal(HAVOC_SAVE_SCHEMA_VERSION),
     runId: idSchema,
-    state: havocRunStateSchema,
+    state: storedHavocStateSchema,
     comparison: havocComparisonSchema.nullable(),
     report: havocReportSchema.nullable(),
     createdAtIso: isoDateSchema,

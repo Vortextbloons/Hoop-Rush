@@ -27,7 +27,7 @@ import {
 import { validateLineup } from '../domain/lineup.ts';
 import { auditScheduleEntries } from '../bracket/schedule.ts';
 import type { EngineContext } from '../sim/kernel.ts';
-import { simulateGame } from '../sim/game.ts';
+import { createGameBatchSimulator } from '../sim/game.ts';
 import { checkGameResult } from '../sim/invariants.ts';
 import { addGameToAggregates, zeroRunAggregates } from './aggregates.ts';
 import { leagueGamesSimulated, leagueQuotas } from './league.ts';
@@ -537,11 +537,12 @@ export function simulateChallenge(
   profile: EraSimulationProfile,
   context: EngineContext,
 ): ChallengeRun {
+  const simulate = createGameBatchSimulator(context);
   let current = run;
   while (current.status === 'active') {
     const input = createNextGameInput(current, profile);
     if (!input) break;
-    const result = simulateGame(input, context);
+    const result = simulate(input);
     current = acceptGameResult(current, result);
   }
   return current;

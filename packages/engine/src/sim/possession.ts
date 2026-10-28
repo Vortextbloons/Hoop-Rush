@@ -121,6 +121,7 @@ export function createTripContext(
   teams: [SimulationTeam, SimulationTeam],
   homeCourt?: HomeCourtMechanisms,
   effects?: EffectsHook,
+  preps?: [TeamPrep, TeamPrep],
 ): TripContext {
   return {
     rng,
@@ -130,7 +131,7 @@ export function createTripContext(
     teams,
     teamUnits: [unitVersionIdsOf(teams[0]), unitVersionIdsOf(teams[1])],
     personalFouls: [new Map<string, number>(), new Map<string, number>()],
-    preps: [prepareTeam(teams[0], profile), prepareTeam(teams[1], profile)],
+    preps: preps ?? [prepareTeam(teams[0], profile), prepareTeam(teams[1], profile)],
     meanTripSeconds: meanTripSeconds(profile),
     eraPossEstimatePerTrip: eraPossEstimatePerTrip(profile) ?? 1,
     passingAnchorFactor: 0.5 + (profile.parameters.assistAnchorRating - 50) / 100,
@@ -639,10 +640,10 @@ export class PossessionStepper {
 export function resolveTrip(ctx: TripContext, offenseSide: SideIndex): TripResolution {
   const startedRemaining = ctx.state.secondsRemaining;
   const stepper = new PossessionStepper(ctx, offenseSide);
-  let step: PossessionStep = { ended: false, pause: false, periodEnded: false, finished: false };
-  while (!step.periodEnded && !step.finished) {
+  let step: PossessionStep;
+  do {
     step = stepper.step();
-  }
+  } while (!step.periodEnded && !step.finished);
   return {
     secondsElapsed: startedRemaining - ctx.state.secondsRemaining,
     ended: step.ended,

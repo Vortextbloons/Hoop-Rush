@@ -7,6 +7,7 @@ import {
   HAVOC_WORKER_WIRE_SCHEMA_VERSION,
   HavocLoadError,
   canonicalJson,
+  canonicalHavocLockedInputs,
   havocAbandonRunCommandSchema,
   havocAcceptGameCommandSchema,
   havocAcceptNormalGameCommandSchema,
@@ -84,7 +85,7 @@ export interface HavocSessionOptions {
 }
 
 function lockedDigestOf(locked: HavocLockedInputs): string {
-  return seasonDigestHex(`havoc-locked-v1:${canonicalJson(locked)}`);
+  return seasonDigestHex(`havoc-locked-v1:${canonicalHavocLockedInputs(locked)}`);
 }
 
 function messageOf(error: unknown): string {

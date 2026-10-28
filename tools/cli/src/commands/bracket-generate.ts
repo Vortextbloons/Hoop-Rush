@@ -28,12 +28,12 @@ import { UsageError } from './sim.ts';
 import { parseCount } from '../args.ts';
 import { readJson, sha256Hex } from '../io.ts';
 const COMMITTED_GENERATION_SEED: Seed = seedSchema.parse('8f2c1d4e6a9b7c3d8f2c1d4e6a9b7c3d');
-const GENERATION_VERSION = 'bracket-m3-v4';
+const GENERATION_VERSION = 'bracket-m3-v5';
 const SINGLE_DIFFICULTY: DifficultyProfile = {
-  profileVersion: 'm3-single-v1',
+  profileVersion: 'm3-single-v2',
   name: 'medium',
-  leagueMedianPercentileBand: [0.3, 0.42],
-  teamPercentileBand: [0.2, 0.5],
+  leagueMedianPercentileBand: [0.42, 0.53],
+  teamPercentileBand: [0.15, 0.8],
 };
 const MIN_BRACKET_SAMPLES = 32;
 const NBA_ROOT = resolve(REPO_ROOT, 'raw-data/nba');

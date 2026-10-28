@@ -7,13 +7,12 @@ import {
   type HavocWorkerTapeRequest,
 } from '@hoop-rush/data-contracts';
 import {
-  auditHavocGame,
   buildHavocGameInput,
   createEngineContext,
   havocGameResultDigest,
   havocGameSummaryOf,
   havocGameTapeDigest,
-  simulateHavocGame,
+  simulateAuditedHavocGame,
 } from '@hoop-rush/engine';
 import { sleep } from '../lib/sleep';
 
@@ -53,8 +52,7 @@ async function runTape(request: HavocWorkerTapeRequest): Promise<void> {
       gameNumber: request.gameNumber,
       variant: request.variant,
     });
-    const { result, tape } = simulateHavocGame(input, engineContext);
-    const audit = auditHavocGame(input, result, tape);
+    const { result, tape, audit } = simulateAuditedHavocGame(input, engineContext);
     if (!audit.ok) {
       postError(
         request.requestId,
@@ -95,8 +93,7 @@ async function runSimulation(request: HavocWorkerSimulateRequest): Promise<void>
         gameNumber,
         variant: request.variant,
       });
-      const { result, tape } = simulateHavocGame(input, engineContext);
-      const audit = auditHavocGame(input, result, tape);
+      const { result, audit } = simulateAuditedHavocGame(input, engineContext);
       if (!audit.ok) {
         postError(
           request.requestId,

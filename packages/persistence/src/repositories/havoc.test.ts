@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'bun:test';
+import Dexie from 'dexie';
+import { HOOP_RUSH_DATABASE_V5_STORES } from './dexie.ts';
 import {
   HAVOC_GAME_COUNT,
   HAVOC_MUTATION_CATALOG_VERSION,
@@ -802,6 +804,98 @@ describe('DexieHavocRepository', () => {
     );
     expect(await repo.readRunGame(RUN_ID, 'havoc', 1)).not.toBeNull();
     expect(await repo.listRunGames(RUN_ID, 'normal')).toHaveLength(0);
+    db.close();
+  });
+
+  it('stores locked inputs once while checkpoints advance and hydrate after reopening', async () => {
+    const { db, repo } = createRepository('havoc-compact-progress');
+    const states = await applyDraftChain(repo, true);
+    const first = buildGame(states.locked, 1, 'havoc', 'cmd-compact-1');
+    const snapshotWrites = vi.spyOn(db.table('havocLockedInputs'), 'put');
+    await applyGameBundle(repo, states.locked, first);
+    expect(snapshotWrites).not.toHaveBeenCalled();
+    const row = await db.havocActiveRuns.get(HAVOC_ACTIVE_RECORD_ID);
+    expect(JSON.stringify(row)).not.toContain('opponents');
+    expect(await db.table('havocLockedInputs').count()).toBe(1);
+    db.close();
+    await db.open();
+    const resumed = await new DexieHavocRepository(db).loadActiveRun();
+    expect(resumed).toEqual(first.nextState);
+    if (resumed === null || resumed.locked === null) throw new Error('expected a resumed run');
+    const locked = resumed.locked;
+    expect(() => {
+      locked.human.displayName = 'Changed after reloading';
+    }).toThrow();
+    const second = buildGame(resumed, 2, 'havoc', 'cmd-compact-2');
+    await applyGameBundle(new DexieHavocRepository(db), resumed, second);
+    expect(await repo.loadActiveRun()).toEqual(second.nextState);
+    db.close();
+  });
+  it('loads a version-5 inline save and splits it atomically on the next accepted game', async () => {
+    const { db, repo } = createRepository('havoc-v5-upgrade');
+    const state = buildDraftChainStates().locked;
+    const legacy = new Dexie(db.name);
+    legacy.version(5).stores(HOOP_RUSH_DATABASE_V5_STORES);
+    await legacy.table('havocActiveRuns').put({
+      saveSchemaVersion: HAVOC_SAVE_SCHEMA_VERSION,
+      recordId: HAVOC_ACTIVE_RECORD_ID,
+      runId: state.runId,
+      revision: state.revision,
+      stateDigest: seasonDigestHex('legacy-state'),
+      state,
+      createdAtIso: '2026-10-28T00:00:00.000Z',
+      updatedAtIso: '2026-10-28T00:00:00.000Z',
+    });
+    legacy.close();
+    expect(await repo.loadActiveRun()).toEqual(state);
+    expect(await db.havocLockedInputs.count()).toBe(0);
+    const game = buildGame(state, 1, 'havoc', 'cmd-v5-game');
+    const failedWrite = vi
+      .spyOn(db.havocGames, 'put')
+      .mockRejectedValueOnce(new Error('save failed'));
+    await expect(applyGameBundle(repo, state, game)).rejects.toThrow('save failed');
+    failedWrite.mockRestore();
+    expect(await db.havocLockedInputs.count()).toBe(0);
+    expect(await repo.loadActiveRun()).toEqual(state);
+    await applyGameBundle(repo, state, game);
+    expect(await db.havocLockedInputs.count()).toBe(1);
+    expect(JSON.stringify(await db.havocActiveRuns.get(HAVOC_ACTIVE_RECORD_ID))).not.toContain(
+      'opponents',
+    );
+    expect(await repo.loadActiveRun()).toEqual(game.nextState);
+    db.close();
+  });
+
+  it('rejects missing or changed locked snapshots when resuming', async () => {
+    const { db, repo } = createRepository('havoc-snapshot-corruption');
+    await applyDraftChain(repo, true);
+    const snapshot = await db.havocLockedInputs.get(RUN_ID);
+    if (snapshot === undefined) throw new Error('expected locked inputs');
+    await db.havocLockedInputs.delete(RUN_ID);
+    await expectHavocLoadError(repo.loadActiveRun(), 'corrupt');
+    await db.havocLockedInputs.put({
+      ...snapshot,
+      locked: {
+        ...snapshot.locked,
+        human: { ...snapshot.locked.human, displayName: 'Changed snapshot' },
+      },
+    });
+    await expectHavocLoadError(repo.loadActiveRun(), 'corrupt');
+    db.close();
+  });
+
+  it('rejects changed locked inputs without saving the game or advancing progress', async () => {
+    const { db, repo } = createRepository('havoc-locked-drift');
+    const states = await applyDraftChain(repo, true);
+    const game = buildGame(states.locked, 1, 'havoc', 'cmd-drift-game');
+    if (game.nextState.locked === null) throw new Error('expected locked state');
+    game.nextState.locked.human.displayName = 'Changed input';
+    await expect(applyGameBundle(repo, states.locked, game)).rejects.toBeInstanceOf(
+      HavocOutcomeIntegrityError,
+    );
+    expect(await repo.readRunGame(RUN_ID, 'havoc', 1)).toBeNull();
+    expect(await repo.loadCommandResult(game.commandId)).toBeNull();
+    expect(await repo.loadActiveRun()).toEqual(states.locked);
     db.close();
   });
 

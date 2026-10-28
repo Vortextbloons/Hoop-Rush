@@ -9314,13 +9314,9 @@
       "contentHash": "3f03b02b374d2b638eb799495d04049e800b7c44e6c529b1f07c8913f25fb7d0"
     }
   ],
-  "assets": {
-    "source": "NBA.com",
-    "cacheVersion": "2026-08-03-historical-logos-v1",
-    "headshotUrlTemplate": "https://cdn.nba.com/headshots/nba/latest/1040x760/{playerExternalId}.png",
-    "headshotUrlTemplateSecondary": "https://www.basketball-reference.com/req/20200617/images/headshots/{altIds.bbref}.jpg",
-    "logoUrlTemplate": "https://cdn.nba.com/logos/nba/{teamExternalId}/global/L/logo.svg",
-    "logoUrlTemplateSecondary": "https://a.espncdn.com/i/teamlogos/nba/500/{teamAbbreviation}.png"
+  "bracket": {
+    "url": "opponents/bracket.json",
+    "contentHash": "43d3ef4bc2d882281bd33a982fd32d2ad7fcfe498fcf7b008ca45ff028e436d0"
   },
   "playersIndex": {
     "url": "players-index.json",
@@ -9329,10 +9325,6 @@
   "rosterDetails": {
     "url": "roster-details.json",
     "contentHash": "75d84289e563d815b87647d6b19113986d9a6b0025ac9f536c775d8f7c02c409"
-  },
-  "bracket": {
-    "url": "opponents/bracket.json",
-    "contentHash": "a0b840a7aadb83f834786016e3040eb31d3543944168c9bb7d08babf39592f1e"
   },
   "draftCatalog": {
     "url": "draft-catalog.json",
@@ -9347,5 +9339,13 @@
       "url": "collection/index.json",
       "contentHash": "90b369166956c5a81b02b28504f65cab38650bb54012316a85c88d668c0bd989"
     }
+  },
+  "assets": {
+    "headshotUrlTemplate": "https://cdn.nba.com/headshots/nba/latest/1040x760/{playerExternalId}.png",
+    "headshotUrlTemplateSecondary": "https://www.basketball-reference.com/req/20200617/images/headshots/{altIds.bbref}.jpg",
+    "logoUrlTemplate": "https://cdn.nba.com/logos/nba/{teamExternalId}/global/L/logo.svg",
+    "logoUrlTemplateSecondary": "https://a.espncdn.com/i/teamlogos/nba/500/{teamAbbreviation}.png",
+    "source": "NBA.com",
+    "cacheVersion": "2026-08-03-historical-logos-v1"
   }
 }

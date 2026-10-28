@@ -2,7 +2,7 @@ import {
   chooseBestRunSeed,
   createEngineContext,
   createGameInput,
-  simulateGame,
+  createGameBatchSimulator,
   type EngineContext,
 } from '@hoop-rush/engine';
 import type { GameResult } from '@hoop-rush/data-contracts';
@@ -61,6 +61,7 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
     return;
   }
   void (async () => {
+    const simulate = createGameBatchSimulator(context);
     let delivered = 0;
     try {
       for (
@@ -72,7 +73,7 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
         const last = Math.min(gameNumber + BATCH_SIZE - 1, 82);
         for (let n = gameNumber; n <= last; n += 1) {
           const input = createGameInput(request.run, request.profile, n);
-          results.push(simulateGame(input, context));
+          results.push(simulate(input));
           delivered += 1;
         }
         if (token !== requestToken) break;

@@ -45,6 +45,7 @@ import {
   type HavocDraftCard,
   type HavocDraftPick,
   type HavocGameInput,
+  type HavocGameAudit,
   type HavocGameResult,
   type HavocGameSummary,
   type HavocGameTape,
@@ -70,7 +71,6 @@ import {
   FoldHavocAggregate,
   HavocSimulationExhaustedError,
   applyHavocMutationPackage,
-  auditHavocGame,
   buildHavocGameInput,
   buildHavocLockedInputs,
   createEngineContext,
@@ -83,7 +83,7 @@ import {
   HAVOC_MUTATION_DEFINITIONS,
   compareHavocSeasons,
   deriveHavocReport,
-  simulateHavocGame,
+  simulateAuditedHavocGame,
   type EngineContext,
   type HavocCommandEnvironment,
   type HavocLockSources,
@@ -704,8 +704,9 @@ export function simulateHavocCliVariant(input: {
     });
     let result: HavocGameResult;
     let tape: HavocGameTape;
+    let audit: HavocGameAudit;
     try {
-      ({ result, tape } = simulateHavocGame(gameInput, context));
+      ({ result, tape, audit } = simulateAuditedHavocGame(gameInput, context));
     } catch (error) {
       if (error instanceof HavocSimulationExhaustedError) {
         failures.push({
@@ -720,7 +721,6 @@ export function simulateHavocCliVariant(input: {
     }
     const resultDigest = havocGameResultDigest(result);
     const summary = havocGameSummaryOf(result, resultDigest);
-    const audit = auditHavocGame(gameInput, result, tape);
     if (!audit.ok) {
       for (const finding of audit.findings) {
         failures.push({

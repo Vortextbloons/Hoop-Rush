@@ -43,6 +43,22 @@ describe('havoc audit', () => {
     expect(auditHavocGame(run.input, run.result).ok).toBe(true);
   });
 
+  it('retains the solo human-side and input-digest checks', () => {
+    const run = corruptedRun();
+    const wrongSide = cloneResult(run.result);
+    wrongSide.humanSide = run.input.humanSide === 'home' ? 'away' : 'home';
+    expect(auditHavocGame(run.input, wrongSide, run.tape).findings).toContainEqual({
+      code: 'input-identity',
+      message: 'result human side differs from input',
+    });
+    const wrongDigest = cloneResult(run.result);
+    wrongDigest.inputDigest = '0'.repeat(32);
+    expect(auditHavocGame(run.input, wrongDigest, run.tape).findings).toContainEqual({
+      code: 'input-digest',
+      message: 'result input digest does not match the supplied input',
+    });
+  });
+
   it('detects a tampered team score', () => {
     const run = corruptedRun();
     const result = cloneResult(run.result);

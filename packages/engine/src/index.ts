@@ -11,7 +11,7 @@ import { slotRequirement as canonicalSlotRequirement } from './domain/lineup.ts'
 export { classifyArchetype } from './domain/archetypes.ts';
 export { createEngineContext, type EngineContext } from './sim/kernel.ts';
 export { fnv1a32, hex32, createRng, type Rng, shuffle, swapAt } from './sim/rng.ts';
-export { simulateGame } from './sim/game.ts';
+export { createGameBatchSimulator, simulateGame } from './sim/game.ts';
 export { checkGameResult, gameResultDigest } from './sim/invariants.ts';
 export { evaluateLineupStrength } from './challenge/lineup-eval.ts';
 export {

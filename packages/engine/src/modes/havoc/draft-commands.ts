@@ -21,6 +21,7 @@ import {
   havocCreateDraftCommandSchema,
   havocDraftStateSchema,
   havocRunStateSchema,
+  freezeHavocLockedInputs,
 } from '@hoop-rush/data-contracts';
 import { createRng, type Rng } from '../../sim/rng.ts';
 import type { HavocCommandOutcome, HavocDraftEnvironment, HavocLockSources } from './api.ts';
@@ -392,6 +393,7 @@ function applyLockLineup(
     locked,
     completionState: 'season',
   });
+  if (nextState.locked !== null) freezeHavocLockedInputs(nextState.locked);
   return acceptHavocCommand(state, command, nextState);
 }
 

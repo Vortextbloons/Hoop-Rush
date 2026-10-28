@@ -15,6 +15,23 @@ import {
 import { auditHavocBattleGame } from '../core/battle-audit.ts';
 import { havocBattleGameInputDigest } from '../core/battle-digests.ts';
 
+export function auditHavocSoloIdentity(
+  input: HavocGameInput,
+  result: HavocGameResult,
+): HavocAuditFinding[] {
+  const findings: HavocAuditFinding[] = [];
+  if (result.humanSide !== input.humanSide) {
+    findings.push({ code: 'input-identity', message: 'result human side differs from input' });
+  }
+  if (result.inputDigest !== havocGameInputDigest(input)) {
+    findings.push({
+      code: 'input-digest',
+      message: 'result input digest does not match the supplied input',
+    });
+  }
+  return findings;
+}
+
 /**
  * Solo facade over the neutral battle audit. It pins the solo-only identity
  * checks (human side and solo input digest) first, then delegates every
@@ -38,12 +55,7 @@ export function auditHavocGame(
     );
     return { ok: false, findings };
   }
-  if (result.humanSide !== input.humanSide) {
-    fail('input-identity', 'result human side differs from input');
-  }
-  if (result.inputDigest !== havocGameInputDigest(input)) {
-    fail('input-digest', 'result input digest does not match the supplied input');
-  }
+  findings.push(...auditHavocSoloIdentity(input, result));
 
   const battleInput = soloToBattleInput(input);
   const battleResult = soloToBattleResult(

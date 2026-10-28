@@ -40,6 +40,7 @@ import type {
 } from '../schemas/draft-duel-record.ts';
 import type {
   StoredHavocActiveRun,
+  StoredHavocLockedInputs,
   StoredHavocCommandRow,
   StoredHavocCompletedRun,
   StoredHavocGameRow,
@@ -124,6 +125,10 @@ export const HOOP_RUSH_DATABASE_V5_STORES: Record<string, string> = {
   ...HOOP_RUSH_DATABASE_V4_STORES,
   archivedProfiles: 'id',
 };
+export const HOOP_RUSH_DATABASE_V6_STORES: Record<string, string> = {
+  ...HOOP_RUSH_DATABASE_V5_STORES,
+  havocLockedInputs: 'runId',
+};
 export class HoopRushDatabase extends Dexie {
   profiles!: EntityTable<PlayerProfile, 'id'>;
   archivedProfiles!: EntityTable<PlayerProfile, 'id'>;
@@ -145,6 +150,7 @@ export class HoopRushDatabase extends Dexie {
   draftDuelResults!: Table<StoredDraftDuelResultRow, [string, number]>;
   draftDuelCompleted!: EntityTable<StoredDraftDuelCompleted, 'roomId'>;
   draftDuelHistory!: EntityTable<StoredDraftDuelHistoryIndex, 'recordId'>;
+  havocLockedInputs!: EntityTable<StoredHavocLockedInputs, 'runId'>;
   havocActiveRuns!: EntityTable<StoredHavocActiveRun, 'recordId'>;
   havocCommands!: EntityTable<StoredHavocCommandRow, 'commandId'>;
   havocGames!: Table<StoredHavocGameRow, [string, string, number]>;
@@ -163,6 +169,7 @@ export class HoopRushDatabase extends Dexie {
     this.version(3).stores(HOOP_RUSH_DATABASE_V3_STORES);
     this.version(4).stores(HOOP_RUSH_DATABASE_V4_STORES);
     this.version(5).stores(HOOP_RUSH_DATABASE_V5_STORES);
+    this.version(6).stores(HOOP_RUSH_DATABASE_V6_STORES);
   }
 }
 export class DexieChallengeRepository {

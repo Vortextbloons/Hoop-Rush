@@ -6,7 +6,7 @@ import {
   type ChallengeCreation,
 } from '../../challenge/commands.ts';
 import { deriveAttemptSeed } from '../../challenge/seeds.ts';
-import { simulateGame } from '../../sim/game.ts';
+import { createGameBatchSimulator } from '../../sim/game.ts';
 import type { EngineContext } from '../../sim/kernel.ts';
 export const BEST_OF_ATTEMPTS = 2;
 export interface RunScore {
@@ -77,6 +77,7 @@ export function chooseBestRunSeed(
   profile: EraSimulationProfile,
   context: EngineContext,
 ): BestOfChoice {
+  const simulate = createGameBatchSimulator(context);
   let best: {
     seed: Seed;
     score: RunScore;
@@ -88,7 +89,7 @@ export function chooseBestRunSeed(
     let differential = 0;
     for (let gameNumber = 1; gameNumber <= 82; gameNumber += 1) {
       const input = createGameInput(attemptRun, profile, gameNumber);
-      const result = simulateGame(input, context);
+      const result = simulate(input);
       const pointsDiff = result.home.box.points - result.away.box.points;
       if (pointsDiff > 0) wins += 1;
       differential += pointsDiff;

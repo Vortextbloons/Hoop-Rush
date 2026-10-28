@@ -10,6 +10,8 @@ import {
   HAVOC_SEED_DERIVATION_VERSION,
   HavocLoadError,
   canonicalJson,
+  canonicalHavocLockedInputs,
+  freezeHavocLockedInputs,
   havocCommandResultSchema,
   havocCommandSchema,
   havocComparisonSchema,
@@ -17,6 +19,7 @@ import {
   havocGameTapeSchema,
   havocReportSchema,
   havocRunStateSchema,
+  havocRunProgressSchema,
   seasonDigestHex,
   type CommandId,
   type HavocCommand,
@@ -33,6 +36,8 @@ import {
   HAVOC_ACTIVE_RECORD_ID,
   havocDigestTextSchema,
   storedHavocActiveRunSchema,
+  storedHavocLockedInputsSchema,
+  type StoredHavocState,
   storedHavocCommandRowSchema,
   storedHavocCompletedRunSchema,
   storedHavocGameRowSchema,
@@ -189,6 +194,7 @@ interface ParsedTapeArtifact {
 function HAVOC_SCOPED_TABLES(db: HoopRushDatabase): Table<unknown>[] {
   return [
     db.havocActiveRuns,
+    db.havocLockedInputs,
     db.havocCommands,
     db.havocGames,
     db.havocRetainedTapes,
@@ -275,14 +281,20 @@ function asRunId(runId: string): Id {
   return runId as Id;
 }
 
-function parseOutcomeState(rawState: unknown, command: HavocCommand | null): ParsedOutcomeState {
-  const direct = havocRunStateSchema.safeParse(rawState);
+function parseOutcomeState(
+  rawState: HavocRunState,
+  command: HavocCommand | null,
+  accepted: boolean,
+): ParsedOutcomeState {
+  const direct = accepted
+    ? havocRunProgressSchema.safeParse(rawState)
+    : havocRunStateSchema.safeParse(rawState);
   if (direct.success) {
     const draftAbandoned =
       direct.data.phase === 'draft' &&
       direct.data.completionState === 'abandoned' &&
       (command === null || command.command === 'abandon-havoc-run');
-    return { state: direct.data, draftAbandoned };
+    return { state: { ...direct.data, locked: rawState.locked }, draftAbandoned };
   }
   throw new HavocOutcomeIntegrityError([`outcome state: ${direct.error.message}`]);
 }
@@ -380,7 +392,7 @@ export class DexieHavocRepository implements HavocRepository {
   async loadActiveRun(): Promise<HavocRunState | null> {
     const row: unknown = await this.db.havocActiveRuns.get(HAVOC_ACTIVE_RECORD_ID);
     if (row === undefined) return null;
-    return parseStored(storedHavocActiveRunSchema, row, 'active run').state;
+    return this.hydrateState(parseStored(storedHavocActiveRunSchema, row, 'active run').state);
   }
 
   async clearActiveRun(): Promise<void> {
@@ -399,7 +411,11 @@ export class DexieHavocRepository implements HavocRepository {
       input.command === undefined
         ? null
         : parseInput(havocCommandSchema, input.command, 'outcome command');
-    const parsedState = parseOutcomeState(input.outcome.state, command);
+    const parsedState = parseOutcomeState(
+      input.outcome.state,
+      command,
+      result.status === 'accepted',
+    );
     const state = parsedState.state;
     if (
       command !== null &&
@@ -549,6 +565,8 @@ export class DexieHavocRepository implements HavocRepository {
       }
 
       if (acceptedState !== null) {
+        const previousLocked = (targetCompleted ?? active)?.state.locked;
+        const storedState = await this.storeState(acceptedState, previousLocked);
         if (parsedState.draftAbandoned) {
           await this.db.havocActiveRuns.delete(HAVOC_ACTIVE_RECORD_ID);
         } else if (targetCompleted !== null) {
@@ -557,7 +575,7 @@ export class DexieHavocRepository implements HavocRepository {
             {
               saveSchemaVersion: HAVOC_SAVE_SCHEMA_VERSION,
               runId: result.runId,
-              state: acceptedState,
+              state: storedState,
               comparison: comparison ?? targetCompleted.comparison ?? report?.comparison ?? null,
               report: report ?? targetCompleted.report,
               createdAtIso: targetCompleted.createdAtIso,
@@ -574,7 +592,7 @@ export class DexieHavocRepository implements HavocRepository {
             {
               saveSchemaVersion: HAVOC_SAVE_SCHEMA_VERSION,
               runId: result.runId,
-              state: acceptedState,
+              state: storedState,
               comparison: comparison ?? report?.comparison ?? null,
               report,
               createdAtIso,
@@ -594,7 +612,7 @@ export class DexieHavocRepository implements HavocRepository {
               runId: result.runId,
               revision: result.revisionAfter,
               stateDigest: result.stateDigest,
-              state: acceptedState,
+              state: storedState,
               createdAtIso: active === null ? now : active.createdAtIso,
               updatedAtIso: now,
             },
@@ -785,7 +803,57 @@ export class DexieHavocRepository implements HavocRepository {
     const row: unknown = await this.db.havocCompletedRuns.get(asRunId(runId));
     if (row === undefined) return null;
     const parsed = parseStored(storedHavocCompletedRunSchema, row, `completed run ${runId}`);
-    return { state: parsed.state, report: parsed.report };
+    return { state: await this.hydrateState(parsed.state), report: parsed.report };
+  }
+
+  private async storeState(
+    state: HavocRunState,
+    previousLocked: StoredHavocState['locked'] | undefined,
+  ): Promise<StoredHavocState> {
+    const hasSnapshot =
+      previousLocked !== undefined && previousLocked !== null && 'digest' in previousLocked;
+    state = hasSnapshot ? state : parseInput(havocRunStateSchema, state, 'outcome state');
+    if (state.locked === null) return state;
+    const digest = seasonDigestHex(canonicalHavocLockedInputs(state.locked));
+    if (hasSnapshot) {
+      if (previousLocked.runId !== state.runId || previousLocked.digest !== digest) {
+        throw integrityError('locked inputs changed after the lineup was locked');
+      }
+    } else {
+      const row = parseInput(
+        storedHavocLockedInputsSchema,
+        {
+          saveSchemaVersion: HAVOC_SAVE_SCHEMA_VERSION,
+          runId: state.runId,
+          digest,
+          locked: state.locked,
+        },
+        'locked inputs',
+      );
+      await this.db.havocLockedInputs.put(row);
+    }
+    return { ...state, locked: { runId: state.runId, digest } };
+  }
+
+  private async hydrateState(state: StoredHavocState): Promise<HavocRunState> {
+    if (state.locked === null || !('digest' in state.locked)) {
+      const hydrated = havocRunStateSchema.parse(state);
+      if (hydrated.locked !== null) freezeHavocLockedInputs(hydrated.locked);
+      return hydrated;
+    }
+    const raw: unknown = await this.db.havocLockedInputs.get(asRunId(state.runId));
+    if (raw === undefined) throw new HavocLoadError('corrupt', ['locked inputs are missing']);
+    const row = parseStored(storedHavocLockedInputsSchema, raw, 'locked inputs');
+    if (
+      row.runId !== state.locked.runId ||
+      row.digest !== state.locked.digest ||
+      row.digest !== seasonDigestHex(canonicalJson(row.locked))
+    ) {
+      throw new HavocLoadError('corrupt', ['locked inputs digest does not match the saved run']);
+    }
+    const hydrated = havocRunStateSchema.parse({ ...state, locked: row.locked });
+    if (hydrated.locked !== null) freezeHavocLockedInputs(hydrated.locked);
+    return hydrated;
   }
 
   private async putHistory(

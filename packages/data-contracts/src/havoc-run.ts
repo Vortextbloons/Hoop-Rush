@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { canonicalJson } from './season-hash.ts';
 import { idSchema, seedSchema } from './ids.ts';
 import { eraSimulationProfileSchema } from './era-sim-profile.ts';
 import { HAVOC_GAME_COUNT, HAVOC_SCHEMA_VERSION, havocVersionSetSchema } from './havoc-versions.ts';
@@ -71,6 +72,27 @@ export const havocLockedInputsSchema = z
   });
 export type HavocLockedInputs = z.infer<typeof havocLockedInputsSchema>;
 
+const lockedInputsJson = new WeakMap<HavocLockedInputs, string>();
+
+function freezeLockedValue(value: object): void {
+  for (const child of Object.values(value as Record<string, unknown>)) {
+    if (typeof child === 'object' && child !== null) freezeLockedValue(child);
+  }
+  Object.freeze(value);
+}
+
+export function freezeHavocLockedInputs(locked: HavocLockedInputs): HavocLockedInputs {
+  if (!lockedInputsJson.has(locked)) {
+    freezeLockedValue(locked);
+    lockedInputsJson.set(locked, canonicalJson(locked));
+  }
+  return locked;
+}
+
+export function canonicalHavocLockedInputs(locked: HavocLockedInputs): string {
+  return lockedInputsJson.get(locked) ?? canonicalJson(locked);
+}
+
 export const havocSeasonAggregateSchema = z
   .object({
     games: z.number().int().min(0).max(HAVOC_GAME_COUNT),
@@ -104,7 +126,7 @@ export const havocCompletionStateSchema = z.enum([
 ]);
 export type HavocCompletionState = z.infer<typeof havocCompletionStateSchema>;
 
-export const havocRunStateSchema = z
+export const havocRunProgressSchema = z
   .object({
     schemaVersion: z.literal(HAVOC_SCHEMA_VERSION),
     runId: idSchema,
@@ -113,7 +135,7 @@ export const havocRunStateSchema = z
     versionSet: havocVersionSetSchema,
     phase: z.enum(['draft', 'run']),
     draft: havocDraftStateSchema.nullable(),
-    locked: havocLockedInputsSchema.nullable(),
+    locked: z.object({ runId: idSchema }).nullable(),
     havocCursor: z.number().int().min(0).max(HAVOC_GAME_COUNT),
     normalCursor: z.number().int().min(0).max(HAVOC_GAME_COUNT),
     havocAggregate: havocSeasonAggregateSchema,
@@ -167,4 +189,7 @@ export const havocRunStateSchema = z
       ctx.addIssue({ code: 'custom', message: 'complete runs require a complete comparison' });
     }
   });
+export const havocRunStateSchema = havocRunProgressSchema.safeExtend({
+  locked: havocLockedInputsSchema.nullable(),
+});
 export type HavocRunState = z.infer<typeof havocRunStateSchema>;

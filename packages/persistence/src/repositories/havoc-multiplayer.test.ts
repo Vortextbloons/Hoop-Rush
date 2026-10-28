@@ -37,7 +37,7 @@ import {
   type StoredHavocMultiplayerCommandRow,
 } from '../schemas/havoc-multiplayer-record.ts';
 import { DexieHavocMultiplayerRepository } from './havoc-multiplayer.ts';
-import { HOOP_RUSH_DATABASE_STORES, HOOP_RUSH_DATABASE_V5_STORES } from './dexie.ts';
+import { HOOP_RUSH_DATABASE_STORES, HOOP_RUSH_DATABASE_V6_STORES } from './dexie.ts';
 import {
   resetIndexedDb,
   restoreIndexedDb,
@@ -417,9 +417,9 @@ describe('DexieHavocMultiplayerRepository', () => {
     const db = new TestDatabase(name);
     const repo = new DexieHavocMultiplayerRepository(db);
     await db.open();
-    expect(db.verno).toBe(5);
+    expect(db.verno).toBe(6);
     const tableNames = db.tables.map((table) => table.name).sort();
-    expect(tableNames).toEqual(Object.keys(HOOP_RUSH_DATABASE_V5_STORES).sort());
+    expect(tableNames).toEqual(Object.keys(HOOP_RUSH_DATABASE_V6_STORES).sort());
     expect((await db.completed.get('legacy-run')) as unknown).toEqual(completedRecord);
     expect((await db.history.get('legacy-run')) as unknown).toEqual(historyRecord);
     await repo.saveActive(buildActiveState());

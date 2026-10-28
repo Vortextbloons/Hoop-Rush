@@ -11,7 +11,7 @@ import {
 } from '@hoop-rush/test-fixtures';
 import { checkGameResult, gameResultDigest } from './invariants.ts';
 import { fnv1a32 } from './rng.ts';
-import { simulateGame } from './game.ts';
+import { createGameBatchSimulator, simulateGame, type TripObservation } from './game.ts';
 import { createEngineContext } from './kernel.ts';
 declare const process: {
   env: Record<string, string | undefined>;
@@ -34,6 +34,36 @@ describe('game determinism and golden replay', () => {
       away: weak,
     });
     expect(fnv1a32(gameResultDigest(simulateGame(input, ctx)))).toBe(GOLDEN_STRONG_WEAK_V25_HASH);
+  });
+  it('batch preparation preserves complete results and observations across seeds, teams, and profiles', () => {
+    const simulate = createGameBatchSimulator(ctx);
+    const base = buildGameSimulationInput();
+    const { strong, weak } = buildStrongWeakFixture();
+    const profiles = [
+      base.profile,
+      {
+        ...base.profile,
+        parameters: { ...base.profile.parameters, league3PARate: 0.4 },
+      },
+    ];
+    for (const profile of profiles) {
+      for (let i = 0; i < 40; i += 1) {
+        const input = {
+          ...base,
+          seed: seedSchema.parse(seedFromString(`batch-${String(i)}`)),
+          profile,
+          home: i % 2 === 0 ? base.home : strong,
+          away: i % 3 === 0 ? base.away : weak,
+        };
+        const expectedTrips: TripObservation[] = [];
+        const actualTrips: TripObservation[] = [];
+        const expected = simulateGame(input, ctx, { onTrip: (trip) => expectedTrips.push(trip) });
+        const actual = simulate(input, { onTrip: (trip) => actualTrips.push(trip) });
+        expect(actual).toEqual(expected);
+        expect(actualTrips).toEqual(expectedTrips);
+        expect(checkGameResult(actual)).toEqual([]);
+      }
+    }
   });
   it('a mirror matchup (same player on both teams) keeps accounting separate', () => {
     const shared = buildSimulationPlayer({

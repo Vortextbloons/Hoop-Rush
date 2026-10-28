@@ -189,6 +189,18 @@ describe('challenge commands', () => {
     const firstLossIndex = completed.games.findIndex((g) => g.winner === 'away');
     expect(completed.firstLossGameNumber).toBe(firstLossIndex === -1 ? null : firstLossIndex + 1);
   });
+  it('batch simulation matches accepting individually prepared games', () => {
+    const creation = fixtureCreation();
+    const run = createChallenge(creation);
+    let expected = run;
+    for (let gameNumber = 1; gameNumber <= 82; gameNumber += 1) {
+      expected = acceptGameResult(
+        expected,
+        simulateGame(createGameInput(expected, creation.profile, gameNumber), context),
+      );
+    }
+    expect(simulateChallenge(run, creation.profile, context)).toEqual(expected);
+  });
   it('an interrupted run resumes byte-for-byte', () => {
     const run = createChallenge(fixtureCreation());
     const profileInput = buildGameSimulationInput().profile;

@@ -19,6 +19,7 @@ import {
 } from './recorder.ts';
 import { createGameState, createTripContext, resolveTrip } from './possession.ts';
 import { buildFacts } from './facts.ts';
+import { prepareTeam, type TeamPrep } from './prepare.ts';
 export interface TripObservation {
   period: number;
   offense: SideIndex;
@@ -110,17 +111,27 @@ function playFixedFivePeriods(
   const winner = homeScore > awayScore ? 'home' : 'away';
   return { overtimePeriods, winner };
 }
-export function simulateGame(
+function simulatePreparedGame(
   input: GameSimulationInput,
   context: EngineContext,
   observers?: GameObservers,
+  preps?: [TeamPrep, TeamPrep],
 ): GameResult {
   const rng = context.rngFactory(input.seed);
   const profile = input.profile;
   const teams: [SimulationTeam, SimulationTeam] = [input.home, input.away];
   const recorder = new GameRecorder();
   const state = createGameState();
-  const tripContext = createTripContext(rng, recorder, state, profile, teams);
+  const tripContext = createTripContext(
+    rng,
+    recorder,
+    state,
+    profile,
+    teams,
+    undefined,
+    undefined,
+    preps,
+  );
   const { overtimePeriods, winner } = playFixedFivePeriods(
     rng,
     recorder,
@@ -157,4 +168,36 @@ export function simulateGame(
   };
   result.facts = buildFacts(result);
   return result;
+}
+
+export function simulateGame(
+  input: GameSimulationInput,
+  context: EngineContext,
+  observers?: GameObservers,
+): GameResult {
+  return simulatePreparedGame(input, context, observers);
+}
+export function createGameBatchSimulator(
+  context: EngineContext,
+): (input: GameSimulationInput, observers?: GameObservers) => GameResult {
+  const profiles = new WeakMap<
+    GameSimulationInput['profile'],
+    WeakMap<SimulationTeam['players'], TeamPrep>
+  >();
+  return (input, observers) => {
+    let teams = profiles.get(input.profile);
+    if (teams === undefined) {
+      teams = new WeakMap();
+      profiles.set(input.profile, teams);
+    }
+    const preps = [input.home, input.away].map((team) => {
+      let prep = teams.get(team.players);
+      if (prep === undefined) {
+        prep = prepareTeam(team, input.profile);
+        teams.set(team.players, prep);
+      }
+      return prep;
+    }) as [TeamPrep, TeamPrep];
+    return simulatePreparedGame(input, context, observers, preps);
+  };
 }

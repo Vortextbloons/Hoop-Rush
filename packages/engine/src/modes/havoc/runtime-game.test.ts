@@ -4,7 +4,7 @@ import {
   buildHavocLockedInputs,
 } from '@hoop-rush/test-fixtures';
 import { createEngineContext } from '../../sim/kernel.ts';
-import { simulateHavocGame } from './game.ts';
+import { simulateAuditedHavocGame, simulateHavocGame } from './game.ts';
 import { havocGameResultDigest, havocGameTapeDigest } from './digests.ts';
 import { auditHavocGame } from './audit.ts';
 import { buildHavocGameInput } from './input.ts';
@@ -47,6 +47,22 @@ describe('havoc runtime smoke', () => {
     for (const team of [normalGame.result.home, normalGame.result.away]) {
       expect(team.participants.length).toBeGreaterThanOrEqual(5);
       expect(team.participants.every((line) => line.kind !== 'clone')).toBe(true);
+    }
+  });
+
+  it('audits before conversion with identical results, tapes, and audit findings', () => {
+    const locked = buildHavocLockedInputs();
+    const context = createEngineContext();
+    for (const variant of ['havoc', 'normal'] as const) {
+      for (let gameNumber = 1; gameNumber <= 12; gameNumber += 1) {
+        const input = buildHavocGameInput({ locked, gameNumber, variant });
+        const expected = simulateHavocGame(input, context);
+        const actual = simulateAuditedHavocGame(input, context);
+        expect(actual.result).toEqual(expected.result);
+        expect(actual.tape).toEqual(expected.tape);
+        expect(actual.audit).toEqual(auditHavocGame(input, expected.result, expected.tape));
+        expect(actual.audit.ok).toBe(true);
+      }
     }
   });
 

@@ -3,4 +3,4 @@
  * (neutral home/away contracts); `solo/audit.ts` adapts the solo contracts.
  */
 export * from './core/battle-audit.ts';
-export * from './solo/audit.ts';
+export { auditHavocGame } from './solo/audit.ts';

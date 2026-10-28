@@ -2,6 +2,10 @@ import { describe, expect, it } from 'bun:test';
 import type { HavocRunState } from '@hoop-rush/data-contracts';
 import {
   HAVOC_GAME_COUNT,
+  canonicalJson,
+  seasonDigestHex,
+  freezeHavocLockedInputs,
+  canonicalHavocLockedInputs,
   HAVOC_SCHEMA_VERSION,
   havocAbandonRunCommandSchema,
   havocAcceptGameCommandSchema,
@@ -414,6 +418,30 @@ describe('havoc run command flow', () => {
     const outcome = ApplyHavocCommand(base, create, environment, lockSources);
     expect(outcome.result.status).toBe('rejected');
     expect(outcome.result.rejection?.code).toBe('phase-mismatch');
+  });
+
+  it('reuses deeply frozen inputs without changing canonical state digests', () => {
+    const state = buildHavocRunStateLocked();
+    if (state.locked === null) throw new Error('expected locked inputs');
+    const locked = state.locked;
+    const original = canonicalHavocLockedInputs(locked);
+    locked.human.displayName = 'Changed before freezing';
+    expect(canonicalHavocLockedInputs(locked)).not.toBe(original);
+    Object.freeze(locked);
+    freezeHavocLockedInputs(locked);
+    expect(() => {
+      locked.profile.parameters.league3PARate = 0.4;
+    }).toThrow();
+    expect(() => {
+      locked.schedule.pop();
+    }).toThrow();
+    for (let revision = 1; revision <= 164; revision += 1) {
+      const next = { ...state, revision };
+      expect(HavocStateDigest(next)).toBe(
+        seasonDigestHex(`havoc-run-state-v1\u0000${canonicalJson(next)}`),
+      );
+    }
+    expect(canonicalHavocLockedInputs(locked)).toBe(canonicalJson(locked));
   });
 
   it('keeps the state digest stable and revision-sensitive', () => {
