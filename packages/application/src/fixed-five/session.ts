@@ -35,8 +35,6 @@ import {
   type SlotIndex,
 } from '@hoop-rush/data-contracts';
 import {
-  assembleCompetitionRun,
-  computeCompetitionDigest,
   computeDueAutopick,
   deriveEffectivePhase,
   findWeakestOpponent,
@@ -46,7 +44,6 @@ import {
   replayFixedFiveLog,
   restoreFixedFiveCommandSyncState,
   roomLogFacts,
-  summarizeWorkerEntries,
   type DraftReplay,
   type EngineContext,
   type FixedFiveCandidate,
@@ -58,10 +55,10 @@ import { SeriesCoordinator } from '../multiplayer/series-coordinator.ts';
 import { clamp01, CoalescedTask } from '../runtime/index.ts';
 import { RoomLifecycle, type RoomAttachment } from '../multiplayer/room-lifecycle.ts';
 import { submitFixedFiveCommand } from './command-submit.ts';
+import { FixedFiveDuelFlow } from './duel-flow.ts';
 import { FixedFiveShared82GameFlow } from './shared82-game-flow.ts';
 import { FixedFiveCompetitionFlow } from './competition-flow.ts';
 import { FixedFiveVerificationFlow, isMissingFunctionError } from './verification-flow.ts';
-import { refsForParticipant } from './pick-refs.ts';
 export { refsForParticipant } from './pick-refs.ts';
 
 const RESYNC_INTERVAL_MS = 15_000;
@@ -290,6 +287,7 @@ export type FixedFiveFlowContext = Pick<
 
 export class FixedFiveRoomSession {
   private readonly competition: FixedFiveCompetitionFlow;
+  private readonly duel: FixedFiveDuelFlow;
   private readonly shared82Game: FixedFiveShared82GameFlow;
   private readonly verification: FixedFiveVerificationFlow;
   private readonly deps: FixedFiveRoomSessionDeps;
@@ -318,13 +316,9 @@ export class FixedFiveRoomSession {
   private phase: FixedFiveRoomPhase = 'lobby';
   private lastOrdinal = -1;
 
-  private duelOutputs: Record<number, FixedFiveDuelGameOutput> = {};
-  private duelRunner: FixedFiveRunnerPort | null = null;
   private shared82H2HPendingGame: number | null = null;
   private shared82H2HConfirmedGame: number | null = null;
   private broadcastStartPending: number | null = null;
-  private duelSimulatingGame: number | null = null;
-  private duelSimError: string | null = null;
   private readonly seriesFlow: SeriesCoordinator;
   private readonly lifecycle = new RoomLifecycle();
   private attachment: RoomAttachment | null = null;
@@ -384,6 +378,21 @@ export class FixedFiveRoomSession {
         this.tickShared82Reveal();
       },
     });
+    this.duel = new FixedFiveDuelFlow(deps, {
+      context: () => this.flowContext(),
+      isDisposed: () => this.isDisposed(),
+      isDuelBroadcast: () => this.isDuelBroadcast(),
+      publish: () => {
+        this.publish();
+      },
+      runAutoFlows: () => {
+        this.runAutoFlows();
+      },
+      recomputePhase: () => {
+        this.recomputePhase();
+      },
+      competition: this.competition,
+    });
     this.verification = new FixedFiveVerificationFlow(deps, {
       context: () => ({
         ...this.flowContext(),
@@ -436,14 +445,14 @@ export class FixedFiveRoomSession {
       phase: this.phase,
       canRematch: this.canRematchNow(),
       duelBroadcast: this.isDuelBroadcast(),
-      duelOutputs: this.duelOutputs,
+      duelOutputs: this.duel.outputs,
       shared82Broadcast: this.isShared82Broadcast(),
       shared82H2HOutputs: this.shared82Game.outputs,
       shared82H2HPendingGame: this.shared82H2HPendingGame,
       shared82H2HError: this.shared82Game.error,
       shared82H2HSimulatingGame: this.shared82Game.simulatingGame,
-      duelSimError: this.duelSimError,
-      duelSimulatingGame: this.duelSimulatingGame,
+      duelSimError: this.duel.error,
+      duelSimulatingGame: this.duel.simulatingGame,
       broadcastProgress: this.broadcastProgress,
       duelVerification: this.duelVerification(),
       localReady: this.duelLocalReady(),
@@ -498,8 +507,7 @@ export class FixedFiveRoomSession {
     this.unsubscribeTransport = null;
     this.competition.dispose();
     this.verification.dispose();
-    this.duelRunner?.dispose();
-    this.duelRunner = null;
+    this.duel.dispose();
     this.shared82Game.stop();
     this.detachWakeHandlers();
     if (this.resyncTimer !== null) {
@@ -705,9 +713,9 @@ export class FixedFiveRoomSession {
 
   retryDuelGame(): void {
     if (this.isDisposed()) return;
-    this.duelSimError = null;
+    this.duel.error = null;
     this.publish();
-    this.maybeStartDuelPipeline();
+    this.duel.start();
   }
 
   retryShared82H2HGame(): void {
@@ -820,8 +828,7 @@ export class FixedFiveRoomSession {
     this.publish();
     try {
       this.competition.stopSimulation();
-      this.duelRunner?.dispose();
-      this.duelRunner = null;
+      this.duel.dispose();
       await this.deps.transport.leave(this.roomId, this.selfId);
       return true;
     } catch (e) {
@@ -1123,8 +1130,8 @@ export class FixedFiveRoomSession {
       return;
     }
     this.autoFlowsDeferred = false;
-    this.maybeStartDuelPipeline();
-    this.maybeFinalizeDuelSeries();
+    this.duel.start();
+    this.duel.finalizeIfReady();
     this.maybeProposeOrConfirmGame();
     this.maybeReadyNextGame();
     this.competition.maybeStart();
@@ -1253,181 +1260,6 @@ export class FixedFiveRoomSession {
     return 'pending';
   }
 
-  private duelPipelineTarget(): number | null {
-    const room = this.room;
-    const series = room?.series;
-    if (!room || !series) return null;
-    if (
-      room.phase === 'preparing-game' ||
-      room.phase === 'broadcasting' ||
-      room.phase === 'game-results'
-    ) {
-      const current = series.currentGameNumber;
-      if (current !== null && !this.duelOutputs[current]) return current;
-      return null;
-    }
-    if (room.phase === 'awaiting-confirmation') {
-      const missing = series.games.find((game) => !this.duelOutputs[game.gameNumber]);
-      if (missing) return missing.gameNumber;
-    }
-    return null;
-  }
-
-  private refreshDuelEntries(): void {
-    const entries = Object.values(this.duelOutputs)
-      .sort((a, b) => a.gameNumber - b.gameNumber)
-      .map((output) => ({ tag: 'duel' as const, game: output.result }));
-    if (entries.length === 0) return;
-    this.competition.setDuelEntries(entries);
-  }
-
-  private maybeStartDuelPipeline(): void {
-    if (this.isDisposed() || !this.isDuelBroadcast()) return;
-    if (this.duelSimulatingGame !== null) return;
-    if (!this.room?.rootSeed || !this.assets || !this.replay) return;
-    const target = this.duelPipelineTarget();
-    if (target === null) return;
-    this.duelSimulatingGame = target;
-    this.duelSimError = null;
-    this.publish();
-    void (async () => {
-      try {
-        const output = await this.simulateDuelGame(target);
-        if (this.isDisposed()) return;
-        this.duelOutputs = { ...this.duelOutputs, [output.gameNumber]: output };
-        this.refreshDuelEntries();
-      } catch (error) {
-        if (this.isDisposed()) return;
-        this.duelSimError = error instanceof Error ? error.message : String(error);
-      } finally {
-        if (this.isDisposed()) return;
-        this.duelSimulatingGame = null;
-        this.publish();
-        if (this.duelSimError === null) this.runAutoFlows();
-      }
-    })();
-  }
-
-  private async simulateDuelGame(gameNumber: number): Promise<FixedFiveDuelGameOutput> {
-    const room = this.room;
-    const assets = this.assets;
-    const replay = this.replay;
-    if (!room || !assets || !replay || !room.rootSeed) {
-      throw new Error('Duel game inputs are incomplete.');
-    }
-    const p1Refs = refsForParticipant(replay, assets, 'p1');
-    const p2Refs = refsForParticipant(replay, assets, 'p2');
-    if (p1Refs.length !== 5 || p2Refs.length !== 5) {
-      throw new Error('both lineups must be complete before simulating');
-    }
-    const p1Team = await this.deps.buildTeam(assets.manifest, 'p1', 'Player 1', p1Refs);
-    if (this.isDisposed()) throw new Error('the room session was disposed');
-    const p2Team = await this.deps.buildTeam(assets.manifest, 'p2', 'Player 2', p2Refs);
-    if (this.isDisposed()) throw new Error('the room session was disposed');
-    const versions = room.settings.versions;
-    return await new Promise<FixedFiveDuelGameOutput>((resolve, reject) => {
-      const active = this.deps.createRunner((event) => {
-        if (this.isDisposed()) return;
-        if (event.kind === 'duel-game') {
-          active.dispose();
-          if (this.duelRunner === active) this.duelRunner = null;
-          resolve(event.output);
-        } else if (event.kind === 'error') {
-          active.dispose();
-          if (this.duelRunner === active) this.duelRunner = null;
-          reject(new Error(event.message));
-        }
-      });
-      this.duelRunner = active;
-      active.runDuelGame({
-        roomId: this.roomId,
-        gameNumber,
-        rootSeed: room.rootSeed as Seed,
-        p1Team,
-        p2Team,
-        profile: assets.profile,
-        dataVersion: versions.dataVersion,
-        engineVersion: versions.engineVersion,
-      });
-    });
-  }
-
-  private maybeFinalizeDuelSeries(): void {
-    if (this.isDisposed() || !this.isDuelBroadcast()) return;
-    const room = this.room;
-    const series = room?.series;
-    if (!room || !series || !series.champion) return;
-    if (room.phase !== 'awaiting-confirmation') return;
-    if (this.competition.getSnapshot().localResult) return;
-    if (this.duelPipelineTarget() !== null) return;
-    const played = series.games.map((game) => this.duelOutputs[game.gameNumber]);
-    if (played.some((output) => output === undefined)) return;
-    void this.finalizeDuelSeries(played as FixedFiveDuelGameOutput[]);
-  }
-
-  private async finalizeDuelSeries(outputs: FixedFiveDuelGameOutput[]): Promise<void> {
-    const room = this.room;
-    const assets = this.assets;
-    const replay = this.replay;
-    if (!room || !assets || !replay || !room.rootSeed) return;
-    try {
-      const rootSeed: Seed = room.rootSeed;
-      const p1Refs = refsForParticipant(replay, assets, 'p1');
-      const p2Refs = refsForParticipant(replay, assets, 'p2');
-      const p1Team = await this.deps.buildTeam(assets.manifest, 'p1', 'Player 1', p1Refs);
-      if (this.isDisposed()) return;
-      const p2Team = await this.deps.buildTeam(assets.manifest, 'p2', 'Player 2', p2Refs);
-      if (this.isDisposed()) return;
-      const summary = summarizeWorkerEntries({
-        mode: room.settings.mode,
-        bracket: assets.bracket,
-        rootSeed,
-        p1TeamId: 'p1',
-        p2TeamId: 'p2',
-        p1PlayerIds: p1Team.players.map((player) => player.playerId),
-        p2PlayerIds: p2Team.players.map((player) => player.playerId),
-        entries: outputs.map((output) => ({ tag: 'duel' as const, game: output.result })),
-      });
-      const digest = computeCompetitionDigest({
-        rootSeed,
-        versions: room.settings.versions,
-        p1: { refs: p1Refs, players: [...p1Team.players] },
-        p2: { refs: p2Refs, players: [...p2Team.players] },
-        commands: this.commands,
-        result: summary.result,
-      });
-      const run = assembleCompetitionRun({
-        roomId: this.roomId,
-        sourceMode: room.settings.sourceMode,
-        competition: 'duel',
-        rootSeed,
-        versions: room.settings.versions,
-        commands: this.commands,
-        p1: { refs: p1Refs, players: [...p1Team.players] },
-        p2: { refs: p2Refs, players: [...p2Team.players] },
-        result: summary.result,
-        resultDigest: digest,
-        weakestReplacedOpponentId: summary.weakestReplacedOpponentId,
-      });
-      await this.deps.repository.savePendingResult(this.roomId, run, this.selfId);
-      if (this.isDisposed()) return;
-      this.competition.acceptDuelResult({
-        result: summary.result,
-        digest,
-        p1: { refs: p1Refs, players: [...p1Team.players] },
-        p2: { refs: p2Refs, players: [...p2Team.players] },
-        weakestReplacedOpponentId: summary.weakestReplacedOpponentId,
-      });
-      this.recomputePhase();
-      this.publish();
-      this.runAutoFlows();
-    } catch (error) {
-      if (this.isDisposed()) return;
-      this.competition.setError(error instanceof Error ? error.message : String(error));
-      this.publish();
-    }
-  }
-
   private duelWinnerOf(
     output: FixedFiveDuelGameOutput | FixedFiveShared82H2HGameOutput,
   ): FixedFiveParticipantId {
@@ -1445,7 +1277,7 @@ export class FixedFiveRoomSession {
     if (!room || gameNumber === null) return;
     if (room.phase !== 'broadcasting' && room.phase !== 'game-results') return;
     const output = this.isDuelBroadcast()
-      ? this.duelOutputs[gameNumber]
+      ? this.duel.outputs[gameNumber]
       : this.shared82Game.outputs[gameNumber];
     if (!output || this.broadcastProgress < 1) return;
     this.seriesFlow.holdMs = this.isDuelBroadcast() ? FIXED_FIVE_DUEL_GAME_RESULTS_HOLD_MS : 0;
