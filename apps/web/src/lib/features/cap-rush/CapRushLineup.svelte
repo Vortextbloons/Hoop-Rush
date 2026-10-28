@@ -46,7 +46,7 @@
           >
             {slot.slot}
             {#if slot.highestPaid}
-              <Crown size={8} class="text-accent" aria-hidden="true" />
+              <Crown size={10} class="text-accent" aria-hidden="true" />
               <span class="sr-only">Highest-paid target</span>
             {/if}
           </span>

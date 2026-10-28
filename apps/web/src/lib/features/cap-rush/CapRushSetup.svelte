@@ -9,6 +9,14 @@
       id: 'clash' as const,
       name: 'Cap Clash',
       icon: Trophy,
+      tagline: 'The pure salary-cap draft.',
+      description:
+        'Draft five historical seasons at exact positions. Balance the payroll and live with the apron penalties. No spin, no second chance.',
+      highlights: [
+        'Five rounds · 8 cards each',
+        'Two protected rerolls',
+        'Under cap or either apron',
+      ],
       accent: 'border-border hover:border-primary',
       iconClass: 'bg-primary/10 text-primary',
     },

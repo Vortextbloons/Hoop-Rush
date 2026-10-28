@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   BracketOpponent,
   DifficultyProfile,
   EraSimulationProfile,
@@ -38,13 +38,13 @@ export const SCHEDULE_VERSION_LABEL = `schedule-${SCHEDULE_GENERATION_VERSION.re
  * toward the extremes.
  */
 export const BRACKET_TARGET_LADDER: readonly (readonly [number, number])[] = [
-  [0, 0.8],
-  [3, 0.685],
-  [7, 0.62],
-  [14, 0.5],
-  [19, 0.42],
-  [24, 0.29],
-  [29, 0.1],
+  [0, 0.787],
+  [3, 0.673],
+  [7, 0.615],
+  [14, 0.52],
+  [19, 0.444],
+  [24, 0.343],
+  [29, 0.206],
 ];
 
 export const BRACKET_WIN_RATE_BAND: readonly [number, number] = [0.1, 0.8];
@@ -159,28 +159,69 @@ export function bestLegalFiveWithin(
   const stars = [...pool].sort((a, b) => b.score - a.score).slice(0, STAR_CANDIDATES);
   let best: SelectedFive | null = null;
   for (const star of [null, ...stars]) {
-    const five = bestFiveWithStar(pool, star ?? null, supportCap);
+    const five = bestFiveWithStar(pool, star ?? null, supportCap, best?.quality ?? -Infinity);
     if (five && (best === null || five.quality > best.quality)) best = five;
   }
   return best;
 }
 
+/**
+ * Branch-and-bound over the PG/SG/SF/PF/C slots. The bound sums the best
+ * remaining eligible scores for the open slots, which ignores the distinct-slot
+ * constraint and so stays admissible: a branch is pruned only when it cannot
+ * beat the incumbent. Exploration order matches the unpruned search, so the
+ * returned five is the same one the exhaustive walk would find.
+ */
 function bestFiveWithStar(
   pool: readonly BracketCandidatePlayer[],
   star: BracketCandidatePlayer | null,
   supportCap: number,
+  incumbentQuality = -Infinity,
 ): SelectedFive | null {
+  const slots = LINEUP_STRUCTURE;
+  const slotCount = slots.length;
   const support = pool
     .filter((player) => player.playerId !== star?.playerId && player.score <= supportCap)
     .sort((a, b) => b.score - a.score);
-  const slots = [...LINEUP_STRUCTURE];
+  const eligibleBySlot = slots.map((slotPosition) =>
+    support.filter((player) => canPlay(player.positions, slotPosition)),
+  );
 
   const placed: (BracketCandidatePlayer | undefined)[] = new Array<
     BracketCandidatePlayer | undefined
-  >(slots.length);
+  >(slotCount);
   const used = new Set<string>();
   let best: SelectedFive | null = null;
+  let bestQuality = incumbentQuality;
   let nodes = 0;
+
+  const remainingBound = (slot: number, placedScore: number, starPlaced: boolean): number => {
+    const open = slotCount - slot;
+    if (open <= 0) return placedScore;
+    let bound = placedScore;
+    let taken = 0;
+    if (star && !starPlaced) {
+      bound += star.score;
+      taken += 1;
+    }
+    if (taken >= open) return bound;
+    const openSlots = slots.slice(slot);
+    for (const player of support) {
+      if (taken >= open) break;
+      if (used.has(player.playerId)) continue;
+      let eligible = false;
+      for (const slotPosition of openSlots) {
+        if (canPlay(player.positions, slotPosition)) {
+          eligible = true;
+          break;
+        }
+      }
+      if (!eligible) continue;
+      bound += player.score;
+      taken += 1;
+    }
+    return bound;
+  };
 
   const evaluate = (): void => {
     const five: BracketCandidatePlayer[] = [];
@@ -190,13 +231,16 @@ function bestFiveWithStar(
     }
     if (!isBalanced(five)) return;
     const quality = totalQuality(five);
-    if (best === null || quality > best.quality) best = { players: five, quality };
+    if (quality > bestQuality) {
+      best = { players: five, quality };
+      bestQuality = quality;
+    }
   };
 
-  const recurse = (slot: number): void => {
+  const recurse = (slot: number, placedScore: number): void => {
     nodes += 1;
     if (nodes > MAX_SEARCH_NODES) return;
-    if (slot === slots.length) {
+    if (slot === slotCount) {
       evaluate();
       return;
     }
@@ -205,22 +249,31 @@ function bestFiveWithStar(
     if (star && !used.has(star.playerId) && canPlay(star.positions, slotPosition)) {
       used.add(star.playerId);
       placed[slot] = star;
-      recurse(slot + 1);
+      const nextScore = placedScore + star.score;
+      if (remainingBound(slot + 1, nextScore, true) / slotCount > bestQuality) {
+        recurse(slot + 1, nextScore);
+      }
       placed[slot] = undefined;
       used.delete(star.playerId);
     }
-    for (const player of support) {
+    for (const player of eligibleBySlot[slot] ?? []) {
       if (used.has(player.playerId)) continue;
-      if (!canPlay(player.positions, slotPosition)) continue;
+      const nextScore = placedScore + player.score;
+      if (
+        remainingBound(slot + 1, nextScore, star !== null && used.has(star.playerId)) / slotCount <=
+        bestQuality
+      ) {
+        break;
+      }
       used.add(player.playerId);
       placed[slot] = player;
-      recurse(slot + 1);
+      recurse(slot + 1, nextScore);
       placed[slot] = undefined;
       used.delete(player.playerId);
     }
   };
 
-  recurse(0);
+  recurse(0, 0);
   return best;
 }
 
@@ -393,8 +446,8 @@ export function generateBracket(options: BracketGenerationOptions): OpponentBrac
    * Each tier gets a support ceiling: the four players around the roster's best
    * scorer must sit at or below `floorSupport` for the weakest tier, rising to
    * the top of the pool for the strongest. That produces the shapes the game
-   * wants — an elite team is good all round, a weak team is one real star
-   * dragging four modest teammates — without any tier losing its star.
+   * wants â€” an elite team is good all round, a weak team is one real star
+   * dragging four modest teammates â€” without any tier losing its star.
    */
   const globalScores = [...pools.values()]
     .flat()

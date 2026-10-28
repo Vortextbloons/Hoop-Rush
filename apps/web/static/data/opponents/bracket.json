@@ -427,8 +427,8 @@
         "evaluationVersion": "bracket-m3-v6",
         "benchmarkVersion": "field-v1",
         "sampleCount": 348,
-        "winRate": 0.3649425287356322,
-        "percentile": 0.25
+        "winRate": 0.40229885057471265,
+        "percentile": 0.2833333333333333
       }
     },
     {
@@ -856,7 +856,7 @@
         "evaluationVersion": "bracket-m3-v6",
         "benchmarkVersion": "field-v1",
         "sampleCount": 348,
-        "winRate": 0.7528735632183908,
+        "winRate": 0.7413793103448276,
         "percentile": 0.9833333333333333
       }
     },
@@ -1291,8 +1291,8 @@
         "evaluationVersion": "bracket-m3-v6",
         "benchmarkVersion": "field-v1",
         "sampleCount": 348,
-        "winRate": 0.646551724137931,
-        "percentile": 0.8166666666666667
+        "winRate": 0.6695402298850575,
+        "percentile": 0.8666666666666667
       }
     },
     {
@@ -1313,14 +1313,6 @@
         ],
         "assignments": [
           {
-            "slotIndex": 2,
-            "playerId": "p-2544",
-            "positions": [
-              "PF",
-              "SF"
-            ]
-          },
-          {
             "slotIndex": 0,
             "playerId": "p-1628378",
             "positions": [
@@ -1334,6 +1326,14 @@
             "positions": [
               "PG",
               "SG"
+            ]
+          },
+          {
+            "slotIndex": 2,
+            "playerId": "p-2544",
+            "positions": [
+              "PF",
+              "SF"
             ]
           },
           {
@@ -1356,78 +1356,6 @@
         ]
       },
       "players": [
-        {
-          "playerId": "p-2544",
-          "displayName": "LeBron James",
-          "positions": [
-            "PF",
-            "SF"
-          ],
-          "heightInches": 80,
-          "weightLbs": 250,
-          "ratings": {
-            "insideScoring": 92,
-            "closeShot": 62,
-            "midrange": 64,
-            "threePoint": 62,
-            "freeThrow": 77,
-            "ballHandling": 76,
-            "passing": 82,
-            "offensiveIq": 70,
-            "offensiveRebound": 45,
-            "defensiveRebound": 72,
-            "perimeterDefense": 66,
-            "interiorDefense": 65,
-            "steal": 75,
-            "block": 68,
-            "defensiveIq": 75,
-            "speed": 62,
-            "strength": 72,
-            "vertical": 62
-          },
-          "tendencies": {
-            "usageRate": 33,
-            "passRate": 12.9,
-            "shotRate": 41.49,
-            "driveRate": 24.64,
-            "postUpRate": 10.14,
-            "rimFrequency": 29.71,
-            "shortMidFrequency": 28.17,
-            "longMidFrequency": 18.32,
-            "cornerThreeFrequency": 7.07,
-            "aboveBreakThreeFrequency": 16.74,
-            "threePointRate": 23.81,
-            "freeThrowRate": 47.24,
-            "turnoverRate": 11.01,
-            "isolationRate": 6.3,
-            "pickAndRollBallHandlerRate": 35.1,
-            "pickAndRollRollManRate": 11.87,
-            "spotUpRate": 17.09,
-            "transitionRate": 12.63,
-            "cutRate": 6.87,
-            "foulRate": 4.18,
-            "stealAttemptRate": 11,
-            "blockAttemptRate": 10.44,
-            "crashOffensiveGlassRate": 15.4
-          },
-          "anchors": {
-            "gamesPlayed": 81,
-            "minutesPerGame": 37.70448559670782,
-            "pointsPerGame": 28.444444444444443,
-            "reboundsPerGame": 7.567901234567901,
-            "offensiveReboundsPerGame": 1.308641975308642,
-            "defensiveReboundsPerGame": 6.2592592592592595,
-            "assistsPerGame": 7.246913580246914,
-            "stealsPerGame": 1.691358024691358,
-            "blocksPerGame": 1.1481481481481481,
-            "turnoversPerGame": 2.9753086419753085,
-            "fieldGoalPct": 0.4873006497341996,
-            "threePointPct": 0.34310344827586203,
-            "freeThrowPct": 0.7767220902612827,
-            "threePointAttemptRate": 0.23806571605703658,
-            "freeThrowAttemptRate": 0.47241165530068197
-          }
-        },
         {
           "playerId": "p-1628378",
           "displayName": "Donovan Mitchell",
@@ -1570,6 +1498,78 @@
             "freeThrowPct": 0.8633405639913232,
             "threePointAttemptRate": 0.21441605839416059,
             "freeThrowAttemptRate": 0.3476277372262774
+          }
+        },
+        {
+          "playerId": "p-2544",
+          "displayName": "LeBron James",
+          "positions": [
+            "PF",
+            "SF"
+          ],
+          "heightInches": 80,
+          "weightLbs": 250,
+          "ratings": {
+            "insideScoring": 92,
+            "closeShot": 62,
+            "midrange": 64,
+            "threePoint": 62,
+            "freeThrow": 77,
+            "ballHandling": 76,
+            "passing": 82,
+            "offensiveIq": 70,
+            "offensiveRebound": 45,
+            "defensiveRebound": 72,
+            "perimeterDefense": 66,
+            "interiorDefense": 65,
+            "steal": 75,
+            "block": 68,
+            "defensiveIq": 75,
+            "speed": 62,
+            "strength": 72,
+            "vertical": 62
+          },
+          "tendencies": {
+            "usageRate": 33,
+            "passRate": 12.9,
+            "shotRate": 41.49,
+            "driveRate": 24.64,
+            "postUpRate": 10.14,
+            "rimFrequency": 29.71,
+            "shortMidFrequency": 28.17,
+            "longMidFrequency": 18.32,
+            "cornerThreeFrequency": 7.07,
+            "aboveBreakThreeFrequency": 16.74,
+            "threePointRate": 23.81,
+            "freeThrowRate": 47.24,
+            "turnoverRate": 11.01,
+            "isolationRate": 6.3,
+            "pickAndRollBallHandlerRate": 35.1,
+            "pickAndRollRollManRate": 11.87,
+            "spotUpRate": 17.09,
+            "transitionRate": 12.63,
+            "cutRate": 6.87,
+            "foulRate": 4.18,
+            "stealAttemptRate": 11,
+            "blockAttemptRate": 10.44,
+            "crashOffensiveGlassRate": 15.4
+          },
+          "anchors": {
+            "gamesPlayed": 81,
+            "minutesPerGame": 37.70448559670782,
+            "pointsPerGame": 28.444444444444443,
+            "reboundsPerGame": 7.567901234567901,
+            "offensiveReboundsPerGame": 1.308641975308642,
+            "defensiveReboundsPerGame": 6.2592592592592595,
+            "assistsPerGame": 7.246913580246914,
+            "stealsPerGame": 1.691358024691358,
+            "blocksPerGame": 1.1481481481481481,
+            "turnoversPerGame": 2.9753086419753085,
+            "fieldGoalPct": 0.4873006497341996,
+            "threePointPct": 0.34310344827586203,
+            "freeThrowPct": 0.7767220902612827,
+            "threePointAttemptRate": 0.23806571605703658,
+            "freeThrowAttemptRate": 0.47241165530068197
           }
         },
         {
@@ -1722,8 +1722,8 @@
         "evaluationVersion": "bracket-m3-v6",
         "benchmarkVersion": "field-v1",
         "sampleCount": 348,
-        "winRate": 0.6896551724137931,
-        "percentile": 0.8833333333333333
+        "winRate": 0.6551724137931034,
+        "percentile": 0.8
       }
     },
     {
@@ -2149,8 +2149,8 @@
         "evaluationVersion": "bracket-m3-v6",
         "benchmarkVersion": "field-v1",
         "sampleCount": 348,
-        "winRate": 0.6925287356321839,
-        "percentile": 0.9166666666666666
+        "winRate": 0.7183908045977011,
+        "percentile": 0.95
       }
     },
     {
@@ -2170,15 +2170,6 @@
           "C"
         ],
         "assignments": [
-          {
-            "slotIndex": 4,
-            "playerId": "p-204001",
-            "positions": [
-              "C",
-              "PF",
-              "SF"
-            ]
-          },
           {
             "slotIndex": 0,
             "playerId": "p-202738",
@@ -2214,83 +2205,19 @@
               "SF",
               "SG"
             ]
+          },
+          {
+            "slotIndex": 4,
+            "playerId": "p-204001",
+            "positions": [
+              "C",
+              "PF",
+              "SF"
+            ]
           }
         ]
       },
       "players": [
-        {
-          "playerId": "p-204001",
-          "displayName": "Kristaps Porziņģis",
-          "positions": [
-            "C",
-            "PF",
-            "SF"
-          ],
-          "heightInches": 86,
-          "weightLbs": 240,
-          "ratings": {
-            "insideScoring": 84,
-            "closeShot": 67,
-            "midrange": 67,
-            "threePoint": 69,
-            "freeThrow": 84,
-            "ballHandling": 68,
-            "passing": 58,
-            "offensiveIq": 70,
-            "offensiveRebound": 51,
-            "defensiveRebound": 71,
-            "perimeterDefense": 60,
-            "interiorDefense": 79,
-            "steal": 55,
-            "block": 88,
-            "defensiveIq": 72,
-            "speed": 57,
-            "strength": 55,
-            "vertical": 62
-          },
-          "tendencies": {
-            "usageRate": 24.7,
-            "passRate": 6.18,
-            "shotRate": 27.49,
-            "driveRate": 3,
-            "postUpRate": 13.48,
-            "rimFrequency": 27.76,
-            "shortMidFrequency": 21.56,
-            "longMidFrequency": 11.71,
-            "cornerThreeFrequency": 16.15,
-            "aboveBreakThreeFrequency": 22.81,
-            "threePointRate": 38.96,
-            "freeThrowRate": 40.16,
-            "turnoverRate": 9.14,
-            "isolationRate": 3.41,
-            "pickAndRollBallHandlerRate": 15.7,
-            "pickAndRollRollManRate": 17.59,
-            "spotUpRate": 24.53,
-            "transitionRate": 9.98,
-            "cutRate": 8.9,
-            "foulRate": 6.43,
-            "stealAttemptRate": 9.4,
-            "blockAttemptRate": 12.04,
-            "crashOffensiveGlassRate": 16.12
-          },
-          "anchors": {
-            "gamesPlayed": 57,
-            "minutesPerGame": 29.648216374269005,
-            "pointsPerGame": 20.087719298245613,
-            "reboundsPerGame": 7.175438596491228,
-            "offensiveReboundsPerGame": 1.7017543859649122,
-            "defensiveReboundsPerGame": 5.473684210526316,
-            "assistsPerGame": 2.017543859649123,
-            "stealsPerGame": 0.7368421052631579,
-            "blocksPerGame": 1.9473684210526316,
-            "turnoversPerGame": 1.5614035087719298,
-            "fieldGoalPct": 0.5096153846153846,
-            "threePointPct": 0.36782841823056295,
-            "freeThrowPct": 0.8350785340314136,
-            "threePointAttemptRate": 0.3896276595744681,
-            "freeThrowAttemptRate": 0.4015957446808511
-          }
-        },
         {
           "playerId": "p-202738",
           "displayName": "Isaiah Thomas",
@@ -2582,6 +2509,79 @@
             "threePointAttemptRate": 0.26182760855476345,
             "freeThrowAttemptRate": 0.3473752430330525
           }
+        },
+        {
+          "playerId": "p-204001",
+          "displayName": "Kristaps Porziņģis",
+          "positions": [
+            "C",
+            "PF",
+            "SF"
+          ],
+          "heightInches": 86,
+          "weightLbs": 240,
+          "ratings": {
+            "insideScoring": 84,
+            "closeShot": 67,
+            "midrange": 67,
+            "threePoint": 69,
+            "freeThrow": 84,
+            "ballHandling": 68,
+            "passing": 58,
+            "offensiveIq": 70,
+            "offensiveRebound": 51,
+            "defensiveRebound": 71,
+            "perimeterDefense": 60,
+            "interiorDefense": 79,
+            "steal": 55,
+            "block": 88,
+            "defensiveIq": 72,
+            "speed": 57,
+            "strength": 55,
+            "vertical": 62
+          },
+          "tendencies": {
+            "usageRate": 24.7,
+            "passRate": 6.18,
+            "shotRate": 27.49,
+            "driveRate": 3,
+            "postUpRate": 13.48,
+            "rimFrequency": 27.76,
+            "shortMidFrequency": 21.56,
+            "longMidFrequency": 11.71,
+            "cornerThreeFrequency": 16.15,
+            "aboveBreakThreeFrequency": 22.81,
+            "threePointRate": 38.96,
+            "freeThrowRate": 40.16,
+            "turnoverRate": 9.14,
+            "isolationRate": 3.41,
+            "pickAndRollBallHandlerRate": 15.7,
+            "pickAndRollRollManRate": 17.59,
+            "spotUpRate": 24.53,
+            "transitionRate": 9.98,
+            "cutRate": 8.9,
+            "foulRate": 6.43,
+            "stealAttemptRate": 9.4,
+            "blockAttemptRate": 12.04,
+            "crashOffensiveGlassRate": 16.12
+          },
+          "anchors": {
+            "gamesPlayed": 57,
+            "minutesPerGame": 29.648216374269005,
+            "pointsPerGame": 20.087719298245613,
+            "reboundsPerGame": 7.175438596491228,
+            "offensiveReboundsPerGame": 1.7017543859649122,
+            "defensiveReboundsPerGame": 5.473684210526316,
+            "assistsPerGame": 2.017543859649123,
+            "stealsPerGame": 0.7368421052631579,
+            "blocksPerGame": 1.9473684210526316,
+            "turnoversPerGame": 1.5614035087719298,
+            "fieldGoalPct": 0.5096153846153846,
+            "threePointPct": 0.36782841823056295,
+            "freeThrowPct": 0.8350785340314136,
+            "threePointAttemptRate": 0.3896276595744681,
+            "freeThrowAttemptRate": 0.4015957446808511
+          }
         }
       ],
       "strength": {
@@ -2589,7 +2589,7 @@
         "benchmarkVersion": "field-v1",
         "sampleCount": 348,
         "winRate": 0.6350574712643678,
-        "percentile": 0.75
+        "percentile": 0.7166666666666667
       }
     },
     {
@@ -3015,8 +3015,8 @@
         "evaluationVersion": "bracket-m3-v6",
         "benchmarkVersion": "field-v1",
         "sampleCount": 348,
-        "winRate": 0.6293103448275862,
-        "percentile": 0.7166666666666667
+        "winRate": 0.6522988505747126,
+        "percentile": 0.75
       }
     },
     {
@@ -3450,8 +3450,8 @@
         "evaluationVersion": "bracket-m3-v6",
         "benchmarkVersion": "field-v1",
         "sampleCount": 348,
-        "winRate": 0.49137931034482757,
-        "percentile": 0.4166666666666667
+        "winRate": 0.5517241379310345,
+        "percentile": 0.48333333333333334
       }
     },
     {
@@ -3472,14 +3472,6 @@
         ],
         "assignments": [
           {
-            "slotIndex": 2,
-            "playerId": "p-203507",
-            "positions": [
-              "PF",
-              "SF"
-            ]
-          },
-          {
             "slotIndex": 0,
             "playerId": "p-951",
             "positions": [
@@ -3493,6 +3485,14 @@
             "positions": [
               "PG",
               "SG"
+            ]
+          },
+          {
+            "slotIndex": 2,
+            "playerId": "p-203507",
+            "positions": [
+              "PF",
+              "SF"
             ]
           },
           {
@@ -3513,78 +3513,6 @@
         ]
       },
       "players": [
-        {
-          "playerId": "p-203507",
-          "displayName": "Giannis Antetokounmpo",
-          "positions": [
-            "PF",
-            "SF"
-          ],
-          "heightInches": 83,
-          "weightLbs": 242,
-          "ratings": {
-            "insideScoring": 97,
-            "closeShot": 70,
-            "midrange": 59,
-            "threePoint": 52,
-            "freeThrow": 63,
-            "ballHandling": 77,
-            "passing": 82,
-            "offensiveIq": 63,
-            "offensiveRebound": 54,
-            "defensiveRebound": 100,
-            "perimeterDefense": 68,
-            "interiorDefense": 68,
-            "steal": 59,
-            "block": 67,
-            "defensiveIq": 71,
-            "speed": 64,
-            "strength": 62,
-            "vertical": 62
-          },
-          "tendencies": {
-            "usageRate": 36.3,
-            "passRate": 10.52,
-            "shotRate": 40.94,
-            "driveRate": 12.28,
-            "postUpRate": 16.72,
-            "rimFrequency": 36.44,
-            "shortMidFrequency": 24.18,
-            "longMidFrequency": 15.72,
-            "cornerThreeFrequency": 7.89,
-            "aboveBreakThreeFrequency": 15.77,
-            "threePointRate": 23.67,
-            "freeThrowRate": 50.81,
-            "turnoverRate": 13.18,
-            "isolationRate": 7.21,
-            "pickAndRollBallHandlerRate": 33.13,
-            "pickAndRollRollManRate": 19.9,
-            "spotUpRate": 17.05,
-            "transitionRate": 12.36,
-            "cutRate": 9.06,
-            "foulRate": 6.88,
-            "stealAttemptRate": 9.72,
-            "blockAttemptRate": 10.36,
-            "crashOffensiveGlassRate": 16.48
-          },
-          "anchors": {
-            "gamesPlayed": 63,
-            "minutesPerGame": 30.42666666666667,
-            "pointsPerGame": 29.476190476190474,
-            "reboundsPerGame": 13.587301587301587,
-            "offensiveReboundsPerGame": 2.2222222222222223,
-            "defensiveReboundsPerGame": 11.365079365079366,
-            "assistsPerGame": 5.619047619047619,
-            "stealsPerGame": 0.9682539682539683,
-            "blocksPerGame": 1.0476190476190477,
-            "turnoversPerGame": 3.6507936507936507,
-            "fieldGoalPct": 0.547040971168437,
-            "threePointPct": 0.3115281501340483,
-            "freeThrowPct": 0.6459802538787024,
-            "threePointAttemptRate": 0.23667205169628433,
-            "freeThrowAttemptRate": 0.5080775444264943
-          }
-        },
         {
           "playerId": "p-951",
           "displayName": "Ray Allen",
@@ -3727,6 +3655,78 @@
             "freeThrowPct": 0.7989130434782609,
             "threePointAttemptRate": 0.1648675171736997,
             "freeThrowAttemptRate": 0.2826300294406281
+          }
+        },
+        {
+          "playerId": "p-203507",
+          "displayName": "Giannis Antetokounmpo",
+          "positions": [
+            "PF",
+            "SF"
+          ],
+          "heightInches": 83,
+          "weightLbs": 242,
+          "ratings": {
+            "insideScoring": 97,
+            "closeShot": 70,
+            "midrange": 59,
+            "threePoint": 52,
+            "freeThrow": 63,
+            "ballHandling": 77,
+            "passing": 82,
+            "offensiveIq": 63,
+            "offensiveRebound": 54,
+            "defensiveRebound": 100,
+            "perimeterDefense": 68,
+            "interiorDefense": 68,
+            "steal": 59,
+            "block": 67,
+            "defensiveIq": 71,
+            "speed": 64,
+            "strength": 62,
+            "vertical": 62
+          },
+          "tendencies": {
+            "usageRate": 36.3,
+            "passRate": 10.52,
+            "shotRate": 40.94,
+            "driveRate": 12.28,
+            "postUpRate": 16.72,
+            "rimFrequency": 36.44,
+            "shortMidFrequency": 24.18,
+            "longMidFrequency": 15.72,
+            "cornerThreeFrequency": 7.89,
+            "aboveBreakThreeFrequency": 15.77,
+            "threePointRate": 23.67,
+            "freeThrowRate": 50.81,
+            "turnoverRate": 13.18,
+            "isolationRate": 7.21,
+            "pickAndRollBallHandlerRate": 33.13,
+            "pickAndRollRollManRate": 19.9,
+            "spotUpRate": 17.05,
+            "transitionRate": 12.36,
+            "cutRate": 9.06,
+            "foulRate": 6.88,
+            "stealAttemptRate": 9.72,
+            "blockAttemptRate": 10.36,
+            "crashOffensiveGlassRate": 16.48
+          },
+          "anchors": {
+            "gamesPlayed": 63,
+            "minutesPerGame": 30.42666666666667,
+            "pointsPerGame": 29.476190476190474,
+            "reboundsPerGame": 13.587301587301587,
+            "offensiveReboundsPerGame": 2.2222222222222223,
+            "defensiveReboundsPerGame": 11.365079365079366,
+            "assistsPerGame": 5.619047619047619,
+            "stealsPerGame": 0.9682539682539683,
+            "blocksPerGame": 1.0476190476190477,
+            "turnoversPerGame": 3.6507936507936507,
+            "fieldGoalPct": 0.547040971168437,
+            "threePointPct": 0.3115281501340483,
+            "freeThrowPct": 0.6459802538787024,
+            "threePointAttemptRate": 0.23667205169628433,
+            "freeThrowAttemptRate": 0.5080775444264943
           }
         },
         {
@@ -3877,8 +3877,8 @@
         "evaluationVersion": "bracket-m3-v6",
         "benchmarkVersion": "field-v1",
         "sampleCount": 348,
-        "winRate": 0.5977011494252874,
-        "percentile": 0.5833333333333334
+        "winRate": 0.6005747126436781,
+        "percentile": 0.6333333333333333
       }
     },
     {
@@ -4306,8 +4306,8 @@
         "evaluationVersion": "bracket-m3-v6",
         "benchmarkVersion": "field-v1",
         "sampleCount": 348,
-        "winRate": 0.7155172413793104,
-        "percentile": 0.95
+        "winRate": 0.7097701149425287,
+        "percentile": 0.9166666666666666
       }
     },
     {
@@ -4328,15 +4328,6 @@
         ],
         "assignments": [
           {
-            "slotIndex": 2,
-            "playerId": "p-708",
-            "positions": [
-              "C",
-              "PF",
-              "SF"
-            ]
-          },
-          {
             "slotIndex": 0,
             "playerId": "p-208",
             "positions": [
@@ -4350,6 +4341,15 @@
             "positions": [
               "PG",
               "SG"
+            ]
+          },
+          {
+            "slotIndex": 2,
+            "playerId": "p-708",
+            "positions": [
+              "C",
+              "PF",
+              "SF"
             ]
           },
           {
@@ -4371,79 +4371,6 @@
         ]
       },
       "players": [
-        {
-          "playerId": "p-708",
-          "displayName": "Kevin Garnett",
-          "positions": [
-            "C",
-            "PF",
-            "SF"
-          ],
-          "heightInches": 83,
-          "weightLbs": 240,
-          "ratings": {
-            "insideScoring": 80,
-            "closeShot": 59,
-            "midrange": 64,
-            "threePoint": 53,
-            "freeThrow": 78,
-            "ballHandling": 72,
-            "passing": 68,
-            "offensiveIq": 67,
-            "offensiveRebound": 58,
-            "defensiveRebound": 100,
-            "perimeterDefense": 63,
-            "interiorDefense": 81,
-            "steal": 68,
-            "block": 85,
-            "defensiveIq": 73,
-            "speed": 62,
-            "strength": 61,
-            "vertical": 62
-          },
-          "tendencies": {
-            "usageRate": 29.1,
-            "passRate": 11.02,
-            "shotRate": 40.93,
-            "driveRate": 19.63,
-            "postUpRate": 19.09,
-            "rimFrequency": 32.69,
-            "shortMidFrequency": 35,
-            "longMidFrequency": 25.47,
-            "cornerThreeFrequency": 0.93,
-            "aboveBreakThreeFrequency": 1.74,
-            "threePointRate": 2.67,
-            "freeThrowRate": 28.86,
-            "turnoverRate": 10.46,
-            "isolationRate": 5.23,
-            "pickAndRollBallHandlerRate": 28.54,
-            "pickAndRollRollManRate": 22.28,
-            "spotUpRate": 10.81,
-            "transitionRate": 12.36,
-            "cutRate": 10.44,
-            "foulRate": 5,
-            "stealAttemptRate": 10.44,
-            "blockAttemptRate": 11.8,
-            "crashOffensiveGlassRate": 16.96
-          },
-          "anchors": {
-            "gamesPlayed": 82,
-            "minutesPerGame": 39.45189024390244,
-            "pointsPerGame": 24.23170731707317,
-            "reboundsPerGame": 13.890243902439025,
-            "offensiveReboundsPerGame": 2.9878048780487805,
-            "defensiveReboundsPerGame": 10.902439024390244,
-            "assistsPerGame": 4.987804878048781,
-            "stealsPerGame": 1.4634146341463414,
-            "blocksPerGame": 2.1707317073170733,
-            "turnoversPerGame": 2.5853658536585367,
-            "fieldGoalPct": 0.4967474866942638,
-            "threePointPct": 0.31056910569105695,
-            "freeThrowPct": 0.7853211009174312,
-            "threePointAttemptRate": 0.02669149596523898,
-            "freeThrowAttemptRate": 0.2886405959031657
-          }
-        },
         {
           "playerId": "p-208",
           "displayName": "Sam Cassell",
@@ -4586,6 +4513,79 @@
             "freeThrowPct": 0.8246527777777778,
             "threePointAttemptRate": 0.5031017369727047,
             "freeThrowAttemptRate": 0.3076923076923077
+          }
+        },
+        {
+          "playerId": "p-708",
+          "displayName": "Kevin Garnett",
+          "positions": [
+            "C",
+            "PF",
+            "SF"
+          ],
+          "heightInches": 83,
+          "weightLbs": 240,
+          "ratings": {
+            "insideScoring": 80,
+            "closeShot": 59,
+            "midrange": 64,
+            "threePoint": 53,
+            "freeThrow": 78,
+            "ballHandling": 72,
+            "passing": 68,
+            "offensiveIq": 67,
+            "offensiveRebound": 58,
+            "defensiveRebound": 100,
+            "perimeterDefense": 63,
+            "interiorDefense": 81,
+            "steal": 68,
+            "block": 85,
+            "defensiveIq": 73,
+            "speed": 62,
+            "strength": 61,
+            "vertical": 62
+          },
+          "tendencies": {
+            "usageRate": 29.1,
+            "passRate": 11.02,
+            "shotRate": 40.93,
+            "driveRate": 19.63,
+            "postUpRate": 19.09,
+            "rimFrequency": 32.69,
+            "shortMidFrequency": 35,
+            "longMidFrequency": 25.47,
+            "cornerThreeFrequency": 0.93,
+            "aboveBreakThreeFrequency": 1.74,
+            "threePointRate": 2.67,
+            "freeThrowRate": 28.86,
+            "turnoverRate": 10.46,
+            "isolationRate": 5.23,
+            "pickAndRollBallHandlerRate": 28.54,
+            "pickAndRollRollManRate": 22.28,
+            "spotUpRate": 10.81,
+            "transitionRate": 12.36,
+            "cutRate": 10.44,
+            "foulRate": 5,
+            "stealAttemptRate": 10.44,
+            "blockAttemptRate": 11.8,
+            "crashOffensiveGlassRate": 16.96
+          },
+          "anchors": {
+            "gamesPlayed": 82,
+            "minutesPerGame": 39.45189024390244,
+            "pointsPerGame": 24.23170731707317,
+            "reboundsPerGame": 13.890243902439025,
+            "offensiveReboundsPerGame": 2.9878048780487805,
+            "defensiveReboundsPerGame": 10.902439024390244,
+            "assistsPerGame": 4.987804878048781,
+            "stealsPerGame": 1.4634146341463414,
+            "blocksPerGame": 2.1707317073170733,
+            "turnoversPerGame": 2.5853658536585367,
+            "fieldGoalPct": 0.4967474866942638,
+            "threePointPct": 0.31056910569105695,
+            "freeThrowPct": 0.7853211009174312,
+            "threePointAttemptRate": 0.02669149596523898,
+            "freeThrowAttemptRate": 0.2886405959031657
           }
         },
         {
@@ -4737,8 +4737,8 @@
         "evaluationVersion": "bracket-m3-v6",
         "benchmarkVersion": "field-v1",
         "sampleCount": 348,
-        "winRate": 0.5747126436781609,
-        "percentile": 0.55
+        "winRate": 0.5689655172413793,
+        "percentile": 0.5833333333333334
       }
     },
     {
@@ -4759,15 +4759,6 @@
         ],
         "assignments": [
           {
-            "slotIndex": 2,
-            "playerId": "p-2405",
-            "positions": [
-              "C",
-              "PF",
-              "SF"
-            ]
-          },
-          {
             "slotIndex": 0,
             "playerId": "p-134",
             "positions": [
@@ -4781,6 +4772,15 @@
             "positions": [
               "PG",
               "SG"
+            ]
+          },
+          {
+            "slotIndex": 2,
+            "playerId": "p-2405",
+            "positions": [
+              "C",
+              "PF",
+              "SF"
             ]
           },
           {
@@ -4801,79 +4801,6 @@
         ]
       },
       "players": [
-        {
-          "playerId": "p-2405",
-          "displayName": "Amar'e Stoudemire",
-          "positions": [
-            "C",
-            "PF",
-            "SF"
-          ],
-          "heightInches": 82,
-          "weightLbs": 249,
-          "ratings": {
-            "insideScoring": 94,
-            "closeShot": 67,
-            "midrange": 65,
-            "threePoint": 47,
-            "freeThrow": 80,
-            "ballHandling": 69,
-            "passing": 51,
-            "offensiveIq": 67,
-            "offensiveRebound": 54,
-            "defensiveRebound": 78,
-            "perimeterDefense": 56,
-            "interiorDefense": 82,
-            "steal": 54,
-            "block": 86,
-            "defensiveIq": 66,
-            "speed": 62,
-            "strength": 67,
-            "vertical": 62
-          },
-          "tendencies": {
-            "usageRate": 27.8,
-            "passRate": 3.96,
-            "shotRate": 31.94,
-            "driveRate": 25.5,
-            "postUpRate": 13.84,
-            "rimFrequency": 49.94,
-            "shortMidFrequency": 35,
-            "longMidFrequency": 10.45,
-            "cornerThreeFrequency": 1.09,
-            "aboveBreakThreeFrequency": 1.47,
-            "threePointRate": 2.56,
-            "freeThrowRate": 57.06,
-            "turnoverRate": 10.3,
-            "isolationRate": 4.88,
-            "pickAndRollBallHandlerRate": 20.53,
-            "pickAndRollRollManRate": 15.87,
-            "spotUpRate": 11.18,
-            "transitionRate": 11.57,
-            "cutRate": 9.02,
-            "foulRate": 7.27,
-            "stealAttemptRate": 9.32,
-            "blockAttemptRate": 11.88,
-            "crashOffensiveGlassRate": 16.48
-          },
-          "anchors": {
-            "gamesPlayed": 79,
-            "minutesPerGame": 33.8834388185654,
-            "pointsPerGame": 25.17721518987342,
-            "reboundsPerGame": 9.10126582278481,
-            "offensiveReboundsPerGame": 2.2531645569620253,
-            "defensiveReboundsPerGame": 6.848101265822785,
-            "assistsPerGame": 1.4936708860759493,
-            "stealsPerGame": 0.810126582278481,
-            "blocksPerGame": 2.0632911392405062,
-            "turnoversPerGame": 2.2025316455696204,
-            "fieldGoalPct": 0.5809450038729667,
-            "threePointPct": 0.2900900900900901,
-            "freeThrowPct": 0.7989623865110247,
-            "threePointAttemptRate": 0.02559867877786953,
-            "freeThrowAttemptRate": 0.5706028075970272
-          }
-        },
         {
           "playerId": "p-134",
           "displayName": "Kevin Johnson",
@@ -5016,6 +4943,79 @@
             "freeThrowPct": 0.8623853211009175,
             "threePointAttemptRate": 0.3532440782698249,
             "freeThrowAttemptRate": 0.25437693099897013
+          }
+        },
+        {
+          "playerId": "p-2405",
+          "displayName": "Amar'e Stoudemire",
+          "positions": [
+            "C",
+            "PF",
+            "SF"
+          ],
+          "heightInches": 82,
+          "weightLbs": 249,
+          "ratings": {
+            "insideScoring": 94,
+            "closeShot": 67,
+            "midrange": 65,
+            "threePoint": 47,
+            "freeThrow": 80,
+            "ballHandling": 69,
+            "passing": 51,
+            "offensiveIq": 67,
+            "offensiveRebound": 54,
+            "defensiveRebound": 78,
+            "perimeterDefense": 56,
+            "interiorDefense": 82,
+            "steal": 54,
+            "block": 86,
+            "defensiveIq": 66,
+            "speed": 62,
+            "strength": 67,
+            "vertical": 62
+          },
+          "tendencies": {
+            "usageRate": 27.8,
+            "passRate": 3.96,
+            "shotRate": 31.94,
+            "driveRate": 25.5,
+            "postUpRate": 13.84,
+            "rimFrequency": 49.94,
+            "shortMidFrequency": 35,
+            "longMidFrequency": 10.45,
+            "cornerThreeFrequency": 1.09,
+            "aboveBreakThreeFrequency": 1.47,
+            "threePointRate": 2.56,
+            "freeThrowRate": 57.06,
+            "turnoverRate": 10.3,
+            "isolationRate": 4.88,
+            "pickAndRollBallHandlerRate": 20.53,
+            "pickAndRollRollManRate": 15.87,
+            "spotUpRate": 11.18,
+            "transitionRate": 11.57,
+            "cutRate": 9.02,
+            "foulRate": 7.27,
+            "stealAttemptRate": 9.32,
+            "blockAttemptRate": 11.88,
+            "crashOffensiveGlassRate": 16.48
+          },
+          "anchors": {
+            "gamesPlayed": 79,
+            "minutesPerGame": 33.8834388185654,
+            "pointsPerGame": 25.17721518987342,
+            "reboundsPerGame": 9.10126582278481,
+            "offensiveReboundsPerGame": 2.2531645569620253,
+            "defensiveReboundsPerGame": 6.848101265822785,
+            "assistsPerGame": 1.4936708860759493,
+            "stealsPerGame": 0.810126582278481,
+            "blocksPerGame": 2.0632911392405062,
+            "turnoversPerGame": 2.2025316455696204,
+            "fieldGoalPct": 0.5809450038729667,
+            "threePointPct": 0.2900900900900901,
+            "freeThrowPct": 0.7989623865110247,
+            "threePointAttemptRate": 0.02559867877786953,
+            "freeThrowAttemptRate": 0.5706028075970272
           }
         },
         {
@@ -5166,8 +5166,8 @@
         "evaluationVersion": "bracket-m3-v6",
         "benchmarkVersion": "field-v1",
         "sampleCount": 348,
-        "winRate": 0.6436781609195402,
-        "percentile": 0.7833333333333333
+        "winRate": 0.6005747126436781,
+        "percentile": 0.6333333333333333
       }
     },
     {
@@ -5593,7 +5593,7 @@
         "evaluationVersion": "bracket-m3-v6",
         "benchmarkVersion": "field-v1",
         "sampleCount": 348,
-        "winRate": 0.514367816091954,
+        "winRate": 0.5057471264367817,
         "percentile": 0.45
       }
     },
@@ -6028,8 +6028,8 @@
         "evaluationVersion": "bracket-m3-v6",
         "benchmarkVersion": "field-v1",
         "sampleCount": 348,
-        "winRate": 0.5459770114942529,
-        "percentile": 0.48333333333333334
+        "winRate": 0.5574712643678161,
+        "percentile": 0.5333333333333333
       }
     },
     {
@@ -6050,15 +6050,6 @@
         ],
         "assignments": [
           {
-            "slotIndex": 2,
-            "playerId": "p-203954",
-            "positions": [
-              "C",
-              "PF",
-              "SF"
-            ]
-          },
-          {
             "slotIndex": 0,
             "playerId": "p-344",
             "positions": [
@@ -6074,6 +6065,15 @@
               "PG",
               "SF",
               "SG"
+            ]
+          },
+          {
+            "slotIndex": 2,
+            "playerId": "p-203954",
+            "positions": [
+              "C",
+              "PF",
+              "SF"
             ]
           },
           {
@@ -6094,79 +6094,6 @@
         ]
       },
       "players": [
-        {
-          "playerId": "p-203954",
-          "displayName": "Joel Embiid",
-          "positions": [
-            "C",
-            "PF",
-            "SF"
-          ],
-          "heightInches": 84,
-          "weightLbs": 280,
-          "ratings": {
-            "insideScoring": 100,
-            "closeShot": 66,
-            "midrange": 67,
-            "threePoint": 58,
-            "freeThrow": 85,
-            "ballHandling": 75,
-            "passing": 68,
-            "offensiveIq": 64,
-            "offensiveRebound": 48,
-            "defensiveRebound": 87,
-            "perimeterDefense": 57,
-            "interiorDefense": 70,
-            "steal": 58,
-            "block": 78,
-            "defensiveIq": 72,
-            "speed": 55,
-            "strength": 73,
-            "vertical": 62
-          },
-          "tendencies": {
-            "usageRate": 37,
-            "passRate": 7.66,
-            "shotRate": 41.92,
-            "driveRate": 6.56,
-            "postUpRate": 13.16,
-            "rimFrequency": 34.94,
-            "shortMidFrequency": 30.3,
-            "longMidFrequency": 19.7,
-            "cornerThreeFrequency": 5.52,
-            "aboveBreakThreeFrequency": 9.54,
-            "threePointRate": 15.06,
-            "freeThrowRate": 58.06,
-            "turnoverRate": 11.94,
-            "isolationRate": 7.4,
-            "pickAndRollBallHandlerRate": 30.32,
-            "pickAndRollRollManRate": 15.35,
-            "spotUpRate": 14.12,
-            "transitionRate": 9.7,
-            "cutRate": 7.82,
-            "foulRate": 6.31,
-            "stealAttemptRate": 9.64,
-            "blockAttemptRate": 11.24,
-            "crashOffensiveGlassRate": 15.76
-          },
-          "anchors": {
-            "gamesPlayed": 66,
-            "minutesPerGame": 34.607676767676764,
-            "pointsPerGame": 33.07575757575758,
-            "reboundsPerGame": 10.151515151515152,
-            "offensiveReboundsPerGame": 1.7121212121212122,
-            "defensiveReboundsPerGame": 8.43939393939394,
-            "assistsPerGame": 4.151515151515151,
-            "stealsPerGame": 1,
-            "blocksPerGame": 1.696969696969697,
-            "turnoversPerGame": 3.4242424242424243,
-            "fieldGoalPct": 0.5426136363636364,
-            "threePointPct": 0.33285714285714285,
-            "freeThrowPct": 0.8472385428907168,
-            "threePointAttemptRate": 0.15060240963855423,
-            "freeThrowAttemptRate": 0.5805722891566265
-          }
-        },
         {
           "playerId": "p-344",
           "displayName": "Dana Barros",
@@ -6311,6 +6238,79 @@
             "freeThrowPct": 0.6481481481481481,
             "threePointAttemptRate": 0.010819165378670788,
             "freeThrowAttemptRate": 0.4605873261205564
+          }
+        },
+        {
+          "playerId": "p-203954",
+          "displayName": "Joel Embiid",
+          "positions": [
+            "C",
+            "PF",
+            "SF"
+          ],
+          "heightInches": 84,
+          "weightLbs": 280,
+          "ratings": {
+            "insideScoring": 100,
+            "closeShot": 66,
+            "midrange": 67,
+            "threePoint": 58,
+            "freeThrow": 85,
+            "ballHandling": 75,
+            "passing": 68,
+            "offensiveIq": 64,
+            "offensiveRebound": 48,
+            "defensiveRebound": 87,
+            "perimeterDefense": 57,
+            "interiorDefense": 70,
+            "steal": 58,
+            "block": 78,
+            "defensiveIq": 72,
+            "speed": 55,
+            "strength": 73,
+            "vertical": 62
+          },
+          "tendencies": {
+            "usageRate": 37,
+            "passRate": 7.66,
+            "shotRate": 41.92,
+            "driveRate": 6.56,
+            "postUpRate": 13.16,
+            "rimFrequency": 34.94,
+            "shortMidFrequency": 30.3,
+            "longMidFrequency": 19.7,
+            "cornerThreeFrequency": 5.52,
+            "aboveBreakThreeFrequency": 9.54,
+            "threePointRate": 15.06,
+            "freeThrowRate": 58.06,
+            "turnoverRate": 11.94,
+            "isolationRate": 7.4,
+            "pickAndRollBallHandlerRate": 30.32,
+            "pickAndRollRollManRate": 15.35,
+            "spotUpRate": 14.12,
+            "transitionRate": 9.7,
+            "cutRate": 7.82,
+            "foulRate": 6.31,
+            "stealAttemptRate": 9.64,
+            "blockAttemptRate": 11.24,
+            "crashOffensiveGlassRate": 15.76
+          },
+          "anchors": {
+            "gamesPlayed": 66,
+            "minutesPerGame": 34.607676767676764,
+            "pointsPerGame": 33.07575757575758,
+            "reboundsPerGame": 10.151515151515152,
+            "offensiveReboundsPerGame": 1.7121212121212122,
+            "defensiveReboundsPerGame": 8.43939393939394,
+            "assistsPerGame": 4.151515151515151,
+            "stealsPerGame": 1,
+            "blocksPerGame": 1.696969696969697,
+            "turnoversPerGame": 3.4242424242424243,
+            "fieldGoalPct": 0.5426136363636364,
+            "threePointPct": 0.33285714285714285,
+            "freeThrowPct": 0.8472385428907168,
+            "threePointAttemptRate": 0.15060240963855423,
+            "freeThrowAttemptRate": 0.5805722891566265
           }
         },
         {
@@ -6461,8 +6461,8 @@
         "evaluationVersion": "bracket-m3-v6",
         "benchmarkVersion": "field-v1",
         "sampleCount": 348,
-        "winRate": 0.6063218390804598,
-        "percentile": 0.6166666666666667
+        "winRate": 0.5574712643678161,
+        "percentile": 0.5333333333333333
       }
     },
     {
@@ -6894,8 +6894,8 @@
         "evaluationVersion": "bracket-m3-v6",
         "benchmarkVersion": "field-v1",
         "sampleCount": 348,
-        "winRate": 0.6609195402298851,
-        "percentile": 0.85
+        "winRate": 0.6551724137931034,
+        "percentile": 0.8
       }
     },
     {
@@ -6915,13 +6915,6 @@
           "C"
         ],
         "assignments": [
-          {
-            "slotIndex": 4,
-            "playerId": "p-203999",
-            "positions": [
-              "C"
-            ]
-          },
           {
             "slotIndex": 0,
             "playerId": "p-51",
@@ -6954,81 +6947,17 @@
               "PF",
               "SF"
             ]
+          },
+          {
+            "slotIndex": 4,
+            "playerId": "p-203999",
+            "positions": [
+              "C"
+            ]
           }
         ]
       },
       "players": [
-        {
-          "playerId": "p-203999",
-          "displayName": "Nikola Jokić",
-          "positions": [
-            "C"
-          ],
-          "heightInches": 83,
-          "weightLbs": 284,
-          "ratings": {
-            "insideScoring": 91,
-            "closeShot": 69,
-            "midrange": 65,
-            "threePoint": 64,
-            "freeThrow": 81,
-            "ballHandling": 74,
-            "passing": 87,
-            "offensiveIq": 75,
-            "offensiveRebound": 59,
-            "defensiveRebound": 96,
-            "perimeterDefense": 68,
-            "interiorDefense": 59,
-            "steal": 67,
-            "block": 63,
-            "defensiveIq": 75,
-            "speed": 57,
-            "strength": 77,
-            "vertical": 62
-          },
-          "tendencies": {
-            "usageRate": 28.8,
-            "passRate": 15.48,
-            "shotRate": 37.21,
-            "driveRate": 5.49,
-            "postUpRate": 21.47,
-            "rimFrequency": 31.18,
-            "shortMidFrequency": 33.99,
-            "longMidFrequency": 18.46,
-            "cornerThreeFrequency": 4.58,
-            "aboveBreakThreeFrequency": 11.79,
-            "threePointRate": 16.37,
-            "freeThrowRate": 31.04,
-            "turnoverRate": 12.88,
-            "isolationRate": 4.36,
-            "pickAndRollBallHandlerRate": 30.26,
-            "pickAndRollRollManRate": 25.42,
-            "spotUpRate": 15.57,
-            "transitionRate": 10.74,
-            "cutRate": 10.01,
-            "foulRate": 5.4,
-            "stealAttemptRate": 10.36,
-            "blockAttemptRate": 10.04,
-            "crashOffensiveGlassRate": 17.08
-          },
-          "anchors": {
-            "gamesPlayed": 79,
-            "minutesPerGame": 34.639662447257386,
-            "pointsPerGame": 26.39240506329114,
-            "reboundsPerGame": 12.354430379746836,
-            "offensiveReboundsPerGame": 2.8227848101265822,
-            "defensiveReboundsPerGame": 9.531645569620252,
-            "assistsPerGame": 8.962025316455696,
-            "stealsPerGame": 1.3670886075949367,
-            "blocksPerGame": 0.8607594936708861,
-            "turnoversPerGame": 3,
-            "fieldGoalPct": 0.5754527162977867,
-            "threePointPct": 0.35434083601286176,
-            "freeThrowPct": 0.806949806949807,
-            "threePointAttemptRate": 0.16371367824238128,
-            "freeThrowAttemptRate": 0.3104181431608788
-          }
-        },
         {
           "playerId": "p-51",
           "displayName": "Mahmoud Abdul-Rauf",
@@ -7317,14 +7246,85 @@
             "threePointAttemptRate": 0.4675642594859241,
             "freeThrowAttemptRate": 0.16401468788249693
           }
+        },
+        {
+          "playerId": "p-203999",
+          "displayName": "Nikola Jokić",
+          "positions": [
+            "C"
+          ],
+          "heightInches": 83,
+          "weightLbs": 284,
+          "ratings": {
+            "insideScoring": 91,
+            "closeShot": 69,
+            "midrange": 65,
+            "threePoint": 64,
+            "freeThrow": 81,
+            "ballHandling": 74,
+            "passing": 87,
+            "offensiveIq": 75,
+            "offensiveRebound": 59,
+            "defensiveRebound": 96,
+            "perimeterDefense": 68,
+            "interiorDefense": 59,
+            "steal": 67,
+            "block": 63,
+            "defensiveIq": 75,
+            "speed": 57,
+            "strength": 77,
+            "vertical": 62
+          },
+          "tendencies": {
+            "usageRate": 28.8,
+            "passRate": 15.48,
+            "shotRate": 37.21,
+            "driveRate": 5.49,
+            "postUpRate": 21.47,
+            "rimFrequency": 31.18,
+            "shortMidFrequency": 33.99,
+            "longMidFrequency": 18.46,
+            "cornerThreeFrequency": 4.58,
+            "aboveBreakThreeFrequency": 11.79,
+            "threePointRate": 16.37,
+            "freeThrowRate": 31.04,
+            "turnoverRate": 12.88,
+            "isolationRate": 4.36,
+            "pickAndRollBallHandlerRate": 30.26,
+            "pickAndRollRollManRate": 25.42,
+            "spotUpRate": 15.57,
+            "transitionRate": 10.74,
+            "cutRate": 10.01,
+            "foulRate": 5.4,
+            "stealAttemptRate": 10.36,
+            "blockAttemptRate": 10.04,
+            "crashOffensiveGlassRate": 17.08
+          },
+          "anchors": {
+            "gamesPlayed": 79,
+            "minutesPerGame": 34.639662447257386,
+            "pointsPerGame": 26.39240506329114,
+            "reboundsPerGame": 12.354430379746836,
+            "offensiveReboundsPerGame": 2.8227848101265822,
+            "defensiveReboundsPerGame": 9.531645569620252,
+            "assistsPerGame": 8.962025316455696,
+            "stealsPerGame": 1.3670886075949367,
+            "blocksPerGame": 0.8607594936708861,
+            "turnoversPerGame": 3,
+            "fieldGoalPct": 0.5754527162977867,
+            "threePointPct": 0.35434083601286176,
+            "freeThrowPct": 0.806949806949807,
+            "threePointAttemptRate": 0.16371367824238128,
+            "freeThrowAttemptRate": 0.3104181431608788
+          }
         }
       ],
       "strength": {
         "evaluationVersion": "bracket-m3-v6",
         "benchmarkVersion": "field-v1",
         "sampleCount": 348,
-        "winRate": 0.617816091954023,
-        "percentile": 0.65
+        "winRate": 0.6695402298850575,
+        "percentile": 0.8666666666666667
       }
     },
     {
@@ -7345,15 +7345,6 @@
         ],
         "assignments": [
           {
-            "slotIndex": 2,
-            "playerId": "p-202326",
-            "positions": [
-              "C",
-              "PF",
-              "SF"
-            ]
-          },
-          {
             "slotIndex": 0,
             "playerId": "p-1627741",
             "positions": [
@@ -7367,6 +7358,15 @@
             "positions": [
               "PG",
               "SG"
+            ]
+          },
+          {
+            "slotIndex": 2,
+            "playerId": "p-202326",
+            "positions": [
+              "C",
+              "PF",
+              "SF"
             ]
           },
           {
@@ -7387,79 +7387,6 @@
         ]
       },
       "players": [
-        {
-          "playerId": "p-202326",
-          "displayName": "DeMarcus Cousins",
-          "positions": [
-            "C",
-            "PF",
-            "SF"
-          ],
-          "heightInches": 83,
-          "weightLbs": 270,
-          "ratings": {
-            "insideScoring": 86,
-            "closeShot": 57,
-            "midrange": 64,
-            "threePoint": 65,
-            "freeThrow": 77,
-            "ballHandling": 75,
-            "passing": 72,
-            "offensiveIq": 59,
-            "offensiveRebound": 51,
-            "defensiveRebound": 93,
-            "perimeterDefense": 74,
-            "interiorDefense": 67,
-            "steal": 68,
-            "block": 71,
-            "defensiveIq": 66,
-            "speed": 57,
-            "strength": 72,
-            "vertical": 62
-          },
-          "tendencies": {
-            "usageRate": 35.9,
-            "passRate": 9.66,
-            "shotRate": 41.44,
-            "driveRate": 9.36,
-            "postUpRate": 14.51,
-            "rimFrequency": 33.5,
-            "shortMidFrequency": 24.93,
-            "longMidFrequency": 16.21,
-            "cornerThreeFrequency": 9.03,
-            "aboveBreakThreeFrequency": 16.32,
-            "threePointRate": 25.35,
-            "freeThrowRate": 46.79,
-            "turnoverRate": 13.48,
-            "isolationRate": 7.1,
-            "pickAndRollBallHandlerRate": 30.8,
-            "pickAndRollRollManRate": 17.25,
-            "spotUpRate": 17.62,
-            "transitionRate": 10.77,
-            "cutRate": 8.34,
-            "foulRate": 7.41,
-            "stealAttemptRate": 10.44,
-            "blockAttemptRate": 10.68,
-            "crashOffensiveGlassRate": 16.12
-          },
-          "anchors": {
-            "gamesPlayed": 72,
-            "minutesPerGame": 34.24115740740741,
-            "pointsPerGame": 26.97222222222222,
-            "reboundsPerGame": 11.027777777777779,
-            "offensiveReboundsPerGame": 2.111111111111111,
-            "defensiveReboundsPerGame": 8.916666666666666,
-            "assistsPerGame": 4.611111111111111,
-            "stealsPerGame": 1.3888888888888888,
-            "blocksPerGame": 1.2916666666666667,
-            "turnoversPerGame": 3.736111111111111,
-            "fieldGoalPct": 0.45171957671957674,
-            "threePointPct": 0.35711060948081264,
-            "freeThrowPct": 0.7693333333333333,
-            "threePointAttemptRate": 0.2534916201117318,
-            "freeThrowAttemptRate": 0.46787709497206703
-          }
-        },
         {
           "playerId": "p-1627741",
           "displayName": "Buddy Hield",
@@ -7602,6 +7529,79 @@
             "freeThrowPct": 0.8035320088300221,
             "threePointAttemptRate": 0.3230769230769231,
             "freeThrowAttemptRate": 0.3188034188034188
+          }
+        },
+        {
+          "playerId": "p-202326",
+          "displayName": "DeMarcus Cousins",
+          "positions": [
+            "C",
+            "PF",
+            "SF"
+          ],
+          "heightInches": 83,
+          "weightLbs": 270,
+          "ratings": {
+            "insideScoring": 86,
+            "closeShot": 57,
+            "midrange": 64,
+            "threePoint": 65,
+            "freeThrow": 77,
+            "ballHandling": 75,
+            "passing": 72,
+            "offensiveIq": 59,
+            "offensiveRebound": 51,
+            "defensiveRebound": 93,
+            "perimeterDefense": 74,
+            "interiorDefense": 67,
+            "steal": 68,
+            "block": 71,
+            "defensiveIq": 66,
+            "speed": 57,
+            "strength": 72,
+            "vertical": 62
+          },
+          "tendencies": {
+            "usageRate": 35.9,
+            "passRate": 9.66,
+            "shotRate": 41.44,
+            "driveRate": 9.36,
+            "postUpRate": 14.51,
+            "rimFrequency": 33.5,
+            "shortMidFrequency": 24.93,
+            "longMidFrequency": 16.21,
+            "cornerThreeFrequency": 9.03,
+            "aboveBreakThreeFrequency": 16.32,
+            "threePointRate": 25.35,
+            "freeThrowRate": 46.79,
+            "turnoverRate": 13.48,
+            "isolationRate": 7.1,
+            "pickAndRollBallHandlerRate": 30.8,
+            "pickAndRollRollManRate": 17.25,
+            "spotUpRate": 17.62,
+            "transitionRate": 10.77,
+            "cutRate": 8.34,
+            "foulRate": 7.41,
+            "stealAttemptRate": 10.44,
+            "blockAttemptRate": 10.68,
+            "crashOffensiveGlassRate": 16.12
+          },
+          "anchors": {
+            "gamesPlayed": 72,
+            "minutesPerGame": 34.24115740740741,
+            "pointsPerGame": 26.97222222222222,
+            "reboundsPerGame": 11.027777777777779,
+            "offensiveReboundsPerGame": 2.111111111111111,
+            "defensiveReboundsPerGame": 8.916666666666666,
+            "assistsPerGame": 4.611111111111111,
+            "stealsPerGame": 1.3888888888888888,
+            "blocksPerGame": 1.2916666666666667,
+            "turnoversPerGame": 3.736111111111111,
+            "fieldGoalPct": 0.45171957671957674,
+            "threePointPct": 0.35711060948081264,
+            "freeThrowPct": 0.7693333333333333,
+            "threePointAttemptRate": 0.2534916201117318,
+            "freeThrowAttemptRate": 0.46787709497206703
           }
         },
         {
@@ -7752,8 +7752,8 @@
         "evaluationVersion": "bracket-m3-v6",
         "benchmarkVersion": "field-v1",
         "sampleCount": 348,
-        "winRate": 0.3936781609195402,
-        "percentile": 0.31666666666666665
+        "winRate": 0.4396551724137931,
+        "percentile": 0.38333333333333336
       }
     },
     {
@@ -8185,7 +8185,7 @@
         "evaluationVersion": "bracket-m3-v6",
         "benchmarkVersion": "field-v1",
         "sampleCount": 348,
-        "winRate": 0.6235632183908046,
+        "winRate": 0.6063218390804598,
         "percentile": 0.6833333333333333
       }
     },
@@ -8616,8 +8616,8 @@
         "evaluationVersion": "bracket-m3-v6",
         "benchmarkVersion": "field-v1",
         "sampleCount": 348,
-        "winRate": 0.5488505747126436,
-        "percentile": 0.5166666666666667
+        "winRate": 0.4942528735632184,
+        "percentile": 0.4166666666666667
       }
     },
     {
@@ -9051,8 +9051,8 @@
         "evaluationVersion": "bracket-m3-v6",
         "benchmarkVersion": "field-v1",
         "sampleCount": 348,
-        "winRate": 0.382183908045977,
-        "percentile": 0.2833333333333333
+        "winRate": 0.3936781609195402,
+        "percentile": 0.25
       }
     },
     {
@@ -9072,13 +9072,6 @@
           "C"
         ],
         "assignments": [
-          {
-            "slotIndex": 4,
-            "playerId": "p-121",
-            "positions": [
-              "C"
-            ]
-          },
           {
             "slotIndex": 0,
             "playerId": "p-1642278",
@@ -9112,81 +9105,17 @@
               "SF",
               "SG"
             ]
+          },
+          {
+            "slotIndex": 4,
+            "playerId": "p-121",
+            "positions": [
+              "C"
+            ]
           }
         ]
       },
       "players": [
-        {
-          "playerId": "p-121",
-          "displayName": "Patrick Ewing",
-          "positions": [
-            "C"
-          ],
-          "heightInches": 84,
-          "weightLbs": 240,
-          "ratings": {
-            "insideScoring": 82,
-            "closeShot": 60,
-            "midrange": 63,
-            "threePoint": 56,
-            "freeThrow": 74,
-            "ballHandling": 72,
-            "passing": 58,
-            "offensiveIq": 58,
-            "offensiveRebound": 53,
-            "defensiveRebound": 84,
-            "perimeterDefense": 57,
-            "interiorDefense": 90,
-            "steal": 56,
-            "block": 100,
-            "defensiveIq": 69,
-            "speed": 62,
-            "strength": 59,
-            "vertical": 62
-          },
-          "tendencies": {
-            "usageRate": 18,
-            "passRate": 6.96,
-            "shotRate": 42.31,
-            "driveRate": 15.33,
-            "postUpRate": 20.74,
-            "rimFrequency": 39.24,
-            "shortMidFrequency": 35,
-            "longMidFrequency": 13.29,
-            "cornerThreeFrequency": 0.14,
-            "aboveBreakThreeFrequency": 0.22,
-            "threePointRate": 0.36,
-            "freeThrowRate": 37.87,
-            "turnoverRate": 13.17,
-            "isolationRate": 1.86,
-            "pickAndRollBallHandlerRate": 15.7,
-            "pickAndRollRollManRate": 23.16,
-            "spotUpRate": 13.5,
-            "transitionRate": 11.79,
-            "cutRate": 12.09,
-            "foulRate": 6.44,
-            "stealAttemptRate": 9.48,
-            "blockAttemptRate": 13,
-            "crashOffensiveGlassRate": 16.36
-          },
-          "anchors": {
-            "gamesPlayed": 81,
-            "minutesPerGame": 38.32098765432099,
-            "pointsPerGame": 26.59259259259259,
-            "reboundsPerGame": 11.17283950617284,
-            "offensiveReboundsPerGame": 2.3950617283950617,
-            "defensiveReboundsPerGame": 8.777777777777779,
-            "assistsPerGame": 3.0123456790123457,
-            "stealsPerGame": 0.9876543209876543,
-            "blocksPerGame": 3.185185185185185,
-            "turnoversPerGame": 3.5925925925925926,
-            "fieldGoalPct": 0.5107246376811594,
-            "threePointPct": 0.3162790697674419,
-            "freeThrowPct": 0.7453769559032717,
-            "threePointAttemptRate": 0.00364741641337386,
-            "freeThrowAttemptRate": 0.37872340425531914
-          }
-        },
         {
           "playerId": "p-1642278",
           "displayName": "Tyler Kolek",
@@ -9476,14 +9405,85 @@
             "threePointAttemptRate": 0.4618181818181818,
             "freeThrowAttemptRate": 0.1709090909090909
           }
+        },
+        {
+          "playerId": "p-121",
+          "displayName": "Patrick Ewing",
+          "positions": [
+            "C"
+          ],
+          "heightInches": 84,
+          "weightLbs": 240,
+          "ratings": {
+            "insideScoring": 82,
+            "closeShot": 60,
+            "midrange": 63,
+            "threePoint": 56,
+            "freeThrow": 74,
+            "ballHandling": 72,
+            "passing": 58,
+            "offensiveIq": 58,
+            "offensiveRebound": 53,
+            "defensiveRebound": 84,
+            "perimeterDefense": 57,
+            "interiorDefense": 90,
+            "steal": 56,
+            "block": 100,
+            "defensiveIq": 69,
+            "speed": 62,
+            "strength": 59,
+            "vertical": 62
+          },
+          "tendencies": {
+            "usageRate": 18,
+            "passRate": 6.96,
+            "shotRate": 42.31,
+            "driveRate": 15.33,
+            "postUpRate": 20.74,
+            "rimFrequency": 39.24,
+            "shortMidFrequency": 35,
+            "longMidFrequency": 13.29,
+            "cornerThreeFrequency": 0.14,
+            "aboveBreakThreeFrequency": 0.22,
+            "threePointRate": 0.36,
+            "freeThrowRate": 37.87,
+            "turnoverRate": 13.17,
+            "isolationRate": 1.86,
+            "pickAndRollBallHandlerRate": 15.7,
+            "pickAndRollRollManRate": 23.16,
+            "spotUpRate": 13.5,
+            "transitionRate": 11.79,
+            "cutRate": 12.09,
+            "foulRate": 6.44,
+            "stealAttemptRate": 9.48,
+            "blockAttemptRate": 13,
+            "crashOffensiveGlassRate": 16.36
+          },
+          "anchors": {
+            "gamesPlayed": 81,
+            "minutesPerGame": 38.32098765432099,
+            "pointsPerGame": 26.59259259259259,
+            "reboundsPerGame": 11.17283950617284,
+            "offensiveReboundsPerGame": 2.3950617283950617,
+            "defensiveReboundsPerGame": 8.777777777777779,
+            "assistsPerGame": 3.0123456790123457,
+            "stealsPerGame": 0.9876543209876543,
+            "blocksPerGame": 3.185185185185185,
+            "turnoversPerGame": 3.5925925925925926,
+            "fieldGoalPct": 0.5107246376811594,
+            "threePointPct": 0.3162790697674419,
+            "freeThrowPct": 0.7453769559032717,
+            "threePointAttemptRate": 0.00364741641337386,
+            "freeThrowAttemptRate": 0.37872340425531914
+          }
         }
       ],
       "strength": {
         "evaluationVersion": "bracket-m3-v6",
         "benchmarkVersion": "field-v1",
         "sampleCount": 348,
-        "winRate": 0.26436781609195403,
-        "percentile": 0.15
+        "winRate": 0.22701149425287356,
+        "percentile": 0.05
       }
     },
     {
@@ -9913,8 +9913,8 @@
         "evaluationVersion": "bracket-m3-v6",
         "benchmarkVersion": "field-v1",
         "sampleCount": 348,
-        "winRate": 0.4339080459770115,
-        "percentile": 0.38333333333333336
+        "winRate": 0.4224137931034483,
+        "percentile": 0.35
       }
     },
     {
@@ -9934,13 +9934,6 @@
           "C"
         ],
         "assignments": [
-          {
-            "slotIndex": 4,
-            "playerId": "p-87",
-            "positions": [
-              "C"
-            ]
-          },
           {
             "slotIndex": 0,
             "playerId": "p-2457",
@@ -9974,81 +9967,17 @@
               "PF",
               "SF"
             ]
+          },
+          {
+            "slotIndex": 4,
+            "playerId": "p-87",
+            "positions": [
+              "C"
+            ]
           }
         ]
       },
       "players": [
-        {
-          "playerId": "p-87",
-          "displayName": "Dikembe Mutombo",
-          "positions": [
-            "C"
-          ],
-          "heightInches": 86,
-          "weightLbs": 261,
-          "ratings": {
-            "insideScoring": 68,
-            "closeShot": 62,
-            "midrange": 60,
-            "threePoint": 46,
-            "freeThrow": 67,
-            "ballHandling": 56,
-            "passing": 49,
-            "offensiveIq": 62,
-            "offensiveRebound": 64,
-            "defensiveRebound": 88,
-            "perimeterDefense": 52,
-            "interiorDefense": 100,
-            "steal": 45,
-            "block": 100,
-            "defensiveIq": 69,
-            "speed": 62,
-            "strength": 62,
-            "vertical": 62
-          },
-          "tendencies": {
-            "usageRate": 17.8,
-            "passRate": 4.59,
-            "shotRate": 18.88,
-            "driveRate": 20.33,
-            "postUpRate": 23.1,
-            "rimFrequency": 47.05,
-            "shortMidFrequency": 35,
-            "longMidFrequency": 11.65,
-            "cornerThreeFrequency": 0,
-            "aboveBreakThreeFrequency": 0,
-            "threePointRate": 0,
-            "freeThrowRate": 60.83,
-            "turnoverRate": 15.14,
-            "isolationRate": 1.81,
-            "pickAndRollBallHandlerRate": 11.43,
-            "pickAndRollRollManRate": 26.01,
-            "spotUpRate": 13.44,
-            "transitionRate": 11.1,
-            "cutRate": 12.92,
-            "foulRate": 6.18,
-            "stealAttemptRate": 8.6,
-            "blockAttemptRate": 13,
-            "crashOffensiveGlassRate": 17.68
-          },
-          "anchors": {
-            "gamesPlayed": 82,
-            "minutesPerGame": 35.54666666666667,
-            "pointsPerGame": 13.426829268292684,
-            "reboundsPerGame": 11.365853658536585,
-            "offensiveReboundsPerGame": 3.3658536585365852,
-            "defensiveReboundsPerGame": 8,
-            "assistsPerGame": 1,
-            "stealsPerGame": 0.4146341463414634,
-            "blocksPerGame": 3.3780487804878048,
-            "turnoversPerGame": 2.048780487804878,
-            "fieldGoalPct": 0.528554070473876,
-            "threePointPct": null,
-            "freeThrowPct": 0.6823308270676691,
-            "threePointAttemptRate": 0,
-            "freeThrowAttemptRate": 0.6083445491251682
-          }
-        },
         {
           "playerId": "p-2457",
           "displayName": "Jannero Pargo",
@@ -10338,14 +10267,85 @@
             "threePointAttemptRate": 0.42021276595744683,
             "freeThrowAttemptRate": 0.1675531914893617
           }
+        },
+        {
+          "playerId": "p-87",
+          "displayName": "Dikembe Mutombo",
+          "positions": [
+            "C"
+          ],
+          "heightInches": 86,
+          "weightLbs": 261,
+          "ratings": {
+            "insideScoring": 68,
+            "closeShot": 62,
+            "midrange": 60,
+            "threePoint": 46,
+            "freeThrow": 67,
+            "ballHandling": 56,
+            "passing": 49,
+            "offensiveIq": 62,
+            "offensiveRebound": 64,
+            "defensiveRebound": 88,
+            "perimeterDefense": 52,
+            "interiorDefense": 100,
+            "steal": 45,
+            "block": 100,
+            "defensiveIq": 69,
+            "speed": 62,
+            "strength": 62,
+            "vertical": 62
+          },
+          "tendencies": {
+            "usageRate": 17.8,
+            "passRate": 4.59,
+            "shotRate": 18.88,
+            "driveRate": 20.33,
+            "postUpRate": 23.1,
+            "rimFrequency": 47.05,
+            "shortMidFrequency": 35,
+            "longMidFrequency": 11.65,
+            "cornerThreeFrequency": 0,
+            "aboveBreakThreeFrequency": 0,
+            "threePointRate": 0,
+            "freeThrowRate": 60.83,
+            "turnoverRate": 15.14,
+            "isolationRate": 1.81,
+            "pickAndRollBallHandlerRate": 11.43,
+            "pickAndRollRollManRate": 26.01,
+            "spotUpRate": 13.44,
+            "transitionRate": 11.1,
+            "cutRate": 12.92,
+            "foulRate": 6.18,
+            "stealAttemptRate": 8.6,
+            "blockAttemptRate": 13,
+            "crashOffensiveGlassRate": 17.68
+          },
+          "anchors": {
+            "gamesPlayed": 82,
+            "minutesPerGame": 35.54666666666667,
+            "pointsPerGame": 13.426829268292684,
+            "reboundsPerGame": 11.365853658536585,
+            "offensiveReboundsPerGame": 3.3658536585365852,
+            "defensiveReboundsPerGame": 8,
+            "assistsPerGame": 1,
+            "stealsPerGame": 0.4146341463414634,
+            "blocksPerGame": 3.3780487804878048,
+            "turnoversPerGame": 2.048780487804878,
+            "fieldGoalPct": 0.528554070473876,
+            "threePointPct": null,
+            "freeThrowPct": 0.6823308270676691,
+            "threePointAttemptRate": 0,
+            "freeThrowAttemptRate": 0.6083445491251682
+          }
         }
       ],
       "strength": {
         "evaluationVersion": "bracket-m3-v6",
         "benchmarkVersion": "field-v1",
         "sampleCount": 348,
-        "winRate": 0.4281609195402299,
-        "percentile": 0.35
+        "winRate": 0.41954022988505746,
+        "percentile": 0.31666666666666665
       }
     },
     {
@@ -10366,14 +10366,6 @@
         ],
         "assignments": [
           {
-            "slotIndex": 2,
-            "playerId": "p-1717",
-            "positions": [
-              "PF",
-              "SF"
-            ]
-          },
-          {
             "slotIndex": 0,
             "playerId": "p-77098",
             "positions": [
@@ -10387,6 +10379,14 @@
             "positions": [
               "PG",
               "SG"
+            ]
+          },
+          {
+            "slotIndex": 2,
+            "playerId": "p-1717",
+            "positions": [
+              "PF",
+              "SF"
             ]
           },
           {
@@ -10407,78 +10407,6 @@
         ]
       },
       "players": [
-        {
-          "playerId": "p-1717",
-          "displayName": "Dirk Nowitzki",
-          "positions": [
-            "PF",
-            "SF"
-          ],
-          "heightInches": 84,
-          "weightLbs": 245,
-          "ratings": {
-            "insideScoring": 89,
-            "closeShot": 58,
-            "midrange": 68,
-            "threePoint": 75,
-            "freeThrow": 89,
-            "ballHandling": 75,
-            "passing": 58,
-            "offensiveIq": 69,
-            "offensiveRebound": 46,
-            "defensiveRebound": 81,
-            "perimeterDefense": 55,
-            "interiorDefense": 63,
-            "steal": 52,
-            "block": 65,
-            "defensiveIq": 74,
-            "speed": 62,
-            "strength": 61,
-            "vertical": 62
-          },
-          "tendencies": {
-            "usageRate": 29.3,
-            "passRate": 6.54,
-            "shotRate": 40.23,
-            "driveRate": 21.74,
-            "postUpRate": 11.59,
-            "rimFrequency": 28.62,
-            "shortMidFrequency": 32.75,
-            "longMidFrequency": 21.3,
-            "cornerThreeFrequency": 6.88,
-            "aboveBreakThreeFrequency": 10.44,
-            "threePointRate": 17.33,
-            "freeThrowRate": 38.24,
-            "turnoverRate": 7.87,
-            "isolationRate": 5.29,
-            "pickAndRollBallHandlerRate": 23.96,
-            "pickAndRollRollManRate": 13.48,
-            "spotUpRate": 15.74,
-            "transitionRate": 11.46,
-            "cutRate": 7.99,
-            "foulRate": 4.55,
-            "stealAttemptRate": 9.16,
-            "blockAttemptRate": 10.2,
-            "crashOffensiveGlassRate": 15.52
-          },
-          "anchors": {
-            "gamesPlayed": 81,
-            "minutesPerGame": 38.13553497942387,
-            "pointsPerGame": 26.555555555555557,
-            "reboundsPerGame": 8.987654320987655,
-            "offensiveReboundsPerGame": 1.4197530864197532,
-            "defensiveReboundsPerGame": 7.567901234567901,
-            "assistsPerGame": 2.7901234567901234,
-            "stealsPerGame": 0.7160493827160493,
-            "blocksPerGame": 1.0246913580246915,
-            "turnoversPerGame": 1.9259259259259258,
-            "fieldGoalPct": 0.4787104622871046,
-            "threePointPct": 0.39088319088319085,
-            "freeThrowPct": 0.883480825958702,
-            "threePointAttemptRate": 0.17327365728900257,
-            "freeThrowAttemptRate": 0.38235294117647056
-          }
-        },
         {
           "playerId": "p-77098",
           "displayName": "Mike Iuzzolino",
@@ -10621,6 +10549,78 @@
             "freeThrowPct": 0.8423645320197044,
             "threePointAttemptRate": 0.08662613981762918,
             "freeThrowAttemptRate": 0.24772036474164133
+          }
+        },
+        {
+          "playerId": "p-1717",
+          "displayName": "Dirk Nowitzki",
+          "positions": [
+            "PF",
+            "SF"
+          ],
+          "heightInches": 84,
+          "weightLbs": 245,
+          "ratings": {
+            "insideScoring": 89,
+            "closeShot": 58,
+            "midrange": 68,
+            "threePoint": 75,
+            "freeThrow": 89,
+            "ballHandling": 75,
+            "passing": 58,
+            "offensiveIq": 69,
+            "offensiveRebound": 46,
+            "defensiveRebound": 81,
+            "perimeterDefense": 55,
+            "interiorDefense": 63,
+            "steal": 52,
+            "block": 65,
+            "defensiveIq": 74,
+            "speed": 62,
+            "strength": 61,
+            "vertical": 62
+          },
+          "tendencies": {
+            "usageRate": 29.3,
+            "passRate": 6.54,
+            "shotRate": 40.23,
+            "driveRate": 21.74,
+            "postUpRate": 11.59,
+            "rimFrequency": 28.62,
+            "shortMidFrequency": 32.75,
+            "longMidFrequency": 21.3,
+            "cornerThreeFrequency": 6.88,
+            "aboveBreakThreeFrequency": 10.44,
+            "threePointRate": 17.33,
+            "freeThrowRate": 38.24,
+            "turnoverRate": 7.87,
+            "isolationRate": 5.29,
+            "pickAndRollBallHandlerRate": 23.96,
+            "pickAndRollRollManRate": 13.48,
+            "spotUpRate": 15.74,
+            "transitionRate": 11.46,
+            "cutRate": 7.99,
+            "foulRate": 4.55,
+            "stealAttemptRate": 9.16,
+            "blockAttemptRate": 10.2,
+            "crashOffensiveGlassRate": 15.52
+          },
+          "anchors": {
+            "gamesPlayed": 81,
+            "minutesPerGame": 38.13553497942387,
+            "pointsPerGame": 26.555555555555557,
+            "reboundsPerGame": 8.987654320987655,
+            "offensiveReboundsPerGame": 1.4197530864197532,
+            "defensiveReboundsPerGame": 7.567901234567901,
+            "assistsPerGame": 2.7901234567901234,
+            "stealsPerGame": 0.7160493827160493,
+            "blocksPerGame": 1.0246913580246915,
+            "turnoversPerGame": 1.9259259259259258,
+            "fieldGoalPct": 0.4787104622871046,
+            "threePointPct": 0.39088319088319085,
+            "freeThrowPct": 0.883480825958702,
+            "threePointAttemptRate": 0.17327365728900257,
+            "freeThrowAttemptRate": 0.38235294117647056
           }
         },
         {
@@ -11202,7 +11202,7 @@
         "evaluationVersion": "bracket-m3-v6",
         "benchmarkVersion": "field-v1",
         "sampleCount": 348,
-        "winRate": 0.34770114942528735,
+        "winRate": 0.31896551724137934,
         "percentile": 0.21666666666666667
       }
     },
@@ -11224,14 +11224,6 @@
         ],
         "assignments": [
           {
-            "slotIndex": 2,
-            "playerId": "p-1882",
-            "positions": [
-              "PF",
-              "SF"
-            ]
-          },
-          {
             "slotIndex": 0,
             "playerId": "p-101137",
             "positions": [
@@ -11245,6 +11237,14 @@
             "positions": [
               "PG",
               "SG"
+            ]
+          },
+          {
+            "slotIndex": 2,
+            "playerId": "p-1882",
+            "positions": [
+              "PF",
+              "SF"
             ]
           },
           {
@@ -11265,78 +11265,6 @@
         ]
       },
       "players": [
-        {
-          "playerId": "p-1882",
-          "displayName": "Elton Brand",
-          "positions": [
-            "PF",
-            "SF"
-          ],
-          "heightInches": 80,
-          "weightLbs": 254,
-          "ratings": {
-            "insideScoring": 81,
-            "closeShot": 61,
-            "midrange": 64,
-            "threePoint": 61,
-            "freeThrow": 77,
-            "ballHandling": 71,
-            "passing": 56,
-            "offensiveIq": 66,
-            "offensiveRebound": 58,
-            "defensiveRebound": 74,
-            "perimeterDefense": 58,
-            "interiorDefense": 86,
-            "steal": 57,
-            "block": 90,
-            "defensiveIq": 71,
-            "speed": 62,
-            "strength": 73,
-            "vertical": 62
-          },
-          "tendencies": {
-            "usageRate": 27.2,
-            "passRate": 6.58,
-            "shotRate": 37.84,
-            "driveRate": 21.51,
-            "postUpRate": 16.22,
-            "rimFrequency": 40.77,
-            "shortMidFrequency": 35,
-            "longMidFrequency": 12.98,
-            "cornerThreeFrequency": 0.08,
-            "aboveBreakThreeFrequency": 0.13,
-            "threePointRate": 0.21,
-            "freeThrowRate": 39.58,
-            "turnoverRate": 9.31,
-            "isolationRate": 4.71,
-            "pickAndRollBallHandlerRate": 22.68,
-            "pickAndRollRollManRate": 18.72,
-            "spotUpRate": 10.57,
-            "transitionRate": 11.83,
-            "cutRate": 9.94,
-            "foulRate": 5.52,
-            "stealAttemptRate": 9.56,
-            "blockAttemptRate": 12.2,
-            "crashOffensiveGlassRate": 16.96
-          },
-          "anchors": {
-            "gamesPlayed": 79,
-            "minutesPerGame": 39.22537974683544,
-            "pointsPerGame": 24.72151898734177,
-            "reboundsPerGame": 10,
-            "offensiveReboundsPerGame": 2.9873417721518987,
-            "defensiveReboundsPerGame": 7.012658227848101,
-            "assistsPerGame": 2.632911392405063,
-            "stealsPerGame": 1.0253164556962024,
-            "blocksPerGame": 2.5443037974683542,
-            "turnoversPerGame": 2.189873417721519,
-            "fieldGoalPct": 0.5227722772277228,
-            "threePointPct": 0.33975903614457836,
-            "freeThrowPct": 0.7716049382716049,
-            "threePointAttemptRate": 0.0020905923344947735,
-            "freeThrowAttemptRate": 0.39581881533101043
-          }
-        },
         {
           "playerId": "p-101137",
           "displayName": "Daniel Ewing",
@@ -11479,6 +11407,78 @@
             "freeThrowPct": 0.7204968944099379,
             "threePointAttemptRate": 0.149812734082397,
             "freeThrowAttemptRate": 0.30337078651685395
+          }
+        },
+        {
+          "playerId": "p-1882",
+          "displayName": "Elton Brand",
+          "positions": [
+            "PF",
+            "SF"
+          ],
+          "heightInches": 80,
+          "weightLbs": 254,
+          "ratings": {
+            "insideScoring": 81,
+            "closeShot": 61,
+            "midrange": 64,
+            "threePoint": 61,
+            "freeThrow": 77,
+            "ballHandling": 71,
+            "passing": 56,
+            "offensiveIq": 66,
+            "offensiveRebound": 58,
+            "defensiveRebound": 74,
+            "perimeterDefense": 58,
+            "interiorDefense": 86,
+            "steal": 57,
+            "block": 90,
+            "defensiveIq": 71,
+            "speed": 62,
+            "strength": 73,
+            "vertical": 62
+          },
+          "tendencies": {
+            "usageRate": 27.2,
+            "passRate": 6.58,
+            "shotRate": 37.84,
+            "driveRate": 21.51,
+            "postUpRate": 16.22,
+            "rimFrequency": 40.77,
+            "shortMidFrequency": 35,
+            "longMidFrequency": 12.98,
+            "cornerThreeFrequency": 0.08,
+            "aboveBreakThreeFrequency": 0.13,
+            "threePointRate": 0.21,
+            "freeThrowRate": 39.58,
+            "turnoverRate": 9.31,
+            "isolationRate": 4.71,
+            "pickAndRollBallHandlerRate": 22.68,
+            "pickAndRollRollManRate": 18.72,
+            "spotUpRate": 10.57,
+            "transitionRate": 11.83,
+            "cutRate": 9.94,
+            "foulRate": 5.52,
+            "stealAttemptRate": 9.56,
+            "blockAttemptRate": 12.2,
+            "crashOffensiveGlassRate": 16.96
+          },
+          "anchors": {
+            "gamesPlayed": 79,
+            "minutesPerGame": 39.22537974683544,
+            "pointsPerGame": 24.72151898734177,
+            "reboundsPerGame": 10,
+            "offensiveReboundsPerGame": 2.9873417721518987,
+            "defensiveReboundsPerGame": 7.012658227848101,
+            "assistsPerGame": 2.632911392405063,
+            "stealsPerGame": 1.0253164556962024,
+            "blocksPerGame": 2.5443037974683542,
+            "turnoversPerGame": 2.189873417721519,
+            "fieldGoalPct": 0.5227722772277228,
+            "threePointPct": 0.33975903614457836,
+            "freeThrowPct": 0.7716049382716049,
+            "threePointAttemptRate": 0.0020905923344947735,
+            "freeThrowAttemptRate": 0.39581881533101043
           }
         },
         {
@@ -11629,8 +11629,8 @@
         "evaluationVersion": "bracket-m3-v6",
         "benchmarkVersion": "field-v1",
         "sampleCount": 348,
-        "winRate": 0.22701149425287356,
-        "percentile": 0.05
+        "winRate": 0.2413793103448276,
+        "percentile": 0.11666666666666667
       }
     },
     {
@@ -12060,8 +12060,8 @@
         "evaluationVersion": "bracket-m3-v6",
         "benchmarkVersion": "field-v1",
         "sampleCount": 348,
-        "winRate": 0.2413793103448276,
-        "percentile": 0.11666666666666667
+        "winRate": 0.23275862068965517,
+        "percentile": 0.08333333333333333
       }
     },
     {
@@ -12081,13 +12081,6 @@
           "C"
         ],
         "assignments": [
-          {
-            "slotIndex": 4,
-            "playerId": "p-49",
-            "positions": [
-              "C"
-            ]
-          },
           {
             "slotIndex": 0,
             "playerId": "p-1631098",
@@ -12119,81 +12112,17 @@
               "PF",
               "SF"
             ]
+          },
+          {
+            "slotIndex": 4,
+            "playerId": "p-49",
+            "positions": [
+              "C"
+            ]
           }
         ]
       },
       "players": [
-        {
-          "playerId": "p-49",
-          "displayName": "Gheorghe Muresan",
-          "positions": [
-            "C"
-          ],
-          "heightInches": 91,
-          "weightLbs": 303,
-          "ratings": {
-            "insideScoring": 72,
-            "closeShot": 66,
-            "midrange": 59,
-            "threePoint": 60,
-            "freeThrow": 63,
-            "ballHandling": 64,
-            "passing": 48,
-            "offensiveIq": 62,
-            "offensiveRebound": 67,
-            "defensiveRebound": 82,
-            "perimeterDefense": 56,
-            "interiorDefense": 87,
-            "steal": 54,
-            "block": 97,
-            "defensiveIq": 63,
-            "speed": 62,
-            "strength": 66,
-            "vertical": 62
-          },
-          "tendencies": {
-            "usageRate": 18,
-            "passRate": 3.27,
-            "shotRate": 21.88,
-            "driveRate": 14.66,
-            "postUpRate": 21.52,
-            "rimFrequency": 45.04,
-            "shortMidFrequency": 35,
-            "longMidFrequency": 12.06,
-            "cornerThreeFrequency": 0.06,
-            "aboveBreakThreeFrequency": 0.07,
-            "threePointRate": 0.13,
-            "freeThrowRate": 34.84,
-            "turnoverRate": 13.45,
-            "isolationRate": 1.86,
-            "pickAndRollBallHandlerRate": 10.87,
-            "pickAndRollRollManRate": 24.09,
-            "spotUpRate": 13.42,
-            "transitionRate": 11.42,
-            "cutRate": 12.34,
-            "foulRate": 8.36,
-            "stealAttemptRate": 9.32,
-            "blockAttemptRate": 12.76,
-            "crashOffensiveGlassRate": 18.04
-          },
-          "anchors": {
-            "gamesPlayed": 76,
-            "minutesPerGame": 29.5,
-            "pointsPerGame": 14.526315789473685,
-            "reboundsPerGame": 9.578947368421053,
-            "offensiveReboundsPerGame": 3.263157894736842,
-            "defensiveReboundsPerGame": 6.315789473684211,
-            "assistsPerGame": 0.7368421052631579,
-            "stealsPerGame": 0.6842105263157895,
-            "blocksPerGame": 2.263157894736842,
-            "turnoversPerGame": 1.881578947368421,
-            "fieldGoalPct": 0.571753986332574,
-            "threePointPct": 0.33580246913580253,
-            "freeThrowPct": 0.6480446927374302,
-            "threePointAttemptRate": 0.0012531328320802004,
-            "freeThrowAttemptRate": 0.3483709273182957
-          }
-        },
         {
           "playerId": "p-1631098",
           "displayName": "Johnny Davis",
@@ -12481,14 +12410,85 @@
             "threePointAttemptRate": 0.40705128205128205,
             "freeThrowAttemptRate": 0.14102564102564102
           }
+        },
+        {
+          "playerId": "p-49",
+          "displayName": "Gheorghe Muresan",
+          "positions": [
+            "C"
+          ],
+          "heightInches": 91,
+          "weightLbs": 303,
+          "ratings": {
+            "insideScoring": 72,
+            "closeShot": 66,
+            "midrange": 59,
+            "threePoint": 60,
+            "freeThrow": 63,
+            "ballHandling": 64,
+            "passing": 48,
+            "offensiveIq": 62,
+            "offensiveRebound": 67,
+            "defensiveRebound": 82,
+            "perimeterDefense": 56,
+            "interiorDefense": 87,
+            "steal": 54,
+            "block": 97,
+            "defensiveIq": 63,
+            "speed": 62,
+            "strength": 66,
+            "vertical": 62
+          },
+          "tendencies": {
+            "usageRate": 18,
+            "passRate": 3.27,
+            "shotRate": 21.88,
+            "driveRate": 14.66,
+            "postUpRate": 21.52,
+            "rimFrequency": 45.04,
+            "shortMidFrequency": 35,
+            "longMidFrequency": 12.06,
+            "cornerThreeFrequency": 0.06,
+            "aboveBreakThreeFrequency": 0.07,
+            "threePointRate": 0.13,
+            "freeThrowRate": 34.84,
+            "turnoverRate": 13.45,
+            "isolationRate": 1.86,
+            "pickAndRollBallHandlerRate": 10.87,
+            "pickAndRollRollManRate": 24.09,
+            "spotUpRate": 13.42,
+            "transitionRate": 11.42,
+            "cutRate": 12.34,
+            "foulRate": 8.36,
+            "stealAttemptRate": 9.32,
+            "blockAttemptRate": 12.76,
+            "crashOffensiveGlassRate": 18.04
+          },
+          "anchors": {
+            "gamesPlayed": 76,
+            "minutesPerGame": 29.5,
+            "pointsPerGame": 14.526315789473685,
+            "reboundsPerGame": 9.578947368421053,
+            "offensiveReboundsPerGame": 3.263157894736842,
+            "defensiveReboundsPerGame": 6.315789473684211,
+            "assistsPerGame": 0.7368421052631579,
+            "stealsPerGame": 0.6842105263157895,
+            "blocksPerGame": 2.263157894736842,
+            "turnoversPerGame": 1.881578947368421,
+            "fieldGoalPct": 0.571753986332574,
+            "threePointPct": 0.33580246913580253,
+            "freeThrowPct": 0.6480446927374302,
+            "threePointAttemptRate": 0.0012531328320802004,
+            "freeThrowAttemptRate": 0.3483709273182957
+          }
         }
       ],
       "strength": {
         "evaluationVersion": "bracket-m3-v6",
         "benchmarkVersion": "field-v1",
         "sampleCount": 348,
-        "winRate": 0.23850574712643677,
-        "percentile": 0.08333333333333333
+        "winRate": 0.25287356321839083,
+        "percentile": 0.15
       }
     },
     {
@@ -12509,13 +12509,6 @@
         ],
         "assignments": [
           {
-            "slotIndex": 4,
-            "playerId": "p-201572",
-            "positions": [
-              "C"
-            ]
-          },
-          {
             "slotIndex": 0,
             "playerId": "p-1642849",
             "positions": [
@@ -12535,14 +12528,6 @@
           },
           {
             "slotIndex": 2,
-            "playerId": "p-917",
-            "positions": [
-              "PF",
-              "SF"
-            ]
-          },
-          {
-            "slotIndex": 3,
             "playerId": "p-203508",
             "positions": [
               "PF",
@@ -12550,81 +12535,25 @@
               "SF",
               "SG"
             ]
+          },
+          {
+            "slotIndex": 3,
+            "playerId": "p-917",
+            "positions": [
+              "PF",
+              "SF"
+            ]
+          },
+          {
+            "slotIndex": 4,
+            "playerId": "p-201572",
+            "positions": [
+              "C"
+            ]
           }
         ]
       },
       "players": [
-        {
-          "playerId": "p-201572",
-          "displayName": "Brook Lopez",
-          "positions": [
-            "C"
-          ],
-          "heightInches": 84,
-          "weightLbs": 265,
-          "ratings": {
-            "insideScoring": 82,
-            "closeShot": 60,
-            "midrange": 63,
-            "threePoint": 59,
-            "freeThrow": 75,
-            "ballHandling": 70,
-            "passing": 49,
-            "offensiveIq": 62,
-            "offensiveRebound": 63,
-            "defensiveRebound": 63,
-            "perimeterDefense": 53,
-            "interiorDefense": 84,
-            "steal": 48,
-            "block": 94,
-            "defensiveIq": 72,
-            "speed": 62,
-            "strength": 68,
-            "vertical": 62
-          },
-          "tendencies": {
-            "usageRate": 28.2,
-            "passRate": 3.25,
-            "shotRate": 30.8,
-            "driveRate": 17.43,
-            "postUpRate": 18.51,
-            "rimFrequency": 36.73,
-            "shortMidFrequency": 35,
-            "longMidFrequency": 13.9,
-            "cornerThreeFrequency": 0.04,
-            "aboveBreakThreeFrequency": 0.05,
-            "threePointRate": 0.09,
-            "freeThrowRate": 35.83,
-            "turnoverRate": 9.37,
-            "isolationRate": 4.22,
-            "pickAndRollBallHandlerRate": 15,
-            "pickAndRollRollManRate": 20.41,
-            "spotUpRate": 10.22,
-            "transitionRate": 11.14,
-            "cutRate": 8.79,
-            "foulRate": 5.24,
-            "stealAttemptRate": 8.84,
-            "blockAttemptRate": 12.52,
-            "crashOffensiveGlassRate": 17.56
-          },
-          "anchors": {
-            "gamesPlayed": 74,
-            "minutesPerGame": 30.450968468468467,
-            "pointsPerGame": 19.41891891891892,
-            "reboundsPerGame": 6.918918918918919,
-            "offensiveReboundsPerGame": 2.810810810810811,
-            "defensiveReboundsPerGame": 4.108108108108108,
-            "assistsPerGame": 0.9459459459459459,
-            "stealsPerGame": 0.44594594594594594,
-            "blocksPerGame": 2.081081081081081,
-            "turnoversPerGame": 1.7702702702702702,
-            "fieldGoalPct": 0.5161839863713799,
-            "threePointPct": 0.33580246913580253,
-            "freeThrowPct": 0.7563559322033898,
-            "threePointAttemptRate": 0.0009140767824497258,
-            "freeThrowAttemptRate": 0.3583180987202925
-          }
-        },
         {
           "playerId": "p-1642849",
           "displayName": "Nolan Traore",
@@ -12772,78 +12701,6 @@
           }
         },
         {
-          "playerId": "p-917",
-          "displayName": "Jack Haley",
-          "positions": [
-            "PF",
-            "SF"
-          ],
-          "heightInches": 82,
-          "weightLbs": 240,
-          "ratings": {
-            "insideScoring": 59,
-            "closeShot": 56,
-            "midrange": 59,
-            "threePoint": 46,
-            "freeThrow": 64,
-            "ballHandling": 61,
-            "passing": 48,
-            "offensiveIq": 60,
-            "offensiveRebound": 67,
-            "defensiveRebound": 71,
-            "perimeterDefense": 53,
-            "interiorDefense": 56,
-            "steal": 48,
-            "block": 58,
-            "defensiveIq": 60,
-            "speed": 62,
-            "strength": 63,
-            "vertical": 62
-          },
-          "tendencies": {
-            "usageRate": 18,
-            "passRate": 3.8,
-            "shotRate": 9.16,
-            "driveRate": 22.11,
-            "postUpRate": 9.46,
-            "rimFrequency": 38.06,
-            "shortMidFrequency": 35,
-            "longMidFrequency": 13.63,
-            "cornerThreeFrequency": 0,
-            "aboveBreakThreeFrequency": 0,
-            "threePointRate": 0,
-            "freeThrowRate": 52.77,
-            "turnoverRate": 12.97,
-            "isolationRate": 2.19,
-            "pickAndRollBallHandlerRate": 14.69,
-            "pickAndRollRollManRate": 10.45,
-            "spotUpRate": 13.38,
-            "transitionRate": 10.91,
-            "cutRate": 9.99,
-            "foulRate": 10.11,
-            "stealAttemptRate": 8.84,
-            "blockAttemptRate": 9.64,
-            "crashOffensiveGlassRate": 18.04
-          },
-          "anchors": {
-            "gamesPlayed": 78,
-            "minutesPerGame": 15.102564102564102,
-            "pointsPerGame": 5.564102564102564,
-            "reboundsPerGame": 4.564102564102564,
-            "offensiveReboundsPerGame": 1.794871794871795,
-            "defensiveReboundsPerGame": 2.769230769230769,
-            "assistsPerGame": 0.3974358974358974,
-            "stealsPerGame": 0.2564102564102564,
-            "blocksPerGame": 0.2692307692307692,
-            "turnoversPerGame": 0.8076923076923077,
-            "fieldGoalPct": 0.4657210401891253,
-            "threePointPct": null,
-            "freeThrowPct": 0.6590038314176245,
-            "threePointAttemptRate": 0,
-            "freeThrowAttemptRate": 0.5276967930029155
-          }
-        },
-        {
           "playerId": "p-203508",
           "displayName": "Sergey Karasev",
           "positions": [
@@ -12916,13 +12773,156 @@
             "threePointAttemptRate": 0.5,
             "freeThrowAttemptRate": 0.3783783783783784
           }
+        },
+        {
+          "playerId": "p-917",
+          "displayName": "Jack Haley",
+          "positions": [
+            "PF",
+            "SF"
+          ],
+          "heightInches": 82,
+          "weightLbs": 240,
+          "ratings": {
+            "insideScoring": 59,
+            "closeShot": 56,
+            "midrange": 59,
+            "threePoint": 46,
+            "freeThrow": 64,
+            "ballHandling": 61,
+            "passing": 48,
+            "offensiveIq": 60,
+            "offensiveRebound": 67,
+            "defensiveRebound": 71,
+            "perimeterDefense": 53,
+            "interiorDefense": 56,
+            "steal": 48,
+            "block": 58,
+            "defensiveIq": 60,
+            "speed": 62,
+            "strength": 63,
+            "vertical": 62
+          },
+          "tendencies": {
+            "usageRate": 18,
+            "passRate": 3.8,
+            "shotRate": 9.16,
+            "driveRate": 22.11,
+            "postUpRate": 9.46,
+            "rimFrequency": 38.06,
+            "shortMidFrequency": 35,
+            "longMidFrequency": 13.63,
+            "cornerThreeFrequency": 0,
+            "aboveBreakThreeFrequency": 0,
+            "threePointRate": 0,
+            "freeThrowRate": 52.77,
+            "turnoverRate": 12.97,
+            "isolationRate": 2.19,
+            "pickAndRollBallHandlerRate": 14.69,
+            "pickAndRollRollManRate": 10.45,
+            "spotUpRate": 13.38,
+            "transitionRate": 10.91,
+            "cutRate": 9.99,
+            "foulRate": 10.11,
+            "stealAttemptRate": 8.84,
+            "blockAttemptRate": 9.64,
+            "crashOffensiveGlassRate": 18.04
+          },
+          "anchors": {
+            "gamesPlayed": 78,
+            "minutesPerGame": 15.102564102564102,
+            "pointsPerGame": 5.564102564102564,
+            "reboundsPerGame": 4.564102564102564,
+            "offensiveReboundsPerGame": 1.794871794871795,
+            "defensiveReboundsPerGame": 2.769230769230769,
+            "assistsPerGame": 0.3974358974358974,
+            "stealsPerGame": 0.2564102564102564,
+            "blocksPerGame": 0.2692307692307692,
+            "turnoversPerGame": 0.8076923076923077,
+            "fieldGoalPct": 0.4657210401891253,
+            "threePointPct": null,
+            "freeThrowPct": 0.6590038314176245,
+            "threePointAttemptRate": 0,
+            "freeThrowAttemptRate": 0.5276967930029155
+          }
+        },
+        {
+          "playerId": "p-201572",
+          "displayName": "Brook Lopez",
+          "positions": [
+            "C"
+          ],
+          "heightInches": 84,
+          "weightLbs": 265,
+          "ratings": {
+            "insideScoring": 82,
+            "closeShot": 60,
+            "midrange": 63,
+            "threePoint": 59,
+            "freeThrow": 75,
+            "ballHandling": 70,
+            "passing": 49,
+            "offensiveIq": 62,
+            "offensiveRebound": 63,
+            "defensiveRebound": 63,
+            "perimeterDefense": 53,
+            "interiorDefense": 84,
+            "steal": 48,
+            "block": 94,
+            "defensiveIq": 72,
+            "speed": 62,
+            "strength": 68,
+            "vertical": 62
+          },
+          "tendencies": {
+            "usageRate": 28.2,
+            "passRate": 3.25,
+            "shotRate": 30.8,
+            "driveRate": 17.43,
+            "postUpRate": 18.51,
+            "rimFrequency": 36.73,
+            "shortMidFrequency": 35,
+            "longMidFrequency": 13.9,
+            "cornerThreeFrequency": 0.04,
+            "aboveBreakThreeFrequency": 0.05,
+            "threePointRate": 0.09,
+            "freeThrowRate": 35.83,
+            "turnoverRate": 9.37,
+            "isolationRate": 4.22,
+            "pickAndRollBallHandlerRate": 15,
+            "pickAndRollRollManRate": 20.41,
+            "spotUpRate": 10.22,
+            "transitionRate": 11.14,
+            "cutRate": 8.79,
+            "foulRate": 5.24,
+            "stealAttemptRate": 8.84,
+            "blockAttemptRate": 12.52,
+            "crashOffensiveGlassRate": 17.56
+          },
+          "anchors": {
+            "gamesPlayed": 74,
+            "minutesPerGame": 30.450968468468467,
+            "pointsPerGame": 19.41891891891892,
+            "reboundsPerGame": 6.918918918918919,
+            "offensiveReboundsPerGame": 2.810810810810811,
+            "defensiveReboundsPerGame": 4.108108108108108,
+            "assistsPerGame": 0.9459459459459459,
+            "stealsPerGame": 0.44594594594594594,
+            "blocksPerGame": 2.081081081081081,
+            "turnoversPerGame": 1.7702702702702702,
+            "fieldGoalPct": 0.5161839863713799,
+            "threePointPct": 0.33580246913580253,
+            "freeThrowPct": 0.7563559322033898,
+            "threePointAttemptRate": 0.0009140767824497258,
+            "freeThrowAttemptRate": 0.3583180987202925
+          }
         }
       ],
       "strength": {
         "evaluationVersion": "bracket-m3-v6",
         "benchmarkVersion": "field-v1",
         "sampleCount": 348,
-        "winRate": 0.20689655172413793,
+        "winRate": 0.21551724137931033,
         "percentile": 0.016666666666666666
       }
     }
@@ -13276,7 +13276,7 @@
     "dataVersion": "m24-ratings-v6.5",
     "targetBands": {
       "teamPercentileBand": [
-        0.15,
+        0.1,
         0.8
       ],
       "leagueMedianPercentileBand": [

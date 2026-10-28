@@ -55,7 +55,7 @@
         class="mt-1.5 flex font-mono text-[8px] tracking-[0.04em] text-muted-foreground uppercase sm:text-[9px]"
       >
         <span class="flex w-[80%] justify-between"><span>$0</span><span>$120M</span></span>
-        <span class="w-[10%] text-center">$135M</span>
+        <span class="invisible w-[10%] text-center sm:visible">$135M</span>
         <span class="w-[10%] text-right">$150M</span>
       </div>
     </div>
