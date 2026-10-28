@@ -82,6 +82,14 @@ export const modeCatalog: readonly ModeDefinition[] = [
     },
   },
   {
+    id: 'cap-rush',
+    label: 'Cap Rush',
+    description:
+      'Draft five historical seasons at exact positions, manage the apron, and build the lineup you would take into an 82-game run.',
+    discovery: { homeOrder: 4, navigationOrder: 4, cta: 'Start Cap Rush' },
+    solo: { href: '/cap-rush' },
+  },
+  {
     id: 'draft-duel',
     label: 'Draft Duel',
     description:

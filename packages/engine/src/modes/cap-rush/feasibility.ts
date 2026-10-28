@@ -4,7 +4,6 @@ import {
   CAP_RUSH_OFFER_RECIPE,
   CAP_RUSH_OFFER_SIZE,
   POSITIONS,
-  capRushPayrollDollars,
 } from '@hoop-rush/data-contracts';
 import type { CapRushCatalogIndex } from './catalog.ts';
 import { CapRushCatalogCoverageError } from './errors.ts';
@@ -103,7 +102,7 @@ export function capRushAssessSigning(
   index: CapRushCatalogIndex,
   card: CapRushCard,
 ): CapRushSigningAssessment {
-  const payroll = capRushPayrollDollars(state.picks);
+  const payroll = state.picks.reduce((total, pick) => total + pick.card.salaryDollars, 0);
   const payrollAfterSigning = payroll + card.salaryDollars;
   if (payrollAfterSigning > CAP_RUSH_HARD_LIMIT_DOLLARS) {
     return {

@@ -54,6 +54,7 @@ import type {
   StoredHavocMultiplayerHistoryIndex,
   StoredHavocMultiplayerResultRow,
 } from '../schemas/havoc-multiplayer-record.ts';
+import type { StoredCapRushCommandRow, StoredCapRushDraftRow } from '../schemas/cap-rush-record.ts';
 import { listCompletedHistory } from './support.ts';
 import { DexieProfileRepository } from './profile.ts';
 const ACTIVE_RECORD_ID = 'active';
@@ -129,6 +130,11 @@ export const HOOP_RUSH_DATABASE_V6_STORES: Record<string, string> = {
   ...HOOP_RUSH_DATABASE_V5_STORES,
   havocLockedInputs: 'runId',
 };
+export const HOOP_RUSH_DATABASE_V7_STORES: Record<string, string> = {
+  ...HOOP_RUSH_DATABASE_V6_STORES,
+  capRushActive: 'recordId',
+  capRushCommands: 'commandId, runId',
+};
 export class HoopRushDatabase extends Dexie {
   profiles!: EntityTable<PlayerProfile, 'id'>;
   archivedProfiles!: EntityTable<PlayerProfile, 'id'>;
@@ -162,6 +168,8 @@ export class HoopRushDatabase extends Dexie {
   havocMultiplayerResults!: Table<StoredHavocMultiplayerResultRow, [string, number]>;
   havocMultiplayerCompleted!: EntityTable<StoredHavocMultiplayerCompleted, 'roomId'>;
   havocMultiplayerHistory!: EntityTable<StoredHavocMultiplayerHistoryIndex, 'recordId'>;
+  capRushActive!: EntityTable<StoredCapRushDraftRow, 'recordId'>;
+  capRushCommands!: EntityTable<StoredCapRushCommandRow, 'commandId'>;
   constructor(name = HOOP_RUSH_DATABASE_NAME) {
     super(name);
     this.version(1).stores(HOOP_RUSH_DATABASE_STORES);
@@ -170,6 +178,7 @@ export class HoopRushDatabase extends Dexie {
     this.version(4).stores(HOOP_RUSH_DATABASE_V4_STORES);
     this.version(5).stores(HOOP_RUSH_DATABASE_V5_STORES);
     this.version(6).stores(HOOP_RUSH_DATABASE_V6_STORES);
+    this.version(7).stores(HOOP_RUSH_DATABASE_V7_STORES);
   }
 }
 export class DexieChallengeRepository {

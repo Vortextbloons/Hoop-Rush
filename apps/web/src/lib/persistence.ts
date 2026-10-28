@@ -1,4 +1,5 @@
 import {
+  DexieCapRushRepository,
   DexieChallengeRepository,
   DexieDraftDuelRepository,
   DexieFixedFiveRepository,
@@ -15,6 +16,7 @@ export interface Persistence {
   havocRepository: DexieHavocRepository;
   draftDuelRepository: DexieDraftDuelRepository;
   havocMultiplayerRepository: DexieHavocMultiplayerRepository;
+  capRushRepository: DexieCapRushRepository;
   profileRepository: DexieProfileRepository;
 }
 
@@ -30,6 +32,7 @@ export function getPersistence(): Persistence {
       havocRepository: new DexieHavocRepository(db),
       draftDuelRepository: new DexieDraftDuelRepository(db),
       havocMultiplayerRepository: new DexieHavocMultiplayerRepository(db),
+      capRushRepository: new DexieCapRushRepository(db),
       profileRepository: new DexieProfileRepository(db),
     };
   }

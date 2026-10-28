@@ -237,7 +237,3 @@ export const capRushDraftStateSchema = z
     }
   });
 export type CapRushDraftState = z.infer<typeof capRushDraftStateSchema>;
-
-export function capRushPayrollDollars(picks: readonly CapRushDraftPick[]): number {
-  return picks.reduce((total, pick) => total + pick.card.salaryDollars, 0);
-}

@@ -26,7 +26,6 @@ import { simulateGame } from '../sim/game.ts';
 import { validateBracketContent } from '../challenge/commands.ts';
 import { evaluateLineupBalance, strengthSeed } from '../challenge/lineup-eval.ts';
 import { FIELD_BENCHMARK_VERSION } from '../challenge/benchmarks.ts';
-import { assignLineup } from '../domain/lineup.ts';
 import { generateSchedule, scheduleInvariants, SCHEDULE_GENERATION_VERSION } from './schedule.ts';
 
 export const SCHEDULE_VERSION_LABEL = `schedule-${SCHEDULE_GENERATION_VERSION.replace('schedule-', '')}`;
@@ -39,16 +38,16 @@ export const SCHEDULE_VERSION_LABEL = `schedule-${SCHEDULE_GENERATION_VERSION.re
  * toward the extremes.
  */
 export const BRACKET_TARGET_LADDER: readonly (readonly [number, number])[] = [
-  [0, 0.787],
-  [3, 0.673],
-  [7, 0.615],
-  [14, 0.52],
-  [19, 0.444],
-  [24, 0.343],
-  [29, 0.206],
+  [0, 0.8],
+  [3, 0.685],
+  [7, 0.62],
+  [14, 0.5],
+  [19, 0.42],
+  [24, 0.29],
+  [29, 0.1],
 ];
 
-export const BRACKET_WIN_RATE_BAND: readonly [number, number] = [0.15, 0.8];
+export const BRACKET_WIN_RATE_BAND: readonly [number, number] = [0.1, 0.8];
 const LEAGUE_MEDIAN_WIN_RATE_BAND: readonly [number, number] = [0.46, 0.54];
 const SAMPLING_TOLERANCE = 0.03;
 
@@ -176,12 +175,19 @@ function bestFiveWithStar(
     .sort((a, b) => b.score - a.score);
   const slots = [...LINEUP_STRUCTURE];
 
-  const chosen: BracketCandidatePlayer[] = [];
+  const placed: (BracketCandidatePlayer | undefined)[] = new Array<
+    BracketCandidatePlayer | undefined
+  >(slots.length);
   const used = new Set<string>();
   let best: SelectedFive | null = null;
   let nodes = 0;
 
-  const evaluate = (five: BracketCandidatePlayer[]): void => {
+  const evaluate = (): void => {
+    const five: BracketCandidatePlayer[] = [];
+    for (const entry of placed) {
+      if (entry === undefined) return;
+      five.push(entry);
+    }
     if (!isBalanced(five)) return;
     const quality = totalQuality(five);
     if (best === null || quality > best.quality) best = { players: five, quality };
@@ -191,24 +197,25 @@ function bestFiveWithStar(
     nodes += 1;
     if (nodes > MAX_SEARCH_NODES) return;
     if (slot === slots.length) {
-      const five = star ? [star, ...chosen] : [...chosen];
-      if (five.length === slots.length) evaluate(five);
+      evaluate();
       return;
     }
     const slotPosition = slots[slot];
     if (!slotPosition) return;
     if (star && !used.has(star.playerId) && canPlay(star.positions, slotPosition)) {
       used.add(star.playerId);
+      placed[slot] = star;
       recurse(slot + 1);
+      placed[slot] = undefined;
       used.delete(star.playerId);
     }
     for (const player of support) {
       if (used.has(player.playerId)) continue;
       if (!canPlay(player.positions, slotPosition)) continue;
       used.add(player.playerId);
-      chosen.push(player);
+      placed[slot] = player;
       recurse(slot + 1);
-      chosen.pop();
+      placed[slot] = undefined;
       used.delete(player.playerId);
     }
   };
@@ -485,14 +492,16 @@ export function generateBracket(options: BracketGenerationOptions): OpponentBrac
     if (winRate === undefined) throw new Error(`bracket: ${franchiseId} was not measured`);
     const top = [...five.players].sort((a, b) => b.score - a.score)[0];
     if (!top) throw new Error(`bracket: ${franchiseId} selection is empty`);
-    const assignment = assignLineup(
-      five.players.map((player) => ({
-        playerId: player.playerId,
-        positions: player.positions,
-      })),
-    );
-    if (assignment === null) {
-      throw new Error(`bracket: lineup for ${franchiseId} cannot fill PG/SG/SF/PF/C`);
+    const assignment = five.players.map((player, slotIndex) => ({
+      slotIndex: slotIndex as 0 | 1 | 2 | 3 | 4,
+      playerId: playerIdSchema.parse(player.playerId),
+      positions: player.positions,
+    }));
+    for (const [slotIndex, slotPosition] of LINEUP_STRUCTURE.entries()) {
+      const player = five.players[slotIndex];
+      if (!player || !canPlay(player.positions, slotPosition)) {
+        throw new Error(`bracket: lineup for ${franchiseId} cannot fill PG/SG/SF/PF/C`);
+      }
     }
     opponents.push({
       schemaVersion: 2,

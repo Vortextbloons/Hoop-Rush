@@ -387,9 +387,7 @@ export function buildCandidateCatalog(
 
 export function bracketGenerate(args: {
   seed?: string;
-  levels?: string;
-  pairs?: string;
-  'final-pairs'?: string;
+  'games-per-pair'?: string;
   'min-score'?: string;
   'data-version'?: string;
   out?: string;
@@ -403,14 +401,12 @@ export function bracketGenerate(args: {
     throw new UsageError(`--seed must be hex (got "${rawSeed}")`);
   }
   const seed = parsedSeed.data;
-  const levels = parseCount(args.levels, '--levels', 6);
-  const pairs = parseCount(args.pairs, '--pairs', 4);
-  if (pairs < MIN_BRACKET_PAIRS) {
+  const gamesPerPair = parseCount(args['games-per-pair'], '--games-per-pair', 12);
+  if (gamesPerPair < MIN_BRACKET_PAIRS) {
     throw new UsageError(
-      `--pairs must be at least ${String(MIN_BRACKET_PAIRS)} for stable field win rates`,
+      `--games-per-pair must be at least ${String(MIN_BRACKET_PAIRS)} for stable field win rates`,
     );
   }
-  const finalPairs = parseCount(args['final-pairs'], '--final-pairs', 16);
   const minScore = parseCount(args['min-score'], '--min-score', 45);
   const dataVersion = args['data-version'];
   const difficulty: DifficultyProfile = { ...SINGLE_DIFFICULTY };
@@ -446,9 +442,7 @@ export function bracketGenerate(args: {
       openingOpponent,
       difficulty,
       candidates,
-      candidateLevels: levels,
-      screeningPairs: pairs,
-      finalPairs,
+      gamesPerPair,
       minPlayerScore: minScore,
       engineContext: createEngineContext(),
     });

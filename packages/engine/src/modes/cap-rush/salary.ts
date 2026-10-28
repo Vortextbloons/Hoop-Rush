@@ -114,6 +114,27 @@ export interface CapRushApronPreview {
   readonly secondApron: SimulationRatings;
 }
 
+export interface CapRushApronReduction {
+  readonly field: RatingField;
+  readonly reduction: number;
+}
+
+export function capRushApronReductions(
+  status: CapRushPayrollStatus,
+): readonly CapRushApronReduction[] {
+  const table =
+    status === 'first-apron'
+      ? FIRST_APRON_REDUCTIONS
+      : status === 'second-apron'
+        ? SECOND_APRON_REDUCTIONS
+        : null;
+  if (table === null) return [];
+  return (Object.keys(table) as RatingField[]).map((field) => ({
+    field,
+    reduction: table[field] ?? 0,
+  }));
+}
+
 export function capRushApronPreview(profile: CapRushPlayerProfile): CapRushApronPreview {
   return {
     firstApron: capRushEffectiveRatings(profile.ratings, 'first-apron'),
