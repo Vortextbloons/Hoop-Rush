@@ -65,6 +65,17 @@ import type {
 } from '../../../sim/havoc-runtime.ts';
 import { havocBattleCapabilityTargets } from './battle-targets.ts';
 import { havocBattleGameInputDigest } from './battle-digests.ts';
+import {
+  havocFieldGoalValue,
+  fieldGoalAttributions,
+  HAVOC_SCORING_SOURCE_MUTATION,
+} from './battle-scoring.ts';
+export { havocFieldGoalValue, HAVOC_SCORING_SOURCE_MUTATION } from './battle-scoring.ts';
+export type {
+  HavocFieldGoalValueInput,
+  HavocFieldGoalContribution,
+  HavocFieldGoalValue,
+} from './battle-scoring.ts';
 
 const HAVOC_RUNTIME_SEED_ROOT = 'havoc-runtime-v1';
 const HAVOC_DUNK_BASE = 0.15;
@@ -117,57 +128,6 @@ function runtimeSeed(gameSeed: string, ...parts: readonly (string | number)[]): 
       [HAVOC_RUNTIME_SEED_ROOT, gameSeed, ...parts.map((part) => String(part))].join('\u0000'),
     ),
   );
-}
-
-export interface HavocFieldGoalValueInput {
-  nominal: 2 | 3;
-  three: boolean;
-  roulette: number | null;
-  fourPointDunk: boolean;
-  reverseBasketball: boolean;
-  heatCheck: boolean;
-  putback: boolean;
-  bounty: boolean;
-  doubleOrNothing: boolean;
-  buzzerBandit: boolean;
-}
-
-export interface HavocFieldGoalContribution {
-  source: HavocScoringSource;
-  points: number;
-}
-
-export interface HavocFieldGoalValue {
-  addends: Array<{ source: HavocScoringSource; points: number }>;
-  multipliers: Array<{ source: HavocScoringSource; factor: 2 | 3 }>;
-  points: number;
-  contributions: HavocFieldGoalContribution[];
-}
-
-export function havocFieldGoalValue(input: HavocFieldGoalValueInput): HavocFieldGoalValue {
-  const addends: HavocFieldGoalValue['addends'] = [];
-  const multipliers: HavocFieldGoalValue['multipliers'] = [];
-  const contributions: HavocFieldGoalContribution[] = [];
-  let value = input.nominal;
-  const add = (source: HavocScoringSource, points: number): void => {
-    addends.push({ source, points });
-    contributions.push({ source, points });
-    value += points;
-  };
-  if (input.roulette !== null) add('roulette', input.roulette - input.nominal);
-  if (input.reverseBasketball) add('reverse-basketball', input.three ? -2 : 1);
-  const multiply = (source: HavocScoringSource, factor: 2 | 3): void => {
-    multipliers.push({ source, factor });
-    contributions.push({ source, points: value * (factor - 1) });
-    value *= factor;
-  };
-  if (input.heatCheck) multiply('heat-check', 2);
-  else if (input.putback) multiply('second-chance-jackpot', 2);
-  else if (input.bounty) multiply('the-bounty', 3);
-  else if (input.doubleOrNothing) multiply('double-or-nothing', 2);
-  else if (input.buzzerBandit) multiply('buzzer-bandit', 2);
-  if (input.fourPointDunk) add('four-point-dunk', 1);
-  return { addends, multipliers, points: value, contributions };
 }
 
 interface RollupCounters {
@@ -247,20 +207,6 @@ interface Attribution {
   mutationId: HavocScoringSource;
   points: number;
 }
-
-const SCORING_SOURCE_MUTATION: Record<HavocScoringSource, HavocMutationId> = {
-  roulette: 'basketball-roulette',
-  'four-point-dunk': 'four-point-dunk',
-  'reverse-basketball': 'reverse-basketball',
-  'golden-assist': 'golden-assist',
-  'double-or-nothing': 'double-or-nothing',
-  'heat-check': 'heat-check',
-  'second-chance-jackpot': 'second-chance-jackpot',
-  'the-bounty': 'the-bounty',
-  'buzzer-bandit': 'buzzer-bandit',
-  'charity-casino': 'charity-casino',
-};
-export { SCORING_SOURCE_MUTATION as HAVOC_SCORING_SOURCE_MUTATION };
 
 const ALL_AUTHORITATIVE: ReadonlySet<string> = new Set(havocAuthoritativeChannelSchema.options);
 
@@ -557,7 +503,7 @@ class HavocBattleRuntime implements HavocRuntimeHooks {
     for (const attribution of attributions) {
       const counters = this.rollupFor(
         attribution.owner,
-        SCORING_SOURCE_MUTATION[attribution.mutationId],
+        HAVOC_SCORING_SOURCE_MUTATION[attribution.mutationId],
       );
       if (counters === undefined) continue;
       counters.pointsDelta += attribution.points;
@@ -873,46 +819,12 @@ class HavocBattleRuntime implements HavocRuntimeHooks {
         doubleOrNothing: doubleOwners.length > 0,
         buzzerBandit: buzzerQualifies,
       });
-      const attributions: Attribution[] = [];
-      const ownerIds: string[] = [];
-      const pushOwner = (participant: ParticipantState): void => {
-        if (!ownerIds.includes(participant.instanceId)) ownerIds.push(participant.instanceId);
-      };
-      for (const contribution of value.contributions) {
-        if (contribution.source === 'roulette' || contribution.source === 'four-point-dunk') {
-          pushOwner(shooter);
-          attributions.push({
-            owner: shooter,
-            mutationId: contribution.source,
-            points: contribution.points,
-          });
-          continue;
-        }
-        const owners =
-          contribution.source === 'reverse-basketball'
-            ? reverseOwners
-            : contribution.source === 'second-chance-jackpot' ||
-                contribution.source === 'the-bounty'
-              ? [shooter]
-              : contribution.source === 'heat-check' || contribution.source === 'buzzer-bandit'
-                ? [shooter]
-                : doubleOwners;
-        const primary = owners[0];
-        if (primary === undefined) continue;
-        if (
-          contribution.source === 'reverse-basketball' ||
-          contribution.source === 'double-or-nothing'
-        ) {
-          for (const owner of owners) pushOwner(owner);
-        } else {
-          pushOwner(primary);
-        }
-        attributions.push({
-          owner: primary,
-          mutationId: contribution.source,
-          points: contribution.points,
-        });
-      }
+      const { attributions, ownerIds } = fieldGoalAttributions(
+        value.contributions,
+        shooter,
+        reverseOwners,
+        doubleOwners,
+      );
       scoringSequence = this.pushScoring({
         side: team.side,
         kind: 'field-goal',
@@ -1998,7 +1910,7 @@ class HavocBattleRuntime implements HavocRuntimeHooks {
         period: entry.period,
         clockSeconds: entry.clockSeconds,
         instanceId: entry.actorInstanceId,
-        mutationId: SCORING_SOURCE_MUTATION[source],
+        mutationId: HAVOC_SCORING_SOURCE_MUTATION[source],
         pointsDelta: entry.points - entry.nominalPoints,
       });
     }

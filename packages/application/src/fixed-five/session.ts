@@ -58,6 +58,7 @@ import { SeriesCoordinator } from '../multiplayer/series-coordinator.ts';
 import { clamp01, CoalescedTask } from '../runtime/index.ts';
 import { RoomLifecycle, type RoomAttachment } from '../multiplayer/room-lifecycle.ts';
 import { submitFixedFiveCommand } from './command-submit.ts';
+import { FixedFiveShared82GameFlow } from './shared82-game-flow.ts';
 import { FixedFiveCompetitionFlow } from './competition-flow.ts';
 import { FixedFiveVerificationFlow, isMissingFunctionError } from './verification-flow.ts';
 import { refsForParticipant } from './pick-refs.ts';
@@ -289,6 +290,7 @@ export type FixedFiveFlowContext = Pick<
 
 export class FixedFiveRoomSession {
   private readonly competition: FixedFiveCompetitionFlow;
+  private readonly shared82Game: FixedFiveShared82GameFlow;
   private readonly verification: FixedFiveVerificationFlow;
   private readonly deps: FixedFiveRoomSessionDeps;
   private readonly roomId: string;
@@ -318,12 +320,8 @@ export class FixedFiveRoomSession {
 
   private duelOutputs: Record<number, FixedFiveDuelGameOutput> = {};
   private duelRunner: FixedFiveRunnerPort | null = null;
-  private shared82H2HOutputs: Record<number, FixedFiveShared82H2HGameOutput> = {};
   private shared82H2HPendingGame: number | null = null;
   private shared82H2HConfirmedGame: number | null = null;
-  private shared82H2HRunner: FixedFiveRunnerPort | null = null;
-  private shared82H2HSimulatingGame: number | null = null;
-  private shared82H2HError: string | null = null;
   private broadcastStartPending: number | null = null;
   private duelSimulatingGame: number | null = null;
   private duelSimError: string | null = null;
@@ -353,6 +351,17 @@ export class FixedFiveRoomSession {
     this.seriesFlow = new SeriesCoordinator(deps.now, DUEL_AUTO_START_RETRY_MS);
     this.seriesFlow.holdMs = FIXED_FIVE_DUEL_GAME_RESULTS_HOLD_MS;
     this.roomId = deps.roomId;
+    this.shared82Game = new FixedFiveShared82GameFlow(deps, {
+      context: () => this.flowContext(),
+      isDisposed: () => this.isDisposed(),
+      isShared82Broadcast: () => this.isShared82Broadcast(),
+      publish: () => {
+        this.publish();
+      },
+      tickReveal: () => {
+        this.tickShared82Reveal();
+      },
+    });
     this.competition = new FixedFiveCompetitionFlow(deps, {
       context: () => this.flowContext(),
       isDisposed: () => this.isDisposed(),
@@ -370,16 +379,7 @@ export class FixedFiveRoomSession {
       },
       sync: () => this.sync(),
       shared82H2HGame: (output) => {
-        this.shared82H2HOutputs = {
-          ...this.shared82H2HOutputs,
-          [output.gameNumber]: output,
-        };
-        if (this.shared82H2HSimulatingGame === output.gameNumber) {
-          this.shared82H2HRunner?.dispose();
-          this.shared82H2HRunner = null;
-          this.shared82H2HSimulatingGame = null;
-        }
-        this.shared82H2HError = null;
+        this.shared82Game.accept(output);
         this.publish();
         this.tickShared82Reveal();
       },
@@ -438,10 +438,10 @@ export class FixedFiveRoomSession {
       duelBroadcast: this.isDuelBroadcast(),
       duelOutputs: this.duelOutputs,
       shared82Broadcast: this.isShared82Broadcast(),
-      shared82H2HOutputs: this.shared82H2HOutputs,
+      shared82H2HOutputs: this.shared82Game.outputs,
       shared82H2HPendingGame: this.shared82H2HPendingGame,
-      shared82H2HError: this.shared82H2HError,
-      shared82H2HSimulatingGame: this.shared82H2HSimulatingGame,
+      shared82H2HError: this.shared82Game.error,
+      shared82H2HSimulatingGame: this.shared82Game.simulatingGame,
       duelSimError: this.duelSimError,
       duelSimulatingGame: this.duelSimulatingGame,
       broadcastProgress: this.broadcastProgress,
@@ -500,8 +500,7 @@ export class FixedFiveRoomSession {
     this.verification.dispose();
     this.duelRunner?.dispose();
     this.duelRunner = null;
-    this.shared82H2HRunner?.dispose();
-    this.shared82H2HRunner = null;
+    this.shared82Game.stop();
     this.detachWakeHandlers();
     if (this.resyncTimer !== null) {
       clearInterval(this.resyncTimer);
@@ -717,14 +716,8 @@ export class FixedFiveRoomSession {
     if (gameNumber === null) return;
     this.shared82H2HConfirmedGame = gameNumber;
     this.shared82H2HPendingGame = null;
-    this.shared82H2HOutputs = Object.fromEntries(
-      Object.entries(this.shared82H2HOutputs).filter(([key]) => Number(key) !== gameNumber),
-    );
-    this.shared82H2HError = null;
-    this.shared82H2HRunner?.dispose();
-    this.shared82H2HRunner = null;
-    this.shared82H2HSimulatingGame = null;
-    this.maybeStartShared82H2HGame(gameNumber);
+    this.shared82Game.reset(gameNumber);
+    this.shared82Game.start(gameNumber);
   }
 
   continueShared82H2HGame(): void {
@@ -734,8 +727,8 @@ export class FixedFiveRoomSession {
     this.shared82H2HConfirmedGame = gameNumber;
     this.shared82H2HPendingGame = null;
     this.publish();
-    if (this.shared82H2HOutputs[gameNumber]) void this.startBroadcast();
-    else this.maybeStartShared82H2HGame(gameNumber);
+    if (this.shared82Game.outputs[gameNumber]) void this.startBroadcast();
+    else this.shared82Game.start(gameNumber);
   }
 
   async readyForNextGame(): Promise<void> {
@@ -763,8 +756,8 @@ export class FixedFiveRoomSession {
     const gameNumber = this.competition.advanceSeasonReveal();
     const room = this.room;
     if (gameNumber === null || !room || room.broadcast) return;
-    if (!this.shared82H2HOutputs[gameNumber]) {
-      this.maybeStartShared82H2HGame(gameNumber);
+    if (!this.shared82Game.outputs[gameNumber]) {
+      this.shared82Game.start(gameNumber);
       return;
     }
     const eligibleGameNumbers = this.shared82H2HGameNumbers();
@@ -777,7 +770,7 @@ export class FixedFiveRoomSession {
         eligibleGameNumbers,
       });
       if (!accepted && !this.isDisposed() && this.room?.broadcast?.gameNumber !== gameNumber) {
-        this.shared82H2HError = 'The head-to-head broadcast could not be started.';
+        this.shared82Game.error = 'The head-to-head broadcast could not be started.';
         this.publish();
       }
     } finally {
@@ -1181,11 +1174,11 @@ export class FixedFiveRoomSession {
     if (this.room?.broadcast?.gameNumber === target) {
       this.shared82H2HPendingGame = null;
       this.shared82H2HConfirmedGame = target;
-      this.maybeStartShared82H2HGame(target);
+      this.shared82Game.start(target);
       return;
     }
     if (this.room?.broadcast) return;
-    if (this.shared82H2HError !== null) return;
+    if (this.shared82Game.error !== null) return;
     if (this.shared82H2HConfirmedGame !== target) {
       if (this.shared82H2HPendingGame !== target) {
         this.shared82H2HPendingGame = target;
@@ -1194,90 +1187,8 @@ export class FixedFiveRoomSession {
       return;
     }
     this.shared82H2HPendingGame = null;
-    if (this.shared82H2HOutputs[target]) void this.startBroadcast();
-    else this.maybeStartShared82H2HGame(target);
-  }
-
-  private maybeStartShared82H2HGame(gameNumber: number): void {
-    if (
-      this.isDisposed() ||
-      !this.isShared82Broadcast() ||
-      this.shared82H2HOutputs[gameNumber] ||
-      this.shared82H2HSimulatingGame !== null
-    ) {
-      return;
-    }
-    const room = this.room;
-    const assets = this.assets;
-    const replay = this.replay;
-    if (!room?.rootSeed || !assets || !replay) return;
-    const rootSeed: Seed = room.rootSeed;
-    this.shared82H2HSimulatingGame = gameNumber;
-    this.shared82H2HError = null;
-    this.publish();
-    void (async () => {
-      try {
-        const p1Refs = refsForParticipant(replay, assets, 'p1');
-        const p2Refs = refsForParticipant(replay, assets, 'p2');
-        if (p1Refs.length !== 5 || p2Refs.length !== 5) {
-          throw new Error('both lineups must be complete before simulating');
-        }
-        const p1Team: FixedFiveWorkerTeam = await this.deps.buildTeam(
-          assets.manifest,
-          'p1',
-          'Player 1',
-          p1Refs,
-        );
-        if (this.isDisposed()) return;
-        const p2Team: FixedFiveWorkerTeam = await this.deps.buildTeam(
-          assets.manifest,
-          'p2',
-          'Player 2',
-          p2Refs,
-        );
-        if (this.isDisposed()) return;
-        const active = this.deps.createRunner((event) => {
-          if (this.isDisposed() || this.shared82H2HSimulatingGame !== gameNumber) return;
-          if (event.kind === 'shared82-h2h-game') {
-            this.shared82H2HOutputs = {
-              ...this.shared82H2HOutputs,
-              [gameNumber]: event.output,
-            };
-            this.shared82H2HError = null;
-            this.shared82H2HRunner?.dispose();
-            this.shared82H2HRunner = null;
-            this.shared82H2HSimulatingGame = null;
-            this.publish();
-            this.tickShared82Reveal();
-          } else if (event.kind === 'error') {
-            this.shared82H2HError = event.message;
-            this.shared82H2HRunner?.dispose();
-            this.shared82H2HRunner = null;
-            this.shared82H2HSimulatingGame = null;
-            this.publish();
-          }
-        });
-        this.shared82H2HRunner = active;
-        active.runShared82H2HGame({
-          roomId: this.roomId,
-          gameNumber,
-          rootSeed,
-          p1Team,
-          p2Team,
-          bracket: assets.bracket,
-          profile: assets.profile,
-          dataVersion: room.settings.versions.dataVersion,
-          engineVersion: room.settings.versions.engineVersion,
-        });
-      } catch (error) {
-        if (this.isDisposed()) return;
-        this.shared82H2HError = error instanceof Error ? error.message : String(error);
-        this.shared82H2HSimulatingGame = null;
-        this.shared82H2HRunner?.dispose();
-        this.shared82H2HRunner = null;
-        this.publish();
-      }
-    })();
+    if (this.shared82Game.outputs[target]) void this.startBroadcast();
+    else this.shared82Game.start(target);
   }
 
   private duelCurrentGameNumber(): number | null {
@@ -1535,7 +1446,7 @@ export class FixedFiveRoomSession {
     if (room.phase !== 'broadcasting' && room.phase !== 'game-results') return;
     const output = this.isDuelBroadcast()
       ? this.duelOutputs[gameNumber]
-      : this.shared82H2HOutputs[gameNumber];
+      : this.shared82Game.outputs[gameNumber];
     if (!output || this.broadcastProgress < 1) return;
     this.seriesFlow.holdMs = this.isDuelBroadcast() ? FIXED_FIVE_DUEL_GAME_RESULTS_HOLD_MS : 0;
     this.seriesFlow.coordinate({

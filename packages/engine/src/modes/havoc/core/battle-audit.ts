@@ -18,7 +18,7 @@ import {
 import { OVERTIME_PERIOD_SECONDS, REGULATION_PERIOD_SECONDS } from '../../../sim/clock.ts';
 import type { SideIndex } from '../../../sim/recorder.ts';
 import { havocBattleGameInputDigest, havocBattleGameTapeDigest } from './battle-digests.ts';
-import { HAVOC_SCORING_SOURCE_MUTATION } from './battle-game.ts';
+import { HAVOC_SCORING_SOURCE_MUTATION } from './battle-scoring.ts';
 
 const REGULATION_SECONDS = 4 * REGULATION_PERIOD_SECONDS;
 const SCORING_SOURCES: ReadonlySet<string> = new Set(havocScoringSourceSchema.options);

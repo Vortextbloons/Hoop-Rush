@@ -34,17 +34,10 @@ import {
   type PoolBuildFailure,
 } from './compute.ts';
 const TEAM = '1610612747';
-const env = { nba: '', data: '', cache: '' };
 await mock.module('../config.ts', () => ({
-  get NBA_ROOT() {
-    return env.nba;
-  },
-  get PUBLIC_DATA() {
-    return env.data;
-  },
-  get RAW_CACHE() {
-    return env.cache;
-  },
+  NBA_ROOT: '',
+  PUBLIC_DATA: '',
+  RAW_CACHE: '',
   FIELD_AVAILABILITY: {},
 }));
 interface RosterSpec {
@@ -452,9 +445,12 @@ function makeRoot(label: string): FixtureRoot {
   mkdirSync(nba, { recursive: true });
   mkdirSync(data, { recursive: true });
   mkdirSync(cache, { recursive: true });
-  env.nba = nba;
-  env.data = data;
-  env.cache = cache;
+  void mock.module('../config.ts', () => ({
+    NBA_ROOT: nba,
+    PUBLIC_DATA: data,
+    RAW_CACHE: cache,
+    FIELD_AVAILABILITY: {},
+  }));
   roots.push(root);
   return { root, nba, data, cache };
 }

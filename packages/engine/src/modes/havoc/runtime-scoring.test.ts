@@ -7,6 +7,7 @@ import type {
   SimulationTendencies,
 } from '@hoop-rush/data-contracts';
 import { havocFieldGoalValue } from './game.ts';
+import { fieldGoalAttributions } from './core/battle-scoring.ts';
 import {
   buildScenarioTeam,
   runScenario,
@@ -91,6 +92,31 @@ function eventOf(tape: { events: HavocEvent[] }, kind: HavocEvent['kind']): Havo
 }
 
 describe('havoc field-goal value resolution', () => {
+  it('attributes combined scoring effects to their owners in order', () => {
+    const shooter = { instanceId: 'shooter' };
+    const first = { instanceId: 'first' };
+    const second = { instanceId: 'second' };
+    expect(
+      fieldGoalAttributions(
+        [
+          { source: 'roulette', points: 1 },
+          { source: 'reverse-basketball', points: 1 },
+          { source: 'double-or-nothing', points: 4 },
+        ],
+        shooter,
+        [first, second],
+        [second, first],
+      ),
+    ).toEqual({
+      ownerIds: ['shooter', 'first', 'second'],
+      attributions: [
+        { owner: shooter, mutationId: 'roulette', points: 1 },
+        { owner: first, mutationId: 'reverse-basketball', points: 1 },
+        { owner: second, mutationId: 'double-or-nothing', points: 4 },
+      ],
+    });
+  });
+
   it('resolves four-point and seven-point dunks exactly', () => {
     const four = havocFieldGoalValue({
       nominal: 2,

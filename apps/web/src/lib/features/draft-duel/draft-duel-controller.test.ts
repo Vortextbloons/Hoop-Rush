@@ -157,7 +157,19 @@ describe('Draft Duel ready check progression', () => {
         playerVersionId: playerVersionIdSchema.parse(`pv-${String(ordinal).padStart(32, '0')}`),
       });
     }
-    session = createDraftDuelSession({ transport });
+    session = createDraftDuelSession({
+      transport,
+      repository: {
+        loadActive: () => Promise.resolve(null),
+        loadCompleted: () => Promise.resolve(null),
+        loadResults: () => Promise.resolve([]),
+        appendCommands: async () => {},
+        saveResult: async () => {},
+        saveVerification: async () => {},
+        saveActive: async () => {},
+        complete: async () => {},
+      },
+    });
     controller = new DraftDuelController(session);
     const lifecycle = session as unknown as SessionLifecycle;
     lifecycle.participantId = 'p1';
@@ -780,25 +792,40 @@ describe('Draft Duel ready check progression', () => {
       controller.continueAfterGame();
       lifecycle.maybeProposeOrConfirm();
       await advanceTimers(0);
-      expect(failed).toBe(true);
+      await waitFor(() => {
+        expect(failed).toBe(true);
+      });
+      const flow = (
+        session as unknown as {
+          seriesFlow: { proposals: Set<number>; confirmations: Set<number> };
+        }
+      ).seriesFlow;
+      await waitFor(() => {
+        expect((kind === 'propose-result' ? flow.proposals : flow.confirmations).has(2)).toBe(
+          false,
+        );
+      });
       expect(
         controller.verification.some(
           (entry) => entry.gameNumber === 2 && entry.status === 'verified',
         ),
       ).toBe(false);
       await advanceTimers(5000);
-      const commands = await transport.refetch(roomId, -1);
-      expect(
-        commands.filter(
-          (command) =>
-            command.actorParticipantId === 'p1' &&
-            command.payload.kind === kind &&
-            command.payload.gameNumber === 2,
-        ),
-      ).toHaveLength(1);
-      expect(controller.verification.find((entry) => entry.gameNumber === 2)?.status).toBe(
-        'verified',
-      );
+      lifecycle.maybeProposeOrConfirm();
+      await waitFor(async () => {
+        const commands = await transport.refetch(roomId, -1);
+        expect(
+          commands.filter(
+            (command) =>
+              command.actorParticipantId === 'p1' &&
+              command.payload.kind === kind &&
+              command.payload.gameNumber === 2,
+          ),
+        ).toHaveLength(1);
+        expect(controller.verification.find((entry) => entry.gameNumber === 2)?.status).toBe(
+          'verified',
+        );
+      });
     },
   );
 
