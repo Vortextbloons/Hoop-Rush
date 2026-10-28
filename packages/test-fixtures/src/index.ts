@@ -987,4 +987,5 @@ export function buildOpeningOpponent(overrides: Partial<OpponentTeam> = {}): Opp
 }
 export * from './classic.ts';
 export * from './season-draft.ts';
+export * from './cap-rush.ts';
 export * from './havoc.ts';

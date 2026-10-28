@@ -22,12 +22,36 @@ import {
 } from '@hoop-rush/data-contracts';
 import type { EngineContext } from '../sim/kernel.ts';
 import { createRng, shuffle } from '../sim/rng.ts';
+import { simulateGame } from '../sim/game.ts';
 import { validateBracketContent } from '../challenge/commands.ts';
-import { evaluateLineupBalance, evaluateLineupStrength } from '../challenge/lineup-eval.ts';
-import { BENCHMARK_VERSION } from '../challenge/benchmarks.ts';
+import { evaluateLineupBalance, strengthSeed } from '../challenge/lineup-eval.ts';
+import { FIELD_BENCHMARK_VERSION } from '../challenge/benchmarks.ts';
 import { assignLineup } from '../domain/lineup.ts';
 import { generateSchedule, scheduleInvariants, SCHEDULE_GENERATION_VERSION } from './schedule.ts';
+
 export const SCHEDULE_VERSION_LABEL = `schedule-${SCHEDULE_GENERATION_VERSION.replace('schedule-', '')}`;
+
+/**
+ * Target win rate by rank, taken from the historical NBA spread of the same 30
+ * franchises. Rank 1 plays like a 64-win team, the middle of the league sits
+ * near .500, and rank 30 plays like a 17-win team. Values are interpolated by
+ * rank, so the middle of the bracket stays competitive instead of collapsing
+ * toward the extremes.
+ */
+export const BRACKET_TARGET_LADDER: readonly (readonly [number, number])[] = [
+  [0, 0.787],
+  [3, 0.673],
+  [7, 0.615],
+  [14, 0.52],
+  [19, 0.444],
+  [24, 0.343],
+  [29, 0.206],
+];
+
+export const BRACKET_WIN_RATE_BAND: readonly [number, number] = [0.15, 0.8];
+const LEAGUE_MEDIAN_WIN_RATE_BAND: readonly [number, number] = [0.46, 0.54];
+const SAMPLING_TOLERANCE = 0.03;
+
 export interface BracketCandidatePlayer {
   playerId: string;
   displayName: string;
@@ -40,11 +64,13 @@ export interface BracketCandidatePlayer {
   seasonKey: string;
   score: number;
 }
+
 export interface FranchiseCandidates {
   franchiseId: string;
   displayName: string;
   players: BracketCandidatePlayer[];
 }
+
 export interface BracketGenerationOptions {
   seed: Seed;
   dataVersion: string;
@@ -53,21 +79,27 @@ export interface BracketGenerationOptions {
   openingOpponent: OpponentTeam;
   difficulty: DifficultyProfile;
   candidates: FranchiseCandidates[];
-  proposalsPerFranchise?: number;
-  samplesPerBenchmark?: number;
+  gamesPerPair?: number;
   minPlayerScore?: number;
   engineContext: EngineContext;
 }
-const DEFAULT_PROPOSALS = 32;
-const DEFAULT_SAMPLES = 32;
+
+const DEFAULT_GAMES_PER_PAIR = 12;
 const DEFAULT_MIN_PLAYER_SCORE = 45;
-interface Proposal {
-  team: SimulationTeam;
-  strength: number;
-  gamesPlayed: number;
-  players: BracketCandidatePlayer[];
-  balance: ReturnType<typeof evaluateLineupBalance>;
+const MAX_SEARCH_NODES = 2_000_000;
+const CALIBRATION_STEPS = 7;
+const STAR_CANDIDATES = 6;
+
+export interface SelectedFive {
+  players: readonly BracketCandidatePlayer[];
+  quality: number;
 }
+
+interface FieldTeam {
+  key: string;
+  team: SimulationTeam;
+}
+
 function toSimulationPlayer(player: BracketCandidatePlayer): SimulationPlayer {
   return {
     playerId: playerIdSchema.parse(player.playerId),
@@ -80,6 +112,7 @@ function toSimulationPlayer(player: BracketCandidatePlayer): SimulationPlayer {
     anchors: player.anchors,
   };
 }
+
 function percentileOf(value: number, population: readonly number[]): number {
   let below = 0;
   let equal = 0;
@@ -89,13 +122,207 @@ function percentileOf(value: number, population: readonly number[]): number {
   }
   return (below + equal / 2) / population.length;
 }
+
+function totalQuality(players: readonly BracketCandidatePlayer[]): number {
+  return players.reduce((sum, player) => sum + player.score, 0) / players.length;
+}
+
+function isBalanced(players: readonly BracketCandidatePlayer[]): boolean {
+  return evaluateLineupBalance({
+    teamId: 'probe',
+    displayName: 'probe',
+    players: players.map(toSimulationPlayer),
+  }).ok;
+}
+
+/**
+ * Strongest legal PG/SG/SF/PF/C five under a per-player score cap. Capping each
+ * player (rather than the lineup mean) keeps tiers coherent: an elite team gets
+ * five strong players, a weak team gets five weak ones, and no tier turns into
+ * one star carrying four fringe players.
+ */
+/**
+ * Strongest legal PG/SG/SF/PF/C five in which every player except the lineup's
+ * best scorer is rated at or below `supportCap`.
+ *
+ * Capping only the supporting players is what gives each tier a believable
+ * roster: an elite tier clears the cap comfortably, a mid tier fields a star
+ * with real weaknesses around him, and the weakest tier is one genuine player
+ * dragging four replacement-level teammates. No tier silently loses its star.
+ */
+export function bestLegalFiveWithin(
+  pool: readonly BracketCandidatePlayer[],
+  supportCap: number,
+): SelectedFive | null {
+  if (!Number.isFinite(supportCap)) {
+    return bestFiveWithStar(pool, null, Infinity);
+  }
+  const stars = [...pool].sort((a, b) => b.score - a.score).slice(0, STAR_CANDIDATES);
+  let best: SelectedFive | null = null;
+  for (const star of [null, ...stars]) {
+    const five = bestFiveWithStar(pool, star ?? null, supportCap);
+    if (five && (best === null || five.quality > best.quality)) best = five;
+  }
+  return best;
+}
+
+function bestFiveWithStar(
+  pool: readonly BracketCandidatePlayer[],
+  star: BracketCandidatePlayer | null,
+  supportCap: number,
+): SelectedFive | null {
+  const support = pool
+    .filter((player) => player.playerId !== star?.playerId && player.score <= supportCap)
+    .sort((a, b) => b.score - a.score);
+  const slots = [...LINEUP_STRUCTURE];
+
+  const chosen: BracketCandidatePlayer[] = [];
+  const used = new Set<string>();
+  let best: SelectedFive | null = null;
+  let nodes = 0;
+
+  const evaluate = (five: BracketCandidatePlayer[]): void => {
+    if (!isBalanced(five)) return;
+    const quality = totalQuality(five);
+    if (best === null || quality > best.quality) best = { players: five, quality };
+  };
+
+  const recurse = (slot: number): void => {
+    nodes += 1;
+    if (nodes > MAX_SEARCH_NODES) return;
+    if (slot === slots.length) {
+      const five = star ? [star, ...chosen] : [...chosen];
+      if (five.length === slots.length) evaluate(five);
+      return;
+    }
+    const slotPosition = slots[slot];
+    if (!slotPosition) return;
+    if (star && !used.has(star.playerId) && canPlay(star.positions, slotPosition)) {
+      used.add(star.playerId);
+      recurse(slot + 1);
+      used.delete(star.playerId);
+    }
+    for (const player of support) {
+      if (used.has(player.playerId)) continue;
+      if (!canPlay(player.positions, slotPosition)) continue;
+      used.add(player.playerId);
+      chosen.push(player);
+      recurse(slot + 1);
+      chosen.pop();
+      used.delete(player.playerId);
+    }
+  };
+
+  recurse(0);
+  return best;
+}
+
+function simulateRoundRobin(
+  teams: readonly FieldTeam[],
+  gamesPerPair: number,
+  seed: Seed,
+  phase: string,
+  profile: EraSimulationProfile,
+  engineContext: EngineContext,
+): {
+  winRates: Map<string, number>;
+  gamesPlayed: Map<string, number>;
+  population: readonly number[];
+} {
+  const wins = new Map<string, number>();
+  const played = new Map<string, number>();
+  for (const entry of teams) {
+    wins.set(entry.key, 0);
+    played.set(entry.key, 0);
+  }
+  for (let i = 0; i < teams.length; i += 1) {
+    for (let j = i + 1; j < teams.length; j += 1) {
+      const home = teams[i];
+      const away = teams[j];
+      if (!home || !away) continue;
+      for (let game = 0; game < gamesPerPair; game += 1) {
+        const homeFirst = game % 2 === 0;
+        const result = simulateGame(
+          {
+            schemaVersion: 2,
+            seed: strengthSeed(`${seed}:${phase}:${home.key}:${away.key}`, 'pair', game),
+            gameNumber: 1,
+            dataVersion: profile.dataVersion,
+            profile,
+            home: homeFirst ? home.team : away.team,
+            away: homeFirst ? away.team : home.team,
+          },
+          engineContext,
+        );
+        const homeWon = result.winner === (homeFirst ? 'home' : 'away');
+        wins.set(home.key, (wins.get(home.key) ?? 0) + (homeWon ? 1 : 0));
+        wins.set(away.key, (wins.get(away.key) ?? 0) + (homeWon ? 0 : 1));
+        played.set(home.key, (played.get(home.key) ?? 0) + 1);
+        played.set(away.key, (played.get(away.key) ?? 0) + 1);
+      }
+    }
+  }
+  const winRates = new Map<string, number>();
+  for (const entry of teams) {
+    const games = played.get(entry.key) ?? 0;
+    if (games === 0) throw new Error(`bracket: ${entry.key} played no games`);
+    winRates.set(entry.key, (wins.get(entry.key) ?? 0) / games);
+  }
+  return {
+    winRates,
+    gamesPlayed: played,
+    population: [...winRates.values()].sort((a, b) => a - b),
+  };
+}
+
+export function interpolateLadder(
+  ladder: readonly (readonly [number, number])[],
+  rank: number,
+): number {
+  const first = ladder[0];
+  const last = ladder[ladder.length - 1];
+  if (!first || !last) throw new Error('bracket: target ladder is empty');
+  if (rank <= first[0]) return first[1];
+  if (rank >= last[0]) return last[1];
+  for (let i = 1; i < ladder.length; i += 1) {
+    const lo = ladder[i - 1];
+    const hi = ladder[i];
+    if (!lo || !hi) continue;
+    if (rank <= hi[0]) {
+      const span = hi[0] - lo[0];
+      return span === 0 ? hi[1] : lo[1] + ((rank - lo[0]) / span) * (hi[1] - lo[1]);
+    }
+  }
+  return last[1];
+}
+
+/** Mean absolute gap between a measured field and the intended rank curve. */
+export function ladderError(
+  rates: readonly number[],
+  ladder: readonly (readonly [number, number])[],
+): number {
+  const sorted = [...rates].sort((a, b) => b - a);
+  let total = 0;
+  for (const [index, rate] of sorted.entries()) {
+    total += Math.abs(rate - interpolateLadder(ladder, index));
+  }
+  return total / sorted.length;
+}
+
+interface CalibrationPoint {
+  scale: number;
+  field: FieldTeam[];
+  selections: Map<string, SelectedFive>;
+  measured: ReturnType<typeof simulateRoundRobin>;
+  spread: number;
+}
+
 export function generateBracket(options: BracketGenerationOptions): OpponentBracket {
-  const proposalsPerFranchise = options.proposalsPerFranchise ?? DEFAULT_PROPOSALS;
-  const samplesPerBenchmark = options.samplesPerBenchmark ?? DEFAULT_SAMPLES;
+  const gamesPerPair = options.gamesPerPair ?? DEFAULT_GAMES_PER_PAIR;
   const minPlayerScore = options.minPlayerScore ?? DEFAULT_MIN_PLAYER_SCORE;
   const { seed, engineContext, profile } = options;
-  const byFranchise = new Map(options.candidates.map((c) => [c.franchiseId, c]));
-  const franchiseIds = options.candidates.map((c) => c.franchiseId);
+
+  const franchiseIds = options.candidates.map((candidate) => candidate.franchiseId);
   if (franchiseIds.length !== 30) {
     throw new Error(`generation requires 30 franchises (got ${String(franchiseIds.length)})`);
   }
@@ -104,347 +331,197 @@ export function generateBracket(options: BracketGenerationOptions): OpponentBrac
       `opening opponent team ${options.openingOpponent.teamId} has no candidate pool`,
     );
   }
-  const proposalsByFranchise = new Map<string, Proposal[]>();
+
+  const pools = new Map<string, BracketCandidatePlayer[]>();
   for (const candidates of options.candidates) {
-    const eligible = candidates.players.filter((p) => p.score >= minPlayerScore);
-    const slotPools = LINEUP_STRUCTURE.map((slot) =>
-      eligible.filter((p) => canPlay(p.positions, slot)),
-    );
-    if (slotPools.some((pool) => pool.length === 0)) {
-      const counts = slotPools.map((pool) => String(pool.length)).join('/');
-      throw new Error(
-        `${candidates.franchiseId} cannot form a legal lineup (PG/SG/SF/PF/C eligible: ${counts})`,
-      );
+    const eligible = candidates.players.filter((player) => player.score >= minPlayerScore);
+    const ordered = shuffle([...eligible], createRng(`${seed}:pool:${candidates.franchiseId}`));
+    ordered.sort((a, b) => b.score - a.score);
+    if (ordered.length < 5) {
+      throw new Error(`${candidates.franchiseId} has fewer than five eligible players`);
     }
-    const rng = createRng(`${seed}:propose:${candidates.franchiseId}`);
-    const proposals: Proposal[] = [];
-    const seen = new Set<string>();
-    const participation = new Map<string, number>();
-    const maxParticipation = Math.max(6, Math.ceil(proposalsPerFranchise * 0.45));
-    const BIASES: ReadonlyArray<'strong' | 'mid' | 'uniform'> = [
-      'strong',
-      'strong',
-      'strong',
-      'mid',
-      'uniform',
-    ];
-    for (let k = 0; k < proposalsPerFranchise; k += 1) {
-      const bias = BIASES[k % BIASES.length];
-      if (bias === undefined) {
-        throw new Error(`bracket: no bias for proposal ${String(k)}`);
-      }
-      const chosen = pickFive(rng, slotPools, bias, (player) => {
-        const count = participation.get(player.playerId) ?? 0;
-        return count >= maxParticipation;
-      });
-      if (!chosen) continue;
-      const key = chosen.map((p) => p.playerId).join(',');
-      if (seen.has(key)) continue;
-      if (
-        assignLineup(chosen.map((p) => ({ playerId: p.playerId, positions: p.positions }))) === null
-      )
-        continue;
-      seen.add(key);
-      for (const player of chosen) {
-        participation.set(player.playerId, (participation.get(player.playerId) ?? 0) + 1);
-      }
-      const players = chosen.map(toSimulationPlayer);
-      const team: SimulationTeam = {
-        teamId: `candidate-${candidates.franchiseId}-${String(k)}`,
-        displayName: candidates.displayName,
-        players,
-      };
-      const balance = evaluateLineupBalance(team);
-      if (!balance.ok) continue;
-      const measurement = evaluateLineupStrength(team, engineContext, profile, {
-        samplesPerBenchmark,
-        seedBase: `${seed}:strength:${candidates.franchiseId}:${String(k)}`,
-      });
-      proposals.push({
-        team,
-        strength: measurement.winRate,
-        gamesPlayed: measurement.gamesPlayed,
-        players: chosen,
-        balance,
-      });
-    }
-    if (proposals.length === 0) {
-      throw new Error(`${candidates.franchiseId} produced no balanced proposals`);
-    }
-    proposalsByFranchise.set(candidates.franchiseId, proposals);
+    pools.set(candidates.franchiseId, ordered);
   }
-  const openingTeam: SimulationTeam = {
-    teamId: options.openingOpponent.teamId,
-    displayName: options.openingOpponent.displayName,
-    players: options.openingOpponent.players,
-  };
-  const openingMeasurement = evaluateLineupStrength(openingTeam, engineContext, profile, {
-    samplesPerBenchmark,
-    seedBase: `${seed}:strength:opening`,
-  });
-  const population: number[] = [openingMeasurement.winRate];
-  for (const proposals of proposalsByFranchise.values()) {
-    for (const p of proposals) population.push(p.strength);
-  }
-  population.sort((a, b) => a - b);
-  const band = options.difficulty.teamPercentileBand;
+
   const selectableFranchises = franchiseIds.filter((id) => id !== options.openingOpponent.teamId);
   if (selectableFranchises.length !== 29) {
     throw new Error(
       `expected 29 selectable franchises (got ${String(selectableFranchises.length)})`,
     );
   }
-  const selected = new Map<
-    string,
-    {
-      proposal: Proposal;
-      target: number;
-    }
-  >();
-  const medianBand = options.difficulty.leagueMedianPercentileBand;
-  const openingPercentileOfPopulation = percentileOf(openingMeasurement.winRate, population);
-  function usedPlayerIds(excludingFranchise: string | null): Set<string> {
-    const used = new Set<string>();
-    for (const player of options.openingOpponent.players) used.add(player.playerId);
-    for (const [franchiseId, current] of selected) {
-      if (franchiseId === excludingFranchise) continue;
-      for (const player of current.proposal.players) used.add(player.playerId);
-    }
-    return used;
-  }
-  function proposalScore(
-    proposal: Proposal,
-    target: number,
-    used: Set<string>,
-  ): {
-    score: number;
-    conflicts: number;
-  } {
-    const conflicts = proposal.players.reduce(
-      (count, p) => count + (used.has(p.playerId) ? 1 : 0),
-      0,
-    );
-    const pct = percentileOf(proposal.strength, population);
-    const outOfBand = pct < band[0] || pct > band[1] ? 1 : 0;
-    const distance = Math.abs(pct - target);
-    return { score: outOfBand * 100 + conflicts * 1000 + distance, conflicts };
-  }
-  for (let attempt = 0; attempt < 6; attempt += 1) {
-    const shuffled = shuffle(
-      selectableFranchises,
-      createRng(`${seed}:select:order:${String(attempt)}`),
-    );
-    selected.clear();
-    const rankProposals = (proposals: readonly Proposal[], target: number): Proposal[] =>
-      [...proposals].sort((a, b) =>
-        inBand(a.strength, population, band) === inBand(b.strength, population, band)
-          ? Math.abs(percentileOf(a.strength, population) - target) -
-              Math.abs(percentileOf(b.strength, population) - target) || a.strength - b.strength
-          : inBand(a.strength, population, band)
-            ? -1
-            : 1,
-      );
-    for (let i = 0; i < shuffled.length; i += 1) {
-      const franchiseId = shuffled[i];
-      if (franchiseId === undefined) {
-        throw new Error(`bracket: missing franchise at index ${String(i)}`);
-      }
-      const target = band[0] + ((band[1] - band[0]) * i) / (shuffled.length - 1);
-      const proposals = proposalsByFranchise.get(franchiseId) ?? [];
-      const top = rankProposals(proposals, target)[0];
-      if (top === undefined) {
-        throw new Error(`bracket: no proposals for ${franchiseId}`);
-      }
-      selected.set(franchiseId, { proposal: top, target });
-    }
-    for (let round = 0; round < 100; round += 1) {
-      let changed = false;
-      for (const franchiseId of shuffled) {
-        const current = selected.get(franchiseId);
-        if (!current) continue;
-        const used = usedPlayerIds(franchiseId);
-        const currentScore = proposalScore(current.proposal, current.target, used);
-        const proposals = proposalsByFranchise.get(franchiseId) ?? [];
-        const best = [...proposals].sort(
-          (a, b) =>
-            proposalScore(a, current.target, used).score -
-              proposalScore(b, current.target, used).score || a.strength - b.strength,
-        )[0];
-        if (best && proposalScore(best, current.target, used).score < currentScore.score) {
-          selected.set(franchiseId, { proposal: best, target: current.target });
-          changed = true;
-        }
-      }
-      const bracketMedian = (): number =>
-        medianOf(bracketPercentileList(selected, openingPercentileOfPopulation, population));
-      const currentMedian = bracketMedian();
-      const medianAdjustment = (direction: -1 | 1): boolean => {
-        let best: {
-          franchiseId: string;
-          proposal: Proposal;
-          target: number;
-          gap: number;
-        } | null = null;
-        for (const [franchiseId, current] of selected) {
-          const used = usedPlayerIds(franchiseId);
-          const candidates = (proposalsByFranchise.get(franchiseId) ?? []).filter((p) =>
-            direction === 1
-              ? p.strength < current.proposal.strength
-              : p.strength > current.proposal.strength,
-          );
-          const ranked = [...candidates].sort(
-            (a, b) =>
-              proposalScore(a, current.target, used).score -
-                proposalScore(b, current.target, used).score ||
-              (direction === 1 ? b.strength - a.strength : a.strength - b.strength),
-          );
-          const bestForFranchise = ranked[0];
-          if (!bestForFranchise) continue;
-          const previous = selected.get(franchiseId);
-          if (previous === undefined) continue;
-          selected.set(franchiseId, {
-            proposal: bestForFranchise,
-            target: current.target,
-          });
-          const movedMedian = bracketMedian();
-          selected.set(franchiseId, previous);
-          const gap =
-            movedMedian < medianBand[0]
-              ? medianBand[0] - movedMedian
-              : movedMedian > medianBand[1]
-                ? movedMedian - medianBand[1]
-                : 0;
-          if (best === null || gap < best.gap) {
-            best = {
-              franchiseId,
-              proposal: bestForFranchise,
-              target: current.target,
-              gap,
-            };
-          }
-        }
-        if (best === null || best.gap >= bestDirectionGap(currentMedian, medianBand)) {
-          return false;
-        }
-        selected.set(best.franchiseId, { proposal: best.proposal, target: best.target });
-        return true;
-      };
-      const median = bracketMedian();
-      if (median > medianBand[1]) {
-        changed = medianAdjustment(1) || changed;
-      } else if (median < medianBand[0]) {
-        changed = medianAdjustment(-1) || changed;
-      }
-      if (!changed) break;
-    }
-    let clean = true;
-    for (const [franchiseId, current] of selected) {
-      const pct = percentileOf(current.proposal.strength, population);
-      const used = usedPlayerIds(franchiseId);
-      const conflicts = current.proposal.players.reduce(
-        (count, p) => count + (used.has(p.playerId) ? 1 : 0),
-        0,
-      );
-      if (pct < band[0] || pct > band[1] || conflicts > 0) {
-        clean = false;
-        break;
-      }
-    }
-    if (clean) break;
-  }
-  {
-    const conflictDetails: string[] = [];
-    for (const [franchiseId, current] of selected) {
-      const used = usedPlayerIds(franchiseId);
-      for (const player of current.proposal.players) {
-        if (used.has(player.playerId)) {
-          conflictDetails.push(`${franchiseId}:${player.playerId}`);
-        }
-      }
-    }
-    if (conflictDetails.length > 0) {
+
+  const ceilings = new Map<string, number>();
+  for (const franchiseId of franchiseIds) {
+    const pool = pools.get(franchiseId) ?? [];
+    const best = bestLegalFiveWithin(pool, Infinity);
+    if (!best) {
+      const counts = LINEUP_STRUCTURE.map((slot) =>
+        String(pool.filter((player) => canPlay(player.positions, slot)).length),
+      ).join('/');
       throw new Error(
-        `selection could not resolve player duplication (${String(conflictDetails.length)} conflicts: ${conflictDetails.join(', ')})`,
+        `${franchiseId} cannot form a legal lineup (PG/SG/SF/PF/C eligible: ${counts})`,
       );
     }
+    ceilings.set(franchiseId, best.quality);
   }
+
+  // Roster quality decides the tier, so an elite pool always gets an elite
+  // build. Ties break by id to keep generation deterministic.
+  const tierOrder = [...selectableFranchises].sort((a, b) => {
+    const diff = (ceilings.get(b) ?? 0) - (ceilings.get(a) ?? 0);
+    return diff !== 0 ? diff : a.localeCompare(b);
+  });
+  const rankOf = new Map(tierOrder.map((id, index) => [id, index]));
+
+  const openingTeam: FieldTeam = {
+    key: options.openingOpponent.opponentId,
+    team: {
+      teamId: options.openingOpponent.teamId,
+      displayName: options.openingOpponent.displayName,
+      players: options.openingOpponent.players,
+    },
+  };
+
+  /**
+   * Each tier gets a support ceiling: the four players around the roster's best
+   * scorer must sit at or below `floorSupport` for the weakest tier, rising to
+   * the top of the pool for the strongest. That produces the shapes the game
+   * wants — an elite team is good all round, a weak team is one real star
+   * dragging four modest teammates — without any tier losing its star.
+   */
+  const globalScores = [...pools.values()]
+    .flat()
+    .map((player) => player.score)
+    .sort((a, b) => a - b);
+  const topSupport = globalScores[globalScores.length - 1] ?? 70;
+  const bottomSupport = globalScores[0] ?? 45;
+
+  const build = (
+    floorSupport: number,
+  ): { field: FieldTeam[]; selections: Map<string, SelectedFive> } => {
+    const selections = new Map<string, SelectedFive>();
+    const field: FieldTeam[] = [openingTeam];
+    for (const franchiseId of tierOrder) {
+      const rank = rankOf.get(franchiseId) ?? 0;
+      const position = tierOrder.length === 1 ? 0 : rank / (tierOrder.length - 1);
+      const ceiling = topSupport - (topSupport - floorSupport) * position;
+      const pool = pools.get(franchiseId) ?? [];
+      const candidates = options.candidates.find((entry) => entry.franchiseId === franchiseId);
+      if (!candidates) throw new Error(`bracket: missing candidates for ${franchiseId}`);
+      const five =
+        bestLegalFiveWithin(pool, ceiling) ??
+        bestLegalFiveWithin(pool, ceilings.get(franchiseId) ?? topSupport);
+      if (!five) throw new Error(`bracket: ${franchiseId} produced no legal five`);
+      selections.set(franchiseId, five);
+      field.push({
+        key: franchiseId,
+        team: {
+          teamId: franchiseId,
+          displayName: candidates.displayName,
+          players: five.players.map(toSimulationPlayer),
+        },
+      });
+    }
+    return { field, selections };
+  };
+
+  const measure = (field: FieldTeam[], phase: string) =>
+    simulateRoundRobin(field, gamesPerPair, seed, phase, profile, engineContext);
+
+  let best: CalibrationPoint | null = null;
+  let bestScore = Infinity;
+  const steps = CALIBRATION_STEPS;
+  for (let step = 0; step < steps; step += 1) {
+    const fraction = step / (steps - 1);
+    const floorSupport = topSupport - (topSupport - bottomSupport) * fraction;
+    const { field, selections } = build(floorSupport);
+    const measured = measure(field, `fit${String(step)}`);
+    const rates = field.map((entry) => measured.winRates.get(entry.key) ?? 0.5);
+    const spread = Math.max(...rates) - Math.min(...rates);
+    const score = ladderError(rates, BRACKET_TARGET_LADDER);
+    if (score < bestScore) {
+      bestScore = score;
+      best = { scale: fraction, field, selections, measured, spread };
+    }
+  }
+  if (best === null) throw new Error('bracket: calibration produced no field');
+
+  // The stored win rate is a fresh, independent measurement of the frozen field.
+  // Calibration searched many fields, so reusing its numbers would bake in the
+  // optimism of having picked the best of several noisy trials.
+  const final = simulateRoundRobin(
+    best.field,
+    gamesPerPair,
+    seed,
+    'record',
+    profile,
+    engineContext,
+  );
+
+  const { field, selections } = best;
+  const measured = final;
   const opponents: BracketOpponent[] = [];
-  const usedInBracket = new Set(options.openingOpponent.players.map((p) => p.playerId));
-  const opponentsByFranchise = new Map<string, BracketOpponent>();
-  const openingEntry: BracketOpponent = {
+  const openingRate = measured.winRates.get(options.openingOpponent.opponentId);
+  const openingGames = measured.gamesPlayed.get(options.openingOpponent.opponentId) ?? 0;
+  if (openingRate === undefined) throw new Error('bracket: opening opponent was not measured');
+  opponents.push({
     ...options.openingOpponent,
     bracketVersion: options.generationVersion,
     strength: {
       evaluationVersion: options.generationVersion,
-      benchmarkVersion: BENCHMARK_VERSION,
-      sampleCount: openingMeasurement.gamesPlayed,
-      winRate: openingMeasurement.winRate,
-      percentile: percentileOf(openingMeasurement.winRate, population),
+      benchmarkVersion: FIELD_BENCHMARK_VERSION,
+      sampleCount: openingGames,
+      winRate: openingRate,
+      percentile: percentileOf(openingRate, measured.population),
     },
-  };
-  opponents.push(openingEntry);
-  opponentsByFranchise.set(openingEntry.teamId, openingEntry);
-  for (const franchiseId of selectableFranchises) {
-    const current = selected.get(franchiseId);
-    if (!current) continue;
-    const candidates = byFranchise.get(franchiseId);
-    if (candidates === undefined) {
-      throw new Error(`bracket: missing candidates for ${franchiseId}`);
-    }
-    const proposal = current.proposal;
-    const top = [...proposal.players].sort((a, b) => b.score - a.score)[0];
-    if (top === undefined) {
-      throw new Error(`bracket: proposal has no players for ${franchiseId}`);
-    }
-    const seasonKey = seasonKeySchema.parse(top.seasonKey);
-    const opponentId = `bracket-${franchiseId}`;
+  });
+
+  for (const franchiseId of tierOrder) {
+    const five = selections.get(franchiseId);
+    const candidates = options.candidates.find((entry) => entry.franchiseId === franchiseId);
+    if (!five || !candidates) throw new Error(`bracket: missing selection for ${franchiseId}`);
+    const winRate = measured.winRates.get(franchiseId);
+    const games = measured.gamesPlayed.get(franchiseId) ?? 0;
+    if (winRate === undefined) throw new Error(`bracket: ${franchiseId} was not measured`);
+    const top = [...five.players].sort((a, b) => b.score - a.score)[0];
+    if (!top) throw new Error(`bracket: ${franchiseId} selection is empty`);
     const assignment = assignLineup(
-      proposal.players.map((player) => ({
+      five.players.map((player) => ({
         playerId: player.playerId,
         positions: player.positions,
       })),
     );
     if (assignment === null) {
-      throw new Error(`bracket: proposal for ${franchiseId} cannot fill PG/SG/SF/PF/C`);
+      throw new Error(`bracket: lineup for ${franchiseId} cannot fill PG/SG/SF/PF/C`);
     }
-    const lineup: BracketOpponent['lineup'] = {
-      structure: LINEUP_STRUCTURE,
-      assignments: assignment,
-    };
-    for (const player of proposal.players) {
-      if (usedInBracket.has(playerIdSchema.parse(player.playerId))) {
-        throw new Error(
-          `player ${player.playerId} appears in more than one opponent (${franchiseId})`,
-        );
-      }
-      usedInBracket.add(playerIdSchema.parse(player.playerId));
-    }
-    const entry: BracketOpponent = {
+    opponents.push({
       schemaVersion: 2,
-      opponentId,
+      opponentId: `bracket-${franchiseId}`,
       bracketVersion: options.generationVersion,
       difficultyBand: options.difficulty.name,
       teamId: franchiseIdSchema.parse(franchiseId),
       displayName: candidates.displayName,
-      seasonKey,
-      lineup,
-      players: proposal.players.map(toSimulationPlayer),
+      seasonKey: seasonKeySchema.parse(top.seasonKey),
+      lineup: { structure: LINEUP_STRUCTURE, assignments: assignment },
+      players: five.players.map(toSimulationPlayer),
       strength: {
         evaluationVersion: options.generationVersion,
-        benchmarkVersion: BENCHMARK_VERSION,
-        sampleCount: proposal.gamesPlayed,
-        winRate: proposal.strength,
-        percentile: percentileOf(proposal.strength, population),
+        benchmarkVersion: FIELD_BENCHMARK_VERSION,
+        sampleCount: games,
+        winRate,
+        percentile: percentileOf(winRate, measured.population),
       },
-    };
-    opponents.push(entry);
-    opponentsByFranchise.set(franchiseId, entry);
+    });
   }
   if (opponents.length !== 30) {
     throw new Error(`selection produced ${String(opponents.length)} opponents, expected 30`);
   }
-  const opponentIds = opponents.map((o) => o.opponentId);
-  const schedule = generateSchedule(opponentIds, options.openingOpponent.opponentId, seed);
+
+  const schedule = generateSchedule(
+    opponents.map((o) => o.opponentId),
+    options.openingOpponent.opponentId,
+    seed,
+  );
   const bracket: OpponentBracket = {
     schemaVersion: 1,
     bracketVersion: options.generationVersion,
@@ -455,106 +532,63 @@ export function generateBracket(options: BracketGenerationOptions): OpponentBrac
       generationVersion: options.generationVersion,
       dataVersion: options.dataVersion,
       targetBands: {
-        teamPercentileBand: band,
-        leagueMedianPercentileBand: medianBand,
+        teamPercentileBand: [BRACKET_WIN_RATE_BAND[0], BRACKET_WIN_RATE_BAND[1]],
+        leagueMedianPercentileBand: [
+          LEAGUE_MEDIAN_WIN_RATE_BAND[0],
+          LEAGUE_MEDIAN_WIN_RATE_BAND[1],
+        ],
       },
     },
     opponents,
     schedule,
   };
+
   const failures = validateBracketContent(bracket);
   failures.push(...scheduleInvariants(schedule));
-  const openingPercentile = percentileOf(openingMeasurement.winRate, population);
-  const bracketPercentiles = bracketPercentileList(selected, openingPercentile, population);
-  const median = medianOf(bracketPercentiles);
-  const selectedPercentiles = [...selected.values()].map((s) =>
-    percentileOf(s.proposal.strength, population),
-  );
-  const minP = Math.min(...selectedPercentiles);
-  const maxP = Math.max(...selectedPercentiles);
-  if (median < medianBand[0] || median > medianBand[1]) {
-    failures.push(
-      `bracket median percentile ${median.toFixed(3)} outside ${medianBand[0].toFixed(2)}..${medianBand[1].toFixed(2)}`,
-    );
-  }
-  if (minP < band[0] || maxP > band[1]) {
-    failures.push(
-      `selected percentiles span ${minP.toFixed(3)}..${maxP.toFixed(3)} outside ${band[0].toFixed(2)}..${band[1].toFixed(2)}`,
-    );
-  }
+  failures.push(...bracketStrengthFailures(opponents, options.openingOpponent.opponentId));
   if (failures.length > 0) {
-    const percentileReport = opponents
-      .map((o) => `${o.opponentId}=${o.strength.percentile.toFixed(3)}`)
+    const rateReport = opponents
+      .map((o) => `${o.opponentId}=${o.strength.winRate.toFixed(3)}`)
       .join(' ');
     throw new Error(
-      `generated bracket fails validation: ${failures.slice(0, 8).join('; ')} :: ${percentileReport}`,
+      `generated bracket fails validation: ${failures.slice(0, 8).join('; ')} :: ${rateReport}`,
     );
   }
   return opponentBracketSchema.parse(bracket);
 }
-function pickFive(
-  rng: ReturnType<typeof createRng>,
-  slotPools: ReadonlyArray<readonly BracketCandidatePlayer[]>,
-  bias: 'strong' | 'mid' | 'uniform',
-  isExhausted: (player: BracketCandidatePlayer) => boolean,
-): BracketCandidatePlayer[] | null {
-  const chosen: BracketCandidatePlayer[] = [];
-  const used = new Set<string>();
-  for (const pool of slotPools) {
-    const available = pool.filter((p) => !used.has(p.playerId) && !isExhausted(p));
-    if (available.length === 0) return null;
-    const weight = (score: number) =>
-      bias === 'strong'
-        ? Math.pow(Math.max(1, score), 3)
-        : bias === 'mid'
-          ? Math.max(1, score)
-          : 1 + rng.next() * 2;
-    const weights = available.map((p) => Math.max(1, weight(p.score)));
-    const pick = rng.weightedPick(available, weights);
-    chosen.push(pick);
-    used.add(pick.playerId);
+
+export function bracketStrengthFailures(
+  opponents: readonly BracketOpponent[],
+  openingOpponentId = 'lakers-1990s-opening',
+): string[] {
+  const failures: string[] = [];
+  // The opening opponent is an authored fixed entry, so it is excluded from the
+  // generated band the same way `bracket audit` treats it.
+  const generated = opponents.filter((opponent) => opponent.opponentId !== openingOpponentId);
+  const rates = opponents.map((opponent) => opponent.strength.winRate);
+  const generatedRates = generated.map((opponent) => opponent.strength.winRate);
+  const minRate = Math.min(...generatedRates);
+  const maxRate = Math.max(...generatedRates);
+  const tolerance = SAMPLING_TOLERANCE;
+  if (minRate < BRACKET_WIN_RATE_BAND[0] - tolerance) {
+    failures.push(
+      `weakest opponent win rate ${minRate.toFixed(3)} below ${BRACKET_WIN_RATE_BAND[0].toFixed(2)}`,
+    );
   }
-  return chosen;
-}
-function medianOf(values: readonly number[]): number {
-  const sorted = [...values].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  if (sorted.length % 2 === 1) {
-    const value = sorted[mid];
-    if (value === undefined) {
-      throw new Error('medianOf: empty values');
-    }
-    return value;
+  if (maxRate > BRACKET_WIN_RATE_BAND[1] + tolerance) {
+    failures.push(
+      `strongest opponent win rate ${maxRate.toFixed(3)} above ${BRACKET_WIN_RATE_BAND[1].toFixed(2)}`,
+    );
   }
-  const lo = sorted[mid - 1];
-  const hi = sorted[mid];
-  if (lo === undefined || hi === undefined) {
-    throw new Error('medianOf: empty values');
+  const sorted = [...rates].sort((a, b) => a - b);
+  const leagueMedian = ((sorted[14] ?? 0) + (sorted[15] ?? 0)) / 2;
+  if (
+    leagueMedian < LEAGUE_MEDIAN_WIN_RATE_BAND[0] - tolerance ||
+    leagueMedian > LEAGUE_MEDIAN_WIN_RATE_BAND[1] + tolerance
+  ) {
+    failures.push(
+      `league median win rate ${leagueMedian.toFixed(3)} outside ${LEAGUE_MEDIAN_WIN_RATE_BAND[0].toFixed(2)}..${LEAGUE_MEDIAN_WIN_RATE_BAND[1].toFixed(2)}`,
+    );
   }
-  return (lo + hi) / 2;
-}
-function inBand(strength: number, population: readonly number[], band: [number, number]): boolean {
-  const p = percentileOf(strength, population);
-  return p >= band[0] && p <= band[1];
-}
-function bestDirectionGap(median: number, band: [number, number]): number {
-  if (median < band[0]) return band[0] - median;
-  if (median > band[1]) return median - band[1];
-  return 0;
-}
-function bracketPercentileList(
-  selected: Map<
-    string,
-    {
-      proposal: Proposal;
-      target: number;
-    }
-  >,
-  openingPercentile: number,
-  population: readonly number[],
-): number[] {
-  return [
-    openingPercentile,
-    ...[...selected.values()].map((s) => percentileOf(s.proposal.strength, population)),
-  ];
+  return failures;
 }

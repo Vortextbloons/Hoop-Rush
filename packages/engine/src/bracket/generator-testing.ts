@@ -84,9 +84,12 @@ const FRANCHISES = [
   'jazz',
   'wizards',
 ];
-function candidatesFor(franchiseId: string): FranchiseCandidates {
+function candidatesFor(franchiseId: string, rank: number): FranchiseCandidates {
   const players: BracketCandidatePlayer[] = [];
   let index = 0;
+  // Each franchise gets its own quality offset so the fixture has a real
+  // strength ordering, the way the packaged pools do.
+  const tierOffset = 14 - (rank / (FRANCHISES.length - 1)) * 26;
   const ladder = [92, 89, 86, 83, 80, 77, 74, 71, 68, 65, 62, 59, 56, 53, 50, 47];
   const groups: Array<{
     position: SimulationPlayer['positions'];
@@ -103,10 +106,11 @@ function candidatesFor(franchiseId: string): FranchiseCandidates {
   ];
   for (const { position, count, offset } of groups) {
     for (let i = 0; i < count; i += 1) {
-      const score = ladder[(offset + i) % ladder.length];
-      if (score === undefined) {
+      const base = ladder[(offset + i) % ladder.length];
+      if (base === undefined) {
         throw new Error(`candidate ladder missing score at index ${String(offset + i)}`);
       }
+      const score = Math.max(20, Math.min(98, Math.round(base + tierOffset)));
       players.push(candidatePlayer(franchiseId, index, position, score));
       index += 1;
     }
@@ -125,9 +129,8 @@ export function generationOptions(
     profile: buildEraSimulationProfile(),
     openingOpponent: opening,
     difficulty,
-    candidates: FRANCHISES.map(candidatesFor),
-    proposalsPerFranchise: 12,
-    samplesPerBenchmark: 32,
+    candidates: FRANCHISES.map((franchiseId, rank) => candidatesFor(franchiseId, rank)),
+    gamesPerPair: 4,
     minPlayerScore: 45,
     engineContext: createEngineContext(),
     ...overrides,

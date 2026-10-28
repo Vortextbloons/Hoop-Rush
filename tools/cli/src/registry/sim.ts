@@ -133,21 +133,24 @@ export const simCommands: CommandSpec[] = [
     name: 'bracket generate',
     options: {
       seed: 'string',
-      proposals: 'string',
-      samples: 'string',
+      levels: 'string',
+      pairs: 'string',
+      'final-pairs': 'string',
       'min-score': 'string',
       'data-version': 'string',
       out: 'string',
     },
     help: `  bracket generate       (dev) Author the frozen bracket from packaged NBA data and
                          commit it with the manifest. Deterministic under --seed.
-                         --seed <hex> --proposals N (default 32) --samples N (default 32, min 32)
+                         --seed <hex> --levels N (default 6, candidates per franchise)
+                         --pairs N (default 4, screening) --final-pairs N (default 16)
                          --min-score N (default 45)`,
     run: (args) =>
       bracketGenerate({
         seed: s(args, 'seed'),
-        proposals: s(args, 'proposals'),
-        samples: s(args, 'samples'),
+        levels: s(args, 'levels'),
+        pairs: s(args, 'pairs'),
+        'final-pairs': s(args, 'final-pairs'),
         'min-score': s(args, 'min-score'),
         'data-version': s(args, 'data-version'),
         out: s(args, 'out'),

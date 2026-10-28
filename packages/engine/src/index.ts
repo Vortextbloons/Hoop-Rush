@@ -358,4 +358,5 @@ export {
   draftDuelGameTapeDigest,
 } from './modes/draft-duel/digests.ts';
 export * from './modes/havoc/index.ts';
+export * from './modes/cap-rush/index.ts';
 export * from './profile.ts';
