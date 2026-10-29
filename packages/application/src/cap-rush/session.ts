@@ -322,6 +322,14 @@ export class CapRushSession implements CapRushService {
     }
   }
 
+  async listRunGames(runId: string): Promise<readonly CapRushStoredGame[]> {
+    try {
+      return await this.repository.listRunGames(runId);
+    } catch (error) {
+      throw new CapRushServiceError('storage', messageOf(error));
+    }
+  }
+
   async startNewRun(variant: CapRushVariant): Promise<void> {
     try {
       await this.repository.clearActiveDraft();

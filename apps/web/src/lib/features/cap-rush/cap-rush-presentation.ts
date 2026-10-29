@@ -38,6 +38,10 @@ export function formatAverage(total: number, games: number): string {
   return (total / games).toFixed(1);
 }
 
+export function formatShootingPercentage(made: number, attempted: number): string {
+  return attempted === 0 ? '\u2014' : `${((made / attempted) * 100).toFixed(1)}%`;
+}
+
 export function capStatusLabel(status: CapRushPayrollStatus): string {
   switch (status) {
     case 'under-cap':

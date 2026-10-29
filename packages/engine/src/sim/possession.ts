@@ -934,7 +934,6 @@ function resolveShot(
   const havoc = ctx.havoc;
   const team = ctx.teams[offenseSide];
   const teamPrep = ctx.preps[offenseSide];
-  const defense = ctx.teams[defenseSide];
   const defensePrep = ctx.preps[defenseSide];
   const handlerSlot =
     handlerKey === undefined ? undefined : teamPrep.slotByPlayerId.get(handlerKey);

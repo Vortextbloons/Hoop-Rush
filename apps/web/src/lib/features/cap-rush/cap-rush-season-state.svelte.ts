@@ -51,6 +51,14 @@ export class CapRushSeasonController {
       const snapshot = await this.service.loadActive();
       if (this.isDestroyed()) return;
       this.draft = snapshot.draft;
+      const runId = snapshot.draft?.draft.runId;
+      if (runId !== undefined && (snapshot.draft?.season?.games.length ?? 0) > 0) {
+        const stored = await this.service.listRunGames(runId);
+        if (this.isDestroyed()) return;
+        this.games = [...stored].sort((left, right) => left.gameNumber - right.gameNumber);
+      } else {
+        this.games = [];
+      }
     } catch (error) {
       if (!this.isDestroyed()) {
         this.error = errorMessageOf(error);

@@ -61,13 +61,17 @@
       Build a contender.<br />
       <span class="text-primary">Mind the apron.</span>
     </h1>
+    <p class="mt-5 max-w-xl text-sm leading-relaxed text-muted-foreground sm:text-base">
+      Draft five players, balance their salaries, and see how far your lineup can go in an 82-game
+      season.
+    </p>
   </div>
 
   <div class="mt-8 grid gap-4 md:grid-cols-2">
     {#each variants as variant (variant.id)}
       {@const Icon = variant.icon}
       <div
-        class="group flex flex-col rounded-2xl border bg-card p-6 transition-colors {variant.accent}"
+        class="mode-card group flex flex-col rounded-2xl border bg-card p-6 transition-colors {variant.accent}"
       >
         <span class="grid h-12 w-12 place-items-center rounded-xl {variant.iconClass}">
           <Icon size={22} aria-hidden="true" />
@@ -97,7 +101,7 @@
         {/if}
         <button
           type="button"
-          class="mt-5 inline-flex min-h-11 items-center justify-between rounded-xl border border-line-strong px-4 text-sm font-bold outline-none transition-colors group-hover:border-primary group-hover:text-primary focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+          class="mt-5 inline-flex min-h-12 items-center justify-between rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground outline-none transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
           disabled={controller.busy}
           onclick={() => void controller.createDraft(variant.id)}
         >
@@ -110,7 +114,7 @@
 
   <ol class="mt-8 grid gap-3 sm:grid-cols-3">
     {#each steps as step (step.title)}
-      <li class="rounded-xl border border-border bg-card p-4">
+      <li class="rounded-xl border border-border bg-card p-5">
         <p class="font-mono text-[10px] font-bold tracking-[0.12em] text-primary uppercase">
           {step.title}
         </p>
@@ -170,3 +174,14 @@
     </div>
   {/if}
 </section>
+
+<style>
+  .mode-card {
+    border-top: 3px solid var(--color-primary);
+    background-image: radial-gradient(
+      ellipse at top right,
+      color-mix(in srgb, var(--color-primary) 12%, transparent),
+      transparent 65%
+    );
+  }
+</style>

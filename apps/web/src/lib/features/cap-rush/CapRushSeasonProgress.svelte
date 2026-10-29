@@ -12,11 +12,13 @@
   import type { CapRushSeasonView } from '@hoop-rush/application/cap-rush';
   import { capRushPlayerSeasonLines } from '@hoop-rush/engine';
   import PlayerFace from '#lib/components/PlayerFace.svelte';
+  import GameScoreboard from '#lib/components/GameScoreboard.svelte';
   import TeamLogo from '#lib/components/TeamLogo.svelte';
   import type { CapRushArt } from './cap-rush-art.ts';
   import {
     formatAverage,
     formatMillions,
+    formatShootingPercentage,
     initialsOf,
     recordLabel,
     variantLabel,
@@ -106,7 +108,19 @@
 
   function totalOf(
     lines: readonly CapRushPlayerSeasonLine[],
-    field: 'minutes' | 'points' | 'rebounds' | 'assists' | 'steals' | 'blocks' | 'turnovers',
+    field:
+      | 'points'
+      | 'rebounds'
+      | 'assists'
+      | 'steals'
+      | 'blocks'
+      | 'turnovers'
+      | 'fieldGoalsMade'
+      | 'fieldGoalsAttempted'
+      | 'freeThrowsMade'
+      | 'freeThrowsAttempted'
+      | 'threesMade'
+      | 'threesAttempted',
   ): number {
     return lines.reduce((total, line) => total + line[field], 0);
   }
@@ -118,41 +132,46 @@
 </script>
 
 <div class="flex flex-col gap-3">
-  <section class="rounded-2xl border border-border bg-card p-4 sm:p-5" aria-label="Season progress">
+  <section
+    class="season-scoreboard rounded-2xl border border-border bg-card p-5 sm:p-7"
+    aria-label="Season progress"
+  >
     <div class="flex flex-wrap items-end justify-between gap-3">
       <div class="min-w-0">
         <p class="font-mono text-[10px] font-bold tracking-[0.16em] text-primary uppercase">
           {variantLabel(draft.variant)} · Season in progress
         </p>
-        <h2 class="font-display mt-1 text-3xl font-extrabold tracking-tight tabular-nums">
+        <h2
+          class="font-display mt-2 text-5xl leading-none font-extrabold tracking-tight tabular-nums sm:text-6xl"
+        >
           {recordLabel(season.aggregate.wins, season.aggregate.losses)}
-          <span class="font-mono text-[11px] font-bold text-muted-foreground uppercase">
-            {played} of {CAP_RUSH_GAME_COUNT} played
-          </span>
         </h2>
+        <p class="mt-2 font-mono text-[10px] tracking-wider text-muted-foreground uppercase">
+          {played} of {CAP_RUSH_GAME_COUNT} games played
+        </p>
       </div>
       <dl class="grid grid-cols-3 gap-2">
-        <div class="rounded-lg bg-surface-1 px-2.5 py-1.5">
+        <div class="rounded-xl border border-line-soft bg-surface-1 px-3 py-2.5">
           <dt class="font-mono text-[9px] tracking-[0.08em] text-muted-foreground uppercase">
             Points for
           </dt>
-          <dd class="font-mono text-xs font-extrabold tabular-nums">
+          <dd class="font-display mt-1 text-xl font-extrabold tabular-nums">
             {season.aggregate.pointsFor}
           </dd>
         </div>
-        <div class="rounded-lg bg-surface-1 px-2.5 py-1.5">
+        <div class="rounded-xl border border-line-soft bg-surface-1 px-3 py-2.5">
           <dt class="font-mono text-[9px] tracking-[0.08em] text-muted-foreground uppercase">
             Points against
           </dt>
-          <dd class="font-mono text-xs font-extrabold tabular-nums">
+          <dd class="font-display mt-1 text-xl font-extrabold tabular-nums">
             {season.aggregate.pointsAgainst}
           </dd>
         </div>
-        <div class="rounded-lg bg-surface-1 px-2.5 py-1.5">
+        <div class="rounded-xl border border-line-soft bg-surface-1 px-3 py-2.5">
           <dt class="font-mono text-[9px] tracking-[0.08em] text-muted-foreground uppercase">
             Remaining
           </dt>
-          <dd class="font-mono text-xs font-extrabold tabular-nums">{remaining}</dd>
+          <dd class="font-display mt-1 text-xl font-extrabold tabular-nums">{remaining}</dd>
         </div>
       </dl>
     </div>
@@ -258,16 +277,26 @@
               · {selectedSummary.overtimePeriods} OT
             {/if}
           </p>
-          <h3
-            class="font-display mt-1 text-xl font-extrabold tracking-tight tabular-nums uppercase"
-          >
-            <span class:text-positive={selectedSummary.won}>{selectedSummary.humanPoints}</span>
-            <span class="text-muted-foreground">–</span>
-            <span class:text-negative={!selectedSummary.won}>{selectedSummary.opponentPoints}</span>
-            <span class="font-mono text-[11px] font-bold text-muted-foreground uppercase">
-              {selectedSummary.won ? 'Win' : 'Loss'}
-            </span>
-          </h3>
+          <GameScoreboard
+            teams={[
+              {
+                key: 'you',
+                label: 'Your five',
+                score: selectedSummary.humanPoints,
+                winner: selectedSummary.won,
+              },
+              {
+                key: 'opponent',
+                label:
+                  opponentTeams.get(selectedSummary.opponentId)?.displayName ??
+                  selectedSummary.opponentId,
+                score: selectedSummary.opponentPoints,
+                winner: !selectedSummary.won,
+              },
+            ]}
+            label={`Game ${selectedSummary.gameNumber} score`}
+            class="mt-2"
+          />
         </div>
         <button
           type="button"
@@ -390,14 +419,15 @@
               class="border-b border-border/70 font-mono text-[9px] tracking-[0.08em] text-muted-foreground uppercase"
             >
               <th scope="col" class="px-2 py-1 text-left font-medium">Slot</th>
-              <th scope="col" class="px-2 py-1 text-right font-medium">GP</th>
-              <th scope="col" class="px-2 py-1 text-right font-medium">Min</th>
               <th scope="col" class="px-2 py-1 text-right font-medium">Pts</th>
               <th scope="col" class="px-2 py-1 text-right font-medium">Reb</th>
               <th scope="col" class="px-2 py-1 text-right font-medium">Ast</th>
               <th scope="col" class="px-2 py-1 text-right font-medium">Stl</th>
               <th scope="col" class="px-2 py-1 text-right font-medium">Blk</th>
               <th scope="col" class="px-2 py-1 text-right font-medium">TO</th>
+              <th scope="col" class="px-2 py-1 text-right font-medium">FG%</th>
+              <th scope="col" class="px-2 py-1 text-right font-medium">FT%</th>
+              <th scope="col" class="px-2 py-1 text-right font-medium">3P%</th>
             </tr>
           </thead>
           <tbody>
@@ -434,10 +464,6 @@
                     </span>
                   </span>
                 </th>
-                <td class="px-2 py-1.5 text-right font-mono">{line.gamesPlayed}</td>
-                <td class="px-2 py-1.5 text-right font-mono">
-                  {formatAverage(line.minutes, line.gamesPlayed)}
-                </td>
                 <td class="px-2 py-1.5 text-right font-mono font-bold">
                   {formatAverage(line.points, line.gamesPlayed)}
                 </td>
@@ -456,20 +482,45 @@
                 <td class="px-2 py-1.5 text-right font-mono">
                   {formatAverage(line.turnovers, line.gamesPlayed)}
                 </td>
+                <td class="px-2 py-1.5 text-right font-mono"
+                  >{formatShootingPercentage(line.fieldGoalsMade, line.fieldGoalsAttempted)}</td
+                >
+                <td class="px-2 py-1.5 text-right font-mono"
+                  >{formatShootingPercentage(line.freeThrowsMade, line.freeThrowsAttempted)}</td
+                >
+                <td class="px-2 py-1.5 text-right font-mono"
+                  >{formatShootingPercentage(line.threesMade, line.threesAttempted)}</td
+                >
               </tr>
             {/each}
           </tbody>
           <tfoot>
             <tr class="font-semibold">
               <th scope="row" class="px-2 py-1.5 text-left">Season totals</th>
-              <td class="px-2 py-1.5 text-right font-mono">{storedGames.length}</td>
-              <td class="px-2 py-1.5 text-right font-mono">{totalOf(slotLines, 'minutes')}</td>
               <td class="px-2 py-1.5 text-right font-mono">{totalOf(slotLines, 'points')}</td>
               <td class="px-2 py-1.5 text-right font-mono">{totalOf(slotLines, 'rebounds')}</td>
               <td class="px-2 py-1.5 text-right font-mono">{totalOf(slotLines, 'assists')}</td>
               <td class="px-2 py-1.5 text-right font-mono">{totalOf(slotLines, 'steals')}</td>
               <td class="px-2 py-1.5 text-right font-mono">{totalOf(slotLines, 'blocks')}</td>
               <td class="px-2 py-1.5 text-right font-mono">{totalOf(slotLines, 'turnovers')}</td>
+              <td class="px-2 py-1.5 text-right font-mono"
+                >{formatShootingPercentage(
+                  totalOf(slotLines, 'fieldGoalsMade'),
+                  totalOf(slotLines, 'fieldGoalsAttempted'),
+                )}</td
+              >
+              <td class="px-2 py-1.5 text-right font-mono"
+                >{formatShootingPercentage(
+                  totalOf(slotLines, 'freeThrowsMade'),
+                  totalOf(slotLines, 'freeThrowsAttempted'),
+                )}</td
+              >
+              <td class="px-2 py-1.5 text-right font-mono"
+                >{formatShootingPercentage(
+                  totalOf(slotLines, 'threesMade'),
+                  totalOf(slotLines, 'threesAttempted'),
+                )}</td
+              >
             </tr>
           </tfoot>
         </table>
@@ -477,3 +528,14 @@
     {/if}
   </section>
 </div>
+
+<style>
+  .season-scoreboard {
+    border-top: 3px solid var(--color-primary);
+    background-image: radial-gradient(
+      ellipse at top right,
+      color-mix(in srgb, var(--color-primary) 12%, transparent),
+      transparent 55%
+    );
+  }
+</style>

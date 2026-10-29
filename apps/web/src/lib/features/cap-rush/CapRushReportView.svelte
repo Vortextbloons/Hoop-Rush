@@ -1,6 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import PlayerFace from '#lib/components/PlayerFace.svelte';
+  import PlayerStatsTable from '#lib/components/PlayerStatsTable.svelte';
+  import type { PlayerStatColumn } from '#lib/components/player-stats-table.js';
   import { getManifest, getPlayersIndex } from '#lib/data.js';
   import type { HoopRushManifest, PlayersIndex } from '@hoop-rush/data-contracts';
   import {
@@ -18,6 +20,7 @@
     capStatusLabel,
     formatAverage,
     formatMillions,
+    formatShootingPercentage,
     initialsOf,
     recordLabel,
     variantLabel,
@@ -54,8 +57,65 @@
   const winsPerMillion = $derived(report.winsPerMillion);
   const mvp = $derived(report.mvp);
 
+  const statColumns: PlayerStatColumn<CapRushPlayerSeasonLine>[] = [
+    ...(
+      [
+        ['points', 'Pts'],
+        ['rebounds', 'Reb'],
+        ['assists', 'Ast'],
+        ['steals', 'Stl'],
+        ['blocks', 'Blk'],
+        ['turnovers', 'TO'],
+      ] as const
+    ).map(([key, label]) => ({
+      key,
+      label,
+      value: (line: CapRushPlayerSeasonLine) => formatAverage(line[key], line.gamesPlayed),
+      ...(key === 'points' ? { cellClass: 'font-bold' } : {}),
+    })),
+    ...(
+      [
+        ['fieldGoals', 'FG%', 'fieldGoalsMade', 'fieldGoalsAttempted'],
+        ['freeThrows', 'FT%', 'freeThrowsMade', 'freeThrowsAttempted'],
+        ['threes', '3P%', 'threesMade', 'threesAttempted'],
+      ] as const
+    ).map(([key, label, made, attempted]) => ({
+      key,
+      label,
+      value: (line: CapRushPlayerSeasonLine) =>
+        formatShootingPercentage(line[made], line[attempted]),
+    })),
+  ];
+  const statTotals = $derived({
+    label: 'Season totals',
+    value: (column: PlayerStatColumn<CapRushPlayerSeasonLine>) => {
+      const shooting = {
+        fieldGoals: ['fieldGoalsMade', 'fieldGoalsAttempted'],
+        freeThrows: ['freeThrowsMade', 'freeThrowsAttempted'],
+        threes: ['threesMade', 'threesAttempted'],
+      } as const;
+      const fields = shooting[column.key as keyof typeof shooting];
+      if (fields) return formatShootingPercentage(totalOf(fields[0]), totalOf(fields[1]));
+      return totalOf(
+        column.key as 'points' | 'rebounds' | 'assists' | 'steals' | 'blocks' | 'turnovers',
+      );
+    },
+  });
+
   function totalOf(
-    field: 'minutes' | 'points' | 'rebounds' | 'assists' | 'steals' | 'blocks' | 'turnovers',
+    field:
+      | 'points'
+      | 'rebounds'
+      | 'assists'
+      | 'steals'
+      | 'blocks'
+      | 'turnovers'
+      | 'fieldGoalsMade'
+      | 'fieldGoalsAttempted'
+      | 'freeThrowsMade'
+      | 'freeThrowsAttempted'
+      | 'threesMade'
+      | 'threesAttempted',
   ): number {
     return players.reduce((total, line: CapRushPlayerSeasonLine) => total + line[field], 0);
   }
@@ -70,7 +130,7 @@
       <Trophy size={22} class="shrink-0 text-accent" aria-hidden="true" />
       <div class="min-w-0">
         <p class="font-display text-lg font-extrabold tracking-tight uppercase text-accent">
-          Perfect season · 82–0
+          Perfect season Â· 82â€“0
         </p>
         <p class="mt-0.5 text-xs text-muted-foreground">
           All {CAP_RUSH_GAME_COUNT} games won. No losses on the schedule.
@@ -86,18 +146,18 @@
     <div class="flex flex-wrap items-end justify-between gap-3">
       <div class="min-w-0">
         <p class="font-mono text-[10px] font-bold tracking-[0.16em] text-primary uppercase">
-          {variantLabel(report.variant)} · Season report
+          {variantLabel(report.variant)} Â· Season report
         </p>
         <h2
           class="font-display mt-2 text-7xl leading-none font-extrabold tracking-tight tabular-nums sm:text-8xl"
         >
           {recordLabel(aggregate.wins, aggregate.losses)}
           {#if aggregate.perfectSeason}
-            <span class="text-accent">· 82–0</span>
+            <span class="text-accent">Â· 82â€“0</span>
           {/if}
         </h2>
         <p class="mt-3 font-mono text-[10px] tracking-[0.08em] text-muted-foreground uppercase">
-          {aggregate.games} games · {aggregate.pointsFor} for · {aggregate.pointsAgainst} against
+          {aggregate.games} games Â· {aggregate.pointsFor} for Â· {aggregate.pointsAgainst} against
         </p>
       </div>
       <span
@@ -193,12 +253,12 @@
         Efficiency
       </p>
       <p class="font-display text-2xl font-extrabold text-primary tabular-nums">
-        {winsPerMillion === null ? '—' : winsPerMillion.toFixed(2)}
+        {winsPerMillion === null ? 'â€”' : winsPerMillion.toFixed(2)}
       </p>
       <p class="mt-0.5 text-[11px] text-muted-foreground">
         wins per $1M of player payroll
         <span class="font-mono"
-          >· {aggregate.wins} wins ÷ {formatMillions(report.payrollDollars)}</span
+          >Â· {aggregate.wins} wins Ã· {formatMillions(report.payrollDollars)}</span
         >
       </p>
     </div>
@@ -273,7 +333,7 @@
       aria-label="Cap status and applied penalties"
     >
       <h3 class="font-display text-xl font-extrabold tracking-tight uppercase">
-        Cap status · {capStatusLabel(report.payrollStatus)}
+        Cap status Â· {capStatusLabel(report.payrollStatus)}
       </h3>
       <p class="mt-1 text-xs font-semibold">{apronPenaltyTitle(report.payrollStatus)}</p>
       {#if penaltyRows.length === 0}
@@ -295,7 +355,7 @@
             {#each penaltyRows as row (row.label)}
               <tr class="border-b border-border/40">
                 <th scope="row" class="px-2 py-1 text-left font-semibold">{row.label}</th>
-                <td class="px-2 py-1 text-right font-mono text-primary">−{row.reduction}</td>
+                <td class="px-2 py-1 text-right font-mono text-primary">âˆ’{row.reduction}</td>
               </tr>
             {/each}
           </tbody>
@@ -369,7 +429,7 @@
               <dd class="truncate text-xs font-extrabold">
                 {spinTarget === null
                   ? spin.targetCardId
-                  : `${spinTarget.displayName} · ${spinTarget.slot}`}
+                  : `${spinTarget.displayName} Â· ${spinTarget.slot}`}
               </dd>
             </div>
           </dl>
@@ -386,90 +446,51 @@
     <h3 class="font-display mt-1 text-2xl font-extrabold tracking-tight uppercase">
       Season statistics
     </h3>
-    <p class="mt-1 text-xs text-muted-foreground">Per-game averages, with season totals below.</p>
+    <p class="mt-1 text-xs text-muted-foreground">
+      Per-game averages and shooting percentages, with season totals below.
+    </p>
     <div class="mt-4 overflow-x-auto rounded-xl border border-line-soft bg-surface-1">
-      <table class="ui-stats-table min-w-[620px] text-xs">
-        <caption class="sr-only"> Season totals and averages for the five signed slots </caption>
-        <thead>
-          <tr
-            class="border-b border-border/70 font-mono text-[9px] tracking-[0.08em] text-muted-foreground uppercase"
-          >
-            <th scope="col" class="px-2 py-1 text-left font-medium">Player</th>
-            <th scope="col" class="px-2 py-1 text-right font-medium">GP</th>
-            <th scope="col" class="px-2 py-1 text-right font-medium">Min</th>
-            <th scope="col" class="px-2 py-1 text-right font-medium">Pts</th>
-            <th scope="col" class="px-2 py-1 text-right font-medium">Reb</th>
-            <th scope="col" class="px-2 py-1 text-right font-medium">Ast</th>
-            <th scope="col" class="px-2 py-1 text-right font-medium">Stl</th>
-            <th scope="col" class="px-2 py-1 text-right font-medium">Blk</th>
-            <th scope="col" class="px-2 py-1 text-right font-medium">TO</th>
-          </tr>
-        </thead>
-        <tbody>
-          {#each players as line (line.slot)}
-            {@const face = playerIndex?.players.find((entry) => entry.playerId === line.playerId)}
-            <tr class="border-b border-border/40">
-              <th scope="row" class="px-3 py-2 text-left font-semibold">
-                <div class="flex min-w-40 items-center gap-2">
-                  {#if manifest && face}
-                    <PlayerFace
-                      player={face}
-                      {manifest}
-                      size="sm"
-                      fallbackInitials={initialsOf(line.displayName)}
-                    />
-                  {:else}
-                    <span
-                      class="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-surface-3 font-display text-xs text-muted-foreground"
-                      >{initialsOf(line.displayName)}</span
-                    >
-                  {/if}
-                  <span
-                    ><span class="block">{line.displayName}</span><span
-                      class="font-mono text-[9px] text-muted-foreground">{line.slot}</span
-                    ></span
-                  >
-                </div>
-              </th>
-              <td class="px-2 py-1 text-right font-mono">{line.gamesPlayed}</td>
-              <td class="px-2 py-1 text-right font-mono">
-                {formatAverage(line.minutes, line.gamesPlayed)}
-              </td>
-              <td class="px-2 py-1 text-right font-mono font-bold">
-                {formatAverage(line.points, line.gamesPlayed)}
-              </td>
-              <td class="px-2 py-1 text-right font-mono">
-                {formatAverage(line.rebounds, line.gamesPlayed)}
-              </td>
-              <td class="px-2 py-1 text-right font-mono">
-                {formatAverage(line.assists, line.gamesPlayed)}
-              </td>
-              <td class="px-2 py-1 text-right font-mono">
-                {formatAverage(line.steals, line.gamesPlayed)}
-              </td>
-              <td class="px-2 py-1 text-right font-mono">
-                {formatAverage(line.blocks, line.gamesPlayed)}
-              </td>
-              <td class="px-2 py-1 text-right font-mono">
-                {formatAverage(line.turnovers, line.gamesPlayed)}
-              </td>
-            </tr>
-          {/each}
-        </tbody>
-        <tfoot>
-          <tr class="font-semibold">
-            <th scope="row" class="px-2 py-1 text-left">Season totals</th>
-            <td class="px-2 py-1 text-right font-mono">{aggregate.games}</td>
-            <td class="px-2 py-1 text-right font-mono">{totalOf('minutes')}</td>
-            <td class="px-2 py-1 text-right font-mono">{totalOf('points')}</td>
-            <td class="px-2 py-1 text-right font-mono">{totalOf('rebounds')}</td>
-            <td class="px-2 py-1 text-right font-mono">{totalOf('assists')}</td>
-            <td class="px-2 py-1 text-right font-mono">{totalOf('steals')}</td>
-            <td class="px-2 py-1 text-right font-mono">{totalOf('blocks')}</td>
-            <td class="px-2 py-1 text-right font-mono">{totalOf('turnovers')}</td>
-          </tr>
-        </tfoot>
-      </table>
+      <PlayerStatsTable
+        columns={statColumns}
+        rows={players}
+        rowKey={(line) => line.slot}
+        totals={statTotals}
+        caption="Season totals and averages for the five signed slots"
+        tableClass="min-w-[720px] text-xs"
+        headClass="border-b border-border/70 font-mono text-[9px] tracking-[0.08em] text-muted-foreground uppercase"
+        rowClass={() => 'border-b border-border/40'}
+        playerCellClass="px-3 py-2 text-left font-semibold"
+        playerHeadCellClass="px-2 py-1 text-left font-medium"
+        headCellClass="px-2 py-1 text-right font-medium"
+        statCellClass="px-2 py-1 text-right font-mono"
+        footClass="font-semibold"
+        playerTotalCellClass="px-2 py-1 text-left"
+        totalCellClass="px-2 py-1 text-right font-mono"
+      >
+        {#snippet identity(line)}
+          {@const face = playerIndex?.players.find((entry) => entry.playerId === line.playerId)}
+          <div class="flex min-w-40 items-center gap-2">
+            {#if manifest && face}
+              <PlayerFace
+                player={face}
+                {manifest}
+                size="sm"
+                fallbackInitials={initialsOf(line.displayName)}
+              />
+            {:else}
+              <span
+                class="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-surface-3 font-display text-xs text-muted-foreground"
+                >{initialsOf(line.displayName)}</span
+              >
+            {/if}
+            <span
+              ><span class="block">{line.displayName}</span><span
+                class="font-mono text-[9px] text-muted-foreground">{line.slot}</span
+              ></span
+            >
+          </div>
+        {/snippet}
+      </PlayerStatsTable>
     </div>
   </section>
 

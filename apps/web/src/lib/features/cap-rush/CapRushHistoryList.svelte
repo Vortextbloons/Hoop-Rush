@@ -67,11 +67,11 @@
           <li>
             <a
               href={resolve('/cap-rush/history/[runId]', { runId: entry.runId })}
-              class="flex min-h-16 flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl border border-border bg-card p-4 outline-none transition-colors hover:border-primary focus-visible:ring-2 focus-visible:ring-ring"
+              class="history-card flex min-h-20 flex-wrap items-center gap-x-5 gap-y-2 rounded-2xl border border-border bg-card p-5 outline-none transition-colors hover:border-primary focus-visible:ring-2 focus-visible:ring-ring"
             >
               <span class="min-w-0 flex-1">
                 <span class="flex flex-wrap items-baseline gap-2">
-                  <span class="font-display text-xl font-extrabold tracking-tight tabular-nums">
+                  <span class="font-display text-3xl font-extrabold tracking-tight tabular-nums">
                     {recordLabel(entry.wins, entry.losses)}
                   </span>
                   {#if entry.perfectSeason}
@@ -91,7 +91,8 @@
                   {new Date(entry.completedAtIso).toLocaleDateString()}
                 </span>
               </span>
-              <span class="shrink-0 font-mono text-[10px] text-muted-foreground uppercase"
+              <span
+                class="shrink-0 rounded-lg border border-line-soft bg-surface-1 px-3 py-2 font-mono text-[10px] font-bold text-foreground uppercase"
                 >Open report →</span
               >
             </a>
@@ -101,3 +102,9 @@
     {/if}
   </div>
 </section>
+
+<style>
+  .history-card {
+    border-left: 3px solid var(--color-primary);
+  }
+</style>

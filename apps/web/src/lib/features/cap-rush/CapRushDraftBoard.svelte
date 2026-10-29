@@ -261,7 +261,7 @@
       </section>
     {:else if complete}
       <section
-        class="rounded-2xl border border-border bg-card p-4 sm:p-5"
+        class="draft-summary rounded-2xl border border-border bg-card p-4 sm:p-5"
         aria-label="Draft summary"
       >
         <div class="flex flex-wrap items-start justify-between gap-3">
@@ -282,12 +282,14 @@
           >
         </div>
 
-        <ul class="mt-4 space-y-2">
+        <ul class="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
           {#each orderedPicks as pick (pick.card.cardId)}
             {@const source = pick.card.source}
             {@const face = art !== null ? art.faceFor(source) : null}
             {@const team = art !== null ? art.teamFor(source.franchiseId) : null}
-            <li class="flex items-center justify-between gap-2 rounded-xl bg-surface-1 px-2.5 py-2">
+            <li
+              class="flex min-w-0 flex-col gap-3 rounded-xl border border-line-soft bg-surface-1 p-3"
+            >
               <span class="flex min-w-0 items-center gap-2">
                 <span
                   class="shrink-0 rounded bg-surface-2 px-1.5 py-0.5 font-mono text-[9px] font-bold"
@@ -326,7 +328,8 @@
                   </span>
                 </span>
               </span>
-              <span class="shrink-0 font-display text-base font-extrabold tabular-nums"
+              <span
+                class="border-t border-line-soft pt-2 font-display text-lg font-extrabold tabular-nums"
                 >{formatMillions(pick.card.salaryDollars)}</span
               >
             </li>
@@ -376,27 +379,47 @@
                   Room before the cap
                 </p>
                 <p class="font-display mt-1 text-2xl font-extrabold tabular-nums">
-                  {formatMillions(Math.max(0, CAP_RUSH_CAP_LINE_DOLLARS - view.payrollDollars))}
+                  {formatMillions(
+                    Math.max(
+                      0,
+                      CAP_RUSH_CAP_LINE_DOLLARS -
+                        view.payrollDollars -
+                        (spin.state.status === 'purchased' ? spin.state.receipt.priceDollars : 0),
+                    ),
+                  )}
                 </p>
               </div>
             </div>
             {#if spin.state.status === 'purchased'}
               {@const receipt = spin.state.receipt}
               {@const definition = havocMutationDefinitionOf(receipt.entry.mutationId)}
-              <p class="mt-1 text-sm font-bold">
-                {definition.name}
-                <span class="font-mono text-[10px] font-normal text-muted-foreground"
-                  >· Tier {receipt.tier}</span
+              <div
+                class="spin-reveal mt-5 flex flex-wrap items-center gap-4 rounded-xl border border-accent/40 bg-card p-4"
+                role="status"
+              >
+                <span
+                  class="spin-reveal-icon grid h-14 w-14 shrink-0 place-items-center rounded-xl border border-accent/40 bg-accent/10 text-accent"
+                  ><Sparkles size={26} aria-hidden="true" /></span
                 >
-              </p>
-              <p class="mt-1 text-xs leading-relaxed text-muted-foreground">
-                {definition.description}
-              </p>
-              <p class="mt-2 font-mono text-[10px] text-muted-foreground uppercase">
-                {receipt.target.slot} · {spinTargetName(receipt.target.cardId)} · {formatMillions(
-                  receipt.priceDollars,
-                )}
-              </p>
+                <div class="min-w-0 flex-1">
+                  <p
+                    class="font-mono text-[10px] font-bold tracking-[0.12em] text-accent uppercase"
+                  >
+                    Tier {receipt.tier} mutation
+                  </p>
+                  <p class="font-display mt-1 text-2xl leading-tight font-extrabold uppercase">
+                    {definition.name}
+                  </p>
+                  <p class="mt-1 text-xs leading-relaxed text-muted-foreground">
+                    {definition.description}
+                  </p>
+                  <p class="mt-3 font-mono text-[10px] text-muted-foreground uppercase">
+                    {receipt.target.slot} &middot; {spinTargetName(receipt.target.cardId)} &middot; {formatMillions(
+                      receipt.priceDollars,
+                    )}
+                  </p>
+                </div>
+              </div>
             {:else if spin.state.status === 'skipped'}
               <p class="mt-1 text-sm font-semibold">No spin purchased. Your five stay unmutated.</p>
             {:else}
@@ -594,6 +617,39 @@
 </div>
 
 <style>
+  .spin-reveal {
+    animation: reveal-spin 700ms ease-out both;
+  }
+  .spin-reveal-icon {
+    animation: reveal-icon 700ms ease-out both;
+  }
+  @keyframes reveal-spin {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes reveal-icon {
+    from {
+      transform: rotate(-35deg) scale(0.6);
+    }
+    to {
+      transform: rotate(0) scale(1);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .spin-reveal,
+    .spin-reveal-icon {
+      animation: none;
+    }
+  }
+  .draft-summary {
+    border-top: 3px solid var(--color-primary);
+  }
   .spin-panel {
     background:
       radial-gradient(

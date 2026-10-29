@@ -3,8 +3,6 @@ import type {
   CapRushCreateDraftCommand,
   CapRushDraftState,
   CapRushVersionSet,
-  EraSimulationProfile,
-  OpponentBracket,
   SeasonDraftCatalog,
 } from '@hoop-rush/data-contracts';
 import {

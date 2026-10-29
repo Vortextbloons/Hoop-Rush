@@ -26,14 +26,12 @@ import {
 } from '@hoop-rush/data-contracts';
 import {
   adaptCapRushCatalog,
-  applyCapRushCommand,
   buildCapRushCatalogIndex,
   capRushStoredGameOf,
   createCapRushDraftState,
   createEngineContext,
   simulateCapRushGame,
 } from '@hoop-rush/engine';
-import type { CapRushRepository } from '@hoop-rush/persistence';
 import {
   buildCapRushTestCatalog,
   buildEraSimulationProfile,
