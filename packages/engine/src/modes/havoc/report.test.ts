@@ -10,6 +10,7 @@ import type {
   HavocTeamResult,
 } from '@hoop-rush/data-contracts';
 import {
+  HAVOC_MUTATION_CATALOG_VERSION,
   HAVOC_RULES_VERSION,
   canonicalJson,
   havocGameResultSchema,
@@ -121,7 +122,7 @@ function syntheticStoredGame(
     seed: havocGameSeed(locked.runSeed, gameNumber),
     engineVersion: 'm3-engine-v24',
     rulesVersion: HAVOC_RULES_VERSION,
-    mutationCatalogVersion: 'havoc-mutations-v6',
+    mutationCatalogVersion: HAVOC_MUTATION_CATALOG_VERSION,
     profileVersion: locked.profile.profileVersion,
     dataVersion: locked.versionSet.dataVersion,
     humanSide,

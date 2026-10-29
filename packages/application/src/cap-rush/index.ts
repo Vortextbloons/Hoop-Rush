@@ -3,6 +3,7 @@ export type { CapRushSessionOptions } from './session.ts';
 export {
   CapRushServiceError,
   type CapRushAcceptedGame,
+  type CapRushAcceptedPlayoffGame,
   type CapRushCardView,
   type CapRushDraftView,
   type CapRushSeasonView,

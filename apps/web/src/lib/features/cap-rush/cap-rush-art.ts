@@ -9,6 +9,7 @@ import { franchiseIdentityOf, type FranchiseIdentity } from '#lib/branding.js';
 export interface CapRushArt {
   readonly manifest: HoopRushManifest;
   faceFor(player: CapRushSourcePlayer): PlayersIndexEntry | null;
+  faceForPlayerId(playerId: string): PlayersIndexEntry | null;
   teamFor(franchiseId: string): FranchiseIdentity | null;
 }
 
@@ -20,9 +21,11 @@ export async function loadCapRushArt(): Promise<CapRushArt> {
   const manifest = await getManifest();
   const playersIndex = await getPlayersIndex().catch(() => null);
   const faces = new Map<string, PlayersIndexEntry>();
+  const byPlayerId = new Map<string, PlayersIndexEntry>();
   if (playersIndex !== null) {
     for (const entry of playersIndex.players) {
       faces.set(tupleKey(entry.playerId, entry.franchiseId, entry.eraId, entry.seasonKey), entry);
+      if (!byPlayerId.has(entry.playerId)) byPlayerId.set(entry.playerId, entry);
     }
   }
   const teams = new Map<string, FranchiseIdentity>();
@@ -33,6 +36,9 @@ export async function loadCapRushArt(): Promise<CapRushArt> {
         faces.get(tupleKey(player.playerId, player.franchiseId, player.eraId, player.seasonKey)) ??
         null
       );
+    },
+    faceForPlayerId(playerId) {
+      return byPlayerId.get(playerId) ?? null;
     },
     teamFor(franchiseId) {
       const cached = teams.get(franchiseId);

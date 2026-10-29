@@ -3,6 +3,7 @@
   import { Play, X } from '@lucide/svelte';
   import AsyncState from '#lib/components/AsyncState.svelte';
   import CapRushLineup from './CapRushLineup.svelte';
+  import CapRushPostseasonView from './CapRushPostseasonView.svelte';
   import CapRushSeasonProgress from './CapRushSeasonProgress.svelte';
   import type { CapRushSeasonController } from './cap-rush-season-state.svelte.js';
   import type { CapRushArt } from './cap-rush-art.ts';
@@ -14,6 +15,7 @@
     onCancel,
     onReport,
     onNewRun,
+    onPostseason,
   }: {
     controller: CapRushSeasonController;
     art?: CapRushArt | null;
@@ -21,15 +23,21 @@
     onCancel: () => void;
     onReport: () => void;
     onNewRun: () => void;
+    onPostseason: () => void;
   } = $props();
 
   const view = $derived(controller.draft);
   const season = $derived(view?.season ?? null);
   const played = $derived(season?.games.length ?? 0);
+  const postseason = $derived(view?.postseason ?? null);
+  const inPostseason = $derived(view?.draft.stage === 'postseason' || postseason !== null);
   const complete = $derived(season !== null && season.completedAt !== null);
 </script>
 
-<section class="mx-auto w-full max-w-5xl px-3 py-4 sm:px-6 sm:py-6" aria-label="Cap Rush season">
+<section
+  class="mx-auto w-full max-w-5xl px-3 py-4 sm:px-6 sm:py-6"
+  aria-label={inPostseason ? 'Cap Rush postseason' : 'Cap Rush season'}
+>
   {#if controller.loading}
     <div class="flex flex-col gap-2">
       <div
@@ -72,6 +80,15 @@
         >
       {/snippet}
     </AsyncState>
+  {:else if inPostseason && view.postseason !== null}
+    <CapRushPostseasonView
+      {controller}
+      {view}
+      {art}
+      onAdvance={onPostseason}
+      {onCancel}
+      {onReport}
+    />
   {:else}
     <header class="flex flex-wrap items-end justify-between gap-3">
       <div class="min-w-0">
@@ -114,7 +131,11 @@
                 onclick={onPlay}
               >
                 <Play size={15} aria-hidden="true" />
-                {played > 0 ? 'Continue the season' : 'Play the 82-game season'}
+                {played >= CAP_RUSH_GAME_COUNT
+                  ? 'Finish the regular season'
+                  : played > 0
+                    ? 'Continue the season'
+                    : 'Play the 82-game season'}
               </button>
             {/if}
             <span class="text-[11px] text-muted-foreground">

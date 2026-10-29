@@ -1,15 +1,25 @@
 import {
   CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION,
+  capRushLeagueSeed,
   capRushWorkerMessageSchema,
   capRushWorkerRequestSchema,
+  type CapRushLockedInputs,
+  type CapRushPlayoffGamePlan,
   type CapRushWorkerErrorCode,
+  type OpponentBracket,
 } from '@hoop-rush/data-contracts';
-import { createEngineContext, simulateCapRushGame } from '@hoop-rush/engine';
+import {
+  createCapRushLeagueSimulation,
+  createEngineContext,
+  simulateCapRushGame,
+  simulateCapRushPlayoffGame,
+} from '@hoop-rush/engine';
 import { sleep } from '../lib/sleep';
 
 const engineContext = createEngineContext();
 const cancelledRequests = new Set<string>();
 const PROGRESS_INTERVAL_MS = 250;
+const STANDINGS_BATCH = 40;
 
 function post(message: unknown): void {
   self.postMessage(capRushWorkerMessageSchema.parse(message));
@@ -129,6 +139,114 @@ async function simulate(
   });
 }
 
+async function completeStandings(
+  request: { requestId: string; locked: CapRushLockedInputs; bracket: OpponentBracket },
+  signal: { cancelled: boolean },
+): Promise<void> {
+  const simulation = createCapRushLeagueSimulation(
+    {
+      seed: capRushLeagueSeed(request.locked.runSeed),
+      bracket: request.bracket,
+      profile: request.locked.profile,
+    },
+    engineContext,
+  );
+  let lastProgressAt = Date.now();
+  while (simulation.gamesDone < simulation.gamesTotal) {
+    if (signal.cancelled || cancelledRequests.has(request.requestId)) {
+      cancelledRequests.delete(request.requestId);
+      post({
+        schemaVersion: CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION,
+        type: 'cap-rush-standings-complete',
+        requestId: request.requestId,
+        result: null,
+        cancelled: true,
+      });
+      return;
+    }
+    const remaining = simulation.gamesTotal - simulation.gamesDone;
+    simulation.advance(Math.min(STANDINGS_BATCH, remaining));
+    if (Date.now() - lastProgressAt >= PROGRESS_INTERVAL_MS) {
+      lastProgressAt = Date.now();
+      post({
+        schemaVersion: CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION,
+        type: 'cap-rush-progress',
+        requestId: request.requestId,
+        gamesCompleted: simulation.gamesDone,
+        gamesTotal: simulation.gamesTotal,
+      });
+      await sleep(0);
+    }
+  }
+  post({
+    schemaVersion: CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION,
+    type: 'cap-rush-standings-complete',
+    requestId: request.requestId,
+    result: simulation.finish(),
+    cancelled: false,
+  });
+}
+
+async function simulatePlayoffs(
+  request: {
+    requestId: string;
+    locked: CapRushLockedInputs;
+    games: CapRushPlayoffGamePlan[];
+  },
+  signal: { cancelled: boolean },
+): Promise<void> {
+  let delivered = 0;
+  for (const plan of request.games) {
+    if (signal.cancelled || cancelledRequests.has(request.requestId)) {
+      cancelledRequests.delete(request.requestId);
+      post({
+        schemaVersion: CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION,
+        type: 'cap-rush-playoffs-complete',
+        requestId: request.requestId,
+        gamesDelivered: delivered,
+        cancelled: true,
+      });
+      return;
+    }
+    let simulation;
+    try {
+      simulation = simulateCapRushPlayoffGame({
+        locked: request.locked,
+        plan,
+        context: engineContext,
+      });
+    } catch (error) {
+      postError(request.requestId, 'internal', failureMessage(error), null);
+      return;
+    }
+    if (!simulation.game.audit.ok) {
+      const first = simulation.game.audit.findings[0];
+      postError(
+        request.requestId,
+        'audit-failure',
+        first === undefined ? 'playoff game audit failed' : `${first.code}: ${first.message}`,
+        null,
+      );
+      return;
+    }
+    post({
+      schemaVersion: CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION,
+      type: 'cap-rush-playoff-game',
+      requestId: request.requestId,
+      game: simulation.game,
+    });
+    delivered += 1;
+    await sleep(0);
+  }
+  post({
+    schemaVersion: CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION,
+    type: 'cap-rush-playoffs-complete',
+    requestId: request.requestId,
+    gamesDelivered: delivered,
+    cancelled: false,
+  });
+}
+
 self.onmessage = (event: MessageEvent<unknown>): void => {
   const parsed = capRushWorkerRequestSchema.safeParse(event.data);
   if (!parsed.success) {
@@ -143,6 +261,20 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
     case 'cap-rush-simulate': {
       const signal = { cancelled: false };
       void simulate(request, signal).catch((error: unknown) => {
+        postError(request.requestId, 'internal', failureMessage(error), null);
+      });
+      return;
+    }
+    case 'cap-rush-standings': {
+      const signal = { cancelled: false };
+      void completeStandings(request, signal).catch((error: unknown) => {
+        postError(request.requestId, 'internal', failureMessage(error), null);
+      });
+      return;
+    }
+    case 'cap-rush-playoffs': {
+      const signal = { cancelled: false };
+      void simulatePlayoffs(request, signal).catch((error: unknown) => {
         postError(request.requestId, 'internal', failureMessage(error), null);
       });
       return;

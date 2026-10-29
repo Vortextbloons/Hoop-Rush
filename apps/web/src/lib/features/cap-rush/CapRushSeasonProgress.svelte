@@ -14,6 +14,7 @@
   import PlayerFace from '#lib/components/PlayerFace.svelte';
   import GameScoreboard from '#lib/components/GameScoreboard.svelte';
   import TeamLogo from '#lib/components/TeamLogo.svelte';
+  import { trueShootingPct, usagePct, usagePossessions } from '#lib/format.js';
   import type { CapRushArt } from './cap-rush-art.ts';
   import {
     formatAverage,
@@ -62,6 +63,13 @@
       : capRushPlayerSeasonLines({ locked, games: storedGames })
           .slice()
           .sort((left, right) => POSITIONS.indexOf(left.slot) - POSITIONS.indexOf(right.slot)),
+  );
+  const teamUsagePossessions = $derived(
+    usagePossessions(
+      totalOf(slotLines, 'fieldGoalsAttempted'),
+      totalOf(slotLines, 'freeThrowsAttempted'),
+      totalOf(slotLines, 'turnovers'),
+    ),
   );
   const selectedGame = $derived(
     selectedGameNumber === null ? null : (gamesByNumber.get(selectedGameNumber) ?? null),
@@ -340,6 +348,16 @@
         <div class="mt-3 grid gap-3 lg:grid-cols-2">
           {#each [humanTeam, opponentTeam] as team (team.teamId)}
             {@const identity = teamIdentityOf(team)}
+            {@const teamUsage = team.participants.reduce(
+              (total, line) =>
+                total +
+                usagePossessions(
+                  line.fieldGoals.attempted,
+                  line.freeThrows.attempted,
+                  line.turnovers,
+                ),
+              0,
+            )}
             <div class="min-w-0 rounded-xl bg-surface-1 p-3">
               <div class="flex items-center gap-2">
                 {#if identity !== null && art !== null}
@@ -371,6 +389,8 @@
                       <th scope="col" class="px-1.5 py-1 text-right font-medium">Blk</th>
                       <th scope="col" class="px-1.5 py-1 text-right font-medium">TO</th>
                       <th scope="col" class="px-1.5 py-1 text-right font-medium">PF</th>
+                      <th scope="col" class="px-1.5 py-1 text-right font-medium">TS%</th>
+                      <th scope="col" class="px-1.5 py-1 text-right font-medium">USG%</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -393,6 +413,23 @@
                         <td class="px-1.5 py-1 text-right font-mono">{line.blocks}</td>
                         <td class="px-1.5 py-1 text-right font-mono">{line.turnovers}</td>
                         <td class="px-1.5 py-1 text-right font-mono">{line.fouls}</td>
+                        <td class="px-1.5 py-1 text-right font-mono"
+                          >{trueShootingPct(
+                            line.points,
+                            line.fieldGoals.attempted,
+                            line.freeThrows.attempted,
+                          )}</td
+                        >
+                        <td class="px-1.5 py-1 text-right font-mono"
+                          >{usagePct(
+                            usagePossessions(
+                              line.fieldGoals.attempted,
+                              line.freeThrows.attempted,
+                              line.turnovers,
+                            ),
+                            teamUsage,
+                          )}</td
+                        >
                       </tr>
                     {/each}
                   </tbody>
@@ -455,6 +492,8 @@
               <th scope="col" class="px-2 py-1 text-right font-medium">FG%</th>
               <th scope="col" class="px-2 py-1 text-right font-medium">FT%</th>
               <th scope="col" class="px-2 py-1 text-right font-medium">3P%</th>
+              <th scope="col" class="px-2 py-1 text-right font-medium">TS%</th>
+              <th scope="col" class="px-2 py-1 text-right font-medium">USG%</th>
             </tr>
           </thead>
           <tbody>
@@ -518,6 +557,23 @@
                 <td class="px-2 py-1.5 text-right font-mono"
                   >{formatShootingPercentage(line.threesMade, line.threesAttempted)}</td
                 >
+                <td class="px-2 py-1.5 text-right font-mono"
+                  >{trueShootingPct(
+                    line.points,
+                    line.fieldGoalsAttempted,
+                    line.freeThrowsAttempted,
+                  )}</td
+                >
+                <td class="px-2 py-1.5 text-right font-mono"
+                  >{usagePct(
+                    usagePossessions(
+                      line.fieldGoalsAttempted,
+                      line.freeThrowsAttempted,
+                      line.turnovers,
+                    ),
+                    teamUsagePossessions,
+                  )}</td
+                >
               </tr>
             {/each}
           </tbody>
@@ -547,6 +603,16 @@
                   totalOf(slotLines, 'threesMade'),
                   totalOf(slotLines, 'threesAttempted'),
                 )}</td
+              >
+              <td class="px-2 py-1.5 text-right font-mono"
+                >{trueShootingPct(
+                  totalOf(slotLines, 'points'),
+                  totalOf(slotLines, 'fieldGoalsAttempted'),
+                  totalOf(slotLines, 'freeThrowsAttempted'),
+                )}</td
+              >
+              <td class="px-2 py-1.5 text-right font-mono"
+                >{usagePct(teamUsagePossessions, teamUsagePossessions)}</td
               >
             </tr>
           </tfoot>

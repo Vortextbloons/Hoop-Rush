@@ -1,4 +1,5 @@
 import {
+  HAVOC_MUTATION_CATALOG_VERSION,
   HAVOC_RULES_VERSION,
   HAVOC_SCHEMA_VERSION,
   SIMULATION_RATINGS,
@@ -55,7 +56,7 @@ export function buildHavocVersionSet(overrides: Partial<HavocVersionSet> = {}): 
   return havocVersionSetSchema.parse({
     schemaVersion: HAVOC_SCHEMA_VERSION,
     rulesVersion: HAVOC_RULES_VERSION,
-    mutationCatalogVersion: 'havoc-mutations-v6',
+    mutationCatalogVersion: HAVOC_MUTATION_CATALOG_VERSION,
     seedDerivationVersion: 'havoc-seeds-v1',
     engineVersion: 'm3-engine-v24',
     profileVersion: 'm2-1990s-fixture-v1',
@@ -418,7 +419,7 @@ export function buildHavocGameInput(overrides: Partial<HavocGameInput> = {}): Ha
   return havocGameInputSchema.parse({
     schemaVersion: HAVOC_SCHEMA_VERSION,
     rulesVersion: HAVOC_RULES_VERSION,
-    mutationCatalogVersion: 'havoc-mutations-v6',
+    mutationCatalogVersion: HAVOC_MUTATION_CATALOG_VERSION,
     gameNumber: 1,
     variant: 'havoc',
     seed: seedFromString('havoc-game-1'),
@@ -498,7 +499,7 @@ export function buildHavocGameResult(overrides: Partial<HavocGameResult> = {}): 
     seed: seedFromString('havoc-game-1'),
     engineVersion: 'm3-engine-v24',
     rulesVersion: HAVOC_RULES_VERSION,
-    mutationCatalogVersion: 'havoc-mutations-v6',
+    mutationCatalogVersion: HAVOC_MUTATION_CATALOG_VERSION,
     profileVersion: 'm2-2010s-fixture-v1',
     dataVersion: 'data-v1',
     humanSide: 'home',

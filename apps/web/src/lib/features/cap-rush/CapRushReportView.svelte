@@ -7,12 +7,15 @@
   import type { HoopRushManifest, PlayersIndex } from '@hoop-rush/data-contracts';
   import {
     POSITIONS,
+    capRushRoundName,
     type CapRushPlayerSeasonLine,
     type CapRushReport,
   } from '@hoop-rush/data-contracts';
   import { havocMutationDefinitionOf } from '@hoop-rush/engine';
   import HavocTierBadge from '#lib/features/havoc/HavocTierBadge.svelte';
+  import CapRushBracket from './CapRushBracket.svelte';
   import { Crown, Trophy } from '@lucide/svelte';
+  import { trueShootingPct, usagePct, usagePossessions } from '#lib/format.js';
   import {
     apronPenaltyRows,
     apronPenaltyTitle,
@@ -54,6 +57,20 @@
   const aggregate = $derived(report.aggregate);
   const winsPerMillion = $derived(report.winsPerMillion);
   const mvp = $derived(report.mvp);
+  const postseason = $derived(report.postseason ?? null);
+  const finalsMvpFace = $derived(
+    postseason === null
+      ? null
+      : (playerIndex?.players.find((entry) => entry.playerId === postseason.finalsMvp.playerId) ??
+          null),
+  );
+  const teamUsagePossessions = $derived(
+    usagePossessions(
+      totalOf('fieldGoalsAttempted'),
+      totalOf('freeThrowsAttempted'),
+      totalOf('turnovers'),
+    ),
+  );
 
   const statColumns: PlayerStatColumn<CapRushPlayerSeasonLine>[] = [
     ...(
@@ -83,10 +100,35 @@
       value: (line: CapRushPlayerSeasonLine) =>
         formatShootingPercentage(line[made], line[attempted]),
     })),
+    {
+      key: 'trueShooting',
+      label: 'TS%',
+      value: (line: CapRushPlayerSeasonLine) =>
+        trueShootingPct(line.points, line.fieldGoalsAttempted, line.freeThrowsAttempted),
+    },
+    {
+      key: 'usage',
+      label: 'USG%',
+      value: (line: CapRushPlayerSeasonLine) =>
+        usagePct(
+          usagePossessions(line.fieldGoalsAttempted, line.freeThrowsAttempted, line.turnovers),
+          teamUsagePossessions,
+        ),
+    },
   ];
   const statTotals = $derived({
     label: 'Season totals',
     value: (column: PlayerStatColumn<CapRushPlayerSeasonLine>) => {
+      if (column.key === 'trueShooting') {
+        return trueShootingPct(
+          totalOf('points'),
+          totalOf('fieldGoalsAttempted'),
+          totalOf('freeThrowsAttempted'),
+        );
+      }
+      if (column.key === 'usage') {
+        return usagePct(teamUsagePossessions, teamUsagePossessions);
+      }
       const shooting = {
         fieldGoals: ['fieldGoalsMade', 'fieldGoalsAttempted'],
         freeThrows: ['freeThrowsMade', 'freeThrowsAttempted'],
@@ -132,6 +174,124 @@
         </p>
       </div>
     </div>
+  {/if}
+
+  {#if postseason !== null}
+    <section
+      class="rounded-2xl border p-5 sm:p-7 {postseason.isUserChampion
+        ? 'border-accent/50 bg-accent/10'
+        : 'border-border bg-card'}"
+      aria-label="Postseason result"
+    >
+      <div class="flex flex-wrap items-center gap-4">
+        <Trophy
+          size={34}
+          class="shrink-0 {postseason.isUserChampion ? 'text-accent' : 'text-muted-foreground'}"
+          aria-hidden="true"
+        />
+        <div class="min-w-0 flex-1">
+          <p
+            class="font-mono text-[10px] font-bold tracking-[0.16em] uppercase {postseason.isUserChampion
+              ? 'text-accent'
+              : 'text-muted-foreground'}"
+          >
+            {postseason.isUserChampion ? 'Cap Rush champion' : 'Champion'}
+          </p>
+          <h2 class="font-display mt-1 text-3xl font-extrabold tracking-tight uppercase">
+            {postseason.championName}
+          </h2>
+          <p class="mt-1 text-sm text-muted-foreground">
+            {#if postseason.isUserChampion}
+              Your five won four best-of-seven rounds.
+            {:else if postseason.userOutcome.status === 'not-qualified'}
+              Your {recordLabel(aggregate.wins, aggregate.losses)} regular season missed the top sixteen.
+            {:else}
+              Your run ended in the {postseason.userOutcome.round === null
+                ? 'postseason'
+                : capRushRoundName(postseason.userOutcome.round).toLowerCase()}. The bracket
+              finished without you.
+            {/if}
+          </p>
+        </div>
+        {#if postseason.seed !== null}
+          <span
+            class="rounded-full border border-primary/40 bg-primary/10 px-3 py-1 font-mono text-[10px] font-bold text-primary uppercase"
+            >Your seed · {postseason.seed}</span
+          >
+        {/if}
+      </div>
+    </section>
+
+    <section class="rounded-2xl border border-accent/40 bg-card p-5 sm:p-7" aria-label="Finals MVP">
+      <p class="font-mono text-[10px] font-bold tracking-[0.16em] text-accent uppercase">
+        Finals MVP
+      </p>
+      <div class="mt-3 flex flex-wrap items-center gap-4">
+        <div class="shrink-0">
+          {#if manifest && finalsMvpFace}
+            <PlayerFace
+              player={finalsMvpFace}
+              {manifest}
+              size="xl"
+              fallbackInitials={initialsOf(postseason.finalsMvp.displayName)}
+            />
+          {:else}
+            <span
+              class="inline-flex h-20 w-20 items-center justify-center rounded-2xl bg-surface-3 font-display text-xl font-extrabold"
+              aria-hidden="true">{initialsOf(postseason.finalsMvp.displayName)}</span
+            >
+          {/if}
+        </div>
+        <div class="min-w-0 flex-1">
+          <h3 class="font-display text-2xl font-extrabold tracking-tight uppercase">
+            {postseason.finalsMvp.displayName}
+          </h3>
+          <p class="font-mono text-[10px] text-muted-foreground uppercase">
+            {postseason.finalsMvp.slot} · {postseason.championName} · {postseason.finalsMvp.games}
+            Finals games
+          </p>
+          <dl class="mt-3 grid grid-cols-4 gap-2">
+            <div>
+              <dt class="font-mono text-[8px] text-muted-foreground uppercase">PTS</dt>
+              <dd class="font-display text-lg font-extrabold tabular-nums">
+                {formatAverage(postseason.finalsMvp.totalPoints, postseason.finalsMvp.games)}
+              </dd>
+            </div>
+            <div>
+              <dt class="font-mono text-[8px] text-muted-foreground uppercase">REB</dt>
+              <dd class="font-display text-lg font-extrabold tabular-nums">
+                {formatAverage(postseason.finalsMvp.totalRebounds, postseason.finalsMvp.games)}
+              </dd>
+            </div>
+            <div>
+              <dt class="font-mono text-[8px] text-muted-foreground uppercase">AST</dt>
+              <dd class="font-display text-lg font-extrabold tabular-nums">
+                {formatAverage(postseason.finalsMvp.totalAssists, postseason.finalsMvp.games)}
+              </dd>
+            </div>
+            <div>
+              <dt class="font-mono text-[8px] text-muted-foreground uppercase">Game score</dt>
+              <dd class="font-display text-lg font-extrabold tabular-nums">
+                {formatAverage(postseason.finalsMvp.totalGameScore, postseason.finalsMvp.games)}
+              </dd>
+            </div>
+          </dl>
+        </div>
+      </div>
+      <p class="mt-3 text-[11px] text-muted-foreground">
+        Cumulative Finals game score
+        <strong class="text-foreground">{postseason.finalsMvp.totalGameScore.toFixed(1)}</strong>.
+        Ranked by cumulative Finals game score, then Finals points, assists, rebounds and stable
+        player ID.
+      </p>
+    </section>
+
+    <CapRushBracket series={postseason.series} standings={postseason.standings} {manifest} />
+  {:else}
+    <p class="rounded-2xl border border-line-soft bg-surface-1 p-4 text-xs text-muted-foreground">
+      This is a regular-season run. It was played before Cap Rush postseasons existed, so it has no
+      bracket or Finals MVP.
+    </p>
   {/if}
 
   <section
@@ -308,6 +468,25 @@
                 <dt>AST</dt>
                 <dd>{formatAverage(line.assists, line.gamesPlayed)}</dd>
               </div>
+              <div>
+                <dt>TS%</dt>
+                <dd>
+                  {trueShootingPct(line.points, line.fieldGoalsAttempted, line.freeThrowsAttempted)}
+                </dd>
+              </div>
+              <div>
+                <dt>USG%</dt>
+                <dd>
+                  {usagePct(
+                    usagePossessions(
+                      line.fieldGoalsAttempted,
+                      line.freeThrowsAttempted,
+                      line.turnovers,
+                    ),
+                    teamUsagePossessions,
+                  )}
+                </dd>
+              </div>
             </dl>
           </div>
         </li>
@@ -451,7 +630,7 @@
         rowKey={(line) => line.slot}
         totals={statTotals}
         caption="Season totals and averages for the five signed slots"
-        tableClass="min-w-[720px] text-xs"
+        tableClass="min-w-[860px] text-xs"
         headClass="border-b border-border/70 font-mono text-[9px] tracking-[0.08em] text-muted-foreground uppercase"
         rowClass={() => 'border-b border-border/40'}
         playerCellClass="px-3 py-2 text-left font-semibold"

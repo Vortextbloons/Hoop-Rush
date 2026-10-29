@@ -69,16 +69,6 @@ function slot(
   return { slot: position, mutations, ratings: RIM_ATTACK, tendencies: HIGH_USAGE, ...overrides };
 }
 
-const HYPER_USAGE: Partial<SimulationTendencies> = {
-  ...HIGH_USAGE,
-  usageRate: 80,
-  shotRate: 100,
-  passRate: 0,
-  threePointRate: 60,
-  rimFrequency: 40,
-  aboveBreakThreeFrequency: 60,
-};
-
 function quoteSlots(): ScenarioSlot[] {
   return [slot('PG', []), slot('SG', []), slot('SF', []), slot('PF', []), slot('C', [])];
 }
@@ -300,8 +290,8 @@ describe('havoc scoring mutations in simulation', () => {
         event.shooterInstanceId === shooterInstanceId &&
         index < run.tape.events.indexOf(consumed),
     );
-    const lastThree = makesBefore.slice(-3);
-    expect(lastThree.every((event) => event.kind === 'shot-attempt' && event.made)).toBe(true);
+    const lastTwo = makesBefore.slice(-2);
+    expect(lastTwo.every((event) => event.kind === 'shot-attempt' && event.made)).toBe(true);
   });
 
   it('doubles an immediate own-rebound putback', () => {
@@ -474,7 +464,7 @@ describe('havoc scoring mutations in simulation', () => {
     expect(started + expired.length).toBe(queued);
   });
 
-  it('can drive team and period totals negative under double or nothing', () => {
+  it('gifts the opponent a point on every double or nothing miss', () => {
     const weakThree: Partial<SimulationRatings> = {
       insideScoring: 20,
       closeShot: 20,
@@ -520,71 +510,30 @@ describe('havoc scoring mutations in simulation', () => {
       buildScenarioTeam('human', humanSlots),
       buildScenarioTeam('opponent', quoteSlots()),
       (candidate) =>
-        candidate.result.home.points < 0 ||
-        candidate.result.home.periods.some((points) => points < 0),
-      'havoc-negative-team',
+        candidate.result.away.teamBonusPoints > 0 &&
+        candidate.tape.scoring.every((entry) => entry.side !== 'human' || entry.points >= 0),
+      'havoc-double-gift',
     );
+    expect(run, 'expected double or nothing miss gifts').not.toBeNull();
     if (run === null) return;
-    const periodsNegative = run.result.home.periods.some((points) => points < 0);
-    expect(run.result.home.points < 0 || periodsNegative).toBe(true);
-    if (periodsNegative) {
-      const negativePeriod = run.result.home.periods.findIndex((points) => points < 0) + 1;
-      const ledgerTotal = run.tape.scoring
-        .filter((entry) => entry.side === 'human' && entry.period === negativePeriod)
-        .reduce((sum, entry) => sum + entry.points, 0);
-      expect(ledgerTotal).toBeLessThan(0);
-    }
-  });
-
-  it('produces negative player points under double or nothing', () => {
-    const weakRatings: Partial<SimulationRatings> = {
-      insideScoring: 25,
-      closeShot: 25,
-      midrange: 25,
-      threePoint: 20,
-      freeThrow: 25,
-      ballHandling: 25,
-      passing: 25,
-      offensiveIq: 25,
-      offensiveRebound: 25,
-      defensiveRebound: 25,
-      perimeterDefense: 25,
-      interiorDefense: 25,
-      steal: 25,
-      block: 25,
-      defensiveIq: 25,
-      speed: 25,
-      strength: 25,
-      vertical: 25,
-    };
-    const weakSlots: ScenarioSlot[] = quoteSlots().map((entry, index) => ({
-      ...entry,
-      ratings: weakRatings,
-      tendencies: HYPER_USAGE,
-      mutations: index === 0 ? ['double-or-nothing'] : [],
-    }));
-    const run = searchScenario(
-      96,
-      buildScenarioTeam('human', weakSlots),
-      buildScenarioTeam('opponent', quoteSlots()),
-      (candidate) =>
-        [...candidate.result.home.participants, ...candidate.result.away.participants].some(
-          (line) => line.points < 0,
+    const gifts = run.tape.scoring.filter(
+      (entry) =>
+        entry.kind === 'bonus' &&
+        entry.side === 'opponent' &&
+        entry.addends.some(
+          (addend) => addend.source === 'double-or-nothing' && addend.points === 1,
         ),
     );
-    expect(run, 'expected a negative player scoreline').not.toBeNull();
-    if (run === null) return;
-    const negative = [...run.result.home.participants, ...run.result.away.participants].filter(
-      (line) => line.points < 0,
-    );
-    expect(negative.length).toBeGreaterThan(0);
-    for (const line of negative) {
-      expect(line.adjustments).toBeLessThan(-(line.fieldGoals.made * 2 + line.freeThrows.made));
-    }
-    const penaltyEntries = run.tape.scoring.filter(
-      (entry) => entry.kind === 'adjustment' && entry.points < 0,
-    );
-    expect(penaltyEntries.length).toBeGreaterThan(0);
+    expect(gifts.length).toBeGreaterThan(0);
+    const misses = run.tape.events.filter(
+      (event) =>
+        (event.kind === 'shot-attempt' || event.kind === 'free-throw-attempt') &&
+        event.side === 'human' &&
+        !event.made,
+    ).length;
+    expect(run.result.away.teamBonusPoints).toBeGreaterThanOrEqual(gifts.length);
+    expect(gifts.length).toBeLessThanOrEqual(misses);
+    expect(run.result.home.participants.every((line) => line.points >= 0)).toBe(true);
   });
 });
 

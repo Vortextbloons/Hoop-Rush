@@ -901,8 +901,8 @@ describe('havoc battle opposing powers', () => {
     expect(run.audit.findings, `${scenario} seed ${seed} audit`).toEqual([]);
   });
 
-  it('runs a mixed two-sided game with negative scoring, a team bonus, and deterministic digests', () => {
-    const scenario = 'mixed negative scoring both';
+  it('runs a mixed two-sided game with reverse penalties, gifted bonuses, and deterministic digests', () => {
+    const scenario = 'mixed two-sided both';
     const home = buildScenarioTeam('human', [
       slot('PG', ['double-or-nothing']),
       slot('SG', ['charity-casino'], {
@@ -925,7 +925,6 @@ describe('havoc battle opposing powers', () => {
       (seed) => battleInput(home, away, seed),
       (run) => {
         if (!run.audit.ok) return false;
-        const negative = run.tape.scoring.filter((entry) => entry.points < 0);
         const bonus = run.tape.scoring.filter((entry) => entry.kind === 'bonus');
         const charityMiss = eventsOf(run, 'charity-casino').some(
           (event) => event.outcome === 'missed',
@@ -937,27 +936,21 @@ describe('havoc battle opposing powers', () => {
               (addend) => addend.source === 'reverse-basketball' && addend.points === -2,
             ),
         );
-        return (
-          negative.some((entry) => entry.side === 'home') &&
-          reversePenalty &&
-          bonus.some((entry) => entry.side === 'away') &&
-          charityMiss
+        const doubleGift = bonus.some(
+          (entry) =>
+            entry.side === 'away' &&
+            entry.addends.some((addend) => addend.source === 'double-or-nothing'),
         );
+        return reversePenalty && doubleGift && charityMiss;
       },
     );
     expect(
       hit,
-      `${scenario}: no seed within 48 produced negative scoring on both sides plus a bonus`,
+      `${scenario}: no seed within 48 produced a reverse penalty, a Double or Nothing gift, and a bonus`,
     ).not.toBeNull();
     if (hit === null) return;
     const { run, seed } = hit;
 
-    const negative = run.tape.scoring.filter((entry) => entry.points < 0);
-    const homeNegative = negative.find(
-      (entry) =>
-        entry.side === 'home' &&
-        entry.addends.some((addend) => addend.source === 'double-or-nothing'),
-    );
     const awayNegative = run.tape.scoring.find(
       (entry) =>
         entry.side === 'away' &&
@@ -965,11 +958,21 @@ describe('havoc battle opposing powers', () => {
           (addend) => addend.source === 'reverse-basketball' && addend.points === -2,
         ),
     );
-    expect(homeNegative, `${scenario} seed ${seed} double-or-nothing penalty`).toBeDefined();
     expect(awayNegative, `${scenario} seed ${seed} reverse-basketball penalty`).toBeDefined();
+    const doubleGift = run.tape.scoring.find(
+      (entry) =>
+        entry.kind === 'bonus' &&
+        entry.side === 'away' &&
+        entry.addends.some((addend) => addend.source === 'double-or-nothing'),
+    );
+    expect(doubleGift, `${scenario} seed ${seed} double-or-nothing gift`).toBeDefined();
+    expect(doubleGift?.points, `${scenario} seed ${seed} gift points`).toBe(1);
+    expect(
+      run.tape.scoring.some((entry) => entry.side === 'home' && entry.points < 0),
+      `${scenario} seed ${seed} home never scores below zero`,
+    ).toBe(false);
     const bonus = run.tape.scoring.find((entry) => entry.kind === 'bonus');
     expect(bonus, `${scenario} seed ${seed} team bonus`).toBeDefined();
-    expect(bonus?.points, `${scenario} seed ${seed} bonus points`).toBe(2);
     expect(
       run.result.away.teamBonusPoints,
       `${scenario} seed ${seed} bonus ledger`,

@@ -10,6 +10,7 @@ import type {
 } from '@hoop-rush/data-contracts';
 import {
   HAVOC_SCHEMA_VERSION,
+  HAVOC_SPECIALIST_CATEGORY_TENDENCIES,
   REQUIRED_RATING_KEYS,
   SIMULATION_RATINGS,
   SIMULATION_TENDENCIES,
@@ -193,11 +194,11 @@ describe('new tier-1 transformations', () => {
     expect(flipped.ratings.midrange).toBe(75);
     expect(flipped.ratings.threePoint).toBe(65);
     expect(flipped.ratings.vertical).toBe(60);
-    expect(flipped.ratings.perimeterDefense).toBe(20);
-    expect(flipped.ratings.interiorDefense).toBe(20);
-    expect(flipped.ratings.steal).toBe(20);
-    expect(flipped.ratings.block).toBe(20);
-    expect(flipped.ratings.defensiveRebound).toBe(25);
+    expect(flipped.ratings.perimeterDefense).toBe(25);
+    expect(flipped.ratings.interiorDefense).toBe(25);
+    expect(flipped.ratings.steal).toBe(25);
+    expect(flipped.ratings.block).toBe(25);
+    expect(flipped.ratings.defensiveRebound).toBe(30);
     expect(flipped.ratings.freeThrow).toBe(70);
     expect(flipped.ratings.ballHandling).toBe(60);
     expect(flipped.ratings.passing).toBe(55);
@@ -259,7 +260,7 @@ describe('new tier-1 transformations', () => {
     expect(merchant.ratings.threePoint).toBe(65);
   });
 
-  it('specializes the sampled category at 99 and subtracts 45 from everything else', () => {
+  it('specializes the sampled category at 99, drops the rest by 20, and lifts its tendencies by 30', () => {
     const categories: readonly HavocSpecialistCategory[] = [
       'scoring',
       'playmaking',
@@ -277,9 +278,18 @@ describe('new tier-1 transformations', () => {
           expect(effective.ratings[field], `${category} ${field}`).toBe(99);
         } else {
           expect(effective.ratings[field], `${category} ${field}`).toBe(
-            Math.max(0, source.profile.ratings[field] - 45),
+            Math.max(0, source.profile.ratings[field] - 20),
           );
         }
+      }
+      const categoryTendencies = new Set<string>(HAVOC_SPECIALIST_CATEGORY_TENDENCIES[category]);
+      for (const field of Object.keys(
+        source.profile.tendencies,
+      ) as (keyof typeof effective.tendencies)[]) {
+        const expected = categoryTendencies.has(field)
+          ? Math.min(100, source.profile.tendencies[field] + 30)
+          : source.profile.tendencies[field];
+        expect(effective.tendencies[field], `${category} ${field}`).toBe(expected);
       }
     }
   });
@@ -478,7 +488,7 @@ describe('buzzer bandit and charity casino', () => {
     }
   });
 
-  it('stacks buzzer-bandit and double-or-nothing miss penalties on the same miss', () => {
+  it('stacks a buzzer-bandit miss penalty with a double-or-nothing gift on the same miss', () => {
     const human = buildScenarioTeam('human', [
       scenarioSlot('PG', ['buzzer-bandit', 'double-or-nothing']),
       ...plainSlots().slice(1),
@@ -496,17 +506,17 @@ describe('buzzer bandit and charity casino', () => {
           if (buzzerEntry === undefined) return false;
           return candidate.tape.scoring.some(
             (entry) =>
-              entry.kind === 'adjustment' &&
+              entry.kind === 'bonus' &&
               entry.originalEventSequence === buzzerEntry.originalEventSequence &&
               entry.addends.some(
-                (addend) => addend.source === 'double-or-nothing' && addend.points === -1,
+                (addend) => addend.source === 'double-or-nothing' && addend.points === 1,
               ),
           );
         });
       },
       'havoc-stack',
     );
-    expect(run, 'expected a stacked double-or-nothing and buzzer-bandit miss').not.toBeNull();
+    expect(run, 'expected a stacked double-or-nothing gift and buzzer-bandit miss').not.toBeNull();
     if (run === null) return;
     const stacked = eventsOf(run, 'buzzer-bandit').find(
       (event) => event.kind === 'buzzer-bandit' && event.outcome === 'penalized',
@@ -518,11 +528,12 @@ describe('buzzer bandit and charity casino', () => {
     expect(buzzerEntry?.points).toBe(-1);
     const doubleEntry = run.tape.scoring.find(
       (entry) =>
-        entry.kind === 'adjustment' &&
+        entry.kind === 'bonus' &&
         entry.originalEventSequence === buzzerEntry?.originalEventSequence &&
         entry.addends.some((addend) => addend.source === 'double-or-nothing'),
     );
-    expect(doubleEntry?.points).toBe(-1);
+    expect(doubleEntry?.points).toBe(1);
+    expect(doubleEntry?.side).toBe('opponent');
     expect(doubleEntry?.sequence).not.toBe(buzzerEntry?.sequence);
   });
 

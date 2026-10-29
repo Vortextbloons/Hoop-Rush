@@ -9,6 +9,7 @@ export class CapRushResultState {
   report = $state.raw<CapRushReport | null>(null);
   loading = $state(true);
   seasonInProgress = $state(false);
+  postseasonInProgress = $state(false);
   busy = $state(false);
   error = $state<string | null>(null);
 
@@ -35,6 +36,7 @@ export class CapRushResultState {
       }
       if (draft.draft.stage !== 'completed') {
         this.seasonInProgress = draft.draft.stage === 'locked';
+        this.postseasonInProgress = draft.draft.stage === 'postseason';
         this.report = null;
         return;
       }

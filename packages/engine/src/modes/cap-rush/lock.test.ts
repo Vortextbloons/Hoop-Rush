@@ -380,7 +380,8 @@ describe('cap rush locked spin and replacement roles', () => {
       { index: setup.index },
     );
     expect(bought.result.status).toBe('accepted');
-    const secondTarget = base.picks[1]!;
+    const secondTarget = base.picks[1];
+    if (secondTarget === undefined) throw new Error('missing second locked pick');
     const second = applyCapRushCommand(
       bought.state,
       {

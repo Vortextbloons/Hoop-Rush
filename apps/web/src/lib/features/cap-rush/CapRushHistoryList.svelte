@@ -6,6 +6,8 @@
     capStatusClass,
     capStatusShortLabel,
     formatMillions,
+    postseasonOutcomeLabel,
+    postseasonResultClass,
     recordLabel,
     variantLabel,
   } from './cap-rush-presentation.ts';
@@ -23,7 +25,7 @@
         Every five you built.
       </h1>
       <p class="mt-2 max-w-xl text-sm text-muted-foreground">
-        Completed 82-game seasons with their record, cap status and report.
+        Completed Cap Rush runs with their regular-season record, cap status and postseason result.
       </p>
     </div>
     <a
@@ -80,6 +82,13 @@
                       >82–0</span
                     >
                   {/if}
+                  {#if entry.postseason !== undefined}
+                    <span
+                      class="rounded-full border px-2 py-0.5 font-mono text-[9px] font-bold tracking-[0.1em] uppercase {postseasonResultClass(
+                        entry.postseason,
+                      )}">{postseasonOutcomeLabel(entry.postseason)}</span
+                    >
+                  {/if}
                   <span
                     class="rounded-full border px-2 py-0.5 font-mono text-[9px] font-bold tracking-[0.1em] uppercase {capStatusClass(
                       entry.payrollStatus,
@@ -89,6 +98,9 @@
                 <span class="mt-0.5 block font-mono text-[10px] text-muted-foreground uppercase">
                   {variantLabel(entry.variant)} · {formatMillions(entry.payrollDollars)} payroll ·
                   {new Date(entry.completedAtIso).toLocaleDateString()}
+                  {#if entry.postseason !== undefined && !entry.postseason.isUserChampion}
+                    · Champion: {entry.postseason.championName}
+                  {/if}
                 </span>
               </span>
               <span

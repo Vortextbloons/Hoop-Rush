@@ -9,6 +9,8 @@ import {
   capRushHistoryEntrySchema,
   capRushReportSchema,
   capRushStoredGameSchema,
+  capRushStoredPlayoffGameSchema,
+  capRushPlayoffGameIdSchema,
   commandIdSchema,
   idSchema,
 } from '@hoop-rush/data-contracts';
@@ -101,6 +103,31 @@ export const storedCapRushGameRowSchema = z
     }
   });
 export type StoredCapRushGameRow = z.infer<typeof storedCapRushGameRowSchema>;
+
+export const storedCapRushPlayoffGameRowSchema = z
+  .object({
+    saveSchemaVersion: z.literal(CAP_RUSH_SAVE_SCHEMA_VERSION),
+    runId: idSchema,
+    gameId: capRushPlayoffGameIdSchema,
+    game: capRushStoredPlayoffGameSchema,
+    updatedAtIso: isoDateSchema,
+  })
+  .superRefine((row, ctx) => {
+    if (row.game.gameId !== row.gameId || row.game.summary.gameId !== row.gameId) {
+      ctx.addIssue({ code: 'custom', message: 'stored playoff game id does not match its row' });
+    }
+    if (
+      row.game.result !== null &&
+      (row.game.result.inputDigest !== row.game.summary.inputDigest ||
+        row.game.result.humanSide !== row.game.summary.userSide)
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'stored playoff result does not match its summary',
+      });
+    }
+  });
+export type StoredCapRushPlayoffGameRow = z.infer<typeof storedCapRushPlayoffGameRowSchema>;
 
 export const storedCapRushHistoryRowSchema = capRushHistoryEntrySchema
   .safeExtend({ saveSchemaVersion: z.literal(CAP_RUSH_SAVE_SCHEMA_VERSION) })

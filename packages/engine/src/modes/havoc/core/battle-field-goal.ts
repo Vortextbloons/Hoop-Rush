@@ -1,4 +1,4 @@
-import type { HavocMutationId, SimulationPlayer } from '@hoop-rush/data-contracts';
+import type { HavocMutationId, ShotZone, SimulationPlayer } from '@hoop-rush/data-contracts';
 import type { EngineContext } from '../../../sim/kernel.ts';
 import type { HavocRuntimeHooks } from '../../../sim/havoc-runtime.ts';
 import type { TripContext } from '../../../sim/possession.ts';
@@ -13,19 +13,32 @@ import type {
 } from './battle-runtime-types.ts';
 import { fieldGoalAttributions, havocFieldGoalValue } from './battle-scoring.ts';
 
-const HAVOC_HEAT_STREAK_ARMS_AT = 3;
+const HAVOC_HEAT_STREAK_ARMS_AT = 2;
 const HAVOC_ROULETTE_EVERY_ATTEMPTS = 4;
 const HAVOC_ROULETTE_MIN = 1;
 const HAVOC_ROULETTE_MAX = 4;
-export const HAVOC_DOUBLE_MISS_PENALTY = -1;
+export const HAVOC_DOUBLE_MISS_GIFT = 1;
 const HAVOC_BUZZER_WINDOW_TENTHS = 50;
 const HAVOC_BUZZER_MISS_PENALTY = -1;
 const HAVOC_DARWINISM_OWN_TEAM_REDUCTION = 3;
 const HAVOC_DARWINISM_OPPONENT_REDUCTION = 5;
+const HAVOC_COLD_BLOOD_MAX_BONUS = 5;
+const HAVOC_COLD_BLOOD_OPPONENT_GIFT = 1;
+const HAVOC_TRIPLE_THREAT_BONUS = 6;
+
+type HavocShotClass = 'rim' | 'midrange' | 'three';
+
+function shotClassOf(zone: ShotZone, three: boolean): HavocShotClass | null {
+  if (three) return 'three';
+  if (zone === 'rim') return 'rim';
+  if (zone === 'shortMid' || zone === 'longMid') return 'midrange';
+  return null;
+}
 
 export interface HavocFieldGoalHost {
   readonly teams: [TeamRuntime, TeamRuntime];
   possessionId(): number;
+  period(): number;
   tripContext(): TripContext | null;
   readonly context: EngineContext;
   requireParticipant(player: SimulationPlayer): ParticipantState;
@@ -72,6 +85,19 @@ export class HavocFieldGoalRuntime {
       args.made && args.shotKind === 'dunk' && shooter.mutations.has('four-point-dunk');
     const reverseOwners = this.host.activeOwners(args.offense, 'reverse-basketball');
     const doubleOwners = this.host.activeOwners(args.offense, 'double-or-nothing');
+    const coldBloodBonus =
+      args.made && shooter.mutations.has('cold-blooded')
+        ? Math.min(HAVOC_COLD_BLOOD_MAX_BONUS, shooter.coldBloodStreak)
+        : 0;
+    const shotClass = shotClassOf(args.zone, args.three);
+    const tripleThreatCompletes =
+      args.made &&
+      shotClass !== null &&
+      shooter.mutations.has('triple-threat') &&
+      shooter.tripleThreatPeriod === this.host.period() &&
+      !shooter.tripleThreatZones.includes(shotClass) &&
+      shooter.tripleThreatZones.length === 2;
+    const tripleThreatBonus = tripleThreatCompletes ? HAVOC_TRIPLE_THREAT_BONUS : 0;
     const shotClockRemaining = this.host.tripContext()?.shotClock?.remaining;
     const shotClockTenths =
       shotClockRemaining === undefined ? null : Math.round(shotClockRemaining * 10);
@@ -107,6 +133,8 @@ export class HavocFieldGoalRuntime {
         bounty: bountyBefore,
         doubleOrNothing: doubleOwners.length > 0,
         buzzerBandit: buzzerQualifies,
+        coldBloodBonus,
+        tripleThreatBonus,
       });
       const { attributions, ownerIds } = fieldGoalAttributions(
         value.contributions,
@@ -143,15 +171,16 @@ export class HavocFieldGoalRuntime {
     } else {
       const penaltyOwner = doubleOwners[0];
       if (penaltyOwner !== undefined) {
-        scoringSequence = this.host.pushScoring({
-          side: team.side,
-          kind: 'adjustment',
+        const opponent = this.host.teams[(1 - args.offense) as SideIndex];
+        this.host.pushScoring({
+          side: opponent.side,
+          kind: 'bonus',
           actorInstanceId: shooter.instanceId,
           beneficiaryInstanceId: null,
           nominalPoints: 0,
-          addends: [{ source: 'double-or-nothing', points: HAVOC_DOUBLE_MISS_PENALTY }],
+          addends: [{ source: 'double-or-nothing', points: HAVOC_DOUBLE_MISS_GIFT }],
           multipliers: [],
-          points: HAVOC_DOUBLE_MISS_PENALTY,
+          points: HAVOC_DOUBLE_MISS_GIFT,
           owners: doubleOwners.map((owner) => owner.instanceId),
           originalEventSequence: shotSequence,
         });
@@ -159,7 +188,7 @@ export class HavocFieldGoalRuntime {
           {
             owner: penaltyOwner,
             mutationId: 'double-or-nothing',
-            points: HAVOC_DOUBLE_MISS_PENALTY,
+            points: -HAVOC_DOUBLE_MISS_GIFT,
           },
         ]);
       }
@@ -336,6 +365,108 @@ export class HavocFieldGoalRuntime {
         nominal,
         scoringSequence: args.made ? scoringSequence : null,
       });
+    }
+    if (shooter.mutations.has('cold-blooded')) {
+      if (args.made) {
+        const counters = this.host.rollupFor(shooter, 'cold-blooded');
+        if (counters !== undefined) {
+          counters.triggers += 1;
+          counters.pointsDelta += coldBloodBonus;
+        }
+        if (coldBloodBonus > 0) {
+          this.host.pushEvent({
+            kind: 'cold-blooded',
+            outcome: 'consumed',
+            ownerInstanceId: shooter.instanceId,
+            side: team.side,
+            missStreak: shooter.coldBloodStreak,
+            scoringSequence,
+          });
+        }
+        shooter.coldBloodStreak = 0;
+      } else {
+        shooter.coldBloodStreak += 1;
+        const counters = this.host.rollupFor(shooter, 'cold-blooded');
+        if (counters !== undefined) counters.triggers += 1;
+        this.host.pushEvent({
+          kind: 'cold-blooded',
+          outcome: 'armed',
+          ownerInstanceId: shooter.instanceId,
+          side: team.side,
+          missStreak: shooter.coldBloodStreak,
+          scoringSequence: null,
+        });
+        if (shooter.coldBloodStreak % 2 === 0) {
+          const opponent = this.host.teams[(1 - args.offense) as SideIndex];
+          const giftSequence = this.host.pushScoring({
+            side: opponent.side,
+            kind: 'bonus',
+            actorInstanceId: shooter.instanceId,
+            beneficiaryInstanceId: null,
+            nominalPoints: 0,
+            addends: [{ source: 'cold-blooded', points: HAVOC_COLD_BLOOD_OPPONENT_GIFT }],
+            multipliers: [],
+            points: HAVOC_COLD_BLOOD_OPPONENT_GIFT,
+            owners: [shooter.instanceId],
+            originalEventSequence: shotSequence,
+          });
+          if (counters !== undefined) counters.pointsDelta -= HAVOC_COLD_BLOOD_OPPONENT_GIFT;
+          this.host.pushEvent({
+            kind: 'cold-blooded',
+            outcome: 'penalty',
+            ownerInstanceId: shooter.instanceId,
+            side: team.side,
+            missStreak: shooter.coldBloodStreak,
+            scoringSequence: giftSequence,
+          });
+        }
+      }
+    }
+    if (shooter.mutations.has('triple-threat')) {
+      if (this.host.period() !== shooter.tripleThreatPeriod) {
+        shooter.tripleThreatPeriod = this.host.period();
+        shooter.tripleThreatZones = [];
+      }
+      if (!args.made) {
+        if (shooter.tripleThreatZones.length > 0) {
+          shooter.tripleThreatZones = [];
+          this.host.pushEvent({
+            kind: 'triple-threat',
+            outcome: 'reset',
+            ownerInstanceId: shooter.instanceId,
+            side: team.side,
+            shotClass: shotClass,
+            scoringSequence: null,
+          });
+        }
+      } else if (shotClass !== null && !shooter.tripleThreatZones.includes(shotClass)) {
+        if (tripleThreatCompletes) {
+          shooter.tripleThreatZones = [];
+          const counters = this.host.rollupFor(shooter, 'triple-threat');
+          if (counters !== undefined) {
+            counters.triggers += 1;
+            counters.pointsDelta += HAVOC_TRIPLE_THREAT_BONUS;
+          }
+          this.host.pushEvent({
+            kind: 'triple-threat',
+            outcome: 'earned',
+            ownerInstanceId: shooter.instanceId,
+            side: team.side,
+            shotClass,
+            scoringSequence,
+          });
+        } else {
+          shooter.tripleThreatZones.push(shotClass);
+          this.host.pushEvent({
+            kind: 'triple-threat',
+            outcome: 'progress',
+            ownerInstanceId: shooter.instanceId,
+            side: team.side,
+            shotClass,
+            scoringSequence: null,
+          });
+        }
+      }
     }
   }
 }

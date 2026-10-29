@@ -52,6 +52,13 @@ const HAVOC_MUTATION_TAGS: Record<HavocMutationId, string> = {
   'the-great-equalizer': 'Leveling',
   'fusion-dance': 'Fused',
   'basketball-darwinism': 'Evolving',
+  'glass-cannon': 'Explosive',
+  'the-pacifist': 'Unselfish',
+  'paper-giant': 'Stretch',
+  'cold-blooded': 'Ice-Cold',
+  'triple-threat': 'Versatile',
+  'oops-all-centers': 'Giant',
+  'hostile-takeover': 'Hostile',
 };
 
 const HAVOC_SLOT_NOUNS: Record<Position, readonly string[]> = {

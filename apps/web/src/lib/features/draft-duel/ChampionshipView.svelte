@@ -13,7 +13,13 @@
   } from '@hoop-rush/data-contracts';
   import PlayerFace from '#lib/components/PlayerFace.svelte';
   import { SLOT_LABELS } from '#lib/player-positions.js';
-  import { perGameText, ratioPct } from '#lib/format.js';
+  import {
+    perGameText,
+    ratioPct,
+    trueShootingPct,
+    usagePct,
+    usagePossessions,
+  } from '#lib/format.js';
 
   let {
     series,
@@ -67,6 +73,8 @@
     fieldGoalAttempts: number;
     threeMakes: number;
     threeAttempts: number;
+    freeThrowMakes: number;
+    freeThrowAttempts: number;
     rebounds: number;
     assists: number;
     turnovers: number;
@@ -163,6 +171,8 @@
       fieldGoalAttempts: 0,
       threeMakes: 0,
       threeAttempts: 0,
+      freeThrowMakes: 0,
+      freeThrowAttempts: 0,
       rebounds: 0,
       assists: 0,
       turnovers: 0,
@@ -176,6 +186,8 @@
     totals.fieldGoalAttempts += team.box.fieldGoals.attempted;
     totals.threeMakes += team.box.threes.made;
     totals.threeAttempts += team.box.threes.attempted;
+    totals.freeThrowMakes += team.box.freeThrows.made;
+    totals.freeThrowAttempts += team.box.freeThrows.attempted;
     totals.rebounds += team.box.rebounds.total;
     totals.assists += team.box.assists;
     totals.turnovers += team.box.turnovers;
@@ -316,6 +328,13 @@
   }));
 
   const statsRows = $derived(statsSide === 'you' ? playerStats.local : playerStats.opponent);
+  const statsTeamUsage = $derived(
+    statsRows.reduce(
+      (total, row) =>
+        total + usagePossessions(row.fieldGoalAttempts, row.freeThrowAttempts, row.turnovers),
+      0,
+    ),
+  );
 
   function statValue(value: number, gamesPlayed: number): string {
     return statsTotals ? String(value) : (value / Math.max(1, gamesPlayed)).toFixed(1);
@@ -488,6 +507,23 @@
               <td>{ratioPct(comparison.opponent.threeMakes, comparison.opponent.threeAttempts)}</td>
             </tr>
             <tr>
+              <td
+                >{trueShootingPct(
+                  comparison.local.points,
+                  comparison.local.fieldGoalAttempts,
+                  comparison.local.freeThrowAttempts,
+                )}</td
+              >
+              <th scope="row">TS%</th>
+              <td
+                >{trueShootingPct(
+                  comparison.opponent.points,
+                  comparison.opponent.fieldGoalAttempts,
+                  comparison.opponent.freeThrowAttempts,
+                )}</td
+              >
+            </tr>
+            <tr>
               <td>{perGameText(comparison.local.rebounds, comparison.local.games)}</td>
               <th scope="row">Rebounds per game</th>
               <td>{perGameText(comparison.opponent.rebounds, comparison.opponent.games)}</td>
@@ -620,6 +656,8 @@
               <th scope="col">FG</th>
               <th scope="col">3P</th>
               <th scope="col">FT</th>
+              <th scope="col">TS%</th>
+              <th scope="col">USG%</th>
             </tr>
           </thead>
           <tbody>
@@ -654,6 +692,13 @@
                 <td>{ratioPct(row.fieldGoalMakes, row.fieldGoalAttempts)}</td>
                 <td>{ratioPct(row.threeMakes, row.threeAttempts)}</td>
                 <td>{ratioPct(row.freeThrowMakes, row.freeThrowAttempts)}</td>
+                <td>{trueShootingPct(row.points, row.fieldGoalAttempts, row.freeThrowAttempts)}</td>
+                <td
+                  >{usagePct(
+                    usagePossessions(row.fieldGoalAttempts, row.freeThrowAttempts, row.turnovers),
+                    statsTeamUsage,
+                  )}</td
+                >
               </tr>
             {/each}
           </tbody>

@@ -14,6 +14,11 @@ import {
 } from './cap-rush-versions.ts';
 import { capRushCatalogSourceSchema } from './cap-rush-versions.ts';
 import { capRushGameSummarySchema } from './cap-rush-season.ts';
+import {
+  capRushLeagueResultSchema,
+  capRushPlayoffGameSummarySchema,
+  capRushStoredPlayoffGameSchema,
+} from './cap-rush-postseason.ts';
 
 export const capRushCreateDraftCommandSchema = z.object({
   command: z.literal('create-cap-rush-draft'),
@@ -111,6 +116,36 @@ export const capRushFinalizeSeasonCommandSchema = z.object({
 });
 export type CapRushFinalizeSeasonCommand = z.infer<typeof capRushFinalizeSeasonCommandSchema>;
 
+export const capRushAcceptStandingsCommandSchema = z.object({
+  command: z.literal('accept-cap-rush-standings'),
+  commandId: commandIdSchema,
+  runId: idSchema,
+  expectedRevision: z.number().int().nonnegative(),
+  league: capRushLeagueResultSchema,
+});
+export type CapRushAcceptStandingsCommand = z.infer<typeof capRushAcceptStandingsCommandSchema>;
+
+export const capRushAcceptPlayoffGameCommandSchema = z.object({
+  command: z.literal('accept-cap-rush-playoff-game'),
+  commandId: commandIdSchema,
+  runId: idSchema,
+  expectedRevision: z.number().int().nonnegative(),
+  game: capRushPlayoffGameSummarySchema,
+  audit: capRushStoredPlayoffGameSchema.shape.audit,
+  result: capRushStoredPlayoffGameSchema.shape.result,
+});
+export type CapRushAcceptPlayoffGameCommand = z.infer<typeof capRushAcceptPlayoffGameCommandSchema>;
+
+export const capRushFinalizePostseasonCommandSchema = z.object({
+  command: z.literal('finalize-cap-rush-postseason'),
+  commandId: commandIdSchema,
+  runId: idSchema,
+  expectedRevision: z.number().int().nonnegative(),
+});
+export type CapRushFinalizePostseasonCommand = z.infer<
+  typeof capRushFinalizePostseasonCommandSchema
+>;
+
 export const capRushAbandonCommandSchema = z.object({
   command: z.literal('abandon-cap-rush-run'),
   commandId: commandIdSchema,
@@ -129,6 +164,9 @@ export const capRushCommandSchema = z.discriminatedUnion('command', [
   capRushLockLineupCommandSchema,
   capRushAcceptGameCommandSchema,
   capRushFinalizeSeasonCommandSchema,
+  capRushAcceptStandingsCommandSchema,
+  capRushAcceptPlayoffGameCommandSchema,
+  capRushFinalizePostseasonCommandSchema,
   capRushAbandonCommandSchema,
 ]);
 export type CapRushCommand = z.infer<typeof capRushCommandSchema>;
@@ -154,6 +192,11 @@ export const capRushCommandRejectionCodeSchema = z.enum([
   'stale-cursor',
   'digest-mismatch',
   'season-complete',
+  'postseason-unavailable',
+  'standings-invalid',
+  'playoff-mismatch',
+  'series-complete',
+  'postseason-complete',
   'abandoned',
 ]);
 export type CapRushCommandRejectionCode = z.infer<typeof capRushCommandRejectionCodeSchema>;

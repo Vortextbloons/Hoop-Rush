@@ -1,9 +1,27 @@
 import type {
   CapRushBucket,
+  CapRushHistoryPostseason,
   CapRushPayrollStatus,
   CapRushVariant,
 } from '@hoop-rush/data-contracts';
+import { capRushRoundName } from '@hoop-rush/data-contracts';
 import { capRushApronReductions, type CapRushApronReduction } from '@hoop-rush/engine';
+
+export function postseasonOutcomeLabel(postseason: CapRushHistoryPostseason): string {
+  if (postseason.isUserChampion) return 'Champion';
+  if (postseason.userStatus === 'champion') return 'Champion';
+  if (postseason.userStatus === 'not-qualified') return 'Missed the playoffs';
+  return `Out in the ${capRushRoundName(postseason.userRound ?? 1).toLowerCase()}`;
+}
+
+export function postseasonResultClass(postseason: CapRushHistoryPostseason): string {
+  if (postseason.isUserChampion) return 'border-accent/50 bg-accent/10 text-accent';
+  if (postseason.userStatus === 'not-qualified')
+    return 'border-line-strong bg-surface-2 text-muted-foreground';
+  if (postseason.userStatus === 'eliminated')
+    return 'border-negative/40 bg-negative/10 text-negative';
+  return 'border-primary/40 bg-primary/10 text-primary';
+}
 
 export function variantLabel(variant: CapRushVariant): string {
   return variant === 'clash' ? 'Cap Clash' : 'Cap Roulette';

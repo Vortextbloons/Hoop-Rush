@@ -1,6 +1,12 @@
 <script lang="ts">
   import HavocPlayerArt from '#lib/features/havoc/HavocPlayerArt.svelte';
-  import { ratioPct, perGameText } from '#lib/format.js';
+  import {
+    ratioPct,
+    perGameText,
+    trueShootingPct,
+    usagePct,
+    usagePossessions,
+  } from '#lib/format.js';
   import { havocParticipantKindLabel } from '#lib/features/havoc/havoc-presentation.js';
   import type { HavocMultiplayerSideBox } from './havoc-multiplayer-playback-view';
 
@@ -29,6 +35,12 @@
   <div class="hm-boxes" data-havoc-multiplayer-boxes>
     {#each boxes as box (box.side)}
       {@const topPoints = Math.max(0, ...box.lines.map((line) => line.points))}
+      {@const teamUsage = box.lines.reduce(
+        (total, line) =>
+          total +
+          usagePossessions(line.fieldGoalsAttempted, line.freeThrowsAttempted, line.turnovers),
+        0,
+      )}
       <section class="hm-box" data-side={box.side} aria-label={`${labelOf(box.side)} box score`}>
         <header class="hm-box-head">
           <span class="hm-box-label" data-side={box.side}>{labelOf(box.side)}</span>
@@ -49,6 +61,8 @@
                 <th scope="col">Pts</th>
                 <th scope="col">FG%</th>
                 <th scope="col">FT%</th>
+                <th scope="col">TS%</th>
+                <th scope="col">USG%</th>
                 <th scope="col">Reb</th>
                 <th scope="col">Ast</th>
                 <th scope="col">Stl</th>
@@ -84,6 +98,23 @@
                   <td class="hm-pts" data-negative={line.points < 0}>{statOf(line.points)}</td>
                   <td>{ratioPct(line.fieldGoalsMade, line.fieldGoalsAttempted)}</td>
                   <td>{ratioPct(line.freeThrowsMade, line.freeThrowsAttempted)}</td>
+                  <td
+                    >{trueShootingPct(
+                      line.points,
+                      line.fieldGoalsAttempted,
+                      line.freeThrowsAttempted,
+                    )}</td
+                  >
+                  <td
+                    >{usagePct(
+                      usagePossessions(
+                        line.fieldGoalsAttempted,
+                        line.freeThrowsAttempted,
+                        line.turnovers,
+                      ),
+                      teamUsage,
+                    )}</td
+                  >
                   <td>{statOf(line.rebounds)}</td>
                   <td>{statOf(line.assists)}</td>
                   <td>{statOf(line.steals)}</td>
@@ -173,7 +204,7 @@
   }
   table {
     width: 100%;
-    min-width: 34rem;
+    min-width: 38rem;
     border-collapse: collapse;
     font-size: 12px;
     font-variant-numeric: tabular-nums;

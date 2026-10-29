@@ -7,6 +7,7 @@ import type {
   CapRushHistoryEntry,
   CapRushReport,
   CapRushStoredGame,
+  CapRushStoredPlayoffGame,
   HoopRushManifest,
   Seed,
 } from '@hoop-rush/data-contracts';
@@ -17,6 +18,7 @@ import {
   CAP_RUSH_SCHEMA_VERSION,
   CAP_RUSH_SEED_DERIVATION_VERSION,
   POSITIONS,
+  capRushLeagueSeed,
   capRushVersionSetSchema,
   commandIdSchema,
   contentHashSchema,
@@ -29,8 +31,10 @@ import {
   buildCapRushCatalogIndex,
   capRushStoredGameOf,
   createCapRushDraftState,
+  createCapRushLeagueSimulation,
   createEngineContext,
   simulateCapRushGame,
+  simulateCapRushPlayoffGame,
 } from '@hoop-rush/engine';
 import {
   buildCapRushTestCatalog,
@@ -46,6 +50,7 @@ class MemoryCapRushRepository implements CapRushDraftRepositoryPort {
   loadError: Error | null = null;
   readonly commands = new Map<string, CapRushCommandResult>();
   readonly games = new Map<string, CapRushStoredGame[]>();
+  readonly playoffGames = new Map<string, CapRushStoredPlayoffGame[]>();
   readonly reports = new Map<string, CapRushReport>();
   readonly history: CapRushHistoryEntry[] = [];
 
@@ -62,6 +67,10 @@ class MemoryCapRushRepository implements CapRushDraftRepositoryPort {
     return [...(this.games.get(runId) ?? [])].sort(
       (left, right) => left.gameNumber - right.gameNumber,
     );
+  }
+
+  async listPlayoffGames(runId: string): Promise<CapRushStoredPlayoffGame[]> {
+    return [...(this.playoffGames.get(runId) ?? [])];
   }
 
   async saveReport(report: CapRushReport): Promise<void> {
@@ -82,6 +91,7 @@ class MemoryCapRushRepository implements CapRushDraftRepositoryPort {
     outcome: { state: CapRushDraftState; result: CapRushCommandResult };
     command: CapRushCommand;
     game?: CapRushStoredGame;
+    playoffGame?: CapRushStoredPlayoffGame;
     report?: CapRushReport;
   }): Promise<CapRushCommandResult> {
     const recorded = this.commands.get(input.outcome.result.commandId);
@@ -99,6 +109,13 @@ class MemoryCapRushRepository implements CapRushDraftRepositoryPort {
         next.push(input.game);
         next.sort((left, right) => left.gameNumber - right.gameNumber);
         this.games.set(result.runId, next);
+      }
+      if (input.playoffGame !== undefined) {
+        const games = this.playoffGames.get(result.runId) ?? [];
+        this.playoffGames.set(result.runId, [
+          ...games.filter((entry) => entry.gameId !== input.playoffGame?.gameId),
+          input.playoffGame,
+        ]);
       }
       if (input.report !== undefined) {
         this.reports.set(input.report.runId, input.report);
@@ -391,9 +408,43 @@ describe('cap rush session', () => {
     expect(progress?.season?.aggregate.games).toBe(CAP_RUSH_GAME_COUNT);
     expect(progress?.draft.stage).toBe('locked');
 
-    const report = await session.finalizeSeason();
+    expect(await session.finalizeSeason()).toBeNull();
+    expect(session.getSnapshot().draft?.draft.stage).toBe('postseason');
+    expect(session.postseasonStep().kind).toBe('standings');
+
+    const preamble = await createAssets().assets.loadPreamble();
+    const league = createCapRushLeagueSimulation(
+      {
+        seed: capRushLeagueSeed(locked.runSeed),
+        bracket: preamble.bracket,
+        profile: preamble.profile,
+      },
+      context,
+    );
+    league.advance(league.gamesTotal);
+    await session.acceptStandings(league.finish());
+    expect(session.postseasonStep().kind).toBe('games');
+
+    for (let stepIndex = 0; stepIndex < 400; stepIndex += 1) {
+      const step = session.postseasonStep();
+      if (step.kind === 'complete') break;
+      if (step.kind === 'finalize') break;
+      if (step.kind === 'standings') throw new Error('standings were already accepted');
+      if (step.games.length === 0) throw new Error('postseason step produced no games');
+      for (const plan of step.games) {
+        const simulation = simulateCapRushPlayoffGame({ locked, plan, context });
+        expect(simulation.game.audit.ok).toBe(true);
+        await session.acceptPlayoffGame({
+          summary: simulation.game.summary,
+          stored: simulation.game,
+        });
+      }
+    }
+    const report = await session.finalizePostseason();
     expect(report.games).toHaveLength(CAP_RUSH_GAME_COUNT);
     expect(report.players).toHaveLength(5);
+    expect(report.postseason?.series).toHaveLength(15);
+    expect(report.postseason?.finalsMvp).not.toBeNull();
     expect(session.getSnapshot().draft?.draft.stage).toBe('completed');
     expect(await session.loadReport(report.runId)).toEqual(report);
   }, 240_000);
@@ -502,11 +553,8 @@ describe('cap rush session', () => {
         stored: capRushStoredGameOf(simulation),
       });
     }
-    const report = await session.finalizeSeason();
-    expect(report.variant).toBe('roulette');
-    expect(report.spin).not.toBeNull();
-    expect(report.spinSpendDollars).toBe(15_000_000);
-    expect(session.getSnapshot().draft?.draft.stage).toBe('completed');
+    expect(await session.finalizeSeason()).toBeNull();
+    expect(session.getSnapshot().draft?.draft.stage).toBe('postseason');
     expect(session.getSnapshot().draft?.draft.spin.status).toBe('purchased');
   }, 240_000);
 

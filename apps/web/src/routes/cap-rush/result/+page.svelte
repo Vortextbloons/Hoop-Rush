@@ -71,6 +71,21 @@
         </div>
       </header>
       <CapRushReportView report={resultState.report} />
+    {:else if resultState.postseasonInProgress}
+      <AsyncState
+        kind="empty"
+        title="The postseason is still running"
+        message="Finish the bracket to unlock the champion, Finals MVP and final report."
+      >
+        {#snippet actions()}
+          <a
+            href={resolve('cap-rush/run/')}
+            class="inline-flex min-h-11 items-center rounded-xl border border-line-strong px-4 text-sm font-semibold outline-none hover:border-primary hover:text-primary focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            Continue the postseason
+          </a>
+        {/snippet}
+      </AsyncState>
     {:else if resultState.seasonInProgress}
       <AsyncState
         kind="empty"

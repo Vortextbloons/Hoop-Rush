@@ -28,10 +28,11 @@
     {:else if state.report !== null}
       <header class="mb-4">
         <p class="font-mono text-[10px] font-bold tracking-[0.18em] text-primary uppercase">
-          Cap Rush · Saved season
+          Cap Rush ·
+          {state.report.postseason === undefined ? 'Regular-season run' : 'Saved postseason'}
         </p>
         <h1 class="font-display mt-1 text-3xl font-extrabold tracking-tight uppercase sm:text-4xl">
-          Saved report
+          {state.report.postseason === undefined ? 'Regular-season report' : 'Championship report'}
         </h1>
         <p class="mt-1 font-mono text-[10px] break-all text-muted-foreground">{runId}</p>
       </header>

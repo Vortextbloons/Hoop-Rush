@@ -79,6 +79,8 @@ const HAVOC_SCORING_SOURCE_LABELS: Record<string, string> = {
   'the-bounty': 'The Bounty',
   'buzzer-bandit': 'Buzzer Bandit',
   'charity-casino': 'Charity Casino',
+  'cold-blooded': 'Cold Blooded',
+  'triple-threat': 'Triple Threat',
 };
 
 export function havocScoringSourceLabel(source: string): string {
@@ -208,6 +210,14 @@ export function havocEventMutationIdOf(
       return 'fusion-dance';
     case 'darwinism':
       return 'basketball-darwinism';
+    case 'cold-blooded':
+      return 'cold-blooded';
+    case 'triple-threat':
+      return 'triple-threat';
+    case 'oops-all-centers':
+      return 'oops-all-centers';
+    case 'hostile-takeover':
+      return 'hostile-takeover';
     default:
       return null;
   }
@@ -298,6 +308,22 @@ export function havocEventTextOf(
       return `Fusion Dance ${event.outcome}: ${name(event.ownerInstanceId)} fuses with ${name(event.donorInstanceId)}`;
     case 'darwinism':
       return `Basketball Darwinism: ${name(event.shooterInstanceId)} scoring ratings decay (−${String(event.shooterDecayAfter)})`;
+    case 'cold-blooded':
+      return event.outcome === 'consumed'
+        ? `Cold Blooded payout: ${name(event.ownerInstanceId)} cashes a ${String(event.missStreak)}-miss streak`
+        : event.outcome === 'penalty'
+          ? `Cold Blooded: ${name(event.ownerInstanceId)} cold streak gifts the opponent a point`
+          : `Cold Blooded: ${name(event.ownerInstanceId)} miss streak ${String(event.missStreak)}`;
+    case 'triple-threat':
+      return event.outcome === 'earned'
+        ? `Triple Threat: ${name(event.ownerInstanceId)} completes the quarter trifecta (+6)`
+        : event.outcome === 'reset'
+          ? `Triple Threat: ${name(event.ownerInstanceId)} progress reset by a miss`
+          : `Triple Threat: ${name(event.ownerInstanceId)} hits the ${event.shotClass ?? 'shot'}`;
+    case 'oops-all-centers':
+      return `Oops, All Centers!: ${name(event.ownerInstanceId)} turns five starters into 7'3" centers`;
+    case 'hostile-takeover':
+      return `Hostile Takeover ${event.outcome}: ${name(event.fromInstanceId)} trades ratings with ${name(event.toInstanceId)}`;
     case 'game-end':
       return `Final: ${context.homeName} ${String(event.homeScore)}, ${context.awayName} ${String(event.awayScore)}`;
   }

@@ -17,6 +17,7 @@ import {
 } from './simulation.ts';
 import {
   CAP_RUSH_DRAFT_ROUNDS,
+  CAP_RUSH_GAME_COUNT,
   CAP_RUSH_HARD_LIMIT_DOLLARS,
   CAP_RUSH_MAX_OVERALL,
   CAP_RUSH_MIN_OVERALL,
@@ -33,6 +34,7 @@ import {
 import { capRushSpinStateSchema } from './cap-rush-spin.ts';
 import { capRushLockedInputsSchema } from './cap-rush-lock.ts';
 import { capRushSeasonStateSchema } from './cap-rush-season.ts';
+import { capRushPostseasonSchema } from './cap-rush-postseason.ts';
 
 export const capRushPlayerProfileSchema = z.object({
   ratings: simulationRatingsSchema,
@@ -108,6 +110,7 @@ export const capRushDraftStageSchema = z.enum([
   'review-offer',
   'complete',
   'locked',
+  'postseason',
   'completed',
   'abandoned',
 ]);
@@ -130,24 +133,43 @@ export const capRushDraftStateSchema = z
     spin: capRushSpinStateSchema,
     locked: capRushLockedInputsSchema.nullable(),
     season: capRushSeasonStateSchema,
+    postseasonEligible: z.boolean().optional(),
+    postseason: capRushPostseasonSchema.optional(),
   })
   .superRefine((state, ctx) => {
     const seasonStarted = state.season.games.length > 0;
-    if (state.stage === 'complete' || state.stage === 'locked') {
+    const seasonDone = state.season.games.length === CAP_RUSH_GAME_COUNT;
+    if (state.stage === 'complete' || state.stage === 'locked' || state.stage === 'postseason') {
       if (state.picks.length !== CAP_RUSH_DRAFT_ROUNDS) {
         ctx.addIssue({ code: 'custom', message: 'a complete draft requires five picks' });
       }
       if (state.offer !== null) {
         ctx.addIssue({ code: 'custom', message: 'a complete draft cannot hold an open offer' });
       }
-      if (state.locked !== null && state.stage !== 'locked') {
+      if (state.locked !== null && state.stage !== 'locked' && state.stage !== 'postseason') {
         ctx.addIssue({ code: 'custom', message: 'only a locked draft holds locked inputs' });
       }
-      if (state.stage === 'locked' && state.locked === null) {
+      if ((state.stage === 'locked' || state.stage === 'postseason') && state.locked === null) {
         ctx.addIssue({ code: 'custom', message: 'a locked draft requires locked inputs' });
       }
-      if (seasonStarted && state.stage !== 'locked') {
+      if (seasonStarted && state.stage !== 'locked' && state.stage !== 'postseason') {
         ctx.addIssue({ code: 'custom', message: 'an unlocked draft cannot hold season progress' });
+      }
+      if (state.stage === 'postseason') {
+        if (!seasonDone || state.season.completedAt === null) {
+          ctx.addIssue({
+            code: 'custom',
+            message: 'the postseason opens only after the regular season',
+          });
+        }
+        if (state.postseasonEligible !== true || state.postseason === undefined) {
+          ctx.addIssue({
+            code: 'custom',
+            message: 'only a postseason-eligible run enters the postseason',
+          });
+        } else if (state.postseason.phase === 'complete') {
+          ctx.addIssue({ code: 'custom', message: 'a complete postseason ends the stage' });
+        }
       }
     } else if (state.stage === 'completed' || state.stage === 'abandoned') {
       if (state.picks.length === CAP_RUSH_DRAFT_ROUNDS && state.locked === null) {
@@ -162,6 +184,14 @@ export const capRushDraftStateSchema = z
         }
         if (state.season.completedAt === null) {
           ctx.addIssue({ code: 'custom', message: 'a completed run requires a completion time' });
+        }
+        if (state.postseasonEligible === true) {
+          if (state.postseason === undefined || state.postseason.phase !== 'complete') {
+            ctx.addIssue({
+              code: 'custom',
+              message: 'a postseason-eligible run completes only with its postseason',
+            });
+          }
         }
       }
       if (state.stage === 'abandoned' && state.season.completedAt !== null) {

@@ -70,7 +70,7 @@ import type {
   RollupCounters,
   TeamRuntime,
 } from './battle-runtime-types.ts';
-import { HavocFieldGoalRuntime, HAVOC_DOUBLE_MISS_PENALTY } from './battle-field-goal.ts';
+import { HavocFieldGoalRuntime, HAVOC_DOUBLE_MISS_GIFT } from './battle-field-goal.ts';
 import { HAVOC_SCORING_SOURCE_MUTATION } from './battle-scoring.ts';
 export { havocFieldGoalValue, HAVOC_SCORING_SOURCE_MUTATION } from './battle-scoring.ts';
 export type {
@@ -92,13 +92,18 @@ const HAVOC_FINISH_HEIGHT_POINTS = 0.015;
 const HAVOC_WINGSPAN_REBOUND_WEIGHT = 0.1;
 const HAVOC_EQUALIZER_CAP = 85;
 const HAVOC_HIGHLIGHT_LIMIT = 16;
-const HAVOC_HEAT_EXPIRY_POSSESSIONS = 3;
+const HAVOC_HEAT_EXPIRY_POSSESSIONS = 5;
 const HAVOC_BOUNTY_EXPIRY_POSSESSIONS = 5;
 const HAVOC_REBOUND_LOOP_EVERY = 3;
 const HAVOC_GOLDEN_ASSIST_EVERY = 3;
 const HAVOC_DOUBLE_OR_NOTHING_FOUL_FREE_THROWS = 1;
 const HAVOC_EXTRA_POSSESSION_RUSH_SECONDS = 12;
 const HAVOC_FUSION_DONOR_RATING = 40;
+const HAVOC_CENTERS_HEIGHT_INCHES = 87;
+const HAVOC_CENTERS_ELITE_RATING = 95;
+const HAVOC_CENTERS_SPEED_CAP = 35;
+const HAVOC_CENTERS_HANDLING_CAP = 35;
+const HAVOC_CENTERS_THREE_CAP = 40;
 const HAVOC_DARWINISM_CHANNELS: ReadonlySet<string> = new Set([
   'two-point-accuracy',
   'three-point-accuracy',
@@ -159,6 +164,19 @@ function capRatings(ratings: SimulationRatings, cap: number): SimulationRatings 
     speed: Math.min(cap, ratings.speed),
     strength: Math.min(cap, ratings.strength),
     vertical: Math.min(cap, ratings.vertical),
+  };
+}
+
+function centersRatings(ratings: SimulationRatings): SimulationRatings {
+  return {
+    ...ratings,
+    strength: Math.max(ratings.strength, HAVOC_CENTERS_ELITE_RATING),
+    interiorDefense: Math.max(ratings.interiorDefense, HAVOC_CENTERS_ELITE_RATING),
+    offensiveRebound: Math.max(ratings.offensiveRebound, HAVOC_CENTERS_ELITE_RATING),
+    defensiveRebound: Math.max(ratings.defensiveRebound, HAVOC_CENTERS_ELITE_RATING),
+    speed: Math.min(ratings.speed, HAVOC_CENTERS_SPEED_CAP),
+    ballHandling: Math.min(ratings.ballHandling, HAVOC_CENTERS_HANDLING_CAP),
+    threePoint: Math.min(ratings.threePoint, HAVOC_CENTERS_THREE_CAP),
   };
 }
 
@@ -225,6 +243,7 @@ class HavocBattleRuntime implements HavocRuntimeHooks {
   } | null = null;
   private readonly playerInstance = new Map<SimulationPlayer, ParticipantState>();
   private readonly bodySnatcherTargets: ReadonlyMap<string, string>;
+  private readonly hostileTakeoverTargets: ReadonlyMap<string, { from: string; to: string }>;
   private readonly bountyTargets: readonly [string | null, string | null];
   private lastTimeLord: [number, number];
   private lastCapped: [string[], string[]] = [[], []];
@@ -257,6 +276,7 @@ class HavocBattleRuntime implements HavocRuntimeHooks {
       possessionId: () => this.possessionId,
       tripContext: () => this.tripContext,
       requireParticipant: (player) => this.requireParticipant(player),
+      period: () => this.period,
       rollupFor: (participant, mutation) => this.rollupFor(participant, mutation),
       activeOwners: (side, mutation) => this.activeOwners(side, mutation),
       runtimeSeed: (...parts) => runtimeSeed(input.seed, ...parts),
@@ -271,6 +291,7 @@ class HavocBattleRuntime implements HavocRuntimeHooks {
     });
     const targets = havocBattleCapabilityTargets(input);
     this.bodySnatcherTargets = targets.bodySnatcher;
+    this.hostileTakeoverTargets = targets.hostileTakeover;
     this.bountyTargets = targets.bounty;
     this.lastTimeLord = [ENGINE_CONSTANTS.shotClockSeconds, ENGINE_CONSTANTS.shotClockSeconds];
   }
@@ -324,6 +345,14 @@ class HavocBattleRuntime implements HavocRuntimeHooks {
         darwinismDecayPoints: 0,
         fusionDonorInstanceId: null,
         fusionOwnerInstanceId: null,
+        coldBloodStreak: 0,
+        tripleThreatPeriod: 0,
+        tripleThreatZones: [],
+        tripleThreatArmed: false,
+        takeoverFromInstanceId: null,
+        takeoverToInstanceId: null,
+        takeoverWith: null,
+        takeoverBy: null,
         simPlayer: undefined as unknown as SimulationPlayer,
         evidence: undefined,
         rollup: new Map(),
@@ -343,6 +372,7 @@ class HavocBattleRuntime implements HavocRuntimeHooks {
       active: [],
       byId,
       extraQueue: [],
+      centersOwner: null,
     };
     for (const participant of participants) {
       if (participant.kind === 'starter') {
@@ -734,19 +764,19 @@ class HavocBattleRuntime implements HavocRuntimeHooks {
         const primary = doubleOwners[0];
         if (primary !== undefined) {
           this.pushScoring({
-            side: team.side,
-            kind: 'adjustment',
+            side: this.teams[(1 - args.side) as SideIndex].side,
+            kind: 'bonus',
             actorInstanceId: shooter.instanceId,
             beneficiaryInstanceId: null,
             nominalPoints: 0,
-            addends: [{ source: 'double-or-nothing', points: HAVOC_DOUBLE_MISS_PENALTY }],
+            addends: [{ source: 'double-or-nothing', points: HAVOC_DOUBLE_MISS_GIFT }],
             multipliers: [],
-            points: HAVOC_DOUBLE_MISS_PENALTY,
+            points: HAVOC_DOUBLE_MISS_GIFT,
             owners: doubleOwners.map((owner) => owner.instanceId),
             originalEventSequence: attemptSequence,
           });
           this.attribute([
-            { owner: primary, mutationId: 'double-or-nothing', points: HAVOC_DOUBLE_MISS_PENALTY },
+            { owner: primary, mutationId: 'double-or-nothing', points: -HAVOC_DOUBLE_MISS_GIFT },
           ]);
         }
       }
@@ -1128,6 +1158,42 @@ class HavocBattleRuntime implements HavocRuntimeHooks {
         side: this.teams[owner.sideIndex].side,
       });
     }
+    for (const [ownerId, swap] of this.hostileTakeoverTargets) {
+      const owner = this.teams[0].byId.get(ownerId) ?? this.teams[1].byId.get(ownerId);
+      const from = this.teams[0].byId.get(swap.from) ?? this.teams[1].byId.get(swap.from);
+      const to = this.teams[0].byId.get(swap.to) ?? this.teams[1].byId.get(swap.to);
+      if (owner === undefined || from === undefined || to === undefined) continue;
+      from.takeoverWith = swap.to;
+      to.takeoverBy = swap.from;
+      const counters = this.rollupFor(owner, 'hostile-takeover');
+      if (counters !== undefined) counters.triggers += 1;
+      this.pushEvent({
+        kind: 'hostile-takeover',
+        outcome: 'applied',
+        ownerInstanceId: ownerId,
+        side: this.teams[owner.sideIndex].side,
+        fromInstanceId: swap.from,
+        toInstanceId: swap.to,
+      });
+    }
+    for (const team of this.teams) {
+      const owner = team.participants.find(
+        (participant) =>
+          participant.kind === 'starter' && participant.mutations.has('oops-all-centers'),
+      );
+      if (owner === undefined) continue;
+      team.centersOwner = owner.instanceId;
+      const resized = team.input.starters.map((participant) => participant.instanceId).sort();
+      const counters = this.rollupFor(owner, 'oops-all-centers');
+      if (counters !== undefined) counters.triggers += 1;
+      this.pushEvent({
+        kind: 'oops-all-centers',
+        outcome: 'applied',
+        ownerInstanceId: owner.instanceId,
+        side: team.side,
+        resizedInstanceIds: resized,
+      });
+    }
     this.rebuildBattleProfiles();
     this.rebuildActiveTeams();
     this.recomputeEqualizer(true);
@@ -1338,6 +1404,24 @@ class HavocBattleRuntime implements HavocRuntimeHooks {
             tendencies = { ...owner.source.profile.tendencies };
           }
         }
+        if (participant.takeoverWith !== null) {
+          const target = this.globalById(participant.takeoverWith);
+          if (target !== null) {
+            ratings = { ...target.effective.ratings };
+            tendencies = { ...target.effective.tendencies };
+          }
+        } else if (participant.takeoverBy !== null) {
+          const owner = this.globalById(participant.takeoverBy);
+          if (owner !== null) {
+            ratings = { ...owner.effective.ratings };
+            tendencies = { ...owner.effective.tendencies };
+          }
+        }
+        let heightInches = participant.effective.physical.heightInches;
+        if (team.centersOwner !== null && participant.kind !== 'clone') {
+          heightInches = HAVOC_CENTERS_HEIGHT_INCHES;
+          ratings = centersRatings(ratings);
+        }
         if (participant.darwinismDecayPoints > 0) {
           for (const field of HAVOC_SCORING_RATING_FIELDS) {
             ratings[field] = Math.max(0, ratings[field] - participant.darwinismDecayPoints);
@@ -1360,7 +1444,7 @@ class HavocBattleRuntime implements HavocRuntimeHooks {
             : { playerVersionId: participant.source.playerVersionId }),
           displayName: participant.source.displayName,
           positions: participant.source.positions,
-          heightInches: participant.effective.physical.heightInches,
+          heightInches,
           weightLbs: participant.effective.physical.weightLbs,
           ratings,
           tendencies,

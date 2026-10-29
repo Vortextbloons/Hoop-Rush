@@ -11,6 +11,8 @@ export interface HavocFieldGoalValueInput {
   bounty: boolean;
   doubleOrNothing: boolean;
   buzzerBandit: boolean;
+  coldBloodBonus?: number;
+  tripleThreatBonus?: number;
 }
 
 export interface HavocFieldGoalContribution {
@@ -37,6 +39,8 @@ export function havocFieldGoalValue(input: HavocFieldGoalValueInput): HavocField
   };
   if (input.roulette !== null) add('roulette', input.roulette - input.nominal);
   if (input.reverseBasketball) add('reverse-basketball', input.three ? -2 : 1);
+  if ((input.coldBloodBonus ?? 0) > 0) add('cold-blooded', input.coldBloodBonus ?? 0);
+  if ((input.tripleThreatBonus ?? 0) > 0) add('triple-threat', input.tripleThreatBonus ?? 0);
   const multiply = (source: HavocScoringSource, factor: 2 | 3): void => {
     multipliers.push({ source, factor });
     contributions.push({ source, points: value * (factor - 1) });
@@ -74,6 +78,8 @@ export function fieldGoalAttributions<T extends { instanceId: string }>(
             contribution.source === 'second-chance-jackpot' ||
             contribution.source === 'the-bounty' ||
             contribution.source === 'heat-check' ||
+            contribution.source === 'cold-blooded' ||
+            contribution.source === 'triple-threat' ||
             contribution.source === 'buzzer-bandit'
           ? [shooter]
           : doubleOwners;
@@ -107,4 +113,6 @@ export const HAVOC_SCORING_SOURCE_MUTATION: Record<HavocScoringSource, HavocMuta
   'the-bounty': 'the-bounty',
   'buzzer-bandit': 'buzzer-bandit',
   'charity-casino': 'charity-casino',
+  'cold-blooded': 'cold-blooded',
+  'triple-threat': 'triple-threat',
 };

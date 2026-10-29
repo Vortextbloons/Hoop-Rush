@@ -8,6 +8,7 @@ import type {
 import {
   HAVOC_SPECIALIST_CATEGORY_IDS,
   HAVOC_SPECIALIST_CATEGORY_RATINGS,
+  HAVOC_SPECIALIST_CATEGORY_TENDENCIES,
 } from '@hoop-rush/data-contracts';
 
 export interface HavocCompatibleBundle {
@@ -120,6 +121,7 @@ function partnerOperationsAllowCategory(
   category: HavocSpecialistCategory,
 ): boolean {
   const specialistFields = new Set<string>(HAVOC_SPECIALIST_CATEGORY_RATINGS[category]);
+  const specialistTendencies = new Set<string>(HAVOC_SPECIALIST_CATEGORY_TENDENCIES[category]);
   for (const operation of operations) {
     switch (operation.op) {
       case 'cap-rating': {
@@ -128,6 +130,10 @@ function partnerOperationsAllowCategory(
       }
       case 'set-rating': {
         if (specialistFields.has(operation.field) && operation.value !== 99) return false;
+        break;
+      }
+      case 'cap-tendency': {
+        if (specialistTendencies.has(operation.field) && operation.value < 100) return false;
         break;
       }
       default:

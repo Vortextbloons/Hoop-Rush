@@ -5,6 +5,7 @@
   import PlayerStatsTable from '#lib/components/PlayerStatsTable.svelte';
   import type { PlayerStatColumn, PlayerStatsTotals } from '#lib/components/player-stats-table.js';
   import { SLOT_LABELS } from '#lib/player-positions.js';
+  import { trueShootingPct, usagePct, usagePossessions } from '#lib/format.js';
   import { gamecastTeamOf } from './gamecast-broadcast-view';
   import type {
     GamecastParticipantId,
@@ -108,7 +109,7 @@
     },
   ]);
 
-  type GamecastBoxRow = PlayerBoxScore & { slotIndex: number };
+  type GamecastBoxRow = PlayerBoxScore & { slotIndex: number; teamUsage: number };
 
   const boxColumns: readonly PlayerStatColumn<GamecastBoxRow>[] = [
     { key: 'minutes', label: 'MIN', value: (row) => row.minutes },
@@ -119,10 +120,35 @@
     { key: 'fieldGoals', label: 'FG', value: (row) => statLine(row) },
     { key: 'threes', label: '3P', value: (row) => threeLine(row) },
     { key: 'freeThrows', label: 'FT', value: (row) => freeThrowLine(row) },
+    {
+      key: 'trueShooting',
+      label: 'TS%',
+      value: (row) =>
+        trueShootingPct(row.points, row.fieldGoals.attempted, row.freeThrows.attempted),
+    },
+    {
+      key: 'usage',
+      label: 'USG%',
+      value: (row) =>
+        usagePct(
+          usagePossessions(row.fieldGoals.attempted, row.freeThrows.attempted, row.turnovers),
+          row.teamUsage,
+        ),
+    },
   ];
 
   function rowsOf(panel: TeamPanel): GamecastBoxRow[] {
-    return panel.team.players.map((player, slotIndex) => ({ ...player, slotIndex }));
+    const teamUsage = panel.team.players.reduce(
+      (total, player) =>
+        total +
+        usagePossessions(
+          player.fieldGoals.attempted,
+          player.freeThrows.attempted,
+          player.turnovers,
+        ),
+      0,
+    );
+    return panel.team.players.map((player, slotIndex) => ({ ...player, slotIndex, teamUsage }));
   }
 
   function totalsOf(panel: TeamPanel): PlayerStatsTotals<GamecastBoxRow> {
@@ -145,6 +171,14 @@
             return `${String(panel.team.box.threes.made)}-${String(panel.team.box.threes.attempted)}`;
           case 'freeThrows':
             return `${String(panel.team.box.freeThrows.made)}-${String(panel.team.box.freeThrows.attempted)}`;
+          case 'trueShooting':
+            return trueShootingPct(
+              panel.team.box.points,
+              panel.team.box.fieldGoals.attempted,
+              panel.team.box.freeThrows.attempted,
+            );
+          case 'usage':
+            return '100.0%';
           default:
             return '';
         }

@@ -14,6 +14,7 @@
     mutationTierOf,
     formatSignedPoints,
   } from './havoc-presentation';
+  import { trueShootingRate } from '#lib/format.js';
   import HavocPlayerArt from './HavocPlayerArt.svelte';
   let {
     comparison,
@@ -71,9 +72,37 @@
     return ((usageOf(line) / teamTotal) * 100).toFixed(1);
   }
   function usageChange(havoc: HavocStatLine, normal: HavocStatLine): string {
-    if (havocTeamUsage <= 0 || normalTeamUsage <= 0) return '—';
-    const delta = usageOf(havoc) / havocTeamUsage - usageOf(normal) / normalTeamUsage;
-    return `${delta > 0 ? '+' : ''}${(delta * 100).toFixed(1)} pp`;
+    const delta = usageDelta(havoc, normal);
+    return delta === null ? '—' : `${delta > 0 ? '+' : ''}${(delta * 100).toFixed(1)} pp`;
+  }
+  function usageDelta(havoc: HavocStatLine, normal: HavocStatLine): number | null {
+    if (havocTeamUsage <= 0 || normalTeamUsage <= 0) return null;
+    return usageOf(havoc) / havocTeamUsage - usageOf(normal) / normalTeamUsage;
+  }
+  function trueShootingLabel(line: HavocStatLine): string {
+    const rate = trueShootingRate(
+      line.points,
+      line.fieldGoals.attempted,
+      line.freeThrows.attempted,
+    );
+    return rate === null ? '—' : (rate * 100).toFixed(1);
+  }
+  function trueShootingChange(havoc: HavocStatLine, normal: HavocStatLine): number | null {
+    const havocRate = trueShootingRate(
+      havoc.points,
+      havoc.fieldGoals.attempted,
+      havoc.freeThrows.attempted,
+    );
+    const normalRate = trueShootingRate(
+      normal.points,
+      normal.fieldGoals.attempted,
+      normal.freeThrows.attempted,
+    );
+    return havocRate === null || normalRate === null ? null : (havocRate - normalRate) * 100;
+  }
+  function trueShootingChangeLabel(havoc: HavocStatLine, normal: HavocStatLine): string {
+    const delta = trueShootingChange(havoc, normal);
+    return delta === null ? '—' : `${delta > 0 ? '+' : ''}${delta.toFixed(1)} pp`;
   }
   let selectedSlot = $state<string | null>(null);
   let detailsOpen = $state(false);
@@ -95,12 +124,27 @@
         ><tr
           ><th scope="col">Player</th>{#each stats as stat (stat.key)}<th scope="col"
               >{stat.label}</th
-            >{/each}</tr
+            >{/each}<th scope="col">TS%</th><th scope="col">USG%</th></tr
         ></thead
       >
       <tbody>
         {#each comparison.slots as player (player.slot)}
           {@const source = lineup.find((slot) => slot.slot === player.slot)}
+          {@const havocTrueShooting = trueShootingRate(
+            player.havoc.combined.points,
+            player.havoc.combined.fieldGoals.attempted,
+            player.havoc.combined.freeThrows.attempted,
+          )}
+          {@const normalTrueShooting = trueShootingRate(
+            player.normal.combined.points,
+            player.normal.combined.fieldGoals.attempted,
+            player.normal.combined.freeThrows.attempted,
+          )}
+          {@const trueShootingDelta =
+            havocTrueShooting !== null && normalTrueShooting !== null
+              ? (havocTrueShooting - normalTrueShooting) * 100
+              : null}
+          {@const playerUsageDelta = usageDelta(player.havoc.combined, player.normal.combined)}
           <tr data-havoc-player-stats={player.slot}>
             <th scope="row">
               <button
@@ -137,6 +181,28 @@
                 >
               </td>
             {/each}
+            <td data-havoc-stat="trueShooting">
+              <span class="h-box-value"
+                >{havocTrueShooting === null ? '—' : (havocTrueShooting * 100).toFixed(1)}</span
+              >
+              <span
+                class="h-box-delta"
+                class:better={trueShootingDelta !== null && trueShootingDelta > 0}
+                class:worse={trueShootingDelta !== null && trueShootingDelta < 0}
+                >{trueShootingDelta === null
+                  ? '—'
+                  : `${trueShootingDelta > 0 ? '+' : ''}${trueShootingDelta.toFixed(1)} pp`}</span
+              >
+            </td>
+            <td data-havoc-stat="usage">
+              <span class="h-box-value">{usageShare(player.havoc.combined, havocTeamUsage)}</span>
+              <span
+                class="h-box-delta"
+                class:better={playerUsageDelta !== null && playerUsageDelta > 0}
+                class:worse={playerUsageDelta !== null && playerUsageDelta < 0}
+                >{usageChange(player.havoc.combined, player.normal.combined)}</span
+              >
+            </td>
           </tr>
         {/each}
       </tbody>
@@ -190,6 +256,19 @@
                 {delta === null ? '—' : `${delta > 0 ? '+' : ''}${delta.toFixed(1)} pp`}
               </dd>
             </div>{/each}
+          <div class="h-stat-columns" data-havoc-stat="trueShooting">
+            <dt>TS%</dt>
+            <dd class="h-powered">{trueShootingLabel(player.havoc.combined)}</dd>
+            <dd>{trueShootingLabel(player.normal.combined)}</dd>
+            <dd
+              class:better={(trueShootingChange(player.havoc.combined, player.normal.combined) ??
+                0) > 0}
+              class:worse={(trueShootingChange(player.havoc.combined, player.normal.combined) ??
+                0) < 0}
+            >
+              {trueShootingChangeLabel(player.havoc.combined, player.normal.combined)}
+            </dd>
+          </div>
           <div class="h-stat-columns" data-havoc-stat="usage">
             <dt>USG%</dt>
             <dd class="h-powered">{usageShare(player.havoc.combined, havocTeamUsage)}</dd>
@@ -286,7 +365,7 @@
   }
   table {
     width: 100%;
-    min-width: 620px;
+    min-width: 720px;
     border-collapse: collapse;
     font-variant-numeric: tabular-nums;
   }
@@ -384,7 +463,7 @@
       display: block;
     }
     table {
-      min-width: 540px;
+      min-width: 640px;
     }
     thead th:first-child,
     tbody th {

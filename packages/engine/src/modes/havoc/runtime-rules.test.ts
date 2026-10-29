@@ -546,7 +546,7 @@ describe('havoc overtime and free throws', () => {
     expect(otEntries.length).toBeGreaterThan(0);
   });
 
-  it('penalizes misses by one under double or nothing without doubling free throws', () => {
+  it('gifts the opponent a point per miss under double or nothing without doubling free throws', () => {
     const human = buildScenarioTeam('human', [
       scenarioSlot('PG', ['double-or-nothing']),
       ...plainSlots().slice(1),
@@ -558,22 +558,25 @@ describe('havoc overtime and free throws', () => {
       (candidate) =>
         candidate.tape.scoring.some(
           (entry) =>
-            entry.kind === 'adjustment' &&
+            entry.kind === 'bonus' &&
             entry.addends.some(
-              (addend) => addend.source === 'double-or-nothing' && addend.points === -1,
+              (addend) => addend.source === 'double-or-nothing' && addend.points === 1,
             ),
         ),
     );
-    expect(run, 'expected a double-or-nothing penalty').not.toBeNull();
+    expect(run, 'expected a double-or-nothing miss gift').not.toBeNull();
     if (run === null) return;
-    const missed = run.tape.scoring.find(
+    const gifts = run.tape.scoring.filter(
       (entry) =>
-        entry.kind === 'adjustment' &&
-        entry.addends.some(
-          (addend) => addend.source === 'double-or-nothing' && addend.points === -1,
-        ),
+        entry.kind === 'bonus' &&
+        entry.addends.some((addend) => addend.source === 'double-or-nothing'),
     );
-    expect(missed?.points).toBe(-1);
+    expect(gifts.length).toBeGreaterThan(0);
+    for (const gift of gifts) {
+      expect(gift.points).toBe(1);
+      expect(gift.side).toBe('opponent');
+    }
+    expect(run.result.away.teamBonusPoints).toBeGreaterThanOrEqual(gifts.length);
     for (const entry of run.tape.scoring) {
       if (entry.kind !== 'free-throw') continue;
       expect(entry.points).toBe(1);

@@ -5,6 +5,7 @@ import type {
   CapRushHistoryEntry,
   CapRushReport,
   CapRushStoredGame,
+  CapRushStoredPlayoffGame,
   CommandId,
   Id,
 } from '@hoop-rush/data-contracts';
@@ -16,6 +17,7 @@ import {
   capRushCommandSchema,
   capRushReportSchema,
   capRushStoredGameSchema,
+  capRushStoredPlayoffGameSchema,
 } from '@hoop-rush/data-contracts';
 import { capRushStateDigest } from '@hoop-rush/engine';
 import {
@@ -24,6 +26,7 @@ import {
   storedCapRushDraftRowSchema,
   storedCapRushGameRowSchema,
   storedCapRushHistoryRowSchema,
+  storedCapRushPlayoffGameRowSchema,
   storedCapRushReportRowSchema,
 } from '../schemas/cap-rush-record.ts';
 import { HoopRushDatabase } from './dexie.ts';
@@ -42,6 +45,7 @@ export interface CapRushApplyOutcomeInput {
   };
   readonly command: CapRushCommand;
   readonly game?: CapRushStoredGame;
+  readonly playoffGame?: CapRushStoredPlayoffGame;
   readonly report?: CapRushReport;
 }
 
@@ -54,6 +58,7 @@ export interface CapRushRepository {
   loadActiveDraft(): Promise<CapRushDraftState | null>;
   loadCommandResult(commandId: string): Promise<CapRushCommandResult | null>;
   applyOutcome(input: CapRushApplyOutcomeInput): Promise<CapRushCommandResult>;
+  listPlayoffGames(runId: string): Promise<CapRushStoredPlayoffGame[]>;
   clearActiveDraft(): Promise<void>;
 }
 export class CapRushLoadError extends Error {
@@ -194,12 +199,44 @@ export class DexieCapRushRepository implements CapRushRepository {
       input.game === undefined
         ? null
         : parseRecord(capRushStoredGameSchema, input.game, 'accepted cap rush game', malformed);
+    const playoffGame =
+      input.playoffGame === undefined
+        ? null
+        : parseRecord(
+            capRushStoredPlayoffGameSchema,
+            input.playoffGame,
+            'accepted cap rush playoff game',
+            malformed,
+          );
     const report =
       input.report === undefined
         ? null
         : parseRecord(capRushReportSchema, input.report, 'cap rush season report', malformed);
-    if (!accepted && (game !== null || report !== null)) {
+    if (!accepted && (game !== null || playoffGame !== null || report !== null)) {
       throw malformed('rejected cap rush commands cannot carry stored artifacts');
+    }
+    if (playoffGame !== null) {
+      if (command.command !== 'accept-cap-rush-playoff-game') {
+        throw malformed('stored playoff games require a playoff accept command');
+      }
+      if (canonicalJson(command.game) !== canonicalJson(playoffGame.summary)) {
+        throw malformed('playoff accept command does not describe the stored game');
+      }
+      if (canonicalJson(command.audit) !== canonicalJson(playoffGame.audit)) {
+        throw malformed('stored playoff audit does not match the accept command');
+      }
+      if (canonicalJson(command.result) !== canonicalJson(playoffGame.result)) {
+        throw malformed('stored playoff result does not match the accept command');
+      }
+      const acceptedGame = state.postseason?.series
+        .flatMap((series) => series.games)
+        .find((entry) => entry.gameId === playoffGame.summary.gameId);
+      if (acceptedGame === undefined) {
+        throw malformed('stored playoff game is missing from the accepted postseason');
+      }
+      if (canonicalJson(acceptedGame) !== canonicalJson(playoffGame.summary)) {
+        throw malformed('stored playoff game disagrees with the postseason state');
+      }
     }
     if (game !== null) {
       if (command.command !== 'accept-cap-rush-game') {
@@ -246,6 +283,21 @@ export class DexieCapRushRepository implements CapRushRepository {
       ) {
         throw malformed('cap rush season report does not match the locked inputs');
       }
+      if (report.postseason !== undefined) {
+        const postseason = state.postseason;
+        if (
+          postseason === undefined ||
+          postseason.phase !== 'complete' ||
+          postseason.standings === null ||
+          postseason.championTeamId !== report.postseason.championTeamId ||
+          postseason.finalsMvp === null ||
+          canonicalJson(postseason.finalsMvp) !== canonicalJson(report.postseason.finalsMvp) ||
+          canonicalJson(postseason.series) !== canonicalJson(report.postseason.series) ||
+          canonicalJson(postseason.standings) !== canonicalJson(report.postseason.standings)
+        ) {
+          throw malformed('cap rush postseason report does not match the accepted bracket');
+        }
+      }
     }
 
     return this.db.transaction(
@@ -254,6 +306,7 @@ export class DexieCapRushRepository implements CapRushRepository {
         this.db.capRushActive,
         this.db.capRushCommands,
         this.db.capRushGames,
+        this.db.capRushPlayoffGames,
         this.db.capRushHistory,
         this.db.capRushReports,
       ],
@@ -327,6 +380,17 @@ export class DexieCapRushRepository implements CapRushRepository {
               }),
             );
           }
+          if (playoffGame !== null) {
+            await this.db.capRushPlayoffGames.put(
+              storedCapRushPlayoffGameRowSchema.parse({
+                saveSchemaVersion: CAP_RUSH_SAVE_SCHEMA_VERSION,
+                runId: result.runId,
+                gameId: playoffGame.gameId,
+                game: playoffGame,
+                updatedAtIso: now,
+              }),
+            );
+          }
           if (report !== null) {
             await this.db.capRushReports.put(
               storedCapRushReportRowSchema.parse({
@@ -356,18 +420,23 @@ export class DexieCapRushRepository implements CapRushRepository {
   }
 
   async clearActiveDraft(): Promise<void> {
-    await this.db.transaction('rw', [this.db.capRushActive, this.db.capRushCommands], async () => {
-      const row: unknown = await this.db.capRushActive.get(CAP_RUSH_ACTIVE_DRAFT_RECORD_ID);
-      await this.db.capRushActive.delete(CAP_RUSH_ACTIVE_DRAFT_RECORD_ID);
-      if (row === undefined) return;
-      const runId =
-        typeof row === 'object' && row !== null && 'runId' in row
-          ? (row as { runId?: unknown }).runId
-          : undefined;
-      if (typeof runId === 'string') {
-        await this.db.capRushCommands.where('runId').equals(runId).delete();
-      }
-    });
+    await this.db.transaction(
+      'rw',
+      [this.db.capRushActive, this.db.capRushCommands, this.db.capRushPlayoffGames],
+      async () => {
+        const row: unknown = await this.db.capRushActive.get(CAP_RUSH_ACTIVE_DRAFT_RECORD_ID);
+        await this.db.capRushActive.delete(CAP_RUSH_ACTIVE_DRAFT_RECORD_ID);
+        if (row === undefined) return;
+        const runId =
+          typeof row === 'object' && row !== null && 'runId' in row
+            ? (row as { runId?: unknown }).runId
+            : undefined;
+        if (typeof runId === 'string') {
+          await this.db.capRushCommands.where('runId').equals(runId).delete();
+          await this.db.capRushPlayoffGames.where('runId').equals(runId).delete();
+        }
+      },
+    );
   }
 
   async listRunGames(runId: string): Promise<CapRushStoredGame[]> {
@@ -379,6 +448,22 @@ export class DexieCapRushRepository implements CapRushRepository {
       })
       .sort((left, right) => left.gameNumber - right.gameNumber)
       .map((row) => row.game);
+  }
+
+  async listPlayoffGames(runId: string): Promise<CapRushStoredPlayoffGame[]> {
+    const rows = await this.db.capRushPlayoffGames.where('runId').equals(runId).toArray();
+    return rows
+      .map((row) => {
+        assertSaveSchemaVersion(row, CAP_RUSH_SAVE_SCHEMA_VERSION, unsupported);
+        return parseRecord(
+          storedCapRushPlayoffGameRowSchema,
+          row,
+          `cap rush playoff game ${runId}`,
+          malformed,
+        );
+      })
+      .map((row) => row.game)
+      .sort((left, right) => left.gameId.localeCompare(right.gameId));
   }
 
   async readRunGame(runId: string, gameNumber: number): Promise<CapRushStoredGame | null> {
@@ -427,18 +512,46 @@ export class DexieCapRushRepository implements CapRushRepository {
       losses: parsed.losses,
       perfectSeason: parsed.perfectSeason,
       completedAtIso: parsed.completedAtIso,
+      ...(parsed.postseason === undefined ? {} : { postseason: parsed.postseason }),
     };
   }
 
   private async putHistory(state: CapRushDraftState): Promise<void> {
-    const completedAtIso = state.season.completedAt;
-    if (completedAtIso === null) {
-      throw malformed('an incomplete cap rush season cannot be written to history');
-    }
     if (state.locked === null) {
       throw malformed('a completed cap rush run requires locked inputs');
     }
+    const postseason = state.postseason;
+    const completedAtIso =
+      postseason?.phase === 'complete' ? postseason.completedAt : state.season.completedAt;
+    if (completedAtIso === null) {
+      throw malformed('an incomplete cap rush season cannot be written to history');
+    }
     const aggregate = state.season.aggregate;
+    const historyPostseason =
+      postseason?.phase === 'complete' &&
+      postseason.standings !== null &&
+      postseason.championTeamId !== null &&
+      postseason.userOutcome.status !== 'pending'
+        ? (() => {
+            const champion = postseason.standings.entries.find(
+              (entry) => entry.teamId === postseason.championTeamId,
+            );
+            const user = postseason.standings.entries.find(
+              (entry) => entry.teamId === state.locked?.human.teamId,
+            );
+            if (champion === undefined) {
+              throw malformed('a completed postseason champion is missing from the standings');
+            }
+            return {
+              championTeamId: champion.teamId,
+              championName: champion.displayName,
+              isUserChampion: champion.teamId === state.locked.human.teamId,
+              userStatus: postseason.userOutcome.status,
+              userRound: postseason.userOutcome.round,
+              seed: user?.seed ?? null,
+            };
+          })()
+        : undefined;
     await this.db.capRushHistory.put(
       storedCapRushHistoryRowSchema.parse({
         saveSchemaVersion: CAP_RUSH_SAVE_SCHEMA_VERSION,
@@ -450,6 +563,7 @@ export class DexieCapRushRepository implements CapRushRepository {
         losses: aggregate.losses,
         perfectSeason: aggregate.perfectSeason,
         completedAtIso,
+        ...(historyPostseason === undefined ? {} : { postseason: historyPostseason }),
       }),
     );
   }

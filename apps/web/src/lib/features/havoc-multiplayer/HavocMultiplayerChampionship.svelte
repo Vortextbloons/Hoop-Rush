@@ -12,7 +12,7 @@
   import HavocMutationList from '#lib/features/havoc/HavocMutationList.svelte';
   import HavocPlayerArt from '#lib/features/havoc/HavocPlayerArt.svelte';
   import HavocTierBadge from '#lib/features/havoc/HavocTierBadge.svelte';
-  import { perGameText, ratioPct } from '#lib/format.js';
+  import { perGameText, ratioPct, trueShootingPct } from '#lib/format.js';
   import HavocMultiplayerBoxScore from './HavocMultiplayerBoxScore.svelte';
   import { havocMultiplayerFinalBoxes } from './havoc-multiplayer-playback-view';
   import { havocMultiplayerSeriesStats } from './havoc-multiplayer-series-stats';
@@ -71,6 +71,7 @@
     const teams = stats.boxes.map((box) => {
       const sum = (
         stat:
+          | 'points'
           | 'rebounds'
           | 'assists'
           | 'turnovers'
@@ -83,6 +84,7 @@
         perGameText(box.score, stats.games),
         ratioPct(sum('fieldGoalsMade'), sum('fieldGoalsAttempted')),
         ratioPct(sum('freeThrowsMade'), sum('freeThrowsAttempted')),
+        trueShootingPct(sum('points'), sum('fieldGoalsAttempted'), sum('freeThrowsAttempted')),
         perGameText(sum('rebounds'), stats.games),
         perGameText(sum('assists'), stats.games),
         perGameText(sum('turnovers'), stats.games),
@@ -92,6 +94,7 @@
       'Points per game',
       'FG%',
       'FT%',
+      'TS%',
       'Player rebounds per game',
       'Assists per game',
       'Turnovers per game',

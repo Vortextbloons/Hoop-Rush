@@ -194,6 +194,8 @@ export const havocScoringSourceSchema = z.enum([
   'the-bounty',
   'buzzer-bandit',
   'charity-casino',
+  'cold-blooded',
+  'triple-threat',
 ]);
 export type HavocScoringSource = z.infer<typeof havocScoringSourceSchema>;
 
@@ -216,7 +218,7 @@ export function buildHavocScoringEntrySchema<TSide extends string>(sideSchema: z
           points: z.number().int().min(-6).max(6),
         }),
       )
-      .max(4),
+      .max(8),
     multipliers: z
       .array(
         z.object({
@@ -477,6 +479,37 @@ export function buildHavocEventSchema<TSide extends string>(sideSchema: z.ZodTyp
       side: sideSchema,
       shooterInstanceId: havocInstanceIdSchema,
       shooterDecayAfter: z.number().int().positive(),
+    }),
+    havocEventBase.extend({
+      kind: z.literal('cold-blooded'),
+      outcome: z.enum(['armed', 'consumed', 'reset', 'penalty']),
+      ownerInstanceId: havocInstanceIdSchema,
+      side: sideSchema,
+      missStreak: z.number().int().nonnegative(),
+      scoringSequence: z.number().int().nonnegative().nullable(),
+    }),
+    havocEventBase.extend({
+      kind: z.literal('triple-threat'),
+      outcome: z.enum(['progress', 'earned', 'consumed', 'reset']),
+      ownerInstanceId: havocInstanceIdSchema,
+      side: sideSchema,
+      shotClass: z.enum(['rim', 'midrange', 'three']).nullable(),
+      scoringSequence: z.number().int().nonnegative().nullable(),
+    }),
+    havocEventBase.extend({
+      kind: z.literal('oops-all-centers'),
+      outcome: z.enum(['applied']),
+      ownerInstanceId: havocInstanceIdSchema,
+      side: sideSchema,
+      resizedInstanceIds: z.array(havocInstanceIdSchema).max(10),
+    }),
+    havocEventBase.extend({
+      kind: z.literal('hostile-takeover'),
+      outcome: z.enum(['applied', 'ended']),
+      ownerInstanceId: havocInstanceIdSchema,
+      side: sideSchema,
+      fromInstanceId: havocInstanceIdSchema,
+      toInstanceId: havocInstanceIdSchema,
     }),
     havocEventBase.extend({
       kind: z.literal('game-end'),

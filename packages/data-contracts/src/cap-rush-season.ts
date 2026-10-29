@@ -14,6 +14,10 @@ import {
   capRushVariantSchema,
 } from './cap-rush-versions.ts';
 import { havocMutationIdSchema, havocTierSchema } from './havoc-mutations.ts';
+import {
+  capRushHistoryPostseasonSchema,
+  capRushPostseasonReportSchema,
+} from './cap-rush-postseason.ts';
 
 export const capRushGameSummarySchema = z.object({
   gameNumber: z.number().int().min(1).max(CAP_RUSH_GAME_COUNT),
@@ -145,6 +149,7 @@ export const capRushReportSchema = z
     leagueBaselineTs: z.number(),
     hasMutationScoring: z.boolean(),
     games: z.array(capRushGameSummarySchema).length(CAP_RUSH_GAME_COUNT),
+    postseason: capRushPostseasonReportSchema.optional(),
   })
   .superRefine((report, ctx) => {
     if (report.spinSpendDollars < 0) {
@@ -192,6 +197,7 @@ export const capRushHistoryEntrySchema = z.object({
   losses: z.number().int().min(0).max(CAP_RUSH_GAME_COUNT),
   perfectSeason: z.boolean(),
   completedAtIso: z.iso.datetime(),
+  postseason: capRushHistoryPostseasonSchema.optional(),
 });
 export type CapRushHistoryEntry = z.infer<typeof capRushHistoryEntrySchema>;
 

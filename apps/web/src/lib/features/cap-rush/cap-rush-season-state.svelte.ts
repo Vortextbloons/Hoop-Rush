@@ -1,7 +1,9 @@
 import {
   CAP_RUSH_GAME_COUNT,
+  type CapRushPlayoffGamePlan,
   type CapRushReport,
   type CapRushStoredGame,
+  type CapRushStoredPlayoffGame,
 } from '@hoop-rush/data-contracts';
 import {
   CapRushServiceError,
@@ -23,6 +25,7 @@ export interface CapRushSeasonProgress {
 export class CapRushSeasonController {
   draft = $state.raw<CapRushDraftView | null>(null);
   games = $state.raw<CapRushStoredGame[]>([]);
+  playoffGames = $state.raw<CapRushStoredPlayoffGame[]>([]);
   report = $state.raw<CapRushReport | null>(null);
   progress = $state.raw<CapRushSeasonProgress | null>(null);
   loading = $state(true);
@@ -59,6 +62,13 @@ export class CapRushSeasonController {
       } else {
         this.games = [];
       }
+      if (runId !== undefined && (snapshot.draft?.postseason?.series.length ?? 0) > 0) {
+        const stored = await this.service.listPlayoffGames(runId);
+        if (this.isDestroyed()) return;
+        this.playoffGames = [...stored];
+      } else {
+        this.playoffGames = [];
+      }
     } catch (error) {
       if (!this.isDestroyed()) {
         this.error = errorMessageOf(error);
@@ -79,6 +89,14 @@ export class CapRushSeasonController {
       return true;
     }
     const start = view.season?.nextGameNumber ?? 1;
+    if (start > CAP_RUSH_GAME_COUNT) {
+      const report = await this.service.finalizeSeason();
+      if (this.isDestroyed()) return false;
+      await this.load();
+      if (report === null) return false;
+      this.report = report;
+      return true;
+    }
     this.busy = true;
     this.cancelling = false;
     this.error = null;
@@ -134,7 +152,13 @@ export class CapRushSeasonController {
         this.notice = `Season paused after game ${String(complete.lastCursor)}. Accepted games are saved.`;
         return false;
       }
-      return await this.finalizeSeason();
+      const report = await this.service.finalizeSeason();
+      if (this.isDestroyed()) return false;
+      await this.load();
+      if (this.isDestroyed()) return false;
+      if (report === null) return false;
+      this.report = report;
+      return true;
     } catch (error) {
       if (!this.isDestroyed()) this.error = errorMessageOf(error);
       return false;
@@ -147,12 +171,151 @@ export class CapRushSeasonController {
     }
   }
 
+  async advancePostseason(): Promise<boolean> {
+    if (this.busy || this.isDestroyed() || this.draft === null) return false;
+    this.busy = true;
+    this.cancelling = false;
+    this.error = null;
+    this.notice = null;
+    try {
+      if (this.draft.draft.stage === 'locked') {
+        if (this.draft.season === null || this.draft.season.games.length !== CAP_RUSH_GAME_COUNT) {
+          return false;
+        }
+        const report = await this.service.finalizeSeason();
+        if (this.isDestroyed()) return false;
+        if (report !== null) {
+          this.report = report;
+          return true;
+        }
+        await this.load();
+        if (this.isDestroyed()) return false;
+      }
+      for (let iteration = 0; iteration < 200; iteration += 1) {
+        if (this.isDestroyed()) return false;
+        const step = this.service.postseasonStep();
+        if (step.kind === 'standings') {
+          await this.completeStandings();
+          return false;
+        }
+        if (step.kind === 'finalize') {
+          this.report = await this.service.finalizePostseason();
+          if (this.isDestroyed()) return false;
+          await this.load();
+          return !this.isDestroyed();
+        }
+        if (step.kind === 'complete') {
+          if (this.report !== null) return true;
+          await this.load();
+          return false;
+        }
+        if (step.games.length === 0) {
+          this.notice = 'The bracket is waiting on an accepted result. Reopen the run to resume.';
+          return false;
+        }
+        const userGames = await this.simulatePlayoffBatch(step.games);
+        if (this.isDestroyed() || userGames === null) return false;
+        const next = this.service.postseasonStep();
+        if (next.kind === 'complete' && this.report !== null) return true;
+        const outcome = this.draft.postseason?.userOutcome.status ?? 'pending';
+        if (userGames > 0 && outcome !== 'eliminated' && outcome !== 'not-qualified') {
+          return false;
+        }
+        if (next.kind === 'games' && next.games.some((game) => game.userSide !== null)) {
+          return false;
+        }
+      }
+      this.notice = 'The postseason paused before completion. Reopen the run to resume.';
+      return false;
+    } catch (error) {
+      if (!this.isDestroyed()) this.error = errorMessageOf(error);
+      return false;
+    } finally {
+      if (!this.isDestroyed()) {
+        this.busy = false;
+        this.cancelling = false;
+        this.progress = null;
+      }
+    }
+  }
+
+  private async completeStandings(): Promise<boolean> {
+    const view = this.draft;
+    if (view === null || view.draft.locked === null) {
+      throw new Error('there is no locked cap rush run');
+    }
+    const bracket = await this.service.loadBracket();
+    const complete = await this.runner.simulateStandings({
+      requestId: newRequestId('cap-rush-standings'),
+      locked: view.draft.locked,
+      bracket,
+      handlers: {
+        onProgress: (message) => {
+          if (!this.isDestroyed()) {
+            this.progress = { completed: message.gamesCompleted, total: message.gamesTotal };
+          }
+        },
+      },
+    });
+    if (this.isDestroyed()) return false;
+    if (complete.cancelled || complete.result === null) {
+      this.notice = 'Standings completion paused. Accepted work is safe.';
+      return false;
+    }
+    await this.service.acceptStandings(complete.result);
+    if (this.isDestroyed()) return false;
+    await this.load();
+    return true;
+  }
+
+  private async simulatePlayoffBatch(
+    games: readonly CapRushPlayoffGamePlan[],
+  ): Promise<number | null> {
+    const view = this.draft;
+    if (view === null || view.draft.locked === null) {
+      throw new Error('there is no locked cap rush run');
+    }
+    let userGames = 0;
+    const complete = await this.runner.simulatePlayoffs({
+      requestId: newRequestId('cap-rush-playoffs'),
+      locked: view.draft.locked,
+      games,
+      handlers: {
+        onGame: async (message) => {
+          await this.service.acceptPlayoffGame({
+            summary: message.game.summary,
+            stored: message.game,
+          });
+          if (this.isDestroyed()) return;
+          if (message.game.summary.userSide !== null) userGames += 1;
+          this.playoffGames = [
+            ...this.playoffGames.filter((entry) => entry.gameId !== message.game.gameId),
+            message.game,
+          ];
+          this.draft = this.service.getSnapshot().draft;
+        },
+        onError: (message) => {
+          if (!this.isDestroyed()) this.error = message.message;
+        },
+      },
+    });
+    if (this.isDestroyed()) return null;
+    if (complete.cancelled) {
+      this.notice = 'The postseason paused. Accepted games are saved.';
+      return null;
+    }
+    await this.load();
+    return userGames;
+  }
+
   async finalizeSeason(): Promise<boolean> {
     if (this.draft === null || this.isDestroyed()) return false;
     try {
-      this.report = await this.service.finalizeSeason();
+      const report = await this.service.finalizeSeason();
       if (this.isDestroyed()) return false;
       await this.load();
+      if (report === null) return false;
+      this.report = report;
       return true;
     } catch (error) {
       if (!this.isDestroyed()) this.error = errorMessageOf(error);

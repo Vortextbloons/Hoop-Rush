@@ -122,3 +122,25 @@ export function capRushGameSeed(runSeed: Seed, gameNumber: number): Seed {
 export function capRushLeagueSeed(runSeed: Seed): Seed {
   return capRushSeed(runSeed, 'background-league');
 }
+
+export function capRushPlayoffGameSeed(
+  runSeed: Seed,
+  round: number,
+  seriesSlot: number,
+  gameOrdinal: number,
+): Seed {
+  if (!Number.isInteger(round) || round < 1 || round > 4) {
+    throw new Error(`cap rush playoff round must be an integer in 1..4 (got ${String(round)})`);
+  }
+  if (!Number.isInteger(seriesSlot) || seriesSlot < 0 || seriesSlot > 7) {
+    throw new Error(
+      `cap rush playoff series slot must be an integer in 0..7 (got ${String(seriesSlot)})`,
+    );
+  }
+  if (!Number.isInteger(gameOrdinal) || gameOrdinal < 1 || gameOrdinal > 7) {
+    throw new Error(
+      `cap rush playoff game ordinal must be an integer in 1..7 (got ${String(gameOrdinal)})`,
+    );
+  }
+  return capRushSeed(runSeed, 'playoffs', round, seriesSlot, gameOrdinal);
+}

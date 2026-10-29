@@ -28,7 +28,7 @@
   import GameStrip from '#lib/components/GameStrip.svelte';
   import PlayerFace from '#lib/components/PlayerFace.svelte';
   import TierBadge from '#lib/components/TierBadge.svelte';
-  import { oneDecimal, percentOneDecimal, ratioPct } from '#lib/format.js';
+  import { oneDecimal, percentOneDecimal, ratioPct, trueShootingPct } from '#lib/format.js';
   import { SLOT_LABELS } from '#lib/player-positions.js';
   type PeakPlayer = PeakPlayerSeason;
   let {
@@ -115,6 +115,8 @@
     let fga = 0;
     let tpm = 0;
     let tpa = 0;
+    let ftm = 0;
+    let fta = 0;
     let reb = 0;
     let tov = 0;
     for (const game of run.games) {
@@ -124,10 +126,12 @@
       fga += box.fieldGoals.attempted;
       tpm += box.threes.made;
       tpa += box.threes.attempted;
+      ftm += box.freeThrows.made;
+      fta += box.freeThrows.attempted;
       reb += box.rebounds.total;
       tov += box.turnovers;
     }
-    return { points, fgm, fga, tpm, tpa, reb, tov };
+    return { points, fgm, fga, tpm, tpa, ftm, fta, reb, tov };
   });
   const lastGames = $derived(selectMemorableGames(run));
   const heroNote = $derived(
@@ -217,10 +221,6 @@
   }
   function zonePctLabel(rate: number): string {
     return percentOneDecimal(rate);
-  }
-  function trueShootingPct(points: number, fga: number, fta: number): string {
-    const denominator = 2 * (fga + 0.44 * fta);
-    return denominator <= 0 ? '—' : percentOneDecimal(points / denominator);
   }
   function usagePct(raw: PlayerSeasonAggregate, team: RunAggregates['team']): string {
     const possessionEstimate = (p: {
@@ -516,6 +516,23 @@
                 <td class="py-2 text-center text-xs text-muted-foreground">3P%</td>
                 <td class="py-2 text-right font-bold"
                   >{ratioPct(opponentTotals.tpm, opponentTotals.tpa)}</td
+                >
+              </tr>
+              <tr>
+                <td class="py-2 text-left font-bold"
+                  >{trueShootingPct(
+                    record.points,
+                    record.fieldGoals.attempted,
+                    record.freeThrows.attempted,
+                  )}</td
+                >
+                <td class="py-2 text-center text-xs text-muted-foreground">TS%</td>
+                <td class="py-2 text-right font-bold"
+                  >{trueShootingPct(
+                    opponentTotals.points,
+                    opponentTotals.fga,
+                    opponentTotals.fta,
+                  )}</td
                 >
               </tr>
               <tr>
@@ -972,7 +989,7 @@
               </dd>
             </div>
           </dl>
-          <div class="mt-3 grid gap-2 font-mono text-xs sm:grid-cols-4">
+          <div class="mt-3 grid gap-2 font-mono text-xs sm:grid-cols-5">
             <p>
               <span class="text-muted-foreground">FG</span>
               {ratioPct(record.fieldGoals.made, record.fieldGoals.attempted)}
@@ -984,6 +1001,14 @@
             <p>
               <span class="text-muted-foreground">FT</span>
               {ratioPct(record.freeThrows.made, record.freeThrows.attempted)}
+            </p>
+            <p>
+              <span class="text-muted-foreground">TS%</span>
+              {trueShootingPct(
+                record.points,
+                record.fieldGoals.attempted,
+                record.freeThrows.attempted,
+              )}
             </p>
             <p>
               <span class="text-muted-foreground">TOV/G</span>

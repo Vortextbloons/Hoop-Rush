@@ -1,12 +1,15 @@
 import type {
   CapRushAbandonCommand,
   CapRushAcceptGameCommand,
+  CapRushAcceptPlayoffGameCommand,
+  CapRushAcceptStandingsCommand,
   CapRushChoosePositionCommand,
   CapRushCommand,
   CapRushCommandRejectionCode,
   CapRushCommandResult,
   CapRushCreateDraftCommand,
   CapRushDraftState,
+  CapRushFinalizePostseasonCommand,
   CapRushFinalizeSeasonCommand,
   CapRushLockLineupCommand,
   CapRushOffer,
@@ -18,13 +21,20 @@ import type {
 import {
   CAP_RUSH_GAME_COUNT,
   CAP_RUSH_HARD_LIMIT_DOLLARS,
+  CAP_RUSH_PLAYOFF_ROUNDS,
   CAP_RUSH_REROLL_LIMIT,
   CAP_RUSH_SCHEMA_VERSION,
+  CAP_RUSH_SERIES_GAMES,
+  CAP_RUSH_USER_TEAM_ID,
   capRushCommandResultSchema,
   capRushCreateDraftCommandSchema,
   capRushDraftStateSchema,
+  capRushEmptyPostseason,
+  capRushLeagueSeed,
+  capRushPlayoffGameSeed,
 } from '@hoop-rush/data-contracts';
 import { capRushEmptySeasonState } from '@hoop-rush/data-contracts';
+import { havocGameResultDigest } from '../havoc/digests.ts';
 import { capRushFoldAggregate } from './season.ts';
 import type { Rng } from '../../sim/rng.ts';
 import type { CapRushCatalogIndex } from './catalog.ts';
@@ -39,6 +49,13 @@ import { generateCapRushOffer, generateCapRushReplacementOffer } from './offers.
 import { buildCapRushLockedInputs, type CapRushLockSources } from './lock.ts';
 import { buildCapRushSpinReceipt, capRushPayrollDollars, capRushSpinEligibility } from './spin.ts';
 import { capRushStateDigest } from './state-digest.ts';
+import {
+  buildCapRushPostseasonStandings,
+  capRushFinalsMvp,
+  capRushOpeningSeries,
+  capRushRefreshPostseason,
+  capRushSeriesIsComplete,
+} from './postseason.ts';
 
 export interface CapRushCommandEnvironment {
   readonly index: CapRushCatalogIndex;
@@ -75,6 +92,7 @@ export function createCapRushDraftState(
     spin: { status: 'unavailable' },
     locked: null,
     season: capRushEmptySeasonState(),
+    postseasonEligible: true,
   });
   return state;
 }
@@ -616,11 +634,297 @@ function applyFinalizeSeason(
       `the season has ${String(state.season.games.length)} of ${String(CAP_RUSH_GAME_COUNT)} games`,
     );
   }
+  const completedAt = environment.nowIso?.() ?? new Date().toISOString();
+  const nextState = capRushDraftStateSchema.parse({
+    ...state,
+    revision: state.revision + 1,
+    stage: state.postseasonEligible === true ? 'postseason' : 'completed',
+    season: { ...state.season, completedAt },
+    ...(state.postseasonEligible === true ? { postseason: capRushEmptyPostseason() } : {}),
+  });
+  return acceptCapRushCommand(state, command, nextState);
+}
+
+function applyAcceptStandings(
+  state: CapRushDraftState,
+  command: CapRushAcceptStandingsCommand,
+  environment: CapRushCommandEnvironment,
+): CapRushCommandOutcome {
+  const mismatch = validateRunAndRevision(state, command, environment);
+  if (mismatch !== null) return mismatch;
+  if (state.stage !== 'postseason' || state.locked === null || state.postseason === undefined) {
+    return rejectCapRushCommand(
+      state,
+      command,
+      'postseason-unavailable',
+      'the run is not in its postseason',
+    );
+  }
+  if (state.postseason.phase !== 'awaiting-standings') {
+    return rejectCapRushCommand(
+      state,
+      command,
+      'phase-mismatch',
+      'the final standings were already accepted',
+    );
+  }
+  if (state.season.games.length !== CAP_RUSH_GAME_COUNT) {
+    return rejectCapRushCommand(
+      state,
+      command,
+      'standings-invalid',
+      'the regular season is incomplete',
+    );
+  }
+  if (command.league.league.seed !== capRushLeagueSeed(state.runSeed)) {
+    return rejectCapRushCommand(
+      state,
+      command,
+      'digest-mismatch',
+      'the league standings do not carry the locked background seed',
+    );
+  }
+  let standings;
+  try {
+    standings = buildCapRushPostseasonStandings({
+      locked: state.locked,
+      league: command.league,
+      userGames: state.season.games.map((game) => ({
+        opponentId: game.opponentId,
+        humanPoints: game.humanPoints,
+        opponentPoints: game.opponentPoints,
+        won: game.won,
+      })),
+    });
+  } catch (error) {
+    return rejectCapRushCommand(
+      state,
+      command,
+      'standings-invalid',
+      error instanceof Error ? error.message : 'the league standings are invalid',
+    );
+  }
+  const userEntry = standings.entries.find((entry) => entry.teamId === CAP_RUSH_USER_TEAM_ID);
+  const qualified = userEntry?.qualified === true;
+  const nextState = capRushDraftStateSchema.parse({
+    ...state,
+    revision: state.revision + 1,
+    postseason: capRushRefreshPostseason({
+      postseason: {
+        ...state.postseason,
+        phase: 'playoffs',
+        standings,
+        series: capRushOpeningSeries(standings),
+        userOutcome: qualified
+          ? { status: 'pending', round: null }
+          : { status: 'not-qualified', round: null },
+      },
+      userTeamId: state.locked.human.teamId,
+    }),
+  });
+  return acceptCapRushCommand(state, command, nextState);
+}
+
+function applyAcceptPlayoffGame(
+  state: CapRushDraftState,
+  command: CapRushAcceptPlayoffGameCommand,
+  environment: CapRushCommandEnvironment,
+): CapRushCommandOutcome {
+  const mismatch = validateRunAndRevision(state, command, environment);
+  if (mismatch !== null) return mismatch;
+  if (state.stage !== 'postseason' || state.locked === null || state.postseason === undefined) {
+    return rejectCapRushCommand(
+      state,
+      command,
+      'postseason-unavailable',
+      'the run is not in its postseason',
+    );
+  }
+  if (state.postseason.phase !== 'playoffs') {
+    return rejectCapRushCommand(
+      state,
+      command,
+      'phase-mismatch',
+      'the playoff bracket is not open',
+    );
+  }
+  const { game } = command;
+  if (!command.audit.ok) {
+    return rejectCapRushCommand(state, command, 'digest-mismatch', 'the playoff game audit failed');
+  }
+  const series = state.postseason.series.find((entry) => entry.seriesId === game.seriesId);
+  if (series === undefined) {
+    return rejectCapRushCommand(
+      state,
+      command,
+      'playoff-mismatch',
+      'the playoff game belongs to an unknown series',
+    );
+  }
+  if (capRushSeriesIsComplete(series)) {
+    return rejectCapRushCommand(state, command, 'series-complete', 'the series is already decided');
+  }
+  if (series.round !== game.round || series.seriesSlot !== game.seriesSlot) {
+    return rejectCapRushCommand(
+      state,
+      command,
+      'playoff-mismatch',
+      'the playoff game identity does not match its series',
+    );
+  }
+  const expectedOrdinal = series.games.length + 1;
+  if (game.gameOrdinal !== expectedOrdinal || expectedOrdinal > CAP_RUSH_SERIES_GAMES) {
+    return rejectCapRushCommand(
+      state,
+      command,
+      'playoff-mismatch',
+      `the series expects game ${String(expectedOrdinal)}`,
+    );
+  }
+  const highHome = [1, 2, 5, 7].includes(expectedOrdinal);
+  const expectedHome = highHome ? series.highTeamId : series.lowTeamId;
+  const expectedAway = highHome ? series.lowTeamId : series.highTeamId;
+  if (game.homeTeamId !== expectedHome || game.awayTeamId !== expectedAway) {
+    return rejectCapRushCommand(
+      state,
+      command,
+      'playoff-mismatch',
+      'the playoff game does not follow the bracket home court',
+    );
+  }
+  if (game.homeSeed !== (highHome ? series.highSeed : series.lowSeed)) {
+    return rejectCapRushCommand(state, command, 'playoff-mismatch', 'the home seed is wrong');
+  }
+  if (game.awaySeed !== (highHome ? series.lowSeed : series.highSeed)) {
+    return rejectCapRushCommand(state, command, 'playoff-mismatch', 'the away seed is wrong');
+  }
+  if (
+    game.seed !==
+    capRushPlayoffGameSeed(state.runSeed, game.round, game.seriesSlot, game.gameOrdinal)
+  ) {
+    return rejectCapRushCommand(
+      state,
+      command,
+      'digest-mismatch',
+      'the playoff game seed does not match the locked run seed',
+    );
+  }
+  const isUserGame =
+    series.highTeamId === state.locked.human.teamId ||
+    series.lowTeamId === state.locked.human.teamId;
+  if (isUserGame !== (game.userSide !== null)) {
+    return rejectCapRushCommand(
+      state,
+      command,
+      'playoff-mismatch',
+      'the playoff game user side does not match the matchup',
+    );
+  }
+  if (isUserGame && command.result === null) {
+    return rejectCapRushCommand(
+      state,
+      command,
+      'digest-mismatch',
+      'a user playoff game requires its box score',
+    );
+  }
+  if (command.result !== null) {
+    if (
+      command.result.home.points !== game.homePoints ||
+      command.result.away.points !== game.awayPoints ||
+      command.result.home.teamId !== game.homeTeamId ||
+      command.result.away.teamId !== game.awayTeamId ||
+      command.result.humanSide !== game.userSide ||
+      havocGameResultDigest(command.result) !== game.resultDigest
+    ) {
+      return rejectCapRushCommand(
+        state,
+        command,
+        'digest-mismatch',
+        'the playoff box score disagrees with the accepted summary',
+      );
+    }
+  }
+  const nextSeries = { ...series, games: [...series.games, game] };
+  const updatedPostseason = capRushRefreshPostseason({
+    postseason: {
+      ...state.postseason,
+      series: state.postseason.series.map((entry) =>
+        entry.seriesId === series.seriesId ? nextSeries : entry,
+      ),
+    },
+    userTeamId: state.locked.human.teamId,
+  });
+  const nextState = capRushDraftStateSchema.parse({
+    ...state,
+    revision: state.revision + 1,
+    postseason: updatedPostseason,
+  });
+  return acceptCapRushCommand(state, command, nextState);
+}
+
+function applyFinalizePostseason(
+  state: CapRushDraftState,
+  command: CapRushFinalizePostseasonCommand,
+  environment: CapRushCommandEnvironment,
+): CapRushCommandOutcome {
+  const mismatch = validateRunAndRevision(state, command, environment);
+  if (mismatch !== null) return mismatch;
+  if (state.stage !== 'postseason' || state.postseason === undefined) {
+    return rejectCapRushCommand(
+      state,
+      command,
+      'postseason-unavailable',
+      'the run is not in its postseason',
+    );
+  }
+  if (state.postseason.phase !== 'playoffs') {
+    return rejectCapRushCommand(
+      state,
+      command,
+      'phase-mismatch',
+      'the playoff bracket is not open',
+    );
+  }
+  if (state.postseason.championTeamId === null) {
+    return rejectCapRushCommand(
+      state,
+      command,
+      'postseason-complete',
+      'the postseason is not finished',
+    );
+  }
+  const finalsSeries = state.postseason.series.find(
+    (series) => series.round === CAP_RUSH_PLAYOFF_ROUNDS && series.seriesSlot === 0,
+  );
+  if (finalsSeries === undefined || !capRushSeriesIsComplete(finalsSeries)) {
+    return rejectCapRushCommand(
+      state,
+      command,
+      'postseason-complete',
+      'the Finals are not finished',
+    );
+  }
+  const finalsMvp = capRushFinalsMvp(state.postseason);
+  if (finalsMvp === null) {
+    return rejectCapRushCommand(
+      state,
+      command,
+      'postseason-complete',
+      'the Finals MVP evidence is missing',
+    );
+  }
+  const completedAt = environment.nowIso?.() ?? new Date().toISOString();
   const nextState = capRushDraftStateSchema.parse({
     ...state,
     revision: state.revision + 1,
     stage: 'completed',
-    season: { ...state.season, completedAt: environment.nowIso?.() ?? new Date().toISOString() },
+    postseason: {
+      ...state.postseason,
+      phase: 'complete',
+      finalsMvp,
+      completedAt,
+    },
   });
   return acceptCapRushCommand(state, command, nextState);
 }
@@ -677,6 +981,12 @@ export function applyCapRushCommand(
       return applyAcceptGame(state, command, environment);
     case 'finalize-cap-rush-season':
       return applyFinalizeSeason(state, command, environment);
+    case 'accept-cap-rush-standings':
+      return applyAcceptStandings(state, command, environment);
+    case 'accept-cap-rush-playoff-game':
+      return applyAcceptPlayoffGame(state, command, environment);
+    case 'finalize-cap-rush-postseason':
+      return applyFinalizePostseason(state, command, environment);
     case 'abandon-cap-rush-run':
       return applyAbandon(state, command, environment);
   }

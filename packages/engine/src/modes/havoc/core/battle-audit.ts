@@ -252,9 +252,19 @@ function checkTape(
     number,
     { made: boolean; shooterInstanceId: string; side: HavocHomeAway }
   >();
+  const shotAttempts = new Map<
+    number,
+    { made: boolean; shooterInstanceId: string; side: HavocHomeAway }
+  >();
   for (const event of tape.events) {
     if (event.kind === 'free-throw-attempt') {
       freeThrowAttempts.set(event.sequence, {
+        made: event.made,
+        shooterInstanceId: event.shooterInstanceId,
+        side: event.side,
+      });
+    } else if (event.kind === 'shot-attempt') {
+      shotAttempts.set(event.sequence, {
         made: event.made,
         shooterInstanceId: event.shooterInstanceId,
         side: event.side,
@@ -279,18 +289,19 @@ function checkTape(
       continue;
     }
     const isBonus = entry.kind === 'bonus';
+    const bonusOrigin =
+      isBonus && entry.originalEventSequence !== null
+        ? (shotAttempts.get(entry.originalEventSequence) ??
+          freeThrowAttempts.get(entry.originalEventSequence))
+        : undefined;
     if (isBonus) {
       if (sideIndex === undefined || actor.sideIndex === sideIndex) {
         fail('actor-eligibility', 'bonus scoring actor is not opposing the scoring side');
       }
-      const attempt =
-        entry.originalEventSequence === null
-          ? undefined
-          : freeThrowAttempts.get(entry.originalEventSequence);
-      if (attempt === undefined) {
-        fail('scoring-entry', 'bonus scoring entry references no free-throw attempt');
-      } else if (attempt.made || attempt.shooterInstanceId !== entry.actorInstanceId) {
-        fail('scoring-entry', 'bonus scoring entry does not reference its own missed free throw');
+      if (bonusOrigin === undefined) {
+        fail('scoring-entry', 'bonus scoring entry references no shot attempt');
+      } else if (bonusOrigin.made || bonusOrigin.shooterInstanceId !== entry.actorInstanceId) {
+        fail('scoring-entry', 'bonus scoring entry does not reference its own missed attempt');
       }
     } else if (sideIndex === undefined || actor.sideIndex !== sideIndex) {
       fail(
@@ -783,6 +794,61 @@ function checkTape(
           fail('darwinism', 'darwinism event without the mutation');
         }
         requireActive(event.shooterInstanceId, 'actor-eligibility');
+        break;
+      }
+      case 'cold-blooded': {
+        const owner = participants.get(event.ownerInstanceId);
+        if (owner === undefined || !owner.mutations.has('cold-blooded')) {
+          fail('cold-blooded', 'cold blooded event without the mutation');
+          break;
+        }
+        if (event.outcome === 'consumed') requireActive(event.ownerInstanceId, 'actor-eligibility');
+        if (event.outcome === 'penalty') {
+          const entry = tape.scoring.find(
+            (candidate) => candidate.sequence === event.scoringSequence,
+          );
+          if (entry === undefined || entry.kind !== 'bonus' || entry.side === event.side) {
+            fail('cold-blooded', 'cold blooded penalty is not an opposing bonus');
+          }
+        }
+        break;
+      }
+      case 'triple-threat': {
+        const owner = participants.get(event.ownerInstanceId);
+        if (owner === undefined || !owner.mutations.has('triple-threat')) {
+          fail('triple-threat', 'triple threat event without the mutation');
+          break;
+        }
+        if (event.outcome === 'earned') requireActive(event.ownerInstanceId, 'actor-eligibility');
+        break;
+      }
+      case 'oops-all-centers': {
+        const owner = participants.get(event.ownerInstanceId);
+        if (owner === undefined || !owner.mutations.has('oops-all-centers')) {
+          fail('oops-all-centers', 'oops all centers event without the mutation');
+        }
+        if (event.resizedInstanceIds.length !== 5) {
+          fail('oops-all-centers', 'oops all centers must resize all five starters');
+        }
+        break;
+      }
+      case 'hostile-takeover': {
+        const owner = participants.get(event.ownerInstanceId);
+        if (owner === undefined || !owner.mutations.has('hostile-takeover')) {
+          fail('hostile-takeover', 'hostile takeover event without the mutation');
+        }
+        const from = participants.get(event.fromInstanceId);
+        const to = participants.get(event.toInstanceId);
+        if (from === undefined || to === undefined) {
+          fail('hostile-takeover', 'hostile takeover references an unknown participant');
+        } else if (owner !== undefined) {
+          if (from.sideIndex !== owner.sideIndex) {
+            fail('hostile-takeover', 'hostile takeover source is not a teammate');
+          }
+          if (to.sideIndex === owner.sideIndex) {
+            fail('hostile-takeover', 'hostile takeover target is not an opponent');
+          }
+        }
         break;
       }
       default:

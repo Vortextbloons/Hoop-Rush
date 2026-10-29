@@ -9,6 +9,7 @@ import type {
 } from '@hoop-rush/data-contracts';
 import {
   HAVOC_SPECIALIST_CATEGORY_RATINGS,
+  HAVOC_SPECIALIST_CATEGORY_TENDENCIES,
   HAVOC_TENDENCY_FIELDS,
   REQUIRED_RATING_KEYS,
   havocEffectiveProfileSchema,
@@ -218,6 +219,18 @@ export function applyHavocMutationPackage(
             if (specialistFields.has(field)) continue;
             ratingAdds.set(field, (ratingAdds.get(field) ?? 0) + operation.value);
             const channel = RATING_CHANNELS[field];
+            if (channel !== undefined) channels.add(channel);
+          }
+          break;
+        }
+        case 'add-category-tendencies': {
+          const category = entry.specialistCategory;
+          if (category === undefined) {
+            throw new Error(`mutation ${entry.mutationId} requires a sampled specialist category`);
+          }
+          for (const field of HAVOC_SPECIALIST_CATEGORY_TENDENCIES[category]) {
+            tendencyAdds.set(field, (tendencyAdds.get(field) ?? 0) + operation.value);
+            const channel = TENDENCY_CHANNELS[field];
             if (channel !== undefined) channels.add(channel);
           }
           break;

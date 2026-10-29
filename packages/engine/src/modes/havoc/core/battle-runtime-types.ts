@@ -59,6 +59,14 @@ export interface ParticipantState {
   darwinismDecayPoints: number;
   fusionDonorInstanceId: string | null;
   fusionOwnerInstanceId: string | null;
+  coldBloodStreak: number;
+  tripleThreatPeriod: number;
+  tripleThreatZones: string[];
+  tripleThreatArmed: boolean;
+  takeoverFromInstanceId: string | null;
+  takeoverToInstanceId: string | null;
+  takeoverWith: string | null;
+  takeoverBy: string | null;
   simPlayer: SimulationPlayer;
   evidence: HavocEvidence | undefined;
   rollup: Map<HavocMutationId, RollupCounters>;
@@ -72,6 +80,7 @@ export interface TeamRuntime {
   active: ParticipantState[];
   byId: Map<string, ParticipantState>;
   extraQueue: Array<{ ownerInstanceId: string; side: HavocHomeAway }>;
+  centersOwner: string | null;
 }
 
 export type HavocBattleEventPayload = HavocBattleEvent extends infer E

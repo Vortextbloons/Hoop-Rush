@@ -3,11 +3,14 @@ import type {
   CapRushCommand,
   CapRushDraftState,
   CapRushHistoryEntry,
+  CapRushLeagueResult,
   CapRushReport,
   CapRushSpinPurchaseId,
   CapRushStoredGame,
+  CapRushStoredPlayoffGame,
   CapRushVariant,
   CapRushVersionSet,
+  OpponentBracket,
   Position,
 } from '@hoop-rush/data-contracts';
 import {
@@ -20,9 +23,12 @@ import {
   CAP_RUSH_SPIN_PURCHASES,
   POSITIONS,
   capRushAcceptGameCommandSchema,
+  capRushAcceptPlayoffGameCommandSchema,
+  capRushAcceptStandingsCommandSchema,
   capRushChoosePositionCommandSchema,
   capRushCommandResultSchema,
   capRushCreateDraftCommandSchema,
+  capRushFinalizePostseasonCommandSchema,
   capRushFinalizeSeasonCommandSchema,
   capRushLockLineupCommandSchema,
   capRushPurchaseSpinCommandSchema,
@@ -37,16 +43,19 @@ import {
   buildCapRushCatalogIndex,
   capRushAssessSigning,
   capRushPayrollStatus,
+  capRushPostseasonStep,
   capRushReport,
   capRushSpinEligibility,
   capRushStateDigest,
   createCapRushDraftState,
   type CapRushCatalogIndex,
   type CapRushLockSources,
+  type CapRushPostseasonStep,
 } from '@hoop-rush/engine';
 import {
   CapRushServiceError,
   type CapRushAcceptedGame,
+  type CapRushAcceptedPlayoffGame,
   type CapRushDraftView,
   type CapRushService,
   type CapRushSlotView,
@@ -269,10 +278,16 @@ export class CapRushSession implements CapRushService {
     );
   }
 
-  async finalizeSeason(): Promise<CapRushReport> {
+  async finalizeSeason(): Promise<CapRushReport | null> {
     const state = this.draft;
     if (state === null || state.locked === null) {
       throw new CapRushServiceError('invalid-phase', 'there is no locked cap rush run');
+    }
+    if (state.stage === 'postseason') {
+      if (state.postseason?.phase !== 'complete') {
+        throw new CapRushServiceError('invalid-phase', 'the postseason is not finished');
+      }
+      return this.buildReport(state);
     }
     if (state.season.games.length !== CAP_RUSH_GAME_COUNT) {
       throw new CapRushServiceError(
@@ -286,6 +301,17 @@ export class CapRushSession implements CapRushService {
         'storage',
         `stored games (${String(games.length)}) disagree with the accepted season (${String(state.season.games.length)})`,
       );
+    }
+    if (state.postseasonEligible === true) {
+      await this.dispatch((current) =>
+        capRushFinalizeSeasonCommandSchema.parse({
+          command: 'finalize-cap-rush-season',
+          commandId: this.ids.newCommandId(),
+          runId: current.runId,
+          expectedRevision: current.revision,
+        }),
+      );
+      return null;
     }
     const report = capRushReport({
       locked: state.locked,
@@ -304,6 +330,119 @@ export class CapRushSession implements CapRushService {
       { report },
     );
     return report;
+  }
+
+  async acceptStandings(league: CapRushLeagueResult): Promise<void> {
+    await this.dispatch((state) =>
+      capRushAcceptStandingsCommandSchema.parse({
+        command: 'accept-cap-rush-standings',
+        commandId: this.ids.newCommandId(),
+        runId: state.runId,
+        expectedRevision: state.revision,
+        league,
+      }),
+    );
+  }
+
+  async acceptPlayoffGame(game: CapRushAcceptedPlayoffGame): Promise<void> {
+    await this.dispatch(
+      (state) =>
+        capRushAcceptPlayoffGameCommandSchema.parse({
+          command: 'accept-cap-rush-playoff-game',
+          commandId: this.ids.newCommandId(),
+          runId: state.runId,
+          expectedRevision: state.revision,
+          game: game.summary,
+          audit: game.stored.audit,
+          result: game.stored.result,
+        }),
+      { playoffGame: game.stored },
+    );
+  }
+
+  postseasonStep(): CapRushPostseasonStep {
+    const state = this.draft;
+    if (state === null || state.postseason === undefined) {
+      return { kind: 'complete' };
+    }
+    return capRushPostseasonStep({
+      postseason: state.postseason,
+      runSeed: state.runSeed,
+      userTeamId: state.locked?.human.teamId,
+    });
+  }
+
+  async loadBracket(): Promise<OpponentBracket> {
+    try {
+      const assets = await this.loadAssets();
+      return assets.lockSources.bracket;
+    } catch (error) {
+      throw new CapRushServiceError('catalog', messageOf(error));
+    }
+  }
+
+  async finalizePostseason(): Promise<CapRushReport> {
+    const state = this.draft;
+    if (state === null || state.stage !== 'postseason' || state.postseason === undefined) {
+      throw new CapRushServiceError('invalid-phase', 'there is no active cap rush postseason');
+    }
+    try {
+      const assets = await this.loadAssets();
+      this.assertSupportedVersion(state, assets.versionSet);
+      const command = capRushFinalizePostseasonCommandSchema.parse({
+        command: 'finalize-cap-rush-postseason',
+        commandId: this.ids.newCommandId(),
+        runId: state.runId,
+        expectedRevision: state.revision,
+      });
+      const outcome = applyCapRushCommand(state, command, {
+        index: assets.index,
+        lockSources: assets.lockSources,
+      });
+      if (outcome.result.status !== 'accepted') {
+        throw new CapRushServiceError(
+          'invalid-phase',
+          outcome.result.rejection?.message ?? 'the postseason could not be finalized',
+        );
+      }
+      const report = await this.buildReport(outcome.state);
+      const applied = await this.repository.applyOutcome({
+        outcome,
+        command,
+        report,
+      });
+      if (applied.status === 'rejected') {
+        throw new CapRushServiceError(
+          'invalid-phase',
+          applied.rejection?.message ?? 'the postseason could not be finalized',
+        );
+      }
+      this.draft = outcome.state;
+      return report;
+    } catch (error) {
+      if (error instanceof CapRushServiceError) throw error;
+      throw new CapRushServiceError('command', messageOf(error));
+    }
+  }
+
+  private async buildReport(state: CapRushDraftState): Promise<CapRushReport> {
+    if (state.locked === null) {
+      throw new CapRushServiceError('invalid-phase', 'there is no locked cap rush run');
+    }
+    const games = await this.repository.listRunGames(state.runId);
+    if (games.length !== state.season.games.length) {
+      throw new CapRushServiceError(
+        'storage',
+        `stored games (${String(games.length)}) disagree with the accepted season (${String(state.season.games.length)})`,
+      );
+    }
+    return capRushReport({
+      locked: state.locked,
+      games,
+      aggregate: state.season.aggregate,
+      apronTriggers: state.season.apronTriggers,
+      postseason: state.postseason,
+    });
   }
 
   async loadReport(runId: string): Promise<CapRushReport | null> {
@@ -330,6 +469,14 @@ export class CapRushSession implements CapRushService {
     }
   }
 
+  async listPlayoffGames(runId: string): Promise<readonly CapRushStoredPlayoffGame[]> {
+    try {
+      return await this.repository.listPlayoffGames(runId);
+    } catch (error) {
+      throw new CapRushServiceError('storage', messageOf(error));
+    }
+  }
+
   async abandonDraft(): Promise<void> {
     try {
       await this.repository.clearActiveDraft();
@@ -341,7 +488,11 @@ export class CapRushSession implements CapRushService {
 
   private async dispatch(
     build: (state: CapRushDraftState) => CapRushCommand,
-    extra: { readonly game?: CapRushStoredGame; readonly report?: CapRushReport } = {},
+    extra: {
+      readonly game?: CapRushStoredGame;
+      readonly playoffGame?: CapRushStoredPlayoffGame;
+      readonly report?: CapRushReport;
+    } = {},
   ): Promise<void> {
     const state = this.draft;
     if (state === null) {
@@ -359,6 +510,7 @@ export class CapRushSession implements CapRushService {
         outcome,
         command,
         ...(extra.game === undefined ? {} : { game: extra.game }),
+        ...(extra.playoffGame === undefined ? {} : { playoffGame: extra.playoffGame }),
         ...(extra.report === undefined ? {} : { report: extra.report }),
       });
       if (applied.status === 'rejected') {
@@ -421,7 +573,10 @@ export class CapRushSession implements CapRushService {
         state.stage === 'complete' &&
         (state.variant === 'clash' || state.spin.status !== 'pending'),
       season:
-        state.stage === 'locked' || state.stage === 'completed' || state.stage === 'abandoned'
+        state.stage === 'locked' ||
+        state.stage === 'postseason' ||
+        state.stage === 'completed' ||
+        state.stage === 'abandoned'
           ? {
               games: state.season.games,
               aggregate: state.season.aggregate,
@@ -430,6 +585,7 @@ export class CapRushSession implements CapRushService {
               nextGameNumber: state.season.games.length + 1,
             }
           : null,
+      postseason: state.postseason ?? null,
     };
   }
 

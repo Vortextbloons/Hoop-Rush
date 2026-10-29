@@ -59,7 +59,7 @@ import {
   CapRushStaleRevisionError,
   DexieCapRushRepository,
 } from './cap-rush.ts';
-import { HoopRushDatabase } from './dexie.ts';
+import { HOOP_RUSH_DATABASE_V9_STORES, HoopRushDatabase } from './dexie.ts';
 import {
   resetIndexedDb,
   restoreIndexedDb,
@@ -230,6 +230,11 @@ describe('cap rush repository', () => {
     await repository.applyOutcome({ outcome: { state, result }, command });
     expect(await repository.loadActiveDraft()).toEqual(state);
     expect(await repository.loadCommandResult(command.commandId)).toEqual(result);
+  });
+
+  it('opens the playoff game store for a run without playoff games', async () => {
+    expect(await repository.listPlayoffGames('run-test')).toEqual([]);
+    expect(HOOP_RUSH_DATABASE_V9_STORES.capRushPlayoffGames).toBe('[runId+gameId], runId');
   });
 
   it('rejects a changed outcome state before persisting its verified digest', async () => {

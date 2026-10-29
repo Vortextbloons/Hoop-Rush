@@ -2,12 +2,15 @@ import type {
   CapRushLockedInputs,
   CapRushMvpEntry,
   CapRushPlayerSeasonLine,
+  CapRushPostseason,
+  CapRushPostseasonReport,
   CapRushReport,
   CapRushSeasonAggregate,
   CapRushStoredGame,
   HavocParticipantLine,
   HavocTeamResult,
   LeaguePlayerTotals,
+  LeagueRecord,
   PlayerBoxScore,
 } from '@hoop-rush/data-contracts';
 import {
@@ -15,6 +18,7 @@ import {
   CAP_RUSH_GAME_COUNT,
   CAP_RUSH_REPORT_VERSION,
   CAP_RUSH_SCHEMA_VERSION,
+  CAP_RUSH_USER_TEAM_ID,
   POSITIONS,
   capRushReportSchema,
   playerIdSchema,
@@ -25,8 +29,6 @@ import {
 } from '../../challenge/league-value.ts';
 
 const CONSISTENCY_PENALTY = 0.08;
-
-export const CAP_RUSH_USER_TEAM_ID = 'cap-rush-user';
 
 function userTeamResult(game: CapRushStoredGame): HavocTeamResult {
   return game.summary.humanHome ? game.result.home : game.result.away;
@@ -161,11 +163,31 @@ export interface CapRushLeagueBaseline {
 export function capRushLeagueMvp(input: {
   readonly locked: CapRushLockedInputs;
   readonly games: readonly CapRushStoredGame[];
+  readonly league?: LeagueRecord | null | undefined;
 }): CapRushLeagueBaseline {
   const totals = new Map<string, LeaguePlayerTotals>();
   const names = new Map<string, string>();
   const teamNames = new Map<string, string>();
   const slots = new Map<string, string>();
+
+  for (const opponent of input.locked.opponents) {
+    teamNames.set(opponent.team.teamId, opponent.team.displayName);
+    for (const starter of opponent.team.starters) {
+      names.set(`${opponent.team.teamId}:${starter.source.playerId}`, starter.source.displayName);
+    }
+  }
+  teamNames.set(input.locked.human.teamId, input.locked.human.displayName);
+  for (const starter of input.locked.human.starters) {
+    names.set(
+      `${input.locked.human.teamId}:${starter.source.playerId}`,
+      starter.source.displayName,
+    );
+  }
+  if (input.league !== undefined && input.league !== null) {
+    for (const entry of input.league.players) {
+      totals.set(`${entry.teamId}:${entry.playerId}`, { ...entry });
+    }
+  }
 
   const foldSide = (side: HavocTeamResult, won: boolean): void => {
     teamNames.set(side.teamId, side.displayName);
@@ -175,7 +197,7 @@ export function capRushLeagueMvp(input: {
       accumulateLeagueAppearance(existing, boxOfLine(line), won);
       totals.set(key, existing);
       names.set(key, line.displayName);
-      if (side.teamId === CAP_RUSH_USER_TEAM_ID) slots.set(key, line.slot);
+      if (side.teamId === input.locked.human.teamId) slots.set(key, line.slot);
     }
   };
 
@@ -284,11 +306,44 @@ export function capRushWinsPerMillion(wins: number, payrollDollars: number): num
   return wins / (payrollDollars / 1_000_000);
 }
 
+function postseasonReportOf(
+  postseason: CapRushPostseason,
+  locked: CapRushLockedInputs,
+): CapRushPostseasonReport {
+  if (
+    postseason.standings === null ||
+    postseason.championTeamId === null ||
+    postseason.finalsMvp === null
+  ) {
+    throw new Error('cap rush report requires a completed postseason');
+  }
+  const champion = postseason.standings.entries.find(
+    (entry) => entry.teamId === postseason.championTeamId,
+  );
+  if (champion === undefined) {
+    throw new Error('cap rush report: the champion is missing from the standings');
+  }
+  const userEntry = postseason.standings.entries.find(
+    (entry) => entry.teamId === locked.human.teamId,
+  );
+  return {
+    championTeamId: champion.teamId,
+    championName: champion.displayName,
+    isUserChampion: champion.teamId === locked.human.teamId,
+    userOutcome: postseason.userOutcome,
+    seed: userEntry?.seed ?? null,
+    series: postseason.series,
+    standings: postseason.standings,
+    finalsMvp: postseason.finalsMvp,
+  };
+}
+
 export function capRushReport(input: {
   readonly locked: CapRushLockedInputs;
   readonly games: readonly CapRushStoredGame[];
   readonly aggregate: CapRushSeasonAggregate;
   readonly apronTriggers: { readonly isolations: number; readonly strikes: number };
+  readonly postseason?: CapRushPostseason | null | undefined;
 }): CapRushReport {
   if (input.games.length !== CAP_RUSH_GAME_COUNT) {
     throw new Error(
@@ -301,7 +356,11 @@ export function capRushReport(input: {
   const spinSpendDollars =
     (spin?.priceDollars ?? 0) +
     additionalSpins.reduce((total, receipt) => total + receipt.priceDollars, 0);
-  const league = capRushLeagueMvp({ locked: input.locked, games: input.games });
+  const league = capRushLeagueMvp({
+    locked: input.locked,
+    games: input.games,
+    league: input.postseason?.standings?.league.league ?? null,
+  });
   return capRushReportSchema.parse({
     reportVersion: CAP_RUSH_REPORT_VERSION,
     schemaVersion: CAP_RUSH_SCHEMA_VERSION,
@@ -347,5 +406,8 @@ export function capRushReport(input: {
     leagueBaselineTs: league.leagueBaselineTs,
     hasMutationScoring: league.hasMutationScoring,
     games: input.games.map((game) => game.summary),
+    ...(input.postseason === undefined || input.postseason === null
+      ? {}
+      : { postseason: postseasonReportOf(input.postseason, input.locked) }),
   });
 }

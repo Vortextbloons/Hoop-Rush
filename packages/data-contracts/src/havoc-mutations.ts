@@ -21,6 +21,9 @@ export const HAVOC_TIER_ONE_MUTATION_IDS = [
   'mr-everything',
   'foul-merchant',
   'the-specialist',
+  'glass-cannon',
+  'the-pacifist',
+  'paper-giant',
 ] as const;
 
 export const HAVOC_TIER_TWO_MUTATION_IDS = [
@@ -36,6 +39,8 @@ export const HAVOC_TIER_TWO_MUTATION_IDS = [
   'basketball-roulette',
   'buzzer-bandit',
   'charity-casino',
+  'cold-blooded',
+  'triple-threat',
 ] as const;
 
 export const HAVOC_TIER_THREE_MUTATION_IDS = [
@@ -47,6 +52,8 @@ export const HAVOC_TIER_THREE_MUTATION_IDS = [
   'the-great-equalizer',
   'fusion-dance',
   'basketball-darwinism',
+  'oops-all-centers',
+  'hostile-takeover',
 ] as const;
 
 export const HAVOC_MUTATION_IDS = [
@@ -75,6 +82,9 @@ export const havocMutationIdSchema = z.enum([
   'mr-everything',
   'foul-merchant',
   'the-specialist',
+  'glass-cannon',
+  'the-pacifist',
+  'paper-giant',
   'four-point-dunk',
   'golden-assist',
   'heat-check',
@@ -87,6 +97,8 @@ export const havocMutationIdSchema = z.enum([
   'basketball-roulette',
   'buzzer-bandit',
   'charity-casino',
+  'cold-blooded',
+  'triple-threat',
   'clone-army',
   'time-lord',
   'body-snatcher',
@@ -95,6 +107,8 @@ export const havocMutationIdSchema = z.enum([
   'the-great-equalizer',
   'fusion-dance',
   'basketball-darwinism',
+  'oops-all-centers',
+  'hostile-takeover',
 ]);
 export type HavocMutationId = z.infer<typeof havocMutationIdSchema>;
 
@@ -157,6 +171,16 @@ export const HAVOC_SPECIALIST_CATEGORY_RATINGS: Readonly<
   defense: ['perimeterDefense', 'interiorDefense', 'steal', 'block', 'defensiveIq'],
   rebounding: ['offensiveRebound', 'defensiveRebound'],
   athleticism: ['speed', 'strength', 'vertical'],
+};
+
+export const HAVOC_SPECIALIST_CATEGORY_TENDENCIES: Readonly<
+  Record<HavocSpecialistCategory, readonly HavocTendencyField[]>
+> = {
+  scoring: ['shotRate', 'threePointRate', 'freeThrowRate'],
+  playmaking: ['passRate'],
+  defense: ['stealAttemptRate', 'blockAttemptRate'],
+  rebounding: ['crashOffensiveGlassRate'],
+  athleticism: ['transitionRate', 'cutRate'],
 };
 
 export const HAVOC_SCORING_RATING_FIELDS: readonly HavocRatingField[] =
@@ -229,6 +253,10 @@ export const havocProfileOperationSchema = z.discriminatedUnion('op', [
     op: z.literal('add-outside-category-ratings'),
     value: z.number().int().min(-100).max(100),
   }),
+  z.object({
+    op: z.literal('add-category-tendencies'),
+    value: z.number().min(-100).max(100),
+  }),
 ]);
 export type HavocProfileOperation = z.infer<typeof havocProfileOperationSchema>;
 
@@ -266,6 +294,10 @@ export const havocEventRuleIdSchema = z.enum([
   'charity-casino',
   'fusion-dance',
   'basketball-darwinism',
+  'cold-blooded',
+  'triple-threat',
+  'oops-all-centers',
+  'hostile-takeover',
 ]);
 export type HavocEventRuleId = z.infer<typeof havocEventRuleIdSchema>;
 

@@ -20,7 +20,7 @@
   import { formatPositions } from '#lib/player-positions.js';
   import type { DraftPresentation } from '#lib/draft-presentation.js';
   import type { FixedFivePlayerStats } from '#lib/features/fixed-five/fixed-five-player-stats.js';
-  import { perGameText } from '#lib/format.js';
+  import { perGameText, trueShootingPct, usagePct, usagePossessions } from '#lib/format.js';
   let {
     mode,
     result,
@@ -77,6 +77,14 @@
     const lines = stats ? (statsPid === 'p1' ? stats.p1 : stats.p2) : [];
     return new Map(lines.map((line) => [line.playerId, line]));
   });
+  const statsTeamUsage = $derived(
+    [...statsLines.values()].reduce(
+      (total, line) =>
+        total +
+        usagePossessions(line.fieldGoalsAttempted, line.freeThrowsAttempted, line.turnovers),
+      0,
+    ),
+  );
   function statValue(value: number, games: number): string {
     return statsTotals ? String(value) : perGameText(value, games);
   }
@@ -195,6 +203,8 @@
       let fga = 0;
       let tpm = 0;
       let tpa = 0;
+      let ftm = 0;
+      let fta = 0;
       let reb = 0;
       let tov = 0;
       for (const l of lines) {
@@ -203,10 +213,12 @@
         fga += l.fieldGoalsAttempted;
         tpm += l.threesMade;
         tpa += l.threesAttempted;
+        ftm += l.freeThrowsMade;
+        fta += l.freeThrowsAttempted;
         reb += l.rebounds;
         tov += l.turnovers;
       }
-      return { points, fgm, fga, tpm, tpa, reb, tov };
+      return { points, fgm, fga, tpm, tpa, ftm, fta, reb, tov };
     }
     const youPid = selfId;
     const oppPid = selfId === 'p1' ? 'p2' : 'p1';
@@ -594,6 +606,23 @@
                 </tr>
                 <tr>
                   <td class="py-2 text-left font-bold"
+                    >{trueShootingPct(
+                      comparison.you.points,
+                      comparison.you.fga,
+                      comparison.you.fta,
+                    )}</td
+                  >
+                  <td class="py-2 text-center text-xs text-muted-foreground">TS%</td>
+                  <td class="py-2 text-right font-bold"
+                    >{trueShootingPct(
+                      comparison.opp.points,
+                      comparison.opp.fga,
+                      comparison.opp.fta,
+                    )}</td
+                  >
+                </tr>
+                <tr>
+                  <td class="py-2 text-left font-bold"
                     >{perGameText(comparison.you.reb, comparison.games)}</td
                   >
                   <td class="py-2 text-center text-xs text-muted-foreground">Rebounds per game</td>
@@ -891,7 +920,7 @@
           </div>
         {:else}
           <div class="mt-4 hidden overflow-x-auto sm:block">
-            <table class="w-full min-w-[760px] border-collapse text-sm">
+            <table class="w-full min-w-[860px] border-collapse text-sm">
               <thead>
                 <tr
                   class="border-b border-border font-mono text-[10px] tracking-[0.12em] text-muted-foreground uppercase"
@@ -907,6 +936,8 @@
                   <th scope="col" class="px-2 py-2 text-right">STL</th>
                   <th scope="col" class="px-2 py-2 text-right">BLK</th>
                   <th scope="col" class="px-2 py-2 text-right">TOV</th>
+                  <th scope="col" class="px-2 py-2 text-right">TS%</th>
+                  <th scope="col" class="px-2 py-2 text-right">USG%</th>
                 </tr>
               </thead>
               <tbody>
@@ -964,8 +995,25 @@
                       <td class="px-2 py-2 text-right font-mono"
                         >{statValue(line.turnovers, line.games)}</td
                       >
+                      <td class="px-2 py-2 text-right font-mono"
+                        >{trueShootingPct(
+                          line.points,
+                          line.fieldGoalsAttempted,
+                          line.freeThrowsAttempted,
+                        )}</td
+                      >
+                      <td class="px-2 py-2 text-right font-mono"
+                        >{usagePct(
+                          usagePossessions(
+                            line.fieldGoalsAttempted,
+                            line.freeThrowsAttempted,
+                            line.turnovers,
+                          ),
+                          statsTeamUsage,
+                        )}</td
+                      >
                     {:else}
-                      <td colspan="10" class="px-2 py-2 text-right font-mono text-muted-foreground"
+                      <td colspan="12" class="px-2 py-2 text-right font-mono text-muted-foreground"
                         >—</td
                       >
                     {/if}
@@ -1032,6 +1080,16 @@
                           >{pctStr(line.freeThrowsMade, line.freeThrowsAttempted)}</span
                         >
                       </div>
+                      <div class="flex items-center justify-between gap-2 py-1.5">
+                        <span class="text-muted-foreground">TS%</span>
+                        <span class="font-semibold text-foreground"
+                          >{trueShootingPct(
+                            line.points,
+                            line.fieldGoalsAttempted,
+                            line.freeThrowsAttempted,
+                          )}</span
+                        >
+                      </div>
                     </div>
                     <div class="min-w-0 divide-y divide-border/40">
                       <div class="flex items-center justify-between gap-2 py-1.5">
@@ -1060,6 +1118,19 @@
                             line.games,
                           )}
                         </span>
+                      </div>
+                      <div class="flex items-center justify-between gap-2 py-1.5">
+                        <span class="text-muted-foreground">USG%</span>
+                        <span class="font-semibold text-foreground"
+                          >{usagePct(
+                            usagePossessions(
+                              line.fieldGoalsAttempted,
+                              line.freeThrowsAttempted,
+                              line.turnovers,
+                            ),
+                            statsTeamUsage,
+                          )}</span
+                        >
                       </div>
                     </div>
                   </div>
@@ -1113,6 +1184,23 @@
                   <td class="py-2 text-center text-xs text-muted-foreground">3P%</td>
                   <td class="py-2 text-right font-bold"
                     >{pctStr(comparison.opp.tpm, comparison.opp.tpa)}</td
+                  >
+                </tr>
+                <tr>
+                  <td class="py-2 text-left font-bold"
+                    >{trueShootingPct(
+                      comparison.you.points,
+                      comparison.you.fga,
+                      comparison.you.fta,
+                    )}</td
+                  >
+                  <td class="py-2 text-center text-xs text-muted-foreground">TS%</td>
+                  <td class="py-2 text-right font-bold"
+                    >{trueShootingPct(
+                      comparison.opp.points,
+                      comparison.opp.fga,
+                      comparison.opp.fta,
+                    )}</td
                   >
                 </tr>
                 <tr>
