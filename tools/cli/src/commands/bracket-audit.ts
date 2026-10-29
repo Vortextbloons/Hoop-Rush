@@ -3,7 +3,6 @@ import { dirname, isAbsolute, resolve } from 'node:path';
 import { generateSchedule, scheduleInvariants, validateBracketContent } from '@hoop-rush/engine';
 import {
   opponentBracketSchema,
-  opponentTeamSchema,
   type HoopRushManifest,
   type OpponentBracket,
 } from '@hoop-rush/data-contracts';
@@ -11,35 +10,7 @@ import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.
 import { bracketAuditReportSchema } from '../report-schemas.ts';
 import { readJson, sha256Hex } from '../io.ts';
 import { median } from '../stats.ts';
-function openingOpponentUnchanged(bracket: OpponentBracket, previewPath: string): string[] {
-  const failures: string[] = [];
-  const preview = readJson(previewPath);
-  const parsed = opponentTeamSchema.safeParse(preview);
-  if (!parsed.success) {
-    failures.push(`opening opponent preview fails the opponent schema (${previewPath})`);
-    return failures;
-  }
-  const entry = bracket.opponents.find((o) => o.opponentId === 'lakers-1990s-opening');
-  if (!entry) {
-    failures.push('opening opponent missing from the bracket');
-    return failures;
-  }
-  if (JSON.stringify(entry.lineup) !== JSON.stringify(parsed.data.lineup)) {
-    failures.push('opening opponent lineup changed from the preview artifact');
-  }
-  if (JSON.stringify(entry.players) !== JSON.stringify(parsed.data.players)) {
-    failures.push('opening opponent players changed from the preview artifact');
-  }
-  if (entry.teamId !== parsed.data.teamId || entry.displayName !== parsed.data.displayName) {
-    failures.push('opening opponent identity changed from the preview artifact');
-  }
-  return failures;
-}
-export function bracketAudit(
-  inputPath: string,
-  verbose: boolean,
-  previewPath = resolve(dirname(inputPath), 'opponents/lakers-1990s-opening.json'),
-): CliReport {
+export function bracketAudit(inputPath: string, verbose: boolean): CliReport {
   let manifest: HoopRushManifest;
   try {
     manifest = readJson(inputPath) as HoopRushManifest;
@@ -95,16 +66,11 @@ export function bracketAudit(
     const medianBand = difficulty.leagueMedianPercentileBand;
     const percentiles = bracket.opponents.map((o) => o.strength.percentile);
     const bracketMedian = median(percentiles);
-    const openingEntry = bracket.opponents.find((o) => o.opponentId === 'lakers-1990s-opening');
-    const generatedPercentiles = bracket.opponents
-      .filter((o) => o.opponentId !== 'lakers-1990s-opening')
-      .map((o) => o.strength.percentile);
-    const minP = Math.min(...generatedPercentiles);
-    const maxP = Math.max(...generatedPercentiles);
-    const openingPercentile = openingEntry?.strength.percentile ?? 0;
+    const minP = Math.min(...percentiles);
+    const maxP = Math.max(...percentiles);
     if (minP < band[0] || maxP > band[1]) {
       failures.push(
-        `${tag}generated strength percentiles span ${minP.toFixed(3)}..${maxP.toFixed(3)} outside band ${band[0].toFixed(2)}..${band[1].toFixed(2)}`,
+        `${tag}strength percentiles span ${minP.toFixed(3)}..${maxP.toFixed(3)} outside band ${band[0].toFixed(2)}..${band[1].toFixed(2)}`,
       );
     }
     if (bracketMedian < medianBand[0] || bracketMedian > medianBand[1]) {
@@ -112,33 +78,10 @@ export function bracketAudit(
         `${tag}league median percentile ${bracketMedian.toFixed(3)} outside ${medianBand[0].toFixed(2)}..${medianBand[1].toFixed(2)}`,
       );
     }
-    if (openingPercentile < band[0] || openingPercentile > band[1]) {
-      details.push(
-        `${tag}opening opponent percentile ${openingPercentile.toFixed(3)} outside the band (authored fixed entry, informational)`,
-      );
-    }
-    let openingFailures: string[];
-    try {
-      openingFailures = openingOpponentUnchanged(bracket, previewPath);
-    } catch (error) {
-      return makeReport(
-        'bracket audit',
-        { input: inputPath, dataVersion: manifest.dataVersion },
-        { failures: [`${tag}${(error as Error).message}`], exitCode: EXIT_USAGE_OR_DATA_ERROR },
-      );
-    }
-    failures.push(...openingFailures.map((f) => `${tag}${f}`));
-    if (bracket.schedule[0]?.opponentId !== 'lakers-1990s-opening') {
-      failures.push(`${tag}schedule game one must be the lakers-1990s-opening opponent`);
-    }
     const opponentIds = bracket.opponents.map((o) => o.opponentId);
     let regenerated: string[] | null = null;
     try {
-      const schedule = generateSchedule(
-        opponentIds,
-        'lakers-1990s-opening',
-        bracket.generation.seed,
-      );
+      const schedule = generateSchedule(opponentIds, bracket.generation.seed);
       if (JSON.stringify(schedule) !== JSON.stringify(bracket.schedule)) {
         failures.push(
           `${tag}schedule regeneration with the committed seed differs from the artifact`,
@@ -173,7 +116,6 @@ export function bracketAudit(
       maxPercentile: maxP,
       teamPercentileBand: band,
       leagueMedianPercentileBand: medianBand,
-      openingOpponentUnchanged: openingFailures.length === 0,
       pass: failures.length === 0,
     });
     details.push(

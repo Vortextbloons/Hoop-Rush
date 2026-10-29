@@ -58,6 +58,7 @@ export { SEED_DERIVATION_VERSION } from './challenge/seeds.ts';
 export { challengeRunProgressDigest } from './challenge/digests.ts';
 export { generateSchedule, scheduleInvariants } from './bracket/schedule.ts';
 export {
+  bestLegalFiveWithin,
   generateBracket,
   type BracketCandidatePlayer,
   type FranchiseCandidates,

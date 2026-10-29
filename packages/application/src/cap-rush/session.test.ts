@@ -12,6 +12,7 @@ import {
   CAP_RUSH_SALARY_CURVE_VERSION,
   CAP_RUSH_SCHEMA_VERSION,
   CAP_RUSH_SEED_DERIVATION_VERSION,
+  POSITIONS,
   capRushVersionSetSchema,
   commandIdSchema,
   contentHashSchema,
@@ -192,5 +193,39 @@ describe('cap rush session', () => {
     );
     expect(repository.active).toBe(before);
     expect(repository.commands.size).toBe(3);
+  });
+
+  it('buys one Roulette spin and resumes the persisted receipt', async () => {
+    const repository = new MemoryCapRushRepository();
+    const session = createSession(repository);
+    await session.createDraft('roulette');
+    for (const slot of POSITIONS) {
+      await session.choosePosition(slot);
+      const cards = session.getSnapshot().draft?.cards ?? [];
+      const cheapest = [...cards]
+        .filter((entry) => entry.signing.legal)
+        .sort((left, right) => left.card.salaryDollars - right.card.salaryDollars)[0];
+      if (cheapest === undefined) throw new Error(`no legal ${slot} signing`);
+      await session.signCard(cheapest.card.cardId);
+    }
+    const complete = session.getSnapshot().draft;
+    expect(complete?.draft.stage).toBe('complete');
+    expect(complete?.spin?.state.status).toBe('pending');
+    const target = complete?.spin?.targets[0];
+    if (target === undefined) throw new Error('roulette spin has no targets');
+
+    await session.purchaseSpin('standard', target.cardId);
+    const purchased = session.getSnapshot().draft?.spin;
+    expect(purchased?.state.status).toBe('purchased');
+    await expect(session.skipSpin()).rejects.toBeInstanceOf(CapRushServiceError);
+
+    const resumed = createSession(repository);
+    const loaded = await resumed.loadActive();
+    const spin = loaded.draft?.spin;
+    if (spin === undefined || spin === null || spin.state.status !== 'purchased') {
+      throw new Error('resumed spin receipt is missing');
+    }
+    expect(spin.state.receipt.target.cardId).toBe(target.cardId);
+    expect(spin.state.receipt.receiptDigest).toHaveLength(32);
   });
 });

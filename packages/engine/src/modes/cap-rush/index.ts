@@ -4,4 +4,5 @@ export * from './errors.ts';
 export * from './feasibility.ts';
 export * from './offers.ts';
 export * from './salary.ts';
+export * from './spin.ts';
 export * from './state-digest.ts';

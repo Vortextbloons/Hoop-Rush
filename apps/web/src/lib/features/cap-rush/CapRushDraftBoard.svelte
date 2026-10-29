@@ -1,6 +1,13 @@
 <script lang="ts">
   import type { CapRushDraftView } from '@hoop-rush/application/cap-rush';
-  import { POSITIONS, franchiseAbbreviation, type Position } from '@hoop-rush/data-contracts';
+  import {
+    CAP_RUSH_CAP_LINE_DOLLARS,
+    POSITIONS,
+    franchiseAbbreviation,
+    type CapRushSpinPurchaseId,
+    type Position,
+  } from '@hoop-rush/data-contracts';
+  import { havocMutationDefinitionOf } from '@hoop-rush/engine';
   import { Check, Shuffle, Sparkles } from '@lucide/svelte';
   import PlayerFace from '#lib/components/PlayerFace.svelte';
   import TeamLogo from '#lib/components/TeamLogo.svelte';
@@ -26,6 +33,8 @@
     onChoose,
     onReroll,
     onSign,
+    onPurchaseSpin,
+    onSkipSpin,
     onDiscard,
   }: {
     view: CapRushDraftView;
@@ -36,11 +45,14 @@
     onChoose: (slot: Position) => void;
     onReroll: (cardId: string) => void;
     onSign: (cardId: string) => void;
+    onPurchaseSpin: (purchase: CapRushSpinPurchaseId, targetCardId: string) => void;
+    onSkipSpin: () => void;
     onDiscard: () => void;
   } = $props();
 
   let protectMode = $state(false);
   let confirmAbandon = $state(false);
+  let spinTargetId = $state<string | null>(null);
 
   const draft = $derived(view.draft);
   const offer = $derived(draft.offer);
@@ -53,6 +65,17 @@
     ),
   );
   const target = $derived(view.slots.find((slot) => slot.highestPaid) ?? null);
+  const spin = $derived(view.spin);
+  const spinTarget = $derived(spinTargetId ?? spin?.targets[0]?.cardId ?? null);
+
+  function spinTargetName(cardId: string): string {
+    return spin?.targets.find((entry) => entry.cardId === cardId)?.player.displayName ?? cardId;
+  }
+
+  function buySpin(purchase: CapRushSpinPurchaseId): void {
+    if (spinTarget === null) return;
+    onPurchaseSpin(purchase, spinTarget);
+  }
 
   function choose(slot: Position): void {
     protectMode = false;
@@ -327,6 +350,89 @@
           </div>
         </dl>
 
+        {#if spin !== null}
+          <div class="mt-4 rounded-xl border border-primary/30 bg-surface-1 p-3">
+            <p class="font-mono text-[9px] tracking-[0.1em] text-muted-foreground uppercase">
+              Cap Roulette spin
+            </p>
+            {#if spin.state.status === 'purchased'}
+              {@const receipt = spin.state.receipt}
+              {@const definition = havocMutationDefinitionOf(receipt.entry.mutationId)}
+              <p class="mt-1 text-sm font-bold">
+                {definition.name}
+                <span class="font-mono text-[10px] font-normal text-muted-foreground"
+                  >· Tier {receipt.tier}</span
+                >
+              </p>
+              <p class="mt-1 text-xs leading-relaxed text-muted-foreground">
+                {definition.description}
+              </p>
+              <p class="mt-2 font-mono text-[10px] text-muted-foreground uppercase">
+                {receipt.target.slot} · {spinTargetName(receipt.target.cardId)} · {formatMillions(
+                  receipt.priceDollars,
+                )}
+              </p>
+            {:else if spin.state.status === 'skipped'}
+              <p class="mt-1 text-sm font-semibold">No spin purchased. Your five stay unmutated.</p>
+            {:else}
+              <p class="mt-1 text-xs leading-relaxed text-muted-foreground">
+                One paid mutation on one signed player, or skip it. You have
+                {formatMillions(Math.max(0, CAP_RUSH_CAP_LINE_DOLLARS - view.payrollDollars))} of spin
+                room before the {formatMillions(CAP_RUSH_CAP_LINE_DOLLARS)} cap.
+              </p>
+              <div class="mt-2 flex flex-wrap gap-1.5" role="group" aria-label="Spin target">
+                {#each spin.targets as entry (entry.cardId)}
+                  {@const active = spinTarget === entry.cardId}
+                  <button
+                    type="button"
+                    aria-pressed={active}
+                    class="inline-flex min-h-9 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 {active
+                      ? 'border-primary bg-primary/15 text-foreground'
+                      : 'border-line-strong text-muted-foreground hover:text-foreground'}"
+                    disabled={busy}
+                    onclick={() => (spinTargetId = entry.cardId)}
+                  >
+                    <span class="font-mono text-[9px]">{entry.slot}</span>
+                    <span class="max-w-32 truncate">{entry.player.displayName}</span>
+                  </button>
+                {/each}
+              </div>
+              <div class="mt-3 flex flex-wrap items-center gap-2">
+                {#each spin.purchases as option (option.purchase)}
+                  <button
+                    type="button"
+                    class="inline-flex min-h-10 flex-col items-start rounded-xl border border-line-strong px-3 py-1.5 text-xs font-bold outline-none hover:border-primary focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                    disabled={busy || spinTarget === null || !option.eligible}
+                    onclick={() => buySpin(option.purchase)}
+                  >
+                    <span
+                      >{option.purchase === 'standard' ? 'Standard' : 'Premium'} · {formatMillions(
+                        option.priceDollars,
+                      )}</span
+                    >
+                    <span class="font-mono text-[9px] font-normal text-muted-foreground"
+                      >{Math.round(option.tierOdds[1] * 100)}% / {Math.round(
+                        option.tierOdds[2] * 100,
+                      )}% / {Math.round(option.tierOdds[3] * 100)}% by tier</span
+                    >
+                    {#if !option.eligible}
+                      <span class="font-mono text-[9px] font-normal text-negative"
+                        >needs payroll ≤ {formatMillions(option.maxEligiblePayrollDollars)}</span
+                      >
+                    {/if}
+                  </button>
+                {/each}
+                <button
+                  type="button"
+                  class="inline-flex min-h-10 items-center rounded-xl border border-line-strong px-3 text-xs font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                  disabled={busy}
+                  onclick={onSkipSpin}>Skip the spin</button
+                >
+              </div>
+            {/if}
+          </div>
+        {/if}
+
         <div class="mt-4 flex flex-wrap items-center gap-3">
           <button
             type="button"
@@ -339,7 +445,9 @@
           <span class="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
             <Sparkles size={13} aria-hidden="true" />
             Your five and payroll are locked.{draft.variant === 'roulette'
-              ? ' The paid mutation spin and season reports come with the run engine.'
+              ? spin?.state.status === 'pending'
+                ? ' Resolve the mutation spin to close the draft.'
+                : ' The season run comes next.'
               : ' Season simulation and reports come with the run engine.'}
           </span>
         </div>

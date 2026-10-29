@@ -67,7 +67,6 @@ import ratings
 import pools
 import era-profile
 import manifest
-import opponent
 import freeze
 import run-all`.split('\n');
 

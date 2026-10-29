@@ -8,15 +8,8 @@ export function pickTwoGameOpponents(opponentIds: readonly string[], seed: Seed)
 }
 export function generateSchedule(
   opponentIds: readonly string[],
-  openingOpponentId: string,
   seed: Seed,
 ): BracketScheduleEntry[] {
-  if (opponentIds.length !== 30) {
-    throw new Error(`schedule requires exactly 30 opponents (got ${String(opponentIds.length)})`);
-  }
-  if (!opponentIds.includes(openingOpponentId)) {
-    throw new Error(`opening opponent ${openingOpponentId} is not in the bracket`);
-  }
   const distinct = [...new Set(opponentIds)];
   if (distinct.length !== 30) {
     throw new Error('schedule requires 30 distinct opponent ids');
@@ -25,13 +18,11 @@ export function generateSchedule(
   const counts = new Map<string, number>();
   for (const id of opponentIds) counts.set(id, twoGames.has(id) ? 2 : 3);
   const rng = createRng(`${seed}:order`);
-  const slots: string[] = [openingOpponentId];
-  const remaining: string[] = [];
-  counts.set(openingOpponentId, (counts.get(openingOpponentId) ?? 0) - 1);
+  const slots: string[] = [];
   for (const id of distinct) {
-    for (let i = 0; i < (counts.get(id) ?? 0); i += 1) remaining.push(id);
+    for (let i = 0; i < (counts.get(id) ?? 0); i += 1) slots.push(id);
   }
-  slots.push(...shuffle(remaining, rng));
+  slots.splice(0, slots.length, ...shuffle(slots, rng));
   for (let i = 1; i < slots.length - 1; i += 1) {
     if (slots[i] !== slots[i - 1]) continue;
     for (let j = i + 1; j < slots.length; j += 1) {
@@ -55,9 +46,6 @@ export function generateSchedule(
     gameNumber: index + 1,
     opponentId,
   }));
-  if (schedule[0]?.opponentId !== openingOpponentId) {
-    throw new Error('schedule game one must be the opening opponent');
-  }
   return schedule;
 }
 export interface ScheduleEntryAuditFacts {

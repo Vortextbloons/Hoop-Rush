@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { buildOpeningOpponent, seedFromString } from '@hoop-rush/test-fixtures';
+import { seedFromString } from '@hoop-rush/test-fixtures';
 import { seedSchema } from '@hoop-rush/data-contracts';
 import { playableSlotGroups } from '../domain/positions.ts';
 import { generateBracket, BRACKET_WIN_RATE_BAND } from './generator.ts';
@@ -15,19 +15,15 @@ describe('generateBracket (propose-review-freeze)', () => {
     expect(bracket.schedule).toHaveLength(82);
     expect(validateBracketContent(bracket)).toEqual([]);
     expect(scheduleInvariants(bracket.schedule)).toEqual([]);
-    expect(bracket.schedule[0]?.opponentId).toBe('lakers-1990s-opening');
     expect(bracket.generation.seed).toBe(seedSchema.parse(seedFromString('fixture-bracket')));
   }, 40000);
 
-  it('keeps the opening opponent unchanged', () => {
-    const opening = buildOpeningOpponent();
+  it('generates every team, with no authored exception', () => {
     const bracket = fixtureBracket();
-    const entry = bracket.opponents.find((o) => o.opponentId === 'lakers-1990s-opening');
-    expect(entry).toBeDefined();
-    expect(entry?.teamId).toBe(opening.teamId);
-    expect(entry?.displayName).toBe(opening.displayName);
-    expect(JSON.stringify(entry?.lineup)).toBe(JSON.stringify(opening.lineup));
-    expect(JSON.stringify(entry?.players)).toBe(JSON.stringify(opening.players));
+    for (const opponent of bracket.opponents) {
+      expect(opponent.opponentId.startsWith('bracket-')).toBe(true);
+      expect(opponent.strength.evaluationVersion).toBe('bracket-m3-v1');
+    }
   }, 40000);
 
   it('only selects balanced legal lineups with no internal duplicates', () => {
@@ -67,11 +63,8 @@ describe('generateBracket (propose-review-freeze)', () => {
   it('records win rates as field results inside the difficulty band', () => {
     const bracket = fixtureBracket();
     const rates = bracket.opponents.map((o) => o.strength.winRate);
-    const generated = bracket.opponents
-      .filter((o) => o.opponentId !== 'lakers-1990s-opening')
-      .map((o) => o.strength.winRate);
-    expect(Math.min(...generated)).toBeGreaterThanOrEqual(BRACKET_WIN_RATE_BAND[0] - 0.03);
-    expect(Math.max(...generated)).toBeLessThanOrEqual(BRACKET_WIN_RATE_BAND[1] + 0.03);
+    expect(Math.min(...rates)).toBeGreaterThanOrEqual(BRACKET_WIN_RATE_BAND[0] - 0.03);
+    expect(Math.max(...rates)).toBeLessThanOrEqual(BRACKET_WIN_RATE_BAND[1] + 0.03);
     const sorted = [...rates].sort((a, b) => a - b);
     const median = ((sorted[14] ?? 0) + (sorted[15] ?? 0)) / 2;
     expect(median).toBeGreaterThan(0.43);

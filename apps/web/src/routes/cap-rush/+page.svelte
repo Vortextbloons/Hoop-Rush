@@ -42,6 +42,15 @@
   function sign(cardId: string): void {
     void controller?.sign(cardId);
   }
+  function purchaseSpin(
+    purchase: Parameters<CapRushDraftController['purchaseSpin']>[0],
+    targetCardId: string,
+  ): void {
+    void controller?.purchaseSpin(purchase, targetCardId);
+  }
+  function skipSpin(): void {
+    void controller?.skipSpin();
+  }
   function discard(): void {
     void controller?.discard();
   }
@@ -89,6 +98,8 @@
       onChoose={choosePosition}
       onReroll={reroll}
       onSign={sign}
+      onPurchaseSpin={purchaseSpin}
+      onSkipSpin={skipSpin}
       onDiscard={discard}
     />
   {:else}

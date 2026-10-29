@@ -105,7 +105,7 @@ Commands:
   bracket audit          Validate the frozen 30-team bracket and 82-game schedule:
                          schema/hash/versions, legal balanced lineups, duplicates,
                          strength percentiles and median, schedule counts and repeats,
-                         opening opponent unchanged, and schedule regeneration.
+                         and schedule regeneration.
                          --input <path>   Manifest path (default apps/web/static/data/manifest.json)
   bracket generate       (dev) Author the frozen bracket from packaged NBA data and
                          commit it with the manifest. Deterministic under --seed.
@@ -213,7 +213,6 @@ Commands:
                          Lakers pool anchors. --era 1990s,1980s (default all)
   import manifest        Refresh manifest content hashes for pools, era profiles,
                          opponents, and the bracket artifact
-  import opponent        Author the lakers-1990s opening opponent artifact
   import freeze          Freeze a calibrate-run baseline into the era profile.
                          --report <calibrate-report.json>  (required)
                          --era <eraId> (default 1990s)

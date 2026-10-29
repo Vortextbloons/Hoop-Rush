@@ -6,8 +6,10 @@ import type {
   CapRushCreateDraftCommand,
   CapRushDraftState,
   CapRushOffer,
+  CapRushPurchaseSpinCommand,
   CapRushRerollOfferCommand,
   CapRushSignCardCommand,
+  CapRushSkipSpinCommand,
 } from '@hoop-rush/data-contracts';
 import {
   CAP_RUSH_HARD_LIMIT_DOLLARS,
@@ -27,6 +29,7 @@ import {
   capRushOfferLegalCardIds,
 } from './feasibility.ts';
 import { generateCapRushOffer, generateCapRushReplacementOffer } from './offers.ts';
+import { buildCapRushSpinReceipt, capRushPayrollDollars, capRushSpinEligibility } from './spin.ts';
 import { capRushStateDigest } from './state-digest.ts';
 
 export interface CapRushCommandEnvironment {
@@ -59,6 +62,7 @@ export function createCapRushDraftState(
     offer: null,
     rerollsRemaining: CAP_RUSH_REROLL_LIMIT,
     picks: [],
+    spin: { status: 'unavailable' },
   });
   return state;
 }
@@ -303,6 +307,102 @@ function applySignCard(
     round: complete ? state.round : state.round + 1,
     offer: null,
     picks,
+    spin:
+      complete && state.variant === 'roulette' ? { status: 'pending' } : { status: 'unavailable' },
+  });
+  return acceptCapRushCommand(state, command, nextState);
+}
+
+function applyPurchaseSpin(
+  state: CapRushDraftState,
+  command: CapRushPurchaseSpinCommand,
+  environment: CapRushCommandEnvironment,
+): CapRushCommandOutcome {
+  const mismatch = validateRunAndRevision(state, command, environment);
+  if (mismatch !== null) return mismatch;
+  if (state.variant !== 'roulette') {
+    return rejectCapRushCommand(state, command, 'spin-unavailable', 'Cap Clash has no spin');
+  }
+  if (state.stage !== 'complete') {
+    return rejectCapRushCommand(
+      state,
+      command,
+      'phase-mismatch',
+      'the spin opens after five signings',
+    );
+  }
+  if (state.spin.status !== 'pending') {
+    return rejectCapRushCommand(
+      state,
+      command,
+      'spin-unavailable',
+      `the spin decision is ${state.spin.status}`,
+    );
+  }
+  const pick = state.picks.find((entry) => entry.card.cardId === command.targetCardId);
+  if (pick === undefined) {
+    return rejectCapRushCommand(
+      state,
+      command,
+      'target-unknown',
+      `card ${command.targetCardId} is not on this roster`,
+    );
+  }
+  const payroll = capRushPayrollDollars(state.picks);
+  const eligibility = capRushSpinEligibility(payroll, command.purchase);
+  if (!eligibility.eligible) {
+    return rejectCapRushCommand(
+      state,
+      command,
+      'spin-ineligible',
+      `payroll of $${String(payroll)} cannot buy a $${String(eligibility.priceDollars)} spin; the limit is $${String(eligibility.maxEligiblePayrollDollars)}`,
+    );
+  }
+  const receipt = buildCapRushSpinReceipt({
+    runSeed: state.runSeed,
+    purchase: command.purchase,
+    payrollDollars: payroll,
+    pick,
+    ...(environment.rngFactory !== undefined ? { rngFactory: environment.rngFactory } : {}),
+  });
+  const nextState = capRushDraftStateSchema.parse({
+    ...state,
+    revision: state.revision + 1,
+    spin: { status: 'purchased', receipt },
+  });
+  return acceptCapRushCommand(state, command, nextState);
+}
+
+function applySkipSpin(
+  state: CapRushDraftState,
+  command: CapRushSkipSpinCommand,
+  environment: CapRushCommandEnvironment,
+): CapRushCommandOutcome {
+  const mismatch = validateRunAndRevision(state, command, environment);
+  if (mismatch !== null) return mismatch;
+  if (state.variant !== 'roulette') {
+    return rejectCapRushCommand(state, command, 'spin-unavailable', 'Cap Clash has no spin');
+  }
+  if (state.stage !== 'complete') {
+    return rejectCapRushCommand(
+      state,
+      command,
+      'phase-mismatch',
+      'the spin opens after five signings',
+    );
+  }
+  if (state.spin.status !== 'pending') {
+    return rejectCapRushCommand(
+      state,
+      command,
+      'spin-unavailable',
+      `the spin decision is ${state.spin.status}`,
+    );
+  }
+  const nextState = capRushDraftStateSchema.parse({
+    ...state,
+    revision: state.revision + 1,
+    spin: { status: 'skipped' },
   });
   return acceptCapRushCommand(state, command, nextState);
 }
@@ -326,5 +426,9 @@ export function applyCapRushCommand(
       return applyRerollOffer(state, command, environment);
     case 'sign-cap-rush-card':
       return applySignCard(state, command, environment);
+    case 'purchase-cap-rush-spin':
+      return applyPurchaseSpin(state, command, environment);
+    case 'skip-cap-rush-spin':
+      return applySkipSpin(state, command, environment);
   }
 }

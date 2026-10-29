@@ -124,7 +124,7 @@ export const simCommands: CommandSpec[] = [
     help: `  bracket audit          Validate the frozen 30-team bracket and 82-game schedule:
                          schema/hash/versions, legal balanced lineups, duplicates,
                          strength percentiles and median, schedule counts and repeats,
-                         opening opponent unchanged, and schedule regeneration.
+                         and schedule regeneration.
                          --input <path>   Manifest path (default apps/web/static/data/manifest.json)`,
     run: (args) =>
       bracketAudit(parseOption(args, 'input', DEFAULT_MANIFEST), hasOption(args, 'verbose')),

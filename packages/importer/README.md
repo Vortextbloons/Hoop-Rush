@@ -11,7 +11,7 @@ raw-data / .raw_nba_cache
   -> ratings.run        (ratings, tendencies, traits, contracts)
   -> pools.run          (franchise-era pools + manifest pool index)
   -> eraProfile.run     (era simulation profiles)
-  -> opponent.run       (opening opponent artifact)
+  -> opponent            (ratio/shrunkRatio stat helpers)
   -> manifest.run       (refresh every content hash)
   -> freeze.run         (freeze a calibrate-run report into an era profile)
 ```

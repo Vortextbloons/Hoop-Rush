@@ -3,7 +3,6 @@ import { playerIdSchema, seedSchema } from '@hoop-rush/data-contracts';
 import {
   buildEraSimulationProfile,
   buildFixtureBracket,
-  buildOpeningOpponent,
   buildSimulationPlayer,
   seedFromString,
 } from '@hoop-rush/test-fixtures';
@@ -121,13 +120,11 @@ export function generationOptions(
   overrides: Partial<BracketGenerationOptions> = {},
 ): BracketGenerationOptions {
   const difficulty = buildFixtureBracket().difficulty;
-  const opening = buildOpeningOpponent();
   return {
     seed: seedSchema.parse(seedFromString('fixture-bracket')),
     dataVersion: 'data-v1',
     generationVersion: 'bracket-m3-v1',
     profile: buildEraSimulationProfile(),
-    openingOpponent: opening,
     difficulty,
     candidates: FRANCHISES.map((franchiseId, rank) => candidatesFor(franchiseId, rank)),
     gamesPerPair: 4,

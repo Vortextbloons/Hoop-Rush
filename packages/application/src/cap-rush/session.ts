@@ -2,6 +2,7 @@ import type {
   CapRushCatalogSource,
   CapRushCommand,
   CapRushDraftState,
+  CapRushSpinPurchaseId,
   CapRushVariant,
   CapRushVersionSet,
   Position,
@@ -12,12 +13,15 @@ import {
   CAP_RUSH_SALARY_CURVE_VERSION,
   CAP_RUSH_SCHEMA_VERSION,
   CAP_RUSH_SEED_DERIVATION_VERSION,
+  CAP_RUSH_SPIN_PURCHASES,
   POSITIONS,
   capRushChoosePositionCommandSchema,
   capRushCommandResultSchema,
   capRushCreateDraftCommandSchema,
+  capRushPurchaseSpinCommandSchema,
   capRushRerollOfferCommandSchema,
   capRushSignCardCommandSchema,
+  capRushSkipSpinCommandSchema,
 } from '@hoop-rush/data-contracts';
 import {
   ENGINE_VERSION,
@@ -26,6 +30,7 @@ import {
   buildCapRushCatalogIndex,
   capRushAssessSigning,
   capRushPayrollStatus,
+  capRushSpinEligibility,
   capRushStateDigest,
   createCapRushDraftState,
   type CapRushCatalogIndex,
@@ -36,6 +41,7 @@ import {
   type CapRushService,
   type CapRushSlotView,
   type CapRushSnapshot,
+  type CapRushSpinView,
 } from './contract.ts';
 import type { CapRushAssetPort, CapRushDraftRepositoryPort, CapRushIdPort } from './ports.ts';
 
@@ -179,6 +185,30 @@ export class CapRushSession implements CapRushService {
     });
   }
 
+  async purchaseSpin(purchase: CapRushSpinPurchaseId, targetCardId: string): Promise<void> {
+    await this.dispatch((state) =>
+      capRushPurchaseSpinCommandSchema.parse({
+        command: 'purchase-cap-rush-spin',
+        commandId: this.ids.newCommandId(),
+        runId: state.runId,
+        expectedRevision: state.revision,
+        purchase,
+        targetCardId,
+      }),
+    );
+  }
+
+  async skipSpin(): Promise<void> {
+    await this.dispatch((state) =>
+      capRushSkipSpinCommandSchema.parse({
+        command: 'skip-cap-rush-spin',
+        commandId: this.ids.newCommandId(),
+        runId: state.runId,
+        expectedRevision: state.revision,
+      }),
+    );
+  }
+
   async abandonDraft(): Promise<void> {
     try {
       await this.repository.clearActiveDraft();
@@ -254,6 +284,33 @@ export class CapRushSession implements CapRushService {
           signing: capRushAssessSigning(state, assets.index, card),
         })) ?? [],
       slots,
+      spin: this.buildSpinView(state, payrollDollars),
+    };
+  }
+
+  private buildSpinView(state: CapRushDraftState, payrollDollars: number): CapRushSpinView | null {
+    if (state.stage !== 'complete' || state.variant !== 'roulette') return null;
+    return {
+      state: state.spin,
+      targets: [...state.picks]
+        .sort((left, right) => left.pickOrdinal - right.pickOrdinal)
+        .map((pick) => ({
+          pickOrdinal: pick.pickOrdinal,
+          cardId: pick.card.cardId,
+          slot: pick.slot,
+          player: pick.card.source,
+          salaryDollars: pick.card.salaryDollars,
+        })),
+      purchases: (['standard', 'premium'] as const).map((purchase) => {
+        const eligibility = capRushSpinEligibility(payrollDollars, purchase);
+        return {
+          purchase,
+          priceDollars: eligibility.priceDollars,
+          maxEligiblePayrollDollars: eligibility.maxEligiblePayrollDollars,
+          eligible: eligibility.eligible,
+          tierOdds: CAP_RUSH_SPIN_PURCHASES[purchase].tierOdds,
+        };
+      }),
     };
   }
 

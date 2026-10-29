@@ -4,7 +4,6 @@ import {
   importEraProfile,
   importFreeze,
   importManifest,
-  importOpponent,
   importPools,
   importRatings,
   importRunAll,
@@ -64,12 +63,6 @@ export const importCommands: CommandSpec[] = [
     help: `  import manifest        Refresh manifest content hashes for pools, era profiles,
                          opponents, and the bracket artifact`,
     run: () => importManifest(),
-  },
-  {
-    name: 'import opponent',
-    options: {},
-    help: `  import opponent        Author the lakers-1990s opening opponent artifact`,
-    run: () => importOpponent(),
   },
   {
     name: 'import freeze',

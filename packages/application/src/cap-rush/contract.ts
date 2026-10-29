@@ -3,6 +3,8 @@ import type {
   CapRushDraftState,
   CapRushPayrollStatus,
   CapRushSourcePlayer,
+  CapRushSpinPurchaseId,
+  CapRushSpinState,
   CapRushVariant,
   Position,
 } from '@hoop-rush/data-contracts';
@@ -32,6 +34,28 @@ export interface CapRushSlotView {
   readonly highestPaid: boolean;
 }
 
+export interface CapRushSpinTargetView {
+  readonly pickOrdinal: number;
+  readonly cardId: string;
+  readonly slot: Position;
+  readonly player: CapRushSourcePlayer;
+  readonly salaryDollars: number;
+}
+
+export interface CapRushSpinPurchaseView {
+  readonly purchase: CapRushSpinPurchaseId;
+  readonly priceDollars: number;
+  readonly maxEligiblePayrollDollars: number;
+  readonly eligible: boolean;
+  readonly tierOdds: Readonly<Record<1 | 2 | 3, number>>;
+}
+
+export interface CapRushSpinView {
+  readonly state: CapRushSpinState;
+  readonly targets: readonly CapRushSpinTargetView[];
+  readonly purchases: readonly CapRushSpinPurchaseView[];
+}
+
 export interface CapRushDraftView {
   readonly draft: CapRushDraftState;
   readonly payrollDollars: number;
@@ -40,6 +64,7 @@ export interface CapRushDraftView {
   readonly status: CapRushPayrollStatus;
   readonly cards: readonly CapRushCardView[];
   readonly slots: readonly CapRushSlotView[];
+  readonly spin: CapRushSpinView | null;
 }
 
 export interface CapRushSnapshot {
@@ -53,5 +78,7 @@ export interface CapRushService {
   choosePosition(slot: Position): Promise<void>;
   rerollOffer(protectedCardId: string): Promise<void>;
   signCard(cardId: string): Promise<void>;
+  purchaseSpin(purchase: CapRushSpinPurchaseId, targetCardId: string): Promise<void>;
+  skipSpin(): Promise<void>;
   abandonDraft(): Promise<void>;
 }

@@ -24,9 +24,12 @@ import {
   CAP_RUSH_REROLL_LIMIT,
   CAP_RUSH_SCHEMA_VERSION,
   capRushBucketSchema,
+  capRushCardIdSchema,
+  capRushOfferIdSchema,
   capRushVersionSetSchema,
   capRushVariantSchema,
 } from './cap-rush-versions.ts';
+import { capRushSpinStateSchema } from './cap-rush-spin.ts';
 
 export const capRushCatalogSourceSchema = z.object({
   catalogVersion: z.string().min(1).max(64),
@@ -71,11 +74,6 @@ export const capRushCatalogSchema = z.object({
   candidates: z.array(capRushSourcePlayerSchema).min(1),
 });
 export type CapRushCatalog = z.infer<typeof capRushCatalogSchema>;
-
-export const capRushOfferIdSchema = z.string().regex(/^cro-[0-9a-f]{32}$/);
-export type CapRushOfferId = z.infer<typeof capRushOfferIdSchema>;
-export const capRushCardIdSchema = z.string().regex(/^crc-[0-9a-f]{32}$/);
-export type CapRushCardId = z.infer<typeof capRushCardIdSchema>;
 
 export const capRushCardSchema = z.object({
   cardId: capRushCardIdSchema,
@@ -129,6 +127,7 @@ export const capRushDraftStateSchema = z
     offer: capRushOfferSchema.nullable(),
     rerollsRemaining: z.number().int().min(0).max(CAP_RUSH_REROLL_LIMIT),
     picks: z.array(capRushDraftPickSchema).max(CAP_RUSH_DRAFT_ROUNDS),
+    spin: capRushSpinStateSchema,
   })
   .superRefine((state, ctx) => {
     if (state.stage === 'complete') {
@@ -160,6 +159,20 @@ export const capRushDraftStateSchema = z
       if (state.offer !== null && state.offer.round !== state.round) {
         ctx.addIssue({ code: 'custom', message: 'offer round does not match the draft round' });
       }
+    }
+
+    if (state.stage !== 'complete' || state.variant === 'clash') {
+      if (state.spin.status !== 'unavailable') {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'only a completed Cap Roulette draft holds a spin decision',
+        });
+      }
+    } else if (state.spin.status === 'unavailable') {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'a completed Cap Roulette draft requires a spin decision',
+      });
     }
 
     if (state.picks.length > 0) {

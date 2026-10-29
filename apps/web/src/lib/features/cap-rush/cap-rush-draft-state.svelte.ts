@@ -3,7 +3,7 @@ import {
   type CapRushDraftView,
   type CapRushService,
 } from '@hoop-rush/application/cap-rush';
-import type { CapRushVariant, Position } from '@hoop-rush/data-contracts';
+import type { CapRushSpinPurchaseId, CapRushVariant, Position } from '@hoop-rush/data-contracts';
 
 function errorMessageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -71,6 +71,14 @@ export class CapRushDraftController {
 
   sign(cardId: string): Promise<boolean> {
     return this.runCommand(() => this.service.signCard(cardId));
+  }
+
+  purchaseSpin(purchase: CapRushSpinPurchaseId, targetCardId: string): Promise<boolean> {
+    return this.runCommand(() => this.service.purchaseSpin(purchase, targetCardId));
+  }
+
+  skipSpin(): Promise<boolean> {
+    return this.runCommand(() => this.service.skipSpin());
   }
 
   async discard(): Promise<boolean> {

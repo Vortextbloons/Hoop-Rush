@@ -359,7 +359,6 @@ export const bracketAuditReportSchema = z.object({
   maxPercentile: z.number().min(0).max(1),
   teamPercentileBand: z.tuple([z.number().min(0).max(1), z.number().min(0).max(1)]),
   leagueMedianPercentileBand: z.tuple([z.number().min(0).max(1), z.number().min(0).max(1)]),
-  openingOpponentUnchanged: z.boolean(),
   pass: z.boolean(),
 });
 const benchmarkRegressionSchema = z.object({

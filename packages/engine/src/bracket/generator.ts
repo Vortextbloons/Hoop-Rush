@@ -38,13 +38,13 @@ export const SCHEDULE_VERSION_LABEL = `schedule-${SCHEDULE_GENERATION_VERSION.re
  * toward the extremes.
  */
 export const BRACKET_TARGET_LADDER: readonly (readonly [number, number])[] = [
-  [0, 0.787],
-  [3, 0.673],
-  [7, 0.615],
-  [14, 0.52],
-  [19, 0.444],
-  [24, 0.343],
-  [29, 0.206],
+  [0, 0.75],
+  [3, 0.66],
+  [7, 0.6],
+  [14, 0.5],
+  [19, 0.41],
+  [24, 0.28],
+  [29, 0.1],
 ];
 
 export const BRACKET_WIN_RATE_BAND: readonly [number, number] = [0.1, 0.8];
@@ -75,7 +75,6 @@ export interface BracketGenerationOptions {
   dataVersion: string;
   generationVersion: string;
   profile: EraSimulationProfile;
-  openingOpponent: OpponentTeam;
   difficulty: DifficultyProfile;
   candidates: FranchiseCandidates[];
   gamesPerPair?: number;
@@ -124,6 +123,16 @@ function percentileOf(value: number, population: readonly number[]): number {
 
 function totalQuality(players: readonly BracketCandidatePlayer[]): number {
   return players.reduce((sum, player) => sum + player.score, 0) / players.length;
+}
+
+function percentileValue(sorted: readonly number[], fraction: number): number {
+  const first = sorted[0];
+  if (first === undefined) return 0;
+  const index = Math.min(
+    sorted.length - 1,
+    Math.max(0, Math.floor(fraction * (sorted.length - 1))),
+  );
+  return sorted[index] ?? first;
 }
 
 function isBalanced(players: readonly BracketCandidatePlayer[]): boolean {
@@ -386,11 +395,6 @@ export function generateBracket(options: BracketGenerationOptions): OpponentBrac
   if (franchiseIds.length !== 30) {
     throw new Error(`generation requires 30 franchises (got ${String(franchiseIds.length)})`);
   }
-  if (!franchiseIds.includes(options.openingOpponent.teamId)) {
-    throw new Error(
-      `opening opponent team ${options.openingOpponent.teamId} has no candidate pool`,
-    );
-  }
 
   const pools = new Map<string, BracketCandidatePlayer[]>();
   for (const candidates of options.candidates) {
@@ -401,13 +405,6 @@ export function generateBracket(options: BracketGenerationOptions): OpponentBrac
       throw new Error(`${candidates.franchiseId} has fewer than five eligible players`);
     }
     pools.set(candidates.franchiseId, ordered);
-  }
-
-  const selectableFranchises = franchiseIds.filter((id) => id !== options.openingOpponent.teamId);
-  if (selectableFranchises.length !== 29) {
-    throw new Error(
-      `expected 29 selectable franchises (got ${String(selectableFranchises.length)})`,
-    );
   }
 
   const ceilings = new Map<string, number>();
@@ -427,20 +424,11 @@ export function generateBracket(options: BracketGenerationOptions): OpponentBrac
 
   // Roster quality decides the tier, so an elite pool always gets an elite
   // build. Ties break by id to keep generation deterministic.
-  const tierOrder = [...selectableFranchises].sort((a, b) => {
+  const tierOrder = [...franchiseIds].sort((a, b) => {
     const diff = (ceilings.get(b) ?? 0) - (ceilings.get(a) ?? 0);
     return diff !== 0 ? diff : a.localeCompare(b);
   });
   const rankOf = new Map(tierOrder.map((id, index) => [id, index]));
-
-  const openingTeam: FieldTeam = {
-    key: options.openingOpponent.opponentId,
-    team: {
-      teamId: options.openingOpponent.teamId,
-      displayName: options.openingOpponent.displayName,
-      players: options.openingOpponent.players,
-    },
-  };
 
   /**
    * Each tier gets a support ceiling: the four players around the roster's best
@@ -455,16 +443,21 @@ export function generateBracket(options: BracketGenerationOptions): OpponentBrac
     .sort((a, b) => a - b);
   const topSupport = globalScores[globalScores.length - 1] ?? 70;
   const bottomSupport = globalScores[0] ?? 45;
+  // With real single-season rosters the strongest pool is deep enough that an
+  // uncapped elite five runs away with the field. The calibration therefore
+  // sweeps the strong end of the ramp too, instead of pinning it to the max
+  // score, so a top tier can still be restrained to the target ladder.
+  const strongSupport = percentileValue(globalScores, 0.8);
 
   const build = (
     floorSupport: number,
   ): { field: FieldTeam[]; selections: Map<string, SelectedFive> } => {
     const selections = new Map<string, SelectedFive>();
-    const field: FieldTeam[] = [openingTeam];
+    const field: FieldTeam[] = [];
     for (const franchiseId of tierOrder) {
       const rank = rankOf.get(franchiseId) ?? 0;
       const position = tierOrder.length === 1 ? 0 : rank / (tierOrder.length - 1);
-      const ceiling = topSupport - (topSupport - floorSupport) * position;
+      const ceiling = strongSupport - (strongSupport - floorSupport) * position;
       const pool = pools.get(franchiseId) ?? [];
       const candidates = options.candidates.find((entry) => entry.franchiseId === franchiseId);
       if (!candidates) throw new Error(`bracket: missing candidates for ${franchiseId}`);
@@ -493,7 +486,7 @@ export function generateBracket(options: BracketGenerationOptions): OpponentBrac
   const steps = CALIBRATION_STEPS;
   for (let step = 0; step < steps; step += 1) {
     const fraction = step / (steps - 1);
-    const floorSupport = topSupport - (topSupport - bottomSupport) * fraction;
+    const floorSupport = strongSupport - (strongSupport - bottomSupport) * fraction;
     const { field, selections } = build(floorSupport);
     const measured = measure(field, `fit${String(step)}`);
     const rates = field.map((entry) => measured.winRates.get(entry.key) ?? 0.5);
@@ -521,20 +514,6 @@ export function generateBracket(options: BracketGenerationOptions): OpponentBrac
   const { field, selections } = best;
   const measured = final;
   const opponents: BracketOpponent[] = [];
-  const openingRate = measured.winRates.get(options.openingOpponent.opponentId);
-  const openingGames = measured.gamesPlayed.get(options.openingOpponent.opponentId) ?? 0;
-  if (openingRate === undefined) throw new Error('bracket: opening opponent was not measured');
-  opponents.push({
-    ...options.openingOpponent,
-    bracketVersion: options.generationVersion,
-    strength: {
-      evaluationVersion: options.generationVersion,
-      benchmarkVersion: FIELD_BENCHMARK_VERSION,
-      sampleCount: openingGames,
-      winRate: openingRate,
-      percentile: percentileOf(openingRate, measured.population),
-    },
-  });
 
   for (const franchiseId of tierOrder) {
     const five = selections.get(franchiseId);
@@ -581,7 +560,6 @@ export function generateBracket(options: BracketGenerationOptions): OpponentBrac
 
   const schedule = generateSchedule(
     opponents.map((o) => o.opponentId),
-    options.openingOpponent.opponentId,
     seed,
   );
   const bracket: OpponentBracket = {
@@ -607,7 +585,7 @@ export function generateBracket(options: BracketGenerationOptions): OpponentBrac
 
   const failures = validateBracketContent(bracket);
   failures.push(...scheduleInvariants(schedule));
-  failures.push(...bracketStrengthFailures(opponents, options.openingOpponent.opponentId));
+  failures.push(...bracketStrengthFailures(opponents));
   if (failures.length > 0) {
     const rateReport = opponents
       .map((o) => `${o.opponentId}=${o.strength.winRate.toFixed(3)}`)
@@ -619,18 +597,11 @@ export function generateBracket(options: BracketGenerationOptions): OpponentBrac
   return opponentBracketSchema.parse(bracket);
 }
 
-export function bracketStrengthFailures(
-  opponents: readonly BracketOpponent[],
-  openingOpponentId = 'lakers-1990s-opening',
-): string[] {
+export function bracketStrengthFailures(opponents: readonly BracketOpponent[]): string[] {
   const failures: string[] = [];
-  // The opening opponent is an authored fixed entry, so it is excluded from the
-  // generated band the same way `bracket audit` treats it.
-  const generated = opponents.filter((opponent) => opponent.opponentId !== openingOpponentId);
   const rates = opponents.map((opponent) => opponent.strength.winRate);
-  const generatedRates = generated.map((opponent) => opponent.strength.winRate);
-  const minRate = Math.min(...generatedRates);
-  const maxRate = Math.max(...generatedRates);
+  const minRate = Math.min(...rates);
+  const maxRate = Math.max(...rates);
   const tolerance = SAMPLING_TOLERANCE;
   if (minRate < BRACKET_WIN_RATE_BAND[0] - tolerance) {
     failures.push(

@@ -3,7 +3,6 @@ import {
   eraProfile,
   freeze,
   manifest,
-  opponent,
   pools,
   ratings,
   runPythonFetch,
@@ -119,20 +118,6 @@ export function importManifest(): CliReport {
     return usageFailure('import manifest', {}, (error as Error).message);
   }
   return makeReport('import manifest', {}, { details: ['manifest content hashes refreshed'] });
-}
-export function importOpponent(): CliReport {
-  try {
-    opponent.run();
-  } catch (error) {
-    return usageFailure('import opponent', {}, (error as Error).message);
-  }
-  return makeReport(
-    'import opponent',
-    {},
-    {
-      details: ['lakers-1990s-opening.json authored'],
-    },
-  );
 }
 export function importFreeze(args: { report?: string | null; era?: string | null }): CliReport {
   const reportPath = args.report ?? null;

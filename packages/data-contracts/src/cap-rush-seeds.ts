@@ -90,3 +90,19 @@ export function capRushOfferShuffleSeed(
     attempt,
   );
 }
+
+export function capRushSpinTierSeed(runSeed: Seed): Seed {
+  return capRushSeed(runSeed, 'spin', 'tier');
+}
+
+export function capRushSpinMutationSeed(runSeed: Seed): Seed {
+  return capRushSeed(runSeed, 'spin', 'mutation');
+}
+
+export function capRushSpinPhysicalSeed(runSeed: Seed): Seed {
+  return capRushSeed(runSeed, 'spin', 'physical');
+}
+
+export function capRushSpinSpecialistSeed(runSeed: Seed): Seed {
+  return capRushSeed(runSeed, 'spin', 'specialist');
+}

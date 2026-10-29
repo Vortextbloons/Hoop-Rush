@@ -93,5 +93,6 @@ export * from './postseason-evidence.ts';
 export * from './cap-rush-versions.ts';
 export * from './cap-rush-seeds.ts';
 export * from './cap-rush-draft.ts';
+export * from './cap-rush-spin.ts';
 export * from './cap-rush-commands.ts';
 export * from './mode-catalog.ts';
