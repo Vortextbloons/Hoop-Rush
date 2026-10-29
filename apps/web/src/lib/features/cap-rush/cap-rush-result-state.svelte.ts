@@ -65,15 +65,10 @@ export class CapRushResultState {
 
   async startNewRun(): Promise<boolean> {
     if (this.busy || this.isDestroyed()) return false;
-    const variant = this.report?.variant;
-    if (variant === undefined) {
-      this.error = 'There is no finished run to replace.';
-      return false;
-    }
     this.busy = true;
     this.error = null;
     try {
-      await this.service.startNewRun(variant);
+      await this.service.abandonDraft();
       return !this.isDestroyed();
     } catch (error) {
       if (!this.isDestroyed()) this.error = errorMessageOf(error);

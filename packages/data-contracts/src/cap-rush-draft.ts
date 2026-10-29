@@ -231,6 +231,31 @@ export const capRushDraftStateSchema = z
       }
     }
 
+    if (state.spin.status === 'purchased') {
+      const receipts = [state.spin.receipt, ...(state.spin.additionalReceipts ?? [])];
+      let spent = state.picks.reduce((total, pick) => total + pick.card.salaryDollars, 0);
+      const targets = new Set<string>();
+      for (const receipt of receipts) {
+        const pick = state.picks.find((entry) => entry.card.cardId === receipt.target.cardId);
+        if (
+          !pick ||
+          pick.slot !== receipt.target.slot ||
+          pick.pickOrdinal !== receipt.target.pickOrdinal ||
+          pick.card.source.playerVersionId !== receipt.target.playerVersionId ||
+          targets.has(receipt.target.cardId) ||
+          receipt.payrollDollars !== spent
+        ) {
+          ctx.addIssue({
+            code: 'custom',
+            message:
+              'spin receipts must target distinct signed players and account for prior spending',
+          });
+        }
+        targets.add(receipt.target.cardId);
+        spent += receipt.priceDollars;
+      }
+    }
+
     const seenPeople = new Set<string>();
     const seenSlots = new Set<string>();
     state.picks.forEach((pick, index) => {

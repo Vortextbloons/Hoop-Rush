@@ -238,7 +238,7 @@ describe('cap rush session', () => {
     expect(repository.commands.size).toBe(3);
   });
 
-  it('buys one Roulette spin and resumes the persisted receipt', async () => {
+  it('buys Roulette spins and resumes the persisted receipts', async () => {
     const repository = new MemoryCapRushRepository();
     const session = createSession(repository);
     await session.createDraft('roulette');
@@ -258,6 +258,9 @@ describe('cap rush session', () => {
     if (target === undefined) throw new Error('roulette spin has no targets');
 
     await session.purchaseSpin('standard', target.cardId);
+    const secondTarget = complete?.spin?.targets[1];
+    if (!secondTarget) throw new Error('roulette spin has no second target');
+    await session.purchaseSpin('standard', secondTarget.cardId);
     const purchased = session.getSnapshot().draft?.spin;
     expect(purchased?.state.status).toBe('purchased');
     await expect(session.skipSpin()).rejects.toBeInstanceOf(CapRushServiceError);
@@ -270,6 +273,7 @@ describe('cap rush session', () => {
     }
     expect(spin.state.receipt.target.cardId).toBe(target.cardId);
     expect(spin.state.receipt.receiptDigest).toHaveLength(32);
+    expect(spin.state.additionalReceipts?.[0]?.target.cardId).toBe(secondTarget.cardId);
   });
 
   it('locks the lineup and resumes the pinned inputs', async () => {
@@ -463,36 +467,6 @@ describe('cap rush session', () => {
     }
     await session.lockLineup();
     await expect(session.finalizeSeason()).rejects.toBeInstanceOf(CapRushServiceError);
-  });
-
-  it('replaces a finished run with a fresh draft of the same variant', async () => {
-    const repository = new MemoryCapRushRepository();
-    const session = createSession(repository);
-    await session.createDraft('roulette');
-    for (const slot of POSITIONS) {
-      await session.choosePosition(slot);
-      const cards = session.getSnapshot().draft?.cards ?? [];
-      const cheapest = [...cards]
-        .filter((entry) => entry.signing.legal)
-        .sort((left, right) => left.card.salaryDollars - right.card.salaryDollars)[0];
-      if (cheapest === undefined) throw new Error(`no legal ${slot} signing`);
-      await session.signCard(cheapest.card.cardId);
-    }
-    await session.skipSpin();
-    await session.lockLineup();
-    expect(session.getSnapshot().draft?.draft.stage).toBe('locked');
-
-    await session.startNewRun('roulette');
-    const fresh = session.getSnapshot().draft;
-    expect(fresh?.draft.stage).toBe('select-position');
-    expect(fresh?.draft.picks).toHaveLength(0);
-    expect(fresh?.draft.variant).toBe('roulette');
-    expect(fresh?.draft.locked).toBeNull();
-    expect(fresh?.season).toBeNull();
-
-    const resumed = createSession(repository);
-    const loaded = await resumed.loadActive();
-    expect(loaded.draft?.draft.stage).toBe('select-position');
   });
 
   it('finalizes a Cap Roulette season with a purchased spin', async () => {

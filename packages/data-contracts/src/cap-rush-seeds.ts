@@ -91,6 +91,11 @@ export function capRushOfferShuffleSeed(
   );
 }
 
+export function capRushAdditionalSpinSeed(runSeed: Seed, ordinal: number): Seed {
+  if (!Number.isInteger(ordinal) || ordinal < 1) throw new Error('spin ordinal must be positive');
+  return capRushSeed(runSeed, 'spin', 'purchase', ordinal);
+}
+
 export function capRushSpinTierSeed(runSeed: Seed): Seed {
   return capRushSeed(runSeed, 'spin', 'tier');
 }

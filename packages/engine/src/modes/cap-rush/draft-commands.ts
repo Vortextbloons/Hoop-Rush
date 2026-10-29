@@ -343,7 +343,7 @@ function applyPurchaseSpin(
       'the spin opens after five signings',
     );
   }
-  if (state.spin.status !== 'pending') {
+  if (state.spin.status !== 'pending' && state.spin.status !== 'purchased') {
     return rejectCapRushCommand(
       state,
       command,
@@ -360,7 +360,21 @@ function applyPurchaseSpin(
       `card ${command.targetCardId} is not on this roster`,
     );
   }
-  const payroll = capRushPayrollDollars(state.picks);
+  const receipts =
+    state.spin.status === 'purchased'
+      ? [state.spin.receipt, ...(state.spin.additionalReceipts ?? [])]
+      : [];
+  if (receipts.some((receipt) => receipt.target.cardId === command.targetCardId)) {
+    return rejectCapRushCommand(
+      state,
+      command,
+      'spin-unavailable',
+      'this player already has a mutation',
+    );
+  }
+  const payroll =
+    capRushPayrollDollars(state.picks) +
+    receipts.reduce((total, receipt) => total + receipt.priceDollars, 0);
   const eligibility = capRushSpinEligibility(payroll, command.purchase);
   if (!eligibility.eligible) {
     return rejectCapRushCommand(
@@ -372,6 +386,7 @@ function applyPurchaseSpin(
   }
   const receipt = buildCapRushSpinReceipt({
     runSeed: state.runSeed,
+    spinOrdinal: receipts.length,
     purchase: command.purchase,
     payrollDollars: payroll,
     pick,
@@ -380,7 +395,14 @@ function applyPurchaseSpin(
   const nextState = capRushDraftStateSchema.parse({
     ...state,
     revision: state.revision + 1,
-    spin: { status: 'purchased', receipt },
+    spin:
+      receipts.length === 0
+        ? { status: 'purchased', receipt }
+        : {
+            status: 'purchased',
+            receipt: receipts[0],
+            additionalReceipts: [...receipts.slice(1), receipt],
+          },
   });
   return acceptCapRushCommand(state, command, nextState);
 }
@@ -481,6 +503,7 @@ function applyLockLineup(
     catalog: state.catalog,
     picks: state.picks,
     spin: state.spin.status === 'purchased' ? state.spin.receipt : null,
+    additionalSpins: state.spin.status === 'purchased' ? state.spin.additionalReceipts : undefined,
     bracket: lockSources.bracket,
     profile: lockSources.profile,
   });

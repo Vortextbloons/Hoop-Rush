@@ -80,6 +80,15 @@ function buildSpunLocked(setup: ReturnType<typeof capRushTestSetup>, salaries: r
     catalog: setup.state.catalog,
     picks,
     spin: receipt,
+    additionalSpins: [
+      buildCapRushSpinReceipt({
+        runSeed: setup.state.runSeed,
+        spinOrdinal: 1,
+        purchase: 'standard',
+        payrollDollars: receipt.payrollDollars + receipt.priceDollars,
+        pick: picks[1] as CapRushDraftPick,
+      }),
+    ],
     bracket: setup.lockSources.bracket,
     profile: setup.lockSources.profile,
   });
@@ -171,11 +180,12 @@ describe('cap rush full season report', () => {
     expect(report.variant).toBe('roulette');
     expect(report.payrollDollars).toBe(80_000_000);
     expect(report.spin).not.toBeNull();
-    expect(report.spinSpendDollars).toBe(15_000_000);
-    expect(report.totalSpendDollars).toBe(95_000_000);
-    expect(report.unusedCapDollars).toBe(40_000_000);
+    expect(report.spinSpendDollars).toBe(30_000_000);
+    expect(report.totalSpendDollars).toBe(110_000_000);
+    expect(report.unusedCapDollars).toBe(10_000_000);
     expect(report.winsPerMillion).toBeCloseTo(season.aggregate.wins / 80, 10);
     expect(report.spin?.targetCardId).toBe('crc-22222222222222222222222222222222');
     expect(report.spin?.tier).toBeGreaterThanOrEqual(1);
+    expect(report.additionalSpins).toHaveLength(1);
   }, 120_000);
 });

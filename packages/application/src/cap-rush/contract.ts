@@ -112,6 +112,5 @@ export interface CapRushService {
   loadReport(runId: string): Promise<CapRushReport | null>;
   listHistory(): Promise<readonly CapRushHistoryEntry[]>;
   listRunGames(runId: string): Promise<readonly CapRushStoredGame[]>;
-  startNewRun(variant: CapRushVariant): Promise<void>;
   abandonDraft(): Promise<void>;
 }

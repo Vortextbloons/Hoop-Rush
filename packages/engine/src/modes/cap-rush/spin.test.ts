@@ -196,14 +196,24 @@ describe('cap rush spin purchase', () => {
     expect(outcome.result.rejection?.code).toBe('target-unknown');
   });
 
-  it('allows one purchase and rejects any second decision', () => {
+  it('buys multiple spins for distinct players up to the cap and replays deterministically', () => {
     const setup = capRushTestSetup();
-    const state = buildCompleteState(setup, payrollSplit(100_000_000));
-    const bought = purchase(setup, state, 'standard');
-    const again = purchase(setup, bought.state, 'standard');
-    const skipped = skip(setup, bought.state);
-    expect(again.result.rejection?.code).toBe('spin-unavailable');
-    expect(skipped.result.rejection?.code).toBe('spin-unavailable');
+    const state = buildCompleteState(setup, payrollSplit(90_000_000));
+    const first = purchase(setup, state, 'standard');
+    expect(purchase(setup, first.state, 'standard').result.rejection?.code).toBe(
+      'spin-unavailable',
+    );
+    const target = state.picks[1]!.card.cardId;
+    const second = purchase(setup, first.state, 'standard', target);
+    const replay = purchase(setup, first.state, 'standard', target);
+    expect(second.result.status).toBe('accepted');
+    expect(second.state).toEqual(replay.state);
+    if (second.state.spin.status !== 'purchased') throw new Error('spin was not purchased');
+    expect(second.state.spin.additionalReceipts?.[0]?.payrollDollars).toBe(105_000_000);
+    expect(second.state.spin.additionalReceipts?.[0]?.target.cardId).toBe(target);
+    expect(
+      purchase(setup, second.state, 'standard', state.picks[2]!.card.cardId).result.rejection?.code,
+    ).toBe('spin-ineligible');
   });
 
   it('skips the spin and then refuses a purchase', () => {

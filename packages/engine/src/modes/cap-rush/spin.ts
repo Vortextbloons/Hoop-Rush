@@ -14,6 +14,7 @@ import {
   CAP_RUSH_CAP_LINE_DOLLARS,
   CAP_RUSH_SPIN_PURCHASES,
   canonicalJson,
+  capRushAdditionalSpinSeed,
   capRushSpinMutationSeed,
   capRushSpinPhysicalSeed,
   capRushSpinReceiptSchema,
@@ -102,6 +103,7 @@ export function capRushSpinReceiptDigest(
 export interface CapRushSpinDrawInput {
   readonly runSeed: Seed;
   readonly purchase: CapRushSpinPurchaseId;
+  readonly spinOrdinal?: number;
   readonly payrollDollars: number;
   readonly pick: CapRushDraftPick;
   readonly rngFactory?: (seed: string) => Rng;
@@ -131,14 +133,17 @@ function materializeSingleDefinition(
 
 export function buildCapRushSpinReceipt(input: CapRushSpinDrawInput): CapRushSpinReceipt {
   const rngFactory = input.rngFactory ?? createRng;
+  const runSeed = input.spinOrdinal
+    ? capRushAdditionalSpinSeed(input.runSeed, input.spinOrdinal)
+    : input.runSeed;
   const eligibility = capRushSpinEligibility(input.payrollDollars, input.purchase);
   if (!eligibility.eligible) {
     throw new Error(
       `cap rush ${input.purchase} spin needs payroll at or below $${String(CAP_RUSH_CAP_LINE_DOLLARS - eligibility.priceDollars)} (got $${String(input.payrollDollars)})`,
     );
   }
-  const tier = drawCapRushSpinTier(rngFactory(capRushSpinTierSeed(input.runSeed)), input.purchase);
-  const entry = materializeSingleDefinition(tier, rngFactory, input.runSeed);
+  const tier = drawCapRushSpinTier(rngFactory(capRushSpinTierSeed(runSeed)), input.purchase);
+  const entry = materializeSingleDefinition(tier, rngFactory, runSeed);
   const effective = applyHavocMutationPackage(havocSourceOf(input.pick.card.source), [entry], {
     slot: input.pick.slot,
   });

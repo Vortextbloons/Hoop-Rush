@@ -297,7 +297,10 @@ export function capRushReport(input: {
   }
   const payrollDollars = input.locked.payrollDollars;
   const spin = input.locked.spin;
-  const spinSpendDollars = spin === null ? 0 : spin.priceDollars;
+  const additionalSpins = input.locked.additionalSpins ?? [];
+  const spinSpendDollars =
+    (spin?.priceDollars ?? 0) +
+    additionalSpins.reduce((total, receipt) => total + receipt.priceDollars, 0);
   const league = capRushLeagueMvp({ locked: input.locked, games: input.games });
   return capRushReportSchema.parse({
     reportVersion: CAP_RUSH_REPORT_VERSION,
@@ -309,7 +312,7 @@ export function capRushReport(input: {
     payrollDollars,
     spinSpendDollars,
     totalSpendDollars: payrollDollars + spinSpendDollars,
-    unusedCapDollars: CAP_RUSH_CAP_LINE_DOLLARS - payrollDollars,
+    unusedCapDollars: CAP_RUSH_CAP_LINE_DOLLARS - payrollDollars - spinSpendDollars,
     winsPerMillion: capRushWinsPerMillion(input.aggregate.wins, payrollDollars),
     aggregate: input.aggregate,
     apronTriggers: {
@@ -328,6 +331,17 @@ export function capRushReport(input: {
             mutationId: spin.entry.mutationId,
             targetCardId: spin.target.cardId,
           },
+    ...(additionalSpins.length
+      ? {
+          additionalSpins: additionalSpins.map((receipt) => ({
+            purchase: receipt.purchase,
+            priceDollars: receipt.priceDollars,
+            tier: receipt.tier,
+            mutationId: receipt.entry.mutationId,
+            targetCardId: receipt.target.cardId,
+          })),
+        }
+      : {}),
     players: capRushPlayerSeasonLines({ locked: input.locked, games: input.games }),
     mvp: league.mvp,
     leagueBaselineTs: league.leagueBaselineTs,

@@ -380,17 +380,36 @@ describe('cap rush locked spin and replacement roles', () => {
       { index: setup.index },
     );
     expect(bought.result.status).toBe('accepted');
-    const outcome = lock(setup, bought.state);
+    const secondTarget = base.picks[1]!;
+    const second = applyCapRushCommand(
+      bought.state,
+      {
+        command: 'purchase-cap-rush-spin',
+        commandId: commandIdSchema.parse('cmd-lock-spin-2'),
+        runId: base.runId,
+        expectedRevision: bought.state.revision,
+        purchase: 'standard',
+        targetCardId: secondTarget.card.cardId,
+      },
+      { index: setup.index },
+    );
+    const outcome = lock(setup, second.state);
     expect(outcome.result.status).toBe('accepted');
     const locked = outcome.state.locked;
     if (locked === null) throw new Error('lock did not produce inputs');
     expect(locked.spin).not.toBeNull();
+    expect(locked.additionalSpins).toHaveLength(1);
 
     const mutatedStarters = locked.human.starters.filter(
       (starter) => starter.mutationPackage.length > 0,
     );
-    expect(mutatedStarters).toHaveLength(1);
-    expect(mutatedStarters[0]?.source.playerId).toBe(target.card.source.playerId);
+    expect(mutatedStarters).toHaveLength(2);
+    expect(mutatedStarters.map((starter) => starter.source.playerId)).toContain(
+      target.card.source.playerId,
+    );
+    expect(mutatedStarters.map((starter) => starter.source.playerId)).toContain(
+      secondTarget.card.source.playerId,
+    );
   });
 
   it('gives the replacement apron penalties without the mutation', () => {

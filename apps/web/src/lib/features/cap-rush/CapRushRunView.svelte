@@ -117,7 +117,7 @@
                 Simulating {controller.progress.completed} of {controller.progress.total} games in this
                 batch…
               {:else}
-                Games are simulated in a worker and saved as they are accepted.
+                Your progress is saved as games finish.
               {/if}
             </span>
           </div>
@@ -159,8 +159,8 @@
         </div>
       {/if}
 
-      <CapRushLineup slots={view.slots} {art} />
       <CapRushSeasonProgress draft={view.draft} {season} storedGames={controller.games} {art} />
+      <CapRushLineup slots={view.slots} {art} />
 
       {#if controller.error !== null}
         <div

@@ -24,13 +24,13 @@
       id: 'roulette' as const,
       name: 'Cap Roulette',
       icon: Dices,
-      tagline: 'One paid spin. One mutation.',
+      tagline: 'Turn cap room into mutations.',
       description:
-        'Everything in Cap Clash, plus one optional paid mutation spin after the draft. The cheaper the roster, the higher the tier you can afford.',
+        'Everything in Cap Clash, plus optional mutation spins after the draft. Spend your remaining cap room on different players.',
       highlights: [
         'Standard $15M · 60/30/10',
         'Premium $30M · 35/40/25',
-        'One mutation, permanently',
+        'One mutation per player',
       ],
       accent: 'border-border hover:border-accent',
       iconClass: 'bg-accent/10 text-accent',

@@ -330,16 +330,6 @@ export class CapRushSession implements CapRushService {
     }
   }
 
-  async startNewRun(variant: CapRushVariant): Promise<void> {
-    try {
-      await this.repository.clearActiveDraft();
-      this.draft = null;
-    } catch (error) {
-      throw new CapRushServiceError('storage', messageOf(error));
-    }
-    await this.createDraft(variant);
-  }
-
   async abandonDraft(): Promise<void> {
     try {
       await this.repository.clearActiveDraft();
@@ -457,7 +447,14 @@ export class CapRushSession implements CapRushService {
           salaryDollars: pick.card.salaryDollars,
         })),
       purchases: (['standard', 'premium'] as const).map((purchase) => {
-        const eligibility = capRushSpinEligibility(payrollDollars, purchase);
+        const spent =
+          state.spin.status === 'purchased'
+            ? [state.spin.receipt, ...(state.spin.additionalReceipts ?? [])].reduce(
+                (total, receipt) => total + receipt.priceDollars,
+                0,
+              )
+            : 0;
+        const eligibility = capRushSpinEligibility(payrollDollars + spent, purchase);
         return {
           purchase,
           priceDollars: eligibility.priceDollars,

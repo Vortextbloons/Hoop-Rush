@@ -12,7 +12,8 @@
     type CapRushReport,
   } from '@hoop-rush/data-contracts';
   import { havocMutationDefinitionOf } from '@hoop-rush/engine';
-  import { Crown, Sparkles, Trophy } from '@lucide/svelte';
+  import HavocTierBadge from '#lib/features/havoc/HavocTierBadge.svelte';
+  import { Crown, Trophy } from '@lucide/svelte';
   import {
     apronPenaltyRows,
     apronPenaltyTitle,
@@ -48,11 +49,9 @@
       .sort((left, right) => POSITIONS.indexOf(left.slot) - POSITIONS.indexOf(right.slot)),
   );
   const penaltyRows = $derived(apronPenaltyRows(report.payrollStatus));
-  const spin = $derived(report.spin);
-  const spinTarget = $derived(
-    spin === null ? null : (players.find((line) => line.cardId === spin.targetCardId) ?? null),
+  const spins = $derived(
+    report.spin === null ? [] : [report.spin, ...(report.additionalSpins ?? [])],
   );
-  const mutation = $derived(spin === null ? null : havocMutationDefinitionOf(spin.mutationId));
   const aggregate = $derived(report.aggregate);
   const winsPerMillion = $derived(report.winsPerMillion);
   const mvp = $derived(report.mvp);
@@ -244,7 +243,7 @@
     </dl>
     <p class="mt-2 text-[11px] leading-relaxed text-muted-foreground">
       Player payroll is the five salaries only. {#if report.variant === 'roulette'}Mutation spend is
-        the spin price, and total spend adds the two.{/if}
+        the price of all spins, and total spend adds the two.{/if}
       Unused normal-cap budget is what is left under the $120M cap.
     </p>
 
@@ -390,49 +389,68 @@
         <h3 class="font-display mt-1 text-2xl font-extrabold tracking-tight uppercase">
           Mutation spin
         </h3>
-        {#if spin === null || mutation === null}
+        {#if spins.length === 0}
           <p class="mt-4 text-lg font-bold">No spin purchased</p>
           <p class="mt-1 text-xs leading-relaxed text-muted-foreground">
             You skipped the spin, so your five played unmutated and no mutation spend was added.
           </p>
         {:else}
-          <div class="mt-2 flex items-center gap-2">
-            <Sparkles size={15} class="shrink-0 text-accent" aria-hidden="true" />
-            <p class="text-sm font-bold">{mutation.name}</p>
-          </div>
-          <p class="mt-1 text-xs leading-relaxed text-muted-foreground">{mutation.description}</p>
-          <dl class="mt-3 grid grid-cols-2 gap-2">
-            <div class="rounded-xl border border-line-soft bg-surface-1 px-3 py-2.5">
-              <dt class="font-mono text-[9px] tracking-[0.08em] text-muted-foreground uppercase">
-                Spin type
-              </dt>
-              <dd class="text-xs font-extrabold capitalize">{spin.purchase}</dd>
+          {#each spins as spin (spin.targetCardId)}
+            {@const mutation = havocMutationDefinitionOf(spin.mutationId)}
+            {@const spinTarget = players.find((line) => line.cardId === spin.targetCardId) ?? null}
+            <div class="mt-4 border-t border-line-soft pt-3">
+              <div class="mt-2 flex items-center gap-2">
+                <HavocTierBadge tier={spin.tier} size="sm" />
+                <p class="text-sm font-bold">{mutation.name}</p>
+              </div>
+              <p class="mt-1 text-xs leading-relaxed text-muted-foreground">
+                {mutation.description}
+              </p>
+              {#if mutation.downside}<p class="mt-1 text-xs text-destructive">
+                  Downside: {mutation.downside}
+                </p>{/if}
+              <dl class="mt-3 grid grid-cols-2 gap-2">
+                <div class="rounded-xl border border-line-soft bg-surface-1 px-3 py-2.5">
+                  <dt
+                    class="font-mono text-[9px] tracking-[0.08em] text-muted-foreground uppercase"
+                  >
+                    Spin type
+                  </dt>
+                  <dd class="text-xs font-extrabold capitalize">{spin.purchase}</dd>
+                </div>
+                <div class="rounded-xl border border-line-soft bg-surface-1 px-3 py-2.5">
+                  <dt
+                    class="font-mono text-[9px] tracking-[0.08em] text-muted-foreground uppercase"
+                  >
+                    Price
+                  </dt>
+                  <dd class="font-mono text-xs font-extrabold tabular-nums">
+                    {formatMillions(spin.priceDollars)}
+                  </dd>
+                </div>
+                <div class="rounded-xl border border-line-soft bg-surface-1 px-3 py-2.5">
+                  <dt
+                    class="font-mono text-[9px] tracking-[0.08em] text-muted-foreground uppercase"
+                  >
+                    Tier
+                  </dt>
+                  <dd class="font-mono text-xs font-extrabold tabular-nums">Tier {spin.tier}</dd>
+                </div>
+                <div class="rounded-xl border border-line-soft bg-surface-1 px-3 py-2.5">
+                  <dt
+                    class="font-mono text-[9px] tracking-[0.08em] text-muted-foreground uppercase"
+                  >
+                    Target
+                  </dt>
+                  <dd class="truncate text-xs font-extrabold">
+                    {spinTarget === null
+                      ? spin.targetCardId
+                      : `${spinTarget.displayName} Â· ${spinTarget.slot}`}
+                  </dd>
+                </div>
+              </dl>
             </div>
-            <div class="rounded-xl border border-line-soft bg-surface-1 px-3 py-2.5">
-              <dt class="font-mono text-[9px] tracking-[0.08em] text-muted-foreground uppercase">
-                Price
-              </dt>
-              <dd class="font-mono text-xs font-extrabold tabular-nums">
-                {formatMillions(spin.priceDollars)}
-              </dd>
-            </div>
-            <div class="rounded-xl border border-line-soft bg-surface-1 px-3 py-2.5">
-              <dt class="font-mono text-[9px] tracking-[0.08em] text-muted-foreground uppercase">
-                Tier
-              </dt>
-              <dd class="font-mono text-xs font-extrabold tabular-nums">Tier {spin.tier}</dd>
-            </div>
-            <div class="rounded-xl border border-line-soft bg-surface-1 px-3 py-2.5">
-              <dt class="font-mono text-[9px] tracking-[0.08em] text-muted-foreground uppercase">
-                Target
-              </dt>
-              <dd class="truncate text-xs font-extrabold">
-                {spinTarget === null
-                  ? spin.targetCardId
-                  : `${spinTarget.displayName} Â· ${spinTarget.slot}`}
-              </dd>
-            </div>
-          </dl>
+          {/each}
         {/if}
       </section>
     {/if}

@@ -40,6 +40,7 @@
 
   const locked = $derived(draft.locked);
   const played = $derived(season.games.length);
+  const latest = $derived(season.games.at(-1) ?? null);
   const remaining = $derived(Math.max(0, CAP_RUSH_GAME_COUNT - played));
   const hasBoxScores = $derived(storedGames.length > 0);
   const boxScoresComplete = $derived(played > 0 && storedGames.length === played);
@@ -47,6 +48,12 @@
   const summaryByNumber = $derived(new Map(season.games.map((game) => [game.gameNumber, game])));
   const opponentTeams = $derived(
     new Map((locked?.opponents ?? []).map((entry) => [entry.opponentId, entry.team])),
+  );
+  const latestOpponent = $derived(
+    latest === null ? null : (opponentTeams.get(latest.opponentId) ?? null),
+  );
+  const latestIdentity = $derived(
+    latestOpponent === null || art === null ? null : art.teamFor(latestOpponent.teamId),
   );
   const picksBySlot = $derived(new Map(draft.picks.map((pick) => [pick.slot, pick])));
   const slotLines = $derived(
@@ -176,24 +183,68 @@
       </dl>
     </div>
 
-    <div
-      class="mt-4 h-2.5 w-full overflow-hidden rounded-full bg-surface-3"
-      role="progressbar"
-      aria-label="Games completed out of 82"
-      aria-valuemin={0}
-      aria-valuemax={CAP_RUSH_GAME_COUNT}
-      aria-valuenow={played}
-      aria-valuetext="{played} of {CAP_RUSH_GAME_COUNT} games completed"
+    {#if latest !== null}
+      <div class="mt-5 rounded-xl border border-line-strong bg-surface-1 p-4">
+        <p
+          class="font-mono text-[10px] font-bold tracking-[0.14em] text-muted-foreground uppercase"
+        >
+          Latest ? Game {latest.gameNumber}
+        </p>
+        <GameScoreboard
+          teams={[
+            { key: 'you', label: 'Your five', score: latest.humanPoints, winner: latest.won },
+            {
+              key: 'opponent',
+              label: opponentTeams.get(latest.opponentId)?.displayName ?? latest.opponentId,
+              score: latest.opponentPoints,
+              winner: !latest.won,
+            },
+          ]}
+          label={`Game ${latest.gameNumber} score`}
+          class="mt-2"
+        >
+          {#snippet team(entry)}
+            <div class="ui-scoreboard-team" data-align="center" data-winner={entry.winner === true}>
+              {#if entry.key === 'opponent' && latestIdentity !== null && art !== null}
+                <TeamLogo
+                  manifest={art.manifest}
+                  franchiseId={latestIdentity.franchiseId}
+                  teamExternalId={latestIdentity.teamExternalId}
+                  className="mx-auto mb-1 h-9 w-9"
+                  eager
+                />
+              {/if}
+              <span class="ui-scoreboard-label">{entry.label}</span>
+              {#key entry.score}<strong class="ui-scoreboard-score">{entry.score}</strong>{/key}
+            </div>
+          {/snippet}
+        </GameScoreboard>
+      </div>
+    {/if}
+    <ol
+      class="mt-4 grid grid-cols-14 gap-[3px] sm:grid-cols-21 md:grid-cols-41"
+      aria-label="82-game season strip"
     >
-      <span
-        class="block h-full rounded-full bg-primary motion-reduce:transition-none"
-        style:width={`${(played / CAP_RUSH_GAME_COUNT) * 100}%`}
-      ></span>
-    </div>
-    <div class="mt-1.5 flex justify-between font-mono text-[9px] text-muted-foreground uppercase">
-      <span>{played} played</span>
-      <span>{remaining} to go</span>
-    </div>
+      {#each cells as cell (cell.gameNumber)}
+        <li
+          class="aspect-square rounded-[3px] {cell.summary === null
+            ? 'bg-surface-3/70'
+            : cell.summary.won
+              ? 'bg-primary/80'
+              : 'bg-destructive/70'}"
+          title={cell.summary === null
+            ? `Game ${cell.gameNumber} upcoming`
+            : `Game ${cell.gameNumber}: ${cell.summary.won ? 'win' : 'loss'} against ${cell.opponentName}`}
+        >
+          <span class="sr-only"
+            >{cell.summary === null
+              ? `Game ${cell.gameNumber} upcoming`
+              : `Game ${cell.gameNumber}: ${cell.summary.won ? 'win' : 'loss'} against ${cell.opponentName}`}</span
+          >
+        </li>
+      {/each}
+    </ol>
+
     {#if season.completedAt !== null}
       <p class="mt-2 text-xs font-semibold text-positive">
         Season complete · {new Date(season.completedAt).toLocaleDateString()}

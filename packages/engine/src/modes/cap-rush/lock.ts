@@ -109,6 +109,7 @@ export function buildCapRushHumanTeam(input: {
   readonly picks: readonly CapRushDraftPick[];
   readonly payrollStatus: CapRushPayrollStatus;
   readonly spin: CapRushSpinReceipt | null;
+  readonly additionalSpins?: readonly CapRushSpinReceipt[] | undefined;
 }): HavocTeamInput {
   if (input.picks.length !== POSITIONS.length) {
     throw new Error(
@@ -119,10 +120,10 @@ export function buildCapRushHumanTeam(input: {
     (left, right) => POSITIONS.indexOf(left.slot) - POSITIONS.indexOf(right.slot),
   );
   const starters = ordered.map((pick) => {
-    const mutationPackage =
-      input.spin !== null && input.spin.target.cardId === pick.card.cardId
-        ? [input.spin.entry]
-        : [];
+    const receipt = [input.spin, ...(input.additionalSpins ?? [])].find(
+      (spin) => spin?.target.cardId === pick.card.cardId,
+    );
+    const mutationPackage = receipt ? [receipt.entry] : [];
     return {
       instanceId: capRushInstanceIdOf(input.runSeed, 'human-starter', pick.pickOrdinal),
       kind: 'starter' as const,
@@ -180,6 +181,7 @@ export function buildCapRushLockedInputs(input: {
   readonly catalog: CapRushLockedInputs['catalog'];
   readonly picks: readonly CapRushDraftPick[];
   readonly spin: CapRushSpinReceipt | null;
+  readonly additionalSpins?: readonly CapRushSpinReceipt[] | undefined;
   readonly bracket: OpponentBracket;
   readonly profile: EraSimulationProfile;
 }): CapRushLockedInputs {
@@ -203,6 +205,7 @@ export function buildCapRushLockedInputs(input: {
     picks: input.picks,
     payrollStatus,
     spin: input.spin,
+    additionalSpins: input.additionalSpins,
   });
   const schedule = buildCapRushSchedule(input.bracket);
   const opponents = input.bracket.opponents.map((opponent) => ({
@@ -226,6 +229,7 @@ export function buildCapRushLockedInputs(input: {
     payrollStatus,
     target: capRushHighestPaidOf(input.picks, input.runSeed),
     spin: input.spin,
+    ...(input.additionalSpins?.length ? { additionalSpins: input.additionalSpins } : {}),
     human,
     schedule,
     opponents,

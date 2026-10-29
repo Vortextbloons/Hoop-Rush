@@ -53,16 +53,6 @@
       </div>
     {:else if resultState.report !== null}
       <header class="mb-4 flex flex-wrap items-end justify-between gap-3">
-        <div class="min-w-0">
-          <p class="font-mono text-[10px] font-bold tracking-[0.18em] text-primary uppercase">
-            Cap Rush · Final report
-          </p>
-          <h1
-            class="font-display mt-1 text-3xl font-extrabold tracking-tight uppercase sm:text-4xl"
-          >
-            The season is in the books.
-          </h1>
-        </div>
         <div class="flex flex-wrap items-center gap-2">
           <a
             href={resolve('cap-rush/history/')}
@@ -76,7 +66,7 @@
             disabled={resultState.busy}
             onclick={() => void startNewRun()}
           >
-            {resultState.busy ? 'Opening a new draft…' : 'Start another run'}
+            {resultState.busy ? 'Starting another run…' : 'Start another run'}
           </button>
         </div>
       </header>

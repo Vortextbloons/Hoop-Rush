@@ -56,6 +56,10 @@ export const capRushSpinStateSchema = z.discriminatedUnion('status', [
   z.object({ status: z.literal('unavailable') }),
   z.object({ status: z.literal('pending') }),
   z.object({ status: z.literal('skipped') }),
-  z.object({ status: z.literal('purchased'), receipt: capRushSpinReceiptSchema }),
+  z.object({
+    status: z.literal('purchased'),
+    receipt: capRushSpinReceiptSchema,
+    additionalReceipts: z.array(capRushSpinReceiptSchema).max(4).optional(),
+  }),
 ]);
 export type CapRushSpinState = z.infer<typeof capRushSpinStateSchema>;

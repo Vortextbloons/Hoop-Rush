@@ -72,6 +72,7 @@ export const capRushLockedInputsSchema = z
     payrollStatus: capRushPayrollStatusSchema,
     target: capRushHighestPaidTargetSchema,
     spin: capRushSpinReceiptSchema.nullable(),
+    additionalSpins: z.array(capRushSpinReceiptSchema).max(4).optional(),
     human: havocTeamInputSchema,
     schedule: z.array(capRushScheduleEntrySchema).length(CAP_RUSH_GAME_COUNT),
     opponents: z.array(capRushFrozenOpponentSchema).min(1).max(64),
@@ -91,6 +92,31 @@ export const capRushLockedInputsSchema = z
     }
     if (locked.spin !== null && locked.variant !== 'roulette') {
       ctx.addIssue({ code: 'custom', message: 'Cap Clash cannot lock a spin receipt' });
+    }
+    const receipts = locked.spin === null ? [] : [locked.spin, ...(locked.additionalSpins ?? [])];
+    if (locked.spin === null && (locked.additionalSpins?.length ?? 0) > 0) {
+      ctx.addIssue({ code: 'custom', message: 'additional spins require a first spin' });
+    }
+    let spend = locked.payrollDollars;
+    const spinTargets = new Set<string>();
+    for (const receipt of receipts) {
+      const pick = locked.picks.find((entry) => entry.cardId === receipt.target.cardId);
+      if (
+        !pick ||
+        pick.slot !== receipt.target.slot ||
+        pick.pickOrdinal !== receipt.target.pickOrdinal ||
+        pick.playerVersionId !== receipt.target.playerVersionId ||
+        spinTargets.has(receipt.target.cardId) ||
+        receipt.payrollDollars !== spend
+      ) {
+        ctx.addIssue({
+          code: 'custom',
+          message:
+            'spin receipts must target distinct locked players and account for prior spending',
+        });
+      }
+      spinTargets.add(receipt.target.cardId);
+      spend += receipt.priceDollars;
     }
     locked.picks.forEach((pick, index) => {
       if (pick.pickOrdinal !== index) {

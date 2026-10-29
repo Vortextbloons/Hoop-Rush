@@ -128,6 +128,18 @@ export const capRushReportSchema = z
         targetCardId: capRushCardIdSchema,
       })
       .nullable(),
+    additionalSpins: z
+      .array(
+        z.object({
+          purchase: capRushSpinPurchaseSchema,
+          priceDollars: z.number().int().nonnegative(),
+          tier: havocTierSchema,
+          mutationId: havocMutationIdSchema,
+          targetCardId: capRushCardIdSchema,
+        }),
+      )
+      .max(4)
+      .optional(),
     players: z.array(capRushPlayerSeasonLineSchema).length(5),
     mvp: capRushMvpEntrySchema.nullable(),
     leagueBaselineTs: z.number(),
@@ -148,7 +160,12 @@ export const capRushReportSchema = z
     if (report.spin === null && report.spinSpendDollars !== 0) {
       ctx.addIssue({ code: 'custom', message: 'a no-spin report cannot carry spin spend' });
     }
-    if (report.spin !== null && report.spinSpendDollars !== report.spin.priceDollars) {
+    if (
+      report.spin !== null &&
+      report.spinSpendDollars !==
+        report.spin.priceDollars +
+          (report.additionalSpins ?? []).reduce((total, spin) => total + spin.priceDollars, 0)
+    ) {
       ctx.addIssue({ code: 'custom', message: 'spin spend must equal the purchased price' });
     }
     const slots = new Set(report.players.map((line) => line.slot));
