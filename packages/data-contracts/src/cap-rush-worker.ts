@@ -2,9 +2,9 @@ import { z } from 'zod';
 import { CAP_RUSH_GAME_COUNT, capRushDigestSchema } from './cap-rush-versions.ts';
 import { capRushGameSummarySchema } from './cap-rush-season.ts';
 import { capRushLockedInputsSchema } from './cap-rush-lock.ts';
-import { havocGameAuditSchema, havocGameResultSchema, havocGameTapeSchema } from './havoc-game.ts';
+import { havocGameAuditSchema, havocGameResultSchema } from './havoc-game.ts';
 
-export const CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION = 1;
+export const CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION = 2;
 
 const capRushWorkerBase = z.object({
   schemaVersion: z.literal(CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION),
@@ -40,7 +40,6 @@ export const capRushWorkerGameMessageSchema = capRushWorkerBase.extend({
   summary: capRushGameSummarySchema,
   audit: havocGameAuditSchema,
   result: havocGameResultSchema,
-  tape: havocGameTapeSchema,
 });
 export type CapRushWorkerGameMessage = z.infer<typeof capRushWorkerGameMessageSchema>;
 

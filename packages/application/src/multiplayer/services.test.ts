@@ -33,9 +33,15 @@ async function flush() {
 }
 function harness(command: LobbySessionDeps['command'] = vi.fn(() => Promise.resolve(lobby))) {
   let tick = () => {};
+  let notified = () => {};
   const stop = vi.fn();
+  const unsubscribe = vi.fn();
   const deps: LobbySessionDeps = {
     command,
+    subscribe: vi.fn<LobbySessionDeps['subscribe']>((_id, onChange) => {
+      notified = onChange;
+      return unsubscribe;
+    }),
     resumeGame: vi.fn(() => Promise.resolve()),
     rememberLobby: vi.fn(),
     friendlyError: String,
@@ -50,6 +56,8 @@ function harness(command: LobbySessionDeps['command'] = vi.fn(() => Promise.reso
     session,
     deps,
     stop,
+    unsubscribe,
+    notify: () => notified(),
     tick: () => {
       tick();
     },
@@ -57,6 +65,21 @@ function harness(command: LobbySessionDeps['command'] = vi.fn(() => Promise.reso
 }
 
 describe('lobby orchestration', () => {
+  it('refreshes immediately on a lobby notification and detaches its subscription', async () => {
+    const command = vi.fn<LobbySessionDeps['command']>().mockResolvedValue(lobby);
+    const h = harness(command);
+    await h.session.attach(lobbyId);
+    command.mockResolvedValue({ ...lobby, revision: 1, guestJoined: true });
+    h.notify();
+    await flush();
+    expect(h.session.getSnapshot().lobby?.guestJoined).toBe(true);
+    h.session.dispose();
+    const calls = command.mock.calls.length;
+    h.notify();
+    await flush();
+    expect(command).toHaveBeenCalledTimes(calls);
+  });
+
   it.each(['success', 'error'] as const)(
     'clears room previews on code edits and ignores delayed %s responses',
     async (result) => {
@@ -99,6 +122,7 @@ describe('lobby orchestration', () => {
     expect(h.session.getSnapshot().navigation).toBeNull();
     h.session.dispose();
     expect(h.stop).toHaveBeenCalledTimes(1);
+    expect(h.unsubscribe).toHaveBeenCalledTimes(1);
   });
   it('never overlaps refreshes and coalesces duplicate events', async () => {
     const pending = deferred<unknown>();

@@ -424,10 +424,19 @@ export class HavocMultiplayerSession {
       }
       this.lifecycle.track(
         attachment,
-        this.deps.transport.subscribe(roomId, () => {
-          if (!attachment.current()) return;
-          void this.syncFromServer();
-        }).unsubscribe,
+        this.deps.transport.subscribe(
+          roomId,
+          () => {
+            if (!attachment.current()) return;
+            void this.syncFromServer();
+          },
+          (error) => {
+            if (!attachment.current()) return;
+            this.lifecycle.failed(attachment);
+            this.error = this.deps.friendlyError(error);
+            this.publish();
+          },
+        ).unsubscribe,
       );
       this.lifecycle.track(
         attachment,
@@ -953,26 +962,21 @@ export class HavocMultiplayerSession {
     const roomId = attachment.roomId;
     const isDisposed = () => !attachment.current();
     try {
-      const resumed = await this.deps.transport.resume(roomId);
+      const resumed = await this.deps.transport.sync(roomId);
       if (isDisposed()) return;
       this.lifecycle.connected(attachment);
       this.error = null;
-      const commands = await this.deps.transport.refetch(roomId, -1);
+      const commands = resumed.commands;
       if (isDisposed()) return;
-      const latest = await this.deps.transport.resume(roomId);
-      if (isDisposed()) return;
-      if (latest.snapshot.revision !== resumed.snapshot.revision) {
-        void this.syncFromServer();
-        return;
-      }
       if (this.snapshot && resumed.snapshot.revision < this.snapshot.revision) {
         void this.syncFromServer();
         return;
       }
+      const commandsChanged = commands.length !== this.commands.length;
       this.commands = commands;
       this.applySnapshot(resumed.snapshot, false);
       if (!this.assertRoomVersions()) return;
-      if (!this.completedPersisted) this.rebuildDraft();
+      if (!this.completedPersisted && (commandsChanged || this.draft === null)) this.rebuildDraft();
       if (this.shouldCreateRematch()) {
         this.rematchRetryAtMs = this.deps.now() + AUTO_START_RETRY_MS;
         await this.deps.transport.rematch(roomId);

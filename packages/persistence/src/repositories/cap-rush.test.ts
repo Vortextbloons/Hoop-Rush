@@ -232,6 +232,18 @@ describe('cap rush repository', () => {
     expect(await repository.loadCommandResult(command.commandId)).toEqual(result);
   });
 
+  it('rejects a changed outcome state before persisting its verified digest', async () => {
+    const { command, state, result } = setup();
+    await expect(
+      repository.applyOutcome({
+        outcome: { state: { ...state, revision: state.revision + 1 }, result },
+        command,
+      }),
+    ).rejects.toBeInstanceOf(CapRushLoadError);
+    expect(await db.capRushActive.count()).toBe(0);
+    expect(await db.capRushCommands.count()).toBe(0);
+  });
+
   it('keeps the same receipt for a duplicate command id', async () => {
     const { command, state, result } = setup();
     await repository.applyOutcome({ outcome: { state, result }, command });

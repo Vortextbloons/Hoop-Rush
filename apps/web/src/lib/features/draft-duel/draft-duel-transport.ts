@@ -27,6 +27,7 @@ import { randomBytes, randomUUID } from '#lib/ids.js';
 import { createInMemoryDraftDuelTransport } from '@hoop-rush/application/draft-duel';
 import {
   createRealtimeRoomRegistry,
+  readRoomSync,
   ensureAnonymous,
   getCachedTransport,
   isUsablePublishableKey,
@@ -257,12 +258,11 @@ export function createDraftDuelTransport(options?: {
     const memberRows = (Array.isArray(memberData) ? memberData : []) as DraftDuelMemberRow[];
     return roomRowToSnapshot(row, memberRows);
   }
-  const registry = createRealtimeRoomRegistry<DraftDuelRoomSnapshot>({
+  const registry = createRealtimeRoomRegistry({
     label: 'Draft Duel',
     roomsTable: 'draft_duel_rooms',
     commandsTable: 'draft_duel_room_commands',
     topic: (roomId) => `draft-duel-room-${roomId}`,
-    fetchSnapshot,
     getClient,
   });
   const transientTopic = (roomId: string): string => `draft-duel:${roomId}`;
@@ -393,8 +393,26 @@ export function createDraftDuelTransport(options?: {
         },
       };
     },
-    subscribe(roomId, handler) {
-      return registry.subscribe(roomId, handler);
+    async sync(roomId, afterOrdinal) {
+      const client = await getClient();
+      const payload = await readRoomSync(client, 'draft-duel', roomId, afterOrdinal);
+      const row = payload.room as unknown as DraftDuelRoomRow;
+      const members = payload.members as unknown as DraftDuelMemberRow[];
+      const rows = payload.commands as unknown as DraftDuelCommandRow[];
+      const commands = rows.map((row) =>
+        draftDuelCommandSchema.parse({
+          schemaVersion: 1,
+          roomId: idSchema.parse(roomId),
+          commandId: row.command_id,
+          ordinal: row.ordinal,
+          actorParticipantId: row.actor_participant_id,
+          payload: row.payload,
+        }),
+      );
+      return { snapshot: roomRowToSnapshot(row, members), commands };
+    },
+    subscribe(roomId, handler, onError) {
+      return registry.subscribe(roomId, handler, onError);
     },
     subscribeTransient(roomId, handler) {
       return subscribeTransientPayloads({

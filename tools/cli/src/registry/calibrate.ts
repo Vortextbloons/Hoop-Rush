@@ -59,7 +59,7 @@ export const calibrateCommands: CommandSpec[] = [
       'allow-skipped': 'flag',
     },
     help: `  calibrate sensitivity  A/B the single-dimension sensitivity fixtures.
-                         --samples N (default 200)   --profile <path>  --era <eraId>`,
+                         --samples N (default 2000)  --profile <path>  --era <eraId>`,
     run: (args) => calibrateSensitivity(pickU(args, ['samples', 'profile', 'era'])),
   },
   {

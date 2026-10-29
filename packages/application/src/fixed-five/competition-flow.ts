@@ -23,9 +23,6 @@ import type {
   FixedFiveRunnerPort,
 } from './session.ts';
 
-const SIM_SHOWDOWN_MIN_MS = 7000;
-const SIM_SHOWDOWN_REDUCED_MS = 400;
-
 type CompetitionSnapshot = Pick<
   FixedFiveRoomSessionSnapshot,
   | 'simStarted'
@@ -62,7 +59,6 @@ export class FixedFiveCompetitionFlow {
   private readonly simulationGate = new FixedFiveSimulationGate();
   private simulationReason: FixedFiveSimulationReason = 'initial';
   private simStarted = false;
-  private simStartAt = 0;
   private simDone = false;
   private simError: string | null = null;
   private progress: { completed: number; total: number } | null = null;
@@ -79,14 +75,14 @@ export class FixedFiveCompetitionFlow {
 
   private readonly deps: Pick<
     FixedFiveRoomSessionDeps,
-    'roomId' | 'repository' | 'createRunner' | 'buildTeam' | 'now' | 'prefersReducedMotion'
+    'roomId' | 'repository' | 'createRunner' | 'buildTeam' | 'now'
   >;
   private readonly host: CompetitionHost;
 
   constructor(
     deps: Pick<
       FixedFiveRoomSessionDeps,
-      'roomId' | 'repository' | 'createRunner' | 'buildTeam' | 'now' | 'prefersReducedMotion'
+      'roomId' | 'repository' | 'createRunner' | 'buildTeam' | 'now'
     >,
     host: CompetitionHost,
   ) {
@@ -328,7 +324,6 @@ export class FixedFiveCompetitionFlow {
         room.seasonBroadcast?.lastCompletedGameNumber ?? 0,
       );
       this.progress = { completed: 0, total: room.settings.mode === 'duel' ? 7 : 161 };
-      this.simStartAt = this.deps.now();
       this.host.publish();
       const simulationContext: SimulationContext = { p1Refs, p2Refs, p1Team, p2Team };
       const active = this.deps.createRunner((event) => {
@@ -428,12 +423,6 @@ export class FixedFiveCompetitionFlow {
       }
       if (!this.pendingRun)
         await this.deps.repository.savePendingResult(this.roomId, run, this.selfId);
-      if (this.host.isDisposed()) return;
-      const minShow = this.deps.prefersReducedMotion()
-        ? SIM_SHOWDOWN_REDUCED_MS
-        : SIM_SHOWDOWN_MIN_MS;
-      const waitMs = Math.max(0, this.simStartAt + minShow - this.deps.now());
-      if (waitMs > 0) await new Promise((resolve) => setTimeout(resolve, waitMs));
       if (this.host.isDisposed()) return;
       const localResult: FixedFiveLocalResult = {
         result: summary.result,

@@ -271,12 +271,43 @@ describe('draft-duel supabase transport protocol pins', () => {
     expect(commands.map((command) => command.commandId)).toEqual(['cmd-1' as CommandId]);
   });
 
+  it('sync reads one coherent RPC without repeated membership lookups', async () => {
+    const { harness, transport } = setupTransport();
+    harness.setRpc('multiplayer_room_sync', () => ({
+      room: roomRow(),
+      members: [memberRow('p1'), memberRow('p2')],
+      commands: [
+        {
+          command_id: 'cmd-sync',
+          ordinal: 0,
+          actor_participant_id: 'p1',
+          payload: { kind: 'ready', ready: true },
+        },
+      ],
+    }));
+    const result = await transport.sync(ROOM_ID, -1);
+    expect(result.snapshot.roomId).toBe(roomId);
+    expect(result.commands.map((command) => command.commandId)).toEqual([
+      commandIdSchema.parse('cmd-sync'),
+    ]);
+    expect(harness.rpcCalls).toEqual([
+      {
+        name: 'multiplayer_room_sync',
+        args: { p_mode: 'draft-duel', p_room_id: ROOM_ID, p_after_ordinal: -1 },
+      },
+    ]);
+    expect(harness.selectQueries).toHaveLength(0);
+    expect(harness.authCalls).not.toContain('getUser');
+    harness.setRpc('multiplayer_room_sync', () => ({ room: roomRow(), members: [], commands: [] }));
+    await expect(transport.sync(ROOM_ID, 0)).rejects.toThrow();
+  });
+
   it('subscribe opens one realtime channel and tears it down with the last handler', async () => {
     const { harness, transport } = setupTransport();
     seedRoom(harness);
-    const snapshots: unknown[] = [];
-    const subscription = transport.subscribe(ROOM_ID, (snapshot) => {
-      snapshots.push(snapshot);
+    const invalidations: boolean[] = [];
+    const subscription = transport.subscribe(ROOM_ID, () => {
+      invalidations.push(true);
     });
 
     await waitFor(() => {
@@ -291,7 +322,7 @@ describe('draft-duel supabase transport protocol pins', () => {
 
     channel?.triggerPostgresChange();
     await waitFor(() => {
-      expect(snapshots.length).toBeGreaterThan(0);
+      expect(invalidations.length).toBeGreaterThan(0);
     });
 
     subscription.unsubscribe();

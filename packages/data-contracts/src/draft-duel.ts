@@ -572,9 +572,17 @@ export interface DraftDuelMultiplayerTransport {
     snapshot: DraftDuelRoomSnapshot;
     membership: DraftDuelRoomMembership;
   }>;
+  sync(
+    roomId: string,
+    afterOrdinal: number,
+  ): Promise<{
+    snapshot: DraftDuelRoomSnapshot;
+    commands: DraftDuelCommand[];
+  }>;
   subscribe(
     roomId: string,
-    handler: (snapshot: DraftDuelRoomSnapshot) => void,
+    handler: () => void,
+    onError?: (error: Error) => void,
   ): {
     unsubscribe: () => void;
   };

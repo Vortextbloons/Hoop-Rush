@@ -722,6 +722,15 @@ export function createInMemoryFixedFiveTransport(options: {
         });
       return record.snapshot;
     },
+    async sync(roomId, afterOrdinal) {
+      await Promise.resolve();
+      const record = rooms.get(roomId);
+      if (!record) throw new Error('authorization');
+      return {
+        snapshot: record.snapshot,
+        commands: record.commands.filter((command) => command.ordinal > afterOrdinal),
+      };
+    },
     subscribe(roomId, handler) {
       const record = rooms.get(roomId);
       if (!record) return { unsubscribe: () => {} };

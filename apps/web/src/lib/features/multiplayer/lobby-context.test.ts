@@ -22,6 +22,7 @@ function mocked<T>(value: T): T & ReturnType<typeof mock> {
 
 void mock.module('./multiplayer-lobby', () => ({
   lobbyCommand: mock(() => Promise.resolve(lobby)),
+  subscribeLobby: mock(() => () => {}),
   loadLobbyId: mock(() => null),
   rememberLobby: mock(),
   resumeMultiplayerGame: mock(() => Promise.resolve()),

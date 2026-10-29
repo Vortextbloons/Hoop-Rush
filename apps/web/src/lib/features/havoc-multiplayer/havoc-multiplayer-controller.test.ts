@@ -440,11 +440,10 @@ describe('havoc multiplayer presenter flow', () => {
   it('publishes matching readiness and commands when a command arrives during refresh', async () => {
     const h = await createHarness('refresh-race');
     try {
-      const resume = h.transport.resume.bind(h.transport);
-      vi.spyOn(h.transport, 'resume').mockImplementationOnce(async (id) => {
-        const prior = await resume(id);
+      const sync = h.transport.sync.bind(h.transport);
+      vi.spyOn(h.transport, 'sync').mockImplementationOnce(async (id) => {
         await h.submit('p2', { kind: 'ready' });
-        return prior;
+        return sync(id);
       });
       const updates: ReturnType<HavocMultiplayerSession['getSnapshot']>[] = [];
       h.session.subscribe(() => updates.push(h.session.getSnapshot()));

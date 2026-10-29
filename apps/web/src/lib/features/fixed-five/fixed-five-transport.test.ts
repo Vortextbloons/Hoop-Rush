@@ -326,12 +326,43 @@ describe('fixed-five supabase transport protocol pins', () => {
     await expect(transport.refetch(ROOM_ID, 2)).rejects.toThrow();
   });
 
+  it('sync reads one coherent RPC without repeated membership lookups', async () => {
+    const { harness, transport } = setupTransport();
+    harness.setRpc('multiplayer_room_sync', () => ({
+      room: roomRow(),
+      members: [memberRow('p1'), memberRow('p2')],
+      commands: [
+        {
+          command_id: 'cmd-sync',
+          ordinal: 0,
+          actor_participant_id: 'p1',
+          payload: { kind: 'ready', ready: true },
+        },
+      ],
+    }));
+    const result = await transport.sync(ROOM_ID, -1);
+    expect(result.snapshot.roomId).toBe(roomId);
+    expect(result.commands.map((command) => command.commandId)).toEqual([
+      commandIdSchema.parse('cmd-sync'),
+    ]);
+    expect(harness.rpcCalls).toEqual([
+      {
+        name: 'multiplayer_room_sync',
+        args: { p_mode: 'fixed-five', p_room_id: ROOM_ID, p_after_ordinal: -1 },
+      },
+    ]);
+    expect(harness.selectQueries).toHaveLength(0);
+    expect(harness.authCalls).not.toContain('getUser');
+    harness.setRpc('multiplayer_room_sync', () => ({ room: roomRow(), members: [], commands: [] }));
+    await expect(transport.sync(ROOM_ID, 0)).rejects.toThrow();
+  });
+
   it('subscribe opens one realtime channel and tears it down with the last handler', async () => {
     const { harness, transport } = setupTransport();
     seedRoom(harness);
-    const snapshots: unknown[] = [];
-    const subscription = transport.subscribe(ROOM_ID, (snapshot) => {
-      snapshots.push(snapshot);
+    const invalidations: boolean[] = [];
+    const subscription = transport.subscribe(ROOM_ID, () => {
+      invalidations.push(true);
     });
 
     await waitFor(() => {
@@ -348,7 +379,7 @@ describe('fixed-five supabase transport protocol pins', () => {
 
     channel?.triggerPostgresChange();
     await waitFor(() => {
-      expect(snapshots.length).toBeGreaterThan(0);
+      expect(invalidations.length).toBeGreaterThan(0);
     });
 
     subscription.unsubscribe();
@@ -358,29 +389,31 @@ describe('fixed-five supabase transport protocol pins', () => {
     });
   });
 
-  it('coalesces overlapping realtime invalidations into one trailing refresh', async () => {
+  it('reports realtime failures and refreshes after a successful rejoin', async () => {
     const { harness, transport } = setupTransport();
-    seedRoom(harness);
-    const subscription = transport.subscribe(ROOM_ID, () => {});
-
-    await waitFor(() => {
-      expect(harness.channels).toHaveLength(1);
-    });
+    const changed = mock(() => {});
+    const failed = mock<(error: Error) => void>(() => {});
+    const subscription = transport.subscribe(ROOM_ID, changed, failed);
+    await waitFor(() => expect(harness.channels).toHaveLength(1));
     const channel = harness.channels[0];
-    channel?.triggerPostgresChange();
-    channel?.triggerPostgresChange();
-    channel?.triggerPostgresChange();
+    channel?.triggerStatus('CHANNEL_ERROR');
+    expect(failed).toHaveBeenCalledTimes(1);
+    expect(failed.mock.calls[0]?.[0].message).toContain('channel_error');
+    changed.mockClear();
+    channel?.triggerStatus('SUBSCRIBED');
+    expect(changed).toHaveBeenCalledTimes(1);
+    subscription.unsubscribe();
+  });
 
-    await waitFor(() => {
-      expect(
-        harness.selectQueries.filter((query) => query.table === 'fixed_five_rooms'),
-      ).toHaveLength(2);
-    });
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(
-      harness.selectQueries.filter((query) => query.table === 'fixed_five_rooms'),
-    ).toHaveLength(2);
-
+  it('invalidates without reading snapshots before session reconciliation', async () => {
+    const { harness, transport } = setupTransport();
+    const invalidated = mock(() => {});
+    const subscription = transport.subscribe(ROOM_ID, invalidated);
+    await waitFor(() => expect(harness.channels).toHaveLength(1));
+    harness.channels[0]?.triggerPostgresChange();
+    harness.channels[0]?.triggerPostgresChange();
+    expect(invalidated.mock.calls.length).toBeGreaterThanOrEqual(2);
+    expect(harness.selectQueries).toHaveLength(0);
     subscription.unsubscribe();
   });
 

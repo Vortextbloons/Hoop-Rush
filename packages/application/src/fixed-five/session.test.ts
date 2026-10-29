@@ -499,8 +499,9 @@ describe('FixedFiveRoomSession', () => {
       const authoritative = await realSnapshot(roomId);
       expect(authoritative.phase).toBe('broadcasting');
       const commandCount = session.getSnapshot().commands.length;
-      vi.spyOn(harness.transport, 'refetch').mockResolvedValue([]);
-      const snapshot = vi.spyOn(harness.transport, 'snapshot').mockResolvedValue(authoritative);
+      const snapshot = vi
+        .spyOn(harness.transport, 'sync')
+        .mockResolvedValue({ snapshot: authoritative, commands: [] });
 
       vi.advanceTimersByTime(15_000);
       await flush();
@@ -558,7 +559,7 @@ describe('FixedFiveRoomSession', () => {
       }
       const advanced = await realSnapshot(roomId);
       expect(advanced.series?.currentGameNumber).toBe(2);
-      snapshot.mockResolvedValue(advanced);
+      snapshot.mockResolvedValue({ snapshot: advanced, commands: [] });
 
       vi.advanceTimersByTime(15_000);
       await flush();
@@ -572,7 +573,7 @@ describe('FixedFiveRoomSession', () => {
     }
   });
 
-  it('reconciles commands accepted between snapshot and log reads without realtime', async () => {
+  it('reconciles an atomic snapshot and command read without realtime', async () => {
     const harness = createHarness();
     const created = await harness.createRoom();
     await harness.transport.join(created.code);
@@ -580,9 +581,8 @@ describe('FixedFiveRoomSession', () => {
     const session = harness.session();
     try {
       await session.start();
-      const readSnapshot = harness.transport.snapshot.bind(harness.transport);
-      vi.spyOn(harness.transport, 'snapshot').mockImplementationOnce(async (roomId) => {
-        const snapshot = await readSnapshot(roomId);
+      const readSync = harness.transport.sync.bind(harness.transport);
+      vi.spyOn(harness.transport, 'sync').mockImplementationOnce(async (roomId, afterOrdinal) => {
         await harness.transport.submitCommand({
           schemaVersion: 1,
           roomId: created.snapshot.roomId,
@@ -590,7 +590,7 @@ describe('FixedFiveRoomSession', () => {
           actorParticipantId: 'p1',
           payload: { kind: 'start' },
         });
-        return snapshot;
+        return readSync(roomId, afterOrdinal);
       });
       const updates: FixedFiveRoomSessionSnapshot[] = [];
       session.subscribe((state) => updates.push(state));
@@ -650,13 +650,13 @@ describe('FixedFiveRoomSession', () => {
         payload: { kind: 'ready', ready: true },
       });
       expect(receipt.accepted).toBe(true);
-      const realSnapshot = harness.transport.snapshot.bind(harness.transport);
-      const authoritative = await realSnapshot(roomId);
-      const pending = deferred<FixedFiveRoomSnapshot>();
+      const realSync = harness.transport.sync.bind(harness.transport);
+      const authoritative = await realSync(roomId, -1);
+      const pending = deferred<typeof authoritative>();
       const snapshot = vi
-        .spyOn(harness.transport, 'snapshot')
+        .spyOn(harness.transport, 'sync')
         .mockImplementationOnce(() => pending.promise)
-        .mockImplementation(realSnapshot);
+        .mockImplementation(realSync);
       const refetch = vi.spyOn(harness.transport, 'refetch');
 
       const first = session.refresh();
@@ -679,11 +679,11 @@ describe('FixedFiveRoomSession', () => {
       pending.resolve(authoritative);
       await Promise.all([first, second]);
 
-      expect(refetch).toHaveBeenCalledTimes(2);
+      expect(refetch).not.toHaveBeenCalled();
       expect(snapshot).toHaveBeenCalledTimes(2);
       const state = session.getSnapshot();
       expect(state.commands.some((command) => command.commandId === 'concurrent-ready')).toBe(true);
-      expect(state.room?.revision).toBe(authoritative.revision);
+      expect(state.room?.revision).toBe(authoritative.snapshot.revision);
     } finally {
       session.dispose();
     }

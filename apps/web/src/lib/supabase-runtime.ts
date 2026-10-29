@@ -1,5 +1,5 @@
 import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js';
-import { idSchema, type Id } from '@hoop-rush/data-contracts';
+import { idSchema, multiplayerRoomSyncSchema, type Id } from '@hoop-rush/data-contracts';
 
 let supabaseModulePromise: Promise<typeof import('@supabase/supabase-js')> | null = null;
 
@@ -162,108 +162,79 @@ export function rpcRoomPayload<Code>(
   };
 }
 
-export interface RealtimeRoomRegistryOptions<TSnapshot> {
+export async function readRoomSync(
+  client: SupabaseClient,
+  mode: 'fixed-five' | 'draft-duel' | 'havoc',
+  roomId: string,
+  afterOrdinal: number,
+) {
+  await ensureAnonymous(client);
+  const response = await client.rpc('multiplayer_room_sync', {
+    p_mode: mode,
+    p_room_id: roomId,
+    p_after_ordinal: afterOrdinal,
+  });
+  if (response.error) throw new Error(`room sync failed: ${response.error.message}`);
+  return multiplayerRoomSyncSchema.parse(response.data);
+}
+
+export interface RealtimeRoomRegistryOptions {
   label: string;
   roomsTable: string;
-  commandsTable: string;
+  commandsTable?: string;
   topic: (roomId: string) => string;
-  fetchSnapshot: (roomId: string) => Promise<TSnapshot>;
   getClient: () => Promise<SupabaseClient>;
 }
 
-export interface RealtimeRoomRegistry<TSnapshot> {
-  subscribe(
-    roomId: string,
-    handler: (snapshot: TSnapshot) => void,
-  ): {
-    unsubscribe: () => void;
-  };
-}
-
-export function createRealtimeRoomRegistry<TSnapshot>(
-  options: RealtimeRoomRegistryOptions<TSnapshot>,
-): RealtimeRoomRegistry<TSnapshot> {
+export function createRealtimeRoomRegistry(options: RealtimeRoomRegistryOptions) {
   const rooms = new Map<
     string,
     {
-      handlers: Set<(snapshot: TSnapshot) => void>;
+      handlers: Map<() => void, ((error: Error) => void) | undefined>;
       channel: RealtimeChannel | null;
     }
   >();
 
-  function emit(roomId: string, snapshot: TSnapshot): void {
-    const record = rooms.get(roomId);
-    if (!record) return;
-    for (const handler of record.handlers) handler(snapshot);
+  function invalidate(roomId: string): void {
+    for (const handler of rooms.get(roomId)?.handlers.keys() ?? []) handler();
   }
 
-  async function refreshOnce(roomId: string): Promise<void> {
-    try {
-      const snapshot = await options.fetchSnapshot(roomId);
-      emit(roomId, snapshot);
-    } catch (error) {
-      const record = rooms.get(roomId);
-      if (!record) return;
-      console.error(`${options.label} realtime refresh failed; snapshot invalidated`, {
-        roomId,
-        errorType: error instanceof Error ? error.name : 'UnknownError',
-      });
-    }
-  }
-
-  const refreshes = new Map<string, { running: Promise<void>; queued: boolean }>();
-
-  function refresh(roomId: string): Promise<void> {
-    const pending = refreshes.get(roomId);
-    if (pending) {
-      pending.queued = true;
-      return pending.running;
-    }
-    const state = { running: Promise.resolve(), queued: false };
-    const hasQueued = (): boolean => state.queued;
-    state.running = (async () => {
-      do {
-        state.queued = false;
-        await refreshOnce(roomId);
-      } while (hasQueued());
-    })().finally(() => {
-      if (refreshes.get(roomId) === state) refreshes.delete(roomId);
-    });
-    refreshes.set(roomId, state);
-    return state.running;
+  function failed(roomId: string, error: Error): void {
+    for (const onError of rooms.get(roomId)?.handlers.values() ?? []) onError?.(error);
   }
 
   return {
-    subscribe(roomId, handler) {
+    subscribe(roomId: string, handler: () => void, onError?: (error: Error) => void) {
       let record = rooms.get(roomId);
       if (!record) {
-        record = { handlers: new Set(), channel: null };
+        record = { handlers: new Map(), channel: null };
         rooms.set(roomId, record);
       }
-      record.handlers.add(handler);
+      record.handlers.set(handler, onError);
       if (!record.channel) {
         const target = record;
         void options
           .getClient()
-          .then((client) => {
+          .then(async (client) => {
+            await ensureAnonymous(client);
+            const { REALTIME_SUBSCRIBE_STATES } = await loadSupabaseModule();
             const current = rooms.get(roomId);
             if (!current || current !== target || current.channel || current.handlers.size === 0)
               return;
-            const channel = client
-              .channel(options.topic(roomId))
-              .on(
-                'postgres_changes',
-                {
-                  event: '*',
-                  schema: 'public',
-                  table: options.roomsTable,
-                  filter: `id=eq.${roomId}`,
-                },
-                () => {
-                  void refresh(roomId);
-                },
-              )
-              .on(
+            const channel = client.channel(options.topic(roomId)).on(
+              'postgres_changes',
+              {
+                event: '*',
+                schema: 'public',
+                table: options.roomsTable,
+                filter: `id=eq.${roomId}`,
+              },
+              () => {
+                invalidate(roomId);
+              },
+            );
+            if (options.commandsTable)
+              channel.on(
                 'postgres_changes',
                 {
                   event: 'INSERT',
@@ -272,13 +243,24 @@ export function createRealtimeRoomRegistry<TSnapshot>(
                   filter: `room_id=eq.${roomId}`,
                 },
                 () => {
-                  void refresh(roomId);
+                  invalidate(roomId);
                 },
-              )
-              .subscribe();
-            current.channel = channel;
+              );
+            current.channel = channel.subscribe((status) => {
+              if (rooms.get(roomId) !== target) return;
+              if (status === REALTIME_SUBSCRIBE_STATES.SUBSCRIBED) invalidate(roomId);
+              else {
+                failed(
+                  roomId,
+                  new Error(`${options.label} realtime connection ${status.toLowerCase()}`),
+                );
+              }
+            });
           })
-          .catch(() => {});
+          .catch((error: unknown) => {
+            if (rooms.get(roomId) === target)
+              failed(roomId, error instanceof Error ? error : new Error(String(error)));
+          });
       }
       return {
         unsubscribe: () => {
@@ -287,16 +269,13 @@ export function createRealtimeRoomRegistry<TSnapshot>(
           existing.handlers.delete(handler);
           if (existing.handlers.size === 0) {
             const channel = existing.channel;
-            existing.channel = null;
             rooms.delete(roomId);
-            if (channel) {
-              void channel.unsubscribe().then(() => {
-                void options
-                  .getClient()
-                  .then((client) => client.removeChannel(channel))
-                  .catch(() => {});
-              });
-            }
+            if (channel)
+              void channel
+                .unsubscribe()
+                .then(() => options.getClient())
+                .then((client) => client.removeChannel(channel))
+                .catch(() => {});
           }
         },
       };

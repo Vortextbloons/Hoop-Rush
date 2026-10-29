@@ -40,6 +40,7 @@ import {
 import { replayHavocMultiplayerDraft } from '@hoop-rush/engine';
 import {
   createRealtimeRoomRegistry,
+  readRoomSync,
   ensureAnonymous,
   getCachedTransport,
   isUsablePublishableKey,
@@ -428,21 +429,23 @@ export function createHavocMultiplayerTransport(
   async function draftFromRow(
     row: HavocMultiplayerRoomRow,
     client: HavocMultiplayerClient,
+    acceptedCommands?: HavocMultiplayerCommandRow[],
   ): Promise<HavocMultiplayerDraftState | null> {
     const server = serverDraftStateOf(row.draft_state);
     if (server === null) return null;
-    const commandsResponse = await client
-      .from('havoc_multiplayer_room_commands')
-      .select(COMMAND_COLUMNS)
-      .eq('room_id', row.id)
-      .order('ordinal', { ascending: true });
-    if (commandsResponse.error) {
-      throw new Error('draft failed: cannot read the accepted command log');
+    let commandRows = acceptedCommands;
+    if (commandRows === undefined) {
+      const commandsResponse = await client
+        .from('havoc_multiplayer_room_commands')
+        .select(COMMAND_COLUMNS)
+        .eq('room_id', row.id)
+        .order('ordinal', { ascending: true });
+      if (commandsResponse.error) {
+        throw new Error('draft failed: cannot read the accepted command log');
+      }
+      const commandData: unknown = commandsResponse.data;
+      commandRows = (Array.isArray(commandData) ? commandData : []) as HavocMultiplayerCommandRow[];
     }
-    const commandData: unknown = commandsResponse.data;
-    const commandRows = (
-      Array.isArray(commandData) ? commandData : []
-    ) as HavocMultiplayerCommandRow[];
     const assets = await loadDraftAssets();
     const versions = havocMultiplayerVersionLocksSchema.parse(row.versions);
     return replayHavocMultiplayerDraft({
@@ -485,12 +488,11 @@ export function createHavocMultiplayerTransport(
     const draft = await draftFromRow(row, client);
     return roomRowToSnapshot(row, memberRows, draft);
   }
-  const registry = createRealtimeRoomRegistry<HavocMultiplayerRoomSnapshot>({
+  const registry = createRealtimeRoomRegistry({
     label: 'Havoc Multiplayer',
     roomsTable: 'havoc_multiplayer_rooms',
     commandsTable: 'havoc_multiplayer_room_commands',
     topic: (roomId) => `havoc-multiplayer-room-${roomId}`,
-    fetchSnapshot,
     getClient,
   });
   const transientTopic = (roomId: string): string => `havoc-multiplayer:${roomId}`;
@@ -591,8 +593,26 @@ export function createHavocMultiplayerTransport(
         membership: { roomId: idSchema.parse(roomId), participantId, code: snapshot.code },
       };
     },
-    subscribe(roomId, handler) {
-      return registry.subscribe(roomId, handler);
+    async sync(roomId) {
+      const client = await getClient();
+      const payload = await readRoomSync(client, 'havoc', roomId, -1);
+      const row = payload.room as unknown as HavocMultiplayerRoomRow;
+      const members = payload.members as unknown as HavocMultiplayerMemberRow[];
+      const rows = payload.commands as unknown as HavocMultiplayerCommandRow[];
+      const commands = rows.map((row) =>
+        havocMultiplayerCommandSchema.parse({
+          schemaVersion: HAVOC_MULTIPLAYER_SAVE_SCHEMA_VERSION,
+          roomId: idSchema.parse(roomId),
+          commandId: row.command_id,
+          actorParticipantId: row.actor_participant_id,
+          payload: row.payload,
+        }),
+      );
+      const draft = await draftFromRow(row, client, rows);
+      return { snapshot: roomRowToSnapshot(row, members, draft), commands };
+    },
+    subscribe(roomId, handler, onError) {
+      return registry.subscribe(roomId, handler, onError);
     },
     subscribeTransient(roomId, handler) {
       return subscribeTransientPayloads({

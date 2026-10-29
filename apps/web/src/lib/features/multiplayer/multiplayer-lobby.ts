@@ -7,7 +7,22 @@ import {
   type MultiplayerLobbyCommand,
 } from '@hoop-rush/data-contracts';
 import { multiplayerMode, modeCatalog } from '#lib/modes/catalog.js';
-import { getMultiplayerClient } from '#lib/supabase-runtime.js';
+import { createRealtimeRoomRegistry, getMultiplayerClient } from '#lib/supabase-runtime.js';
+
+const lobbyRegistry = createRealtimeRoomRegistry({
+  label: 'Lobby',
+  roomsTable: 'multiplayer_lobbies',
+  topic: (lobbyId) => `multiplayer-lobby-${lobbyId}`,
+  getClient: getMultiplayerClient,
+});
+
+export function subscribeLobby(
+  lobbyId: string,
+  onChange: () => void,
+  onError: (error: Error) => void,
+): () => void {
+  return lobbyRegistry.subscribe(lobbyId, onChange, onError).unsubscribe;
+}
 
 export type MultiplayerGameKind = NonNullable<MultiplayerLobby['gameKind']>;
 

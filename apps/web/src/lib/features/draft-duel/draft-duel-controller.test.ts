@@ -176,8 +176,10 @@ describe('Draft Duel ready check progression', () => {
     lifecycle.roomId = roomId;
     lifecycle.attachment = lifecycle.lifecycle.begin(roomId);
     lifecycle.applySnapshot((await transport.resume(roomId)).snapshot);
-    unsubscribe = transport.subscribe(roomId, (snapshot) => {
-      lifecycle.applySnapshot(snapshot);
+    unsubscribe = transport.subscribe(roomId, () => {
+      void transport.sync(roomId, -1).then(({ snapshot }) => {
+        lifecycle.applySnapshot(snapshot);
+      });
     }).unsubscribe;
     lifecycle.startTimers();
   });
@@ -212,11 +214,10 @@ describe('Draft Duel ready check progression', () => {
     const lifecycle = isolateSync();
     unsubscribe();
     await lifecycle.syncFromServer();
-    const resume = transport.resume.bind(transport);
-    vi.spyOn(transport, 'resume').mockImplementationOnce(async (id) => {
-      const prior = await resume(id);
+    const sync = transport.sync.bind(transport);
+    vi.spyOn(transport, 'sync').mockImplementationOnce(async (id, afterOrdinal) => {
       await submit('p2', { kind: 'ready-next-game', gameNumber: 1, ready: true });
-      return prior;
+      return sync(id, afterOrdinal);
     });
     const updates: ReturnType<DraftDuelSession['getSnapshot']>[] = [];
     session.subscribe(() => updates.push(session.getSnapshot()));

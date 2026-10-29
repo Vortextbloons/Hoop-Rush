@@ -885,6 +885,14 @@ export function createInMemoryDraftDuelTransport(options: {
         membership: { roomId: record.snapshot.roomId, participantId: 'p1', code: record.code },
       };
     },
+    async sync(roomId, afterOrdinal) {
+      await Promise.resolve();
+      const record = recordFor(roomId);
+      return {
+        snapshot: record.snapshot,
+        commands: record.commands.filter((command) => command.ordinal > afterOrdinal),
+      };
+    },
     subscribe(roomId, handler) {
       const record = rooms.get(roomId);
       if (!record) return { unsubscribe: () => {} };

@@ -1,4 +1,10 @@
 import { z } from 'zod';
+
+export const multiplayerRoomSyncSchema = z.object({
+  room: z.record(z.string(), z.unknown()),
+  members: z.array(z.record(z.string(), z.unknown())).min(1),
+  commands: z.array(z.record(z.string(), z.unknown())),
+});
 import {
   fixedFiveVersionLocksSchema,
   fixedFiveRoomModeSchema,

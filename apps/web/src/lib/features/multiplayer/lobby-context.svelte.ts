@@ -7,6 +7,7 @@ import {
 } from '@hoop-rush/application/multiplayer';
 import {
   lobbyCommand,
+  subscribeLobby,
   loadLobbyId,
   rememberLobby,
   resumeMultiplayerGame,
@@ -55,6 +56,7 @@ export class LobbyCoordinator {
     if (!this.active) {
       const session = new LobbySession({
         command: lobbyCommand,
+        subscribe: subscribeLobby,
         resumeGame: resumeMultiplayerGame,
         rememberLobby,
         friendlyError: friendlyMultiplayerError,

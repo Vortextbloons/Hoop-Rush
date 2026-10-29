@@ -497,9 +497,17 @@ export interface FixedFiveMultiplayerTransport {
     membership: FixedFiveRoomMembership;
   }>;
   snapshot(roomId: string): Promise<FixedFiveRoomSnapshot>;
+  sync(
+    roomId: string,
+    afterOrdinal: number,
+  ): Promise<{
+    snapshot: FixedFiveRoomSnapshot;
+    commands: FixedFiveCommand[];
+  }>;
   subscribe(
     roomId: string,
-    handler: (snapshot: FixedFiveRoomSnapshot) => void,
+    handler: () => void,
+    onError?: (error: Error) => void,
   ): {
     unsubscribe: () => void;
   };

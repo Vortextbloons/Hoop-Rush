@@ -624,7 +624,7 @@ export function calibrateSensitivity(args: {
   profile?: string;
   era?: string;
 }): CliReport {
-  const samples = parseCount(args.samples, '--samples', 200);
+  const samples = parseCount(args.samples, '--samples', 2000);
   const packaged = loadPackagedData(args.manifest);
   const data = new PackagedData(packaged.manifest, packaged.dir);
   const profile = args.profile

@@ -50,6 +50,7 @@ export interface FakeRealtimeChannel {
   send(message: unknown): Promise<'ok' | 'error'>;
   unsubscribe(): Promise<void>;
   triggerPostgresChange(): void;
+  triggerStatus(status: string): void;
   triggerBroadcast(payload: unknown): void;
 }
 
@@ -153,6 +154,7 @@ export function createFakeSupabaseHarness(options: { userId?: string } = {}): Fa
   }
 
   function createChannel(topic: string, channelOptions?: unknown): FakeRealtimeChannel {
+    let statusHandler: ((status: string) => void) | undefined;
     const channel: FakeRealtimeChannel = {
       topic,
       options: channelOptions ?? null,
@@ -186,6 +188,7 @@ export function createFakeSupabaseHarness(options: { userId?: string } = {}): Fa
       },
       subscribe(callback?: (status: string) => void) {
         channel.subscribed = true;
+        statusHandler = callback;
         if (callback) callback('SUBSCRIBED');
         return channel;
       },
@@ -196,6 +199,9 @@ export function createFakeSupabaseHarness(options: { userId?: string } = {}): Fa
       unsubscribe() {
         channel.unsubscribed = true;
         return Promise.resolve();
+      },
+      triggerStatus(status) {
+        statusHandler?.(status);
       },
       triggerPostgresChange() {
         for (const handler of channel.postgresHandlers) handler.callback();

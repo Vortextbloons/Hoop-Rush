@@ -310,7 +310,7 @@ export class DexieCapRushRepository implements CapRushRepository {
               recordId: CAP_RUSH_ACTIVE_DRAFT_RECORD_ID,
               runId: state.runId,
               revision: state.revision,
-              stateDigest: capRushStateDigest(state),
+              stateDigest: result.stateDigest,
               draft: state,
               createdAtIso,
               updatedAtIso: now,

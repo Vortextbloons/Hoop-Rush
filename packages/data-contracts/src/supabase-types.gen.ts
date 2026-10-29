@@ -1131,6 +1131,10 @@ export type Database = {
         Args: { p_versions: Json }
         Returns: boolean
       }
+      multiplayer_room_sync: {
+        Args: { p_after_ordinal?: number; p_mode: string; p_room_id: string }
+        Returns: Json
+      }
       multiplayer_lobby_command: { Args: { p_command: Json }; Returns: Json }
       multiplayer_lobby_snapshot: {
         Args: { p_lobby_id: string }

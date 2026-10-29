@@ -1141,6 +1141,14 @@ export function createInMemoryHavocMultiplayerTransport(options: {
         membership: { roomId: record.snapshot.roomId, participantId: 'p1', code: record.code },
       };
     },
+    async sync(roomId) {
+      await Promise.resolve();
+      const record = recordFor(roomId);
+      return {
+        snapshot: record.snapshot,
+        commands: record.commandLog.map((entry) => entry.command),
+      };
+    },
     subscribe(roomId, handler) {
       const record = rooms.get(roomId);
       if (!record) return { unsubscribe: () => {} };

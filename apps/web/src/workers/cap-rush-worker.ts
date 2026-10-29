@@ -102,7 +102,6 @@ async function simulate(
       summary: simulation.summary,
       audit: simulation.audit,
       result: simulation.result,
-      tape: simulation.tape,
     });
     delivered += 1;
     lastCursor = gameNumber;

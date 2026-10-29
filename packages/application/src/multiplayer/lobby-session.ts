@@ -29,6 +29,7 @@ export interface LobbySessionSnapshot {
 
 export interface LobbySessionDeps {
   command: (command: MultiplayerLobbyCommand) => Promise<unknown>;
+  subscribe: (lobbyId: string, onChange: () => void, onError: (error: Error) => void) => () => void;
   resumeGame: (kind: MultiplayerGameKind, roomId: string) => Promise<void>;
   rememberLobby: (lobby: MultiplayerLobby) => void;
   friendlyError: (error: unknown) => string;
@@ -100,6 +101,7 @@ export class LobbySession {
       this.deps.scheduleTick ?? intervalTickScheduler,
       2000,
     );
+    this.watch(attachment);
   }
 
   refresh(): Promise<void> {
@@ -239,6 +241,25 @@ export class LobbySession {
       () => this.fetch(attachment, true),
       this.deps.scheduleTick ?? intervalTickScheduler,
       2000,
+    );
+    this.watch(attachment);
+  }
+
+  private watch(attachment: RoomAttachment): void {
+    this.lifecycle.track(
+      attachment,
+      this.deps.subscribe(
+        attachment.roomId,
+        () => {
+          if (attachment.current()) void this.refresh();
+        },
+        (error) => {
+          if (!attachment.current()) return;
+          this.lifecycle.failed(attachment);
+          this.error = this.deps.friendlyError(error);
+          this.events.publish();
+        },
+      ),
     );
   }
 

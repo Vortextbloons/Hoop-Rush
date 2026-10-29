@@ -22,6 +22,7 @@ import { randomBytes, randomUUID } from '#lib/ids.js';
 import { createInMemoryFixedFiveTransport } from '@hoop-rush/application/fixed-five';
 import {
   createRealtimeRoomRegistry,
+  readRoomSync,
   ensureAnonymous,
   getCachedTransport,
   isUsablePublishableKey,
@@ -259,12 +260,11 @@ export function createFixedFiveTransport(options?: {
     const memberRows = (Array.isArray(memberData) ? memberData : []) as FixedFiveMemberRow[];
     return roomRowToSnapshot(row, memberRows);
   }
-  const registry = createRealtimeRoomRegistry<FixedFiveRoomSnapshot>({
+  const registry = createRealtimeRoomRegistry({
     label: 'Fixed-five',
     roomsTable: 'fixed_five_rooms',
     commandsTable: 'fixed_five_room_commands',
     topic: (roomId) => `fixed-five-room-${roomId}`,
-    fetchSnapshot,
     getClient,
   });
   return {
@@ -403,8 +403,26 @@ export function createFixedFiveTransport(options?: {
       await ensureAnonymous(client);
       return fetchSnapshot(roomId);
     },
-    subscribe(roomId, handler) {
-      return registry.subscribe(roomId, handler);
+    async sync(roomId, afterOrdinal) {
+      const client = await getClient();
+      const payload = await readRoomSync(client, 'fixed-five', roomId, afterOrdinal);
+      const row = payload.room as unknown as FixedFiveRoomRow;
+      const members = payload.members as unknown as FixedFiveMemberRow[];
+      const rows = payload.commands as unknown as FixedFiveCommandRow[];
+      const commands = rows.map((row) =>
+        fixedFiveCommandSchema.parse({
+          schemaVersion: 1,
+          roomId: idSchema.parse(roomId),
+          commandId: row.command_id,
+          ordinal: row.ordinal,
+          actorParticipantId: row.actor_participant_id,
+          payload: row.payload,
+        }),
+      );
+      return { snapshot: roomRowToSnapshot(row, members), commands };
+    },
+    subscribe(roomId, handler, onError) {
+      return registry.subscribe(roomId, handler, onError);
     },
     async refetch(roomId, afterOrdinal) {
       const client = await getClient();

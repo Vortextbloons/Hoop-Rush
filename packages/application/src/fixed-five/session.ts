@@ -989,11 +989,19 @@ export class FixedFiveRoomSession {
       await this.deps.repository.saveActiveSnapshot(room, this.lastOrdinal + 1).catch(() => {});
       if (this.isDisposed()) return;
       this.publish();
-      this.unsubscribeTransport = transport.subscribe(this.roomId, () => {
-        if (this.isDisposed()) return;
-        this.reconnecting = false;
-        void this.sync();
-      }).unsubscribe;
+      this.unsubscribeTransport = transport.subscribe(
+        this.roomId,
+        () => {
+          if (this.isDisposed()) return;
+          this.reconnecting = false;
+          void this.sync();
+        },
+        (error) => {
+          if (this.isDisposed()) return;
+          this.error = this.deps.friendlyError(error);
+          this.publish();
+        },
+      ).unsubscribe;
       await this.sync();
       if (this.verification.getSnapshot().receiptsUnsupported) {
         try {
@@ -1082,9 +1090,10 @@ export class FixedFiveRoomSession {
     this.syncing = true;
     this.publish();
     try {
-      const snapshot = await this.deps.transport.snapshot(this.roomId);
-      if (this.isDisposed()) return;
-      const fresh = await this.deps.transport.refetch(this.roomId, this.lastOrdinal);
+      const { snapshot, commands: fresh } = await this.deps.transport.sync(
+        this.roomId,
+        this.lastOrdinal,
+      );
       if (this.isDisposed()) return;
       const merged = mergeFixedFiveCommands(this.commands, fresh);
       if (merged.length > snapshot.commandCount) {
