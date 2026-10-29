@@ -505,7 +505,7 @@ export function buildHavocEventSchema<TSide extends string>(sideSchema: z.ZodTyp
     }),
     havocEventBase.extend({
       kind: z.literal('hostile-takeover'),
-      outcome: z.enum(['applied', 'ended']),
+      outcome: z.enum(['applied']),
       ownerInstanceId: havocInstanceIdSchema,
       side: sideSchema,
       fromInstanceId: havocInstanceIdSchema,

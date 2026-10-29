@@ -107,6 +107,26 @@ export class CapRushActiveDraftExistsError extends Error {
   }
 }
 
+export function capRushReportCommandError(input: {
+  readonly command: CapRushCommand;
+  readonly report: CapRushReport;
+}): string | null {
+  if (
+    input.command.command !== 'finalize-cap-rush-season' &&
+    input.command.command !== 'finalize-cap-rush-postseason'
+  ) {
+    return 'a cap rush report requires a finalize command';
+  }
+  if (input.command.command === 'finalize-cap-rush-postseason') {
+    return input.report.postseason === undefined
+      ? 'a postseason finalize report requires its bracket'
+      : null;
+  }
+  return input.report.postseason === undefined
+    ? null
+    : 'a regular-season report cannot carry a postseason bracket';
+}
+
 function malformed(message: string): CapRushLoadError {
   return new CapRushLoadError('malformed', [message]);
 }
@@ -259,8 +279,9 @@ export class DexieCapRushRepository implements CapRushRepository {
       }
     }
     if (report !== null) {
-      if (command.command !== 'finalize-cap-rush-season') {
-        throw malformed('a cap rush season report requires the finalize command');
+      const reportCommandError = capRushReportCommandError({ command, report });
+      if (reportCommandError !== null) {
+        throw malformed(reportCommandError);
       }
       if (report.runId !== result.runId) {
         throw malformed('cap rush season report belongs to another run');

@@ -1250,6 +1250,10 @@ class HavocBattleRuntime implements HavocRuntimeHooks {
     participant.bountyArmed = false;
     participant.bountyArmedAt = null;
     participant.putbackArmedAt = null;
+    participant.coldBloodStreak = 0;
+    participant.tripleThreatZones = [];
+    const ownTeam = this.teams[participant.sideIndex];
+    if (ownTeam.centersOwner === participant.instanceId) ownTeam.centersOwner = null;
     if (participant.fusionDonorInstanceId !== null) {
       const donorId = participant.fusionDonorInstanceId;
       const donor = this.globalById(donorId);

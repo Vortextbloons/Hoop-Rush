@@ -58,6 +58,7 @@ import {
   CapRushLoadError,
   CapRushStaleRevisionError,
   DexieCapRushRepository,
+  capRushReportCommandError,
 } from './cap-rush.ts';
 import { HOOP_RUSH_DATABASE_V9_STORES, HoopRushDatabase } from './dexie.ts';
 import {
@@ -235,6 +236,29 @@ describe('cap rush repository', () => {
   it('opens the playoff game store for a run without playoff games', async () => {
     expect(await repository.listPlayoffGames('run-test')).toEqual([]);
     expect(HOOP_RUSH_DATABASE_V9_STORES.capRushPlayoffGames).toBe('[runId+gameId], runId');
+  });
+
+  it('allows reports from both finalize commands', () => {
+    const seasonReport = { postseason: undefined } as unknown as CapRushReport;
+    const postseasonReport = { postseason: {} } as unknown as CapRushReport;
+    const seasonCommand = { command: 'finalize-cap-rush-season' } as never;
+    const postseasonCommand = { command: 'finalize-cap-rush-postseason' } as never;
+    expect(capRushReportCommandError({ command: seasonCommand, report: seasonReport })).toBeNull();
+    expect(
+      capRushReportCommandError({ command: postseasonCommand, report: postseasonReport }),
+    ).toBeNull();
+    expect(capRushReportCommandError({ command: postseasonCommand, report: seasonReport })).toBe(
+      'a postseason finalize report requires its bracket',
+    );
+    expect(capRushReportCommandError({ command: seasonCommand, report: postseasonReport })).toBe(
+      'a regular-season report cannot carry a postseason bracket',
+    );
+    expect(
+      capRushReportCommandError({
+        command: { command: 'accept-cap-rush-game' } as never,
+        report: seasonReport,
+      }),
+    ).toBe('a cap rush report requires a finalize command');
   });
 
   it('rejects a changed outcome state before persisting its verified digest', async () => {
