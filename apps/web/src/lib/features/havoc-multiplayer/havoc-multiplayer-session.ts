@@ -3,6 +3,7 @@ import {
   type HavocMultiplayerSessionDeps,
 } from '@hoop-rush/application/havoc-multiplayer';
 import { newRequestId } from '#lib/ids.js';
+import { visibilityTickScheduler } from '../multiplayer/visibility-tick-scheduler';
 import { getPersistence } from '#lib/persistence.js';
 import { loadHavocMultiplayerAssets } from './havoc-multiplayer-assets';
 import { getHavocMultiplayerTransport } from './havoc-multiplayer-transport';
@@ -46,6 +47,7 @@ export function createHavocMultiplayerSession(
   return new HavocMultiplayerSession({
     transport: overrides.transport ?? getHavocMultiplayerTransport(),
     repository,
+    scheduleTick: overrides.scheduleTick ?? visibilityTickScheduler,
     runner: overrides.runner ?? new HavocMultiplayerRunner(),
     loadAssets: overrides.loadAssets ?? (() => loadHavocMultiplayerAssets()),
     now: overrides.now ?? (() => Date.now()),

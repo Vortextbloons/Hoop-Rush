@@ -13,15 +13,9 @@ simulation implementation.
 - `src/registry/` — the typed command registry. `core.ts` owns option kinds,
   common options (`--format`, `--verbose`), arg accessors, usage errors, and
   help rendering; one module per area (`data.ts`, `sim.ts`, `calibrate.ts`,
-  `havoc.ts`, `season.ts`, `projection.ts`, `import.ts`,
+  `havoc.ts`, `cap-rush.ts`, `projection.ts`, `import.ts`,
   `docs.ts`) declares each command's name, options, help text, and handler.
   `index.ts` fixes the help order.
-- `src/calibration/` — shared calibration infrastructure: `harness.ts` (seed and
-  worker resolution, cohort runners, worker fixture loading), `artifacts.ts`
-  (artifact commit + validation + manifest hash pinning), `report.ts` (targets
-  label and gate-failure epilogue), and `shell.ts` (the shared calibration flow:
-  validate short circuit, cohort measurement, gate summary, lazy artifact build,
-  commit, report assembly).
 - `src/commands/` — the handlers and their basketball metrics. Calibration
   gates, cohort definitions, and artifact schemas stay with each command.
 - `src/gen-*.ts` — standalone generators run through package scripts
@@ -34,10 +28,8 @@ simulation implementation.
 1. Add the handler in `src/commands/<area>.ts`.
 2. Add a spec in the matching `src/registry/<area>.ts` module and, if the help
    order matters, register the name in `registry/index.ts`.
-3. Run the registry pin tests. The command surface and rendered help are pinned
-   by `src/registry.test.ts` against `src/fixtures/command-options.json` and
-   `src/fixtures/help.txt`; regenerate the fixtures only when the surface change
-   is intentional.
+3. Regenerate `src/fixtures/command-options.json` and `src/fixtures/help.txt`
+   when the command surface change is intentional.
 4. Add a focused test (command handler or CLI integration).
 
 `src/fixtures/` also holds the committed fixtures (`season-run.json`,

@@ -143,46 +143,6 @@ Commands:
                          --exceptions <path>  Exclusion list, one relative path per
                                               line, # comments allowed (default
                                               <dir>/combine-exceptions.txt)
-  collection pack-audit
-                        --manifest --format --verbose
-                        (no help entry yet)
-  collection pull-reproduce
-                        --input --manifest --format --verbose
-                        (no help entry yet)
-  collection pack-calibrate
-                        --samples --starter-seeds --out --manifest --validate --format --verbose
-                        (no help entry yet)
-  collection game-audit
-                        --manifest --games --format --verbose
-                        (no help entry yet)
-  collection game-reproduce
-                        --input --manifest --format --verbose
-                        (no help entry yet)
-  collection game-calibrate
-                        --workers --calibration-seeds --validation-seeds --out --manifest --validate --format --verbose
-                        (no help entry yet)
-  collection progression-audit
-                         Audit the pinned collection progression rules: every
-                         challenge requirement, feasibility, and matching player
-                         count, sampled per-pack target odds, and optional
-                         exported-state set/first-clear reconciliation.
-                          --player <playerId>    One catalog player's target odds
-                          --input <bundle.json>  Exported collection bundle
-                          --manifest <path>      Manifest (default packaged)
-  collection progression-calibrate
-                         Calibrate M4.4 targeting, challenge, and set economy:
-                         analytic player/pack target odds, at least 1,000,000
-                         simulated ordinary targeted slot draws across tuning
-                         and disjoint held-out seeds, challenge/standard game
-                         cohorts, set claim states, and the M4.3 repeat-rate
-                         envelope. Writes and hash-pins
-                         collection/progression-targets.json.
-                          --workers N            Worker threads (default 8)
-                          --calibration-seeds N  Tuning seed roots (default 6)
-                          --validation-seeds N   Held-out seed roots (default 4)
-                          --out <path>           Artifact path (default packaged)
-                          --manifest <path>      Manifest (default packaged)
-                          --validate <path>      Re-validate a written artifact
   projection base
                         --fixture --seed-from --seed-to --samples --workers --profile --manifest --model --era --reference --format --verbose
                         (no help entry yet)

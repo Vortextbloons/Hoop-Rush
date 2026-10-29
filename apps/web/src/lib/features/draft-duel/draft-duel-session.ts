@@ -1,5 +1,6 @@
 import { DraftDuelSession, type DraftDuelSessionDeps } from '@hoop-rush/application/draft-duel';
 import { newRequestId } from '#lib/ids.js';
+import { visibilityTickScheduler } from '../multiplayer/visibility-tick-scheduler';
 import { getPersistence } from '#lib/persistence.js';
 import { getDraftDuelTransport } from './draft-duel-transport';
 import { DraftDuelRunner } from './draft-duel-runner';
@@ -37,6 +38,7 @@ export function createDraftDuelSession(
   return new DraftDuelSession({
     transport: overrides.transport ?? getDraftDuelTransport(),
     repository,
+    scheduleTick: overrides.scheduleTick ?? visibilityTickScheduler,
     runner: overrides.runner ?? new DraftDuelRunner(),
     loadAssets: overrides.loadAssets ?? (() => loadDraftDuelAssets()),
     now: overrides.now ?? (() => Date.now()),

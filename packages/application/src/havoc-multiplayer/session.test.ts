@@ -502,6 +502,25 @@ async function verifyCurrentGame(h: Harness): Promise<void> {
 }
 
 describe('HavocMultiplayerSession lifecycle', () => {
+  it('skips unchanged snapshots and retries a failed snapshot save', async () => {
+    const h = await createHarness();
+    vi.spyOn(h.transport, 'subscribe').mockReturnValue({ unsubscribe: () => {} });
+    await h.session.attach(h.roomId);
+    await h.sync();
+    const save = vi.spyOn(h.repository, 'saveActive');
+    await h.sync();
+    expect(save).not.toHaveBeenCalled();
+    await h.submit('p2', { kind: 'ready' });
+    save.mockRejectedValueOnce(new Error('storage unavailable'));
+    await h.sync();
+    expect(h.session.getSnapshot().error).toBe('storage unavailable');
+    await h.sync();
+    expect(save).toHaveBeenCalledTimes(2);
+    await h.sync();
+    expect(save).toHaveBeenCalledTimes(2);
+    h.session.dispose();
+  });
+
   it('persists only new commands and retries an unsuccessful append', async () => {
     const h = await createHarness();
     vi.spyOn(h.transport, 'subscribe').mockReturnValue({ unsubscribe: () => {} });
@@ -663,6 +682,9 @@ describe('HavocMultiplayerSession draft and series', () => {
 
   it('drafts ten picks and completes the series with a persisted recap', async () => {
     const h = await createHarness({ seed: ROOM_SEED });
+    const complete = vi
+      .spyOn(h.repository, 'complete')
+      .mockRejectedValueOnce(new Error('storage unavailable'));
     await h.session.attach(h.roomId);
     await startDraft(h);
     await completeDraft(h);
@@ -674,6 +696,8 @@ describe('HavocMultiplayerSession draft and series', () => {
       await verifyCurrentGame(h);
     }
 
+    await h.sync();
+    expect(complete).toHaveBeenCalledTimes(2);
     const view = h.session.getSnapshot();
     expect(view.phase).toBe('championship');
     const series = view.series;
@@ -687,6 +711,7 @@ describe('HavocMultiplayerSession draft and series', () => {
     expect(recap.mvp).not.toBeNull();
     expect(h.repository.completed?.mvp).toEqual(recap.mvp);
     expect(view.mvp).toEqual(recap.mvp);
+    expect(h.session.getSnapshot().mvp).toBe(view.mvp);
     expect(h.runner.calls.map((call) => call.gameNumber)).toHaveLength(series?.games.length ?? 0);
     expect(h.repository.results.every((row) => row.verified)).toBe(true);
     const savedReceipts = h.repository.verificationSaves.at(-1) ?? [];

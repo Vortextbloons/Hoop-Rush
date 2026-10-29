@@ -421,6 +421,7 @@ export function createHavocMultiplayerTransport(
   const transportStorageKey = options?.storageKey;
   const loadDraftAssets = options?.loadDraftAssets ?? loadHavocMultiplayerDraftAssets;
   let replayedDraft: { key: string; draft: HavocMultiplayerDraftState } | null = null;
+  let acceptedLog: { roomId: string; rows: HavocMultiplayerCommandRow[] } | null = null;
   function getClient(): Promise<HavocMultiplayerClient> {
     if (!clientPromise) {
       clientPromise = supabaseClient(transportUrl, transportPublishableKey, transportStorageKey);
@@ -601,12 +602,30 @@ export function createHavocMultiplayerTransport(
         membership: { roomId: idSchema.parse(roomId), participantId, code: snapshot.code },
       };
     },
-    async sync(roomId) {
+    async sync(roomId, afterOrdinal = -1) {
       const client = await getClient();
-      const payload = await readRoomSync(client, 'havoc', roomId, -1);
+      const cached = acceptedLog?.roomId === roomId ? acceptedLog.rows : [];
+      const cursor = afterOrdinal >= 0 && cached.length === afterOrdinal + 1 ? afterOrdinal : -1;
+      let payload = await readRoomSync(client, 'havoc', roomId, cursor);
+      let fullRows = [
+        ...(cursor < 0 ? [] : cached),
+        ...(payload.commands as unknown as HavocMultiplayerCommandRow[]),
+      ];
+      if (
+        fullRows.length !== payload.room['command_count'] ||
+        fullRows.some((command, ordinal) => command.ordinal !== ordinal)
+      ) {
+        payload = await readRoomSync(client, 'havoc', roomId, -1);
+        fullRows = payload.commands as unknown as HavocMultiplayerCommandRow[];
+        if (
+          fullRows.length !== payload.room['command_count'] ||
+          fullRows.some((command, ordinal) => command.ordinal !== ordinal)
+        )
+          throw new Error('room sync returned an incomplete command log');
+      }
       const row = payload.room as unknown as HavocMultiplayerRoomRow;
       const members = payload.members as unknown as HavocMultiplayerMemberRow[];
-      const rows = payload.commands as unknown as HavocMultiplayerCommandRow[];
+      const rows = fullRows.filter((command) => command.ordinal > afterOrdinal);
       const commands = rows.map((row) =>
         havocMultiplayerCommandSchema.parse({
           schemaVersion: HAVOC_MULTIPLAYER_SAVE_SCHEMA_VERSION,
@@ -616,8 +635,13 @@ export function createHavocMultiplayerTransport(
           payload: row.payload,
         }),
       );
-      const draft = await draftFromRow(row, client, rows);
-      return { snapshot: roomRowToSnapshot(row, members, draft), commands };
+      const draft = await draftFromRow(row, client, fullRows);
+      acceptedLog = { roomId, rows: fullRows };
+      return {
+        snapshot: roomRowToSnapshot(row, members, draft),
+        commands,
+        commandCount: fullRows.length,
+      };
     },
     subscribe(roomId, handler, onError) {
       return registry.subscribe(roomId, handler, onError);

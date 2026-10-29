@@ -2,6 +2,7 @@ import {
   DRAFT_DUEL_AUTOPICK_VERSION,
   DRAFT_DUEL_MULTIPLAYER_VERSION,
   commandIdSchema,
+  canonicalJson,
   defaultDraftDuelVersionLocks,
   idSchema,
   type DraftDuelBroadcast,
@@ -221,6 +222,7 @@ export class DraftDuelSession {
   private completedRecap: StoredDraftDuelCompleted | null = null;
   private commands: DraftDuelCommand[] = [];
   private persistedCommandCount = 0;
+  private savedActiveKey: string | null = null;
   private busy = false;
   private error: string | null = null;
   private notice: string | null = null;
@@ -302,6 +304,7 @@ export class DraftDuelSession {
     this.verification = [];
     this.commands = [];
     this.persistedCommandCount = 0;
+    this.savedActiveKey = null;
     this.completedRecap = null;
     this.completedPersisted = false;
     this.progress = 0;
@@ -749,7 +752,10 @@ export class DraftDuelSession {
       snapshot.phase === 'game-results' &&
       broadcastGame !== null &&
       this.seenBroadcastGame !== broadcastGame;
-    this.snapshot = snapshot;
+    this.snapshot =
+      this.snapshot && canonicalJson(this.snapshot.series) === canonicalJson(snapshot.series)
+        ? { ...snapshot, series: this.snapshot.series }
+        : snapshot;
     if (this.seriesFlow.observe(snapshot.phase, broadcastGame)) {
       this.progress = 0;
     }
@@ -886,16 +892,27 @@ export class DraftDuelSession {
     const roomId = attachment.roomId;
     const isDisposed = () => !attachment.current();
     try {
-      const resumed = await this.deps.transport.sync(roomId, -1);
+      const afterOrdinal = this.commands.length - 1;
+      let resumed = await this.deps.transport.sync(roomId, afterOrdinal);
       if (isDisposed()) return;
       this.lifecycle.connected(attachment);
       this.error = null;
-      const commands = resumed.commands;
-      if (isDisposed()) return;
-      if (commands.length > resumed.snapshot.commandCount) {
-        void this.syncFromServer();
-        return;
+      let commands =
+        resumed.commands.length === 0 ? this.commands : [...this.commands, ...resumed.commands];
+      if (
+        commands.length !== resumed.snapshot.commandCount ||
+        commands.some((command, ordinal) => command.ordinal !== ordinal)
+      ) {
+        resumed = await this.deps.transport.sync(roomId, -1);
+        if (isDisposed()) return;
+        commands = resumed.commands;
+        if (
+          commands.length !== resumed.snapshot.commandCount ||
+          commands.some((command, ordinal) => command.ordinal !== ordinal)
+        )
+          throw new Error('room sync returned an incomplete command log');
       }
+      if (isDisposed()) return;
       if (this.snapshot && resumed.snapshot.revision < this.snapshot.revision) {
         void this.syncFromServer();
         return;
@@ -1207,7 +1224,7 @@ export class DraftDuelSession {
   private async persistActive(): Promise<void> {
     const snapshot = this.snapshot;
     if (!snapshot || !this.roomId || !this.participantId) return;
-    await this.deps.repository.saveActive({
+    const state: DraftDuelActiveState = {
       roomId: this.roomId,
       localParticipantId: this.participantId,
       settings: snapshot.settings,
@@ -1217,11 +1234,17 @@ export class DraftDuelSession {
       series: snapshot.series,
       broadcast: snapshot.broadcast,
       verification: this.verification,
-    });
+    };
+    const key = canonicalJson(state);
+    if (key !== this.savedActiveKey) {
+      const attachment = this.attachment;
+      await this.deps.repository.saveActive(state);
+      if (!attachment?.current()) return;
+      this.savedActiveKey = key;
+    }
     const series = snapshot.series;
     const champion = series?.champion ?? null;
     if (snapshot.phase === 'championship' && champion && series && !this.completedPersisted) {
-      this.completedPersisted = true;
       const recap: DraftDuelCompletionRecap = {
         roomId: this.roomId,
         champion,
@@ -1230,7 +1253,11 @@ export class DraftDuelSession {
         standouts: this.seriesStandoutsFact(),
         games: series.games.length,
       };
-      if (recap.games >= 1) await this.deps.repository.complete(recap);
+      if (recap.games >= 1) {
+        const attachment = this.attachment;
+        await this.deps.repository.complete(recap);
+        if (attachment?.current()) this.completedPersisted = true;
+      }
     }
   }
 }

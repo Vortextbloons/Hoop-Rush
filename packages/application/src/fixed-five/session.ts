@@ -3,6 +3,7 @@ import {
   FIXED_FIVE_DUEL_GAME_RESULTS_HOLD_MS,
   FIXED_FIVE_MULTIPLAYER_VERSION,
   commandIdSchema,
+  canonicalJson,
   idSchema,
   playerVersionId,
   type ClassicDraftCatalog,
@@ -52,7 +53,12 @@ import {
   type RoomLogFacts,
 } from '@hoop-rush/engine';
 import { SeriesCoordinator } from '../multiplayer/series-coordinator.ts';
-import { clamp01, CoalescedTask } from '../runtime/index.ts';
+import {
+  clamp01,
+  CoalescedTask,
+  intervalTickScheduler,
+  type TickScheduler,
+} from '../runtime/index.ts';
 import { RoomLifecycle, type RoomAttachment } from '../multiplayer/room-lifecycle.ts';
 import { submitFixedFiveCommand } from './command-submit.ts';
 import { FixedFiveDuelFlow } from './duel-flow.ts';
@@ -249,6 +255,7 @@ export interface FixedFiveRoomRepositoryPort {
 }
 
 export interface FixedFiveRoomSessionDeps {
+  scheduleTick?: TickScheduler;
   roomId: string;
   transport: FixedFiveMultiplayerTransport;
   repository: FixedFiveRoomRepositoryPort;
@@ -330,9 +337,10 @@ export class FixedFiveRoomSession {
   private rematchBusy = false;
 
   private unsubscribeTransport: (() => void) | null = null;
-  private resyncTimer: ReturnType<typeof setInterval> | null = null;
-  private clockTimer: ReturnType<typeof setInterval> | null = null;
-  private revealTimer: ReturnType<typeof setInterval> | null = null;
+  private resyncTimer: (() => void) | null = null;
+  private savedActiveKey: string | null = null;
+  private clockTimer: (() => void) | null = null;
+  private revealTimer: (() => void) | null = null;
   private readonly reconcileTask = new CoalescedTask(() => this.reconcile());
   private pendingReadyGame: number | null = null;
   private pendingReadyRetryAtMs = 0;
@@ -481,19 +489,20 @@ export class FixedFiveRoomSession {
     const membership = this.deps.loadMembership(this.roomId);
     if (membership) this.selfId = membership.participantId;
     this.attachWakeHandlers();
-    this.resyncTimer = setInterval(() => {
+    const schedule = this.deps.scheduleTick ?? intervalTickScheduler;
+    this.resyncTimer = schedule(() => {
       void this.deps.transport
         .resolveTimeout(this.roomId)
         .catch(() => null)
         .then(() => this.sync())
         .catch(() => {});
     }, RESYNC_INTERVAL_MS);
-    this.clockTimer = setInterval(() => {
+    this.clockTimer = schedule(() => {
       this.maybeExpireNotice();
       this.tickDuel();
       void this.resolveOverdue();
     }, CLOCK_INTERVAL_MS);
-    this.revealTimer = setInterval(() => {
+    this.revealTimer = schedule(() => {
       this.tickShared82Reveal();
     }, REVEAL_INTERVAL_MS);
     await this.boot();
@@ -511,15 +520,15 @@ export class FixedFiveRoomSession {
     this.shared82Game.stop();
     this.detachWakeHandlers();
     if (this.resyncTimer !== null) {
-      clearInterval(this.resyncTimer);
+      this.resyncTimer();
       this.resyncTimer = null;
     }
     if (this.clockTimer !== null) {
-      clearInterval(this.clockTimer);
+      this.clockTimer();
       this.clockTimer = null;
     }
     if (this.revealTimer !== null) {
-      clearInterval(this.revealTimer);
+      this.revealTimer();
       this.revealTimer = null;
     }
     this.listeners.clear();
@@ -986,7 +995,7 @@ export class FixedFiveRoomSession {
       if (!room.rootSeed) {
         this.error = 'Room is missing its server seed — it cannot be simulated.';
       }
-      await this.deps.repository.saveActiveSnapshot(room, this.lastOrdinal + 1).catch(() => {});
+      await this.saveActiveSnapshot(room);
       if (this.isDisposed()) return;
       this.publish();
       this.unsubscribeTransport = transport.subscribe(
@@ -1085,6 +1094,16 @@ export class FixedFiveRoomSession {
     return this.reconcileTask.request();
   }
 
+  private async saveActiveSnapshot(room: FixedFiveRoomSnapshot): Promise<void> {
+    const cursor = this.lastOrdinal + 1;
+    const key = canonicalJson([room, cursor]);
+    if (key === this.savedActiveKey) return;
+    try {
+      await this.deps.repository.saveActiveSnapshot(room, cursor);
+      if (!this.isDisposed()) this.savedActiveKey = key;
+    } catch {}
+  }
+
   private async reconcile(): Promise<void> {
     if (this.isDisposed() || !this.room) return;
     this.syncing = true;
@@ -1119,7 +1138,7 @@ export class FixedFiveRoomSession {
         this.recomputePhase();
       }
       const room = this.room;
-      await this.deps.repository.saveActiveSnapshot(room, this.lastOrdinal + 1).catch(() => {});
+      await this.saveActiveSnapshot(room);
     } catch (e) {
       if (!this.isDisposed()) this.error = this.deps.friendlyError(e);
     } finally {

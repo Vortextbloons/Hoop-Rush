@@ -378,6 +378,39 @@ describe('havoc multiplayer supabase transport protocol pins', () => {
     await expect(transport.sync(ROOM_ID)).rejects.toThrow();
   });
 
+  it('reads command deltas, recovers a gap, and rebuilds an evicted log', async () => {
+    const { harness, transport } = setupTransport();
+    const rows = Array.from({ length: 4 }, (_, ordinal) => ({
+      command_id: `delta-${String(ordinal)}`,
+      ordinal,
+      actor_participant_id: 'p1',
+      payload: { kind: 'ready' },
+    }));
+    let count = 1;
+    let gap = false;
+    harness.setRpc('multiplayer_room_sync', (args) => {
+      const after = args['p_after_ordinal'] as number;
+      return {
+        room: { ...roomRow(), command_count: count },
+        members: [memberRow('p1'), memberRow('p2')],
+        commands: rows
+          .slice(0, count)
+          .filter((row) => row.ordinal > after && !(gap && after >= 0 && row.ordinal === 2)),
+      };
+    });
+    await transport.sync(ROOM_ID);
+    count = 2;
+    expect((await transport.sync(ROOM_ID, 0)).commands).toHaveLength(1);
+    expect((await transport.sync(ROOM_ID, 1)).commands).toHaveLength(0);
+    expect(harness.rpcCalls.map((call) => call.args['p_after_ordinal'])).toEqual([-1, 0, 1]);
+    count = 4;
+    gap = true;
+    expect((await transport.sync(ROOM_ID, 1)).commands).toHaveLength(2);
+    expect(harness.rpcCalls.slice(-2).map((call) => call.args['p_after_ordinal'])).toEqual([1, -1]);
+    expect((await transport.sync(ROOM_ID, 0)).commands).toHaveLength(3);
+    expect(harness.rpcCalls.at(-1)?.args['p_after_ordinal']).toBe(-1);
+  });
+
   it('subscribe opens one realtime channel and tears it down with the last handler', async () => {
     const { harness, transport } = setupTransport();
     seedRoom(harness);

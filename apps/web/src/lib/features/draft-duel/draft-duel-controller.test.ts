@@ -92,6 +92,7 @@ type SessionLifecycle = {
       appendCommands: (...args: unknown[]) => Promise<void>;
       saveVerification: (...args: unknown[]) => Promise<void>;
       saveResult: (...args: unknown[]) => Promise<void>;
+      saveActive: (...args: unknown[]) => Promise<void>;
     };
   };
 };
@@ -192,12 +193,12 @@ describe('Draft Duel ready check progression', () => {
     vi.restoreAllMocks();
   });
 
-  function isolateSync() {
+  function isolateSync(mockPersistence = true) {
     const lifecycle = session as unknown as SessionLifecycle;
     lifecycle.assets = {} as DraftDuelAssets;
     vi.spyOn(lifecycle, 'rebuildDraft').mockImplementation(() => {});
     vi.spyOn(lifecycle, 'ensureGamePipeline').mockResolvedValue();
-    vi.spyOn(lifecycle, 'persistActive').mockResolvedValue();
+    if (mockPersistence) vi.spyOn(lifecycle, 'persistActive').mockResolvedValue();
     vi.spyOn(lifecycle.deps.repository, 'appendCommands').mockResolvedValue();
     return lifecycle;
   }
@@ -228,6 +229,39 @@ describe('Draft Duel ready check progression', () => {
     append.mockClear();
     await lifecycle.syncFromServer();
     expect(append).not.toHaveBeenCalled();
+  });
+
+  it('skips unchanged snapshots and retries a changed snapshot after a failed save', async () => {
+    const lifecycle = isolateSync(false);
+    unsubscribe();
+    const save = vi.spyOn(lifecycle.deps.repository, 'saveActive');
+    await lifecycle.syncFromServer();
+    expect(save).toHaveBeenCalledTimes(1);
+    await lifecycle.syncFromServer();
+    expect(save).toHaveBeenCalledTimes(1);
+    await submit('p2', { kind: 'ready-next-game', gameNumber: 1, ready: true });
+    save.mockRejectedValueOnce(new Error('storage unavailable'));
+    await lifecycle.syncFromServer();
+    await lifecycle.syncFromServer();
+    expect(save).toHaveBeenCalledTimes(3);
+    await lifecycle.syncFromServer();
+    expect(save).toHaveBeenCalledTimes(3);
+  });
+
+  it('requests command deltas and replaces an incomplete delta with the full log', async () => {
+    const lifecycle = isolateSync();
+    unsubscribe();
+    await lifecycle.syncFromServer();
+    const previousCount = session.getSnapshot().commands.length;
+    await submit('p2', { kind: 'ready-next-game', gameNumber: 1, ready: true });
+    const sync = transport.sync.bind(transport);
+    const read = vi.spyOn(transport, 'sync').mockImplementationOnce(async (id, after) => ({
+      ...(await sync(id, after)),
+      commands: [],
+    }));
+    await lifecycle.syncFromServer();
+    expect(read.mock.calls.map((call) => call[1])).toEqual([previousCount - 1, -1]);
+    expect(session.getSnapshot().commands).toHaveLength(previousCount + 1);
   });
 
   it('publishes matching snapshots and commands when a command arrives during refresh', async () => {

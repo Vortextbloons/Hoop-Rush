@@ -278,6 +278,9 @@ export class HavocMultiplayerSession {
   private completedRecap: StoredHavocMultiplayerCompleted | null = null;
   private commands: HavocMultiplayerCommand[] = [];
   private persistedCommandCount = 0;
+  private savedActiveKey: string | null = null;
+  private mvpFacts: HavocMultiplayerSeriesFacts | null = null;
+  private mvpValue: HavocMultiplayerSeriesMvp | null = null;
   private challenge: string | null = null;
   private busy = false;
   private error: string | null = null;
@@ -327,11 +330,7 @@ export class HavocMultiplayerSession {
       verification: this.verification,
       commands: this.commands,
       completedRecap: this.completedRecap,
-      mvp: havocMultiplayerSeriesMvpOf({
-        series: this.snapshot?.series ?? null,
-        outputs: this.outputs,
-        completedRecap: this.completedRecap,
-      }),
+      mvp: this.seriesMvp(),
       busy: this.busy,
       error: this.error,
       notice: this.notice,
@@ -372,6 +371,7 @@ export class HavocMultiplayerSession {
     this.verification = [];
     this.commands = [];
     this.persistedCommandCount = 0;
+    this.savedActiveKey = null;
     this.completedRecap = null;
     this.completedPersisted = false;
     this.progress = 0;
@@ -821,7 +821,10 @@ export class HavocMultiplayerSession {
       snapshot.phase === 'game-results' &&
       broadcastGame !== null &&
       this.seenBroadcastGame !== broadcastGame;
-    this.snapshot = snapshot;
+    this.snapshot =
+      this.snapshot && canonicalJson(this.snapshot.series) === canonicalJson(snapshot.series)
+        ? { ...snapshot, series: this.snapshot.series }
+        : snapshot;
     if (this.seriesFlow.observe(snapshot.phase, broadcastGame)) {
       this.progress = 0;
     }
@@ -964,11 +967,19 @@ export class HavocMultiplayerSession {
     const roomId = attachment.roomId;
     const isDisposed = () => !attachment.current();
     try {
-      const resumed = await this.deps.transport.sync(roomId);
+      let resumed = await this.deps.transport.sync(roomId, this.commands.length - 1);
       if (isDisposed()) return;
       this.lifecycle.connected(attachment);
       this.error = null;
-      const commands = resumed.commands;
+      let commands =
+        resumed.commands.length === 0 ? this.commands : [...this.commands, ...resumed.commands];
+      if (commands.length !== resumed.commandCount) {
+        resumed = await this.deps.transport.sync(roomId, -1);
+        if (isDisposed()) return;
+        commands = resumed.commands;
+        if (commands.length !== resumed.commandCount)
+          throw new Error('room sync returned an incomplete command log');
+      }
       if (isDisposed()) return;
       if (this.snapshot && resumed.snapshot.revision < this.snapshot.revision) {
         void this.syncFromServer();
@@ -1348,6 +1359,20 @@ export class HavocMultiplayerSession {
     });
   }
 
+  private seriesMvp(): HavocMultiplayerSeriesMvp | null {
+    const series = this.snapshot?.series ?? null;
+    if (
+      !this.mvpFacts ||
+      this.mvpFacts.series !== series ||
+      this.mvpFacts.outputs !== this.outputs ||
+      this.mvpFacts.completedRecap !== this.completedRecap
+    ) {
+      this.mvpFacts = { series, outputs: this.outputs, completedRecap: this.completedRecap };
+      this.mvpValue = havocMultiplayerSeriesMvpOf(this.mvpFacts);
+    }
+    return this.mvpValue;
+  }
+
   private async persistActive(): Promise<void> {
     const snapshot = this.snapshot;
     if (!snapshot || !this.roomId || !this.participantId) return;
@@ -1355,7 +1380,6 @@ export class HavocMultiplayerSession {
     const champion = series?.champion ?? null;
     if (snapshot.phase === 'championship' && champion && series) {
       if (this.completedPersisted) return;
-      this.completedPersisted = true;
       const recap: HavocMultiplayerCompletionRecap = {
         roomId: this.roomId,
         champion,
@@ -1367,17 +1391,23 @@ export class HavocMultiplayerSession {
         }),
         games: series.games,
       };
+      const attachment = this.attachment;
       await this.deps.repository.complete(recap);
+      if (attachment?.current()) this.completedPersisted = true;
       return;
     }
     const attachment = this.attachment;
     if (!attachment?.current()) return;
     const receipts = (await this.verificationReceipts()) ?? [];
     if (!attachment.current()) return;
-    await this.deps.repository.saveActive({
+    const state: HavocMultiplayerActiveState = {
       roomId: attachment.roomId,
       snapshot,
       verification: receipts,
-    });
+    };
+    const key = canonicalJson(state);
+    if (key === this.savedActiveKey) return;
+    await this.deps.repository.saveActive(state);
+    if (attachment.current()) this.savedActiveKey = key;
   }
 }

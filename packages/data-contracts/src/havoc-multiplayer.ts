@@ -626,9 +626,13 @@ export interface HavocMultiplayerTransport {
     snapshot: HavocMultiplayerRoomSnapshot;
     membership: HavocMultiplayerRoomMembership;
   }>;
-  sync(roomId: string): Promise<{
+  sync(
+    roomId: string,
+    afterOrdinal?: number,
+  ): Promise<{
     snapshot: HavocMultiplayerRoomSnapshot;
     commands: HavocMultiplayerCommand[];
+    commandCount: number;
   }>;
   subscribe(
     roomId: string,

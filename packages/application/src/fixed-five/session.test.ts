@@ -342,6 +342,9 @@ describe('FixedFiveRoomSession', () => {
     expect(harness.memberships).toHaveLength(1);
     expect(harness.memberships[0]?.code).toBe(created.code);
     expect(harness.repository.snapshotCursor).toBe(0);
+    const save = vi.spyOn(harness.repository, 'saveActiveSnapshot');
+    await session.refresh();
+    expect(save).not.toHaveBeenCalled();
 
     await session.startDraft();
     const drafting = session.getSnapshot();

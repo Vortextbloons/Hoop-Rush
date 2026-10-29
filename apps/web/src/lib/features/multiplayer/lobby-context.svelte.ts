@@ -13,6 +13,7 @@ import {
   resumeMultiplayerGame,
 } from './multiplayer-lobby';
 import { friendlyMultiplayerError } from './errors';
+import { visibilityTickScheduler } from './visibility-tick-scheduler';
 import type {
   MultiplayerFormatId,
   MultiplayerGameKind,
@@ -57,6 +58,7 @@ export class LobbyCoordinator {
       const session = new LobbySession({
         command: lobbyCommand,
         subscribe: subscribeLobby,
+        scheduleTick: visibilityTickScheduler,
         resumeGame: resumeMultiplayerGame,
         rememberLobby,
         friendlyError: friendlyMultiplayerError,

@@ -48,6 +48,7 @@ import { buildSimulationTeam } from './fixed-five-room-state';
 import { getFixedFiveTransport } from './fixed-five-transport';
 import { lobbyCommand, loadLobbyId } from '../multiplayer/multiplayer-lobby';
 import { multiplayerInviteLink } from '../multiplayer/invite-link';
+import { visibilityTickScheduler } from '../multiplayer/visibility-tick-scheduler';
 import type { GamecastPlayer } from '#lib/gamecast/gamecast-types.js';
 
 const TICK_MS = 1000;
@@ -61,6 +62,7 @@ export interface FixedFiveRoomControllerDeps {
 function defaultSessionDeps(roomId: string): FixedFiveRoomSessionDeps {
   return {
     roomId,
+    scheduleTick: visibilityTickScheduler,
     transport: getFixedFiveTransport(),
     repository: fixedFiveRepository,
     createRunner: (onEvent) => new FixedFiveRunner(onEvent),
