@@ -284,7 +284,7 @@ describe('cap rush five-round draft', () => {
 
   it('rejects generation failure without consuming the reroll or changing the offer', () => {
     const setup = capRushTestSetup({
-      overalls: [99, 89, 86, 79, 77, 74, 70, 60],
+      overalls: [99, 90, 89, 86, 79, 77, 74, 70, 65, 60],
     });
     const state = choose(setup, setup.state, 'PG');
     const outcome = reroll(setup, state);

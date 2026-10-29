@@ -3,15 +3,15 @@ import { contentHashSchema } from './ids.ts';
 
 export const CAP_RUSH_SCHEMA_VERSION = 1;
 export const CAP_RUSH_RULES_VERSION = 'cap-rush-rules-v1';
-export const CAP_RUSH_SALARY_CURVE_VERSION = 'cap-rush-salary-v2';
+export const CAP_RUSH_SALARY_CURVE_VERSION = 'cap-rush-salary-v3';
 export const CAP_RUSH_SEED_DERIVATION_VERSION = 'cap-rush-seeds-v1';
 export const CAP_RUSH_REPORT_VERSION = 'cap-rush-report-v1';
 export const CAP_RUSH_SAVE_SCHEMA_VERSION = 2;
 export const CAP_RUSH_GAME_COUNT = 82;
 export const CAP_RUSH_DRAFT_ROUNDS = 5;
-export const CAP_RUSH_OFFER_SIZE = 8;
+export const CAP_RUSH_OFFER_SIZE = 10;
 export const CAP_RUSH_REROLL_LIMIT = 2;
-export const CAP_RUSH_MIN_OVERALL = 60;
+export const CAP_RUSH_MIN_OVERALL = 40;
 export const CAP_RUSH_MAX_OVERALL = 99;
 export const CAP_RUSH_CAP_LINE_DOLLARS = 120_000_000;
 export const CAP_RUSH_FIRST_APRON_DOLLARS = 135_000_000;
@@ -29,7 +29,14 @@ export const capRushPayrollStatusSchema = z.enum([
 ]);
 export type CapRushPayrollStatus = z.infer<typeof capRushPayrollStatusSchema>;
 
-export const capRushBucketSchema = z.enum(['star', 'strong', 'rotation', 'budget', 'wildcard']);
+export const capRushBucketSchema = z.enum([
+  'elite',
+  'star',
+  'strong',
+  'rotation',
+  'budget',
+  'wildcard',
+]);
 export type CapRushBucket = z.infer<typeof capRushBucketSchema>;
 
 export interface CapRushSalaryAnchor {
@@ -38,6 +45,7 @@ export interface CapRushSalaryAnchor {
 }
 
 export const CAP_RUSH_SALARY_ANCHORS: readonly CapRushSalaryAnchor[] = [
+  { overall: 40, thousands: 1_000 },
   { overall: 60, thousands: 3_000 },
   { overall: 65, thousands: 4_000 },
   { overall: 70, thousands: 5_000 },
@@ -58,11 +66,12 @@ export interface CapRushOfferBucketRule {
 }
 
 export const CAP_RUSH_OFFER_RECIPE: readonly CapRushOfferBucketRule[] = [
+  { bucket: 'elite', count: 1, minOverall: 95, maxOverall: 99 },
   { bucket: 'star', count: 1, minOverall: 90, maxOverall: 99 },
   { bucket: 'strong', count: 2, minOverall: 80, maxOverall: 89 },
   { bucket: 'rotation', count: 2, minOverall: 75, maxOverall: 79 },
   { bucket: 'budget', count: 2, minOverall: 60, maxOverall: 74 },
-  { bucket: 'wildcard', count: 1, minOverall: 60, maxOverall: 99 },
+  { bucket: 'wildcard', count: 2, minOverall: 40, maxOverall: 99 },
 ];
 
 export interface CapRushSpinPurchase {

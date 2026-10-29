@@ -129,7 +129,7 @@ export function adaptCapRushCatalog(
     if (adapted !== null) candidates.push(adapted);
   }
   if (candidates.length === 0) {
-    throw new Error('cap rush catalog has no candidates with an overall in 60..99');
+    throw new Error('cap rush catalog has no candidates with an overall in 40..99');
   }
   return capRushCatalogSchema.parse({ source: parsedSource, candidates });
 }

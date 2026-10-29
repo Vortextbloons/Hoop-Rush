@@ -199,8 +199,8 @@
               {/each}
             </div>
             <p class="mt-3 text-[11px] leading-relaxed text-muted-foreground">
-              Choosing a position opens eight cards at that exact slot. You cannot change the
-              position after the offer appears.
+              Choosing a position opens ten cards at that exact slot. You cannot change the position
+              after the offer appears.
             </p>
           </section>
         {:else if draft.stage === 'review-offer' && offer !== null}
@@ -215,7 +215,7 @@
                 <h2
                   class="font-display mt-1 hidden text-xl font-extrabold tracking-tight uppercase sm:block"
                 >
-                  Eight cards, one signing
+                  Ten cards, one signing
                 </h2>
               </div>
               <div class="flex flex-wrap items-center gap-2">
@@ -243,9 +243,7 @@
               </div>
             </div>
 
-            <div
-              class="mt-3 grid grid-cols-1 gap-2 min-[420px]:grid-cols-2 sm:gap-3 md:grid-cols-3 xl:grid-cols-4"
-            >
+            <div class="mt-3 grid grid-cols-2 gap-2 sm:gap-2.5 md:grid-cols-3 xl:grid-cols-4">
               {#each view.cards as entry (entry.card.cardId)}
                 <CapRushCard
                   {entry}
@@ -259,8 +257,8 @@
             </div>
             {#if protectMode}
               <p class="mt-3 text-[11px] leading-relaxed text-muted-foreground">
-                The protected card keeps its player, salary, bucket and display spot. The other
-                seven are replaced, and this reroll cannot be undone.
+                The protected card keeps its player, salary, bucket and display spot. The other nine
+                are replaced, and this reroll cannot be undone.
               </p>
             {/if}
           </section>

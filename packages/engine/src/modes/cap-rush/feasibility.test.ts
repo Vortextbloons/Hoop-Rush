@@ -146,6 +146,19 @@ describe('cap rush completion matching', () => {
     ).toBe(17_250_000);
   });
 
+  it('includes sub-60 wildcard salaries when checking completion and signings', () => {
+    const index = testIndex(
+      buildCapRushTestCatalog({
+        extraPlayers: POSITIONS.map((slot) => ({ positions: [slot], overall: 40 })),
+      }),
+    );
+    expect(
+      capRushMinimumCompletionPayroll({ index, signedPlayerIds: new Set(), slots: POSITIONS }),
+    ).toBe(5_750_000);
+    const card = { ...cardOf(playerOf(index, 'PG', 40), 'PG'), bucket: 'wildcard' as const };
+    expect(capRushAssessSigning({ picks: [] }, index, card).legal).toBe(true);
+  });
+
   it('never counts one multi-position person twice', () => {
     const catalog = buildCapRushTestCatalog({
       positions: ['PG', 'SG', 'C'],

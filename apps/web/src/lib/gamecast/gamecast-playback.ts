@@ -16,13 +16,6 @@ export interface GamecastVisibleState {
   periods: GamecastVisiblePeriod[];
 }
 
-export interface GamecastPlaybackPositionInput {
-  startedAtIso: string;
-  durationMs: number;
-  serverOffsetMs: number;
-  nowMs: number;
-}
-
 function zeroLine(): GameTapeStatLine {
   return [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 }
@@ -98,19 +91,4 @@ export function gamecastVisibleState(
     awayScore += event.awayTeamDeltas[0];
   }
   return { homeScore, awayScore, homePlayerLines, awayPlayerLines, periods };
-}
-
-export function gamecastPlaybackPositionMs(input: GamecastPlaybackPositionInput): number {
-  const { startedAtIso, durationMs, serverOffsetMs, nowMs } = input;
-  if (!Number.isFinite(durationMs) || durationMs <= 0) return 0;
-  const startedAtMs = Date.parse(startedAtIso);
-  if (
-    !Number.isFinite(startedAtMs) ||
-    !Number.isFinite(serverOffsetMs) ||
-    !Number.isFinite(nowMs)
-  ) {
-    return 0;
-  }
-  const elapsed = nowMs + serverOffsetMs - startedAtMs;
-  return Math.min(durationMs, Math.max(0, elapsed));
 }

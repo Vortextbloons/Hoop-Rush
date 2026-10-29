@@ -17,7 +17,8 @@ import {
 import { buildSeasonDraftCandidate } from './season-draft.ts';
 
 export const CAP_RUSH_TEST_OVERALLS = [
-  99, 96, 95, 92, 90, 89, 86, 83, 81, 80, 79, 78, 77, 76, 75, 74, 71, 70, 68, 65, 62, 60,
+  99, 98, 97, 96, 95, 92, 90, 89, 88, 86, 84, 83, 81, 80, 79, 79, 78, 78, 77, 76, 75, 74, 71, 70,
+  68, 65, 62, 60,
 ] as const;
 
 export interface CapRushTestExtraPlayer {

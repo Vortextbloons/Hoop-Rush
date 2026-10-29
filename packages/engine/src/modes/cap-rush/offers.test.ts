@@ -26,14 +26,20 @@ function bucketCounts(cards: readonly CapRushCard[]): Record<string, number> {
 }
 
 describe('cap rush offers', () => {
-  it('builds the exact eight-card recipe for every position', () => {
+  it('builds the exact ten-card recipe for every position', () => {
     const expected = Object.fromEntries(
       CAP_RUSH_OFFER_RECIPE.map((rule) => [rule.bucket, rule.count]),
     );
     for (const slot of POSITIONS) {
       const offer = offerFor(slot);
-      expect(offer.cards).toHaveLength(8);
+      expect(offer.cards).toHaveLength(10);
       expect(bucketCounts(offer.cards)).toEqual(expected);
+      expect(
+        offer.cards.find((card) => card.bucket === 'elite')?.source.originalOverall,
+      ).toBeGreaterThanOrEqual(95);
+      expect(
+        offer.cards.find((card) => card.bucket === 'star')?.source.originalOverall,
+      ).toBeGreaterThanOrEqual(90);
     }
   });
 
@@ -53,15 +59,43 @@ describe('cap rush offers', () => {
       expect(card.salaryDollars).toBe(
         capRushSalaryDollars(card.source.originalOverall, card.source.seasonKey),
       );
-      expect(card.salaryDollars).toBeGreaterThanOrEqual(3_000_000);
+      expect(card.salaryDollars).toBeGreaterThanOrEqual(920_000);
       expect(card.salaryDollars).toBeLessThanOrEqual(75_900_000);
     }
   });
 
-  it('offers eight distinct people with distinct card ids', () => {
+  it('offers ten distinct people with distinct card ids', () => {
     const offer = offerFor('SG');
-    expect(new Set(offer.cards.map((card) => card.source.playerId)).size).toBe(8);
-    expect(new Set(offer.cards.map((card) => card.cardId)).size).toBe(8);
+    expect(new Set(offer.cards.map((card) => card.source.playerId)).size).toBe(10);
+    expect(new Set(offer.cards.map((card) => card.cardId)).size).toBe(10);
+  });
+
+  it('offers and prices sub-60 players only as wildcards', () => {
+    const lowSetup = capRushTestSetup({
+      extraPlayers: [40, 50, 59].map((overall) => ({ positions: ['PG'], overall })),
+    });
+    const seen = new Set<number>();
+    for (let offerRevision = 0; offerRevision < 100; offerRevision += 1) {
+      const offer = generateCapRushOffer({
+        index: lowSetup.index,
+        runSeed: lowSetup.state.runSeed,
+        round: 1,
+        slot: 'PG',
+        offerRevision,
+        picks: [],
+      });
+      expect(offer.cards).toHaveLength(10);
+      expect(offer.cards.filter((card) => card.bucket === 'wildcard')).toHaveLength(2);
+      for (const card of offer.cards) {
+        if (card.source.originalOverall >= 60) continue;
+        seen.add(card.source.originalOverall);
+        expect(card.bucket).toBe('wildcard');
+        expect(card.salaryDollars).toBe(
+          capRushSalaryDollars(card.source.originalOverall, card.source.seasonKey),
+        );
+      }
+    }
+    expect([...seen].sort((a, b) => a - b)).toEqual([40, 50, 59]);
   });
 
   it('always contains at least one legal signing', () => {
@@ -125,7 +159,7 @@ describe('cap rush offers', () => {
 });
 
 describe('cap rush protected rerolls', () => {
-  it('keeps the protected card in place and replaces the other seven people', () => {
+  it('keeps the protected card in place and replaces the other nine people', () => {
     const offer = offerFor('SF');
     const protectedCard = offer.cards[3];
     if (protectedCard === undefined) throw new Error('missing card');
@@ -154,9 +188,12 @@ describe('cap rush protected rerolls', () => {
         .filter((card) => card.cardIndex !== protectedCard.cardIndex)
         .map((card) => card.source.playerId),
     );
-    expect(replacedPeople.size).toBe(7);
+    expect(replacedPeople.size).toBe(9);
     for (const playerId of discarded) expect(replacedPeople.has(playerId)).toBe(false);
     expect(bucketCounts(replacement.cards)).toEqual(bucketCounts(offer.cards));
+    expect(
+      replacement.cards.find((card) => card.bucket === 'elite')?.source.originalOverall,
+    ).toBeGreaterThanOrEqual(95);
   });
 
   it('replays identical rerolls to identical offers', () => {

@@ -1,8 +1,5 @@
 import {
-  multiplayerLobbySchema,
   multiplayerLobbyCommandSchema,
-  multiplayerRoomLookupSchema,
-  multiplayerRoomPreviewSchema,
   type MultiplayerLobby,
   type MultiplayerLobbyCommand,
 } from '@hoop-rush/data-contracts';
@@ -32,10 +29,6 @@ export const multiplayerGameKindLabels = Object.fromEntries(
   ),
 ) as Record<MultiplayerGameKind, string>;
 
-export function multiplayerGameRoomRouteId(kind: MultiplayerGameKind) {
-  return multiplayerMode(kind).routeId;
-}
-
 export async function lobbyCommand(command: MultiplayerLobbyCommand): Promise<unknown> {
   const client = await getMultiplayerClient();
   const response = await client.rpc('multiplayer_lobby_command', {
@@ -45,15 +38,7 @@ export async function lobbyCommand(command: MultiplayerLobbyCommand): Promise<un
   const data: unknown = response.data;
   return data;
 }
-export async function getLobby(lobbyId: string): Promise<MultiplayerLobby> {
-  return multiplayerLobbySchema.parse(await lobbyCommand({ kind: 'get', lobbyId }));
-}
-export async function joinMultiplayerRoom(code: string) {
-  return multiplayerRoomLookupSchema.parse(await lobbyCommand({ kind: 'join', code }));
-}
-export async function previewMultiplayerRoom(code: string) {
-  return multiplayerRoomPreviewSchema.parse(await lobbyCommand({ kind: 'preview', code }));
-}
+
 export function rememberLobby(lobby: MultiplayerLobby): void {
   try {
     localStorage.setItem('hoop-rush:multiplayer:last-lobby', lobby.id);

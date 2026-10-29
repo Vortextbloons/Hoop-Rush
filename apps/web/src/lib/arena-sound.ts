@@ -212,22 +212,10 @@ export function arenaReelSettle(): void {
   blip(990, 120, 'sine', 0.055, 60);
 }
 
-export function arenaDraftDraw(): void {
-  if (prefersReducedMotion()) return;
-  tone({ freq: 220, freqEnd: 440, durMs: 180, type: 'sawtooth', gain: 0.035 });
-  blip(1200, 40, 'square', 0.02, 120);
-}
-
 export function arenaDraftPick(fillsNeed = false): void {
   noiseBurst(90, 0.05, 0, 900);
   blip(150, 100, 'square', 0.06);
   blip(fillsNeed ? 1174 : 880, 160, 'triangle', 0.075, 60);
-}
-
-export function arenaDraftFinalize(): void {
-  blip(523, 110, 'triangle', 0.08);
-  blip(659, 110, 'triangle', 0.08, 100);
-  blip(784, 180, 'sine', 0.07, 200);
 }
 
 export function arenaConfirm(): void {
@@ -255,36 +243,6 @@ export function arenaStreak(count: number): void {
 
 export function arenaLeaderChange(): void {
   tone({ freq: 440, freqEnd: 660, durMs: 140, type: 'triangle', gain: 0.06 });
-}
-
-const PACK_LADDER = [523, 659, 784, 1046, 1318, 1568, 2093];
-const PACK_RARITY_INDEX: Record<string, number> = {
-  Ember: 1,
-  Eruption: 2,
-  Apex: 3,
-  Titan: 4,
-  Eclipse: 5,
-  Immortal: 6,
-};
-
-export function arenaPackOpen(): void {
-  noiseBurst(70, 0.04, 0, 2000);
-  tone({ freq: 500, freqEnd: 900, durMs: 120, type: 'sine', gain: 0.07 });
-}
-
-export function arenaPackReveal(rarity?: string): void {
-  const steps = rarity ? (PACK_RARITY_INDEX[rarity] ?? 1) : 1;
-  const notes = PACK_LADDER.slice(0, Math.max(2, Math.min(PACK_LADDER.length, steps + 1)));
-  notes.forEach((freq, i) => {
-    blip(freq, i === notes.length - 1 ? 220 : 100, 'triangle', 0.07, i * 90);
-  });
-  if (steps >= 5) {
-    noiseBurst(200, 0.03, notes.length * 90, 4000);
-  }
-}
-
-export function arenaDuplicate(): void {
-  tone({ freq: 300, freqEnd: 200, durMs: 140, type: 'sawtooth', gain: 0.04 });
 }
 
 export function arenaBlockComplete(record: { wins: number; losses: number } | null = null): void {

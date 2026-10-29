@@ -172,7 +172,7 @@ describe('cap rush session', () => {
 
     await session.choosePosition('PG');
     const offered = session.getSnapshot().draft;
-    expect(offered?.draft.offer?.cards).toHaveLength(8);
+    expect(offered?.draft.offer?.cards).toHaveLength(10);
     const legal = offered?.cards.find((entry) => entry.signing.legal);
     if (legal === undefined) throw new Error('offer has no legal signing');
 

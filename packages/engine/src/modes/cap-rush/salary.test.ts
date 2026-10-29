@@ -26,6 +26,9 @@ describe('cap rush salary curve', () => {
   });
 
   it('interpolates and rounds half up in integer thousands', () => {
+    expect(capRushSalaryThousands(41)).toBe(1_100);
+    expect(capRushSalaryThousands(50)).toBe(2_000);
+    expect(capRushSalaryThousands(59)).toBe(2_900);
     expect(capRushSalaryThousands(76)).toBe(9_000);
     expect(capRushSalaryThousands(86)).toBe(22_000);
     expect(capRushSalaryThousands(96)).toBe(50_667);
@@ -33,6 +36,9 @@ describe('cap rush salary curve', () => {
   });
 
   it('prices seasons by decade and rounds the combined adjustment to thousands', () => {
+    expect(capRushSalaryDollars(40, '1969-70')).toBe(920_000);
+    expect(capRushSalaryDollars(40, '1990-91')).toBe(1_150_000);
+    expect(capRushSalaryDollars(50, '1990-91')).toBe(2_300_000);
     expect(capRushSalaryDollars(85, '1969-70')).toBe(18_400_000);
     expect(capRushSalaryDollars(85, '1970-71')).toBe(20_700_000);
     expect(capRushSalaryDollars(85, '1980-81')).toBe(21_850_000);
@@ -43,13 +49,13 @@ describe('cap rush salary curve', () => {
   });
 
   it('is strictly monotone across the draft range', () => {
-    for (let overall = 60; overall < 99; overall += 1) {
+    for (let overall = 40; overall < 99; overall += 1) {
       expect(capRushSalaryThousands(overall + 1)).toBeGreaterThan(capRushSalaryThousands(overall));
     }
   });
 
   it('rejects overalls outside the draft range', () => {
-    expect(() => capRushSalaryThousands(59)).toThrow();
+    expect(() => capRushSalaryThousands(39)).toThrow();
     expect(() => capRushSalaryThousands(100)).toThrow();
     expect(() => capRushSalaryThousands(80.5)).toThrow();
   });

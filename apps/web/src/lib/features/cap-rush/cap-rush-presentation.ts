@@ -81,6 +81,8 @@ export function capStatusClass(status: CapRushPayrollStatus): string {
 
 export function bucketLabel(bucket: CapRushBucket): string {
   switch (bucket) {
+    case 'elite':
+      return 'Elite';
     case 'star':
       return 'Star';
     case 'strong':
@@ -96,6 +98,7 @@ export function bucketLabel(bucket: CapRushBucket): string {
 
 export function bucketClass(bucket: CapRushBucket): string {
   switch (bucket) {
+    case 'elite':
     case 'star':
       return 'border-accent/50 bg-accent/10 text-accent';
     case 'strong':

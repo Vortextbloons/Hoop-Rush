@@ -54,17 +54,8 @@ export * from './draft-duel.ts';
 export * from './draft-duel-worker.ts';
 export * from './loaders/draft-duel-catalog.ts';
 export * from './collection-versions.ts';
-export * from './collection-difficulty.ts';
-export * from './collection-objective.ts';
-export * from './collection-reward.ts';
 export * from './collection.ts';
-export * from './collection-team.ts';
 export * from './collection-targeting.ts';
-export * from './collection-challenge.ts';
-export * from './collection-set-reward.ts';
-export * from './collection-progression.ts';
-export * from './collection-game.ts';
-export * from './collection-game-worker.ts';
 export * from './loaders/collection-catalog.ts';
 
 export * from './overall-scale.ts';
