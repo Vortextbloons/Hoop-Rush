@@ -89,6 +89,27 @@ describe('generateBracket (propose-review-freeze)', () => {
     expect(bracket.difficulty.name).toBe('medium');
   }, 40000);
 
+  it('preserves curated season-five assignments and freezes them deterministically', () => {
+    const frozen = fixtureBracket();
+    const options = generationOptions({
+      candidates: frozen.opponents.map((opponent) => ({
+        franchiseId: opponent.teamId,
+        displayName: opponent.displayName,
+        players: opponent.players.map((player, index) => ({
+          ...player,
+          seasonKey: opponent.seasonKey,
+          score: 55 + index,
+        })),
+      })),
+    });
+    const first = generateBracket(options);
+    expect(generateBracket(options)).toEqual(first);
+    for (const opponent of first.opponents) {
+      const original = frozen.opponents.find((entry) => entry.teamId === opponent.teamId);
+      expect(original?.lineup.assignments).toEqual(opponent.lineup.assignments);
+    }
+  });
+
   it('throws when a franchise cannot form a legal lineup', () => {
     const options = generationOptions();
     const broken = options.candidates.map((candidate) =>

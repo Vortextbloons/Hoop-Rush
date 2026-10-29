@@ -81,6 +81,10 @@ export class CapRushDraftController {
     return this.runCommand(() => this.service.skipSpin());
   }
 
+  lockLineup(): Promise<boolean> {
+    return this.runCommand(() => this.service.lockLineup());
+  }
+
   async discard(): Promise<boolean> {
     if (this.busy) return false;
     this.busy = true;

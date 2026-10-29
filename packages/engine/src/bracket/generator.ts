@@ -3,7 +3,6 @@
   DifficultyProfile,
   EraSimulationProfile,
   OpponentBracket,
-  OpponentTeam,
   PositionUnion,
   Seed,
   SimulationPlayer,
@@ -21,7 +20,6 @@ import {
   seasonKeySchema,
 } from '@hoop-rush/data-contracts';
 import type { EngineContext } from '../sim/kernel.ts';
-import { createRng, shuffle } from '../sim/rng.ts';
 import { simulateGame } from '../sim/game.ts';
 import { validateBracketContent } from '../challenge/commands.ts';
 import { evaluateLineupBalance, strengthSeed } from '../challenge/lineup-eval.ts';
@@ -30,13 +28,6 @@ import { generateSchedule, scheduleInvariants, SCHEDULE_GENERATION_VERSION } fro
 
 export const SCHEDULE_VERSION_LABEL = `schedule-${SCHEDULE_GENERATION_VERSION.replace('schedule-', '')}`;
 
-/**
- * Target win rate by rank, taken from the historical NBA spread of the same 30
- * franchises. Rank 1 plays like a 64-win team, the middle of the league sits
- * near .500, and rank 30 plays like a 17-win team. Values are interpolated by
- * rank, so the middle of the bracket stays competitive instead of collapsing
- * toward the extremes.
- */
 export const BRACKET_TARGET_LADDER: readonly (readonly [number, number])[] = [
   [0, 0.75],
   [3, 0.66],
@@ -85,8 +76,6 @@ export interface BracketGenerationOptions {
 const DEFAULT_GAMES_PER_PAIR = 12;
 const DEFAULT_MIN_PLAYER_SCORE = 45;
 const MAX_SEARCH_NODES = 2_000_000;
-const CALIBRATION_STEPS = 7;
-const STAR_CANDIDATES = 6;
 
 export interface SelectedFive {
   players: readonly BracketCandidatePlayer[];
@@ -125,16 +114,6 @@ function totalQuality(players: readonly BracketCandidatePlayer[]): number {
   return players.reduce((sum, player) => sum + player.score, 0) / players.length;
 }
 
-function percentileValue(sorted: readonly number[], fraction: number): number {
-  const first = sorted[0];
-  if (first === undefined) return 0;
-  const index = Math.min(
-    sorted.length - 1,
-    Math.max(0, Math.floor(fraction * (sorted.length - 1))),
-  );
-  return sorted[index] ?? first;
-}
-
 function isBalanced(players: readonly BracketCandidatePlayer[]): boolean {
   return evaluateLineupBalance({
     teamId: 'probe',
@@ -143,55 +122,35 @@ function isBalanced(players: readonly BracketCandidatePlayer[]): boolean {
   }).ok;
 }
 
-/**
- * Strongest legal PG/SG/SF/PF/C five under a per-player score cap. Capping each
- * player (rather than the lineup mean) keeps tiers coherent: an elite team gets
- * five strong players, a weak team gets five weak ones, and no tier turns into
- * one star carrying four fringe players.
- */
-/**
- * Strongest legal PG/SG/SF/PF/C five in which every player except the lineup's
- * best scorer is rated at or below `supportCap`.
- *
- * Capping only the supporting players is what gives each tier a believable
- * roster: an elite tier clears the cap comfortably, a mid tier fields a star
- * with real weaknesses around him, and the weakest tier is one genuine player
- * dragging four replacement-level teammates. No tier silently loses its star.
- */
 export function bestLegalFiveWithin(
   pool: readonly BracketCandidatePlayer[],
   supportCap: number,
+  requiredPlayerId?: string,
 ): SelectedFive | null {
-  if (!Number.isFinite(supportCap)) {
-    return bestFiveWithStar(pool, null, Infinity);
+  if (requiredPlayerId !== undefined) {
+    const star = pool.find((player) => player.playerId === requiredPlayerId);
+    return star ? bestFiveWithStar(pool, star, supportCap) : null;
   }
-  const stars = [...pool].sort((a, b) => b.score - a.score).slice(0, STAR_CANDIDATES);
+  if (!Number.isFinite(supportCap)) return bestFiveWithStar(pool, null, Infinity);
+  const stars = [...pool].sort((a, b) => b.score - a.score).slice(0, 6);
   let best: SelectedFive | null = null;
   for (const star of [null, ...stars]) {
-    const five = bestFiveWithStar(pool, star ?? null, supportCap, best?.quality ?? -Infinity);
+    const five = bestFiveWithStar(pool, star ?? null, supportCap);
     if (five && (best === null || five.quality > best.quality)) best = five;
   }
   return best;
 }
 
-/**
- * Branch-and-bound over the PG/SG/SF/PF/C slots. The bound sums the best
- * remaining eligible scores for the open slots, which ignores the distinct-slot
- * constraint and so stays admissible: a branch is pruned only when it cannot
- * beat the incumbent. Exploration order matches the unpruned search, so the
- * returned five is the same one the exhaustive walk would find.
- */
 function bestFiveWithStar(
   pool: readonly BracketCandidatePlayer[],
   star: BracketCandidatePlayer | null,
   supportCap: number,
-  incumbentQuality = -Infinity,
 ): SelectedFive | null {
   const slots = LINEUP_STRUCTURE;
   const slotCount = slots.length;
   const support = pool
     .filter((player) => player.playerId !== star?.playerId && player.score <= supportCap)
-    .sort((a, b) => b.score - a.score);
+    .sort((a, b) => b.score - a.score || a.playerId.localeCompare(b.playerId));
   const eligibleBySlot = slots.map((slotPosition) =>
     support.filter((player) => canPlay(player.positions, slotPosition)),
   );
@@ -201,7 +160,8 @@ function bestFiveWithStar(
   >(slotCount);
   const used = new Set<string>();
   let best: SelectedFive | null = null;
-  let bestQuality = incumbentQuality;
+  let bestQuality = -Infinity;
+  let bestRoleFit = -Infinity;
   let nodes = 0;
 
   const remainingBound = (slot: number, placedScore: number, starPlaced: boolean): number => {
@@ -238,11 +198,17 @@ function bestFiveWithStar(
       if (entry === undefined) return;
       five.push(entry);
     }
+    if (star && !used.has(star.playerId)) return;
     if (!isBalanced(five)) return;
     const quality = totalQuality(five);
-    if (quality > bestQuality) {
+    const roleFit =
+      (five[0]?.anchors?.assistsPerGame ?? 0) +
+      (five[3]?.anchors?.reboundsPerGame ?? 0) +
+      (five[4]?.heightInches ?? 0);
+    if (quality > bestQuality || (quality === bestQuality && roleFit > bestRoleFit)) {
       best = { players: five, quality };
       bestQuality = quality;
+      bestRoleFit = roleFit;
     }
   };
 
@@ -259,7 +225,7 @@ function bestFiveWithStar(
       used.add(star.playerId);
       placed[slot] = star;
       const nextScore = placedScore + star.score;
-      if (remainingBound(slot + 1, nextScore, true) / slotCount > bestQuality) {
+      if (remainingBound(slot + 1, nextScore, true) / slotCount >= bestQuality) {
         recurse(slot + 1, nextScore);
       }
       placed[slot] = undefined;
@@ -269,7 +235,7 @@ function bestFiveWithStar(
       if (used.has(player.playerId)) continue;
       const nextScore = placedScore + player.score;
       if (
-        remainingBound(slot + 1, nextScore, star !== null && used.has(star.playerId)) / slotCount <=
+        remainingBound(slot + 1, nextScore, star !== null && used.has(star.playerId)) / slotCount <
         bestQuality
       ) {
         break;
@@ -378,14 +344,6 @@ export function ladderError(
   return total / sorted.length;
 }
 
-interface CalibrationPoint {
-  scale: number;
-  field: FieldTeam[];
-  selections: Map<string, SelectedFive>;
-  measured: ReturnType<typeof simulateRoundRobin>;
-  spread: number;
-}
-
 export function generateBracket(options: BracketGenerationOptions): OpponentBracket {
   const gamesPerPair = options.gamesPerPair ?? DEFAULT_GAMES_PER_PAIR;
   const minPlayerScore = options.minPlayerScore ?? DEFAULT_MIN_PLAYER_SCORE;
@@ -399,120 +357,40 @@ export function generateBracket(options: BracketGenerationOptions): OpponentBrac
   const pools = new Map<string, BracketCandidatePlayer[]>();
   for (const candidates of options.candidates) {
     const eligible = candidates.players.filter((player) => player.score >= minPlayerScore);
-    const ordered = shuffle([...eligible], createRng(`${seed}:pool:${candidates.franchiseId}`));
-    ordered.sort((a, b) => b.score - a.score);
+    const ordered = eligible;
     if (ordered.length < 5) {
       throw new Error(`${candidates.franchiseId} has fewer than five eligible players`);
     }
     pools.set(candidates.franchiseId, ordered);
   }
 
-  const ceilings = new Map<string, number>();
-  for (const franchiseId of franchiseIds) {
+  const selections = new Map<string, SelectedFive>();
+  const field: FieldTeam[] = [];
+  const tierOrder = [...franchiseIds].sort();
+  for (const franchiseId of tierOrder) {
+    const candidates = options.candidates.find((entry) => entry.franchiseId === franchiseId);
     const pool = pools.get(franchiseId) ?? [];
-    const best = bestLegalFiveWithin(pool, Infinity);
-    if (!best) {
-      const counts = LINEUP_STRUCTURE.map((slot) =>
-        String(pool.filter((player) => canPlay(player.positions, slot)).length),
-      ).join('/');
-      throw new Error(
-        `${franchiseId} cannot form a legal lineup (PG/SG/SF/PF/C eligible: ${counts})`,
-      );
-    }
-    ceilings.set(franchiseId, best.quality);
+    const five =
+      pool.length === 5 &&
+      pool.every((player, index) => {
+        const slot = LINEUP_STRUCTURE[index];
+        return slot !== undefined && canPlay(player.positions, slot);
+      }) &&
+      isBalanced(pool)
+        ? { players: pool, quality: totalQuality(pool) }
+        : bestLegalFiveWithin(pool, Infinity);
+    if (!five || !candidates) throw new Error(`${franchiseId} cannot form a legal lineup`);
+    selections.set(franchiseId, five);
+    field.push({
+      key: franchiseId,
+      team: {
+        teamId: franchiseId,
+        displayName: candidates.displayName,
+        players: five.players.map(toSimulationPlayer),
+      },
+    });
   }
-
-  // Roster quality decides the tier, so an elite pool always gets an elite
-  // build. Ties break by id to keep generation deterministic.
-  const tierOrder = [...franchiseIds].sort((a, b) => {
-    const diff = (ceilings.get(b) ?? 0) - (ceilings.get(a) ?? 0);
-    return diff !== 0 ? diff : a.localeCompare(b);
-  });
-  const rankOf = new Map(tierOrder.map((id, index) => [id, index]));
-
-  /**
-   * Each tier gets a support ceiling: the four players around the roster's best
-   * scorer must sit at or below `floorSupport` for the weakest tier, rising to
-   * the top of the pool for the strongest. That produces the shapes the game
-   * wants â€” an elite team is good all round, a weak team is one real star
-   * dragging four modest teammates â€” without any tier losing its star.
-   */
-  const globalScores = [...pools.values()]
-    .flat()
-    .map((player) => player.score)
-    .sort((a, b) => a - b);
-  const topSupport = globalScores[globalScores.length - 1] ?? 70;
-  const bottomSupport = globalScores[0] ?? 45;
-  // With real single-season rosters the strongest pool is deep enough that an
-  // uncapped elite five runs away with the field. The calibration therefore
-  // sweeps the strong end of the ramp too, instead of pinning it to the max
-  // score, so a top tier can still be restrained to the target ladder.
-  const strongSupport = percentileValue(globalScores, 0.8);
-
-  const build = (
-    floorSupport: number,
-  ): { field: FieldTeam[]; selections: Map<string, SelectedFive> } => {
-    const selections = new Map<string, SelectedFive>();
-    const field: FieldTeam[] = [];
-    for (const franchiseId of tierOrder) {
-      const rank = rankOf.get(franchiseId) ?? 0;
-      const position = tierOrder.length === 1 ? 0 : rank / (tierOrder.length - 1);
-      const ceiling = strongSupport - (strongSupport - floorSupport) * position;
-      const pool = pools.get(franchiseId) ?? [];
-      const candidates = options.candidates.find((entry) => entry.franchiseId === franchiseId);
-      if (!candidates) throw new Error(`bracket: missing candidates for ${franchiseId}`);
-      const five =
-        bestLegalFiveWithin(pool, ceiling) ??
-        bestLegalFiveWithin(pool, ceilings.get(franchiseId) ?? topSupport);
-      if (!five) throw new Error(`bracket: ${franchiseId} produced no legal five`);
-      selections.set(franchiseId, five);
-      field.push({
-        key: franchiseId,
-        team: {
-          teamId: franchiseId,
-          displayName: candidates.displayName,
-          players: five.players.map(toSimulationPlayer),
-        },
-      });
-    }
-    return { field, selections };
-  };
-
-  const measure = (field: FieldTeam[], phase: string) =>
-    simulateRoundRobin(field, gamesPerPair, seed, phase, profile, engineContext);
-
-  let best: CalibrationPoint | null = null;
-  let bestScore = Infinity;
-  const steps = CALIBRATION_STEPS;
-  for (let step = 0; step < steps; step += 1) {
-    const fraction = step / (steps - 1);
-    const floorSupport = strongSupport - (strongSupport - bottomSupport) * fraction;
-    const { field, selections } = build(floorSupport);
-    const measured = measure(field, `fit${String(step)}`);
-    const rates = field.map((entry) => measured.winRates.get(entry.key) ?? 0.5);
-    const spread = Math.max(...rates) - Math.min(...rates);
-    const score = ladderError(rates, BRACKET_TARGET_LADDER);
-    if (score < bestScore) {
-      bestScore = score;
-      best = { scale: fraction, field, selections, measured, spread };
-    }
-  }
-  if (best === null) throw new Error('bracket: calibration produced no field');
-
-  // The stored win rate is a fresh, independent measurement of the frozen field.
-  // Calibration searched many fields, so reusing its numbers would bake in the
-  // optimism of having picked the best of several noisy trials.
-  const final = simulateRoundRobin(
-    best.field,
-    gamesPerPair,
-    seed,
-    'record',
-    profile,
-    engineContext,
-  );
-
-  const { field, selections } = best;
-  const measured = final;
+  const measured = simulateRoundRobin(field, gamesPerPair, seed, 'record', profile, engineContext);
   const opponents: BracketOpponent[] = [];
 
   for (const franchiseId of tierOrder) {

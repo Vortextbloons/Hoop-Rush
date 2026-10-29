@@ -5,6 +5,7 @@ import type {
   CapRushCommandResult,
   CapRushCreateDraftCommand,
   CapRushDraftState,
+  CapRushLockLineupCommand,
   CapRushOffer,
   CapRushPurchaseSpinCommand,
   CapRushRerollOfferCommand,
@@ -29,12 +30,14 @@ import {
   capRushOfferLegalCardIds,
 } from './feasibility.ts';
 import { generateCapRushOffer, generateCapRushReplacementOffer } from './offers.ts';
+import { buildCapRushLockedInputs, type CapRushLockSources } from './lock.ts';
 import { buildCapRushSpinReceipt, capRushPayrollDollars, capRushSpinEligibility } from './spin.ts';
 import { capRushStateDigest } from './state-digest.ts';
 
 export interface CapRushCommandEnvironment {
   readonly index: CapRushCatalogIndex;
   readonly rngFactory?: (seed: string) => Rng;
+  readonly lockSources?: CapRushLockSources;
 }
 
 export interface CapRushCommandOutcome {
@@ -63,6 +66,7 @@ export function createCapRushDraftState(
     rerollsRemaining: CAP_RUSH_REROLL_LIMIT,
     picks: [],
     spin: { status: 'unavailable' },
+    locked: null,
   });
   return state;
 }
@@ -407,6 +411,80 @@ function applySkipSpin(
   return acceptCapRushCommand(state, command, nextState);
 }
 
+function applyLockLineup(
+  state: CapRushDraftState,
+  command: CapRushLockLineupCommand,
+  environment: CapRushCommandEnvironment,
+): CapRushCommandOutcome {
+  const mismatch = validateRunAndRevision(state, command, environment);
+  if (mismatch !== null) return mismatch;
+  if (state.stage === 'locked') {
+    return rejectCapRushCommand(
+      state,
+      command,
+      'already-locked',
+      'the cap rush lineup is already locked',
+    );
+  }
+  if (state.stage !== 'complete') {
+    return rejectCapRushCommand(
+      state,
+      command,
+      'phase-mismatch',
+      'locking requires a completed draft',
+    );
+  }
+  if (state.variant === 'roulette' && state.spin.status === 'pending') {
+    return rejectCapRushCommand(
+      state,
+      command,
+      'spin-unavailable',
+      'resolve the spin decision before locking',
+    );
+  }
+  const matches =
+    command.picks.length === state.picks.length &&
+    command.picks.every((entry, index) => {
+      const pick = state.picks[index];
+      return pick !== undefined && pick.slot === entry.slot && pick.card.cardId === entry.cardId;
+    });
+  if (!matches) {
+    return rejectCapRushCommand(
+      state,
+      command,
+      'incomplete-lineup',
+      'the locked picks do not match the completed draft',
+    );
+  }
+  const lockSources = environment.lockSources;
+  if (lockSources === undefined) {
+    return rejectCapRushCommand(
+      state,
+      command,
+      'generation-failed',
+      'locking requires bracket and simulation profile sources',
+    );
+  }
+  const locked = buildCapRushLockedInputs({
+    runId: state.runId,
+    runSeed: state.runSeed,
+    variant: state.variant,
+    versionSet: state.versionSet,
+    catalog: state.catalog,
+    picks: state.picks,
+    spin: state.spin.status === 'purchased' ? state.spin.receipt : null,
+    bracket: lockSources.bracket,
+    profile: lockSources.profile,
+  });
+  const nextState = capRushDraftStateSchema.parse({
+    ...state,
+    revision: state.revision + 1,
+    stage: 'locked',
+    locked,
+  });
+  return acceptCapRushCommand(state, command, nextState);
+}
+
 export function applyCapRushCommand(
   state: CapRushDraftState,
   command: CapRushCommand,
@@ -430,5 +508,7 @@ export function applyCapRushCommand(
       return applyPurchaseSpin(state, command, environment);
     case 'skip-cap-rush-spin':
       return applySkipSpin(state, command, environment);
+    case 'lock-cap-rush-lineup':
+      return applyLockLineup(state, command, environment);
   }
 }

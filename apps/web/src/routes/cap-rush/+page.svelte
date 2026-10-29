@@ -51,6 +51,9 @@
   function skipSpin(): void {
     void controller?.skipSpin();
   }
+  function lock(): void {
+    void controller?.lockLineup();
+  }
   function discard(): void {
     void controller?.discard();
   }
@@ -100,6 +103,7 @@
       onSign={sign}
       onPurchaseSpin={purchaseSpin}
       onSkipSpin={skipSpin}
+      onLock={lock}
       onDiscard={discard}
     />
   {:else}

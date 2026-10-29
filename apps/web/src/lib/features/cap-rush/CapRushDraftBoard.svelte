@@ -8,7 +8,7 @@
     type Position,
   } from '@hoop-rush/data-contracts';
   import { havocMutationDefinitionOf } from '@hoop-rush/engine';
-  import { Check, Shuffle, Sparkles } from '@lucide/svelte';
+  import { Check, Lock, Shuffle, Sparkles } from '@lucide/svelte';
   import PlayerFace from '#lib/components/PlayerFace.svelte';
   import TeamLogo from '#lib/components/TeamLogo.svelte';
   import CapRushCard from './CapRushCard.svelte';
@@ -35,6 +35,7 @@
     onSign,
     onPurchaseSpin,
     onSkipSpin,
+    onLock,
     onDiscard,
   }: {
     view: CapRushDraftView;
@@ -47,6 +48,7 @@
     onSign: (cardId: string) => void;
     onPurchaseSpin: (purchase: CapRushSpinPurchaseId, targetCardId: string) => void;
     onSkipSpin: () => void;
+    onLock: () => void;
     onDiscard: () => void;
   } = $props();
 
@@ -434,6 +436,17 @@
         {/if}
 
         <div class="mt-4 flex flex-wrap items-center gap-3">
+          {#if view.canLock}
+            <button
+              type="button"
+              class="inline-flex min-h-11 items-center gap-2 rounded-xl border border-primary/50 bg-primary/10 px-4 text-sm font-bold text-primary outline-none hover:bg-primary/15 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+              disabled={busy}
+              onclick={onLock}
+            >
+              <Lock size={15} aria-hidden="true" />
+              Lock the lineup
+            </button>
+          {/if}
           <button
             type="button"
             class="inline-flex min-h-11 items-center gap-2 rounded-xl border border-line-strong px-4 text-sm font-semibold outline-none hover:border-negative hover:text-negative focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
@@ -444,11 +457,13 @@
           </button>
           <span class="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
             <Sparkles size={13} aria-hidden="true" />
-            Your five and payroll are locked.{draft.variant === 'roulette'
-              ? spin?.state.status === 'pending'
-                ? ' Resolve the mutation spin to close the draft.'
-                : ' The season run comes next.'
-              : ' Season simulation and reports come with the run engine.'}
+            {#if draft.stage === 'locked'}
+              Locked. The 82-game season is next.
+            {:else if draft.variant === 'roulette' && spin?.state.status === 'pending'}
+              Resolve the mutation spin to close the draft.
+            {:else}
+              Five salaries, one apron bill, one target. Lock it in to open the season.
+            {/if}
           </span>
         </div>
       </section>

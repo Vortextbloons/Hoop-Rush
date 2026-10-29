@@ -65,6 +65,7 @@ export interface CapRushDraftView {
   readonly cards: readonly CapRushCardView[];
   readonly slots: readonly CapRushSlotView[];
   readonly spin: CapRushSpinView | null;
+  readonly canLock: boolean;
 }
 
 export interface CapRushSnapshot {
@@ -80,5 +81,6 @@ export interface CapRushService {
   signCard(cardId: string): Promise<void>;
   purchaseSpin(purchase: CapRushSpinPurchaseId, targetCardId: string): Promise<void>;
   skipSpin(): Promise<void>;
+  lockLineup(): Promise<void>;
   abandonDraft(): Promise<void>;
 }

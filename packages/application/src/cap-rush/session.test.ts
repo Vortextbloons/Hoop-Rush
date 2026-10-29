@@ -8,6 +8,7 @@ import type {
   Seed,
 } from '@hoop-rush/data-contracts';
 import {
+  CAP_RUSH_GAME_COUNT,
   CAP_RUSH_RULES_VERSION,
   CAP_RUSH_SALARY_CURVE_VERSION,
   CAP_RUSH_SCHEMA_VERSION,
@@ -227,5 +228,67 @@ describe('cap rush session', () => {
     }
     expect(spin.state.receipt.target.cardId).toBe(target.cardId);
     expect(spin.state.receipt.receiptDigest).toHaveLength(32);
+  });
+
+  it('locks the lineup and resumes the pinned inputs', async () => {
+    const repository = new MemoryCapRushRepository();
+    const session = createSession(repository);
+    await session.createDraft('clash');
+    for (const slot of POSITIONS) {
+      await session.choosePosition(slot);
+      const cards = session.getSnapshot().draft?.cards ?? [];
+      const cheapest = [...cards]
+        .filter((entry) => entry.signing.legal)
+        .sort((left, right) => left.card.salaryDollars - right.card.salaryDollars)[0];
+      if (cheapest === undefined) throw new Error(`no legal ${slot} signing`);
+      await session.signCard(cheapest.card.cardId);
+    }
+    const complete = session.getSnapshot().draft;
+    expect(complete?.canLock).toBe(true);
+    expect(complete?.draft.locked).toBeNull();
+
+    await session.lockLineup();
+    const locked = session.getSnapshot().draft;
+    expect(locked?.draft.stage).toBe('locked');
+    expect(locked?.canLock).toBe(false);
+    const inputs = locked?.draft.locked;
+    if (inputs === undefined || inputs === null) throw new Error('lock did not produce inputs');
+    expect(inputs.payrollDollars).toBe(complete?.payrollDollars ?? -1);
+    expect(inputs.schedule).toHaveLength(CAP_RUSH_GAME_COUNT);
+
+    const resumed = createSession(repository);
+    const loaded = await resumed.loadActive();
+    expect(loaded.draft?.draft.stage).toBe('locked');
+    expect(loaded.draft?.draft.locked).toEqual(inputs);
+    await expect(resumed.lockLineup()).rejects.toBeInstanceOf(CapRushServiceError);
+  });
+
+  it('refuses to resume a locked run against a different bracket', async () => {
+    const repository = new MemoryCapRushRepository();
+    const session = createSession(repository);
+    await session.createDraft('clash');
+    for (const slot of POSITIONS) {
+      await session.choosePosition(slot);
+      const cards = session.getSnapshot().draft?.cards ?? [];
+      const cheapest = [...cards]
+        .filter((entry) => entry.signing.legal)
+        .sort((left, right) => left.card.salaryDollars - right.card.salaryDollars)[0];
+      if (cheapest === undefined) throw new Error(`no legal ${slot} signing`);
+      await session.signCard(cheapest.card.cardId);
+    }
+    await session.lockLineup();
+
+    const stored = repository.active;
+    if (stored === null) throw new Error('lock was not stored');
+    repository.active = {
+      ...stored,
+      versionSet: {
+        ...stored.versionSet,
+        bracketHash: contentHashSchema.parse('d'.repeat(64)),
+      },
+    };
+
+    const resumed = createSession(repository);
+    await expect(resumed.loadActive()).rejects.toBeInstanceOf(CapRushServiceError);
   });
 });

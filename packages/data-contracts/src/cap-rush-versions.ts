@@ -113,3 +113,13 @@ export const capRushVersionSetSchema = z.object({
   profileHash: contentHashSchema,
 });
 export type CapRushVersionSet = z.infer<typeof capRushVersionSetSchema>;
+
+export const capRushCatalogSourceSchema = z.object({
+  catalogVersion: z.string().min(1).max(64),
+  catalogHash: z.string().regex(/^[0-9a-f]{64}$/),
+  dataVersion: z.string().min(1).max(64),
+  ratingsVersion: z.string().min(1).max(64),
+  playerVersionIdVersion: z.string().min(1).max(64),
+  positionNormalizationVersion: z.string().min(1).max(64),
+});
+export type CapRushCatalogSource = z.infer<typeof capRushCatalogSourceSchema>;

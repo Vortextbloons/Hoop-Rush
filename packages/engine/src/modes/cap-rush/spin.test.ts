@@ -65,6 +65,7 @@ function buildCompleteState(
     rerollsRemaining: 2,
     picks,
     spin: variant === 'roulette' ? { status: 'pending' } : { status: 'unavailable' },
+    locked: null,
   });
 }
 

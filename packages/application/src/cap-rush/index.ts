@@ -13,3 +13,4 @@ export {
   type CapRushSpinView,
 } from './contract.ts';
 export type { CapRushAssetPort, CapRushDraftRepositoryPort, CapRushIdPort } from './ports.ts';
+export type { CapRushLockSources } from '@hoop-rush/engine';

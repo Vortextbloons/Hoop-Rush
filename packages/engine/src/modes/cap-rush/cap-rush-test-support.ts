@@ -3,6 +3,8 @@ import type {
   CapRushCreateDraftCommand,
   CapRushDraftState,
   CapRushVersionSet,
+  EraSimulationProfile,
+  OpponentBracket,
   SeasonDraftCatalog,
 } from '@hoop-rush/data-contracts';
 import {
@@ -21,15 +23,18 @@ import {
   capRushTestCatalogSource,
   type CapRushTestCatalogOptions,
 } from '@hoop-rush/test-fixtures';
+import { DEFAULT_ERA_SIM_PROFILE, buildFixtureBracket } from '@hoop-rush/test-fixtures';
 import type { CapRushCatalogIndex } from './catalog.ts';
 import { adaptCapRushCatalog, buildCapRushCatalogIndex } from './catalog.ts';
 import { createCapRushDraftState } from './draft-commands.ts';
+import type { CapRushLockSources } from './lock.ts';
 
 export interface CapRushTestSetup {
   readonly catalog: SeasonDraftCatalog;
   readonly source: CapRushCatalogSource;
   readonly versionSet: CapRushVersionSet;
   readonly index: CapRushCatalogIndex;
+  readonly lockSources: CapRushLockSources;
   readonly createCommand: CapRushCreateDraftCommand;
   readonly state: CapRushDraftState;
 }
@@ -69,6 +74,7 @@ export function capRushTestSetup(options: CapRushTestCatalogOptions = {}): CapRu
     source,
     versionSet,
     index,
+    lockSources: { bracket: buildFixtureBracket(), profile: DEFAULT_ERA_SIM_PROFILE },
     createCommand,
     state: createCapRushDraftState(createCommand, index),
   };

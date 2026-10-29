@@ -54,7 +54,7 @@ export {
   validateBracketContent,
   type ChallengeCreation,
 } from './challenge/commands.ts';
-export { SEED_DERIVATION_VERSION } from './challenge/seeds.ts';
+export { deriveAttemptSeed, SEED_DERIVATION_VERSION } from './challenge/seeds.ts';
 export { challengeRunProgressDigest } from './challenge/digests.ts';
 export { generateSchedule, scheduleInvariants } from './bracket/schedule.ts';
 export {

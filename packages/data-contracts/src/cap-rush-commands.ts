@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { commandIdSchema, idSchema, seedSchema } from './ids.ts';
 import { positionSchema } from './positions.ts';
 import {
+  CAP_RUSH_DRAFT_ROUNDS,
   CAP_RUSH_SCHEMA_VERSION,
   capRushCardIdSchema,
   capRushDigestSchema,
@@ -10,7 +11,7 @@ import {
   capRushVersionSetSchema,
   capRushVariantSchema,
 } from './cap-rush-versions.ts';
-import { capRushCatalogSourceSchema } from './cap-rush-draft.ts';
+import { capRushCatalogSourceSchema } from './cap-rush-versions.ts';
 
 export const capRushCreateDraftCommandSchema = z.object({
   command: z.literal('create-cap-rush-draft'),
@@ -70,6 +71,22 @@ export const capRushSkipSpinCommandSchema = z.object({
 });
 export type CapRushSkipSpinCommand = z.infer<typeof capRushSkipSpinCommandSchema>;
 
+export const capRushLockLineupCommandSchema = z.object({
+  command: z.literal('lock-cap-rush-lineup'),
+  commandId: commandIdSchema,
+  runId: idSchema,
+  expectedRevision: z.number().int().nonnegative(),
+  picks: z
+    .array(
+      z.object({
+        slot: positionSchema,
+        cardId: capRushCardIdSchema,
+      }),
+    )
+    .length(CAP_RUSH_DRAFT_ROUNDS),
+});
+export type CapRushLockLineupCommand = z.infer<typeof capRushLockLineupCommandSchema>;
+
 export const capRushCommandSchema = z.discriminatedUnion('command', [
   capRushCreateDraftCommandSchema,
   capRushChoosePositionCommandSchema,
@@ -77,6 +94,7 @@ export const capRushCommandSchema = z.discriminatedUnion('command', [
   capRushSignCardCommandSchema,
   capRushPurchaseSpinCommandSchema,
   capRushSkipSpinCommandSchema,
+  capRushLockLineupCommandSchema,
 ]);
 export type CapRushCommand = z.infer<typeof capRushCommandSchema>;
 
@@ -95,6 +113,8 @@ export const capRushCommandRejectionCodeSchema = z.enum([
   'target-unknown',
   'catalog-mismatch',
   'generation-failed',
+  'incomplete-lineup',
+  'already-locked',
 ]);
 export type CapRushCommandRejectionCode = z.infer<typeof capRushCommandRejectionCodeSchema>;
 

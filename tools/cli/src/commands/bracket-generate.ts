@@ -3,6 +3,9 @@ import { resolve } from 'node:path';
 import {
   generateBracket,
   createEngineContext,
+  simulateGame,
+  toSimulationPlayer,
+  type EngineContext,
   bestLegalFiveWithin,
   type BracketCandidatePlayer,
   type FranchiseCandidates,
@@ -10,12 +13,14 @@ import {
 import {
   REQUIRED_RATING_KEYS,
   contentHashSchema,
-  opponentTeamSchema,
   seedSchema,
+  seedFromString,
+  playerIdSchema,
+  type SimulationTeam,
+  type EraSimulationProfile,
   type DifficultyProfile,
   type HoopRushManifest,
   type OpponentBracket,
-  type OpponentTeam,
   type PositionUnion,
   type Seed,
   type SimulationAnchors,
@@ -29,11 +34,12 @@ import { createRng, shuffle } from '@hoop-rush/engine';
 import { UsageError } from './sim.ts';
 import { parseCount } from '../args.ts';
 import { readJson, sha256Hex } from '../io.ts';
+import { resolvePoolLineup } from './challenge.ts';
 
 const COMMITTED_GENERATION_SEED: Seed = seedSchema.parse('8f2c1d4e6a9b7c3d8f2c1d4e6a9b7c3d');
-const GENERATION_VERSION = 'bracket-m3-v6';
+const GENERATION_VERSION = 'bracket-m3-v7';
 const SINGLE_DIFFICULTY: DifficultyProfile = {
-  profileVersion: 'm3-single-v3',
+  profileVersion: 'm3-single-v4',
   name: 'medium',
   leagueMedianPercentileBand: [0.45, 0.55],
   teamPercentileBand: [0, 1],
@@ -67,7 +73,7 @@ const TENDENCY_KEYS = [
   'blockAttemptRate',
   'crashOffensiveGlassRate',
 ] as const;
-const MIN_TEAM_GAMES = 40;
+const MIN_TEAM_GAMES = 20;
 
 interface RosterPlayer {
   externalId: string;
@@ -112,11 +118,8 @@ interface SeasonStats {
   fta: number;
 }
 
-interface Stint {
-  playerExternalId: string;
+interface Stint extends SeasonStats {
   teamExternalId: string;
-  gamesPlayed: number;
-  minutes: number;
 }
 
 function clampRating(value: number): number {
@@ -156,6 +159,7 @@ function anchorsFromStats(
     stealsPerGame: stats.steals / games,
     blocksPerGame: stats.blocks / games,
     turnoversPerGame: stats.turnovers / games,
+    fieldGoalAttemptsPerGame: stats.fga / games,
     fieldGoalPct: opponent.shrunkRatio(stats.fgm, stats.fga, 0.45),
     threePointPct: stats.tpa > 0 ? opponent.shrunkRatio(stats.tpm, stats.tpa, 0.34) : null,
     freeThrowPct: opponent.shrunkRatio(stats.ftm, stats.fta, 0.75),
@@ -164,26 +168,50 @@ function anchorsFromStats(
   };
 }
 
-/**
- * Positions come from the season that supplies the player snapshot, not from a
- * career union. A career union turns a guard who once played forward into a
- * four-position player, which is how guards end up starting at power forward.
- */
-function seasonPositions(player: RosterPlayer): PositionUnion {
-  const labels = new Set<string>();
-  if (typeof player.position === 'string' && player.position !== '') labels.add(player.position);
-  if (Array.isArray(player.secondaryPositions)) {
-    for (const secondary of player.secondaryPositions) {
-      if (typeof secondary === 'string' && secondary !== '') labels.add(secondary);
+export function seasonPositions(
+  player: Pick<RosterPlayer, 'position' | 'secondaryPositions'>,
+): PositionUnion {
+  const labels = [player.position, ...(player.secondaryPositions ?? [])];
+  const positions = labels.flatMap((label) => {
+    switch (label) {
+      case 'G-F':
+      case 'F-G':
+        return ['SG', 'SF'] as const;
+      case 'F-C':
+      case 'C-F':
+        return ['PF', 'C'] as const;
+      default:
+        return pools.normalizePositionLabels([label]).detailed;
     }
-  }
-  return pools.normalizePositionLabels(labels).detailed;
+  });
+  return [...new Set(positions)].sort();
+}
+
+export function selectSeasonFive(
+  players: readonly (BracketCandidatePlayer & { minutes: number; offensiveInvolvement: number })[],
+): BracketCandidatePlayer[] | null {
+  const cornerstone = [...players].sort(
+    (a, b) =>
+      b.offensiveInvolvement - a.offensiveInvolvement ||
+      b.minutes - a.minutes ||
+      a.playerId.localeCompare(b.playerId),
+  )[0];
+  if (!cornerstone) return null;
+  const rotation = players.map((player) => ({ ...player, score: player.minutes }));
+  const selected = bestLegalFiveWithin(rotation, Infinity, cornerstone.playerId);
+  if (!selected) return null;
+  return selected.players.map((selectedPlayer) => {
+    const original = players.find((player) => player.playerId === selectedPlayer.playerId);
+    if (!original) throw new Error(`missing selected player ${selectedPlayer.playerId}`);
+    return original;
+  });
 }
 
 export function buildCandidateCatalog(
   manifest: HoopRushManifest,
   verbose: boolean,
   seasonSeed: string,
+  benchmark: { team: SimulationTeam; profile: EraSimulationProfile; context: EngineContext },
 ): {
   candidates: FranchiseCandidates[];
   details: string[];
@@ -227,7 +255,6 @@ export function buildCandidateCatalog(
     '2025-26',
   ];
   const rosterBySeason = new Map<string, Map<string, RosterPlayer>>();
-  const statsBySeason = new Map<string, Map<string, SeasonStats>>();
   for (const season of seasonDirs) {
     let roster: unknown[];
     try {
@@ -243,19 +270,6 @@ export function buildCandidateCatalog(
       byId.set(player.externalId, player);
     }
     rosterBySeason.set(season, byId);
-    try {
-      const rawStats = readJson(resolve(NBA_ROOT, season, 'season-stats.json'));
-      const byPlayer = new Map<string, SeasonStats>();
-      if (Array.isArray(rawStats)) {
-        for (const raw of rawStats) {
-          const stats = raw as SeasonStats;
-          if (stats.playerExternalId) byPlayer.set(stats.playerExternalId, stats);
-        }
-      }
-      statsBySeason.set(season, byPlayer);
-    } catch {
-      statsBySeason.set(season, new Map());
-    }
   }
 
   interface PeakCandidate {
@@ -265,6 +279,7 @@ export function buildCandidateCatalog(
     heightInches: number | null;
     weightLbs: number | null;
     minutes: number;
+    offensiveInvolvement: number;
     positions: PositionUnion;
     ratings: BracketCandidatePlayer['ratings'];
     tendencies: BracketCandidatePlayer['tendencies'];
@@ -275,7 +290,6 @@ export function buildCandidateCatalog(
   const candidates: FranchiseCandidates[] = [];
   const details: string[] = [];
   const claimedPlayers = new Set<string>();
-  const selectionKeys = new Map<string, readonly number[]>();
   for (const slot of manifest.modernFranchiseSlots) {
     const perSeason = new Map<string, Map<string, PeakCandidate>>();
     for (const season of seasonDirs) {
@@ -294,13 +308,13 @@ export function buildCandidateCatalog(
         const player = roster.get(stint.playerExternalId);
         if (!player?.summaryRatings) continue;
         const key = `p-${stint.playerExternalId}`;
-        const stats = statsBySeason.get(season)?.get(stint.playerExternalId);
+        const stats = stint;
         const minutes = Math.trunc(stint.minutes);
         const selectionKey = pools.candidateKey({
           season,
           player: player as unknown as Record<string, unknown>,
           stint: stint as unknown as Record<string, unknown>,
-          stats: (stats ?? {}) as Record<string, unknown>,
+          stats: stats as unknown as Record<string, unknown>,
         });
         const ratings = {} as BracketCandidatePlayer['ratings'];
         for (const keyName of REQUIRED_RATING_KEYS) {
@@ -313,7 +327,6 @@ export function buildCandidateCatalog(
           tendencies[keyName] = typeof value === 'number' ? clampTendency(value) : 0;
         }
         const positions = seasonPositions(player);
-        selectionKeys.set(`${slot.franchiseId}/${key}`, selectionKey);
         teamPlayers.set(key, {
           playerId: key,
           displayName: `${player.firstName} ${player.lastName}`.trim(),
@@ -321,6 +334,7 @@ export function buildCandidateCatalog(
           heightInches: player.heightInches ?? null,
           weightLbs: player.weightLbs ?? null,
           minutes,
+          offensiveInvolvement: (stint.points + 2 * stint.assists) / stint.gamesPlayed,
           positions,
           ratings,
           tendencies,
@@ -331,23 +345,58 @@ export function buildCandidateCatalog(
       if (teamPlayers.size >= 5) perSeason.set(season, teamPlayers);
     }
 
-    // One real season per franchise: the roster a team actually fielded, so the
-    // league has genuine stars, role players and weak teams instead of every
-    // franchise's all-time peaks. A player can suit up for two franchises in
-    // different seasons, so seasons are taken in seeded order and the first one
-    // whose roster shares no player with an already-claimed team wins.
     const seasonOrder = shuffle(
       [...perSeason.keys()].sort(),
       createRng(`${seasonSeed}:teamseason:${slot.franchiseId}`),
     );
-    const chosenSeason = seasonOrder.find((season) => {
+    const rank = shuffle(
+      manifest.modernFranchiseSlots.map((franchise) => franchise.franchiseId),
+      createRng(`${seasonSeed}:absolute-tiers`),
+    ).indexOf(slot.franchiseId);
+    const targetWinRate = 0.01 + (rank / 29) * 0.1;
+    let chosenSeason: string | undefined;
+    let bestGap = Infinity;
+    for (const season of seasonOrder) {
       const roster = perSeason.get(season);
-      if (roster === undefined) return false;
-      for (const playerId of roster.keys()) {
-        if (claimedPlayers.has(playerId)) return false;
+      if (!roster) continue;
+      const five = selectSeasonFive([...roster.values()]);
+      if (!five || five.some((player) => claimedPlayers.has(player.playerId))) continue;
+      const team: SimulationTeam = {
+        teamId: slot.franchiseId,
+        displayName: slot.displayName,
+        players: five.map((player) => ({
+          ...player,
+          playerId: playerIdSchema.parse(player.playerId),
+        })),
+      };
+      let wins = 0;
+      const games = 160;
+      for (let game = 0; game < games; game += 1) {
+        const homeFirst = game % 2 === 0;
+        const result = simulateGame(
+          {
+            schemaVersion: 2,
+            seed: seedSchema.parse(
+              seedFromString(
+                `${seasonSeed}:absolute-fit:${slot.franchiseId}:${season}:${String(game)}`,
+              ),
+            ),
+            gameNumber: 1,
+            dataVersion: benchmark.profile.dataVersion,
+            profile: benchmark.profile,
+            home: homeFirst ? team : benchmark.team,
+            away: homeFirst ? benchmark.team : team,
+          },
+          benchmark.context,
+        );
+        if (result.winner === (homeFirst ? 'home' : 'away')) wins += 1;
       }
-      return bestLegalFiveWithin([...roster.values()], Infinity) !== null;
-    });
+      const gap = Math.abs(wins / games - targetWinRate);
+      if (gap < bestGap) {
+        bestGap = gap;
+        chosenSeason = season;
+      }
+    }
     if (chosenSeason === undefined) {
       throw new Error(`no collision-free legal season for ${slot.franchiseId}`);
     }
@@ -355,8 +404,9 @@ export function buildCandidateCatalog(
     if (chosenRoster === undefined) {
       throw new Error(`missing roster for ${slot.franchiseId} ${chosenSeason}`);
     }
-    for (const playerId of chosenRoster.keys()) claimedPlayers.add(playerId);
-    const players = [...chosenRoster.values()].sort((a, b) => a.playerId.localeCompare(b.playerId));
+    const players = selectSeasonFive([...chosenRoster.values()]);
+    if (!players) throw new Error(`no season five for ${slot.franchiseId} ${chosenSeason}`);
+    for (const player of players) claimedPlayers.add(player.playerId);
     candidates.push({
       franchiseId: slot.franchiseId,
       displayName: slot.displayName,
@@ -369,41 +419,6 @@ export function buildCandidateCatalog(
     }
   }
 
-  const owner = new Map<string, { franchiseId: string; key: readonly number[] }>();
-  for (const candidate of candidates) {
-    for (const player of candidate.players) {
-      const selectionKey = selectionKeys.get(`${candidate.franchiseId}/${player.playerId}`);
-      if (selectionKey === undefined) {
-        throw new Error(`missing selection key for ${candidate.franchiseId}/${player.playerId}`);
-      }
-      const current = owner.get(player.playerId);
-      const comparison = current ? pools.compareSelectionKeys(selectionKey, current.key) : 1;
-      if (
-        current === undefined ||
-        comparison > 0 ||
-        (comparison === 0 && candidate.franchiseId < current.franchiseId)
-      ) {
-        owner.set(player.playerId, {
-          franchiseId: candidate.franchiseId,
-          key: selectionKey,
-        });
-      }
-    }
-  }
-  for (const candidate of candidates) {
-    const before = candidate.players.length;
-    candidate.players = candidate.players.filter(
-      (player) => owner.get(player.playerId)?.franchiseId === candidate.franchiseId,
-    );
-    if (candidate.players.length === 0) {
-      throw new Error(`no candidate players for franchise ${candidate.franchiseId}`);
-    }
-    if (verbose) {
-      details.push(
-        `catalog ${candidate.franchiseId}: ${String(candidate.players.length)}/${String(before)} after cross-franchise dedup`,
-      );
-    }
-  }
   return { candidates, details };
 }
 
@@ -435,8 +450,22 @@ export function bracketGenerate(args: {
   const generationVersion = GENERATION_VERSION;
   const packaged = loadPackagedData();
   const manifest = packaged.manifest;
-  const profile = new PackagedData(packaged.manifest, packaged.dir).eraProfile();
-  const { candidates, details } = buildCandidateCatalog(manifest, args.verbose === true, seed);
+  const data = new PackagedData(packaged.manifest, packaged.dir);
+  const profile = data.eraProfile();
+  const context = createEngineContext();
+  const reference = resolvePoolLineup(
+    "Stephen Curry@warriors,Michael Jordan@bulls,LeBron James@cavaliers,Tim Duncan@spurs,Shaquille O'Neal@lakers",
+    data,
+  );
+  const { candidates, details } = buildCandidateCatalog(manifest, args.verbose === true, seed, {
+    team: {
+      teamId: 'legendary-reference',
+      displayName: 'Legendary reference',
+      players: reference.map(toSimulationPlayer),
+    },
+    profile,
+    context,
+  });
   const opponentsDir = args.opponentsDir ?? OPPONENTS_DIR;
 
   let bracket: OpponentBracket;
@@ -450,7 +479,7 @@ export function bracketGenerate(args: {
       candidates,
       gamesPerPair,
       minPlayerScore: minScore,
-      engineContext: createEngineContext(),
+      engineContext: context,
     });
   } catch (error) {
     return makeReport(

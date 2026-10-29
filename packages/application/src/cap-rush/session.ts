@@ -18,6 +18,7 @@ import {
   capRushChoosePositionCommandSchema,
   capRushCommandResultSchema,
   capRushCreateDraftCommandSchema,
+  capRushLockLineupCommandSchema,
   capRushPurchaseSpinCommandSchema,
   capRushRerollOfferCommandSchema,
   capRushSignCardCommandSchema,
@@ -34,6 +35,7 @@ import {
   capRushStateDigest,
   createCapRushDraftState,
   type CapRushCatalogIndex,
+  type CapRushLockSources,
 } from '@hoop-rush/engine';
 import {
   CapRushServiceError,
@@ -48,6 +50,7 @@ import type { CapRushAssetPort, CapRushDraftRepositoryPort, CapRushIdPort } from
 interface CapRushAssets {
   readonly index: CapRushCatalogIndex;
   readonly versionSet: CapRushVersionSet;
+  readonly lockSources: CapRushLockSources;
 }
 
 export interface CapRushSessionOptions {
@@ -209,6 +212,21 @@ export class CapRushSession implements CapRushService {
     );
   }
 
+  async lockLineup(): Promise<void> {
+    await this.dispatch((state) => {
+      if (state.stage !== 'complete') {
+        throw new CapRushServiceError('invalid-phase', 'the draft is not complete');
+      }
+      return capRushLockLineupCommandSchema.parse({
+        command: 'lock-cap-rush-lineup',
+        commandId: this.ids.newCommandId(),
+        runId: state.runId,
+        expectedRevision: state.revision,
+        picks: state.picks.map((pick) => ({ slot: pick.slot, cardId: pick.card.cardId })),
+      });
+    });
+  }
+
   async abandonDraft(): Promise<void> {
     try {
       await this.repository.clearActiveDraft();
@@ -227,7 +245,10 @@ export class CapRushSession implements CapRushService {
       const assets = await this.loadAssets();
       this.assertSupportedVersion(state, assets.versionSet);
       const command = build(state);
-      const outcome = applyCapRushCommand(state, command, { index: assets.index });
+      const outcome = applyCapRushCommand(state, command, {
+        index: assets.index,
+        lockSources: assets.lockSources,
+      });
       const applied = await this.repository.applyOutcome({ outcome, command });
       if (applied.status === 'rejected') {
         throw new CapRushServiceError(
@@ -285,6 +306,9 @@ export class CapRushSession implements CapRushService {
         })) ?? [],
       slots,
       spin: this.buildSpinView(state, payrollDollars),
+      canLock:
+        state.stage === 'complete' &&
+        (state.variant === 'clash' || state.spin.status !== 'pending'),
     };
   }
 
@@ -320,11 +344,14 @@ export class CapRushSession implements CapRushService {
       version.engineVersion !== current.engineVersion ||
       version.catalogVersion !== current.catalogVersion ||
       version.catalogHash !== current.catalogHash ||
-      version.dataVersion !== current.dataVersion
+      version.dataVersion !== current.dataVersion ||
+      version.profileVersion !== current.profileVersion ||
+      version.bracketHash !== current.bracketHash ||
+      version.profileHash !== current.profileHash
     ) {
       throw new CapRushServiceError(
         'unsupported-version',
-        'this cap rush draft was created with a different engine or data version and cannot be resumed',
+        'this cap rush draft was created with a different engine, bracket or data version and cannot be resumed',
       );
     }
   }
@@ -381,6 +408,7 @@ export class CapRushSession implements CapRushService {
     return {
       index: buildCapRushCatalogIndex(adaptCapRushCatalog(catalog, catalogSource)),
       versionSet,
+      lockSources: { bracket: preamble.bracket, profile: preamble.profile },
     };
   }
 }

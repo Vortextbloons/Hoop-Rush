@@ -25,21 +25,13 @@ import {
   CAP_RUSH_SCHEMA_VERSION,
   capRushBucketSchema,
   capRushCardIdSchema,
+  capRushCatalogSourceSchema,
   capRushOfferIdSchema,
   capRushVersionSetSchema,
   capRushVariantSchema,
 } from './cap-rush-versions.ts';
 import { capRushSpinStateSchema } from './cap-rush-spin.ts';
-
-export const capRushCatalogSourceSchema = z.object({
-  catalogVersion: z.string().min(1).max(64),
-  catalogHash: z.string().regex(/^[0-9a-f]{64}$/),
-  dataVersion: z.string().min(1).max(64),
-  ratingsVersion: z.string().min(1).max(64),
-  playerVersionIdVersion: z.string().min(1).max(64),
-  positionNormalizationVersion: z.string().min(1).max(64),
-});
-export type CapRushCatalogSource = z.infer<typeof capRushCatalogSourceSchema>;
+import { capRushLockedInputsSchema } from './cap-rush-lock.ts';
 
 export const capRushPlayerProfileSchema = z.object({
   ratings: simulationRatingsSchema,
@@ -110,7 +102,12 @@ export const capRushDraftPickSchema = z.object({
 });
 export type CapRushDraftPick = z.infer<typeof capRushDraftPickSchema>;
 
-export const capRushDraftStageSchema = z.enum(['select-position', 'review-offer', 'complete']);
+export const capRushDraftStageSchema = z.enum([
+  'select-position',
+  'review-offer',
+  'complete',
+  'locked',
+]);
 export type CapRushDraftStage = z.infer<typeof capRushDraftStageSchema>;
 
 export const capRushDraftStateSchema = z
@@ -128,14 +125,21 @@ export const capRushDraftStateSchema = z
     rerollsRemaining: z.number().int().min(0).max(CAP_RUSH_REROLL_LIMIT),
     picks: z.array(capRushDraftPickSchema).max(CAP_RUSH_DRAFT_ROUNDS),
     spin: capRushSpinStateSchema,
+    locked: capRushLockedInputsSchema.nullable(),
   })
   .superRefine((state, ctx) => {
-    if (state.stage === 'complete') {
+    if (state.stage === 'complete' || state.stage === 'locked') {
       if (state.picks.length !== CAP_RUSH_DRAFT_ROUNDS) {
         ctx.addIssue({ code: 'custom', message: 'a complete draft requires five picks' });
       }
       if (state.offer !== null) {
         ctx.addIssue({ code: 'custom', message: 'a complete draft cannot hold an open offer' });
+      }
+      if (state.locked !== null && state.stage !== 'locked') {
+        ctx.addIssue({ code: 'custom', message: 'only a locked draft holds locked inputs' });
+      }
+      if (state.stage === 'locked' && state.locked === null) {
+        ctx.addIssue({ code: 'custom', message: 'a locked draft requires locked inputs' });
       }
     } else {
       if (state.picks.length >= CAP_RUSH_DRAFT_ROUNDS) {
@@ -161,17 +165,29 @@ export const capRushDraftStateSchema = z
       }
     }
 
-    if (state.stage !== 'complete' || state.variant === 'clash') {
+    if (state.stage !== 'complete' && state.stage !== 'locked') {
       if (state.spin.status !== 'unavailable') {
         ctx.addIssue({
           code: 'custom',
           message: 'only a completed Cap Roulette draft holds a spin decision',
         });
       }
+    } else if (state.variant === 'clash') {
+      if (state.spin.status !== 'unavailable') {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Cap Clash never holds a spin decision',
+        });
+      }
     } else if (state.spin.status === 'unavailable') {
       ctx.addIssue({
         code: 'custom',
         message: 'a completed Cap Roulette draft requires a spin decision',
+      });
+    } else if (state.stage === 'locked' && state.spin.status === 'pending') {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'an unresolved spin decision cannot be locked',
       });
     }
 
