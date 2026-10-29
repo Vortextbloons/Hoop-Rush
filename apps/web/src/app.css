@@ -496,9 +496,6 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .sim-live-dot,
-  .sim-ticker-card,
-  .sim-spot-badge,
   .draft-card-enter,
   .draft-jumbo,
   .draft-roster-enter,
@@ -524,14 +521,11 @@
   animation: none !important;
 }
 
-[data-lite] .sim-live-dot,
 [data-lite] .sim-bar-fill,
 [data-lite] .draft-card-enter,
 [data-lite] .draft-jumbo,
 [data-lite] .draft-roster-enter,
-[data-lite] .draft-just-picked,
-[data-lite] .sim-ticker-card,
-[data-lite] .sim-spot-badge {
+[data-lite] .draft-just-picked {
   animation: none !important;
 }
 
