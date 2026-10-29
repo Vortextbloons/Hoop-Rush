@@ -71,11 +71,33 @@ export const storedCapRushGameRowSchema = z
     updatedAtIso: isoDateSchema,
   })
   .superRefine((row, ctx) => {
-    if (row.game.gameNumber !== row.gameNumber) {
+    const { game, gameNumber } = row;
+    if (game.gameNumber !== gameNumber || game.summary.gameNumber !== gameNumber) {
       ctx.addIssue({ code: 'custom', message: 'stored game number does not match its row' });
     }
-    if (row.game.summary.gameNumber !== row.gameNumber) {
-      ctx.addIssue({ code: 'custom', message: 'stored game summary does not match its row' });
+    if (game.result.gameNumber !== gameNumber) {
+      ctx.addIssue({ code: 'custom', message: 'stored game result number does not match its row' });
+    }
+    if (game.result.inputDigest !== game.summary.inputDigest) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'stored game result digest does not match its summary',
+      });
+    }
+    const humanHome = game.summary.humanHome;
+    if ((game.result.humanSide === 'home') !== humanHome) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'stored game human side does not match its summary',
+      });
+    }
+    const humanPoints = humanHome ? game.result.home.points : game.result.away.points;
+    const opponentPoints = humanHome ? game.result.away.points : game.result.home.points;
+    if (
+      humanPoints !== game.summary.humanPoints ||
+      opponentPoints !== game.summary.opponentPoints
+    ) {
+      ctx.addIssue({ code: 'custom', message: 'stored game scoreline does not match its summary' });
     }
   });
 export type StoredCapRushGameRow = z.infer<typeof storedCapRushGameRowSchema>;

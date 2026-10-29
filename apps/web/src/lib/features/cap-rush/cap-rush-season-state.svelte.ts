@@ -20,8 +20,6 @@ export interface CapRushSeasonProgress {
   readonly total: number;
 }
 
-const SEASON_COMPLETE_MESSAGE = 'The season is complete.';
-
 export class CapRushSeasonController {
   draft = $state.raw<CapRushDraftView | null>(null);
   games = $state.raw<CapRushStoredGame[]>([]);
@@ -43,33 +41,33 @@ export class CapRushSeasonController {
     this.runner = runner;
   }
 
-  get played(): number {
-    return this.games.length;
+  private isDestroyed(): boolean {
+    return this.destroyed;
   }
 
   async load(): Promise<void> {
     this.error = null;
     try {
       const snapshot = await this.service.loadActive();
-      if (this.destroyed) return;
+      if (this.isDestroyed()) return;
       this.draft = snapshot.draft;
     } catch (error) {
-      if (!this.destroyed) {
+      if (!this.isDestroyed()) {
         this.error = errorMessageOf(error);
         this.unsupported =
           error instanceof CapRushServiceError && error.code === 'unsupported-version';
       }
     } finally {
-      if (!this.destroyed) this.loading = false;
+      if (!this.isDestroyed()) this.loading = false;
     }
   }
 
   async playSeason(): Promise<boolean> {
     const view = this.draft;
-    if (this.busy || this.destroyed) return false;
+    if (this.busy || this.isDestroyed()) return false;
     if (view === null || view.draft.locked === null || view.draft.stage !== 'locked') return false;
     if (view.season !== null && view.season.completedAt !== null) {
-      this.notice = SEASON_COMPLETE_MESSAGE;
+      this.notice = 'The season is already complete.';
       return true;
     }
     const start = view.season?.nextGameNumber ?? 1;
@@ -99,7 +97,7 @@ export class CapRushSeasonController {
                 result: message.result,
               },
             });
-            if (this.destroyed) return;
+            if (this.isDestroyed()) return;
             this.games = [
               ...this.games,
               {
@@ -112,28 +110,28 @@ export class CapRushSeasonController {
             this.draft = this.service.getSnapshot().draft;
           },
           onProgress: (message) => {
-            if (!this.destroyed) {
+            if (!this.isDestroyed()) {
               this.progress = { completed: message.gamesCompleted, total: message.gamesTotal };
             }
           },
           onError: (message) => {
-            if (!this.destroyed) this.error = message.message;
+            if (!this.isDestroyed()) this.error = message.message;
           },
         },
       });
-      if (this.destroyed) return false;
+      if (this.isDestroyed()) return false;
+      await this.load();
+      if (this.isDestroyed()) return false;
       if (complete.cancelled) {
         this.notice = `Season paused after game ${String(complete.lastCursor)}. Accepted games are saved.`;
         return false;
       }
-      await this.load();
-      if (this.destroyed) return false;
       return await this.finalizeSeason();
     } catch (error) {
-      if (!this.destroyed) this.error = errorMessageOf(error);
+      if (!this.isDestroyed()) this.error = errorMessageOf(error);
       return false;
     } finally {
-      if (!this.destroyed) {
+      if (!this.isDestroyed()) {
         this.busy = false;
         this.cancelling = false;
         this.progress = null;
@@ -142,15 +140,14 @@ export class CapRushSeasonController {
   }
 
   async finalizeSeason(): Promise<boolean> {
-    const view = this.draft;
-    if (view === null || this.destroyed) return false;
+    if (this.draft === null || this.isDestroyed()) return false;
     try {
       this.report = await this.service.finalizeSeason();
-      if (this.destroyed) return false;
+      if (this.isDestroyed()) return false;
       await this.load();
-      return !this.destroyed && this.report !== null;
+      return true;
     } catch (error) {
-      if (!this.destroyed) this.error = errorMessageOf(error);
+      if (!this.isDestroyed()) this.error = errorMessageOf(error);
       return false;
     }
   }

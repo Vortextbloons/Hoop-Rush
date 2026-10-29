@@ -111,5 +111,6 @@ export interface CapRushService {
   finalizeSeason(): Promise<CapRushReport>;
   loadReport(runId: string): Promise<CapRushReport | null>;
   listHistory(): Promise<readonly CapRushHistoryEntry[]>;
+  startNewRun(variant: CapRushVariant): Promise<void>;
   abandonDraft(): Promise<void>;
 }

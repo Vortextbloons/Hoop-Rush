@@ -115,7 +115,9 @@ export function buildCapRushHumanTeam(input: {
       `cap rush human team requires five locked picks (got ${String(input.picks.length)})`,
     );
   }
-  const ordered = [...input.picks].sort((left, right) => left.pickOrdinal - right.pickOrdinal);
+  const ordered = [...input.picks].sort(
+    (left, right) => POSITIONS.indexOf(left.slot) - POSITIONS.indexOf(right.slot),
+  );
   const starters = ordered.map((pick) => {
     const mutationPackage =
       input.spin !== null && input.spin.target.cardId === pick.card.cardId

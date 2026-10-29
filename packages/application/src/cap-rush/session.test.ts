@@ -26,6 +26,7 @@ import {
 } from '@hoop-rush/data-contracts';
 import {
   adaptCapRushCatalog,
+  applyCapRushCommand,
   buildCapRushCatalogIndex,
   capRushStoredGameOf,
   createCapRushDraftState,
@@ -44,12 +45,14 @@ import { CapRushServiceError, CapRushSession, type CapRushDraftRepositoryPort } 
 
 class MemoryCapRushRepository implements CapRushDraftRepositoryPort {
   active: CapRushDraftState | null = null;
+  loadError: Error | null = null;
   readonly commands = new Map<string, CapRushCommandResult>();
   readonly games = new Map<string, CapRushStoredGame[]>();
   readonly reports = new Map<string, CapRushReport>();
   readonly history: CapRushHistoryEntry[] = [];
 
   async loadActiveDraft(): Promise<CapRushDraftState | null> {
+    if (this.loadError !== null) throw this.loadError;
     return this.active;
   }
 
@@ -57,21 +60,17 @@ class MemoryCapRushRepository implements CapRushDraftRepositoryPort {
     return this.commands.get(commandId) ?? null;
   }
 
-  async listRunGames(runId: string): Promise<readonly CapRushStoredGame[]> {
+  async listRunGames(runId: string): Promise<CapRushStoredGame[]> {
     return [...(this.games.get(runId) ?? [])].sort(
       (left, right) => left.gameNumber - right.gameNumber,
     );
   }
 
-  async saveGame(runId: string, game: CapRushStoredGame): Promise<void> {
-    const games = this.games.get(runId) ?? [];
-    const next = games.filter((entry) => entry.gameNumber !== game.gameNumber);
-    next.push(game);
-    next.sort((left, right) => left.gameNumber - right.gameNumber);
-    this.games.set(runId, next);
+  async saveReport(report: CapRushReport): Promise<void> {
+    this.reports.set(report.runId, report);
   }
 
-  async listHistory(): Promise<readonly CapRushHistoryEntry[]> {
+  async listHistory(): Promise<CapRushHistoryEntry[]> {
     return [...this.history].sort((left, right) =>
       right.completedAtIso.localeCompare(left.completedAtIso),
     );
@@ -81,13 +80,11 @@ class MemoryCapRushRepository implements CapRushDraftRepositoryPort {
     return this.reports.get(runId) ?? null;
   }
 
-  async saveReport(report: CapRushReport): Promise<void> {
-    this.reports.set(report.runId, report);
-  }
-
   async applyOutcome(input: {
     outcome: { state: CapRushDraftState; result: CapRushCommandResult };
     command: CapRushCommand;
+    game?: CapRushStoredGame;
+    report?: CapRushReport;
   }): Promise<CapRushCommandResult> {
     const recorded = this.commands.get(input.outcome.result.commandId);
     if (recorded !== undefined) return recorded;
@@ -98,6 +95,16 @@ class MemoryCapRushRepository implements CapRushDraftRepositoryPort {
         throw new Error('stale revision');
       }
       this.active = input.outcome.state;
+      if (input.game !== undefined) {
+        const games = this.games.get(result.runId) ?? [];
+        const next = games.filter((entry) => entry.gameNumber !== input.game?.gameNumber);
+        next.push(input.game);
+        next.sort((left, right) => left.gameNumber - right.gameNumber);
+        this.games.set(result.runId, next);
+      }
+      if (input.report !== undefined) {
+        this.reports.set(input.report.runId, input.report);
+      }
     }
     return result;
   }
@@ -329,6 +336,23 @@ describe('cap rush session', () => {
     await expect(resumed.loadActive()).rejects.toBeInstanceOf(CapRushServiceError);
   });
 
+  it('reports an outdated save as an unsupported version, not a raw parse dump', async () => {
+    const repository = new MemoryCapRushRepository();
+    repository.loadError = Object.assign(
+      new Error('stored save schema 1 does not match current 2'),
+      {
+        code: 'unsupported',
+      },
+    );
+    const session = createSession(repository);
+    const error = await session.loadActive().catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(CapRushServiceError);
+    if (!(error instanceof CapRushServiceError)) throw new Error('expected a service error');
+    expect(error.code).toBe('unsupported-version');
+    expect(error.message).not.toContain('expected object');
+    expect(error.message).toContain('older version');
+  });
+
   it('runs an accepted season to a final report', async () => {
     const repository = new MemoryCapRushRepository();
     const session = createSession(repository);
@@ -441,5 +465,88 @@ describe('cap rush session', () => {
     }
     await session.lockLineup();
     await expect(session.finalizeSeason()).rejects.toBeInstanceOf(CapRushServiceError);
+  });
+
+  it('replaces a finished run with a fresh draft of the same variant', async () => {
+    const repository = new MemoryCapRushRepository();
+    const session = createSession(repository);
+    await session.createDraft('roulette');
+    for (const slot of POSITIONS) {
+      await session.choosePosition(slot);
+      const cards = session.getSnapshot().draft?.cards ?? [];
+      const cheapest = [...cards]
+        .filter((entry) => entry.signing.legal)
+        .sort((left, right) => left.card.salaryDollars - right.card.salaryDollars)[0];
+      if (cheapest === undefined) throw new Error(`no legal ${slot} signing`);
+      await session.signCard(cheapest.card.cardId);
+    }
+    await session.skipSpin();
+    await session.lockLineup();
+    expect(session.getSnapshot().draft?.draft.stage).toBe('locked');
+
+    await session.startNewRun('roulette');
+    const fresh = session.getSnapshot().draft;
+    expect(fresh?.draft.stage).toBe('select-position');
+    expect(fresh?.draft.picks).toHaveLength(0);
+    expect(fresh?.draft.variant).toBe('roulette');
+    expect(fresh?.draft.locked).toBeNull();
+    expect(fresh?.season).toBeNull();
+
+    const resumed = createSession(repository);
+    const loaded = await resumed.loadActive();
+    expect(loaded.draft?.draft.stage).toBe('select-position');
+  });
+
+  it('finalizes a Cap Roulette season with a purchased spin', async () => {
+    const repository = new MemoryCapRushRepository();
+    const session = createSession(repository);
+    await session.createDraft('roulette');
+    for (const slot of POSITIONS) {
+      await session.choosePosition(slot);
+      const cards = session.getSnapshot().draft?.cards ?? [];
+      const cheapest = [...cards]
+        .filter((entry) => entry.signing.legal)
+        .sort((left, right) => left.card.salaryDollars - right.card.salaryDollars)[0];
+      if (cheapest === undefined) throw new Error(`no legal ${slot} signing`);
+      await session.signCard(cheapest.card.cardId);
+    }
+    const target = session.getSnapshot().draft?.spin?.targets[0];
+    if (target === undefined) throw new Error('roulette spin has no targets');
+    await session.purchaseSpin('standard', target.cardId);
+    await session.lockLineup();
+    const locked = session.getSnapshot().draft?.draft.locked;
+    if (locked === undefined || locked === null) throw new Error('lock did not produce inputs');
+
+    const context = createEngineContext();
+    for (let gameNumber = 1; gameNumber <= CAP_RUSH_GAME_COUNT; gameNumber += 1) {
+      const simulation = simulateCapRushGame({ locked, gameNumber, context });
+      await session.acceptGame({
+        cursor: gameNumber,
+        inputDigest: simulation.summary.inputDigest,
+        resultDigest: simulation.summary.resultDigest,
+        isolations: simulation.facts.filter((fact) => fact.kind === 'isolation').length,
+        strikes: simulation.facts.filter((fact) => fact.kind === 'strike').length,
+        summary: simulation.summary,
+        stored: capRushStoredGameOf(simulation),
+      });
+    }
+    const report = await session.finalizeSeason();
+    expect(report.variant).toBe('roulette');
+    expect(report.spin).not.toBeNull();
+    expect(report.spinSpendDollars).toBe(15_000_000);
+    expect(session.getSnapshot().draft?.draft.stage).toBe('completed');
+    expect(session.getSnapshot().draft?.draft.spin.status).toBe('purchased');
+  }, 240_000);
+
+  it('abandons a mid-draft run and clears the active draft', async () => {
+    const repository = new MemoryCapRushRepository();
+    const session = createSession(repository);
+    await session.createDraft('clash');
+    await session.choosePosition('PG');
+    expect(repository.active?.stage).toBe('review-offer');
+
+    await session.abandonDraft();
+    expect(repository.active).toBeNull();
+    expect(session.getSnapshot().draft).toBeNull();
   });
 });

@@ -5,6 +5,7 @@ import type {
   CapRushHistoryEntry,
   CapRushReport,
   CapRushSpinPurchaseId,
+  CapRushStoredGame,
   CapRushVariant,
   CapRushVersionSet,
   Position,
@@ -70,6 +71,18 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : 'unknown cap rush service failure';
 }
 
+export const OUTDATED_SAVE_MESSAGE =
+  'this Cap Rush save was made by an older version of the game and cannot be resumed. Discard it to start a new draft.';
+
+function isUnsupportedSaveError(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as { code?: unknown }).code === 'unsupported'
+  );
+}
+
 export class CapRushSession implements CapRushService {
   private readonly repository: CapRushDraftRepositoryPort;
   private readonly assets: CapRushAssetPort;
@@ -101,6 +114,9 @@ export class CapRushSession implements CapRushService {
       return this.getSnapshot();
     } catch (error) {
       if (error instanceof CapRushServiceError) throw error;
+      if (isUnsupportedSaveError(error)) {
+        throw new CapRushServiceError('unsupported-version', OUTDATED_SAVE_MESSAGE);
+      }
       throw new CapRushServiceError('storage', messageOf(error));
     }
   }
@@ -235,25 +251,22 @@ export class CapRushSession implements CapRushService {
   }
 
   async acceptGame(game: CapRushAcceptedGame): Promise<void> {
-    await this.dispatch((state) =>
-      capRushAcceptGameCommandSchema.parse({
-        command: 'accept-cap-rush-game',
-        commandId: this.ids.newCommandId(),
-        runId: state.runId,
-        expectedRevision: state.revision,
-        cursor: game.cursor,
-        inputDigest: game.inputDigest,
-        resultDigest: game.resultDigest,
-        isolations: game.isolations,
-        strikes: game.strikes,
-        summary: game.summary,
-      }),
+    await this.dispatch(
+      (state) =>
+        capRushAcceptGameCommandSchema.parse({
+          command: 'accept-cap-rush-game',
+          commandId: this.ids.newCommandId(),
+          runId: state.runId,
+          expectedRevision: state.revision,
+          cursor: game.cursor,
+          inputDigest: game.inputDigest,
+          resultDigest: game.resultDigest,
+          isolations: game.isolations,
+          strikes: game.strikes,
+          summary: game.summary,
+        }),
+      { game: game.stored },
     );
-    const runId = this.draft?.runId;
-    if (runId === undefined) {
-      throw new CapRushServiceError('invalid-phase', 'the run disappeared while accepting a game');
-    }
-    await this.repository.saveGame(runId, game.stored);
   }
 
   async finalizeSeason(): Promise<CapRushReport> {
@@ -280,15 +293,16 @@ export class CapRushSession implements CapRushService {
       aggregate: state.season.aggregate,
       apronTriggers: state.season.apronTriggers,
     });
-    await this.dispatch((current) =>
-      capRushFinalizeSeasonCommandSchema.parse({
-        command: 'finalize-cap-rush-season',
-        commandId: this.ids.newCommandId(),
-        runId: current.runId,
-        expectedRevision: current.revision,
-      }),
+    await this.dispatch(
+      (current) =>
+        capRushFinalizeSeasonCommandSchema.parse({
+          command: 'finalize-cap-rush-season',
+          commandId: this.ids.newCommandId(),
+          runId: current.runId,
+          expectedRevision: current.revision,
+        }),
+      { report },
     );
-    await this.repository.saveReport(report);
     return report;
   }
 
@@ -308,6 +322,16 @@ export class CapRushSession implements CapRushService {
     }
   }
 
+  async startNewRun(variant: CapRushVariant): Promise<void> {
+    try {
+      await this.repository.clearActiveDraft();
+      this.draft = null;
+    } catch (error) {
+      throw new CapRushServiceError('storage', messageOf(error));
+    }
+    await this.createDraft(variant);
+  }
+
   async abandonDraft(): Promise<void> {
     try {
       await this.repository.clearActiveDraft();
@@ -317,7 +341,10 @@ export class CapRushSession implements CapRushService {
     }
   }
 
-  private async dispatch(build: (state: CapRushDraftState) => CapRushCommand): Promise<void> {
+  private async dispatch(
+    build: (state: CapRushDraftState) => CapRushCommand,
+    extra: { readonly game?: CapRushStoredGame; readonly report?: CapRushReport } = {},
+  ): Promise<void> {
     const state = this.draft;
     if (state === null) {
       throw new CapRushServiceError('invalid-phase', 'there is no active cap rush draft');
@@ -330,7 +357,12 @@ export class CapRushSession implements CapRushService {
         index: assets.index,
         lockSources: assets.lockSources,
       });
-      const applied = await this.repository.applyOutcome({ outcome, command });
+      const applied = await this.repository.applyOutcome({
+        outcome,
+        command,
+        ...(extra.game === undefined ? {} : { game: extra.game }),
+        ...(extra.report === undefined ? {} : { report: extra.report }),
+      });
       if (applied.status === 'rejected') {
         throw new CapRushServiceError(
           'invalid-phase',

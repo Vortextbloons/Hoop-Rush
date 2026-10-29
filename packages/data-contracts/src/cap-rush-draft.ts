@@ -150,11 +150,19 @@ export const capRushDraftStateSchema = z
         ctx.addIssue({ code: 'custom', message: 'an unlocked draft cannot hold season progress' });
       }
     } else if (state.stage === 'completed' || state.stage === 'abandoned') {
-      if (state.picks.length !== CAP_RUSH_DRAFT_ROUNDS) {
-        ctx.addIssue({ code: 'custom', message: 'a finished run requires five picks' });
-      }
-      if (state.locked === null) {
+      if (state.picks.length === CAP_RUSH_DRAFT_ROUNDS && state.locked === null) {
         ctx.addIssue({ code: 'custom', message: 'a finished run requires locked inputs' });
+      }
+      if (state.stage === 'completed') {
+        if (state.picks.length !== CAP_RUSH_DRAFT_ROUNDS) {
+          ctx.addIssue({ code: 'custom', message: 'a completed run requires five picks' });
+        }
+        if (state.locked === null) {
+          ctx.addIssue({ code: 'custom', message: 'a completed run requires locked inputs' });
+        }
+        if (state.season.completedAt === null) {
+          ctx.addIssue({ code: 'custom', message: 'a completed run requires a completion time' });
+        }
       }
       if (state.stage === 'abandoned' && state.season.completedAt !== null) {
         ctx.addIssue({ code: 'custom', message: 'an abandoned run cannot be completed' });
@@ -183,30 +191,34 @@ export const capRushDraftStateSchema = z
       }
     }
 
-    if (state.stage !== 'complete' && state.stage !== 'locked') {
+    const drafting = state.stage === 'select-position' || state.stage === 'review-offer';
+    if (state.variant === 'clash') {
+      if (state.spin.status !== 'unavailable') {
+        ctx.addIssue({ code: 'custom', message: 'Cap Clash never holds a spin decision' });
+      }
+    } else if (drafting) {
       if (state.spin.status !== 'unavailable') {
         ctx.addIssue({
           code: 'custom',
           message: 'only a completed Cap Roulette draft holds a spin decision',
         });
       }
-    } else if (state.variant === 'clash') {
-      if (state.spin.status !== 'unavailable') {
+    } else if (
+      state.stage === 'complete' ||
+      state.stage === 'locked' ||
+      state.stage === 'completed'
+    ) {
+      if (state.spin.status === 'unavailable') {
         ctx.addIssue({
           code: 'custom',
-          message: 'Cap Clash never holds a spin decision',
+          message: 'a completed Cap Roulette draft requires a spin decision',
+        });
+      } else if (state.spin.status === 'pending' && state.stage !== 'complete') {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'a resolved Cap Roulette run cannot hold a pending spin decision',
         });
       }
-    } else if (state.spin.status === 'unavailable') {
-      ctx.addIssue({
-        code: 'custom',
-        message: 'a completed Cap Roulette draft requires a spin decision',
-      });
-    } else if (state.stage === 'locked' && state.spin.status === 'pending') {
-      ctx.addIssue({
-        code: 'custom',
-        message: 'an unresolved spin decision cannot be locked',
-      });
     }
 
     if (state.picks.length > 0) {

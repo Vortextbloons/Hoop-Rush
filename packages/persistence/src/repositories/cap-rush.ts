@@ -6,9 +6,9 @@ import type {
   CapRushReport,
   CapRushStoredGame,
   CommandId,
+  Id,
 } from '@hoop-rush/data-contracts';
 import {
-  CAP_RUSH_GAME_COUNT,
   CAP_RUSH_SAVE_SCHEMA_VERSION,
   canonicalJson,
   capRushCommandResultSchema,
@@ -55,14 +55,7 @@ export interface CapRushRepository {
   applyOutcome(input: CapRushApplyOutcomeInput): Promise<CapRushCommandResult>;
   clearActiveDraft(): Promise<void>;
 }
-
-export interface CapRushSeasonRepository {
-  listRunGames(runId: string): Promise<CapRushStoredGame[]>;
-  readRunGame(runId: string, gameNumber: number): Promise<CapRushStoredGame | null>;
-  listHistory(): Promise<CapRushHistoryEntry[]>;
-  readReport(runId: string): Promise<CapRushReport | null>;
-  readCompletedRun(runId: string): Promise<CapRushCompletedRun | null>;
-}export class CapRushLoadError extends Error {
+export class CapRushLoadError extends Error {
   readonly code: 'unsupported' | 'malformed';
   readonly diagnostics: readonly string[];
   constructor(code: 'unsupported' | 'malformed', diagnostics: readonly string[]) {
@@ -114,6 +107,10 @@ function malformed(message: string): CapRushLoadError {
 
 function unsupported(message: string): CapRushLoadError {
   return new CapRushLoadError('unsupported', [message]);
+}
+
+function asRunId(runId: string): Id {
+  return runId as Id;
 }
 
 export class DexieCapRushRepository implements CapRushRepository {
@@ -323,7 +320,7 @@ export class DexieCapRushRepository implements CapRushRepository {
                 updatedAtIso: now,
               }),
             );
-            await this.putHistory(state, now);
+            await this.putHistory(state);
           }
         }
 
@@ -358,11 +355,7 @@ export class DexieCapRushRepository implements CapRushRepository {
   }
 
   async listRunGames(runId: string): Promise<CapRushStoredGame[]> {
-    const rows = await scopedNumericRows<unknown, [string, number], unknown>(
-      this.db.capRushGames,
-      '[runId+gameNumber]',
-      runId,
-    );
+    const rows = await scopedNumericRows(this.db.capRushGames, '[runId+gameNumber]', runId);
     return rows
       .map((row) => {
         assertSaveSchemaVersion(row, CAP_RUSH_SAVE_SCHEMA_VERSION, unsupported);
@@ -385,25 +378,12 @@ export class DexieCapRushRepository implements CapRushRepository {
   }
 
   async listHistory(): Promise<CapRushHistoryEntry[]> {
-    const rows = await listCompletedHistory<unknown>(this.db.capRushHistory, 'completedAtIso');
-    return rows.map((row) => {
-      assertSaveSchemaVersion(row, CAP_RUSH_SAVE_SCHEMA_VERSION, unsupported);
-      const parsed = parseRecord(storedCapRushHistoryRowSchema, row, 'cap rush history', malformed);
-      return {
-        runId: parsed.runId,
-        variant: parsed.variant,
-        payrollStatus: parsed.payrollStatus,
-        payrollDollars: parsed.payrollDollars,
-        wins: parsed.wins,
-        losses: parsed.losses,
-        perfectSeason: parsed.perfectSeason,
-        completedAtIso: parsed.completedAtIso,
-      };
-    });
+    const rows = await listCompletedHistory(this.db.capRushHistory, 'completedAtIso');
+    return rows.map((row) => this.historyEntryOf(row, 'cap rush history'));
   }
 
   async readReport(runId: string): Promise<CapRushReport | null> {
-    const row: unknown = await this.db.capRushReports.get(runId);
+    const row: unknown = await this.db.capRushReports.get(asRunId(runId));
     if (row === undefined) return null;
     assertSaveSchemaVersion(row, CAP_RUSH_SAVE_SCHEMA_VERSION, unsupported);
     return parseRecord(storedCapRushReportRowSchema, row, `cap rush report ${runId}`, malformed)
@@ -411,31 +391,30 @@ export class DexieCapRushRepository implements CapRushRepository {
   }
 
   async readCompletedRun(runId: string): Promise<CapRushCompletedRun | null> {
-    const row: unknown = await this.db.capRushHistory.get(runId);
+    const row: unknown = await this.db.capRushHistory.get(asRunId(runId));
     if (row === undefined) return null;
-    assertSaveSchemaVersion(row, CAP_RUSH_SAVE_SCHEMA_VERSION, unsupported);
-    const parsed = parseRecord(
-      storedCapRushHistoryRowSchema,
-      row,
-      `cap rush history ${runId}`,
-      malformed,
-    );
     return {
-      entry: {
-        runId: parsed.runId,
-        variant: parsed.variant,
-        payrollStatus: parsed.payrollStatus,
-        payrollDollars: parsed.payrollDollars,
-        wins: parsed.wins,
-        losses: parsed.losses,
-        perfectSeason: parsed.perfectSeason,
-        completedAtIso: parsed.completedAtIso,
-      },
+      entry: this.historyEntryOf(row, `cap rush history ${runId}`),
       report: await this.readReport(runId),
     };
   }
 
-  private async putHistory(state: CapRushDraftState, updatedAtIso: string): Promise<void> {
+  private historyEntryOf(row: unknown, label: string): CapRushHistoryEntry {
+    assertSaveSchemaVersion(row, CAP_RUSH_SAVE_SCHEMA_VERSION, unsupported);
+    const parsed = parseRecord(storedCapRushHistoryRowSchema, row, label, malformed);
+    return {
+      runId: parsed.runId,
+      variant: parsed.variant,
+      payrollStatus: parsed.payrollStatus,
+      payrollDollars: parsed.payrollDollars,
+      wins: parsed.wins,
+      losses: parsed.losses,
+      perfectSeason: parsed.perfectSeason,
+      completedAtIso: parsed.completedAtIso,
+    };
+  }
+
+  private async putHistory(state: CapRushDraftState): Promise<void> {
     const completedAtIso = state.season.completedAt;
     if (completedAtIso === null) {
       throw malformed('an incomplete cap rush season cannot be written to history');
@@ -455,7 +434,6 @@ export class DexieCapRushRepository implements CapRushRepository {
         losses: aggregate.losses,
         perfectSeason: aggregate.perfectSeason,
         completedAtIso,
-        updatedAtIso,
       }),
     );
   }

@@ -5,11 +5,11 @@
     franchiseAbbreviation,
     type CapRushDraftState,
     type CapRushPlayerSeasonLine,
-    type CapRushSeasonState,
     type CapRushStoredGame,
     type HavocParticipantLine,
     type HavocTeamResult,
   } from '@hoop-rush/data-contracts';
+  import type { CapRushSeasonView } from '@hoop-rush/application/cap-rush';
   import { capRushPlayerSeasonLines } from '@hoop-rush/engine';
   import PlayerFace from '#lib/components/PlayerFace.svelte';
   import TeamLogo from '#lib/components/TeamLogo.svelte';
@@ -29,7 +29,7 @@
     art = null,
   }: {
     draft: CapRushDraftState;
-    season: CapRushSeasonState;
+    season: CapRushSeasonView;
     storedGames?: readonly CapRushStoredGame[];
     art?: CapRushArt | null;
   } = $props();
@@ -40,6 +40,7 @@
   const played = $derived(season.games.length);
   const remaining = $derived(Math.max(0, CAP_RUSH_GAME_COUNT - played));
   const hasBoxScores = $derived(storedGames.length > 0);
+  const boxScoresComplete = $derived(played > 0 && storedGames.length === played);
   const gamesByNumber = $derived(new Map(storedGames.map((game) => [game.gameNumber, game])));
   const summaryByNumber = $derived(new Map(season.games.map((game) => [game.gameNumber, game])));
   const opponentTeams = $derived(
@@ -357,8 +358,10 @@
         Season averages
       </h3>
       <p class="font-mono text-[10px] text-muted-foreground uppercase">
-        {#if hasBoxScores}
+        {#if boxScoresComplete}
           {storedGames.length} stored {storedGames.length === 1 ? 'game' : 'games'}
+        {:else if hasBoxScores}
+          {storedGames.length} of {played} box scores
         {:else}
           No stored box scores
         {/if}
@@ -368,9 +371,15 @@
     {#if !hasBoxScores}
       <p class="mt-2 text-xs leading-relaxed text-muted-foreground">
         Season player totals need the stored box scores from this run. They appear as games are
-        played and accepted.
+        played and accepted in this session.
       </p>
-    {:else}
+    {:else if !boxScoresComplete}
+      <p class="mt-2 text-xs leading-relaxed text-muted-foreground">
+        Only the {storedGames.length} box scores accepted in this session are loaded, so the totals below
+        cover those games rather than the full {played}-game season.
+      </p>
+    {/if}
+    {#if hasBoxScores}
       <div class="mt-3 overflow-x-auto">
         <table class="ui-stats-table text-[11px]">
           <caption class="sr-only">

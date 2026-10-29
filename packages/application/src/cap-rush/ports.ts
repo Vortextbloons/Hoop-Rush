@@ -11,13 +11,10 @@ import type {
 import type { CapRushRepository } from '@hoop-rush/persistence';
 
 export interface CapRushDraftRepositoryPort extends CapRushRepository {
-  saveGame(runId: string, game: CapRushStoredGame): Promise<void>;
-  listRunGames(runId: string): Promise<readonly CapRushStoredGame[]>;
-  listHistory(): Promise<readonly CapRushHistoryEntry[]>;
+  listRunGames(runId: string): Promise<CapRushStoredGame[]>;
+  listHistory(): Promise<CapRushHistoryEntry[]>;
   readReport(runId: string): Promise<CapRushReport | null>;
-  saveReport(report: CapRushReport): Promise<void>;
 }
-
 export interface CapRushAssetPort {
   loadCatalog(): Promise<SeasonDraftCatalog>;
   loadPreamble(): Promise<{

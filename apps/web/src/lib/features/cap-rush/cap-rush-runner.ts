@@ -29,7 +29,7 @@ interface ActiveBatch {
 }
 
 function defaultWorker(): Worker {
-  return new Worker(new URL('../../workers/cap-rush-worker.ts', import.meta.url), {
+  return new Worker(new URL('../../../workers/cap-rush-worker.ts', import.meta.url), {
     type: 'module',
   });
 }
@@ -132,7 +132,7 @@ export class CapRushRunner {
         }
       };
       worker.onerror = (event) => {
-        fail(errorOf((event as ErrorEvent).error ?? 'cap rush worker crashed'));
+        fail(errorOf(event.error ?? 'cap rush worker crashed'));
       };
       worker.postMessage({
         schemaVersion: CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION,

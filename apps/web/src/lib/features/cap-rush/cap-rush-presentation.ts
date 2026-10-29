@@ -30,7 +30,7 @@ export function formatMillions(amount: number): string {
 }
 
 export function recordLabel(wins: number, losses: number): string {
-  return `${wins}–${losses}`;
+  return `${String(wins)}–${String(losses)}`;
 }
 
 export function formatAverage(total: number, games: number): string {

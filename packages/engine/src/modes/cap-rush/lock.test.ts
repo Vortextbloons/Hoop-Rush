@@ -328,6 +328,32 @@ describe('cap rush lineup lock', () => {
     const second = lock(setup, state).state.locked;
     expect(first).toEqual(second);
   });
+
+  it('locks a draft whose positions were chosen out of canonical order', () => {
+    const setup = capRushTestSetup();
+    const state = buildCompleteState(
+      setup,
+      [12_000_000, 11_000_000, 10_000_000, 9_000_000, 8_000_000],
+    );
+    const order: Position[] = ['C', 'SG', 'PG', 'PF', 'SF'];
+    const shuffled = capRushDraftStateSchema.parse({
+      ...state,
+      picks: order.map((slot, index) => {
+        const pick = state.picks.find((entry) => entry.slot === slot);
+        if (pick === undefined) throw new Error(`missing ${slot}`);
+        return { ...pick, pickOrdinal: index };
+      }),
+    });
+    const outcome = lock(setup, shuffled);
+    expect(outcome.result.status).toBe('accepted');
+    const locked = outcome.state.locked;
+    if (locked === null) throw new Error('lock did not produce inputs');
+    expect(locked.human.starters.map((starter) => starter.slot)).toEqual([...POSITIONS]);
+    expect(locked.human.replacements.map((replacement) => replacement.slot)).toEqual([
+      ...POSITIONS,
+    ]);
+    expect(locked.picks.map((pick) => pick.pickOrdinal)).toEqual([0, 1, 2, 3, 4]);
+  });
 });
 
 describe('cap rush locked spin and replacement roles', () => {

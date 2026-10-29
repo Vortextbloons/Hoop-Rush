@@ -353,10 +353,33 @@
         </dl>
 
         {#if spin !== null}
-          <div class="mt-4 rounded-xl border border-primary/30 bg-surface-1 p-3">
-            <p class="font-mono text-[9px] tracking-[0.1em] text-muted-foreground uppercase">
-              Cap Roulette spin
-            </p>
+          <div class="spin-panel mt-5 rounded-2xl border border-primary/30 p-4 sm:p-6">
+            <div class="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <p class="font-mono text-[10px] font-bold tracking-[0.16em] text-primary uppercase">
+                  Cap Roulette
+                </p>
+                <h3
+                  class="font-display mt-1 text-3xl leading-none font-extrabold tracking-tight uppercase"
+                >
+                  {spin.state.status === 'pending' ? 'Choose your mutation' : 'Your spin'}
+                </h3>
+                {#if spin.state.status === 'pending'}
+                  <p class="mt-2 max-w-xl text-xs leading-relaxed text-muted-foreground">
+                    One spin. One signed player. Choose your target and a spin, or keep your lineup
+                    as drafted.
+                  </p>
+                {/if}
+              </div>
+              <div class="rounded-xl border border-line-soft bg-card px-4 py-3">
+                <p class="font-mono text-[9px] tracking-wider text-muted-foreground uppercase">
+                  Room before the cap
+                </p>
+                <p class="font-display mt-1 text-2xl font-extrabold tabular-nums">
+                  {formatMillions(Math.max(0, CAP_RUSH_CAP_LINE_DOLLARS - view.payrollDollars))}
+                </p>
+              </div>
+            </div>
             {#if spin.state.status === 'purchased'}
               {@const receipt = spin.state.receipt}
               {@const definition = havocMutationDefinitionOf(receipt.entry.mutationId)}
@@ -377,58 +400,108 @@
             {:else if spin.state.status === 'skipped'}
               <p class="mt-1 text-sm font-semibold">No spin purchased. Your five stay unmutated.</p>
             {:else}
-              <p class="mt-1 text-xs leading-relaxed text-muted-foreground">
-                One paid mutation on one signed player, or skip it. You have
-                {formatMillions(Math.max(0, CAP_RUSH_CAP_LINE_DOLLARS - view.payrollDollars))} of spin
-                room before the {formatMillions(CAP_RUSH_CAP_LINE_DOLLARS)} cap.
-              </p>
-              <div class="mt-2 flex flex-wrap gap-1.5" role="group" aria-label="Spin target">
-                {#each spin.targets as entry (entry.cardId)}
-                  {@const active = spinTarget === entry.cardId}
-                  <button
-                    type="button"
-                    aria-pressed={active}
-                    class="inline-flex min-h-9 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 {active
-                      ? 'border-primary bg-primary/15 text-foreground'
-                      : 'border-line-strong text-muted-foreground hover:text-foreground'}"
-                    disabled={busy}
-                    onclick={() => (spinTargetId = entry.cardId)}
+              <div class="mt-6">
+                <div class="flex items-baseline justify-between gap-3">
+                  <h4 class="font-display text-lg font-extrabold uppercase">Pick your player</h4>
+                  <span class="font-mono text-[9px] tracking-wider text-muted-foreground uppercase"
+                    >One target</span
                   >
-                    <span class="font-mono text-[9px]">{entry.slot}</span>
-                    <span class="max-w-32 truncate">{entry.player.displayName}</span>
-                  </button>
-                {/each}
-              </div>
-              <div class="mt-3 flex flex-wrap items-center gap-2">
-                {#each spin.purchases as option (option.purchase)}
-                  <button
-                    type="button"
-                    class="inline-flex min-h-10 flex-col items-start rounded-xl border border-line-strong px-3 py-1.5 text-xs font-bold outline-none hover:border-primary focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-                    disabled={busy || spinTarget === null || !option.eligible}
-                    onclick={() => buySpin(option.purchase)}
-                  >
-                    <span
-                      >{option.purchase === 'standard' ? 'Standard' : 'Premium'} · {formatMillions(
-                        option.priceDollars,
-                      )}</span
+                </div>
+                <div
+                  class="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5"
+                  role="group"
+                  aria-label="Spin target"
+                >
+                  {#each spin.targets as entry (entry.cardId)}
+                    {@const active = spinTarget === entry.cardId}
+                    {@const face = art !== null ? art.faceFor(entry.player) : null}
+                    <button
+                      type="button"
+                      aria-pressed={active}
+                      class="spin-target flex min-w-0 items-center gap-2 rounded-xl border p-2.5 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 {active
+                        ? 'border-primary bg-primary/10'
+                        : 'border-line-soft bg-card hover:border-line-strong'}"
+                      disabled={busy}
+                      onclick={() => (spinTargetId = entry.cardId)}
                     >
-                    <span class="font-mono text-[9px] font-normal text-muted-foreground"
-                      >{Math.round(option.tierOdds[1] * 100)}% / {Math.round(
-                        option.tierOdds[2] * 100,
-                      )}% / {Math.round(option.tierOdds[3] * 100)}% by tier</span
-                    >
-                    {#if !option.eligible}
-                      <span class="font-mono text-[9px] font-normal text-negative"
-                        >needs payroll ≤ {formatMillions(option.maxEligiblePayrollDollars)}</span
+                      {#if face !== null && art !== null}
+                        <PlayerFace
+                          player={face}
+                          manifest={art.manifest}
+                          size="sm"
+                          fallbackInitials={initialsOf(entry.player.displayName)}
+                        />
+                      {:else}
+                        <span
+                          class="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-surface-3 font-display text-xs font-extrabold text-muted-foreground"
+                          aria-hidden="true">{initialsOf(entry.player.displayName)}</span
+                        >
+                      {/if}
+                      <span class="min-w-0 flex-1"
+                        ><span class="block font-mono text-[9px] font-bold text-primary"
+                          >{entry.slot}</span
+                        ><span class="block truncate text-xs font-bold"
+                          >{entry.player.displayName}</span
+                        ></span
                       >
-                    {/if}
-                  </button>
-                {/each}
+                      {#if active}<Check
+                          size={15}
+                          class="shrink-0 text-primary"
+                          aria-hidden="true"
+                        />{/if}
+                    </button>
+                  {/each}
+                </div>
+              </div>
+              <div class="mt-6">
+                <h4 class="font-display text-lg font-extrabold uppercase">Choose your spin</h4>
+                <p class="mt-1 text-xs text-muted-foreground">
+                  Tier odds are shown for each option. The spin is charged when purchased.
+                </p>
+                <div class="mt-3 grid gap-2 sm:grid-cols-2">
+                  {#each spin.purchases as option (option.purchase)}
+                    <button
+                      type="button"
+                      class="spin-option rounded-xl border border-line-soft bg-card p-4 text-left outline-none transition-colors hover:border-primary focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={busy || spinTarget === null || !option.eligible}
+                      onclick={() => buySpin(option.purchase)}
+                    >
+                      <span class="flex items-center justify-between gap-3"
+                        ><span class="font-display text-xl font-extrabold uppercase"
+                          >{option.purchase === 'standard' ? 'Standard' : 'Premium'}</span
+                        ><span class="font-display text-xl font-extrabold text-primary tabular-nums"
+                          >{formatMillions(option.priceDollars)}</span
+                        ></span
+                      >
+                      <span class="mt-3 grid grid-cols-3 gap-2 border-t border-line-soft pt-3">
+                        {#each [1, 2, 3] as tier (tier)}
+                          <span
+                            ><span
+                              class="block font-mono text-[9px] text-muted-foreground uppercase"
+                              >Tier {tier}</span
+                            ><span class="mt-0.5 block text-sm font-bold tabular-nums"
+                              >{Math.round(option.tierOdds[tier as 1 | 2 | 3] * 100)}%</span
+                            ></span
+                          >
+                        {/each}
+                      </span>
+                      {#if !option.eligible}
+                        <span class="mt-3 block text-[11px] font-semibold text-negative"
+                          >Requires payroll of {formatMillions(option.maxEligiblePayrollDollars)} or less</span
+                        >
+                      {:else}
+                        <span class="mt-3 block text-[11px] font-bold text-primary"
+                          >Buy {option.purchase} spin &rarr;</span
+                        >
+                      {/if}
+                    </button>
+                  {/each}
+                </div>
                 <button
                   type="button"
-                  class="inline-flex min-h-10 items-center rounded-xl border border-line-strong px-3 text-xs font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                  class="mt-4 min-h-10 rounded-lg px-1 text-xs font-semibold text-muted-foreground underline underline-offset-4 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
                   disabled={busy}
-                  onclick={onSkipSpin}>Skip the spin</button
+                  onclick={onSkipSpin}>Skip the spin and keep my lineup</button
                 >
               </div>
             {/if}
@@ -519,3 +592,15 @@
     {/if}
   </div>
 </div>
+
+<style>
+  .spin-panel {
+    background:
+      radial-gradient(
+        ellipse at top right,
+        color-mix(in srgb, var(--color-primary) 12%, transparent),
+        transparent 55%
+      ),
+      var(--color-surface-1);
+  }
+</style>
