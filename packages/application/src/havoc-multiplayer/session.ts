@@ -277,6 +277,7 @@ export class HavocMultiplayerSession {
   private verification: HavocMultiplayerGameVerification[] = [];
   private completedRecap: StoredHavocMultiplayerCompleted | null = null;
   private commands: HavocMultiplayerCommand[] = [];
+  private persistedCommandCount = 0;
   private challenge: string | null = null;
   private busy = false;
   private error: string | null = null;
@@ -370,6 +371,7 @@ export class HavocMultiplayerSession {
     this.outputs = {};
     this.verification = [];
     this.commands = [];
+    this.persistedCommandCount = 0;
     this.completedRecap = null;
     this.completedPersisted = false;
     this.progress = 0;
@@ -985,11 +987,17 @@ export class HavocMultiplayerSession {
         this.applySnapshot(rematched.snapshot);
       }
       if (!this.completedPersisted) {
-        await this.deps.repository.appendCommands(
-          roomId,
-          commands.map((command, ordinal) => ({ ordinal, command })),
-        );
-        if (isDisposed()) return;
+        if (commands.length > this.persistedCommandCount) {
+          await this.deps.repository.appendCommands(
+            roomId,
+            commands.slice(this.persistedCommandCount).map((command, offset) => ({
+              ordinal: this.persistedCommandCount + offset,
+              command,
+            })),
+          );
+          if (isDisposed()) return;
+          this.persistedCommandCount = commands.length;
+        }
         await this.ensureGamePipeline();
         if (isDisposed()) return;
         await this.persistActive();

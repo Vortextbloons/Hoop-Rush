@@ -605,8 +605,9 @@ describe('havoc multiplayer supabase transport protocol pins', () => {
   });
 
   it('replays the accepted command log into the contract draft snapshot', async () => {
+    const loadDraftAssets = mock(() => Promise.resolve(fixtureDraftAssets()));
     const { harness, transport } = setupTransport({
-      loadDraftAssets: () => Promise.resolve(fixtureDraftAssets()),
+      loadDraftAssets,
     });
     const rootSeed = 'a'.repeat(32);
     const firstPicker = havocMultiplayerFirstPickerFor(rootSeed);
@@ -647,6 +648,12 @@ describe('havoc multiplayer supabase transport protocol pins', () => {
     expect(resumed.snapshot.draft?.turnOrdinal).toBe(1);
     expect(resumed.snapshot.draft?.status).toBe('drafting');
     expect(resumed.snapshot.draft?.picks).toHaveLength(1);
+    resumed.snapshot.draft?.picks.pop();
+    expect((await transport.resume(ROOM_ID)).snapshot.draft?.picks).toHaveLength(1);
+    expect(loadDraftAssets).toHaveBeenCalledTimes(1);
+    harness.setRows('havoc_multiplayer_room_commands', []);
+    expect((await transport.resume(ROOM_ID)).snapshot.draft?.picks).toHaveLength(0);
+    expect(loadDraftAssets).toHaveBeenCalledTimes(2);
     expect(resumed.snapshot.draft?.offer?.cards).toHaveLength(3);
     expect(harness.selectQueries).toContainEqual(
       expect.objectContaining({

@@ -7,7 +7,6 @@ import {
 } from '@hoop-rush/data-contracts';
 import type { CapRushCatalogIndex } from './catalog.ts';
 import { CapRushCatalogCoverageError } from './errors.ts';
-import { capRushSalaryDollars } from './salary.ts';
 
 export interface CapRushSlotSalaryOption {
   readonly playerId: string;
@@ -26,21 +25,8 @@ export function capRushSlotSalaryOptions(
   signedPlayerIds: ReadonlySet<string>,
   limit: number,
 ): readonly CapRushSlotSalaryOption[] {
-  const byPlayer = new Map<string, number>();
-  for (const player of index.bySlot.get(slot) ?? []) {
-    if (signedPlayerIds.has(player.playerId)) continue;
-    const salary = capRushSalaryDollars(player.originalOverall, player.seasonKey);
-    const current = byPlayer.get(player.playerId);
-    if (current === undefined || salary < current) byPlayer.set(player.playerId, salary);
-  }
-  return [...byPlayer.entries()]
-    .map(([playerId, salaryDollars]) => ({ playerId, salaryDollars }))
-    .sort((left, right) => {
-      if (left.salaryDollars !== right.salaryDollars) {
-        return left.salaryDollars - right.salaryDollars;
-      }
-      return left.playerId < right.playerId ? -1 : left.playerId > right.playerId ? 1 : 0;
-    })
+  return (index.salaryOptionsBySlot.get(slot) ?? [])
+    .filter((option) => !signedPlayerIds.has(option.playerId))
     .slice(0, limit);
 }
 

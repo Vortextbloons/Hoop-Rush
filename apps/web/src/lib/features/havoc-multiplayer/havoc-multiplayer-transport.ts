@@ -420,6 +420,7 @@ export function createHavocMultiplayerTransport(
   const transportPublishableKey = candidateKey;
   const transportStorageKey = options?.storageKey;
   const loadDraftAssets = options?.loadDraftAssets ?? loadHavocMultiplayerDraftAssets;
+  let replayedDraft: { key: string; draft: HavocMultiplayerDraftState } | null = null;
   function getClient(): Promise<HavocMultiplayerClient> {
     if (!clientPromise) {
       clientPromise = supabaseClient(transportUrl, transportPublishableKey, transportStorageKey);
@@ -446,20 +447,27 @@ export function createHavocMultiplayerTransport(
       const commandData: unknown = commandsResponse.data;
       commandRows = (Array.isArray(commandData) ? commandData : []) as HavocMultiplayerCommandRow[];
     }
-    const assets = await loadDraftAssets();
     const versions = havocMultiplayerVersionLocksSchema.parse(row.versions);
-    return replayHavocMultiplayerDraft({
-      rootSeed: seedSchema.parse(row.root_seed),
+    const rootSeed = seedSchema.parse(row.root_seed);
+    const variant = havocMultiplayerVariantSchema.parse(row.variant ?? 'standard');
+    const commands = commandRows.map((command) =>
+      havocMultiplayerCommandPayloadSchema.parse(command.payload),
+    );
+    const key = JSON.stringify([row.id, rootSeed, variant, versions, commands]);
+    if (replayedDraft?.key === key) return replayedDraft.draft;
+    const assets = await loadDraftAssets();
+    const draft = replayHavocMultiplayerDraft({
+      rootSeed,
       catalog: assets.catalog,
       environment: assets.environment,
-      commands: commandRows.map((command) =>
-        havocMultiplayerCommandPayloadSchema.parse(command.payload),
-      ),
+      commands,
       settings: {
-        variant: havocMultiplayerVariantSchema.parse(row.variant ?? 'standard'),
+        variant,
         rulesVersion: versions.rulesVersion,
       },
     });
+    replayedDraft = { key, draft };
+    return draft;
   }
   async function fetchSnapshot(roomId: string): Promise<HavocMultiplayerRoomSnapshot> {
     const client = await getClient();

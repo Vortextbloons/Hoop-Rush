@@ -502,6 +502,30 @@ async function verifyCurrentGame(h: Harness): Promise<void> {
 }
 
 describe('HavocMultiplayerSession lifecycle', () => {
+  it('persists only new commands and retries an unsuccessful append', async () => {
+    const h = await createHarness();
+    vi.spyOn(h.transport, 'subscribe').mockReturnValue({ unsubscribe: () => {} });
+    const append = vi.spyOn(h.repository, 'appendCommands');
+    await h.session.attach(h.roomId);
+    await h.sync();
+    append.mockClear();
+    await h.sync();
+    expect(append).not.toHaveBeenCalled();
+    await h.submit('p2', { kind: 'ready' });
+    append.mockRejectedValueOnce(new Error('storage unavailable'));
+    await h.sync();
+    expect(h.session.getSnapshot().error).toBe('storage unavailable');
+    await h.sync();
+    expect(append).toHaveBeenCalledTimes(2);
+    expect(append.mock.calls[0]?.[1]).toEqual(append.mock.calls[1]?.[1]);
+    expect(append.mock.calls[1]?.[1]).toHaveLength(1);
+    expect(h.session.getSnapshot().error).toBeNull();
+    append.mockClear();
+    await h.sync();
+    expect(append).not.toHaveBeenCalled();
+    h.session.dispose();
+  });
+
   afterEach(() => {
     vi.useRealTimers();
     vi.restoreAllMocks();

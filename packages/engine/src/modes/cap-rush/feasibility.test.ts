@@ -5,7 +5,12 @@ import type {
   CapRushSourcePlayer,
   SeasonDraftCatalog,
 } from '@hoop-rush/data-contracts';
-import { CAP_RUSH_HARD_LIMIT_DOLLARS, POSITIONS } from '@hoop-rush/data-contracts';
+import {
+  CAP_RUSH_HARD_LIMIT_DOLLARS,
+  POSITIONS,
+  playerVersionId,
+  seasonKeySchema,
+} from '@hoop-rush/data-contracts';
 import { buildCapRushTestCatalog, capRushTestCatalogSource } from '@hoop-rush/test-fixtures';
 import {
   adaptCapRushCatalog,
@@ -17,6 +22,7 @@ import {
   capRushAssessSigning,
   capRushCatalogCoverageIssues,
   capRushMinimumCompletionPayroll,
+  capRushSlotSalaryOptions,
 } from './feasibility.ts';
 import { capRushSalaryDollars } from './salary.ts';
 
@@ -85,6 +91,50 @@ describe('cap rush catalog coverage', () => {
 });
 
 describe('cap rush completion matching', () => {
+  it('preserves cheapest-season selection and salary ties when truncating slot options', () => {
+    const catalog = testIndex(buildCapRushTestCatalog({ overalls: [99, 80, 60, 60] })).catalog;
+    const first = catalog.candidates[0];
+    if (first === undefined) throw new Error('missing first player');
+    const index = buildCapRushCatalogIndex({
+      ...catalog,
+      candidates: [
+        ...catalog.candidates,
+        {
+          ...first,
+          playerVersionId: playerVersionId(
+            first.playerId,
+            first.franchiseId,
+            first.eraId,
+            '1996-97',
+          ),
+          seasonKey: seasonKeySchema.parse('1996-97'),
+          originalOverall: 60,
+        },
+      ],
+    });
+    for (const slot of POSITIONS) {
+      const signed = new Set(index.playerIds.filter((_, ordinal) => ordinal % 3 === 1));
+      const salaries = new Map<string, number>();
+      for (const player of index.bySlot.get(slot) ?? []) {
+        if (signed.has(player.playerId)) continue;
+        const salary = capRushSalaryDollars(player.originalOverall, player.seasonKey);
+        salaries.set(player.playerId, Math.min(salaries.get(player.playerId) ?? Infinity, salary));
+      }
+      const ordered = [...salaries]
+        .map(([playerId, salaryDollars]) => ({ playerId, salaryDollars }))
+        .sort(
+          (a, b) =>
+            a.salaryDollars - b.salaryDollars ||
+            (a.playerId < b.playerId ? -1 : a.playerId > b.playerId ? 1 : 0),
+        );
+      for (const limit of [0, 1, 2, 5, ordered.length + 1]) {
+        expect(capRushSlotSalaryOptions(index, slot, signed, limit)).toEqual(
+          ordered.slice(0, limit),
+        );
+      }
+    }
+  });
+
   it('uses the cheapest distinct person for every open slot', () => {
     const index = testIndex();
     expect(

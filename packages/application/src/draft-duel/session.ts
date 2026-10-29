@@ -220,6 +220,7 @@ export class DraftDuelSession {
   private verification: DraftDuelPartiallyVerified[] = [];
   private completedRecap: StoredDraftDuelCompleted | null = null;
   private commands: DraftDuelCommand[] = [];
+  private persistedCommandCount = 0;
   private busy = false;
   private error: string | null = null;
   private notice: string | null = null;
@@ -300,6 +301,7 @@ export class DraftDuelSession {
     this.outputs = {};
     this.verification = [];
     this.commands = [];
+    this.persistedCommandCount = 0;
     this.completedRecap = null;
     this.completedPersisted = false;
     this.progress = 0;
@@ -909,8 +911,14 @@ export class DraftDuelSession {
         if (isDisposed()) return;
         this.applySnapshot(rematched.snapshot);
       }
-      await this.deps.repository.appendCommands(roomId, commands);
-      if (isDisposed()) return;
+      if (commands.length > this.persistedCommandCount) {
+        await this.deps.repository.appendCommands(
+          roomId,
+          commands.slice(this.persistedCommandCount),
+        );
+        if (isDisposed()) return;
+        this.persistedCommandCount = commands.length;
+      }
       await this.ensureGamePipeline();
       if (isDisposed()) return;
       this.maybeProposeOrConfirm();

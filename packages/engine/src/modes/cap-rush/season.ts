@@ -74,7 +74,8 @@ export function simulateCapRushGame(input: {
   if (entry === undefined) {
     throw new Error(`cap rush: no schedule entry for game ${String(gameNumber)}`);
   }
-  const soloResult = battleToSoloResult(battle.result, humanSide, havocGameInputDigest(soloInput));
+  const inputDigest = havocGameInputDigest(soloInput);
+  const soloResult = battleToSoloResult(battle.result, humanSide, inputDigest);
   const soloTape = battleToSoloTape(battle.tape, humanSide);
   const battleAudit = auditHavocBattleGame(battleInput, battle.result, battle.tape);
   const humanHome = humanSide === 'home';
@@ -88,7 +89,7 @@ export function simulateCapRushGame(input: {
     opponentPoints,
     won: humanPoints > opponentPoints,
     overtimePeriods: battle.result.overtimePeriods,
-    inputDigest: havocGameInputDigest(soloInput),
+    inputDigest,
     resultDigest: havocGameResultDigest(soloResult),
   };
   return {

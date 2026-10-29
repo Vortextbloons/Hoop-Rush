@@ -15,6 +15,7 @@ import {
 } from '@hoop-rush/data-contracts';
 import { compareStrings } from '../../domain/math.ts';
 import { capRushSalaryDollars } from './salary.ts';
+import type { CapRushSlotSalaryOption } from './feasibility.ts';
 
 export interface CapRushCatalogIndex {
   readonly catalog: CapRushCatalog;
@@ -22,6 +23,7 @@ export interface CapRushCatalogIndex {
   readonly byVersionId: ReadonlyMap<string, CapRushSourcePlayer>;
   readonly bySlot: ReadonlyMap<Position, readonly CapRushSourcePlayer[]>;
   readonly playerIds: readonly string[];
+  readonly salaryOptionsBySlot: ReadonlyMap<Position, readonly CapRushSlotSalaryOption[]>;
 }
 
 function adaptSourcePlayer(
@@ -160,7 +162,23 @@ export function buildCapRushCatalogIndex(catalog: CapRushCatalog): CapRushCatalo
     });
   }
   const playerIds = [...byPlayerId.keys()].sort(compareStrings);
-  return { catalog, byPlayerId, byVersionId, bySlot, playerIds };
+  const salaryOptionsBySlot = new Map<Position, CapRushSlotSalaryOption[]>();
+  for (const [slot, players] of bySlot) {
+    const salaries = new Map<string, number>();
+    for (const player of players) {
+      const salary = capRushSalaryDollars(player.originalOverall, player.seasonKey);
+      salaries.set(player.playerId, Math.min(salaries.get(player.playerId) ?? Infinity, salary));
+    }
+    salaryOptionsBySlot.set(
+      slot,
+      [...salaries]
+        .map(([playerId, salaryDollars]) => ({ playerId, salaryDollars }))
+        .sort(
+          (a, b) => a.salaryDollars - b.salaryDollars || compareStrings(a.playerId, b.playerId),
+        ),
+    );
+  }
+  return { catalog, byPlayerId, byVersionId, bySlot, playerIds, salaryOptionsBySlot };
 }
 
 export function capRushSalaryOf(player: CapRushSourcePlayer): number {

@@ -210,6 +210,26 @@ describe('Draft Duel ready check progression', () => {
     expect(controller.localReady).toBe(true);
   });
 
+  it('appends only new commands and retries an unsuccessful local save', async () => {
+    const lifecycle = isolateSync();
+    unsubscribe();
+    await lifecycle.syncFromServer();
+    const append = vi.spyOn(lifecycle.deps.repository, 'appendCommands');
+    append.mockClear();
+    await lifecycle.syncFromServer();
+    expect(append).not.toHaveBeenCalled();
+    await submit('p2', { kind: 'ready-next-game', gameNumber: 1, ready: true });
+    append.mockRejectedValueOnce(new Error('storage unavailable'));
+    await lifecycle.syncFromServer();
+    await lifecycle.syncFromServer();
+    expect(append).toHaveBeenCalledTimes(2);
+    expect(append.mock.calls[0]?.[1]).toEqual(append.mock.calls[1]?.[1]);
+    expect(append.mock.calls[1]?.[1]).toHaveLength(1);
+    append.mockClear();
+    await lifecycle.syncFromServer();
+    expect(append).not.toHaveBeenCalled();
+  });
+
   it('publishes matching snapshots and commands when a command arrives during refresh', async () => {
     const lifecycle = isolateSync();
     unsubscribe();
