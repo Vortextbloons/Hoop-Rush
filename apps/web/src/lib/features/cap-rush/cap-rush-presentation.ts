@@ -21,12 +21,10 @@ export function initialsOf(displayName: string): string {
 
 export function formatMillions(amount: number): string {
   const sign = amount < 0 ? '-' : '';
-  const thousands = Math.round(Math.abs(amount) / 1_000);
-  const millions = thousands / 1_000;
-  const text = Number.isInteger(millions)
-    ? String(millions)
-    : millions.toFixed(3).replace(/0+$/, '').replace(/\.$/, '');
-  return `${sign}$${text}M`;
+  const rounded = Math.round(Math.abs(amount) / 100_000);
+  const approximate = Math.abs(amount) !== rounded * 100_000 ? '~' : '';
+  const text = (rounded / 10).toFixed(1).replace(/\.0$/, '');
+  return `${approximate}${sign}$${text}M`;
 }
 
 export function recordLabel(wins: number, losses: number): string {

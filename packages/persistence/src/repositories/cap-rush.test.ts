@@ -316,6 +316,27 @@ describe('cap rush repository', () => {
     await expect(repository.loadActiveDraft()).rejects.toBeInstanceOf(CapRushLoadError);
   });
 
+  it('recognizes an older salary curve in a locked active run as unsupported', async () => {
+    await startLockedRun(repository);
+    const row = await db.capRushActive.get(CAP_RUSH_ACTIVE_DRAFT_RECORD_ID);
+    if (!row || !row.draft.locked) throw new Error('missing locked run');
+    await db.capRushActive.put({
+      ...row,
+      draft: {
+        ...row.draft,
+        versionSet: { ...row.draft.versionSet, salaryCurveVersion: 'cap-rush-salary-v1' },
+        locked: {
+          ...row.draft.locked,
+          versionSet: { ...row.draft.locked.versionSet, salaryCurveVersion: 'cap-rush-salary-v1' },
+        },
+      },
+    } as never);
+    await expect(repository.loadActiveDraft()).rejects.toMatchObject({ code: 'unsupported' });
+    expect(await db.capRushActive.get(CAP_RUSH_ACTIVE_DRAFT_RECORD_ID)).toBeDefined();
+    await repository.clearActiveDraft();
+    expect(await repository.loadActiveDraft()).toBeNull();
+  });
+
   it('reports an unsupported stored save schema version', async () => {
     await db.capRushActive.put({
       saveSchemaVersion: CAP_RUSH_SAVE_SCHEMA_VERSION + 1,

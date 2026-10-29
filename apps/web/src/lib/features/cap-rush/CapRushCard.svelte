@@ -88,7 +88,7 @@
     {/if}
     <div class="min-w-0 flex-1">
       <div class="flex items-center gap-1">
-        <h3 class="truncate font-display text-sm leading-tight font-extrabold">
+        <h3 class="min-w-0 font-display text-sm leading-tight font-extrabold">
           {player.displayName}
         </h3>
         <span
@@ -191,7 +191,7 @@
 
   <details class="order-2 mx-2.5 mb-1.5 rounded bg-surface-1 px-2 sm:mx-3.5 md:order-1">
     <summary
-      class="cursor-pointer py-1.5 font-mono text-[9px] font-bold tracking-[0.08em] text-muted-foreground uppercase outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      class="flex min-h-11 cursor-pointer items-center py-1.5 font-mono text-[10px] font-bold tracking-[0.08em] text-muted-foreground uppercase outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       Attributes<span class="hidden sm:inline"> &amp; apron preview</span>
     </summary>
@@ -232,7 +232,7 @@
     {#if protectMode}
       <button
         type="button"
-        class="inline-flex min-h-10 w-full items-center justify-center rounded-lg border border-accent/60 bg-accent/10 px-2 py-1.5 text-xs font-bold text-accent outline-none transition-colors hover:bg-accent/20 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 sm:min-h-11 sm:text-sm"
+        class="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-accent/60 bg-accent/10 px-2 py-1.5 text-xs font-bold text-accent outline-none transition-colors hover:bg-accent/20 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 sm:min-h-11 sm:text-sm"
         {disabled}
         onclick={() => onProtect(card.cardId)}
       >
@@ -241,7 +241,7 @@
     {:else}
       <button
         type="button"
-        class="inline-flex min-h-10 w-full items-center justify-center rounded-lg bg-primary px-2 py-1.5 text-xs font-bold text-primary-foreground outline-none transition-colors hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-11 sm:text-sm"
+        class="inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-primary px-2 py-1.5 text-xs font-bold text-primary-foreground outline-none transition-colors hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-11 sm:text-sm"
         disabled={!canSign}
         onclick={() => onSign(card.cardId)}
       >

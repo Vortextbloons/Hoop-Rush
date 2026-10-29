@@ -6,7 +6,6 @@
   import { getManifest, getPlayersIndex } from '#lib/data.js';
   import type { HoopRushManifest, PlayersIndex } from '@hoop-rush/data-contracts';
   import {
-    CAP_RUSH_GAME_COUNT,
     POSITIONS,
     type CapRushPlayerSeasonLine,
     type CapRushReport,
@@ -129,10 +128,7 @@
       <Trophy size={22} class="shrink-0 text-accent" aria-hidden="true" />
       <div class="min-w-0">
         <p class="font-display text-lg font-extrabold tracking-tight uppercase text-accent">
-          Perfect season Â· 82â€“0
-        </p>
-        <p class="mt-0.5 text-xs text-muted-foreground">
-          All {CAP_RUSH_GAME_COUNT} games won. No losses on the schedule.
+          Perfect season &middot; 82&ndash;0
         </p>
       </div>
     </div>
@@ -145,18 +141,19 @@
     <div class="flex flex-wrap items-end justify-between gap-3">
       <div class="min-w-0">
         <p class="font-mono text-[10px] font-bold tracking-[0.16em] text-primary uppercase">
-          {variantLabel(report.variant)} Â· Season report
+          {variantLabel(report.variant)} &middot; Season report
         </p>
         <h2
           class="font-display mt-2 text-7xl leading-none font-extrabold tracking-tight tabular-nums sm:text-8xl"
         >
           {recordLabel(aggregate.wins, aggregate.losses)}
           {#if aggregate.perfectSeason}
-            <span class="text-accent">Â· 82â€“0</span>
+            <span class="text-accent">&middot; 82&ndash;0</span>
           {/if}
         </h2>
         <p class="mt-3 font-mono text-[10px] tracking-[0.08em] text-muted-foreground uppercase">
-          {aggregate.games} games Â· {aggregate.pointsFor} for Â· {aggregate.pointsAgainst} against
+          {aggregate.games} games &middot; {aggregate.pointsFor} for &middot; {aggregate.pointsAgainst}
+          against
         </p>
       </div>
       <span
@@ -241,23 +238,18 @@
         </dd>
       </div>
     </dl>
-    <p class="mt-2 text-[11px] leading-relaxed text-muted-foreground">
-      Player payroll is the five salaries only. {#if report.variant === 'roulette'}Mutation spend is
-        the price of all spins, and total spend adds the two.{/if}
-      Unused normal-cap budget is what is left under the $120M cap.
-    </p>
 
     <div class="mt-4 flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t border-line-soft pt-4">
       <p class="font-mono text-[9px] tracking-[0.1em] text-muted-foreground uppercase">
         Efficiency
       </p>
       <p class="font-display text-2xl font-extrabold text-primary tabular-nums">
-        {winsPerMillion === null ? 'â€”' : winsPerMillion.toFixed(2)}
+        {winsPerMillion === null ? '\u2014' : winsPerMillion.toFixed(2)}
       </p>
       <p class="mt-0.5 text-[11px] text-muted-foreground">
         wins per $1M of player payroll
         <span class="font-mono"
-          >Â· {aggregate.wins} wins Ã· {formatMillions(report.payrollDollars)}</span
+          >&middot; {aggregate.wins} wins &divide; {formatMillions(report.payrollDollars)}</span
         >
       </p>
     </div>
@@ -321,63 +313,65 @@
         </li>
       {/each}
     </ul>
-    <p class="mt-3 text-[11px] text-muted-foreground">
-      Per-game averages &middot; Target is the highest-paid player.
-    </p>
   </section>
 
-  <div class="grid gap-4 {report.variant === 'roulette' ? 'lg:grid-cols-2' : ''}">
+  <div class="grid gap-4">
     <section
       class="rounded-2xl border border-border bg-card p-5 sm:p-7"
       aria-label="Cap status and applied penalties"
     >
-      <h3 class="font-display text-xl font-extrabold tracking-tight uppercase">
-        Cap status Â· {capStatusLabel(report.payrollStatus)}
-      </h3>
-      <p class="mt-1 text-xs font-semibold">{apronPenaltyTitle(report.payrollStatus)}</p>
-      {#if penaltyRows.length === 0}
-        <p class="mt-2 text-xs leading-relaxed text-muted-foreground">
-          No rating reductions applied. Every signed player kept their original ratings.
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p class="report-label">Payroll impact</p>
+          <h3 class="font-display mt-1 text-2xl font-extrabold tracking-tight uppercase">
+            Cap status
+          </h3>
+        </div>
+        <span
+          class="inline-flex rounded-full border px-3 py-1 font-mono text-[10px] font-bold tracking-[0.1em] uppercase {capStatusClass(
+            report.payrollStatus,
+          )}">{capStatusLabel(report.payrollStatus)}</span
+        >
+      </div>
+      <div class="mt-4 rounded-xl border border-line-soft bg-surface-1 p-4">
+        <p class="font-mono text-[9px] font-bold tracking-[0.12em] text-muted-foreground uppercase">
+          Applied penalties
         </p>
-      {:else}
-        <table class="ui-stats-table mt-3 text-[11px]">
-          <caption class="sr-only">Rating reductions applied by the apron</caption>
-          <thead>
-            <tr
-              class="border-b border-border/70 font-mono text-[9px] tracking-[0.08em] text-muted-foreground uppercase"
-            >
-              <th scope="col" class="px-2 py-1 text-left font-medium">Rating</th>
-              <th scope="col" class="px-2 py-1 text-right font-medium">Reduction</th>
-            </tr>
-          </thead>
-          <tbody>
+        <p class="mt-1 text-sm font-bold">{apronPenaltyTitle(report.payrollStatus)}</p>
+        {#if penaltyRows.length > 0}
+          <dl class="mt-3 grid grid-cols-1 gap-x-4 sm:grid-cols-2">
             {#each penaltyRows as row (row.label)}
-              <tr class="border-b border-border/40">
-                <th scope="row" class="px-2 py-1 text-left font-semibold">{row.label}</th>
-                <td class="px-2 py-1 text-right font-mono text-primary">âˆ’{row.reduction}</td>
-              </tr>
+              <div class="flex items-center justify-between gap-3 border-t border-line-soft py-2">
+                <dt class="text-xs font-semibold">{row.label}</dt>
+                <dd
+                  class="rounded-md bg-primary/10 px-2 py-0.5 font-mono text-xs font-bold text-primary tabular-nums"
+                >
+                  &minus;{row.reduction}
+                </dd>
+              </div>
             {/each}
-          </tbody>
-        </table>
-      {/if}
-      <dl class="mt-3 grid grid-cols-2 gap-2">
-        <div class="rounded-xl border border-line-soft bg-surface-1 px-3 py-2.5">
-          <dt class="font-mono text-[9px] tracking-[0.08em] text-muted-foreground uppercase">
-            Forced isolations
-          </dt>
-          <dd class="font-display mt-1 text-2xl font-extrabold tabular-nums">
-            {report.apronTriggers.isolations}
-          </dd>
-        </div>
-        <div class="rounded-xl border border-line-soft bg-surface-1 px-3 py-2.5">
-          <dt class="font-mono text-[9px] tracking-[0.08em] text-muted-foreground uppercase">
-            Defensive strikes
-          </dt>
-          <dd class="font-display mt-1 text-2xl font-extrabold tabular-nums">
-            {report.apronTriggers.strikes}
-          </dd>
-        </div>
-      </dl>
+          </dl>
+        {/if}
+      </div>
+      <div class="mt-4">
+        <p class="font-mono text-[9px] font-bold tracking-[0.12em] text-muted-foreground uppercase">
+          Season effects
+        </p>
+        <dl class="mt-2 grid grid-cols-2 gap-2">
+          <div class="rounded-xl border border-line-soft px-3 py-3">
+            <dt class="text-xs text-muted-foreground">Forced isolations</dt>
+            <dd class="font-display mt-1 text-2xl font-extrabold tabular-nums">
+              {report.apronTriggers.isolations.toLocaleString()}
+            </dd>
+          </div>
+          <div class="rounded-xl border border-line-soft px-3 py-3">
+            <dt class="text-xs text-muted-foreground">Defensive strikes</dt>
+            <dd class="font-display mt-1 text-2xl font-extrabold tabular-nums">
+              {report.apronTriggers.strikes.toLocaleString()}
+            </dd>
+          </div>
+        </dl>
+      </div>
     </section>
 
     {#if report.variant === 'roulette'}
@@ -391,66 +385,52 @@
         </h3>
         {#if spins.length === 0}
           <p class="mt-4 text-lg font-bold">No spin purchased</p>
-          <p class="mt-1 text-xs leading-relaxed text-muted-foreground">
-            You skipped the spin, so your five played unmutated and no mutation spend was added.
-          </p>
         {:else}
-          {#each spins as spin (spin.targetCardId)}
-            {@const mutation = havocMutationDefinitionOf(spin.mutationId)}
-            {@const spinTarget = players.find((line) => line.cardId === spin.targetCardId) ?? null}
-            <div class="mt-4 border-t border-line-soft pt-3">
-              <div class="mt-2 flex items-center gap-2">
-                <HavocTierBadge tier={spin.tier} size="sm" />
-                <p class="text-sm font-bold">{mutation.name}</p>
-              </div>
-              <p class="mt-1 text-xs leading-relaxed text-muted-foreground">
-                {mutation.description}
-              </p>
-              {#if mutation.downside}<p class="mt-1 text-xs text-destructive">
-                  Downside: {mutation.downside}
-                </p>{/if}
-              <dl class="mt-3 grid grid-cols-2 gap-2">
-                <div class="rounded-xl border border-line-soft bg-surface-1 px-3 py-2.5">
-                  <dt
-                    class="font-mono text-[9px] tracking-[0.08em] text-muted-foreground uppercase"
+          <div class="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {#each spins as spin (spin.targetCardId)}
+              {@const mutation = havocMutationDefinitionOf(spin.mutationId)}
+              {@const spinTarget =
+                players.find((line) => line.cardId === spin.targetCardId) ?? null}
+              <details class="group min-w-0 rounded-xl border border-line-soft bg-surface-1 p-3">
+                <summary
+                  class="cursor-pointer list-none rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <span class="flex items-start justify-between gap-2">
+                    <span class="min-w-0">
+                      <span class="block text-sm font-bold">{mutation.name}</span>
+                      <span class="mt-1 block text-xs text-muted-foreground"
+                        >{spinTarget === null
+                          ? spin.targetCardId
+                          : `${spinTarget.displayName} - ${spinTarget.slot}`}</span
+                      >
+                    </span>
+                    <HavocTierBadge tier={spin.tier} size="sm" />
+                  </span>
+                  <span
+                    class="mt-3 flex items-center justify-between gap-2 text-[11px] text-muted-foreground"
                   >
-                    Spin type
-                  </dt>
-                  <dd class="text-xs font-extrabold capitalize">{spin.purchase}</dd>
+                    <span
+                      ><span class="capitalize">{spin.purchase}</span> &middot; {formatMillions(
+                        spin.priceDollars,
+                      )}</span
+                    >
+                    <span class="font-semibold text-primary group-open:hidden">Show details</span>
+                    <span class="hidden font-semibold text-primary group-open:inline"
+                      >Hide details</span
+                    >
+                  </span>
+                </summary>
+                <div
+                  class="mt-3 border-t border-line-soft pt-3 text-xs leading-relaxed text-muted-foreground"
+                >
+                  <p>{mutation.description}</p>
+                  {#if mutation.downside}<p class="mt-2 text-destructive">
+                      Downside: {mutation.downside}
+                    </p>{/if}
                 </div>
-                <div class="rounded-xl border border-line-soft bg-surface-1 px-3 py-2.5">
-                  <dt
-                    class="font-mono text-[9px] tracking-[0.08em] text-muted-foreground uppercase"
-                  >
-                    Price
-                  </dt>
-                  <dd class="font-mono text-xs font-extrabold tabular-nums">
-                    {formatMillions(spin.priceDollars)}
-                  </dd>
-                </div>
-                <div class="rounded-xl border border-line-soft bg-surface-1 px-3 py-2.5">
-                  <dt
-                    class="font-mono text-[9px] tracking-[0.08em] text-muted-foreground uppercase"
-                  >
-                    Tier
-                  </dt>
-                  <dd class="font-mono text-xs font-extrabold tabular-nums">Tier {spin.tier}</dd>
-                </div>
-                <div class="rounded-xl border border-line-soft bg-surface-1 px-3 py-2.5">
-                  <dt
-                    class="font-mono text-[9px] tracking-[0.08em] text-muted-foreground uppercase"
-                  >
-                    Target
-                  </dt>
-                  <dd class="truncate text-xs font-extrabold">
-                    {spinTarget === null
-                      ? spin.targetCardId
-                      : `${spinTarget.displayName} Â· ${spinTarget.slot}`}
-                  </dd>
-                </div>
-              </dl>
-            </div>
-          {/each}
+              </details>
+            {/each}
+          </div>
         {/if}
       </section>
     {/if}
@@ -462,11 +442,8 @@
   >
     <p class="report-label">The box score</p>
     <h3 class="font-display mt-1 text-2xl font-extrabold tracking-tight uppercase">
-      Season statistics
+      Season statistics <span class="text-sm text-muted-foreground">&middot; per game</span>
     </h3>
-    <p class="mt-1 text-xs text-muted-foreground">
-      Per-game averages and shooting percentages, with season totals below.
-    </p>
     <div class="mt-4 overflow-x-auto rounded-xl border border-line-soft bg-surface-1">
       <PlayerStatsTable
         columns={statColumns}
@@ -583,16 +560,6 @@
           </dd>
         </div>
       </dl>
-      <p class="mt-2 text-[11px] leading-relaxed text-muted-foreground">
-        The MVP covers your five slots and every frozen opponent using the shared background league
-        schedule and formula.
-        {#if report.hasMutationScoring}
-          Mutation scoring is included, so your field is not a balanced comparison against ordinary
-          opponents.
-        {:else if report.variant === 'roulette'}
-          No mutation scoring was recorded in this season.
-        {/if}
-      </p>
     {/if}
   </section>
 </div>

@@ -50,9 +50,11 @@ describe('cap rush offers', () => {
   it('prices every card from its original overall', () => {
     const offer = offerFor('PG');
     for (const card of offer.cards) {
-      expect(card.salaryDollars).toBe(capRushSalaryDollars(card.source.originalOverall));
+      expect(card.salaryDollars).toBe(
+        capRushSalaryDollars(card.source.originalOverall, card.source.seasonKey),
+      );
       expect(card.salaryDollars).toBeGreaterThanOrEqual(3_000_000);
-      expect(card.salaryDollars).toBeLessThanOrEqual(66_000_000);
+      expect(card.salaryDollars).toBeLessThanOrEqual(75_900_000);
     }
   });
 
@@ -74,8 +76,8 @@ describe('cap rush offers', () => {
   it('keeps a legal signing late in the draft', () => {
     const expensives = [
       { slot: 'C' as const, overall: 99 },
-      { slot: 'SG' as const, overall: 95 },
-      { slot: 'SF' as const, overall: 90 },
+      { slot: 'SG' as const, overall: 92 },
+      { slot: 'SF' as const, overall: 86 },
     ];
     const draftPicks = expensives.map(({ slot, overall }, pickOrdinal) => {
       const player = (setup.index.bySlot.get(slot) ?? []).find(
@@ -92,7 +94,7 @@ describe('cap rush offers', () => {
           slot,
           bucket: 'star' as const,
           source: player,
-          salaryDollars: capRushSalaryDollars(player.originalOverall),
+          salaryDollars: capRushSalaryDollars(player.originalOverall, player.seasonKey),
         },
       };
     });

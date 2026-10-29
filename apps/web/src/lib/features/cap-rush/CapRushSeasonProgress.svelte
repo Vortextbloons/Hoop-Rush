@@ -221,30 +221,6 @@
         </GameScoreboard>
       </div>
     {/if}
-    <ol
-      class="mt-4 grid grid-cols-14 gap-[3px] sm:grid-cols-21 md:grid-cols-41"
-      aria-label="82-game season strip"
-    >
-      {#each cells as cell (cell.gameNumber)}
-        <li
-          class="aspect-square rounded-[3px] {cell.summary === null
-            ? 'bg-surface-3/70'
-            : cell.summary.won
-              ? 'bg-primary/80'
-              : 'bg-destructive/70'}"
-          title={cell.summary === null
-            ? `Game ${cell.gameNumber} upcoming`
-            : `Game ${cell.gameNumber}: ${cell.summary.won ? 'win' : 'loss'} against ${cell.opponentName}`}
-        >
-          <span class="sr-only"
-            >{cell.summary === null
-              ? `Game ${cell.gameNumber} upcoming`
-              : `Game ${cell.gameNumber}: ${cell.summary.won ? 'win' : 'loss'} against ${cell.opponentName}`}</span
-          >
-        </li>
-      {/each}
-    </ol>
-
     {#if season.completedAt !== null}
       <p class="mt-2 text-xs font-semibold text-positive">
         Season complete · {new Date(season.completedAt).toLocaleDateString()}

@@ -120,7 +120,7 @@ function fabricatedPicks(
         slot,
         bucket: 'star',
         source: player,
-        salaryDollars: capRushSalaryDollars(player.originalOverall),
+        salaryDollars: capRushSalaryDollars(player.originalOverall, player.seasonKey),
       },
     };
   });
@@ -298,8 +298,8 @@ describe('cap rush five-round draft', () => {
     const setup = capRushTestSetup({});
     const picks = fabricatedPicks(setup, [
       { slot: 'C', overall: 99 },
-      { slot: 'SG', overall: 95 },
-      { slot: 'SF', overall: 90 },
+      { slot: 'SG', overall: 92 },
+      { slot: 'SF', overall: 86 },
     ]);
     const offer = generateCapRushOffer({
       index: setup.index,

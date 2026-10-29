@@ -164,7 +164,7 @@ export function buildCapRushCatalogIndex(catalog: CapRushCatalog): CapRushCatalo
 }
 
 export function capRushSalaryOf(player: CapRushSourcePlayer): number {
-  return capRushSalaryDollars(player.originalOverall);
+  return capRushSalaryDollars(player.originalOverall, player.seasonKey);
 }
 
 export function capRushEligibleAt(

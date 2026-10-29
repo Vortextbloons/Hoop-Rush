@@ -10,6 +10,7 @@ import type {
 } from '@hoop-rush/data-contracts';
 import {
   CAP_RUSH_SAVE_SCHEMA_VERSION,
+  CAP_RUSH_SALARY_CURVE_VERSION,
   canonicalJson,
   capRushCommandResultSchema,
   capRushCommandSchema,
@@ -123,6 +124,21 @@ export class DexieCapRushRepository implements CapRushRepository {
     const row: unknown = await this.db.capRushActive.get(CAP_RUSH_ACTIVE_DRAFT_RECORD_ID);
     if (row === undefined) return null;
     assertSaveSchemaVersion(row, CAP_RUSH_SAVE_SCHEMA_VERSION, unsupported);
+    if (typeof row === 'object' && row !== null && 'draft' in row) {
+      const draft = row.draft;
+      if (typeof draft === 'object' && draft !== null && 'versionSet' in draft) {
+        const versionSet = draft.versionSet;
+        if (
+          typeof versionSet === 'object' &&
+          versionSet !== null &&
+          'salaryCurveVersion' in versionSet &&
+          typeof versionSet.salaryCurveVersion === 'string' &&
+          versionSet.salaryCurveVersion !== CAP_RUSH_SALARY_CURVE_VERSION
+        ) {
+          throw unsupported('active cap rush draft uses an unsupported salary curve version');
+        }
+      }
+    }
     const parsed = parseRecord(
       storedCapRushDraftRowSchema,
       row,

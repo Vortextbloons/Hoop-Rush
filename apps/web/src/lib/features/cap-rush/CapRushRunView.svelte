@@ -41,15 +41,20 @@
     </div>
   {:else if view === null}
     <AsyncState
-      kind="empty"
-      title="No active Cap Rush run"
-      message="Start a draft to begin an 82-game season."
+      kind={controller.error === null ? 'empty' : 'error'}
+      title={controller.unsupported
+        ? 'This run needs an update'
+        : controller.error === null
+          ? 'No active Cap Rush run'
+          : 'Run unavailable'}
+      message={controller.error ?? 'Start a draft to begin an 82-game season.'}
     >
       {#snippet actions()}
         <button
           type="button"
           class="inline-flex min-h-11 items-center rounded-xl border border-line-strong px-4 text-sm font-semibold outline-none hover:border-primary hover:text-primary focus-visible:ring-2 focus-visible:ring-ring"
-          onclick={onNewRun}>Start a Cap Rush run</button
+          onclick={onNewRun}
+          >{controller.unsupported ? 'Go to draft recovery' : 'Start a Cap Rush run'}</button
         >
       {/snippet}
     </AsyncState>

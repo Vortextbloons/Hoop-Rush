@@ -159,7 +159,10 @@ function buildCard(origin: CardOrigin, offerId: string): CapRushCard {
     slot: origin.slot,
     bucket: origin.prepared.bucket,
     source: origin.prepared.player,
-    salaryDollars: capRushSalaryDollars(origin.prepared.player.originalOverall),
+    salaryDollars: capRushSalaryDollars(
+      origin.prepared.player.originalOverall,
+      origin.prepared.player.seasonKey,
+    ),
   });
 }
 

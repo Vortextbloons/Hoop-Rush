@@ -3,7 +3,7 @@ import { contentHashSchema } from './ids.ts';
 
 export const CAP_RUSH_SCHEMA_VERSION = 1;
 export const CAP_RUSH_RULES_VERSION = 'cap-rush-rules-v1';
-export const CAP_RUSH_SALARY_CURVE_VERSION = 'cap-rush-salary-v1';
+export const CAP_RUSH_SALARY_CURVE_VERSION = 'cap-rush-salary-v2';
 export const CAP_RUSH_SEED_DERIVATION_VERSION = 'cap-rush-seeds-v1';
 export const CAP_RUSH_REPORT_VERSION = 'cap-rush-report-v1';
 export const CAP_RUSH_SAVE_SCHEMA_VERSION = 2;

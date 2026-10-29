@@ -71,8 +71,17 @@ export function capRushSalaryThousands(overall: number): number {
   return last.thousands;
 }
 
-export function capRushSalaryDollars(overall: number): number {
-  return capRushSalaryThousands(overall) * 1_000;
+export function capRushSalaryDollars(overall: number, seasonKey: string): number {
+  const year = Number(seasonKey.slice(0, 4));
+  const eraPercent =
+    year >= 1960 && year < 1970
+      ? 80
+      : year >= 1970 && year < 1980
+        ? 90
+        : year >= 1980 && year < 1990
+          ? 95
+          : 100;
+  return roundHalfUp(capRushSalaryThousands(overall) * 115 * eraPercent, 10_000) * 1_000;
 }
 
 export function capRushPayrollStatus(payrollDollars: number): CapRushPayrollStatus {

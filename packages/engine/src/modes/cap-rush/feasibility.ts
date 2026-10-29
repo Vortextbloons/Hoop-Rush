@@ -29,7 +29,7 @@ export function capRushSlotSalaryOptions(
   const byPlayer = new Map<string, number>();
   for (const player of index.bySlot.get(slot) ?? []) {
     if (signedPlayerIds.has(player.playerId)) continue;
-    const salary = capRushSalaryDollars(player.originalOverall);
+    const salary = capRushSalaryDollars(player.originalOverall, player.seasonKey);
     const current = byPlayer.get(player.playerId);
     if (current === undefined || salary < current) byPlayer.set(player.playerId, salary);
   }

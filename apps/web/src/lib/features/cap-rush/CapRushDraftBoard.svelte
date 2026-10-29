@@ -114,13 +114,11 @@
           Pick your {offer?.slot ?? 'player'}.
         {/if}
       </h1>
-      <p class="mt-2 hidden max-w-xl text-sm leading-relaxed text-muted-foreground sm:block">
-        {#if complete}
+      {#if complete}
+        <p class="mt-2 hidden max-w-xl text-sm leading-relaxed text-muted-foreground sm:block">
           Every salary is locked. Here is the apron bill and the five you would take into the run.
-        {:else}
-          Eight players. One exact position. You get two protected rerolls for the whole draft.
-        {/if}
-      </p>
+        </p>
+      {/if}
     </div>
     <ol class="flex gap-1 sm:gap-1.5" aria-label="Draft progress">
       {#each POSITIONS as slot, index (slot)}
@@ -170,7 +168,7 @@
                 {draft.picks.length}/5 signed
               </span>
             </div>
-            <div class="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
+            <div class="mt-4 grid grid-cols-2 gap-2 min-[360px]:grid-cols-3 sm:grid-cols-5">
               {#each POSITIONS as slot (slot)}
                 {@const player = filledBySlot.get(slot) ?? null}
                 <button
@@ -225,13 +223,13 @@
                   <span class="text-[11px] font-semibold text-accent">Pick one card to keep</span>
                   <button
                     type="button"
-                    class="inline-flex min-h-9 items-center rounded-lg border border-line-strong px-3 text-xs font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                    class="inline-flex min-h-11 items-center rounded-lg border border-line-strong px-3 text-xs font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
                     onclick={() => (protectMode = false)}>Cancel</button
                   >
                 {:else if draft.rerollsRemaining > 0}
                   <button
                     type="button"
-                    class="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-line-strong px-3 text-xs font-semibold outline-none hover:border-primary hover:text-primary focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                    class="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-line-strong px-3 text-xs font-semibold outline-none hover:border-primary hover:text-primary focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
                     disabled={busy}
                     onclick={() => (protectMode = true)}
                   >
@@ -245,7 +243,9 @@
               </div>
             </div>
 
-            <div class="mt-3 grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 xl:grid-cols-4">
+            <div
+              class="mt-3 grid grid-cols-1 gap-2 min-[420px]:grid-cols-2 sm:gap-3 md:grid-cols-3 xl:grid-cols-4"
+            >
               {#each view.cards as entry (entry.card.cardId)}
                 <CapRushCard
                   {entry}
@@ -270,7 +270,7 @@
             aria-label="Draft summary"
           >
             {#if spin !== null}
-              <div class="spin-panel mt-5 rounded-2xl border border-primary/30 p-4 sm:p-6">
+              <div class="spin-panel rounded-2xl border border-primary/30 p-4 sm:p-6">
                 <div class="flex flex-wrap items-start justify-between gap-4">
                   <div>
                     <p
@@ -285,12 +285,6 @@
                         ? 'No mutations purchased'
                         : 'Build your mutations'}
                     </h3>
-                    {#if spin.state.status !== 'skipped'}
-                      <p class="mt-2 max-w-xl text-xs leading-relaxed text-muted-foreground">
-                        Choose a player and buy spins while you have room under the $120M cap. Each
-                        player can receive one mutation.
-                      </p>
-                    {/if}
                   </div>
                   <div class="rounded-xl border border-line-soft bg-card px-4 py-3">
                     <p class="font-mono text-[9px] tracking-wider text-muted-foreground uppercase">
@@ -304,31 +298,37 @@
                   </div>
                 </div>
                 {#if spin.state.status === 'purchased'}
-                  {#each receipts as receipt (receipt.receiptDigest)}
-                    {#key receipt.receiptDigest}
-                      <div class="mutation-wheel" aria-hidden="true"><span></span></div>
-                      <div
-                        class="spin-reveal mt-5 flex flex-wrap items-center gap-4 rounded-xl border bg-card p-4"
-                        style:border-color={HAVOC_TIER_COLORS[receipt.tier]}
-                        role="status"
-                      >
-                        <span
-                          class="spin-reveal-icon grid h-14 w-14 shrink-0 place-items-center rounded-xl border border-accent/40 bg-accent/10 text-accent"
-                          ><Sparkles size={26} aria-hidden="true" /></span
-                        >
-                        <div class="min-w-0 flex-1">
-                          <HavocTierBadge tier={receipt.tier} size="sm" />
-                          <div class="mt-2">
-                            <HavocMutationList mutations={[receipt.entry]} readable />
+                  <div class="mt-5 grid gap-2 sm:grid-cols-2">
+                    {#each receipts as receipt (receipt.receiptDigest)}
+                      {#key receipt.receiptDigest}
+                        <div class="spin-result relative min-w-0">
+                          <div class="mutation-wheel" aria-hidden="true"></div>
+                          <div
+                            class="spin-reveal flex h-full items-start gap-3 rounded-xl border bg-card p-4"
+                            style:border-color={HAVOC_TIER_COLORS[receipt.tier]}
+                            role="status"
+                          >
+                            <span
+                              class="spin-reveal-icon grid h-14 w-14 shrink-0 place-items-center rounded-xl border border-accent/40 bg-accent/10 text-accent"
+                              ><Sparkles size={26} aria-hidden="true" /></span
+                            >
+                            <div class="min-w-0 flex-1">
+                              <HavocTierBadge tier={receipt.tier} size="sm" />
+                              <div class="mt-2">
+                                <HavocMutationList mutations={[receipt.entry]} readable />
+                              </div>
+                              <p class="mt-3 font-mono text-[10px] text-muted-foreground uppercase">
+                                {receipt.target.slot} &middot; {spinTargetName(
+                                  receipt.target.cardId,
+                                )} &middot;
+                                {formatMillions(receipt.priceDollars)}
+                              </p>
+                            </div>
                           </div>
-                          <p class="mt-3 font-mono text-[10px] text-muted-foreground uppercase">
-                            {receipt.target.slot} &middot; {spinTargetName(receipt.target.cardId)} &middot;
-                            {formatMillions(receipt.priceDollars)}
-                          </p>
                         </div>
-                      </div>
-                    {/key}
-                  {/each}
+                      {/key}
+                    {/each}
+                  </div>
                 {/if}
                 {#if spin.state.status === 'skipped'}
                   <p class="mt-1 text-sm font-semibold">
@@ -346,7 +346,7 @@
                       >
                     </div>
                     <div
-                      class="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5"
+                      class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3"
                       role="group"
                       aria-label="Spin target"
                     >
@@ -379,7 +379,7 @@
                           <span class="min-w-0 flex-1"
                             ><span class="block font-mono text-[9px] font-bold text-primary"
                               >{entry.slot}</span
-                            ><span class="block truncate text-xs font-bold"
+                            ><span class="block text-sm leading-tight font-bold"
                               >{entry.player.displayName}</span
                             >{#if receipts.some((receipt) => receipt.target.cardId === entry.cardId)}<span
                                 class="block text-[9px] text-muted-foreground">Mutated</span
@@ -510,13 +510,13 @@
             <div class="mt-2 flex flex-wrap gap-2">
               <button
                 type="button"
-                class="inline-flex min-h-9 items-center rounded-lg bg-negative px-3 text-xs font-bold text-white outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                class="inline-flex min-h-11 items-center rounded-lg bg-negative px-3 text-xs font-bold text-white outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
                 disabled={busy}
                 onclick={onDiscard}>Discard draft</button
               >
               <button
                 type="button"
-                class="inline-flex min-h-9 items-center rounded-lg border border-line-strong px-3 text-xs font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                class="inline-flex min-h-11 items-center rounded-lg border border-line-strong px-3 text-xs font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
                 onclick={() => (confirmAbandon = false)}>Cancel</button
               >
             </div>
@@ -540,11 +540,15 @@
   }
   .draft-main {
     min-width: 0;
+    order: -1;
   }
   @media (min-width: 1100px) {
     .draft-layout {
       grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
       align-items: start;
+    }
+    .draft-main {
+      order: 0;
     }
     .draft-lineup {
       position: sticky;
@@ -552,9 +556,14 @@
     }
   }
   .mutation-wheel {
-    width: 3.5rem;
-    height: 3.5rem;
-    margin: 1rem auto 0;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    z-index: 1;
+    width: 2.5rem;
+    height: 2.5rem;
+    margin: -1.25rem 0 0 -1.25rem;
+    pointer-events: none;
     border: 4px solid var(--color-surface-3);
     border-top-color: var(--color-primary);
     border-right-color: var(--color-accent);

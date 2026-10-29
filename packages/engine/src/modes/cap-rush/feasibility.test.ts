@@ -40,7 +40,7 @@ function cardOf(player: CapRushSourcePlayer, slot: string): CapRushCard {
     slot: slot as CapRushCard['slot'],
     bucket: 'budget',
     source: player,
-    salaryDollars: capRushSalaryDollars(player.originalOverall),
+    salaryDollars: capRushSalaryDollars(player.originalOverall, player.seasonKey),
   };
 }
 
@@ -93,7 +93,7 @@ describe('cap rush completion matching', () => {
         signedPlayerIds: new Set(),
         slots: POSITIONS,
       }),
-    ).toBe(15_000_000);
+    ).toBe(17_250_000);
   });
 
   it('never counts one multi-position person twice', () => {
@@ -124,7 +124,7 @@ describe('cap rush completion matching', () => {
         signedPlayerIds: new Set(),
         slots: ['SF', 'PF'],
       }),
-    ).toBe(6_400_000);
+    ).toBe(7_360_000);
   });
 
   it('excludes already signed people from the completion pool', () => {
@@ -136,7 +136,7 @@ describe('cap rush completion matching', () => {
         signedPlayerIds: new Set([cheapestPg.playerId]),
         slots: ['PG'],
       }),
-    ).toBe(capRushSalaryDollars(62));
+    ).toBe(capRushSalaryDollars(62, '1995-96'));
   });
 });
 
@@ -145,30 +145,30 @@ describe('cap rush budget-safe signing', () => {
     const index = testIndex();
     const picks = picksOf(index, [
       { slot: 'C', overall: 99 },
-      { slot: 'SG', overall: 95 },
-      { slot: 'SF', overall: 90 },
+      { slot: 'SG', overall: 92 },
+      { slot: 'SF', overall: 86 },
     ]);
     const card = cardOf(playerOf(index, 'PG', 60), 'PG');
     const assessment = capRushAssessSigning({ picks }, index, card);
     expect(assessment.legal).toBe(true);
-    expect(assessment.payrollAfterSigning).toBe(145_000_000);
-    expect(assessment.minimumCompletionPayroll).toBe(3_000_000);
-    expect(assessment.projectedPayroll).toBe(148_000_000);
+    expect(assessment.payrollAfterSigning).toBe(146_510_000);
+    expect(assessment.minimumCompletionPayroll).toBe(3_450_000);
+    expect(assessment.projectedPayroll).toBe(149_960_000);
   });
 
   it('rejects a signing whose completion would exceed the hard limit', () => {
     const index = testIndex();
     const picks = picksOf(index, [
       { slot: 'C', overall: 99 },
-      { slot: 'SG', overall: 95 },
-      { slot: 'SF', overall: 90 },
+      { slot: 'SG', overall: 92 },
+      { slot: 'SF', overall: 86 },
     ]);
-    const card = cardOf(playerOf(index, 'PG', 74), 'PG');
+    const card = cardOf(playerOf(index, 'PG', 62), 'PG');
     const assessment = capRushAssessSigning({ picks }, index, card);
     expect(assessment.legal).toBe(false);
     expect(assessment.reason).toBe('completion');
     expect(assessment.payrollAfterSigning + (assessment.minimumCompletionPayroll ?? 0)).toBe(
-      152_400_000,
+      150_420_000,
     );
     expect(
       assessment.payrollAfterSigning + (assessment.minimumCompletionPayroll ?? 0),

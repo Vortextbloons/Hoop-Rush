@@ -84,7 +84,7 @@
         <dt class="truncate font-mono text-[9px] tracking-[0.08em] text-muted-foreground uppercase">
           Target
         </dt>
-        <dd class="mt-0.5 truncate text-[11px] font-extrabold sm:text-xs">
+        <dd class="mt-0.5 text-[11px] leading-tight font-extrabold sm:text-xs">
           {target?.player?.displayName ?? '—'}
         </dd>
       </div>
@@ -101,7 +101,7 @@
       {#if penaltyRows.length > 0}
         <details class="text-[10px] text-muted-foreground">
           <summary
-            class="cursor-pointer font-mono tracking-[0.08em] uppercase outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+            class="flex min-h-11 cursor-pointer items-center font-mono tracking-[0.08em] uppercase outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
           >
             View rating cuts
           </summary>
