@@ -106,3 +106,14 @@ export function capRushSpinPhysicalSeed(runSeed: Seed): Seed {
 export function capRushSpinSpecialistSeed(runSeed: Seed): Seed {
   return capRushSeed(runSeed, 'spin', 'specialist');
 }
+
+export function capRushGameSeed(runSeed: Seed, gameNumber: number): Seed {
+  if (!Number.isInteger(gameNumber) || gameNumber < 1) {
+    throw new Error(`cap rush game number must be a positive integer (got ${String(gameNumber)})`);
+  }
+  return capRushSeed(runSeed, 'game', gameNumber);
+}
+
+export function capRushLeagueSeed(runSeed: Seed): Seed {
+  return capRushSeed(runSeed, 'background-league');
+}

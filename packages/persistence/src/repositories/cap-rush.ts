@@ -2,21 +2,37 @@ import type {
   CapRushCommand,
   CapRushCommandResult,
   CapRushDraftState,
+  CapRushHistoryEntry,
+  CapRushReport,
+  CapRushStoredGame,
   CommandId,
 } from '@hoop-rush/data-contracts';
 import {
+  CAP_RUSH_GAME_COUNT,
   CAP_RUSH_SAVE_SCHEMA_VERSION,
+  canonicalJson,
   capRushCommandResultSchema,
   capRushCommandSchema,
+  capRushReportSchema,
+  capRushStoredGameSchema,
 } from '@hoop-rush/data-contracts';
 import { capRushStateDigest } from '@hoop-rush/engine';
 import {
   CAP_RUSH_ACTIVE_DRAFT_RECORD_ID,
   storedCapRushCommandRowSchema,
   storedCapRushDraftRowSchema,
+  storedCapRushGameRowSchema,
+  storedCapRushHistoryRowSchema,
+  storedCapRushReportRowSchema,
 } from '../schemas/cap-rush-record.ts';
 import { HoopRushDatabase } from './dexie.ts';
-import { assertSaveSchemaVersion, commandReceiptMatches, parseRecord } from './support.ts';
+import {
+  assertSaveSchemaVersion,
+  commandReceiptMatches,
+  listCompletedHistory,
+  parseRecord,
+  scopedNumericRows,
+} from './support.ts';
 
 export interface CapRushApplyOutcomeInput {
   readonly outcome: {
@@ -24,6 +40,13 @@ export interface CapRushApplyOutcomeInput {
     readonly result: CapRushCommandResult;
   };
   readonly command: CapRushCommand;
+  readonly game?: CapRushStoredGame;
+  readonly report?: CapRushReport;
+}
+
+export interface CapRushCompletedRun {
+  readonly entry: CapRushHistoryEntry;
+  readonly report: CapRushReport | null;
 }
 
 export interface CapRushRepository {
@@ -33,7 +56,13 @@ export interface CapRushRepository {
   clearActiveDraft(): Promise<void>;
 }
 
-export class CapRushLoadError extends Error {
+export interface CapRushSeasonRepository {
+  listRunGames(runId: string): Promise<CapRushStoredGame[]>;
+  readRunGame(runId: string, gameNumber: number): Promise<CapRushStoredGame | null>;
+  listHistory(): Promise<CapRushHistoryEntry[]>;
+  readReport(runId: string): Promise<CapRushReport | null>;
+  readCompletedRun(runId: string): Promise<CapRushCompletedRun | null>;
+}export class CapRushLoadError extends Error {
   readonly code: 'unsupported' | 'malformed';
   readonly diagnostics: readonly string[];
   constructor(code: 'unsupported' | 'malformed', diagnostics: readonly string[]) {
@@ -148,80 +177,169 @@ export class DexieCapRushRepository implements CapRushRepository {
     ) {
       throw malformed('rejected cap rush commands must not change the draft revision');
     }
-
-    return this.db.transaction('rw', [this.db.capRushActive, this.db.capRushCommands], async () => {
-      const existingCommandRow: unknown = await this.db.capRushCommands.get(result.commandId);
-      if (existingCommandRow !== undefined) {
-        assertSaveSchemaVersion(existingCommandRow, CAP_RUSH_SAVE_SCHEMA_VERSION, unsupported);
-        const existing = parseRecord(
-          storedCapRushCommandRowSchema,
-          existingCommandRow,
-          `cap rush command ${result.commandId}`,
-          malformed,
-        );
-        if (
-          commandReceiptMatches(command, existing.command) &&
-          existing.result.status === result.status
-        ) {
-          return existing.result;
-        }
-        throw new CapRushCommandConflictError(result.commandId);
+    const game =
+      input.game === undefined
+        ? null
+        : parseRecord(capRushStoredGameSchema, input.game, 'accepted cap rush game', malformed);
+    const report =
+      input.report === undefined
+        ? null
+        : parseRecord(capRushReportSchema, input.report, 'cap rush season report', malformed);
+    if (!accepted && (game !== null || report !== null)) {
+      throw malformed('rejected cap rush commands cannot carry stored artifacts');
+    }
+    if (game !== null) {
+      if (command.command !== 'accept-cap-rush-game') {
+        throw malformed('stored cap rush games require an accept command');
       }
+      if (
+        command.cursor !== game.gameNumber ||
+        canonicalJson(command.summary) !== canonicalJson(game.summary)
+      ) {
+        throw malformed('accept command does not describe the stored game');
+      }
+      if (
+        game.summary.inputDigest !== command.inputDigest ||
+        game.summary.resultDigest !== command.resultDigest
+      ) {
+        throw malformed('stored game digests do not match the accept command');
+      }
+      if (canonicalJson(state.season.games[game.gameNumber - 1]) !== canonicalJson(game.summary)) {
+        throw malformed('stored game is missing from the accepted season state');
+      }
+    }
+    if (report !== null) {
+      if (command.command !== 'finalize-cap-rush-season') {
+        throw malformed('a cap rush season report requires the finalize command');
+      }
+      if (report.runId !== result.runId) {
+        throw malformed('cap rush season report belongs to another run');
+      }
+      if (state.season.completedAt === null) {
+        throw malformed('a cap rush season report requires a completed season');
+      }
+      if (
+        canonicalJson(report.aggregate) !== canonicalJson(state.season.aggregate) ||
+        canonicalJson(report.apronTriggers) !== canonicalJson(state.season.apronTriggers) ||
+        canonicalJson(report.games) !== canonicalJson(state.season.games)
+      ) {
+        throw malformed('cap rush season report does not match the accepted season state');
+      }
+      if (
+        state.locked === null ||
+        report.variant !== state.locked.variant ||
+        report.payrollDollars !== state.locked.payrollDollars ||
+        report.payrollStatus !== state.locked.payrollStatus
+      ) {
+        throw malformed('cap rush season report does not match the locked inputs');
+      }
+    }
 
-      const now = new Date().toISOString();
-      const activeRow: unknown = await this.db.capRushActive.get(CAP_RUSH_ACTIVE_DRAFT_RECORD_ID);
-      let createdAtIso = now;
-      if (activeRow !== undefined) {
-        assertSaveSchemaVersion(activeRow, CAP_RUSH_SAVE_SCHEMA_VERSION, unsupported);
-        const active = parseRecord(
-          storedCapRushDraftRowSchema,
-          activeRow,
-          'active cap rush draft',
-          malformed,
-        );
-        if (active.draft.revision !== result.revisionBefore) {
-          throw new CapRushStaleRevisionError(
-            result.commandId,
-            result.revisionBefore,
-            active.draft.revision,
+    return this.db.transaction(
+      'rw',
+      [
+        this.db.capRushActive,
+        this.db.capRushCommands,
+        this.db.capRushGames,
+        this.db.capRushHistory,
+        this.db.capRushReports,
+      ],
+      async () => {
+        const existingCommandRow: unknown = await this.db.capRushCommands.get(result.commandId);
+        if (existingCommandRow !== undefined) {
+          assertSaveSchemaVersion(existingCommandRow, CAP_RUSH_SAVE_SCHEMA_VERSION, unsupported);
+          const existing = parseRecord(
+            storedCapRushCommandRowSchema,
+            existingCommandRow,
+            `cap rush command ${result.commandId}`,
+            malformed,
           );
+          if (
+            commandReceiptMatches(command, existing.command) &&
+            existing.result.status === result.status
+          ) {
+            return existing.result;
+          }
+          throw new CapRushCommandConflictError(result.commandId);
         }
-        if (active.runId !== result.runId) {
-          throw new CapRushActiveDraftExistsError(active.runId, result.runId);
-        }
-        createdAtIso = active.createdAtIso;
-      }
 
-      if (accepted) {
-        if (activeRow === undefined && result.revisionBefore !== 0) {
-          throw new CapRushStaleRevisionError(result.commandId, result.revisionBefore, 0);
+        const now = new Date().toISOString();
+        const activeRow: unknown = await this.db.capRushActive.get(CAP_RUSH_ACTIVE_DRAFT_RECORD_ID);
+        let createdAtIso = now;
+        if (activeRow !== undefined) {
+          assertSaveSchemaVersion(activeRow, CAP_RUSH_SAVE_SCHEMA_VERSION, unsupported);
+          const active = parseRecord(
+            storedCapRushDraftRowSchema,
+            activeRow,
+            'active cap rush draft',
+            malformed,
+          );
+          if (active.draft.revision !== result.revisionBefore) {
+            throw new CapRushStaleRevisionError(
+              result.commandId,
+              result.revisionBefore,
+              active.draft.revision,
+            );
+          }
+          if (active.runId !== result.runId) {
+            throw new CapRushActiveDraftExistsError(active.runId, result.runId);
+          }
+          createdAtIso = active.createdAtIso;
         }
-        await this.db.capRushActive.put(
-          storedCapRushDraftRowSchema.parse({
+
+        if (accepted) {
+          if (activeRow === undefined && result.revisionBefore !== 0) {
+            throw new CapRushStaleRevisionError(result.commandId, result.revisionBefore, 0);
+          }
+          await this.db.capRushActive.put(
+            storedCapRushDraftRowSchema.parse({
+              saveSchemaVersion: CAP_RUSH_SAVE_SCHEMA_VERSION,
+              recordId: CAP_RUSH_ACTIVE_DRAFT_RECORD_ID,
+              runId: state.runId,
+              revision: state.revision,
+              stateDigest: capRushStateDigest(state),
+              draft: state,
+              createdAtIso,
+              updatedAtIso: now,
+            }),
+          );
+          if (game !== null) {
+            await this.db.capRushGames.put(
+              storedCapRushGameRowSchema.parse({
+                saveSchemaVersion: CAP_RUSH_SAVE_SCHEMA_VERSION,
+                runId: result.runId,
+                gameNumber: game.gameNumber,
+                game,
+                updatedAtIso: now,
+              }),
+            );
+          }
+          if (report !== null) {
+            await this.db.capRushReports.put(
+              storedCapRushReportRowSchema.parse({
+                saveSchemaVersion: CAP_RUSH_SAVE_SCHEMA_VERSION,
+                runId: result.runId,
+                report,
+                updatedAtIso: now,
+              }),
+            );
+            await this.putHistory(state, now);
+          }
+        }
+
+        await this.db.capRushCommands.put(
+          storedCapRushCommandRowSchema.parse({
             saveSchemaVersion: CAP_RUSH_SAVE_SCHEMA_VERSION,
-            recordId: CAP_RUSH_ACTIVE_DRAFT_RECORD_ID,
-            runId: state.runId,
-            revision: state.revision,
-            stateDigest: capRushStateDigest(state),
-            draft: state,
-            createdAtIso,
+            commandId: result.commandId,
+            runId: result.runId,
+            command,
+            result,
             updatedAtIso: now,
           }),
         );
-      }
-
-      await this.db.capRushCommands.put(
-        storedCapRushCommandRowSchema.parse({
-          saveSchemaVersion: CAP_RUSH_SAVE_SCHEMA_VERSION,
-          commandId: result.commandId,
-          runId: result.runId,
-          command,
-          result,
-          updatedAtIso: now,
-        }),
-      );
-      return result;
-    });
+        return result;
+      },
+    );
   }
 
   async clearActiveDraft(): Promise<void> {
@@ -237,5 +355,108 @@ export class DexieCapRushRepository implements CapRushRepository {
         await this.db.capRushCommands.where('runId').equals(runId).delete();
       }
     });
+  }
+
+  async listRunGames(runId: string): Promise<CapRushStoredGame[]> {
+    const rows = await scopedNumericRows<unknown, [string, number], unknown>(
+      this.db.capRushGames,
+      '[runId+gameNumber]',
+      runId,
+    );
+    return rows
+      .map((row) => {
+        assertSaveSchemaVersion(row, CAP_RUSH_SAVE_SCHEMA_VERSION, unsupported);
+        return parseRecord(storedCapRushGameRowSchema, row, `cap rush game ${runId}`, malformed);
+      })
+      .sort((left, right) => left.gameNumber - right.gameNumber)
+      .map((row) => row.game);
+  }
+
+  async readRunGame(runId: string, gameNumber: number): Promise<CapRushStoredGame | null> {
+    const row: unknown = await this.db.capRushGames.get([runId, gameNumber]);
+    if (row === undefined) return null;
+    assertSaveSchemaVersion(row, CAP_RUSH_SAVE_SCHEMA_VERSION, unsupported);
+    return parseRecord(
+      storedCapRushGameRowSchema,
+      row,
+      `cap rush game ${runId}/${String(gameNumber)}`,
+      malformed,
+    ).game;
+  }
+
+  async listHistory(): Promise<CapRushHistoryEntry[]> {
+    const rows = await listCompletedHistory<unknown>(this.db.capRushHistory, 'completedAtIso');
+    return rows.map((row) => {
+      assertSaveSchemaVersion(row, CAP_RUSH_SAVE_SCHEMA_VERSION, unsupported);
+      const parsed = parseRecord(storedCapRushHistoryRowSchema, row, 'cap rush history', malformed);
+      return {
+        runId: parsed.runId,
+        variant: parsed.variant,
+        payrollStatus: parsed.payrollStatus,
+        payrollDollars: parsed.payrollDollars,
+        wins: parsed.wins,
+        losses: parsed.losses,
+        perfectSeason: parsed.perfectSeason,
+        completedAtIso: parsed.completedAtIso,
+      };
+    });
+  }
+
+  async readReport(runId: string): Promise<CapRushReport | null> {
+    const row: unknown = await this.db.capRushReports.get(runId);
+    if (row === undefined) return null;
+    assertSaveSchemaVersion(row, CAP_RUSH_SAVE_SCHEMA_VERSION, unsupported);
+    return parseRecord(storedCapRushReportRowSchema, row, `cap rush report ${runId}`, malformed)
+      .report;
+  }
+
+  async readCompletedRun(runId: string): Promise<CapRushCompletedRun | null> {
+    const row: unknown = await this.db.capRushHistory.get(runId);
+    if (row === undefined) return null;
+    assertSaveSchemaVersion(row, CAP_RUSH_SAVE_SCHEMA_VERSION, unsupported);
+    const parsed = parseRecord(
+      storedCapRushHistoryRowSchema,
+      row,
+      `cap rush history ${runId}`,
+      malformed,
+    );
+    return {
+      entry: {
+        runId: parsed.runId,
+        variant: parsed.variant,
+        payrollStatus: parsed.payrollStatus,
+        payrollDollars: parsed.payrollDollars,
+        wins: parsed.wins,
+        losses: parsed.losses,
+        perfectSeason: parsed.perfectSeason,
+        completedAtIso: parsed.completedAtIso,
+      },
+      report: await this.readReport(runId),
+    };
+  }
+
+  private async putHistory(state: CapRushDraftState, updatedAtIso: string): Promise<void> {
+    const completedAtIso = state.season.completedAt;
+    if (completedAtIso === null) {
+      throw malformed('an incomplete cap rush season cannot be written to history');
+    }
+    if (state.locked === null) {
+      throw malformed('a completed cap rush run requires locked inputs');
+    }
+    const aggregate = state.season.aggregate;
+    await this.db.capRushHistory.put(
+      storedCapRushHistoryRowSchema.parse({
+        saveSchemaVersion: CAP_RUSH_SAVE_SCHEMA_VERSION,
+        runId: state.runId,
+        variant: state.locked.variant,
+        payrollStatus: state.locked.payrollStatus,
+        payrollDollars: state.locked.payrollDollars,
+        wins: aggregate.wins,
+        losses: aggregate.losses,
+        perfectSeason: aggregate.perfectSeason,
+        completedAtIso,
+        updatedAtIso,
+      }),
+    );
   }
 }

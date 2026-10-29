@@ -2,12 +2,15 @@ import type {
   CapRushCatalogSource,
   CapRushCommand,
   CapRushDraftState,
+  CapRushHistoryEntry,
+  CapRushReport,
   CapRushSpinPurchaseId,
   CapRushVariant,
   CapRushVersionSet,
   Position,
 } from '@hoop-rush/data-contracts';
 import {
+  CAP_RUSH_GAME_COUNT,
   CAP_RUSH_HARD_LIMIT_DOLLARS,
   CAP_RUSH_RULES_VERSION,
   CAP_RUSH_SALARY_CURVE_VERSION,
@@ -15,9 +18,11 @@ import {
   CAP_RUSH_SEED_DERIVATION_VERSION,
   CAP_RUSH_SPIN_PURCHASES,
   POSITIONS,
+  capRushAcceptGameCommandSchema,
   capRushChoosePositionCommandSchema,
   capRushCommandResultSchema,
   capRushCreateDraftCommandSchema,
+  capRushFinalizeSeasonCommandSchema,
   capRushLockLineupCommandSchema,
   capRushPurchaseSpinCommandSchema,
   capRushRerollOfferCommandSchema,
@@ -31,6 +36,7 @@ import {
   buildCapRushCatalogIndex,
   capRushAssessSigning,
   capRushPayrollStatus,
+  capRushReport,
   capRushSpinEligibility,
   capRushStateDigest,
   createCapRushDraftState,
@@ -39,6 +45,7 @@ import {
 } from '@hoop-rush/engine';
 import {
   CapRushServiceError,
+  type CapRushAcceptedGame,
   type CapRushDraftView,
   type CapRushService,
   type CapRushSlotView,
@@ -227,6 +234,80 @@ export class CapRushSession implements CapRushService {
     });
   }
 
+  async acceptGame(game: CapRushAcceptedGame): Promise<void> {
+    await this.dispatch((state) =>
+      capRushAcceptGameCommandSchema.parse({
+        command: 'accept-cap-rush-game',
+        commandId: this.ids.newCommandId(),
+        runId: state.runId,
+        expectedRevision: state.revision,
+        cursor: game.cursor,
+        inputDigest: game.inputDigest,
+        resultDigest: game.resultDigest,
+        isolations: game.isolations,
+        strikes: game.strikes,
+        summary: game.summary,
+      }),
+    );
+    const runId = this.draft?.runId;
+    if (runId === undefined) {
+      throw new CapRushServiceError('invalid-phase', 'the run disappeared while accepting a game');
+    }
+    await this.repository.saveGame(runId, game.stored);
+  }
+
+  async finalizeSeason(): Promise<CapRushReport> {
+    const state = this.draft;
+    if (state === null || state.locked === null) {
+      throw new CapRushServiceError('invalid-phase', 'there is no locked cap rush run');
+    }
+    if (state.season.games.length !== CAP_RUSH_GAME_COUNT) {
+      throw new CapRushServiceError(
+        'invalid-phase',
+        `the season has ${String(state.season.games.length)} of ${String(CAP_RUSH_GAME_COUNT)} games`,
+      );
+    }
+    const games = await this.repository.listRunGames(state.runId);
+    if (games.length !== state.season.games.length) {
+      throw new CapRushServiceError(
+        'storage',
+        `stored games (${String(games.length)}) disagree with the accepted season (${String(state.season.games.length)})`,
+      );
+    }
+    const report = capRushReport({
+      locked: state.locked,
+      games,
+      aggregate: state.season.aggregate,
+      apronTriggers: state.season.apronTriggers,
+    });
+    await this.dispatch((current) =>
+      capRushFinalizeSeasonCommandSchema.parse({
+        command: 'finalize-cap-rush-season',
+        commandId: this.ids.newCommandId(),
+        runId: current.runId,
+        expectedRevision: current.revision,
+      }),
+    );
+    await this.repository.saveReport(report);
+    return report;
+  }
+
+  async loadReport(runId: string): Promise<CapRushReport | null> {
+    try {
+      return await this.repository.readReport(runId);
+    } catch (error) {
+      throw new CapRushServiceError('storage', messageOf(error));
+    }
+  }
+
+  async listHistory(): Promise<readonly CapRushHistoryEntry[]> {
+    try {
+      return await this.repository.listHistory();
+    } catch (error) {
+      throw new CapRushServiceError('storage', messageOf(error));
+    }
+  }
+
   async abandonDraft(): Promise<void> {
     try {
       await this.repository.clearActiveDraft();
@@ -309,6 +390,16 @@ export class CapRushSession implements CapRushService {
       canLock:
         state.stage === 'complete' &&
         (state.variant === 'clash' || state.spin.status !== 'pending'),
+      season:
+        state.stage === 'locked' || state.stage === 'completed' || state.stage === 'abandoned'
+          ? {
+              games: state.season.games,
+              aggregate: state.season.aggregate,
+              apronTriggers: state.season.apronTriggers,
+              completedAt: state.season.completedAt,
+              nextGameNumber: state.season.games.length + 1,
+            }
+          : null,
     };
   }
 

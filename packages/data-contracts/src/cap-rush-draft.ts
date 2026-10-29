@@ -32,6 +32,7 @@ import {
 } from './cap-rush-versions.ts';
 import { capRushSpinStateSchema } from './cap-rush-spin.ts';
 import { capRushLockedInputsSchema } from './cap-rush-lock.ts';
+import { capRushSeasonStateSchema } from './cap-rush-season.ts';
 
 export const capRushPlayerProfileSchema = z.object({
   ratings: simulationRatingsSchema,
@@ -107,6 +108,8 @@ export const capRushDraftStageSchema = z.enum([
   'review-offer',
   'complete',
   'locked',
+  'completed',
+  'abandoned',
 ]);
 export type CapRushDraftStage = z.infer<typeof capRushDraftStageSchema>;
 
@@ -126,8 +129,10 @@ export const capRushDraftStateSchema = z
     picks: z.array(capRushDraftPickSchema).max(CAP_RUSH_DRAFT_ROUNDS),
     spin: capRushSpinStateSchema,
     locked: capRushLockedInputsSchema.nullable(),
+    season: capRushSeasonStateSchema,
   })
   .superRefine((state, ctx) => {
+    const seasonStarted = state.season.games.length > 0;
     if (state.stage === 'complete' || state.stage === 'locked') {
       if (state.picks.length !== CAP_RUSH_DRAFT_ROUNDS) {
         ctx.addIssue({ code: 'custom', message: 'a complete draft requires five picks' });
@@ -140,6 +145,19 @@ export const capRushDraftStateSchema = z
       }
       if (state.stage === 'locked' && state.locked === null) {
         ctx.addIssue({ code: 'custom', message: 'a locked draft requires locked inputs' });
+      }
+      if (seasonStarted && state.stage !== 'locked') {
+        ctx.addIssue({ code: 'custom', message: 'an unlocked draft cannot hold season progress' });
+      }
+    } else if (state.stage === 'completed' || state.stage === 'abandoned') {
+      if (state.picks.length !== CAP_RUSH_DRAFT_ROUNDS) {
+        ctx.addIssue({ code: 'custom', message: 'a finished run requires five picks' });
+      }
+      if (state.locked === null) {
+        ctx.addIssue({ code: 'custom', message: 'a finished run requires locked inputs' });
+      }
+      if (state.stage === 'abandoned' && state.season.completedAt !== null) {
+        ctx.addIssue({ code: 'custom', message: 'an abandoned run cannot be completed' });
       }
     } else {
       if (state.picks.length >= CAP_RUSH_DRAFT_ROUNDS) {

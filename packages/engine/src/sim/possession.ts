@@ -40,6 +40,8 @@ import {
 } from './evolution-rules.ts';
 import { prepareTeam, type TeamPrep } from './prepare.ts';
 import type { HavocRuntimeHooks, HavocEvidence } from './havoc-runtime.ts';
+import type { ApronRuntimeHooks } from './apron-runtime.ts';
+import { apronPlayerKeyOf } from './apron-runtime.ts';
 import { ENGINE_CONSTANTS } from './constants.ts';
 import { creationScore } from '../domain/archetypes.ts';
 import type { HomeCourtMechanisms } from '../game/home-court.ts';
@@ -112,6 +114,7 @@ export interface TripContext {
   homeCourt?: HomeCourtMechanisms;
   effects?: EffectsHook;
   havoc?: HavocRuntimeHooks;
+  apron?: ApronRuntimeHooks;
 }
 export function createTripContext(
   rng: Rng,
@@ -188,6 +191,43 @@ function pickFoulerWithAvoidance(
 }
 function homeDefenseShotAdjustment(ctx: TripContext, defenseSide: SideIndex): number {
   return defenseSide === 0 ? (ctx.homeCourt?.homeDefenseShotAdjustment ?? 0) : 0;
+}
+
+function forcedActorOf(ctx: TripContext, offenseSide: SideIndex): SimulationPlayer | null {
+  const apron = ctx.apron;
+  if (apron === undefined) return null;
+  return apron.forcedActor(ctx.teams[offenseSide]);
+}
+
+const strikePrepCache = new WeakMap<
+  TripContext,
+  { struckKey: string; prepRef: TeamPrep; pool: SimulationTeam; prep: TeamPrep }
+>();
+
+function strikeAdjustedDefense(
+  ctx: TripContext,
+  defenseSide: SideIndex,
+): { team: SimulationTeam; prep: TeamPrep } {
+  const apron = ctx.apron;
+  const team = ctx.teams[defenseSide];
+  const prep = ctx.preps[defenseSide];
+  if (apron === undefined) return { team, prep };
+  const struck = apron.struckDefender(team);
+  if (struck === null) return { team, prep };
+  const struckKey = apronPlayerKeyOf(struck);
+  const cached = strikePrepCache.get(ctx);
+  if (cached !== undefined && cached.struckKey === struckKey && cached.prepRef === prep) {
+    return { team: cached.pool, prep: cached.prep };
+  }
+  const pool: SimulationTeam = {
+    teamId: team.teamId,
+    displayName: team.displayName,
+    players: team.players.filter((player) => apronPlayerKeyOf(player) !== struckKey),
+  };
+  if (pool.players.length !== team.players.length - 1) return { team, prep };
+  const adjusted = prepareTeam(pool, ctx.profile, { aggregateDivisor: 5 });
+  strikePrepCache.set(ctx, { struckKey, prepRef: prep, pool, prep: adjusted });
+  return { team: pool, prep: adjusted };
 }
 export class PossessionStepper {
   private phase: 'sample' | 'security' | 'foul' | 'inbound' | 'shot' | 'continuation' | 'done' =
@@ -369,7 +409,9 @@ export class PossessionStepper {
     const team = teams[offense];
     const teamPrep = preps[offense];
     const defensePrep = preps[defense];
-    const handler = rng.weightedPickTable(team.players, teamPrep.initiatorPickTable);
+    const handler =
+      forcedActorOf(this.ctx, offense) ??
+      rng.weightedPickTable(team.players, teamPrep.initiatorPickTable);
     const handlerSlot = slotOf(teamPrep, handler);
     this.handlerKey = teamPrep.keyOf(handler);
     this.handlerVersion = handler.playerVersionId;
@@ -402,7 +444,11 @@ export class PossessionStepper {
       }
       recorder.turnover(offense, this.handlerSlot);
       if (isSteal(rng, defensePrep.stealAbility, this.ctx.profile)) {
-        const stealer = rng.weightedPickTable(teams[defense].players, defensePrep.stealerPickTable);
+        const adjusted = strikeAdjustedDefense(this.ctx, defense);
+        const stealer = rng.weightedPickTable(
+          adjusted.team.players,
+          adjusted.prep.stealerPickTable,
+        );
         const stealerSlot = slotOf(defensePrep, stealer);
         recorder.steal(defense, stealerSlot >= 0 ? stealerSlot : 0);
         havoc?.onSteal(defense, stealer);
@@ -639,11 +685,16 @@ export class PossessionStepper {
 }
 export function resolveTrip(ctx: TripContext, offenseSide: SideIndex): TripResolution {
   const startedRemaining = ctx.state.secondsRemaining;
+  ctx.apron?.beginPossession(offenseSide);
   const stepper = new PossessionStepper(ctx, offenseSide);
   let step: PossessionStep;
-  do {
-    step = stepper.step();
-  } while (!step.periodEnded && !step.finished);
+  try {
+    do {
+      step = stepper.step();
+    } while (!step.periodEnded && !step.finished);
+  } finally {
+    ctx.apron?.endPossession();
+  }
   return {
     secondsElapsed: startedRemaining - ctx.state.secondsRemaining,
     ended: step.ended,
@@ -887,7 +938,9 @@ function resolveShot(
   const defensePrep = ctx.preps[defenseSide];
   const handlerSlot =
     handlerKey === undefined ? undefined : teamPrep.slotByPlayerId.get(handlerKey);
+  const forced = forcedActorOf(ctx, offenseSide);
   const initiator =
+    forced ??
     (handlerSlot === undefined ? undefined : team.players[handlerSlot]) ??
     rng.weightedPickTable(team.players, teamPrep.initiatorPickTable);
   const initiatorKey = teamPrep.keyOf(initiator);
@@ -895,12 +948,16 @@ function resolveShot(
   if (actionTables === undefined) {
     throw new Error(`possession: no action tables for ${initiatorKey}`);
   }
-  const action = pickPreparedAction(actionTables, rng, ctx.possessionStart);
+  const action =
+    forced === null ? pickPreparedAction(actionTables, rng, ctx.possessionStart) : 'isolation';
   const teammateShots = teamPrep.teammateShots.get(initiatorKey);
   if (teammateShots === undefined) {
     throw new Error(`possession: no teammate shot table for ${initiatorKey}`);
   }
-  const shot = pickShot(teammateShots, initiator, action, rng, teamPrep.passP.get(initiatorKey));
+  const shot =
+    forced === null
+      ? pickShot(teammateShots, initiator, action, rng, teamPrep.passP.get(initiatorKey))
+      : { shooter: initiator, initiator, passed: false };
   const shooter = shot.shooter;
   const zonePrep = teamPrep.zonePrep.get(teamPrep.keyOf(shooter));
   if (zonePrep === undefined) {
@@ -924,9 +981,16 @@ function resolveShot(
       action,
       passed: shot.passed,
     }) ?? null;
+  const adjustedDefense = strikeAdjustedDefense(ctx, defenseSide);
   const defender =
     havocPlan === null
-      ? pickDefender(defense, zone, rng, defensePrep.defenderBase, shooterSlot)
+      ? pickDefender(
+          adjustedDefense.team,
+          zone,
+          rng,
+          adjustedDefense.prep.defenderBase,
+          shooterSlot,
+        )
       : havocPlan.defender;
   const three = isThreePointZone(zone);
   const defenderSlot = slotOf(defensePrep, defender);
@@ -1143,10 +1207,11 @@ function reboundAfterMiss(
 ): ShotOutcome {
   const { rng, recorder } = ctx;
   if (!deadBall) reboundChances(ctx, offenseSide, defenseSide, reboundCounter);
+  const adjustedDefense = strikeAdjustedDefense(ctx, defenseSide);
   const result = resolveRebound(
     rng,
     ctx.preps[offenseSide].offensiveReboundMean,
-    ctx.preps[defenseSide].defensiveReboundMean,
+    adjustedDefense.prep.defensiveReboundMean,
     zone,
     ctx.profile,
     deadBall,
@@ -1178,12 +1243,11 @@ function reboundAfterMiss(
       ...(defenderVersion !== undefined ? { defenderVersion } : {}),
     };
   }
-  const prep = ctx.preps[defenseSide];
   const rebounder = rng.weightedPickTable(
-    ctx.teams[defenseSide].players,
-    prep.rebounderPickTables[1],
+    adjustedDefense.team.players,
+    adjustedDefense.prep.rebounderPickTables[1],
   );
-  recorder.defensiveRebound(defenseSide, slotOfOrThrow(prep, rebounder));
+  recorder.defensiveRebound(defenseSide, slotOfOrThrow(ctx.preps[defenseSide], rebounder));
   ctx.havoc?.onRebound(defenseSide, rebounder, false);
   ctx.possessionStart = 'defensiveRebound';
   return {

@@ -1,10 +1,13 @@
 import type {
+  CapRushAbandonCommand,
+  CapRushAcceptGameCommand,
   CapRushChoosePositionCommand,
   CapRushCommand,
   CapRushCommandRejectionCode,
   CapRushCommandResult,
   CapRushCreateDraftCommand,
   CapRushDraftState,
+  CapRushFinalizeSeasonCommand,
   CapRushLockLineupCommand,
   CapRushOffer,
   CapRushPurchaseSpinCommand,
@@ -13,6 +16,7 @@ import type {
   CapRushSkipSpinCommand,
 } from '@hoop-rush/data-contracts';
 import {
+  CAP_RUSH_GAME_COUNT,
   CAP_RUSH_HARD_LIMIT_DOLLARS,
   CAP_RUSH_REROLL_LIMIT,
   CAP_RUSH_SCHEMA_VERSION,
@@ -20,6 +24,8 @@ import {
   capRushCreateDraftCommandSchema,
   capRushDraftStateSchema,
 } from '@hoop-rush/data-contracts';
+import { capRushEmptySeasonState } from '@hoop-rush/data-contracts';
+import { capRushFoldAggregate } from './season.ts';
 import type { Rng } from '../../sim/rng.ts';
 import type { CapRushCatalogIndex } from './catalog.ts';
 import { assertCapRushCatalogSourceMatches } from './catalog.ts';
@@ -38,6 +44,7 @@ export interface CapRushCommandEnvironment {
   readonly index: CapRushCatalogIndex;
   readonly rngFactory?: (seed: string) => Rng;
   readonly lockSources?: CapRushLockSources;
+  readonly nowIso?: () => string;
 }
 
 export interface CapRushCommandOutcome {
@@ -67,6 +74,7 @@ export function createCapRushDraftState(
     picks: [],
     spin: { status: 'unavailable' },
     locked: null,
+    season: capRushEmptySeasonState(),
   });
   return state;
 }
@@ -480,7 +488,139 @@ function applyLockLineup(
     ...state,
     revision: state.revision + 1,
     stage: 'locked',
+    offer: null,
     locked,
+    season: state.season,
+  });
+  return acceptCapRushCommand(state, command, nextState);
+}
+
+function applyAcceptGame(
+  state: CapRushDraftState,
+  command: CapRushAcceptGameCommand,
+  environment: CapRushCommandEnvironment,
+): CapRushCommandOutcome {
+  const mismatch = validateRunAndRevision(state, command, environment);
+  if (mismatch !== null) return mismatch;
+  if (state.stage !== 'locked' || state.locked === null) {
+    return rejectCapRushCommand(state, command, 'not-locked', 'the lineup is not locked');
+  }
+  if (state.season.completedAt !== null) {
+    return rejectCapRushCommand(
+      state,
+      command,
+      'season-complete',
+      'the season is already complete',
+    );
+  }
+  const expected = state.season.games.length + 1;
+  if (command.cursor !== expected) {
+    return rejectCapRushCommand(
+      state,
+      command,
+      'stale-cursor',
+      `game ${String(command.cursor)} cannot be accepted; the next game is ${String(expected)}`,
+    );
+  }
+  if (command.summary.gameNumber !== command.cursor) {
+    return rejectCapRushCommand(
+      state,
+      command,
+      'digest-mismatch',
+      'the accepted summary does not describe the cursor game',
+    );
+  }
+  const entry = state.locked.schedule[command.cursor - 1];
+  if (entry === undefined || entry.opponentId !== command.summary.opponentId) {
+    return rejectCapRushCommand(
+      state,
+      command,
+      'digest-mismatch',
+      'the accepted summary does not match the frozen schedule',
+    );
+  }
+  if (
+    command.summary.inputDigest !== command.inputDigest ||
+    command.summary.resultDigest !== command.resultDigest
+  ) {
+    return rejectCapRushCommand(
+      state,
+      command,
+      'digest-mismatch',
+      'the accept envelope digests disagree with the summary digests',
+    );
+  }
+  const aggregate = capRushFoldAggregate(state.season.aggregate, command.summary);
+  const nextState = capRushDraftStateSchema.parse({
+    ...state,
+    revision: state.revision + 1,
+    season: {
+      games: [...state.season.games, command.summary],
+      aggregate,
+      apronTriggers: {
+        isolations: state.season.apronTriggers.isolations + command.isolations,
+        strikes: state.season.apronTriggers.strikes + command.strikes,
+      },
+      completedAt: null,
+    },
+  });
+  return acceptCapRushCommand(state, command, nextState);
+}
+
+function applyFinalizeSeason(
+  state: CapRushDraftState,
+  command: CapRushFinalizeSeasonCommand,
+  environment: CapRushCommandEnvironment,
+): CapRushCommandOutcome {
+  const mismatch = validateRunAndRevision(state, command, environment);
+  if (mismatch !== null) return mismatch;
+  if (state.stage !== 'locked' || state.locked === null) {
+    return rejectCapRushCommand(state, command, 'not-locked', 'the lineup is not locked');
+  }
+  if (state.season.completedAt !== null) {
+    return rejectCapRushCommand(
+      state,
+      command,
+      'season-complete',
+      'the season is already complete',
+    );
+  }
+  if (state.season.games.length !== CAP_RUSH_GAME_COUNT) {
+    return rejectCapRushCommand(
+      state,
+      command,
+      'phase-mismatch',
+      `the season has ${String(state.season.games.length)} of ${String(CAP_RUSH_GAME_COUNT)} games`,
+    );
+  }
+  const nextState = capRushDraftStateSchema.parse({
+    ...state,
+    revision: state.revision + 1,
+    stage: 'completed',
+    season: { ...state.season, completedAt: environment.nowIso?.() ?? new Date().toISOString() },
+  });
+  return acceptCapRushCommand(state, command, nextState);
+}
+
+function applyAbandon(
+  state: CapRushDraftState,
+  command: CapRushAbandonCommand,
+  environment: CapRushCommandEnvironment,
+): CapRushCommandOutcome {
+  const mismatch = validateRunAndRevision(state, command, environment);
+  if (mismatch !== null) return mismatch;
+  if (state.stage === 'abandoned' || state.stage === 'completed') {
+    return rejectCapRushCommand(
+      state,
+      command,
+      'phase-mismatch',
+      `the run is already ${state.stage}`,
+    );
+  }
+  const nextState = capRushDraftStateSchema.parse({
+    ...state,
+    revision: state.revision + 1,
+    stage: 'abandoned',
   });
   return acceptCapRushCommand(state, command, nextState);
 }
@@ -510,5 +650,11 @@ export function applyCapRushCommand(
       return applySkipSpin(state, command, environment);
     case 'lock-cap-rush-lineup':
       return applyLockLineup(state, command, environment);
+    case 'accept-cap-rush-game':
+      return applyAcceptGame(state, command, environment);
+    case 'finalize-cap-rush-season':
+      return applyFinalizeSeason(state, command, environment);
+    case 'abandon-cap-rush-run':
+      return applyAbandon(state, command, environment);
   }
 }

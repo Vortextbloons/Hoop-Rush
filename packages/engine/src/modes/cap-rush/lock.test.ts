@@ -5,6 +5,7 @@ import {
   POSITIONS,
   capRushCardSchema,
   capRushDraftStateSchema,
+  capRushEmptySeasonState,
   capRushOfferIdSchema,
   commandIdSchema,
 } from '@hoop-rush/data-contracts';
@@ -56,6 +57,7 @@ function buildCompleteState(
     picks,
     spin,
     locked: null,
+    season: capRushEmptySeasonState(),
   });
 }
 

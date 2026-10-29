@@ -6,6 +6,7 @@ import {
   capRushCardIdSchema,
   capRushCardSchema,
   capRushDraftStateSchema,
+  capRushEmptySeasonState,
   capRushOfferIdSchema,
   capRushSpinTierSeed,
   commandIdSchema,
@@ -66,6 +67,7 @@ function buildCompleteState(
     picks,
     spin: variant === 'roulette' ? { status: 'pending' } : { status: 'unavailable' },
     locked: null,
+    season: capRushEmptySeasonState(),
   });
 }
 

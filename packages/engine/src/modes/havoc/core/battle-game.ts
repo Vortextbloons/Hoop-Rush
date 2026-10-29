@@ -34,6 +34,7 @@ import {
 } from '@hoop-rush/data-contracts';
 import type { EngineContext } from '../../../sim/kernel.ts';
 import type { Rng } from '../../../sim/rng.ts';
+import type { ApronRuntimeHooks } from '../../../sim/apron-runtime.ts';
 import {
   MAX_PERIODS_HARD_CAP,
   OVERTIME_PERIOD_SECONDS,
@@ -1627,6 +1628,10 @@ class HavocBattleRuntime implements HavocRuntimeHooks {
   }
 }
 
+export interface HavocBattleOptions {
+  readonly apron?: ApronRuntimeHooks;
+}
+
 class HavocBattleController {
   private readonly input: HavocBattleInput;
   private readonly context: EngineContext;
@@ -1634,15 +1639,17 @@ class HavocBattleController {
   private readonly recorder: GameRecorder;
   private readonly state = createGameState();
   private readonly runtime: HavocBattleRuntime;
+  private readonly options: HavocBattleOptions;
   private tripContext: TripContext;
   private offense: SideIndex = 0;
   private period = 1;
   private secondsRemaining = REGULATION_PERIOD_SECONDS;
   private possessionId = 0;
 
-  constructor(input: HavocBattleInput, context: EngineContext) {
+  constructor(input: HavocBattleInput, context: EngineContext, options: HavocBattleOptions = {}) {
     this.input = input;
     this.context = context;
+    this.options = options;
     this.rng = context.rngFactory(input.seed);
     const homeCount =
       input.home.starters.length + input.home.replacements.length + input.home.clones.length;
@@ -1660,6 +1667,7 @@ class HavocBattleController {
       input.profile,
       placeholder,
     );
+    if (this.options.apron !== undefined) this.tripContext.apron = this.options.apron;
     this.runtime = new HavocBattleRuntime(input, context, this.rng, this.recorder);
     this.runtime.attachTripContext(this.tripContext);
     this.runtime.initialize();
@@ -1924,8 +1932,9 @@ class HavocBattleController {
 export function simulateHavocBattleGame(
   rawInput: HavocBattleInput,
   context: EngineContext,
+  options: HavocBattleOptions = {},
 ): { result: HavocBattleResult; tape: HavocBattleTape } {
   const input = havocBattleInputSchema.parse(rawInput);
-  const controller = new HavocBattleController(input, context);
+  const controller = new HavocBattleController(input, context, options);
   return controller.run();
 }

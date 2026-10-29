@@ -1,17 +1,23 @@
 import type {
+  CapRushApronTriggerTotals,
   CapRushCard,
   CapRushDraftState,
+  CapRushGameSummary,
+  CapRushHistoryEntry,
   CapRushPayrollStatus,
+  CapRushReport,
+  CapRushSeasonAggregate,
   CapRushSourcePlayer,
   CapRushSpinPurchaseId,
   CapRushSpinState,
+  CapRushStoredGame,
   CapRushVariant,
   Position,
 } from '@hoop-rush/data-contracts';
 import type { CapRushSigningAssessment } from '@hoop-rush/engine';
 
 export type CapRushServiceErrorCode =
-  'invalid-phase' | 'unsupported-version' | 'storage' | 'catalog' | 'command';
+  'invalid-phase' | 'unsupported-version' | 'storage' | 'catalog' | 'command' | 'audit-failure';
 
 export class CapRushServiceError extends Error {
   readonly code: CapRushServiceErrorCode;
@@ -56,6 +62,14 @@ export interface CapRushSpinView {
   readonly purchases: readonly CapRushSpinPurchaseView[];
 }
 
+export interface CapRushSeasonView {
+  readonly games: readonly CapRushGameSummary[];
+  readonly aggregate: CapRushSeasonAggregate;
+  readonly apronTriggers: CapRushApronTriggerTotals;
+  readonly completedAt: string | null;
+  readonly nextGameNumber: number;
+}
+
 export interface CapRushDraftView {
   readonly draft: CapRushDraftState;
   readonly payrollDollars: number;
@@ -66,10 +80,21 @@ export interface CapRushDraftView {
   readonly slots: readonly CapRushSlotView[];
   readonly spin: CapRushSpinView | null;
   readonly canLock: boolean;
+  readonly season: CapRushSeasonView | null;
 }
 
 export interface CapRushSnapshot {
   readonly draft: CapRushDraftView | null;
+}
+
+export interface CapRushAcceptedGame {
+  readonly cursor: number;
+  readonly inputDigest: string;
+  readonly resultDigest: string;
+  readonly isolations: number;
+  readonly strikes: number;
+  readonly summary: CapRushGameSummary;
+  readonly stored: CapRushStoredGame;
 }
 
 export interface CapRushService {
@@ -82,5 +107,9 @@ export interface CapRushService {
   purchaseSpin(purchase: CapRushSpinPurchaseId, targetCardId: string): Promise<void>;
   skipSpin(): Promise<void>;
   lockLineup(): Promise<void>;
+  acceptGame(game: CapRushAcceptedGame): Promise<void>;
+  finalizeSeason(): Promise<CapRushReport>;
+  loadReport(runId: string): Promise<CapRushReport | null>;
+  listHistory(): Promise<readonly CapRushHistoryEntry[]>;
   abandonDraft(): Promise<void>;
 }

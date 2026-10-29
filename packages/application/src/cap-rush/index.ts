@@ -2,8 +2,10 @@ export { CapRushSession } from './session.ts';
 export type { CapRushSessionOptions } from './session.ts';
 export {
   CapRushServiceError,
+  type CapRushAcceptedGame,
   type CapRushCardView,
   type CapRushDraftView,
+  type CapRushSeasonView,
   type CapRushService,
   type CapRushServiceErrorCode,
   type CapRushSlotView,

@@ -1,4 +1,5 @@
 import { calibrateCommands } from './calibrate.ts';
+import { capRushCommands } from './cap-rush.ts';
 import { dataCommands } from './data.ts';
 import { havocCommands } from './havoc.ts';
 import { simCommands } from './sim.ts';
@@ -13,6 +14,7 @@ export type { CommandSpec } from './core.ts';
 const AREA_COMMANDS: Record<string, CommandSpec> = {};
 for (const commands of [
   calibrateCommands,
+  capRushCommands,
   dataCommands,
   havocCommands,
   simCommands,
@@ -42,6 +44,8 @@ data derive
 havoc simulate
 havoc audit
 havoc calibrate
+cap-rush season
+cap-rush coverage
 sim game
 sim batch
 sim diagnose

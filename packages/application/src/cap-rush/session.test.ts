@@ -4,6 +4,9 @@ import type {
   CapRushCommand,
   CapRushCommandResult,
   CapRushDraftState,
+  CapRushHistoryEntry,
+  CapRushReport,
+  CapRushStoredGame,
   HoopRushManifest,
   Seed,
 } from '@hoop-rush/data-contracts';
@@ -24,7 +27,10 @@ import {
 import {
   adaptCapRushCatalog,
   buildCapRushCatalogIndex,
+  capRushStoredGameOf,
   createCapRushDraftState,
+  createEngineContext,
+  simulateCapRushGame,
 } from '@hoop-rush/engine';
 import type { CapRushRepository } from '@hoop-rush/persistence';
 import {
@@ -36,9 +42,12 @@ import {
 } from '@hoop-rush/test-fixtures';
 import { CapRushServiceError, CapRushSession, type CapRushDraftRepositoryPort } from './index.ts';
 
-class MemoryCapRushRepository implements CapRushRepository {
+class MemoryCapRushRepository implements CapRushDraftRepositoryPort {
   active: CapRushDraftState | null = null;
   readonly commands = new Map<string, CapRushCommandResult>();
+  readonly games = new Map<string, CapRushStoredGame[]>();
+  readonly reports = new Map<string, CapRushReport>();
+  readonly history: CapRushHistoryEntry[] = [];
 
   async loadActiveDraft(): Promise<CapRushDraftState | null> {
     return this.active;
@@ -46,6 +55,34 @@ class MemoryCapRushRepository implements CapRushRepository {
 
   async loadCommandResult(commandId: string): Promise<CapRushCommandResult | null> {
     return this.commands.get(commandId) ?? null;
+  }
+
+  async listRunGames(runId: string): Promise<readonly CapRushStoredGame[]> {
+    return [...(this.games.get(runId) ?? [])].sort(
+      (left, right) => left.gameNumber - right.gameNumber,
+    );
+  }
+
+  async saveGame(runId: string, game: CapRushStoredGame): Promise<void> {
+    const games = this.games.get(runId) ?? [];
+    const next = games.filter((entry) => entry.gameNumber !== game.gameNumber);
+    next.push(game);
+    next.sort((left, right) => left.gameNumber - right.gameNumber);
+    this.games.set(runId, next);
+  }
+
+  async listHistory(): Promise<readonly CapRushHistoryEntry[]> {
+    return [...this.history].sort((left, right) =>
+      right.completedAtIso.localeCompare(left.completedAtIso),
+    );
+  }
+
+  async readReport(runId: string): Promise<CapRushReport | null> {
+    return this.reports.get(runId) ?? null;
+  }
+
+  async saveReport(report: CapRushReport): Promise<void> {
+    this.reports.set(report.runId, report);
   }
 
   async applyOutcome(input: {
@@ -290,5 +327,119 @@ describe('cap rush session', () => {
 
     const resumed = createSession(repository);
     await expect(resumed.loadActive()).rejects.toBeInstanceOf(CapRushServiceError);
+  });
+
+  it('runs an accepted season to a final report', async () => {
+    const repository = new MemoryCapRushRepository();
+    const session = createSession(repository);
+    await session.createDraft('clash');
+    for (const slot of POSITIONS) {
+      await session.choosePosition(slot);
+      const cards = session.getSnapshot().draft?.cards ?? [];
+      const cheapest = [...cards]
+        .filter((entry) => entry.signing.legal)
+        .sort((left, right) => left.card.salaryDollars - right.card.salaryDollars)[0];
+      if (cheapest === undefined) throw new Error(`no legal ${slot} signing`);
+      await session.signCard(cheapest.card.cardId);
+    }
+    await session.lockLineup();
+    const locked = session.getSnapshot().draft?.draft.locked;
+    if (locked === undefined || locked === null) throw new Error('lock did not produce inputs');
+
+    const context = createEngineContext();
+    for (let gameNumber = 1; gameNumber <= CAP_RUSH_GAME_COUNT; gameNumber += 1) {
+      const simulation = simulateCapRushGame({ locked, gameNumber, context });
+      expect(simulation.audit.ok).toBe(true);
+      await session.acceptGame({
+        cursor: gameNumber,
+        inputDigest: simulation.summary.inputDigest,
+        resultDigest: simulation.summary.resultDigest,
+        isolations: simulation.facts.filter((fact) => fact.kind === 'isolation').length,
+        strikes: simulation.facts.filter((fact) => fact.kind === 'strike').length,
+        summary: simulation.summary,
+        stored: capRushStoredGameOf(simulation),
+      });
+    }
+
+    const progress = session.getSnapshot().draft;
+    expect(progress?.season?.aggregate.games).toBe(CAP_RUSH_GAME_COUNT);
+    expect(progress?.draft.stage).toBe('locked');
+
+    const report = await session.finalizeSeason();
+    expect(report.games).toHaveLength(CAP_RUSH_GAME_COUNT);
+    expect(report.players).toHaveLength(5);
+    expect(session.getSnapshot().draft?.draft.stage).toBe('completed');
+    expect(await session.loadReport(report.runId)).toEqual(report);
+  }, 240_000);
+
+  it('refuses a duplicate or out-of-order game acceptance', async () => {
+    const repository = new MemoryCapRushRepository();
+    const session = createSession(repository);
+    await session.createDraft('clash');
+    for (const slot of POSITIONS) {
+      await session.choosePosition(slot);
+      const cards = session.getSnapshot().draft?.cards ?? [];
+      const cheapest = [...cards]
+        .filter((entry) => entry.signing.legal)
+        .sort((left, right) => left.card.salaryDollars - right.card.salaryDollars)[0];
+      if (cheapest === undefined) throw new Error(`no legal ${slot} signing`);
+      await session.signCard(cheapest.card.cardId);
+    }
+    await session.lockLineup();
+    const locked = session.getSnapshot().draft?.draft.locked;
+    if (locked === undefined || locked === null) throw new Error('lock did not produce inputs');
+
+    const context = createEngineContext();
+    const first = simulateCapRushGame({ locked, gameNumber: 1, context });
+    await session.acceptGame({
+      cursor: 1,
+      inputDigest: first.summary.inputDigest,
+      resultDigest: first.summary.resultDigest,
+      isolations: 0,
+      strikes: 0,
+      summary: first.summary,
+      stored: capRushStoredGameOf(first),
+    });
+    const second = simulateCapRushGame({ locked, gameNumber: 2, context });
+    await expect(
+      session.acceptGame({
+        cursor: 1,
+        inputDigest: first.summary.inputDigest,
+        resultDigest: first.summary.resultDigest,
+        isolations: 0,
+        strikes: 0,
+        summary: first.summary,
+        stored: capRushStoredGameOf(first),
+      }),
+    ).rejects.toBeInstanceOf(CapRushServiceError);
+    await expect(
+      session.acceptGame({
+        cursor: 5,
+        inputDigest: second.summary.inputDigest,
+        resultDigest: second.summary.resultDigest,
+        isolations: 0,
+        strikes: 0,
+        summary: { ...second.summary, gameNumber: 5 },
+        stored: capRushStoredGameOf(second),
+      }),
+    ).rejects.toBeInstanceOf(CapRushServiceError);
+    expect(session.getSnapshot().draft?.season?.aggregate.games).toBe(1);
+  }, 120_000);
+
+  it('refuses to finalize a season before all 82 games are accepted', async () => {
+    const repository = new MemoryCapRushRepository();
+    const session = createSession(repository);
+    await session.createDraft('clash');
+    for (const slot of POSITIONS) {
+      await session.choosePosition(slot);
+      const cards = session.getSnapshot().draft?.cards ?? [];
+      const cheapest = [...cards]
+        .filter((entry) => entry.signing.legal)
+        .sort((left, right) => left.card.salaryDollars - right.card.salaryDollars)[0];
+      if (cheapest === undefined) throw new Error(`no legal ${slot} signing`);
+      await session.signCard(cheapest.card.cardId);
+    }
+    await session.lockLineup();
+    await expect(session.finalizeSeason()).rejects.toBeInstanceOf(CapRushServiceError);
   });
 });

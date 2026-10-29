@@ -29,6 +29,15 @@ export function formatMillions(amount: number): string {
   return `${sign}$${text}M`;
 }
 
+export function recordLabel(wins: number, losses: number): string {
+  return `${wins}–${losses}`;
+}
+
+export function formatAverage(total: number, games: number): string {
+  if (games <= 0) return '—';
+  return (total / games).toFixed(1);
+}
+
 export function capStatusLabel(status: CapRushPayrollStatus): string {
   switch (status) {
     case 'under-cap':

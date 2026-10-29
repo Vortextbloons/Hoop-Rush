@@ -37,9 +37,9 @@ import { readJson, sha256Hex } from '../io.ts';
 import { resolvePoolLineup } from './challenge.ts';
 
 const COMMITTED_GENERATION_SEED: Seed = seedSchema.parse('8f2c1d4e6a9b7c3d8f2c1d4e6a9b7c3d');
-const GENERATION_VERSION = 'bracket-m3-v7';
+const GENERATION_VERSION = 'bracket-m3-v8';
 const SINGLE_DIFFICULTY: DifficultyProfile = {
-  profileVersion: 'm3-single-v4',
+  profileVersion: 'm3-single-v5',
   name: 'medium',
   leagueMedianPercentileBand: [0.45, 0.55],
   teamPercentileBand: [0, 1],
@@ -353,7 +353,7 @@ export function buildCandidateCatalog(
       manifest.modernFranchiseSlots.map((franchise) => franchise.franchiseId),
       createRng(`${seasonSeed}:absolute-tiers`),
     ).indexOf(slot.franchiseId);
-    const targetWinRate = 0.01 + (rank / 29) * 0.1;
+    const targetWinRate = 0.005 + (rank / 29) * 0.06;
     let chosenSeason: string | undefined;
     let bestGap = Infinity;
     for (const season of seasonOrder) {

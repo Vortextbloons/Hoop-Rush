@@ -1,10 +1,14 @@
 import { z } from 'zod';
 import {
+  CAP_RUSH_GAME_COUNT,
   CAP_RUSH_SAVE_SCHEMA_VERSION,
   capRushCommandResultSchema,
   capRushCommandSchema,
   capRushDraftStateSchema,
   capRushDigestSchema,
+  capRushHistoryEntrySchema,
+  capRushReportSchema,
+  capRushStoredGameSchema,
   commandIdSchema,
   idSchema,
 } from '@hoop-rush/data-contracts';
@@ -57,3 +61,44 @@ export const storedCapRushCommandRowSchema = z
     }
   });
 export type StoredCapRushCommandRow = z.infer<typeof storedCapRushCommandRowSchema>;
+
+export const storedCapRushGameRowSchema = z
+  .object({
+    saveSchemaVersion: z.literal(CAP_RUSH_SAVE_SCHEMA_VERSION),
+    runId: idSchema,
+    gameNumber: z.number().int().min(1).max(CAP_RUSH_GAME_COUNT),
+    game: capRushStoredGameSchema,
+    updatedAtIso: isoDateSchema,
+  })
+  .superRefine((row, ctx) => {
+    if (row.game.gameNumber !== row.gameNumber) {
+      ctx.addIssue({ code: 'custom', message: 'stored game number does not match its row' });
+    }
+    if (row.game.summary.gameNumber !== row.gameNumber) {
+      ctx.addIssue({ code: 'custom', message: 'stored game summary does not match its row' });
+    }
+  });
+export type StoredCapRushGameRow = z.infer<typeof storedCapRushGameRowSchema>;
+
+export const storedCapRushHistoryRowSchema = capRushHistoryEntrySchema
+  .safeExtend({ saveSchemaVersion: z.literal(CAP_RUSH_SAVE_SCHEMA_VERSION) })
+  .superRefine((row, ctx) => {
+    if (row.wins + row.losses > CAP_RUSH_GAME_COUNT) {
+      ctx.addIssue({ code: 'custom', message: 'stored history wins and losses exceed a season' });
+    }
+  });
+export type StoredCapRushHistoryRow = z.infer<typeof storedCapRushHistoryRowSchema>;
+
+export const storedCapRushReportRowSchema = z
+  .object({
+    saveSchemaVersion: z.literal(CAP_RUSH_SAVE_SCHEMA_VERSION),
+    runId: idSchema,
+    report: capRushReportSchema,
+    updatedAtIso: isoDateSchema,
+  })
+  .superRefine((row, ctx) => {
+    if (row.report.runId !== row.runId) {
+      ctx.addIssue({ code: 'custom', message: 'stored report belongs to another run' });
+    }
+  });
+export type StoredCapRushReportRow = z.infer<typeof storedCapRushReportRowSchema>;
