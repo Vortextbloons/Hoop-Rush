@@ -20,6 +20,7 @@ import {
   CAP_RUSH_RULES_VERSION,
   CAP_RUSH_SALARY_CURVE_VERSION,
   CAP_RUSH_SEED_DERIVATION_VERSION,
+  CAP_RUSH_SPIN_PURCHASES,
   POSITIONS,
   seedSchema,
   seedFromString,
@@ -140,11 +141,11 @@ for (const variant of ['clash', 'roulette'] as const)
           .slice()
           .sort((a, b) => b.card.source.originalOverall - a.card.source.originalOverall)[0];
         if (target === undefined) throw new Error('missing spin target');
-        if (payroll <= 105000000)
+        if (payroll <= CAP_RUSH_SPIN_PURCHASES.standard.maxEligiblePayrollDollars)
           apply({
             ...base(),
             command: 'purchase-cap-rush-spin',
-            purchase: payroll <= 90000000 ? 'premium' : 'standard',
+            purchase: 'standard',
             targetCardId: target.card.cardId,
           });
         else apply({ ...base(), command: 'skip-cap-rush-spin' });
@@ -229,7 +230,7 @@ writeFileSync(
       fieldHash: entry.contentHash,
       versionSet,
       selection:
-        'PG/SG/SF/PF/C offers with no rerolls. Strong=highest legal overall; middle=median legal overall; budget=lowest legal overall; first-apron=closest legal salary to remaining 130M target per slot. Roulette buys premium or standard if eligible targeting highest overall. Production typed draft and lock commands. Independent named drafts per policy and variant. --league runs first two seeds per policy including full background league and qualification. Default runs ten user seasons; qualification not measured. No postseason simulated; championship not measured.',
+        'PG/SG/SF/PF/C offers with no rerolls. Strong=highest legal overall; middle=median legal overall; budget=lowest legal overall; first-apron=closest legal salary to remaining 130M target per slot. Roulette buys the standard spin when eligible targeting highest overall. Production typed draft and lock commands. Independent named drafts per policy and variant. --league runs first two seeds per policy including full background league and qualification. Default runs ten user seasons; qualification not measured. No postseason simulated; championship not measured.',
       runs,
     },
     null,

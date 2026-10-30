@@ -431,7 +431,7 @@
                     <p class="mt-1 text-xs text-muted-foreground">
                       Tier odds are shown for each option. The spin is charged when purchased.
                     </p>
-                    <div class="mt-3 grid gap-2 sm:grid-cols-2">
+                    <div class="mt-3 grid gap-2">
                       {#each spin.purchases as option (option.purchase)}
                         <button
                           type="button"
@@ -441,7 +441,7 @@
                         >
                           <span class="flex items-center justify-between gap-3"
                             ><span class="font-display text-xl font-extrabold uppercase"
-                              >{option.purchase === 'standard' ? 'Standard' : 'Premium'}</span
+                              >Standard spin</span
                             ><span
                               class="font-display text-xl font-extrabold text-primary tabular-nums"
                               >{formatMillions(option.priceDollars)}</span

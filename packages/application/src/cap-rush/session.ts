@@ -680,7 +680,7 @@ export class CapRushSession implements CapRushService {
           player: pick.card.source,
           salaryDollars: pick.card.salaryDollars,
         })),
-      purchases: (['standard', 'premium'] as const).map((purchase) => {
+      purchases: (['standard'] as const).map((purchase) => {
         const spent =
           state.spin.status === 'purchased'
             ? [state.spin.receipt, ...(state.spin.additionalReceipts ?? [])].reduce(

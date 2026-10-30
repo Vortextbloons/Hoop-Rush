@@ -78,7 +78,7 @@ function payrollSplit(total: number): number[] {
 function purchase(
   setup: CapRushTestSetup,
   state: CapRushDraftState,
-  purchaseId: 'standard' | 'premium',
+  purchaseId: 'standard',
   targetCardId = state.picks[0]?.card.cardId ?? '',
 ) {
   return applyCapRushCommand(
@@ -112,8 +112,6 @@ describe('cap rush spin eligibility', () => {
   it('applies the purchase-specific payroll ceiling', () => {
     expect(capRushSpinEligibility(115_000_000, 'standard').eligible).toBe(true);
     expect(capRushSpinEligibility(115_000_001, 'standard').eligible).toBe(false);
-    expect(capRushSpinEligibility(100_000_000, 'premium').eligible).toBe(true);
-    expect(capRushSpinEligibility(100_000_001, 'premium').eligible).toBe(false);
     expect(capRushSpinEligibility(120_000_000, 'standard').eligible).toBe(false);
     expect(capRushSpinEligibility(120_000_000, 'standard').priceDollars).toBe(15_000_000);
     expect(capRushSpinEligibility(120_000_000, 'standard').maxEligiblePayrollDollars).toBe(
@@ -123,7 +121,6 @@ describe('cap rush spin eligibility', () => {
 
   it('keeps every purchase under the normal cap by construction', () => {
     expect(CAP_RUSH_CAP_LINE_DOLLARS - 15_000_000).toBe(115_000_000);
-    expect(CAP_RUSH_CAP_LINE_DOLLARS - 30_000_000).toBe(100_000_000);
   });
 });
 
@@ -286,7 +283,7 @@ describe('cap rush spin tier draw', () => {
     const state = buildCompleteState(setup, payrollSplit(90_000_000));
     const receipt = buildCapRushSpinReceipt({
       runSeed: state.runSeed,
-      purchase: 'premium',
+      purchase: 'standard',
       payrollDollars: capRushPayrollDollars(state.picks),
       pick: state.picks[2] as CapRushDraftPick,
     });
