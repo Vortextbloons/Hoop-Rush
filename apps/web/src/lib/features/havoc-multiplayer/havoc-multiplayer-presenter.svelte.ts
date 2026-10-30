@@ -27,13 +27,13 @@ import type {
 import { createHavocMultiplayerSession } from './havoc-multiplayer-session';
 import type { RoomConnection } from '@hoop-rush/application/multiplayer';
 import {
-  havocMultiplayerFeedLines,
-  havocMultiplayerPlaybackItems,
-  havocMultiplayerVisibleItemCount,
-  havocMultiplayerVisibleState,
-  type HavocMultiplayerFeedLine,
-  type HavocMultiplayerVisibleState,
-} from './havoc-multiplayer-playback';
+  gamecastBattleFeedLines,
+  gamecastBattlePlaybackItems,
+  gamecastBattleVisibleItemCount,
+  gamecastBattleVisibleState,
+  type GamecastBattleFeedLine,
+  type GamecastBattleVisibleState,
+} from '#lib/gamecast/gamecast-battle-playback.js';
 import { isLiteMode } from '#lib/device-capabilities.js';
 import { PlaybackCadence, presentationIntervalMs } from '#lib/playback-cadence.js';
 
@@ -122,17 +122,17 @@ export class HavocMultiplayerPresenter {
       (this.phase === 'broadcasting' || (this.phase === 'game-results' && this.progress < 1)),
   );
   playbackItems = $derived(
-    this.currentOutput ? havocMultiplayerPlaybackItems(this.currentOutput.tape) : [],
+    this.currentOutput ? gamecastBattlePlaybackItems(this.currentOutput.tape) : [],
   );
   visibleCount = $derived(
-    this.currentOutput ? havocMultiplayerVisibleItemCount(this.playbackItems, this.progress) : 0,
+    this.currentOutput ? gamecastBattleVisibleItemCount(this.playbackItems, this.progress) : 0,
   );
-  visible = $derived.by<HavocMultiplayerVisibleState | null>(() =>
-    this.currentOutput ? havocMultiplayerVisibleState(this.playbackItems, this.visibleCount) : null,
+  visible = $derived.by<GamecastBattleVisibleState | null>(() =>
+    this.currentOutput ? gamecastBattleVisibleState(this.playbackItems, this.visibleCount) : null,
   );
-  feed = $derived.by<HavocMultiplayerFeedLine[]>(() =>
+  feed = $derived.by<GamecastBattleFeedLine[]>(() =>
     this.currentOutput
-      ? havocMultiplayerFeedLines(this.currentOutput, this.playbackItems, this.visibleCount)
+      ? gamecastBattleFeedLines(this.currentOutput, this.playbackItems, this.visibleCount)
       : [],
   );
   activeTurn = $derived(

@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { HavocLineupSlotView } from '@hoop-rush/application/havoc';
-  import HavocPlayerArt from './HavocPlayerArt.svelte';
+  import PlayerArt from '#lib/components/PlayerArt.svelte';
   import HavocTierBadge from './HavocTierBadge.svelte';
   import HavocMutationList from './HavocMutationList.svelte';
   let {
@@ -19,7 +19,7 @@
     {#each slots as slot (slot.slot)}
       <li class="lineup-card">
         <div class="lineup-portrait">
-          <HavocPlayerArt
+          <PlayerArt
             compact
             playerId={slot.playerId}
             franchiseId={slot.franchiseId}

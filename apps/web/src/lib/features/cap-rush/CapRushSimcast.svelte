@@ -10,14 +10,14 @@
   import { capRushPlaybackItems } from './cap-rush-playback.js';
   import type { CapRushSeasonController } from './cap-rush-season-state.svelte.js';
   import {
-    havocMultiplayerVisibleState,
-    type HavocMultiplayerPlaybackItem,
-  } from '#lib/features/havoc-multiplayer/havoc-multiplayer-playback.js';
+    gamecastBattleVisibleState,
+    type GamecastBattlePlaybackItem,
+  } from '#lib/gamecast/gamecast-battle-playback.js';
   import {
-    havocMultiplayerLiveBoxes,
-    havocMultiplayerFinalBoxes,
-  } from '#lib/features/havoc-multiplayer/havoc-multiplayer-playback-view.js';
-  import HavocMultiplayerBoxScore from '#lib/features/havoc-multiplayer/HavocMultiplayerBoxScore.svelte';
+    gamecastBattleLiveBoxes,
+    gamecastBattleFinalBoxes,
+  } from '#lib/gamecast/gamecast-battle-view.js';
+  import GamecastBattleBox from '#lib/gamecast/GamecastBattleBox.svelte';
   import {
     formatHavocClock,
     havocPeriodLabel,
@@ -30,7 +30,7 @@
   const speed = 4;
   const playback = $derived(controller.playback);
   let itemsTape: unknown = null;
-  let cachedItems: HavocMultiplayerPlaybackItem[] = [];
+  let cachedItems: GamecastBattlePlaybackItem[] = [];
   const items = $derived.by(() => {
     const tape = playback?.evidence.tape ?? null;
     if (tape === null) {
@@ -46,13 +46,13 @@
   });
   const cursor = $derived(playback?.evidence.cursor ?? 0);
   const finished = $derived(cursor === items.length);
-  const visible = $derived(havocMultiplayerVisibleState(items, cursor));
+  const visible = $derived(gamecastBattleVisibleState(items, cursor));
   const boxes = $derived(
     playback === null
       ? []
       : finished
-        ? havocMultiplayerFinalBoxes(playback.result)
-        : havocMultiplayerLiveBoxes(playback.result, visible),
+        ? gamecastBattleFinalBoxes(playback.result)
+        : gamecastBattleLiveBoxes(playback.result, visible),
   );
   const names = $derived(
     new Map(
@@ -281,7 +281,7 @@
       <summary class="cursor-pointer text-sm font-bold"
         >Full {finished ? 'final' : 'live'} box score</summary
       >
-      <div class="mt-3"><HavocMultiplayerBoxScore {boxes} {localSide} /></div>
+      <div class="mt-3"><GamecastBattleBox {boxes} {localSide} /></div>
     </details>
   {/if}
   {#if apronFacts.length > 0}

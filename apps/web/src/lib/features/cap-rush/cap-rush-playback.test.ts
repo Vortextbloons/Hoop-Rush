@@ -17,8 +17,8 @@ import {
 import { seedFromString } from '@hoop-rush/test-fixtures';
 import { buildScenarioTeam } from '../../../../../../packages/engine/src/modes/havoc/runtime-test-support.ts';
 import { capRushTestSetup } from '../../../../../../packages/engine/src/modes/cap-rush/cap-rush-test-support.ts';
-import { havocMultiplayerVisibleState } from '#lib/features/havoc-multiplayer/havoc-multiplayer-playback.js';
-import { havocMultiplayerLiveBoxes } from '#lib/features/havoc-multiplayer/havoc-multiplayer-playback-view.js';
+import { gamecastBattleVisibleState } from '#lib/gamecast/gamecast-battle-playback.js';
+import { gamecastBattleLiveBoxes } from '#lib/gamecast/gamecast-battle-view.js';
 import { capRushPlaybackItems } from './cap-rush-playback.js';
 
 function lockedRun() {
@@ -49,10 +49,10 @@ function lockedRun() {
 
 function expectReconciled(result: HavocGameResult, tape: HavocBattleTape) {
   const items = capRushPlaybackItems(tape);
-  const visible = havocMultiplayerVisibleState(items, items.length);
+  const visible = gamecastBattleVisibleState(items, items.length);
   expect(visible.period).toBe(4 + result.overtimePeriods);
   expect(visible.clockSeconds).toBe(0);
-  for (const box of havocMultiplayerLiveBoxes(result, visible)) {
+  for (const box of gamecastBattleLiveBoxes(result, visible)) {
     expect(box.score).toBe(result[box.side].points);
     for (const line of box.lines) {
       const final = result[box.side].participants.find(
@@ -174,11 +174,11 @@ describe('Cap Rush recorded broadcast', () => {
         const items = capRushPlaybackItems(tape);
         const last = items.at(-1);
         expect(last?.event?.kind).toBe('game-end');
-        expect(havocMultiplayerVisibleState(items, 0).homeScore).toBe(0);
-        const partial = havocMultiplayerVisibleState(items, Math.floor(items.length / 2));
+        expect(gamecastBattleVisibleState(items, 0).homeScore).toBe(0);
+        const partial = gamecastBattleVisibleState(items, Math.floor(items.length / 2));
         expect(partial.events.some((event) => event.kind === 'game-end')).toBe(false);
-        const visible = havocMultiplayerVisibleState(items, items.length);
-        const boxes = havocMultiplayerLiveBoxes(result, visible);
+        const visible = gamecastBattleVisibleState(items, items.length);
+        const boxes = gamecastBattleLiveBoxes(result, visible);
         for (const box of boxes) {
           const team = result[box.side];
           expect(box.score).toBe(team.points);
@@ -216,14 +216,14 @@ describe('Cap Rush recorded broadcast', () => {
     const regulationEnd = items.findIndex(
       (item) => item.event?.kind === 'period-end' && item.period === 4,
     );
-    const regulation = havocMultiplayerVisibleState(items, regulationEnd + 1);
+    const regulation = gamecastBattleVisibleState(items, regulationEnd + 1);
     expect(regulation.period).toBe(4);
     expect(regulation.clockSeconds).toBe(0);
     expect(regulation.homeScore).toBe(regulation.awayScore);
     const overtimeStart = items.findIndex(
       (item) => item.event?.kind === 'period-start' && item.period === 5,
     );
-    expect(havocMultiplayerVisibleState(items, overtimeStart + 1).clockSeconds).toBe(
+    expect(gamecastBattleVisibleState(items, overtimeStart + 1).clockSeconds).toBe(
       items[overtimeStart]?.clockSeconds ?? -1,
     );
     const overtimePossession = items.find(
@@ -268,15 +268,15 @@ describe('Cap Rush recorded broadcast', () => {
     );
     const entry = items[negativeIndex]?.scoring;
     if (entry === undefined || entry === null) throw new Error('missing signed scoring');
-    const before = havocMultiplayerVisibleState(items, negativeIndex);
-    const after = havocMultiplayerVisibleState(items, negativeIndex + 1);
+    const before = gamecastBattleVisibleState(items, negativeIndex);
+    const after = gamecastBattleVisibleState(items, negativeIndex + 1);
     const score = entry.side === 'home' ? 'homeScore' : 'awayScore';
     expect(after[score] - before[score]).toBe(entry.points);
     expect(after[score]).toBeLessThan(before[score]);
-    const actorBefore = havocMultiplayerLiveBoxes(result, before)
+    const actorBefore = gamecastBattleLiveBoxes(result, before)
       .find((box) => box.side === entry.side)
       ?.lines.find((line) => line.instanceId === entry.actorInstanceId);
-    const actorAfter = havocMultiplayerLiveBoxes(result, after)
+    const actorAfter = gamecastBattleLiveBoxes(result, after)
       .find((box) => box.side === entry.side)
       ?.lines.find((line) => line.instanceId === entry.actorInstanceId);
     if (actorBefore === undefined || actorAfter === undefined)
@@ -286,5 +286,8 @@ describe('Cap Rush recorded broadcast', () => {
       entry.points - entry.nominalPoints,
     );
     expectReconciled(result, mutated.tape);
+  });
+});
+ape);
   });
 });

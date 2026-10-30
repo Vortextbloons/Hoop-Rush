@@ -1,3 +1,5 @@
+import { derivePlayoffPerformance } from '../ratings/playoff-performance.ts';
+import { loadPostseasonEvidence } from '../ratings/overall-evidence.ts';
 import { readdirSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { z } from 'zod';
@@ -1185,12 +1187,21 @@ export function computePool(
         altIds.photoUrl = previous.photoUrl;
       }
     }
+    const postseason = loadPostseasonEvidence(best.season);
+    const playoffPerformance = derivePlayoffPerformance(
+      best.season,
+      stats,
+      postseason.available && !postseason.missingPlayers.has(pid)
+        ? postseason.players.get(pid)
+        : undefined,
+    );
     playersOut.push({
       schemaVersion: SCHEMA_VERSION,
       playerId: `p-${pid}`,
       franchiseId,
       eraId,
       seasonKey: best.season,
+      ...(playoffPerformance ? { playoffPerformance } : {}),
       firstName,
       lastName,
       displayName: `${firstName} ${lastName}`.trim(),

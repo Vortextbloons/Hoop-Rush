@@ -11,7 +11,7 @@ import {
   mutationNameOf,
 } from '#lib/features/havoc/havoc-presentation.js';
 
-export function havocMultiplayerAbilityLines(
+export function gamecastBattleAbilityLines(
   result: Pick<HavocBattleResult, 'home' | 'away'>,
   events: readonly HavocBattleEvent[],
 ) {
@@ -48,7 +48,7 @@ export function havocMultiplayerAbilityLines(
   });
 }
 
-export interface HavocMultiplayerPlaybackItem {
+export interface GamecastBattlePlaybackItem {
   key: string;
   kind: 'event' | 'scoring';
   period: number;
@@ -58,7 +58,7 @@ export interface HavocMultiplayerPlaybackItem {
   scoring: HavocBattleScoringEntry | null;
 }
 
-export interface HavocMultiplayerVisibleState {
+export interface GamecastBattleVisibleState {
   homeScore: number;
   awayScore: number;
   period: number;
@@ -67,7 +67,7 @@ export interface HavocMultiplayerVisibleState {
   scoring: HavocBattleScoringEntry[];
 }
 
-export interface HavocMultiplayerFeedLine {
+export interface GamecastBattleFeedLine {
   key: string;
   period: number;
   clockSeconds: number;
@@ -76,17 +76,17 @@ export interface HavocMultiplayerFeedLine {
   points: number;
 }
 
-export interface HavocMultiplayerBroadcastOutput {
+export interface GamecastBattleOutput {
   result: HavocBattleResult;
   tape: HavocBattleTape;
 }
 
 const DEFAULT_PERIOD_SECONDS = 720;
 
-export function havocMultiplayerPlaybackItems(
+export function gamecastBattlePlaybackItems(
   tape: HavocBattleTape,
-): HavocMultiplayerPlaybackItem[] {
-  const items: HavocMultiplayerPlaybackItem[] = [];
+): GamecastBattlePlaybackItem[] {
+  const items: GamecastBattlePlaybackItem[] = [];
   tape.events.forEach((event, index) => {
     items.push({
       key: `event-${String(event.sequence)}`,
@@ -118,8 +118,8 @@ export function havocMultiplayerPlaybackItems(
   return items;
 }
 
-export function havocMultiplayerPlaybackWeights(
-  items: readonly HavocMultiplayerPlaybackItem[],
+export function gamecastBattlePlaybackWeights(
+  items: readonly GamecastBattlePlaybackItem[],
 ): number[] {
   const weights: number[] = items.map((item) => (item.kind === 'scoring' ? 1 : 0));
   const total = weights.reduce((sum, weight) => sum + weight, 0);
@@ -135,15 +135,15 @@ export function havocMultiplayerPlaybackWeights(
   return cumulative;
 }
 
-export function havocMultiplayerVisibleItemCount(
-  items: readonly HavocMultiplayerPlaybackItem[],
+export function gamecastBattleVisibleItemCount(
+  items: readonly GamecastBattlePlaybackItem[],
   progress: number,
 ): number {
   if (items.length === 0) return 0;
   if (Number.isNaN(progress)) return 0;
   const clamped = Math.min(1, Math.max(0, progress));
   if (clamped >= 1) return items.length;
-  const cumulative = havocMultiplayerPlaybackWeights(items);
+  const cumulative = gamecastBattlePlaybackWeights(items);
   let count = 0;
   while (count < items.length && (cumulative[count] ?? Number.POSITIVE_INFINITY) <= clamped) {
     count += 1;
@@ -151,10 +151,10 @@ export function havocMultiplayerVisibleItemCount(
   return count;
 }
 
-export function havocMultiplayerVisibleState(
-  items: readonly HavocMultiplayerPlaybackItem[],
+export function gamecastBattleVisibleState(
+  items: readonly GamecastBattlePlaybackItem[],
   visibleCount: number,
-): HavocMultiplayerVisibleState {
+): GamecastBattleVisibleState {
   const count = Number.isNaN(visibleCount)
     ? 0
     : Math.max(0, Math.min(items.length, Math.trunc(visibleCount)));
@@ -181,7 +181,7 @@ export function havocMultiplayerVisibleState(
   return { homeScore, awayScore, period, clockSeconds, events, scoring };
 }
 
-function participantNames(output: HavocMultiplayerBroadcastOutput): Map<string, string> {
+function participantNames(output: GamecastBattleOutput): Map<string, string> {
   const names = new Map<string, string>();
   for (const team of [output.result.home, output.result.away]) {
     for (const participant of team.participants) {
@@ -206,16 +206,16 @@ function feedSummary(entry: HavocBattleScoringEntry, names: Map<string, string>)
   return `${name} ${signedPoints(entry.points)}`;
 }
 
-export function havocMultiplayerFeedLines(
-  output: HavocMultiplayerBroadcastOutput,
-  items: readonly HavocMultiplayerPlaybackItem[],
+export function gamecastBattleFeedLines(
+  output: GamecastBattleOutput,
+  items: readonly GamecastBattlePlaybackItem[],
   visibleCount: number,
-): HavocMultiplayerFeedLine[] {
+): GamecastBattleFeedLine[] {
   const count = Number.isNaN(visibleCount)
     ? 0
     : Math.max(0, Math.min(items.length, Math.trunc(visibleCount)));
   const names = participantNames(output);
-  const lines: HavocMultiplayerFeedLine[] = [];
+  const lines: GamecastBattleFeedLine[] = [];
   for (let index = 0; index < count; index += 1) {
     const item = items[index];
     if (item === undefined || item.scoring === null) continue;

@@ -6,13 +6,13 @@
   import type { HavocMultiplayerGameOutput } from '@hoop-rush/persistence';
   import { formatHavocClock, havocPeriodLabel } from '#lib/features/havoc/havoc-presentation.js';
   import type {
-    HavocMultiplayerFeedLine,
-    HavocMultiplayerVisibleState,
-  } from './havoc-multiplayer-playback';
-  import { havocMultiplayerLiveBoxes } from './havoc-multiplayer-playback-view';
+    GamecastBattleFeedLine,
+    GamecastBattleVisibleState,
+  } from '#lib/gamecast/gamecast-battle-playback.js';
+  import { gamecastBattleLiveBoxes } from '#lib/gamecast/gamecast-battle-view.js';
   import { havocMultiplayerLocalSide } from './havoc-multiplayer-room-view';
-  import HavocMultiplayerBoxScore from './HavocMultiplayerBoxScore.svelte';
-  import { havocMultiplayerAbilityLines } from './havoc-multiplayer-playback';
+  import GamecastBattleBox from '#lib/gamecast/GamecastBattleBox.svelte';
+  import { gamecastBattleAbilityLines } from '#lib/gamecast/gamecast-battle-playback.js';
 
   let {
     output,
@@ -24,8 +24,8 @@
     minimal = false,
   }: {
     output: HavocMultiplayerGameOutput;
-    visible: HavocMultiplayerVisibleState;
-    feed: readonly HavocMultiplayerFeedLine[];
+    visible: GamecastBattleVisibleState;
+    feed: readonly GamecastBattleFeedLine[];
     progress: number;
     localParticipantId: HavocMultiplayerParticipantId;
     series: HavocMultiplayerSeriesSnapshot | null;
@@ -35,7 +35,7 @@
   const localSide = $derived(
     havocMultiplayerLocalSide(series, output.gameNumber, localParticipantId),
   );
-  const boxes = $derived(havocMultiplayerLiveBoxes(output.result, visible));
+  const boxes = $derived(gamecastBattleLiveBoxes(output.result, visible));
   const localBox = $derived(boxes.find((box) => box.side === localSide));
   const opponentBox = $derived(boxes.find((box) => box.side !== localSide));
   const complete = $derived(progress >= 1);
@@ -46,7 +46,7 @@
         ? 'local'
         : 'opponent',
   );
-  const abilities = $derived(havocMultiplayerAbilityLines(output.result, visible.events));
+  const abilities = $derived(gamecastBattleAbilityLines(output.result, visible.events));
   const progressPct = $derived(
     Math.round(Math.min(1, Math.max(0, Number.isNaN(progress) ? 0 : progress)) * 100),
   );
@@ -113,7 +113,7 @@
   </header>
 
   {#if !minimal}
-    <HavocMultiplayerBoxScore {boxes} {localSide} />
+    <GamecastBattleBox {boxes} {localSide} />
   {/if}
 
   <section class="hm-feed" aria-label="Ability activations">

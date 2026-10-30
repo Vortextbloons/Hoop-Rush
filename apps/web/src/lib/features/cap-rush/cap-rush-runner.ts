@@ -10,6 +10,7 @@ import {
   type CapRushWorkerPlayoffGameMessage,
   type CapRushWorkerPlayoffsCompleteMessage,
   type CapRushWorkerProgressMessage,
+  type CapRushWorkerRequest,
   type CapRushWorkerStandingsCompleteMessage,
   type OpponentBracket,
 } from '@hoop-rush/data-contracts';
@@ -25,14 +26,27 @@ export interface CapRushRunnerOptions {
   createWorker?: () => Worker;
 }
 
-interface ActiveBatch {
+interface ActiveJob {
   requestId: string;
   worker: Worker;
   cancelled: boolean;
   queue: Promise<void>;
   handlerError: Error | null;
-  resolve: (message: CapRushWorkerMessage) => void;
   reject: (error: Error) => void;
+}
+
+interface RunJobInput<TComplete> {
+  request: CapRushWorkerRequest;
+  requestId: string;
+  concurrentMessage: string;
+  completeOf: (message: CapRushWorkerMessage) => TComplete | null;
+  errorAfterQueue: boolean;
+  stream?: {
+    matches: (message: CapRushWorkerMessage) => boolean;
+    handle: (message: CapRushWorkerMessage) => void | Promise<void>;
+  };
+  onProgress?: (message: CapRushWorkerProgressMessage) => void;
+  onError?: (message: { code: string; message: string; gameNumber: number | null }) => void;
 }
 
 function defaultWorker(): Worker {
@@ -47,7 +61,7 @@ function errorOf(error: unknown): Error {
 
 export class CapRushRunner {
   private readonly createWorker: () => Worker;
-  private active: ActiveBatch | null = null;
+  private active: ActiveJob | null = null;
   private worker: Worker | null = null;
 
   private getWorker(): Worker {
@@ -85,85 +99,8 @@ export class CapRushRunner {
     backfillLeagueTo?: number;
     handlers: CapRushRunnerHandlers;
   }): Promise<CapRushWorkerCompleteMessage> {
-    if (this.active !== null) {
-      return Promise.reject(new Error('a cap rush season job is already running'));
-    }
-    const worker = this.getWorker();
-    return new Promise<CapRushWorkerCompleteMessage>((resolve, reject) => {
-      const batch: ActiveBatch = {
-        requestId: input.requestId,
-        worker,
-        cancelled: false,
-        queue: Promise.resolve(),
-        handlerError: null,
-        resolve: (message) => {
-          resolve(message as CapRushWorkerCompleteMessage);
-        },
-        reject,
-      };
-      this.active = batch;
-      const finish = (message: CapRushWorkerCompleteMessage): void => {
-        this.active = null;
-        worker.onmessage = null;
-        worker.onerror = null;
-        resolve(message);
-      };
-      const fail = (error: Error): void => {
-        this.active = null;
-        worker.terminate();
-        this.worker = null;
-        reject(error);
-      };
-
-      worker.onmessage = (event: MessageEvent<unknown>) => {
-        const parsed = capRushWorkerMessageSchema.safeParse(event.data);
-        if (!parsed.success) {
-          fail(new Error('cap rush worker sent an unrecognised message'));
-          return;
-        }
-        const message: CapRushWorkerMessage = parsed.data;
-        if (message.requestId !== input.requestId) return;
-        switch (message.type) {
-          case 'cap-rush-game':
-            batch.queue = batch.queue
-              .then(() => input.handlers.onGame(message))
-              .catch((error: unknown) => {
-                batch.handlerError = errorOf(error);
-                this.cancel();
-              });
-            return;
-          case 'cap-rush-league-games':
-            batch.queue = batch.queue
-              .then(() => input.handlers.onLeagueGames?.(message))
-              .catch((error: unknown) => {
-                batch.handlerError = errorOf(error);
-                this.cancel();
-              });
-            return;
-          case 'cap-rush-progress':
-            input.handlers.onProgress?.(message);
-            return;
-          case 'cap-rush-complete':
-            void batch.queue.then(() => {
-              if (batch.handlerError !== null) {
-                fail(batch.handlerError);
-                return;
-              }
-              finish(message);
-            });
-            return;
-          case 'cap-rush-error':
-            input.handlers.onError?.(message);
-            void batch.queue.then(() => {
-              fail(new Error(`${message.code}: ${message.message}`));
-            });
-            return;
-        }
-      };
-      worker.onerror = (event) => {
-        fail(errorOf(event.error ?? 'cap rush worker crashed'));
-      };
-      worker.postMessage({
+    return this.runJob({
+      request: {
         schemaVersion: CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION,
         type: 'cap-rush-simulate',
         requestId: input.requestId,
@@ -178,7 +115,23 @@ export class CapRushRunner {
         ...(input.backfillLeagueTo === undefined
           ? {}
           : { backfillLeagueTo: input.backfillLeagueTo }),
-      });
+      },
+      requestId: input.requestId,
+      concurrentMessage: 'a cap rush season job is already running',
+      completeOf: (message) => (message.type === 'cap-rush-complete' ? message : null),
+      errorAfterQueue: true,
+      stream: {
+        matches: (message) =>
+          message.type === 'cap-rush-game' || message.type === 'cap-rush-league-games',
+        handle: (message) => {
+          if (message.type === 'cap-rush-game') return input.handlers.onGame(message);
+          if (message.type === 'cap-rush-league-games') {
+            return input.handlers.onLeagueGames?.(message);
+          }
+        },
+      },
+      onProgress: input.handlers.onProgress,
+      onError: input.handlers.onError,
     });
   }
 
@@ -188,67 +141,20 @@ export class CapRushRunner {
     bracket: OpponentBracket;
     handlers?: { onProgress?: (message: CapRushWorkerProgressMessage) => void };
   }): Promise<CapRushWorkerStandingsCompleteMessage> {
-    if (this.active !== null) {
-      return Promise.reject(new Error('a cap rush job is already running'));
-    }
-    const worker = this.getWorker();
-    return new Promise<CapRushWorkerStandingsCompleteMessage>((resolve, reject) => {
-      const batch: ActiveBatch = {
-        requestId: input.requestId,
-        worker,
-        cancelled: false,
-        queue: Promise.resolve(),
-        handlerError: null,
-        resolve: (message) => {
-          resolve(message as CapRushWorkerStandingsCompleteMessage);
-        },
-        reject,
-      };
-      this.active = batch;
-      const finish = (message: CapRushWorkerStandingsCompleteMessage): void => {
-        this.active = null;
-        worker.onmessage = null;
-        worker.onerror = null;
-        resolve(message);
-      };
-      const fail = (error: Error): void => {
-        this.active = null;
-        worker.terminate();
-        this.worker = null;
-        reject(error);
-      };
-      worker.onmessage = (event: MessageEvent<unknown>) => {
-        const parsed = capRushWorkerMessageSchema.safeParse(event.data);
-        if (!parsed.success) {
-          fail(new Error('cap rush worker sent an unrecognised message'));
-          return;
-        }
-        const message = parsed.data;
-        if (message.requestId !== input.requestId) return;
-        switch (message.type) {
-          case 'cap-rush-progress':
-            input.handlers?.onProgress?.(message);
-            return;
-          case 'cap-rush-standings-complete':
-            finish(message);
-            return;
-          case 'cap-rush-error':
-            fail(new Error(`${message.code}: ${message.message}`));
-            return;
-          default:
-            return;
-        }
-      };
-      worker.onerror = (event) => {
-        fail(errorOf(event.error ?? 'cap rush worker crashed'));
-      };
-      worker.postMessage({
+    return this.runJob({
+      request: {
         schemaVersion: CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION,
         type: 'cap-rush-standings',
         requestId: input.requestId,
         locked: input.locked,
         bracket: input.bracket,
-      });
+      },
+      requestId: input.requestId,
+      concurrentMessage: 'a cap rush job is already running',
+      completeOf: (message) =>
+        message.type === 'cap-rush-standings-complete' ? message : null,
+      errorAfterQueue: false,
+      onProgress: input.handlers?.onProgress,
     });
   }
 
@@ -262,24 +168,45 @@ export class CapRushRunner {
       onError?: (message: { code: string; message: string; gameNumber: number | null }) => void;
     };
   }): Promise<CapRushWorkerPlayoffsCompleteMessage> {
+    return this.runJob({
+      request: {
+        schemaVersion: CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION,
+        type: 'cap-rush-playoffs',
+        requestId: input.requestId,
+        locked: input.locked,
+        games: input.games,
+        includeTape: input.includeTape,
+      },
+      requestId: input.requestId,
+      concurrentMessage: 'a cap rush job is already running',
+      completeOf: (message) => (message.type === 'cap-rush-playoffs-complete' ? message : null),
+      errorAfterQueue: true,
+      stream: {
+        matches: (message) => message.type === 'cap-rush-playoff-game',
+        handle: (message) => {
+          if (message.type === 'cap-rush-playoff-game') return input.handlers.onGame(message);
+        },
+      },
+      onError: input.handlers.onError,
+    });
+  }
+
+  private runJob<TComplete>(input: RunJobInput<TComplete>): Promise<TComplete> {
     if (this.active !== null) {
-      return Promise.reject(new Error('a cap rush job is already running'));
+      return Promise.reject(new Error(input.concurrentMessage));
     }
     const worker = this.getWorker();
-    return new Promise<CapRushWorkerPlayoffsCompleteMessage>((resolve, reject) => {
-      const batch: ActiveBatch = {
+    return new Promise<TComplete>((resolve, reject) => {
+      const job: ActiveJob = {
         requestId: input.requestId,
         worker,
         cancelled: false,
         queue: Promise.resolve(),
         handlerError: null,
-        resolve: (message) => {
-          resolve(message as CapRushWorkerPlayoffsCompleteMessage);
-        },
         reject,
       };
-      this.active = batch;
-      const finish = (message: CapRushWorkerPlayoffsCompleteMessage): void => {
+      this.active = job;
+      const finish = (message: TComplete): void => {
         this.active = null;
         worker.onmessage = null;
         worker.onerror = null;
@@ -291,53 +218,59 @@ export class CapRushRunner {
         this.worker = null;
         reject(error);
       };
+
       worker.onmessage = (event: MessageEvent<unknown>) => {
+        if (this.active !== job) return;
         const parsed = capRushWorkerMessageSchema.safeParse(event.data);
         if (!parsed.success) {
           fail(new Error('cap rush worker sent an unrecognised message'));
           return;
         }
-        const message = parsed.data;
+        const message: CapRushWorkerMessage = parsed.data;
         if (message.requestId !== input.requestId) return;
-        switch (message.type) {
-          case 'cap-rush-playoff-game':
-            batch.queue = batch.queue
-              .then(() => input.handlers.onGame(message))
-              .catch((error: unknown) => {
-                batch.handlerError = errorOf(error);
-                this.cancel();
-              });
+        const complete = input.completeOf(message);
+        if (complete !== null) {
+          if (!input.errorAfterQueue) {
+            finish(complete);
             return;
-          case 'cap-rush-playoffs-complete':
-            void batch.queue.then(() => {
-              if (batch.handlerError !== null) {
-                fail(batch.handlerError);
-                return;
-              }
-              finish(message);
+          }
+          void job.queue.then(() => {
+            if (job.handlerError !== null) {
+              fail(job.handlerError);
+              return;
+            }
+            finish(complete);
+          });
+          return;
+        }
+        if (message.type === 'cap-rush-error') {
+          input.onError?.(message);
+          if (!input.errorAfterQueue) {
+            fail(new Error(`${message.code}: ${message.message}`));
+            return;
+          }
+          void job.queue.then(() => {
+            fail(new Error(`${message.code}: ${message.message}`));
+          });
+          return;
+        }
+        if (message.type === 'cap-rush-progress') {
+          input.onProgress?.(message);
+          return;
+        }
+        if (input.stream?.matches(message) === true) {
+          job.queue = job.queue
+            .then(() => input.stream?.handle(message))
+            .catch((error: unknown) => {
+              job.handlerError = errorOf(error);
+              this.cancel();
             });
-            return;
-          case 'cap-rush-error':
-            input.handlers.onError?.(message);
-            void batch.queue.then(() => {
-              fail(new Error(`${message.code}: ${message.message}`));
-            });
-            return;
-          default:
-            return;
         }
       };
       worker.onerror = (event) => {
         fail(errorOf(event.error ?? 'cap rush worker crashed'));
       };
-      worker.postMessage({
-        schemaVersion: CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION,
-        type: 'cap-rush-playoffs',
-        requestId: input.requestId,
-        locked: input.locked,
-        games: input.games,
-        includeTape: input.includeTape,
-      });
+      worker.postMessage(input.request);
     });
   }
 

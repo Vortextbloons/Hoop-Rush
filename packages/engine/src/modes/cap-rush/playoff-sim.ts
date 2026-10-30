@@ -22,7 +22,7 @@ import {
 } from '@hoop-rush/data-contracts';
 import type { EngineContext } from '../../sim/kernel.ts';
 import { battleToSoloResult } from '../havoc/core/battle-adapters.ts';
-import { simulateHavocBattleGame } from '../havoc/core/battle-game.ts';
+import { simulateValidatedHavocBattleGame } from '../havoc/core/battle-game.ts';
 import { auditHavocBattleGame } from '../havoc/core/battle-audit.ts';
 import {
   havocBattleGameInputDigest,
@@ -153,9 +153,11 @@ export function simulateCapRushPlayoffGame(input: {
     versionSet: capRushBattleVersionSet(locked),
   });
   const apron = humanSide === null ? undefined : capRushApronRuntimeFor(locked, humanSide);
-  const battle = simulateHavocBattleGame(battleInput, input.context, { apron });
+  const battle = simulateValidatedHavocBattleGame(battleInput, input.context, { apron });
   const audit = auditHavocBattleGame(battleInput, battle.result, battle.tape);
-  const inputDigest = havocBattleGameInputDigest(battleInput);
+  const inputDigest = audit.ok
+    ? battle.result.inputDigest
+    : havocBattleGameInputDigest(battleInput);
   const userResult =
     humanSide === null ? null : battleToSoloResult(battle.result, humanSide, inputDigest);
   const resultDigest =

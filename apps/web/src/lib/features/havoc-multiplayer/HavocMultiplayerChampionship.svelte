@@ -10,11 +10,11 @@
     HavocMultiplayerSeriesMvp,
   } from '@hoop-rush/persistence';
   import HavocMutationList from '#lib/features/havoc/HavocMutationList.svelte';
-  import HavocPlayerArt from '#lib/features/havoc/HavocPlayerArt.svelte';
+  import PlayerArt from '#lib/components/PlayerArt.svelte';
   import HavocTierBadge from '#lib/features/havoc/HavocTierBadge.svelte';
   import { perGameText, ratioPct, trueShootingPct } from '#lib/format.js';
-  import HavocMultiplayerBoxScore from './HavocMultiplayerBoxScore.svelte';
-  import { havocMultiplayerFinalBoxes } from './havoc-multiplayer-playback-view';
+  import GamecastBattleBox from '#lib/gamecast/GamecastBattleBox.svelte';
+  import { gamecastBattleFinalBoxes } from '#lib/gamecast/gamecast-battle-view.js';
   import { havocMultiplayerSeriesStats } from './havoc-multiplayer-series-stats';
   import { mutationNameOf, formatSignedPoints } from '#lib/features/havoc/havoc-presentation.js';
   import {
@@ -133,7 +133,7 @@
         <p class="h-eyebrow">{mvpIsLocal ? 'Your series MVP' : 'Opponent series MVP'}</p>
         <div class="hm-mvp-body">
           {#if mvpPick}
-            <HavocPlayerArt
+            <PlayerArt
               playerId={mvpPick.card.source.playerId}
               playerVersionId={mvpPick.card.source.playerVersionId}
               displayName={mvpPick.card.source.displayName}
@@ -273,7 +273,7 @@
       ).length} verified games available on this device
     </p>
     {#if stats.games > 0}
-      <HavocMultiplayerBoxScore
+      <GamecastBattleBox
         boxes={selectedBoxes}
         localSide="home"
         perGame={!statsTotals}
@@ -339,8 +339,8 @@
               ? row.homeScore
               : row.awayScore}–{row.localIsHome ? row.awayScore : row.homeScore}</summary
           >
-          <HavocMultiplayerBoxScore
-            boxes={havocMultiplayerFinalBoxes(output.result)}
+          <GamecastBattleBox
+            boxes={gamecastBattleFinalBoxes(output.result)}
             localSide={row.localIsHome ? 'home' : 'away'}
           />
         </details>
@@ -643,5 +643,8 @@
     margin: 0;
     font-size: 13px;
     color: #c1cae4;
+  }
+</style>
+
   }
 </style>

@@ -47,6 +47,17 @@ function failureMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'unknown cap rush worker failure';
 }
 
+function postCancelled(requestId: string, gamesDelivered: number, lastCursor: number): void {
+  post({
+    schemaVersion: CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION,
+    type: 'cap-rush-complete',
+    requestId,
+    gamesDelivered,
+    cancelled: true,
+    lastCursor,
+  });
+}
+
 function postLeagueSlot(requestId: string, locked: CapRushLockedInputs, slot: number): boolean {
   let leagueGames;
   try {
@@ -87,23 +98,20 @@ async function simulate(
   let lastCursor = request.startGame - 1;
   let lastProgressAt = Date.now();
 
-  if (request.backfillLeagueFrom !== undefined && request.backfillLeagueTo !== undefined) {
-    const from = Math.max(1, request.backfillLeagueFrom);
-    const to = Math.min(CAP_RUSH_GAME_COUNT, request.backfillLeagueTo);
-    for (let slot = from; slot <= to; slot += 1) {
-      if (signal.cancelled || cancelledRequests.has(request.requestId)) {
-        cancelledRequests.delete(request.requestId);
-        post({
-          schemaVersion: CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION,
-          type: 'cap-rush-complete',
-          requestId: request.requestId,
-          gamesDelivered: delivered,
-          cancelled: true,
-          lastCursor,
-        });
-        return;
-      }
-      if (!postLeagueSlot(request.requestId, request.locked, slot)) return;
+  const backfillFrom =
+    request.backfillLeagueFrom === undefined ? null : Math.max(1, request.backfillLeagueFrom);
+  const backfillTo =
+    request.backfillLeagueTo === undefined
+      ? null
+      : Math.min(CAP_RUSH_GAME_COUNT, request.backfillLeagueTo);
+  const hasBackfill = backfillFrom !== null && backfillTo !== null;
+  const deferBackfill = hasBackfill && request.includeTape === true && request.count === 1;
+
+  const runBackfill = async (): Promise<'ok' | 'cancelled' | 'failed'> => {
+    if (backfillFrom === null || backfillTo === null) return 'ok';
+    for (let slot = backfillFrom; slot <= backfillTo; slot += 1) {
+      if (signal.cancelled || cancelledRequests.has(request.requestId)) return 'cancelled';
+      if (!postLeagueSlot(request.requestId, request.locked, slot)) return 'failed';
       if (Date.now() - lastProgressAt >= PROGRESS_INTERVAL_MS) {
         lastProgressAt = Date.now();
         post({
@@ -111,10 +119,21 @@ async function simulate(
           type: 'cap-rush-progress',
           requestId: request.requestId,
           gamesCompleted: slot,
-          gamesTotal: to,
+          gamesTotal: backfillTo,
         });
       }
       await sleep(0);
+    }
+    return 'ok';
+  };
+
+  if (hasBackfill && !deferBackfill) {
+    const backfill = await runBackfill();
+    if (backfill === 'failed') return;
+    if (backfill === 'cancelled') {
+      cancelledRequests.delete(request.requestId);
+      postCancelled(request.requestId, delivered, lastCursor);
+      return;
     }
   }
 
@@ -127,14 +146,7 @@ async function simulate(
     for (let slot = request.startGame; slot <= to; slot += 1) {
       if (signal.cancelled || cancelledRequests.has(request.requestId)) {
         cancelledRequests.delete(request.requestId);
-        post({
-          schemaVersion: CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION,
-          type: 'cap-rush-complete',
-          requestId: request.requestId,
-          gamesDelivered: delivered,
-          cancelled: true,
-          lastCursor,
-        });
+        postCancelled(request.requestId, delivered, lastCursor);
         return;
       }
       if (!postLeagueSlot(request.requestId, request.locked, slot)) return;
@@ -166,14 +178,7 @@ async function simulate(
   for (let gameNumber = request.startGame; gameNumber <= lastGame; gameNumber += 1) {
     if (signal.cancelled || cancelledRequests.has(request.requestId)) {
       cancelledRequests.delete(request.requestId);
-      post({
-        schemaVersion: CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION,
-        type: 'cap-rush-complete',
-        requestId: request.requestId,
-        gamesDelivered: delivered,
-        cancelled: true,
-        lastCursor,
-      });
+      postCancelled(request.requestId, delivered, lastCursor);
       return;
     }
 
@@ -222,6 +227,16 @@ async function simulate(
     });
     delivered += 1;
     lastCursor = gameNumber;
+
+    if (deferBackfill && gameNumber === request.startGame) {
+      const backfill = await runBackfill();
+      if (backfill === 'failed') return;
+      if (backfill === 'cancelled') {
+        cancelledRequests.delete(request.requestId);
+        postCancelled(request.requestId, delivered, lastCursor);
+        return;
+      }
+    }
 
     if (request.locked.leagueSchedule !== undefined) {
       if (!postLeagueSlot(request.requestId, request.locked, gameNumber)) return;

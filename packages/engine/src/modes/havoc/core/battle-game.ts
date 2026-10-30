@@ -2022,7 +2022,13 @@ export function simulateHavocBattleGame(
   context: EngineContext,
   options: HavocBattleOptions = {},
 ): { result: HavocBattleResult; tape: HavocBattleTape } {
-  const input = havocBattleInputSchema.parse(rawInput);
-  const controller = new HavocBattleController(input, context, options);
-  return controller.run();
+  return simulateValidatedHavocBattleGame(havocBattleInputSchema.parse(rawInput), context, options);
+}
+
+export function simulateValidatedHavocBattleGame(
+  input: HavocBattleInput,
+  context: EngineContext,
+  options: HavocBattleOptions = {},
+): { result: HavocBattleResult; tape: HavocBattleTape } {
+  return new HavocBattleController(input, context, options).run();
 }

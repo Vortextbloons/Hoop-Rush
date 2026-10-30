@@ -4,10 +4,10 @@ import type {
   HavocMultiplayerSeriesGame,
 } from '@hoop-rush/data-contracts';
 import {
-  havocMultiplayerFinalBoxes,
-  type HavocMultiplayerParticipantLine,
-  type HavocMultiplayerSideBox,
-} from './havoc-multiplayer-playback-view';
+  gamecastBattleFinalBoxes,
+  type GamecastBattleParticipantLine,
+  type GamecastBattleSideBox,
+} from '#lib/gamecast/gamecast-battle-view.js';
 
 type SeriesResult = Pick<HavocBattleResult, 'home' | 'away' | 'rollups'>;
 type Ability = HavocBattleResult['rollups'][number];
@@ -22,14 +22,14 @@ export function havocMultiplayerSeriesStats(
   outputs: Readonly<Record<number, { result: SeriesResult }>>,
   localParticipantId: HavocMultiplayerParticipantId,
 ) {
-  const boxes: HavocMultiplayerSideBox[] = (['home', 'away'] as const).map((side) => ({
+  const boxes: GamecastBattleSideBox[] = (['home', 'away'] as const).map((side) => ({
     side,
     displayName: side === 'home' ? 'You' : 'Opponent',
     score: 0,
     bonusPoints: 0,
     lines: [],
   }));
-  const players = new Map<string, HavocMultiplayerParticipantLine>();
+  const players = new Map<string, GamecastBattleParticipantLine>();
   const abilities = new Map<
     string,
     {
@@ -54,7 +54,7 @@ export function havocMultiplayerSeriesStats(
     if (game.status !== 'verified' || !output) continue;
     games += 1;
     const localSide = game.homeParticipantId === localParticipantId ? 'home' : 'away';
-    for (const box of havocMultiplayerFinalBoxes(output.result)) {
+    for (const box of gamecastBattleFinalBoxes(output.result)) {
       const side = box.side === localSide ? 'home' : 'away';
       const target = boxes.find((entry) => entry.side === side);
       if (!target) continue;

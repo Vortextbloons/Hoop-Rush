@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { HavocDraftCard } from '@hoop-rush/data-contracts';
   import { REQUIRED_RATING_KEYS, HAVOC_TENDENCY_FIELDS } from '@hoop-rush/data-contracts';
-  import HavocPlayerArt from './HavocPlayerArt.svelte';
+  import PlayerArt from '#lib/components/PlayerArt.svelte';
   import HavocMutationList from './HavocMutationList.svelte';
   import HavocTierBadge from './HavocTierBadge.svelte';
   import {
@@ -51,7 +51,7 @@
     />
   </header>
   <div class="h-card-art">
-    <HavocPlayerArt
+    <PlayerArt
       playerId={card.source.playerId}
       playerVersionId={card.source.playerVersionId}
       displayName={card.source.displayName}
@@ -168,3 +168,4 @@
     >
   </div>
 </article>
+cle>

@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { HavocComparison } from '@hoop-rush/data-contracts';
-  import HavocPlayerArt from './HavocPlayerArt.svelte';
+  import PlayerArt from '#lib/components/PlayerArt.svelte';
   import { havocMvpFormulaLabel } from './havoc-presentation';
 
   let { comparison }: { comparison: HavocComparison } = $props();
@@ -19,7 +19,7 @@
     {mvp.displayName}
     <span class="text-primary">· {mvp.slot}</span>
   </h2>
-  <HavocPlayerArt
+  <PlayerArt
     playerId={mvp.playerId}
     playerVersionId={mvp.playerVersionId}
     displayName={mvp.displayName}

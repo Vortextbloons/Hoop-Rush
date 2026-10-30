@@ -1,5 +1,5 @@
 <script lang="ts">
-  import HavocPlayerArt from '#lib/features/havoc/HavocPlayerArt.svelte';
+  import PlayerArt from '#lib/components/PlayerArt.svelte';
   import {
     ratioPct,
     perGameText,
@@ -7,8 +7,8 @@
     usagePct,
     usagePossessions,
   } from '#lib/format.js';
-  import { havocParticipantKindLabel } from '#lib/features/havoc/havoc-presentation.js';
-  import type { HavocMultiplayerSideBox } from './havoc-multiplayer-playback-view';
+  import { gamecastBattleParticipantKindLabel } from './gamecast-battle-labels';
+  import type { GamecastBattleSideBox } from './gamecast-battle-view';
 
   let {
     boxes,
@@ -16,7 +16,7 @@
     perGame = false,
     games = 1,
   }: {
-    boxes: readonly HavocMultiplayerSideBox[];
+    boxes: readonly GamecastBattleSideBox[];
     localSide: 'home' | 'away';
     perGame?: boolean;
     games?: number;
@@ -80,7 +80,7 @@
                 >
                   <th scope="row" class="hm-player">
                     <div class="hm-player-identity">
-                      <HavocPlayerArt
+                      <PlayerArt
                         playerId={line.sourcePlayerId}
                         displayName={line.displayName}
                         compact
@@ -94,7 +94,7 @@
                       </div>
                     </div>
                   </th>
-                  <td class="hm-role">{havocParticipantKindLabel(line.kind)}</td>
+                  <td class="hm-role">{gamecastBattleParticipantKindLabel(line.kind)}</td>
                   <td class="hm-pts" data-negative={line.points < 0}>{statOf(line.points)}</td>
                   <td>{ratioPct(line.fieldGoalsMade, line.fieldGoalsAttempted)}</td>
                   <td>{ratioPct(line.freeThrowsMade, line.freeThrowsAttempted)}</td>

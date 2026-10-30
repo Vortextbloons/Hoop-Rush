@@ -46,3 +46,28 @@ export const postseasonEvidenceSchema = z
   });
 
 export type PostseasonPlayerStats = z.infer<typeof postseasonPlayerStatsSchema>;
+
+const playoffComparisonStatsSchema = postseasonPlayerStatsSchema.pick({
+  gamesPlayed: true,
+  minutes: true,
+  points: true,
+  assists: true,
+  rebounds: true,
+  turnovers: true,
+  fga: true,
+  fta: true,
+  tsPct: true,
+});
+export const playoffPerformanceSchema = z.object({
+  season: z.string().regex(/^\d{4}-\d{2}$/),
+  regularSeason: playoffComparisonStatsSchema,
+  playoffs: postseasonPlayerStatsSchema,
+  differences: z.object({
+    tsPct: z.number().nullable(),
+    pointsPer36: z.number().nullable(),
+    assistsPer36: z.number().nullable(),
+    reboundsPer36: z.number().nullable(),
+    turnoversPer36: z.number().nullable(),
+  }),
+});
+export type PlayoffPerformance = z.infer<typeof playoffPerformanceSchema>;

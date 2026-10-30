@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { HavocMultiplayerDraftPick } from '@hoop-rush/data-contracts';
-  import HavocPlayerArt from '#lib/features/havoc/HavocPlayerArt.svelte';
+  import PlayerArt from '#lib/components/PlayerArt.svelte';
   import HavocTierBadge from '#lib/features/havoc/HavocTierBadge.svelte';
   import { mutationEntriesSummary } from '#lib/features/havoc/havoc-presentation.js';
   import { havocMultiplayerLineupSlots } from './havoc-multiplayer-room-view';
@@ -33,7 +33,7 @@
     <ul class="hm-rail-list">
       {#each slots as slot (slot.slot)}
         <li data-havoc-lineup-slot={slot.slot} data-havoc-lineup-side={side}>
-          <HavocPlayerArt
+          <PlayerArt
             compact
             playerId={slot.playerId}
             playerVersionId={slot.playerVersionId}

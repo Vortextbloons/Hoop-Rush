@@ -23,10 +23,7 @@ import {
 import type { EngineContext } from '../../sim/kernel.ts';
 import { simulateHavocBattleGame } from '../havoc/core/battle-game.ts';
 import { auditHavocBattleGame } from '../havoc/core/battle-audit.ts';
-import {
-  havocBattleGameInputDigest,
-  havocBattleGameResultDigest,
-} from '../havoc/core/battle-digests.ts';
+import { havocBattleGameResultDigest } from '../havoc/core/battle-digests.ts';
 import { capRushBattleVersionSet } from './input.ts';
 
 export function capRushLeagueFieldOfLocked(
@@ -179,7 +176,7 @@ export function simulateCapRushLeagueGame(input: {
     winnerTeamId:
       battle.result.home.points > battle.result.away.points ? entry.homeTeamId : entry.awayTeamId,
     box: capRushBoxOf(battle.result.home, battle.result.away, battle.result.overtimePeriods),
-    inputDigest: havocBattleGameInputDigest(battleInput),
+    inputDigest: battle.result.inputDigest,
     resultDigest: havocBattleGameResultDigest(battle.result),
   });
 }

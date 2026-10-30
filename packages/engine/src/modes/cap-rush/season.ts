@@ -16,7 +16,7 @@ import {
   battleToSoloTape,
   soloToBattleInput,
 } from '../havoc/core/battle-adapters.ts';
-import { simulateHavocBattleGame } from '../havoc/core/battle-game.ts';
+import { simulateValidatedHavocBattleGame } from '../havoc/core/battle-game.ts';
 import { auditHavocBattleGame } from '../havoc/core/battle-audit.ts';
 import { buildCapRushGameInput } from './input.ts';
 import { capRushApronRuntimeFor } from './apron-runtime.ts';
@@ -69,7 +69,7 @@ export function simulateCapRushGame(input: {
   const humanSide = soloInput.humanSide;
   const apron = capRushApronRuntimeFor(locked, humanSide);
   const battleInput = soloToBattleInput(soloInput);
-  const battle = simulateHavocBattleGame(battleInput, input.context, { apron });
+  const battle = simulateValidatedHavocBattleGame(battleInput, input.context, { apron });
   const entry = locked.schedule[gameNumber - 1];
   if (entry === undefined) {
     throw new Error(`cap rush: no schedule entry for game ${String(gameNumber)}`);

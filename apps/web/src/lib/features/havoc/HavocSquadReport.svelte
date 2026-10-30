@@ -15,7 +15,7 @@
     formatSignedPoints,
   } from './havoc-presentation';
   import { trueShootingRate } from '#lib/format.js';
-  import HavocPlayerArt from './HavocPlayerArt.svelte';
+  import PlayerArt from '#lib/components/PlayerArt.svelte';
   let {
     comparison,
     lineup,
@@ -155,7 +155,7 @@
                 }}
                 aria-label="View {player.displayName} stats and powers"
               >
-                <HavocPlayerArt
+                <PlayerArt
                   playerId={player.playerId}
                   displayName={player.displayName}
                   franchiseId={source?.franchiseId}
@@ -502,3 +502,4 @@
     }
   }
 </style>
+yle>

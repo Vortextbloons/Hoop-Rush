@@ -27,7 +27,7 @@ void mock.module('@lucide/svelte', () => ({
   ShieldCheck: () => {},
 }));
 
-void mock.module('#lib/features/havoc/HavocPlayerArt.svelte', () => ({ default: () => {} }));
+void mock.module('#lib/components/PlayerArt.svelte', () => ({ default: () => {} }));
 
 function buildGamecastOutput(gameNumber = 2): GamecastRecordedGame {
   const seed = seedSchema.parse('a'.repeat(16));

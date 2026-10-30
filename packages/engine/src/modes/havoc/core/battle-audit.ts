@@ -17,7 +17,7 @@ import {
 } from '@hoop-rush/data-contracts';
 import { OVERTIME_PERIOD_SECONDS, REGULATION_PERIOD_SECONDS } from '../../../sim/clock.ts';
 import type { SideIndex } from '../../../sim/recorder.ts';
-import { havocBattleGameInputDigest, havocBattleGameTapeDigest } from './battle-digests.ts';
+import { havocBattleGameInputDigest } from './battle-digests.ts';
 import { HAVOC_SCORING_SOURCE_MUTATION } from './battle-scoring.ts';
 
 const REGULATION_SECONDS = 4 * REGULATION_PERIOD_SECONDS;
@@ -154,8 +154,6 @@ export function auditHavocBattleGame(
       fail('tape-identity', 'tape game number differs from input');
     if (tape.variant !== input.variant) fail('tape-identity', 'tape variant differs from input');
     if (tape.seed !== input.seed) fail('tape-identity', 'tape seed differs from input');
-    if (havocBattleGameTapeDigest(tape).length !== 32)
-      fail('tape-digest', 'tape digest is not a 32-hex value');
     checkTape(tape, result, input, participants, fail);
   }
 
@@ -418,6 +416,12 @@ function checkTape(
   const foulReplay = new Map<string, FoulState>();
   const turnedOver = new Set<number>();
   const cancelled = new Set<number>();
+  const turnoverSide = new Map<string, number>();
+  const turnoverPlayer = new Map<string, number>();
+  const cancelledTurnoverSide = new Map<string, number>();
+  const cancelledTurnoverPlayer = new Map<string, number>();
+  const turnoversBySequence = new Map<number, { side: HavocHomeAway; playerInstanceId: string }>();
+  const clockViolationSide = new Map<string, number>();
   const possessionOffense = new Map<number, HavocHomeAway>();
   for (const event of tape.events) {
     if (event.kind === 'possession-start') {
@@ -515,13 +519,32 @@ function checkTape(
         requireActive(event.playerInstanceId, 'actor-eligibility');
         turnedOver.add(event.sequence);
         increment(`${event.playerInstanceId}:turnovers`);
+        turnoversBySequence.set(event.sequence, {
+          side: event.side,
+          playerInstanceId: event.playerInstanceId,
+        });
+        turnoverSide.set(event.side, (turnoverSide.get(event.side) ?? 0) + 1);
+        turnoverPlayer.set(
+          event.playerInstanceId,
+          (turnoverPlayer.get(event.playerInstanceId) ?? 0) + 1,
+        );
         break;
       }
       case 'turnover-cancelled': {
         if (!turnedOver.has(event.originalSequence)) {
           fail('turnovers', 'turnover cancellation references no recorded turnover');
         }
-        cancelled.add(event.originalSequence);
+        if (!cancelled.has(event.originalSequence)) {
+          cancelled.add(event.originalSequence);
+          const prior = turnoversBySequence.get(event.originalSequence);
+          if (prior !== undefined) {
+            cancelledTurnoverSide.set(prior.side, (cancelledTurnoverSide.get(prior.side) ?? 0) + 1);
+            cancelledTurnoverPlayer.set(
+              prior.playerInstanceId,
+              (cancelledTurnoverPlayer.get(prior.playerInstanceId) ?? 0) + 1,
+            );
+          }
+        }
         break;
       }
       case 'foul': {
@@ -629,6 +652,10 @@ function checkTape(
       case 'shot-clock-violation': {
         if (event.limitSeconds < 1 || event.limitSeconds > 60)
           fail('clock', 'invalid shot clock limit');
+        clockViolationSide.set(
+          event.offenseSide,
+          (clockViolationSide.get(event.offenseSide) ?? 0) + 1,
+        );
         break;
       }
       case 'extra-possession': {
@@ -915,16 +942,9 @@ function checkTape(
     if (total('blocks') !== team.blocks)
       fail('counts', `${team.side} blocks disagree with the tape`);
     if (total('fouls') !== team.fouls) fail('counts', `${team.side} fouls disagree with the tape`);
-    const officialTurnovers = tape.events.filter(
-      (event) =>
-        event.kind === 'turnover' &&
-        sideIndexBySide.get(event.side) === side &&
-        !cancelled.has(event.sequence),
-    ).length;
-    const violations = tape.events.filter(
-      (event) =>
-        event.kind === 'shot-clock-violation' && sideIndexBySide.get(event.offenseSide) === side,
-    ).length;
+    const officialTurnovers =
+      (turnoverSide.get(sideName) ?? 0) - (cancelledTurnoverSide.get(sideName) ?? 0);
+    const violations = clockViolationSide.get(sideName) ?? 0;
     if (officialTurnovers + violations !== team.turnovers) {
       fail(
         'turnovers',
@@ -933,12 +953,7 @@ function checkTape(
     }
   }
   for (const line of [...result.home.participants, ...result.away.participants]) {
-    const canceledForPlayer = tape.events.filter(
-      (event) =>
-        event.kind === 'turnover' &&
-        event.playerInstanceId === line.instanceId &&
-        cancelled.has(event.sequence),
-    ).length;
+    const canceledForPlayer = cancelledTurnoverPlayer.get(line.instanceId) ?? 0;
     const official = (counts.get(`${line.instanceId}:turnovers`) ?? 0) - canceledForPlayer;
     if (official > line.turnovers) {
       fail(

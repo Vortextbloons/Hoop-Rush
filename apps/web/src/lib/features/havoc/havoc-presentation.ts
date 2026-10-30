@@ -46,11 +46,7 @@ export function formatSignedPoints(points: number): string {
   return points > 0 ? `+${String(points)}` : String(points);
 }
 
-export function havocParticipantKindLabel(kind: HavocParticipantKind): string {
-  if (kind === 'starter') return 'Starter';
-  if (kind === 'replacement') return 'Replacement';
-  return 'Clone';
-}
+export { gamecastBattleParticipantKindLabel as havocParticipantKindLabel } from '#lib/gamecast/gamecast-battle-labels.js';
 
 export function mutationNameOf(mutationId: HavocMutationId): string {
   return havocMutationDefinitionOf(mutationId).name;

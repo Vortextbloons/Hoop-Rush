@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import type { HavocBattleEvent } from '@hoop-rush/data-contracts';
 import { buildHavocGameResult } from '@hoop-rush/test-fixtures';
-import { havocMultiplayerAbilityLines } from './havoc-multiplayer-playback';
+import { gamecastBattleAbilityLines } from './gamecast-battle-playback';
 
 describe('Havoc broadcast ability events', () => {
   const result = buildHavocGameResult();
@@ -19,8 +19,8 @@ describe('Havoc broadcast ability events', () => {
       scoringSequence: null,
     };
     const expired: HavocBattleEvent = { ...armed, sequence: 2, outcome: 'expired' };
-    expect(havocMultiplayerAbilityLines(result, [])).toEqual([]);
-    const revealed = havocMultiplayerAbilityLines(result, [armed]);
+    expect(gamecastBattleAbilityLines(result, [])).toEqual([]);
+    const revealed = gamecastBattleAbilityLines(result, [armed]);
     expect(revealed).toHaveLength(1);
     expect(revealed[0]).toMatchObject({
       side: 'away',
@@ -29,7 +29,7 @@ describe('Havoc broadcast ability events', () => {
       ability: 'Heat Check',
     });
     expect(revealed[0]?.summary).toContain('armed');
-    expect(havocMultiplayerAbilityLines(result, [armed, expired])[1]?.summary).toContain('expired');
+    expect(gamecastBattleAbilityLines(result, [armed, expired])[1]?.summary).toContain('expired');
   });
 
   it('resolves owner teams for events without an explicit side', () => {
@@ -40,7 +40,7 @@ describe('Havoc broadcast ability events', () => {
       ownerInstanceId: owner.instanceId,
       cappedInstanceIds: [],
     };
-    expect(havocMultiplayerAbilityLines(result, [event])[0]?.side).toBe('away');
+    expect(gamecastBattleAbilityLines(result, [event])[0]?.side).toBe('away');
   });
 
   it('excludes ordinary plays and the redundant refund cancellation event', () => {
@@ -64,7 +64,7 @@ describe('Havoc broadcast ability events', () => {
         turnoverSequence: 0,
       },
     ];
-    const lines = havocMultiplayerAbilityLines(result, events);
+    const lines = gamecastBattleAbilityLines(result, events);
     expect(lines).toHaveLength(1);
     expect(lines[0]?.summary).toContain(owner.displayName);
     expect(lines[0]?.ability).toBe('Possession Refund');

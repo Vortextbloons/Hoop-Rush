@@ -15,6 +15,7 @@ import {
   CAP_RUSH_SEED_DERIVATION_VERSION,
   POSITIONS,
   capRushAcceptGameCommandSchema,
+  capRushAcceptLeagueGamesCommandSchema,
   capRushCardSchema,
   capRushChoosePositionCommandSchema,
   capRushCommandResultSchema,
@@ -33,15 +34,19 @@ import {
   adaptCapRushCatalog,
   applyCapRushCommand,
   buildCapRushCatalogIndex,
+  buildCapRushLeagueSchedule,
   buildCapRushLockedInputs,
+  capRushAssignFranchise,
   capRushEmptyAggregate,
   capRushFoldAggregate,
+  capRushLeagueFieldOf,
   capRushReport,
   capRushStateDigest,
   capRushStoredGameOf,
   createEngineContext,
   createCapRushDraftState,
   simulateCapRushGame,
+  simulateCapRushLeagueSlot,
   soloToBattleInput,
   soloToBattleTape,
 } from '@hoop-rush/engine';
@@ -114,7 +119,7 @@ function setup() {
   return { index, command, state, result };
 }
 
-function lockedRun() {
+function lockedRun(options: { league?: boolean } = {}) {
   const { index, command: createCommand, state: created, result: createResult } = setup();
   const picks = POSITIONS.map((slot, ordinal) => {
     const player = index.bySlot.get(slot)?.[0];
@@ -133,6 +138,17 @@ function lockedRun() {
       }),
     };
   });
+  const bracket = buildFixtureBracket();
+  const takeover =
+    options.league === true
+      ? (() => {
+          const field = capRushLeagueFieldOf(bracket);
+          return {
+            franchise: capRushAssignFranchise({ runSeed: created.runSeed, field }),
+            games: buildCapRushLeagueSchedule({ runSeed: created.runSeed, field }).games,
+          };
+        })()
+      : undefined;
   const locked = buildCapRushLockedInputs({
     runId: created.runId,
     runSeed: created.runSeed,
@@ -141,8 +157,9 @@ function lockedRun() {
     catalog: created.catalog,
     picks,
     spin: null,
-    bracket: buildFixtureBracket(),
+    bracket,
     profile: DEFAULT_ERA_SIM_PROFILE,
+    ...(takeover === undefined ? {} : { takeover }),
   });
   const state = capRushDraftStateSchema.parse({
     ...created,
@@ -152,6 +169,7 @@ function lockedRun() {
     offer: null,
     picks,
     locked,
+    ...(takeover === undefined ? {} : { franchise: takeover.franchise }),
   });
   const command = capRushLockLineupCommandSchema.parse({
     command: 'lock-cap-rush-lineup',
@@ -173,8 +191,11 @@ function lockedRun() {
   return { index, createCommand, createResult, created, command, result, state };
 }
 
-async function startLockedRun(repo: DexieCapRushRepository): Promise<ReturnType<typeof lockedRun>> {
-  const run = lockedRun();
+async function startLockedRun(
+  repo: DexieCapRushRepository,
+  options: { league?: boolean } = {},
+): Promise<ReturnType<typeof lockedRun>> {
+  const run = lockedRun(options);
   await repo.applyOutcome({
     outcome: { state: run.created, result: run.createResult },
     command: run.createCommand,
@@ -470,6 +491,62 @@ describe('cap rush repository', () => {
       game: next.game,
     });
     expect((await repository.loadActiveDraft())?.season.games.length).toBe(2);
+  });
+
+  it('saves a background league slot while a broadcast is pending', async () => {
+    const { index, state } = await startLockedRun(repository, { league: true });
+    if (state.locked === null || state.locked.leagueSchedule === undefined) {
+      throw new Error('missing league schedule');
+    }
+    const context = createEngineContext();
+    const simulation = simulateCapRushGame({
+      locked: state.locked,
+      gameNumber: 1,
+      context,
+    });
+    const bundle = acceptBundle(index, state, 1);
+    await repository.applyOutcome({
+      outcome: { state: bundle.state, result: bundle.result },
+      command: bundle.command,
+      game: {
+        ...bundle.game,
+        playback: {
+          input: soloToBattleInput(simulation.input),
+          tape: soloToBattleTape(simulation.tape, simulation.result.humanSide),
+          facts: [...simulation.facts],
+          cursor: 0,
+        },
+      },
+    });
+    const leagueGames = simulateCapRushLeagueSlot({
+      locked: state.locked,
+      slot: 1,
+      context,
+    });
+    const command = capRushAcceptLeagueGamesCommandSchema.parse({
+      command: 'accept-cap-rush-league-games',
+      commandId: commandIdSchema.parse('cmd-league-1'),
+      runId: state.runId,
+      expectedRevision: bundle.state.revision,
+      slot: 1,
+      leagueGames,
+    });
+    const outcome = applyCapRushCommand(bundle.state, command, { index });
+    expect(outcome.result.status).toBe('accepted');
+    await repository.applyOutcome({ outcome, command, leagueGames });
+    expect((await repository.loadActiveDraft())?.season.leagueGamesAccepted).toBe(
+      leagueGames.length,
+    );
+    expect(await repository.listLeagueGames(state.runId)).toHaveLength(leagueGames.length);
+
+    const next = acceptBundle(index, outcome.state, 2);
+    await expect(
+      repository.applyOutcome({
+        outcome: { state: next.state, result: next.result },
+        command: next.command,
+        game: next.game,
+      }),
+    ).rejects.toThrow('pending broadcast');
   });
 
   it('updates playback by writing only the cursor record', async () => {

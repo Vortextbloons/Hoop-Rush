@@ -1,8 +1,8 @@
 import type { HavocBattleTape } from '@hoop-rush/data-contracts';
-import { havocMultiplayerPlaybackItems } from '#lib/features/havoc-multiplayer/havoc-multiplayer-playback.js';
+import { gamecastBattlePlaybackItems } from '#lib/gamecast/gamecast-battle-playback.js';
 
 export function capRushPlaybackItems(tape: HavocBattleTape) {
-  return havocMultiplayerPlaybackItems(tape).sort((a, b) => {
+  return gamecastBattlePlaybackItems(tape).sort((a, b) => {
     const clock = a.period - b.period || b.clockSeconds - a.clockSeconds;
     if (clock !== 0) return clock;
     const terminal = (item: typeof a) =>

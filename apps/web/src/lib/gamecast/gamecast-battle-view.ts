@@ -6,19 +6,18 @@ import type {
   HavocParticipantKind,
   Position,
 } from '@hoop-rush/data-contracts';
-import type { HavocMultiplayerVisibleState } from './havoc-multiplayer-playback';
+import type { GamecastBattleVisibleState } from './gamecast-battle-playback';
 
 /**
- * Playback line derivation for Havoc broadcasts.
+ * Playback line derivation for neutral home/away battle broadcasts.
  *
- * The multiplayer room renders `HavocBattleResult`/`HavocBattleTape` output, which is a different
- * shape from the five-man `GamecastBroadcast` tape. These helpers fold the presenter's
- * `visible` playback state into per-instance box lines (starters, replacements, clones), keep team
- * bonuses separate, and preserve negative scoring totals. Nothing here depends on the room: the
- * same helpers can back the solo Havoc gamecast.
+ * Havoc multiplayer and Cap Rush render `HavocBattleResult`/`HavocBattleTape` output, which is a
+ * different shape from the five-man `GamecastBroadcast` tape. These helpers fold the visible
+ * playback state into per-instance box lines (starters, replacements, clones), keep team bonuses
+ * separate, and preserve negative scoring totals. Nothing here depends on the room or mode.
  */
 
-export interface HavocMultiplayerParticipantLine {
+export interface GamecastBattleParticipantLine {
   instanceId: string;
   sourcePlayerId?: string;
   displayName: string;
@@ -39,12 +38,12 @@ export interface HavocMultiplayerParticipantLine {
   fouls: number;
 }
 
-export interface HavocMultiplayerSideBox {
+export interface GamecastBattleSideBox {
   side: HavocHomeAway;
   displayName: string;
   score: number;
   bonusPoints: number;
-  lines: HavocMultiplayerParticipantLine[];
+  lines: GamecastBattleParticipantLine[];
 }
 
 type ParticipantSource = Pick<
@@ -55,7 +54,7 @@ type ParticipantSource = Pick<
 
 const SIDES: readonly HavocHomeAway[] = ['home', 'away'];
 
-function blankLine(participant: ParticipantSource): HavocMultiplayerParticipantLine {
+function blankLine(participant: ParticipantSource): GamecastBattleParticipantLine {
   return {
     instanceId: participant.instanceId,
     sourcePlayerId: participant.sourcePlayerId,
@@ -78,7 +77,7 @@ function blankLine(participant: ParticipantSource): HavocMultiplayerParticipantL
   };
 }
 
-function fallbackLine(instanceId: string): HavocMultiplayerParticipantLine {
+function fallbackLine(instanceId: string): GamecastBattleParticipantLine {
   return blankLine({
     instanceId,
     displayName: `Instance ${instanceId.slice(-4)}`,
@@ -88,7 +87,7 @@ function fallbackLine(instanceId: string): HavocMultiplayerParticipantLine {
   });
 }
 
-function finalLine(participant: HavocParticipantLine): HavocMultiplayerParticipantLine {
+function finalLine(participant: HavocParticipantLine): GamecastBattleParticipantLine {
   return {
     ...blankLine(participant),
     points: participant.points,
@@ -124,7 +123,7 @@ function eventSideOf(event: HavocBattleEvent): HavocHomeAway | null {
 }
 
 function foldEventInto(
-  resolve: (instanceId: string) => HavocMultiplayerParticipantLine,
+  resolve: (instanceId: string) => GamecastBattleParticipantLine,
   event: HavocBattleEvent,
 ): void {
   switch (event.kind) {
@@ -172,14 +171,14 @@ function foldEventInto(
  * Box lines folded from the visible playback window. Scores include visible team bonuses so the
  * live score converges on the final result (`participant points + team bonus = team points`).
  */
-export function havocMultiplayerLiveBoxes(
+export function gamecastBattleLiveBoxes(
   result: Pick<HavocBattleResult, 'home' | 'away'>,
-  visible: HavocMultiplayerVisibleState,
-): HavocMultiplayerSideBox[] {
-  const lines = new Map<HavocHomeAway, Map<string, HavocMultiplayerParticipantLine>>();
+  visible: GamecastBattleVisibleState,
+): GamecastBattleSideBox[] {
+  const lines = new Map<HavocHomeAway, Map<string, GamecastBattleParticipantLine>>();
   const bonuses = new Map<HavocHomeAway, number>();
   for (const side of SIDES) {
-    const sideLines = new Map<string, HavocMultiplayerParticipantLine>();
+    const sideLines = new Map<string, GamecastBattleParticipantLine>();
     for (const participant of result[side].participants) {
       sideLines.set(participant.instanceId, blankLine(participant));
     }
@@ -188,7 +187,7 @@ export function havocMultiplayerLiveBoxes(
   }
   const resolve =
     (side: HavocHomeAway) =>
-    (instanceId: string): HavocMultiplayerParticipantLine => {
+    (instanceId: string): GamecastBattleParticipantLine => {
       const sideLines = lines.get(side);
       if (!sideLines) return fallbackLine(instanceId);
       const existing = sideLines.get(instanceId);
@@ -226,9 +225,9 @@ export function havocMultiplayerLiveBoxes(
 }
 
 /** Final box lines copied from the completed result, including negative participant totals. */
-export function havocMultiplayerFinalBoxes(
+export function gamecastBattleFinalBoxes(
   result: Pick<HavocBattleResult, 'home' | 'away'>,
-): HavocMultiplayerSideBox[] {
+): GamecastBattleSideBox[] {
   return SIDES.map((side) => {
     const team = result[side];
     return {

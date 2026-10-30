@@ -1,3 +1,4 @@
+import { playoffPerformanceSchema } from './postseason-evidence.ts';
 import { z } from 'zod';
 import {
   bbrefIdSchema,
@@ -103,6 +104,7 @@ export const peakPlayerSeasonSchema = z.object({
   historicalTeamIdentity: historicalTeamIdentitySchema,
   summaryRatings: summaryRatingsSchema,
   ratingProfile: ratingProfileSchema.optional(),
+  playoffPerformance: playoffPerformanceSchema.optional(),
   detailedRatings: simulationRatingsSchema,
   tendencies: simulationTendenciesSchema,
   anchors: simulationAnchorsSchema,

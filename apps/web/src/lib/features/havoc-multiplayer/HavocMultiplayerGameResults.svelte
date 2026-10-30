@@ -5,14 +5,14 @@
     HavocMultiplayerSeriesSnapshot,
   } from '@hoop-rush/data-contracts';
   import type { HavocMultiplayerGameOutput } from '@hoop-rush/persistence';
-  import { havocMultiplayerFinalBoxes } from './havoc-multiplayer-playback-view';
+  import { gamecastBattleFinalBoxes } from '#lib/gamecast/gamecast-battle-view.js';
   import {
     havocMultiplayerCurrentGameNumber,
     havocMultiplayerLocalSide,
     havocMultiplayerSecondsLeft,
     type HavocMultiplayerVerificationTone,
   } from './havoc-multiplayer-room-view';
-  import HavocMultiplayerBoxScore from './HavocMultiplayerBoxScore.svelte';
+  import GamecastBattleBox from '#lib/gamecast/GamecastBattleBox.svelte';
 
   let {
     output,
@@ -39,7 +39,7 @@
   const localSide = $derived(
     havocMultiplayerLocalSide(series, output.gameNumber, localParticipantId),
   );
-  const boxes = $derived(havocMultiplayerFinalBoxes(output.result));
+  const boxes = $derived(gamecastBattleFinalBoxes(output.result));
   const localBox = $derived(boxes.find((box) => box.side === localSide));
   const opponentBox = $derived(boxes.find((box) => box.side !== localSide));
   const localWon = $derived(output.winner === localParticipantId);
@@ -129,7 +129,7 @@
     <p class="hm-badge-detail">{verificationView.detail}</p>
   </header>
 
-  <HavocMultiplayerBoxScore {boxes} {localSide} />
+  <GamecastBattleBox {boxes} {localSide} />
 
   <footer class="hm-results-footer">
     {#if awaitingContinue}
