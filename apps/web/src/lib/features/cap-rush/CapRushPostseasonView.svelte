@@ -23,6 +23,7 @@
   import CapRushBoxScore from './CapRushBoxScore.svelte';
   import CapRushStandings from './CapRushStandings.svelte';
   import CapRushTeamDetail from './CapRushTeamDetail.svelte';
+  import CapRushSeasonProgress from './CapRushSeasonProgress.svelte';
   import type { CapRushArt } from './cap-rush-art.ts';
   import { formatAverage, initialsOf, recordLabel } from './cap-rush-presentation.ts';
 
@@ -173,7 +174,7 @@
   function statusMessage(): string {
     if (postseason === null) return 'Finish the regular season to reach the bracket.';
     if (reviewingSeason && !awaitingStandings)
-      return 'Review the final standings before the postseason begins.';
+      return 'Review the final standings and regular-season results before the postseason begins.';
     if (postseason.phase === 'complete') {
       return `${championEntry?.displayName ?? 'The champion'} won the championship.`;
     }
@@ -565,6 +566,15 @@
     </section>
   {/if}
 
+  {#if reviewingSeason && view.season !== null}
+    <CapRushSeasonProgress
+      draft={view.draft}
+      season={view.season}
+      storedGames={controller.games}
+      {art}
+    />
+  {/if}
+
   {#if standings !== null}
     {#if !reviewingSeason}
       <CapRushBracket
@@ -574,13 +584,14 @@
         {userTeamId}
         onTeamSelect={(teamId) => (selectedTeamId = teamId)}
       />
+    {:else}
+      <CapRushStandings
+        {standings}
+        manifest={art?.manifest ?? null}
+        {userTeamId}
+        onTeamSelect={(teamId) => (selectedTeamId = teamId)}
+      />
     {/if}
-    <CapRushStandings
-      {standings}
-      manifest={art?.manifest ?? null}
-      {userTeamId}
-      onTeamSelect={(teamId) => (selectedTeamId = teamId)}
-    />
   {:else if awaitingStandings}
     <div class="rounded-2xl border border-line-soft bg-card p-5 text-sm text-muted-foreground">
       <p class="font-display text-lg font-extrabold uppercase">Seeding the bracket</p>

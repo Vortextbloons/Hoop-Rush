@@ -19,6 +19,7 @@ import type {
   OpponentBracket,
   Position,
   Seed,
+  SeasonDraftCatalog,
 } from '@hoop-rush/data-contracts';
 import {
   CAP_RUSH_SCHEMA_VERSION,
@@ -38,6 +39,7 @@ export const CAP_RUSH_HUMAN_TEAM_ID = 'cap-rush-human';
 export const CAP_RUSH_HUMAN_TEAM_NAME = 'Cap Rush Five';
 
 export interface CapRushLockSources {
+  readonly historicalCatalog?: SeasonDraftCatalog;
   readonly bracket: OpponentBracket;
   readonly profile: EraSimulationProfile;
 }

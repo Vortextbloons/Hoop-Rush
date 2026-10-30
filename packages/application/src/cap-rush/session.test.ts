@@ -26,6 +26,7 @@ import {
   eraIdSchema,
   idSchema,
   seedSchema,
+  playerVersionId,
 } from '@hoop-rush/data-contracts';
 import {
   adaptCapRushCatalog,
@@ -167,6 +168,29 @@ class MemoryCapRushRepository implements CapRushDraftRepositoryPort {
 
 function createAssets() {
   const catalog = buildCapRushTestCatalog();
+  const historicalPlayers = buildFixtureBracket().opponents.flatMap((opponent) =>
+    catalog.candidates
+      .slice(0)
+      .filter(
+        (player, index, players) =>
+          players.findIndex((other) => other.positions.primary === player.positions.primary) ===
+          index,
+      )
+      .map((player) => ({
+        ...player,
+        franchiseId: opponent.teamId,
+        playerVersionId: playerVersionId(
+          player.playerId,
+          opponent.teamId,
+          player.eraId,
+          player.seasonKey,
+        ),
+      })),
+  );
+  const seen = new Set(catalog.candidates.map((player) => player.playerVersionId));
+  catalog.candidates.push(
+    ...historicalPlayers.filter((player) => !seen.has(player.playerVersionId)),
+  );
   const source = capRushTestCatalogSource(catalog);
   const manifest: HoopRushManifest = buildManifest({
     draftCatalog: {

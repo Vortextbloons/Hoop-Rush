@@ -754,7 +754,11 @@ export class CapRushSession implements CapRushService {
     return {
       index: buildCapRushCatalogIndex(adaptCapRushCatalog(catalog, catalogSource)),
       versionSet,
-      lockSources: { bracket: preamble.bracket, profile: preamble.profile },
+      lockSources: {
+        bracket: preamble.bracket,
+        profile: preamble.profile,
+        historicalCatalog: catalog,
+      },
     };
   }
 }

@@ -1,3 +1,4 @@
+import { buildCapRushHistoricalField } from './historical-field.ts';
 import type {
   CapRushAbandonCommand,
   CapRushAcceptGameCommand,
@@ -549,6 +550,14 @@ function applyLockLineup(
             field: capRushLeagueFieldOf(lockSources.bracket),
           }).games,
         };
+  const bracket =
+    lockSources.historicalCatalog === undefined
+      ? lockSources.bracket
+      : buildCapRushHistoricalField(
+          lockSources.bracket,
+          lockSources.historicalCatalog,
+          state.runSeed,
+        );
   const locked = buildCapRushLockedInputs({
     runId: state.runId,
     runSeed: state.runSeed,
@@ -558,7 +567,7 @@ function applyLockLineup(
     picks: state.picks,
     spin: state.spin.status === 'purchased' ? state.spin.receipt : null,
     additionalSpins: state.spin.status === 'purchased' ? state.spin.additionalReceipts : undefined,
-    bracket: lockSources.bracket,
+    bracket,
     profile: lockSources.profile,
     ...(takeover === undefined ? {} : { takeover }),
   });

@@ -1,10 +1,15 @@
 <script lang="ts">
   import {
+    CAP_RUSH_CONFERENCE_NAMES,
     CAP_RUSH_GAME_COUNT,
     POSITIONS,
+    capRushConferenceStandingsEntries,
     franchiseAbbreviation,
+    isConferenceStandings,
+    type CapRushConferenceStandings,
     type CapRushDraftState,
     type CapRushPlayerSeasonLine,
+    type CapRushPostseasonStandings,
     type CapRushStoredGame,
     type HavocParticipantLine,
     type HavocTeamResult,
@@ -40,6 +45,24 @@
   let selectedGameNumber = $state<number | null>(null);
 
   const locked = $derived(draft.locked);
+  const playoffStandings = $derived(draft.postseason?.standings ?? null);
+  const userPlayoffEntry = $derived.by(() => {
+    const standings = playoffStandings;
+    const teamId = locked?.human.teamId;
+    if (standings === null || teamId === undefined) return null;
+    const entries = isConferenceStandings(standings)
+      ? capRushConferenceStandingsEntries(standings as CapRushConferenceStandings)
+      : (standings as CapRushPostseasonStandings).entries;
+    return entries.find((entry) => entry.teamId === teamId) ?? null;
+  });
+  const userConference = $derived(
+    userPlayoffEntry !== null && 'conference' in userPlayoffEntry
+      ? (userPlayoffEntry as { conference: 'east' | 'west' }).conference
+      : null,
+  );
+  const userPlayoffSeed = $derived(
+    userPlayoffEntry !== null && userPlayoffEntry.qualified ? userPlayoffEntry.seed : null,
+  );
   const played = $derived(season.games.length);
   const latest = $derived(season.games.at(-1) ?? null);
   const remaining = $derived(Math.max(0, CAP_RUSH_GAME_COUNT - played));
@@ -154,7 +177,8 @@
     <div class="flex flex-wrap items-end justify-between gap-3">
       <div class="min-w-0">
         <p class="font-mono text-[10px] font-bold tracking-[0.16em] text-primary uppercase">
-          {variantLabel(draft.variant)} · Season in progress
+          {variantLabel(draft.variant)} ·
+          {season.completedAt === null ? 'Season in progress' : 'Season complete'}
         </p>
         <h2
           class="font-display mt-2 text-5xl leading-none font-extrabold tracking-tight tabular-nums sm:text-6xl"
@@ -165,7 +189,9 @@
           {played} of {CAP_RUSH_GAME_COUNT} games played
         </p>
       </div>
-      <dl class="grid grid-cols-3 gap-2">
+      <dl
+        class="grid {userPlayoffSeed !== null ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'} gap-2"
+      >
         <div class="rounded-xl border border-line-soft bg-surface-1 px-3 py-2.5">
           <dt class="font-mono text-[9px] tracking-[0.08em] text-muted-foreground uppercase">
             Points for
@@ -188,6 +214,18 @@
           </dt>
           <dd class="font-display mt-1 text-xl font-extrabold tabular-nums">{remaining}</dd>
         </div>
+        {#if userPlayoffSeed !== null}
+          <div class="rounded-xl border border-accent/40 bg-accent/10 px-3 py-2.5">
+            <dt class="font-mono text-[9px] tracking-[0.08em] text-accent uppercase">
+              Playoff seed
+            </dt>
+            <dd class="font-display mt-1 text-xl font-extrabold tabular-nums text-accent">
+              {userConference === null
+                ? `#${userPlayoffSeed}`
+                : `${CAP_RUSH_CONFERENCE_NAMES[userConference].split(' ')[0]} #${userPlayoffSeed}`}
+            </dd>
+          </div>
+        {/if}
       </dl>
     </div>
 
