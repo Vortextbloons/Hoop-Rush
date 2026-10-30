@@ -624,6 +624,47 @@ describe('cap rush session', () => {
     expect(session.getSnapshot().draft?.season?.aggregate.games).toBe(1);
   }, 120_000);
 
+  it('accepts a background league slot separately from the user game', async () => {
+    const repository = new MemoryCapRushRepository();
+    const session = createSession(repository);
+    await session.createDraft('clash');
+    for (const slot of POSITIONS) {
+      await session.choosePosition(slot);
+      const cards = session.getSnapshot().draft?.cards ?? [];
+      const cheapest = [...cards]
+        .filter((entry) => entry.signing.legal)
+        .sort((left, right) => left.card.salaryDollars - right.card.salaryDollars)[0];
+      if (cheapest === undefined) throw new Error(`no legal ${slot} signing`);
+      await session.signCard(cheapest.card.cardId);
+    }
+    await session.lockLineup();
+    const locked = session.getSnapshot().draft?.draft.locked;
+    if (locked === undefined || locked === null) throw new Error('lock did not produce inputs');
+    if (locked.leagueSchedule === undefined) throw new Error('fixture league schedule missing');
+
+    const context = createEngineContext();
+    const game = simulateCapRushGame({ locked, gameNumber: 1, context });
+    await session.acceptGame({
+      cursor: 1,
+      inputDigest: game.summary.inputDigest,
+      resultDigest: game.summary.resultDigest,
+      isolations: 0,
+      strikes: 0,
+      summary: game.summary,
+      stored: capRushStoredGameOf(game),
+    });
+    expect(session.getSnapshot().draft?.season?.leagueGamesAccepted).toBe(0);
+
+    const slotGames = simulateCapRushLeagueSlot({ locked, slot: 1, context });
+    await session.acceptLeagueGames(1, slotGames);
+    expect(session.getSnapshot().draft?.season?.leagueGamesAccepted).toBe(slotGames.length);
+    expect(await session.listLeagueGames(locked.runId)).toHaveLength(slotGames.length);
+
+    await expect(session.acceptLeagueGames(1, slotGames)).rejects.toBeInstanceOf(
+      CapRushServiceError,
+    );
+  }, 120_000);
+
   it('refuses to finalize a season before all 82 games are accepted', async () => {
     const repository = new MemoryCapRushRepository();
     const session = createSession(repository);

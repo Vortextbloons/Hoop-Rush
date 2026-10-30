@@ -5,6 +5,7 @@ import {
   type CapRushPlayoffGamePlan,
   type CapRushWorkerCompleteMessage,
   type CapRushWorkerGameMessage,
+  type CapRushWorkerLeagueGamesMessage,
   type CapRushWorkerMessage,
   type CapRushWorkerPlayoffGameMessage,
   type CapRushWorkerPlayoffsCompleteMessage,
@@ -15,6 +16,7 @@ import {
 
 export interface CapRushRunnerHandlers {
   onGame: (message: CapRushWorkerGameMessage) => void | Promise<void>;
+  onLeagueGames?: (message: CapRushWorkerLeagueGamesMessage) => void | Promise<void>;
   onProgress?: (message: CapRushWorkerProgressMessage) => void;
   onError?: (message: { code: string; message: string; gameNumber: number | null }) => void;
 }
@@ -78,6 +80,9 @@ export class CapRushRunner {
     startGame: number;
     count: number;
     includeTape?: boolean;
+    leagueOnly?: boolean;
+    backfillLeagueFrom?: number;
+    backfillLeagueTo?: number;
     handlers: CapRushRunnerHandlers;
   }): Promise<CapRushWorkerCompleteMessage> {
     if (this.active !== null) {
@@ -127,6 +132,14 @@ export class CapRushRunner {
                 this.cancel();
               });
             return;
+          case 'cap-rush-league-games':
+            batch.queue = batch.queue
+              .then(() => input.handlers.onLeagueGames?.(message))
+              .catch((error: unknown) => {
+                batch.handlerError = errorOf(error);
+                this.cancel();
+              });
+            return;
           case 'cap-rush-progress':
             input.handlers.onProgress?.(message);
             return;
@@ -158,6 +171,13 @@ export class CapRushRunner {
         startGame: input.startGame,
         count: input.count,
         includeTape: input.includeTape,
+        ...(input.leagueOnly === undefined ? {} : { leagueOnly: input.leagueOnly }),
+        ...(input.backfillLeagueFrom === undefined
+          ? {}
+          : { backfillLeagueFrom: input.backfillLeagueFrom }),
+        ...(input.backfillLeagueTo === undefined
+          ? {}
+          : { backfillLeagueTo: input.backfillLeagueTo }),
       });
     });
   }

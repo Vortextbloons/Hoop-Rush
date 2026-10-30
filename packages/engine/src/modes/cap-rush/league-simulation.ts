@@ -13,6 +13,7 @@ import type {
   HavocTeamResult,
 } from '@hoop-rush/data-contracts';
 import {
+  CAP_RUSH_GAME_COUNT,
   HAVOC_MUTATION_CATALOG_VERSION,
   HAVOC_RULES_VERSION,
   HAVOC_SCHEMA_VERSION,
@@ -197,6 +198,20 @@ export function capRushLeagueGamesTotal(locked: CapRushLockedInputs): number {
   return leagueScheduleOf(locked).filter(
     (game) => game.homeTeamId !== locked.human.teamId && game.awayTeamId !== locked.human.teamId,
   ).length;
+}
+
+export function capRushNextLeagueSlot(
+  locked: CapRushLockedInputs,
+  accepted: number,
+): number | null {
+  if (locked.leagueSchedule === undefined) return null;
+  let remaining = accepted;
+  for (let slot = 1; slot <= CAP_RUSH_GAME_COUNT; slot += 1) {
+    const count = capRushLeagueSlotGames(locked, slot).length;
+    if (remaining < count) return slot;
+    remaining -= count;
+  }
+  return null;
 }
 
 export function capRushFranchiseOfLocked(locked: CapRushLockedInputs): CapRushFranchiseAssignment {

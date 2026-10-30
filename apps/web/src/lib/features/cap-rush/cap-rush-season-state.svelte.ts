@@ -7,6 +7,7 @@ import {
   type CapRushStoredGame,
   type CapRushStoredPlayoffGame,
   type CapRushWorkerGameMessage,
+  type CapRushWorkerLeagueGamesMessage,
   type CapRushPlayback,
   type HavocGameResult,
 } from '@hoop-rush/data-contracts';
@@ -19,6 +20,7 @@ import {
   buildCapRushConferenceStandings,
   capRushBoxOf,
   capRushLeagueFieldOfLocked,
+  capRushNextLeagueSlot,
   capRushUserLeagueGameOf,
   soloToBattleInput,
   soloToBattleTape,
@@ -141,6 +143,7 @@ export class CapRushSeasonController {
     }
     const start = view.season?.nextGameNumber ?? 1;
     if (start > CAP_RUSH_GAME_COUNT) {
+      if (!(await this.ensureLeagueGames())) return false;
       const report = await this.service.finalizeSeason();
       if (this.isDestroyed()) return false;
       await this.load();
@@ -153,13 +156,18 @@ export class CapRushSeasonController {
     this.error = null;
     this.notice = null;
     try {
+      const backfill = this.leagueBackfill(view, start);
       const complete = await this.runner.simulate({
         requestId: newRequestId('cap-rush-season'),
         locked: view.draft.locked,
         startGame: start,
         count: CAP_RUSH_GAME_COUNT - start + 1,
+        ...(backfill === null
+          ? {}
+          : { backfillLeagueFrom: backfill.from, backfillLeagueTo: backfill.to }),
         handlers: {
           onGame: (message) => this.acceptUserGame(message),
+          onLeagueGames: (message) => this.acceptLeagueGames(message),
           onProgress: (message) => {
             if (!this.isDestroyed()) {
               this.progress = { completed: message.gamesCompleted, total: message.gamesTotal };
@@ -215,23 +223,37 @@ export class CapRushSeasonController {
       return false;
     }
     const start = view.season?.nextGameNumber ?? 1;
+    if (start > CAP_RUSH_GAME_COUNT) {
+      if (!(await this.ensureLeagueGames())) return false;
+      const report = await this.service.finalizeSeason();
+      if (this.isDestroyed()) return false;
+      await this.load();
+      if (report === null) return false;
+      this.report = report;
+      return true;
+    }
     this.busy = true;
     this.cancelling = false;
     this.error = null;
     this.notice = null;
     try {
+      const backfill = this.leagueBackfill(view, start);
       const complete = await this.runner.simulate({
         requestId: newRequestId('cap-rush-game'),
         includeTape: true,
         locked: view.draft.locked,
         startGame: start,
         count: 1,
+        ...(backfill === null
+          ? {}
+          : { backfillLeagueFrom: backfill.from, backfillLeagueTo: backfill.to }),
         handlers: {
           onGame: (message) => {
             if (message.playback === undefined)
               throw new Error('The game has no recorded broadcast. Retry the game.');
             return this.acceptUserGame(message);
           },
+          onLeagueGames: (message) => this.acceptLeagueGames(message),
           onError: (message) => {
             if (!this.isDestroyed()) this.error = message.message;
           },
@@ -250,7 +272,10 @@ export class CapRushSeasonController {
         this.draft?.season.completedAt === null
       ) {
         const played = this.draft.season.games.length;
-        if (played === CAP_RUSH_GAME_COUNT) await this.service.finalizeSeason();
+        if (played === CAP_RUSH_GAME_COUNT) {
+          if (!(await this.ensureLeagueGames())) return false;
+          await this.service.finalizeSeason();
+        }
         if (this.isDestroyed()) return false;
         await this.load();
       }
@@ -332,6 +357,7 @@ export class CapRushSeasonController {
       }
       this.busy = true;
       try {
+        if (!(await this.ensureLeagueGames())) return false;
         const report = await this.service.finalizeSeason();
         if (this.isDestroyed()) return false;
         if (report !== null) {
@@ -433,6 +459,7 @@ export class CapRushSeasonController {
     if (view === null || view.draft.locked === null) {
       throw new Error('there is no locked cap rush run');
     }
+    if (!(await this.ensureLeagueGames())) return false;
     const locked = view.draft.locked;
     if (locked.leagueSchedule !== undefined) {
       const leagueById = new Map(this.leagueGames.map((game) => [game.gameId, game]));
@@ -518,6 +545,13 @@ export class CapRushSeasonController {
     });
     if (this.isDestroyed()) return;
     if (message.playback !== undefined) {
+      if (message.leagueGames !== undefined) {
+        const byId = new Map(this.aiLeagueGames.map((game) => [game.gameId, game]));
+        for (const game of message.leagueGames) byId.set(game.gameId, game);
+        this.aiLeagueGames = [...byId.values()];
+      }
+      this.draft = this.service.getSnapshot().draft;
+      this.leagueGames = [...this.aiLeagueGames, ...this.userLeagueGamesOf(this.draft)];
       this.playback = {
         game: message.cursor,
         result: message.result,
@@ -544,6 +578,79 @@ export class CapRushSeasonController {
     }
     this.draft = this.service.getSnapshot().draft;
     this.leagueGames = [...this.aiLeagueGames, ...this.userLeagueGamesOf(this.draft)];
+  }
+
+  private async acceptLeagueGames(message: CapRushWorkerLeagueGamesMessage): Promise<void> {
+    const locked = this.draft?.draft.locked;
+    const accepted = this.draft?.season?.leagueGamesAccepted ?? 0;
+    if (locked !== null && locked !== undefined && locked.leagueSchedule !== undefined) {
+      const next = capRushNextLeagueSlot(locked, accepted);
+      if (next === null || message.slot < next) return;
+    }
+    if (
+      message.leagueGames.every((game) =>
+        this.aiLeagueGames.some((existing) => existing.gameId === game.gameId),
+      )
+    ) {
+      return;
+    }
+    await this.service.acceptLeagueGames(message.slot, message.leagueGames);
+    if (this.isDestroyed()) return;
+    const byId = new Map(this.aiLeagueGames.map((game) => [game.gameId, game]));
+    for (const game of message.leagueGames) byId.set(game.gameId, game);
+    this.aiLeagueGames = [...byId.values()];
+    this.draft = this.service.getSnapshot().draft;
+    this.leagueGames = [...this.aiLeagueGames, ...this.userLeagueGamesOf(this.draft)];
+  }
+
+  private leagueBackfill(
+    view: CapRushDraftView,
+    startGame: number,
+  ): { from: number; to: number } | null {
+    const locked = view.draft.locked;
+    if (locked === null || locked.leagueSchedule === undefined) return null;
+    const next = capRushNextLeagueSlot(locked, view.season?.leagueGamesAccepted ?? 0);
+    if (next === null || next >= startGame) return null;
+    return { from: next, to: startGame - 1 };
+  }
+
+  private async ensureLeagueGames(): Promise<boolean> {
+    const view = this.draft;
+    if (view === null || view.draft.locked === null) return true;
+    const locked = view.draft.locked;
+    if (locked.leagueSchedule === undefined) return true;
+    const played = view.season?.games.length ?? 0;
+    const next = capRushNextLeagueSlot(locked, view.season?.leagueGamesAccepted ?? 0);
+    if (next === null) return true;
+    if (next > played) {
+      this.error = 'The background league results are incomplete.';
+      return false;
+    }
+    const count = played - next + 1;
+    if (count <= 0) return true;
+    const wasBusy = this.busy;
+    if (!wasBusy) this.busy = true;
+    try {
+      const complete = await this.runner.simulate({
+        requestId: newRequestId('cap-rush-league-backfill'),
+        locked,
+        startGame: next,
+        count,
+        leagueOnly: true,
+        handlers: {
+          onGame: () => {},
+          onLeagueGames: (message) => this.acceptLeagueGames(message),
+        },
+      });
+      if (this.isDestroyed()) return false;
+      await this.load();
+      return !complete.cancelled;
+    } catch (error) {
+      if (!this.isDestroyed()) this.error = errorMessageOf(error);
+      return false;
+    } finally {
+      if (!wasBusy && !this.isDestroyed()) this.busy = false;
+    }
   }
 
   private userLeagueGamesOf(view: CapRushDraftView | null): CapRushLeagueGame[] {
@@ -639,6 +746,7 @@ export class CapRushSeasonController {
 
   async finalizeSeason(): Promise<boolean> {
     if (this.hasPendingPlayback() || this.draft === null || this.isDestroyed()) return false;
+    if (!(await this.ensureLeagueGames())) return false;
     try {
       const report = await this.service.finalizeSeason();
       if (this.isDestroyed()) return false;
@@ -670,7 +778,7 @@ export class CapRushSeasonController {
 
   async finishPlayback(): Promise<void> {
     const playback = this.playback;
-    if (playback === null || this.playbackSaving || this.isDestroyed()) return;
+    if (playback === null || this.playbackSaving || this.busy || this.isDestroyed()) return;
     const total = playback.evidence.tape.events.length + playback.evidence.tape.scoring.length;
     if (playback.evidence.cursor !== total) return;
     this.playbackSaving = true;
@@ -685,6 +793,7 @@ export class CapRushSeasonController {
         this.draft?.draft.stage === 'locked' &&
         this.draft.season?.games.length === CAP_RUSH_GAME_COUNT
       ) {
+        if (!(await this.ensureLeagueGames())) return;
         await this.service.finalizeSeason();
         await this.load();
       }

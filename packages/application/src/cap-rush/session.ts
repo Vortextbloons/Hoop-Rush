@@ -26,6 +26,7 @@ import {
   CAP_RUSH_SPIN_PURCHASES,
   POSITIONS,
   capRushAcceptGameCommandSchema,
+  capRushAcceptLeagueGamesCommandSchema,
   capRushAcceptPlayoffGameCommandSchema,
   capRushAcceptStandingsCommandSchema,
   capRushChoosePositionCommandSchema,
@@ -290,6 +291,21 @@ export class CapRushSession implements CapRushService {
         game: game.stored,
         ...(game.leagueGames === undefined ? {} : { leagueGames: game.leagueGames }),
       },
+    );
+  }
+
+  async acceptLeagueGames(slot: number, leagueGames: readonly CapRushLeagueGame[]): Promise<void> {
+    await this.dispatch(
+      (state) =>
+        capRushAcceptLeagueGamesCommandSchema.parse({
+          command: 'accept-cap-rush-league-games',
+          commandId: this.ids.newCommandId(),
+          runId: state.runId,
+          expectedRevision: state.revision,
+          slot,
+          leagueGames,
+        }),
+      { leagueGames },
     );
   }
 
@@ -562,13 +578,14 @@ export class CapRushSession implements CapRushService {
         index: assets.index,
         lockSources: assets.lockSources,
       });
+      const accepted = outcome.result.status === 'accepted';
       const applied = await this.repository.applyOutcome({
         outcome,
         command,
-        ...(extra.game === undefined ? {} : { game: extra.game }),
-        ...(extra.playoffGame === undefined ? {} : { playoffGame: extra.playoffGame }),
-        ...(extra.leagueGames === undefined ? {} : { leagueGames: extra.leagueGames }),
-        ...(extra.report === undefined ? {} : { report: extra.report }),
+        ...(accepted && extra.game !== undefined ? { game: extra.game } : {}),
+        ...(accepted && extra.playoffGame !== undefined ? { playoffGame: extra.playoffGame } : {}),
+        ...(accepted && extra.leagueGames !== undefined ? { leagueGames: extra.leagueGames } : {}),
+        ...(accepted && extra.report !== undefined ? { report: extra.report } : {}),
       });
       if (applied.status === 'rejected') {
         throw new CapRushServiceError(

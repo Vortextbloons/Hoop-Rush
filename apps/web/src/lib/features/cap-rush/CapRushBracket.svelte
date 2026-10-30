@@ -229,7 +229,7 @@
               Champion
             </p>
             {#if championId !== null}
-              <div class="mt-2 flex items-center justify-center gap-2">
+              <div class="mt-2 flex min-w-0 flex-col items-center justify-center gap-1.5">
                 {#if identityOf(championId) && manifest}
                   {@const identity = identityOf(championId)}
                   <TeamLogo
@@ -237,10 +237,10 @@
                     franchiseId={identity?.franchiseId ?? championId}
                     teamExternalId={identity?.teamExternalId ?? ''}
                     alt=""
-                    className="h-7 w-7"
+                    className="h-8 w-8"
                   />
                 {/if}
-                <span class="champion-name font-display text-lg font-extrabold uppercase">
+                <span class="champion-name font-display text-base font-extrabold uppercase">
                   {nameOf(championId)}
                 </span>
               </div>
@@ -530,6 +530,7 @@
     color: var(--color-muted-foreground);
   }
   .champion-plate {
+    min-width: 0;
     border: 1px solid color-mix(in srgb, var(--color-accent) 30%, transparent);
     border-radius: 12px;
     background: color-mix(in srgb, var(--color-accent) 6%, transparent);
@@ -538,8 +539,10 @@
   }
   .champion-name {
     min-width: 0;
-    overflow-wrap: anywhere;
-    line-height: 1.1;
+    max-width: 100%;
+    overflow-wrap: break-word;
+    text-wrap: balance;
+    line-height: 1.15;
   }
   .mobile-champion {
     margin-top: 4px;

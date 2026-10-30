@@ -1,4 +1,5 @@
 import {
+  CAP_RUSH_GAME_COUNT,
   CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION,
   capRushLeagueSeed,
   capRushWorkerMessageSchema,
@@ -46,6 +47,28 @@ function failureMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'unknown cap rush worker failure';
 }
 
+function postLeagueSlot(requestId: string, locked: CapRushLockedInputs, slot: number): boolean {
+  let leagueGames;
+  try {
+    leagueGames = simulateCapRushLeagueSlot({
+      locked,
+      slot,
+      context: engineContext,
+    });
+  } catch (error) {
+    postError(requestId, 'internal', failureMessage(error), slot);
+    return false;
+  }
+  post({
+    schemaVersion: CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION,
+    type: 'cap-rush-league-games',
+    requestId,
+    slot,
+    leagueGames,
+  });
+  return true;
+}
+
 async function simulate(
   request: {
     requestId: string;
@@ -53,6 +76,9 @@ async function simulate(
     startGame: number;
     count: number;
     includeTape?: boolean;
+    leagueOnly?: boolean;
+    backfillLeagueFrom?: number;
+    backfillLeagueTo?: number;
   },
   signal: { cancelled: boolean },
 ): Promise<void> {
@@ -60,6 +86,60 @@ async function simulate(
   let delivered = 0;
   let lastCursor = request.startGame - 1;
   let lastProgressAt = Date.now();
+
+  if (request.backfillLeagueFrom !== undefined && request.backfillLeagueTo !== undefined) {
+    const from = Math.max(1, request.backfillLeagueFrom);
+    const to = Math.min(CAP_RUSH_GAME_COUNT, request.backfillLeagueTo);
+    for (let slot = from; slot <= to; slot += 1) {
+      if (signal.cancelled || cancelledRequests.has(request.requestId)) {
+        cancelledRequests.delete(request.requestId);
+        post({
+          schemaVersion: CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION,
+          type: 'cap-rush-complete',
+          requestId: request.requestId,
+          gamesDelivered: delivered,
+          cancelled: true,
+          lastCursor,
+        });
+        return;
+      }
+      if (!postLeagueSlot(request.requestId, request.locked, slot)) return;
+    }
+  }
+
+  if (request.leagueOnly === true) {
+    if (request.locked.leagueSchedule === undefined) {
+      postError(request.requestId, 'internal', 'this run has no league schedule', null);
+      return;
+    }
+    const to = Math.min(request.startGame + request.count - 1, CAP_RUSH_GAME_COUNT);
+    for (let slot = request.startGame; slot <= to; slot += 1) {
+      if (signal.cancelled || cancelledRequests.has(request.requestId)) {
+        cancelledRequests.delete(request.requestId);
+        post({
+          schemaVersion: CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION,
+          type: 'cap-rush-complete',
+          requestId: request.requestId,
+          gamesDelivered: delivered,
+          cancelled: true,
+          lastCursor,
+        });
+        return;
+      }
+      if (!postLeagueSlot(request.requestId, request.locked, slot)) return;
+      delivered += 1;
+      lastCursor = slot;
+    }
+    post({
+      schemaVersion: CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION,
+      type: 'cap-rush-complete',
+      requestId: request.requestId,
+      gamesDelivered: delivered,
+      cancelled: false,
+      lastCursor,
+    });
+    return;
+  }
 
   for (let gameNumber = request.startGame; gameNumber <= lastGame; gameNumber += 1) {
     if (signal.cancelled || cancelledRequests.has(request.requestId)) {
@@ -102,20 +182,6 @@ async function simulate(
       return;
     }
 
-    let leagueGames;
-    if (request.locked.leagueSchedule !== undefined) {
-      try {
-        leagueGames = simulateCapRushLeagueSlot({
-          locked: request.locked,
-          slot: gameNumber,
-          context: engineContext,
-        });
-      } catch (error) {
-        postError(request.requestId, 'internal', failureMessage(error), gameNumber);
-        return;
-      }
-    }
-
     post({
       schemaVersion: CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION,
       type: 'cap-rush-game',
@@ -131,10 +197,13 @@ async function simulate(
       ...(request.includeTape && request.count === 1
         ? { playback: { input: simulation.input, tape: simulation.tape, facts: simulation.facts } }
         : {}),
-      ...(leagueGames === undefined ? {} : { leagueGames }),
     });
     delivered += 1;
     lastCursor = gameNumber;
+
+    if (request.locked.leagueSchedule !== undefined) {
+      if (!postLeagueSlot(request.requestId, request.locked, gameNumber)) return;
+    }
 
     if (Date.now() - lastProgressAt >= PROGRESS_INTERVAL_MS) {
       lastProgressAt = Date.now();

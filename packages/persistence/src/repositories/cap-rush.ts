@@ -260,10 +260,18 @@ export class DexieCapRushRepository implements CapRushRepository {
       throw malformed('rejected cap rush commands cannot carry league games');
     }
     if (leagueGames.length > 0) {
-      if (command.command !== 'accept-cap-rush-game') {
+      if (
+        command.command !== 'accept-cap-rush-game' &&
+        command.command !== 'accept-cap-rush-league-games'
+      ) {
         throw malformed('stored league games require an accept command');
       }
-      const acceptedGames = command.leagueGames ?? [];
+      const acceptedGames =
+        command.command === 'accept-cap-rush-league-games'
+          ? command.leagueGames
+          : (command.leagueGames ?? []);
+      const slot =
+        command.command === 'accept-cap-rush-league-games' ? command.slot : command.cursor;
       if (acceptedGames.length !== leagueGames.length) {
         throw malformed('accept command does not describe the stored league games');
       }
@@ -272,7 +280,7 @@ export class DexieCapRushRepository implements CapRushRepository {
         if (commandGame === undefined || canonicalJson(commandGame) !== canonicalJson(leagueGame)) {
           throw malformed('stored league game does not match the accept command');
         }
-        if (leagueGame.slot !== command.cursor) {
+        if (leagueGame.slot !== slot) {
           throw malformed('stored league game belongs to another slot');
         }
       }
@@ -419,6 +427,7 @@ export class DexieCapRushRepository implements CapRushRepository {
           .equals(result.runId)
           .toArray();
         if (
+          command.command !== 'accept-cap-rush-league-games' &&
           [...pendingRegular, ...pendingPlayoffs].some((row) => row.game.playback !== undefined)
         ) {
           throw malformed('finish the pending broadcast before advancing the run');

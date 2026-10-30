@@ -172,7 +172,7 @@
     {#if finished}
       <button
         class="min-h-11 rounded-xl border border-primary px-4 font-bold text-primary"
-        disabled={controller.playbackSaving}
+        disabled={controller.playbackSaving || controller.busy}
         onclick={() => void controller.finishPlayback()}>Continue</button
       >
     {:else}

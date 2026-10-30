@@ -133,6 +133,7 @@ export interface CapRushService {
   lockLineup(): Promise<void>;
   updatePlayback(game: number | string, cursor: number, resolved: boolean): Promise<void>;
   acceptGame(game: CapRushAcceptedGame): Promise<void>;
+  acceptLeagueGames(slot: number, leagueGames: readonly CapRushLeagueGame[]): Promise<void>;
   finalizeSeason(): Promise<CapRushReport | null>;
   acceptStandings(league: CapRushLeagueResult): Promise<void>;
   acceptConferenceStandings(standings: CapRushConferenceStandings): Promise<void>;

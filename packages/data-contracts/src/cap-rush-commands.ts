@@ -110,6 +110,16 @@ export const capRushAcceptGameCommandSchema = z.object({
 });
 export type CapRushAcceptGameCommand = z.infer<typeof capRushAcceptGameCommandSchema>;
 
+export const capRushAcceptLeagueGamesCommandSchema = z.object({
+  command: z.literal('accept-cap-rush-league-games'),
+  commandId: commandIdSchema,
+  runId: idSchema,
+  expectedRevision: z.number().int().nonnegative(),
+  slot: z.number().int().min(1).max(CAP_RUSH_GAME_COUNT),
+  leagueGames: z.array(capRushLeagueGameSchema).min(1).max(15),
+});
+export type CapRushAcceptLeagueGamesCommand = z.infer<typeof capRushAcceptLeagueGamesCommandSchema>;
+
 export const capRushFinalizeSeasonCommandSchema = z.object({
   command: z.literal('finalize-cap-rush-season'),
   commandId: commandIdSchema,
@@ -172,6 +182,7 @@ export const capRushCommandSchema = z.discriminatedUnion('command', [
   capRushSkipSpinCommandSchema,
   capRushLockLineupCommandSchema,
   capRushAcceptGameCommandSchema,
+  capRushAcceptLeagueGamesCommandSchema,
   capRushFinalizeSeasonCommandSchema,
   capRushAcceptStandingsCommandSchema,
   capRushAcceptPlayoffGameCommandSchema,

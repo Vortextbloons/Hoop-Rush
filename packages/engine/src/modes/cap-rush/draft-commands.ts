@@ -2,6 +2,7 @@ import { buildCapRushHistoricalField } from './historical-field.ts';
 import type {
   CapRushAbandonCommand,
   CapRushAcceptGameCommand,
+  CapRushAcceptLeagueGamesCommand,
   CapRushAcceptPlayoffGameCommand,
   CapRushAcceptStandingsCommand,
   CapRushChoosePositionCommand,
@@ -22,6 +23,7 @@ import type {
 } from '@hoop-rush/data-contracts';
 import {
   CAP_RUSH_GAME_COUNT,
+  CAP_RUSH_CONFERENCE_AI_GAMES,
   CAP_RUSH_CONFERENCE_GAMES,
   CAP_RUSH_HARD_LIMIT_DOLLARS,
   CAP_RUSH_PLAYOFF_ROUNDS,
@@ -58,7 +60,11 @@ import {
   capRushAssignFranchise,
   capRushLeagueFieldOf,
 } from './league-schedule.ts';
-import { capRushLeagueFieldOfLocked, capRushLeagueSlotGames } from './league-simulation.ts';
+import {
+  capRushLeagueFieldOfLocked,
+  capRushLeagueSlotGames,
+  capRushNextLeagueSlot,
+} from './league-simulation.ts';
 import { buildCapRushConferenceStandings } from './conference-standings.ts';
 import { buildCapRushSpinReceipt, capRushPayrollDollars, capRushSpinEligibility } from './spin.ts';
 import { capRushStateDigest } from './state-digest.ts';
@@ -638,7 +644,7 @@ function applyAcceptGame(
     );
   }
   let leagueGamesAccepted = state.season.leagueGamesAccepted ?? 0;
-  if (state.locked.leagueSchedule !== undefined) {
+  if (state.locked.leagueSchedule !== undefined && command.leagueGames !== undefined) {
     const expected = capRushLeagueSlotGames(state.locked, command.cursor);
     const supplied = command.leagueGames ?? [];
     const expectedIds = expected.map((game) => game.gameId).sort();
@@ -684,6 +690,85 @@ function applyAcceptGame(
   return acceptCapRushCommand(state, command, nextState);
 }
 
+function applyAcceptLeagueGames(
+  state: CapRushDraftState,
+  command: CapRushAcceptLeagueGamesCommand,
+  environment: CapRushCommandEnvironment,
+): CapRushCommandOutcome {
+  const mismatch = validateRunAndRevision(state, command, environment);
+  if (mismatch !== null) return mismatch;
+  if (state.stage !== 'locked' || state.locked === null) {
+    return rejectCapRushCommand(state, command, 'not-locked', 'the lineup is not locked');
+  }
+  if (state.locked.leagueSchedule === undefined) {
+    return rejectCapRushCommand(
+      state,
+      command,
+      'phase-mismatch',
+      'this run does not use background league games',
+    );
+  }
+  if (state.season.completedAt !== null) {
+    return rejectCapRushCommand(
+      state,
+      command,
+      'season-complete',
+      'the season is already complete',
+    );
+  }
+  const accepted = state.season.leagueGamesAccepted ?? 0;
+  const nextSlot = capRushNextLeagueSlot(state.locked, accepted);
+  if (nextSlot === null) {
+    return rejectCapRushCommand(
+      state,
+      command,
+      'stale-cursor',
+      'all background league games are already accepted',
+    );
+  }
+  if (command.slot !== nextSlot) {
+    return rejectCapRushCommand(
+      state,
+      command,
+      'stale-cursor',
+      `league slot ${String(command.slot)} cannot be accepted; the next slot is ${String(nextSlot)}`,
+    );
+  }
+  const expected = capRushLeagueSlotGames(state.locked, command.slot);
+  const expectedIds = expected.map((game) => game.gameId).sort();
+  const suppliedIds = command.leagueGames.map((game) => game.gameId).sort();
+  if (
+    expectedIds.length !== suppliedIds.length ||
+    expectedIds.some((gameId, index) => suppliedIds[index] !== gameId)
+  ) {
+    return rejectCapRushCommand(
+      state,
+      command,
+      'digest-mismatch',
+      'the background league games do not match the accepted slot',
+    );
+  }
+  for (const game of command.leagueGames) {
+    if (game.slot !== command.slot) {
+      return rejectCapRushCommand(
+        state,
+        command,
+        'digest-mismatch',
+        'a background league game belongs to another slot',
+      );
+    }
+  }
+  const nextState = capRushDraftStateSchema.parse({
+    ...state,
+    revision: state.revision + 1,
+    season: {
+      ...state.season,
+      leagueGamesAccepted: accepted + expected.length,
+    },
+  });
+  return acceptCapRushCommand(state, command, nextState);
+}
+
 function applyFinalizeSeason(
   state: CapRushDraftState,
   command: CapRushFinalizeSeasonCommand,
@@ -708,6 +793,17 @@ function applyFinalizeSeason(
       command,
       'phase-mismatch',
       `the season has ${String(state.season.games.length)} of ${String(CAP_RUSH_GAME_COUNT)} games`,
+    );
+  }
+  if (
+    state.locked.leagueSchedule !== undefined &&
+    (state.season.leagueGamesAccepted ?? 0) !== CAP_RUSH_CONFERENCE_AI_GAMES
+  ) {
+    return rejectCapRushCommand(
+      state,
+      command,
+      'phase-mismatch',
+      `the background league has ${String(state.season.leagueGamesAccepted ?? 0)} of ${String(CAP_RUSH_CONFERENCE_AI_GAMES)} games`,
     );
   }
   const completedAt = environment.nowIso?.() ?? new Date().toISOString();
@@ -757,6 +853,17 @@ function applyAcceptStandings(
       command,
       'standings-invalid',
       'the regular season is incomplete',
+    );
+  }
+  if (
+    state.locked.leagueSchedule !== undefined &&
+    (state.season.leagueGamesAccepted ?? 0) !== CAP_RUSH_CONFERENCE_AI_GAMES
+  ) {
+    return rejectCapRushCommand(
+      state,
+      command,
+      'standings-invalid',
+      'the background league games are incomplete',
     );
   }
   if (command.standings !== undefined) {
@@ -1361,6 +1468,8 @@ export function applyCapRushCommand(
       return applyLockLineup(state, command, environment);
     case 'accept-cap-rush-game':
       return applyAcceptGame(state, command, environment);
+    case 'accept-cap-rush-league-games':
+      return applyAcceptLeagueGames(state, command, environment);
     case 'finalize-cap-rush-season':
       return applyFinalizeSeason(state, command, environment);
     case 'accept-cap-rush-standings':
