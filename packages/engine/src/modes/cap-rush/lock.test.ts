@@ -7,8 +7,13 @@ import {
   capRushDraftStateSchema,
   capRushEmptySeasonState,
   capRushOfferIdSchema,
+  canonicalJson,
+  seasonKeySchema,
   commandIdSchema,
 } from '@hoop-rush/data-contracts';
+import { createEngineContext } from '../../sim/kernel.ts';
+import { simulateCapRushGame } from './season.ts';
+import { havocGameTapeDigest } from '../havoc/digests.ts';
 import { applyCapRushCommand } from './draft-commands.ts';
 import { capRushEffectiveRatings, capRushPayrollStatus } from './salary.ts';
 import { capRushHighestPaidOf } from './lock.ts';
@@ -141,7 +146,7 @@ describe('cap rush lineup lock', () => {
     const expected = capRushEffectiveRatings(pick.card.source.profile.ratings, 'second-apron');
     expect(starter.effective.ratings).toEqual(expected);
     expect(starter.effective.ratings.passing).toBe(
-      Math.max(0, pick.card.source.profile.ratings.passing - 12),
+      Math.max(0, pick.card.source.profile.ratings.passing - 8),
     );
   });
 
@@ -432,7 +437,66 @@ describe('cap rush locked spin and replacement roles', () => {
     expect(replacement.mutationPackage).toEqual([]);
     expect(replacement.effective.ratings).toEqual(starter.effective.ratings);
     expect(replacement.effective.ratings.passing).toBe(
-      Math.max(0, pick.card.source.profile.ratings.passing - 12),
+      Math.max(0, pick.card.source.profile.ratings.passing - 8),
     );
+  });
+  it('retains the frozen franchise season and canonical opponent overall without changing its effective profile', () => {
+    const setup = capRushTestSetup();
+    const bracket = setup.lockSources.bracket;
+    const opponent = bracket.opponents[0];
+    if (opponent === undefined) throw new Error('missing opponent');
+    const players = opponent.players.map((player) => ({ ...player, overall: 95 }));
+    const configured = {
+      ...setup,
+      lockSources: {
+        ...setup.lockSources,
+        bracket: {
+          ...bracket,
+          opponents: bracket.opponents.map((entry) =>
+            entry === opponent
+              ? { ...entry, seasonKey: seasonKeySchema.parse('2005-06'), players }
+              : entry,
+          ),
+        },
+      },
+    };
+    const before = canonicalJson(configured.lockSources.bracket);
+    const locked = lock(
+      configured,
+      buildCompleteState(configured, [10_000_000, 10_000_000, 10_000_000, 10_000_000, 10_000_000]),
+    ).state.locked;
+    const team = locked?.opponents.find((entry) => entry.opponentId === opponent.opponentId)?.team;
+    if (team === undefined) throw new Error('missing frozen opponent');
+    expect(canonicalJson(configured.lockSources.bracket)).toBe(before);
+    if (locked === null) throw new Error('missing locked inputs');
+    const original = lock(
+      setup,
+      buildCompleteState(setup, [10_000_000, 10_000_000, 10_000_000, 10_000_000, 10_000_000]),
+    ).state.locked;
+    if (original === null) throw new Error('missing original locked inputs');
+    const originalSimulation = simulateCapRushGame({
+      locked: original,
+      gameNumber: 1,
+      context: createEngineContext(),
+    });
+    const decoratedSimulation = simulateCapRushGame({
+      locked,
+      gameNumber: 1,
+      context: createEngineContext(),
+    });
+    expect(decoratedSimulation.result.home).toEqual(originalSimulation.result.home);
+    expect(decoratedSimulation.result.away).toEqual(originalSimulation.result.away);
+    expect(havocGameTapeDigest(decoratedSimulation.tape)).toBe(
+      havocGameTapeDigest(originalSimulation.tape),
+    );
+    for (const participant of [...team.starters, ...team.replacements]) {
+      const player = players.find((entry) => entry.playerId === participant.source.playerId);
+      if (player === undefined) throw new Error('missing source player');
+      expect(participant.source.originalOverall).toBe(95);
+      expect(participant.source.overallSource).toBe('catalog');
+      expect(participant.source.seasonKey).toBe('2005-06');
+      expect(participant.effective.ratings).toEqual(player.ratings);
+      expect(participant.effective.tendencies).toEqual(player.tendencies);
+    }
   });
 });

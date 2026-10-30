@@ -7,7 +7,7 @@
     formatPerGame,
     perGame,
     type RosterColumn,
-    type RosterDetailRow,
+    type RosterRow,
     type RosterListItem,
     type RosterSortDirection,
     type RosterSortId,
@@ -46,9 +46,9 @@
     visiblePlayers: number;
     filteredCount: number;
     onSort: (id: RosterSortId) => void;
-    onOpen: (player: RosterDetailRow) => void;
-    isCompared: (player: RosterDetailRow) => boolean;
-    onToggleCompare: (player: RosterDetailRow) => void;
+    onOpen: (player: RosterRow) => void;
+    isCompared: (player: RosterRow) => boolean;
+    onToggleCompare: (player: RosterRow) => void;
     compareFull: boolean;
     onShowMore: () => void;
     moreLabel?: string;
@@ -63,16 +63,16 @@
     const identity = resolveEraTeamIdentity(manifest, franchiseId, eraId);
     return identity.displayLabel ?? franchiseAbbreviation(franchiseId);
   }
-  function teamSlotFor(player: RosterDetailRow): string | null {
+  function teamSlotFor(player: RosterRow): string | null {
     return (
       manifest.modernFranchiseSlots.find((entry) => entry.franchiseId === player.franchiseId)
         ?.teamExternalId ?? null
     );
   }
-  function logoCandidatesFor(player: RosterDetailRow): string[] {
+  function logoCandidatesFor(player: RosterRow): string[] {
     return resolveEraTeamIdentity(manifest, player.franchiseId, player.eraId).logoCandidates ?? [];
   }
-  function compareLabel(player: RosterDetailRow): string {
+  function compareLabel(player: RosterRow): string {
     const added = isCompared(player);
     const suffix = !added && compareFull ? ' (comparison full)' : '';
     return `${added ? 'Remove' : 'Add'} ${player.displayName} to comparison${suffix}`;
@@ -81,7 +81,8 @@
     if (!hideBelow) return '';
     return hideBelow === 'md' ? 'hidden md:table-cell' : 'hidden lg:table-cell';
   }
-  function cellValue(player: RosterDetailRow, key: string): string {
+  function cellValue(player: RosterRow, key: string): string {
+    const stats = player.detail?.stats ?? null;
     switch (key) {
       case 'pos':
         return formatPositions(player.positionsPlayable);
@@ -92,19 +93,20 @@
       case 'overall':
         return String(player.overall);
       case 'games':
-        return String(player.stats.gamesPlayed);
+        return stats ? String(stats.gamesPlayed) : '…';
       case 'usage':
-        return player.stats.usageRate === null ? '—' : `${formatDecimal(player.stats.usageRate)}%`;
+        if (!stats) return '…';
+        return stats.usageRate === null ? '—' : `${formatDecimal(stats.usageRate)}%`;
       case 'points':
-        return formatPerGame(perGame(player.stats, 'points'));
+        return stats ? formatPerGame(perGame(stats, 'points')) : '…';
       case 'rebounds':
-        return formatPerGame(perGame(player.stats, 'rebounds'));
+        return stats ? formatPerGame(perGame(stats, 'rebounds')) : '…';
       case 'assists':
-        return formatPerGame(perGame(player.stats, 'assists'));
+        return stats ? formatPerGame(perGame(stats, 'assists')) : '…';
       case 'ts':
-        return formatPct(player.stats.tsPct);
+        return stats ? formatPct(stats.tsPct) : '…';
       case 'per':
-        return formatDecimal(player.stats.per);
+        return stats ? formatDecimal(stats.per) : '…';
       default:
         return '';
     }
@@ -330,19 +332,23 @@
             <span class="rounded px-1 py-0.5">
               <span class="block text-[10px] text-muted-foreground uppercase">PTS</span>
               <span class="text-stat block font-bold"
-                >{formatPerGame(perGame(player.stats, 'points'))}</span
+                >{player.detail ? formatPerGame(perGame(player.detail.stats, 'points')) : '…'}</span
               >
             </span>
             <span class="rounded px-1 py-0.5">
               <span class="block text-[10px] text-muted-foreground uppercase">REB</span>
               <span class="text-stat block font-bold"
-                >{formatPerGame(perGame(player.stats, 'rebounds'))}</span
+                >{player.detail
+                  ? formatPerGame(perGame(player.detail.stats, 'rebounds'))
+                  : '…'}</span
               >
             </span>
             <span class="rounded px-1 py-0.5">
               <span class="block text-[10px] text-muted-foreground uppercase">AST</span>
               <span class="text-stat block font-bold"
-                >{formatPerGame(perGame(player.stats, 'assists'))}</span
+                >{player.detail
+                  ? formatPerGame(perGame(player.detail.stats, 'assists'))
+                  : '…'}</span
               >
             </span>
           </div>

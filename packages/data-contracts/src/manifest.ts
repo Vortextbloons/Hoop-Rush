@@ -1,9 +1,24 @@
 import { z } from 'zod';
-import { contentHashSchema, eraIdSchema, franchiseIdSchema } from './ids.ts';
+import { simulationPlayerSchema } from './simulation.ts';
+import { contentHashSchema, eraIdSchema, franchiseIdSchema, seasonKeySchema } from './ids.ts';
 import { franchiseLineageSchema, modernFranchiseSlotSchema } from './franchise.ts';
 import { eraDefSchema } from './eras.ts';
 import { poolAvailabilitySchema } from './provenance.ts';
 import { MANIFEST_SCHEMA_VERSION } from './versions.ts';
+export const capRushRosterMetadataSchema = z.object({
+  fieldHash: contentHashSchema,
+  players: z
+    .array(
+      simulationPlayerSchema.pick({ playerId: true, ratings: true, tendencies: true }).extend({
+        teamId: franchiseIdSchema,
+        seasonKey: seasonKeySchema,
+        overall: z.number().int().min(0).max(100),
+      }),
+    )
+    .length(150),
+});
+export type CapRushRosterMetadata = z.infer<typeof capRushRosterMetadataSchema>;
+
 export const assetConfigSchema = z.object({
   headshotUrlTemplate: z.url().nullable(),
   headshotUrlTemplateSecondary: z.url().nullable(),
@@ -51,6 +66,8 @@ export const hoopRushManifestSchema = z.object({
   availability: z.array(poolAvailabilitySchema),
   eraSimulationProfiles: z.array(simProfileIndexEntrySchema),
   bracket: opponentIndexEntrySchema.optional(),
+  capRushBracket: opponentIndexEntrySchema.optional(),
+  capRushRosterMetadata: opponentIndexEntrySchema.optional(),
   playersIndex: playersIndexAssetSchema.optional(),
   rosterDetails: playersIndexAssetSchema.optional(),
   draftCatalog: seasonArtifactIndexEntrySchema.optional(),

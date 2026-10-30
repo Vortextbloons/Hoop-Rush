@@ -264,6 +264,12 @@ export class CapRushSession implements CapRushService {
     });
   }
 
+  async updatePlayback(game: number | string, cursor: number, resolved: boolean): Promise<void> {
+    if (this.draft === null)
+      throw new CapRushServiceError('invalid-phase', 'there is no active run');
+    await this.repository.updatePlayback(this.draft.runId, game, cursor, resolved);
+  }
+
   async acceptGame(game: CapRushAcceptedGame): Promise<void> {
     await this.dispatch(
       (state) =>
@@ -407,6 +413,12 @@ export class CapRushSession implements CapRushService {
   async loadBracket(): Promise<OpponentBracket> {
     try {
       const assets = await this.loadAssets();
+      const hash = this.draft?.versionSet.bracketHash;
+      if (hash !== undefined && hash !== assets.versionSet.bracketHash) {
+        if (this.assets.loadBracket === undefined)
+          throw new Error('the original opponent field is unavailable');
+        return await this.assets.loadBracket(hash);
+      }
       return assets.lockSources.bracket;
     } catch (error) {
       throw new CapRushServiceError('catalog', messageOf(error));
@@ -679,7 +691,8 @@ export class CapRushSession implements CapRushService {
       version.catalogHash !== current.catalogHash ||
       version.dataVersion !== current.dataVersion ||
       version.profileVersion !== current.profileVersion ||
-      version.bracketHash !== current.bracketHash ||
+      (version.bracketHash !== current.bracketHash &&
+        (state.locked === null || state.locked.versionSet.bracketHash !== version.bracketHash)) ||
       version.profileHash !== current.profileHash
     ) {
       throw new CapRushServiceError(

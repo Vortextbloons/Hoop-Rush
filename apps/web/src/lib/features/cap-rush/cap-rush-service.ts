@@ -9,7 +9,9 @@ import type {
 } from '@hoop-rush/data-contracts';
 import { newSeasonId, seasonRootSeed } from '#lib/ids.js';
 import { getPersistence } from '#lib/persistence.js';
-import { loadDraftCatalog } from '#lib/data-assets.js';
+import { capRushBracketWithRosterMetadata } from './cap-rush-opponent-metadata.js';
+import { loadCapRushRosterMetadata, loadDraftCatalog } from '#lib/data-assets.js';
+import { getBracket } from '#lib/data.js';
 import { loadRunPreamble } from '#lib/run-preamble.js';
 
 export interface CreateCapRushServiceOptions {
@@ -29,7 +31,30 @@ export function createCapRushService(options: CreateCapRushServiceOptions = {}):
     repository: options.repository ?? getPersistence().capRushRepository,
     assets: {
       loadCatalog: options.loadCatalog ?? loadDraftCatalog,
-      loadPreamble: options.loadPreamble ?? loadRunPreamble,
+      loadPreamble:
+        options.loadPreamble ??
+        (async () => {
+          const preamble = await loadRunPreamble();
+          const entry = preamble.manifest.capRushBracket;
+          if (entry === undefined) throw new Error('The Cap Rush opponent field is unavailable.');
+          return {
+            ...preamble,
+            manifest: { ...preamble.manifest, bracket: entry },
+            bracket: capRushBracketWithRosterMetadata(
+              await getBracket(entry),
+              await loadCapRushRosterMetadata(),
+              entry.contentHash,
+            ),
+          };
+        }),
+      loadBracket: async (hash) => {
+        const preamble = await loadRunPreamble();
+        const entry = [preamble.manifest.bracket, preamble.manifest.capRushBracket].find(
+          (candidate) => candidate?.contentHash === hash,
+        );
+        if (entry === undefined) throw new Error('The original opponent field is unavailable.');
+        return getBracket(entry);
+      },
     },
     ids: {
       newRunId: options.newRunId ?? (() => idSchema.parse(newSeasonId('cap-rush-run'))),

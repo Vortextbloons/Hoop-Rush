@@ -71,6 +71,7 @@ export class CapRushRunner {
     locked: CapRushLockedInputs;
     startGame: number;
     count: number;
+    includeTape?: boolean;
     handlers: CapRushRunnerHandlers;
   }): Promise<CapRushWorkerCompleteMessage> {
     if (this.active !== null) {
@@ -148,6 +149,7 @@ export class CapRushRunner {
         locked: input.locked,
         startGame: input.startGame,
         count: input.count,
+        includeTape: input.includeTape,
       });
     });
   }
@@ -224,6 +226,7 @@ export class CapRushRunner {
     requestId: string;
     locked: CapRushLockedInputs;
     games: readonly CapRushPlayoffGamePlan[];
+    includeTape?: boolean;
     handlers: {
       onGame: (message: CapRushWorkerPlayoffGameMessage) => void | Promise<void>;
       onError?: (message: { code: string; message: string; gameNumber: number | null }) => void;
@@ -301,6 +304,7 @@ export class CapRushRunner {
         requestId: input.requestId,
         locked: input.locked,
         games: input.games,
+        includeTape: input.includeTape,
       });
     });
   }

@@ -60,6 +60,21 @@ class MemoryCapRushRepository implements CapRushDraftRepositoryPort {
   readonly reports = new Map<string, CapRushReport>();
   readonly history: CapRushHistoryEntry[] = [];
 
+  async updatePlayback(
+    runId: string,
+    game: number | string,
+    cursor: number,
+    resolved: boolean,
+  ): Promise<void> {
+    const stored =
+      typeof game === 'number'
+        ? this.games.get(runId)?.find((entry) => entry.gameNumber === game)
+        : this.playoffGames.get(runId)?.find((entry) => entry.gameId === game);
+    if (stored?.playback === undefined) throw new Error('missing playback');
+    if (resolved) delete stored.playback;
+    else stored.playback.cursor = cursor;
+  }
+
   async loadActiveDraft(): Promise<CapRushDraftState | null> {
     if (this.loadError !== null) throw this.loadError;
     return this.active;
@@ -183,12 +198,32 @@ function createAssets() {
   };
 }
 
-function createSession(repository: CapRushDraftRepositoryPort) {
+function createSession(repository: CapRushDraftRepositoryPort, bracketHash?: string) {
   const { assets } = createAssets();
   let counter = 0;
   return new CapRushSession({
     repository,
-    assets,
+    assets:
+      bracketHash === undefined
+        ? assets
+        : {
+            ...assets,
+            loadPreamble: async () => {
+              const preamble = await assets.loadPreamble();
+              if (preamble.manifest.bracket === undefined)
+                throw new Error('missing fixture bracket');
+              return {
+                ...preamble,
+                manifest: {
+                  ...preamble.manifest,
+                  bracket: {
+                    ...preamble.manifest.bracket,
+                    contentHash: contentHashSchema.parse(bracketHash),
+                  },
+                },
+              };
+            },
+          },
     ids: {
       newRunId: () => 'run-test',
       newCommandId: () => {
@@ -343,10 +378,15 @@ describe('cap rush session', () => {
     const loaded = await resumed.loadActive();
     expect(loaded.draft?.draft.stage).toBe('locked');
     expect(loaded.draft?.draft.locked).toEqual(inputs);
+    const updatedField = createSession(repository, 'd'.repeat(64));
+    expect((await updatedField.loadActive()).draft?.draft.locked).toEqual(inputs);
+    expect((await updatedField.loadActive()).draft?.draft.versionSet.bracketHash).toBe(
+      inputs.versionSet.bracketHash,
+    );
     await expect(resumed.lockLineup()).rejects.toBeInstanceOf(CapRushServiceError);
   });
 
-  it('refuses to resume a locked run against a different bracket', async () => {
+  it('refuses a locked run whose version hash disagrees with its frozen inputs', async () => {
     const repository = new MemoryCapRushRepository();
     const session = createSession(repository);
     await session.createDraft('clash');

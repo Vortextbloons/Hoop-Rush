@@ -16,13 +16,13 @@ const LEGACY_DATABASE_NAME = 'hoop-rush-saves';
 afterEach(restoreIndexedDb);
 
 describe('storage namespace', () => {
-  it('opens the new namespace at version 11 with every store', async () => {
+  it('opens the new namespace at version 12 with every store', async () => {
     resetIndexedDb();
     const db = new HoopRushDatabase(testDatabaseName('namespace-new'));
     await db.open();
     expect(HOOP_RUSH_DATABASE_NAME).toBe('hoop-rush-saves-v2');
     expect(db.name).not.toBe(LEGACY_DATABASE_NAME);
-    expect(db.verno).toBe(11);
+    expect(db.verno).toBe(12);
     const tableNames = db.tables.map((table) => table.name).sort();
     expect(tableNames).toEqual(Object.keys(HOOP_RUSH_DATABASE_V11_STORES).sort());
     db.close();

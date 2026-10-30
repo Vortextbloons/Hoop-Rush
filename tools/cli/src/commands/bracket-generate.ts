@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
   generateBracket,
+  ENGINE_VERSION,
   createEngineContext,
   simulateGame,
   toSimulationPlayer,
@@ -12,6 +13,7 @@ import {
 } from '@hoop-rush/engine';
 import {
   REQUIRED_RATING_KEYS,
+  capRushRosterMetadataSchema,
   contentHashSchema,
   seedSchema,
   seedFromString,
@@ -212,9 +214,21 @@ export function buildCandidateCatalog(
   verbose: boolean,
   seasonSeed: string,
   benchmark: { team: SimulationTeam; profile: EraSimulationProfile; context: EngineContext },
+  field: 'shared' | 'cap-rush' = 'shared',
 ): {
   candidates: FranchiseCandidates[];
   details: string[];
+  evidence: {
+    sources: Record<string, string>;
+    candidates: {
+      franchiseId: string;
+      season: string;
+      wins: number;
+      games: number;
+      targetWinRate: number;
+      playerIds: string[];
+    }[];
+  };
 } {
   const seasonDirs = [
     '1990-91',
@@ -254,11 +268,25 @@ export function buildCandidateCatalog(
     '2024-25',
     '2025-26',
   ];
+  const evidence = {
+    sources: {} as Record<string, string>,
+    candidates: [] as {
+      franchiseId: string;
+      season: string;
+      wins: number;
+      games: number;
+      targetWinRate: number;
+      playerIds: string[];
+    }[],
+  };
   const rosterBySeason = new Map<string, Map<string, RosterPlayer>>();
   for (const season of seasonDirs) {
     let roster: unknown[];
     try {
       roster = readJson(resolve(NBA_ROOT, season, 'roster.json')) as unknown[];
+      evidence.sources[`${season}/roster.json`] = sha256Hex(
+        readFileSync(resolve(NBA_ROOT, season, 'roster.json')),
+      );
     } catch {
       continue;
     }
@@ -297,6 +325,9 @@ export function buildCandidateCatalog(
       let stints: Stint[];
       try {
         stints = readJson(resolve(NBA_ROOT, season, 'stints.json')) as unknown[] as Stint[];
+        evidence.sources[`${season}/stints.json`] = sha256Hex(
+          readFileSync(resolve(NBA_ROOT, season, 'stints.json')),
+        );
       } catch {
         continue;
       }
@@ -353,7 +384,7 @@ export function buildCandidateCatalog(
       manifest.modernFranchiseSlots.map((franchise) => franchise.franchiseId),
       createRng(`${seasonSeed}:absolute-tiers`),
     ).indexOf(slot.franchiseId);
-    const targetWinRate = 0.005 + (rank / 29) * 0.06;
+    const targetWinRate = (field === 'cap-rush' ? 0.035 : 0.005) + (rank / 29) * 0.06;
     let chosenSeason: string | undefined;
     let bestGap = Infinity;
     for (const season of seasonOrder) {
@@ -391,6 +422,14 @@ export function buildCandidateCatalog(
         );
         if (result.winner === (homeFirst ? 'home' : 'away')) wins += 1;
       }
+      evidence.candidates.push({
+        franchiseId: slot.franchiseId,
+        season,
+        wins,
+        games,
+        targetWinRate,
+        playerIds: five.map((player) => player.playerId),
+      });
       const gap = Math.abs(wins / games - targetWinRate);
       if (gap < bestGap) {
         bestGap = gap;
@@ -419,7 +458,7 @@ export function buildCandidateCatalog(
     }
   }
 
-  return { candidates, details };
+  return { candidates, details, evidence };
 }
 
 export function bracketGenerate(args: {
@@ -431,7 +470,12 @@ export function bracketGenerate(args: {
   verbose?: boolean;
   opponentsDir?: string;
   manifestPath?: string;
+  field?: string;
 }): CliReport {
+  if (args.field !== undefined && args.field !== 'shared' && args.field !== 'cap-rush') {
+    throw new UsageError('--field must be shared or cap-rush');
+  }
+  const field = args.field ?? 'shared';
   const rawSeed = args.seed ?? COMMITTED_GENERATION_SEED;
   const parsedSeed = seedSchema.safeParse(rawSeed);
   if (!parsedSeed.success) {
@@ -447,7 +491,7 @@ export function bracketGenerate(args: {
   const minScore = parseCount(args['min-score'], '--min-score', 45);
   const dataVersion = args['data-version'];
   const difficulty: DifficultyProfile = { ...SINGLE_DIFFICULTY };
-  const generationVersion = GENERATION_VERSION;
+  const generationVersion = field === 'cap-rush' ? 'cap-rush-field-v1' : GENERATION_VERSION;
   const packaged = loadPackagedData();
   const manifest = packaged.manifest;
   const data = new PackagedData(packaged.manifest, packaged.dir);
@@ -457,15 +501,21 @@ export function bracketGenerate(args: {
     "Stephen Curry@warriors,Michael Jordan@bulls,LeBron James@cavaliers,Tim Duncan@spurs,Shaquille O'Neal@lakers",
     data,
   );
-  const { candidates, details } = buildCandidateCatalog(manifest, args.verbose === true, seed, {
-    team: {
-      teamId: 'legendary-reference',
-      displayName: 'Legendary reference',
-      players: reference.map(toSimulationPlayer),
+  const { candidates, details, evidence } = buildCandidateCatalog(
+    manifest,
+    args.verbose === true,
+    seed,
+    {
+      team: {
+        teamId: 'legendary-reference',
+        displayName: 'Legendary reference',
+        players: reference.map(toSimulationPlayer),
+      },
+      profile,
+      context,
     },
-    profile,
-    context,
-  });
+    field,
+  );
   const opponentsDir = args.opponentsDir ?? OPPONENTS_DIR;
 
   let bracket: OpponentBracket;
@@ -492,19 +542,57 @@ export function bracketGenerate(args: {
     );
   }
 
-  const outFile = args.out ?? 'bracket.json';
+  const outFile = args.out ?? (field === 'cap-rush' ? 'cap-rush-field.json' : 'bracket.json');
   const outPath = resolve(opponentsDir, outFile);
   writeFileSync(outPath, `${JSON.stringify(bracket, null, 2)}\n`, 'utf8');
   const contentHash = contentHashSchema.parse(sha256Hex(readFileSync(outPath)));
+  if (field === 'cap-rush') {
+    writeFileSync(
+      resolve(opponentsDir, 'cap-rush-field-selection.json'),
+      `${JSON.stringify({ generationVersion, seed, contentHash, engineVersion: ENGINE_VERSION, profileVersion: profile.profileVersion, profileHash: manifest.eraSimulationProfiles.find((entry) => entry.eraId === profile.eraId)?.contentHash, dataVersion: manifest.dataVersion, reference, eligibility: '1990-91 through 2025-26; >=20 franchise games; legal cornerstone/rotation five; global player uniqueness in manifest order', objective: 'nearest measured win rate to 0.035 + tierRank/29 * 0.06', tieBreaking: 'first in seeded shuffled season order', selectionSeeds: '<generation seed>:absolute-fit:<franchise>:<season>:<game>', gamesPerCandidate: 160, evidence }, null, 2)}\n`,
+      'utf8',
+    );
+  }
+  const metadataPath = resolve(opponentsDir, 'cap-rush-roster-metadata.json');
+  if (field === 'cap-rush') {
+    const metadata = capRushRosterMetadataSchema.parse({
+      fieldHash: contentHash,
+      players: bracket.opponents.flatMap((opponent) => {
+        const roster = readJson(
+          resolve(NBA_ROOT, opponent.seasonKey, 'roster.json'),
+        ) as RosterPlayer[];
+        return opponent.players.map((player) => {
+          const source = roster.find((row) => `p-${row.externalId}` === player.playerId);
+          if (source?.summaryRatings === null || source?.summaryRatings === undefined)
+            throw new Error(`missing canonical Overall for ${player.playerId}`);
+          return {
+            teamId: opponent.teamId,
+            seasonKey: opponent.seasonKey,
+            playerId: player.playerId,
+            overall: source.summaryRatings.overallRating,
+            ratings: player.ratings,
+            tendencies: player.tendencies,
+          };
+        });
+      }),
+    });
+    writeFileSync(metadataPath, `${JSON.stringify(metadata, null, 2)}\n`, 'utf8');
+  }
   const manifestPath = args.manifestPath ?? MANIFEST_PATH;
   const nextManifest = { ...manifest } as HoopRushManifest & {
     opponents?: unknown;
     bracketCasual?: unknown;
   };
+  if (field === 'cap-rush') {
+    nextManifest.capRushRosterMetadata = {
+      url: 'opponents/cap-rush-roster-metadata.json',
+      contentHash: contentHashSchema.parse(sha256Hex(readFileSync(metadataPath))),
+    };
+  }
   delete nextManifest.opponents;
   delete nextManifest.bracketCasual;
-  nextManifest.bracket = {
-    url: 'opponents/bracket.json',
+  nextManifest[field === 'cap-rush' ? 'capRushBracket' : 'bracket'] = {
+    url: `opponents/${outFile}`,
     contentHash,
   };
   writeFileSync(manifestPath, `${JSON.stringify(nextManifest, null, 2)}\n`, 'utf8');

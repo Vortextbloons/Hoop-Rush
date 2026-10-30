@@ -7,6 +7,8 @@ import {
   type CapRushStoredGame,
   type CapRushStoredPlayoffGame,
   type CapRushWorkerGameMessage,
+  type CapRushPlayback,
+  type HavocGameResult,
 } from '@hoop-rush/data-contracts';
 import {
   CapRushServiceError,
@@ -18,6 +20,8 @@ import {
   capRushBoxOf,
   capRushLeagueFieldOfLocked,
   capRushUserLeagueGameOf,
+  soloToBattleInput,
+  soloToBattleTape,
 } from '@hoop-rush/engine';
 import { newRequestId } from '#lib/ids.js';
 import type { CapRushRunner } from './cap-rush-runner.ts';
@@ -44,6 +48,12 @@ export class CapRushSeasonController {
   error = $state<string | null>(null);
   notice = $state<string | null>(null);
   unsupported = $state(false);
+  playback = $state.raw<{
+    game: number | string;
+    evidence: CapRushPlayback;
+    result: HavocGameResult;
+  } | null>(null);
+  playbackSaving = $state(false);
 
   private readonly service: CapRushService;
   private readonly runner: CapRushRunner;
@@ -53,6 +63,10 @@ export class CapRushSeasonController {
   constructor(service: CapRushService, runner: CapRushRunner) {
     this.service = service;
     this.runner = runner;
+  }
+
+  private hasPendingPlayback(): boolean {
+    return this.playback !== null;
   }
 
   private isDestroyed(): boolean {
@@ -89,6 +103,23 @@ export class CapRushSeasonController {
         this.aiLeagueGames = [];
         this.leagueGames = [];
       }
+      const regular = this.games.find((game) => game.playback !== undefined);
+      const playoff = this.playoffGames.find((game) => game.playback !== undefined);
+      if (regular?.playback !== undefined) {
+        this.playback = {
+          game: regular.gameNumber,
+          evidence: regular.playback,
+          result: regular.result,
+        };
+      } else if (playoff?.playback !== undefined && playoff.result !== null) {
+        this.playback = {
+          game: playoff.gameId,
+          evidence: playoff.playback,
+          result: playoff.result,
+        };
+      } else {
+        this.playback = null;
+      }
     } catch (error) {
       if (!this.isDestroyed()) {
         this.error = errorMessageOf(error);
@@ -102,7 +133,7 @@ export class CapRushSeasonController {
 
   async playSeason(): Promise<boolean> {
     const view = this.draft;
-    if (this.busy || this.isDestroyed()) return false;
+    if (this.hasPendingPlayback() || this.busy || this.isDestroyed()) return false;
     if (view === null || view.draft.locked === null || view.draft.stage !== 'locked') return false;
     if (view.season !== null && view.season.completedAt !== null) {
       this.notice = 'The season is already complete.';
@@ -167,10 +198,16 @@ export class CapRushSeasonController {
 
   async playNextGame(): Promise<boolean> {
     const view = this.draft;
-    if (this.busy || this.isDestroyed() || view === null || view.draft.locked === null)
+    if (
+      this.playback !== null ||
+      this.busy ||
+      this.isDestroyed() ||
+      view === null ||
+      view.draft.locked === null
+    )
       return false;
     if (view.draft.stage === 'postseason') {
-      return this.simulatePostseasonBatch();
+      return this.simulatePostseasonBatch(true);
     }
     if (view.draft.stage !== 'locked') return false;
     if (view.season !== null && view.season.completedAt !== null) {
@@ -185,11 +222,16 @@ export class CapRushSeasonController {
     try {
       const complete = await this.runner.simulate({
         requestId: newRequestId('cap-rush-game'),
+        includeTape: true,
         locked: view.draft.locked,
         startGame: start,
         count: 1,
         handlers: {
-          onGame: (message) => this.acceptUserGame(message),
+          onGame: (message) => {
+            if (message.playback === undefined)
+              throw new Error('The game has no recorded broadcast. Retry the game.');
+            return this.acceptUserGame(message);
+          },
           onError: (message) => {
             if (!this.isDestroyed()) this.error = message.message;
           },
@@ -202,8 +244,12 @@ export class CapRushSeasonController {
         this.notice = 'The game did not finish. Accepted results are saved.';
         return false;
       }
-      if (this.draft?.season !== null && this.draft?.season.completedAt === null) {
-        const played = this.draft?.season.games.length ?? 0;
+      if (
+        !this.hasPendingPlayback() &&
+        this.draft?.season !== null &&
+        this.draft?.season.completedAt === null
+      ) {
+        const played = this.draft.season.games.length;
         if (played === CAP_RUSH_GAME_COUNT) await this.service.finalizeSeason();
         if (this.isDestroyed()) return false;
         await this.load();
@@ -221,7 +267,8 @@ export class CapRushSeasonController {
   }
 
   async simSeries(): Promise<boolean> {
-    if (this.busy || this.isDestroyed() || this.draft === null) return false;
+    if (this.hasPendingPlayback() || this.busy || this.isDestroyed() || this.draft === null)
+      return false;
     if (this.draft.draft.stage !== 'postseason') return false;
     this.busy = true;
     this.cancelling = false;
@@ -277,7 +324,8 @@ export class CapRushSeasonController {
   }
 
   async advancePostseason(): Promise<boolean> {
-    if (this.busy || this.isDestroyed() || this.draft === null) return false;
+    if (this.hasPendingPlayback() || this.busy || this.isDestroyed() || this.draft === null)
+      return false;
     if (this.draft.draft.stage === 'locked') {
       if (this.draft.season === null || this.draft.season.games.length !== CAP_RUSH_GAME_COUNT) {
         return false;
@@ -302,8 +350,9 @@ export class CapRushSeasonController {
     return this.simulatePostseasonBatch();
   }
 
-  private async simulatePostseasonBatch(): Promise<boolean> {
-    if (this.busy || this.isDestroyed() || this.draft === null) return false;
+  private async simulatePostseasonBatch(broadcast = false): Promise<boolean> {
+    if (this.hasPendingPlayback() || this.busy || this.isDestroyed() || this.draft === null)
+      return false;
     this.busy = true;
     this.cancelling = false;
     this.error = null;
@@ -331,7 +380,12 @@ export class CapRushSeasonController {
           this.notice = 'The bracket is waiting on an accepted result. Reopen the run to resume.';
           return false;
         }
-        const userGames = await this.simulatePlayoffBatch(step.games);
+        const userPlan = broadcast ? step.games.find((game) => game.userSide !== null) : undefined;
+        const userGames = await this.simulatePlayoffBatch(
+          userPlan === undefined ? step.games : [userPlan],
+          { broadcast: userPlan !== undefined },
+        );
+        if (this.playback !== null) return false;
         if (this.isDestroyed() || userGames === null) return false;
         const outcome = this.draft.postseason?.userOutcome.status ?? 'pending';
         if (userGames > 0 && outcome !== 'eliminated' && outcome !== 'not-qualified') {
@@ -449,10 +503,33 @@ export class CapRushSeasonController {
         summary: message.summary,
         audit: message.audit,
         result: message.result,
+        ...(message.playback === undefined
+          ? {}
+          : {
+              playback: {
+                input: soloToBattleInput(message.playback.input),
+                tape: soloToBattleTape(message.playback.tape, message.result.humanSide),
+                facts: message.playback.facts,
+                cursor: 0,
+              },
+            }),
       },
       ...(message.leagueGames === undefined ? {} : { leagueGames: message.leagueGames }),
     });
     if (this.isDestroyed()) return;
+    if (message.playback !== undefined) {
+      this.playback = {
+        game: message.cursor,
+        result: message.result,
+        evidence: {
+          input: soloToBattleInput(message.playback.input),
+          tape: soloToBattleTape(message.playback.tape, message.result.humanSide),
+          facts: message.playback.facts,
+          cursor: 0,
+        },
+      };
+      return;
+    }
     this.games = [
       ...this.games.filter((game) => game.gameNumber !== message.cursor),
       {
@@ -499,7 +576,7 @@ export class CapRushSeasonController {
 
   private async simulatePlayoffBatch(
     games: readonly CapRushPlayoffGamePlan[],
-    options: { stopWhenUserSeriesComplete?: boolean } = {},
+    options: { stopWhenUserSeriesComplete?: boolean; broadcast?: boolean } = {},
   ): Promise<number | null> {
     const view = this.draft;
     if (view === null || view.draft.locked === null) {
@@ -508,14 +585,33 @@ export class CapRushSeasonController {
     let userGames = 0;
     const complete = await this.runner.simulatePlayoffs({
       requestId: newRequestId('cap-rush-playoffs'),
+      includeTape: options.broadcast === true,
       locked: view.draft.locked,
       games,
       handlers: {
         onGame: async (message) => {
-          await this.service.acceptPlayoffGame({
-            summary: message.game.summary,
-            stored: message.game,
-          });
+          if (
+            options.broadcast === true &&
+            (message.playback === undefined || message.game.result === null)
+          ) {
+            throw new Error('The playoff game has no recorded broadcast. Retry the game.');
+          }
+          const stored =
+            message.playback === undefined
+              ? message.game
+              : {
+                  ...message.game,
+                  playback: { ...message.playback, cursor: 0 },
+                };
+          await this.service.acceptPlayoffGame({ summary: stored.summary, stored });
+          if (stored.playback !== undefined && stored.result !== null) {
+            this.playback = {
+              game: stored.gameId,
+              evidence: stored.playback,
+              result: stored.result,
+            };
+            return;
+          }
           if (this.isDestroyed()) return;
           if (message.game.summary.userSide !== null) userGames += 1;
           this.playoffGames = [
@@ -542,7 +638,7 @@ export class CapRushSeasonController {
   }
 
   async finalizeSeason(): Promise<boolean> {
-    if (this.draft === null || this.isDestroyed()) return false;
+    if (this.hasPendingPlayback() || this.draft === null || this.isDestroyed()) return false;
     try {
       const report = await this.service.finalizeSeason();
       if (this.isDestroyed()) return false;
@@ -553,6 +649,53 @@ export class CapRushSeasonController {
     } catch (error) {
       if (!this.isDestroyed()) this.error = errorMessageOf(error);
       return false;
+    }
+  }
+
+  async seekPlayback(cursor: number): Promise<void> {
+    const playback = this.playback;
+    if (playback === null || this.playbackSaving || this.isDestroyed()) return;
+    this.playbackSaving = true;
+    this.error = null;
+    try {
+      await this.service.updatePlayback(playback.game, cursor, false);
+      if (!this.isDestroyed())
+        this.playback = { ...playback, evidence: { ...playback.evidence, cursor } };
+    } catch (error) {
+      if (!this.isDestroyed()) this.error = errorMessageOf(error);
+    } finally {
+      if (!this.isDestroyed()) this.playbackSaving = false;
+    }
+  }
+
+  async finishPlayback(): Promise<void> {
+    const playback = this.playback;
+    if (playback === null || this.playbackSaving || this.isDestroyed()) return;
+    const total = playback.evidence.tape.events.length + playback.evidence.tape.scoring.length;
+    if (playback.evidence.cursor !== total) return;
+    this.playbackSaving = true;
+    this.error = null;
+    try {
+      await this.service.updatePlayback(playback.game, total, true);
+      if (this.isDestroyed()) return;
+      this.playback = null;
+      await this.load();
+      if (this.isDestroyed()) return;
+      if (
+        this.draft?.draft.stage === 'locked' &&
+        this.draft.season?.games.length === CAP_RUSH_GAME_COUNT
+      ) {
+        await this.service.finalizeSeason();
+        await this.load();
+      }
+      const outcome = this.draft?.postseason?.userOutcome.status;
+      if (!this.isDestroyed() && (outcome === 'eliminated' || outcome === 'not-qualified')) {
+        await this.simulatePostseasonBatch();
+      }
+    } catch (error) {
+      if (!this.isDestroyed()) this.error = errorMessageOf(error);
+    } finally {
+      if (!this.isDestroyed()) this.playbackSaving = false;
     }
   }
 

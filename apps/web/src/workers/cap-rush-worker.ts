@@ -52,6 +52,7 @@ async function simulate(
     locked: Parameters<typeof simulateCapRushGame>[0]['locked'];
     startGame: number;
     count: number;
+    includeTape?: boolean;
   },
   signal: { cancelled: boolean },
 ): Promise<void> {
@@ -127,6 +128,9 @@ async function simulate(
       summary: simulation.summary,
       audit: simulation.audit,
       result: simulation.result,
+      ...(request.includeTape && request.count === 1
+        ? { playback: { input: simulation.input, tape: simulation.tape, facts: simulation.facts } }
+        : {}),
       ...(leagueGames === undefined ? {} : { leagueGames }),
     });
     delivered += 1;
@@ -208,6 +212,7 @@ async function simulatePlayoffs(
     requestId: string;
     locked: CapRushLockedInputs;
     games: CapRushPlayoffGamePlan[];
+    includeTape?: boolean;
   },
   signal: { cancelled: boolean },
 ): Promise<void> {
@@ -250,6 +255,17 @@ async function simulatePlayoffs(
       type: 'cap-rush-playoff-game',
       requestId: request.requestId,
       game: simulation.game,
+      ...(request.includeTape &&
+      request.games.length === 1 &&
+      simulation.game.summary.userSide !== null
+        ? {
+            playback: {
+              input: simulation.battleInput,
+              tape: simulation.tape,
+              facts: simulation.facts,
+            },
+          }
+        : {}),
     });
     delivered += 1;
     await sleep(0);

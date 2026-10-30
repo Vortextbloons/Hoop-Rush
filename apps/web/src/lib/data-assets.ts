@@ -1,5 +1,7 @@
 import {
   parseProjectionModelArtifact,
+  capRushRosterMetadataSchema,
+  type CapRushRosterMetadata,
   parseSeasonDraftCatalog,
   type ProjectionModelArtifact,
   type SeasonDraftCatalog,
@@ -23,5 +25,15 @@ export function loadProjectionModel(): Promise<ProjectionModelArtifact> {
     parse: (value: unknown) => parseProjectionModelArtifact(value),
     find: (manifest) => manifest.projection?.model ?? null,
     missingMessage: 'The projection model artifact is unavailable.',
+  });
+}
+
+export function loadCapRushRosterMetadata(): Promise<CapRushRosterMetadata> {
+  return loadManifestAsset({
+    key: 'cap-rush/roster-metadata',
+    label: 'Cap Rush roster metadata',
+    parse: (value: unknown) => capRushRosterMetadataSchema.parse(value),
+    find: (manifest) => manifest.capRushRosterMetadata ?? null,
+    missingMessage: 'The Cap Rush roster metadata is unavailable.',
   });
 }

@@ -17,15 +17,17 @@
     getPlayersIndex,
     getRosterDetails,
   } from '#lib/data.js';
+  import { LITE_TOGGLE_EVENT, deferIdle, isLiteMode } from '#lib/device-capabilities.js';
   import { DETAILED_POSITIONS } from '#lib/player-positions.js';
   import {
     defaultDirection,
     filterRoster,
     paginateGroupedRows,
+    sortNeedsDetails,
     sortRoster,
     type RosterColumn,
-    type RosterDetailRow,
     type RosterListItem,
+    type RosterRow,
     type RosterSortDirection,
     type RosterSortId,
   } from '#lib/roster-browser.js';
@@ -42,7 +44,7 @@
     playerDetailModule ??= import('#lib/components/PlayerDetailDialog.svelte');
     return playerDetailModule;
   }
-  type IndexRow = RosterDetailRow;
+  type IndexRow = RosterRow;
   const SORT_OPTIONS: {
     id: RosterSortId;
     label: string;
@@ -60,7 +62,8 @@
     { id: 'position', label: 'Position' },
   ];
   const POSITION_OPTIONS = DETAILED_POSITIONS;
-  const PAGE_SIZE = 120;
+  const DEFAULT_PAGE_SIZE = 120;
+  const LITE_PAGE_SIZE = 60;
   const SEARCH_DEBOUNCE_MS = 150;
   let manifest = $state.raw<HoopRushManifest | null>(null);
   let manifestError: string | null = $state(null);
@@ -68,6 +71,9 @@
   let indexError: string | null = $state(null);
   let details = $state.raw<RosterDetails | null>(null);
   let detailsError: string | null = $state(null);
+  let detailsLoading = $state(false);
+  let liteActive = $state(false);
+  const pageSize = $derived(liteActive ? LITE_PAGE_SIZE : DEFAULT_PAGE_SIZE);
   let franchiseId = $state('');
   let eraId = $state('');
   let positionFilter = $state<'PG' | 'SG' | 'SF' | 'PF' | 'C' | null>(null);
@@ -75,9 +81,19 @@
   let search = $state('');
   let sortId = $state<RosterSortId>('none');
   let sortDir = $state<RosterSortDirection>('asc');
-  let visibleCount = $state(PAGE_SIZE);
-  let dialogPlayer = $state<IndexRow | null>(null);
-  let compareSelection = $state<IndexRow[]>([]);
+  let visibleCount = $state(DEFAULT_PAGE_SIZE);
+  let dialogKey = $state<string | null>(null);
+  let compareKeys = $state<string[]>([]);
+  let detailsRequest: Promise<void> | null = null;
+  let dataGeneration = 0;
+  $effect(() => {
+    const syncLite = () => {
+      liteActive = isLiteMode();
+    };
+    syncLite();
+    window.addEventListener(LITE_TOGGLE_EVENT, syncLite);
+    return () => window.removeEventListener(LITE_TOGGLE_EVENT, syncLite);
+  });
   $effect(() => {
     const raw = searchInput;
     const timeout = setTimeout(() => {
@@ -85,45 +101,81 @@
     }, SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(timeout);
   });
+  function rowKey(entry: {
+    playerId: string;
+    franchiseId: string;
+    eraId: string;
+    seasonKey: string;
+  }): string {
+    return `${entry.playerId}/${entry.franchiseId}/${entry.eraId}/${entry.seasonKey}`;
+  }
   function loadRosterData() {
+    const generation = (dataGeneration += 1);
     manifestError = null;
     indexError = null;
     detailsError = null;
+    detailsLoading = false;
+    detailsRequest = null;
     manifest = null;
     index = null;
     details = null;
-    let cancelled = false;
+    const current = () => generation === dataGeneration;
     getManifest().then(
       (m) => {
-        if (cancelled) return;
-        manifest = m;
+        if (current()) manifest = m;
       },
       (error: unknown) => {
-        if (!cancelled) manifestError = error instanceof Error ? error.message : String(error);
+        if (current()) manifestError = error instanceof Error ? error.message : String(error);
       },
     );
     getPlayersIndex().then(
       (ix) => {
-        if (cancelled) return;
-        index = ix;
+        if (current()) index = ix;
       },
       (error: unknown) => {
-        if (!cancelled) indexError = error instanceof Error ? error.message : String(error);
+        if (current()) indexError = error instanceof Error ? error.message : String(error);
       },
     );
-    getRosterDetails().then(
+  }
+  function ensureDetails(): Promise<void> {
+    if (details !== null) return Promise.resolve();
+    if (detailsRequest !== null) return detailsRequest;
+    const generation = dataGeneration;
+    detailsLoading = true;
+    detailsError = null;
+    const request = getRosterDetails().then(
       (det) => {
-        if (cancelled) return;
+        if (generation !== dataGeneration) return;
         details = det;
+        detailsLoading = false;
+        detailsRequest = null;
       },
       (error: unknown) => {
-        if (!cancelled) detailsError = error instanceof Error ? error.message : String(error);
+        if (generation !== dataGeneration) return;
+        detailsError = error instanceof Error ? error.message : String(error);
+        detailsLoading = false;
+        detailsRequest = null;
       },
     );
+    detailsRequest = request;
+    return request;
+  }
+  $effect(() => {
+    if (!manifest || !index || details !== null || detailsRequest !== null) return;
+    let cancelled = false;
+    deferIdle(() => {
+      if (!cancelled) void ensureDetails();
+    }, 250);
     return () => {
       cancelled = true;
     };
-  }
+  });
+  $effect(() => {
+    if (dialogKey !== null && details === null) void ensureDetails();
+  });
+  $effect(() => {
+    if (compareKeys.length >= 2 && details === null) void ensureDetails();
+  });
   $effect(() => loadRosterData());
   function retryRosterData() {
     clearDataLoaderCaches();
@@ -153,21 +205,20 @@
       (manifest?.modernFranchiseSlots ?? []).map((e) => [e.franchiseId, e.displayName]),
     ),
   );
+  const detailsByKey = $derived.by(() => {
+    const byKey = new Map<string, RosterDetailsEntry>();
+    if (details) {
+      for (const entry of details.players) byKey.set(rowKey(entry), entry);
+    }
+    return byKey;
+  });
   const rosterRows = $derived.by((): IndexRow[] => {
-    if (!index || !details) return [];
-    const byKey = new SvelteMap<string, RosterDetailsEntry>();
-    for (const entry of details.players) {
-      byKey.set(`${entry.playerId}/${entry.franchiseId}/${entry.eraId}/${entry.seasonKey}`, entry);
-    }
-    const rows: IndexRow[] = [];
-    for (const player of index.players) {
-      const detail = byKey.get(
-        `${player.playerId}/${player.franchiseId}/${player.eraId}/${player.seasonKey}`,
-      );
-      if (!detail) continue;
-      rows.push({ ...player, ...detail });
-    }
-    return rows;
+    if (!index) return [];
+    const byKey = detailsByKey;
+    return index.players.map((player) => ({
+      ...player,
+      detail: byKey.get(rowKey(player)) ?? null,
+    }));
   });
   const filteredRows = $derived.by(() => {
     return filterRoster(rosterRows, {
@@ -177,7 +228,10 @@
       query: search,
     });
   });
-  const sortedRows = $derived.by(() => sortRoster(filteredRows, sortId, sortDir));
+  const sortedRows = $derived.by(() => {
+    if (sortNeedsDetails(sortId) && details === null) return [];
+    return sortRoster(filteredRows, sortId, sortDir);
+  });
   const visibleItems = $derived.by((): RosterListItem<IndexRow>[] => {
     if (sortId !== 'none') {
       return sortedRows.slice(0, visibleCount).map((player) => ({ type: 'player', player }));
@@ -187,8 +241,8 @@
   const hasMore = $derived(filteredRows.length > visibleCount);
   const visiblePlayers = $derived(Math.min(visibleCount, filteredRows.length));
   $effect(() => {
-    void [franchiseId, eraId, positionFilter, search, sortId, sortDir];
-    visibleCount = PAGE_SIZE;
+    void [franchiseId, eraId, positionFilter, search, sortId, sortDir, pageSize];
+    visibleCount = pageSize;
   });
   function selectFranchise(id: string) {
     franchiseId = id;
@@ -197,6 +251,7 @@
     eraId = id;
   }
   function chooseSort(id: RosterSortId) {
+    if (sortNeedsDetails(id) && details === null) void ensureDetails();
     if (id === sortId && id !== 'none') {
       sortDir = sortDir === 'asc' ? 'desc' : 'asc';
       return;
@@ -204,35 +259,38 @@
     sortId = id;
     sortDir = defaultDirection(id);
   }
+  const rowsByKey = $derived(new Map(rosterRows.map((row) => [comparisonKey(row), row] as const)));
+  const dialogPlayer = $derived(dialogKey === null ? null : (rowsByKey.get(dialogKey) ?? null));
+  const compareSelection = $derived(
+    compareKeys
+      .map((key) => rowsByKey.get(key))
+      .filter((row): row is IndexRow => row !== undefined),
+  );
   function openPlayer(player: IndexRow) {
-    dialogPlayer = player;
+    dialogKey = comparisonKey(player);
   }
   function closePlayer() {
-    dialogPlayer = null;
+    dialogKey = null;
   }
   function toggleCompare(player: IndexRow) {
-    const existing = compareSelection.findIndex(
-      (entry) => comparisonKey(entry) === comparisonKey(player),
-    );
-    if (existing >= 0) {
-      compareSelection = compareSelection.filter(
-        (entry) => comparisonKey(entry) !== comparisonKey(player),
-      );
+    const key = comparisonKey(player);
+    if (compareKeys.includes(key)) {
+      compareKeys = compareKeys.filter((entry) => entry !== key);
       return;
     }
-    if (compareSelection.length < 2) compareSelection = [...compareSelection, player];
+    if (compareKeys.length < 2) compareKeys = [...compareKeys, key];
   }
   function comparisonKey(player: IndexRow): string {
     return `${player.franchiseId}/${player.eraId}/${player.playerId}`;
   }
   function isCompared(player: IndexRow): boolean {
-    return compareSelection.some((entry) => comparisonKey(entry) === comparisonKey(player));
+    return compareKeys.includes(comparisonKey(player));
   }
   function removeCompare(key: string) {
-    compareSelection = compareSelection.filter((entry) => comparisonKey(entry) !== key);
+    compareKeys = compareKeys.filter((entry) => entry !== key);
   }
   function clearCompare() {
-    compareSelection = [];
+    compareKeys = [];
   }
   onDestroy(clearCompare);
   const eraIdentity = $derived(
@@ -575,7 +633,41 @@
           </div>
         </div>
 
-        {#if filteredRows.length === 0}
+        {#if detailsError}
+          <div
+            class="flex flex-col gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <p class="text-xs text-destructive">
+              Detailed stats unavailable. Basic player info is still available.
+            </p>
+            <button
+              type="button"
+              onclick={() => void ensureDetails()}
+              class="self-start rounded-md border border-destructive/40 px-3 py-1.5 font-mono text-xs font-bold text-destructive outline-none transition-colors hover:border-destructive focus-visible:ring-2 focus-visible:ring-ring sm:self-auto"
+            >
+              Retry
+            </button>
+          </div>
+        {/if}
+
+        {#if sortNeedsDetails(sortId) && details === null}
+          <div class="p-2">
+            {#if detailsLoading}
+              <AsyncState
+                kind="loading"
+                title="Loading player stats…"
+                message="This sort needs detailed stats."
+              />
+            {:else}
+              <AsyncState
+                kind="error"
+                title="Player stats unavailable"
+                message={detailsError ?? 'Detailed stats could not load.'}
+                retry={() => void ensureDetails()}
+              />
+            {/if}
+          </div>
+        {:else if filteredRows.length === 0}
           <p class="p-6 text-center font-mono text-xs text-muted-foreground">No players match.</p>
         {:else}
           <RosterTable
@@ -594,8 +686,8 @@
             {isCompared}
             onToggleCompare={toggleCompare}
             compareFull={compareSelection.length >= 2}
-            onShowMore={() => (visibleCount += PAGE_SIZE)}
-            moreLabel={`Show ${PAGE_SIZE} more`}
+            onShowMore={() => (visibleCount += pageSize)}
+            moreLabel={`Show ${pageSize} more`}
           />
         {/if}
       </div>
@@ -611,6 +703,8 @@
       oncompare={toggleCompare}
       onremove={removeCompare}
       onclear={clearCompare}
+      {detailsError}
+      onRetry={() => void ensureDetails()}
     />
   {/if}
 
@@ -623,6 +717,8 @@
         {franchiseName}
         {eraLabel}
         onClose={closePlayer}
+        {detailsError}
+        onRetry={() => void ensureDetails()}
       />
     {/await}
   {/if}

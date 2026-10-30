@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { capRushApronFactSchema } from './cap-rush-apron.ts';
 import { opponentBracketSchema } from './bracket.ts';
 import { CAP_RUSH_GAME_COUNT, capRushDigestSchema } from './cap-rush-versions.ts';
 import { capRushGameSummarySchema } from './cap-rush-season.ts';
@@ -9,9 +10,15 @@ import {
   capRushPlayoffGamePlanSchema,
   capRushStoredPlayoffGameSchema,
 } from './cap-rush-postseason.ts';
-import { havocGameAuditSchema, havocGameResultSchema } from './havoc-game.ts';
+import {
+  havocGameAuditSchema,
+  havocGameInputSchema,
+  havocGameResultSchema,
+  havocGameTapeSchema,
+} from './havoc-game.ts';
+import { havocBattleInputSchema, havocBattleTapeSchema } from './havoc-battle.ts';
 
-export const CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION = 3;
+export const CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION = 4;
 
 const capRushWorkerBase = z.object({
   schemaVersion: z.literal(CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION),
@@ -25,6 +32,7 @@ export const capRushWorkerSimulateRequestSchema = capRushWorkerBase.extend({
   locked: capRushLockedInputsSchema,
   startGame: z.number().int().min(1).max(CAP_RUSH_GAME_COUNT),
   count: z.number().int().min(1).max(CAP_RUSH_GAME_COUNT),
+  includeTape: z.boolean().optional(),
 });
 export type CapRushWorkerSimulateRequest = z.infer<typeof capRushWorkerSimulateRequestSchema>;
 
@@ -39,6 +47,7 @@ export const capRushWorkerPlayoffsRequestSchema = capRushWorkerBase.extend({
   type: z.literal('cap-rush-playoffs'),
   locked: capRushLockedInputsSchema,
   games: z.array(capRushPlayoffGamePlanSchema).min(1).max(8),
+  includeTape: z.boolean().optional(),
 });
 export type CapRushWorkerPlayoffsRequest = z.infer<typeof capRushWorkerPlayoffsRequestSchema>;
 
@@ -66,12 +75,26 @@ export const capRushWorkerGameMessageSchema = capRushWorkerBase.extend({
   audit: havocGameAuditSchema,
   result: havocGameResultSchema,
   leagueGames: z.array(capRushLeagueGameSchema).max(15).optional(),
+  playback: z
+    .object({
+      input: havocGameInputSchema,
+      tape: havocGameTapeSchema,
+      facts: z.array(capRushApronFactSchema),
+    })
+    .optional(),
 });
 export type CapRushWorkerGameMessage = z.infer<typeof capRushWorkerGameMessageSchema>;
 
 export const capRushWorkerPlayoffGameMessageSchema = capRushWorkerBase.extend({
   type: z.literal('cap-rush-playoff-game'),
   game: capRushStoredPlayoffGameSchema,
+  playback: z
+    .object({
+      input: havocBattleInputSchema,
+      tape: havocBattleTapeSchema,
+      facts: z.array(capRushApronFactSchema),
+    })
+    .optional(),
 });
 export type CapRushWorkerPlayoffGameMessage = z.infer<typeof capRushWorkerPlayoffGameMessageSchema>;
 

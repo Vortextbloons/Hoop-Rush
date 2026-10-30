@@ -203,6 +203,7 @@ export class HoopRushDatabase extends Dexie {
     this.version(9).stores(HOOP_RUSH_DATABASE_V9_STORES);
     this.version(10).stores(HOOP_RUSH_DATABASE_V10_STORES);
     this.version(11).stores(HOOP_RUSH_DATABASE_V11_STORES);
+    this.version(12).stores(HOOP_RUSH_DATABASE_V11_STORES);
   }
 }
 export class DexieChallengeRepository {

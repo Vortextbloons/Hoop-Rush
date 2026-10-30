@@ -132,6 +132,7 @@ export const simCommands: CommandSpec[] = [
   {
     name: 'bracket generate',
     options: {
+      field: 'string',
       seed: 'string',
       'games-per-pair': 'string',
       'min-score': 'string',
@@ -141,9 +142,10 @@ export const simCommands: CommandSpec[] = [
     help: `  bracket generate       (dev) Author the frozen bracket from packaged NBA data and
                          commit it with the manifest. Deterministic under --seed.
                          --seed <hex> --games-per-pair N (default 12)
-                         --min-score N (default 45)`,
+                         --min-score N (default 45) --field shared|cap-rush`,
     run: (args) =>
       bracketGenerate({
+        field: s(args, 'field'),
         seed: s(args, 'seed'),
         'games-per-pair': s(args, 'games-per-pair'),
         'min-score': s(args, 'min-score'),

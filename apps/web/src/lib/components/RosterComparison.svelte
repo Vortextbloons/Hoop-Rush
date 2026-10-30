@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { HoopRushManifest } from '@hoop-rush/data-contracts';
   import { teamLabelFor, teamNameFor } from '#lib/branding.js';
-  import type { RosterDetailRow } from '#lib/roster-browser.js';
+  import type { RosterRow } from '#lib/roster-browser.js';
   import { formatPositions } from '#lib/player-positions.js';
   import { oneDecimal, percentOneDecimal } from '#lib/format.js';
   import { X } from '@lucide/svelte';
@@ -15,20 +15,24 @@
     oncompare,
     onremove,
     onclear,
+    detailsError = null,
+    onRetry,
   }: {
-    selected: RosterDetailRow[];
+    selected: RosterRow[];
     manifest: HoopRushManifest;
     franchiseName: Map<string, string>;
     eraLabel: Map<string, string>;
-    oncompare: (player: RosterDetailRow) => void;
+    oncompare: (player: RosterRow) => void;
     onremove: (playerId: string) => void;
     onclear: () => void;
+    detailsError?: string | null;
+    onRetry?: () => void;
   } = $props();
   let open = $state(false);
   let compareButton = $state<HTMLButtonElement | undefined>(undefined);
   let lastTrigger = $state<HTMLElement | null>(null);
   const ready = $derived(selected.length === 2);
-  function selectionKey(player: RosterDetailRow): string {
+  function selectionKey(player: RosterRow): string {
     return `${player.franchiseId}/${player.eraId}/${player.playerId}`;
   }
   function openComparison() {
@@ -43,10 +47,10 @@
     lastTrigger = null;
     queueMicrotask(() => target?.focus());
   }
-  function displayName(player: RosterDetailRow): string {
+  function displayName(player: RosterRow): string {
     return player.displayName || `${player.firstName} ${player.lastName}`;
   }
-  function isSelected(player: RosterDetailRow): boolean {
+  function isSelected(player: RosterRow): boolean {
     return selected.some((entry) => entry.playerId === player.playerId);
   }
   function optional(value: number | null | undefined, digits = 1): string {
@@ -57,23 +61,28 @@
     return percentOneDecimal(made / attempted);
   }
   function perGame(
-    player: RosterDetailRow,
+    player: RosterRow,
     key: 'minutes' | 'points' | 'rebounds' | 'assists' | 'steals' | 'blocks',
   ): string {
-    const value = player.stats[key];
-    if (typeof value !== 'number' || player.stats.gamesPlayed <= 0) return '—';
-    return oneDecimal(value / player.stats.gamesPlayed);
+    const stats = player.detail?.stats;
+    if (!stats) return '…';
+    const value = stats[key];
+    if (typeof value !== 'number' || stats.gamesPlayed <= 0) return '—';
+    return oneDecimal(value / stats.gamesPlayed);
   }
   function countValue(
-    player: RosterDetailRow,
+    player: RosterRow,
     key: 'minutes' | 'points' | 'rebounds' | 'assists' | 'steals' | 'blocks',
   ): string {
-    const value = player.stats[key];
+    const stats = player.detail?.stats;
+    if (!stats) return '…';
+    const value = stats[key];
     if (typeof value !== 'number') return '—';
     return `${value.toLocaleString()} (${perGame(player, key)}/g)`;
   }
-  function metricValue(player: RosterDetailRow, metric: string): string {
-    const stats = player.stats;
+  function metricValue(player: RosterRow, metric: string): string {
+    const stats = player.detail?.stats;
+    if (!stats) return '…';
     switch (metric) {
       case 'Games':
         return stats.gamesPlayed.toLocaleString();
@@ -252,6 +261,25 @@
           </section>
         {/each}
       </div>
+
+      {#if selected.some((player) => !player.detail)}
+        <div
+          class="mt-4 flex flex-col gap-2 rounded-lg border border-border bg-surface-1 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <p class="font-mono text-xs text-muted-foreground">
+            {detailsError ?? 'Loading detailed stats…'}
+          </p>
+          {#if detailsError && onRetry}
+            <button
+              type="button"
+              onclick={onRetry}
+              class="self-start rounded-md border border-border px-3 py-1.5 font-mono text-xs font-bold text-foreground outline-none transition-colors hover:border-line-strong focus-visible:ring-2 focus-visible:ring-ring sm:self-auto"
+            >
+              Retry
+            </button>
+          {/if}
+        </div>
+      {/if}
 
       <div class="mt-4 overflow-hidden rounded-lg border border-border">
         <div

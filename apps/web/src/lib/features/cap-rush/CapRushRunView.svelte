@@ -9,6 +9,7 @@
   import TeamLogo from '#lib/components/TeamLogo.svelte';
   import { capRushBoxOf } from '@hoop-rush/engine';
   import CapRushBoxScore from './CapRushBoxScore.svelte';
+  import CapRushSimcast from './CapRushSimcast.svelte';
   import CapRushLineup from './CapRushLineup.svelte';
   import CapRushPostseasonView from './CapRushPostseasonView.svelte';
   import CapRushSeasonProgress from './CapRushSeasonProgress.svelte';
@@ -83,6 +84,8 @@
         class="h-3 w-64 animate-pulse rounded-full bg-surface-2 motion-reduce:animate-none"
       ></div>
     </div>
+  {:else if controller.playback !== null}
+    <CapRushSimcast {controller} {art} />
   {:else if view === null}
     <AsyncState
       kind={controller.error === null ? 'empty' : 'error'}
@@ -365,7 +368,7 @@
 </section>
 
 <DialogShell
-  open={selectedBox !== null}
+  open={selectedBox !== null && controller.playback === null}
   onOpenChange={(open) => {
     if (!open) selectedBox = null;
   }}

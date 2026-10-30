@@ -13,6 +13,8 @@ import {
   type SlotIndex,
 } from '@hoop-rush/data-contracts';
 import { arenaWin } from '#lib/arena-sound.js';
+import { isLiteMode } from '#lib/device-capabilities.js';
+import { PlaybackCadence, presentationIntervalMs } from '#lib/playback-cadence.js';
 import { presentationForVariant } from '#lib/draft-presentation.js';
 import { newRequestId } from '#lib/ids.js';
 import {
@@ -373,6 +375,7 @@ export class FixedFiveRoomController {
   private copyTimer: ReturnType<typeof setTimeout> | null = null;
   private playbackRaf: number | null = null;
   private playbackLastFrameMs = 0;
+  private playbackCadence: PlaybackCadence | null = null;
   private lastBroadcastGame: number | null = null;
 
   constructor(deps: FixedFiveRoomControllerDeps) {
@@ -498,11 +501,17 @@ export class FixedFiveRoomController {
     this.session.beginPlayback();
     if (typeof requestAnimationFrame !== 'function') return;
     this.playbackLastFrameMs = typeof performance === 'undefined' ? 0 : performance.now();
+    this.playbackCadence = new PlaybackCadence(presentationIntervalMs(isLiteMode()));
     const frame = (now: number): void => {
       if (this.disposed) return;
       const delta = Math.max(0, now - this.playbackLastFrameMs);
       this.playbackLastFrameMs = now;
-      this.session.advancePlayback(delta);
+      const advanceMs = this.playbackCadence?.add(delta) ?? null;
+      if (advanceMs === null) {
+        this.playbackRaf = requestAnimationFrame(frame);
+        return;
+      }
+      this.session.advancePlayback(advanceMs);
       if (this.broadcastProgress >= 1) {
         this.stopPlayback();
         return;
@@ -612,6 +621,7 @@ export class FixedFiveRoomController {
     if (this.playbackRaf !== null) {
       cancelAnimationFrame(this.playbackRaf);
       this.playbackRaf = null;
+      this.playbackCadence = null;
     }
   }
 

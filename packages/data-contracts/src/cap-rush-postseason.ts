@@ -1,3 +1,4 @@
+import { capRushPlaybackSchema } from './cap-rush-playback.ts';
 import { z } from 'zod';
 import { playerIdSchema, seedSchema } from './ids.ts';
 import { positionSchema } from './positions.ts';
@@ -554,6 +555,7 @@ export const capRushStoredPlayoffGameSchema = z.object({
   summary: capRushPlayoffGameSummarySchema,
   audit: havocGameAuditSchema,
   result: havocGameResultSchema.nullable(),
+  playback: capRushPlaybackSchema.optional(),
 });
 export type CapRushStoredPlayoffGame = z.infer<typeof capRushStoredPlayoffGameSchema>;
 

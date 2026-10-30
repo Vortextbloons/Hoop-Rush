@@ -119,7 +119,9 @@ export function getBracket(entry: OpponentIndexEntry): Promise<OpponentBracket> 
     label: 'opponent bracket',
     parse: parseOpponentBracket,
     entry,
-    find: (manifest) => manifest.bracket ?? null,
+    find: (manifest) =>
+      (entry.url === manifest.capRushBracket?.url ? manifest.capRushBracket : manifest.bracket) ??
+      null,
     missingMessage: 'The opponent bracket is unavailable.',
     retryOnHashMismatch: true,
   });

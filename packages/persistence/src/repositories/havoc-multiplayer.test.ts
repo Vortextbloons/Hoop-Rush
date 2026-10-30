@@ -392,7 +392,7 @@ describe('DexieHavocMultiplayerRepository', () => {
     db.close();
   });
 
-  it('preserves version 1 solo saves when the database upgrades to version 5', async () => {
+  it('preserves version 1 solo saves when the database upgrades to version 12', async () => {
     resetIndexedDb();
     const name = testDatabaseName('havoc-multiplayer-upgrade');
     const legacy = new Dexie(name);
@@ -417,7 +417,7 @@ describe('DexieHavocMultiplayerRepository', () => {
     const db = new TestDatabase(name);
     const repo = new DexieHavocMultiplayerRepository(db);
     await db.open();
-    expect(db.verno).toBe(10);
+    expect(db.verno).toBe(12);
     const tableNames = db.tables.map((table) => table.name).sort();
     expect(tableNames).toEqual(Object.keys(HOOP_RUSH_DATABASE_V11_STORES).sort());
     expect((await db.completed.get('legacy-run')) as unknown).toEqual(completedRecord);

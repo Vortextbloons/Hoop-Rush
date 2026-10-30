@@ -41,6 +41,7 @@
       ? locked.human
       : (locked.opponents.find((entry) => entry.team.teamId === teamId)?.team ?? null),
   );
+  const teamSeason = $derived(team === null ? null : (art?.opponentSeasonFor(team) ?? null));
   const isUserTeam = $derived(locked.human.teamId === teamId);
   const alignment = $derived(capRushAlignmentOf(teamId));
   const identity = $derived(art === null ? null : art.teamFor(teamId));
@@ -155,6 +156,7 @@
       </thead>
       <tbody>
         {#each team?.starters ?? [] as starter (starter.instanceId)}
+          {@const metadata = isUserTeam ? null : (art?.opponentMetadataFor(starter.source) ?? null)}
           {@const face = art === null ? null : art.faceForPlayerId(starter.source.playerId)}
           <tr class="border-t border-line-soft/60">
             <th scope="row" class="px-3 py-1.5 text-left">
@@ -182,10 +184,15 @@
             <td
               class="hidden px-2 py-1.5 text-center font-mono text-[9px] text-muted-foreground sm:table-cell"
             >
-              {starter.source.seasonKey ?? starter.source.eraId}
+              {starter.source.seasonKey ?? metadata?.seasonKey ?? teamSeason ?? '\u2014'}
             </td>
             <td class="px-2 py-1.5 text-right font-mono text-[10px] tabular-nums">
-              {starter.source.originalOverall}
+              {isUserTeam
+                ? starter.source.originalOverall
+                : (metadata?.overall ??
+                  (starter.source.overallSource === 'catalog'
+                    ? starter.source.originalOverall
+                    : '\u2014'))}
             </td>
             {#if isUserTeam}
               <td

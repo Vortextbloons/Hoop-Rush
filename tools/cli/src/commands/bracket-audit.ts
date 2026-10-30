@@ -1,3 +1,4 @@
+import { capRushValidateLeagueField } from '@hoop-rush/engine';
 import { readFileSync } from 'node:fs';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { generateSchedule, scheduleInvariants, validateBracketContent } from '@hoop-rush/engine';
@@ -23,6 +24,7 @@ export function bracketAudit(inputPath: string, verbose: boolean): CliReport {
   }
   const entries: Array<{ label: string; entry: NonNullable<HoopRushManifest['bracket']> }> = [
     ...(manifest.bracket ? [{ label: 'bracket', entry: manifest.bracket }] : []),
+    ...(manifest.capRushBracket ? [{ label: 'cap-rush', entry: manifest.capRushBracket }] : []),
   ];
   if (entries.length === 0) {
     return makeReport(
@@ -58,6 +60,13 @@ export function bracketAudit(inputPath: string, verbose: boolean): CliReport {
       continue;
     }
     const contentFailures = validateBracketContent(bracket);
+    if (label === 'cap-rush') {
+      try {
+        capRushValidateLeagueField(bracket.opponents);
+      } catch (error) {
+        failures.push(`cap-rush: ${String(error)}`);
+      }
+    }
     failures.push(...contentFailures.map((f) => `${tag}content: ${f}`));
     const scheduleFailures = scheduleInvariants(bracket.schedule);
     failures.push(...scheduleFailures.map((f) => `${tag}schedule: ${f}`));

@@ -6,6 +6,7 @@
   } from '@hoop-rush/data-contracts';
   import { onDestroy, untrack } from 'svelte';
   import TeamLogo from '../TeamLogo.svelte';
+  import { LITE_TOGGLE_EVENT, isLiteMode } from '#lib/device-capabilities.js';
   import {
     arenaReelLock,
     arenaReelSettle,
@@ -15,7 +16,9 @@
   } from '#lib/arena-sound.js';
   const REEL_ROW_HEIGHT_PX = 108;
   const TRAVEL_ROWS = 30;
+  const LITE_TRAVEL_ROWS = 10;
   const SPIN_MS = 1750;
+  const LITE_SPIN_MS = 300;
   const SINGLE_AXIS_SPIN_MS = 1000;
   const RESULT_MS = 800;
   const CROSSFADE_MS = 300;
@@ -53,6 +56,15 @@
     onSettled: () => void;
   } = $props();
   let selfDetectedReduced = $state(detectReducedMotion());
+  let lite = $state(false);
+  $effect(() => {
+    const syncLite = () => {
+      lite = isLiteMode();
+    };
+    syncLite();
+    window.addEventListener(LITE_TOGGLE_EVENT, syncLite);
+    return () => window.removeEventListener(LITE_TOGGLE_EVENT, syncLite);
+  });
   let phase = $state<'idle' | 'spinning' | 'settled'>('idle');
   let franchiseSpinning = $state(false);
   let eraSpinning = $state(false);
@@ -71,7 +83,8 @@
   let pendingKey: string | null = $state(null);
   function repeatsFor(optionCount: number): number {
     if (optionCount <= 0) return 1;
-    return Math.max(1, Math.ceil(TRAVEL_ROWS / optionCount));
+    const travelRows = lite ? LITE_TRAVEL_ROWS : TRAVEL_ROWS;
+    return Math.max(1, Math.ceil(travelRows / optionCount));
   }
   const franchiseRepeats = $derived(repeatsFor(franchiseOptions.length));
   const eraRepeats = $derived(repeatsFor(eraOptions.length));
@@ -158,6 +171,7 @@
       franchiseRepeats,
       eraRepeats,
       reduced: reducedMotion ?? selfDetectedReduced,
+      lite,
       spinDurationMs,
     }));
     const franchiseActive = params.axis === 'both' || params.axis === 'franchise';
@@ -187,7 +201,8 @@
     eraFading = eraActive && !eraStrip;
     announced = '';
     activeSpinDurationMs =
-      params.spinDurationMs ?? (params.axis === 'both' ? SPIN_MS : SINGLE_AXIS_SPIN_MS);
+      params.spinDurationMs ??
+      (params.lite ? LITE_SPIN_MS : params.axis === 'both' ? SPIN_MS : SINGLE_AXIS_SPIN_MS);
     const franchiseDuration = franchiseStrip ? activeSpinDurationMs : 0;
     const eraDuration = eraStrip ? activeSpinDurationMs : 0;
     const duration =
@@ -198,7 +213,7 @@
       try {
         arenaReelSpin(spotlight as ArenaSpotlight);
       } catch {}
-      if (!params.reduced && (franchiseStrip || eraStrip)) startTicks();
+      if (!params.reduced && !params.lite && (franchiseStrip || eraStrip)) startTicks();
     }
     spinTimer = setTimeout(settle, duration);
   }
@@ -218,7 +233,7 @@
       } catch {}
     }
     const reduced = reducedMotion ?? selfDetectedReduced;
-    resultTimer = setTimeout(finish, reduced ? CROSSFADE_MS : RESULT_MS);
+    resultTimer = setTimeout(finish, reduced || lite ? CROSSFADE_MS : RESULT_MS);
   }
   function finish() {
     if (resultTimer !== null) {

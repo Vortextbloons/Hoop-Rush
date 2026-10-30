@@ -34,6 +34,8 @@ import {
   type HavocMultiplayerFeedLine,
   type HavocMultiplayerVisibleState,
 } from './havoc-multiplayer-playback';
+import { isLiteMode } from '#lib/device-capabilities.js';
+import { PlaybackCadence, presentationIntervalMs } from '#lib/playback-cadence.js';
 
 const CONSIDERATION_CLEAR_MS = 2000;
 
@@ -78,6 +80,7 @@ export class HavocMultiplayerPresenter {
   private unsubscribeTransient: (() => void) | null = null;
   private rafId: number | null = null;
   private playbackLastFrameMs: number | null = null;
+  private playbackCadence: PlaybackCadence | null = null;
   private considerationTimer: ReturnType<typeof setTimeout> | null = null;
   private disposed = false;
 
@@ -297,8 +300,10 @@ export class HavocMultiplayerPresenter {
     if (this.disposed) return;
     if (!this.currentBroadcast) return;
     this.playbackLastFrameMs = null;
+    this.playbackCadence = new PlaybackCadence(presentationIntervalMs(isLiteMode()));
     if (this.rafId !== null) return;
     this.session.beginPlayback();
+    this.session.advancePlayback(0);
     const loop = () => {
       if (this.disposed || !this.currentBroadcast) {
         this.rafId = null;
@@ -307,7 +312,12 @@ export class HavocMultiplayerPresenter {
       const nowMs = Date.now();
       const lastFrameMs = this.playbackLastFrameMs ?? nowMs;
       this.playbackLastFrameMs = nowMs;
-      this.session.advancePlayback(nowMs - lastFrameMs);
+      const advanceMs = this.playbackCadence?.add(nowMs - lastFrameMs) ?? null;
+      if (advanceMs === null) {
+        this.rafId = requestAnimationFrame(loop);
+        return;
+      }
+      this.session.advancePlayback(advanceMs);
       if (this.session.getSnapshot().progress >= 1) {
         this.rafId = null;
         return;
@@ -321,6 +331,7 @@ export class HavocMultiplayerPresenter {
     if (this.rafId === null) return;
     cancelAnimationFrame(this.rafId);
     this.rafId = null;
+    this.playbackCadence = null;
   }
 
   private draftCardOf(cardId: string): HavocDraftCard | null {

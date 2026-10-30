@@ -41,6 +41,8 @@ import {
   createEngineContext,
   createCapRushDraftState,
   simulateCapRushGame,
+  soloToBattleInput,
+  soloToBattleTape,
 } from '@hoop-rush/engine';
 import {
   DEFAULT_ERA_SIM_PROFILE,
@@ -413,6 +415,56 @@ describe('cap rush repository', () => {
     const reopened = new DexieCapRushRepository(db);
     expect(await reopened.readRunGame(state.runId, 1)).toEqual(bundle.game);
     expect(await reopened.listRunGames(state.runId)).toHaveLength(1);
+  });
+
+  it('atomically saves and resumes playback, blocks advance, and resolves without changing simulation state', async () => {
+    const { index, state } = await startLockedRun(repository);
+    if (state.locked === null) throw new Error('missing locked inputs');
+    const simulation = simulateCapRushGame({
+      locked: state.locked,
+      gameNumber: 1,
+      context: createEngineContext(),
+    });
+    const bundle = acceptBundle(index, state, 1);
+    const game = {
+      ...bundle.game,
+      playback: {
+        input: soloToBattleInput(simulation.input),
+        tape: soloToBattleTape(simulation.tape, simulation.result.humanSide),
+        facts: [...simulation.facts],
+        cursor: 0,
+      },
+    };
+    await repository.applyOutcome({
+      outcome: { state: bundle.state, result: bundle.result },
+      command: bundle.command,
+      game,
+    });
+    expect((await repository.readRunGame(state.runId, 1))?.playback).toEqual(game.playback);
+    const next = acceptBundle(index, bundle.state, 2);
+    await expect(
+      repository.applyOutcome({
+        outcome: { state: next.state, result: next.result },
+        command: next.command,
+        game: next.game,
+      }),
+    ).rejects.toThrow('pending broadcast');
+    await repository.updatePlayback(state.runId, 1, 10, false);
+    await repository.updatePlayback(state.runId, 1, 5, false);
+    expect((await repository.readRunGame(state.runId, 1))?.playback?.cursor).toBe(10);
+    await expect(repository.updatePlayback(state.runId, 1, 10, true)).rejects.toThrow(
+      'final event',
+    );
+    const total = simulation.tape.events.length + simulation.tape.scoring.length;
+    await repository.updatePlayback(state.runId, 1, total, true);
+    expect((await repository.readRunGame(state.runId, 1))?.playback).toBeUndefined();
+    expect(await repository.loadActiveDraft()).toEqual(bundle.state);
+    await repository.applyOutcome({
+      outcome: { state: next.state, result: next.result },
+      command: next.command,
+      game: next.game,
+    });
+    expect((await repository.loadActiveDraft())?.season.games.length).toBe(2);
   });
 
   it('rejects a malformed stored game record on read', async () => {

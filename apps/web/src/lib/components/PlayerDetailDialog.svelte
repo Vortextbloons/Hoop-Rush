@@ -8,7 +8,7 @@
     formatPerGame,
     perGame,
     shotPct,
-    type RosterDetailRow,
+    type RosterRow,
   } from '#lib/roster-browser.js';
   import { formatPositions } from '#lib/player-positions.js';
   import { teamNameFor } from '#lib/branding.js';
@@ -19,15 +19,19 @@
     franchiseName,
     eraLabel,
     onClose,
+    detailsError = null,
+    onRetry,
   }: {
-    player: RosterDetailRow | null;
+    player: RosterRow | null;
     manifest: HoopRushManifest;
     franchiseName: Map<string, string>;
     eraLabel: Map<string, string>;
     onClose: () => void;
+    detailsError?: string | null;
+    onRetry?: () => void;
   } = $props();
-  function statLine(row: RosterDetailRow) {
-    const s = row.stats;
+  function statLine(detail: NonNullable<RosterRow['detail']>) {
+    const s = detail.stats;
     return {
       mpg: perGame(s, 'minutes'),
       ppg: perGame(s, 'points'),
@@ -46,24 +50,25 @@
       usage: s.usageRate,
     };
   }
-  function heightLabel(row: RosterDetailRow): string {
-    if (row.heightInches === null || row.heightInches === undefined) return '—';
-    const feet = Math.floor(row.heightInches / 12);
-    const inches = row.heightInches % 12;
+  function heightLabel(row: RosterRow): string {
+    if (row.detail?.heightInches === null || row.detail?.heightInches === undefined) return '—';
+    const feet = Math.floor(row.detail.heightInches / 12);
+    const inches = row.detail.heightInches % 12;
     return `${feet}'${inches}"`;
   }
-  function weightLabel(row: RosterDetailRow): string {
-    if (row.weightLbs === null || row.weightLbs === undefined) return '—';
-    return `${row.weightLbs} lbs`;
+  function weightLabel(row: RosterRow): string {
+    if (row.detail?.weightLbs === null || row.detail?.weightLbs === undefined) return '—';
+    return `${row.detail.weightLbs} lbs`;
   }
   const sections = $derived.by(() => {
     const subject = player;
-    if (!subject)
+    const detail = subject?.detail;
+    if (!subject || !detail)
       return [] as {
         title: string;
         items: [string, string][];
       }[];
-    const s = statLine(subject);
+    const s = statLine(detail);
     return [
       {
         title: 'Per game',
@@ -98,8 +103,8 @@
       {
         title: 'Info',
         items: [
-          ['Games', String(subject.stats.gamesPlayed)],
-          ['Minutes', String(subject.stats.minutes)],
+          ['Games', String(detail.stats.gamesPlayed)],
+          ['Minutes', String(detail.stats.minutes)],
           ['Height', heightLabel(subject)],
           ['Weight', weightLabel(subject)],
         ],
@@ -153,29 +158,48 @@
       <span class="rounded bg-surface-3 px-1.5 py-0.5" title="Defense">DF {subject.defense}</span>
     </div>
 
-    <div class="mt-4 grid gap-4 sm:grid-cols-2">
-      {#each sections as section (section.title)}
-        <div>
-          <h3
-            class="font-mono text-[10px] font-bold tracking-[0.14em] text-muted-foreground uppercase"
+    {#if !subject.detail}
+      <div
+        class="mt-4 flex flex-col gap-2 rounded-md border border-border bg-surface-1 px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
+      >
+        <p class="font-mono text-xs text-muted-foreground">
+          {detailsError ?? 'Loading detailed stats…'}
+        </p>
+        {#if detailsError && onRetry}
+          <button
+            type="button"
+            onclick={onRetry}
+            class="self-start rounded-md border border-border px-3 py-1.5 font-mono text-xs font-bold text-foreground outline-none transition-colors hover:border-line-strong focus-visible:ring-2 focus-visible:ring-ring sm:self-auto"
           >
-            {section.title}
-          </h3>
-          <dl class="mt-2 grid grid-cols-2 gap-1.5">
-            {#each section.items as [label, value] (label)}
-              <div
-                class="flex items-center justify-between gap-2 rounded-md border border-border bg-surface-1 px-2.5 py-1.5"
-              >
-                <dt class="font-mono text-[10px] text-muted-foreground">{label}</dt>
-                <dd class="font-mono text-xs font-bold tabular-nums">{value}</dd>
-              </div>
-            {/each}
-          </dl>
-        </div>
-      {/each}
-    </div>
-    <p class="mt-3 text-xs text-muted-foreground">
-      — means unavailable in the historical source. Some stats were not recorded in older seasons.
-    </p>
+            Retry
+          </button>
+        {/if}
+      </div>
+    {:else}
+      <div class="mt-4 grid gap-4 sm:grid-cols-2">
+        {#each sections as section (section.title)}
+          <div>
+            <h3
+              class="font-mono text-[10px] font-bold tracking-[0.14em] text-muted-foreground uppercase"
+            >
+              {section.title}
+            </h3>
+            <dl class="mt-2 grid grid-cols-2 gap-1.5">
+              {#each section.items as [label, value] (label)}
+                <div
+                  class="flex items-center justify-between gap-2 rounded-md border border-border bg-surface-1 px-2.5 py-1.5"
+                >
+                  <dt class="font-mono text-[10px] text-muted-foreground">{label}</dt>
+                  <dd class="font-mono text-xs font-bold tabular-nums">{value}</dd>
+                </div>
+              {/each}
+            </dl>
+          </div>
+        {/each}
+      </div>
+      <p class="mt-3 text-xs text-muted-foreground">
+        — means unavailable in the historical source. Some stats were not recorded in older seasons.
+      </p>
+    {/if}
   {/if}
 </DialogShell>

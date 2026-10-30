@@ -38,6 +38,8 @@ import {
   type GamecastVisibleState,
 } from '#lib/gamecast/gamecast-playback.js';
 import { draftDuelFeedLines, type DraftDuelFeedLine } from './draft-duel-broadcast-view';
+import { isLiteMode } from '#lib/device-capabilities.js';
+import { PlaybackCadence, presentationIntervalMs } from '#lib/playback-cadence.js';
 
 const CONSIDERATION_CLEAR_MS = 2000;
 
@@ -78,6 +80,7 @@ export class DraftDuelPresenter {
   private unsubscribeTransient: (() => void) | null = null;
   private rafId: number | null = null;
   private playbackLastFrameMs: number | null = null;
+  private playbackCadence: PlaybackCadence | null = null;
   private considerationTimer: ReturnType<typeof setTimeout> | null = null;
   private disposed = false;
 
@@ -392,8 +395,10 @@ export class DraftDuelPresenter {
     if (this.disposed) return;
     if (!this.snapshot?.broadcast) return;
     this.playbackLastFrameMs = null;
+    this.playbackCadence = new PlaybackCadence(presentationIntervalMs(isLiteMode()));
     if (this.rafId !== null) return;
     this.session.beginPlayback();
+    this.session.advancePlayback(0);
     const loop = () => {
       if (this.disposed || !this.snapshot?.broadcast) {
         this.rafId = null;
@@ -402,7 +407,12 @@ export class DraftDuelPresenter {
       const nowMs = Date.now();
       const lastFrameMs = this.playbackLastFrameMs ?? nowMs;
       this.playbackLastFrameMs = nowMs;
-      this.session.advancePlayback(nowMs - lastFrameMs);
+      const advanceMs = this.playbackCadence?.add(nowMs - lastFrameMs) ?? null;
+      if (advanceMs === null) {
+        this.rafId = requestAnimationFrame(loop);
+        return;
+      }
+      this.session.advancePlayback(advanceMs);
       if (this.session.getSnapshot().progress >= 1) {
         this.rafId = null;
         return;
@@ -416,6 +426,7 @@ export class DraftDuelPresenter {
     if (this.rafId === null) return;
     cancelAnimationFrame(this.rafId);
     this.rafId = null;
+    this.playbackCadence = null;
   }
 
   private onTransient(event: DraftDuelTransientEvent): void {

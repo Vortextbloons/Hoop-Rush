@@ -131,6 +131,7 @@ export interface CapRushService {
   purchaseSpin(purchase: CapRushSpinPurchaseId, targetCardId: string): Promise<void>;
   skipSpin(): Promise<void>;
   lockLineup(): Promise<void>;
+  updatePlayback(game: number | string, cursor: number, resolved: boolean): Promise<void>;
   acceptGame(game: CapRushAcceptedGame): Promise<void>;
   finalizeSeason(): Promise<CapRushReport | null>;
   acceptStandings(league: CapRushLeagueResult): Promise<void>;

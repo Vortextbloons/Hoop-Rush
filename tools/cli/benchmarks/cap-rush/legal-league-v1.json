@@ -1,0 +1,1244 @@
+{
+  "protocol": "legal-offer-policy-v1",
+  "fullLeague": true,
+  "attemptsPerPolicy": 2,
+  "fieldHash": "01914790a076d04c91dd69ba0da22ed2ba34c505b35d92b0b0036b22b6d6f2dd",
+  "versionSet": {
+    "schemaVersion": 1,
+    "rulesVersion": "cap-rush-rules-v3",
+    "salaryCurveVersion": "cap-rush-salary-v3",
+    "seedDerivationVersion": "cap-rush-seeds-v1",
+    "engineVersion": "m3-engine-v25",
+    "profileVersion": "m3-2010s-v1",
+    "dataVersion": "m24-ratings-v6.5",
+    "catalogVersion": "season-draft-catalog-v4",
+    "catalogHash": "3e029fa6105905d62d4bff03da77d8fc3d4a1a94c1f049f6b9d8337d38342ea3",
+    "bracketHash": "01914790a076d04c91dd69ba0da22ed2ba34c505b35d92b0b0036b22b6d6f2dd",
+    "profileHash": "dd09203abbda5254a8f813f864c52db3af6fc01905974e226da9a02a1227c784"
+  },
+  "selection": "PG/SG/SF/PF/C offers with no rerolls. Strong=highest legal overall; middle=median legal overall; budget=lowest legal overall; first-apron=closest legal salary to remaining 130M target per slot. Roulette buys premium or standard if eligible targeting highest overall. Production typed draft and lock commands. Independent named drafts per policy and variant. --league runs first two seeds per policy including full background league and qualification. Default runs ten user seasons; qualification not measured. No postseason simulated; championship not measured.",
+  "runs": [
+    {
+      "qualified": true,
+      "conferenceSeed": 1,
+      "variant": "clash",
+      "strategy": "strong",
+      "attempt": 0,
+      "runSeed": "a60f9a03a60f9a03a60f9a03a60f9a03",
+      "franchise": {
+        "franchiseId": "lakers",
+        "displayName": "Los Angeles Lakers",
+        "conference": "west",
+        "division": "pacific"
+      },
+      "payroll": 149880000,
+      "tier": "second-apron",
+      "spin": null,
+      "lineup": [
+        {
+          "slot": "PG",
+          "player": "Shai Gilgeous-Alexander",
+          "version": "pv-27416718dbc7b2c4e3caba5a91359208",
+          "overall": 97,
+          "salary": 63633000
+        },
+        {
+          "slot": "SG",
+          "player": "Kawhi Leonard",
+          "version": "pv-fec696dd22236999ec35910fedef754d",
+          "overall": 96,
+          "salary": 58267000
+        },
+        {
+          "slot": "SF",
+          "player": "Sandro Mamukelashvili",
+          "version": "pv-d84601fcfa0e64001f4e4d32b00e826c",
+          "overall": 86,
+          "salary": 25300000
+        },
+        {
+          "slot": "PF",
+          "player": "Corny Thompson",
+          "version": "pv-4b72effd89cbbd8178aed2cbcdcbf9ad",
+          "overall": 44,
+          "salary": 1530000
+        },
+        {
+          "slot": "C",
+          "player": "Ivano Newbill",
+          "version": "pv-68bf2f9c82cb91f0c1ebe8f60ebebaec",
+          "overall": 40,
+          "salary": 1150000
+        }
+      ],
+      "wins": 51,
+      "losses": 31,
+      "pointDifferential": 377,
+      "undefeated": false
+    },
+    {
+      "qualified": false,
+      "conferenceSeed": 10,
+      "variant": "clash",
+      "strategy": "strong",
+      "attempt": 1,
+      "runSeed": "a50f9870a50f9870a50f9870a50f9870",
+      "franchise": {
+        "franchiseId": "clippers",
+        "displayName": "Los Angeles Clippers",
+        "conference": "west",
+        "division": "pacific"
+      },
+      "payroll": 148825000,
+      "tier": "second-apron",
+      "spin": null,
+      "lineup": [
+        {
+          "slot": "PG",
+          "player": "Luka Dončić",
+          "version": "pv-78cdfec7099c198344e48f4132cae077",
+          "overall": 95,
+          "salary": 52900000
+        },
+        {
+          "slot": "SG",
+          "player": "Shai Gilgeous-Alexander",
+          "version": "pv-27416718dbc7b2c4e3caba5a91359208",
+          "overall": 97,
+          "salary": 63633000
+        },
+        {
+          "slot": "SF",
+          "player": "Anthony Parker",
+          "version": "pv-4356964492483790403808e2f9fd9574",
+          "overall": 82,
+          "salary": 18170000
+        },
+        {
+          "slot": "PF",
+          "player": "Wayman Tisdale",
+          "version": "pv-95b634ef75e2d253cb96c015b301acdf",
+          "overall": 79,
+          "salary": 13110000
+        },
+        {
+          "slot": "C",
+          "player": "Paul Hogue",
+          "version": "pv-47aee2b37c37baf7c5937041b9bebcc3",
+          "overall": 41,
+          "salary": 1012000
+        }
+      ],
+      "wins": 39,
+      "losses": 43,
+      "pointDifferential": -112,
+      "undefeated": false
+    },
+    {
+      "qualified": false,
+      "conferenceSeed": 11,
+      "variant": "clash",
+      "strategy": "middle",
+      "attempt": 0,
+      "runSeed": "b5c5a3f9b5c5a3f9b5c5a3f9b5c5a3f9",
+      "franchise": {
+        "franchiseId": "raptors",
+        "displayName": "Toronto Raptors",
+        "conference": "east",
+        "division": "atlantic"
+      },
+      "payroll": 66930000,
+      "tier": "under-cap",
+      "spin": null,
+      "lineup": [
+        {
+          "slot": "PG",
+          "player": "Mario Elie",
+          "version": "pv-1b976b7dd204cb912a004ad761d0e26d",
+          "overall": 81,
+          "salary": 16560000
+        },
+        {
+          "slot": "SG",
+          "player": "Erick Strickland",
+          "version": "pv-5e5c21a96af5cabd94027dbf88fd3439",
+          "overall": 76,
+          "salary": 10350000
+        },
+        {
+          "slot": "SF",
+          "player": "Jared Sullinger",
+          "version": "pv-9b1d78a76059ae6b35ed3129de9589b7",
+          "overall": 79,
+          "salary": 13800000
+        },
+        {
+          "slot": "PF",
+          "player": "Howard Porter",
+          "version": "pv-3780a0eefbc0593a57f9c1d40785dcbe",
+          "overall": 79,
+          "salary": 12420000
+        },
+        {
+          "slot": "C",
+          "player": "Bison Dele",
+          "version": "pv-a4bc0cd9af9684c52ff432ff3add44e9",
+          "overall": 79,
+          "salary": 13800000
+        }
+      ],
+      "wins": 35,
+      "losses": 47,
+      "pointDifferential": -381,
+      "undefeated": false
+    },
+    {
+      "qualified": false,
+      "conferenceSeed": 10,
+      "variant": "clash",
+      "strategy": "middle",
+      "attempt": 1,
+      "runSeed": "b4c5a266b4c5a266b4c5a266b4c5a266",
+      "franchise": {
+        "franchiseId": "spurs",
+        "displayName": "San Antonio Spurs",
+        "conference": "west",
+        "division": "southwest"
+      },
+      "payroll": 82570000,
+      "tier": "under-cap",
+      "spin": null,
+      "lineup": [
+        {
+          "slot": "PG",
+          "player": "Craig Ehlo",
+          "version": "pv-051b7630f9d630344ef69eaed893f840",
+          "overall": 83,
+          "salary": 19780000
+        },
+        {
+          "slot": "SG",
+          "player": "Mookie Blaylock",
+          "version": "pv-0ebdaa7b282cdf6f1e3d06ddbf78f08b",
+          "overall": 82,
+          "salary": 18170000
+        },
+        {
+          "slot": "SF",
+          "player": "Lauri Markkanen",
+          "version": "pv-4b9cda9c8fd03468d214d4e2d3f2d40c",
+          "overall": 78,
+          "salary": 12650000
+        },
+        {
+          "slot": "PF",
+          "player": "CJ Miles",
+          "version": "pv-9d160d79a02184cd22f7e0fba992b8e9",
+          "overall": 79,
+          "salary": 13800000
+        },
+        {
+          "slot": "C",
+          "player": "Kevin Willis",
+          "version": "pv-18e1fb77457c69a3e96586f19842a107",
+          "overall": 82,
+          "salary": 18170000
+        }
+      ],
+      "wins": 36,
+      "losses": 46,
+      "pointDifferential": -47,
+      "undefeated": false
+    },
+    {
+      "qualified": false,
+      "conferenceSeed": 15,
+      "variant": "clash",
+      "strategy": "budget",
+      "attempt": 0,
+      "runSeed": "3bf41db53bf41db53bf41db53bf41db5",
+      "franchise": {
+        "franchiseId": "pistons",
+        "displayName": "Detroit Pistons",
+        "conference": "east",
+        "division": "central"
+      },
+      "payroll": 21011000,
+      "tier": "under-cap",
+      "spin": null,
+      "lineup": [
+        {
+          "slot": "PG",
+          "player": "Reggie Williams",
+          "version": "pv-ef9b86f82dd5821c1766f4ce8851eb68",
+          "overall": 68,
+          "salary": 5026000
+        },
+        {
+          "slot": "SG",
+          "player": "Sidney Moncrief",
+          "version": "pv-8492fbfee2a5ba127c987e348a68994e",
+          "overall": 70,
+          "salary": 5750000
+        },
+        {
+          "slot": "SF",
+          "player": "Dennis Bell",
+          "version": "pv-a08738bb35724a67ea2465c91f7889cb",
+          "overall": 65,
+          "salary": 4140000
+        },
+        {
+          "slot": "PF",
+          "player": "Don May",
+          "version": "pv-32d819611a3f6d753aaee0b3d5bb9371",
+          "overall": 65,
+          "salary": 4140000
+        },
+        {
+          "slot": "C",
+          "player": "Reggie Evans",
+          "version": "pv-c96c18371f50334bfae3e9110edd6327",
+          "overall": 47,
+          "salary": 1955000
+        }
+      ],
+      "wins": 18,
+      "losses": 64,
+      "pointDifferential": -827,
+      "undefeated": false
+    },
+    {
+      "qualified": false,
+      "conferenceSeed": 15,
+      "variant": "clash",
+      "strategy": "budget",
+      "attempt": 1,
+      "runSeed": "3af41c223af41c223af41c223af41c22",
+      "franchise": {
+        "franchiseId": "cavaliers",
+        "displayName": "Cleveland Cavaliers",
+        "conference": "east",
+        "division": "central"
+      },
+      "payroll": 24748000,
+      "tier": "under-cap",
+      "spin": null,
+      "lineup": [
+        {
+          "slot": "PG",
+          "player": "Si Green",
+          "version": "pv-a38e81f007ac555c857ac29624aaca00",
+          "overall": 72,
+          "salary": 5704000
+        },
+        {
+          "slot": "SG",
+          "player": "Anthony Jones",
+          "version": "pv-92322c78a3ccd0a4eab9048a29f7d868",
+          "overall": 65,
+          "salary": 4370000
+        },
+        {
+          "slot": "SF",
+          "player": "Wes Iwundu",
+          "version": "pv-dd088dcfcc9dc1fbcb625f59e7a418df",
+          "overall": 70,
+          "salary": 5750000
+        },
+        {
+          "slot": "PF",
+          "player": "Enoch Olsen",
+          "version": "pv-695f9c794c2c9935d205ababde190369",
+          "overall": 65,
+          "salary": 3680000
+        },
+        {
+          "slot": "C",
+          "player": "Ed Horton",
+          "version": "pv-d6250f1a3bf9621e6b4b21ecb730b2ea",
+          "overall": 69,
+          "salary": 5244000
+        }
+      ],
+      "wins": 25,
+      "losses": 57,
+      "pointDifferential": -704,
+      "undefeated": false
+    },
+    {
+      "qualified": true,
+      "conferenceSeed": 1,
+      "variant": "clash",
+      "strategy": "first-apron",
+      "attempt": 0,
+      "runSeed": "2363c64b2363c64b2363c64b2363c64b",
+      "franchise": {
+        "franchiseId": "kings",
+        "displayName": "Sacramento Kings",
+        "conference": "west",
+        "division": "pacific"
+      },
+      "payroll": 128455000,
+      "tier": "first-apron",
+      "spin": null,
+      "lineup": [
+        {
+          "slot": "PG",
+          "player": "Cedric Ceballos",
+          "version": "pv-d92a35249442fe70d5da9f1670c77c34",
+          "overall": 86,
+          "salary": 25300000
+        },
+        {
+          "slot": "SG",
+          "player": "Chris Mullin",
+          "version": "pv-f013f02493ca43c01ab6471e5a78fc74",
+          "overall": 90,
+          "salary": 32775000
+        },
+        {
+          "slot": "SF",
+          "player": "Jahlil Okafor",
+          "version": "pv-b8b9c2ce1bd808326995176c4b99be3e",
+          "overall": 83,
+          "salary": 19780000
+        },
+        {
+          "slot": "PF",
+          "player": "Ersan Ilyasova",
+          "version": "pv-4d269d107eafa4f4e6402976206c9ae0",
+          "overall": 86,
+          "salary": 25300000
+        },
+        {
+          "slot": "C",
+          "player": "Sandro Mamukelashvili",
+          "version": "pv-d84601fcfa0e64001f4e4d32b00e826c",
+          "overall": 86,
+          "salary": 25300000
+        }
+      ],
+      "wins": 63,
+      "losses": 19,
+      "pointDifferential": 778,
+      "undefeated": false
+    },
+    {
+      "qualified": false,
+      "conferenceSeed": 14,
+      "variant": "clash",
+      "strategy": "first-apron",
+      "attempt": 1,
+      "runSeed": "2263c4b82263c4b82263c4b82263c4b8",
+      "franchise": {
+        "franchiseId": "blazers",
+        "displayName": "Portland Trail Blazers",
+        "conference": "west",
+        "division": "northwest"
+      },
+      "payroll": 135240000,
+      "tier": "second-apron",
+      "spin": null,
+      "lineup": [
+        {
+          "slot": "PG",
+          "player": "Jevon Carter",
+          "version": "pv-7a403db4b7a4a490b1fb7ffa7a804a44",
+          "overall": 83,
+          "salary": 19780000
+        },
+        {
+          "slot": "SG",
+          "player": "Mitch Richmond",
+          "version": "pv-96e771530437e1b723e67e898d1b2203",
+          "overall": 90,
+          "salary": 34500000
+        },
+        {
+          "slot": "SF",
+          "player": "Doug Christie",
+          "version": "pv-9a97fd814542bfa5d9bc81873d492f71",
+          "overall": 85,
+          "salary": 23000000
+        },
+        {
+          "slot": "PF",
+          "player": "Rodney Rogers",
+          "version": "pv-3fd0a4ffcdb9e25b672c230da708954f",
+          "overall": 83,
+          "salary": 19780000
+        },
+        {
+          "slot": "C",
+          "player": "DeMarcus Cousins",
+          "version": "pv-33067fe45f74fbb877b98b26a7666e54",
+          "overall": 91,
+          "salary": 38180000
+        }
+      ],
+      "wins": 29,
+      "losses": 53,
+      "pointDifferential": -341,
+      "undefeated": false
+    },
+    {
+      "qualified": false,
+      "conferenceSeed": 13,
+      "variant": "roulette",
+      "strategy": "strong",
+      "attempt": 0,
+      "runSeed": "7c979e0e7c979e0e7c979e0e7c979e0e",
+      "franchise": {
+        "franchiseId": "suns",
+        "displayName": "Phoenix Suns",
+        "conference": "west",
+        "division": "pacific"
+      },
+      "payroll": 149653000,
+      "tier": "second-apron",
+      "spin": null,
+      "lineup": [
+        {
+          "slot": "PG",
+          "player": "Chris Paul",
+          "version": "pv-3e79e23b6db05497f5e9f4653a7e63eb",
+          "overall": 95,
+          "salary": 52900000
+        },
+        {
+          "slot": "SG",
+          "player": "Shai Gilgeous-Alexander",
+          "version": "pv-27416718dbc7b2c4e3caba5a91359208",
+          "overall": 97,
+          "salary": 63633000
+        },
+        {
+          "slot": "SF",
+          "player": "Nick Anderson",
+          "version": "pv-42ecc97240aea046d64eab140a2b7682",
+          "overall": 87,
+          "salary": 27600000
+        },
+        {
+          "slot": "PF",
+          "player": "Ron Knight",
+          "version": "pv-aa8fcc3994e9455d832d69b3bf6c2ca9",
+          "overall": 65,
+          "salary": 4140000
+        },
+        {
+          "slot": "C",
+          "player": "Zarko Cabarkapa",
+          "version": "pv-974cf793dc7349572d9b48f15efd8f63",
+          "overall": 42,
+          "salary": 1380000
+        }
+      ],
+      "wins": 36,
+      "losses": 46,
+      "pointDifferential": -164,
+      "undefeated": false
+    },
+    {
+      "qualified": false,
+      "conferenceSeed": 11,
+      "variant": "roulette",
+      "strategy": "strong",
+      "attempt": 1,
+      "runSeed": "7d979fa17d979fa17d979fa17d979fa1",
+      "franchise": {
+        "franchiseId": "magic",
+        "displayName": "Orlando Magic",
+        "conference": "east",
+        "division": "southeast"
+      },
+      "payroll": 149883000,
+      "tier": "second-apron",
+      "spin": null,
+      "lineup": [
+        {
+          "slot": "PG",
+          "player": "Kawhi Leonard",
+          "version": "pv-a696e35b7419fb37efbb85cd3671f90b",
+          "overall": 95,
+          "salary": 52900000
+        },
+        {
+          "slot": "SG",
+          "player": "Giannis Antetokounmpo",
+          "version": "pv-3ed9acd0928efba48759b83e137957e0",
+          "overall": 97,
+          "salary": 63633000
+        },
+        {
+          "slot": "SF",
+          "player": "Tom Chambers",
+          "version": "pv-38fc696d5671d25964f8bbef70d0b13d",
+          "overall": 87,
+          "salary": 26220000
+        },
+        {
+          "slot": "PF",
+          "player": "Jason Caffey",
+          "version": "pv-72f1062c641eaeb05b1b7d8a335ec0fc",
+          "overall": 66,
+          "salary": 4830000
+        },
+        {
+          "slot": "C",
+          "player": "Todd Fuller",
+          "version": "pv-b3cf425925eed24501ea5babfab255c9",
+          "overall": 50,
+          "salary": 2300000
+        }
+      ],
+      "wins": 35,
+      "losses": 47,
+      "pointDifferential": -147,
+      "undefeated": false
+    },
+    {
+      "qualified": false,
+      "conferenceSeed": 10,
+      "variant": "roulette",
+      "strategy": "middle",
+      "attempt": 0,
+      "runSeed": "93ef8a2c93ef8a2c93ef8a2c93ef8a2c",
+      "franchise": {
+        "franchiseId": "warriors",
+        "displayName": "Golden State Warriors",
+        "conference": "west",
+        "division": "pacific"
+      },
+      "payroll": 84295000,
+      "tier": "under-cap",
+      "spin": {
+        "purchase": "premium",
+        "priceDollars": 30000000,
+        "payrollDollars": 84295000,
+        "tier": 2,
+        "target": {
+          "pickOrdinal": 1,
+          "cardId": "crc-057ac49ffc00ac7bd432bf615ee4fd4f",
+          "slot": "SG",
+          "playerVersionId": "pv-73174218546c2d3c8bd96f127ec3ee48"
+        },
+        "entry": {
+          "mutationId": "golden-assist"
+        },
+        "effective": {
+          "ratings": {
+            "insideScoring": 65,
+            "closeShot": 58,
+            "midrange": 67,
+            "threePoint": 85,
+            "freeThrow": 85,
+            "ballHandling": 64,
+            "passing": 63,
+            "offensiveIq": 74,
+            "offensiveRebound": 33,
+            "defensiveRebound": 47,
+            "perimeterDefense": 59,
+            "interiorDefense": 40,
+            "steal": 56,
+            "block": 50,
+            "defensiveIq": 73,
+            "speed": 60,
+            "strength": 59,
+            "vertical": 62
+          },
+          "tendencies": {
+            "usageRate": 16.9,
+            "passRate": 10.93,
+            "shotRate": 0,
+            "driveRate": 5.47,
+            "postUpRate": 4.38,
+            "rimFrequency": 17.84,
+            "shortMidFrequency": 16.98,
+            "longMidFrequency": 14.46,
+            "cornerThreeFrequency": 20.23,
+            "aboveBreakThreeFrequency": 30.49,
+            "threePointRate": 50.72,
+            "freeThrowRate": 13.95,
+            "turnoverRate": 19.990000000000002,
+            "isolationRate": 2.35,
+            "pickAndRollBallHandlerRate": 26.78,
+            "pickAndRollRollManRate": 5.48,
+            "spotUpRate": 30.97,
+            "transitionRate": 10.93,
+            "cutRate": 8.91,
+            "foulRate": 4.81,
+            "stealAttemptRate": 9.48,
+            "blockAttemptRate": 9,
+            "crashOffensiveGlassRate": 13.96
+          },
+          "physical": {
+            "baselineHeightInches": 74,
+            "baselineHeightSource": "source",
+            "heightInches": 74,
+            "weightLbs": 185,
+            "wingspanDeltaInches": 0,
+            "reachUnits": 0
+          },
+          "authoritativeChannels": ["turnover-blend", "offensive-allocation"]
+        },
+        "receiptDigest": "8391420ef6cece12008e7e90b74cf3de"
+      },
+      "lineup": [
+        {
+          "slot": "PG",
+          "player": "Mike D'Antoni",
+          "version": "pv-71dc0ed98dc3bfed4af6886b39f99b89",
+          "overall": 82,
+          "salary": 16353000
+        },
+        {
+          "slot": "SG",
+          "player": "Seth Curry",
+          "version": "pv-73174218546c2d3c8bd96f127ec3ee48",
+          "overall": 84,
+          "salary": 21390000
+        },
+        {
+          "slot": "SF",
+          "player": "Trey Lyles",
+          "version": "pv-19bbd3d0d7003baca78cb38660f62d80",
+          "overall": 78,
+          "salary": 12650000
+        },
+        {
+          "slot": "PF",
+          "player": "Elton Brand",
+          "version": "pv-00d292503880976cf1617e2eb69d4860",
+          "overall": 82,
+          "salary": 18170000
+        },
+        {
+          "slot": "C",
+          "player": "Mel Turpin",
+          "version": "pv-c5503b76e50d99922bca43444eb505e6",
+          "overall": 81,
+          "salary": 15732000
+        }
+      ],
+      "wins": 41,
+      "losses": 41,
+      "pointDifferential": 63,
+      "undefeated": false
+    },
+    {
+      "qualified": false,
+      "conferenceSeed": 9,
+      "variant": "roulette",
+      "strategy": "middle",
+      "attempt": 1,
+      "runSeed": "94ef8bbf94ef8bbf94ef8bbf94ef8bbf",
+      "franchise": {
+        "franchiseId": "magic",
+        "displayName": "Orlando Magic",
+        "conference": "east",
+        "division": "southeast"
+      },
+      "payroll": 91770000,
+      "tier": "under-cap",
+      "spin": {
+        "purchase": "standard",
+        "priceDollars": 15000000,
+        "payrollDollars": 91770000,
+        "tier": 1,
+        "target": {
+          "pickOrdinal": 1,
+          "cardId": "crc-23deed5570077ba92399652f2b2ac825",
+          "slot": "SG",
+          "playerVersionId": "pv-8272b0fb43a8bcdf416f3621d502b60b"
+        },
+        "entry": {
+          "mutationId": "mr-everything"
+        },
+        "effective": {
+          "ratings": {
+            "insideScoring": 83,
+            "closeShot": 71,
+            "midrange": 81,
+            "threePoint": 100,
+            "freeThrow": 97,
+            "ballHandling": 83,
+            "passing": 92,
+            "offensiveIq": 91,
+            "offensiveRebound": 52,
+            "defensiveRebound": 61,
+            "perimeterDefense": 74,
+            "interiorDefense": 55,
+            "steal": 76,
+            "block": 64,
+            "defensiveIq": 88,
+            "speed": 77,
+            "strength": 74,
+            "vertical": 77
+          },
+          "tendencies": {
+            "usageRate": 33,
+            "passRate": 31.22,
+            "shotRate": 33.47,
+            "driveRate": 39.44,
+            "postUpRate": 20.03,
+            "rimFrequency": 39.129999999999995,
+            "shortMidFrequency": 40.59,
+            "longMidFrequency": 36.8,
+            "cornerThreeFrequency": 24.96,
+            "aboveBreakThreeFrequency": 33.510000000000005,
+            "threePointRate": 43.47,
+            "freeThrowRate": 53.38,
+            "turnoverRate": 28.09,
+            "isolationRate": 17.72,
+            "pickAndRollBallHandlerRate": 46.39,
+            "pickAndRollRollManRate": 20.740000000000002,
+            "spotUpRate": 38.06,
+            "transitionRate": 26.6,
+            "cutRate": 23.7,
+            "foulRate": 20.12,
+            "stealAttemptRate": 24.880000000000003,
+            "blockAttemptRate": 23.92,
+            "crashOffensiveGlassRate": 29.439999999999998
+          },
+          "physical": {
+            "baselineHeightInches": 74,
+            "baselineHeightSource": "source",
+            "heightInches": 74,
+            "weightLbs": 185,
+            "wingspanDeltaInches": 0,
+            "reachUnits": 0
+          },
+          "authoritativeChannels": [
+            "two-point-accuracy",
+            "three-point-accuracy",
+            "three-point-volume",
+            "free-throw-accuracy",
+            "block-anchor",
+            "assist-anchor",
+            "rebound-weights",
+            "turnover-blend",
+            "offensive-allocation"
+          ]
+        },
+        "receiptDigest": "a4a040424246c2d62d88cbf4ddaa5372"
+      },
+      "lineup": [
+        {
+          "slot": "PG",
+          "player": "Gary Grant",
+          "version": "pv-865a0c0e962d0b6a053f116087c94f7e",
+          "overall": 80,
+          "salary": 14950000
+        },
+        {
+          "slot": "SG",
+          "player": "B.J. Armstrong",
+          "version": "pv-8272b0fb43a8bcdf416f3621d502b60b",
+          "overall": 88,
+          "salary": 29900000
+        },
+        {
+          "slot": "SF",
+          "player": "Jae Crowder",
+          "version": "pv-046308731a0e95ef8442d539037a3143",
+          "overall": 79,
+          "salary": 13800000
+        },
+        {
+          "slot": "PF",
+          "player": "Lauri Markkanen",
+          "version": "pv-ffebad046420e1b0e475c2e6b50130d4",
+          "overall": 80,
+          "salary": 14950000
+        },
+        {
+          "slot": "C",
+          "player": "Shareef Abdur-Rahim",
+          "version": "pv-598841e3bda928a73461f059642b9173",
+          "overall": 82,
+          "salary": 18170000
+        }
+      ],
+      "wins": 40,
+      "losses": 42,
+      "pointDifferential": -77,
+      "undefeated": false
+    },
+    {
+      "qualified": false,
+      "conferenceSeed": 14,
+      "variant": "roulette",
+      "strategy": "budget",
+      "attempt": 0,
+      "runSeed": "30794ccc30794ccc30794ccc30794ccc",
+      "franchise": {
+        "franchiseId": "warriors",
+        "displayName": "Golden State Warriors",
+        "conference": "west",
+        "division": "pacific"
+      },
+      "payroll": 26910000,
+      "tier": "under-cap",
+      "spin": {
+        "purchase": "premium",
+        "priceDollars": 30000000,
+        "payrollDollars": 26910000,
+        "tier": 2,
+        "target": {
+          "pickOrdinal": 0,
+          "cardId": "crc-2d2e874839e35604501caea66cc34ab8",
+          "slot": "PG",
+          "playerVersionId": "pv-e028c8e93e595905af22079b1907e359"
+        },
+        "entry": {
+          "mutationId": "second-chance-jackpot"
+        },
+        "effective": {
+          "ratings": {
+            "insideScoring": 61,
+            "closeShot": 52,
+            "midrange": 64,
+            "threePoint": 67,
+            "freeThrow": 76,
+            "ballHandling": 65,
+            "passing": 65,
+            "offensiveIq": 63,
+            "offensiveRebound": 42,
+            "defensiveRebound": 17,
+            "perimeterDefense": 62,
+            "interiorDefense": 42,
+            "steal": 67,
+            "block": 50,
+            "defensiveIq": 71,
+            "speed": 62,
+            "strength": 61,
+            "vertical": 62
+          },
+          "tendencies": {
+            "usageRate": 18,
+            "passRate": 13.07,
+            "shotRate": 23.57,
+            "driveRate": 26.06,
+            "postUpRate": 6.35,
+            "rimFrequency": 27.12,
+            "shortMidFrequency": 24.66,
+            "longMidFrequency": 21.01,
+            "cornerThreeFrequency": 10.1,
+            "aboveBreakThreeFrequency": 17.11,
+            "threePointRate": 27.21,
+            "freeThrowRate": 45.72,
+            "turnoverRate": 15.46,
+            "isolationRate": 2.72,
+            "pickAndRollBallHandlerRate": 29.4,
+            "pickAndRollRollManRate": 7.32,
+            "spotUpRate": 22.63,
+            "transitionRate": 12.12,
+            "cutRate": 9.13,
+            "foulRate": 5.78,
+            "stealAttemptRate": 10.36,
+            "blockAttemptRate": 9,
+            "crashOffensiveGlassRate": 15.04
+          },
+          "physical": {
+            "baselineHeightInches": 74,
+            "baselineHeightSource": "source",
+            "heightInches": 74,
+            "weightLbs": 190,
+            "wingspanDeltaInches": 0,
+            "reachUnits": 0
+          },
+          "authoritativeChannels": ["rebound-weights"]
+        },
+        "receiptDigest": "c79c975e59a1f02a50aa0d5853729e0e"
+      },
+      "lineup": [
+        {
+          "slot": "PG",
+          "player": "Travis Mays",
+          "version": "pv-e028c8e93e595905af22079b1907e359",
+          "overall": 71,
+          "salary": 6440000
+        },
+        {
+          "slot": "SG",
+          "player": "Tony Smith",
+          "version": "pv-0156f24c0f738308eb2ab0b63a8b4ebc",
+          "overall": 66,
+          "salary": 4830000
+        },
+        {
+          "slot": "SF",
+          "player": "Johnny Newman",
+          "version": "pv-651d56e11e4a7ced00984063440c1b91",
+          "overall": 70,
+          "salary": 5750000
+        },
+        {
+          "slot": "PF",
+          "player": "Micah Peavy",
+          "version": "pv-a8dcc13bdef7f7577ee3a279a1c4f9ab",
+          "overall": 69,
+          "salary": 5520000
+        },
+        {
+          "slot": "C",
+          "player": "Rick Robey",
+          "version": "pv-78f615e10d38305da33262bbfa54f1b1",
+          "overall": 65,
+          "salary": 4370000
+        }
+      ],
+      "wins": 19,
+      "losses": 63,
+      "pointDifferential": -777,
+      "undefeated": false
+    },
+    {
+      "qualified": false,
+      "conferenceSeed": 15,
+      "variant": "roulette",
+      "strategy": "budget",
+      "attempt": 1,
+      "runSeed": "31794e5f31794e5f31794e5f31794e5f",
+      "franchise": {
+        "franchiseId": "magic",
+        "displayName": "Orlando Magic",
+        "conference": "east",
+        "division": "southeast"
+      },
+      "payroll": 23046000,
+      "tier": "under-cap",
+      "spin": {
+        "purchase": "premium",
+        "priceDollars": 30000000,
+        "payrollDollars": 23046000,
+        "tier": 2,
+        "target": {
+          "pickOrdinal": 3,
+          "cardId": "crc-b65057d67b29a8b2e7d8d2801e6d8b86",
+          "slot": "PF",
+          "playerVersionId": "pv-6d29dfd4c708f21030a5e82ea6551964"
+        },
+        "entry": {
+          "mutationId": "possession-refund"
+        },
+        "effective": {
+          "ratings": {
+            "insideScoring": 62,
+            "closeShot": 57,
+            "midrange": 61,
+            "threePoint": 53,
+            "freeThrow": 69,
+            "ballHandling": 54,
+            "passing": 52,
+            "offensiveIq": 64,
+            "offensiveRebound": 67,
+            "defensiveRebound": 75,
+            "perimeterDefense": 69,
+            "interiorDefense": 49,
+            "steal": 82,
+            "block": 50,
+            "defensiveIq": 70,
+            "speed": 62,
+            "strength": 53,
+            "vertical": 62
+          },
+          "tendencies": {
+            "usageRate": 13.3,
+            "passRate": 8.21,
+            "shotRate": 10.29,
+            "driveRate": 19.47,
+            "postUpRate": 13.05,
+            "rimFrequency": 39.63,
+            "shortMidFrequency": 35,
+            "longMidFrequency": 12.76,
+            "cornerThreeFrequency": 1.04,
+            "aboveBreakThreeFrequency": 1.34,
+            "threePointRate": 2.38,
+            "freeThrowRate": 46.13,
+            "turnoverRate": 15.47,
+            "isolationRate": 1,
+            "pickAndRollBallHandlerRate": 16.1,
+            "pickAndRollRollManRate": 14.89,
+            "spotUpRate": 15.65,
+            "transitionRate": 12.19,
+            "cutRate": 12.37,
+            "foulRate": 5.96,
+            "stealAttemptRate": 11.56,
+            "blockAttemptRate": 9,
+            "crashOffensiveGlassRate": 18.04
+          },
+          "physical": {
+            "baselineHeightInches": 81,
+            "baselineHeightSource": "source",
+            "heightInches": 81,
+            "weightLbs": 206,
+            "wingspanDeltaInches": 0,
+            "reachUnits": 0
+          },
+          "authoritativeChannels": []
+        },
+        "receiptDigest": "2ef6cac7dc87ada3ca9f2b3d00cb7f17"
+      },
+      "lineup": [
+        {
+          "slot": "PG",
+          "player": "Jojo White",
+          "version": "pv-d1135ac577ec0099f1db52cb246bd015",
+          "overall": 65,
+          "salary": 4140000
+        },
+        {
+          "slot": "SG",
+          "player": "Josh Childress",
+          "version": "pv-549c9e4210ceddde892165709b3814d2",
+          "overall": 66,
+          "salary": 4830000
+        },
+        {
+          "slot": "SF",
+          "player": "Bill Curley",
+          "version": "pv-ddaea093e4dd046783d7f465eeb50563",
+          "overall": 67,
+          "salary": 5060000
+        },
+        {
+          "slot": "PF",
+          "player": "Jerome Williams",
+          "version": "pv-6d29dfd4c708f21030a5e82ea6551964",
+          "overall": 69,
+          "salary": 5520000
+        },
+        {
+          "slot": "C",
+          "player": "Will Perdue",
+          "version": "pv-00732fa2746bca4e357348a4b3afd972",
+          "overall": 61,
+          "salary": 3496000
+        }
+      ],
+      "wins": 29,
+      "losses": 53,
+      "pointDifferential": -476,
+      "undefeated": false
+    },
+    {
+      "qualified": true,
+      "conferenceSeed": 1,
+      "variant": "roulette",
+      "strategy": "first-apron",
+      "attempt": 0,
+      "runSeed": "d47efa28d47efa28d47efa28d47efa28",
+      "franchise": {
+        "franchiseId": "jazz",
+        "displayName": "Utah Jazz",
+        "conference": "west",
+        "division": "northwest"
+      },
+      "payroll": 114943000,
+      "tier": "under-cap",
+      "spin": null,
+      "lineup": [
+        {
+          "slot": "PG",
+          "player": "Willie White",
+          "version": "pv-339252ea007265ce74da5b30c2c02e5a",
+          "overall": 82,
+          "salary": 17262000
+        },
+        {
+          "slot": "SG",
+          "player": "Luke Kennard",
+          "version": "pv-eea318470611a6bb54ee3a414a80bf97",
+          "overall": 86,
+          "salary": 25300000
+        },
+        {
+          "slot": "SF",
+          "player": "Rashard Lewis",
+          "version": "pv-7a52aae26102e4c69ab842f004d29732",
+          "overall": 84,
+          "salary": 21390000
+        },
+        {
+          "slot": "PF",
+          "player": "Bobby Portis",
+          "version": "pv-6b258fcd24c98c293e5476079b8b549d",
+          "overall": 89,
+          "salary": 32200000
+        },
+        {
+          "slot": "C",
+          "player": "Wayne Cooper",
+          "version": "pv-44b56e7a389ec6ce43e0fd14e87311aa",
+          "overall": 83,
+          "salary": 18791000
+        }
+      ],
+      "wins": 60,
+      "losses": 22,
+      "pointDifferential": 696,
+      "undefeated": false
+    },
+    {
+      "qualified": true,
+      "conferenceSeed": 1,
+      "variant": "roulette",
+      "strategy": "first-apron",
+      "attempt": 1,
+      "runSeed": "d57efbbbd57efbbbd57efbbbd57efbbb",
+      "franchise": {
+        "franchiseId": "cavaliers",
+        "displayName": "Cleveland Cavaliers",
+        "conference": "east",
+        "division": "central"
+      },
+      "payroll": 130502000,
+      "tier": "first-apron",
+      "spin": null,
+      "lineup": [
+        {
+          "slot": "PG",
+          "player": "Shabazz Napier",
+          "version": "pv-35feb0a42ce31910a7ff6d4296796694",
+          "overall": 86,
+          "salary": 25300000
+        },
+        {
+          "slot": "SG",
+          "player": "Kendrick Nunn",
+          "version": "pv-6e8c26d7bd1ea8fbde927701fd99fa27",
+          "overall": 81,
+          "salary": 16560000
+        },
+        {
+          "slot": "SF",
+          "player": "Bobby Jones",
+          "version": "pv-bc87e3389813150cb429f8ae03a8a7e8",
+          "overall": 91,
+          "salary": 34362000
+        },
+        {
+          "slot": "PF",
+          "player": "Darrell Arthur",
+          "version": "pv-bd107944556e70d04fa20462caf468b4",
+          "overall": 83,
+          "salary": 19780000
+        },
+        {
+          "slot": "C",
+          "player": "Jay Huff",
+          "version": "pv-33a8b5ef2111ed2b429092154c50e5bf",
+          "overall": 90,
+          "salary": 34500000
+        }
+      ],
+      "wins": 64,
+      "losses": 18,
+      "pointDifferential": 939,
+      "undefeated": false
+    }
+  ]
+}

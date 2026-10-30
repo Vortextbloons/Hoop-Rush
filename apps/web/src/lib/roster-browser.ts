@@ -4,8 +4,8 @@ import type {
   RosterDetailsEntry,
 } from '@hoop-rush/data-contracts';
 import { oneDecimal, percentOneDecimal } from './format';
-export type RosterDetailRow = PlayersIndexEntry & RosterDetailsEntry;
-export type RosterListItem<T = RosterDetailRow> =
+export type RosterRow = PlayersIndexEntry & { detail: RosterDetailsEntry | null };
+export type RosterListItem<T = RosterRow> =
   | {
       type: 'group';
       franchiseId: string;
@@ -49,6 +49,9 @@ export function defaultDirection(sortId: RosterSortId): RosterSortDirection {
       return 'asc';
   }
 }
+export function sortNeedsDetails(sortId: RosterSortId): boolean {
+  return sortId === 'points' || sortId === 'per';
+}
 export interface RosterFilters {
   franchiseId: string | null;
   eraId: string | null;
@@ -78,11 +81,11 @@ function compareName(a: PlayersIndexEntry, b: PlayersIndexEntry): number {
   return a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName) || 0;
 }
 function compareBy<T>(
-  rows: RosterDetailRow[],
-  value: (row: RosterDetailRow) => T,
+  rows: RosterRow[],
+  value: (row: RosterRow) => T,
   direction: RosterSortDirection,
   compare: (a: T, b: T) => number,
-): RosterDetailRow[] {
+): RosterRow[] {
   const sign = direction === 'asc' ? 1 : -1;
   return [...rows].sort((a, b) => {
     const primary = sign * compare(value(a), value(b));
@@ -92,14 +95,29 @@ function compareBy<T>(
 function compareNumber(a: number, b: number): number {
   return a - b;
 }
+function compareDetailBy(
+  rows: RosterRow[],
+  value: (detail: RosterDetailsEntry) => number,
+  direction: RosterSortDirection,
+): RosterRow[] {
+  const sign = direction === 'asc' ? 1 : -1;
+  return [...rows].sort((a, b) => {
+    if (!a.detail || !b.detail) {
+      if (a.detail !== b.detail) return a.detail ? -1 : 1;
+      return compareName(a, b);
+    }
+    const primary = sign * compareNumber(value(a.detail), value(b.detail));
+    return primary !== 0 ? primary : compareName(a, b);
+  });
+}
 function compareText(a: string, b: string): number {
   return a.localeCompare(b);
 }
 export function sortRoster(
-  rows: RosterDetailRow[],
+  rows: RosterRow[],
   sortId: RosterSortId,
   direction: RosterSortDirection,
-): RosterDetailRow[] {
+): RosterRow[] {
   switch (sortId) {
     case 'none':
       return [...rows];
@@ -112,9 +130,9 @@ export function sortRoster(
     case 'defense':
       return compareBy(rows, (r) => r.defense, direction, compareNumber);
     case 'points':
-      return compareBy(rows, (r) => perGame(r.stats, 'points'), direction, compareNumber);
+      return compareDetailBy(rows, (detail) => perGame(detail.stats, 'points'), direction);
     case 'per':
-      return compareBy(rows, (r) => r.stats.per ?? -Infinity, direction, compareNumber);
+      return compareDetailBy(rows, (detail) => detail.stats.per ?? -Infinity, direction);
     case 'season':
       return compareBy(rows, (r) => seasonStartYear(r.seasonKey), direction, compareNumber);
     case 'team':
@@ -130,7 +148,7 @@ export function sortRoster(
       );
   }
 }
-export function filterRoster(rows: RosterDetailRow[], filters: RosterFilters): RosterDetailRow[] {
+export function filterRoster(rows: RosterRow[], filters: RosterFilters): RosterRow[] {
   const franchiseId = filters.franchiseId;
   const eraId = filters.eraId;
   const position = filters.position;

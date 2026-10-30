@@ -1,10 +1,12 @@
 import type {
   CapRushLockedInputs,
+  CapRushApronFact,
   CapRushPlayoffGamePlan,
   CapRushPlayoffGameSummary,
   CapRushPlayoffParticipant,
   CapRushStoredPlayoffGame,
   HavocBattleInput,
+  HavocBattleTape,
   HavocBattleTeamInput,
   HavocParticipantLine,
   HavocTeamInput,
@@ -110,6 +112,9 @@ export interface CapRushPlayoffSimulation {
   readonly game: CapRushStoredPlayoffGame;
   readonly inputDigest: string;
   readonly resultDigest: string;
+  readonly battleInput: HavocBattleInput;
+  readonly tape: HavocBattleTape;
+  readonly facts: readonly CapRushApronFact[];
 }
 
 export function simulateCapRushPlayoffGame(input: {
@@ -201,5 +206,8 @@ export function simulateCapRushPlayoffGame(input: {
     },
     inputDigest,
     resultDigest,
+    battleInput,
+    tape: battle.tape,
+    facts: apron?.recordedFacts() ?? [],
   };
 }

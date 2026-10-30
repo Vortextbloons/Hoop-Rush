@@ -209,7 +209,7 @@ export function havocMultiplayerLiveBoxes(
     }
     const line = resolve(entry.side)(entry.actorInstanceId);
     line.points += entry.points;
-    if (entry.kind === 'adjustment') line.adjustments += entry.points;
+    line.adjustments += entry.points - entry.nominalPoints;
   }
   return SIDES.map((side) => {
     const team = result[side];

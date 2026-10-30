@@ -174,6 +174,21 @@ export function buildCapRushHumanTeam(input: {
   });
 }
 
+function capRushOpponentTeamOf(
+  input: Parameters<typeof buildHavocOpponentTeam>[0],
+): HavocTeamInput {
+  const team = buildHavocOpponentTeam(input).team;
+  const withSeason = (participant: HavocTeamInput['starters'][number]) => ({
+    ...participant,
+    source: { ...participant.source, seasonKey: input.opponent.seasonKey },
+  });
+  return {
+    ...team,
+    starters: team.starters.map(withSeason),
+    replacements: team.replacements.map(withSeason),
+  };
+}
+
 function buildOpponentSides(input: {
   readonly runSeed: Seed;
   readonly bracket: OpponentBracket;
@@ -187,11 +202,11 @@ function buildOpponentSides(input: {
     .filter((opponent) => opponent.teamId !== input.excludeTeamId)
     .map((opponent) => ({
       opponentId: opponent.teamId,
-      team: buildHavocOpponentTeam({
+      team: capRushOpponentTeamOf({
         runSeed: input.runSeed,
         opponent,
         profile: input.profile,
-      }).team,
+      }),
     }));
 }
 
@@ -250,11 +265,11 @@ export function buildCapRushLockedInputs(input: {
     const schedule = buildCapRushSchedule(input.bracket);
     const opponents = input.bracket.opponents.map((opponent) => ({
       opponentId: opponent.opponentId,
-      team: buildHavocOpponentTeam({
+      team: capRushOpponentTeamOf({
         runSeed: input.runSeed,
         opponent,
         profile: input.profile,
-      }).team,
+      }),
     }));
     return capRushLockedInputsSchema.parse({
       schemaVersion: CAP_RUSH_SCHEMA_VERSION,

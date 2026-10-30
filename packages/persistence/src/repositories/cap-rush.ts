@@ -23,7 +23,12 @@ import {
   capRushStoredPlayoffGameSchema,
   isConferencePostseason,
 } from '@hoop-rush/data-contracts';
-import { capRushStateDigest } from '@hoop-rush/engine';
+import {
+  auditHavocBattleGame,
+  havocBattleGameInputDigest,
+  soloToBattleResult,
+  capRushStateDigest,
+} from '@hoop-rush/engine';
 import {
   CAP_RUSH_ACTIVE_DRAFT_RECORD_ID,
   storedCapRushCommandRowSchema,
@@ -66,6 +71,12 @@ export interface CapRushRepository {
   applyOutcome(input: CapRushApplyOutcomeInput): Promise<CapRushCommandResult>;
   listPlayoffGames(runId: string): Promise<CapRushStoredPlayoffGame[]>;
   listLeagueGames(runId: string): Promise<CapRushLeagueGame[]>;
+  updatePlayback(
+    runId: string,
+    game: number | string,
+    cursor: number,
+    resolved: boolean,
+  ): Promise<void>;
   clearActiveDraft(): Promise<void>;
 }
 export class CapRushLoadError extends Error {
@@ -309,6 +320,23 @@ export class DexieCapRushRepository implements CapRushRepository {
         throw malformed('stored game is missing from the accepted season state');
       }
     }
+    const broadcastGame = game ?? playoffGame;
+    if (broadcastGame?.playback !== undefined) {
+      const playback = broadcastGame.playback;
+      if (broadcastGame.result === null || playback.cursor !== 0)
+        throw malformed('a new broadcast requires an initial cursor and user result');
+      const audit = auditHavocBattleGame(
+        playback.input,
+        soloToBattleResult(
+          broadcastGame.result,
+          broadcastGame.result.humanSide,
+          havocBattleGameInputDigest(playback.input),
+        ),
+        playback.tape,
+      );
+      if (!audit.ok)
+        throw malformed('the recorded broadcast does not reconcile with the accepted result');
+    }
     if (report !== null) {
       const reportCommandError = capRushReportCommandError({ command, report });
       if (reportCommandError !== null) {
@@ -380,6 +408,20 @@ export class DexieCapRushRepository implements CapRushRepository {
             return existing.result;
           }
           throw new CapRushCommandConflictError(result.commandId);
+        }
+
+        const pendingRegular = await this.db.capRushGames
+          .where('runId')
+          .equals(result.runId)
+          .toArray();
+        const pendingPlayoffs = await this.db.capRushPlayoffGames
+          .where('runId')
+          .equals(result.runId)
+          .toArray();
+        if (
+          [...pendingRegular, ...pendingPlayoffs].some((row) => row.game.playback !== undefined)
+        ) {
+          throw malformed('finish the pending broadcast before advancing the run');
         }
 
         const now = new Date().toISOString();
@@ -481,6 +523,52 @@ export class DexieCapRushRepository implements CapRushRepository {
           }),
         );
         return result;
+      },
+    );
+  }
+
+  async updatePlayback(
+    runId: string,
+    game: number | string,
+    cursor: number,
+    resolved: boolean,
+  ): Promise<void> {
+    await this.db.transaction(
+      'rw',
+      [this.db.capRushGames, this.db.capRushPlayoffGames],
+      async () => {
+        if (typeof game === 'number') {
+          const row = await this.db.capRushGames.get([runId, game]);
+          if (row === undefined) throw malformed('the broadcast game is missing');
+          const parsed = storedCapRushGameRowSchema.parse(row);
+          const playback = parsed.game.playback;
+          if (playback === undefined) return;
+          if (cursor < playback.cursor) return;
+          if (resolved && cursor !== playback.tape.events.length + playback.tape.scoring.length) {
+            throw malformed('the broadcast must reach its final event before it can resolve');
+          }
+          const updated: CapRushStoredGame = { ...parsed.game, playback: { ...playback, cursor } };
+          capRushStoredGameSchema.parse(updated);
+          if (resolved) delete updated.playback;
+          await this.db.capRushGames.put({ ...parsed, game: updated });
+        } else {
+          const row = await this.db.capRushPlayoffGames.get([runId, game]);
+          if (row === undefined) throw malformed('the broadcast game is missing');
+          const parsed = storedCapRushPlayoffGameRowSchema.parse(row);
+          const playback = parsed.game.playback;
+          if (playback === undefined) return;
+          if (cursor < playback.cursor) return;
+          if (resolved && cursor !== playback.tape.events.length + playback.tape.scoring.length) {
+            throw malformed('the broadcast must reach its final event before it can resolve');
+          }
+          const updated: CapRushStoredPlayoffGame = {
+            ...parsed.game,
+            playback: { ...playback, cursor },
+          };
+          capRushStoredPlayoffGameSchema.parse(updated);
+          if (resolved) delete updated.playback;
+          await this.db.capRushPlayoffGames.put({ ...parsed, game: updated });
+        }
       },
     );
   }

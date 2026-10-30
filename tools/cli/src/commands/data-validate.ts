@@ -1,3 +1,4 @@
+import { capRushValidateLeagueField } from '@hoop-rush/engine';
 import { readFile, stat } from 'node:fs/promises';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { validateBracketContent, scheduleInvariants } from '@hoop-rush/engine';
@@ -17,6 +18,7 @@ import {
   COLLECTION_SPECIALS_VERSION,
   COLLECTION_PACK_RULES_VERSION,
   canonicalJson,
+  capRushRosterMetadataSchema,
   collectionCatalogSchema,
   collectionIndexSchema,
   unavailabilityReasonSchema,
@@ -549,6 +551,7 @@ async function auditBracket(
   const details: string[] = [];
   const entries: Array<{ label: string; entry: OpponentIndexEntry }> = [];
   if (manifest.bracket) entries.push({ label: 'bracket', entry: manifest.bracket });
+  if (manifest.capRushBracket) entries.push({ label: 'cap-rush', entry: manifest.capRushBracket });
   if (entries.length === 0) {
     details.push('bracket: none packaged');
     return { ok: true, details, failures };
@@ -578,6 +581,38 @@ async function auditBracket(
         return { ok: failures.length === 0, details, failures };
       }
       const bracket = parsed.data;
+      if (label === 'cap-rush') {
+        try {
+          capRushValidateLeagueField(bracket.opponents);
+          const metadataEntry = manifest.capRushRosterMetadata;
+          if (metadataEntry === undefined) throw new Error('missing roster metadata');
+          const metadataBytes = await readFile(resolve(manifestDir, metadataEntry.url));
+          if (sha256Hex(metadataBytes) !== metadataEntry.contentHash)
+            throw new Error('roster metadata hash mismatch');
+          const metadata = capRushRosterMetadataSchema.parse(
+            JSON.parse(metadataBytes.toString('utf8')),
+          );
+          if (metadata.fieldHash !== entry.contentHash)
+            throw new Error('roster metadata belongs to another field');
+          const seen = new Set<string>();
+          for (const row of metadata.players) {
+            const key = `${row.teamId}/${row.playerId}`;
+            if (seen.has(key)) throw new Error(`duplicate roster metadata ${key}`);
+            seen.add(key);
+            const opponent = bracket.opponents.find((team) => team.teamId === row.teamId);
+            const player = opponent?.players.find((player) => player.playerId === row.playerId);
+            if (
+              opponent?.seasonKey !== row.seasonKey ||
+              player === undefined ||
+              canonicalJson(player.ratings) !== canonicalJson(row.ratings) ||
+              canonicalJson(player.tendencies) !== canonicalJson(row.tendencies)
+            )
+              throw new Error(`roster metadata does not match frozen player ${key}`);
+          }
+        } catch (error) {
+          failures.push(`cap-rush: ${String(error)}`);
+        }
+      }
       failures.push(
         ...validateBracketContent(bracket).map((f) => `${label}: ${f}`),
         ...scheduleInvariants(bracket.schedule).map((f) => `${label}: ${f}`),
