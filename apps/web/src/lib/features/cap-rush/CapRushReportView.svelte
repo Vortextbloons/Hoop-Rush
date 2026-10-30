@@ -529,6 +529,11 @@
           Applied penalties
         </p>
         <p class="mt-1 text-sm font-bold">{apronPenaltyTitle(report.payrollStatus)}</p>
+        {#if report.payrollStatus === 'first-apron' || report.payrollStatus === 'second-apron'}
+          <p class="mt-1 text-xs text-muted-foreground">
+            Intercepted passes are not included in season effect totals.
+          </p>
+        {/if}
         {#if penaltyRows.length > 0}
           <dl class="mt-3 grid grid-cols-1 gap-x-4 sm:grid-cols-2">
             {#each penaltyRows as row (row.label)}
@@ -544,25 +549,33 @@
           </dl>
         {/if}
       </div>
-      <div class="mt-4">
-        <p class="font-mono text-[9px] font-bold tracking-[0.12em] text-muted-foreground uppercase">
-          Season effects
-        </p>
-        <dl class="mt-2 grid grid-cols-2 gap-2">
-          <div class="rounded-xl border border-line-soft px-3 py-3">
-            <dt class="text-xs text-muted-foreground">Forced isolations</dt>
-            <dd class="font-display mt-1 text-2xl font-extrabold tabular-nums">
-              {report.apronTriggers.isolations.toLocaleString()}
-            </dd>
-          </div>
-          <div class="rounded-xl border border-line-soft px-3 py-3">
-            <dt class="text-xs text-muted-foreground">Defensive strikes</dt>
-            <dd class="font-display mt-1 text-2xl font-extrabold tabular-nums">
-              {report.apronTriggers.strikes.toLocaleString()}
-            </dd>
-          </div>
-        </dl>
-      </div>
+      {#if report.apronTriggers.isolations > 0 || report.payrollStatus === 'second-apron' || report.apronTriggers.strikes > 0}
+        <div class="mt-4">
+          <p
+            class="font-mono text-[9px] font-bold tracking-[0.12em] text-muted-foreground uppercase"
+          >
+            Season effects
+          </p>
+          <dl class="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {#if report.apronTriggers.isolations > 0}
+              <div class="rounded-xl border border-line-soft px-3 py-3">
+                <dt class="text-xs text-muted-foreground">Forced isolations (legacy rules)</dt>
+                <dd class="font-display mt-1 text-2xl font-extrabold tabular-nums">
+                  {report.apronTriggers.isolations.toLocaleString()}
+                </dd>
+              </div>
+            {/if}
+            {#if report.payrollStatus === 'second-apron' || report.apronTriggers.strikes > 0}
+              <div class="rounded-xl border border-line-soft px-3 py-3">
+                <dt class="text-xs text-muted-foreground">Defensive strikes</dt>
+                <dd class="font-display mt-1 text-2xl font-extrabold tabular-nums">
+                  {report.apronTriggers.strikes.toLocaleString()}
+                </dd>
+              </div>
+            {/if}
+          </dl>
+        </div>
+      {/if}
     </section>
 
     {#if report.variant === 'roulette'}

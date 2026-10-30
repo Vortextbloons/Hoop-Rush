@@ -1,12 +1,5 @@
-import type {
-  Lineup,
-  LineupAssignment,
-  Position,
-  PositionUnion,
-  SlotIndex,
-} from '@hoop-rush/data-contracts';
+import type { Lineup, Position, SlotIndex } from '@hoop-rush/data-contracts';
 import { LINEUP_STRUCTURE } from '@hoop-rush/data-contracts';
-import { playerIdSchema } from '@hoop-rush/data-contracts';
 import { canPlay } from './positions.ts';
 export function slotRequirement(slotIndex: SlotIndex): Position {
   const requirement = LINEUP_STRUCTURE[slotIndex];
@@ -14,9 +7,6 @@ export function slotRequirement(slotIndex: SlotIndex): Position {
     throw new Error(`lineup: no position requirement for slot ${String(slotIndex)}`);
   }
   return requirement;
-}
-export function canFillSlot(positions: PositionUnion, slotIndex: SlotIndex): boolean {
-  return canPlay(positions, slotRequirement(slotIndex));
 }
 export interface LineupIssue {
   code: 'duplicate-player' | 'slot-missing' | 'slot-mismatch' | 'bad-slot';
@@ -82,44 +72,4 @@ export function validateLineup(lineup: Lineup): LineupValidation {
     }
   }
   return { ok: issues.length === 0, issues };
-}
-export function assignLineup(
-  players: ReadonlyArray<{
-    playerId: string;
-    positions: PositionUnion;
-  }>,
-): LineupAssignment[] | null {
-  if (players.length !== 5) return null;
-  const byId = new Map(players.map((p) => [p.playerId, p]));
-  if (byId.size !== 5) return null;
-  const slots: SlotIndex[] = [0, 1, 2, 3, 4];
-  function search(index: number, used: Map<SlotIndex, string>): LineupAssignment[] | null {
-    if (index === players.length) {
-      return [...used.entries()].map(([slotIndex, playerId]) => {
-        const assigned = byId.get(playerId);
-        if (assigned === undefined) {
-          throw new Error(`lineup: missing player ${playerId}`);
-        }
-        return {
-          slotIndex,
-          playerId: playerIdSchema.parse(playerId),
-          positions: assigned.positions,
-        };
-      });
-    }
-    const player = players[index];
-    if (player === undefined) {
-      throw new Error(`lineup: missing player at index ${String(index)}`);
-    }
-    for (const slotIndex of slots) {
-      if (used.has(slotIndex)) continue;
-      if (!canFillSlot(player.positions, slotIndex)) continue;
-      used.set(slotIndex, player.playerId);
-      const result = search(index + 1, used);
-      if (result) return result;
-      used.delete(slotIndex);
-    }
-    return null;
-  }
-  return search(0, new Map());
 }

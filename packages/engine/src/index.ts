@@ -70,17 +70,8 @@ export {
   simulateChallengeAttempts,
   simulateChallengeBestOf,
 } from './modes/sandbox/selection.ts';
-export { plannerCandidates } from './game/rotation-planner.ts';
-export {
-  simulateGameWithEffects,
-  defaultGameSeam,
-  sameUnit,
-  type GameAvailabilitySeam,
-  type GameEffectsMode,
-} from './game/controller.ts';
 export { type HomeCourtMechanisms } from './game/home-court.ts';
-export { createEffectsBuffer, type EffectsBuffer, type EffectsHook } from './game/effects.ts';
-export { minuteQualityOf, minuteReliefOf } from './game/minute-plan.ts';
+export { type EffectsHook } from './game/effects.ts';
 export {
   FIRST_TO_SEVEN_TARGET,
   FIRST_TO_SEVEN_SAFETY_POSSESSIONS,

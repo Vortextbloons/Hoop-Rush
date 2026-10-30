@@ -1,6 +1,6 @@
 import { fnv1a32 } from '@hoop-rush/data-contracts';
 
-export function mulberry32Seed(seed: number): () => number {
+function mulberry32Seed(seed: number): () => number {
   let a = seed | 0;
   return () => {
     a = (a + 0x6d2b79f5) | 0;
