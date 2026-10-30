@@ -6,6 +6,7 @@ import type {
   CapRushLeagueScheduleEntry,
   CapRushLockedInputs,
   CapRushTeamBox,
+  HavocBattleInput,
   HavocBattleTeamInput,
   HavocParticipantLine,
   HavocTeamInput,
@@ -17,7 +18,6 @@ import {
   HAVOC_SCHEMA_VERSION,
   capRushLeagueGameSchema,
   capRushLeagueGameSeed,
-  havocBattleInputSchema,
 } from '@hoop-rush/data-contracts';
 import type { EngineContext } from '../../sim/kernel.ts';
 import { simulateHavocBattleGame } from '../havoc/core/battle-game.ts';
@@ -50,18 +50,22 @@ export function capRushTeamById(locked: CapRushLockedInputs, teamId: string): Ha
   return opponent.team;
 }
 
-export function capRushLeagueScheduleOf(locked: CapRushLockedInputs): CapRushLeagueScheduleEntry[] {
+function leagueScheduleOf(locked: CapRushLockedInputs): readonly CapRushLeagueScheduleEntry[] {
   if (locked.leagueSchedule === undefined) {
     throw new Error('cap rush league: this run has no league schedule');
   }
-  return [...locked.leagueSchedule];
+  return locked.leagueSchedule;
+}
+
+export function capRushLeagueScheduleOf(locked: CapRushLockedInputs): CapRushLeagueScheduleEntry[] {
+  return [...leagueScheduleOf(locked)];
 }
 
 export function capRushLeagueSlotGames(
   locked: CapRushLockedInputs,
   slot: number,
 ): CapRushLeagueScheduleEntry[] {
-  return capRushLeagueScheduleOf(locked).filter(
+  return leagueScheduleOf(locked).filter(
     (game) =>
       game.slot === slot &&
       game.homeTeamId !== locked.human.teamId &&
@@ -73,7 +77,7 @@ export function capRushUserLeagueGameOf(
   locked: CapRushLockedInputs,
   slot: number,
 ): CapRushLeagueScheduleEntry {
-  const game = capRushLeagueScheduleOf(locked).find(
+  const game = leagueScheduleOf(locked).find(
     (entry) =>
       entry.slot === slot &&
       (entry.homeTeamId === locked.human.teamId || entry.awayTeamId === locked.human.teamId),
@@ -145,7 +149,7 @@ export function simulateCapRushLeagueGame(input: {
   }
   const home = capRushTeamById(locked, entry.homeTeamId);
   const away = capRushTeamById(locked, entry.awayTeamId);
-  const battleInput = havocBattleInputSchema.parse({
+  const battleInput: HavocBattleInput = {
     schemaVersion: HAVOC_SCHEMA_VERSION,
     rulesVersion: HAVOC_RULES_VERSION,
     mutationCatalogVersion: HAVOC_MUTATION_CATALOG_VERSION,
@@ -156,7 +160,7 @@ export function simulateCapRushLeagueGame(input: {
     home: battleTeamOf(home, 'home'),
     away: battleTeamOf(away, 'away'),
     versionSet: capRushBattleVersionSet(locked),
-  });
+  };
   const battle = simulateHavocBattleGame(battleInput, input.context);
   const audit = auditHavocBattleGame(battleInput, battle.result, battle.tape);
   if (!audit.ok) {
@@ -190,7 +194,7 @@ export function simulateCapRushLeagueSlot(input: {
 }
 
 export function capRushLeagueGamesTotal(locked: CapRushLockedInputs): number {
-  return capRushLeagueScheduleOf(locked).filter(
+  return leagueScheduleOf(locked).filter(
     (game) => game.homeTeamId !== locked.human.teamId && game.awayTeamId !== locked.human.teamId,
   ).length;
 }

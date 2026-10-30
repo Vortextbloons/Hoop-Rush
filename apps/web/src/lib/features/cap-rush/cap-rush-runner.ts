@@ -46,6 +46,12 @@ function errorOf(error: unknown): Error {
 export class CapRushRunner {
   private readonly createWorker: () => Worker;
   private active: ActiveBatch | null = null;
+  private worker: Worker | null = null;
+
+  private getWorker(): Worker {
+    this.worker ??= this.createWorker();
+    return this.worker;
+  }
 
   constructor(options: CapRushRunnerOptions = {}) {
     this.createWorker = options.createWorker ?? defaultWorker;
@@ -77,7 +83,7 @@ export class CapRushRunner {
     if (this.active !== null) {
       return Promise.reject(new Error('a cap rush season job is already running'));
     }
-    const worker = this.createWorker();
+    const worker = this.getWorker();
     return new Promise<CapRushWorkerCompleteMessage>((resolve, reject) => {
       const batch: ActiveBatch = {
         requestId: input.requestId,
@@ -93,12 +99,14 @@ export class CapRushRunner {
       this.active = batch;
       const finish = (message: CapRushWorkerCompleteMessage): void => {
         this.active = null;
-        worker.terminate();
+        worker.onmessage = null;
+        worker.onerror = null;
         resolve(message);
       };
       const fail = (error: Error): void => {
         this.active = null;
         worker.terminate();
+        this.worker = null;
         reject(error);
       };
 
@@ -163,7 +171,7 @@ export class CapRushRunner {
     if (this.active !== null) {
       return Promise.reject(new Error('a cap rush job is already running'));
     }
-    const worker = this.createWorker();
+    const worker = this.getWorker();
     return new Promise<CapRushWorkerStandingsCompleteMessage>((resolve, reject) => {
       const batch: ActiveBatch = {
         requestId: input.requestId,
@@ -179,12 +187,14 @@ export class CapRushRunner {
       this.active = batch;
       const finish = (message: CapRushWorkerStandingsCompleteMessage): void => {
         this.active = null;
-        worker.terminate();
+        worker.onmessage = null;
+        worker.onerror = null;
         resolve(message);
       };
       const fail = (error: Error): void => {
         this.active = null;
         worker.terminate();
+        this.worker = null;
         reject(error);
       };
       worker.onmessage = (event: MessageEvent<unknown>) => {
@@ -235,7 +245,7 @@ export class CapRushRunner {
     if (this.active !== null) {
       return Promise.reject(new Error('a cap rush job is already running'));
     }
-    const worker = this.createWorker();
+    const worker = this.getWorker();
     return new Promise<CapRushWorkerPlayoffsCompleteMessage>((resolve, reject) => {
       const batch: ActiveBatch = {
         requestId: input.requestId,
@@ -251,12 +261,14 @@ export class CapRushRunner {
       this.active = batch;
       const finish = (message: CapRushWorkerPlayoffsCompleteMessage): void => {
         this.active = null;
-        worker.terminate();
+        worker.onmessage = null;
+        worker.onerror = null;
         resolve(message);
       };
       const fail = (error: Error): void => {
         this.active = null;
         worker.terminate();
+        this.worker = null;
         reject(error);
       };
       worker.onmessage = (event: MessageEvent<unknown>) => {
@@ -311,8 +323,9 @@ export class CapRushRunner {
 
   destroy(): void {
     const active = this.active;
-    if (active === null) return;
-    active.worker.terminate();
+    this.worker?.terminate();
+    this.worker = null;
     this.active = null;
+    active?.reject(new Error('cap rush runner destroyed'));
   }
 }

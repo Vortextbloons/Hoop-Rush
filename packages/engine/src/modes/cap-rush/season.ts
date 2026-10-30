@@ -76,7 +76,6 @@ export function simulateCapRushGame(input: {
   }
   const inputDigest = havocGameInputDigest(soloInput);
   const soloResult = battleToSoloResult(battle.result, humanSide, inputDigest);
-  const soloTape = battleToSoloTape(battle.tape, humanSide);
   const battleAudit = auditHavocBattleGame(battleInput, battle.result, battle.tape);
   const humanHome = humanSide === 'home';
   const humanPoints = humanHome ? battle.result.home.points : battle.result.away.points;
@@ -95,7 +94,9 @@ export function simulateCapRushGame(input: {
   return {
     input: soloInput,
     result: soloResult,
-    tape: soloTape,
+    get tape() {
+      return battleToSoloTape(battle.tape, humanSide);
+    },
     audit: battleAudit,
     summary,
     facts: apron?.recordedFacts() ?? [],

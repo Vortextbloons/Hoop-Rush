@@ -101,12 +101,25 @@
       seriesWins(userSeries, userSeries.lowTeamId) < 4,
   );
 
+  let reviewingSeason = $state(false);
   let selectedTeamId = $state<string | null>(null);
   let selectedBox = $state<{ label: string; box: CapRushBoxScoreData } | null>(null);
 
   const roundName = $derived(
     conferencePostseason !== null ? capRushConferenceRoundName : capRushRoundName,
   );
+
+  let reviewInitialized = false;
+  $effect(() => {
+    if (reviewInitialized || controller.busy) return;
+    reviewInitialized = true;
+    if (awaitingStandings) {
+      reviewingSeason = true;
+      void controller.advancePostseason();
+    } else if (series.length > 0 && series.every((entry) => entry.games.length === 0)) {
+      reviewingSeason = true;
+    }
+  });
 
   function seriesWins(entry: CapRushPlayoffSeries, teamId: string): number {
     return entry.games.filter((game) => game.winnerTeamId === teamId).length;
@@ -126,6 +139,7 @@
 
   function actionLabel(): string {
     if (awaitingStandings) return 'Complete league standings';
+    if (reviewingSeason) return 'Continue to postseason';
     if (finalsReady || postseason?.phase === 'complete') return 'Open the final report';
     if (postseason?.userOutcome.status === 'not-qualified') return 'Finish the bracket';
     if (postseason?.userOutcome.status === 'eliminated') return 'Finish the bracket';
@@ -141,6 +155,7 @@
 
   function statusHeadline(): string {
     if (postseason === null) return 'The postseason awaits.';
+    if (reviewingSeason) return 'The regular season is in the books.';
     if (postseason.phase === 'complete') {
       return isChampion ? 'Champions.' : `${championEntry?.displayName ?? 'The champion'}.`;
     }
@@ -157,6 +172,8 @@
 
   function statusMessage(): string {
     if (postseason === null) return 'Finish the regular season to reach the bracket.';
+    if (reviewingSeason && !awaitingStandings)
+      return 'Review the final standings before the postseason begins.';
     if (postseason.phase === 'complete') {
       return `${championEntry?.displayName ?? 'The champion'} won the championship.`;
     }
@@ -373,14 +390,16 @@
           type="button"
           class="inline-flex min-h-11 items-center gap-2 rounded-xl border border-primary/50 bg-primary/10 px-4 text-sm font-bold text-primary outline-none hover:bg-primary/15 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
           onclick={() =>
-            void (awaitingStandings || !userSeriesActive
-              ? controller.advancePostseason()
-              : controller.playNextGame())}
+            reviewingSeason && !awaitingStandings
+              ? (reviewingSeason = false)
+              : void (awaitingStandings || !userSeriesActive
+                  ? controller.advancePostseason()
+                  : controller.playNextGame())}
         >
           <Play size={15} aria-hidden="true" />
           {actionLabel()}
         </button>
-        {#if userSeriesActive}
+        {#if userSeriesActive && !reviewingSeason}
           <button
             type="button"
             class="inline-flex min-h-11 items-center gap-2 rounded-xl border border-line-strong px-4 text-sm font-bold outline-none hover:border-primary hover:text-primary focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
@@ -433,7 +452,7 @@
     {/if}
   </div>
 
-  {#if userSeries !== null && postseason?.phase !== 'complete'}
+  {#if userSeries !== null && postseason?.phase !== 'complete' && !reviewingSeason}
     <section class="matchup-panel rounded-2xl p-4 sm:p-6" aria-label="Current series">
       <div class="flex flex-wrap items-center justify-between gap-2">
         <p class="font-mono text-[10px] font-bold tracking-[0.16em] text-accent uppercase">
@@ -547,13 +566,15 @@
   {/if}
 
   {#if standings !== null}
-    <CapRushBracket
-      {series}
-      {standings}
-      manifest={art?.manifest ?? null}
-      {userTeamId}
-      onTeamSelect={(teamId) => (selectedTeamId = teamId)}
-    />
+    {#if !reviewingSeason}
+      <CapRushBracket
+        {series}
+        {standings}
+        manifest={art?.manifest ?? null}
+        {userTeamId}
+        onTeamSelect={(teamId) => (selectedTeamId = teamId)}
+      />
+    {/if}
     <CapRushStandings
       {standings}
       manifest={art?.manifest ?? null}

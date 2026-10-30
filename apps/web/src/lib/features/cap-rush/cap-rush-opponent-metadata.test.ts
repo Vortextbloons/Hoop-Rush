@@ -101,9 +101,11 @@ describe('Cap Rush opponent display metadata', () => {
       if (original === undefined || updated === undefined) throw new Error('missing opponent');
       expect(updated.seasonKey).toBe(original.seasonKey);
       updated.players.forEach((player, playerIndex) => {
+        const originalPlayer = original.players[playerIndex];
+        if (originalPlayer === undefined) throw new Error('missing original player');
         expect(player.overall).toBe(95);
-        expect(player.ratings).toEqual(original.players[playerIndex]?.ratings);
-        expect(player.tendencies).toEqual(original.players[playerIndex]?.tendencies);
+        expect(player.ratings).toEqual(originalPlayer.ratings);
+        expect(player.tendencies).toEqual(originalPlayer.tendencies);
       });
     }
     expect(() => capRushBracketWithRosterMetadata(bracket, metadata, 'b'.repeat(64))).toThrow(

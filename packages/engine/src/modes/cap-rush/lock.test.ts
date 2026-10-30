@@ -494,7 +494,7 @@ describe('cap rush locked spin and replacement roles', () => {
       if (player === undefined) throw new Error('missing source player');
       expect(participant.source.originalOverall).toBe(95);
       expect(participant.source.overallSource).toBe('catalog');
-      expect(participant.source.seasonKey).toBe('2005-06');
+      expect(participant.source.seasonKey).toBe(seasonKeySchema.parse('2005-06'));
       expect(participant.effective.ratings).toEqual(player.ratings);
       expect(participant.effective.tendencies).toEqual(player.tendencies);
     }
