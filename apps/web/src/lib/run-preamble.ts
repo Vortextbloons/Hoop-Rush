@@ -2,10 +2,14 @@ import type {
   EraSimulationProfile,
   HoopRushManifest,
   OpponentBracket,
+  OpponentIndexEntry,
 } from '@hoop-rush/data-contracts';
 import { getBracket, getEraSimulationProfile, getManifest } from '#lib/data.js';
 export const FIXED_SANDBOX_ERA = '2010s';
-export async function loadRunPreamble(): Promise<{
+export async function loadRunPreamble(
+  selectBracket: (manifest: HoopRushManifest) => OpponentIndexEntry | undefined = (manifest) =>
+    manifest.bracket,
+): Promise<{
   manifest: HoopRushManifest;
   profile: EraSimulationProfile;
   bracket: OpponentBracket;
@@ -15,7 +19,7 @@ export async function loadRunPreamble(): Promise<{
   if (!profileEntry) {
     throw new Error('The decade simulation profile is unavailable.');
   }
-  const bracketEntry = manifest.bracket;
+  const bracketEntry = selectBracket(manifest);
   if (!bracketEntry) {
     throw new Error('The opponent bracket is unavailable.');
   }

@@ -9,7 +9,10 @@
   import type { CapRushArt } from './cap-rush-art.js';
   import { capRushPlaybackItems } from './cap-rush-playback.js';
   import type { CapRushSeasonController } from './cap-rush-season-state.svelte.js';
-  import { havocMultiplayerVisibleState } from '#lib/features/havoc-multiplayer/havoc-multiplayer-playback.js';
+  import {
+    havocMultiplayerVisibleState,
+    type HavocMultiplayerPlaybackItem,
+  } from '#lib/features/havoc-multiplayer/havoc-multiplayer-playback.js';
   import {
     havocMultiplayerLiveBoxes,
     havocMultiplayerFinalBoxes,
@@ -26,7 +29,21 @@
   let paused = $state(false);
   const speed = 4;
   const playback = $derived(controller.playback);
-  const items = $derived(playback === null ? [] : capRushPlaybackItems(playback.evidence.tape));
+  let itemsTape: unknown = null;
+  let cachedItems: HavocMultiplayerPlaybackItem[] = [];
+  const items = $derived.by(() => {
+    const tape = playback?.evidence.tape ?? null;
+    if (tape === null) {
+      itemsTape = null;
+      cachedItems = [];
+      return cachedItems;
+    }
+    if (tape !== itemsTape) {
+      itemsTape = tape;
+      cachedItems = capRushPlaybackItems(tape);
+    }
+    return cachedItems;
+  });
   const cursor = $derived(playback?.evidence.cursor ?? 0);
   const finished = $derived(cursor === items.length);
   const visible = $derived(havocMultiplayerVisibleState(items, cursor));

@@ -60,6 +60,8 @@ export class CapRushSeasonController {
   private readonly service: CapRushService;
   private readonly runner: CapRushRunner;
   private aiLeagueGames: CapRushLeagueGame[] = [];
+  private aiLeagueGameIds = new Set<string>();
+  private userLeagueGames = new Map<string, CapRushLeagueGame>();
   private destroyed = false;
 
   constructor(service: CapRushService, runner: CapRushRunner) {
@@ -100,9 +102,15 @@ export class CapRushSeasonController {
         const stored = await this.service.listLeagueGames(runId);
         if (this.isDestroyed()) return;
         this.aiLeagueGames = [...stored];
-        this.leagueGames = [...stored, ...this.userLeagueGamesOf(snapshot.draft)];
+        this.aiLeagueGameIds = new Set(stored.map((game) => game.gameId));
+        this.userLeagueGames = new Map(
+          this.userLeagueGamesOf(snapshot.draft).map((game) => [game.gameId, game]),
+        );
+        this.publishLeagueGames();
       } else {
         this.aiLeagueGames = [];
+        this.aiLeagueGameIds = new Set();
+        this.userLeagueGames = new Map();
         this.leagueGames = [];
       }
       const regular = this.games.find((game) => game.playback !== undefined);
@@ -518,6 +526,22 @@ export class CapRushSeasonController {
   }
 
   private async acceptUserGame(message: CapRushWorkerGameMessage): Promise<void> {
+    const playback =
+      message.playback === undefined
+        ? undefined
+        : {
+            input: soloToBattleInput(message.playback.input),
+            tape: soloToBattleTape(message.playback.tape, message.result.humanSide),
+            facts: message.playback.facts,
+            cursor: 0,
+          };
+    const stored: CapRushStoredGame = {
+      gameNumber: message.cursor,
+      summary: message.summary,
+      audit: message.audit,
+      result: message.result,
+      ...(playback === undefined ? {} : { playback }),
+    };
     await this.service.acceptGame({
       cursor: message.cursor,
       inputDigest: message.inputDigest,
@@ -525,59 +549,17 @@ export class CapRushSeasonController {
       isolations: message.isolations,
       strikes: message.strikes,
       summary: message.summary,
-      stored: {
-        gameNumber: message.cursor,
-        summary: message.summary,
-        audit: message.audit,
-        result: message.result,
-        ...(message.playback === undefined
-          ? {}
-          : {
-              playback: {
-                input: soloToBattleInput(message.playback.input),
-                tape: soloToBattleTape(message.playback.tape, message.result.humanSide),
-                facts: message.playback.facts,
-                cursor: 0,
-              },
-            }),
-      },
+      stored,
       ...(message.leagueGames === undefined ? {} : { leagueGames: message.leagueGames }),
     });
     if (this.isDestroyed()) return;
-    if (message.playback !== undefined) {
-      if (message.leagueGames !== undefined) {
-        const byId = new Map(this.aiLeagueGames.map((game) => [game.gameId, game]));
-        for (const game of message.leagueGames) byId.set(game.gameId, game);
-        this.aiLeagueGames = [...byId.values()];
-      }
-      this.draft = this.service.getSnapshot().draft;
-      this.leagueGames = [...this.aiLeagueGames, ...this.userLeagueGamesOf(this.draft)];
-      this.playback = {
-        game: message.cursor,
-        result: message.result,
-        evidence: {
-          input: soloToBattleInput(message.playback.input),
-          tape: soloToBattleTape(message.playback.tape, message.result.humanSide),
-          facts: message.playback.facts,
-          cursor: 0,
-        },
-      };
-      return;
-    }
-    this.games = [
-      ...this.games.filter((game) => game.gameNumber !== message.cursor),
-      {
-        gameNumber: message.cursor,
-        summary: message.summary,
-        audit: message.audit,
-        result: message.result,
-      },
-    ].sort((left, right) => left.gameNumber - right.gameNumber);
-    if (message.leagueGames !== undefined) {
-      this.aiLeagueGames = [...this.aiLeagueGames, ...message.leagueGames];
-    }
     this.draft = this.service.getSnapshot().draft;
-    this.leagueGames = [...this.aiLeagueGames, ...this.userLeagueGamesOf(this.draft)];
+    this.upsertGame(stored);
+    if (message.leagueGames !== undefined) this.addAiLeagueGames(message.leagueGames);
+    this.publishLeagueGames();
+    if (playback !== undefined) {
+      this.playback = { game: message.cursor, result: message.result, evidence: playback };
+    }
   }
 
   private async acceptLeagueGames(message: CapRushWorkerLeagueGamesMessage): Promise<void> {
@@ -587,20 +569,43 @@ export class CapRushSeasonController {
       const next = capRushNextLeagueSlot(locked, accepted);
       if (next === null || message.slot < next) return;
     }
-    if (
-      message.leagueGames.every((game) =>
-        this.aiLeagueGames.some((existing) => existing.gameId === game.gameId),
-      )
-    ) {
+    if (message.leagueGames.every((game) => this.aiLeagueGameIds.has(game.gameId))) {
       return;
     }
     await this.service.acceptLeagueGames(message.slot, message.leagueGames);
     if (this.isDestroyed()) return;
-    const byId = new Map(this.aiLeagueGames.map((game) => [game.gameId, game]));
-    for (const game of message.leagueGames) byId.set(game.gameId, game);
-    this.aiLeagueGames = [...byId.values()];
+    this.addAiLeagueGames(message.leagueGames);
     this.draft = this.service.getSnapshot().draft;
-    this.leagueGames = [...this.aiLeagueGames, ...this.userLeagueGamesOf(this.draft)];
+    this.publishLeagueGames();
+  }
+
+  private addAiLeagueGames(games: readonly CapRushLeagueGame[]): void {
+    const added: CapRushLeagueGame[] = [];
+    for (const game of games) {
+      if (this.aiLeagueGameIds.has(game.gameId)) continue;
+      this.aiLeagueGameIds.add(game.gameId);
+      added.push(game);
+    }
+    if (added.length > 0) this.aiLeagueGames = [...this.aiLeagueGames, ...added];
+  }
+
+  private upsertGame(game: CapRushStoredGame): void {
+    const index = this.games.findIndex((entry) => entry.gameNumber === game.gameNumber);
+    if (index < 0) {
+      this.games = [...this.games, game];
+    } else {
+      const games = [...this.games];
+      games[index] = game;
+      this.games = games;
+    }
+    const locked = this.draft?.draft.locked;
+    if (locked === null || locked === undefined || locked.leagueSchedule === undefined) return;
+    const leagueGame = this.userLeagueGameOf(locked, game);
+    this.userLeagueGames.set(leagueGame.gameId, leagueGame);
+  }
+
+  private publishLeagueGames(): void {
+    this.leagueGames = [...this.aiLeagueGames, ...this.userLeagueGames.values()];
   }
 
   private leagueBackfill(

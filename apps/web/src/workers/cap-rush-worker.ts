@@ -104,6 +104,17 @@ async function simulate(
         return;
       }
       if (!postLeagueSlot(request.requestId, request.locked, slot)) return;
+      if (Date.now() - lastProgressAt >= PROGRESS_INTERVAL_MS) {
+        lastProgressAt = Date.now();
+        post({
+          schemaVersion: CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION,
+          type: 'cap-rush-progress',
+          requestId: request.requestId,
+          gamesCompleted: slot,
+          gamesTotal: to,
+        });
+      }
+      await sleep(0);
     }
   }
 
@@ -129,6 +140,17 @@ async function simulate(
       if (!postLeagueSlot(request.requestId, request.locked, slot)) return;
       delivered += 1;
       lastCursor = slot;
+      if (Date.now() - lastProgressAt >= PROGRESS_INTERVAL_MS) {
+        lastProgressAt = Date.now();
+        post({
+          schemaVersion: CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION,
+          type: 'cap-rush-progress',
+          requestId: request.requestId,
+          gamesCompleted: slot,
+          gamesTotal: to,
+        });
+      }
+      await sleep(0);
     }
     post({
       schemaVersion: CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION,

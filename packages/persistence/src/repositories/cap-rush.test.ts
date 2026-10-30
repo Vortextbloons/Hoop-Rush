@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'bun:test';
+import Dexie from 'dexie';
 import type {
   CapRushAcceptGameCommand,
   CapRushDraftState,
@@ -62,7 +63,11 @@ import {
   DexieCapRushRepository,
   capRushReportCommandError,
 } from './cap-rush.ts';
-import { HOOP_RUSH_DATABASE_V9_STORES, HoopRushDatabase } from './dexie.ts';
+import {
+  HOOP_RUSH_DATABASE_V11_STORES,
+  HOOP_RUSH_DATABASE_V9_STORES,
+  HoopRushDatabase,
+} from './dexie.ts';
 import {
   resetIndexedDb,
   restoreIndexedDb,
@@ -465,6 +470,76 @@ describe('cap rush repository', () => {
       game: next.game,
     });
     expect((await repository.loadActiveDraft())?.season.games.length).toBe(2);
+  });
+
+  it('updates playback by writing only the cursor record', async () => {
+    const { index, state } = await startLockedRun(repository);
+    if (state.locked === null) throw new Error('missing locked inputs');
+    const simulation = simulateCapRushGame({
+      locked: state.locked,
+      gameNumber: 1,
+      context: createEngineContext(),
+    });
+    const bundle = acceptBundle(index, state, 1);
+    await repository.applyOutcome({
+      outcome: { state: bundle.state, result: bundle.result },
+      command: bundle.command,
+      game: {
+        ...bundle.game,
+        playback: {
+          input: soloToBattleInput(simulation.input),
+          tape: soloToBattleTape(simulation.tape, simulation.result.humanSide),
+          facts: [...simulation.facts],
+          cursor: 0,
+        },
+      },
+    });
+    const key = [state.runId, 'regular:1'] as const;
+    const evidenceBefore = await db.capRushPlaybackEvidence.get(key);
+    const gameBefore = await db.capRushGames.get([state.runId, 1]);
+    await repository.updatePlayback(state.runId, 1, 1, false);
+    expect(await db.capRushPlaybackEvidence.get(key)).toEqual(evidenceBefore);
+    expect(await db.capRushGames.get([state.runId, 1])).toEqual(gameBefore);
+    expect((await db.capRushPlaybackCursors.get(key))?.cursor).toBe(1);
+    expect((await repository.readRunGame(state.runId, 1))?.playback?.cursor).toBe(1);
+  });
+
+  it('moves an active run broadcast out of game rows when upgrading', async () => {
+    const name = testDatabaseName('cap-rush-migration');
+    const legacy = new Dexie(name);
+    legacy.version(12).stores(HOOP_RUSH_DATABASE_V11_STORES);
+    await legacy.open();
+    await legacy.table('capRushActive').put({
+      recordId: CAP_RUSH_ACTIVE_DRAFT_RECORD_ID,
+      runId: 'run-migrate',
+    });
+    await legacy.table('capRushGames').put({
+      runId: 'run-migrate',
+      gameNumber: 1,
+      updatedAtIso: '2026-01-01T00:00:00.000Z',
+      game: {
+        gameNumber: 1,
+        playback: {
+          cursor: 2,
+          input: {},
+          facts: [],
+          tape: { events: [{}], scoring: [{}] },
+        },
+      },
+    });
+    legacy.close();
+
+    const upgraded = new HoopRushDatabase(name);
+    await upgraded.open();
+    const game = await upgraded.capRushGames.get(['run-migrate', 1]);
+    expect(game?.game.playback).toBeUndefined();
+    const evidence = await upgraded.capRushPlaybackEvidence.get(['run-migrate', 'regular:1']);
+    expect(evidence?.playback.cursor).toBe(0);
+    expect(evidence?.playback.tape.events).toHaveLength(1);
+    const cursor = await upgraded.capRushPlaybackCursors.get(['run-migrate', 'regular:1']);
+    expect(cursor?.cursor).toBe(2);
+    expect(cursor?.total).toBe(2);
+    upgraded.close();
   });
 
   it('rejects a malformed stored game record on read', async () => {

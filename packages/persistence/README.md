@@ -13,7 +13,7 @@ this package for namespace rules and testing notes.
 - **Storage namespace**: one database, `hoop-rush-saves-v2`
   (`HOOP_RUSH_DATABASE_NAME` in `repositories/dexie.ts`). The previous
   `hoop-rush-saves` database is never read or migrated; schema changes add a new
-  Dexie version inside the current namespace (currently version 11).
+  Dexie version inside the current namespace (currently version 13).
 - **Atomic commits**: checkpoint writes commit in one transaction; pending
   blocks are deleted in the same transaction as the state they supersede. Never
   commit state and clear pendings separately.

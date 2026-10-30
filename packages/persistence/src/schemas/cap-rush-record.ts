@@ -9,6 +9,7 @@ import {
   capRushHistoryEntrySchema,
   capRushLeagueGameIdSchema,
   capRushLeagueGameSchema,
+  capRushPlaybackSchema,
   capRushReportSchema,
   capRushStoredGameSchema,
   capRushStoredPlayoffGameSchema,
@@ -19,6 +20,46 @@ import {
 
 export const CAP_RUSH_ACTIVE_DRAFT_RECORD_ID = 'cap-rush-draft';
 const isoDateSchema = z.iso.datetime();
+
+export function capRushPlaybackGameKey(game: number | string): string {
+  return typeof game === 'number' ? `regular:${String(game)}` : `playoff:${game}`;
+}
+
+export const storedCapRushPlaybackEvidenceRowSchema = z
+  .object({
+    saveSchemaVersion: z.literal(CAP_RUSH_SAVE_SCHEMA_VERSION),
+    runId: idSchema,
+    gameKey: z.string().min(1),
+    playback: capRushPlaybackSchema,
+    updatedAtIso: isoDateSchema,
+  })
+  .superRefine((row, ctx) => {
+    if (row.playback.cursor !== 0) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'stored playback evidence must start at cursor zero',
+      });
+    }
+  });
+export type StoredCapRushPlaybackEvidenceRow = z.infer<
+  typeof storedCapRushPlaybackEvidenceRowSchema
+>;
+
+export const storedCapRushPlaybackCursorRowSchema = z
+  .object({
+    saveSchemaVersion: z.literal(CAP_RUSH_SAVE_SCHEMA_VERSION),
+    runId: idSchema,
+    gameKey: z.string().min(1),
+    cursor: z.number().int().nonnegative(),
+    total: z.number().int().nonnegative(),
+    updatedAtIso: isoDateSchema,
+  })
+  .superRefine((row, ctx) => {
+    if (row.cursor > row.total) {
+      ctx.addIssue({ code: 'custom', message: 'stored playback cursor exceeds the recorded tape' });
+    }
+  });
+export type StoredCapRushPlaybackCursorRow = z.infer<typeof storedCapRushPlaybackCursorRowSchema>;
 
 export const storedCapRushDraftRowSchema = z
   .object({

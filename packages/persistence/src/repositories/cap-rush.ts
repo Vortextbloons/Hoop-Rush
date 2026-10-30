@@ -4,6 +4,7 @@ import type {
   CapRushDraftState,
   CapRushHistoryEntry,
   CapRushLeagueGame,
+  CapRushPlayback,
   CapRushReport,
   CapRushStoredGame,
   CapRushStoredPlayoffGame,
@@ -31,11 +32,14 @@ import {
 } from '@hoop-rush/engine';
 import {
   CAP_RUSH_ACTIVE_DRAFT_RECORD_ID,
+  capRushPlaybackGameKey,
   storedCapRushCommandRowSchema,
   storedCapRushDraftRowSchema,
   storedCapRushGameRowSchema,
   storedCapRushHistoryRowSchema,
   storedCapRushLeagueGameRowSchema,
+  storedCapRushPlaybackCursorRowSchema,
+  storedCapRushPlaybackEvidenceRowSchema,
   storedCapRushPlayoffGameRowSchema,
   storedCapRushReportRowSchema,
 } from '../schemas/cap-rush-record.ts';
@@ -388,18 +392,20 @@ export class DexieCapRushRepository implements CapRushRepository {
       }
     }
 
-    return this.db.transaction(
+    const outcome = await this.db.transaction(
       'rw',
       [
         this.db.capRushActive,
         this.db.capRushCommands,
         this.db.capRushGames,
+        this.db.capRushPlaybackEvidence,
+        this.db.capRushPlaybackCursors,
         this.db.capRushPlayoffGames,
         this.db.capRushLeagueGames,
         this.db.capRushHistory,
         this.db.capRushReports,
       ],
-      async () => {
+      async (): Promise<CapRushCommandResult | null> => {
         const existingCommandRow: unknown = await this.db.capRushCommands.get(result.commandId);
         if (existingCommandRow !== undefined) {
           assertSaveSchemaVersion(existingCommandRow, CAP_RUSH_SAVE_SCHEMA_VERSION, unsupported);
@@ -418,19 +424,12 @@ export class DexieCapRushRepository implements CapRushRepository {
           throw new CapRushCommandConflictError(result.commandId);
         }
 
-        const pendingRegular = await this.db.capRushGames
+        const pendingPlayback = await this.db.capRushPlaybackEvidence
           .where('runId')
           .equals(result.runId)
-          .toArray();
-        const pendingPlayoffs = await this.db.capRushPlayoffGames
-          .where('runId')
-          .equals(result.runId)
-          .toArray();
-        if (
-          command.command !== 'accept-cap-rush-league-games' &&
-          [...pendingRegular, ...pendingPlayoffs].some((row) => row.game.playback !== undefined)
-        ) {
-          throw malformed('finish the pending broadcast before advancing the run');
+          .count();
+        if (command.command !== 'accept-cap-rush-league-games' && pendingPlayback > 0) {
+          return null;
         }
 
         const now = new Date().toISOString();
@@ -474,26 +473,44 @@ export class DexieCapRushRepository implements CapRushRepository {
             }),
           );
           if (game !== null) {
+            const { playback, ...storedGame } = game;
             await this.db.capRushGames.put(
               storedCapRushGameRowSchema.parse({
                 saveSchemaVersion: CAP_RUSH_SAVE_SCHEMA_VERSION,
                 runId: result.runId,
                 gameNumber: game.gameNumber,
-                game,
+                game: storedGame,
                 updatedAtIso: now,
               }),
             );
+            if (playback !== undefined) {
+              await this.putPlayback(
+                result.runId,
+                capRushPlaybackGameKey(game.gameNumber),
+                playback,
+                now,
+              );
+            }
           }
           if (playoffGame !== null) {
+            const { playback, ...storedGame } = playoffGame;
             await this.db.capRushPlayoffGames.put(
               storedCapRushPlayoffGameRowSchema.parse({
                 saveSchemaVersion: CAP_RUSH_SAVE_SCHEMA_VERSION,
                 runId: result.runId,
                 gameId: playoffGame.gameId,
-                game: playoffGame,
+                game: storedGame,
                 updatedAtIso: now,
               }),
             );
+            if (playback !== undefined) {
+              await this.putPlayback(
+                result.runId,
+                capRushPlaybackGameKey(playoffGame.gameId),
+                playback,
+                now,
+              );
+            }
           }
           if (leagueGames.length > 0) {
             await this.db.capRushLeagueGames.bulkPut(
@@ -534,6 +551,10 @@ export class DexieCapRushRepository implements CapRushRepository {
         return result;
       },
     );
+    if (outcome === null) {
+      throw malformed('finish the pending broadcast before advancing the run');
+    }
+    return outcome;
   }
 
   async updatePlayback(
@@ -542,42 +563,111 @@ export class DexieCapRushRepository implements CapRushRepository {
     cursor: number,
     resolved: boolean,
   ): Promise<void> {
-    await this.db.transaction(
+    const gameKey = capRushPlaybackGameKey(game);
+    const outcome = await this.db.transaction(
       'rw',
-      [this.db.capRushGames, this.db.capRushPlayoffGames],
-      async () => {
-        if (typeof game === 'number') {
-          const row = await this.db.capRushGames.get([runId, game]);
-          if (row === undefined) throw malformed('the broadcast game is missing');
-          const parsed = storedCapRushGameRowSchema.parse(row);
-          const playback = parsed.game.playback;
-          if (playback === undefined) return;
-          if (cursor < playback.cursor) return;
-          if (resolved && cursor !== playback.tape.events.length + playback.tape.scoring.length) {
-            throw malformed('the broadcast must reach its final event before it can resolve');
-          }
-          const updated: CapRushStoredGame = { ...parsed.game, playback: { ...playback, cursor } };
-          capRushStoredGameSchema.parse(updated);
-          if (resolved) delete updated.playback;
-          await this.db.capRushGames.put({ ...parsed, game: updated });
-        } else {
-          const row = await this.db.capRushPlayoffGames.get([runId, game]);
-          if (row === undefined) throw malformed('the broadcast game is missing');
-          const parsed = storedCapRushPlayoffGameRowSchema.parse(row);
-          const playback = parsed.game.playback;
-          if (playback === undefined) return;
-          if (cursor < playback.cursor) return;
-          if (resolved && cursor !== playback.tape.events.length + playback.tape.scoring.length) {
-            throw malformed('the broadcast must reach its final event before it can resolve');
-          }
-          const updated: CapRushStoredPlayoffGame = {
-            ...parsed.game,
-            playback: { ...playback, cursor },
-          };
-          capRushStoredPlayoffGameSchema.parse(updated);
-          if (resolved) delete updated.playback;
-          await this.db.capRushPlayoffGames.put({ ...parsed, game: updated });
+      [this.db.capRushPlaybackCursors, this.db.capRushPlaybackEvidence],
+      async (): Promise<'missing' | 'unfinished' | 'ok'> => {
+        const row: unknown = await this.db.capRushPlaybackCursors.get([runId, gameKey]);
+        if (row === undefined) {
+          const evidence = await this.db.capRushPlaybackEvidence.get([runId, gameKey]);
+          return evidence === undefined ? 'ok' : 'missing';
         }
+        const parsed = parseRecord(
+          storedCapRushPlaybackCursorRowSchema,
+          row,
+          `cap rush playback cursor ${runId}/${gameKey}`,
+          malformed,
+        );
+        if (cursor < parsed.cursor) return 'ok';
+        if (resolved && cursor !== parsed.total) return 'unfinished';
+        if (resolved) {
+          await this.db.capRushPlaybackCursors.delete([runId, gameKey]);
+          await this.db.capRushPlaybackEvidence.delete([runId, gameKey]);
+          return 'ok';
+        }
+        if (cursor !== parsed.cursor) {
+          await this.db.capRushPlaybackCursors.put(
+            storedCapRushPlaybackCursorRowSchema.parse({
+              ...parsed,
+              cursor,
+              updatedAtIso: new Date().toISOString(),
+            }),
+          );
+        }
+        return 'ok';
+      },
+    );
+    if (outcome === 'missing') throw malformed('the broadcast game is missing');
+    if (outcome === 'unfinished') {
+      throw malformed('the broadcast must reach its final event before it can resolve');
+    }
+  }
+
+  private async putPlayback(
+    runId: string,
+    gameKey: string,
+    playback: CapRushPlayback,
+    updatedAtIso: string,
+  ): Promise<void> {
+    await this.db.capRushPlaybackEvidence.put(
+      storedCapRushPlaybackEvidenceRowSchema.parse({
+        saveSchemaVersion: CAP_RUSH_SAVE_SCHEMA_VERSION,
+        runId,
+        gameKey,
+        playback: { ...playback, cursor: 0 },
+        updatedAtIso,
+      }),
+    );
+    await this.db.capRushPlaybackCursors.put(
+      storedCapRushPlaybackCursorRowSchema.parse({
+        saveSchemaVersion: CAP_RUSH_SAVE_SCHEMA_VERSION,
+        runId,
+        gameKey,
+        cursor: playback.cursor,
+        total: playback.tape.events.length + playback.tape.scoring.length,
+        updatedAtIso,
+      }),
+    );
+  }
+
+  private async pendingPlaybackOf(runId: string): Promise<Map<string, CapRushPlayback>> {
+    return this.db.transaction(
+      'r',
+      [this.db.capRushPlaybackEvidence, this.db.capRushPlaybackCursors],
+      async () => {
+        const pending = new Map<string, CapRushPlayback>();
+        const evidenceRows = await this.db.capRushPlaybackEvidence
+          .where('runId')
+          .equals(runId)
+          .toArray();
+        if (evidenceRows.length === 0) return pending;
+        const cursorRows = await this.db.capRushPlaybackCursors
+          .where('runId')
+          .equals(runId)
+          .toArray();
+        const cursors = new Map<string, number>();
+        for (const row of cursorRows) {
+          const parsed = parseRecord(
+            storedCapRushPlaybackCursorRowSchema,
+            row,
+            `cap rush playback cursor ${runId}`,
+            malformed,
+          );
+          cursors.set(parsed.gameKey, parsed.cursor);
+        }
+        for (const row of evidenceRows) {
+          const parsed = parseRecord(
+            storedCapRushPlaybackEvidenceRowSchema,
+            row,
+            `cap rush playback evidence ${runId}`,
+            malformed,
+          );
+          const cursor = cursors.get(parsed.gameKey);
+          if (cursor === undefined) throw malformed('the broadcast cursor is missing');
+          pending.set(parsed.gameKey, { ...parsed.playback, cursor });
+        }
+        return pending;
       },
     );
   }
@@ -588,6 +678,8 @@ export class DexieCapRushRepository implements CapRushRepository {
       [
         this.db.capRushActive,
         this.db.capRushCommands,
+        this.db.capRushPlaybackCursors,
+        this.db.capRushPlaybackEvidence,
         this.db.capRushPlayoffGames,
         this.db.capRushLeagueGames,
       ],
@@ -601,6 +693,8 @@ export class DexieCapRushRepository implements CapRushRepository {
             : undefined;
         if (typeof runId === 'string') {
           await this.db.capRushCommands.where('runId').equals(runId).delete();
+          await this.db.capRushPlaybackCursors.where('runId').equals(runId).delete();
+          await this.db.capRushPlaybackEvidence.where('runId').equals(runId).delete();
           await this.db.capRushPlayoffGames.where('runId').equals(runId).delete();
           await this.db.capRushLeagueGames.where('runId').equals(runId).delete();
         }
@@ -610,17 +704,19 @@ export class DexieCapRushRepository implements CapRushRepository {
 
   async listRunGames(runId: string): Promise<CapRushStoredGame[]> {
     const rows = await scopedNumericRows(this.db.capRushGames, '[runId+gameNumber]', runId);
+    const pending = await this.pendingPlaybackOf(runId);
     return rows
       .map((row) => {
         assertSaveSchemaVersion(row, CAP_RUSH_SAVE_SCHEMA_VERSION, unsupported);
         return parseRecord(storedCapRushGameRowSchema, row, `cap rush game ${runId}`, malformed);
       })
       .sort((left, right) => left.gameNumber - right.gameNumber)
-      .map((row) => row.game);
+      .map((row) => this.gameWithPlayback(row.game, pending, row.game.gameNumber));
   }
 
   async listPlayoffGames(runId: string): Promise<CapRushStoredPlayoffGame[]> {
     const rows = await this.db.capRushPlayoffGames.where('runId').equals(runId).toArray();
+    const pending = await this.pendingPlaybackOf(runId);
     return rows
       .map((row) => {
         assertSaveSchemaVersion(row, CAP_RUSH_SAVE_SCHEMA_VERSION, unsupported);
@@ -631,8 +727,17 @@ export class DexieCapRushRepository implements CapRushRepository {
           malformed,
         );
       })
-      .map((row) => row.game)
+      .map((row) => this.gameWithPlayback(row.game, pending, row.game.gameId))
       .sort((left, right) => left.gameId.localeCompare(right.gameId));
+  }
+
+  private gameWithPlayback<T extends CapRushStoredGame | CapRushStoredPlayoffGame>(
+    game: T,
+    pending: Map<string, CapRushPlayback>,
+    gameId: number | string,
+  ): T {
+    const playback = pending.get(capRushPlaybackGameKey(gameId));
+    return playback === undefined ? game : { ...game, playback };
   }
 
   async listLeagueGames(runId: string): Promise<CapRushLeagueGame[]> {
@@ -655,12 +760,14 @@ export class DexieCapRushRepository implements CapRushRepository {
     const row: unknown = await this.db.capRushGames.get([runId, gameNumber]);
     if (row === undefined) return null;
     assertSaveSchemaVersion(row, CAP_RUSH_SAVE_SCHEMA_VERSION, unsupported);
-    return parseRecord(
+    const game = parseRecord(
       storedCapRushGameRowSchema,
       row,
       `cap rush game ${runId}/${String(gameNumber)}`,
       malformed,
     ).game;
+    const pending = await this.pendingPlaybackOf(runId);
+    return this.gameWithPlayback(game, pending, gameNumber);
   }
 
   async listHistory(): Promise<CapRushHistoryEntry[]> {
