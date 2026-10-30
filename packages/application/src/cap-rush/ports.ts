@@ -1,5 +1,6 @@
 import type {
   CapRushHistoryEntry,
+  CapRushLeagueGame,
   CapRushReport,
   CapRushStoredGame,
   EraSimulationProfile,
@@ -14,6 +15,7 @@ export interface CapRushDraftRepositoryPort extends CapRushRepository {
   listRunGames(runId: string): Promise<CapRushStoredGame[]>;
   listHistory(): Promise<CapRushHistoryEntry[]>;
   readReport(runId: string): Promise<CapRushReport | null>;
+  listLeagueGames(runId: string): Promise<CapRushLeagueGame[]>;
 }
 export interface CapRushAssetPort {
   loadCatalog(): Promise<SeasonDraftCatalog>;

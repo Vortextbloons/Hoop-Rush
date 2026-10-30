@@ -1,9 +1,12 @@
 import type {
   CapRushApronTriggerTotals,
   CapRushCard,
+  CapRushConferenceStandings,
   CapRushDraftState,
+  CapRushFranchiseAssignment,
   CapRushGameSummary,
   CapRushHistoryEntry,
+  CapRushLeagueGame,
   CapRushLeagueResult,
   CapRushPayrollStatus,
   CapRushPlayoffGameSummary,
@@ -19,7 +22,13 @@ import type {
   OpponentBracket,
   Position,
 } from '@hoop-rush/data-contracts';
-import type { CapRushPostseasonStep, CapRushSigningAssessment } from '@hoop-rush/engine';
+import type {
+  CapRushConferencePostseasonStep,
+  CapRushPostseasonStep,
+  CapRushSigningAssessment,
+} from '@hoop-rush/engine';
+
+export type CapRushAnyPostseasonStep = CapRushPostseasonStep | CapRushConferencePostseasonStep;
 
 export type CapRushServiceErrorCode =
   'invalid-phase' | 'unsupported-version' | 'storage' | 'catalog' | 'command' | 'audit-failure';
@@ -73,10 +82,13 @@ export interface CapRushSeasonView {
   readonly apronTriggers: CapRushApronTriggerTotals;
   readonly completedAt: string | null;
   readonly nextGameNumber: number;
+  readonly leagueGamesAccepted: number;
+  readonly leagueGamesTotal: number;
 }
 
 export interface CapRushDraftView {
   readonly draft: CapRushDraftState;
+  readonly franchise: CapRushFranchiseAssignment | null;
   readonly payrollDollars: number;
   readonly hardLimitDollars: number;
   readonly remainingRoomDollars: number;
@@ -101,6 +113,7 @@ export interface CapRushAcceptedGame {
   readonly strikes: number;
   readonly summary: CapRushGameSummary;
   readonly stored: CapRushStoredGame;
+  readonly leagueGames?: readonly CapRushLeagueGame[];
 }
 
 export interface CapRushAcceptedPlayoffGame {
@@ -121,13 +134,15 @@ export interface CapRushService {
   acceptGame(game: CapRushAcceptedGame): Promise<void>;
   finalizeSeason(): Promise<CapRushReport | null>;
   acceptStandings(league: CapRushLeagueResult): Promise<void>;
+  acceptConferenceStandings(standings: CapRushConferenceStandings): Promise<void>;
   acceptPlayoffGame(game: CapRushAcceptedPlayoffGame): Promise<void>;
   finalizePostseason(): Promise<CapRushReport>;
-  postseasonStep(): CapRushPostseasonStep;
+  postseasonStep(): CapRushAnyPostseasonStep;
   loadBracket(): Promise<OpponentBracket>;
   loadReport(runId: string): Promise<CapRushReport | null>;
   listHistory(): Promise<readonly CapRushHistoryEntry[]>;
   listRunGames(runId: string): Promise<readonly CapRushStoredGame[]>;
   listPlayoffGames(runId: string): Promise<readonly CapRushStoredPlayoffGame[]>;
+  listLeagueGames(runId: string): Promise<readonly CapRushLeagueGame[]>;
   abandonDraft(): Promise<void>;
 }

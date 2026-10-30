@@ -2,6 +2,7 @@
   import type { CapRushDraftView } from '@hoop-rush/application/cap-rush';
   import {
     CAP_RUSH_CAP_LINE_DOLLARS,
+    CAP_RUSH_CONFERENCE_NAMES,
     POSITIONS,
     type CapRushSpinPurchaseId,
     type Position,
@@ -11,6 +12,7 @@
   import { HAVOC_TIER_COLORS } from '#lib/features/havoc/havoc-presentation.js';
   import { Check, Lock, Shuffle, Sparkles } from '@lucide/svelte';
   import PlayerFace from '#lib/components/PlayerFace.svelte';
+  import TeamLogo from '#lib/components/TeamLogo.svelte';
   import CapRushCard from './CapRushCard.svelte';
   import CapRushLineup from './CapRushLineup.svelte';
   import CapRushPayroll from './CapRushPayroll.svelte';
@@ -98,6 +100,38 @@
 </script>
 
 <div class="mx-auto w-full max-w-[1440px] px-3 pt-4 pb-24 sm:px-6 md:pb-10">
+  {#if view.franchise}
+    {@const franchiseIdentity = art === null ? null : art.teamFor(view.franchise.franchiseId)}
+    <div
+      class="assignment-reveal mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-accent/40 bg-accent/5 px-4 py-3"
+      role="status"
+    >
+      {#if franchiseIdentity !== null && art !== null}
+        <TeamLogo
+          manifest={art.manifest}
+          franchiseId={franchiseIdentity.franchiseId}
+          teamExternalId={franchiseIdentity.teamExternalId}
+          alt=""
+          className="h-9 w-9"
+        />
+      {/if}
+      <div class="min-w-0">
+        <p class="font-mono text-[9px] font-bold tracking-[0.16em] text-accent uppercase">
+          Franchise takeover
+        </p>
+        <p class="font-display truncate text-lg font-extrabold uppercase">
+          {view.franchise.displayName}
+        </p>
+        <p class="font-mono text-[9px] text-muted-foreground uppercase">
+          {CAP_RUSH_CONFERENCE_NAMES[view.franchise.conference]} · {view.franchise.division}
+        </p>
+      </div>
+      <p class="ml-auto max-w-xs text-[11px] leading-snug text-muted-foreground">
+        Your drafted five replaces this franchise's frozen lineup. Its identity and schedule slot
+        stay.
+      </p>
+    </div>
+  {/if}
   <header class="flex flex-wrap items-end justify-between gap-4">
     <div class="min-w-0">
       <p class="font-mono text-[10px] font-bold tracking-[0.18em] text-primary uppercase">
@@ -532,6 +566,24 @@
 </div>
 
 <style>
+  .assignment-reveal {
+    animation: assignment-in 360ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+  @keyframes assignment-in {
+    from {
+      transform: translateY(-6px);
+      opacity: 0;
+    }
+    to {
+      transform: none;
+      opacity: 1;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .assignment-reveal {
+      animation: none;
+    }
+  }
   .draft-layout {
     display: grid;
     gap: 1rem;

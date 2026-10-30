@@ -4,14 +4,18 @@ import type {
   CapRushPayrollStatus,
   CapRushVariant,
 } from '@hoop-rush/data-contracts';
-import { capRushRoundName } from '@hoop-rush/data-contracts';
+import { capRushConferenceRoundName, capRushRoundName } from '@hoop-rush/data-contracts';
 import { capRushApronReductions, type CapRushApronReduction } from '@hoop-rush/engine';
 
 export function postseasonOutcomeLabel(postseason: CapRushHistoryPostseason): string {
   if (postseason.isUserChampion) return 'Champion';
   if (postseason.userStatus === 'champion') return 'Champion';
   if (postseason.userStatus === 'not-qualified') return 'Missed the playoffs';
-  return `Out in the ${capRushRoundName(postseason.userRound ?? 1).toLowerCase()}`;
+  const round =
+    postseason.conference === undefined
+      ? capRushRoundName(postseason.userRound ?? 1)
+      : capRushConferenceRoundName(postseason.userRound ?? 1);
+  return `Out in the ${round.toLowerCase()}`;
 }
 
 export function postseasonResultClass(postseason: CapRushHistoryPostseason): string {
@@ -160,9 +164,9 @@ export function apronPenaltyRows(status: CapRushPayrollStatus): ApronPenaltyRow[
 export function apronPenaltyTitle(status: CapRushPayrollStatus): string {
   switch (status) {
     case 'first-apron':
-      return 'Superstar Syndrome + Give Me the Ball';
+      return 'Superstar Syndrome + Telegraphed Passes (1.5% extra interception chance per pass)';
     case 'second-apron':
-      return 'Locker Room Meltdown + Hero Ball + Defensive Strike';
+      return 'Locker Room Meltdown + Telegraphed Passes (7% extra interception chance per pass) + Defensive Strike';
     default:
       return 'No apron penalties';
   }

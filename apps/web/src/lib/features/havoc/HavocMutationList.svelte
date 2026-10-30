@@ -31,7 +31,7 @@
     'mr-everything': 'Every rating set to exactly 88. No weakness, no standout.',
     'foul-merchant': 'Elite free throws, handles, and IQ, hunting drives and contact.',
     'the-specialist': 'One sampled category rises to 99 while everything else drops by 20.',
-    'glass-cannon': 'Every shot is a bucket. Defense is a rumor.',
+    'glass-cannon': 'Everything in the shot diet gets a big lift. Defense is a rumor.',
     'the-pacifist': 'Elite vision and IQ. Almost never shoots.',
     'paper-giant': 'A skyscraper with a jumper. No strength, no glass.',
     'cold-blooded': 'Misses stack a bonus on the next make, but hand points away.',

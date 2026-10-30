@@ -4,8 +4,15 @@ import { positionSchema } from './positions.ts';
 import { leagueRecordSchema } from './league.ts';
 import { capRushDigestSchema } from './cap-rush-versions.ts';
 import { havocGameAuditSchema, havocGameResultSchema } from './havoc-game.ts';
+import {
+  CAP_RUSH_CONFERENCE_SIZE,
+  capRushConferenceSchema,
+  capRushBoxScoreSchema,
+  capRushConferenceStandingsSchema,
+} from './cap-rush-league.ts';
 
 export const CAP_RUSH_POSTSEASON_VERSION = 'cap-rush-postseason-v1';
+export const CAP_RUSH_CONFERENCE_POSTSEASON_VERSION = 'cap-rush-postseason-v2';
 export const CAP_RUSH_FINALS_MVP_VERSION = 'cap-rush-finals-mvp-v1';
 export const CAP_RUSH_PLAYOFF_TEAMS = 16;
 export const CAP_RUSH_PLAYOFF_ROUNDS = 4;
@@ -27,8 +34,19 @@ export const CAP_RUSH_PLAYOFF_ROUND_NAMES = [
   'Finals',
 ] as const;
 
+export const CAP_RUSH_CONFERENCE_ROUND_NAMES = [
+  'First round',
+  'Conference semifinals',
+  'Conference finals',
+  'NBA Finals',
+] as const;
+
 export function capRushRoundName(round: number): string {
   return CAP_RUSH_PLAYOFF_ROUND_NAMES[round - 1] ?? `Round ${String(round)}`;
+}
+
+export function capRushConferenceRoundName(round: number): string {
+  return CAP_RUSH_CONFERENCE_ROUND_NAMES[round - 1] ?? `Round ${String(round)}`;
 }
 
 export const capRushSeriesIdSchema = z.string().regex(/^crs-[1-4]-[0-7]$/);
@@ -156,6 +174,7 @@ export const capRushPlayoffGameSummarySchema = z
     inputDigest: capRushDigestSchema,
     resultDigest: capRushDigestSchema,
     finalsLines: z.array(capRushPlayoffParticipantSchema).max(40).optional(),
+    box: capRushBoxScoreSchema.optional(),
   })
   .superRefine((game, ctx) => {
     const expectedId = `crp-${String(game.round)}-${String(game.seriesSlot)}-${String(game.gameOrdinal)}`;
@@ -176,17 +195,8 @@ export const capRushPlayoffGameSummarySchema = z
     if (game.winnerTeamId !== expectedWinner) {
       ctx.addIssue({ code: 'custom', message: 'playoff winner disagrees with the scoreline' });
     }
-    if (game.userSide === 'home' && game.homeTeamId !== CAP_RUSH_USER_TEAM_ID) {
-      ctx.addIssue({ code: 'custom', message: 'the user side must be the user team' });
-    }
-    if (game.userSide === 'away' && game.awayTeamId !== CAP_RUSH_USER_TEAM_ID) {
-      ctx.addIssue({ code: 'custom', message: 'the user side must be the user team' });
-    }
-    if (
-      game.userSide === null &&
-      (game.homeTeamId === CAP_RUSH_USER_TEAM_ID || game.awayTeamId === CAP_RUSH_USER_TEAM_ID)
-    ) {
-      ctx.addIssue({ code: 'custom', message: 'a user playoff game must record its side' });
+    if (game.userSide !== null && game.homeTeamId === game.awayTeamId) {
+      ctx.addIssue({ code: 'custom', message: 'a playoff game needs two teams' });
     }
     if (game.round !== CAP_RUSH_PLAYOFF_ROUNDS && game.finalsLines !== undefined) {
       ctx.addIssue({ code: 'custom', message: 'only Finals games carry participant evidence' });
@@ -257,6 +267,84 @@ export const capRushPlayoffSeriesSchema = z
   });
 export type CapRushPlayoffSeries = z.infer<typeof capRushPlayoffSeriesSchema>;
 
+export const capRushConferenceSeriesSchema = z
+  .object({
+    seriesId: capRushSeriesIdSchema,
+    round: capRushPlayoffRoundSchema,
+    seriesSlot: z.number().int().min(0).max(7),
+    conference: capRushConferenceSchema.nullable(),
+    highSeed: z.number().int().min(1).max(CAP_RUSH_CONFERENCE_SIZE),
+    lowSeed: z.number().int().min(1).max(CAP_RUSH_CONFERENCE_SIZE),
+    highTeamId: z.string().min(1).max(64),
+    lowTeamId: z.string().min(1).max(64),
+    games: z.array(capRushPlayoffGameSummarySchema).max(CAP_RUSH_SERIES_GAMES),
+  })
+  .superRefine((series, ctx) => {
+    const expectedId = `crs-${String(series.round)}-${String(series.seriesSlot)}`;
+    if (series.seriesId !== expectedId) {
+      ctx.addIssue({ code: 'custom', message: 'series id does not match its identity' });
+    }
+    const expectedConference = capRushSeriesConferenceOf(series.round, series.seriesSlot);
+    if (series.conference !== expectedConference) {
+      ctx.addIssue({ code: 'custom', message: 'series conference does not match its slot' });
+    }
+    if (series.round < CAP_RUSH_PLAYOFF_ROUNDS && series.highSeed >= series.lowSeed) {
+      ctx.addIssue({ code: 'custom', message: 'the higher seed must carry the lower seed number' });
+    }
+    if (series.highTeamId === series.lowTeamId) {
+      ctx.addIssue({ code: 'custom', message: 'a series needs two teams' });
+    }
+    series.games.forEach((game, index) => {
+      if (game.gameOrdinal !== index + 1) {
+        ctx.addIssue({ code: 'custom', message: 'series games must be sequential' });
+      }
+      if (game.seriesId !== series.seriesId) {
+        ctx.addIssue({ code: 'custom', message: 'series game belongs to another series' });
+      }
+      if (
+        (game.homeTeamId !== series.highTeamId && game.homeTeamId !== series.lowTeamId) ||
+        (game.awayTeamId !== series.highTeamId && game.awayTeamId !== series.lowTeamId) ||
+        game.homeTeamId === game.awayTeamId
+      ) {
+        ctx.addIssue({ code: 'custom', message: 'series game teams do not match the matchup' });
+      }
+      const highSeed = game.homeTeamId === series.highTeamId ? game.homeSeed : game.awaySeed;
+      const lowSeed = game.homeTeamId === series.lowTeamId ? game.homeSeed : game.awaySeed;
+      if (highSeed !== series.highSeed || lowSeed !== series.lowSeed) {
+        ctx.addIssue({ code: 'custom', message: 'series game seeds do not match the matchup' });
+      }
+      const expectedHome = [1, 2, 5, 7].includes(game.gameOrdinal)
+        ? series.highTeamId
+        : series.lowTeamId;
+      if (game.homeTeamId !== expectedHome) {
+        ctx.addIssue({ code: 'custom', message: 'series home court does not follow the format' });
+      }
+    });
+    const highWins = series.games.filter((game) => game.winnerTeamId === series.highTeamId).length;
+    const lowWins = series.games.filter((game) => game.winnerTeamId === series.lowTeamId).length;
+    if (highWins > CAP_RUSH_SERIES_WINS || lowWins > CAP_RUSH_SERIES_WINS) {
+      ctx.addIssue({ code: 'custom', message: 'a series cannot exceed four wins' });
+    }
+    if (
+      (highWins === CAP_RUSH_SERIES_WINS || lowWins === CAP_RUSH_SERIES_WINS) &&
+      series.games.at(-1)?.winnerTeamId !==
+        (highWins === CAP_RUSH_SERIES_WINS ? series.highTeamId : series.lowTeamId)
+    ) {
+      ctx.addIssue({ code: 'custom', message: 'a series must end on its clinching win' });
+    }
+  });
+export type CapRushConferenceSeries = z.infer<typeof capRushConferenceSeriesSchema>;
+
+export function capRushSeriesConferenceOf(
+  round: number,
+  seriesSlot: number,
+): 'east' | 'west' | null {
+  if (round === 1) return seriesSlot < 4 ? 'west' : 'east';
+  if (round === 2) return seriesSlot < 2 ? 'west' : 'east';
+  if (round === 3) return seriesSlot === 0 ? 'west' : 'east';
+  return null;
+}
+
 export const capRushPostseasonUserOutcomeSchema = z.object({
   status: z.enum(['pending', 'not-qualified', 'eliminated', 'champion']),
   round: capRushPlayoffRoundSchema.nullable(),
@@ -283,7 +371,93 @@ export const capRushFinalsMvpSchema = z.object({
 });
 export type CapRushFinalsMvp = z.infer<typeof capRushFinalsMvpSchema>;
 
-export const capRushPostseasonSchema = z
+export const capRushConferencePostseasonSchema = z
+  .object({
+    version: z.literal(CAP_RUSH_CONFERENCE_POSTSEASON_VERSION),
+    format: z.literal('conference'),
+    phase: z.enum(['awaiting-standings', 'playoffs', 'complete']),
+    standings: capRushConferenceStandingsSchema.nullable(),
+    series: z.array(capRushConferenceSeriesSchema).max(15),
+    userOutcome: capRushPostseasonUserOutcomeSchema,
+    championTeamId: z.string().min(1).max(64).nullable(),
+    finalsMvp: capRushFinalsMvpSchema.nullable(),
+    completedAt: z.iso.datetime().nullable(),
+  })
+  .superRefine((postseason, ctx) => {
+    if (postseason.phase === 'awaiting-standings') {
+      if (postseason.standings !== null || postseason.series.length !== 0) {
+        ctx.addIssue({ code: 'custom', message: 'standings must be accepted before the bracket' });
+      }
+    }
+    if (postseason.phase === 'playoffs' && postseason.standings === null) {
+      ctx.addIssue({ code: 'custom', message: 'a playoff bracket requires final standings' });
+    }
+    if (postseason.phase === 'complete') {
+      if (postseason.championTeamId === null) {
+        ctx.addIssue({ code: 'custom', message: 'a complete postseason requires a champion' });
+      }
+      if (postseason.finalsMvp === null) {
+        ctx.addIssue({ code: 'custom', message: 'a complete postseason requires a Finals MVP' });
+      }
+      if (postseason.completedAt === null) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'a complete postseason requires a completion time',
+        });
+      }
+      if (postseason.series.length !== 15) {
+        ctx.addIssue({ code: 'custom', message: 'a complete postseason has fifteen series' });
+      }
+    } else if (postseason.completedAt !== null) {
+      ctx.addIssue({ code: 'custom', message: 'an unfinished postseason has no completion time' });
+    }
+    const rounds = new Map<number, number>();
+    for (const series of postseason.series) {
+      rounds.set(series.round, (rounds.get(series.round) ?? 0) + 1);
+    }
+    for (const [round, count] of rounds) {
+      const expected = 8 >> (round - 1);
+      if (count !== expected) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `round ${String(round)} must contain ${String(expected)} series`,
+        });
+      }
+    }
+    if (postseason.championTeamId !== null && postseason.userOutcome.status === 'champion') {
+      if (postseason.userOutcome.round !== CAP_RUSH_PLAYOFF_ROUNDS) {
+        ctx.addIssue({ code: 'custom', message: 'a user championship ends in the Finals' });
+      }
+    }
+    if (postseason.championTeamId !== null && postseason.userOutcome.status === 'eliminated') {
+      if (postseason.userOutcome.round === null) {
+        ctx.addIssue({ code: 'custom', message: 'an elimination records its round' });
+      }
+    }
+  });
+export type CapRushConferencePostseason = z.infer<typeof capRushConferencePostseasonSchema>;
+
+export function capRushEmptyConferencePostseason(): CapRushConferencePostseason {
+  return {
+    version: CAP_RUSH_CONFERENCE_POSTSEASON_VERSION,
+    format: 'conference',
+    phase: 'awaiting-standings',
+    standings: null,
+    series: [],
+    userOutcome: { status: 'pending', round: null },
+    championTeamId: null,
+    finalsMvp: null,
+    completedAt: null,
+  };
+}
+
+export function isConferencePostseason(
+  postseason: CapRushPostseason,
+): postseason is CapRushConferencePostseason {
+  return 'format' in postseason;
+}
+
+export const capRushLegacyPostseasonSchema = z
   .object({
     version: z.literal(CAP_RUSH_POSTSEASON_VERSION),
     phase: z.enum(['awaiting-standings', 'playoffs', 'complete']),
@@ -354,9 +528,15 @@ export const capRushPostseasonSchema = z
       });
     }
   });
+export type CapRushLegacyPostseason = z.infer<typeof capRushLegacyPostseasonSchema>;
+
+export const capRushPostseasonSchema = z.union([
+  capRushLegacyPostseasonSchema,
+  capRushConferencePostseasonSchema,
+]);
 export type CapRushPostseason = z.infer<typeof capRushPostseasonSchema>;
 
-export function capRushEmptyPostseason(): CapRushPostseason {
+export function capRushEmptyPostseason(): CapRushLegacyPostseason {
   return {
     version: CAP_RUSH_POSTSEASON_VERSION,
     phase: 'awaiting-standings',
@@ -377,7 +557,8 @@ export const capRushStoredPlayoffGameSchema = z.object({
 });
 export type CapRushStoredPlayoffGame = z.infer<typeof capRushStoredPlayoffGameSchema>;
 
-export const capRushPostseasonReportSchema = z.object({
+export const capRushLegacyPostseasonReportSchema = z.object({
+  format: z.literal('overall').optional(),
   championTeamId: z.string().min(1).max(64),
   championName: z.string().min(1).max(96),
   isUserChampion: z.boolean(),
@@ -387,6 +568,28 @@ export const capRushPostseasonReportSchema = z.object({
   standings: capRushPostseasonStandingsSchema,
   finalsMvp: capRushFinalsMvpSchema,
 });
+export type CapRushLegacyPostseasonReport = z.infer<typeof capRushLegacyPostseasonReportSchema>;
+
+export const capRushConferencePostseasonReportSchema = z.object({
+  format: z.literal('conference'),
+  championTeamId: z.string().min(1).max(64),
+  championName: z.string().min(1).max(96),
+  isUserChampion: z.boolean(),
+  userOutcome: capRushPostseasonUserOutcomeSchema,
+  seed: z.number().int().min(1).max(CAP_RUSH_CONFERENCE_SIZE).nullable(),
+  conference: capRushConferenceSchema,
+  series: z.array(capRushConferenceSeriesSchema).length(15),
+  standings: capRushConferenceStandingsSchema,
+  finalsMvp: capRushFinalsMvpSchema,
+});
+export type CapRushConferencePostseasonReport = z.infer<
+  typeof capRushConferencePostseasonReportSchema
+>;
+
+export const capRushPostseasonReportSchema = z.union([
+  capRushLegacyPostseasonReportSchema,
+  capRushConferencePostseasonReportSchema,
+]);
 export type CapRushPostseasonReport = z.infer<typeof capRushPostseasonReportSchema>;
 
 export const capRushPlayoffGamePlanSchema = z.object({
@@ -411,6 +614,7 @@ export const capRushHistoryPostseasonSchema = z.object({
   userStatus: z.enum(['not-qualified', 'eliminated', 'champion']),
   userRound: capRushPlayoffRoundSchema.nullable(),
   seed: z.number().int().min(1).max(CAP_RUSH_LEAGUE_TEAMS).nullable(),
+  conference: capRushConferenceSchema.optional(),
 });
 export type CapRushHistoryPostseason = z.infer<typeof capRushHistoryPostseasonSchema>;
 

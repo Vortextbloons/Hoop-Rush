@@ -15,29 +15,29 @@ import {
 type RatingField = keyof SimulationRatings;
 
 const FIRST_APRON_REDUCTIONS: Partial<Record<RatingField, number>> = {
-  passing: 5,
-  ballHandling: 3,
-  offensiveIq: 5,
-  defensiveIq: 5,
-  perimeterDefense: 4,
-  interiorDefense: 4,
-  threePoint: 2,
-  midrange: 2,
+  passing: 3,
+  ballHandling: 2,
+  offensiveIq: 3,
+  defensiveIq: 3,
+  perimeterDefense: 3,
+  interiorDefense: 3,
+  threePoint: 1,
+  midrange: 1,
 };
 
 const SECOND_APRON_REDUCTIONS: Partial<Record<RatingField, number>> = {
-  passing: 12,
-  ballHandling: 9,
-  offensiveIq: 12,
-  defensiveIq: 12,
-  perimeterDefense: 9,
-  interiorDefense: 9,
-  threePoint: 6,
-  midrange: 6,
-  insideScoring: 4,
-  closeShot: 4,
-  offensiveRebound: 4,
-  defensiveRebound: 4,
+  passing: 8,
+  ballHandling: 5,
+  offensiveIq: 7,
+  defensiveIq: 7,
+  perimeterDefense: 5,
+  interiorDefense: 5,
+  threePoint: 3,
+  midrange: 3,
+  insideScoring: 3,
+  closeShot: 3,
+  offensiveRebound: 2,
+  defensiveRebound: 2,
 };
 
 function roundHalfUp(numerator: number, denominator: number): number {

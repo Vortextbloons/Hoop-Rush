@@ -7,6 +7,7 @@ import { simulateHavocBattleGame } from '../havoc/core/battle-game.ts';
 import { soloToBattleInput } from '../havoc/core/battle-adapters.ts';
 import { buildHavocGameInput } from '../havoc/input.ts';
 import { buildScenarioTeam } from '../havoc/runtime-test-support.ts';
+import { auditHavocBattleGame } from '../havoc/core/battle-audit.ts';
 import { CapRushApronRuntime } from './apron-runtime.ts';
 
 function battleInput(): HavocBattleInput {
@@ -41,6 +42,7 @@ function runWithApron(rules: CapRushApronRules, side: 0 | 1 = 0) {
   const apron = new CapRushApronRuntime({
     side,
     rules,
+    legacyIsolation: true,
     targetInstanceId: target.instanceId,
     targetSlot: 'C',
   });
@@ -61,11 +63,49 @@ function runWithApron(rules: CapRushApronRules, side: 0 | 1 = 0) {
 }
 
 describe('cap rush apron integration', () => {
+  it('records intercepted passes with audited accounting and seeded replay', () => {
+    let interceptions = 0;
+    for (let index = 0; index < 8; index += 1) {
+      const input = havocBattleInputSchema.parse({
+        ...battleInput(),
+        seed: index.toString(16).padStart(32, '0'),
+      });
+      const side = index % 2 === 0 ? 0 : 1;
+      const humanSide = side === 0 ? 'home' : 'away';
+      const opponentSide = side === 0 ? 'away' : 'home';
+      const target = input[humanSide].starters[4];
+      if (target === undefined) throw new Error('fixture is missing a C starter');
+      const makeApron = () =>
+        new CapRushApronRuntime({
+          side,
+          rules: { payrollStatus: index % 4 < 2 ? 'first-apron' : 'second-apron' },
+          targetInstanceId: target.instanceId,
+          targetSlot: 'C',
+        });
+      const apron = makeApron();
+      const first = simulateHavocBattleGame(input, createEngineContext(), { apron });
+      const replayApron = makeApron();
+      const replay = simulateHavocBattleGame(input, createEngineContext(), { apron: replayApron });
+      expect(replay.result).toEqual(first.result);
+      expect(replay.tape).toEqual(first.tape);
+      expect(replayApron.recordedFacts()).toEqual(apron.recordedFacts());
+      expect(auditHavocBattleGame(input, first.result, first.tape).ok).toBe(true);
+      const intercepted = apron.recordedFacts().filter((fact) => fact.kind === 'pass-interception');
+      interceptions += intercepted.length;
+      expect(intercepted.every((fact) => fact.side === humanSide)).toBe(true);
+      expect(first.result[humanSide].turnovers).toBeGreaterThanOrEqual(intercepted.length);
+      expect(first.result[opponentSide].steals).toBeGreaterThanOrEqual(intercepted.length);
+      expect(apron.recordedFacts().some((fact) => fact.kind === 'isolation')).toBe(false);
+    }
+    expect(interceptions).toBeGreaterThan(0);
+  });
+
   it('leaves the game untouched when no apron rules apply', () => {
     const baseline = simulateHavocBattleGame(battleInput(), createEngineContext());
     const clean = new CapRushApronRuntime({
       side: 0,
       rules: { payrollStatus: 'first-apron' },
+      legacyIsolation: true,
       targetInstanceId: `hvi-${'0'.repeat(32)}`,
       targetSlot: 'C',
     });

@@ -3,6 +3,7 @@ import { opponentBracketSchema } from './bracket.ts';
 import { CAP_RUSH_GAME_COUNT, capRushDigestSchema } from './cap-rush-versions.ts';
 import { capRushGameSummarySchema } from './cap-rush-season.ts';
 import { capRushLockedInputsSchema } from './cap-rush-lock.ts';
+import { capRushLeagueGameSchema } from './cap-rush-league.ts';
 import {
   capRushLeagueResultSchema,
   capRushPlayoffGamePlanSchema,
@@ -64,6 +65,7 @@ export const capRushWorkerGameMessageSchema = capRushWorkerBase.extend({
   summary: capRushGameSummarySchema,
   audit: havocGameAuditSchema,
   result: havocGameResultSchema,
+  leagueGames: z.array(capRushLeagueGameSchema).max(15).optional(),
 });
 export type CapRushWorkerGameMessage = z.infer<typeof capRushWorkerGameMessageSchema>;
 

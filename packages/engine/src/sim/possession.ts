@@ -958,6 +958,23 @@ function resolveShot(
       ? pickShot(teammateShots, initiator, action, rng, teamPrep.passP.get(initiatorKey))
       : { shooter: initiator, initiator, passed: false };
   const shooter = shot.shooter;
+  const interceptionChance = shot.passed
+    ? (ctx.apron?.passInterceptionChance?.(offenseSide) ?? 0)
+    : 0;
+  if (interceptionChance > 0 && rng.chance(interceptionChance)) {
+    const cancelled = havoc?.cancelTurnover(offenseSide, initiator) ?? false;
+    havoc?.onTurnover(offenseSide, initiator, cancelled);
+    if (!cancelled) {
+      const adjusted = strikeAdjustedDefense(ctx, defenseSide);
+      const stealer = rng.weightedPickTable(adjusted.team.players, adjusted.prep.stealerPickTable);
+      recorder.turnover(offenseSide, slotOf(teamPrep, initiator));
+      recorder.steal(defenseSide, slotOf(defensePrep, stealer));
+      havoc?.onSteal(defenseSide, stealer);
+      ctx.apron?.onPassIntercepted?.(initiator, stealer);
+      ctx.possessionStart = 'liveTurnover';
+      return { continues: false, liveReboundEnd: true };
+    }
+  }
   const zonePrep = teamPrep.zonePrep.get(teamPrep.keyOf(shooter));
   if (zonePrep === undefined) {
     throw new Error(`possession: no zone preparation for ${teamPrep.keyOf(shooter)}`);

@@ -7,6 +7,7 @@
   import type { HoopRushManifest, PlayersIndex } from '@hoop-rush/data-contracts';
   import {
     POSITIONS,
+    capRushConferenceRoundName,
     capRushRoundName,
     type CapRushPlayerSeasonLine,
     type CapRushReport,
@@ -58,6 +59,11 @@
   const winsPerMillion = $derived(report.winsPerMillion);
   const mvp = $derived(report.mvp);
   const postseason = $derived(report.postseason ?? null);
+  const roundName = $derived(
+    postseason !== null && 'format' in postseason && postseason.format === 'conference'
+      ? capRushConferenceRoundName
+      : capRushRoundName,
+  );
   const finalsMvpFace = $derived(
     postseason === null
       ? null
@@ -204,12 +210,13 @@
             {#if postseason.isUserChampion}
               Your five won four best-of-seven rounds.
             {:else if postseason.userOutcome.status === 'not-qualified'}
-              Your {recordLabel(aggregate.wins, aggregate.losses)} regular season missed the top sixteen.
+              Your {recordLabel(aggregate.wins, aggregate.losses)} regular season missed the top
+              {'format' in postseason && postseason.format === 'conference' ? 'eight' : 'sixteen'}.
             {:else}
               Your run ended in the {postseason.userOutcome.round === null
                 ? 'postseason'
-                : capRushRoundName(postseason.userOutcome.round).toLowerCase()}. The bracket
-              finished without you.
+                : roundName(postseason.userOutcome.round).toLowerCase()}. The bracket finished
+              without you.
             {/if}
           </p>
         </div>
@@ -286,7 +293,12 @@
       </p>
     </section>
 
-    <CapRushBracket series={postseason.series} standings={postseason.standings} {manifest} />
+    <CapRushBracket
+      series={postseason.series}
+      standings={postseason.standings}
+      {manifest}
+      userTeamId={report.franchise?.franchiseId ?? null}
+    />
   {:else}
     <p class="rounded-2xl border border-line-soft bg-surface-1 p-4 text-xs text-muted-foreground">
       This is a regular-season run. It was played before Cap Rush postseasons existed, so it has no

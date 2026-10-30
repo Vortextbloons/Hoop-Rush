@@ -1,8 +1,10 @@
 import type {
   CapRushCatalogSource,
   CapRushCommand,
+  CapRushConferenceStandings,
   CapRushDraftState,
   CapRushHistoryEntry,
+  CapRushLeagueGame,
   CapRushLeagueResult,
   CapRushReport,
   CapRushSpinPurchaseId,
@@ -14,6 +16,7 @@ import type {
   Position,
 } from '@hoop-rush/data-contracts';
 import {
+  CAP_RUSH_CONFERENCE_AI_GAMES,
   CAP_RUSH_GAME_COUNT,
   CAP_RUSH_HARD_LIMIT_DOLLARS,
   CAP_RUSH_RULES_VERSION,
@@ -35,6 +38,7 @@ import {
   capRushRerollOfferCommandSchema,
   capRushSignCardCommandSchema,
   capRushSkipSpinCommandSchema,
+  isConferencePostseason,
 } from '@hoop-rush/data-contracts';
 import {
   ENGINE_VERSION,
@@ -42,6 +46,7 @@ import {
   applyCapRushCommand,
   buildCapRushCatalogIndex,
   capRushAssessSigning,
+  capRushConferencePostseasonStep,
   capRushPayrollStatus,
   capRushPostseasonStep,
   capRushReport,
@@ -50,12 +55,12 @@ import {
   createCapRushDraftState,
   type CapRushCatalogIndex,
   type CapRushLockSources,
-  type CapRushPostseasonStep,
 } from '@hoop-rush/engine';
 import {
   CapRushServiceError,
   type CapRushAcceptedGame,
   type CapRushAcceptedPlayoffGame,
+  type CapRushAnyPostseasonStep,
   type CapRushDraftView,
   type CapRushService,
   type CapRushSlotView,
@@ -146,7 +151,7 @@ export class CapRushSession implements CapRushService {
         versionSet: assets.versionSet,
         catalog: assets.index.catalog.source,
       });
-      const state = createCapRushDraftState(command, assets.index);
+      const state = createCapRushDraftState(command, assets.index, assets.lockSources);
       const result = capRushCommandResultSchema.parse({
         schemaVersion: CAP_RUSH_SCHEMA_VERSION,
         commandId: command.commandId,
@@ -273,8 +278,12 @@ export class CapRushSession implements CapRushService {
           isolations: game.isolations,
           strikes: game.strikes,
           summary: game.summary,
+          ...(game.leagueGames === undefined ? {} : { leagueGames: game.leagueGames }),
         }),
-      { game: game.stored },
+      {
+        game: game.stored,
+        ...(game.leagueGames === undefined ? {} : { leagueGames: game.leagueGames }),
+      },
     );
   }
 
@@ -318,6 +327,9 @@ export class CapRushSession implements CapRushService {
       games,
       aggregate: state.season.aggregate,
       apronTriggers: state.season.apronTriggers,
+      ...(state.locked.leagueSchedule === undefined
+        ? {}
+        : { leagueGames: await this.repository.listLeagueGames(state.runId) }),
     });
     await this.dispatch(
       (current) =>
@@ -344,6 +356,18 @@ export class CapRushSession implements CapRushService {
     );
   }
 
+  async acceptConferenceStandings(standings: CapRushConferenceStandings): Promise<void> {
+    await this.dispatch((state) =>
+      capRushAcceptStandingsCommandSchema.parse({
+        command: 'accept-cap-rush-standings',
+        commandId: this.ids.newCommandId(),
+        runId: state.runId,
+        expectedRevision: state.revision,
+        standings,
+      }),
+    );
+  }
+
   async acceptPlayoffGame(game: CapRushAcceptedPlayoffGame): Promise<void> {
     await this.dispatch(
       (state) =>
@@ -360,10 +384,18 @@ export class CapRushSession implements CapRushService {
     );
   }
 
-  postseasonStep(): CapRushPostseasonStep {
+  postseasonStep(): CapRushAnyPostseasonStep {
     const state = this.draft;
     if (state === null || state.postseason === undefined) {
       return { kind: 'complete' };
+    }
+    if (isConferencePostseason(state.postseason)) {
+      return capRushConferencePostseasonStep({
+        postseason: state.postseason,
+        runSeed: state.runSeed,
+        userTeamId:
+          state.locked?.human.teamId ?? state.postseason.standings?.qualifiedTeamIds[0] ?? '',
+      });
     }
     return capRushPostseasonStep({
       postseason: state.postseason,
@@ -442,6 +474,9 @@ export class CapRushSession implements CapRushService {
       aggregate: state.season.aggregate,
       apronTriggers: state.season.apronTriggers,
       postseason: state.postseason,
+      ...(state.locked.leagueSchedule === undefined
+        ? {}
+        : { leagueGames: await this.repository.listLeagueGames(state.runId) }),
     });
   }
 
@@ -477,6 +512,14 @@ export class CapRushSession implements CapRushService {
     }
   }
 
+  async listLeagueGames(runId: string): Promise<readonly CapRushLeagueGame[]> {
+    try {
+      return await this.repository.listLeagueGames(runId);
+    } catch (error) {
+      throw new CapRushServiceError('storage', messageOf(error));
+    }
+  }
+
   async abandonDraft(): Promise<void> {
     try {
       await this.repository.clearActiveDraft();
@@ -491,6 +534,7 @@ export class CapRushSession implements CapRushService {
     extra: {
       readonly game?: CapRushStoredGame;
       readonly playoffGame?: CapRushStoredPlayoffGame;
+      readonly leagueGames?: readonly CapRushLeagueGame[];
       readonly report?: CapRushReport;
     } = {},
   ): Promise<void> {
@@ -511,6 +555,7 @@ export class CapRushSession implements CapRushService {
         command,
         ...(extra.game === undefined ? {} : { game: extra.game }),
         ...(extra.playoffGame === undefined ? {} : { playoffGame: extra.playoffGame }),
+        ...(extra.leagueGames === undefined ? {} : { leagueGames: extra.leagueGames }),
         ...(extra.report === undefined ? {} : { report: extra.report }),
       });
       if (applied.status === 'rejected') {
@@ -558,6 +603,7 @@ export class CapRushSession implements CapRushService {
     }
     return {
       draft: state,
+      franchise: state.franchise ?? null,
       payrollDollars,
       hardLimitDollars: CAP_RUSH_HARD_LIMIT_DOLLARS,
       remainingRoomDollars: CAP_RUSH_HARD_LIMIT_DOLLARS - payrollDollars,
@@ -583,6 +629,9 @@ export class CapRushSession implements CapRushService {
               apronTriggers: state.season.apronTriggers,
               completedAt: state.season.completedAt,
               nextGameNumber: state.season.games.length + 1,
+              leagueGamesAccepted: state.season.leagueGamesAccepted ?? 0,
+              leagueGamesTotal:
+                state.locked?.leagueSchedule === undefined ? 0 : CAP_RUSH_CONFERENCE_AI_GAMES,
             }
           : null,
       postseason: state.postseason ?? null,

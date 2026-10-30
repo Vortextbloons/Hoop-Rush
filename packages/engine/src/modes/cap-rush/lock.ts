@@ -1,6 +1,8 @@
 import type {
   CapRushDraftPick,
+  CapRushFranchiseAssignment,
   CapRushHighestPaidTarget,
+  CapRushLeagueScheduleEntry,
   CapRushLockedInputs,
   CapRushLockedPick,
   CapRushPayrollStatus,
@@ -30,6 +32,7 @@ import {
 import { applyHavocMutationPackage } from '../havoc/transform.ts';
 import { buildHavocOpponentTeam, buildHavocSchedule } from '../havoc/opponents.ts';
 import { capRushEffectiveRatings, capRushPayrollStatus } from './salary.ts';
+import { capRushUserScheduleOf, capRushValidateLeagueField } from './league-schedule.ts';
 
 export const CAP_RUSH_HUMAN_TEAM_ID = 'cap-rush-human';
 export const CAP_RUSH_HUMAN_TEAM_NAME = 'Cap Rush Five';
@@ -110,6 +113,8 @@ export function buildCapRushHumanTeam(input: {
   readonly payrollStatus: CapRushPayrollStatus;
   readonly spin: CapRushSpinReceipt | null;
   readonly additionalSpins?: readonly CapRushSpinReceipt[] | undefined;
+  readonly teamId?: string | undefined;
+  readonly displayName?: string | undefined;
 }): HavocTeamInput {
   if (input.picks.length !== POSITIONS.length) {
     throw new Error(
@@ -161,12 +166,33 @@ export function buildCapRushHumanTeam(input: {
   });
   return havocTeamInputSchema.parse({
     side: 'human',
-    teamId: CAP_RUSH_HUMAN_TEAM_ID,
-    displayName: CAP_RUSH_HUMAN_TEAM_NAME,
+    teamId: input.teamId ?? CAP_RUSH_HUMAN_TEAM_ID,
+    displayName: input.displayName ?? CAP_RUSH_HUMAN_TEAM_NAME,
     starters,
     replacements,
     clones: [],
   });
+}
+
+function buildOpponentSides(input: {
+  readonly runSeed: Seed;
+  readonly bracket: OpponentBracket;
+  readonly profile: EraSimulationProfile;
+  readonly excludeTeamId?: string | undefined;
+}): {
+  readonly opponentId: string;
+  readonly team: HavocTeamInput;
+}[] {
+  return input.bracket.opponents
+    .filter((opponent) => opponent.teamId !== input.excludeTeamId)
+    .map((opponent) => ({
+      opponentId: opponent.teamId,
+      team: buildHavocOpponentTeam({
+        runSeed: input.runSeed,
+        opponent,
+        profile: input.profile,
+      }).team,
+    }));
 }
 
 export function buildCapRushSchedule(bracket: OpponentBracket): CapRushScheduleEntry[] {
@@ -184,6 +210,12 @@ export function buildCapRushLockedInputs(input: {
   readonly additionalSpins?: readonly CapRushSpinReceipt[] | undefined;
   readonly bracket: OpponentBracket;
   readonly profile: EraSimulationProfile;
+  readonly takeover?:
+    | {
+        readonly franchise: CapRushFranchiseAssignment;
+        readonly games: readonly CapRushLeagueScheduleEntry[];
+      }
+    | undefined;
 }): CapRushLockedInputs {
   const payrollDollars = capRushPayrollDollarsOf(input.picks);
   const payrollStatus = capRushPayrollStatus(payrollDollars);
@@ -200,22 +232,67 @@ export function buildCapRushLockedInputs(input: {
     playerVersionId: pick.card.source.playerVersionId,
     salaryDollars: pick.card.salaryDollars,
   }));
+  const takeover = input.takeover;
   const human = buildCapRushHumanTeam({
     runSeed: input.runSeed,
     picks: input.picks,
     payrollStatus,
     spin: input.spin,
     additionalSpins: input.additionalSpins,
+    ...(takeover === undefined
+      ? {}
+      : {
+          teamId: takeover.franchise.franchiseId,
+          displayName: takeover.franchise.displayName,
+        }),
   });
-  const schedule = buildCapRushSchedule(input.bracket);
-  const opponents = input.bracket.opponents.map((opponent) => ({
-    opponentId: opponent.opponentId,
-    team: buildHavocOpponentTeam({
+  if (takeover === undefined) {
+    const schedule = buildCapRushSchedule(input.bracket);
+    const opponents = input.bracket.opponents.map((opponent) => ({
+      opponentId: opponent.opponentId,
+      team: buildHavocOpponentTeam({
+        runSeed: input.runSeed,
+        opponent,
+        profile: input.profile,
+      }).team,
+    }));
+    return capRushLockedInputsSchema.parse({
+      schemaVersion: CAP_RUSH_SCHEMA_VERSION,
+      runId: input.runId,
       runSeed: input.runSeed,
-      opponent,
+      variant: input.variant,
+      versionSet: input.versionSet,
       profile: input.profile,
-    }).team,
-  }));
+      catalog: input.catalog,
+      picks: lockedPicks,
+      payrollDollars,
+      payrollStatus,
+      target: capRushHighestPaidOf(input.picks, input.runSeed),
+      spin: input.spin,
+      ...(input.additionalSpins?.length ? { additionalSpins: input.additionalSpins } : {}),
+      human,
+      schedule,
+      opponents,
+    });
+  }
+  const opponentSides = buildOpponentSides({
+    runSeed: input.runSeed,
+    bracket: input.bracket,
+    profile: input.profile,
+    excludeTeamId: takeover.franchise.franchiseId,
+  });
+  const field = [
+    { teamId: human.teamId, displayName: human.displayName },
+    ...opponentSides.map((entry) => ({
+      teamId: entry.team.teamId,
+      displayName: entry.team.displayName,
+    })),
+  ];
+  capRushValidateLeagueField(field);
+  const schedule = capRushUserScheduleOf({
+    games: takeover.games,
+    userTeamId: human.teamId,
+  });
   return capRushLockedInputsSchema.parse({
     schemaVersion: CAP_RUSH_SCHEMA_VERSION,
     runId: input.runId,
@@ -230,8 +307,10 @@ export function buildCapRushLockedInputs(input: {
     target: capRushHighestPaidOf(input.picks, input.runSeed),
     spin: input.spin,
     ...(input.additionalSpins?.length ? { additionalSpins: input.additionalSpins } : {}),
+    franchise: takeover.franchise,
+    leagueSchedule: takeover.games,
     human,
     schedule,
-    opponents,
+    opponents: opponentSides,
   });
 }

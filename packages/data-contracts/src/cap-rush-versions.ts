@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { contentHashSchema } from './ids.ts';
 
 export const CAP_RUSH_SCHEMA_VERSION = 1;
-export const CAP_RUSH_RULES_VERSION = 'cap-rush-rules-v1';
+export const CAP_RUSH_RULES_VERSION = 'cap-rush-rules-v3';
 export const CAP_RUSH_SALARY_CURVE_VERSION = 'cap-rush-salary-v3';
 export const CAP_RUSH_SEED_DERIVATION_VERSION = 'cap-rush-seeds-v1';
 export const CAP_RUSH_REPORT_VERSION = 'cap-rush-report-v1';
@@ -110,7 +110,7 @@ export type CapRushDigest = z.infer<typeof capRushDigestSchema>;
 
 export const capRushVersionSetSchema = z.object({
   schemaVersion: z.literal(CAP_RUSH_SCHEMA_VERSION),
-  rulesVersion: z.literal(CAP_RUSH_RULES_VERSION),
+  rulesVersion: z.enum(['cap-rush-rules-v1', 'cap-rush-rules-v2', CAP_RUSH_RULES_VERSION]),
   salaryCurveVersion: z.literal(CAP_RUSH_SALARY_CURVE_VERSION),
   seedDerivationVersion: z.literal(CAP_RUSH_SEED_DERIVATION_VERSION),
   engineVersion: z.string().min(1).max(64),

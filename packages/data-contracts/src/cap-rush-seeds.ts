@@ -123,6 +123,19 @@ export function capRushLeagueSeed(runSeed: Seed): Seed {
   return capRushSeed(runSeed, 'background-league');
 }
 
+export function capRushFranchiseAssignmentSeed(runSeed: Seed): Seed {
+  return capRushSeed(runSeed, 'franchise-assignment');
+}
+
+export function capRushScheduleSeed(runSeed: Seed): Seed {
+  return capRushSeed(runSeed, 'league-schedule');
+}
+
+export function capRushLeagueGameSeed(runSeed: Seed, gameId: string): Seed {
+  if (gameId.length === 0) throw new Error('league game id must not be empty');
+  return capRushSeed(runSeed, 'league-game', gameId);
+}
+
 export function capRushPlayoffGameSeed(
   runSeed: Seed,
   round: number,

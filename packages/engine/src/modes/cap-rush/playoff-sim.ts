@@ -29,6 +29,7 @@ import {
 import { havocGameResultDigest } from '../havoc/digests.ts';
 import { capRushApronRuntimeFor } from './apron-runtime.ts';
 import { capRushBattleVersionSet } from './input.ts';
+import { capRushBoxOf } from './league-simulation.ts';
 
 function battleTeamOf(team: HavocTeamInput, side: 'home' | 'away'): HavocBattleTeamInput {
   return { ...team, side };
@@ -175,6 +176,7 @@ export function simulateCapRushPlayoffGame(input: {
     overtimePeriods: battle.result.overtimePeriods,
     inputDigest,
     resultDigest,
+    box: capRushBoxOf(battle.result.home, battle.result.away, battle.result.overtimePeriods),
     ...(plan.round === CAP_RUSH_PLAYOFF_ROUNDS
       ? {
           finalsLines: [

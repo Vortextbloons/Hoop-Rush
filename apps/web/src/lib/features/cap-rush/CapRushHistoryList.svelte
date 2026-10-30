@@ -96,10 +96,14 @@
                   >
                 </span>
                 <span class="mt-0.5 block font-mono text-[10px] text-muted-foreground uppercase">
-                  {variantLabel(entry.variant)} · {formatMillions(entry.payrollDollars)} payroll ·
+                  {#if entry.franchise}{entry.franchise.displayName} ·
+                  {/if}{variantLabel(entry.variant)} · {formatMillions(entry.payrollDollars)} payroll
+                  ·
                   {new Date(entry.completedAtIso).toLocaleDateString()}
                   {#if entry.postseason !== undefined && !entry.postseason.isUserChampion}
                     · Champion: {entry.postseason.championName}
+                  {:else if entry.postseason === undefined}
+                    · Regular-season run
                   {/if}
                 </span>
               </span>

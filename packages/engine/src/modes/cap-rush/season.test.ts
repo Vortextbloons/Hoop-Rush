@@ -124,7 +124,7 @@ describe('cap rush season simulation', () => {
       isolations += game.facts.filter((fact) => fact.kind === 'isolation').length;
       strikes += game.facts.filter((fact) => fact.kind === 'strike').length;
     }
-    expect(isolations).toBeGreaterThan(0);
+    expect(isolations).toBe(0);
     expect(strikes).toBeGreaterThan(0);
   });
 

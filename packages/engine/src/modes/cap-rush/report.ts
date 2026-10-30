@@ -1,4 +1,6 @@
 import type {
+  CapRushBoxParticipant,
+  CapRushLeagueGame,
   CapRushLockedInputs,
   CapRushMvpEntry,
   CapRushPlayerSeasonLine,
@@ -7,6 +9,7 @@ import type {
   CapRushReport,
   CapRushSeasonAggregate,
   CapRushStoredGame,
+  CapRushTeamBox,
   HavocParticipantLine,
   HavocTeamResult,
   LeaguePlayerTotals,
@@ -16,11 +19,13 @@ import type {
 import {
   CAP_RUSH_CAP_LINE_DOLLARS,
   CAP_RUSH_GAME_COUNT,
+  CAP_RUSH_LEAGUE_VERSION,
   CAP_RUSH_REPORT_VERSION,
   CAP_RUSH_SCHEMA_VERSION,
-  CAP_RUSH_USER_TEAM_ID,
   POSITIONS,
   capRushReportSchema,
+  capRushConferenceStandingsEntries,
+  isConferencePostseason,
   playerIdSchema,
 } from '@hoop-rush/data-contracts';
 import {
@@ -164,6 +169,7 @@ export function capRushLeagueMvp(input: {
   readonly locked: CapRushLockedInputs;
   readonly games: readonly CapRushStoredGame[];
   readonly league?: LeagueRecord | null | undefined;
+  readonly leagueGames?: readonly CapRushLeagueGame[] | undefined;
 }): CapRushLeagueBaseline {
   const totals = new Map<string, LeaguePlayerTotals>();
   const names = new Map<string, string>();
@@ -201,6 +207,25 @@ export function capRushLeagueMvp(input: {
     }
   };
 
+  if (input.leagueGames !== undefined) {
+    for (const game of input.leagueGames) {
+      foldLeagueBox({
+        box: game.box.home,
+        won: game.homePoints > game.awayPoints,
+        totals,
+        names,
+        teamNames,
+      });
+      foldLeagueBox({
+        box: game.box.away,
+        won: game.awayPoints > game.homePoints,
+        totals,
+        names,
+        teamNames,
+      });
+    }
+  }
+
   let hasMutationScoring = false;
   for (const game of input.games) {
     const human = userTeamResult(game);
@@ -235,7 +260,7 @@ export function capRushLeagueMvp(input: {
         meanValue * meanValue,
     );
     const standardDeviation = Math.sqrt(variance);
-    const isUserTeam = entry.teamId === CAP_RUSH_USER_TEAM_ID;
+    const isUserTeam = entry.teamId === input.locked.human.teamId;
     const slot = slots.get(key);
     ranked.push({
       playerId: entry.playerId,
@@ -280,6 +305,45 @@ export function capRushLeagueMvp(input: {
   return { leagueBaselineTs, mvp, hasMutationScoring };
 }
 
+function boxOfPartner(line: CapRushBoxParticipant): PlayerBoxScore {
+  return {
+    playerId: playerIdSchema.parse(line.playerId),
+    minutes: line.minutes,
+    points: line.points,
+    fieldGoals: { made: line.fieldGoalsMade, attempted: line.fieldGoalsAttempted },
+    threes: { made: line.threesMade, attempted: line.threesAttempted },
+    freeThrows: { made: line.freeThrowsMade, attempted: line.freeThrowsAttempted },
+    rebounds: {
+      total: line.rebounds,
+      offensive: line.offensiveRebounds,
+      defensive: line.defensiveRebounds,
+    },
+    assists: line.assists,
+    steals: line.steals,
+    blocks: line.blocks,
+    turnovers: line.turnovers,
+    fouls: line.fouls,
+  };
+}
+
+function foldLeagueBox(input: {
+  readonly box: CapRushTeamBox;
+  readonly won: boolean;
+  readonly totals: Map<string, LeaguePlayerTotals>;
+  readonly names: Map<string, string>;
+  readonly teamNames: Map<string, string>;
+}): void {
+  input.teamNames.set(input.box.teamId, input.box.displayName);
+  for (const line of input.box.participants) {
+    const key = `${input.box.teamId}:${line.playerId}`;
+    const existing =
+      input.totals.get(key) ?? emptyLeaguePlayerTotals(input.box.teamId, line.playerId);
+    accumulateLeagueAppearance(existing, boxOfPartner(line), input.won);
+    input.totals.set(key, existing);
+    input.names.set(key, line.displayName);
+  }
+}
+
 function boxOfLine(line: HavocParticipantLine): PlayerBoxScore {
   return {
     playerId: playerIdSchema.parse(line.sourcePlayerId),
@@ -310,11 +374,33 @@ function postseasonReportOf(
   postseason: CapRushPostseason,
   locked: CapRushLockedInputs,
 ): CapRushPostseasonReport {
-  if (
-    postseason.standings === null ||
-    postseason.championTeamId === null ||
-    postseason.finalsMvp === null
-  ) {
+  if (postseason.championTeamId === null || postseason.finalsMvp === null) {
+    throw new Error('cap rush report requires a completed postseason');
+  }
+  if (isConferencePostseason(postseason)) {
+    if (postseason.standings === null) {
+      throw new Error('cap rush report requires final conference standings');
+    }
+    const entries = capRushConferenceStandingsEntries(postseason.standings);
+    const champion = entries.find((entry) => entry.teamId === postseason.championTeamId);
+    if (champion === undefined) {
+      throw new Error('cap rush report: the champion is missing from the standings');
+    }
+    const userEntry = entries.find((entry) => entry.teamId === locked.human.teamId);
+    return {
+      format: 'conference',
+      championTeamId: champion.teamId,
+      championName: champion.displayName,
+      isUserChampion: champion.teamId === locked.human.teamId,
+      userOutcome: postseason.userOutcome,
+      seed: userEntry?.seed ?? null,
+      conference: userEntry?.conference ?? champion.conference,
+      series: postseason.series,
+      standings: postseason.standings,
+      finalsMvp: postseason.finalsMvp,
+    };
+  }
+  if (postseason.standings === null) {
     throw new Error('cap rush report requires a completed postseason');
   }
   const champion = postseason.standings.entries.find(
@@ -344,6 +430,7 @@ export function capRushReport(input: {
   readonly aggregate: CapRushSeasonAggregate;
   readonly apronTriggers: { readonly isolations: number; readonly strikes: number };
   readonly postseason?: CapRushPostseason | null | undefined;
+  readonly leagueGames?: readonly CapRushLeagueGame[] | undefined;
 }): CapRushReport {
   if (input.games.length !== CAP_RUSH_GAME_COUNT) {
     throw new Error(
@@ -356,10 +443,17 @@ export function capRushReport(input: {
   const spinSpendDollars =
     (spin?.priceDollars ?? 0) +
     additionalSpins.reduce((total, receipt) => total + receipt.priceDollars, 0);
+  const legacyLeague =
+    input.postseason !== undefined &&
+    input.postseason !== null &&
+    !isConferencePostseason(input.postseason)
+      ? (input.postseason.standings?.league.league ?? null)
+      : null;
   const league = capRushLeagueMvp({
     locked: input.locked,
     games: input.games,
-    league: input.postseason?.standings?.league.league ?? null,
+    league: legacyLeague,
+    leagueGames: input.leagueGames,
   });
   return capRushReportSchema.parse({
     reportVersion: CAP_RUSH_REPORT_VERSION,
@@ -406,6 +500,13 @@ export function capRushReport(input: {
     leagueBaselineTs: league.leagueBaselineTs,
     hasMutationScoring: league.hasMutationScoring,
     games: input.games.map((game) => game.summary),
+    ...(input.locked.franchise === undefined
+      ? {}
+      : {
+          leagueFormat: CAP_RUSH_LEAGUE_VERSION,
+          franchise: input.locked.franchise,
+          leagueGamesAccepted: input.leagueGames?.length ?? 0,
+        }),
     ...(input.postseason === undefined || input.postseason === null
       ? {}
       : { postseason: postseasonReportOf(input.postseason, input.locked) }),

@@ -16,7 +16,27 @@ import {
   capRushVariantSchema,
   capRushVersionSetSchema,
 } from './cap-rush-versions.ts';
+import {
+  CAP_RUSH_CONFERENCE_AI_GAMES,
+  CAP_RUSH_CONFERENCE_GAMES,
+  CAP_RUSH_CONFERENCE_GAMES_PER_TEAM,
+  CAP_RUSH_FRANCHISE_ALIGNMENT,
+  CAP_RUSH_TAKEOVER_TEAMS,
+  capRushAlignmentOf,
+  capRushConferenceSchema,
+  capRushDivisionSchema,
+  capRushLeagueScheduleEntrySchema,
+  type CapRushLeagueScheduleEntry,
+} from './cap-rush-league.ts';
 import { capRushSpinReceiptSchema } from './cap-rush-spin.ts';
+
+export const capRushFranchiseAssignmentSchema = z.object({
+  franchiseId: z.string().min(1).max(64),
+  displayName: z.string().min(1).max(96),
+  conference: capRushConferenceSchema,
+  division: capRushDivisionSchema,
+});
+export type CapRushFranchiseAssignment = z.infer<typeof capRushFranchiseAssignmentSchema>;
 
 export const capRushLockedPickSchema = z.object({
   pickOrdinal: z
@@ -73,6 +93,11 @@ export const capRushLockedInputsSchema = z
     target: capRushHighestPaidTargetSchema,
     spin: capRushSpinReceiptSchema.nullable(),
     additionalSpins: z.array(capRushSpinReceiptSchema).max(4).optional(),
+    franchise: capRushFranchiseAssignmentSchema.optional(),
+    leagueSchedule: z
+      .array(capRushLeagueScheduleEntrySchema)
+      .max(CAP_RUSH_CONFERENCE_GAMES)
+      .optional(),
     human: havocTeamInputSchema,
     schedule: z.array(capRushScheduleEntrySchema).length(CAP_RUSH_GAME_COUNT),
     opponents: z.array(capRushFrozenOpponentSchema).min(1).max(64),
@@ -156,6 +181,128 @@ export const capRushLockedInputsSchema = z
           code: 'custom',
           message: 'frozen opponents must be opponent-side teams without clones',
         });
+      }
+    }
+    if ((locked.franchise === undefined) !== (locked.leagueSchedule === undefined)) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'takeover runs carry both a franchise assignment and a league schedule',
+      });
+    }
+    if (locked.franchise !== undefined && locked.leagueSchedule !== undefined) {
+      const franchise = locked.franchise;
+      if (
+        !CAP_RUSH_FRANCHISE_ALIGNMENT.some((entry) => entry.franchiseId === franchise.franchiseId)
+      ) {
+        ctx.addIssue({ code: 'custom', message: 'unknown takeover franchise' });
+      }
+      const alignment = capRushAlignmentOf(franchise.franchiseId);
+      if (
+        alignment.conference !== franchise.conference ||
+        alignment.division !== franchise.division
+      ) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'franchise alignment does not match its identity',
+        });
+      }
+      if (locked.human.teamId !== franchise.franchiseId) {
+        ctx.addIssue({ code: 'custom', message: 'the user team must be the takeover franchise' });
+      }
+      if (locked.human.displayName !== franchise.displayName) {
+        ctx.addIssue({ code: 'custom', message: 'the user team must carry franchise branding' });
+      }
+      if (locked.opponents.length !== CAP_RUSH_TAKEOVER_TEAMS - 1) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `a takeover field carries ${String(CAP_RUSH_TAKEOVER_TEAMS - 1)} opponents`,
+        });
+      }
+      const teamIds = new Set<string>([locked.human.teamId]);
+      for (const opponent of locked.opponents) teamIds.add(opponent.team.teamId);
+      if (teamIds.size !== CAP_RUSH_TAKEOVER_TEAMS) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'the league field must hold thirty distinct teams',
+        });
+      }
+      if (locked.leagueSchedule.length !== CAP_RUSH_CONFERENCE_GAMES) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `the league schedule carries ${String(CAP_RUSH_CONFERENCE_GAMES)} games`,
+        });
+      }
+      const slots = new Map<number, Set<string>>();
+      const gamesPerTeam = new Map<string, { home: number; away: number }>();
+      let userGames = 0;
+      const userBySlot = new Map<number, CapRushLeagueScheduleEntry>();
+      for (const game of locked.leagueSchedule) {
+        if (!teamIds.has(game.homeTeamId) || !teamIds.has(game.awayTeamId)) {
+          ctx.addIssue({ code: 'custom', message: 'league schedule references an unknown team' });
+        }
+        const slotTeams = slots.get(game.slot) ?? new Set<string>();
+        if (slotTeams.has(game.homeTeamId) || slotTeams.has(game.awayTeamId)) {
+          ctx.addIssue({ code: 'custom', message: 'a team plays twice in one league slot' });
+        }
+        slotTeams.add(game.homeTeamId);
+        slotTeams.add(game.awayTeamId);
+        slots.set(game.slot, slotTeams);
+        const home = gamesPerTeam.get(game.homeTeamId) ?? { home: 0, away: 0 };
+        home.home += 1;
+        gamesPerTeam.set(game.homeTeamId, home);
+        const away = gamesPerTeam.get(game.awayTeamId) ?? { home: 0, away: 0 };
+        away.away += 1;
+        gamesPerTeam.set(game.awayTeamId, away);
+        if (game.homeTeamId === locked.human.teamId || game.awayTeamId === locked.human.teamId) {
+          userGames += 1;
+          const humanHome = game.homeTeamId === locked.human.teamId;
+          userBySlot.set(game.slot, game);
+          const entry = locked.schedule[game.slot - 1];
+          const opponentId = humanHome ? game.awayTeamId : game.homeTeamId;
+          if (
+            entry === undefined ||
+            entry.opponentId !== opponentId ||
+            entry.humanHome !== humanHome
+          ) {
+            ctx.addIssue({
+              code: 'custom',
+              message: 'the user schedule must match the league schedule',
+            });
+          }
+        }
+      }
+      if (userGames !== CAP_RUSH_CONFERENCE_GAMES_PER_TEAM) {
+        ctx.addIssue({ code: 'custom', message: 'the user plays exactly 82 league games' });
+      }
+      if (locked.leagueSchedule.length - userGames !== CAP_RUSH_CONFERENCE_AI_GAMES) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `the league plays ${String(CAP_RUSH_CONFERENCE_AI_GAMES)} AI-only games`,
+        });
+      }
+      for (let slot = 1; slot <= CAP_RUSH_CONFERENCE_GAMES_PER_TEAM; slot += 1) {
+        const slotTeams = slots.get(slot);
+        if (slotTeams === undefined || slotTeams.size !== CAP_RUSH_TAKEOVER_TEAMS) {
+          ctx.addIssue({
+            code: 'custom',
+            message: `league slot ${String(slot)} must play every team`,
+          });
+        }
+        if (!userBySlot.has(slot)) {
+          ctx.addIssue({
+            code: 'custom',
+            message: `league slot ${String(slot)} misses the user game`,
+          });
+        }
+      }
+      for (const teamId of teamIds) {
+        const record = gamesPerTeam.get(teamId);
+        if (record === undefined || record.home !== 41 || record.away !== 41) {
+          ctx.addIssue({
+            code: 'custom',
+            message: `${teamId} must play 41 home and 41 away games`,
+          });
+        }
       }
     }
   });

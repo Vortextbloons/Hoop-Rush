@@ -5,6 +5,7 @@ import type {
   CapRushCommandResult,
   CapRushDraftState,
   CapRushHistoryEntry,
+  CapRushLeagueGame,
   CapRushReport,
   CapRushStoredGame,
   CapRushStoredPlayoffGame,
@@ -29,11 +30,15 @@ import {
 import {
   adaptCapRushCatalog,
   buildCapRushCatalogIndex,
+  buildCapRushConferenceStandings,
+  capRushLeagueFieldOfLocked,
   capRushStoredGameOf,
+  capRushUserLeagueGameOf,
   createCapRushDraftState,
   createCapRushLeagueSimulation,
   createEngineContext,
   simulateCapRushGame,
+  simulateCapRushLeagueSlot,
   simulateCapRushPlayoffGame,
 } from '@hoop-rush/engine';
 import {
@@ -51,6 +56,7 @@ class MemoryCapRushRepository implements CapRushDraftRepositoryPort {
   readonly commands = new Map<string, CapRushCommandResult>();
   readonly games = new Map<string, CapRushStoredGame[]>();
   readonly playoffGames = new Map<string, CapRushStoredPlayoffGame[]>();
+  readonly leagueGames = new Map<string, CapRushLeagueGame[]>();
   readonly reports = new Map<string, CapRushReport>();
   readonly history: CapRushHistoryEntry[] = [];
 
@@ -73,6 +79,10 @@ class MemoryCapRushRepository implements CapRushDraftRepositoryPort {
     return [...(this.playoffGames.get(runId) ?? [])];
   }
 
+  async listLeagueGames(runId: string): Promise<CapRushLeagueGame[]> {
+    return [...(this.leagueGames.get(runId) ?? [])];
+  }
+
   async saveReport(report: CapRushReport): Promise<void> {
     this.reports.set(report.runId, report);
   }
@@ -92,6 +102,7 @@ class MemoryCapRushRepository implements CapRushDraftRepositoryPort {
     command: CapRushCommand;
     game?: CapRushStoredGame;
     playoffGame?: CapRushStoredPlayoffGame;
+    leagueGames?: readonly CapRushLeagueGame[];
     report?: CapRushReport;
   }): Promise<CapRushCommandResult> {
     const recorded = this.commands.get(input.outcome.result.commandId);
@@ -115,6 +126,15 @@ class MemoryCapRushRepository implements CapRushDraftRepositoryPort {
         this.playoffGames.set(result.runId, [
           ...games.filter((entry) => entry.gameId !== input.playoffGame?.gameId),
           input.playoffGame,
+        ]);
+      }
+      if (input.leagueGames !== undefined) {
+        const games = this.leagueGames.get(result.runId) ?? [];
+        this.leagueGames.set(result.runId, [
+          ...games,
+          ...input.leagueGames.filter(
+            (game) => !games.some((entry) => entry.gameId === game.gameId),
+          ),
         ]);
       }
       if (input.report !== undefined) {
@@ -390,9 +410,15 @@ describe('cap rush session', () => {
     if (locked === undefined || locked === null) throw new Error('lock did not produce inputs');
 
     const context = createEngineContext();
+    const leagueSamples: CapRushLeagueGame[] = [];
     for (let gameNumber = 1; gameNumber <= CAP_RUSH_GAME_COUNT; gameNumber += 1) {
       const simulation = simulateCapRushGame({ locked, gameNumber, context });
       expect(simulation.audit.ok).toBe(true);
+      const slotGames =
+        locked.leagueSchedule === undefined
+          ? undefined
+          : simulateCapRushLeagueSlot({ locked, slot: gameNumber, context });
+      if (slotGames !== undefined) leagueSamples.push(...slotGames);
       await session.acceptGame({
         cursor: gameNumber,
         inputDigest: simulation.summary.inputDigest,
@@ -401,6 +427,7 @@ describe('cap rush session', () => {
         strikes: simulation.facts.filter((fact) => fact.kind === 'strike').length,
         summary: simulation.summary,
         stored: capRushStoredGameOf(simulation),
+        ...(slotGames === undefined ? {} : { leagueGames: slotGames }),
       });
     }
 
@@ -413,16 +440,43 @@ describe('cap rush session', () => {
     expect(session.postseasonStep().kind).toBe('standings');
 
     const preamble = await createAssets().assets.loadPreamble();
-    const league = createCapRushLeagueSimulation(
-      {
-        seed: capRushLeagueSeed(locked.runSeed),
-        bracket: preamble.bracket,
-        profile: preamble.profile,
-      },
-      context,
-    );
-    league.advance(league.gamesTotal);
-    await session.acceptStandings(league.finish());
+    if (locked.leagueSchedule !== undefined) {
+      const userStored = await session.listRunGames(locked.runId);
+      const results = leagueSamples.map((game) => ({
+        gameId: game.gameId,
+        homeTeamId: game.homeTeamId,
+        awayTeamId: game.awayTeamId,
+        homePoints: game.homePoints,
+        awayPoints: game.awayPoints,
+      }));
+      for (const game of userStored) {
+        const entry = capRushUserLeagueGameOf(locked, game.gameNumber);
+        const humanHome = entry.homeTeamId === locked.human.teamId;
+        results.push({
+          gameId: entry.gameId,
+          homeTeamId: entry.homeTeamId,
+          awayTeamId: entry.awayTeamId,
+          homePoints: humanHome ? game.summary.humanPoints : game.summary.opponentPoints,
+          awayPoints: humanHome ? game.summary.opponentPoints : game.summary.humanPoints,
+        });
+      }
+      const standings = buildCapRushConferenceStandings({
+        teams: capRushLeagueFieldOfLocked(locked),
+        games: results,
+      });
+      await session.acceptConferenceStandings(standings);
+    } else {
+      const league = createCapRushLeagueSimulation(
+        {
+          seed: capRushLeagueSeed(locked.runSeed),
+          bracket: preamble.bracket,
+          profile: preamble.profile,
+        },
+        context,
+      );
+      league.advance(league.gamesTotal);
+      await session.acceptStandings(league.finish());
+    }
     expect(session.postseasonStep().kind).toBe('games');
 
     for (let stepIndex = 0; stepIndex < 400; stepIndex += 1) {
@@ -476,6 +530,9 @@ describe('cap rush session', () => {
       strikes: 0,
       summary: first.summary,
       stored: capRushStoredGameOf(first),
+      ...(locked.leagueSchedule === undefined
+        ? {}
+        : { leagueGames: simulateCapRushLeagueSlot({ locked, slot: 1, context }) }),
     });
     const second = simulateCapRushGame({ locked, gameNumber: 2, context });
     await expect(
@@ -551,6 +608,15 @@ describe('cap rush session', () => {
         strikes: simulation.facts.filter((fact) => fact.kind === 'strike').length,
         summary: simulation.summary,
         stored: capRushStoredGameOf(simulation),
+        ...(locked.leagueSchedule === undefined
+          ? {}
+          : {
+              leagueGames: simulateCapRushLeagueSlot({
+                locked,
+                slot: gameNumber,
+                context,
+              }),
+            }),
       });
     }
     expect(await session.finalizeSeason()).toBeNull();

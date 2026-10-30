@@ -32,7 +32,7 @@ import {
   capRushVariantSchema,
 } from './cap-rush-versions.ts';
 import { capRushSpinStateSchema } from './cap-rush-spin.ts';
-import { capRushLockedInputsSchema } from './cap-rush-lock.ts';
+import { capRushFranchiseAssignmentSchema, capRushLockedInputsSchema } from './cap-rush-lock.ts';
 import { capRushSeasonStateSchema } from './cap-rush-season.ts';
 import { capRushPostseasonSchema } from './cap-rush-postseason.ts';
 
@@ -131,6 +131,7 @@ export const capRushDraftStateSchema = z
     rerollsRemaining: z.number().int().min(0).max(CAP_RUSH_REROLL_LIMIT),
     picks: z.array(capRushDraftPickSchema).max(CAP_RUSH_DRAFT_ROUNDS),
     spin: capRushSpinStateSchema,
+    franchise: capRushFranchiseAssignmentSchema.optional(),
     locked: capRushLockedInputsSchema.nullable(),
     season: capRushSeasonStateSchema,
     postseasonEligible: z.boolean().optional(),
@@ -347,6 +348,14 @@ export const capRushDraftStateSchema = z
       }
       if (seenSlots.has(state.offer.slot)) {
         ctx.addIssue({ code: 'custom', message: 'the open offer targets a filled slot' });
+      }
+    }
+
+    if (state.locked !== null && state.locked.leagueSchedule !== undefined) {
+      if (state.franchise === undefined) {
+        ctx.addIssue({ code: 'custom', message: 'a takeover run requires a franchise assignment' });
+      } else if (state.franchise.franchiseId !== state.locked.franchise?.franchiseId) {
+        ctx.addIssue({ code: 'custom', message: 'the locked franchise does not match the draft' });
       }
     }
   });

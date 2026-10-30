@@ -7,6 +7,8 @@ import {
   capRushDraftStateSchema,
   capRushDigestSchema,
   capRushHistoryEntrySchema,
+  capRushLeagueGameIdSchema,
+  capRushLeagueGameSchema,
   capRushReportSchema,
   capRushStoredGameSchema,
   capRushStoredPlayoffGameSchema,
@@ -128,6 +130,21 @@ export const storedCapRushPlayoffGameRowSchema = z
     }
   });
 export type StoredCapRushPlayoffGameRow = z.infer<typeof storedCapRushPlayoffGameRowSchema>;
+
+export const storedCapRushLeagueGameRowSchema = z
+  .object({
+    saveSchemaVersion: z.literal(CAP_RUSH_SAVE_SCHEMA_VERSION),
+    runId: idSchema,
+    gameId: capRushLeagueGameIdSchema,
+    game: capRushLeagueGameSchema,
+    updatedAtIso: isoDateSchema,
+  })
+  .superRefine((row, ctx) => {
+    if (row.game.gameId !== row.gameId) {
+      ctx.addIssue({ code: 'custom', message: 'stored league game id does not match its row' });
+    }
+  });
+export type StoredCapRushLeagueGameRow = z.infer<typeof storedCapRushLeagueGameRowSchema>;
 
 export const storedCapRushHistoryRowSchema = capRushHistoryEntrySchema
   .safeExtend({ saveSchemaVersion: z.literal(CAP_RUSH_SAVE_SCHEMA_VERSION) })

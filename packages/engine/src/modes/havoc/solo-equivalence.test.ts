@@ -115,7 +115,7 @@ const PINNED_DRAFTS: readonly PinnedDraft[] = [
     seed: 'havoc-equiv-b',
     rerollOnFirstTurn: true,
     transcriptDigest: '7440e9f102c0f2bd1c23fccf05055081',
-    rerollStateDigest: '217f8a49e67bfde5c0bf783b82aeae99',
+    rerollStateDigest: '62db3276f0c4cb3aad59dfc480112d06',
     lockedStateDigest: '196f97c0f1c1ff24c84c49feb29ebad0',
   },
 ];

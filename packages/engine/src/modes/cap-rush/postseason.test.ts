@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import type {
   CapRushPlayoffGameSummary,
   CapRushPlayoffSeries,
-  CapRushPostseason,
+  CapRushLegacyPostseason,
   CapRushPostseasonStandings,
   CapRushStandingsEntry,
 } from '@hoop-rush/data-contracts';
@@ -144,7 +144,7 @@ function gameOf(input: {
   });
 }
 
-function postseasonOf(series: CapRushPlayoffSeries[]): CapRushPostseason {
+function postseasonOf(series: CapRushPlayoffSeries[]): CapRushLegacyPostseason {
   return {
     version: 'cap-rush-postseason-v1',
     phase: 'playoffs',
@@ -296,7 +296,7 @@ describe('cap rush postseason', () => {
         };
       }),
     });
-    const postseason: CapRushPostseason = {
+    const postseason: CapRushLegacyPostseason = {
       ...postseasonOf([withReplacement]),
       championTeamId: 'team-01',
     };

@@ -59,6 +59,7 @@ import type {
   StoredCapRushDraftRow,
   StoredCapRushGameRow,
   StoredCapRushHistoryRow,
+  StoredCapRushLeagueGameRow,
   StoredCapRushPlayoffGameRow,
   StoredCapRushReportRow,
 } from '../schemas/cap-rush-record.ts';
@@ -152,6 +153,10 @@ export const HOOP_RUSH_DATABASE_V9_STORES: Record<string, string> = {
   ...HOOP_RUSH_DATABASE_V8_STORES,
   capRushPlayoffGames: '[runId+gameId], runId',
 };
+export const HOOP_RUSH_DATABASE_V10_STORES: Record<string, string> = {
+  ...HOOP_RUSH_DATABASE_V9_STORES,
+  capRushLeagueGames: '[runId+gameId], runId',
+};
 export class HoopRushDatabase extends Dexie {
   profiles!: EntityTable<PlayerProfile, 'id'>;
   archivedProfiles!: EntityTable<PlayerProfile, 'id'>;
@@ -191,6 +196,7 @@ export class HoopRushDatabase extends Dexie {
   capRushHistory!: EntityTable<StoredCapRushHistoryRow, 'runId'>;
   capRushReports!: EntityTable<StoredCapRushReportRow, 'runId'>;
   capRushPlayoffGames!: Table<StoredCapRushPlayoffGameRow, [string, string]>;
+  capRushLeagueGames!: Table<StoredCapRushLeagueGameRow, [string, string]>;
   constructor(name = HOOP_RUSH_DATABASE_NAME) {
     super(name);
     this.version(1).stores(HOOP_RUSH_DATABASE_STORES);
@@ -202,6 +208,7 @@ export class HoopRushDatabase extends Dexie {
     this.version(7).stores(HOOP_RUSH_DATABASE_V7_STORES);
     this.version(8).stores(HOOP_RUSH_DATABASE_V8_STORES);
     this.version(9).stores(HOOP_RUSH_DATABASE_V9_STORES);
+    this.version(10).stores(HOOP_RUSH_DATABASE_V10_STORES);
   }
 }
 export class DexieChallengeRepository {

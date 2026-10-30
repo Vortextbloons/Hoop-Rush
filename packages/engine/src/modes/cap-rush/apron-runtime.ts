@@ -17,6 +17,8 @@ import type { SideIndex } from '../../sim/recorder.ts';
 import { apronPlayerKeyOf } from '../../sim/apron-runtime.ts';
 
 export interface CapRushApronSpec {
+  readonly legacyIsolation?: boolean;
+  readonly legacyInterceptionRates?: boolean;
   readonly side: SideIndex;
   readonly rules: CapRushApronRules;
   readonly targetInstanceId: string;
@@ -59,10 +61,16 @@ export class CapRushApronRuntime {
     const ordinal = (this.ordinals[offense] += 1);
     const defendOrdinal = this.ordinals[offense === 0 ? 1 : 0];
     const isolation =
-      offense === this.spec.side && capRushIsolationDue(this.spec.rules, ordinal)
+      this.spec.legacyIsolation === true &&
+      offense === this.spec.side &&
+      capRushIsolationDue(this.spec.rules, ordinal)
         ? capRushIsolationReason(this.spec.rules)
         : null;
-    const strike = offense !== this.spec.side && capRushStrikeDue(this.spec.rules, ordinal);
+    const strike =
+      offense !== this.spec.side &&
+      (this.spec.legacyIsolation === true
+        ? this.spec.rules.payrollStatus === 'second-apron' && ordinal % 6 === 0
+        : capRushStrikeDue(this.spec.rules, ordinal));
     this.current = {
       offenseOrdinal: ordinal,
       defenseOrdinal: defendOrdinal,
@@ -120,6 +128,26 @@ export class CapRushApronRuntime {
     return this.resolveTarget(team);
   }
 
+  passInterceptionChance(offense: SideIndex): number {
+    if (this.spec.legacyIsolation === true || offense !== this.spec.side) return 0;
+    if (this.spec.legacyInterceptionRates === true) {
+      return this.spec.rules.payrollStatus === 'first-apron' ? 0.025 : 0.08;
+    }
+    return this.spec.rules.payrollStatus === 'first-apron' ? 0.015 : 0.07;
+  }
+
+  onPassIntercepted(passer: SimulationPlayer, defender: SimulationPlayer): void {
+    if (this.current === null) return;
+    this.facts.push({
+      schemaVersion: CAP_RUSH_SCHEMA_VERSION,
+      kind: 'pass-interception',
+      side: sideLabel(this.spec.side),
+      possessionOrdinal: this.current.offenseOrdinal,
+      passerPlayerId: passer.playerId,
+      defenderPlayerId: defender.playerId,
+    });
+  }
+
   private resolveTarget(team: SimulationTeam): SimulationPlayer | null {
     if (this.targetPlayer !== null && team.players.includes(this.targetPlayer)) {
       return this.targetPlayer;
@@ -135,6 +163,7 @@ export class CapRushApronRuntime {
 
 export function capRushApronRuntimeFor(
   locked: {
+    readonly versionSet: { readonly rulesVersion: string };
     readonly payrollStatus: CapRushPayrollStatus;
     readonly target: { readonly instanceId: string; readonly slot: Position };
     readonly human: {
@@ -150,6 +179,8 @@ export function capRushApronRuntimeFor(
     return undefined;
   }
   const apron = new CapRushApronRuntime({
+    legacyIsolation: locked.versionSet.rulesVersion === 'cap-rush-rules-v1',
+    legacyInterceptionRates: locked.versionSet.rulesVersion === 'cap-rush-rules-v2',
     side: humanSide === 'home' ? 0 : 1,
     rules: { payrollStatus: locked.payrollStatus },
     targetInstanceId: locked.target.instanceId,

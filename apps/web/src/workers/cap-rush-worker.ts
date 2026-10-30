@@ -12,6 +12,7 @@ import {
   createCapRushLeagueSimulation,
   createEngineContext,
   simulateCapRushGame,
+  simulateCapRushLeagueSlot,
   simulateCapRushPlayoffGame,
 } from '@hoop-rush/engine';
 import { sleep } from '../lib/sleep';
@@ -100,6 +101,20 @@ async function simulate(
       return;
     }
 
+    let leagueGames;
+    if (request.locked.leagueSchedule !== undefined) {
+      try {
+        leagueGames = simulateCapRushLeagueSlot({
+          locked: request.locked,
+          slot: gameNumber,
+          context: engineContext,
+        });
+      } catch (error) {
+        postError(request.requestId, 'internal', failureMessage(error), gameNumber);
+        return;
+      }
+    }
+
     post({
       schemaVersion: CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION,
       type: 'cap-rush-game',
@@ -112,6 +127,7 @@ async function simulate(
       summary: simulation.summary,
       audit: simulation.audit,
       result: simulation.result,
+      ...(leagueGames === undefined ? {} : { leagueGames }),
     });
     delivered += 1;
     lastCursor = gameNumber;

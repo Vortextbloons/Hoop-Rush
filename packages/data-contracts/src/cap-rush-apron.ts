@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { positionSchema } from './positions.ts';
+import { playerIdSchema } from './ids.ts';
 import { havocInstanceIdSchema } from './havoc-profile.ts';
 import {
   CAP_RUSH_SCHEMA_VERSION,
@@ -9,9 +10,9 @@ import {
 
 export const CAP_RUSH_CLASH_ISOLATION_EVERY = 6;
 export const CAP_RUSH_HERO_BALL_ISOLATION_EVERY = 3;
-export const CAP_RUSH_STRIKE_EVERY = 6;
+export const CAP_RUSH_STRIKE_EVERY = 8;
 
-export const capRushApronMechanicSchema = z.enum(['isolation', 'strike']);
+export const capRushApronMechanicSchema = z.enum(['isolation', 'strike', 'pass-interception']);
 export type CapRushApronMechanic = z.infer<typeof capRushApronMechanicSchema>;
 
 export const capRushIsolationReasonSchema = z.enum(['give-me-the-ball', 'hero-ball']);
@@ -42,9 +43,19 @@ export const capRushStrikeFactSchema = z.object({
 });
 export type CapRushStrikeFact = z.infer<typeof capRushStrikeFactSchema>;
 
+export const capRushPassInterceptionFactSchema = z.object({
+  schemaVersion: z.literal(CAP_RUSH_SCHEMA_VERSION),
+  kind: z.literal('pass-interception'),
+  side: capRushApronSideSchema,
+  possessionOrdinal: z.number().int().min(1),
+  passerPlayerId: playerIdSchema,
+  defenderPlayerId: playerIdSchema,
+});
+
 export const capRushApronFactSchema = z.discriminatedUnion('kind', [
   capRushIsolationFactSchema,
   capRushStrikeFactSchema,
+  capRushPassInterceptionFactSchema,
 ]);
 export type CapRushApronFact = z.infer<typeof capRushApronFactSchema>;
 

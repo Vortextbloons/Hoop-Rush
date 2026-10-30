@@ -99,10 +99,9 @@ function entryOf(run: ScenarioRun, sequence: number | null): HavocScoringEntry |
 }
 
 describe('new tier-1 mutations', () => {
-  it('sets all five scoring ratings to 99 and caps every defensive rating at 20 for Glass Cannon', () => {
-    const effective = applyHavocMutationPackage(sourceWith({ ratings: { speed: 88 } }), [
-      { mutationId: 'glass-cannon' },
-    ]);
+  it('adds 35 to every scoring rating and lifts shot and usage rate for Glass Cannon', () => {
+    const source = sourceWith({ ratings: { speed: 88 } });
+    const effective = applyHavocMutationPackage(source, [{ mutationId: 'glass-cannon' }]);
     for (const field of [
       'insideScoring',
       'closeShot',
@@ -110,7 +109,9 @@ describe('new tier-1 mutations', () => {
       'threePoint',
       'freeThrow',
     ] as const) {
-      expect(effective.ratings[field], field).toBe(99);
+      expect(effective.ratings[field], field).toBe(
+        Math.min(100, source.profile.ratings[field] + 35),
+      );
     }
     for (const field of [
       'perimeterDefense',
@@ -121,8 +122,12 @@ describe('new tier-1 mutations', () => {
     ] as const) {
       expect(effective.ratings[field], field).toBe(20);
     }
-    expect(effective.tendencies.shotRate).toBe(95);
-    expect(effective.tendencies.usageRate).toBe(95);
+    expect(effective.tendencies.shotRate).toBe(
+      Math.min(100, source.profile.tendencies.shotRate + 45),
+    );
+    expect(effective.tendencies.usageRate).toBe(
+      Math.min(100, source.profile.tendencies.usageRate + 35),
+    );
     expect(effective.ratings.speed).toBe(88);
   });
 

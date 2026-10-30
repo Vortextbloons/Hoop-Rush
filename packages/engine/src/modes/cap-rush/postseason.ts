@@ -6,7 +6,7 @@ import type {
   CapRushPlayoffGameSummary,
   CapRushPlayoffParticipant,
   CapRushPlayoffSeries,
-  CapRushPostseason,
+  CapRushLegacyPostseason,
   CapRushPostseasonStandings,
   CapRushStandingsEntry,
   Seed,
@@ -263,7 +263,7 @@ export function capRushSeriesIsComplete(series: CapRushPlayoffSeries): boolean {
 }
 
 export function capRushSeriesForTeam(
-  postseason: CapRushPostseason,
+  postseason: CapRushLegacyPostseason,
   teamId: string,
   round: number,
 ): CapRushPlayoffSeries | null {
@@ -284,7 +284,7 @@ function standingsEntryOf(
   return entry;
 }
 
-function createNextRound(postseason: CapRushPostseason): CapRushPlayoffSeries[] {
+function createNextRound(postseason: CapRushLegacyPostseason): CapRushPlayoffSeries[] {
   const standings = postseason.standings;
   if (standings === null || postseason.series.length === 0) return [];
   const currentRound = Math.max(...postseason.series.map((series) => series.round));
@@ -315,11 +315,11 @@ function createNextRound(postseason: CapRushPostseason): CapRushPlayoffSeries[] 
 }
 
 export function capRushRefreshPostseason(input: {
-  readonly postseason: CapRushPostseason;
+  readonly postseason: CapRushLegacyPostseason;
   readonly userTeamId?: string;
-}): CapRushPostseason {
+}): CapRushLegacyPostseason {
   const userTeamId = input.userTeamId ?? CAP_RUSH_USER_TEAM_ID;
-  let next: CapRushPostseason = {
+  let next: CapRushLegacyPostseason = {
     ...input.postseason,
     series: [...input.postseason.series],
   };
@@ -392,7 +392,7 @@ function nextGamePlanOf(input: {
 }
 
 export function capRushPostseasonStep(input: {
-  readonly postseason: CapRushPostseason;
+  readonly postseason: CapRushLegacyPostseason;
   readonly runSeed: Seed;
   readonly userTeamId?: string;
 }): CapRushPostseasonStep {
@@ -427,7 +427,7 @@ export function capRushPostseasonStep(input: {
   return { kind: 'games', games };
 }
 
-export function capRushFinalsMvp(postseason: CapRushPostseason): CapRushFinalsMvp | null {
+export function capRushFinalsMvp(postseason: CapRushLegacyPostseason): CapRushFinalsMvp | null {
   const champion = postseason.championTeamId;
   if (champion === null) return null;
   const finals = postseason.series.find(

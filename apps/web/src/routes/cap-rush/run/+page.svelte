@@ -33,20 +33,6 @@
       instance.destroy();
     };
   });
-
-  async function play(): Promise<void> {
-    if (controller === null) return;
-    if (await controller.playSeason()) await goto(resolve('cap-rush/result/'));
-  }
-
-  function cancel(): void {
-    controller?.cancel();
-  }
-
-  async function postseason(): Promise<void> {
-    if (controller === null) return;
-    if (await controller.advancePostseason()) await goto(resolve('cap-rush/result/'));
-  }
 </script>
 
 <svelte:head>
@@ -72,10 +58,7 @@
   <CapRushRunView
     {controller}
     {art}
-    onPlay={() => void play()}
-    onCancel={cancel}
     onReport={() => void goto(resolve('cap-rush/result/'))}
     onNewRun={() => void goto(resolve('cap-rush/'))}
-    onPostseason={() => void postseason()}
   />
 {/if}

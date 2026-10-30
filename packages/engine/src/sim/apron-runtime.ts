@@ -6,6 +6,8 @@ export interface ApronRuntimeHooks {
   endPossession(): void;
   forcedActor(team: SimulationTeam): SimulationPlayer | null;
   struckDefender(team: SimulationTeam): SimulationPlayer | null;
+  passInterceptionChance?(offense: SideIndex): number;
+  onPassIntercepted?(passer: SimulationPlayer, defender: SimulationPlayer): void;
 }
 
 export function apronPlayerKeyOf(player: SimulationPlayer): string {

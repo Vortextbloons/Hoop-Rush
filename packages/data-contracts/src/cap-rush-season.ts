@@ -13,6 +13,8 @@ import {
   capRushSpinPurchaseSchema,
   capRushVariantSchema,
 } from './cap-rush-versions.ts';
+import { capRushFranchiseAssignmentSchema } from './cap-rush-lock.ts';
+import { CAP_RUSH_CONFERENCE_AI_GAMES, CAP_RUSH_LEAGUE_VERSION } from './cap-rush-league.ts';
 import { havocMutationIdSchema, havocTierSchema } from './havoc-mutations.ts';
 import {
   capRushHistoryPostseasonSchema,
@@ -149,6 +151,9 @@ export const capRushReportSchema = z
     leagueBaselineTs: z.number(),
     hasMutationScoring: z.boolean(),
     games: z.array(capRushGameSummarySchema).length(CAP_RUSH_GAME_COUNT),
+    leagueFormat: z.literal(CAP_RUSH_LEAGUE_VERSION).optional(),
+    leagueGamesAccepted: z.number().int().min(0).max(CAP_RUSH_CONFERENCE_AI_GAMES).optional(),
+    franchise: capRushFranchiseAssignmentSchema.optional(),
     postseason: capRushPostseasonReportSchema.optional(),
   })
   .superRefine((report, ctx) => {
@@ -197,6 +202,7 @@ export const capRushHistoryEntrySchema = z.object({
   losses: z.number().int().min(0).max(CAP_RUSH_GAME_COUNT),
   perfectSeason: z.boolean(),
   completedAtIso: z.iso.datetime(),
+  franchise: capRushFranchiseAssignmentSchema.optional(),
   postseason: capRushHistoryPostseasonSchema.optional(),
 });
 export type CapRushHistoryEntry = z.infer<typeof capRushHistoryEntrySchema>;
@@ -206,6 +212,7 @@ export const capRushSeasonStateSchema = z.object({
   aggregate: capRushSeasonAggregateSchema,
   apronTriggers: capRushApronTriggerTotalsSchema,
   completedAt: z.iso.datetime().nullable(),
+  leagueGamesAccepted: z.number().int().min(0).max(CAP_RUSH_CONFERENCE_AI_GAMES).optional(),
 });
 export type CapRushSeasonState = z.infer<typeof capRushSeasonStateSchema>;
 
@@ -221,6 +228,7 @@ export const capRushEmptySeasonState = (): CapRushSeasonState => ({
   },
   apronTriggers: { isolations: 0, strikes: 0 },
   completedAt: null,
+  leagueGamesAccepted: 0,
 });
 
 export const capRushTeamIdSchema = franchiseIdSchema;

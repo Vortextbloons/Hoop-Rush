@@ -80,26 +80,32 @@ describe('cap rush payroll boundaries', () => {
 describe('cap rush apron ratings', () => {
   it('applies the first-apron table once from original ratings', () => {
     const reduced = capRushEffectiveRatings(SIMULATION_RATINGS, 'first-apron');
-    expect(reduced.passing).toBe(SIMULATION_RATINGS.passing - 5);
-    expect(reduced.ballHandling).toBe(SIMULATION_RATINGS.ballHandling - 3);
-    expect(reduced.offensiveIq).toBe(SIMULATION_RATINGS.offensiveIq - 5);
-    expect(reduced.defensiveIq).toBe(SIMULATION_RATINGS.defensiveIq - 5);
-    expect(reduced.perimeterDefense).toBe(SIMULATION_RATINGS.perimeterDefense - 4);
-    expect(reduced.interiorDefense).toBe(SIMULATION_RATINGS.interiorDefense - 4);
-    expect(reduced.threePoint).toBe(SIMULATION_RATINGS.threePoint - 2);
-    expect(reduced.midrange).toBe(SIMULATION_RATINGS.midrange - 2);
+    expect(reduced.passing).toBe(SIMULATION_RATINGS.passing - 3);
+    expect(reduced.ballHandling).toBe(SIMULATION_RATINGS.ballHandling - 2);
+    expect(reduced.offensiveIq).toBe(SIMULATION_RATINGS.offensiveIq - 3);
+    expect(reduced.defensiveIq).toBe(SIMULATION_RATINGS.defensiveIq - 3);
+    expect(reduced.perimeterDefense).toBe(SIMULATION_RATINGS.perimeterDefense - 3);
+    expect(reduced.interiorDefense).toBe(SIMULATION_RATINGS.interiorDefense - 3);
+    expect(reduced.threePoint).toBe(SIMULATION_RATINGS.threePoint - 1);
+    expect(reduced.midrange).toBe(SIMULATION_RATINGS.midrange - 1);
     expect(reduced.insideScoring).toBe(SIMULATION_RATINGS.insideScoring);
     expect(reduced.offensiveRebound).toBe(SIMULATION_RATINGS.offensiveRebound);
   });
 
   it('replaces first-apron effects with the second-apron table', () => {
     const reduced = capRushEffectiveRatings(SIMULATION_RATINGS, 'second-apron');
-    expect(reduced.passing).toBe(SIMULATION_RATINGS.passing - 12);
-    expect(reduced.ballHandling).toBe(SIMULATION_RATINGS.ballHandling - 9);
-    expect(reduced.insideScoring).toBe(SIMULATION_RATINGS.insideScoring - 4);
-    expect(reduced.closeShot).toBe(SIMULATION_RATINGS.closeShot - 4);
-    expect(reduced.offensiveRebound).toBe(SIMULATION_RATINGS.offensiveRebound - 4);
-    expect(reduced.defensiveRebound).toBe(SIMULATION_RATINGS.defensiveRebound - 4);
+    expect(reduced.passing).toBe(SIMULATION_RATINGS.passing - 8);
+    expect(reduced.ballHandling).toBe(SIMULATION_RATINGS.ballHandling - 5);
+    expect(reduced.offensiveIq).toBe(SIMULATION_RATINGS.offensiveIq - 7);
+    expect(reduced.defensiveIq).toBe(SIMULATION_RATINGS.defensiveIq - 7);
+    expect(reduced.perimeterDefense).toBe(SIMULATION_RATINGS.perimeterDefense - 5);
+    expect(reduced.interiorDefense).toBe(SIMULATION_RATINGS.interiorDefense - 5);
+    expect(reduced.threePoint).toBe(SIMULATION_RATINGS.threePoint - 3);
+    expect(reduced.midrange).toBe(SIMULATION_RATINGS.midrange - 3);
+    expect(reduced.insideScoring).toBe(SIMULATION_RATINGS.insideScoring - 3);
+    expect(reduced.closeShot).toBe(SIMULATION_RATINGS.closeShot - 3);
+    expect(reduced.offensiveRebound).toBe(SIMULATION_RATINGS.offensiveRebound - 2);
+    expect(reduced.defensiveRebound).toBe(SIMULATION_RATINGS.defensiveRebound - 2);
   });
 
   it('leaves ratings untouched under the cap', () => {
@@ -125,8 +131,8 @@ describe('cap rush apron ratings', () => {
       tendencies: { ...SIMULATION_TENDENCIES },
     };
     const preview = capRushApronPreview(profile);
-    expect(preview.firstApron.passing).toBe(SIMULATION_RATINGS.passing - 5);
-    expect(preview.secondApron.passing).toBe(SIMULATION_RATINGS.passing - 12);
+    expect(preview.firstApron.passing).toBe(SIMULATION_RATINGS.passing - 3);
+    expect(preview.secondApron.passing).toBe(SIMULATION_RATINGS.passing - 8);
     expect(profile.ratings.passing).toBe(SIMULATION_RATINGS.passing);
   });
 });
