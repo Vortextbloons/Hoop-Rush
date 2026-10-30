@@ -14,8 +14,8 @@ export const CAP_RUSH_REROLL_LIMIT = 2;
 export const CAP_RUSH_MIN_OVERALL = 40;
 export const CAP_RUSH_MAX_OVERALL = 99;
 export const CAP_RUSH_CAP_LINE_DOLLARS = 130_000_000;
-export const CAP_RUSH_FIRST_APRON_DOLLARS = CAP_RUSH_CAP_LINE_DOLLARS * 1.25;
-export const CAP_RUSH_HARD_LIMIT_DOLLARS = CAP_RUSH_CAP_LINE_DOLLARS * 1.6;
+export const CAP_RUSH_FIRST_APRON_DOLLARS = CAP_RUSH_CAP_LINE_DOLLARS * 1.2;
+export const CAP_RUSH_HARD_LIMIT_DOLLARS = CAP_RUSH_CAP_LINE_DOLLARS * 1.4;
 export const CAP_RUSH_SEED_ROOT = 'cap-rush-v1';
 
 export const capRushVariantSchema = z.enum(['clash', 'roulette']);

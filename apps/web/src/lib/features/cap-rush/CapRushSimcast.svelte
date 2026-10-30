@@ -121,7 +121,7 @@
           {box?.displayName ?? ''}
         </span>
         {#if entry.key === leader}<span class="bc-leader">{finished ? 'Winner' : 'Leading'}</span
-          >{/if}
+          >{:else}<span class="bc-leader invisible" aria-hidden="true">Leading</span>{/if}
         {#key entry.score}<span class="bc-score">{entry.score}</span>{/key}
       </div>
     {/snippet}
@@ -248,9 +248,14 @@
             </li>
           {/each}
         </ul>
-        {#if side.bonusPoints !== 0}<p class="px-4 py-2 font-mono text-xs text-muted-foreground">
-            Team bonus {side.bonusPoints > 0 ? '+' : ''}{side.bonusPoints}
-          </p>{/if}
+        <p
+          class="px-4 py-2 font-mono text-xs text-muted-foreground {side.bonusPoints === 0
+            ? 'invisible'
+            : ''}"
+          aria-hidden={side.bonusPoints === 0}
+        >
+          Team bonus {side.bonusPoints > 0 ? '+' : ''}{side.bonusPoints}
+        </p>
       </section>
     {/each}
   </div>
@@ -348,5 +353,9 @@
     font-size: 12px;
     font-weight: 600;
     color: var(--color-muted-foreground);
+  }
+  .bc-feed-list,
+  .bc-feed-empty {
+    height: 236px;
   }
 </style>
