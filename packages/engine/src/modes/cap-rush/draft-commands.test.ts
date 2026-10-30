@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import type { CapRushDraftPick, CapRushDraftState, Position } from '@hoop-rush/data-contracts';
 import {
+  CAP_RUSH_HARD_LIMIT_DOLLARS,
   CAP_RUSH_REROLL_LIMIT,
   POSITIONS,
   capRushDraftStateSchema,
@@ -160,7 +161,7 @@ describe('cap rush five-round draft', () => {
       expect(new Set(state.picks.map((pick) => pick.card.source.playerId)).size).toBe(5);
       expect(
         state.picks.reduce((total, pick) => total + pick.card.salaryDollars, 0),
-      ).toBeLessThanOrEqual(150_000_000);
+      ).toBeLessThanOrEqual(CAP_RUSH_HARD_LIMIT_DOLLARS);
     }
   });
 
@@ -298,8 +299,8 @@ describe('cap rush five-round draft', () => {
     const setup = capRushTestSetup({});
     const picks = fabricatedPicks(setup, [
       { slot: 'C', overall: 99 },
-      { slot: 'SG', overall: 92 },
-      { slot: 'SF', overall: 86 },
+      { slot: 'SG', overall: 97 },
+      { slot: 'SF', overall: 95 },
     ]);
     const offer = generateCapRushOffer({
       index: setup.index,

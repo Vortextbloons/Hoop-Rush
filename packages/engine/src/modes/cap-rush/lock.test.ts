@@ -133,7 +133,7 @@ describe('cap rush lineup lock', () => {
     const setup = capRushTestSetup();
     const state = buildCompleteState(
       setup,
-      [30_000_000, 30_000_000, 30_000_000, 30_000_000, 30_000_000],
+      [35_000_000, 35_000_000, 35_000_000, 35_000_000, 35_000_000],
     );
     const outcome = lock(setup, state);
     const locked = outcome.state.locked;
@@ -169,14 +169,14 @@ describe('cap rush lineup lock', () => {
     const setup = capRushTestSetup();
     const first = buildCompleteState(
       setup,
-      [25_000_000, 25_000_000, 25_000_000, 25_000_000, 25_000_000],
+      [28_000_000, 28_000_000, 28_000_000, 28_000_000, 28_000_000],
     );
     const second = buildCompleteState(
       setup,
-      [30_000_000, 30_000_000, 30_000_000, 30_000_000, 30_000_000],
+      [35_000_000, 35_000_000, 35_000_000, 35_000_000, 35_000_000],
     );
-    expect(capRushPayrollStatus(125_000_000)).toBe('first-apron');
-    expect(capRushPayrollStatus(150_000_000)).toBe('second-apron');
+    expect(capRushPayrollStatus(140_000_000)).toBe('first-apron');
+    expect(capRushPayrollStatus(175_000_000)).toBe('second-apron');
     const firstLock = lock(setup, first).state.locked;
     const secondLock = lock(setup, second).state.locked;
     if (firstLock === null || secondLock === null) throw new Error('lock did not produce inputs');
@@ -422,7 +422,7 @@ describe('cap rush locked spin and replacement roles', () => {
     const setup = capRushTestSetup();
     const state = buildCompleteState(
       setup,
-      [30_000_000, 30_000_000, 30_000_000, 30_000_000, 30_000_000],
+      [35_000_000, 35_000_000, 35_000_000, 35_000_000, 35_000_000],
       'clash',
     );
     const locked = lock(setup, state).state.locked;

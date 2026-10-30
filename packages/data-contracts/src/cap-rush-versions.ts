@@ -13,9 +13,9 @@ export const CAP_RUSH_OFFER_SIZE = 10;
 export const CAP_RUSH_REROLL_LIMIT = 2;
 export const CAP_RUSH_MIN_OVERALL = 40;
 export const CAP_RUSH_MAX_OVERALL = 99;
-export const CAP_RUSH_CAP_LINE_DOLLARS = 120_000_000;
-export const CAP_RUSH_FIRST_APRON_DOLLARS = 135_000_000;
-export const CAP_RUSH_HARD_LIMIT_DOLLARS = 150_000_000;
+export const CAP_RUSH_CAP_LINE_DOLLARS = 130_000_000;
+export const CAP_RUSH_FIRST_APRON_DOLLARS = CAP_RUSH_CAP_LINE_DOLLARS * 1.2;
+export const CAP_RUSH_HARD_LIMIT_DOLLARS = CAP_RUSH_CAP_LINE_DOLLARS * 1.4;
 export const CAP_RUSH_SEED_ROOT = 'cap-rush-v1';
 
 export const capRushVariantSchema = z.enum(['clash', 'roulette']);
@@ -87,12 +87,12 @@ export interface CapRushSpinPurchase {
 export const CAP_RUSH_SPIN_PURCHASES = {
   standard: {
     priceDollars: 15_000_000,
-    maxEligiblePayrollDollars: 105_000_000,
+    maxEligiblePayrollDollars: CAP_RUSH_CAP_LINE_DOLLARS - 15_000_000,
     tierOdds: { 1: 0.6, 2: 0.3, 3: 0.1 },
   },
   premium: {
     priceDollars: 30_000_000,
-    maxEligiblePayrollDollars: 90_000_000,
+    maxEligiblePayrollDollars: CAP_RUSH_CAP_LINE_DOLLARS - 30_000_000,
     tierOdds: { 1: 0.35, 2: 0.4, 3: 0.25 },
   },
 } as const satisfies Record<'standard' | 'premium', CapRushSpinPurchase>;

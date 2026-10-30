@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { CapRushCardView } from '@hoop-rush/application/cap-rush';
-  import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
+  import { franchiseAbbreviation, CAP_RUSH_HARD_LIMIT_DOLLARS } from '@hoop-rush/data-contracts';
   import { capRushPayrollStatus } from '@hoop-rush/engine';
   import PlayerFace from '#lib/components/PlayerFace.svelte';
   import TeamLogo from '#lib/components/TeamLogo.svelte';
@@ -50,7 +50,7 @@
     if (entry.signing.legal) return null;
     switch (entry.signing.reason) {
       case 'hard-limit':
-        return `Past the $150M limit by ${formatMillions(entry.signing.payrollAfterSigning - 150_000_000)}`;
+        return `Past the ${formatMillions(CAP_RUSH_HARD_LIMIT_DOLLARS)} limit by ${formatMillions(entry.signing.payrollAfterSigning - CAP_RUSH_HARD_LIMIT_DOLLARS)}`;
       case 'completion':
         return `Cheapest finish ${formatMillions(entry.signing.projectedPayroll ?? 0)}`;
       case 'no-completion':

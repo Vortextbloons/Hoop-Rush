@@ -110,7 +110,7 @@ describe('cap rush season simulation', () => {
     });
     expect(clean.facts).toEqual([]);
 
-    const over = buildLocked([30_000_000, 30_000_000, 30_000_000, 30_000_000, 30_000_000]);
+    const over = buildLocked([35_000_000, 35_000_000, 35_000_000, 35_000_000, 35_000_000]);
     expect(over.payrollStatus).toBe('second-apron');
     let isolations = 0;
     let strikes = 0;

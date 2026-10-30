@@ -110,27 +110,27 @@ function skip(setup: CapRushTestSetup, state: CapRushDraftState) {
 
 describe('cap rush spin eligibility', () => {
   it('applies the purchase-specific payroll ceiling', () => {
-    expect(capRushSpinEligibility(105_000_000, 'standard').eligible).toBe(true);
-    expect(capRushSpinEligibility(105_000_001, 'standard').eligible).toBe(false);
-    expect(capRushSpinEligibility(90_000_000, 'premium').eligible).toBe(true);
-    expect(capRushSpinEligibility(90_000_001, 'premium').eligible).toBe(false);
-    expect(capRushSpinEligibility(110_000_000, 'standard').eligible).toBe(false);
-    expect(capRushSpinEligibility(110_000_000, 'standard').priceDollars).toBe(15_000_000);
-    expect(capRushSpinEligibility(110_000_000, 'standard').maxEligiblePayrollDollars).toBe(
-      105_000_000,
+    expect(capRushSpinEligibility(115_000_000, 'standard').eligible).toBe(true);
+    expect(capRushSpinEligibility(115_000_001, 'standard').eligible).toBe(false);
+    expect(capRushSpinEligibility(100_000_000, 'premium').eligible).toBe(true);
+    expect(capRushSpinEligibility(100_000_001, 'premium').eligible).toBe(false);
+    expect(capRushSpinEligibility(120_000_000, 'standard').eligible).toBe(false);
+    expect(capRushSpinEligibility(120_000_000, 'standard').priceDollars).toBe(15_000_000);
+    expect(capRushSpinEligibility(120_000_000, 'standard').maxEligiblePayrollDollars).toBe(
+      115_000_000,
     );
   });
 
   it('keeps every purchase under the normal cap by construction', () => {
-    expect(CAP_RUSH_CAP_LINE_DOLLARS - 15_000_000).toBe(105_000_000);
-    expect(CAP_RUSH_CAP_LINE_DOLLARS - 30_000_000).toBe(90_000_000);
+    expect(CAP_RUSH_CAP_LINE_DOLLARS - 15_000_000).toBe(115_000_000);
+    expect(CAP_RUSH_CAP_LINE_DOLLARS - 30_000_000).toBe(100_000_000);
   });
 });
 
 describe('cap rush spin purchase', () => {
   it('buys exactly one mutation at the payroll ceiling', () => {
     const setup = capRushTestSetup();
-    const state = buildCompleteState(setup, payrollSplit(105_000_000));
+    const state = buildCompleteState(setup, payrollSplit(115_000_000));
     const outcome = purchase(setup, state, 'standard');
     expect(outcome.result.status).toBe('accepted');
     if (outcome.state.spin.status !== 'purchased') throw new Error('spin was not purchased');
@@ -182,7 +182,7 @@ describe('cap rush spin purchase', () => {
 
   it('rejects an unaffordable purchase without moving the revision', () => {
     const setup = capRushTestSetup();
-    const state = buildCompleteState(setup, payrollSplit(110_000_000));
+    const state = buildCompleteState(setup, payrollSplit(120_000_000));
     const outcome = purchase(setup, state, 'standard');
     expect(outcome.result.status).toBe('rejected');
     expect(outcome.result.rejection?.code).toBe('spin-ineligible');

@@ -24,7 +24,7 @@
   let { controller, art = null }: { controller: CapRushSeasonController; art?: CapRushArt | null } =
     $props();
   let paused = $state(false);
-  let speed = $state(1);
+  const speed = 4;
   const playback = $derived(controller.playback);
   const items = $derived(playback === null ? [] : capRushPlaybackItems(playback.evidence.tape));
   const cursor = $derived(playback?.evidence.cursor ?? 0);
@@ -180,17 +180,7 @@
         class="min-h-11 rounded-xl border border-line-strong px-4"
         onclick={() => (paused = !paused)}>{paused ? 'Resume' : 'Pause'}</button
       >
-      <label class="text-sm"
-        >Speed
-        <select
-          class="min-h-11 rounded-lg border border-line-strong bg-card px-3"
-          bind:value={speed}
-        >
-          <option value={1}>1&times;</option><option value={2}>2&times;</option><option value={4}
-            >4&times;</option
-          >
-        </select>
-      </label>
+      <span class="font-mono text-xs text-muted-foreground uppercase">4× speed</span>
       <button
         class="min-h-11 rounded-xl border border-line-strong px-4"
         disabled={controller.playbackSaving}

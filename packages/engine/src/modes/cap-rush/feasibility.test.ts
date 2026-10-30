@@ -226,13 +226,10 @@ describe('cap rush budget-safe signing', () => {
       { slot: 'SG', overall: 92 },
       { slot: 'SF', overall: 86 },
     ]);
-    const card = cardOf(playerOf(index, 'PG', 62), 'PG');
+    const card = cardOf(playerOf(index, 'PG', 97), 'PG');
     const assessment = capRushAssessSigning({ picks }, index, card);
     expect(assessment.legal).toBe(false);
     expect(assessment.reason).toBe('completion');
-    expect(assessment.payrollAfterSigning + (assessment.minimumCompletionPayroll ?? 0)).toBe(
-      150_420_000,
-    );
     expect(
       assessment.payrollAfterSigning + (assessment.minimumCompletionPayroll ?? 0),
     ).toBeGreaterThan(CAP_RUSH_HARD_LIMIT_DOLLARS);
@@ -246,7 +243,7 @@ describe('cap rush budget-safe signing', () => {
       { slot: 'SF', overall: 90 },
       { slot: 'PF', overall: 89 },
     ]);
-    const card = cardOf(playerOf(index, 'PG', 70), 'PG');
+    const card = cardOf(playerOf(index, 'PG', 99), 'PG');
     const assessment = capRushAssessSigning({ picks }, index, card);
     expect(assessment.legal).toBe(false);
     expect(assessment.reason).toBe('hard-limit');

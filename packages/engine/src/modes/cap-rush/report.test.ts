@@ -141,7 +141,7 @@ describe('cap rush full season report', () => {
     expect(report.payrollDollars).toBe(50_000_000);
     expect(report.spinSpendDollars).toBe(0);
     expect(report.totalSpendDollars).toBe(50_000_000);
-    expect(report.unusedCapDollars).toBe(70_000_000);
+    expect(report.unusedCapDollars).toBe(80_000_000);
     expect(report.spin).toBeNull();
     expect(report.winsPerMillion).toBeCloseTo(season.aggregate.wins / 50, 10);
     expect(report.apronTriggers.isolations).toBe(0);
@@ -182,7 +182,7 @@ describe('cap rush full season report', () => {
     expect(report.spin).not.toBeNull();
     expect(report.spinSpendDollars).toBe(30_000_000);
     expect(report.totalSpendDollars).toBe(110_000_000);
-    expect(report.unusedCapDollars).toBe(10_000_000);
+    expect(report.unusedCapDollars).toBe(20_000_000);
     expect(report.winsPerMillion).toBeCloseTo(season.aggregate.wins / 80, 10);
     expect(report.spin?.targetCardId).toBe('crc-22222222222222222222222222222222');
     expect(report.spin?.tier).toBeGreaterThanOrEqual(1);
