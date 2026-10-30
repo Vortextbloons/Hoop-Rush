@@ -1,8 +1,4 @@
 import type {
-  CapRushHistoryEntry,
-  CapRushLeagueGame,
-  CapRushReport,
-  CapRushStoredGame,
   EraSimulationProfile,
   HoopRushManifest,
   OpponentBracket,
@@ -11,12 +7,19 @@ import type {
 } from '@hoop-rush/data-contracts';
 import type { CapRushRepository } from '@hoop-rush/persistence';
 
-export interface CapRushDraftRepositoryPort extends CapRushRepository {
-  listRunGames(runId: string): Promise<CapRushStoredGame[]>;
-  listHistory(): Promise<CapRushHistoryEntry[]>;
-  readReport(runId: string): Promise<CapRushReport | null>;
-  listLeagueGames(runId: string): Promise<CapRushLeagueGame[]>;
-}
+export type CapRushDraftRepositoryPort = Pick<
+  CapRushRepository,
+  | 'loadActiveDraft'
+  | 'loadCommandResult'
+  | 'applyOutcome'
+  | 'listRunGames'
+  | 'listPlayoffGames'
+  | 'listLeagueGames'
+  | 'listHistory'
+  | 'readReport'
+  | 'updatePlayback'
+  | 'clearActiveDraft'
+>;
 export interface CapRushAssetPort {
   loadCatalog(): Promise<SeasonDraftCatalog>;
   loadBracket?(hash: string): Promise<OpponentBracket>;

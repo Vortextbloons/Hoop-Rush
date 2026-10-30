@@ -16,7 +16,7 @@ import {
   havocBattleGameResultDigest,
   havocBattleGameTapeDigest,
 } from './core/battle-digests.ts';
-import { simulateHavocBattleGame } from './core/battle-game.ts';
+import { simulateHavocBattleGame, simulateValidatedHavocBattleGame } from './core/battle-game.ts';
 import { havocGameInputDigest, havocGameResultDigest, havocGameTapeDigest } from './digests.ts';
 import { simulateHavocGame } from './game.ts';
 import { buildHavocGameInput } from './input.ts';
@@ -78,6 +78,51 @@ describe('havoc battle runtime', () => {
 
     expect(havocBattleGameResultDigest(second.result)).toBe(resultDigest);
     expect(havocBattleGameTapeDigest(second.tape)).toBe(tapeDigest);
+  });
+
+  it('reuses a validated battle input with identical seeded output', () => {
+    const input = lockedBattleInput();
+    const context = createEngineContext();
+    const parsed = simulateHavocBattleGame(input, context);
+    const reused = simulateValidatedHavocBattleGame(input, context);
+    expect(reused.result).toEqual(parsed.result);
+    expect(reused.tape).toEqual(parsed.tape);
+  });
+
+  it('audits cancelled turnovers against the official turnover ledger', () => {
+    const locked = buildHavocLockedInputs();
+    const context = createEngineContext();
+    const home = buildScenarioTeam('human', [
+      { slot: 'PG', mutations: ['possession-refund'] },
+      { slot: 'SG', mutations: [] },
+      { slot: 'SF', mutations: [] },
+      { slot: 'PF', mutations: [] },
+      { slot: 'C', mutations: [] },
+    ]);
+    const away = buildScenarioTeam('opponent', [
+      { slot: 'PG', mutations: [] },
+      { slot: 'SG', mutations: [] },
+      { slot: 'SF', mutations: [] },
+      { slot: 'PF', mutations: [] },
+      { slot: 'C', mutations: [] },
+    ]);
+    for (let gameNumber = 1; gameNumber <= 82; gameNumber += 1) {
+      const base = buildHavocGameInput({ locked, gameNumber, variant: 'havoc' });
+      const input = havocBattleInputSchema.parse({
+        ...base,
+        home: { ...home, side: 'home' },
+        away: { ...away, side: 'away' },
+      });
+      const battle = simulateHavocBattleGame(input, context);
+      if (!battle.tape.events.some((event) => event.kind === 'turnover-cancelled')) continue;
+      expect(auditHavocBattleGame(input, battle.result, battle.tape).ok).toBe(true);
+      const tampered = structuredClone(battle.tape);
+      tampered.events = tampered.events.filter((event) => event.kind !== 'turnover-cancelled');
+      const audit = auditHavocBattleGame(input, battle.result, tampered);
+      expect(audit.findings.some((finding) => finding.code === 'turnovers')).toBe(true);
+      return;
+    }
+    throw new Error('expected a game with a cancelled turnover');
   });
 
   it('round-trips battle results and tapes through the solo contracts losslessly', () => {

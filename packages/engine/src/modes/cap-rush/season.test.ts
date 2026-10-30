@@ -10,7 +10,10 @@ import {
   capRushCardSchema,
   capRushDraftStateSchema,
   capRushOfferIdSchema,
+  capRushPlayoffGameSeed,
 } from '@hoop-rush/data-contracts';
+import { simulateCapRushPlayoffGame } from './playoff-sim.ts';
+import { havocBattleGameInputDigest } from '../havoc/core/battle-digests.ts';
 
 function buildLocked(salaries: readonly number[], variant: 'clash' | 'roulette' = 'clash') {
   const setup = capRushTestSetup();
@@ -166,5 +169,32 @@ describe('cap rush season simulation', () => {
     expect(aggregate.games).toBe(CAP_RUSH_GAME_COUNT);
     expect(aggregate.wins).toBe(CAP_RUSH_GAME_COUNT);
     expect(aggregate.perfectSeason).toBe(true);
+  });
+});
+
+describe('cap rush playoff simulation', () => {
+  it('reports the audited battle input digest for a seeded playoff game', () => {
+    const locked = buildLocked(UNDER_CAP);
+    const plan = {
+      seriesId: 'crs-1-0',
+      round: 1,
+      seriesSlot: 0,
+      gameOrdinal: 1,
+      homeTeamId: locked.human.teamId,
+      awayTeamId: locked.opponents[0]?.team.teamId ?? '',
+      homeSeed: 1,
+      awaySeed: 8,
+      userSide: 'home' as const,
+      isFinals: false,
+      seed: capRushPlayoffGameSeed(locked.runSeed, 1, 0, 1),
+    };
+    const simulation = simulateCapRushPlayoffGame({ locked, plan, context: createEngineContext() });
+    expect(simulation.game.audit.ok).toBe(true);
+    expect(simulation.inputDigest).toBe(havocBattleGameInputDigest(simulation.battleInput));
+    expect(simulation.game.summary.inputDigest).toBe(simulation.inputDigest);
+    expect(simulation.game.summary.resultDigest).toBe(simulation.resultDigest);
+    const replay = simulateCapRushPlayoffGame({ locked, plan, context: createEngineContext() });
+    expect(replay.resultDigest).toBe(simulation.resultDigest);
+    expect(replay.game.result).toEqual(simulation.game.result);
   });
 });

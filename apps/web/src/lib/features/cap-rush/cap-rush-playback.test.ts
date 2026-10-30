@@ -288,6 +288,3 @@ describe('Cap Rush recorded broadcast', () => {
     expectReconciled(result, mutated.tape);
   });
 });
-ape);
-  });
-});

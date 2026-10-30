@@ -61,9 +61,6 @@ import type {
   HavocMultiplayerCompletionRecap,
   HavocMultiplayerGameOutput,
   HavocMultiplayerSeriesMvp,
-  StoredHavocMultiplayerActive,
-  StoredHavocMultiplayerCompleted,
-  StoredHavocMultiplayerResultRow,
 } from '@hoop-rush/persistence';
 import {
   CoalescedTask,
@@ -79,6 +76,8 @@ import {
 } from '../multiplayer/room-lifecycle.ts';
 import { SeriesCoordinator } from '../multiplayer/series-coordinator.ts';
 import { CommandRecovery, executeMultiplayerCommand } from '../multiplayer/command-execution.ts';
+import { mergeCommandLog } from '../multiplayer/command-log.ts';
+import { PendingReadyCoordinator } from '../multiplayer/pending-ready.ts';
 
 const TICK_MS = 250;
 const AUTO_START_RETRY_MS = 5000;
@@ -114,7 +113,7 @@ export interface HavocMultiplayerGameVerification {
 export interface HavocMultiplayerSeriesFacts {
   series: HavocMultiplayerSeriesSnapshot | null;
   outputs: Record<number, HavocMultiplayerGameOutput>;
-  completedRecap: StoredHavocMultiplayerCompleted | null;
+  completedRecap: HavocMultiplayerCompletionRecap | null;
 }
 
 export interface HavocMultiplayerSessionView {
@@ -133,7 +132,7 @@ export interface HavocMultiplayerSessionView {
   outputs: Record<number, HavocMultiplayerGameOutput>;
   verification: HavocMultiplayerGameVerification[];
   commands: HavocMultiplayerCommand[];
-  completedRecap: StoredHavocMultiplayerCompleted | null;
+  completedRecap: HavocMultiplayerCompletionRecap | null;
   mvp: HavocMultiplayerSeriesMvp | null;
   busy: boolean;
   error: string | null;
@@ -148,9 +147,9 @@ export interface HavocMultiplayerSessionView {
 }
 
 export interface HavocMultiplayerSessionRepository {
-  loadActive(roomId: string): Promise<StoredHavocMultiplayerActive | null>;
-  loadCompleted(roomId: string): Promise<StoredHavocMultiplayerCompleted | null>;
-  loadResults(roomId: string): Promise<StoredHavocMultiplayerResultRow[]>;
+  loadActive(roomId: string): Promise<HavocMultiplayerActiveState | null>;
+  loadCompleted(roomId: string): Promise<HavocMultiplayerCompletionRecap | null>;
+  loadResults(roomId: string): Promise<HavocMultiplayerGameOutput[]>;
   appendCommands(roomId: string, entries: readonly HavocMultiplayerCommandEntry[]): Promise<void>;
   saveResult(output: HavocMultiplayerGameOutput): Promise<void>;
   saveVerification(
@@ -204,19 +203,6 @@ function verificationFromReceipts(
       };
     })
     .sort((left, right) => left.gameNumber - right.gameNumber);
-}
-
-function storedResultToOutput(row: StoredHavocMultiplayerResultRow): HavocMultiplayerGameOutput {
-  return {
-    roomId: row.roomId,
-    gameNumber: row.gameNumber,
-    winner: row.winner,
-    result: row.result,
-    tape: row.tape,
-    inputDigest: row.inputDigest,
-    resultDigest: row.resultDigest,
-    tapeDigest: row.tapeDigest,
-  };
 }
 
 /**
@@ -275,7 +261,7 @@ export class HavocMultiplayerSession {
   private draft: HavocMultiplayerDraftState | null = null;
   private outputs: Record<number, HavocMultiplayerGameOutput> = {};
   private verification: HavocMultiplayerGameVerification[] = [];
-  private completedRecap: StoredHavocMultiplayerCompleted | null = null;
+  private completedRecap: HavocMultiplayerCompletionRecap | null = null;
   private commands: HavocMultiplayerCommand[] = [];
   private persistedCommandCount = 0;
   private savedActiveKey: string | null = null;
@@ -292,8 +278,9 @@ export class HavocMultiplayerSession {
   private deadlineResolving = false;
   private deadlineRetryAtMs = 0;
   private rematchRetryAtMs = 0;
-  private pendingReadyGame: number | null = null;
-  private pendingReadyRetryAtMs = 0;
+  private pendingReady = new PendingReadyCoordinator(AUTO_START_RETRY_MS, () => {
+    void this.readyForNextGame();
+  });
   private seenBroadcastGame: number | null = null;
   private completedPersisted = false;
   private disposed = false;
@@ -383,8 +370,7 @@ export class HavocMultiplayerSession {
     this.deadlineResolving = false;
     this.deadlineRetryAtMs = 0;
     this.rematchRetryAtMs = 0;
-    this.pendingReadyGame = null;
-    this.pendingReadyRetryAtMs = 0;
+    this.pendingReady.reset();
     this.seenBroadcastGame = null;
     this.challenge = null;
     this.roomId = idSchema.parse(roomId);
@@ -421,7 +407,7 @@ export class HavocMultiplayerSession {
       if (!attachment.current()) return;
       if (rows.length > 0) {
         const outputs: Record<number, HavocMultiplayerGameOutput> = {};
-        for (const row of rows) outputs[row.gameNumber] = storedResultToOutput(row);
+        for (const row of rows) outputs[row.gameNumber] = row;
         this.outputs = { ...this.outputs, ...outputs };
       }
       this.lifecycle.track(
@@ -680,8 +666,7 @@ export class HavocMultiplayerSession {
     const output = this.currentOutput();
     if (!output) return;
     this.seriesFlow.playback.approve(output.gameNumber);
-    this.pendingReadyGame = output.gameNumber + 1;
-    this.pendingReadyRetryAtMs = 0;
+    this.pendingReady.schedule(output.gameNumber + 1);
     this.maybeReadyNextGame();
     this.maybeProposeOrConfirm();
   }
@@ -971,22 +956,28 @@ export class HavocMultiplayerSession {
       if (isDisposed()) return;
       this.lifecycle.connected(attachment);
       this.error = null;
-      let commands =
-        resumed.commands.length === 0 ? this.commands : [...this.commands, ...resumed.commands];
-      if (commands.length !== resumed.commandCount) {
+      let merged = mergeCommandLog({
+        local: this.commands,
+        fetched: resumed.commands,
+        expectedCount: resumed.commandCount,
+      });
+      if (!merged.complete) {
         resumed = await this.deps.transport.sync(roomId, -1);
         if (isDisposed()) return;
-        commands = resumed.commands;
-        if (commands.length !== resumed.commandCount)
-          throw new Error('room sync returned an incomplete command log');
+        merged = mergeCommandLog({
+          local: [],
+          fetched: resumed.commands,
+          expectedCount: resumed.commandCount,
+        });
+        if (!merged.complete) throw new Error('room sync returned an incomplete command log');
       }
       if (isDisposed()) return;
       if (this.snapshot && resumed.snapshot.revision < this.snapshot.revision) {
         void this.syncFromServer();
         return;
       }
-      const commandsChanged = commands.length !== this.commands.length;
-      this.commands = commands;
+      const commandsChanged = merged.commands.length !== this.commands.length;
+      this.commands = merged.commands;
       this.applySnapshot(resumed.snapshot, false);
       if (!this.assertRoomVersions()) return;
       if (!this.completedPersisted && (commandsChanged || this.draft === null)) this.rebuildDraft();
@@ -998,16 +989,16 @@ export class HavocMultiplayerSession {
         this.applySnapshot(rematched.snapshot);
       }
       if (!this.completedPersisted) {
-        if (commands.length > this.persistedCommandCount) {
+        if (this.commands.length > this.persistedCommandCount) {
           await this.deps.repository.appendCommands(
             roomId,
-            commands.slice(this.persistedCommandCount).map((command, offset) => ({
+            this.commands.slice(this.persistedCommandCount).map((command, offset) => ({
               ordinal: this.persistedCommandCount + offset,
               command,
             })),
           );
           if (isDisposed()) return;
-          this.persistedCommandCount = commands.length;
+          this.persistedCommandCount = this.commands.length;
         }
         await this.ensureGamePipeline();
         if (isDisposed()) return;
@@ -1213,30 +1204,14 @@ export class HavocMultiplayerSession {
   }
 
   private maybeReadyNextGame(): void {
-    const target = this.pendingReadyGame;
-    if (target === null || this.disposed || this.busy) return;
-    const phase = this.phase();
-    if (phase === 'championship' || phase === 'integrity-failed' || phase === 'expired') {
-      this.pendingReadyGame = null;
-      return;
-    }
-    if (phase !== 'preparing-game') return;
-    const current = this.currentGameNumber();
-    if (current === null) {
-      this.pendingReadyGame = null;
-      return;
-    }
-    if (current !== target) {
-      if (current > target) this.pendingReadyGame = null;
-      return;
-    }
-    if (this.localReady()) {
-      this.pendingReadyGame = null;
-      return;
-    }
-    if (this.deps.now() < this.pendingReadyRetryAtMs) return;
-    this.pendingReadyRetryAtMs = this.deps.now() + AUTO_START_RETRY_MS;
-    void this.readyForNextGame();
+    this.pendingReady.tick({
+      disposed: this.disposed,
+      busy: this.busy,
+      phase: this.phase(),
+      currentGameNumber: this.currentGameNumber(),
+      localReady: this.localReady(),
+      now: this.deps.now(),
+    });
   }
 
   private maybeProposeOrConfirm(): void {

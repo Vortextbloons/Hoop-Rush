@@ -417,7 +417,6 @@ function checkTape(
   const turnedOver = new Set<number>();
   const cancelled = new Set<number>();
   const turnoverSide = new Map<string, number>();
-  const turnoverPlayer = new Map<string, number>();
   const cancelledTurnoverSide = new Map<string, number>();
   const cancelledTurnoverPlayer = new Map<string, number>();
   const turnoversBySequence = new Map<number, { side: HavocHomeAway; playerInstanceId: string }>();
@@ -524,10 +523,13 @@ function checkTape(
           playerInstanceId: event.playerInstanceId,
         });
         turnoverSide.set(event.side, (turnoverSide.get(event.side) ?? 0) + 1);
-        turnoverPlayer.set(
-          event.playerInstanceId,
-          (turnoverPlayer.get(event.playerInstanceId) ?? 0) + 1,
-        );
+        if (cancelled.has(event.sequence)) {
+          cancelledTurnoverSide.set(event.side, (cancelledTurnoverSide.get(event.side) ?? 0) + 1);
+          cancelledTurnoverPlayer.set(
+            event.playerInstanceId,
+            (cancelledTurnoverPlayer.get(event.playerInstanceId) ?? 0) + 1,
+          );
+        }
         break;
       }
       case 'turnover-cancelled': {

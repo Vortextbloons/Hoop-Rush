@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/await-thenable, @typescript-eslint/no-confusing-void-expression -- bun-types@1.4.4 declares .resolves/.rejects matchers as void; Bun docs require awaiting them */
 import { describe, expect, it } from 'bun:test';
 import {
   CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION,
@@ -127,10 +128,7 @@ function progressMessage(requestId: string): CapRushWorkerMessage {
   };
 }
 
-function completeMessage(
-  requestId: string,
-  cancelled = false,
-): CapRushWorkerMessage {
+function completeMessage(requestId: string, cancelled = false): CapRushWorkerMessage {
   return {
     schemaVersion: CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION,
     type: 'cap-rush-complete',
@@ -336,6 +334,7 @@ describe('CapRushRunner', () => {
     runner.destroy();
     await expect(pending).rejects.toThrow('cap rush runner destroyed');
     expect(fake.terminated).toBe(true);
+    fake.emit(completeMessage('req-1'));
   });
 
   it('forwards progress without queueing it', async () => {

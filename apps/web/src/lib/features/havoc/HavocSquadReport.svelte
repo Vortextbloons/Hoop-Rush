@@ -340,6 +340,7 @@
     </Dialog.Content>
   </Dialog.Portal>
 </Dialog.Root>
+yle>
 
 <style>
   .h-box-score {
@@ -502,4 +503,3 @@
     }
   }
 </style>
-yle>

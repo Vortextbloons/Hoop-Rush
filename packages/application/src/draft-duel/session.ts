@@ -43,13 +43,7 @@ import {
   type DraftDuelSeriesRosters,
   type EngineContext,
 } from '@hoop-rush/engine';
-import type {
-  DraftDuelActiveState,
-  DraftDuelCompletionRecap,
-  StoredDraftDuelActive,
-  StoredDraftDuelCompleted,
-  StoredDraftDuelResultRow,
-} from '@hoop-rush/persistence';
+import type { DraftDuelActiveState, DraftDuelCompletionRecap } from '@hoop-rush/persistence';
 import {
   CoalescedTask,
   SessionEvents,
@@ -64,6 +58,8 @@ import {
 } from '../multiplayer/room-lifecycle.ts';
 import { SeriesCoordinator } from '../multiplayer/series-coordinator.ts';
 import { CommandRecovery, executeMultiplayerCommand } from '../multiplayer/command-execution.ts';
+import { mergeCommandLog } from '../multiplayer/command-log.ts';
+import { PendingReadyCoordinator } from '../multiplayer/pending-ready.ts';
 
 const TICK_MS = 250;
 const AUTO_START_RETRY_MS = 5000;
@@ -92,7 +88,7 @@ export interface DraftDuelSeriesFacts {
   draft: DraftDuelDraft | null;
   series: DraftDuelSeriesSnapshot | null;
   playedGames: readonly DraftDuelPlayedGame[];
-  completedRecap: StoredDraftDuelCompleted | null;
+  completedRecap: DraftDuelCompletionRecap | null;
 }
 
 export interface DraftDuelSessionView {
@@ -104,7 +100,7 @@ export interface DraftDuelSessionView {
   outputs: Record<number, DraftDuelGameOutput>;
   verification: DraftDuelPartiallyVerified[];
   commands: DraftDuelCommand[];
-  completedRecap: StoredDraftDuelCompleted | null;
+  completedRecap: DraftDuelCompletionRecap | null;
   busy: boolean;
   error: string | null;
   notice: string | null;
@@ -118,9 +114,9 @@ export interface DraftDuelSessionView {
 }
 
 export interface DraftDuelSessionRepository {
-  loadActive(roomId: string): Promise<StoredDraftDuelActive | null>;
-  loadCompleted(roomId: string): Promise<StoredDraftDuelCompleted | null>;
-  loadResults(roomId: string): Promise<StoredDraftDuelResultRow[]>;
+  loadActive(roomId: string): Promise<DraftDuelActiveState | null>;
+  loadCompleted(roomId: string): Promise<DraftDuelCompletionRecap | null>;
+  loadResults(roomId: string): Promise<{ output: DraftDuelGameOutput }[]>;
   appendCommands(roomId: string, commands: readonly DraftDuelCommand[]): Promise<void>;
   saveResult(output: DraftDuelGameOutput): Promise<void>;
   saveVerification(roomId: string, entries: readonly DraftDuelPartiallyVerified[]): Promise<void>;
@@ -219,7 +215,7 @@ export class DraftDuelSession {
   private draft: DraftDuelDraft | null = null;
   private outputs: Record<number, DraftDuelGameOutput> = {};
   private verification: DraftDuelPartiallyVerified[] = [];
-  private completedRecap: StoredDraftDuelCompleted | null = null;
+  private completedRecap: DraftDuelCompletionRecap | null = null;
   private commands: DraftDuelCommand[] = [];
   private persistedCommandCount = 0;
   private savedActiveKey: string | null = null;
@@ -233,8 +229,9 @@ export class DraftDuelSession {
   private deadlineResolving = false;
   private deadlineRetryAtMs = 0;
   private rematchRetryAtMs = 0;
-  private pendingReadyGame: number | null = null;
-  private pendingReadyRetryAtMs = 0;
+  private pendingReady = new PendingReadyCoordinator(AUTO_START_RETRY_MS, () => {
+    void this.readyForNextGame();
+  });
   private seenBroadcastGame: number | null = null;
   private completedPersisted = false;
   private disposed = false;
@@ -316,8 +313,7 @@ export class DraftDuelSession {
     this.deadlineResolving = false;
     this.deadlineRetryAtMs = 0;
     this.rematchRetryAtMs = 0;
-    this.pendingReadyGame = null;
-    this.pendingReadyRetryAtMs = 0;
+    this.pendingReady.reset();
     this.seenBroadcastGame = null;
     this.roomId = idSchema.parse(roomId);
     try {
@@ -349,7 +345,7 @@ export class DraftDuelSession {
       if (!attachment.current()) return;
       if (rows.length > 0) {
         const outputs: Record<number, DraftDuelGameOutput> = {};
-        for (const row of rows) outputs[row.gameNumber] = row.output;
+        for (const row of rows) outputs[row.output.gameNumber] = row.output;
         this.outputs = { ...this.outputs, ...outputs };
       }
       this.lifecycle.track(
@@ -631,8 +627,7 @@ export class DraftDuelSession {
     const output = this.currentOutput();
     if (!output) return;
     this.seriesFlow.playback.approve(output.gameNumber);
-    this.pendingReadyGame = output.gameNumber + 1;
-    this.pendingReadyRetryAtMs = 0;
+    this.pendingReady.schedule(output.gameNumber + 1);
     this.maybeReadyNextGame();
     this.maybeProposeOrConfirm();
   }
@@ -897,28 +892,30 @@ export class DraftDuelSession {
       if (isDisposed()) return;
       this.lifecycle.connected(attachment);
       this.error = null;
-      let commands =
-        resumed.commands.length === 0 ? this.commands : [...this.commands, ...resumed.commands];
-      if (
-        commands.length !== resumed.snapshot.commandCount ||
-        commands.some((command, ordinal) => command.ordinal !== ordinal)
-      ) {
+      let merged = mergeCommandLog({
+        local: this.commands,
+        fetched: resumed.commands,
+        expectedCount: resumed.snapshot.commandCount,
+        ordinalOf: (command) => command.ordinal,
+      });
+      if (!merged.complete) {
         resumed = await this.deps.transport.sync(roomId, -1);
         if (isDisposed()) return;
-        commands = resumed.commands;
-        if (
-          commands.length !== resumed.snapshot.commandCount ||
-          commands.some((command, ordinal) => command.ordinal !== ordinal)
-        )
-          throw new Error('room sync returned an incomplete command log');
+        merged = mergeCommandLog({
+          local: [],
+          fetched: resumed.commands,
+          expectedCount: resumed.snapshot.commandCount,
+          ordinalOf: (command) => command.ordinal,
+        });
+        if (!merged.complete) throw new Error('room sync returned an incomplete command log');
       }
       if (isDisposed()) return;
       if (this.snapshot && resumed.snapshot.revision < this.snapshot.revision) {
         void this.syncFromServer();
         return;
       }
-      const commandsChanged = commands.length !== this.commands.length;
-      this.commands = commands;
+      const commandsChanged = merged.commands.length !== this.commands.length;
+      this.commands = merged.commands;
       this.applySnapshot(resumed.snapshot, false);
       if (commandsChanged || this.draft === null) this.rebuildDraft();
       if (this.shouldCreateRematch()) {
@@ -928,13 +925,13 @@ export class DraftDuelSession {
         if (isDisposed()) return;
         this.applySnapshot(rematched.snapshot);
       }
-      if (commands.length > this.persistedCommandCount) {
+      if (this.commands.length > this.persistedCommandCount) {
         await this.deps.repository.appendCommands(
           roomId,
-          commands.slice(this.persistedCommandCount),
+          this.commands.slice(this.persistedCommandCount),
         );
         if (isDisposed()) return;
-        this.persistedCommandCount = commands.length;
+        this.persistedCommandCount = this.commands.length;
       }
       await this.ensureGamePipeline();
       if (isDisposed()) return;
@@ -1095,30 +1092,14 @@ export class DraftDuelSession {
   }
 
   private maybeReadyNextGame(): void {
-    const target = this.pendingReadyGame;
-    if (target === null || this.disposed || this.busy) return;
-    const phase = this.phase();
-    if (phase === 'championship' || phase === 'integrity-failed' || phase === 'expired') {
-      this.pendingReadyGame = null;
-      return;
-    }
-    if (phase !== 'preparing-game') return;
-    const current = this.currentGameNumber();
-    if (current === null) {
-      this.pendingReadyGame = null;
-      return;
-    }
-    if (current !== target) {
-      if (current > target) this.pendingReadyGame = null;
-      return;
-    }
-    if (this.localReady()) {
-      this.pendingReadyGame = null;
-      return;
-    }
-    if (this.deps.now() < this.pendingReadyRetryAtMs) return;
-    this.pendingReadyRetryAtMs = this.deps.now() + AUTO_START_RETRY_MS;
-    void this.readyForNextGame();
+    this.pendingReady.tick({
+      disposed: this.disposed,
+      busy: this.busy,
+      phase: this.phase(),
+      currentGameNumber: this.currentGameNumber(),
+      localReady: this.localReady(),
+      now: this.deps.now(),
+    });
   }
 
   private maybeProposeOrConfirm(): void {

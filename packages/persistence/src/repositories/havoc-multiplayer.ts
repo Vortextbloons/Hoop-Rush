@@ -28,8 +28,10 @@ import { HoopRushDatabase } from './dexie.ts';
 import { DexieProfileRepository } from './profile.ts';
 import {
   commandReceiptMatches,
+  commandRowsToAppend,
   deleteWhereEquals,
   listCompletedHistory,
+  putResultPreservingVerified,
   rowsWhereEquals,
 } from './support.ts';
 
@@ -102,32 +104,22 @@ export class DexieHavocMultiplayerRepository {
         'roomId',
         roomId,
       );
-      const byOrdinal = new Map<number, StoredHavocMultiplayerCommandRow>();
-      const byCommandId = new Map<string, StoredHavocMultiplayerCommandRow>();
-      for (const existing of existingRows) {
-        const parsed = storedHavocMultiplayerCommandRowSchema.parse(existing);
-        byOrdinal.set(parsed.ordinal, parsed);
-        byCommandId.set(parsed.commandId, parsed);
-      }
-      for (const row of rows) {
-        const sameCommand = byCommandId.get(row.commandId);
-        if (sameCommand !== undefined) {
-          if (commandRowMatches(sameCommand, row)) continue;
-          throw new Error(
-            `appendCommands: conflicting command ${String(row.commandId)} in room ${roomId}`,
-          );
-        }
-        const sameOrdinal = byOrdinal.get(row.ordinal);
-        if (sameOrdinal !== undefined) {
-          if (commandRowMatches(sameOrdinal, row)) continue;
-          throw new Error(
-            `appendCommands: conflicting command at ordinal ${String(row.ordinal)} in room ${roomId}`,
-          );
-        }
-        await this.db.havocMultiplayerCommands.put(row);
-        byOrdinal.set(row.ordinal, row);
-        byCommandId.set(row.commandId, row);
-      }
+      const append = commandRowsToAppend({
+        existing: existingRows.map((row) => storedHavocMultiplayerCommandRowSchema.parse(row)),
+        incoming: rows,
+        ordinalOf: (row) => row.ordinal,
+        identityOf: (row) => row.commandId,
+        matches: commandRowMatches,
+        conflict: (kind, row) =>
+          kind === 'identity'
+            ? new Error(
+                `appendCommands: conflicting command ${String(row.commandId)} in room ${roomId}`,
+              )
+            : new Error(
+                `appendCommands: conflicting command at ordinal ${String(row.ordinal)} in room ${roomId}`,
+              ),
+      });
+      for (const row of append) await this.db.havocMultiplayerCommands.put(row);
     });
   }
   async loadCommands(roomId: string): Promise<HavocMultiplayerCommand[]> {
@@ -150,25 +142,25 @@ export class DexieHavocMultiplayerRepository {
     const validated = havocMultiplayerGameOutputSchema.parse(output);
     const key: [string, number] = [validated.roomId, validated.gameNumber];
     await this.db.transaction('rw', this.db.havocMultiplayerResults, async () => {
-      const existing = await this.db.havocMultiplayerResults.get(key);
-      const verified =
-        existing === undefined
-          ? false
-          : storedHavocMultiplayerResultRowSchema.parse(existing).verified;
-      const row: StoredHavocMultiplayerResultRow = storedHavocMultiplayerResultRowSchema.parse({
-        saveSchemaVersion: HAVOC_MULTIPLAYER_SAVE_SCHEMA_VERSION,
-        roomId: validated.roomId,
-        gameNumber: validated.gameNumber,
-        winner: validated.winner,
-        result: validated.result,
-        tape: validated.tape,
-        inputDigest: validated.inputDigest,
-        resultDigest: validated.resultDigest,
-        tapeDigest: validated.tapeDigest,
-        verified,
-        storedAtIso: new Date().toISOString(),
+      await putResultPreservingVerified({
+        table: this.db.havocMultiplayerResults,
+        key,
+        parse: (row) => storedHavocMultiplayerResultRowSchema.parse(row),
+        build: (verified) =>
+          storedHavocMultiplayerResultRowSchema.parse({
+            saveSchemaVersion: HAVOC_MULTIPLAYER_SAVE_SCHEMA_VERSION,
+            roomId: validated.roomId,
+            gameNumber: validated.gameNumber,
+            winner: validated.winner,
+            result: validated.result,
+            tape: validated.tape,
+            inputDigest: validated.inputDigest,
+            resultDigest: validated.resultDigest,
+            tapeDigest: validated.tapeDigest,
+            verified,
+            storedAtIso: new Date().toISOString(),
+          }),
       });
-      await this.db.havocMultiplayerResults.put(row);
     });
   }
   async loadResults(roomId: string): Promise<StoredHavocMultiplayerResultRow[]> {

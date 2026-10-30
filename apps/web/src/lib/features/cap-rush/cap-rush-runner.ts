@@ -151,8 +151,7 @@ export class CapRushRunner {
       },
       requestId: input.requestId,
       concurrentMessage: 'a cap rush job is already running',
-      completeOf: (message) =>
-        message.type === 'cap-rush-standings-complete' ? message : null,
+      completeOf: (message) => (message.type === 'cap-rush-standings-complete' ? message : null),
       errorAfterQueue: false,
       onProgress: input.handlers?.onProgress,
     });
@@ -174,7 +173,7 @@ export class CapRushRunner {
         type: 'cap-rush-playoffs',
         requestId: input.requestId,
         locked: input.locked,
-        games: input.games,
+        games: [...input.games],
         includeTape: input.includeTape,
       },
       requestId: input.requestId,

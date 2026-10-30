@@ -21,7 +21,7 @@ import {
   draftDuelRepositionSlots,
   draftDuelRoster,
 } from '@hoop-rush/engine';
-import type { StoredDraftDuelCompleted } from '@hoop-rush/persistence';
+import type { DraftDuelCompletionRecap } from '@hoop-rush/persistence';
 import {
   draftDuelPlayedGames,
   draftDuelSeriesMvpOf,
@@ -74,7 +74,7 @@ export class DraftDuelPresenter {
   } | null>(null);
   muted = $state(false);
   private commands = $state.raw<DraftDuelCommand[]>([]);
-  private completedRecap = $state.raw<StoredDraftDuelCompleted | null>(null);
+  private completedRecap = $state.raw<DraftDuelCompletionRecap | null>(null);
   private errorState = $state<string | null>(null);
   private unsubscribe: (() => void) | null = null;
   private unsubscribeTransient: (() => void) | null = null;

@@ -14,9 +14,9 @@ import type {
   Id,
 } from '@hoop-rush/data-contracts';
 import type {
+  HavocMultiplayerCompletionRecap,
   HavocMultiplayerGameOutput,
   HavocMultiplayerSeriesMvp,
-  StoredHavocMultiplayerCompleted,
 } from '@hoop-rush/persistence';
 import type {
   HavocMultiplayerGameVerification,
@@ -73,7 +73,7 @@ export class HavocMultiplayerPresenter {
   consideration = $state<HavocMultiplayerConsideration | null>(null);
   reaction = $state<HavocMultiplayerReaction | null>(null);
   muted = $state(false);
-  completedRecap = $state.raw<StoredHavocMultiplayerCompleted | null>(null);
+  completedRecap = $state.raw<HavocMultiplayerCompletionRecap | null>(null);
   private commands = $state.raw<HavocMultiplayerCommand[]>([]);
   private errorState = $state<string | null>(null);
   private unsubscribe: (() => void) | null = null;

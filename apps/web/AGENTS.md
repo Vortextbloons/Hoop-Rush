@@ -14,6 +14,10 @@ imports engine, never the reverse.
   in `src/lib/components/`; shared helpers (ids, data, sleep, draft
   presentation/fit/slots, player refs, run preamble, supabase runtime,
   membership storage) stay in `src/lib/`.
+- `src/lib/gamecast/` owns neutral playback. The five-man `GameResult` helpers
+  live beside the home/away battle selectors, feed folding, box folding, and
+  `GamecastBattleBox.svelte` shared by Havoc multiplayer and Cap Rush. Keep
+  mode labels, controls, and series-specific stats in `features/<mode>/`.
 - Mode sessions live in `@hoop-rush/application` behind ports:
   `challenge/`, `havoc/`, `draft-duel/`, `fixed-five/`, `havoc-multiplayer/`,
   and `multiplayer/` (lobby). Web

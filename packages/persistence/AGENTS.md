@@ -30,7 +30,8 @@ schemas live here; domain schemas live in `@hoop-rush/data-contracts`.
   audits detect drift. Do not silently accept malformed records.
 - **Shared repository helpers**: `repositories/support.ts` owns record
   envelopes, parse helpers, scoped compound-index reads/deletes, command receipt
-  comparison, and revision/digest guards — extend it instead of duplicating.
+  comparison, command-row dedupe planning, verified-preserving result upserts,
+  and revision/digest guards — extend it instead of duplicating.
 
 ## Testing
 

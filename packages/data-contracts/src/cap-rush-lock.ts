@@ -29,6 +29,10 @@ import {
   type CapRushLeagueScheduleEntry,
 } from './cap-rush-league.ts';
 import { capRushSpinReceiptSchema } from './cap-rush-spin.ts';
+import {
+  capRushPlayoffPerformanceSchema,
+  type CapRushPlayoffPerformance,
+} from './cap-rush-playoff.ts';
 
 export const capRushFranchiseAssignmentSchema = z.object({
   franchiseId: z.string().min(1).max(64),
@@ -101,6 +105,7 @@ export const capRushLockedInputsSchema = z
     human: havocTeamInputSchema,
     schedule: z.array(capRushScheduleEntrySchema).length(CAP_RUSH_GAME_COUNT),
     opponents: z.array(capRushFrozenOpponentSchema).min(1).max(64),
+    playoffPerformance: capRushPlayoffPerformanceSchema.optional(),
   })
   .superRefine((locked, ctx) => {
     if (locked.human.side !== 'human') {
@@ -181,6 +186,43 @@ export const capRushLockedInputsSchema = z
           code: 'custom',
           message: 'frozen opponents must be opponent-side teams without clones',
         });
+      }
+    }
+    if (locked.playoffPerformance !== undefined) {
+      const participantById = new Map(
+        [locked.human, ...locked.opponents.map((entry) => entry.team)].flatMap((team) =>
+          [...team.starters, ...team.replacements].map(
+            (participant) => [participant.instanceId, participant] as const,
+          ),
+        ),
+      );
+      const seenInstances = new Set<string>();
+      for (const row of locked.playoffPerformance.players) {
+        const participant = participantById.get(row.instanceId);
+        if (participant === undefined) {
+          ctx.addIssue({
+            code: 'custom',
+            message: `playoff performance references unknown instance ${row.instanceId}`,
+          });
+          continue;
+        }
+        if (seenInstances.has(row.instanceId)) {
+          ctx.addIssue({
+            code: 'custom',
+            message: `playoff performance repeats instance ${row.instanceId}`,
+          });
+        }
+        seenInstances.add(row.instanceId);
+        if (
+          participant.source.playerId !== row.playerId ||
+          participant.source.playerVersionId !== row.playerVersionId ||
+          participant.source.seasonKey !== row.seasonKey
+        ) {
+          ctx.addIssue({
+            code: 'custom',
+            message: `playoff performance does not match participant ${row.instanceId}`,
+          });
+        }
       }
     }
     if ((locked.franchise === undefined) !== (locked.leagueSchedule === undefined)) {

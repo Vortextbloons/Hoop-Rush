@@ -645,6 +645,3 @@
     color: #c1cae4;
   }
 </style>
-
-  }
-</style>

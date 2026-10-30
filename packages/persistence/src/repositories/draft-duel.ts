@@ -24,8 +24,10 @@ import { HoopRushDatabase } from './dexie.ts';
 import { DexieProfileRepository } from './profile.ts';
 import {
   commandReceiptMatches,
+  commandRowsToAppend,
   deleteWhereEquals,
   listCompletedHistory,
+  putResultPreservingVerified,
   rowsWhereEquals,
 } from './support.ts';
 export class DexieDraftDuelRepository {
@@ -70,22 +72,17 @@ export class DexieDraftDuelRepository {
       .sort((a, b) => a.ordinal - b.ordinal);
     await this.db.transaction('rw', this.db.draftDuelCommands, async () => {
       const existingRows = await rowsWhereEquals(this.db.draftDuelCommands, 'roomId', roomId);
-      const byOrdinal = new Map<number, (typeof rows)[number]>();
-      for (const existing of existingRows) {
-        const parsed = storedDraftDuelCommandRowSchema.parse(existing);
-        byOrdinal.set(parsed.ordinal, parsed);
-      }
-      for (const row of rows) {
-        const existing = byOrdinal.get(row.ordinal);
-        if (existing !== undefined) {
-          if (commandReceiptMatches(existing.command, row.command)) continue;
-          throw new Error(
+      const append = commandRowsToAppend({
+        existing: existingRows.map((row) => storedDraftDuelCommandRowSchema.parse(row)),
+        incoming: rows,
+        ordinalOf: (row) => row.ordinal,
+        matches: (stored, incoming) => commandReceiptMatches(stored.command, incoming.command),
+        conflict: (_kind, row) =>
+          new Error(
             `appendCommands: conflicting command at ordinal ${String(row.ordinal)} in room ${roomId}`,
-          );
-        }
-        await this.db.draftDuelCommands.put(row);
-        byOrdinal.set(row.ordinal, row);
-      }
+          ),
+      });
+      for (const row of append) await this.db.draftDuelCommands.put(row);
     });
   }
   async loadCommands(roomId: string): Promise<DraftDuelCommand[]> {
@@ -96,18 +93,20 @@ export class DexieDraftDuelRepository {
     const validated = draftDuelGameOutputSchema.parse(output);
     const key: [string, number] = [validated.roomId, validated.gameNumber];
     await this.db.transaction('rw', this.db.draftDuelResults, async () => {
-      const existing = await this.db.draftDuelResults.get(key);
-      const verified =
-        existing === undefined ? false : storedDraftDuelResultRowSchema.parse(existing).verified;
-      const row: StoredDraftDuelResultRow = storedDraftDuelResultRowSchema.parse({
-        saveSchemaVersion: DRAFT_DUEL_SAVE_SCHEMA_VERSION,
-        roomId: validated.roomId,
-        gameNumber: validated.gameNumber,
-        output: validated,
-        verified,
-        storedAtIso: new Date().toISOString(),
+      await putResultPreservingVerified({
+        table: this.db.draftDuelResults,
+        key,
+        parse: (row) => storedDraftDuelResultRowSchema.parse(row),
+        build: (verified) =>
+          storedDraftDuelResultRowSchema.parse({
+            saveSchemaVersion: DRAFT_DUEL_SAVE_SCHEMA_VERSION,
+            roomId: validated.roomId,
+            gameNumber: validated.gameNumber,
+            output: validated,
+            verified,
+            storedAtIso: new Date().toISOString(),
+          }),
       });
-      await this.db.draftDuelResults.put(row);
     });
   }
   async loadResults(roomId: string): Promise<StoredDraftDuelResultRow[]> {

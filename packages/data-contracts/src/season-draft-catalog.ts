@@ -12,6 +12,7 @@ import {
   positionUnionSchema,
 } from './positions.ts';
 import { summaryRatingsSchema } from './player-season.ts';
+import { playoffPerformanceSchema } from './postseason-evidence.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
 import {
   PLAYER_VERSION_ID_VERSION,
@@ -65,6 +66,7 @@ export const seasonDraftCandidateSchema = z.object({
   durability: seasonDraftCandidateDurabilitySchema,
   anchors: simulationAnchorsSchema.optional(),
   reconstructedThreePoint: reconstructedThreePointProfileSchema.optional(),
+  playoffPerformance: playoffPerformanceSchema.optional(),
 });
 export type SeasonDraftCandidate = z.infer<typeof seasonDraftCandidateSchema>;
 export const seasonDraftCatalogSchema = z

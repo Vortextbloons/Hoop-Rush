@@ -83,9 +83,7 @@ export interface GamecastBattleOutput {
 
 const DEFAULT_PERIOD_SECONDS = 720;
 
-export function gamecastBattlePlaybackItems(
-  tape: HavocBattleTape,
-): GamecastBattlePlaybackItem[] {
+export function gamecastBattlePlaybackItems(tape: HavocBattleTape): GamecastBattlePlaybackItem[] {
   const items: GamecastBattlePlaybackItem[] = [];
   tape.events.forEach((event, index) => {
     items.push({

@@ -123,3 +123,56 @@ export async function listCompletedHistory<T, TKey, TInsertType>(
   const rows = await table.orderBy(index).reverse().toArray();
   return rows;
 }
+
+export interface CommandRowDedupe<TRow> {
+  ordinalOf(row: TRow): number;
+  identityOf?(row: TRow): string;
+  matches(stored: TRow, incoming: TRow): boolean;
+  conflict(kind: 'ordinal' | 'identity', row: TRow): Error;
+}
+
+/** Returns the incoming rows that are not already stored, preserving each mode's dedupe rules. */
+export function commandRowsToAppend<TRow>(
+  input: CommandRowDedupe<TRow> & {
+    existing: readonly TRow[];
+    incoming: readonly TRow[];
+  },
+): TRow[] {
+  const byOrdinal = new Map<number, TRow>();
+  const byIdentity = new Map<string, TRow>();
+  for (const row of input.existing) {
+    byOrdinal.set(input.ordinalOf(row), row);
+    const identity = input.identityOf?.(row);
+    if (identity !== undefined) byIdentity.set(identity, row);
+  }
+  return input.incoming.filter((row) => {
+    const identity = input.identityOf?.(row);
+    const sameIdentity = identity === undefined ? undefined : byIdentity.get(identity);
+    if (sameIdentity !== undefined) {
+      if (input.matches(sameIdentity, row)) return false;
+      throw input.conflict('identity', row);
+    }
+    const ordinal = input.ordinalOf(row);
+    const sameOrdinal = byOrdinal.get(ordinal);
+    if (sameOrdinal !== undefined) {
+      if (input.matches(sameOrdinal, row)) return false;
+      throw input.conflict('ordinal', row);
+    }
+    byOrdinal.set(ordinal, row);
+    if (identity !== undefined) byIdentity.set(identity, row);
+    return true;
+  });
+}
+
+/** Upserts a result row while retaining the verification flag of the stored row. */
+export async function putResultPreservingVerified<TRow extends { verified: boolean }, TKey>(input: {
+  table: Pick<Table<TRow, TKey>, 'get' | 'put'>;
+  key: TKey;
+  parse: (row: unknown) => TRow;
+  build: (verified: boolean) => TRow;
+}): Promise<void> {
+  const existing = await input.table.get(input.key);
+  await input.table.put(
+    input.build(existing === undefined ? false : input.parse(existing).verified),
+  );
+}

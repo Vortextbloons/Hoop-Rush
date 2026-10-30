@@ -32,6 +32,7 @@ import {
   capRushVariantSchema,
 } from './cap-rush-versions.ts';
 import { capRushSpinStateSchema } from './cap-rush-spin.ts';
+import { playoffPerformanceSchema } from './postseason-evidence.ts';
 import { capRushFranchiseAssignmentSchema, capRushLockedInputsSchema } from './cap-rush-lock.ts';
 import { capRushSeasonStateSchema } from './cap-rush-season.ts';
 import { capRushPostseasonSchema } from './cap-rush-postseason.ts';
@@ -61,6 +62,7 @@ export const capRushSourcePlayerSchema = z.object({
   originalOverall: z.number().int().min(CAP_RUSH_MIN_OVERALL).max(CAP_RUSH_MAX_OVERALL),
   profile: capRushPlayerProfileSchema,
   physical: capRushPhysicalSchema,
+  playoffPerformance: playoffPerformanceSchema.optional(),
 });
 export type CapRushSourcePlayer = z.infer<typeof capRushSourcePlayerSchema>;
 

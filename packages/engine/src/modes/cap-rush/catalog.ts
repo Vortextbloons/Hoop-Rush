@@ -63,6 +63,9 @@ function adaptSourcePlayer(
       heightInches: candidate.heightInches,
       weightLbs: candidate.weightLbs,
     },
+    ...(candidate.playoffPerformance === undefined
+      ? {}
+      : { playoffPerformance: candidate.playoffPerformance }),
   });
 }
 

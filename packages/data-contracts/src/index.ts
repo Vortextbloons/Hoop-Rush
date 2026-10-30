@@ -88,3 +88,4 @@ export * from './cap-rush-commands.ts';
 export * from './mode-catalog.ts';
 
 export * from './cap-rush-playback.ts';
+export * from './cap-rush-playoff.ts';

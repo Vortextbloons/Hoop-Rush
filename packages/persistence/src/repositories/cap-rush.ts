@@ -73,8 +73,11 @@ export interface CapRushRepository {
   loadActiveDraft(): Promise<CapRushDraftState | null>;
   loadCommandResult(commandId: string): Promise<CapRushCommandResult | null>;
   applyOutcome(input: CapRushApplyOutcomeInput): Promise<CapRushCommandResult>;
+  listRunGames(runId: string): Promise<CapRushStoredGame[]>;
   listPlayoffGames(runId: string): Promise<CapRushStoredPlayoffGame[]>;
   listLeagueGames(runId: string): Promise<CapRushLeagueGame[]>;
+  listHistory(): Promise<CapRushHistoryEntry[]>;
+  readReport(runId: string): Promise<CapRushReport | null>;
   updatePlayback(
     runId: string,
     game: number | string,
