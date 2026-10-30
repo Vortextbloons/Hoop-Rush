@@ -1,3 +1,10 @@
+export const COURT_INNOVATION_GAME_RULES = [
+  'standard',
+  'twenty-second-clock',
+  'deep-four',
+  'first-to-seven-overtime',
+] as const;
+export type CourtInnovationGameRule = (typeof COURT_INNOVATION_GAME_RULES)[number];
 export const DEEP_FOUR_SPLIT = 0.2;
 export const DEEP_FOUR_MAKE_SCALE = 0.75;
 export const DEEP_FOUR_FT_MISS = 4;

@@ -1,7 +1,7 @@
 import type { BracketScheduleEntry, Seed } from '@hoop-rush/data-contracts';
 import { createRng, shuffle, swapAt } from '../sim/rng.ts';
 export const SCHEDULE_GENERATION_VERSION = 'schedule-v1';
-export function pickTwoGameOpponents(opponentIds: readonly string[], seed: Seed): Set<string> {
+function pickTwoGameOpponents(opponentIds: readonly string[], seed: Seed): Set<string> {
   const rng = createRng(`${seed}:counts`);
   const shuffled = shuffle(opponentIds, rng);
   return new Set(shuffled.slice(0, 8));

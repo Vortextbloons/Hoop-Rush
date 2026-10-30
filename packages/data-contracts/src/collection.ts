@@ -1,13 +1,10 @@
 import { z } from 'zod';
 import {
   contentHashSchema,
-  commandIdSchema,
   eraIdSchema,
   franchiseIdSchema,
-  idSchema,
   playerIdSchema,
   seasonKeySchema,
-  seedSchema,
 } from './ids.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
 import {
@@ -22,20 +19,13 @@ import {
   simulationTendenciesSchema,
 } from './simulation.ts';
 import { summaryRatingsSchema } from './player-season.ts';
-import { seasonCheckpointDigestSchema } from './season-hash.ts';
 import {
   COLLECTION_CATALOG_VERSION,
-  COLLECTION_COMMAND_V1_VERSION,
-  COLLECTION_COMMAND_VERSION,
-  COLLECTION_ECONOMY_VERSION,
   COLLECTION_OVERLAY_VERSION,
   COLLECTION_PACK_RULES_VERSION,
-  COLLECTION_SPECIALS_VERSION,
-  COLLECTION_PROGRESSION_VERSION,
   COLLECTION_REPLAY_V1_VERSION,
-  COLLECTION_REPLAY_VERSION,
   COLLECTION_SCHEMA_VERSION,
-  COLLECTION_STATE_SCHEMA_VERSION,
+  COLLECTION_SPECIALS_VERSION,
   COLLECTION_VERSION,
 } from './collection-versions.ts';
 import {
@@ -47,7 +37,6 @@ import {
   collectionRaritySchema,
   collectionSetIdSchema,
 } from './collection-primitives.ts';
-import { collectionTargetSnapshotSchema } from './collection-targeting.ts';
 
 export {
   collectionCardIdSchema,
@@ -133,266 +122,12 @@ export const collectionPackDefinitionSchema = z.object({
 });
 export type CollectionPackDefinition = z.infer<typeof collectionPackDefinitionSchema>;
 
-export const collectionOwnedCardSchema = z.object({
-  cardId: collectionCardIdSchema,
-  acquiredPullSequence: z.number().int().nonnegative(),
-  acquiredSlotIndex: z.number().int().nonnegative(),
-  acquiredAtIso: z.string().min(1).max(64),
-});
-export type CollectionOwnedCard = z.infer<typeof collectionOwnedCardSchema>;
-
-export const collectionPullSlotResultSchema = z.object({
-  slotIndex: z.number().int().nonnegative(),
-  cardId: collectionCardIdSchema,
-  rarity: collectionRaritySchema,
-  kept: z.boolean(),
-  conversionAmount: z.number().int().nonnegative(),
-});
-export type CollectionPullSlotResult = z.infer<typeof collectionPullSlotResultSchema>;
-
-export const collectionPullRecordV1Schema = z.object({
-  pullSequence: z.number().int().nonnegative(),
-  kind: z.enum(['welcome', 'pack']),
-  packId: collectionPackIdSchema.optional(),
-  packRulesVersion: z.literal(COLLECTION_PACK_RULES_VERSION),
-  economyVersion: z.literal(COLLECTION_ECONOMY_VERSION),
-  catalogVersion: z.literal(COLLECTION_CATALOG_VERSION),
-  catalogHash: contentHashSchema,
-  commandId: commandIdSchema,
-  seedPath: z.array(z.string().min(1).max(128)).min(1),
-  slots: z.array(collectionPullSlotResultSchema).min(1).max(10),
-});
-export type CollectionPullRecordV1 = z.infer<typeof collectionPullRecordV1Schema>;
-
-export const collectionPullRecordV2Schema = collectionPullRecordV1Schema
-  .extend({
-    replayVersion: z.literal(COLLECTION_REPLAY_VERSION),
-    targeting: collectionTargetSnapshotSchema.nullable(),
-  })
-  .strict();
-export type CollectionPullRecordV2 = z.infer<typeof collectionPullRecordV2Schema>;
-
-export const collectionPullRecordSchema = z.union([
-  collectionPullRecordV2Schema,
-  collectionPullRecordV1Schema,
-]);
-export type CollectionPullRecord = z.infer<typeof collectionPullRecordSchema>;
-
-export const collectionLedgerReasonSchema = z.enum([
-  'welcome-grant',
-  'pack-purchase',
-  'duplicate-conversion',
-  'game-win-reward',
-  'game-loss-reward',
-  'game-objective-reward',
-  'game-margin-reward',
-  'game-first-clear-reward',
-  'challenge-first-clear-reward',
-  'challenge-repeat-win-reward',
-  'set-completion-reward',
-]);
-export type CollectionLedgerReason = z.infer<typeof collectionLedgerReasonSchema>;
-
-export const collectionLedgerEntrySchema = z.object({
-  transactionId: z.string().regex(/^txn-[0-9a-f]{32}$/),
-  commandId: commandIdSchema,
-  pullSequence: z.number().int().nonnegative().nullable(),
-  currency: collectionCurrencySchema,
-  amount: z.number().int(),
-  reason: collectionLedgerReasonSchema,
-});
-export type CollectionLedgerEntry = z.infer<typeof collectionLedgerEntrySchema>;
-
-export const collectionBalancesSchema = z.object({
-  Coins: z.number().int().nonnegative(),
-  Exchange: z.number().int().nonnegative(),
-});
-export type CollectionBalances = z.infer<typeof collectionBalancesSchema>;
-
-export const collectionStateV1Schema = z.object({
-  schemaVersion: z.literal(COLLECTION_SCHEMA_VERSION),
-  collectionVersion: z.literal(COLLECTION_VERSION),
-  catalogVersion: z.literal(COLLECTION_CATALOG_VERSION),
-  economyVersion: z.literal(COLLECTION_ECONOMY_VERSION),
-  collectionId: idSchema,
-  rootSeed: seedSchema,
-  revision: z.number().int().nonnegative(),
-  digest: seasonCheckpointDigestSchema,
-  claimedWelcome: z.boolean(),
-  owned: z.array(collectionOwnedCardSchema),
-  balances: collectionBalancesSchema,
-  nextPullSequence: z.number().int().nonnegative(),
-});
-export type CollectionStateV1 = z.infer<typeof collectionStateV1Schema>;
-
-export const collectionStateV2Schema = z
-  .object({
-    schemaVersion: z.literal(COLLECTION_STATE_SCHEMA_VERSION),
-    collectionVersion: z.literal(COLLECTION_VERSION),
-    catalogVersion: z.literal(COLLECTION_CATALOG_VERSION),
-    economyVersion: z.literal(COLLECTION_ECONOMY_VERSION),
-    progressionVersion: z.literal(COLLECTION_PROGRESSION_VERSION),
-    progressionHash: contentHashSchema.nullable(),
-    collectionId: idSchema,
-    rootSeed: seedSchema,
-    revision: z.number().int().nonnegative(),
-    digest: seasonCheckpointDigestSchema,
-    claimedWelcome: z.boolean(),
-    owned: z.array(collectionOwnedCardSchema),
-    balances: collectionBalancesSchema,
-    nextPullSequence: z.number().int().nonnegative(),
-    activeTargetPlayerId: playerIdSchema.nullable(),
-    claimedSetIds: z.array(collectionSetIdSchema),
-  })
-  .superRefine((state, ctx) => {
-    const seen = new Set<string>();
-    let previous = '';
-    for (const setId of state.claimedSetIds) {
-      if (seen.has(setId)) {
-        ctx.addIssue({ code: 'custom', message: `duplicate claimed set ${setId}` });
-      }
-      if (seen.size > 0 && setId <= previous) {
-        ctx.addIssue({ code: 'custom', message: 'claimed set ids must be canonical sorted' });
-      }
-      seen.add(setId);
-      previous = setId;
-    }
-  });
-export type CollectionStateV2 = z.infer<typeof collectionStateV2Schema>;
-
-export const collectionStateUnionSchema = z.union([
-  collectionStateV2Schema,
-  collectionStateV1Schema,
-]);
-export type CollectionState = CollectionStateV2;
-export type CollectionStateUnion = z.infer<typeof collectionStateUnionSchema>;
-
-export const collectionCommandBaseV1Schema = z.object({
-  schemaVersion: z.literal(COLLECTION_SCHEMA_VERSION),
-  commandVersion: z.literal(COLLECTION_COMMAND_V1_VERSION),
-  commandId: commandIdSchema,
-  collectionId: idSchema,
-  expectedRevision: z.number().int().nonnegative(),
-  expectedDigest: seasonCheckpointDigestSchema,
-});
-export type CollectionCommandBaseV1 = z.infer<typeof collectionCommandBaseV1Schema>;
-
-export const collectionCommandBaseV2Schema = z.object({
-  schemaVersion: z.literal(COLLECTION_STATE_SCHEMA_VERSION),
-  commandVersion: z.literal(COLLECTION_COMMAND_VERSION),
-  commandId: commandIdSchema,
-  collectionId: idSchema,
-  expectedRevision: z.number().int().nonnegative(),
-  expectedDigest: seasonCheckpointDigestSchema,
-});
-export type CollectionCommandBaseV2 = z.infer<typeof collectionCommandBaseV2Schema>;
-export const collectionClaimWelcomeCommandV1Schema = collectionCommandBaseV1Schema.extend({
-  command: z.literal('claim-welcome'),
-  acquiredAtIso: z.string().min(1).max(64),
-});
-export type CollectionClaimWelcomeCommandV1 = z.infer<typeof collectionClaimWelcomeCommandV1Schema>;
-
-export const collectionOpenPackCommandV1Schema = collectionCommandBaseV1Schema.extend({
-  command: z.literal('open-pack'),
-  packId: collectionPackIdSchema,
-  acquiredAtIso: z.string().min(1).max(64),
-});
-export type CollectionOpenPackCommandV1 = z.infer<typeof collectionOpenPackCommandV1Schema>;
-
-export const collectionClaimWelcomeCommandSchema = collectionCommandBaseV2Schema.extend({
-  command: z.literal('claim-welcome'),
-  acquiredAtIso: z.string().min(1).max(64),
-});
-export type CollectionClaimWelcomeCommand = z.infer<typeof collectionClaimWelcomeCommandSchema>;
-
-export const collectionOpenPackCommandSchema = collectionCommandBaseV2Schema.extend({
-  command: z.literal('open-pack'),
-  packId: collectionPackIdSchema,
-  acquiredAtIso: z.string().min(1).max(64),
-});
-export type CollectionOpenPackCommand = z.infer<typeof collectionOpenPackCommandSchema>;
-
-export const collectionSetTargetPlayerCommandSchema = collectionCommandBaseV2Schema.extend({
-  command: z.literal('set-target-player'),
-  playerId: playerIdSchema.nullable(),
-});
-export type CollectionSetTargetPlayerCommand = z.infer<
-  typeof collectionSetTargetPlayerCommandSchema
->;
-
-export const collectionClaimSetRewardCommandSchema = collectionCommandBaseV2Schema.extend({
-  command: z.literal('claim-set-reward'),
-  setId: collectionSetIdSchema,
-  claimedAtIso: z.string().min(1).max(64),
-});
-export type CollectionClaimSetRewardCommand = z.infer<typeof collectionClaimSetRewardCommandSchema>;
-
-export const collectionCommandV1Schema = z.discriminatedUnion('command', [
-  collectionClaimWelcomeCommandV1Schema,
-  collectionOpenPackCommandV1Schema,
-]);
-export type CollectionCommandV1 = z.infer<typeof collectionCommandV1Schema>;
-
-export const collectionCommandV2Schema = z.discriminatedUnion('command', [
-  collectionClaimWelcomeCommandSchema,
-  collectionOpenPackCommandSchema,
-  collectionSetTargetPlayerCommandSchema,
-  collectionClaimSetRewardCommandSchema,
-]);
-export type CollectionCommandV2 = z.infer<typeof collectionCommandV2Schema>;
-
-export const collectionCommandSchema = z.union([
-  collectionCommandV1Schema,
-  collectionCommandV2Schema,
-]);
-export type CollectionCommand = z.infer<typeof collectionCommandSchema>;
-
-export const collectionRejectionSchema = z.discriminatedUnion('code', [
-  z.object({ code: z.literal('collection-mismatch'), expectedCollectionId: z.string() }),
-  z.object({ code: z.literal('duplicate-command'), commandId: z.string() }),
-  z.object({
-    code: z.literal('stale-state'),
-    expectedRevision: z.number().int().nonnegative(),
-    expectedDigest: seasonCheckpointDigestSchema,
-    currentRevision: z.number().int().nonnegative(),
-    currentDigest: seasonCheckpointDigestSchema,
-  }),
-  z.object({ code: z.literal('conflicting-command-reuse'), commandId: z.string() }),
-  z.object({ code: z.literal('already-claimed') }),
-  z.object({ code: z.literal('insufficient-funds'), currency: collectionCurrencySchema }),
-  z.object({ code: z.literal('missing-content'), detail: z.string() }),
-  z.object({ code: z.literal('incompatible-content'), detail: z.string() }),
-  z.object({ code: z.literal('invalid-definition'), detail: z.string() }),
-  z.object({ code: z.literal('no-feasible-starter'), detail: z.string() }),
-  z.object({ code: z.literal('arithmetic-overflow'), detail: z.string() }),
-  z.object({ code: z.literal('unknown-target-player'), playerId: z.string() }),
-  z.object({ code: z.literal('target-unchanged'), playerId: z.string().nullable() }),
-  z.object({ code: z.literal('unknown-set'), setId: z.string() }),
-  z.object({
-    code: z.literal('set-incomplete'),
-    setId: z.string(),
-    ownedCount: z.number().int().nonnegative(),
-    requiredCount: z.number().int().positive(),
-    missingCardIds: z.array(collectionCardIdSchema),
-  }),
-  z.object({ code: z.literal('set-already-claimed'), setId: z.string() }),
-  z.object({ code: z.literal('invalid-progression-rules'), detail: z.string() }),
-  z.object({ code: z.literal('targeting-version-mismatch'), detail: z.string() }),
-  z.object({ code: z.literal('set-reward-divergence'), detail: z.string() }),
-]);
-export type CollectionRejection = z.infer<typeof collectionRejectionSchema>;
-
 export const collectionSetDefinitionSchema = z.object({
   setId: collectionSetIdSchema,
   title: z.string().min(1).max(96),
   memberCardIds: z.array(collectionCardIdSchema).min(1),
 });
 export type CollectionSetDefinition = z.infer<typeof collectionSetDefinitionSchema>;
-
-export const collectionTeamFoundationSchema = z.object({
-  cardIds: z.array(collectionCardIdSchema).max(12),
-});
-export type CollectionTeamFoundation = z.infer<typeof collectionTeamFoundationSchema>;
 
 export const collectionCatalogCardSchema = collectionCardDefinitionSchema.extend({
   summarySource: summaryRatingsSchema.optional(),

@@ -32,9 +32,9 @@ simulation implementation.
    when the command surface change is intentional.
 4. Add a focused test (command handler or CLI integration).
 
-`src/fixtures/` also holds the committed fixtures (`season-run.json`,
-`season-draft-commands.json`, `season-game-*.json`, ...) used by audits and
-reproduction tests. `bun run hoop-rush help` prints the in-tool help.
+`src/fixtures/` holds committed sim fixtures (`equal.json`, sensitivity
+profiles, ...) used by calibration and diagnose commands. `bun run hoop-rush help`
+prints the in-tool help.
 
 ## Verification
 

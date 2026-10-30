@@ -37,7 +37,7 @@ export interface CapRushTestSetup {
   readonly state: CapRushDraftState;
 }
 
-export function capRushTestVersionSet(source: CapRushCatalogSource): CapRushVersionSet {
+function capRushTestVersionSet(source: CapRushCatalogSource): CapRushVersionSet {
   return capRushVersionSetSchema.parse({
     schemaVersion: CAP_RUSH_SCHEMA_VERSION,
     rulesVersion: CAP_RUSH_RULES_VERSION,

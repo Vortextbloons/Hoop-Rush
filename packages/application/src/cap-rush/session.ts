@@ -85,7 +85,7 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : 'unknown cap rush service failure';
 }
 
-export const OUTDATED_SAVE_MESSAGE =
+const OUTDATED_SAVE_MESSAGE =
   'this Cap Rush save was made by an older version of the game and cannot be resumed. Discard it to start a new draft.';
 
 function isUnsupportedSaveError(error: unknown): boolean {

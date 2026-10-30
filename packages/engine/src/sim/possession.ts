@@ -37,6 +37,7 @@ import {
   DEEP_FOUR_SPLIT,
   DEEP_FOUR_FT_MISS,
   DEEP_FOUR_MAKE_SCALE,
+  type CourtInnovationGameRule,
 } from './evolution-rules.ts';
 import { prepareTeam, type TeamPrep } from './prepare.ts';
 import type { HavocRuntimeHooks, HavocEvidence } from './havoc-runtime.ts';
@@ -108,7 +109,7 @@ export interface TripContext {
   eraPossEstimatePerTrip: number;
   passingAnchorFactor: number;
   possessionStart: PossessionStartType;
-  gameRule?: import('@hoop-rush/data-contracts').SeasonGameRule;
+  gameRule?: CourtInnovationGameRule;
   shotClock?: { remaining: number };
   race?: { home: number; away: number; target: number; decided: 'home' | 'away' | null };
   homeCourt?: HomeCourtMechanisms;

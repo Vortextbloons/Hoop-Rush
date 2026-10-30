@@ -76,20 +76,6 @@ export const HOOP_RUSH_DATABASE_STORES: Record<string, string> = {
   completed: 'recordId',
   history: 'recordId, completedAtIso',
   classicDrafts: 'recordId',
-  seasonDrafts: 'recordId',
-  seasonRuns: 'recordId',
-  seasonRunSummaries: '[runId+gameId], [runId+blockIndex], runId, blockIndex',
-  seasonRunDetails: '[runId+gameId], runId',
-  seasonRunBlocks: '[runId+blockIndex], runId',
-  seasonRunIndex: 'recordId',
-  seasonPendingBlocks: 'runId',
-  seasonPostseasonSummaries: '[runId+gameId], runId',
-  seasonPostseasonDetails: '[runId+gameId], runId',
-  seasonCommandLog: '[runId+ordinal], runId',
-  seasonAlmanacs: 'runId',
-  seasonCompletedRuns: 'runId',
-  seasonCompletedIndex: 'recordId, completedAtIso',
-  seasonRunPlayerSlices: 'runId',
   fixedFiveActive: 'roomId',
   fixedFiveCommands: '[roomId+ordinal], roomId',
   fixedFivePendingResults: 'roomId',
@@ -117,10 +103,12 @@ export const HOOP_RUSH_DATABASE_V2_STORES: Record<string, string> = {
 };
 
 const COLLECTION_STORE_PREFIX = 'collection';
+const SEASON_LEGACY_STORE_PREFIX = 'season';
 
 export const HOOP_RUSH_DATABASE_V3_STORES: Record<string, string> = Object.fromEntries(
   Object.entries({ ...HOOP_RUSH_DATABASE_STORES, ...HOOP_RUSH_DATABASE_V2_STORES }).filter(
-    ([name]) => !name.startsWith(COLLECTION_STORE_PREFIX),
+    ([name]) =>
+      !name.startsWith(COLLECTION_STORE_PREFIX) && !name.startsWith(SEASON_LEGACY_STORE_PREFIX),
   ),
 );
 export const HOOP_RUSH_DATABASE_V4_STORES: Record<string, string> = {
@@ -157,6 +145,11 @@ export const HOOP_RUSH_DATABASE_V10_STORES: Record<string, string> = {
   ...HOOP_RUSH_DATABASE_V9_STORES,
   capRushLeagueGames: '[runId+gameId], runId',
 };
+export const HOOP_RUSH_DATABASE_V11_STORES: Record<string, string> = Object.fromEntries(
+  Object.entries(HOOP_RUSH_DATABASE_V10_STORES).filter(
+    ([name]) => !name.startsWith(SEASON_LEGACY_STORE_PREFIX),
+  ),
+);
 export class HoopRushDatabase extends Dexie {
   profiles!: EntityTable<PlayerProfile, 'id'>;
   archivedProfiles!: EntityTable<PlayerProfile, 'id'>;
@@ -209,6 +202,7 @@ export class HoopRushDatabase extends Dexie {
     this.version(8).stores(HOOP_RUSH_DATABASE_V8_STORES);
     this.version(9).stores(HOOP_RUSH_DATABASE_V9_STORES);
     this.version(10).stores(HOOP_RUSH_DATABASE_V10_STORES);
+    this.version(11).stores(HOOP_RUSH_DATABASE_V11_STORES);
   }
 }
 export class DexieChallengeRepository {

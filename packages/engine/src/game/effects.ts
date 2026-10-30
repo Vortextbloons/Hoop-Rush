@@ -1,6 +1,6 @@
 import type { SideIndex } from '../sim/recorder.ts';
 
-export interface SeasonEffectsTripFacts {
+export interface EffectsTripFacts {
   homeUnit: readonly string[];
   awayUnit: readonly string[];
   handler: string;
@@ -19,6 +19,6 @@ export interface EffectsHook {
   assistAdjustment(facts: { offenseSide: SideIndex }): number;
   setActiveUnits(homeUnit: readonly string[], awayUnit: readonly string[]): void;
   recordStintSeconds(side: SideIndex, seconds: number, activeVersions: readonly string[]): void;
-  recordTrip(facts: SeasonEffectsTripFacts): void;
+  recordTrip(facts: EffectsTripFacts): void;
   halftime(): void;
 }

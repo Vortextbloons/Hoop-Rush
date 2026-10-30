@@ -2,26 +2,19 @@
 
 Package overview and verification commands: **README.md**.
 
-IndexedDB/Dexie repository adapters for challenge (classic/sandbox), havoc,
-draft-duel, fixed-five, and havoc-multiplayer saves. Season Run persistence
-remains for historical tests and benchmarks only. Record-level schemas live
-here; domain schemas live in `@hoop-rush/data-contracts`. Ultimate Run mode was
-removed on 2026-10-22; legacy `collection*` **save** object stores in the old
-database are not opened and Dexie upgrades skip them (the player catalog is
-packaged data, not IndexedDB).
+IndexedDB/Dexie repository adapters for challenge (classic/sandbox), cap-rush,
+havoc, draft-duel, fixed-five, and havoc-multiplayer saves. Record-level
+schemas live here; domain schemas live in `@hoop-rush/data-contracts`.
 
 ## Hard rules
 
-- **Schema source of truth**: `@hoop-rush/data-contracts/src/` (and
-  `season-versions.ts` for Season Run). Storage wrappers in `src/schemas/`
+- **Schema source of truth**: `@hoop-rush/data-contracts/src/`. Storage wrappers in `src/schemas/`
   add only record-level envelope fields. Never re-declare a domain schema or
   enum that data-contracts already exports (e.g. import `runModeSchema` /
   `runOutcomeSchema` instead of re-declaring `z.enum`).
 - **Version constants**: import version literals from data-contracts
-  (`SAVE_SCHEMA_VERSION`, `CLASSIC_DRAFT_SCHEMA_VERSION`,
-  `SEASON_DRAFT_SAVE_SCHEMA_VERSION`, `SEASON_RUN_SAVE_SCHEMA_VERSION`,
-  checkpoint constants). Do not hardcode `z.literal(2)` etc. — TypeScript
-  fails closed when a constant bumps.
+  (`SAVE_SCHEMA_VERSION`, `CLASSIC_DRAFT_SCHEMA_VERSION`, checkpoint constants).
+  Do not hardcode `z.literal(2)` etc. — TypeScript fails closed when a constant bumps.
 - **Storage namespace**: the database is `hoop-rush-saves-v2`
   (`HOOP_RUSH_DATABASE_NAME` in `src/repositories/dexie.ts`). The previous
   `hoop-rush-saves` database is never read or migrated; do not add upgrade
@@ -42,7 +35,4 @@ packaged data, not IndexedDB).
 ## Testing
 
 - Package tests: `bun run --filter @hoop-rush/persistence test:run`
-- Slowest suite is `season-run.test.ts` (~7 s); use single-file runs when
-iterating: `bun test <path>`
-- `src/testing/season-run-fixture.ts` builds stub seams that mirror engine
-  behavior; keep them aligned with the engine or reconciliation tests fail.
+- Use single-file runs when iterating: `bun test <path>`

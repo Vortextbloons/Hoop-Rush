@@ -30,7 +30,7 @@ export interface DraftDuelCardView {
   strengthHidden: boolean;
 }
 
-export function draftDuelBandLabel(card: DraftDuelCard): string {
+function draftDuelBandLabel(card: DraftDuelCard): string {
   const index = Math.min(Math.max(card.bandIndex, 0), OVERALL_BANDS.length - 1);
   return OVERALL_BANDS[index]?.label ?? '';
 }
