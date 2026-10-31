@@ -2,11 +2,7 @@ import { z } from 'zod';
 import { idSchema, seedSchema } from './ids.ts';
 import { eraSimulationProfileSchema } from './era-sim-profile.ts';
 import { havocTeamInputSchema } from './havoc-game.ts';
-import {
-  capRushCatalogSourceSchema,
-  capRushPayrollStatusSchema,
-  capRushVariantSchema,
-} from './cap-rush-versions.ts';
+import { capRushCatalogSourceSchema, capRushPayrollStatusSchema } from './cap-rush-versions.ts';
 import {
   capRushFranchiseAssignmentSchema,
   capRushFrozenOpponentSchema,
@@ -32,7 +28,6 @@ import { capRushSpinReceiptSchema } from './cap-rush-spin.ts';
 import { capRushPlayoffPerformanceSchema } from './cap-rush-playoff.ts';
 import {
   CAP_RUSH_MULTIPLAYER_BLOCK_COUNT,
-  CAP_RUSH_MULTIPLAYER_BLOCK_ENDPOINTS,
   CAP_RUSH_MULTIPLAYER_HARD_LIMIT_DOLLARS,
   CAP_RUSH_MULTIPLAYER_POSTSEASON_VERSION,
   CAP_RUSH_MULTIPLAYER_REPORT_VERSION,

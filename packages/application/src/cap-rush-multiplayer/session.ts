@@ -235,6 +235,7 @@ export class CapRushMultiplayerSession {
   }
 
   async verifyLog(): Promise<boolean> {
+    await Promise.resolve();
     if (this.snapshot?.rootSeed === null || this.snapshot?.rootSeed === undefined) {
       return false;
     }
@@ -242,6 +243,7 @@ export class CapRushMultiplayerSession {
       rootSeed: this.snapshot.rootSeed,
       commands: this.commands,
       environment: this.deps.environment,
+      variant: this.snapshot.settings.variant,
     });
     return replayed.stateDigest === capRushMultiplayerStateDigest(this.state);
   }

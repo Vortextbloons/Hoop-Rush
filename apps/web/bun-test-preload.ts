@@ -51,6 +51,9 @@ await mock.module('./src/workers/draft-duel-game-worker.ts?worker&url', () => ({
 await mock.module('./src/workers/havoc-multiplayer-worker.ts?worker&url', () => ({
   default: '/havoc-multiplayer-worker.js',
 }));
+await mock.module('./src/workers/cap-rush-multiplayer-worker.ts?worker&url', () => ({
+  default: '/cap-rush-multiplayer-worker.js',
+}));
 
 plugin({
   name: 'hoop-rush-svelte-test-loader',

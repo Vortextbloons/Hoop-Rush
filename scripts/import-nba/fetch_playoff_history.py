@@ -12,6 +12,7 @@ from fetch_postseason import config, util
 VERSION = 533
 SOURCE = f'https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/{VERSION}'
 CACHE = config.RAW_CACHE / 'playoff-model'
+SHOT_COLUMNS = ('fieldGoalsMade', 'threePointersMade', 'threePointersAttempted', 'freeThrowsMade')
 COLUMNS = ('points', 'assists', 'reboundsTotal', 'turnovers', 'fieldGoalsAttempted', 'freeThrowsAttempted', 'reboundsOffensive')
 
 
@@ -53,7 +54,7 @@ def normalized_row(row, game):
         if not math.isfinite(value) or value < 0:
             raise ValueError(f'Invalid {column} in {row["gameId"]}')
         values[column] = value
-    return {'season_year': game_season(row['gameId']), 'gameId': row['gameId'], 'teamId': team, 'personId': row['personId'], 'minutes': f'{minutes:.12f}', 'minutePrecision': int(minutes.is_integer()), **values}
+    return {'season_year': game_season(row['gameId']), 'gameId': row['gameId'], 'teamId': team, 'personId': row['personId'], 'minutes': f'{minutes:.12f}', 'minutePrecision': int(minutes.is_integer()), **{c: row.get(c, '') for c in SHOT_COLUMNS}, **values}
 
 
 def normalize_game_minutes(rows):
@@ -104,7 +105,7 @@ def main():
     counts = defaultdict(lambda: {'regularGames': 0, 'playoffGames': 0, 'rejectedGames': 0})
     names = ['historical-regular.csv', 'historical-playoffs.csv']
     files = [(CACHE / name).open('w', encoding='utf-8', newline='') for name in names]
-    writers = [csv.DictWriter(file, fieldnames=('season_year', 'gameId', 'teamId', 'personId', 'minutes', 'minutePrecision', *COLUMNS)) for file in files]
+    writers = [csv.DictWriter(file, fieldnames=('season_year', 'gameId', 'teamId', 'personId', 'minutes', 'minutePrecision', *SHOT_COLUMNS, *COLUMNS)) for file in files]
     try:
         for writer in writers:
             writer.writeheader()

@@ -27,7 +27,12 @@ export function capRushPlayoffDirection(applied: CapRushPlayoffApplied): CapRush
   const c = CAP_RUSH_PLAYOFF_CAPS;
   const share = (value: number, cap: number): number => (cap > 0 ? value / cap : 0);
   const score =
-    share(applied.fieldGoalPct, c.fieldGoalPct) +
+    (applied.twoPointPct === undefined
+      ? share(applied.fieldGoalPct, c.fieldGoalPct)
+      : (share(applied.twoPointPct, c.twoPointPct) +
+          share(applied.threePointPct, c.threePointPct) +
+          share(applied.freeThrowPct ?? 0, c.freeThrowPct)) /
+        3) +
     share(applied.fieldGoalAttemptsPerGame, c.fieldGoalAttemptsPerGame) +
     share(applied.assistsPerGame, c.assistsPerGame) +
     share(

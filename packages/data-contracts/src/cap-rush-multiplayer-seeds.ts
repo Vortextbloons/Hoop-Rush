@@ -44,7 +44,6 @@ export function capRushMultiplayerMarketBucketSeed(
   position: Position,
   bucket: CapRushBucket,
 ): Seed {
-  attempt;
   positionSchema.parse(position);
   return multiplayerSeed(
     capRushMultiplayerMarketSeed(rootSeed, attempt),

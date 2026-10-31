@@ -88,6 +88,28 @@ export const modeCatalog: readonly ModeDefinition[] = [
       'Draft five historical seasons at exact positions, manage the apron, and build the lineup you would take into an 82-game run.',
     discovery: { homeOrder: 4, navigationOrder: 4, cta: 'Start Cap Rush' },
     solo: { href: '/cap-rush' },
+    multiplayer: {
+      gameKind: 'cap-rush',
+      label: 'Cap Rush',
+      routeId: '/cap-rush/room/[roomId]',
+      formats: [
+        {
+          id: 'cap-rush',
+          order: 5,
+          name: 'Cap Rush',
+          category: '2 seats · 82 games',
+          icon: Trophy,
+          image: '/images/multiplayer/shared-season.jpg',
+          format: '82 games',
+          description:
+            'Two general managers bid on the same 60-player market, lock five each, then play one shared 30-team season.',
+        },
+      ],
+      load: () =>
+        import('../features/cap-rush-multiplayer/mode-adapter').then(
+          (module) => module.capRushMultiplayerModeAdapter,
+        ),
+    },
   },
   {
     id: 'draft-duel',

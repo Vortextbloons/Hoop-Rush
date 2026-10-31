@@ -93,3 +93,29 @@ report includes accepted player-season counts by season, including zeros. Covera
 is partial in older seasons, 2000-01, and the newest seasons. Existing calibration
 windows remain 2010-11 through 2018-19 for training and 2019-20 through 2023-24
 for validation; the expanded coverage uses those same validated parameters.
+
+
+### Separate shooting model (opponent-pace-v2)
+
+New formula-v4 locks use separate two-point, three-point and free-throw residuals.
+Two- and three-point expectations use each opponent's regular-season accuracy
+allowed, weighted by attempts of that type and adjusted for the player's own
+regular-season schedule. Free throws use the player's regular-season accuracy;
+opponent free-throw percentage is not treated as a defensive skill.
+Shot-volume expectations use field-goal attempts per possession, independently
+of scoring efficiency. Training now includes covered 1977-78 through 2018-19
+seasons; held-out seasons remain 2019-20 through 2023-24. Shooting shrinkage uses
+attempts and attempt-weighted prediction error. Volume uses possession exposure.
+Each shooting type passes validation separately; current attempt priors are
+400 for two-pointers, 400 for threes, and 100 for free throws. The volume prior
+is 1,000 possessions. Missing or inconsistent shooting records contribute no
+shooting effect and are listed in the validation report.
+
+The gameplay mapping applies a 1.25 multiplier to supported sample-weighted
+residuals before caps. Shooting caps are four percentage points for two-pointers
+and threes and five for free throws. Other channel caps are unchanged. This
+multiplier is a gameplay balance choice, not statistical confidence. Overall
+FG% is recombined from the separate accuracy changes and the existing shot mix,
+so three-point changes do not leak into two-point accuracy. Stored v1-v3
+formula effects retain their original values. The existing regeneration commands
+rebuild the new evidence, player catalogs and checksums.

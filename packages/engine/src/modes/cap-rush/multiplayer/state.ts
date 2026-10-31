@@ -5,7 +5,6 @@ import type {
   CapRushMultiplayerCommand,
   CapRushMultiplayerCommandRejectionCode,
   CapRushMultiplayerLockedInputs,
-  CapRushMultiplayerRecruitment,
   CapRushMultiplayerSeasonState,
   CapRushMultiplayerSeatId,
   CapRushMultiplayerSeatLock,
@@ -128,7 +127,7 @@ function seasonFor(locked: CapRushMultiplayerLockedInputs): CapRushMultiplayerSe
     h2hSlots: capRushMultiplayerH2HSlots(locked),
     block: {
       index: 0,
-      endpoint: CAP_RUSH_MULTIPLAYER_BLOCK_ENDPOINTS[0] ?? 20,
+      endpoint: CAP_RUSH_MULTIPLAYER_BLOCK_ENDPOINTS[0],
       plans: { p1: null, p2: null },
       status: 'choosing',
       startedAtIso: null,
@@ -259,6 +258,7 @@ export function applyCapRushMultiplayerCommand(
   state: CapRushMultiplayerState,
   command: CapRushMultiplayerCommand,
   environment: CapRushMultiplayerEnvironment,
+  variant: CapRushMultiplayerVariant = environment.variant,
 ): CapRushMultiplayerCommandOutcome {
   const actor = command.actorParticipantId;
   const payload = command.payload;
@@ -345,7 +345,7 @@ export function applyCapRushMultiplayerCommand(
       const locked = buildCapRushMultiplayerLockedInputs({
         roomId: command.roomId,
         rootSeed: state.rootSeed,
-        variant: environment.variant,
+        variant,
         versionLocks: environment.versionLocks,
         catalog: environment.catalogSource,
         profile: environment.profile,

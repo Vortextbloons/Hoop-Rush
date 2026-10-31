@@ -191,3 +191,22 @@ describe('cap rush playoff presentation', () => {
     });
   });
 });
+
+it('includes separate three-point and free-throw effects in the playoff mark', () => {
+  expect(
+    capRushPlayoffDirection({
+      ...neutralApplied,
+      twoPointPct: 0,
+      threePointPct: 0.02,
+      freeThrowPct: 0,
+    }),
+  ).toBe('up');
+  expect(
+    capRushPlayoffDirection({
+      ...neutralApplied,
+      twoPointPct: 0,
+      threePointPct: 0,
+      freeThrowPct: -0.03,
+    }),
+  ).toBe('down');
+});

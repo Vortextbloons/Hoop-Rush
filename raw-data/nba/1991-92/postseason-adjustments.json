@@ -1,6 +1,19 @@
 {
   "1034": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": null,
+      "threePoint": null,
+      "freeThrow": null
+    },
+    "shotVolume": {
+      "expected": 23.23477625283352,
+      "actual": 0.0,
+      "difference": -23.23477625283352,
+      "possessions": 3.7758333333333334,
+      "differencePer36": -17.722799305587902,
+      "weight": 0.00376163004522092
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -29,15 +42,46 @@
       "turnoversPer36": -3.6095056203274063
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.0055248618784530384,
-      "assistsPer36": 0.01098901098901099,
+      "tsPct": 0.0013869625520110957,
+      "pointsPer36": 0.002770083102493075,
+      "assistsPer36": 0.0055248618784530384,
       "reboundsPer36": 0.002770083102493075,
       "turnoversPer36": 0.002770083102493075
     }
   },
   "104": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.4812608443214957,
+        "actual": 0.575,
+        "difference": 0.09373915567850427,
+        "attempts": 40.0,
+        "weight": 0.09090909090909091
+      },
+      "threePoint": {
+        "expected": 0.02895078416465452,
+        "actual": 0.0,
+        "difference": -0.02895078416465452,
+        "attempts": 1.0,
+        "weight": 0.0024937655860349127
+      },
+      "freeThrow": {
+        "expected": 0.6867469879518072,
+        "actual": 0.5,
+        "difference": -0.18674698795180722,
+        "attempts": 18.0,
+        "weight": 0.15254237288135594
+      }
+    },
+    "shotVolume": {
+      "expected": 18.61966221978299,
+      "actual": 12.816354919253056,
+      "difference": -5.803307300529935,
+      "possessions": 319.90375,
+      "differencePer36": -4.2850160337611864,
+      "weight": 0.24236899849704951
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -66,15 +110,46 @@
       "turnoversPer36": -1.4131962590430815
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.30902111324376197,
-      "assistsPer36": 0.47214076246334313,
+      "tsPct": 0.10056214865708932,
+      "pointsPer36": 0.18274687854710556,
+      "assistsPer36": 0.30902111324376197,
       "reboundsPer36": 0.18274687854710556,
       "turnoversPer36": 0.18274687854710556
     }
   },
   "105": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.4871540147917269,
+        "actual": 0.5,
+        "difference": 0.012845985208273125,
+        "attempts": 78.0,
+        "weight": 0.16317991631799164
+      },
+      "threePoint": {
+        "expected": 0.364401875679994,
+        "actual": 0.2727272727272727,
+        "difference": -0.09167460295272128,
+        "attempts": 33.0,
+        "weight": 0.07621247113163972
+      },
+      "freeThrow": {
+        "expected": 0.7557755775577558,
+        "actual": 0.9615384615384616,
+        "difference": 0.20576288398070575,
+        "attempts": 26.0,
+        "weight": 0.20634920634920634
+      }
+    },
+    "shotVolume": {
+      "expected": 18.64028960881406,
+      "actual": 19.21160789341049,
+      "difference": 0.5713182845964297,
+      "possessions": 577.7756896551724,
+      "differencePer36": 0.4364315298566929,
+      "weight": 0.3661963442860798
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -103,15 +178,46 @@
       "turnoversPer36": -0.11918507930766209
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.4249201277955272,
-      "assistsPer36": 0.5964125560538116,
+      "tsPct": 0.1559202813599062,
+      "pointsPer36": 0.2697768762677485,
+      "assistsPer36": 0.4249201277955272,
       "reboundsPer36": 0.2697768762677485,
       "turnoversPer36": 0.2697768762677485
     }
   },
   "121": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.5058099165269592,
+        "actual": 0.4579831932773109,
+        "difference": -0.04782672324964826,
+        "attempts": 238.0,
+        "weight": 0.3730407523510972
+      },
+      "threePoint": {
+        "expected": 0.17508673920941786,
+        "actual": 0.0,
+        "difference": -0.17508673920941786,
+        "attempts": 1.0,
+        "weight": 0.0024937655860349127
+      },
+      "freeThrow": {
+        "expected": 0.7377690802348337,
+        "actual": 0.7397260273972602,
+        "difference": 0.001956947162426559,
+        "attempts": 73.0,
+        "weight": 0.42196531791907516
+      }
+    },
+    "shotVolume": {
+      "expected": 24.66557419034322,
+      "actual": 27.359604576281026,
+      "difference": 2.694030385937804,
+      "possessions": 873.5506367924529,
+      "differencePer36": 1.916078191677303,
+      "weight": 0.4662540844308243
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -140,15 +246,46 @@
       "turnoversPer36": -0.4778041082451569
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.5724465558194775,
-      "assistsPer36": 0.7280966767371602,
+      "tsPct": 0.25078043704474506,
+      "pointsPer36": 0.40099833610648916,
+      "assistsPer36": 0.5724465558194775,
       "reboundsPer36": 0.40099833610648916,
       "turnoversPer36": 0.40099833610648916
     }
   },
   "124": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.5043935016055417,
+        "actual": 0.36585365853658536,
+        "difference": -0.1385398430689564,
+        "attempts": 41.0,
+        "weight": 0.09297052154195011
+      },
+      "threePoint": {
+        "expected": 0.23751542893047067,
+        "actual": 0.0,
+        "difference": -0.23751542893047067,
+        "attempts": 2.0,
+        "weight": 0.004975124378109453
+      },
+      "freeThrow": {
+        "expected": 0.7678571428571429,
+        "actual": 0.9,
+        "difference": 0.13214285714285712,
+        "attempts": 10.0,
+        "weight": 0.09090909090909091
+      }
+    },
+    "shotVolume": {
+      "expected": 15.797886347762317,
+      "actual": 15.458495045868313,
+      "difference": -0.339391301894004,
+      "possessions": 278.1642059748428,
+      "differencePer36": -0.24242644936324964,
+      "weight": 0.2176279109323749
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -177,15 +314,46 @@
       "turnoversPer36": 1.2301495544099754
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.28429423459244535,
-      "assistsPer36": 0.44272445820433437,
+      "tsPct": 0.0903348073278585,
+      "pointsPer36": 0.1657010428736964,
+      "assistsPer36": 0.28429423459244535,
       "reboundsPer36": 0.1657010428736964,
       "turnoversPer36": 0.1657010428736964
     }
   },
   "134": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.4751979706632721,
+        "actual": 0.48360655737704916,
+        "difference": 0.008408586713777089,
+        "attempts": 122.0,
+        "weight": 0.23371647509578544
+      },
+      "threePoint": {
+        "expected": 0.20126560048779715,
+        "actual": 0.5,
+        "difference": 0.2987343995122028,
+        "attempts": 6.0,
+        "weight": 0.014778325123152709
+      },
+      "freeThrow": {
+        "expected": 0.8072072072072072,
+        "actual": 0.8611111111111112,
+        "difference": 0.05390390390390398,
+        "attempts": 72.0,
+        "weight": 0.4186046511627907
+      }
+    },
+    "shotVolume": {
+      "expected": 17.976691562420804,
+      "actual": 17.960605212397944,
+      "difference": -0.016086350022860074,
+      "possessions": 712.6708620689656,
+      "differencePer36": -0.01229284722143896,
+      "weight": 0.4161166502290081
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -214,15 +382,46 @@
       "turnoversPer36": -0.7406865797313459
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.48201438848920863,
-      "assistsPer36": 0.6504854368932039,
+      "tsPct": 0.18873239436619718,
+      "pointsPer36": 0.3175355450236967,
+      "assistsPer36": 0.48201438848920863,
       "reboundsPer36": 0.3175355450236967,
       "turnoversPer36": 0.3175355450236967
     }
   },
   "1365": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.4668002679107816,
+        "actual": 0.48677248677248675,
+        "difference": 0.019972218861705138,
+        "attempts": 189.0,
+        "weight": 0.32088285229202035
+      },
+      "threePoint": {
+        "expected": 0.30811832581024756,
+        "actual": 0.25,
+        "difference": -0.05811832581024756,
+        "attempts": 8.0,
+        "weight": 0.0196078431372549
+      },
+      "freeThrow": {
+        "expected": 0.7135416666666666,
+        "actual": 0.7346938775510204,
+        "difference": 0.021152210884353817,
+        "attempts": 49.0,
+        "weight": 0.3288590604026846
+      }
+    },
+    "shotVolume": {
+      "expected": 22.09768680792852,
+      "actual": 23.774174939100877,
+      "difference": 1.6764881311723592,
+      "possessions": 828.6302279874213,
+      "differencePer36": 1.19721948217374,
+      "weight": 0.45314258470910573
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -251,15 +450,40 @@
       "turnoversPer36": 0.09481465775338946
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.5599022004889975,
-      "assistsPer36": 0.7178683385579937,
+      "tsPct": 0.24130663856691253,
+      "pointsPer36": 0.38879456706281834,
+      "assistsPer36": 0.5599022004889975,
       "reboundsPer36": 0.38879456706281834,
       "turnoversPer36": 0.38879456706281834
     }
   },
   "140": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.43518523034186435,
+        "actual": 0.5555555555555556,
+        "difference": 0.12037032521369123,
+        "attempts": 9.0,
+        "weight": 0.022004889975550123
+      },
+      "threePoint": null,
+      "freeThrow": {
+        "expected": 0.6917293233082706,
+        "actual": 0.5555555555555556,
+        "difference": -0.13617376775271506,
+        "attempts": 9.0,
+        "weight": 0.08256880733944955
+      }
+    },
+    "shotVolume": {
+      "expected": 12.260104680787464,
+      "actual": 7.917569306222989,
+      "difference": -4.342535374564475,
+      "possessions": 113.67125000000001,
+      "differencePer36": -3.1924291044659387,
+      "weight": 0.10206894539120051
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -288,15 +512,46 @@
       "turnoversPer36": 1.9765432896888706
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.1366906474820144,
-      "assistsPer36": 0.24050632911392406,
+      "tsPct": 0.03807615230460922,
+      "pointsPer36": 0.07335907335907337,
+      "assistsPer36": 0.1366906474820144,
       "reboundsPer36": 0.07335907335907337,
       "turnoversPer36": 0.07335907335907337
     }
   },
   "1449": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.47062712054314076,
+        "actual": 0.5675675675675675,
+        "difference": 0.09694044702442678,
+        "attempts": 37.0,
+        "weight": 0.08466819221967964
+      },
+      "threePoint": {
+        "expected": 0.39846758970070817,
+        "actual": 0.0,
+        "difference": -0.39846758970070817,
+        "attempts": 5.0,
+        "weight": 0.012345679012345678
+      },
+      "freeThrow": {
+        "expected": 0.9259259259259259,
+        "actual": 0.75,
+        "difference": -0.17592592592592593,
+        "attempts": 4.0,
+        "weight": 0.038461538461538464
+      }
+    },
+    "shotVolume": {
+      "expected": 23.407684483980862,
+      "actual": 19.97064960459056,
+      "difference": -3.4370348793903034,
+      "possessions": 210.30863207547168,
+      "differencePer36": -2.5665517244150875,
+      "weight": 0.17376446511401678
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -325,15 +580,46 @@
       "turnoversPer36": -0.3507892540987373
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.2291220556745182,
-      "assistsPer36": 0.37282229965156793,
+      "tsPct": 0.0691661279896574,
+      "pointsPer36": 0.1293833131801693,
+      "assistsPer36": 0.2291220556745182,
       "reboundsPer36": 0.1293833131801693,
       "turnoversPer36": 0.1293833131801693
     }
   },
   "1450": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.5133162830779829,
+        "actual": 0.52,
+        "difference": 0.00668371692201708,
+        "attempts": 125.0,
+        "weight": 0.23809523809523808
+      },
+      "threePoint": {
+        "expected": 0,
+        "actual": 0.0,
+        "difference": 0.0,
+        "attempts": 1.0,
+        "weight": 0.0024937655860349127
+      },
+      "freeThrow": {
+        "expected": 0.8220858895705522,
+        "actual": 0.7954545454545454,
+        "difference": -0.02663134411600676,
+        "attempts": 44.0,
+        "weight": 0.3055555555555556
+      }
+    },
+    "shotVolume": {
+      "expected": 23.0557331191447,
+      "actual": 21.15880163017509,
+      "difference": -1.89693148896961,
+      "possessions": 595.4968632075471,
+      "differencePer36": -1.392766219993636,
+      "weight": 0.373235997475028
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -362,15 +648,46 @@
       "turnoversPer36": -0.848442775271813
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.4594594594594595,
-      "assistsPer36": 0.6296296296296297,
+      "tsPct": 0.17525773195876287,
+      "pointsPer36": 0.2982456140350877,
+      "assistsPer36": 0.4594594594594595,
       "reboundsPer36": 0.2982456140350877,
       "turnoversPer36": 0.2982456140350877
     }
   },
   "1472": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.4201899252120668,
+        "actual": 0.44871794871794873,
+        "difference": 0.02852802350588196,
+        "attempts": 78.0,
+        "weight": 0.16317991631799164
+      },
+      "threePoint": {
+        "expected": 0.3514723326300505,
+        "actual": 0.5714285714285714,
+        "difference": 0.2199562387985209,
+        "attempts": 7.0,
+        "weight": 0.0171990171990172
+      },
+      "freeThrow": {
+        "expected": 0.8295819935691319,
+        "actual": 0.84375,
+        "difference": 0.01416800643086813,
+        "attempts": 32.0,
+        "weight": 0.24242424242424243
+      }
+    },
+    "shotVolume": {
+      "expected": 23.37008601647913,
+      "actual": 20.188459060579405,
+      "difference": -3.181626955899727,
+      "possessions": 421.0326293103448,
+      "differencePer36": -2.4351438557078153,
+      "weight": 0.29628639105541177
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -399,15 +716,46 @@
       "turnoversPer36": 0.7818674446442491
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.35018050541516244,
-      "assistsPer36": 0.5187165775401069,
+      "tsPct": 0.11872705018359853,
+      "pointsPer36": 0.212253829321663,
+      "assistsPer36": 0.35018050541516244,
       "reboundsPer36": 0.212253829321663,
       "turnoversPer36": 0.212253829321663
     }
   },
   "156": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.4780419364397223,
+        "actual": 0.5476190476190477,
+        "difference": 0.06957711117932536,
+        "attempts": 42.0,
+        "weight": 0.09502262443438914
+      },
+      "threePoint": {
+        "expected": 0.1653665524665069,
+        "actual": 0.5,
+        "difference": 0.3346334475334931,
+        "attempts": 2.0,
+        "weight": 0.004975124378109453
+      },
+      "freeThrow": {
+        "expected": 0.7641509433962265,
+        "actual": 0.625,
+        "difference": -0.13915094339622647,
+        "attempts": 16.0,
+        "weight": 0.13793103448275862
+      }
+    },
+    "shotVolume": {
+      "expected": 19.325001180598026,
+      "actual": 20.18908145414918,
+      "difference": 0.8640802735511528,
+      "possessions": 217.93958333333336,
+      "differencePer36": 0.6396557884837525,
+      "weight": 0.17894121048013126
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -436,15 +784,46 @@
       "turnoversPer36": -0.7597035127998012
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.232409381663113,
-      "assistsPer36": 0.3771626297577855,
+      "tsPct": 0.07036797934151065,
+      "pointsPer36": 0.13148371531966224,
+      "assistsPer36": 0.232409381663113,
       "reboundsPer36": 0.13148371531966224,
       "turnoversPer36": 0.13148371531966224
     }
   },
   "170": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.48427098922378037,
+        "actual": 0.42857142857142855,
+        "difference": -0.05569956065235182,
+        "attempts": 21.0,
+        "weight": 0.0498812351543943
+      },
+      "threePoint": {
+        "expected": 0.4946091410864029,
+        "actual": 0.0,
+        "difference": -0.4946091410864029,
+        "attempts": 1.0,
+        "weight": 0.0024937655860349127
+      },
+      "freeThrow": {
+        "expected": 0.7083333333333334,
+        "actual": 1.0,
+        "difference": 0.29166666666666663,
+        "attempts": 2.0,
+        "weight": 0.0196078431372549
+      }
+    },
+    "shotVolume": {
+      "expected": 15.035990825055285,
+      "actual": 13.739827450863325,
+      "difference": -1.2961633741919592,
+      "possessions": 160.11845911949686,
+      "differencePer36": -0.9592757471492809,
+      "weight": 0.1380190599165391
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -473,15 +852,46 @@
       "turnoversPer36": 0.4816819726845514
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.18552036199095023,
-      "assistsPer36": 0.31297709923664124,
+      "tsPct": 0.05387647831800263,
+      "pointsPer36": 0.10224438902743142,
+      "assistsPer36": 0.18552036199095023,
       "reboundsPer36": 0.10224438902743142,
       "turnoversPer36": 0.10224438902743142
     }
   },
   "184": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.4538635043019192,
+        "actual": 0.5,
+        "difference": 0.046136495698080815,
+        "attempts": 8.0,
+        "weight": 0.0196078431372549
+      },
+      "threePoint": {
+        "expected": 0.002992657958131778,
+        "actual": 0.0,
+        "difference": -0.002992657958131778,
+        "attempts": 1.0,
+        "weight": 0.0024937655860349127
+      },
+      "freeThrow": {
+        "expected": 0.6363636363636364,
+        "actual": 0.75,
+        "difference": 0.11363636363636365,
+        "attempts": 4.0,
+        "weight": 0.038461538461538464
+      }
+    },
+    "shotVolume": {
+      "expected": 21.426053362309446,
+      "actual": 37.5384508437462,
+      "difference": 16.11239748143675,
+      "possessions": 23.975416666666668,
+      "differencePer36": 11.815877963188736,
+      "weight": 0.02341405494353909
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -510,15 +920,46 @@
       "turnoversPer36": 1.891065719286052
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.03225806451612903,
-      "assistsPer36": 0.0625,
+      "tsPct": 0.008264462809917356,
+      "pointsPer36": 0.01639344262295082,
+      "assistsPer36": 0.03225806451612903,
       "reboundsPer36": 0.01639344262295082,
       "turnoversPer36": 0.01639344262295082
     }
   },
   "187": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.4746944267154995,
+        "actual": 0.5230769230769231,
+        "difference": 0.04838249636142361,
+        "attempts": 65.0,
+        "weight": 0.13978494623655913
+      },
+      "threePoint": {
+        "expected": 0.3679433126992302,
+        "actual": 0.0,
+        "difference": -0.3679433126992302,
+        "attempts": 1.0,
+        "weight": 0.0024937655860349127
+      },
+      "freeThrow": {
+        "expected": 0.7108433734939759,
+        "actual": 0.5,
+        "difference": -0.21084337349397586,
+        "attempts": 20.0,
+        "weight": 0.16666666666666666
+      }
+    },
+    "shotVolume": {
+      "expected": 24.272503741764133,
+      "actual": 27.021586562901952,
+      "difference": 2.7490828211378187,
+      "possessions": 244.2491666666667,
+      "differencePer36": 2.0265957372222996,
+      "weight": 0.19630245549692285
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -547,15 +988,40 @@
       "turnoversPer36": 0.2665500751343447
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.25311203319502074,
-      "assistsPer36": 0.40397350993377484,
+      "tsPct": 0.07810499359795134,
+      "pointsPer36": 0.14489311163895488,
+      "assistsPer36": 0.25311203319502074,
       "reboundsPer36": 0.14489311163895488,
       "turnoversPer36": 0.14489311163895488
     }
   },
   "193": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.48991648727753917,
+        "actual": 0.4418604651162791,
+        "difference": -0.04805602216126009,
+        "attempts": 43.0,
+        "weight": 0.09706546275395034
+      },
+      "threePoint": null,
+      "freeThrow": {
+        "expected": 0.6423076923076924,
+        "actual": 0.7857142857142857,
+        "difference": 0.14340659340659334,
+        "attempts": 28.0,
+        "weight": 0.21875
+      }
+    },
+    "shotVolume": {
+      "expected": 9.224981810280356,
+      "actual": 8.24510550873926,
+      "difference": -0.979876301541097,
+      "possessions": 521.5215251572328,
+      "differencePer36": -0.6992931743222112,
+      "weight": 0.3427631594652197
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -584,15 +1050,34 @@
       "turnoversPer36": -0.12485858248435514
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.4444444444444444,
-      "assistsPer36": 0.6153846153846154,
+      "tsPct": 0.16666666666666666,
+      "pointsPer36": 0.2857142857142857,
+      "assistsPer36": 0.4444444444444444,
       "reboundsPer36": 0.2857142857142857,
       "turnoversPer36": 0.2857142857142857
     }
   },
   "1972": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": null,
+      "threePoint": null,
+      "freeThrow": {
+        "expected": 0.8421052631578947,
+        "actual": 1.0,
+        "difference": 0.1578947368421053,
+        "attempts": 2.0,
+        "weight": 0.0196078431372549
+      }
+    },
+    "shotVolume": {
+      "expected": 16.16838581260579,
+      "actual": 0.0,
+      "difference": -16.16838581260579,
+      "possessions": 3.891666666666667,
+      "differencePer36": -12.356293630075223,
+      "weight": 0.003876580308300199
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -621,15 +1106,46 @@
       "turnoversPer36": 15.835561706838124
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.0055248618784530384,
-      "assistsPer36": 0.01098901098901099,
+      "tsPct": 0.0013869625520110957,
+      "pointsPer36": 0.002770083102493075,
+      "assistsPer36": 0.0055248618784530384,
       "reboundsPer36": 0.002770083102493075,
       "turnoversPer36": 0.002770083102493075
     }
   },
   "198": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.4052426808273517,
+        "actual": 0.5,
+        "difference": 0.09475731917264829,
+        "attempts": 12.0,
+        "weight": 0.02912621359223301
+      },
+      "threePoint": {
+        "expected": 0.3501189772157934,
+        "actual": 0.3333333333333333,
+        "difference": -0.016785643882460066,
+        "attempts": 3.0,
+        "weight": 0.007444168734491315
+      },
+      "freeThrow": {
+        "expected": 0.8356164383561644,
+        "actual": 1.0,
+        "difference": 0.1643835616438356,
+        "attempts": 4.0,
+        "weight": 0.038461538461538464
+      }
+    },
+    "shotVolume": {
+      "expected": 17.28106320003725,
+      "actual": 13.772154997953304,
+      "difference": -3.508908202083944,
+      "possessions": 108.91541666666667,
+      "differencePer36": -2.576401327321427,
+      "weight": 0.09821796597801831
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -658,15 +1174,46 @@
       "turnoversPer36": -0.3890106429148252
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.13253012048192772,
-      "assistsPer36": 0.23404255319148937,
+      "tsPct": 0.03678929765886288,
+      "pointsPer36": 0.07096774193548387,
+      "assistsPer36": 0.13253012048192772,
       "reboundsPer36": 0.07096774193548387,
       "turnoversPer36": 0.07096774193548387
     }
   },
   "2": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.4691525927451289,
+        "actual": 0.46875,
+        "difference": -0.00040259274512888243,
+        "attempts": 32.0,
+        "weight": 0.07407407407407407
+      },
+      "threePoint": {
+        "expected": 0.31507954990953124,
+        "actual": 0.5833333333333334,
+        "difference": 0.26825378342380213,
+        "attempts": 12.0,
+        "weight": 0.02912621359223301
+      },
+      "freeThrow": {
+        "expected": 0.8384879725085911,
+        "actual": 0.8888888888888888,
+        "difference": 0.050400916380297756,
+        "attempts": 27.0,
+        "weight": 0.2125984251968504
+      }
+    },
+    "shotVolume": {
+      "expected": 18.434880050313694,
+      "actual": 15.256063656994144,
+      "difference": -3.1788163933195506,
+      "possessions": 288.4099135220126,
+      "differencePer36": -2.2649700242260904,
+      "weight": 0.2238494989017989
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -695,15 +1242,46 @@
       "turnoversPer36": -0.4103774114520456
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.29133858267716534,
-      "assistsPer36": 0.45121951219512196,
+      "tsPct": 0.09319899244332494,
+      "pointsPer36": 0.17050691244239632,
+      "assistsPer36": 0.29133858267716534,
       "reboundsPer36": 0.17050691244239632,
       "turnoversPer36": 0.17050691244239632
     }
   },
   "203": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.4903653813997905,
+        "actual": 0.5087719298245614,
+        "difference": 0.018406548424770908,
+        "attempts": 57.0,
+        "weight": 0.12472647702407003
+      },
+      "threePoint": {
+        "expected": 0.2812339667062243,
+        "actual": 0.23076923076923078,
+        "difference": -0.05046473593699352,
+        "attempts": 26.0,
+        "weight": 0.06103286384976526
+      },
+      "freeThrow": {
+        "expected": 0.6428571428571429,
+        "actual": 0.7142857142857143,
+        "difference": 0.0714285714285714,
+        "attempts": 14.0,
+        "weight": 0.12280701754385964
+      }
+    },
+    "shotVolume": {
+      "expected": 11.997444050022692,
+      "actual": 16.887338057040544,
+      "difference": 4.889894007017853,
+      "possessions": 491.4925,
+      "differencePer36": 3.592256597186039,
+      "weight": 0.32953065469655396
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -732,15 +1310,46 @@
       "turnoversPer36": 0.8077966896141461
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.40594059405940597,
-      "assistsPer36": 0.5774647887323944,
+      "tsPct": 0.14590747330960854,
+      "pointsPer36": 0.2546583850931677,
+      "assistsPer36": 0.40594059405940597,
       "reboundsPer36": 0.2546583850931677,
       "turnoversPer36": 0.2546583850931677
     }
   },
   "204": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.50943135686348,
+        "actual": 0.4864864864864865,
+        "difference": -0.022944870376993443,
+        "attempts": 111.0,
+        "weight": 0.2172211350293542
+      },
+      "threePoint": {
+        "expected": 0.42692597638633895,
+        "actual": 0.47058823529411764,
+        "difference": 0.043662258907778695,
+        "attempts": 17.0,
+        "weight": 0.0407673860911271
+      },
+      "freeThrow": {
+        "expected": 0.8857142857142857,
+        "actual": 0.9117647058823529,
+        "difference": 0.026050420168067245,
+        "attempts": 34.0,
+        "weight": 0.2537313432835821
+      }
+    },
+    "shotVolume": {
+      "expected": 18.679117766929394,
+      "actual": 17.50641369301499,
+      "difference": -1.172704073914403,
+      "possessions": 731.1606034482759,
+      "differencePer36": -0.8949329756372085,
+      "weight": 0.4223528435154351
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -769,15 +1378,46 @@
       "turnoversPer36": -0.03527679781253051
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.4879089615931721,
-      "assistsPer36": 0.655831739961759,
+      "tsPct": 0.19237240605720696,
+      "pointsPer36": 0.32267168391345247,
+      "assistsPer36": 0.4879089615931721,
       "reboundsPer36": 0.32267168391345247,
       "turnoversPer36": 0.32267168391345247
     }
   },
   "21": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.383554345003796,
+        "actual": 0.4117647058823529,
+        "difference": 0.02821036087855694,
+        "attempts": 34.0,
+        "weight": 0.07834101382488479
+      },
+      "threePoint": {
+        "expected": 0.14752819084573424,
+        "actual": 0.4166666666666667,
+        "difference": 0.2691384758209324,
+        "attempts": 12.0,
+        "weight": 0.02912621359223301
+      },
+      "freeThrow": {
+        "expected": 0.740506329113924,
+        "actual": 0.6060606060606061,
+        "difference": -0.13444572305331792,
+        "attempts": 33.0,
+        "weight": 0.24812030075187969
+      }
+    },
+    "shotVolume": {
+      "expected": 14.504630920530275,
+      "actual": 11.881741581624043,
+      "difference": -2.6228893389062318,
+      "possessions": 387.1486320754717,
+      "differencePer36": -1.886371652734789,
+      "weight": 0.2790967190705544
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -806,15 +1446,46 @@
       "turnoversPer36": 0.10253989301226762
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.3717277486910995,
-      "assistsPer36": 0.5419847328244275,
+      "tsPct": 0.12885662431941924,
+      "pointsPer36": 0.2282958199356913,
+      "assistsPer36": 0.3717277486910995,
       "reboundsPer36": 0.2282958199356913,
       "turnoversPer36": 0.2282958199356913
     }
   },
   "216": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.403859795752774,
+        "actual": 0.44,
+        "difference": 0.03614020424722603,
+        "attempts": 25.0,
+        "weight": 0.058823529411764705
+      },
+      "threePoint": {
+        "expected": 0.2136813812681273,
+        "actual": 0.6,
+        "difference": 0.3863186187318727,
+        "attempts": 5.0,
+        "weight": 0.012345679012345678
+      },
+      "freeThrow": {
+        "expected": 0.7912087912087912,
+        "actual": 0.625,
+        "difference": -0.16620879120879117,
+        "attempts": 8.0,
+        "weight": 0.07407407407407407
+      }
+    },
+    "shotVolume": {
+      "expected": 17.385763216687007,
+      "actual": 17.729885198993337,
+      "difference": 0.34412198230632995,
+      "possessions": 169.20583333333332,
+      "differencePer36": 0.25728523752028537,
+      "weight": 0.14471860172895132
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -843,15 +1514,46 @@
       "turnoversPer36": 0.5668844228267597
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.19101123595505617,
-      "assistsPer36": 0.32075471698113206,
+      "tsPct": 0.05573770491803279,
+      "pointsPer36": 0.10559006211180125,
+      "assistsPer36": 0.19101123595505617,
       "reboundsPer36": 0.10559006211180125,
       "turnoversPer36": 0.10559006211180125
     }
   },
   "23": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.5672335134851704,
+        "actual": 0.64,
+        "difference": 0.07276648651482964,
+        "attempts": 25.0,
+        "weight": 0.058823529411764705
+      },
+      "threePoint": {
+        "expected": 0.2780357735737908,
+        "actual": 0.0,
+        "difference": -0.2780357735737908,
+        "attempts": 2.0,
+        "weight": 0.004975124378109453
+      },
+      "freeThrow": {
+        "expected": 0.6,
+        "actual": 0.5,
+        "difference": -0.09999999999999998,
+        "attempts": 8.0,
+        "weight": 0.07407407407407407
+      }
+    },
+    "shotVolume": {
+      "expected": 9.614453325158415,
+      "actual": 9.442082197966295,
+      "difference": -0.17237112719212,
+      "possessions": 285.95387578616356,
+      "differencePer36": -0.12123436303817206,
+      "weight": 0.2223671324224958
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -880,15 +1582,46 @@
       "turnoversPer36": 0.17876175005792774
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.3023255813953488,
-      "assistsPer36": 0.4642857142857143,
+      "tsPct": 0.09774436090225563,
+      "pointsPer36": 0.1780821917808219,
+      "assistsPer36": 0.3023255813953488,
       "reboundsPer36": 0.1780821917808219,
       "turnoversPer36": 0.1780821917808219
     }
   },
   "244": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.4365683892907665,
+        "actual": 0.5365853658536586,
+        "difference": 0.10001697656289205,
+        "attempts": 41.0,
+        "weight": 0.09297052154195011
+      },
+      "threePoint": {
+        "expected": 0.22504293230148675,
+        "actual": 0.0,
+        "difference": -0.22504293230148675,
+        "attempts": 3.0,
+        "weight": 0.007444168734491315
+      },
+      "freeThrow": {
+        "expected": 0.7692307692307693,
+        "actual": 0.6666666666666666,
+        "difference": -0.10256410256410264,
+        "attempts": 6.0,
+        "weight": 0.05660377358490566
+      }
+    },
+    "shotVolume": {
+      "expected": 20.529423845361407,
+      "actual": 18.796731757224062,
+      "difference": -1.7326920881373447,
+      "possessions": 234.08324685534592,
+      "differencePer36": -1.2678197060223286,
+      "weight": 0.1896818933826627
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -917,15 +1650,46 @@
       "turnoversPer36": -0.07977593637153692
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.25,
-      "assistsPer36": 0.4,
+      "tsPct": 0.07692307692307693,
+      "pointsPer36": 0.14285714285714285,
+      "assistsPer36": 0.25,
       "reboundsPer36": 0.14285714285714285,
       "turnoversPer36": 0.14285714285714285
     }
   },
   "247": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.437684041187006,
+        "actual": 0.46551724137931033,
+        "difference": 0.02783320019230434,
+        "attempts": 58.0,
+        "weight": 0.12663755458515283
+      },
+      "threePoint": {
+        "expected": 0.3700633216370822,
+        "actual": 0.5,
+        "difference": 0.12993667836291778,
+        "attempts": 10.0,
+        "weight": 0.024390243902439025
+      },
+      "freeThrow": {
+        "expected": 0.8673684210526316,
+        "actual": 0.7894736842105263,
+        "difference": -0.07789473684210524,
+        "attempts": 19.0,
+        "weight": 0.15966386554621848
+      }
+    },
+    "shotVolume": {
+      "expected": 20.511445562258444,
+      "actual": 16.77400912897366,
+      "difference": -3.7374364332847847,
+      "possessions": 405.38907232704406,
+      "differencePer36": -2.632886126415432,
+      "weight": 0.28845326914048125
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -954,15 +1718,46 @@
       "turnoversPer36": -0.9782689727229431
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.3803786574870912,
-      "assistsPer36": 0.5511221945137157,
+      "tsPct": 0.13305237808549067,
+      "pointsPer36": 0.23485653560042508,
+      "assistsPer36": 0.3803786574870912,
       "reboundsPer36": 0.23485653560042508,
       "turnoversPer36": 0.23485653560042508
     }
   },
   "251": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.496302101545338,
+        "actual": 0.4375,
+        "difference": -0.05880210154533799,
+        "attempts": 32.0,
+        "weight": 0.07407407407407407
+      },
+      "threePoint": {
+        "expected": 0.2815520421518033,
+        "actual": 0.625,
+        "difference": 0.3434479578481967,
+        "attempts": 8.0,
+        "weight": 0.0196078431372549
+      },
+      "freeThrow": {
+        "expected": 0.8610271903323263,
+        "actual": 0.8888888888888888,
+        "difference": 0.02786169855656251,
+        "attempts": 18.0,
+        "weight": 0.15254237288135594
+      }
+    },
+    "shotVolume": {
+      "expected": 16.470622019958764,
+      "actual": 14.58933306991482,
+      "difference": -1.8812889500439436,
+      "possessions": 274.17291666666665,
+      "differencePer36": -1.3898037017126388,
+      "weight": 0.21517716557963254
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -991,15 +1786,40 @@
       "turnoversPer36": -0.06743018589128986
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.27565392354124746,
-      "assistsPer36": 0.43217665615141954,
+      "tsPct": 0.08687381103360811,
+      "pointsPer36": 0.15985997666277713,
+      "assistsPer36": 0.27565392354124746,
       "reboundsPer36": 0.15985997666277713,
       "turnoversPer36": 0.15985997666277713
     }
   },
   "262": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.5746119088218642,
+        "actual": 0.5588235294117647,
+        "difference": -0.015788379410099473,
+        "attempts": 34.0,
+        "weight": 0.07834101382488479
+      },
+      "threePoint": null,
+      "freeThrow": {
+        "expected": 0.6198830409356725,
+        "actual": 1.0,
+        "difference": 0.3801169590643275,
+        "attempts": 1.0,
+        "weight": 0.009900990099009901
+      }
+    },
+    "shotVolume": {
+      "expected": 10.80401692646381,
+      "actual": 8.629733662729702,
+      "difference": -2.1742832637341074,
+      "possessions": 393.9866666666667,
+      "differencePer36": -1.5935007707089945,
+      "weight": 0.28263302374962934
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -1028,15 +1848,46 @@
       "turnoversPer36": 0.33043534095130767
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.35368043087971274,
-      "assistsPer36": 0.5225464190981433,
+      "tsPct": 0.12034208918753818,
+      "pointsPer36": 0.2148309705561614,
+      "assistsPer36": 0.35368043087971274,
       "reboundsPer36": 0.2148309705561614,
       "turnoversPer36": 0.2148309705561614
     }
   },
   "270": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.57262791421741,
+        "actual": 0.5469613259668509,
+        "difference": -0.02566658825055912,
+        "attempts": 181.0,
+        "weight": 0.31153184165232356
+      },
+      "threePoint": {
+        "expected": 0,
+        "actual": 0.0,
+        "difference": 0.0,
+        "attempts": 2.0,
+        "weight": 0.004975124378109453
+      },
+      "freeThrow": {
+        "expected": 0.7413249211356467,
+        "actual": 0.6710526315789473,
+        "difference": -0.0702722895566994,
+        "attempts": 76.0,
+        "weight": 0.4318181818181818
+      }
+    },
+    "shotVolume": {
+      "expected": 13.697669870724983,
+      "actual": 11.262053780864342,
+      "difference": -2.435616089860641,
+      "possessions": 1624.925644654088,
+      "differencePer36": -1.7627397694671743,
+      "weight": 0.6190368279434522
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -1065,15 +1916,46 @@
       "turnoversPer36": -0.3001918686846194
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.7039473684210527,
-      "assistsPer36": 0.8262548262548263,
+      "tsPct": 0.37282229965156793,
+      "pointsPer36": 0.5431472081218274,
+      "assistsPer36": 0.7039473684210527,
       "reboundsPer36": 0.5431472081218274,
       "turnoversPer36": 0.5431472081218274
     }
   },
   "281": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.48212056422866134,
+        "actual": 0.4927536231884058,
+        "difference": 0.010633058959744479,
+        "attempts": 69.0,
+        "weight": 0.14712153518123666
+      },
+      "threePoint": {
+        "expected": 0.006447716710211623,
+        "actual": 0.0,
+        "difference": -0.006447716710211623,
+        "attempts": 1.0,
+        "weight": 0.0024937655860349127
+      },
+      "freeThrow": {
+        "expected": 0.6486486486486487,
+        "actual": 0.7142857142857143,
+        "difference": 0.06563706563706562,
+        "attempts": 28.0,
+        "weight": 0.21875
+      }
+    },
+    "shotVolume": {
+      "expected": 12.29773541265857,
+      "actual": 11.35750473274008,
+      "difference": -0.9402306799184892,
+      "possessions": 616.3325628930818,
+      "differencePer36": -0.681994660302261,
+      "weight": 0.3813154403014099
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -1102,15 +1984,46 @@
       "turnoversPer36": -0.07355123403000433
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.4713656387665198,
-      "assistsPer36": 0.6407185628742516,
+      "tsPct": 0.18228279386712096,
+      "pointsPer36": 0.30835734870317005,
+      "assistsPer36": 0.4713656387665198,
       "reboundsPer36": 0.30835734870317005,
       "turnoversPer36": 0.30835734870317005
     }
   },
   "291": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.5309207170373594,
+        "actual": 0.6140350877192983,
+        "difference": 0.08311437068193883,
+        "attempts": 57.0,
+        "weight": 0.12472647702407003
+      },
+      "threePoint": {
+        "expected": 0,
+        "actual": 0.0,
+        "difference": 0.0,
+        "attempts": 1.0,
+        "weight": 0.0024937655860349127
+      },
+      "freeThrow": {
+        "expected": 0.8117647058823529,
+        "actual": 0.8387096774193549,
+        "difference": 0.026944971537001927,
+        "attempts": 31.0,
+        "weight": 0.2366412213740458
+      }
+    },
+    "shotVolume": {
+      "expected": 10.069495361421746,
+      "actual": 9.505108590029307,
+      "difference": -0.5643867713924386,
+      "possessions": 610.1981839622641,
+      "differencePer36": -0.4128371718314696,
+      "weight": 0.3789584350795445
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -1139,15 +2052,40 @@
       "turnoversPer36": 0.2806500094201022
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.4658753709198813,
-      "assistsPer36": 0.6356275303643725,
+      "tsPct": 0.1790193842645382,
+      "pointsPer36": 0.3036750483558994,
+      "assistsPer36": 0.4658753709198813,
       "reboundsPer36": 0.3036750483558994,
       "turnoversPer36": 0.3036750483558994
     }
   },
   "293": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.4621546620109246,
+        "actual": 0.39285714285714285,
+        "difference": -0.06929751915378174,
+        "attempts": 56.0,
+        "weight": 0.12280701754385964
+      },
+      "threePoint": null,
+      "freeThrow": {
+        "expected": 0.7851851851851852,
+        "actual": 0.9333333333333333,
+        "difference": 0.14814814814814814,
+        "attempts": 15.0,
+        "weight": 0.13043478260869565
+      }
+    },
+    "shotVolume": {
+      "expected": 20.612474302346655,
+      "actual": 19.626655451434978,
+      "difference": -0.9858188509116772,
+      "possessions": 285.32625,
+      "differencePer36": -0.7188923261780478,
+      "weight": 0.22198741370138517
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -1176,15 +2114,46 @@
       "turnoversPer36": 0.772295322347812
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.29133858267716534,
-      "assistsPer36": 0.45121951219512196,
+      "tsPct": 0.09319899244332494,
+      "pointsPer36": 0.17050691244239632,
+      "assistsPer36": 0.29133858267716534,
       "reboundsPer36": 0.17050691244239632,
       "turnoversPer36": 0.17050691244239632
     }
   },
   "296": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.47228908855634316,
+        "actual": 0.47058823529411764,
+        "difference": -0.0017008532622255212,
+        "attempts": 17.0,
+        "weight": 0.0407673860911271
+      },
+      "threePoint": {
+        "expected": 0.3229945066091739,
+        "actual": 0.5,
+        "difference": 0.1770054933908261,
+        "attempts": 6.0,
+        "weight": 0.014778325123152709
+      },
+      "freeThrow": {
+        "expected": 0.7554347826086957,
+        "actual": 1.0,
+        "difference": 0.24456521739130432,
+        "attempts": 4.0,
+        "weight": 0.038461538461538464
+      }
+    },
+    "shotVolume": {
+      "expected": 17.0678592453406,
+      "actual": 17.522333848374316,
+      "difference": 0.45447460303371656,
+      "possessions": 131.2610534591195,
+      "differencePer36": 0.33724621423972434,
+      "weight": 0.11603073672319515
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -1213,15 +2182,40 @@
       "turnoversPer36": -1.541785283814231
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.15690866510538642,
-      "assistsPer36": 0.27125506072874495,
+      "tsPct": 0.04445919044459191,
+      "pointsPer36": 0.08513341804320203,
+      "assistsPer36": 0.15690866510538642,
       "reboundsPer36": 0.08513341804320203,
       "turnoversPer36": 0.08513341804320203
     }
   },
   "305": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.5299619771733635,
+        "actual": 0.49504950495049505,
+        "difference": -0.03491247222286842,
+        "attempts": 101.0,
+        "weight": 0.20159680638722555
+      },
+      "threePoint": null,
+      "freeThrow": {
+        "expected": 0.771551724137931,
+        "actual": 0.7142857142857143,
+        "difference": -0.05726600985221675,
+        "attempts": 28.0,
+        "weight": 0.21875
+      }
+    },
+    "shotVolume": {
+      "expected": 19.445580425442987,
+      "actual": 15.467981199453375,
+      "difference": -3.9775992259896125,
+      "possessions": 652.9617452830189,
+      "differencePer36": -2.9119223117642137,
+      "weight": 0.39502532175735217
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -1250,15 +2244,46 @@
       "turnoversPer36": -0.9152763564180929
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.48201438848920863,
-      "assistsPer36": 0.6504854368932039,
+      "tsPct": 0.18873239436619718,
+      "pointsPer36": 0.3175355450236967,
+      "assistsPer36": 0.48201438848920863,
       "reboundsPer36": 0.3175355450236967,
       "turnoversPer36": 0.3175355450236967
     }
   },
   "317": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.4739001920158405,
+        "actual": 0.45454545454545453,
+        "difference": -0.019354737470385963,
+        "attempts": 77.0,
+        "weight": 0.16142557651991615
+      },
+      "threePoint": {
+        "expected": 0.3480569560740514,
+        "actual": 0.2391304347826087,
+        "difference": -0.1089265212914427,
+        "attempts": 46.0,
+        "weight": 0.1031390134529148
+      },
+      "freeThrow": {
+        "expected": 0.7781456953642384,
+        "actual": 0.8076923076923077,
+        "difference": 0.02954661232806932,
+        "attempts": 52.0,
+        "weight": 0.34210526315789475
+      }
+    },
+    "shotVolume": {
+      "expected": 21.69222546408014,
+      "actual": 22.975862641536054,
+      "difference": 1.2836371774559154,
+      "possessions": 535.344426100629,
+      "differencePer36": 0.914335445893363,
+      "weight": 0.3486803462466484
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -1287,15 +2312,46 @@
       "turnoversPer36": 0.4209413304324672
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.45038167938931295,
-      "assistsPer36": 0.6210526315789474,
+      "tsPct": 0.17002881844380405,
+      "pointsPer36": 0.29064039408866993,
+      "assistsPer36": 0.45038167938931295,
       "reboundsPer36": 0.29064039408866993,
       "turnoversPer36": 0.29064039408866993
     }
   },
   "333": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.5293448698556333,
+        "actual": 0.4806201550387597,
+        "difference": -0.04872471481687363,
+        "attempts": 129.0,
+        "weight": 0.2438563327032136
+      },
+      "threePoint": {
+        "expected": 0.2910559598988966,
+        "actual": 0.0,
+        "difference": -0.2910559598988966,
+        "attempts": 2.0,
+        "weight": 0.004975124378109453
+      },
+      "freeThrow": {
+        "expected": 0.8853503184713376,
+        "actual": 0.8,
+        "difference": -0.08535031847133756,
+        "attempts": 15.0,
+        "weight": 0.13043478260869565
+      }
+    },
+    "shotVolume": {
+      "expected": 18.41261685681022,
+      "actual": 20.047806641315997,
+      "difference": 1.6351897845057763,
+      "possessions": 653.4380660377358,
+      "differencePer36": 1.2021797343935983,
+      "weight": 0.39519960224674217
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -1324,15 +2380,40 @@
       "turnoversPer36": -0.17363655527943425
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.48201438848920863,
-      "assistsPer36": 0.6504854368932039,
+      "tsPct": 0.18873239436619718,
+      "pointsPer36": 0.3175355450236967,
+      "assistsPer36": 0.48201438848920863,
       "reboundsPer36": 0.3175355450236967,
       "turnoversPer36": 0.3175355450236967
     }
   },
   "344": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.5007834446728785,
+        "actual": 0.4782608695652174,
+        "difference": -0.02252257510766109,
+        "attempts": 23.0,
+        "weight": 0.054373522458628844
+      },
+      "threePoint": {
+        "expected": 0.46051521423511765,
+        "actual": 0.5882352941176471,
+        "difference": 0.12772007988252942,
+        "attempts": 17.0,
+        "weight": 0.0407673860911271
+      },
+      "freeThrow": null
+    },
+    "shotVolume": {
+      "expected": 18.13519624171008,
+      "actual": 21.43392991104919,
+      "difference": 3.2987336693391107,
+      "possessions": 186.62,
+      "differencePer36": 2.4409093137428153,
+      "weight": 0.1572702297281354
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -1361,15 +2442,46 @@
       "turnoversPer36": 0.9018336927607683
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.21052631578947367,
-      "assistsPer36": 0.34782608695652173,
+      "tsPct": 0.0625,
+      "pointsPer36": 0.11764705882352941,
+      "assistsPer36": 0.21052631578947367,
       "reboundsPer36": 0.11764705882352941,
       "turnoversPer36": 0.11764705882352941
     }
   },
   "349": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.4868506138593083,
+        "actual": 0.4647887323943662,
+        "difference": -0.02206188146494209,
+        "attempts": 71.0,
+        "weight": 0.15074309978768577
+      },
+      "threePoint": {
+        "expected": 0.25530777926162074,
+        "actual": 0.19047619047619047,
+        "difference": -0.06483158878543027,
+        "attempts": 21.0,
+        "weight": 0.0498812351543943
+      },
+      "freeThrow": {
+        "expected": 0.7702702702702703,
+        "actual": 0.8148148148148148,
+        "difference": 0.044544544544544484,
+        "attempts": 27.0,
+        "weight": 0.2125984251968504
+      }
+    },
+    "shotVolume": {
+      "expected": 15.525544607329639,
+      "actual": 13.820633488690273,
+      "difference": -1.704911118639366,
+      "possessions": 665.6713679245283,
+      "differencePer36": -1.210294515458165,
+      "weight": 0.3996414783511425
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -1398,15 +2510,46 @@
       "turnoversPer36": 0.1809774686170901
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.5054945054945055,
-      "assistsPer36": 0.6715328467153284,
+      "tsPct": 0.20353982300884957,
+      "pointsPer36": 0.3382352941176471,
+      "assistsPer36": 0.5054945054945055,
       "reboundsPer36": 0.3382352941176471,
       "turnoversPer36": 0.3382352941176471
     }
   },
   "351": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.5004872968803009,
+        "actual": 0.42105263157894735,
+        "difference": -0.07943466530135357,
+        "attempts": 38.0,
+        "weight": 0.0867579908675799
+      },
+      "threePoint": {
+        "expected": 0.39422287779389087,
+        "actual": 1.0,
+        "difference": 0.6057771222061091,
+        "attempts": 2.0,
+        "weight": 0.004975124378109453
+      },
+      "freeThrow": {
+        "expected": 0.7531645569620253,
+        "actual": 0.6521739130434783,
+        "difference": -0.10099064391854706,
+        "attempts": 23.0,
+        "weight": 0.18699186991869918
+      }
+    },
+    "shotVolume": {
+      "expected": 16.565529048598084,
+      "actual": 18.558614290133004,
+      "difference": 1.9930852415349207,
+      "possessions": 215.53333333333333,
+      "differencePer36": 1.4555247386029184,
+      "weight": 0.17731585586573795
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -1435,15 +2578,46 @@
       "turnoversPer36": 1.2583501363260283
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.2356687898089172,
-      "assistsPer36": 0.38144329896907214,
+      "tsPct": 0.07156673114119923,
+      "pointsPer36": 0.13357400722021662,
+      "assistsPer36": 0.2356687898089172,
       "reboundsPer36": 0.13357400722021662,
       "turnoversPer36": 0.13357400722021662
     }
   },
   "357": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.4317899224453501,
+        "actual": 0.5,
+        "difference": 0.06821007755464992,
+        "attempts": 4.0,
+        "weight": 0.009900990099009901
+      },
+      "threePoint": {
+        "expected": 0.2717048796126806,
+        "actual": 0.0,
+        "difference": -0.2717048796126806,
+        "attempts": 2.0,
+        "weight": 0.004975124378109453
+      },
+      "freeThrow": {
+        "expected": 0.7555555555555555,
+        "actual": 1.0,
+        "difference": 0.24444444444444446,
+        "attempts": 3.0,
+        "weight": 0.02912621359223301
+      }
+    },
+    "shotVolume": {
+      "expected": 19.617003976864407,
+      "actual": 20.23750966200548,
+      "difference": 0.6205056851410724,
+      "possessions": 29.64791666666667,
+      "differencePer36": 0.4614400966636086,
+      "weight": 0.028794227800360568
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -1472,15 +2646,46 @@
       "turnoversPer36": -4.051259288294178
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.04,
-      "assistsPer36": 0.07692307692307693,
+      "tsPct": 0.010309278350515464,
+      "pointsPer36": 0.02040816326530612,
+      "assistsPer36": 0.04,
       "reboundsPer36": 0.02040816326530612,
       "turnoversPer36": 0.02040816326530612
     }
   },
   "359": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.4725670728706079,
+        "actual": 0.4444444444444444,
+        "difference": -0.028122628426163476,
+        "attempts": 18.0,
+        "weight": 0.0430622009569378
+      },
+      "threePoint": {
+        "expected": 0,
+        "actual": 0.0,
+        "difference": 0.0,
+        "attempts": 1.0,
+        "weight": 0.0024937655860349127
+      },
+      "freeThrow": {
+        "expected": 0.6122448979591837,
+        "actual": 0.5,
+        "difference": -0.11224489795918369,
+        "attempts": 6.0,
+        "weight": 0.05660377358490566
+      }
+    },
+    "shotVolume": {
+      "expected": 14.460935684472839,
+      "actual": 21.862115255537443,
+      "difference": 7.4011795710646044,
+      "possessions": 86.90833333333333,
+      "differencePer36": 5.347731484531769,
+      "weight": 0.07995921152504427
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -1509,15 +2714,46 @@
       "turnoversPer36": -1.6517484494659618
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.10891089108910891,
-      "assistsPer36": 0.19642857142857142,
+      "tsPct": 0.029649595687331536,
+      "pointsPer36": 0.05759162303664921,
+      "assistsPer36": 0.10891089108910891,
       "reboundsPer36": 0.05759162303664921,
       "turnoversPer36": 0.05759162303664921
     }
   },
   "365": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.48418522750709475,
+        "actual": 0.5662650602409639,
+        "difference": 0.08207983273386915,
+        "attempts": 83.0,
+        "weight": 0.17184265010351968
+      },
+      "threePoint": {
+        "expected": 0.39164789560623003,
+        "actual": 0.3125,
+        "difference": -0.07914789560623003,
+        "attempts": 16.0,
+        "weight": 0.038461538461538464
+      },
+      "freeThrow": {
+        "expected": 0.8468468468468469,
+        "actual": 0.8444444444444444,
+        "difference": -0.002402402402402415,
+        "attempts": 45.0,
+        "weight": 0.3103448275862069
+      }
+    },
+    "shotVolume": {
+      "expected": 16.99593132615097,
+      "actual": 15.592024443254479,
+      "difference": -1.4039068828964911,
+      "possessions": 634.94,
+      "differencePer36": -1.018601685466252,
+      "weight": 0.38835675926945334
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -1546,15 +2782,46 @@
       "turnoversPer36": 0.12174243991479021
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.4666666666666667,
-      "assistsPer36": 0.6363636363636364,
+      "tsPct": 0.1794871794871795,
+      "pointsPer36": 0.30434782608695654,
+      "assistsPer36": 0.4666666666666667,
       "reboundsPer36": 0.30434782608695654,
       "turnoversPer36": 0.30434782608695654
     }
   },
   "380": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.40593271446030105,
+        "actual": 0.375,
+        "difference": -0.030932714460301047,
+        "attempts": 8.0,
+        "weight": 0.0196078431372549
+      },
+      "threePoint": {
+        "expected": 0,
+        "actual": 0.0,
+        "difference": 0.0,
+        "attempts": 2.0,
+        "weight": 0.004975124378109453
+      },
+      "freeThrow": {
+        "expected": 0.6533333333333333,
+        "actual": 0.5,
+        "difference": -0.15333333333333332,
+        "attempts": 2.0,
+        "weight": 0.0196078431372549
+      }
+    },
+    "shotVolume": {
+      "expected": 16.96476289395386,
+      "actual": 12.655814769813414,
+      "difference": -4.308948124140446,
+      "possessions": 79.01506289308176,
+      "differencePer36": -3.071431741641952,
+      "weight": 0.07322887845626977
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -1583,15 +2850,40 @@
       "turnoversPer36": 0.43320749641163014
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.1,
-      "assistsPer36": 0.18181818181818182,
+      "tsPct": 0.02702702702702703,
+      "pointsPer36": 0.05263157894736842,
+      "assistsPer36": 0.1,
       "reboundsPer36": 0.05263157894736842,
       "turnoversPer36": 0.05263157894736842
     }
   },
   "393": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.4423901438476337,
+        "actual": 0.5909090909090909,
+        "difference": 0.14851894706145724,
+        "attempts": 22.0,
+        "weight": 0.052132701421800945
+      },
+      "threePoint": null,
+      "freeThrow": {
+        "expected": 0.6867924528301886,
+        "actual": 0.625,
+        "difference": -0.06179245283018864,
+        "attempts": 8.0,
+        "weight": 0.07407407407407407
+      }
+    },
+    "shotVolume": {
+      "expected": 15.945050795900647,
+      "actual": 13.554379245370203,
+      "difference": -2.3906715505304437,
+      "possessions": 162.30916666666667,
+      "differencePer36": -1.7551090357657446,
+      "weight": 0.13964371212191823
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -1620,15 +2912,46 @@
       "turnoversPer36": 0.016159161030784436
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.18181818181818182,
-      "assistsPer36": 0.3076923076923077,
+      "tsPct": 0.05263157894736842,
+      "pointsPer36": 0.1,
+      "assistsPer36": 0.18181818181818182,
       "reboundsPer36": 0.1,
       "turnoversPer36": 0.1
     }
   },
   "428": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.46979119433605765,
+        "actual": 0.391304347826087,
+        "difference": -0.07848684650997068,
+        "attempts": 23.0,
+        "weight": 0.054373522458628844
+      },
+      "threePoint": {
+        "expected": 0.09605601166954046,
+        "actual": 0.0,
+        "difference": -0.09605601166954046,
+        "attempts": 2.0,
+        "weight": 0.004975124378109453
+      },
+      "freeThrow": {
+        "expected": 0.6822429906542056,
+        "actual": 0.5,
+        "difference": -0.18224299065420557,
+        "attempts": 2.0,
+        "weight": 0.0196078431372549
+      }
+    },
+    "shotVolume": {
+      "expected": 16.932018358125724,
+      "actual": 19.72395640732724,
+      "difference": 2.791938049201516,
+      "possessions": 126.74941823899371,
+      "differencePer36": 2.0276501184263154,
+      "weight": 0.11249122137297525
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -1657,15 +2980,40 @@
       "turnoversPer36": -0.755674944907735
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.15294117647058825,
-      "assistsPer36": 0.2653061224489796,
+      "tsPct": 0.04318936877076412,
+      "pointsPer36": 0.08280254777070063,
+      "assistsPer36": 0.15294117647058825,
       "reboundsPer36": 0.08280254777070063,
       "turnoversPer36": 0.08280254777070063
     }
   },
   "431": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.5062494453478844,
+        "actual": 0.4752475247524752,
+        "difference": -0.031001920595409183,
+        "attempts": 101.0,
+        "weight": 0.20159680638722555
+      },
+      "threePoint": null,
+      "freeThrow": {
+        "expected": 0.7479224376731302,
+        "actual": 0.7625,
+        "difference": 0.014577562326869797,
+        "attempts": 80.0,
+        "weight": 0.4444444444444444
+      }
+    },
+    "shotVolume": {
+      "expected": 19.34273022105918,
+      "actual": 14.940340336515142,
+      "difference": -4.402389884544039,
+      "possessions": 676.0220833333333,
+      "differencePer36": -3.2447193479058205,
+      "weight": 0.40334915038162034
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -1694,15 +3042,46 @@
       "turnoversPer36": -0.23025031750582145
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.48424068767908307,
-      "assistsPer36": 0.6525096525096525,
+      "tsPct": 0.19010123734533182,
+      "pointsPer36": 0.31947069943289225,
+      "assistsPer36": 0.48424068767908307,
       "reboundsPer36": 0.31947069943289225,
       "turnoversPer36": 0.31947069943289225
     }
   },
   "45": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.4170848327182489,
+        "actual": 0.5,
+        "difference": 0.08291516728175108,
+        "attempts": 6.0,
+        "weight": 0.014778325123152709
+      },
+      "threePoint": {
+        "expected": 0.31577765434728317,
+        "actual": 0.5,
+        "difference": 0.18422234565271683,
+        "attempts": 6.0,
+        "weight": 0.014778325123152709
+      },
+      "freeThrow": {
+        "expected": 0.78125,
+        "actual": 0.7272727272727273,
+        "difference": -0.05397727272727271,
+        "attempts": 11.0,
+        "weight": 0.0990990990990991
+      }
+    },
+    "shotVolume": {
+      "expected": 17.155743087592562,
+      "actual": 11.14321794583713,
+      "difference": -6.012525141755432,
+      "possessions": 107.68882075471697,
+      "differencePer36": -4.538213749768911,
+      "weight": 0.09721938033223433
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -1731,15 +3110,40 @@
       "turnoversPer36": -0.07391487068183378
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.12832929782082325,
-      "assistsPer36": 0.22746781115879827,
+      "tsPct": 0.03549899531145345,
+      "pointsPer36": 0.0685640362225097,
+      "assistsPer36": 0.12832929782082325,
       "reboundsPer36": 0.0685640362225097,
       "turnoversPer36": 0.0685640362225097
     }
   },
   "457": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.5073625149227624,
+        "actual": 0.375,
+        "difference": -0.1323625149227624,
+        "attempts": 40.0,
+        "weight": 0.09090909090909091
+      },
+      "threePoint": null,
+      "freeThrow": {
+        "expected": 0.7682926829268293,
+        "actual": 0.7894736842105263,
+        "difference": 0.021181001283697043,
+        "attempts": 19.0,
+        "weight": 0.15966386554621848
+      }
+    },
+    "shotVolume": {
+      "expected": 11.16292118865232,
+      "actual": 9.854500285511492,
+      "difference": -1.3084209031408278,
+      "possessions": 405.9059195402299,
+      "differencePer36": -1.0032263584912189,
+      "weight": 0.28871485203858616
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -1768,15 +3172,40 @@
       "turnoversPer36": -0.10031244359884237
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.34782608695652173,
-      "assistsPer36": 0.5161290322580645,
+      "tsPct": 0.11764705882352941,
+      "pointsPer36": 0.21052631578947367,
+      "assistsPer36": 0.34782608695652173,
       "reboundsPer36": 0.21052631578947367,
       "turnoversPer36": 0.21052631578947367
     }
   },
   "55": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.4864952974619714,
+        "actual": 0.0,
+        "difference": -0.4864952974619714,
+        "attempts": 1.0,
+        "weight": 0.0024937655860349127
+      },
+      "threePoint": null,
+      "freeThrow": {
+        "expected": 0.75,
+        "actual": 1.0,
+        "difference": 0.25,
+        "attempts": 2.0,
+        "weight": 0.0196078431372549
+      }
+    },
+    "shotVolume": {
+      "expected": 12.711560295678467,
+      "actual": 45.97701149425287,
+      "difference": 33.265451198574404,
+      "possessions": 2.1750000000000003,
+      "differencePer36": 24.49423833494385,
+      "weight": 0.002170279641779131
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -1805,15 +3234,46 @@
       "turnoversPer36": -2.8283410646302745
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.002770083102493075,
-      "assistsPer36": 0.0055248618784530384,
+      "tsPct": 0.0006939625260235947,
+      "pointsPer36": 0.0013869625520110957,
+      "assistsPer36": 0.002770083102493075,
       "reboundsPer36": 0.0013869625520110957,
       "turnoversPer36": 0.0013869625520110957
     }
   },
   "56": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.46858527587532584,
+        "actual": 0.48214285714285715,
+        "difference": 0.013557581267531316,
+        "attempts": 56.0,
+        "weight": 0.12280701754385964
+      },
+      "threePoint": {
+        "expected": 0.14498165021703877,
+        "actual": 0.0,
+        "difference": -0.14498165021703877,
+        "attempts": 2.0,
+        "weight": 0.004975124378109453
+      },
+      "freeThrow": {
+        "expected": 0.668918918918919,
+        "actual": 0.5833333333333334,
+        "difference": -0.0855855855855856,
+        "attempts": 12.0,
+        "weight": 0.10714285714285714
+      }
+    },
+    "shotVolume": {
+      "expected": 14.00240340203414,
+      "actual": 13.089337549755,
+      "difference": -0.913065852279141,
+      "possessions": 443.10875,
+      "differencePer36": -0.6720812010963566,
+      "weight": 0.3070515302467676
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -1842,15 +3302,40 @@
       "turnoversPer36": -0.8848230216214765
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.3803786574870912,
-      "assistsPer36": 0.5511221945137157,
+      "tsPct": 0.13305237808549067,
+      "pointsPer36": 0.23485653560042508,
+      "assistsPer36": 0.3803786574870912,
       "reboundsPer36": 0.23485653560042508,
       "turnoversPer36": 0.23485653560042508
     }
   },
   "600009": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.3926046013940009,
+        "actual": 0.25,
+        "difference": -0.14260460139400088,
+        "attempts": 4.0,
+        "weight": 0.009900990099009901
+      },
+      "threePoint": null,
+      "freeThrow": {
+        "expected": 0.6153846153846154,
+        "actual": 0.75,
+        "difference": 0.13461538461538458,
+        "attempts": 4.0,
+        "weight": 0.038461538461538464
+      }
+    },
+    "shotVolume": {
+      "expected": 15.04521440497041,
+      "actual": 12.95195988761731,
+      "difference": -2.0932545173531008,
+      "possessions": 30.883356918238995,
+      "differencePer36": -1.510407702177123,
+      "weight": 0.029958148718748207
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -1879,15 +3364,46 @@
       "turnoversPer36": -2.4889066583719077
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.0425531914893617,
-      "assistsPer36": 0.08163265306122448,
+      "tsPct": 0.01098901098901099,
+      "pointsPer36": 0.021739130434782608,
+      "assistsPer36": 0.0425531914893617,
       "reboundsPer36": 0.021739130434782608,
       "turnoversPer36": 0.021739130434782608
     }
   },
   "698": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.4807450568425737,
+        "actual": 0.5304347826086957,
+        "difference": 0.04968972576612202,
+        "attempts": 115.0,
+        "weight": 0.22330097087378642
+      },
+      "threePoint": {
+        "expected": 0.26286384588088096,
+        "actual": 0.18181818181818182,
+        "difference": -0.08104566406269914,
+        "attempts": 22.0,
+        "weight": 0.052132701421800945
+      },
+      "freeThrow": {
+        "expected": 0.8609467455621301,
+        "actual": 0.9411764705882353,
+        "difference": 0.08022972502610515,
+        "attempts": 34.0,
+        "weight": 0.2537313432835821
+      }
+    },
+    "shotVolume": {
+      "expected": 23.95743804787579,
+      "actual": 27.736536644621406,
+      "difference": 3.779098596745616,
+      "possessions": 493.93333333333334,
+      "differencePer36": 2.788367422828219,
+      "weight": 0.33062608773260743
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -1916,15 +3432,46 @@
       "turnoversPer36": 0.22703292044542614
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.40691927512355847,
-      "assistsPer36": 0.5784543325526932,
+      "tsPct": 0.14641375222288086,
+      "pointsPer36": 0.25542916235780766,
+      "assistsPer36": 0.40691927512355847,
       "reboundsPer36": 0.25542916235780766,
       "turnoversPer36": 0.25542916235780766
     }
   },
   "70": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.5386545610632555,
+        "actual": 0.5,
+        "difference": -0.03865456106325549,
+        "attempts": 30.0,
+        "weight": 0.06976744186046512
+      },
+      "threePoint": {
+        "expected": 0.4137082733706338,
+        "actual": 0.2727272727272727,
+        "difference": -0.1409810006433611,
+        "attempts": 11.0,
+        "weight": 0.0267639902676399
+      },
+      "freeThrow": {
+        "expected": 0.8333333333333334,
+        "actual": 1.0,
+        "difference": 0.16666666666666663,
+        "attempts": 5.0,
+        "weight": 0.047619047619047616
+      }
+    },
+    "shotVolume": {
+      "expected": 13.79302413676261,
+      "actual": 13.65377143808625,
+      "difference": -0.13925269867635848,
+      "possessions": 300.28333333333336,
+      "differencePer36": -0.10203566169441931,
+      "weight": 0.2309368470974275
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -1953,15 +3500,40 @@
       "turnoversPer36": -0.3321765476332824
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.29273084479371314,
-      "assistsPer36": 0.45288753799392095,
+      "tsPct": 0.09376966645689112,
+      "pointsPer36": 0.1714614499424626,
+      "assistsPer36": 0.29273084479371314,
       "reboundsPer36": 0.1714614499424626,
       "turnoversPer36": 0.1714614499424626
     }
   },
   "72": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.3913440418411393,
+        "actual": 0.3333333333333333,
+        "difference": -0.058010708507805986,
+        "attempts": 9.0,
+        "weight": 0.022004889975550123
+      },
+      "threePoint": null,
+      "freeThrow": {
+        "expected": 0.7448979591836735,
+        "actual": 1.0,
+        "difference": 0.2551020408163265,
+        "attempts": 2.0,
+        "weight": 0.0196078431372549
+      }
+    },
+    "shotVolume": {
+      "expected": 22.178674089741737,
+      "actual": 17.866891657154202,
+      "difference": -4.311782432587535,
+      "possessions": 50.372499999999995,
+      "differencePer36": -3.2513864486541797,
+      "weight": 0.04795679627941516
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -1990,15 +3562,34 @@
       "turnoversPer36": -1.5294160189067936
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.0625,
-      "assistsPer36": 0.11764705882352941,
+      "tsPct": 0.01639344262295082,
+      "pointsPer36": 0.03225806451612903,
+      "assistsPer36": 0.0625,
       "reboundsPer36": 0.03225806451612903,
       "turnoversPer36": 0.03225806451612903
     }
   },
   "737": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.3900331131147656,
+        "actual": 0.5,
+        "difference": 0.10996688688523443,
+        "attempts": 6.0,
+        "weight": 0.014778325123152709
+      },
+      "threePoint": null,
+      "freeThrow": null
+    },
+    "shotVolume": {
+      "expected": 12.529511123871982,
+      "actual": 23.688885964335068,
+      "difference": 11.159374840463085,
+      "possessions": 25.328333333333333,
+      "differencePer36": 8.085473136588504,
+      "weight": 0.024702656222315777
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -2027,15 +3618,40 @@
       "turnoversPer36": 3.7733584480768823
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.03485254691689008,
-      "assistsPer36": 0.06735751295336788,
+      "tsPct": 0.008947006194081212,
+      "pointsPer36": 0.017735334242837655,
+      "assistsPer36": 0.03485254691689008,
       "reboundsPer36": 0.017735334242837655,
       "turnoversPer36": 0.017735334242837655
     }
   },
   "738": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.13766867311520062,
+        "actual": 0.4,
+        "difference": 0.26233132688479943,
+        "attempts": 5.0,
+        "weight": 0.012345679012345678
+      },
+      "threePoint": null,
+      "freeThrow": {
+        "expected": 1,
+        "actual": 0.75,
+        "difference": -0.25,
+        "attempts": 4.0,
+        "weight": 0.038461538461538464
+      }
+    },
+    "shotVolume": {
+      "expected": 51.666115246674686,
+      "actual": 8.000681315880609,
+      "difference": -43.66543393079408,
+      "possessions": 62.49467767295598,
+      "differencePer36": -33.5044874550983,
+      "weight": 0.0588188148008703
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -2064,15 +3680,40 @@
       "turnoversPer36": 1.2277845547350386
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.08163265306122448,
-      "assistsPer36": 0.1509433962264151,
+      "tsPct": 0.021739130434782608,
+      "pointsPer36": 0.0425531914893617,
+      "assistsPer36": 0.08163265306122448,
       "reboundsPer36": 0.0425531914893617,
       "turnoversPer36": 0.0425531914893617
     }
   },
   "76": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.4713013296589957,
+        "actual": 0.55,
+        "difference": 0.07869867034100436,
+        "attempts": 80.0,
+        "weight": 0.16666666666666666
+      },
+      "threePoint": null,
+      "freeThrow": {
+        "expected": 0.7364864864864865,
+        "actual": 0.6666666666666666,
+        "difference": -0.06981981981981988,
+        "attempts": 30.0,
+        "weight": 0.23076923076923078
+      }
+    },
+    "shotVolume": {
+      "expected": 23.01391562738252,
+      "actual": 20.123178573151712,
+      "difference": -2.890737054230808,
+      "possessions": 397.5515086206897,
+      "differencePer36": -2.2390914695424637,
+      "weight": 0.2844628667841032
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -2101,15 +3742,46 @@
       "turnoversPer36": -1.3489489431295725
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.34306569343065696,
-      "assistsPer36": 0.5108695652173914,
+      "tsPct": 0.11547911547911548,
+      "pointsPer36": 0.20704845814977973,
+      "assistsPer36": 0.34306569343065696,
       "reboundsPer36": 0.20704845814977973,
       "turnoversPer36": 0.20704845814977973
     }
   },
   "76016": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.43874778068903125,
+        "actual": 0.3488372093023256,
+        "difference": -0.08991057138670566,
+        "attempts": 43.0,
+        "weight": 0.09706546275395034
+      },
+      "threePoint": {
+        "expected": 0.1767768815012069,
+        "actual": 0.2,
+        "difference": 0.023223118498793105,
+        "attempts": 5.0,
+        "weight": 0.012345679012345678
+      },
+      "freeThrow": {
+        "expected": 0.6869565217391305,
+        "actual": 0.75,
+        "difference": 0.06304347826086953,
+        "attempts": 16.0,
+        "weight": 0.13793103448275862
+      }
+    },
+    "shotVolume": {
+      "expected": 24.784401717687153,
+      "actual": 22.944919716080665,
+      "difference": -1.8394820016064877,
+      "possessions": 209.1966352201258,
+      "differencePer36": -1.3009888196185657,
+      "weight": 0.17300464550337014
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -2138,15 +3810,46 @@
       "turnoversPer36": 1.9836954554565067
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.23890063424947147,
-      "assistsPer36": 0.3856655290102389,
+      "tsPct": 0.07276239536381197,
+      "pointsPer36": 0.13565426170468187,
+      "assistsPer36": 0.23890063424947147,
       "reboundsPer36": 0.13565426170468187,
       "turnoversPer36": 0.13565426170468187
     }
   },
   "76082": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.45300859485545963,
+        "actual": 0.45054945054945056,
+        "difference": -0.0024591443060090756,
+        "attempts": 91.0,
+        "weight": 0.18533604887983707
+      },
+      "threePoint": {
+        "expected": 0.24134671304151528,
+        "actual": 0.25,
+        "difference": 0.008653286958484718,
+        "attempts": 4.0,
+        "weight": 0.009900990099009901
+      },
+      "freeThrow": {
+        "expected": 0.7157894736842105,
+        "actual": 0.7027027027027027,
+        "difference": -0.01308677098150779,
+        "attempts": 37.0,
+        "weight": 0.27007299270072993
+      }
+    },
+    "shotVolume": {
+      "expected": 14.694727958921387,
+      "actual": 15.831754514103682,
+      "difference": 1.1370265551822953,
+      "possessions": 600.0598349056604,
+      "differencePer36": 0.8373007120690665,
+      "weight": 0.37502337213598014
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -2175,15 +3878,34 @@
       "turnoversPer36": 1.460588593990866
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.46107784431137727,
-      "assistsPer36": 0.6311475409836066,
+      "tsPct": 0.17620137299771166,
+      "pointsPer36": 0.29961089494163423,
+      "assistsPer36": 0.46107784431137727,
       "reboundsPer36": 0.29961089494163423,
       "turnoversPer36": 0.29961089494163423
     }
   },
   "76138": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.40250670915626213,
+        "actual": 0.5,
+        "difference": 0.09749329084373787,
+        "attempts": 6.0,
+        "weight": 0.014778325123152709
+      },
+      "threePoint": null,
+      "freeThrow": null
+    },
+    "shotVolume": {
+      "expected": 16.293057440609164,
+      "actual": 34.217279726261765,
+      "difference": 17.9242222856526,
+      "possessions": 17.535,
+      "differencePer36": 12.87065495216181,
+      "weight": 0.017232822458195542
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -2212,15 +3934,34 @@
       "turnoversPer36": -1.504448153558007
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.024390243902439025,
-      "assistsPer36": 0.047619047619047616,
+      "tsPct": 0.006211180124223602,
+      "pointsPer36": 0.012345679012345678,
+      "assistsPer36": 0.024390243902439025,
       "reboundsPer36": 0.012345679012345678,
       "turnoversPer36": 0.012345679012345678
     }
   },
   "76183": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.4642976160431422,
+        "actual": 0.5,
+        "difference": 0.03570238395685782,
+        "attempts": 2.0,
+        "weight": 0.004975124378109453
+      },
+      "threePoint": null,
+      "freeThrow": null
+    },
+    "shotVolume": {
+      "expected": 14.2586552984883,
+      "actual": 10.265183917878531,
+      "difference": -3.993471380609769,
+      "possessions": 19.48333333333333,
+      "differencePer36": -2.8827823987450807,
+      "weight": 0.01911098759175399
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -2249,15 +3990,46 @@
       "turnoversPer36": 1.0498763455571856
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.02702702702702703,
-      "assistsPer36": 0.05263157894736842,
+      "tsPct": 0.006896551724137931,
+      "pointsPer36": 0.0136986301369863,
+      "assistsPer36": 0.02702702702702703,
       "reboundsPer36": 0.0136986301369863,
       "turnoversPer36": 0.0136986301369863
     }
   },
   "76316": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.4596462061025133,
+        "actual": 0.4444444444444444,
+        "difference": -0.015201761658068857,
+        "attempts": 36.0,
+        "weight": 0.08256880733944955
+      },
+      "threePoint": {
+        "expected": 0.13249954618195992,
+        "actual": 0.0,
+        "difference": -0.13249954618195992,
+        "attempts": 2.0,
+        "weight": 0.004975124378109453
+      },
+      "freeThrow": {
+        "expected": 0.7037037037037037,
+        "actual": 0.8571428571428571,
+        "difference": 0.15343915343915338,
+        "attempts": 21.0,
+        "weight": 0.17355371900826447
+      }
+    },
+    "shotVolume": {
+      "expected": 20.48024856716456,
+      "actual": 17.172666657100326,
+      "difference": -3.3075819100642327,
+      "possessions": 221.28188218390804,
+      "differencePer36": -2.541371415608409,
+      "weight": 0.18118821331256438
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -2286,15 +4058,40 @@
       "turnoversPer36": -0.5480241917718937
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.22413793103448276,
-      "assistsPer36": 0.36619718309859156,
+      "tsPct": 0.06735751295336788,
+      "pointsPer36": 0.1262135922330097,
+      "assistsPer36": 0.22413793103448276,
       "reboundsPer36": 0.1262135922330097,
       "turnoversPer36": 0.1262135922330097
     }
   },
   "76362": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.459308820157966,
+        "actual": 0.47413793103448276,
+        "difference": 0.014829110876516782,
+        "attempts": 116.0,
+        "weight": 0.2248062015503876
+      },
+      "threePoint": null,
+      "freeThrow": {
+        "expected": 0.6037735849056604,
+        "actual": 0.41935483870967744,
+        "difference": -0.18441874619598292,
+        "attempts": 31.0,
+        "weight": 0.2366412213740458
+      }
+    },
+    "shotVolume": {
+      "expected": 15.046633263058599,
+      "actual": 10.009844248188427,
+      "difference": -5.0367890148701715,
+      "possessions": 1158.8591902515723,
+      "differencePer36": -3.614488651370587,
+      "weight": 0.5367923927065064
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -2323,15 +4120,40 @@
       "turnoversPer36": -0.18282977279345106
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.6296296296296297,
-      "assistsPer36": 0.7727272727272727,
+      "tsPct": 0.2982456140350877,
+      "pointsPer36": 0.4594594594594595,
+      "assistsPer36": 0.6296296296296297,
       "reboundsPer36": 0.4594594594594595,
       "turnoversPer36": 0.4594594594594595
     }
   },
   "76876": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.41404821951294823,
+        "actual": 0.3,
+        "difference": -0.11404821951294825,
+        "attempts": 10.0,
+        "weight": 0.024390243902439025
+      },
+      "threePoint": null,
+      "freeThrow": {
+        "expected": 0.8202247191011236,
+        "actual": 0.75,
+        "difference": -0.0702247191011236,
+        "attempts": 4.0,
+        "weight": 0.038461538461538464
+      }
+    },
+    "shotVolume": {
+      "expected": 15.039699036342613,
+      "actual": 10.60412588864784,
+      "difference": -4.4355731476947735,
+      "possessions": 94.30291666666668,
+      "differencePer36": -3.283595231446435,
+      "weight": 0.0861762453799546
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -2360,15 +4182,46 @@
       "turnoversPer36": -0.3475273951251272
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.11547911547911548,
-      "assistsPer36": 0.20704845814977973,
+      "tsPct": 0.03160726294552791,
+      "pointsPer36": 0.061277705345501955,
+      "assistsPer36": 0.11547911547911548,
       "reboundsPer36": 0.061277705345501955,
       "turnoversPer36": 0.061277705345501955
     }
   },
   "769": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.48547951772271214,
+        "actual": 0.47540983606557374,
+        "difference": -0.010069681657138396,
+        "attempts": 122.0,
+        "weight": 0.23371647509578544
+      },
+      "threePoint": {
+        "expected": 0.38133465984668535,
+        "actual": 0.29411764705882354,
+        "difference": -0.08721701278786181,
+        "attempts": 17.0,
+        "weight": 0.0407673860911271
+      },
+      "freeThrow": {
+        "expected": 0.8062015503875969,
+        "actual": 0.7894736842105263,
+        "difference": -0.01672786617707056,
+        "attempts": 38.0,
+        "weight": 0.2753623188405797
+      }
+    },
+    "shotVolume": {
+      "expected": 18.36778681305224,
+      "actual": 16.858238336977237,
+      "difference": -1.509548476075004,
+      "possessions": 824.5226886792453,
+      "differencePer36": -1.096930598058042,
+      "weight": 0.451911447193956
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -2397,15 +4250,46 @@
       "turnoversPer36": -0.2235379158105518
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.5465994962216625,
-      "assistsPer36": 0.7068403908794788,
+      "tsPct": 0.23159018143009605,
+      "pointsPer36": 0.37608318890814557,
+      "assistsPer36": 0.5465994962216625,
       "reboundsPer36": 0.37608318890814557,
       "turnoversPer36": 0.37608318890814557
     }
   },
   "76942": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.47628887842224216,
+        "actual": 0.375,
+        "difference": -0.10128887842224216,
+        "attempts": 16.0,
+        "weight": 0.038461538461538464
+      },
+      "threePoint": {
+        "expected": 0.23892961071822055,
+        "actual": 0.5,
+        "difference": 0.26107038928177945,
+        "attempts": 6.0,
+        "weight": 0.014778325123152709
+      },
+      "freeThrow": {
+        "expected": 0.36363636363636365,
+        "actual": 0.3333333333333333,
+        "difference": -0.03030303030303033,
+        "attempts": 3.0,
+        "weight": 0.02912621359223301
+      }
+    },
+    "shotVolume": {
+      "expected": 10.657097330715947,
+      "actual": 15.986278672645295,
+      "difference": 5.329181341929347,
+      "possessions": 137.61801886792455,
+      "differencePer36": 3.918913961876067,
+      "weight": 0.12097032271418492
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -2434,15 +4318,40 @@
       "turnoversPer36": -0.18799467657579297
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.16083916083916083,
-      "assistsPer36": 0.27710843373493976,
+      "tsPct": 0.04572564612326044,
+      "pointsPer36": 0.08745247148288973,
+      "assistsPer36": 0.16083916083916083,
       "reboundsPer36": 0.08745247148288973,
       "turnoversPer36": 0.08745247148288973
     }
   },
   "770": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.6167859893924246,
+        "actual": 0.7368421052631579,
+        "difference": 0.12005611587073328,
+        "attempts": 19.0,
+        "weight": 0.045346062052505964
+      },
+      "threePoint": null,
+      "freeThrow": {
+        "expected": 0.6374269005847953,
+        "actual": 0.5,
+        "difference": -0.13742690058479534,
+        "attempts": 8.0,
+        "weight": 0.07407407407407407
+      }
+    },
+    "shotVolume": {
+      "expected": 10.029499751897392,
+      "actual": 9.392267587010403,
+      "difference": -0.6372321648869885,
+      "possessions": 202.29406609195402,
+      "differencePer36": -0.48547576062004283,
+      "weight": 0.16825672836389277
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -2471,15 +4380,46 @@
       "turnoversPer36": -1.330414229422988
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.21052631578947367,
-      "assistsPer36": 0.34782608695652173,
+      "tsPct": 0.0625,
+      "pointsPer36": 0.11764705882352941,
+      "assistsPer36": 0.21052631578947367,
       "reboundsPer36": 0.11764705882352941,
       "turnoversPer36": 0.11764705882352941
     }
   },
   "77034": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.3895305006488285,
+        "actual": 0.3333333333333333,
+        "difference": -0.05619716731549518,
+        "attempts": 21.0,
+        "weight": 0.0498812351543943
+      },
+      "threePoint": {
+        "expected": 0.36065995744766494,
+        "actual": 0.45,
+        "difference": 0.08934004255233507,
+        "attempts": 20.0,
+        "weight": 0.047619047619047616
+      },
+      "freeThrow": {
+        "expected": 0.9411764705882353,
+        "actual": 0.5,
+        "difference": -0.4411764705882353,
+        "attempts": 2.0,
+        "weight": 0.0196078431372549
+      }
+    },
+    "shotVolume": {
+      "expected": 21.572198148276247,
+      "actual": 15.93713254705827,
+      "difference": -5.635065601217976,
+      "possessions": 257.2608333333333,
+      "differencePer36": -4.124042051466947,
+      "weight": 0.20462009673145257
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -2508,15 +4448,46 @@
       "turnoversPer36": 0.8548306477789102
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.27565392354124746,
-      "assistsPer36": 0.43217665615141954,
+      "tsPct": 0.08687381103360811,
+      "pointsPer36": 0.15985997666277713,
+      "assistsPer36": 0.27565392354124746,
       "reboundsPer36": 0.15985997666277713,
       "turnoversPer36": 0.15985997666277713
     }
   },
   "77167": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.40248380322279226,
+        "actual": 0.45,
+        "difference": 0.04751619677720775,
+        "attempts": 20.0,
+        "weight": 0.047619047619047616
+      },
+      "threePoint": {
+        "expected": 0.2956649768814044,
+        "actual": 0.5,
+        "difference": 0.20433502311859558,
+        "attempts": 4.0,
+        "weight": 0.009900990099009901
+      },
+      "freeThrow": {
+        "expected": 0.6470588235294118,
+        "actual": 0.5,
+        "difference": -0.1470588235294118,
+        "attempts": 2.0,
+        "weight": 0.0196078431372549
+      }
+    },
+    "shotVolume": {
+      "expected": 18.359859789454482,
+      "actual": 17.376247032311976,
+      "difference": -0.983612757142506,
+      "possessions": 138.11958333333334,
+      "differencePer36": -0.7217934076511374,
+      "weight": 0.12135770735866581
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -2545,15 +4516,46 @@
       "turnoversPer36": 0.7532677638709558
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.16083916083916083,
-      "assistsPer36": 0.27710843373493976,
+      "tsPct": 0.04572564612326044,
+      "pointsPer36": 0.08745247148288973,
+      "assistsPer36": 0.16083916083916083,
       "reboundsPer36": 0.08745247148288973,
       "turnoversPer36": 0.08745247148288973
     }
   },
   "77377": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.500325623736028,
+        "actual": 0.44642857142857145,
+        "difference": -0.053897052307456506,
+        "attempts": 56.0,
+        "weight": 0.12280701754385964
+      },
+      "threePoint": {
+        "expected": 0.14399792319629892,
+        "actual": 0.0,
+        "difference": -0.14399792319629892,
+        "attempts": 1.0,
+        "weight": 0.0024937655860349127
+      },
+      "freeThrow": {
+        "expected": 0.625,
+        "actual": 0.5,
+        "difference": -0.125,
+        "attempts": 28.0,
+        "weight": 0.21875
+      }
+    },
+    "shotVolume": {
+      "expected": 12.14799229577653,
+      "actual": 15.419316338852365,
+      "difference": 3.2713240430758344,
+      "possessions": 369.66619496855344,
+      "differencePer36": 2.383992332420682,
+      "weight": 0.2698951002269868
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -2582,15 +4584,46 @@
       "turnoversPer36": 0.6876168085209254
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.3466424682395644,
-      "assistsPer36": 0.5148247978436657,
+      "tsPct": 0.11710606989576947,
+      "pointsPer36": 0.20965971459934138,
+      "assistsPer36": 0.3466424682395644,
       "reboundsPer36": 0.20965971459934138,
       "turnoversPer36": 0.20965971459934138
     }
   },
   "77384": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.5004587237684148,
+        "actual": 0.5330188679245284,
+        "difference": 0.032560144156113524,
+        "attempts": 212.0,
+        "weight": 0.3464052287581699
+      },
+      "threePoint": {
+        "expected": 0.24109086728612,
+        "actual": 0.3333333333333333,
+        "difference": 0.09224246604721331,
+        "attempts": 6.0,
+        "weight": 0.014778325123152709
+      },
+      "freeThrow": {
+        "expected": 0.8513119533527697,
+        "actual": 0.7619047619047619,
+        "difference": -0.0894071914480078,
+        "attempts": 63.0,
+        "weight": 0.38650306748466257
+      }
+    },
+    "shotVolume": {
+      "expected": 23.176272204730612,
+      "actual": 27.41041097220674,
+      "difference": 4.234138767476129,
+      "possessions": 795.3182468553458,
+      "differencePer36": 3.10678695554411,
+      "weight": 0.4429956907352855
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -2619,15 +4652,34 @@
       "turnoversPer36": -0.006709386478201944
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.53125,
-      "assistsPer36": 0.6938775510204082,
+      "tsPct": 0.22077922077922077,
+      "pointsPer36": 0.3617021276595745,
+      "assistsPer36": 0.53125,
       "reboundsPer36": 0.3617021276595745,
       "turnoversPer36": 0.3617021276595745
     }
   },
   "77516": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.39313384817903924,
+        "actual": 0.0,
+        "difference": -0.39313384817903924,
+        "attempts": 2.0,
+        "weight": 0.004975124378109453
+      },
+      "threePoint": null,
+      "freeThrow": null
+    },
+    "shotVolume": {
+      "expected": 15.427896297584132,
+      "actual": 17.108639863130882,
+      "difference": 1.6807435655467504,
+      "possessions": 11.69,
+      "differencePer36": 1.2355612823546813,
+      "weight": 0.011554922950706243
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -2656,15 +4708,46 @@
       "turnoversPer36": -2.436328508959995
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.01639344262295082,
-      "assistsPer36": 0.03225806451612903,
+      "tsPct": 0.004149377593360996,
+      "pointsPer36": 0.008264462809917356,
+      "assistsPer36": 0.01639344262295082,
       "reboundsPer36": 0.008264462809917356,
       "turnoversPer36": 0.008264462809917356
     }
   },
   "77697": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.5776226869237538,
+        "actual": 0.4,
+        "difference": -0.17762268692375383,
+        "attempts": 5.0,
+        "weight": 0.012345679012345678
+      },
+      "threePoint": {
+        "expected": 0.3901740684394221,
+        "actual": 0.38461538461538464,
+        "difference": -0.005558683824037458,
+        "attempts": 13.0,
+        "weight": 0.031476997578692496
+      },
+      "freeThrow": {
+        "expected": 0.6666666666666666,
+        "actual": 1.0,
+        "difference": 0.33333333333333337,
+        "attempts": 4.0,
+        "weight": 0.038461538461538464
+      }
+    },
+    "shotVolume": {
+      "expected": 10.896439510534535,
+      "actual": 12.526402883632336,
+      "difference": 1.6299633730978016,
+      "possessions": 143.69647988505747,
+      "differencePer36": 1.2739691200562882,
+      "weight": 0.1256421458073379
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -2693,15 +4776,46 @@
       "turnoversPer36": -1.2069680988148401
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.15690866510538642,
-      "assistsPer36": 0.27125506072874495,
+      "tsPct": 0.04445919044459191,
+      "pointsPer36": 0.08513341804320203,
+      "assistsPer36": 0.15690866510538642,
       "reboundsPer36": 0.08513341804320203,
       "turnoversPer36": 0.08513341804320203
     }
   },
   "77820": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.5452817636111819,
+        "actual": 0.5446428571428571,
+        "difference": -0.0006389064683247625,
+        "attempts": 112.0,
+        "weight": 0.21875
+      },
+      "threePoint": {
+        "expected": 0.2476581580077708,
+        "actual": 0.4444444444444444,
+        "difference": 0.19678628643667362,
+        "attempts": 27.0,
+        "weight": 0.06323185011709602
+      },
+      "freeThrow": {
+        "expected": 0.7837837837837838,
+        "actual": 0.8421052631578947,
+        "difference": 0.05832147937411092,
+        "attempts": 19.0,
+        "weight": 0.15966386554621848
+      }
+    },
+    "shotVolume": {
+      "expected": 12.409134417027582,
+      "actual": 12.200225372404518,
+      "difference": -0.2089090446230646,
+      "possessions": 1139.323215408805,
+      "differencePer36": -0.15103150331475562,
+      "weight": 0.5325624511540163
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -2730,15 +4844,40 @@
       "turnoversPer36": 0.012117547106366516
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.6242171189979123,
-      "assistsPer36": 0.7686375321336761,
+      "tsPct": 0.2934249263984298,
+      "pointsPer36": 0.4537177541729894,
+      "assistsPer36": 0.6242171189979123,
       "reboundsPer36": 0.4537177541729894,
       "turnoversPer36": 0.4537177541729894
     }
   },
   "77879": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.3928113299539964,
+        "actual": 0.3125,
+        "difference": -0.08031132995399642,
+        "attempts": 16.0,
+        "weight": 0.038461538461538464
+      },
+      "threePoint": {
+        "expected": 0.1124647420409775,
+        "actual": 0.5,
+        "difference": 0.3875352579590225,
+        "attempts": 2.0,
+        "weight": 0.004975124378109453
+      },
+      "freeThrow": null
+    },
+    "shotVolume": {
+      "expected": 10.561274534297278,
+      "actual": 19.831068674256333,
+      "difference": 9.269794139959055,
+      "possessions": 90.76666666666668,
+      "differencePer36": 6.779877907466082,
+      "weight": 0.08321364178101032
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -2767,15 +4906,40 @@
       "turnoversPer36": 1.1014218310277355
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.11330049261083744,
-      "assistsPer36": 0.20353982300884957,
+      "tsPct": 0.03095558546433378,
+      "pointsPer36": 0.06005221932114883,
+      "assistsPer36": 0.11330049261083744,
       "reboundsPer36": 0.06005221932114883,
       "turnoversPer36": 0.06005221932114883
     }
   },
   "77986": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.41534150718794827,
+        "actual": 0.3,
+        "difference": -0.11534150718794828,
+        "attempts": 10.0,
+        "weight": 0.024390243902439025
+      },
+      "threePoint": null,
+      "freeThrow": {
+        "expected": 0.875,
+        "actual": 0.625,
+        "difference": -0.25,
+        "attempts": 8.0,
+        "weight": 0.07407407407407407
+      }
+    },
+    "shotVolume": {
+      "expected": 16.662351384298955,
+      "actual": 21.602255601556585,
+      "difference": 4.939904217257631,
+      "possessions": 46.291462264150944,
+      "differencePer36": 3.5240041709861623,
+      "weight": 0.044243371884137586
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -2804,15 +4968,46 @@
       "turnoversPer36": -0.45394170438471504
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.0625,
-      "assistsPer36": 0.11764705882352941,
+      "tsPct": 0.01639344262295082,
+      "pointsPer36": 0.03225806451612903,
+      "assistsPer36": 0.0625,
       "reboundsPer36": 0.03225806451612903,
       "turnoversPer36": 0.03225806451612903
     }
   },
   "781": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.5465346836315007,
+        "actual": 0.5,
+        "difference": -0.046534683631500706,
+        "attempts": 36.0,
+        "weight": 0.08256880733944955
+      },
+      "threePoint": {
+        "expected": 0.46973204740070984,
+        "actual": 0.0,
+        "difference": -0.46973204740070984,
+        "attempts": 1.0,
+        "weight": 0.0024937655860349127
+      },
+      "freeThrow": {
+        "expected": 0.4945054945054945,
+        "actual": 0.45,
+        "difference": -0.044505494505494514,
+        "attempts": 20.0,
+        "weight": 0.16666666666666666
+      }
+    },
+    "shotVolume": {
+      "expected": 13.699013406532318,
+      "actual": 12.520557001974653,
+      "difference": -1.1784564045576644,
+      "possessions": 295.51400943396226,
+      "differencePer36": -0.8609586550097397,
+      "weight": 0.22810560694984583
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -2841,15 +5036,40 @@
       "turnoversPer36": 0.40893793338241397
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.3036750483558994,
-      "assistsPer36": 0.4658753709198813,
+      "tsPct": 0.09830932999373826,
+      "pointsPer36": 0.1790193842645382,
+      "assistsPer36": 0.3036750483558994,
       "reboundsPer36": 0.1790193842645382,
       "turnoversPer36": 0.1790193842645382
     }
   },
   "78110": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.45364855488095945,
+        "actual": 0.5,
+        "difference": 0.046351445119040546,
+        "attempts": 4.0,
+        "weight": 0.009900990099009901
+      },
+      "threePoint": null,
+      "freeThrow": {
+        "expected": 0.7692307692307693,
+        "actual": 1.0,
+        "difference": 0.23076923076923073,
+        "attempts": 2.0,
+        "weight": 0.0196078431372549
+      }
+    },
+    "shotVolume": {
+      "expected": 19.245429714412417,
+      "actual": 15.838709145204666,
+      "difference": -3.406720569207751,
+      "possessions": 25.254583333333333,
+      "differencePer36": -2.4285351236502786,
+      "weight": 0.02463249981407057
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -2878,15 +5098,34 @@
       "turnoversPer36": -2.375601114887557
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.03485254691689008,
-      "assistsPer36": 0.06735751295336788,
+      "tsPct": 0.008947006194081212,
+      "pointsPer36": 0.017735334242837655,
+      "assistsPer36": 0.03485254691689008,
       "reboundsPer36": 0.017735334242837655,
       "turnoversPer36": 0.017735334242837655
     }
   },
   "78279": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0,
+        "actual": 0.0,
+        "difference": 0.0,
+        "attempts": 1.0,
+        "weight": 0.0024937655860349127
+      },
+      "threePoint": null,
+      "freeThrow": null
+    },
+    "shotVolume": {
+      "expected": 17.739707051957048,
+      "actual": 25.69593147751606,
+      "difference": 7.956224425559011,
+      "possessions": 3.891666666666667,
+      "differencePer36": 6.059211890492444,
+      "weight": 0.003876580308300199
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -2915,15 +5154,40 @@
       "turnoversPer36": 0.0
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.0055248618784530384,
-      "assistsPer36": 0.01098901098901099,
+      "tsPct": 0.0013869625520110957,
+      "pointsPer36": 0.002770083102493075,
+      "assistsPer36": 0.0055248618784530384,
       "reboundsPer36": 0.002770083102493075,
       "turnoversPer36": 0.002770083102493075
     }
   },
   "78304": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.4432461577859608,
+        "actual": 0.4909090909090909,
+        "difference": 0.04766293312313008,
+        "attempts": 55.0,
+        "weight": 0.12087912087912088
+      },
+      "threePoint": null,
+      "freeThrow": {
+        "expected": 0.766497461928934,
+        "actual": 0.8,
+        "difference": 0.03350253807106607,
+        "attempts": 20.0,
+        "weight": 0.16666666666666666
+      }
+    },
+    "shotVolume": {
+      "expected": 24.629190255160207,
+      "actual": 22.41831877862333,
+      "difference": -2.2108714765368767,
+      "possessions": 245.3350786163522,
+      "differencePer36": -1.5817630202098678,
+      "weight": 0.19700326669424212
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -2952,15 +5216,46 @@
       "turnoversPer36": -0.2983323315470145
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.25925925925925924,
-      "assistsPer36": 0.4117647058823529,
+      "tsPct": 0.08045977011494253,
+      "pointsPer36": 0.14893617021276595,
+      "assistsPer36": 0.25925925925925924,
       "reboundsPer36": 0.14893617021276595,
       "turnoversPer36": 0.14893617021276595
     }
   },
   "78318": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.44400076695320334,
+        "actual": 0.3333333333333333,
+        "difference": -0.11066743361987003,
+        "attempts": 54.0,
+        "weight": 0.11894273127753303
+      },
+      "threePoint": {
+        "expected": 0.25367635207919553,
+        "actual": 0.36363636363636365,
+        "difference": 0.10996001155716811,
+        "attempts": 11.0,
+        "weight": 0.0267639902676399
+      },
+      "freeThrow": {
+        "expected": 0.7724867724867724,
+        "actual": 0.7857142857142857,
+        "difference": 0.013227513227513255,
+        "attempts": 28.0,
+        "weight": 0.21875
+      }
+    },
+    "shotVolume": {
+      "expected": 21.64378916586464,
+      "actual": 17.742176307533803,
+      "difference": -3.901612858330836,
+      "possessions": 366.3586635220126,
+      "differencePer36": -2.744991649236796,
+      "weight": 0.2681277422266737
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -2989,15 +5284,46 @@
       "turnoversPer36": -0.07466544848606484
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.35714285714285715,
-      "assistsPer36": 0.5263157894736842,
+      "tsPct": 0.12195121951219512,
+      "pointsPer36": 0.21739130434782608,
+      "assistsPer36": 0.35714285714285715,
       "reboundsPer36": 0.21739130434782608,
       "turnoversPer36": 0.21739130434782608
     }
   },
   "78375": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.488162844006512,
+        "actual": 0.5555555555555556,
+        "difference": 0.06739271154904358,
+        "attempts": 9.0,
+        "weight": 0.022004889975550123
+      },
+      "threePoint": {
+        "expected": 0.375896780952995,
+        "actual": 0.2,
+        "difference": -0.175896780952995,
+        "attempts": 5.0,
+        "weight": 0.012345679012345678
+      },
+      "freeThrow": {
+        "expected": 0.8,
+        "actual": 1.0,
+        "difference": 0.19999999999999996,
+        "attempts": 1.0,
+        "weight": 0.009900990099009901
+      }
+    },
+    "shotVolume": {
+      "expected": 15.637410900089403,
+      "actual": 18.4889671490673,
+      "difference": 2.8515562489778965,
+      "possessions": 75.72083333333333,
+      "differencePer36": 2.066182986435381,
+      "weight": 0.07039078447397676
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -3026,15 +5352,46 @@
       "turnoversPer36": 1.6980875611801194
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.09547738693467336,
-      "assistsPer36": 0.1743119266055046,
+      "tsPct": 0.02571041948579161,
+      "pointsPer36": 0.05013192612137203,
+      "assistsPer36": 0.09547738693467336,
       "reboundsPer36": 0.05013192612137203,
       "turnoversPer36": 0.05013192612137203
     }
   },
   "78404": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.4873884695910378,
+        "actual": 0.47368421052631576,
+        "difference": -0.013704259064722057,
+        "attempts": 19.0,
+        "weight": 0.045346062052505964
+      },
+      "threePoint": {
+        "expected": 0.3959460128645758,
+        "actual": 0.8,
+        "difference": 0.40405398713542423,
+        "attempts": 5.0,
+        "weight": 0.012345679012345678
+      },
+      "freeThrow": {
+        "expected": 0.8024691358024691,
+        "actual": 0.8571428571428571,
+        "difference": 0.05467372134038795,
+        "attempts": 7.0,
+        "weight": 0.06542056074766354
+      }
+    },
+    "shotVolume": {
+      "expected": 20.56178824137727,
+      "actual": 17.287474712651232,
+      "difference": -3.2743135287260365,
+      "possessions": 138.8288364779874,
+      "differencePer36": -2.3347902778181355,
+      "weight": 0.1219049184839208
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -3063,15 +5420,40 @@
       "turnoversPer36": -0.44511086318090926
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.1724137931034483,
-      "assistsPer36": 0.29411764705882354,
+      "tsPct": 0.04950495049504951,
+      "pointsPer36": 0.09433962264150944,
+      "assistsPer36": 0.1724137931034483,
       "reboundsPer36": 0.09433962264150944,
       "turnoversPer36": 0.09433962264150944
     }
   },
   "78437": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.4202567150615989,
+        "actual": 0.3333333333333333,
+        "difference": -0.08692338172826558,
+        "attempts": 9.0,
+        "weight": 0.022004889975550123
+      },
+      "threePoint": null,
+      "freeThrow": {
+        "expected": 0.6190476190476191,
+        "actual": 1.0,
+        "difference": 0.38095238095238093,
+        "attempts": 4.0,
+        "weight": 0.038461538461538464
+      }
+    },
+    "shotVolume": {
+      "expected": 12.243104095811542,
+      "actual": 7.141153303744041,
+      "difference": -5.101950792067502,
+      "possessions": 126.03006289308176,
+      "differencePer36": -3.6309334301760705,
+      "weight": 0.11192424345161422
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -3100,15 +5482,46 @@
       "turnoversPer36": 0.9705308153704084
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.1588785046728972,
-      "assistsPer36": 0.27419354838709675,
+      "tsPct": 0.04509283819628647,
+      "pointsPer36": 0.08629441624365482,
+      "assistsPer36": 0.1588785046728972,
       "reboundsPer36": 0.08629441624365482,
       "turnoversPer36": 0.08629441624365482
     }
   },
   "786": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.4412904302709322,
+        "actual": 0.4583333333333333,
+        "difference": 0.017042903062401138,
+        "attempts": 96.0,
+        "weight": 0.1935483870967742
+      },
+      "threePoint": {
+        "expected": 0.35348871503307133,
+        "actual": 0.07692307692307693,
+        "difference": -0.2765656381099944,
+        "attempts": 13.0,
+        "weight": 0.031476997578692496
+      },
+      "freeThrow": {
+        "expected": 0.7295597484276729,
+        "actual": 0.6956521739130435,
+        "difference": -0.033907574514629446,
+        "attempts": 23.0,
+        "weight": 0.18699186991869918
+      }
+    },
+    "shotVolume": {
+      "expected": 20.843738336492393,
+      "actual": 17.591875194826642,
+      "difference": -3.2518631416657513,
+      "possessions": 619.604213836478,
+      "differencePer36": -2.3240123612687245,
+      "weight": 0.3825652023766813
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -3137,15 +5550,40 @@
       "turnoversPer36": 0.01458580448568092
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.48863636363636365,
-      "assistsPer36": 0.6564885496183206,
+      "tsPct": 0.19282511210762332,
+      "pointsPer36": 0.3233082706766917,
+      "assistsPer36": 0.48863636363636365,
       "reboundsPer36": 0.3233082706766917,
       "turnoversPer36": 0.3233082706766917
     }
   },
   "78615": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.4878471524238102,
+        "actual": 0.4423076923076923,
+        "difference": -0.045539460116117925,
+        "attempts": 52.0,
+        "weight": 0.11504424778761062
+      },
+      "threePoint": null,
+      "freeThrow": {
+        "expected": 0.6827195467422096,
+        "actual": 0.5625,
+        "difference": -0.12021954674220958,
+        "attempts": 16.0,
+        "weight": 0.13793103448275862
+      }
+    },
+    "shotVolume": {
+      "expected": 21.40138800953107,
+      "actual": 22.036294320456975,
+      "difference": 0.6349063109259063,
+      "possessions": 235.9743396226415,
+      "differencePer36": 0.44791110981803905,
+      "weight": 0.19092171419569068
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -3174,15 +5612,40 @@
       "turnoversPer36": -0.4927426009161417
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.26229508196721313,
-      "assistsPer36": 0.4155844155844156,
+      "tsPct": 0.08163265306122448,
+      "pointsPer36": 0.1509433962264151,
+      "assistsPer36": 0.26229508196721313,
       "reboundsPer36": 0.1509433962264151,
       "turnoversPer36": 0.1509433962264151
     }
   },
   "78633": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.4090737986101351,
+        "actual": 1.0,
+        "difference": 0.5909262013898648,
+        "attempts": 2.0,
+        "weight": 0.004975124378109453
+      },
+      "threePoint": {
+        "expected": 0.3403299577464217,
+        "actual": 0.0,
+        "difference": -0.3403299577464217,
+        "attempts": 2.0,
+        "weight": 0.004975124378109453
+      },
+      "freeThrow": null
+    },
+    "shotVolume": {
+      "expected": 12.234863039492346,
+      "actual": 19.4002101689435,
+      "difference": 7.165347129451153,
+      "possessions": 20.618333333333332,
+      "differencePer36": 5.345991433257843,
+      "weight": 0.020201805768071967
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -3211,15 +5674,40 @@
       "turnoversPer36": 5.683290253936455
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.029649595687331536,
-      "assistsPer36": 0.05759162303664921,
+      "tsPct": 0.007580978635423846,
+      "pointsPer36": 0.015047879616963064,
+      "assistsPer36": 0.029649595687331536,
       "reboundsPer36": 0.015047879616963064,
       "turnoversPer36": 0.015047879616963064
     }
   },
   "891": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.5074635959841722,
+        "actual": 0.3793103448275862,
+        "difference": -0.12815325115658605,
+        "attempts": 58.0,
+        "weight": 0.12663755458515283
+      },
+      "threePoint": null,
+      "freeThrow": {
+        "expected": 0.7350427350427351,
+        "actual": 0.7407407407407407,
+        "difference": 0.005698005698005604,
+        "attempts": 27.0,
+        "weight": 0.2125984251968504
+      }
+    },
+    "shotVolume": {
+      "expected": 8.861500544520064,
+      "actual": 9.060044346028706,
+      "difference": 0.1985438015086416,
+      "possessions": 640.173466981132,
+      "differencePer36": 0.1416148454893263,
+      "weight": 0.3903083910748913
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -3248,15 +5736,46 @@
       "turnoversPer36": -0.20459594157158587
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.4957983193277311,
-      "assistsPer36": 0.6629213483146067,
+      "tsPct": 0.19732441471571907,
+      "pointsPer36": 0.329608938547486,
+      "assistsPer36": 0.4957983193277311,
       "reboundsPer36": 0.329608938547486,
       "turnoversPer36": 0.329608938547486
     }
   },
   "893": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.5273104455264146,
+        "actual": 0.5083798882681564,
+        "difference": -0.018930557258258207,
+        "attempts": 537.0,
+        "weight": 0.5731056563500534
+      },
+      "threePoint": {
+        "expected": 0.24189966851927902,
+        "actual": 0.38636363636363635,
+        "difference": 0.14446396784435733,
+        "attempts": 44.0,
+        "weight": 0.0990990990990991
+      },
+      "freeThrow": {
+        "expected": 0.8322033898305085,
+        "actual": 0.8571428571428571,
+        "difference": 0.02493946731234864,
+        "attempts": 189.0,
+        "weight": 0.6539792387543253
+      }
+    },
+    "shotVolume": {
+      "expected": 29.096191315089335,
+      "actual": 33.24812763560982,
+      "difference": 4.151936320520484,
+      "possessions": 1747.466823899371,
+      "differencePer36": 3.00279816913357,
+      "weight": 0.6360283620892865
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -3285,15 +5804,46 @@
       "turnoversPer36": 1.033513222087354
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.71875,
-      "assistsPer36": 0.8363636363636363,
+      "tsPct": 0.3898305084745763,
+      "pointsPer36": 0.5609756097560976,
+      "assistsPer36": 0.71875,
       "reboundsPer36": 0.5609756097560976,
       "turnoversPer36": 0.5609756097560976
     }
   },
   "894": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.4977175642365443,
+        "actual": 0.5,
+        "difference": 0.0022824357634557146,
+        "attempts": 120.0,
+        "weight": 0.23076923076923078
+      },
+      "threePoint": {
+        "expected": 0.27676742639110735,
+        "actual": 0.2727272727272727,
+        "difference": -0.004040153663834645,
+        "attempts": 11.0,
+        "weight": 0.0267639902676399
+      },
+      "freeThrow": {
+        "expected": 0.9164835164835164,
+        "actual": 0.8703703703703703,
+        "difference": -0.0461131461131461,
+        "attempts": 54.0,
+        "weight": 0.35064935064935066
+      }
+    },
+    "shotVolume": {
+      "expected": 24.04089426828084,
+      "actual": 20.653786954610936,
+      "difference": -3.3871073136699046,
+      "possessions": 634.26625,
+      "differencePer36": -2.4833059607293575,
+      "weight": 0.3881046004590745
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -3322,15 +5872,40 @@
       "turnoversPer36": 0.15022546745445936
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.46745562130177515,
-      "assistsPer36": 0.6370967741935484,
+      "tsPct": 0.17995444191343962,
+      "pointsPer36": 0.305019305019305,
+      "assistsPer36": 0.46745562130177515,
       "reboundsPer36": 0.305019305019305,
       "turnoversPer36": 0.305019305019305
     }
   },
   "897": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.5105016968335669,
+        "actual": 0.6031746031746031,
+        "difference": 0.0926729063410362,
+        "attempts": 63.0,
+        "weight": 0.13606911447084233
+      },
+      "threePoint": null,
+      "freeThrow": {
+        "expected": 0.7116279069767442,
+        "actual": 0.71875,
+        "difference": 0.007122093023255838,
+        "attempts": 32.0,
+        "weight": 0.24242424242424243
+      }
+    },
+    "shotVolume": {
+      "expected": 14.734897329856446,
+      "actual": 16.10304479682117,
+      "difference": 1.3681474669647233,
+      "possessions": 391.2303591954023,
+      "differencePer36": 1.0436718711790247,
+      "weight": 0.2812117753250185
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -3359,15 +5934,46 @@
       "turnoversPer36": 0.6589076065054195
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.3394495412844037,
-      "assistsPer36": 0.5068493150684932,
+      "tsPct": 0.11384615384615385,
+      "pointsPer36": 0.20441988950276244,
+      "assistsPer36": 0.3394495412844037,
       "reboundsPer36": 0.20441988950276244,
       "turnoversPer36": 0.20441988950276244
     }
   },
   "9": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.49074085643600135,
+        "actual": 0.5116279069767442,
+        "difference": 0.020887050540742857,
+        "attempts": 43.0,
+        "weight": 0.09706546275395034
+      },
+      "threePoint": {
+        "expected": 0.292956135823107,
+        "actual": 0.6666666666666666,
+        "difference": 0.37371053084355965,
+        "attempts": 3.0,
+        "weight": 0.007444168734491315
+      },
+      "freeThrow": {
+        "expected": 0.831275720164609,
+        "actual": 0.75,
+        "difference": -0.08127572016460904,
+        "attempts": 12.0,
+        "weight": 0.10714285714285714
+      }
+    },
+    "shotVolume": {
+      "expected": 16.687991103294678,
+      "actual": 14.569293396491172,
+      "difference": -2.1186977068035056,
+      "possessions": 315.7325393081761,
+      "differencePer36": -1.5081607234068743,
+      "weight": 0.2399671132813901
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -3396,15 +6002,34 @@
       "turnoversPer36": 0.28439836462069984
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.3103448275862069,
-      "assistsPer36": 0.47368421052631576,
+      "tsPct": 0.10112359550561797,
+      "pointsPer36": 0.1836734693877551,
+      "assistsPer36": 0.3103448275862069,
       "reboundsPer36": 0.1836734693877551,
       "turnoversPer36": 0.1836734693877551
     }
   },
   "905": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.5343776745741163,
+        "actual": 0.4,
+        "difference": -0.1343776745741163,
+        "attempts": 10.0,
+        "weight": 0.024390243902439025
+      },
+      "threePoint": null,
+      "freeThrow": null
+    },
+    "shotVolume": {
+      "expected": 10.484130901504678,
+      "actual": 7.2056941298404915,
+      "difference": -3.278436771664186,
+      "possessions": 138.77913522012577,
+      "differencePer36": -2.4843852049017445,
+      "weight": 0.1218665946081808
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -3433,15 +6058,34 @@
       "turnoversPer36": -0.6396770483697591
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.16083916083916083,
-      "assistsPer36": 0.27710843373493976,
+      "tsPct": 0.04572564612326044,
+      "pointsPer36": 0.08745247148288973,
+      "assistsPer36": 0.16083916083916083,
       "reboundsPer36": 0.08745247148288973,
       "turnoversPer36": 0.08745247148288973
     }
   },
   "917": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.3547448513191532,
+        "actual": 0.25,
+        "difference": -0.10474485131915318,
+        "attempts": 4.0,
+        "weight": 0.009900990099009901
+      },
+      "threePoint": null,
+      "freeThrow": null
+    },
+    "shotVolume": {
+      "expected": 10.59274221043569,
+      "actual": 16.890405897566726,
+      "difference": 6.2976636871310365,
+      "possessions": 23.682083333333335,
+      "differencePer36": 4.442799987083439,
+      "weight": 0.023134216881299005
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -3470,15 +6114,40 @@
       "turnoversPer36": -2.3368152764388967
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.03225806451612903,
-      "assistsPer36": 0.0625,
+      "tsPct": 0.008264462809917356,
+      "pointsPer36": 0.01639344262295082,
+      "assistsPer36": 0.03225806451612903,
       "reboundsPer36": 0.01639344262295082,
       "turnoversPer36": 0.01639344262295082
     }
   },
   "920": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.4852464932300317,
+        "actual": 0.41025641025641024,
+        "difference": -0.07499008297362147,
+        "attempts": 39.0,
+        "weight": 0.0888382687927107
+      },
+      "threePoint": null,
+      "freeThrow": {
+        "expected": 0.7439824945295405,
+        "actual": 0.8260869565217391,
+        "difference": 0.08210446199219867,
+        "attempts": 23.0,
+        "weight": 0.18699186991869918
+      }
+    },
+    "shotVolume": {
+      "expected": 13.592005962404118,
+      "actual": 13.067519283138777,
+      "difference": -0.5244866792653404,
+      "possessions": 298.4499135220126,
+      "differencePer36": -0.3739259874134641,
+      "weight": 0.22985092487123723
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -3507,15 +6176,40 @@
       "turnoversPer36": -0.2270693827079081
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.2982456140350877,
-      "assistsPer36": 0.4594594594594595,
+      "tsPct": 0.096045197740113,
+      "pointsPer36": 0.17525773195876287,
+      "assistsPer36": 0.2982456140350877,
       "reboundsPer36": 0.17525773195876287,
       "turnoversPer36": 0.17525773195876287
     }
   },
   "922": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.4419568734010619,
+        "actual": 0.3783783783783784,
+        "difference": -0.06357849502268348,
+        "attempts": 37.0,
+        "weight": 0.08466819221967964
+      },
+      "threePoint": null,
+      "freeThrow": {
+        "expected": 0.6188340807174888,
+        "actual": 0.6666666666666666,
+        "difference": 0.04783258594917783,
+        "attempts": 18.0,
+        "weight": 0.15254237288135594
+      }
+    },
+    "shotVolume": {
+      "expected": 12.840494433817636,
+      "actual": 16.1411310479855,
+      "difference": 3.300636614167864,
+      "possessions": 229.2280503144654,
+      "differencePer36": 2.3613202402406466,
+      "weight": 0.18648130447057687
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -3544,15 +6238,46 @@
       "turnoversPer36": -0.18604744330501968
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.24528301886792453,
-      "assistsPer36": 0.3939393939393939,
+      "tsPct": 0.07514450867052024,
+      "pointsPer36": 0.13978494623655913,
+      "assistsPer36": 0.24528301886792453,
       "reboundsPer36": 0.13978494623655913,
       "turnoversPer36": 0.13978494623655913
     }
   },
   "927": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.49964773644802923,
+        "actual": 0.46511627906976744,
+        "difference": -0.0345314573782618,
+        "attempts": 43.0,
+        "weight": 0.09706546275395034
+      },
+      "threePoint": {
+        "expected": 0,
+        "actual": 0.0,
+        "difference": 0.0,
+        "attempts": 1.0,
+        "weight": 0.0024937655860349127
+      },
+      "freeThrow": {
+        "expected": 0.7153846153846154,
+        "actual": 0.8214285714285714,
+        "difference": 0.106043956043956,
+        "attempts": 28.0,
+        "weight": 0.21875
+      }
+    },
+    "shotVolume": {
+      "expected": 13.661803059892604,
+      "actual": 16.15273943597767,
+      "difference": 2.490936376085065,
+      "possessions": 272.39961477987424,
+      "differencePer36": 1.759588106643513,
+      "weight": 0.2140833835657829
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -3581,15 +6306,46 @@
       "turnoversPer36": 0.25830882313851716
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.29273084479371314,
-      "assistsPer36": 0.45288753799392095,
+      "tsPct": 0.09376966645689112,
+      "pointsPer36": 0.1714614499424626,
+      "assistsPer36": 0.29273084479371314,
       "reboundsPer36": 0.1714614499424626,
       "turnoversPer36": 0.1714614499424626
     }
   },
   "937": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": {
+        "expected": 0.5188134961940992,
+        "actual": 0.4850498338870432,
+        "difference": -0.03376366230705602,
+        "attempts": 301.0,
+        "weight": 0.42938659058487877
+      },
+      "threePoint": {
+        "expected": 0.1821180921265507,
+        "actual": 0.25,
+        "difference": 0.0678819078734493,
+        "attempts": 24.0,
+        "weight": 0.05660377358490566
+      },
+      "freeThrow": {
+        "expected": 0.7603686635944701,
+        "actual": 0.7612903225806451,
+        "difference": 0.0009216589861750224,
+        "attempts": 155.0,
+        "weight": 0.6078431372549019
+      }
+    },
+    "shotVolume": {
+      "expected": 21.27757481330638,
+      "actual": 19.03169673386252,
+      "difference": -2.245878079443859,
+      "possessions": 1707.6774842767295,
+      "differencePer36": -1.6262050057159199,
+      "weight": 0.6306797963173526
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -3618,9 +6374,9 @@
       "turnoversPer36": 0.08662321112688277
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.7140587768069897,
-      "assistsPer36": 0.8331788693234476,
+      "tsPct": 0.38435228730226595,
+      "pointsPer36": 0.5552810376775787,
+      "assistsPer36": 0.7140587768069897,
       "reboundsPer36": 0.5552810376775787,
       "turnoversPer36": 0.5552810376775787
     }

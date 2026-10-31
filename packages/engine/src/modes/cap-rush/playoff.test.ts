@@ -21,6 +21,7 @@ import { capRushTestSetup } from './cap-rush-test-support.ts';
 import { buildCapRushLockedInputs } from './lock.ts';
 import {
   CAP_RUSH_PLAYOFF_FORMULA,
+  CAP_RUSH_PLAYOFF_EFFECT_STRENGTH,
   capRushPlayoffAppliedOf,
   capRushPlayoffEffectOf,
   capRushPlayoffPerformanceOf,
@@ -749,4 +750,159 @@ it('pins adjusted effects for both teams and produces audited deterministic play
   );
   const stored = capRushLockedInputsSchema.parse(JSON.parse(JSON.stringify(adjusted)));
   expect(stored.playoffPerformance).toEqual(adjusted.playoffPerformance);
+});
+
+function shootingProfile(season = '2015-16'): PlayoffPerformance {
+  const source = adjustedProfile(season);
+  const adjustment = required(source.adjustment, 'adjustment');
+  return {
+    ...source,
+    adjustment: {
+      ...adjustment,
+      modelVersion: 'opponent-pace-v2',
+      shooting: {
+        twoPoint: { expected: 0.5, actual: 0.55, difference: 0.05, attempts: 400, weight: 0.5 },
+        threePoint: { expected: 0.4, actual: 0.38, difference: -0.02, attempts: 200, weight: 0.4 },
+        freeThrow: { expected: 0.8, actual: 0.84, difference: 0.04, attempts: 100, weight: 0.5 },
+      },
+      shotVolume: {
+        expected: 20,
+        actual: 22,
+        difference: 2,
+        differencePer36: 1,
+        possessions: 500,
+        weight: 0.5,
+      },
+    },
+  };
+}
+
+it('applies separate shooting effects, attempts-based volume and the stronger bounded mapping', () => {
+  const source = shootingProfile();
+  const applied = capRushPlayoffEffectOf({
+    profile: source,
+    authoritativeChannels: [],
+    observedFieldGoalAttemptsPerGame: 12,
+  });
+  expect(applied.twoPointPct).toBeCloseTo(0.05 * 0.5 * CAP_RUSH_PLAYOFF_EFFECT_STRENGTH);
+  expect(applied.threePointPct).toBeCloseTo(-0.02 * 0.4 * CAP_RUSH_PLAYOFF_EFFECT_STRENGTH);
+  expect(applied.freeThrowPct).toBeCloseTo(0.04 * 0.5 * CAP_RUSH_PLAYOFF_EFFECT_STRENGTH);
+  expect(applied.fieldGoalPct).toBe(0);
+  expect(applied.fieldGoalAttemptsPerGame).toBeCloseTo(1 * 0.5 * CAP_RUSH_PLAYOFF_EFFECT_STRENGTH);
+  const owned = capRushPlayoffEffectOf({
+    profile: source,
+    authoritativeChannels: [
+      'two-point-accuracy',
+      'three-point-accuracy',
+      'free-throw-accuracy',
+      'offensive-allocation',
+    ],
+    observedFieldGoalAttemptsPerGame: 12,
+  });
+  expect(owned.twoPointPct).toBe(0);
+  expect(owned.threePointPct).toBe(0);
+  expect(owned.freeThrowPct).toBe(0);
+  expect(owned.fieldGoalAttemptsPerGame).toBe(0);
+});
+
+it('does not leak a three-point shooting change into two-point accuracy', () => {
+  const human = humanOf();
+  const season = required(human.starters[0]?.source.seasonKey, 'season');
+  const source = shootingProfile(season);
+  const evidence = required(source.adjustment?.shooting, 'shooting');
+  required(evidence.twoPoint, 'two-point').difference = 0;
+  required(evidence.freeThrow, 'free-throw').difference = 0;
+  const performance = capRushPlayoffPerformanceOf({
+    human,
+    opponents: [],
+    profileOf: () => source,
+  });
+  const original = required(human.starters[0]?.source.profile.anchors, 'anchors');
+  const changed = required(
+    capRushPlayoffTeam({ team: human, performance }).starters[0]?.source.profile.anchors,
+    'changed anchors',
+  );
+  const rate = original.threePointAttemptRate ?? 0;
+  if (rate >= 1) throw new Error('fixture needs two-point attempts');
+  const beforeTwo = (original.fieldGoalPct - rate * (original.threePointPct ?? 0)) / (1 - rate);
+  const afterTwo = (changed.fieldGoalPct - rate * (changed.threePointPct ?? 0)) / (1 - rate);
+  expect(afterTwo).toBeCloseTo(beforeTwo, 10);
+  expect(changed.threePointPct).not.toBe(original.threePointPct);
+});
+
+it('caps each shooting channel independently and persists its new effects', () => {
+  const source = shootingProfile();
+  const shooting = required(source.adjustment?.shooting, 'shooting');
+  for (const channel of Object.values(shooting)) {
+    if (channel) {
+      channel.difference = 0.9;
+      channel.weight = 1;
+    }
+  }
+  const applied = capRushPlayoffEffectOf({
+    profile: source,
+    authoritativeChannels: [],
+    observedFieldGoalAttemptsPerGame: 12,
+  });
+  expect(applied.twoPointPct).toBe(CAP_RUSH_PLAYOFF_CAPS.twoPointPct);
+  expect(applied.threePointPct).toBe(CAP_RUSH_PLAYOFF_CAPS.threePointPct);
+  expect(applied.freeThrowPct).toBe(CAP_RUSH_PLAYOFF_CAPS.freeThrowPct);
+  const locked = lockedOf((season) => shootingProfile(required(season, 'season')));
+  const parsed = capRushLockedInputsSchema.parse(JSON.parse(JSON.stringify(locked)));
+  expect(parsed.playoffPerformance).toEqual(locked.playoffPerformance);
+  const context = createEngineContext();
+  const plan = planOf(locked);
+  const game = simulateCapRushPlayoffGame({ locked, plan, context });
+  expect(game.game.audit.ok).toBe(true);
+  expect(simulateCapRushPlayoffGame({ locked: parsed, plan, context }).game.result).toEqual(
+    game.game.result,
+  );
+});
+
+it('moves seeded scoring distributions in the direction of the shooting adjustment with clean accounting', () => {
+  const base = lockedOf(undefined, { versioned: true });
+  const performance = (direction: number) =>
+    capRushPlayoffPerformanceOf({
+      human: base.human,
+      opponents: [],
+      profileOf: (participant) => {
+        const source = shootingProfile(required(participant.seasonKey, 'season'));
+        const adjustment = required(source.adjustment, 'adjustment');
+        for (const channel of Object.values(required(adjustment.shooting, 'shooting'))) {
+          if (channel) {
+            channel.difference = direction * 0.1;
+            channel.weight = 1;
+          }
+        }
+        adjustment.shotVolume = null;
+        for (const key of Object.keys(
+          adjustment.differences,
+        ) as (keyof typeof adjustment.differences)[])
+          adjustment.differences[key] = 0;
+        return source;
+      },
+    });
+  const up = { ...base, playoffPerformance: performance(1) };
+  const down = { ...base, playoffPerformance: performance(-1) };
+  const context = createEngineContext();
+  let boosted = 0,
+    penalized = 0;
+  for (let index = 1; index <= 16; index += 1) {
+    const plan = {
+      ...planOf(base),
+      seed: capRushPlayoffGameSeed(
+        base.runSeed,
+        1,
+        Math.floor((index - 1) / 7),
+        ((index - 1) % 7) + 1,
+      ),
+    };
+    const positive = simulateCapRushPlayoffGame({ locked: up, plan, context });
+    const negative = simulateCapRushPlayoffGame({ locked: down, plan, context });
+    expect(positive.game.audit.ok).toBe(true);
+    expect(negative.game.audit.ok).toBe(true);
+    boosted += positive.game.summary.homePoints;
+    penalized += negative.game.summary.homePoints;
+  }
+  expect(boosted).toBeGreaterThan(penalized);
 });

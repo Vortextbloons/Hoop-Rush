@@ -2,6 +2,7 @@ import type {
   CapRushMultiplayerCheckpoint,
   CapRushMultiplayerCommand,
   CapRushMultiplayerState,
+  CapRushMultiplayerVariant,
 } from '@hoop-rush/data-contracts';
 import { canonicalJson, seasonDigestHex } from '@hoop-rush/data-contracts';
 import {
@@ -16,6 +17,7 @@ export function replayCapRushMultiplayerLog(input: {
   readonly rootSeed: string;
   readonly commands: readonly CapRushMultiplayerCommand[];
   readonly environment: CapRushMultiplayerEnvironment;
+  readonly variant?: CapRushMultiplayerVariant;
 }): { readonly state: CapRushMultiplayerState; readonly stateDigest: string } {
   const ordered = [...input.commands].sort((left, right) => left.ordinal - right.ordinal);
   let state = createCapRushMultiplayerState(input.rootSeed);
@@ -27,7 +29,12 @@ export function replayCapRushMultiplayerLog(input: {
         `cap rush multiplayer replay: command ${command.commandId} has ordinal ${String(command.ordinal)}, expected ${String(index)}`,
       );
     }
-    const outcome = applyCapRushMultiplayerCommand(state, command, input.environment);
+    const outcome = applyCapRushMultiplayerCommand(
+      state,
+      command,
+      input.environment,
+      input.variant,
+    );
     if (!outcome.ok) {
       throw new Error(
         `cap rush multiplayer replay: ${command.commandId} rejected (${outcome.code}): ${outcome.message}`,

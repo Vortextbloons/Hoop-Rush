@@ -404,16 +404,14 @@ describe('cap rush locked spin and replacement roles', () => {
     const locked = outcome.state.locked;
     if (locked === null) throw new Error('lock did not produce inputs');
     expect(locked.spin).not.toBeNull();
+    const firstReceipt =
+      bought.state.spin.status === 'purchased' ? bought.state.spin.receipt : null;
+    if (firstReceipt === null) throw new Error('spin was not purchased');
     expect(
       locked.human.starters.find(
         (starter) => starter.source.playerId === target.card.source.playerId,
       )?.mutationPackage,
-    ).toEqual([
-      bought.state.spin.status === 'purchased' ? bought.state.spin.receipt.entry : undefined,
-      ...(bought.state.spin.status === 'purchased'
-        ? (bought.state.spin.receipt.additionalEntries ?? [])
-        : []),
-    ]);
+    ).toEqual([firstReceipt.entry, ...(firstReceipt.additionalEntries ?? [])]);
     expect(locked.additionalSpins).toHaveLength(1);
 
     const mutatedStarters = locked.human.starters.filter(

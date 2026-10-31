@@ -12,3 +12,5 @@ export * from './schemas/cap-rush-record.ts';
 export * from './repositories/cap-rush.ts';
 export * from './schemas/havoc-multiplayer-record.ts';
 export * from './repositories/havoc-multiplayer.ts';
+export * from './schemas/cap-rush-multiplayer-record.ts';
+export * from './repositories/cap-rush-multiplayer.ts';

@@ -33,7 +33,10 @@ export const CAP_RUSH_PLAYOFF_FORMULA = {
   turnoversPer36Slope: 1.6,
 } as const;
 
+export const CAP_RUSH_PLAYOFF_EFFECT_STRENGTH = 1.25;
+
 /** A points-per-36 shift may never move a player's shot volume by more than half its own rate. */
+
 export const CAP_RUSH_PLAYOFF_ATTEMPTS_SHARE = 0.5;
 
 export const NEUTRAL_CAP_RUSH_PLAYOFF_APPLIED: CapRushPlayoffApplied = {
@@ -101,6 +104,7 @@ export function capRushPlayoffObservedOf(profile: PlayoffPerformance): CapRushPl
 export function capRushPlayoffAppliedOf(input: {
   readonly observed: CapRushPlayoffObserved;
   readonly weight: number;
+  readonly fieldGoalAttemptsPer36?: number | null;
   readonly observedFieldGoalAttemptsPerGame: number | null;
   readonly authoritativeChannels: readonly string[];
 }): CapRushPlayoffApplied {
@@ -111,7 +115,9 @@ export function capRushPlayoffAppliedOf(input: {
   const observed = input.observed;
   const shooting = clamp(f.tsPctSlope * scale(observed.tsPct), c.fieldGoalPct);
   const rawAttempts = clamp(
-    f.pointsPer36Slope * scale(observed.pointsPer36),
+    input.fieldGoalAttemptsPer36 === undefined
+      ? f.pointsPer36Slope * scale(observed.pointsPer36)
+      : scale(input.fieldGoalAttemptsPer36),
     c.fieldGoalAttemptsPerGame,
   );
   const attempts =
@@ -158,11 +164,18 @@ export function capRushPlayoffEffectOf(input: {
   if (adjustment === undefined) return { ...NEUTRAL_CAP_RUSH_PLAYOFF_APPLIED };
   const differences = adjustment.differences;
   const weights = adjustment.weights;
-  return capRushPlayoffAppliedOf({
+  const modern = adjustment.modelVersion === 'opponent-pace-v2';
+  const volume = adjustment.shotVolume;
+  const applied = capRushPlayoffAppliedOf({
     observed: {
-      tsPct: differences.tsPct === null ? null : differences.tsPct * weights.tsPct,
-      pointsPer36:
-        differences.pointsPer36 === null ? null : differences.pointsPer36 * weights.pointsPer36,
+      tsPct: modern || differences.tsPct === null ? null : differences.tsPct * weights.tsPct,
+      pointsPer36: modern
+        ? volume
+          ? volume.differencePer36 * volume.weight
+          : null
+        : differences.pointsPer36 === null
+          ? null
+          : differences.pointsPer36 * weights.pointsPer36,
       assistsPer36:
         differences.assistsPer36 === null ? null : differences.assistsPer36 * weights.assistsPer36,
       reboundsPer36:
@@ -174,10 +187,35 @@ export function capRushPlayoffEffectOf(input: {
           ? null
           : differences.turnoversPer36 * weights.turnoversPer36,
     },
-    weight: 1,
+    weight: modern ? CAP_RUSH_PLAYOFF_EFFECT_STRENGTH : 1,
+    ...(modern
+      ? { fieldGoalAttemptsPer36: volume ? volume.differencePer36 * volume.weight : null }
+      : {}),
     authoritativeChannels: input.authoritativeChannels,
     observedFieldGoalAttemptsPerGame: input.observedFieldGoalAttemptsPerGame,
   });
+  if (!modern) return applied;
+  const owned = new Set(input.authoritativeChannels);
+  const shooting = (
+    channel: 'twoPoint' | 'threePoint' | 'freeThrow',
+    cap: number,
+    ownership: string,
+  ) => {
+    const evidence = adjustment.shooting?.[channel];
+    return !evidence || owned.has(ownership)
+      ? 0
+      : clamp(evidence.difference * evidence.weight * CAP_RUSH_PLAYOFF_EFFECT_STRENGTH, cap);
+  };
+  return {
+    ...applied,
+    twoPointPct: shooting('twoPoint', CAP_RUSH_PLAYOFF_CAPS.twoPointPct, 'two-point-accuracy'),
+    threePointPct: shooting(
+      'threePoint',
+      CAP_RUSH_PLAYOFF_CAPS.threePointPct,
+      'three-point-accuracy',
+    ),
+    freeThrowPct: shooting('freeThrow', CAP_RUSH_PLAYOFF_CAPS.freeThrowPct, 'free-throw-accuracy'),
+  };
 }
 
 /**
@@ -245,9 +283,20 @@ function adjustedAnchors(
 ): SimulationAnchors {
   const capped = applied.fieldGoalPct;
   const cappedThree = applied.threePointPct;
+  const threeRate = anchors.threePointAttemptRate ?? 0;
+  const modernFieldGoalShift =
+    (applied.twoPointPct ?? 0) * (1 - threeRate) + cappedThree * threeRate;
   return {
     ...anchors,
-    fieldGoalPct: shift(anchors.fieldGoalPct, capped, 0.2, 0.85),
+    fieldGoalPct: shift(
+      anchors.fieldGoalPct,
+      applied.twoPointPct === undefined ? capped : modernFieldGoalShift,
+      0.2,
+      0.85,
+    ),
+    ...(applied.freeThrowPct === undefined
+      ? {}
+      : { freeThrowPct: shift(anchors.freeThrowPct, applied.freeThrowPct, 0, 1) }),
     ...(anchors.threePointPct === null
       ? {}
       : { threePointPct: shift(anchors.threePointPct, cappedThree, 0, 1) }),

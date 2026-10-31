@@ -72,7 +72,7 @@ export function buildCapRushMultiplayerReport(input: {
       p1: seatReportOf({ ...input, seat: 'p1' }),
       p2: seatReportOf({ ...input, seat: 'p2' }),
     },
-    finalsMvp: input.postseason?.finalsMvp ?? null,
+    finalsMvp: input.postseason.finalsMvp,
     completedAtIso: input.completedAtIso,
   });
 }

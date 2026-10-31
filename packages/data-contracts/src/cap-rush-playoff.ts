@@ -3,10 +3,11 @@ import { z } from 'zod';
 import { playerIdSchema, seasonKeySchema } from './ids.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
 
-export const CAP_RUSH_PLAYOFF_FORMULA_VERSION = 'cap-rush-playoff-formula-v3';
+export const CAP_RUSH_PLAYOFF_FORMULA_VERSION = 'cap-rush-playoff-formula-v4';
 export const capRushPlayoffFormulaVersionSchema = z.enum([
   'cap-rush-playoff-formula-v1',
   'cap-rush-playoff-formula-v2',
+  'cap-rush-playoff-formula-v3',
   CAP_RUSH_PLAYOFF_FORMULA_VERSION,
 ]);
 export const CAP_RUSH_PLAYOFF_SAMPLE_MINUTES = 180;
@@ -14,6 +15,8 @@ export const CAP_RUSH_PLAYOFF_MAX_PLAYERS = 320;
 
 export const CAP_RUSH_PLAYOFF_CAPS = {
   fieldGoalPct: 0.04,
+  twoPointPct: 0.04,
+  freeThrowPct: 0.05,
   threePointPct: 0.04,
   fieldGoalAttemptsPerGame: 2.5,
   passRate: 6,
@@ -44,6 +47,16 @@ export const capRushPlayoffObservedSchema = z.object({
 export type CapRushPlayoffObserved = z.infer<typeof capRushPlayoffObservedSchema>;
 
 export const capRushPlayoffAppliedSchema = z.object({
+  twoPointPct: z
+    .number()
+    .min(-CAP_RUSH_PLAYOFF_CAPS.twoPointPct)
+    .max(CAP_RUSH_PLAYOFF_CAPS.twoPointPct)
+    .optional(),
+  freeThrowPct: z
+    .number()
+    .min(-CAP_RUSH_PLAYOFF_CAPS.freeThrowPct)
+    .max(CAP_RUSH_PLAYOFF_CAPS.freeThrowPct)
+    .optional(),
   fieldGoalPct: z
     .number()
     .min(-CAP_RUSH_PLAYOFF_CAPS.fieldGoalPct)

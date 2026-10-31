@@ -60,7 +60,11 @@ export interface ModeDefinition<TId extends string = ModeId> {
   multiplayer?: {
     gameKind: MultiplayerGameKind;
     label: string;
-    routeId: '/multiplayer/room/[roomId]' | '/draft-duel/room/[roomId]' | '/havoc/room/[roomId]';
+    routeId:
+      | '/multiplayer/room/[roomId]'
+      | '/draft-duel/room/[roomId]'
+      | '/havoc/room/[roomId]'
+      | '/cap-rush/room/[roomId]';
     formats: readonly MultiplayerFormatDefinition[];
     load: () => Promise<MultiplayerModeAdapter>;
   };

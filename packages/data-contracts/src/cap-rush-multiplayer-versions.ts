@@ -39,9 +39,6 @@ export const CAP_RUSH_MULTIPLAYER_BLOCK_COUNT = CAP_RUSH_MULTIPLAYER_BLOCK_ENDPO
 export const capRushMultiplayerSeatIdSchema = z.enum(['p1', 'p2']);
 export type CapRushMultiplayerSeatId = z.infer<typeof capRushMultiplayerSeatIdSchema>;
 
-export const capRushMultiplayerSeatMapSchema = <T extends z.ZodTypeAny>(value: T) =>
-  z.object({ p1: value, p2: value });
-
 export const capRushMultiplayerVariantSchema = capRushVariantSchema;
 export type CapRushMultiplayerVariant = z.infer<typeof capRushMultiplayerVariantSchema>;
 
@@ -100,3 +97,8 @@ export const capRushMultiplayerSettingsSchema = z.object({
   versionLocks: capRushMultiplayerVersionLocksSchema,
 });
 export type CapRushMultiplayerSettings = z.infer<typeof capRushMultiplayerSettingsSchema>;
+
+export const capRushMultiplayerSetupSchema = z.object({
+  variant: capRushMultiplayerVariantSchema,
+});
+export type CapRushMultiplayerSetup = z.infer<typeof capRushMultiplayerSetupSchema>;

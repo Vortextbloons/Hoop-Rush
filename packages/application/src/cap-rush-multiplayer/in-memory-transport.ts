@@ -84,6 +84,7 @@ export class CapRushMultiplayerInMemoryTransport implements CapRushMultiplayerTr
   }
 
   async create(input: CapRushMultiplayerCreateInput): Promise<CapRushMultiplayerRoomMembership> {
+    await Promise.resolve();
     this.counter += 1;
     const roomId = idSchema.parse(`crm-${String(this.counter)}`);
     const code = String(this.codeCounter + this.counter);
@@ -125,12 +126,14 @@ export class CapRushMultiplayerInMemoryTransport implements CapRushMultiplayerTr
   }
 
   async preview(code: string): Promise<CapRushMultiplayerRoomSnapshot> {
+    await Promise.resolve();
     const roomId = this.codes.get(code);
     if (roomId === undefined) throw new Error('invalid-code');
     return this.snapshotOf(this.room(roomId));
   }
 
   async join(code: string): Promise<CapRushMultiplayerRoomMembership> {
+    await Promise.resolve();
     const roomId = this.codes.get(code);
     if (roomId === undefined) throw new Error('invalid-code');
     const room = this.room(roomId);
@@ -146,6 +149,7 @@ export class CapRushMultiplayerInMemoryTransport implements CapRushMultiplayerTr
   }
 
   async resume(roomId: string): Promise<CapRushMultiplayerRoomMembership> {
+    await Promise.resolve();
     const room = this.room(roomId);
     const member = room.members.get('p1');
     if (member === undefined) throw new Error('membership');
@@ -156,10 +160,12 @@ export class CapRushMultiplayerInMemoryTransport implements CapRushMultiplayerTr
   }
 
   async snapshot(roomId: string): Promise<CapRushMultiplayerRoomSnapshot> {
+    await Promise.resolve();
     return this.snapshotOf(this.room(roomId));
   }
 
   async sync(roomId: string, afterOrdinal = -1): Promise<CapRushMultiplayerSync> {
+    await Promise.resolve();
     const room = this.room(roomId);
     return {
       snapshot: this.snapshotOf(room),
@@ -183,6 +189,7 @@ export class CapRushMultiplayerInMemoryTransport implements CapRushMultiplayerTr
   async submitCommand(
     input: CapRushMultiplayerSubmitInput,
   ): Promise<CapRushMultiplayerCommandReceipt> {
+    await Promise.resolve();
     const room = this.room(input.roomId);
     commandIdSchema.parse(input.commandId);
     const key = payloadKey(input.payload);
@@ -227,7 +234,12 @@ export class CapRushMultiplayerInMemoryTransport implements CapRushMultiplayerTr
       acceptedAtIso: new Date(this.now()).toISOString(),
       payload: input.payload,
     };
-    const outcome = applyCapRushMultiplayerCommand(room.state, command, this.options.environment);
+    const outcome = applyCapRushMultiplayerCommand(
+      room.state,
+      command,
+      this.options.environment,
+      room.settings.variant,
+    );
     if (!outcome.ok) {
       return {
         roomId: idSchema.parse(room.roomId),
@@ -258,6 +270,7 @@ export class CapRushMultiplayerInMemoryTransport implements CapRushMultiplayerTr
   }
 
   async closeDueAuctions(roomId: string): Promise<CapRushMultiplayerCommandReceipt | null> {
+    await Promise.resolve();
     const room = this.room(roomId);
     const deadline = this.deadlineOf(room.state);
     if (deadline === null || room.state.recruitment === null) return null;
@@ -275,17 +288,20 @@ export class CapRushMultiplayerInMemoryTransport implements CapRushMultiplayerTr
   }
 
   async removeGuest(roomId: string): Promise<void> {
+    await Promise.resolve();
     const room = this.room(roomId);
     room.members.delete('p2');
     this.emit(room);
   }
 
   async leave(roomId: string): Promise<void> {
+    await Promise.resolve();
     const room = this.room(roomId);
     this.emit(room);
   }
 
   async verificationChallenge(roomId: string): Promise<string> {
+    await Promise.resolve();
     const room = this.room(roomId);
     return digestOf({
       roomId: room.roomId,
@@ -300,14 +316,17 @@ export class CapRushMultiplayerInMemoryTransport implements CapRushMultiplayerTr
     participantId: CapRushMultiplayerSeatId,
     receipt: CapRushMultiplayerVerificationReceipt,
   ): Promise<void> {
+    await Promise.resolve();
     this.room(roomId).receipts.set(participantId, receipt);
   }
 
   async complete(roomId: string): Promise<void> {
+    await Promise.resolve();
     this.room(roomId);
   }
 
   async fail(roomId: string): Promise<void> {
+    await Promise.resolve();
     const room = this.room(roomId);
     room.state = { ...room.state, phase: 'integrity-failed' };
     this.emit(room);

@@ -1,6 +1,6 @@
 import unittest
 
-from build_playoff_adjustments import difference, possessions
+from build_playoff_adjustments import difference, possessions, shooting_difference, volume_difference
 from fetch_playoff_history import game_season, normalize_game_minutes, normalized_row, COLUMNS
 
 
@@ -36,6 +36,32 @@ class PlayoffAdjustmentTests(unittest.TestCase):
         a = {'fieldGoalsAttempted': 90, 'freeThrowsAttempted': 20, 'reboundsOffensive': 10, 'turnovers': 12}
         b = {'fieldGoalsAttempted': 85, 'freeThrowsAttempted': 25, 'reboundsOffensive': 8, 'turnovers': 15}
         self.assertEqual(possessions(a, b), possessions(b, a))
+
+
+class ShootingModelTests(unittest.TestCase):
+    def shooting_sample(self, made=50, attempts=100, fga=20, points=30, defense=0):
+        return {'shots': [(made, attempts), (10, 30), (15, 20)], 'context': [0, 1, 1, 1, 1, defense, 0, 0, 1], 'possessions': 100, 'minutes': 36, 'fga': fga, 'points': points}
+
+    def test_harder_two_point_defense_does_not_create_a_shooting_penalty(self):
+        regular = [self.shooting_sample()]
+        post = [self.shooting_sample(made=45, defense=-.05)]
+        result = shooting_difference(regular, post, 0)
+        self.assertAlmostEqual(result['difference'], 0)
+        self.assertEqual(result['attempts'], 100)
+
+    def test_separates_shooting_types_and_unavailable_attempts(self):
+        regular, post = [self.shooting_sample()], [self.shooting_sample(made=60)]
+        self.assertGreater(shooting_difference(regular, post, 0)['difference'], 0)
+        self.assertEqual(shooting_difference(regular, post, 1)['difference'], 0)
+        post[0]['shots'][2] = None
+        self.assertIsNone(shooting_difference(regular, post, 2))
+
+    def test_lower_scoring_does_not_reduce_shot_volume_when_attempts_are_unchanged(self):
+        regular = [self.shooting_sample(points=30)]
+        post = [self.shooting_sample(points=20)]
+        self.assertEqual(volume_difference(regular, post)['differencePer36'], 0)
+        post[0]['fga'] = 25
+        self.assertGreater(volume_difference(regular, post)['differencePer36'], 0)
 
 
 class HistoricalSourceTests(unittest.TestCase):

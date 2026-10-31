@@ -39,10 +39,12 @@ describe('mode catalog', () => {
       'duel',
       'draft-duel',
       'havoc',
+      'cap-rush',
     ]);
     expect(multiplayerMode('fixed-five').routeId).toBe('/multiplayer/room/[roomId]');
     expect(multiplayerMode('draft-duel').routeId).toBe('/draft-duel/room/[roomId]');
     expect(multiplayerMode('havoc').routeId).toBe('/havoc/room/[roomId]');
+    expect(multiplayerMode('cap-rush').routeId).toBe('/cap-rush/room/[roomId]');
   });
 
   it.each(multiplayerGameKindSchema.options)(

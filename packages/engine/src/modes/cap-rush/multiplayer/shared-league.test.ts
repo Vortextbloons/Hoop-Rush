@@ -151,7 +151,6 @@ describe('cap rush multiplayer shared league', () => {
       guard += 1;
       if (guard > 40) throw new Error('playoffs did not finish');
       const postseason = state.postseason;
-      if (postseason === null) throw new Error('no postseason');
       const round = capRushMultiplayerCurrentRound(postseason);
       const plans = capRushMultiplayerPlayoffPlans({
         locked: state.locked as NonNullable<CapRushMultiplayerState['locked']>,
@@ -176,10 +175,12 @@ describe('cap rush multiplayer shared league', () => {
     run('p1', { kind: 'complete-league' });
     expect(state.phase).toBe('completed');
     expect(state.report).not.toBeNull();
-    expect(state.report?.seats.p1.roster).toHaveLength(5);
-    expect(state.report?.seats.p2.roster).toHaveLength(5);
-    expect(state.report?.seats.p1.wins + state.report?.seats.p1.losses).toBe(82);
-    expect(state.report?.seats.p2.wins + state.report?.seats.p2.losses).toBe(82);
+    const report = state.report;
+    if (report === null) throw new Error('no report');
+    expect(report.seats.p1.roster).toHaveLength(5);
+    expect(report.seats.p2.roster).toHaveLength(5);
+    expect(report.seats.p1.wins + report.seats.p1.losses).toBe(82);
+    expect(report.seats.p2.wins + report.seats.p2.losses).toBe(82);
 
     const replayed = replayCapRushMultiplayerLog({
       rootSeed,

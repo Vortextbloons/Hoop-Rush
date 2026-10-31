@@ -15,8 +15,12 @@ import {
   havocMultiplayerVariantSchema,
   havocMultiplayerVersionLocksSchema,
 } from './havoc-multiplayer.ts';
+import {
+  capRushMultiplayerVariantSchema,
+  capRushMultiplayerVersionLocksSchema,
+} from './cap-rush-multiplayer-versions.ts';
 
-export const multiplayerGameKindSchema = z.enum(['fixed-five', 'draft-duel', 'havoc']);
+export const multiplayerGameKindSchema = z.enum(['fixed-five', 'draft-duel', 'havoc', 'cap-rush']);
 const gameKindSchema = multiplayerGameKindSchema;
 const legacyRoomSchema = z.object({
   legacy: z.literal(true),
@@ -62,6 +66,11 @@ export const multiplayerMatchSettingsSchema = z.discriminatedUnion('gameKind', [
     gameKind: z.literal('havoc'),
     variant: havocMultiplayerVariantSchema,
     versions: havocMultiplayerVersionLocksSchema,
+  }),
+  z.object({
+    gameKind: z.literal('cap-rush'),
+    variant: capRushMultiplayerVariantSchema,
+    versions: capRushMultiplayerVersionLocksSchema,
   }),
 ]);
 export type MultiplayerMatchSettings = z.infer<typeof multiplayerMatchSettingsSchema>;

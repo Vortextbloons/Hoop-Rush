@@ -1,6 +1,25 @@
 {
   "76231": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": null,
+      "threePoint": null,
+      "freeThrow": {
+        "expected": 0.74,
+        "actual": 1.0,
+        "difference": 0.26,
+        "attempts": 1.0,
+        "weight": 0.009900990099009901
+      }
+    },
+    "shotVolume": {
+      "expected": 14.462418359920932,
+      "actual": 13.520936324840497,
+      "difference": -0.9414820350804352,
+      "possessions": 59.1675,
+      "differencePer36": -0.7295784169941734,
+      "weight": 0.05586226918782912
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -29,15 +48,34 @@
       "turnoversPer36": 4.064956066525743
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.0625,
-      "assistsPer36": 0.11764705882352941,
+      "tsPct": 0.01639344262295082,
+      "pointsPer36": 0.03225806451612903,
+      "assistsPer36": 0.0625,
       "reboundsPer36": 0.03225806451612903,
       "turnoversPer36": 0.03225806451612903
     }
   },
   "78233": {
-    "modelVersion": "opponent-pace-v1",
+    "modelVersion": "opponent-pace-v2",
+    "shooting": {
+      "twoPoint": null,
+      "threePoint": null,
+      "freeThrow": {
+        "expected": 0,
+        "actual": 0.0,
+        "difference": 0.0,
+        "attempts": 1.0,
+        "weight": 0.009900990099009901
+      }
+    },
+    "shotVolume": {
+      "expected": 13.624580987224807,
+      "actual": 24.016811768237766,
+      "difference": 10.392230781012959,
+      "possessions": 16.655,
+      "differencePer36": 8.553578328304686,
+      "weight": 0.016382155205059732
+    },
     "sources": [
       "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores/versions/533"
     ],
@@ -66,9 +104,9 @@
       "turnoversPer36": -4.025068506855891
     },
     "weights": {
-      "tsPct": 0,
-      "pointsPer36": 0.024390243902439025,
-      "assistsPer36": 0.047619047619047616,
+      "tsPct": 0.006211180124223602,
+      "pointsPer36": 0.012345679012345678,
+      "assistsPer36": 0.024390243902439025,
       "reboundsPer36": 0.012345679012345678,
       "turnoversPer36": 0.012345679012345678
     }

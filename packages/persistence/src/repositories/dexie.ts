@@ -67,6 +67,13 @@ import {
   type StoredCapRushPlayoffGameRow,
   type StoredCapRushReportRow,
 } from '../schemas/cap-rush-record.ts';
+import type {
+  StoredCapRushMultiplayerActiveRow,
+  StoredCapRushMultiplayerCommandRow,
+  StoredCapRushMultiplayerCompletedRow,
+  StoredCapRushMultiplayerGameRow,
+  StoredCapRushMultiplayerHistoryRow,
+} from '../schemas/cap-rush-multiplayer-record.ts';
 import { listCompletedHistory } from './support.ts';
 import { DexieProfileRepository } from './profile.ts';
 const ACTIVE_RECORD_ID = 'active';
@@ -158,6 +165,14 @@ export const HOOP_RUSH_DATABASE_V13_STORES: Record<string, string> = {
   ...HOOP_RUSH_DATABASE_V11_STORES,
   capRushPlaybackEvidence: '[runId+gameKey], runId',
   capRushPlaybackCursors: '[runId+gameKey], runId',
+};
+export const HOOP_RUSH_DATABASE_V14_STORES: Record<string, string> = {
+  ...HOOP_RUSH_DATABASE_V13_STORES,
+  capRushMultiplayerActive: 'roomId',
+  capRushMultiplayerCommands: '[roomId+ordinal], roomId',
+  capRushMultiplayerGames: '[roomId+gameId], roomId',
+  capRushMultiplayerCompleted: 'roomId',
+  capRushMultiplayerHistory: 'recordId, completedAtIso',
 };
 
 async function migrateActiveCapRushPlayback(tx: Transaction): Promise<void> {
@@ -259,6 +274,11 @@ export class HoopRushDatabase extends Dexie {
   capRushLeagueGames!: Table<StoredCapRushLeagueGameRow, [string, string]>;
   capRushPlaybackEvidence!: Table<StoredCapRushPlaybackEvidenceRow, [string, string]>;
   capRushPlaybackCursors!: Table<StoredCapRushPlaybackCursorRow, [string, string]>;
+  capRushMultiplayerActive!: EntityTable<StoredCapRushMultiplayerActiveRow, 'roomId'>;
+  capRushMultiplayerCommands!: Table<StoredCapRushMultiplayerCommandRow, [string, number]>;
+  capRushMultiplayerGames!: Table<StoredCapRushMultiplayerGameRow, [string, string]>;
+  capRushMultiplayerCompleted!: EntityTable<StoredCapRushMultiplayerCompletedRow, 'roomId'>;
+  capRushMultiplayerHistory!: EntityTable<StoredCapRushMultiplayerHistoryRow, 'recordId'>;
   constructor(name = HOOP_RUSH_DATABASE_NAME) {
     super(name);
     this.version(1).stores(HOOP_RUSH_DATABASE_STORES);
@@ -276,6 +296,7 @@ export class HoopRushDatabase extends Dexie {
     this.version(13)
       .stores(HOOP_RUSH_DATABASE_V13_STORES)
       .upgrade((tx) => migrateActiveCapRushPlayback(tx));
+    this.version(14).stores(HOOP_RUSH_DATABASE_V14_STORES);
   }
 }
 export class DexieChallengeRepository {
