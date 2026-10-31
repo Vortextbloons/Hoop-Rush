@@ -26,14 +26,12 @@ export class PendingReadyCoordinator {
     currentGameNumber: number | null;
     localReady: boolean;
     now: number;
+    terminalPhases?: readonly string[];
   }): void {
     const target = this.target;
     if (target === null || input.disposed || input.busy) return;
-    if (
-      input.phase === 'championship' ||
-      input.phase === 'integrity-failed' ||
-      input.phase === 'expired'
-    ) {
+    const terminal = input.terminalPhases ?? ['championship', 'integrity-failed', 'expired'];
+    if (terminal.includes(input.phase)) {
       this.reset();
       return;
     }

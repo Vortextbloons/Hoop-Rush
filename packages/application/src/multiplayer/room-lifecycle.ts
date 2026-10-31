@@ -2,6 +2,44 @@ import { CoalescedTask, type TickScheduler } from '../runtime/index.ts';
 
 export type RoomConnection = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'error';
 
+export type RoomParticipantId = 'p1' | 'p2';
+
+export interface RoomSessionTransport<TSnapshot, TMembership, TTransient> {
+  resume(roomId: string): Promise<{ snapshot: TSnapshot; membership: TMembership }>;
+  subscribe(
+    roomId: string,
+    onSnapshot: () => void,
+    onError: (error: unknown) => void,
+  ): { unsubscribe: () => void };
+  subscribeTransient(
+    roomId: string,
+    listener: (event: TTransient) => void,
+  ): { unsubscribe: () => void };
+}
+
+export interface RoomSessionRepository<TVerification, TCompleted, TOutput> {
+  loadActive(roomId: string): Promise<TVerification | null>;
+  loadCompleted(roomId: string): Promise<TCompleted | null>;
+  loadResults(roomId: string): Promise<TOutput[]>;
+}
+
+export function shouldCreateRematch(input: {
+  participantId: RoomParticipantId | null;
+  phase: string;
+  successorRoomId: string | null | undefined;
+  now: number;
+  retryAtMs: number;
+  commands: readonly { payload: { kind: string } }[];
+}): boolean {
+  return (
+    input.participantId === 'p1' &&
+    input.phase === 'championship' &&
+    !input.successorRoomId &&
+    input.now >= input.retryAtMs &&
+    input.commands.some((command) => command.payload.kind === 'rematch-confirm')
+  );
+}
+
 export interface RoomAttachment {
   readonly generation: number;
   readonly roomId: string;

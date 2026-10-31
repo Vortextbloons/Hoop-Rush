@@ -1,8 +1,48 @@
-import { PlaybackProgress } from '../runtime/index.ts';
+import { clamp01, PlaybackProgress, type PlaybackAdvanceOutcome } from '../runtime/index.ts';
+
+export type SeriesParticipantId = 'p1' | 'p2';
 
 export interface SeriesMember {
-  participantId: 'p1' | 'p2';
+  participantId: SeriesParticipantId;
   nextGameReady?: number | null;
+}
+
+export function otherSeriesParticipant(participantId: SeriesParticipantId): SeriesParticipantId {
+  return participantId === 'p1' ? 'p2' : 'p1';
+}
+
+export interface ProposalCommand {
+  actorParticipantId: SeriesParticipantId;
+  payload: { kind: string };
+}
+
+export function proposalsForGame(
+  commands: readonly ProposalCommand[],
+  gameNumber: number,
+  kind: 'propose-result' | 'propose-game-result' = 'propose-result',
+): Partial<Record<SeriesParticipantId, string>> {
+  const byParticipant: Partial<Record<SeriesParticipantId, string>> = {};
+  for (const command of commands) {
+    const payload = command.payload as {
+      kind: string;
+      gameNumber?: number;
+      resultDigest?: string;
+    };
+    if (payload.kind !== kind) continue;
+    if (payload.gameNumber !== gameNumber) continue;
+    if (payload.resultDigest === undefined) continue;
+    byParticipant[command.actorParticipantId] = payload.resultDigest;
+  }
+  return byParticipant;
+}
+
+export function withVerificationEntry<TEntry extends { gameNumber: number }>(
+  entries: readonly TEntry[],
+  entry: TEntry,
+): TEntry[] {
+  return [...entries.filter((existing) => existing.gameNumber !== entry.gameNumber), entry].sort(
+    (left, right) => left.gameNumber - right.gameNumber,
+  );
 }
 
 export interface SeriesCoordination {
@@ -63,7 +103,7 @@ export class SeriesCoordinator {
 
   memberReady(
     members: readonly SeriesMember[],
-    participantId: 'p1' | 'p2' | null,
+    participantId: SeriesParticipantId | null,
     game: number | null,
   ): boolean {
     return (
@@ -73,6 +113,31 @@ export class SeriesCoordinator {
         (member) => member.participantId === participantId && member.nextGameReady === game,
       )
     );
+  }
+
+  beginBroadcast(startedAtIso: string, durationMs: number): number {
+    const now = this.now();
+    const startedAt = Date.parse(startedAtIso);
+    this.playback.begin(now, startedAt, durationMs);
+    return clamp01((now - startedAt) / durationMs);
+  }
+
+  advanceBroadcast(deltaMs: number, durationMs: number): PlaybackAdvanceOutcome {
+    return this.playback.advance(deltaMs, durationMs, this.now());
+  }
+
+  continueApproved(gameNumber: number, holdMs: number): boolean {
+    return this.playback.continueApproved(gameNumber, holdMs, this.now());
+  }
+
+  awaitingContinue(input: {
+    phase: string;
+    gameNumber: number | null;
+    approved: boolean;
+  }): boolean {
+    if (input.phase !== 'game-results' || input.gameNumber === null) return false;
+    if (this.confirmations.has(input.gameNumber)) return false;
+    return !input.approved;
   }
 
   readyCountdown(opponentReady: boolean, timeoutMs: number, now = this.now()): number | null {
@@ -112,6 +177,40 @@ export class SeriesCoordinator {
     } finally {
       if (current()) this.jobs.delete(game);
     }
+  }
+
+  coordinateGame<TOutput extends { gameNumber: number; resultDigest: string }>(input: {
+    phase: string;
+    progress: number;
+    busy: boolean;
+    selfId: SeriesParticipantId;
+    output: TOutput | null;
+    proposals: Partial<Record<SeriesParticipantId, string>>;
+    current: () => boolean;
+    propose: (output: TOutput) => Promise<boolean>;
+    confirm: (output: TOutput, verified: boolean) => Promise<boolean>;
+    verification?: (output: TOutput, verified: boolean, peerDigest: string) => void;
+    mismatch?: () => void;
+  }): void {
+    if (!input.current() || input.busy) return;
+    if (input.phase !== 'broadcasting' && input.phase !== 'game-results') return;
+    const output = input.output;
+    if (!output || input.progress < 1) return;
+    const gameNumber = output.gameNumber;
+    this.coordinate({
+      gameNumber,
+      localDigest: output.resultDigest,
+      ownProposal: input.proposals[input.selfId],
+      peerProposal: input.proposals[otherSeriesParticipant(input.selfId)],
+      current: input.current,
+      propose: () => input.propose(output),
+      confirm: (verified) => input.confirm(output, verified),
+      verification:
+        input.verification === undefined
+          ? undefined
+          : (verified, peerDigest) => input.verification?.(output, verified, peerDigest),
+      mismatch: input.mismatch,
+    });
   }
 
   coordinate(input: SeriesCoordination): void {
