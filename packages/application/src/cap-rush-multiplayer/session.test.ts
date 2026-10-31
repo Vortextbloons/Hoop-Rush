@@ -1,87 +1,15 @@
 import { describe, expect, test, vi } from 'bun:test';
-import type { CapRushMultiplayerSettings } from '@hoop-rush/data-contracts';
-import {
-  CAP_RUSH_MULTIPLAYER_MARKET_VERSION,
-  CAP_RUSH_MULTIPLAYER_PRICING_VERSION,
-  CAP_RUSH_MULTIPLAYER_RULES_VERSION,
-  CAP_RUSH_MULTIPLAYER_SCHEMA_VERSION,
-  CAP_RUSH_MULTIPLAYER_SEED_DERIVATION_VERSION,
-  CAP_RUSH_MULTIPLAYER_VERSION,
-  capRushMultiplayerVersionLocksSchema,
-  seedSchema,
-} from '@hoop-rush/data-contracts';
-import {
-  adaptCapRushCatalog,
-  buildCapRushCatalogIndex,
-  createEngineContext,
-  simulateCapRushMultiplayerSlot,
-} from '@hoop-rush/engine';
-import {
-  DEFAULT_ERA_SIM_PROFILE,
-  buildCapRushTestCatalog,
-  buildFixtureBracket,
-  capRushTestCatalogSource,
-} from '@hoop-rush/test-fixtures';
-import { CapRushMultiplayerInMemoryTransport } from './in-memory-transport.ts';
-import { CapRushMultiplayerSession } from './session.ts';
-
-const ROOT = seedSchema.parse('abc123def4567890');
-
-function setup() {
-  const catalog = buildCapRushTestCatalog();
-  const source = capRushTestCatalogSource(catalog);
-  const index = buildCapRushCatalogIndex(adaptCapRushCatalog(catalog, source));
-  const versionLocks = capRushMultiplayerVersionLocksSchema.parse({
-    schemaVersion: CAP_RUSH_MULTIPLAYER_SCHEMA_VERSION,
-    multiplayerVersion: CAP_RUSH_MULTIPLAYER_VERSION,
-    rulesVersion: CAP_RUSH_MULTIPLAYER_RULES_VERSION,
-    marketVersion: CAP_RUSH_MULTIPLAYER_MARKET_VERSION,
-    pricingVersion: CAP_RUSH_MULTIPLAYER_PRICING_VERSION,
-    seedDerivationVersion: CAP_RUSH_MULTIPLAYER_SEED_DERIVATION_VERSION,
-    engineVersion: 'test-engine-v1',
-    profileVersion: 'test-profile-v1',
-    dataVersion: source.dataVersion,
-    catalogVersion: source.catalogVersion,
-    catalogHash: source.catalogHash,
-    bracketHash: 'b'.repeat(64),
-    profileHash: 'c'.repeat(64),
-  });
-  const environment = {
-    variant: 'clash' as const,
-    bracket: buildFixtureBracket(),
-    seasonCatalog: catalog,
-    index,
-    profile: DEFAULT_ERA_SIM_PROFILE,
-    catalogSource: source,
-    versionLocks,
-  };
-  const settings: CapRushMultiplayerSettings = {
-    schemaVersion: CAP_RUSH_MULTIPLAYER_SCHEMA_VERSION,
-    variant: 'clash',
-    versionLocks,
-  };
-  return { environment, settings };
-}
+import { createEngineContext, simulateCapRushMultiplayerSlot } from '@hoop-rush/engine';
+import { createSessionTestRoom } from './session-test-fixtures.ts';
 
 describe('cap rush multiplayer application session', () => {
   test('coalesces realtime refreshes, skips overlapping polls, and drops work after disposal', async () => {
-    const { environment, settings } = setup();
-    const transport = new CapRushMultiplayerInMemoryTransport({
-      environment,
-      defaultSettings: settings,
-      rootSeed: ROOT,
-    });
-    const created = await transport.create({ variant: 'clash', settings });
-    const session = new CapRushMultiplayerSession({
-      transport,
-      environment,
-      roomId: created.roomId,
-      seat: 'p1',
-      newCommandId: () => 'test-command',
-    });
+    const room = await createSessionTestRoom();
+    const { transport } = room;
+    const session = room.session('p1');
     await session.attach();
     const initial = session.current;
-    const response = await transport.sync(created.roomId);
+    const response = await transport.sync(room.roomId);
     let resolve!: (value: typeof response) => void;
     const pending = new Promise<typeof response>((yes) => {
       resolve = yes;
@@ -118,14 +46,9 @@ describe('cap rush multiplayer application session', () => {
   });
 
   test('does not subscribe when disposed during attachment', async () => {
-    const { environment, settings } = setup();
-    const transport = new CapRushMultiplayerInMemoryTransport({
-      environment,
-      defaultSettings: settings,
-      rootSeed: ROOT,
-    });
-    const created = await transport.create({ variant: 'clash', settings });
-    const response = await transport.sync(created.roomId);
+    const room = await createSessionTestRoom();
+    const { transport } = room;
+    const response = await transport.sync(room.roomId);
     let resolve!: (value: typeof response) => void;
     vi.spyOn(transport, 'sync').mockImplementation(
       () =>
@@ -134,13 +57,7 @@ describe('cap rush multiplayer application session', () => {
         }),
     );
     const subscribe = vi.spyOn(transport, 'subscribe');
-    const session = new CapRushMultiplayerSession({
-      transport,
-      environment,
-      roomId: created.roomId,
-      seat: 'p1',
-      newCommandId: () => 'test-command',
-    });
+    const session = room.session('p1');
     const attaching = session.attach();
     for (let i = 0; i < 5; i++) await Promise.resolve();
     session.dispose();
@@ -151,32 +68,15 @@ describe('cap rush multiplayer application session', () => {
   });
 
   test('opens two seats, locks a recruited league, and advances one shared slot', async () => {
-    const { environment, settings } = setup();
     let nowMs = Date.parse('2026-11-01T00:00:00.000Z');
-    const transport = new CapRushMultiplayerInMemoryTransport({
-      environment,
-      defaultSettings: settings,
-      rootSeed: ROOT,
-      now: () => nowMs,
-    });
-    const created = await transport.create({ variant: 'clash', settings });
-    const roomId = created.roomId;
+    const room = await createSessionTestRoom({ now: () => nowMs, commandPrefix: 'session' });
+    const { transport, roomId } = room;
 
-    const counters = { p1: 0, p2: 0 };
-    const makeSession = (seat: 'p1' | 'p2') =>
-      new CapRushMultiplayerSession({
-        transport,
-        environment,
-        roomId,
-        seat,
-        newCommandId: () => `${seat}-cmd-${String((counters[seat] += 1))}`,
-      });
-
-    const host = makeSession('p1');
+    const host = room.session('p1');
     await host.attach();
-    const joined = await transport.join(created.code);
+    const joined = await transport.join(room.code);
     expect(joined.participantId).toBe('p2');
-    const guest = makeSession('p2');
+    const guest = room.session('p2');
     await guest.attach();
 
     await host.start();

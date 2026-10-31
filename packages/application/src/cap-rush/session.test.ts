@@ -6,6 +6,7 @@ import type {
   CapRushDraftState,
   CapRushHistoryEntry,
   CapRushLeagueGame,
+  CapRushLockedInputs,
   CapRushReport,
   CapRushStoredGame,
   CapRushStoredPlayoffGame,
@@ -41,6 +42,7 @@ import {
   simulateCapRushGame,
   simulateCapRushLeagueSlot,
   simulateCapRushPlayoffGame,
+  type EngineContext,
 } from '@hoop-rush/engine';
 import {
   buildCapRushTestCatalog,
@@ -259,6 +261,56 @@ function createSession(repository: CapRushDraftRepositoryPort, bracketHash?: str
   });
 }
 
+async function draftLineup(
+  session: CapRushSession,
+  variant: 'clash' | 'roulette' = 'clash',
+): Promise<void> {
+  await session.createDraft(variant);
+  for (const slot of POSITIONS) {
+    await session.choosePosition(slot);
+    const cards = session.getSnapshot().draft?.cards ?? [];
+    const cheapest = [...cards]
+      .filter((entry) => entry.signing.legal)
+      .sort((left, right) => left.card.salaryDollars - right.card.salaryDollars)[0];
+    if (cheapest === undefined) throw new Error(`no legal ${slot} signing`);
+    await session.signCard(cheapest.card.cardId);
+  }
+}
+
+async function draftAndLock(session: CapRushSession, variant: 'clash' | 'roulette' = 'clash') {
+  await draftLineup(session, variant);
+  const beforeLock = session.getSnapshot().draft;
+  await session.lockLineup();
+  const locked = session.getSnapshot().draft?.draft.locked;
+  if (locked === undefined || locked === null) throw new Error('lock did not produce inputs');
+  return { beforeLock, locked };
+}
+
+async function acceptSimulatedGame(
+  session: CapRushSession,
+  locked: CapRushLockedInputs,
+  gameNumber: number,
+  context: EngineContext,
+  options: { leagueGames?: boolean } = {},
+) {
+  const simulation = simulateCapRushGame({ locked, gameNumber, context });
+  const slotGames =
+    options.leagueGames === false || locked.leagueSchedule === undefined
+      ? undefined
+      : simulateCapRushLeagueSlot({ locked, slot: gameNumber, context });
+  await session.acceptGame({
+    cursor: gameNumber,
+    inputDigest: simulation.summary.inputDigest,
+    resultDigest: simulation.summary.resultDigest,
+    isolations: simulation.facts.filter((fact) => fact.kind === 'isolation').length,
+    strikes: simulation.facts.filter((fact) => fact.kind === 'strike').length,
+    summary: simulation.summary,
+    stored: capRushStoredGameOf(simulation),
+    ...(slotGames === undefined ? {} : { leagueGames: slotGames }),
+  });
+  return { simulation, slotGames };
+}
+
 describe('cap rush session', () => {
   it('creates, drafts, persists, and resumes a run', async () => {
     const repository = new MemoryCapRushRepository();
@@ -337,16 +389,7 @@ describe('cap rush session', () => {
   it('buys Roulette spins and resumes the persisted receipts', async () => {
     const repository = new MemoryCapRushRepository();
     const session = createSession(repository);
-    await session.createDraft('roulette');
-    for (const slot of POSITIONS) {
-      await session.choosePosition(slot);
-      const cards = session.getSnapshot().draft?.cards ?? [];
-      const cheapest = [...cards]
-        .filter((entry) => entry.signing.legal)
-        .sort((left, right) => left.card.salaryDollars - right.card.salaryDollars)[0];
-      if (cheapest === undefined) throw new Error(`no legal ${slot} signing`);
-      await session.signCard(cheapest.card.cardId);
-    }
+    await draftLineup(session, 'roulette');
     const complete = session.getSnapshot().draft;
     expect(complete?.draft.stage).toBe('complete');
     expect(complete?.spin?.state.status).toBe('pending');
@@ -375,26 +418,13 @@ describe('cap rush session', () => {
   it('locks the lineup and resumes the pinned inputs', async () => {
     const repository = new MemoryCapRushRepository();
     const session = createSession(repository);
-    await session.createDraft('clash');
-    for (const slot of POSITIONS) {
-      await session.choosePosition(slot);
-      const cards = session.getSnapshot().draft?.cards ?? [];
-      const cheapest = [...cards]
-        .filter((entry) => entry.signing.legal)
-        .sort((left, right) => left.card.salaryDollars - right.card.salaryDollars)[0];
-      if (cheapest === undefined) throw new Error(`no legal ${slot} signing`);
-      await session.signCard(cheapest.card.cardId);
-    }
-    const complete = session.getSnapshot().draft;
+    const { beforeLock: complete, locked: inputs } = await draftAndLock(session);
     expect(complete?.canLock).toBe(true);
     expect(complete?.draft.locked).toBeNull();
 
-    await session.lockLineup();
     const locked = session.getSnapshot().draft;
     expect(locked?.draft.stage).toBe('locked');
     expect(locked?.canLock).toBe(false);
-    const inputs = locked?.draft.locked;
-    if (inputs === undefined || inputs === null) throw new Error('lock did not produce inputs');
     expect(inputs.payrollDollars).toBe(complete?.payrollDollars ?? -1);
     expect(inputs.schedule).toHaveLength(CAP_RUSH_GAME_COUNT);
 
@@ -413,17 +443,7 @@ describe('cap rush session', () => {
   it('refuses a locked run whose version hash disagrees with its frozen inputs', async () => {
     const repository = new MemoryCapRushRepository();
     const session = createSession(repository);
-    await session.createDraft('clash');
-    for (const slot of POSITIONS) {
-      await session.choosePosition(slot);
-      const cards = session.getSnapshot().draft?.cards ?? [];
-      const cheapest = [...cards]
-        .filter((entry) => entry.signing.legal)
-        .sort((left, right) => left.card.salaryDollars - right.card.salaryDollars)[0];
-      if (cheapest === undefined) throw new Error(`no legal ${slot} signing`);
-      await session.signCard(cheapest.card.cardId);
-    }
-    await session.lockLineup();
+    await draftAndLock(session);
 
     const stored = repository.active;
     if (stored === null) throw new Error('lock was not stored');
@@ -459,40 +479,19 @@ describe('cap rush session', () => {
   it('runs an accepted season to a final report', async () => {
     const repository = new MemoryCapRushRepository();
     const session = createSession(repository);
-    await session.createDraft('clash');
-    for (const slot of POSITIONS) {
-      await session.choosePosition(slot);
-      const cards = session.getSnapshot().draft?.cards ?? [];
-      const cheapest = [...cards]
-        .filter((entry) => entry.signing.legal)
-        .sort((left, right) => left.card.salaryDollars - right.card.salaryDollars)[0];
-      if (cheapest === undefined) throw new Error(`no legal ${slot} signing`);
-      await session.signCard(cheapest.card.cardId);
-    }
-    await session.lockLineup();
-    const locked = session.getSnapshot().draft?.draft.locked;
-    if (locked === undefined || locked === null) throw new Error('lock did not produce inputs');
+    const { locked } = await draftAndLock(session);
 
     const context = createEngineContext();
     const leagueSamples: CapRushLeagueGame[] = [];
     for (let gameNumber = 1; gameNumber <= CAP_RUSH_GAME_COUNT; gameNumber += 1) {
-      const simulation = simulateCapRushGame({ locked, gameNumber, context });
+      const { simulation, slotGames } = await acceptSimulatedGame(
+        session,
+        locked,
+        gameNumber,
+        context,
+      );
       expect(simulation.audit.ok).toBe(true);
-      const slotGames =
-        locked.leagueSchedule === undefined
-          ? undefined
-          : simulateCapRushLeagueSlot({ locked, slot: gameNumber, context });
       if (slotGames !== undefined) leagueSamples.push(...slotGames);
-      await session.acceptGame({
-        cursor: gameNumber,
-        inputDigest: simulation.summary.inputDigest,
-        resultDigest: simulation.summary.resultDigest,
-        isolations: simulation.facts.filter((fact) => fact.kind === 'isolation').length,
-        strikes: simulation.facts.filter((fact) => fact.kind === 'strike').length,
-        summary: simulation.summary,
-        stored: capRushStoredGameOf(simulation),
-        ...(slotGames === undefined ? {} : { leagueGames: slotGames }),
-      });
     }
 
     const progress = session.getSnapshot().draft;
@@ -570,34 +569,10 @@ describe('cap rush session', () => {
   it('refuses a duplicate or out-of-order game acceptance', async () => {
     const repository = new MemoryCapRushRepository();
     const session = createSession(repository);
-    await session.createDraft('clash');
-    for (const slot of POSITIONS) {
-      await session.choosePosition(slot);
-      const cards = session.getSnapshot().draft?.cards ?? [];
-      const cheapest = [...cards]
-        .filter((entry) => entry.signing.legal)
-        .sort((left, right) => left.card.salaryDollars - right.card.salaryDollars)[0];
-      if (cheapest === undefined) throw new Error(`no legal ${slot} signing`);
-      await session.signCard(cheapest.card.cardId);
-    }
-    await session.lockLineup();
-    const locked = session.getSnapshot().draft?.draft.locked;
-    if (locked === undefined || locked === null) throw new Error('lock did not produce inputs');
+    const { locked } = await draftAndLock(session);
 
     const context = createEngineContext();
-    const first = simulateCapRushGame({ locked, gameNumber: 1, context });
-    await session.acceptGame({
-      cursor: 1,
-      inputDigest: first.summary.inputDigest,
-      resultDigest: first.summary.resultDigest,
-      isolations: 0,
-      strikes: 0,
-      summary: first.summary,
-      stored: capRushStoredGameOf(first),
-      ...(locked.leagueSchedule === undefined
-        ? {}
-        : { leagueGames: simulateCapRushLeagueSlot({ locked, slot: 1, context }) }),
-    });
+    const { simulation: first } = await acceptSimulatedGame(session, locked, 1, context);
     const second = simulateCapRushGame({ locked, gameNumber: 2, context });
     await expect(
       session.acceptGame({
@@ -627,32 +602,11 @@ describe('cap rush session', () => {
   it('accepts a background league slot separately from the user game', async () => {
     const repository = new MemoryCapRushRepository();
     const session = createSession(repository);
-    await session.createDraft('clash');
-    for (const slot of POSITIONS) {
-      await session.choosePosition(slot);
-      const cards = session.getSnapshot().draft?.cards ?? [];
-      const cheapest = [...cards]
-        .filter((entry) => entry.signing.legal)
-        .sort((left, right) => left.card.salaryDollars - right.card.salaryDollars)[0];
-      if (cheapest === undefined) throw new Error(`no legal ${slot} signing`);
-      await session.signCard(cheapest.card.cardId);
-    }
-    await session.lockLineup();
-    const locked = session.getSnapshot().draft?.draft.locked;
-    if (locked === undefined || locked === null) throw new Error('lock did not produce inputs');
+    const { locked } = await draftAndLock(session);
     if (locked.leagueSchedule === undefined) throw new Error('fixture league schedule missing');
 
     const context = createEngineContext();
-    const game = simulateCapRushGame({ locked, gameNumber: 1, context });
-    await session.acceptGame({
-      cursor: 1,
-      inputDigest: game.summary.inputDigest,
-      resultDigest: game.summary.resultDigest,
-      isolations: 0,
-      strikes: 0,
-      summary: game.summary,
-      stored: capRushStoredGameOf(game),
-    });
+    await acceptSimulatedGame(session, locked, 1, context, { leagueGames: false });
     expect(session.getSnapshot().draft?.season?.leagueGamesAccepted).toBe(0);
 
     const slotGames = simulateCapRushLeagueSlot({ locked, slot: 1, context });
@@ -668,33 +622,14 @@ describe('cap rush session', () => {
   it('refuses to finalize a season before all 82 games are accepted', async () => {
     const repository = new MemoryCapRushRepository();
     const session = createSession(repository);
-    await session.createDraft('clash');
-    for (const slot of POSITIONS) {
-      await session.choosePosition(slot);
-      const cards = session.getSnapshot().draft?.cards ?? [];
-      const cheapest = [...cards]
-        .filter((entry) => entry.signing.legal)
-        .sort((left, right) => left.card.salaryDollars - right.card.salaryDollars)[0];
-      if (cheapest === undefined) throw new Error(`no legal ${slot} signing`);
-      await session.signCard(cheapest.card.cardId);
-    }
-    await session.lockLineup();
+    await draftAndLock(session);
     await expect(session.finalizeSeason()).rejects.toBeInstanceOf(CapRushServiceError);
   });
 
   it('finalizes a Cap Roulette season with a purchased spin', async () => {
     const repository = new MemoryCapRushRepository();
     const session = createSession(repository);
-    await session.createDraft('roulette');
-    for (const slot of POSITIONS) {
-      await session.choosePosition(slot);
-      const cards = session.getSnapshot().draft?.cards ?? [];
-      const cheapest = [...cards]
-        .filter((entry) => entry.signing.legal)
-        .sort((left, right) => left.card.salaryDollars - right.card.salaryDollars)[0];
-      if (cheapest === undefined) throw new Error(`no legal ${slot} signing`);
-      await session.signCard(cheapest.card.cardId);
-    }
+    await draftLineup(session, 'roulette');
     const target = session.getSnapshot().draft?.spin?.targets[0];
     if (target === undefined) throw new Error('roulette spin has no targets');
     await session.purchaseSpin('standard', target.cardId);
@@ -704,25 +639,7 @@ describe('cap rush session', () => {
 
     const context = createEngineContext();
     for (let gameNumber = 1; gameNumber <= CAP_RUSH_GAME_COUNT; gameNumber += 1) {
-      const simulation = simulateCapRushGame({ locked, gameNumber, context });
-      await session.acceptGame({
-        cursor: gameNumber,
-        inputDigest: simulation.summary.inputDigest,
-        resultDigest: simulation.summary.resultDigest,
-        isolations: simulation.facts.filter((fact) => fact.kind === 'isolation').length,
-        strikes: simulation.facts.filter((fact) => fact.kind === 'strike').length,
-        summary: simulation.summary,
-        stored: capRushStoredGameOf(simulation),
-        ...(locked.leagueSchedule === undefined
-          ? {}
-          : {
-              leagueGames: simulateCapRushLeagueSlot({
-                locked,
-                slot: gameNumber,
-                context,
-              }),
-            }),
-      });
+      await acceptSimulatedGame(session, locked, gameNumber, context);
     }
     expect(await session.finalizeSeason()).toBeNull();
     expect(session.getSnapshot().draft?.draft.stage).toBe('postseason');
