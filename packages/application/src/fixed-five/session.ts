@@ -52,13 +52,9 @@ import {
   type FixedFiveVerificationInput,
   type RoomLogFacts,
 } from '@hoop-rush/engine';
-import { SeriesCoordinator } from '../multiplayer/series-coordinator.ts';
-import {
-  clamp01,
-  CoalescedTask,
-  intervalTickScheduler,
-  type TickScheduler,
-} from '../runtime/index.ts';
+import { otherSeriesParticipant, SeriesCoordinator } from '../multiplayer/series-coordinator.ts';
+import { PendingReadyCoordinator } from '../multiplayer/pending-ready.ts';
+import { CoalescedTask, intervalTickScheduler, type TickScheduler } from '../runtime/index.ts';
 import { RoomLifecycle, type RoomAttachment } from '../multiplayer/room-lifecycle.ts';
 import { submitFixedFiveCommand } from './command-submit.ts';
 import { FixedFiveDuelFlow } from './duel-flow.ts';
@@ -283,10 +279,6 @@ export interface FixedFiveRoomSessionDeps {
   };
 }
 
-function otherParticipant(participantId: FixedFiveParticipantId): FixedFiveParticipantId {
-  return participantId === 'p1' ? 'p2' : 'p1';
-}
-
 export type FixedFiveFlowContext = Pick<
   FixedFiveRoomSessionSnapshot,
   'room' | 'assets' | 'replay' | 'commands' | 'selfId' | 'phase'
@@ -342,8 +334,9 @@ export class FixedFiveRoomSession {
   private clockTimer: (() => void) | null = null;
   private revealTimer: (() => void) | null = null;
   private readonly reconcileTask = new CoalescedTask(() => this.reconcile());
-  private pendingReadyGame: number | null = null;
-  private pendingReadyRetryAtMs = 0;
+  private readonly pendingReady = new PendingReadyCoordinator(DUEL_AUTO_START_RETRY_MS, () => {
+    void this.readyForNextGame();
+  });
   private readonly wakeHandler = (): void => {
     this.wake();
   };
@@ -799,9 +792,10 @@ export class FixedFiveRoomSession {
     if (this.isDisposed()) return;
     const broadcast = this.duelBroadcastOf();
     if (!broadcast) return;
-    const startedAt = Date.parse(broadcast.startedAtIso);
-    this.seriesFlow.playback.begin(this.deps.now(), startedAt, broadcast.durationMs);
-    this.broadcastProgress = clamp01((this.deps.now() - startedAt) / broadcast.durationMs);
+    this.broadcastProgress = this.seriesFlow.beginBroadcast(
+      broadcast.startedAtIso,
+      broadcast.durationMs,
+    );
     this.publish();
   }
 
@@ -809,11 +803,7 @@ export class FixedFiveRoomSession {
     if (this.isDisposed()) return;
     const broadcast = this.duelBroadcastOf();
     if (!broadcast) return;
-    const outcome = this.seriesFlow.playback.advance(
-      deltaMs,
-      broadcast.durationMs,
-      this.deps.now(),
-    );
+    const outcome = this.seriesFlow.advanceBroadcast(deltaMs, broadcast.durationMs);
     this.broadcastProgress = outcome.progress;
     if (outcome.completed) this.duelRecapGame = broadcast.gameNumber;
     this.publish();
@@ -825,8 +815,7 @@ export class FixedFiveRoomSession {
     const gameNumber = this.duelRecapGame ?? this.duelCurrentGameNumber();
     if (gameNumber === null) return;
     this.seriesFlow.playback.approve(gameNumber);
-    this.pendingReadyGame = gameNumber + 1;
-    this.pendingReadyRetryAtMs = 0;
+    this.pendingReady.schedule(gameNumber + 1);
     this.publish();
     this.maybeProposeOrConfirmGame();
   }
@@ -1246,7 +1235,7 @@ export class FixedFiveRoomSession {
     return this.duelMemberReady(this.selfId);
   }
   private duelOpponentReady(): boolean {
-    return this.duelMemberReady(otherParticipant(this.selfId));
+    return this.duelMemberReady(otherSeriesParticipant(this.selfId));
   }
 
   private duelReadyCountdownMs(): number | null {
@@ -1263,11 +1252,7 @@ export class FixedFiveRoomSession {
   }
 
   private duelContinueApproved(gameNumber: number): boolean {
-    return this.seriesFlow.playback.continueApproved(
-      gameNumber,
-      FIXED_FIVE_DUEL_GAME_RESULTS_HOLD_MS,
-      this.deps.now(),
-    );
+    return this.seriesFlow.continueApproved(gameNumber, FIXED_FIVE_DUEL_GAME_RESULTS_HOLD_MS);
   }
 
   private duelVerification(): DuelGameVerification {
@@ -1293,11 +1278,11 @@ export class FixedFiveRoomSession {
   ): FixedFiveParticipantId {
     return output.result.winner === 'home'
       ? output.homeParticipantId
-      : otherParticipant(output.homeParticipantId);
+      : otherSeriesParticipant(output.homeParticipantId);
   }
 
   private maybeProposeOrConfirmGame(): void {
-    if (this.isDisposed() || !this.isGamecastBroadcast() || this.busyAction !== null) return;
+    if (this.isDisposed() || !this.isGamecastBroadcast()) return;
     const room = this.room;
     const gameNumber = this.isDuelBroadcast()
       ? (room?.series?.currentGameNumber ?? null)
@@ -1307,32 +1292,37 @@ export class FixedFiveRoomSession {
     const output = this.isDuelBroadcast()
       ? this.duel.outputs[gameNumber]
       : this.shared82Game.outputs[gameNumber];
-    if (!output || this.broadcastProgress < 1) return;
     this.seriesFlow.holdMs = this.isDuelBroadcast() ? FIXED_FIVE_DUEL_GAME_RESULTS_HOLD_MS : 0;
-    this.seriesFlow.coordinate({
-      gameNumber,
-      localDigest: output.resultDigest,
-      ownProposal: this.facts.gameProposals.find(
-        (p) => p.actor === this.selfId && p.gameNumber === gameNumber,
-      )?.digest,
-      peerProposal: this.facts.gameProposals.find(
-        (p) => p.actor !== this.selfId && p.gameNumber === gameNumber,
-      )?.digest,
+    const better = otherSeriesParticipant(this.selfId);
+    this.seriesFlow.coordinateGame({
+      phase: room.phase,
+      progress: this.broadcastProgress,
+      busy: this.busyAction !== null,
+      selfId: this.selfId,
+      output: output ?? null,
+      proposals: {
+        [this.selfId]: this.facts.gameProposals.find(
+          (proposal) => proposal.actor === this.selfId && proposal.gameNumber === gameNumber,
+        )?.digest,
+        [better]: this.facts.gameProposals.find(
+          (proposal) => proposal.actor === better && proposal.gameNumber === gameNumber,
+        )?.digest,
+      },
       current: () => !this.isDisposed(),
-      propose: () =>
+      propose: (gameOutput) =>
         this.sendCommand({
           kind: 'propose-game-result',
-          gameNumber,
-          winner: this.duelWinnerOf(output),
-          resultDigest: output.resultDigest,
-          tapeDigest: output.tapeDigest,
-          inputDigest: output.inputDigest,
+          gameNumber: gameOutput.gameNumber,
+          winner: this.duelWinnerOf(gameOutput),
+          resultDigest: gameOutput.resultDigest,
+          tapeDigest: gameOutput.tapeDigest,
+          inputDigest: gameOutput.inputDigest,
         }),
-      confirm: (verified) =>
+      confirm: (gameOutput, verified) =>
         this.sendCommand({
           kind: 'confirm-game-result',
-          gameNumber,
-          resultDigest: output.resultDigest,
+          gameNumber: gameOutput.gameNumber,
+          resultDigest: gameOutput.resultDigest,
           verified,
         }),
       mismatch: () => {
@@ -1399,32 +1389,15 @@ export class FixedFiveRoomSession {
   }
 
   private maybeReadyNextGame(): void {
-    const target = this.pendingReadyGame;
-    if (target === null || this.isDisposed() || this.submissionsInFlight > 0) return;
-    const room = this.room;
-    if (
-      !room ||
-      room.phase === 'awaiting-confirmation' ||
-      room.phase === 'completed' ||
-      room.phase === 'integrity-failed' ||
-      room.phase === 'expired'
-    ) {
-      this.pendingReadyGame = null;
-      return;
-    }
-    if (room.phase !== 'preparing-game') return;
-    const current = this.duelCurrentGameNumber();
-    if (current !== target) {
-      if (current === null || current > target) this.pendingReadyGame = null;
-      return;
-    }
-    if (this.duelLocalReady()) {
-      this.pendingReadyGame = null;
-      return;
-    }
-    if (this.deps.now() < this.pendingReadyRetryAtMs) return;
-    this.pendingReadyRetryAtMs = this.deps.now() + DUEL_AUTO_START_RETRY_MS;
-    void this.readyForNextGame();
+    this.pendingReady.tick({
+      disposed: this.isDisposed(),
+      busy: this.submissionsInFlight > 0,
+      phase: this.phase,
+      currentGameNumber: this.duelCurrentGameNumber(),
+      localReady: this.duelLocalReady(),
+      now: this.deps.now(),
+      terminalPhases: ['awaiting-confirmation', 'completed', 'integrity-failed', 'expired'],
+    });
   }
 
   private completeElapsedBroadcast(): void {
@@ -1437,8 +1410,8 @@ export class FixedFiveRoomSession {
     if (!Number.isFinite(startedAt)) return;
     const now = this.deps.now();
     if (now < startedAt + broadcast.durationMs) return;
-    this.seriesFlow.playback.begin(now, startedAt, broadcast.durationMs);
-    this.seriesFlow.playback.advance(0, broadcast.durationMs, now);
+    this.seriesFlow.beginBroadcast(broadcast.startedAtIso, broadcast.durationMs);
+    this.seriesFlow.advanceBroadcast(0, broadcast.durationMs);
     this.broadcastProgress = 1;
     this.duelRecapGame = broadcast.gameNumber;
     this.maybeProposeOrConfirmGame();
@@ -1457,39 +1430,6 @@ export class FixedFiveRoomSession {
     const commandId = this.newCommandId(options?.commandId);
     this.submissionsInFlight += 1;
     try {
-      return await this.dispatchCommand(payload, commandId, options);
-    } finally {
-      this.submissionsInFlight -= 1;
-      this.flushDeferredAutoFlows();
-    }
-  }
-
-  private flushDeferredAutoFlows(): void {
-    if (this.submissionsInFlight > 0 || !this.autoFlowsDeferred) return;
-    this.autoFlowsDeferred = false;
-    this.runAutoFlows();
-  }
-
-  private async resyncForRetry(): Promise<void> {
-    try {
-      const fresh = await this.deps.transport.snapshot(this.roomId);
-      if (this.isDisposed()) return;
-      this.applyRoomSnapshot(fresh);
-    } catch {}
-    await this.sync();
-  }
-
-  private async dispatchCommand(
-    payload: FixedFiveCommandPayload,
-    commandId: CommandId,
-    options?: {
-      actor?: FixedFiveParticipantId;
-      commandId?: string;
-      retry?: boolean;
-      quiet?: boolean;
-    },
-  ): Promise<boolean> {
-    try {
       const result = await submitFixedFiveCommand({
         submitCommand: (command) => this.deps.transport.submitCommand(command),
         roomId: this.brandedRoomId(),
@@ -1497,7 +1437,14 @@ export class FixedFiveRoomSession {
         actorParticipantId: options?.actor ?? this.selfId,
         payload,
         expectedRevision: this.room?.revision,
-        resync: () => this.resyncForRetry().then(() => this.room?.revision),
+        resync: async () => {
+          try {
+            const fresh = await this.deps.transport.snapshot(this.roomId);
+            if (!this.isDisposed()) this.applyRoomSnapshot(fresh);
+          } catch {}
+          await this.sync();
+          return this.room?.revision;
+        },
         retry: options?.retry,
         retryAfterResync: () => this.verification.canRetry(payload),
       });
@@ -1535,6 +1482,12 @@ export class FixedFiveRoomSession {
         this.publish();
       }
       return false;
+    } finally {
+      this.submissionsInFlight -= 1;
+      if (this.submissionsInFlight === 0 && this.autoFlowsDeferred) {
+        this.autoFlowsDeferred = false;
+        this.runAutoFlows();
+      }
     }
   }
 
@@ -1567,19 +1520,20 @@ export class FixedFiveRoomSession {
       participant,
     );
     if (!pick) return;
+    const payload = {
+      kind: 'timeout-autopick' as const,
+      playerId: pick.playerId,
+      playerVersionId: pick.playerVersionId,
+      slotIndex: pick.slotIndex,
+      pickOrdinal: ordinal,
+      seedPath: pick.seedPath,
+    };
     this.submittedTimeouts.add(key);
     try {
       const stored = await this.deps.transport.commitFallback(
         this.roomId,
         deadline.cursor,
-        {
-          kind: 'timeout-autopick',
-          playerId: pick.playerId,
-          playerVersionId: pick.playerVersionId,
-          slotIndex: pick.slotIndex,
-          pickOrdinal: ordinal,
-          seedPath: pick.seedPath,
-        },
+        payload,
         this.room.revision,
       );
       if (this.isDisposed()) return;
@@ -1598,17 +1552,10 @@ export class FixedFiveRoomSession {
       if (isMissingFunctionError(e)) {
         this.verification.markReceiptsUnsupported();
         this.submittedTimeouts.add(key);
-        void this.sendCommand(
-          {
-            kind: 'timeout-autopick',
-            playerId: pick.playerId,
-            playerVersionId: pick.playerVersionId,
-            slotIndex: pick.slotIndex,
-            pickOrdinal: ordinal,
-            seedPath: pick.seedPath,
-          },
-          { actor: participant, commandId: `timeout-${deadline.cursor}-${String(ordinal)}` },
-        );
+        void this.sendCommand(payload, {
+          actor: participant,
+          commandId: `timeout-${deadline.cursor}-${String(ordinal)}`,
+        });
         return;
       }
       if (!this.isDisposed()) {

@@ -56,3 +56,8 @@ export async function executeMultiplayerCommand<
           },
   });
 }
+
+export interface RecoveredCommandReceipt {
+  accepted: boolean;
+  rejectionCode?: string | null;
+}
