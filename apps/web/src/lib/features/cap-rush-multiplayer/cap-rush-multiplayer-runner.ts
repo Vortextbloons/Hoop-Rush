@@ -151,6 +151,7 @@ export class CapRushMultiplayerRunner {
       errorMessages: ERROR_MESSAGES,
       timeoutMs: options.timeoutMs,
       createWorker: options.createWorker,
+      reuseWorker: true,
     });
   }
 

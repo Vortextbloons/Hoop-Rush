@@ -72,8 +72,6 @@ describe('cap rush multiplayer shared league', () => {
       return state;
     };
 
-    run('p1', { kind: 'ready', ready: true });
-    run('p2', { kind: 'ready', ready: true });
     run('p1', { kind: 'start' });
     expect(state.phase).toBe('recruiting');
     expect(state.recruitment?.market.players).toHaveLength(60);

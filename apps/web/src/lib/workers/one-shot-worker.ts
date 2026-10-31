@@ -26,6 +26,7 @@ export interface OneShotWorkerSpec<TPayload, TResponse, TOutput> {
   errorMessages: OneShotWorkerErrorMessages;
   timeoutMs?: number;
   createWorker?: (url: URL) => Worker;
+  reuseWorker?: boolean;
 }
 
 interface PendingOneShotRequest {
@@ -41,15 +42,16 @@ export class OneShotWorkerRunner<TPayload, TResponse, TOutput> {
   constructor(private readonly spec: OneShotWorkerSpec<TPayload, TResponse, TOutput>) {}
 
   run(payload: TPayload): Promise<TOutput> {
+    const hadPending = this.pending !== null;
     this.cancelPending(this.spec.errorMessages.superseded);
-    this.teardownWorker();
+    if (hadPending || !this.spec.reuseWorker) this.teardownWorker();
     const requestId = newRequestId();
     const request = this.spec.buildRequest(payload, requestId);
     const workerUrl = this.spec.workerUrl;
     const createWorker = this.spec.createWorker;
-    const worker = createWorker
-      ? createWorker(workerUrl)
-      : new Worker(workerUrl, { type: 'module' });
+    const worker =
+      this.worker ??
+      (createWorker ? createWorker(workerUrl) : new Worker(workerUrl, { type: 'module' }));
     this.worker = worker;
     return new Promise<TOutput>((resolve, reject) => {
       const timeout = setTimeout(() => {
@@ -70,9 +72,15 @@ export class OneShotWorkerRunner<TPayload, TResponse, TOutput> {
           resolve(result.output);
           return;
         }
+        if (this.spec.reuseWorker) this.teardownWorker();
         reject(new Error(result.message));
       };
       worker.onerror = () => {
+        if (this.worker !== worker) return;
+        if (this.pending === null) {
+          if (this.spec.reuseWorker) this.teardownWorker();
+          return;
+        }
         this.fail(requestId, new Error(this.spec.errorMessages.crashed));
       };
       worker.postMessage(request);

@@ -273,9 +273,6 @@ export function applyCapRushMultiplayerCommand(
       if (actor !== 'p1') return reject('not-host', 'only the host starts the league');
       if (state.phase !== 'lobby') return reject('invalid-phase', 'the league already started');
       if (state.rootSeed === null) return reject('invalid-phase', 'the room has no root seed');
-      if (!state.ready.p1 || !state.ready.p2) {
-        return reject('not-ready', 'both seats must be ready');
-      }
       const field = capRushLeagueFieldOf(environment.bracket);
       const franchises = capRushMultiplayerAssignFranchises({
         rootSeed: state.rootSeed,

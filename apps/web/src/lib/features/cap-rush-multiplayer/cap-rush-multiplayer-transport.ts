@@ -27,6 +27,7 @@ import {
 import { capRushMultiplayerDeadlineOf } from '@hoop-rush/application/cap-rush-multiplayer';
 import { createRealtimeRoomRegistry, getMultiplayerClient } from '#lib/supabase-runtime.js';
 import { getCapRushMultiplayerData } from './cap-rush-multiplayer-assets.js';
+import { capRushMultiplayerAcceptedAt } from './cap-rush-multiplayer-presentation.js';
 
 interface CommandRow {
   command_id: string;

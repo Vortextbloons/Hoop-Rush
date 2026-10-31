@@ -69,8 +69,6 @@ function prepareRecruitment(bidDollars: number | null): Harness {
   let clock = capRushTestDate();
   const at = (offset = 0) => new Date(clock + offset).toISOString();
   let state = createCapRushMultiplayerState(ROOT);
-  state = runCommand(state, commands, 'p1', { kind: 'ready', ready: true }, at());
-  state = runCommand(state, commands, 'p2', { kind: 'ready', ready: true }, at());
   state = runCommand(state, commands, 'p1', { kind: 'start' }, at());
   if (bidDollars !== null) {
     const lot = capRushMultiplayerActiveRound(

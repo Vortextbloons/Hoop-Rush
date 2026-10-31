@@ -99,6 +99,89 @@ function requestIdOf(worker: FakeWorker): string {
 }
 
 describe('OneShotWorkerRunner', () => {
+  it('keeps creating a fresh worker after successful jobs by default', async () => {
+    const { spec, workers } = stubSpec();
+    const runner = new OneShotWorkerRunner(spec);
+    for (let index = 0; index < 2; index += 1) {
+      const pending = runner.run({ value: index });
+      const worker = workerAt(workers, index);
+      worker.emit({ requestId: requestIdOf(worker), ok: true, output: 'done' });
+      await expect(pending).resolves.toBe('done');
+    }
+    expect(workers).toHaveLength(2);
+    expect(workerAt(workers, 0).terminated).toBe(true);
+    runner.dispose();
+  });
+
+  it.each(['malformed', 'crash', 'mapped', 'timeout'] as const)(
+    'replaces a reusable worker after a %s failure',
+    async (failure) => {
+      const { spec, workers } = stubSpec({ reuseWorker: true, timeoutMs: 10 });
+      const runner = new OneShotWorkerRunner(spec);
+      const pending = runner.run({ value: 1 });
+      const worker = workerAt(workers, 0);
+      if (failure === 'malformed') worker.emit('invalid');
+      if (failure === 'crash') worker.crash();
+      if (failure === 'mapped') {
+        worker.emit({ requestId: requestIdOf(worker), ok: false, message: 'mapped failure' });
+      }
+      await expect(pending).rejects.toThrow();
+      expect(worker.terminated).toBe(true);
+      const next = runner.run({ value: 2 });
+      const replacement = workerAt(workers, 1);
+      replacement.emit({ requestId: requestIdOf(replacement), ok: true, output: 'recovered' });
+      await expect(next).resolves.toBe('recovered');
+      runner.dispose();
+    },
+  );
+
+  it('reuses an idle worker when enabled and ignores responses from its previous request', async () => {
+    const { spec, workers } = stubSpec({ reuseWorker: true });
+    const runner = new OneShotWorkerRunner(spec);
+    const first = runner.run({ value: 1 });
+    const worker = workerAt(workers, 0);
+    const firstId = requestIdOf(worker);
+    worker.emit({ requestId: firstId, ok: true, output: 'first' });
+    await expect(first).resolves.toBe('first');
+    const second = runner.run({ value: 2 });
+    expect(workers).toHaveLength(1);
+    const secondId = (worker.posted[1] as { requestId: string }).requestId;
+    worker.emit({ requestId: firstId, ok: true, output: 'stale' });
+    worker.emit({ requestId: secondId, ok: true, output: 'second' });
+    await expect(second).resolves.toBe('second');
+    runner.dispose();
+    expect(worker.terminated).toBe(true);
+  });
+
+  it('replaces an enabled reusable worker when a pending request is superseded', async () => {
+    const { spec, workers } = stubSpec({ reuseWorker: true });
+    const runner = new OneShotWorkerRunner(spec);
+    const first = runner.run({ value: 1 });
+    const second = runner.run({ value: 2 });
+    await expect(first).rejects.toThrow(ERRORS.superseded);
+    expect(workerAt(workers, 0).terminated).toBe(true);
+    const worker = workerAt(workers, 1);
+    worker.emit({ requestId: requestIdOf(worker), ok: true, output: 'second' });
+    await expect(second).resolves.toBe('second');
+    runner.dispose();
+  });
+
+  it('replaces a reusable worker after an idle crash', async () => {
+    const { spec, workers } = stubSpec({ reuseWorker: true });
+    const runner = new OneShotWorkerRunner(spec);
+    const first = runner.run({ value: 1 });
+    const worker = workerAt(workers, 0);
+    worker.emit({ requestId: requestIdOf(worker), ok: true, output: 'first' });
+    await first;
+    worker.crash();
+    expect(worker.terminated).toBe(true);
+    const second = runner.run({ value: 2 });
+    const replacement = workerAt(workers, 1);
+    replacement.emit({ requestId: requestIdOf(replacement), ok: true, output: 'second' });
+    await expect(second).resolves.toBe('second');
+    runner.dispose();
+  });
+
   it('posts the built request under a fresh correlation id and resolves the mapped output', async () => {
     const { spec, workers } = stubSpec();
     const runner = new OneShotWorkerRunner(spec);

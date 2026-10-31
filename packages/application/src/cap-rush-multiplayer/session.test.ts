@@ -179,8 +179,6 @@ describe('cap rush multiplayer application session', () => {
     const guest = makeSession('p2');
     await guest.attach();
 
-    await host.ready(true);
-    await guest.ready(true);
     await host.start();
     await host.refresh();
     await guest.refresh();

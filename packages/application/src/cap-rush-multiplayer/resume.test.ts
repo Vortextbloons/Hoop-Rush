@@ -95,8 +95,6 @@ describe('cap rush multiplayer disconnect and resume', () => {
     let guest = makeSession('p2');
     await guest.attach();
 
-    await host.ready(true);
-    await guest.ready(true);
     await host.start();
     await host.refresh();
     await guest.refresh();

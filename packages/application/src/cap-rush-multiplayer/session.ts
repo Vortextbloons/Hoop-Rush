@@ -129,10 +129,6 @@ export class CapRushMultiplayerSession {
     };
   }
 
-  async ready(ready: boolean): Promise<CapRushMultiplayerCommandReceipt> {
-    return this.send({ kind: 'ready', ready });
-  }
-
   async start(): Promise<CapRushMultiplayerCommandReceipt> {
     return this.send({ kind: 'start' });
   }

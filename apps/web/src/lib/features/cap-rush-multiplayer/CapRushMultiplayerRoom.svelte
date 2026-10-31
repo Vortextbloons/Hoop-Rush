@@ -31,6 +31,7 @@
       online: member.online,
     })) ?? [],
   );
+  const bothOnline = $derived(view?.connected ?? false);
   const phaseLabel = $derived(
     game === null
       ? 'Connecting'
@@ -116,46 +117,25 @@
       <div>
         <p class="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Lobby</p>
         <h2 class="font-display text-2xl font-extrabold uppercase tracking-tight">
-          Both seats must ready up
+          {bothOnline ? 'Both seats are in' : 'Waiting for your opponent'}
         </h2>
         <p class="mt-1 text-sm text-muted-foreground">
           The market is generated once the host starts. Both seats use the same 60 players.
         </p>
       </div>
-      <div class="grid gap-3 sm:grid-cols-2">
-        {#each ['p1', 'p2'] as const as entry (entry)}
-          <div class="rounded-xl border border-border bg-surface-2 p-3">
-            <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-              {seatLabelFor(entry, seat)}
-            </p>
-            <p class="mt-1 text-sm font-semibold">
-              {game.ready[entry] ? 'Ready' : 'Not ready'}
-            </p>
-          </div>
-        {/each}
-      </div>
-      <div class="flex flex-wrap gap-2">
+      {#if controller.isHost}
         <button
           type="button"
-          class="inline-flex min-h-11 items-center justify-center rounded-xl border border-border bg-surface-2 px-4 text-sm font-semibold
+          class="inline-flex min-h-11 w-fit items-center justify-center rounded-xl border border-primary/50 bg-primary/10 px-4 text-sm font-bold text-primary
             disabled:opacity-40"
-          disabled={controller.busy}
-          onclick={() => controller.readiness()}
+          disabled={controller.busy || !bothOnline}
+          onclick={() => controller.startLeague()}
         >
-          {game.ready[seat] ? 'Cancel ready' : 'Ready up'}
+          Start recruitment
         </button>
-        {#if controller.isHost}
-          <button
-            type="button"
-            class="inline-flex min-h-11 items-center justify-center rounded-xl border border-primary/50 bg-primary/10 px-4 text-sm font-bold text-primary
-              disabled:opacity-40"
-            disabled={controller.busy || !game.ready.p1 || !game.ready.p2}
-            onclick={() => controller.startLeague()}
-          >
-            Start recruitment
-          </button>
-        {/if}
-      </div>
+      {:else}
+        <p class="text-sm text-muted-foreground">Waiting for the host to start the auction.</p>
+      {/if}
     </section>
   {:else if game.phase === 'recruiting'}
     <CapRushAuctionBoard

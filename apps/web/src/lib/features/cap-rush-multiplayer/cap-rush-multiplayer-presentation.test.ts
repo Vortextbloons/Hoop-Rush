@@ -55,6 +55,15 @@ function auction(overrides: Partial<CapRushMultiplayerAuction> = {}): CapRushMul
 }
 
 describe('cap rush multiplayer presentation', () => {
+  test('normalizes the coordination clock to UTC ISO with a Z suffix', () => {
+    expect(capRushMultiplayerAcceptedAt('2026-10-31T22:05:48.210+00:00')).toBe(
+      '2026-10-31T22:05:48.210Z',
+    );
+    expect(capRushMultiplayerAcceptedAt(null, new Date('2026-10-31T22:05:48.210Z'))).toBe(
+      '2026-10-31T22:05:48.210Z',
+    );
+  });
+
   test('formats the auction clock', () => {
     expect(clockLabel(60_000)).toBe('1:00');
     expect(clockLabel(9_400)).toBe('0:10');

@@ -110,12 +110,6 @@ export class CapRushMultiplayerController {
     return this.disposed;
   }
 
-  async readiness(): Promise<void> {
-    const state = this.state;
-    if (state === null) return;
-    await this.run(() => this.session?.ready(!state.ready[this.seat]));
-  }
-
   async startLeague(): Promise<void> {
     await this.run(() => this.session?.start());
   }
