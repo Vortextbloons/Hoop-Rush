@@ -539,12 +539,12 @@
         class="rounded-xl border border-negative/40 bg-negative/10 p-4 text-sm text-negative"
       >
         <p>{error}</p>
-        {#if unsupported}
+        {#if unsupported || error !== null}
           <button
             type="button"
             class="mt-3 inline-flex min-h-10 items-center rounded-lg border border-negative/50 px-3 text-xs font-bold uppercase"
             disabled={busy}
-            onclick={onDiscard}>Discard outdated draft and start fresh</button
+            onclick={onDiscard}>Discard draft and start fresh</button
           >
         {/if}
       </div>

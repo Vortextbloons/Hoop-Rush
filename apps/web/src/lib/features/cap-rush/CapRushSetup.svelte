@@ -67,12 +67,12 @@
       class="mt-5 rounded-xl border border-negative/40 bg-negative/10 p-4 text-sm text-negative"
     >
       {controller.error}
-      {#if controller.unsupported}
+      {#if controller.error !== null}
         <button
           type="button"
           class="mt-3 inline-flex min-h-10 items-center rounded-lg border border-negative/50 px-3 text-xs font-bold uppercase"
           disabled={controller.busy}
-          onclick={() => void controller.discard()}>Discard outdated draft and start fresh</button
+          onclick={() => void controller.discard()}>Discard draft and start fresh</button
         >
       {/if}
     </div>
