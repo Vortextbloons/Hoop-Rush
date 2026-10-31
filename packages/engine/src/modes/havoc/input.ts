@@ -12,38 +12,6 @@ import {
   havocGameSeed,
 } from '@hoop-rush/data-contracts';
 import type { BuildHavocGameInputInput } from './api.ts';
-import { soloToBattleInput } from './core/battle-adapters.ts';
-import { havocBattleCapabilityTargets, rankedHavocStarters } from './core/battle-targets.ts';
-
-/**
- * The frozen `havocGameInputSchema` carries no capability-target field, so the
- * per-game target assignment is a pure function of the input and is derived
- * independently by the runtime. Both sides use this function.
- */
-export interface HavocCapabilityTargets {
-  /** Body Snatcher owner instance id -> opponent starter instance id. */
-  readonly bodySnatcher: ReadonlyMap<string, string>;
-  /** The Bounty target: highest-ranked opponent starter instance id. */
-  readonly bounty: string | null;
-}
-
-function opponentTeam(input: HavocGameInput): HavocTeamInput {
-  return input.humanSide === 'home' ? input.away : input.home;
-}
-
-/** Opponent starters ranked by frozen original Overall, source version id, source player id. */
-export function rankedHavocOpponentStarters(input: HavocGameInput): HavocParticipant[] {
-  return rankedHavocStarters({ ...opponentTeam(input), side: 'home' });
-}
-
-export function havocCapabilityTargets(input: HavocGameInput): HavocCapabilityTargets {
-  const targets = havocBattleCapabilityTargets(soloToBattleInput(input));
-  const humanSideIndex: 0 | 1 = input.humanSide === 'home' ? 0 : 1;
-  return {
-    bodySnatcher: targets.bodySnatcher,
-    bounty: targets.bounty[humanSideIndex],
-  };
-}
 
 function unmutatedTeam(team: HavocTeamInput): HavocTeamInput {
   return {

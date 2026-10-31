@@ -37,9 +37,15 @@ export function buildCapRushHistoricalField(
   for (const player of catalog.candidates) {
     if (player.anchors === undefined) continue;
     let franchise = seasons.get(player.franchiseId);
-    if (franchise === undefined) seasons.set(player.franchiseId, (franchise = new Map()));
+    if (franchise === undefined) {
+      franchise = new Map<string, Candidate[]>();
+      seasons.set(player.franchiseId, franchise);
+    }
     let roster = franchise.get(player.seasonKey);
-    if (roster === undefined) franchise.set(player.seasonKey, (roster = []));
+    if (roster === undefined) {
+      roster = [];
+      franchise.set(player.seasonKey, roster);
+    }
     roster.push(player);
   }
   return opponentBracketSchema.parse({

@@ -10,6 +10,7 @@ export * from './league-simulation.ts';
 export * from './conference-standings.ts';
 export * from './conference-postseason.ts';
 export * from './lock.ts';
+export * from './playoff.ts';
 export * from './playoff-sim.ts';
 export * from './postseason.ts';
 export * from './report.ts';

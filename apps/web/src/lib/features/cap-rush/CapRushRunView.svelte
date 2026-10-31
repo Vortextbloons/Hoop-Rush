@@ -14,6 +14,7 @@
   import CapRushPostseasonView from './CapRushPostseasonView.svelte';
   import CapRushSeasonProgress from './CapRushSeasonProgress.svelte';
   import type { CapRushSeasonController } from './cap-rush-season-state.svelte.js';
+  import { capRushPlayoffStatusOf } from './cap-rush-playoff-presentation.ts';
   import type { CapRushArt } from './cap-rush-art.ts';
   import { formatMillions, recordLabel, variantLabel } from './cap-rush-presentation.ts';
 
@@ -347,7 +348,12 @@
       {/if}
 
       <CapRushSeasonProgress draft={view.draft} {season} storedGames={controller.games} {art} />
-      <CapRushLineup slots={view.slots} {art} />
+      <CapRushLineup
+        slots={view.slots}
+        {art}
+        locked={view.draft.locked}
+        playoffStatus={capRushPlayoffStatusOf(view.draft)}
+      />
 
       {#if controller.error !== null}
         <div

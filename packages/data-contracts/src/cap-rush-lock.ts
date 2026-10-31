@@ -29,10 +29,7 @@ import {
   type CapRushLeagueScheduleEntry,
 } from './cap-rush-league.ts';
 import { capRushSpinReceiptSchema } from './cap-rush-spin.ts';
-import {
-  capRushPlayoffPerformanceSchema,
-  type CapRushPlayoffPerformance,
-} from './cap-rush-playoff.ts';
+import { capRushPlayoffPerformanceSchema } from './cap-rush-playoff.ts';
 
 export const capRushFranchiseAssignmentSchema = z.object({
   franchiseId: z.string().min(1).max(64),
@@ -189,38 +186,45 @@ export const capRushLockedInputsSchema = z
       }
     }
     if (locked.playoffPerformance !== undefined) {
-      const participantById = new Map(
+      const participantByVersion = new Map(
         [locked.human, ...locked.opponents.map((entry) => entry.team)].flatMap((team) =>
-          [...team.starters, ...team.replacements].map(
-            (participant) => [participant.instanceId, participant] as const,
+          [...team.starters, ...team.replacements, ...team.clones].flatMap((participant) =>
+            participant.source.playerVersionId === null || participant.source.seasonKey === null
+              ? []
+              : [
+                  [
+                    participant.source.playerVersionId,
+                    {
+                      playerId: participant.source.playerId,
+                      seasonKey: participant.source.seasonKey,
+                    },
+                  ] as const,
+                ],
           ),
         ),
       );
-      const seenInstances = new Set<string>();
+      const seenVersions = new Set<string>();
       for (const row of locked.playoffPerformance.players) {
-        const participant = participantById.get(row.instanceId);
-        if (participant === undefined) {
+        if (seenVersions.has(row.playerVersionId)) {
           ctx.addIssue({
             code: 'custom',
-            message: `playoff performance references unknown instance ${row.instanceId}`,
+            message: `playoff performance repeats player version ${row.playerVersionId}`,
           });
           continue;
         }
-        if (seenInstances.has(row.instanceId)) {
+        seenVersions.add(row.playerVersionId);
+        const participant = participantByVersion.get(row.playerVersionId);
+        if (participant === undefined) {
           ctx.addIssue({
             code: 'custom',
-            message: `playoff performance repeats instance ${row.instanceId}`,
+            message: `playoff performance references unknown player version ${row.playerVersionId}`,
           });
+          continue;
         }
-        seenInstances.add(row.instanceId);
-        if (
-          participant.source.playerId !== row.playerId ||
-          participant.source.playerVersionId !== row.playerVersionId ||
-          participant.source.seasonKey !== row.seasonKey
-        ) {
+        if (participant.playerId !== row.playerId || participant.seasonKey !== row.seasonKey) {
           ctx.addIssue({
             code: 'custom',
-            message: `playoff performance does not match participant ${row.instanceId}`,
+            message: `playoff performance does not match player version ${row.playerVersionId}`,
           });
         }
       }

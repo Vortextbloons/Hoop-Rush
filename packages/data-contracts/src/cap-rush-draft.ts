@@ -33,6 +33,7 @@ import {
 } from './cap-rush-versions.ts';
 import { capRushSpinStateSchema } from './cap-rush-spin.ts';
 import { playoffPerformanceSchema } from './postseason-evidence.ts';
+import { CAP_RUSH_PLAYOFF_FORMULA_VERSION } from './cap-rush-playoff.ts';
 import { capRushFranchiseAssignmentSchema, capRushLockedInputsSchema } from './cap-rush-lock.ts';
 import { capRushSeasonStateSchema } from './cap-rush-season.ts';
 import { capRushPostseasonSchema } from './cap-rush-postseason.ts';
@@ -138,6 +139,11 @@ export const capRushDraftStateSchema = z
     season: capRushSeasonStateSchema,
     postseasonEligible: z.boolean().optional(),
     postseason: capRushPostseasonSchema.optional(),
+    /**
+     * Pinned when the run is created. A run without it predates playoff performance, so its games
+     * keep the pre-feature simulation even if it has not locked or reached the playoffs yet.
+     */
+    playoffFormulaVersion: z.literal(CAP_RUSH_PLAYOFF_FORMULA_VERSION).optional(),
   })
   .superRefine((state, ctx) => {
     const seasonStarted = state.season.games.length > 0;

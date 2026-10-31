@@ -1,11 +1,13 @@
 export class PendingReadyCoordinator {
   private target: number | null = null;
   private retryAtMs = 0;
+  private readonly retryMs: number;
+  private readonly ready: () => void;
 
-  constructor(
-    private readonly retryMs: number,
-    private readonly ready: () => void,
-  ) {}
+  constructor(retryMs: number, ready: () => void) {
+    this.retryMs = retryMs;
+    this.ready = ready;
+  }
 
   schedule(gameNumber: number): void {
     this.target = gameNumber;

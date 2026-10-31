@@ -28,16 +28,6 @@ import { generateSchedule, scheduleInvariants, SCHEDULE_GENERATION_VERSION } fro
 
 export const SCHEDULE_VERSION_LABEL = `schedule-${SCHEDULE_GENERATION_VERSION.replace('schedule-', '')}`;
 
-export const BRACKET_TARGET_LADDER: readonly (readonly [number, number])[] = [
-  [0, 0.75],
-  [3, 0.66],
-  [7, 0.6],
-  [14, 0.5],
-  [19, 0.41],
-  [24, 0.28],
-  [29, 0.1],
-];
-
 export const BRACKET_WIN_RATE_BAND: readonly [number, number] = [0.1, 0.8];
 const LEAGUE_MEDIAN_WIN_RATE_BAND: readonly [number, number] = [0.46, 0.54];
 const SAMPLING_TOLERANCE = 0.03;
@@ -308,40 +298,6 @@ function simulateRoundRobin(
     gamesPlayed: played,
     population: [...winRates.values()].sort((a, b) => a - b),
   };
-}
-
-export function interpolateLadder(
-  ladder: readonly (readonly [number, number])[],
-  rank: number,
-): number {
-  const first = ladder[0];
-  const last = ladder[ladder.length - 1];
-  if (!first || !last) throw new Error('bracket: target ladder is empty');
-  if (rank <= first[0]) return first[1];
-  if (rank >= last[0]) return last[1];
-  for (let i = 1; i < ladder.length; i += 1) {
-    const lo = ladder[i - 1];
-    const hi = ladder[i];
-    if (!lo || !hi) continue;
-    if (rank <= hi[0]) {
-      const span = hi[0] - lo[0];
-      return span === 0 ? hi[1] : lo[1] + ((rank - lo[0]) / span) * (hi[1] - lo[1]);
-    }
-  }
-  return last[1];
-}
-
-/** Mean absolute gap between a measured field and the intended rank curve. */
-export function ladderError(
-  rates: readonly number[],
-  ladder: readonly (readonly [number, number])[],
-): number {
-  const sorted = [...rates].sort((a, b) => b - a);
-  let total = 0;
-  for (const [index, rate] of sorted.entries()) {
-    total += Math.abs(rate - interpolateLadder(ladder, index));
-  }
-  return total / sorted.length;
 }
 
 export function generateBracket(options: BracketGenerationOptions): OpponentBracket {

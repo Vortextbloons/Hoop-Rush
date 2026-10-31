@@ -351,7 +351,7 @@ export const bracketAuditReportSchema = z.object({
 });
 const benchmarkRegressionSchema = z.object({
   metric: z.enum(['medianMs', 'p95Ms']),
-  measurement: z.enum(['poolCold', 'poolCached', 'singleGame', 'challenge82']),
+  measurement: z.string().min(1).max(64),
   baselineMs: z.number().nonnegative(),
   currentMs: z.number().nonnegative(),
   noiseAllowanceMs: z.number().nonnegative(),
@@ -400,6 +400,68 @@ export const benchmarkReportSchema = z.object({
   baselineComparison: benchmarkBaselineComparisonSchema,
 });
 export type BenchmarkReport = z.infer<typeof benchmarkReportSchema>;
+
+const capRushBenchmarkPhasesSchema = z.object({
+  seasonSimulate: timingStatsSchema,
+  seasonAccept: timingStatsSchema,
+  leagueSimulate: timingStatsSchema,
+  leagueAccept: timingStatsSchema,
+  seasonFinalize: timingStatsSchema,
+  standings: timingStatsSchema,
+  postseasonStep: timingStatsSchema,
+  postseasonSimulate: timingStatsSchema,
+  postseasonAccept: timingStatsSchema,
+  postseasonFinalize: timingStatsSchema,
+  seasonTotal: timingStatsSchema,
+  postseasonTotal: timingStatsSchema,
+  total: timingStatsSchema,
+});
+
+export const capRushBenchmarkReportSchema = z.object({
+  schemaVersion: z.literal(1),
+  command: z.literal('cap-rush benchmark'),
+  environment: z.object({
+    node: z.string().min(1).max(64),
+    platform: z.string().min(1).max(64),
+    arch: z.string().min(1).max(64),
+    cpus: z.number().int().positive(),
+    fingerprint: z.string().min(1).max(256),
+  }),
+  engineVersion: z.string().min(1).max(64),
+  dataVersion: z.string().min(1).max(64),
+  profileVersion: z.string().min(1).max(64),
+  bracketHash: z.string().min(1).max(128),
+  fixture: z.string().min(1).max(64),
+  samples: z.number().int().positive(),
+  policies: z.array(
+    z.object({
+      policy: z.enum(['balanced', 'premium']),
+      payrollDollars: z.number().int().nonnegative(),
+      payrollStatus: z.enum(['under-cap', 'first-apron', 'second-apron']),
+      counts: z.object({
+        userSeasonGames: z.number().int().nonnegative(),
+        leagueGames: z.number().int().nonnegative(),
+        standingsGames: z.number().int().nonnegative(),
+        postseasonUserGames: z.number().int().nonnegative(),
+        postseasonAiGames: z.number().int().nonnegative(),
+        postseasonSteps: z.number().int().nonnegative(),
+        postseasonRounds: z.number().int().nonnegative(),
+      }),
+      phases: capRushBenchmarkPhasesSchema,
+      markers: z.object({
+        championTeamId: z.string().nullable(),
+        userOutcome: z.string(),
+        seasonLastResultDigest: z.string(),
+        isolations: z.number().int().nonnegative(),
+        strikes: z.number().int().nonnegative(),
+        consistentAcrossSamples: z.boolean(),
+      }),
+      auditFailures: z.number().int().nonnegative(),
+    }),
+  ),
+  baselineComparison: benchmarkBaselineComparisonSchema,
+});
+export type CapRushBenchmarkReport = z.infer<typeof capRushBenchmarkReportSchema>;
 const draftFitBenchmarkPlayerSchema = z.object({
   slot: z.enum(['PG', 'SG', 'SF', 'PF', 'C']),
   playerId: z.string().min(1).max(64),

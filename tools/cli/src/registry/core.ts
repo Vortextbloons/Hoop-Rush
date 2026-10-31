@@ -68,24 +68,6 @@ export function pickU<const T extends string>(
   return out;
 }
 
-export interface SeedRangeCliArgs {
-  'seed-from': string | null;
-  'seed-to': string | null;
-  workers: string | null;
-  out: string | null;
-  manifest: string | null;
-  validate: string | null;
-}
-
-export const seedRange = (args: ParsedArgs): SeedRangeCliArgs => ({
-  'seed-from': n(args, 'seed-from'),
-  'seed-to': n(args, 'seed-to'),
-  workers: n(args, 'workers'),
-  out: n(args, 'out'),
-  manifest: n(args, 'manifest'),
-  validate: n(args, 'validate'),
-});
-
 const HEADER = `hoop-rush — developer CLI for the Hoop Rush engine and data
 
 Usage:

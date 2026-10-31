@@ -122,8 +122,6 @@ export {
   resolveReference,
   identifyWeaknesses,
   weaknessPenalty,
-  ProjectionCache,
-  type ProjectionCacheStats,
 } from './projection/index.ts';
 export {
   FIXED_FIVE_SEED_VERSION,

@@ -13,6 +13,3 @@ export function loadEraSimulationProfile(
 ): Promise<EraSimulationProfile> {
   return loadAsset(url, eraSimulationProfileSchema, 'era simulation profile', expectedHash, init);
 }
-export function parseOpponentTeam(value: unknown): OpponentTeam {
-  return opponentTeamSchema.parse(value);
-}

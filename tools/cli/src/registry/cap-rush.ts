@@ -1,6 +1,7 @@
 import { n } from './core.ts';
 import { UsageError } from '../args.ts';
 import { capRushCoverage, capRushSeason } from '../commands/cap-rush.ts';
+import { capRushBenchmark } from '../commands/cap-rush-benchmark.ts';
 
 import type { CommandSpec } from './core.ts';
 
@@ -26,6 +27,22 @@ export const capRushCommands: CommandSpec[] = [
     run: (args) =>
       capRushCoverage({
         catalog: required(args, 'catalog'),
+      }),
+  },
+  {
+    name: 'cap-rush benchmark',
+    options: {
+      samples: 'string',
+      policy: 'string',
+      baseline: 'string',
+      'write-baseline': 'string',
+    },
+    run: (args) =>
+      capRushBenchmark({
+        samples: n(args, 'samples') ?? undefined,
+        policy: n(args, 'policy') ?? undefined,
+        baseline: n(args, 'baseline') ?? undefined,
+        'write-baseline': n(args, 'write-baseline') ?? undefined,
       }),
   },
 ];

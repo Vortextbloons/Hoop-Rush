@@ -8,7 +8,6 @@ export type CourtInnovationGameRule = (typeof COURT_INNOVATION_GAME_RULES)[numbe
 export const DEEP_FOUR_SPLIT = 0.2;
 export const DEEP_FOUR_MAKE_SCALE = 0.75;
 export const DEEP_FOUR_FT_MISS = 4;
-export const TWENTY_SECOND_CLOCK = 20;
 export const TWENTY_SECOND_LATE_WINDOW = 4;
 export const TWENTY_SECOND_LATE_PRESSURE = 0.1;
 export const FIRST_TO_SEVEN_TARGET = 7 as const;

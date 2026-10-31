@@ -6,6 +6,7 @@ import type {
   CapRushLockedInputs,
   CapRushLockedPick,
   CapRushPayrollStatus,
+  CapRushPlayoffPerformance,
   CapRushScheduleEntry,
   CapRushSourcePlayer,
   CapRushSpinReceipt,
@@ -17,10 +18,10 @@ import type {
   HavocSourcePlayer,
   HavocTeamInput,
   OpponentBracket,
+  PlayoffPerformance,
   Position,
   Seed,
   SeasonDraftCatalog,
-  PlayoffPerformance,
 } from '@hoop-rush/data-contracts';
 import {
   CAP_RUSH_SCHEMA_VERSION,
@@ -35,6 +36,7 @@ import { applyHavocMutationPackage } from '../havoc/transform.ts';
 import { buildHavocOpponentTeam, buildHavocSchedule } from '../havoc/opponents.ts';
 import { capRushEffectiveRatings, capRushPayrollStatus } from './salary.ts';
 import { capRushUserScheduleOf, capRushValidateLeagueField } from './league-schedule.ts';
+import { capRushPlayoffPerformanceOf } from './playoff.ts';
 
 export const CAP_RUSH_HUMAN_TEAM_ID = 'cap-rush-human';
 export const CAP_RUSH_HUMAN_TEAM_NAME = 'Cap Rush Five';
@@ -43,9 +45,12 @@ export interface CapRushLockSources {
   readonly historicalCatalog?: SeasonDraftCatalog;
   readonly bracket: OpponentBracket;
   readonly profile: EraSimulationProfile;
-  readonly playoffPerformanceOf?: (playerVersionId: string) => PlayoffPerformance | undefined;
 }
 
+/**
+ * Playoff evidence is keyed by exact player version, so the same season that produced the locked
+ * roster also produces the pinned rows. Nothing is re-read from the packaged catalog at sim time.
+ */
 export function capRushPlayoffProfilesOf(input: {
   readonly catalog?: SeasonDraftCatalog;
   readonly picks: readonly CapRushDraftPick[];
@@ -235,6 +240,27 @@ export function buildCapRushSchedule(bracket: OpponentBracket): CapRushScheduleE
   return buildHavocSchedule(bracket);
 }
 
+function playoffPerformanceOfLock(
+  human: HavocTeamInput,
+  opponents: readonly { readonly team: HavocTeamInput }[],
+  profiles: ReadonlyMap<string, PlayoffPerformance> | undefined,
+): CapRushPlayoffPerformance | undefined {
+  if (profiles === undefined || profiles.size === 0) return undefined;
+  const performance = capRushPlayoffPerformanceOf({
+    human,
+    opponents,
+    profileOf: (source) =>
+      source.playerVersionId === null ? undefined : profiles.get(source.playerVersionId),
+  });
+  return performance.players.length === 0 ? undefined : performance;
+}
+
+function playoffPerformanceField(performance: CapRushPlayoffPerformance | undefined): {
+  readonly playoffPerformance?: CapRushPlayoffPerformance;
+} {
+  return performance === undefined ? {} : { playoffPerformance: performance };
+}
+
 export function buildCapRushLockedInputs(input: {
   readonly runId: string;
   readonly runSeed: Seed;
@@ -246,7 +272,7 @@ export function buildCapRushLockedInputs(input: {
   readonly additionalSpins?: readonly CapRushSpinReceipt[] | undefined;
   readonly bracket: OpponentBracket;
   readonly profile: EraSimulationProfile;
-  readonly playoffProfileOf?: (playerVersionId: string) => PlayoffPerformance | undefined;
+  readonly playoffProfiles?: ReadonlyMap<string, PlayoffPerformance>;
   readonly takeover?:
     | {
         readonly franchise: CapRushFranchiseAssignment;
@@ -293,17 +319,6 @@ export function buildCapRushLockedInputs(input: {
         profile: input.profile,
       }),
     }));
-    const playoffPerformance =
-      input.playoffProfileOf === undefined
-        ? undefined
-        : capRushPlayoffPerformanceOf({
-            human,
-            opponents,
-            profileOf: (source) =>
-              source.playerVersionId === null
-                ? undefined
-                : input.playoffProfileOf?.(source.playerVersionId),
-          });
     return capRushLockedInputsSchema.parse({
       schemaVersion: CAP_RUSH_SCHEMA_VERSION,
       runId: input.runId,
@@ -321,9 +336,7 @@ export function buildCapRushLockedInputs(input: {
       human,
       schedule,
       opponents,
-      ...(playoffPerformance === undefined || playoffPerformance.players.length === 0
-        ? {}
-        : { playoffPerformance }),
+      ...playoffPerformanceField(playoffPerformanceOfLock(human, opponents, input.playoffProfiles)),
     });
   }
   const opponentSides = buildOpponentSides({
@@ -344,17 +357,6 @@ export function buildCapRushLockedInputs(input: {
     games: takeover.games,
     userTeamId: human.teamId,
   });
-  const playoffPerformance =
-    input.playoffProfileOf === undefined
-      ? undefined
-      : capRushPlayoffPerformanceOf({
-          human,
-          opponents: opponentSides,
-          profileOf: (source) =>
-            source.playerVersionId === null
-              ? undefined
-              : input.playoffProfileOf?.(source.playerVersionId),
-        });
   return capRushLockedInputsSchema.parse({
     schemaVersion: CAP_RUSH_SCHEMA_VERSION,
     runId: input.runId,
@@ -374,8 +376,8 @@ export function buildCapRushLockedInputs(input: {
     human,
     schedule,
     opponents: opponentSides,
-    ...(playoffPerformance === undefined || playoffPerformance.players.length === 0
-      ? {}
-      : { playoffPerformance }),
+    ...playoffPerformanceField(
+      playoffPerformanceOfLock(human, opponentSides, input.playoffProfiles),
+    ),
   });
 }

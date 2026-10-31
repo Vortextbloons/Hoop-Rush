@@ -17,6 +17,7 @@ import {
   seasonDigestHex,
 } from '@hoop-rush/data-contracts';
 import { havocProductionIndex } from '../comparison.ts';
+import { addHavocStatLine, zeroHavocStatLine } from '../aggregate.ts';
 import { havocMultiplayerByteDraw } from './seed-parity.ts';
 
 const HOME_COURT_GAME_NUMBERS: readonly number[] = [1, 2, 5, 7];
@@ -144,47 +145,6 @@ export function recordHavocMultiplayerGame(
   });
 }
 
-function zeroStatLine(): HavocStatLine {
-  return {
-    secondsPlayed: 0,
-    minutes: 0,
-    points: 0,
-    fieldGoals: { made: 0, attempted: 0 },
-    threes: { made: 0, attempted: 0 },
-    freeThrows: { made: 0, attempted: 0 },
-    rebounds: { total: 0, offensive: 0, defensive: 0 },
-    assists: 0,
-    steals: 0,
-    blocks: 0,
-    turnovers: 0,
-    fouls: 0,
-    chargedFouls: 0,
-    adjustments: 0,
-  };
-}
-
-function addInto(target: HavocStatLine, source: HavocStatLine): void {
-  target.secondsPlayed += source.secondsPlayed;
-  target.minutes += source.minutes;
-  target.points += source.points;
-  target.fieldGoals.made += source.fieldGoals.made;
-  target.fieldGoals.attempted += source.fieldGoals.attempted;
-  target.threes.made += source.threes.made;
-  target.threes.attempted += source.threes.attempted;
-  target.freeThrows.made += source.freeThrows.made;
-  target.freeThrows.attempted += source.freeThrows.attempted;
-  target.rebounds.total += source.rebounds.total;
-  target.rebounds.offensive += source.rebounds.offensive;
-  target.rebounds.defensive += source.rebounds.defensive;
-  target.assists += source.assists;
-  target.steals += source.steals;
-  target.blocks += source.blocks;
-  target.turnovers += source.turnovers;
-  target.fouls += source.fouls;
-  target.chargedFouls += source.chargedFouls;
-  target.adjustments += source.adjustments;
-}
-
 export interface HavocMultiplayerSeriesMvpResult {
   readonly participantId: HavocMultiplayerParticipantId;
   readonly slot: Position;
@@ -201,7 +161,9 @@ export function havocMultiplayerSeriesMvp(
   }
   const byNumber = new Map<number, HavocBattleResult>();
   for (const result of results) byNumber.set(result.gameNumber, result);
-  const totals = new Map<Position, HavocStatLine>(POSITIONS.map((slot) => [slot, zeroStatLine()]));
+  const totals = new Map<Position, HavocStatLine>(
+    POSITIONS.map((slot) => [slot, zeroHavocStatLine()]),
+  );
   let verifiedGames = 0;
   for (const game of series.games) {
     if (game.status !== 'verified') continue;
@@ -212,7 +174,7 @@ export function havocMultiplayerSeriesMvp(
     const team = game.homeParticipantId === champion ? result.home : result.away;
     for (const line of team.participants) {
       const total = totals.get(line.slot);
-      if (total !== undefined) addInto(total, line);
+      if (total !== undefined) addHavocStatLine(total, line);
     }
     verifiedGames += 1;
   }

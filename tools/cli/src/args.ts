@@ -11,28 +11,7 @@ export function parseCount(value: string | undefined, option: string, fallback: 
   return parsed;
 }
 export interface SeedRangeOptionBag {
-  'seed-from'?: string | null;
-  'seed-to'?: string | null;
   workers?: string | null;
-}
-export function parseSeedRange(
-  args: SeedRangeOptionBag,
-  defaultTo: number,
-  options: {
-    requireOrder?: boolean;
-    error?: new (message: string) => Error;
-  } = {},
-): {
-  from: number;
-  to: number;
-} {
-  const from = parseCount(args['seed-from'] ?? undefined, '--seed-from', 0);
-  const to = parseCount(args['seed-to'] ?? undefined, '--seed-to', defaultTo);
-  if (options.requireOrder === true && to < from) {
-    const ErrorType = options.error ?? UsageError;
-    throw new ErrorType('--seed-to must be >= --seed-from');
-  }
-  return { from, to };
 }
 export function parseWorkers(
   args: Pick<SeedRangeOptionBag, 'workers'>,

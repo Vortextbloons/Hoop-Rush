@@ -9,13 +9,13 @@ import {
   summaryRatingsSchema,
 } from '@hoop-rush/data-contracts';
 import { DEFAULT_SEASONS, ensureOutputDir } from '../config.ts';
-import { clamp, fileExists, parseJsonLoose, readJson, safeFloat, writeJsonRetry } from '../json.ts';
+import { fileExists, parseJsonLoose, readJson, safeFloat, writeJsonRetry } from '../json.ts';
 import { chunkList, defaultWorkerCount, runWorker } from '../shared/worker-pool.ts';
 import { join } from 'node:path';
 import { deriveRatingProfile } from './v3.ts';
 import { deriveTraits } from './traits.ts';
 import { deriveContract } from './contracts.ts';
-import { derivePlayerRecord, fieldPublished, positionGroup, type SeasonContext } from './v2.ts';
+import { derivePlayerRecord, fieldPublished, type SeasonContext } from './v2.ts';
 import { getEra } from './era.ts';
 import { canonicalPlayerName } from '../identity.ts';
 import { positionOverrideFor } from '../positions/overrides.ts';
@@ -111,139 +111,6 @@ export function loadEvidenceMap(outDir: string): Map<string, Record<string, unkn
   if (!fileExists(path)) return new Map();
   const data = z.record(z.string().min(1), seasonStatsEvidenceSchema).parse(readJson(path));
   return new Map(Object.entries(data));
-}
-export function estimateTeamWinPctMap(statsList: readonly RatingsStatsRow[]): Map<string, number> {
-  const teamBuckets = new Map<
-    string,
-    {
-      weightedBpm: number;
-      totalMinutes: number;
-      perSum: number;
-      perCount: number;
-    }
-  >();
-  for (const s of statsList) {
-    const teamId = typeof s.teamExternalId === 'string' ? s.teamExternalId : '';
-    if (!teamId) continue;
-    let bucket = teamBuckets.get(teamId);
-    if (!bucket) {
-      bucket = { weightedBpm: 0, totalMinutes: 0, perSum: 0, perCount: 0 };
-      teamBuckets.set(teamId, bucket);
-    }
-    const minutes = safeFloat(s.minutes, 0);
-    const bpm = s.boxPlusMinus;
-    if (bpm != null && typeof bpm === 'number' && Number.isFinite(bpm)) {
-      bucket.weightedBpm += bpm * Math.max(1, minutes);
-      bucket.totalMinutes += Math.max(1, minutes);
-    }
-    const per = s.per;
-    if (per != null && typeof per === 'number' && Number.isFinite(per)) {
-      bucket.perSum += per;
-      bucket.perCount += 1;
-    }
-  }
-  const out = new Map<string, number>();
-  for (const [teamId, bucket] of teamBuckets) {
-    let winPct: number | null = null;
-    if (bucket.totalMinutes > 0) {
-      const avgBpm = bucket.weightedBpm / bucket.totalMinutes;
-      winPct = clamp(0.5 + avgBpm * 0.075, 0.08, 0.92);
-    }
-    if (winPct == null && bucket.perCount > 0) {
-      const avgPer = bucket.perSum / bucket.perCount;
-      winPct = clamp(0.5 + (avgPer - 15) * 0.025, 0.08, 0.92);
-    }
-    if (winPct != null) {
-      out.set(teamId, winPct);
-    }
-  }
-  return out;
-}
-export function resolveTeamWinPct(
-  playerWinPct: number | null,
-  standingsWinPct: number | null,
-  fallbackWinPct: number | null,
-): number | null {
-  return playerWinPct ?? standingsWinPct ?? fallbackWinPct;
-}
-export function loadStandingsMap(outDir: string): Map<string, number> {
-  const map = new Map<string, number>();
-  const path = join(outDir, 'standings.json');
-  if (!fileExists(path)) return map;
-  try {
-    const raw: unknown = readJson(path);
-    if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return map;
-    for (const [teamId, value] of Object.entries(raw)) {
-      const pct = typeof value === 'number' && Number.isFinite(value) ? value : null;
-      if (teamId !== '' && pct !== null) map.set(teamId, clamp(pct, 0, 1));
-    }
-  } catch {}
-  return map;
-}
-export function pooledRatePriors(
-  roster: readonly RosterPlayer[],
-  statsList: readonly RatingsStatsRow[],
-): Map<
-  string,
-  {
-    threePointPctPrior?: number;
-    freeThrowPctPrior?: number;
-  }
-> {
-  const groupByExtId = new Map<string, 'G' | 'F' | 'C'>();
-  for (const player of roster) {
-    const extId = player.externalId ?? '';
-    if (extId === '') continue;
-    const override = positionOverrideFor(extId);
-    const pos =
-      override !== null ? override.primary : primaryPositionForSource(player.position ?? 'SF');
-    groupByExtId.set(extId, positionGroup(pos));
-  }
-  const sums = new Map<
-    'G' | 'F' | 'C',
-    {
-      tpm: number;
-      tpa: number;
-      ftm: number;
-      fta: number;
-    }
-  >();
-  for (const s of statsList) {
-    const extId = s.playerExternalId;
-    const group = typeof extId === 'string' ? groupByExtId.get(extId) : undefined;
-    if (group === undefined) continue;
-    const tpm = safeFloat(s.tpm);
-    const tpa = safeFloat(s.tpa);
-    const ftm = safeFloat(s.ftm);
-    const fta = safeFloat(s.fta);
-    const acc = sums.get(group) ?? { tpm: 0, tpa: 0, ftm: 0, fta: 0 };
-    if (Number.isFinite(tpm) && Number.isFinite(tpa) && tpa > 0) {
-      acc.tpm += tpm;
-      acc.tpa += tpa;
-    }
-    if (Number.isFinite(ftm) && Number.isFinite(fta) && fta > 0) {
-      acc.ftm += ftm;
-      acc.fta += fta;
-    }
-    sums.set(group, acc);
-  }
-  const priors = new Map<
-    string,
-    {
-      threePointPctPrior?: number;
-      freeThrowPctPrior?: number;
-    }
-  >();
-  for (const [group, acc] of sums) {
-    const prior: {
-      threePointPctPrior?: number;
-      freeThrowPctPrior?: number;
-    } = {};
-    if (acc.tpa > 0) prior.threePointPctPrior = acc.tpm / acc.tpa;
-    if (acc.fta > 0) prior.freeThrowPctPrior = acc.ftm / acc.fta;
-    priors.set(group, prior);
-  }
-  return priors;
 }
 export function computeForSeason(season: string, force = false, overallOnly = false): void {
   const out = ensureOutputDir(season);

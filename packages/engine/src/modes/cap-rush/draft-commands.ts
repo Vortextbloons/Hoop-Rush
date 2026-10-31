@@ -41,7 +41,10 @@ import {
   capRushPlayoffGameSeed,
   isConferencePostseason,
 } from '@hoop-rush/data-contracts';
-import { capRushEmptySeasonState } from '@hoop-rush/data-contracts';
+import {
+  CAP_RUSH_PLAYOFF_FORMULA_VERSION,
+  capRushEmptySeasonState,
+} from '@hoop-rush/data-contracts';
 import { havocGameResultDigest } from '../havoc/digests.ts';
 import { capRushFoldAggregate } from './season.ts';
 import type { Rng } from '../../sim/rng.ts';
@@ -54,7 +57,11 @@ import {
   capRushOfferLegalCardIds,
 } from './feasibility.ts';
 import { generateCapRushOffer, generateCapRushReplacementOffer } from './offers.ts';
-import { buildCapRushLockedInputs, type CapRushLockSources } from './lock.ts';
+import {
+  buildCapRushLockedInputs,
+  capRushPlayoffProfilesOf,
+  type CapRushLockSources,
+} from './lock.ts';
 import {
   buildCapRushLeagueSchedule,
   capRushAssignFranchise,
@@ -126,6 +133,7 @@ export function createCapRushDraftState(
     locked: null,
     season: capRushEmptySeasonState(),
     postseasonEligible: true,
+    playoffFormulaVersion: CAP_RUSH_PLAYOFF_FORMULA_VERSION,
   });
   return state;
 }
@@ -575,6 +583,14 @@ function applyLockLineup(
     additionalSpins: state.spin.status === 'purchased' ? state.spin.additionalReceipts : undefined,
     bracket,
     profile: lockSources.profile,
+    ...(state.playoffFormulaVersion === undefined
+      ? {}
+      : {
+          playoffProfiles: capRushPlayoffProfilesOf({
+            catalog: lockSources.historicalCatalog,
+            picks: state.picks,
+          }),
+        }),
     ...(takeover === undefined ? {} : { takeover }),
   });
   const nextState = capRushDraftStateSchema.parse({

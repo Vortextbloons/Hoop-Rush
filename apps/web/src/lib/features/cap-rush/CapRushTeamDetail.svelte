@@ -5,12 +5,14 @@
     capRushConferenceStandingsEntries,
     isConferenceStandings,
     type CapRushConferenceStandings,
+    type CapRushDraftState,
     type CapRushLeagueGame,
     type CapRushLockedInputs,
     type CapRushPostseasonStandings,
   } from '@hoop-rush/data-contracts';
   import PlayerFace from '#lib/components/PlayerFace.svelte';
   import TeamLogo from '#lib/components/TeamLogo.svelte';
+  import DialogShell from '#lib/components/DialogShell.svelte';
   import type { CapRushArt } from './cap-rush-art.ts';
   import {
     capStatusLabel,
@@ -19,10 +21,18 @@
     initialsOf,
     recordLabel,
   } from './cap-rush-presentation.ts';
+  import CapRushPlayoffMark from './CapRushPlayoffMark.svelte';
+  import CapRushPlayoffPanel from './CapRushPlayoffPanel.svelte';
+  import {
+    capRushPlayoffCoverage,
+    capRushPlayoffRowFor,
+    capRushPlayoffStatusOf,
+  } from './cap-rush-playoff-presentation.ts';
 
   let {
     teamId,
     locked,
+    draft = null,
     standings = null,
     leagueGames = [],
     art = null,
@@ -30,6 +40,7 @@
   }: {
     teamId: string;
     locked: CapRushLockedInputs;
+    draft?: CapRushDraftState | null;
     standings?: CapRushPostseasonStandings | CapRushConferenceStandings | null;
     leagueGames?: readonly CapRushLeagueGame[];
     art?: CapRushArt | null;
@@ -80,6 +91,32 @@
       }));
   });
   const penalties = $derived(isUserTeam ? apronPenaltyRows(locked.payrollStatus) : []);
+  const playoffStatus = $derived(draft === null ? 'legacy' : capRushPlayoffStatusOf(draft));
+  const playoffCoverage = $derived(
+    capRushPlayoffCoverage(
+      locked,
+      (team?.starters ?? []).map((starter) => starter.source.playerVersionId),
+    ),
+  );
+  let selectedPlayerVersionId = $state<string | null>(null);
+  const selectedPlayer = $derived.by(() => {
+    if (selectedPlayerVersionId === null) return null;
+    const starter = (team?.starters ?? []).find(
+      (candidate) => candidate.source.playerVersionId === selectedPlayerVersionId,
+    );
+    if (starter === undefined) return null;
+    const row = capRushPlayoffRowFor(locked, starter.source.playerVersionId);
+    return row === null ? null : { starter, row };
+  });
+  const playoffSummary = $derived.by(() => {
+    if (playoffStatus === 'legacy')
+      return 'This run predates playoff performance, so its playoffs use the previous simulation.';
+    if (playoffCoverage.withEvidence === 0)
+      return 'No starter has a recorded playoff sample for this exact season, so the playoffs run at regular-season strength.';
+    if (playoffStatus === 'active')
+      return `${String(playoffCoverage.withEvidence)} of ${String(playoffCoverage.total)} starters carry a recorded playoff sample. Those adjustments are live in this postseason.`;
+    return `${String(playoffCoverage.withEvidence)} of ${String(playoffCoverage.total)} starters carry a recorded playoff sample. They take effect when the playoffs start.`;
+  });
 
   function opponentName(opponentId: string): string {
     if (locked.human.teamId === opponentId) return locked.human.displayName;
@@ -158,6 +195,7 @@
         {#each team?.starters ?? [] as starter (starter.instanceId)}
           {@const metadata = isUserTeam ? null : (art?.opponentMetadataFor(starter.source) ?? null)}
           {@const face = art === null ? null : art.faceForPlayerId(starter.source.playerId)}
+          {@const playoffRow = capRushPlayoffRowFor(locked, starter.source.playerVersionId)}
           <tr class="border-t border-line-soft/60">
             <th scope="row" class="px-3 py-1.5 text-left">
               <span class="flex min-w-0 items-center gap-2">
@@ -174,10 +212,22 @@
                     >{initialsOf(starter.source.displayName)}</span
                   >
                 {/if}
-                <span
-                  class="min-w-0 truncate text-[11px] font-semibold"
-                  title={starter.source.displayName}>{starter.source.displayName}</span
-                >
+                {#if playoffRow !== null}
+                  <button
+                    type="button"
+                    class="min-w-0 truncate rounded text-left text-[11px] font-semibold underline-offset-2 outline-none hover:text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                    title={`${starter.source.displayName} playoff adjustment`}
+                    onclick={() => (selectedPlayerVersionId = starter.source.playerVersionId)}
+                  >
+                    {starter.source.displayName}
+                  </button>
+                  <CapRushPlayoffMark row={playoffRow} status={playoffStatus} size="sm" />
+                {:else}
+                  <span
+                    class="min-w-0 truncate text-[11px] font-semibold"
+                    title={starter.source.displayName}>{starter.source.displayName}</span
+                  >
+                {/if}
               </span>
             </th>
             <td class="px-2 py-1.5 text-center font-mono text-[10px]">{starter.slot}</td>
@@ -205,6 +255,28 @@
         {/each}
       </tbody>
     </table>
+  </section>
+
+  <section
+    aria-label="Playoff performance coverage"
+    class="rounded-xl border border-line-soft bg-surface-1 p-3"
+  >
+    <div class="flex items-center justify-between gap-2">
+      <p class="font-mono text-[9px] font-bold tracking-[0.12em] text-muted-foreground uppercase">
+        Playoff form
+      </p>
+      {#if playoffCoverage.withEvidence > 0}
+        <span class="font-mono text-[10px] tabular-nums text-muted-foreground"
+          >{playoffCoverage.withEvidence}/{playoffCoverage.total} sampled</span
+        >
+      {/if}
+    </div>
+    <p class="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
+      {playoffSummary}
+      {#if playoffCoverage.withEvidence > 0}
+        Select a marked player for the measured history and the exact simulation change.
+      {/if}
+    </p>
   </section>
 
   {#if isUserTeam && penalties.length > 0}
@@ -287,3 +359,30 @@
     </p>
   {/if}
 </div>
+
+<DialogShell
+  open={selectedPlayer !== null}
+  onOpenChange={(open) => {
+    if (!open) selectedPlayerVersionId = null;
+  }}
+  size="lg"
+  layout="sheet"
+  grabHandle={true}
+>
+  {#snippet header()}
+    <p class="font-mono text-[10px] font-bold tracking-[0.16em] text-primary uppercase">
+      Playoff performance
+    </p>
+    <p class="font-display text-lg font-extrabold tracking-tight uppercase">
+      {selectedPlayer?.starter.source.displayName ?? ''}
+    </p>
+  {/snippet}
+  {#if selectedPlayer !== null}
+    <CapRushPlayoffPanel
+      row={selectedPlayer.row}
+      displayName={selectedPlayer.starter.source.displayName}
+      seasonKey={selectedPlayer.row.seasonKey}
+      status={playoffStatus}
+    />
+  {/if}
+</DialogShell>

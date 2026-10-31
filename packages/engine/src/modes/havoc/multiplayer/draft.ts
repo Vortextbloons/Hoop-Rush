@@ -54,6 +54,7 @@ import type { HavocDraftEnvironment } from '../api.ts';
 import { HavocCatalogCoverageError } from '../api.ts';
 import type { HavocCompatibleBundle } from '../compatibility.ts';
 import { enumerateHavocBundles } from '../compatibility.ts';
+import { copyHavocEffectiveProfile } from '../catalog.ts';
 import { teamExclusiveMutationIdsOf } from '../mutations.ts';
 import { generateHavocNickname } from '../nicknames.ts';
 import {
@@ -824,15 +825,6 @@ export function havocMultiplayerTimeoutPick(
   return rng.pick(offer.cards);
 }
 
-function copyEffectiveProfile(profile: HavocDraftCard['effective']): HavocDraftCard['effective'] {
-  return {
-    ratings: { ...profile.ratings },
-    tendencies: { ...profile.tendencies },
-    physical: { ...profile.physical },
-    authoritativeChannels: [...profile.authoritativeChannels],
-  };
-}
-
 function instanceIdOf(seed: Seed, purpose: string, ...keys: readonly (string | number)[]): string {
   return havocInstanceIdSchema.parse(`hvi-${havocInstanceSeed(seed, purpose, ...keys)}`);
 }
@@ -887,7 +879,7 @@ export function buildHavocMultiplayerTeam(
       ownerInstanceId: null,
       mutationPackage: pick.card.mutations.map((entry) => ({ ...entry })),
       source: pick.card.source,
-      effective: copyEffectiveProfile(pick.card.effective),
+      effective: copyHavocEffectiveProfile(pick.card.effective),
     });
     replacements.push({
       instanceId: instanceIdOf(
@@ -916,7 +908,7 @@ export function buildHavocMultiplayerTeam(
         ownerInstanceId: starterInstanceId,
         mutationPackage: [],
         source: pick.card.source,
-        effective: copyEffectiveProfile(pick.card.effective),
+        effective: copyHavocEffectiveProfile(pick.card.effective),
       });
     }
   }

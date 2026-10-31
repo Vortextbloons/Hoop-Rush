@@ -7,4 +7,3 @@ export {
   resolveReference,
 } from './reference-lineups.ts';
 export { identifyWeaknesses, weaknessPenalty } from './weaknesses.ts';
-export { ProjectionCache, type ProjectionCacheStats } from './cache.ts';

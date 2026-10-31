@@ -2,11 +2,21 @@ import type {
   HavocAdaptedCandidate,
   HavocCatalog,
   HavocCatalogSource,
+  HavocEffectiveProfile,
   HavocPlayerProfile,
   SeasonDraftCandidate,
   SeasonDraftCatalog,
 } from '@hoop-rush/data-contracts';
 import { havocCatalogSourceSchema, havocCatalogSchema } from '@hoop-rush/data-contracts';
+
+export function copyHavocEffectiveProfile(profile: HavocEffectiveProfile): HavocEffectiveProfile {
+  return {
+    ratings: { ...profile.ratings },
+    tendencies: { ...profile.tendencies },
+    physical: { ...profile.physical },
+    authoritativeChannels: [...profile.authoritativeChannels],
+  };
+}
 
 export function copyHavocPlayerProfile(profile: HavocPlayerProfile): HavocPlayerProfile {
   return {

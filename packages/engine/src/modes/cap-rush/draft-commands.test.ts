@@ -300,7 +300,7 @@ describe('cap rush five-round draft', () => {
     const picks = fabricatedPicks(setup, [
       { slot: 'C', overall: 99 },
       { slot: 'SG', overall: 97 },
-      { slot: 'SF', overall: 95 },
+      { slot: 'SF', overall: 86 },
     ]);
     const offer = generateCapRushOffer({
       index: setup.index,

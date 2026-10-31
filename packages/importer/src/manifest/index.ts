@@ -78,6 +78,9 @@ function rebuildDraftCatalog(pools: readonly FranchiseEraPool[], dataDir: string
           },
           anchors: player.anchors,
           reconstructedThreePoint: player.reconstructedThreePoint,
+          ...(player.playoffPerformance === undefined
+            ? {}
+            : { playoffPerformance: player.playoffPerformance }),
         };
       }),
     )
@@ -362,11 +365,17 @@ export function run(dataDir = PUBLIC_DATA): void {
   }
   manifest.eraSimulationProfiles = profiles;
   const opponentsDir = join(dataDir, 'opponents');
-  if (fileExists(join(opponentsDir, 'bracket.json'))) {
-    manifest.bracket = {
-      url: 'opponents/bracket.json',
-      contentHash: sha256File(join(opponentsDir, 'bracket.json')),
-    };
+  for (const [key, filename] of [
+    ['bracket', 'bracket.json'],
+    ['capRushBracket', 'cap-rush-field.json'],
+    ['capRushRosterMetadata', 'cap-rush-roster-metadata.json'],
+  ] as const) {
+    if (fileExists(join(opponentsDir, filename))) {
+      manifest[key] = {
+        url: `opponents/${filename}`,
+        contentHash: sha256File(join(opponentsDir, filename)),
+      };
+    }
   }
   if (poolByKey.size > 0)
     manifest.draftCatalog = rebuildDraftCatalog([...poolByKey.values()], dataDir);

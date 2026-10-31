@@ -103,9 +103,6 @@ function normalizeMemberships(values: readonly number[]): ArchetypeMemberships {
   if (last) result[last] = Math.round((result[last] + 1 - sum) * 1000000) / 1000000;
   return result;
 }
-export function effectiveUsageFor(stats: StatsRow, eraPace?: number | null): number | null {
-  return possessionExposure(stats, eraPace ?? 100) > 0 ? usageFor(stats, eraPace ?? 100) : null;
-}
 export function productionEvidence(
   stats: StatsRow,
   eraPace?: number | null,

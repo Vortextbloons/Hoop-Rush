@@ -620,6 +620,7 @@
     <CapRushTeamDetail
       teamId={selectedTeamId}
       locked={view.draft.locked}
+      draft={view.draft}
       {standings}
       leagueGames={controller.leagueGames}
       {art}

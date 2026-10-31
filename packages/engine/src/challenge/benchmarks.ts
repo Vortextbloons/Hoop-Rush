@@ -4,7 +4,6 @@ import type {
   SimulationTeam,
   SimulationTendencies,
 } from '@hoop-rush/data-contracts';
-export const BENCHMARK_VERSION = 'benchmark-v1';
 export const FIELD_BENCHMARK_VERSION = 'field-v1';
 const SLOT_POSITIONS: SimulationPlayer['positions'][] = [['PG'], ['SG'], ['SF'], ['PF'], ['C']];
 const BENCHMARK_TENDENCIES: SimulationTendencies = {

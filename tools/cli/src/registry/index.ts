@@ -46,6 +46,7 @@ havoc audit
 havoc calibrate
 cap-rush season
 cap-rush coverage
+cap-rush benchmark
 sim game
 sim batch
 sim diagnose

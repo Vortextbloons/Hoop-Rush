@@ -13,6 +13,3 @@ export function createEngineContext(overrides: Partial<EngineContext> = {}): Eng
     ...overrides,
   };
 }
-export function assertNever(value: never, message: string): never {
-  throw new Error(message);
-}

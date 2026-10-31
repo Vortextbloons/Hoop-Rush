@@ -2,7 +2,6 @@ import type {
   BracketOpponent,
   EraSimulationProfile,
   HavocDraftPick,
-  HavocEffectiveProfile,
   HavocFrozenOpponent,
   HavocLockedInputs,
   HavocParticipant,
@@ -28,7 +27,7 @@ import {
   slotGroupOf,
   summaryRatingsOfRatings,
 } from '@hoop-rush/data-contracts';
-import { copyHavocPlayerProfile } from './catalog.ts';
+import { copyHavocEffectiveProfile, copyHavocPlayerProfile } from './catalog.ts';
 import { applyHavocMutationPackage } from './transform.ts';
 
 export const HAVOC_HUMAN_TEAM_ID = 'havoc-human';
@@ -36,15 +35,6 @@ export const HAVOC_HUMAN_TEAM_NAME = 'Havoc Five';
 
 function instanceIdOf(seed: Seed, purpose: string, ...keys: readonly (string | number)[]): string {
   return havocInstanceIdSchema.parse(`hvi-${havocInstanceSeed(seed, purpose, ...keys)}`);
-}
-
-function copyEffectiveProfile(profile: HavocEffectiveProfile): HavocEffectiveProfile {
-  return {
-    ratings: { ...profile.ratings },
-    tendencies: { ...profile.tendencies },
-    physical: { ...profile.physical },
-    authoritativeChannels: [...profile.authoritativeChannels],
-  };
 }
 
 function opponentSourceOf(
@@ -209,7 +199,7 @@ export function buildHavocHumanTeam(input: {
     ownerInstanceId: null,
     mutationPackage: pick.card.mutations.map((entry) => ({ ...entry })),
     source: pick.card.source,
-    effective: copyEffectiveProfile(pick.card.effective),
+    effective: copyHavocEffectiveProfile(pick.card.effective),
   }));
   const replacements = input.picks.map((pick, ordinal) => {
     const starter = starters[ordinal];
@@ -240,7 +230,7 @@ export function buildHavocHumanTeam(input: {
         ownerInstanceId: starter.instanceId,
         mutationPackage: [],
         source: pick.card.source,
-        effective: copyEffectiveProfile(pick.card.effective),
+        effective: copyHavocEffectiveProfile(pick.card.effective),
       },
     ];
   });

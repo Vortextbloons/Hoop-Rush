@@ -4,101 +4,17 @@ import { isAbsolute, resolve } from 'node:path';
 import { createChallenge, createEngineContext, simulateChallenge } from '@hoop-rush/engine';
 import { eraIdSchema, franchiseIdSchema, idSchema } from '@hoop-rush/data-contracts';
 import { EXIT_USAGE_OR_DATA_ERROR, makeReport, type CliReport } from '../report.ts';
-import { benchmarkReportSchema, type BenchmarkReport } from '../report-schemas.ts';
+import { benchmarkReportSchema } from '../report-schemas.ts';
+import { compareTimedBaselines, timingStats, type TimedMetric } from '../benchmark-support.ts';
 import { loadPackagedData, PackagedData, REPO_ROOT } from './data-loader.ts';
 import { lineupForTeam, resolveUserTeam } from './challenge.ts';
 import { buildInput, chunkRange, fixtureSeed, loadFixture, runSingleGame } from './sim.ts';
 import { parseCount } from '../args.ts';
-function stats(samples: readonly number[]): {
-  medianMs: number;
-  p95Ms: number;
-  minMs: number;
-  maxMs: number;
-} {
-  const sorted = [...samples].sort((a, b) => a - b);
-  const median = sorted[Math.floor(sorted.length / 2)] ?? 0;
-  const p95 = sorted[Math.ceil(sorted.length * 0.95) - 1] ?? sorted[sorted.length - 1] ?? 0;
-  return {
-    medianMs: median,
-    p95Ms: p95,
-    minMs: sorted[0] ?? 0,
-    maxMs: sorted[sorted.length - 1] ?? 0,
-  };
-}
 function resolveBaselinePath(value: string): string {
   return isAbsolute(value) ? value : resolve(REPO_ROOT, value);
 }
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
-}
-type TimedMetric = {
-  sampleCount: number;
-  medianMs: number;
-  p95Ms: number;
-  minMs: number;
-  maxMs: number;
-};
-function compareBaseline(
-  current: BenchmarkReport,
-  baseline: BenchmarkReport,
-  details: string[],
-): {
-  failures: string[];
-  comparison: BenchmarkReport['baselineComparison'];
-} {
-  if (baseline.environment.fingerprint !== current.environment.fingerprint) {
-    details.push('baseline comparison skipped: environment fingerprint does not match');
-    return {
-      failures: [],
-      comparison: {
-        status: 'skipped-fingerprint',
-        fingerprintMatched: false,
-        baselineFingerprint: baseline.environment.fingerprint,
-        regressions: [],
-      },
-    };
-  }
-  details.push('baseline environment fingerprint matched');
-  const comparisons: Array<{
-    id: 'poolCold' | 'poolCached' | 'singleGame' | 'challenge82';
-    label: string;
-    noiseMs: number;
-  }> = [
-    { id: 'poolCold', label: 'pool cold', noiseMs: 2 },
-    { id: 'poolCached', label: 'pool cached', noiseMs: 2 },
-    { id: 'singleGame', label: 'warm single game', noiseMs: 2 },
-    { id: 'challenge82', label: '82-game run', noiseMs: 50 },
-  ];
-  const failures: string[] = [];
-  const regressions: BenchmarkReport['baselineComparison']['regressions'] = [];
-  for (const comparison of comparisons) {
-    const currentMetric: TimedMetric = current[comparison.id];
-    const baselineMetric: TimedMetric = baseline[comparison.id];
-    for (const metric of ['medianMs', 'p95Ms'] as const) {
-      const increase = currentMetric[metric] - baselineMetric[metric];
-      if (currentMetric[metric] > baselineMetric[metric] * 1.25 && increase > comparison.noiseMs) {
-        regressions.push({
-          metric,
-          measurement: comparison.id,
-          baselineMs: baselineMetric[metric],
-          currentMs: currentMetric[metric],
-          noiseAllowanceMs: comparison.noiseMs,
-        });
-        failures.push(
-          `${comparison.label} ${metric} regressed from ${baselineMetric[metric].toFixed(2)} ms to ${currentMetric[metric].toFixed(2)} ms`,
-        );
-      }
-    }
-  }
-  return {
-    failures,
-    comparison: {
-      status: regressions.length > 0 ? 'regressed' : 'matched',
-      fingerprintMatched: true,
-      baselineFingerprint: baseline.environment.fingerprint,
-      regressions,
-    },
-  };
 }
 export function benchmark(args: {
   fixture?: string;
@@ -188,8 +104,8 @@ export function benchmark(args: {
     simulateChallenge(run, profile, context);
     challengeSamples.push(performance.now() - started);
   }
-  const single = stats(singleSamples);
-  const challenge = stats(challengeSamples);
+  const single = timingStats(singleSamples);
+  const challenge = timingStats(challengeSamples);
   const heapAfterMb = process.memoryUsage().heapUsed / 1024 / 1024;
   const fingerprint = [
     process.version,
@@ -220,10 +136,10 @@ export function benchmark(args: {
     fixture: fixtureId,
     samples,
     workers,
-    poolCold: { ...stats(poolColdSamples), sampleCount: samples },
-    poolCached: { ...stats(poolCachedSamples), sampleCount: samples },
-    singleGame: { ...single, sampleCount: samples },
-    challenge82: { ...challenge, sampleCount: samples },
+    poolCold: timingStats(poolColdSamples),
+    poolCached: timingStats(poolCachedSamples),
+    singleGame: single,
+    challenge82: challenge,
     heapUsedMb: Math.round(heapAfterMb * 100) / 100,
     heap: {
       beforeMb: Math.round(heapBeforeMb * 100) / 100,
@@ -272,7 +188,19 @@ export function benchmark(args: {
       const baseline = benchmarkReportSchema.parse(
         JSON.parse(readFileSync(path, 'utf8')) as unknown,
       );
-      const comparison = compareBaseline(payload, baseline, details);
+      const comparison = compareTimedBaselines({
+        currentFingerprint: payload.environment.fingerprint,
+        baselineFingerprint: baseline.environment.fingerprint,
+        current: payload as unknown as Record<string, TimedMetric>,
+        baseline: baseline as unknown as Record<string, TimedMetric>,
+        metrics: [
+          { id: 'poolCold', label: 'pool cold', noiseMs: 2 },
+          { id: 'poolCached', label: 'pool cached', noiseMs: 2 },
+          { id: 'singleGame', label: 'warm single game', noiseMs: 2 },
+          { id: 'challenge82', label: '82-game run', noiseMs: 50 },
+        ],
+        details,
+      });
       payload.baselineComparison = comparison.comparison;
       failures = comparison.failures;
     } catch (error) {

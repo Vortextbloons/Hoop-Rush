@@ -16,6 +16,7 @@
   import CapRushCard from './CapRushCard.svelte';
   import CapRushLineup from './CapRushLineup.svelte';
   import CapRushPayroll from './CapRushPayroll.svelte';
+  import { capRushPlayoffStatusOf } from './cap-rush-playoff-presentation.ts';
   import type { CapRushArt } from './cap-rush-art.ts';
   import { formatMillions, initialsOf, variantLabel } from './cap-rush-presentation.ts';
 
@@ -180,7 +181,14 @@
   <div class="mt-4 space-y-3">
     <CapRushPayroll {view} />
     <div class="draft-layout">
-      <div class="draft-lineup"><CapRushLineup slots={view.slots} {art} /></div>
+      <div class="draft-lineup">
+        <CapRushLineup
+          slots={view.slots}
+          {art}
+          locked={view.draft.locked}
+          playoffStatus={capRushPlayoffStatusOf(view.draft)}
+        />
+      </div>
       <div class="draft-main">
         {#if draft.stage === 'select-position'}
           <section

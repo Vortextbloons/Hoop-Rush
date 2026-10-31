@@ -32,6 +32,7 @@ import { havocGameResultDigest } from '../havoc/digests.ts';
 import { capRushApronRuntimeFor } from './apron-runtime.ts';
 import { capRushBattleVersionSet } from './input.ts';
 import { capRushBoxOf } from './league-simulation.ts';
+import { capRushPlayoffTeam } from './playoff.ts';
 
 function battleTeamOf(team: HavocTeamInput, side: 'home' | 'away'): HavocBattleTeamInput {
   return { ...team, side };
@@ -127,10 +128,21 @@ export function simulateCapRushPlayoffGame(input: {
     throw new Error('cap rush playoffs: a team cannot play itself');
   }
   const opponentById = new Map(locked.opponents.map((entry) => [entry.team.teamId, entry.team]));
+  const performance = locked.playoffPerformance;
   const homeTeam =
-    plan.homeTeamId === locked.human.teamId ? locked.human : opponentById.get(plan.homeTeamId);
+    plan.homeTeamId === locked.human.teamId
+      ? capRushPlayoffTeam({ team: locked.human, performance })
+      : (() => {
+          const team = opponentById.get(plan.homeTeamId);
+          return team === undefined ? undefined : capRushPlayoffTeam({ team, performance });
+        })();
   const awayTeam =
-    plan.awayTeamId === locked.human.teamId ? locked.human : opponentById.get(plan.awayTeamId);
+    plan.awayTeamId === locked.human.teamId
+      ? capRushPlayoffTeam({ team: locked.human, performance })
+      : (() => {
+          const team = opponentById.get(plan.awayTeamId);
+          return team === undefined ? undefined : capRushPlayoffTeam({ team, performance });
+        })();
   if (homeTeam === undefined || awayTeam === undefined) {
     throw new Error('cap rush playoffs: unknown team in the playoff matchup');
   }
