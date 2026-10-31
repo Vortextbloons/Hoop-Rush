@@ -1,4 +1,4 @@
-export type Json =
+﻿export type Json =
   | string
   | number
   | boolean
@@ -34,6 +34,201 @@ export type Database = {
   }
   public: {
     Tables: {
+      cap_rush_multiplayer_join_attempts: {
+        Row: {
+          code: string | null
+          created_at: string
+          id: number
+          uid: string
+        }
+        Insert: {
+          code?: string | null
+          created_at?: string
+          id?: number
+          uid: string
+        }
+        Update: {
+          code?: string | null
+          created_at?: string
+          id?: number
+          uid?: string
+        }
+        Relationships: []
+      }
+      cap_rush_multiplayer_room_commands: {
+        Row: {
+          accepted_at: string
+          actor_participant_id: string
+          command_id: string
+          created_at: string
+          ordinal: number
+          payload: Json
+          room_id: string
+        }
+        Insert: {
+          accepted_at?: string
+          actor_participant_id: string
+          command_id: string
+          created_at?: string
+          ordinal: number
+          payload: Json
+          room_id: string
+        }
+        Update: {
+          accepted_at?: string
+          actor_participant_id?: string
+          command_id?: string
+          created_at?: string
+          ordinal?: number
+          payload?: Json
+          room_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cap_rush_multiplayer_room_commands_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "cap_rush_multiplayer_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cap_rush_multiplayer_room_members: {
+        Row: {
+          created_at: string
+          display_name: string
+          last_seen_at: string | null
+          online: boolean
+          participant_id: string
+          room_id: string
+          uid: string
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string
+          last_seen_at?: string | null
+          online?: boolean
+          participant_id: string
+          room_id: string
+          uid: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string
+          last_seen_at?: string | null
+          online?: boolean
+          participant_id?: string
+          room_id?: string
+          uid?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cap_rush_multiplayer_room_members_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "cap_rush_multiplayer_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cap_rush_multiplayer_rooms: {
+        Row: {
+          code: string | null
+          code_active: boolean
+          code_expires_at: string | null
+          command_count: number
+          confirmed_digest: string | null
+          created_at: string
+          deadline: Json | null
+          expires_at: string
+          id: string
+          phase: string
+          result_digest: string | null
+          revision: number
+          root_seed: string
+          settings: Json
+          state: Json | null
+          state_digest: string | null
+          successor_room_id: string | null
+          updated_at: string
+          variant: string
+        }
+        Insert: {
+          code?: string | null
+          code_active?: boolean
+          code_expires_at?: string | null
+          command_count?: number
+          confirmed_digest?: string | null
+          created_at?: string
+          deadline?: Json | null
+          expires_at?: string
+          id?: string
+          phase?: string
+          result_digest?: string | null
+          revision?: number
+          root_seed: string
+          settings: Json
+          state?: Json | null
+          state_digest?: string | null
+          successor_room_id?: string | null
+          updated_at?: string
+          variant: string
+        }
+        Update: {
+          code?: string | null
+          code_active?: boolean
+          code_expires_at?: string | null
+          command_count?: number
+          confirmed_digest?: string | null
+          created_at?: string
+          deadline?: Json | null
+          expires_at?: string
+          id?: string
+          phase?: string
+          result_digest?: string | null
+          revision?: number
+          root_seed?: string
+          settings?: Json
+          state?: Json | null
+          state_digest?: string | null
+          successor_room_id?: string | null
+          updated_at?: string
+          variant?: string
+        }
+        Relationships: []
+      }
+      cap_rush_multiplayer_verification_receipts: {
+        Row: {
+          created_at: string
+          participant_id: string
+          receipt: Json
+          receipt_id: string
+          room_id: string
+        }
+        Insert: {
+          created_at?: string
+          participant_id: string
+          receipt: Json
+          receipt_id: string
+          room_id: string
+        }
+        Update: {
+          created_at?: string
+          participant_id?: string
+          receipt?: Json
+          receipt_id?: string
+          room_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cap_rush_multiplayer_verification_receipts_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "cap_rush_multiplayer_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       draft_duel_deadline_commitments: {
         Row: {
           cursor: string
@@ -930,6 +1125,81 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cap_rush_multiplayer_clock: { Args: never; Returns: string }
+      cap_rush_multiplayer_command_submit: {
+        Args: {
+          p_accepted_at: string
+          p_command_id: string
+          p_deadline?: Json
+          p_expected_revision: number
+          p_payload: Json
+          p_room_id: string
+          p_state: Json
+          p_state_digest: string
+        }
+        Returns: Json
+      }
+      cap_rush_multiplayer_cron_tick: { Args: never; Returns: undefined }
+      cap_rush_multiplayer_initial_state: {
+        Args: { p_root_seed: string }
+        Returns: Json
+      }
+      cap_rush_multiplayer_is_member: {
+        Args: { p_room_id: string }
+        Returns: boolean
+      }
+      cap_rush_multiplayer_room_complete: {
+        Args: { p_result_digest: string; p_room_id: string }
+        Returns: undefined
+      }
+      cap_rush_multiplayer_room_create: {
+        Args: { p_settings: Json; p_variant: string }
+        Returns: Json
+      }
+      cap_rush_multiplayer_room_fail: {
+        Args: { p_room_id: string }
+        Returns: undefined
+      }
+      cap_rush_multiplayer_room_init: {
+        Args: { p_room_id: string; p_state: Json }
+        Returns: Json
+      }
+      cap_rush_multiplayer_room_join: {
+        Args: { p_code: string }
+        Returns: Json
+      }
+      cap_rush_multiplayer_room_json: {
+        Args: { p_room_id: string }
+        Returns: Json
+      }
+      cap_rush_multiplayer_room_leave: {
+        Args: { p_room_id: string }
+        Returns: undefined
+      }
+      cap_rush_multiplayer_room_preview: {
+        Args: { p_code: string }
+        Returns: Json
+      }
+      cap_rush_multiplayer_room_remove_guest: {
+        Args: { p_room_id: string; p_target: string }
+        Returns: undefined
+      }
+      cap_rush_multiplayer_room_resume: {
+        Args: { p_room_id: string }
+        Returns: Json
+      }
+      cap_rush_multiplayer_room_sync: {
+        Args: { p_after_ordinal?: number; p_room_id: string }
+        Returns: Json
+      }
+      cap_rush_multiplayer_verification_challenge: {
+        Args: { p_room_id: string }
+        Returns: string
+      }
+      cap_rush_multiplayer_verification_submit: {
+        Args: { p_participant: string; p_receipt: Json; p_room_id: string }
+        Returns: undefined
+      }
       draft_duel_command_submit: {
         Args: {
           p_command_id: string
@@ -989,6 +1259,16 @@ export type Database = {
         Returns: boolean
       }
       fixed_five_command_submit: {
+        Args: {
+          p_actor: string
+          p_command_id: string
+          p_expected_revision: number
+          p_payload: Json
+          p_room_id: string
+        }
+        Returns: Json
+      }
+      fixed_five_command_submit_legacy: {
         Args: {
           p_actor: string
           p_command_id: string
@@ -1131,13 +1411,13 @@ export type Database = {
         Args: { p_versions: Json }
         Returns: boolean
       }
-      multiplayer_room_sync: {
-        Args: { p_after_ordinal?: number; p_mode: string; p_room_id: string }
-        Returns: Json
-      }
       multiplayer_lobby_command: { Args: { p_command: Json }; Returns: Json }
       multiplayer_lobby_snapshot: {
         Args: { p_lobby_id: string }
+        Returns: Json
+      }
+      multiplayer_room_sync: {
+        Args: { p_after_ordinal?: number; p_mode: string; p_room_id: string }
         Returns: Json
       }
     }
@@ -1157,6 +1437,8 @@ export type Database = {
           created_at: string | null
           file_size_limit: number | null
           id: string
+          lifecycle_configuration: Json | null
+          lifecycle_configuration_generation: string | null
           name: string
           owner: string | null
           owner_id: string | null
@@ -1171,6 +1453,8 @@ export type Database = {
           created_at?: string | null
           file_size_limit?: number | null
           id: string
+          lifecycle_configuration?: Json | null
+          lifecycle_configuration_generation?: string | null
           name: string
           owner?: string | null
           owner_id?: string | null
@@ -1185,6 +1469,8 @@ export type Database = {
           created_at?: string | null
           file_size_limit?: number | null
           id?: string
+          lifecycle_configuration?: Json | null
+          lifecycle_configuration_generation?: string | null
           name?: string
           owner?: string | null
           owner_id?: string | null
@@ -1594,7 +1880,7 @@ export type Database = {
         Returns: string
       }
       get_size_by_bucket: {
-        Args: never
+        Args: { delete_markers?: string; noncurrent_versions?: string }
         Returns: {
           bucket_id: string
           size: number
@@ -1608,6 +1894,7 @@ export type Database = {
           next_key_token?: string
           next_upload_token?: string
           prefix_param: string
+          raw_prefix_param?: string
         }
         Returns: {
           created_at: string
@@ -1618,28 +1905,38 @@ export type Database = {
       list_objects_with_delimiter: {
         Args: {
           _bucket_id: string
+          delete_markers?: string
           delimiter_param: string
           max_keys?: number
           next_token?: string
+          next_token_archived_at?: string
+          next_token_version?: string
+          noncurrent_versions?: string
           prefix_param: string
           sort_order?: string
           start_after?: string
         }
         Returns: {
+          archived_at: string
           created_at: string
           id: string
+          is_delete_marker: boolean
+          is_versioned: boolean
           last_accessed_at: string
           metadata: Json
           name: string
           updated_at: string
+          version: string
         }[]
       }
       operation: { Args: never; Returns: string }
       search: {
         Args: {
           bucketname: string
+          delete_markers?: string
           levels?: number
           limits?: number
+          noncurrent_versions?: string
           offsets?: number
           prefix: string
           search?: string
@@ -1647,16 +1944,22 @@ export type Database = {
           sortorder?: string
         }
         Returns: {
+          archived_at: string
           created_at: string
           id: string
+          is_delete_marker: boolean
+          is_versioned: boolean
           last_accessed_at: string
           metadata: Json
           name: string
           updated_at: string
+          version: string
         }[]
       }
       search_by_timestamp: {
         Args: {
+          delete_markers?: string
+          noncurrent_versions?: string
           p_bucket_id: string
           p_level: number
           p_limit: number
@@ -1665,36 +1968,50 @@ export type Database = {
           p_sort_column_after: string
           p_sort_order: string
           p_start_after: string
+          p_start_after_version?: string
         }
         Returns: {
+          archived_at: string
           created_at: string
           id: string
+          is_delete_marker: boolean
+          is_versioned: boolean
           key: string
           last_accessed_at: string
           metadata: Json
           name: string
           updated_at: string
+          version: string
         }[]
       }
       search_v2: {
         Args: {
           bucket_name: string
+          delete_markers?: string
           levels?: number
           limits?: number
+          noncurrent_versions?: string
           prefix: string
           sort_column?: string
           sort_column_after?: string
           sort_order?: string
           start_after?: string
+          start_after_archived_at?: string
+          start_after_is_continuation?: boolean
+          start_after_version?: string
         }
         Returns: {
+          archived_at: string
           created_at: string
           id: string
+          is_delete_marker: boolean
+          is_versioned: boolean
           key: string
           last_accessed_at: string
           metadata: Json
           name: string
           updated_at: string
+          version: string
         }[]
       }
     }

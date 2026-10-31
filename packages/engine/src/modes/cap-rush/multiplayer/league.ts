@@ -5,6 +5,8 @@ import type {
   CapRushMultiplayerLockedInputs,
   CapRushMultiplayerSeasonState,
   CapRushMultiplayerSeatId,
+  HavocBattleInput,
+  HavocBattleResult,
   HavocBattleTape,
 } from '@hoop-rush/data-contracts';
 import {
@@ -59,6 +61,8 @@ export function capRushMultiplayerSimulateGame(input: {
   readonly game: CapRushLeagueGame;
   readonly tape: HavocBattleTape;
   readonly facts: readonly CapRushApronFact[];
+  readonly input: HavocBattleInput;
+  readonly result: HavocBattleResult;
 } {
   const battleInput = capRushMultiplayerGameInputFor({
     locked: input.locked,
@@ -95,7 +99,13 @@ export function capRushMultiplayerSimulateGame(input: {
     inputDigest: battle.result.inputDigest,
     resultDigest: havocBattleGameResultDigest(battle.result),
   });
-  return { game, tape: battle.tape, facts: apron?.facts() ?? [] };
+  return {
+    game,
+    tape: battle.tape,
+    facts: apron?.facts() ?? [],
+    input: battleInput,
+    result: battle.result,
+  };
 }
 
 export function simulateCapRushMultiplayerSlot(input: {

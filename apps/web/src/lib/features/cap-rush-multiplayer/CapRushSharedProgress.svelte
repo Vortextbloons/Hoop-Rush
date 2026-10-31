@@ -17,14 +17,16 @@
     busy = false,
     onsimulate,
     onack,
-    onfinishBroadcast,
+    onwatchh2h,
+    onwatchown,
   }: {
     state: CapRushMultiplayerState;
     localSeat: CapRushMultiplayerSeatId;
     busy?: boolean;
     onsimulate: () => void;
     onack: () => void;
-    onfinishBroadcast: (gameId: string) => void;
+    onwatchh2h: (gameId: string) => void;
+    onwatchown: () => void;
   } = $props();
 
   const season = $derived(state.season);
@@ -49,6 +51,7 @@
   const nextSlot = $derived(
     season === null ? null : accepted < season.block.endpoint ? accepted + 1 : null,
   );
+  const localPlan = $derived(season?.block.plans[localSeat] ?? null);
   const progress = $derived(season === null ? 0 : Math.round((season.frontierSlot / 82) * 100));
 
   function teamName(teamId: string): string {
@@ -171,9 +174,9 @@
             class="mt-2 inline-flex min-h-11 items-center justify-center rounded-xl border border-accent/60 bg-accent/15 px-4 text-sm font-bold text-accent
               disabled:opacity-40"
             disabled={busy}
-            onclick={() => onfinishBroadcast(h2hGame.gameId)}
+            onclick={() => onwatchh2h(h2hGame.gameId)}
           >
-            Continue head-to-head
+            Watch head-to-head
           </button>
         {:else}
           <p class="mt-2 text-xs text-muted-foreground">
@@ -192,15 +195,27 @@
         Sim slot {nextSlot}
       </button>
     {:else if ackPending !== null}
-      <button
-        type="button"
-        class="inline-flex min-h-11 items-center justify-center rounded-xl border border-primary/50 bg-primary/10 px-4 text-sm font-bold text-primary
-          disabled:opacity-40"
-        disabled={busy}
-        onclick={onack}
-      >
-        Ready for slot {ackPending}
-      </button>
+      {#if localPlan === 'simcast'}
+        <button
+          type="button"
+          class="inline-flex min-h-11 items-center justify-center rounded-xl border border-primary/50 bg-primary/10 px-4 text-sm font-bold text-primary
+            disabled:opacity-40"
+          disabled={busy}
+          onclick={onwatchown}
+        >
+          Watch game {ackPending}
+        </button>
+      {:else}
+        <button
+          type="button"
+          class="inline-flex min-h-11 items-center justify-center rounded-xl border border-primary/50 bg-primary/10 px-4 text-sm font-bold text-primary
+            disabled:opacity-40"
+          disabled={busy}
+          onclick={onack}
+        >
+          Ready for slot {ackPending}
+        </button>
+      {/if}
     {:else}
       <p class="text-xs text-muted-foreground">
         {localSeat === 'p1' ? 'Waiting for the other seat.' : 'Waiting for the host to simulate.'}

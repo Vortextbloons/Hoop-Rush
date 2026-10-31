@@ -1,10 +1,12 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { resolve } from '$app/paths';
   import type { CapRushConferenceSeries, CapRushMultiplayerState } from '@hoop-rush/data-contracts';
   import { POSITIONS } from '@hoop-rush/data-contracts';
   import { capRushSeriesWins } from '@hoop-rush/engine';
   import RoomShell from '../multiplayer/RoomShell.svelte';
   import CapRushAuctionBoard from './CapRushAuctionBoard.svelte';
+  import CapRushBroadcast from './CapRushBroadcast.svelte';
   import CapRushBlockPlan from './CapRushBlockPlan.svelte';
   import CapRushSeatLedger from './CapRushSeatLedger.svelte';
   import CapRushSharedProgress from './CapRushSharedProgress.svelte';
@@ -92,7 +94,22 @@
   connection={view?.connected ? 'connected' : 'reconnecting'}
   error={controller.error}
 >
-  {#if controller.loading || game === null}
+  {#if controller.broadcast}
+    <CapRushBroadcast
+      input={controller.broadcast.input}
+      result={controller.broadcast.result}
+      tape={controller.broadcast.tape}
+      speed={controller.broadcast.speed}
+      label={controller.broadcast.kind === 'h2h'
+        ? 'Head-to-head'
+        : controller.broadcast.kind === 'playoff'
+          ? 'Playoff'
+          : 'Simcast'}
+      localTeamId={game?.locked?.seats[seat].franchise.franchiseId ?? ''}
+      oncomplete={() => controller.completeBroadcast()}
+      onclose={() => controller.closeBroadcast()}
+    />
+  {:else if controller.loading || game === null}
     <p class="py-10 text-sm text-muted-foreground">Opening the room…</p>
   {:else if game.phase === 'lobby'}
     <section class="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5">
@@ -247,7 +264,8 @@
           busy={controller.busy}
           onsimulate={() => controller.simulateNextSlot()}
           onack={() => controller.ackSlot()}
-          onfinishBroadcast={(gameId) => controller.finishBroadcast(gameId)}
+          onwatchh2h={(gameId) => controller.watchHeadToHead(gameId)}
+          onwatchown={() => controller.watchOwnGame()}
         />
       </div>
       <div class="flex flex-col gap-3">
@@ -293,6 +311,15 @@
             onclick={() => controller.choosePlayoffPlan('simcast')}
           >
             Watch at 4×
+          </button>
+          <button
+            type="button"
+            class="inline-flex min-h-11 items-center justify-center rounded-xl border border-border bg-surface-2 px-4 text-sm font-semibold
+              disabled:opacity-40"
+            disabled={controller.busy || controller.broadcastLoading}
+            onclick={() => controller.watchPlayoffGame()}
+          >
+            Watch playoff game
           </button>
           {#if controller.isHost}
             <button
@@ -376,7 +403,7 @@
       {/if}
       <a
         class="inline-flex min-h-11 w-fit items-center justify-center rounded-xl border border-border bg-surface-2 px-4 text-sm font-semibold"
-        href="/multiplayer">Return to the lobby</a
+        href={resolve('/multiplayer')}>Return to the lobby</a
       >
     </section>
   {:else}

@@ -37,7 +37,7 @@ import {
   type StoredHavocMultiplayerCommandRow,
 } from '../schemas/havoc-multiplayer-record.ts';
 import { DexieHavocMultiplayerRepository } from './havoc-multiplayer.ts';
-import { HOOP_RUSH_DATABASE_STORES, HOOP_RUSH_DATABASE_V13_STORES } from './dexie.ts';
+import { HOOP_RUSH_DATABASE_STORES, HOOP_RUSH_DATABASE_V14_STORES } from './dexie.ts';
 import {
   resetIndexedDb,
   restoreIndexedDb,
@@ -392,7 +392,7 @@ describe('DexieHavocMultiplayerRepository', () => {
     db.close();
   });
 
-  it('preserves version 1 solo saves when the database upgrades to version 12', async () => {
+  it('preserves version 1 solo saves when the database upgrades to version 14', async () => {
     resetIndexedDb();
     const name = testDatabaseName('havoc-multiplayer-upgrade');
     const legacy = new Dexie(name);
@@ -417,9 +417,9 @@ describe('DexieHavocMultiplayerRepository', () => {
     const db = new TestDatabase(name);
     const repo = new DexieHavocMultiplayerRepository(db);
     await db.open();
-    expect(db.verno).toBe(13);
+    expect(db.verno).toBe(14);
     const tableNames = db.tables.map((table) => table.name).sort();
-    expect(tableNames).toEqual(Object.keys(HOOP_RUSH_DATABASE_V13_STORES).sort());
+    expect(tableNames).toEqual(Object.keys(HOOP_RUSH_DATABASE_V14_STORES).sort());
     expect((await db.completed.get('legacy-run')) as unknown).toEqual(completedRecord);
     expect((await db.history.get('legacy-run')) as unknown).toEqual(historyRecord);
     await repo.saveActive(buildActiveState());

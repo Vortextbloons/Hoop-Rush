@@ -41,6 +41,13 @@ export default tseslint.config(
   },
   ...eslintPluginSvelte.configs['flat/recommended'],
   {
+    files: ['src/lib/components/PlayerDetailDialog.svelte'],
+    rules: {
+      // Source links are external URLs, not app routes.
+      'svelte/no-navigation-without-resolve': 'off',
+    },
+  },
+  {
     files: ['**/*.svelte', '**/*.svelte.ts'],
     rules: {
       'svelte/prefer-svelte-reactivity': 'off',

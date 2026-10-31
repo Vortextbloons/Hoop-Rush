@@ -14,11 +14,7 @@
     onbid: (totalDollars: number) => void;
   } = $props();
 
-  let amount: number = $state(0);
-
-  $effect(() => {
-    amount = minimum;
-  });
+  let amount: number = $state(minimum);
 
   function submit(value: number) {
     if (disabled) return;

@@ -7,7 +7,7 @@
 -- scratch table, so pgTAP state is never role-switched.
 
 begin;
-select plan(193);
+select plan(194);
 
 create function public.pgtap_has_policy(p_schema text, p_table text, p_policy text)
 returns boolean

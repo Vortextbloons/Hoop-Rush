@@ -2,8 +2,14 @@ import {
   CAP_RUSH_MULTIPLAYER_WORKER_WIRE_SCHEMA_VERSION,
   capRushMultiplayerWorkerMessageSchema,
   capRushMultiplayerWorkerRequestSchema,
+  type CapRushPlayoffGameSummary,
 } from '@hoop-rush/data-contracts';
-import { createEngineContext, simulateCapRushMultiplayerSlot } from '@hoop-rush/engine';
+import {
+  capRushMultiplayerSimulateGame,
+  createEngineContext,
+  simulateCapRushMultiplayerPlayoffGame,
+  simulateCapRushMultiplayerSlot,
+} from '@hoop-rush/engine';
 
 const context = createEngineContext();
 
@@ -38,13 +44,66 @@ self.onmessage = (event: MessageEvent<unknown>) => {
       });
       return;
     }
-    post({
-      schemaVersion: CAP_RUSH_MULTIPLAYER_WORKER_WIRE_SCHEMA_VERSION,
-      kind: 'cap-rush-multiplayer-error',
-      requestId: request.requestId,
-      code: 'internal',
-      message: 'the playoff worker path is not wired',
-    });
+    if (request.kind === 'cap-rush-multiplayer-playoff-games') {
+      const tapeIds = new Set(request.tapeGameIds);
+      const games: CapRushPlayoffGameSummary[] = [];
+      const tapes: { gameId: string; tape: unknown }[] = [];
+      for (const plan of request.plans) {
+        const simulated = simulateCapRushMultiplayerPlayoffGame({
+          locked: request.locked,
+          plan,
+          context,
+        });
+        games.push(simulated.game);
+        if (tapeIds.has(simulated.game.gameId)) {
+          tapes.push({ gameId: simulated.game.gameId, tape: simulated.tape });
+        }
+      }
+      post({
+        schemaVersion: CAP_RUSH_MULTIPLAYER_WORKER_WIRE_SCHEMA_VERSION,
+        kind: 'cap-rush-multiplayer-playoff-games',
+        requestId: request.requestId,
+        games,
+        tapes,
+      });
+      return;
+    }
+    {
+      if (request.entry !== undefined) {
+        const simulated = capRushMultiplayerSimulateGame({
+          locked: request.locked,
+          entry: request.entry,
+          context,
+        });
+        post({
+          schemaVersion: CAP_RUSH_MULTIPLAYER_WORKER_WIRE_SCHEMA_VERSION,
+          kind: 'cap-rush-multiplayer-tape',
+          requestId: request.requestId,
+          gameId: simulated.game.gameId,
+          input: simulated.input,
+          result: simulated.result,
+          tape: simulated.tape,
+        });
+        return;
+      }
+      if (request.plan !== undefined) {
+        const simulated = simulateCapRushMultiplayerPlayoffGame({
+          locked: request.locked,
+          plan: request.plan,
+          context,
+        });
+        post({
+          schemaVersion: CAP_RUSH_MULTIPLAYER_WORKER_WIRE_SCHEMA_VERSION,
+          kind: 'cap-rush-multiplayer-tape',
+          requestId: request.requestId,
+          gameId: simulated.game.gameId,
+          input: simulated.input,
+          result: simulated.result,
+          tape: simulated.tape,
+        });
+        return;
+      }
+    }
   } catch (error) {
     post({
       schemaVersion: CAP_RUSH_MULTIPLAYER_WORKER_WIRE_SCHEMA_VERSION,

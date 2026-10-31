@@ -128,18 +128,18 @@ export class CapRushMultiplayerSupabaseTransport implements CapRushMultiplayerTr
     const row = recordOf(result.data);
     const snapshot = capRushMultiplayerRoomSnapshotSchema.parse(row.room);
     if (snapshot.state !== null) this.states.set(roomId, snapshot.state);
-    const commands: CapRushMultiplayerCommand[] = ((row.commands as CommandRow[]) ?? []).map(
-      (command) => ({
-        schemaVersion: CAP_RUSH_MULTIPLAYER_SCHEMA_VERSION,
-        roomId: snapshot.roomId,
-        commandId: commandIdSchema.parse(command.command_id),
-        ordinal: command.ordinal,
-        actorParticipantId: command.actor_participant_id,
-        expectedRevision: Math.max(0, command.ordinal),
-        acceptedAtIso: command.accepted_at,
-        payload: command.payload,
-      }),
-    );
+    const commands: CapRushMultiplayerCommand[] = (
+      (row.commands as CommandRow[] | undefined) ?? []
+    ).map((command) => ({
+      schemaVersion: CAP_RUSH_MULTIPLAYER_SCHEMA_VERSION,
+      roomId: snapshot.roomId,
+      commandId: commandIdSchema.parse(command.command_id),
+      ordinal: command.ordinal,
+      actorParticipantId: command.actor_participant_id,
+      expectedRevision: Math.max(0, command.ordinal),
+      acceptedAtIso: command.accepted_at,
+      payload: command.payload,
+    }));
     return { snapshot, commands, commandCount: snapshot.commandCount };
   }
 
@@ -158,7 +158,9 @@ export class CapRushMultiplayerSupabaseTransport implements CapRushMultiplayerTr
               table: 'cap_rush_multiplayer_rooms',
               filter: `id=eq.${roomId}`,
             },
-            () => onChange(),
+            () => {
+              onChange();
+            },
           )
           .on(
             'postgres_changes',
@@ -168,7 +170,9 @@ export class CapRushMultiplayerSupabaseTransport implements CapRushMultiplayerTr
               table: 'cap_rush_multiplayer_room_commands',
               filter: `room_id=eq.${roomId}`,
             },
-            () => onChange(),
+            () => {
+              onChange();
+            },
           )
           .subscribe();
       } catch (error) {

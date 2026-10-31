@@ -600,6 +600,9 @@ export function applyCapRushMultiplayerCommand(
       if (state.phase !== 'postseason' || state.postseason === null || state.locked === null) {
         return reject('invalid-phase', 'the playoffs are not running');
       }
+      if (state.postseason.plans.p1 === null || state.postseason.plans.p2 === null) {
+        return reject('plan-missing', 'both seats must choose a playoff plan');
+      }
       const round = capRushMultiplayerCurrentRound(state.postseason);
       if (payload.round !== round) {
         return reject('playoff-mismatch', 'that playoff round is not active');

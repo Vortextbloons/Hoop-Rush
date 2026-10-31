@@ -167,7 +167,7 @@ returns jsonb language sql stable security definer set search_path = '' as $$
 $$;
 
 create or replace function public.cap_rush_multiplayer_clock()
-returns text language sql stable set search_path = '' as $$ select now()::text; $$;
+returns timestamptz language sql stable set search_path = '' as $$ select now(); $$;
 
 create or replace function public.cap_rush_multiplayer_room_create(
   p_variant text,
@@ -262,11 +262,11 @@ create or replace function public.cap_rush_multiplayer_room_sync(
   p_room_id uuid,
   p_after_ordinal integer default -1
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
-declare v_room public.cap_rush_multiplayer_rooms%rowtype;
 begin
   if not public.cap_rush_multiplayer_is_member(p_room_id) then raise exception 'membership'; end if;
-  select * into v_room from public.cap_rush_multiplayer_rooms where id = p_room_id;
-  if not found then raise exception 'invalid-room'; end if;
+  if not exists(select 1 from public.cap_rush_multiplayer_rooms where id = p_room_id) then
+    raise exception 'invalid-room';
+  end if;
   return jsonb_build_object(
     'room', public.cap_rush_multiplayer_room_json(p_room_id),
     'members', coalesce((
@@ -444,7 +444,7 @@ alter table public.multiplayer_lobbies add constraint multiplayer_lobbies_game_k
 
 create or replace function multiplayer_private.allocate_code()
 returns text language plpgsql security invoker set search_path = '' as $$
-declare v_code text; v_bytes bytea; v_value integer; v_i integer;
+declare v_code text; v_bytes bytea; v_value integer;
 begin
   perform pg_advisory_xact_lock(731904);
   for v_i in 1..10000 loop
@@ -478,8 +478,13 @@ begin
       select jsonb_build_object('room_id', id) into v_result
         from public.cap_rush_multiplayer_rooms
         where code = p_payload->>'code' and code_active and code_expires_at > now() limit 1;
-    when 'join' then v_result := public.cap_rush_multiplayer_room_join(p_payload->>'code');
-    when 'preview' then v_result := public.cap_rush_multiplayer_room_preview(p_payload->>'code');
+    when 'join' then
+      v_result := public.cap_rush_multiplayer_room_join(p_payload->>'code');
+      v_result := v_result || jsonb_build_object('room_id', v_result->>'roomId');
+    when 'preview' then
+      select jsonb_build_object('room_id', id) into v_result
+        from public.cap_rush_multiplayer_rooms
+        where code = p_payload->>'code' and code_active and code_expires_at > now() limit 1;
     when 'create' then
       v_created := public.cap_rush_multiplayer_room_create(
         coalesce(p_payload->>'variant', 'clash'), p_payload);

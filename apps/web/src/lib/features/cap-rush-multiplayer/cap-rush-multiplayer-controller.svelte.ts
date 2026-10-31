@@ -1,18 +1,17 @@
 import type {
+  CapRushLeagueScheduleEntry,
   CapRushMultiplayerSeatId,
   CapRushMultiplayerState,
-  CapRushPlayoffGameSummary,
+  CapRushPlayoffGamePlan,
+  HavocBattleInput,
+  HavocBattleResult,
+  HavocBattleTape,
 } from '@hoop-rush/data-contracts';
 import {
   CapRushMultiplayerSession,
   type CapRushMultiplayerSessionView,
 } from '@hoop-rush/application/cap-rush-multiplayer';
-import {
-  capRushMultiplayerCurrentRound,
-  capRushMultiplayerPlayoffPlans,
-  createEngineContext,
-  simulateCapRushMultiplayerPlayoffGame,
-} from '@hoop-rush/engine';
+import { capRushMultiplayerCurrentRound, capRushMultiplayerPlayoffPlans } from '@hoop-rush/engine';
 import { newSeasonId } from '#lib/ids.js';
 import { getCapRushMultiplayerData } from './cap-rush-multiplayer-assets.js';
 import { getCapRushMultiplayerTransport } from './cap-rush-multiplayer-transport.js';
@@ -20,12 +19,24 @@ import { CapRushMultiplayerRunner } from './cap-rush-multiplayer-runner.js';
 
 const POLL_MS = 1_000;
 
+export interface CapRushBroadcastState {
+  readonly gameId: string;
+  readonly speed: 2 | 4;
+  readonly kind: 'h2h' | 'season-simcast' | 'playoff';
+  readonly slot: number | null;
+  readonly input: HavocBattleInput;
+  readonly result: HavocBattleResult;
+  readonly tape: HavocBattleTape;
+}
+
 export class CapRushMultiplayerController {
   view = $state<CapRushMultiplayerSessionView | null>(null);
   busy = $state(false);
   error = $state<string | null>(null);
   nowMs = $state(Date.now());
   loading = $state(true);
+  broadcast = $state<CapRushBroadcastState | null>(null);
+  broadcastLoading = $state(false);
 
   private session: CapRushMultiplayerSession | null = null;
   private readonly runner = new CapRushMultiplayerRunner();
@@ -52,10 +63,8 @@ export class CapRushMultiplayerController {
   async load(): Promise<void> {
     this.loading = true;
     try {
-      const [data, transport] = await Promise.all([
-        getCapRushMultiplayerData(),
-        getCapRushMultiplayerTransport(),
-      ]);
+      const data = await getCapRushMultiplayerData();
+      const transport = getCapRushMultiplayerTransport();
       const membership = await transport.resume(this.roomId);
       this.session = new CapRushMultiplayerSession({
         transport,
@@ -137,26 +146,15 @@ export class CapRushMultiplayerController {
       const slot = session.nextSlot();
       if (slot === null) return;
       const h2h = new Set(state.season.h2hSlots);
-      const tapeGameIds: string[] = [];
-      if (h2h.has(slot)) {
-        const ids = [
-          state.locked.seats.p1.franchise.franchiseId,
-          state.locked.seats.p2.franchise.franchiseId,
-        ];
-        const game = state.season.games.find(
-          (entry) =>
-            entry.slot === slot && ids.includes(entry.homeTeamId) && ids.includes(entry.awayTeamId),
-        );
-        if (game !== undefined) tapeGameIds.push(game.gameId);
-      }
       const output = await this.runner.simulateSlot({
         roomId: this.roomId,
         locked: state.locked,
         slot,
-        tapeGameIds,
+        tapeGameIds: [],
       });
       await session.acceptSlot(slot, output.games);
-      if (!h2h.has(slot)) await session.ackSlot(slot);
+      const plan = state.season.block.plans.p1;
+      if (!h2h.has(slot) && plan !== 'simcast') await session.ackSlot(slot);
     });
   }
 
@@ -211,17 +209,141 @@ export class CapRushMultiplayerController {
       });
       if (plans.length === 0) return;
       const round = capRushMultiplayerCurrentRound(state.postseason);
-      const context = createEngineContext();
-      const games: CapRushPlayoffGameSummary[] = plans.map(
-        (entry) =>
-          simulateCapRushMultiplayerPlayoffGame({
-            locked: state.locked as NonNullable<typeof state.locked>,
-            plan: entry.plan,
-            context,
-          }).game,
-      );
-      await session.acceptPlayoffStep(round, games);
+      const output = await this.runner.simulatePlayoffStep({
+        roomId: this.roomId,
+        locked: state.locked,
+        plans: plans.map((entry) => entry.plan),
+        tapeGameIds: [],
+      });
+      await session.acceptPlayoffStep(round, output.games);
     });
+  }
+
+  async watchHeadToHead(gameId: string): Promise<void> {
+    const state = this.state;
+    const entry = state?.locked?.leagueSchedule.find((candidate) => candidate.gameId === gameId);
+    const game = state?.season?.games.find((candidate) => candidate.gameId === gameId);
+    if (entry === undefined || game === undefined) return;
+    await this.loadTape({
+      gameId,
+      kind: 'h2h',
+      speed: 2,
+      slot: game.slot,
+      entry,
+    });
+  }
+
+  async watchOwnGame(): Promise<void> {
+    const state = this.state;
+    const locked = state?.locked;
+    const season = state?.season;
+    if (locked === null || locked === undefined || season === null || season === undefined) return;
+    const slot = season.slotAcks[this.seat] + 1;
+    const teamId = locked.seats[this.seat].franchise.franchiseId;
+    const game = season.games.find(
+      (candidate) =>
+        candidate.slot === slot &&
+        (candidate.homeTeamId === teamId || candidate.awayTeamId === teamId),
+    );
+    if (game === undefined) return;
+    const entry = locked.leagueSchedule.find((candidate) => candidate.gameId === game.gameId);
+    if (entry === undefined) return;
+    await this.loadTape({
+      gameId: game.gameId,
+      kind: 'season-simcast',
+      speed: 4,
+      slot,
+      entry,
+    });
+  }
+
+  async watchPlayoffGame(): Promise<void> {
+    const state = this.state;
+    if (state === null || state.locked === null || state.postseason === null) {
+      return;
+    }
+    const plans = capRushMultiplayerPlayoffPlans({
+      locked: state.locked,
+      state: state.postseason,
+    });
+    const entry = plans.find((candidate) => candidate.seat === this.seat) ?? plans[0];
+    if (entry === undefined) return;
+    await this.loadTape({
+      gameId: `crp-${String(entry.plan.round)}-${String(entry.plan.seriesSlot)}-${String(entry.plan.gameOrdinal)}`,
+      kind: 'playoff',
+      speed: entry.plan.round === 4 && entry.seat !== null ? 2 : 4,
+      plan: entry.plan,
+    });
+  }
+
+  async completeBroadcast(): Promise<void> {
+    const broadcast = this.broadcast;
+    if (broadcast === null) return;
+    const total = broadcast.tape.events.length + broadcast.tape.scoring.length;
+    await this.run(async () => {
+      const session = this.session;
+      if (session === null) return;
+      if (broadcast.kind === 'h2h') {
+        await session.ackBroadcast({
+          gameId: broadcast.gameId,
+          cursor: total,
+          total,
+          resolved: true,
+        });
+        if (broadcast.slot !== null) await session.ackSlot(broadcast.slot);
+        return;
+      }
+      if (broadcast.kind === 'season-simcast') {
+        if (broadcast.slot !== null) await session.ackSlot(broadcast.slot);
+        return;
+      }
+      await session.ackPlayoffPlayback({
+        gameId: broadcast.gameId,
+        cursor: total,
+        total,
+        resolved: true,
+      });
+    });
+    this.broadcast = null;
+  }
+
+  closeBroadcast(): void {
+    this.broadcast = null;
+  }
+
+  private async loadTape(input: {
+    readonly gameId: string;
+    readonly kind: CapRushBroadcastState['kind'];
+    readonly speed: 2 | 4;
+    readonly slot?: number;
+    readonly entry?: CapRushLeagueScheduleEntry;
+    readonly plan?: CapRushPlayoffGamePlan;
+  }): Promise<void> {
+    const locked = this.state?.locked;
+    if (locked === null || locked === undefined) return;
+    this.broadcastLoading = true;
+    this.error = null;
+    try {
+      const output = await this.runner.tapeForGame({
+        roomId: this.roomId,
+        locked,
+        ...(input.entry === undefined ? {} : { entry: input.entry }),
+        ...(input.plan === undefined ? {} : { plan: input.plan }),
+      });
+      this.broadcast = {
+        gameId: output.gameId,
+        speed: input.speed,
+        kind: input.kind,
+        slot: input.slot ?? null,
+        input: output.input,
+        result: output.result,
+        tape: output.tape,
+      };
+    } catch (error) {
+      this.error = error instanceof Error ? error.message : 'Could not load the broadcast.';
+    } finally {
+      this.broadcastLoading = false;
+    }
   }
 
   async completeLeague(): Promise<void> {

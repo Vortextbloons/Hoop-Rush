@@ -221,12 +221,14 @@
                 {bidDisabledReason}
               </p>
             {/if}
-            <CapRushBidControls
-              {minimum}
-              currentBid={selected.auction.leaderBidDollars}
-              disabled={!canBid}
-              onbid={(totalDollars) => onbid(selected.auction.playerId, totalDollars)}
-            />
+            {#key selected.auction.playerId}
+              <CapRushBidControls
+                {minimum}
+                currentBid={selected.auction.leaderBidDollars}
+                disabled={!canBid}
+                onbid={(totalDollars) => onbid(selected.auction.playerId, totalDollars)}
+              />
+            {/key}
           </section>
         {/if}
       </div>

@@ -9,6 +9,8 @@ import type {
   CapRushPlayoffGameSummary,
   CapRushPlayoffParticipant,
   CapRushPostseasonUserOutcome,
+  HavocBattleInput,
+  HavocBattleResult,
   HavocBattleTape,
   HavocParticipantLine,
   HavocTeamInput,
@@ -49,6 +51,8 @@ export interface CapRushMultiplayerPlayoffSimulation {
   readonly game: CapRushPlayoffGameSummary;
   readonly tape: HavocBattleTape;
   readonly facts: readonly CapRushApronFact[];
+  readonly input: HavocBattleInput;
+  readonly result: HavocBattleResult;
 }
 
 function outcomeOf(
@@ -268,7 +272,13 @@ export function simulateCapRushMultiplayerPlayoffGame(input: {
         }
       : {}),
   });
-  return { game: summary, tape: battle.tape, facts: apron?.facts() ?? [] };
+  return {
+    game: summary,
+    tape: battle.tape,
+    facts: apron?.facts() ?? [],
+    input: battleInput,
+    result: battle.result,
+  };
 }
 
 function outcomeForSeat(input: {

@@ -1,7 +1,16 @@
 import { z } from 'zod';
 import { idSchema } from './ids.ts';
-import { capRushLeagueGameSchema } from './cap-rush-league.ts';
+import { capRushLeagueGameSchema, capRushLeagueScheduleEntrySchema } from './cap-rush-league.ts';
+import {
+  capRushPlayoffGamePlanSchema,
+  capRushPlayoffGameSummarySchema,
+} from './cap-rush-postseason.ts';
 import { capRushMultiplayerLockedInputsSchema } from './cap-rush-multiplayer-league.ts';
+import {
+  havocBattleInputSchema,
+  havocBattleResultSchema,
+  havocBattleTapeSchema,
+} from './havoc-battle.ts';
 import { CAP_RUSH_MULTIPLAYER_WORKER_WIRE_SCHEMA_VERSION } from './cap-rush-multiplayer-versions.ts';
 
 const base = z.object({
@@ -21,9 +30,20 @@ export const capRushMultiplayerWorkerRequestSchema = z.discriminatedUnion('kind'
     kind: z.literal('cap-rush-multiplayer-playoff-games'),
     roomId: idSchema,
     locked: capRushMultiplayerLockedInputsSchema,
-    games: z.array(z.string().min(1).max(80)).min(1).max(8),
+    plans: z.array(capRushPlayoffGamePlanSchema).min(1).max(8),
     tapeGameIds: z.array(z.string().min(1).max(80)).max(8),
   }),
+  base
+    .extend({
+      kind: z.literal('cap-rush-multiplayer-tape'),
+      roomId: idSchema,
+      locked: capRushMultiplayerLockedInputsSchema,
+      entry: capRushLeagueScheduleEntrySchema.optional(),
+      plan: capRushPlayoffGamePlanSchema.optional(),
+    })
+    .refine((value) => (value.entry === undefined) !== (value.plan === undefined), {
+      message: 'a tape request needs exactly one schedule entry or playoff plan',
+    }),
   base.extend({
     kind: z.literal('cap-rush-multiplayer-cancel'),
   }),
@@ -46,11 +66,24 @@ export const capRushMultiplayerWorkerPlayoffMessageSchema = z.object({
   schemaVersion: z.literal(CAP_RUSH_MULTIPLAYER_WORKER_WIRE_SCHEMA_VERSION),
   kind: z.literal('cap-rush-multiplayer-playoff-games'),
   requestId: idSchema,
-  games: z.array(capRushLeagueGameSchema).min(1).max(8),
+  games: z.array(capRushPlayoffGameSummarySchema).min(1).max(8),
   tapes: z.array(z.object({ gameId: z.string().min(1).max(80), tape: z.unknown() })).max(8),
 });
 export type CapRushMultiplayerWorkerPlayoffMessage = z.infer<
   typeof capRushMultiplayerWorkerPlayoffMessageSchema
+>;
+
+export const capRushMultiplayerWorkerTapeMessageSchema = z.object({
+  schemaVersion: z.literal(CAP_RUSH_MULTIPLAYER_WORKER_WIRE_SCHEMA_VERSION),
+  kind: z.literal('cap-rush-multiplayer-tape'),
+  requestId: idSchema,
+  gameId: z.string().min(1).max(80),
+  input: havocBattleInputSchema,
+  result: havocBattleResultSchema,
+  tape: havocBattleTapeSchema,
+});
+export type CapRushMultiplayerWorkerTapeMessage = z.infer<
+  typeof capRushMultiplayerWorkerTapeMessageSchema
 >;
 
 export const capRushMultiplayerWorkerErrorMessageSchema = z.object({
@@ -67,6 +100,7 @@ export type CapRushMultiplayerWorkerErrorMessage = z.infer<
 export const capRushMultiplayerWorkerMessageSchema = z.union([
   capRushMultiplayerWorkerSlotMessageSchema,
   capRushMultiplayerWorkerPlayoffMessageSchema,
+  capRushMultiplayerWorkerTapeMessageSchema,
   capRushMultiplayerWorkerErrorMessageSchema,
 ]);
 export type CapRushMultiplayerWorkerMessage = z.infer<typeof capRushMultiplayerWorkerMessageSchema>;
