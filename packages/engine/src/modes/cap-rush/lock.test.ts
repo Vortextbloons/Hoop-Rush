@@ -379,7 +379,7 @@ describe('cap rush locked spin and replacement roles', () => {
         commandId: commandIdSchema.parse('cmd-lock-spin'),
         runId: base.runId,
         expectedRevision: base.revision,
-        purchase: 'standard',
+        purchase: 'surge',
         targetCardId: target.card.cardId,
       },
       { index: setup.index },
@@ -404,6 +404,16 @@ describe('cap rush locked spin and replacement roles', () => {
     const locked = outcome.state.locked;
     if (locked === null) throw new Error('lock did not produce inputs');
     expect(locked.spin).not.toBeNull();
+    expect(
+      locked.human.starters.find(
+        (starter) => starter.source.playerId === target.card.source.playerId,
+      )?.mutationPackage,
+    ).toEqual([
+      bought.state.spin.status === 'purchased' ? bought.state.spin.receipt.entry : undefined,
+      ...(bought.state.spin.status === 'purchased'
+        ? (bought.state.spin.receipt.additionalEntries ?? [])
+        : []),
+    ]);
     expect(locked.additionalSpins).toHaveLength(1);
 
     const mutatedStarters = locked.human.starters.filter(

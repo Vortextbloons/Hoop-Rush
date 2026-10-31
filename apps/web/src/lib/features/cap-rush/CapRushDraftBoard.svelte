@@ -355,7 +355,10 @@
                             <div class="min-w-0 flex-1">
                               <HavocTierBadge tier={receipt.tier} size="sm" />
                               <div class="mt-2">
-                                <HavocMutationList mutations={[receipt.entry]} readable />
+                                <HavocMutationList
+                                  mutations={[receipt.entry, ...(receipt.additionalEntries ?? [])]}
+                                  readable
+                                />
                               </div>
                               <p class="mt-3 font-mono text-[10px] text-muted-foreground uppercase">
                                 {receipt.target.slot} &middot; {spinTargetName(
@@ -382,7 +385,7 @@
                       </h4>
                       <span
                         class="font-mono text-[9px] tracking-wider text-muted-foreground uppercase"
-                        >One mutation per player</span
+                        >One purchase per player</span
                       >
                     </div>
                     <div
@@ -449,7 +452,9 @@
                         >
                           <span class="flex items-center justify-between gap-3"
                             ><span class="font-display text-xl font-extrabold uppercase"
-                              >Standard spin</span
+                              >{option.purchase === 'standard'
+                                ? 'Mutation Spark'
+                                : 'Mutation Surge'}</span
                             ><span
                               class="font-display text-xl font-extrabold text-primary tabular-nums"
                               >{formatMillions(option.priceDollars)}</span
@@ -460,7 +465,13 @@
                               <span
                                 ><span
                                   class="block font-mono text-[9px] text-muted-foreground uppercase"
-                                  >Tier {tier}</span
+                                  >{option.purchase === 'standard'
+                                    ? `1 T${tier}`
+                                    : tier === 1
+                                      ? '3 T1s'
+                                      : tier === 2
+                                        ? '1 T2 + 1 T1'
+                                        : '1 T3'}</span
                                 ><span class="mt-0.5 block text-sm font-bold tabular-nums"
                                   >{Math.round(option.tierOdds[tier as 1 | 2 | 3] * 100)}%</span
                                 ></span
@@ -475,7 +486,7 @@
                             >
                           {:else}
                             <span class="mt-3 block text-[11px] font-bold text-primary"
-                              >Buy {option.purchase} spin &rarr;</span
+                              >Buy {option.purchase === 'standard' ? 'Spark' : 'Surge'} &rarr;</span
                             >
                           {/if}
                         </button>

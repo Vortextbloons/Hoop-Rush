@@ -110,30 +110,30 @@ function skip(setup: CapRushTestSetup, state: CapRushDraftState) {
 
 describe('cap rush spin eligibility', () => {
   it('applies the purchase-specific payroll ceiling', () => {
-    expect(capRushSpinEligibility(115_000_000, 'standard').eligible).toBe(true);
-    expect(capRushSpinEligibility(115_000_001, 'standard').eligible).toBe(false);
-    expect(capRushSpinEligibility(120_000_000, 'standard').eligible).toBe(false);
-    expect(capRushSpinEligibility(120_000_000, 'standard').priceDollars).toBe(15_000_000);
+    expect(capRushSpinEligibility(120_000_000, 'standard').eligible).toBe(true);
+    expect(capRushSpinEligibility(120_000_001, 'standard').eligible).toBe(false);
+    expect(capRushSpinEligibility(120_000_001, 'standard').eligible).toBe(false);
+    expect(capRushSpinEligibility(120_000_000, 'standard').priceDollars).toBe(10_000_000);
     expect(capRushSpinEligibility(120_000_000, 'standard').maxEligiblePayrollDollars).toBe(
-      115_000_000,
+      120_000_000,
     );
   });
 
   it('keeps every purchase under the normal cap by construction', () => {
-    expect(CAP_RUSH_CAP_LINE_DOLLARS - 15_000_000).toBe(115_000_000);
+    expect(CAP_RUSH_CAP_LINE_DOLLARS - 10_000_000).toBe(120_000_000);
   });
 });
 
 describe('cap rush spin purchase', () => {
   it('buys exactly one mutation at the payroll ceiling', () => {
     const setup = capRushTestSetup();
-    const state = buildCompleteState(setup, payrollSplit(115_000_000));
+    const state = buildCompleteState(setup, payrollSplit(120_000_000));
     const outcome = purchase(setup, state, 'standard');
     expect(outcome.result.status).toBe('accepted');
     if (outcome.state.spin.status !== 'purchased') throw new Error('spin was not purchased');
     const receipt = outcome.state.spin.receipt;
     expect(receipt.purchase).toBe('standard');
-    expect(receipt.priceDollars).toBe(15_000_000);
+    expect(receipt.priceDollars).toBe(10_000_000);
     expect(receipt.payrollDollars).toBe(capRushPayrollDollars(state.picks));
     expect(receipt.target).toEqual(capRushSpinTargetOf(state.picks[0] as CapRushDraftPick));
     expect(capRushSpinDefinitionsForTier(receipt.tier)).toContain(receipt.entry.mutationId);
@@ -179,7 +179,7 @@ describe('cap rush spin purchase', () => {
 
   it('rejects an unaffordable purchase without moving the revision', () => {
     const setup = capRushTestSetup();
-    const state = buildCompleteState(setup, payrollSplit(120_000_000));
+    const state = buildCompleteState(setup, payrollSplit(120_000_001));
     const outcome = purchase(setup, state, 'standard');
     expect(outcome.result.status).toBe('rejected');
     expect(outcome.result.rejection?.code).toBe('spin-ineligible');
@@ -195,7 +195,7 @@ describe('cap rush spin purchase', () => {
 
   it('buys multiple spins for distinct players up to the cap and replays deterministically', () => {
     const setup = capRushTestSetup();
-    const state = buildCompleteState(setup, payrollSplit(90_000_000));
+    const state = buildCompleteState(setup, payrollSplit(110_000_000));
     const first = purchase(setup, state, 'standard');
     expect(purchase(setup, first.state, 'standard').result.rejection?.code).toBe(
       'spin-unavailable',
@@ -208,7 +208,7 @@ describe('cap rush spin purchase', () => {
     expect(second.result.status).toBe('accepted');
     expect(second.state).toEqual(replay.state);
     if (second.state.spin.status !== 'purchased') throw new Error('spin was not purchased');
-    expect(second.state.spin.additionalReceipts?.[0]?.payrollDollars).toBe(105_000_000);
+    expect(second.state.spin.additionalReceipts?.[0]?.payrollDollars).toBe(120_000_000);
     expect(second.state.spin.additionalReceipts?.[0]?.target.cardId).toBe(target);
     expect(
       purchase(setup, second.state, 'standard', state.picks[2]?.card.cardId ?? '').result.rejection
@@ -262,6 +262,36 @@ describe('cap rush spin purchase', () => {
 });
 
 describe('cap rush spin tier draw', () => {
+  it('materializes each Surge outcome as a deterministic compatible bundle', () => {
+    const setup = capRushTestSetup();
+    const state = buildCompleteState(setup, payrollSplit(90_000_000));
+    for (const [roll, tiers] of [
+      [0, [1, 1, 1]],
+      [0.6, [2, 1]],
+      [0.9, [3]],
+    ] as const) {
+      const input = {
+        runSeed: state.runSeed,
+        purchase: 'surge' as const,
+        payrollDollars: 90_000_000,
+        pick: state.picks[0] as CapRushDraftPick,
+        rngFactory: (seed: string) =>
+          seed === capRushSpinTierSeed(state.runSeed)
+            ? { ...createRng(seed), next: () => roll }
+            : createRng(seed),
+      };
+      const receipt = buildCapRushSpinReceipt(input);
+      expect(receipt.priceDollars).toBe(35_000_000);
+      const entries = [receipt.entry, ...(receipt.additionalEntries ?? [])];
+      expect(entries).toHaveLength(tiers.length);
+      entries.forEach((entry, index) => {
+        expect(capRushSpinDefinitionsForTier(tiers[index] as 1 | 2 | 3)).toContain(
+          entry.mutationId,
+        );
+      });
+      expect(buildCapRushSpinReceipt(input)).toEqual(receipt);
+    }
+  });
   it('matches the published categorical odds over a seeded cohort', () => {
     const counts = { 1: 0, 2: 0, 3: 0 };
     const draws = 4000;
@@ -270,12 +300,11 @@ describe('cap rush spin tier draw', () => {
       const tier = drawCapRushSpinTier(createRng(capRushSpinTierSeed(runSeed)), 'standard');
       counts[tier] += 1;
     }
-    expect(counts[1] / draws).toBeGreaterThan(0.55);
-    expect(counts[1] / draws).toBeLessThan(0.65);
+    expect(counts[1] / draws).toBeGreaterThan(0.65);
+    expect(counts[1] / draws).toBeLessThan(0.75);
     expect(counts[2] / draws).toBeGreaterThan(0.26);
     expect(counts[2] / draws).toBeLessThan(0.34);
-    expect(counts[3] / draws).toBeGreaterThan(0.07);
-    expect(counts[3] / draws).toBeLessThan(0.13);
+    expect(counts[3]).toBe(0);
   });
 
   it('materializes a single definition from the rolled tier', () => {

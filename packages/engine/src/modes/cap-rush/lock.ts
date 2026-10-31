@@ -154,7 +154,7 @@ export function buildCapRushHumanTeam(input: {
     const receipt = [input.spin, ...(input.additionalSpins ?? [])].find(
       (spin) => spin?.target.cardId === pick.card.cardId,
     );
-    const mutationPackage = receipt ? [receipt.entry] : [];
+    const mutationPackage = receipt ? [receipt.entry, ...(receipt.additionalEntries ?? [])] : [];
     return {
       instanceId: capRushInstanceIdOf(input.runSeed, 'human-starter', pick.pickOrdinal),
       kind: 'starter' as const,

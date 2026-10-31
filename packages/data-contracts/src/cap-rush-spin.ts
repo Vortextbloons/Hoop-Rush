@@ -32,10 +32,20 @@ export const capRushSpinReceiptSchema = z
     tier: havocTierSchema,
     target: capRushSpinTargetSchema,
     entry: havocMutationEntrySchema,
+    additionalEntries: z.array(havocMutationEntrySchema).max(2).optional(),
     effective: havocEffectiveProfileSchema,
     receiptDigest: capRushDigestSchema,
   })
   .superRefine((receipt, ctx) => {
+    const count = 1 + (receipt.additionalEntries?.length ?? 0);
+    const expectedCount =
+      receipt.purchase === 'standard' ? 1 : receipt.tier === 1 ? 3 : receipt.tier === 2 ? 2 : 1;
+    if (count !== expectedCount || (receipt.purchase === 'standard' && receipt.tier === 3)) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'mutation outcome does not match the purchased spin',
+      });
+    }
     const price = CAP_RUSH_SPIN_PURCHASES[receipt.purchase].priceDollars;
     if (receipt.priceDollars !== price) {
       ctx.addIssue({

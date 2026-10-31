@@ -482,6 +482,7 @@ export function capRushReport(input: {
             priceDollars: spin.priceDollars,
             tier: spin.tier,
             mutationId: spin.entry.mutationId,
+            additionalMutationIds: (spin.additionalEntries ?? []).map((entry) => entry.mutationId),
             targetCardId: spin.target.cardId,
           },
     ...(additionalSpins.length
@@ -491,6 +492,9 @@ export function capRushReport(input: {
             priceDollars: receipt.priceDollars,
             tier: receipt.tier,
             mutationId: receipt.entry.mutationId,
+            additionalMutationIds: (receipt.additionalEntries ?? []).map(
+              (entry) => entry.mutationId,
+            ),
             targetCardId: receipt.target.cardId,
           })),
         }

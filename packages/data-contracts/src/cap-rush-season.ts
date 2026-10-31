@@ -132,6 +132,7 @@ export const capRushReportSchema = z
         priceDollars: z.number().int().nonnegative(),
         tier: havocTierSchema,
         mutationId: havocMutationIdSchema,
+        additionalMutationIds: z.array(havocMutationIdSchema).max(2).optional(),
         targetCardId: capRushCardIdSchema,
       })
       .nullable(),
@@ -142,6 +143,7 @@ export const capRushReportSchema = z
           priceDollars: z.number().int().nonnegative(),
           tier: havocTierSchema,
           mutationId: havocMutationIdSchema,
+          additionalMutationIds: z.array(havocMutationIdSchema).max(2).optional(),
           targetCardId: capRushCardIdSchema,
         }),
       )

@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { contentHashSchema } from './ids.ts';
 
 export const CAP_RUSH_SCHEMA_VERSION = 1;
-export const CAP_RUSH_RULES_VERSION = 'cap-rush-rules-v3';
+export const CAP_RUSH_RULES_VERSION = 'cap-rush-rules-v4';
 export const CAP_RUSH_SALARY_CURVE_VERSION = 'cap-rush-salary-v3';
 export const CAP_RUSH_SEED_DERIVATION_VERSION = 'cap-rush-seeds-v1';
 export const CAP_RUSH_REPORT_VERSION = 'cap-rush-report-v1';
@@ -86,13 +86,18 @@ export interface CapRushSpinPurchase {
 
 export const CAP_RUSH_SPIN_PURCHASES = {
   standard: {
-    priceDollars: 15_000_000,
-    maxEligiblePayrollDollars: CAP_RUSH_CAP_LINE_DOLLARS - 15_000_000,
+    priceDollars: 10_000_000,
+    maxEligiblePayrollDollars: CAP_RUSH_CAP_LINE_DOLLARS - 10_000_000,
+    tierOdds: { 1: 0.7, 2: 0.3, 3: 0 },
+  },
+  surge: {
+    priceDollars: 35_000_000,
+    maxEligiblePayrollDollars: CAP_RUSH_CAP_LINE_DOLLARS - 35_000_000,
     tierOdds: { 1: 0.6, 2: 0.3, 3: 0.1 },
   },
-} as const satisfies Record<'standard', CapRushSpinPurchase>;
+} as const satisfies Record<'standard' | 'surge', CapRushSpinPurchase>;
 
-export const capRushSpinPurchaseSchema = z.literal('standard');
+export const capRushSpinPurchaseSchema = z.enum(['standard', 'surge']);
 export type CapRushSpinPurchaseId = z.infer<typeof capRushSpinPurchaseSchema>;
 
 export const capRushOfferIdSchema = z.string().regex(/^cro-[0-9a-f]{32}$/);

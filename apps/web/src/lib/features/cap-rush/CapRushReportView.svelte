@@ -614,9 +614,10 @@
                     class="mt-3 flex items-center justify-between gap-2 text-[11px] text-muted-foreground"
                   >
                     <span
-                      ><span class="capitalize">{spin.purchase}</span> &middot; {formatMillions(
-                        spin.priceDollars,
-                      )}</span
+                      ><span
+                        >{spin.purchase === 'standard' ? 'Mutation Spark' : 'Mutation Surge'}</span
+                      >
+                      &middot; {formatMillions(spin.priceDollars)}</span
                     >
                     <span class="font-semibold text-primary group-open:hidden">Show details</span>
                     <span class="hidden font-semibold text-primary group-open:inline"
@@ -627,7 +628,25 @@
                 <div
                   class="mt-3 border-t border-line-soft pt-3 text-xs leading-relaxed text-muted-foreground"
                 >
+                  {#if spinTarget !== null}
+                    <p class="mb-2 font-bold text-primary">
+                      {spinTarget.adjustments > 0 ? '+' : ''}{spinTarget.adjustments} direct mutation
+                      points
+                    </p>
+                    <p class="mb-2">
+                      Recorded scoring adjustments for this player across all their powers. Rating
+                      effects are described below.
+                    </p>
+                  {/if}
                   <p>{mutation.description}</p>
+                  {#each spin.additionalMutationIds ?? [] as mutationId (mutationId)}
+                    {@const extra = havocMutationDefinitionOf(mutationId)}
+                    <p class="mt-2 font-bold">{extra.name}</p>
+                    <p>{extra.description}</p>
+                    {#if extra.downside}<p class="mt-2 text-destructive">
+                        Downside: {extra.downside}
+                      </p>{/if}
+                  {/each}
                   {#if mutation.downside}<p class="mt-2 text-destructive">
                       Downside: {mutation.downside}
                     </p>{/if}

@@ -24,6 +24,7 @@ import {
 } from '@hoop-rush/data-contracts';
 import { createRng, type Rng } from '../../sim/rng.ts';
 import { HAVOC_MUTATION_DEFINITIONS } from '../havoc/mutations.ts';
+import { enumerateHavocBundles } from '../havoc/compatibility.ts';
 import { materializeHavocBundle } from '../havoc/offers.ts';
 import { applyHavocMutationPackage } from '../havoc/transform.ts';
 
@@ -143,8 +144,20 @@ export function buildCapRushSpinReceipt(input: CapRushSpinDrawInput): CapRushSpi
     );
   }
   const tier = drawCapRushSpinTier(rngFactory(capRushSpinTierSeed(runSeed)), input.purchase);
-  const entry = materializeSingleDefinition(tier, rngFactory, runSeed);
-  const effective = applyHavocMutationPackage(havocSourceOf(input.pick.card.source), [entry], {
+  const entries =
+    input.purchase === 'surge'
+      ? materializeHavocBundle(
+          rngFactory(capRushSpinMutationSeed(runSeed)).pick([
+            ...enumerateHavocBundles(HAVOC_MUTATION_DEFINITIONS, tier),
+          ]),
+          rngFactory(capRushSpinPhysicalSeed(runSeed)),
+          rngFactory(capRushSpinSpecialistSeed(runSeed)),
+          HAVOC_MUTATION_DEFINITIONS,
+        )
+      : [materializeSingleDefinition(tier, rngFactory, runSeed)];
+  const entry = entries[0];
+  if (entry === undefined) throw new Error('cap rush spin produced no mutations');
+  const effective = applyHavocMutationPackage(havocSourceOf(input.pick.card.source), entries, {
     slot: input.pick.slot,
   });
   const payload: Omit<CapRushSpinReceipt, 'receiptDigest'> = {
@@ -154,6 +167,7 @@ export function buildCapRushSpinReceipt(input: CapRushSpinDrawInput): CapRushSpi
     tier,
     target: capRushSpinTargetOf(input.pick),
     entry,
+    ...(entries.length > 1 ? { additionalEntries: entries.slice(1) } : {}),
     effective,
   };
   return capRushSpinReceiptSchema.parse({
