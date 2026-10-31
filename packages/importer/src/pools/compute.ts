@@ -1,4 +1,7 @@
-import { derivePlayoffPerformance } from '../ratings/playoff-performance.ts';
+import {
+  derivePlayoffPerformance,
+  loadPlayoffAdjustments,
+} from '../ratings/playoff-performance.ts';
 import { loadPostseasonEvidence } from '../ratings/overall-evidence.ts';
 import { readdirSync } from 'node:fs';
 import { basename, join } from 'node:path';
@@ -1194,6 +1197,7 @@ export function computePool(
       postseason.available && !postseason.missingPlayers.has(pid)
         ? postseason.players.get(pid)
         : undefined,
+      loadPlayoffAdjustments(best.season).get(pid),
     );
     playersOut.push({
       schemaVersion: SCHEMA_VERSION,

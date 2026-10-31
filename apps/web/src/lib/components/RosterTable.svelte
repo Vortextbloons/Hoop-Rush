@@ -34,6 +34,9 @@
     compareFull,
     onShowMore,
     moreLabel = 'Show more',
+    filterFranchiseId = '',
+    filterEraId = '',
+    filterPosition = null as 'PG' | 'SG' | 'SF' | 'PF' | 'C' | null,
   }: {
     items: RosterListItem[];
     columns: RosterColumn[];
@@ -52,6 +55,9 @@
     compareFull: boolean;
     onShowMore: () => void;
     moreLabel?: string;
+    filterFranchiseId?: string;
+    filterEraId?: string;
+    filterPosition?: 'PG' | 'SG' | 'SF' | 'PF' | 'C' | null;
   } = $props();
   const sortArrow = $derived(sortId === 'none' ? '' : sortDir === 'asc' ? '↑' : '↓');
   const dataColumns = $derived(columns.filter((c) => c.key !== 'player'));
@@ -114,6 +120,25 @@
   function rowActionTarget(target: EventTarget | null): boolean {
     return target instanceof HTMLElement && target.closest('input,button,label,a') !== null;
   }
+  function openPlayerRow(player: RosterRow) {
+    onOpen(player);
+    if (!isCompared(player) && !compareFull) onToggleCompare(player);
+  }
+  function playerMetaLine(player: RosterRow): string {
+    const parts: string[] = [];
+    if (!filterFranchiseId) {
+      parts.push(teamLabelFor(manifest, player.franchiseId, player.eraId));
+    }
+    if (!filterEraId) {
+      parts.push(eraLabel.get(player.eraId) ?? player.eraId);
+    }
+    parts.push(player.seasonKey);
+    if (!filterPosition) {
+      parts.push(formatPositions(player.positionsPlayable));
+    }
+    return parts.join(' · ');
+  }
+  const showTeamInPlayerCell = $derived(!filterFranchiseId);
 </script>
 
 <div class="hidden sm:block" aria-label={heading}>
@@ -163,7 +188,7 @@
             <tr>
               <td
                 colspan={columns.length + 1}
-                class="border-b border-border/60 bg-surface-1 px-3 py-2 text-xs font-bold tracking-[0.1em] text-muted-foreground uppercase"
+                class="bg-surface-2/80 px-3 py-2 text-xs font-bold tracking-[0.1em] text-muted-foreground uppercase first:rounded-t-lg"
               >
                 {groupLabel(item.franchiseId, item.eraId)} · {eraLabel.get(item.eraId) ??
                   item.eraId} · {item.count} players
@@ -177,15 +202,15 @@
               tabindex="0"
               aria-label={`View ${player.displayName} stats`}
               onclick={(event) => {
-                if (!rowActionTarget(event.target)) onOpen(player);
+                if (!rowActionTarget(event.target)) openPlayerRow(player);
               }}
               onkeydown={(event) => {
                 if (event.key === 'Enter' || event.key === ' ') {
                   event.preventDefault();
-                  onOpen(player);
+                  openPlayerRow(player);
                 }
               }}
-              class="cursor-pointer border-b border-border/40 transition-colors last:border-b-0 hover:bg-surface-2 group"
+              class="cursor-pointer transition-colors hover:bg-surface-2 group"
               data-virtual-row
             >
               <td class="sticky left-0 z-10 bg-card px-2 py-3 group-hover:bg-surface-2">
@@ -213,19 +238,29 @@
                   />
                   <span class="min-w-0">
                     <span class="block truncate text-base font-bold">{player.displayName}</span>
-                    <span class="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      {#if teamExternalId}
-                        <TeamLogo
-                          {manifest}
-                          franchiseId={player.franchiseId}
-                          {teamExternalId}
-                          logoCandidates={logoCandidatesFor(player)}
-                          className="h-4 w-4"
-                        />
-                      {/if}
-                      <span class="truncate"
-                        >{teamLabelFor(manifest, player.franchiseId, player.eraId)}</span
-                      >
+                    {#if showTeamInPlayerCell}
+                      <span class="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        {#if teamExternalId}
+                          <TeamLogo
+                            {manifest}
+                            franchiseId={player.franchiseId}
+                            {teamExternalId}
+                            logoCandidates={logoCandidatesFor(player)}
+                            className="h-4 w-4"
+                          />
+                        {/if}
+                        <span class="truncate"
+                          >{teamLabelFor(manifest, player.franchiseId, player.eraId)}</span
+                        >
+                      </span>
+                    {/if}
+                    <span
+                      class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0 font-mono text-[10px] tabular-nums"
+                      aria-label="Ratings"
+                    >
+                      <span class="font-bold text-primary" title="Overall">O {player.overall}</span>
+                      <span class="text-muted-foreground" title="Offense">OF {player.offense}</span>
+                      <span class="text-muted-foreground" title="Defense">DF {player.defense}</span>
                     </span>
                   </span>
                 </div>
@@ -265,12 +300,12 @@
           tabindex="0"
           aria-label={`View ${player.displayName} stats`}
           onclick={(event) => {
-            if (!rowActionTarget(event.target)) onOpen(player);
+            if (!rowActionTarget(event.target)) openPlayerRow(player);
           }}
           onkeydown={(event) => {
             if (event.key === 'Enter' || event.key === ' ') {
               event.preventDefault();
-              onOpen(player);
+              openPlayerRow(player);
             }
           }}
           class="cursor-pointer rounded-lg bg-card px-3 py-4 transition-colors hover:bg-surface-2"
@@ -295,24 +330,29 @@
             />
             <span class="min-w-0 flex-1">
               <span class="block truncate text-base font-bold">{player.displayName}</span>
-              <span
-                class="mt-0.5 flex items-center gap-1.5 text-xs leading-snug text-muted-foreground"
-              >
-                {#if mobileTeamExternalId}
-                  <TeamLogo
-                    {manifest}
-                    franchiseId={player.franchiseId}
-                    teamExternalId={mobileTeamExternalId}
-                    logoCandidates={logoCandidatesFor(player)}
-                    className="h-4 w-4"
-                  />
-                {/if}
-                <span class="min-w-0 truncate">
-                  {teamLabelFor(manifest, player.franchiseId, player.eraId)} · {eraLabel.get(
-                    player.eraId,
-                  ) ?? player.eraId} · {player.seasonKey}
-                  · {formatPositions(player.positionsPlayable)}
+              {#if playerMetaLine(player)}
+                <span
+                  class="mt-0.5 flex items-center gap-1.5 text-xs leading-snug text-muted-foreground"
+                >
+                  {#if showTeamInPlayerCell && mobileTeamExternalId}
+                    <TeamLogo
+                      {manifest}
+                      franchiseId={player.franchiseId}
+                      teamExternalId={mobileTeamExternalId}
+                      logoCandidates={logoCandidatesFor(player)}
+                      className="h-4 w-4"
+                    />
+                  {/if}
+                  <span class="min-w-0 truncate">{playerMetaLine(player)}</span>
                 </span>
+              {/if}
+              <span
+                class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0 font-mono text-[10px] tabular-nums"
+                aria-label="Ratings"
+              >
+                <span class="font-bold text-primary" title="Overall">O {player.overall}</span>
+                <span class="text-muted-foreground" title="Offense">OF {player.offense}</span>
+                <span class="text-muted-foreground" title="Defense">DF {player.defense}</span>
               </span>
             </span>
           </div>
@@ -326,8 +366,8 @@
               <span class="text-stat block font-bold">{cellValue(player, 'usage')}</span>
             </span>
             <span class="rounded px-1 py-0.5">
-              <span class="block text-[10px] text-muted-foreground uppercase">O</span>
-              <span class="text-stat block font-bold">{player.overall}</span>
+              <span class="block text-[10px] text-muted-foreground uppercase">PER</span>
+              <span class="text-stat block font-bold">{cellValue(player, 'per')}</span>
             </span>
             <span class="rounded px-1 py-0.5">
               <span class="block text-[10px] text-muted-foreground uppercase">PTS</span>

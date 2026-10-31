@@ -162,6 +162,7 @@ export const rosterDetailsEntrySchema = z.object({
       usageRate: z.url().optional(),
     })
     .optional(),
+  playoffPerformance: playoffPerformanceSchema.optional(),
 });
 export type RosterDetailsEntry = z.infer<typeof rosterDetailsEntrySchema>;
 export const rosterDetailsSchema = z.object({

@@ -307,20 +307,26 @@
           ? era.label
           : 'All players',
   );
-  const columns: RosterColumn[] = [
-    { key: 'player', label: 'Player', sort: 'name' },
-    { key: 'pos', label: 'Pos', sort: 'position', hideBelow: 'md' },
-    { key: 'decade', label: 'Decade', sort: 'decade', hideBelow: 'lg' },
-    { key: 'season', label: 'Season', sort: 'season', hideBelow: 'md' },
-    { key: 'overall', label: 'O', sort: 'overall', numeric: true },
-    { key: 'games', label: 'Games', numeric: true },
-    { key: 'usage', label: 'USG%', numeric: true },
-    { key: 'points', label: 'PTS', sort: 'points', numeric: true },
-    { key: 'rebounds', label: 'REB', hideBelow: 'lg', numeric: true },
-    { key: 'assists', label: 'AST', hideBelow: 'lg', numeric: true },
-    { key: 'ts', label: 'TS%', hideBelow: 'lg', numeric: true },
-    { key: 'per', label: 'PER', sort: 'per', hideBelow: 'lg', numeric: true },
-  ];
+  const columns = $derived.by((): RosterColumn[] => {
+    const cols: RosterColumn[] = [{ key: 'player', label: 'Player', sort: 'name' }];
+    if (!positionFilter) {
+      cols.push({ key: 'pos', label: 'Pos', sort: 'position', hideBelow: 'md' });
+    }
+    if (!eraId) {
+      cols.push({ key: 'decade', label: 'Decade', sort: 'decade', hideBelow: 'lg' });
+    }
+    cols.push(
+      { key: 'season', label: 'Season', sort: 'season', hideBelow: 'md' },
+      { key: 'games', label: 'Games', numeric: true },
+      { key: 'usage', label: 'USG%', numeric: true },
+      { key: 'points', label: 'PTS', sort: 'points', numeric: true },
+      { key: 'rebounds', label: 'REB', hideBelow: 'lg', numeric: true },
+      { key: 'assists', label: 'AST', hideBelow: 'lg', numeric: true },
+      { key: 'ts', label: 'TS%', hideBelow: 'lg', numeric: true },
+      { key: 'per', label: 'PER', sort: 'per', hideBelow: 'lg', numeric: true },
+    );
+    return cols;
+  });
 </script>
 
 <svelte:head>
@@ -688,6 +694,9 @@
             compareFull={compareSelection.length >= 2}
             onShowMore={() => (visibleCount += pageSize)}
             moreLabel={`Show ${pageSize} more`}
+            filterFranchiseId={franchiseId}
+            filterEraId={eraId}
+            filterPosition={positionFilter}
           />
         {/if}
       </div>
@@ -710,7 +719,6 @@
 
   {#if dialogPlayer}
     {#await loadPlayerDetailDialog() then { default: PlayerDetailDialog }}
-      <p class="px-4 py-3 font-mono text-xs text-muted-foreground">Opening player details…</p>
       <PlayerDetailDialog
         player={dialogPlayer}
         manifest={manifest!}

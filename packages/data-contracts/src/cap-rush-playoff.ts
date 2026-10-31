@@ -1,8 +1,9 @@
+import { playoffAdjustmentSchema } from './postseason-evidence.ts';
 import { z } from 'zod';
 import { playerIdSchema, seasonKeySchema } from './ids.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
 
-export const CAP_RUSH_PLAYOFF_FORMULA_VERSION = 'cap-rush-playoff-formula-v1';
+export const CAP_RUSH_PLAYOFF_FORMULA_VERSION = 'cap-rush-playoff-formula-v3';
 export const CAP_RUSH_PLAYOFF_SAMPLE_MINUTES = 180;
 export const CAP_RUSH_PLAYOFF_MAX_PLAYERS = 320;
 
@@ -75,6 +76,7 @@ export const capRushPlayoffPlayerSchema = z.object({
   playerVersionId: playerVersionIdSchema,
   seasonKey: seasonKeySchema,
   weight: z.number().min(0).max(1),
+  adjustment: playoffAdjustmentSchema.optional(),
   observed: capRushPlayoffObservedSchema,
   regularSeason: capRushPlayoffStatLineSchema,
   playoffs: capRushPlayoffStatLineSchema,
@@ -83,7 +85,11 @@ export const capRushPlayoffPlayerSchema = z.object({
 export type CapRushPlayoffPlayer = z.infer<typeof capRushPlayoffPlayerSchema>;
 
 export const capRushPlayoffPerformanceSchema = z.object({
-  formulaVersion: z.literal(CAP_RUSH_PLAYOFF_FORMULA_VERSION),
+  formulaVersion: z.enum([
+    'cap-rush-playoff-formula-v1',
+    'cap-rush-playoff-formula-v2',
+    CAP_RUSH_PLAYOFF_FORMULA_VERSION,
+  ]),
   sampleMinutesAnchor: z.literal(CAP_RUSH_PLAYOFF_SAMPLE_MINUTES),
   players: z.array(capRushPlayoffPlayerSchema).max(CAP_RUSH_PLAYOFF_MAX_PLAYERS),
 });

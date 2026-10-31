@@ -1,3 +1,8 @@
+import { join } from 'node:path';
+import { z } from 'zod';
+import { NBA_ROOT } from '../config.ts';
+import { fileExists, readJson } from '../json.ts';
+import { playoffAdjustmentSchema, type PlayoffAdjustment } from '@hoop-rush/data-contracts';
 import {
   playoffPerformanceSchema,
   type PlayoffPerformance,
@@ -9,6 +14,7 @@ export function derivePlayoffPerformance(
   season: string,
   stats: StatsRow,
   playoffs: PostseasonPlayerStats | undefined,
+  adjustment?: PlayoffAdjustment,
 ): PlayoffPerformance | undefined {
   if (!playoffs || playoffs.gamesPlayed === 0 || playoffs.minutes === 0) return undefined;
   const number = (key: string): number | null => {
@@ -39,6 +45,7 @@ export function derivePlayoffPerformance(
     return undefined;
   return playoffPerformanceSchema.parse({
     season,
+    ...(adjustment ? { adjustment } : {}),
     regularSeason: {
       gamesPlayed: number('gamesPlayed'),
       minutes,
@@ -59,4 +66,12 @@ export function derivePlayoffPerformance(
       turnoversPer36: per36Difference('turnovers'),
     },
   });
+}
+
+export function loadPlayoffAdjustments(season: string): Map<string, PlayoffAdjustment> {
+  const path = join(NBA_ROOT, season, 'postseason-adjustments.json');
+  if (!fileExists(path)) return new Map();
+  return new Map(
+    Object.entries(z.record(z.string(), playoffAdjustmentSchema).parse(readJson(path))),
+  );
 }

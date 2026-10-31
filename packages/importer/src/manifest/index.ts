@@ -138,6 +138,9 @@ function peakPlayerToRosterDetails(player: ReturnType<typeof parsePool>['players
     heightInches: player.heightInches,
     weightLbs: player.weightLbs,
     stats: player.stats,
+    ...(player.playoffPerformance !== undefined
+      ? { playoffPerformance: player.playoffPerformance }
+      : {}),
   };
 }
 export function rebuildPlayersIndex(

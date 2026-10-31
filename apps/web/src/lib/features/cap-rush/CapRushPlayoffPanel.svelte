@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PlayoffEffectDetails from '#lib/components/PlayoffEffectDetails.svelte';
   import {
     CAP_RUSH_PLAYOFF_CAPS,
     CAP_RUSH_PLAYOFF_FORMULA_VERSION,
@@ -157,135 +158,139 @@
     <span class="badge ml-auto" data-tone={badge.tone}>{badge.text}</span>
   </header>
 
-  <div class="sample">
-    <div class="sample-figure">
-      <span class="sample-value">{sampleLabel(row.row)}</span>
-      <span class="sample-label">playoff sample</span>
+  {#if row.row.adjustment}
+    <PlayoffEffectDetails adjustment={row.row.adjustment} applied={row.row.applied} />
+  {:else}
+    <div class="sample">
+      <div class="sample-figure">
+        <span class="sample-value">{sampleLabel(row.row)}</span>
+        <span class="sample-label">playoff sample</span>
+      </div>
+      <div class="sample-figure">
+        <span class="sample-value">{weightLabel(row.row)}</span>
+        <span class="sample-label">applied</span>
+      </div>
+      <p class="sample-note">
+        A short run is deliberately pulled toward neutral instead of being discarded. This is the
+        observed difference for this exact season — not an opponent-adjusted estimate, and not a
+        forecast of points or results.
+      </p>
     </div>
-    <div class="sample-figure">
-      <span class="sample-value">{weightLabel(row.row)}</span>
-      <span class="sample-label">applied</span>
-    </div>
-    <p class="sample-note">
-      A short run is deliberately pulled toward neutral instead of being discarded. This is the
-      observed difference for this exact season — not an opponent-adjusted estimate, and not a
-      forecast of points or results.
-    </p>
-  </div>
 
-  {#if status === 'legacy'}
-    <p class="notice">
-      This run was created before playoff performance existed, so its playoffs keep the previous
-      simulation. Start a new run to use playoff form.
-    </p>
-  {:else if status === 'no-sample'}
-    <p class="notice">
-      No player in this run carries a recorded playoff sample, so nothing is adjusted.
-    </p>
-  {/if}
+    {#if status === 'legacy'}
+      <p class="notice">
+        This run was created before playoff performance existed, so its playoffs keep the previous
+        simulation. Start a new run to use playoff form.
+      </p>
+    {:else if status === 'no-sample'}
+      <p class="notice">
+        No player in this run carries a recorded playoff sample, so nothing is adjusted.
+      </p>
+    {/if}
 
-  <table class="ledger">
-    <caption class="sr-only">
-      Regular-season and playoff values, the measured difference, and the gameplay change the
-      simulation uses.
-    </caption>
-    <thead>
-      <tr>
-        <th scope="col" class="th-left">Channel</th>
-        <th scope="col">Reg</th>
-        <th scope="col">PO</th>
-        <th scope="col">Measured</th>
-        <th scope="col">Applied</th>
-      </tr>
-    </thead>
-    <tbody>
-      {#each rows as entry (entry.key)}
-        <tr data-missing={entry.measured === null}>
-          <th scope="row" class="th-row">
-            <span class="channel">{entry.label}</span>
-            <span class="feeds">{entry.feeds}</span>
-          </th>
-          <td class="num">{entry.regular}</td>
-          <td class="num">{entry.playoffs}</td>
-          <td class="num measured">
-            {entry.measuredLabel}
-            <span class="rail" aria-hidden="true">
-              <span class="rail-axis"></span>
-              {#if entry.measured !== null}
-                <span
-                  class="rail-bar rail-measured"
-                  data-sign={entry.measured < 0 ? 'down' : 'up'}
-                  style:--share={share(entry.measured, entry.cap)}
-                ></span>
-              {/if}
-            </span>
-          </td>
-          <td class="num applied">
-            <span
-              class="applied-value"
-              data-better={Math.abs(entry.applied) < 0.005
-                ? 'flat'
-                : isBetter(entry, entry.applied)
-                  ? 'true'
-                  : 'false'}>{entry.appliedLabel}</span
-            >
-            <span class="rail" aria-hidden="true">
-              <span class="rail-axis"></span>
+    <table class="ledger">
+      <caption class="sr-only">
+        Regular-season and playoff values, the measured difference, and the gameplay change the
+        simulation uses.
+      </caption>
+      <thead>
+        <tr>
+          <th scope="col" class="th-left">Channel</th>
+          <th scope="col">Reg</th>
+          <th scope="col">PO</th>
+          <th scope="col">Measured</th>
+          <th scope="col">Applied</th>
+        </tr>
+      </thead>
+      <tbody>
+        {#each rows as entry (entry.key)}
+          <tr data-missing={entry.measured === null}>
+            <th scope="row" class="th-row">
+              <span class="channel">{entry.label}</span>
+              <span class="feeds">{entry.feeds}</span>
+            </th>
+            <td class="num">{entry.regular}</td>
+            <td class="num">{entry.playoffs}</td>
+            <td class="num measured">
+              {entry.measuredLabel}
+              <span class="rail" aria-hidden="true">
+                <span class="rail-axis"></span>
+                {#if entry.measured !== null}
+                  <span
+                    class="rail-bar rail-measured"
+                    data-sign={entry.measured < 0 ? 'down' : 'up'}
+                    style:--share={share(entry.measured, entry.cap)}
+                  ></span>
+                {/if}
+              </span>
+            </td>
+            <td class="num applied">
               <span
-                class="rail-bar rail-applied"
-                data-sign={entry.applied < 0 ? 'down' : 'up'}
+                class="applied-value"
                 data-better={Math.abs(entry.applied) < 0.005
                   ? 'flat'
                   : isBetter(entry, entry.applied)
                     ? 'true'
-                    : 'false'}
-                style:--share={share(entry.applied, entry.cap)}
-              ></span>
-            </span>
-          </td>
-        </tr>
-      {/each}
-    </tbody>
-  </table>
+                    : 'false'}>{entry.appliedLabel}</span
+              >
+              <span class="rail" aria-hidden="true">
+                <span class="rail-axis"></span>
+                <span
+                  class="rail-bar rail-applied"
+                  data-sign={entry.applied < 0 ? 'down' : 'up'}
+                  data-better={Math.abs(entry.applied) < 0.005
+                    ? 'flat'
+                    : isBetter(entry, entry.applied)
+                      ? 'true'
+                      : 'false'}
+                  style:--share={share(entry.applied, entry.cap)}
+                ></span>
+              </span>
+            </td>
+          </tr>
+        {/each}
+      </tbody>
+    </table>
 
-  <div class="legend">
-    <p class="legend-row">
-      <span class="legend-swatch" data-kind="measured" aria-hidden="true"></span>
-      Historical difference from the recorded regular season and playoff totals.
-    </p>
-    <p class="legend-row">
-      <span class="legend-swatch" data-kind="applied" aria-hidden="true"></span>
-      What the simulation actually changes, after the {String(
-        CAP_RUSH_PLAYOFF_SAMPLE_MINUTES,
-      )}-minute neutral anchor ({row.row.weight < 0.5 ? 'less' : 'more'} than half of the measured difference)
-      and the per-channel caps. Both bars share one scale.
-    </p>
-    <p class="legend-row legend-note">
-      True shooting is shown in percentage points, production per 36 minutes, applied changes in the
-      engine units named. A higher turnover value is worse. Caps: {signedFixed(
-        CAP_RUSH_PLAYOFF_CAPS.fieldGoalPct * 100,
-        0,
-      )}pp shooting, {signedFixed(CAP_RUSH_PLAYOFF_CAPS.fieldGoalAttemptsPerGame, 1)} shots/g,
-      {signedFixed(CAP_RUSH_PLAYOFF_CAPS.assistsPerGame, 1)} ast/g, {signedFixed(
-        CAP_RUSH_PLAYOFF_CAPS.offensiveReboundsPerGame +
-          CAP_RUSH_PLAYOFF_CAPS.defensiveReboundsPerGame,
-        1,
-      )} reb/g, {signedFixed(CAP_RUSH_PLAYOFF_CAPS.turnoverRate, 0)} turnover tendency. Formula
-      {CAP_RUSH_PLAYOFF_FORMULA_VERSION}.
-    </p>
-  </div>
+    <div class="legend">
+      <p class="legend-row">
+        <span class="legend-swatch" data-kind="measured" aria-hidden="true"></span>
+        Historical difference from the recorded regular season and playoff totals.
+      </p>
+      <p class="legend-row">
+        <span class="legend-swatch" data-kind="applied" aria-hidden="true"></span>
+        What the simulation actually changes, after the {String(
+          CAP_RUSH_PLAYOFF_SAMPLE_MINUTES,
+        )}-minute neutral anchor ({row.row.weight < 0.5 ? 'less' : 'more'} than half of the measured difference)
+        and the per-channel caps. Both bars share one scale.
+      </p>
+      <p class="legend-row legend-note">
+        True shooting is shown in percentage points, production per 36 minutes, applied changes in
+        the engine units named. A higher turnover value is worse. Caps: {signedFixed(
+          CAP_RUSH_PLAYOFF_CAPS.fieldGoalPct * 100,
+          0,
+        )}pp shooting, {signedFixed(CAP_RUSH_PLAYOFF_CAPS.fieldGoalAttemptsPerGame, 1)} shots/g,
+        {signedFixed(CAP_RUSH_PLAYOFF_CAPS.assistsPerGame, 1)} ast/g, {signedFixed(
+          CAP_RUSH_PLAYOFF_CAPS.offensiveReboundsPerGame +
+            CAP_RUSH_PLAYOFF_CAPS.defensiveReboundsPerGame,
+          1,
+        )} reb/g, {signedFixed(CAP_RUSH_PLAYOFF_CAPS.turnoverRate, 0)} turnover tendency. Formula
+        {CAP_RUSH_PLAYOFF_FORMULA_VERSION}.
+      </p>
+    </div>
 
-  {#if moving.length === 0}
-    <p class="notice">
-      {measuredChannels === 0
-        ? 'This season records no measurable playoff difference, so the playoffs use his regular-season inputs.'
-        : 'The measured differences round to no gameplay change, so the playoffs use his regular-season inputs.'}
-    </p>
-  {:else}
-    <p class="notice notice-quiet">
-      {moving.length} of {rows.length} channels move. A positive change is not a promise of more points:
-      the other four players, the opponent, and the possession rolls still decide the game.
-    </p>
+    {#if moving.length === 0}
+      <p class="notice">
+        {measuredChannels === 0
+          ? 'This season records no measurable playoff difference, so the playoffs use his regular-season inputs.'
+          : 'The measured differences round to no gameplay change, so the playoffs use his regular-season inputs.'}
+      </p>
+    {:else}
+      <p class="notice notice-quiet">
+        {moving.length} of {rows.length} channels move. A positive change is not a promise of more points:
+        the other four players, the opponent, and the possession rolls still decide the game.
+      </p>
+    {/if}
   {/if}
 </div>
 

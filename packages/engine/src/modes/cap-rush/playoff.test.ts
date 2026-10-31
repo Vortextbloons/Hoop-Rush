@@ -380,7 +380,7 @@ describe('cap rush playoff rows', () => {
     expect(matched.players[0]?.seasonKey).toBe(seasonKey);
   });
 
-  it('records the observed difference beside the effective adjustment', () => {
+  it('retains raw evidence without rewarding or penalizing an unadjusted sample', () => {
     const human = humanOf();
     const seasonKey = required(required(human.starters[0], 'a starter').source.seasonKey, 'season');
     const performance = capRushPlayoffPerformanceOf({
@@ -390,7 +390,7 @@ describe('cap rush playoff rows', () => {
     });
     const row = required(performance.players[0], 'a pinned row');
     expect(row.observed.tsPct).toBeCloseTo(0.06, 10);
-    expect(row.applied.fieldGoalPct).toBeGreaterThan(0);
+    expect(Object.values(row.applied).every((value) => value === 0)).toBe(true);
     expect(row.applied.fieldGoalPct).toBeLessThan(0.06);
     expect(row.regularSeason.tsPct).not.toBeNull();
     expect(row.playoffs.tsPct).not.toBeNull();
@@ -421,6 +421,14 @@ describe('cap rush playoff application', () => {
       opponents: [],
       profileOf: () => profile({ season: seasonKey, tsPct: 0.06, assistsPer36: 2 }),
     });
+    for (const row of performance.players) {
+      row.applied = capRushPlayoffAppliedOf({
+        observed: row.observed,
+        weight: row.weight,
+        observedFieldGoalAttemptsPerGame: null,
+        authoritativeChannels: [],
+      });
+    }
     const base = required(human.starters[0], 'a starter').source.profile;
     const baseAnchors = { ...required(base.anchors, 'anchors') };
     const baseTendencies = { ...base.tendencies };
@@ -504,8 +512,8 @@ describe('cap rush playoff simulation', () => {
     }
   });
 
-  it('changes playoff games deterministically and audits cleanly', () => {
-    const plain = lockedOf();
+  it('keeps unadjusted evidence neutral and replays deterministically', () => {
+    const plain = lockedOf(undefined, { versioned: true });
     const withEvidence = lockedOf((season) =>
       profile({
         season: required(season, 'season'),
@@ -521,14 +529,14 @@ describe('cap rush playoff simulation', () => {
     const adjusted = simulateCapRushPlayoffGame({ locked: withEvidence, plan, context });
     expect(base.game.audit.ok).toBe(true);
     expect(adjusted.game.audit.ok).toBe(true);
-    expect(adjusted.resultDigest).not.toBe(base.resultDigest);
+    expect(adjusted.game.result).toEqual(base.game.result);
     const replay = simulateCapRushPlayoffGame({ locked: withEvidence, plan, context });
     expect(replay.resultDigest).toBe(adjusted.resultDigest);
     expect(replay.game.result).toEqual(adjusted.game.result);
   });
 
-  it('applies to AI-versus-AI series as well as the user team', () => {
-    const plain = lockedOf();
+  it('keeps unadjusted evidence neutral for user and AI series', () => {
+    const plain = lockedOf(undefined, { versioned: true });
     const withEvidence = lockedOf((season) =>
       profile({ season: required(season, 'season'), tsPct: 0.15, pointsPer36: 8 }),
     );
@@ -556,12 +564,12 @@ describe('cap rush playoff simulation', () => {
       const adjusted = simulateCapRushPlayoffGame({ locked: withEvidence, plan, context });
       expect(base.game.audit.ok).toBe(true);
       expect(adjusted.game.audit.ok).toBe(true);
-      expect(adjusted.resultDigest).not.toBe(base.resultDigest);
+      expect(adjusted.game.result).toEqual(base.game.result);
     }
   });
 
   it('keeps the home and away swap consistent', () => {
-    const plain = lockedOf();
+    const plain = lockedOf(undefined, { versioned: true });
     const withEvidence = lockedOf((season) =>
       profile({ season: required(season, 'season'), tsPct: 0.1, pointsPer36: 5 }),
     );
@@ -586,7 +594,7 @@ describe('cap rush playoff simulation', () => {
       });
       expect(base.game.audit.ok).toBe(true);
       expect(adjusted.game.audit.ok).toBe(true);
-      expect(adjusted.resultDigest).not.toBe(base.resultDigest);
+      expect(adjusted.game.result).toEqual(base.game.result);
     }
   });
 });

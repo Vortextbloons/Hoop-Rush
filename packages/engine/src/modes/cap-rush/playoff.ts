@@ -83,12 +83,13 @@ export function capRushPlayoffStatLine(
 }
 
 export function capRushPlayoffObservedOf(profile: PlayoffPerformance): CapRushPlayoffObserved {
+  const differences = profile.adjustment?.differences ?? profile.differences;
   return {
-    tsPct: profile.differences.tsPct,
-    pointsPer36: profile.differences.pointsPer36,
-    assistsPer36: profile.differences.assistsPer36,
-    reboundsPer36: profile.differences.reboundsPer36,
-    turnoversPer36: profile.differences.turnoversPer36,
+    tsPct: differences.tsPct,
+    pointsPer36: differences.pointsPer36,
+    assistsPer36: differences.assistsPer36,
+    reboundsPer36: differences.reboundsPer36,
+    turnoversPer36: differences.turnoversPer36,
   };
 }
 
@@ -148,6 +149,37 @@ export function capRushPlayoffIsNeutral(applied: CapRushPlayoffApplied): boolean
   return Object.values(applied).every((value) => value === 0);
 }
 
+export function capRushPlayoffEffectOf(input: {
+  readonly profile: PlayoffPerformance;
+  readonly authoritativeChannels: readonly string[];
+  readonly observedFieldGoalAttemptsPerGame: number | null;
+}): CapRushPlayoffApplied {
+  const adjustment = input.profile.adjustment;
+  if (adjustment === undefined) return { ...NEUTRAL_CAP_RUSH_PLAYOFF_APPLIED };
+  const differences = adjustment.differences;
+  const weights = adjustment.weights;
+  return capRushPlayoffAppliedOf({
+    observed: {
+      tsPct: differences.tsPct === null ? null : differences.tsPct * weights.tsPct,
+      pointsPer36:
+        differences.pointsPer36 === null ? null : differences.pointsPer36 * weights.pointsPer36,
+      assistsPer36:
+        differences.assistsPer36 === null ? null : differences.assistsPer36 * weights.assistsPer36,
+      reboundsPer36:
+        differences.reboundsPer36 === null
+          ? null
+          : differences.reboundsPer36 * weights.reboundsPer36,
+      turnoversPer36:
+        differences.turnoversPer36 === null
+          ? null
+          : differences.turnoversPer36 * weights.turnoversPer36,
+    },
+    weight: 1,
+    authoritativeChannels: input.authoritativeChannels,
+    observedFieldGoalAttemptsPerGame: input.observedFieldGoalAttemptsPerGame,
+  });
+}
+
 /**
  * One pinned row per player-season that carries recorded playoff evidence. Identity is the exact
  * player version, so another season of the same player can never borrow this evidence.
@@ -171,12 +203,12 @@ export function capRushPlayoffPlayerRowOf(input: {
     observed,
     regularSeason: capRushPlayoffStatLine(profile, 'regular'),
     playoffs: capRushPlayoffStatLine(profile, 'playoffs'),
-    applied: capRushPlayoffAppliedOf({
-      observed,
-      weight,
+    ...(profile.adjustment ? { adjustment: profile.adjustment } : {}),
+    applied: capRushPlayoffEffectOf({
+      profile,
+      authoritativeChannels: participant.effective.authoritativeChannels,
       observedFieldGoalAttemptsPerGame:
         participant.source.profile.anchors?.fieldGoalAttemptsPerGame ?? null,
-      authoritativeChannels: participant.effective.authoritativeChannels,
     }),
   };
 }

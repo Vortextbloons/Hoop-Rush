@@ -58,8 +58,40 @@ const playoffComparisonStatsSchema = postseasonPlayerStatsSchema.pick({
   fta: true,
   tsPct: true,
 });
+const playoffDifferencesSchema = z.object({
+  tsPct: z.number().finite().nullable(),
+  pointsPer36: z.number().finite().nullable(),
+  assistsPer36: z.number().finite().nullable(),
+  reboundsPer36: z.number().finite().nullable(),
+  turnoversPer36: z.number().finite().nullable(),
+});
+const playoffRatesSchema = z.object({
+  tsPct: z.number().finite().nullable(),
+  pointsPer100: z.number().finite().nullable(),
+  assistsPer100: z.number().finite().nullable(),
+  reboundsPer100: z.number().finite().nullable(),
+  turnoversPer100: z.number().finite().nullable(),
+});
+export const playoffAdjustmentSchema = z.object({
+  modelVersion: z.literal('opponent-pace-v1'),
+  sources: z.array(z.url()).min(1),
+  possessions: z.number().positive(),
+  opponents: z.number().int().positive(),
+  expected: playoffRatesSchema,
+  actual: playoffRatesSchema,
+  differences: playoffDifferencesSchema,
+  weights: z.object({
+    tsPct: z.number().min(0).max(1),
+    pointsPer36: z.number().min(0).max(1),
+    assistsPer36: z.number().min(0).max(1),
+    reboundsPer36: z.number().min(0).max(1),
+    turnoversPer36: z.number().min(0).max(1),
+  }),
+});
+export type PlayoffAdjustment = z.infer<typeof playoffAdjustmentSchema>;
 export const playoffPerformanceSchema = z.object({
   season: z.string().regex(/^\d{4}-\d{2}$/),
+  adjustment: playoffAdjustmentSchema.optional(),
   regularSeason: playoffComparisonStatsSchema,
   playoffs: postseasonPlayerStatsSchema,
   differences: z.object({
