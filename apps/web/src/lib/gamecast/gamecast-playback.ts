@@ -43,9 +43,16 @@ export function gamecastVisibleEventCount(
   if (Number.isNaN(progress)) return 0;
   const clamped = Math.min(1, Math.max(0, progress));
   if (clamped >= 1) return tape.length;
-  const cumulative = gamecastPlaybackWeights(tape);
+  let total = 0;
+  for (const item of tape) {
+    if (item.kind === 'trip') total += 1;
+  }
+  if (total === 0) return tape.length - 1;
+  let running = 0;
   let count = 0;
-  while (count < tape.length && (cumulative[count] ?? Number.POSITIVE_INFINITY) <= clamped) {
+  for (const item of tape) {
+    if (item.kind === 'trip') running += 1;
+    if (running / total > clamped) break;
     count += 1;
   }
   return count;

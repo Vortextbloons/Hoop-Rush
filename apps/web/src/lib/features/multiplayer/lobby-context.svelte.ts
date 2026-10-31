@@ -58,7 +58,7 @@ export class LobbyCoordinator {
       const session = new LobbySession({
         command: lobbyCommand,
         subscribe: subscribeLobby,
-        scheduleTick: visibilityTickScheduler,
+        scheduleTick: (tick, intervalMs) => visibilityTickScheduler(tick, intervalMs, 10000),
         resumeGame: resumeMultiplayerGame,
         rememberLobby,
         friendlyError: friendlyMultiplayerError,

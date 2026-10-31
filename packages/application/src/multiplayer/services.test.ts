@@ -65,6 +65,91 @@ function harness(command: LobbySessionDeps['command'] = vi.fn(() => Promise.reso
 }
 
 describe('lobby orchestration', () => {
+  it('keeps unchanged polls silent and avoids rewriting lobby routing hints', async () => {
+    const command = vi.fn<LobbySessionDeps['command']>().mockResolvedValue(lobby);
+    const h = harness(command);
+    await h.session.attach(lobbyId);
+    const initialLobby = h.session.getSnapshot().lobby;
+    const changed = vi.fn();
+    h.session.subscribe(changed);
+    for (let i = 0; i < 30; i++) await h.session.refresh();
+    expect(h.session.getSnapshot().lobby).toBe(initialLobby);
+    expect(changed).not.toHaveBeenCalled();
+    expect(h.deps.rememberLobby).toHaveBeenCalledTimes(1);
+    command.mockResolvedValue({ ...lobby, revision: 1, guestJoined: true });
+    await h.session.refresh();
+    expect(changed).toHaveBeenCalledTimes(1);
+    expect(h.session.getSnapshot().lobby?.guestJoined).toBe(true);
+    expect(h.deps.rememberLobby).toHaveBeenCalledTimes(1);
+    command.mockResolvedValue({
+      ...lobby,
+      revision: 2,
+      gameKind: 'fixed-five',
+      gameRoomId: roomId,
+    });
+    await h.session.refresh();
+    expect(h.deps.rememberLobby).toHaveBeenCalledTimes(2);
+    h.session.dispose();
+  });
+
+  it('publishes game availability changes even when the lobby revision stays the same', async () => {
+    const command = vi
+      .fn<LobbySessionDeps['command']>()
+      .mockResolvedValue({ ...lobby, canStart: false });
+    const h = harness(command);
+    await h.session.attach(lobbyId);
+    const changed = vi.fn();
+    h.session.subscribe(changed);
+    command.mockResolvedValue(lobby);
+    await h.session.refresh();
+    expect(h.session.getSnapshot().lobby?.canStart).toBe(true);
+    expect(changed).toHaveBeenCalledTimes(1);
+    h.session.dispose();
+  });
+
+  it('recovers from errors with an unchanged lobby and retries failed guest navigation', async () => {
+    const started = { ...lobby, participantId: 'p2', gameKind: 'fixed-five', gameRoomId: roomId };
+    const command = vi
+      .fn<LobbySessionDeps['command']>()
+      .mockResolvedValueOnce({ ...lobby, participantId: 'p2' })
+      .mockResolvedValue(started);
+    const h = harness(command);
+    const resume = vi.fn().mockRejectedValueOnce(new Error('offline')).mockResolvedValue(undefined);
+    h.deps.resumeGame = resume;
+    await h.session.attach(lobbyId);
+    await h.session.refresh();
+    expect(h.session.getSnapshot().error).not.toBeNull();
+    await h.session.refresh();
+    expect(h.session.getSnapshot()).toMatchObject({
+      error: null,
+      connection: 'connected',
+      navigation: { kind: 'game', roomId },
+    });
+    expect(resume).toHaveBeenCalledTimes(2);
+    h.session.dispose();
+  });
+
+  it('does not queue periodic polls behind a slow request', async () => {
+    const pending = deferred<unknown>();
+    const command = vi
+      .fn<LobbySessionDeps['command']>()
+      .mockResolvedValueOnce(lobby)
+      .mockReturnValueOnce(pending.promise)
+      .mockResolvedValue(lobby);
+    const h = harness(command);
+    await h.session.attach(lobbyId);
+    h.tick();
+    h.tick();
+    h.tick();
+    pending.resolve(lobby);
+    await flush();
+    expect(command).toHaveBeenCalledTimes(2);
+    h.tick();
+    await flush();
+    expect(command).toHaveBeenCalledTimes(3);
+    h.session.dispose();
+  });
+
   it('refreshes immediately on a lobby notification and detaches its subscription', async () => {
     const command = vi.fn<LobbySessionDeps['command']>().mockResolvedValue(lobby);
     const h = harness(command);
@@ -124,26 +209,31 @@ describe('lobby orchestration', () => {
     expect(h.stop).toHaveBeenCalledTimes(1);
     expect(h.unsubscribe).toHaveBeenCalledTimes(1);
   });
-  it('never overlaps refreshes and coalesces duplicate events', async () => {
-    const pending = deferred<unknown>();
-    const command = vi
-      .fn<LobbySessionDeps['command']>()
-      .mockResolvedValueOnce(lobby)
-      .mockReturnValueOnce(pending.promise)
-      .mockResolvedValue(lobby);
-    const h = harness(command);
-    await h.session.attach(lobbyId);
-    h.tick();
-    h.tick();
-    h.tick();
-    await flush();
-    expect(command).toHaveBeenCalledTimes(2);
-    const refresh = h.session.refresh();
-    pending.resolve(lobby);
-    await refresh;
-    expect(command).toHaveBeenCalledTimes(3);
-    h.session.dispose();
-  });
+  it.each(['notification', 'explicit refresh'])(
+    'never overlaps refreshes and retains a trailing %s',
+    async (source) => {
+      const pending = deferred<unknown>();
+      const command = vi
+        .fn<LobbySessionDeps['command']>()
+        .mockResolvedValueOnce(lobby)
+        .mockReturnValueOnce(pending.promise)
+        .mockResolvedValue(lobby);
+      const h = harness(command);
+      await h.session.attach(lobbyId);
+      h.tick();
+      h.tick();
+      h.tick();
+      await flush();
+      expect(command).toHaveBeenCalledTimes(2);
+      const refresh = source === 'explicit refresh' ? h.session.refresh() : h.notify();
+      h.tick();
+      pending.resolve(lobby);
+      await refresh;
+      await flush();
+      expect(command).toHaveBeenCalledTimes(3);
+      h.session.dispose();
+    },
+  );
   it('keeps validated state during disconnection and recovers on reconnect', async () => {
     const command = vi
       .fn<LobbySessionDeps['command']>()

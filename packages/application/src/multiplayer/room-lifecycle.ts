@@ -66,7 +66,7 @@ export class RoomLifecycle {
     });
     this.refreshTask = task;
     this.stopPolling = schedule(() => {
-      if (attachment.current()) void task.request();
+      if (attachment.current()) void task.request(false);
     }, intervalMs);
   }
 

@@ -141,9 +141,16 @@ export function gamecastBattleVisibleItemCount(
   if (Number.isNaN(progress)) return 0;
   const clamped = Math.min(1, Math.max(0, progress));
   if (clamped >= 1) return items.length;
-  const cumulative = gamecastBattlePlaybackWeights(items);
+  let total = 0;
+  for (const item of items) {
+    if (item.kind === 'scoring') total += 1;
+  }
+  if (total === 0) return items.length - 1;
+  let running = 0;
   let count = 0;
-  while (count < items.length && (cumulative[count] ?? Number.POSITIVE_INFINITY) <= clamped) {
+  for (const item of items) {
+    if (item.kind === 'scoring') running += 1;
+    if (running / total > clamped) break;
     count += 1;
   }
   return count;

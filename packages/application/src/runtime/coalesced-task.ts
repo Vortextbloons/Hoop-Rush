@@ -11,9 +11,9 @@ export class CoalescedTask {
     return this.queued;
   }
 
-  request(): Promise<void> {
+  request(queueIfRunning = true): Promise<void> {
     if (this.running !== null) {
-      this.queued = true;
+      this.queued ||= queueIfRunning;
       return this.running;
     }
     this.running = (async () => {

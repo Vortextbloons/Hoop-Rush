@@ -282,9 +282,23 @@ export class LobbySession {
   }
 
   private apply(lobby: MultiplayerLobby): boolean {
-    if (this.lobby?.id === lobby.id && this.lobby.revision > lobby.revision) return false;
+    const previous = this.lobby;
+    if (previous?.id === lobby.id && previous.revision > lobby.revision) return false;
+    if (
+      previous?.id === lobby.id &&
+      previous.code === lobby.code &&
+      previous.revision === lobby.revision &&
+      previous.participantId === lobby.participantId &&
+      previous.guestJoined === lobby.guestJoined &&
+      previous.gameKind === lobby.gameKind &&
+      previous.gameRoomId === lobby.gameRoomId &&
+      previous.canStart === lobby.canStart
+    )
+      return true;
     this.lobby = lobby;
-    this.deps.rememberLobby(lobby);
+    if (previous?.id !== lobby.id || previous.gameRoomId !== lobby.gameRoomId) {
+      this.deps.rememberLobby(lobby);
+    }
     return true;
   }
 
@@ -293,6 +307,8 @@ export class LobbySession {
       const lobby = multiplayerLobbySchema.parse(
         await this.deps.command({ kind: 'get', lobbyId: attachment.roomId }),
       );
+      const previous = this.lobby;
+      const hadError = this.error !== null;
       if (!attachment.current() || !this.apply(lobby)) return;
       this.error = null;
       this.lifecycle.connected(attachment);
@@ -307,7 +323,7 @@ export class LobbySession {
       } else if (!follow) {
         this.followedRoomId = lobby.gameRoomId;
       }
-      this.events.publish();
+      if (this.lobby !== previous || hadError || this.navigation !== null) this.events.publish();
     } catch (error) {
       if (!attachment.current()) return;
       this.error = this.deps.friendlyError(error);

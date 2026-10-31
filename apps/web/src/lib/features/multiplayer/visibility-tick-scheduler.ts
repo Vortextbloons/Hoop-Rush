@@ -1,4 +1,8 @@
-export function visibilityTickScheduler(tick: () => void, intervalMs: number): () => void {
+export function visibilityTickScheduler(
+  tick: () => void,
+  intervalMs: number,
+  hiddenIntervalMs = 1000,
+): () => void {
   if (typeof document === 'undefined') {
     const timer = setInterval(tick, intervalMs);
     return () => {
@@ -7,7 +11,10 @@ export function visibilityTickScheduler(tick: () => void, intervalMs: number): (
   }
   let timer: ReturnType<typeof setInterval>;
   const schedule = () => {
-    timer = setInterval(tick, document.hidden ? Math.max(intervalMs, 1000) : intervalMs);
+    timer = setInterval(
+      tick,
+      document.hidden ? Math.max(intervalMs, hiddenIntervalMs) : intervalMs,
+    );
   };
   const changed = () => {
     clearInterval(timer);
