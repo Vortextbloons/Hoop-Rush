@@ -159,7 +159,7 @@
         profile: performance,
         authoritativeChannels: [],
         observedFieldGoalAttemptsPerGame:
-          player?.detail?.stats.fga && performance.regularSeason.gamesPlayed > 0
+          performance.regularSeason.gamesPlayed > 0
             ? performance.regularSeason.fga / performance.regularSeason.gamesPlayed
             : null,
       }),

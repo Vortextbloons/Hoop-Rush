@@ -171,9 +171,8 @@
         <span class="sample-label">applied</span>
       </div>
       <p class="sample-note">
-        A short run is deliberately pulled toward neutral instead of being discarded. This is the
-        observed difference for this exact season — not an opponent-adjusted estimate, and not a
-        forecast of points or results.
+        These are raw historical differences. New runs without opponent-adjusted evidence remain
+        neutral. Older runs retain their saved effects.
       </p>
     </div>
 

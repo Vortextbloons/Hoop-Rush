@@ -53,3 +53,43 @@ bun run hoop-rush data validate
 
 The manifest rebuild derives the active draft catalog from current pools. The
 collection generator refreshes the player catalog still used by gameplay.
+
+
+## Opponent-adjusted playoff performance
+
+```powershell
+python scripts/import-nba/build_playoff_adjustments.py
+bun scripts/import-nba/refresh-playoff-profiles.ts
+bun run --filter @hoop-rush/cli gen-collection-catalog
+bun run hoop-rush data validate
+```
+
+The builder downloads pinned box-score snapshots into the ignored raw cache.
+The original 2010-11 through 2023-24 source is supplemented by version 533 of
+Eoin Moore's historical NBA dataset for 1977-78 through 2009-10 and 2024-25
+through 2025-26. It checks player totals against the existing
+canonical regular-season and playoff evidence before generating adjustment files.
+Counting stats use estimated possessions and opponent allowance ratios relative to
+the player's regular-season schedule. Shooting uses TS-allowed differences.
+The model learns separate sample shrinkage parameters from earlier seasons and
+checks prediction against later series with different opponents in held-out seasons.
+A channel stays neutral if it does not improve on neutral prediction. The validation
+report records errors, selected parameters, enabled channels and excluded samples
+at `raw-data/nba/playoff-adjustment-validation.json`. Currently shooting is disabled;
+scoring volume, passing, rebounding and turnovers have supported adjustments.
+Uncovered seasons stay neutral. Injuries and role changes are not isolated.
+
+The historical downloader preserves whole-minute precision and resolves mixed
+minute/second encodings against legal team game durations. It includes short
+appearances truncated to zero whole minutes when their recorded counting stats
+prove an appearance. Counting stats and appearances must match canonical season
+totals; minutes are checked within the precision reported by the source. Missing
+or inconsistent games and player-seasons are excluded rather than filled in.
+The roster labels whole-minute possession exposure as approximate.
+
+`raw-data/nba/playoff-history-coverage.json` records source version, downloaded
+file hashes, and accepted/rejected game counts by season. The model validation
+report includes accepted player-season counts by season, including zeros. Coverage
+is partial in older seasons, 2000-01, and the newest seasons. Existing calibration
+windows remain 2010-11 through 2018-19 for training and 2019-20 through 2023-24
+for validation; the expanded coverage uses those same validated parameters.

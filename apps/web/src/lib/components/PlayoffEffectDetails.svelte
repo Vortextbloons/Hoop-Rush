@@ -3,9 +3,12 @@
 
   let { adjustment, applied }: { adjustment: PlayoffAdjustment; applied: CapRushPlayoffApplied } =
     $props();
-  const signed = (value: number, digits = 2) => `${value < 0 ? '' : '+'}${value.toFixed(digits)}`;
+  const signed = (value: number, digits = 2) => {
+    const rounded = Math.abs(value).toFixed(digits);
+    return Number(rounded) === 0 ? rounded : `${value < 0 ? '-' : '+'}${rounded}`;
+  };
   const rate = (value: number | null, percent = false) =>
-    value === null ? '?' : percent ? `${(value * 100).toFixed(1)}%` : value.toFixed(1);
+    value === null ? '--' : percent ? `${(value * 100).toFixed(1)}%` : value.toFixed(1);
   const rows = $derived([
     {
       label: 'Shooting',
@@ -30,7 +33,7 @@
       key: 'assistsPer36' as const,
       expected: rate(adjustment.expected.assistsPer100),
       actual: rate(adjustment.actual.assistsPer100),
-      effect: `${signed(applied.assistsPerGame)} ast/g ? ${signed(applied.passRate)} pass tendency`,
+      effect: `${signed(applied.assistsPerGame)} ast/g / ${signed(applied.passRate)} pass tendency`,
       value: applied.assistsPerGame,
       worse: false,
     },
@@ -63,7 +66,7 @@
     receives its own sample adjustment and capped gameplay effect.
   </p>
   <p class="mt-2 font-mono text-[10px] text-muted-foreground">
-    {adjustment.opponents} opponents ? {Math.round(adjustment.possessions)} estimated possessions
+    {adjustment.opponents} opponents / {Math.round(adjustment.possessions)} estimated possessions
   </p>
   <div class="mt-3 overflow-x-auto">
     <table class="w-full min-w-[28rem] text-left text-[11px]">
@@ -91,11 +94,13 @@
             >
             <td class="p-2">
               <span class="font-bold"
-                >{Math.abs(row.value) < 0.005
-                  ? 'Near neutral'
-                  : (row.worse ? row.value < 0 : row.value > 0)
-                    ? 'Bonus'
-                    : 'Penalty'}</span
+                >{adjustment.weights[row.key] === 0
+                  ? 'Insufficient predictive evidence'
+                  : Math.abs(row.value) < 0.005
+                    ? 'Near neutral'
+                    : (row.worse ? row.value < 0 : row.value > 0)
+                      ? 'Bonus'
+                      : 'Penalty'}</span
               >
               <span class="mt-0.5 block font-mono text-[10px] text-muted-foreground"
                 >{row.effect}</span
@@ -111,5 +116,8 @@
     scoring. Retained is the share left after shrinking the sample toward neutral, not a confidence
     probability. Effects change simulation inputs, not guaranteed box-score results. Injury and role
     changes are not isolated.
+    {#if adjustment.minutePrecision === 'whole-minutes'}
+      Some game minutes were reported as whole minutes, so possession exposure is approximate.
+    {/if}
   </p>
 </div>

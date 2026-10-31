@@ -19,3 +19,4 @@ export * from './season.ts';
 export * from './salary.ts';
 export * from './spin.ts';
 export * from './state-digest.ts';
+export * from './multiplayer/index.ts';

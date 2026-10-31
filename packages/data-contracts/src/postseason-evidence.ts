@@ -74,6 +74,7 @@ const playoffRatesSchema = z.object({
 });
 export const playoffAdjustmentSchema = z.object({
   modelVersion: z.literal('opponent-pace-v1'),
+  minutePrecision: z.enum(['seconds', 'whole-minutes']).optional(),
   sources: z.array(z.url()).min(1),
   possessions: z.number().positive(),
   opponents: z.number().int().positive(),

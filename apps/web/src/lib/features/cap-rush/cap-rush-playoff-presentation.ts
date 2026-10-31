@@ -1,6 +1,5 @@
 import {
   CAP_RUSH_PLAYOFF_CAPS,
-  CAP_RUSH_PLAYOFF_FORMULA_VERSION,
   CAP_RUSH_PLAYOFF_SAMPLE_MINUTES,
   type CapRushDraftState,
   type CapRushLockedInputs,
@@ -46,7 +45,7 @@ function isPostseason(draft: CapRushDraftState): boolean {
 }
 
 export function capRushPlayoffStatusOf(draft: CapRushDraftState): CapRushPlayoffStatus {
-  if (draft.playoffFormulaVersion !== CAP_RUSH_PLAYOFF_FORMULA_VERSION) return 'legacy';
+  if (draft.playoffFormulaVersion === undefined) return 'legacy';
   if (draft.locked?.playoffPerformance === undefined) return 'no-sample';
   return isPostseason(draft) ? 'active' : 'pending';
 }

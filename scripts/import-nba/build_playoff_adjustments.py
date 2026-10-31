@@ -31,7 +31,7 @@ def load(names):
         with (CACHE / name).open(encoding='utf-8-sig', newline='') as file:
             for row in csv.DictReader(file):
                 m = minutes(row['minutes'])
-                if m <= 0:
+                if m <= 0 and row.get('minutePrecision') != '1':
                     continue
                 key = (row['gameId'], row['teamId'], row['personId'])
                 if key in seen:
@@ -40,6 +40,7 @@ def load(names):
                     continue
                 seen[key] = dict(row)
                 row['m'] = m
+                row['minutePrecision'] = float(row.get('minutePrecision') or 0)
                 for column in (*COLUMNS, 'fieldGoalsAttempted', 'freeThrowsAttempted', 'reboundsOffensive'):
                     row[column] = float(row[column])
                     if not math.isfinite(row[column]) or row[column] < 0:
@@ -67,7 +68,8 @@ def observations(games, defense=None):
             own, opp = teams[own_id], teams[opp_id]
             a, b = totals(own), totals(opp)
             poss = possessions(a, b)
-            if poss <= 0 or abs(a['m'] - b['m']) > 1:
+            precision = sum(r.get('minutePrecision', 0) for r in own + opp)
+            if poss <= 0 or abs(a['m'] - b['m']) > max(1, precision):
                 raise ValueError(f'Invalid possession/minute accounting {game_id}')
             season = own[0]['season_year']
             allowed[(season, opp_id)][0] += poss
@@ -77,12 +79,14 @@ def observations(games, defense=None):
             allowed[(season, opp_id)][6] += a['freeThrowsAttempted']
             for row in own:
                 exposure = poss * row['m'] / (a['m'] / 5)
-                context = defense[(season, opp_id)] if defense else [0] * 5
+                context = defense[(season, opp_id)] if defense else [0, 1, 1, 1, 1]
                 players[(season, row['personId'])].append({
                     'game': game_id, 'opponent': opp_id, 'minutes': row['m'],
                     'possessions': exposure, 'points': row['points'],
                     'tsa': row['fieldGoalsAttempted'] + .44 * row['freeThrowsAttempted'],
                     'values': [row[c] for c in COLUMNS], 'context': context,
+                    'fga': row['fieldGoalsAttempted'], 'fta': row['freeThrowsAttempted'],
+                    'minutePrecision': row.get('minutePrecision', 0),
                 })
     return players, allowed
 
@@ -92,16 +96,16 @@ def summarize(rows):
     tsa = sum(r['tsa'] for r in rows)
     mins = sum(r['minutes'] for r in rows)
     actual = [sum(r['points'] for r in rows) / (2 * tsa) if tsa else None]
-    actual += [100 * sum(r['values'][i] for r in rows) / poss for i in range(4)]
+    actual += [100 * sum(r['values'][i] for r in rows) / poss if poss > 0 else None for i in range(4)]
     context = [sum(r['context'][0] * r['tsa'] for r in rows) / tsa if tsa else 0]
-    context += [sum(r['context'][i + 1] * r['possessions'] for r in rows) / poss for i in range(4)]
+    context += [sum(r['context'][i + 1] * r['possessions'] for r in rows) / poss if poss > 0 else 1 for i in range(4)]
     return actual, context, mins, poss
 
 
 def difference(regular, post):
     actual, context, mins, poss = summarize(post)
     baseline, reg_context, reg_mins, reg_poss = summarize(regular)
-    expected = [None if baseline[i] is None else baseline[i] + context[i] - reg_context[i] for i in range(5)]
+    expected = [None if baseline[i] is None else (baseline[i] + context[i] - reg_context[i] if i == 0 else baseline[i] * context[i] / reg_context[i]) for i in range(5)]
     delta = [None if actual[i] is None or expected[i] is None else actual[i] - expected[i] for i in range(5)]
     equivalent = [delta[0]] + [d * (reg_poss / reg_mins) * .36 if d is not None else None for d in delta[1:]]
     return actual, expected, equivalent, mins, poss
@@ -115,7 +119,9 @@ def main():
             url = f'https://raw.githubusercontent.com/NocturneBear/NBA-Data-2010-2024/{REVISION}/{remote}'
             with urllib.request.urlopen(url, timeout=60) as response:
                 (CACHE / name).write_bytes(response.read())
-    regular_games = load([f'regular_season_box_scores_2010_2024_part_{i}.csv' for i in range(1, 4)])
+    from fetch_playoff_history import main as fetch_history, SOURCE as HISTORY_SOURCE
+    fetch_history()
+    regular_games = load([f'regular_season_box_scores_2010_2024_part_{i}.csv' for i in range(1, 4)] + ['historical-regular.csv'])
     _, allowed = observations(regular_games)
     league = defaultdict(lambda: [0.0] * 7)
     for (season, _), values in allowed.items():
@@ -125,21 +131,47 @@ def main():
     for key, values in allowed.items():
         avg = league[key[0]]
         defense[key] = [values[1] / (2 * (values[5] + .44 * values[6])) - avg[1] / (2 * (avg[5] + .44 * avg[6]))]
-        defense[key] += [100 * (values[i] / values[0] - avg[i] / avg[0]) for i in range(1, 5)]
+        defense[key] += [(values[i] / values[0]) / (avg[i] / avg[0]) for i in range(1, 5)]
     regular, _ = observations(regular_games, defense)
-    playoff, _ = observations(load(['playoffs.csv']), defense)
+    playoff, _ = observations(load(['playoffs.csv', 'historical-playoffs.csv']), defense)
+    rejected = []
+    canonical = {}
+    postseason_canonical = {}
+    for season, _ in sorted(regular):
+        if season not in canonical:
+            path = config.NBA_ROOT / season / 'season-stats.json'
+            canonical[season] = {r['playerExternalId']: r for r in json.loads(path.read_text(encoding='utf-8'))}
+    for key in list(playoff):
+        season, player = key
+        recorded = canonical.get(season, {}).get(player)
+        rows = regular.get(key, [])
+        columns = {'points': 0, 'assists': 1, 'rebounds': 2, 'turnovers': 3}
+        if not recorded or not rows or sum(r['minutes'] for r in rows) <= 0 or len(rows) != recorded['gamesPlayed'] or any(recorded.get(c) is None or abs(sum(r['values'][i] for r in rows) - recorded[c]) > .01 for c, i in columns.items()) or abs(sum(r['fga'] for r in rows) - recorded['fga']) > .01 or abs(sum(r['fta'] for r in rows) - recorded['fta']) > .01 or abs(sum(r['minutes'] for r in rows) - recorded['minutes']) > max(2, sum(r.get('minutePrecision', 0) for r in rows)):
+            rejected.append([season, player, 'regular-season coverage'])
+            del playoff[key]
+    for key in list(playoff):
+        season, player = key
+        if season not in postseason_canonical:
+            source = json.loads((config.NBA_ROOT / season / 'postseason-stats.json').read_text(encoding='utf-8'))
+            postseason_canonical[season] = {r['playerExternalId']: r for r in source['players']}
+        recorded = postseason_canonical[season].get(player)
+        rows = playoff[key]
+        if recorded is None or sum(r['minutes'] for r in rows) <= 0 or any(recorded.get(c) is None or abs(sum(r['values'][i] for r in rows) - recorded[c]) > .01 for c, i in columns.items()) or abs(sum(r['fga'] for r in rows) - recorded['fga']) > .01 or abs(sum(r['fta'] for r in rows) - recorded['fta']) > .01 or abs(sum(r['minutes'] for r in rows) - recorded['minutes']) > max(2, sum(r.get('minutePrecision', 0) for r in rows)) or len(rows) != recorded['gamesPlayed']:
+            rejected.append([season, player, 'playoff coverage'])
+            del playoff[key]
     samples = []
     for key, rows in sorted(playoff.items()):
-        if key not in regular or len(rows) < 4:
+        opponents = list(dict.fromkeys(r['opponent'] for r in rows))
+        if key not in regular or len(opponents) < 2:
             continue
-        middle = len(rows) // 2
-        left = difference(regular[key], rows[:middle])
-        right = difference(regular[key], rows[middle:])
+        early = set(opponents[:len(opponents) // 2])
+        left = difference(regular[key], [r for r in rows if r['opponent'] in early])
+        right = difference(regular[key], [r for r in rows if r['opponent'] not in early])
         samples.append((key[0], left[2], right[2], left[3]))
     parameters, report = {}, {}
     for i, channel in enumerate(CHANNELS):
-        train = [r for r in samples if r[0] < '2019-20' and r[1][i] is not None and r[2][i] is not None]
-        test = [r for r in samples if r[0] >= '2019-20' and r[1][i] is not None and r[2][i] is not None]
+        train = [r for r in samples if '2010-11' <= r[0] < '2019-20' and r[1][i] is not None and r[2][i] is not None]
+        test = [r for r in samples if '2019-20' <= r[0] <= '2023-24' and r[1][i] is not None and r[2][i] is not None]
         def loss(rows, k):
             return sum((x[i] * m / (m + k) - y[i]) ** 2 for _, x, y, m in rows) / len(rows)
         choices = [90, 180, 360, 720, 1440, 2880, 1000000000]
@@ -150,22 +182,17 @@ def main():
         parameters[channel] = k if enabled else None
         report[channel] = {'trainingSamples': len(train), 'heldOutSamples': len(test), 'minutesPrior': k, 'neutralMSE': baseline, 'adjustedMSE': error, 'enabled': enabled}
     by_season = defaultdict(dict)
-    rejected = []
     for key, rows in sorted(playoff.items()):
         if key not in regular:
             continue
         season, player = key
-        source = json.loads((config.NBA_ROOT / season / 'postseason-stats.json').read_text(encoding='utf-8'))
-        recorded = next((p for p in source['players'] if p['playerExternalId'] == player), None)
-        if recorded is None or abs(sum(r['points'] for r in rows) - recorded['points']) > .01 or abs(sum(r['minutes'] for r in rows) - recorded['minutes']) > 2 or len(rows) != recorded['gamesPlayed']:
-            rejected.append([season, player])
-            continue
         actual, expected, delta, mins, poss = difference(regular[key], rows)
         weights = {c: mins / (mins + parameters[c]) if parameters[c] else 0 for c in CHANNELS}
-        by_season[season][player] = {'modelVersion': 'opponent-pace-v1', 'sources': [SOURCE], 'possessions': poss, 'opponents': len(set(r['opponent'] for r in rows)), 'expected': dict(zip(RATES, expected)), 'actual': dict(zip(RATES, actual)), 'differences': dict(zip(CHANNELS, delta)), 'weights': weights}
-    for season, players in sorted(by_season.items()):
+        by_season[season][player] = {'modelVersion': 'opponent-pace-v1', 'sources': [SOURCE if '2010-11' <= season <= '2023-24' else HISTORY_SOURCE], 'minutePrecision': 'whole-minutes' if any(r.get('minutePrecision', 0) for r in rows) else 'seconds', 'possessions': poss, 'opponents': len(set(r['opponent'] for r in rows)), 'expected': dict(zip(RATES, expected)), 'actual': dict(zip(RATES, actual)), 'differences': dict(zip(CHANNELS, delta)), 'weights': weights}
+    for season in sorted(canonical):
+        players = by_season.get(season, {})
         util.write_json(config.NBA_ROOT / season / 'postseason-adjustments.json', players)
-    util.write_json(config.NBA_ROOT / 'playoff-adjustment-validation.json', {'modelVersion': 'opponent-pace-v1', 'trainingSeasons': '2010-11 through 2018-19', 'heldOutSeasons': '2019-20 through 2023-24', 'channels': report, 'rejectedSamples': rejected, 'playerSeasons': sum(map(len, by_season.values()))})
+    util.write_json(config.NBA_ROOT / 'playoff-adjustment-validation.json', {'modelVersion': 'opponent-pace-v1', 'trainingSeasons': '2010-11 through 2018-19', 'heldOutSeasons': '2019-20 through 2023-24', 'channels': report, 'rejectedSamples': rejected, 'playerSeasons': sum(map(len, by_season.values())), 'playerSeasonsBySeason': {season: len(by_season.get(season, {})) for season in sorted(canonical)}})
     print(json.dumps(report, indent=2))
     print(f'Adjusted {sum(map(len, by_season.values()))} player-seasons; rejected {len(rejected)} inconsistent samples')
 

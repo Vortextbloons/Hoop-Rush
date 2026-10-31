@@ -22,6 +22,7 @@ import { buildCapRushLockedInputs } from './lock.ts';
 import {
   CAP_RUSH_PLAYOFF_FORMULA,
   capRushPlayoffAppliedOf,
+  capRushPlayoffEffectOf,
   capRushPlayoffPerformanceOf,
   capRushPlayoffSampleWeight,
   capRushPlayoffTeam,
@@ -653,4 +654,99 @@ describe('cap rush playoff pinning', () => {
       simulateCapRushPlayoffGame({ locked, plan: planOf(locked), context }).game.audit.ok,
     ).toBe(true);
   });
+});
+
+function adjustedProfile(season = '2015-16'): PlayoffPerformance {
+  const source = profile({ season, tsPct: -0.1, pointsPer36: -5 });
+  const differences = {
+    tsPct: 0.02,
+    pointsPer36: 2,
+    assistsPer36: 1,
+    reboundsPer36: -1,
+    turnoversPer36: -0.5,
+  };
+  const rates = {
+    tsPct: 0.6,
+    pointsPer100: 30,
+    assistsPer100: 8,
+    reboundsPer100: 10,
+    turnoversPer100: 3,
+  };
+  return {
+    ...source,
+    adjustment: {
+      modelVersion: 'opponent-pace-v1',
+      sources: ['https://stats.nba.com'],
+      possessions: 500,
+      opponents: 2,
+      expected: rates,
+      actual: rates,
+      differences,
+      weights: {
+        tsPct: 0.2,
+        pointsPer36: 0.6,
+        assistsPer36: 0.5,
+        reboundsPer36: 0.4,
+        turnoversPer36: 0.3,
+      },
+    },
+  };
+}
+
+it('uses adjusted residuals and channel-specific sample weights instead of raw declines', () => {
+  const source = adjustedProfile();
+  const applied = capRushPlayoffEffectOf({
+    profile: source,
+    authoritativeChannels: [],
+    observedFieldGoalAttemptsPerGame: 12,
+  });
+  expect(applied.fieldGoalPct).toBeCloseTo(0.02 * 0.2 * CAP_RUSH_PLAYOFF_FORMULA.tsPctSlope);
+  expect(applied.fieldGoalAttemptsPerGame).toBeCloseTo(
+    2 * 0.6 * CAP_RUSH_PLAYOFF_FORMULA.pointsPer36Slope,
+  );
+  expect(applied.assistsPerGame).toBeGreaterThan(0);
+  expect(applied.defensiveReboundsPerGame).toBeLessThan(0);
+  expect(applied.turnoverRate).toBeLessThan(0);
+  const owned = capRushPlayoffEffectOf({
+    profile: source,
+    authoritativeChannels: ['two-point-accuracy', 'turnover-blend'],
+    observedFieldGoalAttemptsPerGame: 12,
+  });
+  expect(owned.fieldGoalPct).toBe(0);
+  expect(owned.turnoverRate).toBe(0);
+});
+
+it('keeps a player neutral when harder opponents fully explain the raw decline', () => {
+  const source = adjustedProfile();
+  const adjustment = required(source.adjustment, 'adjustment');
+  for (const key of Object.keys(adjustment.differences) as (keyof typeof adjustment.differences)[])
+    adjustment.differences[key] = 0;
+  expect(
+    Object.values(
+      capRushPlayoffEffectOf({
+        profile: source,
+        authoritativeChannels: [],
+        observedFieldGoalAttemptsPerGame: 12,
+      }),
+    ).every((value) => value === 0),
+  ).toBe(true);
+});
+
+it('pins adjusted effects for both teams and produces audited deterministic playoff games', () => {
+  const baseline = lockedOf(undefined, { versioned: true });
+  const adjusted = lockedOf((season) => adjustedProfile(required(season, 'season')));
+  expect(adjusted.playoffPerformance?.players.some((row) => row.applied.fieldGoalPct > 0)).toBe(
+    true,
+  );
+  const context = createEngineContext();
+  const plan = planOf(baseline);
+  const before = simulateCapRushPlayoffGame({ locked: baseline, plan, context });
+  const after = simulateCapRushPlayoffGame({ locked: adjusted, plan, context });
+  expect(after.game.audit.ok).toBe(true);
+  expect(after.game.result).not.toEqual(before.game.result);
+  expect(simulateCapRushPlayoffGame({ locked: adjusted, plan, context }).game.result).toEqual(
+    after.game.result,
+  );
+  const stored = capRushLockedInputsSchema.parse(JSON.parse(JSON.stringify(adjusted)));
+  expect(stored.playoffPerformance).toEqual(adjusted.playoffPerformance);
 });

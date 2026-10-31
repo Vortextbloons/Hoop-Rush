@@ -4,6 +4,11 @@ import { playerIdSchema, seasonKeySchema } from './ids.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
 
 export const CAP_RUSH_PLAYOFF_FORMULA_VERSION = 'cap-rush-playoff-formula-v3';
+export const capRushPlayoffFormulaVersionSchema = z.enum([
+  'cap-rush-playoff-formula-v1',
+  'cap-rush-playoff-formula-v2',
+  CAP_RUSH_PLAYOFF_FORMULA_VERSION,
+]);
 export const CAP_RUSH_PLAYOFF_SAMPLE_MINUTES = 180;
 export const CAP_RUSH_PLAYOFF_MAX_PLAYERS = 320;
 
@@ -85,11 +90,7 @@ export const capRushPlayoffPlayerSchema = z.object({
 export type CapRushPlayoffPlayer = z.infer<typeof capRushPlayoffPlayerSchema>;
 
 export const capRushPlayoffPerformanceSchema = z.object({
-  formulaVersion: z.enum([
-    'cap-rush-playoff-formula-v1',
-    'cap-rush-playoff-formula-v2',
-    CAP_RUSH_PLAYOFF_FORMULA_VERSION,
-  ]),
+  formulaVersion: capRushPlayoffFormulaVersionSchema,
   sampleMinutesAnchor: z.literal(CAP_RUSH_PLAYOFF_SAMPLE_MINUTES),
   players: z.array(capRushPlayoffPlayerSchema).max(CAP_RUSH_PLAYOFF_MAX_PLAYERS),
 });
