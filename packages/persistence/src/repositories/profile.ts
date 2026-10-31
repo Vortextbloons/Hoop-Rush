@@ -152,6 +152,32 @@ export class DexieProfileRepository {
   }
 
   async recordGame(bindingId: string, gameId: string, facts: ProfileGameFacts) {
+    return this.recordOnce(bindingId, gameId, (profile) => applyProfileGame(profile, facts));
+  }
+
+  async recordMatch(bindingId: string, won: boolean) {
+    return this.recordOnce(bindingId, 'match', (profile) => {
+      const multiplayerStreak = won ? profile.multiplayerStreak + 1 : 0;
+      const unlocked =
+        multiplayerStreak >= 5 && !profile.achievements.includes('built-different')
+          ? ['built-different' as const]
+          : [];
+      return {
+        profile: {
+          ...profile,
+          multiplayerStreak,
+          achievements: [...profile.achievements, ...unlocked],
+        },
+        unlocked,
+      };
+    });
+  }
+
+  private async recordOnce(
+    bindingId: string,
+    gameId: string,
+    apply: (profile: PlayerProfile) => ReturnType<typeof applyProfileGame>,
+  ) {
     return this.db.transaction(
       'rw',
       this.db.profileBindings,
@@ -165,7 +191,7 @@ export class DexieProfileRepository {
         const id = `${bindingId}:${gameId}`;
         const prior = await this.db.profileGames.get(id);
         if (prior) return profileGameSchema.parse(prior).unlocked;
-        const result = applyProfileGame(profile, facts);
+        const result = apply(profile);
         await this.db.profiles.put(playerProfileSchema.parse(result.profile));
         await this.db.profileGames.add(
           profileGameSchema.parse({
@@ -176,45 +202,6 @@ export class DexieProfileRepository {
           }),
         );
         return result.unlocked;
-      },
-    );
-  }
-
-  async recordMatch(bindingId: string, won: boolean) {
-    return this.db.transaction(
-      'rw',
-      this.db.profileBindings,
-      this.db.profileGames,
-      this.db.profiles,
-      this.db.archivedProfiles,
-      async () => {
-        profileBindingSchema.parse(await this.db.profileBindings.get(bindingId));
-        const profile = await this.loadBound(bindingId);
-        if (!profile) return [];
-        const id = `${bindingId}:match`;
-        const prior = await this.db.profileGames.get(id);
-        if (prior) return profileGameSchema.parse(prior).unlocked;
-        const multiplayerStreak = won ? profile.multiplayerStreak + 1 : 0;
-        const unlocked =
-          multiplayerStreak >= 5 && !profile.achievements.includes('built-different')
-            ? ['built-different' as const]
-            : [];
-        await this.db.profiles.put(
-          playerProfileSchema.parse({
-            ...profile,
-            multiplayerStreak,
-            achievements: [...profile.achievements, ...unlocked],
-          }),
-        );
-        await this.db.profileGames.add(
-          profileGameSchema.parse({
-            saveSchemaVersion: PROFILE_SAVE_SCHEMA_VERSION,
-            id,
-            profileId: profile.id,
-            unlocked,
-          }),
-        );
-        return unlocked;
       },
     );
   }
