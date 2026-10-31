@@ -15,11 +15,15 @@ import {
   shared82GameEvents,
   simulateRecordedShared82H2HGame,
   verifyFixedFiveCompetition,
+  type EngineContext,
+  type Shared82GameEvent,
+  type Shared82SimulationInput,
 } from '@hoop-rush/engine';
 import type {
   FixedFiveCompetitionRun,
   FixedFiveShared82H2HGameOutput,
   FixedFiveWorkerResultEntry,
+  OpponentBracket,
   Position,
 } from '@hoop-rush/data-contracts';
 import { afterEach, describe, expect, it, vi } from 'bun:test';
@@ -214,6 +218,32 @@ function createHarness(overrides: Partial<FixedFiveRoomSessionDeps> = {}): Harne
   };
 }
 
+function submitCommand(
+  harness: Harness,
+  commandId: string,
+  actor: 'p1' | 'p2',
+  payload: FixedFiveCommandPayload,
+): Promise<FixedFiveCommandReceipt> {
+  return harness.transport.submitCommand({
+    schemaVersion: 1,
+    roomId: harness.deps.roomId as Id,
+    commandId: commandIdSchema.parse(commandId),
+    actorParticipantId: actor,
+    payload,
+  });
+}
+
+async function submitAccepted(
+  harness: Harness,
+  commandId: string,
+  actor: 'p1' | 'p2',
+  payload: FixedFiveCommandPayload,
+): Promise<FixedFiveCommandReceipt> {
+  const receipt = await submitCommand(harness, commandId, actor, payload);
+  expect(receipt.accepted).toBe(true);
+  return receipt;
+}
+
 async function flush(): Promise<void> {
   await Promise.resolve();
   await Promise.resolve();
@@ -246,78 +276,148 @@ function sandboxAssets(pool: FixedFiveCandidate[]): FixedFiveSessionAssets {
   } as unknown as FixedFiveSessionAssets;
 }
 
-async function fillSandboxDraft(
-  transport: FixedFiveMultiplayerTransport,
-  roomId: Id,
-  pool: FixedFiveCandidate[],
-): Promise<void> {
-  const submit = (
-    commandId: string,
-    actor: 'p1' | 'p2',
-    payload: FixedFiveCommandPayload,
-  ): Promise<FixedFiveCommandReceipt> =>
-    transport.submitCommand({
-      schemaVersion: 1,
-      roomId,
-      commandId: commandIdSchema.parse(commandId),
-      actorParticipantId: actor,
-      payload,
-    });
-  const startReceipt = await submit('cmd-start', 'p1', { kind: 'start' });
-  expect(startReceipt.accepted).toBe(true);
+async function fillSandboxDraft(harness: Harness, pool: FixedFiveCandidate[]): Promise<void> {
+  await submitAccepted(harness, 'cmd-start', 'p1', { kind: 'start' });
   const used = new Set<string>();
   const slots: Record<'p1' | 'p2', number> = { p1: 0, p2: 0 };
   for (let ordinal = 0; ordinal < 10; ordinal += 1) {
-    const resumed = await transport.resume(roomId);
+    const resumed = await harness.transport.resume(harness.deps.roomId);
     const picker = resumed.snapshot.deadline?.participantId;
     if (!picker) throw new Error('sandbox draft deadline closed early');
     const candidate = pool.find((entry) => !used.has(entry.playerId));
     if (!candidate) throw new Error('sandbox pool exhausted');
     used.add(candidate.playerId);
-    const receipt = await submit(`cmd-pick-${String(ordinal)}`, picker, {
+    await submitAccepted(harness, `cmd-pick-${String(ordinal)}`, picker, {
       kind: 'sandbox-place',
       playerId: candidate.playerId,
       playerVersionId: candidate.playerVersionId,
       slotIndex: slots[picker],
     });
-    expect(receipt.accepted).toBe(true);
     slots[picker] += 1;
   }
 }
 
 async function waitFor(predicate: () => boolean): Promise<void> {
-  for (let attempt = 0; attempt < 50; attempt += 1) {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
     if (predicate()) return;
     await Promise.resolve();
   }
   throw new Error('condition was never met');
 }
 
-async function fillDuelDraft(transport: FixedFiveMultiplayerTransport, roomId: Id): Promise<void> {
-  const submit = (
-    commandId: string,
-    actor: 'p1' | 'p2',
-    payload: FixedFiveCommandPayload,
-  ): Promise<FixedFiveCommandReceipt> =>
-    transport.submitCommand({
-      schemaVersion: 1,
-      roomId,
-      commandId: commandIdSchema.parse(commandId),
-      actorParticipantId: actor,
-      payload,
-    });
-  const startReceipt = await submit('duel-start', 'p1', { kind: 'start' });
-  expect(startReceipt.accepted).toBe(true);
+async function fillDuelDraft(harness: Harness): Promise<void> {
+  await submitAccepted(harness, 'duel-start', 'p1', { kind: 'start' });
   for (let index = 0; index < 10; index += 1) {
-    const receipt = await submit(`duel-pick-${String(index)}`, index % 2 === 0 ? 'p1' : 'p2', {
+    await submitAccepted(harness, `duel-pick-${String(index)}`, index % 2 === 0 ? 'p1' : 'p2', {
       kind: 'duel-claim',
       playerId: playerIdSchema.parse(`duel-player-${String(index)}`),
       slotIndex: index % 5,
       franchiseId: franchiseIdSchema.parse('lakers'),
       eraId: '1990s',
     });
-    expect(receipt.accepted).toBe(true);
   }
+}
+
+const SIMULATION_SLOTS: Position[] = ['PG', 'SG', 'SF', 'PF', 'C'];
+
+function buildSimulationTeam(
+  ...args: Parameters<FixedFiveRoomSessionDeps['buildTeam']>
+): ReturnType<FixedFiveRoomSessionDeps['buildTeam']> {
+  const [, teamId, displayName, refs] = args;
+  return Promise.resolve({
+    teamId,
+    displayName,
+    players: refs.map((ref) => {
+      const position = SIMULATION_SLOTS[ref.slotIndex];
+      assert(position);
+      return buildSimulationPlayer({
+        playerId: playerIdSchema.parse(ref.playerId),
+        positions: [position],
+      });
+    }),
+  });
+}
+
+function sandboxAssetsWithPreamble(
+  pool: FixedFiveCandidate[],
+  bracket: OpponentBracket = buildFixtureBracket(),
+) {
+  return {
+    ...sandboxAssets(pool),
+    manifest: buildManifest(),
+    bracket,
+    profile: buildEraSimulationProfile(),
+  };
+}
+
+async function openSandboxRoom(
+  harness: Harness,
+  pool: FixedFiveCandidate[],
+  options: { join?: boolean; fill?: boolean } = {},
+) {
+  const created = await harness.createRoom({ mode: 'sandbox-shared-82', sourceMode: 'sandbox' });
+  if (options.join !== false) await harness.transport.join(created.code);
+  if (options.fill !== false) await fillSandboxDraft(harness, pool);
+  return created;
+}
+
+async function lockSandboxDraft(harness: Harness, commandPrefix: string): Promise<void> {
+  for (const actor of ['p1', 'p2'] as const) {
+    await submitAccepted(harness, `${commandPrefix}-${actor}`, actor, { kind: 'sandbox-lock' });
+  }
+}
+
+function workerEntries(events: Iterable<Shared82GameEvent>): FixedFiveWorkerResultEntry[] {
+  return [...events].map((event) =>
+    event.tag === 'h2h'
+      ? { tag: 'h2h', game: event.game, ...(event.tape ? { tape: event.tape } : {}) }
+      : { tag: event.tag, game: event.game },
+  );
+}
+
+async function submitPeerH2HRound(
+  harness: Harness,
+  session: FixedFiveRoomSession,
+  gameNumber: number,
+  output: FixedFiveShared82H2HGameOutput,
+  commandPrefix: string,
+): Promise<void> {
+  await submitAccepted(harness, `${commandPrefix}-propose`, 'p2', {
+    kind: 'propose-game-result',
+    gameNumber,
+    winner: output.result.winner === 'home' ? 'p1' : 'p2',
+    resultDigest: output.resultDigest,
+    tapeDigest: output.tapeDigest,
+    inputDigest: output.inputDigest,
+  });
+  await session.refresh();
+  await submitAccepted(harness, `${commandPrefix}-confirm`, 'p2', {
+    kind: 'confirm-game-result',
+    gameNumber,
+    resultDigest: output.resultDigest,
+    verified: true,
+  });
+}
+
+function h2hOutputFor(
+  input: Shared82SimulationInput,
+  gameNumber: number,
+  context: EngineContext,
+): FixedFiveShared82H2HGameOutput {
+  const recorded = simulateRecordedShared82H2HGame(input, gameNumber, context);
+  const gameInput = shared82H2HGameInput(input, gameNumber);
+  return {
+    schemaVersion: 1,
+    gameNumber,
+    homeParticipantId: 'p1',
+    awayParticipantId: 'p2',
+    seed: recorded.seed,
+    result: recorded.result,
+    tape: recorded.tape,
+    inputDigest: fixedFiveDuelGameInputDigest(gameInput),
+    resultDigest: fixedFiveDuelGameResultDigest(recorded.result),
+    tapeDigest: fixedFiveDuelGameTapeDigest(recorded.tape),
+  };
 }
 
 afterEach(() => {
@@ -360,17 +460,11 @@ describe('FixedFiveRoomSession', () => {
 
   it('refetches commands appended by the other seat', async () => {
     const harness = createHarness();
-    const created = await harness.createRoom();
+    await harness.createRoom();
     const session = harness.session();
     await session.start();
 
-    await harness.transport.submitCommand({
-      schemaVersion: 1,
-      roomId: created.snapshot.roomId,
-      commandId: commandIdSchema.parse('cmd-from-p2'),
-      actorParticipantId: 'p2',
-      payload: { kind: 'ready', ready: true },
-    });
+    await submitCommand(harness, 'cmd-from-p2', 'p2', { kind: 'ready', ready: true });
     await session.refresh();
 
     const state = session.getSnapshot();
@@ -387,20 +481,17 @@ describe('FixedFiveRoomSession', () => {
     const harness = createHarness();
     const created = await harness.createRoom({ mode: 'duel', sourceMode: 'classic' });
     await harness.transport.join(created.code);
-    await fillDuelDraft(harness.transport, created.snapshot.roomId);
+    await fillDuelDraft(harness);
     vi.spyOn(harness.transport, 'subscribe').mockReturnValue({ unsubscribe: () => {} });
     const session = harness.session();
     try {
       await session.start();
       expect(session.getSnapshot().opponentReady).toBe(false);
-      const receipt = await harness.transport.submitCommand({
-        schemaVersion: 1,
-        roomId: created.snapshot.roomId,
-        commandId: commandIdSchema.parse('missed-ready'),
-        actorParticipantId: 'p2',
-        payload: { kind: 'ready-next-game', gameNumber: 1, ready: true },
+      await submitAccepted(harness, 'missed-ready', 'p2', {
+        kind: 'ready-next-game',
+        gameNumber: 1,
+        ready: true,
       });
-      expect(receipt.accepted).toBe(true);
 
       vi.advanceTimersByTime(15_000);
       await flush();
@@ -430,43 +521,24 @@ describe('FixedFiveRoomSession', () => {
     const harness = createHarness();
     const created = await harness.createRoom({ mode: 'duel', sourceMode: 'classic' });
     await harness.transport.join(created.code);
-    await fillDuelDraft(harness.transport, created.snapshot.roomId);
+    await fillDuelDraft(harness);
     vi.spyOn(harness.transport, 'subscribe').mockReturnValue({ unsubscribe: () => {} });
     const session = harness.session();
     try {
       await session.start();
-      const receipt = await harness.transport.submitCommand({
-        schemaVersion: 1,
-        roomId: created.snapshot.roomId,
-        commandId: commandIdSchema.parse('wake-ready'),
-        actorParticipantId: 'p2',
-        payload: { kind: 'ready-next-game', gameNumber: 1, ready: true },
+      await submitAccepted(harness, 'wake-ready', 'p2', {
+        kind: 'ready-next-game',
+        gameNumber: 1,
+        ready: true,
       });
-      expect(receipt.accepted).toBe(true);
 
       handlers.get('focus')?.();
 
-      for (let attempt = 0; attempt < 100; attempt += 1) {
-        try {
-          expect(session.getSnapshot().commands.some((c) => c.commandId === 'wake-ready')).toBe(
-            true,
-          );
-          expect(session.getSnapshot().opponentReady).toBe(true);
-          break;
-        } catch {
-          await flush();
-        }
-        if (attempt === 99) {
-          expect(session.getSnapshot().commands.some((c) => c.commandId === 'wake-ready')).toBe(
-            true,
-          );
-          expect(session.getSnapshot().opponentReady).toBe(true);
-        }
-      }
-      for (let attempt = 0; attempt < 100 && session.getSnapshot().reconnecting; attempt += 1) {
-        await flush();
-      }
-      expect(session.getSnapshot().reconnecting).toBe(false);
+      await waitFor(() =>
+        session.getSnapshot().commands.some((command) => command.commandId === 'wake-ready'),
+      );
+      await waitFor(() => session.getSnapshot().opponentReady);
+      await waitFor(() => !session.getSnapshot().reconnecting);
     } finally {
       session.dispose();
       (globalThis as { window?: unknown }).window = originalWindow;
@@ -478,7 +550,7 @@ describe('FixedFiveRoomSession', () => {
     const harness = createHarness();
     const created = await harness.createRoom({ mode: 'duel', sourceMode: 'classic' });
     await harness.transport.join(created.code);
-    await fillDuelDraft(harness.transport, created.snapshot.roomId);
+    await fillDuelDraft(harness);
     vi.spyOn(harness.transport, 'subscribe').mockReturnValue({ unsubscribe: () => {} });
     const session = harness.session();
     try {
@@ -489,14 +561,7 @@ describe('FixedFiveRoomSession', () => {
         ['phase-ready-p2', 'p2', { kind: 'ready-next-game', gameNumber: 1, ready: true }],
         ['phase-broadcast', 'p1', { kind: 'broadcast-start', gameNumber: 1 }],
       ] as const) {
-        const receipt = await harness.transport.submitCommand({
-          schemaVersion: 1,
-          roomId,
-          commandId: commandIdSchema.parse(commandId),
-          actorParticipantId: actor,
-          payload,
-        });
-        expect(receipt.accepted).toBe(true);
+        await submitAccepted(harness, commandId, actor, payload);
       }
       const realSnapshot = harness.transport.snapshot.bind(harness.transport);
       const authoritative = await realSnapshot(roomId);
@@ -551,14 +616,7 @@ describe('FixedFiveRoomSession', () => {
           { kind: 'confirm-game-result', gameNumber: 1, resultDigest: digest, verified: true },
         ],
       ] as const) {
-        const receipt = await harness.transport.submitCommand({
-          schemaVersion: 1,
-          roomId,
-          commandId: commandIdSchema.parse(commandId),
-          actorParticipantId: actor,
-          payload,
-        });
-        expect(receipt.accepted).toBe(true);
+        await submitAccepted(harness, commandId, actor, payload);
       }
       const advanced = await realSnapshot(roomId);
       expect(advanced.series?.currentGameNumber).toBe(2);
@@ -586,13 +644,7 @@ describe('FixedFiveRoomSession', () => {
       await session.start();
       const readSync = harness.transport.sync.bind(harness.transport);
       vi.spyOn(harness.transport, 'sync').mockImplementationOnce(async (roomId, afterOrdinal) => {
-        await harness.transport.submitCommand({
-          schemaVersion: 1,
-          roomId: created.snapshot.roomId,
-          commandId: commandIdSchema.parse('between-reads'),
-          actorParticipantId: 'p1',
-          payload: { kind: 'start' },
-        });
+        await submitCommand(harness, 'between-reads', 'p1', { kind: 'start' });
         return readSync(roomId, afterOrdinal);
       });
       const updates: FixedFiveRoomSessionSnapshot[] = [];
@@ -618,14 +670,7 @@ describe('FixedFiveRoomSession', () => {
       await session.start();
       const updates: FixedFiveRoomSessionSnapshot[] = [];
       session.subscribe((state) => updates.push(state));
-      const receipt = await harness.transport.submitCommand({
-        schemaVersion: 1,
-        roomId: created.snapshot.roomId,
-        commandId: commandIdSchema.parse('coherent-ready'),
-        actorParticipantId: 'p2',
-        payload: { kind: 'ready', ready: true },
-      });
-      expect(receipt.accepted).toBe(true);
+      await submitAccepted(harness, 'coherent-ready', 'p2', { kind: 'ready', ready: true });
       await session.refresh();
       expect(session.getSnapshot().commands).toHaveLength(1);
       expect(
@@ -645,14 +690,7 @@ describe('FixedFiveRoomSession', () => {
     try {
       await session.start();
       const roomId = created.snapshot.roomId;
-      const receipt = await harness.transport.submitCommand({
-        schemaVersion: 1,
-        roomId,
-        commandId: commandIdSchema.parse('concurrent-ready'),
-        actorParticipantId: 'p2',
-        payload: { kind: 'ready', ready: true },
-      });
-      expect(receipt.accepted).toBe(true);
+      await submitAccepted(harness, 'concurrent-ready', 'p2', { kind: 'ready', ready: true });
       const realSync = harness.transport.sync.bind(harness.transport);
       const authoritative = await realSync(roomId, -1);
       const pending = deferred<typeof authoritative>();
@@ -663,17 +701,7 @@ describe('FixedFiveRoomSession', () => {
       const refetch = vi.spyOn(harness.transport, 'refetch');
 
       const first = session.refresh();
-      for (let attempt = 0; attempt < 100; attempt += 1) {
-        try {
-          expect(snapshot).toHaveBeenCalledTimes(1);
-          break;
-        } catch {
-          await flush();
-        }
-        if (attempt === 99) {
-          expect(snapshot).toHaveBeenCalledTimes(1);
-        }
-      }
+      await waitFor(() => snapshot.mock.calls.length === 1);
       const second = session.refresh();
       await flush();
       expect(snapshot).toHaveBeenCalledTimes(1);
@@ -740,7 +768,7 @@ describe('FixedFiveRoomSession', () => {
     const pool = Array.from({ length: 12 }, (_, index) => sandboxCandidate(index));
     const harness = createHarness({ loadAssets: () => Promise.resolve(sandboxAssets(pool)) });
     const created = await harness.createRoom({ mode: 'sandbox-shared-82', sourceMode: 'sandbox' });
-    await fillSandboxDraft(harness.transport, created.snapshot.roomId, pool);
+    await fillSandboxDraft(harness, pool);
 
     const session = harness.session();
     await session.start();
@@ -799,42 +827,13 @@ describe('FixedFiveRoomSession', () => {
       opponentId: gameFortyMatchup.opponentId,
     };
     schedule[39] = { ...gameFortyMatchup, opponentId: weakestOpponentId };
-    const assets = {
-      ...sandboxAssets(pool),
-      manifest: buildManifest(),
-      bracket: { ...fixtureBracket, schedule },
-      profile: buildEraSimulationProfile(),
-    };
-    const slots: Position[] = ['PG', 'SG', 'SF', 'PF', 'C'];
+    const assets = sandboxAssetsWithPreamble(pool, { ...fixtureBracket, schedule });
     const harness = createHarness({
       loadAssets: () => Promise.resolve(assets),
-      buildTeam: (_manifest, teamId, displayName, refs) =>
-        Promise.resolve({
-          teamId,
-          displayName,
-          players: refs.map((ref) => {
-            const position = slots[ref.slotIndex];
-            assert(position);
-            return buildSimulationPlayer({
-              playerId: playerIdSchema.parse(ref.playerId),
-              positions: [position],
-            });
-          }),
-        }),
+      buildTeam: buildSimulationTeam,
     });
-    const created = await harness.createRoom({ mode: 'sandbox-shared-82', sourceMode: 'sandbox' });
-    await harness.transport.join(created.code);
-    await fillSandboxDraft(harness.transport, created.snapshot.roomId, pool);
-    for (const actor of ['p1', 'p2'] as const) {
-      const receipt = await harness.transport.submitCommand({
-        schemaVersion: 1,
-        roomId: created.snapshot.roomId,
-        commandId: commandIdSchema.parse(`lock-${actor}`),
-        actorParticipantId: actor,
-        payload: { kind: 'sandbox-lock' },
-      });
-      expect(receipt.accepted).toBe(true);
-    }
+    await openSandboxRoom(harness, pool);
+    await lockSandboxDraft(harness, 'lock');
 
     let session = harness.session();
     try {
@@ -846,30 +845,14 @@ describe('FixedFiveRoomSession', () => {
       assert(run);
       const input = { ...run, bracket: assets.bracket };
       const engineContext = createEngineContext({ engineVersion: 'test-engine' });
-      const events = [...shared82GameEvents(input, engineContext, 1, { recordH2H: true })];
-      const entries: FixedFiveWorkerResultEntry[] = events.map((event) =>
-        event.tag === 'h2h'
-          ? { tag: 'h2h', game: event.game, ...(event.tape ? { tape: event.tape } : {}) }
-          : { tag: event.tag, game: event.game },
+      const entries = workerEntries(
+        shared82GameEvents(input, engineContext, 1, { recordH2H: true }),
       );
       const weakest = findWeakestOpponent(assets.bracket);
       const eligibleGameNumbers = h2hGameNumbersFor(assets.bracket, weakest.opponentId);
       const firstGame = eligibleGameNumbers[0];
       assert(firstGame);
-      const recorded = simulateRecordedShared82H2HGame(input, firstGame, engineContext);
-      const gameInput = shared82H2HGameInput(input, firstGame);
-      let output: FixedFiveShared82H2HGameOutput = {
-        schemaVersion: 1,
-        gameNumber: firstGame,
-        homeParticipantId: 'p1',
-        awayParticipantId: 'p2',
-        seed: recorded.seed,
-        result: recorded.result,
-        tape: recorded.tape,
-        inputDigest: fixedFiveDuelGameInputDigest(gameInput),
-        resultDigest: fixedFiveDuelGameResultDigest(recorded.result),
-        tapeDigest: fixedFiveDuelGameTapeDigest(recorded.tape),
-      };
+      let output = h2hOutputFor(input, firstGame, engineContext);
       runner.emit({ kind: 'results', entries });
       runner.emit({ kind: 'complete', gamesDelivered: entries.length });
       await waitFor(() => harness.repository.pending !== null);
@@ -990,24 +973,7 @@ describe('FixedFiveRoomSession', () => {
         rootSeed: tapeRun.rootSeed,
         dataVersion: tapeRun.dataVersion,
       };
-      const resumedRecorded = simulateRecordedShared82H2HGame(
-        resumedInput,
-        firstGame,
-        engineContext,
-      );
-      const resumedGameInput = shared82H2HGameInput(resumedInput, firstGame);
-      output = {
-        schemaVersion: 1,
-        gameNumber: firstGame,
-        homeParticipantId: 'p1',
-        awayParticipantId: 'p2',
-        seed: resumedRecorded.seed,
-        result: resumedRecorded.result,
-        tape: resumedRecorded.tape,
-        inputDigest: fixedFiveDuelGameInputDigest(resumedGameInput),
-        resultDigest: fixedFiveDuelGameResultDigest(resumedRecorded.result),
-        tapeDigest: fixedFiveDuelGameTapeDigest(resumedRecorded.tape),
-      };
+      output = h2hOutputFor(resumedInput, firstGame, engineContext);
       expect(output).toStrictEqual(originalOutput);
       tapeRunner.emit({ kind: 'shared82-h2h-game', output });
       resumedRunner.emit({ kind: 'results', entries });
@@ -1016,35 +982,7 @@ describe('FixedFiveRoomSession', () => {
       expect(session.getSnapshot().broadcastProgress).toBeCloseTo(0.4, 1);
       reconnectNowMs += 6_000;
       session.advancePlayback(6_000);
-      const peerPropose = await harness.transport.submitCommand({
-        schemaVersion: 1,
-        roomId: created.snapshot.roomId,
-        commandId: commandIdSchema.parse('peer-season-proposal'),
-        actorParticipantId: 'p2',
-        payload: {
-          kind: 'propose-game-result',
-          gameNumber: firstGame,
-          winner: output.result.winner === 'home' ? 'p1' : 'p2',
-          resultDigest: output.resultDigest,
-          tapeDigest: output.tapeDigest,
-          inputDigest: output.inputDigest,
-        },
-      });
-      expect(peerPropose.accepted).toBe(true);
-      await session.refresh();
-      const peerConfirm = await harness.transport.submitCommand({
-        schemaVersion: 1,
-        roomId: created.snapshot.roomId,
-        commandId: commandIdSchema.parse('peer-season-confirmation'),
-        actorParticipantId: 'p2',
-        payload: {
-          kind: 'confirm-game-result',
-          gameNumber: firstGame,
-          resultDigest: output.resultDigest,
-          verified: true,
-        },
-      });
-      expect(peerConfirm.accepted).toBe(true);
+      await submitPeerH2HRound(harness, session, firstGame, output, 'peer-season');
       await waitFor(() =>
         session
           .getSnapshot()
@@ -1073,41 +1011,13 @@ describe('FixedFiveRoomSession', () => {
   it('recovers a saved season, rebuilds stats, and retries verification before completing once', async () => {
     vi.useFakeTimers();
     const pool = Array.from({ length: 12 }, (_, index) => sandboxCandidate(index));
-    const assets = {
-      ...sandboxAssets(pool),
-      manifest: buildManifest(),
-      bracket: buildFixtureBracket(),
-      profile: buildEraSimulationProfile(),
-    };
-    const slots: Position[] = ['PG', 'SG', 'SF', 'PF', 'C'];
+    const assets = sandboxAssetsWithPreamble(pool);
     const harness = createHarness({
       loadAssets: () => Promise.resolve(assets),
-      buildTeam: (_manifest, teamId, displayName, refs) =>
-        Promise.resolve({
-          teamId,
-          displayName,
-          players: refs.map((ref) => {
-            const position = slots[ref.slotIndex];
-            assert(position);
-            return buildSimulationPlayer({
-              playerId: playerIdSchema.parse(ref.playerId),
-              positions: [position],
-            });
-          }),
-        }),
+      buildTeam: buildSimulationTeam,
     });
-    const created = await harness.createRoom({ mode: 'sandbox-shared-82', sourceMode: 'sandbox' });
-    await fillSandboxDraft(harness.transport, created.snapshot.roomId, pool);
-    for (const actor of ['p1', 'p2'] as const) {
-      const receipt = await harness.transport.submitCommand({
-        schemaVersion: 1,
-        roomId: created.snapshot.roomId,
-        commandId: commandIdSchema.parse(`recovery-lock-${actor}`),
-        actorParticipantId: actor,
-        payload: { kind: 'sandbox-lock' },
-      });
-      expect(receipt.accepted).toBe(true);
-    }
+    await openSandboxRoom(harness, pool, { join: false });
+    await lockSandboxDraft(harness, 'recovery-lock');
     const firstSession = harness.session();
     await firstSession.start();
     await waitFor(() => harness.runners.length === 1);
@@ -1117,36 +1027,20 @@ describe('FixedFiveRoomSession', () => {
     assert(input);
     const context = createEngineContext();
     const simulationInput = { ...input, bracket: assets.bracket };
-    const entries = [...shared82GameEvents(simulationInput, context)];
-    const recordedEvents = [
-      ...shared82GameEvents(simulationInput, context, 1, { recordH2H: true }),
-    ];
-    const recordedEntries: FixedFiveWorkerResultEntry[] = recordedEvents.map((event) =>
-      event.tag === 'h2h'
-        ? { tag: 'h2h', game: event.game, ...(event.tape ? { tape: event.tape } : {}) }
-        : { tag: event.tag, game: event.game },
+    const entries = workerEntries(shared82GameEvents(simulationInput, context));
+    const recordedEntries = workerEntries(
+      shared82GameEvents(simulationInput, context, 1, { recordH2H: true }),
     );
     const eligibleGameNumbers = h2hGameNumbersFor(
       assets.bracket,
       findWeakestOpponent(assets.bracket).opponentId,
     );
-    const h2hOutputs = new Map<number, FixedFiveShared82H2HGameOutput>();
-    for (const gameNumber of eligibleGameNumbers) {
-      const recorded = simulateRecordedShared82H2HGame(simulationInput, gameNumber, context);
-      const gameInput = shared82H2HGameInput(simulationInput, gameNumber);
-      h2hOutputs.set(gameNumber, {
-        schemaVersion: 1,
+    const h2hOutputs = new Map<number, FixedFiveShared82H2HGameOutput>(
+      eligibleGameNumbers.map((gameNumber) => [
         gameNumber,
-        homeParticipantId: 'p1',
-        awayParticipantId: 'p2',
-        seed: recorded.seed,
-        result: recorded.result,
-        tape: recorded.tape,
-        inputDigest: fixedFiveDuelGameInputDigest(gameInput),
-        resultDigest: fixedFiveDuelGameResultDigest(recorded.result),
-        tapeDigest: fixedFiveDuelGameTapeDigest(recorded.tape),
-      });
-    }
+        h2hOutputFor(simulationInput, gameNumber, context),
+      ]),
+    );
     runner.emit({ kind: 'results', entries: recordedEntries });
     for (const output of h2hOutputs.values()) {
       runner.emit({ kind: 'shared82-h2h-game', output });
@@ -1173,35 +1067,13 @@ describe('FixedFiveRoomSession', () => {
       );
       const output = h2hOutputs.get(gameNumber);
       assert(output);
-      const peerPropose = await harness.transport.submitCommand({
-        schemaVersion: 1,
-        roomId: created.snapshot.roomId,
-        commandId: commandIdSchema.parse(`recovery-propose-${String(gameNumber)}`),
-        actorParticipantId: 'p2',
-        payload: {
-          kind: 'propose-game-result',
-          gameNumber,
-          winner: output.result.winner === 'home' ? 'p1' : 'p2',
-          resultDigest: output.resultDigest,
-          tapeDigest: output.tapeDigest,
-          inputDigest: output.inputDigest,
-        },
-      });
-      expect(peerPropose.accepted).toBe(true);
-      await firstSession.refresh();
-      const peerConfirm = await harness.transport.submitCommand({
-        schemaVersion: 1,
-        roomId: created.snapshot.roomId,
-        commandId: commandIdSchema.parse(`recovery-confirm-${String(gameNumber)}`),
-        actorParticipantId: 'p2',
-        payload: {
-          kind: 'confirm-game-result',
-          gameNumber,
-          resultDigest: output.resultDigest,
-          verified: true,
-        },
-      });
-      expect(peerConfirm.accepted).toBe(true);
+      await submitPeerH2HRound(
+        harness,
+        firstSession,
+        gameNumber,
+        output,
+        `recovery-${String(gameNumber)}`,
+      );
       await waitFor(
         () =>
           firstSession.getSnapshot().room?.seasonBroadcast?.lastCompletedGameNumber === gameNumber,
@@ -1235,14 +1107,7 @@ describe('FixedFiveRoomSession', () => {
       { kind: 'propose-result', resultDigest: digest },
       { kind: 'confirm-result', resultDigest: digest, verified: true },
     ] satisfies FixedFiveCommandPayload[]) {
-      const receipt = await harness.transport.submitCommand({
-        schemaVersion: 1,
-        roomId: created.snapshot.roomId,
-        commandId: commandIdSchema.parse(`peer-${payload.kind}`),
-        actorParticipantId: 'p2',
-        payload,
-      });
-      expect(receipt.accepted).toBe(true);
+      await submitAccepted(harness, `peer-${payload.kind}`, 'p2', payload);
       await session.refresh();
     }
     await waitFor(() => harness.runners.some((job) => job.verifications.length > 0));
@@ -1288,8 +1153,8 @@ describe('FixedFiveRoomSession', () => {
 
   it('coordinates a duel broadcast from readiness through the recap hold', async () => {
     const harness = createHarness();
-    const created = await harness.createRoom({ mode: 'duel', sourceMode: 'classic' });
-    await fillDuelDraft(harness.transport, created.snapshot.roomId);
+    await harness.createRoom({ mode: 'duel', sourceMode: 'classic' });
+    await fillDuelDraft(harness);
 
     const session = harness.session();
     await session.start();
@@ -1302,14 +1167,11 @@ describe('FixedFiveRoomSession', () => {
     expect(session.getSnapshot().localReady).toBe(true);
     expect(session.getSnapshot().opponentReady).toBe(false);
 
-    const p2Ready = await harness.transport.submitCommand({
-      schemaVersion: 1,
-      roomId: created.snapshot.roomId,
-      commandId: commandIdSchema.parse('duel-ready-p2'),
-      actorParticipantId: 'p2',
-      payload: { kind: 'ready-next-game', gameNumber: 1, ready: true },
+    await submitAccepted(harness, 'duel-ready-p2', 'p2', {
+      kind: 'ready-next-game',
+      gameNumber: 1,
+      ready: true,
     });
-    expect(p2Ready.accepted).toBe(true);
     await session.refresh();
     state = session.getSnapshot();
     expect(state.opponentReady).toBe(true);
@@ -1340,20 +1202,14 @@ describe('FixedFiveRoomSession', () => {
     const harness = createHarness();
     const created = await harness.createRoom({ mode: 'duel', sourceMode: 'classic' });
     await harness.transport.join(created.code);
-    await fillDuelDraft(harness.transport, created.snapshot.roomId);
+    await fillDuelDraft(harness);
     const session = harness.session();
     try {
       await session.start();
       await session.readyForNextGame();
       const roomId = created.snapshot.roomId;
       const submit = (commandId: string, payload: FixedFiveCommandPayload) =>
-        harness.transport.submitCommand({
-          schemaVersion: 1,
-          roomId,
-          commandId: commandIdSchema.parse(commandId),
-          actorParticipantId: 'p2',
-          payload,
-        });
+        submitCommand(harness, commandId, 'p2', payload);
       await submit('peer-first-ready', { kind: 'ready-next-game', gameNumber: 1, ready: true });
       await session.startBroadcast();
       session.beginPlayback();
@@ -1377,19 +1233,12 @@ describe('FixedFiveRoomSession', () => {
       session.continueAfterGame();
       expect(session.getSnapshot().awaitingContinue).toBe(false);
       for (const actor of ['p1', 'p2'] as const) {
-        const receipt = await harness.transport.submitCommand({
-          schemaVersion: 1,
-          roomId,
-          commandId: commandIdSchema.parse(`peer-first-confirm-${actor}`),
-          actorParticipantId: actor,
-          payload: {
-            kind: 'confirm-game-result',
-            gameNumber: 1,
-            resultDigest: digest,
-            verified: true,
-          },
+        await submitAccepted(harness, `peer-first-confirm-${actor}`, actor, {
+          kind: 'confirm-game-result',
+          gameNumber: 1,
+          resultDigest: digest,
+          verified: true,
         });
-        expect(receipt.accepted).toBe(true);
       }
       await session.refresh();
       await waitFor(() => session.getSnapshot().localReady);
@@ -1412,26 +1261,17 @@ describe('FixedFiveRoomSession', () => {
     const harness = createHarness();
     const created = await harness.createRoom({ mode: 'duel', sourceMode: 'classic' });
     await harness.transport.join(created.code);
-    await fillDuelDraft(harness.transport, created.snapshot.roomId);
+    await fillDuelDraft(harness);
     const roomId = created.snapshot.roomId;
-    const submit = (commandId: string, actor: 'p1' | 'p2', payload: FixedFiveCommandPayload) =>
-      harness.transport.submitCommand({
-        schemaVersion: 1,
-        roomId,
-        commandId: commandIdSchema.parse(commandId),
-        actorParticipantId: actor,
-        payload,
-      });
     for (const [commandId, actor, payload] of [
       ['late-ready-p1', 'p1', { kind: 'ready-next-game', gameNumber: 1, ready: true }],
       ['late-ready-p2', 'p2', { kind: 'ready-next-game', gameNumber: 1, ready: true }],
       ['late-broadcast', 'p1', { kind: 'broadcast-start', gameNumber: 1 }],
     ] as const) {
-      const receipt = await submit(commandId, actor, payload);
-      expect(receipt.accepted).toBe(true);
+      await submitAccepted(harness, commandId, actor, payload);
     }
     const digest = contentHashSchema.parse('c'.repeat(64));
-    const proposal = await submit('late-propose', 'p2', {
+    await submitAccepted(harness, 'late-propose', 'p2', {
       kind: 'propose-game-result',
       gameNumber: 1,
       winner: 'p1',
@@ -1439,7 +1279,6 @@ describe('FixedFiveRoomSession', () => {
       tapeDigest: digest,
       inputDigest: digest,
     });
-    expect(proposal.accepted).toBe(true);
 
     let now = 1_700_000_000_000;
     harness.deps.now = () => now;

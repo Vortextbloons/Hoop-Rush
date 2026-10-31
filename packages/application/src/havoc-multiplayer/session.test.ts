@@ -445,6 +445,31 @@ async function reachBroadcasting(h: Harness): Promise<number> {
   return gameNumber;
 }
 
+async function attachDrafting(h: Harness): Promise<void> {
+  await h.session.attach(h.roomId);
+  await startDraft(h);
+}
+
+async function attachDrafted(h: Harness): Promise<void> {
+  await attachDrafting(h);
+  await completeDraft(h);
+}
+
+async function attachDraftedToBroadcast(h: Harness): Promise<number> {
+  await attachDrafted(h);
+  return reachBroadcasting(h);
+}
+
+async function attachFreshSession(
+  h: Harness,
+  repository = new FakeHavocMultiplayerRepository(),
+  runner = new FakeHavocRunner(),
+): Promise<HavocMultiplayerSession> {
+  const session = h.createSession(repository, runner);
+  await session.attach(h.roomId);
+  return session;
+}
+
 async function hasCommand(
   h: Harness,
   predicate: (command: HavocMultiplayerCommand) => boolean,
@@ -501,6 +526,11 @@ async function verifyCurrentGame(h: Harness): Promise<void> {
   await h.sync();
 }
 
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
+
 describe('HavocMultiplayerSession lifecycle', () => {
   it('skips unchanged snapshots and retries a failed snapshot save', async () => {
     const h = await createHarness();
@@ -543,11 +573,6 @@ describe('HavocMultiplayerSession lifecycle', () => {
     await h.sync();
     expect(append).not.toHaveBeenCalled();
     h.session.dispose();
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
-    vi.restoreAllMocks();
   });
 
   it('reports a missing membership without touching the transport', async () => {
@@ -613,50 +638,38 @@ describe('HavocMultiplayerSession lifecycle', () => {
     expect(h.session.getSnapshot().progress).toBe(0.25);
   });
 
-  it('refuses to sync a room locked to different versions', async () => {
-    const h = await createHarness({
-      seed: ROOM_SEED,
-      lockOverrides: { catalogHash: contentHashSchema.parse('cd'.repeat(32)) },
+  const versionMismatch = 'This room was created with different engine or data versions.';
+  const legacyLocks = {
+    multiplayerVersion: HAVOC_MULTIPLAYER_LEGACY_VERSION,
+    rulesVersion: HAVOC_MULTIPLAYER_LEGACY_RULES_VERSION,
+  } as const;
+  for (const scenario of [
+    {
+      name: 'refuses to sync a room locked to different versions',
+      options: { lockOverrides: { catalogHash: contentHashSchema.parse('cd'.repeat(32)) } },
+      error: versionMismatch,
+      expectNoRefetch: true,
+    },
+    {
+      name: 'accepts legacy v1 room locks for standard rooms',
+      options: { lockOverrides: legacyLocks },
+      error: null,
+    },
+    {
+      name: 'rejects curated rooms locked to the legacy rules version',
+      options: { variant: 'curated' as const, lockOverrides: legacyLocks },
+      error: versionMismatch,
+    },
+  ]) {
+    it(scenario.name, async () => {
+      const h = await createHarness({ seed: ROOM_SEED, ...scenario.options });
+      const refetch = vi.spyOn(h.transport, 'refetch');
+      await h.session.attach(h.roomId);
+      expect(h.session.getSnapshot().error).toBe(scenario.error);
+      if ('expectNoRefetch' in scenario) expect(refetch).not.toHaveBeenCalled();
+      h.session.dispose();
     });
-    const refetch = vi.spyOn(h.transport, 'refetch');
-
-    await h.session.attach(h.roomId);
-
-    expect(h.session.getSnapshot().error).toBe(
-      'This room was created with different engine or data versions.',
-    );
-    expect(refetch).not.toHaveBeenCalled();
-    h.session.dispose();
-  });
-
-  it('accepts legacy v1 room locks for standard rooms', async () => {
-    const h = await createHarness({
-      seed: ROOM_SEED,
-      lockOverrides: {
-        multiplayerVersion: HAVOC_MULTIPLAYER_LEGACY_VERSION,
-        rulesVersion: HAVOC_MULTIPLAYER_LEGACY_RULES_VERSION,
-      },
-    });
-    await h.session.attach(h.roomId);
-    expect(h.session.getSnapshot().error).toBeNull();
-    h.session.dispose();
-  });
-
-  it('rejects curated rooms locked to the legacy rules version', async () => {
-    const h = await createHarness({
-      seed: ROOM_SEED,
-      variant: 'curated',
-      lockOverrides: {
-        multiplayerVersion: HAVOC_MULTIPLAYER_LEGACY_VERSION,
-        rulesVersion: HAVOC_MULTIPLAYER_LEGACY_RULES_VERSION,
-      },
-    });
-    await h.session.attach(h.roomId);
-    expect(h.session.getSnapshot().error).toBe(
-      'This room was created with different engine or data versions.',
-    );
-    h.session.dispose();
-  });
+  }
 
   it('passes the requested variant through room creation', async () => {
     const h = await createHarness({ seed: ROOM_SEED });
@@ -675,19 +688,12 @@ describe('HavocMultiplayerSession draft and series', () => {
     commandCounter = 0;
   });
 
-  afterEach(() => {
-    vi.useRealTimers();
-    vi.restoreAllMocks();
-  });
-
   it('drafts ten picks and completes the series with a persisted recap', async () => {
     const h = await createHarness({ seed: ROOM_SEED });
     const complete = vi
       .spyOn(h.repository, 'complete')
       .mockRejectedValueOnce(new Error('storage unavailable'));
-    await h.session.attach(h.roomId);
-    await startDraft(h);
-    await completeDraft(h);
+    await attachDrafted(h);
     expect(h.session.getSnapshot().phase).toBe('lineup-showdown');
 
     for (let game = 0; game < 7; game += 1) {
@@ -723,8 +729,7 @@ describe('HavocMultiplayerSession draft and series', () => {
 
   it('rejects wrong-turn, stale, and conflicting commands without changing the draft', async () => {
     const h = await createHarness({ rng: () => 0 });
-    await h.session.attach(h.roomId);
-    await startDraft(h);
+    await attachDrafting(h);
     const before = await h.snapshot();
     const draft = must(before.draft, 'draft');
     const active = must(draft.activeParticipantId, 'active participant');
@@ -771,8 +776,7 @@ describe('HavocMultiplayerSession draft and series', () => {
 
   it('resolves a timeout with the deterministic fallback only for the active participant', async () => {
     const h = await createHarness({ rng: () => 0 });
-    await h.session.attach(h.roomId);
-    await startDraft(h);
+    await attachDrafting(h);
     const before = await h.snapshot();
     const draft = must(before.draft, 'draft');
     expect(draft.activeParticipantId).toBe('p1');
@@ -802,8 +806,7 @@ describe('HavocMultiplayerSession draft and series', () => {
 
   it('keeps the deadline but invalidates the fallback after a reroll', async () => {
     const h = await createHarness({ rng: () => 0 });
-    await h.session.attach(h.roomId);
-    await startDraft(h);
+    await attachDrafting(h);
     const before = await h.snapshot();
     const deadline = must(before.deadline, 'deadline');
     const draft = must(before.draft, 'draft');
@@ -842,10 +845,7 @@ describe('HavocMultiplayerSession draft and series', () => {
 
   it('halts advancement when the peer digest mismatches', async () => {
     const h = await createHarness({ seed: ROOM_SEED });
-    await h.session.attach(h.roomId);
-    await startDraft(h);
-    await completeDraft(h);
-    const gameNumber = await reachBroadcasting(h);
+    const gameNumber = await attachDraftedToBroadcast(h);
     const output = must(h.session.getSnapshot().outputs[gameNumber], 'game output');
     h.session.beginPlayback();
     h.session.advancePlayback(HAVOC_MULTIPLAYER_BROADCAST_MS);
@@ -889,8 +889,7 @@ describe('HavocMultiplayerSession draft and series', () => {
 
   it('reconnects during drafting without creating a new offer or refunding a reroll', async () => {
     const h = await createHarness({ rng: () => 0 });
-    await h.session.attach(h.roomId);
-    await startDraft(h);
+    await attachDrafting(h);
     await h.session.rerollOffer();
     await pickOnce(h);
     await pickOnce(h);
@@ -898,8 +897,7 @@ describe('HavocMultiplayerSession draft and series', () => {
     expect(before.draft?.rerollsUsed.p1).toBe(1);
     h.session.dispose();
 
-    const sessionB = h.createSession(new FakeHavocMultiplayerRepository(), new FakeHavocRunner());
-    await sessionB.attach(h.roomId);
+    const sessionB = await attachFreshSession(h);
     const viewB = sessionB.getSnapshot();
     expect(viewB.draft?.turnOrdinal).toBe(before.draft?.turnOrdinal);
     expect(viewB.draft?.offer?.offerId).toBe(before.draft?.offer?.offerId);
@@ -911,16 +909,12 @@ describe('HavocMultiplayerSession draft and series', () => {
 
   it('regenerates a missing game identically from the frozen input', async () => {
     const h = await createHarness({ seed: ROOM_SEED });
-    await h.session.attach(h.roomId);
-    await startDraft(h);
-    await completeDraft(h);
-    const gameNumber = await reachBroadcasting(h);
+    const gameNumber = await attachDraftedToBroadcast(h);
     const outputA = must(h.session.getSnapshot().outputs[gameNumber], 'game output');
     h.session.dispose();
 
     const runnerB = new FakeHavocRunner();
-    const sessionB = h.createSession(new FakeHavocMultiplayerRepository(), runnerB);
-    await sessionB.attach(h.roomId);
+    const sessionB = await attachFreshSession(h, new FakeHavocMultiplayerRepository(), runnerB);
     const outputB = sessionB.getSnapshot().outputs[gameNumber];
     expect(outputB?.inputDigest).toBe(outputA.inputDigest);
     expect(outputB?.resultDigest).toBe(outputA.resultDigest);
@@ -931,10 +925,7 @@ describe('HavocMultiplayerSession draft and series', () => {
 
   it('reconnects during the results phase and recovers the current game', async () => {
     const h = await createHarness({ seed: ROOM_SEED });
-    await h.session.attach(h.roomId);
-    await startDraft(h);
-    await completeDraft(h);
-    const gameNumber = await reachBroadcasting(h);
+    const gameNumber = await attachDraftedToBroadcast(h);
     const output = must(h.session.getSnapshot().outputs[gameNumber], 'game output');
     h.session.beginPlayback();
     h.session.advancePlayback(HAVOC_MULTIPLAYER_BROADCAST_MS);
@@ -942,8 +933,7 @@ describe('HavocMultiplayerSession draft and series', () => {
     h.session.dispose();
 
     const runnerB = new FakeHavocRunner();
-    const sessionB = h.createSession(new FakeHavocMultiplayerRepository(), runnerB);
-    await sessionB.attach(h.roomId);
+    const sessionB = await attachFreshSession(h, new FakeHavocMultiplayerRepository(), runnerB);
     const viewB = sessionB.getSnapshot();
     expect(viewB.phase).toBe('game-results');
     expect(viewB.outputs[gameNumber]?.resultDigest).toBe(output.resultDigest);
@@ -960,10 +950,7 @@ describe('HavocMultiplayerSession draft and series', () => {
 
   it('restores persisted verification and results on attach', async () => {
     const h = await createHarness({ seed: ROOM_SEED });
-    await h.session.attach(h.roomId);
-    await startDraft(h);
-    await completeDraft(h);
-    const gameNumber = await reachBroadcasting(h);
+    const gameNumber = await attachDraftedToBroadcast(h);
     await verifyCurrentGame(h);
     const view = h.session.getSnapshot();
     const output = must(view.outputs[gameNumber], 'game output');
@@ -978,8 +965,7 @@ describe('HavocMultiplayerSession draft and series', () => {
     h.session.dispose();
 
     const runnerB = new FakeHavocRunner();
-    const sessionB = h.createSession(h.repository, runnerB);
-    await sessionB.attach(h.roomId);
+    const sessionB = await attachFreshSession(h, h.repository, runnerB);
     const viewB = sessionB.getSnapshot();
     expect(viewB.outputs[gameNumber]?.resultDigest).toBe(output.resultDigest);
     expect(viewB.verification).toEqual([
@@ -996,9 +982,7 @@ describe('HavocMultiplayerSession draft and series', () => {
 
   it('starts the broadcast automatically when both participants are ready', async () => {
     const h = await createHarness({ seed: ROOM_SEED });
-    await h.session.attach(h.roomId);
-    await startDraft(h);
-    await completeDraft(h);
+    await attachDrafted(h);
     const gameNumber = must(h.session.getSnapshot().currentGameNumber, 'current game');
     await h.session.readyForNextGame();
     await h.submit('p2', { kind: 'ready-next-game', gameNumber });
@@ -1014,9 +998,7 @@ describe('HavocMultiplayerSession draft and series', () => {
 
   it('waits for the opponent until the ready window elapses', async () => {
     const h = await createHarness({ seed: ROOM_SEED });
-    await h.session.attach(h.roomId);
-    await startDraft(h);
-    await completeDraft(h);
+    await attachDrafted(h);
     const gameNumber = must(h.session.getSnapshot().currentGameNumber, 'current game');
     await h.session.readyForNextGame();
     await h.sync();

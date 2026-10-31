@@ -1,98 +1,23 @@
 import { describe, expect, test } from 'bun:test';
-import type { CapRushMultiplayerSettings } from '@hoop-rush/data-contracts';
 import {
-  CAP_RUSH_MULTIPLAYER_MARKET_VERSION,
-  CAP_RUSH_MULTIPLAYER_PRICING_VERSION,
-  CAP_RUSH_MULTIPLAYER_RULES_VERSION,
-  CAP_RUSH_MULTIPLAYER_SCHEMA_VERSION,
-  CAP_RUSH_MULTIPLAYER_SEED_DERIVATION_VERSION,
-  CAP_RUSH_MULTIPLAYER_VERSION,
-  capRushMultiplayerVersionLocksSchema,
-  seedSchema,
-} from '@hoop-rush/data-contracts';
-import {
-  adaptCapRushCatalog,
-  buildCapRushCatalogIndex,
   capRushMultiplayerActiveRound,
   capRushMultiplayerCheckpointOf,
   capRushMultiplayerStateDigest,
   createEngineContext,
   simulateCapRushMultiplayerSlot,
 } from '@hoop-rush/engine';
-import {
-  DEFAULT_ERA_SIM_PROFILE,
-  buildCapRushTestCatalog,
-  buildFixtureBracket,
-  capRushTestCatalogSource,
-} from '@hoop-rush/test-fixtures';
-import { CapRushMultiplayerInMemoryTransport } from './in-memory-transport.ts';
-import { CapRushMultiplayerSession } from './session.ts';
-
-const ROOT = seedSchema.parse('abc123def4567890');
-
-function setup() {
-  const catalog = buildCapRushTestCatalog();
-  const source = capRushTestCatalogSource(catalog);
-  const index = buildCapRushCatalogIndex(adaptCapRushCatalog(catalog, source));
-  const versionLocks = capRushMultiplayerVersionLocksSchema.parse({
-    schemaVersion: CAP_RUSH_MULTIPLAYER_SCHEMA_VERSION,
-    multiplayerVersion: CAP_RUSH_MULTIPLAYER_VERSION,
-    rulesVersion: CAP_RUSH_MULTIPLAYER_RULES_VERSION,
-    marketVersion: CAP_RUSH_MULTIPLAYER_MARKET_VERSION,
-    pricingVersion: CAP_RUSH_MULTIPLAYER_PRICING_VERSION,
-    seedDerivationVersion: CAP_RUSH_MULTIPLAYER_SEED_DERIVATION_VERSION,
-    engineVersion: 'test-engine-v1',
-    profileVersion: 'test-profile-v1',
-    dataVersion: source.dataVersion,
-    catalogVersion: source.catalogVersion,
-    catalogHash: source.catalogHash,
-    bracketHash: 'b'.repeat(64),
-    profileHash: 'c'.repeat(64),
-  });
-  const environment = {
-    variant: 'clash' as const,
-    bracket: buildFixtureBracket(),
-    seasonCatalog: catalog,
-    index,
-    profile: DEFAULT_ERA_SIM_PROFILE,
-    catalogSource: source,
-    versionLocks,
-  };
-  const settings: CapRushMultiplayerSettings = {
-    schemaVersion: CAP_RUSH_MULTIPLAYER_SCHEMA_VERSION,
-    variant: 'clash',
-    versionLocks,
-  };
-  return { environment, settings };
-}
+import { createSessionTestRoom } from './session-test-fixtures.ts';
 
 describe('cap rush multiplayer disconnect and resume', () => {
   test('resumes bidding and simulation without duplicate signings, games, or acknowledgements', async () => {
-    const { environment, settings } = setup();
     let nowMs = Date.parse('2026-11-01T00:00:00.000Z');
-    const transport = new CapRushMultiplayerInMemoryTransport({
-      environment,
-      defaultSettings: settings,
-      rootSeed: ROOT,
-      now: () => nowMs,
-    });
-    const created = await transport.create({ variant: 'clash', settings });
-    const roomId = created.roomId;
+    const room = await createSessionTestRoom({ now: () => nowMs, commandPrefix: 'resume' });
+    const { transport, roomId } = room;
 
-    let counter = 0;
-    const makeSession = (seat: 'p1' | 'p2') =>
-      new CapRushMultiplayerSession({
-        transport,
-        environment,
-        roomId,
-        seat,
-        newCommandId: () => `resume-${seat}-${String((counter += 1))}`,
-      });
-
-    let host = makeSession('p1');
+    let host = room.session('p1');
     await host.attach();
-    await transport.join(created.code);
-    let guest = makeSession('p2');
+    await transport.join(room.code);
+    let guest = room.session('p2');
     await guest.attach();
 
     await host.start();
@@ -119,9 +44,9 @@ describe('cap rush multiplayer disconnect and resume', () => {
     host.dispose();
     guest.dispose();
 
-    host = makeSession('p1');
+    host = room.session('p1');
     await host.attach();
-    guest = makeSession('p2');
+    guest = room.session('p2');
     await guest.attach();
     expect(host.current.recruitment?.signings.length).toBe(signingsBefore);
     expect(host.room?.commandCount).toBe(commandsBefore);
@@ -185,9 +110,9 @@ describe('cap rush multiplayer disconnect and resume', () => {
     host.dispose();
     guest.dispose();
 
-    host = makeSession('p1');
+    host = room.session('p1');
     await host.attach();
-    guest = makeSession('p2');
+    guest = room.session('p2');
     await guest.attach();
     expect(host.current.season?.games).toHaveLength(gamesBefore);
     expect(host.current.season?.slotAcks).toEqual(slotAcksBefore);
