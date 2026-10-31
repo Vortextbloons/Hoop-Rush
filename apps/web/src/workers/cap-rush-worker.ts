@@ -210,6 +210,20 @@ async function simulate(
       return;
     }
 
+    let leagueGames;
+    if (!request.includeTape && request.locked.leagueSchedule !== undefined) {
+      try {
+        leagueGames = simulateCapRushLeagueSlot({
+          locked: request.locked,
+          slot: gameNumber,
+          context: engineContext,
+        });
+      } catch (error) {
+        postError(request.requestId, 'internal', failureMessage(error), gameNumber);
+        return;
+      }
+    }
+
     post({
       schemaVersion: CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION,
       type: 'cap-rush-game',
@@ -222,6 +236,7 @@ async function simulate(
       summary: simulation.summary,
       audit: simulation.audit,
       result: simulation.result,
+      ...(leagueGames === undefined ? {} : { leagueGames }),
       ...(request.includeTape && request.count === 1
         ? { playback: { input: simulation.input, tape: simulation.tape, facts: simulation.facts } }
         : {}),
@@ -239,7 +254,7 @@ async function simulate(
       }
     }
 
-    if (request.locked.leagueSchedule !== undefined) {
+    if (leagueGames === undefined && request.locked.leagueSchedule !== undefined) {
       if (!postLeagueSlot(request.requestId, request.locked, gameNumber)) return;
     }
 

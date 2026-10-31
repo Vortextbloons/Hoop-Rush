@@ -30,6 +30,7 @@ import {
 } from './cap-rush-league.ts';
 import { capRushSpinReceiptSchema } from './cap-rush-spin.ts';
 import { capRushPlayoffPerformanceSchema } from './cap-rush-playoff.ts';
+import { immutableCanonicalSchema } from './season-hash.ts';
 
 export const capRushFranchiseAssignmentSchema = z.object({
   franchiseId: z.string().min(1).max(64),
@@ -79,7 +80,7 @@ export const capRushFrozenOpponentSchema = z.object({
 });
 export type CapRushFrozenOpponent = z.infer<typeof capRushFrozenOpponentSchema>;
 
-export const capRushLockedInputsSchema = z
+const capRushLockedInputsValueSchema = z
   .object({
     schemaVersion: z.literal(CAP_RUSH_SCHEMA_VERSION),
     runId: idSchema,
@@ -352,4 +353,6 @@ export const capRushLockedInputsSchema = z
       }
     }
   });
-export type CapRushLockedInputs = z.infer<typeof capRushLockedInputsSchema>;
+export type CapRushLockedInputs = z.infer<typeof capRushLockedInputsValueSchema>;
+
+export const capRushLockedInputsSchema = immutableCanonicalSchema(capRushLockedInputsValueSchema);

@@ -12,6 +12,7 @@ import type {
   CapRushPlayoffGameSummary,
 } from '@hoop-rush/data-contracts';
 import { playerIdSchema } from '@hoop-rush/data-contracts';
+import { CoalescedTask, SessionEvents } from '../runtime/index.ts';
 import {
   capRushMultiplayerLockDigest,
   capRushMultiplayerStateDigest,
@@ -47,6 +48,8 @@ export interface CapRushMultiplayerSessionView {
 }
 
 export class CapRushMultiplayerSession {
+  private readonly events = new SessionEvents<never>();
+  private readonly refreshTask = new CoalescedTask(() => this.fetch());
   private snapshot: CapRushMultiplayerRoomSnapshot | null = null;
   private state: CapRushMultiplayerState;
   private commands: CapRushMultiplayerCommand[] = [];
@@ -61,24 +64,43 @@ export class CapRushMultiplayerSession {
   }
 
   async attach(): Promise<void> {
+    if (this.isDisposed()) return;
     await this.deps.transport.resume(this.deps.roomId);
-    const sync = await this.deps.transport.sync(this.deps.roomId);
-    this.adopt(sync.snapshot, sync.commands);
+    if (this.isDisposed()) return;
+    await this.refresh();
+    if (this.isDisposed()) return;
+    this.unsubscribe?.();
     this.unsubscribe = this.deps.transport.subscribe(
       this.deps.roomId,
       () => {
-        void this.refresh();
+        void this.refresh().catch((error: unknown) => {
+          if (this.disposed) return;
+          this.error = error instanceof Error ? error.message : 'Could not refresh the room.';
+          this.events.publish();
+        });
       },
       (error) => {
+        if (this.disposed) return;
         this.error = error.message;
+        this.events.publish();
       },
     );
   }
 
-  async refresh(): Promise<void> {
-    if (this.disposed) return;
+  subscribe(listener: () => void): () => void {
+    return this.events.subscribe(listener);
+  }
+
+  refresh(queueIfRunning = true): Promise<void> {
+    if (this.disposed) return Promise.resolve();
+    return this.refreshTask.request(queueIfRunning);
+  }
+
+  private async fetch(): Promise<void> {
+    if (this.isDisposed()) return;
     const last = this.commands[this.commands.length - 1]?.ordinal ?? -1;
     const sync = await this.deps.transport.sync(this.deps.roomId, last);
+    if (this.isDisposed()) return;
     this.adopt(sync.snapshot, sync.commands);
   }
 
@@ -252,12 +274,18 @@ export class CapRushMultiplayerSession {
     this.disposed = true;
     this.unsubscribe?.();
     this.unsubscribe = null;
+    this.events.dispose();
+  }
+
+  private isDisposed(): boolean {
+    return this.disposed;
   }
 
   private adopt(
     snapshot: CapRushMultiplayerRoomSnapshot,
     fetched: readonly CapRushMultiplayerCommand[],
   ): void {
+    if (this.snapshot !== null && snapshot.revision < this.snapshot.revision) return;
     this.snapshot = snapshot;
     if (fetched.length > 0) {
       const seen = new Set(this.commands.map((command) => command.commandId));
@@ -268,6 +296,7 @@ export class CapRushMultiplayerSession {
       this.commands = merged;
     }
     this.state = snapshot.state ?? createCapRushMultiplayerState(snapshot.rootSeed ?? null);
+    this.events.publish();
   }
 
   private async send(

@@ -1,3 +1,4 @@
+import { immutableCanonicalSchema } from './season-hash.ts';
 import { capRushPlaybackSchema } from './cap-rush-playback.ts';
 import { z } from 'zod';
 import { franchiseIdSchema, idSchema, playerIdSchema, seedSchema } from './ids.ts';
@@ -22,7 +23,7 @@ import {
   capRushPostseasonReportSchema,
 } from './cap-rush-postseason.ts';
 
-export const capRushGameSummarySchema = z.object({
+const capRushGameSummaryValueSchema = z.object({
   gameNumber: z.number().int().min(1).max(CAP_RUSH_GAME_COUNT),
   opponentId: z.string().min(1).max(64),
   humanHome: z.boolean(),
@@ -33,6 +34,7 @@ export const capRushGameSummarySchema = z.object({
   inputDigest: capRushDigestSchema,
   resultDigest: capRushDigestSchema,
 });
+export const capRushGameSummarySchema = immutableCanonicalSchema(capRushGameSummaryValueSchema);
 export type CapRushGameSummary = z.infer<typeof capRushGameSummarySchema>;
 
 export const capRushSeasonAggregateSchema = z

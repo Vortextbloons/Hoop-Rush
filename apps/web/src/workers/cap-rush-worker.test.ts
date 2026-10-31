@@ -1,14 +1,18 @@
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import {
   CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION,
   POSITIONS,
   capRushCardSchema,
+  type CapRushLeagueGame,
 } from '@hoop-rush/data-contracts';
 import {
   buildCapRushLeagueSchedule,
   buildCapRushLockedInputs,
   capRushAssignFranchise,
   capRushLeagueFieldOf,
+  capRushNextLeagueSlot,
+  createEngineContext,
+  simulateCapRushLeagueSlot,
 } from '@hoop-rush/engine';
 import { capRushTestSetup } from '../../../../packages/engine/src/modes/cap-rush/cap-rush-test-support.ts';
 
@@ -50,9 +54,19 @@ interface PostedMessage {
   cursor?: number;
   playback?: unknown;
   message?: string;
+  leagueGames?: CapRushLeagueGame[];
 }
 
 const originalSelf = (globalThis as { self?: unknown }).self;
+const fakeSelf = {
+  postMessage: (() => {}) as (message: PostedMessage) => void,
+  onmessage: null as ((event: { data: unknown }) => void) | null,
+};
+
+beforeAll(async () => {
+  (globalThis as { self?: unknown }).self = fakeSelf;
+  await import('./cap-rush-worker.ts');
+});
 
 afterAll(() => {
   if (originalSelf === undefined) {
@@ -69,17 +83,12 @@ describe('Cap Rush worker broadcast ordering', () => {
     const completed = new Promise<void>((resolve) => {
       settle = resolve;
     });
-    const fakeSelf = {
-      postMessage(message: PostedMessage) {
-        posted.push(message);
-        if (message.type === 'cap-rush-complete' || message.type === 'cap-rush-error') {
-          settle?.();
-        }
-      },
-      onmessage: null as ((event: { data: unknown }) => void) | null,
+    fakeSelf.postMessage = (message) => {
+      posted.push(message);
+      if (message.type === 'cap-rush-complete' || message.type === 'cap-rush-error') {
+        settle?.();
+      }
     };
-    (globalThis as { self?: unknown }).self = fakeSelf;
-    await import('./cap-rush-worker.ts');
     fakeSelf.onmessage?.({
       data: {
         schemaVersion: CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION,
@@ -107,6 +116,95 @@ describe('Cap Rush worker broadcast ordering', () => {
       cancelled: false,
       gamesDelivered: 1,
       lastCursor: 2,
+    });
+  }, 60_000);
+
+  it('batches user and league results together without changing seeded league games', async () => {
+    const posted: PostedMessage[] = [];
+    let settle: (() => void) | null = null;
+    const completed = new Promise<void>((resolve) => {
+      settle = resolve;
+    });
+    fakeSelf.postMessage = (message) => {
+      posted.push(message);
+      if (message.type === 'cap-rush-complete' || message.type === 'cap-rush-error') settle?.();
+    };
+    const locked = lockedRun();
+    fakeSelf.onmessage?.({
+      data: {
+        schemaVersion: CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION,
+        type: 'cap-rush-simulate',
+        requestId: 'worker-batch',
+        locked,
+        startGame: 1,
+        count: 2,
+      },
+    });
+    await completed;
+    expect(posted.find((message) => message.type === 'cap-rush-error')).toBeUndefined();
+    expect(posted.filter((message) => message.type === 'cap-rush-league-games')).toHaveLength(0);
+    const games = posted.filter((message) => message.type === 'cap-rush-game');
+    expect(games.map((game) => game.cursor)).toEqual([1, 2]);
+    for (const game of games) {
+      expect(game.playback).toBeUndefined();
+      expect(game.leagueGames).toEqual(
+        simulateCapRushLeagueSlot({
+          locked,
+          slot: game.cursor ?? 0,
+          context: createEngineContext(),
+        }),
+      );
+    }
+    for (let slot = 1; slot <= 82; slot += 1) {
+      expect(capRushNextLeagueSlot(locked, (slot - 1) * 14)).toBe(slot);
+    }
+    expect(capRushNextLeagueSlot(locked, 1148)).toBeNull();
+    expect(posted.at(-1)).toMatchObject({
+      type: 'cap-rush-complete',
+      cancelled: false,
+      gamesDelivered: 2,
+      lastCursor: 2,
+    });
+  }, 60_000);
+
+  it('cancels a batch at a complete slot with both user and league results delivered', async () => {
+    const posted: PostedMessage[] = [];
+    let settle: (() => void) | null = null;
+    const completed = new Promise<void>((resolve) => {
+      settle = resolve;
+    });
+    fakeSelf.postMessage = (message) => {
+      posted.push(message);
+      if (message.type === 'cap-rush-game') {
+        fakeSelf.onmessage?.({
+          data: {
+            schemaVersion: CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION,
+            type: 'cap-rush-cancel',
+            requestId: 'worker-cancel-batch',
+          },
+        });
+      }
+      if (message.type === 'cap-rush-complete' || message.type === 'cap-rush-error') settle?.();
+    };
+    fakeSelf.onmessage?.({
+      data: {
+        schemaVersion: CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION,
+        type: 'cap-rush-simulate',
+        requestId: 'worker-cancel-batch',
+        locked: lockedRun(),
+        startGame: 1,
+        count: 2,
+      },
+    });
+    await completed;
+    const games = posted.filter((message) => message.type === 'cap-rush-game');
+    expect(games).toHaveLength(1);
+    expect(games[0]?.leagueGames).toHaveLength(14);
+    expect(posted.at(-1)).toMatchObject({
+      type: 'cap-rush-complete',
+      cancelled: true,
+      gamesDelivered: 1,
+      lastCursor: 1,
     });
   }, 60_000);
 });

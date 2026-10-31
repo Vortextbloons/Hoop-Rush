@@ -6,8 +6,10 @@ import {
   capRushCardSchema,
   capRushDraftStateSchema,
   capRushEmptySeasonState,
+  capRushLockedInputsSchema,
   capRushOfferIdSchema,
   canonicalJson,
+  seasonDigestHex,
   seasonKeySchema,
   commandIdSchema,
 } from '@hoop-rush/data-contracts';
@@ -17,6 +19,7 @@ import { havocGameTapeDigest } from '../havoc/digests.ts';
 import { applyCapRushCommand } from './draft-commands.ts';
 import { capRushEffectiveRatings, capRushPayrollStatus } from './salary.ts';
 import { capRushHighestPaidOf } from './lock.ts';
+import { CAP_RUSH_STATE_DIGEST_PREFIX, capRushStateDigest } from './state-digest.ts';
 import { capRushTestSetup, type CapRushTestSetup } from './cap-rush-test-support.ts';
 
 function playerForSlot(setup: CapRushTestSetup, slot: Position) {
@@ -106,6 +109,45 @@ describe('cap rush highest-paid target', () => {
 });
 
 describe('cap rush lineup lock', () => {
+  it('reuses validated locked inputs without allowing nested mutation or trusting frozen copies', () => {
+    const setup = capRushTestSetup();
+    const outcome = lock(setup, buildCompleteState(setup, [1_000, 2_000, 3_000, 4_000, 5_000]));
+    const locked = outcome.state.locked;
+    if (locked === null) throw new Error('lock did not produce inputs');
+    const serialized = canonicalJson(locked);
+    const starter = locked.human.starters[0];
+    if (starter === undefined) throw new Error('missing starter');
+    expect(() => {
+      starter.effective.ratings.passing = 0;
+    }).toThrow();
+    expect(() => locked.schedule.pop()).toThrow();
+    expect(canonicalJson(locked)).toBe(serialized);
+    expect(capRushDraftStateSchema.parse(outcome.state).locked).toBe(locked);
+    const restored = capRushLockedInputsSchema.parse(JSON.parse(serialized));
+    expect(restored).toEqual(locked);
+    expect(canonicalJson(restored)).toBe(serialized);
+    const changed = structuredClone(outcome.state);
+    for (const current of [
+      outcome.state,
+      { ...outcome.state, revision: outcome.state.revision + 1 },
+      { ...outcome.state, catalog: { ...outcome.state.catalog, catalogHash: 'c'.repeat(64) } },
+      changed,
+    ]) {
+      expect(capRushStateDigest(current)).toBe(
+        seasonDigestHex(`${CAP_RUSH_STATE_DIGEST_PREFIX}\u0000${canonicalJson(current)}`),
+      );
+    }
+    if (changed.locked === null) throw new Error('missing copied lock');
+    changed.locked.human.displayName = 'Changed team';
+    expect(capRushStateDigest(changed)).toBe(
+      seasonDigestHex(`${CAP_RUSH_STATE_DIGEST_PREFIX}\u0000${canonicalJson(changed)}`),
+    );
+    expect(
+      capRushLockedInputsSchema.safeParse(Object.freeze({ ...locked, payrollStatus: 'illegal' }))
+        .success,
+    ).toBe(false);
+  });
+
   it('locks a completed draft and pins the season inputs', () => {
     const setup = capRushTestSetup();
     const state = buildCompleteState(

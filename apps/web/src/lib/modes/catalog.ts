@@ -99,7 +99,7 @@ export const modeCatalog: readonly ModeDefinition[] = [
           name: 'Cap Rush',
           category: '2 seats · 82 games',
           icon: Trophy,
-          image: '/images/multiplayer/shared-season.jpg',
+          image: '/images/multiplayer/cap-rush.png',
           format: '82 games',
           description:
             'Two general managers bid on the same 60-player market, lock five each, then play one shared 30-team season.',

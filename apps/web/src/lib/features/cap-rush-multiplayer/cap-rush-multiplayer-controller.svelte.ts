@@ -30,12 +30,12 @@ export interface CapRushBroadcastState {
 }
 
 export class CapRushMultiplayerController {
-  view = $state<CapRushMultiplayerSessionView | null>(null);
+  view = $state.raw<CapRushMultiplayerSessionView | null>(null);
   busy = $state(false);
   error = $state<string | null>(null);
   nowMs = $state(Date.now());
   loading = $state(true);
-  broadcast = $state<CapRushBroadcastState | null>(null);
+  broadcast = $state.raw<CapRushBroadcastState | null>(null);
   broadcastLoading = $state(false);
 
   private session: CapRushMultiplayerSession | null = null;
@@ -61,11 +61,14 @@ export class CapRushMultiplayerController {
   }
 
   async load(): Promise<void> {
+    if (this.isDisposed()) return;
     this.loading = true;
     try {
       const data = await getCapRushMultiplayerData();
+      if (this.isDisposed()) return;
       const transport = getCapRushMultiplayerTransport();
       const membership = await transport.resume(this.roomId);
+      if (this.isDisposed()) return;
       this.session = new CapRushMultiplayerSession({
         transport,
         environment: data.environment,
@@ -73,17 +76,20 @@ export class CapRushMultiplayerController {
         seat: membership.participantId,
         newCommandId: () => newSeasonId('cap-rush-mp-cmd'),
       });
+      this.session.subscribe(() => {
+        this.sync();
+      });
       await this.session.attach();
-      this.sync();
     } catch (error) {
+      if (this.isDisposed()) return;
       this.error = error instanceof Error ? error.message : 'Could not open the room.';
     } finally {
-      this.loading = false;
+      if (!this.isDisposed()) this.loading = false;
     }
   }
 
   start(): void {
-    if (this.timer !== null) return;
+    if (this.disposed || this.timer !== null) return;
     this.timer = setInterval(() => {
       this.nowMs = Date.now();
       void this.tick();
@@ -98,6 +104,10 @@ export class CapRushMultiplayerController {
     }
     this.runner.dispose();
     this.session?.dispose();
+  }
+
+  private isDisposed(): boolean {
+    return this.disposed;
   }
 
   async readiness(): Promise<void> {
@@ -320,7 +330,14 @@ export class CapRushMultiplayerController {
     readonly plan?: CapRushPlayoffGamePlan;
   }): Promise<void> {
     const locked = this.state?.locked;
-    if (locked === null || locked === undefined) return;
+    if (
+      this.isDisposed() ||
+      this.busy ||
+      this.broadcastLoading ||
+      locked === null ||
+      locked === undefined
+    )
+      return;
     this.broadcastLoading = true;
     this.error = null;
     try {
@@ -330,6 +347,7 @@ export class CapRushMultiplayerController {
         ...(input.entry === undefined ? {} : { entry: input.entry }),
         ...(input.plan === undefined ? {} : { plan: input.plan }),
       });
+      if (this.isDisposed()) return;
       this.broadcast = {
         gameId: output.gameId,
         speed: input.speed,
@@ -340,9 +358,10 @@ export class CapRushMultiplayerController {
         tape: output.tape,
       };
     } catch (error) {
+      if (this.isDisposed()) return;
       this.error = error instanceof Error ? error.message : 'Could not load the broadcast.';
     } finally {
-      this.broadcastLoading = false;
+      if (!this.isDisposed()) this.broadcastLoading = false;
     }
   }
 
@@ -365,28 +384,31 @@ export class CapRushMultiplayerController {
       }
     }
     try {
-      await this.session.refresh();
-      this.sync();
+      await this.session.refresh(false);
     } catch {
       // The transport surfaces its own connection error.
     }
   }
 
   private async run(action: () => Promise<unknown> | undefined): Promise<void> {
-    if (this.busy || this.disposed) return;
+    if (this.busy || this.isDisposed()) return;
     this.busy = true;
     this.error = null;
     try {
       await action();
     } catch (error) {
+      if (this.isDisposed()) return;
       this.error = error instanceof Error ? error.message : 'The room rejected that action.';
     } finally {
-      this.busy = false;
-      this.sync();
+      if (!this.isDisposed()) {
+        this.busy = false;
+        this.sync();
+      }
     }
   }
 
   private sync(): void {
+    if (this.disposed) return;
     this.view = this.session?.view() ?? null;
     if (this.view?.error) this.error = this.view.error;
   }

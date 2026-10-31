@@ -202,9 +202,15 @@ export function capRushNextLeagueSlot(
   accepted: number,
 ): number | null {
   if (locked.leagueSchedule === undefined) return null;
+  const counts = new Array<number>(CAP_RUSH_GAME_COUNT).fill(0);
+  for (const game of locked.leagueSchedule) {
+    if (game.homeTeamId !== locked.human.teamId && game.awayTeamId !== locked.human.teamId) {
+      counts[game.slot - 1] = (counts[game.slot - 1] ?? 0) + 1;
+    }
+  }
   let remaining = accepted;
   for (let slot = 1; slot <= CAP_RUSH_GAME_COUNT; slot += 1) {
-    const count = capRushLeagueSlotGames(locked, slot).length;
+    const count = counts[slot - 1] ?? 0;
     if (remaining < count) return slot;
     remaining -= count;
   }

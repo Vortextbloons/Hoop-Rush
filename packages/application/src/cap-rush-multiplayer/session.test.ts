@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, test, vi } from 'bun:test';
 import type { CapRushMultiplayerSettings } from '@hoop-rush/data-contracts';
 import {
   CAP_RUSH_MULTIPLAYER_MARKET_VERSION,
@@ -64,6 +64,92 @@ function setup() {
 }
 
 describe('cap rush multiplayer application session', () => {
+  test('coalesces realtime refreshes, skips overlapping polls, and drops work after disposal', async () => {
+    const { environment, settings } = setup();
+    const transport = new CapRushMultiplayerInMemoryTransport({
+      environment,
+      defaultSettings: settings,
+      rootSeed: ROOT,
+    });
+    const created = await transport.create({ variant: 'clash', settings });
+    const session = new CapRushMultiplayerSession({
+      transport,
+      environment,
+      roomId: created.roomId,
+      seat: 'p1',
+      newCommandId: () => 'test-command',
+    });
+    await session.attach();
+    const initial = session.current;
+    const response = await transport.sync(created.roomId);
+    let resolve!: (value: typeof response) => void;
+    const pending = new Promise<typeof response>((yes) => {
+      resolve = yes;
+    });
+    const sync = vi
+      .spyOn(transport, 'sync')
+      .mockReturnValueOnce(pending)
+      .mockResolvedValue(response);
+    const first = session.refresh(false);
+    const poll = session.refresh(false);
+    expect(sync).toHaveBeenCalledTimes(1);
+    const notified = session.refresh();
+    void session.refresh(false);
+    resolve(response);
+    await Promise.all([first, poll, notified]);
+    expect(sync).toHaveBeenCalledTimes(2);
+    const beforeDisposal = session.current;
+    const delayed = new Promise<typeof response>((yes) => {
+      resolve = yes;
+    });
+    sync.mockReturnValueOnce(delayed);
+    const refresh = session.refresh();
+    session.dispose();
+    resolve({
+      ...response,
+      snapshot: {
+        ...response.snapshot,
+        revision: 1,
+        state: { ...initial, ready: { p1: true, p2: false } },
+      },
+    });
+    await refresh;
+    expect(session.current).toBe(beforeDisposal);
+  });
+
+  test('does not subscribe when disposed during attachment', async () => {
+    const { environment, settings } = setup();
+    const transport = new CapRushMultiplayerInMemoryTransport({
+      environment,
+      defaultSettings: settings,
+      rootSeed: ROOT,
+    });
+    const created = await transport.create({ variant: 'clash', settings });
+    const response = await transport.sync(created.roomId);
+    let resolve!: (value: typeof response) => void;
+    vi.spyOn(transport, 'sync').mockImplementation(
+      () =>
+        new Promise((yes) => {
+          resolve = yes;
+        }),
+    );
+    const subscribe = vi.spyOn(transport, 'subscribe');
+    const session = new CapRushMultiplayerSession({
+      transport,
+      environment,
+      roomId: created.roomId,
+      seat: 'p1',
+      newCommandId: () => 'test-command',
+    });
+    const attaching = session.attach();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+    session.dispose();
+    resolve(response);
+    await attaching;
+    expect(subscribe).not.toHaveBeenCalled();
+    expect(session.room).toBeNull();
+  });
+
   test('opens two seats, locks a recruited league, and advances one shared slot', async () => {
     const { environment, settings } = setup();
     let nowMs = Date.parse('2026-11-01T00:00:00.000Z');

@@ -42,6 +42,15 @@ export function money(dollars: number): string {
   return formatMillions(dollars);
 }
 
+/** Normalizes the coordination clock to the UTC ISO form the state schema requires. */
+export function capRushMultiplayerAcceptedAt(clockValue: unknown, now: Date = new Date()): string {
+  if (typeof clockValue === 'string') {
+    const parsed = Date.parse(clockValue);
+    if (!Number.isNaN(parsed)) return new Date(parsed).toISOString();
+  }
+  return now.toISOString();
+}
+
 export function remainingMs(endsAtIso: string, nowMs: number): number {
   return Math.max(0, Date.parse(endsAtIso) - nowMs);
 }

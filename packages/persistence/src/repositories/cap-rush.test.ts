@@ -680,6 +680,35 @@ describe('cap rush repository', () => {
     expect(history[0]).toMatchObject({ wins: 82, perfectSeason: true, variant: 'roulette' });
   });
 
+  it('atomically saves user and league results together and rolls both back on failure', async () => {
+    const { index, state } = await startLockedRun(repository, { league: true });
+    if (state.locked === null) throw new Error('missing locked inputs');
+    const bundle = acceptBundle(index, state, 1);
+    const leagueGames = simulateCapRushLeagueSlot({
+      locked: state.locked,
+      slot: 1,
+      context: createEngineContext(),
+    });
+    const command = capRushAcceptGameCommandSchema.parse({ ...bundle.command, leagueGames });
+    const outcome = applyCapRushCommand(state, command, { index });
+    expect(outcome.result.status).toBe('accepted');
+    const failWrite = vi
+      .spyOn(db.capRushLeagueGames, 'bulkPut')
+      .mockRejectedValueOnce(new Error('league save failed'));
+    await expect(
+      repository.applyOutcome({ outcome, command, game: bundle.game, leagueGames }),
+    ).rejects.toThrow('league save failed');
+    failWrite.mockRestore();
+    expect(await repository.readRunGame(state.runId, 1)).toBeNull();
+    expect(await repository.listLeagueGames(state.runId)).toEqual([]);
+    expect(await repository.loadActiveDraft()).toEqual(state);
+    expect(await repository.loadCommandResult(command.commandId)).toBeNull();
+    await repository.applyOutcome({ outcome, command, game: bundle.game, leagueGames });
+    expect(await repository.readRunGame(state.runId, 1)).toEqual(bundle.game);
+    expect(await repository.listLeagueGames(state.runId)).toHaveLength(14);
+    expect((await repository.loadActiveDraft())?.season.leagueGamesAccepted).toBe(14);
+  });
+
   it('commits nothing when a stored game cannot be written', async () => {
     const { index, state } = await startLockedRun(repository);
     const bundle = acceptBundle(index, state, 1);

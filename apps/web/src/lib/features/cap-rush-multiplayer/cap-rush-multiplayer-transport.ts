@@ -6,7 +6,6 @@ import type {
   CapRushMultiplayerRoomMembership,
   CapRushMultiplayerRoomSnapshot,
   CapRushMultiplayerSeatId,
-  CapRushMultiplayerState,
   CapRushMultiplayerSubmitInput,
   CapRushMultiplayerSync,
   CapRushMultiplayerTransport,
@@ -26,7 +25,7 @@ import {
   createCapRushMultiplayerState,
 } from '@hoop-rush/engine';
 import { capRushMultiplayerDeadlineOf } from '@hoop-rush/application/cap-rush-multiplayer';
-import { getMultiplayerClient } from '#lib/supabase-runtime.js';
+import { createRealtimeRoomRegistry, getMultiplayerClient } from '#lib/supabase-runtime.js';
 import { getCapRushMultiplayerData } from './cap-rush-multiplayer-assets.js';
 
 interface CommandRow {
@@ -50,7 +49,13 @@ function requiredString(record: Record<string, unknown>, key: string): string {
 }
 
 export class CapRushMultiplayerSupabaseTransport implements CapRushMultiplayerTransport {
-  private readonly states = new Map<string, CapRushMultiplayerState>();
+  private readonly rooms = createRealtimeRoomRegistry({
+    label: 'Cap Rush',
+    roomsTable: 'cap_rush_multiplayer_rooms',
+    commandsTable: 'cap_rush_multiplayer_room_commands',
+    topic: (roomId) => `cap-rush-multiplayer:${roomId}`,
+    getClient: getMultiplayerClient,
+  });
 
   async create(input: CapRushMultiplayerCreateInput): Promise<CapRushMultiplayerRoomMembership> {
     const data = await getCapRushMultiplayerData();
@@ -74,7 +79,6 @@ export class CapRushMultiplayerSupabaseTransport implements CapRushMultiplayerTr
       p_state: state,
     });
     if (initialized.error) throw new Error(initialized.error.message);
-    this.states.set(roomId, state);
     return {
       roomId,
       participantId: 'p1',
@@ -127,7 +131,6 @@ export class CapRushMultiplayerSupabaseTransport implements CapRushMultiplayerTr
     if (result.error) throw new Error(result.error.message);
     const row = recordOf(result.data);
     const snapshot = capRushMultiplayerRoomSnapshotSchema.parse(row.room);
-    if (snapshot.state !== null) this.states.set(roomId, snapshot.state);
     const commands: CapRushMultiplayerCommand[] = (
       (row.commands as CommandRow[] | undefined) ?? []
     ).map((command) => ({
@@ -144,44 +147,7 @@ export class CapRushMultiplayerSupabaseTransport implements CapRushMultiplayerTr
   }
 
   subscribe(roomId: string, onChange: () => void, onError: (error: Error) => void): () => void {
-    let channel: { unsubscribe?: () => void } | null = null;
-    void (async () => {
-      try {
-        const client = await getMultiplayerClient();
-        channel = client
-          .channel(`cap-rush-multiplayer:${roomId}`)
-          .on(
-            'postgres_changes',
-            {
-              event: '*',
-              schema: 'public',
-              table: 'cap_rush_multiplayer_rooms',
-              filter: `id=eq.${roomId}`,
-            },
-            () => {
-              onChange();
-            },
-          )
-          .on(
-            'postgres_changes',
-            {
-              event: '*',
-              schema: 'public',
-              table: 'cap_rush_multiplayer_room_commands',
-              filter: `room_id=eq.${roomId}`,
-            },
-            () => {
-              onChange();
-            },
-          )
-          .subscribe();
-      } catch (error) {
-        onError(error instanceof Error ? error : new Error('realtime subscription failed'));
-      }
-    })();
-    return () => {
-      channel?.unsubscribe?.();
-    };
+    return this.rooms.subscribe(roomId, onChange, onError).unsubscribe;
   }
 
   async submitCommand(
@@ -190,7 +156,7 @@ export class CapRushMultiplayerSupabaseTransport implements CapRushMultiplayerTr
     const client = await getMultiplayerClient();
     const clock = await client.rpc('cap_rush_multiplayer_clock');
     if (clock.error) throw new Error(clock.error.message);
-    const acceptedAtIso = typeof clock.data === 'string' ? clock.data : new Date().toISOString();
+    const acceptedAtIso = capRushMultiplayerAcceptedAt(clock.data);
     const snapshot = await this.snapshot(input.roomId);
     const state = snapshot.state;
     if (state === null) {
@@ -250,7 +216,6 @@ export class CapRushMultiplayerSupabaseTransport implements CapRushMultiplayerTr
       rejectionCode: typeof receipt.rejectionCode === 'string' ? receipt.rejectionCode : null,
       revision: typeof receipt.revision === 'number' ? receipt.revision : snapshot.revision,
     };
-    if (parsed.accepted) this.states.set(input.roomId, outcome.state);
     return parsed;
   }
 

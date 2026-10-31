@@ -4,6 +4,7 @@ import type {
   CapRushMultiplayerMarketPlayer,
 } from '@hoop-rush/data-contracts';
 import {
+  capRushMultiplayerAcceptedAt,
   clockLabel,
   lotState,
   nextMinimumBid,

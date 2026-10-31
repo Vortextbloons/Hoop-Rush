@@ -1689,22 +1689,28 @@ class HavocBattleRuntime implements HavocRuntimeHooks {
 
   sidePoints(side: SideIndex): number {
     const target = this.teams[side].side;
-    return this.scoring
-      .filter((entry) => entry.side === target)
-      .reduce((sum, entry) => sum + entry.points, 0);
+    let points = 0;
+    for (const entry of this.scoring) {
+      if (entry.side === target) points += entry.points;
+    }
+    return points;
   }
 
   participantPoints(instanceId: string): number {
-    return this.scoring
-      .filter((entry) => entry.actorInstanceId === instanceId && entry.kind !== 'bonus')
-      .reduce((sum, entry) => sum + entry.points, 0);
+    let points = 0;
+    for (const entry of this.scoring) {
+      if (entry.actorInstanceId === instanceId && entry.kind !== 'bonus') points += entry.points;
+    }
+    return points;
   }
 
   teamBonusPoints(sideIndex: SideIndex): number {
     const side = this.teams[sideIndex].side;
-    return this.scoring
-      .filter((entry) => entry.side === side && entry.kind === 'bonus')
-      .reduce((sum, entry) => sum + entry.points, 0);
+    let points = 0;
+    for (const entry of this.scoring) {
+      if (entry.side === side && entry.kind === 'bonus') points += entry.points;
+    }
+    return points;
   }
 
   teamOf(sideIndex: SideIndex): TeamRuntime {

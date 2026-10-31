@@ -1,3 +1,4 @@
+import { immutableCanonicalSchema } from './season-hash.ts';
 import { capRushPlaybackSchema } from './cap-rush-playback.ts';
 import { z } from 'zod';
 import { playerIdSchema, seedSchema } from './ids.ts';
@@ -155,7 +156,7 @@ export const capRushPlayoffParticipantSchema = z.object({
 });
 export type CapRushPlayoffParticipant = z.infer<typeof capRushPlayoffParticipantSchema>;
 
-export const capRushPlayoffGameSummarySchema = z
+const capRushPlayoffGameSummaryValueSchema = z
   .object({
     gameId: capRushPlayoffGameIdSchema,
     seriesId: capRushSeriesIdSchema,
@@ -206,6 +207,9 @@ export const capRushPlayoffGameSummarySchema = z
       ctx.addIssue({ code: 'custom', message: 'Finals games require participant evidence' });
     }
   });
+export const capRushPlayoffGameSummarySchema = immutableCanonicalSchema(
+  capRushPlayoffGameSummaryValueSchema,
+);
 export type CapRushPlayoffGameSummary = z.infer<typeof capRushPlayoffGameSummarySchema>;
 
 function addPlayoffSeriesGameIssues(

@@ -2,7 +2,7 @@
 -- Run with: supabase test db
 
 begin;
-select plan(47);
+select plan(49);
 
 -- 1. Schema and policies.
 select has_table('public', 'cap_rush_multiplayer_rooms', 'rooms exist');
@@ -96,6 +96,12 @@ select is(
 select is(
   (select jsonb_array_length(value::jsonb->'members') from public.cr_pgtap_ctx where name = 'preview'),
   2, 'preview always reports two seats');
+select matches(
+  (select value::jsonb->>'createdAt' from public.cr_pgtap_ctx where name = 'preview'),
+  'Z$', 'createdAt is UTC ISO with a Z suffix');
+select matches(
+  (select value::jsonb->'members'->0->>'lastSeenAt' from public.cr_pgtap_ctx where name = 'preview'),
+  'Z$', 'member lastSeenAt is UTC ISO with a Z suffix');
 select is(
   (select count(*)::int from public.cap_rush_multiplayer_room_members
     where room_id = (select value::jsonb->>'roomId' from public.cr_pgtap_ctx where name = 'created')::uuid),
