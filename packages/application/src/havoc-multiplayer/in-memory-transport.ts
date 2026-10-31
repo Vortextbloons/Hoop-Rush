@@ -56,19 +56,21 @@ import {
 } from '@hoop-rush/data-contracts';
 import {
   createInMemoryRoomStore,
-  membershipError,
-  phaseError,
   roomError,
   type InMemoryRoomRecord,
 } from '../multiplayer/in-memory-room-store.ts';
-
-function nowIsoWith(clock: () => number): string {
-  return new Date(clock()).toISOString();
-}
-
-function seedByteParity(rootSeed: string, offset: number): boolean {
-  return Number.parseInt(rootSeed.slice(offset, offset + 2), 16) % 2 === 0;
-}
+import {
+  allocateInMemoryRoom,
+  baseRoomRecord,
+  commandReceiptWithoutOrdinal,
+  createRoomTransportMechanics,
+  homeGameFor,
+  nowIso,
+  otherParticipantId,
+  patchMember,
+  pickerFor,
+  seedByteParity,
+} from '../multiplayer/in-memory-transport-support.ts';
 
 export function havocMultiplayerFirstPickerFor(rootSeed: string): HavocMultiplayerParticipantId {
   return seedByteParity(rootSeed, 0) ? 'p1' : 'p2';
@@ -78,35 +80,11 @@ export function havocMultiplayerHomeWinnerFor(rootSeed: string): HavocMultiplaye
   return seedByteParity(rootSeed, 2) ? 'p1' : 'p2';
 }
 
-function otherParticipant(
-  participantId: HavocMultiplayerParticipantId,
-): HavocMultiplayerParticipantId {
-  return participantId === 'p1' ? 'p2' : 'p1';
-}
-
-function pickerFor(
-  firstPicker: HavocMultiplayerParticipantId,
-  turnOrdinal: number,
-): HavocMultiplayerParticipantId {
-  return turnOrdinal % 2 === 0 ? firstPicker : otherParticipant(firstPicker);
-}
-
-const HAVOC_HOME_GAMES: ReadonlySet<number> = new Set([1, 2, 5, 7]);
-
 export function havocMultiplayerHomeForGame(
   homeWinner: HavocMultiplayerParticipantId,
   gameNumber: number,
 ): HavocMultiplayerParticipantId {
-  if (
-    !Number.isInteger(gameNumber) ||
-    gameNumber < 1 ||
-    gameNumber > HAVOC_MULTIPLAYER_SERIES_GAMES
-  ) {
-    throw new Error(
-      `havoc multiplayer gameNumber must be an integer in 1..${String(HAVOC_MULTIPLAYER_SERIES_GAMES)} (got ${String(gameNumber)})`,
-    );
-  }
-  return HAVOC_HOME_GAMES.has(gameNumber) ? homeWinner : otherParticipant(homeWinner);
+  return homeGameFor(homeWinner, gameNumber, HAVOC_MULTIPLAYER_SERIES_GAMES, 'havoc multiplayer');
 }
 
 const SYNTHETIC_RATING = 70;
@@ -229,12 +207,7 @@ function memberWith(
   participantId: HavocMultiplayerParticipantId,
   patch: Partial<HavocMultiplayerMemberSnapshot>,
 ): HavocMultiplayerRoomSnapshot {
-  return {
-    ...snapshot,
-    members: snapshot.members.map((member) =>
-      member.participantId === participantId ? { ...member, ...patch } : member,
-    ),
-  };
+  return { ...snapshot, members: patchMember(snapshot.members, participantId, patch) };
 }
 
 function withSeriesGame(
@@ -267,7 +240,7 @@ function createHavocSeries(rootSeed: string): HavocMultiplayerSeriesSnapshot {
       return {
         gameNumber,
         homeParticipantId,
-        awayParticipantId: otherParticipant(homeParticipantId),
+        awayParticipantId: otherParticipantId(homeParticipantId),
         status: 'scheduled',
         winner: null,
         inputDigest: null,
@@ -356,13 +329,12 @@ export function createInMemoryHavocMultiplayerTransport(options: {
     rejectionCode: HavocMultiplayerCommandRejectionCode,
     revision: number,
   ): HavocMultiplayerCommandReceipt {
-    return {
-      roomId: idSchema.parse(roomId),
-      commandId: commandIdSchema.parse(commandId),
-      accepted: false,
+    return commandReceiptWithoutOrdinal(
+      idSchema.parse(roomId),
+      commandIdSchema.parse(commandId),
       rejectionCode,
       revision,
-    };
+    );
   }
 
   function stageDraftDeadline(record: RoomRecord): void {
@@ -558,10 +530,11 @@ export function createInMemoryHavocMultiplayerTransport(options: {
       variant: settingsInput.variant,
       versions: settingsInput.versions,
     });
-    const allocation = store.allocateRoom(now);
-    const roomId = idSchema.parse(allocation.roomId);
-    const code = allocation.code;
-    const rootSeed = allocation.rootSeed;
+    const { roomId, code, rootSeed, codeExpiresAt } = allocateInMemoryRoom(
+      store,
+      HAVOC_MULTIPLAYER_ROOM_RETENTION_MS,
+      now,
+    );
     const snapshot = havocMultiplayerRoomSnapshotSchema.parse({
       roomId,
       code,
@@ -579,20 +552,11 @@ export function createInMemoryHavocMultiplayerTransport(options: {
       successorRoomId: null,
     });
     const record: RoomRecord = {
-      snapshot,
+      ...baseRoomRecord({ snapshot, code, codeExpiresAt, now }),
       commandLog: [],
-      commandIds: new Set(),
       payloadHashes: new Map(),
       rootSeed,
-      code,
-      codeExpiresAt: allocation.codeExpiresAt,
       expiresAt: now + HAVOC_MULTIPLAYER_ROOM_RETENTION_MS,
-      updatedAt: now,
-      subscribers: new Set(),
-      transientSubscribers: new Set(),
-      verificationChallenge: null,
-      receipts: new Map(),
-      fallback: null,
       proposals: {},
       confirmations: {},
       rematchRequests: new Set(),
@@ -626,13 +590,12 @@ export function createInMemoryHavocMultiplayerTransport(options: {
       if (record.payloadHashes.get(commandId) !== payloadHash) {
         return rejection(command.roomId, commandId, 'command-conflict', record.snapshot.revision);
       }
-      return {
-        roomId: record.snapshot.roomId,
+      return commandReceiptWithoutOrdinal(
+        record.snapshot.roomId,
         commandId,
-        accepted: true,
-        rejectionCode: null,
-        revision: record.snapshot.revision,
-      };
+        null,
+        record.snapshot.revision,
+      );
     }
     if (
       command.expectedRevision !== undefined &&
@@ -845,7 +808,7 @@ export function createInMemoryHavocMultiplayerTransport(options: {
         broadcast: {
           gameNumber: payload.gameNumber,
           durationMs: HAVOC_MULTIPLAYER_BROADCAST_MS,
-          startedAt: nowIsoWith(clock),
+          startedAt: nowIso(clock),
         },
         members: record.snapshot.members.map((member) => ({
           ...member,
@@ -974,205 +937,127 @@ export function createInMemoryHavocMultiplayerTransport(options: {
     record.snapshot = { ...record.snapshot, revision };
     record.updatedAt = clock();
     store.emit(record);
-    return {
-      roomId: record.snapshot.roomId,
-      commandId,
-      accepted: true,
-      rejectionCode: null,
-      revision,
-    };
+    return commandReceiptWithoutOrdinal(record.snapshot.roomId, commandId, null, revision);
   }
 
-  return {
-    async create(settingsInput) {
-      await Promise.resolve();
-      return createRoomRecord(settingsInput);
-    },
-    async preview(code) {
-      await Promise.resolve();
-      return store.roomByCode(code).snapshot;
-    },
-    async join(code) {
-      await Promise.resolve();
-      const record = store.joinableRoom(code);
+  const mechanics = createRoomTransportMechanics<
+    HavocMultiplayerRoomSnapshot,
+    HavocMultiplayerTransientEvent,
+    HavocMultiplayerVerificationReceipt,
+    FallbackCommitment,
+    RoomRecord,
+    HavocMultiplayerCommand,
+    HavocMultiplayerCommandPayload,
+    HavocMultiplayerCommandReceipt,
+    HavocMultiplayerRoomCode
+  >({
+    store,
+    clock,
+    markOnline: (snapshot, participantId, online) =>
+      memberWith(snapshot, participantId, { online }),
+    removeGuest: (snapshot, nextCode) => ({
+      ...memberWith(snapshot, 'p2', idleMember('p2')),
+      code: nextCode,
+    }),
+    beforeJoin: (record) => {
       if (
         record.snapshot.phase === 'championship' ||
         record.snapshot.phase === 'integrity-failed'
       ) {
         throw roomError('room-full', 'room-full', false);
       }
-      record.snapshot = memberWith(record.snapshot, 'p2', { online: true });
-      record.snapshot = { ...record.snapshot, revision: record.snapshot.revision + 1 };
+    },
+    syncCommands: (record, afterOrdinal) =>
+      record.commandLog.slice(afterOrdinal + 1).map((entry) => entry.command),
+    syncCommandCount: (record) => record.commandLog.length,
+    refetchCommands: (record, afterRevision) =>
+      record.commandLog
+        .filter((entry) => entry.revision > afterRevision)
+        .map((entry) => entry.command),
+    parseTransient: (event) => {
+      const parsed = havocMultiplayerTransientEventSchema.safeParse(event);
+      return parsed.success ? parsed.data : null;
+    },
+    receiptSchema: havocMultiplayerVerificationReceiptSchema,
+    verificationOptions: { touch: true },
+    buildFallback: ({ record, cursor, payload, deadline }) => {
+      const parsed = havocMultiplayerCommandPayloadSchema.safeParse(payload);
+      const draft = record.snapshot.draft;
+      const timeoutPick =
+        parsed.success && parsed.data.kind === 'timeout-pick' ? parsed.data : null;
+      if (
+        !timeoutPick ||
+        !draft ||
+        draft.offer === null ||
+        timeoutPick.turnOrdinal !== draft.turnOrdinal ||
+        timeoutPick.offerId !== draft.offer.offerId ||
+        !draft.offer.cards.some((card) => card.cardId === timeoutPick.cardId)
+      ) {
+        throw roomError(
+          'commit-fallback: payload must match the deadline timeout-pick',
+          'illegal-move',
+          false,
+        );
+      }
+      record.snapshot = {
+        ...record.snapshot,
+        deadline: { ...deadline, fallback: timeoutPick },
+      };
       record.updatedAt = clock();
-      store.emit(record);
       return {
-        snapshot: record.snapshot,
-        membership: { roomId: record.snapshot.roomId, participantId: 'p2', code: record.code },
+        cursor,
+        participantId: deadline.participantId,
+        turnOrdinal: timeoutPick.turnOrdinal,
+        payload: timeoutPick,
       };
     },
-    async resume(roomId) {
+    deadlineAt: (deadline) => deadline.at,
+    timeoutCommandId: (deadline) => `timeout-${deadline.cursor}`,
+    submitTimeout: (record, commitment, commandId) =>
+      applyCommand({
+        schemaVersion: HAVOC_MULTIPLAYER_SAVE_SCHEMA_VERSION,
+        roomId: record.snapshot.roomId,
+        commandId: commandIdSchema.parse(commandId),
+        actorParticipantId: commitment.participantId,
+        payload: commitment.payload,
+      }),
+    rematch: {
+      phase: 'championship',
+      reuseSuccessor: true,
+      touch: true,
+      create: (record) => {
+        const created = createRoomRecord(
+          {
+            variant: record.snapshot.settings.variant,
+            versions: record.snapshot.settings.versions,
+          },
+          {
+            p1:
+              record.snapshot.members.find((member) => member.participantId === 'p1')?.online ??
+              true,
+            p2:
+              record.snapshot.members.find((member) => member.participantId === 'p2')?.online ??
+              false,
+          },
+        );
+        return { snapshot: created.snapshot, code: created.code };
+      },
+    },
+  });
+
+  return {
+    ...mechanics,
+    async create(settingsInput) {
       await Promise.resolve();
-      const record = recordFor(roomId);
-      return {
-        snapshot: record.snapshot,
-        membership: { roomId: record.snapshot.roomId, participantId: 'p1', code: record.code },
-      };
+      return createRoomRecord(settingsInput);
     },
     async sync(roomId, afterOrdinal = -1) {
-      await Promise.resolve();
-      const record = recordFor(roomId);
-      return {
-        snapshot: record.snapshot,
-        commands: record.commandLog.slice(afterOrdinal + 1).map((entry) => entry.command),
-        commandCount: record.commandLog.length,
-      };
-    },
-    subscribe(roomId, handler) {
-      return store.subscribe(roomId, handler);
-    },
-    subscribeTransient(roomId, handler) {
-      return store.subscribeTransient(roomId, handler);
-    },
-    publishTransient(roomId, event) {
-      const parsed = havocMultiplayerTransientEventSchema.safeParse(event);
-      if (!parsed.success) return Promise.resolve(false);
-      return Promise.resolve(store.publishTransient(roomId, parsed.data));
-    },
-    async refetch(roomId, afterRevision) {
-      await Promise.resolve();
-      const record = recordFor(roomId);
-      return record.commandLog
-        .filter((entry) => entry.revision > afterRevision)
-        .map((entry) => entry.command);
+      const synced = await mechanics.sync(roomId, afterOrdinal);
+      return { ...synced, commandCount: synced.commandCount ?? 0 };
     },
     async submitCommand(command) {
       await Promise.resolve();
       return applyCommand(command);
-    },
-    async verificationChallenge(roomId) {
-      await Promise.resolve();
-      return store.verificationChallenge(recordFor(roomId));
-    },
-    async submitVerification(roomId, receipt, expectedRevision) {
-      await Promise.resolve();
-      return store.submitVerification(
-        recordFor(roomId),
-        receipt,
-        expectedRevision,
-        havocMultiplayerVerificationReceiptSchema,
-        { touch: true },
-      );
-    },
-    async commitFallback(roomId, cursor, payload, expectedRevision) {
-      await Promise.resolve();
-      const record = recordFor(roomId);
-      return store.commitFallback(record, cursor, expectedRevision, (deadline) => {
-        const parsed = havocMultiplayerCommandPayloadSchema.safeParse(payload);
-        const draft = record.snapshot.draft;
-        const timeoutPick =
-          parsed.success && parsed.data.kind === 'timeout-pick' ? parsed.data : null;
-        if (
-          !timeoutPick ||
-          !draft ||
-          draft.offer === null ||
-          timeoutPick.turnOrdinal !== draft.turnOrdinal ||
-          timeoutPick.offerId !== draft.offer.offerId ||
-          !draft.offer.cards.some((card) => card.cardId === timeoutPick.cardId)
-        ) {
-          throw roomError(
-            'commit-fallback: payload must match the deadline timeout-pick',
-            'illegal-move',
-            false,
-          );
-        }
-        record.snapshot = {
-          ...record.snapshot,
-          deadline: { ...deadline, fallback: timeoutPick },
-        };
-        record.updatedAt = clock();
-        return {
-          cursor,
-          participantId: deadline.participantId,
-          turnOrdinal: timeoutPick.turnOrdinal,
-          payload: timeoutPick,
-        };
-      });
-    },
-    async resolveTimeout(roomId) {
-      await Promise.resolve();
-      const record = store.find(roomId);
-      return store.resolveTimeout(
-        record,
-        (deadline) => deadline.at,
-        (deadline) => `timeout-${deadline.cursor}`,
-        (commitment, commandId) =>
-          record === undefined
-            ? Promise.resolve(null)
-            : applyCommand({
-                schemaVersion: HAVOC_MULTIPLAYER_SAVE_SCHEMA_VERSION,
-                roomId: record.snapshot.roomId,
-                commandId: commandIdSchema.parse(commandId),
-                actorParticipantId: commitment.participantId,
-                payload: commitment.payload,
-              }),
-      );
-    },
-    async removeGuest(roomId, targetParticipantId) {
-      await Promise.resolve();
-      const record = recordFor(roomId);
-      if (record.snapshot.phase !== 'lobby') {
-        throw phaseError();
-      }
-      if (targetParticipantId !== 'p2') {
-        throw membershipError();
-      }
-      const nextCode = store.rotateCode(record);
-      record.snapshot = memberWith(record.snapshot, 'p2', idleMember('p2'));
-      record.snapshot = {
-        ...record.snapshot,
-        code: nextCode,
-        revision: record.snapshot.revision + 1,
-      };
-      record.updatedAt = clock();
-      store.emit(record);
-      return record.snapshot;
-    },
-    async leave(roomId, participantId) {
-      await Promise.resolve();
-      const record = store.find(roomId);
-      if (!record) return;
-      record.snapshot = memberWith(record.snapshot, participantId, { online: false });
-      record.snapshot = { ...record.snapshot, revision: record.snapshot.revision + 1 };
-      record.updatedAt = clock();
-      store.emit(record);
-    },
-    async rematch(roomId) {
-      await Promise.resolve();
-      const record = recordFor(roomId);
-      if (record.snapshot.phase !== 'championship') {
-        throw phaseError();
-      }
-      if (record.snapshot.successorRoomId) {
-        const successor = recordFor(record.snapshot.successorRoomId);
-        return { snapshot: successor.snapshot, code: successor.code };
-      }
-      const created = createRoomRecord(
-        {
-          variant: record.snapshot.settings.variant,
-          versions: record.snapshot.settings.versions,
-        },
-        {
-          p1:
-            record.snapshot.members.find((member) => member.participantId === 'p1')?.online ?? true,
-          p2:
-            record.snapshot.members.find((member) => member.participantId === 'p2')?.online ??
-            false,
-        },
-      );
-      record.snapshot = { ...record.snapshot, successorRoomId: created.snapshot.roomId };
-      record.updatedAt = clock();
-      store.emit(record);
-      return { snapshot: created.snapshot, code: created.code };
     },
     async complete(roomId, receiptId) {
       await Promise.resolve();

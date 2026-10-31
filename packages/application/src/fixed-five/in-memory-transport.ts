@@ -21,20 +21,22 @@ import {
   canonicalJson,
   commandIdSchema,
   contentHashSchema,
-  idSchema,
-  seedSchema,
 } from '@hoop-rush/data-contracts';
 import {
   createInMemoryRoomStore,
-  membershipError,
-  phaseError,
   roomError,
   type InMemoryRoomRecord,
 } from '../multiplayer/in-memory-room-store.ts';
+import {
+  allocateInMemoryRoom,
+  baseRoomRecord,
+  commandReceipt,
+  createRoomTransportMechanics,
+  nowIso,
+  otherParticipantId,
+  patchMember,
+} from '../multiplayer/in-memory-transport-support.ts';
 
-function nowIsoWith(clock: () => number): string {
-  return new Date(clock()).toISOString();
-}
 function isSandboxSnakeRoom(settings: FixedFiveRoomSettings): boolean {
   return (
     settings.mode === 'sandbox-shared-82' ||
@@ -86,9 +88,6 @@ function shared82DraftReady(record: RoomRecord): boolean {
 }
 function duelHomeForGame(gameNumber: number): FixedFiveParticipantId {
   return gameNumber % 2 === 1 ? 'p1' : 'p2';
-}
-function otherParticipantId(participantId: FixedFiveParticipantId): FixedFiveParticipantId {
-  return participantId === 'p1' ? 'p2' : 'p1';
 }
 function sandboxPicker(rootSeed: string, pickOrdinal: number): FixedFiveParticipantId {
   const first = Number.parseInt(rootSeed.slice(0, 2), 16) % 2 === 0 ? 'p1' : 'p2';
@@ -360,7 +359,7 @@ export function createInMemoryFixedFiveTransport(options: {
         phase: 'broadcasting',
         broadcast: {
           gameNumber,
-          startedAtIso: nowIsoWith(clock),
+          startedAtIso: nowIso(clock),
           durationMs: FIXED_FIVE_DUEL_BROADCAST_MS,
         },
         members: members.map((member) => ({ ...member, nextGameReady: null })),
@@ -439,7 +438,7 @@ export function createInMemoryFixedFiveTransport(options: {
         phase: 'broadcasting',
         broadcast: {
           gameNumber: payload.gameNumber,
-          startedAtIso: nowIsoWith(clock),
+          startedAtIso: nowIso(clock),
           durationMs: FIXED_FIVE_DUEL_BROADCAST_MS,
         },
         seasonBroadcast: {
@@ -491,417 +490,297 @@ export function createInMemoryFixedFiveTransport(options: {
     };
     record.gameState = emptyDuelGameState();
   }
-  return {
-    async create(settingsInput) {
-      await Promise.resolve();
-      const now = store.claimCreateSlot();
-      const settings: FixedFiveRoomSettings = {
-        schemaVersion: FIXED_FIVE_ROOM_SCHEMA_VERSION,
-        timerPolicyVersion: 'fixed-five-autopick-v1',
-        ...settingsInput,
-        versions: settingsInput.versions,
-      };
-      const allocation = store.allocateRoom(now);
-      const roomId = idSchema.parse(allocation.roomId);
-      const code = allocation.code;
-      const rootSeed = seedSchema.parse(allocation.rootSeed);
-      const timeoutMs = fixedFiveTimeoutMsForMode(settings.mode);
-      const createdAt = new Date(now).toISOString();
-      const expiresAt = new Date(now + 24 * 60 * 60 * 1000).toISOString();
-      const deadlineAt = new Date(now + timeoutMs).toISOString();
-      const snapshot: FixedFiveRoomSnapshot = {
-        roomId,
-        code,
-        codeActive: true,
-        settings,
-        phase: 'lobby',
-        revision: 0,
-        commandCount: 0,
-        digest: null,
-        members: [
-          {
-            participantId: 'p1',
-            online: true,
-            ready: false,
-            picksCommitted: 0,
-            locked: false,
-            nextGameReady: null,
-            lastSeenAt: createdAt,
-          },
-          {
-            participantId: 'p2',
-            online: false,
-            ready: false,
-            picksCommitted: 0,
-            locked: false,
-            nextGameReady: null,
-            lastSeenAt: null,
-          },
-        ],
-        rootSeed,
-        deadline: {
-          roomId,
-          cursor: 'lobby',
+  type CreateInput = Omit<FixedFiveRoomSettings, 'schemaVersion' | 'timerPolicyVersion'> &
+    Partial<Pick<FixedFiveRoomSettings, 'schemaVersion' | 'timerPolicyVersion'>>;
+
+  async function createRoom(settingsInput: CreateInput): Promise<{
+    snapshot: FixedFiveRoomSnapshot;
+    code: string;
+    membership: FixedFiveRoomMembership;
+  }> {
+    await Promise.resolve();
+    const now = store.claimCreateSlot();
+    const settings: FixedFiveRoomSettings = {
+      schemaVersion: FIXED_FIVE_ROOM_SCHEMA_VERSION,
+      timerPolicyVersion: 'fixed-five-autopick-v1',
+      ...settingsInput,
+      versions: settingsInput.versions,
+    };
+    const { roomId, code, rootSeed, codeExpiresAt, createdAt, expiresAt } = allocateInMemoryRoom(
+      store,
+      24 * 60 * 60 * 1000,
+      now,
+    );
+    const timeoutMs = fixedFiveTimeoutMsForMode(settings.mode);
+    const deadlineAt = new Date(now + timeoutMs).toISOString();
+    const snapshot: FixedFiveRoomSnapshot = {
+      roomId,
+      code,
+      codeActive: true,
+      settings,
+      phase: 'lobby',
+      revision: 0,
+      commandCount: 0,
+      digest: null,
+      members: [
+        {
           participantId: 'p1',
-          deadlineAt,
-          fallback: { kind: 'ready', ready: true },
-          pickOrdinal: 0,
+          online: true,
+          ready: false,
+          picksCommitted: 0,
+          locked: false,
+          nextGameReady: null,
+          lastSeenAt: createdAt,
         },
-        series: null,
-        broadcast: null,
-        seasonBroadcast: null,
-        resultDigest: null,
-        confirmedDigest: null,
-        successorRoomId: null,
-        expiresAt,
-        createdAt,
-      };
-      const record: RoomRecord = {
-        snapshot,
-        commands: [],
-        commandIds: new Set(),
-        code,
-        codeExpiresAt: allocation.codeExpiresAt,
-        updatedAt: now,
-        subscribers: new Set(),
-        transientSubscribers: new Set(),
-        verificationChallenge: null,
-        receipts: new Map(),
-        fallback: null,
-        gameState: emptyDuelGameState(),
-      };
-      store.add(roomId, record);
-      const membership: FixedFiveRoomMembership = { roomId, participantId: 'p1', code };
-      return { snapshot, code, membership };
+        {
+          participantId: 'p2',
+          online: false,
+          ready: false,
+          picksCommitted: 0,
+          locked: false,
+          nextGameReady: null,
+          lastSeenAt: null,
+        },
+      ],
+      rootSeed,
+      deadline: {
+        roomId,
+        cursor: 'lobby',
+        participantId: 'p1',
+        deadlineAt,
+        fallback: { kind: 'ready', ready: true },
+        pickOrdinal: 0,
+      },
+      series: null,
+      broadcast: null,
+      seasonBroadcast: null,
+      resultDigest: null,
+      confirmedDigest: null,
+      successorRoomId: null,
+      expiresAt,
+      createdAt,
+    };
+    const record: RoomRecord = {
+      ...baseRoomRecord({ snapshot, code, codeExpiresAt, now }),
+      commands: [],
+      gameState: emptyDuelGameState(),
+    };
+    store.add(roomId, record);
+    const membership: FixedFiveRoomMembership = { roomId, participantId: 'p1', code };
+    return { snapshot, code, membership };
+  }
+
+  async function applyCommand(
+    command: Omit<FixedFiveCommand, 'ordinal'> & {
+      ordinal?: number;
+      expectedRevision?: number;
     },
-    async preview(code) {
-      await Promise.resolve();
-      return store.roomByCode(code).snapshot;
+  ): Promise<FixedFiveCommandReceipt> {
+    await Promise.resolve();
+    const record = store.require(command.roomId);
+    const reject = (rejectionCode: string) =>
+      commandReceipt(
+        command.roomId,
+        command.commandId,
+        -1,
+        rejectionCode,
+        record.snapshot.revision,
+      );
+    const payloadBytes = new TextEncoder().encode(canonicalJson(command.payload)).length;
+    if (payloadBytes > FIXED_FIVE_ENVELOPE_MAX_BYTES) {
+      return reject('payload-too-large');
+    }
+    if (record.commandIds.has(command.commandId)) {
+      const existing = record.commands.find((c) => c.commandId === command.commandId);
+      return commandReceipt(
+        command.roomId,
+        command.commandId,
+        existing?.ordinal ?? -1,
+        null,
+        record.snapshot.revision,
+      );
+    }
+    if (
+      command.expectedRevision !== undefined &&
+      command.expectedRevision !== record.snapshot.revision
+    ) {
+      return reject('stale-revision');
+    }
+    const expectedOrdinal = record.commands.length;
+    const ordinal = command.ordinal ?? expectedOrdinal;
+    if (ordinal !== expectedOrdinal) return reject('stale-revision');
+    const full = { ...command, ordinal, schemaVersion: 1 as const };
+    const parsed = fixedFiveCommandSchema.safeParse(full);
+    if (!parsed.success) {
+      return reject('illegal-move');
+    }
+    const sandboxSnake =
+      isSandboxSnakeRoom(record.snapshot.settings) &&
+      FIXED_FIVE_SNAKE_ROOM_VERSIONS.has(record.snapshot.settings.versions.multiplayerVersion);
+    const repositionAware = isRepositionAwareRoom(record.snapshot.settings);
+    if (
+      parsed.data.payload.kind === 'duel-reposition' &&
+      (record.snapshot.settings.mode !== 'duel' || !repositionAware)
+    ) {
+      return reject('illegal-move');
+    }
+    if (parsed.data.payload.kind === 'sandbox-reposition' && sandboxSnake && !repositionAware) {
+      return reject('illegal-move');
+    }
+    const pickedPayload =
+      parsed.data.payload.kind === 'sandbox-place' ||
+      parsed.data.payload.kind === 'timeout-autopick'
+        ? parsed.data.payload
+        : null;
+    if (sandboxSnake && pickedPayload) {
+      const priorPicks = record.commands.filter(
+        (entry) =>
+          entry.payload.kind === 'sandbox-place' || entry.payload.kind === 'timeout-autopick',
+      );
+      if (
+        priorPicks.some((entry) => {
+          if (entry.payload.kind !== 'sandbox-place' && entry.payload.kind !== 'timeout-autopick') {
+            return false;
+          }
+          if (entry.payload.playerId === pickedPayload.playerId) return true;
+          return (
+            !repositionAware &&
+            entry.actorParticipantId === parsed.data.actorParticipantId &&
+            entry.payload.slotIndex === pickedPayload.slotIndex
+          );
+        })
+      ) {
+        return reject('illegal-move');
+      }
+    }
+    if (
+      sandboxSnake &&
+      pickedPayload?.kind === 'sandbox-place' &&
+      record.snapshot.deadline &&
+      record.snapshot.deadline.participantId !== parsed.data.actorParticipantId
+    ) {
+      return reject('turn');
+    }
+    const broadcastRejection = duelBroadcastRejection(record, parsed.data);
+    if (broadcastRejection !== null) return reject(broadcastRejection);
+    record.commands.push(parsed.data);
+    record.commandIds.add(command.commandId);
+    record.snapshot = {
+      ...record.snapshot,
+      commandCount: record.commands.length,
+      revision: record.snapshot.revision + 1,
+      digest: null,
+    };
+    touchDeadline(record, parsed.data.payload);
+    record.updatedAt = clock();
+    if (
+      isDuelBroadcastRoom(record.snapshot.settings) &&
+      record.snapshot.series === null &&
+      duelDraftPickCount(record.commands) >= 10
+    ) {
+      initializeDuelSeries(record);
+    }
+    applyDuelBroadcastCommand(record, parsed.data);
+    applyShared82BroadcastCommand(record, parsed.data);
+    store.emit(record);
+    return commandReceipt(
+      command.roomId,
+      command.commandId,
+      ordinal,
+      null,
+      record.snapshot.revision,
+    );
+  }
+
+  const mechanics = createRoomTransportMechanics<
+    FixedFiveRoomSnapshot,
+    never,
+    FixedFiveVerificationReceipt,
+    FallbackCommitment,
+    RoomRecord,
+    FixedFiveCommand,
+    FixedFiveCommandPayload,
+    FixedFiveCommandReceipt,
+    string
+  >({
+    store,
+    clock,
+    markOnline: (snapshot, participantId, online, atIso) => ({
+      ...snapshot,
+      members: patchMember(
+        snapshot.members,
+        participantId,
+        online ? { online, lastSeenAt: atIso } : { online },
+      ),
+    }),
+    removeGuest: (snapshot, nextCode) => ({
+      ...snapshot,
+      code: nextCode,
+      codeActive: true,
+    }),
+    touchOnRemoveGuest: false,
+    findForSync: (roomId) => store.find(roomId),
+    syncCommands: (record, afterOrdinal) =>
+      record.commands.filter((command) => command.ordinal > afterOrdinal),
+    receiptSchema: fixedFiveVerificationReceiptSchema,
+    verificationOptions: {
+      foreignReceiptMessage: 'verification: receipt does not belong to the room',
     },
-    async join(code) {
-      await Promise.resolve();
-      const record = store.joinableRoom(code);
-      record.snapshot = {
-        ...record.snapshot,
-        members: record.snapshot.members.map((m) =>
-          m.participantId === 'p2' ? { ...m, online: true, lastSeenAt: nowIsoWith(clock) } : m,
-        ),
-        revision: record.snapshot.revision + 1,
-      };
-      record.updatedAt = clock();
-      store.emit(record);
+    buildFallback: ({ cursor, payload, deadline }) => {
+      const parsed = fixedFiveCommandPayloadSchema.safeParse(payload);
+      if (
+        !parsed.success ||
+        parsed.data.kind !== 'timeout-autopick' ||
+        parsed.data.pickOrdinal !== deadline.pickOrdinal
+      ) {
+        throw roomError(
+          'commit-fallback: payload must match the deadline autopick',
+          'illegal-move',
+          false,
+        );
+      }
       return {
-        snapshot: record.snapshot,
-        membership: { roomId: record.snapshot.roomId, participantId: 'p2', code: record.code },
+        cursor,
+        participantId: deadline.participantId,
+        pickOrdinal: deadline.pickOrdinal,
+        payload: parsed.data,
       };
     },
-    async resume(roomId) {
-      await Promise.resolve();
-      const record = store.require(roomId);
-      return {
-        snapshot: record.snapshot,
-        membership: { roomId: record.snapshot.roomId, participantId: 'p1', code: record.code },
-      };
+    deadlineAt: (deadline) => deadline.deadlineAt,
+    timeoutCommandId: (deadline, commitment) =>
+      `timeout-${deadline.cursor}-${String(commitment.pickOrdinal)}`,
+    submitTimeout: (record, commitment, commandId) =>
+      applyCommand({
+        schemaVersion: 1,
+        roomId: record.snapshot.roomId,
+        commandId: commandIdSchema.parse(commandId),
+        actorParticipantId: commitment.participantId,
+        payload: commitment.payload,
+      }),
+    rematch: {
+      phase: 'completed',
+      reuseSuccessor: false,
+      touch: false,
+      create: async (record) => {
+        const created = await createRoom({
+          mode: record.snapshot.settings.mode,
+          sourceMode: record.snapshot.settings.sourceMode,
+          variant: record.snapshot.settings.variant,
+          versions: record.snapshot.settings.versions,
+        });
+        return { snapshot: created.snapshot, code: created.code };
+      },
     },
+  });
+
+  return {
+    ...mechanics,
+    create: createRoom,
     async snapshot(roomId) {
       await Promise.resolve();
       return store.require(roomId).snapshot;
     },
-    async sync(roomId, afterOrdinal) {
-      await Promise.resolve();
-      const record = store.find(roomId);
-      if (!record) throw new Error('authorization');
-      return {
-        snapshot: record.snapshot,
-        commands: record.commands.filter((command) => command.ordinal > afterOrdinal),
-      };
-    },
-    subscribe(roomId, handler) {
-      return store.subscribe(roomId, handler);
-    },
-    async refetch(roomId, afterOrdinal) {
-      await Promise.resolve();
-      return store.require(roomId).commands.filter((command) => command.ordinal > afterOrdinal);
-    },
-    async submitCommand(command) {
-      await Promise.resolve();
-      const record = store.require(command.roomId);
-      const payloadBytes = new TextEncoder().encode(canonicalJson(command.payload)).length;
-      if (payloadBytes > FIXED_FIVE_ENVELOPE_MAX_BYTES) {
-        return {
-          roomId: command.roomId,
-          commandId: command.commandId,
-          ordinal: -1,
-          accepted: false,
-          rejectionCode: 'payload-too-large',
-          revision: record.snapshot.revision,
-        };
-      }
-      if (record.commandIds.has(command.commandId)) {
-        const existing = record.commands.find((c) => c.commandId === command.commandId);
-        return {
-          roomId: command.roomId,
-          commandId: command.commandId,
-          ordinal: existing?.ordinal ?? -1,
-          accepted: true,
-          rejectionCode: null,
-          revision: record.snapshot.revision,
-        };
-      }
-      if (
-        command.expectedRevision !== undefined &&
-        command.expectedRevision !== record.snapshot.revision
-      ) {
-        return {
-          roomId: command.roomId,
-          commandId: command.commandId,
-          ordinal: -1,
-          accepted: false,
-          rejectionCode: 'stale-revision',
-          revision: record.snapshot.revision,
-        };
-      }
-      const expectedOrdinal = record.commands.length;
-      const ordinal = command.ordinal ?? expectedOrdinal;
-      if (ordinal !== expectedOrdinal) {
-        const receipt: FixedFiveCommandReceipt = {
-          roomId: command.roomId,
-          commandId: command.commandId,
-          ordinal: -1,
-          accepted: false,
-          rejectionCode: 'stale-revision',
-          revision: record.snapshot.revision,
-        };
-        return receipt;
-      }
-      const full = { ...command, ordinal, schemaVersion: 1 as const };
-      const parsed = fixedFiveCommandSchema.safeParse(full);
-      if (!parsed.success) {
-        return {
-          roomId: command.roomId,
-          commandId: command.commandId,
-          ordinal: -1,
-          accepted: false,
-          rejectionCode: 'illegal-move',
-          revision: record.snapshot.revision,
-        };
-      }
-      const sandboxSnake =
-        isSandboxSnakeRoom(record.snapshot.settings) &&
-        FIXED_FIVE_SNAKE_ROOM_VERSIONS.has(record.snapshot.settings.versions.multiplayerVersion);
-      const repositionAware = isRepositionAwareRoom(record.snapshot.settings);
-      if (
-        parsed.data.payload.kind === 'duel-reposition' &&
-        (record.snapshot.settings.mode !== 'duel' || !repositionAware)
-      ) {
-        return {
-          roomId: command.roomId,
-          commandId: command.commandId,
-          ordinal: -1,
-          accepted: false,
-          rejectionCode: 'illegal-move',
-          revision: record.snapshot.revision,
-        };
-      }
-      if (parsed.data.payload.kind === 'sandbox-reposition' && sandboxSnake && !repositionAware) {
-        return {
-          roomId: command.roomId,
-          commandId: command.commandId,
-          ordinal: -1,
-          accepted: false,
-          rejectionCode: 'illegal-move',
-          revision: record.snapshot.revision,
-        };
-      }
-      const pickedPayload =
-        parsed.data.payload.kind === 'sandbox-place' ||
-        parsed.data.payload.kind === 'timeout-autopick'
-          ? parsed.data.payload
-          : null;
-      if (sandboxSnake && pickedPayload) {
-        const priorPicks = record.commands.filter(
-          (entry) =>
-            entry.payload.kind === 'sandbox-place' || entry.payload.kind === 'timeout-autopick',
-        );
-        if (
-          priorPicks.some((entry) => {
-            if (
-              entry.payload.kind !== 'sandbox-place' &&
-              entry.payload.kind !== 'timeout-autopick'
-            ) {
-              return false;
-            }
-            if (entry.payload.playerId === pickedPayload.playerId) return true;
-            return (
-              !repositionAware &&
-              entry.actorParticipantId === parsed.data.actorParticipantId &&
-              entry.payload.slotIndex === pickedPayload.slotIndex
-            );
-          })
-        ) {
-          return {
-            roomId: command.roomId,
-            commandId: command.commandId,
-            ordinal: -1,
-            accepted: false,
-            rejectionCode: 'illegal-move',
-            revision: record.snapshot.revision,
-          };
-        }
-      }
-      if (
-        sandboxSnake &&
-        pickedPayload?.kind === 'sandbox-place' &&
-        record.snapshot.deadline &&
-        record.snapshot.deadline.participantId !== parsed.data.actorParticipantId
-      ) {
-        return {
-          roomId: command.roomId,
-          commandId: command.commandId,
-          ordinal: -1,
-          accepted: false,
-          rejectionCode: 'turn',
-          revision: record.snapshot.revision,
-        };
-      }
-      const broadcastRejection = duelBroadcastRejection(record, parsed.data);
-      if (broadcastRejection !== null) {
-        return {
-          roomId: command.roomId,
-          commandId: command.commandId,
-          ordinal: -1,
-          accepted: false,
-          rejectionCode: broadcastRejection,
-          revision: record.snapshot.revision,
-        };
-      }
-      record.commands.push(parsed.data);
-      record.commandIds.add(command.commandId);
-      record.snapshot = {
-        ...record.snapshot,
-        commandCount: record.commands.length,
-        revision: record.snapshot.revision + 1,
-        digest: null,
-      };
-      touchDeadline(record, parsed.data.payload);
-      record.updatedAt = clock();
-      if (
-        isDuelBroadcastRoom(record.snapshot.settings) &&
-        record.snapshot.series === null &&
-        duelDraftPickCount(record.commands) >= 10
-      ) {
-        initializeDuelSeries(record);
-      }
-      applyDuelBroadcastCommand(record, parsed.data);
-      applyShared82BroadcastCommand(record, parsed.data);
-      store.emit(record);
-      return {
-        roomId: command.roomId,
-        commandId: command.commandId,
-        ordinal,
-        accepted: true,
-        rejectionCode: null,
-        revision: record.snapshot.revision,
-      };
-    },
-    async verificationChallenge(roomId) {
-      await Promise.resolve();
-      return store.verificationChallenge(store.require(roomId));
-    },
-    async submitVerification(roomId, receipt, expectedRevision) {
-      await Promise.resolve();
-      return store.submitVerification(
-        store.require(roomId),
-        receipt,
-        expectedRevision,
-        fixedFiveVerificationReceiptSchema,
-        { foreignReceiptMessage: 'verification: receipt does not belong to the room' },
-      );
-    },
-    async commitFallback(roomId, cursor, payload, expectedRevision) {
-      await Promise.resolve();
-      const record = store.require(roomId);
-      return store.commitFallback(record, cursor, expectedRevision, (deadline) => {
-        const parsed = fixedFiveCommandPayloadSchema.safeParse(payload);
-        if (
-          !parsed.success ||
-          parsed.data.kind !== 'timeout-autopick' ||
-          parsed.data.pickOrdinal !== deadline.pickOrdinal
-        ) {
-          throw roomError(
-            'commit-fallback: payload must match the deadline autopick',
-            'illegal-move',
-            false,
-          );
-        }
-        return {
-          cursor,
-          participantId: deadline.participantId,
-          pickOrdinal: deadline.pickOrdinal,
-          payload: parsed.data,
-        };
-      });
-    },
-    async resolveTimeout(roomId) {
-      const record = store.find(roomId);
-      return store.resolveTimeout(
-        record,
-        (deadline) => deadline.deadlineAt,
-        (deadline, commitment) => `timeout-${deadline.cursor}-${String(commitment.pickOrdinal)}`,
-        (commitment, commandId) =>
-          record === undefined
-            ? Promise.resolve(null)
-            : this.submitCommand({
-                schemaVersion: 1,
-                roomId: record.snapshot.roomId,
-                commandId: commandIdSchema.parse(commandId),
-                actorParticipantId: commitment.participantId,
-                payload: commitment.payload,
-              }),
-      );
-    },
-    async removeGuest(roomId, targetParticipantId: FixedFiveParticipantId) {
-      await Promise.resolve();
-      const record = store.require(roomId);
-      if (record.snapshot.phase !== 'lobby') throw phaseError();
-      if (targetParticipantId !== 'p2') throw membershipError();
-      const nextCode = store.rotateCode(record);
-      record.snapshot = {
-        ...record.snapshot,
-        code: nextCode,
-        codeActive: true,
-        revision: record.snapshot.revision + 1,
-      };
-      store.emit(record);
-      return record.snapshot;
-    },
-    async leave(roomId, participantId) {
-      await Promise.resolve();
-      const record = store.find(roomId);
-      if (!record) return;
-      record.snapshot = {
-        ...record.snapshot,
-        members: record.snapshot.members.map((m) =>
-          m.participantId === participantId ? { ...m, online: false } : m,
-        ),
-        revision: record.snapshot.revision + 1,
-      };
-      record.updatedAt = clock();
-      store.emit(record);
-    },
-    async rematch(roomId) {
-      const record = store.require(roomId);
-      if (record.snapshot.phase !== 'completed') throw phaseError();
-      const created = await this.create({
-        mode: record.snapshot.settings.mode,
-        sourceMode: record.snapshot.settings.sourceMode,
-        variant: record.snapshot.settings.variant,
-        versions: record.snapshot.settings.versions,
-      });
-      record.snapshot = { ...record.snapshot, successorRoomId: created.snapshot.roomId };
-      store.emit(record);
-      return { snapshot: created.snapshot, code: created.code };
-    },
+    submitCommand: applyCommand,
     async complete(roomId, receiptId) {
       await Promise.resolve();
       const record = store.require(roomId);

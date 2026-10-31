@@ -28,16 +28,25 @@ import {
   commandIdSchema,
   contentHashSchema,
   idSchema,
-  seedSchema,
   canonicalJson,
 } from '@hoop-rush/data-contracts';
 import {
   createInMemoryRoomStore,
-  membershipError,
-  phaseError,
   roomError,
   type InMemoryRoomRecord,
 } from '../multiplayer/in-memory-room-store.ts';
+import {
+  allocateInMemoryRoom,
+  baseRoomRecord,
+  commandReceipt,
+  createRoomTransportMechanics,
+  homeGameFor,
+  nowIso,
+  otherParticipantId,
+  patchMember,
+  pickerFor,
+  seedByteParity,
+} from '../multiplayer/in-memory-transport-support.ts';
 
 export function draftDuelFirstPickerFor(rootSeed: string): DraftDuelParticipantId {
   return seedByteParity(rootSeed, 0) ? 'p1' : 'p2';
@@ -47,35 +56,11 @@ export function draftDuelHomeWinnerFor(rootSeed: string): DraftDuelParticipantId
   return seedByteParity(rootSeed, 2) ? 'p1' : 'p2';
 }
 
-function seedByteParity(rootSeed: string, offset: number): boolean {
-  return Number.parseInt(rootSeed.slice(offset, offset + 2), 16) % 2 === 0;
-}
-
-function otherParticipant(participantId: DraftDuelParticipantId): DraftDuelParticipantId {
-  return participantId === 'p1' ? 'p2' : 'p1';
-}
-
-function pickerFor(
-  firstPicker: DraftDuelParticipantId,
-  pickOrdinal: number,
-): DraftDuelParticipantId {
-  return pickOrdinal % 2 === 0 ? firstPicker : otherParticipant(firstPicker);
-}
-
-const DRAFT_DUEL_HOME_GAMES: ReadonlySet<number> = new Set([1, 2, 5, 7]);
-
 export function draftDuelHomeForGameFor(
   homeWinner: DraftDuelParticipantId,
   gameNumber: number,
 ): DraftDuelParticipantId {
-  if (!Number.isInteger(gameNumber) || gameNumber < 1 || gameNumber > 7) {
-    throw new Error(`draft duel gameNumber must be an integer in 1..7 (got ${String(gameNumber)})`);
-  }
-  return DRAFT_DUEL_HOME_GAMES.has(gameNumber) ? homeWinner : otherParticipant(homeWinner);
-}
-
-function nowIsoWith(clock: () => number): string {
-  return new Date(clock()).toISOString();
+  return homeGameFor(homeWinner, gameNumber, 7, 'draft duel');
 }
 
 function idleMember(participantId: DraftDuelParticipantId): DraftDuelMemberSnapshot {
@@ -94,12 +79,7 @@ function memberWith(
   participantId: DraftDuelParticipantId,
   patch: Partial<DraftDuelMemberSnapshot>,
 ): DraftDuelRoomSnapshot {
-  return {
-    ...snapshot,
-    members: snapshot.members.map((member) =>
-      member.participantId === participantId ? { ...member, ...patch } : member,
-    ),
-  };
+  return { ...snapshot, members: patchMember(snapshot.members, participantId, patch) };
 }
 
 interface FallbackCommitment {
@@ -177,14 +157,13 @@ export function createInMemoryDraftDuelTransport(options: {
     rejectionCode: string,
     revision: number,
   ): DraftDuelCommandReceipt {
-    return {
-      roomId: idSchema.parse(roomId),
-      commandId: commandIdSchema.parse(commandId),
-      ordinal: -1,
-      accepted: false,
+    return commandReceipt(
+      idSchema.parse(roomId),
+      commandIdSchema.parse(commandId),
+      -1,
       rejectionCode,
       revision,
-    };
+    );
   }
 
   function stagePickDeadline(record: RoomRecord, pickOrdinal: number): void {
@@ -245,7 +224,7 @@ export function createInMemoryDraftDuelTransport(options: {
       return;
     }
     const home = draftDuelHomeForGameFor(series.homeWinner, gameNumber);
-    const away = otherParticipant(home);
+    const away = otherParticipantId(home);
     const p1Wins = series.p1Wins + (winner === 'p1' ? 1 : 0);
     const p2Wins = series.p2Wins + (winner === 'p2' ? 1 : 0);
     const champion = p1Wins >= 4 ? 'p1' : p2Wins >= 4 ? 'p2' : null;
@@ -307,14 +286,13 @@ export function createInMemoryDraftDuelTransport(options: {
       if (record.payloadHashes.get(commandId) !== payloadHash) {
         return rejection(command.roomId, commandId, 'duplicate-command', record.snapshot.revision);
       }
-      return {
-        roomId: record.snapshot.roomId,
+      return commandReceipt(
+        record.snapshot.roomId,
         commandId,
-        ordinal: existing.ordinal,
-        accepted: true,
-        rejectionCode: null,
-        revision: record.snapshot.revision,
-      };
+        existing.ordinal,
+        null,
+        record.snapshot.revision,
+      );
     }
     if (
       command.expectedRevision !== undefined &&
@@ -343,7 +321,7 @@ export function createInMemoryDraftDuelTransport(options: {
       }
       record.snapshot = memberWith(record.snapshot, actor, {
         ready: payload.ready,
-        lastSeenAt: nowIsoWith(clock),
+        lastSeenAt: nowIso(clock),
       });
     } else if (payload.kind === 'settings') {
       if (phase !== 'lobby') {
@@ -470,7 +448,7 @@ export function createInMemoryDraftDuelTransport(options: {
       }
       record.snapshot = memberWith(record.snapshot, actor, {
         nextGameReady: payload.ready ? payload.gameNumber : null,
-        lastSeenAt: nowIsoWith(clock),
+        lastSeenAt: nowIso(clock),
       });
       if (payload.ready && phase !== 'preparing-game') {
         record.snapshot = { ...record.snapshot, phase: 'preparing-game' };
@@ -504,7 +482,7 @@ export function createInMemoryDraftDuelTransport(options: {
         phase: 'broadcasting',
         broadcast: {
           gameNumber: payload.gameNumber,
-          startedAtIso: nowIsoWith(clock),
+          startedAtIso: nowIso(clock),
           durationMs: DRAFT_DUEL_BROADCAST_MS,
         },
         members: record.snapshot.members.map((member) => ({ ...member, nextGameReady: null })),
@@ -518,7 +496,7 @@ export function createInMemoryDraftDuelTransport(options: {
         return rejection(command.roomId, commandId, 'turn', record.snapshot.revision);
       }
       const home = draftDuelHomeForGameFor(series.homeWinner, payload.gameNumber);
-      if (payload.winner !== home && payload.winner !== otherParticipant(home)) {
+      if (payload.winner !== home && payload.winner !== otherParticipantId(home)) {
         return rejection(command.roomId, commandId, 'illegal-move', record.snapshot.revision);
       }
       record.proposals = {
@@ -612,14 +590,13 @@ export function createInMemoryDraftDuelTransport(options: {
     };
     record.updatedAt = clock();
     store.emit(record);
-    return {
-      roomId: record.snapshot.roomId,
+    return commandReceipt(
+      record.snapshot.roomId,
       commandId,
       ordinal,
-      accepted: true,
-      rejectionCode: null,
-      revision: record.snapshot.revision,
-    };
+      null,
+      record.snapshot.revision,
+    );
   }
 
   async function createRoom(
@@ -631,7 +608,6 @@ export function createInMemoryDraftDuelTransport(options: {
     membership: DraftDuelRoomMembership;
   }> {
     await Promise.resolve();
-    const now = store.claimCreateSlot();
     const settings: DraftDuelRoomSettings = draftDuelRoomSettingsSchema.parse({
       ...settingsInput,
       schemaVersion: settingsInput.schemaVersion ?? DRAFT_DUEL_ROOM_SCHEMA_VERSION,
@@ -644,12 +620,8 @@ export function createInMemoryDraftDuelTransport(options: {
     ) {
       throw roomError('invalid versions', 'illegal-move', false);
     }
-    const allocation = store.allocateRoom(now);
-    const roomId = idSchema.parse(allocation.roomId);
-    const code = allocation.code;
-    const rootSeed = seedSchema.parse(allocation.rootSeed);
-    const createdAt = new Date(now).toISOString();
-    const expiresAt = new Date(now + DRAFT_DUEL_ROOM_RETENTION_MS).toISOString();
+    const { now, roomId, code, rootSeed, codeExpiresAt, createdAt, expiresAt } =
+      allocateInMemoryRoom(store, DRAFT_DUEL_ROOM_RETENTION_MS);
     const snapshot: DraftDuelRoomSnapshot = {
       roomId,
       code,
@@ -680,18 +652,9 @@ export function createInMemoryDraftDuelTransport(options: {
       createdAt,
     };
     const record: RoomRecord = {
-      snapshot,
+      ...baseRoomRecord({ snapshot, code, codeExpiresAt, now }),
       commands: [],
-      commandIds: new Set(),
       payloadHashes: new Map(),
-      code,
-      codeExpiresAt: allocation.codeExpiresAt,
-      updatedAt: now,
-      subscribers: new Set(),
-      transientSubscribers: new Set(),
-      verificationChallenge: null,
-      receipts: new Map(),
-      fallback: null,
       draftState: null,
       proposals: {},
       confirmations: {},
@@ -706,177 +669,95 @@ export function createInMemoryDraftDuelTransport(options: {
     return store.require(roomId);
   }
 
+  const mechanics = createRoomTransportMechanics<
+    DraftDuelRoomSnapshot,
+    DraftDuelTransientEvent,
+    DraftDuelVerificationReceipt,
+    FallbackCommitment,
+    RoomRecord,
+    DraftDuelCommand,
+    DraftDuelCommandPayload,
+    DraftDuelCommandReceipt,
+    DraftDuelRoomCode
+  >({
+    store,
+    clock,
+    markOnline: (snapshot, participantId, online, atIso) =>
+      memberWith(snapshot, participantId, online ? { online, lastSeenAt: atIso } : { online }),
+    removeGuest: (snapshot, nextCode) => ({
+      ...memberWith(snapshot, 'p2', idleMember('p2')),
+      code: nextCode,
+      codeActive: true,
+    }),
+    syncCommands: (record, afterOrdinal) =>
+      record.commands.filter((command) => command.ordinal > afterOrdinal),
+    parseTransient: (event, roomId) => {
+      const parsed = draftDuelTransientEventSchema.safeParse(event);
+      return parsed.success && parsed.data.roomId === roomId ? parsed.data : null;
+    },
+    receiptSchema: draftDuelVerificationReceiptSchema,
+    verificationOptions: { touch: true },
+    buildFallback: ({ record, cursor, payload, deadline }) => {
+      const parsed = draftDuelCommandPayloadSchema.safeParse(payload);
+      if (
+        !parsed.success ||
+        parsed.data.kind !== 'timeout-autopick' ||
+        parsed.data.pickOrdinal !== deadline.pickOrdinal
+      ) {
+        throw roomError(
+          'commit-fallback: payload must match the deadline autopick',
+          'illegal-move',
+          false,
+        );
+      }
+      record.snapshot = {
+        ...record.snapshot,
+        deadline: { ...deadline, fallback: parsed.data },
+      };
+      record.updatedAt = clock();
+      return {
+        cursor,
+        participantId: deadline.participantId,
+        pickOrdinal: deadline.pickOrdinal,
+        payload: parsed.data,
+      };
+    },
+    deadlineAt: (deadline) => deadline.deadlineAt,
+    timeoutCommandId: (deadline, commitment) =>
+      `timeout-${deadline.cursor}-${String(commitment.pickOrdinal)}`,
+    submitTimeout: (record, commitment, commandId) =>
+      applyCommand({
+        schemaVersion: 1,
+        roomId: record.snapshot.roomId,
+        commandId: commandIdSchema.parse(commandId),
+        actorParticipantId: commitment.participantId,
+        payload: commitment.payload,
+      }),
+    rematch: {
+      phase: 'championship',
+      reuseSuccessor: true,
+      touch: true,
+      create: async (record) => {
+        const created = await createRoom({
+          fairness: record.snapshot.settings.fairness,
+          presentation: record.snapshot.settings.presentation,
+          versions: record.snapshot.settings.versions,
+        });
+        return { snapshot: created.snapshot, code: created.code };
+      },
+    },
+  });
+
   return {
+    ...mechanics,
     async create(settingsInput) {
       const created = await createRoom(settingsInput);
       const record = recordFor(created.snapshot.roomId);
       return { ...created, snapshot: record.snapshot };
     },
-    async preview(code) {
-      await Promise.resolve();
-      return store.roomByCode(code).snapshot;
-    },
-    async join(code) {
-      await Promise.resolve();
-      const record = store.joinableRoom(code);
-      record.snapshot = memberWith(record.snapshot, 'p2', {
-        online: true,
-        lastSeenAt: nowIsoWith(clock),
-      });
-      record.snapshot = { ...record.snapshot, revision: record.snapshot.revision + 1 };
-      record.updatedAt = clock();
-      store.emit(record);
-      return {
-        snapshot: record.snapshot,
-        membership: { roomId: record.snapshot.roomId, participantId: 'p2', code: record.code },
-      };
-    },
-    async resume(roomId) {
-      await Promise.resolve();
-      const record = recordFor(roomId);
-      return {
-        snapshot: record.snapshot,
-        membership: { roomId: record.snapshot.roomId, participantId: 'p1', code: record.code },
-      };
-    },
-    async sync(roomId, afterOrdinal) {
-      await Promise.resolve();
-      const record = recordFor(roomId);
-      return {
-        snapshot: record.snapshot,
-        commands: record.commands.filter((command) => command.ordinal > afterOrdinal),
-      };
-    },
-    subscribe(roomId, handler) {
-      return store.subscribe(roomId, handler);
-    },
-    subscribeTransient(roomId, handler) {
-      return store.subscribeTransient(roomId, handler);
-    },
-    publishTransient(roomId, event) {
-      const parsed = draftDuelTransientEventSchema.safeParse(event);
-      if (!parsed.success || parsed.data.roomId !== roomId) return Promise.resolve(false);
-      return Promise.resolve(store.publishTransient(roomId, parsed.data));
-    },
-    async refetch(roomId, afterOrdinal) {
-      await Promise.resolve();
-      const record = recordFor(roomId);
-      return record.commands.filter((command) => command.ordinal > afterOrdinal);
-    },
     async submitCommand(command) {
       await Promise.resolve();
       return applyCommand(command);
-    },
-    async verificationChallenge(roomId) {
-      await Promise.resolve();
-      return store.verificationChallenge(recordFor(roomId));
-    },
-    async submitVerification(roomId, receipt, expectedRevision) {
-      await Promise.resolve();
-      return store.submitVerification(
-        recordFor(roomId),
-        receipt,
-        expectedRevision,
-        draftDuelVerificationReceiptSchema,
-        { touch: true },
-      );
-    },
-    async commitFallback(roomId, cursor, payload, expectedRevision) {
-      await Promise.resolve();
-      const record = recordFor(roomId);
-      return store.commitFallback(record, cursor, expectedRevision, (deadline) => {
-        const parsed = draftDuelCommandPayloadSchema.safeParse(payload);
-        if (
-          !parsed.success ||
-          parsed.data.kind !== 'timeout-autopick' ||
-          parsed.data.pickOrdinal !== deadline.pickOrdinal
-        ) {
-          throw roomError(
-            'commit-fallback: payload must match the deadline autopick',
-            'illegal-move',
-            false,
-          );
-        }
-        record.snapshot = {
-          ...record.snapshot,
-          deadline: { ...deadline, fallback: parsed.data },
-        };
-        record.updatedAt = clock();
-        return {
-          cursor,
-          participantId: deadline.participantId,
-          pickOrdinal: deadline.pickOrdinal,
-          payload: parsed.data,
-        };
-      });
-    },
-    async resolveTimeout(roomId) {
-      await Promise.resolve();
-      const record = store.find(roomId);
-      return store.resolveTimeout(
-        record,
-        (deadline) => deadline.deadlineAt,
-        (deadline, commitment) => `timeout-${deadline.cursor}-${String(commitment.pickOrdinal)}`,
-        (commitment, commandId) =>
-          record === undefined
-            ? Promise.resolve(null)
-            : applyCommand({
-                schemaVersion: 1,
-                roomId: record.snapshot.roomId,
-                commandId: commandIdSchema.parse(commandId),
-                actorParticipantId: commitment.participantId,
-                payload: commitment.payload,
-              }),
-      );
-    },
-    async removeGuest(roomId, targetParticipantId) {
-      await Promise.resolve();
-      const record = recordFor(roomId);
-      if (record.snapshot.phase !== 'lobby') {
-        throw phaseError();
-      }
-      if (targetParticipantId !== 'p2') {
-        throw membershipError();
-      }
-      const nextCode = store.rotateCode(record);
-      record.snapshot = memberWith(record.snapshot, 'p2', idleMember('p2'));
-      record.snapshot = {
-        ...record.snapshot,
-        code: nextCode,
-        codeActive: true,
-        revision: record.snapshot.revision + 1,
-      };
-      record.updatedAt = clock();
-      store.emit(record);
-      return record.snapshot;
-    },
-    async leave(roomId, participantId) {
-      await Promise.resolve();
-      const record = store.find(roomId);
-      if (!record) return;
-      record.snapshot = memberWith(record.snapshot, participantId, { online: false });
-      record.snapshot = { ...record.snapshot, revision: record.snapshot.revision + 1 };
-      record.updatedAt = clock();
-      store.emit(record);
-    },
-    async rematch(roomId) {
-      const record = recordFor(roomId);
-      if (record.snapshot.phase !== 'championship') {
-        throw phaseError();
-      }
-      if (record.snapshot.successorRoomId) {
-        const successor = recordFor(record.snapshot.successorRoomId);
-        return { snapshot: successor.snapshot, code: successor.code };
-      }
-      const created = await createRoom({
-        fairness: record.snapshot.settings.fairness,
-        presentation: record.snapshot.settings.presentation,
-        versions: record.snapshot.settings.versions,
-      });
-      record.snapshot = { ...record.snapshot, successorRoomId: created.snapshot.roomId };
-      record.updatedAt = clock();
-      store.emit(record);
-      return { snapshot: created.snapshot, code: created.code };
     },
     async complete(roomId, receiptId) {
       await Promise.resolve();

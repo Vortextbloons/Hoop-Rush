@@ -27,6 +27,7 @@ import {
   createCapRushMultiplayerState,
   type CapRushMultiplayerEnvironment,
 } from '@hoop-rush/engine';
+import { commandReceipt, nowIso } from '../multiplayer/in-memory-transport-support.ts';
 import type { CapRushMultiplayerNextDeadline } from './recruitment-deadline.ts';
 
 export interface CapRushMultiplayerInMemoryTransportOptions {
@@ -94,7 +95,7 @@ export class CapRushMultiplayerInMemoryTransport implements CapRushMultiplayerTr
     const settings = capRushMultiplayerSettingsSchema.parse(
       input.settings ?? this.options.defaultSettings,
     );
-    const createdAtIso = new Date(this.now()).toISOString();
+    const createdAtIso = nowIso(this.now);
     const room: InMemoryRoom = {
       roomId,
       code,
@@ -142,7 +143,7 @@ export class CapRushMultiplayerInMemoryTransport implements CapRushMultiplayerTr
       participantId: 'p2',
       displayName: 'Guest',
       online: true,
-      lastSeenAt: new Date(this.now()).toISOString(),
+      lastSeenAt: nowIso(this.now),
     });
     this.emit(room);
     return { roomId: idSchema.parse(room.roomId), participantId: 'p2', code };
@@ -154,7 +155,7 @@ export class CapRushMultiplayerInMemoryTransport implements CapRushMultiplayerTr
     const member = room.members.get('p1');
     if (member === undefined) throw new Error('membership');
     member.online = true;
-    member.lastSeenAt = new Date(this.now()).toISOString();
+    member.lastSeenAt = nowIso(this.now);
     this.emit(room);
     return { roomId: idSchema.parse(room.roomId), participantId: 'p1', code: room.code };
   }
@@ -191,47 +192,38 @@ export class CapRushMultiplayerInMemoryTransport implements CapRushMultiplayerTr
   ): Promise<CapRushMultiplayerCommandReceipt> {
     await Promise.resolve();
     const room = this.room(input.roomId);
-    commandIdSchema.parse(input.commandId);
+    const roomId = idSchema.parse(room.roomId);
+    const commandId = commandIdSchema.parse(input.commandId);
     const key = payloadKey(input.payload);
     const existing = room.commandIds.get(input.commandId);
     if (existing !== undefined) {
-      if (existing.actor === input.actorParticipantId && existing.payload === key) {
-        return {
-          roomId: idSchema.parse(room.roomId),
-          commandId: commandIdSchema.parse(input.commandId),
-          ordinal: existing.ordinal,
-          accepted: true,
-          rejectionCode: null,
-          revision: room.revision,
-        };
-      }
-      return {
-        roomId: idSchema.parse(room.roomId),
-        commandId: commandIdSchema.parse(input.commandId),
-        ordinal: existing.ordinal,
-        accepted: false,
-        rejectionCode: 'command-conflict',
-        revision: room.revision,
-      };
+      return commandReceipt(
+        roomId,
+        commandId,
+        existing.ordinal,
+        existing.actor === input.actorParticipantId && existing.payload === key
+          ? null
+          : 'command-conflict',
+        room.revision,
+      );
     }
     if (input.expectedRevision !== room.revision) {
-      return {
-        roomId: idSchema.parse(room.roomId),
-        commandId: commandIdSchema.parse(input.commandId),
-        ordinal: room.commands.length,
-        accepted: false,
-        rejectionCode: 'stale-revision',
-        revision: room.revision,
-      };
+      return commandReceipt(
+        roomId,
+        commandId,
+        room.commands.length,
+        'stale-revision',
+        room.revision,
+      );
     }
     const command: CapRushMultiplayerCommand = {
       schemaVersion: CAP_RUSH_MULTIPLAYER_SCHEMA_VERSION,
-      roomId: idSchema.parse(room.roomId),
-      commandId: commandIdSchema.parse(input.commandId),
+      roomId,
+      commandId,
       ordinal: room.commands.length,
       actorParticipantId: input.actorParticipantId,
       expectedRevision: input.expectedRevision,
-      acceptedAtIso: new Date(this.now()).toISOString(),
+      acceptedAtIso: nowIso(this.now),
       payload: input.payload,
     };
     const outcome = applyCapRushMultiplayerCommand(
@@ -241,14 +233,7 @@ export class CapRushMultiplayerInMemoryTransport implements CapRushMultiplayerTr
       room.settings.variant,
     );
     if (!outcome.ok) {
-      return {
-        roomId: idSchema.parse(room.roomId),
-        commandId: commandIdSchema.parse(input.commandId),
-        ordinal: room.commands.length,
-        accepted: false,
-        rejectionCode: outcome.code,
-        revision: room.revision,
-      };
+      return commandReceipt(roomId, commandId, room.commands.length, outcome.code, room.revision);
     }
     room.commands.push(command);
     room.commandIds.set(input.commandId, {
@@ -259,14 +244,7 @@ export class CapRushMultiplayerInMemoryTransport implements CapRushMultiplayerTr
     room.state = outcome.state;
     room.revision += 1;
     this.emit(room);
-    return {
-      roomId: idSchema.parse(room.roomId),
-      commandId: commandIdSchema.parse(input.commandId),
-      ordinal: command.ordinal,
-      accepted: true,
-      rejectionCode: null,
-      revision: room.revision,
-    };
+    return commandReceipt(roomId, commandId, command.ordinal, null, room.revision);
   }
 
   async closeDueAuctions(roomId: string): Promise<CapRushMultiplayerCommandReceipt | null> {
