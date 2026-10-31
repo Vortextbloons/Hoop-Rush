@@ -80,6 +80,9 @@ export class ChallengeSession {
   private isDisposed(): boolean {
     return this.disposed;
   }
+  private revealIntervalMs(): number {
+    return this.reducedMotion ? 0 : REVEAL_INTERVAL_MS;
+  }
   async load(): Promise<void> {
     if (this.isDisposed()) return;
     if (this.phase === 'running' || this.phase === 'starting') return;
@@ -230,7 +233,7 @@ export class ChallengeSession {
     const profile = this.profile;
     if (profile === null) return;
     this.expectedNext = run.games.length + 1;
-    this.nextRevealAt = this.clock.now() + (this.reducedMotion ? 0 : REVEAL_INTERVAL_MS);
+    this.nextRevealAt = this.clock.now() + this.revealIntervalMs();
     this.phase = 'running';
     this.emit();
     this.job.startSimulation(
@@ -292,7 +295,7 @@ export class ChallengeSession {
         if (this.abandoned(token)) return;
         this.run = accepted;
         this.expectedNext += 1;
-        this.nextRevealAt += REVEAL_INTERVAL_MS;
+        this.nextRevealAt += this.revealIntervalMs();
         if (accepted.status === 'finished') {
           this.phase = 'finished';
           this.emit();

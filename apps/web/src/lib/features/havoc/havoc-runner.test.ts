@@ -101,7 +101,42 @@ describe('HavocRunner', () => {
     const message = await pending;
     expect(message.gamesDelivered).toBe(2);
     expect(order).toEqual([1, 2]);
-    expect(fake.terminated).toBe(true);
+    expect(fake.terminated).toBe(false);
+  });
+
+  it('reuses one worker across successful requests and terminates it on dispose', async () => {
+    const first = new FakeWorker();
+    const second = new FakeWorker();
+    const workers = [first, second];
+    const runner = new HavocRunner({ createWorker: () => (workers.shift() ?? second).asWorker() });
+    const pending = runner.startBatch(buildRequest(), {});
+    first.emit({
+      schemaVersion: HAVOC_WORKER_WIRE_SCHEMA_VERSION,
+      type: 'havoc-complete',
+      requestId: 'req-batch',
+      variant: 'havoc',
+      gamesDelivered: 0,
+      cancelled: false,
+      lastCursor: 0,
+    });
+    await pending;
+    const next = runner.startBatch(buildRequest({ requestId: 'req-next' }), {});
+    expect(workers).toHaveLength(1);
+    expect(first.posted).toHaveLength(2);
+    expect(second.posted).toHaveLength(0);
+    first.emit({
+      schemaVersion: HAVOC_WORKER_WIRE_SCHEMA_VERSION,
+      type: 'havoc-complete',
+      requestId: 'req-next',
+      variant: 'havoc',
+      gamesDelivered: 0,
+      cancelled: false,
+      lastCursor: 0,
+    });
+    await next;
+    runner.dispose();
+    expect(first.terminated).toBe(true);
+    expect(second.terminated).toBe(false);
   });
 
   it('ignores stale request ids and non-batch messages', async () => {
@@ -196,7 +231,7 @@ describe('HavocRunner', () => {
     fake.emit(message);
     const resolved = await pending;
     expect(resolved.gameNumber).toBe(1);
-    expect(fake.terminated).toBe(true);
+    expect(fake.terminated).toBe(false);
   });
 
   it('rejects pending work when disposed', async () => {

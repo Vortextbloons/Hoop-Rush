@@ -1,4 +1,3 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   commandIdSchema,
   fixedFiveCommandPayloadSchema,
@@ -21,20 +20,23 @@ import {
 import { randomBytes, randomUUID } from '#lib/ids.js';
 import { createInMemoryFixedFiveTransport } from '@hoop-rush/application/fixed-five';
 import {
+  cachedRoomTransport,
+  commitRoomFallback,
   createRealtimeRoomRegistry,
+  createRoomClientFactory,
+  fetchRoomRows,
+  parseRoomCommandRows,
+  readRoomParticipant,
   readRoomSync,
   ensureAnonymous,
-  getCachedTransport,
-  isUsablePublishableKey,
-  isUsableSupabaseUrl,
   parseRoomCode,
-  readSupabaseEnv,
+  resolveRoomTimeout,
+  rpcChallenge,
+  rpcCommandResult,
   rpcRoomPayload,
-  stringField,
-  supabaseClient,
+  roomPreviewFields,
+  submitRoomVerification,
 } from '#lib/supabase-runtime.js';
-
-type FixedFiveClient = SupabaseClient;
 
 interface FixedFiveRoomRow {
   id: Id;
@@ -81,24 +83,14 @@ interface FixedFiveCommandRow {
   payload: unknown;
 }
 
+const ROOM_COLUMNS =
+  'id, code, code_active, mode, source_mode, variant, versions, phase, revision, command_count, digest, result_digest, confirmed_digest, successor_room_id, series, broadcast, game_state, root_seed, deadline_at, deadline_cursor, deadline_participant, deadline_fallback, deadline_pick_ordinal, expires_at, created_at';
+const MEMBER_COLUMNS =
+  'participant_id, online, ready, picks_committed, locked, next_game_ready, last_seen_at';
+const COMMAND_COLUMNS = 'command_id, ordinal, actor_participant_id, payload';
+const MEMBERS_TABLE = 'fixed_five_room_members';
+
 const rpcPayload = (value: unknown) => rpcRoomPayload(value, fixedFiveRoomCodeSchema);
-
-interface RpcCommandPayload {
-  accepted: boolean;
-  ordinal?: number;
-  revision?: number;
-  rejection_code?: string;
-}
-
-function commandPayload(value: unknown): RpcCommandPayload {
-  const record = value as Record<string, unknown>;
-  const accepted = record['accepted'] === true;
-  const ordinal = typeof record['ordinal'] === 'number' ? record['ordinal'] : undefined;
-  const revision = typeof record['revision'] === 'number' ? record['revision'] : undefined;
-  const rejection =
-    typeof record['rejection_code'] === 'string' ? record['rejection_code'] : undefined;
-  return { accepted, ordinal, revision, rejection_code: rejection };
-}
 
 const configuredTransportCache = new Map<string, FixedFiveMultiplayerTransport>();
 
@@ -107,14 +99,7 @@ export function getFixedFiveTransport(options?: {
   publishableKey?: string;
   storageKey?: string;
 }): FixedFiveMultiplayerTransport {
-  const env = readSupabaseEnv();
-  const url = options?.url ?? env.url;
-  const publishableKey = options?.publishableKey ?? env.publishableKey;
-  const storageKey = options?.storageKey ?? '';
-  const key = `${url ?? 'memory'}${publishableKey ?? ''}${storageKey}`;
-  return getCachedTransport(configuredTransportCache, key, () =>
-    createFixedFiveTransport({ url, publishableKey, storageKey }),
-  );
+  return cachedRoomTransport(configuredTransportCache, options, createFixedFiveTransport);
 }
 
 export function createFixedFiveTransport(options?: {
@@ -122,27 +107,11 @@ export function createFixedFiveTransport(options?: {
   publishableKey?: string;
   storageKey?: string;
 }): FixedFiveMultiplayerTransport {
-  const candidateUrl =
-    typeof options?.url === 'string' ? options.url.trim().replace(/\/+$/, '') : undefined;
-  const candidateKey =
-    typeof options?.publishableKey === 'string' ? options.publishableKey.trim() : undefined;
-  if (
-    !candidateUrl ||
-    !candidateKey ||
-    !isUsableSupabaseUrl(candidateUrl) ||
-    !isUsablePublishableKey(candidateKey)
-  ) {
+  const clientFactory = createRoomClientFactory(options);
+  if (clientFactory === null) {
     return createInMemoryFixedFiveTransport({ clock: Date.now, random: { bytes: randomBytes } });
   }
-  let clientPromise: Promise<FixedFiveClient> | null = null;
-  const transportUrl = candidateUrl;
-  const transportPublishableKey = candidateKey;
-  const transportStorageKey = options?.storageKey;
-  function getClient(): Promise<FixedFiveClient> {
-    if (!clientPromise)
-      clientPromise = supabaseClient(transportUrl, transportPublishableKey, transportStorageKey);
-    return clientPromise;
-  }
+  const getClient = clientFactory;
   function memberFallback(participantId: FixedFiveParticipantId): FixedFiveMemberSnapshot {
     return {
       participantId,
@@ -231,34 +200,15 @@ export function createFixedFiveTransport(options?: {
     });
   }
   async function fetchSnapshot(roomId: string): Promise<FixedFiveRoomSnapshot> {
-    const client = await getClient();
-    const roomResponse = await client
-      .from('fixed_five_rooms')
-      .select(
-        'id, code, code_active, mode, source_mode, variant, versions, phase, revision, command_count, digest, result_digest, confirmed_digest, successor_room_id, series, broadcast, game_state, root_seed, deadline_at, deadline_cursor, deadline_participant, deadline_fallback, deadline_pick_ordinal, expires_at, created_at',
-      )
-      .eq('id', roomId)
-      .single();
-    if (roomResponse.error) throw new Error('authorization: cannot read room');
-    const roomData: unknown = roomResponse.data;
-    if (roomData == null) throw new Error('authorization: cannot read room');
-    const memberResponse = await client
-      .from('fixed_five_room_members')
-      .select(
-        'participant_id, online, ready, picks_committed, locked, next_game_ready, last_seen_at',
-      )
-      .eq('room_id', roomId);
-    if (
-      memberResponse.error ||
-      !Array.isArray(memberResponse.data) ||
-      memberResponse.data.length === 0
-    ) {
-      throw new Error('members failed: cannot verify room membership');
-    }
-    const row = roomData as FixedFiveRoomRow;
-    const memberData: unknown = memberResponse.data;
-    const memberRows = (Array.isArray(memberData) ? memberData : []) as FixedFiveMemberRow[];
-    return roomRowToSnapshot(row, memberRows);
+    const { room, members } = await fetchRoomRows({
+      client: await getClient(),
+      roomsTable: 'fixed_five_rooms',
+      roomSelect: ROOM_COLUMNS,
+      membersTable: MEMBERS_TABLE,
+      membersSelect: MEMBER_COLUMNS,
+      roomId,
+    });
+    return roomRowToSnapshot(room as FixedFiveRoomRow, members as FixedFiveMemberRow[]);
   }
   const registry = createRealtimeRoomRegistry({
     label: 'Fixed-five',
@@ -314,24 +264,14 @@ export function createFixedFiveTransport(options?: {
       const phase = fixedFiveRoomPhaseSchema.parse(
         typeof record['phase'] === 'string' ? record['phase'] : 'lobby',
       );
-      const revision = typeof record['revision'] === 'number' ? record['revision'] : 0;
-      const serverExpiresAt =
-        typeof record['expires_at'] === 'string' &&
-        Number.isFinite(Date.parse(record['expires_at']))
-          ? record['expires_at']
-          : null;
-      const serverCreatedAt =
-        typeof record['created_at'] === 'string' &&
-        Number.isFinite(Date.parse(record['created_at']))
-          ? record['created_at']
-          : null;
+      const preview = roomPreviewFields(record);
       return {
-        roomId: idSchema.parse(stringField(record, 'room_id')),
+        roomId: preview.roomId,
         code: parseRoomCode(code, fixedFiveRoomCodeSchema),
         codeActive: true,
         settings,
         phase,
-        revision,
+        revision: preview.revision,
         commandCount: 0,
         digest: null,
         members: [memberFallback('p1'), memberFallback('p2')],
@@ -343,8 +283,8 @@ export function createFixedFiveTransport(options?: {
         resultDigest: null,
         confirmedDigest: null,
         successorRoomId: null,
-        expiresAt: serverExpiresAt ?? new Date(Date.now() + 15 * 60 * 1000).toISOString(),
-        createdAt: serverCreatedAt ?? new Date().toISOString(),
+        expiresAt: preview.expiresAt ?? new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+        createdAt: preview.createdAt ?? new Date().toISOString(),
       };
     },
     async join(code) {
@@ -366,29 +306,7 @@ export function createFixedFiveTransport(options?: {
       const client = await getClient();
       await ensureAnonymous(client);
       const snapshot = await fetchSnapshot(roomId);
-      const user = await client.auth.getUser();
-      const uid = user.data.user?.id;
-      if (!uid) throw new Error('membership: not signed in');
-      const memberResponse = await client
-        .from('fixed_five_room_members')
-        .select('participant_id')
-        .eq('room_id', roomId)
-        .eq('uid', uid)
-        .single();
-      if (memberResponse.error) {
-        throw new Error('membership: no seat in this room');
-      }
-      const seatData: unknown = memberResponse.data;
-      if (seatData == null) {
-        throw new Error('membership: no seat in this room');
-      }
-      const member = seatData as {
-        participant_id?: unknown;
-      };
-      if (member.participant_id !== 'p1' && member.participant_id !== 'p2') {
-        throw new Error('membership: no seat in this room');
-      }
-      const participantId: FixedFiveParticipantId = member.participant_id;
+      const participantId = await readRoomParticipant(client, MEMBERS_TABLE, roomId);
       return {
         snapshot,
         membership: {
@@ -406,20 +324,20 @@ export function createFixedFiveTransport(options?: {
     async sync(roomId, afterOrdinal) {
       const client = await getClient();
       const payload = await readRoomSync(client, 'fixed-five', roomId, afterOrdinal);
-      const row = payload.room as unknown as FixedFiveRoomRow;
-      const members = payload.members as unknown as FixedFiveMemberRow[];
-      const rows = payload.commands as unknown as FixedFiveCommandRow[];
-      const commands = rows.map((row) =>
-        fixedFiveCommandSchema.parse({
-          schemaVersion: 1,
-          roomId: idSchema.parse(roomId),
-          commandId: row.command_id,
-          ordinal: row.ordinal,
-          actorParticipantId: row.actor_participant_id,
-          payload: row.payload,
-        }),
-      );
-      return { snapshot: roomRowToSnapshot(row, members), commands };
+      const parsedRoomId = idSchema.parse(roomId);
+      return {
+        snapshot: roomRowToSnapshot(
+          payload.room as unknown as FixedFiveRoomRow,
+          payload.members as unknown as FixedFiveMemberRow[],
+        ),
+        commands: parseRoomCommandRows(
+          payload.commands as unknown as FixedFiveCommandRow[],
+          parsedRoomId,
+          1,
+          fixedFiveCommandSchema,
+          true,
+        ),
+      };
     },
     subscribe(roomId, handler, onError) {
       return registry.subscribe(roomId, handler, onError);
@@ -430,21 +348,17 @@ export function createFixedFiveTransport(options?: {
       const parsedRoomId = idSchema.parse(roomId);
       const response = await client
         .from('fixed_five_room_commands')
-        .select('command_id, ordinal, actor_participant_id, payload')
+        .select(COMMAND_COLUMNS)
         .eq('room_id', parsedRoomId)
         .gt('ordinal', afterOrdinal)
         .order('ordinal', { ascending: true });
       if (response.error) throw new Error(`refetch failed: ${response.error.message}`);
-      const rows = response.data as unknown as FixedFiveCommandRow[];
-      return rows.map((row) =>
-        fixedFiveCommandSchema.parse({
-          schemaVersion: 1,
-          roomId: parsedRoomId,
-          commandId: row.command_id,
-          ordinal: row.ordinal,
-          actorParticipantId: row.actor_participant_id,
-          payload: row.payload,
-        }),
+      return parseRoomCommandRows(
+        response.data as unknown as FixedFiveCommandRow[],
+        parsedRoomId,
+        1,
+        fixedFiveCommandSchema,
+        true,
       );
     },
     async submitCommand(command) {
@@ -464,14 +378,14 @@ export function createFixedFiveTransport(options?: {
         p_payload: command.payload,
       });
       if (response.error) throw new Error(`command failed: ${response.error.message}`);
-      const payload = commandPayload(response.data);
+      const result = rpcCommandResult(response.data);
       const receipt: FixedFiveCommandReceipt = {
         roomId: command.roomId,
         commandId,
-        ordinal: payload.ordinal ?? -1,
-        accepted: payload.accepted,
-        rejectionCode: payload.rejection_code ?? null,
-        revision: payload.revision ?? 0,
+        ordinal: result.ordinal ?? -1,
+        accepted: result.accepted,
+        rejectionCode: result.rejectionCode ?? null,
+        revision: result.revision ?? 0,
       };
       return receipt;
     },
@@ -483,84 +397,45 @@ export function createFixedFiveTransport(options?: {
       });
       if (response.error)
         throw new Error(`verification challenge failed: ${response.error.message}`);
-      const data: unknown = response.data;
-      if (typeof data === 'string' && data.length > 0) return data;
-      const record =
-        typeof data === 'object' && data !== null ? (data as Record<string, unknown>) : {};
-      for (const key of ['challenge', 'challenge_string', 'value', 'token']) {
-        const candidate = record[key];
-        if (typeof candidate === 'string' && candidate.length > 0) return candidate;
-      }
-      throw new Error('verification challenge failed: server returned no challenge');
+      return rpcChallenge(response.data);
     },
     async submitVerification(roomId, receipt, expectedRevision) {
       const client = await getClient();
       await ensureAnonymous(client);
       const parsed = fixedFiveVerificationReceiptSchema.parse(receipt);
-      const response = await client.rpc('fixed_five_verification_submit', {
-        p_room_id: roomId,
-        p_receipt_id: parsed.receiptDigest,
-        p_receipt: parsed,
-        p_expected_revision: expectedRevision ?? null,
+      return submitRoomVerification({
+        client,
+        rpc: 'fixed_five_verification_submit',
+        roomId,
+        receipt: parsed,
+        ownReceiptId: parsed.receiptDigest,
+        expectedRevision,
       });
-      if (response.error) throw new Error(`verification submit failed: ${response.error.message}`);
-      const record =
-        typeof response.data === 'object' && response.data !== null
-          ? (response.data as Record<string, unknown>)
-          : {};
-      if (record['accepted'] !== true) {
-        const rejectionCode =
-          typeof record['rejectionCode'] === 'string' ? record['rejectionCode'] : 'invalid-receipt';
-        const rejectionRevision =
-          typeof record['revision'] === 'number' ? record['revision'] : null;
-        throw Object.assign(new Error(`verification submit rejected: ${rejectionCode}`), {
-          rejectionCode,
-          revision: rejectionRevision,
-        });
-      }
-      const receiptId =
-        typeof record['receiptId'] === 'string' && record['receiptId'].length > 0
-          ? record['receiptId']
-          : parsed.receiptDigest;
-      const revision = typeof record['revision'] === 'number' ? record['revision'] : 0;
-      return { receiptId, revision };
     },
     async commitFallback(roomId, cursor, payload, expectedRevision) {
       const client = await getClient();
       await ensureAnonymous(client);
-      const response = await client.rpc('fixed_five_commit_fallback', {
-        p_room_id: roomId,
-        p_cursor: cursor,
-        p_payload: payload,
-        p_expected_revision: expectedRevision ?? null,
+      return commitRoomFallback({
+        client,
+        rpc: 'fixed_five_commit_fallback',
+        roomId,
+        cursor,
+        payload,
+        expectedRevision,
       });
-      if (response.error) throw new Error(`commit fallback failed: ${response.error.message}`);
-      const record =
-        typeof response.data === 'object' && response.data !== null
-          ? (response.data as Record<string, unknown>)
-          : {};
-      const revision = typeof record['revision'] === 'number' ? record['revision'] : 0;
-      return { stored: record['stored'] === true, revision };
     },
     async resolveTimeout(roomId) {
       const client = await getClient();
       await ensureAnonymous(client);
-      const response = await client.rpc('fixed_five_timeout_resolve', { p_room_id: roomId });
-      if (response.error || !response.data) return null;
-      const record = response.data as unknown as Record<string, unknown>;
-      if (record['resolved'] !== true) return null;
-      const commandId =
-        typeof record['command_id'] === 'string'
-          ? commandIdSchema.parse(record['command_id'])
-          : commandIdSchema.parse('timeout');
-      return {
-        roomId: idSchema.parse(roomId),
-        commandId,
-        ordinal: -1,
-        accepted: true,
-        rejectionCode: null,
-        revision: 0,
-      };
+      const timeout = await resolveRoomTimeout({
+        client,
+        rpc: 'fixed_five_timeout_resolve',
+        roomId,
+        acceptedField: 'resolved',
+      });
+      return timeout === null
+        ? null
+        : { ...timeout, ordinal: -1, accepted: true, rejectionCode: null };
     },
     async removeGuest(roomId, targetParticipantId) {
       const client = await getClient();

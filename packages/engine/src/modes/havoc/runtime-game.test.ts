@@ -4,7 +4,11 @@ import {
   buildHavocLockedInputs,
 } from '@hoop-rush/test-fixtures';
 import { createEngineContext } from '../../sim/kernel.ts';
-import { simulateAuditedHavocGame, simulateHavocGame } from './game.ts';
+import {
+  simulateAuditedHavocGame,
+  simulateAuditedHavocSummaryGame,
+  simulateHavocGame,
+} from './game.ts';
 import { havocGameResultDigest, havocGameTapeDigest } from './digests.ts';
 import { auditHavocGame } from './audit.ts';
 import { buildHavocGameInput } from './input.ts';
@@ -62,6 +66,22 @@ describe('havoc runtime smoke', () => {
         expect(actual.tape).toEqual(expected.tape);
         expect(actual.audit).toEqual(auditHavocGame(input, expected.result, expected.tape));
         expect(actual.audit.ok).toBe(true);
+      }
+    }
+  });
+
+  it('keeps the tape-free audited path equal to the recorded path', () => {
+    const locked = buildHavocLockedInputs();
+    const context = createEngineContext();
+    for (const variant of ['havoc', 'normal'] as const) {
+      for (let gameNumber = 1; gameNumber <= 12; gameNumber += 1) {
+        const input = buildHavocGameInput({ locked, gameNumber, variant });
+        const recorded = simulateAuditedHavocGame(input, context);
+        const summary = simulateAuditedHavocSummaryGame(input, context);
+        expect(summary.result).toEqual(recorded.result);
+        expect(havocGameResultDigest(summary.result)).toBe(havocGameResultDigest(recorded.result));
+        expect(summary.audit).toEqual(recorded.audit);
+        expect(summary.audit.ok).toBe(true);
       }
     }
   });

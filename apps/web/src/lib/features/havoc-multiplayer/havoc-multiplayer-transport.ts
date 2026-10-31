@@ -39,18 +39,23 @@ import {
 } from '@hoop-rush/application/havoc-multiplayer';
 import { replayHavocMultiplayerDraft } from '@hoop-rush/engine';
 import {
+  cachedRoomTransport,
+  commitRoomFallback,
   createRealtimeRoomRegistry,
+  createRoomClientFactory,
+  fetchRoomRows,
+  parseRoomCommandRows,
+  readRoomParticipant,
   readRoomSync,
   ensureAnonymous,
-  getCachedTransport,
-  isUsablePublishableKey,
-  isUsableSupabaseUrl,
   parseRoomCode,
   publishTransientPayload,
-  readSupabaseEnv,
+  resolveRoomTimeout,
+  rpcChallenge,
+  rpcCommandResult,
   stringField,
+  submitRoomVerification,
   subscribeTransientPayloads,
-  supabaseClient,
 } from '#lib/supabase-runtime.js';
 import {
   loadHavocMultiplayerDraftAssets,
@@ -123,6 +128,8 @@ const ROOM_COLUMNS =
   'id, code, code_active, versions, variant, root_seed, phase, revision, command_count, result_digest, confirmed_digest, successor_room_id, deadline_at, deadline_cursor, deadline_participant, deadline_fallback, deadline_pick_ordinal, draft_state, series, broadcast, game_state, created_at, expires_at';
 const MEMBER_COLUMNS = 'participant_id, online, ready, next_game_ready, locked, last_seen_at';
 const COMMAND_COLUMNS = 'command_id, ordinal, actor_participant_id, payload';
+const MEMBERS_TABLE = 'havoc_multiplayer_room_members';
+const COMMANDS_TABLE = 'havoc_multiplayer_room_commands';
 
 function participantOf(value: unknown): HavocMultiplayerParticipantId | null {
   return value === 'p1' || value === 'p2' ? value : null;
@@ -332,24 +339,6 @@ function rpcPayload(value: unknown): RpcRoomPayload {
   };
 }
 
-interface RpcCommandPayload {
-  accepted: boolean;
-  revision?: number;
-  rejectionCode?: string;
-  commandId?: string;
-}
-
-function commandPayload(value: unknown): RpcCommandPayload {
-  const record = value as Record<string, unknown>;
-  return {
-    accepted: record['accepted'] === true,
-    revision: typeof record['revision'] === 'number' ? record['revision'] : undefined,
-    rejectionCode:
-      typeof record['rejectionCode'] === 'string' ? record['rejectionCode'] : undefined,
-    commandId: typeof record['commandId'] === 'string' ? record['commandId'] : undefined,
-  };
-}
-
 function mapRejectionCode(raw: string | undefined): HavocMultiplayerCommandRejectionCode | null {
   if (raw === undefined) return null;
   const direct = havocMultiplayerCommandRejectionCodeSchema.safeParse(raw);
@@ -387,47 +376,23 @@ export function getHavocMultiplayerTransport(options?: {
   publishableKey?: string;
   storageKey?: string;
 }): HavocMultiplayerTransport {
-  const env = readSupabaseEnv();
-  const url = options?.url ?? env.url;
-  const publishableKey = options?.publishableKey ?? env.publishableKey;
-  const storageKey = options?.storageKey ?? '';
-  const key = `${url ?? 'memory'}${publishableKey ?? ''}${storageKey}`;
-  return getCachedTransport(configuredTransportCache, key, () =>
-    createHavocMultiplayerTransport({ url, publishableKey, storageKey }),
-  );
+  return cachedRoomTransport(configuredTransportCache, options, createHavocMultiplayerTransport);
 }
 
 export function createHavocMultiplayerTransport(
   options?: HavocMultiplayerTransportOptions,
 ): HavocMultiplayerTransport {
-  const candidateUrl =
-    typeof options?.url === 'string' ? options.url.trim().replace(/\/+$/, '') : undefined;
-  const candidateKey =
-    typeof options?.publishableKey === 'string' ? options.publishableKey.trim() : undefined;
-  if (
-    !candidateUrl ||
-    !candidateKey ||
-    !isUsableSupabaseUrl(candidateUrl) ||
-    !isUsablePublishableKey(candidateKey)
-  ) {
+  const clientFactory = createRoomClientFactory(options);
+  if (clientFactory === null) {
     return createInMemoryHavocMultiplayerTransport({
       clock: Date.now,
       random: { bytes: randomBytes },
     });
   }
-  let clientPromise: Promise<HavocMultiplayerClient> | null = null;
-  const transportUrl = candidateUrl;
-  const transportPublishableKey = candidateKey;
-  const transportStorageKey = options?.storageKey;
+  const getClient = clientFactory;
   const loadDraftAssets = options?.loadDraftAssets ?? loadHavocMultiplayerDraftAssets;
   let replayedDraft: { key: string; draft: HavocMultiplayerDraftState } | null = null;
   let acceptedLog: { roomId: string; rows: HavocMultiplayerCommandRow[] } | null = null;
-  function getClient(): Promise<HavocMultiplayerClient> {
-    if (!clientPromise) {
-      clientPromise = supabaseClient(transportUrl, transportPublishableKey, transportStorageKey);
-    }
-    return clientPromise;
-  }
   async function draftFromRow(
     row: HavocMultiplayerRoomRow,
     client: HavocMultiplayerClient,
@@ -472,30 +437,17 @@ export function createHavocMultiplayerTransport(
   }
   async function fetchSnapshot(roomId: string): Promise<HavocMultiplayerRoomSnapshot> {
     const client = await getClient();
-    const roomResponse = await client
-      .from('havoc_multiplayer_rooms')
-      .select(ROOM_COLUMNS)
-      .eq('id', roomId)
-      .single();
-    if (roomResponse.error) throw new Error('authorization: cannot read room');
-    const roomData: unknown = roomResponse.data;
-    if (roomData == null) throw new Error('authorization: cannot read room');
-    const memberResponse = await client
-      .from('havoc_multiplayer_room_members')
-      .select(MEMBER_COLUMNS)
-      .eq('room_id', roomId);
-    if (
-      memberResponse.error ||
-      !Array.isArray(memberResponse.data) ||
-      memberResponse.data.length === 0
-    ) {
-      throw new Error('members failed: cannot verify room membership');
-    }
-    const row = roomData as HavocMultiplayerRoomRow;
-    const memberData: unknown = memberResponse.data;
-    const memberRows = (Array.isArray(memberData) ? memberData : []) as HavocMultiplayerMemberRow[];
+    const { room, members } = await fetchRoomRows({
+      client,
+      roomsTable: 'havoc_multiplayer_rooms',
+      roomSelect: ROOM_COLUMNS,
+      membersTable: MEMBERS_TABLE,
+      membersSelect: MEMBER_COLUMNS,
+      roomId,
+    });
+    const row = room as HavocMultiplayerRoomRow;
     const draft = await draftFromRow(row, client);
-    return roomRowToSnapshot(row, memberRows, draft);
+    return roomRowToSnapshot(row, members as HavocMultiplayerMemberRow[], draft);
   }
   const registry = createRealtimeRoomRegistry({
     label: 'Havoc Multiplayer',
@@ -576,27 +528,7 @@ export function createHavocMultiplayerTransport(
       const client = await getClient();
       await ensureAnonymous(client);
       const snapshot = await fetchSnapshot(roomId);
-      const user = await client.auth.getUser();
-      const uid = user.data.user?.id;
-      if (!uid) throw new Error('membership: not signed in');
-      const memberResponse = await client
-        .from('havoc_multiplayer_room_members')
-        .select('participant_id')
-        .eq('room_id', roomId)
-        .eq('uid', uid)
-        .single();
-      if (memberResponse.error) {
-        throw new Error('membership: no seat in this room');
-      }
-      const seatData: unknown = memberResponse.data;
-      if (seatData == null) {
-        throw new Error('membership: no seat in this room');
-      }
-      const member = seatData as { participant_id?: unknown };
-      const participantId = participantOf(member.participant_id);
-      if (participantId === null) {
-        throw new Error('membership: no seat in this room');
-      }
+      const participantId = await readRoomParticipant(client, MEMBERS_TABLE, roomId);
       return {
         snapshot,
         membership: { roomId: idSchema.parse(roomId), participantId, code: snapshot.code },
@@ -626,14 +558,12 @@ export function createHavocMultiplayerTransport(
       const row = payload.room as unknown as HavocMultiplayerRoomRow;
       const members = payload.members as unknown as HavocMultiplayerMemberRow[];
       const rows = fullRows.filter((command) => command.ordinal > afterOrdinal);
-      const commands = rows.map((row) =>
-        havocMultiplayerCommandSchema.parse({
-          schemaVersion: HAVOC_MULTIPLAYER_SAVE_SCHEMA_VERSION,
-          roomId: idSchema.parse(roomId),
-          commandId: row.command_id,
-          actorParticipantId: row.actor_participant_id,
-          payload: row.payload,
-        }),
+      const commands = parseRoomCommandRows(
+        rows,
+        idSchema.parse(roomId),
+        HAVOC_MULTIPLAYER_SAVE_SCHEMA_VERSION,
+        havocMultiplayerCommandSchema,
+        false,
       );
       const draft = await draftFromRow(row, client, fullRows);
       acceptedLog = { roomId, rows: fullRows };
@@ -668,21 +598,18 @@ export function createHavocMultiplayerTransport(
       await ensureAnonymous(client);
       const parsedRoomId = idSchema.parse(roomId);
       const response = await client
-        .from('havoc_multiplayer_room_commands')
+        .from(COMMANDS_TABLE)
         .select(COMMAND_COLUMNS)
         .eq('room_id', parsedRoomId)
         .gt('ordinal', afterRevision)
         .order('ordinal', { ascending: true });
       if (response.error) throw new Error(`refetch failed: ${response.error.message}`);
-      const rows = response.data as unknown as HavocMultiplayerCommandRow[];
-      return rows.map((row) =>
-        havocMultiplayerCommandSchema.parse({
-          schemaVersion: HAVOC_MULTIPLAYER_SAVE_SCHEMA_VERSION,
-          roomId: parsedRoomId,
-          commandId: row.command_id,
-          actorParticipantId: row.actor_participant_id,
-          payload: row.payload,
-        }),
+      return parseRoomCommandRows(
+        response.data as unknown as HavocMultiplayerCommandRow[],
+        parsedRoomId,
+        HAVOC_MULTIPLAYER_SAVE_SCHEMA_VERSION,
+        havocMultiplayerCommandSchema,
+        false,
       );
     },
     async submitCommand(command) {
@@ -696,16 +623,16 @@ export function createHavocMultiplayerTransport(
         p_payload: command.payload,
       });
       if (response.error) throw new Error(`command failed: ${response.error.message}`);
-      const payload = commandPayload(response.data);
-      const accepted = payload.accepted;
+      const result = rpcCommandResult(response.data);
+      const accepted = result.accepted;
       const receipt: HavocMultiplayerCommandReceipt = {
         roomId: idSchema.parse(command.roomId),
-        commandId: payload.commandId ? commandIdSchema.parse(payload.commandId) : commandId,
+        commandId: result.commandId ? commandIdSchema.parse(result.commandId) : commandId,
         accepted,
         rejectionCode: accepted
           ? null
-          : (mapRejectionCode(payload.rejectionCode) ?? 'unknown-command'),
-        revision: payload.revision ?? 0,
+          : (mapRejectionCode(result.rejectionCode) ?? 'unknown-command'),
+        revision: result.revision ?? 0,
       };
       return receipt;
     },
@@ -717,84 +644,51 @@ export function createHavocMultiplayerTransport(
       });
       if (response.error)
         throw new Error(`verification challenge failed: ${response.error.message}`);
-      const data: unknown = response.data;
-      if (typeof data === 'string' && data.length > 0) return data;
-      const record =
-        typeof data === 'object' && data !== null ? (data as Record<string, unknown>) : {};
-      for (const key of ['challenge', 'challenge_string', 'value', 'token']) {
-        const candidate = record[key];
-        if (typeof candidate === 'string' && candidate.length > 0) return candidate;
-      }
-      throw new Error('verification challenge failed: server returned no challenge');
+      return rpcChallenge(response.data);
     },
     async submitVerification(roomId, receipt, expectedRevision) {
       const client = await getClient();
       await ensureAnonymous(client);
       const parsed = havocMultiplayerVerificationReceiptSchema.parse(receipt);
-      const response = await client.rpc('havoc_multiplayer_verification_submit', {
-        p_room_id: roomId,
-        p_receipt_id: parsed.receiptId,
-        p_receipt: parsed,
-        p_expected_revision: expectedRevision ?? null,
+      return submitRoomVerification({
+        client,
+        rpc: 'havoc_multiplayer_verification_submit',
+        roomId,
+        receipt: parsed,
+        ownReceiptId: parsed.receiptId,
+        expectedRevision,
       });
-      if (response.error) throw new Error(`verification submit failed: ${response.error.message}`);
-      const record =
-        typeof response.data === 'object' && response.data !== null
-          ? (response.data as Record<string, unknown>)
-          : {};
-      if (record['accepted'] !== true) {
-        const rejectionCode =
-          typeof record['rejectionCode'] === 'string' ? record['rejectionCode'] : 'invalid-receipt';
-        const rejectionRevision =
-          typeof record['revision'] === 'number' ? record['revision'] : null;
-        throw Object.assign(new Error(`verification submit rejected: ${rejectionCode}`), {
-          rejectionCode,
-          revision: rejectionRevision,
-        });
-      }
-      const receiptId =
-        typeof record['receiptId'] === 'string' && record['receiptId'].length > 0
-          ? record['receiptId']
-          : parsed.receiptId;
-      const revision = typeof record['revision'] === 'number' ? record['revision'] : 0;
-      return { receiptId, revision };
     },
     async commitFallback(roomId, cursor, payload, expectedRevision) {
       const client = await getClient();
       await ensureAnonymous(client);
-      const response = await client.rpc('havoc_multiplayer_commit_fallback', {
-        p_room_id: roomId,
-        p_cursor: cursor,
-        p_payload: payload,
-        p_expected_revision: expectedRevision ?? null,
+      return commitRoomFallback({
+        client,
+        rpc: 'havoc_multiplayer_commit_fallback',
+        roomId,
+        cursor,
+        payload,
+        expectedRevision,
       });
-      if (response.error) throw new Error(`commit fallback failed: ${response.error.message}`);
-      const record =
-        typeof response.data === 'object' && response.data !== null
-          ? (response.data as Record<string, unknown>)
-          : {};
-      const revision = typeof record['revision'] === 'number' ? record['revision'] : 0;
-      return { stored: record['stored'] === true, revision };
     },
     async resolveTimeout(roomId) {
       const client = await getClient();
       await ensureAnonymous(client);
-      const response = await client.rpc('havoc_multiplayer_timeout_resolve', { p_room_id: roomId });
-      if (response.error || !response.data) return null;
-      const record = response.data as unknown as Record<string, unknown>;
-      if (record['accepted'] !== true) return null;
-      const commandId =
-        typeof record['commandId'] === 'string'
-          ? commandIdSchema.parse(record['commandId'])
-          : commandIdSchema.parse('timeout');
-      const revision = typeof record['revision'] === 'number' ? record['revision'] : 0;
-      return {
-        roomId: idSchema.parse(roomId),
-        commandId,
-        accepted: true,
-        rejectionCode: null,
-        revision,
-      };
+      const timeout = await resolveRoomTimeout({
+        client,
+        rpc: 'havoc_multiplayer_timeout_resolve',
+        roomId,
+        acceptedField: 'accepted',
+      });
+      return timeout === null
+        ? null
+        : {
+            roomId: timeout.roomId,
+            commandId: timeout.commandId,
+            accepted: true,
+            rejectionCode: null,
+            revision: timeout.revision,
+          };
     },
     async removeGuest(roomId, targetParticipantId) {
       const client = await getClient();
@@ -807,7 +701,7 @@ export function createHavocMultiplayerTransport(
         p_payload: { kind: 'remove-guest', targetParticipantId },
       });
       if (response.error) throw new Error(`remove-guest failed: ${response.error.message}`);
-      const payload = commandPayload(response.data);
+      const payload = rpcCommandResult(response.data);
       if (!payload.accepted) {
         throw new Error(`remove-guest failed: ${payload.rejectionCode ?? 'rejected'}`);
       }

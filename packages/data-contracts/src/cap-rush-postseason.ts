@@ -208,6 +208,57 @@ export const capRushPlayoffGameSummarySchema = z
   });
 export type CapRushPlayoffGameSummary = z.infer<typeof capRushPlayoffGameSummarySchema>;
 
+function addPlayoffSeriesGameIssues(
+  series: {
+    readonly seriesId: string;
+    readonly highSeed: number;
+    readonly lowSeed: number;
+    readonly highTeamId: string;
+    readonly lowTeamId: string;
+    readonly games: readonly CapRushPlayoffGameSummary[];
+  },
+  ctx: z.RefinementCtx,
+): void {
+  series.games.forEach((game, index) => {
+    if (game.gameOrdinal !== index + 1) {
+      ctx.addIssue({ code: 'custom', message: 'series games must be sequential' });
+    }
+    if (game.seriesId !== series.seriesId) {
+      ctx.addIssue({ code: 'custom', message: 'series game belongs to another series' });
+    }
+    if (
+      (game.homeTeamId !== series.highTeamId && game.homeTeamId !== series.lowTeamId) ||
+      (game.awayTeamId !== series.highTeamId && game.awayTeamId !== series.lowTeamId) ||
+      game.homeTeamId === game.awayTeamId
+    ) {
+      ctx.addIssue({ code: 'custom', message: 'series game teams do not match the matchup' });
+    }
+    const highSeed = game.homeTeamId === series.highTeamId ? game.homeSeed : game.awaySeed;
+    const lowSeed = game.homeTeamId === series.lowTeamId ? game.homeSeed : game.awaySeed;
+    if (highSeed !== series.highSeed || lowSeed !== series.lowSeed) {
+      ctx.addIssue({ code: 'custom', message: 'series game seeds do not match the matchup' });
+    }
+    const expectedHome = [1, 2, 5, 7].includes(game.gameOrdinal)
+      ? series.highTeamId
+      : series.lowTeamId;
+    if (game.homeTeamId !== expectedHome) {
+      ctx.addIssue({ code: 'custom', message: 'series home court does not follow the format' });
+    }
+  });
+  const highWins = series.games.filter((game) => game.winnerTeamId === series.highTeamId).length;
+  const lowWins = series.games.filter((game) => game.winnerTeamId === series.lowTeamId).length;
+  if (highWins > CAP_RUSH_SERIES_WINS || lowWins > CAP_RUSH_SERIES_WINS) {
+    ctx.addIssue({ code: 'custom', message: 'a series cannot exceed four wins' });
+  }
+  if (
+    (highWins === CAP_RUSH_SERIES_WINS || lowWins === CAP_RUSH_SERIES_WINS) &&
+    series.games.at(-1)?.winnerTeamId !==
+      (highWins === CAP_RUSH_SERIES_WINS ? series.highTeamId : series.lowTeamId)
+  ) {
+    ctx.addIssue({ code: 'custom', message: 'a series must end on its clinching win' });
+  }
+}
+
 export const capRushPlayoffSeriesSchema = z
   .object({
     seriesId: capRushSeriesIdSchema,
@@ -227,44 +278,7 @@ export const capRushPlayoffSeriesSchema = z
     if (series.highSeed >= series.lowSeed) {
       ctx.addIssue({ code: 'custom', message: 'the higher seed must carry the lower seed number' });
     }
-    series.games.forEach((game, index) => {
-      if (game.gameOrdinal !== index + 1) {
-        ctx.addIssue({ code: 'custom', message: 'series games must be sequential' });
-      }
-      if (game.seriesId !== series.seriesId) {
-        ctx.addIssue({ code: 'custom', message: 'series game belongs to another series' });
-      }
-      if (
-        (game.homeTeamId !== series.highTeamId && game.homeTeamId !== series.lowTeamId) ||
-        (game.awayTeamId !== series.highTeamId && game.awayTeamId !== series.lowTeamId) ||
-        game.homeTeamId === game.awayTeamId
-      ) {
-        ctx.addIssue({ code: 'custom', message: 'series game teams do not match the matchup' });
-      }
-      const highSeed = game.homeTeamId === series.highTeamId ? game.homeSeed : game.awaySeed;
-      const lowSeed = game.homeTeamId === series.lowTeamId ? game.homeSeed : game.awaySeed;
-      if (highSeed !== series.highSeed || lowSeed !== series.lowSeed) {
-        ctx.addIssue({ code: 'custom', message: 'series game seeds do not match the matchup' });
-      }
-      const expectedHome = [1, 2, 5, 7].includes(game.gameOrdinal)
-        ? series.highTeamId
-        : series.lowTeamId;
-      if (game.homeTeamId !== expectedHome) {
-        ctx.addIssue({ code: 'custom', message: 'series home court does not follow the format' });
-      }
-    });
-    const highWins = series.games.filter((game) => game.winnerTeamId === series.highTeamId).length;
-    const lowWins = series.games.filter((game) => game.winnerTeamId === series.lowTeamId).length;
-    if (highWins > CAP_RUSH_SERIES_WINS || lowWins > CAP_RUSH_SERIES_WINS) {
-      ctx.addIssue({ code: 'custom', message: 'a series cannot exceed four wins' });
-    }
-    if (
-      (highWins === CAP_RUSH_SERIES_WINS || lowWins === CAP_RUSH_SERIES_WINS) &&
-      series.games.at(-1)?.winnerTeamId !==
-        (highWins === CAP_RUSH_SERIES_WINS ? series.highTeamId : series.lowTeamId)
-    ) {
-      ctx.addIssue({ code: 'custom', message: 'a series must end on its clinching win' });
-    }
+    addPlayoffSeriesGameIssues(series, ctx);
   });
 export type CapRushPlayoffSeries = z.infer<typeof capRushPlayoffSeriesSchema>;
 
@@ -295,44 +309,7 @@ export const capRushConferenceSeriesSchema = z
     if (series.highTeamId === series.lowTeamId) {
       ctx.addIssue({ code: 'custom', message: 'a series needs two teams' });
     }
-    series.games.forEach((game, index) => {
-      if (game.gameOrdinal !== index + 1) {
-        ctx.addIssue({ code: 'custom', message: 'series games must be sequential' });
-      }
-      if (game.seriesId !== series.seriesId) {
-        ctx.addIssue({ code: 'custom', message: 'series game belongs to another series' });
-      }
-      if (
-        (game.homeTeamId !== series.highTeamId && game.homeTeamId !== series.lowTeamId) ||
-        (game.awayTeamId !== series.highTeamId && game.awayTeamId !== series.lowTeamId) ||
-        game.homeTeamId === game.awayTeamId
-      ) {
-        ctx.addIssue({ code: 'custom', message: 'series game teams do not match the matchup' });
-      }
-      const highSeed = game.homeTeamId === series.highTeamId ? game.homeSeed : game.awaySeed;
-      const lowSeed = game.homeTeamId === series.lowTeamId ? game.homeSeed : game.awaySeed;
-      if (highSeed !== series.highSeed || lowSeed !== series.lowSeed) {
-        ctx.addIssue({ code: 'custom', message: 'series game seeds do not match the matchup' });
-      }
-      const expectedHome = [1, 2, 5, 7].includes(game.gameOrdinal)
-        ? series.highTeamId
-        : series.lowTeamId;
-      if (game.homeTeamId !== expectedHome) {
-        ctx.addIssue({ code: 'custom', message: 'series home court does not follow the format' });
-      }
-    });
-    const highWins = series.games.filter((game) => game.winnerTeamId === series.highTeamId).length;
-    const lowWins = series.games.filter((game) => game.winnerTeamId === series.lowTeamId).length;
-    if (highWins > CAP_RUSH_SERIES_WINS || lowWins > CAP_RUSH_SERIES_WINS) {
-      ctx.addIssue({ code: 'custom', message: 'a series cannot exceed four wins' });
-    }
-    if (
-      (highWins === CAP_RUSH_SERIES_WINS || lowWins === CAP_RUSH_SERIES_WINS) &&
-      series.games.at(-1)?.winnerTeamId !==
-        (highWins === CAP_RUSH_SERIES_WINS ? series.highTeamId : series.lowTeamId)
-    ) {
-      ctx.addIssue({ code: 'custom', message: 'a series must end on its clinching win' });
-    }
+    addPlayoffSeriesGameIssues(series, ctx);
   });
 export type CapRushConferenceSeries = z.infer<typeof capRushConferenceSeriesSchema>;
 

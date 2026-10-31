@@ -21,6 +21,7 @@ import { sleep } from '../lib/sleep';
 const engineContext = createEngineContext();
 const cancelledRequests = new Set<string>();
 const PROGRESS_INTERVAL_MS = 250;
+const YIELD_INTERVAL_MS = 8;
 const STANDINGS_BATCH = 40;
 
 function post(message: unknown): void {
@@ -323,6 +324,7 @@ async function simulatePlayoffs(
   signal: { cancelled: boolean },
 ): Promise<void> {
   let delivered = 0;
+  let lastYieldAt = Date.now();
   for (const plan of request.games) {
     if (signal.cancelled || cancelledRequests.has(request.requestId)) {
       cancelledRequests.delete(request.requestId);
@@ -374,7 +376,10 @@ async function simulatePlayoffs(
         : {}),
     });
     delivered += 1;
-    await sleep(0);
+    if (Date.now() - lastYieldAt >= YIELD_INTERVAL_MS) {
+      lastYieldAt = Date.now();
+      await sleep(0);
+    }
   }
   post({
     schemaVersion: CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION,

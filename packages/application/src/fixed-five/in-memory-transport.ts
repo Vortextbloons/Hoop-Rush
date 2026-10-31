@@ -6,6 +6,7 @@ import {
   FIXED_FIVE_ROOM_SCHEMA_VERSION,
   fixedFiveCommandPayloadSchema,
   fixedFiveCommandSchema,
+  fixedFiveRoomCodeSchema,
   fixedFiveTimeoutMsForMode,
   fixedFiveVerificationReceiptSchema,
   type FixedFiveCommand,
@@ -13,7 +14,6 @@ import {
   type FixedFiveCommandReceipt,
   type FixedFiveMultiplayerTransport,
   type FixedFiveParticipantId,
-  type FixedFiveRoomCode,
   type FixedFiveRoomMembership,
   type FixedFiveRoomSettings,
   type FixedFiveRoomSnapshot,
@@ -24,7 +24,13 @@ import {
   idSchema,
   seedSchema,
 } from '@hoop-rush/data-contracts';
-import { createSeededRng } from '../runtime/seeded-rng.ts';
+import {
+  createInMemoryRoomStore,
+  membershipError,
+  phaseError,
+  roomError,
+  type InMemoryRoomRecord,
+} from '../multiplayer/in-memory-room-store.ts';
 
 function nowIsoWith(clock: () => number): string {
   return new Date(clock()).toISOString();
@@ -97,68 +103,6 @@ function sandboxPickerForSnapshot(
   if (!snapshot.rootSeed) throw new Error('sandbox snake room is missing a root seed');
   return sandboxPicker(snapshot.rootSeed, pickOrdinal);
 }
-function randomSeedWith(
-  rng: () => number,
-  randomBytes: ((length: number) => Uint8Array) | undefined,
-): string {
-  if (randomBytes) {
-    const bytes = new Uint8Array(16);
-    bytes.set(randomBytes(bytes.length));
-    return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
-  }
-  const bytes = new Uint8Array(16);
-  for (let i = 0; i < bytes.length; i += 1) {
-    bytes[i] = Math.floor(rng() * 256);
-  }
-  return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
-}
-function randomCodeWith(existing: Set<string>, rng: () => number): FixedFiveRoomCode {
-  for (let attempt = 0; attempt < 2000; attempt += 1) {
-    const n = Math.floor(rng() * 10000);
-    const code = String(n).padStart(4, '0');
-    if (!existing.has(code)) return code;
-  }
-  throw new Error('in-memory fixed-five: code space exhausted');
-}
-function randomRoomIdWith(
-  rng: () => number,
-  randomBytes: ((length: number) => Uint8Array) | undefined,
-): string {
-  if (randomBytes) {
-    const bytes = new Uint8Array(12);
-    bytes.set(randomBytes(bytes.length));
-    return `ff-${[...bytes]
-      .map((b) => b.toString(36))
-      .join('')
-      .slice(0, 12)}`
-      .toLowerCase()
-      .replace(/[^a-z0-9._:-]/g, 'a');
-  }
-  const bytes = new Uint8Array(12);
-  for (let i = 0; i < bytes.length; i += 1) {
-    bytes[i] = Math.floor(rng() * 256);
-  }
-  return `ff-${[...bytes]
-    .map((b) => b.toString(36))
-    .join('')
-    .slice(0, 12)}`
-    .toLowerCase()
-    .replace(/[^a-z0-9._:-]/g, 'a');
-}
-function randomChallengeWith(
-  rng: () => number,
-  randomBytes: ((length: number) => Uint8Array) | undefined,
-): string {
-  const bytes = new Uint8Array(24);
-  if (randomBytes) {
-    bytes.set(randomBytes(bytes.length));
-  } else {
-    for (let i = 0; i < bytes.length; i += 1) {
-      bytes[i] = Math.floor(rng() * 256);
-    }
-  }
-  return `ff-challenge-${[...bytes].map((b) => b.toString(16).padStart(2, '0')).join('')}`;
-}
 interface FallbackCommitment {
   cursor: string;
   participantId: FixedFiveParticipantId;
@@ -181,17 +125,13 @@ interface DuelGameState {
   proposals: Partial<Record<FixedFiveParticipantId, DuelGameProposal>>;
   confirmations: Partial<Record<FixedFiveParticipantId, DuelGameConfirmation>>;
 }
-interface RoomRecord {
-  snapshot: FixedFiveRoomSnapshot;
+interface RoomRecord extends InMemoryRoomRecord<
+  FixedFiveRoomSnapshot,
+  never,
+  FixedFiveVerificationReceipt,
+  FallbackCommitment
+> {
   commands: FixedFiveCommand[];
-  commandIds: Set<string>;
-  code: FixedFiveRoomCode;
-  codeExpiresAt: number;
-  updatedAt: number;
-  subscribers: Set<(snapshot: FixedFiveRoomSnapshot) => void>;
-  verificationChallenge: string | null;
-  receipts: Map<string, FixedFiveVerificationReceipt>;
-  fallback: FallbackCommitment | null;
   gameState: DuelGameState;
 }
 function emptyDuelGameState(): DuelGameState {
@@ -202,41 +142,24 @@ export function createInMemoryFixedFiveTransport(options: {
   random: { seed: string } | { rng: () => number } | { bytes: (length: number) => Uint8Array };
 }): FixedFiveMultiplayerTransport {
   const clock = options.clock;
-  const random = options.random;
-  const randomBytes = 'bytes' in random ? random.bytes : undefined;
-  const rng =
-    'rng' in random
-      ? random.rng
-      : 'seed' in random
-        ? createSeededRng(random.seed)
-        : () => {
-            const bytes = new Uint8Array(random.bytes(4));
-            return new DataView(bytes.buffer).getUint32(0, true) / 4294967296;
-          };
-  const rooms = new Map<string, RoomRecord>();
-  const codeIndex = new Map<string, string>();
-  const createTimestamps: number[] = [];
-  function pruneExpiredCodes(): void {
-    const now = clock();
-    for (const [code, roomId] of [...codeIndex.entries()]) {
-      const record = rooms.get(roomId);
-      if (!record || record.codeExpiresAt <= now || record.snapshot.phase === 'expired') {
-        codeIndex.delete(code);
-        if (record && record.snapshot.codeActive) {
-          record.snapshot = { ...record.snapshot, codeActive: false, code: null };
-        }
-      }
-    }
-  }
-  function emit(record: RoomRecord): void {
-    for (const handler of record.subscribers) {
-      try {
-        handler(record.snapshot);
-      } catch {
-        continue;
-      }
-    }
-  }
+  const store = createInMemoryRoomStore<
+    FixedFiveRoomSnapshot,
+    never,
+    FixedFiveVerificationReceipt,
+    FallbackCommitment,
+    RoomRecord
+  >({
+    clock,
+    random: options.random,
+    roomIdPrefix: 'ff-',
+    codeTtlMs: FIXED_FIVE_CODE_TTL_MS,
+    codeSchema: fixedFiveRoomCodeSchema,
+    challengePrefix: 'ff-challenge-',
+    challengeBytes: 24,
+    codeExhaustedMessage: 'in-memory fixed-five: code space exhausted',
+    clearCode: (snapshot) =>
+      snapshot.codeActive ? { ...snapshot, codeActive: false, code: null } : snapshot,
+  });
   function touchDeadline(record: RoomRecord, payload: FixedFiveCommandPayload): void {
     const { snapshot } = record;
     const sandboxSnake = isSandboxSnakeRoom(snapshot.settings);
@@ -571,26 +494,17 @@ export function createInMemoryFixedFiveTransport(options: {
   return {
     async create(settingsInput) {
       await Promise.resolve();
-      pruneExpiredCodes();
-      const now = clock();
-      const recent = createTimestamps.filter((t) => now - t < 60000);
-      if (recent.length >= 60) {
-        throw Object.assign(new Error('rate-limit: too many rooms'), {
-          code: 'rate-limit',
-          retryable: true,
-        });
-      }
-      createTimestamps.push(now);
+      const now = store.claimCreateSlot();
       const settings: FixedFiveRoomSettings = {
         schemaVersion: FIXED_FIVE_ROOM_SCHEMA_VERSION,
         timerPolicyVersion: 'fixed-five-autopick-v1',
         ...settingsInput,
         versions: settingsInput.versions,
       };
-      const roomId = idSchema.parse(randomRoomIdWith(rng, randomBytes));
-      const codes = new Set(codeIndex.keys());
-      const code = randomCodeWith(codes, rng);
-      const rootSeed = seedSchema.parse(randomSeedWith(rng, randomBytes));
+      const allocation = store.allocateRoom(now);
+      const roomId = idSchema.parse(allocation.roomId);
+      const code = allocation.code;
+      const rootSeed = seedSchema.parse(allocation.rootSeed);
       const timeoutMs = fixedFiveTimeoutMsForMode(settings.mode);
       const createdAt = new Date(now).toISOString();
       const expiresAt = new Date(now + 24 * 60 * 60 * 1000).toISOString();
@@ -647,53 +561,35 @@ export function createInMemoryFixedFiveTransport(options: {
         commands: [],
         commandIds: new Set(),
         code,
-        codeExpiresAt: now + FIXED_FIVE_CODE_TTL_MS,
+        codeExpiresAt: allocation.codeExpiresAt,
         updatedAt: now,
         subscribers: new Set(),
+        transientSubscribers: new Set(),
         verificationChallenge: null,
         receipts: new Map(),
         fallback: null,
         gameState: emptyDuelGameState(),
       };
-      rooms.set(roomId, record);
-      codeIndex.set(code, roomId);
+      store.add(roomId, record);
       const membership: FixedFiveRoomMembership = { roomId, participantId: 'p1', code };
       return { snapshot, code, membership };
     },
     async preview(code) {
       await Promise.resolve();
-      pruneExpiredCodes();
-      const roomId = codeIndex.get(code);
-      if (!roomId)
-        throw Object.assign(new Error('invalid-code'), { code: 'invalid-code', retryable: false });
-      const record = rooms.get(roomId);
-      if (!record)
-        throw Object.assign(new Error('invalid-code'), { code: 'invalid-code', retryable: false });
-      return record.snapshot;
+      return store.roomByCode(code).snapshot;
     },
     async join(code) {
       await Promise.resolve();
-      pruneExpiredCodes();
-      const roomId = codeIndex.get(code);
-      if (!roomId)
-        throw Object.assign(new Error('invalid-code'), { code: 'invalid-code', retryable: false });
-      const record = rooms.get(roomId);
-      if (!record)
-        throw Object.assign(new Error('invalid-code'), { code: 'invalid-code', retryable: false });
-      if (record.snapshot.phase === 'expired')
-        throw Object.assign(new Error('code-expired'), { code: 'code-expired', retryable: false });
-      const p2 = record.snapshot.members.find((m) => m.participantId === 'p2');
-      const updated = record.snapshot.members.map((m) =>
-        m.participantId === 'p2' ? { ...m, online: true, lastSeenAt: nowIsoWith(clock) } : m,
-      );
-      void p2;
+      const record = store.joinableRoom(code);
       record.snapshot = {
         ...record.snapshot,
-        members: updated,
+        members: record.snapshot.members.map((m) =>
+          m.participantId === 'p2' ? { ...m, online: true, lastSeenAt: nowIsoWith(clock) } : m,
+        ),
         revision: record.snapshot.revision + 1,
       };
       record.updatedAt = clock();
-      emit(record);
+      store.emit(record);
       return {
         snapshot: record.snapshot,
         membership: { roomId: record.snapshot.roomId, participantId: 'p2', code: record.code },
@@ -701,12 +597,7 @@ export function createInMemoryFixedFiveTransport(options: {
     },
     async resume(roomId) {
       await Promise.resolve();
-      const record = rooms.get(roomId);
-      if (!record)
-        throw Object.assign(new Error('authorization'), {
-          code: 'authorization',
-          retryable: false,
-        });
+      const record = store.require(roomId);
       return {
         snapshot: record.snapshot,
         membership: { roomId: record.snapshot.roomId, participantId: 'p1', code: record.code },
@@ -714,17 +605,11 @@ export function createInMemoryFixedFiveTransport(options: {
     },
     async snapshot(roomId) {
       await Promise.resolve();
-      const record = rooms.get(roomId);
-      if (!record)
-        throw Object.assign(new Error('authorization'), {
-          code: 'authorization',
-          retryable: false,
-        });
-      return record.snapshot;
+      return store.require(roomId).snapshot;
     },
     async sync(roomId, afterOrdinal) {
       await Promise.resolve();
-      const record = rooms.get(roomId);
+      const record = store.find(roomId);
       if (!record) throw new Error('authorization');
       return {
         snapshot: record.snapshot,
@@ -732,33 +617,15 @@ export function createInMemoryFixedFiveTransport(options: {
       };
     },
     subscribe(roomId, handler) {
-      const record = rooms.get(roomId);
-      if (!record) return { unsubscribe: () => {} };
-      record.subscribers.add(handler);
-      return {
-        unsubscribe: () => {
-          record.subscribers.delete(handler);
-        },
-      };
+      return store.subscribe(roomId, handler);
     },
     async refetch(roomId, afterOrdinal) {
       await Promise.resolve();
-      const record = rooms.get(roomId);
-      if (!record)
-        throw Object.assign(new Error('authorization'), {
-          code: 'authorization',
-          retryable: false,
-        });
-      return record.commands.filter((c) => c.ordinal > afterOrdinal);
+      return store.require(roomId).commands.filter((command) => command.ordinal > afterOrdinal);
     },
     async submitCommand(command) {
       await Promise.resolve();
-      const record = rooms.get(command.roomId);
-      if (!record)
-        throw Object.assign(new Error('authorization'), {
-          code: 'authorization',
-          retryable: false,
-        });
+      const record = store.require(command.roomId);
       const payloadBytes = new TextEncoder().encode(canonicalJson(command.payload)).length;
       if (payloadBytes > FIXED_FIVE_ENVELOPE_MAX_BYTES) {
         return {
@@ -927,7 +794,7 @@ export function createInMemoryFixedFiveTransport(options: {
       }
       applyDuelBroadcastCommand(record, parsed.data);
       applyShared82BroadcastCommand(record, parsed.data);
-      emit(record);
+      store.emit(record);
       return {
         roomId: command.roomId,
         commandId: command.commandId,
@@ -939,143 +806,78 @@ export function createInMemoryFixedFiveTransport(options: {
     },
     async verificationChallenge(roomId) {
       await Promise.resolve();
-      const record = rooms.get(roomId);
-      if (!record)
-        throw Object.assign(new Error('authorization'), {
-          code: 'authorization',
-          retryable: false,
-        });
-      record.verificationChallenge ??= randomChallengeWith(rng, randomBytes);
-      return record.verificationChallenge;
+      return store.verificationChallenge(store.require(roomId));
     },
     async submitVerification(roomId, receipt, expectedRevision) {
       await Promise.resolve();
-      const record = rooms.get(roomId);
-      if (!record)
-        throw Object.assign(new Error('authorization'), {
-          code: 'authorization',
-          retryable: false,
-        });
-      const parsed = fixedFiveVerificationReceiptSchema.safeParse(receipt);
-      if (!parsed.success) {
-        throw Object.assign(new Error('verification: invalid receipt'), {
-          rejectionCode: 'invalid-receipt',
-          revision: record.snapshot.revision,
-        });
-      }
-      if (parsed.data.roomId !== record.snapshot.roomId) {
-        throw Object.assign(new Error('verification: receipt does not belong to the room'), {
-          rejectionCode: 'invalid-receipt',
-          revision: record.snapshot.revision,
-        });
-      }
-      if (
-        record.verificationChallenge === null ||
-        parsed.data.challenge !== record.verificationChallenge
-      ) {
-        throw Object.assign(new Error('verification: challenge mismatch'), {
-          rejectionCode: 'invalid-receipt',
-          revision: record.snapshot.revision,
-        });
-      }
-      if (expectedRevision !== undefined && expectedRevision !== record.snapshot.revision) {
-        throw Object.assign(new Error('stale-revision'), {
-          rejectionCode: 'stale-revision',
-          revision: record.snapshot.revision,
-        });
-      }
-      record.receipts.set(parsed.data.receiptDigest, parsed.data);
-      return { receiptId: parsed.data.receiptDigest, revision: record.snapshot.revision };
+      return store.submitVerification(
+        store.require(roomId),
+        receipt,
+        expectedRevision,
+        fixedFiveVerificationReceiptSchema,
+        { foreignReceiptMessage: 'verification: receipt does not belong to the room' },
+      );
     },
     async commitFallback(roomId, cursor, payload, expectedRevision) {
       await Promise.resolve();
-      const record = rooms.get(roomId);
-      if (!record)
-        throw Object.assign(new Error('authorization'), {
-          code: 'authorization',
-          retryable: false,
-        });
-      const deadline = record.snapshot.deadline;
-      if (!deadline || deadline.cursor !== cursor) {
-        return { stored: false, revision: record.snapshot.revision };
-      }
-      if (expectedRevision !== undefined && expectedRevision !== record.snapshot.revision) {
-        throw Object.assign(new Error('stale-revision'), {
-          code: 'stale-revision',
-          retryable: true,
-        });
-      }
-      const parsed = fixedFiveCommandPayloadSchema.safeParse(payload);
-      if (
-        !parsed.success ||
-        parsed.data.kind !== 'timeout-autopick' ||
-        parsed.data.pickOrdinal !== deadline.pickOrdinal
-      ) {
-        throw Object.assign(
-          new Error('commit-fallback: payload must match the deadline autopick'),
-          {
-            code: 'illegal-move',
-            retryable: false,
-          },
-        );
-      }
-      record.fallback = {
-        cursor,
-        participantId: deadline.participantId,
-        pickOrdinal: deadline.pickOrdinal,
-        payload: parsed.data,
-      };
-      return { stored: true, revision: record.snapshot.revision };
+      const record = store.require(roomId);
+      return store.commitFallback(record, cursor, expectedRevision, (deadline) => {
+        const parsed = fixedFiveCommandPayloadSchema.safeParse(payload);
+        if (
+          !parsed.success ||
+          parsed.data.kind !== 'timeout-autopick' ||
+          parsed.data.pickOrdinal !== deadline.pickOrdinal
+        ) {
+          throw roomError(
+            'commit-fallback: payload must match the deadline autopick',
+            'illegal-move',
+            false,
+          );
+        }
+        return {
+          cursor,
+          participantId: deadline.participantId,
+          pickOrdinal: deadline.pickOrdinal,
+          payload: parsed.data,
+        };
+      });
     },
     async resolveTimeout(roomId) {
-      const record = rooms.get(roomId);
-      if (!record) return null;
-      const deadline = record.snapshot.deadline;
-      if (!deadline) return null;
-      if (clock() < Date.parse(deadline.deadlineAt)) return null;
-      const commitment = record.fallback;
-      if (!commitment || commitment.cursor !== deadline.cursor) return null;
-      const commandId = `timeout-${deadline.cursor}-${String(commitment.pickOrdinal)}`;
-      if (record.commandIds.has(commandId)) return null;
-      const receipt = await this.submitCommand({
-        schemaVersion: 1,
-        roomId: record.snapshot.roomId,
-        commandId: commandIdSchema.parse(commandId),
-        actorParticipantId: commitment.participantId,
-        payload: commitment.payload,
-      });
-      return receipt;
+      const record = store.find(roomId);
+      return store.resolveTimeout(
+        record,
+        (deadline) => deadline.deadlineAt,
+        (deadline, commitment) => `timeout-${deadline.cursor}-${String(commitment.pickOrdinal)}`,
+        (commitment, commandId) =>
+          record === undefined
+            ? Promise.resolve(null)
+            : this.submitCommand({
+                schemaVersion: 1,
+                roomId: record.snapshot.roomId,
+                commandId: commandIdSchema.parse(commandId),
+                actorParticipantId: commitment.participantId,
+                payload: commitment.payload,
+              }),
+      );
     },
     async removeGuest(roomId, targetParticipantId: FixedFiveParticipantId) {
       await Promise.resolve();
-      const record = rooms.get(roomId);
-      if (!record)
-        throw Object.assign(new Error('authorization'), {
-          code: 'authorization',
-          retryable: false,
-        });
-      if (record.snapshot.phase !== 'lobby')
-        throw Object.assign(new Error('phase'), { code: 'phase', retryable: false });
-      if (targetParticipantId !== 'p2')
-        throw Object.assign(new Error('membership'), { code: 'membership', retryable: false });
-      const codes = new Set([...codeIndex.keys()].filter((c) => c !== record.code));
-      const nextCode = randomCodeWith(codes, rng);
-      codeIndex.delete(record.code);
-      codeIndex.set(nextCode, roomId);
-      record.code = nextCode;
-      record.codeExpiresAt = clock() + FIXED_FIVE_CODE_TTL_MS;
+      const record = store.require(roomId);
+      if (record.snapshot.phase !== 'lobby') throw phaseError();
+      if (targetParticipantId !== 'p2') throw membershipError();
+      const nextCode = store.rotateCode(record);
       record.snapshot = {
         ...record.snapshot,
         code: nextCode,
         codeActive: true,
         revision: record.snapshot.revision + 1,
       };
-      emit(record);
+      store.emit(record);
       return record.snapshot;
     },
     async leave(roomId, participantId) {
       await Promise.resolve();
-      const record = rooms.get(roomId);
+      const record = store.find(roomId);
       if (!record) return;
       record.snapshot = {
         ...record.snapshot,
@@ -1085,17 +887,11 @@ export function createInMemoryFixedFiveTransport(options: {
         revision: record.snapshot.revision + 1,
       };
       record.updatedAt = clock();
-      emit(record);
+      store.emit(record);
     },
     async rematch(roomId) {
-      const record = rooms.get(roomId);
-      if (!record)
-        throw Object.assign(new Error('authorization'), {
-          code: 'authorization',
-          retryable: false,
-        });
-      if (record.snapshot.phase !== 'completed')
-        throw Object.assign(new Error('phase'), { code: 'phase', retryable: false });
+      const record = store.require(roomId);
+      if (record.snapshot.phase !== 'completed') throw phaseError();
       const created = await this.create({
         mode: record.snapshot.settings.mode,
         sourceMode: record.snapshot.settings.sourceMode,
@@ -1103,17 +899,12 @@ export function createInMemoryFixedFiveTransport(options: {
         versions: record.snapshot.settings.versions,
       });
       record.snapshot = { ...record.snapshot, successorRoomId: created.snapshot.roomId };
-      emit(record);
+      store.emit(record);
       return { snapshot: created.snapshot, code: created.code };
     },
     async complete(roomId, receiptId) {
       await Promise.resolve();
-      const record = rooms.get(roomId);
-      if (!record)
-        throw Object.assign(new Error('authorization'), {
-          code: 'authorization',
-          retryable: false,
-        });
+      const record = store.require(roomId);
       if (record.snapshot.phase === 'completed')
         return { completed: true, phase: record.snapshot.phase };
       if (record.snapshot.phase === 'integrity-failed' || record.snapshot.phase === 'expired')
@@ -1141,17 +932,12 @@ export function createInMemoryFixedFiveTransport(options: {
         codeActive: false,
         revision: record.snapshot.revision + 1,
       };
-      emit(record);
+      store.emit(record);
       return { completed: true, phase: record.snapshot.phase };
     },
     async fail(roomId) {
       await Promise.resolve();
-      const record = rooms.get(roomId);
-      if (!record)
-        throw Object.assign(new Error('authorization'), {
-          code: 'authorization',
-          retryable: false,
-        });
+      const record = store.require(roomId);
       if (record.snapshot.phase === 'integrity-failed')
         return { failed: true, phase: record.snapshot.phase };
       if (record.snapshot.phase === 'completed' || record.snapshot.phase === 'expired')
@@ -1182,7 +968,7 @@ export function createInMemoryFixedFiveTransport(options: {
         codeActive: false,
         revision: record.snapshot.revision + 1,
       };
-      emit(record);
+      store.emit(record);
       return { failed: true, phase: record.snapshot.phase };
     },
   };

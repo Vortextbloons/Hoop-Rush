@@ -29,10 +29,15 @@ import {
   contentHashSchema,
   idSchema,
   seedSchema,
-  type Id,
   canonicalJson,
 } from '@hoop-rush/data-contracts';
-import { createSeededRng } from '../runtime/seeded-rng.ts';
+import {
+  createInMemoryRoomStore,
+  membershipError,
+  phaseError,
+  roomError,
+  type InMemoryRoomRecord,
+} from '../multiplayer/in-memory-room-store.ts';
 
 export function draftDuelFirstPickerFor(rootSeed: string): DraftDuelParticipantId {
   return seedByteParity(rootSeed, 0) ? 'p1' : 'p2';
@@ -71,67 +76,6 @@ export function draftDuelHomeForGameFor(
 
 function nowIsoWith(clock: () => number): string {
   return new Date(clock()).toISOString();
-}
-
-function randomSeedWith(
-  rng: () => number,
-  randomBytes: ((length: number) => Uint8Array) | undefined,
-): string {
-  const bytes = new Uint8Array(16);
-  if (randomBytes) {
-    bytes.set(randomBytes(bytes.length));
-  } else {
-    for (let i = 0; i < bytes.length; i += 1) {
-      bytes[i] = Math.floor(rng() * 256);
-    }
-  }
-  return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
-}
-
-function randomCodeWith(existing: Set<string>, rng: () => number): DraftDuelRoomCode {
-  for (let attempt = 0; attempt < 2000; attempt += 1) {
-    const n = Math.floor(rng() * 10000);
-    const code = String(n).padStart(4, '0');
-    if (!existing.has(code)) return draftDuelRoomCodeSchema.parse(code);
-  }
-  throw new Error('in-memory draft-duel: code space exhausted');
-}
-
-function randomRoomIdWith(
-  rng: () => number,
-  randomBytes: ((length: number) => Uint8Array) | undefined,
-): Id {
-  const bytes = new Uint8Array(12);
-  if (randomBytes) {
-    bytes.set(randomBytes(bytes.length));
-  } else {
-    for (let i = 0; i < bytes.length; i += 1) {
-      bytes[i] = Math.floor(rng() * 256);
-    }
-  }
-  return idSchema.parse(
-    `dd-${[...bytes]
-      .map((b) => b.toString(36))
-      .join('')
-      .slice(0, 12)
-      .toLowerCase()
-      .replace(/[^a-z0-9._:-]/g, 'a')}`,
-  );
-}
-
-function randomChallengeWith(
-  rng: () => number,
-  randomBytes: ((length: number) => Uint8Array) | undefined,
-): string {
-  const bytes = new Uint8Array(24);
-  if (randomBytes) {
-    bytes.set(randomBytes(bytes.length));
-  } else {
-    for (let i = 0; i < bytes.length; i += 1) {
-      bytes[i] = Math.floor(rng() * 256);
-    }
-  }
-  return `dd-challenge-${[...bytes].map((b) => b.toString(16).padStart(2, '0')).join('')}`;
 }
 
 function idleMember(participantId: DraftDuelParticipantId): DraftDuelMemberSnapshot {
@@ -185,19 +129,14 @@ interface GameConfirmation {
   verified: boolean;
 }
 
-interface RoomRecord {
-  snapshot: DraftDuelRoomSnapshot;
+interface RoomRecord extends InMemoryRoomRecord<
+  DraftDuelRoomSnapshot,
+  DraftDuelTransientEvent,
+  DraftDuelVerificationReceipt,
+  FallbackCommitment
+> {
   commands: DraftDuelCommand[];
-  commandIds: Set<string>;
   payloadHashes: Map<string, string>;
-  code: DraftDuelRoomCode;
-  codeExpiresAt: number;
-  updatedAt: number;
-  subscribers: Set<(snapshot: DraftDuelRoomSnapshot) => void>;
-  transientSubscribers: Set<(event: DraftDuelTransientEvent) => void>;
-  verificationChallenge: string | null;
-  receipts: Map<string, DraftDuelVerificationReceipt>;
-  fallback: FallbackCommitment | null;
   draftState: DraftState | null;
   proposals: Partial<Record<DraftDuelParticipantId, GameProposal>>;
   confirmations: Partial<Record<DraftDuelParticipantId, GameConfirmation>>;
@@ -213,43 +152,24 @@ export function createInMemoryDraftDuelTransport(options: {
   random: { seed: string } | { rng: () => number } | { bytes: (length: number) => Uint8Array };
 }): InMemoryDraftDuelTransport {
   const clock = options.clock;
-  const random = options.random;
-  const randomBytes = 'bytes' in random ? random.bytes : undefined;
-  const rng =
-    'rng' in random
-      ? random.rng
-      : 'seed' in random
-        ? createSeededRng(random.seed)
-        : () => {
-            const bytes = new Uint8Array(random.bytes(4));
-            return new DataView(bytes.buffer).getUint32(0, true) / 4294967296;
-          };
-  const rooms = new Map<string, RoomRecord>();
-  const codeIndex = new Map<string, string>();
-  const createTimestamps: number[] = [];
-
-  function pruneExpiredCodes(): void {
-    const now = clock();
-    for (const [code, roomId] of [...codeIndex.entries()]) {
-      const record = rooms.get(roomId);
-      if (!record || record.codeExpiresAt <= now || record.snapshot.phase === 'expired') {
-        codeIndex.delete(code);
-        if (record && record.snapshot.codeActive) {
-          record.snapshot = { ...record.snapshot, codeActive: false, code: null };
-        }
-      }
-    }
-  }
-
-  function emit(record: RoomRecord): void {
-    for (const handler of record.subscribers) {
-      try {
-        handler(record.snapshot);
-      } catch {
-        continue;
-      }
-    }
-  }
+  const store = createInMemoryRoomStore<
+    DraftDuelRoomSnapshot,
+    DraftDuelTransientEvent,
+    DraftDuelVerificationReceipt,
+    FallbackCommitment,
+    RoomRecord
+  >({
+    clock,
+    random: options.random,
+    roomIdPrefix: 'dd-',
+    codeTtlMs: DRAFT_DUEL_CODE_TTL_MS,
+    codeSchema: draftDuelRoomCodeSchema,
+    challengePrefix: 'dd-challenge-',
+    challengeBytes: 24,
+    codeExhaustedMessage: 'in-memory draft-duel: code space exhausted',
+    clearCode: (snapshot) =>
+      snapshot.codeActive ? { ...snapshot, codeActive: false, code: null } : snapshot,
+  });
 
   function rejection(
     roomId: string,
@@ -351,7 +271,7 @@ export function createInMemoryDraftDuelTransport(options: {
       codeActive: champion ? false : record.snapshot.codeActive,
     };
     if (champion) {
-      codeIndex.delete(record.code);
+      store.retireCode(record);
     }
   }
 
@@ -364,13 +284,7 @@ export function createInMemoryDraftDuelTransport(options: {
     payload: DraftDuelCommandPayload;
     expectedRevision?: number;
   }): DraftDuelCommandReceipt {
-    const record = rooms.get(command.roomId);
-    if (!record) {
-      throw Object.assign(new Error('authorization'), {
-        code: 'authorization',
-        retryable: false,
-      });
-    }
+    const record = store.require(command.roomId);
     const commandIdParsed = commandIdSchema.safeParse(command.commandId);
     if (!commandIdParsed.success) {
       return rejection(
@@ -673,12 +587,7 @@ export function createInMemoryDraftDuelTransport(options: {
       if (actor !== 'p1') {
         return rejection(command.roomId, commandId, 'membership', record.snapshot.revision);
       }
-      const codes = new Set([...codeIndex.keys()].filter((code) => code !== record.code));
-      const nextCode = randomCodeWith(codes, rng);
-      codeIndex.delete(record.code);
-      codeIndex.set(nextCode, record.snapshot.roomId);
-      record.code = nextCode;
-      record.codeExpiresAt = clock() + DRAFT_DUEL_CODE_TTL_MS;
+      const nextCode = store.rotateCode(record);
       record.snapshot = memberWith(record.snapshot, 'p2', idleMember('p2'));
       record.snapshot = {
         ...record.snapshot,
@@ -702,7 +611,7 @@ export function createInMemoryDraftDuelTransport(options: {
       revision: record.snapshot.revision + 1,
     };
     record.updatedAt = clock();
-    emit(record);
+    store.emit(record);
     return {
       roomId: record.snapshot.roomId,
       commandId,
@@ -722,16 +631,7 @@ export function createInMemoryDraftDuelTransport(options: {
     membership: DraftDuelRoomMembership;
   }> {
     await Promise.resolve();
-    pruneExpiredCodes();
-    const now = clock();
-    const recent = createTimestamps.filter((timestamp) => now - timestamp < 60000);
-    if (recent.length >= 60) {
-      throw Object.assign(new Error('rate-limit: too many rooms'), {
-        code: 'rate-limit',
-        retryable: true,
-      });
-    }
-    createTimestamps.push(now);
+    const now = store.claimCreateSlot();
     const settings: DraftDuelRoomSettings = draftDuelRoomSettingsSchema.parse({
       ...settingsInput,
       schemaVersion: settingsInput.schemaVersion ?? DRAFT_DUEL_ROOM_SCHEMA_VERSION,
@@ -742,15 +642,12 @@ export function createInMemoryDraftDuelTransport(options: {
       settings.versions.multiplayerVersion !== DRAFT_DUEL_MULTIPLAYER_VERSION ||
       settings.versions.autopickVersion !== DRAFT_DUEL_AUTOPICK_VERSION
     ) {
-      throw Object.assign(new Error('invalid versions'), {
-        code: 'illegal-move',
-        retryable: false,
-      });
+      throw roomError('invalid versions', 'illegal-move', false);
     }
-    const roomId = randomRoomIdWith(rng, randomBytes);
-    const codes = new Set(codeIndex.keys());
-    const code = randomCodeWith(codes, rng);
-    const rootSeed = seedSchema.parse(randomSeedWith(rng, randomBytes));
+    const allocation = store.allocateRoom(now);
+    const roomId = idSchema.parse(allocation.roomId);
+    const code = allocation.code;
+    const rootSeed = seedSchema.parse(allocation.rootSeed);
     const createdAt = new Date(now).toISOString();
     const expiresAt = new Date(now + DRAFT_DUEL_ROOM_RETENTION_MS).toISOString();
     const snapshot: DraftDuelRoomSnapshot = {
@@ -788,7 +685,7 @@ export function createInMemoryDraftDuelTransport(options: {
       commandIds: new Set(),
       payloadHashes: new Map(),
       code,
-      codeExpiresAt: now + DRAFT_DUEL_CODE_TTL_MS,
+      codeExpiresAt: allocation.codeExpiresAt,
       updatedAt: now,
       subscribers: new Set(),
       transientSubscribers: new Set(),
@@ -800,21 +697,13 @@ export function createInMemoryDraftDuelTransport(options: {
       confirmations: {},
       rematchRequests: new Set(),
     };
-    rooms.set(roomId, record);
-    codeIndex.set(code, roomId);
+    store.add(roomId, record);
     const membership: DraftDuelRoomMembership = { roomId, participantId: 'p1', code };
     return { snapshot, code, membership };
   }
 
   function recordFor(roomId: string): RoomRecord {
-    const record = rooms.get(roomId);
-    if (!record) {
-      throw Object.assign(new Error('authorization'), {
-        code: 'authorization',
-        retryable: false,
-      });
-    }
-    return record;
+    return store.require(roomId);
   }
 
   return {
@@ -825,53 +714,18 @@ export function createInMemoryDraftDuelTransport(options: {
     },
     async preview(code) {
       await Promise.resolve();
-      pruneExpiredCodes();
-      const roomId = codeIndex.get(code);
-      if (!roomId) {
-        throw Object.assign(new Error('invalid-code'), {
-          code: 'invalid-code',
-          retryable: false,
-        });
-      }
-      const record = rooms.get(roomId);
-      if (!record) {
-        throw Object.assign(new Error('invalid-code'), {
-          code: 'invalid-code',
-          retryable: false,
-        });
-      }
-      return record.snapshot;
+      return store.roomByCode(code).snapshot;
     },
     async join(code) {
       await Promise.resolve();
-      pruneExpiredCodes();
-      const roomId = codeIndex.get(code);
-      if (!roomId) {
-        throw Object.assign(new Error('invalid-code'), {
-          code: 'invalid-code',
-          retryable: false,
-        });
-      }
-      const record = rooms.get(roomId);
-      if (!record) {
-        throw Object.assign(new Error('invalid-code'), {
-          code: 'invalid-code',
-          retryable: false,
-        });
-      }
-      if (record.snapshot.phase === 'expired') {
-        throw Object.assign(new Error('code-expired'), {
-          code: 'code-expired',
-          retryable: false,
-        });
-      }
+      const record = store.joinableRoom(code);
       record.snapshot = memberWith(record.snapshot, 'p2', {
         online: true,
         lastSeenAt: nowIsoWith(clock),
       });
       record.snapshot = { ...record.snapshot, revision: record.snapshot.revision + 1 };
       record.updatedAt = clock();
-      emit(record);
+      store.emit(record);
       return {
         snapshot: record.snapshot,
         membership: { roomId: record.snapshot.roomId, participantId: 'p2', code: record.code },
@@ -894,38 +748,15 @@ export function createInMemoryDraftDuelTransport(options: {
       };
     },
     subscribe(roomId, handler) {
-      const record = rooms.get(roomId);
-      if (!record) return { unsubscribe: () => {} };
-      record.subscribers.add(handler);
-      return {
-        unsubscribe: () => {
-          record.subscribers.delete(handler);
-        },
-      };
+      return store.subscribe(roomId, handler);
     },
     subscribeTransient(roomId, handler) {
-      const record = rooms.get(roomId);
-      if (!record) return { unsubscribe: () => {} };
-      record.transientSubscribers.add(handler);
-      return {
-        unsubscribe: () => {
-          record.transientSubscribers.delete(handler);
-        },
-      };
+      return store.subscribeTransient(roomId, handler);
     },
     publishTransient(roomId, event) {
       const parsed = draftDuelTransientEventSchema.safeParse(event);
       if (!parsed.success || parsed.data.roomId !== roomId) return Promise.resolve(false);
-      const record = rooms.get(roomId);
-      if (!record) return Promise.resolve(false);
-      for (const handler of record.transientSubscribers) {
-        try {
-          handler(parsed.data);
-        } catch {
-          continue;
-        }
-      }
-      return Promise.resolve(true);
+      return Promise.resolve(store.publishTransient(roomId, parsed.data));
     },
     async refetch(roomId, afterOrdinal) {
       await Promise.resolve();
@@ -938,113 +769,76 @@ export function createInMemoryDraftDuelTransport(options: {
     },
     async verificationChallenge(roomId) {
       await Promise.resolve();
-      const record = recordFor(roomId);
-      record.verificationChallenge ??= randomChallengeWith(rng, randomBytes);
-      return record.verificationChallenge;
+      return store.verificationChallenge(recordFor(roomId));
     },
     async submitVerification(roomId, receipt, expectedRevision) {
       await Promise.resolve();
-      const record = recordFor(roomId);
-      const parsed = draftDuelVerificationReceiptSchema.safeParse(receipt);
-      if (!parsed.success || parsed.data.roomId !== record.snapshot.roomId) {
-        throw Object.assign(new Error('verification: invalid receipt'), {
-          rejectionCode: 'invalid-receipt',
-          revision: record.snapshot.revision,
-        });
-      }
-      if (
-        record.verificationChallenge === null ||
-        parsed.data.challenge !== record.verificationChallenge
-      ) {
-        throw Object.assign(new Error('verification: challenge mismatch'), {
-          rejectionCode: 'invalid-receipt',
-          revision: record.snapshot.revision,
-        });
-      }
-      if (expectedRevision !== undefined && expectedRevision !== record.snapshot.revision) {
-        throw Object.assign(new Error('stale-revision'), {
-          rejectionCode: 'stale-revision',
-          revision: record.snapshot.revision,
-        });
-      }
-      record.receipts.set(parsed.data.receiptDigest, parsed.data);
-      record.updatedAt = clock();
-      return { receiptId: parsed.data.receiptDigest, revision: record.snapshot.revision };
+      return store.submitVerification(
+        recordFor(roomId),
+        receipt,
+        expectedRevision,
+        draftDuelVerificationReceiptSchema,
+        { touch: true },
+      );
     },
     async commitFallback(roomId, cursor, payload, expectedRevision) {
       await Promise.resolve();
       const record = recordFor(roomId);
-      const deadline = record.snapshot.deadline;
-      if (!deadline || deadline.cursor !== cursor) {
-        return { stored: false, revision: record.snapshot.revision };
-      }
-      if (expectedRevision !== undefined && expectedRevision !== record.snapshot.revision) {
-        throw Object.assign(new Error('stale-revision'), {
-          code: 'stale-revision',
-          retryable: true,
-        });
-      }
-      const parsed = draftDuelCommandPayloadSchema.safeParse(payload);
-      if (
-        !parsed.success ||
-        parsed.data.kind !== 'timeout-autopick' ||
-        parsed.data.pickOrdinal !== deadline.pickOrdinal
-      ) {
-        throw Object.assign(
-          new Error('commit-fallback: payload must match the deadline autopick'),
-          { code: 'illegal-move', retryable: false },
-        );
-      }
-      record.fallback = {
-        cursor,
-        participantId: deadline.participantId,
-        pickOrdinal: deadline.pickOrdinal,
-        payload: parsed.data,
-      };
-      record.snapshot = {
-        ...record.snapshot,
-        deadline: { ...deadline, fallback: parsed.data },
-      };
-      record.updatedAt = clock();
-      return { stored: true, revision: record.snapshot.revision };
+      return store.commitFallback(record, cursor, expectedRevision, (deadline) => {
+        const parsed = draftDuelCommandPayloadSchema.safeParse(payload);
+        if (
+          !parsed.success ||
+          parsed.data.kind !== 'timeout-autopick' ||
+          parsed.data.pickOrdinal !== deadline.pickOrdinal
+        ) {
+          throw roomError(
+            'commit-fallback: payload must match the deadline autopick',
+            'illegal-move',
+            false,
+          );
+        }
+        record.snapshot = {
+          ...record.snapshot,
+          deadline: { ...deadline, fallback: parsed.data },
+        };
+        record.updatedAt = clock();
+        return {
+          cursor,
+          participantId: deadline.participantId,
+          pickOrdinal: deadline.pickOrdinal,
+          payload: parsed.data,
+        };
+      });
     },
     async resolveTimeout(roomId) {
       await Promise.resolve();
-      const record = rooms.get(roomId);
-      if (!record) return null;
-      const deadline = record.snapshot.deadline;
-      if (!deadline) return null;
-      if (clock() < Date.parse(deadline.deadlineAt)) return null;
-      const commitment = record.fallback;
-      if (!commitment || commitment.cursor !== deadline.cursor) return null;
-      const commandId = `timeout-${deadline.cursor}-${String(commitment.pickOrdinal)}`;
-      if (record.commandIds.has(commandId)) return null;
-      return applyCommand({
-        schemaVersion: 1,
-        roomId: record.snapshot.roomId,
-        commandId: commandIdSchema.parse(commandId),
-        actorParticipantId: commitment.participantId,
-        payload: commitment.payload,
-      });
+      const record = store.find(roomId);
+      return store.resolveTimeout(
+        record,
+        (deadline) => deadline.deadlineAt,
+        (deadline, commitment) => `timeout-${deadline.cursor}-${String(commitment.pickOrdinal)}`,
+        (commitment, commandId) =>
+          record === undefined
+            ? Promise.resolve(null)
+            : applyCommand({
+                schemaVersion: 1,
+                roomId: record.snapshot.roomId,
+                commandId: commandIdSchema.parse(commandId),
+                actorParticipantId: commitment.participantId,
+                payload: commitment.payload,
+              }),
+      );
     },
     async removeGuest(roomId, targetParticipantId) {
       await Promise.resolve();
       const record = recordFor(roomId);
       if (record.snapshot.phase !== 'lobby') {
-        throw Object.assign(new Error('phase'), { code: 'phase', retryable: false });
+        throw phaseError();
       }
       if (targetParticipantId !== 'p2') {
-        throw Object.assign(new Error('membership'), {
-          code: 'membership',
-          retryable: false,
-        });
+        throw membershipError();
       }
-      const codes = new Set([...codeIndex.keys()].filter((code) => code !== record.code));
-      const nextCode = randomCodeWith(codes, rng);
-      codeIndex.delete(record.code);
-      codeIndex.set(nextCode, record.snapshot.roomId);
-      record.code = nextCode;
-      record.codeExpiresAt = clock() + DRAFT_DUEL_CODE_TTL_MS;
+      const nextCode = store.rotateCode(record);
       record.snapshot = memberWith(record.snapshot, 'p2', idleMember('p2'));
       record.snapshot = {
         ...record.snapshot,
@@ -1053,22 +847,22 @@ export function createInMemoryDraftDuelTransport(options: {
         revision: record.snapshot.revision + 1,
       };
       record.updatedAt = clock();
-      emit(record);
+      store.emit(record);
       return record.snapshot;
     },
     async leave(roomId, participantId) {
       await Promise.resolve();
-      const record = rooms.get(roomId);
+      const record = store.find(roomId);
       if (!record) return;
       record.snapshot = memberWith(record.snapshot, participantId, { online: false });
       record.snapshot = { ...record.snapshot, revision: record.snapshot.revision + 1 };
       record.updatedAt = clock();
-      emit(record);
+      store.emit(record);
     },
     async rematch(roomId) {
       const record = recordFor(roomId);
       if (record.snapshot.phase !== 'championship') {
-        throw Object.assign(new Error('phase'), { code: 'phase', retryable: false });
+        throw phaseError();
       }
       if (record.snapshot.successorRoomId) {
         const successor = recordFor(record.snapshot.successorRoomId);
@@ -1081,7 +875,7 @@ export function createInMemoryDraftDuelTransport(options: {
       });
       record.snapshot = { ...record.snapshot, successorRoomId: created.snapshot.roomId };
       record.updatedAt = clock();
-      emit(record);
+      store.emit(record);
       return { snapshot: created.snapshot, code: created.code };
     },
     async complete(roomId, receiptId) {
@@ -1105,7 +899,7 @@ export function createInMemoryDraftDuelTransport(options: {
         members: record.snapshot.members.map((member) => ({ ...member, locked: true })),
       };
       record.updatedAt = clock();
-      emit(record);
+      store.emit(record);
       return { completed: true, phase: record.snapshot.phase };
     },
     async fail(roomId) {
@@ -1140,7 +934,7 @@ export function createInMemoryDraftDuelTransport(options: {
         codeActive: false,
       };
       record.updatedAt = clock();
-      emit(record);
+      store.emit(record);
       return { failed: true, phase: record.snapshot.phase };
     },
   };

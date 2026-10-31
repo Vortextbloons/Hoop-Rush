@@ -1,4 +1,3 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   commandIdSchema,
   DRAFT_DUEL_AUTOPICK_VERSION,
@@ -26,22 +25,25 @@ import {
 import { randomBytes, randomUUID } from '#lib/ids.js';
 import { createInMemoryDraftDuelTransport } from '@hoop-rush/application/draft-duel';
 import {
+  cachedRoomTransport,
+  commitRoomFallback,
   createRealtimeRoomRegistry,
+  createRoomClientFactory,
+  fetchRoomRows,
+  parseRoomCommandRows,
+  readRoomParticipant,
   readRoomSync,
   ensureAnonymous,
-  getCachedTransport,
-  isUsablePublishableKey,
-  isUsableSupabaseUrl,
   parseRoomCode,
   publishTransientPayload,
-  readSupabaseEnv,
+  resolveRoomTimeout,
+  rpcChallenge,
+  rpcCommandResult,
   rpcRoomPayload,
-  stringField,
+  roomPreviewFields,
+  submitRoomVerification,
   subscribeTransientPayloads,
-  supabaseClient,
 } from '#lib/supabase-runtime.js';
-
-type DraftDuelClient = SupabaseClient;
 
 interface DraftDuelRoomRow {
   id: Id;
@@ -84,26 +86,13 @@ interface DraftDuelCommandRow {
   payload: unknown;
 }
 
+const ROOM_COLUMNS =
+  'id, code, code_active, fairness, presentation, versions, phase, revision, command_count, result_digest, confirmed_digest, successor_room_id, root_seed, deadline_at, deadline_cursor, deadline_participant, deadline_fallback, deadline_pick_ordinal, series, broadcast, expires_at, created_at';
+const MEMBER_COLUMNS = 'participant_id, online, ready, next_game_ready, locked, last_seen_at';
+const COMMAND_COLUMNS = 'command_id, ordinal, actor_participant_id, payload';
+const MEMBERS_TABLE = 'draft_duel_room_members';
+
 const rpcPayload = (value: unknown) => rpcRoomPayload(value, draftDuelRoomCodeSchema);
-
-interface RpcCommandPayload {
-  accepted: boolean;
-  ordinal?: number;
-  revision?: number;
-  rejectionCode?: string;
-  commandId?: string;
-}
-
-function commandPayload(value: unknown): RpcCommandPayload {
-  const record = value as Record<string, unknown>;
-  const accepted = record['accepted'] === true;
-  const ordinal = typeof record['ordinal'] === 'number' ? record['ordinal'] : undefined;
-  const revision = typeof record['revision'] === 'number' ? record['revision'] : undefined;
-  const rejectionCode =
-    typeof record['rejectionCode'] === 'string' ? record['rejectionCode'] : undefined;
-  const commandId = typeof record['commandId'] === 'string' ? record['commandId'] : undefined;
-  return { accepted, ordinal, revision, rejectionCode, commandId };
-}
 
 const configuredTransportCache = new Map<string, DraftDuelMultiplayerTransport>();
 
@@ -112,14 +101,7 @@ export function getDraftDuelTransport(options?: {
   publishableKey?: string;
   storageKey?: string;
 }): DraftDuelMultiplayerTransport {
-  const env = readSupabaseEnv();
-  const url = options?.url ?? env.url;
-  const publishableKey = options?.publishableKey ?? env.publishableKey;
-  const storageKey = options?.storageKey ?? '';
-  const key = `${url ?? 'memory'}${publishableKey ?? ''}${storageKey}`;
-  return getCachedTransport(configuredTransportCache, key, () =>
-    createDraftDuelTransport({ url, publishableKey, storageKey }),
-  );
+  return cachedRoomTransport(configuredTransportCache, options, createDraftDuelTransport);
 }
 
 export function createDraftDuelTransport(options?: {
@@ -127,27 +109,11 @@ export function createDraftDuelTransport(options?: {
   publishableKey?: string;
   storageKey?: string;
 }): DraftDuelMultiplayerTransport {
-  const candidateUrl =
-    typeof options?.url === 'string' ? options.url.trim().replace(/\/+$/, '') : undefined;
-  const candidateKey =
-    typeof options?.publishableKey === 'string' ? options.publishableKey.trim() : undefined;
-  if (
-    !candidateUrl ||
-    !candidateKey ||
-    !isUsableSupabaseUrl(candidateUrl) ||
-    !isUsablePublishableKey(candidateKey)
-  ) {
+  const clientFactory = createRoomClientFactory(options);
+  if (clientFactory === null) {
     return createInMemoryDraftDuelTransport({ clock: Date.now, random: { bytes: randomBytes } });
   }
-  let clientPromise: Promise<DraftDuelClient> | null = null;
-  const transportUrl = candidateUrl;
-  const transportPublishableKey = candidateKey;
-  const transportStorageKey = options?.storageKey;
-  function getClient(): Promise<DraftDuelClient> {
-    if (!clientPromise)
-      clientPromise = supabaseClient(transportUrl, transportPublishableKey, transportStorageKey);
-    return clientPromise;
-  }
+  const getClient = clientFactory;
   function memberFallback(participantId: DraftDuelParticipantId): DraftDuelMemberSnapshot {
     return {
       participantId,
@@ -231,32 +197,15 @@ export function createDraftDuelTransport(options?: {
     });
   }
   async function fetchSnapshot(roomId: string): Promise<DraftDuelRoomSnapshot> {
-    const client = await getClient();
-    const roomResponse = await client
-      .from('draft_duel_rooms')
-      .select(
-        'id, code, code_active, fairness, presentation, versions, phase, revision, command_count, result_digest, confirmed_digest, successor_room_id, root_seed, deadline_at, deadline_cursor, deadline_participant, deadline_fallback, deadline_pick_ordinal, series, broadcast, expires_at, created_at',
-      )
-      .eq('id', roomId)
-      .single();
-    if (roomResponse.error) throw new Error('authorization: cannot read room');
-    const roomData: unknown = roomResponse.data;
-    if (roomData == null) throw new Error('authorization: cannot read room');
-    const memberResponse = await client
-      .from('draft_duel_room_members')
-      .select('participant_id, online, ready, next_game_ready, locked, last_seen_at')
-      .eq('room_id', roomId);
-    if (
-      memberResponse.error ||
-      !Array.isArray(memberResponse.data) ||
-      memberResponse.data.length === 0
-    ) {
-      throw new Error('members failed: cannot verify room membership');
-    }
-    const row = roomData as DraftDuelRoomRow;
-    const memberData: unknown = memberResponse.data;
-    const memberRows = (Array.isArray(memberData) ? memberData : []) as DraftDuelMemberRow[];
-    return roomRowToSnapshot(row, memberRows);
+    const { room, members } = await fetchRoomRows({
+      client: await getClient(),
+      roomsTable: 'draft_duel_rooms',
+      roomSelect: ROOM_COLUMNS,
+      membersTable: MEMBERS_TABLE,
+      membersSelect: MEMBER_COLUMNS,
+      roomId,
+    });
+    return roomRowToSnapshot(room as DraftDuelRoomRow, members as DraftDuelMemberRow[]);
   }
   const registry = createRealtimeRoomRegistry({
     label: 'Draft Duel',
@@ -311,24 +260,14 @@ export function createDraftDuelTransport(options?: {
       const phase = draftDuelRoomPhaseSchema.parse(
         typeof record['phase'] === 'string' ? record['phase'] : 'lobby',
       );
-      const revision = typeof record['revision'] === 'number' ? record['revision'] : 0;
-      const serverExpiresAt =
-        typeof record['expires_at'] === 'string' &&
-        Number.isFinite(Date.parse(record['expires_at']))
-          ? record['expires_at']
-          : null;
-      const serverCreatedAt =
-        typeof record['created_at'] === 'string' &&
-        Number.isFinite(Date.parse(record['created_at']))
-          ? record['created_at']
-          : null;
+      const preview = roomPreviewFields(record);
       return {
-        roomId: idSchema.parse(stringField(record, 'room_id')),
+        roomId: preview.roomId,
         code: parseRoomCode(code, draftDuelRoomCodeSchema),
         codeActive: true,
         settings,
         phase,
-        revision,
+        revision: preview.revision,
         commandCount: 0,
         members: [memberFallback('p1'), memberFallback('p2')],
         rootSeed: null,
@@ -338,8 +277,8 @@ export function createDraftDuelTransport(options?: {
         resultDigest: null,
         confirmedDigest: null,
         successorRoomId: null,
-        expiresAt: serverExpiresAt ?? new Date(Date.now() + 15 * 60 * 1000).toISOString(),
-        createdAt: serverCreatedAt ?? new Date().toISOString(),
+        expiresAt: preview.expiresAt ?? new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+        createdAt: preview.createdAt ?? new Date().toISOString(),
       };
     },
     async join(code) {
@@ -361,29 +300,7 @@ export function createDraftDuelTransport(options?: {
       const client = await getClient();
       await ensureAnonymous(client);
       const snapshot = await fetchSnapshot(roomId);
-      const user = await client.auth.getUser();
-      const uid = user.data.user?.id;
-      if (!uid) throw new Error('membership: not signed in');
-      const memberResponse = await client
-        .from('draft_duel_room_members')
-        .select('participant_id')
-        .eq('room_id', roomId)
-        .eq('uid', uid)
-        .single();
-      if (memberResponse.error) {
-        throw new Error('membership: no seat in this room');
-      }
-      const seatData: unknown = memberResponse.data;
-      if (seatData == null) {
-        throw new Error('membership: no seat in this room');
-      }
-      const member = seatData as {
-        participant_id?: unknown;
-      };
-      if (member.participant_id !== 'p1' && member.participant_id !== 'p2') {
-        throw new Error('membership: no seat in this room');
-      }
-      const participantId: DraftDuelParticipantId = member.participant_id;
+      const participantId = await readRoomParticipant(client, MEMBERS_TABLE, roomId);
       return {
         snapshot,
         membership: {
@@ -396,20 +313,20 @@ export function createDraftDuelTransport(options?: {
     async sync(roomId, afterOrdinal) {
       const client = await getClient();
       const payload = await readRoomSync(client, 'draft-duel', roomId, afterOrdinal);
-      const row = payload.room as unknown as DraftDuelRoomRow;
-      const members = payload.members as unknown as DraftDuelMemberRow[];
-      const rows = payload.commands as unknown as DraftDuelCommandRow[];
-      const commands = rows.map((row) =>
-        draftDuelCommandSchema.parse({
-          schemaVersion: 1,
-          roomId: idSchema.parse(roomId),
-          commandId: row.command_id,
-          ordinal: row.ordinal,
-          actorParticipantId: row.actor_participant_id,
-          payload: row.payload,
-        }),
-      );
-      return { snapshot: roomRowToSnapshot(row, members), commands };
+      const parsedRoomId = idSchema.parse(roomId);
+      return {
+        snapshot: roomRowToSnapshot(
+          payload.room as unknown as DraftDuelRoomRow,
+          payload.members as unknown as DraftDuelMemberRow[],
+        ),
+        commands: parseRoomCommandRows(
+          payload.commands as unknown as DraftDuelCommandRow[],
+          parsedRoomId,
+          1,
+          draftDuelCommandSchema,
+          true,
+        ),
+      };
     },
     subscribe(roomId, handler, onError) {
       return registry.subscribe(roomId, handler, onError);
@@ -438,21 +355,17 @@ export function createDraftDuelTransport(options?: {
       const parsedRoomId = idSchema.parse(roomId);
       const response = await client
         .from('draft_duel_room_commands')
-        .select('command_id, ordinal, actor_participant_id, payload')
+        .select(COMMAND_COLUMNS)
         .eq('room_id', parsedRoomId)
         .gt('ordinal', afterOrdinal)
         .order('ordinal', { ascending: true });
       if (response.error) throw new Error(`refetch failed: ${response.error.message}`);
-      const rows = response.data as unknown as DraftDuelCommandRow[];
-      return rows.map((row) =>
-        draftDuelCommandSchema.parse({
-          schemaVersion: 1,
-          roomId: parsedRoomId,
-          commandId: row.command_id,
-          ordinal: row.ordinal,
-          actorParticipantId: row.actor_participant_id,
-          payload: row.payload,
-        }),
+      return parseRoomCommandRows(
+        response.data as unknown as DraftDuelCommandRow[],
+        parsedRoomId,
+        1,
+        draftDuelCommandSchema,
+        true,
       );
     },
     async submitCommand(command) {
@@ -471,14 +384,14 @@ export function createDraftDuelTransport(options?: {
         p_payload: command.payload,
       });
       if (response.error) throw new Error(`command failed: ${response.error.message}`);
-      const payload = commandPayload(response.data);
+      const result = rpcCommandResult(response.data);
       const receipt: DraftDuelCommandReceipt = {
         roomId: command.roomId,
-        commandId: payload.commandId ? commandIdSchema.parse(payload.commandId) : commandId,
-        ordinal: payload.ordinal ?? -1,
-        accepted: payload.accepted,
-        rejectionCode: payload.rejectionCode ?? null,
-        revision: payload.revision ?? 0,
+        commandId: result.commandId ? commandIdSchema.parse(result.commandId) : commandId,
+        ordinal: result.ordinal ?? -1,
+        accepted: result.accepted,
+        rejectionCode: result.rejectionCode ?? null,
+        revision: result.revision ?? 0,
       };
       return receipt;
     },
@@ -490,86 +403,43 @@ export function createDraftDuelTransport(options?: {
       });
       if (response.error)
         throw new Error(`verification challenge failed: ${response.error.message}`);
-      const data: unknown = response.data;
-      if (typeof data === 'string' && data.length > 0) return data;
-      const record =
-        typeof data === 'object' && data !== null ? (data as Record<string, unknown>) : {};
-      for (const key of ['challenge', 'challenge_string', 'value', 'token']) {
-        const candidate = record[key];
-        if (typeof candidate === 'string' && candidate.length > 0) return candidate;
-      }
-      throw new Error('verification challenge failed: server returned no challenge');
+      return rpcChallenge(response.data);
     },
     async submitVerification(roomId, receipt, expectedRevision) {
       const client = await getClient();
       await ensureAnonymous(client);
       const parsed = draftDuelVerificationReceiptSchema.parse(receipt);
-      const response = await client.rpc('draft_duel_verification_submit', {
-        p_room_id: roomId,
-        p_receipt_id: parsed.receiptDigest,
-        p_receipt: parsed,
-        p_expected_revision: expectedRevision ?? null,
+      return submitRoomVerification({
+        client,
+        rpc: 'draft_duel_verification_submit',
+        roomId,
+        receipt: parsed,
+        ownReceiptId: parsed.receiptDigest,
+        expectedRevision,
       });
-      if (response.error) throw new Error(`verification submit failed: ${response.error.message}`);
-      const record =
-        typeof response.data === 'object' && response.data !== null
-          ? (response.data as Record<string, unknown>)
-          : {};
-      if (record['accepted'] !== true) {
-        const rejectionCode =
-          typeof record['rejectionCode'] === 'string' ? record['rejectionCode'] : 'invalid-receipt';
-        const rejectionRevision =
-          typeof record['revision'] === 'number' ? record['revision'] : null;
-        throw Object.assign(new Error(`verification submit rejected: ${rejectionCode}`), {
-          rejectionCode,
-          revision: rejectionRevision,
-        });
-      }
-      const receiptId =
-        typeof record['receiptId'] === 'string' && record['receiptId'].length > 0
-          ? record['receiptId']
-          : parsed.receiptDigest;
-      const revision = typeof record['revision'] === 'number' ? record['revision'] : 0;
-      return { receiptId, revision };
     },
     async commitFallback(roomId, cursor, payload, expectedRevision) {
       const client = await getClient();
       await ensureAnonymous(client);
-      const response = await client.rpc('draft_duel_commit_fallback', {
-        p_room_id: roomId,
-        p_cursor: cursor,
-        p_payload: payload,
-        p_expected_revision: expectedRevision ?? null,
+      return commitRoomFallback({
+        client,
+        rpc: 'draft_duel_commit_fallback',
+        roomId,
+        cursor,
+        payload,
+        expectedRevision,
       });
-      if (response.error) throw new Error(`commit fallback failed: ${response.error.message}`);
-      const record =
-        typeof response.data === 'object' && response.data !== null
-          ? (response.data as Record<string, unknown>)
-          : {};
-      const revision = typeof record['revision'] === 'number' ? record['revision'] : 0;
-      return { stored: record['stored'] === true, revision };
     },
     async resolveTimeout(roomId) {
       const client = await getClient();
       await ensureAnonymous(client);
-      const response = await client.rpc('draft_duel_timeout_resolve', { p_room_id: roomId });
-      if (response.error || !response.data) return null;
-      const record = response.data as unknown as Record<string, unknown>;
-      if (record['accepted'] !== true) return null;
-      const commandId =
-        typeof record['commandId'] === 'string'
-          ? commandIdSchema.parse(record['commandId'])
-          : commandIdSchema.parse('timeout');
-      const ordinal = typeof record['ordinal'] === 'number' ? record['ordinal'] : -1;
-      const revision = typeof record['revision'] === 'number' ? record['revision'] : 0;
-      return {
-        roomId: idSchema.parse(roomId),
-        commandId,
-        ordinal,
-        accepted: true,
-        rejectionCode: null,
-        revision,
-      };
+      const timeout = await resolveRoomTimeout({
+        client,
+        rpc: 'draft_duel_timeout_resolve',
+        roomId,
+        acceptedField: 'accepted',
+      });
+      return timeout === null ? null : { ...timeout, accepted: true, rejectionCode: null };
     },
     async removeGuest(roomId, targetParticipantId) {
       const client = await getClient();
@@ -582,9 +452,9 @@ export function createDraftDuelTransport(options?: {
         p_payload: { kind: 'remove-guest', targetParticipantId },
       });
       if (response.error) throw new Error(`remove-guest failed: ${response.error.message}`);
-      const payload = commandPayload(response.data);
-      if (!payload.accepted) {
-        throw new Error(`remove-guest failed: ${payload.rejectionCode ?? 'rejected'}`);
+      const result = rpcCommandResult(response.data);
+      if (!result.accepted) {
+        throw new Error(`remove-guest failed: ${result.rejectionCode ?? 'rejected'}`);
       }
       return fetchSnapshot(roomId);
     },

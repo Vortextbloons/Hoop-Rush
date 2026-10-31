@@ -1,5 +1,11 @@
 import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js';
-import { idSchema, multiplayerRoomSyncSchema, type Id } from '@hoop-rush/data-contracts';
+import {
+  commandIdSchema,
+  idSchema,
+  multiplayerRoomSyncSchema,
+  type CommandId,
+  type Id,
+} from '@hoop-rush/data-contracts';
 
 let supabaseModulePromise: Promise<typeof import('@supabase/supabase-js')> | null = null;
 
@@ -113,6 +119,256 @@ export async function getMultiplayerClient(): Promise<SupabaseClient> {
   const client = await supabaseClient(url, publishableKey);
   await ensureAnonymous(client);
   return client;
+}
+
+export function cachedRoomTransport<T>(
+  cache: Map<string, T>,
+  options: { url?: string; publishableKey?: string; storageKey?: string } | undefined,
+  create: (options: { url?: string; publishableKey?: string; storageKey: string }) => T,
+): T {
+  const env = readSupabaseEnv();
+  const url = options?.url ?? env.url;
+  const publishableKey = options?.publishableKey ?? env.publishableKey;
+  const storageKey = options?.storageKey ?? '';
+  return getCachedTransport(cache, `${url ?? 'memory'}${publishableKey ?? ''}${storageKey}`, () =>
+    create({ url, publishableKey, storageKey }),
+  );
+}
+
+export function createRoomClientFactory(options?: {
+  url?: string;
+  publishableKey?: string;
+  storageKey?: string;
+}): (() => Promise<SupabaseClient>) | null {
+  const candidateUrl =
+    typeof options?.url === 'string' ? options.url.trim().replace(/\/+$/, '') : undefined;
+  const candidateKey =
+    typeof options?.publishableKey === 'string' ? options.publishableKey.trim() : undefined;
+  if (
+    !candidateUrl ||
+    !candidateKey ||
+    !isUsableSupabaseUrl(candidateUrl) ||
+    !isUsablePublishableKey(candidateKey)
+  ) {
+    return null;
+  }
+  let clientPromise: Promise<SupabaseClient> | null = null;
+  return () => {
+    clientPromise ??= supabaseClient(candidateUrl, candidateKey, options?.storageKey);
+    return clientPromise;
+  };
+}
+
+export function rpcRecord(value: unknown): Record<string, unknown> {
+  return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {};
+}
+
+function rpcNumber(record: Record<string, unknown>, key: string): number | undefined {
+  const value = record[key];
+  return typeof value === 'number' ? value : undefined;
+}
+
+function rpcString(record: Record<string, unknown>, key: string): string | undefined {
+  const value = record[key];
+  return typeof value === 'string' ? value : undefined;
+}
+
+export function rpcCommandResult(value: unknown): {
+  accepted: boolean;
+  ordinal: number | undefined;
+  revision: number | undefined;
+  rejectionCode: string | undefined;
+  commandId: string | undefined;
+} {
+  const record = rpcRecord(value);
+  return {
+    accepted: record['accepted'] === true,
+    ordinal: rpcNumber(record, 'ordinal'),
+    revision: rpcNumber(record, 'revision'),
+    rejectionCode: rpcString(record, 'rejectionCode') ?? rpcString(record, 'rejection_code'),
+    commandId: rpcString(record, 'commandId'),
+  };
+}
+
+export function rpcChallenge(value: unknown): string {
+  if (typeof value === 'string' && value.length > 0) return value;
+  const record = rpcRecord(value);
+  for (const key of ['challenge', 'challenge_string', 'value', 'token']) {
+    const candidate = record[key];
+    if (typeof candidate === 'string' && candidate.length > 0) return candidate;
+  }
+  throw new Error('verification challenge failed: server returned no challenge');
+}
+
+export interface RoomCommandRow {
+  command_id: string;
+  ordinal: number;
+  actor_participant_id: string;
+  payload: unknown;
+}
+
+export function parseRoomCommandRows<C>(
+  rows: readonly RoomCommandRow[],
+  roomId: Id,
+  schemaVersion: number,
+  schema: { parse(value: unknown): C },
+  includeOrdinal: boolean,
+): C[] {
+  return rows.map((row) =>
+    schema.parse({
+      schemaVersion,
+      roomId,
+      commandId: row.command_id,
+      ...(includeOrdinal ? { ordinal: row.ordinal } : {}),
+      actorParticipantId: row.actor_participant_id,
+      payload: row.payload,
+    }),
+  );
+}
+
+export function roomPreviewFields(record: Record<string, unknown>): {
+  roomId: Id;
+  revision: number;
+  expiresAt: string | null;
+  createdAt: string | null;
+} {
+  const timestamp = (key: string): string | null => {
+    const value = record[key];
+    return typeof value === 'string' && Number.isFinite(Date.parse(value)) ? value : null;
+  };
+  return {
+    roomId: idSchema.parse(stringField(record, 'room_id')),
+    revision: rpcNumber(record, 'revision') ?? 0,
+    expiresAt: timestamp('expires_at'),
+    createdAt: timestamp('created_at'),
+  };
+}
+
+export async function fetchRoomRows(options: {
+  client: SupabaseClient;
+  roomsTable: string;
+  roomSelect: string;
+  membersTable: string;
+  membersSelect: string;
+  roomId: string;
+}): Promise<{ room: unknown; members: unknown[] }> {
+  const roomResponse = await options.client
+    .from(options.roomsTable)
+    .select(options.roomSelect)
+    .eq('id', options.roomId)
+    .single();
+  const roomData: unknown = roomResponse.data;
+  if (roomResponse.error) throw new Error('authorization: cannot read room');
+  if (roomData == null) throw new Error('authorization: cannot read room');
+  const memberResponse = await options.client
+    .from(options.membersTable)
+    .select(options.membersSelect)
+    .eq('room_id', options.roomId);
+  const memberData: unknown = memberResponse.data;
+  if (memberResponse.error || !Array.isArray(memberData) || memberData.length === 0) {
+    throw new Error('members failed: cannot verify room membership');
+  }
+  return { room: roomData, members: memberData };
+}
+
+export async function readRoomParticipant(
+  client: SupabaseClient,
+  membersTable: string,
+  roomId: string,
+): Promise<'p1' | 'p2'> {
+  const user = await client.auth.getUser();
+  const uid = user.data.user?.id;
+  if (!uid) throw new Error('membership: not signed in');
+  const memberResponse = await client
+    .from(membersTable)
+    .select('participant_id')
+    .eq('room_id', roomId)
+    .eq('uid', uid)
+    .single();
+  const seat: unknown = memberResponse.data;
+  if (memberResponse.error || seat == null) {
+    throw new Error('membership: no seat in this room');
+  }
+  const participantId = (seat as { participant_id?: unknown }).participant_id;
+  if (participantId !== 'p1' && participantId !== 'p2') {
+    throw new Error('membership: no seat in this room');
+  }
+  return participantId;
+}
+
+export async function submitRoomVerification(options: {
+  client: SupabaseClient;
+  rpc: string;
+  roomId: string;
+  receipt: unknown;
+  ownReceiptId: string;
+  expectedRevision: number | undefined;
+}): Promise<{ receiptId: string; revision: number }> {
+  const response = await options.client.rpc(options.rpc, {
+    p_room_id: options.roomId,
+    p_receipt_id: options.ownReceiptId,
+    p_receipt: options.receipt,
+    p_expected_revision: options.expectedRevision ?? null,
+  });
+  if (response.error) throw new Error(`verification submit failed: ${response.error.message}`);
+  const record = rpcRecord(response.data);
+  if (record['accepted'] !== true) {
+    const rejectionCode =
+      typeof record['rejectionCode'] === 'string' ? record['rejectionCode'] : 'invalid-receipt';
+    const rejectionRevision = rpcNumber(record, 'revision') ?? null;
+    throw Object.assign(new Error(`verification submit rejected: ${rejectionCode}`), {
+      rejectionCode,
+      revision: rejectionRevision,
+    });
+  }
+  const receiptId =
+    typeof record['receiptId'] === 'string' && record['receiptId'].length > 0
+      ? record['receiptId']
+      : options.ownReceiptId;
+  return { receiptId, revision: rpcNumber(record, 'revision') ?? 0 };
+}
+
+export async function commitRoomFallback(options: {
+  client: SupabaseClient;
+  rpc: string;
+  roomId: string;
+  cursor: string;
+  payload: unknown;
+  expectedRevision: number | undefined;
+}): Promise<{ stored: boolean; revision: number }> {
+  const response = await options.client.rpc(options.rpc, {
+    p_room_id: options.roomId,
+    p_cursor: options.cursor,
+    p_payload: options.payload,
+    p_expected_revision: options.expectedRevision ?? null,
+  });
+  if (response.error) throw new Error(`commit fallback failed: ${response.error.message}`);
+  const record = rpcRecord(response.data);
+  return { stored: record['stored'] === true, revision: rpcNumber(record, 'revision') ?? 0 };
+}
+
+export async function resolveRoomTimeout(options: {
+  client: SupabaseClient;
+  rpc: string;
+  roomId: string;
+  acceptedField: 'resolved' | 'accepted';
+}): Promise<{
+  roomId: Id;
+  commandId: CommandId;
+  ordinal: number;
+  revision: number;
+} | null> {
+  const response = await options.client.rpc(options.rpc, { p_room_id: options.roomId });
+  if (response.error || !response.data) return null;
+  const record = rpcRecord(response.data);
+  if (record[options.acceptedField] !== true) return null;
+  const rawCommandId = rpcString(record, 'commandId') ?? rpcString(record, 'command_id');
+  return {
+    roomId: idSchema.parse(options.roomId),
+    commandId: commandIdSchema.parse(rawCommandId ?? 'timeout'),
+    ordinal: rpcNumber(record, 'ordinal') ?? -1,
+    revision: rpcNumber(record, 'revision') ?? 0,
+  };
 }
 
 export function getCachedTransport<T>(cache: Map<string, T>, key: string, create: () => T): T {

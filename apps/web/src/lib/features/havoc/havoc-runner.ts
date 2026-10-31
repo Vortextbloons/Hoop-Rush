@@ -41,6 +41,7 @@ interface ActiveTape {
 export class HavocRunner {
   private batch: ActiveBatch | null = null;
   private tape: ActiveTape | null = null;
+  private worker: Worker | null = null;
 
   constructor(private readonly options: HavocRunnerOptions = {}) {}
 
@@ -53,13 +54,23 @@ export class HavocRunner {
     });
   }
 
+  private getWorker(): Worker {
+    this.worker ??= this.createWorker();
+    return this.worker;
+  }
+
+  private terminateWorker(): void {
+    this.worker?.terminate();
+    this.worker = null;
+  }
+
   startBatch(
     request: HavocWorkerSimulateRequest,
     handlers: HavocBatchHandlers,
   ): Promise<HavocWorkerCompleteMessage> {
     this.settleBatch(new Error('the havoc batch was superseded'));
     this.settleTape(new Error('the havoc tape run was superseded'));
-    const worker = this.createWorker();
+    const worker = this.getWorker();
     return new Promise<HavocWorkerCompleteMessage>((resolve, reject) => {
       const active: ActiveBatch = {
         requestId: request.requestId,
@@ -85,7 +96,7 @@ export class HavocRunner {
   runTape(request: HavocWorkerTapeRequest): Promise<HavocWorkerTapeMessage> {
     this.settleBatch(new Error('the havoc batch was superseded'));
     this.settleTape(new Error('the havoc tape run was superseded'));
-    const worker = this.createWorker();
+    const worker = this.getWorker();
     return new Promise<HavocWorkerTapeMessage>((resolve, reject) => {
       const timeout = setTimeout(() => {
         this.failTape(new Error('the havoc tape worker timed out'));
@@ -122,6 +133,7 @@ export class HavocRunner {
   dispose(): void {
     this.settleBatch(new Error('the havoc runner was disposed'));
     this.settleTape(new Error('the havoc runner was disposed'));
+    this.terminateWorker();
   }
 
   private handleBatchMessage(
@@ -183,14 +195,15 @@ export class HavocRunner {
   private finishBatch(active: ActiveBatch, message: HavocWorkerCompleteMessage): void {
     if (this.batch !== active) return;
     this.batch = null;
-    active.worker.terminate();
+    active.worker.onmessage = null;
+    active.worker.onerror = null;
     active.resolve(message);
   }
 
   private failBatch(active: ActiveBatch, error: Error): void {
     if (this.batch !== active) return;
     this.batch = null;
-    active.worker.terminate();
+    this.terminateWorker();
     active.reject(error);
   }
 
@@ -198,7 +211,7 @@ export class HavocRunner {
     if (this.batch === null) return;
     const active = this.batch;
     this.batch = null;
-    active.worker.terminate();
+    this.terminateWorker();
     active.reject(error);
   }
 
@@ -206,7 +219,8 @@ export class HavocRunner {
     if (this.tape !== active) return;
     this.tape = null;
     clearTimeout(active.timeout);
-    active.worker.terminate();
+    active.worker.onmessage = null;
+    active.worker.onerror = null;
     active.resolve(message);
   }
 
@@ -215,7 +229,7 @@ export class HavocRunner {
     const active = this.tape;
     this.tape = null;
     clearTimeout(active.timeout);
-    active.worker.terminate();
+    this.terminateWorker();
     active.reject(error);
   }
 
@@ -224,7 +238,7 @@ export class HavocRunner {
     const active = this.tape;
     this.tape = null;
     clearTimeout(active.timeout);
-    active.worker.terminate();
+    this.terminateWorker();
     active.reject(error);
   }
 }

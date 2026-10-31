@@ -51,11 +51,16 @@ import {
   playerIdSchema,
   seasonKeySchema,
   seedSchema,
-  type Id,
   canonicalJson,
   seasonDigestHex,
 } from '@hoop-rush/data-contracts';
-import { createSeededRng } from '../runtime/seeded-rng.ts';
+import {
+  createInMemoryRoomStore,
+  membershipError,
+  phaseError,
+  roomError,
+  type InMemoryRoomRecord,
+} from '../multiplayer/in-memory-room-store.ts';
 
 function nowIsoWith(clock: () => number): string {
   return new Date(clock()).toISOString();
@@ -102,63 +107,6 @@ export function havocMultiplayerHomeForGame(
     );
   }
   return HAVOC_HOME_GAMES.has(gameNumber) ? homeWinner : otherParticipant(homeWinner);
-}
-
-function randomBytesWith(
-  rng: () => number,
-  randomBytes: ((length: number) => Uint8Array) | undefined,
-  length: number,
-): Uint8Array {
-  const bytes = new Uint8Array(length);
-  if (randomBytes) {
-    bytes.set(randomBytes(bytes.length));
-  } else {
-    for (let i = 0; i < bytes.length; i += 1) {
-      bytes[i] = Math.floor(rng() * 256);
-    }
-  }
-  return bytes;
-}
-
-function randomSeedWith(
-  rng: () => number,
-  randomBytes: ((length: number) => Uint8Array) | undefined,
-): string {
-  return [...randomBytesWith(rng, randomBytes, 16)]
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
-}
-
-function randomCodeWith(existing: Set<string>, rng: () => number): HavocMultiplayerRoomCode {
-  for (let attempt = 0; attempt < 2000; attempt += 1) {
-    const n = Math.floor(rng() * 10000);
-    const code = String(n).padStart(4, '0');
-    if (!existing.has(code)) return havocMultiplayerRoomCodeSchema.parse(code);
-  }
-  throw new Error('in-memory havoc multiplayer: code space exhausted');
-}
-
-function randomRoomIdWith(
-  rng: () => number,
-  randomBytes: ((length: number) => Uint8Array) | undefined,
-): Id {
-  return idSchema.parse(
-    `hm-${[...randomBytesWith(rng, randomBytes, 12)]
-      .map((b) => b.toString(36))
-      .join('')
-      .slice(0, 12)
-      .toLowerCase()
-      .replace(/[^a-z0-9._:-]/g, 'a')}`,
-  );
-}
-
-function randomChallengeWith(
-  rng: () => number,
-  randomBytes: ((length: number) => Uint8Array) | undefined,
-): string {
-  return [...randomBytesWith(rng, randomBytes, 32)]
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
 }
 
 const SYNTHETIC_RATING = 70;
@@ -359,21 +307,16 @@ interface CommandLogEntry {
   revision: number;
 }
 
-interface RoomRecord {
-  snapshot: HavocMultiplayerRoomSnapshot;
+interface RoomRecord extends InMemoryRoomRecord<
+  HavocMultiplayerRoomSnapshot,
+  HavocMultiplayerTransientEvent,
+  HavocMultiplayerVerificationReceipt,
+  FallbackCommitment
+> {
   commandLog: CommandLogEntry[];
-  commandIds: Set<string>;
   payloadHashes: Map<string, string>;
   rootSeed: string;
-  code: HavocMultiplayerRoomCode;
-  codeExpiresAt: number;
   expiresAt: number;
-  updatedAt: number;
-  subscribers: Set<(snapshot: HavocMultiplayerRoomSnapshot) => void>;
-  transientSubscribers: Set<(event: HavocMultiplayerTransientEvent) => void>;
-  verificationChallenge: string | null;
-  receipts: Map<string, HavocMultiplayerVerificationReceipt>;
-  fallback: FallbackCommitment | null;
   proposals: Partial<Record<HavocMultiplayerParticipantId, GameProposal>>;
   confirmations: Partial<Record<HavocMultiplayerParticipantId, GameConfirmation>>;
   rematchRequests: Set<HavocMultiplayerParticipantId>;
@@ -390,40 +333,22 @@ export function createInMemoryHavocMultiplayerTransport(options: {
   random: { seed: string } | { rng: () => number } | { bytes: (length: number) => Uint8Array };
 }): InMemoryHavocMultiplayerTransport {
   const clock = options.clock;
-  const random = options.random;
-  const randomBytes = 'bytes' in random ? random.bytes : undefined;
-  const rng =
-    'rng' in random
-      ? random.rng
-      : 'seed' in random
-        ? createSeededRng(random.seed)
-        : () => {
-            const bytes = new Uint8Array(random.bytes(4));
-            return new DataView(bytes.buffer).getUint32(0, true) / 4294967296;
-          };
-  const rooms = new Map<string, RoomRecord>();
-  const codeIndex = new Map<string, string>();
-  const createTimestamps: number[] = [];
-
-  function pruneExpiredCodes(): void {
-    const now = clock();
-    for (const [code, roomId] of [...codeIndex.entries()]) {
-      const record = rooms.get(roomId);
-      if (!record || record.codeExpiresAt <= now || record.snapshot.phase === 'expired') {
-        codeIndex.delete(code);
-      }
-    }
-  }
-
-  function emit(record: RoomRecord): void {
-    for (const handler of record.subscribers) {
-      try {
-        handler(record.snapshot);
-      } catch {
-        continue;
-      }
-    }
-  }
+  const store = createInMemoryRoomStore<
+    HavocMultiplayerRoomSnapshot,
+    HavocMultiplayerTransientEvent,
+    HavocMultiplayerVerificationReceipt,
+    FallbackCommitment,
+    RoomRecord
+  >({
+    clock,
+    random: options.random,
+    roomIdPrefix: 'hm-',
+    codeTtlMs: HAVOC_MULTIPLAYER_CODE_TTL_MS,
+    codeSchema: havocMultiplayerRoomCodeSchema,
+    challengePrefix: '',
+    challengeBytes: 32,
+    codeExhaustedMessage: 'in-memory havoc multiplayer: code space exhausted',
+  });
 
   function rejection(
     roomId: string,
@@ -627,24 +552,16 @@ export function createInMemoryHavocMultiplayerTransport(options: {
     code: HavocMultiplayerRoomCode;
     membership: HavocMultiplayerRoomMembership;
   } {
-    pruneExpiredCodes();
-    const now = clock();
-    const recent = createTimestamps.filter((timestamp) => now - timestamp < 60000);
-    if (recent.length >= 60) {
-      throw Object.assign(new Error('rate-limit: too many rooms'), {
-        code: 'rate-limit',
-        retryable: true,
-      });
-    }
-    createTimestamps.push(now);
+    const now = store.claimCreateSlot();
     const settings = havocMultiplayerRoomSettingsSchema.parse({
       schemaVersion: settingsInput.schemaVersion ?? HAVOC_MULTIPLAYER_SAVE_SCHEMA_VERSION,
       variant: settingsInput.variant,
       versions: settingsInput.versions,
     });
-    const roomId = randomRoomIdWith(rng, randomBytes);
-    const code = randomCodeWith(new Set(codeIndex.keys()), rng);
-    const rootSeed = randomSeedWith(rng, randomBytes);
+    const allocation = store.allocateRoom(now);
+    const roomId = idSchema.parse(allocation.roomId);
+    const code = allocation.code;
+    const rootSeed = allocation.rootSeed;
     const snapshot = havocMultiplayerRoomSnapshotSchema.parse({
       roomId,
       code,
@@ -668,7 +585,7 @@ export function createInMemoryHavocMultiplayerTransport(options: {
       payloadHashes: new Map(),
       rootSeed,
       code,
-      codeExpiresAt: now + HAVOC_MULTIPLAYER_CODE_TTL_MS,
+      codeExpiresAt: allocation.codeExpiresAt,
       expiresAt: now + HAVOC_MULTIPLAYER_ROOM_RETENTION_MS,
       updatedAt: now,
       subscribers: new Set(),
@@ -680,30 +597,16 @@ export function createInMemoryHavocMultiplayerTransport(options: {
       confirmations: {},
       rematchRequests: new Set(),
     };
-    rooms.set(roomId, record);
-    codeIndex.set(code, roomId);
+    store.add(roomId, record);
     return { snapshot, code, membership: { roomId, participantId: 'p1', code } };
   }
 
   function recordFor(roomId: string): RoomRecord {
-    const record = rooms.get(roomId);
-    if (!record) {
-      throw Object.assign(new Error('authorization'), {
-        code: 'authorization',
-        retryable: false,
-      });
-    }
-    return record;
+    return store.require(roomId);
   }
 
   function applyCommand(command: HavocMultiplayerCommand): HavocMultiplayerCommandReceipt {
-    const record = rooms.get(command.roomId);
-    if (!record) {
-      throw Object.assign(new Error('authorization'), {
-        code: 'authorization',
-        retryable: false,
-      });
-    }
+    const record = store.require(command.roomId);
     const commandIdParsed = commandIdSchema.safeParse(command.commandId);
     if (!commandIdParsed.success) {
       return rejection(
@@ -1070,7 +973,7 @@ export function createInMemoryHavocMultiplayerTransport(options: {
     record.payloadHashes.set(commandId, payloadHash);
     record.snapshot = { ...record.snapshot, revision };
     record.updatedAt = clock();
-    emit(record);
+    store.emit(record);
     return {
       roomId: record.snapshot.roomId,
       commandId,
@@ -1087,47 +990,21 @@ export function createInMemoryHavocMultiplayerTransport(options: {
     },
     async preview(code) {
       await Promise.resolve();
-      pruneExpiredCodes();
-      const roomId = codeIndex.get(code);
-      const record = roomId === undefined ? undefined : rooms.get(roomId);
-      if (!record) {
-        throw Object.assign(new Error('invalid-code'), {
-          code: 'invalid-code',
-          retryable: false,
-        });
-      }
-      return record.snapshot;
+      return store.roomByCode(code).snapshot;
     },
     async join(code) {
       await Promise.resolve();
-      pruneExpiredCodes();
-      const roomId = codeIndex.get(code);
-      const record = roomId === undefined ? undefined : rooms.get(roomId);
-      if (!record) {
-        throw Object.assign(new Error('invalid-code'), {
-          code: 'invalid-code',
-          retryable: false,
-        });
-      }
-      if (record.snapshot.phase === 'expired') {
-        throw Object.assign(new Error('code-expired'), {
-          code: 'code-expired',
-          retryable: false,
-        });
-      }
+      const record = store.joinableRoom(code);
       if (
         record.snapshot.phase === 'championship' ||
         record.snapshot.phase === 'integrity-failed'
       ) {
-        throw Object.assign(new Error('room-full'), {
-          code: 'room-full',
-          retryable: false,
-        });
+        throw roomError('room-full', 'room-full', false);
       }
       record.snapshot = memberWith(record.snapshot, 'p2', { online: true });
       record.snapshot = { ...record.snapshot, revision: record.snapshot.revision + 1 };
       record.updatedAt = clock();
-      emit(record);
+      store.emit(record);
       return {
         snapshot: record.snapshot,
         membership: { roomId: record.snapshot.roomId, participantId: 'p2', code: record.code },
@@ -1151,38 +1028,15 @@ export function createInMemoryHavocMultiplayerTransport(options: {
       };
     },
     subscribe(roomId, handler) {
-      const record = rooms.get(roomId);
-      if (!record) return { unsubscribe: () => {} };
-      record.subscribers.add(handler);
-      return {
-        unsubscribe: () => {
-          record.subscribers.delete(handler);
-        },
-      };
+      return store.subscribe(roomId, handler);
     },
     subscribeTransient(roomId, handler) {
-      const record = rooms.get(roomId);
-      if (!record) return { unsubscribe: () => {} };
-      record.transientSubscribers.add(handler);
-      return {
-        unsubscribe: () => {
-          record.transientSubscribers.delete(handler);
-        },
-      };
+      return store.subscribeTransient(roomId, handler);
     },
     publishTransient(roomId, event) {
       const parsed = havocMultiplayerTransientEventSchema.safeParse(event);
       if (!parsed.success) return Promise.resolve(false);
-      const record = rooms.get(roomId);
-      if (!record) return Promise.resolve(false);
-      for (const handler of record.transientSubscribers) {
-        try {
-          handler(parsed.data);
-        } catch {
-          continue;
-        }
-      }
-      return Promise.resolve(true);
+      return Promise.resolve(store.publishTransient(roomId, parsed.data));
     },
     async refetch(roomId, afterRevision) {
       await Promise.resolve();
@@ -1197,121 +1051,82 @@ export function createInMemoryHavocMultiplayerTransport(options: {
     },
     async verificationChallenge(roomId) {
       await Promise.resolve();
-      const record = recordFor(roomId);
-      record.verificationChallenge ??= randomChallengeWith(rng, randomBytes);
-      return record.verificationChallenge;
+      return store.verificationChallenge(recordFor(roomId));
     },
     async submitVerification(roomId, receipt, expectedRevision) {
       await Promise.resolve();
-      const record = recordFor(roomId);
-      const parsed = havocMultiplayerVerificationReceiptSchema.safeParse(receipt);
-      if (!parsed.success) {
-        throw Object.assign(new Error('verification: invalid receipt'), {
-          rejectionCode: 'invalid-receipt',
-          revision: record.snapshot.revision,
-        });
-      }
-      if (
-        record.verificationChallenge === null ||
-        parsed.data.challenge !== record.verificationChallenge
-      ) {
-        throw Object.assign(new Error('verification: challenge mismatch'), {
-          rejectionCode: 'invalid-receipt',
-          revision: record.snapshot.revision,
-        });
-      }
-      if (expectedRevision !== undefined && expectedRevision !== record.snapshot.revision) {
-        throw Object.assign(new Error('stale-revision'), {
-          rejectionCode: 'stale-revision',
-          revision: record.snapshot.revision,
-        });
-      }
-      record.receipts.set(parsed.data.receiptDigest, parsed.data);
-      record.updatedAt = clock();
-      return { receiptId: parsed.data.receiptDigest, revision: record.snapshot.revision };
+      return store.submitVerification(
+        recordFor(roomId),
+        receipt,
+        expectedRevision,
+        havocMultiplayerVerificationReceiptSchema,
+        { touch: true },
+      );
     },
     async commitFallback(roomId, cursor, payload, expectedRevision) {
       await Promise.resolve();
       const record = recordFor(roomId);
-      const deadline = record.snapshot.deadline;
-      if (!deadline || deadline.cursor !== cursor) {
-        return { stored: false, revision: record.snapshot.revision };
-      }
-      if (expectedRevision !== undefined && expectedRevision !== record.snapshot.revision) {
-        throw Object.assign(new Error('stale-revision'), {
-          code: 'stale-revision',
-          retryable: true,
-        });
-      }
-      const parsed = havocMultiplayerCommandPayloadSchema.safeParse(payload);
-      const draft = record.snapshot.draft;
-      const timeoutPick =
-        parsed.success && parsed.data.kind === 'timeout-pick' ? parsed.data : null;
-      if (
-        !timeoutPick ||
-        !draft ||
-        draft.offer === null ||
-        timeoutPick.turnOrdinal !== draft.turnOrdinal ||
-        timeoutPick.offerId !== draft.offer.offerId ||
-        !draft.offer.cards.some((card) => card.cardId === timeoutPick.cardId)
-      ) {
-        throw Object.assign(
-          new Error('commit-fallback: payload must match the deadline timeout-pick'),
-          { code: 'illegal-move', retryable: false },
-        );
-      }
-      record.fallback = {
-        cursor,
-        participantId: deadline.participantId,
-        turnOrdinal: timeoutPick.turnOrdinal,
-        payload: timeoutPick,
-      };
-      record.snapshot = {
-        ...record.snapshot,
-        deadline: { ...deadline, fallback: timeoutPick },
-      };
-      record.updatedAt = clock();
-      return { stored: true, revision: record.snapshot.revision };
+      return store.commitFallback(record, cursor, expectedRevision, (deadline) => {
+        const parsed = havocMultiplayerCommandPayloadSchema.safeParse(payload);
+        const draft = record.snapshot.draft;
+        const timeoutPick =
+          parsed.success && parsed.data.kind === 'timeout-pick' ? parsed.data : null;
+        if (
+          !timeoutPick ||
+          !draft ||
+          draft.offer === null ||
+          timeoutPick.turnOrdinal !== draft.turnOrdinal ||
+          timeoutPick.offerId !== draft.offer.offerId ||
+          !draft.offer.cards.some((card) => card.cardId === timeoutPick.cardId)
+        ) {
+          throw roomError(
+            'commit-fallback: payload must match the deadline timeout-pick',
+            'illegal-move',
+            false,
+          );
+        }
+        record.snapshot = {
+          ...record.snapshot,
+          deadline: { ...deadline, fallback: timeoutPick },
+        };
+        record.updatedAt = clock();
+        return {
+          cursor,
+          participantId: deadline.participantId,
+          turnOrdinal: timeoutPick.turnOrdinal,
+          payload: timeoutPick,
+        };
+      });
     },
     async resolveTimeout(roomId) {
       await Promise.resolve();
-      const record = rooms.get(roomId);
-      if (!record) return null;
-      const deadline = record.snapshot.deadline;
-      if (!deadline) return null;
-      if (clock() < Date.parse(deadline.at)) return null;
-      const commitment = record.fallback;
-      if (!commitment || commitment.cursor !== deadline.cursor) return null;
-      const commandId = commandIdSchema.parse(`timeout-${deadline.cursor}`);
-      if (record.commandIds.has(commandId)) return null;
-      return applyCommand({
-        schemaVersion: HAVOC_MULTIPLAYER_SAVE_SCHEMA_VERSION,
-        roomId: record.snapshot.roomId,
-        commandId,
-        actorParticipantId: commitment.participantId,
-        payload: commitment.payload,
-      });
+      const record = store.find(roomId);
+      return store.resolveTimeout(
+        record,
+        (deadline) => deadline.at,
+        (deadline) => `timeout-${deadline.cursor}`,
+        (commitment, commandId) =>
+          record === undefined
+            ? Promise.resolve(null)
+            : applyCommand({
+                schemaVersion: HAVOC_MULTIPLAYER_SAVE_SCHEMA_VERSION,
+                roomId: record.snapshot.roomId,
+                commandId: commandIdSchema.parse(commandId),
+                actorParticipantId: commitment.participantId,
+                payload: commitment.payload,
+              }),
+      );
     },
     async removeGuest(roomId, targetParticipantId) {
       await Promise.resolve();
       const record = recordFor(roomId);
       if (record.snapshot.phase !== 'lobby') {
-        throw Object.assign(new Error('phase'), { code: 'phase', retryable: false });
+        throw phaseError();
       }
       if (targetParticipantId !== 'p2') {
-        throw Object.assign(new Error('membership'), {
-          code: 'membership',
-          retryable: false,
-        });
+        throw membershipError();
       }
-      const nextCode = randomCodeWith(
-        new Set([...codeIndex.keys()].filter((code) => code !== record.code)),
-        rng,
-      );
-      codeIndex.delete(record.code);
-      codeIndex.set(nextCode, record.snapshot.roomId);
-      record.code = nextCode;
-      record.codeExpiresAt = clock() + HAVOC_MULTIPLAYER_CODE_TTL_MS;
+      const nextCode = store.rotateCode(record);
       record.snapshot = memberWith(record.snapshot, 'p2', idleMember('p2'));
       record.snapshot = {
         ...record.snapshot,
@@ -1319,23 +1134,23 @@ export function createInMemoryHavocMultiplayerTransport(options: {
         revision: record.snapshot.revision + 1,
       };
       record.updatedAt = clock();
-      emit(record);
+      store.emit(record);
       return record.snapshot;
     },
     async leave(roomId, participantId) {
       await Promise.resolve();
-      const record = rooms.get(roomId);
+      const record = store.find(roomId);
       if (!record) return;
       record.snapshot = memberWith(record.snapshot, participantId, { online: false });
       record.snapshot = { ...record.snapshot, revision: record.snapshot.revision + 1 };
       record.updatedAt = clock();
-      emit(record);
+      store.emit(record);
     },
     async rematch(roomId) {
       await Promise.resolve();
       const record = recordFor(roomId);
       if (record.snapshot.phase !== 'championship') {
-        throw Object.assign(new Error('phase'), { code: 'phase', retryable: false });
+        throw phaseError();
       }
       if (record.snapshot.successorRoomId) {
         const successor = recordFor(record.snapshot.successorRoomId);
@@ -1356,7 +1171,7 @@ export function createInMemoryHavocMultiplayerTransport(options: {
       );
       record.snapshot = { ...record.snapshot, successorRoomId: created.snapshot.roomId };
       record.updatedAt = clock();
-      emit(record);
+      store.emit(record);
       return { snapshot: created.snapshot, code: created.code };
     },
     async complete(roomId, receiptId) {
@@ -1386,19 +1201,19 @@ export function createInMemoryHavocMultiplayerTransport(options: {
       if (!hasIntegrityMismatch(record)) return { failed: false, phase };
       failRoom(record);
       record.updatedAt = clock();
-      emit(record);
+      store.emit(record);
       return { failed: true, phase: record.snapshot.phase };
     },
     async expireRooms() {
       await Promise.resolve();
       const now = clock();
       const expired: HavocMultiplayerRoomSnapshot[] = [];
-      pruneExpiredCodes();
-      for (const record of rooms.values()) {
+      store.pruneExpiredCodes();
+      for (const record of store.all()) {
         if (record.expiresAt <= now && record.snapshot.phase !== 'expired') {
           record.snapshot = { ...record.snapshot, phase: 'expired', deadline: null };
           record.updatedAt = now;
-          emit(record);
+          store.emit(record);
           expired.push(record.snapshot);
         }
       }

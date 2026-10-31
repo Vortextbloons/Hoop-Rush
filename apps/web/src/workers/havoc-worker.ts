@@ -13,12 +13,14 @@ import {
   havocGameSummaryOf,
   havocGameTapeDigest,
   simulateAuditedHavocGame,
+  simulateAuditedHavocSummaryGame,
 } from '@hoop-rush/engine';
 import { sleep } from '../lib/sleep';
 
 const engineContext = createEngineContext();
 const cancelledRequests = new Set<string>();
 const PROGRESS_INTERVAL_MS = 250;
+const YIELD_INTERVAL_MS = 8;
 
 function post(message: unknown): void {
   self.postMessage(havocWorkerMessageSchema.parse(message));
@@ -84,6 +86,7 @@ async function runTape(request: HavocWorkerTapeRequest): Promise<void> {
 async function runSimulation(request: HavocWorkerSimulateRequest): Promise<void> {
   let delivered = 0;
   let lastProgressAt = 0;
+  let lastYieldAt = Date.now();
   try {
     for (let offset = 0; offset < request.count; offset += 1) {
       if (cancelledRequests.has(request.requestId)) break;
@@ -93,7 +96,7 @@ async function runSimulation(request: HavocWorkerSimulateRequest): Promise<void>
         gameNumber,
         variant: request.variant,
       });
-      const { result, audit } = simulateAuditedHavocGame(input, engineContext);
+      const { result, audit } = simulateAuditedHavocSummaryGame(input, engineContext);
       if (!audit.ok) {
         postError(
           request.requestId,
@@ -128,7 +131,10 @@ async function runSimulation(request: HavocWorkerSimulateRequest): Promise<void>
           gamesTotal: request.count,
         });
       }
-      await sleep(0);
+      if (now - lastYieldAt >= YIELD_INTERVAL_MS) {
+        lastYieldAt = now;
+        await sleep(0);
+      }
     }
     post({
       schemaVersion: HAVOC_WORKER_WIRE_SCHEMA_VERSION,

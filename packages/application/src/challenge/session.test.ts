@@ -134,7 +134,9 @@ class FakeChallengeClock implements ChallengeClockPort {
   nowIso(): string {
     return '2026-01-01T00:00:00.000Z';
   }
-  sleep(): Promise<void> {
+  sleeps: number[] = [];
+  sleep(ms: number): Promise<void> {
+    this.sleeps.push(ms);
     return Promise.resolve();
   }
 }
@@ -154,15 +156,16 @@ function setup(run: ChallengeRun | null, options: { failPromotion?: boolean } = 
   if (run !== null) repository.record = storedRecord(run);
   repository.failPromotion = options.failPromotion ?? false;
   const job = new FakeChallengeJob();
+  const clock = new FakeChallengeClock();
   const session = new ChallengeSession({
     repository,
     job,
     assets: assets(),
-    clock: new FakeChallengeClock(),
+    clock,
   });
   const snapshots: Array<ReturnType<ChallengeSession['getSnapshot']>> = [];
   session.subscribe(() => snapshots.push(session.getSnapshot()));
-  return { repository, job, session, snapshots };
+  return { repository, job, session, snapshots, clock };
 }
 
 describe('ChallengeSession', () => {
@@ -256,6 +259,30 @@ describe('ChallengeSession', () => {
     expect(job.attempts).toHaveLength(0);
     expect(job.simulations).toHaveLength(1);
     expect(job.simulations[0]?.startGameNumber).toBe(2);
+  });
+
+  it('paces reveals only when motion is not reduced', async () => {
+    const run = fixtureRun({ runId: 'run-pacing' });
+    const results = resultSequence(run, 3);
+    const timed = setup(run);
+    await timed.session.load();
+    timed.session.start({ reducedMotion: false });
+    timed.job.chooseSeed(run.runSeed);
+    await flush();
+    timed.job.deliver(results);
+    await flush();
+    expect(timed.clock.sleeps).toHaveLength(3);
+    expect(timed.clock.sleeps.every((ms) => ms > 0)).toBe(true);
+
+    const reduced = setup(run);
+    await reduced.session.load();
+    reduced.session.start({ reducedMotion: true });
+    reduced.job.chooseSeed(run.runSeed);
+    await flush();
+    reduced.job.deliver(results);
+    await flush();
+    expect(reduced.clock.sleeps).toEqual([]);
+    expect(reduced.repository.appends.map((append) => append.gameNumber)).toEqual([1, 2, 3]);
   });
 
   it('cancels into paused and drops late results', async () => {
