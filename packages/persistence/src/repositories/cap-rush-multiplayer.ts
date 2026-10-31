@@ -13,7 +13,7 @@ import {
   idSchema,
 } from '@hoop-rush/data-contracts';
 import type { HoopRushDatabase } from './dexie.ts';
-import { commandRowsToAppend } from './support.ts';
+import { commandRowsToAppend, listCompletedHistory, parseRecord } from './support.ts';
 import {
   storedCapRushMultiplayerActiveRowSchema,
   storedCapRushMultiplayerCommandRowSchema,
@@ -44,14 +44,13 @@ export interface CapRushMultiplayerCheckpointInput {
 }
 
 function parseOrThrow<T>(schema: z.ZodType<T>, value: unknown): T {
-  const parsed = schema.safeParse(value);
-  if (!parsed.success) {
-    throw new CapRushMultiplayerLoadError(
-      'malformed',
-      'stored cap rush multiplayer row is malformed',
-    );
-  }
-  return parsed.data;
+  return parseRecord(
+    schema,
+    value,
+    'stored cap rush multiplayer row',
+    () =>
+      new CapRushMultiplayerLoadError('malformed', 'stored cap rush multiplayer row is malformed'),
+  );
 }
 
 export class DexieCapRushMultiplayerRepository {
@@ -220,10 +219,7 @@ export class DexieCapRushMultiplayerRepository {
   async listHistory(): Promise<
     ReturnType<typeof storedCapRushMultiplayerHistoryRowSchema.parse>[]
   > {
-    const rows = await this.db.capRushMultiplayerHistory
-      .orderBy('completedAtIso')
-      .reverse()
-      .toArray();
+    const rows = await listCompletedHistory(this.db.capRushMultiplayerHistory);
     return rows.map((row) => storedCapRushMultiplayerHistoryRowSchema.parse(row));
   }
 

@@ -26,6 +26,7 @@ import {
   commandReceiptMatches,
   commandRowsToAppend,
   deleteWhereEquals,
+  getParsedRecord,
   listCompletedHistory,
   putResultPreservingVerified,
   rowsWhereEquals,
@@ -44,9 +45,9 @@ export class DexieDraftDuelRepository {
     await this.db.draftDuelActive.put(record);
   }
   async loadActive(roomId: string): Promise<StoredDraftDuelActive | null> {
-    const record = await this.db.draftDuelActive.get(roomId);
-    if (record === undefined) return null;
-    return storedDraftDuelActiveSchema.parse(record);
+    return getParsedRecord(this.db.draftDuelActive, roomId, (row) =>
+      storedDraftDuelActiveSchema.parse(row),
+    );
   }
   async deleteActive(roomId: string): Promise<void> {
     await this.db.draftDuelActive.delete(roomId);
@@ -202,9 +203,9 @@ export class DexieDraftDuelRepository {
     );
   }
   async loadCompleted(roomId: string): Promise<StoredDraftDuelCompleted | null> {
-    const record = await this.db.draftDuelCompleted.get(roomId);
-    if (record === undefined) return null;
-    return storedDraftDuelCompletedSchema.parse(record);
+    return getParsedRecord(this.db.draftDuelCompleted, roomId, (row) =>
+      storedDraftDuelCompletedSchema.parse(row),
+    );
   }
   async listHistory(): Promise<StoredDraftDuelHistoryIndex[]> {
     return listCompletedHistory(this.db.draftDuelHistory);

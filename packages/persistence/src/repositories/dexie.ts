@@ -74,7 +74,7 @@ import type {
   StoredCapRushMultiplayerGameRow,
   StoredCapRushMultiplayerHistoryRow,
 } from '../schemas/cap-rush-multiplayer-record.ts';
-import { listCompletedHistory } from './support.ts';
+import { getParsedRecord, listCompletedHistory } from './support.ts';
 import { DexieProfileRepository } from './profile.ts';
 const ACTIVE_RECORD_ID = 'active';
 const CLASSIC_DRAFT_RECORD_ID = 'classic-draft';
@@ -467,9 +467,9 @@ export class DexieChallengeRepository {
     return rows.map((row) => completedRunIndexSchema.parse(row));
   }
   async loadCompletedRun(runId: string): Promise<StoredRunRecord | null> {
-    const record = await this.db.completed.get(runId);
-    if (record === undefined) return null;
-    return storedRunRecordSchema.parse(record);
+    return getParsedRecord(this.db.completed, runId, (record) =>
+      storedRunRecordSchema.parse(record),
+    );
   }
   async clearHistory(): Promise<void> {
     await this.db.transaction('rw', this.db.completed, this.db.history, async () => {
@@ -485,9 +485,9 @@ export class DexieChallengeRepository {
     });
   }
   async loadClassicDraft(): Promise<StoredClassicDraft | null> {
-    const record = await this.db.classicDrafts.get(CLASSIC_DRAFT_RECORD_ID);
-    if (record === undefined) return null;
-    return classicDraftRecordSchema.parse(record);
+    return getParsedRecord(this.db.classicDrafts, CLASSIC_DRAFT_RECORD_ID, (record) =>
+      classicDraftRecordSchema.parse(record),
+    );
   }
   async clearClassicDraft(): Promise<void> {
     await this.db.classicDrafts.delete(CLASSIC_DRAFT_RECORD_ID);

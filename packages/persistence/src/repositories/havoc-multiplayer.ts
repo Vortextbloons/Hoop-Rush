@@ -30,6 +30,7 @@ import {
   commandReceiptMatches,
   commandRowsToAppend,
   deleteWhereEquals,
+  getParsedRecord,
   listCompletedHistory,
   putResultPreservingVerified,
   rowsWhereEquals,
@@ -67,9 +68,9 @@ export class DexieHavocMultiplayerRepository {
     await this.db.havocMultiplayerActive.put(record);
   }
   async loadActive(roomId: string): Promise<StoredHavocMultiplayerActive | null> {
-    const record = await this.db.havocMultiplayerActive.get(roomId);
-    if (record === undefined) return null;
-    return storedHavocMultiplayerActiveSchema.parse(record);
+    return getParsedRecord(this.db.havocMultiplayerActive, roomId, (record) =>
+      storedHavocMultiplayerActiveSchema.parse(record),
+    );
   }
   async deleteActive(roomId: string): Promise<void> {
     await this.db.havocMultiplayerActive.delete(roomId);
@@ -263,9 +264,9 @@ export class DexieHavocMultiplayerRepository {
     );
   }
   async loadCompleted(roomId: string): Promise<StoredHavocMultiplayerCompleted | null> {
-    const record = await this.db.havocMultiplayerCompleted.get(roomId);
-    if (record === undefined) return null;
-    return storedHavocMultiplayerCompletedSchema.parse(record);
+    return getParsedRecord(this.db.havocMultiplayerCompleted, roomId, (record) =>
+      storedHavocMultiplayerCompletedSchema.parse(record),
+    );
   }
   async listHistory(): Promise<StoredHavocMultiplayerHistoryIndex[]> {
     return listCompletedHistory(this.db.havocMultiplayerHistory);

@@ -18,7 +18,7 @@ import {
 } from '../schemas/fixed-five-record.ts';
 import type { HoopRushDatabase } from './dexie.ts';
 import { DexieProfileRepository } from './profile.ts';
-import { deleteWhereEquals, listCompletedHistory } from './support.ts';
+import { deleteWhereEquals, getParsedRecord, listCompletedHistory } from './support.ts';
 export class DexieFixedFiveRepository {
   private readonly db: HoopRushDatabase;
   constructor(db: HoopRushDatabase) {
@@ -35,9 +35,9 @@ export class DexieFixedFiveRepository {
     await this.db.fixedFiveActive.put(record);
   }
   async loadActive(roomId: string): Promise<StoredFixedFiveActive | null> {
-    const record = await this.db.fixedFiveActive.get(roomId);
-    if (!record) return null;
-    return storedFixedFiveActiveSchema.parse(record);
+    return getParsedRecord(this.db.fixedFiveActive, roomId, (row) =>
+      storedFixedFiveActiveSchema.parse(row),
+    );
   }
   async appendCommand(command: FixedFiveCommand): Promise<void> {
     const row = storedFixedFiveCommandRowSchema.parse({
@@ -82,9 +82,9 @@ export class DexieFixedFiveRepository {
     await this.db.fixedFivePendingResults.put(record);
   }
   async loadPendingResult(roomId: string): Promise<StoredFixedFivePendingResult | null> {
-    const record = await this.db.fixedFivePendingResults.get(roomId);
-    if (!record) return null;
-    return storedFixedFivePendingResultSchema.parse(record);
+    return getParsedRecord(this.db.fixedFivePendingResults, roomId, (row) =>
+      storedFixedFivePendingResultSchema.parse(row),
+    );
   }
   async clearPendingResult(roomId: string): Promise<void> {
     await this.db.fixedFivePendingResults.delete(roomId);
@@ -129,15 +129,14 @@ export class DexieFixedFiveRepository {
           ? profileBindingSchema.parse(bindingRow).participantId
           : undefined;
         if (participant && run.result.competition === 'duel') {
-          const profileRepo = new DexieProfileRepository(this.db);
-          for (const game of run.result.games) {
-            await profileRepo.recordGame(bindingId, String(game.gameNumber), {
-              won: game.winner === participant,
-              multiplayer: true,
-              players: [],
-            });
-          }
-          await profileRepo.recordMatch(bindingId, run.result.winner === participant);
+          await new DexieProfileRepository(this.db).recordCompletedMatch(
+            bindingId,
+            run.result.games.map((game) => ({
+              gameId: String(game.gameNumber),
+              facts: { won: game.winner === participant, multiplayer: true, players: [] },
+            })),
+            run.result.winner === participant,
+          );
         }
         await this.db.fixedFiveCompleted.put(completed);
         await this.db.fixedFiveHistory.put(index);
@@ -148,9 +147,9 @@ export class DexieFixedFiveRepository {
     );
   }
   async loadCompleted(roomId: string): Promise<StoredFixedFiveCompleted | null> {
-    const record = await this.db.fixedFiveCompleted.get(roomId);
-    if (!record) return null;
-    return storedFixedFiveCompletedSchema.parse(record);
+    return getParsedRecord(this.db.fixedFiveCompleted, roomId, (row) =>
+      storedFixedFiveCompletedSchema.parse(row),
+    );
   }
   async listHistory(): Promise<StoredFixedFiveHistoryIndex[]> {
     return listCompletedHistory(this.db.fixedFiveHistory);
