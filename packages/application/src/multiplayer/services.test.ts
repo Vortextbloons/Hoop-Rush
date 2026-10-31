@@ -271,6 +271,41 @@ describe('lobby orchestration', () => {
     expect(h.deps.resumeGame).toHaveBeenCalledWith('fixed-five', roomId);
     h.session.dispose();
   });
+  it('refreshes the lobby revision and retries once when start is stale', async () => {
+    const settings = {
+      gameKind: 'fixed-five' as const,
+      mode: 'duel' as const,
+      sourceMode: 'classic' as const,
+      variant: 'ratings' as const,
+      versions: defaultFixedFiveVersionLocks({}),
+    };
+    const refreshed = { ...lobby, revision: 1, guestJoined: true };
+    const started = {
+      ...lobby,
+      revision: 2,
+      guestJoined: true,
+      gameKind: 'fixed-five' as const,
+      gameRoomId: roomId,
+      canStart: false,
+    };
+    const command = vi
+      .fn<LobbySessionDeps['command']>()
+      .mockResolvedValueOnce(lobby)
+      .mockRejectedValueOnce(new Error('stale-revision'))
+      .mockResolvedValueOnce(refreshed)
+      .mockResolvedValueOnce(started);
+    const h = harness(command);
+    await h.session.attach(lobbyId);
+    await h.session.startMatch(settings);
+    const starts = command.mock.calls
+      .map(([entry]) => entry)
+      .filter((entry) => entry.kind === 'start');
+    expect(starts).toHaveLength(2);
+    expect(starts[0]).toMatchObject({ kind: 'start', expectedRevision: 0 });
+    expect(starts[1]).toMatchObject({ kind: 'start', expectedRevision: 1 });
+    expect(h.deps.resumeGame).toHaveBeenCalledWith('fixed-five', roomId);
+    h.session.dispose();
+  });
   it('does not create a second match after a lost response; refresh recovers it', async () => {
     const command = vi
       .fn<LobbySessionDeps['command']>()

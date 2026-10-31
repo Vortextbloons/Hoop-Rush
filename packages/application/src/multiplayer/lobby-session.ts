@@ -18,6 +18,10 @@ export type LobbyNavigation =
   | { kind: 'game'; gameKind: MultiplayerGameKind; roomId: string }
   | { kind: 'lobby'; lobbyId: string };
 
+function isStaleRevision(error: unknown): boolean {
+  return error instanceof Error && error.message.includes('stale-revision');
+}
+
 export interface LobbySessionSnapshot {
   lobby: MultiplayerLobby | null;
   preview: MultiplayerRoomPreview | null;
@@ -169,19 +173,33 @@ export class LobbySession {
     const lobby = this.lobby;
     const attachment = this.attachment;
     if (!lobby || !attachment?.current()) return;
-    await this.perform(async () => {
-      const result = multiplayerLobbySchema.parse(
-        await this.deps.command({
-          kind: 'start',
-          lobbyId: lobby.id,
-          expectedRevision: lobby.revision,
-          settings,
-        }),
-      );
-      if (!attachment.current()) return;
-      this.apply(result);
-      if (result.gameKind && result.gameRoomId) {
-        await this.openGame(result.gameKind, result.gameRoomId, attachment.current);
+    await this.perform(async (current) => {
+      let expectedRevision = lobby.revision;
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+          const result = multiplayerLobbySchema.parse(
+            await this.deps.command({
+              kind: 'start',
+              lobbyId: lobby.id,
+              expectedRevision,
+              settings,
+            }),
+          );
+          if (!current()) return;
+          this.apply(result);
+          if (result.gameKind && result.gameRoomId) {
+            await this.openGame(result.gameKind, result.gameRoomId, attachment.current);
+          }
+          return;
+        } catch (error) {
+          if (attempt > 0 || !isStaleRevision(error)) throw error;
+          const latest = multiplayerLobbySchema.parse(
+            await this.deps.command({ kind: 'get', lobbyId: lobby.id }),
+          );
+          if (!current()) return;
+          this.apply(latest);
+          expectedRevision = latest.revision;
+        }
       }
     });
   }
