@@ -11,6 +11,7 @@ import type {
   CapRushLeagueGame,
   CapRushPlayoffGameSummary,
 } from '@hoop-rush/data-contracts';
+import { playerIdSchema } from '@hoop-rush/data-contracts';
 import {
   capRushMultiplayerLockDigest,
   capRushMultiplayerStateDigest,
@@ -119,7 +120,12 @@ export class CapRushMultiplayerSession {
     playerId: string,
     totalDollars: number,
   ): Promise<CapRushMultiplayerCommandReceipt> {
-    return this.send({ kind: 'bid', round, playerId, totalDollars });
+    return this.send({
+      kind: 'bid',
+      round,
+      playerId: playerIdSchema.parse(playerId),
+      totalDollars,
+    });
   }
 
   async closeDueAuctions(): Promise<CapRushMultiplayerCommandReceipt | null> {
@@ -132,7 +138,11 @@ export class CapRushMultiplayerSession {
     purchase: 'standard' | 'surge',
     targetPlayerId: string,
   ): Promise<CapRushMultiplayerCommandReceipt> {
-    return this.send({ kind: 'purchase-mutation', purchase, targetPlayerId });
+    return this.send({
+      kind: 'purchase-mutation',
+      purchase,
+      targetPlayerId: playerIdSchema.parse(targetPlayerId),
+    });
   }
 
   async skipMutation(): Promise<CapRushMultiplayerCommandReceipt> {

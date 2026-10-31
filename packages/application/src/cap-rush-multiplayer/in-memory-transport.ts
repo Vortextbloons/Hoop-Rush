@@ -75,7 +75,10 @@ export class CapRushMultiplayerInMemoryTransport implements CapRushMultiplayerTr
   private codeCounter: number;
   private readonly now: () => number;
 
-  constructor(private readonly options: CapRushMultiplayerInMemoryTransportOptions) {
+  private readonly options: CapRushMultiplayerInMemoryTransportOptions;
+
+  constructor(options: CapRushMultiplayerInMemoryTransportOptions) {
+    this.options = options;
     this.now = options.now ?? (() => Date.parse('2026-11-01T00:00:00.000Z'));
     this.codeCounter = options.codeStart ?? 1000;
   }
@@ -139,7 +142,7 @@ export class CapRushMultiplayerInMemoryTransport implements CapRushMultiplayerTr
       lastSeenAt: new Date(this.now()).toISOString(),
     });
     this.emit(room);
-    return { roomId, participantId: 'p2', code };
+    return { roomId: idSchema.parse(room.roomId), participantId: 'p2', code };
   }
 
   async resume(roomId: string): Promise<CapRushMultiplayerRoomMembership> {
@@ -149,7 +152,7 @@ export class CapRushMultiplayerInMemoryTransport implements CapRushMultiplayerTr
     member.online = true;
     member.lastSeenAt = new Date(this.now()).toISOString();
     this.emit(room);
-    return { roomId, participantId: 'p1', code: room.code };
+    return { roomId: idSchema.parse(room.roomId), participantId: 'p1', code: room.code };
   }
 
   async snapshot(roomId: string): Promise<CapRushMultiplayerRoomSnapshot> {
@@ -354,7 +357,7 @@ export class CapRushMultiplayerInMemoryTransport implements CapRushMultiplayerTr
       };
     });
     return {
-      roomId: room.roomId,
+      roomId: idSchema.parse(room.roomId),
       code: room.code,
       codeActive: true,
       settings: room.settings,
@@ -362,7 +365,7 @@ export class CapRushMultiplayerInMemoryTransport implements CapRushMultiplayerTr
       revision: room.revision,
       commandCount: room.commands.length,
       members,
-      rootSeed: room.rootSeed,
+      rootSeed: seedSchema.parse(room.rootSeed),
       state: room.state,
       deadline,
       resultDigest: room.state.report === null ? null : digestOf(room.state.report),
