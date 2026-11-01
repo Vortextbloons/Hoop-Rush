@@ -8,18 +8,13 @@ import type {
   CapRushPayrollStatus,
   CapRushPlayoffPerformance,
   CapRushScheduleEntry,
-  CapRushSourcePlayer,
   CapRushSpinReceipt,
   CapRushVariant,
   CapRushVersionSet,
   EraSimulationProfile,
-  HavocEffectiveProfile,
-  HavocMutationPackage,
-  HavocSourcePlayer,
   HavocTeamInput,
   OpponentBracket,
   PlayoffPerformance,
-  Position,
   Seed,
   SeasonDraftCatalog,
 } from '@hoop-rush/data-contracts';
@@ -27,14 +22,13 @@ import {
   CAP_RUSH_SCHEMA_VERSION,
   POSITIONS,
   capRushLockedInputsSchema,
-  havocEffectiveProfileSchema,
   havocInstanceIdSchema,
   havocInstanceSeed,
   havocTeamInputSchema,
 } from '@hoop-rush/data-contracts';
-import { applyHavocMutationPackage } from '../havoc/transform.ts';
 import { buildHavocOpponentTeam, buildHavocSchedule } from '../havoc/opponents.ts';
-import { capRushEffectiveRatings, capRushPayrollStatus } from './salary.ts';
+import { capRushEffectiveProfileOf, capRushHavocSourceOf } from './effective-profile.ts';
+import { capRushPayrollStatus } from './salary.ts';
 import { capRushUserScheduleOf, capRushValidateLeagueField } from './league-schedule.ts';
 import { capRushPlayoffPerformanceOf } from './playoff.ts';
 
@@ -102,37 +96,6 @@ export function capRushHighestPaidOf(
   };
 }
 
-function havocSourceOf(player: CapRushSourcePlayer): HavocSourcePlayer {
-  return {
-    playerId: player.playerId,
-    playerVersionId: player.playerVersionId,
-    displayName: player.displayName,
-    franchiseId: player.franchiseId,
-    eraId: player.eraId,
-    seasonKey: player.seasonKey,
-    positions: player.positions,
-    originalOverall: player.originalOverall,
-    overallSource: 'catalog',
-    profile: player.profile,
-    physical: player.physical,
-  };
-}
-
-function effectiveProfileOf(input: {
-  readonly player: CapRushSourcePlayer;
-  readonly slot: Position;
-  readonly payrollStatus: CapRushPayrollStatus;
-  readonly mutationPackage: HavocMutationPackage;
-}): HavocEffectiveProfile {
-  const mutated = applyHavocMutationPackage(havocSourceOf(input.player), input.mutationPackage, {
-    slot: input.slot,
-  });
-  return havocEffectiveProfileSchema.parse({
-    ...mutated,
-    ratings: capRushEffectiveRatings(mutated.ratings, input.payrollStatus),
-  });
-}
-
 export function buildCapRushHumanTeam(input: {
   readonly runSeed: Seed;
   readonly picks: readonly CapRushDraftPick[];
@@ -161,8 +124,8 @@ export function buildCapRushHumanTeam(input: {
       slot: pick.slot,
       ownerInstanceId: null,
       mutationPackage,
-      source: havocSourceOf(pick.card.source),
-      effective: effectiveProfileOf({
+      source: capRushHavocSourceOf(pick.card.source),
+      effective: capRushEffectiveProfileOf({
         player: pick.card.source,
         slot: pick.slot,
         payrollStatus: input.payrollStatus,
@@ -181,8 +144,8 @@ export function buildCapRushHumanTeam(input: {
       slot: pick.slot,
       ownerInstanceId: starter.instanceId,
       mutationPackage: [],
-      source: havocSourceOf(pick.card.source),
-      effective: effectiveProfileOf({
+      source: capRushHavocSourceOf(pick.card.source),
+      effective: capRushEffectiveProfileOf({
         player: pick.card.source,
         slot: pick.slot,
         payrollStatus: input.payrollStatus,

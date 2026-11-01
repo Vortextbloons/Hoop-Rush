@@ -1,6 +1,6 @@
 import type { OpponentBracket, SeasonDraftCatalog, Seed } from '@hoop-rush/data-contracts';
 import { POSITIONS, havocInstanceSeed, opponentBracketSchema } from '@hoop-rush/data-contracts';
-import { createRng } from '../../sim/rng.ts';
+import { createRng, type Rng } from '../../sim/rng.ts';
 
 type Candidate = SeasonDraftCatalog['candidates'][number];
 
@@ -26,6 +26,27 @@ function lineupOf(candidates: readonly Candidate[]): Candidate[] | null {
     return false;
   }
   return assign(0) ? selected : null;
+}
+
+function varyLineup(lineup: Candidate[], roster: readonly Candidate[], rng: Rng): Candidate[] {
+  const variants: Candidate[][] = [lineup];
+  for (const [slot, starter] of lineup.entries()) {
+    const position = POSITIONS[slot];
+    for (const player of [...roster].sort((a, b) =>
+      a.playerVersionId.localeCompare(b.playerVersionId),
+    )) {
+      if (
+        position === undefined ||
+        !player.positions.playable.includes(position) ||
+        lineup.some((selected) => selected.playerId === player.playerId) ||
+        Math.abs(player.summaryRatings.overallRating - starter.summaryRatings.overallRating) > 2 ||
+        (player.anchors?.minutesPerGame ?? 0) < (starter.anchors?.minutesPerGame ?? 0) * 0.8
+      )
+        continue;
+      variants.push(lineup.map((selected, index) => (index === slot ? player : selected)));
+    }
+  }
+  return rng.pick(variants);
 }
 
 export function buildCapRushHistoricalField(
@@ -60,22 +81,27 @@ export function buildCapRushHistoricalField(
       if (choices.length === 0)
         throw new Error(`Cap Rush has no historical lineup for ${opponent.teamId}`);
       const rng = createRng(
-        havocInstanceSeed(runSeed, 'cap-rush-historical-field-v1', opponent.teamId),
+        havocInstanceSeed(runSeed, 'cap-rush-historical-field-v2', opponent.teamId),
       );
       const chosen = rng.pick(choices);
+      const lineup = varyLineup(
+        chosen.lineup,
+        seasons.get(opponent.teamId)?.get(chosen.seasonKey) ?? [],
+        rng,
+      );
       return {
         ...opponent,
         seasonKey: chosen.seasonKey,
         displayName: `${opponent.displayName.replace(/\s*\(?\d{4}-\d{2,4}\)?\s*/g, ' ').trim()} ${chosen.seasonKey}`,
         lineup: {
           structure: POSITIONS,
-          assignments: chosen.lineup.map((player, slotIndex) => ({
+          assignments: lineup.map((player, slotIndex) => ({
             slotIndex,
             playerId: player.playerId,
             positions: player.positions.playable,
           })),
         },
-        players: chosen.lineup.map((player) => ({
+        players: lineup.map((player) => ({
           playerId: player.playerId,
           playerVersionId: player.playerVersionId,
           displayName: player.displayName,

@@ -24,7 +24,6 @@ export const CAP_RUSH_LEAGUE_TEAMS = 31;
 export const CAP_RUSH_LEAGUE_GAMES_PER_TEAM = 82;
 export const CAP_RUSH_LEAGUE_GAMES = 1271;
 export const CAP_RUSH_USER_TEAM_ID = 'cap-rush-human';
-export const CAP_RUSH_USER_TEAM_NAME = 'Cap Rush Five';
 
 export const capRushPlayoffRoundSchema = z.number().int().min(1).max(CAP_RUSH_PLAYOFF_ROUNDS);
 export type CapRushPlayoffRound = z.infer<typeof capRushPlayoffRoundSchema>;

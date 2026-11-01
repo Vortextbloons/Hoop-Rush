@@ -212,7 +212,7 @@
       ),
       radial-gradient(
         120% 150% at 100% 0%,
-        color-mix(in srgb, var(--broadcast-opponent, #f290c5) 14%, transparent),
+        color-mix(in srgb, var(--broadcast-opponent, hsl(212 90% 62%)) 14%, transparent),
         transparent 55%
       ),
       var(--broadcast-card, #20294c);
@@ -220,7 +220,7 @@
   .hm-team {
     display: grid;
     gap: 2px;
-    --team-color: var(--broadcast-opponent, #f290c5);
+    --team-color: var(--broadcast-opponent, hsl(212 90% 62%));
   }
   .hm-team[data-align='start'] {
     justify-items: start;
@@ -262,7 +262,10 @@
     color: var(--broadcast-foreground, #f2f4ff);
   }
   .hm-team[data-leading='false'] .hm-score[data-negative='true'] {
-    color: var(--broadcast-opponent, #f290c5);
+    color: var(--broadcast-opponent, hsl(212 90% 62%));
+  }
+  .hm-team[data-align='end'] .hm-score {
+    color: var(--broadcast-opponent, hsl(212 90% 62%));
   }
   .hm-team-bonus {
     font-family: var(--font-mono);
@@ -327,7 +330,7 @@
     display: block;
     height: 100%;
     border-radius: inherit;
-    background: linear-gradient(90deg, #679dff, var(--broadcast-opponent, #f290c5));
+    background: linear-gradient(90deg, #679dff, var(--broadcast-opponent, hsl(212 90% 62%)));
   }
   .hm-broadcast[data-theme='duel'] .hm-progress-fill {
     background: linear-gradient(
@@ -384,7 +387,7 @@
     align-items: center;
     gap: 10px;
     padding: 8px 10px;
-    border-left: 3px solid var(--broadcast-opponent, #f290c5);
+    border-left: 3px solid var(--broadcast-opponent, hsl(212 90% 62%));
     border-radius: 9px;
     background: var(--broadcast-surface, #303c63);
   }
@@ -404,8 +407,8 @@
   .hm-feed-team {
     padding: 2px 8px;
     border-radius: 999px;
-    background: color-mix(in srgb, var(--broadcast-opponent, #f290c5) 16%, transparent);
-    color: var(--broadcast-opponent, #f290c5);
+    background: color-mix(in srgb, var(--broadcast-opponent, hsl(212 90% 62%)) 16%, transparent);
+    color: var(--broadcast-opponent, hsl(212 90% 62%));
     font-family: var(--font-mono);
     font-size: 9px;
     font-weight: 800;
@@ -435,7 +438,7 @@
     color: var(--broadcast-accent, #ffd782);
   }
   .hm-ability-line[data-side='opponent'] .hm-ability-detail strong {
-    color: var(--broadcast-opponent, #f290c5);
+    color: var(--broadcast-opponent, hsl(212 90% 62%));
   }
   .hm-feed-points {
     font-family: var(--font-display);
@@ -444,7 +447,7 @@
     color: var(--broadcast-positive, #8bceaf);
   }
   .hm-feed-points[data-negative='true'] {
-    color: var(--broadcast-opponent, #f290c5);
+    color: var(--broadcast-opponent, hsl(212 90% 62%));
   }
   .hm-feed-empty {
     font-size: 12px;
@@ -495,6 +498,31 @@
     .hm-feed-points {
       grid-column: 3;
       justify-self: end;
+    }
+  }
+  @media (max-width: 480px) {
+    .hm-scoreboard {
+      grid-template-columns: minmax(0, 1fr) 76px minmax(0, 1fr);
+      gap: 6px;
+      padding: 12px 8px;
+    }
+    .hm-team {
+      min-width: 0;
+    }
+    .hm-team-label {
+      max-width: 100%;
+      overflow-wrap: anywhere;
+      font-size: 9px;
+      letter-spacing: 0.1em;
+    }
+    .hm-clock {
+      font-size: 10px;
+      white-space: nowrap;
+    }
+    .hm-team[data-align='start'],
+    .hm-team[data-align='end'] {
+      justify-items: center;
+      text-align: center;
     }
   }
   @media (prefers-reduced-motion: reduce) {

@@ -1,36 +1,11 @@
-import type {
-  SimulationPlayer,
-  SimulationRatings,
-  SimulationTeam,
-  SimulationTendencies,
+import {
+  SIMULATION_TENDENCIES,
+  type SimulationPlayer,
+  type SimulationRatings,
+  type SimulationTeam,
 } from '@hoop-rush/data-contracts';
 export const FIELD_BENCHMARK_VERSION = 'field-v1';
 const SLOT_POSITIONS: SimulationPlayer['positions'][] = [['PG'], ['SG'], ['SF'], ['PF'], ['C']];
-const BENCHMARK_TENDENCIES: SimulationTendencies = {
-  usageRate: 20,
-  passRate: 30,
-  shotRate: 25,
-  driveRate: 18,
-  postUpRate: 5,
-  rimFrequency: 30,
-  shortMidFrequency: 20,
-  longMidFrequency: 14,
-  cornerThreeFrequency: 8,
-  aboveBreakThreeFrequency: 12,
-  threePointRate: 20,
-  freeThrowRate: 22,
-  turnoverRate: 12,
-  isolationRate: 10,
-  pickAndRollBallHandlerRate: 25,
-  pickAndRollRollManRate: 10,
-  spotUpRate: 20,
-  transitionRate: 15,
-  cutRate: 10,
-  foulRate: 2,
-  stealAttemptRate: 8,
-  blockAttemptRate: 10,
-  crashOffensiveGlassRate: 12,
-};
 function scaleRatings(targetCenter: number): SimulationRatings {
   const base: SimulationRatings = {
     insideScoring: 78,
@@ -72,7 +47,7 @@ function benchmarkTeam(teamId: string, displayName: string, targetCenter: number
       heightInches: 78,
       weightLbs: 215,
       ratings: scaleRatings(targetCenter),
-      tendencies: { ...BENCHMARK_TENDENCIES },
+      tendencies: { ...SIMULATION_TENDENCIES },
     })),
   };
 }

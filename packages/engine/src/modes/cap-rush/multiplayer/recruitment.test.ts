@@ -46,11 +46,11 @@ function bid(
 }
 
 describe('cap rush multiplayer pricing', () => {
-  test('applies the 35% discount at and above 90 overall', () => {
+  test('applies a 50% discount at and above 90 overall', () => {
     for (const overall of [90, 95, 99]) {
       const solo = capRushSalaryDollars(overall, '1995-96');
       expect(capRushMultiplayerMinimumBidDollars(overall, '1995-96')).toBe(
-        Math.floor((solo * 35 + 50) / 100),
+        Math.floor((solo * 50 + 50) / 100),
       );
     }
   });

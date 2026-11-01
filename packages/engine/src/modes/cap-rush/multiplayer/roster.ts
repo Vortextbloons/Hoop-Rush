@@ -9,23 +9,18 @@ import type {
   CapRushPayrollStatus,
   CapRushSourcePlayer,
   CapRushSpinReceipt,
-  HavocEffectiveProfile,
-  HavocMutationPackage,
-  HavocSourcePlayer,
   HavocTeamInput,
-  Position,
   Seed,
 } from '@hoop-rush/data-contracts';
 import {
   POSITIONS,
-  havocEffectiveProfileSchema,
   havocInstanceIdSchema,
   havocInstanceSeed,
   havocTeamInputSchema,
   seasonDigestHex,
 } from '@hoop-rush/data-contracts';
-import { applyHavocMutationPackage } from '../../havoc/transform.ts';
-import { capRushEffectiveRatings, capRushPayrollStatus } from '../salary.ts';
+import { capRushEffectiveProfileOf, capRushHavocSourceOf } from '../effective-profile.ts';
+import { capRushPayrollStatus } from '../salary.ts';
 import { CapRushMultiplayerCompletionError } from './market.ts';
 
 export function capRushMultiplayerInstanceIdOf(
@@ -41,37 +36,6 @@ export function capRushMultiplayerInstanceIdOf(
 
 export function capRushMultiplayerCardId(marketDigest: string, playerId: string): string {
   return `crc-${seasonDigestHex(`${marketDigest}\u0000${playerId}`)}`;
-}
-
-function havocSourceOf(player: CapRushSourcePlayer): HavocSourcePlayer {
-  return {
-    playerId: player.playerId,
-    playerVersionId: player.playerVersionId,
-    displayName: player.displayName,
-    franchiseId: player.franchiseId,
-    eraId: player.eraId,
-    seasonKey: player.seasonKey,
-    positions: player.positions,
-    originalOverall: player.originalOverall,
-    overallSource: 'catalog',
-    profile: player.profile,
-    physical: player.physical,
-  };
-}
-
-function effectiveProfileOf(input: {
-  readonly player: CapRushSourcePlayer;
-  readonly slot: Position;
-  readonly payrollStatus: CapRushPayrollStatus;
-  readonly mutationPackage: HavocMutationPackage;
-}): HavocEffectiveProfile {
-  const mutated = applyHavocMutationPackage(havocSourceOf(input.player), input.mutationPackage, {
-    slot: input.slot,
-  });
-  return havocEffectiveProfileSchema.parse({
-    ...mutated,
-    ratings: capRushEffectiveRatings(mutated.ratings, input.payrollStatus),
-  });
 }
 
 function receiptTargets(
@@ -127,8 +91,8 @@ export function buildCapRushMultiplayerTeam(input: {
       slot: pick.slot,
       ownerInstanceId: null,
       mutationPackage,
-      source: havocSourceOf(source),
-      effective: effectiveProfileOf({
+      source: capRushHavocSourceOf(source),
+      effective: capRushEffectiveProfileOf({
         player: source,
         slot: pick.slot,
         payrollStatus: input.payrollStatus,
@@ -159,8 +123,8 @@ export function buildCapRushMultiplayerTeam(input: {
       slot: pick.slot,
       ownerInstanceId: starter.instanceId,
       mutationPackage: [],
-      source: havocSourceOf(source),
-      effective: effectiveProfileOf({
+      source: capRushHavocSourceOf(source),
+      effective: capRushEffectiveProfileOf({
         player: source,
         slot: pick.slot,
         payrollStatus: input.payrollStatus,

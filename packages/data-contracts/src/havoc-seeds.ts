@@ -66,21 +66,6 @@ export function havocGameSeed(runSeed: Seed, gameNumber: number): Seed {
   assertGameNumber(gameNumber);
   return havocSeed(runSeed, 'game', gameNumber, 'basketball');
 }
-export function havocMutationStreamSeed(
-  runSeed: Seed,
-  gameNumber: number,
-  instanceId: string,
-  effect: string,
-  eventOrdinal: number,
-): Seed {
-  assertGameNumber(gameNumber);
-  if (!Number.isInteger(eventOrdinal) || eventOrdinal < 0) {
-    throw new Error(
-      `havoc event ordinal must be a nonnegative integer (got ${String(eventOrdinal)})`,
-    );
-  }
-  return havocSeed(runSeed, 'game', gameNumber, 'mutation', instanceId, effect, eventOrdinal);
-}
 export function havocInstanceSeed(
   runSeed: Seed,
   purpose: string,

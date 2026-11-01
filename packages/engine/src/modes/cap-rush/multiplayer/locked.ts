@@ -1,3 +1,4 @@
+import { buildCapRushHistoricalField } from '../historical-field.ts';
 import type {
   CapRushFranchiseAssignment,
   CapRushMultiplayerLockedInputs,
@@ -163,7 +164,12 @@ export function buildCapRushMultiplayerLockedInputs(input: {
     });
   }
   capRushValidateLeagueField(field);
-  const opponents = input.bracket.opponents
+  const historicalBracket = buildCapRushHistoricalField(
+    input.bracket,
+    input.seasonCatalog,
+    input.rootSeed,
+  );
+  const opponents = historicalBracket.opponents
     .filter((opponent) => !humanIds.has(opponent.teamId))
     .map((opponent) => ({
       opponentId: opponent.teamId,

@@ -38,7 +38,12 @@ export function capRushTestEnvironment(setup: CapRushTestSetup): CapRushMultipla
   return {
     variant: 'clash',
     bracket: setup.lockSources.bracket,
-    seasonCatalog: setup.catalog,
+    seasonCatalog: {
+      ...setup.catalog,
+      candidates: setup.lockSources.bracket.opponents.flatMap((opponent) =>
+        setup.catalog.candidates.map((player) => ({ ...player, franchiseId: opponent.teamId })),
+      ),
+    },
     index: setup.index,
     profile: setup.lockSources.profile,
     catalogSource: setup.source,

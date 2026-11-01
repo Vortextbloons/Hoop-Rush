@@ -10,7 +10,7 @@ export type {
   EraSimParameters,
   EraSimProfile,
 } from './profile.ts';
-export { deriveLeagueAggregates, deriveLeagueAggregatesFromStints } from './aggregates.ts';
+export { deriveLeagueAggregates } from './aggregates.ts';
 export type { LeagueAggregates, StintRow } from './aggregates.ts';
 export { computePoolShotMix, poolShotMixAndAnchors } from './shot-mix.ts';
 export type { PoolPlayerLike, ShotMixAndAnchors, ZoneMix } from './shot-mix.ts';

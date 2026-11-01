@@ -263,6 +263,3 @@ export function deriveLeagueAggregates(seasons: readonly string[]): LeagueAggreg
   };
   return combined;
 }
-export function deriveLeagueAggregatesFromStints(stints: readonly StintRow[]): LeagueAggregates {
-  return deriveSeasonAggregatesFromStints('2099-00', stints);
-}

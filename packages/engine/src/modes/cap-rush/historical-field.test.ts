@@ -41,3 +41,27 @@ test('historical fields preserve franchise-season rosters and replay independent
   }
   expect(bracket.opponents[0]?.seasonKey).not.toBe(first.opponents[0]?.seasonKey);
 });
+
+test('historical lineup variation stays close to the starting five strength', () => {
+  const setup = capRushTestSetup();
+  const bracket = setup.lockSources.bracket;
+  const candidates = bracket.opponents.flatMap((opponent) =>
+    setup.catalog.candidates.map((player) => ({ ...player, franchiseId: opponent.teamId })),
+  );
+  const catalog = { ...setup.catalog, candidates };
+  const fields = Array.from({ length: 20 }, (_, index) =>
+    buildCapRushHistoricalField(
+      bracket,
+      catalog,
+      seedSchema.parse(index.toString(16).padStart(16, '0')),
+    ),
+  );
+  for (const opponent of bracket.opponents) {
+    const strengths = fields.map((field) => {
+      const team = field.opponents.find((team) => team.teamId === opponent.teamId);
+      if (team === undefined) throw new Error('Missing historical opponent');
+      return team.players.reduce((sum, player) => sum + (player.overall ?? 0), 0);
+    });
+    expect(Math.max(...strengths) - Math.min(...strengths)).toBeLessThanOrEqual(4);
+  }
+});

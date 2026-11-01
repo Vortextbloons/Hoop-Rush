@@ -27,6 +27,11 @@
     teamIdentity?: Snippet<['home' | 'away']>;
   } = $props();
 
+  const orderedBoxes = $derived([
+    ...boxes.filter((box) => box.side === localSide),
+    ...boxes.filter((box) => box.side !== localSide),
+  ]);
+
   function statOf(value: number): string {
     return perGame ? perGameText(value, games) : String(value);
   }
@@ -38,7 +43,7 @@
 
 <div class="hm-boxes-container">
   <div class="hm-boxes" data-havoc-multiplayer-boxes data-theme={theme}>
-    {#each boxes as box (box.side)}
+    {#each orderedBoxes as box (box.side)}
       {@const topPoints = Math.max(0, ...box.lines.map((line) => line.points))}
       {@const teamUsage = box.lines.reduce(
         (total, line) =>
@@ -158,7 +163,7 @@
     --box-line: #3c486b;
     --box-muted: #aab9db;
     --box-accent: #679dff;
-    --box-opponent: #f290c5;
+    --box-opponent: hsl(212 90% 62%);
     --box-highlight: #ffd782;
   }
   .hm-boxes[data-theme='duel'] {
