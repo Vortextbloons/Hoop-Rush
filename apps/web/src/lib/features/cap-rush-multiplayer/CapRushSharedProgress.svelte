@@ -12,7 +12,7 @@
   import TeamLogo from '#lib/components/TeamLogo.svelte';
   import type { CapRushArt } from '../cap-rush/cap-rush-art.js';
   import { capStatusLabel } from '../cap-rush/cap-rush-presentation.js';
-  import { seatLabelFor } from './cap-rush-multiplayer-presentation.js';
+  import { seatLabelFor, teamNameOf } from './cap-rush-multiplayer-presentation.js';
 
   type StepAction = 'watch-h2h' | null;
 
@@ -171,14 +171,7 @@
   });
 
   function teamName(teamId: string): string {
-    if (locked === null) return teamId;
-    if (locked.seats.p1.franchise.franchiseId === teamId)
-      return locked.seats.p1.franchise.displayName;
-    if (locked.seats.p2.franchise.franchiseId === teamId)
-      return locked.seats.p2.franchise.displayName;
-    return (
-      locked.opponents.find((entry) => entry.team.teamId === teamId)?.team.displayName ?? teamId
-    );
+    return teamNameOf(locked, teamId);
   }
 </script>
 

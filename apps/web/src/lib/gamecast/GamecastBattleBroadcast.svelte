@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import { formatHavocClock, havocPeriodLabel } from '#lib/features/havoc/havoc-presentation.js';
   import type {
     GamecastBattleFeedLine,
@@ -17,6 +18,7 @@
     progress,
     minimal = false,
     theme = 'havoc',
+    teamIdentity,
   }: {
     result: import('@hoop-rush/data-contracts').HavocBattleResult;
     gameNumber?: number;
@@ -26,6 +28,7 @@
     progress: number;
     minimal?: boolean;
     theme?: 'havoc' | 'duel';
+    teamIdentity?: Snippet<['home' | 'away']>;
   } = $props();
 
   const boxes = $derived(gamecastBattleLiveBoxes(result, visible));
@@ -62,7 +65,9 @@
 >
   <header class="hm-scoreboard">
     <div class="hm-team" data-align="start" data-leading={leader === 'local'}>
-      <span class="hm-team-label" data-side="local">You</span>
+      <span class="hm-team-label" data-side="local"
+        >{#if teamIdentity}{@render teamIdentity(localSide)}{:else}You{/if}</span
+      >
       {#if leader === 'local'}<span class="hm-leader">{complete ? 'Winner' : 'Leading'}</span>{/if}
       {#key localBox?.score}
         <span class="hm-score" data-negative={(localBox?.score ?? 0) < 0}
@@ -92,7 +97,11 @@
       <span class="hm-plays">{visible.events.length + visible.scoring.length} plays shown</span>
     </div>
     <div class="hm-team" data-align="end" data-leading={leader === 'opponent'}>
-      <span class="hm-team-label" data-side="opponent">Opponent</span>
+      <span class="hm-team-label" data-side="opponent"
+        >{#if teamIdentity}{@render teamIdentity(
+            localSide === 'home' ? 'away' : 'home',
+          )}{:else}Opponent{/if}</span
+      >
       {#if leader === 'opponent'}<span class="hm-leader">{complete ? 'Winner' : 'Leading'}</span
         >{/if}
       {#key opponentBox?.score}
@@ -107,7 +116,7 @@
   </header>
 
   {#if !minimal}
-    <GamecastBattleBox {boxes} {localSide} {theme} />
+    <GamecastBattleBox {teamIdentity} {boxes} {localSide} {theme} />
   {/if}
 
   <section class="hm-feed" aria-label="Ability activations">

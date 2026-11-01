@@ -43,6 +43,7 @@
     busy = false,
     bidAttempt = null,
     onbid,
+    oncancelbid,
     ondismissbid,
   }: {
     game: CapRushMultiplayerState;
@@ -52,6 +53,7 @@
     busy?: boolean;
     bidAttempt?: CapRushBidAttempt | null;
     onbid: (input: { round: number; playerId: string; totalDollars: number }) => Promise<boolean>;
+    oncancelbid: (round: number, playerId: string) => void;
     ondismissbid?: () => void;
   } = $props();
 
@@ -149,11 +151,6 @@
       ? null
       : (playerById(recruitment, leadPlayerId)?.displayName ?? null),
   );
-  const leadsAnotherLot = $derived(
-    leadPlayerId !== null &&
-      activeSelection !== null &&
-      leadPlayerId !== activeSelection.player.playerId,
-  );
   const seatFilled = $derived(
     recruitment !== null &&
       activePool !== null &&
@@ -176,12 +173,6 @@
     }
     if (activeSelection.auction.status === 'closed') {
       return { reason: 'This lot has closed. Pick an open lot.', playerId: null };
-    }
-    if (leadsAnotherLot) {
-      return {
-        reason: `You are already leading ${leadPlayerName ?? 'another lot'}. Only one binding lead is allowed per position.`,
-        playerId: leadPlayerId,
-      };
     }
     if (busy && pendingAttempt === null) {
       return { reason: 'Another room action is still running.', playerId: null };
@@ -495,6 +486,21 @@
 
         {#if inspectedIndex === activePoolIndex}
           <section class="flex flex-col gap-2" aria-label="Place a bid">
+            <p class="text-xs text-muted-foreground">
+              Bid on multiple players. When this position round ends, you sign only your highest
+              offer that still leads. Equal offers use player ID order. Other offers are released.
+            </p>
+            {#if activeSelection?.auction?.leaderSeat === localSeat}
+              <button
+                type="button"
+                class="min-h-11 rounded-xl border border-border bg-surface-2 px-3 text-xs font-bold focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
+                disabled={busy || pendingAttempt !== null}
+                onclick={() =>
+                  activeSelection && oncancelbid(activePoolIndex, activeSelection.player.playerId)}
+                >Cancel bid on {activeSelection.player.displayName}</button
+              >
+            {/if}
+
             <CapRushBidEditor
               {draft}
               minimum={bidMinimum}
@@ -532,7 +538,7 @@
                     <dt
                       class="font-mono text-[8px] font-bold tracking-[0.08em] text-muted-foreground uppercase"
                     >
-                      Binding lead
+                      Highest winning offer
                     </dt>
                     <dd class="mt-0.5 truncate text-xs font-semibold">
                       {payrollSummary.bindingBidDollars === null

@@ -1,4 +1,4 @@
-import { createContext } from 'svelte';
+import { getContext, setContext } from 'svelte';
 import {
   LobbySession,
   type LobbyNavigation,
@@ -145,4 +145,12 @@ export class LobbyCoordinator {
   }
 }
 
-export const [getLobbyCoordinator, setLobbyCoordinator] = createContext<LobbyCoordinator>();
+const LOBBY_CONTEXT_KEY = 'hoop-rush:lobby-coordinator';
+
+export function getLobbyCoordinator(): LobbyCoordinator {
+  return getContext<LobbyCoordinator>(LOBBY_CONTEXT_KEY);
+}
+
+export function setLobbyCoordinator(coordinator: LobbyCoordinator): LobbyCoordinator {
+  return setContext(LOBBY_CONTEXT_KEY, coordinator);
+}

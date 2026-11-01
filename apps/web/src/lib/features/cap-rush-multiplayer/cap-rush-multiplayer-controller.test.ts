@@ -245,3 +245,19 @@ test('continues the season immediately after a successful step instead of waitin
   expect(simulate).toHaveBeenCalledTimes(1);
   controller.dispose();
 });
+
+for (const plans of [
+  { p1: 'sim', p2: 'sim' },
+  { p1: 'sim', p2: null },
+  { p1: 'sim', p2: 'simcast' },
+]) {
+  test(`automatically runs the playoff series only when both seats choose sim: ${JSON.stringify(plans)}`, async () => {
+    const controller = new CapRushMultiplayerController('room-a');
+    const view = sessionView(null);
+    Object.assign(view.state, { phase: 'postseason', postseason: { championTeamId: null, plans } });
+    Object.assign(controller, { view, session: { refresh: () => Promise.resolve() } });
+    const simulate = vi.spyOn(controller, 'simulatePlayoffStep').mockResolvedValue();
+    await (controller as unknown as { tick(): Promise<void> }).tick();
+    expect(simulate).toHaveBeenCalledTimes(plans.p2 === 'sim' ? 1 : 0);
+  });
+}

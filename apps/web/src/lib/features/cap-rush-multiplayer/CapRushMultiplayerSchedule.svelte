@@ -8,6 +8,7 @@
   import {
     type CapRushSeatScheduleCell,
     seatScheduleCells,
+    teamNameOf,
   } from './cap-rush-multiplayer-presentation.js';
 
   let {
@@ -50,14 +51,7 @@
   );
 
   function teamName(teamId: string): string {
-    if (locked === null) return teamId;
-    if (locked.seats.p1.franchise.franchiseId === teamId)
-      return locked.seats.p1.franchise.displayName;
-    if (locked.seats.p2.franchise.franchiseId === teamId)
-      return locked.seats.p2.franchise.displayName;
-    return (
-      locked.opponents.find((entry) => entry.team.teamId === teamId)?.team.displayName ?? teamId
-    );
+    return teamNameOf(locked, teamId);
   }
 
   function opponentLabel(cell: CapRushSeatScheduleCell): string {

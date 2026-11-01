@@ -32,6 +32,7 @@ import {
 } from '@hoop-rush/data-contracts';
 import {
   applyCapRushMultiplayerBid,
+  cancelCapRushMultiplayerBid,
   capRushMultiplayerCloseDueAuctions,
   capRushMultiplayerRecruitmentComplete,
   createCapRushMultiplayerRecruitment,
@@ -298,6 +299,21 @@ export function applyCapRushMultiplayerCommand(
         franchises,
         recruitment: { ...recruitment },
       });
+    }
+    case 'cancel-bid': {
+      if (
+        state.phase !== 'recruiting' ||
+        state.recruitment === null ||
+        payload.round !== state.recruitment.roundIndex
+      )
+        return reject('invalid-phase', 'that position round is not open');
+      const outcome = cancelCapRushMultiplayerBid(state.recruitment, {
+        seat: actor,
+        playerId: payload.playerId,
+        acceptedAtIso: command.acceptedAtIso,
+      });
+      if (!outcome.ok) return reject(outcome.code, outcome.message);
+      return accept({ ...state, recruitment: outcome.recruitment });
     }
     case 'bid': {
       if (state.phase !== 'recruiting' || state.recruitment === null) {

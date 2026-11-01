@@ -1,4 +1,6 @@
 <script lang="ts">
+  import TeamLogo from '#lib/components/TeamLogo.svelte';
+  import type { CapRushArt } from '../cap-rush/cap-rush-art.js';
   import { onMount } from 'svelte';
   import type {
     HavocBattleInput,
@@ -15,6 +17,7 @@
   import { gamecastBattleFinalBoxes } from '#lib/gamecast/gamecast-battle-view.js';
 
   let {
+    art = null,
     input,
     result,
     tape,
@@ -25,6 +28,7 @@
     oncomplete,
     onclose,
   }: {
+    art?: CapRushArt | null;
     input: HavocBattleInput;
     result: HavocBattleResult;
     tape: HavocBattleTape;
@@ -73,6 +77,21 @@
   );
 </script>
 
+{#snippet teamIdentity(side: 'home' | 'away')}
+  {@const team = art?.teamFor(input[side].teamId) ?? null}
+  <span class="inline-flex min-w-0 items-center gap-2">
+    {#if team !== null && art !== null}
+      <TeamLogo
+        manifest={art.manifest}
+        franchiseId={team.franchiseId}
+        teamExternalId={team.teamExternalId}
+        className="h-7 w-7 shrink-0"
+      />
+    {/if}
+    <span>{input[side].displayName}</span>
+  </span>
+{/snippet}
+
 {#if complete}
   <section
     class="flex flex-col gap-4 rounded-2xl border border-border border-t-[3px] border-t-primary bg-card p-4"
@@ -87,15 +106,19 @@
       <h2 class="font-display text-2xl font-extrabold tracking-tight uppercase sm:text-3xl">
         {kind === 'review' ? 'Final' : localWon ? 'You win' : 'Opponent wins'}
       </h2>
-      <p class="font-display text-5xl font-extrabold tabular-nums sm:text-6xl">
-        <span class="text-primary">{localBox?.score ?? 0}</span>
-        <span class="px-2 text-muted-foreground" aria-hidden="true">–</span>
-        <span>{opponentBox?.score ?? 0}</span>
-      </p>
+      <div class="flex flex-wrap items-center justify-center gap-3">
+        {@render teamIdentity(localSide)}
+        <p class="font-display text-5xl font-extrabold tabular-nums sm:text-6xl">
+          <span class="text-primary">{localBox?.score ?? 0}</span>
+          <span class="px-2 text-muted-foreground" aria-hidden="true">–</span>
+          <span>{opponentBox?.score ?? 0}</span>
+        </p>
+        {@render teamIdentity(localSide === 'home' ? 'away' : 'home')}
+      </div>
       <p class="max-w-md text-xs leading-relaxed text-muted-foreground">{recapDetail}</p>
     </header>
 
-    <GamecastBattleBox {boxes} {localSide} theme="duel" />
+    <GamecastBattleBox {teamIdentity} {boxes} {localSide} theme="duel" />
 
     <footer class="flex flex-wrap items-center justify-end gap-2">
       <button
@@ -118,8 +141,12 @@
         <p class="font-mono text-[10px] uppercase tracking-[0.16em] text-primary">
           {matchupLabel} · {speed}×
         </p>
-        <h2 class="font-display text-2xl font-extrabold uppercase tracking-tight">
-          {result.home.displayName} vs {result.away.displayName}
+        <h2
+          class="flex flex-wrap items-center gap-2 font-display text-2xl font-extrabold uppercase tracking-tight"
+        >
+          {@render teamIdentity('home')}
+          <span class="text-muted-foreground">vs</span>
+          {@render teamIdentity('away')}
         </h2>
       </div>
       <div class="flex items-center gap-2">
@@ -140,6 +167,14 @@
       </div>
     </header>
 
-    <GamecastBattleBroadcast theme="duel" {result} {visible} {feed} {progress} {localSide} />
+    <GamecastBattleBroadcast
+      {teamIdentity}
+      theme="duel"
+      {result}
+      {visible}
+      {feed}
+      {progress}
+      {localSide}
+    />
   </section>
 {/if}

@@ -2,6 +2,7 @@ import type {
   CapRushLeagueGame,
   CapRushLeagueScheduleEntry,
   CapRushMultiplayerAuction,
+  CapRushMultiplayerLockedInputs,
   CapRushMultiplayerCommandRejectionCode,
   CapRushMultiplayerMarketPlayer,
   CapRushMultiplayerRecruitment,
@@ -12,7 +13,6 @@ import type {
   Position,
 } from '@hoop-rush/data-contracts';
 import {
-  CAP_RUSH_MULTIPLAYER_AUCTION_MS,
   CAP_RUSH_MULTIPLAYER_BID_INCREMENT_DOLLARS,
   CAP_RUSH_MULTIPLAYER_HARD_LIMIT_DOLLARS,
   POSITIONS,
@@ -68,14 +68,6 @@ export function clockLabel(ms: number): string {
   const minutes = Math.floor(total / 60);
   const seconds = total % 60;
   return `${String(minutes)}:${String(seconds).padStart(2, '0')}`;
-}
-
-export function auctionProgress(auction: CapRushMultiplayerAuction, nowMs: number): number {
-  const opened = Date.parse(auction.openedAtIso);
-  const ends = Date.parse(auction.endsAtIso);
-  if (ends <= opened) return 0;
-  const remaining = Math.max(0, ends - nowMs);
-  return Math.min(1, remaining / Math.max(CAP_RUSH_MULTIPLAYER_AUCTION_MS, ends - opened));
 }
 
 export function currentRound(
@@ -134,29 +126,20 @@ export function lotStateLabel(state: LotState): string {
   }
 }
 
-export function seatSignedCount(
-  state: CapRushMultiplayerState,
-  seat: CapRushMultiplayerSeatId,
-): number {
-  return state.recruitment?.seats[seat].filledPositions.length ?? 0;
-}
-
-export function deadlineLabel(state: CapRushMultiplayerState, nowMs: number): string | null {
-  if (state.recruitment === null) return null;
-  const round = currentRound(state.recruitment);
-  if (round.status !== 'bidding') return null;
-  const ends = round.auctions
-    .filter((auction) => auction.status === 'open')
-    .map((auction) => Date.parse(auction.endsAtIso));
-  if (ends.length === 0) return null;
-  return clockLabel(Math.min(...ends) - nowMs);
-}
-
 export function activeRound(recruitment: CapRushMultiplayerRecruitment): CapRushMultiplayerRound {
   return (
     recruitment.rounds.find((round) => round.index === recruitment.roundIndex) ??
     currentRound(recruitment)
   );
+}
+
+export function teamNameOf(locked: CapRushMultiplayerLockedInputs | null, teamId: string): string {
+  if (locked === null) return teamId;
+  if (locked.seats.p1.franchise.franchiseId === teamId)
+    return locked.seats.p1.franchise.displayName;
+  if (locked.seats.p2.franchise.franchiseId === teamId)
+    return locked.seats.p2.franchise.displayName;
+  return locked.opponents.find((entry) => entry.team.teamId === teamId)?.team.displayName ?? teamId;
 }
 
 export function seatOrder(
@@ -267,8 +250,13 @@ export function seatPayrollSummary(
   const signedPayrollDollars = lockedPayroll ?? recruitment?.seats[seat].payrollDollars ?? 0;
   const round = recruitment === null ? null : activeRound(recruitment);
   const bindingAuction =
-    round?.auctions.find((auction) => auction.status === 'open' && auction.leaderSeat === seat) ??
-    null;
+    round?.auctions
+      .filter((auction) => auction.status === 'open' && auction.leaderSeat === seat)
+      .sort(
+        (left, right) =>
+          (right.leaderBidDollars ?? 0) - (left.leaderBidDollars ?? 0) ||
+          (left.playerId < right.playerId ? -1 : left.playerId > right.playerId ? 1 : 0),
+      )[0] ?? null;
   const bindingBidDollars = bindingAuction?.leaderBidDollars ?? null;
   const bindingPlayerId = bindingAuction?.playerId ?? null;
   const bindingPlayerName =
@@ -307,7 +295,8 @@ export function bidProjection(
   totalDollars: number,
 ): BidProjection {
   const summary = seatPayrollSummary(state, seat);
-  const projectedPayrollDollars = summary.signedPayrollDollars + totalDollars;
+  const projectedPayrollDollars =
+    summary.signedPayrollDollars + Math.max(totalDollars, summary.bindingBidDollars ?? 0);
   const headroomDollars = CAP_RUSH_MULTIPLAYER_HARD_LIMIT_DOLLARS - projectedPayrollDollars;
   return {
     signedPayrollDollars: summary.signedPayrollDollars,

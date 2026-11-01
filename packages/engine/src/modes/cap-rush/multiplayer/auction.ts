@@ -67,15 +67,17 @@ function committedDollars(
     .reduce((total, signing) => total + signing.salaryDollars, 0);
 }
 
-function reservedDollars(round: CapRushMultiplayerRound, seat: CapRushMultiplayerSeatId): number {
+function preferredAuction(
+  round: CapRushMultiplayerRound,
+  seat: CapRushMultiplayerSeatId,
+): CapRushMultiplayerAuction | undefined {
   return round.auctions
-    .filter(
-      (auction) =>
-        auction.status === 'open' &&
-        auction.leaderSeat === seat &&
-        auction.leaderBidDollars !== null,
-    )
-    .reduce((total, auction) => total + (auction.leaderBidDollars ?? 0), 0);
+    .filter((auction) => auction.leaderSeat === seat)
+    .sort(
+      (left, right) =>
+        (right.leaderBidDollars ?? 0) - (left.leaderBidDollars ?? 0) ||
+        (left.playerId < right.playerId ? -1 : left.playerId > right.playerId ? 1 : 0),
+    )[0];
 }
 
 function filledPositions(
@@ -94,9 +96,7 @@ function recomputeSeats(
   const seatOf = (seat: CapRushMultiplayerSeatId): CapRushMultiplayerSeatRecruitment => ({
     seat,
     filledPositions: filledPositions(recruitment, seat),
-    leadPlayerId:
-      round.auctions.find((auction) => auction.status === 'open' && auction.leaderSeat === seat)
-        ?.playerId ?? null,
+    leadPlayerId: preferredAuction(round, seat)?.playerId ?? null,
     payrollDollars: committedDollars(recruitment, seat),
   });
   return { p1: seatOf('p1'), p2: seatOf('p2') };
@@ -106,28 +106,24 @@ function feasibilityOf(
   recruitment: CapRushMultiplayerRecruitment,
   round: CapRushMultiplayerRound,
 ): boolean {
-  const reserved = new Set(
-    round.auctions
-      .filter((auction) => auction.status === 'open' && auction.leaderSeat !== null)
-      .map((auction) => auction.playerId),
-  );
-  const signed = new Set(recruitment.signings.map((signing) => signing.playerId));
-  const unavailable = new Set<string>([...signed, ...reserved]);
+  const preferred = { p1: preferredAuction(round, 'p1'), p2: preferredAuction(round, 'p2') };
+  const unavailable = new Set(recruitment.signings.map((signing) => signing.playerId));
+  for (const seat of ['p1', 'p2'] as const) {
+    if (preferred[seat]) unavailable.add(preferred[seat].playerId);
+  }
+  const seatOf = (seat: CapRushMultiplayerSeatId) => {
+    const filled = filledPositions(recruitment, seat);
+    const lead = filled.includes(round.position) ? undefined : preferred[seat];
+    return {
+      committedDollars: committedDollars(recruitment, seat),
+      reservedDollars: lead?.leaderBidDollars ?? 0,
+      filledPositions: lead ? [...filled, round.position] : filled,
+    };
+  };
   return capRushMultiplayerCompletionFeasible({
     players: recruitment.market.players,
     unavailablePlayerIds: unavailable,
-    seats: {
-      p1: {
-        committedDollars: committedDollars(recruitment, 'p1'),
-        reservedDollars: reservedDollars(round, 'p1'),
-        filledPositions: filledPositions(recruitment, 'p1'),
-      },
-      p2: {
-        committedDollars: committedDollars(recruitment, 'p2'),
-        reservedDollars: reservedDollars(round, 'p2'),
-        filledPositions: filledPositions(recruitment, 'p2'),
-      },
-    },
+    seats: { p1: seatOf('p1'), p2: seatOf('p2') },
   });
 }
 
@@ -212,15 +208,6 @@ export function applyCapRushMultiplayerBid(
   if (auction.status !== 'open') {
     return reject('auction-closed', 'that auction has closed');
   }
-  const competingLead = round.auctions.find(
-    (entry) =>
-      entry.status === 'open' &&
-      entry.leaderSeat === input.seat &&
-      entry.playerId !== input.playerId,
-  );
-  if (competingLead !== undefined) {
-    return reject('multiple-leads', 'this seat already leads another auction');
-  }
   const marketPlayer = capRushMultiplayerMarketPlayerOf(recruitment.market, input.playerId);
   if (input.totalDollars < marketPlayer.minimumBidDollars) {
     return reject('bid-too-low', 'the bid is below the player minimum');
@@ -235,7 +222,9 @@ export function applyCapRushMultiplayerBid(
   if (!Number.isFinite(acceptedAt)) {
     throw new Error(`cap rush multiplayer: invalid accepted time ${input.acceptedAtIso}`);
   }
-  const currentEnds = Date.parse(auction.endsAtIso);
+  if (acceptedAt >= Date.parse(auction.endsAtIso))
+    return reject('auction-closed', 'that auction has reached its deadline');
+  const currentEnds = Math.max(...round.auctions.map((entry) => Date.parse(entry.endsAtIso)));
   const minimumEnd = acceptedAt + CAP_RUSH_MULTIPLAYER_MIN_EXTENSION_MS;
   const endsAtIso = new Date(Math.max(currentEnds, minimumEnd)).toISOString();
   const nextAuctions = round.auctions.map((entry) =>
@@ -246,9 +235,13 @@ export function applyCapRushMultiplayerBid(
           leaderBidDollars: input.totalDollars,
           endsAtIso,
         }
-      : entry,
+      : { ...entry, endsAtIso },
   );
-  const nextRound: CapRushMultiplayerRound = { ...round, auctions: nextAuctions };
+  const nextRound: CapRushMultiplayerRound = {
+    ...round,
+    auctions: nextAuctions,
+    endEarlySeats: [],
+  };
   const next: CapRushMultiplayerRecruitment = {
     ...recruitment,
     rounds: [...recruitment.rounds.slice(0, -1), nextRound],
@@ -259,6 +252,41 @@ export function applyCapRushMultiplayerBid(
       'that bid would leave the two teams unable to complete their rosters under the hard limit',
     );
   }
+  return {
+    ok: true,
+    recruitment: { ...next, seats: recomputeSeats(next, nextRound) },
+    roundComplete: false,
+  };
+}
+
+export function cancelCapRushMultiplayerBid(
+  recruitment: CapRushMultiplayerRecruitment,
+  input: {
+    readonly seat: CapRushMultiplayerSeatId;
+    readonly playerId: string;
+    readonly acceptedAtIso: string;
+  },
+): CapRushAuctionOutcome {
+  const round = lastRound(recruitment);
+  const auction = round.auctions.find((entry) => entry.playerId === input.playerId);
+  if (
+    round.status !== 'bidding' ||
+    auction?.status !== 'open' ||
+    Date.parse(input.acceptedAtIso) >= Date.parse(auction.endsAtIso)
+  )
+    return reject('auction-closed', 'that auction is closed');
+  if (auction.leaderSeat !== input.seat)
+    return reject('invalid-phase', 'you do not lead that auction');
+  const nextRound = {
+    ...round,
+    auctions: round.auctions.map((entry) =>
+      entry.playerId === input.playerId
+        ? { ...entry, leaderSeat: null, leaderBidDollars: null }
+        : entry,
+    ),
+    endEarlySeats: [],
+  };
+  const next = { ...recruitment, rounds: [...recruitment.rounds.slice(0, -1), nextRound] };
   return {
     ok: true,
     recruitment: { ...next, seats: recomputeSeats(next, nextRound) },
@@ -374,64 +402,53 @@ export function capRushMultiplayerCloseDueAuctions(
   if (due.length === 0) {
     return reject('auction-not-due', 'no auction has reached its deadline');
   }
-  let closed: CapRushMultiplayerRound = {
+  const allDue = round.auctions.every(
+    (auction) => auction.status === 'closed' || Date.parse(auction.endsAtIso) <= now,
+  );
+  if (!allDue) return reject('auction-not-due', 'the position round is still open');
+  const preferred = { p1: preferredAuction(round, 'p1'), p2: preferredAuction(round, 'p2') };
+  const closed: CapRushMultiplayerRound = {
     ...round,
-    auctions: round.auctions.map((auction) =>
-      auction.status === 'open' && Date.parse(auction.endsAtIso) <= now
-        ? closeAuction(auction, input.acceptedAtIso)
-        : auction,
-    ),
+    auctions: round.auctions.map((auction) => {
+      const selected =
+        auction.leaderSeat !== null && preferred[auction.leaderSeat]?.playerId === auction.playerId;
+      return closeAuction(
+        selected ? auction : { ...auction, leaderSeat: null, leaderBidDollars: null },
+        input.acceptedAtIso,
+      );
+    }),
   };
   let signings = [...recruitment.signings, ...awardsOf(closed, recruitment.market)];
-  const bothFilled =
-    signings.some((signing) => signing.seat === 'p1' && signing.position === round.position) &&
-    signings.some((signing) => signing.seat === 'p2' && signing.position === round.position);
-  if (bothFilled) {
-    closed = {
-      ...closed,
-      auctions: closed.auctions.map((auction) =>
-        auction.status === 'open' ? closeAuction(auction, input.acceptedAtIso) : auction,
-      ),
-    };
-  }
-  const allClosed = closed.auctions.every((auction) => auction.status === 'closed');
   let next: CapRushMultiplayerRecruitment = {
     ...recruitment,
     rounds: [...recruitment.rounds.slice(0, -1), closed],
     signings,
   };
-  if (allClosed || bothFilled) {
-    for (const seat of autoSignPriority(next, closed)) {
-      if (signingOf(next, seat, closed.position) !== undefined) continue;
-      const signing = autoSignSeat(next, closed, seat);
-      signings = [...next.signings, signing];
-      next = { ...next, signings };
-    }
-    const completed: CapRushMultiplayerRound = {
-      ...closed,
-      status: 'complete',
-      closedAtIso: input.acceptedAtIso,
-    };
-    const rounds = [...next.rounds.slice(0, -1), completed];
-    next = { ...next, rounds };
-    if (completed.index < POSITIONS.length - 1) {
-      const nextRound = capRushMultiplayerOpenRound({
-        market: next.market,
-        index: completed.index + 1,
-        openedAtIso: input.acceptedAtIso,
-      });
-      next = { ...next, roundIndex: nextRound.index, rounds: [...rounds, nextRound] };
-    }
-    return {
-      ok: true,
-      recruitment: { ...next, seats: recomputeSeats(next, lastRound(next)) },
-      roundComplete: completed.index === POSITIONS.length - 1,
-    };
+  for (const seat of autoSignPriority(next, closed)) {
+    if (signingOf(next, seat, closed.position) !== undefined) continue;
+    const signing = autoSignSeat(next, closed, seat);
+    signings = [...next.signings, signing];
+    next = { ...next, signings };
+  }
+  const completed: CapRushMultiplayerRound = {
+    ...closed,
+    status: 'complete',
+    closedAtIso: input.acceptedAtIso,
+  };
+  const rounds = [...next.rounds.slice(0, -1), completed];
+  next = { ...next, rounds };
+  if (completed.index < POSITIONS.length - 1) {
+    const nextRound = capRushMultiplayerOpenRound({
+      market: next.market,
+      index: completed.index + 1,
+      openedAtIso: input.acceptedAtIso,
+    });
+    next = { ...next, roundIndex: nextRound.index, rounds: [...rounds, nextRound] };
   }
   return {
     ok: true,
-    recruitment: { ...next, seats: recomputeSeats(next, closed) },
-    roundComplete: false,
+    recruitment: { ...next, seats: recomputeSeats(next, lastRound(next)) },
+    roundComplete: completed.index === POSITIONS.length - 1,
   };
 }
 

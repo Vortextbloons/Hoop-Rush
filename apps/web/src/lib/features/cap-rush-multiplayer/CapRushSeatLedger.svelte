@@ -75,7 +75,7 @@
   {#if summary.bindingBidDollars !== null}
     <div class="rounded-lg border border-accent/40 bg-accent/10 px-3 py-2">
       <p class="font-mono text-[9px] font-bold tracking-[0.12em] text-accent uppercase">
-        Binding lead · not signed yet
+        Highest winning offer · not signed yet
       </p>
       <p class="mt-0.5 flex flex-wrap items-baseline justify-between gap-x-2 text-sm">
         <span class="min-w-0 truncate font-semibold">

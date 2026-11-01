@@ -3,7 +3,6 @@ import type {
   CapRushLeagueGame,
   CapRushLeagueScheduleEntry,
   CapRushMultiplayerLockedInputs,
-  CapRushMultiplayerSeasonState,
   CapRushMultiplayerSeatId,
   HavocBattleInput,
   HavocBattleResult,
@@ -12,7 +11,6 @@ import type {
 import {
   CAP_RUSH_CONFERENCE_GAMES_PER_TEAM,
   capRushLeagueGameSchema,
-  capRushLeagueGameSeed,
 } from '@hoop-rush/data-contracts';
 import type { EngineContext } from '../../../sim/kernel.ts';
 import { simulateValidatedHavocBattleGame } from '../../havoc/core/battle-game.ts';
@@ -182,25 +180,6 @@ export function capRushMultiplayerAcceptedThrough(games: readonly CapRushLeagueG
     if (game.slot > highest) highest = game.slot;
   }
   return highest;
-}
-
-export function capRushMultiplayerFrontier(season: CapRushMultiplayerSeasonState): number {
-  return Math.min(season.slotAcks.p1, season.slotAcks.p2, season.frontierSlot);
-}
-
-export function capRushMultiplayerGameSeedOf(
-  locked: CapRushMultiplayerLockedInputs,
-  gameId: string,
-): string {
-  return capRushLeagueGameSeed(locked.rootSeed, gameId);
-}
-
-export function capRushMultiplayerSlotRange(
-  locked: CapRushMultiplayerLockedInputs,
-): readonly number[] {
-  return Array.from(new Set(locked.leagueSchedule.map((entry) => entry.slot))).sort(
-    (left, right) => left - right,
-  );
 }
 
 export const CAP_RUSH_MULTIPLAYER_REGULAR_GAMES = CAP_RUSH_CONFERENCE_GAMES_PER_TEAM;

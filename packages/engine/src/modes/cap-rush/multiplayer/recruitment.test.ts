@@ -15,6 +15,7 @@ import { buildCapRushMultiplayerMarket } from './market.ts';
 import { capRushMultiplayerCompletionFeasible } from './joint-feasibility.ts';
 import {
   applyCapRushMultiplayerBid,
+  cancelCapRushMultiplayerBid,
   capRushMultiplayerActiveRound,
   capRushMultiplayerCloseDueAuctions,
   capRushMultiplayerNextDeadline,
@@ -239,7 +240,7 @@ describe('cap rush multiplayer auction', () => {
     expect(outcome.recruitment.seats.p1.leadPlayerId).toBe(lot.playerId);
   });
 
-  test('rejects a second lead in the same position', () => {
+  test('accepts multiple leads and signs only the highest winning offer', () => {
     const state = recruitment();
     const [first, second] = capRushMultiplayerActiveRound(state).auctions;
     if (first === undefined || second === undefined) throw new Error('no lots');
@@ -254,9 +255,32 @@ describe('cap rush multiplayer auction', () => {
       second.playerId,
       secondPlayer.minimumBidDollars,
     );
-    expect(rejected.ok).toBe(false);
-    if (rejected.ok) return;
-    expect(rejected.code).toBe('multiple-leads');
+    expect(rejected.ok).toBe(true);
+    if (!rejected.ok) return;
+    const closed = capRushMultiplayerCloseDueAuctions(rejected.recruitment, {
+      round: 0,
+      acceptedAtIso: '2026-11-01T00:02:00.000Z',
+    });
+    expect(closed.ok).toBe(true);
+    if (!closed.ok) return;
+    const signed = closed.recruitment.signings.filter((entry) => entry.seat === 'p1');
+    expect(signed).toHaveLength(1);
+    expect(signed[0]?.salaryDollars).toBe(
+      Math.max(firstPlayer.minimumBidDollars, secondPlayer.minimumBidDollars),
+    );
+    const cancelled = cancelCapRushMultiplayerBid(rejected.recruitment, {
+      seat: 'p1',
+      playerId: first.playerId,
+      acceptedAtIso: '2026-11-01T00:00:06.000Z',
+    });
+    expect(cancelled.ok).toBe(true);
+    if (!cancelled.ok) return;
+    expect(
+      capRushMultiplayerActiveRound(cancelled.recruitment).auctions.find(
+        (entry) => entry.playerId === first.playerId,
+      )?.leaderSeat,
+    ).toBeNull();
+    expect(cancelled.recruitment.seats.p1.leadPlayerId).toBe(second.playerId);
   });
 
   test('requires a $100,000 raise and never replaces an equal offer', () => {

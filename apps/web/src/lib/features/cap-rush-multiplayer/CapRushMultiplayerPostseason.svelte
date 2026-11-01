@@ -11,14 +11,16 @@
   } from '@hoop-rush/data-contracts';
   import {
     capRushMultiplayerCurrentRound,
+    capRushMultiplayerSeatRecord,
     capRushSeriesWins,
     capRushSeriesWinner,
   } from '@hoop-rush/engine';
   import TeamLogo from '#lib/components/TeamLogo.svelte';
   import type { CapRushArt } from '../cap-rush/cap-rush-art.js';
   import { initialsOf } from '../cap-rush/cap-rush-presentation.js';
+  import CapRushStandings from '../cap-rush/CapRushStandings.svelte';
   import CapRushBracket from '../cap-rush/CapRushBracket.svelte';
-  import { seatLabelFor, seatOrder } from './cap-rush-multiplayer-presentation.js';
+  import { seatLabelFor, seatOrder, teamNameOf } from './cap-rush-multiplayer-presentation.js';
 
   let {
     state,
@@ -48,9 +50,6 @@
   const otherSeat = $derived(localSeat === 'p1' ? ('p2' as const) : ('p1' as const));
   const localTeamId = $derived(
     locked === null ? null : locked.seats[localSeat].franchise.franchiseId,
-  );
-  const otherSeatTeamId = $derived(
-    locked === null ? null : locked.seats[otherSeat].franchise.franchiseId,
   );
   const standings = $derived(postseason?.standings ?? null);
   const championTeamId = $derived(postseason?.championTeamId ?? null);
@@ -85,16 +84,14 @@
         teamId,
         name: locked.seats[seat].franchise.displayName,
         seed: seedOf(teamId),
+        record:
+          state.season === null
+            ? null
+            : capRushMultiplayerSeatRecord(locked, state.season.games, seat),
         outcome: postseason.outcomes[seat],
         seriesLine: series === null ? null : seriesLine(series, teamId),
       };
     });
-  });
-  const completedSeries = $derived.by((): CapRushConferenceSeries[] => {
-    if (postseason === null) return [];
-    return postseason.series
-      .filter((series) => capRushSeriesWinner(series) !== null)
-      .sort((left, right) => left.round - right.round || left.seriesSlot - right.seriesSlot);
   });
   const personalNote = $derived.by((): string | null => {
     if (postseason === null || localOutcome === null) return null;
@@ -129,14 +126,7 @@
   });
 
   function teamName(teamId: string): string {
-    if (locked === null) return teamId;
-    if (locked.seats.p1.franchise.franchiseId === teamId)
-      return locked.seats.p1.franchise.displayName;
-    if (locked.seats.p2.franchise.franchiseId === teamId)
-      return locked.seats.p2.franchise.displayName;
-    return (
-      locked.opponents.find((entry) => entry.team.teamId === teamId)?.team.displayName ?? teamId
-    );
+    return teamNameOf(locked, teamId);
   }
 
   function seedOf(teamId: string): number | null {
@@ -248,6 +238,15 @@
                 >
               {/if}
             </div>
+            {#if detail.record !== null}
+              <p class="font-display text-2xl font-extrabold tabular-nums">
+                {detail.record.wins}&ndash;{detail.record.losses}
+                <span
+                  class="font-mono text-[9px] font-normal tracking-wider text-muted-foreground uppercase"
+                  >Regular season</span
+                >
+              </p>
+            {/if}
             <p class="text-xs font-semibold">{outcomeLabel(detail.outcome)}</p>
             <p class="min-w-0 truncate text-[11px] text-muted-foreground">
               {detail.seriesLine ?? 'No bracket series yet.'}
@@ -267,6 +266,20 @@
         </p>
       {/if}
     </section>
+
+    {#if standings !== null && postseason.series.every((series) => series.games.length === 0)}
+      <section class="min-w-0" aria-label="Final regular season standings">
+        <header class="mb-3">
+          <p class="font-mono text-[10px] tracking-[0.16em] text-primary uppercase">
+            Regular season complete
+          </p>
+          <h2 class="font-display text-2xl font-extrabold tracking-tight uppercase">
+            Final standings
+          </h2>
+        </header>
+        <CapRushStandings {standings} manifest={art?.manifest ?? null} userTeamId={localTeamId} />
+      </section>
+    {/if}
 
     {#if standings === null}
       <section class="rounded-2xl border border-border bg-card p-4">
@@ -371,59 +384,6 @@
         manifest={art?.manifest ?? null}
         userTeamId={localTeamId}
       />
-
-      <section class="flex min-w-0 flex-col gap-2 rounded-2xl border border-border bg-card p-4">
-        <header>
-          <p class="font-mono text-[10px] tracking-[0.16em] text-muted-foreground uppercase">
-            Bracket results
-          </p>
-          <h2 class="font-display text-2xl font-extrabold tracking-tight uppercase">
-            Completed series
-          </h2>
-          <p class="mt-1 text-xs text-muted-foreground">
-            Scores are recorded series wins. Your team and the other seat are outlined.
-          </p>
-        </header>
-        {#if completedSeries.length === 0}
-          <p class="text-xs text-muted-foreground">No series has finished yet.</p>
-        {:else}
-          <ul class="grid min-w-0 gap-1.5 sm:grid-cols-2">
-            {#each completedSeries as series (series.seriesId)}
-              {@const highWins = capRushSeriesWins(series, series.highTeamId)}
-              {@const lowWins = capRushSeriesWins(series, series.lowTeamId)}
-              {@const winnerTeamId = capRushSeriesWinner(series)}
-              {@const involvesLocal =
-                localTeamId !== null &&
-                (series.highTeamId === localTeamId || series.lowTeamId === localTeamId)}
-              {@const involvesOther =
-                otherSeatTeamId !== null &&
-                (series.highTeamId === otherSeatTeamId || series.lowTeamId === otherSeatTeamId)}
-              <li
-                class="flex min-w-0 items-center justify-between gap-2 rounded-lg border bg-surface-1 px-2 py-1.5 {involvesLocal
-                  ? 'border-primary/40'
-                  : involvesOther
-                    ? 'border-accent/40'
-                    : 'border-border'}"
-              >
-                <div class="min-w-0">
-                  <p class="font-mono text-[9px] tracking-[0.08em] text-muted-foreground uppercase">
-                    {capRushConferenceRoundName(series.round)}
-                  </p>
-                  <p class="truncate text-xs">
-                    {teamName(series.highTeamId)} vs {teamName(series.lowTeamId)}
-                  </p>
-                </div>
-                <div class="shrink-0 text-right">
-                  <p class="font-mono text-xs font-semibold tabular-nums">{highWins}–{lowWins}</p>
-                  <p class="max-w-[9rem] truncate text-[9px] text-muted-foreground">
-                    {winnerTeamId === null ? '' : `${teamName(winnerTeamId)} won`}
-                  </p>
-                </div>
-              </li>
-            {/each}
-          </ul>
-        {/if}
-      </section>
     {/if}
   </div>
 {/if}
