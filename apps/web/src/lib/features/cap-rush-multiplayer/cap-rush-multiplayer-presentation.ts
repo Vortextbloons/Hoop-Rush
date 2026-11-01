@@ -10,6 +10,7 @@ import type {
   CapRushMultiplayerSeatId,
   CapRushMultiplayerState,
   CapRushPayrollStatus,
+  CapRushPostseasonUserOutcome,
   Position,
 } from '@hoop-rush/data-contracts';
 import {
@@ -466,4 +467,15 @@ export function marketPools(recruitment: CapRushMultiplayerRecruitment): readonl
       }));
     return { index, position, status, lots };
   });
+}
+
+export function playoffSeriesSeat(
+  outcomes: Readonly<Record<CapRushMultiplayerSeatId, CapRushPostseasonUserOutcome>>,
+  localSeat: CapRushMultiplayerSeatId,
+): CapRushMultiplayerSeatId | null {
+  return (
+    seatOrder(localSeat).find(
+      (seat) => outcomes[seat].status !== 'eliminated' && outcomes[seat].status !== 'not-qualified',
+    ) ?? null
+  );
 }

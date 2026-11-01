@@ -3,7 +3,6 @@
   import type { CapRushArt } from '../cap-rush/cap-rush-art.js';
   import { onMount } from 'svelte';
   import type {
-    CapRushConferenceSeries,
     HavocBattleInput,
     HavocBattleResult,
     HavocBattleTape,
@@ -18,8 +17,6 @@
   import { gamecastBattleFinalBoxes } from '#lib/gamecast/gamecast-battle-view.js';
 
   let {
-    series = null,
-    gameOrdinal = null,
     art = null,
     input,
     result,
@@ -31,8 +28,6 @@
     oncomplete,
     onclose,
   }: {
-    series?: CapRushConferenceSeries | null;
-    gameOrdinal?: number | null;
     art?: CapRushArt | null;
     input: HavocBattleInput;
     result: HavocBattleResult;
@@ -73,22 +68,6 @@
   const localBox = $derived(boxes.find((box) => box.side === localSide));
   const opponentBox = $derived(boxes.find((box) => box.side !== localSide));
   const localWon = $derived((localBox?.score ?? 0) > (opponentBox?.score ?? 0));
-  const seriesRecord = $derived.by(() => {
-    if (kind !== 'playoff' || series === null || gameOrdinal === null) return null;
-    const ownTeamId = input[localSide].teamId;
-    const prior = series.games.filter((game) => game.gameOrdinal < gameOrdinal);
-    let wins = prior.filter((game) => game.winnerTeamId === ownTeamId).length;
-    let losses = prior.length - wins;
-    if (complete) {
-      if (localWon) wins += 1;
-      else losses += 1;
-    }
-    return {
-      wins,
-      losses,
-      label: wins === 4 ? 'Won series' : losses === 4 ? 'Lost series' : 'Series',
-    };
-  });
   const recapDetail = $derived(
     kind === 'review'
       ? 'Review the final box score, then continue.'
@@ -97,20 +76,6 @@
         : 'Review the result, then continue.',
   );
 </script>
-
-{#snippet seriesHeader()}
-  {#if seriesRecord !== null}
-    <p
-      class="inline-flex items-center gap-2 rounded-lg border border-primary/40 bg-primary/10 px-3 py-1.5 font-mono text-xs font-bold text-primary"
-      aria-label={`${seriesRecord.label}: ${seriesRecord.wins} wins, ${seriesRecord.losses} losses`}
-    >
-      <span class="text-[10px] tracking-wider uppercase">{seriesRecord.label}</span>
-      <span class="font-display text-xl tabular-nums"
-        >{seriesRecord.wins}&ndash;{seriesRecord.losses}</span
-      >
-    </p>
-  {/if}
-{/snippet}
 
 {#snippet teamIdentity(side: 'home' | 'away')}
   {@const team = art?.teamFor(input[side].teamId) ?? null}
@@ -137,7 +102,6 @@
     data-complete="true"
   >
     <header class="flex flex-col items-center gap-1 text-center">
-      {@render seriesHeader()}
       <p class="font-mono text-[10px] tracking-[0.16em] text-primary uppercase">
         {matchupLabel} · Final
       </p>
@@ -180,7 +144,6 @@
   >
     <header class="flex flex-wrap items-center justify-between gap-2">
       <div>
-        {@render seriesHeader()}
         <p class="font-mono text-[10px] uppercase tracking-[0.16em] text-primary">
           {matchupLabel} · {speed}×
         </p>

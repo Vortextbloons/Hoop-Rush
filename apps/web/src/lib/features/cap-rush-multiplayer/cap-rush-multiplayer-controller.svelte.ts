@@ -12,7 +12,11 @@ import {
   CapRushMultiplayerSession,
   type CapRushMultiplayerSessionView,
 } from '@hoop-rush/application/cap-rush-multiplayer';
-import { capRushMultiplayerCurrentRound, capRushMultiplayerPlayoffPlans } from '@hoop-rush/engine';
+import {
+  capRushMultiplayerHumanFinals,
+  capRushMultiplayerCurrentRound,
+  capRushMultiplayerPlayoffPlans,
+} from '@hoop-rush/engine';
 import { newSeasonId } from '#lib/ids.js';
 import { loadCapRushArt, type CapRushArt } from '../cap-rush/cap-rush-art.js';
 import { getCapRushMultiplayerData } from './cap-rush-multiplayer-assets.js';
@@ -26,7 +30,6 @@ export interface CapRushBroadcastState {
   readonly gameId: string;
   readonly speed: 2 | 4;
   readonly kind: 'h2h' | 'playoff' | 'review';
-  readonly playoffPlan?: CapRushPlayoffGamePlan;
   readonly slot: number | null;
   readonly input: HavocBattleInput;
   readonly result: HavocBattleResult;
@@ -306,6 +309,27 @@ export class CapRushMultiplayerController {
     if (state === null || state.locked === null || state.postseason === null) {
       return;
     }
+    const finals = capRushMultiplayerHumanFinals(state.locked, state.postseason);
+    if (finals !== null) {
+      const pending = finals.games.find(
+        (game) =>
+          !state.season?.playbackAcks.some(
+            (ack) =>
+              ack.gameId === game.gameId &&
+              ack.seat === this.seat &&
+              ack.resolved &&
+              ack.cursor === ack.total,
+          ),
+      );
+      if (pending !== undefined)
+        await this.loadTape({
+          gameId: pending.gameId,
+          kind: 'playoff',
+          speed: 2,
+          plan: { ...pending, isFinals: true },
+        });
+      return;
+    }
     const plans = capRushMultiplayerPlayoffPlans({
       locked: state.locked,
       state: state.postseason,
@@ -392,7 +416,6 @@ export class CapRushMultiplayerController {
         gameId: output.gameId,
         speed: input.speed,
         kind: input.kind,
-        ...(input.plan === undefined ? {} : { playoffPlan: input.plan }),
         slot: input.slot ?? null,
         input: output.input,
         result: output.result,
@@ -426,6 +449,49 @@ export class CapRushMultiplayerController {
 
   private async advance(): Promise<boolean> {
     const state = this.state;
+    if (state?.phase === 'postseason' && state.locked != null && state.postseason !== null) {
+      const finals = capRushMultiplayerHumanFinals(state.locked, state.postseason);
+      if (finals !== null) {
+        const pending = finals.games.find(
+          (game) =>
+            !state.season?.playbackAcks.some(
+              (ack) =>
+                ack.gameId === game.gameId &&
+                ack.seat === this.seat &&
+                ack.resolved &&
+                ack.cursor === ack.total,
+            ),
+        );
+        if (pending !== undefined) {
+          await this.refreshRoom();
+          return false;
+        }
+        const waiting = finals.games.some((game) =>
+          (['p1', 'p2'] as const).some(
+            (seat) =>
+              !state.season?.playbackAcks.some(
+                (ack) =>
+                  ack.gameId === game.gameId &&
+                  ack.seat === seat &&
+                  ack.resolved &&
+                  ack.cursor === ack.total,
+              ),
+          ),
+        );
+        if (waiting) {
+          await this.refreshRoom();
+          return false;
+        }
+        if (
+          state.postseason.championTeamId === null &&
+          state.postseason.plans.p1 !== null &&
+          state.postseason.plans.p2 !== null &&
+          this.isHost
+        ) {
+          return this.progressed(() => this.simulatePlayoffStep());
+        }
+      }
+    }
     if (state?.phase === 'recruiting') {
       const deadline = this.session?.deadline() ?? null;
       if (deadline !== null && Date.parse(deadline.atIso) <= this.nowMs) {

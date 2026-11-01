@@ -6,7 +6,10 @@
     CapRushSpinReceipt,
   } from '@hoop-rush/data-contracts';
   import { CAP_RUSH_SPIN_PURCHASES, REQUIRED_RATING_KEYS } from '@hoop-rush/data-contracts';
-  import { capRushSpinEligibility, havocMutationDefinitionOf } from '@hoop-rush/engine';
+  import { capRushSpinEligibility } from '@hoop-rush/engine';
+  import { Sparkles } from '@lucide/svelte';
+  import { HAVOC_TIER_COLORS } from '#lib/features/havoc/havoc-presentation.js';
+  import HavocMutationList from '#lib/features/havoc/HavocMutationList.svelte';
   import PlayerFace from '#lib/components/PlayerFace.svelte';
   import TeamLogo from '#lib/components/TeamLogo.svelte';
   import HavocTierBadge from '#lib/features/havoc/HavocTierBadge.svelte';
@@ -44,7 +47,6 @@
   } = $props();
 
   let targetPlayerId = $state<string | null>(null);
-  let purchase = $state<CapRushSpinPurchaseId>('standard');
 
   const variant = $derived(game.locked?.variant ?? 'clash');
   const seats = $derived(seatOrder(localSeat));
@@ -66,7 +68,6 @@
   });
   const spinSpend = $derived(receipts.reduce((total, receipt) => total + receipt.priceDollars, 0));
   const purchasesLeft = $derived(receipts.length < 5);
-  const eligibility = $derived(capRushSpinEligibility(localPayroll, purchase));
   const localConfirmed = $derived(game.lockConfirmations[localSeat] !== null);
   const opponentSeat = $derived(seats[1]);
   const opponentConfirmed = $derived(game.lockConfirmations[opponentSeat] !== null);
@@ -90,12 +91,6 @@
 
   function purchaseLabel(value: CapRushSpinPurchaseId): string {
     return value === 'standard' ? 'Mutation Spark' : 'Mutation Surge';
-  }
-
-  function mutationNames(receipt: CapRushSpinReceipt): string[] {
-    return [receipt.entry, ...(receipt.additionalEntries ?? [])].map(
-      (entry) => havocMutationDefinitionOf(entry.mutationId).name,
-    );
   }
 
   function ratingChanges(
@@ -203,7 +198,7 @@
             Cap Roulette
           </p>
           <h3 class="font-display text-lg font-extrabold tracking-tight uppercase">
-            Buy mutations
+            Mutation spins
           </h3>
         </div>
         <p class="font-mono text-[10px] text-muted-foreground">
@@ -213,7 +208,7 @@
 
       <div role="group" aria-label="Target player" class="flex flex-col gap-2">
         <p class="font-mono text-[9px] font-bold tracking-[0.12em] text-muted-foreground uppercase">
-          Target player
+          Pick your player
         </p>
         <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-5">
           {#each picks as pick (pick.playerId)}
@@ -227,7 +222,7 @@
                 ? 'border-primary bg-primary/10'
                 : 'border-line-soft bg-surface-1 hover:border-line-strong'}"
               aria-pressed={pick.playerId === targetId}
-              disabled={busy}
+              disabled={busy || mutated}
               onclick={() => (targetPlayerId = pick.playerId)}
             >
               {#if player !== null && face !== null && art !== null}
@@ -263,23 +258,29 @@
 
       <div role="group" aria-label="Mutation purchase" class="flex flex-col gap-2">
         <p class="font-mono text-[9px] font-bold tracking-[0.12em] text-muted-foreground uppercase">
-          Purchase
+          Choose your spin
         </p>
         <div class="grid gap-2 sm:grid-cols-2">
           {#each PURCHASE_OPTIONS as option (option)}
-            {@const optionEligibility = capRushSpinEligibility(localPayroll, option)}
+            {@const optionEligibility = capRushSpinEligibility(localPayroll + spinSpend, option)}
             <button
               type="button"
-              class="flex min-h-11 min-w-0 flex-col rounded-xl border p-2.5 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 {purchase ===
-              option
-                ? 'border-primary bg-primary/10'
-                : 'border-line-soft bg-surface-1 hover:border-line-strong'}"
-              aria-pressed={purchase === option}
-              disabled={busy}
-              onclick={() => (purchase = option)}
+              class="flex min-h-11 min-w-0 flex-col rounded-xl border border-line-soft bg-card p-4 text-left outline-none transition-colors hover:border-primary focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={busy ||
+                targetId === null ||
+                !optionEligibility.eligible ||
+                !purchasesLeft ||
+                receipts.some(
+                  (receipt) =>
+                    receipt.target.cardId ===
+                    picks.find((pick) => pick.playerId === targetId)?.cardId,
+                )}
+              onclick={() => {
+                if (targetId !== null) onpurchasemutation(option, targetId);
+              }}
             >
               <span class="flex items-baseline justify-between gap-2">
-                <span class="font-display text-sm font-extrabold tracking-tight uppercase"
+                <span class="font-display text-xl font-extrabold tracking-tight uppercase"
                   >{purchaseLabel(option)}</span
                 >
                 <span class="font-mono text-sm font-semibold tabular-nums"
@@ -289,9 +290,32 @@
               <span class="mt-0.5 block text-[10px] leading-snug text-muted-foreground">
                 {option === 'standard' ? 'One mutation.' : 'Two or three mutations.'}
               </span>
+              <span class="mt-3 grid w-full grid-cols-3 gap-2 border-t border-line-soft pt-3">
+                {#each [1, 2, 3] as tier (tier)}
+                  <span>
+                    <span class="block font-mono text-[9px] text-muted-foreground uppercase"
+                      >{option === 'standard'
+                        ? `1 T${tier}`
+                        : tier === 1
+                          ? '3 T1s'
+                          : tier === 2
+                            ? '1 T2 + 1 T1'
+                            : '1 T3'}</span
+                    >
+                    <span class="mt-0.5 block text-sm font-bold tabular-nums"
+                      >{Math.round(
+                        CAP_RUSH_SPIN_PURCHASES[option].tierOdds[tier as 1 | 2 | 3] * 100,
+                      )}%</span
+                    >
+                  </span>
+                {/each}
+              </span>
+              {#if optionEligibility.eligible}<span class="mt-3 text-xs font-bold text-primary"
+                  >Buy {option === 'standard' ? 'Spark' : 'Surge'} &rarr;</span
+                >{/if}
               {#if !optionEligibility.eligible}
                 <span class="mt-1 block text-[10px] leading-snug font-semibold text-negative">
-                  Needs recruited payroll of
+                  Needs total spending of
                   {exactMoney(optionEligibility.maxEligiblePayrollDollars)} or less.
                 </span>
               {/if}
@@ -304,16 +328,6 @@
         <div class="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            class="inline-flex min-h-11 items-center justify-center rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground outline-none transition-colors hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40"
-            disabled={busy || targetId === null || !eligibility.eligible || !purchasesLeft}
-            onclick={() => {
-              if (targetId !== null) onpurchasemutation(purchase, targetId);
-            }}
-          >
-            Buy mutation · {exactMoney(eligibility.priceDollars)}
-          </button>
-          <button
-            type="button"
             class="inline-flex min-h-11 items-center justify-center rounded-xl border border-border bg-surface-2 px-4 text-xs font-semibold outline-none transition-colors hover:border-line-strong focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
             disabled={busy}
             onclick={onskipmutation}
@@ -321,16 +335,11 @@
             Skip mutations
           </button>
           <p class="font-mono text-[10px] text-muted-foreground">
-            Recruited payroll {exactMoney(localPayroll)}
+            Total spending {exactMoney(localPayroll + spinSpend)}
           </p>
         </div>
         {#if !purchasesLeft}
           <p class="text-[11px] font-semibold">All five mutation purchases are used.</p>
-        {:else if !eligibility.eligible}
-          <p class="text-[11px] font-semibold text-negative">
-            This payroll is above the {purchaseLabel(purchase)} ceiling of
-            {exactMoney(eligibility.maxEligiblePayrollDollars)}.
-          </p>
         {/if}
       </div>
 
@@ -355,7 +364,9 @@
               {@const changes = ratingChanges(receipt)}
               {@const physical = receipt.effective.physical}
               <li
-                class="flex min-w-0 flex-col gap-1.5 rounded-xl border border-line-soft bg-surface-1 p-2.5"
+                class="spin-reveal flex min-w-0 flex-col gap-3 rounded-xl border bg-card p-4"
+                style:border-color={HAVOC_TIER_COLORS[receipt.tier]}
+                role="status"
               >
                 <div class="flex flex-wrap items-center justify-between gap-2">
                   <p class="min-w-0 text-sm font-bold">
@@ -373,15 +384,16 @@
                     >{exactMoney(receipt.priceDollars)}</span
                   >
                 </p>
-                <ul class="flex flex-wrap gap-1">
-                  {#each mutationNames(receipt) as name (name)}
-                    <li
-                      class="rounded border border-line-soft bg-background/60 px-1.5 py-0.5 text-[10px] font-semibold"
-                    >
-                      {name}
-                    </li>
-                  {/each}
-                </ul>
+                <div class="flex items-start gap-3">
+                  <span
+                    class="grid h-14 w-14 shrink-0 place-items-center rounded-xl border border-accent/40 bg-accent/10 text-accent"
+                    ><Sparkles size={26} aria-hidden="true" /></span
+                  >
+                  <HavocMutationList
+                    mutations={[receipt.entry, ...(receipt.additionalEntries ?? [])]}
+                    readable
+                  />
+                </div>
                 {#if changes.length > 0 || physical.heightInches !== physical.baselineHeightInches || physical.wingspanDeltaInches !== 0}
                   <dl
                     class="flex flex-wrap gap-x-3 gap-y-1 border-t border-line-soft pt-1.5 text-[10px]"
@@ -444,3 +456,24 @@
     </div>
   </section>
 </div>
+
+<style>
+  .spin-reveal {
+    animation: reveal-spin 700ms ease-out both;
+  }
+  @keyframes reveal-spin {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .spin-reveal {
+      animation: none;
+    }
+  }
+</style>
