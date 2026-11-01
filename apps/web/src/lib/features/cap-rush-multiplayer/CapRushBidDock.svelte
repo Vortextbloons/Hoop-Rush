@@ -4,12 +4,14 @@
     CapRushMultiplayerMarketPlayer,
     CapRushMultiplayerSeatId,
   } from '@hoop-rush/data-contracts';
+  import CapRushBidAdjuster from './CapRushBidAdjuster.svelte';
+  import type { CapRushBidDraft } from './cap-rush-bid-draft.svelte.js';
   import PlayerFace from '#lib/components/PlayerFace.svelte';
   import type { CapRushArt } from '../cap-rush/cap-rush-art.js';
   import { initialsOf } from '../cap-rush/cap-rush-presentation.js';
   import {
     clockLabel,
-    exactMoney,
+    money,
     lotState,
     remainingMs,
     seatLabelFor,
@@ -21,6 +23,8 @@
     localSeat,
     nowMs,
     art = null,
+    draft,
+    adjustable = false,
     proposedTotal,
     pending = false,
     pendingTotal = null,
@@ -35,6 +39,8 @@
     localSeat: CapRushMultiplayerSeatId;
     nowMs: number;
     art?: CapRushArt | null;
+    draft: CapRushBidDraft;
+    adjustable?: boolean;
     proposedTotal: number | null;
     pending?: boolean;
     pendingTotal?: number | null;
@@ -106,7 +112,7 @@
           >{player.displayName}</span
         >
         <span class="block truncate font-mono text-[10px] text-muted-foreground">
-          {leaderText} · {exactMoney(offerDollars)}
+          {leaderText} · {money(offerDollars)}
         </span>
       </span>
       <span class="shrink-0 text-right">
@@ -120,24 +126,32 @@
       </span>
     </button>
 
+    {#if adjustable}
+      <CapRushBidAdjuster {draft} disabled={pending} />
+    {/if}
+
     <div class="flex items-center gap-2">
-      <div class="min-w-0 flex-1">
+      <button
+        type="button"
+        class="min-h-12 min-w-0 flex-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        onclick={onopensheet}
+      >
         <p class="font-mono text-[8px] font-bold tracking-[0.08em] text-muted-foreground uppercase">
-          Your total
+          Your total ? tap amount to edit
         </p>
         {#if pending}
           <p
             class="truncate font-mono text-sm font-bold text-accent tabular-nums"
             aria-live="polite"
           >
-            Placing bid… {pendingTotal === null ? '' : exactMoney(pendingTotal)}
+            Placing bid… {pendingTotal === null ? '' : money(pendingTotal)}
           </p>
         {:else}
           <p class="truncate font-mono text-sm font-bold tabular-nums">
-            {proposedTotal === null ? '—' : exactMoney(proposedTotal)}
+            {proposedTotal === null ? '—' : money(proposedTotal)}
           </p>
         {/if}
-      </div>
+      </button>
       <button
         type="button"
         class="inline-flex min-h-12 min-w-24 shrink-0 items-center justify-center rounded-xl bg-primary px-3 font-display text-sm font-extrabold uppercase tracking-wide text-primary-foreground outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40"
@@ -150,7 +164,7 @@
         {pending
           ? 'Placing…'
           : canSubmit
-            ? `Bid ${proposedTotal === null ? '' : exactMoney(proposedTotal)}`
+            ? `Bid ${proposedTotal === null ? '' : money(proposedTotal)}`
             : 'Review bid'}
       </button>
     </div>

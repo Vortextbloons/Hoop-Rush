@@ -52,6 +52,12 @@ export class CapRushBidDraft {
     this.text = '';
   }
 
+  adjust(deltaDollars: number): void {
+    this.setTotal(
+      Math.max(this.minimumDollars, (this.proposedTotal ?? this.minimumDollars) + deltaDollars),
+    );
+  }
+
   setTotal(totalDollars: number): void {
     this.mode = 'custom';
     this.text = String(totalDollars);

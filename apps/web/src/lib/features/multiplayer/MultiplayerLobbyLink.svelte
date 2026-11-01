@@ -3,7 +3,7 @@
   import { resolve } from '$app/paths';
   import { ArrowRight, Users } from '@lucide/svelte';
   import { loadLobbyId } from './multiplayer-lobby';
-  import { getLobbyCoordinator } from './lobby-context.svelte';
+  import { getLobbyCoordinator } from './lobby-context.svelte.js';
   let { roomId, completed = false }: { roomId: string; completed?: boolean } = $props();
   const coordinator = getLobbyCoordinator();
   let lobbyId = $state<string | null>(null);

@@ -1,4 +1,3 @@
-import Dexie from 'dexie';
 import { afterEach, describe, expect, it, vi } from 'bun:test';
 import {
   HAVOC_MULTIPLAYER_SAVE_SCHEMA_VERSION,
@@ -37,7 +36,6 @@ import {
   type StoredHavocMultiplayerCommandRow,
 } from '../schemas/havoc-multiplayer-record.ts';
 import { DexieHavocMultiplayerRepository } from './havoc-multiplayer.ts';
-import { HOOP_RUSH_DATABASE_STORES, HOOP_RUSH_DATABASE_V14_STORES } from './dexie.ts';
 import {
   resetIndexedDb,
   restoreIndexedDb,
@@ -389,43 +387,6 @@ describe('DexieHavocMultiplayerRepository', () => {
       corruptRow as unknown as StoredHavocMultiplayerCommandRow,
     );
     await expect(repo.loadCommands(ROOM_ID)).rejects.toThrow();
-    db.close();
-  });
-
-  it('preserves version 1 solo saves when the database upgrades to version 14', async () => {
-    resetIndexedDb();
-    const name = testDatabaseName('havoc-multiplayer-upgrade');
-    const legacy = new Dexie(name);
-    legacy.version(1).stores(HOOP_RUSH_DATABASE_STORES);
-    await legacy.open();
-    expect(legacy.verno).toBe(1);
-    const completedRecord = {
-      recordId: 'legacy-run',
-      saveSchemaVersion: 1,
-      run: { runId: 'legacy-run' },
-      updatedAtIso: '2026-01-01T00:00:00.000Z',
-    };
-    const historyRecord = {
-      recordId: 'legacy-run',
-      runId: 'legacy-run',
-      completedAtIso: '2026-01-01T00:00:00.000Z',
-    };
-    await legacy.table('completed').put(completedRecord);
-    await legacy.table('history').put(historyRecord);
-    legacy.close();
-
-    const db = new TestDatabase(name);
-    const repo = new DexieHavocMultiplayerRepository(db);
-    await db.open();
-    expect(db.verno).toBe(14);
-    const tableNames = db.tables.map((table) => table.name).sort();
-    expect(tableNames).toEqual(Object.keys(HOOP_RUSH_DATABASE_V14_STORES).sort());
-    expect((await db.completed.get('legacy-run')) as unknown).toEqual(completedRecord);
-    expect((await db.history.get('legacy-run')) as unknown).toEqual(historyRecord);
-    await repo.saveActive(buildActiveState());
-    await repo.appendCommands(ROOM_ID, [buildCommandEntry(ROOM_ID, 0)]);
-    expect((await repo.loadActive(ROOM_ID))?.snapshot.roomId as string).toBe(ROOM_ID);
-    expect(await repo.loadCommands(ROOM_ID)).toHaveLength(1);
     db.close();
   });
 });

@@ -1,6 +1,4 @@
 import { afterEach, describe, expect, it, vi } from 'bun:test';
-import Dexie from 'dexie';
-import { HOOP_RUSH_DATABASE_V5_STORES } from './dexie.ts';
 import {
   HAVOC_GAME_COUNT,
   HAVOC_MUTATION_CATALOG_VERSION,
@@ -829,40 +827,6 @@ describe('DexieHavocRepository', () => {
     const second = buildGame(resumed, 2, 'havoc', 'cmd-compact-2');
     await applyGameBundle(new DexieHavocRepository(db), resumed, second);
     expect(await repo.loadActiveRun()).toEqual(second.nextState);
-    db.close();
-  });
-  it('loads a version-5 inline save and splits it atomically on the next accepted game', async () => {
-    const { db, repo } = createRepository('havoc-v5-upgrade');
-    const state = buildDraftChainStates().locked;
-    const legacy = new Dexie(db.name);
-    legacy.version(5).stores(HOOP_RUSH_DATABASE_V5_STORES);
-    await legacy.table('havocActiveRuns').put({
-      saveSchemaVersion: HAVOC_SAVE_SCHEMA_VERSION,
-      recordId: HAVOC_ACTIVE_RECORD_ID,
-      runId: state.runId,
-      revision: state.revision,
-      stateDigest: seasonDigestHex('legacy-state'),
-      state,
-      createdAtIso: '2026-10-28T00:00:00.000Z',
-      updatedAtIso: '2026-10-28T00:00:00.000Z',
-    });
-    legacy.close();
-    expect(await repo.loadActiveRun()).toEqual(state);
-    expect(await db.havocLockedInputs.count()).toBe(0);
-    const game = buildGame(state, 1, 'havoc', 'cmd-v5-game');
-    const failedWrite = vi
-      .spyOn(db.havocGames, 'put')
-      .mockRejectedValueOnce(new Error('save failed'));
-    await expect(applyGameBundle(repo, state, game)).rejects.toThrow('save failed');
-    failedWrite.mockRestore();
-    expect(await db.havocLockedInputs.count()).toBe(0);
-    expect(await repo.loadActiveRun()).toEqual(state);
-    await applyGameBundle(repo, state, game);
-    expect(await db.havocLockedInputs.count()).toBe(1);
-    expect(JSON.stringify(await db.havocActiveRuns.get(HAVOC_ACTIVE_RECORD_ID))).not.toContain(
-      'opponents',
-    );
-    expect(await repo.loadActiveRun()).toEqual(game.nextState);
     db.close();
   });
 

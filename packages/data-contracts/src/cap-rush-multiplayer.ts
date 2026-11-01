@@ -25,6 +25,11 @@ export const capRushMultiplayerCommandPayloadSchema = z.discriminatedUnion('kind
   z.object({ kind: z.literal('ready'), ready: z.boolean() }),
   z.object({ kind: z.literal('start') }),
   z.object({
+    kind: z.literal('end-auction-early'),
+    round: z.number().int().min(0).max(4),
+    agree: z.boolean(),
+  }),
+  z.object({
     kind: z.literal('bid'),
     round: z.number().int().min(0).max(4),
     playerId: playerIdSchema,

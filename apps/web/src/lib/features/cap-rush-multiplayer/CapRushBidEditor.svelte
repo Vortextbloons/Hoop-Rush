@@ -1,8 +1,9 @@
 <script lang="ts">
+  import CapRushBidAdjuster from './CapRushBidAdjuster.svelte';
   import type { Snippet } from 'svelte';
   import { CAP_RUSH_MULTIPLAYER_HARD_LIMIT_DOLLARS } from '@hoop-rush/data-contracts';
   import type { CapRushBidDraft } from './cap-rush-bid-draft.svelte.js';
-  import { exactMoney, type BidQuickChoice } from './cap-rush-multiplayer-presentation.js';
+  import { exactMoney, money, type BidQuickChoice } from './cap-rush-multiplayer-presentation.js';
 
   let {
     draft,
@@ -55,19 +56,20 @@
           {draft.proposedTotal === choice.totalDollars
           ? 'border-primary bg-primary/10'
           : 'border-border bg-surface-2 hover:border-line-strong'}"
+        title={exactMoney(choice.totalDollars)}
         aria-label={`Set total to ${exactMoney(choice.totalDollars)} (${choice.hint})`}
         disabled={disabled || pending}
         onclick={() => draft.setTotal(choice.totalDollars)}
       >
-        <span class="font-mono text-xs font-bold tabular-nums"
-          >{exactMoney(choice.totalDollars)}</span
-        >
+        <span class="font-mono text-xs font-bold tabular-nums">{money(choice.totalDollars)}</span>
         <span class="text-[9px] font-semibold tracking-wide text-muted-foreground uppercase"
           >{choice.hint}</span
         >
       </button>
     {/each}
   </div>
+
+  <CapRushBidAdjuster {draft} disabled={disabled || pending} />
 
   <form class="flex flex-col gap-2" onsubmit={submit} novalidate>
     <label class="flex flex-col gap-1">
@@ -111,7 +113,7 @@
           class="inline-flex min-h-11 items-center rounded-lg border border-accent/50 bg-accent/10 px-2.5 text-[11px] font-bold text-accent outline-none focus-visible:ring-2 focus-visible:ring-ring"
           onclick={() => draft.useMinimum()}
         >
-          Use next bid {exactMoney(minimum)}
+          Use next bid {money(minimum)}
         </button>
       </div>
     {:else if overHardLimit}
@@ -138,7 +140,7 @@
         class="inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-primary px-3 font-display text-sm font-extrabold uppercase tracking-wide text-primary-foreground outline-none transition-colors duration-150 hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40"
         disabled={!canSubmit}
       >
-        Place bid {proposed === null ? '' : exactMoney(proposed)}
+        Place bid {proposed === null ? '' : money(proposed)}
       </button>
     </div>
   </form>

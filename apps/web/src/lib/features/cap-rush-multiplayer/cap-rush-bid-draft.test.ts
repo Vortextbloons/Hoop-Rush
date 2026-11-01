@@ -58,3 +58,15 @@ describe('cap rush bid draft', () => {
     expect(draft.valid).toBe(true);
   });
 });
+
+test('repeated adjustments accumulate and stop at the latest legal minimum', () => {
+  const draft = new CapRushBidDraft(12694850);
+  draft.adjust(100000);
+  draft.adjust(500000);
+  expect(draft.proposedTotal).toBe(13294850);
+  draft.adjust(-1000000);
+  expect(draft.proposedTotal).toBe(12694850);
+  draft.adoptMinimum(14000000);
+  draft.adjust(-100000);
+  expect(draft.proposedTotal).toBe(14000000);
+});

@@ -58,3 +58,12 @@ test('does not create a channel when unsubscribed before the client is ready', a
   await flush();
   expect(harness.channels).toHaveLength(0);
 });
+
+test('snapshot reads omit command history', async () => {
+  const transport = new CapRushMultiplayerSupabaseTransport();
+  const sync = vi
+    .spyOn(transport, 'sync')
+    .mockResolvedValue({ snapshot: null } as unknown as Awaited<ReturnType<typeof transport.sync>>);
+  await transport.snapshot('room-a');
+  expect(sync).toHaveBeenCalledWith('room-a', 2147483647);
+});

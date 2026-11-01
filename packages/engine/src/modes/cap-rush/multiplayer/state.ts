@@ -306,6 +306,52 @@ export function applyCapRushMultiplayerCommand(
       if (!outcome.ok) return reject(outcome.code, outcome.message);
       return accept({ ...state, recruitment: outcome.recruitment });
     }
+    case 'end-auction-early': {
+      const recruitment = state.recruitment;
+      const round = recruitment?.rounds.find((entry) => entry.index === payload.round);
+      if (
+        state.phase !== 'recruiting' ||
+        recruitment === null ||
+        round?.status !== 'bidding' ||
+        recruitment.roundIndex !== payload.round
+      ) {
+        return reject('invalid-phase', 'that auction round is not open');
+      }
+      const votes = (round.endEarlySeats ?? []).filter((seat) => seat !== actor);
+      if (payload.agree) votes.push(actor);
+      const unanimous = votes.includes('p1') && votes.includes('p2');
+      const next = {
+        ...state,
+        recruitment: {
+          ...recruitment,
+          rounds: recruitment.rounds.map((entry) =>
+            entry.index !== round.index
+              ? entry
+              : {
+                  ...entry,
+                  endEarlySeats: votes,
+                  auctions: unanimous
+                    ? entry.auctions.map((auction) =>
+                        auction.status === 'open'
+                          ? { ...auction, endsAtIso: command.acceptedAtIso }
+                          : auction,
+                      )
+                    : entry.auctions,
+                },
+          ),
+        },
+      };
+      if (!unanimous) return accept(next);
+      return applyCapRushMultiplayerCommand(
+        next,
+        {
+          ...command,
+          payload: { kind: 'close-due-auctions', round: payload.round },
+        },
+        environment,
+        variant,
+      );
+    }
     case 'close-due-auctions': {
       if (state.phase !== 'recruiting' || state.recruitment === null) {
         return reject('invalid-phase', 'bidding is closed');

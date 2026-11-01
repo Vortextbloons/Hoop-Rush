@@ -1,11 +1,11 @@
-import Dexie, { type EntityTable, type Table, type Transaction } from 'dexie';
+import Dexie, { type EntityTable, type Table } from 'dexie';
 import type {
   PlayerProfile,
   ProfileBinding,
   ProfileGame,
   ProfileSelection,
 } from '@hoop-rush/data-contracts';
-import { CAP_RUSH_SAVE_SCHEMA_VERSION, SAVE_SCHEMA_VERSION } from '@hoop-rush/data-contracts';
+import { SAVE_SCHEMA_VERSION } from '@hoop-rush/data-contracts';
 import { challengeRunProgressDigest } from '@hoop-rush/engine';
 import {
   classicDraftRecordSchema,
@@ -24,6 +24,7 @@ import {
   type CompletedRunIndex,
   type StoredRunRecord,
 } from '../schemas/run-record.ts';
+import type { PromoteActiveToCompletedExpectation } from '@hoop-rush/data-contracts';
 import type {
   StoredFixedFiveActive,
   StoredFixedFiveCommandRow,
@@ -55,8 +56,6 @@ import type {
   StoredHavocMultiplayerResultRow,
 } from '../schemas/havoc-multiplayer-record.ts';
 import {
-  CAP_RUSH_ACTIVE_DRAFT_RECORD_ID,
-  capRushPlaybackGameKey,
   type StoredCapRushCommandRow,
   type StoredCapRushDraftRow,
   type StoredCapRushGameRow,
@@ -103,71 +102,26 @@ export const HOOP_RUSH_DATABASE_STORES: Record<string, string> = {
   havocRetainedTapes: '[runId+gameNumber], runId',
   havocCompletedRuns: 'runId',
   havocHistory: 'runId, updatedAtIso',
-};
-
-export const HOOP_RUSH_DATABASE_V2_STORES: Record<string, string> = {
   havocMultiplayerActive: 'roomId',
   havocMultiplayerCommands: '[roomId+ordinal], roomId',
   havocMultiplayerResults: '[roomId+gameNumber], roomId',
   havocMultiplayerCompleted: 'roomId',
   havocMultiplayerHistory: 'recordId, completedAtIso',
-};
-
-const COLLECTION_STORE_PREFIX = 'collection';
-const SEASON_LEGACY_STORE_PREFIX = 'season';
-
-export const HOOP_RUSH_DATABASE_V3_STORES: Record<string, string> = Object.fromEntries(
-  Object.entries({ ...HOOP_RUSH_DATABASE_STORES, ...HOOP_RUSH_DATABASE_V2_STORES }).filter(
-    ([name]) =>
-      !name.startsWith(COLLECTION_STORE_PREFIX) && !name.startsWith(SEASON_LEGACY_STORE_PREFIX),
-  ),
-);
-export const HOOP_RUSH_DATABASE_V4_STORES: Record<string, string> = {
-  ...HOOP_RUSH_DATABASE_V3_STORES,
   profiles: 'id',
   profileBindings: 'id',
   profileGames: 'id',
   profileSelection: 'id',
-};
-export const HOOP_RUSH_DATABASE_V5_STORES: Record<string, string> = {
-  ...HOOP_RUSH_DATABASE_V4_STORES,
   archivedProfiles: 'id',
-};
-export const HOOP_RUSH_DATABASE_V6_STORES: Record<string, string> = {
-  ...HOOP_RUSH_DATABASE_V5_STORES,
   havocLockedInputs: 'runId',
-};
-export const HOOP_RUSH_DATABASE_V7_STORES: Record<string, string> = {
-  ...HOOP_RUSH_DATABASE_V6_STORES,
   capRushActive: 'recordId',
   capRushCommands: 'commandId, runId',
-};
-export const HOOP_RUSH_DATABASE_V8_STORES: Record<string, string> = {
-  ...HOOP_RUSH_DATABASE_V7_STORES,
   capRushGames: '[runId+gameNumber], runId',
   capRushHistory: 'runId, completedAtIso',
   capRushReports: 'runId',
-};
-export const HOOP_RUSH_DATABASE_V9_STORES: Record<string, string> = {
-  ...HOOP_RUSH_DATABASE_V8_STORES,
   capRushPlayoffGames: '[runId+gameId], runId',
-};
-export const HOOP_RUSH_DATABASE_V10_STORES: Record<string, string> = {
-  ...HOOP_RUSH_DATABASE_V9_STORES,
   capRushLeagueGames: '[runId+gameId], runId',
-};
-export const HOOP_RUSH_DATABASE_V11_STORES: Record<string, string> = Object.fromEntries(
-  Object.entries(HOOP_RUSH_DATABASE_V10_STORES).filter(
-    ([name]) => !name.startsWith(SEASON_LEGACY_STORE_PREFIX),
-  ),
-);
-export const HOOP_RUSH_DATABASE_V13_STORES: Record<string, string> = {
-  ...HOOP_RUSH_DATABASE_V11_STORES,
   capRushPlaybackEvidence: '[runId+gameKey], runId',
   capRushPlaybackCursors: '[runId+gameKey], runId',
-};
-export const HOOP_RUSH_DATABASE_V14_STORES: Record<string, string> = {
-  ...HOOP_RUSH_DATABASE_V13_STORES,
   capRushMultiplayerActive: 'roomId',
   capRushMultiplayerCommands: '[roomId+ordinal], roomId',
   capRushMultiplayerGames: '[roomId+gameId], roomId',
@@ -175,63 +129,6 @@ export const HOOP_RUSH_DATABASE_V14_STORES: Record<string, string> = {
   capRushMultiplayerHistory: 'recordId, completedAtIso',
 };
 
-async function migrateActiveCapRushPlayback(tx: Transaction): Promise<void> {
-  const active: unknown = await tx.table('capRushActive').get(CAP_RUSH_ACTIVE_DRAFT_RECORD_ID);
-  const runId =
-    typeof active === 'object' && active !== null && 'runId' in active
-      ? (active as { runId?: unknown }).runId
-      : undefined;
-  if (typeof runId !== 'string') return;
-  const evidence = tx.table('capRushPlaybackEvidence');
-  const cursors = tx.table('capRushPlaybackCursors');
-  const moveRows = async (
-    tableName: 'capRushGames' | 'capRushPlayoffGames',
-    gameOf: (row: Record<string, unknown>) => number | string | undefined,
-  ): Promise<void> => {
-    const table = tx.table(tableName);
-    const rows: unknown[] = await table.where('runId').equals(runId).toArray();
-    for (const row of rows) {
-      if (typeof row !== 'object' || row === null) continue;
-      const record = row as Record<string, unknown>;
-      const game = record.game;
-      if (typeof game !== 'object' || game === null) continue;
-      const playback = (game as { playback?: unknown }).playback;
-      if (typeof playback !== 'object' || playback === null) continue;
-      const gameId = gameOf(record);
-      if (gameId === undefined) continue;
-      const gameKey = capRushPlaybackGameKey(gameId);
-      const updatedAtIso =
-        typeof record.updatedAtIso === 'string' ? record.updatedAtIso : new Date().toISOString();
-      const playbackRecord = playback as Record<string, unknown>;
-      const cursor = typeof playbackRecord.cursor === 'number' ? playbackRecord.cursor : 0;
-      const tape = playbackRecord.tape as { events?: unknown[]; scoring?: unknown[] } | undefined;
-      const total = (tape?.events?.length ?? 0) + (tape?.scoring?.length ?? 0);
-      await evidence.put({
-        saveSchemaVersion: CAP_RUSH_SAVE_SCHEMA_VERSION,
-        runId,
-        gameKey,
-        playback: { ...playbackRecord, cursor: 0 },
-        updatedAtIso,
-      });
-      await cursors.put({
-        saveSchemaVersion: CAP_RUSH_SAVE_SCHEMA_VERSION,
-        runId,
-        gameKey,
-        cursor,
-        total,
-        updatedAtIso,
-      });
-      const { playback: _removed, ...gameWithoutPlayback } = game as Record<string, unknown>;
-      await table.put({ ...record, game: gameWithoutPlayback });
-    }
-  };
-  await moveRows('capRushGames', (row) =>
-    typeof row.gameNumber === 'number' ? row.gameNumber : undefined,
-  );
-  await moveRows('capRushPlayoffGames', (row) =>
-    typeof row.gameId === 'string' ? row.gameId : undefined,
-  );
-}
 export class HoopRushDatabase extends Dexie {
   profiles!: EntityTable<PlayerProfile, 'id'>;
   archivedProfiles!: EntityTable<PlayerProfile, 'id'>;
@@ -281,22 +178,13 @@ export class HoopRushDatabase extends Dexie {
   capRushMultiplayerHistory!: EntityTable<StoredCapRushMultiplayerHistoryRow, 'recordId'>;
   constructor(name = HOOP_RUSH_DATABASE_NAME) {
     super(name);
-    this.version(1).stores(HOOP_RUSH_DATABASE_STORES);
-    this.version(2).stores(HOOP_RUSH_DATABASE_V2_STORES);
-    this.version(3).stores(HOOP_RUSH_DATABASE_V3_STORES);
-    this.version(4).stores(HOOP_RUSH_DATABASE_V4_STORES);
-    this.version(5).stores(HOOP_RUSH_DATABASE_V5_STORES);
-    this.version(6).stores(HOOP_RUSH_DATABASE_V6_STORES);
-    this.version(7).stores(HOOP_RUSH_DATABASE_V7_STORES);
-    this.version(8).stores(HOOP_RUSH_DATABASE_V8_STORES);
-    this.version(9).stores(HOOP_RUSH_DATABASE_V9_STORES);
-    this.version(10).stores(HOOP_RUSH_DATABASE_V10_STORES);
-    this.version(11).stores(HOOP_RUSH_DATABASE_V11_STORES);
-    this.version(12).stores(HOOP_RUSH_DATABASE_V11_STORES);
-    this.version(13)
-      .stores(HOOP_RUSH_DATABASE_V13_STORES)
-      .upgrade((tx) => migrateActiveCapRushPlayback(tx));
-    this.version(14).stores(HOOP_RUSH_DATABASE_V14_STORES);
+    this.version(14)
+      .stores(HOOP_RUSH_DATABASE_STORES)
+      .upgrade(() => {
+        throw new Error(
+          'This save database is outdated. Clear Hoop Rush site data to reset saves and start fresh.',
+        );
+      });
   }
 }
 export class DexieChallengeRepository {
@@ -397,10 +285,6 @@ export class DexieChallengeRepository {
     const checkpoint = await this.db.active.get(ACTIVE_RECORD_ID);
     if (checkpoint === undefined) return null;
     const validated = activeRunCheckpointSchema.parse(checkpoint);
-    if (validated.gamesPlayed === undefined) {
-      const gamesPlayed = await this.db.activeGames.where('runId').equals(validated.runId).count();
-      return { ...validated, gamesPlayed };
-    }
     return validated;
   }
   async promoteActiveToCompleted(
@@ -441,7 +325,7 @@ export class DexieChallengeRepository {
           .where('runId')
           .equals(validatedCheckpoint.runId)
           .sortBy('gameNumber');
-        const storedGamesPlayed = validatedCheckpoint.gamesPlayed ?? rows.length;
+        const storedGamesPlayed = validatedCheckpoint.gamesPlayed;
         const storedRun = runFromCheckpoint(
           validatedCheckpoint,
           rows.map((row) => activeGameRowSchema.parse(row).result),
@@ -513,7 +397,3 @@ export class DexieChallengeRepository {
   }
 }
 export type ChallengeRepository = DexieChallengeRepository;
-export interface PromoteActiveToCompletedExpectation {
-  expectedGamesPlayed: number;
-  expectedRunDigest: string;
-}
