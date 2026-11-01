@@ -18,6 +18,7 @@
     localSeat,
     art = null,
     busy = false,
+    broadcastLoading = false,
     onwatchh2h,
     onreviewgame,
   }: {
@@ -25,6 +26,7 @@
     localSeat: CapRushMultiplayerSeatId;
     art?: CapRushArt | null;
     busy?: boolean;
+    broadcastLoading?: boolean;
     onwatchh2h: (gameId: string) => void;
     onreviewgame: (gameId: string) => void;
   } = $props();
@@ -67,6 +69,7 @@
       {localSeat}
       {art}
       {busy}
+      {broadcastLoading}
       onwatchh2h={(gameId) => onwatchh2h(gameId)}
     />
 

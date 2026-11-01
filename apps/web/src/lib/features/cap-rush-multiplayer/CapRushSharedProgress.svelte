@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { Tween, prefersReducedMotion } from 'svelte/motion';
+  import { cubicOut } from 'svelte/easing';
   import type {
     CapRushMultiplayerSeatId,
     CapRushMultiplayerState,
@@ -27,23 +29,31 @@
     localSeat,
     art = null,
     busy = false,
+    broadcastLoading = false,
     onwatchh2h,
   }: {
     state: CapRushMultiplayerState;
     localSeat: CapRushMultiplayerSeatId;
     art?: CapRushArt | null;
     busy?: boolean;
+    broadcastLoading?: boolean;
     onwatchh2h: (gameId: string) => void;
   } = $props();
 
   const season = $derived(state.season);
   const locked = $derived(state.locked);
+  const animatedProgress = Tween.of(() => season?.frontierSlot ?? 0, {
+    duration: () => (prefersReducedMotion.current ? 0 : 650),
+    easing: cubicOut,
+  });
+  const displayedSlot = $derived(Math.floor(animatedProgress.current));
+  const visibleGames = $derived(season?.games.filter((game) => game.slot <= displayedSlot) ?? []);
   const records = $derived(
     season === null || locked === null
       ? null
       : {
-          p1: capRushMultiplayerSeatRecord(locked, season.games, 'p1'),
-          p2: capRushMultiplayerSeatRecord(locked, season.games, 'p2'),
+          p1: capRushMultiplayerSeatRecord(locked, visibleGames, 'p1'),
+          p2: capRushMultiplayerSeatRecord(locked, visibleGames, 'p2'),
         },
   );
   const localRecord = $derived(records === null ? null : records[localSeat]);
@@ -66,9 +76,7 @@
       : art.teamFor(locked.seats[otherSeat].franchise.franchiseId),
   );
   const h2h = $derived(capRushMultiplayerPendingH2H({ state, locked }));
-  const progress = $derived(
-    season === null ? 0 : Math.round((season.frontierSlot / CAP_RUSH_GAME_COUNT) * 100),
-  );
+  const progress = $derived((animatedProgress.current / CAP_RUSH_GAME_COUNT) * 100);
   const played = $derived(localRecord?.played ?? 0);
   const remaining = $derived(Math.max(0, CAP_RUSH_GAME_COUNT - played));
   const h2hGame = $derived(
@@ -76,11 +84,12 @@
       ? null
       : (season.games.find((game) => game.gameId === h2h.gameId) ?? null),
   );
+  const localH2HConfirmed = $derived(h2h !== null && !h2h.missing.includes(localSeat));
   const latest = $derived.by(() => {
     if (season === null || locked === null) return null;
     const teamId = locked.seats[localSeat].franchise.franchiseId;
     const game =
-      season.games
+      visibleGames
         .filter((entry) => entry.homeTeamId === teamId || entry.awayTeamId === teamId)
         .sort((left, right) => right.slot - left.slot)[0] ?? null;
     if (game === null) return null;
@@ -128,11 +137,16 @@
 
     if (h2h !== null) {
       const localMissing = h2h.missing.includes(localSeat);
+      const confirmed = 2 - h2h.missing.length;
       return {
-        title: `Head-to-head result ready · slot ${h2h.slot}`,
-        detail: '',
+        title: localMissing
+          ? `Head-to-head ready · slot ${h2h.slot}`
+          : `You confirmed · slot ${h2h.slot}`,
+        detail: localMissing
+          ? 'Both players must confirm this result. Watch the broadcast, then continue when it ends.'
+          : `Waiting for your opponent to watch and confirm. ${confirmed} of 2 confirmed; the season continues once both players confirm.`,
         action: localMissing ? 'watch-h2h' : null,
-        actionLabel: 'Watch head-to-head',
+        actionLabel: localMissing ? 'Watch head-to-head' : '',
         mine: localMissing,
       };
     }
@@ -178,7 +192,7 @@
     <div class="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:items-end">
       <div class="min-w-0">
         <p class="font-mono text-[10px] font-bold tracking-[0.18em] text-primary uppercase">
-          Shared season · Through game {season.frontierSlot} of {CAP_RUSH_GAME_COUNT}
+          Shared season · Through game {displayedSlot} of {CAP_RUSH_GAME_COUNT}
         </p>
         <div class="mt-2 flex flex-wrap items-end gap-x-4 gap-y-1">
           <h2
@@ -205,15 +219,15 @@
           aria-valuenow={season.frontierSlot}
         >
           <div
-            class="h-full rounded-full bg-primary transition-[width] motion-reduce:transition-none"
-            style:width={`${progress}%`}
+            class="h-full origin-left rounded-full bg-primary will-change-transform"
+            style:transform={`scaleX(${progress / 100})`}
           ></div>
         </div>
         <div
           class="mt-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 font-mono text-[10px] text-muted-foreground tabular-nums"
         >
-          <span>{progress}% of the shared season</span>
-          <span>{season.games.length} / 1230 results accepted</span>
+          <span>{Math.floor(progress)}% of the shared season</span>
+          <span>{visibleGames.length} / 1230 results</span>
         </div>
       </div>
 
@@ -280,7 +294,7 @@
             Latest result
           </p>
           <p class="mt-2 text-sm text-muted-foreground">
-            No results accepted yet. The first slate appears after the host runs slot 1.
+            The first results will appear as the season advances.
           </p>
         {:else}
           <div class="flex flex-wrap items-center justify-between gap-2">
@@ -349,7 +363,7 @@
         <p class="font-display text-2xl leading-tight font-extrabold tracking-tight uppercase">
           {nextStep.title}
         </p>
-        {#if h2hGame !== null}
+        {#if h2hGame !== null && localH2HConfirmed}
           <p class="font-mono text-xs font-semibold tabular-nums">
             {teamName(h2hGame.homeTeamId)}
             {h2hGame.homePoints}–{h2hGame.awayPoints}
@@ -364,10 +378,10 @@
             type="button"
             class="mt-1 inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-primary/50 bg-primary/10 px-4 text-sm font-bold text-primary outline-none
               focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40 sm:w-fit"
-            disabled={busy}
+            disabled={busy || broadcastLoading}
             onclick={() => onwatchh2h(h2hGame.gameId)}
           >
-            {nextStep.actionLabel}
+            {broadcastLoading ? 'Preparing broadcast…' : nextStep.actionLabel}
           </button>
         {/if}
       </div>

@@ -7,7 +7,8 @@ import {
 import {
   capRushMultiplayerSimulateGame,
   applyCapRushMultiplayerCommand,
-  type CapRushMultiplayerEnvironment,
+  adaptCapRushCatalog,
+  buildCapRushCatalogIndex,
   createEngineContext,
   simulateCapRushMultiplayerPlayoffGame,
   simulateCapRushMultiplayerSlot,
@@ -30,15 +31,30 @@ self.onmessage = (event: MessageEvent<unknown>) => {
   if (request.kind === 'cap-rush-multiplayer-cancel') return;
   try {
     if (request.kind === 'cap-rush-multiplayer-project') {
+      const environment = {
+        ...request.environment,
+        index: buildCapRushCatalogIndex(
+          adaptCapRushCatalog(request.environment.seasonCatalog, request.environment.catalogSource),
+        ),
+      };
       let state = request.state;
       for (const command of request.commands) {
         const outcome = applyCapRushMultiplayerCommand(
           state,
           command,
-          request.environment as CapRushMultiplayerEnvironment,
+          environment,
           request.variant,
         );
-        if (!outcome.ok) throw new Error(`${outcome.code}: ${outcome.message}`);
+        if (!outcome.ok) {
+          post({
+            schemaVersion: CAP_RUSH_MULTIPLAYER_WORKER_WIRE_SCHEMA_VERSION,
+            kind: 'cap-rush-multiplayer-rejection',
+            requestId: request.requestId,
+            code: outcome.code,
+            message: outcome.message,
+          });
+          return;
+        }
         state = outcome.state;
       }
       post({

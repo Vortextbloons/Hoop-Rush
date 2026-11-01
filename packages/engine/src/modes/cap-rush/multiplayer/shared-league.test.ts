@@ -122,7 +122,6 @@ describe('cap rush multiplayer shared league', () => {
       for (let slot = accepted + 1; slot <= season.block.endpoint; slot += 1) {
         const nextH2H = [...h2hSlots].find((entry) => entry >= slot);
         const throughSlot = Math.min(
-          slot + 4,
           season.block.endpoint,
           nextH2H === slot ? slot : (nextH2H ?? 83) - 1,
         );
@@ -218,7 +217,25 @@ describe('cap rush multiplayer shared league', () => {
             context,
           }).game,
       );
+      const expected = applyCapRushMultiplayerCommand(
+        state,
+        {
+          schemaVersion: CAP_RUSH_MULTIPLAYER_SCHEMA_VERSION,
+          roomId: idSchema.parse('room-test'),
+          commandId: commandIdSchema.parse('compare-playoffs'),
+          ordinal,
+          expectedRevision: ordinal,
+          actorParticipantId: 'p1',
+          acceptedAtIso: at(),
+          payload: { kind: 'accept-playoff-step', round, games },
+        },
+        environment,
+      );
+      if (!expected.ok) throw new Error(expected.message);
       run('p1', { kind: 'simulate-playoff-step', round });
+      expect(capRushMultiplayerStateDigest(state)).toBe(
+        capRushMultiplayerStateDigest(expected.state),
+      );
     }
     expect(state.postseason?.championTeamId).not.toBeNull();
     expect(state.postseason?.series).toHaveLength(15);

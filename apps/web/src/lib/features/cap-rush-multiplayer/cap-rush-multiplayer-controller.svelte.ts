@@ -25,7 +25,7 @@ const POLL_MS = 1_000;
 export interface CapRushBroadcastState {
   readonly gameId: string;
   readonly speed: 2 | 4;
-  readonly kind: 'h2h' | 'season-simcast' | 'playoff' | 'review';
+  readonly kind: 'h2h' | 'playoff' | 'review';
   readonly slot: number | null;
   readonly input: HavocBattleInput;
   readonly result: HavocBattleResult;
@@ -269,7 +269,19 @@ export class CapRushMultiplayerController {
       });
       if (plans.length === 0) return;
       const round = capRushMultiplayerCurrentRound(state.postseason);
-      await session.simulatePlayoffRound(round);
+      let postseason = state.postseason;
+      do {
+        const receipt = await session.simulatePlayoffRound(round);
+        if (!receipt.accepted || this.isDisposed()) return;
+        const next = session.view().state.postseason;
+        if (next === null || next === postseason) return;
+        postseason = next;
+      } while (
+        postseason.championTeamId === null &&
+        capRushMultiplayerCurrentRound(postseason) === round &&
+        postseason.plans.p1 === 'sim' &&
+        postseason.plans.p2 === 'sim'
+      );
     });
   }
 
@@ -293,30 +305,6 @@ export class CapRushMultiplayerController {
     const game = state?.season?.games.find((candidate) => candidate.gameId === gameId);
     if (entry === undefined || game === undefined) return;
     await this.loadTape({ gameId, kind: 'review', speed: 4, entry });
-  }
-
-  async watchOwnGame(): Promise<void> {
-    const state = this.state;
-    const locked = state?.locked;
-    const season = state?.season;
-    if (locked === null || locked === undefined || season === null || season === undefined) return;
-    const slot = season.slotAcks[this.seat] + 1;
-    const teamId = locked.seats[this.seat].franchise.franchiseId;
-    const game = season.games.find(
-      (candidate) =>
-        candidate.slot === slot &&
-        (candidate.homeTeamId === teamId || candidate.awayTeamId === teamId),
-    );
-    if (game === undefined) return;
-    const entry = locked.leagueSchedule.find((candidate) => candidate.gameId === game.gameId);
-    if (entry === undefined) return;
-    await this.loadTape({
-      gameId: game.gameId,
-      kind: 'season-simcast',
-      speed: 4,
-      slot,
-      entry,
-    });
   }
 
   async watchPlayoffGame(): Promise<void> {
@@ -350,16 +338,13 @@ export class CapRushMultiplayerController {
       const session = this.session;
       if (session === null) return;
       if (broadcast.kind === 'h2h') {
+        // The slot stays unacknowledged until both seats confirm the broadcast.
         await session.ackBroadcast({
           gameId: broadcast.gameId,
           cursor: total,
           total,
           resolved: true,
         });
-        return;
-      }
-      if (broadcast.kind === 'season-simcast') {
-        if (broadcast.slot !== null) await session.ackSlot(broadcast.slot);
         return;
       }
       await session.ackPlayoffPlayback({
@@ -465,9 +450,8 @@ export class CapRushMultiplayerController {
       }
       const pending = this.session?.pendingH2H() ?? null;
       if (pending !== null) {
-        if (pending.missing.includes(this.seat) && this.broadcast === null) {
-          await this.watchHeadToHead(pending.gameId);
-        }
+        // Both seats must open and confirm the head-to-head broadcast before the slot advances.
+        await this.refreshRoom();
         return false;
       }
       const accepted = season.games.reduce((highest, game) => Math.max(highest, game.slot), 0);
@@ -478,12 +462,16 @@ export class CapRushMultiplayerController {
         return this.progressed(() => this.simulateNextSlot());
       }
     }
+    await this.refreshRoom();
+    return false;
+  }
+
+  private async refreshRoom(): Promise<void> {
     try {
       await this.session?.refresh(false);
     } catch {
       // The transport surfaces its own connection error.
     }
-    return false;
   }
 
   private revision(): number {

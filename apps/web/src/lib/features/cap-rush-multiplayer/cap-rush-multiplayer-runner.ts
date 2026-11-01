@@ -135,6 +135,7 @@ function isError(
 }
 
 function outputOf(response: CapRushMultiplayerWorkerMessage): unknown {
+  if (response.kind === 'cap-rush-multiplayer-rejection') return response;
   if (response.kind === 'cap-rush-multiplayer-slot') {
     return { games: response.games, tapes: response.tapes };
   }
@@ -151,6 +152,15 @@ function outputOf(response: CapRushMultiplayerWorkerMessage): unknown {
     };
   }
   throw new Error('cap rush multiplayer worker returned an error');
+}
+
+export class CapRushMultiplayerProjectionRejection extends Error {
+  constructor(
+    readonly code: string,
+    message: string,
+  ) {
+    super(message);
+  }
 }
 
 export class CapRushMultiplayerRunner {
@@ -181,7 +191,12 @@ export class CapRushMultiplayerRunner {
   }
 
   async project(input: CapRushMultiplayerProjectionInput): Promise<CapRushMultiplayerState> {
-    return (await this.transport.run(input)) as CapRushMultiplayerState;
+    const result = (await this.transport.run(input)) as
+      | CapRushMultiplayerState
+      | Extract<CapRushMultiplayerWorkerMessage, { kind: 'cap-rush-multiplayer-rejection' }>;
+    if ('kind' in result)
+      throw new CapRushMultiplayerProjectionRejection(result.code, result.message);
+    return result;
   }
 
   async simulateSlot(input: CapRushMultiplayerSlotInput): Promise<CapRushMultiplayerSlotOutput> {

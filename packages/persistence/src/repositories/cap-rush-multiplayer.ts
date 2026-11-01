@@ -133,7 +133,9 @@ export class DexieCapRushMultiplayerRepository {
       this.db.capRushMultiplayerCommands,
       this.db.capRushMultiplayerGames,
       async () => {
-        await this.db.capRushMultiplayerActive.put(active);
+        const current = await this.db.capRushMultiplayerActive.get(active.roomId);
+        if (!current || current.snapshot.revision <= active.snapshot.revision)
+          await this.db.capRushMultiplayerActive.put(active);
         const existing = await this.db.capRushMultiplayerCommands
           .where('roomId')
           .equals(active.roomId)

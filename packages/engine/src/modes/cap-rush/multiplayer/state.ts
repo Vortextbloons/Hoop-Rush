@@ -1,5 +1,4 @@
 import { createEngineContext } from '../../../sim/kernel.ts';
-import { simulateCapRushMultiplayerSlot } from './league.ts';
 import {
   capRushMultiplayerPlayoffPlans,
   simulateCapRushMultiplayerPlayoffGame,
@@ -45,6 +44,7 @@ import {
 } from './locked.ts';
 import {
   capRushMultiplayerAcceptedThrough,
+  simulateCapRushMultiplayerSlot,
   capRushMultiplayerH2HSlots,
   capRushMultiplayerSlotEntries,
 } from './league.ts';
@@ -555,13 +555,11 @@ export function applyCapRushMultiplayerCommand(
       )
         return reject('invalid-phase', 'only the host can simulate active playoffs');
       const context = createEngineContext();
+      const locked = state.locked;
       const games = capRushMultiplayerPlayoffPlans({
         locked: state.locked,
         state: state.postseason,
-      }).map(
-        ({ plan }) =>
-          simulateCapRushMultiplayerPlayoffGame({ locked: state.locked!, plan, context }).game,
-      );
+      }).map(({ plan }) => simulateCapRushMultiplayerPlayoffGame({ locked, plan, context }).game);
       return applyCapRushMultiplayerCommand(
         state,
         { ...command, payload: { kind: 'accept-playoff-step', round: payload.round, games } },

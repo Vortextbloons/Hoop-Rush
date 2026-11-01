@@ -144,10 +144,17 @@ test('automatically chooses bulk simulation for the season', async () => {
   expect(chooseBlockPlan).toHaveBeenCalledWith(0, 'sim');
 });
 
-test('pauses bulk simulation for the pending head-to-head', async () => {
+test('waits for the confirmed head-to-head instead of opening it automatically', async () => {
   const controller = new CapRushMultiplayerController('room-a');
   const view = sessionView(null);
-  Object.assign(view.state, { phase: 'season', season: { block: { status: 'running' } } });
+  Object.assign(view.state, {
+    phase: 'season',
+    season: {
+      block: { status: 'running' },
+      games: [{ slot: 5 }],
+      slotAcks: { p1: 4, p2: 4 },
+    },
+  });
   Object.assign(controller, {
     view,
     session: {
@@ -156,10 +163,43 @@ test('pauses bulk simulation for the pending head-to-head', async () => {
     },
   });
   const watch = vi.spyOn(controller, 'watchHeadToHead').mockResolvedValue();
+  const ack = vi.spyOn(controller, 'ackSlot').mockResolvedValue();
   const simulate = vi.spyOn(controller, 'simulateNextSlot').mockResolvedValue();
   await (controller as unknown as { tick(): Promise<void> }).tick();
-  expect(watch).toHaveBeenCalledWith('h2h-1');
+  expect(watch).not.toHaveBeenCalled();
+  expect(ack).not.toHaveBeenCalled();
   expect(simulate).not.toHaveBeenCalled();
+});
+
+test('confirms the head-to-head broadcast without acknowledging its slot', async () => {
+  const controller = new CapRushMultiplayerController('room-a');
+  const view = sessionView(null);
+  const ackBroadcast = vi.fn(() => Promise.resolve({ accepted: true, rejectionCode: null }));
+  const ackSlot = vi.fn(() => Promise.resolve({ accepted: true, rejectionCode: null }));
+  Object.assign(controller, {
+    view,
+    session: { ackBroadcast, ackSlot, view: () => view },
+    broadcast: {
+      gameId: 'game-1',
+      speed: 2,
+      kind: 'h2h',
+      slot: 5,
+      input: {},
+      result: {},
+      tape: { events: [{}], scoring: [{}] },
+    },
+  });
+
+  await controller.completeBroadcast();
+
+  expect(ackBroadcast).toHaveBeenCalledWith({
+    gameId: 'game-1',
+    cursor: 2,
+    total: 2,
+    resolved: true,
+  });
+  expect(ackSlot).not.toHaveBeenCalled();
+  expect(controller.broadcast).toBeNull();
 });
 
 test('continues the season immediately after a successful step instead of waiting for the poll', async () => {

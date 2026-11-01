@@ -170,7 +170,7 @@
         : winner === teamId
           ? 'Won'
           : 'Lost';
-    return `${capRushConferenceRoundName(series.round)} vs ${teamName(opponentId)} · ${status} ${ownWins}–${opponentWins}`;
+    return `${capRushConferenceRoundName(series.round)} vs ${teamName(opponentId)} Â· ${status} ${ownWins}â€“${opponentWins}`;
   }
 
   function outcomeLabel(outcome: CapRushPostseasonUserOutcome): string {
@@ -197,7 +197,7 @@
       <header class="flex flex-wrap items-end justify-between gap-2">
         <div class="min-w-0">
           <p class="font-mono text-[10px] tracking-[0.16em] text-muted-foreground uppercase">
-            Postseason · {championTeamId === null ? `round ${currentRound} of 4` : 'complete'}
+            Postseason Â· {championTeamId === null ? `round ${currentRound} of 4` : 'complete'}
           </p>
           <h2 class="font-display text-2xl font-extrabold tracking-tight uppercase">
             {championTeamId === null
@@ -306,7 +306,7 @@
                   {seatLabelFor(seat, localSeat)}
                 </p>
                 <p class="mt-1 truncate font-display text-lg font-bold tracking-tight uppercase">
-                  {plan === null ? 'Choosing…' : plan === 'sim' ? 'Sim' : 'Simcast'}
+                  {plan === null ? 'Choosingâ€¦' : plan === 'sim' ? 'Sim' : 'Simcast'}
                 </p>
               </li>
             {/each}
@@ -315,42 +315,20 @@
           <div class="flex flex-wrap gap-2">
             <button
               type="button"
-              class="inline-flex min-h-11 items-center justify-center rounded-xl border border-primary/50 bg-primary/10 px-4 text-sm font-bold text-primary outline-none
-                focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
-              disabled={busy || localPlan !== null}
-              onclick={() => onchooseplan('sim')}
+              class="inline-flex min-h-11 items-center justify-center rounded-xl border border-primary/50 bg-primary/10 px-4 text-sm font-bold text-primary outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
+              disabled={busy || (localPlan !== null && (!ishost || !bothPlans))}
+              onclick={() => (localPlan === null ? onchooseplan('sim') : onsimulatestep())}
             >
-              Sim round {currentRound}
+              Sim series
             </button>
             <button
               type="button"
-              class="inline-flex min-h-11 items-center justify-center rounded-xl border border-border bg-surface-2 px-4 text-sm font-semibold outline-none
-                focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
-              disabled={busy || localPlan !== null}
-              onclick={() => onchooseplan('simcast')}
-            >
-              Simcast round {currentRound}
-            </button>
-            <button
-              type="button"
-              class="inline-flex min-h-11 items-center justify-center rounded-xl border border-border bg-surface-2 px-4 text-sm font-semibold outline-none
-                focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
+              class="inline-flex min-h-11 items-center justify-center rounded-xl border border-border bg-surface-2 px-4 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
               disabled={busy || !hasOpenSeries}
-              onclick={onwatchplayoff}
+              onclick={() => (localPlan === null ? onchooseplan('simcast') : onwatchplayoff())}
             >
-              Watch playoff game
+              Simcast game
             </button>
-            {#if ishost}
-              <button
-                type="button"
-                class="inline-flex min-h-11 items-center justify-center rounded-xl border border-primary/50 bg-primary/10 px-4 text-sm font-bold text-primary outline-none
-                  focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
-                disabled={busy || !bothPlans}
-                onclick={onsimulatestep}
-              >
-                Sim playoff step
-              </button>
-            {/if}
           </div>
         {:else}
           <div
@@ -436,7 +414,7 @@
                   </p>
                 </div>
                 <div class="shrink-0 text-right">
-                  <p class="font-mono text-xs font-semibold tabular-nums">{highWins}–{lowWins}</p>
+                  <p class="font-mono text-xs font-semibold tabular-nums">{highWins}â€“{lowWins}</p>
                   <p class="max-w-[9rem] truncate text-[9px] text-muted-foreground">
                     {winnerTeamId === null ? '' : `${teamName(winnerTeamId)} won`}
                   </p>

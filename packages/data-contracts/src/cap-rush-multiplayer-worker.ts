@@ -1,5 +1,11 @@
+import { opponentBracketSchema } from './bracket.ts';
+import { seasonDraftCatalogSchema } from './season-draft-catalog.ts';
+import { eraSimulationProfileSchema } from './era-sim-profile.ts';
+import { capRushCatalogSourceSchema } from './cap-rush-versions.ts';
+import { capRushMultiplayerVersionLocksSchema } from './cap-rush-multiplayer-versions.ts';
 import {
   capRushMultiplayerCommandSchema,
+  capRushMultiplayerCommandRejectionCodeSchema,
   capRushMultiplayerStateSchema,
 } from './cap-rush-multiplayer.ts';
 import { z } from 'zod';
@@ -27,7 +33,14 @@ export const capRushMultiplayerWorkerRequestSchema = z.discriminatedUnion('kind'
     kind: z.literal('cap-rush-multiplayer-project'),
     state: capRushMultiplayerStateSchema,
     commands: z.array(capRushMultiplayerCommandSchema),
-    environment: z.unknown(),
+    environment: z.object({
+      variant: z.enum(['clash', 'roulette']),
+      bracket: opponentBracketSchema,
+      seasonCatalog: seasonDraftCatalogSchema,
+      profile: eraSimulationProfileSchema,
+      catalogSource: capRushCatalogSourceSchema,
+      versionLocks: capRushMultiplayerVersionLocksSchema,
+    }),
     variant: z.enum(['clash', 'roulette']),
   }),
   base.extend({
@@ -110,6 +123,11 @@ export type CapRushMultiplayerWorkerErrorMessage = z.infer<
 >;
 
 export const capRushMultiplayerWorkerMessageSchema = z.union([
+  base.extend({
+    kind: z.literal('cap-rush-multiplayer-rejection'),
+    code: capRushMultiplayerCommandRejectionCodeSchema,
+    message: z.string().min(1),
+  }),
   base.extend({
     kind: z.literal('cap-rush-multiplayer-projection'),
     state: capRushMultiplayerStateSchema,

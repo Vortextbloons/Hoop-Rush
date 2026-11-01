@@ -1,11 +1,13 @@
 import * as persistence from '#lib/persistence.js';
 import * as assets from './cap-rush-multiplayer-assets.js';
-import { CapRushMultiplayerRunner } from './cap-rush-multiplayer-runner.js';
+import {
+  CapRushMultiplayerRunner,
+  CapRushMultiplayerProjectionRejection,
+} from './cap-rush-multiplayer-runner.js';
 import { createSessionTestRoom } from '../../../../../../packages/application/src/cap-rush-multiplayer/session-test-fixtures.ts';
 import { applyCapRushMultiplayerCommand, capRushMultiplayerStateDigest } from '@hoop-rush/engine';
 import type {
   CapRushMultiplayerCommand,
-  CapRushMultiplayerState,
   CapRushMultiplayerRoomSnapshot,
 } from '@hoop-rush/data-contracts';
 import { afterEach, expect, test, vi } from 'bun:test';
@@ -127,7 +129,8 @@ test('reads the server clock and room snapshot concurrently before submitting', 
 test('projects compact commands, persists locally, resumes without replay, and rejects mismatches', async () => {
   const room = await createSessionTestRoom();
   const original = await room.transport.snapshot(room.roomId);
-  let state = original.state!;
+  if (!original.state) throw new Error('Missing fixture state');
+  let state = original.state;
   const command: CapRushMultiplayerCommand = {
     schemaVersion: 1,
     roomId: original.roomId,
@@ -142,11 +145,15 @@ test('projects compact commands, persists locally, resumes without replay, and r
   if (!applied.ok) throw new Error(applied.message);
   state = applied.state;
   let saved: { snapshot: CapRushMultiplayerRoomSnapshot } | null = null;
-  const save = vi.fn(async (input: { snapshot: CapRushMultiplayerRoomSnapshot }) => {
+  const save = vi.fn((input: { snapshot: CapRushMultiplayerRoomSnapshot }) => {
     saved = input;
+    return Promise.resolve();
   });
   vi.spyOn(persistence, 'getPersistence').mockReturnValue({
-    capRushMultiplayerRepository: { loadActive: async () => saved, saveCheckpoint: save },
+    capRushMultiplayerRepository: {
+      loadActive: () => Promise.resolve(saved),
+      saveCheckpoint: save,
+    },
   } as unknown as ReturnType<typeof persistence.getPersistence>);
   vi.spyOn(assets, 'getCapRushMultiplayerData').mockResolvedValue({
     environment: room.environment,
@@ -154,7 +161,7 @@ test('projects compact commands, persists locally, resumes without replay, and r
   } as Awaited<ReturnType<typeof assets.getCapRushMultiplayerData>>);
   const project = vi
     .spyOn(CapRushMultiplayerRunner.prototype, 'project')
-    .mockImplementation(async (input) => {
+    .mockImplementation((input) => {
       let projected = input.state;
       for (const entry of input.commands) {
         const result = applyCapRushMultiplayerCommand(
@@ -166,33 +173,35 @@ test('projects compact commands, persists locally, resumes without replay, and r
         if (!result.ok) throw new Error(result.message);
         projected = result.state;
       }
-      return projected;
+      return Promise.resolve(projected);
     });
   let digest = capRushMultiplayerStateDigest(state);
-  const rpc = vi.fn(async (_name: string, args: { p_after_ordinal: number }) => ({
-    error: null,
-    data: {
-      room: {
-        ...original,
-        revision: 1,
-        commandCount: 1,
-        state: { _localSimulation: true, phase: state.phase, ready: state.ready },
-        stateDigest: digest,
+  const rpc = vi.fn((_name: string, args: { p_after_ordinal: number }) =>
+    Promise.resolve({
+      error: null,
+      data: {
+        room: {
+          ...original,
+          revision: 1,
+          commandCount: 1,
+          state: { _localSimulation: true, phase: state.phase, ready: state.ready },
+          stateDigest: digest,
+        },
+        commands:
+          args.p_after_ordinal < 0
+            ? [
+                {
+                  command_id: command.commandId,
+                  ordinal: 0,
+                  actor_participant_id: 'p1',
+                  accepted_at: command.acceptedAtIso,
+                  payload: command.payload,
+                },
+              ]
+            : [],
       },
-      commands:
-        args.p_after_ordinal < 0
-          ? [
-              {
-                command_id: command.commandId,
-                ordinal: 0,
-                actor_participant_id: 'p1',
-                accepted_at: command.acceptedAtIso,
-                payload: command.payload,
-              },
-            ]
-          : [],
-    },
-  }));
+    }),
+  );
   vi.spyOn(runtime, 'getMultiplayerClient').mockResolvedValue({ rpc } as unknown as SupabaseClient);
   const transport = new CapRushMultiplayerSupabaseTransport();
   const first = await transport.sync(room.roomId, 2147483647);
@@ -202,11 +211,28 @@ test('projects compact commands, persists locally, resumes without replay, and r
   const reconnected = new CapRushMultiplayerSupabaseTransport();
   const resumed = await reconnected.sync(room.roomId, 2147483647);
   expect(resumed.snapshot.state).toEqual(state);
+  expect(resumed.snapshot.state).toBe(first.snapshot.state);
   expect(project).toHaveBeenCalledTimes(1);
   expect(rpc).toHaveBeenLastCalledWith('cap_rush_multiplayer_room_sync', {
     p_room_id: room.roomId,
     p_after_ordinal: 0,
   });
   digest = 'invalid-digest';
-  await expect(reconnected.sync(room.roomId, 0)).rejects.toThrow('simulation mismatch');
+  const mismatch = await reconnected.sync(room.roomId, 0).catch((error: unknown) => error);
+  expect(mismatch).toBeInstanceOf(Error);
+  expect((mismatch as Error).message).toContain('simulation mismatch');
+  rpc.mockImplementation(() =>
+    Promise.resolve({ error: null, data: command.acceptedAtIso } as never),
+  );
+  project.mockRejectedValueOnce(
+    new CapRushMultiplayerProjectionRejection('invalid-phase', 'Invalid phase'),
+  );
+  const rejected = await reconnected.submitCommand({
+    roomId: room.roomId,
+    commandId: 'rejected-command',
+    actorParticipantId: 'p1',
+    expectedRevision: 1,
+    payload: { kind: 'start' },
+  });
+  expect(rejected).toMatchObject({ accepted: false, rejectionCode: 'invalid-phase' });
 });

@@ -88,17 +88,20 @@
           result={controller.broadcast.result}
           tape={controller.broadcast.tape}
           speed={controller.broadcast.speed}
-          label={controller.broadcast.kind === 'h2h'
-            ? 'Head-to-head'
-            : controller.broadcast.kind === 'playoff'
-              ? 'Playoff'
-              : controller.broadcast.kind === 'review'
-                ? 'Game review'
-                : 'Simcast'}
+          kind={controller.broadcast.kind}
+          slot={controller.broadcast.slot}
           {localTeamId}
           oncomplete={() => controller.completeBroadcast()}
           onclose={() => controller.closeBroadcast()}
         />
+      {:else if game === null && controller.error}
+        <section class="rounded-xl border border-border bg-card p-4">
+          <h2 class="font-display text-xl font-bold">Room unavailable</h2>
+          <a
+            class="mt-3 inline-flex min-h-11 items-center font-bold text-primary"
+            href={resolve('/multiplayer')}>Return to the lobby</a
+          >
+        </section>
       {:else if game === null}
         <div class="flex flex-col gap-3 py-6" role="status" aria-label="Opening the room">
           <div
@@ -234,6 +237,7 @@
           localSeat={seat}
           art={controller.art}
           busy={controller.busy}
+          broadcastLoading={controller.broadcastLoading}
           onwatchh2h={(gameId) => controller.watchHeadToHead(gameId)}
           onreviewgame={(gameId) => controller.reviewGame(gameId)}
         />
