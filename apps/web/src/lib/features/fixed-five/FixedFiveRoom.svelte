@@ -1,5 +1,7 @@
 <script lang="ts">
   import RoomShell from '#lib/features/multiplayer/RoomShell.svelte';
+  import RoomNav from '#lib/features/multiplayer/RoomNav.svelte';
+  import RoomStages from '#lib/features/multiplayer/RoomStages.svelte';
   import { onMount, untrack } from 'svelte';
   import MultiplayerLobbyLink from '#lib/features/multiplayer/MultiplayerLobbyLink.svelte';
   import { resolve } from '$app/paths';
@@ -7,7 +9,6 @@
   import {
     Check,
     Copy,
-    ArrowLeft,
     ArrowRight,
     Users,
     Clock,
@@ -29,7 +30,6 @@
     gamecastVisibleEventCount,
     gamecastVisibleState,
   } from '#lib/gamecast/gamecast-playback.js';
-  import ArenaSoundToggle from '#lib/components/ArenaSoundToggle.svelte';
   import { FixedFiveRoomController } from '#lib/features/fixed-five/fixed-five-room-controller.svelte.js';
   import type { PublicProfile } from '@hoop-rush/data-contracts';
   let { roomId }: { roomId: string } = $props();
@@ -82,14 +82,7 @@
 </svelte:head>
 
 <section class="room-page">
-  <div class="room-nav">
-    <a href={resolve('multiplayer/')}>
-      <ArrowLeft size={15} aria-hidden="true" />
-      Multiplayer
-    </a>
-
-    <ArenaSoundToggle />
-  </div>
+  <RoomNav target="multiplayer/" label="Multiplayer" />
   {#if controller.loading}
     <div class="room-empty" role="status">
       <Users size={28} aria-hidden="true" />
@@ -133,20 +126,10 @@
           verified={snapshot.phase === 'completed'}
         />
       {/if}
-      <ol class="room-stages" aria-label="Match progress">
-        {#each ['Lobby', 'Draft your five', 'Play', 'Results'] as label, i (label)}
-          <li
-            class:current={i === controller.stageIndex}
-            class:finished={i < controller.stageIndex}
-            aria-current={i === controller.stageIndex ? 'step' : undefined}
-          >
-            <span
-              >{#if i < controller.stageIndex}<Check size={13} aria-hidden="true" />{:else}{i +
-                  1}{/if}</span
-            >{label}
-          </li>
-        {/each}
-      </ol>
+      <RoomStages
+        labels={['Lobby', 'Draft your five', 'Play', 'Results']}
+        current={controller.stageIndex}
+      />
     {/if}
 
     {#if phase === 'completed'}

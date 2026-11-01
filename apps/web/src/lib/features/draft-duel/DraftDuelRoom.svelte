@@ -1,12 +1,13 @@
 <script lang="ts">
   import AchievementReveal from '#lib/features/profile/AchievementReveal.svelte';
   import RoomShell from '#lib/features/multiplayer/RoomShell.svelte';
+  import RoomNav from '#lib/features/multiplayer/RoomNav.svelte';
+  import RoomStages from '#lib/features/multiplayer/RoomStages.svelte';
   import { getLobbyCoordinator } from '#lib/features/multiplayer/lobby-context.svelte.js';
   import { onDestroy, onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import {
-    ArrowLeft,
     ArrowRight,
     Check,
     Clock,
@@ -19,7 +20,6 @@
     Sparkles,
     Users,
   } from '@lucide/svelte';
-  import ArenaSoundToggle from '#lib/components/ArenaSoundToggle.svelte';
   import MultiplayerLobbyLink from '#lib/features/multiplayer/MultiplayerLobbyLink.svelte';
   import type { DraftDuelCard, DraftDuelOfferedPick } from '@hoop-rush/data-contracts';
   import { DraftDuelController } from '#lib/features/draft-duel/draft-duel-controller.svelte.js';
@@ -231,14 +231,7 @@
 </svelte:head>
 
 <section class="room-page">
-  <div class="room-nav">
-    <a href={resolve('draft-duel/')}>
-      <ArrowLeft size={15} aria-hidden="true" />
-      Draft Duel
-    </a>
-
-    <ArenaSoundToggle />
-  </div>
+  <RoomNav target="draft-duel/" label="Draft Duel" />
 
   {#if !controller.snapshot && !controller.error}
     <div class="room-empty" role="status">
@@ -270,19 +263,7 @@
       error={controller.error}
     />
 
-    <ol class="room-stages" aria-label="Match progress">
-      {#each ['Lobby', 'Draft your five', 'Series', 'Champion'] as label, i (label)}
-        <li
-          class:current={i === stageIndex}
-          class:finished={i < stageIndex}
-          aria-current={i === stageIndex ? 'step' : undefined}
-        >
-          <span
-            >{#if i < stageIndex}<Check size={13} aria-hidden="true" />{:else}{i + 1}{/if}</span
-          >{label}
-        </li>
-      {/each}
-    </ol>
+    <RoomStages labels={['Lobby', 'Draft your five', 'Series', 'Champion']} current={stageIndex} />
 
     {#if controller.phase === 'championship'}
       <MultiplayerLobbyLink {roomId} completed />
