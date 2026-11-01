@@ -181,6 +181,14 @@ export abstract class SeriesRoomSession<
   protected notice: string | null = null;
   protected integrityFailed = false;
   protected progress = 0;
+  /**
+   * Outputs keyed by game number.
+   *
+   * Shared because both series modes store, read, and reset it identically; only
+   * the per-game simulation differs. Recording here is what lets
+   * `runGamePipeline` own persistence and publication for both.
+   */
+  protected outputs: Record<number, TOutput> = {};
   protected now: number;
   protected resolvedCursor: string | null = null;
   protected deadlineResolving = false;
@@ -242,13 +250,74 @@ export abstract class SeriesRoomSession<
   ): TCommand;
   protected abstract shouldRebuildDraft(commandsChanged: boolean): boolean;
   protected abstract appendCommands(roomId: string, commands: readonly TCommand[]): Promise<void>;
-  protected abstract ensureGamePipeline(): Promise<void>;
   protected abstract persistActive(): Promise<void>;
   protected abstract rebuildDraft(): void;
   protected abstract saveVerification(entries: readonly TVerification[]): void;
   protected abstract readyNextPayload(gameNumber: number): TPayload;
   protected abstract confirmPayload(output: TOutput, verified: boolean): TPayload;
   protected abstract proposeWinner(output: TOutput): SeriesParticipantId;
+
+  /**
+   * Produce one game's output for a game number.
+   *
+   * Milestone 5: this is the only part of the simulation pipeline that differs
+   * between series modes. Draft Duel resolves home court from the series and
+   * simulates from rosters; Havoc builds both teams from the draft. Everything
+   * around it — attachment checks, phase gating, job de-duplication, persistence
+   * before publication, cancellation, and error reporting — is identical and
+   * lives here in `runGamePipeline`.
+   */
+  protected abstract simulateGame(gameNumber: number): Promise<TOutput>;
+
+  /** Persist a freshly simulated output before it may be published. */
+  protected abstract persistOutput(output: TOutput): Promise<void>;
+
+  /**
+   * Run, persist, and publish the current game exactly once.
+   *
+   * Order matters and is enforced here rather than repeated per mode: output is
+   * persisted before publication, publication is gated on the attachment still
+   * being current, and a failure never publishes a partial result. Cancellation
+   * (`attachment.current()` becoming false) abandons the job without undoing an
+   * already committed game — resume re-reads the durable cursor to decide
+   * whether another job is needed.
+   */
+  protected async runGamePipeline(): Promise<void> {
+    const attachment = this.attachment;
+    if (!attachment?.current()) return;
+    const snapshot = this.snapshot;
+    if (!snapshot || !this.roomId) return;
+    // `currentGameNumber` already encodes the series check for each mode.
+    const gameNumber = this.currentGameNumber();
+    if (gameNumber === null) return;
+    if (
+      snapshot.phase !== 'preparing-game' &&
+      snapshot.phase !== 'broadcasting' &&
+      snapshot.phase !== 'game-results'
+    ) {
+      return;
+    }
+    if (this.currentOutput() || this.seriesFlow.jobs.has(gameNumber)) return;
+    try {
+      await this.seriesFlow.runGame(
+        gameNumber,
+        attachment.current,
+        () => this.simulateGame(gameNumber),
+        async (output) => {
+          this.outputs = { ...this.outputs, [output.gameNumber]: output };
+          await this.persistOutput(output);
+          if (attachment.current()) this.publish();
+        },
+      );
+    } catch (error) {
+      if (!attachment.current()) return;
+      this.error =
+        error instanceof Error
+          ? `Game simulation failed: ${error.message.slice(0, 200)}`
+          : 'Game simulation failed.';
+      this.publish();
+    }
+  }
 
   protected ordinalOf?: (command: TCommand) => number;
   protected onSnapshot?: (snapshot: TSnapshot) => void;
@@ -866,7 +935,7 @@ export abstract class SeriesRoomSession<
           if (isDisposed()) return;
           this.persistedCommandCount = this.commands.length;
         }
-        await this.ensureGamePipeline();
+        await this.runGamePipeline();
         if (isDisposed()) return;
         await this.persistActive();
       }

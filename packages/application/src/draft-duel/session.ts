@@ -195,7 +195,6 @@ export class DraftDuelSession extends SeriesRoomSession<
 > {
   private assets: DraftDuelSessionAssets | null = null;
   private draft: DraftDuelDraft | null = null;
-  private outputs: Record<number, DraftDuelGameOutput> = {};
   private completedRecap: DraftDuelCompletionRecap | null = null;
 
   constructor(deps: DraftDuelSessionDeps) {
@@ -421,44 +420,21 @@ export class DraftDuelSession extends SeriesRoomSession<
     }
   }
 
-  protected async ensureGamePipeline(): Promise<void> {
-    const attachment = this.attachment;
-    if (!attachment?.current()) return;
-    const snapshot = this.snapshot;
-    const series = snapshot?.series;
-    if (!snapshot || !series || !this.assets || !this.roomId) return;
-    const gameNumber = series.currentGameNumber;
-    if (gameNumber === null) return;
-    if (
-      snapshot.phase !== 'preparing-game' &&
-      snapshot.phase !== 'broadcasting' &&
-      snapshot.phase !== 'game-results'
-    ) {
-      return;
-    }
-    if (this.outputs[gameNumber] || this.seriesFlow.jobs.has(gameNumber)) return;
-    try {
-      await this.seriesFlow.runGame(
-        gameNumber,
-        attachment.current,
-        () => this.simulateGame(gameNumber, series.homeWinner),
-        async (output) => {
-          this.outputs = { ...this.outputs, [gameNumber]: output };
-          await this.deps.repository.saveResult(output);
-          if (attachment.current()) this.publish();
-        },
-      );
-    } catch (error) {
-      if (!attachment.current()) return;
-      this.error =
-        error instanceof Error
-          ? `Game simulation failed: ${error.message.slice(0, 200)}`
-          : 'Game simulation failed.';
-      this.publish();
-    }
+  /**
+   * Draft Duel supplies only the simulation. The pipeline that guards, persists,
+   * and publishes it is shared in `SeriesRoomSession.runGamePipeline`.
+   */
+  protected async simulateGame(gameNumber: number): Promise<DraftDuelGameOutput> {
+    const series = this.snapshot?.series;
+    if (!series) throw new Error('Draft Duel series is missing.');
+    return this.simulateSeriesGame(gameNumber, series.homeWinner);
   }
 
-  private async simulateGame(
+  protected async persistOutput(output: DraftDuelGameOutput): Promise<void> {
+    await this.deps.repository.saveResult(output);
+  }
+
+  private async simulateSeriesGame(
     gameNumber: number,
     homeWinner: DraftDuelParticipantId,
   ): Promise<DraftDuelGameOutput> {
