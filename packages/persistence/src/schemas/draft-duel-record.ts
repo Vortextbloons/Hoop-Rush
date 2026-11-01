@@ -4,7 +4,6 @@ import {
   draftDuelCommandSchema,
   draftDuelCompletionRecapSchema,
   draftDuelGameOutputSchema,
-  draftDuelPartiallyVerifiedSchema,
   draftDuelParticipantIdSchema,
   draftDuelSeriesMvpSchema,
   draftDuelSeriesSnapshotSchema,

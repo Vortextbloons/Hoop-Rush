@@ -249,6 +249,57 @@ afterEach(() => {
 });
 
 describe('cap rush repository', () => {
+  it('rolls back every table when a commit fails partway through', async () => {
+    const run = await startLockedRun(repository);
+    const before = await repository.loadActiveDraft();
+    const commandsBefore = await db.capRushCommands.count();
+
+    // Accept a real game, but fail after the artifact write by making the
+    // history insert invalid. Dexie must roll back the whole transaction.
+    const bundle = acceptBundle(run.index, run.state, 1);
+    const broken = {
+      ...bundle,
+      report: { runId: 'wrong-run' } as unknown as CapRushReport,
+    };
+    await expect(
+      repository.applyOutcome({
+        outcome: { state: broken.state, result: broken.result },
+        command: broken.command,
+        game: broken.game,
+        report: broken.report,
+      }),
+    ).rejects.toThrow();
+
+    // Nothing from the failed commit survived.
+    expect(await repository.loadActiveDraft()).toEqual(before);
+    expect(await db.capRushCommands.count()).toBe(commandsBefore);
+    expect(await repository.listRunGames(run.state.runId)).toEqual([]);
+  });
+
+  it('replaying an accepted receipt writes no duplicate artifacts', async () => {
+    const run = await startLockedRun(repository);
+    const bundle = acceptBundle(run.index, run.state, 1);
+    const outcome = { state: bundle.state, result: bundle.result };
+
+    const first = await repository.applyOutcome({
+      outcome,
+      command: bundle.command,
+      game: bundle.game,
+    });
+    const gamesAfterFirst = await repository.listRunGames(run.state.runId);
+    const commandsAfterFirst = await db.capRushCommands.count();
+
+    const replay = await repository.applyOutcome({
+      outcome,
+      command: bundle.command,
+      game: bundle.game,
+    });
+
+    expect(replay).toEqual(first);
+    expect(await repository.listRunGames(run.state.runId)).toHaveLength(gamesAfterFirst.length);
+    expect(await db.capRushCommands.count()).toBe(commandsAfterFirst);
+  });
+
   it('persists the created draft and resumes it', async () => {
     const { command, state, result } = setup();
     await repository.applyOutcome({ outcome: { state, result }, command });
