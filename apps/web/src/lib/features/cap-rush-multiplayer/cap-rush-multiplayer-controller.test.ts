@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from 'bun:test';
 import type { CapRushMultiplayerSessionView } from '@hoop-rush/application/cap-rush-multiplayer';
-import { idSchema } from '@hoop-rush/data-contracts';
+import { idSchema, type CapRushMultiplayerRoomMembership } from '@hoop-rush/data-contracts';
 import * as assets from './cap-rush-multiplayer-assets';
 import * as transports from './cap-rush-multiplayer-transport';
 import { CapRushMultiplayerController } from './cap-rush-multiplayer-controller.svelte';
@@ -68,20 +68,41 @@ test('keeps a rejected bid local to the attempted total', async () => {
   expect(controller.error).toBeNull();
 });
 
-test('does not open a room when disposed while assets load', async () => {
-  let resolve!: (data: assets.CapRushMultiplayerData) => void;
+test('overlaps asset loading with presence resume and stops before syncing when disposed', async () => {
+  let resolveData!: (data: assets.CapRushMultiplayerData) => void;
   vi.spyOn(assets, 'getCapRushMultiplayerData').mockReturnValue(
     new Promise((yes) => {
-      resolve = yes;
+      resolveData = yes;
     }),
   );
-  const transport = vi.spyOn(transports, 'getCapRushMultiplayerTransport');
+  let resolveResume!: (value: typeof membership) => void;
+  const membership = {
+    roomId: idSchema.parse('room-a'),
+    participantId: 'p1' as const,
+    code: '1234',
+  };
+  const transport = {
+    resume: vi.fn(
+      () =>
+        new Promise<typeof membership>((yes) => {
+          resolveResume = yes;
+        }),
+    ),
+    sync: vi.fn(),
+    subscribe: vi.fn(() => () => {}),
+  };
+  vi.spyOn(transports, 'getCapRushMultiplayerTransport').mockReturnValue(
+    transport as unknown as transports.CapRushMultiplayerSupabaseTransport,
+  );
   const controller = new CapRushMultiplayerController('room-a');
   const loading = controller.load();
+  for (let i = 0; i < 5; i++) await Promise.resolve();
+  expect(transport.resume).toHaveBeenCalledTimes(1);
   controller.dispose();
-  resolve({} as assets.CapRushMultiplayerData);
+  resolveResume(membership);
+  resolveData({} as assets.CapRushMultiplayerData);
   await loading;
-  expect(transport).not.toHaveBeenCalled();
+  expect(transport.sync).not.toHaveBeenCalled();
   expect(controller.view).toBeNull();
 });
 
@@ -139,4 +160,48 @@ test('pauses bulk simulation for the pending head-to-head', async () => {
   await (controller as unknown as { tick(): Promise<void> }).tick();
   expect(watch).toHaveBeenCalledWith('h2h-1');
   expect(simulate).not.toHaveBeenCalled();
+});
+
+test('continues the season immediately after a successful step instead of waiting for the poll', async () => {
+  const controller = new CapRushMultiplayerController('room-a');
+  const view = sessionView(null);
+  const season = {
+    block: { index: 0, status: 'choosing', plans: { p1: null, p2: null } },
+    games: [],
+    slotAcks: { p1: 0, p2: 0 },
+    h2hSlots: [],
+  };
+  Object.assign(view.state, { phase: 'season', season });
+  let revision = 0;
+  const chooseBlockPlan = vi.fn(() => {
+    season.block.status = 'running';
+    revision += 1;
+    return Promise.resolve();
+  });
+  Object.assign(controller, {
+    view,
+    session: {
+      room: {
+        get revision() {
+          return revision;
+        },
+      },
+      chooseBlockPlan,
+      pendingH2H: () => null,
+      nextSlot: () => (revision < 2 ? 1 : null),
+      refresh: () => Promise.resolve(),
+      dispose: vi.fn(),
+      view: () => view,
+    },
+  });
+  const simulate = vi.spyOn(controller, 'simulateNextSlot').mockImplementation(() => {
+    revision += 1;
+    return Promise.resolve();
+  });
+
+  await (controller as unknown as { tick(): Promise<void> }).tick();
+  expect(chooseBlockPlan).toHaveBeenCalledWith(0, 'sim');
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(simulate).toHaveBeenCalledTimes(1);
+  controller.dispose();
 });

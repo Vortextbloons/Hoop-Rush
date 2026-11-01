@@ -24,7 +24,6 @@
     exactMoney,
     lotState,
     marketPools,
-    money,
     nextMinimumBid,
     playerById,
     positionLabel,
@@ -610,14 +609,6 @@
             </button>
           </section>
         {/if}
-
-        <p class="text-[10px] leading-relaxed text-muted-foreground">
-          One binding lead per position. Unfilled positions auto-sign at close. The {money(
-            CAP_RUSH_MULTIPLAYER_CAP_LINE_DOLLARS,
-          )} cap line is not the spending limit — the hard limit is {money(
-            CAP_RUSH_MULTIPLAYER_HARD_LIMIT_DOLLARS,
-          )}.
-        </p>
       {/if}
     </div>
   {/key}
@@ -648,9 +639,6 @@
           >
             {inspectedPool === null ? 'Recruitment' : positionLabel(inspectedPool.position)}
           </h2>
-          <p class="text-xs text-muted-foreground">
-            {inspectedPool?.lots.length ?? 0} lots · {inspectedOpenCount} open · one signing per seat
-          </p>
         </div>
         <div class="shrink-0 text-right">
           <p
@@ -705,9 +693,6 @@
       class="flex min-w-0 flex-col gap-4 md:grid md:grid-cols-[minmax(0,1fr)_20rem] md:items-start lg:grid-cols-[minmax(0,1fr)_22rem]"
     >
       <section class="flex min-w-0 flex-col gap-2" aria-label="Market">
-        <p class="text-[10px] text-muted-foreground">
-          Market order stays fixed. Selecting a card never spends money.
-        </p>
         <div class="grid min-w-0 grid-cols-2 gap-2 lg:grid-cols-3 min-[1440px]:grid-cols-4">
           {#each inspectedPool?.lots ?? [] as lot (lot.player.playerId)}
             <CapRushAuctionLot

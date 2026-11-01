@@ -126,11 +126,6 @@
     <h2 class="font-display text-2xl font-extrabold tracking-tight uppercase sm:text-3xl">
       {variant === 'roulette' ? 'Mutation window' : 'Roster lock'}
     </h2>
-    <p class="max-w-2xl text-xs leading-relaxed text-muted-foreground sm:text-sm">
-      {variant === 'roulette'
-        ? 'Buy mutations from your recruited payroll, then both seats confirm to lock the rosters.'
-        : 'Review both lineups, then confirm your roster.'}
-    </p>
   </header>
 
   <div class="grid gap-3 lg:grid-cols-2">
@@ -215,10 +210,6 @@
           {receipts.length} of 5 purchases used
         </p>
       </header>
-
-      <p class="max-w-2xl text-[11px] leading-relaxed text-muted-foreground">
-        Mutations are paid from the recruited payroll and do not change roster salaries.
-      </p>
 
       <div role="group" aria-label="Target player" class="flex flex-col gap-2">
         <p class="font-mono text-[9px] font-bold tracking-[0.12em] text-muted-foreground uppercase">
@@ -436,10 +427,6 @@
 
   <section class="flex flex-col gap-2 rounded-2xl border border-border bg-card p-3 sm:p-4">
     <h3 class="font-display text-lg font-extrabold tracking-tight uppercase">Lock the rosters</h3>
-    <p class="max-w-2xl text-xs leading-relaxed text-muted-foreground">
-      The season starts when both seats confirm the same rosters. Neither confirmation changes
-      salaries.
-    </p>
     <div class="flex flex-wrap items-center gap-3">
       <button
         type="button"

@@ -154,11 +154,26 @@ export class CapRushMultiplayerSupabaseTransport implements CapRushMultiplayerTr
   async submitCommand(
     input: CapRushMultiplayerSubmitInput,
   ): Promise<CapRushMultiplayerCommandReceipt> {
+    const [acceptedAtIso, snapshot] = await Promise.all([
+      this.clockNow(),
+      this.snapshot(input.roomId),
+    ]);
+    return this.submitWithSnapshot(input, snapshot, acceptedAtIso);
+  }
+
+  private async clockNow(): Promise<string> {
     const client = await getMultiplayerClient();
     const clock = await client.rpc('cap_rush_multiplayer_clock');
     if (clock.error) throw new Error(clock.error.message);
-    const acceptedAtIso = capRushMultiplayerAcceptedAt(clock.data);
-    const snapshot = await this.snapshot(input.roomId);
+    return capRushMultiplayerAcceptedAt(clock.data);
+  }
+
+  private async submitWithSnapshot(
+    input: CapRushMultiplayerSubmitInput,
+    snapshot: CapRushMultiplayerRoomSnapshot,
+    acceptedAtIso: string,
+  ): Promise<CapRushMultiplayerCommandReceipt> {
+    const client = await getMultiplayerClient();
     const state = snapshot.state;
     if (state === null) {
       return {
@@ -209,7 +224,7 @@ export class CapRushMultiplayerSupabaseTransport implements CapRushMultiplayerTr
     });
     if (result.error) throw new Error(result.error.message);
     const receipt = recordOf(result.data);
-    const parsed: CapRushMultiplayerCommandReceipt = {
+    return {
       roomId: snapshot.roomId,
       commandId: command.commandId,
       ordinal: typeof receipt.ordinal === 'number' ? receipt.ordinal : snapshot.commandCount,
@@ -217,25 +232,28 @@ export class CapRushMultiplayerSupabaseTransport implements CapRushMultiplayerTr
       rejectionCode: typeof receipt.rejectionCode === 'string' ? receipt.rejectionCode : null,
       revision: typeof receipt.revision === 'number' ? receipt.revision : snapshot.revision,
     };
-    return parsed;
   }
 
   async closeDueAuctions(roomId: string): Promise<CapRushMultiplayerCommandReceipt | null> {
-    const snapshot = await this.snapshot(roomId);
+    const [snapshot, acceptedAtIso] = await Promise.all([this.snapshot(roomId), this.clockNow()]);
     const state = snapshot.state;
     if (state === null || snapshot.phase !== 'recruiting' || snapshot.deadline === null)
       return null;
     if (Date.parse(snapshot.deadline.atIso) > Date.now()) return null;
-    return this.submitCommand({
-      roomId,
-      commandId: `close-${String(state.recruitment?.roundIndex ?? 0)}-${String(snapshot.commandCount)}`,
-      actorParticipantId: 'p1',
-      expectedRevision: snapshot.revision,
-      payload: {
-        kind: 'close-due-auctions',
-        round: state.recruitment?.roundIndex ?? 0,
+    return this.submitWithSnapshot(
+      {
+        roomId,
+        commandId: `close-${String(state.recruitment?.roundIndex ?? 0)}-${String(snapshot.commandCount)}`,
+        actorParticipantId: 'p1',
+        expectedRevision: snapshot.revision,
+        payload: {
+          kind: 'close-due-auctions',
+          round: state.recruitment?.roundIndex ?? 0,
+        },
       },
-    });
+      snapshot,
+      acceptedAtIso,
+    );
   }
 
   async removeGuest(roomId: string, targetParticipantId: CapRushMultiplayerSeatId): Promise<void> {

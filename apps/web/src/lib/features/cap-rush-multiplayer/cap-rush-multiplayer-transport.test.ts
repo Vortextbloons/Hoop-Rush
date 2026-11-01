@@ -67,3 +67,49 @@ test('snapshot reads omit command history', async () => {
   await transport.snapshot('room-a');
   expect(sync).toHaveBeenCalledWith('room-a', 2147483647);
 });
+
+test('reads the server clock and room snapshot concurrently before submitting', async () => {
+  let resolveClock!: (value: { data: unknown; error: null }) => void;
+  const clock = new Promise<{ data: unknown; error: null }>((yes) => {
+    resolveClock = yes;
+  });
+  const client = {
+    rpc: vi.fn((name: string) =>
+      name === 'cap_rush_multiplayer_clock'
+        ? clock
+        : Promise.resolve({ data: null, error: { message: 'unexpected rpc' } }),
+    ),
+  };
+  vi.spyOn(runtime, 'getMultiplayerClient').mockResolvedValue(client as unknown as SupabaseClient);
+  const transport = new CapRushMultiplayerSupabaseTransport();
+  let resolveSnapshot!: (value: unknown) => void;
+  const snapshot = new Promise((yes) => {
+    resolveSnapshot = yes;
+  });
+  const snapshotSpy = vi
+    .spyOn(transport, 'snapshot')
+    .mockReturnValue(snapshot as unknown as ReturnType<typeof transport.snapshot>);
+
+  const pending = transport.submitCommand({
+    roomId: 'room-a',
+    commandId: 'cmd-1',
+    actorParticipantId: 'p1',
+    expectedRevision: 0,
+    payload: { kind: 'start' },
+  });
+  for (let i = 0; i < 5; i++) await Promise.resolve();
+  expect(client.rpc).toHaveBeenCalledWith('cap_rush_multiplayer_clock');
+  expect(snapshotSpy).toHaveBeenCalledTimes(1);
+
+  resolveClock({ data: '2026-11-01T00:00:00.000Z', error: null });
+  resolveSnapshot({
+    roomId: 'room-a',
+    revision: 0,
+    commandCount: 0,
+    state: null,
+  });
+  expect(await pending).toMatchObject({
+    accepted: false,
+    rejectionCode: 'invalid-phase',
+  });
+});

@@ -67,6 +67,44 @@ describe('cap rush multiplayer application session', () => {
     expect(session.room).toBeNull();
   });
 
+  test('adopts a prefetched sync without resuming or refetching', async () => {
+    const room = await createSessionTestRoom();
+    const { transport } = room;
+    const initialSync = await transport.sync(room.roomId);
+    const resume = vi.spyOn(transport, 'resume');
+    const sync = vi.spyOn(transport, 'sync');
+    const session = room.session('p1');
+
+    await session.attach({ resume: false, initialSync });
+
+    expect(resume).not.toHaveBeenCalled();
+    expect(sync).not.toHaveBeenCalled();
+    expect(session.room?.revision).toBe(initialSync.snapshot.revision);
+    session.dispose();
+  });
+
+  test('skips unchanged snapshots but still observes presence changes', async () => {
+    let nowMs = Date.parse('2026-11-01T00:00:00.000Z');
+    const room = await createSessionTestRoom({ now: () => nowMs });
+    const session = room.session('p1');
+    await session.attach();
+    let changes = 0;
+    session.subscribe(() => {
+      changes += 1;
+    });
+
+    await session.refresh();
+    expect(changes).toBe(0);
+
+    const state = session.current;
+    nowMs += 5_000;
+    await room.transport.resume(room.roomId);
+    await session.refresh();
+    expect(changes).toBe(1);
+    expect(session.current).toBe(state);
+    session.dispose();
+  });
+
   test('opens two seats, locks a recruited league, and advances one shared slot', async () => {
     let nowMs = Date.parse('2026-11-01T00:00:00.000Z');
     const room = await createSessionTestRoom({ now: () => nowMs, commandPrefix: 'session' });

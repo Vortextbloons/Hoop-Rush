@@ -548,10 +548,23 @@ export function applyCapRushMultiplayerCommand(
         }
         seen.add(game.gameId);
       }
-      return accept({
-        ...state,
-        season: { ...season, games: [...season.games, ...payload.games] },
-      });
+      const next = { ...state, season: { ...season, games: [...season.games, ...payload.games] } };
+      if (
+        season.block.plans.p1 === 'sim' &&
+        season.block.plans.p2 === 'sim' &&
+        !payload.games.some((game) => isH2HGame(locked, game))
+      ) {
+        return applyCapRushMultiplayerCommand(
+          next,
+          {
+            ...command,
+            payload: { kind: 'ack-slot', slot: payload.slot },
+          },
+          environment,
+          variant,
+        );
+      }
+      return accept(next);
     }
     case 'ack-slot': {
       if (state.phase !== 'season' || state.season === null || state.locked === null) {
@@ -575,10 +588,26 @@ export function applyCapRushMultiplayerCommand(
           return reject('not-due', 'both seats must finish the head-to-head broadcast');
         }
       }
-      const slotAcks = {
-        ...season.slotAcks,
-        [actor]: Math.max(season.slotAcks[actor], payload.slot),
-      };
+      const unresolvedH2H = season.games.some(
+        (game) =>
+          game.slot <= payload.slot &&
+          isH2HGame(locked, game) &&
+          !(['p1', 'p2'] as const).every((seat) =>
+            season.playbackAcks.some(
+              (ack) => ack.gameId === game.gameId && ack.seat === seat && ack.resolved,
+            ),
+          ),
+      );
+      if (unresolvedH2H)
+        return reject('not-due', 'both seats must finish the head-to-head broadcast');
+      const autoAdvance =
+        h2h === undefined && season.block.plans.p1 === 'sim' && season.block.plans.p2 === 'sim';
+      const slotAcks = autoAdvance
+        ? {
+            p1: Math.max(season.slotAcks.p1, payload.slot),
+            p2: Math.max(season.slotAcks.p2, payload.slot),
+          }
+        : { ...season.slotAcks, [actor]: Math.max(season.slotAcks[actor], payload.slot) };
       const revealed = revealState({ season: { ...season, slotAcks } });
       if (revealed.complete) {
         const postseason = capRushMultiplayerOpenPostseason({

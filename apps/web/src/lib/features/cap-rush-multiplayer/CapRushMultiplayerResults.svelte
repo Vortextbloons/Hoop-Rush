@@ -69,7 +69,7 @@
     const local = seatViews.find((detail) => detail.seat === localSeat) ?? null;
     if (local === null) return null;
     if (local.isChampion) {
-      return 'Your team won the league. The shared regular season and postseason are complete.';
+      return 'Your team won the league.';
     }
     if (local.outcome === null) {
       return 'The league is complete.';
@@ -151,9 +151,7 @@
           >
         {/if}
         <div class="min-w-0 flex-1">
-          <p class="font-mono text-[10px] tracking-[0.16em] text-accent uppercase">
-            Final report · shared league
-          </p>
+          <p class="font-mono text-[10px] tracking-[0.16em] text-accent uppercase">Final report</p>
           <h2 class="font-display text-3xl font-extrabold tracking-tight uppercase">
             {championName === null ? 'League complete' : `${championName} win the league`}
           </h2>
@@ -166,9 +164,6 @@
                 · {seatLabelFor(championSeat, localSeat)}
               {/if}
             {/if}
-          </p>
-          <p class="mt-1 text-xs text-muted-foreground">
-            The shared regular season and postseason are complete.
           </p>
         </div>
       </div>

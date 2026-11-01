@@ -3,7 +3,6 @@
     CapRushMultiplayerSeatId,
     CapRushMultiplayerState,
   } from '@hoop-rush/data-contracts';
-  import { CAP_RUSH_MULTIPLAYER_LEAGUE_GAMES } from '@hoop-rush/data-contracts';
   import { capRushMultiplayerSeatRecord, capRushMultiplayerStandings } from '@hoop-rush/engine';
   import TeamLogo from '#lib/components/TeamLogo.svelte';
   import type { CapRushArt } from '../cap-rush/cap-rush-art.js';
@@ -119,9 +118,6 @@
             <CapRushSeatLedger {state} {seat} {localSeat} {art} />
           </div>
         {/each}
-        <p class="px-1 text-[11px] leading-relaxed text-muted-foreground sm:col-span-2">
-          Both rosters are locked in for the shared 82-game season.
-        </p>
       </aside>
     </div>
 
@@ -137,8 +133,6 @@
             Final standings unlock after the last slot
           </h2>
           <p class="mt-1 text-sm text-muted-foreground">
-            All {CAP_RUSH_MULTIPLAYER_LEAGUE_GAMES} shared games must be accepted before seeds can be
-            built.
             {season.games.length} accepted so far.
           </p>
         </div>

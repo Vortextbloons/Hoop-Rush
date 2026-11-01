@@ -7,6 +7,7 @@ import type {
   CapRushMultiplayerRoomSnapshot,
   CapRushMultiplayerSeatId,
   CapRushMultiplayerState,
+  CapRushMultiplayerSync,
   CapRushMultiplayerTransport,
   CapRushLeagueGame,
   CapRushPlayoffGameSummary,
@@ -36,6 +37,13 @@ export interface CapRushMultiplayerSessionDeps {
   readonly scheduleTick?: (tick: () => void, intervalMs: number) => () => void;
 }
 
+export interface CapRushMultiplayerAttachOptions {
+  /** Skip the presence resume when the caller already resumed this room. */
+  readonly resume?: boolean;
+  /** Adopt an already fetched sync instead of issuing another initial read. */
+  readonly initialSync?: CapRushMultiplayerSync;
+}
+
 export interface CapRushMultiplayerSessionView {
   readonly roomId: string;
   readonly seat: CapRushMultiplayerSeatId;
@@ -63,11 +71,19 @@ export class CapRushMultiplayerSession {
     this.state = createCapRushMultiplayerState(null);
   }
 
-  async attach(): Promise<void> {
+  async attach(options: CapRushMultiplayerAttachOptions = {}): Promise<void> {
     if (this.isDisposed()) return;
-    await this.deps.transport.resume(this.deps.roomId);
+    const initialSync = options.initialSync;
+    const resuming = options.resume === false ? null : this.deps.transport.resume(this.deps.roomId);
+    if (resuming === null) {
+      if (initialSync === undefined) await this.refresh();
+    } else if (initialSync === undefined) {
+      await Promise.all([resuming, this.refresh()]);
+    } else {
+      await resuming;
+    }
     if (this.isDisposed()) return;
-    await this.refresh();
+    if (initialSync !== undefined) this.adopt(initialSync.snapshot, initialSync.commands);
     if (this.isDisposed()) return;
     this.unsubscribe?.();
     this.unsubscribe = this.deps.transport.subscribe(
@@ -286,6 +302,9 @@ export class CapRushMultiplayerSession {
     fetched: readonly CapRushMultiplayerCommand[],
   ): void {
     if (this.snapshot !== null && snapshot.revision < this.snapshot.revision) return;
+    if (this.snapshot !== null && fetched.length === 0 && sameSnapshot(this.snapshot, snapshot)) {
+      return;
+    }
     this.snapshot = snapshot;
     if (fetched.length > 0) {
       const seen = new Set(this.commands.map((command) => command.commandId));
@@ -318,4 +337,50 @@ export class CapRushMultiplayerSession {
     await this.refresh();
     return receipt;
   }
+}
+
+type SnapshotMember = CapRushMultiplayerRoomSnapshot['members'][number];
+
+function sameMember(left: SnapshotMember, right: SnapshotMember): boolean {
+  return (
+    left.participantId === right.participantId &&
+    left.displayName === right.displayName &&
+    left.online === right.online &&
+    left.ready === right.ready &&
+    left.lastSeenAt === right.lastSeenAt
+  );
+}
+
+function sameMembers(left: readonly SnapshotMember[], right: readonly SnapshotMember[]): boolean {
+  if (left.length !== right.length) return false;
+  for (const [index, member] of left.entries()) {
+    const other = right[index];
+    if (other === undefined || !sameMember(member, other)) return false;
+  }
+  return true;
+}
+
+function sameSnapshot(
+  left: CapRushMultiplayerRoomSnapshot,
+  right: CapRushMultiplayerRoomSnapshot,
+): boolean {
+  return (
+    left.roomId === right.roomId &&
+    left.code === right.code &&
+    left.codeActive === right.codeActive &&
+    left.settings.variant === right.settings.variant &&
+    left.phase === right.phase &&
+    left.revision === right.revision &&
+    left.commandCount === right.commandCount &&
+    left.rootSeed === right.rootSeed &&
+    (left.state === null) === (right.state === null) &&
+    left.deadline?.cursor === right.deadline?.cursor &&
+    left.deadline?.atIso === right.deadline?.atIso &&
+    left.resultDigest === right.resultDigest &&
+    left.confirmedDigest === right.confirmedDigest &&
+    left.successorRoomId === right.successorRoomId &&
+    left.expiresAt === right.expiresAt &&
+    left.createdAt === right.createdAt &&
+    sameMembers(left.members, right.members)
+  );
 }

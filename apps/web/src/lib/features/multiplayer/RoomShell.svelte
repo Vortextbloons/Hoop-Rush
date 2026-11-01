@@ -121,6 +121,9 @@
     {#if lobbyId}<a href={resolve(`/multiplayer?lobby=${lobbyId}`)}>Room lobby →</a>{/if}
     {@render children?.()}
   </div>
+  {#if error || copyError || (lobbyId && coordinator.snapshot.error)}<p class="error" role="alert">
+      {error ?? copyError ?? coordinator.snapshot.error}
+    </p>{/if}
   {#if content}
     <div class="room-content">{@render content()}</div>
   {/if}
@@ -139,9 +142,6 @@
       {onProfilesChange}
     />
   {/if}
-  {#if error || copyError || (lobbyId && coordinator.snapshot.error)}<p class="error" role="alert">
-      {error ?? copyError ?? coordinator.snapshot.error}
-    </p>{/if}
 </header>
 
 <style>

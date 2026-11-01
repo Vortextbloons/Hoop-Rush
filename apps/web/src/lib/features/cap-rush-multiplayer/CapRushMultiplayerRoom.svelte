@@ -99,7 +99,7 @@
           oncomplete={() => controller.completeBroadcast()}
           onclose={() => controller.closeBroadcast()}
         />
-      {:else if controller.loading || game === null}
+      {:else if game === null}
         <div class="flex flex-col gap-3 py-6" role="status" aria-label="Opening the room">
           <div
             class="h-8 w-48 animate-pulse rounded-lg bg-surface-2 motion-reduce:animate-none"
@@ -119,10 +119,6 @@
               <h2 class="font-display text-2xl font-extrabold uppercase tracking-tight">
                 {bothOnline ? 'Both seats are in' : 'Waiting for your opponent'}
               </h2>
-              <p class="mt-1 max-w-xl text-sm text-muted-foreground">
-                The host starts one shared 60-player market. Both seats bid on the same players,
-                sign one player per position, then play the same league.
-              </p>
             </div>
             <span
               class="rounded-full border border-primary/40 bg-primary/10 px-2.5 py-1 font-mono text-[10px] font-bold uppercase text-primary"
@@ -179,16 +175,7 @@
               >
                 Start recruitment
               </button>
-              <p class="text-xs text-muted-foreground">
-                {bothOnline
-                  ? 'Starting opens the same market for both seats.'
-                  : 'Both seats must be online before the market opens.'}
-              </p>
             </div>
-          {:else}
-            <p class="text-sm text-muted-foreground">
-              Waiting for the host to start the shared auction.
-            </p>
           {/if}
         </section>
       {:else if game.phase === 'recruiting'}
@@ -201,11 +188,8 @@
           />
           {#if activeRound?.status === 'bidding'}
             <div
-              class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card p-3"
+              class="flex flex-wrap items-center justify-end gap-3 rounded-xl border border-border bg-card p-3"
             >
-              <p class="text-sm text-muted-foreground">
-                Both players must agree to end this round. Current bids stand.
-              </p>
               <button
                 type="button"
                 class="min-h-11 rounded-xl border border-primary/40 px-4 text-sm font-bold text-primary outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"

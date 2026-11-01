@@ -147,8 +147,11 @@ describe('cap rush multiplayer shared league', () => {
             });
           }
         }
-        run('p1', { kind: 'ack-slot', slot });
-        run('p2', { kind: 'ack-slot', slot });
+        if (h2hSlots.has(slot)) {
+          run('p1', { kind: 'ack-slot', slot });
+          run('p2', { kind: 'ack-slot', slot });
+        }
+        expect(state.season?.frontierSlot).toBe(slot);
       }
       expect(state.season?.games).toHaveLength(season.block.endpoint * 15);
     }
