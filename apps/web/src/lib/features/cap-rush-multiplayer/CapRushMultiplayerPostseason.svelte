@@ -170,7 +170,7 @@
         : winner === teamId
           ? 'Won'
           : 'Lost';
-    return `${capRushConferenceRoundName(series.round)} vs ${teamName(opponentId)} Â· ${status} ${ownWins}â€“${opponentWins}`;
+    return `${capRushConferenceRoundName(series.round)} vs ${teamName(opponentId)} · ${status} ${ownWins}–${opponentWins}`;
   }
 
   function outcomeLabel(outcome: CapRushPostseasonUserOutcome): string {
@@ -197,7 +197,7 @@
       <header class="flex flex-wrap items-end justify-between gap-2">
         <div class="min-w-0">
           <p class="font-mono text-[10px] tracking-[0.16em] text-muted-foreground uppercase">
-            Postseason Â· {championTeamId === null ? `round ${currentRound} of 4` : 'complete'}
+            Postseason · {championTeamId === null ? `round ${currentRound} of 4` : 'complete'}
           </p>
           <h2 class="font-display text-2xl font-extrabold tracking-tight uppercase">
             {championTeamId === null
@@ -306,7 +306,7 @@
                   {seatLabelFor(seat, localSeat)}
                 </p>
                 <p class="mt-1 truncate font-display text-lg font-bold tracking-tight uppercase">
-                  {plan === null ? 'Choosingâ€¦' : plan === 'sim' ? 'Sim' : 'Simcast'}
+                  {plan === null ? 'Choosing…' : plan === 'sim' ? 'Sim' : 'Simcast'}
                 </p>
               </li>
             {/each}
@@ -414,7 +414,7 @@
                   </p>
                 </div>
                 <div class="shrink-0 text-right">
-                  <p class="font-mono text-xs font-semibold tabular-nums">{highWins}â€“{lowWins}</p>
+                  <p class="font-mono text-xs font-semibold tabular-nums">{highWins}–{lowWins}</p>
                   <p class="max-w-[9rem] truncate text-[9px] text-muted-foreground">
                     {winnerTeamId === null ? '' : `${teamName(winnerTeamId)} won`}
                   </p>
