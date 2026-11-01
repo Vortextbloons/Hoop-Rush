@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import PlayerArt from '#lib/components/PlayerArt.svelte';
   import {
     ratioPct,
@@ -16,12 +17,14 @@
     perGame = false,
     games = 1,
     theme = 'havoc',
+    teamIdentity,
   }: {
     boxes: readonly GamecastBattleSideBox[];
     localSide: 'home' | 'away';
     perGame?: boolean;
     games?: number;
     theme?: 'havoc' | 'duel';
+    teamIdentity?: Snippet<['home' | 'away']>;
   } = $props();
 
   function statOf(value: number): string {
@@ -50,7 +53,9 @@
         aria-label={`${labelOf(box.side)} box score`}
       >
         <header class="hm-box-head">
-          <span class="hm-box-label" data-side={box.side}>{labelOf(box.side)}</span>
+          <span class="hm-box-label" data-side={box.side}
+            >{#if teamIdentity}{@render teamIdentity(box.side)}{:else}{labelOf(box.side)}{/if}</span
+          >
           {#if box.bonusPoints !== 0}
             <span class="hm-box-bonus" data-negative={box.bonusPoints < 0}
               >Team bonus {box.bonusPoints > 0 ? `+${box.bonusPoints}` : box.bonusPoints}</span

@@ -1,7 +1,6 @@
 import type {
   CapRushMultiplayerLockedInputs,
   CapRushMultiplayerSeatId,
-  CapRushMultiplayerSeasonState,
   CapRushMultiplayerState,
 } from '@hoop-rush/data-contracts';
 import { capRushMultiplayerAcceptedThrough } from '@hoop-rush/engine';
@@ -29,11 +28,6 @@ export function capRushMultiplayerDeadlineOf(
     }
   }
   return earliest;
-}
-
-export function capRushMultiplayerIsDue(state: CapRushMultiplayerState, nowMs: number): boolean {
-  const deadline = capRushMultiplayerDeadlineOf(state);
-  return deadline !== null && Date.parse(deadline.atIso) <= nowMs;
 }
 
 export function capRushMultiplayerNextSlot(state: CapRushMultiplayerState): number | null {
@@ -72,13 +66,4 @@ export function capRushMultiplayerPendingH2H(input: {
     }
   }
   return null;
-}
-
-export function capRushMultiplayerSlotAckPending(
-  season: CapRushMultiplayerSeasonState,
-  seat: CapRushMultiplayerSeatId,
-): number | null {
-  const accepted = capRushMultiplayerAcceptedThrough(season.games);
-  if (season.slotAcks[seat] >= accepted) return null;
-  return season.slotAcks[seat] + 1;
 }

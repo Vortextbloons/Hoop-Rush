@@ -165,7 +165,7 @@
       </table>
     </div>
     <p class="panel-note">
-      {totals ? 'Season totals' : 'Per-game averages'} ? {rows.length} players
+      {totals ? 'Season totals' : 'Per-game averages'} · {rows.length} players
     </p>
   {:else}<p class="panel-note">Box scores are not available on this device.</p>{/if}
 </section>

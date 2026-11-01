@@ -84,6 +84,7 @@
     {#snippet content()}
       {#if controller.broadcast}
         <CapRushBroadcast
+          art={controller.art}
           input={controller.broadcast.input}
           result={controller.broadcast.result}
           tape={controller.broadcast.tape}
@@ -205,7 +206,7 @@
               >
                 {(activeRound.endEarlySeats ?? []).includes(seat)
                   ? 'Cancel agreement'
-                  : 'End auction early'} ? {activeRound.endEarlySeats?.length ?? 0}/2
+                  : 'End auction early'} · {activeRound.endEarlySeats?.length ?? 0}/2
               </button>
             </div>
           {/if}
@@ -217,6 +218,7 @@
             busy={controller.busy}
             bidAttempt={controller.bidAttempt}
             onbid={(input) => controller.placeBid(input)}
+            oncancelbid={(round, playerId) => controller.cancelBid(round, playerId)}
             ondismissbid={() => controller.dismissBidAttempt()}
           />
         </div>

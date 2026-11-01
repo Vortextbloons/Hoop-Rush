@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Crown, Trophy } from '@lucide/svelte';
   import type {
     CapRushLeagueGame,
     CapRushMultiplayerSeatId,
@@ -7,12 +8,18 @@
   } from '@hoop-rush/data-contracts';
   import { capRushConferenceRoundName } from '@hoop-rush/data-contracts';
   import { capRushLeagueMvp, capRushMultiplayerSeatRecord } from '@hoop-rush/engine';
+  import PlayerFace from '#lib/components/PlayerFace.svelte';
   import TeamLogo from '#lib/components/TeamLogo.svelte';
   import type { CapRushArt } from '../cap-rush/cap-rush-art.js';
   import { capStatusClass, capStatusLabel, initialsOf } from '../cap-rush/cap-rush-presentation.js';
   import CapRushMultiplayerStats from './CapRushMultiplayerStats.svelte';
   import CapRushMultiplayerRoster from './CapRushMultiplayerRoster.svelte';
-  import { money, seatLabelFor, seatOrder } from './cap-rush-multiplayer-presentation.js';
+  import {
+    money,
+    seatLabelFor,
+    seatOrder,
+    teamNameOf,
+  } from './cap-rush-multiplayer-presentation.js';
 
   let {
     state,
@@ -76,27 +83,6 @@
   const championSeat = $derived.by((): CapRushMultiplayerSeatId | null => {
     return seatViews.find((detail) => detail.isChampion)?.seat ?? null;
   });
-  const personalNote = $derived.by((): string | null => {
-    const local = seatViews.find((detail) => detail.seat === localSeat) ?? null;
-    if (local === null) return null;
-    if (local.isChampion) {
-      return 'Your team won the league.';
-    }
-    if (local.outcome === null) {
-      return 'The league is complete.';
-    }
-    if (local.outcome.status === 'eliminated') {
-      return `Your run ended in the ${
-        local.outcome.round === null
-          ? 'postseason'
-          : capRushConferenceRoundName(local.outcome.round)
-      }. The league is complete.`;
-    }
-    if (local.outcome.status === 'not-qualified') {
-      return 'Your team missed the playoffs. The league is complete.';
-    }
-    return 'The league is complete without the title for your team.';
-  });
   const h2hGames = $derived.by((): CapRushLeagueGame[] => {
     if (season === null || locked === null) return [];
     const humanTeamIds = new Set([
@@ -109,14 +95,7 @@
   });
 
   function teamName(teamId: string): string {
-    if (locked === null) return teamId;
-    if (locked.seats.p1.franchise.franchiseId === teamId)
-      return locked.seats.p1.franchise.displayName;
-    if (locked.seats.p2.franchise.franchiseId === teamId)
-      return locked.seats.p2.franchise.displayName;
-    return (
-      locked.opponents.find((entry) => entry.team.teamId === teamId)?.team.displayName ?? teamId
-    );
+    return teamNameOf(locked, teamId);
   }
 
   function recordText(wins: number | null, losses: number | null): string {
@@ -166,45 +145,62 @@
           <h2 class="font-display text-3xl font-extrabold tracking-tight uppercase">
             {championName === null ? 'League complete' : `${championName} win the league`}
           </h2>
-          <p class="mt-1 text-sm text-muted-foreground">
-            {#if championName === null}
-              The league is complete.
-            {:else}
-              Champion: {championName}
-              {#if championSeat !== null}
-                · {seatLabelFor(championSeat, localSeat)}
-              {/if}
-            {/if}
-          </p>
+          {#if championSeat !== null}
+            <p class="mt-1 text-sm text-muted-foreground">
+              {seatLabelFor(championSeat, localSeat)}'s franchise
+            </p>
+          {/if}
         </div>
       </div>
-
-      {#if personalNote !== null}
-        <p
-          class="rounded-xl border border-border bg-surface-1 p-3 text-xs leading-relaxed text-muted-foreground"
-          role="status"
-        >
-          {personalNote}
-        </p>
-      {/if}
     </section>
 
     <section class="grid gap-3 sm:grid-cols-2" aria-label="League awards">
-      {#each [{ label: 'Season MVP', winner: seasonMvp }, { label: 'Finals MVP', winner: finalsMvp }] as award (award.label)}
-        <article class="rounded-2xl border border-accent/40 bg-accent/10 p-4">
-          <p class="font-mono text-xs font-bold uppercase tracking-widest text-accent">
-            {award.label}
-          </p>
+      {#each [{ label: 'MVP', winner: seasonMvp }, { label: 'Finals MVP', winner: finalsMvp }] as award (award.label)}
+        <article class="award-card" data-finals={award.label === 'Finals MVP'}>
+          <header class="award-heading">
+            <span class="award-icon" aria-hidden="true">
+              {#if award.label === 'Finals MVP'}<Trophy size={24} strokeWidth={1.7} />{:else}<Crown
+                  size={24}
+                  strokeWidth={1.7}
+                />{/if}
+            </span>
+            <div>
+              <p class="award-kicker">
+                {award.label === 'Finals MVP' ? 'The championship stage' : 'The regular season'}
+              </p>
+              <h3 class="award-title">{award.label}</h3>
+            </div>
+          </header>
           {#if award.winner !== null}
-            <h3 class="mt-2 font-display text-2xl font-extrabold uppercase">
-              {award.winner.displayName}
-            </h3>
-            <p class="text-sm text-muted-foreground">{teamName(award.winner.teamId)}</p>
-            <p class="mt-2 font-mono text-sm tabular-nums">
-              {award.winner.averagePoints.toFixed(1)} PPG ? {award.winner.averageRebounds.toFixed(
-                1,
-              )} RPG ? {award.winner.averageAssists.toFixed(1)} APG
-            </p>
+            {@const face = art?.faceForPlayerId(award.winner.playerId) ?? null}
+            <div class="award-player">
+              <div class="award-portrait">
+                {#if art !== null && face !== null}
+                  <PlayerFace
+                    player={face}
+                    manifest={art.manifest}
+                    size="xl"
+                    fallbackInitials={initialsOf(award.winner.displayName)}
+                  />
+                {:else}
+                  <span
+                    class="inline-flex h-20 w-20 items-center justify-center rounded-2xl bg-surface-3 font-display text-xl font-extrabold"
+                    aria-hidden="true">{initialsOf(award.winner.displayName)}</span
+                  >
+                {/if}
+              </div>
+              <div class="min-w-0 flex-1">
+                <h4 class="font-display text-2xl leading-tight font-extrabold uppercase">
+                  {award.winner.displayName}
+                </h4>
+                <p class="text-sm text-muted-foreground">{teamName(award.winner.teamId)}</p>
+                <p class="award-statline">
+                  {award.winner.averagePoints.toFixed(1)} PPG &middot; {award.winner.averageRebounds.toFixed(
+                    1,
+                  )} RPG &middot; {award.winner.averageAssists.toFixed(1)} APG
+                </p>
+              </div>
+            </div>
           {:else}
             <p class="mt-2 text-sm text-muted-foreground">Award data unavailable.</p>
           {/if}
@@ -355,3 +351,85 @@
     {/if}
   </div>
 {/if}
+
+<style>
+  .award-card {
+    --award-color: var(--color-primary);
+    position: relative;
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--award-color) 45%, var(--color-border));
+    border-top: 3px solid var(--award-color);
+    border-radius: 1rem;
+    padding: 1.25rem;
+    background: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--award-color) 12%, var(--color-card)),
+      var(--color-card) 75%
+    );
+  }
+  .award-card[data-finals='true'] {
+    --award-color: var(--color-accent);
+    background:
+      radial-gradient(
+        ellipse at top right,
+        color-mix(in srgb, var(--award-color) 20%, transparent),
+        transparent 70%
+      ),
+      var(--color-card);
+  }
+  .award-heading {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .award-icon {
+    display: grid;
+    place-items: center;
+    width: 3rem;
+    height: 3rem;
+    flex-shrink: 0;
+    border: 1px solid color-mix(in srgb, var(--award-color) 35%, transparent);
+    border-radius: 0.75rem;
+    background: color-mix(in srgb, var(--award-color) 12%, transparent);
+    color: var(--award-color);
+  }
+  .award-kicker {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--color-muted-foreground);
+  }
+  .award-title {
+    font-family: var(--font-display);
+    font-size: 1.8rem;
+    font-weight: 800;
+    line-height: 1.1;
+    text-transform: uppercase;
+    color: var(--award-color);
+  }
+  .award-player {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 1.25rem;
+  }
+  .award-portrait {
+    flex-shrink: 0;
+    padding: 0.3rem;
+    border-radius: 1.25rem;
+    border: 1px solid color-mix(in srgb, var(--award-color) 35%, transparent);
+    background: color-mix(in srgb, var(--award-color) 10%, transparent);
+  }
+  .award-statline {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid color-mix(in srgb, var(--award-color) 20%, transparent);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+</style>

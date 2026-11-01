@@ -207,6 +207,10 @@ export class CapRushMultiplayerSession {
     return this.send({ kind: 'simulate-range', slot, throughSlot });
   }
 
+  async cancelBid(round: number, playerId: string): Promise<CapRushMultiplayerCommandReceipt> {
+    return this.send({ kind: 'cancel-bid', round, playerId: playerIdSchema.parse(playerId) });
+  }
+
   async simulatePlayoffRound(round: number): Promise<CapRushMultiplayerCommandReceipt> {
     return this.send({ kind: 'simulate-playoff-step', round });
   }

@@ -30,6 +30,11 @@ export const capRushMultiplayerCommandPayloadSchema = z.discriminatedUnion('kind
     agree: z.boolean(),
   }),
   z.object({
+    kind: z.literal('cancel-bid'),
+    round: z.number().int().min(0).max(4),
+    playerId: playerIdSchema,
+  }),
+  z.object({
     kind: z.literal('bid'),
     round: z.number().int().min(0).max(4),
     playerId: playerIdSchema,

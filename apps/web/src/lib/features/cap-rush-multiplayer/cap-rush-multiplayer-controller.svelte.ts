@@ -233,15 +233,8 @@ export class CapRushMultiplayerController {
     });
   }
 
-  async finishBroadcast(gameId: string): Promise<void> {
-    await this.run(async () => {
-      const session = this.session;
-      const state = this.state;
-      if (session === null || state?.season === null || state?.season === undefined) return;
-      await session.ackBroadcast({ gameId, cursor: 1, total: 1, resolved: true });
-      const game = state.season.games.find((entry) => entry.gameId === gameId);
-      if (game !== undefined) await session.ackSlot(game.slot);
-    });
+  async cancelBid(round: number, playerId: string): Promise<void> {
+    await this.run(() => this.session?.cancelBid(round, playerId));
   }
 
   async choosePlayoffPlan(choice: 'sim' | 'simcast'): Promise<void> {
@@ -415,10 +408,6 @@ export class CapRushMultiplayerController {
     await this.run(() => this.session?.completeLeague());
   }
 
-  async leave(): Promise<void> {
-    await this.run(() => this.session?.leave());
-  }
-
   private async tick(): Promise<void> {
     if (this.disposed || this.busy || this.session === null) return;
     const progressed = await this.advance();
@@ -461,6 +450,16 @@ export class CapRushMultiplayerController {
       if (this.isHost && season.block.status === 'running' && this.session?.nextSlot() !== null) {
         return this.progressed(() => this.simulateNextSlot());
       }
+    }
+    if (
+      state?.phase === 'postseason' &&
+      state.postseason !== null &&
+      state.postseason.championTeamId === null &&
+      state.postseason.plans.p1 === 'sim' &&
+      state.postseason.plans.p2 === 'sim' &&
+      this.isHost
+    ) {
+      return this.progressed(() => this.simulatePlayoffStep());
     }
     await this.refreshRoom();
     return false;

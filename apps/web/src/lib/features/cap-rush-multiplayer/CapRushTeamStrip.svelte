@@ -89,7 +89,7 @@
           </dt>
           <dd
             class="shrink-0 font-mono text-[9px] font-bold tabular-nums"
-            title="Signed payroll plus the current binding lead"
+            title="Signed payroll plus your highest winning offer"
           >
             {exactMoney(summary.payrollDollars)}
           </dd>
