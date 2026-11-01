@@ -5,65 +5,60 @@
   } from '@hoop-rush/data-contracts';
   import {
     CAP_RUSH_CAP_LINE_DOLLARS,
-    CAP_RUSH_HARD_LIMIT_DOLLARS,
-    POSITIONS,
+    CAP_RUSH_MULTIPLAYER_HARD_LIMIT_DOLLARS,
   } from '@hoop-rush/data-contracts';
-  import { money, positionLabel, seatLabelFor } from './cap-rush-multiplayer-presentation.js';
+  import type { CapRushArt } from '../cap-rush/cap-rush-art.js';
+  import { capStatusClass, capStatusLabel } from '../cap-rush/cap-rush-presentation.js';
+  import CapRushMultiplayerRoster from './CapRushMultiplayerRoster.svelte';
+  import { exactMoney, money, seatPayrollSummary } from './cap-rush-multiplayer-presentation.js';
 
   let {
     state,
     seat,
     localSeat,
+    art = null,
+    highlightPlayerId = null,
   }: {
     state: CapRushMultiplayerState;
     seat: CapRushMultiplayerSeatId;
     localSeat: CapRushMultiplayerSeatId;
+    art?: CapRushArt | null;
+    highlightPlayerId?: string | null;
   } = $props();
 
-  const locked = $derived(state.locked?.seats[seat] ?? null);
-  const recruitment = $derived(state.recruitment);
-  const payroll = $derived(locked?.payrollDollars ?? recruitment?.seats[seat].payrollDollars ?? 0);
-  const filled = $derived(
-    recruitment?.seats[seat].filledPositions ?? locked?.picks.map((pick) => pick.slot) ?? [],
-  );
-  const lead = $derived(recruitment?.seats[seat].leadPlayerId ?? null);
-  const leadName = $derived(
-    lead === null
-      ? null
-      : (recruitment?.market.players.find((player) => player.playerId === lead)?.displayName ??
-          lead),
-  );
-  const signed = $derived(
-    recruitment?.signings
-      .filter((signing) => signing.seat === seat)
-      .sort(
-        (left, right) => POSITIONS.indexOf(left.position) - POSITIONS.indexOf(right.position),
-      ) ?? [],
-  );
+  const summary = $derived(seatPayrollSummary(state, seat));
   const capPercent = $derived(
-    Math.min(100, Math.round((payroll / CAP_RUSH_HARD_LIMIT_DOLLARS) * 100)),
+    Math.min(
+      100,
+      Math.round((summary.payrollDollars / CAP_RUSH_MULTIPLAYER_HARD_LIMIT_DOLLARS) * 100),
+    ),
   );
   const capLinePercent = $derived(
-    Math.round((CAP_RUSH_CAP_LINE_DOLLARS / CAP_RUSH_HARD_LIMIT_DOLLARS) * 100),
+    Math.round((CAP_RUSH_CAP_LINE_DOLLARS / CAP_RUSH_MULTIPLAYER_HARD_LIMIT_DOLLARS) * 100),
   );
-  const remaining = $derived(Math.max(0, CAP_RUSH_HARD_LIMIT_DOLLARS - payroll));
 </script>
 
-<section
-  class="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4
-    {seat === localSeat ? 'border-primary/40' : ''}"
->
-  <header class="flex items-baseline justify-between gap-2">
-    <h3 class="font-display text-lg font-bold uppercase tracking-tight">
-      {seatLabelFor(seat, localSeat)}
-    </h3>
-    <span class="font-mono text-xs text-muted-foreground tabular-nums">
-      {money(payroll)} payroll
+<section class="flex min-w-0 flex-col gap-2.5 rounded-2xl border border-border bg-card p-3">
+  <header class="flex items-start justify-between gap-2">
+    <div class="min-w-0">
+      <p class="font-mono text-[9px] tracking-[0.14em] text-muted-foreground uppercase">
+        Signed payroll
+      </p>
+      <p class="font-display text-xl font-extrabold tracking-tight tabular-nums">
+        {money(summary.signedPayrollDollars)}
+      </p>
+    </div>
+    <span
+      class="inline-flex shrink-0 rounded-full border px-1.5 py-0.5 text-right font-mono text-[9px] leading-tight font-bold tracking-[0.04em] uppercase {capStatusClass(
+        summary.status,
+      )}"
+    >
+      {capStatusLabel(summary.status)}
     </span>
   </header>
 
   <div class="flex flex-col gap-1">
-    <div class="relative h-2.5 overflow-hidden rounded-full bg-surface-2">
+    <div class="relative h-2 overflow-hidden rounded-full bg-surface-2">
       <div class="h-full bg-primary" style:width={`${capPercent}%`}></div>
       <span
         class="absolute inset-y-0 w-px bg-foreground/40"
@@ -71,35 +66,41 @@
         aria-hidden="true"
       ></span>
     </div>
-    <div class="flex justify-between text-[10px] text-muted-foreground">
+    <p class="flex justify-between gap-2 font-mono text-[9px] text-muted-foreground tabular-nums">
       <span>Cap {money(CAP_RUSH_CAP_LINE_DOLLARS)}</span>
-      <span>{money(remaining)} left</span>
-    </div>
+      <span>Limit {money(CAP_RUSH_MULTIPLAYER_HARD_LIMIT_DOLLARS)}</span>
+    </p>
   </div>
 
-  {#if leadName !== null}
-    <p class="rounded-lg border border-accent/40 bg-accent/10 px-2 py-1.5 text-xs">
-      Leading <span class="font-semibold">{leadName}</span>
-    </p>
+  {#if summary.bindingBidDollars !== null}
+    <div class="rounded-lg border border-accent/40 bg-accent/10 px-2 py-1.5">
+      <p class="font-mono text-[9px] font-bold tracking-[0.12em] text-accent uppercase">
+        Binding lead · not signed yet
+      </p>
+      <p class="mt-0.5 flex flex-wrap items-baseline justify-between gap-x-2 text-xs">
+        <span class="min-w-0 truncate font-semibold">
+          {summary.bindingPlayerName ?? 'Winning bid'}
+        </span>
+        <span class="shrink-0 font-mono font-semibold tabular-nums"
+          >{exactMoney(summary.bindingBidDollars)}</span
+        >
+      </p>
+      <p class="mt-0.5 text-[10px] leading-snug text-muted-foreground">
+        Charged only if the auction closes with your bid.
+      </p>
+    </div>
   {/if}
 
-  <ul class="flex flex-col gap-1.5">
-    {#each POSITIONS as position (position)}
-      {@const signing = signed.find((entry) => entry.position === position)}
-      {@const isFilled = filled.includes(position)}
-      <li class="flex items-center justify-between gap-2 text-xs">
-        <span class="flex items-center gap-2">
-          <span class="w-7 font-mono text-[10px] font-bold text-muted-foreground">{position}</span>
-          <span class="truncate" class:text-muted-foreground={!isFilled}>
-            {signing?.displayName ?? 'Open'}
-          </span>
-        </span>
-        {#if signing}
-          <span class="font-mono text-[10px] tabular-nums">{money(signing.salaryDollars)}</span>
-        {:else}
-          <span class="text-[10px] text-muted-foreground">{positionLabel(position)}</span>
-        {/if}
-      </li>
-    {/each}
-  </ul>
+  <dl class="flex flex-col gap-1 rounded-lg bg-surface-1 px-2 py-1.5 font-mono text-[10px]">
+    <div class="flex items-baseline justify-between gap-2">
+      <dt class="text-muted-foreground">Total commitments</dt>
+      <dd class="font-semibold tabular-nums">{money(summary.payrollDollars)}</dd>
+    </div>
+    <div class="flex items-baseline justify-between gap-2">
+      <dt class="text-muted-foreground">Remaining to limit</dt>
+      <dd class="font-semibold tabular-nums">{money(summary.headroomDollars)}</dd>
+    </div>
+  </dl>
+
+  <CapRushMultiplayerRoster {state} {seat} {localSeat} {art} {highlightPlayerId} compact />
 </section>

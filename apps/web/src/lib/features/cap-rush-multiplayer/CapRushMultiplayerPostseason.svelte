@@ -1,0 +1,479 @@
+<script lang="ts">
+  import type {
+    CapRushConferenceSeries,
+    CapRushMultiplayerSeatId,
+    CapRushMultiplayerState,
+    CapRushPostseasonUserOutcome,
+  } from '@hoop-rush/data-contracts';
+  import {
+    capRushConferenceRoundName,
+    capRushConferenceStandingsEntries,
+  } from '@hoop-rush/data-contracts';
+  import {
+    capRushMultiplayerCurrentRound,
+    capRushSeriesWins,
+    capRushSeriesWinner,
+  } from '@hoop-rush/engine';
+  import TeamLogo from '#lib/components/TeamLogo.svelte';
+  import type { CapRushArt } from '../cap-rush/cap-rush-art.js';
+  import { initialsOf } from '../cap-rush/cap-rush-presentation.js';
+  import CapRushBracket from '../cap-rush/CapRushBracket.svelte';
+  import { seatLabelFor, seatOrder } from './cap-rush-multiplayer-presentation.js';
+
+  let {
+    state,
+    localSeat,
+    art = null,
+    busy = false,
+    ishost,
+    onchooseplan,
+    onsimulatestep,
+    onwatchplayoff,
+    oncomplete,
+  }: {
+    state: CapRushMultiplayerState;
+    localSeat: CapRushMultiplayerSeatId;
+    art?: CapRushArt | null;
+    busy?: boolean;
+    ishost: boolean;
+    onchooseplan: (choice: 'sim' | 'simcast') => void;
+    onsimulatestep: () => void;
+    onwatchplayoff: () => void;
+    oncomplete: () => void;
+  } = $props();
+
+  const postseason = $derived(state.postseason);
+  const locked = $derived(state.locked);
+  const orderedSeats = $derived(seatOrder(localSeat));
+  const otherSeat = $derived(localSeat === 'p1' ? ('p2' as const) : ('p1' as const));
+  const localTeamId = $derived(
+    locked === null ? null : locked.seats[localSeat].franchise.franchiseId,
+  );
+  const otherSeatTeamId = $derived(
+    locked === null ? null : locked.seats[otherSeat].franchise.franchiseId,
+  );
+  const standings = $derived(postseason?.standings ?? null);
+  const championTeamId = $derived(postseason?.championTeamId ?? null);
+  const championName = $derived(championTeamId === null ? null : teamName(championTeamId));
+  const championTeam = $derived(
+    championTeamId === null || art === null ? null : art.teamFor(championTeamId),
+  );
+  const currentRound = $derived(
+    postseason === null ? 1 : capRushMultiplayerCurrentRound(postseason),
+  );
+  const localPlan = $derived(postseason?.plans[localSeat] ?? null);
+  const otherPlan = $derived(postseason?.plans[otherSeat] ?? null);
+  const bothPlans = $derived(localPlan !== null && otherPlan !== null);
+  const hasOpenSeries = $derived(
+    postseason !== null && postseason.series.some((series) => capRushSeriesWinner(series) === null),
+  );
+  const championSeat = $derived.by((): CapRushMultiplayerSeatId | null => {
+    if (locked === null || championTeamId === null) return null;
+    for (const seat of orderedSeats) {
+      if (locked.seats[seat].franchise.franchiseId === championTeamId) return seat;
+    }
+    return null;
+  });
+  const localOutcome = $derived(postseason?.outcomes[localSeat] ?? null);
+  const seatDetails = $derived.by(() => {
+    if (postseason === null || locked === null) return [];
+    return orderedSeats.map((seat) => {
+      const teamId = locked.seats[seat].franchise.franchiseId;
+      const series = latestSeriesOf(teamId);
+      return {
+        seat,
+        teamId,
+        name: locked.seats[seat].franchise.displayName,
+        seed: seedOf(teamId),
+        outcome: postseason.outcomes[seat],
+        seriesLine: series === null ? null : seriesLine(series, teamId),
+      };
+    });
+  });
+  const completedSeries = $derived.by((): CapRushConferenceSeries[] => {
+    if (postseason === null) return [];
+    return postseason.series
+      .filter((series) => capRushSeriesWinner(series) !== null)
+      .sort((left, right) => left.round - right.round || left.seriesSlot - right.seriesSlot);
+  });
+  const personalNote = $derived.by((): string | null => {
+    if (postseason === null || localOutcome === null) return null;
+    if (championTeamId === null) {
+      if (standings === null) {
+        return 'The bracket has not opened yet. Both seats wait for the room to accept the final standings.';
+      }
+      if (localOutcome.status === 'eliminated') {
+        return `Your run ends here${
+          localOutcome.round === null
+            ? ''
+            : ` in the ${capRushConferenceRoundName(localOutcome.round)}`
+        }. The bracket continues without your team; both seats still choose each round so the host can simulate the next step.`;
+      }
+      if (localOutcome.status === 'not-qualified') {
+        return 'Your team missed the playoffs. The bracket continues without your team; both seats still choose each round so the host can simulate the next step.';
+      }
+      return 'Your team is still alive in the bracket. Both seats choose a round plan before the host simulates the step.';
+    }
+    if (championSeat === localSeat) {
+      return 'Your team won the league. The shared postseason is complete.';
+    }
+    if (localOutcome.status === 'eliminated') {
+      return `Your run ended in the ${
+        localOutcome.round === null ? 'postseason' : capRushConferenceRoundName(localOutcome.round)
+      }. The league is complete.`;
+    }
+    if (localOutcome.status === 'not-qualified') {
+      return 'Your team missed the playoffs. The league is complete.';
+    }
+    return 'The league is complete without the title for your team.';
+  });
+
+  function teamName(teamId: string): string {
+    if (locked === null) return teamId;
+    if (locked.seats.p1.franchise.franchiseId === teamId)
+      return locked.seats.p1.franchise.displayName;
+    if (locked.seats.p2.franchise.franchiseId === teamId)
+      return locked.seats.p2.franchise.displayName;
+    return (
+      locked.opponents.find((entry) => entry.team.teamId === teamId)?.team.displayName ?? teamId
+    );
+  }
+
+  function seedOf(teamId: string): number | null {
+    if (standings === null) return null;
+    return (
+      capRushConferenceStandingsEntries(standings).find((entry) => entry.teamId === teamId)?.seed ??
+      null
+    );
+  }
+
+  function latestSeriesOf(teamId: string): CapRushConferenceSeries | null {
+    if (postseason === null) return null;
+    return (
+      postseason.series
+        .filter((series) => series.highTeamId === teamId || series.lowTeamId === teamId)
+        .sort((left, right) => right.round - left.round || right.seriesSlot - left.seriesSlot)[0] ??
+      null
+    );
+  }
+
+  function seriesLine(series: CapRushConferenceSeries, teamId: string): string {
+    const opponentId = series.highTeamId === teamId ? series.lowTeamId : series.highTeamId;
+    const ownWins = capRushSeriesWins(series, teamId);
+    const opponentWins = capRushSeriesWins(series, opponentId);
+    const winner = capRushSeriesWinner(series);
+    const status =
+      winner === null
+        ? series.games.length === 0
+          ? 'Not started'
+          : 'In progress'
+        : winner === teamId
+          ? 'Won'
+          : 'Lost';
+    return `${capRushConferenceRoundName(series.round)} vs ${teamName(opponentId)} · ${status} ${ownWins}–${opponentWins}`;
+  }
+
+  function outcomeLabel(outcome: CapRushPostseasonUserOutcome): string {
+    switch (outcome.status) {
+      case 'champion':
+        return 'League champion';
+      case 'eliminated':
+        return outcome.round === null
+          ? 'Eliminated'
+          : `Eliminated in the ${capRushConferenceRoundName(outcome.round)}`;
+      case 'not-qualified':
+        return 'Missed the playoffs';
+      default:
+        return 'Still playing';
+    }
+  }
+</script>
+
+{#if postseason === null || locked === null}
+  <p class="text-sm text-muted-foreground">The postseason has not started.</p>
+{:else}
+  <div class="flex min-w-0 flex-col gap-4" data-cap-rush-multiplayer-postseason>
+    <section class="flex min-w-0 flex-col gap-3 rounded-2xl border border-border bg-card p-4">
+      <header class="flex flex-wrap items-end justify-between gap-2">
+        <div class="min-w-0">
+          <p class="font-mono text-[10px] tracking-[0.16em] text-muted-foreground uppercase">
+            Postseason · {championTeamId === null ? `round ${currentRound} of 4` : 'complete'}
+          </p>
+          <h2 class="font-display text-2xl font-extrabold tracking-tight uppercase">
+            {championTeamId === null
+              ? capRushConferenceRoundName(currentRound)
+              : 'Champion crowned'}
+          </h2>
+        </div>
+        <p class="max-w-full text-xs text-muted-foreground">
+          Only the host simulates playoff steps. Both seats resolve their own playback.
+        </p>
+      </header>
+
+      <ul class="grid min-w-0 gap-2 sm:grid-cols-2">
+        {#each seatDetails as detail (detail.seat)}
+          {@const team = art === null ? null : art.teamFor(detail.teamId)}
+          <li
+            class="flex min-w-0 flex-col gap-1 rounded-xl border bg-surface-2 p-3 {detail.seat ===
+            localSeat
+              ? 'border-primary/40'
+              : 'border-border'}"
+            data-seat={detail.seat}
+          >
+            <div class="flex min-w-0 items-center gap-2">
+              {#if team !== null && art !== null}
+                <TeamLogo
+                  manifest={art.manifest}
+                  franchiseId={team.franchiseId}
+                  teamExternalId={team.teamExternalId}
+                  className="h-5 w-5"
+                />
+              {:else}
+                <span
+                  class="grid h-5 w-5 shrink-0 place-items-center rounded bg-surface-3 font-display text-[9px] font-extrabold text-muted-foreground"
+                  aria-hidden="true">{initialsOf(detail.name)}</span
+                >
+              {/if}
+              <div class="min-w-0 flex-1">
+                <p
+                  class="font-mono text-[9px] font-semibold tracking-[0.12em] text-muted-foreground uppercase"
+                >
+                  {seatLabelFor(detail.seat, localSeat)}
+                </p>
+                <p class="truncate font-display text-base leading-tight font-extrabold uppercase">
+                  {detail.name}
+                </p>
+              </div>
+              {#if detail.seed !== null}
+                <span
+                  class="shrink-0 rounded-full border border-line-strong px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase"
+                  >Seed {detail.seed}</span
+                >
+              {/if}
+            </div>
+            <p class="text-xs font-semibold">{outcomeLabel(detail.outcome)}</p>
+            <p class="min-w-0 truncate text-[11px] text-muted-foreground">
+              {detail.seriesLine ?? 'No bracket series yet.'}
+            </p>
+          </li>
+        {/each}
+      </ul>
+
+      {#if personalNote !== null}
+        <p
+          class="rounded-xl border p-3 text-xs leading-relaxed {championSeat === localSeat
+            ? 'border-accent/50 bg-accent/10 text-foreground'
+            : 'border-border bg-surface-1 text-muted-foreground'}"
+          role="status"
+        >
+          {personalNote}
+        </p>
+      {/if}
+    </section>
+
+    {#if standings === null}
+      <section class="rounded-2xl border border-border bg-card p-4">
+        <p class="font-mono text-[10px] tracking-[0.16em] text-muted-foreground uppercase">
+          Bracket
+        </p>
+        <h2 class="font-display text-2xl font-extrabold tracking-tight uppercase">
+          Waiting for final standings
+        </h2>
+        <p class="mt-1 text-sm text-muted-foreground">
+          The playoff bracket opens once the room has accepted the final shared standings.
+        </p>
+      </section>
+    {:else}
+      <section class="flex min-w-0 flex-col gap-3 rounded-2xl border border-border bg-card p-4">
+        <header>
+          <p class="font-mono text-[10px] tracking-[0.16em] text-muted-foreground uppercase">
+            Round plan
+          </p>
+          <h2 class="font-display text-2xl font-extrabold tracking-tight uppercase">
+            {championTeamId === null
+              ? `${capRushConferenceRoundName(currentRound)}`
+              : 'League complete'}
+          </h2>
+          <p class="mt-1 text-xs leading-relaxed text-muted-foreground">
+            {championTeamId === null
+              ? 'Both seats choose a plan each round. The host runs the step; both seats then resolve their own playback.'
+              : 'The Finals are finished. Both seats can accept the shared final report.'}
+          </p>
+        </header>
+
+        {#if championTeamId === null}
+          <ul class="grid min-w-0 gap-2 sm:grid-cols-2">
+            {#each orderedSeats as seat (seat)}
+              {@const plan = postseason.plans[seat]}
+              <li
+                class="min-w-0 rounded-xl border bg-surface-2 p-3 {seat === localSeat
+                  ? 'border-primary/40'
+                  : 'border-border'}"
+                data-seat={seat}
+              >
+                <p
+                  class="font-mono text-[10px] font-semibold tracking-[0.12em] text-muted-foreground uppercase"
+                >
+                  {seatLabelFor(seat, localSeat)}
+                </p>
+                <p class="mt-1 truncate font-display text-lg font-bold tracking-tight uppercase">
+                  {plan === null ? 'Choosing…' : plan === 'sim' ? 'Sim' : 'Simcast'}
+                </p>
+              </li>
+            {/each}
+          </ul>
+
+          <div class="flex flex-wrap gap-2">
+            <button
+              type="button"
+              class="inline-flex min-h-11 items-center justify-center rounded-xl border border-primary/50 bg-primary/10 px-4 text-sm font-bold text-primary outline-none
+                focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
+              disabled={busy || localPlan !== null}
+              onclick={() => onchooseplan('sim')}
+            >
+              Sim round {currentRound}
+            </button>
+            <button
+              type="button"
+              class="inline-flex min-h-11 items-center justify-center rounded-xl border border-border bg-surface-2 px-4 text-sm font-semibold outline-none
+                focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
+              disabled={busy || localPlan !== null}
+              onclick={() => onchooseplan('simcast')}
+            >
+              Simcast round {currentRound}
+            </button>
+            <button
+              type="button"
+              class="inline-flex min-h-11 items-center justify-center rounded-xl border border-border bg-surface-2 px-4 text-sm font-semibold outline-none
+                focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
+              disabled={busy || !hasOpenSeries}
+              onclick={onwatchplayoff}
+            >
+              Watch playoff game
+            </button>
+            {#if ishost}
+              <button
+                type="button"
+                class="inline-flex min-h-11 items-center justify-center rounded-xl border border-primary/50 bg-primary/10 px-4 text-sm font-bold text-primary outline-none
+                  focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
+                disabled={busy || !bothPlans}
+                onclick={onsimulatestep}
+              >
+                Sim playoff step
+              </button>
+            {/if}
+          </div>
+
+          <p class="text-xs leading-relaxed text-muted-foreground">
+            {#if localPlan === null}
+              Choose Sim or Simcast for round {currentRound}. Both plans are required before the
+              step can run.
+            {:else if !bothPlans}
+              Waiting for {seatLabelFor(otherSeat, localSeat)} to choose round {currentRound}.
+            {:else if ishost}
+              Both plans are in. Simulate the next playoff step when ready.
+            {:else}
+              Waiting for the host to simulate the next playoff step. Both seats resolve their own
+              playback afterward.
+            {/if}
+          </p>
+        {:else}
+          <div
+            class="flex min-w-0 flex-col gap-2 rounded-xl border border-accent/50 bg-accent/10 p-3"
+          >
+            <div class="flex min-w-0 items-center gap-2">
+              {#if championTeam !== null && art !== null}
+                <TeamLogo
+                  manifest={art.manifest}
+                  franchiseId={championTeam.franchiseId}
+                  teamExternalId={championTeam.teamExternalId}
+                  className="h-6 w-6"
+                />
+              {/if}
+              <p class="min-w-0 font-display text-xl font-extrabold tracking-tight uppercase">
+                {championName} won the league
+              </p>
+            </div>
+            {#if championSeat !== null}
+              <p class="font-mono text-[10px] tracking-[0.12em] text-accent uppercase">
+                {seatLabelFor(championSeat, localSeat)}'s franchise
+              </p>
+            {/if}
+            <button
+              type="button"
+              class="inline-flex min-h-11 w-fit items-center justify-center rounded-xl border border-primary/50 bg-primary/10 px-4 text-sm font-bold text-primary outline-none
+                focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
+              disabled={busy}
+              onclick={oncomplete}
+            >
+              Accept final report
+            </button>
+            <p class="text-[11px] leading-relaxed text-muted-foreground">
+              Either seat can accept the shared report. It opens the final results for both.
+            </p>
+          </div>
+        {/if}
+      </section>
+
+      <CapRushBracket
+        series={postseason.series}
+        {standings}
+        manifest={art?.manifest ?? null}
+        userTeamId={localTeamId}
+      />
+
+      <section class="flex min-w-0 flex-col gap-2 rounded-2xl border border-border bg-card p-4">
+        <header>
+          <p class="font-mono text-[10px] tracking-[0.16em] text-muted-foreground uppercase">
+            Bracket results
+          </p>
+          <h2 class="font-display text-2xl font-extrabold tracking-tight uppercase">
+            Completed series
+          </h2>
+          <p class="mt-1 text-xs text-muted-foreground">
+            Scores are recorded series wins. Your team and the other seat are outlined.
+          </p>
+        </header>
+        {#if completedSeries.length === 0}
+          <p class="text-xs text-muted-foreground">No series has finished yet.</p>
+        {:else}
+          <ul class="grid min-w-0 gap-1.5 sm:grid-cols-2">
+            {#each completedSeries as series (series.seriesId)}
+              {@const highWins = capRushSeriesWins(series, series.highTeamId)}
+              {@const lowWins = capRushSeriesWins(series, series.lowTeamId)}
+              {@const winnerTeamId = capRushSeriesWinner(series)}
+              {@const involvesLocal =
+                localTeamId !== null &&
+                (series.highTeamId === localTeamId || series.lowTeamId === localTeamId)}
+              {@const involvesOther =
+                otherSeatTeamId !== null &&
+                (series.highTeamId === otherSeatTeamId || series.lowTeamId === otherSeatTeamId)}
+              <li
+                class="flex min-w-0 items-center justify-between gap-2 rounded-lg border bg-surface-1 px-2 py-1.5 {involvesLocal
+                  ? 'border-primary/40'
+                  : involvesOther
+                    ? 'border-accent/40'
+                    : 'border-border'}"
+              >
+                <div class="min-w-0">
+                  <p class="font-mono text-[9px] tracking-[0.08em] text-muted-foreground uppercase">
+                    {capRushConferenceRoundName(series.round)}
+                  </p>
+                  <p class="truncate text-xs">
+                    {teamName(series.highTeamId)} vs {teamName(series.lowTeamId)}
+                  </p>
+                </div>
+                <div class="shrink-0 text-right">
+                  <p class="font-mono text-xs font-semibold tabular-nums">{highWins}–{lowWins}</p>
+                  <p class="max-w-[9rem] truncate text-[9px] text-muted-foreground">
+                    {winnerTeamId === null ? '' : `${teamName(winnerTeamId)} won`}
+                  </p>
+                </div>
+              </li>
+            {/each}
+          </ul>
+        {/if}
+      </section>
+    {/if}
+  </div>
+{/if}

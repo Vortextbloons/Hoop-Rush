@@ -1,5 +1,6 @@
 import type {
   CapRushLeagueScheduleEntry,
+  CapRushMultiplayerPhase,
   CapRushMultiplayerSeatId,
   CapRushMultiplayerState,
   CapRushPlayoffGamePlan,
@@ -13,7 +14,9 @@ import {
 } from '@hoop-rush/application/cap-rush-multiplayer';
 import { capRushMultiplayerCurrentRound, capRushMultiplayerPlayoffPlans } from '@hoop-rush/engine';
 import { newSeasonId } from '#lib/ids.js';
+import { loadCapRushArt, type CapRushArt } from '../cap-rush/cap-rush-art.js';
 import { getCapRushMultiplayerData } from './cap-rush-multiplayer-assets.js';
+import { commandErrorLabel, type CapRushBidAttempt } from './cap-rush-multiplayer-presentation.js';
 import { getCapRushMultiplayerTransport } from './cap-rush-multiplayer-transport.js';
 import { CapRushMultiplayerRunner } from './cap-rush-multiplayer-runner.js';
 
@@ -22,12 +25,14 @@ const POLL_MS = 1_000;
 export interface CapRushBroadcastState {
   readonly gameId: string;
   readonly speed: 2 | 4;
-  readonly kind: 'h2h' | 'season-simcast' | 'playoff';
+  readonly kind: 'h2h' | 'season-simcast' | 'playoff' | 'review';
   readonly slot: number | null;
   readonly input: HavocBattleInput;
   readonly result: HavocBattleResult;
   readonly tape: HavocBattleTape;
 }
+
+export type { CapRushBidAttempt };
 
 export class CapRushMultiplayerController {
   view = $state.raw<CapRushMultiplayerSessionView | null>(null);
@@ -35,6 +40,9 @@ export class CapRushMultiplayerController {
   error = $state<string | null>(null);
   nowMs = $state(Date.now());
   loading = $state(true);
+  art = $state.raw<CapRushArt | null>(null);
+  bidAttempt = $state.raw<CapRushBidAttempt | null>(null);
+  franchiseReveal = $state(false);
   broadcast = $state.raw<CapRushBroadcastState | null>(null);
   broadcastLoading = $state(false);
 
@@ -43,6 +51,8 @@ export class CapRushMultiplayerController {
   private timer: ReturnType<typeof setInterval> | null = null;
   private disposed = false;
   private roomId: string;
+  private lastPhase: CapRushMultiplayerPhase | null = null;
+  private suppressedError: string | null = null;
 
   constructor(roomId: string) {
     this.roomId = roomId;
@@ -66,6 +76,13 @@ export class CapRushMultiplayerController {
     try {
       const data = await getCapRushMultiplayerData();
       if (this.isDisposed()) return;
+      void loadCapRushArt()
+        .then((art) => {
+          if (!this.isDisposed()) this.art = art;
+        })
+        .catch(() => {
+          // Presentation art is optional; the room still runs without it.
+        });
       const transport = getCapRushMultiplayerTransport();
       const membership = await transport.resume(this.roomId);
       if (this.isDisposed()) return;
@@ -80,6 +97,8 @@ export class CapRushMultiplayerController {
         this.sync();
       });
       await this.session.attach();
+      if (this.isDisposed()) return;
+      this.sync();
     } catch (error) {
       if (this.isDisposed()) return;
       this.error = error instanceof Error ? error.message : 'Could not open the room.';
@@ -114,11 +133,36 @@ export class CapRushMultiplayerController {
     await this.run(() => this.session?.start());
   }
 
-  async bid(playerId: string, totalDollars: number): Promise<void> {
-    const state = this.state;
-    const round = state?.recruitment ? state.recruitment.roundIndex : null;
-    if (round === null) return;
-    await this.run(() => this.session?.bid(round, playerId, totalDollars));
+  async placeBid(input: {
+    readonly round: number;
+    readonly playerId: string;
+    readonly totalDollars: number;
+  }): Promise<boolean> {
+    if (this.busy || this.isDisposed() || this.session === null) return false;
+    this.suppressedError = null;
+    this.bidAttempt = { ...input, state: 'pending', code: null };
+    this.busy = true;
+    this.error = null;
+    try {
+      const receipt = await this.session.bid(input.round, input.playerId, input.totalDollars);
+      if (receipt.accepted) {
+        this.bidAttempt = null;
+        return true;
+      }
+      this.bidAttempt = { ...input, state: 'rejected', code: receipt.rejectionCode };
+      return false;
+    } catch (error) {
+      this.bidAttempt = { ...input, state: 'rejected', code: 'connection' };
+      if (!this.isDisposed()) {
+        this.error = error instanceof Error ? error.message : 'Could not place the bid. Try again.';
+      }
+      return false;
+    } finally {
+      if (!this.isDisposed()) {
+        this.busy = false;
+        this.sync();
+      }
+    }
   }
 
   async chooseBlock(choice: 'sim' | 'simcast'): Promise<void> {
@@ -237,6 +281,14 @@ export class CapRushMultiplayerController {
     });
   }
 
+  async reviewGame(gameId: string): Promise<void> {
+    const state = this.state;
+    const entry = state?.locked?.leagueSchedule.find((candidate) => candidate.gameId === gameId);
+    const game = state?.season?.games.find((candidate) => candidate.gameId === gameId);
+    if (entry === undefined || game === undefined) return;
+    await this.loadTape({ gameId, kind: 'review', speed: 4, entry });
+  }
+
   async watchOwnGame(): Promise<void> {
     const state = this.state;
     const locked = state?.locked;
@@ -283,6 +335,10 @@ export class CapRushMultiplayerController {
   async completeBroadcast(): Promise<void> {
     const broadcast = this.broadcast;
     if (broadcast === null) return;
+    if (broadcast.kind === 'review') {
+      this.broadcast = null;
+      return;
+    }
     const total = broadcast.tape.events.length + broadcast.tape.scoring.length;
     await this.run(async () => {
       const session = this.session;
@@ -313,6 +369,12 @@ export class CapRushMultiplayerController {
 
   closeBroadcast(): void {
     this.broadcast = null;
+  }
+
+  dismissBidAttempt(): void {
+    this.suppressedError = this.session?.error ?? null;
+    this.bidAttempt = null;
+    this.error = null;
   }
 
   private async loadTape(input: {
@@ -387,6 +449,8 @@ export class CapRushMultiplayerController {
   private async run(action: () => Promise<unknown> | undefined): Promise<void> {
     if (this.busy || this.isDisposed()) return;
     this.busy = true;
+    this.bidAttempt = null;
+    this.suppressedError = null;
     this.error = null;
     try {
       await action();
@@ -404,6 +468,18 @@ export class CapRushMultiplayerController {
   private sync(): void {
     if (this.disposed) return;
     this.view = this.session?.view() ?? null;
-    if (this.view?.error) this.error = this.view.error;
+    const phase = this.view?.state.phase ?? null;
+    if (phase !== null) {
+      if (phase === 'recruiting' && this.lastPhase === 'lobby') this.franchiseReveal = true;
+      else if (phase !== 'recruiting') this.franchiseReveal = false;
+      this.lastPhase = phase;
+    }
+    const viewError = this.view?.error ?? null;
+    if (viewError === null) return;
+    if (this.bidAttempt !== null || viewError === this.suppressedError) {
+      this.error = null;
+      return;
+    }
+    this.error = commandErrorLabel(viewError);
   }
 }

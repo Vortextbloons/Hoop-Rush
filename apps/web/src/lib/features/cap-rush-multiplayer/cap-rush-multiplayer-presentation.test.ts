@@ -2,13 +2,26 @@ import { describe, expect, test } from 'bun:test';
 import type {
   CapRushMultiplayerAuction,
   CapRushMultiplayerMarketPlayer,
+  CapRushMultiplayerRecruitment,
+  CapRushMultiplayerRound,
+  CapRushMultiplayerSeatRecruitment,
+  CapRushMultiplayerSigning,
+  CapRushMultiplayerState,
 } from '@hoop-rush/data-contracts';
 import {
+  bidProjection,
+  bidQuickChoices,
+  bidRejectionNotice,
   capRushMultiplayerAcceptedAt,
   clockLabel,
+  commandErrorLabel,
+  exactMoney,
   lotState,
+  marketPools,
   nextMinimumBid,
+  parseBidDollars,
   remainingMs,
+  seatPayrollSummary,
 } from './cap-rush-multiplayer-presentation.js';
 
 const player = {
@@ -39,7 +52,11 @@ const player = {
   },
 } as unknown as CapRushMultiplayerMarketPlayer;
 
-function auction(overrides: Partial<CapRushMultiplayerAuction> = {}): CapRushMultiplayerAuction {
+type AuctionOverrides = Partial<Omit<CapRushMultiplayerAuction, 'playerId'>> & {
+  playerId?: string;
+};
+
+function auction(overrides: AuctionOverrides = {}): CapRushMultiplayerAuction {
   return {
     playerId: 'p-1',
     position: 'SG',
@@ -52,6 +69,65 @@ function auction(overrides: Partial<CapRushMultiplayerAuction> = {}): CapRushMul
     winningBidDollars: null,
     ...overrides,
   } as unknown as CapRushMultiplayerAuction;
+}
+
+const pointGuard = {
+  ...player,
+  playerId: 'p-pg',
+  playerVersionId: 'v-pg',
+  displayName: 'Test Point',
+  position: 'PG',
+  bucket: 'strong',
+  minimumBidDollars: 8_000_000,
+} as unknown as CapRushMultiplayerMarketPlayer;
+
+function round(
+  index: number,
+  position: CapRushMultiplayerRound['position'],
+  auctions: CapRushMultiplayerAuction[],
+  status: CapRushMultiplayerRound['status'] = 'bidding',
+): CapRushMultiplayerRound {
+  return {
+    index,
+    position,
+    status,
+    auctions,
+    closedAtIso: status === 'complete' ? '2026-11-01T00:02:00.000Z' : null,
+  };
+}
+
+const emptySeat = (seat: 'p1' | 'p2'): CapRushMultiplayerSeatRecruitment => ({
+  seat,
+  filledPositions: [],
+  leadPlayerId: null,
+  payrollDollars: 0,
+});
+
+type RecruitmentOverrides = Partial<
+  Omit<CapRushMultiplayerRecruitment, 'market' | 'seats' | 'rounds'>
+> & {
+  market?: unknown;
+  seats?: unknown;
+  rounds?: CapRushMultiplayerRound[];
+};
+
+function recruitment(overrides: RecruitmentOverrides = {}): CapRushMultiplayerRecruitment {
+  return {
+    schemaVersion: 1,
+    market: { players: [player, pointGuard] },
+    roundIndex: 0,
+    rounds: [round(0, 'SG', [auction()])],
+    signings: [],
+    seats: { p1: emptySeat('p1'), p2: emptySeat('p2') },
+    ...overrides,
+  } as unknown as CapRushMultiplayerRecruitment;
+}
+
+function stateOf(
+  value: CapRushMultiplayerRecruitment | null,
+  locked: CapRushMultiplayerState['locked'] = null,
+): CapRushMultiplayerState {
+  return { recruitment: value, locked } as unknown as CapRushMultiplayerState;
 }
 
 describe('cap rush multiplayer presentation', () => {
@@ -103,5 +179,182 @@ describe('cap rush multiplayer presentation', () => {
     expect(
       lotState(auction({ status: 'closed', leaderSeat: null, leaderBidDollars: null }), 'p1'),
     ).toBe('unsold');
+  });
+});
+
+describe('cap rush multiplayer bidding presentation', () => {
+  test('formats submitted totals exactly', () => {
+    expect(exactMoney(13_123_456)).toBe('$13,123,456');
+    expect(exactMoney(-1_500_000)).toBe('-$1,500,000');
+    expect(exactMoney(100_000)).toBe('$100,000');
+  });
+
+  test('parses only whole-dollar totals', () => {
+    expect(parseBidDollars('13,123,456')).toBe(13_123_456);
+    expect(parseBidDollars('$ 13 123 456')).toBe(13_123_456);
+    expect(parseBidDollars('')).toBeNull();
+    expect(parseBidDollars('13.5M')).toBeNull();
+    expect(parseBidDollars('12.5')).toBeNull();
+    expect(parseBidDollars('-12')).toBeNull();
+    expect(parseBidDollars('abc')).toBeNull();
+  });
+
+  test('offers unique quick totals anchored to the current offer', () => {
+    const unopened = bidQuickChoices(auction(), player);
+    expect(unopened.map((choice) => choice.totalDollars)).toEqual([
+      12_075_000, 12_175_000, 12_575_000, 13_075_000,
+    ]);
+
+    const opened = bidQuickChoices(
+      auction({ leaderSeat: 'p2', leaderBidDollars: 13_000_000 }),
+      player,
+    );
+    expect(opened.map((choice) => choice.totalDollars)).toEqual([
+      13_100_000, 13_500_000, 14_000_000,
+    ]);
+    expect(opened.map((choice) => choice.hint)).toEqual(['Next bid', '+$500K', '+$1M']);
+  });
+
+  test('keeps signed payroll separate from a binding lead', () => {
+    const signing = {
+      seat: 'p1',
+      position: 'PG',
+      playerId: 'p-pg',
+      playerVersionId: 'v-pg',
+      displayName: 'Test Point',
+      salaryDollars: 40_000_000,
+      source: 'bid',
+    } as unknown as CapRushMultiplayerSigning;
+    const activeAuction = auction({
+      playerId: 'p-1',
+      leaderSeat: 'p1',
+      leaderBidDollars: 12_000_000,
+    });
+    const value = recruitment({
+      roundIndex: 1,
+      rounds: [
+        round(0, 'PG', [auction({ playerId: 'p-pg' })], 'complete'),
+        round(1, 'SG', [activeAuction]),
+      ],
+      signings: [signing],
+      seats: {
+        p1: {
+          seat: 'p1',
+          filledPositions: ['PG'],
+          leadPlayerId: 'p-1',
+          payrollDollars: 40_000_000,
+        } as CapRushMultiplayerSeatRecruitment,
+        p2: emptySeat('p2'),
+      },
+    });
+    const summary = seatPayrollSummary(stateOf(value), 'p1');
+    expect(summary.signedPayrollDollars).toBe(40_000_000);
+    expect(summary.bindingBidDollars).toBe(12_000_000);
+    expect(summary.bindingPlayerName).toBe('Test Guard');
+    expect(summary.payrollDollars).toBe(52_000_000);
+    expect(summary.status).toBe('under-cap');
+    expect(summary.filledPositions).toEqual(['PG']);
+  });
+
+  test('replaces the current commitment when projecting a raise', () => {
+    const activeAuction = auction({
+      playerId: 'p-1',
+      leaderSeat: 'p1',
+      leaderBidDollars: 12_000_000,
+    });
+    const value = recruitment({
+      rounds: [round(0, 'SG', [activeAuction])],
+      seats: {
+        p1: {
+          seat: 'p1',
+          filledPositions: ['PG'],
+          leadPlayerId: 'p-1',
+          payrollDollars: 40_000_000,
+        } as CapRushMultiplayerSeatRecruitment,
+        p2: emptySeat('p2'),
+      },
+    });
+    const projection = bidProjection(stateOf(value), 'p1', 15_000_000);
+    expect(projection.signedPayrollDollars).toBe(40_000_000);
+    expect(projection.bindingBidDollars).toBe(12_000_000);
+    expect(projection.projectedPayrollDollars).toBe(55_000_000);
+    expect(projection.headroomDollars).toBe(127_000_000);
+    expect(projection.overHardLimit).toBe(false);
+  });
+
+  test('explains rejections with actionable context', () => {
+    expect(
+      bidRejectionNotice('bid-too-low', {
+        nextMinimumDollars: 13_100_000,
+        position: 'SG',
+      }),
+    ).toEqual({
+      message: 'The next legal bid is $13,100,000.',
+      action: { kind: 'use-next-bid', totalDollars: 13_100_000 },
+    });
+
+    expect(
+      bidRejectionNotice('multiple-leads', {
+        nextMinimumDollars: 13_100_000,
+        position: 'SG',
+        leadPlayerId: 'p-2',
+        leadPlayerName: 'Other Wing',
+      }).action,
+    ).toEqual({ kind: 'view-lead', playerId: 'p-2', label: 'View Other Wing' });
+
+    expect(
+      bidRejectionNotice('completion-rejected', {
+        nextMinimumDollars: 13_100_000,
+        position: 'SG',
+      }).message,
+    ).toContain('hard limit');
+    expect(
+      bidRejectionNotice('position-filled', {
+        nextMinimumDollars: 13_100_000,
+        position: 'SG',
+      }).message,
+    ).toBe('You already signed a Shooting guard this round.');
+  });
+
+  test('maps room rejection codes to readable copy', () => {
+    expect(commandErrorLabel('position-filled')).toBe('That position is already signed.');
+    expect(commandErrorLabel('something-else')).toBe('something-else');
+    expect(commandErrorLabel(null)).toBeNull();
+  });
+
+  test('builds completed, active, and upcoming pools from recorded rounds', () => {
+    const value = recruitment({
+      market: { players: [player, pointGuard] },
+      roundIndex: 1,
+      rounds: [
+        round(
+          0,
+          'PG',
+          [
+            auction({
+              playerId: 'p-pg',
+              status: 'closed',
+              leaderSeat: 'p1',
+              leaderBidDollars: 9_000_000,
+              winningSeat: 'p1',
+              winningBidDollars: 9_000_000,
+            }),
+          ],
+          'complete',
+        ),
+        round(1, 'SG', [auction()]),
+      ],
+    });
+    const pools = marketPools(value);
+    expect(pools.map((pool) => pool.status)).toEqual([
+      'completed',
+      'active',
+      'upcoming',
+      'upcoming',
+      'upcoming',
+    ]);
+    expect(pools[0]?.lots[0]?.auction?.winningSeat).toBe('p1');
+    expect(pools[1]?.lots[0]?.player.playerId).toBe(player.playerId);
+    expect(pools[2]?.lots).toEqual([]);
   });
 });

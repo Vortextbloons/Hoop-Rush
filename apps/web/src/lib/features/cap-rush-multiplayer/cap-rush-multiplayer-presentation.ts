@@ -1,15 +1,21 @@
 import type {
   CapRushMultiplayerAuction,
+  CapRushMultiplayerCommandRejectionCode,
   CapRushMultiplayerMarketPlayer,
   CapRushMultiplayerRecruitment,
+  CapRushMultiplayerRound,
   CapRushMultiplayerSeatId,
   CapRushMultiplayerState,
+  CapRushPayrollStatus,
   Position,
 } from '@hoop-rush/data-contracts';
 import {
   CAP_RUSH_MULTIPLAYER_AUCTION_MS,
   CAP_RUSH_MULTIPLAYER_BID_INCREMENT_DOLLARS,
+  CAP_RUSH_MULTIPLAYER_HARD_LIMIT_DOLLARS,
+  POSITIONS,
 } from '@hoop-rush/data-contracts';
+import { capRushPayrollStatus } from '@hoop-rush/engine';
 import { formatMillions } from '../cap-rush/cap-rush-presentation.js';
 
 export function seatLabel(seat: CapRushMultiplayerSeatId): string {
@@ -142,4 +148,289 @@ export function deadlineLabel(state: CapRushMultiplayerState, nowMs: number): st
     .map((auction) => Date.parse(auction.endsAtIso));
   if (ends.length === 0) return null;
   return clockLabel(Math.min(...ends) - nowMs);
+}
+
+export function activeRound(recruitment: CapRushMultiplayerRecruitment): CapRushMultiplayerRound {
+  return (
+    recruitment.rounds.find((round) => round.index === recruitment.roundIndex) ??
+    currentRound(recruitment)
+  );
+}
+
+export function seatOrder(
+  localSeat: CapRushMultiplayerSeatId,
+): readonly [CapRushMultiplayerSeatId, CapRushMultiplayerSeatId] {
+  return localSeat === 'p1' ? ['p1', 'p2'] : ['p2', 'p1'];
+}
+
+/** Exact integer dollars for submitted totals and button labels. Never approximates. */
+export function exactMoney(dollars: number): string {
+  const rounded = Math.trunc(dollars);
+  const sign = rounded < 0 ? '-' : '';
+  return `${sign}$${Math.abs(rounded).toLocaleString('en-US')}`;
+}
+
+/** Parses a typed total. Returns null unless the value is a whole dollar amount. */
+export function parseBidDollars(raw: string): number | null {
+  const cleaned = raw.trim().replace(/^\$/, '').replace(/[,\s]/g, '');
+  if (cleaned === '' || !/^\d+$/.test(cleaned)) return null;
+  const value = Number(cleaned);
+  return Number.isSafeInteger(value) ? value : null;
+}
+
+export interface BidQuickChoice {
+  readonly totalDollars: number;
+  readonly hint: string;
+}
+
+export function bidQuickChoices(
+  auction: CapRushMultiplayerAuction,
+  player: CapRushMultiplayerMarketPlayer,
+): BidQuickChoice[] {
+  const baseline = auction.leaderBidDollars ?? player.minimumBidDollars;
+  const offset = CAP_RUSH_MULTIPLAYER_BID_INCREMENT_DOLLARS;
+  const choices: BidQuickChoice[] = [
+    { totalDollars: nextMinimumBid(auction, player), hint: 'Next bid' },
+    { totalDollars: baseline + offset, hint: '+$100K' },
+    { totalDollars: baseline + 5 * offset, hint: '+$500K' },
+    { totalDollars: baseline + 10 * offset, hint: '+$1M' },
+  ];
+  const seen = new Set<number>();
+  return choices.filter((choice) => {
+    if (seen.has(choice.totalDollars)) return false;
+    seen.add(choice.totalDollars);
+    return true;
+  });
+}
+
+export interface SeatPayrollSummary {
+  readonly signedPayrollDollars: number;
+  readonly bindingBidDollars: number | null;
+  readonly bindingPlayerId: string | null;
+  readonly bindingPlayerName: string | null;
+  readonly payrollDollars: number;
+  readonly headroomDollars: number;
+  readonly status: CapRushPayrollStatus;
+  readonly filledPositions: readonly Position[];
+}
+
+export function seatPayrollSummary(
+  state: CapRushMultiplayerState,
+  seat: CapRushMultiplayerSeatId,
+): SeatPayrollSummary {
+  const recruitment = state.recruitment;
+  const lockedPayroll = state.locked?.seats[seat].payrollDollars ?? null;
+  const signedPayrollDollars = lockedPayroll ?? recruitment?.seats[seat].payrollDollars ?? 0;
+  const round = recruitment === null ? null : activeRound(recruitment);
+  const bindingAuction =
+    round?.auctions.find((auction) => auction.status === 'open' && auction.leaderSeat === seat) ??
+    null;
+  const bindingBidDollars = bindingAuction?.leaderBidDollars ?? null;
+  const bindingPlayerId = bindingAuction?.playerId ?? null;
+  const bindingPlayerName =
+    bindingPlayerId === null || recruitment === null
+      ? null
+      : (playerById(recruitment, bindingPlayerId)?.displayName ?? null);
+  const payrollDollars = signedPayrollDollars + (bindingBidDollars ?? 0);
+  const filledPositions =
+    state.locked?.seats[seat].picks.map((pick) => pick.slot) ??
+    recruitment?.seats[seat].filledPositions ??
+    [];
+  return {
+    signedPayrollDollars,
+    bindingBidDollars,
+    bindingPlayerId,
+    bindingPlayerName,
+    payrollDollars,
+    headroomDollars: CAP_RUSH_MULTIPLAYER_HARD_LIMIT_DOLLARS - payrollDollars,
+    status: capRushPayrollStatus(payrollDollars),
+    filledPositions,
+  };
+}
+
+export interface BidProjection {
+  readonly signedPayrollDollars: number;
+  readonly bindingBidDollars: number | null;
+  readonly projectedPayrollDollars: number;
+  readonly headroomDollars: number;
+  readonly status: CapRushPayrollStatus;
+  readonly overHardLimit: boolean;
+}
+
+export function bidProjection(
+  state: CapRushMultiplayerState,
+  seat: CapRushMultiplayerSeatId,
+  totalDollars: number,
+): BidProjection {
+  const summary = seatPayrollSummary(state, seat);
+  const projectedPayrollDollars = summary.signedPayrollDollars + totalDollars;
+  const headroomDollars = CAP_RUSH_MULTIPLAYER_HARD_LIMIT_DOLLARS - projectedPayrollDollars;
+  return {
+    signedPayrollDollars: summary.signedPayrollDollars,
+    bindingBidDollars: summary.bindingBidDollars,
+    projectedPayrollDollars,
+    headroomDollars,
+    status: capRushPayrollStatus(projectedPayrollDollars),
+    overHardLimit: headroomDollars < 0,
+  };
+}
+
+export interface BidRejectionContext {
+  readonly nextMinimumDollars: number;
+  readonly position: Position;
+  readonly leadPlayerId?: string | null;
+  readonly leadPlayerName?: string | null;
+}
+
+export type BidRejectionAction =
+  | { readonly kind: 'use-next-bid'; readonly totalDollars: number }
+  | { readonly kind: 'view-lead'; readonly playerId: string; readonly label: string };
+
+export interface BidRejectionNotice {
+  readonly message: string;
+  readonly action: BidRejectionAction | null;
+}
+
+export interface CapRushBidAttempt {
+  readonly round: number;
+  readonly playerId: string;
+  readonly totalDollars: number;
+  readonly state: 'pending' | 'rejected';
+  readonly code: string | null;
+}
+
+export function bidRejectionNotice(
+  code: string | null,
+  context: BidRejectionContext,
+): BidRejectionNotice {
+  const position = positionLabel(context.position);
+  switch (code) {
+    case 'auction-closed':
+      return { message: 'That auction has closed. Pick another lot.', action: null };
+    case 'invalid-phase':
+    case 'round-mismatch':
+      return {
+        message: 'This position round has closed. The board is refreshing.',
+        action: null,
+      };
+    case 'position-filled':
+      return { message: `You already signed a ${position} this round.`, action: null };
+    case 'multiple-leads':
+      return {
+        message:
+          context.leadPlayerName === null || context.leadPlayerName === undefined
+            ? 'Only one binding lead is allowed per position.'
+            : `You are already leading ${context.leadPlayerName}. Only one binding lead is allowed per position.`,
+        action:
+          context.leadPlayerId === null || context.leadPlayerId === undefined
+            ? null
+            : {
+                kind: 'view-lead',
+                playerId: context.leadPlayerId,
+                label: `View ${context.leadPlayerName ?? 'your lead'}`,
+              },
+      };
+    case 'bid-too-low':
+      return {
+        message: `The next legal bid is ${exactMoney(context.nextMinimumDollars)}.`,
+        action: { kind: 'use-next-bid', totalDollars: context.nextMinimumDollars },
+      };
+    case 'budget-rejected':
+      return {
+        message: 'That total is outside the room budget rules for this bid.',
+        action: null,
+      };
+    case 'completion-rejected':
+      return {
+        message:
+          'That bid would leave the two teams unable to fill every position under the hard limit. Lower the total.',
+        action: null,
+      };
+    case 'stale-revision':
+    case 'command-conflict':
+      return {
+        message:
+          'Another update landed first. The board refreshed; review the total and try again.',
+        action: null,
+      };
+    case 'not-a-member':
+      return { message: 'You are not an active member of this room.', action: null };
+    case 'not-ready':
+      return { message: 'The room is not ready for that action yet.', action: null };
+    case 'expired':
+      return { message: 'This room has expired.', action: null };
+    default:
+      return {
+        message: 'The room rejected that bid. Check the current offer and try again.',
+        action: null,
+      };
+  }
+}
+
+const COMMAND_ERROR_LABELS: Partial<Record<CapRushMultiplayerCommandRejectionCode, string>> = {
+  'not-a-member': 'You are not an active member of this room.',
+  'not-host': 'Only the host can do that.',
+  'invalid-phase': 'The room has moved to another phase. Refresh to see the latest state.',
+  'stale-revision': 'Another update landed first. Try that action again.',
+  'room-full': 'This room already has two seats.',
+  expired: 'This room has expired.',
+  'command-conflict': 'Another update landed first. Try that action again.',
+  'unknown-command': 'The room did not recognize that action.',
+  'not-ready': 'Both seats must be ready first.',
+  'round-mismatch': 'That round is no longer active.',
+  'auction-closed': 'That auction has closed.',
+  'auction-not-due': 'That auction has not reached its deadline yet.',
+  'bid-too-low': 'That bid is below the next legal amount.',
+  'multiple-leads': 'Only one binding lead is allowed per position.',
+  'position-filled': 'That position is already signed.',
+  'budget-rejected': 'That action is outside the room budget rules.',
+  'completion-rejected': 'That action would leave a roster unable to finish under the hard limit.',
+  'not-locked': 'Both rosters must be locked first.',
+  'plan-missing': 'The room is missing a required plan.',
+  'frontier-gap': 'Earlier results are still waiting.',
+  'result-mismatch': 'The result did not match the room.',
+  'verification-mismatch': 'The result failed verification.',
+  'playoff-mismatch': 'The playoff step did not match the room.',
+  'not-due': 'That action is not due yet.',
+};
+
+export function commandErrorLabel(raw: string | null): string | null {
+  if (raw === null || raw === '') return null;
+  return COMMAND_ERROR_LABELS[raw as CapRushMultiplayerCommandRejectionCode] ?? raw;
+}
+
+export type MarketPoolStatus = 'completed' | 'active' | 'upcoming';
+
+export interface MarketPoolLot {
+  readonly player: CapRushMultiplayerMarketPlayer;
+  readonly auction: CapRushMultiplayerAuction | null;
+}
+
+export interface MarketPool {
+  readonly index: number;
+  readonly position: Position;
+  readonly status: MarketPoolStatus;
+  readonly lots: readonly MarketPoolLot[];
+}
+
+export function marketPools(recruitment: CapRushMultiplayerRecruitment): readonly MarketPool[] {
+  const rounds = new Map(recruitment.rounds.map((round) => [round.index, round]));
+  return POSITIONS.map((position, index) => {
+    const round = rounds.get(index) ?? null;
+    const status: MarketPoolStatus =
+      index < recruitment.roundIndex
+        ? 'completed'
+        : index === recruitment.roundIndex
+          ? round?.status === 'complete'
+            ? 'completed'
+            : 'active'
+          : 'upcoming';
+    const lots = recruitment.market.players
+      .filter((player) => player.position === position)
+      .map((player) => ({
+        player,
+        auction: round?.auctions.find((auction) => auction.playerId === player.playerId) ?? null,
+      }));
+    return { index, position, status, lots };
+  });
 }
