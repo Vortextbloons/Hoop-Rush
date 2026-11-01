@@ -293,7 +293,12 @@ describe('draft-duel supabase transport protocol pins', () => {
     expect(harness.rpcCalls).toEqual([
       {
         name: 'multiplayer_room_sync',
-        args: { p_mode: 'draft-duel', p_room_id: ROOM_ID, p_after_ordinal: -1 },
+        args: {
+          p_mode: 'draft-duel',
+          p_room_id: ROOM_ID,
+          p_after_ordinal: -1,
+          p_protocol_version: 2,
+        },
       },
     ]);
     expect(harness.selectQueries).toHaveLength(0);

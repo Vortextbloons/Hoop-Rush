@@ -95,3 +95,4 @@ export * from './cap-rush-multiplayer-market.ts';
 export * from './cap-rush-multiplayer-league.ts';
 export * from './cap-rush-multiplayer.ts';
 export * from './cap-rush-multiplayer-worker.ts';
+export * from './multiplayer-protocol.ts';
