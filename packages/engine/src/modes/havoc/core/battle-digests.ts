@@ -13,20 +13,18 @@ export const HAVOC_BATTLE_INPUT_DIGEST_PREFIX = 'havoc-battle-input-v1:';
 export const HAVOC_BATTLE_RESULT_DIGEST_PREFIX = 'havoc-battle-result-v1:';
 export const HAVOC_BATTLE_TAPE_DIGEST_PREFIX = 'havoc-battle-tape-v1:';
 
+export function digestOf(prefix: string, value: unknown): string {
+  return havocDigestSchema.parse(seasonDigestHex(`${prefix}${canonicalJson(value)}`));
+}
+
 export function havocBattleGameInputDigest(input: HavocBattleInput): string {
-  return havocDigestSchema.parse(
-    seasonDigestHex(`${HAVOC_BATTLE_INPUT_DIGEST_PREFIX}${canonicalJson(input)}`),
-  );
+  return digestOf(HAVOC_BATTLE_INPUT_DIGEST_PREFIX, input);
 }
 
 export function havocBattleGameResultDigest(result: HavocBattleResult): string {
-  return havocDigestSchema.parse(
-    seasonDigestHex(`${HAVOC_BATTLE_RESULT_DIGEST_PREFIX}${canonicalJson(result)}`),
-  );
+  return digestOf(HAVOC_BATTLE_RESULT_DIGEST_PREFIX, result);
 }
 
 export function havocBattleGameTapeDigest(tape: HavocBattleTape): string {
-  return havocDigestSchema.parse(
-    seasonDigestHex(`${HAVOC_BATTLE_TAPE_DIGEST_PREFIX}${canonicalJson(tape)}`),
-  );
+  return digestOf(HAVOC_BATTLE_TAPE_DIGEST_PREFIX, tape);
 }

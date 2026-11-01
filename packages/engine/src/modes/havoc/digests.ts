@@ -6,32 +6,25 @@ import type {
 } from '@hoop-rush/data-contracts';
 import {
   HAVOC_SCHEMA_VERSION,
-  canonicalJson,
   havocDigestSchema,
   havocGameSummarySchema,
-  seasonDigestHex,
 } from '@hoop-rush/data-contracts';
+import { digestOf } from './core/battle-digests.ts';
 
 export const HAVOC_INPUT_DIGEST_PREFIX = 'havoc-input-v1:';
 export const HAVOC_RESULT_DIGEST_PREFIX = 'havoc-result-v1:';
 export const HAVOC_TAPE_DIGEST_PREFIX = 'havoc-tape-v1:';
 
 export function havocGameInputDigest(input: HavocGameInput): string {
-  return havocDigestSchema.parse(
-    seasonDigestHex(`${HAVOC_INPUT_DIGEST_PREFIX}${canonicalJson(input)}`),
-  );
+  return digestOf(HAVOC_INPUT_DIGEST_PREFIX, input);
 }
 
 export function havocGameResultDigest(result: HavocGameResult): string {
-  return havocDigestSchema.parse(
-    seasonDigestHex(`${HAVOC_RESULT_DIGEST_PREFIX}${canonicalJson(result)}`),
-  );
+  return digestOf(HAVOC_RESULT_DIGEST_PREFIX, result);
 }
 
 export function havocGameTapeDigest(tape: HavocGameTape): string {
-  return havocDigestSchema.parse(
-    seasonDigestHex(`${HAVOC_TAPE_DIGEST_PREFIX}${canonicalJson(tape)}`),
-  );
+  return digestOf(HAVOC_TAPE_DIGEST_PREFIX, tape);
 }
 
 export function havocGameSummaryOf(
