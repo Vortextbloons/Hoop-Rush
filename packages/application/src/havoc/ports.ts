@@ -1,12 +1,10 @@
 import type {
   EraSimulationProfile,
-  HavocCommand,
   HavocCommandResult,
   HavocComparison,
   HavocComparisonStatus,
   HavocCompletionState,
   HavocGameResult,
-  HavocGameTape,
   HavocReport,
   HavocRunState,
   HavocVariant,
@@ -22,33 +20,16 @@ import type {
   SeasonDraftCatalog,
   Seed,
 } from '@hoop-rush/data-contracts';
+import type { HavocApplyOutcomeInput } from '@hoop-rush/data-contracts';
+
+export type { HavocApplyOutcomeInput, HavocCommandOutcome } from '@hoop-rush/data-contracts';
 
 /** Completion states a Havoc run can carry once it appears in history. */
 export type HavocHistoryCompletionState = Exclude<HavocCompletionState, 'draft'>;
 
 /** One accepted Havoc command plus the state it produced. */
-export interface HavocCommandOutcome {
-  readonly state: HavocRunState;
-  readonly result: HavocCommandResult;
-}
 
 /** Everything a single Havoc save commit may write. */
-export interface HavocApplyOutcomeInput {
-  outcome: HavocCommandOutcome;
-  game?: {
-    result: HavocGameResult;
-    inputDigest: string;
-    resultDigest: string;
-  };
-  tape?: {
-    tape: HavocGameTape;
-    tapeDigest: string;
-    selectedRank?: number;
-  };
-  comparison?: HavocComparison;
-  report?: HavocReport;
-  command?: HavocCommand;
-}
 
 /**
  * The save surface Havoc solo needs.

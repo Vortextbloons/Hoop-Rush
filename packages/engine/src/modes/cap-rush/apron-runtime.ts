@@ -9,16 +9,12 @@ import type {
 } from '@hoop-rush/data-contracts';
 import {
   CAP_RUSH_SCHEMA_VERSION,
-  capRushIsolationDue,
-  capRushIsolationReason,
   capRushStrikeDue,
 } from '@hoop-rush/data-contracts';
 import type { SideIndex } from '../../sim/recorder.ts';
 import { apronPlayerKeyOf } from '../../sim/apron-runtime.ts';
 
 export interface CapRushApronSpec {
-  readonly legacyIsolation?: boolean;
-  readonly legacyInterceptionRates?: boolean;
   readonly side: SideIndex;
   readonly rules: CapRushApronRules;
   readonly targetInstanceId: string;
@@ -60,17 +56,9 @@ export class CapRushApronRuntime {
   beginPossession(offense: SideIndex): CapRushPossessionState {
     const ordinal = (this.ordinals[offense] += 1);
     const defendOrdinal = this.ordinals[offense === 0 ? 1 : 0];
-    const isolation =
-      this.spec.legacyIsolation === true &&
-      offense === this.spec.side &&
-      capRushIsolationDue(this.spec.rules, ordinal)
-        ? capRushIsolationReason(this.spec.rules)
-        : null;
+    const isolation = null;
     const strike =
-      offense !== this.spec.side &&
-      (this.spec.legacyIsolation === true
-        ? this.spec.rules.payrollStatus === 'second-apron' && ordinal % 6 === 0
-        : capRushStrikeDue(this.spec.rules, ordinal));
+      offense !== this.spec.side && capRushStrikeDue(this.spec.rules, ordinal);
     this.current = {
       offenseOrdinal: ordinal,
       defenseOrdinal: defendOrdinal,
@@ -129,10 +117,7 @@ export class CapRushApronRuntime {
   }
 
   passInterceptionChance(offense: SideIndex): number {
-    if (this.spec.legacyIsolation === true || offense !== this.spec.side) return 0;
-    if (this.spec.legacyInterceptionRates === true) {
-      return this.spec.rules.payrollStatus === 'first-apron' ? 0.025 : 0.08;
-    }
+    if (offense !== this.spec.side) return 0;
     return this.spec.rules.payrollStatus === 'first-apron' ? 0.015 : 0.07;
   }
 
@@ -179,8 +164,6 @@ export function capRushApronRuntimeFor(
     return undefined;
   }
   const apron = new CapRushApronRuntime({
-    legacyIsolation: locked.versionSet.rulesVersion === 'cap-rush-rules-v1',
-    legacyInterceptionRates: locked.versionSet.rulesVersion === 'cap-rush-rules-v2',
     side: humanSide === 'home' ? 0 : 1,
     rules: { payrollStatus: locked.payrollStatus },
     targetInstanceId: locked.target.instanceId,

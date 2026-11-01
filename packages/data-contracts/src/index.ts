@@ -96,3 +96,5 @@ export * from './cap-rush-multiplayer-league.ts';
 export * from './cap-rush-multiplayer.ts';
 export * from './cap-rush-multiplayer-worker.ts';
 export * from './multiplayer-protocol.ts';
+
+export * from './command-commit.ts';

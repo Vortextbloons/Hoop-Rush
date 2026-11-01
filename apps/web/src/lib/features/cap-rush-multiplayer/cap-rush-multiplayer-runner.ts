@@ -1,4 +1,5 @@
 import type { CapRushMultiplayerState, CapRushMultiplayerCommand } from '@hoop-rush/data-contracts';
+import { createCapRushMultiplayerState, capRushMultiplayerStateDigest } from '@hoop-rush/engine';
 import type { CapRushMultiplayerEnvironment } from '@hoop-rush/engine';
 import type {
   CapRushLeagueGame,
@@ -28,6 +29,7 @@ export interface CapRushMultiplayerProjectionInput {
   commands: readonly CapRushMultiplayerCommand[];
   environment: CapRushMultiplayerEnvironment;
   variant: 'clash' | 'roulette';
+  verifyLog?: boolean;
 }
 
 export interface CapRushMultiplayerSlotInput {
@@ -35,6 +37,7 @@ export interface CapRushMultiplayerSlotInput {
   locked: CapRushMultiplayerLockedInputs;
   slot: number;
   throughSlot?: number;
+  partition?: number;
   tapeGameIds?: readonly string[];
 }
 
@@ -103,6 +106,7 @@ function buildRequest(
       locked: payload.locked,
       slot: payload.slot,
       throughSlot: payload.throughSlot,
+      partition: payload.partition,
       tapeGameIds: [...(payload.tapeGameIds ?? [])],
     });
   }
@@ -164,6 +168,13 @@ export class CapRushMultiplayerProjectionRejection extends Error {
 }
 
 export class CapRushMultiplayerRunner {
+  private readonly slotRunners: CapRushMultiplayerRunner[] = [];
+  private readonly options: {
+    timeoutMs?: number;
+    createWorker?: (url: URL) => Worker;
+    parallelism?: number;
+  };
+
   private readonly transport: OneShotWorkerRunner<
     | CapRushMultiplayerSlotInput
     | CapRushMultiplayerPlayoffInput
@@ -173,7 +184,10 @@ export class CapRushMultiplayerRunner {
     unknown
   >;
 
-  constructor(options: { timeoutMs?: number; createWorker?: (url: URL) => Worker } = {}) {
+  constructor(
+    options: { timeoutMs?: number; createWorker?: (url: URL) => Worker; parallelism?: number } = {},
+  ) {
+    this.options = options;
     this.transport = new OneShotWorkerRunner({
       workerUrl: WORKER_URL,
       buildRequest,
@@ -191,6 +205,7 @@ export class CapRushMultiplayerRunner {
   }
 
   async project(input: CapRushMultiplayerProjectionInput): Promise<CapRushMultiplayerState> {
+    for (const runner of this.slotRunners) runner.dispose();
     const result = (await this.transport.run(input)) as
       | CapRushMultiplayerState
       | Extract<CapRushMultiplayerWorkerMessage, { kind: 'cap-rush-multiplayer-rejection' }>;
@@ -199,21 +214,96 @@ export class CapRushMultiplayerRunner {
     return result;
   }
 
+  async verifyLog(
+    input: Omit<CapRushMultiplayerProjectionInput, 'state'> & { rootSeed: string },
+  ): Promise<string> {
+    const state = await this.project({
+      ...input,
+      state: createCapRushMultiplayerState(input.rootSeed),
+      verifyLog: true,
+    });
+    return capRushMultiplayerStateDigest(state);
+  }
+
   async simulateSlot(input: CapRushMultiplayerSlotInput): Promise<CapRushMultiplayerSlotOutput> {
-    return (await this.transport.run(input)) as CapRushMultiplayerSlotOutput;
+    const through = input.throughSlot ?? input.slot;
+    const parallelism =
+      this.options.parallelism ??
+      (typeof navigator !== 'undefined' && navigator.hardwareConcurrency >= 4 ? 2 : 1);
+    if (parallelism <= 1 || through < input.slot || through - input.slot > 4) {
+      for (const runner of this.slotRunners) runner.dispose();
+      return (await this.transport.run(input)) as CapRushMultiplayerSlotOutput;
+    }
+    this.transport.dispose();
+    while (this.slotRunners.length < 2) {
+      this.slotRunners.push(new CapRushMultiplayerRunner({ ...this.options, parallelism: 1 }));
+    }
+    const midpoint = Math.floor((input.slot + through) / 2);
+    const outputs = await Promise.all(
+      this.slotRunners.map((runner, index) =>
+        runner.simulateSlot({
+          ...input,
+          slot: through === input.slot ? input.slot : index === 0 ? input.slot : midpoint + 1,
+          throughSlot: through === input.slot ? through : index === 0 ? midpoint : through,
+          partition: through === input.slot ? index : undefined,
+        }),
+      ),
+    );
+    return {
+      games: outputs.flatMap((output) => output.games),
+      tapes: outputs.flatMap((output) => output.tapes),
+    };
   }
 
   async simulatePlayoffStep(
     input: CapRushMultiplayerPlayoffInput,
   ): Promise<CapRushMultiplayerPlayoffOutput> {
-    return (await this.transport.run(input)) as CapRushMultiplayerPlayoffOutput;
+    const groups = new Map<string, CapRushPlayoffGamePlan[]>();
+    for (const plan of input.plans) {
+      const group = groups.get(plan.seriesId) ?? [];
+      group.push(plan);
+      groups.set(plan.seriesId, group);
+    }
+    const parallelism =
+      this.options.parallelism ??
+      (typeof navigator !== 'undefined' && navigator.hardwareConcurrency >= 4 ? 2 : 1);
+    if (parallelism <= 1 || groups.size <= 1) {
+      for (const runner of this.slotRunners) runner.dispose();
+      return (await this.transport.run(input)) as CapRushMultiplayerPlayoffOutput;
+    }
+    this.transport.dispose();
+    while (this.slotRunners.length < 2)
+      this.slotRunners.push(new CapRushMultiplayerRunner({ ...this.options, parallelism: 1 }));
+    const batches: [CapRushPlayoffGamePlan[], CapRushPlayoffGamePlan[]] = [[], []];
+    for (const group of groups.values()) {
+      const target = batches[0].length <= batches[1].length ? batches[0] : batches[1];
+      target.push(...group);
+    }
+    const outputs = await Promise.all(
+      this.slotRunners.map((runner, index) =>
+        runner.simulatePlayoffStep({ ...input, plans: batches[index] ?? [] }),
+      ),
+    );
+    const games = outputs.flatMap((output) => output.games);
+    const order = new Map(
+      input.plans.map((plan, index) => [
+        `crp-${String(plan.round)}-${String(plan.seriesSlot)}-${String(plan.gameOrdinal)}`,
+        index,
+      ]),
+    );
+    games.sort((left, right) => (order.get(left.gameId) ?? 0) - (order.get(right.gameId) ?? 0));
+    const tapes = outputs.flatMap((output) => output.tapes);
+    tapes.sort((left, right) => (order.get(left.gameId) ?? 0) - (order.get(right.gameId) ?? 0));
+    return { games, tapes };
   }
 
   async tapeForGame(input: CapRushMultiplayerTapeInput): Promise<CapRushMultiplayerTapeOutput> {
+    for (const runner of this.slotRunners) runner.dispose();
     return (await this.transport.run(input)) as CapRushMultiplayerTapeOutput;
   }
 
   dispose(): void {
     this.transport.dispose();
+    for (const runner of this.slotRunners) runner.dispose();
   }
 }

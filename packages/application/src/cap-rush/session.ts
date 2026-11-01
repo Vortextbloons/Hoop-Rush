@@ -69,6 +69,7 @@ import {
   type CapRushSpinView,
 } from './contract.ts';
 import type { CapRushAssetPort, CapRushDraftRepositoryPort, CapRushIdPort } from './ports.ts';
+import { prepareCommandCommit } from '@hoop-rush/data-contracts';
 
 interface CapRushAssets {
   readonly index: CapRushCatalogIndex;
@@ -163,10 +164,12 @@ export class CapRushSession implements CapRushService {
         stateDigest: capRushStateDigest(state),
         rejection: null,
       });
-      const applied = await this.repository.applyOutcome({
-        outcome: { state, result },
-        command,
-      });
+      const applied = await this.repository.applyOutcome(
+        prepareCommandCommit({
+          outcome: { state, result },
+          command,
+        }),
+      );
       if (applied.status === 'rejected') {
         throw new CapRushServiceError(
           'invalid-phase',
@@ -466,11 +469,13 @@ export class CapRushSession implements CapRushService {
         );
       }
       const report = await this.buildReport(outcome.state);
-      const applied = await this.repository.applyOutcome({
-        outcome,
-        command,
-        report,
-      });
+      const applied = await this.repository.applyOutcome(
+        prepareCommandCommit({
+          outcome,
+          command,
+          report,
+        }),
+      );
       if (applied.status === 'rejected') {
         throw new CapRushServiceError(
           'invalid-phase',
@@ -579,14 +584,20 @@ export class CapRushSession implements CapRushService {
         lockSources: assets.lockSources,
       });
       const accepted = outcome.result.status === 'accepted';
-      const applied = await this.repository.applyOutcome({
-        outcome,
-        command,
-        ...(accepted && extra.game !== undefined ? { game: extra.game } : {}),
-        ...(accepted && extra.playoffGame !== undefined ? { playoffGame: extra.playoffGame } : {}),
-        ...(accepted && extra.leagueGames !== undefined ? { leagueGames: extra.leagueGames } : {}),
-        ...(accepted && extra.report !== undefined ? { report: extra.report } : {}),
-      });
+      const applied = await this.repository.applyOutcome(
+        prepareCommandCommit({
+          outcome,
+          command,
+          ...(accepted && extra.game !== undefined ? { game: extra.game } : {}),
+          ...(accepted && extra.playoffGame !== undefined
+            ? { playoffGame: extra.playoffGame }
+            : {}),
+          ...(accepted && extra.leagueGames !== undefined
+            ? { leagueGames: extra.leagueGames }
+            : {}),
+          ...(accepted && extra.report !== undefined ? { report: extra.report } : {}),
+        }),
+      );
       if (applied.status === 'rejected') {
         throw new CapRushServiceError(
           'invalid-phase',
@@ -703,6 +714,9 @@ export class CapRushSession implements CapRushService {
   private assertSupportedVersion(state: CapRushDraftState, current: CapRushVersionSet): void {
     const version = state.versionSet;
     if (
+      version.rulesVersion !== current.rulesVersion ||
+      version.salaryCurveVersion !== current.salaryCurveVersion ||
+      version.seedDerivationVersion !== current.seedDerivationVersion ||
       version.engineVersion !== current.engineVersion ||
       version.catalogVersion !== current.catalogVersion ||
       version.catalogHash !== current.catalogHash ||

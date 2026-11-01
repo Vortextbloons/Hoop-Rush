@@ -28,8 +28,7 @@ import {
   playerIdSchema,
 } from '@hoop-rush/data-contracts';
 import type { EngineContext } from '../../../sim/kernel.ts';
-import { simulateHavocBattleGame } from '../../havoc/core/battle-game.ts';
-import { auditHavocBattleGame } from '../../havoc/core/battle-audit.ts';
+import { simulateAuditedHavocBattleGame } from '../../havoc/core/battle-game.ts';
 import { havocBattleGameResultDigest } from '../../havoc/core/battle-digests.ts';
 import { capRushBoxOf } from '../league-simulation.ts';
 import {
@@ -212,8 +211,10 @@ export function simulateCapRushMultiplayerPlayoffGame(input: {
     homeTeamId: input.plan.homeTeamId,
     awayTeamId: input.plan.awayTeamId,
   });
-  const battle = simulateHavocBattleGame(battleInput, input.context, { apron: apron?.hooks });
-  const audit = auditHavocBattleGame(battleInput, battle.result, battle.tape);
+  const battle = simulateAuditedHavocBattleGame(battleInput, input.context, {
+    apron: apron?.hooks,
+  });
+  const audit = battle.audit;
   if (!audit.ok) {
     throw new Error(
       `cap rush multiplayer: playoff game failed accounting: ${audit.findings
@@ -275,7 +276,9 @@ export function simulateCapRushMultiplayerPlayoffGame(input: {
   });
   return {
     game: summary,
-    tape: battle.tape,
+    get tape() {
+      return battle.tape;
+    },
     facts: apron?.facts() ?? [],
     input: battleInput,
     result: battle.result,

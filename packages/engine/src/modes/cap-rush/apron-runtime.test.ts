@@ -3,6 +3,7 @@ import type { CapRushApronRules, SimulationPlayer } from '@hoop-rush/data-contra
 import {
   CAP_RUSH_CLASH_ISOLATION_EVERY,
   CAP_RUSH_HERO_BALL_ISOLATION_EVERY,
+  CAP_RUSH_RULES_VERSION,
   CAP_RUSH_STRIKE_EVERY,
   capRushIsolationDue,
   capRushIsolationReason,
@@ -18,7 +19,6 @@ function runtime(rules: CapRushApronRules, side: 0 | 1 = 0): CapRushApronRuntime
   return new CapRushApronRuntime({
     side,
     rules,
-    legacyIsolation: true,
     targetInstanceId: `hvi-${'a'.repeat(32)}`,
     targetSlot: 'C',
   });
@@ -73,22 +73,10 @@ describe('cap rush strike cadence', () => {
 });
 
 describe('cap rush apron runtime', () => {
-  it('only starts isolating on the user side', () => {
-    const apron = runtime(FIRST, 0);
-    for (let possession = 1; possession <= 5; possession += 1) {
-      apron.beginPossession(0);
-      expect(apron.isolationActive()).toBe(false);
-      apron.endPossession();
-    }
-    apron.beginPossession(0);
-    expect(apron.isolationActive()).toBe(true);
-    apron.endPossession();
-  });
-
-  it('never isolates the opponent side', () => {
+  it('never forces isolation on the user side under current rules', () => {
     const apron = runtime(SECOND, 0);
     for (let possession = 1; possession <= 12; possession += 1) {
-      apron.beginPossession(1);
+      apron.beginPossession(0);
       expect(apron.isolationActive()).toBe(false);
       apron.endPossession();
     }
@@ -107,9 +95,9 @@ describe('cap rush apron runtime', () => {
   it('strikes only opponent possessions, in the second apron only', () => {
     const second = runtime(SECOND, 0);
     const first = runtime(FIRST, 0);
-    for (let possession = 1; possession <= 6; possession += 1) {
+    for (let possession = 1; possession <= 16; possession += 1) {
       second.beginPossession(1);
-      expect(second.strikeActive()).toBe(possession === 6);
+      expect(second.strikeActive()).toBe(possession === 8 || possession === 16);
       second.endPossession();
       first.beginPossession(1);
       expect(first.strikeActive()).toBe(false);
@@ -117,80 +105,41 @@ describe('cap rush apron runtime', () => {
     }
   });
 
-  it('records a typed fact for every isolation and strike', () => {
+  it('records strike facts only in the second apron', () => {
     const apron = runtime(SECOND, 0);
-    for (let possession = 1; possession <= 6; possession += 1) {
-      apron.beginPossession(0);
-      apron.endPossession();
+    for (let possession = 1; possession <= 16; possession += 1) {
       apron.beginPossession(1);
       apron.endPossession();
     }
     const facts = apron.recordedFacts();
-    const isolations = facts.filter((fact) => fact.kind === 'isolation');
-    const strikes = facts.filter((fact) => fact.kind === 'strike');
-    expect(isolations.map((fact) => fact.possessionOrdinal)).toEqual([3, 6]);
-    expect(strikes.map((fact) => fact.possessionOrdinal)).toEqual([6]);
-    expect(isolations.every((fact) => fact.side === 'home')).toBe(true);
-    expect(isolations[0]).toMatchObject({
-      reason: 'hero-ball',
-      targetSlot: 'C',
-      payrollStatus: 'second-apron',
-    });
+    expect(facts.every((fact) => fact.kind === 'strike')).toBe(true);
+    expect(facts.map((fact) => fact.possessionOrdinal)).toEqual([8, 16]);
   });
 
-  it('reports the forced actor and struck defender only during their possession', () => {
+  it('never forces usage during opponent possessions', () => {
     const apron = runtime(SECOND, 0);
     const target = { playerId: 'p-target' } as unknown as SimulationPlayer;
     const team = { teamId: 't', displayName: 'T', players: [target] };
     apron.bindTarget(target);
-    for (let possession = 1; possession <= 2; possession += 1) {
+    for (let possession = 1; possession <= 24; possession += 1) {
       apron.beginPossession(0);
       expect(apron.forcedActor(team)).toBeNull();
       apron.endPossession();
+    }
+  });
+
+  it('resolves the struck defender during strike possessions', () => {
+    const apron = runtime(SECOND, 0);
+    const target = { playerId: 'p-target' } as unknown as SimulationPlayer;
+    const team = { teamId: 't', displayName: 'T', players: [target] };
+    apron.bindTarget(target);
+    for (let possession = 1; possession <= 7; possession += 1) {
       apron.beginPossession(1);
       expect(apron.struckDefender(team)).toBeNull();
       apron.endPossession();
     }
-    apron.beginPossession(0);
-    expect(apron.forcedActor(team)).toBe(target);
-    expect(apron.struckDefender(team)).toBeNull();
-    apron.endPossession();
     apron.beginPossession(1);
-    apron.beginPossession(1);
-    apron.beginPossession(1);
-    expect(apron.struckDefender(team)).toBeNull();
-    apron.endPossession();
-  });
-
-  it('restores ordinary participation once the possession ends', () => {
-    const apron = runtime(SECOND, 0);
-    const target = { playerId: 'p-target' } as unknown as SimulationPlayer;
-    const team = { teamId: 't', displayName: 'T', players: [target] };
-    apron.bindTarget(target);
-    apron.beginPossession(1);
-    apron.beginPossession(1);
-    expect(apron.forcedActor(team)).toBeNull();
-    apron.endPossession();
-    expect(apron.forcedActor(team)).toBeNull();
-    expect(apron.struckDefender(team)).toBeNull();
-  });
-
-  it('resolves the target by identity when the roster object differs', () => {
-    const apron = runtime(SECOND, 0);
-    const bound = {
-      playerId: 'p-target',
-      playerVersionId: 'v-target',
-    } as unknown as SimulationPlayer;
-    const rebuilt = {
-      playerId: 'p-target',
-      playerVersionId: 'v-target',
-    } as unknown as SimulationPlayer;
-    const team = { teamId: 't', displayName: 'T', players: [rebuilt] };
-    apron.bindTarget(bound);
-    apron.beginPossession(0);
-    apron.beginPossession(0);
-    apron.beginPossession(0);
-    expect(apron.forcedActor(team)).toBe(rebuilt);
+    expect(apron.struckDefender(team)).toBe(target);
   });
 });
 
@@ -215,7 +164,7 @@ describe('cap rush telegraphed passes rules', () => {
     expect(strikes).toEqual([8, 16, 24]);
   });
 
-  it('only increases interception risk for the user and leaves legacy rules unchanged', () => {
+  it('only increases interception risk for the user offense', () => {
     for (const side of [0, 1] as const) {
       for (const rules of [FIRST, SECOND]) {
         const apron = new CapRushApronRuntime({
@@ -226,59 +175,21 @@ describe('cap rush telegraphed passes rules', () => {
         });
         expect(apron.passInterceptionChance(side)).toBe(rules === FIRST ? 0.015 : 0.07);
         expect(apron.passInterceptionChance(side === 0 ? 1 : 0)).toBe(0);
-        expect(runtime(rules, side).passInterceptionChance(side)).toBe(0);
       }
     }
   });
 
-  it('keeps forced isolation only for saved v1 rules', () => {
-    for (const rulesVersion of ['cap-rush-rules-v1', 'cap-rush-rules-v2', 'cap-rush-rules-v3']) {
-      const apron = capRushApronRuntimeFor(
+  it('builds apron runtime only for apron payroll statuses', () => {
+    expect(
+      capRushApronRuntimeFor(
         {
-          versionSet: { rulesVersion },
-          payrollStatus: 'first-apron',
-          target: { instanceId: `hvi-${'a'.repeat(32)}`, slot: 'C' },
-          human: { starters: [] },
-        },
-        'away',
-      );
-      if (apron === undefined) throw new Error('missing first-apron runtime');
-      for (let ordinal = 1; ordinal <= 6; ordinal += 1) apron.beginPossession(1);
-      expect(apron.isolationActive()).toBe(rulesVersion === 'cap-rush-rules-v1');
-    }
-  });
-
-  it('preserves saved v2 interception rates', () => {
-    for (const payrollStatus of ['first-apron', 'second-apron'] as const) {
-      const apron = capRushApronRuntimeFor(
-        {
-          versionSet: { rulesVersion: 'cap-rush-rules-v2' },
-          payrollStatus,
+          versionSet: { rulesVersion: CAP_RUSH_RULES_VERSION },
+          payrollStatus: 'under-cap',
           target: { instanceId: `hvi-${'a'.repeat(32)}`, slot: 'C' },
           human: { starters: [] },
         },
         'home',
-      );
-      expect(apron?.passInterceptionChance(0)).toBe(payrollStatus === 'first-apron' ? 0.025 : 0.08);
-    }
-  });
-
-  it('never forces the highest-paid player on offense in either apron', () => {
-    for (const rules of [FIRST, SECOND]) {
-      const apron = new CapRushApronRuntime({
-        side: 0,
-        rules,
-        targetInstanceId: `hvi-${'a'.repeat(32)}`,
-        targetSlot: 'C',
-      });
-      const target = { playerId: 'p-target' } as unknown as SimulationPlayer;
-      apron.bindTarget(target);
-      for (let ordinal = 1; ordinal <= 30; ordinal += 1) {
-        apron.beginPossession(0);
-        expect(apron.forcedActor({ teamId: 't', displayName: 'T', players: [target] })).toBeNull();
-        apron.endPossession();
-      }
-      expect(apron.recordedFacts()).toEqual([]);
-    }
+      ),
+    ).toBeUndefined();
   });
 });

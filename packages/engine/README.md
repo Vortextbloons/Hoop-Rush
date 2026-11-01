@@ -28,6 +28,21 @@ draft-duel, fixed-five, and classic draft flows.
 - `src/game/` — shared simulation hooks (`effects.ts`, `home-court.ts`).
 - `src/index.ts` — package export surface.
 
+## Mode ownership
+
+Cap Rush's public `draft-commands.ts` dispatches to typed draft, season, and
+postseason reducers. Each reducer owns its phase-specific command set;
+`command-outcome.ts` owns shared admission and receipt construction. The
+persisted aggregate remains the compatibility boundary.
+
+Havoc's battle runtime composes `battle-participants.ts` for roster activation,
+clones, substitutions, and participant lookup; `battle-profile-effects.ts` for
+rating changes and time-lord/equalizer state; and `battle-mutation-ledger.ts`
+for event ordering, scoring attribution, rollups, and highlights. The runtime
+retains possession hooks and explicitly orders those owners at boundaries.
+`runtime-refactor-parity.test.ts` pins pre-refactor results and replay tapes
+across seeded mutation scenarios.
+
 ## Verification
 
 ```text

@@ -14,7 +14,7 @@
 
   const direction = $derived(row?.direction ?? 'neutral');
   const glyph = $derived(
-    status === 'legacy' || status === 'no-sample' || row === null
+    status === 'no-sample' || row === null
       ? '–'
       : direction === 'up'
         ? '▲'
@@ -23,7 +23,7 @@
           : '=',
   );
   const tone = $derived(
-    status === 'legacy' || status === 'no-sample' || row === null
+    status === 'no-sample' || row === null
       ? 'muted'
       : status === 'pending'
         ? 'armed'
@@ -34,7 +34,6 @@
             : 'flat',
   );
   const label = $derived.by(() => {
-    if (status === 'legacy') return 'No playoff adjustment: this run predates playoff performance.';
     if (status === 'no-sample' || row === null)
       return 'No recorded playoff sample for this season, so no playoff adjustment.';
     const verb = direction === 'up' ? 'improves' : direction === 'down' ? 'declines' : 'is neutral';

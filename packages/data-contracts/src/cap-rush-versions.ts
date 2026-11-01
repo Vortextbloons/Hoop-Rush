@@ -110,7 +110,7 @@ export type CapRushDigest = z.infer<typeof capRushDigestSchema>;
 
 export const capRushVersionSetSchema = z.object({
   schemaVersion: z.literal(CAP_RUSH_SCHEMA_VERSION),
-  rulesVersion: z.enum(['cap-rush-rules-v1', 'cap-rush-rules-v2', CAP_RUSH_RULES_VERSION]),
+  rulesVersion: z.literal(CAP_RUSH_RULES_VERSION),
   salaryCurveVersion: z.literal(CAP_RUSH_SALARY_CURVE_VERSION),
   seedDerivationVersion: z.literal(CAP_RUSH_SEED_DERIVATION_VERSION),
   engineVersion: z.string().min(1).max(64),

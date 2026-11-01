@@ -139,11 +139,7 @@ export const capRushDraftStateSchema = z
     season: capRushSeasonStateSchema,
     postseasonEligible: z.boolean().optional(),
     postseason: capRushPostseasonSchema.optional(),
-    /**
-     * Pinned when the run is created. A run without it predates playoff performance, so its games
-     * keep the pre-feature simulation even if it has not locked or reached the playoffs yet.
-     */
-    playoffFormulaVersion: capRushPlayoffFormulaVersionSchema.optional(),
+    playoffFormulaVersion: capRushPlayoffFormulaVersionSchema,
   })
   .superRefine((state, ctx) => {
     const seasonStarted = state.season.games.length > 0;

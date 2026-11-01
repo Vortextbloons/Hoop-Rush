@@ -13,8 +13,7 @@ import {
   capRushLeagueGameSchema,
 } from '@hoop-rush/data-contracts';
 import type { EngineContext } from '../../../sim/kernel.ts';
-import { simulateValidatedHavocBattleGame } from '../../havoc/core/battle-game.ts';
-import { auditHavocBattleGame } from '../../havoc/core/battle-audit.ts';
+import { simulateAuditedHavocBattleGame } from '../../havoc/core/battle-game.ts';
 import { havocBattleGameResultDigest } from '../../havoc/core/battle-digests.ts';
 import { capRushBoxOf } from '../league-simulation.ts';
 import { buildCapRushConferenceStandings } from '../conference-standings.ts';
@@ -71,10 +70,10 @@ export function capRushMultiplayerSimulateGame(input: {
     homeTeamId: input.entry.homeTeamId,
     awayTeamId: input.entry.awayTeamId,
   });
-  const battle = simulateValidatedHavocBattleGame(battleInput, input.context, {
+  const battle = simulateAuditedHavocBattleGame(battleInput, input.context, {
     apron: apron?.hooks,
   });
-  const audit = auditHavocBattleGame(battleInput, battle.result, battle.tape);
+  const audit = battle.audit;
   if (!audit.ok) {
     throw new Error(
       `cap rush multiplayer: game ${input.entry.gameId} failed accounting: ${audit.findings
@@ -99,7 +98,9 @@ export function capRushMultiplayerSimulateGame(input: {
   });
   return {
     game,
-    tape: battle.tape,
+    get tape() {
+      return battle.tape;
+    },
     facts: apron?.facts() ?? [],
     input: battleInput,
     result: battle.result,
@@ -111,6 +112,7 @@ export function simulateCapRushMultiplayerSlot(input: {
   readonly slot: number;
   readonly context: EngineContext;
   readonly tapeGameIds?: readonly string[] | undefined;
+  readonly partition?: number;
 }): CapRushMultiplayerSlotSimulation {
   const entries = capRushMultiplayerSlotEntries(input.locked, input.slot);
   if (entries.length === 0) {
@@ -120,7 +122,14 @@ export function simulateCapRushMultiplayerSlot(input: {
   const games: CapRushLeagueGame[] = [];
   const facts: CapRushApronFact[] = [];
   const tapeIds = new Set(input.tapeGameIds ?? []);
-  for (const entry of entries) {
+  const midpoint = Math.ceil(entries.length / 2);
+  const selected =
+    input.partition === undefined
+      ? entries
+      : input.partition === 0
+        ? entries.slice(0, midpoint)
+        : entries.slice(midpoint);
+  for (const entry of selected) {
     const simulated = capRushMultiplayerSimulateGame({
       locked: input.locked,
       entry,

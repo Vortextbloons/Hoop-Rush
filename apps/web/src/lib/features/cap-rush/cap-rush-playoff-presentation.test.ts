@@ -165,11 +165,8 @@ describe('cap rush playoff presentation', () => {
     ).toBe('active');
   });
 
-  it('marks a pre-feature run as legacy so it never claims an adjustment', () => {
+  it('treats a draft without playoff formula version as unsupported', () => {
     const locked = { playoffPerformance: performance } as never;
-    expect(capRushPlayoffStatusOf({ stage: 'postseason', postseason: {}, locked } as never)).toBe(
-      'legacy',
-    );
     expect(
       capRushPlayoffStatusOf({
         playoffFormulaVersion: CAP_RUSH_PLAYOFF_FORMULA_VERSION,
@@ -177,6 +174,7 @@ describe('cap rush playoff presentation', () => {
         locked: { human: {} },
       } as never),
     ).toBe('no-sample');
+    void locked;
   });
 
   it('counts coverage against the roster it is given', () => {

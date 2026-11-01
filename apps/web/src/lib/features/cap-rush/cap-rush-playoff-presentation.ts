@@ -7,7 +7,7 @@ import {
   type CapRushPlayoffPlayer,
 } from '@hoop-rush/data-contracts';
 
-export type CapRushPlayoffStatus = 'active' | 'pending' | 'legacy' | 'no-sample';
+export type CapRushPlayoffStatus = 'active' | 'pending' | 'no-sample';
 export type CapRushPlayoffDirection = 'up' | 'down' | 'neutral';
 
 export interface CapRushPlayoffRow {
@@ -50,7 +50,6 @@ function isPostseason(draft: CapRushDraftState): boolean {
 }
 
 export function capRushPlayoffStatusOf(draft: CapRushDraftState): CapRushPlayoffStatus {
-  if (draft.playoffFormulaVersion === undefined) return 'legacy';
   if (draft.locked?.playoffPerformance === undefined) return 'no-sample';
   return isPostseason(draft) ? 'active' : 'pending';
 }

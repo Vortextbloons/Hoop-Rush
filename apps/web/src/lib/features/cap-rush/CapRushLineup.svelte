@@ -40,7 +40,6 @@
   const statusLabel: Record<CapRushPlayoffStatus, string> = {
     active: 'live now',
     pending: 'playoffs only',
-    legacy: 'not in this run',
     'no-sample': 'no sample',
   };
 </script>

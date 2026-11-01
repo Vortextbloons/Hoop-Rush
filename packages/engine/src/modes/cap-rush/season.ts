@@ -16,8 +16,7 @@ import {
   battleToSoloTape,
   soloToBattleInput,
 } from '../havoc/core/battle-adapters.ts';
-import { simulateValidatedHavocBattleGame } from '../havoc/core/battle-game.ts';
-import { auditHavocBattleGame } from '../havoc/core/battle-audit.ts';
+import { simulateAuditedHavocBattleGame } from '../havoc/core/battle-game.ts';
 import { buildCapRushGameInput } from './input.ts';
 import { capRushApronRuntimeFor } from './apron-runtime.ts';
 import type { CapRushApronFact } from '@hoop-rush/data-contracts';
@@ -69,14 +68,14 @@ export function simulateCapRushGame(input: {
   const humanSide = soloInput.humanSide;
   const apron = capRushApronRuntimeFor(locked, humanSide);
   const battleInput = soloToBattleInput(soloInput);
-  const battle = simulateValidatedHavocBattleGame(battleInput, input.context, { apron });
+  const battle = simulateAuditedHavocBattleGame(battleInput, input.context, { apron });
   const entry = locked.schedule[gameNumber - 1];
   if (entry === undefined) {
     throw new Error(`cap rush: no schedule entry for game ${String(gameNumber)}`);
   }
   const inputDigest = havocGameInputDigest(soloInput);
   const soloResult = battleToSoloResult(battle.result, humanSide, inputDigest);
-  const battleAudit = auditHavocBattleGame(battleInput, battle.result, battle.tape);
+  const battleAudit = battle.audit;
   const humanHome = humanSide === 'home';
   const humanPoints = humanHome ? battle.result.home.points : battle.result.away.points;
   const opponentPoints = humanHome ? battle.result.away.points : battle.result.home.points;

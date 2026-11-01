@@ -559,7 +559,7 @@
           <dl class="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
             {#if report.apronTriggers.isolations > 0}
               <div class="rounded-xl border border-line-soft px-3 py-3">
-                <dt class="text-xs text-muted-foreground">Forced isolations (legacy rules)</dt>
+                <dt class="text-xs text-muted-foreground">Forced isolations</dt>
                 <dd class="font-display mt-1 text-2xl font-extrabold tabular-nums">
                   {report.apronTriggers.isolations.toLocaleString()}
                 </dd>

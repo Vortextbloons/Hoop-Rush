@@ -1,5 +1,7 @@
 import { describe, expect, test, vi } from 'bun:test';
 import { createEngineContext, simulateCapRushMultiplayerSlot } from '@hoop-rush/engine';
+import { CapRushMultiplayerSession } from './session.ts';
+import { capRushMultiplayerStateDigest } from '@hoop-rush/engine';
 import { createSessionTestRoom } from './session-test-fixtures.ts';
 
 describe('cap rush multiplayer application session', () => {
@@ -255,4 +257,29 @@ test('syncs multiple offers and cancellation to the other seat', async () => {
     host.dispose();
     guest.dispose();
   }
+});
+
+test('uses the verification port and rejects mismatches and disposed results', async () => {
+  const room = await createSessionTestRoom();
+  let digest = '';
+  const verifyLog = vi.fn(() => Promise.resolve(digest));
+  const session = new CapRushMultiplayerSession({
+    transport: room.transport,
+    environment: room.environment,
+    roomId: room.roomId,
+    seat: 'p1',
+    newCommandId: () => 'verify-test',
+    verifyLog,
+  });
+  await session.attach();
+  digest = capRushMultiplayerStateDigest(session.current);
+  expect(await session.verifyLog()).toBe(true);
+  expect(verifyLog).toHaveBeenCalledTimes(1);
+  digest = 'mismatch';
+  expect(await session.verifyLog()).toBe(false);
+  verifyLog.mockImplementation(() => {
+    session.dispose();
+    return Promise.resolve(capRushMultiplayerStateDigest(session.current));
+  });
+  expect(await session.verifyLog()).toBe(false);
 });

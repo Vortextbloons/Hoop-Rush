@@ -34,6 +34,7 @@ export const capRushWorkerSimulateRequestSchema = capRushWorkerBase.extend({
   count: z.number().int().min(1).max(CAP_RUSH_GAME_COUNT),
   includeTape: z.boolean().optional(),
   leagueOnly: z.boolean().optional(),
+  partition: z.number().int().min(0).max(1).optional(),
   backfillLeagueFrom: z.number().int().min(1).max(CAP_RUSH_GAME_COUNT).optional(),
   backfillLeagueTo: z.number().int().min(1).max(CAP_RUSH_GAME_COUNT).optional(),
 });

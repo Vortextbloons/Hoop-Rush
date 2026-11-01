@@ -1,11 +1,5 @@
 import { GameExecution } from './game-execution.ts';
-import {
-  canonicalJson,
-  commandIdSchema,
-  idSchema,
-  type CommandId,
-  type Id,
-} from '@hoop-rush/data-contracts';
+import { canonicalJson, idSchema, type CommandId, type Id } from '@hoop-rush/data-contracts';
 import {
   CoalescedTask,
   SessionEvents,
@@ -28,13 +22,11 @@ import {
   type SeriesMember,
   type SeriesParticipantId,
 } from './series-coordinator.ts';
-import {
-  CommandRecovery,
-  executeMultiplayerCommand,
-  type RecoveredCommandReceipt,
-} from './command-execution.ts';
-import { mergeCommandLog, type CommandLogMerge } from './command-log.ts';
+import { type RecoveredCommandReceipt } from './command-execution.ts';
 import { PendingReadyCoordinator } from './pending-ready.ts';
+import { DeadlineRecovery } from './deadline-recovery.ts';
+import { RoomActions } from './room-actions.ts';
+import { RoomSynchronization } from './room-synchronization.ts';
 
 const TICK_MS = 250;
 
@@ -140,56 +132,65 @@ export interface SeriesRoomSessionDeps<
  * actions. Mode subclasses own their draft/result rules and command payloads;
  * everything here is derived from the same room/job/playback contract.
  */
+export interface SeriesRoomModel {
+  snapshot: SeriesRoomSnapshotBase;
+  phase: string;
+  output: SeriesGameOutput;
+  resultRow: unknown;
+  payload: unknown;
+  command: SeriesSessionCommand;
+  verification: SeriesVerification;
+  storedVerification: unknown;
+  completed: unknown;
+  membership: { participantId: SeriesParticipantId };
+  transient: unknown;
+}
+
 export abstract class SeriesRoomSession<
-  TSnapshot extends SeriesRoomSnapshotBase,
-  TPhase extends string,
-  TOutput extends SeriesGameOutput,
-  TResultRow,
-  TPayload,
-  TCommand extends SeriesSessionCommand,
-  TVerification extends SeriesVerification,
-  TStoredVerification,
-  TCompleted,
-  TMembership extends { participantId: SeriesParticipantId },
-  TTransient,
+  TMode extends SeriesRoomModel,
   TDeps extends SeriesRoomSessionDeps<
-    TMembership,
-    TSnapshot,
-    TTransient,
-    TPayload,
-    TCommand,
-    TStoredVerification,
-    TCompleted,
-    TResultRow
+    TMode['membership'],
+    TMode['snapshot'],
+    TMode['transient'],
+    TMode['payload'],
+    TMode['command'],
+    TMode['storedVerification'],
+    TMode['completed'],
+    TMode['resultRow']
   >,
 > {
   protected readonly deps: TDeps;
-  protected readonly events: SessionEvents<TTransient>;
+  protected readonly events: SessionEvents<TMode['transient']>;
   protected readonly lifecycle: RoomLifecycle;
   protected attachment: RoomAttachment | null = null;
   protected readonly seriesFlow: SeriesCoordinator;
-  protected readonly commandRecovery = new CommandRecovery();
+  private readonly actions = new RoomActions();
+  private readonly synchronization = new RoomSynchronization<TMode['snapshot'], TMode['command']>();
   protected readonly syncTask: CoalescedTask;
   protected readonly tickLoop: TickLoop;
-  protected snapshot: TSnapshot | null = null;
+  protected snapshot: TMode['snapshot'] | null = null;
   protected participantId: SeriesParticipantId | null = null;
-  protected commands: TCommand[] = [];
-  protected persistedCommandCount = 0;
+  protected get commands(): TMode['command'][] {
+    return this.synchronization.commands;
+  }
+  protected get persistedCommandCount(): number {
+    return this.synchronization.persistedCount;
+  }
   protected savedActiveKey: string | null = null;
-  protected verification: TVerification[] = [];
-  protected busy = false;
+  protected verification: TMode['verification'][] = [];
+  protected get busy(): boolean {
+    return this.actions.busy;
+  }
   protected error: string | null = null;
   protected notice: string | null = null;
   protected integrityFailed = false;
   protected progress = 0;
-  protected readonly games = new GameExecution<TOutput>();
-  protected get outputs(): Record<number, TOutput> {
+  protected readonly games = new GameExecution<TMode['output']>();
+  protected get outputs(): Record<number, TMode['output']> {
     return this.games.getOutputs();
   }
   protected now: number;
-  protected resolvedCursor: string | null = null;
-  protected deadlineResolving = false;
-  protected deadlineRetryAtMs = 0;
+  protected readonly deadlineRecovery = new DeadlineRecovery();
   protected rematchRetryAtMs = 0;
   protected readonly pendingReady: PendingReadyCoordinator;
   protected seenBroadcastGame: number | null = null;
@@ -207,7 +208,7 @@ export abstract class SeriesRoomSession<
     this.deps = deps;
     this.retryMs = config.retryMs;
     this.readyWindowMs = config.readyWindowMs;
-    this.events = new SessionEvents<TTransient>();
+    this.events = new SessionEvents<TMode['transient']>();
     this.lifecycle = new RoomLifecycle(() => {
       this.publish();
     });
@@ -231,28 +232,31 @@ export abstract class SeriesRoomSession<
   protected abstract loadAssets(): Promise<void>;
   protected abstract hasAssets(): boolean;
   protected abstract resetModeState(): void;
-  protected abstract setVerification(verification: TStoredVerification): void;
-  protected abstract setCompleted(completed: TCompleted): void;
-  protected abstract mergeOutputs(rows: readonly TResultRow[]): void;
+  protected abstract setVerification(verification: TMode['storedVerification']): void;
+  protected abstract setCompleted(completed: TMode['completed']): void;
+  protected abstract mergeOutputs(rows: readonly TMode['resultRow'][]): void;
   protected abstract currentGameNumber(): number | null;
-  protected abstract currentOutput(): TOutput | null;
+  protected abstract currentOutput(): TMode['output'] | null;
   protected abstract dueDeadline(): { cursor: string } | null;
-  protected abstract deadlineFallback(cursor: string): TPayload | null;
+  protected abstract deadlineFallback(cursor: string): TMode['payload'] | null;
 
   protected abstract buildCommand(
     commandId: CommandId,
-    payload: TPayload,
+    payload: TMode['payload'],
     roomId: Id,
     participantId: SeriesParticipantId,
-  ): TCommand;
+  ): TMode['command'];
   protected abstract shouldRebuildDraft(commandsChanged: boolean): boolean;
-  protected abstract appendCommands(roomId: string, commands: readonly TCommand[]): Promise<void>;
+  protected abstract appendCommands(
+    roomId: string,
+    commands: readonly TMode['command'][],
+  ): Promise<void>;
   protected abstract persistActive(): Promise<void>;
   protected abstract rebuildDraft(): void;
-  protected abstract saveVerification(entries: readonly TVerification[]): void;
-  protected abstract readyNextPayload(gameNumber: number): TPayload;
-  protected abstract confirmPayload(output: TOutput, verified: boolean): TPayload;
-  protected abstract proposeWinner(output: TOutput): SeriesParticipantId;
+  protected abstract saveVerification(entries: readonly TMode['verification'][]): void;
+  protected abstract readyNextPayload(gameNumber: number): TMode['payload'];
+  protected abstract confirmPayload(output: TMode['output'], verified: boolean): TMode['payload'];
+  protected abstract proposeWinner(output: TMode['output']): SeriesParticipantId;
 
   /**
    * Produce one game's output for a game number.
@@ -264,10 +268,10 @@ export abstract class SeriesRoomSession<
    * before publication, cancellation, and error reporting — is identical and
    * is composed here through `GameExecution`.
    */
-  protected abstract simulateGame(gameNumber: number): Promise<TOutput>;
+  protected abstract simulateGame(gameNumber: number): Promise<TMode['output']>;
 
   /** Persist a freshly simulated output before it may be published. */
-  protected abstract persistOutput(output: TOutput): Promise<void>;
+  protected abstract persistOutput(output: TMode['output']): Promise<void>;
 
   /**
    * Run, persist, and publish the current game exactly once.
@@ -312,14 +316,14 @@ export abstract class SeriesRoomSession<
     }
   }
 
-  protected ordinalOf?: (command: TCommand) => number;
-  protected onSnapshot?: (snapshot: TSnapshot) => void;
+  protected ordinalOf?: (command: TMode['command']) => number;
+  protected onSnapshot?: (snapshot: TMode['snapshot']) => void;
 
   subscribe(listener: () => void): () => void {
     return this.events.subscribe(listener);
   }
 
-  subscribeTransient(listener: (event: TTransient) => void): () => void {
+  subscribeTransient(listener: (event: TMode['transient']) => void): () => void {
     return this.events.subscribeTransient(listener);
   }
 
@@ -411,46 +415,39 @@ export abstract class SeriesRoomSession<
   }
 
   protected async runBusy<T>(action: () => Promise<T>): Promise<T | null> {
-    this.busy = true;
+    if (this.disposed || this.busy) return null;
+    const isDisposed = () => this.disposed;
     this.error = null;
+    const pending = this.actions.run(action);
     this.publish();
-    try {
-      return await action();
-    } catch (error) {
-      this.error = this.deps.friendlyError(error);
-      return null;
-    } finally {
-      this.busy = false;
-      this.publish();
-    }
+    const outcome = await pending;
+    if (isDisposed() || outcome.kind === 'abandoned') return null;
+    if (outcome.kind === 'failed') this.error = this.deps.friendlyError(outcome.error);
+    this.publish();
+    return outcome.kind === 'succeeded' ? outcome.value : null;
   }
 
   protected shouldPersistActive(): boolean {
     return true;
   }
 
-  protected deadlineOutcome(cursor: string, accepted: boolean): void {
-    if (accepted) this.resolvedCursor = cursor;
-    else this.deadlineRetryAtMs = this.deps.now() + this.retryMs;
-  }
-
-  protected broadcastStartPayload(gameNumber: number, auto: boolean): TPayload {
+  protected broadcastStartPayload(gameNumber: number, auto: boolean): TMode['payload'] {
     return {
       kind: 'broadcast-start',
       gameNumber,
       ...(auto ? { auto: true } : {}),
-    } as TPayload;
+    };
   }
 
-  protected rematchRequestPayload(): TPayload {
-    return { kind: 'rematch-request' } as TPayload;
+  protected rematchRequestPayload(): TMode['payload'] {
+    return { kind: 'rematch-request' };
   }
 
-  protected rematchConfirmPayload(): TPayload {
-    return { kind: 'rematch-confirm' } as TPayload;
+  protected rematchConfirmPayload(): TMode['payload'] {
+    return { kind: 'rematch-confirm' };
   }
 
-  protected proposePayload(output: TOutput): TPayload {
+  protected proposePayload(output: TMode['output']): TMode['payload'] {
     return {
       kind: 'propose-result',
       gameNumber: output.gameNumber,
@@ -458,7 +455,7 @@ export abstract class SeriesRoomSession<
       resultDigest: output.resultDigest,
       tapeDigest: output.tapeDigest,
       inputDigest: output.inputDigest,
-    } as TPayload;
+    };
   }
 
   protected async rematchAndResume(roomId: string): Promise<void> {
@@ -568,12 +565,12 @@ export abstract class SeriesRoomSession<
     if (!this.disposed) this.events.publish();
   }
 
-  protected emitTransient(event: TTransient): void {
+  protected emitTransient(event: TMode['transient']): void {
     this.events.emitTransient(event);
   }
 
-  protected phase(): TPhase {
-    return (this.snapshot?.phase ?? 'lobby') as TPhase;
+  protected phase(): TMode['phase'] {
+    return (this.snapshot?.phase ?? 'lobby');
   }
 
   protected viewBase() {
@@ -647,7 +644,7 @@ export abstract class SeriesRoomSession<
     });
   }
 
-  protected applySnapshot(snapshot: TSnapshot, publish = true): void {
+  protected applySnapshot(snapshot: TMode['snapshot'], publish = true): void {
     if (
       this.disposed ||
       snapshot.roomId !== this.roomId ||
@@ -695,7 +692,7 @@ export abstract class SeriesRoomSession<
       localResultDigest: localDigest,
       peerResultDigest: peerDigest,
       status,
-    } as unknown as TVerification);
+    } as unknown as TMode['verification']);
     this.publish();
     this.saveVerification(this.verification);
   }
@@ -756,46 +753,31 @@ export abstract class SeriesRoomSession<
     });
   }
 
-  protected async submitPayload(payload: TPayload): Promise<boolean> {
+  protected async submitPayload(payload: TMode['payload']): Promise<boolean> {
     const attachment = this.attachment;
     if (!attachment?.current() || !this.roomId || !this.participantId) return false;
     if (this.busy) return false;
-    this.busy = true;
     this.error = null;
-    this.publish();
     const roomId = this.roomId;
     const participantId = this.participantId;
     try {
-      const commandId = commandIdSchema.parse(
-        this.commandRecovery.id(payload, this.deps.newCommandId),
-      );
-      const report = await executeMultiplayerCommand(
-        this.buildCommand(commandId, payload, roomId, participantId),
-        {
-          submit: (command) => this.deps.transport.submitCommand(command),
-          classify: (receipt) =>
-            receipt.accepted
-              ? 'accepted'
-              : receipt.rejectionCode === 'stale-revision'
-                ? 'stale'
-                : 'rejected',
-        },
-      );
-      if (!attachment.current()) return false;
-      if (report.receipt) this.commandRecovery.settled(payload);
-      if (!report.receipt?.accepted) {
-        throw new Error(`${this.rejectedLabel}: ${report.receipt?.rejectionCode ?? 'unknown'}`);
-      }
-      if (!attachment.current()) return false;
-      await this.syncFromServer();
-      return true;
+      const pending = this.actions.submit({
+        payload,
+        current: attachment.current,
+        newCommandId: this.deps.newCommandId,
+        build: (id) => this.buildCommand(id, payload, roomId, participantId),
+        submit: (command) => this.deps.transport.submitCommand(command),
+        sync: () => this.syncFromServer(),
+        rejectedLabel: this.rejectedLabel,
+      });
+      this.publish();
+      return (await pending) === 'accepted';
     } catch (error) {
       if (!attachment.current()) return false;
       this.error = this.deps.friendlyError(error);
       return false;
     } finally {
       if (attachment.current()) {
-        this.busy = false;
         this.maybeProposeOrConfirm();
         this.maybeReadyNextGame();
         this.publish();
@@ -807,22 +789,18 @@ export abstract class SeriesRoomSession<
     this.tickLoop.dispose();
     this.seriesFlow.reset();
     this.games.reset();
-    this.commandRecovery.reset();
+    this.actions.reset();
+    this.synchronization.reset();
     this.snapshot = null;
     this.participantId = null;
-    this.commands = [];
-    this.persistedCommandCount = 0;
     this.verification = [];
     this.savedActiveKey = null;
     this.completedPersisted = false;
     this.progress = 0;
-    this.busy = false;
     this.error = null;
     this.notice = null;
     this.integrityFailed = false;
-    this.resolvedCursor = null;
-    this.deadlineResolving = false;
-    this.deadlineRetryAtMs = 0;
+    this.deadlineRecovery.reset();
     this.rematchRetryAtMs = 0;
     this.pendingReady.reset();
     this.seenBroadcastGame = null;
@@ -849,36 +827,18 @@ export abstract class SeriesRoomSession<
   }
 
   private async resolveDeadline(cursor: string): Promise<void> {
-    if (this.deadlineResolving || !this.roomId || !this.participantId) return;
+    if (!this.roomId || !this.participantId) return;
     const payload = this.deadlineFallback(cursor);
-    if (payload === null) return;
     const attachment = this.attachment;
-    if (!attachment?.current()) return;
-    this.deadlineResolving = true;
-    try {
-      await this.deps.transport.commitFallback(attachment.roomId, cursor, payload);
-      if (!attachment.current()) return;
-      const receipt = await this.deps.transport.resolveTimeout(attachment.roomId);
-      if (!attachment.current()) return;
-      this.deadlineOutcome(cursor, receipt?.accepted === true);
-      await this.syncFromServer();
-    } catch {
-      if (attachment.current()) this.deadlineOutcome(cursor, false);
-    } finally {
-      if (attachment.current()) this.deadlineResolving = false;
-    }
-  }
-
-  private mergeLog(
-    local: readonly TCommand[],
-    fetched: readonly TCommand[],
-    expectedCount: number,
-  ): CommandLogMerge<TCommand> {
-    return mergeCommandLog({
-      local,
-      fetched,
-      expectedCount,
-      ordinalOf: this.ordinalOf,
+    if (payload === null || !attachment?.current()) return;
+    await this.deadlineRecovery.resolve({
+      cursor,
+      current: attachment.current,
+      now: this.deps.now,
+      retryMs: this.retryMs,
+      commit: () => this.deps.transport.commitFallback(attachment.roomId, cursor, payload),
+      resolveTimeout: () => this.deps.transport.resolveTimeout(attachment.roomId),
+      sync: () => this.syncFromServer(),
     });
   }
 
@@ -889,32 +849,20 @@ export abstract class SeriesRoomSession<
     const roomId = attachment.roomId;
     const isDisposed = () => !attachment.current();
     try {
-      let resumed = await this.deps.transport.sync(roomId, this.commands.length - 1);
+      const resumed = await this.synchronization.fetch({
+        current: attachment.current,
+        revision: () => this.snapshot?.revision ?? -1,
+        ordinalOf: this.ordinalOf,
+        sync: (ordinal) => this.deps.transport.sync(roomId, ordinal),
+      });
       if (isDisposed()) return;
-      this.lifecycle.connected(attachment);
-      this.error = null;
-      let merged = this.mergeLog(
-        this.commands,
-        resumed.commands,
-        resumed.commandCount ?? resumed.snapshot.commandCount ?? this.commands.length,
-      );
-      if (!merged.complete) {
-        resumed = await this.deps.transport.sync(roomId, -1);
-        if (isDisposed()) return;
-        merged = this.mergeLog(
-          [],
-          resumed.commands,
-          resumed.commandCount ?? resumed.snapshot.commandCount ?? 0,
-        );
-        if (!merged.complete) throw new Error('room sync returned an incomplete command log');
-      }
-      if (isDisposed()) return;
-      if (this.snapshot && resumed.snapshot.revision < this.snapshot.revision) {
+      if (resumed === null) {
         void this.syncFromServer();
         return;
       }
-      const commandsChanged = merged.commands.length !== this.commands.length;
-      this.commands = merged.commands;
+      this.lifecycle.connected(attachment);
+      this.error = null;
+      const commandsChanged = resumed.commandsChanged;
       this.applySnapshot(resumed.snapshot, false);
       if (!this.afterSnapshotCompatible()) return;
       if (this.shouldRebuildDraft(commandsChanged)) this.rebuildDraft();
@@ -924,11 +872,12 @@ export abstract class SeriesRoomSession<
         if (isDisposed()) return;
       }
       if (this.shouldPersistActive()) {
-        if (this.commands.length > this.persistedCommandCount) {
-          await this.appendCommands(roomId, this.commands.slice(this.persistedCommandCount));
-          if (isDisposed()) return;
-          this.persistedCommandCount = this.commands.length;
-        }
+        if (
+          !(await this.synchronization.persist(attachment.current, (commands) =>
+            this.appendCommands(roomId, commands),
+          ))
+        )
+          return;
         await this.runGamePipeline();
         if (isDisposed()) return;
         await this.persistActive();

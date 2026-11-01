@@ -5,6 +5,7 @@ import {
   type CapRushPlayoffGameSummary,
 } from '@hoop-rush/data-contracts';
 import {
+  replayCapRushMultiplayerLog,
   capRushMultiplayerSimulateGame,
   applyCapRushMultiplayerCommand,
   adaptCapRushCatalog,
@@ -56,6 +57,22 @@ self.onmessage = (event: MessageEvent<unknown>) => {
         ...request.environment,
         index: catalogIndexOf(request.environment),
       };
+      if (request.verifyLog) {
+        if (request.state.rootSeed === null) throw new Error('the room has no root seed');
+        const replayed = replayCapRushMultiplayerLog({
+          rootSeed: request.state.rootSeed,
+          commands: request.commands,
+          environment,
+          variant: request.variant,
+        });
+        post({
+          schemaVersion: CAP_RUSH_MULTIPLAYER_WORKER_WIRE_SCHEMA_VERSION,
+          kind: 'cap-rush-multiplayer-projection',
+          requestId: request.requestId,
+          state: replayed.state,
+        });
+        return;
+      }
       let state = request.state;
       for (const command of request.commands) {
         const outcome = applyCapRushMultiplayerCommand(
@@ -96,6 +113,7 @@ self.onmessage = (event: MessageEvent<unknown>) => {
           slot,
           context,
           tapeGameIds: request.tapeGameIds,
+          partition: request.partition,
         });
         games.push(...simulated.games);
         tapes.push(...[...simulated.tapes].map(([gameId, tape]) => ({ gameId, tape })));

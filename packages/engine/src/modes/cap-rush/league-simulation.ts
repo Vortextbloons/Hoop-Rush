@@ -21,8 +21,7 @@ import {
   capRushLeagueGameSeed,
 } from '@hoop-rush/data-contracts';
 import type { EngineContext } from '../../sim/kernel.ts';
-import { simulateHavocBattleGame } from '../havoc/core/battle-game.ts';
-import { auditHavocBattleGame } from '../havoc/core/battle-audit.ts';
+import { simulateAuditedHavocBattleGame } from '../havoc/core/battle-game.ts';
 import { havocBattleGameResultDigest } from '../havoc/core/battle-digests.ts';
 import { capRushBattleVersionSet } from './input.ts';
 
@@ -159,8 +158,8 @@ export function simulateCapRushLeagueGame(input: {
     away: battleTeamOf(away, 'away'),
     versionSet: capRushBattleVersionSet(locked),
   };
-  const battle = simulateHavocBattleGame(battleInput, input.context);
-  const audit = auditHavocBattleGame(battleInput, battle.result, battle.tape);
+  const battle = simulateAuditedHavocBattleGame(battleInput, input.context);
+  const audit = battle.audit;
   if (!audit.ok) {
     throw new Error(
       `cap rush league: game ${entry.gameId} failed accounting: ${audit.findings.map((finding) => finding.message).join('; ')}`,
@@ -185,8 +184,17 @@ export function simulateCapRushLeagueSlot(input: {
   readonly locked: CapRushLockedInputs;
   readonly slot: number;
   readonly context: EngineContext;
+  readonly partition?: number;
 }): CapRushLeagueGame[] {
-  return capRushLeagueSlotGames(input.locked, input.slot).map((entry) =>
+  const entries = capRushLeagueSlotGames(input.locked, input.slot);
+  const midpoint = Math.ceil(entries.length / 2);
+  const selected =
+    input.partition === undefined
+      ? entries
+      : input.partition === 0
+        ? entries.slice(0, midpoint)
+        : entries.slice(midpoint);
+  return selected.map((entry) =>
     simulateCapRushLeagueGame({ locked: input.locked, entry, context: input.context }),
   );
 }

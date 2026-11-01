@@ -4,12 +4,7 @@ import { playerIdSchema, seasonKeySchema } from './ids.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
 
 export const CAP_RUSH_PLAYOFF_FORMULA_VERSION = 'cap-rush-playoff-formula-v4';
-export const capRushPlayoffFormulaVersionSchema = z.enum([
-  'cap-rush-playoff-formula-v1',
-  'cap-rush-playoff-formula-v2',
-  'cap-rush-playoff-formula-v3',
-  CAP_RUSH_PLAYOFF_FORMULA_VERSION,
-]);
+export const capRushPlayoffFormulaVersionSchema = z.literal(CAP_RUSH_PLAYOFF_FORMULA_VERSION);
 export const CAP_RUSH_PLAYOFF_SAMPLE_MINUTES = 180;
 export const CAP_RUSH_PLAYOFF_MAX_PLAYERS = 320;
 

@@ -58,18 +58,10 @@ import {
   scopedNumericRows,
   type ParseableSchema,
 } from './support.ts';
+import type { CapRushApplyOutcomeInput } from '@hoop-rush/data-contracts';
+import { CAP_RUSH_RULES_VERSION } from '@hoop-rush/data-contracts';
 
-export interface CapRushApplyOutcomeInput {
-  readonly outcome: {
-    readonly state: CapRushDraftState;
-    readonly result: CapRushCommandResult;
-  };
-  readonly command: CapRushCommand;
-  readonly game?: CapRushStoredGame;
-  readonly playoffGame?: CapRushStoredPlayoffGame;
-  readonly leagueGames?: readonly CapRushLeagueGame[];
-  readonly report?: CapRushReport;
-}
+export type { CapRushApplyOutcomeInput } from '@hoop-rush/data-contracts';
 
 export interface CapRushCompletedRun {
   readonly entry: CapRushHistoryEntry;
@@ -185,6 +177,15 @@ export class DexieCapRushRepository {
         ) {
           throw unsupported('active cap rush draft uses an unsupported salary curve version');
         }
+        if (
+          typeof versionSet === 'object' &&
+          versionSet !== null &&
+          'rulesVersion' in versionSet &&
+          typeof versionSet.rulesVersion === 'string' &&
+          versionSet.rulesVersion !== CAP_RUSH_RULES_VERSION
+        ) {
+          throw unsupported('active cap rush draft uses an unsupported rules version');
+        }
       }
     }
     const parsed = parseStored(storedCapRushDraftRowSchema, row, 'active cap rush draft');
@@ -203,6 +204,10 @@ export class DexieCapRushRepository {
 
   async applyOutcome(input: CapRushApplyOutcomeInput): Promise<CapRushCommandResult> {
     const result = capRushCommandResultSchema.parse(input.outcome.result);
+    invariant(
+      input.expectedRevision === result.revisionBefore,
+      'commit expected revision does not match the outcome receipt',
+    );
     const command = capRushCommandSchema.parse(input.command);
     const state = input.outcome.state;
     invariant(

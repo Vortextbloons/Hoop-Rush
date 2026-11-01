@@ -58,6 +58,16 @@ gathers intent, the engine owns basketball rules, adapters own I/O.
   revision, ordinal continuity, payload schema. It reports a neutral reason and
   each mode maps that to its own published rejection code, so per-mode
   vocabularies stay intact until they are unified deliberately.
+- Series room orchestration composes `RoomSynchronization` (validated logs and
+  durable command cursors), `RoomActions` (busy state and stable retry IDs),
+  `DeadlineRecovery` (room-scoped timeout recovery), `GameExecution` (committed
+  outputs), and `SeriesCoordinator` (readiness and playback). Mode adapters use
+  a named `SeriesRoomModel` type map rather than positional type arguments.
+  The session template retains phase policy and mode hooks.
+- Cap Rush and Havoc commits use `command-commit.ts` in data-contracts. Both
+  application ports and persistence adapters use the same outcome/artifact
+  contracts. Each commit states its expected revision; adapters validate it
+  against the receipt before entering the existing atomic write path.
 - `SeriesRoomSession.runGamePipeline` (`src/multiplayer/series-room-session.ts`):
   composes `GameExecution` for Draft Duel and Havoc. The execution owns in-flight
   games and committed outputs, and returns a typed outcome. Outputs become

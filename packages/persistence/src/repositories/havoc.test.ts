@@ -74,11 +74,16 @@ import {
   testDatabaseName,
   TestDatabase,
 } from '../testing/repo-test-support.ts';
+import { prepareCommandCommit } from '@hoop-rush/data-contracts';
 
 const RUN_ID = idSchema.parse('havoc-run-1');
+
 const RUN_ID_2 = idSchema.parse('havoc-run-2');
+
 const OFFER_1 = `hvo-${'3'.repeat(32)}`;
+
 const OFFER_2 = `hvo-${'6'.repeat(32)}`;
+
 const OFFER_3 = `hvo-${'9'.repeat(32)}`;
 
 const ZERO_DELTA: HavocStatDelta = {
@@ -588,41 +593,49 @@ async function applyDraftChain(
 ): Promise<ReturnType<typeof buildDraftChainStates>> {
   const states = buildDraftChainStates();
   await repo.applyOutcome(
-    withCommands
-      ? {
-          outcome: acceptedOutcome(states.create, 0, 'cmd-create'),
-          command: buildCreateCommand('cmd-create'),
-        }
-      : { outcome: acceptedOutcome(states.create, 0, 'cmd-create') },
+    prepareCommandCommit(
+      withCommands
+        ? {
+            outcome: acceptedOutcome(states.create, 0, 'cmd-create'),
+            command: buildCreateCommand('cmd-create'),
+          }
+        : { outcome: acceptedOutcome(states.create, 0, 'cmd-create') },
+    ),
   );
   expect(await repo.loadActiveRun()).toEqual(states.create);
   await repo.applyOutcome(
-    withCommands
-      ? {
-          outcome: acceptedOutcome(states.reroll, 1, 'cmd-reroll'),
-          command: buildRerollCommand('cmd-reroll', 1, OFFER_1),
-        }
-      : { outcome: acceptedOutcome(states.reroll, 1, 'cmd-reroll') },
+    prepareCommandCommit(
+      withCommands
+        ? {
+            outcome: acceptedOutcome(states.reroll, 1, 'cmd-reroll'),
+            command: buildRerollCommand('cmd-reroll', 1, OFFER_1),
+          }
+        : { outcome: acceptedOutcome(states.reroll, 1, 'cmd-reroll') },
+    ),
   );
   expect(await repo.loadActiveRun()).toEqual(states.reroll);
   await repo.applyOutcome(
-    withCommands
-      ? {
-          outcome: acceptedOutcome(states.pick, 2, 'cmd-pick'),
-          command: buildPickCommand('cmd-pick', 2, OFFER_2, states.pick0.card.cardId),
-        }
-      : { outcome: acceptedOutcome(states.pick, 2, 'cmd-pick') },
+    prepareCommandCommit(
+      withCommands
+        ? {
+            outcome: acceptedOutcome(states.pick, 2, 'cmd-pick'),
+            command: buildPickCommand('cmd-pick', 2, OFFER_2, states.pick0.card.cardId),
+          }
+        : { outcome: acceptedOutcome(states.pick, 2, 'cmd-pick') },
+    ),
   );
   expect(await repo.loadActiveRun()).toEqual(states.pick);
   const lockedInputs = states.locked.locked;
   if (lockedInputs === null) throw new Error('locked fixture missing inputs');
   await repo.applyOutcome(
-    withCommands
-      ? {
-          outcome: acceptedOutcome(states.locked, 3, 'cmd-lock'),
-          command: buildLockCommand('cmd-lock', 3, lockedInputs.picks),
-        }
-      : { outcome: acceptedOutcome(states.locked, 3, 'cmd-lock') },
+    prepareCommandCommit(
+      withCommands
+        ? {
+            outcome: acceptedOutcome(states.locked, 3, 'cmd-lock'),
+            command: buildLockCommand('cmd-lock', 3, lockedInputs.picks),
+          }
+        : { outcome: acceptedOutcome(states.locked, 3, 'cmd-lock') },
+    ),
   );
   expect(await repo.loadActiveRun()).toEqual(states.locked);
   return states;
@@ -651,15 +664,19 @@ async function archiveRunAtGame82(
   locked: HavocRunState,
 ): Promise<{ final: HavocRunState; game: GameBundle }> {
   const state = lateSeasonState(locked);
-  await repo.applyOutcome({
-    outcome: acceptedOutcome(state, locked.revision, 'cmd-batch-81'),
-  });
+  await repo.applyOutcome(
+    prepareCommandCommit({
+      outcome: acceptedOutcome(state, locked.revision, 'cmd-batch-81'),
+    }),
+  );
   const game = buildGame(state, HAVOC_GAME_COUNT, 'havoc', 'cmd-game-82');
-  await repo.applyOutcome({
-    outcome: acceptedOutcome(game.nextState, state.revision, game.commandId),
-    command: game.command,
-    game: { result: game.result, inputDigest: game.inputDigest, resultDigest: game.resultDigest },
-  });
+  await repo.applyOutcome(
+    prepareCommandCommit({
+      outcome: acceptedOutcome(game.nextState, state.revision, game.commandId),
+      command: game.command,
+      game: { result: game.result, inputDigest: game.inputDigest, resultDigest: game.resultDigest },
+    }),
+  );
   return { final: game.nextState, game };
 }
 
@@ -669,18 +686,20 @@ async function applyGameBundle(
   bundle: GameBundle,
   extras: { tape?: HavocGameTape } = {},
 ): Promise<HavocCommandResult> {
-  return repo.applyOutcome({
-    outcome: acceptedOutcome(bundle.nextState, state.revision, bundle.commandId),
-    command: bundle.command,
-    game: {
-      result: bundle.result,
-      inputDigest: bundle.inputDigest,
-      resultDigest: bundle.resultDigest,
-    },
-    ...(extras.tape === undefined
-      ? {}
-      : { tape: { tape: extras.tape, tapeDigest: seasonDigestHex('tape'), selectedRank: 1 } }),
-  });
+  return repo.applyOutcome(
+    prepareCommandCommit({
+      outcome: acceptedOutcome(bundle.nextState, state.revision, bundle.commandId),
+      command: bundle.command,
+      game: {
+        result: bundle.result,
+        inputDigest: bundle.inputDigest,
+        resultDigest: bundle.resultDigest,
+      },
+      ...(extras.tape === undefined
+        ? {}
+        : { tape: { tape: extras.tape, tapeDigest: seasonDigestHex('tape'), selectedRank: 1 } }),
+    }),
+  );
 }
 
 async function expectHavocLoadError(
@@ -718,16 +737,30 @@ describe('DexieHavocRepository', () => {
     db.close();
   });
 
+  it('rejects an inconsistent commit expectation before writing any rows', async () => {
+    const { db, repo } = createRepository('havoc-commit-expectation');
+    const states = buildDraftChainStates();
+    await expect(
+      repo.applyOutcome({
+        ...prepareCommandCommit({ outcome: acceptedOutcome(states.create, 0, 'cmd-create') }),
+        expectedRevision: 99,
+      }),
+    ).rejects.toThrow('commit expected revision');
+    expect(await repo.loadActiveRun()).toBeNull();
+    expect(await db.havocCommands.count()).toBe(0);
+    db.close();
+  });
+
   it('keeps duplicate command ids idempotent without command payloads', async () => {
     const { db, repo } = createRepository('havoc-idempotent');
     const states = await applyDraftChain(repo, false);
     const createOutcome = acceptedOutcome(states.create, 0, 'cmd-create');
-    const first = await repo.applyOutcome({ outcome: createOutcome });
-    const second = await repo.applyOutcome({ outcome: createOutcome });
+    const first = await repo.applyOutcome(prepareCommandCommit({ outcome: createOutcome }));
+    const second = await repo.applyOutcome(prepareCommandCommit({ outcome: createOutcome }));
     expect(second).toEqual(first);
     const rerollOutcome = acceptedOutcome(states.reroll, 1, 'cmd-reroll');
-    const rerollFirst = await repo.applyOutcome({ outcome: rerollOutcome });
-    const rerollSecond = await repo.applyOutcome({ outcome: rerollOutcome });
+    const rerollFirst = await repo.applyOutcome(prepareCommandCommit({ outcome: rerollOutcome }));
+    const rerollSecond = await repo.applyOutcome(prepareCommandCommit({ outcome: rerollOutcome }));
     expect(rerollSecond).toEqual(rerollFirst);
     expect((await repo.loadActiveRun())?.revision).toBe(4);
     expect(await db.havocCommands.count()).toBe(4);
@@ -750,11 +783,11 @@ describe('DexieHavocRepository', () => {
       seasonDigestHex('different-state'),
     );
     await expect(
-      repo.applyOutcome({ outcome: conflicting, command: duplicateCommand }),
+      repo.applyOutcome(prepareCommandCommit({ outcome: conflicting, command: duplicateCommand })),
     ).rejects.toBeInstanceOf(HavocCommandConflictError);
-    await expect(repo.applyOutcome({ outcome: conflicting })).rejects.toBeInstanceOf(
-      HavocCommandConflictError,
-    );
+    await expect(
+      repo.applyOutcome(prepareCommandCommit({ outcome: conflicting })),
+    ).rejects.toBeInstanceOf(HavocCommandConflictError);
     expect((await repo.loadActiveRun())?.revision).toBe(4);
     db.close();
   });
@@ -768,7 +801,7 @@ describe('DexieHavocRepository', () => {
       draft: buildHavocDraftState({ runId: RUN_ID, revision: 4 }),
     });
     await expect(
-      repo.applyOutcome({ outcome: acceptedOutcome(stale, 3, 'cmd-stale') }),
+      repo.applyOutcome(prepareCommandCommit({ outcome: acceptedOutcome(stale, 3, 'cmd-stale') })),
     ).rejects.toBeInstanceOf(HavocStaleRevisionError);
     expect((await repo.loadActiveRun())?.revision).toBe(4);
     expect(await repo.loadCommandResult('cmd-stale')).toBeNull();
@@ -872,15 +905,17 @@ describe('DexieHavocRepository', () => {
     // but rejected by the integrity checks after the state and game rows have
     // already been staged inside the transaction.
     await expect(
-      repo.applyOutcome({
-        outcome: acceptedOutcome(game.nextState, 4, game.commandId),
-        command: game.command,
-        game: {
-          result: game.result,
-          inputDigest: game.inputDigest,
-          resultDigest: 'f'.repeat(64),
-        },
-      }),
+      repo.applyOutcome(
+        prepareCommandCommit({
+          outcome: acceptedOutcome(game.nextState, 4, game.commandId),
+          command: game.command,
+          game: {
+            result: game.result,
+            inputDigest: game.inputDigest,
+            resultDigest: 'f'.repeat(64),
+          },
+        }),
+      ),
     ).rejects.toThrow();
 
     // The whole transaction rolled back: no artifact, no receipt, unchanged state.
@@ -894,11 +929,17 @@ describe('DexieHavocRepository', () => {
     const { db, repo } = createRepository('havoc-game-commit');
     const states = await applyDraftChain(repo, true);
     const game = buildGame(states.locked, 1, 'havoc', 'cmd-game-1');
-    await repo.applyOutcome({
-      outcome: acceptedOutcome(game.nextState, 4, game.commandId),
-      command: game.command,
-      game: { result: game.result, inputDigest: game.inputDigest, resultDigest: game.resultDigest },
-    });
+    await repo.applyOutcome(
+      prepareCommandCommit({
+        outcome: acceptedOutcome(game.nextState, 4, game.commandId),
+        command: game.command,
+        game: {
+          result: game.result,
+          inputDigest: game.inputDigest,
+          resultDigest: game.resultDigest,
+        },
+      }),
+    );
     const active = await repo.loadActiveRun();
     expect(active?.havocCursor).toBe(1);
     expect(active?.havocAggregate).toMatchObject({ games: 1, wins: 1, losses: 0 });
@@ -955,18 +996,20 @@ describe('DexieHavocRepository', () => {
     const storedGame = await repo.readRunGame(RUN_ID, 'havoc', HAVOC_GAME_COUNT);
     expect(storedGame?.resultDigest).toBe(game.resultDigest);
 
-    await repo.applyOutcome({
-      outcome: acceptedOutcome(
-        buildHavocRunState({
-          runId: RUN_ID_2,
-          revision: 1,
-          draft: buildHavocDraftState({ runId: RUN_ID_2, revision: 1 }),
-        }),
-        0,
-        'cmd-create-2',
-      ),
-      command: buildCreateCommand('cmd-create-2', RUN_ID_2),
-    });
+    await repo.applyOutcome(
+      prepareCommandCommit({
+        outcome: acceptedOutcome(
+          buildHavocRunState({
+            runId: RUN_ID_2,
+            revision: 1,
+            draft: buildHavocDraftState({ runId: RUN_ID_2, revision: 1 }),
+          }),
+          0,
+          'cmd-create-2',
+        ),
+        command: buildCreateCommand('cmd-create-2', RUN_ID_2),
+      }),
+    );
     expect((await repo.loadActiveRun())?.runId).toBe(RUN_ID_2);
     const completedAfterRestart = await repo.readCompletedRun(RUN_ID);
     expect(completedAfterRestart?.state).toEqual(final);
@@ -983,10 +1026,12 @@ describe('DexieHavocRepository', () => {
       revision: 1,
       draft: buildHavocDraftState({ runId: RUN_ID_2, revision: 1 }),
     });
-    await repo.applyOutcome({
-      outcome: acceptedOutcome(secondRun, 0, 'cmd-create-2'),
-      command: buildCreateCommand('cmd-create-2', RUN_ID_2),
-    });
+    await repo.applyOutcome(
+      prepareCommandCommit({
+        outcome: acceptedOutcome(secondRun, 0, 'cmd-create-2'),
+        command: buildCreateCommand('cmd-create-2', RUN_ID_2),
+      }),
+    );
     expect((await repo.loadActiveRun())?.runId).toBe(RUN_ID_2);
     const normal1 = buildGame(final, 1, 'normal', 'cmd-normal-1');
     await applyGameBundle(repo, final, normal1);
@@ -1030,16 +1075,18 @@ describe('DexieHavocRepository', () => {
       comparisonStatus: 'complete',
       completionState: 'complete',
     });
-    await repo.applyOutcome({
-      outcome: acceptedOutcome(completeState, beforeFinal.state.revision, 'cmd-complete'),
-      command: buildCompleteComparisonCommand(
-        'cmd-complete',
-        beforeFinal.state.revision,
+    await repo.applyOutcome(
+      prepareCommandCommit({
+        outcome: acceptedOutcome(completeState, beforeFinal.state.revision, 'cmd-complete'),
+        command: buildCompleteComparisonCommand(
+          'cmd-complete',
+          beforeFinal.state.revision,
+          comparison,
+        ),
         comparison,
-      ),
-      comparison,
-      report,
-    });
+        report,
+      }),
+    );
     expect(await repo.readComparison(RUN_ID)).toEqual(comparison);
     expect(await repo.readReport(RUN_ID)).toEqual(report);
     const history = await repo.listHistory();
@@ -1063,10 +1110,12 @@ describe('DexieHavocRepository', () => {
       revision: 5,
       completionState: 'abandoned',
     });
-    await repo.applyOutcome({
-      outcome: acceptedOutcome(abandonedState, 4, 'cmd-abandon'),
-      command: buildAbandonCommand('cmd-abandon', 4),
-    });
+    await repo.applyOutcome(
+      prepareCommandCommit({
+        outcome: acceptedOutcome(abandonedState, 4, 'cmd-abandon'),
+        command: buildAbandonCommand('cmd-abandon', 4),
+      }),
+    );
     expect(await repo.loadActiveRun()).toBeNull();
     const completed = await repo.readCompletedRun(RUN_ID);
     expect(completed?.state.completionState).toBe('abandoned');
@@ -1078,10 +1127,12 @@ describe('DexieHavocRepository', () => {
       revision: 1,
       draft: buildHavocDraftState({ runId: RUN_ID_2, revision: 1 }),
     });
-    await repo.applyOutcome({
-      outcome: acceptedOutcome(secondRun, 0, 'cmd-create-2'),
-      command: buildCreateCommand('cmd-create-2', RUN_ID_2),
-    });
+    await repo.applyOutcome(
+      prepareCommandCommit({
+        outcome: acceptedOutcome(secondRun, 0, 'cmd-create-2'),
+        command: buildCreateCommand('cmd-create-2', RUN_ID_2),
+      }),
+    );
     expect((await repo.loadActiveRun())?.runId).toBe(RUN_ID_2);
     expect(await repo.listHistory()).toHaveLength(1);
     db.close();
@@ -1090,16 +1141,20 @@ describe('DexieHavocRepository', () => {
   it('frees the singleton when a draft is abandoned', async () => {
     const { db, repo } = createRepository('havoc-abandon-draft');
     const states = buildDraftChainStates();
-    await repo.applyOutcome({
-      outcome: acceptedOutcome(states.create, 0, 'cmd-create'),
-      command: buildCreateCommand('cmd-create'),
-    });
+    await repo.applyOutcome(
+      prepareCommandCommit({
+        outcome: acceptedOutcome(states.create, 0, 'cmd-create'),
+        command: buildCreateCommand('cmd-create'),
+      }),
+    );
     const abandonedDraft: HavocRunState = {
       ...states.create,
       revision: 2,
       completionState: 'abandoned',
     };
-    await repo.applyOutcome({ outcome: acceptedOutcome(abandonedDraft, 1, 'cmd-abandon-draft') });
+    await repo.applyOutcome(
+      prepareCommandCommit({ outcome: acceptedOutcome(abandonedDraft, 1, 'cmd-abandon-draft') }),
+    );
     expect(await repo.loadActiveRun()).toBeNull();
     expect(await repo.readCompletedRun(RUN_ID)).toBeNull();
     expect(await repo.listHistory()).toEqual([]);
@@ -1110,10 +1165,12 @@ describe('DexieHavocRepository', () => {
       revision: 1,
       draft: buildHavocDraftState({ runId: RUN_ID_2, revision: 1 }),
     });
-    await repo.applyOutcome({
-      outcome: acceptedOutcome(secondRun, 0, 'cmd-create-2'),
-      command: buildCreateCommand('cmd-create-2', RUN_ID_2),
-    });
+    await repo.applyOutcome(
+      prepareCommandCommit({
+        outcome: acceptedOutcome(secondRun, 0, 'cmd-create-2'),
+        command: buildCreateCommand('cmd-create-2', RUN_ID_2),
+      }),
+    );
     expect((await repo.loadActiveRun())?.runId).toBe(RUN_ID_2);
     db.close();
   });
@@ -1127,10 +1184,12 @@ describe('DexieHavocRepository', () => {
       draft: buildHavocDraftState({ runId: RUN_ID_2, revision: 1 }),
     });
     await expect(
-      repo.applyOutcome({
-        outcome: acceptedOutcome(secondRun, 0, 'cmd-create-2'),
-        command: buildCreateCommand('cmd-create-2', RUN_ID_2),
-      }),
+      repo.applyOutcome(
+        prepareCommandCommit({
+          outcome: acceptedOutcome(secondRun, 0, 'cmd-create-2'),
+          command: buildCreateCommand('cmd-create-2', RUN_ID_2),
+        }),
+      ),
     ).rejects.toBeInstanceOf(HavocActiveRunExistsError);
     expect((await repo.loadActiveRun())?.runId).toBe(RUN_ID);
     db.close();
@@ -1212,27 +1271,31 @@ describe('DexieHavocRepository', () => {
     });
     const tamperedCommand = makeAcceptCommand('cmd-game-1', RUN_ID, 4, 1, 'havoc', tamperedSummary);
     await expect(
-      repo.applyOutcome({
-        outcome: acceptedOutcome(game.nextState, 4, 'cmd-game-1'),
-        command: tamperedCommand,
-        game: {
-          result: game.result,
-          inputDigest: game.inputDigest,
-          resultDigest: game.resultDigest,
-        },
-      }),
+      repo.applyOutcome(
+        prepareCommandCommit({
+          outcome: acceptedOutcome(game.nextState, 4, 'cmd-game-1'),
+          command: tamperedCommand,
+          game: {
+            result: game.result,
+            inputDigest: game.inputDigest,
+            resultDigest: game.resultDigest,
+          },
+        }),
+      ),
     ).rejects.toBeInstanceOf(HavocOutcomeIntegrityError);
     expect(await repo.listRunGames(RUN_ID, 'havoc')).toEqual([]);
     await expect(
-      repo.applyOutcome({
-        outcome: acceptedOutcome(game.nextState, 4, 'cmd-game-1'),
-        command: game.command,
-        game: {
-          result: game.result,
-          inputDigest: seasonDigestHex('wrong-input'),
-          resultDigest: game.resultDigest,
-        },
-      }),
+      repo.applyOutcome(
+        prepareCommandCommit({
+          outcome: acceptedOutcome(game.nextState, 4, 'cmd-game-1'),
+          command: game.command,
+          game: {
+            result: game.result,
+            inputDigest: seasonDigestHex('wrong-input'),
+            resultDigest: game.resultDigest,
+          },
+        }),
+      ),
     ).rejects.toBeInstanceOf(HavocOutcomeIntegrityError);
     db.close();
   });
@@ -1241,10 +1304,12 @@ describe('DexieHavocRepository', () => {
     const { db, repo } = createRepository('havoc-rejected-artifacts');
     const states = await applyDraftChain(repo, true);
     await expect(
-      repo.applyOutcome({
-        outcome: rejectedOutcome(states.locked, 'cmd-rejected'),
-        tape: { tape: buildGameTape(1, 'havoc'), tapeDigest: seasonDigestHex('tape') },
-      }),
+      repo.applyOutcome(
+        prepareCommandCommit({
+          outcome: rejectedOutcome(states.locked, 'cmd-rejected'),
+          tape: { tape: buildGameTape(1, 'havoc'), tapeDigest: seasonDigestHex('tape') },
+        }),
+      ),
     ).rejects.toBeInstanceOf(HavocOutcomeIntegrityError);
     expect(await repo.loadCommandResult('cmd-rejected')).toBeNull();
     db.close();
@@ -1254,7 +1319,7 @@ describe('DexieHavocRepository', () => {
     const { db, repo } = createRepository('havoc-rejected-record');
     const states = await applyDraftChain(repo, true);
     const outcome = rejectedOutcome(states.locked, 'cmd-rejected');
-    const returned = await repo.applyOutcome({ outcome });
+    const returned = await repo.applyOutcome(prepareCommandCommit({ outcome }));
     expect(returned.status).toBe('rejected');
     const active = await repo.loadActiveRun();
     expect(active?.revision).toBe(4);

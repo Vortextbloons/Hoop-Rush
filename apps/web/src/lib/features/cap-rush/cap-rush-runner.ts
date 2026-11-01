@@ -14,6 +14,7 @@ import {
   type CapRushWorkerStandingsCompleteMessage,
   type OpponentBracket,
 } from '@hoop-rush/data-contracts';
+import { CapRushParallelWorker } from './cap-rush-parallel-worker';
 import { StreamingWorkerRunner } from '#lib/workers/streaming-worker.js';
 
 export interface CapRushRunnerHandlers {
@@ -25,6 +26,7 @@ export interface CapRushRunnerHandlers {
 
 export interface CapRushRunnerOptions {
   createWorker?: () => Worker;
+  parallelism?: number;
 }
 
 interface RunJobInput<TComplete> {
@@ -51,8 +53,15 @@ export class CapRushRunner {
   private readonly transport: StreamingWorkerRunner<CapRushWorkerMessage>;
 
   constructor(options: CapRushRunnerOptions = {}) {
+    const createWorker = options.createWorker ?? defaultWorker;
+    const parallelism =
+      options.parallelism ??
+      (typeof navigator !== 'undefined' && navigator.hardwareConcurrency >= 4 ? 2 : 1);
     this.transport = new StreamingWorkerRunner({
-      createWorker: options.createWorker ?? defaultWorker,
+      createWorker:
+        parallelism > 1
+          ? () => new CapRushParallelWorker(createWorker) as unknown as Worker
+          : createWorker,
       responseSchema: capRushWorkerMessageSchema,
       invalidMessage: 'cap rush worker sent an unrecognised message',
       crashed: 'cap rush worker crashed',

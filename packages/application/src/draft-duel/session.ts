@@ -180,17 +180,19 @@ export function draftDuelSeriesStandoutsOf(facts: DraftDuelSeriesFacts): DraftDu
 }
 
 export class DraftDuelSession extends SeriesRoomSession<
-  DraftDuelRoomSnapshot,
-  DraftDuelRoomSnapshot['phase'],
-  DraftDuelGameOutput,
-  { output: DraftDuelGameOutput },
-  DraftDuelCommand['payload'],
-  DraftDuelCommand,
-  DraftDuelPartiallyVerified,
-  DraftDuelActiveState,
-  DraftDuelCompletionRecap,
-  DraftDuelRoomMembership,
-  DraftDuelTransientEvent,
+  {
+    snapshot: DraftDuelRoomSnapshot;
+    phase: DraftDuelRoomSnapshot['phase'];
+    output: DraftDuelGameOutput;
+    resultRow: { output: DraftDuelGameOutput };
+    payload: DraftDuelCommand['payload'];
+    command: DraftDuelCommand;
+    verification: DraftDuelPartiallyVerified;
+    storedVerification: DraftDuelActiveState;
+    completed: DraftDuelCompletionRecap;
+    membership: DraftDuelRoomMembership;
+    transient: DraftDuelTransientEvent;
+  },
   DraftDuelSessionDeps
 > {
   private assets: DraftDuelSessionAssets | null = null;
@@ -576,8 +578,7 @@ export class DraftDuelSession extends SeriesRoomSession<
     const deadline = this.snapshot?.deadline;
     if (!deadline || this.phase() !== 'drafting') return null;
     if (this.now < Date.parse(deadline.deadlineAt)) return null;
-    if (this.now < this.deadlineRetryAtMs) return null;
-    if (this.resolvedCursor === deadline.cursor) return null;
+    if (!this.deadlineRecovery.due(deadline.cursor, this.now)) return null;
     if (this.draft?.pickOrdinal !== deadline.pickOrdinal) return null;
     return { cursor: deadline.cursor };
   }

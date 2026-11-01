@@ -59,13 +59,19 @@ function postCancelled(requestId: string, gamesDelivered: number, lastCursor: nu
   });
 }
 
-function postLeagueSlot(requestId: string, locked: CapRushLockedInputs, slot: number): boolean {
+function postLeagueSlot(
+  requestId: string,
+  locked: CapRushLockedInputs,
+  slot: number,
+  partition?: number,
+): boolean {
   let leagueGames;
   try {
     leagueGames = simulateCapRushLeagueSlot({
       locked,
       slot,
       context: engineContext,
+      partition,
     });
   } catch (error) {
     postError(requestId, 'internal', failureMessage(error), slot);
@@ -89,6 +95,7 @@ async function simulate(
     count: number;
     includeTape?: boolean;
     leagueOnly?: boolean;
+    partition?: number;
     backfillLeagueFrom?: number;
     backfillLeagueTo?: number;
   },
@@ -112,7 +119,8 @@ async function simulate(
     if (backfillFrom === null || backfillTo === null) return 'ok';
     for (let slot = backfillFrom; slot <= backfillTo; slot += 1) {
       if (signal.cancelled || cancelledRequests.has(request.requestId)) return 'cancelled';
-      if (!postLeagueSlot(request.requestId, request.locked, slot)) return 'failed';
+      if (!postLeagueSlot(request.requestId, request.locked, slot, request.partition))
+        return 'failed';
       if (Date.now() - lastProgressAt >= PROGRESS_INTERVAL_MS) {
         lastProgressAt = Date.now();
         post({
@@ -150,7 +158,7 @@ async function simulate(
         postCancelled(request.requestId, delivered, lastCursor);
         return;
       }
-      if (!postLeagueSlot(request.requestId, request.locked, slot)) return;
+      if (!postLeagueSlot(request.requestId, request.locked, slot, request.partition)) return;
       delivered += 1;
       lastCursor = slot;
       if (Date.now() - lastProgressAt >= PROGRESS_INTERVAL_MS) {
@@ -216,6 +224,7 @@ async function simulate(
         leagueGames = simulateCapRushLeagueSlot({
           locked: request.locked,
           slot: gameNumber,
+          partition: request.partition,
           context: engineContext,
         });
       } catch (error) {
@@ -255,7 +264,7 @@ async function simulate(
     }
 
     if (leagueGames === undefined && request.locked.leagueSchedule !== undefined) {
-      if (!postLeagueSlot(request.requestId, request.locked, gameNumber)) return;
+      if (!postLeagueSlot(request.requestId, request.locked, gameNumber, request.partition)) return;
     }
 
     if (Date.now() - lastProgressAt >= PROGRESS_INTERVAL_MS) {

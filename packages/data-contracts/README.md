@@ -38,6 +38,11 @@ workers embed.
 - `src/loaders/` — packaged-artifact parsing helpers used by the web client
   (`collection-catalog.ts` for `static/data/collection/`).
 
+`command-commit.ts` defines the shared Cap Rush and Havoc commit envelopes,
+including the expected revision, outcome, and mode-specific artifacts.
+`prepareCommandCommit` constructs these envelopes without changing saved record
+schemas or simulation versions.
+
 ## Verification
 
 ```text

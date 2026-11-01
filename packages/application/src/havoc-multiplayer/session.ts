@@ -223,17 +223,19 @@ export function havocMultiplayerSeriesMvpOf(
 }
 
 export class HavocMultiplayerSession extends SeriesRoomSession<
-  HavocMultiplayerRoomSnapshot,
-  HavocMultiplayerPhase,
-  HavocMultiplayerGameOutput,
-  HavocMultiplayerGameOutput,
-  HavocMultiplayerCommand['payload'],
-  HavocMultiplayerCommand,
-  HavocMultiplayerGameVerification,
-  HavocMultiplayerActiveState,
-  HavocMultiplayerCompletionRecap,
-  HavocMultiplayerRoomMembership,
-  HavocMultiplayerTransientEvent,
+  {
+    snapshot: HavocMultiplayerRoomSnapshot;
+    phase: HavocMultiplayerPhase;
+    output: HavocMultiplayerGameOutput;
+    resultRow: HavocMultiplayerGameOutput;
+    payload: HavocMultiplayerCommand['payload'];
+    command: HavocMultiplayerCommand;
+    verification: HavocMultiplayerGameVerification;
+    storedVerification: HavocMultiplayerActiveState;
+    completed: HavocMultiplayerCompletionRecap;
+    membership: HavocMultiplayerRoomMembership;
+    transient: HavocMultiplayerTransientEvent;
+  },
   HavocMultiplayerSessionDeps
 > {
   private assets: HavocMultiplayerSessionAssets | null = null;
@@ -720,8 +722,7 @@ export class HavocMultiplayerSession extends SeriesRoomSession<
     if (!deadline || this.phase() !== 'drafting') return null;
     if (deadline.participantId !== this.participantId) return null;
     if (this.now < Date.parse(deadline.at)) return null;
-    if (this.now < this.deadlineRetryAtMs) return null;
-    if (this.resolvedCursor === deadline.cursor) return null;
+    if (!this.deadlineRecovery.due(deadline.cursor, this.now)) return null;
     return { cursor: deadline.cursor };
   }
 

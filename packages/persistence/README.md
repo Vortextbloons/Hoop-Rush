@@ -15,6 +15,10 @@ this package for namespace rules and testing notes.
   `hoop-rush-saves` database is never read or migrated. **Only Dexie version 14
   is supported**; an older database is rejected with a site-data reset
   instruction rather than upgraded. Do not restore historical migrations.
+- **Command commits**: Cap Rush and Havoc share outcome/artifact contracts from
+  `data-contracts/command-commit.ts`. The expected revision must agree with the
+  receipt before a commit can write. Mode adapters retain artifact validation,
+  idempotent receipt handling, and transaction ownership.
 - **Atomic commits**: checkpoint writes commit in one transaction; pending
   blocks are deleted in the same transaction as the state they supersede. Never
   commit state and clear pendings separately.

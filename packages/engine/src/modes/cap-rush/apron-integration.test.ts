@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import type { CapRushApronRules, HavocBattleInput } from '@hoop-rush/data-contracts';
-import { havocBattleInputSchema } from '@hoop-rush/data-contracts';
+import { havocBattleInputSchema, CAP_RUSH_RULES_VERSION, CAP_RUSH_STRIKE_EVERY } from '@hoop-rush/data-contracts';
+import { capRushApronRuntimeFor } from './apron-runtime.ts';
 import { buildHavocLockedInputs } from '@hoop-rush/test-fixtures';
 import { createEngineContext } from '../../sim/kernel.ts';
 import { simulateHavocBattleGame } from '../havoc/core/battle-game.ts';
@@ -42,7 +43,6 @@ function runWithApron(rules: CapRushApronRules, side: 0 | 1 = 0) {
   const apron = new CapRushApronRuntime({
     side,
     rules,
-    legacyIsolation: true,
     targetInstanceId: target.instanceId,
     targetSlot: 'C',
   });
@@ -100,30 +100,18 @@ describe('cap rush apron integration', () => {
     expect(interceptions).toBeGreaterThan(0);
   });
 
-  it('leaves the game untouched when no apron rules apply', () => {
-    const baseline = simulateHavocBattleGame(battleInput(), createEngineContext());
-    const clean = new CapRushApronRuntime({
-      side: 0,
-      rules: { payrollStatus: 'first-apron' },
-      legacyIsolation: true,
-      targetInstanceId: `hvi-${'0'.repeat(32)}`,
-      targetSlot: 'C',
-    });
-    const withApron = simulateHavocBattleGame(battleInput(), createEngineContext(), {
-      apron: clean,
-    });
-    expect(withApron.result.inputDigest).toBe(baseline.result.inputDigest);
-    expect(withApron.result.home.points).toBe(baseline.result.home.points);
-    expect(withApron.result.away.points).toBe(baseline.result.away.points);
-  });
-
-  it('records isolation facts at the first-apron cadence across the whole game', () => {
-    const { apron } = runWithApron({ payrollStatus: 'first-apron' });
-    const isolations = apron.recordedFacts().filter((fact) => fact.kind === 'isolation');
-    expect(isolations.length).toBeGreaterThan(5);
-    expect(isolations.every((fact) => fact.possessionOrdinal % 6 === 0)).toBe(true);
-    expect(isolations.every((fact) => fact.side === 'home')).toBe(true);
-    expect(isolations.every((fact) => fact.reason === 'give-me-the-ball')).toBe(true);
+  it('does not attach apron hooks when payroll is under the apron', () => {
+    expect(
+      capRushApronRuntimeFor(
+        {
+          versionSet: { rulesVersion: CAP_RUSH_RULES_VERSION },
+          payrollStatus: 'under-cap',
+          target: { instanceId: `hvi-${'0'.repeat(32)}`, slot: 'C' },
+          human: { starters: [] },
+        },
+        'home',
+      ),
+    ).toBeUndefined();
   });
 
   it('records strike facts only in the second apron and only for opponent possessions', () => {
@@ -133,7 +121,7 @@ describe('cap rush apron integration', () => {
     const second = runWithApron({ payrollStatus: 'second-apron' });
     const strikes = second.apron.recordedFacts().filter((fact) => fact.kind === 'strike');
     expect(strikes.length).toBeGreaterThan(5);
-    expect(strikes.every((fact) => fact.possessionOrdinal % 6 === 0)).toBe(true);
+    expect(strikes.every((fact) => fact.possessionOrdinal % CAP_RUSH_STRIKE_EVERY === 0)).toBe(true);
   });
 
   it('keeps the targeted defender on court while removing his defensive line', () => {

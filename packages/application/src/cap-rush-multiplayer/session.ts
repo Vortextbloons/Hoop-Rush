@@ -33,6 +33,11 @@ export interface CapRushMultiplayerSessionDeps {
   readonly roomId: string;
   readonly seat: CapRushMultiplayerSeatId;
   readonly newCommandId: () => string;
+  readonly verifyLog?: (input: {
+    rootSeed: string;
+    commands: readonly CapRushMultiplayerCommand[];
+    variant: 'clash' | 'roulette';
+  }) => Promise<string>;
   readonly now?: () => number;
   readonly scheduleTick?: (tick: () => void, intervalMs: number) => () => void;
 }
@@ -300,13 +305,16 @@ export class CapRushMultiplayerSession {
     }
     const history = await this.deps.transport.sync(this.deps.roomId, -1);
     if (this.isDisposed()) return false;
-    const replayed = replayCapRushMultiplayerLog({
+    const expectedDigest = capRushMultiplayerStateDigest(this.state);
+    const input = {
       rootSeed: this.snapshot.rootSeed,
       commands: history.commands,
-      environment: this.deps.environment,
       variant: this.snapshot.settings.variant,
-    });
-    return replayed.stateDigest === capRushMultiplayerStateDigest(this.state);
+    };
+    const digest = this.deps.verifyLog
+      ? await this.deps.verifyLog(input)
+      : replayCapRushMultiplayerLog({ ...input, environment: this.deps.environment }).stateDigest;
+    return !this.isDisposed() && digest === expectedDigest;
   }
 
   dispose(): void {

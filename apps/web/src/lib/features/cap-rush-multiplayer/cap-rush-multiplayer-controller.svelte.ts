@@ -52,6 +52,7 @@ export class CapRushMultiplayerController {
 
   private session: CapRushMultiplayerSession | null = null;
   private readonly runner = new CapRushMultiplayerRunner();
+  private readonly verifier = new CapRushMultiplayerRunner();
   private timer: ReturnType<typeof setInterval> | null = null;
   private followUpTimer: ReturnType<typeof setTimeout> | null = null;
   private disposed = false;
@@ -100,6 +101,7 @@ export class CapRushMultiplayerController {
       this.session = new CapRushMultiplayerSession({
         transport,
         environment: data.environment,
+        verifyLog: (input) => this.verifier.verifyLog({ ...input, environment: data.environment }),
         roomId: this.roomId,
         seat: membership.participantId,
         newCommandId: () => newSeasonId('cap-rush-mp-cmd'),
@@ -138,6 +140,7 @@ export class CapRushMultiplayerController {
       this.followUpTimer = null;
     }
     this.runner.dispose();
+    this.verifier.dispose();
     this.session?.dispose();
   }
 

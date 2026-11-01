@@ -1,8 +1,8 @@
+import type { HavocCommandOutcome } from '@hoop-rush/data-contracts';
 import type {
   HavocCatalog,
   HavocCatalogSource,
   HavocCommand,
-  HavocCommandResult,
   HavocComparison,
   HavocCreateDraftCommand,
   HavocDraftOffer,
@@ -70,10 +70,7 @@ export interface HavocLockSources {
   readonly profile: EraSimulationProfile;
 }
 
-export interface HavocCommandOutcome {
-  readonly state: HavocRunState;
-  readonly result: HavocCommandResult;
-}
+export type { HavocCommandOutcome } from '@hoop-rush/data-contracts';
 
 export type CreateHavocRunState = (
   command: HavocCreateDraftCommand,

@@ -91,7 +91,7 @@
       }));
   });
   const penalties = $derived(isUserTeam ? apronPenaltyRows(locked.payrollStatus) : []);
-  const playoffStatus = $derived(draft === null ? 'legacy' : capRushPlayoffStatusOf(draft));
+  const playoffStatus = $derived(draft === null ? 'no-sample' : capRushPlayoffStatusOf(draft));
   const playoffCoverage = $derived(
     capRushPlayoffCoverage(
       locked,
@@ -109,8 +109,6 @@
     return row === null ? null : { starter, row };
   });
   const playoffSummary = $derived.by(() => {
-    if (playoffStatus === 'legacy')
-      return 'This run predates playoff performance, so its playoffs use the previous simulation.';
     if (playoffCoverage.withEvidence === 0)
       return 'No starter has a recorded playoff sample for this exact season, so the playoffs run at regular-season strength.';
     if (playoffStatus === 'active')
@@ -355,7 +353,8 @@
     </section>
   {:else if locked.leagueSchedule === undefined && isUserTeam}
     <p class="text-[11px] text-muted-foreground">
-      This legacy run stores only the user schedule and regular-season results.
+      This completed run has no stored league schedule. Discard outdated saves and start a fresh
+      draft to browse the full league.
     </p>
   {/if}
 </div>

@@ -31,6 +31,7 @@ const base = z.object({
 export const capRushMultiplayerWorkerRequestSchema = z.discriminatedUnion('kind', [
   base.extend({
     kind: z.literal('cap-rush-multiplayer-project'),
+    verifyLog: z.boolean().optional(),
     state: capRushMultiplayerStateSchema,
     commands: z.array(capRushMultiplayerCommandSchema),
     environment: z.object({
@@ -49,6 +50,7 @@ export const capRushMultiplayerWorkerRequestSchema = z.discriminatedUnion('kind'
     locked: capRushMultiplayerLockedInputsSchema,
     slot: z.number().int().min(1).max(82),
     throughSlot: z.number().int().min(1).max(82).optional(),
+    partition: z.number().int().min(0).max(1).optional(),
     tapeGameIds: z.array(z.string().min(1).max(80)).max(2),
   }),
   base.extend({

@@ -139,9 +139,7 @@
       ? { text: 'Live in playoffs', tone: 'live' }
       : status === 'pending'
         ? { text: 'Playoffs only', tone: 'armed' }
-        : status === 'legacy'
-          ? { text: 'Not in this run', tone: 'muted' }
-          : { text: 'No sample', tone: 'muted' },
+        : { text: 'No sample', tone: 'muted' },
   );
 </script>
 
@@ -171,17 +169,12 @@
         <span class="sample-label">applied</span>
       </div>
       <p class="sample-note">
-        These are raw historical differences. New runs without opponent-adjusted evidence remain
-        neutral. Older runs retain their saved effects.
+        These are raw historical differences weighted by sample size before they reach the
+        simulation.
       </p>
     </div>
 
-    {#if status === 'legacy'}
-      <p class="notice">
-        This run was created before playoff performance existed, so its playoffs keep the previous
-        simulation. Start a new run to use playoff form.
-      </p>
-    {:else if status === 'no-sample'}
+    {#if status === 'no-sample'}
       <p class="notice">
         No player in this run carries a recorded playoff sample, so nothing is adjusted.
       </p>

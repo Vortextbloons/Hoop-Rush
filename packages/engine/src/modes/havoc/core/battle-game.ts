@@ -6,25 +6,21 @@ import type {
   HavocBattleScoringEntry,
   HavocBattleTape,
   HavocBattleTeamInput,
+  HavocGameAudit,
   HavocHighlight,
   HavocMutationId,
-  HavocParticipant,
   HavocParticipantLine,
   HavocShotKind,
   HavocTeamResult,
-  SimulationPlayer,
-  SimulationRatings,
-  SimulationTeam,
   ShotZone,
+  SimulationPlayer,
+  SimulationTeam,
 } from '@hoop-rush/data-contracts';
 import {
   HAVOC_MUTATION_CATALOG_VERSION,
   HAVOC_PERSONAL_FOUL_LIMIT,
   HAVOC_RULES_VERSION,
   HAVOC_SCHEMA_VERSION,
-  HAVOC_SCORING_RATING_FIELDS,
-  POSITIONS,
-  REQUIRED_RATING_KEYS,
   havocAuthoritativeChannelSchema,
   havocBattleInputSchema,
   havocBattleResultSchema,
@@ -32,27 +28,15 @@ import {
   seasonDigestHex,
   seedSchema,
 } from '@hoop-rush/data-contracts';
-import type { EngineContext } from '../../../sim/kernel.ts';
-import type { Rng } from '../../../sim/rng.ts';
+import { clamp } from '../../../domain/math.ts';
 import type { ApronRuntimeHooks } from '../../../sim/apron-runtime.ts';
 import {
   MAX_PERIODS_HARD_CAP,
   OVERTIME_PERIOD_SECONDS,
   REGULATION_PERIOD_SECONDS,
 } from '../../../sim/clock.ts';
-import { GameRecorder, type SideIndex } from '../../../sim/recorder.ts';
-import {
-  createGameState,
-  createTripContext,
-  resolveTrip,
-  type TripContext,
-} from '../../../sim/possession.ts';
-import { prepareTeam } from '../../../sim/prepare.ts';
-import { pickDefender } from '../../../sim/usage.ts';
-import { sameGroupMatchWeight } from '../../../sim/position-responsibilities.ts';
-import { freeThrowsForZone } from '../../../sim/fouls.ts';
 import { ENGINE_CONSTANTS } from '../../../sim/constants.ts';
-import { clamp } from '../../../domain/math.ts';
+import { freeThrowsForZone } from '../../../sim/fouls.ts';
 import type {
   HavocCoveragePlan,
   HavocEvidence,
@@ -60,8 +44,23 @@ import type {
   HavocRuntimeHooks,
   HavocShotPlan,
 } from '../../../sim/havoc-runtime.ts';
-import { havocBattleCapabilityTargets } from './battle-targets.ts';
+import type { EngineContext } from '../../../sim/kernel.ts';
+import { sameGroupMatchWeight } from '../../../sim/position-responsibilities.ts';
+import {
+  createGameState,
+  createTripContext,
+  resolveTrip,
+  type TripContext,
+} from '../../../sim/possession.ts';
+import { GameRecorder, type SideIndex } from '../../../sim/recorder.ts';
+import type { Rng } from '../../../sim/rng.ts';
+import { pickDefender } from '../../../sim/usage.ts';
+import { auditHavocBattleGame } from './battle-audit.ts';
 import { havocBattleGameInputDigest } from './battle-digests.ts';
+import { HAVOC_DOUBLE_MISS_GIFT, HavocFieldGoalRuntime } from './battle-field-goal.ts';
+import { HavocMutationLedger } from './battle-mutation-ledger.ts';
+import { HavocParticipants } from './battle-participants.ts';
+import { HavocProfileEffects } from './battle-profile-effects.ts';
 import type {
   Attribution,
   HavocBattleEventPayload,
@@ -70,13 +69,12 @@ import type {
   RollupCounters,
   TeamRuntime,
 } from './battle-runtime-types.ts';
-import { HavocFieldGoalRuntime, HAVOC_DOUBLE_MISS_GIFT } from './battle-field-goal.ts';
-import { HAVOC_SCORING_SOURCE_MUTATION } from './battle-scoring.ts';
-export { havocFieldGoalValue, HAVOC_SCORING_SOURCE_MUTATION } from './battle-scoring.ts';
+import { havocBattleCapabilityTargets } from './battle-targets.ts';
+export { HAVOC_SCORING_SOURCE_MUTATION, havocFieldGoalValue } from './battle-scoring.ts';
 export type {
-  HavocFieldGoalValueInput,
   HavocFieldGoalContribution,
   HavocFieldGoalValue,
+  HavocFieldGoalValueInput,
 } from './battle-scoring.ts';
 
 const HAVOC_RUNTIME_SEED_ROOT = 'havoc-runtime-v1';
@@ -90,20 +88,14 @@ const HAVOC_CONTEST_REACH_POINTS = 0.015;
 const HAVOC_BLOCK_REACH_POINTS = 0.02;
 const HAVOC_FINISH_HEIGHT_POINTS = 0.015;
 const HAVOC_WINGSPAN_REBOUND_WEIGHT = 0.1;
-const HAVOC_EQUALIZER_CAP = 85;
-const HAVOC_HIGHLIGHT_LIMIT = 16;
+
 const HAVOC_HEAT_EXPIRY_POSSESSIONS = 5;
 const HAVOC_BOUNTY_EXPIRY_POSSESSIONS = 5;
 const HAVOC_REBOUND_LOOP_EVERY = 3;
 const HAVOC_GOLDEN_ASSIST_EVERY = 3;
 const HAVOC_DOUBLE_OR_NOTHING_FOUL_FREE_THROWS = 1;
 const HAVOC_EXTRA_POSSESSION_RUSH_SECONDS = 12;
-const HAVOC_FUSION_DONOR_RATING = 40;
-const HAVOC_CENTERS_HEIGHT_INCHES = 87;
-const HAVOC_CENTERS_ELITE_RATING = 95;
-const HAVOC_CENTERS_SPEED_CAP = 35;
-const HAVOC_CENTERS_HANDLING_CAP = 35;
-const HAVOC_CENTERS_THREE_CAP = 40;
+
 const HAVOC_DARWINISM_CHANNELS: ReadonlySet<string> = new Set([
   'two-point-accuracy',
   'three-point-accuracy',
@@ -129,56 +121,6 @@ function runtimeSeed(gameSeed: string, ...parts: readonly (string | number)[]): 
 }
 
 const ALL_AUTHORITATIVE: ReadonlySet<string> = new Set(havocAuthoritativeChannelSchema.options);
-
-function zeroRollup(): RollupCounters {
-  return {
-    triggers: 0,
-    pointsDelta: 0,
-    freeThrowsGranted: 0,
-    turnoversCancelled: 0,
-    extraPossessionsEarned: 0,
-    extraPossessionsUsed: 0,
-    extraPossessionsExpired: 0,
-    swapPoints: 0,
-    ratingChanges: 0,
-  };
-}
-
-function capRatings(ratings: SimulationRatings, cap: number): SimulationRatings {
-  return {
-    insideScoring: Math.min(cap, ratings.insideScoring),
-    closeShot: Math.min(cap, ratings.closeShot),
-    midrange: Math.min(cap, ratings.midrange),
-    threePoint: Math.min(cap, ratings.threePoint),
-    freeThrow: Math.min(cap, ratings.freeThrow),
-    ballHandling: Math.min(cap, ratings.ballHandling),
-    passing: Math.min(cap, ratings.passing),
-    offensiveIq: Math.min(cap, ratings.offensiveIq),
-    offensiveRebound: Math.min(cap, ratings.offensiveRebound),
-    defensiveRebound: Math.min(cap, ratings.defensiveRebound),
-    perimeterDefense: Math.min(cap, ratings.perimeterDefense),
-    interiorDefense: Math.min(cap, ratings.interiorDefense),
-    steal: Math.min(cap, ratings.steal),
-    block: Math.min(cap, ratings.block),
-    defensiveIq: Math.min(cap, ratings.defensiveIq),
-    speed: Math.min(cap, ratings.speed),
-    strength: Math.min(cap, ratings.strength),
-    vertical: Math.min(cap, ratings.vertical),
-  };
-}
-
-function centersRatings(ratings: SimulationRatings): SimulationRatings {
-  return {
-    ...ratings,
-    strength: Math.max(ratings.strength, HAVOC_CENTERS_ELITE_RATING),
-    interiorDefense: Math.max(ratings.interiorDefense, HAVOC_CENTERS_ELITE_RATING),
-    offensiveRebound: Math.max(ratings.offensiveRebound, HAVOC_CENTERS_ELITE_RATING),
-    defensiveRebound: Math.max(ratings.defensiveRebound, HAVOC_CENTERS_ELITE_RATING),
-    speed: Math.min(ratings.speed, HAVOC_CENTERS_SPEED_CAP),
-    ballHandling: Math.min(ratings.ballHandling, HAVOC_CENTERS_HANDLING_CAP),
-    threePoint: Math.min(ratings.threePoint, HAVOC_CENTERS_THREE_CAP),
-  };
-}
 
 function zoneDefenseSkill(defender: SimulationPlayer, zone: ShotZone): number {
   const ratings = defender.ratings;
@@ -227,13 +169,22 @@ export function havocCoverageAssignment(
 }
 
 class HavocBattleRuntime implements HavocRuntimeHooks {
-  readonly events: HavocBattleEvent[] = [];
-  readonly scoring: HavocBattleScoringEntry[] = [];
-  readonly teams: [TeamRuntime, TeamRuntime];
+  private readonly participants: HavocParticipants;
+  private readonly ledger: HavocMutationLedger;
+  private readonly profileEffects: HavocProfileEffects;
+  get teams(): [TeamRuntime, TeamRuntime] {
+    return this.participants.teams;
+  }
+  get events(): HavocBattleEvent[] {
+    return this.ledger.events;
+  }
+  get scoring(): HavocBattleScoringEntry[] {
+    return this.ledger.scoring;
+  }
+
   period = 1;
   possessionId = 0;
-  private eventSeq = 0;
-  private scoreSeq = 0;
+
   private shotKindOrdinal = 0;
   private coverageCache: {
     possessionId: number;
@@ -241,13 +192,11 @@ class HavocBattleRuntime implements HavocRuntimeHooks {
     help: ParticipantState[];
     rng: Rng;
   } | null = null;
-  private readonly playerInstance = new Map<SimulationPlayer, ParticipantState>();
+
   private readonly bodySnatcherTargets: ReadonlyMap<string, string>;
   private readonly hostileTakeoverTargets: ReadonlyMap<string, { from: string; to: string }>;
   private readonly bountyTargets: readonly [string | null, string | null];
-  private lastTimeLord: [number, number];
-  private lastCapped: [string[], string[]] = [[], []];
-  private equalizerApplied: [boolean, boolean] = [false, false];
+
   private rushedExtraSide: SideIndex | null = null;
   private darwinismDirty = false;
   private tripContext: TripContext | null = null;
@@ -267,9 +216,22 @@ class HavocBattleRuntime implements HavocRuntimeHooks {
     this.context = context;
     this.mainRng = mainRng;
     this.recorder = recorder;
-    const home = this.buildTeam(input.home, 0);
-    const away = this.buildTeam(input.away, 1);
-    this.teams = [home, away];
+    this.participants = new HavocParticipants(input, recorder, {
+      tripContext: () => this.requireTripContext(),
+      evidenceOf: (player) => this.evidenceOf(player),
+      reboundWeightScale: (player) => this.reboundWeightScale(player),
+      reboundMeanReach: (player) => this.reboundMeanReach(player),
+      pushEvent: (event) => this.pushEvent(event),
+    });
+    this.ledger = new HavocMutationLedger(input.gameNumber, this.participants, {
+      period: () => this.period,
+      possessionId: () => this.possessionId,
+      clock: () => this.clock(),
+    });
+    this.profileEffects = new HavocProfileEffects(this.participants, this.ledger, {
+      fullShotClock: (side) => this.fullShotClockOf(side),
+      tripContext: () => this.tripContext,
+    });
     this.fieldGoal = new HavocFieldGoalRuntime({
       teams: this.teams,
       context,
@@ -293,7 +255,6 @@ class HavocBattleRuntime implements HavocRuntimeHooks {
     this.bodySnatcherTargets = targets.bodySnatcher;
     this.hostileTakeoverTargets = targets.hostileTakeover;
     this.bountyTargets = targets.bounty;
-    this.lastTimeLord = [ENGINE_CONSTANTS.shotClockSeconds, ENGINE_CONSTANTS.shotClockSeconds];
   }
 
   initialize(): void {
@@ -306,93 +267,16 @@ class HavocBattleRuntime implements HavocRuntimeHooks {
     tripContext.havoc = this;
   }
 
-  private buildTeam(input: HavocBattleTeamInput, sideIndex: SideIndex): TeamRuntime {
-    const participants: ParticipantState[] = [];
-    const byId = new Map<string, ParticipantState>();
-    const add = (participant: HavocParticipant): void => {
-      const mutations = new Set(participant.mutationPackage.map((entry) => entry.mutationId));
-      const state: ParticipantState = {
-        instanceId: participant.instanceId,
-        kind: participant.kind,
-        slot: participant.slot,
-        slotIndex: Math.max(0, POSITIONS.indexOf(participant.slot)),
-        ownerInstanceId: participant.ownerInstanceId,
-        source: participant.source,
-        effective: participant.effective,
-        mutations,
-        sideIndex,
-        rosterIndex: participants.length,
-        active: false,
-        started: false,
-        replaced: false,
-        cloneExited: false,
-        committedFouls: 0,
-        chargedFouls: 0,
-        swapWith: null,
-        swappedBy: null,
-        fgStreak: 0,
-        heatArmed: false,
-        heatArmedAt: null,
-        fgaCount: 0,
-        assistCount: 0,
-        shootingFoulsDrawn: 0,
-        refundUsed: [],
-        reboundLoopCount: 0,
-        putbackArmedAt: null,
-        bountyArmed: false,
-        bountyArmedAt: null,
-        activeSeconds: 0,
-        darwinismDecayPoints: 0,
-        fusionDonorInstanceId: null,
-        fusionOwnerInstanceId: null,
-        coldBloodStreak: 0,
-        tripleThreatPeriod: 0,
-        tripleThreatZones: [],
-        tripleThreatArmed: false,
-        takeoverFromInstanceId: null,
-        takeoverToInstanceId: null,
-        takeoverWith: null,
-        takeoverBy: null,
-        simPlayer: undefined as unknown as SimulationPlayer,
-        evidence: undefined,
-        rollup: new Map(),
-      };
-      for (const mutation of mutations) state.rollup.set(mutation, zeroRollup());
-      participants.push(state);
-      byId.set(state.instanceId, state);
-    };
-    for (const starter of input.starters) add(starter);
-    for (const replacement of input.replacements) add(replacement);
-    for (const clone of input.clones) add(clone);
-    const team: TeamRuntime = {
-      sideIndex,
-      side: input.side,
-      input,
-      participants,
-      active: [],
-      byId,
-      extraQueue: [],
-      centersOwner: null,
-    };
-    for (const participant of participants) {
-      if (participant.kind === 'starter') {
-        participant.active = true;
-        participant.started = true;
-      }
-    }
-    return team;
-  }
-
   keyOf(player: SimulationPlayer): string {
-    return this.playerInstance.get(player)?.instanceId ?? `unknown:${player.playerId}`;
+    return this.participants.get(player)?.instanceId ?? `unknown:${player.playerId}`;
   }
 
   responsibilitySlotOf(player: SimulationPlayer): number {
-    return this.playerInstance.get(player)?.slotIndex ?? 0;
+    return this.participants.get(player)?.slotIndex ?? 0;
   }
 
   evidenceOf(player: SimulationPlayer): HavocEvidence | undefined {
-    const participant = this.playerInstance.get(player);
+    const participant = this.participants.get(player);
     if (participant === undefined) return undefined;
     if (participant.swapWith !== null || participant.swappedBy !== null) {
       return { isAuthoritative: (channel) => ALL_AUTHORITATIVE.has(channel) };
@@ -417,7 +301,7 @@ class HavocBattleRuntime implements HavocRuntimeHooks {
   }
 
   reboundWeightScale(player: SimulationPlayer): number {
-    const participant = this.playerInstance.get(player);
+    const participant = this.participants.get(player);
     if (participant === undefined) return 1;
     return (
       1 + (HAVOC_WINGSPAN_REBOUND_WEIGHT * participant.effective.physical.wingspanDeltaInches) / 24
@@ -425,7 +309,7 @@ class HavocBattleRuntime implements HavocRuntimeHooks {
   }
 
   reboundMeanReach(player: SimulationPlayer): number {
-    const participant = this.playerInstance.get(player);
+    const participant = this.participants.get(player);
     if (participant === undefined) return 0;
     return 4 * participant.effective.physical.reachUnits;
   }
@@ -435,43 +319,26 @@ class HavocBattleRuntime implements HavocRuntimeHooks {
   }
 
   private participantOf(player: SimulationPlayer | null): ParticipantState | null {
-    if (player === null) return null;
-    return this.playerInstance.get(player) ?? null;
+    return this.participants.participantOf(player);
   }
 
   private requireParticipant(player: SimulationPlayer): ParticipantState {
-    const participant = this.playerInstance.get(player);
-    if (participant === undefined) {
-      throw new Error(`havoc: unknown runtime participant ${player.playerId}`);
-    }
-    return participant;
+    return this.participants.requireParticipant(player);
   }
 
   private activeOwners(side: SideIndex, mutationId: HavocMutationId): ParticipantState[] {
-    return this.teams[side].active.filter((participant) => participant.mutations.has(mutationId));
+    return this.participants.activeOwners(side, mutationId);
   }
 
   private rollupFor(
     participant: ParticipantState,
     mutationId: HavocMutationId,
   ): RollupCounters | undefined {
-    let counters = participant.rollup.get(mutationId);
-    if (counters === undefined && participant.mutations.has(mutationId)) {
-      counters = zeroRollup();
-      participant.rollup.set(mutationId, counters);
-    }
-    return counters;
+    return this.ledger.rollupFor(participant, mutationId);
   }
 
   private attribute(attributions: readonly Attribution[]): void {
-    for (const attribution of attributions) {
-      const counters = this.rollupFor(
-        attribution.owner,
-        HAVOC_SCORING_SOURCE_MUTATION[attribution.mutationId],
-      );
-      if (counters === undefined) continue;
-      counters.pointsDelta += attribution.points;
-    }
+    this.ledger.attribute(attributions);
   }
 
   fullShotClock(side: SideIndex): number {
@@ -1201,38 +1068,7 @@ class HavocBattleRuntime implements HavocRuntimeHooks {
   }
 
   processBoundary(): void {
-    let changed = false;
-    for (const team of this.teams) {
-      for (const participant of team.participants) {
-        if (!participant.active) continue;
-        if (participant.chargedFouls < HAVOC_PERSONAL_FOUL_LIMIT) continue;
-        if (participant.kind === 'starter' && !participant.replaced) {
-          const replacement = team.participants.find(
-            (candidate) =>
-              candidate.kind === 'replacement' &&
-              candidate.ownerInstanceId === participant.instanceId,
-          );
-          participant.active = false;
-          participant.replaced = true;
-          if (replacement !== undefined) {
-            replacement.active = true;
-            replacement.started = true;
-          }
-          this.pushEvent({
-            kind: 'substitution',
-            outInstanceId: participant.instanceId,
-            inInstanceId: replacement?.instanceId ?? participant.instanceId,
-            reason: 'foul-out',
-          });
-          this.endPowersFor(participant);
-          this.removeClone(team, participant.instanceId, 'owner-exited');
-          changed = true;
-        } else if (participant.kind === 'clone') {
-          this.removeClone(team, participant.ownerInstanceId ?? '', 'fouled-out');
-          changed = true;
-        }
-      }
-    }
+    const changed = this.participants.processExits();
     const equalizerChanged = this.recomputeEqualizer(false);
     const timeLordChanged = this.recomputeTimeLord('owner-exit');
     const darwinismChanged = this.darwinismDirty;
@@ -1244,42 +1080,7 @@ class HavocBattleRuntime implements HavocRuntimeHooks {
   }
 
   private endPowersFor(participant: ParticipantState): void {
-    participant.heatArmed = false;
-    participant.heatArmedAt = null;
-    participant.fgStreak = 0;
-    participant.bountyArmed = false;
-    participant.bountyArmedAt = null;
-    participant.putbackArmedAt = null;
-    participant.coldBloodStreak = 0;
-    participant.tripleThreatZones = [];
-    const ownTeam = this.teams[participant.sideIndex];
-    if (ownTeam.centersOwner === participant.instanceId) ownTeam.centersOwner = null;
-    if (participant.fusionDonorInstanceId !== null) {
-      const donorId = participant.fusionDonorInstanceId;
-      const donor = this.globalById(donorId);
-      participant.fusionDonorInstanceId = null;
-      if (donor !== null) donor.fusionOwnerInstanceId = null;
-      this.pushEvent({
-        kind: 'fusion-dance',
-        outcome: 'ended',
-        ownerInstanceId: participant.instanceId,
-        donorInstanceId: donorId,
-        side: this.teams[participant.sideIndex].side,
-      });
-    }
-    if (participant.swapWith !== null) {
-      const target = this.globalById(participant.swapWith);
-      const targetId = participant.swapWith;
-      participant.swapWith = null;
-      if (target !== null) target.swappedBy = null;
-      this.pushEvent({
-        kind: 'body-snatcher',
-        outcome: 'ended',
-        ownerInstanceId: participant.instanceId,
-        targetInstanceId: targetId,
-        side: this.teams[participant.sideIndex].side,
-      });
-    }
+    this.participants.endPowersFor(participant);
   }
 
   private removeClone(
@@ -1287,223 +1088,27 @@ class HavocBattleRuntime implements HavocRuntimeHooks {
     ownerInstanceId: string,
     reason: 'owner-exited' | 'fouled-out',
   ): void {
-    const clone = team.participants.find(
-      (candidate) =>
-        candidate.kind === 'clone' &&
-        candidate.ownerInstanceId === ownerInstanceId &&
-        candidate.active,
-    );
-    if (clone === undefined) return;
-    clone.active = false;
-    clone.cloneExited = true;
-    this.pushEvent({
-      kind: 'clone',
-      outcome: 'exited',
-      ownerInstanceId,
-      cloneInstanceId: clone.instanceId,
-      side: team.side,
-      reason,
-    });
+    this.participants.removeClone(team, ownerInstanceId, reason);
   }
 
   private globalById(instanceId: string): ParticipantState | null {
-    return this.teams[0].byId.get(instanceId) ?? this.teams[1].byId.get(instanceId) ?? null;
-  }
-
-  private equalizerApplies(participant: ParticipantState): boolean {
-    return this.teams.some(
-      (team) =>
-        team.sideIndex !== participant.sideIndex &&
-        this.activeOwners(team.sideIndex, 'the-great-equalizer').length > 0,
-    );
+    return this.participants.globalById(instanceId);
   }
 
   private recomputeEqualizer(tipoff: boolean): boolean {
-    let changed = false;
-    for (const sideIndex of [0, 1] as const) {
-      const owners = this.activeOwners(sideIndex, 'the-great-equalizer');
-      if (owners.length === 0) continue;
-      const cappedIds = this.teams[(1 - sideIndex) as SideIndex].active
-        .map((participant) => participant.instanceId)
-        .sort();
-      if (!tipoff && cappedIds.join(',') === this.lastCapped[sideIndex].join(',')) continue;
-      this.lastCapped[sideIndex] = cappedIds;
-      changed = true;
-      const owner = owners[0];
-      if (owner === undefined) continue;
-      const counters = this.rollupFor(owner, 'the-great-equalizer');
-      if (counters !== undefined) counters.triggers += 1;
-      this.pushEvent({
-        kind: 'great-equalizer',
-        outcome: this.equalizerApplied[sideIndex] ? 'updated' : 'applied',
-        ownerInstanceId: owner.instanceId,
-        cappedInstanceIds: cappedIds.slice(0, 10),
-      });
-      this.equalizerApplied[sideIndex] = true;
-    }
-    if (!tipoff && changed) this.rebuildBattleProfiles();
-    return changed;
+    return this.profileEffects.recomputeEqualizer(tipoff);
   }
 
   private recomputeTimeLord(source: 'tipoff' | 'owner-exit'): boolean {
-    const limits: [number, number] = [this.fullShotClockOf(0), this.fullShotClockOf(1)];
-    const changed = limits[0] !== this.lastTimeLord[0] || limits[1] !== this.lastTimeLord[1];
-    if (!changed) return false;
-    const previous = [...this.lastTimeLord] as [number, number];
-    this.lastTimeLord = limits;
-    for (const side of [0, 1] as const) {
-      if (limits[side] === previous[side]) continue;
-      this.pushEvent({
-        kind: 'time-lord',
-        side: this.teams[side].side,
-        fullSeconds: limits[side],
-        reboundSeconds: Math.min(14, limits[side]),
-        source,
-      });
-      if (
-        this.tripContext !== null &&
-        this.tripContext.shotClock !== undefined &&
-        source === 'owner-exit'
-      ) {
-        this.tripContext.shotClock.remaining = Math.min(
-          this.tripContext.shotClock.remaining,
-          limits[side],
-        );
-      }
-    }
-    return true;
+    return this.profileEffects.recomputeTimeLord(source);
   }
 
   private rebuildBattleProfiles(): void {
-    for (const team of this.teams) {
-      for (const participant of team.participants) {
-        let ratings = { ...participant.effective.ratings };
-        let tendencies = { ...participant.effective.tendencies };
-        if (participant.fusionDonorInstanceId !== null) {
-          const donor = this.globalById(participant.fusionDonorInstanceId);
-          if (donor !== null && participant.active) {
-            for (const field of REQUIRED_RATING_KEYS) {
-              ratings[field] = Math.max(ratings[field], donor.effective.ratings[field]);
-            }
-            tendencies.usageRate = 99;
-          }
-        } else if (participant.fusionOwnerInstanceId !== null) {
-          const owner = this.globalById(participant.fusionOwnerInstanceId);
-          if (owner !== null && owner.active) {
-            for (const field of REQUIRED_RATING_KEYS) {
-              ratings[field] = HAVOC_FUSION_DONOR_RATING;
-            }
-          }
-        }
-        if (participant.swapWith !== null) {
-          const target = this.globalById(participant.swapWith);
-          if (target !== null) {
-            ratings = { ...target.source.profile.ratings };
-            tendencies = { ...target.source.profile.tendencies };
-          }
-        } else if (participant.swappedBy !== null) {
-          const owner = this.globalById(participant.swappedBy);
-          if (owner !== null) {
-            ratings = { ...owner.source.profile.ratings };
-            tendencies = { ...owner.source.profile.tendencies };
-          }
-        }
-        if (participant.takeoverWith !== null) {
-          const target = this.globalById(participant.takeoverWith);
-          if (target !== null) {
-            ratings = { ...target.effective.ratings };
-            tendencies = { ...target.effective.tendencies };
-          }
-        } else if (participant.takeoverBy !== null) {
-          const owner = this.globalById(participant.takeoverBy);
-          if (owner !== null) {
-            ratings = { ...owner.effective.ratings };
-            tendencies = { ...owner.effective.tendencies };
-          }
-        }
-        let heightInches = participant.effective.physical.heightInches;
-        if (team.centersOwner !== null && participant.kind !== 'clone') {
-          heightInches = HAVOC_CENTERS_HEIGHT_INCHES;
-          ratings = centersRatings(ratings);
-        }
-        if (participant.darwinismDecayPoints > 0) {
-          for (const field of HAVOC_SCORING_RATING_FIELDS) {
-            ratings[field] = Math.max(0, ratings[field] - participant.darwinismDecayPoints);
-          }
-        }
-        if (this.equalizerApplies(participant)) {
-          ratings = capRatings(ratings, HAVOC_EQUALIZER_CAP);
-        }
-        participant.evidence =
-          participant.effective.authoritativeChannels.length === 0
-            ? undefined
-            : {
-                isAuthoritative: (channel) =>
-                  participant.effective.authoritativeChannels.includes(channel),
-              };
-        participant.simPlayer = {
-          playerId: participant.source.playerId,
-          ...(participant.source.playerVersionId === null
-            ? {}
-            : { playerVersionId: participant.source.playerVersionId }),
-          displayName: participant.source.displayName,
-          positions: participant.source.positions,
-          heightInches,
-          weightLbs: participant.effective.physical.weightLbs,
-          ratings,
-          tendencies,
-          ...(participant.source.profile.anchors === undefined
-            ? {}
-            : { anchors: participant.source.profile.anchors }),
-          ...(participant.source.profile.reconstructedThreePoint === undefined
-            ? {}
-            : { reconstructedThreePoint: participant.source.profile.reconstructedThreePoint }),
-          overall: participant.source.originalOverall,
-        };
-      }
-    }
-    this.playerInstance.clear();
-    for (const team of this.teams) {
-      for (const participant of team.participants) {
-        this.playerInstance.set(participant.simPlayer, participant);
-      }
-    }
+    this.profileEffects.rebuildBattleProfiles();
   }
 
   private rebuildActiveTeams(): void {
-    for (const team of this.teams) {
-      const bySlot: ParticipantState[] = [];
-      for (let slot = 0; slot < 5; slot += 1) {
-        const participant = team.participants.find(
-          (candidate) =>
-            candidate.active && candidate.kind !== 'clone' && candidate.slotIndex === slot,
-        );
-        if (participant !== undefined) bySlot.push(participant);
-      }
-      const clones = team.participants.filter(
-        (candidate) => candidate.active && candidate.kind === 'clone',
-      );
-      team.active = [...bySlot, ...clones];
-      const simTeam: SimulationTeam = {
-        teamId: team.input.teamId,
-        displayName: team.input.displayName,
-        players: team.active.map((participant) => participant.simPlayer),
-      };
-      const tripContext = this.requireTripContext();
-      tripContext.teams[team.sideIndex] = simTeam;
-      tripContext.preps[team.sideIndex] = prepareTeam(simTeam, this.input.profile, {
-        keyOf: (player) => this.playerInstance.get(player)?.instanceId ?? 'missing',
-        responsibilitySlotOf: (player) => this.playerInstance.get(player)?.slotIndex ?? 0,
-        evidenceOf: (player) => this.evidenceOf(player),
-        aggregateDivisor: 5,
-        rebounderWeightScale: (player) => this.reboundWeightScale(player),
-        reboundMeanReach: (player) => this.reboundMeanReach(player),
-      });
-      this.recorder.setActiveUnits(
-        team.sideIndex,
-        team.active.map((participant) => participant.rosterIndex),
-      );
-    }
+    this.participants.rebuildActiveTeams();
   }
 
   expireExtraPossessions(): void {
@@ -1552,165 +1157,35 @@ class HavocBattleRuntime implements HavocRuntimeHooks {
   }
 
   pushEvent(event: HavocBattleEventPayload): number {
-    const full = {
-      sequence: this.eventSeq,
-      gameNumber: this.input.gameNumber,
-      period: this.period,
-      clockSeconds: this.clock(),
-      ...event,
-    };
-    this.events.push(full);
-    const sequence = this.eventSeq;
-    this.eventSeq += 1;
-    return sequence;
+    return this.ledger.pushEvent(event);
   }
 
   pushScoring(entry: HavocBattleScoringPayload): number {
-    const full: HavocBattleScoringEntry = {
-      sequence: this.scoreSeq,
-      gameNumber: this.input.gameNumber,
-      period: this.period,
-      clockSeconds: this.clock(),
-      possessionId: this.possessionId,
-      ...entry,
-    };
-    this.scoring.push(full);
-    const sequence = this.scoreSeq;
-    this.scoreSeq += 1;
-    const scorer = this.globalById(full.actorInstanceId);
-    if (
-      scorer !== null &&
-      scorer.swapWith !== null &&
-      (full.kind === 'field-goal' || full.kind === 'free-throw')
-    ) {
-      const counters = this.rollupFor(scorer, 'body-snatcher');
-      if (counters !== undefined) counters.swapPoints += full.points;
-    }
-    return sequence;
+    return this.ledger.pushScoring(entry);
   }
 
   rollupsOf(): HavocBattleMutationRollup[] {
-    const rollups: HavocBattleMutationRollup[] = [];
-    for (const team of this.teams) {
-      for (const participant of team.participants) {
-        if (participant.mutations.size === 0) continue;
-        const activeSeconds = Math.round(participant.activeSeconds);
-        for (const mutationId of participant.mutations) {
-          const counters = participant.rollup.get(mutationId) ?? zeroRollup();
-          rollups.push({
-            ownerInstanceId: participant.instanceId,
-            mutationId,
-            side: team.side,
-            triggers: counters.triggers,
-            pointsDelta: counters.pointsDelta,
-            freeThrowsGranted: counters.freeThrowsGranted,
-            turnoversCancelled: counters.turnoversCancelled,
-            extraPossessionsEarned: counters.extraPossessionsEarned,
-            extraPossessionsUsed: counters.extraPossessionsUsed,
-            extraPossessionsExpired: counters.extraPossessionsExpired,
-            swapPoints: counters.swapPoints,
-            swapSeconds:
-              mutationId === 'body-snatcher' || mutationId === 'fusion-dance' ? activeSeconds : 0,
-            capSeconds: mutationId === 'the-great-equalizer' ? activeSeconds : 0,
-            activeSeconds,
-            ratingChanges: counters.ratingChanges,
-          });
-        }
-      }
-    }
-    return rollups.slice(0, 40);
+    return this.ledger.rollupsOf();
   }
 
   highlightsOf(overtimePeriods: number): HavocHighlight[] {
-    const highlights: HavocHighlight[] = [];
-    for (const entry of this.scoring) {
-      if (highlights.length >= HAVOC_HIGHLIGHT_LIMIT) break;
-      if (entry.addends.length === 0 && entry.multipliers.length === 0) continue;
-      const source = entry.addends[0]?.source ?? entry.multipliers[0]?.source;
-      if (source === undefined) continue;
-      highlights.push({
-        kind: 'mutation',
-        period: entry.period,
-        clockSeconds: entry.clockSeconds,
-        instanceId: entry.actorInstanceId,
-        mutationId: HAVOC_SCORING_SOURCE_MUTATION[source],
-        pointsDelta: entry.points - entry.nominalPoints,
-      });
-    }
-    for (const team of this.teams) {
-      for (const participant of team.participants) {
-        if (highlights.length >= HAVOC_HIGHLIGHT_LIMIT) break;
-        if (
-          (participant.kind === 'starter' && participant.replaced) ||
-          (participant.kind === 'clone' && participant.cloneExited)
-        ) {
-          highlights.push({
-            kind: 'foul-out',
-            period: this.period,
-            clockSeconds: 0,
-            instanceId: participant.instanceId,
-            mutationId: null,
-            pointsDelta: 0,
-          });
-        }
-      }
-    }
-    const periodTotals = this.periodTotals();
-    for (const side of [0, 1] as const) {
-      if (highlights.length >= HAVOC_HIGHLIGHT_LIMIT) break;
-      const negativeIndex = periodTotals[side].findIndex((points) => points < 0);
-      if (negativeIndex >= 0) {
-        highlights.push({
-          kind: 'negative-score',
-          period: negativeIndex + 1,
-          clockSeconds: 0,
-          instanceId: null,
-          mutationId: null,
-          pointsDelta: periodTotals[side][negativeIndex] ?? 0,
-        });
-      }
-    }
-    void overtimePeriods;
-    return highlights.slice(0, HAVOC_HIGHLIGHT_LIMIT);
+    return this.ledger.highlightsOf(overtimePeriods);
   }
 
   private periodTotals(): [number[], number[]] {
-    const totals: [number[], number[]] = [
-      Array.from({ length: this.period }, () => 0),
-      Array.from({ length: this.period }, () => 0),
-    ];
-    for (const entry of this.scoring) {
-      const index = entry.period - 1;
-      const side = entry.side === this.teams[0].side ? 0 : 1;
-      totals[side][index] = (totals[side][index] ?? 0) + entry.points;
-    }
-    return totals;
+    return this.ledger.periodTotals();
   }
 
   sidePoints(side: SideIndex): number {
-    const target = this.teams[side].side;
-    let points = 0;
-    for (const entry of this.scoring) {
-      if (entry.side === target) points += entry.points;
-    }
-    return points;
+    return this.ledger.sidePoints(side);
   }
 
   participantPoints(instanceId: string): number {
-    let points = 0;
-    for (const entry of this.scoring) {
-      if (entry.actorInstanceId === instanceId && entry.kind !== 'bonus') points += entry.points;
-    }
-    return points;
+    return this.ledger.participantPoints(instanceId);
   }
 
   teamBonusPoints(sideIndex: SideIndex): number {
-    const side = this.teams[sideIndex].side;
-    let points = 0;
-    for (const entry of this.scoring) {
-      if (entry.side === side && entry.kind === 'bonus') points += entry.points;
-    }
-    return points;
+    return this.ledger.teamBonusPoints(sideIndex);
   }
 
   teamOf(sideIndex: SideIndex): TeamRuntime {
@@ -1889,14 +1364,14 @@ class HavocBattleController {
       rollups: this.runtime.rollupsOf(),
       highlights: this.runtime.highlightsOf(overtimePeriods),
     });
-    const tape = havocBattleTapeSchema.parse({
+    const tape: HavocBattleTape = {
       schemaVersion: HAVOC_SCHEMA_VERSION,
       gameNumber: this.input.gameNumber,
       variant: this.input.variant,
       seed: this.input.seed,
       events: this.runtime.events,
       scoring: this.runtime.scoring,
-    });
+    };
     return { result, tape };
   }
 
@@ -2036,5 +1511,23 @@ export function simulateValidatedHavocBattleGame(
   context: EngineContext,
   options: HavocBattleOptions = {},
 ): { result: HavocBattleResult; tape: HavocBattleTape } {
-  return new HavocBattleController(input, context, options).run();
+  const battle = new HavocBattleController(input, context, options).run();
+  return { result: battle.result, tape: havocBattleTapeSchema.parse(battle.tape) };
+}
+
+export function simulateAuditedHavocBattleGame(
+  input: HavocBattleInput,
+  context: EngineContext,
+  options: HavocBattleOptions = {},
+): { result: HavocBattleResult; tape: HavocBattleTape; audit: HavocGameAudit } {
+  const battle = new HavocBattleController(input, context, options).run();
+  const audit = auditHavocBattleGame(input, battle.result, battle.tape);
+  let tape: HavocBattleTape | undefined;
+  return {
+    result: battle.result,
+    audit,
+    get tape() {
+      return (tape ??= havocBattleTapeSchema.parse(battle.tape));
+    },
+  };
 }

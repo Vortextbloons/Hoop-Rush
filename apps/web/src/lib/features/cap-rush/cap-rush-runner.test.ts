@@ -167,7 +167,7 @@ function simulate(
 describe('CapRushRunner', () => {
   it('posts the request, reuses the worker, and maps completion messages', async () => {
     const fake = new FakeWorker();
-    const runner = new CapRushRunner({ createWorker: () => fake.asWorker() });
+    const runner = new CapRushRunner({ parallelism: 1, createWorker: () => fake.asWorker() });
     const pending = simulate(runner, 'req-1');
     expect(fake.posted[0]).toMatchObject({ type: 'cap-rush-simulate', requestId: 'req-1' });
     fake.emit(completeMessage('req-1'));
@@ -192,7 +192,7 @@ describe('CapRushRunner', () => {
 
   it('rejects concurrent jobs without disturbing the active job', async () => {
     const fake = new FakeWorker();
-    const runner = new CapRushRunner({ createWorker: () => fake.asWorker() });
+    const runner = new CapRushRunner({ parallelism: 1, createWorker: () => fake.asWorker() });
     const pending = simulate(runner, 'req-1');
     await expect(simulate(runner, 'req-2')).rejects.toThrow(
       'a cap rush season job is already running',
@@ -206,7 +206,7 @@ describe('CapRushRunner', () => {
 
   it('serializes async stream handlers and settles only after the queue drains', async () => {
     const fake = new FakeWorker();
-    const runner = new CapRushRunner({ createWorker: () => fake.asWorker() });
+    const runner = new CapRushRunner({ parallelism: 1, createWorker: () => fake.asWorker() });
     const order: number[] = [];
     let release!: () => void;
     const gate = new Promise<void>((resolve) => {
@@ -231,7 +231,7 @@ describe('CapRushRunner', () => {
 
   it('cancels and rejects with the handler error after draining the queue', async () => {
     const fake = new FakeWorker();
-    const runner = new CapRushRunner({ createWorker: () => fake.asWorker() });
+    const runner = new CapRushRunner({ parallelism: 1, createWorker: () => fake.asWorker() });
     const pending = simulate(runner, 'req-1', {
       onGame: () => {},
       onLeagueGames: () => {
@@ -253,7 +253,7 @@ describe('CapRushRunner', () => {
 
   it('drains the handler queue before rejecting a worker error', async () => {
     const fake = new FakeWorker();
-    const runner = new CapRushRunner({ createWorker: () => fake.asWorker() });
+    const runner = new CapRushRunner({ parallelism: 1, createWorker: () => fake.asWorker() });
     const order: string[] = [];
     let release!: () => void;
     const gate = new Promise<void>((resolve) => {
@@ -280,7 +280,7 @@ describe('CapRushRunner', () => {
 
   it('resolves cancellation through the completion message', async () => {
     const fake = new FakeWorker();
-    const runner = new CapRushRunner({ createWorker: () => fake.asWorker() });
+    const runner = new CapRushRunner({ parallelism: 1, createWorker: () => fake.asWorker() });
     const pending = simulate(runner, 'req-1');
     runner.cancel();
     expect(fake.posted[1]).toMatchObject({ type: 'cap-rush-cancel', requestId: 'req-1' });
@@ -290,7 +290,7 @@ describe('CapRushRunner', () => {
 
   it('ignores stale messages and late messages after settlement', async () => {
     const fake = new FakeWorker();
-    const runner = new CapRushRunner({ createWorker: () => fake.asWorker() });
+    const runner = new CapRushRunner({ parallelism: 1, createWorker: () => fake.asWorker() });
     const seen: number[] = [];
     const pending = simulate(runner, 'req-1', {
       onGame: () => {},
@@ -313,7 +313,7 @@ describe('CapRushRunner', () => {
     const first = new FakeWorker();
     const second = new FakeWorker();
     const workers = [first, second];
-    const runner = new CapRushRunner({
+    const runner = new CapRushRunner({ parallelism: 1,
       createWorker: () => (workers.shift() ?? second).asWorker(),
     });
     const pending = simulate(runner, 'req-1');
@@ -329,7 +329,7 @@ describe('CapRushRunner', () => {
 
   it('rejects a pending job when destroyed', async () => {
     const fake = new FakeWorker();
-    const runner = new CapRushRunner({ createWorker: () => fake.asWorker() });
+    const runner = new CapRushRunner({ parallelism: 1, createWorker: () => fake.asWorker() });
     const pending = simulate(runner, 'req-1');
     runner.destroy();
     await expect(pending).rejects.toThrow('cap rush runner destroyed');
@@ -339,7 +339,7 @@ describe('CapRushRunner', () => {
 
   it('forwards progress without queueing it', async () => {
     const fake = new FakeWorker();
-    const runner = new CapRushRunner({ createWorker: () => fake.asWorker() });
+    const runner = new CapRushRunner({ parallelism: 1, createWorker: () => fake.asWorker() });
     const progress: number[] = [];
     const pending = simulate(runner, 'req-1', {
       onGame: () => {},
@@ -356,7 +356,7 @@ describe('CapRushRunner', () => {
     const first = new FakeWorker();
     const second = new FakeWorker();
     const workers = [first, second];
-    const runner = new CapRushRunner({
+    const runner = new CapRushRunner({ parallelism: 1,
       createWorker: () => (workers.shift() ?? second).asWorker(),
     });
     let release!: () => void;
@@ -391,7 +391,7 @@ describe('CapRushRunner', () => {
     fake.postMessage = () => {
       throw new Error('cannot clone request');
     };
-    const runner = new CapRushRunner({ createWorker: () => fake.asWorker() });
+    const runner = new CapRushRunner({ parallelism: 1, createWorker: () => fake.asWorker() });
     await expect(simulate(runner, 'bad-request')).rejects.toThrow('cannot clone request');
     expect(runner.busy).toBe(false);
     expect(fake.terminated).toBe(true);

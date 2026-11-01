@@ -73,6 +73,7 @@ import {
   restoreIndexedDb,
   testDatabaseName,
 } from '../testing/repo-test-support.ts';
+import { prepareCommandCommit } from '@hoop-rush/data-contracts';
 
 function setup() {
   const catalog = buildCapRushTestCatalog();
@@ -191,14 +192,18 @@ async function startLockedRun(
   options: { league?: boolean } = {},
 ): Promise<ReturnType<typeof lockedRun>> {
   const run = lockedRun(options);
-  await repo.applyOutcome({
-    outcome: { state: run.created, result: run.createResult },
-    command: run.createCommand,
-  });
-  await repo.applyOutcome({
-    outcome: { state: run.state, result: run.result },
-    command: run.command,
-  });
+  await repo.applyOutcome(
+    prepareCommandCommit({
+      outcome: { state: run.created, result: run.createResult },
+      command: run.createCommand,
+    }),
+  );
+  await repo.applyOutcome(
+    prepareCommandCommit({
+      outcome: { state: run.state, result: run.result },
+      command: run.command,
+    }),
+  );
   return run;
 }
 
@@ -235,6 +240,7 @@ function acceptBundle(
 }
 
 let db: HoopRushDatabase;
+
 let repository: DexieCapRushRepository;
 
 beforeEach(() => {
@@ -249,6 +255,18 @@ afterEach(() => {
 });
 
 describe('cap rush repository', () => {
+  it('rejects a commit expectation that disagrees with its receipt without writing', async () => {
+    const { state, result, command } = setup();
+    await expect(
+      repository.applyOutcome({
+        ...prepareCommandCommit({ outcome: { state, result }, command }),
+        expectedRevision: 99,
+      }),
+    ).rejects.toThrow('commit expected revision');
+    expect(await repository.loadActiveDraft()).toBeNull();
+    expect(await db.capRushCommands.count()).toBe(0);
+  });
+
   it('rolls back every table when a commit fails partway through', async () => {
     const run = await startLockedRun(repository);
     const before = await repository.loadActiveDraft();
@@ -262,12 +280,14 @@ describe('cap rush repository', () => {
       report: { runId: 'wrong-run' } as unknown as CapRushReport,
     };
     await expect(
-      repository.applyOutcome({
-        outcome: { state: broken.state, result: broken.result },
-        command: broken.command,
-        game: broken.game,
-        report: broken.report,
-      }),
+      repository.applyOutcome(
+        prepareCommandCommit({
+          outcome: { state: broken.state, result: broken.result },
+          command: broken.command,
+          game: broken.game,
+          report: broken.report,
+        }),
+      ),
     ).rejects.toThrow();
 
     // Nothing from the failed commit survived.
@@ -281,19 +301,23 @@ describe('cap rush repository', () => {
     const bundle = acceptBundle(run.index, run.state, 1);
     const outcome = { state: bundle.state, result: bundle.result };
 
-    const first = await repository.applyOutcome({
-      outcome,
-      command: bundle.command,
-      game: bundle.game,
-    });
+    const first = await repository.applyOutcome(
+      prepareCommandCommit({
+        outcome,
+        command: bundle.command,
+        game: bundle.game,
+      }),
+    );
     const gamesAfterFirst = await repository.listRunGames(run.state.runId);
     const commandsAfterFirst = await db.capRushCommands.count();
 
-    const replay = await repository.applyOutcome({
-      outcome,
-      command: bundle.command,
-      game: bundle.game,
-    });
+    const replay = await repository.applyOutcome(
+      prepareCommandCommit({
+        outcome,
+        command: bundle.command,
+        game: bundle.game,
+      }),
+    );
 
     expect(replay).toEqual(first);
     expect(await repository.listRunGames(run.state.runId)).toHaveLength(gamesAfterFirst.length);
@@ -302,7 +326,7 @@ describe('cap rush repository', () => {
 
   it('persists the created draft and resumes it', async () => {
     const { command, state, result } = setup();
-    await repository.applyOutcome({ outcome: { state, result }, command });
+    await repository.applyOutcome(prepareCommandCommit({ outcome: { state, result }, command }));
     expect(await repository.loadActiveDraft()).toEqual(state);
     expect(await repository.loadCommandResult(command.commandId)).toEqual(result);
   });
@@ -338,10 +362,12 @@ describe('cap rush repository', () => {
   it('rejects a changed outcome state before persisting its verified digest', async () => {
     const { command, state, result } = setup();
     await expect(
-      repository.applyOutcome({
-        outcome: { state: { ...state, revision: state.revision + 1 }, result },
-        command,
-      }),
+      repository.applyOutcome(
+        prepareCommandCommit({
+          outcome: { state: { ...state, revision: state.revision + 1 }, result },
+          command,
+        }),
+      ),
     ).rejects.toBeInstanceOf(CapRushLoadError);
     expect(await db.capRushActive.count()).toBe(0);
     expect(await db.capRushCommands.count()).toBe(0);
@@ -349,15 +375,17 @@ describe('cap rush repository', () => {
 
   it('keeps the same receipt for a duplicate command id', async () => {
     const { command, state, result } = setup();
-    await repository.applyOutcome({ outcome: { state, result }, command });
-    const duplicate = await repository.applyOutcome({ outcome: { state, result }, command });
+    await repository.applyOutcome(prepareCommandCommit({ outcome: { state, result }, command }));
+    const duplicate = await repository.applyOutcome(
+      prepareCommandCommit({ outcome: { state, result }, command }),
+    );
     expect(duplicate).toEqual(result);
     expect(await db.capRushCommands.count()).toBe(1);
   });
 
   it('rejects reusing a command id with different content', async () => {
     const { command, state, result } = setup();
-    await repository.applyOutcome({ outcome: { state, result }, command });
+    await repository.applyOutcome(prepareCommandCommit({ outcome: { state, result }, command }));
     const choose = capRushChoosePositionCommandSchema.parse({
       command: 'choose-cap-rush-position',
       commandId: command.commandId,
@@ -375,14 +403,14 @@ describe('cap rush repository', () => {
         rejection: { code: 'phase-mismatch', message: 'test' },
       }),
     };
-    await expect(repository.applyOutcome({ outcome, command: choose })).rejects.toBeInstanceOf(
-      CapRushCommandConflictError,
-    );
+    await expect(
+      repository.applyOutcome(prepareCommandCommit({ outcome, command: choose })),
+    ).rejects.toBeInstanceOf(CapRushCommandConflictError);
   });
 
   it('rejects a stale revision without changing the draft', async () => {
     const { command, state, result } = setup();
-    await repository.applyOutcome({ outcome: { state, result }, command });
+    await repository.applyOutcome(prepareCommandCommit({ outcome: { state, result }, command }));
     const choose = capRushChoosePositionCommandSchema.parse({
       command: 'choose-cap-rush-position',
       commandId: commandIdSchema.parse('cmd-choose'),
@@ -402,14 +430,14 @@ describe('cap rush repository', () => {
       }),
     };
     await expect(
-      repository.applyOutcome({ outcome: stale, command: choose }),
+      repository.applyOutcome(prepareCommandCommit({ outcome: stale, command: choose })),
     ).rejects.toBeInstanceOf(CapRushStaleRevisionError);
     expect(await repository.loadActiveDraft()).toEqual(state);
   });
 
   it('clears the active draft and its command receipts', async () => {
     const { command, state, result } = setup();
-    await repository.applyOutcome({ outcome: { state, result }, command });
+    await repository.applyOutcome(prepareCommandCommit({ outcome: { state, result }, command }));
     await repository.clearActiveDraft();
     expect(await repository.loadActiveDraft()).toBeNull();
     expect(await db.capRushCommands.count()).toBe(0);
@@ -429,6 +457,24 @@ describe('cap rush repository', () => {
     });
     await db.capRushActive.put(row);
     await expect(repository.loadActiveDraft()).rejects.toBeInstanceOf(CapRushLoadError);
+  });
+
+  it('recognizes an older rules version in a locked active run as unsupported', async () => {
+    await startLockedRun(repository);
+    const row = await db.capRushActive.get(CAP_RUSH_ACTIVE_DRAFT_RECORD_ID);
+    if (!row || !row.draft.locked) throw new Error('missing locked run');
+    await db.capRushActive.put({
+      ...row,
+      draft: {
+        ...row.draft,
+        versionSet: { ...row.draft.versionSet, rulesVersion: 'cap-rush-rules-v1' },
+        locked: {
+          ...row.draft.locked,
+          versionSet: { ...row.draft.locked.versionSet, rulesVersion: 'cap-rush-rules-v1' },
+        },
+      },
+    } as never);
+    await expect(repository.loadActiveDraft()).rejects.toMatchObject({ code: 'unsupported' });
   });
 
   it('recognizes an older salary curve in a locked active run as unsupported', async () => {
@@ -472,11 +518,13 @@ describe('cap rush repository', () => {
     const { index, state } = await startLockedRun(repository);
     const bundle = acceptBundle(index, state, 1);
     expect(bundle.result.status).toBe('accepted');
-    await repository.applyOutcome({
-      outcome: { state: bundle.state, result: bundle.result },
-      command: bundle.command,
-      game: bundle.game,
-    });
+    await repository.applyOutcome(
+      prepareCommandCommit({
+        outcome: { state: bundle.state, result: bundle.result },
+        command: bundle.command,
+        game: bundle.game,
+      }),
+    );
     expect(await repository.readRunGame(state.runId, 1)).toEqual(bundle.game);
     expect(await repository.listRunGames(state.runId)).toEqual([bundle.game]);
     expect((await repository.loadActiveDraft())?.season.games).toEqual([bundle.game.summary]);
@@ -507,19 +555,23 @@ describe('cap rush repository', () => {
         cursor: 0,
       },
     };
-    await repository.applyOutcome({
-      outcome: { state: bundle.state, result: bundle.result },
-      command: bundle.command,
-      game,
-    });
+    await repository.applyOutcome(
+      prepareCommandCommit({
+        outcome: { state: bundle.state, result: bundle.result },
+        command: bundle.command,
+        game,
+      }),
+    );
     expect((await repository.readRunGame(state.runId, 1))?.playback).toEqual(game.playback);
     const next = acceptBundle(index, bundle.state, 2);
     await expect(
-      repository.applyOutcome({
-        outcome: { state: next.state, result: next.result },
-        command: next.command,
-        game: next.game,
-      }),
+      repository.applyOutcome(
+        prepareCommandCommit({
+          outcome: { state: next.state, result: next.result },
+          command: next.command,
+          game: next.game,
+        }),
+      ),
     ).rejects.toThrow('pending broadcast');
     await repository.updatePlayback(state.runId, 1, 10, false);
     await repository.updatePlayback(state.runId, 1, 5, false);
@@ -531,11 +583,13 @@ describe('cap rush repository', () => {
     await repository.updatePlayback(state.runId, 1, total, true);
     expect((await repository.readRunGame(state.runId, 1))?.playback).toBeUndefined();
     expect(await repository.loadActiveDraft()).toEqual(bundle.state);
-    await repository.applyOutcome({
-      outcome: { state: next.state, result: next.result },
-      command: next.command,
-      game: next.game,
-    });
+    await repository.applyOutcome(
+      prepareCommandCommit({
+        outcome: { state: next.state, result: next.result },
+        command: next.command,
+        game: next.game,
+      }),
+    );
     expect((await repository.loadActiveDraft())?.season.games.length).toBe(2);
   });
 
@@ -551,19 +605,21 @@ describe('cap rush repository', () => {
       context,
     });
     const bundle = acceptBundle(index, state, 1);
-    await repository.applyOutcome({
-      outcome: { state: bundle.state, result: bundle.result },
-      command: bundle.command,
-      game: {
-        ...bundle.game,
-        playback: {
-          input: soloToBattleInput(simulation.input),
-          tape: soloToBattleTape(simulation.tape, simulation.result.humanSide),
-          facts: [...simulation.facts],
-          cursor: 0,
+    await repository.applyOutcome(
+      prepareCommandCommit({
+        outcome: { state: bundle.state, result: bundle.result },
+        command: bundle.command,
+        game: {
+          ...bundle.game,
+          playback: {
+            input: soloToBattleInput(simulation.input),
+            tape: soloToBattleTape(simulation.tape, simulation.result.humanSide),
+            facts: [...simulation.facts],
+            cursor: 0,
+          },
         },
-      },
-    });
+      }),
+    );
     const leagueGames = simulateCapRushLeagueSlot({
       locked: state.locked,
       slot: 1,
@@ -579,7 +635,7 @@ describe('cap rush repository', () => {
     });
     const outcome = applyCapRushCommand(bundle.state, command, { index });
     expect(outcome.result.status).toBe('accepted');
-    await repository.applyOutcome({ outcome, command, leagueGames });
+    await repository.applyOutcome(prepareCommandCommit({ outcome, command, leagueGames }));
     expect((await repository.loadActiveDraft())?.season.leagueGamesAccepted).toBe(
       leagueGames.length,
     );
@@ -587,11 +643,13 @@ describe('cap rush repository', () => {
 
     const next = acceptBundle(index, outcome.state, 2);
     await expect(
-      repository.applyOutcome({
-        outcome: { state: next.state, result: next.result },
-        command: next.command,
-        game: next.game,
-      }),
+      repository.applyOutcome(
+        prepareCommandCommit({
+          outcome: { state: next.state, result: next.result },
+          command: next.command,
+          game: next.game,
+        }),
+      ),
     ).rejects.toThrow('pending broadcast');
   });
 
@@ -604,19 +662,21 @@ describe('cap rush repository', () => {
       context: createEngineContext(),
     });
     const bundle = acceptBundle(index, state, 1);
-    await repository.applyOutcome({
-      outcome: { state: bundle.state, result: bundle.result },
-      command: bundle.command,
-      game: {
-        ...bundle.game,
-        playback: {
-          input: soloToBattleInput(simulation.input),
-          tape: soloToBattleTape(simulation.tape, simulation.result.humanSide),
-          facts: [...simulation.facts],
-          cursor: 0,
+    await repository.applyOutcome(
+      prepareCommandCommit({
+        outcome: { state: bundle.state, result: bundle.result },
+        command: bundle.command,
+        game: {
+          ...bundle.game,
+          playback: {
+            input: soloToBattleInput(simulation.input),
+            tape: soloToBattleTape(simulation.tape, simulation.result.humanSide),
+            facts: [...simulation.facts],
+            cursor: 0,
+          },
         },
-      },
-    });
+      }),
+    );
     const key = [state.runId, 'regular:1'] as const;
     const evidenceBefore = await db.capRushPlaybackEvidence.get(key);
     const gameBefore = await db.capRushGames.get([state.runId, 1]);
@@ -630,11 +690,13 @@ describe('cap rush repository', () => {
   it('rejects a malformed stored game record on read', async () => {
     const { index, state } = await startLockedRun(repository);
     const bundle = acceptBundle(index, state, 1);
-    await repository.applyOutcome({
-      outcome: { state: bundle.state, result: bundle.result },
-      command: bundle.command,
-      game: bundle.game,
-    });
+    await repository.applyOutcome(
+      prepareCommandCommit({
+        outcome: { state: bundle.state, result: bundle.result },
+        command: bundle.command,
+        game: bundle.game,
+      }),
+    );
     await db.capRushGames.put({
       saveSchemaVersion: CAP_RUSH_SAVE_SCHEMA_VERSION,
       runId: state.runId,
@@ -704,14 +766,18 @@ describe('cap rush repository', () => {
       .spyOn(db.capRushLeagueGames, 'bulkPut')
       .mockRejectedValueOnce(new Error('league save failed'));
     await expect(
-      repository.applyOutcome({ outcome, command, game: bundle.game, leagueGames }),
+      repository.applyOutcome(
+        prepareCommandCommit({ outcome, command, game: bundle.game, leagueGames }),
+      ),
     ).rejects.toThrow('league save failed');
     failWrite.mockRestore();
     expect(await repository.readRunGame(state.runId, 1)).toBeNull();
     expect(await repository.listLeagueGames(state.runId)).toEqual([]);
     expect(await repository.loadActiveDraft()).toEqual(state);
     expect(await repository.loadCommandResult(command.commandId)).toBeNull();
-    await repository.applyOutcome({ outcome, command, game: bundle.game, leagueGames });
+    await repository.applyOutcome(
+      prepareCommandCommit({ outcome, command, game: bundle.game, leagueGames }),
+    );
     expect(await repository.readRunGame(state.runId, 1)).toEqual(bundle.game);
     expect(await repository.listLeagueGames(state.runId)).toHaveLength(14);
     expect((await repository.loadActiveDraft())?.season.leagueGamesAccepted).toBe(14);
@@ -724,11 +790,13 @@ describe('cap rush repository', () => {
       .spyOn(db.capRushGames, 'put')
       .mockRejectedValueOnce(new Error('save failed'));
     await expect(
-      repository.applyOutcome({
-        outcome: { state: bundle.state, result: bundle.result },
-        command: bundle.command,
-        game: bundle.game,
-      }),
+      repository.applyOutcome(
+        prepareCommandCommit({
+          outcome: { state: bundle.state, result: bundle.result },
+          command: bundle.command,
+          game: bundle.game,
+        }),
+      ),
     ).rejects.toThrow('save failed');
     failWrite.mockRestore();
     expect(await repository.readRunGame(state.runId, 1)).toBeNull();
@@ -792,15 +860,15 @@ describe('cap rush repository', () => {
     const failWrite = vi
       .spyOn(db.capRushHistory, 'put')
       .mockRejectedValueOnce(new Error('history failed'));
-    await expect(repository.applyOutcome({ outcome, command: finalize, report })).rejects.toThrow(
-      'history failed',
-    );
+    await expect(
+      repository.applyOutcome(prepareCommandCommit({ outcome, command: finalize, report })),
+    ).rejects.toThrow('history failed');
     failWrite.mockRestore();
     expect(await repository.readReport(state.runId)).toBeNull();
     expect(await repository.listHistory()).toEqual([]);
     expect(await repository.loadCommandResult('cmd-finalize')).toBeNull();
 
-    await repository.applyOutcome({ outcome, command: finalize, report });
+    await repository.applyOutcome(prepareCommandCommit({ outcome, command: finalize, report }));
     expect(await repository.readReport(state.runId)).toEqual(report);
     expect(await repository.readCompletedRun(state.runId)).toEqual({
       entry: {

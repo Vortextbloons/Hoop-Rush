@@ -64,28 +64,9 @@ import {
   parseRecord,
   revisionMatches,
 } from './support.ts';
+import type { HavocApplyOutcomeInput } from '@hoop-rush/data-contracts';
 
-export interface HavocCommandOutcome {
-  readonly state: HavocRunState;
-  readonly result: HavocCommandResult;
-}
-
-export interface HavocApplyOutcomeInput {
-  outcome: HavocCommandOutcome;
-  game?: {
-    result: HavocGameResult;
-    inputDigest: string;
-    resultDigest: string;
-  };
-  tape?: {
-    tape: HavocGameTape;
-    tapeDigest: string;
-    selectedRank?: number;
-  };
-  comparison?: HavocComparison;
-  report?: HavocReport;
-  command?: HavocCommand;
-}
+export type { HavocApplyOutcomeInput, HavocCommandOutcome } from '@hoop-rush/data-contracts';
 
 export type HavocHistoryEntry = Omit<StoredHavocHistoryRow, 'saveSchemaVersion' | 'runId'> & {
   runId: string;
@@ -386,6 +367,10 @@ export class DexieHavocRepository {
 
   async applyOutcome(input: HavocApplyOutcomeInput): Promise<HavocCommandResult> {
     const result = parseInput(havocCommandResultSchema, input.outcome.result, 'outcome result');
+    invariant(
+      input.expectedRevision === result.revisionBefore,
+      'commit expected revision does not match the outcome receipt',
+    );
     const command =
       input.command === undefined
         ? null

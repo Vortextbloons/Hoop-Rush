@@ -1,5 +1,4 @@
 import type {
-  CapRushCommand,
   CapRushCommandResult,
   CapRushDraftState,
   CapRushHistoryEntry,
@@ -13,19 +12,11 @@ import type {
   SeasonDraftCatalog,
   Seed,
 } from '@hoop-rush/data-contracts';
+import type { CapRushApplyOutcomeInput } from '@hoop-rush/data-contracts';
+
+export type { CapRushApplyOutcomeInput } from '@hoop-rush/data-contracts';
 
 /** What a save commit returns to the Cap Rush session when it applies an outcome. */
-export interface CapRushApplyOutcomeInput {
-  readonly outcome: {
-    readonly state: CapRushDraftState;
-    readonly result: CapRushCommandResult;
-  };
-  readonly command: CapRushCommand;
-  readonly game?: CapRushStoredGame;
-  readonly playoffGame?: CapRushStoredPlayoffGame;
-  readonly leagueGames?: readonly CapRushLeagueGame[];
-  readonly report?: CapRushReport;
-}
 
 export interface CapRushCompletedRun {
   readonly entry: CapRushHistoryEntry;
@@ -56,6 +47,7 @@ export interface CapRushDraftRepositoryPort {
   ): Promise<void>;
   clearActiveDraft(): Promise<void>;
 }
+
 export interface CapRushAssetPort {
   loadCatalog(): Promise<SeasonDraftCatalog>;
   loadBracket?(hash: string): Promise<OpponentBracket>;

@@ -68,6 +68,7 @@ import type {
   HavocRunRepositoryPort,
   HavocRunnerPort,
 } from './ports.ts';
+import { prepareCommandCommit } from '@hoop-rush/data-contracts';
 
 interface HavocAssets {
   catalog: HavocCatalog;
@@ -218,10 +219,12 @@ export class HavocSession implements HavocService {
         stateDigest: HavocStateDigest(state),
         rejection: null,
       });
-      const applied = await this.repository.applyOutcome({
-        outcome: { state, result },
-        command,
-      });
+      const applied = await this.repository.applyOutcome(
+        prepareCommandCommit({
+          outcome: { state, result },
+          command,
+        }),
+      );
       if (applied.status === 'accepted') {
         this.run = state;
         this.lastRunId = state.runId;
@@ -529,7 +532,9 @@ export class HavocSession implements HavocService {
           outcome.result.rejection?.message ?? 'comparison finalization was rejected',
         );
       }
-      await this.repository.applyOutcome({ outcome, command, comparison, report });
+      await this.repository.applyOutcome(
+        prepareCommandCommit({ outcome, command, comparison, report }),
+      );
       this.run = outcome.state;
       this.emit({ type: 'comparison-updated', comparison });
       return comparison;
@@ -682,15 +687,17 @@ export class HavocSession implements HavocService {
         outcome.result.rejection?.message ?? 'the accepted game was rejected',
       );
     }
-    const applied = await this.repository.applyOutcome({
-      outcome,
-      command,
-      game: {
-        result: message.result,
-        inputDigest: message.inputDigest,
-        resultDigest: message.resultDigest,
-      },
-    });
+    const applied = await this.repository.applyOutcome(
+      prepareCommandCommit({
+        outcome,
+        command,
+        game: {
+          result: message.result,
+          inputDigest: message.inputDigest,
+          resultDigest: message.resultDigest,
+        },
+      }),
+    );
     if (applied.status !== 'accepted') {
       throw new HavocServiceError(
         'simulation',
@@ -723,7 +730,9 @@ export class HavocSession implements HavocService {
         bracket: assets.bracket,
         profile: assets.profile,
       });
-      const applied = await this.repository.applyOutcome({ outcome, command });
+      const applied = await this.repository.applyOutcome(
+        prepareCommandCommit({ outcome, command }),
+      );
       if (applied.status === 'accepted') {
         this.run = outcome.state;
         if (outcome.state.completionState === 'abandoned') {
