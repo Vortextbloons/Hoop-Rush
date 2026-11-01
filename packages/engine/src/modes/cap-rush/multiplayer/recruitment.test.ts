@@ -429,3 +429,89 @@ describe('cap rush multiplayer auction', () => {
     expect(capRushMultiplayerMarketSeed(ROOT, 0)).toBe(capRushMultiplayerMarketSeed(ROOT, 0));
   });
 });
+
+describe('multiple offers and cancellation', () => {
+  function leadingOffers() {
+    let state = recruitment();
+    const players = state.market.players.filter((entry) => entry.position === 'PG').slice(0, 2);
+    const amount = Math.max(...players.map((entry) => entry.minimumBidDollars)) + 100_000;
+    for (const player of players) {
+      const result = bid(state, 'p1', player.playerId, amount);
+      if (!result.ok) throw new Error(result.message);
+      state = result.recruitment;
+    }
+    return { state, players, amount };
+  }
+
+  test('breaks equal offers deterministically and releases unselected players', () => {
+    const { state, players } = leadingOffers();
+    const result = capRushMultiplayerCloseDueAuctions(state, {
+      round: 0,
+      acceptedAtIso: '2026-11-01T00:02:00.000Z',
+    });
+    if (!result.ok) throw new Error(result.message);
+    const preferred = players.map((player) => player.playerId).sort()[0];
+    expect(result.recruitment.signings.find((entry) => entry.seat === 'p1')?.playerId).toBe(
+      preferred,
+    );
+    expect(
+      result.recruitment.rounds[0]?.auctions.filter((entry) => entry.winningSeat === 'p1'),
+    ).toHaveLength(1);
+    expect(new Set(result.recruitment.signings.map((entry) => entry.playerId)).size).toBe(2);
+    expect(
+      capRushMultiplayerCloseDueAuctions(state, {
+        round: 0,
+        acceptedAtIso: '2026-11-01T00:02:00.000Z',
+      }),
+    ).toEqual(result);
+  });
+
+  test('only the leading owner can cancel before the deadline', () => {
+    const { state, players } = leadingOffers();
+    const player = players[0];
+    if (!player) throw new Error('missing player');
+    expect(
+      cancelCapRushMultiplayerBid(state, {
+        seat: 'p2',
+        playerId: player.playerId,
+        acceptedAtIso: '2026-11-01T00:00:06.000Z',
+      }).ok,
+    ).toBe(false);
+    expect(
+      cancelCapRushMultiplayerBid(state, {
+        seat: 'p1',
+        playerId: player.playerId,
+        acceptedAtIso: '2026-11-01T00:01:00.000Z',
+      }).ok,
+    ).toBe(false);
+    const result = cancelCapRushMultiplayerBid(state, {
+      seat: 'p1',
+      playerId: player.playerId,
+      acceptedAtIso: '2026-11-01T00:00:06.000Z',
+    });
+    if (!result.ok) throw new Error(result.message);
+    expect(result.recruitment.signings).toHaveLength(0);
+    expect(result.recruitment.seats.p1.leadPlayerId).toBe(players[1]?.playerId ?? null);
+    expect(
+      state.rounds[0]?.auctions.find((entry) => entry.playerId === player.playerId)?.leaderSeat,
+    ).toBe('p1');
+  });
+
+  test('extends all lots together and prevents early signing', () => {
+    const { state, players, amount } = leadingOffers();
+    const player = players[0];
+    if (!player) throw new Error('missing player');
+    const result = bid(state, 'p2', player.playerId, amount + 100_000, '2026-11-01T00:00:59.000Z');
+    if (!result.ok) throw new Error(result.message);
+    expect(new Set(result.recruitment.rounds[0]?.auctions.map((entry) => entry.endsAtIso))).toEqual(
+      new Set(['2026-11-01T00:01:09.000Z']),
+    );
+    expect(
+      capRushMultiplayerCloseDueAuctions(result.recruitment, {
+        round: 0,
+        acceptedAtIso: '2026-11-01T00:01:00.000Z',
+      }).ok,
+    ).toBe(false);
+    expect(result.recruitment.signings).toHaveLength(0);
+  });
+});
