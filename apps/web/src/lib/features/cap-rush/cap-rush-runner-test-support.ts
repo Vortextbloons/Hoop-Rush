@@ -1,7 +1,4 @@
-import {
-  POSITIONS,
-  capRushCardSchema,
-} from '@hoop-rush/data-contracts';
+import { POSITIONS, capRushCardSchema } from '@hoop-rush/data-contracts';
 import {
   buildCapRushLeagueSchedule,
   buildCapRushLockedInputs,
@@ -41,4 +38,3 @@ export function lockedRun() {
     },
   });
 }
-

@@ -50,7 +50,7 @@ export const capRushMultiplayerWorkerRequestSchema = z.discriminatedUnion('kind'
     locked: capRushMultiplayerLockedInputsSchema,
     slot: z.number().int().min(1).max(82),
     throughSlot: z.number().int().min(1).max(82).optional(),
-    partition: z.number().int().min(0).max(1).optional(),
+    partition: z.union([z.literal(0), z.literal(1)]).optional(),
     tapeGameIds: z.array(z.string().min(1).max(80)).max(2),
   }),
   base.extend({

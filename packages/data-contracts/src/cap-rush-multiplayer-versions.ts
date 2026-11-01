@@ -14,7 +14,7 @@ export const CAP_RUSH_MULTIPLAYER_PRICING_VERSION = 'cap-rush-multiplayer-pricin
 export const CAP_RUSH_MULTIPLAYER_SEED_DERIVATION_VERSION = 'cap-rush-multiplayer-seeds-v1';
 export const CAP_RUSH_MULTIPLAYER_SEED_ROOT = 'cap-rush-multiplayer-v1';
 export const CAP_RUSH_MULTIPLAYER_SAVE_SCHEMA_VERSION = 1;
-export const CAP_RUSH_MULTIPLAYER_WORKER_WIRE_SCHEMA_VERSION = 1;
+export const CAP_RUSH_MULTIPLAYER_WORKER_WIRE_SCHEMA_VERSION = 2;
 export const CAP_RUSH_MULTIPLAYER_POSTSEASON_VERSION = 'cap-rush-multiplayer-postseason-v1';
 export const CAP_RUSH_MULTIPLAYER_REPORT_VERSION = 'cap-rush-multiplayer-report-v1';
 

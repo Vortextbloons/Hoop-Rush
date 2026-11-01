@@ -53,7 +53,9 @@ export class CapRushParallelWorker {
     const parallelPlayoffs = request.type === 'cap-rush-playoffs' && series.length > 1;
     if (!parallelSeason && !parallelPlayoffs) {
       this.job = null;
-      this.start([request], (message) => this.emit(message));
+      this.start([request], (message) => {
+        this.emit(message);
+      });
       return;
     }
     if (request.type === 'cap-rush-simulate') {
@@ -65,9 +67,11 @@ export class CapRushParallelWorker {
           { ...request, partition: 0 },
           { ...request, partition: 1, leagueOnly: true },
         ],
-        (message, lane) => this.accept(message, lane),
+        (message, lane) => {
+          this.accept(message, lane);
+        },
       );
-    } else if (request.type === 'cap-rush-playoffs') {
+    } else {
       this.job = request;
       this.next = 0;
       this.start(
@@ -75,7 +79,9 @@ export class CapRushParallelWorker {
           ...request,
           games: request.games.filter((game) => series.indexOf(game.seriesId) % 2 === lane),
         })),
-        (message, lane) => this.accept(message, lane),
+        (message, lane) => {
+          this.accept(message, lane);
+        },
       );
     }
   }
@@ -226,8 +232,14 @@ export class CapRushParallelWorker {
     this.games.clear();
     this.league.clear();
     this.playoffs.clear();
-    const base = { schemaVersion: CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION, requestId: job.requestId, gamesDelivered: this.delivered, cancelled };
-    if (job.type === 'cap-rush-simulate') this.emit({ ...base, type: 'cap-rush-complete', lastCursor: this.cursor });
+    const base = {
+      schemaVersion: CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION,
+      requestId: job.requestId,
+      gamesDelivered: this.delivered,
+      cancelled,
+    } as const;
+    if (job.type === 'cap-rush-simulate')
+      this.emit({ ...base, type: 'cap-rush-complete', lastCursor: this.cursor });
     else this.emit({ ...base, type: 'cap-rush-playoffs-complete' });
   }
 

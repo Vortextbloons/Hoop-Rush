@@ -37,7 +37,7 @@ export interface CapRushMultiplayerSlotInput {
   locked: CapRushMultiplayerLockedInputs;
   slot: number;
   throughSlot?: number;
-  partition?: number;
+  partition?: 0 | 1;
   tapeGameIds?: readonly string[];
 }
 
@@ -168,6 +168,7 @@ export class CapRushMultiplayerProjectionRejection extends Error {
 }
 
 export class CapRushMultiplayerRunner {
+  private generation = 0;
   private readonly slotRunners: CapRushMultiplayerRunner[] = [];
   private readonly options: {
     timeoutMs?: number;
@@ -205,6 +206,7 @@ export class CapRushMultiplayerRunner {
   }
 
   async project(input: CapRushMultiplayerProjectionInput): Promise<CapRushMultiplayerState> {
+    this.generation += 1;
     for (const runner of this.slotRunners) runner.dispose();
     const result = (await this.transport.run(input)) as
       | CapRushMultiplayerState
@@ -226,6 +228,7 @@ export class CapRushMultiplayerRunner {
   }
 
   async simulateSlot(input: CapRushMultiplayerSlotInput): Promise<CapRushMultiplayerSlotOutput> {
+    const generation = ++this.generation;
     const through = input.throughSlot ?? input.slot;
     const parallelism =
       this.options.parallelism ??
@@ -245,10 +248,13 @@ export class CapRushMultiplayerRunner {
           ...input,
           slot: through === input.slot ? input.slot : index === 0 ? input.slot : midpoint + 1,
           throughSlot: through === input.slot ? through : index === 0 ? midpoint : through,
-          partition: through === input.slot ? index : undefined,
+          partition: through === input.slot ? (index === 0 ? 0 : 1) : undefined,
         }),
       ),
-    );
+    ).catch((error: unknown) => {
+      if (generation === this.generation) for (const runner of this.slotRunners) runner.dispose();
+      throw error;
+    });
     return {
       games: outputs.flatMap((output) => output.games),
       tapes: outputs.flatMap((output) => output.tapes),
@@ -258,6 +264,7 @@ export class CapRushMultiplayerRunner {
   async simulatePlayoffStep(
     input: CapRushMultiplayerPlayoffInput,
   ): Promise<CapRushMultiplayerPlayoffOutput> {
+    const generation = ++this.generation;
     const groups = new Map<string, CapRushPlayoffGamePlan[]>();
     for (const plan of input.plans) {
       const group = groups.get(plan.seriesId) ?? [];
@@ -283,7 +290,10 @@ export class CapRushMultiplayerRunner {
       this.slotRunners.map((runner, index) =>
         runner.simulatePlayoffStep({ ...input, plans: batches[index] ?? [] }),
       ),
-    );
+    ).catch((error: unknown) => {
+      if (generation === this.generation) for (const runner of this.slotRunners) runner.dispose();
+      throw error;
+    });
     const games = outputs.flatMap((output) => output.games);
     const order = new Map(
       input.plans.map((plan, index) => [
@@ -298,11 +308,13 @@ export class CapRushMultiplayerRunner {
   }
 
   async tapeForGame(input: CapRushMultiplayerTapeInput): Promise<CapRushMultiplayerTapeOutput> {
+    this.generation += 1;
     for (const runner of this.slotRunners) runner.dispose();
     return (await this.transport.run(input)) as CapRushMultiplayerTapeOutput;
   }
 
   dispose(): void {
+    this.generation += 1;
     this.transport.dispose();
     for (const runner of this.slotRunners) runner.dispose();
   }

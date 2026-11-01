@@ -63,7 +63,7 @@ function postLeagueSlot(
   requestId: string,
   locked: CapRushLockedInputs,
   slot: number,
-  partition?: number,
+  partition?: 0 | 1,
 ): boolean {
   let leagueGames;
   try {
@@ -95,7 +95,7 @@ async function simulate(
     count: number;
     includeTape?: boolean;
     leagueOnly?: boolean;
-    partition?: number;
+    partition?: 0 | 1;
     backfillLeagueFrom?: number;
     backfillLeagueTo?: number;
   },

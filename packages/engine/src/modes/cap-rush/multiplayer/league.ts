@@ -112,7 +112,7 @@ export function simulateCapRushMultiplayerSlot(input: {
   readonly slot: number;
   readonly context: EngineContext;
   readonly tapeGameIds?: readonly string[] | undefined;
-  readonly partition?: number;
+  readonly partition?: 0 | 1;
 }): CapRushMultiplayerSlotSimulation {
   const entries = capRushMultiplayerSlotEntries(input.locked, input.slot);
   if (entries.length === 0) {

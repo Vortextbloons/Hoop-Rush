@@ -313,7 +313,8 @@ describe('CapRushRunner', () => {
     const first = new FakeWorker();
     const second = new FakeWorker();
     const workers = [first, second];
-    const runner = new CapRushRunner({ parallelism: 1,
+    const runner = new CapRushRunner({
+      parallelism: 1,
       createWorker: () => (workers.shift() ?? second).asWorker(),
     });
     const pending = simulate(runner, 'req-1');
@@ -356,7 +357,8 @@ describe('CapRushRunner', () => {
     const first = new FakeWorker();
     const second = new FakeWorker();
     const workers = [first, second];
-    const runner = new CapRushRunner({ parallelism: 1,
+    const runner = new CapRushRunner({
+      parallelism: 1,
       createWorker: () => (workers.shift() ?? second).asWorker(),
     });
     let release!: () => void;

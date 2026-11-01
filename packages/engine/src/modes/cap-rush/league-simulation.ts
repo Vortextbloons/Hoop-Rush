@@ -184,7 +184,7 @@ export function simulateCapRushLeagueSlot(input: {
   readonly locked: CapRushLockedInputs;
   readonly slot: number;
   readonly context: EngineContext;
-  readonly partition?: number;
+  readonly partition?: 0 | 1;
 }): CapRushLeagueGame[] {
   const entries = capRushLeagueSlotGames(input.locked, input.slot);
   const midpoint = Math.ceil(entries.length / 2);

@@ -18,7 +18,7 @@ import {
 } from './havoc-game.ts';
 import { havocBattleInputSchema, havocBattleTapeSchema } from './havoc-battle.ts';
 
-export const CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION = 4;
+export const CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION = 5;
 
 const capRushWorkerBase = z.object({
   schemaVersion: z.literal(CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION),
@@ -34,7 +34,7 @@ export const capRushWorkerSimulateRequestSchema = capRushWorkerBase.extend({
   count: z.number().int().min(1).max(CAP_RUSH_GAME_COUNT),
   includeTape: z.boolean().optional(),
   leagueOnly: z.boolean().optional(),
-  partition: z.number().int().min(0).max(1).optional(),
+  partition: z.union([z.literal(0), z.literal(1)]).optional(),
   backfillLeagueFrom: z.number().int().min(1).max(CAP_RUSH_GAME_COUNT).optional(),
   backfillLeagueTo: z.number().int().min(1).max(CAP_RUSH_GAME_COUNT).optional(),
 });
