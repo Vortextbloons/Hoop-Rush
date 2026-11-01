@@ -23,7 +23,7 @@
   import { seatLabelFor, seatOrder, teamNameOf } from './cap-rush-multiplayer-presentation.js';
 
   let {
-    state,
+    state: game,
     localSeat,
     art = null,
     busy = false,
@@ -44,8 +44,13 @@
     oncomplete: () => void;
   } = $props();
 
-  const postseason = $derived(state.postseason);
-  const locked = $derived(state.locked);
+  let showingPlayoffs = $state(false);
+  const postseason = $derived(game.postseason);
+  const playoffsStarted = $derived(
+    postseason?.series.some((series) => series.games.length > 0) ?? false,
+  );
+  const showLeagueResults = $derived(!showingPlayoffs && !playoffsStarted);
+  const locked = $derived(game.locked);
   const orderedSeats = $derived(seatOrder(localSeat));
   const otherSeat = $derived(localSeat === 'p1' ? ('p2' as const) : ('p1' as const));
   const localTeamId = $derived(
@@ -85,9 +90,9 @@
         name: locked.seats[seat].franchise.displayName,
         seed: seedOf(teamId),
         record:
-          state.season === null
+          game.season === null
             ? null
-            : capRushMultiplayerSeatRecord(locked, state.season.games, seat),
+            : capRushMultiplayerSeatRecord(locked, game.season.games, seat),
         outcome: postseason.outcomes[seat],
         seriesLine: series === null ? null : seriesLine(series, teamId),
       };
@@ -190,9 +195,11 @@
             Postseason · {championTeamId === null ? `round ${currentRound} of 4` : 'complete'}
           </p>
           <h2 class="font-display text-2xl font-extrabold tracking-tight uppercase">
-            {championTeamId === null
-              ? capRushConferenceRoundName(currentRound)
-              : 'Champion crowned'}
+            {showLeagueResults
+              ? 'League results'
+              : championTeamId === null
+                ? capRushConferenceRoundName(currentRound)
+                : 'Champion crowned'}
           </h2>
         </div>
       </header>
@@ -247,15 +254,17 @@
                 >
               </p>
             {/if}
-            <p class="text-xs font-semibold">{outcomeLabel(detail.outcome)}</p>
-            <p class="min-w-0 truncate text-[11px] text-muted-foreground">
-              {detail.seriesLine ?? 'No bracket series yet.'}
-            </p>
+            {#if !showLeagueResults}
+              <p class="text-xs font-semibold">{outcomeLabel(detail.outcome)}</p>
+              <p class="min-w-0 truncate text-[11px] text-muted-foreground">
+                {detail.seriesLine ?? 'No bracket series yet.'}
+              </p>
+            {/if}
           </li>
         {/each}
       </ul>
 
-      {#if personalNote !== null}
+      {#if !showLeagueResults && personalNote !== null}
         <p
           class="rounded-xl border p-3 text-xs leading-relaxed {championSeat === localSeat
             ? 'border-accent/50 bg-accent/10 text-foreground'
@@ -267,7 +276,7 @@
       {/if}
     </section>
 
-    {#if standings !== null && postseason.series.every((series) => series.games.length === 0)}
+    {#if showLeagueResults && standings !== null}
       <section class="min-w-0" aria-label="Final regular season standings">
         <header class="mb-3">
           <p class="font-mono text-[10px] tracking-[0.16em] text-primary uppercase">
@@ -281,7 +290,15 @@
       </section>
     {/if}
 
-    {#if standings === null}
+    {#if showLeagueResults && standings !== null}
+      <button
+        type="button"
+        class="inline-flex min-h-11 w-fit items-center justify-center rounded-xl border border-primary/50 bg-primary/10 px-4 text-sm font-bold text-primary outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        onclick={() => (showingPlayoffs = true)}
+      >
+        Continue to playoffs
+      </button>
+    {:else if standings === null}
       <section class="rounded-2xl border border-border bg-card p-4">
         <p class="font-mono text-[10px] tracking-[0.16em] text-muted-foreground uppercase">
           Bracket

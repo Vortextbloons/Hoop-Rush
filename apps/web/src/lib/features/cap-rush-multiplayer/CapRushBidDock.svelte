@@ -31,6 +31,8 @@
     canSubmit = false,
     pendingNote = null,
     rejectedMessage = null,
+    oncancelbid = null,
+    cancelBusy = false,
     onopensheet,
     onsubmit,
   }: {
@@ -47,6 +49,8 @@
     canSubmit?: boolean;
     pendingNote?: string | null;
     rejectedMessage?: string | null;
+    oncancelbid?: (() => void) | null;
+    cancelBusy?: boolean;
     onopensheet: () => void;
     onsubmit: () => void;
   } = $props();
@@ -168,6 +172,16 @@
             : 'Review bid'}
       </button>
     </div>
+
+    {#if auction?.status === 'open' && auction.leaderSeat === localSeat && oncancelbid !== null}
+      <button
+        type="button"
+        class="min-h-11 w-full rounded-xl border border-border bg-surface-2 px-3 text-xs font-bold outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
+        aria-label={`Cancel bid on ${player.displayName}`}
+        disabled={cancelBusy || pending || remaining <= 0}
+        onclick={oncancelbid}>Cancel bid</button
+      >
+    {/if}
 
     {#if pendingNote !== null && !pending}
       <p class="truncate text-[10px] font-semibold text-accent" aria-live="polite">{pendingNote}</p>

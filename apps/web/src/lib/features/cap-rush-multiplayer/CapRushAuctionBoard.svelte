@@ -488,13 +488,16 @@
           <section class="flex flex-col gap-2" aria-label="Place a bid">
             <p class="text-xs text-muted-foreground">
               Bid on multiple players. When this position round ends, you sign only your highest
-              offer that still leads. Equal offers use player ID order. Other offers are released.
+              offer that still leads. Other offers are released.
             </p>
             {#if activeSelection?.auction?.leaderSeat === localSeat}
               <button
                 type="button"
                 class="min-h-11 rounded-xl border border-border bg-surface-2 px-3 text-xs font-bold focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
-                disabled={busy || pendingAttempt !== null}
+                disabled={busy ||
+                  pendingAttempt !== null ||
+                  activeSelection.auction.status !== 'open' ||
+                  Date.parse(activeSelection.auction.endsAtIso) <= nowMs}
                 onclick={() =>
                   activeSelection && oncancelbid(activePoolIndex, activeSelection.player.playerId)}
                 >Cancel bid on {activeSelection.player.displayName}</button
@@ -736,6 +739,11 @@
         : null}
       canSubmit={inspectedIndex === activePoolIndex && canSubmitBid}
       rejectedMessage={rejection === null || !rejection.isTarget ? null : rejection.message}
+      cancelBusy={busy || pendingAttempt !== null}
+      oncancelbid={inspectedIndex === activePoolIndex
+        ? () =>
+            inspectedSelection && oncancelbid(activePoolIndex, inspectedSelection.player.playerId)
+        : null}
       onopensheet={() => (sheetOpen = true)}
       onsubmit={() => {
         if (proposedTotal !== null) void submitBid(proposedTotal);

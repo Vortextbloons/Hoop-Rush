@@ -223,3 +223,36 @@ test('resumes from the checkpoint command count instead of downloading history a
   expect(sync).toHaveBeenCalledWith(room.roomId, 6);
   session.dispose();
 });
+
+test('syncs multiple offers and cancellation to the other seat', async () => {
+  const room = await createSessionTestRoom({ now: () => Date.parse('2026-11-01T00:00:05.000Z') });
+  const host = room.session('p1');
+  await host.attach();
+  await room.transport.join(room.code);
+  const guest = room.session('p2');
+  await guest.attach();
+  try {
+    await host.start();
+    const players = host.current.recruitment?.market.players
+      .filter((entry) => entry.position === 'PG')
+      .slice(0, 2);
+    if (!players || players.length !== 2) throw new Error('missing players');
+    for (const player of players)
+      expect((await host.bid(0, player.playerId, player.minimumBidDollars)).accepted).toBe(true);
+    await guest.refresh();
+    expect(
+      guest.current.recruitment?.rounds[0]?.auctions.filter((entry) => entry.leaderSeat === 'p1'),
+    ).toHaveLength(2);
+    const player = players[0];
+    if (!player) throw new Error('missing player');
+    expect((await host.cancelBid(0, player.playerId)).accepted).toBe(true);
+    await guest.refresh();
+    expect(
+      guest.current.recruitment?.rounds[0]?.auctions.filter((entry) => entry.leaderSeat === 'p1'),
+    ).toHaveLength(1);
+    expect(guest.current).toEqual(host.current);
+  } finally {
+    host.dispose();
+    guest.dispose();
+  }
+});
