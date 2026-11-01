@@ -287,6 +287,72 @@ describe('in-memory Draft Duel transport', () => {
     expect(otherActor.rejectionCode).toBe('membership');
   });
 
+  it('keeps ordinals contiguous: a rejected attempt consumes none, and a gap is stale', async () => {
+    const transport = createInMemoryDraftDuelTransport({
+      clock: () => 1_700_000_000_000,
+      random: { seed: 'draft-duel-ordinals' },
+    });
+    const { roomId } = await createAndJoin(transport);
+
+    const first = await submit(transport, roomId, 'ord-a', 'p1', { kind: 'ready', ready: true });
+    expect(first.accepted).toBe(true);
+    expect(first.ordinal).toBe(0);
+
+    // A rejected attempt must not consume the next accepted ordinal.
+    const rejected = await submit(transport, roomId, 'ord-b', 'p2', {
+      kind: 'settings',
+      fairness: 'fair',
+      presentation: 'ratings',
+    });
+    expect(rejected.accepted).toBe(false);
+    expect(rejected.rejectionCode).toBe('membership');
+
+    const second = await submit(transport, roomId, 'ord-c', 'p2', { kind: 'ready', ready: true });
+    expect(second.accepted).toBe(true);
+    expect(second.ordinal).toBe(1);
+
+    // An explicit ordinal that does not match the next slot is a stale write.
+    const gap = await transport.submitCommand({
+      schemaVersion: 1,
+      roomId,
+      commandId: commandIdSchema.parse('ord-gap'),
+      ordinal: 5,
+      actorParticipantId: 'p1',
+      payload: { kind: 'ready', ready: false },
+    });
+    expect(gap.accepted).toBe(false);
+    expect(gap.rejectionCode).toBe('stale-revision');
+
+    const synced = await transport.sync(roomId, -1);
+    expect(synced.commands.map((command) => command.ordinal)).toEqual([0, 1]);
+  });
+
+  it('recognises a retry after a lost response without transitioning twice', async () => {
+    const transport = createInMemoryDraftDuelTransport({
+      clock: () => 1_700_000_000_000,
+      random: { seed: 'draft-duel-lost-response' },
+    });
+    const { roomId } = await createAndJoin(transport);
+
+    // The client submits, the response is lost, and it retries the same envelope.
+    const first = await submit(transport, roomId, 'lost-pick', 'p1', {
+      kind: 'ready',
+      ready: true,
+    });
+    const retry = await submit(transport, roomId, 'lost-pick', 'p1', {
+      kind: 'ready',
+      ready: true,
+    });
+    expect(first.accepted).toBe(true);
+    expect(retry.accepted).toBe(true);
+    expect(retry.ordinal).toBe(first.ordinal);
+    expect(retry.revision).toBe(first.revision);
+
+    // Exactly one command was recorded.
+    const synced = await transport.sync(roomId, -1);
+    expect(synced.commands).toHaveLength(1);
+  });
+
   it('rejects re-claiming a player already claimed in the draft', async () => {
     const transport = createInMemoryDraftDuelTransport({
       clock: () => 1_700_000_000_000,

@@ -71,6 +71,25 @@ import {
   pickerFor,
   seedByteParity,
 } from '../multiplayer/in-memory-transport-support.ts';
+import {
+  decideCommandAdmission,
+  rememberAcceptedCommand,
+  type CommandRejectionCodes,
+} from '../multiplayer/command-admission.ts';
+
+/**
+ * Havoc multiplayer's published rejection codes, mapped from the shared
+ * admission reasons. Codes not listed here belong to mode rules and stay
+ * inline in `applyCommand`.
+ */
+const HAVOC_MULTIPLAYER_REJECTION_CODES: CommandRejectionCodes<HavocMultiplayerCommandRejectionCode> =
+  {
+    'invalid-command-id': 'unknown-command',
+    'actor-mismatch': 'not-a-member',
+    'payload-mismatch': 'command-conflict',
+    'stale-revision': 'stale-revision',
+    'illegal-payload': 'unknown-command',
+  };
 
 export function havocMultiplayerFirstPickerFor(rootSeed: string): HavocMultiplayerParticipantId {
   return seedByteParity(rootSeed, 0) ? 'p1' : 'p2';
@@ -571,43 +590,41 @@ export function createInMemoryHavocMultiplayerTransport(options: {
 
   function applyCommand(command: HavocMultiplayerCommand): HavocMultiplayerCommandReceipt {
     const record = store.require(command.roomId);
-    const commandIdParsed = commandIdSchema.safeParse(command.commandId);
-    if (!commandIdParsed.success) {
-      return rejection(
-        command.roomId,
-        'invalid-command-id',
-        'unknown-command',
-        record.snapshot.revision,
-      );
+    /*
+     * Milestone 2: shared admission order with Draft Duel. Havoc's published
+     * rejection codes are unchanged; the mapping below declares them once.
+     */
+    const admission = decideCommandAdmission({
+      commandId: command.commandId,
+      actor: command.actorParticipantId,
+      payload: command.payload,
+      expectedRevision: command.expectedRevision,
+      revision: record.snapshot.revision,
+      ordinal: undefined,
+      accepted: record.commandLog.map((entry) => ({
+        commandId: entry.command.commandId,
+        actor: entry.command.actorParticipantId,
+        ordinal: null,
+      })),
+      payloadHashOf: (commandId) => record.payloadHashes.get(commandId),
+      payloadSchema: havocMultiplayerCommandPayloadSchema,
+      commandIdSchema,
+      codes: HAVOC_MULTIPLAYER_REJECTION_CODES,
+    });
+    const commandId = commandIdSchema.parse(command.commandId);
+    if (admission.kind === 'rejected') {
+      return rejection(command.roomId, commandId, admission.code, record.snapshot.revision);
     }
-    const commandId = commandIdParsed.data;
-    const payloadHash = canonicalJson(command.payload);
-    const existing = record.commandLog.find((entry) => entry.command.commandId === commandId);
-    if (existing) {
-      if (existing.command.actorParticipantId !== command.actorParticipantId) {
-        return rejection(command.roomId, commandId, 'not-a-member', record.snapshot.revision);
-      }
-      if (record.payloadHashes.get(commandId) !== payloadHash) {
-        return rejection(command.roomId, commandId, 'command-conflict', record.snapshot.revision);
-      }
+    if (admission.kind === 'replayed') {
       return commandReceiptWithoutOrdinal(
         record.snapshot.roomId,
-        commandId,
+        admission.commandId,
         null,
         record.snapshot.revision,
       );
     }
-    if (
-      command.expectedRevision !== undefined &&
-      command.expectedRevision !== record.snapshot.revision
-    ) {
-      return rejection(command.roomId, commandId, 'stale-revision', record.snapshot.revision);
-    }
-    const parsed = havocMultiplayerCommandPayloadSchema.safeParse(command.payload);
-    if (!parsed.success) {
-      return rejection(command.roomId, commandId, 'unknown-command', record.snapshot.revision);
-    }
-    const payload = parsed.data;
+    const payloadHash = admission.payloadHash;
+    const payload = admission.payload;
     const actor = command.actorParticipantId;
     const phase = record.snapshot.phase;
     if (phase === 'expired') {
@@ -932,8 +949,7 @@ export function createInMemoryHavocMultiplayerTransport(options: {
       },
       revision,
     });
-    record.commandIds.add(commandId);
-    record.payloadHashes.set(commandId, payloadHash);
+    rememberAcceptedCommand(record, commandId, payloadHash);
     record.snapshot = { ...record.snapshot, revision };
     record.updatedAt = clock();
     store.emit(record);
