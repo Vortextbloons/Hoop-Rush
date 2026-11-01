@@ -6,7 +6,6 @@ type ZoneKeys = (typeof SHOT_ZONES)[number];
 const zoneRecord = <T extends z.ZodType>(value: T): z.ZodObject<Record<ZoneKeys, T>> =>
   z.object(Object.fromEntries(SHOT_ZONES.map((zone) => [zone, value])) as Record<ZoneKeys, T>);
 export const eraZoneMixSchema = zoneRecord(z.number().min(0).max(1));
-export type EraZoneMix = z.infer<typeof eraZoneMixSchema>;
 export const eraSimulationParametersSchema = z.object({
   pace: z.number().positive().max(130),
   league3PARate: z.number().min(0).max(0.6),
@@ -27,7 +26,6 @@ export const eraSimulationParametersSchema = z.object({
     .record(z.string().min(1).max(64), historicalValueProvenanceSchema)
     .optional(),
 });
-export type EraSimulationParameters = z.infer<typeof eraSimulationParametersSchema>;
 export const calibrationTargetSchema = z.object({
   value: z.number(),
   tolerance: z.number().nonnegative(),
@@ -67,7 +65,6 @@ export const eraCalibrationTargetsSchema = z.object({
     )
     .default([]),
 });
-export type EraCalibrationTargets = z.infer<typeof eraCalibrationTargetsSchema>;
 export const eraSimulationProfileSchema = z.object({
   schemaVersion: z.literal(1),
   eraId: eraIdSchema,

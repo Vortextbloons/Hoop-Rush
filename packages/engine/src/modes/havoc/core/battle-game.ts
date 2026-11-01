@@ -203,7 +203,6 @@ class HavocBattleRuntime implements HavocRuntimeHooks {
   private readonly input: HavocBattleInput;
   private readonly context: EngineContext;
   private readonly mainRng: Rng;
-  private readonly recorder: GameRecorder;
   private readonly fieldGoal: HavocFieldGoalRuntime;
 
   constructor(
@@ -215,7 +214,6 @@ class HavocBattleRuntime implements HavocRuntimeHooks {
     this.input = input;
     this.context = context;
     this.mainRng = mainRng;
-    this.recorder = recorder;
     this.participants = new HavocParticipants(input, recorder, {
       tripContext: () => this.requireTripContext(),
       evidenceOf: (player) => this.evidenceOf(player),
@@ -369,7 +367,7 @@ class HavocBattleRuntime implements HavocRuntimeHooks {
     });
   }
 
-  cancelTurnover(offense: SideIndex, handler: SimulationPlayer): boolean {
+  cancelTurnover(_offense: SideIndex, handler: SimulationPlayer): boolean {
     const participant = this.participantOf(handler);
     if (participant === null || !participant.mutations.has('possession-refund')) return false;
     const period = this.period;
@@ -903,7 +901,7 @@ class HavocBattleRuntime implements HavocRuntimeHooks {
     };
   }
 
-  beginPossession(offense: SideIndex, possessionId: number): void {
+  beginPossession(possessionId: number): void {
     this.possessionId = possessionId;
     this.shotKindOrdinal = 0;
     this.coverageCache = null;
@@ -1079,18 +1077,6 @@ class HavocBattleRuntime implements HavocRuntimeHooks {
     }
   }
 
-  private endPowersFor(participant: ParticipantState): void {
-    this.participants.endPowersFor(participant);
-  }
-
-  private removeClone(
-    team: TeamRuntime,
-    ownerInstanceId: string,
-    reason: 'owner-exited' | 'fouled-out',
-  ): void {
-    this.participants.removeClone(team, ownerInstanceId, reason);
-  }
-
   private globalById(instanceId: string): ParticipantState | null {
     return this.participants.globalById(instanceId);
   }
@@ -1170,10 +1156,6 @@ class HavocBattleRuntime implements HavocRuntimeHooks {
 
   highlightsOf(overtimePeriods: number): HavocHighlight[] {
     return this.ledger.highlightsOf(overtimePeriods);
-  }
-
-  private periodTotals(): [number[], number[]] {
-    return this.ledger.periodTotals();
   }
 
   sidePoints(side: SideIndex): number {
@@ -1311,7 +1293,7 @@ class HavocBattleController {
         possessionId: this.possessionId,
         offenseSide: this.runtime.teams[this.offense].side,
       });
-      this.runtime.beginPossession(this.offense, this.possessionId);
+      this.runtime.beginPossession(this.possessionId);
       this.state.secondsRemaining = this.secondsRemaining;
       const result = resolveTrip(this.tripContext, this.offense);
       this.secondsRemaining = this.state.secondsRemaining;

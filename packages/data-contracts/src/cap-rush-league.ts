@@ -84,7 +84,6 @@ export function capRushConferenceTeams(conference: CapRushConference): readonly 
 export const capRushLeagueGameIdSchema = z
   .string()
   .regex(/^crl-[0-9]{2}-[a-z0-9._:]+-[a-z0-9._:]+$/);
-export type CapRushLeagueGameId = z.infer<typeof capRushLeagueGameIdSchema>;
 
 export function capRushLeagueGameId(slot: number, homeTeamId: string, awayTeamId: string): string {
   return `crl-${String(slot).padStart(2, '0')}-${homeTeamId}-${awayTeamId}`;
@@ -246,7 +245,6 @@ export const capRushConferenceCutoffSchema = z.object({
     'team-id',
   ]),
 });
-export type CapRushConferenceCutoff = z.infer<typeof capRushConferenceCutoffSchema>;
 
 export const capRushConferenceTableSchema = z
   .object({

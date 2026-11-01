@@ -3,7 +3,6 @@ import { franchiseIdSchema, seasonKeySchema } from './ids.ts';
 import { lineupSchema } from './lineup.ts';
 import { simulationPlayerSchema } from './simulation.ts';
 export const difficultyBandSchema = z.enum(['medium', 'casual']);
-export type DifficultyBand = z.infer<typeof difficultyBandSchema>;
 export const opponentTeamSchema = z.object({
   schemaVersion: z.literal(2),
   opponentId: z.string().min(1).max(64),
@@ -15,4 +14,3 @@ export const opponentTeamSchema = z.object({
   lineup: lineupSchema,
   players: z.array(simulationPlayerSchema).length(5),
 });
-export type OpponentTeam = z.infer<typeof opponentTeamSchema>;

@@ -82,7 +82,6 @@ export const collectionRatingOverlaySchema = z
     vertical: ratingDeltaSchema.optional(),
   })
   .strict();
-export type CollectionRatingOverlay = z.infer<typeof collectionRatingOverlaySchema>;
 
 export const collectionCardDefinitionSchema = z.object({
   cardId: collectionCardIdSchema,
@@ -108,7 +107,6 @@ export const collectionPackSlotSchema = z.object({
   kind: z.enum(['ordinary', 'guaranteed']),
   floorRarity: collectionRaritySchema.optional(),
 });
-export type CollectionPackSlot = z.infer<typeof collectionPackSlotSchema>;
 
 export const collectionPackDefinitionSchema = z.object({
   packId: collectionPackIdSchema,
@@ -127,7 +125,6 @@ export const collectionSetDefinitionSchema = z.object({
   title: z.string().min(1).max(96),
   memberCardIds: z.array(collectionCardIdSchema).min(1),
 });
-export type CollectionSetDefinition = z.infer<typeof collectionSetDefinitionSchema>;
 
 export const collectionCatalogCardSchema = collectionCardDefinitionSchema.extend({
   summarySource: summaryRatingsSchema.optional(),
@@ -139,7 +136,6 @@ export const collectionCatalogCardSchema = collectionCardDefinitionSchema.extend
   weightLbs: z.number().int().min(120).max(400).nullable(),
   playerExternalId: z.string().min(1).max(64),
 });
-export type CollectionCatalogCard = z.infer<typeof collectionCatalogCardSchema>;
 
 export const collectionCatalogSchema = z
   .object({
@@ -198,7 +194,6 @@ export const collectionIndexEntrySchema = z.object({
   positions: positionUnionSchema,
   overall: z.number().int().min(0).max(100),
 });
-export type CollectionIndexEntry = z.infer<typeof collectionIndexEntrySchema>;
 
 export const collectionIndexSchema = z.object({
   schemaVersion: z.literal(COLLECTION_SCHEMA_VERSION),
@@ -206,4 +201,3 @@ export const collectionIndexSchema = z.object({
   catalogHash: contentHashSchema,
   cards: z.array(collectionIndexEntrySchema).min(1),
 });
-export type CollectionIndex = z.infer<typeof collectionIndexSchema>;

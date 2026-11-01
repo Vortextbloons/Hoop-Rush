@@ -122,7 +122,7 @@ export function pickPreparedAction(
   return rng.weightedPickTable(ACTION_TYPES, tables.byStart[start]);
 }
 export function pickAction(
-  initiator: SimulationPlayer,
+  _initiator: SimulationPlayer,
   weights: readonly number[],
   rng: Rng,
   start: PossessionStartType = 'neutral',

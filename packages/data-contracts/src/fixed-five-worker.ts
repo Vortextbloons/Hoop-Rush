@@ -35,7 +35,6 @@ export const fixedFiveWorkerShared82RequestSchema = z.object({
   startGameNumber: z.number().int().min(1).max(82).default(1),
   recordH2H: z.boolean().default(false),
 });
-export type FixedFiveWorkerShared82Request = z.infer<typeof fixedFiveWorkerShared82RequestSchema>;
 export const fixedFiveWorkerDuelRequestSchema = z.object({
   schemaVersion: z.literal(FIXED_FIVE_WORKER_WIRE_VERSION),
   type: z.literal('fixed-five-duel'),
@@ -47,7 +46,6 @@ export const fixedFiveWorkerDuelRequestSchema = z.object({
   dataVersion: z.string().min(1).max(64),
   engineVersion: z.string().min(1).max(64),
 });
-export type FixedFiveWorkerDuelRequest = z.infer<typeof fixedFiveWorkerDuelRequestSchema>;
 export const fixedFiveWorkerDuelGameRequestSchema = z.object({
   schemaVersion: z.literal(FIXED_FIVE_WORKER_WIRE_VERSION),
   type: z.literal('fixed-five-duel-game'),
@@ -61,7 +59,6 @@ export const fixedFiveWorkerDuelGameRequestSchema = z.object({
   dataVersion: z.string().min(1).max(64),
   engineVersion: z.string().min(1).max(64),
 });
-export type FixedFiveWorkerDuelGameRequest = z.infer<typeof fixedFiveWorkerDuelGameRequestSchema>;
 export const fixedFiveWorkerShared82H2HGameRequestSchema = z.object({
   schemaVersion: z.literal(FIXED_FIVE_WORKER_WIRE_VERSION),
   type: z.literal('fixed-five-shared82-h2h-game'),
@@ -84,7 +81,6 @@ export const fixedFiveWorkerCancelSchema = z.object({
   type: z.literal('fixed-five-cancel'),
   requestId: z.string().min(1).max(64),
 });
-export type FixedFiveWorkerCancel = z.infer<typeof fixedFiveWorkerCancelSchema>;
 export const fixedFiveWorkerVerifyRequestSchema = z.object({
   schemaVersion: z.literal(FIXED_FIVE_WORKER_WIRE_VERSION),
   type: z.literal('fixed-five-verify'),
@@ -105,7 +101,6 @@ export const fixedFiveWorkerVerifyRequestSchema = z.object({
   profile: eraSimulationProfileSchema,
   dataVersion: z.string().min(1).max(64),
 });
-export type FixedFiveWorkerVerifyRequest = z.infer<typeof fixedFiveWorkerVerifyRequestSchema>;
 export const fixedFiveWorkerRequestSchema = z.discriminatedUnion('type', [
   fixedFiveWorkerShared82RequestSchema,
   fixedFiveWorkerDuelRequestSchema,
@@ -122,9 +117,7 @@ export const fixedFiveWorkerProgressSchema = z.object({
   completedGames: z.number().int().nonnegative(),
   totalGames: z.number().int().positive(),
 });
-export type FixedFiveWorkerProgress = z.infer<typeof fixedFiveWorkerProgressSchema>;
 export const fixedFiveWorkerResultTagSchema = z.enum(['p1', 'p2', 'h2h', 'duel']);
-export type FixedFiveWorkerResultTag = z.infer<typeof fixedFiveWorkerResultTagSchema>;
 export const fixedFiveWorkerResultEntrySchema = z.discriminatedUnion('tag', [
   z.object({
     tag: z.literal('h2h'),
@@ -142,14 +135,12 @@ export const fixedFiveWorkerResultsSchema = z.object({
   requestId: z.string().min(1).max(64),
   entries: z.array(fixedFiveWorkerResultEntrySchema).min(1).max(8),
 });
-export type FixedFiveWorkerResults = z.infer<typeof fixedFiveWorkerResultsSchema>;
 export const fixedFiveWorkerDuelGameMessageSchema = z.object({
   schemaVersion: z.literal(FIXED_FIVE_WORKER_WIRE_VERSION),
   type: z.literal('fixed-five-duel-game'),
   requestId: z.string().min(1).max(64),
   output: fixedFiveDuelGameOutputSchema,
 });
-export type FixedFiveWorkerDuelGameMessage = z.infer<typeof fixedFiveWorkerDuelGameMessageSchema>;
 export const fixedFiveWorkerShared82H2HGameMessageSchema = z.object({
   schemaVersion: z.literal(FIXED_FIVE_WORKER_WIRE_VERSION),
   type: z.literal('fixed-five-shared82-h2h-game'),
@@ -166,7 +157,6 @@ export const fixedFiveWorkerCompleteSchema = z.object({
   gamesDelivered: z.number().int().nonnegative(),
   cancelled: z.boolean(),
 });
-export type FixedFiveWorkerComplete = z.infer<typeof fixedFiveWorkerCompleteSchema>;
 export const fixedFiveWorkerErrorSchema = z.object({
   schemaVersion: z.literal(FIXED_FIVE_WORKER_WIRE_VERSION),
   type: z.literal('fixed-five-error'),
@@ -180,7 +170,6 @@ export const fixedFiveWorkerVerifiedSchema = z.object({
   requestId: z.string().min(1).max(64),
   receipt: fixedFiveVerificationReceiptSchema,
 });
-export type FixedFiveWorkerVerified = z.infer<typeof fixedFiveWorkerVerifiedSchema>;
 export const fixedFiveWorkerVerificationFailedSchema = z.object({
   schemaVersion: z.literal(FIXED_FIVE_WORKER_WIRE_VERSION),
   type: z.literal('fixed-five-verification-failed'),

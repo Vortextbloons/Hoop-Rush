@@ -9,7 +9,6 @@ export const opponentStrengthSchema = z.object({
   winRate: z.number().min(0).max(1),
   percentile: z.number().min(0).max(1),
 });
-export type OpponentStrength = z.infer<typeof opponentStrengthSchema>;
 export const bracketOpponentSchema = opponentTeamSchema.extend({
   strength: opponentStrengthSchema,
 });
@@ -35,7 +34,6 @@ export const bracketGenerationSchema = z.object({
     leagueMedianPercentileBand: z.tuple([z.number().min(0).max(1), z.number().min(0).max(1)]),
   }),
 });
-export type BracketGeneration = z.infer<typeof bracketGenerationSchema>;
 export const opponentBracketSchema = opponentBracketCoreSchema.extend({
   schemaVersion: z.literal(1),
   difficulty: difficultyProfileSchema,

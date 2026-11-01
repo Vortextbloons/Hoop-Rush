@@ -37,12 +37,10 @@ export const seasonDraftCandidateStaminaSchema = z.object({
   historicalMpg: z.number().min(0).max(60),
   derivationVersion: z.literal(SEASON_STAMINA_VERSION),
 });
-export type SeasonDraftCandidateStamina = z.infer<typeof seasonDraftCandidateStaminaSchema>;
 export const seasonDraftCandidateDurabilitySchema = z.object({
   rating: z.number().int().min(45).max(95),
   derivationVersion: z.literal(SEASON_DURABILITY_VERSION),
 });
-export type SeasonDraftCandidateDurability = z.infer<typeof seasonDraftCandidateDurabilitySchema>;
 export const seasonDraftCandidateSchema = z.object({
   playerVersionId: playerVersionIdSchema,
   playerId: playerIdSchema,

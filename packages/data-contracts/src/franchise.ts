@@ -11,7 +11,6 @@ export const historicalLogoCandidateSchema = z.object({
   source: z.string().min(1).max(64),
   attribution: z.string().min(1).max(256).optional(),
 });
-export type HistoricalLogoCandidate = z.infer<typeof historicalLogoCandidateSchema>;
 export const franchiseLineageEntrySchema = z.object({
   modernFranchiseId: franchiseIdSchema,
   historicalTeamId: teamExternalIdSchema,
@@ -26,7 +25,6 @@ export const franchiseLineageEntrySchema = z.object({
 });
 export type FranchiseLineageEntry = z.infer<typeof franchiseLineageEntrySchema>;
 export const franchiseLineageSchema = z.array(franchiseLineageEntrySchema);
-export type FranchiseLineage = z.infer<typeof franchiseLineageSchema>;
 const FRANCHISE_ABBREVIATIONS: Readonly<Record<string, string>> = {
   hawks: 'ATL',
   celtics: 'BOS',

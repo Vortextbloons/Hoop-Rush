@@ -264,14 +264,12 @@ export const fixedFiveDeadlineSchema = z.object({
   fallback: fixedFiveCommandPayloadSchema.nullable(),
   pickOrdinal: z.number().int().nonnegative(),
 });
-export type FixedFiveDeadline = z.infer<typeof fixedFiveDeadlineSchema>;
 export const fixedFiveDuelSeriesGameSchema = z.object({
   gameNumber: z.number().int().min(1).max(7),
   homeParticipantId: fixedFiveParticipantIdSchema,
   awayParticipantId: fixedFiveParticipantIdSchema,
   winner: fixedFiveParticipantIdSchema,
 });
-export type FixedFiveDuelSeriesGame = z.infer<typeof fixedFiveDuelSeriesGameSchema>;
 export const fixedFiveDuelSeriesSchema = z.object({
   games: z.array(fixedFiveDuelSeriesGameSchema).max(7),
   p1Wins: z.number().int().min(0).max(4),
@@ -279,7 +277,6 @@ export const fixedFiveDuelSeriesSchema = z.object({
   currentGameNumber: z.number().int().min(1).max(7).nullable(),
   champion: fixedFiveParticipantIdSchema.nullable(),
 });
-export type FixedFiveDuelSeries = z.infer<typeof fixedFiveDuelSeriesSchema>;
 export const fixedFiveBroadcastSchema = z.object({
   gameNumber: z.number().int().min(1).max(82),
   startedAtIso: z.string().min(1).max(64),
@@ -307,7 +304,6 @@ export const fixedFiveShared82BroadcastStateSchema = z
       context.addIssue({ code: 'custom', message: 'last completed game must be eligible' });
     }
   });
-export type FixedFiveShared82BroadcastState = z.infer<typeof fixedFiveShared82BroadcastStateSchema>;
 export const fixedFiveRoomSnapshotSchema = z.object({
   roomId: idSchema,
   code: fixedFiveRoomCodeSchema.nullable(),
@@ -367,7 +363,6 @@ export const fixedFiveDuelGameSchema = z.object({
   seed: seedSchema,
   winner: fixedFiveParticipantIdSchema,
 });
-export type FixedFiveDuelGame = z.infer<typeof fixedFiveDuelGameSchema>;
 export const fixedFiveDuelResultSchema = z.object({
   competition: z.literal('duel'),
   games: z.array(fixedFiveDuelGameSchema).min(4).max(7),
@@ -471,13 +466,11 @@ export const fixedFiveMultiplayerErrorCodeSchema = z.enum([
   'not-ready',
   'already-locked',
 ]);
-export type FixedFiveMultiplayerErrorCode = z.infer<typeof fixedFiveMultiplayerErrorCodeSchema>;
 export const fixedFiveMultiplayerErrorSchema = z.object({
   code: fixedFiveMultiplayerErrorCodeSchema,
   message: z.string().min(1).max(512),
   retryable: z.boolean(),
 });
-export type FixedFiveMultiplayerError = z.infer<typeof fixedFiveMultiplayerErrorSchema>;
 export interface FixedFiveMultiplayerTransport {
   create(
     settings: Omit<FixedFiveRoomSettings, 'schemaVersion' | 'timerPolicyVersion'> &

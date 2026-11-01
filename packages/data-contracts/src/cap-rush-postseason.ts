@@ -26,7 +26,6 @@ export const CAP_RUSH_LEAGUE_GAMES = 1271;
 export const CAP_RUSH_USER_TEAM_ID = 'cap-rush-human';
 
 export const capRushPlayoffRoundSchema = z.number().int().min(1).max(CAP_RUSH_PLAYOFF_ROUNDS);
-export type CapRushPlayoffRound = z.infer<typeof capRushPlayoffRoundSchema>;
 
 export const CAP_RUSH_PLAYOFF_ROUND_NAMES = [
   'First round',
@@ -51,10 +50,8 @@ export function capRushConferenceRoundName(round: number): string {
 }
 
 export const capRushSeriesIdSchema = z.string().regex(/^crs-[1-4]-[0-7]$/);
-export type CapRushSeriesId = z.infer<typeof capRushSeriesIdSchema>;
 
 export const capRushPlayoffGameIdSchema = z.string().regex(/^crp-[1-4]-[0-7]-[1-7]$/);
-export type CapRushPlayoffGameId = z.infer<typeof capRushPlayoffGameIdSchema>;
 
 export const capRushStandingsEntrySchema = z.object({
   teamId: z.string().min(1).max(64),
@@ -79,14 +76,12 @@ export const capRushStandingsCutoffSchema = z.object({
   pointsFor: z.number().int(),
   tieBreak: z.enum(['wins', 'point-differential', 'points-for', 'team-id']),
 });
-export type CapRushStandingsCutoff = z.infer<typeof capRushStandingsCutoffSchema>;
 
 export const capRushLeagueTeamPointsSchema = z.object({
   teamId: z.string().min(1).max(64),
   pointsFor: z.number().int(),
   pointsAgainst: z.number().int(),
 });
-export type CapRushLeagueTeamPoints = z.infer<typeof capRushLeagueTeamPointsSchema>;
 
 export const capRushLeagueResultSchema = z.object({
   league: leagueRecordSchema,
@@ -550,7 +545,6 @@ export const capRushLegacyPostseasonReportSchema = z.object({
   standings: capRushPostseasonStandingsSchema,
   finalsMvp: capRushFinalsMvpSchema,
 });
-export type CapRushLegacyPostseasonReport = z.infer<typeof capRushLegacyPostseasonReportSchema>;
 
 export const capRushConferencePostseasonReportSchema = z.object({
   format: z.literal('conference'),

@@ -50,7 +50,6 @@ export const capRushPhysicalSchema = z.object({
   heightInches: z.number().int().min(60).max(96).nullable(),
   weightLbs: z.number().int().min(120).max(400).nullable(),
 });
-export type CapRushPhysical = z.infer<typeof capRushPhysicalSchema>;
 
 export const capRushSourcePlayerSchema = z.object({
   playerId: playerIdSchema,
@@ -117,7 +116,6 @@ export const capRushDraftStageSchema = z.enum([
   'completed',
   'abandoned',
 ]);
-export type CapRushDraftStage = z.infer<typeof capRushDraftStageSchema>;
 
 export const capRushDraftStateSchema = z
   .object({

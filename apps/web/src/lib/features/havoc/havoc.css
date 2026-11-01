@@ -203,27 +203,6 @@
 .havoc-world .h-affected-grid strong.reduced {
   color: #f290c5;
 }
-.havoc-world .h-lineup {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 16px;
-}
-.havoc-world .h-lineup li {
-  background: #141b39;
-  border: 1px solid #3e4a6c;
-  border-radius: 16px;
-  padding: 16px 12px;
-  min-width: 0;
-}
-.havoc-world .h-lineup-name {
-  font-family: var(--font-display);
-  font-size: 1.3rem;
-  line-height: 1.05;
-  font-weight: 800;
-  margin: 12px 0 6px;
-  text-transform: uppercase;
-}
 .havoc-world .h-meter {
   height: 12px;
   background: #111831;
@@ -236,33 +215,6 @@
   background: var(--h-blue);
   border-radius: inherit;
   transition: width 0.2s;
-}
-.havoc-world .h-score {
-  font-family: var(--font-display);
-  font-size: clamp(4rem, 10vw, 8rem);
-  font-weight: 900;
-  line-height: 1;
-  color: var(--h-gold);
-}
-.havoc-world .h-stats {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
-  margin: 24px 0;
-}
-.havoc-world .h-stats > div {
-  padding: 20px;
-  border-radius: 16px;
-  background: #20294c;
-}
-.havoc-world .h-stats dt {
-  color: #c1cae4;
-  font-size: 12px;
-}
-.havoc-world .h-stats dd {
-  font-family: var(--font-display);
-  font-size: 2.5rem;
-  font-weight: 800;
 }
 .havoc-world .h-alert {
   padding: 16px;
@@ -292,15 +244,6 @@
   }
   .havoc-world .h-cards {
     grid-template-columns: 1fr;
-  }
-  .havoc-world .h-lineup {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .havoc-world .h-stats {
-    gap: 8px;
-  }
-  .havoc-world .h-stats > div {
-    padding: 12px;
   }
   .havoc-world .h-panel {
     padding: 18px;

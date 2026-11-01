@@ -78,7 +78,6 @@ export const capRushFrozenOpponentSchema = z.object({
   opponentId: z.string().min(1).max(64),
   team: havocTeamInputSchema,
 });
-export type CapRushFrozenOpponent = z.infer<typeof capRushFrozenOpponentSchema>;
 
 const capRushLockedInputsValueSchema = z
   .object({

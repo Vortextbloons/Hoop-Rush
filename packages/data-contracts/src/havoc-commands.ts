@@ -16,7 +16,6 @@ export const havocRevisionedCommandBaseSchema = z.object({
   runId: idSchema,
   expectedRevision: z.number().int().nonnegative(),
 });
-export type HavocRevisionedCommandBase = z.infer<typeof havocRevisionedCommandBaseSchema>;
 
 export const havocCreateDraftCommandSchema = z.object({
   schemaVersion: z.literal(HAVOC_SCHEMA_VERSION),
@@ -126,7 +125,6 @@ export const havocCommandRejectionSchema = z.object({
   code: havocCommandRejectionCodeSchema,
   message: z.string().min(1).max(512),
 });
-export type HavocCommandRejection = z.infer<typeof havocCommandRejectionSchema>;
 
 export const havocCommandResultSchema = z
   .object({

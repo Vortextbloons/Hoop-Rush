@@ -1,10 +1,5 @@
 import type { Table } from 'dexie';
-import {
-  assertSaveSchemaVersion,
-  commandReceiptMatches,
-  getParsedRecord,
-  saveSchemaVersionOf,
-} from './support.ts';
+import { commandReceiptMatches, getParsedRecord } from './support.ts';
 
 /**
  * Shared save-commit mechanics.
@@ -32,45 +27,6 @@ import {
  * interchangeable, and that the transaction must not hide its scope behind an
  * arbitrary callback. Every function here takes an explicit table list.
  */
-
-/** The envelope facts every saved record carries. */
-export interface SaveEnvelope {
-  /** Storage envelope version. Distinct from domain and protocol versions. */
-  saveSchemaVersion: number;
-  /**
-   * Domain save version for the mode. Also distinct: a rules change should not
-   * force a storage schema change, and vice versa.
-   */
-  domainVersion: number;
-}
-
-/**
- * Compare a stored record's envelope version against the supported one.
- *
- * Missing, corrupt, and unsupported are distinct outcomes. A caller must be
- * able to tell "this save predates the reset" from "this save is garbage",
- * because only the first has a reset remedy.
- */
-export type SaveEnvelopeStatus =
-  | { kind: 'supported' }
-  | { kind: 'missing-version' }
-  | { kind: 'unsupported'; stored: number; supported: number };
-
-export function readSaveEnvelope(row: unknown, supported: number): SaveEnvelopeStatus {
-  const stored = saveSchemaVersionOf(row);
-  if (stored === null) return { kind: 'missing-version' };
-  if (stored !== supported) return { kind: 'unsupported', stored, supported };
-  return { kind: 'supported' };
-}
-
-/** Throws on a mismatched envelope, using the caller's own error type. */
-export function requireSaveEnvelope(
-  row: unknown,
-  supported: number,
-  onMismatch: (message: string) => Error,
-): void {
-  assertSaveSchemaVersion(row, supported, onMismatch);
-}
 
 /** Outcome of looking for an already-committed command. */
 export type CommandReplay<Result> =
@@ -122,41 +78,4 @@ export async function readStoredCommand<Row, Key extends string>(input: {
   parse: (row: unknown) => Row;
 }): Promise<Row | null> {
   return getParsedRecord(input.table, input.commandId, input.parse);
-}
-
-/**
- * Compact progress for the common save envelope.
- *
- * Games, commands, and artifacts stay normalized and indexed; these counts are
- * the cheap summary a list view can read without loading them.
- */
-export interface SaveProgress {
-  revision: number;
-  gamesPlayed: number;
-  commandsAccepted: number;
-  status: 'active' | 'complete';
-}
-
-/**
- * Guard against rewriting a whole season as one growing blob.
- *
- * A save commit writes the state row plus the artifacts for one command. If a
- * caller ever passes a table list without also writing its state row, or tries
- * to commit a payload far larger than a single game, that is a regression the
- * spec calls out. This is a cheap assertion, not a substitute for review.
- */
-export function assertCommitIsIncremental(input: {
-  stateWritten: boolean;
-  artifactCount: number;
-  tableCount: number;
-}): void {
-  if (!input.stateWritten) {
-    throw new Error('save commit: a commit must write its state row, not only artifacts');
-  }
-  if (input.tableCount === 0) {
-    throw new Error('save commit: explicit table set is required');
-  }
-  if (input.artifactCount < 0) {
-    throw new Error('save commit: artifact count cannot be negative');
-  }
 }

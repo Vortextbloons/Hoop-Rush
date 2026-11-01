@@ -17,7 +17,6 @@ export const lineupAssignmentSchema = z.object({
   playerId: playerIdSchema,
   positions: z.array(positionSchema).min(1).max(5),
 });
-export type LineupAssignment = z.infer<typeof lineupAssignmentSchema>;
 export const lineupSchema = z.object({
   structure: lineupStructureSchema,
   assignments: z.array(lineupAssignmentSchema).length(5),

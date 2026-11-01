@@ -38,14 +38,12 @@ export const capRushWorkerSimulateRequestSchema = capRushWorkerBase.extend({
   backfillLeagueFrom: z.number().int().min(1).max(CAP_RUSH_GAME_COUNT).optional(),
   backfillLeagueTo: z.number().int().min(1).max(CAP_RUSH_GAME_COUNT).optional(),
 });
-export type CapRushWorkerSimulateRequest = z.infer<typeof capRushWorkerSimulateRequestSchema>;
 
 export const capRushWorkerStandingsRequestSchema = capRushWorkerBase.extend({
   type: z.literal('cap-rush-standings'),
   locked: capRushLockedInputsSchema,
   bracket: capRushWorkerBracketSchema,
 });
-export type CapRushWorkerStandingsRequest = z.infer<typeof capRushWorkerStandingsRequestSchema>;
 
 export const capRushWorkerPlayoffsRequestSchema = capRushWorkerBase.extend({
   type: z.literal('cap-rush-playoffs'),
@@ -53,12 +51,10 @@ export const capRushWorkerPlayoffsRequestSchema = capRushWorkerBase.extend({
   games: z.array(capRushPlayoffGamePlanSchema).min(1).max(8),
   includeTape: z.boolean().optional(),
 });
-export type CapRushWorkerPlayoffsRequest = z.infer<typeof capRushWorkerPlayoffsRequestSchema>;
 
 export const capRushWorkerCancelRequestSchema = capRushWorkerBase.extend({
   type: z.literal('cap-rush-cancel'),
 });
-export type CapRushWorkerCancelRequest = z.infer<typeof capRushWorkerCancelRequestSchema>;
 
 export const capRushWorkerRequestSchema = z.discriminatedUnion('type', [
   capRushWorkerSimulateRequestSchema,
@@ -156,7 +152,6 @@ export const capRushWorkerErrorMessageSchema = capRushWorkerBase.extend({
   message: z.string().min(1).max(512),
   gameNumber: z.number().int().min(1).max(CAP_RUSH_GAME_COUNT).nullable(),
 });
-export type CapRushWorkerErrorMessage = z.infer<typeof capRushWorkerErrorMessageSchema>;
 
 export const capRushWorkerMessageSchema = z.discriminatedUnion('type', [
   capRushWorkerGameMessageSchema,

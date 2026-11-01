@@ -15,9 +15,7 @@ import {
 import { havocMutationPackageSchema, havocTierSchema } from './havoc-mutations.ts';
 
 export const havocOfferIdSchema = z.string().regex(/^hvo-[0-9a-f]{32}$/);
-export type HavocOfferId = z.infer<typeof havocOfferIdSchema>;
 export const havocCardIdSchema = z.string().regex(/^hvc-[0-9a-f]{32}$/);
-export type HavocCardId = z.infer<typeof havocCardIdSchema>;
 
 export const havocCatalogSourceSchema = z.object({
   catalogVersion: z.string().min(1).max(64),

@@ -116,23 +116,6 @@ export function gamecastBattlePlaybackItems(tape: HavocBattleTape): GamecastBatt
   return items;
 }
 
-export function gamecastBattlePlaybackWeights(
-  items: readonly GamecastBattlePlaybackItem[],
-): number[] {
-  const weights: number[] = items.map((item) => (item.kind === 'scoring' ? 1 : 0));
-  const total = weights.reduce((sum, weight) => sum + weight, 0);
-  if (total === 0) {
-    return weights.map((_, index) => (index === weights.length - 1 ? 1 : 0));
-  }
-  const cumulative: number[] = [];
-  let running = 0;
-  for (const weight of weights) {
-    running += weight;
-    cumulative.push(running / total);
-  }
-  return cumulative;
-}
-
 export function gamecastBattleVisibleItemCount(
   items: readonly GamecastBattlePlaybackItem[],
   progress: number,

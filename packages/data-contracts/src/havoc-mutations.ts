@@ -299,7 +299,6 @@ export const havocEventRuleIdSchema = z.enum([
   'oops-all-centers',
   'hostile-takeover',
 ]);
-export type HavocEventRuleId = z.infer<typeof havocEventRuleIdSchema>;
 
 export const havocMutationDefinitionSchema = z
   .object({

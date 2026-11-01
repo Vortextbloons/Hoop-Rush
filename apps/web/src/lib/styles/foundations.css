@@ -21,14 +21,6 @@
     background: var(--color-surface-1);
   }
 
-  .ui-panel-quiet {
-    position: relative;
-    min-width: 0;
-    border: 1px solid var(--ui-panel-line);
-    border-radius: var(--ui-panel-radius);
-    background: var(--color-card);
-  }
-
   .ui-btn {
     display: inline-flex;
     align-items: center;
@@ -207,14 +199,11 @@
   .ui-pos-option[data-tone='self'] {
     border-color: color-mix(in srgb, var(--color-primary) 40%, transparent);
     background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+    opacity: 0.7;
   }
 
   .ui-pos-option[data-tone='muted'] {
     opacity: var(--ui-disabled-opacity);
-  }
-
-  .ui-pos-option[data-tone='self'] {
-    opacity: 0.7;
   }
 
   .ui-pos-badge {
@@ -287,23 +276,6 @@
     font-weight: 900;
     font-variant-numeric: tabular-nums;
     line-height: 1;
-  }
-
-  .ui-scoreboard-status {
-    display: grid;
-    justify-items: center;
-    gap: 0.15rem;
-    min-width: 0;
-    color: var(--color-muted-foreground);
-    font-family: var(--font-mono);
-    font-size: 0.65rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-
-  .ui-scoreboard[data-layout='duo'] .ui-scoreboard-status {
-    grid-column: 1 / -1;
   }
 }
 

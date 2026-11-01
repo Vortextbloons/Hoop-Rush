@@ -39,7 +39,6 @@ export const HAVOC_ESTIMATED_HEIGHT_BY_SLOT = {
 } as const;
 
 export const havocDigestSchema = z.string().regex(/^[0-9a-f]{32}$/);
-export type HavocDigest = z.infer<typeof havocDigestSchema>;
 
 export const havocVersionSetSchema = z.object({
   schemaVersion: z.literal(HAVOC_SCHEMA_VERSION),

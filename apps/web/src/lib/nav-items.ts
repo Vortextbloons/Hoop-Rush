@@ -7,7 +7,6 @@ export type NavItem = {
     class?: string;
   }>;
 };
-const ACTIVE_ALIASES: Readonly<Record<string, readonly string[]>> = {};
 function normalizeRouteId(routeId: string): string {
   return routeId.length > 1 && routeId.endsWith('/') ? routeId.slice(0, -1) : routeId;
 }
@@ -17,9 +16,5 @@ export function isNavItemActive(item: NavItem, routeId: string | null): boolean 
   const href = normalizeRouteId(item.href);
   if (href === '/') return current === '/';
   if (current === href) return true;
-  for (const alias of ACTIVE_ALIASES[href] ?? []) {
-    const normalizedAlias = normalizeRouteId(alias);
-    if (current === normalizedAlias || current.startsWith(`${normalizedAlias}/`)) return true;
-  }
   return false;
 }

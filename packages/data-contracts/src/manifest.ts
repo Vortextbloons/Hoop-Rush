@@ -27,7 +27,6 @@ export const assetConfigSchema = z.object({
   source: z.string().min(1).max(256),
   cacheVersion: z.string().min(1).max(64),
 });
-export type AssetConfig = z.infer<typeof assetConfigSchema>;
 export const poolIndexEntrySchema = z.object({
   franchiseId: franchiseIdSchema,
   eraId: eraIdSchema,
@@ -50,12 +49,10 @@ export const playersIndexAssetSchema = z.object({
   url: z.string().min(1).max(512),
   contentHash: contentHashSchema,
 });
-export type PlayersIndexAsset = z.infer<typeof playersIndexAssetSchema>;
 export const seasonArtifactIndexEntrySchema = z.object({
   url: z.string().min(1).max(512),
   contentHash: contentHashSchema,
 });
-export type SeasonArtifactIndexEntry = z.infer<typeof seasonArtifactIndexEntrySchema>;
 export const hoopRushManifestSchema = z.object({
   schemaVersion: z.union([z.literal(3), z.literal(MANIFEST_SCHEMA_VERSION)]),
   dataVersion: z.string().min(1).max(64),

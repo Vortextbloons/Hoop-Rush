@@ -711,7 +711,6 @@ function applyPick(
 
 function applyReroll(
   state: HavocMultiplayerDraftState,
-  payload: Extract<HavocMultiplayerDraftCommandPayload, { kind: 'reroll' }>,
   catalog: HavocCatalog,
   environment: HavocMultiplayerDraftEnvironment,
   settings: HavocMultiplayerDraftSettings,
@@ -765,7 +764,7 @@ export function applyHavocMultiplayerDraftCommand(
     return reject(state, 'offer-mismatch');
   }
   if (payload.kind === 'reroll') {
-    return applyReroll(state, payload, catalog, environment, settings);
+    return applyReroll(state, catalog, environment, settings);
   }
   return applyPick(state, payload, catalog, environment, settings);
 }
@@ -810,7 +809,7 @@ export function replayHavocMultiplayerDraft(
 
 export function havocMultiplayerTimeoutPick(
   state: HavocMultiplayerDraftState,
-  catalog: HavocCatalog,
+  _catalog: HavocCatalog,
   environment: HavocMultiplayerDraftEnvironment,
 ): HavocDraftCard {
   const offer = state.offer;

@@ -56,7 +56,6 @@ export const capRushMultiplayerSeatLockMapSchema = z.object({
   p1: capRushMultiplayerSeatLockSchema,
   p2: capRushMultiplayerSeatLockSchema,
 });
-export type CapRushMultiplayerSeatLockMap = z.infer<typeof capRushMultiplayerSeatLockMapSchema>;
 
 export const capRushMultiplayerLockedInputsSchema = z
   .object({
@@ -163,7 +162,6 @@ export const capRushMultiplayerBlockSchema = z.object({
   startedAtIso: z.iso.datetime().nullable(),
   completedAtIso: z.iso.datetime().nullable(),
 });
-export type CapRushMultiplayerBlock = z.infer<typeof capRushMultiplayerBlockSchema>;
 
 export const capRushMultiplayerPlaybackAckSchema = z.object({
   gameId: z.string().min(1).max(80),
@@ -172,7 +170,6 @@ export const capRushMultiplayerPlaybackAckSchema = z.object({
   total: z.number().int().nonnegative(),
   resolved: z.boolean(),
 });
-export type CapRushMultiplayerPlaybackAck = z.infer<typeof capRushMultiplayerPlaybackAckSchema>;
 
 export const capRushMultiplayerSeasonStateSchema = z.object({
   games: z.array(capRushLeagueGameSchema).max(CAP_RUSH_CONFERENCE_GAMES),
@@ -254,6 +251,5 @@ export const capRushMultiplayerOutcomeSchema = z.object({
   championTeamId: z.string().min(1).max(64),
   completedAtIso: z.iso.datetime(),
 });
-export type CapRushMultiplayerOutcome = z.infer<typeof capRushMultiplayerOutcomeSchema>;
 
 export const capRushMultiplayerConferenceSize = CAP_RUSH_CONFERENCE_SIZE;

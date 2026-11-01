@@ -29,7 +29,6 @@ export type PlayerExternalId = z.infer<typeof playerExternalIdSchema>;
 export const teamExternalIdSchema = z.string().regex(/^\d{1,12}$/);
 export type TeamExternalId = z.infer<typeof teamExternalIdSchema>;
 export const bbrefIdSchema = z.string().regex(/^[a-z0-9]{6,12}$/);
-export type BbrefId = z.infer<typeof bbrefIdSchema>;
 export const seedSchema = z
   .string()
   .regex(/^[0-9a-f]{16,64}$/)

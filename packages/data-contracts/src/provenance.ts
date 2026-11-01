@@ -5,7 +5,6 @@ export type ProvenanceKind = z.infer<typeof provenanceKindSchema>;
 export const confidenceSchema = z.enum(['high', 'medium', 'low']);
 export type Confidence = z.infer<typeof confidenceSchema>;
 export const sourceStatusSchema = z.enum(['available', 'unavailable', 'not-applicable']);
-export type SourceStatus = z.infer<typeof sourceStatusSchema>;
 export const historicalValueProvenanceSchema = z.object({
   kind: provenanceKindSchema,
   confidence: confidenceSchema,
@@ -17,7 +16,6 @@ export const historicalValueProvenanceSchema = z.object({
   sourceStatus: sourceStatusSchema.optional(),
   notesCode: z.string().min(1).max(64).optional(),
 });
-export type HistoricalValueProvenance = z.infer<typeof historicalValueProvenanceSchema>;
 export const provenanceMapSchema = z.record(
   z.string().min(1).max(64),
   historicalValueProvenanceSchema,
@@ -31,7 +29,6 @@ export const historicalTeamIdentitySchema = z.object({
   seasonKey: seasonKeySchema,
   lineageRuleVersion: z.string().min(1).max(64),
 });
-export type HistoricalTeamIdentity = z.infer<typeof historicalTeamIdentitySchema>;
 export const coverageSummarySchema = z.object({
   coverageBand: z.enum([
     'advanced-supported',
@@ -67,7 +64,6 @@ export const poolAvailableSchema = z.object({
   playerCount: z.number().int().positive(),
   coverageSummary: coverageSummarySchema,
 });
-export type PoolAvailable = z.infer<typeof poolAvailableSchema>;
 export const poolUnavailableSchema = z.object({
   franchiseId: franchiseIdSchema,
   eraId: eraIdSchema,
@@ -76,9 +72,7 @@ export const poolUnavailableSchema = z.object({
   detail: z.string().min(1).max(256).optional(),
   firstSupportedSeason: seasonKeySchema.optional(),
 });
-export type PoolUnavailable = z.infer<typeof poolUnavailableSchema>;
 export const poolAvailabilitySchema = z.discriminatedUnion('status', [
   poolAvailableSchema,
   poolUnavailableSchema,
 ]);
-export type PoolAvailability = z.infer<typeof poolAvailabilitySchema>;

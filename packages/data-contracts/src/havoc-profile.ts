@@ -11,7 +11,6 @@ import {
 import { havocAuthoritativeChannelSchema } from './havoc-mutations.ts';
 
 export const havocInstanceIdSchema = z.string().regex(/^hvi-[0-9a-f]{32}$/);
-export type HavocInstanceId = z.infer<typeof havocInstanceIdSchema>;
 
 export const havocPlayerProfileSchema = z.object({
   ratings: simulationRatingsSchema,
@@ -35,7 +34,6 @@ export const havocEffectivePhysicalSchema = z.object({
   wingspanDeltaInches: z.number().int().min(0).max(36),
   reachUnits: z.number().min(-2).max(2),
 });
-export type HavocEffectivePhysical = z.infer<typeof havocEffectivePhysicalSchema>;
 
 export const havocEffectiveProfileSchema = z.object({
   ratings: simulationRatingsSchema,
@@ -64,7 +62,6 @@ export const havocClaimKeySchema = z.object({
   playerId: playerIdSchema,
   seasonKey: seasonKeySchema,
 });
-export type HavocClaimKey = z.infer<typeof havocClaimKeySchema>;
 
 export function havocClaimKeyOf(playerId: string, seasonKey: string): string {
   return `${playerId}::${seasonKey}`;

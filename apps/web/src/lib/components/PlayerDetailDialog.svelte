@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { HoopRushManifest } from '@hoop-rush/data-contracts';
+  import type { HoopRushManifest, PlayoffPerformance } from '@hoop-rush/data-contracts';
   import { resolveEraTeamIdentity } from '@hoop-rush/data-contracts';
   import { Dialog } from 'bits-ui';
   import { ExternalLink, X } from '@lucide/svelte';
@@ -15,7 +15,6 @@
   } from '#lib/roster-browser.js';
   import { formatPositions } from '#lib/player-positions.js';
   import { teamNameFor } from '#lib/branding.js';
-  import { rosterPlayoffSampleLabel } from '#lib/roster-playoff-presentation.js';
   import PlayerFace from './PlayerFace.svelte';
   import PlayoffEffectDetails from './PlayoffEffectDetails.svelte';
   import { capRushPlayoffEffectOf } from '@hoop-rush/engine';
@@ -37,6 +36,12 @@
     detailsError?: string | null;
     onRetry?: () => void;
   } = $props();
+
+  function rosterPlayoffSampleLabel(performance: PlayoffPerformance): string {
+    const games = performance.playoffs.gamesPlayed;
+    const minutes = Math.round(performance.playoffs.minutes);
+    return `${String(games)} GP · ${String(minutes)} min`;
+  }
 
   function statLine(detail: NonNullable<RosterRow['detail']>) {
     const s = detail.stats;

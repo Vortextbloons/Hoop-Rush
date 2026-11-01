@@ -13,13 +13,11 @@ export const CAP_RUSH_HERO_BALL_ISOLATION_EVERY = 3;
 export const CAP_RUSH_STRIKE_EVERY = 8;
 
 export const capRushApronMechanicSchema = z.enum(['isolation', 'strike', 'pass-interception']);
-export type CapRushApronMechanic = z.infer<typeof capRushApronMechanicSchema>;
 
 export const capRushIsolationReasonSchema = z.enum(['give-me-the-ball', 'hero-ball']);
 export type CapRushIsolationReason = z.infer<typeof capRushIsolationReasonSchema>;
 
 export const capRushApronSideSchema = z.enum(['home', 'away']);
-export type CapRushApronSide = z.infer<typeof capRushApronSideSchema>;
 
 export const capRushIsolationFactSchema = z.object({
   schemaVersion: z.literal(CAP_RUSH_SCHEMA_VERSION),
@@ -31,7 +29,6 @@ export const capRushIsolationFactSchema = z.object({
   targetSlot: positionSchema,
   payrollStatus: capRushPayrollStatusSchema,
 });
-export type CapRushIsolationFact = z.infer<typeof capRushIsolationFactSchema>;
 
 export const capRushStrikeFactSchema = z.object({
   schemaVersion: z.literal(CAP_RUSH_SCHEMA_VERSION),
@@ -41,7 +38,6 @@ export const capRushStrikeFactSchema = z.object({
   targetInstanceId: havocInstanceIdSchema,
   targetSlot: positionSchema,
 });
-export type CapRushStrikeFact = z.infer<typeof capRushStrikeFactSchema>;
 
 export const capRushPassInterceptionFactSchema = z.object({
   schemaVersion: z.literal(CAP_RUSH_SCHEMA_VERSION),

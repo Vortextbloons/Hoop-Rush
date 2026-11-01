@@ -75,7 +75,6 @@ export const periodScoresSchema = z.object({
   home: z.array(z.number().int().nonnegative()).min(4).max(12),
   away: z.array(z.number().int().nonnegative()).min(4).max(12),
 });
-export type PeriodScores = z.infer<typeof periodScoresSchema>;
 export const explanationFactSchema = z.object({
   kind: z.enum([
     'turnoverMargin',

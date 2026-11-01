@@ -310,7 +310,6 @@ export const draftDuelDeadlineSchema = z.object({
   fallback: draftDuelCommandPayloadSchema.nullable(),
   pickOrdinal: z.number().int().nonnegative(),
 });
-export type DraftDuelDeadline = z.infer<typeof draftDuelDeadlineSchema>;
 
 export const draftDuelSeriesGameSchema = z.object({
   gameNumber: z.number().int().min(1).max(7),
@@ -333,7 +332,6 @@ export const draftDuelBroadcastSchema = z.object({
   startedAtIso: z.string().min(1).max(64),
   durationMs: z.number().int().positive(),
 });
-export type DraftDuelBroadcast = z.infer<typeof draftDuelBroadcastSchema>;
 export const draftDuelRoomSnapshotSchema = z.object({
   roomId: idSchema,
   code: draftDuelRoomCodeSchema.nullable(),
@@ -430,7 +428,6 @@ export const draftDuelTapePeriodSchema = z.object({
   homeScore: z.number().int().nonnegative(),
   awayScore: z.number().int().nonnegative(),
 });
-export type DraftDuelTapePeriod = z.infer<typeof draftDuelTapePeriodSchema>;
 export const draftDuelTapeEventSchema = z.discriminatedUnion('kind', [
   draftDuelTapeTripSchema,
   draftDuelTapePeriodSchema,
@@ -558,20 +555,17 @@ export const draftDuelMultiplayerErrorCodeSchema = z.enum([
   'generation-failed',
   'integrity-failed',
 ]);
-export type DraftDuelMultiplayerErrorCode = z.infer<typeof draftDuelMultiplayerErrorCodeSchema>;
 export const draftDuelMultiplayerErrorSchema = z.object({
   code: draftDuelMultiplayerErrorCodeSchema,
   message: z.string().min(1).max(512),
   retryable: z.boolean(),
 });
-export type DraftDuelMultiplayerError = z.infer<typeof draftDuelMultiplayerErrorSchema>;
 
 const receiptHexSchema = z.string().regex(/^[0-9a-f]{64}$/);
 export const draftDuelReceiptGameSeedSchema = z.object({
   gameNumber: z.number().int().min(1).max(7),
   seed: seedSchema,
 });
-export type DraftDuelReceiptGameSeed = z.infer<typeof draftDuelReceiptGameSeedSchema>;
 export const draftDuelVerificationReceiptSchema = z.object({
   schemaVersion: z.literal(1),
   roomId: z.string().min(1).max(64),

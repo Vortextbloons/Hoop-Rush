@@ -174,7 +174,6 @@ export const capRushMultiplayerDeadlineSchema = z.object({
   cursor: z.string().min(1).max(128),
   atIso: z.iso.datetime(),
 });
-export type CapRushMultiplayerDeadline = z.infer<typeof capRushMultiplayerDeadlineSchema>;
 
 export const capRushMultiplayerStateSchema = z.object({
   schemaVersion: z.literal(CAP_RUSH_MULTIPLAYER_SCHEMA_VERSION),
@@ -249,7 +248,6 @@ export const capRushMultiplayerErrorSchema = z.object({
   message: z.string().min(1).max(400),
   retryable: z.boolean(),
 });
-export type CapRushMultiplayerError = z.infer<typeof capRushMultiplayerErrorSchema>;
 
 export const capRushMultiplayerCreateInputSchema = z.object({
   variant: capRushMultiplayerSettingsSchema.shape.variant,

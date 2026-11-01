@@ -154,4 +154,3 @@ export const capRushMultiplayerBidRecordSchema = z.object({
   totalDollars: z.number().int().positive(),
   acceptedAtIso: z.iso.datetime(),
 });
-export type CapRushMultiplayerBidRecord = z.infer<typeof capRushMultiplayerBidRecordSchema>;

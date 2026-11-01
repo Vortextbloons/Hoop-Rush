@@ -6,9 +6,7 @@ import { CLASSIC_DRAFT_SCHEMA_VERSION } from './versions.ts';
 export const classicVariantSchema = z.enum(['ratings', 'ball-knowledge']);
 export type ClassicVariant = z.infer<typeof classicVariantSchema>;
 export const classicRoundSchema = z.number().int().min(1).max(5);
-export type ClassicRound = z.infer<typeof classicRoundSchema>;
 export const classicDraftStatusSchema = z.enum(['drafting', 'complete']);
-export type ClassicDraftStatus = z.infer<typeof classicDraftStatusSchema>;
 export const classicRollContextSchema = z.object({
   franchiseId: franchiseIdSchema,
   eraId: eraIdSchema,
@@ -20,7 +18,6 @@ export const classicRerollStateSchema = z.object({
   eraSpent: z.boolean(),
   eraRound: classicRoundSchema.optional(),
 });
-export type ClassicRerollState = z.infer<typeof classicRerollStateSchema>;
 export const classicPickSchema = z.object({
   round: classicRoundSchema,
   playerId: playerIdSchema,
@@ -62,7 +59,6 @@ export const classicCatalogPlayerSchema = z.object({
   playerId: playerIdSchema,
   positions: positionUnionSchema,
 });
-export type ClassicCatalogPlayer = z.infer<typeof classicCatalogPlayerSchema>;
 export const classicCatalogEntrySchema = z.object({
   franchiseId: franchiseIdSchema,
   eraId: eraIdSchema,

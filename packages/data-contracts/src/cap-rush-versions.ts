@@ -101,12 +101,9 @@ export const capRushSpinPurchaseSchema = z.enum(['standard', 'surge']);
 export type CapRushSpinPurchaseId = z.infer<typeof capRushSpinPurchaseSchema>;
 
 export const capRushOfferIdSchema = z.string().regex(/^cro-[0-9a-f]{32}$/);
-export type CapRushOfferId = z.infer<typeof capRushOfferIdSchema>;
 export const capRushCardIdSchema = z.string().regex(/^crc-[0-9a-f]{32}$/);
-export type CapRushCardId = z.infer<typeof capRushCardIdSchema>;
 
 export const capRushDigestSchema = z.string().regex(/^[0-9a-f]{32}$/);
-export type CapRushDigest = z.infer<typeof capRushDigestSchema>;
 
 export const capRushVersionSetSchema = z.object({
   schemaVersion: z.literal(CAP_RUSH_SCHEMA_VERSION),

@@ -64,7 +64,6 @@ export const sourceMetadataSchema = z.object({
   derivationMethodVersion: z.string().min(1).max(64),
   lineageRuleVersion: z.string().min(1).max(64),
 });
-export type SourceMetadata = z.infer<typeof sourceMetadataSchema>;
 export const playersIndexAltIdsSchema = z
   .object({
     bbref: bbrefIdSchema.nullable().optional(),

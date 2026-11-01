@@ -12,13 +12,11 @@ export const workerSimulateRequestSchema = z.object({
   profile: eraSimulationProfileSchema,
   engineVersion: z.string().min(1).max(64),
 });
-export type WorkerSimulateRequest = z.infer<typeof workerSimulateRequestSchema>;
 export const workerCancelRequestSchema = z.object({
   schemaVersion: z.literal(WORKER_WIRE_SCHEMA_VERSION),
   type: z.literal('cancel'),
   requestId: z.string().min(1).max(64),
 });
-export type WorkerCancelRequest = z.infer<typeof workerCancelRequestSchema>;
 export const workerStartRequestSchema = z.object({
   schemaVersion: z.literal(WORKER_WIRE_SCHEMA_VERSION),
   type: z.literal('start'),
@@ -27,13 +25,11 @@ export const workerStartRequestSchema = z.object({
   profile: eraSimulationProfileSchema,
   engineVersion: z.string().min(1).max(64),
 });
-export type WorkerStartRequest = z.infer<typeof workerStartRequestSchema>;
 export const workerRequestSchema = z.discriminatedUnion('type', [
   workerSimulateRequestSchema,
   workerStartRequestSchema,
   workerCancelRequestSchema,
 ]);
-export type WorkerRequest = z.infer<typeof workerRequestSchema>;
 export const workerResultsMessageSchema = z.object({
   schemaVersion: z.literal(WORKER_WIRE_SCHEMA_VERSION),
   type: z.literal('results'),
@@ -41,7 +37,6 @@ export const workerResultsMessageSchema = z.object({
   fromGameNumber: z.number().int().min(1).max(82),
   results: z.array(gameResultSchema).min(1).max(8),
 });
-export type WorkerResultsMessage = z.infer<typeof workerResultsMessageSchema>;
 export const workerCompleteMessageSchema = z.object({
   schemaVersion: z.literal(WORKER_WIRE_SCHEMA_VERSION),
   type: z.literal('complete'),
@@ -49,7 +44,6 @@ export const workerCompleteMessageSchema = z.object({
   gamesDelivered: z.number().int().nonnegative(),
   cancelled: z.boolean(),
 });
-export type WorkerCompleteMessage = z.infer<typeof workerCompleteMessageSchema>;
 export const workerErrorMessageSchema = z.object({
   schemaVersion: z.literal(WORKER_WIRE_SCHEMA_VERSION),
   type: z.literal('error'),
@@ -66,7 +60,6 @@ export const workerStartResultMessageSchema = z.object({
   chosenLosses: z.number().int().nonnegative(),
   chosenDifferential: z.number().int(),
 });
-export type WorkerStartResultMessage = z.infer<typeof workerStartResultMessageSchema>;
 export const workerMessageSchema = z.discriminatedUnion('type', [
   workerResultsMessageSchema,
   workerCompleteMessageSchema,

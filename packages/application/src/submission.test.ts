@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'bun:test';
-import { runSubmission, type SubmissionPolicy } from './index.ts';
+import { runSubmission, type SubmissionPolicy } from './submission.ts';
 
 const RETRY_POLICY: SubmissionPolicy = {
   intent: 'fixed-five-command',

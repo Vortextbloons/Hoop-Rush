@@ -51,7 +51,6 @@ export const capRushMultiplayerPhaseSchema = z.enum([
 export type CapRushMultiplayerPhase = z.infer<typeof capRushMultiplayerPhaseSchema>;
 
 export const capRushMultiplayerBlockChoiceSchema = z.enum(['sim', 'simcast']);
-export type CapRushMultiplayerBlockChoice = z.infer<typeof capRushMultiplayerBlockChoiceSchema>;
 
 export interface CapRushMultiplayerBucketRule {
   readonly bucket: z.infer<typeof capRushBucketSchema>;
@@ -96,4 +95,3 @@ export type CapRushMultiplayerSettings = z.infer<typeof capRushMultiplayerSettin
 export const capRushMultiplayerSetupSchema = z.object({
   variant: capRushMultiplayerVariantSchema,
 });
-export type CapRushMultiplayerSetup = z.infer<typeof capRushMultiplayerSetupSchema>;

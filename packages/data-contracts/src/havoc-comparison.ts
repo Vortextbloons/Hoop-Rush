@@ -150,7 +150,6 @@ export const havocMvpWeightsSchema = z.object({
   blocks: z.literal(HAVOC_MVP_INDEX_WEIGHTS.blocks),
   turnovers: z.literal(HAVOC_MVP_INDEX_WEIGHTS.turnovers),
 });
-export type HavocMvpWeights = z.infer<typeof havocMvpWeightsSchema>;
 
 export const havocDifferenceSchema = z.object({
   gameNumber: z.number().int().min(1).max(82),
@@ -200,7 +199,6 @@ export const havocReportLineupEntrySchema = z.object({
   tier: z.union([z.literal(1), z.literal(2), z.literal(3)]),
   mutations: z.array(havocMutationEntrySchema).min(1).max(3),
 });
-export type HavocReportLineupEntry = z.infer<typeof havocReportLineupEntrySchema>;
 
 export const havocReportSchema = z.object({
   schemaVersion: z.literal(HAVOC_SCHEMA_VERSION),

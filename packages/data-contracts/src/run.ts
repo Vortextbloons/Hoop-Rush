@@ -23,13 +23,9 @@ export const runVersionBoundariesSchema = z.object({
   scheduleVersion: z.string().min(1).max(64),
   seedDerivationVersion: z.string().min(1).max(64),
 });
-export type RunVersionBoundaries = z.infer<typeof runVersionBoundariesSchema>;
 export const runModeSchema = z.enum(['sandbox', 'classic']);
-export type RunMode = z.infer<typeof runModeSchema>;
 export const runStatusSchema = z.enum(['active', 'finished', 'abandoned']);
-export type RunStatus = z.infer<typeof runStatusSchema>;
 export const runOutcomeSchema = z.enum(['perfect', 'eliminated']);
-export type RunOutcome = z.infer<typeof runOutcomeSchema>;
 export const playerSeasonAggregateSchema = playerBoxScoreSchema
   .omit({ diagnostics: true })
   .extend({ gamesPlayed: z.number().int().nonnegative() });

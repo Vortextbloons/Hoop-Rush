@@ -21,13 +21,11 @@ export const leagueWorkerCancelRequestSchema = z.object({
   type: z.literal('cancel'),
   requestId: z.string().min(1).max(64),
 });
-export type LeagueWorkerCancelRequest = z.infer<typeof leagueWorkerCancelRequestSchema>;
 
 export const leagueWorkerRequestSchema = z.discriminatedUnion('type', [
   leagueWorkerComputeRequestSchema,
   leagueWorkerCancelRequestSchema,
 ]);
-export type LeagueWorkerRequest = z.infer<typeof leagueWorkerRequestSchema>;
 
 export const leagueWorkerProgressMessageSchema = z.object({
   schemaVersion: z.literal(LEAGUE_WORKER_WIRE_SCHEMA_VERSION),
@@ -36,7 +34,6 @@ export const leagueWorkerProgressMessageSchema = z.object({
   gamesDone: z.number().int().nonnegative(),
   gamesTotal: z.number().int().positive(),
 });
-export type LeagueWorkerProgressMessage = z.infer<typeof leagueWorkerProgressMessageSchema>;
 
 export const leagueWorkerResultMessageSchema = z.object({
   schemaVersion: z.literal(LEAGUE_WORKER_WIRE_SCHEMA_VERSION),
@@ -44,7 +41,6 @@ export const leagueWorkerResultMessageSchema = z.object({
   requestId: z.string().min(1).max(64),
   record: leagueRecordSchema,
 });
-export type LeagueWorkerResultMessage = z.infer<typeof leagueWorkerResultMessageSchema>;
 
 export const leagueWorkerErrorMessageSchema = z.object({
   schemaVersion: z.literal(LEAGUE_WORKER_WIRE_SCHEMA_VERSION),
@@ -52,7 +48,6 @@ export const leagueWorkerErrorMessageSchema = z.object({
   requestId: z.string().min(1).max(64),
   message: z.string().min(1).max(512),
 });
-export type LeagueWorkerErrorMessage = z.infer<typeof leagueWorkerErrorMessageSchema>;
 
 export const leagueWorkerMessageSchema = z.discriminatedUnion('type', [
   leagueWorkerProgressMessageSchema,

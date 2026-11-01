@@ -24,11 +24,9 @@ workers embed.
 - `src/index.ts` — the public surface.
 - `src/ids.ts`, `src/versions.ts`, `src/season-versions.ts` — brands and
   versions.
-- `src/multiplayer-protocol.ts` — the versioned room protocol. One
-  mode-keyed table (`roomProtocolSchema`) bundling each mode's settings, state,
-  command, payload, receipt, transient event, and verification receipt, plus the
-  common room and command envelopes. `ROOM_PROTOCOL_VERSION` is separate from
-  every storage and engine version. Adding a mode is one table entry.
+- `src/multiplayer-protocol.ts` — the room protocol version constant
+  (`ROOM_PROTOCOL_VERSION`, separate from every storage and engine version) and
+  the client-side legacy-room rejection message.
 - Domain groups: `run.ts`, `bracket.ts`, `classic.ts`, `player-season.ts`,
   `season-*.ts` (hash, identity, seeds, versions, plus the shared game wire:
   game simulation, rotation, home court, effects, evolution, draft catalog),

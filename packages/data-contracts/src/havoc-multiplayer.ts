@@ -456,7 +456,6 @@ export const havocMultiplayerSeriesWinsSchema = z.object({
   p1: z.number().int().min(0).max(HAVOC_MULTIPLAYER_SERIES_WINS),
   p2: z.number().int().min(0).max(HAVOC_MULTIPLAYER_SERIES_WINS),
 });
-export type HavocMultiplayerSeriesWins = z.infer<typeof havocMultiplayerSeriesWinsSchema>;
 
 export const havocMultiplayerSeriesSnapshotSchema = z
   .object({
@@ -604,13 +603,11 @@ export const havocMultiplayerErrorCodeSchema = z.enum([
   'generation-failed',
   'integrity-failed',
 ]);
-export type HavocMultiplayerErrorCode = z.infer<typeof havocMultiplayerErrorCodeSchema>;
 export const havocMultiplayerErrorSchema = z.object({
   code: havocMultiplayerErrorCodeSchema,
   message: z.string().min(1).max(512),
   retryable: z.boolean(),
 });
-export type HavocMultiplayerError = z.infer<typeof havocMultiplayerErrorSchema>;
 
 const havocMultiplayerRoomIdSchema = z.string().min(1).max(64);
 const havocMultiplayerGameNumberSchema = z

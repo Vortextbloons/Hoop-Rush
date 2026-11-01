@@ -20,21 +20,6 @@ function zeroLine(): GameTapeStatLine {
   return [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 }
 
-export function gamecastPlaybackWeights(tape: readonly GameTapeEvent[]): number[] {
-  const weights: number[] = tape.map((event) => (event.kind === 'trip' ? 1 : 0));
-  const total = weights.reduce((sum, weight) => sum + weight, 0);
-  if (total === 0) {
-    return weights.map((_, index) => (index === weights.length - 1 ? 1 : 0));
-  }
-  const cumulative: number[] = [];
-  let running = 0;
-  for (const weight of weights) {
-    running += weight;
-    cumulative.push(running / total);
-  }
-  return cumulative;
-}
-
 export function gamecastVisibleEventCount(
   tape: readonly GameTapeEvent[],
   progress: number,

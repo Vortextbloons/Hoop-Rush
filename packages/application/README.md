@@ -20,7 +20,6 @@ gathers intent, the engine owns basketball rules, adapters own I/O.
 ## Entry points
 
 ```text
-@hoop-rush/application          shared submission runtime (runSubmission + types)
 @hoop-rush/application/challenge  challenge run session (classic/sandbox job lifecycle)
 @hoop-rush/application/draft-duel draft duel room session (transport/repository ports)
 @hoop-rush/application/fixed-five fixed-five room session + command policy/retry helpers

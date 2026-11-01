@@ -47,14 +47,12 @@ export const havocWorkerCancelRequestSchema = z.object({
   type: z.literal('havoc-cancel'),
   requestId: z.string().min(1).max(64),
 });
-export type HavocWorkerCancelRequest = z.infer<typeof havocWorkerCancelRequestSchema>;
 
 export const havocWorkerRequestSchema = z.discriminatedUnion('type', [
   havocWorkerSimulateRequestSchema,
   havocWorkerTapeRequestSchema,
   havocWorkerCancelRequestSchema,
 ]);
-export type HavocWorkerRequest = z.infer<typeof havocWorkerRequestSchema>;
 
 export const havocWorkerGameMessageSchema = z.object({
   schemaVersion: z.literal(HAVOC_WORKER_WIRE_SCHEMA_VERSION),
