@@ -691,46 +691,6 @@
 </section>
 
 <style>
-  .room-page {
-    width: 100%;
-    max-width: 1400px;
-    margin: auto;
-    padding: 24px 32px 80px;
-  }
-  .room-nav {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 30px;
-  }
-  .room-nav a {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    color: var(--color-muted-foreground);
-    font-size: 12px;
-  }
-  .room-nav a:hover {
-    color: var(--color-foreground);
-  }
-
-  .room-eyebrow {
-    font-family: var(--font-mono);
-    font-size: 10px;
-    color: var(--color-primary);
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-  }
-  .room-empty h1 {
-    margin-top: 6px;
-    font-family: var(--font-display);
-    font-size: clamp(38px, 4vw, 58px);
-    font-weight: 800;
-    line-height: 1;
-    text-transform: uppercase;
-  }
-
   .verified-pill {
     display: flex;
     gap: 7px;
@@ -738,53 +698,7 @@
     color: var(--color-positive);
     font-size: 11px;
   }
-  .room-stages {
-    display: flex;
-    margin: 28px 0;
-    padding: 17px 0;
-    border-top: 1px solid var(--color-line-soft);
-    border-bottom: 1px solid var(--color-line-soft);
-    gap: 32px;
-  }
-  .room-stages li {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    color: var(--color-muted-foreground);
-    font-size: 12px;
-  }
-  .room-stages li > span {
-    display: grid;
-    place-items: center;
-    width: 22px;
-    height: 22px;
-    border: 1px solid var(--color-line-strong);
-    border-radius: 50%;
-    font-family: var(--font-mono);
-    font-size: 10px;
-  }
-  .room-stages .current {
-    color: var(--color-foreground);
-    font-weight: 600;
-  }
-  .room-stages .current > span {
-    color: var(--color-primary-foreground);
-    background: var(--color-primary);
-    border-color: var(--color-primary);
-  }
-  .room-stages .finished > span {
-    color: var(--color-positive);
-    border-color: var(--color-positive);
-  }
-  .room-alert {
-    margin: 16px 0;
-    padding: 14px;
-    border: 1px solid var(--color-destructive);
-    background: color-mix(in srgb, var(--color-destructive) 8%, var(--color-card));
-    border-radius: 8px;
-    font-size: 13px;
-    line-height: 1.7;
-  }
+
   .room-connection {
     min-height: 1.5em;
     color: var(--color-muted-foreground);
@@ -808,169 +722,23 @@
   .room-players {
     margin-bottom: 24px;
   }
-  .lobby-layout {
-    display: grid;
-    grid-template-columns: minmax(0, 1.2fr) minmax(340px, 0.8fr);
-    gap: 24px;
-    align-items: start;
-  }
-  .invite-panel,
-  .lobby-settings {
-    overflow: hidden;
-    border: 1px solid var(--color-line-soft);
-    border-radius: 12px;
-    background: var(--color-card);
-  }
-  .lobby-photo {
-    position: relative;
-    height: 205px;
-    color: #f5f3ef;
-  }
-  .lobby-photo::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(180deg, transparent 30%, rgb(8 12 17 / 85%));
-  }
-  .lobby-photo img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    object-position: 50% 30%;
-  }
-  .photo-caption {
-    position: absolute;
-    z-index: 1;
-    bottom: 20px;
-    left: 28px;
-    font-family: var(--font-display);
-    font-size: 15px;
-    text-transform: uppercase;
-    font-weight: 700;
-    letter-spacing: 0.05em;
-  }
-  .invite-body {
-    padding: 28px;
-  }
-  .invite-body h2 {
-    font-family: var(--font-display);
-    font-size: 34px;
-    line-height: 1.1;
-    font-weight: 800;
-    margin: 7px 0 10px;
-  }
+
   .invite-body > p:not(.room-eyebrow) {
     color: var(--color-muted-foreground);
     font-size: 12px;
     line-height: 1.7;
     max-width: 420px;
   }
-  .invite-code {
-    font-family: var(--font-mono);
-    font-size: clamp(40px, 5vw, 62px);
-    font-weight: 700;
-    letter-spacing: 0.18em;
-    line-height: 1;
-    padding: 28px 0;
-    user-select: all;
-  }
-  .invite-actions {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-  }
-  .room-primary,
-  .room-secondary {
-    display: inline-flex;
-    justify-content: center;
-    align-items: center;
-    gap: 8px;
-    padding: 12px 18px;
-    border-radius: 7px;
-    font-size: 12px;
-    font-weight: 600;
-  }
-  .room-primary {
-    background: var(--color-primary);
-    color: var(--color-primary-foreground);
-  }
-  .room-secondary {
-    border: 1px solid var(--color-line-strong);
-    background: var(--color-surface-2);
-  }
+
   .invite-body .invite-footnote {
     margin-top: 16px;
     font-size: 10px;
   }
-  .lobby-settings {
-    border-top: 2px solid var(--color-primary);
-    padding: 24px;
-  }
-  .lobby-panel-heading {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 20px;
-  }
-  .lobby-panel-heading h2 {
-    font-family: var(--font-display);
-    font-size: 24px;
-    font-weight: 700;
-  }
-  .lobby-panel-heading > span {
-    display: flex;
-    gap: 6px;
-    align-items: center;
-    font-size: 11px;
-    color: var(--color-muted-foreground);
-  }
+
   .lobby-settings :global(.player-seats) {
     grid-template-columns: 1fr;
   }
-  .lobby-rules {
-    margin: 24px 0;
-    padding: 20px 0;
-    border-block: 1px solid var(--color-line-soft);
-  }
-  .lobby-rules > div {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    font-size: 12px;
-    margin-bottom: 13px;
-  }
-  .lobby-rules > div:last-child {
-    margin: 0;
-  }
-  .lobby-rules dt {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    color: var(--color-muted-foreground);
-  }
-  .lobby-rules dd {
-    font-weight: 600;
-  }
-  .lobby-ready {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    color: var(--color-muted-foreground);
-    font-size: 12px;
-    line-height: 1.6;
-    margin-bottom: 16px;
-  }
-  .lobby-ready > span {
-    height: 6px;
-    width: 6px;
-    flex-shrink: 0;
-    border-radius: 50%;
-    background: var(--color-muted-foreground);
-  }
-  .lobby-ready > span.joined {
-    background: var(--color-positive);
-  }
+
   .start-draft {
     width: 100%;
     padding: 14px;
@@ -981,40 +749,17 @@
     gap: 14px;
     margin-top: 22px;
   }
-  .lobby-manage button {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    color: var(--color-muted-foreground);
-    font-size: 11px;
-  }
-  .lobby-manage button:hover {
-    color: var(--color-foreground);
-  }
+
   .draft-room {
     min-width: 0;
   }
-  .room-footer {
-    border-top: 1px solid var(--color-line-soft);
-    margin-top: 30px;
-    padding-top: 20px;
-  }
-  .room-empty {
-    display: flex;
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 18px;
-    padding: 60px 0;
-  }
+
   .room-empty h2 {
     font-family: var(--font-display);
     font-size: 32px;
     font-weight: 800;
   }
-  .room-empty p {
-    font-size: 13px;
-    color: var(--color-muted-foreground);
-  }
+
   button {
     cursor: pointer;
   }
@@ -1027,43 +772,6 @@
   summary:focus-visible {
     outline: 2px solid var(--color-ring);
     outline-offset: 4px;
-  }
-  @media (max-width: 850px) {
-    .lobby-layout {
-      grid-template-columns: 1fr;
-    }
-    .room-page {
-      padding: 24px 20px 88px;
-    }
-    .lobby-photo {
-      height: 180px;
-    }
-  }
-  @media (max-width: 520px) {
-    .room-stages {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 8px;
-    }
-    .room-stages li {
-      flex-direction: column;
-      text-align: center;
-      gap: 6px;
-      font-size: 10px;
-    }
-    .room-stages li > span {
-      width: 18px;
-      height: 18px;
-    }
-
-    .invite-body,
-    .lobby-settings {
-      padding: 20px;
-    }
-    .invite-actions > button {
-      flex: 1;
-      padding-inline: 10px;
-    }
   }
 
   .verify-banner {
