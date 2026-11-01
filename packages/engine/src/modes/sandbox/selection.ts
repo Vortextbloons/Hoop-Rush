@@ -1,4 +1,9 @@
-import type { ChallengeRun, EraSimulationProfile, Seed } from '@hoop-rush/data-contracts';
+import type {
+  ChallengeRun,
+  EraSimulationProfile,
+  GameResult,
+  Seed,
+} from '@hoop-rush/data-contracts';
 import {
   createChallenge,
   createGameInput,
@@ -72,40 +77,72 @@ export interface BestOfChoice {
   chosenLosses: number;
   chosenDifferential: number;
 }
-export function chooseBestRunSeed(
+export interface BestOfSelection extends BestOfChoice {
+  /** The chosen attempt's games in game order, so callers need not re-simulate them. */
+  chosenGames: GameResult[];
+}
+interface AttemptOutcome {
+  seed: Seed;
+  score: RunScore;
+  games: GameResult[] | null;
+}
+function chooseBestAttempt(
   run: ChallengeRun,
   profile: EraSimulationProfile,
   context: EngineContext,
-): BestOfChoice {
+  retainGames: boolean,
+): AttemptOutcome {
   const simulate = createGameBatchSimulator(context);
-  let best: {
-    seed: Seed;
-    score: RunScore;
-  } | null = null;
+  let best: AttemptOutcome | null = null;
   for (let attempt = 0; attempt < BEST_OF_ATTEMPTS; attempt += 1) {
     const attemptSeed = deriveAttemptSeed(run.runSeed, attempt);
     const attemptRun = { ...run, runSeed: attemptSeed };
     let wins = 0;
     let differential = 0;
+    const games: GameResult[] | null = retainGames ? [] : null;
     for (let gameNumber = 1; gameNumber <= 82; gameNumber += 1) {
       const input = createGameInput(attemptRun, profile, gameNumber);
       const result = simulate(input);
+      games?.push(result);
       const pointsDiff = result.home.box.points - result.away.box.points;
       if (pointsDiff > 0) wins += 1;
       differential += pointsDiff;
     }
     const score: RunScore = { wins, differential };
     if (best === null || isBetterScore(score, best.score)) {
-      best = { seed: attemptSeed, score };
+      best = { seed: attemptSeed, score, games };
     }
   }
   if (best === null) {
     throw new Error('chooseBestRunSeed requires at least one attempt');
   }
+  return best;
+}
+function choiceOf(attempt: AttemptOutcome): BestOfChoice {
   return {
-    chosenRunSeed: best.seed,
-    chosenWins: best.score.wins,
-    chosenLosses: 82 - best.score.wins,
-    chosenDifferential: best.score.differential,
+    chosenRunSeed: attempt.seed,
+    chosenWins: attempt.score.wins,
+    chosenLosses: 82 - attempt.score.wins,
+    chosenDifferential: attempt.score.differential,
   };
+}
+export function chooseBestRunSeed(
+  run: ChallengeRun,
+  profile: EraSimulationProfile,
+  context: EngineContext,
+): BestOfChoice {
+  return choiceOf(chooseBestAttempt(run, profile, context, false));
+}
+/**
+ * Same selection as {@link chooseBestRunSeed}, but returns the winning attempt's
+ * games so a caller that immediately replays the chosen run does not simulate the
+ * same 82 seeded games twice. At most one attempt's games are retained.
+ */
+export function chooseBestRunSeedWithGames(
+  run: ChallengeRun,
+  profile: EraSimulationProfile,
+  context: EngineContext,
+): BestOfSelection {
+  const best = chooseBestAttempt(run, profile, context, true);
+  return { ...choiceOf(best), chosenGames: best.games ?? [] };
 }

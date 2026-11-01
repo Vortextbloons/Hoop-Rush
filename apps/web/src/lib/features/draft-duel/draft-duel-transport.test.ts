@@ -107,6 +107,7 @@ function roomRow(overrides: Record<string, unknown> = {}): Record<string, unknow
 function memberRow(participantId: string, overrides: Record<string, unknown> = {}) {
   return {
     room_id: ROOM_ID,
+    uid: participantId === 'p1' ? 'user-1' : 'user-2',
     participant_id: participantId,
     online: true,
     ready: false,
@@ -161,6 +162,27 @@ describe('draft-duel supabase transport protocol pins', () => {
     expect(created.snapshot.settings.timerPolicyVersion).toBe(DRAFT_DUEL_AUTOPICK_VERSION);
     expect(created.snapshot.members.map((member) => member.participantId)).toEqual(['p1', 'p2']);
     expect(created.snapshot.series).toBeNull();
+  });
+
+  it('resume resolves the caller seat from membership without a second auth round trip', async () => {
+    const { harness, transport } = setupTransport();
+    seedRoom(harness);
+
+    const resumed = await transport.resume(ROOM_ID);
+
+    expect(resumed.membership.participantId).toBe('p1');
+    expect(resumed.snapshot.revision).toBe(2);
+    expect(harness.selectQueries).toContainEqual({
+      table: 'draft_duel_room_members',
+      columns: 'participant_id',
+      filters: [
+        { op: 'eq', column: 'room_id', value: ROOM_ID },
+        { op: 'eq', column: 'uid', value: 'user-1' },
+      ],
+      order: null,
+      single: true,
+    });
+    expect(harness.authCalls).not.toContain('getUser');
   });
 
   it('preview and join keep their RPC names and args', async () => {

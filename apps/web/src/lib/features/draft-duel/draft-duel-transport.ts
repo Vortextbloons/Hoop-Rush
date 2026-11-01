@@ -34,6 +34,7 @@ import {
   readRoomParticipant,
   readRoomSync,
   ensureAnonymous,
+  ensureAnonymousUser,
   parseRoomCode,
   publishTransientPayload,
   resolveRoomTimeout,
@@ -298,9 +299,18 @@ export function createDraftDuelTransport(options?: {
     },
     async resume(roomId) {
       const client = await getClient();
-      await ensureAnonymous(client);
-      const snapshot = await fetchSnapshot(roomId);
-      const participantId = await readRoomParticipant(client, MEMBERS_TABLE, roomId);
+      // One shared session check; its uid also resolves our seat below.
+      const uid = await ensureAnonymousUser(client);
+      // Snapshot and seat are independent reads, so run them together. Room
+      // errors still win so a non-member sees the room failure, not the seat one.
+      const [snapshotResult, seatResult] = await Promise.allSettled([
+        fetchSnapshot(roomId),
+        readRoomParticipant(client, MEMBERS_TABLE, roomId, uid),
+      ]);
+      if (snapshotResult.status === 'rejected') throw snapshotResult.reason;
+      if (seatResult.status === 'rejected') throw seatResult.reason;
+      const snapshot = snapshotResult.value;
+      const participantId = seatResult.value;
       return {
         snapshot,
         membership: {

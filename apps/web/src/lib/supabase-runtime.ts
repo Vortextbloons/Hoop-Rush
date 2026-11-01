@@ -101,20 +101,35 @@ export function isMultiplayerConfigured(): boolean {
   return Boolean(url && publishableKey);
 }
 
-export async function ensureAnonymous(client: SupabaseClient): Promise<void> {
+/**
+ * Ensure an anonymous session and return its user id when the client reports
+ * one.
+ *
+ * Callers that also need their own seat pass the id instead of asking the auth
+ * server again: `getSession` reads the persisted session locally, while
+ * `getUser` costs a round trip. A null id just means the caller falls back to
+ * that round trip.
+ */
+export async function ensureAnonymousUser(client: SupabaseClient): Promise<string | null> {
   try {
     const session = await client.auth.getSession();
-    if (session.data.session) return;
+    const uid = session.data.session?.user.id;
+    if (uid) return uid;
   } catch {
     throw new Error('anonymous sign-in unreachable: failed to fetch');
   }
   try {
     const signed = await client.auth.signInAnonymously();
     if (signed.error) throw new Error(`anonymous sign-in failed: ${signed.error.message}`);
+    return signed.data.user?.id ?? null;
   } catch (e) {
     if (e instanceof Error && e.message.startsWith('anonymous sign-in failed:')) throw e;
     throw new Error('anonymous sign-in unreachable: failed to fetch');
   }
+}
+
+export async function ensureAnonymous(client: SupabaseClient): Promise<void> {
+  await ensureAnonymousUser(client);
 }
 
 export async function getMultiplayerClient(): Promise<SupabaseClient> {
@@ -256,18 +271,23 @@ export async function fetchRoomRows(options: {
   membersSelect: string;
   roomId: string;
 }): Promise<{ room: unknown; members: unknown[] }> {
-  const roomResponse = await options.client
-    .from(options.roomsTable)
-    .select(options.roomSelect)
-    .eq('id', options.roomId)
-    .single();
+  // Both reads are keyed by the room id the caller already holds, so they run
+  // together instead of one round trip after the other. Error precedence stays
+  // the room's: a missing room is reported before missing membership.
+  const [roomResponse, memberResponse] = await Promise.all([
+    options.client
+      .from(options.roomsTable)
+      .select(options.roomSelect)
+      .eq('id', options.roomId)
+      .single(),
+    options.client
+      .from(options.membersTable)
+      .select(options.membersSelect)
+      .eq('room_id', options.roomId),
+  ]);
   const roomData: unknown = roomResponse.data;
   if (roomResponse.error) throw new Error('authorization: cannot read room');
   if (roomData == null) throw new Error('authorization: cannot read room');
-  const memberResponse = await options.client
-    .from(options.membersTable)
-    .select(options.membersSelect)
-    .eq('room_id', options.roomId);
   const memberData: unknown = memberResponse.data;
   if (memberResponse.error || !Array.isArray(memberData) || memberData.length === 0) {
     throw new Error('members failed: cannot verify room membership');
@@ -275,19 +295,31 @@ export async function fetchRoomRows(options: {
   return { room: roomData, members: memberData };
 }
 
+/**
+ * Resolve the caller's own seat.
+ *
+ * Pass `uid` when the caller already established the anonymous session; it
+ * avoids a second auth round trip. The query is still filtered by that uid and
+ * guarded by row-level security, so a wrong uid yields no row rather than
+ * someone else's seat. A null uid falls back to the auth lookup.
+ */
 export async function readRoomParticipant(
   client: SupabaseClient,
   membersTable: string,
   roomId: string,
+  uid?: string | null,
 ): Promise<'p1' | 'p2'> {
-  const user = await client.auth.getUser();
-  const uid = user.data.user?.id;
-  if (!uid) throw new Error('membership: not signed in');
+  let resolvedUid = uid ?? undefined;
+  if (resolvedUid === undefined) {
+    const user = await client.auth.getUser();
+    resolvedUid = user.data.user?.id;
+  }
+  if (!resolvedUid) throw new Error('membership: not signed in');
   const memberResponse = await client
     .from(membersTable)
     .select('participant_id')
     .eq('room_id', roomId)
-    .eq('uid', uid)
+    .eq('uid', resolvedUid)
     .single();
   const seat: unknown = memberResponse.data;
   if (memberResponse.error || seat == null) {
@@ -564,44 +596,106 @@ export function createRealtimeRoomRegistry(options: RealtimeRoomRegistryOptions)
   };
 }
 
-const transientSenderChannels = new Map<string, Promise<RealtimeChannel>>();
+/**
+ * Realtime broadcast sender channels.
+ *
+ * A private broadcast channel is scoped to one room topic, so channels cannot
+ * be shared across rooms. Without a bound, every room a client ever published
+ * to (`rematch` allocates a new room each series) would keep a live channel for
+ * the rest of the page's life. Keep only the most recently used senders and
+ * release the rest; a later publish to an evicted room transparently recreates
+ * its channel.
+ */
+const TRANSIENT_SENDER_LIMIT = 3;
 
-async function transientSenderChannel(
-  topic: string,
+interface TransientSender {
+  channel: Promise<RealtimeChannel>;
+  lastUsed: number;
+  active: number;
+}
+
+/** Senders are per client: a channel created on one client must be removed from it. */
+const transientSendersByClient = new WeakMap<SupabaseClient, Map<string, TransientSender>>();
+
+function transientSenders(client: SupabaseClient): Map<string, TransientSender> {
+  let senders = transientSendersByClient.get(client);
+  if (!senders) {
+    senders = new Map();
+    transientSendersByClient.set(client, senders);
+  }
+  return senders;
+}
+
+function releaseTransientSender(
   client: SupabaseClient,
-): Promise<RealtimeChannel> {
-  const existing = transientSenderChannels.get(topic);
-  if (existing) return existing;
-  const creating = (async (): Promise<RealtimeChannel> => {
-    const { REALTIME_SUBSCRIBE_STATES } = await loadSupabaseModule();
-    try {
-      await client.realtime.setAuth();
-    } catch {
-      await Promise.resolve();
-    }
-    const channel = client.channel(topic, {
-      config: { private: true, broadcast: { self: false } },
-    });
-    await new Promise<void>((resolve) => {
-      const timer = setTimeout(() => {
-        resolve();
-      }, 1500);
-      channel.subscribe((status) => {
-        if (status === REALTIME_SUBSCRIBE_STATES.SUBSCRIBED) {
-          clearTimeout(timer);
-          resolve();
-        }
+  topic: string,
+  sender: TransientSender,
+): void {
+  transientSenders(client).delete(topic);
+  void sender.channel
+    .then((channel) => channel.unsubscribe().then(() => client.removeChannel(channel)))
+    .catch(() => {});
+}
+
+function trimTransientSenders(client: SupabaseClient): void {
+  const senders = transientSenders(client);
+  const idle = [...senders.entries()]
+    .filter(([, sender]) => sender.active === 0)
+    .sort((left, right) => left[1].lastUsed - right[1].lastUsed);
+  let excess = senders.size - TRANSIENT_SENDER_LIMIT;
+  for (const [topic, sender] of idle) {
+    if (excess <= 0) break;
+    releaseTransientSender(client, topic, sender);
+    excess -= 1;
+  }
+}
+
+/**
+ * Acquire the sender for `topic` and mark it in use.
+ *
+ * The usage count is taken synchronously so a concurrent trim cannot evict a
+ * channel that is about to send. The caller clears it once the send settles.
+ */
+async function acquireTransientSender(
+  client: SupabaseClient,
+  topic: string,
+): Promise<{ sender: TransientSender; channel: RealtimeChannel }> {
+  const senders = transientSenders(client);
+  let sender = senders.get(topic);
+  if (!sender) {
+    const creating = (async (): Promise<RealtimeChannel> => {
+      const { REALTIME_SUBSCRIBE_STATES } = await loadSupabaseModule();
+      try {
+        await client.realtime.setAuth();
+      } catch {
+        await Promise.resolve();
+      }
+      const channel = client.channel(topic, {
+        config: { private: true, broadcast: { self: false } },
       });
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(() => {
+          resolve();
+        }, 1500);
+        channel.subscribe((status) => {
+          if (status === REALTIME_SUBSCRIBE_STATES.SUBSCRIBED) {
+            clearTimeout(timer);
+            resolve();
+          }
+        });
+      });
+      return channel;
+    })();
+    sender = { channel: creating, lastUsed: Date.now(), active: 0 };
+    senders.set(topic, sender);
+    const owned = sender;
+    creating.catch(() => {
+      if (senders.get(topic) === owned) senders.delete(topic);
     });
-    return channel;
-  })();
-  transientSenderChannels.set(topic, creating);
-  creating.catch(() => {
-    if (transientSenderChannels.get(topic) === creating) {
-      transientSenderChannels.delete(topic);
-    }
-  });
-  return creating;
+  }
+  sender.active += 1;
+  sender.lastUsed = Date.now();
+  return { sender, channel: await sender.channel };
 }
 
 export async function publishTransientPayload(
@@ -610,14 +704,23 @@ export async function publishTransientPayload(
   event: string,
   payload: unknown,
 ): Promise<boolean> {
+  let client: SupabaseClient | null = null;
+  let sender: TransientSender | null = null;
   try {
-    const client = await getClient();
+    client = await getClient();
     await ensureAnonymous(client);
-    const channel = await transientSenderChannel(topic, client);
-    const status = await channel.send({ type: 'broadcast', event, payload });
+    const acquired = await acquireTransientSender(client, topic);
+    sender = acquired.sender;
+    const status = await acquired.channel.send({ type: 'broadcast', event, payload });
     return status === 'ok';
   } catch {
     return false;
+  } finally {
+    if (sender !== null && client !== null) {
+      sender.active -= 1;
+      sender.lastUsed = Date.now();
+      trimTransientSenders(client);
+    }
   }
 }
 

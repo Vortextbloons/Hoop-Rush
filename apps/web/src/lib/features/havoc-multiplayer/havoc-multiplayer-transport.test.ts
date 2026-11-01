@@ -240,20 +240,22 @@ describe('havoc multiplayer supabase transport protocol pins', () => {
     ]);
   });
 
-  it('resume resolves the caller seat from membership', async () => {
+  it('resume resolves the caller seat from membership without a second auth round trip', async () => {
     const { harness, transport } = setupTransport();
     seedRoom(harness);
     const resumed = await transport.resume(ROOM_ID);
     expect(resumed.membership.participantId).toBe('p1');
-    expect(harness.selectQueries.at(-1)).toMatchObject({
+    expect(harness.selectQueries).toContainEqual({
       table: 'havoc_multiplayer_room_members',
       columns: 'participant_id',
       filters: [
         { op: 'eq', column: 'room_id', value: ROOM_ID },
         { op: 'eq', column: 'uid', value: 'user-1' },
       ],
+      order: null,
       single: true,
     });
+    expect(harness.authCalls).not.toContain('getUser');
   });
 
   it('submitCommand pins p_expected_revision and maps camelCase rejections', async () => {
