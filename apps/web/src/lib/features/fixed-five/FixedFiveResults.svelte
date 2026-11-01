@@ -261,6 +261,54 @@
   }
 </script>
 
+{#snippet comparisonTable(data: NonNullable<typeof comparison>)}
+  <table class="mt-2 w-full text-sm">
+    <thead>
+      <tr class="font-mono text-[10px] tracking-widest text-muted-foreground uppercase">
+        <th scope="col" class="py-1 text-left">You</th>
+        <th scope="col" class="py-1 text-center">Stat</th>
+        <th scope="col" class="py-1 text-right">Opponent</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-border/50 tabular-nums">
+      <tr>
+        <td class="py-2 text-left font-bold">{perGameText(data.you.points, data.games)}</td>
+        <td class="py-2 text-center text-xs text-muted-foreground">Points per game</td>
+        <td class="py-2 text-right font-bold">{perGameText(data.opp.points, data.games)}</td>
+      </tr>
+      <tr>
+        <td class="py-2 text-left font-bold">{pctStr(data.you.fgm, data.you.fga)}</td>
+        <td class="py-2 text-center text-xs text-muted-foreground">FG%</td>
+        <td class="py-2 text-right font-bold">{pctStr(data.opp.fgm, data.opp.fga)}</td>
+      </tr>
+      <tr>
+        <td class="py-2 text-left font-bold">{pctStr(data.you.tpm, data.you.tpa)}</td>
+        <td class="py-2 text-center text-xs text-muted-foreground">3P%</td>
+        <td class="py-2 text-right font-bold">{pctStr(data.opp.tpm, data.opp.tpa)}</td>
+      </tr>
+      <tr>
+        <td class="py-2 text-left font-bold"
+          >{trueShootingPct(data.you.points, data.you.fga, data.you.fta)}</td
+        >
+        <td class="py-2 text-center text-xs text-muted-foreground">TS%</td>
+        <td class="py-2 text-right font-bold"
+          >{trueShootingPct(data.opp.points, data.opp.fga, data.opp.fta)}</td
+        >
+      </tr>
+      <tr>
+        <td class="py-2 text-left font-bold">{perGameText(data.you.reb, data.games)}</td>
+        <td class="py-2 text-center text-xs text-muted-foreground">Rebounds per game</td>
+        <td class="py-2 text-right font-bold">{perGameText(data.opp.reb, data.games)}</td>
+      </tr>
+      <tr>
+        <td class="py-2 text-left font-bold">{perGameText(data.you.tov, data.games)}</td>
+        <td class="py-2 text-center text-xs text-muted-foreground">Turnovers per game</td>
+        <td class="py-2 text-right font-bold">{perGameText(data.opp.tov, data.games)}</td>
+      </tr>
+    </tbody>
+  </table>
+{/snippet}
+
 <div class="match-results">
   <div class="result-hero">
     <div
@@ -568,79 +616,7 @@
             Series comparison
           </h3>
           {#if comparison}
-            <table class="mt-2 w-full text-sm">
-              <thead>
-                <tr class="font-mono text-[10px] tracking-widest text-muted-foreground uppercase">
-                  <th scope="col" class="py-1 text-left">You</th>
-                  <th scope="col" class="py-1 text-center">Stat</th>
-                  <th scope="col" class="py-1 text-right">Opponent</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-border/50 tabular-nums">
-                <tr>
-                  <td class="py-2 text-left font-bold"
-                    >{perGameText(comparison.you.points, comparison.games)}</td
-                  >
-                  <td class="py-2 text-center text-xs text-muted-foreground">Points per game</td>
-                  <td class="py-2 text-right font-bold"
-                    >{perGameText(comparison.opp.points, comparison.games)}</td
-                  >
-                </tr>
-                <tr>
-                  <td class="py-2 text-left font-bold"
-                    >{pctStr(comparison.you.fgm, comparison.you.fga)}</td
-                  >
-                  <td class="py-2 text-center text-xs text-muted-foreground">FG%</td>
-                  <td class="py-2 text-right font-bold"
-                    >{pctStr(comparison.opp.fgm, comparison.opp.fga)}</td
-                  >
-                </tr>
-                <tr>
-                  <td class="py-2 text-left font-bold"
-                    >{pctStr(comparison.you.tpm, comparison.you.tpa)}</td
-                  >
-                  <td class="py-2 text-center text-xs text-muted-foreground">3P%</td>
-                  <td class="py-2 text-right font-bold"
-                    >{pctStr(comparison.opp.tpm, comparison.opp.tpa)}</td
-                  >
-                </tr>
-                <tr>
-                  <td class="py-2 text-left font-bold"
-                    >{trueShootingPct(
-                      comparison.you.points,
-                      comparison.you.fga,
-                      comparison.you.fta,
-                    )}</td
-                  >
-                  <td class="py-2 text-center text-xs text-muted-foreground">TS%</td>
-                  <td class="py-2 text-right font-bold"
-                    >{trueShootingPct(
-                      comparison.opp.points,
-                      comparison.opp.fga,
-                      comparison.opp.fta,
-                    )}</td
-                  >
-                </tr>
-                <tr>
-                  <td class="py-2 text-left font-bold"
-                    >{perGameText(comparison.you.reb, comparison.games)}</td
-                  >
-                  <td class="py-2 text-center text-xs text-muted-foreground">Rebounds per game</td>
-                  <td class="py-2 text-right font-bold"
-                    >{perGameText(comparison.opp.reb, comparison.games)}</td
-                  >
-                </tr>
-                <tr>
-                  <td class="py-2 text-left font-bold"
-                    >{perGameText(comparison.you.tov, comparison.games)}</td
-                  >
-                  <td class="py-2 text-center text-xs text-muted-foreground">Turnovers per game</td>
-                  <td class="py-2 text-right font-bold"
-                    >{perGameText(comparison.opp.tov, comparison.games)}</td
-                  >
-                </tr>
-              </tbody>
-            </table>
+            {@render comparisonTable(comparison)}
           {:else}
             <p class="mt-3 text-sm text-muted-foreground">Comparison needs simulated games.</p>
           {/if}
@@ -1150,79 +1126,7 @@
             Team comparison
           </h3>
           {#if comparison}
-            <table class="mt-2 w-full text-sm">
-              <thead>
-                <tr class="font-mono text-[10px] tracking-widest text-muted-foreground uppercase">
-                  <th scope="col" class="py-1 text-left">You</th>
-                  <th scope="col" class="py-1 text-center">Stat</th>
-                  <th scope="col" class="py-1 text-right">Opponent</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-border/50 tabular-nums">
-                <tr>
-                  <td class="py-2 text-left font-bold"
-                    >{perGameText(comparison.you.points, comparison.games)}</td
-                  >
-                  <td class="py-2 text-center text-xs text-muted-foreground">Points per game</td>
-                  <td class="py-2 text-right font-bold"
-                    >{perGameText(comparison.opp.points, comparison.games)}</td
-                  >
-                </tr>
-                <tr>
-                  <td class="py-2 text-left font-bold"
-                    >{pctStr(comparison.you.fgm, comparison.you.fga)}</td
-                  >
-                  <td class="py-2 text-center text-xs text-muted-foreground">FG%</td>
-                  <td class="py-2 text-right font-bold"
-                    >{pctStr(comparison.opp.fgm, comparison.opp.fga)}</td
-                  >
-                </tr>
-                <tr>
-                  <td class="py-2 text-left font-bold"
-                    >{pctStr(comparison.you.tpm, comparison.you.tpa)}</td
-                  >
-                  <td class="py-2 text-center text-xs text-muted-foreground">3P%</td>
-                  <td class="py-2 text-right font-bold"
-                    >{pctStr(comparison.opp.tpm, comparison.opp.tpa)}</td
-                  >
-                </tr>
-                <tr>
-                  <td class="py-2 text-left font-bold"
-                    >{trueShootingPct(
-                      comparison.you.points,
-                      comparison.you.fga,
-                      comparison.you.fta,
-                    )}</td
-                  >
-                  <td class="py-2 text-center text-xs text-muted-foreground">TS%</td>
-                  <td class="py-2 text-right font-bold"
-                    >{trueShootingPct(
-                      comparison.opp.points,
-                      comparison.opp.fga,
-                      comparison.opp.fta,
-                    )}</td
-                  >
-                </tr>
-                <tr>
-                  <td class="py-2 text-left font-bold"
-                    >{perGameText(comparison.you.reb, comparison.games)}</td
-                  >
-                  <td class="py-2 text-center text-xs text-muted-foreground">Rebounds per game</td>
-                  <td class="py-2 text-right font-bold"
-                    >{perGameText(comparison.opp.reb, comparison.games)}</td
-                  >
-                </tr>
-                <tr>
-                  <td class="py-2 text-left font-bold"
-                    >{perGameText(comparison.you.tov, comparison.games)}</td
-                  >
-                  <td class="py-2 text-center text-xs text-muted-foreground">Turnovers per game</td>
-                  <td class="py-2 text-right font-bold"
-                    >{perGameText(comparison.opp.tov, comparison.games)}</td
-                  >
-                </tr>
-              </tbody>
-            </table>
+            {@render comparisonTable(comparison)}
           {:else}
             <p class="mt-3 text-sm text-muted-foreground">Comparison needs simulated games.</p>
             {#if onRebuildStats}
