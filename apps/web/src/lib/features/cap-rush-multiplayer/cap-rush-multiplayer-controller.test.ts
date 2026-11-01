@@ -261,3 +261,47 @@ for (const plans of [
     expect(simulate).toHaveBeenCalledTimes(plans.p2 === 'sim' ? 1 : 0);
   });
 }
+
+for (const opponent of ['b', 'cpu']) {
+  for (const acknowledged of [false, true]) {
+    test(`requires both players to watch a Finals game against ${opponent}: local ack ${String(acknowledged)}`, async () => {
+      const controller = new CapRushMultiplayerController('room-a');
+      const view = sessionView(null);
+      Object.assign(view.state, {
+        phase: 'postseason',
+        locked: {
+          seats: {
+            p1: { franchise: { franchiseId: 'a' } },
+            p2: { franchise: { franchiseId: 'b' } },
+          },
+        },
+        postseason: {
+          championTeamId: null,
+          plans: { p1: 'simcast', p2: 'simcast' },
+          series: [
+            { round: 4, highTeamId: 'a', lowTeamId: opponent, games: [{ gameId: 'finals-1' }] },
+          ],
+        },
+        season: {
+          playbackAcks: acknowledged
+            ? [{ gameId: 'finals-1', seat: 'p1', resolved: true, cursor: 10, total: 10 }]
+            : [],
+        },
+      });
+      const refresh = vi.fn(() => Promise.resolve());
+      Object.assign(controller, { view, session: { refresh, dispose: vi.fn() } });
+      const load = vi.fn(() => Promise.resolve());
+      Object.assign(controller, { loadTape: load });
+      const simulate = vi.spyOn(controller, 'simulatePlayoffStep').mockResolvedValue();
+      await (controller as unknown as { tick(): Promise<void> }).tick();
+      expect(load).not.toHaveBeenCalled();
+      if (!acknowledged) {
+        await controller.watchPlayoffGame();
+        expect(load).toHaveBeenCalledTimes(1);
+      }
+      expect(simulate).not.toHaveBeenCalled();
+      if (acknowledged) expect(refresh).toHaveBeenCalled();
+      controller.dispose();
+    });
+  }
+}

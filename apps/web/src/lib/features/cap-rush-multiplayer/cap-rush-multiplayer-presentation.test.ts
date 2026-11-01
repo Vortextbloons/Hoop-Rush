@@ -11,6 +11,7 @@ import type {
   CapRushMultiplayerState,
 } from '@hoop-rush/data-contracts';
 import {
+  playoffSeriesSeat,
   bidProjection,
   bidQuickChoices,
   bidRejectionNotice,
@@ -374,4 +375,25 @@ describe('cap rush multiplayer season presentation', () => {
     expect(cells[0]).toMatchObject({ slot: 1, humanHome: false, played: false, won: null });
     expect(cells[1]).toMatchObject({ slot: 2, humanHome: true, played: false, won: null });
   });
+});
+
+describe('playoff series focus', () => {
+  for (const localSeat of ['p1', 'p2'] as const) {
+    const otherSeat = localSeat === 'p1' ? 'p2' : 'p1';
+    for (const localStatus of ['pending', 'eliminated', 'not-qualified'] as const) {
+      for (const otherStatus of ['pending', 'eliminated', 'not-qualified'] as const) {
+        test(`${localSeat}: local ${localStatus}, opponent ${otherStatus}`, () => {
+          const outcomes = {
+            p1: { status: 'pending' as typeof localStatus, round: null },
+            p2: { status: 'pending' as typeof otherStatus, round: null },
+          };
+          outcomes[localSeat].status = localStatus;
+          outcomes[otherSeat].status = otherStatus;
+          const expected =
+            localStatus === 'pending' ? localSeat : otherStatus === 'pending' ? otherSeat : null;
+          expect(playoffSeriesSeat(outcomes, localSeat)).toBe(expected);
+        });
+      }
+    }
+  }
 });

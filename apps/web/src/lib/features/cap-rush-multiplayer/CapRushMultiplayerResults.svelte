@@ -1,12 +1,12 @@
 <script lang="ts">
-  import { Crown, Trophy } from '@lucide/svelte';
+  import { ChevronDown, Crown, Trophy, Sparkles } from '@lucide/svelte';
   import type {
     CapRushLeagueGame,
     CapRushMultiplayerSeatId,
     CapRushMultiplayerState,
     CapRushPostseasonUserOutcome,
   } from '@hoop-rush/data-contracts';
-  import { capRushConferenceRoundName } from '@hoop-rush/data-contracts';
+  import { CAP_RUSH_CAP_LINE_DOLLARS, capRushConferenceRoundName } from '@hoop-rush/data-contracts';
   import {
     capRushLeagueMvp,
     capRushMultiplayerSeatRecord,
@@ -90,6 +90,14 @@
           lock === null
             ? []
             : [lock.spin, ...(lock.additionalSpins ?? [])].filter((spin) => spin !== null),
+        mutationSpend:
+          seatReport?.spinSpendDollars ??
+          [lock?.spin, ...(lock?.additionalSpins ?? [])].reduce(
+            (sum, spin) => sum + (spin?.priceDollars ?? 0),
+            0,
+          ),
+        pointsFor: seatReport?.pointsFor ?? fallbackRecord?.pointsFor ?? null,
+        pointsAgainst: seatReport?.pointsAgainst ?? fallbackRecord?.pointsAgainst ?? null,
         isChampion: teamId !== null && teamId === championTeamId,
       };
     }),
@@ -113,7 +121,7 @@
   }
 
   function recordText(wins: number | null, losses: number | null): string {
-    return wins === null || losses === null ? '—' : `${wins}–${losses}`;
+    return wins === null || losses === null ? 'â€”' : `${wins}â€“${losses}`;
   }
 
   function outcomeLabel(outcome: CapRushPostseasonUserOutcome | null): string {
@@ -136,36 +144,217 @@
 {#if report === null && locked === null && season === null}
   <p class="text-sm text-muted-foreground">No final report has been recorded yet.</p>
 {:else}
-  <div class="flex min-w-0 flex-col gap-4" data-cap-rush-multiplayer-results>
-    <section
-      class="flex min-w-0 flex-col gap-3 rounded-2xl border border-accent/40 bg-card p-4 sm:p-5"
-    >
-      <div class="flex min-w-0 flex-wrap items-center gap-3">
-        {#if championTeam !== null && art !== null}
-          <TeamLogo
-            manifest={art.manifest}
-            franchiseId={championTeam.franchiseId}
-            teamExternalId={championTeam.teamExternalId}
-            className="h-10 w-10"
-          />
-        {:else if championName !== null}
-          <span
-            class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-surface-3 font-display text-sm font-extrabold text-muted-foreground"
-            aria-hidden="true">{initialsOf(championName)}</span
+  <div class="final-report" data-cap-rush-multiplayer-results>
+    <section class="champion-banner" aria-label="League champion">
+      <div class="champion-emblem" aria-hidden="true"><Trophy size={28} strokeWidth={1.5} /></div>
+      <div class="min-w-0 flex-1">
+        <p class="report-eyebrow">
+          Final report <span class="text-muted-foreground"
+            >/ {(report?.variant ?? locked?.variant) === 'roulette'
+              ? 'Cap Roulette'
+              : 'Cap Clash'}</span
           >
-        {/if}
-        <div class="min-w-0 flex-1">
-          <p class="font-mono text-[10px] tracking-[0.16em] text-accent uppercase">Final report</p>
-          <h2 class="font-display text-3xl font-extrabold tracking-tight uppercase">
-            {championName === null ? 'League complete' : `${championName} win the league`}
-          </h2>
-          {#if championSeat !== null}
-            <p class="mt-1 text-sm text-muted-foreground">
-              {seatLabelFor(championSeat, localSeat)}'s franchise
-            </p>
-          {/if}
-        </div>
+        </p>
+        <h2 class="champion-name">{championName ?? 'League complete'}</h2>
+        <p class="champion-caption">
+          {championName === null ? 'Season summary' : 'League champion'}{#if championSeat !== null}
+            &middot; {seatLabelFor(championSeat, localSeat)}'s franchise{/if}
+        </p>
       </div>
+      {#if championTeam !== null && art !== null}
+        <TeamLogo
+          manifest={art.manifest}
+          franchiseId={championTeam.franchiseId}
+          teamExternalId={championTeam.teamExternalId}
+          className="h-12 w-12 sm:h-16 sm:w-16"
+        />
+      {/if}
+    </section>
+
+    <section class="team-comparison" aria-label="Team results">
+      {#each seatViews as detail (detail.seat)}
+        {@const team = detail.teamId === null ? null : (art?.teamFor(detail.teamId) ?? null)}
+        {@const totalSpend =
+          detail.payrollDollars === null ? null : detail.payrollDollars + detail.mutationSpend}
+        <article class="team-report" data-local={detail.seat === localSeat} data-seat={detail.seat}>
+          <header class="team-heading">
+            {#if team !== null && art !== null}
+              <TeamLogo
+                manifest={art.manifest}
+                franchiseId={team.franchiseId}
+                teamExternalId={team.teamExternalId}
+                className="h-9 w-9"
+              />
+            {:else}<span class="team-initials" aria-hidden="true"
+                >{initialsOf(detail.displayName)}</span
+              >{/if}
+            <div class="min-w-0 flex-1">
+              <p class="report-eyebrow text-muted-foreground">
+                {seatLabelFor(detail.seat, localSeat)}
+              </p>
+              <h3 class="team-name">{detail.displayName}</h3>
+            </div>
+            {#if detail.isChampion}<Trophy
+                size={18}
+                class="shrink-0 text-accent"
+                aria-label="Champion"
+              />{/if}
+          </header>
+          <div class="team-overview">
+            <div>
+              <p class="metric-label">Regular season</p>
+              <p class="record-value">{recordText(detail.wins, detail.losses)}</p>
+            </div>
+            <div class="team-finish">
+              <p class="metric-label">Postseason</p>
+              <p class="outcome-text" class:text-accent={detail.isChampion}>
+                {outcomeLabel(detail.outcome)}
+              </p>
+            </div>
+          </div>
+          <details class="report-disclosure team-disclosure">
+            <summary>
+              <span class="disclosure-copy"
+                ><span class="disclosure-title">Roster &amp; finances</span><span
+                  class="disclosure-note"
+                  >{detail.payrollDollars === null
+                    ? 'Payroll unavailable'
+                    : `${money(detail.payrollDollars)} payroll`}{#if detail.payrollStatus !== null}
+                    &middot; {capStatusLabel(detail.payrollStatus)}{/if}</span
+                ></span
+              >
+              <ChevronDown size={16} class="disclosure-chevron" aria-hidden="true" />
+            </summary>
+            <div class="disclosure-body">
+              <dl class="finance-grid">
+                <div>
+                  <dt>Player salaries</dt>
+                  <dd>{detail.payrollDollars === null ? '—' : money(detail.payrollDollars)}</dd>
+                </div>
+                {#if (report?.variant ?? locked?.variant) === 'roulette'}
+                  <div>
+                    <dt>Mutation purchases</dt>
+                    <dd>{money(detail.mutationSpend)}</dd>
+                  </div>
+                  <div>
+                    <dt>Total spending</dt>
+                    <dd>{totalSpend === null ? '—' : money(totalSpend)}</dd>
+                  </div>
+                  <div>
+                    <dt>Unused mutation budget</dt>
+                    <dd>
+                      {totalSpend === null
+                        ? '—'
+                        : money(Math.max(0, CAP_RUSH_CAP_LINE_DOLLARS - totalSpend))}
+                    </dd>
+                  </div>
+                {/if}
+                {#if detail.pointsFor !== null && detail.pointsAgainst !== null}
+                  <div>
+                    <dt>Points scored / allowed</dt>
+                    <dd>
+                      {detail.pointsFor.toLocaleString()} / {detail.pointsAgainst.toLocaleString()}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Point differential</dt>
+                    <dd>
+                      {detail.pointsFor >= detail.pointsAgainst ? '+' : ''}{(
+                        detail.pointsFor - detail.pointsAgainst
+                      ).toLocaleString()}
+                    </dd>
+                  </div>
+                {/if}
+              </dl>
+              {#if detail.payrollStatus !== null}
+                <div class="penalty-note">
+                  <span class="cap-badge {capStatusClass(detail.payrollStatus)}"
+                    >{capStatusLabel(detail.payrollStatus)}</span
+                  >
+                  <p class="mt-2 text-xs font-semibold">
+                    {apronPenaltyTitle(detail.payrollStatus)}
+                  </p>
+                  <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+                    {#each apronPenaltyRows(detail.payrollStatus) as row (row.label)}<p
+                        class="text-xs text-muted-foreground"
+                      >
+                        {row.label}: -{row.reduction}
+                      </p>{/each}
+                  </div>
+                  {#if (report?.variant ?? locked?.variant) === 'roulette'}<p
+                      class="mt-2 text-xs text-muted-foreground"
+                    >
+                      Apron penalties use player salaries. Mutations only reduce the purchase
+                      budget.
+                    </p>{/if}
+                </div>
+              {/if}
+              {#if locked !== null}
+                <CapRushMultiplayerRoster {state} seat={detail.seat} {localSeat} {art} />
+              {:else}<p class="text-xs text-muted-foreground">Roster unavailable.</p>{/if}
+            </div>
+          </details>
+          {#if (report?.variant ?? locked?.variant) === 'roulette'}
+            <details class="report-disclosure team-disclosure">
+              <summary
+                ><span class="disclosure-copy"
+                  ><span class="disclosure-title flex items-center gap-2"
+                    ><Sparkles size={14} class="text-primary" aria-hidden="true" />Mutations</span
+                  ><span class="disclosure-note"
+                    >{detail.spins.length} purchases &middot; {money(detail.mutationSpend)}</span
+                  ></span
+                ><ChevronDown size={16} class="disclosure-chevron" aria-hidden="true" /></summary
+              >
+              <div class="disclosure-body mutation-list">
+                {#if detail.spins.length === 0}<p class="text-xs text-muted-foreground">
+                    No mutations purchased.
+                  </p>{/if}
+                {#each detail.spins as spin (spin.receiptDigest)}
+                  {@const target = locked?.seats[detail.seat].team.starters.find(
+                    (starter) => starter.source.playerVersionId === spin.target.playerVersionId,
+                  )}
+                  <details class="mutation-detail">
+                    <summary
+                      ><span class="disclosure-copy"
+                        ><span class="disclosure-title"
+                          >{target?.source.displayName ?? spin.target.cardId}</span
+                        ><span class="disclosure-note"
+                          >{spin.purchase === 'standard' ? 'Mutation Spark' : 'Mutation Surge'} &middot;
+                          {money(spin.priceDollars)}</span
+                        ><span class="mutation-names"
+                          >{[spin.entry, ...(spin.additionalEntries ?? [])]
+                            .map((entry) => havocMutationDefinitionOf(entry.mutationId).name)
+                            .join(' / ')}</span
+                        ></span
+                      ><ChevronDown
+                        size={14}
+                        class="disclosure-chevron"
+                        aria-hidden="true"
+                      /></summary
+                    >
+                    <div class="mutation-effects">
+                      {#each [spin.entry, ...(spin.additionalEntries ?? [])] as entry (entry.mutationId)}
+                        {@const mutation = havocMutationDefinitionOf(entry.mutationId)}
+                        <div>
+                          <p class="text-sm font-semibold">{mutation.name}</p>
+                          <p class="mt-1 text-xs leading-relaxed text-muted-foreground">
+                            {mutation.description}
+                          </p>
+                          {#if mutation.downside}<p
+                              class="mt-1 text-xs leading-relaxed text-destructive"
+                            >
+                              Downside: {mutation.downside}
+                            </p>{/if}
+                        </div>
+                      {/each}
+                    </div>
+                  </details>
+                {/each}
+              </div>
+            </details>
+          {/if}
+        </article>
+      {/each}
     </section>
 
     <section class="grid gap-3 sm:grid-cols-2" aria-label="League awards">
@@ -222,195 +411,337 @@
       {/each}
     </section>
 
-    <div class="grid min-w-0 gap-4 lg:grid-cols-2">
-      {#each seatViews as detail (detail.seat)}
-        {@const team = art === null || detail.teamId === null ? null : art.teamFor(detail.teamId)}
-        <article
-          class="flex min-w-0 flex-col gap-3 rounded-2xl border bg-card p-4 {detail.seat ===
-          localSeat
-            ? 'border-primary/40'
-            : 'border-border'}"
-          data-seat={detail.seat}
-        >
-          <header class="flex min-w-0 items-start justify-between gap-2">
-            <div class="flex min-w-0 items-center gap-2">
-              {#if team !== null && art !== null}
-                <TeamLogo
-                  manifest={art.manifest}
-                  franchiseId={team.franchiseId}
-                  teamExternalId={team.teamExternalId}
-                  className="h-7 w-7"
-                />
-              {:else}
-                <span
-                  class="grid h-7 w-7 shrink-0 place-items-center rounded bg-surface-3 font-display text-[10px] font-extrabold text-muted-foreground"
-                  aria-hidden="true">{initialsOf(detail.displayName)}</span
-                >
-              {/if}
-              <div class="min-w-0">
-                <p
-                  class="font-mono text-[9px] font-semibold tracking-[0.12em] text-muted-foreground uppercase"
-                >
-                  {seatLabelFor(detail.seat, localSeat)}
-                </p>
-                <h3 class="truncate font-display text-xl leading-tight font-extrabold uppercase">
-                  {detail.displayName}
-                </h3>
-              </div>
-            </div>
-            {#if detail.isChampion}
-              <span
-                class="shrink-0 rounded-full border border-accent/50 bg-accent/10 px-2 py-0.5 font-mono text-[9px] font-bold text-accent uppercase"
-                >Champion</span
-              >
-            {/if}
-          </header>
-
-          <dl class="grid min-w-0 grid-cols-2 gap-2">
-            <div class="min-w-0 rounded-xl border border-line-soft bg-surface-1 p-2.5">
-              <dt class="font-mono text-[9px] tracking-[0.08em] text-muted-foreground uppercase">
-                Record
-              </dt>
-              <dd class="mt-0.5 font-display text-xl font-extrabold tabular-nums">
-                {recordText(detail.wins, detail.losses)}
-              </dd>
-            </div>
-            <div class="min-w-0 rounded-xl border border-line-soft bg-surface-1 p-2.5">
-              <dt class="font-mono text-[9px] tracking-[0.08em] text-muted-foreground uppercase">
-                Payroll
-              </dt>
-              <dd class="mt-0.5 font-display text-xl font-extrabold tabular-nums">
-                {detail.payrollDollars === null ? '—' : money(detail.payrollDollars)}
-              </dd>
-            </div>
-            <div class="min-w-0 rounded-xl border border-line-soft bg-surface-1 p-2.5">
-              <dt class="font-mono text-[9px] tracking-[0.08em] text-muted-foreground uppercase">
-                Cap status
-              </dt>
-              <dd class="mt-1">
-                {#if detail.payrollStatus === null}
-                  <span class="text-xs text-muted-foreground">—</span>
-                {:else}
-                  <span
-                    class="inline-flex rounded-full border px-2 py-0.5 font-mono text-[9px] font-bold uppercase {capStatusClass(
-                      detail.payrollStatus,
-                    )}">{capStatusLabel(detail.payrollStatus)}</span
-                  >
-                {/if}
-              </dd>
-            </div>
-            <div class="min-w-0 rounded-xl border border-line-soft bg-surface-1 p-2.5">
-              <dt class="font-mono text-[9px] tracking-[0.08em] text-muted-foreground uppercase">
-                Outcome
-              </dt>
-              <dd class="mt-0.5 text-xs leading-snug font-semibold">
-                {outcomeLabel(detail.outcome)}
-              </dd>
-            </div>
-          </dl>
-
-          {#if detail.payrollStatus !== null}
-            <section
-              class="rounded-xl border border-line-soft bg-surface-1 p-3"
-              aria-label="Apron penalties"
-            >
-              <h4 class="text-sm font-bold">{apronPenaltyTitle(detail.payrollStatus)}</h4>
-              {#each apronPenaltyRows(detail.payrollStatus) as row (row.label)}
-                <p class="mt-1 text-xs text-muted-foreground">{row.label}: -{row.reduction}</p>
-              {/each}
-            </section>
-          {/if}
-
-          {#if (report?.variant ?? locked?.variant) === 'roulette'}
-            <section class="flex flex-col gap-2" aria-label="Mutation purchases">
-              <h4 class="font-display text-lg font-bold uppercase">Mutations</h4>
-              {#if detail.spins.length === 0}
-                <p class="text-xs text-muted-foreground">No mutations purchased.</p>
-              {/if}
-              {#each detail.spins as spin (spin.receiptDigest)}
-                {@const target = locked?.seats[detail.seat].team.starters.find(
-                  (starter) => starter.source.playerVersionId === spin.target.playerVersionId,
-                )}
-                <div class="rounded-xl border border-line-soft bg-surface-1 p-3">
-                  <p class="text-sm font-bold">
-                    {target?.source.displayName ?? spin.target.cardId}
-                  </p>
-                  <p class="mt-1 text-xs text-muted-foreground">
-                    {spin.purchase === 'standard' ? 'Mutation Spark' : 'Mutation Surge'} &middot; {money(
-                      spin.priceDollars,
-                    )}
-                  </p>
-                  {#each [spin.entry, ...(spin.additionalEntries ?? [])] as entry (entry.mutationId)}
-                    {@const mutation = havocMutationDefinitionOf(entry.mutationId)}
-                    <p class="mt-2 text-sm font-semibold">{mutation.name}</p>
-                    <p class="mt-1 text-xs text-muted-foreground">{mutation.description}</p>
-                    {#if mutation.downside}<p class="mt-1 text-xs text-destructive">
-                        Downside: {mutation.downside}
-                      </p>{/if}
-                  {/each}
-                </div>
-              {/each}
-            </section>
-          {/if}
-
-          {#if locked !== null}
-            <CapRushMultiplayerRoster {state} seat={detail.seat} {localSeat} {art} />
-          {:else}
-            <p class="text-xs text-muted-foreground">Roster unavailable.</p>
-          {/if}
-        </article>
-      {/each}
-    </div>
-
-    <CapRushMultiplayerStats {state} {localSeat} {art} />
+    <details class="report-disclosure report-panel">
+      <summary
+        ><span class="disclosure-copy"
+          ><span class="disclosure-title">Season player stats</span><span class="disclosure-note"
+            >Compare both rosters &middot; Averages, totals &amp; shooting splits</span
+          ></span
+        ><ChevronDown size={18} class="disclosure-chevron" aria-hidden="true" /></summary
+      >
+      <div class="disclosure-body stats-body">
+        <CapRushMultiplayerStats {state} {localSeat} {art} />
+      </div>
+    </details>
 
     {#if h2hGames.length > 0}
-      <section class="flex min-w-0 flex-col gap-2 rounded-2xl border border-border bg-card p-4">
-        <header class="flex flex-wrap items-baseline justify-between gap-2">
-          <div class="min-w-0">
-            <p class="font-mono text-[10px] tracking-[0.16em] text-muted-foreground uppercase">
-              Head-to-head
-            </p>
-            <h2 class="font-display text-2xl font-extrabold tracking-tight uppercase">
-              Both seats' meetings
-            </h2>
-          </div>
-        </header>
-        <ul class="flex min-w-0 flex-col gap-1">
+      <details class="report-disclosure report-panel">
+        <summary
+          ><span class="disclosure-copy"
+            ><span class="disclosure-title">Head-to-head</span><span class="disclosure-note"
+              >{h2hGames.length} regular-season meetings{#if onreviewgame}
+                &middot; Game replays{/if}</span
+            ></span
+          ><ChevronDown size={18} class="disclosure-chevron" aria-hidden="true" /></summary
+        >
+        <ul class="disclosure-body meeting-list">
           {#each h2hGames as game (game.gameId)}
-            <li
-              class="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-lg border border-line-soft bg-surface-1 px-2 py-1.5"
-            >
-              <span class="flex min-w-0 flex-wrap items-baseline gap-x-1.5 gap-y-0.5 text-xs">
-                <span class="shrink-0 font-mono text-[10px] text-muted-foreground"
-                  >G{game.slot}</span
-                >
-                <span class="min-w-0 truncate text-muted-foreground">
-                  {teamName(game.homeTeamId)}
-                  {game.homePoints}–{game.awayPoints}
-                  {teamName(game.awayTeamId)}
-                </span>
-              </span>
-              {#if onreviewgame}
-                <button
+            <li class="meeting-row">
+              <span class="font-mono text-[10px] text-muted-foreground">G{game.slot}</span>
+              <span class="meeting-score"
+                ><span>{teamName(game.homeTeamId)}</span><strong
+                  >{game.homePoints}&ndash;{game.awayPoints}</strong
+                ><span>{teamName(game.awayTeamId)}</span></span
+              >
+              {#if onreviewgame}<button
                   type="button"
-                  class="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg border border-border bg-surface-2 px-3 text-xs font-semibold outline-none
-                    focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
+                  class="review-button"
                   aria-label={`Review head-to-head game ${game.slot}`}
-                  onclick={() => onreviewgame?.(game.gameId)}
-                >
-                  Review
-                </button>
-              {/if}
+                  onclick={() => onreviewgame?.(game.gameId)}>Review</button
+                >{/if}
             </li>
           {/each}
         </ul>
-      </section>
+      </details>
     {/if}
   </div>
 {/if}
 
 <style>
+  .final-report {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    min-width: 0;
+  }
+  .champion-banner {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.25rem;
+    border: 1px solid var(--color-border);
+    border-left: 3px solid var(--color-accent);
+    border-radius: 1rem;
+    background: var(--color-card);
+  }
+  .champion-emblem {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 3rem;
+    height: 3rem;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+    color: var(--color-accent);
+  }
+  .report-eyebrow {
+    font: 700 0.6rem var(--font-mono);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--color-accent);
+  }
+  .champion-name {
+    margin-top: 0.3rem;
+    font: 800 clamp(1.5rem, 3vw, 2.25rem)/1.05 var(--font-display);
+    text-transform: uppercase;
+    overflow-wrap: anywhere;
+  }
+  .champion-caption {
+    margin-top: 0.4rem;
+    font-size: 0.75rem;
+    color: var(--color-muted-foreground);
+  }
+  .team-comparison {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.75rem;
+    align-items: start;
+  }
+  .team-report {
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid var(--color-border);
+    border-radius: 1rem;
+    background: var(--color-card);
+  }
+  .team-report[data-local='true'] {
+    border-top: 2px solid var(--color-primary);
+  }
+  .team-heading {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 1rem 1rem 0;
+  }
+  .team-initials {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 0.5rem;
+    background: var(--color-surface-3);
+    font: 800 0.75rem var(--font-display);
+  }
+  .team-name {
+    margin-top: 0.2rem;
+    font: 800 1.25rem/1.15 var(--font-display);
+    text-transform: uppercase;
+    overflow-wrap: anywhere;
+  }
+  .team-overview {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: end;
+    gap: 1rem;
+    padding: 1rem;
+  }
+  .metric-label {
+    font: 500 0.55rem var(--font-mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-muted-foreground);
+  }
+  .record-value {
+    margin-top: 0.25rem;
+    font: 800 2.1rem/1 var(--font-display);
+    font-variant-numeric: tabular-nums;
+  }
+  .team-finish {
+    padding-left: 1rem;
+    border-left: 1px solid var(--color-line-soft);
+  }
+  .outcome-text {
+    margin-top: 0.4rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+  .report-panel {
+    min-width: 0;
+    border: 1px solid var(--color-border);
+    border-radius: 0.85rem;
+    background: var(--color-card);
+  }
+  .team-disclosure {
+    border-top: 1px solid var(--color-line-soft);
+  }
+  summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    min-height: 3.25rem;
+    padding: 0.85rem 1rem;
+    cursor: pointer;
+    list-style: none;
+    border-radius: inherit;
+  }
+  summary::-webkit-details-marker {
+    display: none;
+  }
+  summary:hover {
+    background: var(--color-surface-2);
+  }
+  summary:focus-visible,
+  .review-button:focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: -3px;
+  }
+  .disclosure-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 0;
+  }
+  .disclosure-title {
+    font-size: 0.8rem;
+    font-weight: 700;
+  }
+  .disclosure-note {
+    font-size: 0.65rem;
+    line-height: 1.5;
+    color: var(--color-muted-foreground);
+  }
+  :global(.disclosure-chevron) {
+    flex-shrink: 0;
+    color: var(--color-muted-foreground);
+    transition: transform 150ms ease;
+  }
+  details[open] > summary :global(.disclosure-chevron) {
+    transform: rotate(180deg);
+  }
+  .disclosure-body {
+    min-width: 0;
+    padding: 0 1rem 1rem;
+  }
+  .finance-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+    padding: 0.75rem 0;
+  }
+  .finance-grid dt {
+    font-size: 0.65rem;
+    color: var(--color-muted-foreground);
+  }
+  .finance-grid dd {
+    margin-top: 0.25rem;
+    font: 600 0.8rem var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+  }
+  .penalty-note {
+    margin: 0.5rem 0 1rem;
+    padding: 0.75rem;
+    border-radius: 0.5rem;
+    background: var(--color-surface-1);
+  }
+  .cap-badge {
+    display: inline-flex;
+    border-width: 1px;
+    border-radius: 2rem;
+    padding: 0.2rem 0.5rem;
+    font: 700 0.55rem var(--font-mono);
+    text-transform: uppercase;
+  }
+  .mutation-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .mutation-detail {
+    border: 1px solid var(--color-line-soft);
+    border-radius: 0.6rem;
+    background: var(--color-surface-1);
+  }
+  .mutation-detail summary {
+    padding: 0.75rem;
+  }
+  .mutation-names {
+    font-size: 0.65rem;
+    line-height: 1.5;
+    color: var(--color-primary);
+  }
+  .mutation-effects {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0 0.75rem 0.75rem;
+  }
+  .meeting-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .meeting-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.65rem;
+    border: 1px solid var(--color-line-soft);
+    border-radius: 0.5rem;
+    background: var(--color-surface-1);
+  }
+  .meeting-score {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.4rem;
+    font-size: 0.7rem;
+  }
+  .meeting-score strong {
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  .review-button {
+    min-height: 2.75rem;
+    padding: 0 0.75rem;
+    border: 1px solid var(--color-border);
+    border-radius: 0.5rem;
+    background: var(--color-surface-2);
+    font-size: 0.7rem;
+    font-weight: 600;
+  }
+  @media (min-width: 768px) {
+    .team-comparison {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .champion-banner {
+      padding: 1.5rem;
+    }
+  }
+  @media (max-width: 400px) {
+    .champion-emblem {
+      display: none;
+    }
+    .champion-banner {
+      gap: 0.65rem;
+      padding: 1rem;
+    }
+    .stats-body {
+      padding-inline: 0.5rem;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    :global(.disclosure-chevron) {
+      transition: none;
+    }
+  }
+
   .award-card {
     --award-color: var(--color-primary);
     position: relative;

@@ -1,4 +1,5 @@
 import type {
+  CapRushConferenceSeries,
   CapRushApronFact,
   CapRushConferencePostseason,
   CapRushLeagueGame,
@@ -391,3 +392,16 @@ export function capRushMultiplayerQualifiedSeats(
 }
 
 export { capRushConferenceSeriesForTeam, capRushPlayoffPerformanceSchema };
+
+export function capRushMultiplayerHumanFinals(
+  locked: CapRushMultiplayerLockedInputs,
+  state: CapRushMultiplayerPlayoffState,
+): CapRushConferenceSeries | null {
+  const ids = [locked.seats.p1.franchise.franchiseId, locked.seats.p2.franchise.franchiseId];
+  return (
+    state.series.find(
+      (series) =>
+        series.round === 4 && (ids.includes(series.highTeamId) || ids.includes(series.lowTeamId)),
+    ) ?? null
+  );
+}

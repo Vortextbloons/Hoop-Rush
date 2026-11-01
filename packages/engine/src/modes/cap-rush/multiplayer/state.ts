@@ -1,6 +1,7 @@
 import { createEngineContext } from '../../../sim/kernel.ts';
 import {
   capRushMultiplayerPlayoffPlans,
+  capRushMultiplayerHumanFinals,
   simulateCapRushMultiplayerPlayoffGame,
 } from './postseason.ts';
 import type {
@@ -439,9 +440,21 @@ export function applyCapRushMultiplayerCommand(
       if (!seatLock.picks.some((pick) => pick.playerId === payload.targetPlayerId)) {
         return reject('result-mismatch', 'the mutation target is not on this roster');
       }
-      const eligibility = capRushSpinEligibility(seatLock.payrollDollars, payload.purchase);
+      const totalSpend =
+        seatLock.payrollDollars +
+        receipts.reduce((total, receipt) => total + receipt.priceDollars, 0);
+      const eligibility = capRushSpinEligibility(totalSpend, payload.purchase);
       if (!eligibility.eligible) {
         return reject('budget-rejected', 'this payroll is not eligible for that mutation');
+      }
+      if (
+        receipts.some(
+          (receipt) =>
+            receipt.target.cardId ===
+            seatLock.picks.find((pick) => pick.playerId === payload.targetPlayerId)?.cardId,
+        )
+      ) {
+        return reject('budget-rejected', 'this player already has a mutation purchase');
       }
       const ordinal = receipts.length;
       const pick = draftPickForSpin({ state, playerId: payload.targetPlayerId });
@@ -454,7 +467,7 @@ export function applyCapRushMultiplayerCommand(
         ),
         purchase: payload.purchase,
         spinOrdinal: ordinal,
-        payrollDollars: seatLock.payrollDollars,
+        payrollDollars: totalSpend,
         pick,
       });
       const spin = seatLock.spin ?? receipt;
@@ -770,7 +783,14 @@ export function applyCapRushMultiplayerCommand(
         ...state,
         postseason: {
           ...state.postseason,
-          plans: { ...state.postseason.plans, [actor]: payload.choice },
+          plans: {
+            ...state.postseason.plans,
+            [actor]:
+              state.locked !== null &&
+              capRushMultiplayerHumanFinals(state.locked, state.postseason) !== null
+                ? 'simcast'
+                : payload.choice,
+          },
         },
       });
     }

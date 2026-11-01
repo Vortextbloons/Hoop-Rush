@@ -228,6 +228,54 @@ describe('cap rush multiplayer mutation receipts', () => {
     expect(surge.code).toBe('budget-rejected');
   });
 
+  test('rejects another purchase for an already mutated player without changing the roster', () => {
+    const harn = prepareRecruitment(40_000_000);
+    const pick = harn.state.locked?.seats.p1.picks[0];
+    if (pick === undefined) throw new Error('no pick');
+    const first = purchase(harn.state, harn.commands, 'standard', pick.playerId);
+    if (!first.ok) throw new Error(first.message);
+    const digest = capRushMultiplayerStateDigest(first.state);
+    const duplicate = purchase(first.state, harn.commands, 'standard', pick.playerId);
+    expect(duplicate.ok).toBe(false);
+    expect(capRushMultiplayerStateDigest(first.state)).toBe(digest);
+  });
+
+  test('allows at most one purchase for each of five players', () => {
+    const harn = prepareRecruitment(null);
+    const targets = harn.state.locked?.seats.p1.picks ?? [];
+    let state = harn.state;
+    for (const target of targets) {
+      const result = purchase(state, harn.commands, 'standard', target.playerId);
+      if (!result.ok) throw new Error(result.message);
+      state = result.state;
+    }
+    expect(state.locked?.seats.p1.additionalSpins).toHaveLength(4);
+    const sixth = purchase(state, harn.commands, 'standard', targets[0]!.playerId);
+    expect(sixth.ok).toBe(false);
+    if (!sixth.ok) expect(sixth.code).toBe('budget-rejected');
+    expect(state.locked?.seats.p1.payrollDollars).toBe(harn.state.locked?.seats.p1.payrollDollars);
+    expect(state.locked?.seats.p1.payrollStatus).toBe(harn.state.locked?.seats.p1.payrollStatus);
+  });
+
+  test('counts previous mutations when enforcing the cap', () => {
+    const base = prepareRecruitment(null);
+    const picks = base.state.locked?.seats.p1.picks ?? [];
+    const pg = picks.find((pick) => pick.slot === 'PG');
+    if (pg === undefined) throw new Error('no PG');
+    const basePayroll = base.state.locked?.seats.p1.payrollDollars ?? 0;
+    const harn = prepareRecruitment(110_000_000 - (basePayroll - pg.salaryDollars));
+    const targets = harn.state.locked?.seats.p1.picks ?? [];
+    if (targets.length < 3) throw new Error('missing targets');
+    const first = purchase(harn.state, harn.commands, 'standard', targets[0]!.playerId);
+    if (!first.ok) throw new Error(first.message);
+    const second = purchase(first.state, harn.commands, 'standard', targets[1]!.playerId);
+    if (!second.ok) throw new Error(second.message);
+    expect(second.state.locked?.seats.p1.additionalSpins?.[0]?.payrollDollars).toBe(120_000_000);
+    const third = purchase(second.state, harn.commands, 'standard', targets[2]!.playerId);
+    expect(third.ok).toBe(false);
+    if (!third.ok) expect(third.code).toBe('budget-rejected');
+  });
+
   test('keeps player payroll separate from mutation spending across two purchases', () => {
     const harn = prepareRecruitment(40_000_000);
     const pick = harn.state.locked?.seats.p1.picks[0];
