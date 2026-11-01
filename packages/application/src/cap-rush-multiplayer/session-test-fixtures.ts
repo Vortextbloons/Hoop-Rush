@@ -58,10 +58,16 @@ export async function createSessionTestRoom(
     bracketHash: 'b'.repeat(64),
     profileHash: 'c'.repeat(64),
   });
+  const bracket = buildFixtureBracket();
   const environment: CapRushMultiplayerEnvironment = {
     variant: 'clash',
-    bracket: buildFixtureBracket(),
-    seasonCatalog: catalog,
+    bracket,
+    seasonCatalog: {
+      ...catalog,
+      candidates: bracket.opponents.flatMap((opponent) =>
+        catalog.candidates.map((player) => ({ ...player, franchiseId: opponent.teamId })),
+      ),
+    },
     index,
     profile: DEFAULT_ERA_SIM_PROFILE,
     catalogSource: source,

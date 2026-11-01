@@ -250,7 +250,9 @@ describe('cap rush multiplayer mutation receipts', () => {
       state = result.state;
     }
     expect(state.locked?.seats.p1.additionalSpins).toHaveLength(4);
-    const sixth = purchase(state, harn.commands, 'standard', targets[0]!.playerId);
+    const sixthTarget = targets[0];
+    if (sixthTarget === undefined) throw new Error('missing target');
+    const sixth = purchase(state, harn.commands, 'standard', sixthTarget.playerId);
     expect(sixth.ok).toBe(false);
     if (!sixth.ok) expect(sixth.code).toBe('budget-rejected');
     expect(state.locked?.seats.p1.payrollDollars).toBe(harn.state.locked?.seats.p1.payrollDollars);
@@ -265,13 +267,15 @@ describe('cap rush multiplayer mutation receipts', () => {
     const basePayroll = base.state.locked?.seats.p1.payrollDollars ?? 0;
     const harn = prepareRecruitment(110_000_000 - (basePayroll - pg.salaryDollars));
     const targets = harn.state.locked?.seats.p1.picks ?? [];
-    if (targets.length < 3) throw new Error('missing targets');
-    const first = purchase(harn.state, harn.commands, 'standard', targets[0]!.playerId);
+    const [firstTarget, secondTarget, thirdTarget] = targets;
+    if (firstTarget === undefined || secondTarget === undefined || thirdTarget === undefined)
+      throw new Error('missing targets');
+    const first = purchase(harn.state, harn.commands, 'standard', firstTarget.playerId);
     if (!first.ok) throw new Error(first.message);
-    const second = purchase(first.state, harn.commands, 'standard', targets[1]!.playerId);
+    const second = purchase(first.state, harn.commands, 'standard', secondTarget.playerId);
     if (!second.ok) throw new Error(second.message);
     expect(second.state.locked?.seats.p1.additionalSpins?.[0]?.payrollDollars).toBe(120_000_000);
-    const third = purchase(second.state, harn.commands, 'standard', targets[2]!.playerId);
+    const third = purchase(second.state, harn.commands, 'standard', thirdTarget.playerId);
     expect(third.ok).toBe(false);
     if (!third.ok) expect(third.code).toBe('budget-rejected');
   });

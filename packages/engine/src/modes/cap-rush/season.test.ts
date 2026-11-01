@@ -7,6 +7,7 @@ import { buildCapRushLockedInputs } from './lock.ts';
 import { POSITIONS } from '@hoop-rush/data-contracts';
 import type { CapRushDraftPick, CapRushDraftState } from '@hoop-rush/data-contracts';
 import {
+  CAP_RUSH_PLAYOFF_FORMULA_VERSION,
   capRushCardSchema,
   capRushDraftStateSchema,
   capRushOfferIdSchema,
@@ -55,6 +56,7 @@ function buildLocked(salaries: readonly number[], variant: 'clash' | 'roulette' 
       apronTriggers: { isolations: 0, strikes: 0 },
       completedAt: null,
     },
+    playoffFormulaVersion: CAP_RUSH_PLAYOFF_FORMULA_VERSION,
   });
   return buildCapRushLockedInputs({
     runId: state.runId,

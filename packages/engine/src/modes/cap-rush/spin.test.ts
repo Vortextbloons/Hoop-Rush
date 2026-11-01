@@ -9,6 +9,7 @@ import {
   capRushEmptySeasonState,
   capRushOfferIdSchema,
   capRushSpinTierSeed,
+  CAP_RUSH_PLAYOFF_FORMULA_VERSION,
   commandIdSchema,
   seedSchema,
 } from '@hoop-rush/data-contracts';
@@ -68,6 +69,7 @@ function buildCompleteState(
     spin: variant === 'roulette' ? { status: 'pending' } : { status: 'unavailable' },
     locked: null,
     season: capRushEmptySeasonState(),
+    playoffFormulaVersion: CAP_RUSH_PLAYOFF_FORMULA_VERSION,
   });
 }
 

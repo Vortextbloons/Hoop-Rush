@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import type { CapRushDraftPick, CapRushDraftState, Position } from '@hoop-rush/data-contracts';
 import {
   CAP_RUSH_GAME_COUNT,
+  CAP_RUSH_PLAYOFF_FORMULA_VERSION,
   POSITIONS,
   capRushCardSchema,
   capRushDraftStateSchema,
@@ -66,6 +67,7 @@ function buildCompleteState(
     spin,
     locked: null,
     season: capRushEmptySeasonState(),
+    playoffFormulaVersion: CAP_RUSH_PLAYOFF_FORMULA_VERSION,
   });
 }
 
