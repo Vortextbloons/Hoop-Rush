@@ -129,7 +129,7 @@
     <p class="max-w-2xl text-xs leading-relaxed text-muted-foreground sm:text-sm">
       {variant === 'roulette'
         ? 'Buy mutations from your recruited payroll, then both seats confirm to lock the rosters.'
-        : 'Cap Clash has no mutations. Review both lineups, then both seats confirm to lock the rosters.'}
+        : 'Review both lineups, then confirm your roster.'}
     </p>
   </header>
 
@@ -178,12 +178,14 @@
               {exactMoney(summary.signedPayrollDollars)}
             </dd>
           </div>
-          <div class="flex items-baseline justify-between gap-2">
-            <dt class="text-muted-foreground">Total commitments</dt>
-            <dd class="font-mono font-semibold tabular-nums">
-              {exactMoney(summary.payrollDollars)}
-            </dd>
-          </div>
+          {#if summary.payrollDollars !== summary.signedPayrollDollars}
+            <div class="flex items-baseline justify-between gap-2">
+              <dt class="text-muted-foreground">Total commitments</dt>
+              <dd class="font-mono font-semibold tabular-nums">
+                {exactMoney(summary.payrollDollars)}
+              </dd>
+            </div>
+          {/if}
           <div class="flex items-baseline justify-between gap-2">
             <dt class="text-muted-foreground">Remaining to limit</dt>
             <dd class="font-mono font-semibold tabular-nums">

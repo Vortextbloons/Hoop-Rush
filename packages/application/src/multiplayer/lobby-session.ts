@@ -217,7 +217,11 @@ export class LobbySession {
     const attachment = this.attachment;
     if (!lobby || !attachment?.current()) return;
     await this.perform(async () => {
-      await this.deps.command({ kind: 'leave', lobbyId: lobby.id });
+      try {
+        await this.deps.command({ kind: 'leave', lobbyId: lobby.id });
+      } catch (error) {
+        if (!(error instanceof Error) || error.message !== 'membership') throw error;
+      }
       if (!attachment.current()) return;
       this.lifecycle.detach();
       this.attachment = null;
@@ -303,10 +307,12 @@ export class LobbySession {
   }
 
   private async fetch(attachment: RoomAttachment, follow: boolean): Promise<void> {
+    let fetched = false;
     try {
       const lobby = multiplayerLobbySchema.parse(
         await this.deps.command({ kind: 'get', lobbyId: attachment.roomId }),
       );
+      fetched = true;
       const previous = this.lobby;
       const hadError = this.error !== null;
       if (!attachment.current() || !this.apply(lobby)) return;
@@ -326,6 +332,17 @@ export class LobbySession {
       if (this.lobby !== previous || hadError || this.navigation !== null) this.events.publish();
     } catch (error) {
       if (!attachment.current()) return;
+      if (!fetched && error instanceof Error && error.message === 'membership') {
+        this.lifecycle.detach();
+        this.attachment = null;
+        this.lobby = null;
+        this.navigation = null;
+        this.followedRoomId = null;
+        this.followingRoomId = null;
+        this.error = null;
+        this.events.publish();
+        return;
+      }
       this.error = this.deps.friendlyError(error);
       this.lifecycle.failed(attachment);
       this.events.publish();

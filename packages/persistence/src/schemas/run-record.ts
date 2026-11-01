@@ -32,7 +32,7 @@ export const activeRunCheckpointSchema = activeRunCheckpointBaseSchema.extend({
   recordId: z.literal('active'),
   saveSchemaVersion: z.literal(CHECKPOINT_SAVE_SCHEMA_VERSION),
   status: runStatusSchema.extract(['active', 'finished']),
-  gamesPlayed: z.number().int().min(0).max(82).optional(),
+  gamesPlayed: z.number().int().min(0).max(82),
   updatedAtIso: z.iso.datetime().optional(),
 });
 export type ActiveRunCheckpoint = z.infer<typeof activeRunCheckpointSchema>;

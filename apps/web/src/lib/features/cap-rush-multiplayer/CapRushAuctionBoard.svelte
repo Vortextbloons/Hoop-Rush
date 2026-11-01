@@ -4,11 +4,7 @@
     CapRushMultiplayerState,
     Position,
   } from '@hoop-rush/data-contracts';
-  import {
-    CAP_RUSH_MULTIPLAYER_CAP_LINE_DOLLARS,
-    CAP_RUSH_MULTIPLAYER_HARD_LIMIT_DOLLARS,
-    POSITIONS,
-  } from '@hoop-rush/data-contracts';
+  import { POSITIONS } from '@hoop-rush/data-contracts';
   import { onDestroy } from 'svelte';
   import type { CapRushArt } from '../cap-rush/cap-rush-art.js';
   import { capStatusClass, capStatusLabel } from '../cap-rush/cap-rush-presentation.js';
@@ -633,7 +629,7 @@
   </p>
 {:else}
   <div
-    class="flex w-full min-w-0 flex-col gap-3 pb-[calc(9.5rem_+_env(safe-area-inset-bottom))] md:pb-0"
+    class="flex w-full min-w-0 flex-col gap-3 pb-[calc(13rem_+_env(safe-area-inset-bottom))] md:pb-0"
   >
     <header class="flex flex-col gap-3 rounded-2xl border border-border bg-card p-3 sm:p-4">
       <div class="flex flex-wrap items-start justify-between gap-3">
@@ -743,6 +739,8 @@
 
   {#if inspectedSelection !== null}
     <CapRushBidDock
+      {draft}
+      adjustable={inspectedIndex === activePoolIndex && bidBlock === null}
       player={inspectedSelection.player}
       auction={inspectedSelection.auction}
       {localSeat}

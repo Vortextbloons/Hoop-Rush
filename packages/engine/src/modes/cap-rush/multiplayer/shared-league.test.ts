@@ -76,7 +76,19 @@ describe('cap rush multiplayer shared league', () => {
     expect(state.phase).toBe('recruiting');
     expect(state.recruitment?.market.players).toHaveLength(60);
 
-    for (let round = 0; round < 5; round += 1) {
+    run('p1', { kind: 'end-auction-early', round: 0, agree: true });
+    expect(state.recruitment?.roundIndex).toBe(0);
+    run('p1', { kind: 'end-auction-early', round: 0, agree: true });
+    expect(state.recruitment?.rounds[0]?.endEarlySeats).toEqual(['p1']);
+    run('p1', { kind: 'end-auction-early', round: 0, agree: false });
+    expect(state.recruitment?.rounds[0]?.endEarlySeats).toEqual([]);
+    run('p2', { kind: 'end-auction-early', round: 0, agree: true });
+    expect(state.recruitment?.roundIndex).toBe(0);
+    run('p1', { kind: 'end-auction-early', round: 0, agree: true });
+    expect(state.recruitment?.roundIndex).toBe(1);
+    expect(state.recruitment?.rounds[1]?.endEarlySeats ?? []).toEqual([]);
+
+    for (let round = 1; round < 5; round += 1) {
       const closeAt = advance(61_000);
       run('p1', { kind: 'close-due-auctions', round }, closeAt);
     }

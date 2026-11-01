@@ -2,13 +2,14 @@
   import { onMount, type Snippet } from 'svelte';
   import { resolve } from '$app/paths';
   import { Check, Copy, Link, Users } from '@lucide/svelte';
-  import { getLobbyCoordinator } from './lobby-context.svelte';
+  import { getLobbyCoordinator } from './lobby-context.svelte.js';
   import { loadLobbyId } from './multiplayer-lobby';
   import { multiplayerInviteLink } from './invite-link';
   import RoomProfiles from '#lib/features/profile/RoomProfiles.svelte';
   import type { PublicProfile } from '@hoop-rush/data-contracts';
   let {
     roomId,
+    compactMobile = false,
     title,
     summary,
     phase,
@@ -18,11 +19,13 @@
     connection = 'connected',
     error = null,
     children,
+    content,
     lobbyId: suppliedLobbyId = null,
     profileKind = null,
     onProfilesChange,
   }: {
     roomId: string;
+    compactMobile?: boolean;
     title: string;
     summary: string;
     phase: string;
@@ -32,6 +35,7 @@
     connection?: string;
     error?: string | null;
     children?: Snippet;
+    content?: Snippet;
     lobbyId?: string | null;
     profileKind?: 'fixed-five' | 'draft-duel' | 'havoc-multiplayer' | null;
     onProfilesChange?: (players: PublicProfile[]) => void;
@@ -64,7 +68,7 @@
   }
 </script>
 
-<header class="room-shell">
+<header class="room-shell" class:compact-mobile={compactMobile}>
   <div class="heading">
     <div>
       <p class="eyebrow">Multiplayer · {phase}</p>
@@ -76,7 +80,8 @@
         <span>Room code</span><strong>{roomCode}</strong>
         <div class="actions">
           <button type="button" onclick={() => copy('code')} aria-label="Copy room code"
-            >{#if copied === 'code'}<Check size={15} />{:else}<Copy size={15} />{/if} Code</button
+            >{#if copied === 'code'}<Check size={15} />{:else}<Copy size={15} />{/if}
+            <span class="code-label">Code</span><span class="mobile-code">{roomCode}</span></button
           >
           <button type="button" onclick={() => copy('link')}
             >{#if copied === 'link'}<Check size={15} />{:else}<Link size={15} />{/if} Invite</button
@@ -116,6 +121,9 @@
     {#if lobbyId}<a href={resolve(`/multiplayer?lobby=${lobbyId}`)}>Room lobby →</a>{/if}
     {@render children?.()}
   </div>
+  {#if content}
+    <div class="room-content">{@render content()}</div>
+  {/if}
   {#if suppliedLobbyId}
     <RoomProfiles
       topic={`profile-lobby:${suppliedLobbyId}`}
@@ -137,6 +145,26 @@
 </header>
 
 <style>
+  .room-content {
+    min-width: 0;
+    margin-top: 16px;
+  }
+  @media (min-width: 768px) {
+    .compact-mobile .summary {
+      display: none;
+    }
+    .compact-mobile.room-shell {
+      padding: 20px;
+      margin-block: 12px 16px;
+    }
+    .compact-mobile .room-footer {
+      margin-top: 12px;
+      padding-top: 10px;
+    }
+  }
+  .mobile-code {
+    display: none;
+  }
   .room-shell {
     margin-block: 20px 24px;
     padding: 24px;
@@ -262,6 +290,72 @@
     .seats {
       flex-basis: 100%;
       gap: 16px;
+    }
+  }
+  @media (max-width: 767px) {
+    .compact-mobile.room-shell {
+      margin-block: 8px 12px;
+      padding: 10px;
+    }
+    .compact-mobile .heading {
+      flex-direction: row;
+      align-items: center;
+      gap: 8px;
+    }
+    .compact-mobile .heading > div:first-child {
+      min-width: 0;
+      flex: 1;
+    }
+    .compact-mobile h1 {
+      margin-block: 3px 0;
+      font-size: 23px;
+    }
+    .compact-mobile .eyebrow {
+      font-size: 8px;
+      letter-spacing: 0.04em;
+    }
+    .compact-mobile .summary,
+    .compact-mobile .invite > span,
+    .compact-mobile .invite > strong,
+    .compact-mobile .code-label {
+      display: none;
+    }
+    .compact-mobile .mobile-code {
+      display: inline;
+      font-family: var(--font-mono);
+      font-weight: 800;
+      letter-spacing: 0.08em;
+    }
+    .compact-mobile .actions {
+      gap: 4px;
+    }
+    .compact-mobile button {
+      min-height: 44px;
+      padding-inline: 8px;
+    }
+    .compact-mobile .room-footer {
+      margin-top: 8px;
+      padding-top: 8px;
+      gap: 8px;
+    }
+    .compact-mobile .seats {
+      flex-basis: auto;
+      gap: 10px;
+    }
+    .compact-mobile .seat {
+      gap: 4px;
+      font-size: 10px;
+    }
+    .compact-mobile .seat small {
+      display: none;
+    }
+    .compact-mobile .connection {
+      font-size: 10px;
+    }
+    .compact-mobile .room-footer > a {
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
     }
   }
 </style>

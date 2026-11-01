@@ -104,6 +104,7 @@ export const capRushMultiplayerRoundSchema = z.object({
   status: z.enum(['bidding', 'complete']),
   auctions: z.array(capRushMultiplayerAuctionSchema).length(12),
   closedAtIso: z.iso.datetime().nullable(),
+  endEarlySeats: z.array(capRushMultiplayerSeatIdSchema).max(2).optional(),
 });
 export type CapRushMultiplayerRound = z.infer<typeof capRushMultiplayerRoundSchema>;
 

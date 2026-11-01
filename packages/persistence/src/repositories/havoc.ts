@@ -762,7 +762,7 @@ export class DexieHavocRepository {
     const hasSnapshot =
       previousLocked !== undefined && previousLocked !== null && 'digest' in previousLocked;
     state = hasSnapshot ? state : parseInput(havocRunStateSchema, state, 'outcome state');
-    if (state.locked === null) return state;
+    if (state.locked === null) return { ...state, locked: null };
     const digest = seasonDigestHex(canonicalHavocLockedInputs(state.locked));
     if (hasSnapshot) {
       invariant(
@@ -786,7 +786,7 @@ export class DexieHavocRepository {
   }
 
   private async hydrateState(state: StoredHavocState): Promise<HavocRunState> {
-    if (state.locked === null || !('digest' in state.locked)) {
+    if (state.locked === null) {
       const hydrated = havocRunStateSchema.parse(state);
       if (hydrated.locked !== null) freezeHavocLockedInputs(hydrated.locked);
       return hydrated;

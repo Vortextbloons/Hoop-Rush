@@ -119,7 +119,7 @@ export class CapRushMultiplayerSupabaseTransport implements CapRushMultiplayerTr
   }
 
   async snapshot(roomId: string): Promise<CapRushMultiplayerRoomSnapshot> {
-    const sync = await this.sync(roomId);
+    const sync = await this.sync(roomId, 2_147_483_647);
     return sync.snapshot;
   }
 
