@@ -102,6 +102,7 @@ function roomRow(overrides: Record<string, unknown> = {}): Record<string, unknow
 function memberRow(participantId: string, overrides: Record<string, unknown> = {}) {
   return {
     room_id: ROOM_ID,
+    uid: participantId === 'p1' ? 'user-1' : 'user-2',
     participant_id: participantId,
     online: true,
     ready: false,
@@ -220,6 +221,38 @@ describe('fixed-five supabase transport protocol pins', () => {
       ['fixed_five_complete', { p_room_id: ROOM_ID, p_receipt_id: 'receipt-1' }],
       ['fixed_five_fail', { p_room_id: ROOM_ID }],
     ]);
+  });
+
+  it('resume resolves the caller seat from membership without a second auth round trip', async () => {
+    const { harness, transport } = setupTransport();
+    seedRoom(harness);
+
+    const resumed = await transport.resume(ROOM_ID);
+
+    expect(resumed.membership.participantId).toBe('p1');
+    expect(resumed.snapshot.revision).toBe(3);
+    expect(harness.selectQueries).toContainEqual({
+      table: 'fixed_five_room_members',
+      columns: 'participant_id',
+      filters: [
+        { op: 'eq', column: 'room_id', value: ROOM_ID },
+        { op: 'eq', column: 'uid', value: 'user-1' },
+      ],
+      order: null,
+      single: true,
+    });
+    expect(harness.authCalls).not.toContain('getUser');
+  });
+
+  it('reports a missing seat for a caller with no member row', async () => {
+    const { harness, transport } = setupTransport();
+    harness.setRows('fixed_five_rooms', [roomRow()]);
+    harness.setRows('fixed_five_room_members', [
+      memberRow('p1', { uid: 'someone-else' }),
+      memberRow('p2', { uid: 'another-user' }),
+    ]);
+
+    await expect(transport.resume(ROOM_ID)).rejects.toThrow('membership: no seat in this room');
   });
 
   it('rejects a malformed room code with the invalid-code prefix', async () => {
