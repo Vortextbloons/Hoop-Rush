@@ -1,4 +1,13 @@
-import * as contracts from '@hoop-rush/data-contracts';
+import * as persistence from '#lib/persistence.js';
+import * as assets from './cap-rush-multiplayer-assets.js';
+import { CapRushMultiplayerRunner } from './cap-rush-multiplayer-runner.js';
+import { createSessionTestRoom } from '../../../../../../packages/application/src/cap-rush-multiplayer/session-test-fixtures.ts';
+import { applyCapRushMultiplayerCommand, capRushMultiplayerStateDigest } from '@hoop-rush/engine';
+import type {
+  CapRushMultiplayerCommand,
+  CapRushMultiplayerState,
+  CapRushMultiplayerRoomSnapshot,
+} from '@hoop-rush/data-contracts';
 import { afterEach, expect, test, vi } from 'bun:test';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import * as runtime from '#lib/supabase-runtime.js';
@@ -115,74 +124,89 @@ test('reads the server clock and room snapshot concurrently before submitting', 
   });
 });
 
-test('reconstructs incremental syncs without duplicating games or losing locked inputs', async () => {
-  const locked = { rootSeed: 'locked' };
-  const recruitment = { roundIndex: 4 };
-  const first = { gameId: 'game-1', slot: 1 };
-  const second = { gameId: 'game-2', slot: 2 };
-  const client = {
-    rpc: vi
-      .fn()
-      .mockResolvedValueOnce({
-        error: null,
-        data: {
-          room: {
-            roomId: 'room-a',
-            phase: 'season',
-            revision: 1,
-            commandCount: 1,
-            state: { locked, recruitment, season: { games: [first] } },
-          },
-          commands: [],
-        },
-      })
-      .mockResolvedValueOnce({
-        error: null,
-        data: {
-          incremental: true,
-          room: {
-            roomId: 'room-a',
-            phase: 'season',
-            revision: 2,
-            commandCount: 2,
-            state: { season: { frontierSlot: 2 } },
-          },
-          commands: [
-            {
-              command_id: 'cmd-2',
-              ordinal: 1,
-              actor_participant_id: 'p1',
-              accepted_at: '2026-11-01T00:00:00Z',
-              payload: { kind: 'accept-slot', slot: 2, games: [first, second] },
-            },
-          ],
-        },
-      }),
+test('projects compact commands, persists locally, resumes without replay, and rejects mismatches', async () => {
+  const room = await createSessionTestRoom();
+  const original = await room.transport.snapshot(room.roomId);
+  let state = original.state!;
+  const command: CapRushMultiplayerCommand = {
+    schemaVersion: 1,
+    roomId: original.roomId,
+    commandId: 'ready-command' as CapRushMultiplayerCommand['commandId'],
+    ordinal: 0,
+    expectedRevision: 0,
+    actorParticipantId: 'p1',
+    acceptedAtIso: '2026-11-01T00:00:00Z',
+    payload: { kind: 'ready', ready: true },
   };
-  vi.spyOn(runtime, 'getMultiplayerClient').mockResolvedValue(client as unknown as SupabaseClient);
-  const descriptor = Object.getOwnPropertyDescriptor(
-    contracts.capRushMultiplayerRoomSnapshotSchema,
-    'parse',
-  )!;
-  Object.defineProperty(contracts.capRushMultiplayerRoomSnapshotSchema, 'parse', {
-    configurable: true,
-    value: (value: unknown) => value,
+  const applied = applyCapRushMultiplayerCommand(state, command, room.environment);
+  if (!applied.ok) throw new Error(applied.message);
+  state = applied.state;
+  let saved: { snapshot: CapRushMultiplayerRoomSnapshot } | null = null;
+  const save = vi.fn(async (input: { snapshot: CapRushMultiplayerRoomSnapshot }) => {
+    saved = input;
   });
-  try {
-    const transport = new CapRushMultiplayerSupabaseTransport();
-    await transport.sync('room-a');
-    const synced = await transport.sync('room-a', 0);
-    expect(client.rpc).toHaveBeenLastCalledWith('cap_rush_multiplayer_room_sync', {
-      p_room_id: 'room-a',
-      p_after_ordinal: -2,
+  vi.spyOn(persistence, 'getPersistence').mockReturnValue({
+    capRushMultiplayerRepository: { loadActive: async () => saved, saveCheckpoint: save },
+  } as unknown as ReturnType<typeof persistence.getPersistence>);
+  vi.spyOn(assets, 'getCapRushMultiplayerData').mockResolvedValue({
+    environment: room.environment,
+    versionLocks: room.environment.versionLocks,
+  } as Awaited<ReturnType<typeof assets.getCapRushMultiplayerData>>);
+  const project = vi
+    .spyOn(CapRushMultiplayerRunner.prototype, 'project')
+    .mockImplementation(async (input) => {
+      let projected = input.state;
+      for (const entry of input.commands) {
+        const result = applyCapRushMultiplayerCommand(
+          projected,
+          entry,
+          input.environment,
+          input.variant,
+        );
+        if (!result.ok) throw new Error(result.message);
+        projected = result.state;
+      }
+      return projected;
     });
-    expect<unknown>(synced.snapshot.state?.locked).toEqual(locked);
-    expect<unknown>(synced.snapshot.state?.recruitment).toEqual(recruitment);
-    expect<unknown>(synced.snapshot.state?.season?.games).toEqual([first, second]);
-    expect(synced.snapshot.state?.season?.frontierSlot).toBe(2);
-  } finally {
-    if (descriptor)
-      Object.defineProperty(contracts.capRushMultiplayerRoomSnapshotSchema, 'parse', descriptor);
-    else Reflect.deleteProperty(contracts.capRushMultiplayerRoomSnapshotSchema, 'parse');
-  }
+  let digest = capRushMultiplayerStateDigest(state);
+  const rpc = vi.fn(async (_name: string, args: { p_after_ordinal: number }) => ({
+    error: null,
+    data: {
+      room: {
+        ...original,
+        revision: 1,
+        commandCount: 1,
+        state: { _localSimulation: true, phase: state.phase, ready: state.ready },
+        stateDigest: digest,
+      },
+      commands:
+        args.p_after_ordinal < 0
+          ? [
+              {
+                command_id: command.commandId,
+                ordinal: 0,
+                actor_participant_id: 'p1',
+                accepted_at: command.acceptedAtIso,
+                payload: command.payload,
+              },
+            ]
+          : [],
+    },
+  }));
+  vi.spyOn(runtime, 'getMultiplayerClient').mockResolvedValue({ rpc } as unknown as SupabaseClient);
+  const transport = new CapRushMultiplayerSupabaseTransport();
+  const first = await transport.sync(room.roomId, 2147483647);
+  expect(first.snapshot.state).toEqual(state);
+  expect(save).toHaveBeenCalledTimes(1);
+  expect(project).toHaveBeenCalledTimes(1);
+  const reconnected = new CapRushMultiplayerSupabaseTransport();
+  const resumed = await reconnected.sync(room.roomId, 2147483647);
+  expect(resumed.snapshot.state).toEqual(state);
+  expect(project).toHaveBeenCalledTimes(1);
+  expect(rpc).toHaveBeenLastCalledWith('cap_rush_multiplayer_room_sync', {
+    p_room_id: room.roomId,
+    p_after_ordinal: 0,
+  });
+  digest = 'invalid-digest';
+  await expect(reconnected.sync(room.roomId, 0)).rejects.toThrow('simulation mismatch');
 });

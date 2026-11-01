@@ -1,3 +1,9 @@
+import { createEngineContext } from '../../../sim/kernel.ts';
+import { simulateCapRushMultiplayerSlot } from './league.ts';
+import {
+  capRushMultiplayerPlayoffPlans,
+  simulateCapRushMultiplayerPlayoffGame,
+} from './postseason.ts';
 import type {
   CapRushCatalogSource,
   CapRushDraftPick,
@@ -507,6 +513,61 @@ export function applyCapRushMultiplayerCommand(
           },
         },
       });
+    }
+    case 'simulate-range': {
+      if (
+        actor !== 'p1' ||
+        state.phase !== 'season' ||
+        state.locked === null ||
+        state.season === null
+      )
+        return reject('invalid-phase', 'only the host can simulate an active season');
+      if (payload.throughSlot < payload.slot || payload.throughSlot > state.season.block.endpoint)
+        return reject('frontier-gap', 'invalid simulation range');
+      if (payload.slot !== capRushMultiplayerAcceptedThrough(state.season.games) + 1)
+        return reject('frontier-gap', 'slots must be simulated in order');
+      if (
+        state.season.h2hSlots.some((slot) => slot >= payload.slot && slot <= payload.throughSlot) &&
+        payload.throughSlot !== payload.slot
+      )
+        return reject('not-due', 'head-to-head games must be simulated separately');
+      const context = createEngineContext();
+      let next = state;
+      for (let slot = payload.slot; slot <= payload.throughSlot; slot += 1) {
+        const simulated = simulateCapRushMultiplayerSlot({ locked: state.locked, slot, context });
+        const outcome = applyCapRushMultiplayerCommand(
+          next,
+          { ...command, payload: { kind: 'accept-slot', slot, games: simulated.games } },
+          environment,
+          variant,
+        );
+        if (!outcome.ok) return outcome;
+        next = outcome.state;
+      }
+      return accept(next);
+    }
+    case 'simulate-playoff-step': {
+      if (
+        actor !== 'p1' ||
+        state.phase !== 'postseason' ||
+        state.locked === null ||
+        state.postseason === null
+      )
+        return reject('invalid-phase', 'only the host can simulate active playoffs');
+      const context = createEngineContext();
+      const games = capRushMultiplayerPlayoffPlans({
+        locked: state.locked,
+        state: state.postseason,
+      }).map(
+        ({ plan }) =>
+          simulateCapRushMultiplayerPlayoffGame({ locked: state.locked!, plan, context }).game,
+      );
+      return applyCapRushMultiplayerCommand(
+        state,
+        { ...command, payload: { kind: 'accept-playoff-step', round: payload.round, games } },
+        environment,
+        variant,
+      );
     }
     case 'accept-slot': {
       if (payload.throughSlot !== undefined) {

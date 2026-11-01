@@ -211,18 +211,10 @@ export class CapRushMultiplayerController {
       if (slot === null) return;
       const nextH2H = state.season.h2hSlots.find((entry) => entry >= slot);
       const throughSlot = Math.min(
-        slot + 4,
         state.season.block.endpoint,
         nextH2H === slot ? slot : (nextH2H ?? 83) - 1,
       );
-      const output = await this.runner.simulateSlot({
-        roomId: this.roomId,
-        locked: state.locked,
-        slot,
-        throughSlot,
-        tapeGameIds: [],
-      });
-      await session.acceptSlot(slot, output.games, throughSlot);
+      await session.simulateRange(slot, throughSlot);
     });
   }
 
@@ -277,13 +269,7 @@ export class CapRushMultiplayerController {
       });
       if (plans.length === 0) return;
       const round = capRushMultiplayerCurrentRound(state.postseason);
-      const output = await this.runner.simulatePlayoffStep({
-        roomId: this.roomId,
-        locked: state.locked,
-        plans: plans.map((entry) => entry.plan),
-        tapeGameIds: [],
-      });
-      await session.acceptPlayoffStep(round, output.games);
+      await session.simulatePlayoffRound(round);
     });
   }
 

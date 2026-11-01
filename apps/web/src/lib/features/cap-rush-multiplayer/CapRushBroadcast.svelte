@@ -54,10 +54,12 @@
   const localSide = $derived(input.home.teamId === localTeamId ? 'home' : 'away');
 </script>
 
-<section class="flex flex-col gap-4 rounded-2xl border border-border bg-card p-4">
+<section
+  class="flex flex-col gap-4 rounded-2xl border border-border border-t-[3px] border-t-primary bg-card p-4"
+>
   <header class="flex flex-wrap items-center justify-between gap-2">
     <div>
-      <p class="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+      <p class="font-mono text-[10px] uppercase tracking-[0.16em] text-primary">
         {label} · {speed}×
       </p>
       <h2 class="font-display text-2xl font-extrabold uppercase tracking-tight">

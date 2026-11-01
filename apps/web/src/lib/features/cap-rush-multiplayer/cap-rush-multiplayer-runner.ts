@@ -1,3 +1,5 @@
+import type { CapRushMultiplayerState, CapRushMultiplayerCommand } from '@hoop-rush/data-contracts';
+import type { CapRushMultiplayerEnvironment } from '@hoop-rush/engine';
 import type {
   CapRushLeagueGame,
   CapRushLeagueScheduleEntry,
@@ -20,6 +22,13 @@ import {
   type OneShotWorkerErrorMessages,
 } from '#lib/workers/one-shot-worker.js';
 import workerUrl from '../../../workers/cap-rush-multiplayer-worker.ts?worker&url';
+
+export interface CapRushMultiplayerProjectionInput {
+  state: CapRushMultiplayerState;
+  commands: readonly CapRushMultiplayerCommand[];
+  environment: CapRushMultiplayerEnvironment;
+  variant: 'clash' | 'roulette';
+}
 
 export interface CapRushMultiplayerSlotInput {
   roomId: string;
@@ -72,9 +81,19 @@ const ERROR_MESSAGES: OneShotWorkerErrorMessages = {
 
 function buildRequest(
   payload:
-    CapRushMultiplayerSlotInput | CapRushMultiplayerPlayoffInput | CapRushMultiplayerTapeInput,
+    | CapRushMultiplayerSlotInput
+    | CapRushMultiplayerPlayoffInput
+    | CapRushMultiplayerTapeInput
+    | CapRushMultiplayerProjectionInput,
   requestId: string,
 ): CapRushMultiplayerWorkerRequest {
+  if ('commands' in payload)
+    return capRushMultiplayerWorkerRequestSchema.parse({
+      ...payload,
+      schemaVersion: CAP_RUSH_MULTIPLAYER_WORKER_WIRE_SCHEMA_VERSION,
+      kind: 'cap-rush-multiplayer-project',
+      requestId,
+    });
   if ('slot' in payload) {
     return capRushMultiplayerWorkerRequestSchema.parse({
       schemaVersion: CAP_RUSH_MULTIPLAYER_WORKER_WIRE_SCHEMA_VERSION,
@@ -119,6 +138,7 @@ function outputOf(response: CapRushMultiplayerWorkerMessage): unknown {
   if (response.kind === 'cap-rush-multiplayer-slot') {
     return { games: response.games, tapes: response.tapes };
   }
+  if (response.kind === 'cap-rush-multiplayer-projection') return response.state;
   if (response.kind === 'cap-rush-multiplayer-playoff-games') {
     return { games: response.games, tapes: response.tapes };
   }
@@ -135,7 +155,10 @@ function outputOf(response: CapRushMultiplayerWorkerMessage): unknown {
 
 export class CapRushMultiplayerRunner {
   private readonly transport: OneShotWorkerRunner<
-    CapRushMultiplayerSlotInput | CapRushMultiplayerPlayoffInput | CapRushMultiplayerTapeInput,
+    | CapRushMultiplayerSlotInput
+    | CapRushMultiplayerPlayoffInput
+    | CapRushMultiplayerTapeInput
+    | CapRushMultiplayerProjectionInput,
     CapRushMultiplayerWorkerMessage,
     unknown
   >;
@@ -155,6 +178,10 @@ export class CapRushMultiplayerRunner {
       createWorker: options.createWorker,
       reuseWorker: true,
     });
+  }
+
+  async project(input: CapRushMultiplayerProjectionInput): Promise<CapRushMultiplayerState> {
+    return (await this.transport.run(input)) as CapRushMultiplayerState;
   }
 
   async simulateSlot(input: CapRushMultiplayerSlotInput): Promise<CapRushMultiplayerSlotOutput> {

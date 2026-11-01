@@ -159,7 +159,7 @@ describe('cap rush multiplayer shared league', () => {
           if (!outcome.ok) throw new Error(outcome.message);
           sequential = outcome.state;
         }
-        run('p1', { kind: 'accept-slot', slot, throughSlot, games });
+        run('p1', { kind: 'simulate-range', slot, throughSlot });
         expect(capRushMultiplayerStateDigest(state)).toBe(
           capRushMultiplayerStateDigest(sequential),
         );
@@ -218,7 +218,7 @@ describe('cap rush multiplayer shared league', () => {
             context,
           }).game,
       );
-      run('p1', { kind: 'accept-playoff-step', round, games });
+      run('p1', { kind: 'simulate-playoff-step', round });
     }
     expect(state.postseason?.championTeamId).not.toBeNull();
     expect(state.postseason?.series).toHaveLength(15);

@@ -107,7 +107,7 @@
   </header>
 
   {#if !minimal}
-    <GamecastBattleBox {boxes} {localSide} />
+    <GamecastBattleBox {boxes} {localSide} {theme} />
   {/if}
 
   <section class="hm-feed" aria-label="Ability activations">
@@ -211,9 +211,11 @@
   .hm-team {
     display: grid;
     gap: 2px;
+    --team-color: var(--broadcast-opponent, #f290c5);
   }
   .hm-team[data-align='start'] {
     justify-items: start;
+    --team-color: var(--broadcast-accent, #ffd782);
   }
   .hm-team[data-align='end'] {
     justify-items: end;
@@ -225,15 +227,13 @@
     font-weight: 800;
     letter-spacing: 0.2em;
     text-transform: uppercase;
+    color: color-mix(in srgb, var(--team-color) 55%, var(--broadcast-muted, #aab9db));
   }
   .hm-team[data-leading='true'] .hm-team-label {
-    color: var(--broadcast-accent, #ffd782);
-  }
-  .hm-team[data-leading='false'] .hm-team-label {
-    color: var(--broadcast-muted, #aab9db);
+    color: var(--team-color);
   }
   .hm-leader {
-    color: var(--broadcast-accent, #ffd782);
+    color: var(--team-color);
     font-family: var(--font-mono);
     font-size: 10px;
   }
@@ -246,8 +246,8 @@
     animation: hm-score-pop 340ms cubic-bezier(0.22, 1, 0.36, 1);
   }
   .hm-team[data-leading='true'] .hm-score {
-    color: var(--broadcast-accent, #ffd782);
-    text-shadow: 0 0 30px color-mix(in srgb, var(--broadcast-accent, #ffd782) 35%, transparent);
+    color: var(--team-color);
+    text-shadow: 0 0 30px color-mix(in srgb, var(--team-color) 35%, transparent);
   }
   .hm-team[data-leading='false'] .hm-score {
     color: var(--broadcast-foreground, #f2f4ff);
@@ -261,7 +261,7 @@
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: var(--broadcast-accent, #ffd782);
+    color: var(--team-color);
   }
   .hm-center {
     display: grid;
@@ -320,6 +320,13 @@
     border-radius: inherit;
     background: linear-gradient(90deg, #679dff, var(--broadcast-opponent, #f290c5));
   }
+  .hm-broadcast[data-theme='duel'] .hm-progress-fill {
+    background: linear-gradient(
+      90deg,
+      var(--broadcast-accent),
+      color-mix(in srgb, var(--broadcast-accent) 55%, white)
+    );
+  }
   .hm-plays {
     font-family: var(--font-mono);
     font-size: 10px;
@@ -376,7 +383,7 @@
     border-left-color: var(--broadcast-accent, #ffd782);
   }
   .hm-feed-line[data-latest='true'] {
-    background: #3a4770;
+    background: color-mix(in srgb, var(--broadcast-surface, #303c63) 82%, white 7%);
   }
   .hm-feed-clock {
     font-family: var(--font-mono);
@@ -417,6 +424,9 @@
   }
   .hm-ability-detail strong {
     color: var(--broadcast-accent, #ffd782);
+  }
+  .hm-ability-line[data-side='opponent'] .hm-ability-detail strong {
+    color: var(--broadcast-opponent, #f290c5);
   }
   .hm-feed-points {
     font-family: var(--font-display);

@@ -6,6 +6,8 @@ import {
 } from '@hoop-rush/data-contracts';
 import {
   capRushMultiplayerSimulateGame,
+  applyCapRushMultiplayerCommand,
+  type CapRushMultiplayerEnvironment,
   createEngineContext,
   simulateCapRushMultiplayerPlayoffGame,
   simulateCapRushMultiplayerSlot,
@@ -27,6 +29,26 @@ self.onmessage = (event: MessageEvent<unknown>) => {
   const request = parsed.data;
   if (request.kind === 'cap-rush-multiplayer-cancel') return;
   try {
+    if (request.kind === 'cap-rush-multiplayer-project') {
+      let state = request.state;
+      for (const command of request.commands) {
+        const outcome = applyCapRushMultiplayerCommand(
+          state,
+          command,
+          request.environment as CapRushMultiplayerEnvironment,
+          request.variant,
+        );
+        if (!outcome.ok) throw new Error(`${outcome.code}: ${outcome.message}`);
+        state = outcome.state;
+      }
+      post({
+        schemaVersion: CAP_RUSH_MULTIPLAYER_WORKER_WIRE_SCHEMA_VERSION,
+        kind: 'cap-rush-multiplayer-projection',
+        requestId: request.requestId,
+        state,
+      });
+      return;
+    }
     if (request.kind === 'cap-rush-multiplayer-slot') {
       const games = [];
       const tapes = [];

@@ -200,6 +200,17 @@ export class CapRushMultiplayerSession {
     return this.send({ kind: 'choose-block-plan', block, choice });
   }
 
+  async simulateRange(
+    slot: number,
+    throughSlot: number,
+  ): Promise<CapRushMultiplayerCommandReceipt> {
+    return this.send({ kind: 'simulate-range', slot, throughSlot });
+  }
+
+  async simulatePlayoffRound(round: number): Promise<CapRushMultiplayerCommandReceipt> {
+    return this.send({ kind: 'simulate-playoff-step', round });
+  }
+
   async acceptSlot(
     slot: number,
     games: readonly CapRushLeagueGame[],

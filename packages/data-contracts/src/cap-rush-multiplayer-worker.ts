@@ -1,3 +1,7 @@
+import {
+  capRushMultiplayerCommandSchema,
+  capRushMultiplayerStateSchema,
+} from './cap-rush-multiplayer.ts';
 import { z } from 'zod';
 import { idSchema } from './ids.ts';
 import { capRushLeagueGameSchema, capRushLeagueScheduleEntrySchema } from './cap-rush-league.ts';
@@ -19,6 +23,13 @@ const base = z.object({
 });
 
 export const capRushMultiplayerWorkerRequestSchema = z.discriminatedUnion('kind', [
+  base.extend({
+    kind: z.literal('cap-rush-multiplayer-project'),
+    state: capRushMultiplayerStateSchema,
+    commands: z.array(capRushMultiplayerCommandSchema),
+    environment: z.unknown(),
+    variant: z.enum(['clash', 'roulette']),
+  }),
   base.extend({
     kind: z.literal('cap-rush-multiplayer-slot'),
     roomId: idSchema,
@@ -99,6 +110,10 @@ export type CapRushMultiplayerWorkerErrorMessage = z.infer<
 >;
 
 export const capRushMultiplayerWorkerMessageSchema = z.union([
+  base.extend({
+    kind: z.literal('cap-rush-multiplayer-projection'),
+    state: capRushMultiplayerStateSchema,
+  }),
   capRushMultiplayerWorkerSlotMessageSchema,
   capRushMultiplayerWorkerPlayoffMessageSchema,
   capRushMultiplayerWorkerTapeMessageSchema,

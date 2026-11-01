@@ -137,6 +137,16 @@
       };
     }
 
+    if (season.frontierSlot >= CAP_RUSH_GAME_COUNT) {
+      return {
+        title: 'Regular season complete',
+        detail: '',
+        action: null,
+        actionLabel: '',
+        mine: false,
+      };
+    }
+
     return {
       title: 'Simulating the season',
       detail: '',

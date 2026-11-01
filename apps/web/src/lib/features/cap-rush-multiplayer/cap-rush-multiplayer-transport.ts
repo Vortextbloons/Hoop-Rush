@@ -1,3 +1,5 @@
+import { getPersistence } from '#lib/persistence.js';
+import { CapRushMultiplayerRunner } from './cap-rush-multiplayer-runner.js';
 import type {
   CapRushMultiplayerCommand,
   CapRushMultiplayerCommandPayload,
@@ -13,17 +15,14 @@ import type {
 } from '@hoop-rush/data-contracts';
 import {
   CAP_RUSH_MULTIPLAYER_SCHEMA_VERSION,
+  CAP_RUSH_MULTIPLAYER_VERSION,
   capRushMultiplayerRoomSnapshotSchema,
   capRushMultiplayerSettingsSchema,
   commandIdSchema,
   idSchema,
   seedSchema,
 } from '@hoop-rush/data-contracts';
-import {
-  applyCapRushMultiplayerCommand,
-  capRushMultiplayerStateDigest,
-  createCapRushMultiplayerState,
-} from '@hoop-rush/engine';
+import { capRushMultiplayerStateDigest, createCapRushMultiplayerState } from '@hoop-rush/engine';
 import { capRushMultiplayerDeadlineOf } from '@hoop-rush/application/cap-rush-multiplayer';
 import { createRealtimeRoomRegistry, getMultiplayerClient } from '#lib/supabase-runtime.js';
 import { getCapRushMultiplayerData } from './cap-rush-multiplayer-assets.js';
@@ -50,6 +49,8 @@ function requiredString(record: Record<string, unknown>, key: string): string {
 }
 
 export class CapRushMultiplayerSupabaseTransport implements CapRushMultiplayerTransport {
+  private readonly projector = new CapRushMultiplayerRunner();
+  private projectionTail: Promise<unknown> = Promise.resolve();
   private readonly snapshots = new Map<string, CapRushMultiplayerRoomSnapshot>();
   private readonly rooms = createRealtimeRoomRegistry({
     label: 'Cap Rush',
@@ -126,49 +127,104 @@ export class CapRushMultiplayerSupabaseTransport implements CapRushMultiplayerTr
 
   async sync(roomId: string, afterOrdinal = -1): Promise<CapRushMultiplayerSync> {
     const client = await getMultiplayerClient();
+    let previous = this.snapshots.get(roomId);
+    if (!previous) {
+      const saved = await getPersistence().capRushMultiplayerRepository.loadActive(roomId);
+      if (saved) {
+        previous = saved.snapshot;
+        this.snapshots.set(roomId, previous);
+      }
+    }
+    const cursor = previous ? Math.min(afterOrdinal, previous.commandCount - 1) : -1;
     const result = await client.rpc('cap_rush_multiplayer_room_sync', {
       p_room_id: roomId,
-      p_after_ordinal:
-        this.snapshots.get(roomId)?.phase === 'season' &&
-        afterOrdinal >= 0 &&
-        afterOrdinal < 2147483647
-          ? -afterOrdinal - 2
-          : afterOrdinal,
+      p_after_ordinal: cursor,
     });
     if (result.error) throw new Error(result.error.message);
     const row = recordOf(result.data);
-    const previous = this.snapshots.get(roomId);
     const rawRoom = recordOf(row.room);
-    if (row.incremental === true && previous?.state) {
-      const incoming = recordOf(rawRoom.state);
-      const season = recordOf(incoming.season);
-      const games = new Map(previous.state.season?.games.map((game) => [game.gameId, game]));
-      for (const command of (row.commands as CommandRow[] | undefined) ?? []) {
-        if (command.payload.kind === 'accept-slot') {
-          for (const game of command.payload.games) games.set(game.gameId, game);
-        }
-      }
-      rawRoom.state = {
-        ...previous.state,
-        ...incoming,
-        ...(incoming.season === null ? {} : { season: { ...season, games: [...games.values()] } }),
-      };
-    }
-    const snapshot = capRushMultiplayerRoomSnapshotSchema.parse(rawRoom);
-    if (!previous || snapshot.revision >= previous.revision) this.snapshots.set(roomId, snapshot);
+    const protocol = recordOf(recordOf(rawRoom.settings).versionLocks).multiplayerVersion;
+    if (typeof protocol === 'string' && protocol !== CAP_RUSH_MULTIPLAYER_VERSION)
+      throw new Error(
+        'This room uses the old Cap Rush multiplayer protocol. Leave the lobby and create a new Cap Rush match.',
+      );
     const commands: CapRushMultiplayerCommand[] = (
       (row.commands as CommandRow[] | undefined) ?? []
     ).map((command) => ({
       schemaVersion: CAP_RUSH_MULTIPLAYER_SCHEMA_VERSION,
-      roomId: snapshot.roomId,
+      roomId: idSchema.parse(roomId),
       commandId: commandIdSchema.parse(command.command_id),
       ordinal: command.ordinal,
       actorParticipantId: command.actor_participant_id,
-      expectedRevision: Math.max(0, command.ordinal),
+      expectedRevision: command.ordinal,
       acceptedAtIso: command.accepted_at,
       payload: command.payload,
     }));
+    if (recordOf(rawRoom.state)._localSimulation === true) {
+      const settings = capRushMultiplayerSettingsSchema.parse(rawRoom.settings);
+      const rootSeed = seedSchema.parse(rawRoom.rootSeed);
+      const pending = commands.filter(
+        (command) => command.ordinal >= (previous?.commandCount ?? 0),
+      );
+      const start = previous?.commandCount ?? 0;
+      for (let index = 0; index < pending.length; index += 1) {
+        if (pending[index]?.ordinal !== start + index)
+          throw new Error('cap rush command log has a gap');
+      }
+      if (start + pending.length !== rawRoom.commandCount)
+        throw new Error('cap rush command log is incomplete');
+      const projected =
+        pending.length === 0 && previous?.state
+          ? previous.state
+          : await this.project(
+              previous?.state ?? createCapRushMultiplayerState(rootSeed),
+              pending,
+              settings.variant,
+            );
+      if (
+        typeof rawRoom.stateDigest === 'string' &&
+        capRushMultiplayerStateDigest(projected) !== rawRoom.stateDigest
+      )
+        throw new Error(
+          'Cap Rush simulation mismatch. Both players must use the same game version.',
+        );
+      rawRoom.state = projected;
+    }
+    const snapshot = capRushMultiplayerRoomSnapshotSchema.parse(rawRoom);
+    if (!previous || snapshot.revision >= previous.revision) {
+      this.snapshots.set(roomId, snapshot);
+      if (snapshot.state && snapshot.revision !== previous?.revision) {
+        await getPersistence().capRushMultiplayerRepository.saveCheckpoint({
+          snapshot,
+          state: snapshot.state,
+          commands,
+          receipts: [],
+          games:
+            snapshot.state.season?.games.filter(
+              (game) => !previous?.state?.season?.games.some((old) => old.gameId === game.gameId),
+            ) ?? [],
+          updatedAtIso: new Date().toISOString(),
+        });
+      }
+    }
     return { snapshot, commands, commandCount: snapshot.commandCount };
+  }
+
+  private project(
+    state: import('@hoop-rush/data-contracts').CapRushMultiplayerState,
+    commands: readonly CapRushMultiplayerCommand[],
+    variant: 'clash' | 'roulette',
+  ) {
+    const next = this.projectionTail.then(async () =>
+      this.projector.project({
+        state,
+        commands,
+        environment: (await getCapRushMultiplayerData()).environment,
+        variant,
+      }),
+    );
+    this.projectionTail = next.catch(() => {});
+    return next;
   }
 
   subscribe(roomId: string, onChange: () => void, onError: (error: Error) => void): () => void {
@@ -211,7 +267,6 @@ export class CapRushMultiplayerSupabaseTransport implements CapRushMultiplayerTr
         revision: snapshot.revision,
       };
     }
-    const data = await getCapRushMultiplayerData();
     const command: CapRushMultiplayerCommand = {
       schemaVersion: CAP_RUSH_MULTIPLAYER_SCHEMA_VERSION,
       roomId: snapshot.roomId,
@@ -222,45 +277,50 @@ export class CapRushMultiplayerSupabaseTransport implements CapRushMultiplayerTr
       acceptedAtIso,
       payload: input.payload,
     };
-    const outcome = applyCapRushMultiplayerCommand(
-      state,
-      command,
-      data.environment,
-      snapshot.settings.variant,
-    );
-    if (!outcome.ok) {
-      return {
-        roomId: snapshot.roomId,
-        commandId: command.commandId,
-        ordinal: snapshot.commandCount,
-        accepted: false,
-        rejectionCode: outcome.code,
-        revision: snapshot.revision,
-      };
-    }
-    const coordinationState = { ...outcome.state };
-    if (
-      ['accept-slot', 'ack-slot', 'choose-block-plan', 'ack-broadcast'].includes(input.payload.kind)
-    ) {
-      Reflect.deleteProperty(coordinationState, 'locked');
-      Reflect.deleteProperty(coordinationState, 'recruitment');
-      if (coordinationState.season !== null) {
-        coordinationState.season = { ...coordinationState.season };
-        Reflect.deleteProperty(coordinationState.season, 'games');
-      }
-    }
+    const projected = await this.project(state, [command], snapshot.settings.variant);
+    const coordinationState = {
+      _localSimulation: true,
+      phase: projected.phase,
+      ready: projected.ready,
+    };
     const result = await client.rpc('cap_rush_multiplayer_command_submit', {
       p_room_id: input.roomId,
       p_command_id: input.commandId,
       p_expected_revision: input.expectedRevision,
       p_payload: input.payload,
       p_state: coordinationState,
-      p_state_digest: capRushMultiplayerStateDigest(outcome.state),
+      p_state_digest: capRushMultiplayerStateDigest(projected),
       p_accepted_at: acceptedAtIso,
-      p_deadline: capRushMultiplayerDeadlineOf(outcome.state),
+      p_deadline: capRushMultiplayerDeadlineOf(projected),
     });
     if (result.error) throw new Error(result.error.message);
     const receipt = recordOf(result.data);
+    if (
+      receipt.accepted === true &&
+      typeof receipt.revision === 'number' &&
+      typeof receipt.ordinal === 'number'
+    ) {
+      const accepted = {
+        ...snapshot,
+        phase: projected.phase,
+        revision: receipt.revision,
+        commandCount: receipt.ordinal + 1,
+        state: projected,
+        deadline: capRushMultiplayerDeadlineOf(projected),
+      };
+      this.snapshots.set(snapshot.roomId, accepted);
+      await getPersistence().capRushMultiplayerRepository.saveCheckpoint({
+        snapshot: accepted,
+        state: projected,
+        commands: [command],
+        receipts: [],
+        games:
+          projected.season?.games.filter(
+            (game) => !state.season?.games.some((old) => old.gameId === game.gameId),
+          ) ?? [],
+        updatedAtIso: new Date().toISOString(),
+      });
+    }
     return {
       roomId: snapshot.roomId,
       commandId: command.commandId,
