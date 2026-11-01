@@ -100,22 +100,22 @@
     if (postseason === null || localOutcome === null) return null;
     if (championTeamId === null) {
       if (standings === null) {
-        return 'The bracket has not opened yet. Both seats wait for the room to accept the final standings.';
+        return 'Waiting for final standings.';
       }
       if (localOutcome.status === 'eliminated') {
         return `Your run ends here${
           localOutcome.round === null
             ? ''
             : ` in the ${capRushConferenceRoundName(localOutcome.round)}`
-        }. The bracket continues without your team; both seats still choose each round so the host can simulate the next step.`;
+        }.`;
       }
       if (localOutcome.status === 'not-qualified') {
-        return 'Your team missed the playoffs. The bracket continues without your team; both seats still choose each round so the host can simulate the next step.';
+        return 'Your team missed the playoffs.';
       }
-      return 'Your team is still alive in the bracket. Both seats choose a round plan before the host simulates the step.';
+      return 'Your team is still alive in the bracket.';
     }
     if (championSeat === localSeat) {
-      return 'Your team won the league. The shared postseason is complete.';
+      return 'Your team won the league.';
     }
     if (localOutcome.status === 'eliminated') {
       return `Your run ended in the ${
@@ -170,7 +170,7 @@
         : winner === teamId
           ? 'Won'
           : 'Lost';
-    return `${capRushConferenceRoundName(series.round)} vs ${teamName(opponentId)} · ${status} ${ownWins}–${opponentWins}`;
+    return `${capRushConferenceRoundName(series.round)} vs ${teamName(opponentId)} Â· ${status} ${ownWins}â€“${opponentWins}`;
   }
 
   function outcomeLabel(outcome: CapRushPostseasonUserOutcome): string {
@@ -197,7 +197,7 @@
       <header class="flex flex-wrap items-end justify-between gap-2">
         <div class="min-w-0">
           <p class="font-mono text-[10px] tracking-[0.16em] text-muted-foreground uppercase">
-            Postseason · {championTeamId === null ? `round ${currentRound} of 4` : 'complete'}
+            Postseason Â· {championTeamId === null ? `round ${currentRound} of 4` : 'complete'}
           </p>
           <h2 class="font-display text-2xl font-extrabold tracking-tight uppercase">
             {championTeamId === null
@@ -205,9 +205,6 @@
               : 'Champion crowned'}
           </h2>
         </div>
-        <p class="max-w-full text-xs text-muted-foreground">
-          Only the host simulates playoff steps. Both seats resolve their own playback.
-        </p>
       </header>
 
       <ul class="grid min-w-0 gap-2 sm:grid-cols-2">
@@ -279,9 +276,6 @@
         <h2 class="font-display text-2xl font-extrabold tracking-tight uppercase">
           Waiting for final standings
         </h2>
-        <p class="mt-1 text-sm text-muted-foreground">
-          The playoff bracket opens once the room has accepted the final shared standings.
-        </p>
       </section>
     {:else}
       <section class="flex min-w-0 flex-col gap-3 rounded-2xl border border-border bg-card p-4">
@@ -294,11 +288,6 @@
               ? `${capRushConferenceRoundName(currentRound)}`
               : 'League complete'}
           </h2>
-          <p class="mt-1 text-xs leading-relaxed text-muted-foreground">
-            {championTeamId === null
-              ? 'Both seats choose a plan each round. The host runs the step; both seats then resolve their own playback.'
-              : 'The Finals are finished. Both seats can accept the shared final report.'}
-          </p>
         </header>
 
         {#if championTeamId === null}
@@ -317,7 +306,7 @@
                   {seatLabelFor(seat, localSeat)}
                 </p>
                 <p class="mt-1 truncate font-display text-lg font-bold tracking-tight uppercase">
-                  {plan === null ? 'Choosing…' : plan === 'sim' ? 'Sim' : 'Simcast'}
+                  {plan === null ? 'Choosingâ€¦' : plan === 'sim' ? 'Sim' : 'Simcast'}
                 </p>
               </li>
             {/each}
@@ -326,57 +315,21 @@
           <div class="flex flex-wrap gap-2">
             <button
               type="button"
-              class="inline-flex min-h-11 items-center justify-center rounded-xl border border-primary/50 bg-primary/10 px-4 text-sm font-bold text-primary outline-none
-                focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
-              disabled={busy || localPlan !== null}
-              onclick={() => onchooseplan('sim')}
+              class="inline-flex min-h-11 items-center justify-center rounded-xl border border-primary/50 bg-primary/10 px-4 text-sm font-bold text-primary outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
+              disabled={busy || (localPlan !== null && (!ishost || !bothPlans))}
+              onclick={() => (localPlan === null ? onchooseplan('sim') : onsimulatestep())}
             >
-              Sim round {currentRound}
+              Sim series
             </button>
             <button
               type="button"
-              class="inline-flex min-h-11 items-center justify-center rounded-xl border border-border bg-surface-2 px-4 text-sm font-semibold outline-none
-                focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
-              disabled={busy || localPlan !== null}
-              onclick={() => onchooseplan('simcast')}
-            >
-              Simcast round {currentRound}
-            </button>
-            <button
-              type="button"
-              class="inline-flex min-h-11 items-center justify-center rounded-xl border border-border bg-surface-2 px-4 text-sm font-semibold outline-none
-                focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
+              class="inline-flex min-h-11 items-center justify-center rounded-xl border border-border bg-surface-2 px-4 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
               disabled={busy || !hasOpenSeries}
-              onclick={onwatchplayoff}
+              onclick={() => (localPlan === null ? onchooseplan('simcast') : onwatchplayoff())}
             >
-              Watch playoff game
+              Simcast game
             </button>
-            {#if ishost}
-              <button
-                type="button"
-                class="inline-flex min-h-11 items-center justify-center rounded-xl border border-primary/50 bg-primary/10 px-4 text-sm font-bold text-primary outline-none
-                  focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
-                disabled={busy || !bothPlans}
-                onclick={onsimulatestep}
-              >
-                Sim playoff step
-              </button>
-            {/if}
           </div>
-
-          <p class="text-xs leading-relaxed text-muted-foreground">
-            {#if localPlan === null}
-              Choose Sim or Simcast for round {currentRound}. Both plans are required before the
-              step can run.
-            {:else if !bothPlans}
-              Waiting for {seatLabelFor(otherSeat, localSeat)} to choose round {currentRound}.
-            {:else if ishost}
-              Both plans are in. Simulate the next playoff step when ready.
-            {:else}
-              Waiting for the host to simulate the next playoff step. Both seats resolve their own
-              playback afterward.
-            {/if}
-          </p>
         {:else}
           <div
             class="flex min-w-0 flex-col gap-2 rounded-xl border border-accent/50 bg-accent/10 p-3"
@@ -408,9 +361,6 @@
             >
               Accept final report
             </button>
-            <p class="text-[11px] leading-relaxed text-muted-foreground">
-              Either seat can accept the shared report. It opens the final results for both.
-            </p>
           </div>
         {/if}
       </section>
@@ -464,7 +414,7 @@
                   </p>
                 </div>
                 <div class="shrink-0 text-right">
-                  <p class="font-mono text-xs font-semibold tabular-nums">{highWins}–{lowWins}</p>
+                  <p class="font-mono text-xs font-semibold tabular-nums">{highWins}â€“{lowWins}</p>
                   <p class="max-w-[9rem] truncate text-[9px] text-muted-foreground">
                     {winnerTeamId === null ? '' : `${teamName(winnerTeamId)} won`}
                   </p>

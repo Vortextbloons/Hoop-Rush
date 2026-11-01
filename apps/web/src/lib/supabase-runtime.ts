@@ -27,6 +27,8 @@ export async function supabaseClient(
   const existing = sharedClients.get(key);
   if (existing) return existing;
   const { createClient } = await loadSupabaseModule();
+  const loadedClient = sharedClients.get(key);
+  if (loadedClient) return loadedClient;
   const client = createClient(url, publishableKey, {
     auth: {
       persistSession: true,

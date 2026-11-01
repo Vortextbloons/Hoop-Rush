@@ -83,3 +83,25 @@ refuses a room it cannot serve:
 This is a deliberate protocol break, authorized for the storage reset. Old
 in-flight rooms end at cutover; players start a new room. `supabase test db`
 covers this in `supabase/tests/multiplayer_room_protocol.sql`.
+
+## Cap Rush local simulation protocol
+
+New Cap Rush rooms use `cap-rush-multiplayer-v2` and rules v2. Both clients
+apply the same ordered command log in a Web Worker. `simulate-range` and
+`simulate-playoff-step` commands contain ranges or round numbers, not game
+results. The host submits a compact phase/readiness checkpoint and a digest;
+the guest computes independently and rejects a mismatching digest. H2H
+broadcast acknowledgements still gate shared advancement.
+
+IndexedDB checkpoints contain the full projected state, results, and accepted
+commands. Reconnect applies commands after the local checkpoint; a fresh
+browser rebuilds from the root seed and complete compact log. Supabase stores
+coordination metadata and the command log only. Revision checks and command
+IDs retain conflict detection and idempotent retries.
+
+Deploy `20261101041259_cap_rush_local_simulation_protocol.sql` and
+`20261101041731_cap_rush_retired_protocol_snapshot.sql` before the v2 client.
+Version 1 rooms require a new match. Their records remain untouched; their
+sync response omits the large historical state/log and the v2 client explains
+that a new match is required.
+

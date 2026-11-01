@@ -9,6 +9,7 @@ import type {
 } from '@hoop-rush/data-contracts';
 import {
   CAP_RUSH_MULTIPLAYER_SAVE_SCHEMA_VERSION,
+  CAP_RUSH_MULTIPLAYER_VERSION,
   canonicalJson,
   idSchema,
 } from '@hoop-rush/data-contracts';
@@ -74,6 +75,14 @@ export class DexieCapRushMultiplayerRepository {
         'this cap rush multiplayer room was saved with another save schema',
       );
     }
+    const protocol = (
+      row as { snapshot?: { settings?: { versionLocks?: { multiplayerVersion?: unknown } } } }
+    ).snapshot?.settings?.versionLocks?.multiplayerVersion;
+    if (typeof protocol === 'string' && protocol !== CAP_RUSH_MULTIPLAYER_VERSION)
+      throw new CapRushMultiplayerLoadError(
+        'unsupported',
+        'This room uses the old Cap Rush multiplayer protocol. Leave the lobby and create a new Cap Rush match.',
+      );
     return parseOrThrow(storedCapRushMultiplayerActiveRowSchema, row);
   }
 
@@ -124,7 +133,9 @@ export class DexieCapRushMultiplayerRepository {
       this.db.capRushMultiplayerCommands,
       this.db.capRushMultiplayerGames,
       async () => {
-        await this.db.capRushMultiplayerActive.put(active);
+        const current = await this.db.capRushMultiplayerActive.get(active.roomId);
+        if (!current || current.snapshot.revision <= active.snapshot.revision)
+          await this.db.capRushMultiplayerActive.put(active);
         const existing = await this.db.capRushMultiplayerCommands
           .where('roomId')
           .equals(active.roomId)

@@ -15,11 +15,13 @@
     localSide,
     perGame = false,
     games = 1,
+    theme = 'havoc',
   }: {
     boxes: readonly GamecastBattleSideBox[];
     localSide: 'home' | 'away';
     perGame?: boolean;
     games?: number;
+    theme?: 'havoc' | 'duel';
   } = $props();
 
   function statOf(value: number): string {
@@ -32,7 +34,7 @@
 </script>
 
 <div class="hm-boxes-container">
-  <div class="hm-boxes" data-havoc-multiplayer-boxes>
+  <div class="hm-boxes" data-havoc-multiplayer-boxes data-theme={theme}>
     {#each boxes as box (box.side)}
       {@const topPoints = Math.max(0, ...box.lines.map((line) => line.points))}
       {@const teamUsage = box.lines.reduce(
@@ -41,7 +43,12 @@
           usagePossessions(line.fieldGoalsAttempted, line.freeThrowsAttempted, line.turnovers),
         0,
       )}
-      <section class="hm-box" data-side={box.side} aria-label={`${labelOf(box.side)} box score`}>
+      <section
+        class="hm-box"
+        data-side={box.side}
+        data-local={box.side === localSide}
+        aria-label={`${labelOf(box.side)} box score`}
+      >
         <header class="hm-box-head">
           <span class="hm-box-label" data-side={box.side}>{labelOf(box.side)}</span>
           {#if box.bonusPoints !== 0}
@@ -140,6 +147,28 @@
     display: grid;
     gap: 12px;
     grid-template-columns: 1fr;
+    --box-border: #465273;
+    --box-card: #20294c;
+    --box-head: transparent;
+    --box-line: #3c486b;
+    --box-muted: #aab9db;
+    --box-accent: #679dff;
+    --box-opponent: #f290c5;
+    --box-highlight: #ffd782;
+  }
+  .hm-boxes[data-theme='duel'] {
+    --box-border: var(--color-line-soft);
+    --box-card: var(--color-surface-1);
+    --box-head: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--color-card) 92%, white 8%),
+      var(--color-card)
+    );
+    --box-line: var(--color-line-soft);
+    --box-muted: var(--color-muted-foreground);
+    --box-accent: var(--color-primary);
+    --box-opponent: hsl(212 90% 62%);
+    --box-highlight: var(--color-primary);
   }
   @container havoc-boxes (min-width: 76rem) {
     .hm-boxes {
@@ -150,16 +179,17 @@
   .hm-box {
     min-width: 0;
     overflow: clip;
-    border: 1px solid #465273;
+    border: 1px solid var(--box-border);
     border-radius: 16px;
-    background: #20294c;
+    background: var(--box-card);
   }
   .hm-box-head {
     display: flex;
     align-items: center;
     gap: 10px;
     padding: 10px 14px;
-    border-bottom: 1px solid #3c486b;
+    border-bottom: 1px solid var(--box-line);
+    background: var(--box-head);
   }
   .hm-box-label {
     font-family: var(--font-display);
@@ -168,25 +198,25 @@
     letter-spacing: 0.04em;
     text-transform: uppercase;
   }
-  .hm-box-label[data-side='home'] {
-    color: #679dff;
+  .hm-box[data-local='true'] .hm-box-label {
+    color: var(--box-accent);
   }
-  .hm-box-label[data-side='away'] {
-    color: #f290c5;
+  .hm-box[data-local='false'] .hm-box-label {
+    color: var(--box-opponent);
   }
   .hm-box-bonus {
     padding: 2px 8px;
-    border: 1px solid #465273;
+    border: 1px solid var(--box-border);
     border-radius: 999px;
     font-family: var(--font-mono);
     font-size: 10px;
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: #ffd782;
+    color: var(--box-highlight);
   }
   .hm-box-bonus[data-negative='true'] {
-    color: #f290c5;
+    color: var(--box-opponent);
   }
   .hm-box-score {
     margin-left: auto;
@@ -196,7 +226,7 @@
     font-variant-numeric: tabular-nums;
   }
   .hm-box-score[data-negative='true'] {
-    color: #f290c5;
+    color: var(--box-opponent);
   }
   .hm-box-scroll {
     overflow-x: auto;
@@ -221,20 +251,20 @@
     font-weight: 700;
     letter-spacing: 0.12em;
     text-transform: uppercase;
-    color: #aab9db;
-    border-bottom: 1px solid #3c486b;
+    color: var(--box-muted);
+    border-bottom: 1px solid var(--box-line);
   }
   tbody tr {
-    border-top: 1px solid rgb(60 72 107 / 55%);
+    border-top: 1px solid color-mix(in srgb, var(--box-line) 55%, transparent);
   }
   tbody tr:first-child {
     border-top: 0;
   }
   tbody tr[data-kind='replacement'] {
-    background: rgb(103 157 255 / 7%);
+    background: color-mix(in srgb, var(--box-accent) 7%, transparent);
   }
   tbody tr[data-kind='clone'] {
-    background: rgb(242 144 197 / 7%);
+    background: color-mix(in srgb, var(--box-opponent) 7%, transparent);
   }
   .hm-player {
     max-width: 13rem;
@@ -242,10 +272,10 @@
     text-align: left;
   }
   tbody tr[data-top-scorer='true'] {
-    background: rgb(255 215 130 / 12%);
+    background: color-mix(in srgb, var(--box-highlight) 12%, transparent);
   }
   .hm-top-scorer {
-    color: #ffd782;
+    color: var(--box-highlight);
     font-size: 9px;
   }
   .hm-player-name {
@@ -267,14 +297,14 @@
     font-family: var(--font-mono);
     font-size: 9px;
     letter-spacing: 0.1em;
-    color: #aab9db;
+    color: var(--box-muted);
   }
   .hm-role {
     font-family: var(--font-mono);
     font-size: 9px;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: #aab9db;
+    color: var(--box-muted);
   }
   .hm-pts {
     font-family: var(--font-display);
@@ -282,6 +312,6 @@
     font-weight: 800;
   }
   .hm-pts[data-negative='true'] {
-    color: #f290c5;
+    color: var(--box-opponent);
   }
 </style>

@@ -101,8 +101,7 @@ export const modeCatalog: readonly ModeDefinition[] = [
           icon: Trophy,
           image: '/images/multiplayer/cap-rush.png',
           format: '82 games',
-          description:
-            'Two general managers bid on the same 60-player market, lock five each, then play one shared 30-team season.',
+          description: 'Cap Clash and Cap Roulette.',
         },
       ],
       load: () =>

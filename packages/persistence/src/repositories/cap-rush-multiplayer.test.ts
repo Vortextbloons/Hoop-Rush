@@ -148,6 +148,16 @@ describe('cap rush multiplayer persistence', () => {
       });
       expect(await repository.loadCommands(ROOM)).toHaveLength(1);
 
+      await repository.saveCheckpoint({
+        snapshot: snapshot(0),
+        state: createCapRushMultiplayerState(ROOT),
+        commands: [],
+        receipts: [],
+        games: [],
+        updatedAtIso: AT,
+      });
+      expect((await repository.loadActive(ROOM))?.snapshot.revision).toBe(1);
+
       await repository.clearActive(ROOM);
       expect(await repository.loadActive(ROOM)).toBeNull();
       expect(await repository.loadCommands(ROOM)).toHaveLength(0);

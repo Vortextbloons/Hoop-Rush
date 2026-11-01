@@ -126,11 +126,6 @@
     <h2 class="font-display text-2xl font-extrabold tracking-tight uppercase sm:text-3xl">
       {variant === 'roulette' ? 'Mutation window' : 'Roster lock'}
     </h2>
-    <p class="max-w-2xl text-xs leading-relaxed text-muted-foreground sm:text-sm">
-      {variant === 'roulette'
-        ? 'Buy mutations from your recruited payroll, then both seats confirm to lock the rosters.'
-        : 'Cap Clash has no mutations. Review both lineups, then both seats confirm to lock the rosters.'}
-    </p>
   </header>
 
   <div class="grid gap-3 lg:grid-cols-2">
@@ -178,12 +173,14 @@
               {exactMoney(summary.signedPayrollDollars)}
             </dd>
           </div>
-          <div class="flex items-baseline justify-between gap-2">
-            <dt class="text-muted-foreground">Total commitments</dt>
-            <dd class="font-mono font-semibold tabular-nums">
-              {exactMoney(summary.payrollDollars)}
-            </dd>
-          </div>
+          {#if summary.payrollDollars !== summary.signedPayrollDollars}
+            <div class="flex items-baseline justify-between gap-2">
+              <dt class="text-muted-foreground">Total commitments</dt>
+              <dd class="font-mono font-semibold tabular-nums">
+                {exactMoney(summary.payrollDollars)}
+              </dd>
+            </div>
+          {/if}
           <div class="flex items-baseline justify-between gap-2">
             <dt class="text-muted-foreground">Remaining to limit</dt>
             <dd class="font-mono font-semibold tabular-nums">
@@ -213,10 +210,6 @@
           {receipts.length} of 5 purchases used
         </p>
       </header>
-
-      <p class="max-w-2xl text-[11px] leading-relaxed text-muted-foreground">
-        Mutations are paid from the recruited payroll and do not change roster salaries.
-      </p>
 
       <div role="group" aria-label="Target player" class="flex flex-col gap-2">
         <p class="font-mono text-[9px] font-bold tracking-[0.12em] text-muted-foreground uppercase">
@@ -419,10 +412,6 @@
                       </div>
                     {/if}
                   </dl>
-                {:else}
-                  <p class="border-t border-line-soft pt-1.5 text-[10px] leading-snug">
-                    Base ratings stay the same; the mutation changes game rules.
-                  </p>
                 {/if}
               </li>
             {/each}
@@ -434,10 +423,6 @@
 
   <section class="flex flex-col gap-2 rounded-2xl border border-border bg-card p-3 sm:p-4">
     <h3 class="font-display text-lg font-extrabold tracking-tight uppercase">Lock the rosters</h3>
-    <p class="max-w-2xl text-xs leading-relaxed text-muted-foreground">
-      The season starts when both seats confirm the same rosters. Neither confirmation changes
-      salaries.
-    </p>
     <div class="flex flex-wrap items-center gap-3">
       <button
         type="button"
