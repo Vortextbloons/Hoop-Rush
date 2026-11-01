@@ -40,21 +40,27 @@ describe('storage namespace', () => {
     reopened.close();
   });
 
-  it('rejects every older database version without migrating its records', async () => {
+  it('resets every older database version and can save multiplayer checkpoints afterward', async () => {
     for (let version = 1; version < 14; version++) {
       resetIndexedDb();
       const name = testDatabaseName(`unsupported-${String(version)}`);
       const old = new Dexie(name);
-      old.version(version).stores({ completed: 'recordId' });
+      old.version(version).stores({ completed: 'recordId', profileSelection: 'id' });
       await old.table('completed').put({ recordId: 'old-save' });
+      await old.table('profileSelection').put({ id: 'selection', profileId: 'old-profile' });
       old.close();
       const current = new HoopRushDatabase(name);
-      await expect(Promise.resolve(current.open())).rejects.toThrow('Clear Hoop Rush site data');
+      await current.open();
+      expect(current.verno).toBe(14);
+      for (const table of current.tables) expect(await table.count()).toBe(0);
+      await current.table('capRushMultiplayerActive').put({ roomId: 'new-room' });
       current.close();
-      const reopened = new Dexie(name);
+      const reopened = new HoopRushDatabase(name);
       await reopened.open();
-      expect(reopened.verno).toBe(version);
-      expect(await reopened.table('completed').count()).toBe(1);
+      expect(await reopened.table('completed').count()).toBe(0);
+      expect(await reopened.table('capRushMultiplayerActive').get('new-room')).toEqual({
+        roomId: 'new-room',
+      });
       reopened.close();
     }
   });

@@ -180,11 +180,9 @@ export class HoopRushDatabase extends Dexie {
     super(name);
     this.version(14)
       .stores(HOOP_RUSH_DATABASE_STORES)
-      .upgrade(() => {
-        throw new Error(
-          'This save database is outdated. Clear Hoop Rush site data to reset saves and start fresh.',
-        );
-      });
+      .upgrade((transaction) =>
+        Dexie.Promise.all(transaction.storeNames.map((name) => transaction.table(name).clear())),
+      );
   }
 }
 export class DexieChallengeRepository {

@@ -193,7 +193,7 @@ grant execute on function public.multiplayer_room_sync(text, uuid, integer, smal
 create or replace function public.multiplayer_room_sync(
   p_mode text,
   p_room_id uuid,
-  p_after_ordinal integer
+  p_after_ordinal integer default -1
 )
 returns jsonb
 language plpgsql
