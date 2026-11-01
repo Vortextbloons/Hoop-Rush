@@ -19,6 +19,9 @@ import {
   type CapRushMultiplayerEnvironment,
 } from './state.ts';
 import { capRushMultiplayerLockDigest } from './state.ts';
+import { capRushMultiplayerGameInputFor } from './input.ts';
+import { applyHavocMutationPackage } from '../../havoc/transform.ts';
+import { capRushEffectiveRatings } from '../salary.ts';
 import { capRushMultiplayerActiveRound } from './auction.ts';
 import { capRushTestSetup } from '../cap-rush-test-support.ts';
 import {
@@ -186,6 +189,21 @@ describe('cap rush multiplayer mutation receipts', () => {
 
     const locked = lock({ ...harn, state: standard.state });
     expect(locked.phase).toBe('season');
+    if (locked.locked === null || mutated === undefined) throw new Error('no locked team');
+    const entry = locked.locked.leagueSchedule.find(
+      (game) => game.homeTeamId === seat.team.teamId || game.awayTeamId === seat.team.teamId,
+    );
+    if (entry === undefined) throw new Error('no scheduled game');
+    const gameInput = capRushMultiplayerGameInputFor({ locked: locked.locked, entry });
+    const side = gameInput.home.teamId === seat.team.teamId ? gameInput.home : gameInput.away;
+    const gamePlayer = side.starters.find((player) => player.instanceId === mutated.instanceId);
+    const expected = applyHavocMutationPackage(mutated.source, mutated.mutationPackage, {
+      slot: mutated.slot,
+    });
+    expect(gamePlayer?.mutationPackage).toEqual(mutated.mutationPackage);
+    expect(gamePlayer?.effective.ratings).toEqual(
+      capRushEffectiveRatings(expected.ratings, seat.payrollStatus),
+    );
 
     const surge = purchase(standard.state, harn.commands, 'surge', pg.playerId);
     expect(surge.ok).toBe(false);

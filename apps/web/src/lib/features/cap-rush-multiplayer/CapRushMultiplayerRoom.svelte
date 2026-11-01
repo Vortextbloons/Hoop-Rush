@@ -84,6 +84,10 @@
     {#snippet content()}
       {#if controller.broadcast}
         <CapRushBroadcast
+          series={game?.postseason?.series.find(
+            (entry) => entry.seriesId === controller.broadcast?.playoffPlan?.seriesId,
+          ) ?? null}
+          gameOrdinal={controller.broadcast.playoffPlan?.gameOrdinal ?? null}
           art={controller.art}
           input={controller.broadcast.input}
           result={controller.broadcast.result}

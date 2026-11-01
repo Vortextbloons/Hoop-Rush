@@ -7,11 +7,21 @@
     CapRushPostseasonUserOutcome,
   } from '@hoop-rush/data-contracts';
   import { capRushConferenceRoundName } from '@hoop-rush/data-contracts';
-  import { capRushLeagueMvp, capRushMultiplayerSeatRecord } from '@hoop-rush/engine';
+  import {
+    capRushLeagueMvp,
+    capRushMultiplayerSeatRecord,
+    havocMutationDefinitionOf,
+  } from '@hoop-rush/engine';
   import PlayerFace from '#lib/components/PlayerFace.svelte';
   import TeamLogo from '#lib/components/TeamLogo.svelte';
   import type { CapRushArt } from '../cap-rush/cap-rush-art.js';
-  import { capStatusClass, capStatusLabel, initialsOf } from '../cap-rush/cap-rush-presentation.js';
+  import {
+    apronPenaltyRows,
+    apronPenaltyTitle,
+    capStatusClass,
+    capStatusLabel,
+    initialsOf,
+  } from '../cap-rush/cap-rush-presentation.js';
   import CapRushMultiplayerStats from './CapRushMultiplayerStats.svelte';
   import CapRushMultiplayerRoster from './CapRushMultiplayerRoster.svelte';
   import {
@@ -76,6 +86,10 @@
         payrollDollars: seatReport?.payrollDollars ?? lock?.payrollDollars ?? null,
         payrollStatus: seatReport?.payrollStatus ?? lock?.payrollStatus ?? null,
         outcome: seatReport?.outcome ?? postseason?.outcomes[seat] ?? null,
+        spins:
+          lock === null
+            ? []
+            : [lock.spin, ...(lock.additionalSpins ?? [])].filter((spin) => spin !== null),
         isChampion: teamId !== null && teamId === championTeamId,
       };
     }),
@@ -294,6 +308,50 @@
               </dd>
             </div>
           </dl>
+
+          {#if detail.payrollStatus !== null}
+            <section
+              class="rounded-xl border border-line-soft bg-surface-1 p-3"
+              aria-label="Apron penalties"
+            >
+              <h4 class="text-sm font-bold">{apronPenaltyTitle(detail.payrollStatus)}</h4>
+              {#each apronPenaltyRows(detail.payrollStatus) as row (row.label)}
+                <p class="mt-1 text-xs text-muted-foreground">{row.label}: -{row.reduction}</p>
+              {/each}
+            </section>
+          {/if}
+
+          {#if (report?.variant ?? locked?.variant) === 'roulette'}
+            <section class="flex flex-col gap-2" aria-label="Mutation purchases">
+              <h4 class="font-display text-lg font-bold uppercase">Mutations</h4>
+              {#if detail.spins.length === 0}
+                <p class="text-xs text-muted-foreground">No mutations purchased.</p>
+              {/if}
+              {#each detail.spins as spin (spin.receiptDigest)}
+                {@const target = locked?.seats[detail.seat].team.starters.find(
+                  (starter) => starter.source.playerVersionId === spin.target.playerVersionId,
+                )}
+                <div class="rounded-xl border border-line-soft bg-surface-1 p-3">
+                  <p class="text-sm font-bold">
+                    {target?.source.displayName ?? spin.target.cardId}
+                  </p>
+                  <p class="mt-1 text-xs text-muted-foreground">
+                    {spin.purchase === 'standard' ? 'Mutation Spark' : 'Mutation Surge'} &middot; {money(
+                      spin.priceDollars,
+                    )}
+                  </p>
+                  {#each [spin.entry, ...(spin.additionalEntries ?? [])] as entry (entry.mutationId)}
+                    {@const mutation = havocMutationDefinitionOf(entry.mutationId)}
+                    <p class="mt-2 text-sm font-semibold">{mutation.name}</p>
+                    <p class="mt-1 text-xs text-muted-foreground">{mutation.description}</p>
+                    {#if mutation.downside}<p class="mt-1 text-xs text-destructive">
+                        Downside: {mutation.downside}
+                      </p>{/if}
+                  {/each}
+                </div>
+              {/each}
+            </section>
+          {/if}
 
           {#if locked !== null}
             <CapRushMultiplayerRoster {state} seat={detail.seat} {localSeat} {art} />

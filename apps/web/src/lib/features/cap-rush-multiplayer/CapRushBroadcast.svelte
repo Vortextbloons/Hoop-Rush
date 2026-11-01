@@ -3,6 +3,7 @@
   import type { CapRushArt } from '../cap-rush/cap-rush-art.js';
   import { onMount } from 'svelte';
   import type {
+    CapRushConferenceSeries,
     HavocBattleInput,
     HavocBattleResult,
     HavocBattleTape,
@@ -17,6 +18,8 @@
   import { gamecastBattleFinalBoxes } from '#lib/gamecast/gamecast-battle-view.js';
 
   let {
+    series = null,
+    gameOrdinal = null,
     art = null,
     input,
     result,
@@ -28,6 +31,8 @@
     oncomplete,
     onclose,
   }: {
+    series?: CapRushConferenceSeries | null;
+    gameOrdinal?: number | null;
     art?: CapRushArt | null;
     input: HavocBattleInput;
     result: HavocBattleResult;
@@ -68,6 +73,22 @@
   const localBox = $derived(boxes.find((box) => box.side === localSide));
   const opponentBox = $derived(boxes.find((box) => box.side !== localSide));
   const localWon = $derived((localBox?.score ?? 0) > (opponentBox?.score ?? 0));
+  const seriesRecord = $derived.by(() => {
+    if (kind !== 'playoff' || series === null || gameOrdinal === null) return null;
+    const ownTeamId = input[localSide].teamId;
+    const prior = series.games.filter((game) => game.gameOrdinal < gameOrdinal);
+    let wins = prior.filter((game) => game.winnerTeamId === ownTeamId).length;
+    let losses = prior.length - wins;
+    if (complete) {
+      if (localWon) wins += 1;
+      else losses += 1;
+    }
+    return {
+      wins,
+      losses,
+      label: wins === 4 ? 'Won series' : losses === 4 ? 'Lost series' : 'Series',
+    };
+  });
   const recapDetail = $derived(
     kind === 'review'
       ? 'Review the final box score, then continue.'
@@ -77,9 +98,25 @@
   );
 </script>
 
+{#snippet seriesHeader()}
+  {#if seriesRecord !== null}
+    <p
+      class="inline-flex items-center gap-2 rounded-lg border border-primary/40 bg-primary/10 px-3 py-1.5 font-mono text-xs font-bold text-primary"
+      aria-label={`${seriesRecord.label}: ${seriesRecord.wins} wins, ${seriesRecord.losses} losses`}
+    >
+      <span class="text-[10px] tracking-wider uppercase">{seriesRecord.label}</span>
+      <span class="font-display text-xl tabular-nums"
+        >{seriesRecord.wins}&ndash;{seriesRecord.losses}</span
+      >
+    </p>
+  {/if}
+{/snippet}
+
 {#snippet teamIdentity(side: 'home' | 'away')}
   {@const team = art?.teamFor(input[side].teamId) ?? null}
-  <span class="inline-flex min-w-0 items-center gap-2">
+  <span
+    class="inline-flex min-w-0 max-w-full flex-col items-center gap-1 text-center sm:flex-row sm:gap-2 sm:text-left"
+  >
     {#if team !== null && art !== null}
       <TeamLogo
         manifest={art.manifest}
@@ -88,7 +125,7 @@
         className="h-7 w-7 shrink-0"
       />
     {/if}
-    <span>{input[side].displayName}</span>
+    <span class="min-w-0 break-words">{input[side].displayName}</span>
   </span>
 {/snippet}
 
@@ -100,15 +137,20 @@
     data-complete="true"
   >
     <header class="flex flex-col items-center gap-1 text-center">
+      {@render seriesHeader()}
       <p class="font-mono text-[10px] tracking-[0.16em] text-primary uppercase">
         {matchupLabel} · Final
       </p>
       <h2 class="font-display text-2xl font-extrabold tracking-tight uppercase sm:text-3xl">
         {kind === 'review' ? 'Final' : localWon ? 'You win' : 'Opponent wins'}
       </h2>
-      <div class="flex flex-wrap items-center justify-center gap-3">
+      <div
+        class="grid w-full min-w-0 grid-cols-2 items-center gap-3 sm:flex sm:flex-wrap sm:justify-center"
+      >
         {@render teamIdentity(localSide)}
-        <p class="font-display text-5xl font-extrabold tabular-nums sm:text-6xl">
+        <p
+          class="order-last col-span-2 font-display text-5xl sm:order-none font-extrabold tabular-nums sm:text-6xl"
+        >
           <span class="text-primary">{localBox?.score ?? 0}</span>
           <span class="px-2 text-muted-foreground" aria-hidden="true">–</span>
           <span>{opponentBox?.score ?? 0}</span>
@@ -138,6 +180,7 @@
   >
     <header class="flex flex-wrap items-center justify-between gap-2">
       <div>
+        {@render seriesHeader()}
         <p class="font-mono text-[10px] uppercase tracking-[0.16em] text-primary">
           {matchupLabel} · {speed}×
         </p>
@@ -152,14 +195,14 @@
       <div class="flex items-center gap-2">
         <button
           type="button"
-          class="inline-flex min-h-9 items-center justify-center rounded-lg border border-border bg-surface-2 px-3 text-xs font-semibold"
+          class="inline-flex min-h-11 items-center justify-center rounded-lg border border-border bg-surface-2 px-3 text-xs font-semibold"
           onclick={() => (playing = !playing)}
         >
           {playing ? 'Pause' : 'Resume'}
         </button>
         <button
           type="button"
-          class="inline-flex min-h-9 items-center justify-center rounded-lg border border-border bg-surface-2 px-3 text-xs font-semibold"
+          class="inline-flex min-h-11 items-center justify-center rounded-lg border border-border bg-surface-2 px-3 text-xs font-semibold"
           onclick={onclose}
         >
           Close
