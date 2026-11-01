@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'bun:test';
-import Dexie from 'dexie';
 import type {
   CapRushAcceptGameCommand,
   CapRushDraftState,
@@ -68,11 +67,7 @@ import {
   DexieCapRushRepository,
   capRushReportCommandError,
 } from './cap-rush.ts';
-import {
-  HOOP_RUSH_DATABASE_V11_STORES,
-  HOOP_RUSH_DATABASE_V9_STORES,
-  HoopRushDatabase,
-} from './dexie.ts';
+import { HOOP_RUSH_DATABASE_STORES, HoopRushDatabase } from './dexie.ts';
 import {
   resetIndexedDb,
   restoreIndexedDb,
@@ -263,7 +258,7 @@ describe('cap rush repository', () => {
 
   it('opens the playoff game store for a run without playoff games', async () => {
     expect(await repository.listPlayoffGames('run-test')).toEqual([]);
-    expect(HOOP_RUSH_DATABASE_V9_STORES.capRushPlayoffGames).toBe('[runId+gameId], runId');
+    expect(HOOP_RUSH_DATABASE_STORES.capRushPlayoffGames).toBe('[runId+gameId], runId');
   });
 
   it('allows reports from both finalize commands', () => {
@@ -579,44 +574,6 @@ describe('cap rush repository', () => {
     expect(await db.capRushGames.get([state.runId, 1])).toEqual(gameBefore);
     expect((await db.capRushPlaybackCursors.get(key))?.cursor).toBe(1);
     expect((await repository.readRunGame(state.runId, 1))?.playback?.cursor).toBe(1);
-  });
-
-  it('moves an active run broadcast out of game rows when upgrading', async () => {
-    const name = testDatabaseName('cap-rush-migration');
-    const legacy = new Dexie(name);
-    legacy.version(12).stores(HOOP_RUSH_DATABASE_V11_STORES);
-    await legacy.open();
-    await legacy.table('capRushActive').put({
-      recordId: CAP_RUSH_ACTIVE_DRAFT_RECORD_ID,
-      runId: 'run-migrate',
-    });
-    await legacy.table('capRushGames').put({
-      runId: 'run-migrate',
-      gameNumber: 1,
-      updatedAtIso: '2026-01-01T00:00:00.000Z',
-      game: {
-        gameNumber: 1,
-        playback: {
-          cursor: 2,
-          input: {},
-          facts: [],
-          tape: { events: [{}], scoring: [{}] },
-        },
-      },
-    });
-    legacy.close();
-
-    const upgraded = new HoopRushDatabase(name);
-    await upgraded.open();
-    const game = await upgraded.capRushGames.get(['run-migrate', 1]);
-    expect(game?.game.playback).toBeUndefined();
-    const evidence = await upgraded.capRushPlaybackEvidence.get(['run-migrate', 'regular:1']);
-    expect(evidence?.playback.cursor).toBe(0);
-    expect(evidence?.playback.tape.events).toHaveLength(1);
-    const cursor = await upgraded.capRushPlaybackCursors.get(['run-migrate', 'regular:1']);
-    expect(cursor?.cursor).toBe(2);
-    expect(cursor?.total).toBe(2);
-    upgraded.close();
   });
 
   it('rejects a malformed stored game record on read', async () => {

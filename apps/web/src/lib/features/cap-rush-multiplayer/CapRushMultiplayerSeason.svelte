@@ -54,12 +54,15 @@
 </script>
 
 {#if season === null || locked === null || records === null}
-  <section class="rounded-2xl border border-border bg-card p-4" data-cap-rush-multiplayer-season>
+  <section
+    class="rounded-2xl border border-border bg-card p-3 sm:p-4"
+    data-cap-rush-multiplayer-season
+  >
     <p class="text-sm text-muted-foreground">The shared season is not ready yet.</p>
   </section>
 {:else}
   <div class="flex min-w-0 flex-col gap-4" data-cap-rush-multiplayer-season>
-    <div class="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
+    <div class="grid min-w-0 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
       <div class="flex min-w-0 flex-col gap-4">
         <CapRushSharedProgress
           {state}
@@ -71,7 +74,10 @@
         />
       </div>
 
-      <aside class="flex min-w-0 flex-col gap-3" aria-label="Team payroll and rosters">
+      <aside
+        class="grid min-w-0 items-start gap-3 sm:grid-cols-2"
+        aria-label="Team payroll and rosters"
+      >
         {#each orderedSeats as seat (seat)}
           {@const franchise = locked.seats[seat].franchise}
           {@const record = records[seat]}
@@ -113,7 +119,7 @@
             <CapRushSeatLedger {state} {seat} {localSeat} {art} />
           </div>
         {/each}
-        <p class="px-1 text-[11px] leading-relaxed text-muted-foreground">
+        <p class="px-1 text-[11px] leading-relaxed text-muted-foreground sm:col-span-2">
           Both rosters are locked in for the shared 82-game season.
         </p>
       </aside>
@@ -123,7 +129,7 @@
       {#if standings !== null}
         <CapRushStandings {standings} manifest={art?.manifest ?? null} userTeamId={localTeamId} />
       {:else}
-        <div class="rounded-2xl border border-border bg-card p-4">
+        <div class="rounded-2xl border border-border bg-card p-3 sm:p-4">
           <p class="font-mono text-[10px] tracking-[0.16em] text-muted-foreground uppercase">
             Standings
           </p>

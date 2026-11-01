@@ -29,6 +29,9 @@
   const view = $derived(controller.view);
   const game = $derived(view?.state ?? null);
   const seat = $derived(controller.seat);
+  const activeRound = $derived(
+    game?.recruitment?.rounds.find((round) => round.index === game?.recruitment?.roundIndex),
+  );
   const members = $derived(
     view?.snapshot?.members.map((member) => ({
       participantId: member.participantId,
@@ -67,6 +70,7 @@
 
 <div class="mx-auto w-full max-w-6xl px-3 pb-8 sm:px-6">
   <RoomShell
+    compactMobile
     {roomId}
     title="Cap Rush"
     {summary}
@@ -192,6 +196,29 @@
           art={controller.art}
           animate={controller.franchiseReveal}
         />
+        {#if activeRound?.status === 'bidding'}
+          <div
+            class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card p-3"
+          >
+            <p class="text-sm text-muted-foreground">
+              Both players must agree to end this round. Current bids stand.
+            </p>
+            <button
+              type="button"
+              class="min-h-11 rounded-xl border border-primary/40 px-4 text-sm font-bold text-primary outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
+              disabled={controller.busy}
+              onclick={() =>
+                controller.endAuctionEarly(
+                  activeRound.index,
+                  !(activeRound.endEarlySeats ?? []).includes(seat),
+                )}
+            >
+              {(activeRound.endEarlySeats ?? []).includes(seat)
+                ? 'Cancel agreement'
+                : 'End auction early'} ? {activeRound.endEarlySeats?.length ?? 0}/2
+            </button>
+          </div>
+        {/if}
         <CapRushAuctionBoard
           {game}
           localSeat={seat}

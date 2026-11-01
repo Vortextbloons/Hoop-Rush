@@ -146,6 +146,10 @@ export class CapRushMultiplayerSession {
     });
   }
 
+  async endAuctionEarly(round: number, agree: boolean): Promise<CapRushMultiplayerCommandReceipt> {
+    return this.send({ kind: 'end-auction-early', round, agree });
+  }
+
   async closeDueAuctions(): Promise<CapRushMultiplayerCommandReceipt | null> {
     const receipt = await this.deps.transport.closeDueAuctions(this.deps.roomId);
     await this.refresh();

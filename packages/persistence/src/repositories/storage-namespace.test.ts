@@ -1,10 +1,6 @@
 import Dexie from 'dexie';
 import { afterEach, describe, expect, it } from 'bun:test';
-import {
-  HOOP_RUSH_DATABASE_NAME,
-  HOOP_RUSH_DATABASE_V14_STORES,
-  HoopRushDatabase,
-} from './dexie.ts';
+import { HOOP_RUSH_DATABASE_NAME, HOOP_RUSH_DATABASE_STORES, HoopRushDatabase } from './dexie.ts';
 import {
   resetIndexedDb,
   restoreIndexedDb,
@@ -24,8 +20,43 @@ describe('storage namespace', () => {
     expect(db.name).not.toBe(LEGACY_DATABASE_NAME);
     expect(db.verno).toBe(14);
     const tableNames = db.tables.map((table) => table.name).sort();
-    expect(tableNames).toEqual(Object.keys(HOOP_RUSH_DATABASE_V14_STORES).sort());
+    expect(tableNames).toEqual(Object.keys(HOOP_RUSH_DATABASE_STORES).sort());
     db.close();
+  });
+
+  it('reopens current saves without resetting records', async () => {
+    resetIndexedDb();
+    const name = testDatabaseName('current-reopen');
+    const db = new HoopRushDatabase(name);
+    await db.open();
+    await db.table('profileSelection').put({ id: 'selection', profileId: 'current' });
+    db.close();
+    const reopened = new HoopRushDatabase(name);
+    await reopened.open();
+    expect(await reopened.table('profileSelection').get('selection')).toEqual({
+      id: 'selection',
+      profileId: 'current',
+    });
+    reopened.close();
+  });
+
+  it('rejects every older database version without migrating its records', async () => {
+    for (let version = 1; version < 14; version++) {
+      resetIndexedDb();
+      const name = testDatabaseName(`unsupported-${String(version)}`);
+      const old = new Dexie(name);
+      old.version(version).stores({ completed: 'recordId' });
+      await old.table('completed').put({ recordId: 'old-save' });
+      old.close();
+      const current = new HoopRushDatabase(name);
+      await expect(Promise.resolve(current.open())).rejects.toThrow('Clear Hoop Rush site data');
+      current.close();
+      const reopened = new Dexie(name);
+      await reopened.open();
+      expect(reopened.verno).toBe(version);
+      expect(await reopened.table('completed').count()).toBe(1);
+      reopened.close();
+    }
   });
 
   it('leaves the legacy database untouched and unread', async () => {

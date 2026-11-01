@@ -12,7 +12,6 @@ import {
   havocGameResultSchema,
   havocGameTapeSchema,
   havocReportSchema,
-  havocRunStateSchema,
   havocRunProgressSchema,
   havocLockedInputsSchema,
   havocVariantSchema,
@@ -27,7 +26,7 @@ const isoDateSchema = z.iso.datetime();
 const storedHavocProgressSchema = havocRunProgressSchema.safeExtend({
   locked: z.object({ runId: idSchema, digest: havocDigestSchema }).strict().nullable(),
 });
-const storedHavocStateSchema = z.union([storedHavocProgressSchema, havocRunStateSchema]);
+const storedHavocStateSchema = storedHavocProgressSchema;
 export type StoredHavocState = z.infer<typeof storedHavocStateSchema>;
 export const storedHavocLockedInputsSchema = z
   .object({

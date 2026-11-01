@@ -65,6 +65,33 @@ function harness(command: LobbySessionDeps['command'] = vi.fn(() => Promise.reso
 }
 
 describe('lobby orchestration', () => {
+  it('clears a stale lobby and stops polling when membership is lost', async () => {
+    const command = vi
+      .fn<LobbySessionDeps['command']>()
+      .mockResolvedValueOnce(lobby)
+      .mockRejectedValue(new Error('membership'));
+    const h = harness(command);
+    await h.session.attach(lobbyId);
+    await h.session.refresh();
+    expect(h.session.getSnapshot().lobby).toBeNull();
+    expect(h.session.getSnapshot().error).toBeNull();
+    expect(h.unsubscribe).toHaveBeenCalledTimes(1);
+    expect(h.stop).toHaveBeenCalledTimes(1);
+    h.session.dispose();
+  });
+  it('allows local leave when the server already removed membership', async () => {
+    const command = vi
+      .fn<LobbySessionDeps['command']>()
+      .mockResolvedValueOnce(lobby)
+      .mockRejectedValue(new Error('membership'));
+    const h = harness(command);
+    await h.session.attach(lobbyId);
+    await h.session.leave();
+    expect(h.session.getSnapshot().lobby).toBeNull();
+    expect(h.session.getSnapshot().error).toBeNull();
+    h.session.dispose();
+  });
+
   it('keeps unchanged polls silent and avoids rewriting lobby routing hints', async () => {
     const command = vi.fn<LobbySessionDeps['command']>().mockResolvedValue(lobby);
     const h = harness(command);

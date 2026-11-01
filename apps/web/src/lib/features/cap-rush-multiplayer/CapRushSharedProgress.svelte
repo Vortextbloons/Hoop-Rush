@@ -163,7 +163,7 @@
   <p class="text-sm text-muted-foreground">The shared season is not ready yet.</p>
 {:else}
   <section
-    class="flex min-w-0 flex-col gap-4 rounded-2xl border border-border bg-card p-4"
+    class="flex min-w-0 flex-col gap-4 rounded-2xl border border-border bg-card p-3 sm:p-4"
     data-cap-rush-shared-progress
   >
     <header class="flex min-w-0 flex-col gap-2">
@@ -172,7 +172,7 @@
           <p class="font-mono text-[10px] tracking-[0.16em] text-muted-foreground uppercase">
             Shared season
           </p>
-          <h2 class="font-display text-2xl font-extrabold tracking-tight uppercase">
+          <h2 class="font-display text-xl font-extrabold tracking-tight uppercase sm:text-2xl">
             Through game {season.frontierSlot} of 82
           </h2>
         </div>
@@ -249,7 +249,7 @@
           ? 'text-primary'
           : 'text-muted-foreground'}"
       >
-        {nextStep.mine ? 'Your move' : 'Waiting'}
+        {nextStep.mine ? 'Your move' : h2h === null ? 'Season in progress' : 'Waiting for opponent'}
       </p>
       <p class="font-display text-lg leading-tight font-bold tracking-tight uppercase">
         {nextStep.title}

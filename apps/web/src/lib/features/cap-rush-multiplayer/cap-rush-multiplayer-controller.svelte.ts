@@ -165,6 +165,10 @@ export class CapRushMultiplayerController {
     }
   }
 
+  async endAuctionEarly(round: number, agree: boolean): Promise<void> {
+    await this.run(() => this.session?.endAuctionEarly(round, agree));
+  }
+
   async chooseBlock(choice: 'sim' | 'simcast'): Promise<void> {
     const state = this.state;
     if (state?.season === null || state?.season === undefined) return;
