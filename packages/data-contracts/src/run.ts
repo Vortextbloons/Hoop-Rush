@@ -3,7 +3,12 @@ import { franchiseIdSchema, eraIdSchema, playerIdSchema, seedSchema } from './id
 import { difficultyProfileSchema } from './difficulty.ts';
 import { lineupSchema } from './lineup.ts';
 import { simulationPlayerSchema } from './simulation.ts';
-import { gameResultSchema, playerBoxScoreSchema, teamBoxScoreSchema } from './result.ts';
+import {
+  gameResultSchema,
+  playerBoxScoreSchema,
+  teamBoxScoreSchema,
+  type GameResult,
+} from './result.ts';
 import { opponentBracketCoreSchema } from './bracket.ts';
 import { leagueRecordSchema } from './league.ts';
 import { RUN_SCHEMA_VERSION, SAVE_SCHEMA_VERSION } from './versions.ts';
@@ -74,3 +79,53 @@ export const challengeRunSchema = z.object({
   aggregates: runAggregatesSchema,
 });
 export type ChallengeRun = z.infer<typeof challengeRunSchema>;
+
+/**
+ * Canonical saved-run values.
+ *
+ * `@hoop-rush/persistence` owns the record envelopes, but these two values are
+ * application-facing contracts: a use case hands a completed run and its index
+ * to a repository port. Defining them here lets the application describe that
+ * commit without importing the storage package.
+ */
+export const storedRunRecordSchema = z.object({
+  recordId: z.string().min(1).max(64),
+  saveSchemaVersion: z.literal(SAVE_SCHEMA_VERSION),
+  run: challengeRunSchema,
+  updatedAtIso: z.iso.datetime().optional(),
+});
+export type StoredRunRecord = z.infer<typeof storedRunRecordSchema>;
+
+export const completedRunIndexSchema = z.object({
+  recordId: z.string().min(1).max(64),
+  runId: z.string().min(1).max(64),
+  mode: runModeSchema,
+  variant: classicVariantSchema.optional(),
+  franchiseId: z.string().min(1).max(64).nullable(),
+  eraId: z.string().min(1).max(24),
+  playerIds: z.array(playerIdSchema).length(5),
+  selections: z.array(runPlayerSelectionSchema).length(5).optional(),
+  runSeed: seedSchema,
+  wins: z.number().int().nonnegative(),
+  losses: z.number().int().nonnegative(),
+  gamesPlayed: z.number().int().positive(),
+  outcome: runOutcomeSchema,
+  completedAtIso: z.iso.datetime(),
+});
+export type CompletedRunIndex = z.infer<typeof completedRunIndexSchema>;
+
+/** Values a save commit must observe when promoting an active run. */
+export interface PromoteActiveToCompletedExpectation {
+  expectedGamesPlayed: number;
+  expectedRunDigest: string;
+}
+
+/** One accepted game appended to an active run. */
+export interface ActiveGameAppend {
+  runId: string;
+  gameNumber: number;
+  result: GameResult;
+  aggregates: RunAggregates;
+  status: 'active' | 'finished';
+  firstLossGameNumber: number | null;
+}

@@ -41,7 +41,7 @@ import {
   type DraftDuelSeriesRosters,
   type EngineContext,
 } from '@hoop-rush/engine';
-import type { DraftDuelActiveState, DraftDuelCompletionRecap } from '@hoop-rush/persistence';
+import type { DraftDuelActiveState, DraftDuelCompletionRecap } from '@hoop-rush/data-contracts';
 import type { TickScheduler } from '../runtime/index.ts';
 import { type RoomConnection } from '../multiplayer/room-lifecycle.ts';
 import { otherSeriesParticipant } from '../multiplayer/series-coordinator.ts';

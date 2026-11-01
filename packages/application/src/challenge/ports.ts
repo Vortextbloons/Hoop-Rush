@@ -1,10 +1,12 @@
-import type { ChallengeRun, EraSimulationProfile, GameResult } from '@hoop-rush/data-contracts';
 import type {
   ActiveGameAppend,
+  ChallengeRun,
   CompletedRunIndex,
+  EraSimulationProfile,
+  GameResult,
   PromoteActiveToCompletedExpectation,
   StoredRunRecord,
-} from '@hoop-rush/persistence';
+} from '@hoop-rush/data-contracts';
 
 export interface ChallengeRunRepositoryPort {
   loadActiveRun(): Promise<StoredRunRecord | null>;

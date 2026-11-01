@@ -354,6 +354,7 @@ export const draftDuelRoomSnapshotSchema = z.object({
   createdAt: z.string().min(1).max(64),
 });
 export type DraftDuelRoomSnapshot = z.infer<typeof draftDuelRoomSnapshotSchema>;
+
 export const draftDuelRoomMembershipSchema = z.object({
   roomId: idSchema,
   participantId: draftDuelParticipantIdSchema,
@@ -505,6 +506,37 @@ export const draftDuelTransientEventSchema = z.discriminatedUnion('kind', [
   }),
 ]);
 export type DraftDuelTransientEvent = z.infer<typeof draftDuelTransientEventSchema>;
+
+/**
+ * A participant's durable view of a Draft Duel room.
+ *
+ * This is a domain value, not a storage envelope: it holds only the gameplay
+ * state the application reads back on resume. Repositories wrap it with their
+ * own save-schema version and timestamp.
+ */
+export const draftDuelActiveStateSchema = z.object({
+  roomId: z.string().min(1).max(64),
+  localParticipantId: draftDuelParticipantIdSchema,
+  settings: draftDuelRoomSettingsSchema,
+  rootSeed: seedSchema.nullable(),
+  phase: draftDuelRoomPhaseSchema,
+  draft: draftDuelDraftSchema.nullable(),
+  series: draftDuelSeriesSnapshotSchema.nullable(),
+  broadcast: draftDuelBroadcastSchema.nullable(),
+  verification: z.array(draftDuelPartiallyVerifiedSchema).max(7),
+});
+export type DraftDuelActiveState = z.infer<typeof draftDuelActiveStateSchema>;
+
+/** The series summary handed to a save repository when a Draft Duel completes. */
+export const draftDuelCompletionRecapSchema = z.object({
+  roomId: z.string().min(1).max(64),
+  champion: draftDuelParticipantIdSchema,
+  series: draftDuelSeriesSnapshotSchema,
+  mvp: draftDuelSeriesMvpSchema.nullable(),
+  standouts: z.array(draftDuelStandoutSchema),
+  games: z.number().int().min(1).max(7),
+});
+export type DraftDuelCompletionRecap = z.infer<typeof draftDuelCompletionRecapSchema>;
 export const draftDuelMultiplayerErrorCodeSchema = z.enum([
   'authorization',
   'membership',

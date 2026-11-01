@@ -6,7 +6,11 @@ import {
   createGameInput,
   simulateGame,
 } from '@hoop-rush/engine';
-import type { ActiveGameAppend, CompletedRunIndex, StoredRunRecord } from '@hoop-rush/persistence';
+import type {
+  ActiveGameAppend,
+  CompletedRunIndex,
+  StoredRunRecord,
+} from '@hoop-rush/data-contracts';
 import {
   buildChallengeRun,
   buildEraSimulationProfile,

@@ -53,14 +53,10 @@ import type {
   HavocMultiplayerCommandEntry,
   HavocMultiplayerCompletionRecap,
   HavocMultiplayerGameOutput,
-  StoredHavocMultiplayerActive,
-  StoredHavocMultiplayerCompleted,
-  StoredHavocMultiplayerResultRow,
-} from '@hoop-rush/persistence';
+} from '@hoop-rush/data-contracts';
 import { HavocMultiplayerSession, type HavocMultiplayerSessionAssets } from './session.ts';
 
 const START_MS = Date.parse('2026-10-13T12:00:00.000Z');
-const FIXED_ISO = new Date(START_MS).toISOString();
 const ROOM_SEED = 'havoc-multiplayer-session-test';
 
 let commandCounter = 0;
@@ -105,26 +101,28 @@ function locksFor(versionSet: HavocVersionSet): HavocMultiplayerVersionLocks {
 }
 
 class FakeHavocMultiplayerRepository {
-  active: StoredHavocMultiplayerActive | null = null;
-  completed: StoredHavocMultiplayerCompleted | null = null;
-  results: StoredHavocMultiplayerResultRow[] = [];
+  active: HavocMultiplayerActiveState | null = null;
+  completed: HavocMultiplayerCompletionRecap | null = null;
+  results: HavocMultiplayerGameOutput[] = [];
+  /** Mirrors the storage layer's "do not downgrade verified" behavior. */
+  verified = new Map<string, boolean>();
   commandRows: HavocMultiplayerCommandEntry[] = [];
   recaps: HavocMultiplayerCompletionRecap[] = [];
   verificationSaves: HavocMultiplayerVerificationReceipt[][] = [];
 
-  loadActive(roomId: string): Promise<StoredHavocMultiplayerActive | null> {
+  loadActive(roomId: string): Promise<HavocMultiplayerActiveState | null> {
     return Promise.resolve(
       this.active !== null && this.active.roomId === roomId ? this.active : null,
     );
   }
 
-  loadCompleted(roomId: string): Promise<StoredHavocMultiplayerCompleted | null> {
+  loadCompleted(roomId: string): Promise<HavocMultiplayerCompletionRecap | null> {
     return Promise.resolve(
       this.completed !== null && this.completed.roomId === roomId ? this.completed : null,
     );
   }
 
-  loadResults(roomId: string): Promise<StoredHavocMultiplayerResultRow[]> {
+  loadResults(roomId: string): Promise<HavocMultiplayerGameOutput[]> {
     return Promise.resolve(this.results.filter((row) => row.roomId === roomId));
   }
 
@@ -146,27 +144,11 @@ class FakeHavocMultiplayerRepository {
   }
 
   saveResult(output: HavocMultiplayerGameOutput): Promise<void> {
-    const existing = this.results.find(
-      (row) => row.roomId === output.roomId && row.gameNumber === output.gameNumber,
-    );
-    const row: StoredHavocMultiplayerResultRow = {
-      saveSchemaVersion: HAVOC_MULTIPLAYER_SAVE_SCHEMA_VERSION,
-      roomId: output.roomId,
-      gameNumber: output.gameNumber,
-      winner: output.winner,
-      result: output.result,
-      tape: output.tape,
-      inputDigest: output.inputDigest,
-      resultDigest: output.resultDigest,
-      tapeDigest: output.tapeDigest,
-      verified: existing?.verified ?? false,
-      storedAtIso: FIXED_ISO,
-    };
     this.results = [
       ...this.results.filter(
         (entry) => entry.roomId !== output.roomId || entry.gameNumber !== output.gameNumber,
       ),
-      row,
+      output,
     ];
     return Promise.resolve();
   }
@@ -181,30 +163,23 @@ class FakeHavocMultiplayerRepository {
       this.active = { ...this.active, verification: receipts };
     }
     const digests = new Set(receipts.map((receipt) => receipt.resultDigest));
-    this.results = this.results.map((row) => ({ ...row, verified: digests.has(row.resultDigest) }));
+    for (const [key, value] of this.verified) {
+      if (!digests.has(key)) this.verified.set(key, value);
+    }
+    for (const row of this.results) {
+      if (digests.has(row.resultDigest)) this.verified.set(row.resultDigest, true);
+    }
     return Promise.resolve();
   }
 
   saveActive(state: HavocMultiplayerActiveState): Promise<void> {
-    this.active = {
-      ...state,
-      saveSchemaVersion: HAVOC_MULTIPLAYER_SAVE_SCHEMA_VERSION,
-      updatedAtIso: FIXED_ISO,
-    };
+    this.active = state;
     return Promise.resolve();
   }
 
   complete(recap: HavocMultiplayerCompletionRecap): Promise<void> {
     this.recaps.push(recap);
-    this.completed = {
-      saveSchemaVersion: HAVOC_MULTIPLAYER_SAVE_SCHEMA_VERSION,
-      roomId: recap.roomId,
-      champion: recap.champion,
-      series: recap.series,
-      mvp: recap.mvp,
-      games: recap.games,
-      completedAtIso: FIXED_ISO,
-    };
+    this.completed = recap;
     this.active = null;
     this.commandRows = [];
     return Promise.resolve();
@@ -719,7 +694,9 @@ describe('HavocMultiplayerSession draft and series', () => {
     expect(view.mvp).toEqual(recap.mvp);
     expect(h.session.getSnapshot().mvp).toBe(view.mvp);
     expect(h.runner.calls.map((call) => call.gameNumber)).toHaveLength(series?.games.length ?? 0);
-    expect(h.repository.results.every((row) => row.verified)).toBe(true);
+    expect(h.repository.results.every((row) => h.repository.verified.get(row.resultDigest))).toBe(
+      true,
+    );
     const savedReceipts = h.repository.verificationSaves.at(-1) ?? [];
     expect(savedReceipts.map((receipt) => receipt.receiptId)).toEqual(
       (series?.games ?? []).map((game) => `hvr-${String(game.gameNumber)}`),

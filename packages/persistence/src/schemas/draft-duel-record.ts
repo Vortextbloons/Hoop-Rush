@@ -1,40 +1,29 @@
 import { z } from 'zod';
 import {
-  draftDuelBroadcastSchema,
+  draftDuelActiveStateSchema,
   draftDuelCommandSchema,
-  draftDuelDraftSchema,
+  draftDuelCompletionRecapSchema,
   draftDuelGameOutputSchema,
   draftDuelPartiallyVerifiedSchema,
   draftDuelParticipantIdSchema,
-  draftDuelRoomPhaseSchema,
-  draftDuelRoomSettingsSchema,
   draftDuelSeriesMvpSchema,
   draftDuelSeriesSnapshotSchema,
   draftDuelStandoutSchema,
-  seedSchema,
+  type DraftDuelActiveState,
+  type DraftDuelCompletionRecap,
 } from '@hoop-rush/data-contracts';
+
+export { draftDuelActiveStateSchema, draftDuelCompletionRecapSchema };
+export type { DraftDuelActiveState, DraftDuelCompletionRecap };
 export const DRAFT_DUEL_SAVE_SCHEMA_VERSION = 1;
 const roomIdSchema = z.string().min(1).max(64);
 const roomRecordIdSchema = z.string().min(1).max(64);
 const isoDateSchema = z.string().min(1).max(64);
-export const storedDraftDuelActiveSchema = z.object({
+export const storedDraftDuelActiveSchema = draftDuelActiveStateSchema.extend({
   saveSchemaVersion: z.literal(DRAFT_DUEL_SAVE_SCHEMA_VERSION),
-  roomId: roomIdSchema,
-  localParticipantId: draftDuelParticipantIdSchema,
-  settings: draftDuelRoomSettingsSchema,
-  rootSeed: seedSchema.nullable(),
-  phase: draftDuelRoomPhaseSchema,
-  draft: draftDuelDraftSchema.nullable(),
-  series: draftDuelSeriesSnapshotSchema.nullable(),
-  broadcast: draftDuelBroadcastSchema.nullable(),
-  verification: z.array(draftDuelPartiallyVerifiedSchema).max(7),
   updatedAtIso: isoDateSchema,
 });
 export type StoredDraftDuelActive = z.infer<typeof storedDraftDuelActiveSchema>;
-export type DraftDuelActiveState = Omit<
-  StoredDraftDuelActive,
-  'saveSchemaVersion' | 'updatedAtIso'
->;
 export const storedDraftDuelCommandRowSchema = z.object({
   saveSchemaVersion: z.literal(DRAFT_DUEL_SAVE_SCHEMA_VERSION),
   roomId: roomIdSchema,
@@ -72,12 +61,3 @@ export const storedDraftDuelHistoryIndexSchema = z.object({
   completedAtIso: isoDateSchema,
 });
 export type StoredDraftDuelHistoryIndex = z.infer<typeof storedDraftDuelHistoryIndexSchema>;
-export const draftDuelCompletionRecapSchema = z.object({
-  roomId: roomIdSchema,
-  champion: draftDuelParticipantIdSchema,
-  series: draftDuelSeriesSnapshotSchema,
-  mvp: draftDuelSeriesMvpSchema.nullable(),
-  standouts: z.array(draftDuelStandoutSchema),
-  games: z.number().int().min(1).max(7),
-});
-export type DraftDuelCompletionRecap = z.infer<typeof draftDuelCompletionRecapSchema>;

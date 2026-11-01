@@ -7,14 +7,20 @@ import {
   havocBattleResultSchema,
   havocBattleTapeSchema,
   havocDigestSchema,
+  havocMultiplayerActiveStateSchema,
+  havocMultiplayerCommandEntrySchema,
   havocMultiplayerCommandPayloadSchema,
-  havocMultiplayerCommandSchema,
+  havocMultiplayerCompletionRecapSchema,
+  havocMultiplayerGameOutputSchema,
   havocMultiplayerParticipantIdSchema,
-  havocMultiplayerRoomSnapshotSchema,
   havocMultiplayerSeriesGameSchema,
+  havocMultiplayerSeriesMvpSchema,
   havocMultiplayerSeriesSnapshotSchema,
-  havocMultiplayerVerificationReceiptSchema,
-  positionSchema,
+  type HavocMultiplayerActiveState,
+  type HavocMultiplayerCommandEntry,
+  type HavocMultiplayerCompletionRecap,
+  type HavocMultiplayerGameOutput,
+  type HavocMultiplayerSeriesMvp,
 } from '@hoop-rush/data-contracts';
 
 const roomIdSchema = z.string().min(1).max(64);
@@ -22,26 +28,26 @@ const roomRecordIdSchema = z.string().min(1).max(64);
 const isoDateSchema = z.string().min(1).max(64);
 const gameNumberSchema = z.number().int().min(1).max(HAVOC_MULTIPLAYER_SERIES_GAMES);
 
-export const havocMultiplayerGameOutputSchema = z.object({
-  roomId: roomIdSchema,
-  gameNumber: gameNumberSchema,
-  winner: havocMultiplayerParticipantIdSchema,
-  result: havocBattleResultSchema,
-  tape: havocBattleTapeSchema,
-  inputDigest: havocDigestSchema,
-  resultDigest: havocDigestSchema,
-  tapeDigest: havocDigestSchema,
-});
-export type HavocMultiplayerGameOutput = z.infer<typeof havocMultiplayerGameOutputSchema>;
+// Domain values are canonical in `@hoop-rush/data-contracts`, because the
+// application describes saves with them. Re-exported for existing imports.
+export {
+  havocMultiplayerActiveStateSchema,
+  havocMultiplayerCommandEntrySchema,
+  havocMultiplayerCompletionRecapSchema,
+  havocMultiplayerGameOutputSchema,
+  havocMultiplayerSeriesMvpSchema,
+};
+export type {
+  HavocMultiplayerActiveState,
+  HavocMultiplayerCommandEntry,
+  HavocMultiplayerCompletionRecap,
+  HavocMultiplayerGameOutput,
+  HavocMultiplayerSeriesMvp,
+};
 
-export const storedHavocMultiplayerActiveSchema = z
-  .object({
+export const storedHavocMultiplayerActiveSchema = havocMultiplayerActiveStateSchema
+  .extend({
     saveSchemaVersion: z.literal(HAVOC_MULTIPLAYER_SAVE_SCHEMA_VERSION),
-    roomId: roomIdSchema,
-    snapshot: havocMultiplayerRoomSnapshotSchema,
-    verification: z
-      .array(havocMultiplayerVerificationReceiptSchema)
-      .max(HAVOC_MULTIPLAYER_SERIES_GAMES),
     updatedAtIso: isoDateSchema,
   })
   .superRefine((row, ctx) => {
@@ -50,16 +56,6 @@ export const storedHavocMultiplayerActiveSchema = z
     }
   });
 export type StoredHavocMultiplayerActive = z.infer<typeof storedHavocMultiplayerActiveSchema>;
-export type HavocMultiplayerActiveState = Omit<
-  StoredHavocMultiplayerActive,
-  'saveSchemaVersion' | 'updatedAtIso'
->;
-
-export const havocMultiplayerCommandEntrySchema = z.object({
-  ordinal: z.number().int().nonnegative(),
-  command: havocMultiplayerCommandSchema,
-});
-export type HavocMultiplayerCommandEntry = z.infer<typeof havocMultiplayerCommandEntrySchema>;
 
 export const storedHavocMultiplayerCommandRowSchema = z.object({
   saveSchemaVersion: z.literal(HAVOC_MULTIPLAYER_SAVE_SCHEMA_VERSION),
@@ -95,29 +91,8 @@ export const storedHavocMultiplayerResultRowSchema = z
   });
 export type StoredHavocMultiplayerResultRow = z.infer<typeof storedHavocMultiplayerResultRowSchema>;
 
-export const havocMultiplayerSeriesMvpSchema = z.object({
-  participantId: havocMultiplayerParticipantIdSchema,
-  slot: positionSchema,
-  index: z.number().int(),
-});
-export type HavocMultiplayerSeriesMvp = z.infer<typeof havocMultiplayerSeriesMvpSchema>;
-
-export const havocMultiplayerCompletionRecapSchema = z.object({
-  roomId: roomIdSchema,
-  champion: havocMultiplayerParticipantIdSchema,
-  series: havocMultiplayerSeriesSnapshotSchema,
-  mvp: havocMultiplayerSeriesMvpSchema.nullable(),
-  games: z.array(havocMultiplayerSeriesGameSchema).max(HAVOC_MULTIPLAYER_SERIES_GAMES),
-});
-export type HavocMultiplayerCompletionRecap = z.infer<typeof havocMultiplayerCompletionRecapSchema>;
-
-export const storedHavocMultiplayerCompletedSchema = z.object({
+export const storedHavocMultiplayerCompletedSchema = havocMultiplayerCompletionRecapSchema.extend({
   saveSchemaVersion: z.literal(HAVOC_MULTIPLAYER_SAVE_SCHEMA_VERSION),
-  roomId: roomIdSchema,
-  champion: havocMultiplayerParticipantIdSchema,
-  series: havocMultiplayerSeriesSnapshotSchema,
-  mvp: havocMultiplayerSeriesMvpSchema.nullable(),
-  games: z.array(havocMultiplayerSeriesGameSchema).max(HAVOC_MULTIPLAYER_SERIES_GAMES),
   completedAtIso: isoDateSchema,
 });
 export type StoredHavocMultiplayerCompleted = z.infer<typeof storedHavocMultiplayerCompletedSchema>;

@@ -13,6 +13,7 @@ import {
   havocOfferIdSchema,
 } from './havoc-draft.ts';
 import { havocClaimKeySchema } from './havoc-profile.ts';
+import { havocBattleResultSchema, havocBattleTapeSchema } from './havoc-battle.ts';
 import {
   HAVOC_CURATED_RATING_BANDS,
   HAVOC_CURATED_RATING_BAND_NAMES,
@@ -610,6 +611,65 @@ export const havocMultiplayerErrorSchema = z.object({
   retryable: z.boolean(),
 });
 export type HavocMultiplayerError = z.infer<typeof havocMultiplayerErrorSchema>;
+
+const havocMultiplayerRoomIdSchema = z.string().min(1).max(64);
+const havocMultiplayerGameNumberSchema = z
+  .number()
+  .int()
+  .min(1)
+  .max(HAVOC_MULTIPLAYER_SERIES_GAMES);
+
+/** A simulated Havoc multiplayer game before it is written to a save record. */
+export const havocMultiplayerGameOutputSchema = z.object({
+  roomId: havocMultiplayerRoomIdSchema,
+  gameNumber: havocMultiplayerGameNumberSchema,
+  winner: havocMultiplayerParticipantIdSchema,
+  result: havocBattleResultSchema,
+  tape: havocBattleTapeSchema,
+  inputDigest: havocDigestSchema,
+  resultDigest: havocDigestSchema,
+  tapeDigest: havocDigestSchema,
+});
+export type HavocMultiplayerGameOutput = z.infer<typeof havocMultiplayerGameOutputSchema>;
+
+/** One accepted command, ordered within its room. */
+export const havocMultiplayerCommandEntrySchema = z.object({
+  ordinal: z.number().int().nonnegative(),
+  command: havocMultiplayerCommandSchema,
+});
+export type HavocMultiplayerCommandEntry = z.infer<typeof havocMultiplayerCommandEntrySchema>;
+
+/**
+ * A participant's durable view of a Havoc multiplayer room.
+ *
+ * Domain value, not a storage envelope: repositories wrap it with their own
+ * save-schema version and timestamp.
+ */
+export const havocMultiplayerActiveStateSchema = z.object({
+  roomId: havocMultiplayerRoomIdSchema,
+  snapshot: havocMultiplayerRoomSnapshotSchema,
+  verification: z
+    .array(havocMultiplayerVerificationReceiptSchema)
+    .max(HAVOC_MULTIPLAYER_SERIES_GAMES),
+});
+export type HavocMultiplayerActiveState = z.infer<typeof havocMultiplayerActiveStateSchema>;
+
+export const havocMultiplayerSeriesMvpSchema = z.object({
+  participantId: havocMultiplayerParticipantIdSchema,
+  slot: positionSchema,
+  index: z.number().int(),
+});
+export type HavocMultiplayerSeriesMvp = z.infer<typeof havocMultiplayerSeriesMvpSchema>;
+
+/** The series summary handed to a save repository when a Havoc series completes. */
+export const havocMultiplayerCompletionRecapSchema = z.object({
+  roomId: havocMultiplayerRoomIdSchema,
+  champion: havocMultiplayerParticipantIdSchema,
+  series: havocMultiplayerSeriesSnapshotSchema,
+  mvp: havocMultiplayerSeriesMvpSchema.nullable(),
+  games: z.array(havocMultiplayerSeriesGameSchema).max(HAVOC_MULTIPLAYER_SERIES_GAMES),
+});
+export type HavocMultiplayerCompletionRecap = z.infer<typeof havocMultiplayerCompletionRecapSchema>;
 
 export interface HavocMultiplayerTransport {
   create(settings: HavocMultiplayerRoomSettingsInput): Promise<{
