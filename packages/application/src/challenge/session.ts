@@ -7,7 +7,7 @@ import {
   type GameResult,
 } from '@hoop-rush/data-contracts';
 import { acceptGameResult, challengeRunProgressDigest } from '@hoop-rush/engine';
-import type { CompletedRunIndex, StoredRunRecord } from '@hoop-rush/persistence';
+import type { CompletedRunIndex, StoredRunRecord } from '@hoop-rush/data-contracts';
 import type {
   ChallengeAssetPort,
   ChallengeClockPort,

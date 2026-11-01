@@ -2,27 +2,30 @@ import { z } from 'zod';
 import {
   challengeRunSchema,
   CHECKPOINT_SAVE_SCHEMA_VERSION,
-  classicVariantSchema,
+  completedRunIndexSchema,
   gameResultSchema,
-  playerIdSchema,
-  runModeSchema,
   runStatusSchema,
-  runOutcomeSchema,
-  runPlayerSelectionSchema,
+  storedRunRecordSchema,
   RUN_SCHEMA_VERSION,
-  SAVE_SCHEMA_VERSION,
-  seedSchema,
-  type ChallengeRun,
+  type CompletedRunIndex,
   type GameResult,
-  type RunAggregates,
+  type StoredRunRecord,
+  type ActiveGameAppend,
+  type ChallengeRun,
+  type PromoteActiveToCompletedExpectation,
 } from '@hoop-rush/data-contracts';
-export const storedRunRecordSchema = z.object({
-  recordId: z.string().min(1).max(64),
-  saveSchemaVersion: z.literal(SAVE_SCHEMA_VERSION),
-  run: challengeRunSchema,
-  updatedAtIso: z.iso.datetime().optional(),
-});
-export type StoredRunRecord = z.infer<typeof storedRunRecordSchema>;
+
+// `storedRunRecordSchema` and `completedRunIndexSchema` are canonical in
+// `@hoop-rush/data-contracts`, because application ports describe save commits
+// with them. Re-exported here so existing persistence imports keep working.
+export { completedRunIndexSchema, storedRunRecordSchema };
+export type {
+  ActiveGameAppend,
+  CompletedRunIndex,
+  PromoteActiveToCompletedExpectation,
+  StoredRunRecord,
+};
+
 const activeRunCheckpointBaseSchema = challengeRunSchema.omit({
   schemaVersion: true,
   games: true,
@@ -32,7 +35,7 @@ export const activeRunCheckpointSchema = activeRunCheckpointBaseSchema.extend({
   recordId: z.literal('active'),
   saveSchemaVersion: z.literal(CHECKPOINT_SAVE_SCHEMA_VERSION),
   status: runStatusSchema.extract(['active', 'finished']),
-  gamesPlayed: z.number().int().min(0).max(82).optional(),
+  gamesPlayed: z.number().int().min(0).max(82),
   updatedAtIso: z.iso.datetime().optional(),
 });
 export type ActiveRunCheckpoint = z.infer<typeof activeRunCheckpointSchema>;
@@ -54,14 +57,6 @@ export const activeGameRowSchema = z.object({
   updatedAtIso: z.iso.datetime().optional(),
 });
 export type ActiveGameRow = z.infer<typeof activeGameRowSchema>;
-export interface ActiveGameAppend {
-  runId: string;
-  gameNumber: number;
-  result: GameResult;
-  aggregates: RunAggregates;
-  status: 'active' | 'finished';
-  firstLossGameNumber: number | null;
-}
 export function checkpointFromRun(record: StoredRunRecord): ActiveRunCheckpoint {
   if (record.run.games.length !== 0) {
     throw new Error('saveActiveRun: active run must start with no accepted games');
@@ -89,20 +84,3 @@ export function runFromCheckpoint(
     games: results,
   };
 }
-export const completedRunIndexSchema = z.object({
-  recordId: z.string().min(1).max(64),
-  runId: z.string().min(1).max(64),
-  mode: runModeSchema,
-  variant: classicVariantSchema.optional(),
-  franchiseId: z.string().min(1).max(64).nullable(),
-  eraId: z.string().min(1).max(24),
-  playerIds: z.array(playerIdSchema).length(5),
-  selections: z.array(runPlayerSelectionSchema).length(5).optional(),
-  runSeed: seedSchema,
-  wins: z.number().int().nonnegative(),
-  losses: z.number().int().nonnegative(),
-  gamesPlayed: z.number().int().positive(),
-  outcome: runOutcomeSchema,
-  completedAtIso: z.iso.datetime(),
-});
-export type CompletedRunIndex = z.infer<typeof completedRunIndexSchema>;

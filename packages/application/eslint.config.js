@@ -26,9 +26,8 @@ export default tseslint.config(...sharedEslintBase(import.meta.dirname), {
         paths: [
           {
             name: '@hoop-rush/persistence',
-            allowTypeImports: true,
             message:
-              'application code may import persistence types only; runtime access goes through the persistence port',
+              'application must not import persistence at all; declare use-case contracts in ports.ts and let persistence satisfy them structurally',
           },
         ],
         patterns: [

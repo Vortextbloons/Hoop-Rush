@@ -60,7 +60,7 @@ import type {
   HavocMultiplayerCompletionRecap,
   HavocMultiplayerGameOutput,
   HavocMultiplayerSeriesMvp,
-} from '@hoop-rush/persistence';
+} from '@hoop-rush/data-contracts';
 import type { TickScheduler } from '../runtime/index.ts';
 import { type RoomConnection } from '../multiplayer/room-lifecycle.ts';
 import { SeriesRoomSession } from '../multiplayer/series-room-session.ts';

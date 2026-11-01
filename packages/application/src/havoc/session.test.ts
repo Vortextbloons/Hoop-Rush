@@ -23,21 +23,22 @@ import {
   havocGameTapeDigest,
   simulateHavocGame,
 } from '@hoop-rush/engine';
-import type {
-  HavocApplyOutcomeInput,
-  HavocHistoryEntry,
-  HavocRepository,
-} from '@hoop-rush/persistence';
 import {
   buildFixtureBracket,
   buildHavocEraProfile,
   buildSeasonDraftCatalog,
 } from '@hoop-rush/test-fixtures';
-import type { HavocBatchHandlers, HavocRunnerPort } from './ports.ts';
+import type {
+  HavocApplyOutcomeInput,
+  HavocBatchHandlers,
+  HavocHistoryEntry,
+  HavocRunRepositoryPort,
+  HavocRunnerPort,
+} from './ports.ts';
 import { HavocSession, type HavocService, type HavocSessionOptions } from './index.ts';
 import type { HavocWorkerCompleteMessage, HavocWorkerTapeMessage } from '@hoop-rush/data-contracts';
 
-class MemoryHavocRepository implements HavocRepository {
+class MemoryHavocRepository implements HavocRunRepositoryPort {
   private active: HavocRunState | null = null;
   private completed = new Map<string, { state: HavocRunState; report: HavocReport | null }>();
   private commands = new Map<string, HavocCommandResult>();
