@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import { contentHashSchema } from './ids.ts';
 import {
-  CAP_RUSH_CAP_LINE_DOLLARS,
   CAP_RUSH_HARD_LIMIT_DOLLARS,
   capRushBucketSchema,
   capRushVariantSchema,
@@ -11,7 +10,7 @@ export const CAP_RUSH_MULTIPLAYER_SCHEMA_VERSION = 1;
 export const CAP_RUSH_MULTIPLAYER_VERSION = 'cap-rush-multiplayer-v2';
 export const CAP_RUSH_MULTIPLAYER_RULES_VERSION = 'cap-rush-multiplayer-rules-v3';
 export const CAP_RUSH_MULTIPLAYER_MARKET_VERSION = 'cap-rush-multiplayer-market-v1';
-export const CAP_RUSH_MULTIPLAYER_PRICING_VERSION = 'cap-rush-multiplayer-pricing-v1';
+export const CAP_RUSH_MULTIPLAYER_PRICING_VERSION = 'cap-rush-multiplayer-pricing-v2';
 export const CAP_RUSH_MULTIPLAYER_SEED_DERIVATION_VERSION = 'cap-rush-multiplayer-seeds-v1';
 export const CAP_RUSH_MULTIPLAYER_SEED_ROOT = 'cap-rush-multiplayer-v1';
 export const CAP_RUSH_MULTIPLAYER_SAVE_SCHEMA_VERSION = 1;
@@ -26,13 +25,9 @@ export const CAP_RUSH_MULTIPLAYER_AUCTION_MS = 60_000;
 export const CAP_RUSH_MULTIPLAYER_MIN_EXTENSION_MS = 10_000;
 export const CAP_RUSH_MULTIPLAYER_BID_INCREMENT_DOLLARS = 100_000;
 export const CAP_RUSH_MULTIPLAYER_MAX_GENERATION_ATTEMPTS = 128;
-export const CAP_RUSH_MULTIPLAYER_HUMAN_GAMES = 162;
-export const CAP_RUSH_MULTIPLAYER_AI_GAMES = 1068;
-export const CAP_RUSH_MULTIPLAYER_LEAGUE_GAMES = 1230;
 export const CAP_RUSH_MULTIPLAYER_DISCOUNT_BELOW_90 = 65;
-export const CAP_RUSH_MULTIPLAYER_DISCOUNT_AT_LEAST_90 = 35;
+export const CAP_RUSH_MULTIPLAYER_DISCOUNT_AT_LEAST_90 = 50;
 export const CAP_RUSH_MULTIPLAYER_HARD_LIMIT_DOLLARS = CAP_RUSH_HARD_LIMIT_DOLLARS;
-export const CAP_RUSH_MULTIPLAYER_CAP_LINE_DOLLARS = CAP_RUSH_CAP_LINE_DOLLARS;
 export const CAP_RUSH_MULTIPLAYER_BLOCK_ENDPOINTS = [20, 40, 60, 82] as const;
 export const CAP_RUSH_MULTIPLAYER_BLOCK_COUNT = CAP_RUSH_MULTIPLAYER_BLOCK_ENDPOINTS.length;
 

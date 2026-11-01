@@ -16,7 +16,6 @@ import type { GamecastSeries, GamecastSeriesGame } from '#lib/gamecast/gamecast-
  */
 
 export const HAVOC_MULTIPLAYER_STAGE_LABELS = ['Lobby', 'Draft', 'Series', 'Champion'] as const;
-export type HavocMultiplayerStageLabel = (typeof HAVOC_MULTIPLAYER_STAGE_LABELS)[number];
 
 export function havocMultiplayerPhaseLabel(phase: HavocMultiplayerPhase): string {
   switch (phase) {

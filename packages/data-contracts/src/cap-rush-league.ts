@@ -10,10 +10,6 @@ export const CAP_RUSH_CONFERENCE_GAMES = 1230;
 export const CAP_RUSH_CONFERENCE_AI_GAMES = 1148;
 export const CAP_RUSH_CONFERENCE_SIZE = 15;
 export const CAP_RUSH_CONFERENCE_PLAYOFF_TEAMS = 8;
-export const CAP_RUSH_HOME_GAMES_PER_TEAM = 41;
-export const CAP_RUSH_DIVISION_GAMES = 16;
-export const CAP_RUSH_CONFERENCE_NON_DIVISION_GAMES = 36;
-export const CAP_RUSH_OPPOSITE_CONFERENCE_GAMES = 30;
 
 export const capRushConferenceSchema = z.enum(['east', 'west']);
 export type CapRushConference = z.infer<typeof capRushConferenceSchema>;

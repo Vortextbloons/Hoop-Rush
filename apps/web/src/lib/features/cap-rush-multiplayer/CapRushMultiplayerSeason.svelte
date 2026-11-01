@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { Tween, prefersReducedMotion } from 'svelte/motion';
+  import { linear } from 'svelte/easing';
   import type {
     CapRushMultiplayerSeatId,
     CapRushMultiplayerState,
@@ -31,7 +33,25 @@
     onreviewgame: (gameId: string) => void;
   } = $props();
 
-  const season = $derived(state.season);
+  const animatedSlot = Tween.of(() => state.season?.frontierSlot ?? 0, {
+    duration: (from, to) =>
+      prefersReducedMotion.current ? 0 : Math.min(4000, Math.abs(to - from) * 300),
+    easing: linear,
+  });
+  const displayedState = $derived({
+    ...state,
+    season:
+      state.season === null
+        ? null
+        : {
+            ...state.season,
+            frontierSlot: Math.floor(animatedSlot.current),
+            games: state.season.games.filter(
+              (game) => game.slot <= Math.floor(animatedSlot.current),
+            ),
+          },
+  });
+  const season = $derived(displayedState.season);
   const locked = $derived(state.locked);
   const orderedSeats = $derived(seatOrder(localSeat));
   const localTeamId = $derived(
@@ -66,6 +86,7 @@
   <div class="flex min-w-0 flex-col gap-4" data-cap-rush-multiplayer-season>
     <CapRushSharedProgress
       {state}
+      displayedSlot={animatedSlot.current}
       {localSeat}
       {art}
       {busy}
@@ -75,7 +96,7 @@
 
     <div class="grid min-w-0 items-start gap-4 xl:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]">
       <CapRushMultiplayerSchedule
-        {state}
+        state={displayedState}
         {localSeat}
         {art}
         {busy}
@@ -124,7 +145,7 @@
                 {record.wins}–{record.losses}
               </p>
             </header>
-            <CapRushSeatLedger {state} {seat} {localSeat} {art} />
+            <CapRushSeatLedger state={displayedState} {seat} {localSeat} {art} />
           </div>
         {/each}
       </aside>

@@ -90,7 +90,12 @@
         className="h-7 w-7 shrink-0"
       />
     {/if}
-    <span class="min-w-0 break-words">{input[side].displayName}</span>
+    <span
+      class="min-w-0 break-words"
+      class:text-primary={side === localSide}
+      style:color={side !== localSide ? 'hsl(212 90% 62%)' : undefined}
+      >{input[side].displayName}</span
+    >
   </span>
 {/snippet}
 
@@ -117,7 +122,7 @@
         >
           <span class="text-primary">{localBox?.score ?? 0}</span>
           <span class="px-2 text-muted-foreground" aria-hidden="true">–</span>
-          <span>{opponentBox?.score ?? 0}</span>
+          <span style:color="hsl(212 90% 62%)">{opponentBox?.score ?? 0}</span>
         </p>
         {@render teamIdentity(localSide === 'home' ? 'away' : 'home')}
       </div>
@@ -150,9 +155,9 @@
         <h2
           class="flex flex-wrap items-center gap-2 font-display text-2xl font-extrabold uppercase tracking-tight"
         >
-          {@render teamIdentity('home')}
+          {@render teamIdentity(localSide)}
           <span class="text-muted-foreground">vs</span>
-          {@render teamIdentity('away')}
+          {@render teamIdentity(localSide === 'home' ? 'away' : 'home')}
         </h2>
       </div>
       <div class="flex items-center gap-2">

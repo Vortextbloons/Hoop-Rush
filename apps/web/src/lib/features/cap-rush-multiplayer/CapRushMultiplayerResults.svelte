@@ -121,7 +121,7 @@
   }
 
   function recordText(wins: number | null, losses: number | null): string {
-    return wins === null || losses === null ? 'â€”' : `${wins}â€“${losses}`;
+    return wins === null || losses === null ? '\u2014' : `${wins}\u2013${losses}`;
   }
 
   function outcomeLabel(outcome: CapRushPostseasonUserOutcome | null): string {
@@ -411,18 +411,9 @@
       {/each}
     </section>
 
-    <details class="report-disclosure report-panel">
-      <summary
-        ><span class="disclosure-copy"
-          ><span class="disclosure-title">Season player stats</span><span class="disclosure-note"
-            >Compare both rosters &middot; Averages, totals &amp; shooting splits</span
-          ></span
-        ><ChevronDown size={18} class="disclosure-chevron" aria-hidden="true" /></summary
-      >
-      <div class="disclosure-body stats-body">
-        <CapRushMultiplayerStats {state} {localSeat} {art} />
-      </div>
-    </details>
+    <div class="report-panel stats-body">
+      <CapRushMultiplayerStats {state} {localSeat} {art} />
+    </div>
 
     {#if h2hGames.length > 0}
       <details class="report-disclosure report-panel">
@@ -461,7 +452,7 @@
   .final-report {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 1.5rem;
     min-width: 0;
   }
   .champion-banner {
@@ -521,7 +512,7 @@
     display: flex;
     align-items: center;
     gap: 0.65rem;
-    padding: 1rem 1rem 0;
+    padding: 1.5rem 1.5rem 0;
   }
   .team-initials {
     display: grid;
@@ -535,31 +526,32 @@
   }
   .team-name {
     margin-top: 0.2rem;
-    font: 800 1.25rem/1.15 var(--font-display);
+    font: 800 1.5rem/1.15 var(--font-display);
     text-transform: uppercase;
     overflow-wrap: anywhere;
   }
   .team-overview {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    align-items: end;
-    gap: 1rem;
-    padding: 1rem;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: center;
+    gap: 1.25rem;
+    padding: 1.5rem;
   }
   .metric-label {
-    font: 500 0.55rem var(--font-mono);
+    font: 500 0.65rem var(--font-mono);
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--color-muted-foreground);
   }
   .record-value {
     margin-top: 0.25rem;
-    font: 800 2.1rem/1 var(--font-display);
+    font: 800 clamp(2.5rem, 4vw, 3.25rem)/1.1 var(--font-display);
+    white-space: nowrap;
     font-variant-numeric: tabular-nums;
   }
   .team-finish {
-    padding-left: 1rem;
-    border-left: 1px solid var(--color-line-soft);
+    padding-top: 1rem;
+    border-top: 1px solid var(--color-line-soft);
   }
   .outcome-text {
     margin-top: 0.4rem;
@@ -573,6 +565,9 @@
     border-radius: 0.85rem;
     background: var(--color-card);
   }
+  .stats-body {
+    padding: 1.25rem;
+  }
   .team-disclosure {
     border-top: 1px solid var(--color-line-soft);
   }
@@ -582,7 +577,7 @@
     justify-content: space-between;
     gap: 0.75rem;
     min-height: 3.25rem;
-    padding: 0.85rem 1rem;
+    padding: 1rem 1.5rem;
     cursor: pointer;
     list-style: none;
     border-radius: inherit;
@@ -623,7 +618,7 @@
   }
   .disclosure-body {
     min-width: 0;
-    padding: 0 1rem 1rem;
+    padding: 0 1.5rem 1.5rem;
   }
   .finance-grid {
     display: grid;
@@ -722,6 +717,17 @@
     }
     .champion-banner {
       padding: 1.5rem;
+    }
+  }
+  @media (min-width: 1100px) {
+    .team-overview {
+      grid-template-columns: auto minmax(0, 1fr);
+    }
+    .team-finish {
+      padding-top: 0;
+      padding-left: 1.25rem;
+      border-top: 0;
+      border-left: 1px solid var(--color-line-soft);
     }
   }
   @media (max-width: 400px) {

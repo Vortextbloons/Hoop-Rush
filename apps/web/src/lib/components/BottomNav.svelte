@@ -5,7 +5,6 @@
   import { isNavItemActive, type NavItem } from '#lib/nav-items.js';
   import { MoreHorizontal, X } from '@lucide/svelte';
   export type { NavItem } from '#lib/nav-items.js';
-  export type BottomNavItem = NavItem;
   let {
     items,
     overflowItems = [],

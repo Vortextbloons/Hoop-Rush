@@ -1,6 +1,4 @@
 <script lang="ts">
-  import { Tween, prefersReducedMotion } from 'svelte/motion';
-  import { cubicOut } from 'svelte/easing';
   import type {
     CapRushMultiplayerSeatId,
     CapRushMultiplayerState,
@@ -26,6 +24,7 @@
 
   let {
     state,
+    displayedSlot,
     localSeat,
     art = null,
     busy = false,
@@ -33,6 +32,7 @@
     onwatchh2h,
   }: {
     state: CapRushMultiplayerState;
+    displayedSlot: number;
     localSeat: CapRushMultiplayerSeatId;
     art?: CapRushArt | null;
     busy?: boolean;
@@ -42,12 +42,9 @@
 
   const season = $derived(state.season);
   const locked = $derived(state.locked);
-  const animatedProgress = Tween.of(() => season?.frontierSlot ?? 0, {
-    duration: () => (prefersReducedMotion.current ? 0 : 650),
-    easing: cubicOut,
-  });
-  const displayedSlot = $derived(Math.floor(animatedProgress.current));
-  const visibleGames = $derived(season?.games.filter((game) => game.slot <= displayedSlot) ?? []);
+  const visibleGames = $derived(
+    season?.games.filter((game) => game.slot <= Math.floor(displayedSlot)) ?? [],
+  );
   const records = $derived(
     season === null || locked === null
       ? null
@@ -76,7 +73,7 @@
       : art.teamFor(locked.seats[otherSeat].franchise.franchiseId),
   );
   const h2h = $derived(capRushMultiplayerPendingH2H({ state, locked }));
-  const progress = $derived((animatedProgress.current / CAP_RUSH_GAME_COUNT) * 100);
+  const progress = $derived((displayedSlot / CAP_RUSH_GAME_COUNT) * 100);
   const played = $derived(localRecord?.played ?? 0);
   const remaining = $derived(Math.max(0, CAP_RUSH_GAME_COUNT - played));
   const h2hGame = $derived(
@@ -185,7 +182,7 @@
     <div class="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:items-end">
       <div class="min-w-0">
         <p class="font-mono text-[10px] font-bold tracking-[0.18em] text-primary uppercase">
-          Shared season · Through game {displayedSlot} of {CAP_RUSH_GAME_COUNT}
+          Shared season · Through game {Math.floor(displayedSlot)} of {CAP_RUSH_GAME_COUNT}
         </p>
         <div class="mt-2 flex flex-wrap items-end gap-x-4 gap-y-1">
           <h2

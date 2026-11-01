@@ -9,15 +9,12 @@ import {
   challengeRunSchema,
   eraIdSchema,
   eraSimulationProfileSchema,
-  franchiseEraPoolSchema,
   franchiseIdSchema,
   gameSimulationInputSchema,
   hoopRushManifestSchema,
   leagueRecordDigest,
   leagueRecordSchema,
   opponentBracketSchema,
-  opponentTeamSchema,
-  peakPlayerSeasonSchema,
   playerIdSchema,
   seedFromString,
   seedSchema,
@@ -30,174 +27,17 @@ import type {
   ChallengeRun,
   DifficultyProfile,
   EraSimulationProfile,
-  FranchiseEraPool,
   GameSimulationInput,
   HoopRushManifest,
   LeagueRecord,
   ModernFranchiseSlot,
   OpponentBracket,
-  OpponentTeam,
-  PeakPlayerSeason,
-  PlayerSeasonStats,
   RunAggregates,
   SimulationPlayer,
   SimulationRatings,
   SimulationTeam,
-  SummaryRatings,
 } from '@hoop-rush/data-contracts';
 export { seedFromString };
-const DEFAULT_SUMMARY_RATINGS: SummaryRatings = {
-  overallRating: 90,
-  offenseRating: 92,
-  defenseRating: 84,
-};
-const DEFAULT_PLAYER_STATS: PlayerSeasonStats = {
-  gamesPlayed: 79,
-  minutes: 2860,
-  points: 1920,
-  rebounds: 480,
-  offensiveRebounds: 110,
-  defensiveRebounds: 370,
-  assists: 410,
-  steals: 90,
-  blocks: 40,
-  turnovers: 220,
-  fieldGoalsMade: 740,
-  fieldGoalsAttempted: 1450,
-  threesMade: 110,
-  threesAttempted: 300,
-  freeThrowsMade: 330,
-  freeThrowsAttempted: 420,
-  per: 22.5,
-  boxPlusMinus: 4.2,
-  usageRate: 28.5,
-  tsPct: 0.598,
-  efgPct: 0.548,
-};
-const FIXTURE_HISTORICAL_IDENTITY = {
-  teamId: '1610612747',
-  displayName: 'Los Angeles Lakers',
-  city: 'Los Angeles',
-  abbreviation: 'LAL',
-  seasonKey: '1996-97',
-  lineageRuleVersion: 'lineage-v1',
-};
-function fullProvenance(): PeakPlayerSeason['provenance'] {
-  const entry = {
-    kind: 'derived' as const,
-    confidence: 'medium' as const,
-    methodVersion: 'derive-v1',
-    sourceVersion: 'source-v1',
-    sourceFields: ['fixture'],
-  };
-  const provenance: PeakPlayerSeason['provenance'] = {};
-  for (const key of Object.keys(DEFAULT_SIM_RATINGS)) provenance[key] = { ...entry };
-  for (const key of Object.keys(DEFAULT_SIM_TENDENCIES)) provenance[key] = { ...entry };
-  for (const key of [
-    'gamesPlayed',
-    'minutesPerGame',
-    'pointsPerGame',
-    'reboundsPerGame',
-    'offensiveReboundsPerGame',
-    'defensiveReboundsPerGame',
-    'assistsPerGame',
-    'stealsPerGame',
-    'blocksPerGame',
-    'turnoversPerGame',
-    'fieldGoalPct',
-    'threePointPct',
-    'freeThrowPct',
-    'threePointAttemptRate',
-    'freeThrowAttemptRate',
-  ]) {
-    provenance[key] = { ...entry };
-  }
-  return provenance;
-}
-export function buildPlayerSeason(overrides: Partial<PeakPlayerSeason> = {}): PeakPlayerSeason {
-  return peakPlayerSeasonSchema.parse({
-    schemaVersion: 3,
-    playerId: 'p-1',
-    franchiseId: 'lakers',
-    eraId: '1990s',
-    seasonKey: '1996-97',
-    firstName: 'Test',
-    lastName: 'Player',
-    displayName: 'Test Player',
-    playerExternalId: '101',
-    positions: {
-      primary: 'SG',
-      secondary: [],
-      playable: ['SG'],
-      sourceLabels: ['SG'],
-      normalizationVersion: 'position-v3',
-    },
-    heightInches: 79,
-    weightLbs: 215,
-    eligibility: {
-      minimumTeamGames: 40,
-      teamGames: 78,
-      teamMinutes: 2700,
-    },
-    selectionScore: 91.517,
-    selectionScoreVersion: 'score-v1',
-    stats: DEFAULT_PLAYER_STATS,
-    historicalTeamIdentity: FIXTURE_HISTORICAL_IDENTITY,
-    summaryRatings: DEFAULT_SUMMARY_RATINGS,
-    detailedRatings: { ...DEFAULT_SIM_RATINGS },
-    tendencies: { ...DEFAULT_SIM_TENDENCIES },
-    anchors: {
-      gamesPlayed: 79,
-      minutesPerGame: 36.2,
-      pointsPerGame: 24.3,
-      reboundsPerGame: 6.1,
-      offensiveReboundsPerGame: 1.4,
-      defensiveReboundsPerGame: 4.7,
-      assistsPerGame: 5.2,
-      stealsPerGame: 1.1,
-      blocksPerGame: 0.5,
-      turnoversPerGame: 2.8,
-      fieldGoalPct: 0.51,
-      threePointPct: 0.367,
-      freeThrowPct: 0.786,
-      threePointAttemptRate: 0.207,
-      freeThrowAttemptRate: 0.29,
-    },
-    provenance: fullProvenance(),
-    source: {
-      dataVersion: 'data-v1',
-      ratingsVersion: 'ratings-v1',
-      selectionScoreVersion: 'score-v1',
-      sourceVersion: 'source-v1',
-      derivationMethodVersion: 'derive-v1',
-      lineageRuleVersion: 'lineage-v1',
-    },
-    ...overrides,
-  });
-}
-export function buildPool(
-  players: PeakPlayerSeason[],
-  overrides: Partial<FranchiseEraPool> = {},
-): FranchiseEraPool {
-  return franchiseEraPoolSchema.parse({
-    schemaVersion: 3,
-    dataVersion: 'data-v1',
-    franchiseId: players[0]?.franchiseId ?? 'lakers',
-    eraId: players[0]?.eraId ?? '1990s',
-    eligibility: { minimumTeamGames: 40 },
-    coverageSummary: {
-      coverageBand: 'complete-box-derived',
-      observedFamilies: ['base', 'rebounding', 'defensive-events', 'turnovers', 'three-point'],
-      derivedFamilies: ['advanced'],
-      estimatedFamilies: [],
-      missingCategories: [],
-      lowConfidenceShare: 0,
-      policyVersion: 'policy-v1',
-    },
-    players,
-    ...overrides,
-  });
-}
 const DEFAULT_DIFFICULTY: DifficultyProfile = {
   profileVersion: 'm3-single-v1',
   name: 'medium',
@@ -936,56 +776,6 @@ export function buildGameSimulationInput(
     ...overrides,
   });
 }
-export function buildOpeningOpponent(overrides: Partial<OpponentTeam> = {}): OpponentTeam {
-  return opponentTeamSchema.parse({
-    schemaVersion: 2,
-    opponentId: 'lakers-1990s-opening',
-    bracketVersion: 'bracket-m3-preview-v1',
-    difficultyBand: 'medium',
-    teamId: 'lakers',
-    displayName: 'Los Angeles Lakers',
-    seasonKey: '1995-96',
-    lineup: {
-      structure: LINEUP_STRUCTURE,
-      assignments: [
-        { slotIndex: 0, playerId: 'p-89', positions: ['PG'] },
-        { slotIndex: 1, playerId: 'p-9', positions: ['SG'] },
-        { slotIndex: 2, playerId: 'p-920', positions: ['SF'] },
-        { slotIndex: 3, playerId: 'p-109', positions: ['PF'] },
-        { slotIndex: 4, playerId: 'p-124', positions: ['C'] },
-      ],
-    },
-    players: [
-      buildSimulationPlayer({
-        playerId: playerIdSchema.parse('p-89'),
-        displayName: 'Nick Van Exel',
-        positions: ['PG'],
-      }),
-      buildSimulationPlayer({
-        playerId: playerIdSchema.parse('p-9'),
-        displayName: 'Sedale Threatt',
-        positions: ['SG'],
-      }),
-      buildSimulationPlayer({
-        playerId: playerIdSchema.parse('p-920'),
-        displayName: 'A.C. Green',
-        positions: ['SF'],
-      }),
-      buildSimulationPlayer({
-        playerId: playerIdSchema.parse('p-109'),
-        displayName: 'Robert Horry',
-        positions: ['PF'],
-      }),
-      buildSimulationPlayer({
-        playerId: playerIdSchema.parse('p-124'),
-        displayName: 'Vlade Divac',
-        positions: ['C'],
-      }),
-    ],
-    ...overrides,
-  });
-}
-export * from './classic.ts';
 export * from './season-draft.ts';
 export * from './cap-rush.ts';
 export * from './havoc.ts';

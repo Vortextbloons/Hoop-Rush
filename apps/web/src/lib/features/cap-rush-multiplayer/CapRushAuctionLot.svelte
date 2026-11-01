@@ -47,7 +47,11 @@
   );
   const offerDollars = $derived(auction?.leaderBidDollars ?? player.minimumBidDollars);
   const offerLabel = $derived(
-    auction?.leaderBidDollars === null || auction === null ? 'Min' : 'Offer',
+    state === 'outbid'
+      ? 'Opponent bid'
+      : auction?.leaderBidDollars === null || auction === null
+        ? 'Min'
+        : 'Offer',
   );
   const remaining = $derived(auction === null ? 0 : remainingMs(auction.endsAtIso, nowMs));
   const clockText = $derived(
@@ -77,11 +81,13 @@
   const tone = $derived(
     state === 'you-lead'
       ? 'border-accent/60'
-      : state === 'sold-to-you'
-        ? 'border-positive/50'
-        : state === 'unsold'
-          ? 'border-dashed'
-          : 'border-border',
+      : state === 'outbid'
+        ? 'border-negative/70 bg-negative/10'
+        : state === 'sold-to-you'
+          ? 'border-positive/50'
+          : state === 'unsold'
+            ? 'border-dashed'
+            : 'border-border',
   );
   const ariaLabel = $derived(
     `${player.displayName}, ${player.position}, overall ${String(player.originalOverall)}, ${stateLabel}, ${offerLabel} ${exactMoney(offerDollars)}, ${
@@ -161,12 +167,14 @@
       >{player.position}</span
     >
     <span
-      class="truncate rounded border px-1 py-0.5 font-mono text-[8px] font-bold tracking-[0.06em] uppercase {state ===
+      class="rounded border px-1.5 py-0.5 font-mono text-[9px] font-bold tracking-[0.06em] uppercase {state ===
       'you-lead'
         ? 'border-accent/50 bg-accent/10 text-accent'
-        : state === 'sold-to-you'
-          ? 'border-positive/40 bg-positive/10 text-positive'
-          : 'border-line-soft bg-surface-1 text-muted-foreground'}">{stateLabel}</span
+        : state === 'outbid'
+          ? 'border-negative/60 bg-negative/20 text-negative'
+          : state === 'sold-to-you'
+            ? 'border-positive/40 bg-positive/10 text-positive'
+            : 'border-line-soft bg-surface-1 text-muted-foreground'}">{stateLabel}</span
     >
   </span>
 
@@ -175,8 +183,10 @@
       <span class="font-mono text-[8px] font-bold tracking-[0.08em] text-muted-foreground uppercase"
         >{offerLabel}</span
       >
-      <span class="font-mono text-xs font-bold tabular-nums sm:text-sm" class:lot-pulse={pulse}
-        >{money(offerDollars)}</span
+      <span
+        class="font-mono text-xs font-bold tabular-nums sm:text-sm"
+        class:lot-pulse={pulse}
+        class:text-negative={state === 'outbid'}>{money(offerDollars)}</span
       >
     </span>
     <span class="flex min-w-0 flex-col items-end">
