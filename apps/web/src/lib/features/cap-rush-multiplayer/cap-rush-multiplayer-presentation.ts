@@ -1,4 +1,6 @@
 import type {
+  CapRushLeagueGame,
+  CapRushLeagueScheduleEntry,
   CapRushMultiplayerAuction,
   CapRushMultiplayerCommandRejectionCode,
   CapRushMultiplayerMarketPlayer,
@@ -161,6 +163,48 @@ export function seatOrder(
   localSeat: CapRushMultiplayerSeatId,
 ): readonly [CapRushMultiplayerSeatId, CapRushMultiplayerSeatId] {
   return localSeat === 'p1' ? ['p1', 'p2'] : ['p2', 'p1'];
+}
+
+export interface CapRushSeatScheduleCell {
+  readonly slot: number;
+  readonly gameId: string;
+  readonly opponentId: string;
+  readonly humanHome: boolean;
+  readonly played: boolean;
+  readonly h2h: boolean;
+  readonly won: boolean | null;
+  readonly pointsFor: number | null;
+  readonly pointsAgainst: number | null;
+}
+
+export function seatScheduleCells(input: {
+  readonly schedule: readonly CapRushLeagueScheduleEntry[];
+  readonly games: readonly CapRushLeagueGame[];
+  readonly teamId: string;
+  readonly opponentTeamId: string;
+}): CapRushSeatScheduleCell[] {
+  const played = new Map(input.games.map((game) => [game.gameId, game]));
+  return input.schedule
+    .filter((entry) => entry.homeTeamId === input.teamId || entry.awayTeamId === input.teamId)
+    .sort((left, right) => left.slot - right.slot)
+    .map((entry) => {
+      const humanHome = entry.homeTeamId === input.teamId;
+      const opponentId = humanHome ? entry.awayTeamId : entry.homeTeamId;
+      const game = played.get(entry.gameId) ?? null;
+      const pointsFor = game === null ? null : humanHome ? game.homePoints : game.awayPoints;
+      const pointsAgainst = game === null ? null : humanHome ? game.awayPoints : game.homePoints;
+      return {
+        slot: entry.slot,
+        gameId: entry.gameId,
+        opponentId,
+        humanHome,
+        played: game !== null,
+        h2h: opponentId === input.opponentTeamId,
+        won: pointsFor === null || pointsAgainst === null ? null : pointsFor > pointsAgainst,
+        pointsFor,
+        pointsAgainst,
+      };
+    });
 }
 
 /** Exact integer dollars for submitted totals and button labels. Never approximates. */

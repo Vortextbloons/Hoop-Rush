@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import type {
+  CapRushLeagueGame,
+  CapRushLeagueScheduleEntry,
   CapRushMultiplayerAuction,
   CapRushMultiplayerMarketPlayer,
   CapRushMultiplayerRecruitment,
@@ -17,6 +19,7 @@ import {
   nextMinimumBid,
   parseBidDollars,
   seatPayrollSummary,
+  seatScheduleCells,
 } from './cap-rush-multiplayer-presentation.js';
 
 const player = {
@@ -305,5 +308,70 @@ describe('cap rush multiplayer bidding presentation', () => {
     expect(pools[0]?.lots[0]?.auction?.winningSeat).toBe('p1');
     expect(pools[1]?.lots[0]?.player.playerId).toBe(player.playerId);
     expect(pools[2]?.lots).toEqual([]);
+  });
+});
+
+describe('cap rush multiplayer season presentation', () => {
+  test('maps the local seat fixture to ordered schedule cells', () => {
+    const schedule = [
+      { gameId: 'g-3', slot: 3, homeTeamId: 'other', awayTeamId: 'other-2' },
+      { gameId: 'g-2', slot: 2, homeTeamId: 'rival', awayTeamId: 'local' },
+      { gameId: 'g-1', slot: 1, homeTeamId: 'local', awayTeamId: 'opponent' },
+    ] as unknown as CapRushLeagueScheduleEntry[];
+    const games = [
+      {
+        gameId: 'g-1',
+        homeTeamId: 'local',
+        awayTeamId: 'opponent',
+        homePoints: 101,
+        awayPoints: 96,
+      },
+      {
+        gameId: 'g-2',
+        homeTeamId: 'rival',
+        awayTeamId: 'local',
+        homePoints: 110,
+        awayPoints: 104,
+      },
+    ] as unknown as CapRushLeagueGame[];
+
+    const cells = seatScheduleCells({
+      schedule,
+      games,
+      teamId: 'local',
+      opponentTeamId: 'rival',
+    });
+
+    expect(cells.map((cell) => cell.slot)).toEqual([1, 2]);
+    expect(cells[0]).toMatchObject({
+      played: true,
+      h2h: false,
+      won: true,
+      pointsFor: 101,
+      pointsAgainst: 96,
+    });
+    expect(cells[1]).toMatchObject({
+      played: true,
+      h2h: true,
+      won: false,
+      pointsFor: 104,
+      pointsAgainst: 110,
+    });
+  });
+
+  test('keeps unplayed schedule cells in order', () => {
+    const schedule = [
+      { gameId: 'g-2', slot: 2, homeTeamId: 'local', awayTeamId: 'opponent' },
+      { gameId: 'g-1', slot: 1, homeTeamId: 'opponent', awayTeamId: 'local' },
+    ] as unknown as CapRushLeagueScheduleEntry[];
+    const cells = seatScheduleCells({
+      schedule,
+      games: [],
+      teamId: 'local',
+      opponentTeamId: 'rival',
+    });
+    expect(cells).toHaveLength(2);
+    expect(cells[0]).toMatchObject({ slot: 1, humanHome: false, played: false, won: null });
+    expect(cells[1]).toMatchObject({ slot: 2, humanHome: true, played: false, won: null });
   });
 });

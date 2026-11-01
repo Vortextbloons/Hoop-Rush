@@ -9,7 +9,7 @@
   import PlayerFace from '#lib/components/PlayerFace.svelte';
   import TeamLogo from '#lib/components/TeamLogo.svelte';
   import type { CapRushArt } from '../cap-rush/cap-rush-art.js';
-  import { initialsOf } from '../cap-rush/cap-rush-presentation.js';
+  import { formatAverage, initialsOf } from '../cap-rush/cap-rush-presentation.js';
   import { money, positionLabel, seatLabelFor } from './cap-rush-multiplayer-presentation.js';
 
   interface RosterSlot {
@@ -61,6 +61,28 @@
     });
   });
   const filled = $derived(slots.filter((entry) => entry.playerId !== null).length);
+  const averages = $derived.by(() => {
+    const totals = new Map<
+      string,
+      { games: number; points: number; rebounds: number; assists: number }
+    >();
+    for (const game of state.season?.games ?? []) {
+      for (const line of [...game.box.home.participants, ...game.box.away.participants]) {
+        const entry = totals.get(line.playerId) ?? {
+          games: 0,
+          points: 0,
+          rebounds: 0,
+          assists: 0,
+        };
+        entry.games += 1;
+        entry.points += line.points;
+        entry.rebounds += line.rebounds;
+        entry.assists += line.assists;
+        totals.set(line.playerId, entry);
+      }
+    }
+    return totals;
+  });
 
   function nameOf(entry: RosterSlot): string {
     return entry.player?.displayName ?? entry.fallbackName ?? 'Unlisted player';
@@ -98,6 +120,7 @@
       {@const player = entry.player}
       {@const face = player !== null && art !== null ? art.faceFor(player.source) : null}
       {@const team = player !== null && art !== null ? art.teamFor(player.franchiseId) : null}
+      {@const average = player === null ? null : (averages.get(player.playerId) ?? null)}
       <li
         class="flex min-w-0 items-center gap-2 rounded-lg px-1 py-1
           {entry.playerId !== null && entry.playerId === highlightPlayerId
@@ -160,6 +183,13 @@
               >
             {/if}
           </p>
+          {#if average !== null && average.games > 0}
+            <p class="mt-0.5 font-mono text-[9px] text-muted-foreground tabular-nums">
+              {formatAverage(average.points, average.games)} PPG ·
+              {formatAverage(average.rebounds, average.games)} RPG ·
+              {formatAverage(average.assists, average.games)} APG
+            </p>
+          {/if}
         </div>
 
         <div class="shrink-0 text-right">

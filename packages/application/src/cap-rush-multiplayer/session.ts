@@ -89,7 +89,7 @@ export class CapRushMultiplayerSession {
     this.unsubscribe = this.deps.transport.subscribe(
       this.deps.roomId,
       () => {
-        void this.refresh().catch((error: unknown) => {
+        void this.refresh(false).catch((error: unknown) => {
           if (this.disposed) return;
           this.error = error instanceof Error ? error.message : 'Could not refresh the room.';
           this.events.publish();
@@ -114,7 +114,7 @@ export class CapRushMultiplayerSession {
 
   private async fetch(): Promise<void> {
     if (this.isDisposed()) return;
-    const last = this.commands[this.commands.length - 1]?.ordinal ?? -1;
+    const last = this.snapshot === null ? 2_147_483_647 : this.snapshot.commandCount - 1;
     const sync = await this.deps.transport.sync(this.deps.roomId, last);
     if (this.isDisposed()) return;
     this.adopt(sync.snapshot, sync.commands);
@@ -283,9 +283,11 @@ export class CapRushMultiplayerSession {
     if (this.snapshot?.rootSeed === null || this.snapshot?.rootSeed === undefined) {
       return false;
     }
+    const history = await this.deps.transport.sync(this.deps.roomId, -1);
+    if (this.isDisposed()) return false;
     const replayed = replayCapRushMultiplayerLog({
       rootSeed: this.snapshot.rootSeed,
-      commands: this.commands,
+      commands: history.commands,
       environment: this.deps.environment,
       variant: this.snapshot.settings.variant,
     });

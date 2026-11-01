@@ -1,3 +1,4 @@
+import * as contracts from '@hoop-rush/data-contracts';
 import { afterEach, expect, test, vi } from 'bun:test';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import * as runtime from '#lib/supabase-runtime.js';
@@ -112,4 +113,76 @@ test('reads the server clock and room snapshot concurrently before submitting', 
     accepted: false,
     rejectionCode: 'invalid-phase',
   });
+});
+
+test('reconstructs incremental syncs without duplicating games or losing locked inputs', async () => {
+  const locked = { rootSeed: 'locked' };
+  const recruitment = { roundIndex: 4 };
+  const first = { gameId: 'game-1', slot: 1 };
+  const second = { gameId: 'game-2', slot: 2 };
+  const client = {
+    rpc: vi
+      .fn()
+      .mockResolvedValueOnce({
+        error: null,
+        data: {
+          room: {
+            roomId: 'room-a',
+            phase: 'season',
+            revision: 1,
+            commandCount: 1,
+            state: { locked, recruitment, season: { games: [first] } },
+          },
+          commands: [],
+        },
+      })
+      .mockResolvedValueOnce({
+        error: null,
+        data: {
+          incremental: true,
+          room: {
+            roomId: 'room-a',
+            phase: 'season',
+            revision: 2,
+            commandCount: 2,
+            state: { season: { frontierSlot: 2 } },
+          },
+          commands: [
+            {
+              command_id: 'cmd-2',
+              ordinal: 1,
+              actor_participant_id: 'p1',
+              accepted_at: '2026-11-01T00:00:00Z',
+              payload: { kind: 'accept-slot', slot: 2, games: [first, second] },
+            },
+          ],
+        },
+      }),
+  };
+  vi.spyOn(runtime, 'getMultiplayerClient').mockResolvedValue(client as unknown as SupabaseClient);
+  const descriptor = Object.getOwnPropertyDescriptor(
+    contracts.capRushMultiplayerRoomSnapshotSchema,
+    'parse',
+  )!;
+  Object.defineProperty(contracts.capRushMultiplayerRoomSnapshotSchema, 'parse', {
+    configurable: true,
+    value: (value: unknown) => value,
+  });
+  try {
+    const transport = new CapRushMultiplayerSupabaseTransport();
+    await transport.sync('room-a');
+    const synced = await transport.sync('room-a', 0);
+    expect(client.rpc).toHaveBeenLastCalledWith('cap_rush_multiplayer_room_sync', {
+      p_room_id: 'room-a',
+      p_after_ordinal: -2,
+    });
+    expect<unknown>(synced.snapshot.state?.locked).toEqual(locked);
+    expect<unknown>(synced.snapshot.state?.recruitment).toEqual(recruitment);
+    expect<unknown>(synced.snapshot.state?.season?.games).toEqual([first, second]);
+    expect(synced.snapshot.state?.season?.frontierSlot).toBe(2);
+  } finally {
+    if (descriptor)
+      Object.defineProperty(contracts.capRushMultiplayerRoomSnapshotSchema, 'parse', descriptor);
+    else Reflect.deleteProperty(contracts.capRushMultiplayerRoomSnapshotSchema, 'parse');
+  }
 });

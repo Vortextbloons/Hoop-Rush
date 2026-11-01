@@ -88,7 +88,10 @@ export class CapRushMultiplayerController {
       const transport = getCapRushMultiplayerTransport();
       const membership = await transport.resume(this.roomId);
       if (this.isDisposed()) return;
-      const [data, initialSync] = await Promise.all([dataPromise, transport.sync(this.roomId)]);
+      const [data, initialSync] = await Promise.all([
+        dataPromise,
+        transport.sync(this.roomId, 2_147_483_647),
+      ]);
       if (this.isDisposed()) return;
       this.session = new CapRushMultiplayerSession({
         transport,

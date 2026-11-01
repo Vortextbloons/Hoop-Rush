@@ -50,6 +50,7 @@ function requiredString(record: Record<string, unknown>, key: string): string {
 }
 
 export class CapRushMultiplayerSupabaseTransport implements CapRushMultiplayerTransport {
+  private readonly snapshots = new Map<string, CapRushMultiplayerRoomSnapshot>();
   private readonly rooms = createRealtimeRoomRegistry({
     label: 'Cap Rush',
     roomsTable: 'cap_rush_multiplayer_rooms',
@@ -127,11 +128,34 @@ export class CapRushMultiplayerSupabaseTransport implements CapRushMultiplayerTr
     const client = await getMultiplayerClient();
     const result = await client.rpc('cap_rush_multiplayer_room_sync', {
       p_room_id: roomId,
-      p_after_ordinal: afterOrdinal,
+      p_after_ordinal:
+        this.snapshots.get(roomId)?.phase === 'season' &&
+        afterOrdinal >= 0 &&
+        afterOrdinal < 2147483647
+          ? -afterOrdinal - 2
+          : afterOrdinal,
     });
     if (result.error) throw new Error(result.error.message);
     const row = recordOf(result.data);
-    const snapshot = capRushMultiplayerRoomSnapshotSchema.parse(row.room);
+    const previous = this.snapshots.get(roomId);
+    const rawRoom = recordOf(row.room);
+    if (row.incremental === true && previous?.state) {
+      const incoming = recordOf(rawRoom.state);
+      const season = recordOf(incoming.season);
+      const games = new Map(previous.state.season?.games.map((game) => [game.gameId, game]));
+      for (const command of (row.commands as CommandRow[] | undefined) ?? []) {
+        if (command.payload.kind === 'accept-slot') {
+          for (const game of command.payload.games) games.set(game.gameId, game);
+        }
+      }
+      rawRoom.state = {
+        ...previous.state,
+        ...incoming,
+        ...(incoming.season === null ? {} : { season: { ...season, games: [...games.values()] } }),
+      };
+    }
+    const snapshot = capRushMultiplayerRoomSnapshotSchema.parse(rawRoom);
+    if (!previous || snapshot.revision >= previous.revision) this.snapshots.set(roomId, snapshot);
     const commands: CapRushMultiplayerCommand[] = (
       (row.commands as CommandRow[] | undefined) ?? []
     ).map((command) => ({
@@ -156,7 +180,9 @@ export class CapRushMultiplayerSupabaseTransport implements CapRushMultiplayerTr
   ): Promise<CapRushMultiplayerCommandReceipt> {
     const [acceptedAtIso, snapshot] = await Promise.all([
       this.clockNow(),
-      this.snapshot(input.roomId),
+      this.snapshots.get(input.roomId)?.revision === input.expectedRevision
+        ? Promise.resolve(this.snapshots.get(input.roomId)!)
+        : this.snapshot(input.roomId),
     ]);
     return this.submitWithSnapshot(input, snapshot, acceptedAtIso);
   }
@@ -218,6 +244,10 @@ export class CapRushMultiplayerSupabaseTransport implements CapRushMultiplayerTr
     ) {
       Reflect.deleteProperty(coordinationState, 'locked');
       Reflect.deleteProperty(coordinationState, 'recruitment');
+      if (coordinationState.season !== null) {
+        coordinationState.season = { ...coordinationState.season };
+        Reflect.deleteProperty(coordinationState.season, 'games');
+      }
     }
     const result = await client.rpc('cap_rush_multiplayer_command_submit', {
       p_room_id: input.roomId,

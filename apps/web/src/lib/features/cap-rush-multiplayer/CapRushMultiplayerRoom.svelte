@@ -68,7 +68,7 @@
   const summary = $derived(variantLabel(variant));
 </script>
 
-<div class="mx-auto w-full max-w-6xl px-3 pb-8 sm:px-6">
+<div class="mx-auto w-full max-w-[1440px] px-3 pb-8 sm:px-6">
   <RoomShell
     compactMobile
     {roomId}
