@@ -39,6 +39,8 @@ gathers intent, the engine owns basketball rules, adapters own I/O.
   saved-result recovery, stats rebuilding) and `FixedFiveVerificationFlow`
   (proposals, confirmations, mismatch recovery, receipts, completion). Each flow
   owns its state; the session owns room synchronization, drafting, and Duel playback.
+  `FixedFiveCheckpointWriter` owns the durable command cursor and snapshot key.
+  Failed writes remain pending for the next sync and surface through the session.
 
 - `LobbySession` owns lobby commands, one coalesced two-second refresh loop,
   validated snapshots, membership recovery ports, and navigation intents.
@@ -57,11 +59,15 @@ gathers intent, the engine owns basketball rules, adapters own I/O.
   each mode maps that to its own published rejection code, so per-mode
   vocabularies stay intact until they are unified deliberately.
 - `SeriesRoomSession.runGamePipeline` (`src/multiplayer/series-room-session.ts`):
-  the guard, persist, then publish order for one series game, shared by Draft
-  Duel and Havoc. Each mode supplies only `simulateGame` and `persistOutput`.
+  composes `GameExecution` for Draft Duel and Havoc. The execution owns in-flight
+  games and committed outputs, and returns a typed outcome. Outputs become
+  available for proposals only after persistence. Each mode supplies
+  `simulateGame` and `persistOutput`.
 - `ChallengeSession` + ports: the classic/sandbox run lifecycle (load, start,
   cancel, reveal pacing, acceptance, completion promotion) with a worker job
-  port, repository port, asset port, and clock (`src/challenge/`).
+  port, repository port, asset port, and clock (`src/challenge/`). Each execution
+  owns a `ChallengeResultQueue` for ordering and pacing. Restarts settle pending
+  writes before using the committed run; completion promotion has its own phase.
 - `HavocSession` + ports: the havoc draft/run/season/comparison lifecycle with
   a runner port, repository port, asset port, and id port; `HavocServiceError`
   and the run/history view contract live here (`src/havoc/`).

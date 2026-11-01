@@ -1,3 +1,4 @@
+import { GameExecution } from './game-execution.ts';
 import {
   canonicalJson,
   commandIdSchema,
@@ -181,14 +182,10 @@ export abstract class SeriesRoomSession<
   protected notice: string | null = null;
   protected integrityFailed = false;
   protected progress = 0;
-  /**
-   * Outputs keyed by game number.
-   *
-   * Shared because both series modes store, read, and reset it identically; only
-   * the per-game simulation differs. Recording here is what lets
-   * `runGamePipeline` own persistence and publication for both.
-   */
-  protected outputs: Record<number, TOutput> = {};
+  protected readonly games = new GameExecution<TOutput>();
+  protected get outputs(): Record<number, TOutput> {
+    return this.games.getOutputs();
+  }
   protected now: number;
   protected resolvedCursor: string | null = null;
   protected deadlineResolving = false;
@@ -265,7 +262,7 @@ export abstract class SeriesRoomSession<
    * simulates from rosters; Havoc builds both teams from the draft. Everything
    * around it — attachment checks, phase gating, job de-duplication, persistence
    * before publication, cancellation, and error reporting — is identical and
-   * lives here in `runGamePipeline`.
+   * is composed here through `GameExecution`.
    */
   protected abstract simulateGame(gameNumber: number): Promise<TOutput>;
 
@@ -275,7 +272,7 @@ export abstract class SeriesRoomSession<
   /**
    * Run, persist, and publish the current game exactly once.
    *
-   * Order matters and is enforced here rather than repeated per mode: output is
+   * `GameExecution` enforces the order for both modes: output is
    * persisted before publication, publication is gated on the attachment still
    * being current, and a failure never publishes a partial result. Cancellation
    * (`attachment.current()` becoming false) abandons the job without undoing an
@@ -297,18 +294,14 @@ export abstract class SeriesRoomSession<
     ) {
       return;
     }
-    if (this.currentOutput() || this.seriesFlow.jobs.has(gameNumber)) return;
     try {
-      await this.seriesFlow.runGame(
+      const outcome = await this.games.run({
         gameNumber,
-        attachment.current,
-        () => this.simulateGame(gameNumber),
-        async (output) => {
-          this.outputs = { ...this.outputs, [output.gameNumber]: output };
-          await this.persistOutput(output);
-          if (attachment.current()) this.publish();
-        },
-      );
+        current: attachment.current,
+        simulate: () => this.simulateGame(gameNumber),
+        persist: (output) => this.persistOutput(output),
+      });
+      if (outcome === 'saved') this.publish();
     } catch (error) {
       if (!attachment.current()) return;
       this.error =
@@ -813,6 +806,7 @@ export abstract class SeriesRoomSession<
   private resetForAttach(): void {
     this.tickLoop.dispose();
     this.seriesFlow.reset();
+    this.games.reset();
     this.commandRecovery.reset();
     this.snapshot = null;
     this.participantId = null;

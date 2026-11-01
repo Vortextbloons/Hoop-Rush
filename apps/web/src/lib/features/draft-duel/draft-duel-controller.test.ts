@@ -71,7 +71,8 @@ type SessionLifecycle = {
   participantId: DraftDuelParticipantId | null;
   snapshot: DraftDuelRoomSnapshot | null;
   draft: DraftDuelDraft | null;
-  outputs: Record<number, DraftDuelGameOutput>;
+  readonly outputs: Record<number, DraftDuelGameOutput>;
+  games: { restore(outputs: readonly DraftDuelGameOutput[]): void; reset(): void };
   assets: DraftDuelAssets | null;
   progress: number;
   publish: () => void;
@@ -529,8 +530,8 @@ describe('Draft Duel ready check progression', () => {
       createEngineContext(),
     );
     const lifecycle = session as unknown as SessionLifecycle;
-    lifecycle.outputs = {
-      2: {
+    lifecycle.games.restore([
+      {
         schemaVersion: DRAFT_DUEL_TAPE_VERSION,
         roomId,
         gameNumber: 2,
@@ -543,7 +544,7 @@ describe('Draft Duel ready check progression', () => {
         tapeDigest: digest,
         inputDigest: digest,
       },
-    };
+    ]);
     lifecycle.progress = options.progress ?? 1;
     lifecycle.assets = {} as DraftDuelAssets;
     vi.spyOn(lifecycle, 'rebuildDraft').mockImplementation(() => {});
@@ -800,7 +801,7 @@ describe('Draft Duel ready check progression', () => {
     const { lifecycle } = await prepareSecondGame();
     const output = lifecycle.outputs[2];
     if (!output) throw new Error('Missing game output');
-    lifecycle.outputs = {};
+    lifecycle.games.reset();
     // Setup stubs the pipeline; restore the real one so this exercises it.
     mocked(lifecycle.runGamePipeline).mockRestore();
     const simulate = vi.spyOn(lifecycle, 'simulateGame').mockResolvedValue(output);

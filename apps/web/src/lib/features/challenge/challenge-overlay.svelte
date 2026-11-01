@@ -68,6 +68,8 @@
         Paused
       {:else if phase === 'error'}
         Stopped
+      {:else if phase === 'completing'}
+        Saving results
       {:else}
         Playing
       {/if}

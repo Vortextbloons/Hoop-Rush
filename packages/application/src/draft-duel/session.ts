@@ -556,7 +556,6 @@ export class DraftDuelSession extends SeriesRoomSession<
 
   protected resetModeState(): void {
     this.draft = null;
-    this.outputs = {};
     this.completedRecap = null;
   }
 
@@ -570,9 +569,7 @@ export class DraftDuelSession extends SeriesRoomSession<
   }
 
   protected mergeOutputs(rows: readonly { output: DraftDuelGameOutput }[]): void {
-    const outputs: Record<number, DraftDuelGameOutput> = {};
-    for (const row of rows) outputs[row.output.gameNumber] = row.output;
-    this.outputs = { ...this.outputs, ...outputs };
+    this.games.restore(rows.map((row) => row.output));
   }
 
   protected dueDeadline(): { cursor: string } | null {

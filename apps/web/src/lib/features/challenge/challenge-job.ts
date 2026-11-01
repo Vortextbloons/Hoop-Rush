@@ -46,17 +46,7 @@ export class ChallengeWorkerJob implements ChallengeJobPort {
   }
 
   cancel(): void {
-    const worker = this.worker;
-    const requestId = this.requestId;
     this.teardownWorker();
-    if (worker !== null && requestId !== null) {
-      try {
-        worker.postMessage(
-          workerRequestSchema.parse({ schemaVersion: 1, type: 'cancel', requestId }),
-        );
-      } catch {}
-      worker.terminate();
-    }
   }
 
   dispose(): void {
@@ -83,10 +73,13 @@ export class ChallengeWorkerJob implements ChallengeJobPort {
 
   private teardownWorker(): void {
     if (this.worker !== null) {
+      this.worker.onmessage = null;
+      this.worker.onerror = null;
       this.worker.terminate();
       this.worker = null;
     }
     this.requestId = null;
+    this.events = null;
   }
 
   private handleMessage(raw: unknown): void {

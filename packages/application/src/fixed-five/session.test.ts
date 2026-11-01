@@ -458,6 +458,45 @@ describe('FixedFiveRoomSession', () => {
     expect(harness.runners).toHaveLength(0);
   });
 
+  it('reports a failed command save and retries it even when the server has no fresh commands', async () => {
+    const harness = createHarness();
+    await harness.createRoom();
+    const session = harness.session();
+    await session.start();
+    const append = vi
+      .spyOn(harness.repository, 'appendCommand')
+      .mockRejectedValue(new Error('disk full'));
+    await submitCommand(harness, 'save-retry-ready', 'p2', { kind: 'ready', ready: true });
+    await session.refresh();
+    expect(session.getSnapshot().error).toContain('Could not save room progress: disk full');
+    expect(harness.repository.snapshotCursor).toBe(0);
+    append.mockRestore();
+    await session.refresh();
+    expect(harness.repository.rows.get(0)?.commandId).toBe(
+      commandIdSchema.parse('save-retry-ready'),
+    );
+    expect(harness.repository.snapshotCursor).toBe(1);
+    expect(session.getSnapshot().error).toBeNull();
+    session.dispose();
+  });
+
+  it('keeps syncing after an initial checkpoint save fails and clears the save error on recovery', async () => {
+    const harness = createHarness();
+    await harness.createRoom();
+    const save = vi
+      .spyOn(harness.repository, 'saveActiveSnapshot')
+      .mockRejectedValue(new Error('storage offline'));
+    const session = harness.session();
+    await session.start();
+    expect(session.getSnapshot().error).toContain('Could not save room progress');
+    save.mockRestore();
+    await submitCommand(harness, 'checkpoint-recovery', 'p2', { kind: 'ready', ready: true });
+    await session.refresh();
+    expect(session.getSnapshot().error).toBeNull();
+    expect(harness.repository.snapshotCursor).toBe(1);
+    session.dispose();
+  });
+
   it('refetches commands appended by the other seat', async () => {
     const harness = createHarness();
     await harness.createRoom();

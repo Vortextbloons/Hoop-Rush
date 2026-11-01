@@ -1,13 +1,13 @@
 import {
   HAVOC_WORKER_WIRE_SCHEMA_VERSION,
   havocWorkerMessageSchema,
-  type HavocWorkerCancelRequest,
+  type HavocWorkerMessage,
   type HavocWorkerCompleteMessage,
-  type HavocWorkerErrorMessage,
   type HavocWorkerSimulateRequest,
   type HavocWorkerTapeMessage,
   type HavocWorkerTapeRequest,
 } from '@hoop-rush/data-contracts';
+import { StreamingWorkerRunner } from '#lib/workers/streaming-worker.js';
 import type { HavocBatchHandlers } from '@hoop-rush/application/havoc';
 
 export type { HavocBatchHandlers } from '@hoop-rush/application/havoc';
@@ -19,226 +19,80 @@ export interface HavocRunnerOptions {
 
 const DEFAULT_TAPE_TIMEOUT_MS = 60_000;
 
-interface ActiveBatch {
-  requestId: string;
-  worker: Worker;
-  cancelled: boolean;
-  queue: Promise<void>;
-  handlerError: Error | null;
-  onError?: (message: HavocWorkerErrorMessage) => void;
-  resolve: (message: HavocWorkerCompleteMessage) => void;
-  reject: (error: Error) => void;
-}
-
-interface ActiveTape {
-  requestId: string;
-  worker: Worker;
-  timeout: ReturnType<typeof setTimeout>;
-  resolve: (message: HavocWorkerTapeMessage) => void;
-  reject: (error: Error) => void;
-}
-
 export class HavocRunner {
-  private batch: ActiveBatch | null = null;
-  private tape: ActiveTape | null = null;
-  private worker: Worker | null = null;
+  private readonly transport: StreamingWorkerRunner<HavocWorkerMessage>;
+  private tapeActive = false;
 
-  constructor(private readonly options: HavocRunnerOptions = {}) {}
-
-  private createWorker(): Worker {
-    if (this.options.createWorker !== undefined) {
-      return this.options.createWorker();
-    }
-    return new Worker(new URL('../../../workers/havoc-worker.ts', import.meta.url), {
-      type: 'module',
+  constructor(private readonly options: HavocRunnerOptions = {}) {
+    this.transport = new StreamingWorkerRunner({
+      createWorker:
+        options.createWorker ??
+        (() =>
+          new Worker(new URL('../../../workers/havoc-worker.ts', import.meta.url), {
+            type: 'module',
+          })),
+      responseSchema: havocWorkerMessageSchema,
+      invalidMessage: null,
+      crashed: 'the havoc worker crashed',
     });
-  }
-
-  private getWorker(): Worker {
-    this.worker ??= this.createWorker();
-    return this.worker;
-  }
-
-  private terminateWorker(): void {
-    this.worker?.terminate();
-    this.worker = null;
   }
 
   startBatch(
     request: HavocWorkerSimulateRequest,
     handlers: HavocBatchHandlers,
   ): Promise<HavocWorkerCompleteMessage> {
-    this.settleBatch(new Error('the havoc batch was superseded'));
-    this.settleTape(new Error('the havoc tape run was superseded'));
-    const worker = this.getWorker();
-    return new Promise<HavocWorkerCompleteMessage>((resolve, reject) => {
-      const active: ActiveBatch = {
+    const message = this.tapeActive
+      ? 'the havoc tape run was superseded'
+      : 'the havoc batch was superseded';
+    this.tapeActive = false;
+    return this.transport.run({
+      request,
+      requestId: request.requestId,
+      concurrent: { kind: 'supersede', message },
+      completeOf: (message) => (message.type === 'havoc-complete' ? message : null),
+      errorOf: (message) => {
+        if (message.type !== 'havoc-error') return null;
+        handlers.onError?.(message);
+        return new Error(message.message);
+      },
+      drainOnError: false,
+      cancelRequest: {
+        schemaVersion: HAVOC_WORKER_WIRE_SCHEMA_VERSION,
+        type: 'havoc-cancel',
         requestId: request.requestId,
-        worker,
-        cancelled: false,
-        queue: Promise.resolve(),
-        handlerError: null,
-        onError: handlers.onError,
-        resolve,
-        reject,
-      };
-      this.batch = active;
-      worker.onmessage = (event: MessageEvent<unknown>) => {
-        this.handleBatchMessage(active, event.data, handlers);
-      };
-      worker.onerror = () => {
-        this.failBatch(active, new Error('the havoc worker crashed'));
-      };
-      worker.postMessage(request);
+      },
+      handle: (message, enqueue) => {
+        if (message.type === 'havoc-game') enqueue(() => handlers.onGame?.(message));
+        else if (message.type === 'havoc-progress') handlers.onProgress?.(message);
+      },
     });
   }
 
   runTape(request: HavocWorkerTapeRequest): Promise<HavocWorkerTapeMessage> {
-    this.settleBatch(new Error('the havoc batch was superseded'));
-    this.settleTape(new Error('the havoc tape run was superseded'));
-    const worker = this.getWorker();
-    return new Promise<HavocWorkerTapeMessage>((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        this.failTape(new Error('the havoc tape worker timed out'));
-      }, this.options.tapeTimeoutMs ?? DEFAULT_TAPE_TIMEOUT_MS);
-      const active: ActiveTape = { requestId: request.requestId, worker, timeout, resolve, reject };
-      this.tape = active;
-      worker.onmessage = (event: MessageEvent<unknown>) => {
-        if (this.tape !== active) return;
-        const parsed = havocWorkerMessageSchema.safeParse(event.data);
-        if (!parsed.success) return;
-        const message = parsed.data;
-        if (message.requestId !== active.requestId) return;
-        if (message.type === 'havoc-tape') {
-          this.finishTape(active, message);
-          return;
-        }
-        if (message.type === 'havoc-error') {
-          this.failTape(new Error(message.message));
-        }
-      };
-      worker.onerror = () => {
-        this.failTape(new Error('the havoc worker crashed'));
-      };
-      worker.postMessage(request);
+    const message = this.tapeActive
+      ? 'the havoc tape run was superseded'
+      : 'the havoc batch was superseded';
+    this.tapeActive = true;
+    return this.transport.run({
+      request,
+      requestId: request.requestId,
+      concurrent: { kind: 'supersede', message },
+      completeOf: (message) => (message.type === 'havoc-tape' ? message : null),
+      errorOf: (message) => (message.type === 'havoc-error' ? new Error(message.message) : null),
+      drainOnError: false,
+      timeout: {
+        ms: this.options.tapeTimeoutMs ?? DEFAULT_TAPE_TIMEOUT_MS,
+        message: 'the havoc tape worker timed out',
+      },
+      handle: () => {},
     });
   }
 
   cancel(): void {
-    if (this.batch !== null) {
-      this.requestBatchCancel(this.batch);
-    }
+    if (!this.tapeActive) this.transport.cancel();
   }
 
   dispose(): void {
-    this.settleBatch(new Error('the havoc runner was disposed'));
-    this.settleTape(new Error('the havoc runner was disposed'));
-    this.terminateWorker();
-  }
-
-  private handleBatchMessage(
-    active: ActiveBatch,
-    data: unknown,
-    handlers: HavocBatchHandlers,
-  ): void {
-    if (this.batch !== active) return;
-    const parsed = havocWorkerMessageSchema.safeParse(data);
-    if (!parsed.success) return;
-    const message = parsed.data;
-    if (message.requestId !== active.requestId) return;
-    switch (message.type) {
-      case 'havoc-game':
-        active.queue = active.queue
-          .then(async () => {
-            await handlers.onGame?.(message);
-          })
-          .catch((error: unknown) => {
-            if (active.handlerError === null) {
-              active.handlerError = error instanceof Error ? error : new Error(String(error));
-            }
-            this.requestBatchCancel(active);
-          });
-        return;
-      case 'havoc-progress':
-        handlers.onProgress?.(message);
-        return;
-      case 'havoc-error':
-        active.onError?.(message);
-        this.failBatch(active, new Error(message.message));
-        return;
-      case 'havoc-complete':
-        void active.queue.then(() => {
-          if (this.batch !== active) return;
-          if (active.handlerError !== null) {
-            this.failBatch(active, active.handlerError);
-            return;
-          }
-          this.finishBatch(active, message);
-        });
-        return;
-      case 'havoc-tape':
-        return;
-    }
-  }
-
-  private requestBatchCancel(active: ActiveBatch): void {
-    if (active.cancelled) return;
-    active.cancelled = true;
-    const cancel: HavocWorkerCancelRequest = {
-      schemaVersion: HAVOC_WORKER_WIRE_SCHEMA_VERSION,
-      type: 'havoc-cancel',
-      requestId: active.requestId,
-    };
-    active.worker.postMessage(cancel);
-  }
-
-  private finishBatch(active: ActiveBatch, message: HavocWorkerCompleteMessage): void {
-    if (this.batch !== active) return;
-    this.batch = null;
-    active.worker.onmessage = null;
-    active.worker.onerror = null;
-    active.resolve(message);
-  }
-
-  private failBatch(active: ActiveBatch, error: Error): void {
-    if (this.batch !== active) return;
-    this.batch = null;
-    this.terminateWorker();
-    active.reject(error);
-  }
-
-  private settleBatch(error: Error): void {
-    if (this.batch === null) return;
-    const active = this.batch;
-    this.batch = null;
-    this.terminateWorker();
-    active.reject(error);
-  }
-
-  private finishTape(active: ActiveTape, message: HavocWorkerTapeMessage): void {
-    if (this.tape !== active) return;
-    this.tape = null;
-    clearTimeout(active.timeout);
-    active.worker.onmessage = null;
-    active.worker.onerror = null;
-    active.resolve(message);
-  }
-
-  private failTape(error: Error): void {
-    if (this.tape === null) return;
-    const active = this.tape;
-    this.tape = null;
-    clearTimeout(active.timeout);
-    this.terminateWorker();
-    active.reject(error);
-  }
-
-  private settleTape(error: Error): void {
-    if (this.tape === null) return;
-    const active = this.tape;
-    this.tape = null;
-    clearTimeout(active.timeout);
-    this.terminateWorker();
-    active.reject(error);
+    this.transport.dispose('the havoc runner was disposed');
   }
 }

@@ -686,7 +686,6 @@ export class HavocMultiplayerSession extends SeriesRoomSession<
 
   protected resetModeState(): void {
     this.draft = null;
-    this.outputs = {};
     this.completedRecap = null;
     this.challenge = null;
   }
@@ -701,9 +700,7 @@ export class HavocMultiplayerSession extends SeriesRoomSession<
   }
 
   protected mergeOutputs(rows: readonly HavocMultiplayerGameOutput[]): void {
-    const outputs: Record<number, HavocMultiplayerGameOutput> = {};
-    for (const row of rows) outputs[row.gameNumber] = row;
-    this.outputs = { ...this.outputs, ...outputs };
+    this.games.restore(rows);
   }
 
   protected onSnapshot = (snapshot: HavocMultiplayerRoomSnapshot): void => {

@@ -86,16 +86,16 @@ class MemoryChallengeRepository implements ChallengeRunRepositoryPort {
   }
   saveActiveRun(record: StoredRunRecord): Promise<void> {
     this.record = record;
-    return Promise.resolve();
+    return Promise.resolve(undefined);
   }
   appendActiveGame(input: ActiveGameAppend): Promise<void> {
     this.appends.push(input);
-    return Promise.resolve();
+    return Promise.resolve(undefined);
   }
   promoteActiveToCompleted(completed: StoredRunRecord, index: CompletedRunIndex): Promise<void> {
     if (this.failPromotion) return Promise.reject(new Error('promotion store offline'));
     this.promotion = { completed, index };
-    return Promise.resolve();
+    return Promise.resolve(undefined);
   }
 }
 
@@ -141,7 +141,7 @@ class FakeChallengeClock implements ChallengeClockPort {
   sleeps: number[] = [];
   sleep(ms: number): Promise<void> {
     this.sleeps.push(ms);
-    return Promise.resolve();
+    return Promise.resolve(undefined);
   }
 }
 
@@ -170,6 +170,16 @@ function setup(run: ChallengeRun | null, options: { failPromotion?: boolean } = 
   const snapshots: Array<ReturnType<ChallengeSession['getSnapshot']>> = [];
   session.subscribe(() => snapshots.push(session.getSnapshot()));
   return { repository, job, session, snapshots, clock };
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (error: Error) => void;
+  const promise = new Promise<T>((yes, no) => {
+    resolve = yes;
+    reject = no;
+  });
+  return { promise, resolve, reject };
 }
 
 describe('ChallengeSession', () => {
@@ -375,5 +385,172 @@ describe('ChallengeSession', () => {
     job.deliver(results);
     await flush();
     expect(repository.appends).toHaveLength(0);
+  });
+  it('keeps the newest load when an earlier repository load resolves late', async () => {
+    const older = deferred<StoredRunRecord | null>();
+    const run = fixtureRun({ runId: 'newest-load' });
+    const { session, repository } = setup(run);
+    let calls = 0;
+    repository.loadActiveRun = () =>
+      ++calls === 1 ? older.promise : Promise.resolve(storedRecord(run));
+    const first = session.load();
+    await session.load();
+    older.resolve(null);
+    await first;
+    expect(session.getSnapshot()).toMatchObject({ run: { runId: run.runId }, loadError: null });
+  });
+
+  it('does not let a stale profile failure clear a newer load', async () => {
+    const profile = deferred<ReturnType<typeof buildEraSimulationProfile>>();
+    const run = fixtureRun();
+    const repository = new MemoryChallengeRepository();
+    repository.record = storedRecord(run);
+    let calls = 0;
+    const session = new ChallengeSession({
+      repository,
+      job: new FakeChallengeJob(),
+      clock: new FakeChallengeClock(),
+      assets: {
+        loadEraSimulationProfile: () =>
+          ++calls === 1 ? profile.promise : Promise.resolve(PROFILE),
+      },
+    });
+    const first = session.load();
+    await flush();
+    await session.load();
+    profile.reject(new Error('old load failed'));
+    await first;
+    expect(session.getSnapshot()).toMatchObject({ run: { runId: run.runId }, loadError: null });
+  });
+
+  it('drains a resumed queue while the cancelled execution is still sleeping', async () => {
+    const run = fixtureRun();
+    const results = resultSequence(run, 2);
+    const { session, job, clock, repository } = setup(run);
+    const sleep = deferred<undefined>();
+    clock.sleep = () => sleep.promise;
+    await session.load();
+    session.start({ reducedMotion: false });
+    job.chooseSeed(run.runSeed);
+    job.deliver([pick(results, 0)]);
+    session.cancel();
+    session.start({ reducedMotion: true });
+    job.chooseSeed(run.runSeed);
+    job.deliver(results);
+    await flush();
+    expect(repository.appends.map((row) => row.gameNumber)).toEqual([1, 2]);
+    sleep.resolve(undefined);
+    await flush();
+    expect(session.getSnapshot().run?.games).toHaveLength(2);
+  });
+
+  it('waits for a cancelled append and resumes after the committed game', async () => {
+    const run = fixtureRun();
+    const { session, job, repository } = setup(run);
+    const append = deferred<undefined>();
+    repository.appendActiveGame = () => append.promise;
+    await session.load();
+    session.start({ reducedMotion: true });
+    job.chooseSeed(run.runSeed);
+    job.deliver(resultSequence(run, 1));
+    session.cancel();
+    session.start({ reducedMotion: true });
+    expect(job.simulations).toHaveLength(1);
+    append.resolve(undefined);
+    await flush();
+    expect(job.simulations[1]?.startGameNumber).toBe(2);
+    expect(session.getSnapshot().run?.games).toHaveLength(1);
+  });
+
+  it('ignores a rejected cancelled append when a restart is waiting', async () => {
+    const run = fixtureRun();
+    const { session, job, repository } = setup(run);
+    const append = deferred<undefined>();
+    repository.appendActiveGame = () => append.promise;
+    await session.load();
+    session.start({ reducedMotion: true });
+    job.chooseSeed(run.runSeed);
+    job.deliver(resultSequence(run, 1));
+    session.cancel();
+    session.start({ reducedMotion: true });
+    append.reject(new Error('old append failed'));
+    await flush();
+    expect(session.getSnapshot()).toMatchObject({ phase: 'starting', error: null });
+    expect(job.attempts).toHaveLength(2);
+  });
+
+  it('waits for seed persistence before restarting an attempt', async () => {
+    const run = fixtureRun();
+    const { session, job, repository } = setup(run);
+    const save = deferred<undefined>();
+    repository.saveActiveRun = () => save.promise;
+    await session.load();
+    session.start({ reducedMotion: true });
+    const chosen = seedSchema.parse('abcdef0123456789');
+    job.chooseSeed(chosen);
+    session.cancel();
+    session.start({ reducedMotion: true });
+    expect(job.attempts).toHaveLength(1);
+    save.resolve(undefined);
+    await flush();
+    expect(job.attempts[1]?.run.runSeed).toBe(chosen);
+  });
+
+  it('keeps completion pending and prevents duplicate promotions', async () => {
+    const run = fixtureRun();
+    const { session, job, repository } = setup(run);
+    const promotion = deferred<undefined>();
+    let calls = 0;
+    repository.promoteActiveToCompleted = () => {
+      calls += 1;
+      return promotion.promise;
+    };
+    await session.load();
+    session.start({ reducedMotion: true });
+    job.chooseSeed(run.runSeed);
+    job.deliver(resultsUntilFinished(run));
+    await flush();
+    expect(session.getSnapshot().phase).toBe('completing');
+    session.start({ reducedMotion: true });
+    expect(calls).toBe(1);
+    session.dispose();
+    promotion.reject(new Error('late failure'));
+    await flush();
+    expect(session.getSnapshot().phase).toBe('completing');
+  });
+  it('promotes a finished active checkpoint on reload before reporting finished', async () => {
+    const base = fixtureRun();
+    const finished = resultsUntilFinished(base).reduce(
+      (run, result) => acceptGameResult(run, result),
+      base,
+    );
+    const { session, repository } = setup(finished, { failPromotion: true });
+    await session.load();
+    expect(session.getSnapshot().phase).toBe('error');
+    repository.failPromotion = false;
+    session.start({ reducedMotion: true });
+    await flush();
+    expect(session.getSnapshot().phase).toBe('finished');
+    expect(repository.promotion?.completed.run.runId).toBe(base.runId);
+  });
+
+  it('ignores duplicate seed responses while the chosen seed is being saved', async () => {
+    const run = fixtureRun();
+    const { session, job, repository } = setup(run);
+    const save = deferred<undefined>();
+    let saves = 0;
+    repository.saveActiveRun = () => {
+      saves += 1;
+      return save.promise;
+    };
+    await session.load();
+    session.start({ reducedMotion: true });
+    job.chooseSeed('abcdef0123456789');
+    job.chooseSeed('fedcba9876543210');
+    save.resolve(undefined);
+    await flush();
+    expect(saves).toBe(1);
+    expect(job.simulations).toHaveLength(1);
+    expect(session.getSnapshot().run?.runSeed).toBe(seedSchema.parse('abcdef0123456789'));
   });
 });

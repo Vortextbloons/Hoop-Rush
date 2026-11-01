@@ -352,4 +352,48 @@ describe('CapRushRunner', () => {
     await pending;
     expect(progress).toEqual([1]);
   });
+  it('does not let an abandoned draining job settle or detach its replacement', async () => {
+    const first = new FakeWorker();
+    const second = new FakeWorker();
+    const workers = [first, second];
+    const runner = new CapRushRunner({
+      createWorker: () => (workers.shift() ?? second).asWorker(),
+    });
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let handled = 0;
+    const old = simulate(runner, 'old-job', {
+      onGame: () => {},
+      onLeagueGames: async () => {
+        handled += 1;
+        await gate;
+      },
+    });
+    first.emit(leagueGamesMessage('old-job', 1));
+    first.emit(leagueGamesMessage('old-job', 2));
+    first.emit(completeMessage('old-job'));
+    await Promise.resolve();
+    runner.destroy();
+    await expect(old).rejects.toThrow('destroyed');
+    const next = simulate(runner, 'new-job');
+    release();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(handled).toBe(1);
+    expect(runner.busy).toBe(true);
+    second.emit(completeMessage('new-job'));
+    await expect(next).resolves.toMatchObject({ requestId: 'new-job' });
+  });
+
+  it('settles and cleans up when posting a request throws', async () => {
+    const fake = new FakeWorker();
+    fake.postMessage = () => {
+      throw new Error('cannot clone request');
+    };
+    const runner = new CapRushRunner({ createWorker: () => fake.asWorker() });
+    await expect(simulate(runner, 'bad-request')).rejects.toThrow('cannot clone request');
+    expect(runner.busy).toBe(false);
+    expect(fake.terminated).toBe(true);
+  });
 });

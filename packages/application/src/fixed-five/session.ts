@@ -1,9 +1,9 @@
+import { FixedFiveCheckpointWriter } from './checkpoint-writer.ts';
 import {
   FIXED_FIVE_DUEL_GAME_READY_TIMEOUT_MS,
   FIXED_FIVE_DUEL_GAME_RESULTS_HOLD_MS,
   FIXED_FIVE_MULTIPLAYER_VERSION,
   commandIdSchema,
-  canonicalJson,
   idSchema,
   playerVersionId,
   type ClassicDraftCatalog,
@@ -330,7 +330,7 @@ export class FixedFiveRoomSession {
 
   private unsubscribeTransport: (() => void) | null = null;
   private resyncTimer: (() => void) | null = null;
-  private savedActiveKey: string | null = null;
+  private readonly checkpoint: FixedFiveCheckpointWriter;
   private clockTimer: (() => void) | null = null;
   private revealTimer: (() => void) | null = null;
   private readonly reconcileTask = new CoalescedTask(() => this.reconcile());
@@ -343,6 +343,7 @@ export class FixedFiveRoomSession {
 
   constructor(deps: FixedFiveRoomSessionDeps) {
     this.deps = deps;
+    this.checkpoint = new FixedFiveCheckpointWriter(deps.repository);
     this.seriesFlow = new SeriesCoordinator(deps.now, DUEL_AUTO_START_RETRY_MS);
     this.seriesFlow.holdMs = FIXED_FIVE_DUEL_GAME_RESULTS_HOLD_MS;
     this.roomId = deps.roomId;
@@ -431,7 +432,7 @@ export class FixedFiveRoomSession {
       ...this.verification.getSnapshot(),
       roomId: this.roomId,
       loading: this.loading,
-      error: this.error,
+      error: this.error ?? this.checkpoint.getError(),
       notice: this.notice,
       draftError: this.draftError,
       reconnecting: this.reconnecting,
@@ -980,11 +981,11 @@ export class FixedFiveRoomSession {
       const restored = restoreFixedFiveCommandSyncState(storedCommands);
       this.commands = restored.commands;
       this.lastOrdinal = restored.lastOrdinal;
+      this.checkpoint.restore(restored.lastOrdinal);
       this.refreshDerived();
       if (!room.rootSeed) {
         this.error = 'Room is missing its server seed — it cannot be simulated.';
       }
-      await this.saveActiveSnapshot(room);
       if (this.isDisposed()) return;
       this.publish();
       this.unsubscribeTransport = transport.subscribe(
@@ -1083,16 +1084,6 @@ export class FixedFiveRoomSession {
     return this.reconcileTask.request();
   }
 
-  private async saveActiveSnapshot(room: FixedFiveRoomSnapshot): Promise<void> {
-    const cursor = this.lastOrdinal + 1;
-    const key = canonicalJson([room, cursor]);
-    if (key === this.savedActiveKey) return;
-    try {
-      await this.deps.repository.saveActiveSnapshot(room, cursor);
-      if (!this.isDisposed()) this.savedActiveKey = key;
-    } catch {}
-  }
-
   private async reconcile(): Promise<void> {
     if (this.isDisposed() || !this.room) return;
     this.syncing = true;
@@ -1115,19 +1106,13 @@ export class FixedFiveRoomSession {
         let contiguous = this.lastOrdinal;
         while (byOrdinal.has(contiguous + 1)) contiguous += 1;
         this.lastOrdinal = contiguous;
-        for (const command of fresh) {
-          try {
-            await this.deps.repository.appendCommand(command);
-          } catch {}
-        }
-        if (this.isDisposed()) return;
         this.deps.saveActivityNow(this.roomId);
         this.refreshDerived();
       } else {
         this.recomputePhase();
       }
       const room = this.room;
-      await this.saveActiveSnapshot(room);
+      await this.checkpoint.save(room, this.commands, this.lastOrdinal, () => !this.isDisposed());
     } catch (e) {
       if (!this.isDisposed()) this.error = this.deps.friendlyError(e);
     } finally {
@@ -1137,11 +1122,11 @@ export class FixedFiveRoomSession {
     }
     if (this.isDisposed()) return;
     this.publish();
-    this.runAutoFlows();
+    if (this.checkpoint.getError() === null) this.runAutoFlows();
   }
 
   private runAutoFlows(): void {
-    if (this.isDisposed()) return;
+    if (this.isDisposed() || this.checkpoint.getError() !== null) return;
     if (this.submissionsInFlight > 0) {
       this.autoFlowsDeferred = true;
       return;

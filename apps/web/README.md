@@ -30,6 +30,10 @@ routes/ and lib/features/<mode>/  ->  @hoop-rush/application sessions  ->  engin
   in `src/lib/`.
 - Workers live in `src/workers/`; their messages are validated with Zod at both
   ends and must match `@hoop-rush/data-contracts` worker schemas.
+  `src/lib/workers/one-shot-worker.ts` handles single-result requests. Havoc and
+  Cap Rush compose `streaming-worker.ts` for serial result handlers, worker reuse,
+  cancellation, and guarded settlement. Mode adapters specify concurrency,
+  malformed-message, and error-draining policies.
 - Test doubles stay under `testing/` directories (`src/lib/testing/`,
   `src/lib/features/havoc/testing/`) and are
   imported only by tests.

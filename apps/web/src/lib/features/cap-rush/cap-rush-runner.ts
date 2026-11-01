@@ -14,6 +14,7 @@ import {
   type CapRushWorkerStandingsCompleteMessage,
   type OpponentBracket,
 } from '@hoop-rush/data-contracts';
+import { StreamingWorkerRunner } from '#lib/workers/streaming-worker.js';
 
 export interface CapRushRunnerHandlers {
   onGame: (message: CapRushWorkerGameMessage) => void | Promise<void>;
@@ -24,15 +25,6 @@ export interface CapRushRunnerHandlers {
 
 export interface CapRushRunnerOptions {
   createWorker?: () => Worker;
-}
-
-interface ActiveJob {
-  requestId: string;
-  worker: Worker;
-  cancelled: boolean;
-  queue: Promise<void>;
-  handlerError: Error | null;
-  reject: (error: Error) => void;
 }
 
 interface RunJobInput<TComplete> {
@@ -55,37 +47,24 @@ function defaultWorker(): Worker {
   });
 }
 
-function errorOf(error: unknown): Error {
-  return error instanceof Error ? error : new Error(String(error));
-}
-
 export class CapRushRunner {
-  private readonly createWorker: () => Worker;
-  private active: ActiveJob | null = null;
-  private worker: Worker | null = null;
-
-  private getWorker(): Worker {
-    this.worker ??= this.createWorker();
-    return this.worker;
-  }
+  private readonly transport: StreamingWorkerRunner<CapRushWorkerMessage>;
 
   constructor(options: CapRushRunnerOptions = {}) {
-    this.createWorker = options.createWorker ?? defaultWorker;
+    this.transport = new StreamingWorkerRunner({
+      createWorker: options.createWorker ?? defaultWorker,
+      responseSchema: capRushWorkerMessageSchema,
+      invalidMessage: 'cap rush worker sent an unrecognised message',
+      crashed: 'cap rush worker crashed',
+    });
   }
 
   get busy(): boolean {
-    return this.active !== null;
+    return this.transport.busy;
   }
 
   cancel(): void {
-    const active = this.active;
-    if (active === null) return;
-    active.cancelled = true;
-    active.worker.postMessage({
-      schemaVersion: CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION,
-      type: 'cap-rush-cancel',
-      requestId: active.requestId,
-    });
+    this.transport.cancel();
   }
 
   simulate(input: {
@@ -191,93 +170,31 @@ export class CapRushRunner {
   }
 
   private runJob<TComplete>(input: RunJobInput<TComplete>): Promise<TComplete> {
-    if (this.active !== null) {
-      return Promise.reject(new Error(input.concurrentMessage));
-    }
-    const worker = this.getWorker();
-    return new Promise<TComplete>((resolve, reject) => {
-      const job: ActiveJob = {
+    return this.transport.run({
+      request: input.request,
+      requestId: input.requestId,
+      concurrent: { kind: 'reject', message: input.concurrentMessage },
+      completeOf: input.completeOf,
+      errorOf: (message) => {
+        if (message.type !== 'cap-rush-error') return null;
+        input.onError?.(message);
+        return new Error(`${message.code}: ${message.message}`);
+      },
+      drainOnError: input.errorAfterQueue,
+      cancelRequest: {
+        schemaVersion: CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION,
+        type: 'cap-rush-cancel',
         requestId: input.requestId,
-        worker,
-        cancelled: false,
-        queue: Promise.resolve(),
-        handlerError: null,
-        reject,
-      };
-      this.active = job;
-      const finish = (message: TComplete): void => {
-        this.active = null;
-        worker.onmessage = null;
-        worker.onerror = null;
-        resolve(message);
-      };
-      const fail = (error: Error): void => {
-        this.active = null;
-        worker.terminate();
-        this.worker = null;
-        reject(error);
-      };
-
-      worker.onmessage = (event: MessageEvent<unknown>) => {
-        if (this.active !== job) return;
-        const parsed = capRushWorkerMessageSchema.safeParse(event.data);
-        if (!parsed.success) {
-          fail(new Error('cap rush worker sent an unrecognised message'));
-          return;
-        }
-        const message: CapRushWorkerMessage = parsed.data;
-        if (message.requestId !== input.requestId) return;
-        const complete = input.completeOf(message);
-        if (complete !== null) {
-          if (!input.errorAfterQueue) {
-            finish(complete);
-            return;
-          }
-          void job.queue.then(() => {
-            if (job.handlerError !== null) {
-              fail(job.handlerError);
-              return;
-            }
-            finish(complete);
-          });
-          return;
-        }
-        if (message.type === 'cap-rush-error') {
-          input.onError?.(message);
-          if (!input.errorAfterQueue) {
-            fail(new Error(`${message.code}: ${message.message}`));
-            return;
-          }
-          void job.queue.then(() => {
-            fail(new Error(`${message.code}: ${message.message}`));
-          });
-          return;
-        }
-        if (message.type === 'cap-rush-progress') {
-          input.onProgress?.(message);
-          return;
-        }
-        if (input.stream?.matches(message) === true) {
-          job.queue = job.queue
-            .then(() => input.stream?.handle(message))
-            .catch((error: unknown) => {
-              job.handlerError = errorOf(error);
-              this.cancel();
-            });
-        }
-      };
-      worker.onerror = (event) => {
-        fail(errorOf(event.error ?? 'cap rush worker crashed'));
-      };
-      worker.postMessage(input.request);
+      },
+      handle: (message, enqueue) => {
+        if (message.type === 'cap-rush-progress') input.onProgress?.(message);
+        else if (input.stream?.matches(message) === true)
+          enqueue(() => input.stream?.handle(message));
+      },
     });
   }
 
   destroy(): void {
-    const active = this.active;
-    this.worker?.terminate();
-    this.worker = null;
-    this.active = null;
-    active?.reject(new Error('cap rush runner destroyed'));
+    this.transport.dispose('cap rush runner destroyed');
   }
 }
