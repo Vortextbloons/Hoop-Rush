@@ -916,4 +916,9 @@
       animation: none;
     }
   }
+  .room-footer {
+    border-top: 1px solid var(--color-line-soft);
+    margin-top: 30px;
+    padding-top: 20px;
+  }
 </style>
