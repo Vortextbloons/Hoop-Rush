@@ -239,7 +239,6 @@ export class HavocMultiplayerSession extends SeriesRoomSession<
   private assets: HavocMultiplayerSessionAssets | null = null;
   private environment: HavocCommandEnvironment | null = null;
   private draft: HavocMultiplayerDraftState | null = null;
-  private outputs: Record<number, HavocMultiplayerGameOutput> = {};
   private completedRecap: HavocMultiplayerCompletionRecap | null = null;
   private mvpFacts: HavocMultiplayerSeriesFacts | null = null;
   private mvpValue: HavocMultiplayerSeriesMvp | null = null;
@@ -484,46 +483,23 @@ export class HavocMultiplayerSession extends SeriesRoomSession<
     this.publish();
   }
 
-  protected async ensureGamePipeline(): Promise<void> {
-    const attachment = this.attachment;
-    if (!attachment?.current()) return;
-    const snapshot = this.snapshot;
-    const series = snapshot?.series;
-    if (!snapshot || !series || !this.assets || !this.roomId) return;
-    const gameNumber = this.currentGameNumber();
-    if (gameNumber === null) return;
-    if (
-      snapshot.phase !== 'preparing-game' &&
-      snapshot.phase !== 'broadcasting' &&
-      snapshot.phase !== 'game-results'
-    ) {
-      return;
-    }
-    if (this.outputs[gameNumber] || this.seriesFlow.jobs.has(gameNumber)) return;
+  /**
+   * Havoc supplies only the simulation; the guarding, persistence, and
+   * publication pipeline is shared in `SeriesRoomSession.runGamePipeline`.
+   */
+  protected async simulateGame(gameNumber: number): Promise<HavocMultiplayerGameOutput> {
+    const series = this.snapshot?.series;
+    if (!series) throw new Error('Havoc series is missing.');
     const game = series.games.find((entry) => entry.gameNumber === gameNumber);
-    if (!game) return;
-    try {
-      await this.seriesFlow.runGame(
-        gameNumber,
-        attachment.current,
-        () => this.simulateGame(game),
-        async (output) => {
-          this.outputs = { ...this.outputs, [gameNumber]: output };
-          await this.deps.repository.saveResult(output);
-          if (attachment.current()) this.publish();
-        },
-      );
-    } catch (error) {
-      if (!attachment.current()) return;
-      this.error =
-        error instanceof Error
-          ? `Game simulation failed: ${error.message.slice(0, 200)}`
-          : 'Game simulation failed.';
-      this.publish();
-    }
+    if (!game) throw new Error('Havoc series game is missing.');
+    return this.simulateSeriesGame(game);
   }
 
-  private async simulateGame(
+  protected async persistOutput(output: HavocMultiplayerGameOutput): Promise<void> {
+    await this.deps.repository.saveResult(output);
+  }
+
+  private async simulateSeriesGame(
     game: HavocMultiplayerSeriesGame,
   ): Promise<HavocMultiplayerGameOutput> {
     const roomId = this.roomId;

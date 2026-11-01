@@ -804,12 +804,12 @@ describe('Draft Duel ready check progression', () => {
     const output = lifecycle.outputs[2];
     if (!output) throw new Error('Missing game output');
     lifecycle.outputs = {};
-    const pipeline = mocked(lifecycle.ensureGamePipeline);
-    pipeline.mockRestore();
     const simulate = vi.spyOn(lifecycle, 'simulateGame').mockResolvedValue(output);
     const save = vi.spyOn(lifecycle.deps.repository, 'saveResult').mockResolvedValue();
-    await lifecycle.ensureGamePipeline();
-    expect(simulate).toHaveBeenCalledWith(2, expect.any(String));
+    await lifecycle.runGamePipeline();
+    // The shared pipeline resolves the game number itself, then asks the mode
+    // to simulate it; the mode no longer receives the home winner separately.
+    expect(simulate).toHaveBeenCalledWith(2);
     expect(lifecycle.outputs[2]).toEqual(output);
     expect(save).toHaveBeenCalledWith(output);
   });
