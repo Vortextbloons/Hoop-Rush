@@ -6,6 +6,9 @@ import {
 } from '@hoop-rush/data-contracts';
 import {
   capRushMultiplayerSimulateGame,
+  applyCapRushMultiplayerCommand,
+  adaptCapRushCatalog,
+  buildCapRushCatalogIndex,
   createEngineContext,
   simulateCapRushMultiplayerPlayoffGame,
   simulateCapRushMultiplayerSlot,
@@ -27,20 +30,64 @@ self.onmessage = (event: MessageEvent<unknown>) => {
   const request = parsed.data;
   if (request.kind === 'cap-rush-multiplayer-cancel') return;
   try {
-    if (request.kind === 'cap-rush-multiplayer-slot') {
-      const simulated = simulateCapRushMultiplayerSlot({
-        locked: request.locked,
-        slot: request.slot,
-        context,
-        tapeGameIds: request.tapeGameIds,
+    if (request.kind === 'cap-rush-multiplayer-project') {
+      const environment = {
+        ...request.environment,
+        index: buildCapRushCatalogIndex(
+          adaptCapRushCatalog(request.environment.seasonCatalog, request.environment.catalogSource),
+        ),
+      };
+      let state = request.state;
+      for (const command of request.commands) {
+        const outcome = applyCapRushMultiplayerCommand(
+          state,
+          command,
+          environment,
+          request.variant,
+        );
+        if (!outcome.ok) {
+          post({
+            schemaVersion: CAP_RUSH_MULTIPLAYER_WORKER_WIRE_SCHEMA_VERSION,
+            kind: 'cap-rush-multiplayer-rejection',
+            requestId: request.requestId,
+            code: outcome.code,
+            message: outcome.message,
+          });
+          return;
+        }
+        state = outcome.state;
+      }
+      post({
+        schemaVersion: CAP_RUSH_MULTIPLAYER_WORKER_WIRE_SCHEMA_VERSION,
+        kind: 'cap-rush-multiplayer-projection',
+        requestId: request.requestId,
+        state,
       });
+      return;
+    }
+    if (request.kind === 'cap-rush-multiplayer-slot') {
+      const games = [];
+      const tapes = [];
+      const through = request.throughSlot ?? request.slot;
+      if (through < request.slot || through - request.slot > 4)
+        throw new Error('invalid simulation range');
+      for (let slot = request.slot; slot <= through; slot += 1) {
+        const simulated = simulateCapRushMultiplayerSlot({
+          locked: request.locked,
+          slot,
+          context,
+          tapeGameIds: request.tapeGameIds,
+        });
+        games.push(...simulated.games);
+        tapes.push(...[...simulated.tapes].map(([gameId, tape]) => ({ gameId, tape })));
+      }
       post({
         schemaVersion: CAP_RUSH_MULTIPLAYER_WORKER_WIRE_SCHEMA_VERSION,
         kind: 'cap-rush-multiplayer-slot',
         requestId: request.requestId,
         slot: request.slot,
-        games: simulated.games,
-        tapes: [...simulated.tapes].map(([gameId, tape]) => ({ gameId, tape })),
+        games,
+        tapes,
       });
       return;
     }

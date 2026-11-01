@@ -19,6 +19,7 @@
     connection = 'connected',
     error = null,
     children,
+    content,
     lobbyId: suppliedLobbyId = null,
     profileKind = null,
     onProfilesChange,
@@ -34,6 +35,7 @@
     connection?: string;
     error?: string | null;
     children?: Snippet;
+    content?: Snippet;
     lobbyId?: string | null;
     profileKind?: 'fixed-five' | 'draft-duel' | 'havoc-multiplayer' | null;
     onProfilesChange?: (players: PublicProfile[]) => void;
@@ -119,6 +121,12 @@
     {#if lobbyId}<a href={resolve(`/multiplayer?lobby=${lobbyId}`)}>Room lobby →</a>{/if}
     {@render children?.()}
   </div>
+  {#if error || copyError || (lobbyId && coordinator.snapshot.error)}<p class="error" role="alert">
+      {error ?? copyError ?? coordinator.snapshot.error}
+    </p>{/if}
+  {#if content}
+    <div class="room-content">{@render content()}</div>
+  {/if}
   {#if suppliedLobbyId}
     <RoomProfiles
       topic={`profile-lobby:${suppliedLobbyId}`}
@@ -134,12 +142,26 @@
       {onProfilesChange}
     />
   {/if}
-  {#if error || copyError || (lobbyId && coordinator.snapshot.error)}<p class="error" role="alert">
-      {error ?? copyError ?? coordinator.snapshot.error}
-    </p>{/if}
 </header>
 
 <style>
+  .room-content {
+    min-width: 0;
+    margin-top: 16px;
+  }
+  @media (min-width: 768px) {
+    .compact-mobile .summary {
+      display: none;
+    }
+    .compact-mobile.room-shell {
+      padding: 20px;
+      margin-block: 12px 16px;
+    }
+    .compact-mobile .room-footer {
+      margin-top: 12px;
+      padding-top: 10px;
+    }
+  }
   .mobile-code {
     display: none;
   }

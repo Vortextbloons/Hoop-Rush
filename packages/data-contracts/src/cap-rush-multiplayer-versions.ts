@@ -8,8 +8,8 @@ import {
 } from './cap-rush-versions.ts';
 
 export const CAP_RUSH_MULTIPLAYER_SCHEMA_VERSION = 1;
-export const CAP_RUSH_MULTIPLAYER_VERSION = 'cap-rush-multiplayer-v1';
-export const CAP_RUSH_MULTIPLAYER_RULES_VERSION = 'cap-rush-multiplayer-rules-v1';
+export const CAP_RUSH_MULTIPLAYER_VERSION = 'cap-rush-multiplayer-v2';
+export const CAP_RUSH_MULTIPLAYER_RULES_VERSION = 'cap-rush-multiplayer-rules-v2';
 export const CAP_RUSH_MULTIPLAYER_MARKET_VERSION = 'cap-rush-multiplayer-market-v1';
 export const CAP_RUSH_MULTIPLAYER_PRICING_VERSION = 'cap-rush-multiplayer-pricing-v1';
 export const CAP_RUSH_MULTIPLAYER_SEED_DERIVATION_VERSION = 'cap-rush-multiplayer-seeds-v1';

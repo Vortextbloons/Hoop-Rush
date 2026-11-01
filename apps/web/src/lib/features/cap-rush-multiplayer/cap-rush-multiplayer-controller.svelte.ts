@@ -25,7 +25,7 @@ const POLL_MS = 1_000;
 export interface CapRushBroadcastState {
   readonly gameId: string;
   readonly speed: 2 | 4;
-  readonly kind: 'h2h' | 'season-simcast' | 'playoff' | 'review';
+  readonly kind: 'h2h' | 'playoff' | 'review';
   readonly slot: number | null;
   readonly input: HavocBattleInput;
   readonly result: HavocBattleResult;
@@ -49,6 +49,7 @@ export class CapRushMultiplayerController {
   private session: CapRushMultiplayerSession | null = null;
   private readonly runner = new CapRushMultiplayerRunner();
   private timer: ReturnType<typeof setInterval> | null = null;
+  private followUpTimer: ReturnType<typeof setTimeout> | null = null;
   private disposed = false;
   private roomId: string;
   private lastPhase: CapRushMultiplayerPhase | null = null;
@@ -74,8 +75,9 @@ export class CapRushMultiplayerController {
     if (this.isDisposed()) return;
     this.loading = true;
     try {
-      const data = await getCapRushMultiplayerData();
-      if (this.isDisposed()) return;
+      const dataPromise = getCapRushMultiplayerData();
+      // Keep a rejected asset load from surfacing before presence finishes; it is awaited below.
+      void dataPromise.catch(() => {});
       void loadCapRushArt()
         .then((art) => {
           if (!this.isDisposed()) this.art = art;
@@ -85,6 +87,11 @@ export class CapRushMultiplayerController {
         });
       const transport = getCapRushMultiplayerTransport();
       const membership = await transport.resume(this.roomId);
+      if (this.isDisposed()) return;
+      const [data, initialSync] = await Promise.all([
+        dataPromise,
+        transport.sync(this.roomId, 2_147_483_647),
+      ]);
       if (this.isDisposed()) return;
       this.session = new CapRushMultiplayerSession({
         transport,
@@ -96,9 +103,10 @@ export class CapRushMultiplayerController {
       this.session.subscribe(() => {
         this.sync();
       });
-      await this.session.attach();
+      await this.session.attach({ resume: false, initialSync });
       if (this.isDisposed()) return;
       this.sync();
+      void this.tick();
     } catch (error) {
       if (this.isDisposed()) return;
       this.error = error instanceof Error ? error.message : 'Could not open the room.';
@@ -120,6 +128,10 @@ export class CapRushMultiplayerController {
     if (this.timer !== null) {
       clearInterval(this.timer);
       this.timer = null;
+    }
+    if (this.followUpTimer !== null) {
+      clearTimeout(this.followUpTimer);
+      this.followUpTimer = null;
     }
     this.runner.dispose();
     this.session?.dispose();
@@ -197,15 +209,12 @@ export class CapRushMultiplayerController {
       if (!this.isHost) return;
       const slot = session.nextSlot();
       if (slot === null) return;
-      const h2h = new Set(state.season.h2hSlots);
-      const output = await this.runner.simulateSlot({
-        roomId: this.roomId,
-        locked: state.locked,
-        slot,
-        tapeGameIds: [],
-      });
-      await session.acceptSlot(slot, output.games);
-      if (!h2h.has(slot)) await session.ackSlot(slot);
+      const nextH2H = state.season.h2hSlots.find((entry) => entry >= slot);
+      const throughSlot = Math.min(
+        state.season.block.endpoint,
+        nextH2H === slot ? slot : (nextH2H ?? 83) - 1,
+      );
+      await session.simulateRange(slot, throughSlot);
     });
   }
 
@@ -260,13 +269,19 @@ export class CapRushMultiplayerController {
       });
       if (plans.length === 0) return;
       const round = capRushMultiplayerCurrentRound(state.postseason);
-      const output = await this.runner.simulatePlayoffStep({
-        roomId: this.roomId,
-        locked: state.locked,
-        plans: plans.map((entry) => entry.plan),
-        tapeGameIds: [],
-      });
-      await session.acceptPlayoffStep(round, output.games);
+      let postseason = state.postseason;
+      do {
+        const receipt = await session.simulatePlayoffRound(round);
+        if (!receipt.accepted || this.isDisposed()) return;
+        const next = session.view().state.postseason;
+        if (next === null || next === postseason) return;
+        postseason = next;
+      } while (
+        postseason.championTeamId === null &&
+        capRushMultiplayerCurrentRound(postseason) === round &&
+        postseason.plans.p1 === 'sim' &&
+        postseason.plans.p2 === 'sim'
+      );
     });
   }
 
@@ -290,30 +305,6 @@ export class CapRushMultiplayerController {
     const game = state?.season?.games.find((candidate) => candidate.gameId === gameId);
     if (entry === undefined || game === undefined) return;
     await this.loadTape({ gameId, kind: 'review', speed: 4, entry });
-  }
-
-  async watchOwnGame(): Promise<void> {
-    const state = this.state;
-    const locked = state?.locked;
-    const season = state?.season;
-    if (locked === null || locked === undefined || season === null || season === undefined) return;
-    const slot = season.slotAcks[this.seat] + 1;
-    const teamId = locked.seats[this.seat].franchise.franchiseId;
-    const game = season.games.find(
-      (candidate) =>
-        candidate.slot === slot &&
-        (candidate.homeTeamId === teamId || candidate.awayTeamId === teamId),
-    );
-    if (game === undefined) return;
-    const entry = locked.leagueSchedule.find((candidate) => candidate.gameId === game.gameId);
-    if (entry === undefined) return;
-    await this.loadTape({
-      gameId: game.gameId,
-      kind: 'season-simcast',
-      speed: 4,
-      slot,
-      entry,
-    });
   }
 
   async watchPlayoffGame(): Promise<void> {
@@ -347,16 +338,13 @@ export class CapRushMultiplayerController {
       const session = this.session;
       if (session === null) return;
       if (broadcast.kind === 'h2h') {
+        // The slot stays unacknowledged until both seats confirm the broadcast.
         await session.ackBroadcast({
           gameId: broadcast.gameId,
           cursor: total,
           total,
           resolved: true,
         });
-        return;
-      }
-      if (broadcast.kind === 'season-simcast') {
-        if (broadcast.slot !== null) await session.ackSlot(broadcast.slot);
         return;
       }
       await session.ackPlayoffPlayback({
@@ -433,42 +421,68 @@ export class CapRushMultiplayerController {
 
   private async tick(): Promise<void> {
     if (this.disposed || this.busy || this.session === null) return;
+    const progressed = await this.advance();
+    if (progressed && !this.isDisposed()) this.scheduleFollowUp();
+  }
+
+  private scheduleFollowUp(): void {
+    if (this.disposed || this.followUpTimer !== null) return;
+    this.followUpTimer = setTimeout(() => {
+      this.followUpTimer = null;
+      void this.tick();
+    }, 0);
+  }
+
+  private async advance(): Promise<boolean> {
     const state = this.state;
     if (state?.phase === 'recruiting') {
-      const deadline = this.session.deadline();
+      const deadline = this.session?.deadline() ?? null;
       if (deadline !== null && Date.parse(deadline.atIso) <= this.nowMs) {
+        const before = this.revision();
         await this.run(() => this.session?.closeDueAuctions());
-        return;
+        return this.revision() > before;
       }
     }
     if (state?.phase === 'season' && state.season !== null) {
       const season = state.season;
       if (season.block.status === 'choosing' && season.block.plans[this.seat] === null) {
-        await this.chooseBlock('sim');
-        return;
+        return this.progressed(() => this.chooseBlock('sim'));
       }
-      const pending = this.session.pendingH2H();
+      const pending = this.session?.pendingH2H() ?? null;
       if (pending !== null) {
-        if (pending.missing.includes(this.seat) && this.broadcast === null) {
-          await this.watchHeadToHead(pending.gameId);
-        }
-      } else {
-        const accepted = season.games.reduce((highest, game) => Math.max(highest, game.slot), 0);
-        if (season.slotAcks[this.seat] < accepted) {
-          await this.ackSlot();
-          return;
-        }
-        if (this.isHost && season.block.status === 'running' && this.session.nextSlot() !== null) {
-          await this.simulateNextSlot();
-          return;
-        }
+        // Both seats must open and confirm the head-to-head broadcast before the slot advances.
+        await this.refreshRoom();
+        return false;
+      }
+      const accepted = season.games.reduce((highest, game) => Math.max(highest, game.slot), 0);
+      if (season.slotAcks[this.seat] < accepted) {
+        return this.progressed(() => this.ackSlot());
+      }
+      if (this.isHost && season.block.status === 'running' && this.session?.nextSlot() !== null) {
+        return this.progressed(() => this.simulateNextSlot());
       }
     }
+    await this.refreshRoom();
+    return false;
+  }
+
+  private async refreshRoom(): Promise<void> {
     try {
-      await this.session.refresh(false);
+      await this.session?.refresh(false);
     } catch {
       // The transport surfaces its own connection error.
     }
+  }
+
+  private revision(): number {
+    return this.session?.room?.revision ?? -1;
+  }
+
+  private async progressed(action: () => Promise<void>): Promise<boolean> {
+    const before = this.revision();
+    await action();
+    if (this.disposed) return false;
+    return this.revision() > before;
   }
 
   private async run(action: () => Promise<unknown> | undefined): Promise<void> {

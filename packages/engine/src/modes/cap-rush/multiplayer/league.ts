@@ -15,7 +15,7 @@ import {
   capRushLeagueGameSeed,
 } from '@hoop-rush/data-contracts';
 import type { EngineContext } from '../../../sim/kernel.ts';
-import { simulateHavocBattleGame } from '../../havoc/core/battle-game.ts';
+import { simulateValidatedHavocBattleGame } from '../../havoc/core/battle-game.ts';
 import { auditHavocBattleGame } from '../../havoc/core/battle-audit.ts';
 import { havocBattleGameResultDigest } from '../../havoc/core/battle-digests.ts';
 import { capRushBoxOf } from '../league-simulation.ts';
@@ -73,7 +73,7 @@ export function capRushMultiplayerSimulateGame(input: {
     homeTeamId: input.entry.homeTeamId,
     awayTeamId: input.entry.awayTeamId,
   });
-  const battle = simulateHavocBattleGame(battleInput, input.context, {
+  const battle = simulateValidatedHavocBattleGame(battleInput, input.context, {
     apron: apron?.hooks,
   });
   const audit = auditHavocBattleGame(battleInput, battle.result, battle.tape);

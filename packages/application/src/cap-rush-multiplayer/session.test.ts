@@ -67,6 +67,44 @@ describe('cap rush multiplayer application session', () => {
     expect(session.room).toBeNull();
   });
 
+  test('adopts a prefetched sync without resuming or refetching', async () => {
+    const room = await createSessionTestRoom();
+    const { transport } = room;
+    const initialSync = await transport.sync(room.roomId);
+    const resume = vi.spyOn(transport, 'resume');
+    const sync = vi.spyOn(transport, 'sync');
+    const session = room.session('p1');
+
+    await session.attach({ resume: false, initialSync });
+
+    expect(resume).not.toHaveBeenCalled();
+    expect(sync).not.toHaveBeenCalled();
+    expect(session.room?.revision).toBe(initialSync.snapshot.revision);
+    session.dispose();
+  });
+
+  test('skips unchanged snapshots but still observes presence changes', async () => {
+    let nowMs = Date.parse('2026-11-01T00:00:00.000Z');
+    const room = await createSessionTestRoom({ now: () => nowMs });
+    const session = room.session('p1');
+    await session.attach();
+    let changes = 0;
+    session.subscribe(() => {
+      changes += 1;
+    });
+
+    await session.refresh();
+    expect(changes).toBe(0);
+
+    const state = session.current;
+    nowMs += 5_000;
+    await room.transport.resume(room.roomId);
+    await session.refresh();
+    expect(changes).toBe(1);
+    expect(session.current).toBe(state);
+    session.dispose();
+  });
+
   test('opens two seats, locks a recruited league, and advances one shared slot', async () => {
     let nowMs = Date.parse('2026-11-01T00:00:00.000Z');
     const room = await createSessionTestRoom({ now: () => nowMs, commandPrefix: 'session' });
@@ -130,4 +168,58 @@ describe('cap rush multiplayer application session', () => {
     host.dispose();
     guest.dispose();
   }, 300_000);
+});
+
+test('realtime bursts do not keep a pending sync running indefinitely and publish new progress', async () => {
+  const room = await createSessionTestRoom();
+  let notify!: () => void;
+  vi.spyOn(room.transport, 'subscribe').mockImplementation((_roomId, onChange) => {
+    notify = onChange;
+    return () => {};
+  });
+  const session = room.session('p1');
+  await session.attach();
+  const response = await room.transport.sync(room.roomId);
+  let resolve!: (value: typeof response) => void;
+  const sync = vi.spyOn(room.transport, 'sync').mockImplementation(
+    () =>
+      new Promise((yes) => {
+        resolve = yes;
+      }),
+  );
+  const publish = vi.fn();
+  session.subscribe(publish);
+  const pending = session.refresh(false);
+  for (let i = 0; i < 20; i += 1) notify();
+  resolve({
+    ...response,
+    snapshot: {
+      ...response.snapshot,
+      revision: response.snapshot.revision + 1,
+      state: { ...session.current, ready: { p1: true, p2: false } },
+    },
+  });
+  await pending;
+  expect(sync).toHaveBeenCalledTimes(1);
+  expect(publish).toHaveBeenCalled();
+  expect(session.current.ready.p1).toBe(true);
+  session.dispose();
+});
+
+test('resumes from the checkpoint command count instead of downloading history again', async () => {
+  const room = await createSessionTestRoom();
+  const initial = await room.transport.sync(room.roomId);
+  const sync = vi.spyOn(room.transport, 'sync').mockResolvedValue(initial);
+  const session = room.session('p1');
+  await session.attach({
+    resume: false,
+    initialSync: {
+      ...initial,
+      snapshot: { ...initial.snapshot, revision: 7, commandCount: 7 },
+      commands: [],
+    },
+  });
+  await session.refresh(false);
+  expect(sync).toHaveBeenCalledWith(room.roomId, 6);
+  session.dispose();
 });

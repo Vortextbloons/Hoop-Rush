@@ -4,11 +4,7 @@
     CapRushMultiplayerState,
     Position,
   } from '@hoop-rush/data-contracts';
-  import {
-    CAP_RUSH_MULTIPLAYER_CAP_LINE_DOLLARS,
-    CAP_RUSH_MULTIPLAYER_HARD_LIMIT_DOLLARS,
-    POSITIONS,
-  } from '@hoop-rush/data-contracts';
+  import { POSITIONS } from '@hoop-rush/data-contracts';
   import { onDestroy } from 'svelte';
   import type { CapRushArt } from '../cap-rush/cap-rush-art.js';
   import { capStatusClass, capStatusLabel } from '../cap-rush/cap-rush-presentation.js';
@@ -28,7 +24,6 @@
     exactMoney,
     lotState,
     marketPools,
-    money,
     nextMinimumBid,
     playerById,
     positionLabel,
@@ -259,14 +254,6 @@
           ? 'Closure pending'
           : 'All lots closed'
         : 'Next lot closes in',
-  );
-  const inspectedOpenCount = $derived(
-    inspectedPool === null
-      ? 0
-      : inspectedPool.lots.filter((lot) => lot.auction?.status === 'open').length,
-  );
-  const inspectedPositionName = $derived(
-    inspectedPool === null ? 'position' : positionLabel(inspectedPool.position).toLowerCase(),
   );
   const inspectedLotState = $derived.by(() => {
     const selection = inspectedSelection;
@@ -600,11 +587,6 @@
           </section>
         {:else}
           <section class="flex flex-col gap-2 rounded-2xl border border-border bg-card p-3">
-            <p class="text-xs leading-snug">
-              {inspectedPool?.status === 'completed'
-                ? `The ${inspectedPositionName} pool is complete. Bidding is closed.`
-                : `Bidding opens when the ${inspectedPositionName} pool becomes active. Inspecting it now does not change the active auction.`}
-            </p>
             <button
               type="button"
               class="inline-flex min-h-11 w-fit items-center justify-center rounded-xl border border-primary/50 bg-primary/10 px-3 text-xs font-bold text-primary outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -614,14 +596,6 @@
             </button>
           </section>
         {/if}
-
-        <p class="text-[10px] leading-relaxed text-muted-foreground">
-          One binding lead per position. Unfilled positions auto-sign at close. The {money(
-            CAP_RUSH_MULTIPLAYER_CAP_LINE_DOLLARS,
-          )} cap line is not the spending limit — the hard limit is {money(
-            CAP_RUSH_MULTIPLAYER_HARD_LIMIT_DOLLARS,
-          )}.
-        </p>
       {/if}
     </div>
   {/key}
@@ -652,9 +626,6 @@
           >
             {inspectedPool === null ? 'Recruitment' : positionLabel(inspectedPool.position)}
           </h2>
-          <p class="text-xs text-muted-foreground">
-            {inspectedPool?.lots.length ?? 0} lots · {inspectedOpenCount} open · one signing per seat
-          </p>
         </div>
         <div class="shrink-0 text-right">
           <p
@@ -709,9 +680,6 @@
       class="flex min-w-0 flex-col gap-4 md:grid md:grid-cols-[minmax(0,1fr)_20rem] md:items-start lg:grid-cols-[minmax(0,1fr)_22rem]"
     >
       <section class="flex min-w-0 flex-col gap-2" aria-label="Market">
-        <p class="text-[10px] text-muted-foreground">
-          Market order stays fixed. Selecting a card never spends money.
-        </p>
         <div class="grid min-w-0 grid-cols-2 gap-2 lg:grid-cols-3 min-[1440px]:grid-cols-4">
           {#each inspectedPool?.lots ?? [] as lot (lot.player.playerId)}
             <CapRushAuctionLot

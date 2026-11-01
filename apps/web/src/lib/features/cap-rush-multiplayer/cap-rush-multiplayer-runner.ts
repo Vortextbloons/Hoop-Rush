@@ -1,3 +1,5 @@
+import type { CapRushMultiplayerState, CapRushMultiplayerCommand } from '@hoop-rush/data-contracts';
+import type { CapRushMultiplayerEnvironment } from '@hoop-rush/engine';
 import type {
   CapRushLeagueGame,
   CapRushLeagueScheduleEntry,
@@ -21,10 +23,18 @@ import {
 } from '#lib/workers/one-shot-worker.js';
 import workerUrl from '../../../workers/cap-rush-multiplayer-worker.ts?worker&url';
 
+export interface CapRushMultiplayerProjectionInput {
+  state: CapRushMultiplayerState;
+  commands: readonly CapRushMultiplayerCommand[];
+  environment: CapRushMultiplayerEnvironment;
+  variant: 'clash' | 'roulette';
+}
+
 export interface CapRushMultiplayerSlotInput {
   roomId: string;
   locked: CapRushMultiplayerLockedInputs;
   slot: number;
+  throughSlot?: number;
   tapeGameIds?: readonly string[];
 }
 
@@ -71,9 +81,19 @@ const ERROR_MESSAGES: OneShotWorkerErrorMessages = {
 
 function buildRequest(
   payload:
-    CapRushMultiplayerSlotInput | CapRushMultiplayerPlayoffInput | CapRushMultiplayerTapeInput,
+    | CapRushMultiplayerSlotInput
+    | CapRushMultiplayerPlayoffInput
+    | CapRushMultiplayerTapeInput
+    | CapRushMultiplayerProjectionInput,
   requestId: string,
 ): CapRushMultiplayerWorkerRequest {
+  if ('commands' in payload)
+    return capRushMultiplayerWorkerRequestSchema.parse({
+      ...payload,
+      schemaVersion: CAP_RUSH_MULTIPLAYER_WORKER_WIRE_SCHEMA_VERSION,
+      kind: 'cap-rush-multiplayer-project',
+      requestId,
+    });
   if ('slot' in payload) {
     return capRushMultiplayerWorkerRequestSchema.parse({
       schemaVersion: CAP_RUSH_MULTIPLAYER_WORKER_WIRE_SCHEMA_VERSION,
@@ -82,6 +102,7 @@ function buildRequest(
       roomId: payload.roomId,
       locked: payload.locked,
       slot: payload.slot,
+      throughSlot: payload.throughSlot,
       tapeGameIds: [...(payload.tapeGameIds ?? [])],
     });
   }
@@ -114,9 +135,11 @@ function isError(
 }
 
 function outputOf(response: CapRushMultiplayerWorkerMessage): unknown {
+  if (response.kind === 'cap-rush-multiplayer-rejection') return response;
   if (response.kind === 'cap-rush-multiplayer-slot') {
     return { games: response.games, tapes: response.tapes };
   }
+  if (response.kind === 'cap-rush-multiplayer-projection') return response.state;
   if (response.kind === 'cap-rush-multiplayer-playoff-games') {
     return { games: response.games, tapes: response.tapes };
   }
@@ -131,9 +154,21 @@ function outputOf(response: CapRushMultiplayerWorkerMessage): unknown {
   throw new Error('cap rush multiplayer worker returned an error');
 }
 
+export class CapRushMultiplayerProjectionRejection extends Error {
+  constructor(
+    readonly code: string,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
 export class CapRushMultiplayerRunner {
   private readonly transport: OneShotWorkerRunner<
-    CapRushMultiplayerSlotInput | CapRushMultiplayerPlayoffInput | CapRushMultiplayerTapeInput,
+    | CapRushMultiplayerSlotInput
+    | CapRushMultiplayerPlayoffInput
+    | CapRushMultiplayerTapeInput
+    | CapRushMultiplayerProjectionInput,
     CapRushMultiplayerWorkerMessage,
     unknown
   >;
@@ -153,6 +188,15 @@ export class CapRushMultiplayerRunner {
       createWorker: options.createWorker,
       reuseWorker: true,
     });
+  }
+
+  async project(input: CapRushMultiplayerProjectionInput): Promise<CapRushMultiplayerState> {
+    const result = (await this.transport.run(input)) as
+      | CapRushMultiplayerState
+      | Extract<CapRushMultiplayerWorkerMessage, { kind: 'cap-rush-multiplayer-rejection' }>;
+    if ('kind' in result)
+      throw new CapRushMultiplayerProjectionRejection(result.code, result.message);
+    return result;
   }
 
   async simulateSlot(input: CapRushMultiplayerSlotInput): Promise<CapRushMultiplayerSlotOutput> {
