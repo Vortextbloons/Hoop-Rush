@@ -1,6 +1,8 @@
 import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js';
 import {
+  ROOM_PROTOCOL_VERSION,
   commandIdSchema,
+  describeLegacyRoomRejection,
   idSchema,
   multiplayerRoomSyncSchema,
   type CommandId,
@@ -420,7 +422,7 @@ export function rpcRoomPayload<Code>(
 
 export async function readRoomSync(
   client: SupabaseClient,
-  mode: 'fixed-five' | 'draft-duel' | 'havoc',
+  mode: 'fixed-five' | 'draft-duel' | 'havoc' | 'cap-rush',
   roomId: string,
   afterOrdinal: number,
 ) {
@@ -429,9 +431,30 @@ export async function readRoomSync(
     p_mode: mode,
     p_room_id: roomId,
     p_after_ordinal: afterOrdinal,
+    p_protocol_version: ROOM_PROTOCOL_VERSION,
   });
-  if (response.error) throw new Error(`room sync failed: ${response.error.message}`);
+  if (response.error) throw roomProtocolError(response.error);
   return multiplayerRoomSyncSchema.parse(response.data);
+}
+
+/**
+ * Turn a protocol refusal into a message a player can act on.
+ *
+ * The server refuses outdated rooms and versionless clients with stable error
+ * codes; the spec requires old clients be told to start a new room rather than
+ * silently half-work. Anything else passes through unchanged.
+ */
+export function roomProtocolError(error: { message: string; details?: string | null }): Error {
+  const message = error.message;
+  if (message.includes('outdated-room')) {
+    return new Error(describeLegacyRoomRejection(ROOM_PROTOCOL_VERSION));
+  }
+  if (message.includes('unsupported-protocol')) {
+    return new Error(
+      'This version of the game cannot talk to the server. Reload the page, then start a new room.',
+    );
+  }
+  return new Error(`room sync failed: ${message}`);
 }
 
 export interface RealtimeRoomRegistryOptions {
