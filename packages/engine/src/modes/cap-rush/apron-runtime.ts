@@ -7,10 +7,7 @@ import type {
   SimulationPlayer,
   SimulationTeam,
 } from '@hoop-rush/data-contracts';
-import {
-  CAP_RUSH_SCHEMA_VERSION,
-  capRushStrikeDue,
-} from '@hoop-rush/data-contracts';
+import { CAP_RUSH_SCHEMA_VERSION, capRushStrikeDue } from '@hoop-rush/data-contracts';
 import type { SideIndex } from '../../sim/recorder.ts';
 import { apronPlayerKeyOf } from '../../sim/apron-runtime.ts';
 
@@ -56,27 +53,13 @@ export class CapRushApronRuntime {
   beginPossession(offense: SideIndex): CapRushPossessionState {
     const ordinal = (this.ordinals[offense] += 1);
     const defendOrdinal = this.ordinals[offense === 0 ? 1 : 0];
-    const isolation = null;
-    const strike =
-      offense !== this.spec.side && capRushStrikeDue(this.spec.rules, ordinal);
+    const strike = offense !== this.spec.side && capRushStrikeDue(this.spec.rules, ordinal);
     this.current = {
       offenseOrdinal: ordinal,
       defenseOrdinal: defendOrdinal,
-      isolation,
+      isolation: null,
       strike,
     };
-    if (isolation !== null) {
-      this.facts.push({
-        schemaVersion: CAP_RUSH_SCHEMA_VERSION,
-        kind: 'isolation',
-        side: sideLabel(this.spec.side),
-        possessionOrdinal: ordinal,
-        reason: isolation,
-        targetInstanceId: this.spec.targetInstanceId,
-        targetSlot: this.spec.targetSlot,
-        payrollStatus: this.spec.rules.payrollStatus,
-      });
-    }
     if (strike) {
       this.facts.push({
         schemaVersion: CAP_RUSH_SCHEMA_VERSION,

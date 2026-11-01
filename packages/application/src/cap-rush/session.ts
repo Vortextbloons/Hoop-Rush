@@ -714,9 +714,6 @@ export class CapRushSession implements CapRushService {
   private assertSupportedVersion(state: CapRushDraftState, current: CapRushVersionSet): void {
     const version = state.versionSet;
     if (
-      version.rulesVersion !== current.rulesVersion ||
-      version.salaryCurveVersion !== current.salaryCurveVersion ||
-      version.seedDerivationVersion !== current.seedDerivationVersion ||
       version.engineVersion !== current.engineVersion ||
       version.catalogVersion !== current.catalogVersion ||
       version.catalogHash !== current.catalogHash ||

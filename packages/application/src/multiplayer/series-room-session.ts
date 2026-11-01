@@ -570,7 +570,7 @@ export abstract class SeriesRoomSession<
   }
 
   protected phase(): TMode['phase'] {
-    return (this.snapshot?.phase ?? 'lobby');
+    return this.snapshot?.phase ?? 'lobby';
   }
 
   protected viewBase() {

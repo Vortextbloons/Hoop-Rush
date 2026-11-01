@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'bun:test';
 import type { CapRushApronRules, HavocBattleInput } from '@hoop-rush/data-contracts';
-import { havocBattleInputSchema, CAP_RUSH_RULES_VERSION, CAP_RUSH_STRIKE_EVERY } from '@hoop-rush/data-contracts';
+import {
+  havocBattleInputSchema,
+  CAP_RUSH_RULES_VERSION,
+  CAP_RUSH_STRIKE_EVERY,
+} from '@hoop-rush/data-contracts';
 import { capRushApronRuntimeFor } from './apron-runtime.ts';
 import { buildHavocLockedInputs } from '@hoop-rush/test-fixtures';
 import { createEngineContext } from '../../sim/kernel.ts';
@@ -121,7 +125,9 @@ describe('cap rush apron integration', () => {
     const second = runWithApron({ payrollStatus: 'second-apron' });
     const strikes = second.apron.recordedFacts().filter((fact) => fact.kind === 'strike');
     expect(strikes.length).toBeGreaterThan(5);
-    expect(strikes.every((fact) => fact.possessionOrdinal % CAP_RUSH_STRIKE_EVERY === 0)).toBe(true);
+    expect(strikes.every((fact) => fact.possessionOrdinal % CAP_RUSH_STRIKE_EVERY === 0)).toBe(
+      true,
+    );
   });
 
   it('keeps the targeted defender on court while removing his defensive line', () => {
