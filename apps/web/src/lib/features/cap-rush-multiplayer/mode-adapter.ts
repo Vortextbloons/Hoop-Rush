@@ -1,16 +1,29 @@
 import { capRushMultiplayerSetupSchema } from '@hoop-rush/data-contracts';
-import type { MultiplayerModeAdapter } from '#lib/modes/types.js';
+import type { MultiplayerModeAdapter, SettingsChoice } from '#lib/modes/types.js';
 import { multiplayerInviteLink } from '../multiplayer/invite-link.js';
 import { loadCapRushMultiplayerVersionLocks } from './cap-rush-multiplayer-assets.js';
 import { CapRushMultiplayerController } from './cap-rush-multiplayer-controller.svelte.js';
 import { getCapRushMultiplayerTransport } from './cap-rush-multiplayer-transport.js';
-import Settings from './ModeSettings.svelte';
-
 const LAST_ROOM_KEY = 'hoop-rush:cap-rush-multiplayer:last-room';
+
+const settingsFields: readonly SettingsChoice[] = [
+  {
+    key: 'variant',
+    label: 'Variant',
+    options: [
+      { value: 'clash', label: 'Normal', description: 'No paid spins' },
+      {
+        value: 'roulette',
+        label: 'Mutation',
+        description: 'Unlocks the spin window after recruitment',
+      },
+    ],
+  },
+];
 
 export const capRushMultiplayerModeAdapter: MultiplayerModeAdapter = {
   defaults: { variant: 'clash' },
-  Settings,
+  settingsFields,
   loadRoom: () => import('./CapRushMultiplayerRoom.svelte').then((module) => module.default),
   loadLastRoomId: () => {
     try {

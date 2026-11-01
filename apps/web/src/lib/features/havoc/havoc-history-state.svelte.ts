@@ -1,6 +1,6 @@
 import type { HavocComparison, HavocReport } from '@hoop-rush/data-contracts';
 import type { HavocHistoryView, HavocRunView, HavocService } from '@hoop-rush/application/havoc';
-import { errorMessageOf } from './havoc-state-util.ts';
+import { errorMessageOf } from '#lib/errors.js';
 
 export interface HavocHistoryDetail {
   run: HavocRunView;

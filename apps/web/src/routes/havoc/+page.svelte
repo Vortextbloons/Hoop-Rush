@@ -2,6 +2,8 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
+  import ServiceErrorPanel from '#lib/components/ServiceErrorPanel.svelte';
+  import { openService } from '#lib/service-state.js';
   import HavocSetup from '#lib/features/havoc/HavocSetup.svelte';
   import { getManifest } from '#lib/data.js';
   import { HavocDraftController } from '#lib/features/havoc/havoc-draft-state.svelte.js';
@@ -12,13 +14,12 @@
   let franchiseName = $state<(franchiseId: string) => string>((franchiseId) => franchiseId);
 
   onMount(() => {
-    let instance: HavocDraftController;
-    try {
-      instance = new HavocDraftController(getHavocService());
-    } catch (error) {
-      serviceError = error instanceof Error ? error.message : String(error);
+    const opened = openService(() => new HavocDraftController(getHavocService()));
+    if (!opened.ok) {
+      serviceError = opened.error;
       return;
     }
+    const instance = opened.value;
     let mounted = true;
     controller = instance;
     void instance.load();
@@ -43,18 +44,12 @@
 
 {#if serviceError !== null}
   <section class="mx-auto w-full max-w-xl px-3 py-10 sm:px-6">
-    <div role="alert" class="rounded-xl border border-destructive/40 bg-destructive/10 p-6">
-      <h1 class="font-display text-xl font-extrabold tracking-tight uppercase">
-        Havoc is not wired yet
-      </h1>
-      <p class="mt-2 text-sm text-muted-foreground">{serviceError}</p>
-      <a
-        href={resolve('/')}
-        class="mt-4 inline-flex min-h-11 items-center justify-center rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        Back to home
-      </a>
-    </div>
+    <ServiceErrorPanel
+      title="Havoc is not wired yet"
+      message={serviceError}
+      tone="destructive"
+      homeLink
+    />
   </section>
 {:else if controller !== null}
   <div class="multiplayer-entry">

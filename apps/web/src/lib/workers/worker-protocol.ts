@@ -1,3 +1,5 @@
+import { errorMessageOf } from '#lib/errors.js';
+
 export function postWorkerMessage<Output>(
   schema: { parse: (value: unknown) => Output },
   message: Output,
@@ -7,7 +9,7 @@ export function postWorkerMessage<Output>(
 }
 
 export function workerErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  return errorMessageOf(error);
 }
 
 export function normalizeSimulationError(message: string): string {

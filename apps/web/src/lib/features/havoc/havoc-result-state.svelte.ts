@@ -6,7 +6,7 @@ import type {
   HavocSimulationProgress,
 } from '@hoop-rush/application/havoc';
 import { HAVOC_GAME_COUNT } from '@hoop-rush/data-contracts';
-import { errorMessageOf } from './havoc-state-util.ts';
+import { errorMessageOf } from '#lib/errors.js';
 
 export class HavocResultState {
   run = $state.raw<HavocRunView | null>(null);

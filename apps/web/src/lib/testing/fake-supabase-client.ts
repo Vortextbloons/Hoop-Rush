@@ -1,3 +1,5 @@
+import { errorMessageOf } from '#lib/errors.js';
+
 export interface FakeSupabaseError {
   message: string;
 }
@@ -251,7 +253,7 @@ export function createFakeSupabaseHarness(options: { userId?: string } = {}): Fa
       } catch (error) {
         return Promise.resolve({
           data: null,
-          error: { message: error instanceof Error ? error.message : String(error) },
+          error: { message: errorMessageOf(error) },
         });
       }
     },

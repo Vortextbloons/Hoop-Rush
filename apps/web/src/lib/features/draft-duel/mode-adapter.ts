@@ -7,7 +7,20 @@ import {
   loadLastDraftDuelRoomId,
   saveDraftDuelMembership,
 } from './draft-duel-identity';
-import Settings from './ModeSettings.svelte';
+import { knowledgeField } from '#lib/modes/settings-fields.js';
+import type { SettingsChoice } from '#lib/modes/types.js';
+
+const settingsFields: readonly SettingsChoice[] = [
+  {
+    key: 'fairness',
+    label: 'Fairness',
+    options: [
+      { value: 'fair', label: 'Fair', description: 'Shared strength bands' },
+      { value: 'unfair', label: 'Unfair', description: 'Equal player odds' },
+    ],
+  },
+  knowledgeField,
+];
 
 async function loadVersions() {
   const session = createDraftDuelSession();
@@ -19,7 +32,7 @@ async function loadVersions() {
 }
 export const draftDuelModeAdapter: MultiplayerModeAdapter = {
   defaults: { fairness: 'fair', variant: 'ratings' },
-  Settings,
+  settingsFields,
   loadRoom: () => import('./DraftDuelRoom.svelte').then((module) => module.default),
   loadLastRoomId: loadLastDraftDuelRoomId,
   settingsSchema: draftDuelSetupSchema,

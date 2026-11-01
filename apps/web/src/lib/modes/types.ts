@@ -21,7 +21,7 @@ export interface SettingsProps {
 }
 export interface MultiplayerModeAdapter {
   defaults: MultiplayerSetup;
-  Settings: Component<SettingsProps>;
+  settingsFields: readonly SettingsChoice[];
   loadRoom: () => Promise<Component<{ roomId: string }>>;
   loadLastRoomId: () => string | null;
   settingsSchema: z.ZodType<MultiplayerSetup>;

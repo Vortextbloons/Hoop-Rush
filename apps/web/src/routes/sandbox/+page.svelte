@@ -15,6 +15,7 @@
     LINEUP_STRUCTURE,
   } from '@hoop-rush/data-contracts';
   import { validateLineup } from '@hoop-rush/engine';
+  import { errorMessageOf } from '#lib/errors.js';
   import { clearDataLoaderCaches, getManifest, getPlayersIndex, getPool } from '#lib/data.js';
   import { resolvePlayerRefs } from '#lib/player-refs.js';
   import { generateSeed, parseSandboxUrl } from '#lib/sandbox-url.js';
@@ -122,8 +123,7 @@
         maybeRestore();
       },
       (error: unknown) => {
-        if (!cancelled && gen === dataGen)
-          manifestError = error instanceof Error ? error.message : String(error);
+        if (!cancelled && gen === dataGen) manifestError = errorMessageOf(error);
       },
     );
     getPlayersIndex().then(
@@ -133,8 +133,7 @@
         maybeRestore();
       },
       (error: unknown) => {
-        if (!cancelled && gen === dataGen)
-          indexError = error instanceof Error ? error.message : String(error);
+        if (!cancelled && gen === dataGen) indexError = errorMessageOf(error);
       },
     );
     return () => {
@@ -466,7 +465,7 @@
       if (!mounted) return;
     } catch (e) {
       if (!mounted) return;
-      runError = e instanceof Error ? e.message : String(e);
+      runError = errorMessageOf(e);
       starting = false;
     }
   }

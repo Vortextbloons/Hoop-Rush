@@ -1,5 +1,7 @@
 <script lang="ts">
   import { page } from '$app/state';
+  import ServiceErrorPanel from '#lib/components/ServiceErrorPanel.svelte';
+  import { openService } from '#lib/service-state.js';
   import CapRushRunDetail from '#lib/features/cap-rush/CapRushRunDetail.svelte';
   import { CapRushResultState } from '#lib/features/cap-rush/cap-rush-result-state.svelte.js';
   import { getCapRushService } from '#lib/features/cap-rush/cap-rush-service.js';
@@ -10,13 +12,12 @@
 
   $effect(() => {
     const id = runId;
-    let instance: CapRushResultState;
-    try {
-      instance = new CapRushResultState(getCapRushService());
-    } catch (error) {
-      serviceError = error instanceof Error ? error.message : String(error);
+    const opened = openService(() => new CapRushResultState(getCapRushService()));
+    if (!opened.ok) {
+      serviceError = opened.error;
       return;
     }
+    const instance = opened.value;
     resultState = instance;
     void instance.loadRun(id);
     return () => instance.destroy();
@@ -29,12 +30,7 @@
 
 {#if serviceError !== null}
   <section class="mx-auto w-full max-w-xl px-3 py-10 sm:px-6">
-    <div role="alert" class="rounded-xl border border-negative/40 bg-negative/10 p-6">
-      <h1 class="font-display text-xl font-extrabold tracking-tight uppercase">
-        Cap Rush could not start
-      </h1>
-      <p class="mt-2 text-sm text-muted-foreground">{serviceError}</p>
-    </div>
+    <ServiceErrorPanel title="Cap Rush could not start" message={serviceError} />
   </section>
 {:else if resultState !== null}
   <CapRushRunDetail state={resultState} {runId} />

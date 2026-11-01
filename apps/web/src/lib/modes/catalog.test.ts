@@ -54,7 +54,7 @@ describe('mode catalog', () => {
       const adapter = await mode.load();
       expect(adapter.settingsSchema.safeParse(adapter.defaults).success).toBe(true);
       expect(adapter.settingsSchema.safeParse({ variant: 'invalid' }).success).toBe(false);
-      expect(adapter.Settings).toBeTypeOf('function');
+      expect(adapter.settingsFields.length).toBeGreaterThan(0);
       expect(adapter.loadRoom).toBeTypeOf('function');
       expect(await adapter.loadRoom()).toBeTypeOf('function');
       expect(adapter.loadLastRoomId).toBeTypeOf('function');

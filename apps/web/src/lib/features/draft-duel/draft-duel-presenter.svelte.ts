@@ -38,10 +38,12 @@ import {
   type GamecastVisibleState,
 } from '#lib/gamecast/gamecast-playback.js';
 import { draftDuelFeedLines, type DraftDuelFeedLine } from './draft-duel-broadcast-view';
-import { isLiteMode } from '#lib/device-capabilities.js';
-import { PlaybackCadence, presentationIntervalMs } from '#lib/playback-cadence.js';
-
-const CONSIDERATION_CLEAR_MS = 2000;
+import {
+  reactionFromTransient,
+  rematchRequested,
+  RoomConsiderationTimer,
+  RoomPlaybackLoop,
+} from '#lib/features/multiplayer/room-presenter-plumbing.js';
 
 function otherParticipant(participantId: DraftDuelParticipantId): DraftDuelParticipantId {
   return participantId === 'p1' ? 'p2' : 'p1';
@@ -78,10 +80,16 @@ export class DraftDuelPresenter {
   private errorState = $state<string | null>(null);
   private unsubscribe: (() => void) | null = null;
   private unsubscribeTransient: (() => void) | null = null;
-  private rafId: number | null = null;
-  private playbackLastFrameMs: number | null = null;
-  private playbackCadence: PlaybackCadence | null = null;
-  private considerationTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly playback = new RoomPlaybackLoop();
+  private readonly considerationTimer = new RoomConsiderationTimer<{
+    displayName: string;
+    seasonKey: string;
+  }>(
+    (value) => {
+      this.consideration = value;
+    },
+    () => this.consideration,
+  );
   private disposed = false;
 
   constructor(session: DraftDuelSession = createDraftDuelSession()) {
@@ -193,20 +201,8 @@ export class DraftDuelPresenter {
       completedRecap: this.completedRecap,
     }),
   );
-  rivalRematchRequested = $derived.by(() =>
-    this.commands.some(
-      (command) =>
-        command.payload.kind === 'rematch-request' &&
-        command.actorParticipantId !== this.participantId,
-    ),
-  );
-  myRematchRequested = $derived.by(() =>
-    this.commands.some(
-      (command) =>
-        command.payload.kind === 'rematch-request' &&
-        command.actorParticipantId === this.participantId,
-    ),
-  );
+  rivalRematchRequested = $derived(rematchRequested(this.commands, this.participantId, false));
+  myRematchRequested = $derived(rematchRequested(this.commands, this.participantId, true));
   successorRoomId = $derived(this.snapshot?.successorRoomId ?? null);
 
   attach(roomId: string): Promise<void> {
@@ -317,7 +313,7 @@ export class DraftDuelPresenter {
 
   async leaveRoom(): Promise<void> {
     await this.session.leaveRoom();
-    this.stopPlayback();
+    this.playback.stop();
   }
 
   async consider(card: DraftDuelCard | null): Promise<void> {
@@ -346,11 +342,8 @@ export class DraftDuelPresenter {
 
   dispose(): void {
     this.disposed = true;
-    this.stopPlayback();
-    if (this.considerationTimer !== null) {
-      clearTimeout(this.considerationTimer);
-      this.considerationTimer = null;
-    }
+    this.playback.stop();
+    this.considerationTimer.clear();
     this.unsubscribe?.();
     this.unsubscribe = null;
     this.unsubscribeTransient?.();
@@ -385,48 +378,27 @@ export class DraftDuelPresenter {
     if (broadcastGame !== null && broadcastGame !== previousBroadcastGame) {
       this.startPlayback();
     }
-    if (view.snapshot?.broadcast == null && this.rafId !== null) {
-      cancelAnimationFrame(this.rafId);
-      this.rafId = null;
+    if (view.snapshot?.broadcast == null && this.playback.active) {
+      this.playback.stop();
     }
   }
 
-  private startPlayback(): void {
-    if (this.disposed) return;
-    if (!this.snapshot?.broadcast) return;
-    this.playbackLastFrameMs = null;
-    this.playbackCadence = new PlaybackCadence(presentationIntervalMs(isLiteMode()));
-    if (this.rafId !== null) return;
-    this.session.beginPlayback();
-    this.session.advancePlayback(0);
-    const loop = () => {
-      if (this.disposed || !this.snapshot?.broadcast) {
-        this.rafId = null;
-        return;
-      }
-      const nowMs = Date.now();
-      const lastFrameMs = this.playbackLastFrameMs ?? nowMs;
-      this.playbackLastFrameMs = nowMs;
-      const advanceMs = this.playbackCadence?.add(nowMs - lastFrameMs) ?? null;
-      if (advanceMs === null) {
-        this.rafId = requestAnimationFrame(loop);
-        return;
-      }
-      this.session.advancePlayback(advanceMs);
-      if (this.session.getSnapshot().progress >= 1) {
-        this.rafId = null;
-        return;
-      }
-      this.rafId = requestAnimationFrame(loop);
-    };
-    this.rafId = requestAnimationFrame(loop);
+  private stopPlayback(): void {
+    this.playback.stop();
   }
 
-  private stopPlayback(): void {
-    if (this.rafId === null) return;
-    cancelAnimationFrame(this.rafId);
-    this.rafId = null;
-    this.playbackCadence = null;
+  private startPlayback(): void {
+    this.playback.start({
+      isDisposed: () => this.disposed,
+      hasBroadcast: () => this.snapshot?.broadcast != null,
+      beginPlayback: () => {
+        this.session.beginPlayback();
+      },
+      advancePlayback: (advanceMs) => {
+        this.session.advancePlayback(advanceMs);
+      },
+      progress: () => this.session.getSnapshot().progress,
+    });
   }
 
   private onTransient(event: DraftDuelTransientEvent): void {
@@ -436,26 +408,16 @@ export class DraftDuelPresenter {
       if (!assets) return;
       const entry = assets.catalog.byVersionId.get(event.playerVersionId);
       if (!entry) return;
-      const consideration = {
+      this.considerationTimer.show({
         displayName: entry.card.displayName,
         seasonKey: entry.card.seasonKey,
-      };
-      this.consideration = consideration;
-      if (this.considerationTimer !== null) clearTimeout(this.considerationTimer);
-      this.considerationTimer = setTimeout(() => {
-        this.considerationTimer = null;
-        if (!this.disposed && this.consideration === consideration) {
-          this.consideration = null;
-        }
-      }, CONSIDERATION_CLEAR_MS);
+      });
       return;
     }
-    if (!this.muted) {
-      this.reaction = {
-        participantId: event.participantId,
-        reaction: event.reaction,
-        atMs: event.sentAtMs,
-      };
-    }
+    const reaction = reactionFromTransient(event, {
+      muted: this.muted,
+      participantId: this.participantId,
+    });
+    if (reaction) this.reaction = reaction;
   }
 }

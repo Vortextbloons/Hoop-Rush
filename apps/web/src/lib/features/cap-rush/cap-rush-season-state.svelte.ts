@@ -28,9 +28,7 @@ import {
 import { newRequestId } from '#lib/ids.js';
 import type { CapRushRunner } from './cap-rush-runner.ts';
 
-function errorMessageOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
+import { errorMessageOf } from '#lib/errors.js';
 
 export interface CapRushSeasonProgress {
   readonly completed: number;

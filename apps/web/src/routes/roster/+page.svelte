@@ -17,6 +17,7 @@
     getPlayersIndex,
     getRosterDetails,
   } from '#lib/data.js';
+  import { errorMessageOf } from '#lib/errors.js';
   import { LITE_TOGGLE_EVENT, deferIdle, isLiteMode } from '#lib/device-capabilities.js';
   import { DETAILED_POSITIONS } from '#lib/player-positions.js';
   import {
@@ -125,7 +126,7 @@
         if (current()) manifest = m;
       },
       (error: unknown) => {
-        if (current()) manifestError = error instanceof Error ? error.message : String(error);
+        if (current()) manifestError = errorMessageOf(error);
       },
     );
     getPlayersIndex().then(
@@ -133,7 +134,7 @@
         if (current()) index = ix;
       },
       (error: unknown) => {
-        if (current()) indexError = error instanceof Error ? error.message : String(error);
+        if (current()) indexError = errorMessageOf(error);
       },
     );
   }
@@ -152,7 +153,7 @@
       },
       (error: unknown) => {
         if (generation !== dataGeneration) return;
-        detailsError = error instanceof Error ? error.message : String(error);
+        detailsError = errorMessageOf(error);
         detailsLoading = false;
         detailsRequest = null;
       },

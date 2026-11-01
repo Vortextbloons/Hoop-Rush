@@ -34,10 +34,12 @@ import {
   type GamecastBattleFeedLine,
   type GamecastBattleVisibleState,
 } from '#lib/gamecast/gamecast-battle-playback.js';
-import { isLiteMode } from '#lib/device-capabilities.js';
-import { PlaybackCadence, presentationIntervalMs } from '#lib/playback-cadence.js';
-
-const CONSIDERATION_CLEAR_MS = 2000;
+import {
+  reactionFromTransient,
+  rematchRequested,
+  RoomConsiderationTimer,
+  RoomPlaybackLoop,
+} from '#lib/features/multiplayer/room-presenter-plumbing.js';
 
 export interface HavocMultiplayerConsideration {
   displayName: string;
@@ -78,10 +80,13 @@ export class HavocMultiplayerPresenter {
   private errorState = $state<string | null>(null);
   private unsubscribe: (() => void) | null = null;
   private unsubscribeTransient: (() => void) | null = null;
-  private rafId: number | null = null;
-  private playbackLastFrameMs: number | null = null;
-  private playbackCadence: PlaybackCadence | null = null;
-  private considerationTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly playback = new RoomPlaybackLoop();
+  private readonly considerationTimer = new RoomConsiderationTimer<HavocMultiplayerConsideration>(
+    (value) => {
+      this.consideration = value;
+    },
+    () => this.consideration,
+  );
   private disposed = false;
 
   constructor(session: HavocMultiplayerSession = createHavocMultiplayerSession()) {
@@ -141,20 +146,8 @@ export class HavocMultiplayerPresenter {
       this.draft.activeParticipantId === this.participantId &&
       !this.busy,
   );
-  myRematchRequested = $derived.by(() =>
-    this.commands.some(
-      (command) =>
-        command.payload.kind === 'rematch-request' &&
-        command.actorParticipantId === this.participantId,
-    ),
-  );
-  rivalRematchRequested = $derived.by(() =>
-    this.commands.some(
-      (command) =>
-        command.payload.kind === 'rematch-request' &&
-        command.actorParticipantId !== this.participantId,
-    ),
-  );
+  myRematchRequested = $derived(rematchRequested(this.commands, this.participantId, true));
+  rivalRematchRequested = $derived(rematchRequested(this.commands, this.participantId, false));
   successorRoomId = $derived(this.snapshot?.successorRoomId ?? null);
 
   attach(roomId: string): Promise<void> {
@@ -221,7 +214,7 @@ export class HavocMultiplayerPresenter {
 
   async leaveRoom(): Promise<void> {
     await this.session.leaveRoom();
-    this.stopPlayback();
+    this.playback.stop();
   }
 
   async consider(card: HavocDraftCard | null): Promise<void> {
@@ -250,11 +243,8 @@ export class HavocMultiplayerPresenter {
 
   dispose(): void {
     this.disposed = true;
-    this.stopPlayback();
-    if (this.considerationTimer !== null) {
-      clearTimeout(this.considerationTimer);
-      this.considerationTimer = null;
-    }
+    this.playback.stop();
+    this.considerationTimer.clear();
     this.unsubscribe?.();
     this.unsubscribe = null;
     this.unsubscribeTransient?.();
@@ -290,48 +280,23 @@ export class HavocMultiplayerPresenter {
     if (broadcastGame !== null && broadcastGame !== previousBroadcastGame) {
       this.startPlayback();
     }
-    if (view.snapshot?.broadcast == null && this.rafId !== null) {
-      cancelAnimationFrame(this.rafId);
-      this.rafId = null;
+    if (view.snapshot?.broadcast == null && this.playback.active) {
+      this.playback.stop();
     }
   }
 
   private startPlayback(): void {
-    if (this.disposed) return;
-    if (!this.currentBroadcast) return;
-    this.playbackLastFrameMs = null;
-    this.playbackCadence = new PlaybackCadence(presentationIntervalMs(isLiteMode()));
-    if (this.rafId !== null) return;
-    this.session.beginPlayback();
-    this.session.advancePlayback(0);
-    const loop = () => {
-      if (this.disposed || !this.currentBroadcast) {
-        this.rafId = null;
-        return;
-      }
-      const nowMs = Date.now();
-      const lastFrameMs = this.playbackLastFrameMs ?? nowMs;
-      this.playbackLastFrameMs = nowMs;
-      const advanceMs = this.playbackCadence?.add(nowMs - lastFrameMs) ?? null;
-      if (advanceMs === null) {
-        this.rafId = requestAnimationFrame(loop);
-        return;
-      }
-      this.session.advancePlayback(advanceMs);
-      if (this.session.getSnapshot().progress >= 1) {
-        this.rafId = null;
-        return;
-      }
-      this.rafId = requestAnimationFrame(loop);
-    };
-    this.rafId = requestAnimationFrame(loop);
-  }
-
-  private stopPlayback(): void {
-    if (this.rafId === null) return;
-    cancelAnimationFrame(this.rafId);
-    this.rafId = null;
-    this.playbackCadence = null;
+    this.playback.start({
+      isDisposed: () => this.disposed,
+      hasBroadcast: () => this.currentBroadcast != null,
+      beginPlayback: () => {
+        this.session.beginPlayback();
+      },
+      advancePlayback: (advanceMs) => {
+        this.session.advancePlayback(advanceMs);
+      },
+      progress: () => this.session.getSnapshot().progress,
+    });
   }
 
   private draftCardOf(cardId: string): HavocDraftCard | null {
@@ -347,26 +312,16 @@ export class HavocMultiplayerPresenter {
     if (event.kind === 'consideration') {
       const card = this.draftCardOf(event.cardId);
       if (!card) return;
-      const consideration: HavocMultiplayerConsideration = {
+      this.considerationTimer.show({
         displayName: card.source.displayName,
         seasonKey: card.source.seasonKey,
-      };
-      this.consideration = consideration;
-      if (this.considerationTimer !== null) clearTimeout(this.considerationTimer);
-      this.considerationTimer = setTimeout(() => {
-        this.considerationTimer = null;
-        if (!this.disposed && this.consideration === consideration) {
-          this.consideration = null;
-        }
-      }, CONSIDERATION_CLEAR_MS);
+      });
       return;
     }
-    if (!this.muted) {
-      this.reaction = {
-        participantId: event.participantId,
-        reaction: event.reaction,
-        atMs: event.sentAtMs,
-      };
-    }
+    const reaction = reactionFromTransient(event, {
+      muted: this.muted,
+      participantId: this.participantId,
+    });
+    if (reaction) this.reaction = reaction;
   }
 }

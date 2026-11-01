@@ -1,4 +1,6 @@
 <script lang="ts">
+  import ServiceErrorPanel from '#lib/components/ServiceErrorPanel.svelte';
+  import { openService } from '#lib/service-state.js';
   import HavocHistoryList from '#lib/features/havoc/HavocHistoryList.svelte';
   import { HavocHistoryState } from '#lib/features/havoc/havoc-history-state.svelte.js';
   import { getHavocService } from '#lib/features/havoc/havoc-service.js';
@@ -7,13 +9,12 @@
   let serviceError = $state<string | null>(null);
 
   $effect(() => {
-    let instance: HavocHistoryState;
-    try {
-      instance = new HavocHistoryState(getHavocService());
-    } catch (error) {
-      serviceError = error instanceof Error ? error.message : String(error);
+    const opened = openService(() => new HavocHistoryState(getHavocService()));
+    if (!opened.ok) {
+      serviceError = opened.error;
       return;
     }
+    const instance = opened.value;
     historyState = instance;
     void instance.load();
     return () => instance.destroy();
@@ -26,12 +27,7 @@
 
 {#if serviceError !== null}
   <section class="mx-auto w-full max-w-xl px-3 py-10 sm:px-6">
-    <div role="alert" class="rounded-xl border border-destructive/40 bg-destructive/10 p-6">
-      <h1 class="font-display text-xl font-extrabold tracking-tight uppercase">
-        Havoc is not wired yet
-      </h1>
-      <p class="mt-2 text-sm text-muted-foreground">{serviceError}</p>
-    </div>
+    <ServiceErrorPanel title="Havoc is not wired yet" message={serviceError} tone="destructive" />
   </section>
 {:else if historyState !== null}
   <HavocHistoryList state={historyState} />

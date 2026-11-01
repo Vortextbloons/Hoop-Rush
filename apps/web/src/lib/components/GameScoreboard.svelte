@@ -1,6 +1,14 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
-  import type { GameScoreboardTeam } from './game-scoreboard';
+
+  interface GameScoreboardTeam {
+    key: string;
+    label: string;
+    score: number | string;
+    align?: 'start' | 'center' | 'end';
+    winner?: boolean;
+  }
+
   let {
     teams,
     status = null,

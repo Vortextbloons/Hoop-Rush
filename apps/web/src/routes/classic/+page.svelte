@@ -1,4 +1,4 @@
-﻿<script lang="ts">
+<script lang="ts">
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import type { RouteId } from './$types';
@@ -16,6 +16,7 @@
   import { franchiseAbbreviation, resolveEraTeamIdentity } from '@hoop-rush/data-contracts';
   import { classic, createEngineContext } from '@hoop-rush/engine';
   import { Dialog } from 'bits-ui';
+  import { errorMessageOf } from '#lib/errors.js';
   import { clearDataLoaderCaches, getManifest, getPlayersIndex } from '#lib/data.js';
   import {
     buildClassicCatalog,
@@ -131,8 +132,7 @@
         manifest = m;
       },
       (error: unknown) => {
-        if (!cancelled && gen === dataGen)
-          manifestError = error instanceof Error ? error.message : String(error);
+        if (!cancelled && gen === dataGen) manifestError = errorMessageOf(error);
       },
     );
     getPlayersIndex().then(
@@ -141,8 +141,7 @@
         index = ix;
       },
       (error: unknown) => {
-        if (!cancelled && gen === dataGen)
-          indexError = error instanceof Error ? error.message : String(error);
+        if (!cancelled && gen === dataGen) indexError = errorMessageOf(error);
       },
     );
     loadClassicDraftState().then(
@@ -153,7 +152,7 @@
       },
       (error: unknown) => {
         if (cancelled || gen !== dataGen) return;
-        draftError = error instanceof Error ? error.message : String(error);
+        draftError = errorMessageOf(error);
         draftLoaded = true;
       },
     );
@@ -361,7 +360,7 @@
       spinKey += 1;
     } catch (error) {
       spinning = false;
-      setupError = error instanceof Error ? error.message : String(error);
+      setupError = errorMessageOf(error);
     }
   }
   async function rerollFranchise() {
@@ -373,7 +372,7 @@
       await applyRoll(next, 'franchise');
     } catch (error) {
       spinning = false;
-      actionError = error instanceof Error ? error.message : String(error);
+      actionError = errorMessageOf(error);
     }
   }
   async function rerollEra() {
@@ -385,7 +384,7 @@
       await applyRoll(next, 'era');
     } catch (error) {
       spinning = false;
-      actionError = error instanceof Error ? error.message : String(error);
+      actionError = errorMessageOf(error);
     }
   }
   function openPicker(player: IndexRow) {
@@ -455,7 +454,7 @@
       try {
         arenaError();
       } catch {}
-      actionError = error instanceof Error ? error.message : String(error);
+      actionError = errorMessageOf(error);
     }
   }
   async function launchRun(draftToRun: ClassicDraftState) {
@@ -465,7 +464,7 @@
       await startClassicRun(draftToRun, runSeed ?? classicDraftSeed());
     } catch (error) {
       if (!mounted) return;
-      launchError = error instanceof Error ? error.message : String(error);
+      launchError = errorMessageOf(error);
       starting = false;
     }
   }

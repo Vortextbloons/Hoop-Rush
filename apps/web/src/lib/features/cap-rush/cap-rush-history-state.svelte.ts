@@ -1,9 +1,7 @@
 import type { CapRushHistoryEntry } from '@hoop-rush/data-contracts';
 import type { CapRushService } from '@hoop-rush/application/cap-rush';
 
-function errorMessageOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
+import { errorMessageOf } from '#lib/errors.js';
 
 export class CapRushHistoryState {
   entries = $state.raw<CapRushHistoryEntry[]>([]);
