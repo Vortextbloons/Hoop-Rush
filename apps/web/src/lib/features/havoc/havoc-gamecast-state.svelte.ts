@@ -16,7 +16,7 @@ import {
   havocPeriodLabel,
   havocScoringTextOf,
 } from './havoc-presentation';
-import { errorMessageOf } from './havoc-state-util.ts';
+import { errorMessageOf } from '#lib/errors.js';
 import { prefersReducedMotion } from '#lib/device-capabilities.js';
 
 export type HavocPlaybackSpeed = 1 | 2 | 4 | 8;

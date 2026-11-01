@@ -4,7 +4,6 @@
     CapRushMultiplayerMarketPlayer,
     CapRushMultiplayerSeatId,
   } from '@hoop-rush/data-contracts';
-  import CapRushBidAdjuster from './CapRushBidAdjuster.svelte';
   import type { CapRushBidDraft } from './cap-rush-bid-draft.svelte.js';
   import PlayerFace from '#lib/components/PlayerFace.svelte';
   import type { CapRushArt } from '../cap-rush/cap-rush-art.js';
@@ -131,7 +130,18 @@
     </button>
 
     {#if adjustable}
-      <CapRushBidAdjuster {draft} disabled={pending} />
+      <div class="grid grid-cols-4 gap-1.5" aria-label="Adjust bid amount">
+        {#each [{ delta: -100000, label: '?$100K' }, { delta: 100000, label: '+$100K' }, { delta: 500000, label: '+$500K' }, { delta: 1000000, label: '+$1M' }] as step (step.delta)}
+          <button
+            type="button"
+            class="min-h-12 touch-manipulation rounded-xl border border-border bg-surface-2 px-1 font-mono text-xs font-bold tabular-nums outline-none hover:border-primary active:bg-primary/15 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
+            disabled={pending ||
+              (step.delta < 0 &&
+                (draft.proposedTotal ?? draft.minimumDollars) <= draft.minimumDollars)}
+            onclick={() => draft.adjust(step.delta)}>{step.label}</button
+          >
+        {/each}
+      </div>
     {/if}
 
     <div class="flex items-center gap-2">

@@ -1,5 +1,6 @@
 import { ChallengeSession, type ChallengePhase } from '@hoop-rush/application/challenge';
 import type { ChallengeRun } from '@hoop-rush/data-contracts';
+import { errorMessageOf } from '#lib/errors.js';
 import { getEraSimulationProfile, getManifest } from '#lib/data.js';
 import { sleep } from '#lib/sleep.js';
 import { prefersReducedMotion } from '#lib/device-capabilities.js';
@@ -76,8 +77,7 @@ export class ChallengeRunPresenter {
       if (record) await profileRepository().bind(`challenge:${record.run.runId}`);
       if (this.session === session) await session.load();
     } catch (error) {
-      if (this.session === session)
-        this.loadError = error instanceof Error ? error.message : String(error);
+      if (this.session === session) this.loadError = errorMessageOf(error);
     }
   }
 }

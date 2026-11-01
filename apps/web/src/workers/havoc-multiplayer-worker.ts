@@ -13,6 +13,7 @@ import {
   havocBattleGameTapeDigest,
   simulateHavocBattleGame,
 } from '@hoop-rush/engine';
+import { errorMessageOf } from '#lib/errors.js';
 import { normalizeSimulationError } from '../lib/workers/worker-protocol';
 
 let currentRequestId: string | null = null;
@@ -77,7 +78,7 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
       });
     } catch (error) {
       if (token !== requestToken) return;
-      const message = error instanceof Error ? error.message : String(error);
+      const message = errorMessageOf(error);
       postError(request.requestId, 'simulation-failed', normalizeSimulationError(message));
     }
   })();

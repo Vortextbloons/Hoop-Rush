@@ -1,6 +1,6 @@
 import type { HavocDraftState } from '@hoop-rush/data-contracts';
 import type { HavocRunView, HavocService } from '@hoop-rush/application/havoc';
-import { errorMessageOf } from './havoc-state-util.ts';
+import { errorMessageOf } from '#lib/errors.js';
 
 export class HavocDraftController {
   run = $state.raw<HavocRunView | null>(null);

@@ -1,9 +1,11 @@
+import { errorMessageOf } from '#lib/errors.js';
+
 export type MultiplayerErrorMapping = (message: string) => string | null | undefined;
 export function friendlyMultiplayerError(
   error: unknown,
   mapping?: MultiplayerErrorMapping,
 ): string {
-  const message = error instanceof Error ? error.message : String(error);
+  const message = errorMessageOf(error);
   const mapped = mapping?.(message);
   if (mapped) return mapped;
   const lower = message.toLowerCase();

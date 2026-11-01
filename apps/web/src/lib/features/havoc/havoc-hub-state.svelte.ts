@@ -7,7 +7,7 @@ import type {
 } from '@hoop-rush/application/havoc';
 import { foldHavocSeasonStats, type HavocSeasonStats } from './havoc-presentation';
 import { HavocGamecastState } from './havoc-gamecast-state.svelte.ts';
-import { errorMessageOf } from './havoc-state-util.ts';
+import { errorMessageOf } from '#lib/errors.js';
 
 export class HavocHubState {
   run = $state.raw<HavocRunView | null>(null);

@@ -28,9 +28,10 @@
   import RosterRail from '#lib/features/draft-duel/RosterRail.svelte';
   import ReactionBar from '#lib/features/draft-duel/ReactionBar.svelte';
   import RivalConsideration from '#lib/features/draft-duel/RivalConsideration.svelte';
-  import SeriesTracker from '#lib/features/draft-duel/SeriesTracker.svelte';
-  import BroadcastView from '#lib/features/draft-duel/BroadcastView.svelte';
-  import GameResultsPanel from '#lib/features/draft-duel/GameResultsPanel.svelte';
+  import GamecastSeriesTracker from '#lib/gamecast/GamecastSeriesTracker.svelte';
+  import GamecastBroadcast from '#lib/gamecast/GamecastBroadcast.svelte';
+  import GamecastRecap from '#lib/gamecast/GamecastRecap.svelte';
+  import { draftDuelGamecastPlayers } from '#lib/features/draft-duel/draft-duel-card-view.js';
   import ChampionshipView from '#lib/features/draft-duel/ChampionshipView.svelte';
   import { inviteLinkForDraftDuelCode } from '#lib/features/draft-duel/draft-duel-identity.js';
   import { loadLobbyId } from '#lib/features/multiplayer/multiplayer-lobby.js';
@@ -145,6 +146,7 @@
     for (const slot of controller.rivalRoster?.slots ?? []) map[slot.card.playerId] = slot.card;
     return map;
   });
+  const gamecastPlayers = $derived(draftDuelGamecastPlayers(playerCards));
 
   const lastPlayedGame = $derived(controller.series?.games.at(-1) ?? null);
   const lastOutput = $derived(
@@ -522,9 +524,10 @@
     {:else if controller.phase === 'preparing-game'}
       <section class="panel" aria-label="Preparing game">
         {#if controller.series}
-          <SeriesTracker
+          <GamecastSeriesTracker
             series={controller.series}
             localParticipantId={controller.participantId ?? 'p1'}
+            homeFormat="best-of-2-2-1-1-1"
           />
         {/if}
         <h2>Game {controller.currentGameNumber ?? 1} ready check</h2>
@@ -561,13 +564,13 @@
       </section>
     {:else if controller.showingBroadcast && controller.currentOutput && controller.visible}
       <section class="panel broadcast-panel" aria-label="Broadcast">
-        <BroadcastView
+        <GamecastBroadcast
           output={controller.currentOutput}
           visible={controller.visible}
           progress={controller.progress}
           localParticipantId={controller.participantId ?? 'p1'}
           feed={controller.feed}
-          cards={playerCards}
+          players={gamecastPlayers}
           manifest={controller.assets?.manifest ?? null}
         />
       </section>
@@ -593,7 +596,7 @@
     {:else if controller.phase === 'game-results' && controller.series}
       {#if controller.currentOutput}
         <section class="panel" aria-label="Game results">
-          <GameResultsPanel
+          <GamecastRecap
             output={controller.currentOutput}
             series={controller.series}
             localParticipantId={controller.participantId ?? 'p1'}
@@ -603,7 +606,7 @@
             onready={() => controller.readyForNextGame()}
             awaitingContinue={controller.awaitingContinue}
             oncontinue={() => controller.continueAfterGame()}
-            cards={playerCards}
+            players={gamecastPlayers}
             manifest={controller.assets?.manifest ?? null}
           />
         </section>

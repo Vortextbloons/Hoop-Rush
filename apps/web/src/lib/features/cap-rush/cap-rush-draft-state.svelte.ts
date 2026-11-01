@@ -5,9 +5,7 @@ import {
 } from '@hoop-rush/application/cap-rush';
 import type { CapRushSpinPurchaseId, CapRushVariant, Position } from '@hoop-rush/data-contracts';
 
-function errorMessageOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
+import { errorMessageOf } from '#lib/errors.js';
 
 export class CapRushDraftController {
   draft = $state.raw<CapRushDraftView | null>(null);

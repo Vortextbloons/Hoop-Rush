@@ -2,6 +2,8 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
+  import ServiceErrorPanel from '#lib/components/ServiceErrorPanel.svelte';
+  import { openService } from '#lib/service-state.js';
   import CapRushDraftBoard from '#lib/features/cap-rush/CapRushDraftBoard.svelte';
   import CapRushSetup from '#lib/features/cap-rush/CapRushSetup.svelte';
   import { CapRushDraftController } from '#lib/features/cap-rush/cap-rush-draft-state.svelte.js';
@@ -16,13 +18,12 @@
 
   onMount(() => {
     let mounted = true;
-    let instance: CapRushDraftController;
-    try {
-      instance = new CapRushDraftController(getCapRushService());
-    } catch (error) {
-      serviceError = error instanceof Error ? error.message : String(error);
+    const opened = openService(() => new CapRushDraftController(getCapRushService()));
+    if (!opened.ok) {
+      serviceError = opened.error;
       return;
     }
+    const instance = opened.value;
     controller = instance;
     void instance.load();
     void loadCapRushArt()
@@ -80,18 +81,7 @@
 
 {#if serviceError !== null}
   <section class="mx-auto w-full max-w-xl px-3 py-10 sm:px-6">
-    <div role="alert" class="rounded-xl border border-negative/40 bg-negative/10 p-6">
-      <h1 class="font-display text-xl font-extrabold tracking-tight uppercase">
-        Cap Rush could not start
-      </h1>
-      <p class="mt-2 text-sm text-muted-foreground">{serviceError}</p>
-      <a
-        href={resolve('/')}
-        class="mt-4 inline-flex min-h-11 items-center justify-center rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        Back to home
-      </a>
-    </div>
+    <ServiceErrorPanel title="Cap Rush could not start" message={serviceError} homeLink />
   </section>
 {:else if controller !== null}
   {#if controller.loading}

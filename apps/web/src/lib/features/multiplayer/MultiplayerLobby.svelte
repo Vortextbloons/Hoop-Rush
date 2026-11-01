@@ -25,6 +25,7 @@
     type LobbyView,
   } from '#lib/features/multiplayer/lobby-context.svelte.js';
   import { multiplayerFormats } from '#lib/modes/catalog.js';
+  import SettingsChoices from '#lib/modes/SettingsChoices.svelte';
   import type { MultiplayerModeAdapter } from '#lib/modes/types.js';
   let {
     initialFormat,
@@ -340,7 +341,8 @@
             </div>
           </div>
           {#if adapter}
-            <adapter.Settings
+            <SettingsChoices
+              fields={adapter.settingsFields}
               value={settings}
               onchange={updateSettings}
               disabled={busy || (lobby !== null && !lobby.canStart)}

@@ -4,6 +4,7 @@ import {
   type DraftDuelPresentation,
   type DraftDuelUnavailableReason,
 } from '@hoop-rush/data-contracts';
+import type { GamecastPlayer } from '#lib/gamecast/gamecast-types.js';
 
 const DRAFT_DUEL_ELITE_OVERALL = 95;
 
@@ -33,6 +34,22 @@ export interface DraftDuelCardView {
 function draftDuelBandLabel(card: DraftDuelCard): string {
   const index = Math.min(Math.max(card.bandIndex, 0), OVERALL_BANDS.length - 1);
   return OVERALL_BANDS[index]?.label ?? '';
+}
+
+export function draftDuelGamecastPlayers(
+  cards: Record<string, DraftDuelCard>,
+): Record<string, GamecastPlayer> {
+  const mapped: Record<string, GamecastPlayer> = {};
+  for (const card of Object.values(cards)) {
+    mapped[card.playerId] = {
+      playerId: card.playerId,
+      displayName: card.displayName,
+      seasonKey: card.seasonKey,
+      franchiseId: card.franchiseId,
+      playerExternalId: card.playerExternalId,
+    };
+  }
+  return mapped;
 }
 
 export function draftDuelCardView(

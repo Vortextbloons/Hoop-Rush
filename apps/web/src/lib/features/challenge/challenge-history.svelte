@@ -3,6 +3,7 @@
   import { resolve } from '$app/paths';
   import type { ActiveRunCheckpoint, CompletedRunIndex } from '@hoop-rush/persistence';
   import type { HoopRushManifest } from '@hoop-rush/data-contracts';
+  import { errorMessageOf } from '#lib/errors.js';
   import { clearDataLoaderCaches, getManifest } from '#lib/data.js';
   import { challengeRepository } from './challenge-repo';
   import AsyncState from '#lib/components/AsyncState.svelte';
@@ -38,7 +39,7 @@
       },
       (e: unknown) => {
         if (cancelled) return;
-        error = e instanceof Error ? e.message : String(e);
+        error = errorMessageOf(e);
         loading = false;
       },
     );

@@ -3,6 +3,8 @@
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import AsyncState from '#lib/components/AsyncState.svelte';
+  import ServiceErrorPanel from '#lib/components/ServiceErrorPanel.svelte';
+  import { openService } from '#lib/service-state.js';
   import CapRushReportView from '#lib/features/cap-rush/CapRushReportView.svelte';
   import { CapRushResultState } from '#lib/features/cap-rush/cap-rush-result-state.svelte.js';
   import { getCapRushService } from '#lib/features/cap-rush/cap-rush-service.js';
@@ -11,13 +13,12 @@
   let serviceError = $state<string | null>(null);
 
   onMount(() => {
-    let instance: CapRushResultState;
-    try {
-      instance = new CapRushResultState(getCapRushService());
-    } catch (error) {
-      serviceError = error instanceof Error ? error.message : String(error);
+    const opened = openService(() => new CapRushResultState(getCapRushService()));
+    if (!opened.ok) {
+      serviceError = opened.error;
       return;
     }
+    const instance = opened.value;
     resultState = instance;
     void instance.load();
     return () => instance.destroy();
@@ -35,12 +36,7 @@
 
 <section class="mx-auto w-full max-w-5xl px-3 py-4 sm:px-6 sm:py-6">
   {#if serviceError !== null}
-    <div role="alert" class="rounded-xl border border-negative/40 bg-negative/10 p-6">
-      <h1 class="font-display text-xl font-extrabold tracking-tight uppercase">
-        Cap Rush could not start
-      </h1>
-      <p class="mt-2 text-sm text-muted-foreground">{serviceError}</p>
-    </div>
+    <ServiceErrorPanel title="Cap Rush could not start" message={serviceError} />
   {:else if resultState !== null}
     {#if resultState.loading}
       <div class="flex flex-col gap-2">

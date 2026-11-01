@@ -9,6 +9,7 @@
     PlayersIndexEntry,
   } from '@hoop-rush/data-contracts';
   import type { SandboxHref } from '#lib/sandbox-url.js';
+  import { errorMessageOf } from '#lib/errors.js';
   import { clearDataLoaderCaches, getManifest, getPlayersIndex } from '#lib/data.js';
   import { challengeRepository } from './challenge-repo';
   import { loadRunPlayersById } from './sandbox-lineup';
@@ -106,7 +107,7 @@
         },
         (e: unknown) => {
           if (!cancelled) {
-            error = e instanceof Error ? e.message : String(e);
+            error = errorMessageOf(e);
             loading = false;
           }
         },
@@ -155,7 +156,7 @@
     error = null;
     Promise.resolve(handler(run, byId))
       .catch((e: unknown) => {
-        error = e instanceof Error ? e.message : String(e);
+        error = errorMessageOf(e);
       })
       .finally(() => {
         running = false;

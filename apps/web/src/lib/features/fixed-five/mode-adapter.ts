@@ -13,12 +13,24 @@ import {
 } from '@hoop-rush/data-contracts';
 import { ENGINE_VERSION } from '@hoop-rush/engine';
 import { loadRunPreamble } from '#lib/run-preamble.js';
-import type { MultiplayerModeAdapter } from '#lib/modes/types.js';
+import type { MultiplayerModeAdapter, SettingsChoice } from '#lib/modes/types.js';
+import { knowledgeField } from '#lib/modes/settings-fields.js';
 import { loadLastFixedFiveRoomId, saveFixedFiveMembership } from './fixed-five-identity';
 import { getFixedFiveTransport } from './fixed-five-transport';
 import { FixedFiveRoomController } from './fixed-five-room-controller.svelte';
-import Settings from './ModeSettings.svelte';
 import { multiplayerInviteLink } from '../multiplayer/invite-link';
+
+const settingsFields: readonly SettingsChoice[] = [
+  {
+    key: 'sourceMode',
+    label: 'Draft source',
+    options: [
+      { value: 'classic', label: 'Classic', description: 'Roll Draft' },
+      { value: 'sandbox', label: 'Sandbox', description: 'Snake Draft' },
+    ],
+  },
+  knowledgeField,
+];
 
 async function loadVersions() {
   const { manifest, profile, bracket } = await loadRunPreamble();
@@ -46,7 +58,7 @@ function roomMode(format: MultiplayerFormatId, settings: MultiplayerSetup): Fixe
 
 export const fixedFiveModeAdapter: MultiplayerModeAdapter = {
   defaults: { sourceMode: 'classic', variant: 'ratings' },
-  Settings,
+  settingsFields,
   loadRoom: () => import('./FixedFiveRoom.svelte').then((module) => module.default),
   loadLastRoomId: loadLastFixedFiveRoomId,
   settingsSchema: fixedFiveSetupSchema,
