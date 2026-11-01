@@ -4,6 +4,7 @@ import {
   CapRushMultiplayerProjectionRejection,
 } from './cap-rush-multiplayer-runner.js';
 import type {
+  CapRushLeagueGame,
   CapRushMultiplayerCommand,
   CapRushMultiplayerCommandPayload,
   CapRushMultiplayerCommandReceipt,
@@ -41,6 +42,14 @@ interface CommandRow {
 }
 
 const roomMetadataSchema = capRushMultiplayerRoomSnapshotSchema.omit({ state: true });
+
+function freshGames(
+  next: CapRushMultiplayerState | null | undefined,
+  previous: CapRushMultiplayerState | null | undefined,
+): CapRushLeagueGame[] {
+  const seen = new Set(previous?.season?.games.map((game) => game.gameId) ?? []);
+  return next?.season?.games.filter((game) => !seen.has(game.gameId)) ?? [];
+}
 
 function recordOf(value: unknown): Record<string, unknown> {
   return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {};
@@ -210,10 +219,7 @@ export class CapRushMultiplayerSupabaseTransport implements CapRushMultiplayerTr
           state: snapshot.state,
           commands,
           receipts: [],
-          games:
-            snapshot.state.season?.games.filter(
-              (game) => !previous?.state?.season?.games.some((old) => old.gameId === game.gameId),
-            ) ?? [],
+          games: freshGames(snapshot.state, previous?.state),
           updatedAtIso: new Date().toISOString(),
         });
       }
@@ -347,10 +353,7 @@ export class CapRushMultiplayerSupabaseTransport implements CapRushMultiplayerTr
         state: projected,
         commands: [command],
         receipts: [],
-        games:
-          projected.season?.games.filter(
-            (game) => !state.season?.games.some((old) => old.gameId === game.gameId),
-          ) ?? [],
+        games: freshGames(projected, state),
         updatedAtIso: new Date().toISOString(),
       });
     }

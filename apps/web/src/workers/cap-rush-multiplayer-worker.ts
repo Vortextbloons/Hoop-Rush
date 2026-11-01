@@ -12,9 +12,30 @@ import {
   createEngineContext,
   simulateCapRushMultiplayerPlayoffGame,
   simulateCapRushMultiplayerSlot,
+  type CapRushCatalogIndex,
+  type CapRushMultiplayerEnvironment,
 } from '@hoop-rush/engine';
 
 const context = createEngineContext();
+
+let catalogCache: { readonly key: string; readonly index: CapRushCatalogIndex } | null = null;
+
+/**
+ * The packaged catalog is static and content-addressed, so the adapted index only changes when the
+ * catalog version or hash changes. Building it costs several hundred milliseconds for ~8k
+ * candidates; every projection request would otherwise pay that cost again.
+ */
+function catalogIndexOf(
+  environment: Omit<CapRushMultiplayerEnvironment, 'index'>,
+): CapRushCatalogIndex {
+  const key = `${environment.catalogSource.catalogVersion}:${environment.catalogSource.catalogHash}`;
+  if (catalogCache?.key === key) return catalogCache.index;
+  const index = buildCapRushCatalogIndex(
+    adaptCapRushCatalog(environment.seasonCatalog, environment.catalogSource),
+  );
+  catalogCache = { key, index };
+  return index;
+}
 
 function post(message: unknown): void {
   self.postMessage(capRushMultiplayerWorkerMessageSchema.parse(message));
@@ -33,9 +54,7 @@ self.onmessage = (event: MessageEvent<unknown>) => {
     if (request.kind === 'cap-rush-multiplayer-project') {
       const environment = {
         ...request.environment,
-        index: buildCapRushCatalogIndex(
-          adaptCapRushCatalog(request.environment.seasonCatalog, request.environment.catalogSource),
-        ),
+        index: catalogIndexOf(request.environment),
       };
       let state = request.state;
       for (const command of request.commands) {

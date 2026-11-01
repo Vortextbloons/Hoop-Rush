@@ -26,6 +26,7 @@ export interface CapRushBroadcastState {
   readonly gameId: string;
   readonly speed: 2 | 4;
   readonly kind: 'h2h' | 'playoff' | 'review';
+  readonly playoffPlan?: CapRushPlayoffGamePlan;
   readonly slot: number | null;
   readonly input: HavocBattleInput;
   readonly result: HavocBattleResult;
@@ -391,6 +392,7 @@ export class CapRushMultiplayerController {
         gameId: output.gameId,
         speed: input.speed,
         kind: input.kind,
+        ...(input.plan === undefined ? {} : { playoffPlan: input.plan }),
         slot: input.slot ?? null,
         input: output.input,
         result: output.result,
