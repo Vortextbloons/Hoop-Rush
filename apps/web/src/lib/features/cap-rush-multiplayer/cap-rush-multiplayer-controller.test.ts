@@ -75,16 +75,16 @@ test('overlaps asset loading with presence resume and stops before syncing when 
       resolveData = yes;
     }),
   );
-  let resolveResume!: (value: typeof membership) => void;
-  const membership = {
+  let resolveResume!: (value: CapRushMultiplayerRoomMembership) => void;
+  const membership: CapRushMultiplayerRoomMembership = {
     roomId: idSchema.parse('room-a'),
-    participantId: 'p1' as const,
+    participantId: 'p1',
     code: '1234',
   };
   const transport = {
     resume: vi.fn(
       () =>
-        new Promise<typeof membership>((yes) => {
+        new Promise<CapRushMultiplayerRoomMembership>((yes) => {
           resolveResume = yes;
         }),
     ),

@@ -94,17 +94,9 @@
 
     if (h2h !== null) {
       const localMissing = h2h.missing.includes(localSeat);
-      const otherMissing = h2h.missing.filter((seat) => seat !== localSeat);
-      const detail = localMissing
-        ? otherMissing.length > 0
-          ? `Both seats must finish the head-to-head broadcast before slot ${h2h.slot} can be accepted.`
-          : `Finish the head-to-head broadcast to accept slot ${h2h.slot}.`
-        : `Waiting for ${otherMissing
-            .map((seat) => seatLabelFor(seat, localSeat))
-            .join(' and ')} to finish the head-to-head broadcast.`;
       return {
         title: `Head-to-head result ready · slot ${h2h.slot}`,
-        detail,
+        detail: '',
         action: localMissing ? 'watch-h2h' : null,
         actionLabel: 'Watch head-to-head',
         mine: localMissing,
@@ -113,8 +105,7 @@
 
     return {
       title: 'Simulating the season',
-      detail:
-        'Regular games advance automatically. Simcast opens for head-to-head games between both players.',
+      detail: '',
       action: null,
       actionLabel: '',
       mine: false,

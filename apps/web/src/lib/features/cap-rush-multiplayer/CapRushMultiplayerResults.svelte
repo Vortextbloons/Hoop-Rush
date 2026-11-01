@@ -285,7 +285,6 @@
               Both seats' meetings
             </h2>
           </div>
-          <p class="text-[11px] text-muted-foreground">Replays do not change the report.</p>
         </header>
         <ul class="flex min-w-0 flex-col gap-1">
           {#each h2hGames as game (game.gameId)}
