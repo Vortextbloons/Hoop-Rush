@@ -166,7 +166,7 @@ export interface CapRushLeagueBaseline {
  * participant total.
  */
 export function capRushLeagueMvp(input: {
-  readonly locked: CapRushLockedInputs;
+  readonly locked: Pick<CapRushLockedInputs, 'human' | 'opponents'>;
   readonly games: readonly CapRushStoredGame[];
   readonly league?: LeagueRecord | null | undefined;
   readonly leagueGames?: readonly CapRushLeagueGame[] | undefined;

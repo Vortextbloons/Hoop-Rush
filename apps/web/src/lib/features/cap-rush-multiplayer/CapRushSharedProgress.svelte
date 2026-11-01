@@ -140,8 +140,8 @@
       const confirmed = 2 - h2h.missing.length;
       return {
         title: localMissing
-          ? `Head-to-head ready · slot ${h2h.slot}`
-          : `You confirmed · slot ${h2h.slot}`,
+          ? `Head-to-head ready · Game ${h2h.slot}`
+          : `You confirmed · Game ${h2h.slot}`,
         detail: localMissing
           ? 'Both players must confirm this result. Watch the broadcast, then continue when it ends.'
           : `Waiting for your opponent to watch and confirm. ${confirmed} of 2 confirmed; the season continues once both players confirm.`,

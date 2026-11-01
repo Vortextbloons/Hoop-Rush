@@ -6,10 +6,11 @@
     CapRushPostseasonUserOutcome,
   } from '@hoop-rush/data-contracts';
   import { capRushConferenceRoundName } from '@hoop-rush/data-contracts';
-  import { capRushMultiplayerSeatRecord } from '@hoop-rush/engine';
+  import { capRushLeagueMvp, capRushMultiplayerSeatRecord } from '@hoop-rush/engine';
   import TeamLogo from '#lib/components/TeamLogo.svelte';
   import type { CapRushArt } from '../cap-rush/cap-rush-art.js';
   import { capStatusClass, capStatusLabel, initialsOf } from '../cap-rush/cap-rush-presentation.js';
+  import CapRushMultiplayerStats from './CapRushMultiplayerStats.svelte';
   import CapRushMultiplayerRoster from './CapRushMultiplayerRoster.svelte';
   import { money, seatLabelFor, seatOrder } from './cap-rush-multiplayer-presentation.js';
 
@@ -25,6 +26,16 @@
     onreviewgame?: (gameId: string) => void;
   } = $props();
 
+  const seasonMvp = $derived.by(() => {
+    if (state.locked === null || state.season === null || state.season.games.length !== 1230)
+      return null;
+    return capRushLeagueMvp({
+      locked: { human: state.locked.seats[localSeat].team, opponents: state.locked.opponents },
+      games: [],
+      leagueGames: state.season.games,
+    }).mvp;
+  });
+  const finalsMvp = $derived(state.report?.finalsMvp ?? state.postseason?.finalsMvp ?? null);
   const report = $derived(state.report);
   const locked = $derived(state.locked);
   const season = $derived(state.season);
@@ -178,6 +189,29 @@
       {/if}
     </section>
 
+    <section class="grid gap-3 sm:grid-cols-2" aria-label="League awards">
+      {#each [{ label: 'Season MVP', winner: seasonMvp }, { label: 'Finals MVP', winner: finalsMvp }] as award (award.label)}
+        <article class="rounded-2xl border border-accent/40 bg-accent/10 p-4">
+          <p class="font-mono text-xs font-bold uppercase tracking-widest text-accent">
+            {award.label}
+          </p>
+          {#if award.winner !== null}
+            <h3 class="mt-2 font-display text-2xl font-extrabold uppercase">
+              {award.winner.displayName}
+            </h3>
+            <p class="text-sm text-muted-foreground">{teamName(award.winner.teamId)}</p>
+            <p class="mt-2 font-mono text-sm tabular-nums">
+              {award.winner.averagePoints.toFixed(1)} PPG ? {award.winner.averageRebounds.toFixed(
+                1,
+              )} RPG ? {award.winner.averageAssists.toFixed(1)} APG
+            </p>
+          {:else}
+            <p class="mt-2 text-sm text-muted-foreground">Award data unavailable.</p>
+          {/if}
+        </article>
+      {/each}
+    </section>
+
     <div class="grid min-w-0 gap-4 lg:grid-cols-2">
       {#each seatViews as detail (detail.seat)}
         {@const team = art === null || detail.teamId === null ? null : art.teamFor(detail.teamId)}
@@ -273,6 +307,8 @@
         </article>
       {/each}
     </div>
+
+    <CapRushMultiplayerStats {state} {localSeat} {art} />
 
     {#if h2hGames.length > 0}
       <section class="flex min-w-0 flex-col gap-2 rounded-2xl border border-border bg-card p-4">

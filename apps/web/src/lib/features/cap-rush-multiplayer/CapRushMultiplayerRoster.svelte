@@ -22,7 +22,7 @@
   }
 
   let {
-    state,
+    state: roomState,
     seat,
     localSeat,
     art = null,
@@ -39,8 +39,8 @@
 
   const isLocal = $derived(seat === localSeat);
   const slots: RosterSlot[] = $derived.by(() => {
-    const locked = state.locked?.seats[seat] ?? null;
-    const recruitment = state.recruitment;
+    const locked = roomState.locked?.seats[seat] ?? null;
+    const recruitment = roomState.recruitment;
     const signings = recruitment?.signings.filter((entry) => entry.seat === seat) ?? [];
     return POSITIONS.map((slot) => {
       const pick = locked?.picks.find((entry) => entry.slot === slot) ?? null;
@@ -66,7 +66,7 @@
       string,
       { games: number; points: number; rebounds: number; assists: number }
     >();
-    for (const game of state.season?.games ?? []) {
+    for (const game of roomState.season?.games ?? []) {
       for (const line of [...game.box.home.participants, ...game.box.away.participants]) {
         const entry = totals.get(line.playerId) ?? {
           games: 0,
@@ -184,7 +184,7 @@
             {/if}
           </p>
           {#if average !== null && average.games > 0}
-            <p class="mt-0.5 font-mono text-[9px] text-muted-foreground tabular-nums">
+            <p class="mt-0.5 font-mono text-xs text-foreground tabular-nums">
               {formatAverage(average.points, average.games)} PPG ·
               {formatAverage(average.rebounds, average.games)} RPG ·
               {formatAverage(average.assists, average.games)} APG
