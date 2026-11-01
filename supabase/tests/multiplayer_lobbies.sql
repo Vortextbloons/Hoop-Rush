@@ -94,6 +94,13 @@ begin
   assert v_next->>'gameKind' = 'havoc', 'draft-duel switches to Hoop Havoc';
   assert (select variant from public.havoc_multiplayer_rooms where id = (v_next->>'gameRoomId')::uuid) = 'curated', 'lobby passes the curated variant into the room';
   assert exists(select 1 from public.havoc_multiplayer_room_members where room_id = (v_next->>'gameRoomId')::uuid and uid = v_host and participant_id = 'p1'), 'havoc host seat transfers';
+  perform set_config('request.jwt.claim.sub', v_guest::text, true);
+  v_next := public.multiplayer_lobby_command(jsonb_build_object('kind', 'join', 'code', v_next->>'code'));
+  perform public.multiplayer_lobby_command(jsonb_build_object('kind', 'leave', 'lobbyId', v_lobby->>'id'));
+  assert (select guest_uid is null from public.multiplayer_lobbies where id = (v_lobby->>'id')::uuid), 'guest can leave during an unfinished match';
+  perform set_config('request.jwt.claim.sub', v_host::text, true);
+  perform public.multiplayer_lobby_command(jsonb_build_object('kind', 'leave', 'lobbyId', v_lobby->>'id'));
+  assert not exists(select 1 from public.multiplayer_lobbies where id = (v_lobby->>'id')::uuid), 'host can close lobby during an unfinished match';
 end $$;
 select pass('multiplayer lobby integration assertions passed');
 select * from finish();

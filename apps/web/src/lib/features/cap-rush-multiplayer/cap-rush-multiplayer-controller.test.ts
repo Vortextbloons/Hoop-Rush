@@ -109,3 +109,34 @@ test('does not create a session when disposed while membership loads', async () 
   expect(resume).toHaveBeenCalledTimes(1);
   expect(controller.view).toBeNull();
 });
+
+test('automatically chooses bulk simulation for the season', async () => {
+  const controller = new CapRushMultiplayerController('room-a');
+  const view = sessionView(null);
+  Object.assign(view.state, {
+    phase: 'season',
+    season: { block: { index: 0, status: 'choosing', plans: { p1: null } } },
+  });
+  const chooseBlockPlan = vi.fn(() => Promise.resolve());
+  Object.assign(controller, { view, session: { chooseBlockPlan, view: () => view } });
+  await (controller as unknown as { tick(): Promise<void> }).tick();
+  expect(chooseBlockPlan).toHaveBeenCalledWith(0, 'sim');
+});
+
+test('pauses bulk simulation for the pending head-to-head', async () => {
+  const controller = new CapRushMultiplayerController('room-a');
+  const view = sessionView(null);
+  Object.assign(view.state, { phase: 'season', season: { block: { status: 'running' } } });
+  Object.assign(controller, {
+    view,
+    session: {
+      refresh: () => Promise.resolve(),
+      pendingH2H: () => ({ gameId: 'h2h-1', missing: ['p1', 'p2'] }),
+    },
+  });
+  const watch = vi.spyOn(controller, 'watchHeadToHead').mockResolvedValue();
+  const simulate = vi.spyOn(controller, 'simulateNextSlot').mockResolvedValue();
+  await (controller as unknown as { tick(): Promise<void> }).tick();
+  expect(watch).toHaveBeenCalledWith('h2h-1');
+  expect(simulate).not.toHaveBeenCalled();
+});

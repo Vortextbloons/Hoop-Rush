@@ -220,11 +220,7 @@
         localSeat={seat}
         art={controller.art}
         busy={controller.busy}
-        onchoose={(choice) => controller.chooseBlock(choice)}
-        onsimulate={() => controller.simulateNextSlot()}
-        onack={() => controller.ackSlot()}
         onwatchh2h={(gameId) => controller.watchHeadToHead(gameId)}
-        onwatchown={() => controller.watchOwnGame()}
         onreviewgame={(gameId) => controller.reviewGame(gameId)}
       />
     {:else if game.phase === 'postseason'}

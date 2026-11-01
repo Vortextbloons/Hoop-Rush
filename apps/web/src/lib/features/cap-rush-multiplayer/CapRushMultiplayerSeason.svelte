@@ -9,7 +9,6 @@
   import type { CapRushArt } from '../cap-rush/cap-rush-art.js';
   import { initialsOf } from '../cap-rush/cap-rush-presentation.js';
   import CapRushStandings from '../cap-rush/CapRushStandings.svelte';
-  import CapRushBlockPlan from './CapRushBlockPlan.svelte';
   import CapRushSeatLedger from './CapRushSeatLedger.svelte';
   import CapRushSharedProgress from './CapRushSharedProgress.svelte';
   import { seatLabelFor, seatOrder } from './cap-rush-multiplayer-presentation.js';
@@ -19,22 +18,14 @@
     localSeat,
     art = null,
     busy = false,
-    onchoose,
-    onsimulate,
-    onack,
     onwatchh2h,
-    onwatchown,
     onreviewgame,
   }: {
     state: CapRushMultiplayerState;
     localSeat: CapRushMultiplayerSeatId;
     art?: CapRushArt | null;
     busy?: boolean;
-    onchoose: (choice: 'sim' | 'simcast') => void;
-    onsimulate: () => void;
-    onack: () => void;
     onwatchh2h: (gameId: string) => void;
-    onwatchown: () => void;
     onreviewgame: (gameId: string) => void;
   } = $props();
 
@@ -70,16 +61,12 @@
   <div class="flex min-w-0 flex-col gap-4" data-cap-rush-multiplayer-season>
     <div class="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
       <div class="flex min-w-0 flex-col gap-4">
-        <CapRushBlockPlan {state} {localSeat} {busy} onchoose={(choice) => onchoose(choice)} />
         <CapRushSharedProgress
           {state}
           {localSeat}
           {art}
           {busy}
-          onsimulate={() => onsimulate()}
-          onack={() => onack()}
           onwatchh2h={(gameId) => onwatchh2h(gameId)}
-          onwatchown={() => onwatchown()}
           onreviewgame={(gameId) => onreviewgame(gameId)}
         />
       </div>

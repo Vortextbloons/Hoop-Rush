@@ -201,8 +201,7 @@ export class CapRushMultiplayerController {
         tapeGameIds: [],
       });
       await session.acceptSlot(slot, output.games);
-      const plan = state.season.block.plans.p1;
-      if (!h2h.has(slot) && plan !== 'simcast') await session.ackSlot(slot);
+      if (!h2h.has(slot)) await session.ackSlot(slot);
     });
   }
 
@@ -350,7 +349,6 @@ export class CapRushMultiplayerController {
           total,
           resolved: true,
         });
-        if (broadcast.slot !== null) await session.ackSlot(broadcast.slot);
         return;
       }
       if (broadcast.kind === 'season-simcast') {
@@ -437,6 +435,29 @@ export class CapRushMultiplayerController {
       if (deadline !== null && Date.parse(deadline.atIso) <= this.nowMs) {
         await this.run(() => this.session?.closeDueAuctions());
         return;
+      }
+    }
+    if (state?.phase === 'season' && state.season !== null) {
+      const season = state.season;
+      if (season.block.status === 'choosing' && season.block.plans[this.seat] === null) {
+        await this.chooseBlock('sim');
+        return;
+      }
+      const pending = this.session.pendingH2H();
+      if (pending !== null) {
+        if (pending.missing.includes(this.seat) && this.broadcast === null) {
+          await this.watchHeadToHead(pending.gameId);
+        }
+      } else {
+        const accepted = season.games.reduce((highest, game) => Math.max(highest, game.slot), 0);
+        if (season.slotAcks[this.seat] < accepted) {
+          await this.ackSlot();
+          return;
+        }
+        if (this.isHost && season.block.status === 'running' && this.session.nextSlot() !== null) {
+          await this.simulateNextSlot();
+          return;
+        }
       }
     }
     try {

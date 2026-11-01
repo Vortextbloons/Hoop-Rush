@@ -232,9 +232,7 @@
           onclick={() => coordinator.session.removeOpponent()}>Remove opponent</button
         >
       {/if}
-      <button class="secondary-action" disabled={busy || !lobby.canStart} onclick={leaveLobby}
-        >Leave lobby</button
-      >
+      <button class="secondary-action" disabled={busy} onclick={leaveLobby}>Leave lobby</button>
     </RoomShell>
   {/if}
   <div
