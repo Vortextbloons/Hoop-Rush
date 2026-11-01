@@ -44,9 +44,13 @@ import {
 } from '../schemas/cap-rush-record.ts';
 import { HoopRushDatabase } from './dexie.ts';
 import {
+  classifyCommandReplay,
+  commandEnvelopeMatches,
+  readStoredCommand,
+} from './save-envelope.ts';
+import {
   assertSaveSchemaVersion,
   canonicalEquals,
-  commandReceiptMatches,
   getParsedRecord,
   listCompletedHistory,
   parseOptionalRecord,
@@ -399,18 +403,22 @@ export class DexieCapRushRepository {
         this.db.capRushReports,
       ],
       async (): Promise<CapRushCommandResult | null> => {
-        const existing = await getParsedRecord(this.db.capRushCommands, result.commandId, (row) =>
-          parseStored(storedCapRushCommandRowSchema, row, `cap rush command ${result.commandId}`),
-        );
-        if (existing !== null) {
-          if (
-            commandReceiptMatches(command, existing.command) &&
-            existing.result.status === result.status
-          ) {
-            return existing.result;
-          }
-          throw new CapRushCommandConflictError(result.commandId);
-        }
+        const existing = await readStoredCommand({
+          table: this.db.capRushCommands,
+          commandId: result.commandId,
+          parse: (row) =>
+            parseStored(storedCapRushCommandRowSchema, row, `cap rush command ${result.commandId}`),
+        });
+        const replay = classifyCommandReplay({
+          stored: existing,
+          incoming: command,
+          resultOf: (row) => row.result,
+          // Cap Rush replays only when both the command and the result status match.
+          matches: (row, incoming) =>
+            commandEnvelopeMatches(incoming, row.command) && row.result.status === result.status,
+        });
+        if (replay.kind === 'replayed') return replay.result;
+        if (replay.kind === 'conflict') throw new CapRushCommandConflictError(result.commandId);
 
         const pendingPlayback = await this.db.capRushPlaybackEvidence
           .where('runId')

@@ -50,6 +50,11 @@ import {
 import { HoopRushDatabase } from './dexie.ts';
 import { DexieProfileRepository } from './profile.ts';
 import {
+  classifyCommandReplay,
+  commandEnvelopeMatches,
+  readStoredCommand,
+} from './save-envelope.ts';
+import {
   assertSaveSchemaVersion,
   canonicalEquals,
   commandReceiptMatches,
@@ -458,22 +463,33 @@ export class DexieHavocRepository {
 
     return this.db.transaction('rw', HAVOC_SCOPED_TABLES(this.db), async () => {
       const now = new Date().toISOString();
-      const existing = await getParsedRecord(this.db.havocCommands, result.commandId, (row) =>
-        parseStored(storedHavocCommandRowSchema, row, `command ${result.commandId}`),
-      );
-      if (existing !== null) {
-        if (command !== null && existing.command !== null) {
-          if (commandReceiptMatches(command, existing.command)) return existing.result;
-          throw new HavocCommandConflictError(result.commandId);
-        }
-        if (
-          existing.outcomeDigest === outcomeDigest ||
-          commandReceiptMatches(existing.result, result)
-        ) {
-          return existing.result;
-        }
-        throw new HavocCommandConflictError(result.commandId);
-      }
+      const existing = await readStoredCommand({
+        table: this.db.havocCommands,
+        commandId: result.commandId,
+        parse: (row) =>
+          parseStored(storedHavocCommandRowSchema, row, `command ${result.commandId}`),
+      });
+      const replay = classifyCommandReplay({
+        stored: existing,
+        incoming: { command, result, outcomeDigest },
+        resultOf: (row) => row.result,
+        /*
+         * Havoc replays on either a matching command envelope or a matching
+         * outcome digest. The digest arm covers commands replayed without a
+         * command payload, which Cap Rush has no equivalent for.
+         */
+        matches: (row, incoming) => {
+          if (incoming.command !== null && row.command !== null) {
+            return commandEnvelopeMatches(incoming.command, row.command);
+          }
+          return (
+            row.outcomeDigest === incoming.outcomeDigest ||
+            commandReceiptMatches(row.result, incoming.result)
+          );
+        },
+      });
+      if (replay.kind === 'replayed') return replay.result;
+      if (replay.kind === 'conflict') throw new HavocCommandConflictError(result.commandId);
 
       const active = await getParsedRecord(this.db.havocActiveRuns, HAVOC_ACTIVE_RECORD_ID, (row) =>
         parseStored<StoredHavocActiveRun>(storedHavocActiveRunSchema, row, 'active run'),

@@ -863,6 +863,33 @@ describe('DexieHavocRepository', () => {
     db.close();
   });
 
+  it('rolls back state, game, and command when a commit fails partway through', async () => {
+    const { db, repo } = createRepository('havoc-commit-rollback');
+    const states = await applyDraftChain(repo, true);
+    const game = buildGame(states.locked, 1, 'havoc', 'cmd-rollback-game');
+
+    // A digest that does not match the game result: individually well-formed,
+    // but rejected by the integrity checks after the state and game rows have
+    // already been staged inside the transaction.
+    await expect(
+      repo.applyOutcome({
+        outcome: acceptedOutcome(game.nextState, 4, game.commandId),
+        command: game.command,
+        game: {
+          result: game.result,
+          inputDigest: game.inputDigest,
+          resultDigest: 'f'.repeat(64),
+        },
+      }),
+    ).rejects.toThrow();
+
+    // The whole transaction rolled back: no artifact, no receipt, unchanged state.
+    expect(await repo.readRunGame(RUN_ID, 'havoc', 1)).toBeNull();
+    expect(await repo.loadCommandResult(game.commandId)).toBeNull();
+    expect(await repo.loadActiveRun()).toEqual(states.locked);
+    db.close();
+  });
+
   it('commits a game result, its summary command, and aggregate state together', async () => {
     const { db, repo } = createRepository('havoc-game-commit');
     const states = await applyDraftChain(repo, true);
