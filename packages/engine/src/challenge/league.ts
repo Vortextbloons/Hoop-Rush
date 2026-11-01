@@ -18,6 +18,7 @@ import {
 } from '@hoop-rush/data-contracts';
 import type { EngineContext } from '../sim/kernel.ts';
 import { simulateGame } from '../sim/game.ts';
+import { checkGameResult } from '../sim/invariants.ts';
 import { accumulateLeagueAppearance, emptyLeaguePlayerTotals } from './league-value.ts';
 import { deriveLeagueGameSeed } from './seeds.ts';
 
@@ -154,6 +155,38 @@ export function validateLeagueSchedule(
   return failures;
 }
 
+export interface LeagueSimulationTeam {
+  readonly teamId: string;
+  readonly displayName: string;
+  readonly players: SimulationPlayer[];
+}
+
+export interface LeagueSimulationCoreInput {
+  readonly seed: Seed;
+  readonly bracket: OpponentBracketCore;
+  readonly profile: EraSimulationProfile;
+  readonly errorLabel?: string;
+  readonly teamIdOf?: (teamId: LeagueTeamRecord['teamId']) => LeagueTeamRecord['teamId'];
+  readonly checkResult?: boolean;
+  readonly onGame?: (input: {
+    readonly game: LeagueGamePlan;
+    readonly result: GameResult;
+    readonly home: LeagueSimulationTeam;
+    readonly away: LeagueSimulationTeam;
+  }) => void;
+}
+
+export interface LeagueSimulationCore {
+  readonly plan: readonly LeagueGamePlan[];
+  readonly teamRecords: readonly LeagueTeamRecord[];
+  readonly totalsByKey: ReadonlyMap<string, LeaguePlayerTotals>;
+  readonly gamesTotal: number;
+  readonly gamesDone: number;
+  advance(count: number): void;
+  assertComplete(): void;
+  material(): Omit<LeagueRecord, 'digest'>;
+}
+
 export interface LeagueSimulation {
   readonly gamesTotal: number;
   readonly gamesDone: number;
@@ -167,23 +200,27 @@ export interface LeagueSimulationInput {
   profile: EraSimulationProfile;
 }
 
-function teamSimulationOf(
+function simulationTeamOf(
   bracket: OpponentBracketCore,
   teamIndex: number,
-): { teamId: string; displayName: string; players: SimulationPlayer[] } {
+  errorLabel: string,
+): LeagueSimulationTeam {
   const opponent = bracket.opponents[teamIndex];
-  if (!opponent) throw new Error(`league: missing opponent ${String(teamIndex)}`);
+  if (!opponent) throw new Error(`${errorLabel}: missing opponent ${String(teamIndex)}`);
   return { teamId: opponent.teamId, displayName: opponent.displayName, players: opponent.players };
 }
 
-export function createLeagueSimulation(
-  input: LeagueSimulationInput,
+export function createLeagueSimulationCore(
+  input: LeagueSimulationCoreInput,
   context: EngineContext,
-): LeagueSimulation {
+): LeagueSimulationCore {
+  const errorLabel = input.errorLabel ?? 'league';
+  const teamIdOf =
+    input.teamIdOf ?? ((teamId: LeagueTeamRecord['teamId']): LeagueTeamRecord['teamId'] => teamId);
   const plan = planLeagueSchedule(input.bracket);
   const totalsByKey = new Map<string, LeaguePlayerTotals>();
   const teamRecords: LeagueTeamRecord[] = input.bracket.opponents.map((opponent) => ({
-    teamId: franchiseIdSchema.parse(opponent.teamId),
+    teamId: teamIdOf(opponent.teamId),
     gamesPlayed: 0,
     wins: 0,
     losses: 0,
@@ -201,12 +238,15 @@ export function createLeagueSimulation(
     for (const box of side.players) {
       const totals = totalsByKey.get(keyOf(teamIndex, box.playerId));
       if (!totals) {
-        throw new Error(`league: missing totals for ${box.playerId} on team ${String(teamIndex)}`);
+        throw new Error(
+          `${errorLabel}: missing totals for ${box.playerId} on team ${String(teamIndex)}`,
+        );
       }
       accumulateLeagueAppearance(totals, box, won);
     }
     const record = teamRecords[teamIndex];
-    if (record === undefined) throw new Error(`league: missing team record ${String(teamIndex)}`);
+    if (record === undefined)
+      throw new Error(`${errorLabel}: missing team record ${String(teamIndex)}`);
     record.gamesPlayed += 1;
     if (won) {
       record.wins += 1;
@@ -216,6 +256,9 @@ export function createLeagueSimulation(
   };
   let done = 0;
   return {
+    plan,
+    teamRecords,
+    totalsByKey,
     gamesTotal: plan.length,
     get gamesDone(): number {
       return done;
@@ -224,9 +267,9 @@ export function createLeagueSimulation(
       const until = Math.min(plan.length, done + Math.max(0, Math.floor(count)));
       for (let index = done; index < until; index += 1) {
         const game = plan[index];
-        if (!game) throw new Error(`league: missing planned game ${String(index)}`);
-        const home = teamSimulationOf(input.bracket, game.homeTeamIndex);
-        const away = teamSimulationOf(input.bracket, game.awayTeamIndex);
+        if (!game) throw new Error(`${errorLabel}: missing planned game ${String(index)}`);
+        const home = simulationTeamOf(input.bracket, game.homeTeamIndex, errorLabel);
+        const away = simulationTeamOf(input.bracket, game.awayTeamIndex, errorLabel);
         const result: GameResult = simulateGame(
           {
             schemaVersion: 2,
@@ -234,24 +277,35 @@ export function createLeagueSimulation(
             gameNumber: (game.gameIndex % LEAGUE_GAME_NUMBER_CYCLE) + 1,
             dataVersion: input.profile.dataVersion,
             profile: input.profile,
-            home: { teamId: home.teamId, displayName: home.displayName, players: home.players },
-            away: { teamId: away.teamId, displayName: away.displayName, players: away.players },
+            home,
+            away,
           },
           context,
         );
+        if (input.checkResult === true) {
+          const failures = checkGameResult(result);
+          if (failures.length > 0) {
+            throw new Error(
+              `${errorLabel}: game ${String(game.gameIndex)} failed accounting: ${failures.join('; ')}`,
+            );
+          }
+        }
         const homeWon = result.winner === 'home';
         foldSide(game.homeTeamIndex, result.home, homeWon);
         foldSide(game.awayTeamIndex, result.away, !homeWon);
+        input.onGame?.({ game, result, home, away });
         done = index + 1;
       }
     },
-    finish(): LeagueRecord {
+    assertComplete(): void {
       if (done !== plan.length) {
         throw new Error(
-          `league: simulation is incomplete (${String(done)}/${String(plan.length)})`,
+          `${errorLabel}: simulation is incomplete (${String(done)}/${String(plan.length)})`,
         );
       }
-      const material: Omit<LeagueRecord, 'digest'> = {
+    },
+    material(): Omit<LeagueRecord, 'digest'> {
+      return {
         leagueVersion: LEAGUE_RECORD_VERSION,
         scheduleVersion: LEAGUE_SCHEDULE_VERSION,
         seed: input.seed,
@@ -262,6 +316,34 @@ export function createLeagueSimulation(
         teams: teamRecords,
         players: [...totalsByKey.values()],
       };
+    },
+  };
+}
+
+export function createLeagueSimulation(
+  input: LeagueSimulationInput,
+  context: EngineContext,
+): LeagueSimulation {
+  const core = createLeagueSimulationCore(
+    {
+      seed: input.seed,
+      bracket: input.bracket,
+      profile: input.profile,
+      teamIdOf: (teamId) => franchiseIdSchema.parse(teamId),
+    },
+    context,
+  );
+  return {
+    gamesTotal: core.gamesTotal,
+    get gamesDone(): number {
+      return core.gamesDone;
+    },
+    advance(count: number): void {
+      core.advance(count);
+    },
+    finish(): LeagueRecord {
+      core.assertComplete();
+      const material = core.material();
       return leagueRecordSchema.parse({ ...material, digest: leagueRecordDigest(material) });
     },
   };

@@ -8,14 +8,10 @@ import type {
   CapRushMultiplayerSeatId,
   CapRushPlayoffGamePlan,
   CapRushPlayoffGameSummary,
-  CapRushPlayoffParticipant,
   CapRushPostseasonUserOutcome,
   HavocBattleInput,
   HavocBattleResult,
   HavocBattleTape,
-  HavocParticipantLine,
-  HavocTeamInput,
-  Position,
 } from '@hoop-rush/data-contracts';
 import {
   CAP_RUSH_CONFERENCE_POSTSEASON_VERSION,
@@ -25,19 +21,17 @@ import {
   capRushPlayoffPerformanceSchema,
   capRushSeriesComplete,
   capRushSeriesWinner,
-  playerIdSchema,
 } from '@hoop-rush/data-contracts';
 import type { EngineContext } from '../../../sim/kernel.ts';
 import { simulateAuditedHavocBattleGame } from '../../havoc/core/battle-game.ts';
 import { havocBattleGameResultDigest } from '../../havoc/core/battle-digests.ts';
-import { capRushBoxOf } from '../league-simulation.ts';
 import {
   capRushConferenceFinalsMvp,
   capRushConferenceOpeningSeries,
   capRushConferenceSeriesForTeam,
   capRushRefreshConferencePostseason,
 } from '../conference-postseason.ts';
-import { capRushNextPlayoffGamePlan } from '../playoff-shared.ts';
+import { capRushNextPlayoffGamePlan, capRushPlayoffSummaryOf } from '../playoff-shared.ts';
 import { capRushMultiplayerPlayoffInputFor } from './input.ts';
 import { capRushMultiplayerApronFor } from './apron.ts';
 import { capRushMultiplayerStandings } from './league.ts';
@@ -131,72 +125,6 @@ export function capRushMultiplayerPlayoffPlans(input: {
   return plans;
 }
 
-function ownerSlotMapsOf(team: HavocTeamInput): {
-  readonly slotByInstance: Map<string, Position>;
-  readonly starterBySlot: Map<Position, HavocTeamInput['starters'][number]>;
-} {
-  const slotByInstance = new Map<string, Position>();
-  const starterBySlot = new Map<Position, HavocTeamInput['starters'][number]>();
-  for (const starter of team.starters) {
-    slotByInstance.set(starter.instanceId, starter.slot);
-    starterBySlot.set(starter.slot, starter);
-  }
-  for (const replacement of team.replacements) {
-    slotByInstance.set(replacement.instanceId, replacement.slot);
-  }
-  for (const clone of team.clones) {
-    slotByInstance.set(clone.instanceId, clone.slot);
-  }
-  return { slotByInstance, starterBySlot };
-}
-
-function participantGroupOf(
-  line: HavocParticipantLine,
-  maps: ReturnType<typeof ownerSlotMapsOf>,
-): Position | null {
-  const ownerId = line.ownerInstanceId ?? line.instanceId;
-  return maps.slotByInstance.get(ownerId) ?? null;
-}
-
-function finalsLinesOf(input: {
-  readonly team: HavocTeamInput;
-  readonly resultParticipants: readonly HavocParticipantLine[];
-}): CapRushPlayoffParticipant[] {
-  const maps = ownerSlotMapsOf(input.team);
-  return input.resultParticipants.flatMap((line) => {
-    const slot = participantGroupOf(line, maps);
-    if (slot === null) return [];
-    const starter = maps.starterBySlot.get(slot);
-    if (starter === undefined) return [];
-    return [
-      {
-        teamId: input.team.teamId,
-        slot,
-        playerId: playerIdSchema.parse(starter.source.playerId),
-        displayName: starter.source.displayName,
-        kind: line.kind,
-        minutes: line.minutes,
-        points: line.points,
-        rebounds: line.rebounds.total,
-        offensiveRebounds: line.rebounds.offensive,
-        defensiveRebounds: line.rebounds.defensive,
-        assists: line.assists,
-        steals: line.steals,
-        blocks: line.blocks,
-        turnovers: line.turnovers,
-        fouls: line.fouls,
-        fieldGoalsMade: line.fieldGoals.made,
-        fieldGoalsAttempted: line.fieldGoals.attempted,
-        freeThrowsMade: line.freeThrows.made,
-        freeThrowsAttempted: line.freeThrows.attempted,
-        threesMade: line.threes.made,
-        threesAttempted: line.threes.attempted,
-        adjustments: line.adjustments,
-      },
-    ];
-  });
-}
-
 export function simulateCapRushMultiplayerPlayoffGame(input: {
   readonly locked: CapRushMultiplayerLockedInputs;
   readonly plan: CapRushPlayoffGamePlan;
@@ -237,43 +165,17 @@ export function simulateCapRushMultiplayerPlayoffGame(input: {
   if (homeTeam === undefined || awayTeam === undefined) {
     throw new Error('cap rush multiplayer: unknown playoff team');
   }
-  const summary = capRushPlayoffGameSummarySchema.parse({
-    gameId: `crp-${String(input.plan.round)}-${String(input.plan.seriesSlot)}-${String(input.plan.gameOrdinal)}`,
-    seriesId: input.plan.seriesId,
-    round: input.plan.round,
-    seriesSlot: input.plan.seriesSlot,
-    gameOrdinal: input.plan.gameOrdinal,
-    seed: input.plan.seed,
-    homeTeamId: input.plan.homeTeamId,
-    awayTeamId: input.plan.awayTeamId,
-    homeSeed: input.plan.homeSeed,
-    awaySeed: input.plan.awaySeed,
-    userSide: input.plan.userSide,
-    homePoints: battle.result.home.points,
-    awayPoints: battle.result.away.points,
-    winnerTeamId:
-      battle.result.home.points > battle.result.away.points
-        ? input.plan.homeTeamId
-        : input.plan.awayTeamId,
-    overtimePeriods: battle.result.overtimePeriods,
-    inputDigest: battle.result.inputDigest,
-    resultDigest: havocBattleGameResultDigest(battle.result),
-    box: capRushBoxOf(battle.result.home, battle.result.away, battle.result.overtimePeriods),
-    ...(input.plan.round === CAP_RUSH_PLAYOFF_ROUNDS
-      ? {
-          finalsLines: [
-            ...finalsLinesOf({
-              team: homeTeam,
-              resultParticipants: battle.result.home.participants,
-            }),
-            ...finalsLinesOf({
-              team: awayTeam,
-              resultParticipants: battle.result.away.participants,
-            }),
-          ],
-        }
-      : {}),
-  });
+  const summary = capRushPlayoffGameSummarySchema.parse(
+    capRushPlayoffSummaryOf({
+      plan: input.plan,
+      result: battle.result,
+      inputDigest: battle.result.inputDigest,
+      resultDigest: havocBattleGameResultDigest(battle.result),
+      userSide: input.plan.userSide,
+      homeTeam,
+      awayTeam,
+    }),
+  );
   return {
     game: summary,
     get tape() {

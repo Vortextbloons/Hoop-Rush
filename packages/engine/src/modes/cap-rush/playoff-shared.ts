@@ -3,6 +3,10 @@ import type {
   CapRushPlayoffGamePlan,
   CapRushPlayoffGameSummary,
   CapRushPlayoffParticipant,
+  HavocBattleResult,
+  HavocParticipantLine,
+  HavocTeamInput,
+  Position,
   Seed,
 } from '@hoop-rush/data-contracts';
 import {
@@ -12,6 +16,7 @@ import {
   playerIdSchema,
 } from '@hoop-rush/data-contracts';
 import { gameScore } from '../../challenge/league-value.ts';
+import { capRushBoxOf } from './league-simulation.ts';
 
 function compareCodeUnits(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;
@@ -142,5 +147,117 @@ export function capRushNextPlayoffGamePlan(input: {
     userSide,
     isFinals: series.round === CAP_RUSH_PLAYOFF_ROUNDS,
     seed: capRushPlayoffGameSeed(input.runSeed, series.round, series.seriesSlot, ordinal),
+  };
+}
+
+function ownerSlotMapsOf(team: HavocTeamInput): {
+  readonly slotByInstance: Map<string, Position>;
+  readonly starterBySlot: Map<Position, HavocTeamInput['starters'][number]>;
+} {
+  const slotByInstance = new Map<string, Position>();
+  const starterBySlot = new Map<Position, HavocTeamInput['starters'][number]>();
+  for (const starter of team.starters) {
+    slotByInstance.set(starter.instanceId, starter.slot);
+    starterBySlot.set(starter.slot, starter);
+  }
+  for (const replacement of team.replacements) {
+    slotByInstance.set(replacement.instanceId, replacement.slot);
+  }
+  for (const clone of team.clones) {
+    slotByInstance.set(clone.instanceId, clone.slot);
+  }
+  return { slotByInstance, starterBySlot };
+}
+
+function participantGroupOf(
+  line: HavocParticipantLine,
+  maps: ReturnType<typeof ownerSlotMapsOf>,
+): Position | null {
+  const ownerId = line.ownerInstanceId ?? line.instanceId;
+  return maps.slotByInstance.get(ownerId) ?? null;
+}
+
+function finalsLinesOf(input: {
+  readonly team: HavocTeamInput;
+  readonly resultParticipants: readonly HavocParticipantLine[];
+}): CapRushPlayoffParticipant[] {
+  const maps = ownerSlotMapsOf(input.team);
+  return input.resultParticipants.flatMap((line) => {
+    const slot = participantGroupOf(line, maps);
+    if (slot === null) return [];
+    const starter = maps.starterBySlot.get(slot);
+    if (starter === undefined) return [];
+    return [
+      {
+        teamId: input.team.teamId,
+        slot,
+        playerId: playerIdSchema.parse(starter.source.playerId),
+        displayName: starter.source.displayName,
+        kind: line.kind,
+        minutes: line.minutes,
+        points: line.points,
+        rebounds: line.rebounds.total,
+        offensiveRebounds: line.rebounds.offensive,
+        defensiveRebounds: line.rebounds.defensive,
+        assists: line.assists,
+        steals: line.steals,
+        blocks: line.blocks,
+        turnovers: line.turnovers,
+        fouls: line.fouls,
+        fieldGoalsMade: line.fieldGoals.made,
+        fieldGoalsAttempted: line.fieldGoals.attempted,
+        freeThrowsMade: line.freeThrows.made,
+        freeThrowsAttempted: line.freeThrows.attempted,
+        threesMade: line.threes.made,
+        threesAttempted: line.threes.attempted,
+        adjustments: line.adjustments,
+      },
+    ];
+  });
+}
+
+export function capRushPlayoffSummaryOf(input: {
+  readonly plan: CapRushPlayoffGamePlan;
+  readonly result: HavocBattleResult;
+  readonly inputDigest: string;
+  readonly resultDigest: string;
+  readonly userSide: 'home' | 'away' | null;
+  readonly homeTeam: HavocTeamInput;
+  readonly awayTeam: HavocTeamInput;
+}): CapRushPlayoffGameSummary {
+  const { plan, result } = input;
+  return {
+    gameId: `crp-${String(plan.round)}-${String(plan.seriesSlot)}-${String(plan.gameOrdinal)}`,
+    seriesId: plan.seriesId,
+    round: plan.round,
+    seriesSlot: plan.seriesSlot,
+    gameOrdinal: plan.gameOrdinal,
+    seed: plan.seed,
+    homeTeamId: plan.homeTeamId,
+    awayTeamId: plan.awayTeamId,
+    homeSeed: plan.homeSeed,
+    awaySeed: plan.awaySeed,
+    userSide: input.userSide,
+    homePoints: result.home.points,
+    awayPoints: result.away.points,
+    winnerTeamId: result.home.points > result.away.points ? plan.homeTeamId : plan.awayTeamId,
+    overtimePeriods: result.overtimePeriods,
+    inputDigest: input.inputDigest,
+    resultDigest: input.resultDigest,
+    box: capRushBoxOf(result.home, result.away, result.overtimePeriods),
+    ...(plan.round === CAP_RUSH_PLAYOFF_ROUNDS
+      ? {
+          finalsLines: [
+            ...finalsLinesOf({
+              team: input.homeTeam,
+              resultParticipants: result.home.participants,
+            }),
+            ...finalsLinesOf({
+              team: input.awayTeam,
+              resultParticipants: result.away.participants,
+            }),
+          ],
+        }
+      : {}),
   };
 }
