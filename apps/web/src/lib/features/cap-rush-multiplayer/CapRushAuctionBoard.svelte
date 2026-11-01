@@ -610,14 +610,6 @@
             </button>
           </section>
         {/if}
-
-        <p class="text-[10px] leading-relaxed text-muted-foreground">
-          One binding lead per position. Unfilled positions auto-sign at close. The {money(
-            CAP_RUSH_MULTIPLAYER_CAP_LINE_DOLLARS,
-          )} cap line is not the spending limit — the hard limit is {money(
-            CAP_RUSH_MULTIPLAYER_HARD_LIMIT_DOLLARS,
-          )}.
-        </p>
       {/if}
     </div>
   {/key}
