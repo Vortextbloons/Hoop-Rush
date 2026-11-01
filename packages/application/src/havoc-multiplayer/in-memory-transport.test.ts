@@ -412,6 +412,24 @@ describe('in-memory Havoc multiplayer transport', () => {
     expect(unknown.rejectionCode).toBe('unknown-command');
   });
 
+  it('advances the revision only once when a response is lost and the client retries', async () => {
+    const transport = createInMemoryHavocMultiplayerTransport({
+      clock: () => 1_700_000_000_000,
+      random: { seed: 'lost-response' },
+    });
+    const { roomId } = await createAndJoin(transport);
+    const before = await snapshot(transport, roomId);
+
+    const first = await submit(transport, roomId, 'lost-ready', 'p1', { kind: 'ready' });
+    const retry = await submit(transport, roomId, 'lost-ready', 'p1', { kind: 'ready' });
+    expect(first.accepted).toBe(true);
+    expect(retry.accepted).toBe(true);
+    expect(retry.revision).toBe(first.revision);
+
+    const after = await snapshot(transport, roomId);
+    expect(after.revision).toBe(before.revision + 1);
+  });
+
   it('rejects re-claiming a person even through a different season card', async () => {
     const transport = createInMemoryHavocMultiplayerTransport({
       clock: () => 1_700_000_000_000,

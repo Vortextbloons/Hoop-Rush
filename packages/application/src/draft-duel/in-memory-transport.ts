@@ -47,6 +47,25 @@ import {
   pickerFor,
   seedByteParity,
 } from '../multiplayer/in-memory-transport-support.ts';
+import {
+  decideCommandAdmission,
+  rememberAcceptedCommand,
+  type CommandRejectionCodes,
+} from '../multiplayer/command-admission.ts';
+
+/**
+ * Draft Duel's published rejection codes, mapped from the shared admission
+ * reasons. Milestone 3 owns normalizing these across modes; until then this
+ * table is the only place Draft Duel's spelling lives.
+ */
+const DRAFT_DUEL_REJECTION_CODES: CommandRejectionCodes = {
+  'invalid-command-id': 'illegal-move',
+  'payload-too-large': 'payload-too-large',
+  'actor-mismatch': 'membership',
+  'payload-mismatch': 'duplicate-command',
+  'stale-revision': 'stale-revision',
+  'illegal-payload': 'illegal-move',
+};
 
 export function draftDuelFirstPickerFor(rootSeed: string): DraftDuelParticipantId {
   return seedByteParity(rootSeed, 0) ? 'p1' : 'p2';
@@ -264,52 +283,50 @@ export function createInMemoryDraftDuelTransport(options: {
     expectedRevision?: number;
   }): DraftDuelCommandReceipt {
     const record = store.require(command.roomId);
-    const commandIdParsed = commandIdSchema.safeParse(command.commandId);
-    if (!commandIdParsed.success) {
+    /*
+     * Milestone 2: the ordering of these checks is shared with Havoc via
+     * `decideCommandAdmission`. Draft Duel's published rejection codes are
+     * unchanged; the mapping below is the single place they are declared.
+     */
+    const admission = decideCommandAdmission({
+      commandId: command.commandId,
+      actor: command.actorParticipantId,
+      payload: command.payload,
+      expectedRevision: command.expectedRevision,
+      revision: record.snapshot.revision,
+      ordinal: command.ordinal,
+      accepted: record.commands.map((entry) => ({
+        commandId: entry.commandId,
+        actor: entry.actorParticipantId,
+        ordinal: entry.ordinal,
+      })),
+      payloadHashOf: (commandId) => record.payloadHashes.get(commandId),
+      payloadSchema: draftDuelCommandPayloadSchema,
+      commandIdSchema,
+      codes: DRAFT_DUEL_REJECTION_CODES,
+      maxPayloadBytes: DRAFT_DUEL_ENVELOPE_MAX_BYTES,
+    });
+    if (admission.kind === 'rejected') {
       return rejection(
         command.roomId,
-        'invalid-command-id',
-        'illegal-move',
+        commandIdSchema.parse(command.commandId),
+        admission.code,
         record.snapshot.revision,
       );
     }
-    const commandId = commandIdParsed.data;
-    const payloadHash = canonicalJson(command.payload);
-    if (new TextEncoder().encode(payloadHash).length > DRAFT_DUEL_ENVELOPE_MAX_BYTES) {
-      return rejection(command.roomId, commandId, 'payload-too-large', record.snapshot.revision);
-    }
-    const existing = record.commands.find((entry) => entry.commandId === commandId);
-    if (existing) {
-      if (existing.actorParticipantId !== command.actorParticipantId) {
-        return rejection(command.roomId, commandId, 'membership', record.snapshot.revision);
-      }
-      if (record.payloadHashes.get(commandId) !== payloadHash) {
-        return rejection(command.roomId, commandId, 'duplicate-command', record.snapshot.revision);
-      }
+    const commandId = admission.commandId;
+    if (admission.kind === 'replayed') {
       return commandReceipt(
         record.snapshot.roomId,
         commandId,
-        existing.ordinal,
+        admission.ordinal ?? -1,
         null,
         record.snapshot.revision,
       );
     }
-    if (
-      command.expectedRevision !== undefined &&
-      command.expectedRevision !== record.snapshot.revision
-    ) {
-      return rejection(command.roomId, commandId, 'stale-revision', record.snapshot.revision);
-    }
-    const expectedOrdinal = record.commands.length;
-    const ordinal = command.ordinal ?? expectedOrdinal;
-    if (ordinal !== expectedOrdinal) {
-      return rejection(command.roomId, commandId, 'stale-revision', record.snapshot.revision);
-    }
-    const parsed = draftDuelCommandPayloadSchema.safeParse(command.payload);
-    if (!parsed.success) {
-      return rejection(command.roomId, commandId, 'illegal-move', record.snapshot.revision);
-    }
-    const payload = parsed.data;
+    const payloadHash = admission.payloadHash;
+    const ordinal = record.commands.length;
+    const payload = admission.payload;
     const actor = command.actorParticipantId;
     const phase = record.snapshot.phase;
     if (phase === 'integrity-failed' || phase === 'expired') {
@@ -581,8 +598,7 @@ export function createInMemoryDraftDuelTransport(options: {
       actorParticipantId: actor,
       payload,
     });
-    record.commandIds.add(commandId);
-    record.payloadHashes.set(commandId, payloadHash);
+    rememberAcceptedCommand(record, commandId, payloadHash);
     record.snapshot = {
       ...record.snapshot,
       commandCount: record.commands.length,
