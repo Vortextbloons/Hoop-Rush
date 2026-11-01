@@ -12,8 +12,9 @@ this package for namespace rules and testing notes.
   domain schema or enum.
 - **Storage namespace**: one database, `hoop-rush-saves-v2`
   (`HOOP_RUSH_DATABASE_NAME` in `repositories/dexie.ts`). The previous
-  `hoop-rush-saves` database is never read or migrated; schema changes add a new
-  Dexie version inside the current namespace (currently version 13).
+  `hoop-rush-saves` database is never read or migrated. **Only Dexie version 14
+  is supported**; an older database is rejected with a site-data reset
+  instruction rather than upgraded. Do not restore historical migrations.
 - **Atomic commits**: checkpoint writes commit in one transaction; pending
   blocks are deleted in the same transaction as the state they supersede. Never
   commit state and clear pendings separately.
@@ -22,12 +23,17 @@ this package for namespace rules and testing notes.
 - `repositories/support.ts` owns shared record envelopes, parse helpers, scoped
   compound-index reads/deletes, command receipt comparison, and
   revision/digest guards.
+- `repositories/save-envelope.ts` owns the order and preconditions of a save
+  commit: envelope version checks, stored-command reads, replay classification,
+  and the compact progress summary. It does not own commit *contents* — table
+  sets and artifacts stay explicit per mode.
 
 ## Layout
 
 - `src/index.ts` — runtime surface (repositories + record schemas).
 - `src/repositories/` — `dexie.ts`, `cap-rush.ts`, `havoc.ts`, `fixed-five.ts`,
-  `draft-duel.ts`, `havoc-multiplayer.ts`, `profile.ts`, `support.ts`.
+  `draft-duel.ts`, `havoc-multiplayer.ts`, `profile.ts`, `support.ts`,
+  `save-envelope.ts`.
 - `src/schemas/` — record envelopes per mode.
 - `src/testing/` — fake-IndexedDB test support.
 

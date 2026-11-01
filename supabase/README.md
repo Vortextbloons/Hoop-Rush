@@ -57,5 +57,29 @@ access the private schema or execute its functions.
    Validate existing and new rooms after deployment. Do not deploy unverified
    schema changes as part of publishing a web-only artifact.
 
-No IndexedDB migration, membership-key change, seed change, or public room
-protocol change is required by the shared coordination refactor.
+No IndexedDB migration, membership-key change, or seed change is required by
+the shared coordination refactor — but the **room protocol did change**: see
+below.
+
+## Room protocol version
+
+Every room operation declares the protocol version it speaks, and the server
+refuses a room it cannot serve:
+
+- `multiplayer_private.required_room_protocol_version()` is the single source of
+  the current version (currently `2`). `ROOM_PROTOCOL_VERSION` in
+  `packages/data-contracts/src/multiplayer-protocol.ts` must match it.
+- `public.multiplayer_room_sync` takes `p_protocol_version` and calls
+  `multiplayer_private.assert_room_protocol` *before* reading any room row, so a
+  stale client cannot reach new room state.
+- All four room tables carry `room_protocol_version`, defaulting to the current
+  version for new rooms. A room below the required version is refused with
+  `outdated-room`; a caller that cannot declare a version gets
+  `unsupported-protocol`.
+- The three-argument `multiplayer_room_sync(text, uuid, integer)` is retained but
+  always refuses, so a still-deployed old client fails with a clear protocol
+  error rather than a function-not-found error.
+
+This is a deliberate protocol break, authorized for the storage reset. Old
+in-flight rooms end at cutover; players start a new room. `supabase test db`
+covers this in `supabase/tests/multiplayer_room_protocol.sql`.

@@ -79,11 +79,8 @@ type SessionLifecycle = {
   startTimers: () => void;
   maybeProposeOrConfirm: () => void;
   rebuildDraft: () => void;
-  ensureGamePipeline: () => Promise<void>;
-  simulateGame: (
-    gameNumber: number,
-    homeWinner: DraftDuelParticipantId,
-  ) => Promise<DraftDuelGameOutput>;
+  runGamePipeline: () => Promise<void>;
+  simulateGame: (gameNumber: number) => Promise<DraftDuelGameOutput>;
   persistActive: () => Promise<void>;
   resolveDeadline: (cursor: string, pickOrdinal: number) => Promise<void>;
   syncFromServer: () => Promise<void>;
@@ -197,7 +194,7 @@ describe('Draft Duel ready check progression', () => {
     const lifecycle = session as unknown as SessionLifecycle;
     lifecycle.assets = {} as DraftDuelAssets;
     vi.spyOn(lifecycle, 'rebuildDraft').mockImplementation(() => {});
-    vi.spyOn(lifecycle, 'ensureGamePipeline').mockResolvedValue();
+    vi.spyOn(lifecycle, 'runGamePipeline').mockResolvedValue();
     if (mockPersistence) vi.spyOn(lifecycle, 'persistActive').mockResolvedValue();
     vi.spyOn(lifecycle.deps.repository, 'appendCommands').mockResolvedValue();
     return lifecycle;
@@ -550,7 +547,7 @@ describe('Draft Duel ready check progression', () => {
     lifecycle.progress = options.progress ?? 1;
     lifecycle.assets = {} as DraftDuelAssets;
     vi.spyOn(lifecycle, 'rebuildDraft').mockImplementation(() => {});
-    vi.spyOn(lifecycle, 'ensureGamePipeline').mockResolvedValue();
+    vi.spyOn(lifecycle, 'runGamePipeline').mockResolvedValue();
     vi.spyOn(lifecycle, 'persistActive').mockResolvedValue();
     vi.spyOn(lifecycle.deps.repository, 'appendCommands').mockResolvedValue();
     vi.spyOn(lifecycle.deps.repository, 'saveVerification').mockResolvedValue();
@@ -804,6 +801,8 @@ describe('Draft Duel ready check progression', () => {
     const output = lifecycle.outputs[2];
     if (!output) throw new Error('Missing game output');
     lifecycle.outputs = {};
+    // Setup stubs the pipeline; restore the real one so this exercises it.
+    mocked(lifecycle.runGamePipeline).mockRestore();
     const simulate = vi.spyOn(lifecycle, 'simulateGame').mockResolvedValue(output);
     const save = vi.spyOn(lifecycle.deps.repository, 'saveResult').mockResolvedValue();
     await lifecycle.runGamePipeline();

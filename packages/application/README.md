@@ -7,8 +7,10 @@ gathers intent, the engine owns basketball rules, adapters own I/O.
 ## Boundary rules
 
 - May import `@hoop-rush/data-contracts` and `@hoop-rush/engine`.
-- May import `@hoop-rush/persistence` **types only** (runtime access goes
-  through a persistence port).
+- **Must not import `@hoop-rush/persistence` at all** — not for runtime, and
+  not for types. Use-case contracts live in each mode's `ports.ts` as ordinary
+  interfaces, and the persistence repositories satisfy them structurally. This
+  is enforced by `eslint.config.js`, which rejects the import outright.
 - Must not import Svelte, Dexie, Web Workers, browsers, `node:*`, or Supabase.
 - Must not read wall clocks or random values; clocks, ids, and seeds are
   injected through ports.
@@ -49,6 +51,14 @@ gathers intent, the engine owns basketball rules, adapters own I/O.
 
 - `runSubmission` and submission policies/report types: the retry and
   conflict policy runtime shared by every mode (`src/submission.ts`).
+- `decideCommandAdmission` (`src/multiplayer/command-admission.ts`): the shared
+  command admission order — identity, payload size, duplicate replay, expected
+  revision, ordinal continuity, payload schema. It reports a neutral reason and
+  each mode maps that to its own published rejection code, so per-mode
+  vocabularies stay intact until they are unified deliberately.
+- `SeriesRoomSession.runGamePipeline` (`src/multiplayer/series-room-session.ts`):
+  the guard, persist, then publish order for one series game, shared by Draft
+  Duel and Havoc. Each mode supplies only `simulateGame` and `persistOutput`.
 - `ChallengeSession` + ports: the classic/sandbox run lifecycle (load, start,
   cancel, reveal pacing, acceptance, completion promotion) with a worker job
   port, repository port, asset port, and clock (`src/challenge/`).
