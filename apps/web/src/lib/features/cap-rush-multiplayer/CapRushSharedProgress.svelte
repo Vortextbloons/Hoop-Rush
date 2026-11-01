@@ -252,7 +252,9 @@
           {teamName(h2hGame.awayTeamId)}
         </p>
       {/if}
-      <p class="text-xs leading-relaxed text-muted-foreground">{nextStep.detail}</p>
+      {#if nextStep.detail}
+        <p class="text-xs leading-relaxed text-muted-foreground">{nextStep.detail}</p>
+      {/if}
       {#if nextStep.action === 'watch-h2h' && h2hGame !== null}
         <button
           type="button"
@@ -271,7 +273,6 @@
         <p class="font-mono text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
           Accepted results
         </p>
-        <p class="text-[11px] text-muted-foreground">Replays never advance the season.</p>
       </div>
       {#if reviewGames.length === 0}
         <p class="text-xs text-muted-foreground">No results accepted yet.</p>

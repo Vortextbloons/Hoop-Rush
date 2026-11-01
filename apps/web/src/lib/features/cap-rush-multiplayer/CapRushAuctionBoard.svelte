@@ -255,14 +255,6 @@
           : 'All lots closed'
         : 'Next lot closes in',
   );
-  const inspectedOpenCount = $derived(
-    inspectedPool === null
-      ? 0
-      : inspectedPool.lots.filter((lot) => lot.auction?.status === 'open').length,
-  );
-  const inspectedPositionName = $derived(
-    inspectedPool === null ? 'position' : positionLabel(inspectedPool.position).toLowerCase(),
-  );
   const inspectedLotState = $derived.by(() => {
     const selection = inspectedSelection;
     if (selection === null || selection.auction === null) return 'upcoming';
@@ -595,11 +587,6 @@
           </section>
         {:else}
           <section class="flex flex-col gap-2 rounded-2xl border border-border bg-card p-3">
-            <p class="text-xs leading-snug">
-              {inspectedPool?.status === 'completed'
-                ? `The ${inspectedPositionName} pool is complete. Bidding is closed.`
-                : `Bidding opens when the ${inspectedPositionName} pool becomes active. Inspecting it now does not change the active auction.`}
-            </p>
             <button
               type="button"
               class="inline-flex min-h-11 w-fit items-center justify-center rounded-xl border border-primary/50 bg-primary/10 px-3 text-xs font-bold text-primary outline-none focus-visible:ring-2 focus-visible:ring-ring"

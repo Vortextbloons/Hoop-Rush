@@ -28,19 +28,28 @@ self.onmessage = (event: MessageEvent<unknown>) => {
   if (request.kind === 'cap-rush-multiplayer-cancel') return;
   try {
     if (request.kind === 'cap-rush-multiplayer-slot') {
-      const simulated = simulateCapRushMultiplayerSlot({
-        locked: request.locked,
-        slot: request.slot,
-        context,
-        tapeGameIds: request.tapeGameIds,
-      });
+      const games = [];
+      const tapes = [];
+      const through = request.throughSlot ?? request.slot;
+      if (through < request.slot || through - request.slot > 4)
+        throw new Error('invalid simulation range');
+      for (let slot = request.slot; slot <= through; slot += 1) {
+        const simulated = simulateCapRushMultiplayerSlot({
+          locked: request.locked,
+          slot,
+          context,
+          tapeGameIds: request.tapeGameIds,
+        });
+        games.push(...simulated.games);
+        tapes.push(...[...simulated.tapes].map(([gameId, tape]) => ({ gameId, tape })));
+      }
       post({
         schemaVersion: CAP_RUSH_MULTIPLAYER_WORKER_WIRE_SCHEMA_VERSION,
         kind: 'cap-rush-multiplayer-slot',
         requestId: request.requestId,
         slot: request.slot,
-        games: simulated.games,
-        tapes: [...simulated.tapes].map(([gameId, tape]) => ({ gameId, tape })),
+        games,
+        tapes,
       });
       return;
     }

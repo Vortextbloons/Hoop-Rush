@@ -206,13 +206,20 @@ export class CapRushMultiplayerController {
       if (!this.isHost) return;
       const slot = session.nextSlot();
       if (slot === null) return;
+      const nextH2H = state.season.h2hSlots.find((entry) => entry >= slot);
+      const throughSlot = Math.min(
+        slot + 4,
+        state.season.block.endpoint,
+        nextH2H === slot ? slot : (nextH2H ?? 83) - 1,
+      );
       const output = await this.runner.simulateSlot({
         roomId: this.roomId,
         locked: state.locked,
         slot,
+        throughSlot,
         tapeGameIds: [],
       });
-      await session.acceptSlot(slot, output.games);
+      await session.acceptSlot(slot, output.games, throughSlot);
     });
   }
 

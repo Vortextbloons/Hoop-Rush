@@ -412,10 +412,6 @@
                       </div>
                     {/if}
                   </dl>
-                {:else}
-                  <p class="border-t border-line-soft pt-1.5 text-[10px] leading-snug">
-                    Base ratings stay the same; the mutation changes game rules.
-                  </p>
                 {/if}
               </li>
             {/each}

@@ -61,7 +61,11 @@
       </div>
       <p class="text-xs text-muted-foreground">
         {block.status === 'choosing'
-          ? 'Both seats must choose before the block runs.'
+          ? localPlan === null
+            ? 'Choose Sim or Simcast.'
+            : otherPlan === null
+              ? `Waiting for ${seatLabelFor(otherSeat, localSeat)}.`
+              : 'Ready to run.'
           : block.status === 'running'
             ? 'Block in progress.'
             : 'Block complete.'}
@@ -115,27 +119,12 @@
           Simcast this block
         </button>
       </div>
-      <p class="text-xs text-muted-foreground">
-        Both seats choose before the host can simulate game {startSlot}.
-      </p>
     {:else if block.status === 'choosing'}
-      {#if otherPlan === null}
+      {#if otherPlan === null && localPlan !== null}
         <p class="text-xs text-muted-foreground">
-          You chose {planLabel(localPlan)}. Waiting for {seatLabelFor(otherSeat, localSeat)} to choose.
-        </p>
-      {:else}
-        <p class="text-xs text-muted-foreground">
-          Both seats have chosen. The block starts with game {startSlot}.
+          Waiting for {seatLabelFor(otherSeat, localSeat)}.
         </p>
       {/if}
-    {:else if block.status === 'running' && localPlan === 'simcast'}
-      <p class="text-xs text-muted-foreground">
-        You watch your own games at 4× and accept each one after the broadcast.
-      </p>
-    {:else if block.status === 'running'}
-      <p class="text-xs text-muted-foreground">
-        The host simulates league slots. Both seats accept every result.
-      </p>
     {/if}
   </section>
 {/if}

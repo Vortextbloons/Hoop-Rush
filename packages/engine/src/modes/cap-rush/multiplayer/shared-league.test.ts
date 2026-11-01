@@ -120,12 +120,49 @@ describe('cap rush multiplayer shared league', () => {
       run('p2', { kind: 'choose-block-plan', block: season.block.index, choice: 'sim' });
       const accepted = capRushMultiplayerAcceptedThrough(state.season?.games ?? []);
       for (let slot = accepted + 1; slot <= season.block.endpoint; slot += 1) {
-        const simulated = simulateCapRushMultiplayerSlot({
-          locked: state.locked as NonNullable<CapRushMultiplayerState['locked']>,
-          slot,
-          context,
-        });
-        run('p1', { kind: 'accept-slot', slot, games: simulated.games });
+        const nextH2H = [...h2hSlots].find((entry) => entry >= slot);
+        const throughSlot = Math.min(
+          slot + 4,
+          season.block.endpoint,
+          nextH2H === slot ? slot : (nextH2H ?? 83) - 1,
+        );
+        const games = [];
+        for (let current = slot; current <= throughSlot; current += 1) {
+          games.push(
+            ...simulateCapRushMultiplayerSlot({
+              locked: state.locked as NonNullable<CapRushMultiplayerState['locked']>,
+              slot: current,
+              context,
+            }).games,
+          );
+        }
+        let sequential = state;
+        for (let current = slot; current <= throughSlot; current += 1) {
+          const outcome = applyCapRushMultiplayerCommand(
+            sequential,
+            {
+              schemaVersion: CAP_RUSH_MULTIPLAYER_SCHEMA_VERSION,
+              roomId: idSchema.parse('room-test'),
+              commandId: commandIdSchema.parse('compare'),
+              ordinal,
+              expectedRevision: ordinal,
+              actorParticipantId: 'p1',
+              acceptedAtIso: at(),
+              payload: {
+                kind: 'accept-slot',
+                slot: current,
+                games: games.filter((game) => game.slot === current),
+              },
+            },
+            environment,
+          );
+          if (!outcome.ok) throw new Error(outcome.message);
+          sequential = outcome.state;
+        }
+        run('p1', { kind: 'accept-slot', slot, throughSlot, games });
+        expect(capRushMultiplayerStateDigest(state)).toBe(
+          capRushMultiplayerStateDigest(sequential),
+        );
         if (h2hSlots.has(slot)) {
           const locked = state.locked as NonNullable<CapRushMultiplayerState['locked']>;
           const ids = new Set([
@@ -151,7 +188,8 @@ describe('cap rush multiplayer shared league', () => {
           run('p1', { kind: 'ack-slot', slot });
           run('p2', { kind: 'ack-slot', slot });
         }
-        expect(state.season?.frontierSlot).toBe(slot);
+        expect(state.season?.frontierSlot).toBe(throughSlot);
+        slot = throughSlot;
       }
       expect(state.season?.games).toHaveLength(season.block.endpoint * 15);
     }

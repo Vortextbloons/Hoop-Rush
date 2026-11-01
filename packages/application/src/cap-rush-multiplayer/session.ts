@@ -203,8 +203,14 @@ export class CapRushMultiplayerSession {
   async acceptSlot(
     slot: number,
     games: readonly CapRushLeagueGame[],
+    throughSlot?: number,
   ): Promise<CapRushMultiplayerCommandReceipt> {
-    return this.send({ kind: 'accept-slot', slot, games: [...games] });
+    return this.send({
+      kind: 'accept-slot',
+      slot,
+      games: [...games],
+      ...(throughSlot === undefined ? {} : { throughSlot }),
+    });
   }
 
   async ackSlot(slot: number): Promise<CapRushMultiplayerCommandReceipt> {
@@ -364,6 +370,7 @@ function sameSnapshot(
   left: CapRushMultiplayerRoomSnapshot,
   right: CapRushMultiplayerRoomSnapshot,
 ): boolean {
+  // Presence can change without a revision bump, so members are compared explicitly.
   return (
     left.roomId === right.roomId &&
     left.code === right.code &&

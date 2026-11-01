@@ -25,6 +25,7 @@ export interface CapRushMultiplayerSlotInput {
   roomId: string;
   locked: CapRushMultiplayerLockedInputs;
   slot: number;
+  throughSlot?: number;
   tapeGameIds?: readonly string[];
 }
 
@@ -82,6 +83,7 @@ function buildRequest(
       roomId: payload.roomId,
       locked: payload.locked,
       slot: payload.slot,
+      throughSlot: payload.throughSlot,
       tapeGameIds: [...(payload.tapeGameIds ?? [])],
     });
   }

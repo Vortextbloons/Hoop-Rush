@@ -212,12 +212,19 @@ export class CapRushMultiplayerSupabaseTransport implements CapRushMultiplayerTr
         revision: snapshot.revision,
       };
     }
+    const coordinationState = { ...outcome.state };
+    if (
+      ['accept-slot', 'ack-slot', 'choose-block-plan', 'ack-broadcast'].includes(input.payload.kind)
+    ) {
+      Reflect.deleteProperty(coordinationState, 'locked');
+      Reflect.deleteProperty(coordinationState, 'recruitment');
+    }
     const result = await client.rpc('cap_rush_multiplayer_command_submit', {
       p_room_id: input.roomId,
       p_command_id: input.commandId,
       p_expected_revision: input.expectedRevision,
       p_payload: input.payload,
-      p_state: outcome.state,
+      p_state: coordinationState,
       p_state_digest: capRushMultiplayerStateDigest(outcome.state),
       p_accepted_at: acceptedAtIso,
       p_deadline: capRushMultiplayerDeadlineOf(outcome.state),

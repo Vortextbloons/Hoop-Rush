@@ -24,6 +24,7 @@ export const capRushMultiplayerWorkerRequestSchema = z.discriminatedUnion('kind'
     roomId: idSchema,
     locked: capRushMultiplayerLockedInputsSchema,
     slot: z.number().int().min(1).max(82),
+    throughSlot: z.number().int().min(1).max(82).optional(),
     tapeGameIds: z.array(z.string().min(1).max(80)).max(2),
   }),
   base.extend({
@@ -55,7 +56,7 @@ export const capRushMultiplayerWorkerSlotMessageSchema = z.object({
   kind: z.literal('cap-rush-multiplayer-slot'),
   requestId: idSchema,
   slot: z.number().int().min(1).max(82),
-  games: z.array(capRushLeagueGameSchema).min(1).max(15),
+  games: z.array(capRushLeagueGameSchema).min(1).max(75),
   tapes: z.array(z.object({ gameId: z.string().min(1).max(80), tape: z.unknown() })).max(2),
 });
 export type CapRushMultiplayerWorkerSlotMessage = z.infer<

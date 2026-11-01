@@ -100,22 +100,22 @@
     if (postseason === null || localOutcome === null) return null;
     if (championTeamId === null) {
       if (standings === null) {
-        return 'The bracket has not opened yet. Both seats wait for the room to accept the final standings.';
+        return 'Waiting for final standings.';
       }
       if (localOutcome.status === 'eliminated') {
         return `Your run ends here${
           localOutcome.round === null
             ? ''
             : ` in the ${capRushConferenceRoundName(localOutcome.round)}`
-        }. The bracket continues without your team; both seats still choose each round so the host can simulate the next step.`;
+        }.`;
       }
       if (localOutcome.status === 'not-qualified') {
-        return 'Your team missed the playoffs. The bracket continues without your team; both seats still choose each round so the host can simulate the next step.';
+        return 'Your team missed the playoffs.';
       }
-      return 'Your team is still alive in the bracket. Both seats choose a round plan before the host simulates the step.';
+      return 'Your team is still alive in the bracket.';
     }
     if (championSeat === localSeat) {
-      return 'Your team won the league. The shared postseason is complete.';
+      return 'Your team won the league.';
     }
     if (localOutcome.status === 'eliminated') {
       return `Your run ended in the ${
@@ -205,9 +205,6 @@
               : 'Champion crowned'}
           </h2>
         </div>
-        <p class="max-w-full text-xs text-muted-foreground">
-          Only the host simulates playoff steps. Both seats resolve their own playback.
-        </p>
       </header>
 
       <ul class="grid min-w-0 gap-2 sm:grid-cols-2">
@@ -279,9 +276,6 @@
         <h2 class="font-display text-2xl font-extrabold tracking-tight uppercase">
           Waiting for final standings
         </h2>
-        <p class="mt-1 text-sm text-muted-foreground">
-          The playoff bracket opens once the room has accepted the final shared standings.
-        </p>
       </section>
     {:else}
       <section class="flex min-w-0 flex-col gap-3 rounded-2xl border border-border bg-card p-4">
@@ -294,11 +288,6 @@
               ? `${capRushConferenceRoundName(currentRound)}`
               : 'League complete'}
           </h2>
-          <p class="mt-1 text-xs leading-relaxed text-muted-foreground">
-            {championTeamId === null
-              ? 'Both seats choose a plan each round. The host runs the step; both seats then resolve their own playback.'
-              : 'The Finals are finished. Both seats can accept the shared final report.'}
-          </p>
         </header>
 
         {#if championTeamId === null}
@@ -363,20 +352,6 @@
               </button>
             {/if}
           </div>
-
-          <p class="text-xs leading-relaxed text-muted-foreground">
-            {#if localPlan === null}
-              Choose Sim or Simcast for round {currentRound}. Both plans are required before the
-              step can run.
-            {:else if !bothPlans}
-              Waiting for {seatLabelFor(otherSeat, localSeat)} to choose round {currentRound}.
-            {:else if ishost}
-              Both plans are in. Simulate the next playoff step when ready.
-            {:else}
-              Waiting for the host to simulate the next playoff step. Both seats resolve their own
-              playback afterward.
-            {/if}
-          </p>
         {:else}
           <div
             class="flex min-w-0 flex-col gap-2 rounded-xl border border-accent/50 bg-accent/10 p-3"
@@ -408,9 +383,6 @@
             >
               Accept final report
             </button>
-            <p class="text-[11px] leading-relaxed text-muted-foreground">
-              Either seat can accept the shared report. It opens the final results for both.
-            </p>
           </div>
         {/if}
       </section>

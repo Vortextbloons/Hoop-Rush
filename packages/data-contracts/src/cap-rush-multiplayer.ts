@@ -53,8 +53,9 @@ export const capRushMultiplayerCommandPayloadSchema = z.discriminatedUnion('kind
   }),
   z.object({
     kind: z.literal('accept-slot'),
+    throughSlot: z.number().int().min(1).max(82).optional(),
     slot: z.number().int().min(1).max(82),
-    games: z.array(capRushLeagueGameSchema).min(1).max(15),
+    games: z.array(capRushLeagueGameSchema).min(1).max(75),
   }),
   z.object({ kind: z.literal('ack-slot'), slot: z.number().int().min(1).max(82) }),
   z.object({

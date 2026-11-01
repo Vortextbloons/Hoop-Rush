@@ -85,9 +85,6 @@
           >{exactMoney(summary.bindingBidDollars)}</span
         >
       </p>
-      <p class="mt-0.5 text-[10px] leading-snug text-muted-foreground">
-        Charged only if the auction closes with your bid.
-      </p>
     </div>
   {/if}
 

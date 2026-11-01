@@ -509,6 +509,38 @@ export function applyCapRushMultiplayerCommand(
       });
     }
     case 'accept-slot': {
+      if (payload.throughSlot !== undefined) {
+        const through = payload.throughSlot;
+        if (
+          through < payload.slot ||
+          through - payload.slot > 4 ||
+          payload.games.some((game) => game.slot < payload.slot || game.slot > through)
+        ) {
+          return reject('result-mismatch', 'invalid simulation range');
+        }
+        let next = state;
+        for (let slot = payload.slot; slot <= through; slot += 1) {
+          if (next.season?.h2hSlots.includes(slot) && through !== payload.slot)
+            return reject('not-due', 'head-to-head games must be accepted separately');
+          const outcome = applyCapRushMultiplayerCommand(
+            next,
+            {
+              ...command,
+              payload: {
+                kind: 'accept-slot',
+                slot,
+                games: payload.games.filter((game) => game.slot === slot),
+              },
+            },
+            environment,
+            variant,
+          );
+          if (!outcome.ok) return outcome;
+          next = outcome.state;
+        }
+        return accept(next);
+      }
+
       if (actor !== 'p1') return reject('not-host', 'only the host accepts league results');
       if (state.phase !== 'season' || state.season === null || state.locked === null) {
         return reject('invalid-phase', 'the season is not running');
