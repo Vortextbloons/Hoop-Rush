@@ -16,7 +16,7 @@ import type {
 import {
   CAP_RUSH_MULTIPLAYER_WORKER_WIRE_SCHEMA_VERSION,
   capRushMultiplayerWorkerMessageSchema,
-  capRushMultiplayerWorkerRequestSchema,
+  idSchema,
 } from '@hoop-rush/data-contracts';
 import {
   OneShotWorkerRunner,
@@ -91,45 +91,56 @@ function buildRequest(
   requestId: string,
 ): CapRushMultiplayerWorkerRequest {
   if ('commands' in payload)
-    return capRushMultiplayerWorkerRequestSchema.parse({
-      ...payload,
+    return {
+      state: payload.state,
+      commands: [...payload.commands],
+      environment: {
+        variant: payload.environment.variant,
+        bracket: payload.environment.bracket,
+        seasonCatalog: payload.environment.seasonCatalog,
+        profile: payload.environment.profile,
+        catalogSource: payload.environment.catalogSource,
+        versionLocks: payload.environment.versionLocks,
+      },
+      variant: payload.variant,
+      verifyLog: payload.verifyLog,
       schemaVersion: CAP_RUSH_MULTIPLAYER_WORKER_WIRE_SCHEMA_VERSION,
       kind: 'cap-rush-multiplayer-project',
-      requestId,
-    });
+      requestId: idSchema.parse(requestId),
+    } satisfies CapRushMultiplayerWorkerRequest;
   if ('slot' in payload) {
-    return capRushMultiplayerWorkerRequestSchema.parse({
+    return {
       schemaVersion: CAP_RUSH_MULTIPLAYER_WORKER_WIRE_SCHEMA_VERSION,
       kind: 'cap-rush-multiplayer-slot',
-      requestId,
-      roomId: payload.roomId,
+      requestId: idSchema.parse(requestId),
+      roomId: idSchema.parse(payload.roomId),
       locked: payload.locked,
       slot: payload.slot,
       throughSlot: payload.throughSlot,
       partition: payload.partition,
       tapeGameIds: [...(payload.tapeGameIds ?? [])],
-    });
+    } satisfies CapRushMultiplayerWorkerRequest;
   }
   if ('plans' in payload) {
-    return capRushMultiplayerWorkerRequestSchema.parse({
+    return {
       schemaVersion: CAP_RUSH_MULTIPLAYER_WORKER_WIRE_SCHEMA_VERSION,
       kind: 'cap-rush-multiplayer-playoff-games',
-      requestId,
-      roomId: payload.roomId,
+      requestId: idSchema.parse(requestId),
+      roomId: idSchema.parse(payload.roomId),
       locked: payload.locked,
       plans: [...payload.plans],
       tapeGameIds: [...(payload.tapeGameIds ?? [])],
-    });
+    } satisfies CapRushMultiplayerWorkerRequest;
   }
-  return capRushMultiplayerWorkerRequestSchema.parse({
+  return {
     schemaVersion: CAP_RUSH_MULTIPLAYER_WORKER_WIRE_SCHEMA_VERSION,
     kind: 'cap-rush-multiplayer-tape',
-    requestId,
-    roomId: payload.roomId,
+    requestId: idSchema.parse(requestId),
+    roomId: idSchema.parse(payload.roomId),
     locked: payload.locked,
     ...(payload.entry === undefined ? {} : { entry: payload.entry }),
     ...(payload.plan === undefined ? {} : { plan: payload.plan }),
-  });
+  } satisfies CapRushMultiplayerWorkerRequest;
 }
 
 function isError(

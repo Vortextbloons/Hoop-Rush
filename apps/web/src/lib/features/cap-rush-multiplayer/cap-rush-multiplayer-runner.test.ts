@@ -222,3 +222,41 @@ test('single-slot partitions and playoff series match serial engine outputs incl
     parallel.dispose();
   }
 });
+
+test('dispatches projection inputs without copying the catalog or sending the local index', async () => {
+  const setup = capRushTestSetup();
+  const environment = { ...capRushTestEnvironment(setup), seasonCatalog: setup.catalog };
+  const state = createCapRushMultiplayerState(capRushTestRootSeed());
+  let posted: unknown;
+  const worker = {
+    onmessage: null as ((event: MessageEvent<unknown>) => void) | null,
+    onerror: null,
+    terminate() {},
+    postMessage(value: unknown) {
+      posted = value;
+    },
+  };
+  const runner = new CapRushMultiplayerRunner({ createWorker: () => worker as unknown as Worker });
+  try {
+    const pending = runner.project({ state, commands: [], environment, variant: 'clash' });
+    const request = posted as Extract<
+      import('@hoop-rush/data-contracts').CapRushMultiplayerWorkerRequest,
+      { kind: 'cap-rush-multiplayer-project' }
+    >;
+    expect(request.environment.seasonCatalog).toBe(environment.seasonCatalog);
+    expect(request.state).toBe(state);
+    expect('index' in request.environment).toBe(false);
+    expect(capRushMultiplayerWorkerRequestSchema.safeParse(request).success).toBe(true);
+    worker.onmessage?.({
+      data: {
+        schemaVersion: request.schemaVersion,
+        requestId: request.requestId,
+        kind: 'cap-rush-multiplayer-projection',
+        state,
+      },
+    } as MessageEvent<unknown>);
+    expect(await pending).toEqual(state);
+  } finally {
+    runner.dispose();
+  }
+});

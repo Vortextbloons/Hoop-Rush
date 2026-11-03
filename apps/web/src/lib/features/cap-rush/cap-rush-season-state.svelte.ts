@@ -740,7 +740,7 @@ export class CapRushSeasonController {
       this.notice = 'The postseason paused. Accepted games are saved.';
       return null;
     }
-    await this.load();
+    this.draft = this.service.getSnapshot().draft;
     if (options.stopWhenUserSeriesComplete === true && this.currentUserRound() === null) {
       return userGames;
     }
