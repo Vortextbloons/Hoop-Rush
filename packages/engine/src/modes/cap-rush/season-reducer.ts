@@ -10,7 +10,6 @@ import {
   CAP_RUSH_GAME_COUNT,
   capRushDraftStateSchema,
   capRushEmptyConferencePostseason,
-  capRushEmptyPostseason,
 } from '@hoop-rush/data-contracts';
 import {
   acceptCapRushCommand,
@@ -243,6 +242,14 @@ function applyFinalizeSeason(
       `the background league has ${String(state.season.leagueGamesAccepted ?? 0)} of ${String(CAP_RUSH_CONFERENCE_AI_GAMES)} games`,
     );
   }
+  if (state.postseasonEligible === true && state.locked.leagueSchedule === undefined) {
+    return rejectCapRushCommand(
+      state,
+      command,
+      'phase-mismatch',
+      'this legacy season is no longer supported',
+    );
+  }
   const completedAt = environment.nowIso?.() ?? new Date().toISOString();
   const nextState = capRushDraftStateSchema.parse({
     ...state,
@@ -251,10 +258,7 @@ function applyFinalizeSeason(
     season: { ...state.season, completedAt },
     ...(state.postseasonEligible === true
       ? {
-          postseason:
-            state.locked.leagueSchedule === undefined
-              ? capRushEmptyPostseason()
-              : capRushEmptyConferencePostseason(),
+          postseason: capRushEmptyConferencePostseason(),
         }
       : {}),
   });

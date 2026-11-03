@@ -72,6 +72,12 @@ function offerBandHistogram(
   return counts;
 }
 describe('draft duel production catalog integration', () => {
+  it('ships only the active catalog fields', () => {
+    const raw = JSON.parse(readFileSync(catalogPath, 'utf8')) as Record<string, unknown>;
+    expect(raw).not.toHaveProperty('packs');
+    expect(raw).not.toHaveProperty('sets');
+    expect(raw).not.toHaveProperty('replayVersion');
+  });
   it('uses the current pool peaks and ratings in the draft and base player catalogs', () => {
     const manifestUrl = new URL('../../../apps/web/static/data/manifest.json', import.meta.url);
     const manifest = JSON.parse(readFileSync(manifestUrl, 'utf8')) as {

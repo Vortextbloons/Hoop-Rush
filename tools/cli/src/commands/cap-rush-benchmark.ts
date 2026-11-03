@@ -32,7 +32,6 @@ import {
   capRushFinalizeSeasonCommandSchema,
   commandIdSchema,
   idSchema,
-  isConferencePostseason,
   opponentBracketSchema,
   seedFromString,
   seedSchema,
@@ -328,9 +327,6 @@ function runPolicy(
   for (let guard = 0; guard < 400; guard += 1) {
     const postseason = state.postseason;
     if (postseason === undefined || postseason.phase === 'complete') break;
-    if (!isConferencePostseason(postseason)) {
-      throw new Error('the benchmark requires a conference postseason');
-    }
     if (postseason.phase === 'awaiting-standings') {
       throw new Error('the postseason still awaits final standings');
     }

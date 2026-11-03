@@ -54,7 +54,6 @@ export class HavocMultiplayerRunner {
           input: payload.input,
         }),
       responseSchema: havocMultiplayerWorkerResponseSchema,
-      requestIdOf: (response) => response.requestId,
       resultOf: (response) =>
         response.kind === 'havoc-multiplayer-error'
           ? { kind: 'error', message: response.message }

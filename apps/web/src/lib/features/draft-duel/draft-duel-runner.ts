@@ -52,7 +52,6 @@ export class DraftDuelRunner {
           input: payload.input,
         }),
       responseSchema: draftDuelWorkerResponseSchema,
-      requestIdOf: (response) => response.requestId,
       resultOf: (response) =>
         response.kind === 'draft-duel-error'
           ? { kind: 'error', message: response.message }

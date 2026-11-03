@@ -22,8 +22,6 @@ import { summaryRatingsSchema } from './player-season.ts';
 import {
   COLLECTION_CATALOG_VERSION,
   COLLECTION_OVERLAY_VERSION,
-  COLLECTION_PACK_RULES_VERSION,
-  COLLECTION_REPLAY_V1_VERSION,
   COLLECTION_SCHEMA_VERSION,
   COLLECTION_SPECIALS_VERSION,
   COLLECTION_VERSION,
@@ -31,30 +29,21 @@ import {
 import {
   collectionCardIdSchema,
   collectionCardAvailabilitySchema,
-  collectionCurrencySchema,
   collectionFamilySchema,
-  collectionPackIdSchema,
   collectionRaritySchema,
-  collectionSetIdSchema,
 } from './collection-primitives.ts';
 
 export {
   collectionCardIdSchema,
   collectionCardAvailabilitySchema,
-  collectionCurrencySchema,
   collectionFamilySchema,
-  collectionPackIdSchema,
   collectionRaritySchema,
-  collectionSetIdSchema,
 } from './collection-primitives.ts';
 export type {
   CollectionCardId,
   CollectionCardAvailability,
-  CollectionCurrency,
   CollectionFamily,
-  CollectionPackId,
   CollectionRarity,
-  CollectionSetId,
 } from './collection-primitives.ts';
 
 const ratingDeltaSchema = z.number().int().min(-100).max(100);
@@ -103,29 +92,6 @@ export const collectionCardDefinitionSchema = z.object({
 });
 export type CollectionCardDefinition = z.infer<typeof collectionCardDefinitionSchema>;
 
-export const collectionPackSlotSchema = z.object({
-  kind: z.enum(['ordinary', 'guaranteed']),
-  floorRarity: collectionRaritySchema.optional(),
-});
-
-export const collectionPackDefinitionSchema = z.object({
-  packId: collectionPackIdSchema,
-  packRulesVersion: z.literal(COLLECTION_PACK_RULES_VERSION),
-  priceCurrency: collectionCurrencySchema,
-  priceAmount: z.number().int().nonnegative(),
-  slots: z.array(collectionPackSlotSchema).min(1).max(10),
-  eligibleScope: z.enum(['full-catalog', 'specials-only']),
-  rarityWeights: z.record(collectionRaritySchema, z.number().nonnegative()),
-  duplicateExchange: z.record(collectionRaritySchema, z.number().int().nonnegative()),
-});
-export type CollectionPackDefinition = z.infer<typeof collectionPackDefinitionSchema>;
-
-export const collectionSetDefinitionSchema = z.object({
-  setId: collectionSetIdSchema,
-  title: z.string().min(1).max(96),
-  memberCardIds: z.array(collectionCardIdSchema).min(1),
-});
-
 export const collectionCatalogCardSchema = collectionCardDefinitionSchema.extend({
   summarySource: summaryRatingsSchema.optional(),
   detailedRatings: simulationRatingsSchema,
@@ -151,9 +117,6 @@ export const collectionCatalogSchema = z
     sourceCatalogVersion: z.string().min(1).max(64),
     sourceCatalogHash: contentHashSchema,
     cards: z.array(collectionCatalogCardSchema).min(1),
-    sets: z.array(collectionSetDefinitionSchema).min(1),
-    packs: z.array(collectionPackDefinitionSchema).min(1),
-    replayVersion: z.literal(COLLECTION_REPLAY_V1_VERSION),
   })
   .superRefine((catalog, ctx) => {
     const seen = new Set<string>();
@@ -162,20 +125,6 @@ export const collectionCatalogSchema = z
         ctx.addIssue({ code: 'custom', message: `duplicate card ${card.cardId}` });
       }
       seen.add(card.cardId);
-    }
-    for (const set of catalog.sets) {
-      const members = new Set(set.memberCardIds);
-      if (members.size !== set.memberCardIds.length) {
-        ctx.addIssue({ code: 'custom', message: `set ${set.setId} has duplicate members` });
-      }
-      for (const member of set.memberCardIds) {
-        if (!seen.has(member)) {
-          ctx.addIssue({
-            code: 'custom',
-            message: `set ${set.setId} references unknown card ${member}`,
-          });
-        }
-      }
     }
   });
 export type CollectionCatalog = z.infer<typeof collectionCatalogSchema>;

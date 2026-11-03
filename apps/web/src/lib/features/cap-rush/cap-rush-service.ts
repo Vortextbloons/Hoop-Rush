@@ -11,7 +11,6 @@ import { newSeasonId, seasonRootSeed } from '#lib/ids.js';
 import { getPersistence } from '#lib/persistence.js';
 import { capRushBracketWithRosterMetadata } from './cap-rush-opponent-metadata.js';
 import { loadCapRushRosterMetadata, loadDraftCatalog } from '#lib/data-assets.js';
-import { getBracket, getManifest } from '#lib/data.js';
 import { loadRunPreamble } from '#lib/run-preamble.js';
 
 export interface CreateCapRushServiceOptions {
@@ -50,14 +49,6 @@ export function createCapRushService(options: CreateCapRushServiceOptions = {}):
             ),
           };
         }),
-      loadBracket: async (hash) => {
-        const manifest = await getManifest();
-        const entry = [manifest.bracket, manifest.capRushBracket].find(
-          (candidate) => candidate?.contentHash === hash,
-        );
-        if (entry === undefined) throw new Error('The original opponent field is unavailable.');
-        return getBracket(entry);
-      },
     },
     ids: {
       newRunId: options.newRunId ?? (() => idSchema.parse(newSeasonId('cap-rush-run'))),

@@ -11,8 +11,6 @@ import {
   type CapRushWorkerPlayoffsCompleteMessage,
   type CapRushWorkerProgressMessage,
   type CapRushWorkerRequest,
-  type CapRushWorkerStandingsCompleteMessage,
-  type OpponentBracket,
 } from '@hoop-rush/data-contracts';
 import { CapRushParallelWorker } from './cap-rush-parallel-worker';
 import { StreamingWorkerRunner } from '#lib/workers/streaming-worker.js';
@@ -120,28 +118,6 @@ export class CapRushRunner {
       },
       onProgress: input.handlers.onProgress,
       onError: input.handlers.onError,
-    });
-  }
-
-  simulateStandings(input: {
-    requestId: string;
-    locked: CapRushLockedInputs;
-    bracket: OpponentBracket;
-    handlers?: { onProgress?: (message: CapRushWorkerProgressMessage) => void };
-  }): Promise<CapRushWorkerStandingsCompleteMessage> {
-    return this.runJob({
-      request: {
-        schemaVersion: CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION,
-        type: 'cap-rush-standings',
-        requestId: input.requestId,
-        locked: input.locked,
-        bracket: input.bracket,
-      },
-      requestId: input.requestId,
-      concurrentMessage: 'a cap rush job is already running',
-      completeOf: (message) => (message.type === 'cap-rush-standings-complete' ? message : null),
-      errorAfterQueue: false,
-      onProgress: input.handlers?.onProgress,
     });
   }
 

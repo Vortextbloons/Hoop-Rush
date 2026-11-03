@@ -21,7 +21,6 @@ import {
   capRushReportSchema,
   capRushStoredGameSchema,
   capRushStoredPlayoffGameSchema,
-  isConferencePostseason,
 } from '@hoop-rush/data-contracts';
 import {
   auditHavocBattleGame,
@@ -166,6 +165,29 @@ export class DexieCapRushRepository {
     if (row === undefined) return null;
     if (typeof row === 'object' && row !== null && 'draft' in row) {
       const draft = row.draft;
+      if (typeof draft === 'object' && draft !== null && 'postseason' in draft) {
+        const postseason = draft.postseason;
+        if (
+          typeof postseason === 'object' &&
+          postseason !== null &&
+          'version' in postseason &&
+          postseason.version === 'cap-rush-postseason-v1'
+        ) {
+          throw unsupported('active cap rush draft uses an unsupported postseason format');
+        }
+      }
+      if (
+        typeof draft === 'object' &&
+        draft !== null &&
+        'postseasonEligible' in draft &&
+        draft.postseasonEligible === true &&
+        'locked' in draft &&
+        typeof draft.locked === 'object' &&
+        draft.locked !== null &&
+        !('leagueSchedule' in draft.locked)
+      ) {
+        throw unsupported('active cap rush draft uses an unsupported league format');
+      }
       if (typeof draft === 'object' && draft !== null && 'versionSet' in draft) {
         const versionSet = draft.versionSet;
         if (
@@ -789,9 +811,7 @@ export class DexieCapRushRepository {
       postseason.championTeamId !== null &&
       postseason.userOutcome.status !== 'pending'
         ? (() => {
-            const entries = isConferencePostseason(postseason)
-              ? capRushConferenceStandingsEntries(postseason.standings)
-              : postseason.standings.entries;
+            const entries = capRushConferenceStandingsEntries(postseason.standings);
             const champion = entries.find((entry) => entry.teamId === postseason.championTeamId);
             const user = entries.find((entry) => entry.teamId === locked.human.teamId);
             invariant(

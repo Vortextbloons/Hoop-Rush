@@ -13,10 +13,8 @@ import {
   REQUIRED_RATING_KEYS,
   SELECTION_SCORE_VERSION,
   COLLECTION_CATALOG_VERSION,
-  COLLECTION_ECONOMY_VERSION,
   COLLECTION_OVERLAY_VERSION,
   COLLECTION_SPECIALS_VERSION,
-  COLLECTION_PACK_RULES_VERSION,
   canonicalJson,
   capRushRosterMetadataSchema,
   collectionCatalogSchema,
@@ -855,12 +853,6 @@ async function auditCollectionCatalog(
       `collection-catalog: specialsVersion ${String(catalog.specialsVersion)} unexpected`,
     );
   }
-  for (const pack of catalog.packs) {
-    const packRulesVersion: string = pack.packRulesVersion;
-    if (packRulesVersion !== COLLECTION_PACK_RULES_VERSION) {
-      failures.push(`collection-catalog: pack ${pack.packId} rules version unexpected`);
-    }
-  }
   const indexCatalogVersion: string = index.catalogVersion;
   if (indexCatalogVersion !== COLLECTION_CATALOG_VERSION) {
     failures.push('collection-index: catalogVersion unexpected');
@@ -923,36 +915,13 @@ async function auditCollectionCatalog(
       failures.push(`collection-catalog: ${card.cardId} has unexpected eligibility overlay`);
     }
   }
-  if (catalog.sets.length !== 2) {
-    failures.push(`collection-catalog: want 2 sets, have ${String(catalog.sets.length)}`);
-  }
-  for (const set of catalog.sets) {
-    const family = set.setId === 'arm-guard-set' ? 'Arm Guard' : 'Heat Check';
-    const expectedMembers = catalog.cards
-      .filter((card) => card.family === family)
-      .map((card) => card.cardId)
-      .sort();
-    const expectedCount = set.setId === 'arm-guard-set' ? 7 : 6;
-    if (set.memberCardIds.length !== expectedCount) {
-      failures.push(
-        `collection-catalog: set ${set.setId} has ${String(set.memberCardIds.length)} members, want ${String(expectedCount)}`,
-      );
-    }
-    if (canonicalJson([...set.memberCardIds].sort()) !== canonicalJson(expectedMembers)) {
-      failures.push(`collection-catalog: set ${set.setId} membership does not match ${family}`);
-    }
-  }
-  if (catalog.packs.length !== 5) {
-    failures.push(`collection-catalog: want 5 packs, have ${String(catalog.packs.length)}`);
-  }
   if (index.cards.length !== catalog.cards.length) {
     failures.push(
       `collection-index: ${String(index.cards.length)} entries != ${String(catalog.cards.length)} cards`,
     );
   }
-  void COLLECTION_ECONOMY_VERSION;
   details.push(
-    `collection: ${String(catalog.cards.length)} cards (${String(baseCount)} base + ${String(activeSpecialCount)} specials) · ${String(catalog.sets.length)} sets · ${String(catalog.packs.length)} packs · ${String(catalogContent.length)} bytes`,
+    `collection: ${String(catalog.cards.length)} cards (${String(baseCount)} base + ${String(activeSpecialCount)} specials), ${String(catalogContent.length)} bytes`,
   );
   return { ok: failures.length === 0, details, failures };
 }

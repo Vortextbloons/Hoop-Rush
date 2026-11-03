@@ -20,7 +20,6 @@ import {
   CAP_RUSH_SCHEMA_VERSION,
   CAP_RUSH_SEED_DERIVATION_VERSION,
   POSITIONS,
-  capRushLeagueSeed,
   capRushVersionSetSchema,
   commandIdSchema,
   contentHashSchema,
@@ -37,7 +36,6 @@ import {
   capRushStoredGameOf,
   capRushUserLeagueGameOf,
   createCapRushDraftState,
-  createCapRushLeagueSimulation,
   createEngineContext,
   simulateCapRushGame,
   simulateCapRushLeagueSlot,
@@ -502,8 +500,8 @@ describe('cap rush session', () => {
     expect(session.getSnapshot().draft?.draft.stage).toBe('postseason');
     expect(session.postseasonStep().kind).toBe('standings');
 
-    const preamble = await createAssets().assets.loadPreamble();
-    if (locked.leagueSchedule !== undefined) {
+    if (locked.leagueSchedule === undefined) throw new Error('missing league schedule');
+    {
       const userStored = await session.listRunGames(locked.runId);
       const results = leagueSamples.map((game) => ({
         gameId: game.gameId,
@@ -528,17 +526,6 @@ describe('cap rush session', () => {
         games: results,
       });
       await session.acceptConferenceStandings(standings);
-    } else {
-      const league = createCapRushLeagueSimulation(
-        {
-          seed: capRushLeagueSeed(locked.runSeed),
-          bracket: preamble.bracket,
-          profile: preamble.profile,
-        },
-        context,
-      );
-      league.advance(league.gamesTotal);
-      await session.acceptStandings(league.finish());
     }
     expect(session.postseasonStep().kind).toBe('games');
 

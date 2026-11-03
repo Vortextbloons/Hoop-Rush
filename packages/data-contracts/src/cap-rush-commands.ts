@@ -16,7 +16,6 @@ import { capRushCatalogSourceSchema } from './cap-rush-versions.ts';
 import { capRushGameSummarySchema } from './cap-rush-season.ts';
 import { capRushLeagueGameSchema, capRushConferenceStandingsSchema } from './cap-rush-league.ts';
 import {
-  capRushLeagueResultSchema,
   capRushPlayoffGameSummarySchema,
   capRushStoredPlayoffGameSchema,
 } from './cap-rush-postseason.ts';
@@ -128,20 +127,13 @@ export const capRushFinalizeSeasonCommandSchema = z.object({
 });
 export type CapRushFinalizeSeasonCommand = z.infer<typeof capRushFinalizeSeasonCommandSchema>;
 
-export const capRushAcceptStandingsCommandSchema = z
-  .object({
-    command: z.literal('accept-cap-rush-standings'),
-    commandId: commandIdSchema,
-    runId: idSchema,
-    expectedRevision: z.number().int().nonnegative(),
-    league: capRushLeagueResultSchema.optional(),
-    standings: capRushConferenceStandingsSchema.optional(),
-  })
-  .superRefine((command, ctx) => {
-    if ((command.league === undefined) === (command.standings === undefined)) {
-      ctx.addIssue({ code: 'custom', message: 'accept exactly one standings format' });
-    }
-  });
+export const capRushAcceptStandingsCommandSchema = z.object({
+  command: z.literal('accept-cap-rush-standings'),
+  commandId: commandIdSchema,
+  runId: idSchema,
+  expectedRevision: z.number().int().nonnegative(),
+  standings: capRushConferenceStandingsSchema,
+});
 export type CapRushAcceptStandingsCommand = z.infer<typeof capRushAcceptStandingsCommandSchema>;
 
 export const capRushAcceptPlayoffGameCommandSchema = z.object({

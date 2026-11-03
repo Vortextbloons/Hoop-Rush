@@ -5,11 +5,8 @@
     POSITIONS,
     capRushConferenceStandingsEntries,
     franchiseAbbreviation,
-    isConferenceStandings,
-    type CapRushConferenceStandings,
     type CapRushDraftState,
     type CapRushPlayerSeasonLine,
-    type CapRushPostseasonStandings,
     type CapRushStoredGame,
     type HavocParticipantLine,
     type HavocTeamResult,
@@ -50,16 +47,10 @@
     const standings = playoffStandings;
     const teamId = locked?.human.teamId;
     if (standings === null || teamId === undefined) return null;
-    const entries = isConferenceStandings(standings)
-      ? capRushConferenceStandingsEntries(standings as CapRushConferenceStandings)
-      : (standings as CapRushPostseasonStandings).entries;
+    const entries = capRushConferenceStandingsEntries(standings);
     return entries.find((entry) => entry.teamId === teamId) ?? null;
   });
-  const userConference = $derived(
-    userPlayoffEntry !== null && 'conference' in userPlayoffEntry
-      ? (userPlayoffEntry as { conference: 'east' | 'west' }).conference
-      : null,
-  );
+  const userConference = $derived(userPlayoffEntry?.conference ?? null);
   const userPlayoffSeed = $derived(
     userPlayoffEntry !== null && userPlayoffEntry.qualified ? userPlayoffEntry.seed : null,
   );

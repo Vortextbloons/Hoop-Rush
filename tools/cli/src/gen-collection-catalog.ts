@@ -21,15 +21,12 @@ import {
   reconstructedThreePointProfileSchema,
   type CollectionCatalog,
   type CollectionCardDefinition,
-  type CollectionPackDefinition,
   type CollectionRarity,
   type SeasonDraftCandidate,
 } from '@hoop-rush/data-contracts';
 import {
   COLLECTION_CATALOG_VERSION,
   COLLECTION_OVERLAY_VERSION,
-  COLLECTION_PACK_RULES_VERSION,
-  COLLECTION_REPLAY_V1_VERSION,
   COLLECTION_SCHEMA_VERSION,
   COLLECTION_SPECIALS_VERSION,
   COLLECTION_VERSION,
@@ -104,97 +101,6 @@ export function rarityForOverall(overall: number): CollectionRarity {
   if (overall < 95) return 'Titan';
   if (overall < 99) return 'Eclipse';
   return 'Immortal';
-}
-
-const ORDINARY_WEIGHTS: Record<CollectionRarity, number> = {
-  Ember: 70,
-  Eruption: 23,
-  Apex: 5,
-  Titan: 1.7,
-  Eclipse: 0.29,
-  Immortal: 0.01,
-};
-
-const DUPLICATE_EXCHANGE: Record<CollectionRarity, number> = {
-  Ember: 5,
-  Eruption: 15,
-  Apex: 50,
-  Titan: 150,
-  Eclipse: 500,
-  Immortal: 1500,
-};
-
-export function launchPackDefinitions(): CollectionPackDefinition[] {
-  const ordinary = { kind: 'ordinary' as const };
-  return [
-    {
-      packId: 'tip-off',
-      packRulesVersion: COLLECTION_PACK_RULES_VERSION,
-      priceCurrency: 'Coins',
-      priceAmount: 100,
-      slots: [ordinary],
-      eligibleScope: 'full-catalog',
-      rarityWeights: { ...ORDINARY_WEIGHTS },
-      duplicateExchange: { ...DUPLICATE_EXCHANGE },
-    },
-    {
-      packId: 'fast-break',
-      packRulesVersion: COLLECTION_PACK_RULES_VERSION,
-      priceCurrency: 'Coins',
-      priceAmount: 300,
-      slots: [ordinary, ordinary, ordinary],
-      eligibleScope: 'full-catalog',
-      rarityWeights: { ...ORDINARY_WEIGHTS },
-      duplicateExchange: { ...DUPLICATE_EXCHANGE },
-    },
-    {
-      packId: 'full-court',
-      packRulesVersion: COLLECTION_PACK_RULES_VERSION,
-      priceCurrency: 'Coins',
-      priceAmount: 500,
-      slots: [
-        ordinary,
-        ordinary,
-        ordinary,
-        ordinary,
-        { kind: 'guaranteed', floorRarity: 'Eruption' },
-      ],
-      eligibleScope: 'full-catalog',
-      rarityWeights: { ...ORDINARY_WEIGHTS },
-      duplicateExchange: { ...DUPLICATE_EXCHANGE },
-    },
-    {
-      packId: 'main-event',
-      packRulesVersion: COLLECTION_PACK_RULES_VERSION,
-      priceCurrency: 'Coins',
-      priceAmount: 1000,
-      slots: [
-        ordinary,
-        ordinary,
-        ordinary,
-        ordinary,
-        ordinary,
-        ordinary,
-        ordinary,
-        ordinary,
-        ordinary,
-        { kind: 'guaranteed', floorRarity: 'Apex' },
-      ],
-      eligibleScope: 'full-catalog',
-      rarityWeights: { ...ORDINARY_WEIGHTS },
-      duplicateExchange: { ...DUPLICATE_EXCHANGE },
-    },
-    {
-      packId: 'spotlight',
-      packRulesVersion: COLLECTION_PACK_RULES_VERSION,
-      priceCurrency: 'Exchange',
-      priceAmount: 2000,
-      slots: [{ kind: 'guaranteed', floorRarity: 'Apex' }],
-      eligibleScope: 'specials-only',
-      rarityWeights: { ...ORDINARY_WEIGHTS },
-      duplicateExchange: { ...DUPLICATE_EXCHANGE },
-    },
-  ];
 }
 
 function baseCardId(sourcePlayerVersionId: string): string {
@@ -365,34 +271,6 @@ function main(): void {
     });
   }
   cards.sort((a, b) => (a.cardId < b.cardId ? -1 : 1));
-  const byCardId = new Map(cards.map((card) => [card.cardId, card]));
-  const setOf = (
-    family: string,
-    setId: CollectionCatalog['sets'][number]['setId'],
-    title: string,
-  ) => ({
-    setId,
-    title,
-    memberCardIds: cards
-      .filter((card) => card.family === family)
-      .map((card) => card.cardId)
-      .sort(),
-  });
-  const sets = [
-    setOf('Heat Check', 'heat-check-set', 'Heat Check'),
-    setOf('Arm Guard', 'arm-guard-set', 'Arm Guard'),
-  ] as CollectionCatalog['sets'];
-  for (const set of sets) {
-    const expectedCount = set.setId === 'arm-guard-set' ? 7 : 6;
-    if (set.memberCardIds.length !== expectedCount) {
-      throw new Error(
-        `set ${set.setId} has ${String(set.memberCardIds.length)} members, want ${String(expectedCount)}`,
-      );
-    }
-    for (const member of set.memberCardIds) {
-      if (!byCardId.has(member)) throw new Error(`set ${set.setId} references unknown ${member}`);
-    }
-  }
   const catalog = {
     schemaVersion: COLLECTION_SCHEMA_VERSION,
     catalogVersion: COLLECTION_CATALOG_VERSION,
@@ -406,9 +284,6 @@ function main(): void {
     sourceCatalogVersion: 'season-draft-catalog-v4',
     sourceCatalogHash: draftRef.contentHash,
     cards,
-    sets,
-    packs: launchPackDefinitions(),
-    replayVersion: COLLECTION_REPLAY_V1_VERSION,
   };
   const parsed = collectionCatalogSchema.safeParse(catalog);
   if (!parsed.success) {
@@ -457,7 +332,7 @@ function main(): void {
   };
   writeJsonRetry(MANIFEST_PATH, fullManifest, true);
   console.log(
-    `wrote collection catalog (${String(parsed.data.cards.length)} cards, ${String(sets.length)} sets) hash ${catalogHash}`,
+    `wrote collection catalog (${String(parsed.data.cards.length)} cards) hash ${catalogHash}`,
   );
 }
 

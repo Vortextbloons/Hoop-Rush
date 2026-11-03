@@ -3,12 +3,10 @@
     CAP_RUSH_CONFERENCE_NAMES,
     capRushAlignmentOf,
     capRushConferenceStandingsEntries,
-    isConferenceStandings,
     type CapRushConferenceStandings,
     type CapRushDraftState,
     type CapRushLeagueGame,
     type CapRushLockedInputs,
-    type CapRushPostseasonStandings,
   } from '@hoop-rush/data-contracts';
   import PlayerFace from '#lib/components/PlayerFace.svelte';
   import TeamLogo from '#lib/components/TeamLogo.svelte';
@@ -41,7 +39,7 @@
     teamId: string;
     locked: CapRushLockedInputs;
     draft?: CapRushDraftState | null;
-    standings?: CapRushPostseasonStandings | CapRushConferenceStandings | null;
+    standings?: CapRushConferenceStandings | null;
     leagueGames?: readonly CapRushLeagueGame[];
     art?: CapRushArt | null;
     onGameSelect?: (game: CapRushLeagueGame) => void;
@@ -58,9 +56,7 @@
   const identity = $derived(art === null ? null : art.teamFor(teamId));
   const entry = $derived.by(() => {
     if (standings === null) return null;
-    const entries = isConferenceStandings(standings)
-      ? capRushConferenceStandingsEntries(standings)
-      : standings.entries;
+    const entries = capRushConferenceStandingsEntries(standings);
     return entries.find((candidate) => candidate.teamId === teamId) ?? null;
   });
   const record = $derived.by(() => {

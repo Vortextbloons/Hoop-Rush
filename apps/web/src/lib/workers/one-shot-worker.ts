@@ -13,7 +13,7 @@ export interface OneShotWorkerErrorMessages {
 export type OneShotWorkerResult<TOutput> =
   { kind: 'output'; output: TOutput } | { kind: 'error'; message: string };
 
-export interface OneShotWorkerSpec<TPayload, TResponse, TOutput> {
+export interface OneShotWorkerSpec<TPayload, TResponse extends { requestId: string }, TOutput> {
   workerUrl: URL;
   buildRequest(payload: TPayload, requestId: string): unknown;
   responseSchema: {
@@ -21,7 +21,6 @@ export interface OneShotWorkerSpec<TPayload, TResponse, TOutput> {
       value: unknown,
     ): { success: true; data: TResponse } | { success: false; error: unknown };
   };
-  requestIdOf(response: TResponse): string;
   resultOf(response: TResponse): OneShotWorkerResult<TOutput>;
   errorMessages: OneShotWorkerErrorMessages;
   timeoutMs?: number;
@@ -35,7 +34,7 @@ interface PendingOneShotRequest {
   timeout: ReturnType<typeof setTimeout>;
 }
 
-export class OneShotWorkerRunner<TPayload, TResponse, TOutput> {
+export class OneShotWorkerRunner<TPayload, TResponse extends { requestId: string }, TOutput> {
   private worker: Worker | null = null;
   private pending: PendingOneShotRequest | null = null;
 
@@ -64,7 +63,7 @@ export class OneShotWorkerRunner<TPayload, TResponse, TOutput> {
           this.fail(requestId, new Error(this.spec.errorMessages.invalidMessage));
           return;
         }
-        if (this.spec.requestIdOf(parsed.data) !== requestId) return;
+        if (parsed.data.requestId !== requestId) return;
         if (this.pending?.requestId !== requestId) return;
         const result = this.spec.resultOf(parsed.data);
         this.settle(requestId);

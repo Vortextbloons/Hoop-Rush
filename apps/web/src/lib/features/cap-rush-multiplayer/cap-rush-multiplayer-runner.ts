@@ -204,7 +204,6 @@ export class CapRushMultiplayerRunner {
       workerUrl: WORKER_URL,
       buildRequest,
       responseSchema: capRushMultiplayerWorkerMessageSchema,
-      requestIdOf: (response) => response.requestId,
       resultOf: (response) =>
         isError(response)
           ? { kind: 'error', message: response.message }

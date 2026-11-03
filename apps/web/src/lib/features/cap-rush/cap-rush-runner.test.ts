@@ -174,20 +174,10 @@ describe('CapRushRunner', () => {
     await expect(pending).resolves.toMatchObject({ type: 'cap-rush-complete' });
     expect(fake.terminated).toBe(false);
 
-    const standings = runner.simulateStandings({
-      requestId: 'req-2',
-      locked: LOCKED,
-      bracket: {} as never,
-    });
-    expect(fake.posted[1]).toMatchObject({ type: 'cap-rush-standings', requestId: 'req-2' });
-    fake.emit({
-      schemaVersion: CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION,
-      type: 'cap-rush-standings-complete',
-      requestId: 'req-2',
-      result: null,
-      cancelled: false,
-    });
-    await expect(standings).resolves.toMatchObject({ type: 'cap-rush-standings-complete' });
+    const next = simulate(runner, 'req-2');
+    expect(fake.posted[1]).toMatchObject({ type: 'cap-rush-simulate', requestId: 'req-2' });
+    fake.emit(completeMessage('req-2'));
+    await expect(next).resolves.toMatchObject({ type: 'cap-rush-complete' });
   });
 
   it('rejects concurrent jobs without disturbing the active job', async () => {
@@ -197,9 +187,6 @@ describe('CapRushRunner', () => {
     await expect(simulate(runner, 'req-2')).rejects.toThrow(
       'a cap rush season job is already running',
     );
-    await expect(
-      runner.simulateStandings({ requestId: 'req-3', locked: LOCKED, bracket: {} as never }),
-    ).rejects.toThrow('a cap rush job is already running');
     fake.emit(completeMessage('req-1'));
     await expect(pending).resolves.toMatchObject({ requestId: 'req-1' });
   });

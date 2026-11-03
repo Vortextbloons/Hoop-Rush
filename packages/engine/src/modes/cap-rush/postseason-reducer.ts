@@ -16,9 +16,8 @@ import {
   canonicalJson,
   capRushDraftStateSchema,
   capRushEmptyConferencePostseason,
-  capRushLeagueSeed,
   capRushPlayoffGameSeed,
-  isConferencePostseason,
+  capRushSeriesComplete,
 } from '@hoop-rush/data-contracts';
 import { havocGameResultDigest } from '../havoc/digests.ts';
 import {
@@ -35,13 +34,6 @@ import {
 } from './conference-postseason.ts';
 import { buildCapRushConferenceStandings } from './conference-standings.ts';
 import { capRushLeagueFieldOfLocked } from './league-simulation.ts';
-import {
-  buildCapRushPostseasonStandings,
-  capRushFinalsMvp,
-  capRushOpeningSeries,
-  capRushRefreshPostseason,
-  capRushSeriesIsComplete,
-} from './postseason.ts';
 export type CapRushPostseasonCommand = Extract<
   CapRushCommand,
   {
@@ -91,7 +83,7 @@ function applyAcceptStandings(
       'the background league games are incomplete',
     );
   }
-  if (command.standings !== undefined) {
+  {
     if (state.locked.leagueSchedule === undefined) {
       return rejectCapRushCommand(
         state,
@@ -174,69 +166,6 @@ function applyAcceptStandings(
     });
     return acceptCapRushCommand(state, command, nextState);
   }
-  if (command.league === undefined) {
-    return rejectCapRushCommand(
-      state,
-      command,
-      'standings-invalid',
-      'the command carries no standings',
-    );
-  }
-  if (isConferencePostseason(state.postseason)) {
-    return rejectCapRushCommand(
-      state,
-      command,
-      'standings-invalid',
-      'conference runs require conference standings',
-    );
-  }
-  if (command.league.league.seed !== capRushLeagueSeed(state.runSeed)) {
-    return rejectCapRushCommand(
-      state,
-      command,
-      'digest-mismatch',
-      'the league standings do not carry the locked background seed',
-    );
-  }
-  let standings;
-  try {
-    standings = buildCapRushPostseasonStandings({
-      locked: state.locked,
-      league: command.league,
-      userGames: state.season.games.map((game) => ({
-        opponentId: game.opponentId,
-        humanPoints: game.humanPoints,
-        opponentPoints: game.opponentPoints,
-        won: game.won,
-      })),
-    });
-  } catch (error) {
-    return rejectCapRushCommand(
-      state,
-      command,
-      'standings-invalid',
-      error instanceof Error ? error.message : 'the league standings are invalid',
-    );
-  }
-  const userEntry = standings.entries.find((entry) => entry.teamId === CAP_RUSH_USER_TEAM_ID);
-  const qualified = userEntry?.qualified === true;
-  const nextState = capRushDraftStateSchema.parse({
-    ...state,
-    revision: state.revision + 1,
-    postseason: capRushRefreshPostseason({
-      postseason: {
-        ...state.postseason,
-        phase: 'playoffs',
-        standings,
-        series: capRushOpeningSeries(standings),
-        userOutcome: qualified
-          ? { status: 'pending', round: null }
-          : { status: 'not-qualified', round: null },
-      },
-      userTeamId: state.locked.human.teamId,
-    }),
-  });
-  return acceptCapRushCommand(state, command, nextState);
 }
 
 function applyAcceptPlayoffGame(
@@ -254,130 +183,7 @@ function applyAcceptPlayoffGame(
       'the run is not in its postseason',
     );
   }
-  if (isConferencePostseason(state.postseason)) {
-    return applyAcceptConferencePlayoffGame(state, command, environment, state.postseason);
-  }
-  if (state.postseason.phase !== 'playoffs') {
-    return rejectCapRushCommand(
-      state,
-      command,
-      'phase-mismatch',
-      'the playoff bracket is not open',
-    );
-  }
-  const { game } = command;
-  if (!command.audit.ok) {
-    return rejectCapRushCommand(state, command, 'digest-mismatch', 'the playoff game audit failed');
-  }
-  const series = state.postseason.series.find((entry) => entry.seriesId === game.seriesId);
-  if (series === undefined) {
-    return rejectCapRushCommand(
-      state,
-      command,
-      'playoff-mismatch',
-      'the playoff game belongs to an unknown series',
-    );
-  }
-  if (capRushSeriesIsComplete(series)) {
-    return rejectCapRushCommand(state, command, 'series-complete', 'the series is already decided');
-  }
-  if (series.round !== game.round || series.seriesSlot !== game.seriesSlot) {
-    return rejectCapRushCommand(
-      state,
-      command,
-      'playoff-mismatch',
-      'the playoff game identity does not match its series',
-    );
-  }
-  const expectedOrdinal = series.games.length + 1;
-  if (game.gameOrdinal !== expectedOrdinal || expectedOrdinal > CAP_RUSH_SERIES_GAMES) {
-    return rejectCapRushCommand(
-      state,
-      command,
-      'playoff-mismatch',
-      `the series expects game ${String(expectedOrdinal)}`,
-    );
-  }
-  const highHome = [1, 2, 5, 7].includes(expectedOrdinal);
-  const expectedHome = highHome ? series.highTeamId : series.lowTeamId;
-  const expectedAway = highHome ? series.lowTeamId : series.highTeamId;
-  if (game.homeTeamId !== expectedHome || game.awayTeamId !== expectedAway) {
-    return rejectCapRushCommand(
-      state,
-      command,
-      'playoff-mismatch',
-      'the playoff game does not follow the bracket home court',
-    );
-  }
-  if (game.homeSeed !== (highHome ? series.highSeed : series.lowSeed)) {
-    return rejectCapRushCommand(state, command, 'playoff-mismatch', 'the home seed is wrong');
-  }
-  if (game.awaySeed !== (highHome ? series.lowSeed : series.highSeed)) {
-    return rejectCapRushCommand(state, command, 'playoff-mismatch', 'the away seed is wrong');
-  }
-  if (
-    game.seed !==
-    capRushPlayoffGameSeed(state.runSeed, game.round, game.seriesSlot, game.gameOrdinal)
-  ) {
-    return rejectCapRushCommand(
-      state,
-      command,
-      'digest-mismatch',
-      'the playoff game seed does not match the locked run seed',
-    );
-  }
-  const isUserGame =
-    series.highTeamId === state.locked.human.teamId ||
-    series.lowTeamId === state.locked.human.teamId;
-  if (isUserGame !== (game.userSide !== null)) {
-    return rejectCapRushCommand(
-      state,
-      command,
-      'playoff-mismatch',
-      'the playoff game user side does not match the matchup',
-    );
-  }
-  if (isUserGame && command.result === null) {
-    return rejectCapRushCommand(
-      state,
-      command,
-      'digest-mismatch',
-      'a user playoff game requires its box score',
-    );
-  }
-  if (command.result !== null) {
-    if (
-      command.result.home.points !== game.homePoints ||
-      command.result.away.points !== game.awayPoints ||
-      command.result.home.teamId !== game.homeTeamId ||
-      command.result.away.teamId !== game.awayTeamId ||
-      command.result.humanSide !== game.userSide ||
-      havocGameResultDigest(command.result) !== game.resultDigest
-    ) {
-      return rejectCapRushCommand(
-        state,
-        command,
-        'digest-mismatch',
-        'the playoff box score disagrees with the accepted summary',
-      );
-    }
-  }
-  const nextSeries = { ...series, games: [...series.games, game] };
-  const updatedPostseason = capRushRefreshPostseason({
-    postseason: {
-      ...state.postseason,
-      series: state.postseason.series.map((entry) =>
-        entry.seriesId === series.seriesId ? nextSeries : entry,
-      ),
-    },
-    userTeamId: state.locked.human.teamId,
-  });
-  const nextState = capRushDraftStateSchema.parse({
-    ...state,
-    revision: state.revision + 1,
-    postseason: updatedPostseason,
-  });
-  return acceptCapRushCommand(state, command, nextState);
+  return applyAcceptConferencePlayoffGame(state, command, environment, state.postseason);
 }
 
 function applyFinalizePostseason(
@@ -395,58 +201,7 @@ function applyFinalizePostseason(
       'the run is not in its postseason',
     );
   }
-  if (isConferencePostseason(state.postseason)) {
-    return applyFinalizeConferencePostseason(state, command, environment, state.postseason);
-  }
-  if (state.postseason.phase !== 'playoffs') {
-    return rejectCapRushCommand(
-      state,
-      command,
-      'phase-mismatch',
-      'the playoff bracket is not open',
-    );
-  }
-  if (state.postseason.championTeamId === null) {
-    return rejectCapRushCommand(
-      state,
-      command,
-      'postseason-complete',
-      'the postseason is not finished',
-    );
-  }
-  const finalsSeries = state.postseason.series.find(
-    (series) => series.round === CAP_RUSH_PLAYOFF_ROUNDS && series.seriesSlot === 0,
-  );
-  if (finalsSeries === undefined || !capRushSeriesIsComplete(finalsSeries)) {
-    return rejectCapRushCommand(
-      state,
-      command,
-      'postseason-complete',
-      'the Finals are not finished',
-    );
-  }
-  const finalsMvp = capRushFinalsMvp(state.postseason);
-  if (finalsMvp === null) {
-    return rejectCapRushCommand(
-      state,
-      command,
-      'postseason-complete',
-      'the Finals MVP evidence is missing',
-    );
-  }
-  const completedAt = environment.nowIso?.() ?? new Date().toISOString();
-  const nextState = capRushDraftStateSchema.parse({
-    ...state,
-    revision: state.revision + 1,
-    stage: 'completed',
-    postseason: {
-      ...state.postseason,
-      phase: 'complete',
-      finalsMvp,
-      completedAt,
-    },
-  });
-  return acceptCapRushCommand(state, command, nextState);
+  return applyFinalizeConferencePostseason(state, command, environment, state.postseason);
 }
 
 function applyFinalizeConferencePostseason(
@@ -476,7 +231,7 @@ function applyFinalizeConferencePostseason(
   const finalsSeries = postseason.series.find(
     (series) => series.round === CAP_RUSH_PLAYOFF_ROUNDS && series.seriesSlot === 0,
   );
-  if (finalsSeries === undefined || !capRushSeriesIsComplete(finalsSeries)) {
+  if (finalsSeries === undefined || !capRushSeriesComplete(finalsSeries)) {
     return rejectCapRushCommand(
       state,
       command,
@@ -541,7 +296,7 @@ function applyAcceptConferencePlayoffGame(
       'the playoff game belongs to an unknown series',
     );
   }
-  if (capRushSeriesIsComplete(series)) {
+  if (capRushSeriesComplete(series)) {
     return rejectCapRushCommand(state, command, 'series-complete', 'the series is already decided');
   }
   if (series.round !== game.round || series.seriesSlot !== game.seriesSlot) {

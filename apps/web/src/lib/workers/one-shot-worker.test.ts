@@ -71,7 +71,6 @@ function stubSpec(
         return { success: false, error: null };
       },
     },
-    requestIdOf: (response) => response.requestId,
     resultOf: (response): OneShotWorkerResult<string> =>
       response.ok
         ? { kind: 'output', output: response.output ?? '' }

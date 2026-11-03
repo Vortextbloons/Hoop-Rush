@@ -1,3 +1,5 @@
+import { HIGH_USAGE } from './runtime-test-support.ts';
+import { RIM_ATTACK } from './runtime-test-support.ts';
 import { describe, expect, it } from 'bun:test';
 import type {
   HavocBattleEvent,
@@ -39,52 +41,6 @@ interface SeedHit {
   seed: Seed;
   run: BattleRun;
 }
-
-const RIM_ATTACK: Partial<SimulationRatings> = {
-  insideScoring: 99,
-  closeShot: 95,
-  midrange: 80,
-  threePoint: 55,
-  freeThrow: 90,
-  ballHandling: 95,
-  passing: 75,
-  offensiveIq: 90,
-  offensiveRebound: 90,
-  defensiveRebound: 60,
-  perimeterDefense: 70,
-  interiorDefense: 60,
-  steal: 65,
-  block: 55,
-  defensiveIq: 70,
-  speed: 99,
-  strength: 85,
-  vertical: 99,
-};
-
-const HIGH_USAGE: Partial<SimulationTendencies> = {
-  usageRate: 45,
-  shotRate: 99,
-  driveRate: 95,
-  rimFrequency: 100,
-  shortMidFrequency: 35,
-  longMidFrequency: 5,
-  cornerThreeFrequency: 5,
-  aboveBreakThreeFrequency: 5,
-  threePointRate: 10,
-  freeThrowRate: 95,
-  turnoverRate: 35,
-  isolationRate: 45,
-  pickAndRollBallHandlerRate: 40,
-  pickAndRollRollManRate: 20,
-  spotUpRate: 10,
-  transitionRate: 30,
-  cutRate: 20,
-  foulRate: 35,
-  stealAttemptRate: 15,
-  blockAttemptRate: 10,
-  crashOffensiveGlassRate: 95,
-  passRate: 5,
-};
 
 /** Draws most of a side's defensive fouls so a chosen player fouls out early. */
 const FOUL_MAGNET_RATINGS: Partial<SimulationRatings> = {

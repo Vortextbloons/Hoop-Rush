@@ -161,6 +161,7 @@ function lockedRun(options: { league?: boolean } = {}) {
     ...created,
     revision: created.revision + 1,
     stage: 'locked',
+    postseasonEligible: takeover !== undefined,
     round: 5,
     offer: null,
     picks,
@@ -457,6 +458,27 @@ describe('cap rush repository', () => {
     });
     await db.capRushActive.put(row);
     await expect(repository.loadActiveDraft()).rejects.toBeInstanceOf(CapRushLoadError);
+  });
+
+  it('rejects an old locked season without deleting the save', async () => {
+    await startLockedRun(repository);
+    const row = await db.capRushActive.get(CAP_RUSH_ACTIVE_DRAFT_RECORD_ID);
+    if (!row) throw new Error('missing locked run');
+    await db.capRushActive.put({ ...row, draft: { ...row.draft, postseasonEligible: true } });
+    await expect(repository.loadActiveDraft()).rejects.toMatchObject({ code: 'unsupported' });
+    expect(await db.capRushActive.get(CAP_RUSH_ACTIVE_DRAFT_RECORD_ID)).toBeDefined();
+  });
+
+  it('rejects an old postseason without deleting the save', async () => {
+    await startLockedRun(repository);
+    const row = await db.capRushActive.get(CAP_RUSH_ACTIVE_DRAFT_RECORD_ID);
+    if (!row) throw new Error('missing locked run');
+    await db.capRushActive.put({
+      ...row,
+      draft: { ...row.draft, postseason: { version: 'cap-rush-postseason-v1' } },
+    } as never);
+    await expect(repository.loadActiveDraft()).rejects.toMatchObject({ code: 'unsupported' });
+    expect(await db.capRushActive.get(CAP_RUSH_ACTIVE_DRAFT_RECORD_ID)).toBeDefined();
   });
 
   it('recognizes an older rules version in a locked active run as unsupported', async () => {
@@ -826,6 +848,7 @@ describe('cap rush repository', () => {
     }
     const completed: CapRushDraftState = capRushDraftStateSchema.parse({
       ...state,
+      postseasonEligible: false,
       revision: state.revision + CAP_RUSH_GAME_COUNT,
       season: {
         games: games.map((game) => game.summary),

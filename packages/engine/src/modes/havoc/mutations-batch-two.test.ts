@@ -1,3 +1,4 @@
+import { RIM_ATTACK } from './runtime-test-support.ts';
 import { describe, expect, it } from 'bun:test';
 import type {
   HavocEvent,
@@ -15,27 +16,6 @@ import {
   type ScenarioRun,
   type ScenarioSlot,
 } from './runtime-test-support.ts';
-
-const RIM_ATTACK: Partial<SimulationRatings> = {
-  insideScoring: 99,
-  closeShot: 95,
-  midrange: 80,
-  threePoint: 55,
-  freeThrow: 90,
-  ballHandling: 95,
-  passing: 75,
-  offensiveIq: 90,
-  offensiveRebound: 90,
-  defensiveRebound: 60,
-  perimeterDefense: 70,
-  interiorDefense: 60,
-  steal: 65,
-  block: 55,
-  defensiveIq: 70,
-  speed: 99,
-  strength: 85,
-  vertical: 99,
-};
 
 const HIGH_USAGE: Partial<SimulationTendencies> = {
   usageRate: 45,

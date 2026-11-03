@@ -119,10 +119,6 @@ export function capRushGameSeed(runSeed: Seed, gameNumber: number): Seed {
   return capRushSeed(runSeed, 'game', gameNumber);
 }
 
-export function capRushLeagueSeed(runSeed: Seed): Seed {
-  return capRushSeed(runSeed, 'background-league');
-}
-
 export function capRushFranchiseAssignmentSeed(runSeed: Seed): Seed {
   return capRushSeed(runSeed, 'franchise-assignment');
 }

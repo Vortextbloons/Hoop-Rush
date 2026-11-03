@@ -1,12 +1,10 @@
 import { z } from 'zod';
 import { capRushApronFactSchema } from './cap-rush-apron.ts';
-import { opponentBracketSchema } from './bracket.ts';
 import { CAP_RUSH_GAME_COUNT, capRushDigestSchema } from './cap-rush-versions.ts';
 import { capRushGameSummarySchema } from './cap-rush-season.ts';
 import { capRushLockedInputsSchema } from './cap-rush-lock.ts';
 import { capRushLeagueGameSchema } from './cap-rush-league.ts';
 import {
-  capRushLeagueResultSchema,
   capRushPlayoffGamePlanSchema,
   capRushStoredPlayoffGameSchema,
 } from './cap-rush-postseason.ts';
@@ -25,8 +23,6 @@ const capRushWorkerBase = z.object({
   requestId: z.string().min(1).max(64),
 });
 
-export const capRushWorkerBracketSchema = opponentBracketSchema;
-
 export const capRushWorkerSimulateRequestSchema = capRushWorkerBase.extend({
   type: z.literal('cap-rush-simulate'),
   locked: capRushLockedInputsSchema,
@@ -37,12 +33,6 @@ export const capRushWorkerSimulateRequestSchema = capRushWorkerBase.extend({
   partition: z.union([z.literal(0), z.literal(1)]).optional(),
   backfillLeagueFrom: z.number().int().min(1).max(CAP_RUSH_GAME_COUNT).optional(),
   backfillLeagueTo: z.number().int().min(1).max(CAP_RUSH_GAME_COUNT).optional(),
-});
-
-export const capRushWorkerStandingsRequestSchema = capRushWorkerBase.extend({
-  type: z.literal('cap-rush-standings'),
-  locked: capRushLockedInputsSchema,
-  bracket: capRushWorkerBracketSchema,
 });
 
 export const capRushWorkerPlayoffsRequestSchema = capRushWorkerBase.extend({
@@ -58,7 +48,6 @@ export const capRushWorkerCancelRequestSchema = capRushWorkerBase.extend({
 
 export const capRushWorkerRequestSchema = z.discriminatedUnion('type', [
   capRushWorkerSimulateRequestSchema,
-  capRushWorkerStandingsRequestSchema,
   capRushWorkerPlayoffsRequestSchema,
   capRushWorkerCancelRequestSchema,
 ]);
@@ -112,15 +101,6 @@ export const capRushWorkerProgressMessageSchema = capRushWorkerBase.extend({
 });
 export type CapRushWorkerProgressMessage = z.infer<typeof capRushWorkerProgressMessageSchema>;
 
-export const capRushWorkerStandingsCompleteMessageSchema = capRushWorkerBase.extend({
-  type: z.literal('cap-rush-standings-complete'),
-  result: capRushLeagueResultSchema.nullable(),
-  cancelled: z.boolean(),
-});
-export type CapRushWorkerStandingsCompleteMessage = z.infer<
-  typeof capRushWorkerStandingsCompleteMessageSchema
->;
-
 export const capRushWorkerCompleteMessageSchema = capRushWorkerBase.extend({
   type: z.literal('cap-rush-complete'),
   gamesDelivered: z.number().int().nonnegative(),
@@ -158,7 +138,6 @@ export const capRushWorkerMessageSchema = z.discriminatedUnion('type', [
   capRushWorkerLeagueGamesMessageSchema,
   capRushWorkerPlayoffGameMessageSchema,
   capRushWorkerProgressMessageSchema,
-  capRushWorkerStandingsCompleteMessageSchema,
   capRushWorkerCompleteMessageSchema,
   capRushWorkerPlayoffsCompleteMessageSchema,
   capRushWorkerErrorMessageSchema,

@@ -2,11 +2,8 @@
   import {
     CAP_RUSH_CONFERENCE_PLAYOFF_TEAMS,
     CAP_RUSH_CONFERENCE_NAMES,
-    CAP_RUSH_PLAYOFF_TEAMS,
     capRushConferenceStandingsEntries,
-    isConferenceStandings,
     type CapRushConferenceStandings,
-    type CapRushPostseasonStandings,
     type HoopRushManifest,
   } from '@hoop-rush/data-contracts';
   import TeamLogo from '#lib/components/TeamLogo.svelte';
@@ -17,32 +14,18 @@
     manifest = null,
     userTeamId = null,
     onTeamSelect,
-    highlightSeed = null,
   }: {
-    standings: CapRushPostseasonStandings | CapRushConferenceStandings;
+    standings: CapRushConferenceStandings;
     manifest?: HoopRushManifest | null;
     userTeamId?: string | null;
     onTeamSelect?: (teamId: string) => void;
-    highlightSeed?: number | null;
   } = $props();
 
-  const conference = $derived(isConferenceStandings(standings));
-  const conferenceStandings = $derived(
-    conference ? (standings as CapRushConferenceStandings) : null,
-  );
-  const entries = $derived(
-    conferenceStandings === null
-      ? (standings as CapRushPostseasonStandings).entries
-      : capRushConferenceStandingsEntries(conferenceStandings),
-  );
+  const entries = $derived(capRushConferenceStandingsEntries(standings));
   const userEntry = $derived(
     userTeamId === null ? null : (entries.find((entry) => entry.teamId === userTeamId) ?? null),
   );
-  const userConference = $derived(
-    userEntry !== null && 'conference' in userEntry
-      ? (userEntry as { conference: 'east' | 'west' }).conference
-      : null,
-  );
+  const userConference = $derived(userEntry?.conference ?? null);
 
   function identityOf(teamId: string) {
     if (manifest === null) return null;
@@ -68,22 +51,10 @@
     }
   }
 
-  const tables = $derived(
-    conferenceStandings === null
-      ? [{ conference: null, entries, cutoff: null }]
-      : [
-          {
-            conference: 'west' as const,
-            entries: conferenceStandings.west.entries,
-            cutoff: conferenceStandings.west.cutoff,
-          },
-          {
-            conference: 'east' as const,
-            entries: conferenceStandings.east.entries,
-            cutoff: conferenceStandings.east.cutoff,
-          },
-        ],
-  );
+  const tables = $derived([
+    { conference: 'west' as const, entries: standings.west.entries, cutoff: standings.west.cutoff },
+    { conference: 'east' as const, entries: standings.east.entries, cutoff: standings.east.cutoff },
+  ]);
 </script>
 
 <section
@@ -93,17 +64,17 @@
   <div class="flex flex-wrap items-end justify-between gap-3">
     <div>
       <p class="font-mono text-[10px] font-bold tracking-[0.16em] text-primary uppercase">
-        {conference ? 'Conference standings' : 'League standings'}
+        Conference standings
       </p>
       <h2 class="font-display mt-1 text-2xl font-extrabold tracking-tight uppercase">
-        {conference ? 'Eight per conference.' : '82 games decide the field.'}
+        Eight per conference.
       </h2>
     </div>
     {#if userEntry}
       <p
         class="rounded-lg border border-primary/40 bg-primary/10 px-3 py-1.5 font-mono text-[10px] font-bold text-primary uppercase"
       >
-        {conference && userConference !== null
+        {userConference !== null
           ? `${CAP_RUSH_CONFERENCE_NAMES[userConference]} · Seed ${userEntry.seed}`
           : `Your seed · ${userEntry.seed}`}
       </p>
@@ -111,17 +82,12 @@
   </div>
 
   <p class="mt-2 text-xs text-muted-foreground">
-    {#if conference}
-      Seeds 1–{CAP_RUSH_CONFERENCE_PLAYOFF_TEAMS} in each conference qualify. Ties break on wins, then
-      head-to-head record among tied teams, then conference record, point differential, points scored
-      and stable team id.
-    {:else}
-      Seeds 1–{CAP_RUSH_PLAYOFF_TEAMS} qualify. Ties break on wins, then point differential, then points
-      scored.
-    {/if}
+    Seeds 1?{CAP_RUSH_CONFERENCE_PLAYOFF_TEAMS} in each conference qualify. Ties break on wins, then head-to-head
+    record among tied teams, then conference record, point differential, points scored and stable team
+    id.
   </p>
 
-  <div class={conference ? 'mt-4 grid gap-4 lg:grid-cols-2' : 'mt-4'}>
+  <div class="mt-4 grid gap-4 lg:grid-cols-2">
     {#each tables as table (table.conference ?? 'overall')}
       <div class="min-w-0">
         {#if table.conference !== null}
@@ -159,8 +125,6 @@
                 <tr
                   class="border-b border-line-soft/60 last:border-0 {entry.teamId === userTeamId
                     ? 'bg-primary/10'
-                    : ''} {highlightSeed === entry.seed && table.conference === null
-                    ? 'ring-1 ring-inset ring-primary/40'
                     : ''}"
                 >
                   <td
@@ -235,16 +199,6 @@
             Cutoff: seed {table.cutoff.seed} finished {table.cutoff.wins}–{table.cutoff.losses} with a
             {table.cutoff.pointDifferential > 0 ? '+' : ''}{table.cutoff.pointDifferential}
             differential. Decided by {tieBreakLabel(table.cutoff.tieBreak)}.
-          </p>
-        {:else if !conference}
-          <p class="mt-3 text-[11px] text-muted-foreground">
-            Cutoff: seed {(standings as CapRushPostseasonStandings).cutoff.seed} finished
-            {(standings as CapRushPostseasonStandings).cutoff.wins}–{(
-              standings as CapRushPostseasonStandings
-            ).cutoff.losses} with a {(standings as CapRushPostseasonStandings).cutoff
-              .pointDifferential > 0
-              ? '+'
-              : ''}{(standings as CapRushPostseasonStandings).cutoff.pointDifferential} differential.
           </p>
         {/if}
       </div>

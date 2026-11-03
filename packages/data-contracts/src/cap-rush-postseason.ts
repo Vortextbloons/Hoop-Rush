@@ -3,7 +3,6 @@ import { capRushPlaybackSchema } from './cap-rush-playback.ts';
 import { z } from 'zod';
 import { playerIdSchema, seedSchema } from './ids.ts';
 import { positionSchema } from './positions.ts';
-import { leagueRecordSchema } from './league.ts';
 import { capRushDigestSchema } from './cap-rush-versions.ts';
 import { havocGameAuditSchema, havocGameResultSchema } from './havoc-game.ts';
 import {
@@ -13,7 +12,6 @@ import {
   capRushConferenceStandingsSchema,
 } from './cap-rush-league.ts';
 
-export const CAP_RUSH_POSTSEASON_VERSION = 'cap-rush-postseason-v1';
 export const CAP_RUSH_CONFERENCE_POSTSEASON_VERSION = 'cap-rush-postseason-v2';
 export const CAP_RUSH_FINALS_MVP_VERSION = 'cap-rush-finals-mvp-v1';
 export const CAP_RUSH_PLAYOFF_TEAMS = 16;
@@ -21,8 +19,6 @@ export const CAP_RUSH_PLAYOFF_ROUNDS = 4;
 export const CAP_RUSH_SERIES_WINS = 4;
 export const CAP_RUSH_SERIES_GAMES = 7;
 export const CAP_RUSH_LEAGUE_TEAMS = 31;
-export const CAP_RUSH_LEAGUE_GAMES_PER_TEAM = 82;
-export const CAP_RUSH_LEAGUE_GAMES = 1271;
 export const CAP_RUSH_USER_TEAM_ID = 'cap-rush-human';
 
 export const capRushPlayoffRoundSchema = z.number().int().min(1).max(CAP_RUSH_PLAYOFF_ROUNDS);
@@ -52,77 +48,6 @@ export function capRushConferenceRoundName(round: number): string {
 export const capRushSeriesIdSchema = z.string().regex(/^crs-[1-4]-[0-7]$/);
 
 export const capRushPlayoffGameIdSchema = z.string().regex(/^crp-[1-4]-[0-7]-[1-7]$/);
-
-export const capRushStandingsEntrySchema = z.object({
-  teamId: z.string().min(1).max(64),
-  displayName: z.string().min(1).max(96),
-  isUserTeam: z.boolean(),
-  wins: z.number().int().min(0).max(CAP_RUSH_LEAGUE_GAMES_PER_TEAM),
-  losses: z.number().int().min(0).max(CAP_RUSH_LEAGUE_GAMES_PER_TEAM),
-  pointsFor: z.number().int(),
-  pointsAgainst: z.number().int(),
-  pointDifferential: z.number().int(),
-  seed: z.number().int().min(1).max(CAP_RUSH_LEAGUE_TEAMS),
-  qualified: z.boolean(),
-});
-export type CapRushStandingsEntry = z.infer<typeof capRushStandingsEntrySchema>;
-
-export const capRushStandingsCutoffSchema = z.object({
-  seed: z.literal(CAP_RUSH_PLAYOFF_TEAMS),
-  teamId: z.string().min(1).max(64),
-  wins: z.number().int().min(0).max(CAP_RUSH_LEAGUE_GAMES_PER_TEAM),
-  losses: z.number().int().min(0).max(CAP_RUSH_LEAGUE_GAMES_PER_TEAM),
-  pointDifferential: z.number().int(),
-  pointsFor: z.number().int(),
-  tieBreak: z.enum(['wins', 'point-differential', 'points-for', 'team-id']),
-});
-
-export const capRushLeagueTeamPointsSchema = z.object({
-  teamId: z.string().min(1).max(64),
-  pointsFor: z.number().int(),
-  pointsAgainst: z.number().int(),
-});
-
-export const capRushLeagueResultSchema = z.object({
-  league: leagueRecordSchema,
-  points: z.array(capRushLeagueTeamPointsSchema).length(30),
-});
-export type CapRushLeagueResult = z.infer<typeof capRushLeagueResultSchema>;
-
-export const capRushPostseasonStandingsSchema = z
-  .object({
-    entries: z.array(capRushStandingsEntrySchema).length(CAP_RUSH_LEAGUE_TEAMS),
-    qualifiedTeamIds: z.array(z.string().min(1).max(64)).length(CAP_RUSH_PLAYOFF_TEAMS),
-    cutoff: capRushStandingsCutoffSchema,
-    league: capRushLeagueResultSchema,
-    tiesAtCutoff: z.array(z.string().min(1).max(64)),
-  })
-  .superRefine((standings, ctx) => {
-    standings.entries.forEach((entry, index) => {
-      if (entry.seed !== index + 1) {
-        ctx.addIssue({ code: 'custom', message: 'standings seeds must be sequential' });
-      }
-      if (entry.qualified !== entry.seed <= CAP_RUSH_PLAYOFF_TEAMS) {
-        ctx.addIssue({ code: 'custom', message: 'only the top sixteen seeds qualify' });
-      }
-      if (entry.wins + entry.losses !== CAP_RUSH_LEAGUE_GAMES_PER_TEAM) {
-        ctx.addIssue({ code: 'custom', message: 'every team must play 82 games' });
-      }
-      if (entry.pointDifferential !== entry.pointsFor - entry.pointsAgainst) {
-        ctx.addIssue({ code: 'custom', message: 'point differential must match its points' });
-      }
-    });
-    const qualified = standings.entries
-      .filter((entry) => entry.qualified)
-      .map((entry) => entry.teamId);
-    if (
-      qualified.length !== CAP_RUSH_PLAYOFF_TEAMS ||
-      qualified.some((teamId, index) => standings.qualifiedTeamIds[index] !== teamId)
-    ) {
-      ctx.addIssue({ code: 'custom', message: 'qualified teams must be the top sixteen seeds' });
-    }
-  });
-export type CapRushPostseasonStandings = z.infer<typeof capRushPostseasonStandingsSchema>;
 
 export const capRushPlayoffParticipantSchema = z.object({
   teamId: z.string().min(1).max(64),
@@ -427,103 +352,8 @@ export function capRushEmptyConferencePostseason(): CapRushConferencePostseason 
   };
 }
 
-export function isConferencePostseason(
-  postseason: CapRushPostseason,
-): postseason is CapRushConferencePostseason {
-  return 'format' in postseason;
-}
-
-export const capRushLegacyPostseasonSchema = z
-  .object({
-    version: z.literal(CAP_RUSH_POSTSEASON_VERSION),
-    phase: z.enum(['awaiting-standings', 'playoffs', 'complete']),
-    standings: capRushPostseasonStandingsSchema.nullable(),
-    series: z.array(capRushPlayoffSeriesSchema).max(15),
-    userOutcome: capRushPostseasonUserOutcomeSchema,
-    championTeamId: z.string().min(1).max(64).nullable(),
-    finalsMvp: capRushFinalsMvpSchema.nullable(),
-    completedAt: z.iso.datetime().nullable(),
-  })
-  .superRefine((postseason, ctx) => {
-    if (postseason.phase === 'awaiting-standings') {
-      if (postseason.standings !== null || postseason.series.length !== 0) {
-        ctx.addIssue({ code: 'custom', message: 'standings must be accepted before the bracket' });
-      }
-    }
-    if (postseason.phase === 'playoffs' && postseason.standings === null) {
-      ctx.addIssue({ code: 'custom', message: 'a playoff bracket requires final standings' });
-    }
-    if (postseason.phase === 'complete') {
-      if (postseason.championTeamId === null) {
-        ctx.addIssue({ code: 'custom', message: 'a complete postseason requires a champion' });
-      }
-      if (postseason.finalsMvp === null) {
-        ctx.addIssue({ code: 'custom', message: 'a complete postseason requires a Finals MVP' });
-      }
-      if (postseason.completedAt === null) {
-        ctx.addIssue({
-          code: 'custom',
-          message: 'a complete postseason requires a completion time',
-        });
-      }
-      if (postseason.series.length !== 15) {
-        ctx.addIssue({ code: 'custom', message: 'a complete postseason has fifteen series' });
-      }
-    } else if (postseason.completedAt !== null) {
-      ctx.addIssue({ code: 'custom', message: 'an unfinished postseason has no completion time' });
-    }
-    const rounds = new Map<number, number>();
-    for (const series of postseason.series) {
-      rounds.set(series.round, (rounds.get(series.round) ?? 0) + 1);
-    }
-    for (const [round, count] of rounds) {
-      const expected = 8 >> (round - 1);
-      if (count !== expected) {
-        ctx.addIssue({
-          code: 'custom',
-          message: `round ${String(round)} must contain ${String(expected)} series`,
-        });
-      }
-    }
-    if (postseason.userOutcome.status === 'champion') {
-      if (
-        postseason.championTeamId !== CAP_RUSH_USER_TEAM_ID ||
-        postseason.userOutcome.round !== CAP_RUSH_PLAYOFF_ROUNDS
-      ) {
-        ctx.addIssue({ code: 'custom', message: 'a user championship must match the champion' });
-      }
-    }
-    if (postseason.championTeamId === CAP_RUSH_USER_TEAM_ID) {
-      if (postseason.userOutcome.status !== 'champion') {
-        ctx.addIssue({ code: 'custom', message: 'a user champion must record a championship' });
-      }
-    } else if (postseason.championTeamId !== null && postseason.userOutcome.status === 'champion') {
-      ctx.addIssue({
-        code: 'custom',
-        message: 'only the user team can record a user championship',
-      });
-    }
-  });
-export type CapRushLegacyPostseason = z.infer<typeof capRushLegacyPostseasonSchema>;
-
-export const capRushPostseasonSchema = z.union([
-  capRushLegacyPostseasonSchema,
-  capRushConferencePostseasonSchema,
-]);
-export type CapRushPostseason = z.infer<typeof capRushPostseasonSchema>;
-
-export function capRushEmptyPostseason(): CapRushLegacyPostseason {
-  return {
-    version: CAP_RUSH_POSTSEASON_VERSION,
-    phase: 'awaiting-standings',
-    standings: null,
-    series: [],
-    userOutcome: { status: 'pending', round: null },
-    championTeamId: null,
-    finalsMvp: null,
-    completedAt: null,
-  };
-}
+export const capRushPostseasonSchema = capRushConferencePostseasonSchema;
+export type CapRushPostseason = CapRushConferencePostseason;
 
 export const capRushStoredPlayoffGameSchema = z.object({
   gameId: capRushPlayoffGameIdSchema,
@@ -533,18 +363,6 @@ export const capRushStoredPlayoffGameSchema = z.object({
   playback: capRushPlaybackSchema.optional(),
 });
 export type CapRushStoredPlayoffGame = z.infer<typeof capRushStoredPlayoffGameSchema>;
-
-export const capRushLegacyPostseasonReportSchema = z.object({
-  format: z.literal('overall').optional(),
-  championTeamId: z.string().min(1).max(64),
-  championName: z.string().min(1).max(96),
-  isUserChampion: z.boolean(),
-  userOutcome: capRushPostseasonUserOutcomeSchema,
-  seed: z.number().int().min(1).max(CAP_RUSH_LEAGUE_TEAMS).nullable(),
-  series: z.array(capRushPlayoffSeriesSchema).length(15),
-  standings: capRushPostseasonStandingsSchema,
-  finalsMvp: capRushFinalsMvpSchema,
-});
 
 export const capRushConferencePostseasonReportSchema = z.object({
   format: z.literal('conference'),
@@ -562,10 +380,7 @@ export type CapRushConferencePostseasonReport = z.infer<
   typeof capRushConferencePostseasonReportSchema
 >;
 
-export const capRushPostseasonReportSchema = z.union([
-  capRushLegacyPostseasonReportSchema,
-  capRushConferencePostseasonReportSchema,
-]);
+export const capRushPostseasonReportSchema = capRushConferencePostseasonReportSchema;
 export type CapRushPostseasonReport = z.infer<typeof capRushPostseasonReportSchema>;
 
 export const capRushPlayoffGamePlanSchema = z.object({

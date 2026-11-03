@@ -8,7 +8,6 @@
   import {
     POSITIONS,
     capRushConferenceRoundName,
-    capRushRoundName,
     type CapRushPlayerSeasonLine,
     type CapRushReport,
   } from '@hoop-rush/data-contracts';
@@ -59,11 +58,7 @@
   const winsPerMillion = $derived(report.winsPerMillion);
   const mvp = $derived(report.mvp);
   const postseason = $derived(report.postseason ?? null);
-  const roundName = $derived(
-    postseason !== null && 'format' in postseason && postseason.format === 'conference'
-      ? capRushConferenceRoundName
-      : capRushRoundName,
-  );
+  const roundName = capRushConferenceRoundName;
   const finalsMvpFace = $derived(
     postseason === null
       ? null
@@ -210,8 +205,7 @@
             {#if postseason.isUserChampion}
               Your five won four best-of-seven rounds.
             {:else if postseason.userOutcome.status === 'not-qualified'}
-              Your {recordLabel(aggregate.wins, aggregate.losses)} regular season missed the top
-              {'format' in postseason && postseason.format === 'conference' ? 'eight' : 'sixteen'}.
+              Your {recordLabel(aggregate.wins, aggregate.losses)} regular season missed the top eight.
             {:else}
               Your run ended in the {postseason.userOutcome.round === null
                 ? 'postseason'

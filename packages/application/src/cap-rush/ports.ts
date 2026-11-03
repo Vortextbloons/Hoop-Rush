@@ -50,7 +50,6 @@ export interface CapRushDraftRepositoryPort {
 
 export interface CapRushAssetPort {
   loadCatalog(): Promise<SeasonDraftCatalog>;
-  loadBracket?(hash: string): Promise<OpponentBracket>;
   loadPreamble(): Promise<{
     manifest: HoopRushManifest;
     profile: EraSimulationProfile;

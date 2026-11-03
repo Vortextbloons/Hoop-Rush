@@ -3,13 +3,8 @@
     CAP_RUSH_SERIES_WINS,
     capRushConferenceStandingsEntries,
     capRushConferenceRoundName,
-    capRushRoundName,
-    isConferencePostseason,
-    isConferenceStandings,
     type CapRushBoxScore as CapRushBoxScoreData,
-    type CapRushConferenceStandings,
     type CapRushPlayoffSeries,
-    type CapRushPostseasonStandings,
     type CapRushStoredPlayoffGame,
   } from '@hoop-rush/data-contracts';
   import { Play, SkipForward, Trophy, X } from '@lucide/svelte';
@@ -40,26 +35,14 @@
   } = $props();
 
   const postseason = $derived(view.postseason);
-  const conferencePostseason = $derived(
-    postseason !== null && isConferencePostseason(postseason) ? postseason : null,
-  );
   const standings = $derived(postseason?.standings ?? null);
   const series = $derived(postseason?.series ?? []);
   const userTeamId = $derived(view.draft.locked?.human.teamId ?? null);
-  const entries = $derived.by(() => {
-    if (standings === null) return [];
-    return isConferenceStandings(standings)
-      ? capRushConferenceStandingsEntries(standings as CapRushConferenceStandings)
-      : (standings as CapRushPostseasonStandings).entries;
-  });
+  const entries = $derived(standings === null ? [] : capRushConferenceStandingsEntries(standings));
   const userEntry = $derived(
     userTeamId === null ? null : (entries.find((entry) => entry.teamId === userTeamId) ?? null),
   );
-  const userConference = $derived(
-    userEntry !== null && 'conference' in userEntry
-      ? (userEntry as { conference: 'east' | 'west' }).conference
-      : null,
-  );
+  const userConference = $derived(userEntry?.conference ?? null);
   const latestRound = $derived(
     series.length === 0 ? 1 : Math.max(...series.map((entry) => entry.round)),
   );
@@ -106,9 +89,7 @@
   let selectedTeamId = $state<string | null>(null);
   let selectedBox = $state<{ label: string; box: CapRushBoxScoreData } | null>(null);
 
-  const roundName = $derived(
-    conferencePostseason !== null ? capRushConferenceRoundName : capRushRoundName,
-  );
+  const roundName = capRushConferenceRoundName;
 
   let reviewInitialized = false;
   $effect(() => {
@@ -246,7 +227,7 @@
       {#if userEntry !== null}
         <span
           class="seed-reveal rounded-full border border-accent/40 bg-accent/10 px-3 py-1 font-mono text-[10px] font-bold text-accent uppercase"
-          >{conferencePostseason !== null && userConference !== null
+          >{userConference !== null
             ? `${userConference} seed ${userEntry.seed}`
             : `Seed ${userEntry.seed}`} · {recordLabel(userEntry.wins, userEntry.losses)}</span
         >

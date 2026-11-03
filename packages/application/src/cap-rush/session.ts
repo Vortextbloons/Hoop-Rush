@@ -5,14 +5,12 @@ import type {
   CapRushDraftState,
   CapRushHistoryEntry,
   CapRushLeagueGame,
-  CapRushLeagueResult,
   CapRushReport,
   CapRushSpinPurchaseId,
   CapRushStoredGame,
   CapRushStoredPlayoffGame,
   CapRushVariant,
   CapRushVersionSet,
-  OpponentBracket,
   Position,
 } from '@hoop-rush/data-contracts';
 import {
@@ -39,7 +37,6 @@ import {
   capRushRerollOfferCommandSchema,
   capRushSignCardCommandSchema,
   capRushSkipSpinCommandSchema,
-  isConferencePostseason,
 } from '@hoop-rush/data-contracts';
 import {
   ENGINE_VERSION,
@@ -49,7 +46,6 @@ import {
   capRushAssessSigning,
   capRushConferencePostseasonStep,
   capRushPayrollStatus,
-  capRushPostseasonStep,
   capRushReport,
   capRushSpinEligibility,
   capRushStateDigest,
@@ -369,18 +365,6 @@ export class CapRushSession implements CapRushService {
     return report;
   }
 
-  async acceptStandings(league: CapRushLeagueResult): Promise<void> {
-    await this.dispatch((state) =>
-      capRushAcceptStandingsCommandSchema.parse({
-        command: 'accept-cap-rush-standings',
-        commandId: this.ids.newCommandId(),
-        runId: state.runId,
-        expectedRevision: state.revision,
-        league,
-      }),
-    );
-  }
-
   async acceptConferenceStandings(standings: CapRushConferenceStandings): Promise<void> {
     await this.dispatch((state) =>
       capRushAcceptStandingsCommandSchema.parse({
@@ -414,34 +398,12 @@ export class CapRushSession implements CapRushService {
     if (state === null || state.postseason === undefined) {
       return { kind: 'complete' };
     }
-    if (isConferencePostseason(state.postseason)) {
-      return capRushConferencePostseasonStep({
-        postseason: state.postseason,
-        runSeed: state.runSeed,
-        userTeamId:
-          state.locked?.human.teamId ?? state.postseason.standings?.qualifiedTeamIds[0] ?? '',
-      });
-    }
-    return capRushPostseasonStep({
+    return capRushConferencePostseasonStep({
       postseason: state.postseason,
       runSeed: state.runSeed,
-      userTeamId: state.locked?.human.teamId,
+      userTeamId:
+        state.locked?.human.teamId ?? state.postseason.standings?.qualifiedTeamIds[0] ?? '',
     });
-  }
-
-  async loadBracket(): Promise<OpponentBracket> {
-    try {
-      const assets = await this.loadAssets();
-      const hash = this.draft?.versionSet.bracketHash;
-      if (hash !== undefined && hash !== assets.versionSet.bracketHash) {
-        if (this.assets.loadBracket === undefined)
-          throw new Error('the original opponent field is unavailable');
-        return await this.assets.loadBracket(hash);
-      }
-      return assets.lockSources.bracket;
-    } catch (error) {
-      throw new CapRushServiceError('catalog', messageOf(error));
-    }
   }
 
   async finalizePostseason(): Promise<CapRushReport> {

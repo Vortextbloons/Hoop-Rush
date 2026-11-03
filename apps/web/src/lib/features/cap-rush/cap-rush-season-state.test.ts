@@ -1,6 +1,9 @@
 import { expect, test, mock } from 'bun:test';
 import type { CapRushService } from '@hoop-rush/application/cap-rush';
-import type { CapRushPlayoffGamePlan } from '@hoop-rush/data-contracts';
+import {
+  CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION,
+  type CapRushPlayoffGamePlan,
+} from '@hoop-rush/data-contracts';
 import { createEngineContext, simulateCapRushPlayoffGame } from '@hoop-rush/engine';
 import { CapRushSeasonController } from './cap-rush-season-state.svelte';
 import type { CapRushRunner } from './cap-rush-runner';
@@ -35,11 +38,11 @@ test('playoff batches retain accepted games without reloading the season archive
   const runner = {
     simulatePlayoffs: async (input: Parameters<CapRushRunner['simulatePlayoffs']>[0]) => {
       await input.handlers.onGame({
-        schemaVersion: 'cap-rush-worker-wire-v1',
+        schemaVersion: CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION,
         type: 'cap-rush-playoff-game',
         requestId: input.requestId,
         game,
-      } as Parameters<typeof input.handlers.onGame>[0]);
+      });
       return { cancelled: false };
     },
   } as unknown as CapRushRunner;

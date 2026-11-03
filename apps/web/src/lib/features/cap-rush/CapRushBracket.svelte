@@ -1,12 +1,9 @@
 <script lang="ts">
   import {
     CAP_RUSH_CONFERENCE_ROUND_NAMES,
-    CAP_RUSH_PLAYOFF_ROUND_NAMES,
     capRushConferenceStandingsEntries,
-    isConferenceStandings,
     type CapRushPlayoffSeries,
     type CapRushConferenceStandings,
-    type CapRushPostseasonStandings,
     type HoopRushManifest,
   } from '@hoop-rush/data-contracts';
   import TeamLogo from '#lib/components/TeamLogo.svelte';
@@ -22,7 +19,7 @@
     selectedSeriesId = null,
   }: {
     series: readonly CapRushPlayoffSeries[];
-    standings: CapRushPostseasonStandings | CapRushConferenceStandings;
+    standings: CapRushConferenceStandings;
     manifest?: HoopRushManifest | null;
     userTeamId?: string | null;
     onTeamSelect?: (teamId: string) => void;
@@ -42,14 +39,8 @@
     games: CapRushPlayoffSeries['games'];
   }
 
-  const conference = $derived(isConferenceStandings(standings));
   const entries = $derived(
-    new Map(
-      (conference
-        ? capRushConferenceStandingsEntries(standings as CapRushConferenceStandings)
-        : (standings as CapRushPostseasonStandings).entries
-      ).map((entry) => [entry.teamId, entry]),
-    ),
+    new Map(capRushConferenceStandingsEntries(standings).map((entry) => [entry.teamId, entry])),
   );
   const normalized = $derived(
     series.map((entry): BracketSeries => {
@@ -78,9 +69,7 @@
   let selectedRound = $state<number | null>(null);
   let mobileConference = $state<'west' | 'east'>('west');
   const activeRound = $derived(selectedRound ?? latestRound);
-  const roundNames = $derived(
-    conference ? CAP_RUSH_CONFERENCE_ROUND_NAMES : CAP_RUSH_PLAYOFF_ROUND_NAMES,
-  );
+  const roundNames = CAP_RUSH_CONFERENCE_ROUND_NAMES;
 
   function winsOf(entry: BracketSeries, teamId: string): number {
     return entry.games.filter((game) => game.winnerTeamId === teamId).length;
@@ -145,13 +134,7 @@
   }
 
   const mobileSeries = $derived(
-    conference
-      ? activeRound === 4
-        ? roundSeries(4, 'finals')
-        : roundSeries(activeRound, mobileConference)
-      : normalized
-          .filter((entry) => entry.round === activeRound)
-          .sort((left, right) => left.seriesSlot - right.seriesSlot),
+    activeRound === 4 ? roundSeries(4, 'finals') : roundSeries(activeRound, mobileConference),
   );
 </script>
 
@@ -162,14 +145,14 @@
   <div class="flex flex-wrap items-end justify-between gap-3">
     <div>
       <p class="font-mono text-[10px] font-bold tracking-[0.16em] text-primary uppercase">
-        {conference ? 'Conference bracket' : 'The bracket'}
+        Conference bracket
       </p>
       <h2 class="font-display mt-1 text-2xl font-extrabold tracking-tight uppercase">
-        {conference ? 'West to East. One champion.' : 'Sixteen teams. Four rounds.'}
+        West to East. One champion.
       </h2>
     </div>
     <div
-      class="round-picker {conference ? 'conference-round-picker' : ''}"
+      class="round-picker conference-round-picker"
       role="group"
       aria-label="Choose a playoff round"
     >
@@ -186,90 +169,88 @@
     </div>
   </div>
 
-  {#if conference}
-    <div class="mt-4 hidden lg:block">
-      <div class="mb-2 grid grid-cols-[1fr_1fr_1fr_1.1fr_1fr_1fr_1fr] gap-2">
-        <p class="bracket-side-label text-left">Western Conference</p>
-        <span></span>
-        <span></span>
-        <p
-          class="text-center font-mono text-[10px] font-bold tracking-[0.14em] text-accent uppercase"
-        >
-          Finals
-        </p>
-        <span></span>
-        <span></span>
-        <p class="bracket-side-label text-right">Eastern Conference</p>
-      </div>
-      <div class="grid grid-cols-[1fr_1fr_1fr_1.1fr_1fr_1fr_1fr] items-stretch gap-2">
-        {#each [1, 2, 3] as round (round)}
-          {@const west = roundSeries(round, 'west')}
-          <div class="bracket-col bracket-west">
-            <p class="bracket-round-label">{roundNames[round - 1]}</p>
-            <div class="bracket-col-body">
-              {#each west as entry (entry.seriesId)}
-                {@render seriesCard(entry, 'right')}
-              {/each}
-              {#if west.length === 0}
-                <div class="awaiting">Awaiting</div>
-              {/if}
-            </div>
-          </div>
-        {/each}
-
-        <div class="bracket-finals">
-          <p class="bracket-round-label text-center">NBA Finals</p>
-          {#if seriesAt(4, 0)}
-            {@render seriesCard(seriesAt(4, 0) as BracketSeries, 'none')}
-          {:else}
-            <div class="awaiting">Conference champions meet here.</div>
-          {/if}
-          <div class="champion-plate" class:champion-live={championId !== null}>
-            <p class="font-mono text-[9px] font-bold tracking-[0.16em] text-accent uppercase">
-              Champion
-            </p>
-            {#if championId !== null}
-              <div class="mt-2 flex min-w-0 flex-col items-center justify-center gap-1.5">
-                {#if identityOf(championId) && manifest}
-                  {@const identity = identityOf(championId)}
-                  <TeamLogo
-                    {manifest}
-                    franchiseId={identity?.franchiseId ?? championId}
-                    teamExternalId={identity?.teamExternalId ?? ''}
-                    alt=""
-                    className="h-8 w-8"
-                  />
-                {/if}
-                <span class="champion-name font-display text-base font-extrabold uppercase">
-                  {nameOf(championId)}
-                </span>
-              </div>
-            {:else}
-              <p class="mt-2 font-mono text-[9px] text-muted-foreground uppercase">Undecided</p>
+  <div class="mt-4 hidden lg:block">
+    <div class="mb-2 grid grid-cols-[1fr_1fr_1fr_1.1fr_1fr_1fr_1fr] gap-2">
+      <p class="bracket-side-label text-left">Western Conference</p>
+      <span></span>
+      <span></span>
+      <p
+        class="text-center font-mono text-[10px] font-bold tracking-[0.14em] text-accent uppercase"
+      >
+        Finals
+      </p>
+      <span></span>
+      <span></span>
+      <p class="bracket-side-label text-right">Eastern Conference</p>
+    </div>
+    <div class="grid grid-cols-[1fr_1fr_1fr_1.1fr_1fr_1fr_1fr] items-stretch gap-2">
+      {#each [1, 2, 3] as round (round)}
+        {@const west = roundSeries(round, 'west')}
+        <div class="bracket-col bracket-west">
+          <p class="bracket-round-label">{roundNames[round - 1]}</p>
+          <div class="bracket-col-body">
+            {#each west as entry (entry.seriesId)}
+              {@render seriesCard(entry, 'right')}
+            {/each}
+            {#if west.length === 0}
+              <div class="awaiting">Awaiting</div>
             {/if}
           </div>
         </div>
+      {/each}
 
-        {#each [3, 2, 1] as round (round)}
-          {@const east = roundSeries(round, 'east')}
-          <div class="bracket-col bracket-east">
-            <p class="bracket-round-label text-right">{roundNames[round - 1]}</p>
-            <div class="bracket-col-body">
-              {#each east as entry (entry.seriesId)}
-                {@render seriesCard(entry, 'left')}
-              {/each}
-              {#if east.length === 0}
-                <div class="awaiting">Awaiting</div>
+      <div class="bracket-finals">
+        <p class="bracket-round-label text-center">NBA Finals</p>
+        {#if seriesAt(4, 0)}
+          {@render seriesCard(seriesAt(4, 0) as BracketSeries, 'none')}
+        {:else}
+          <div class="awaiting">Conference champions meet here.</div>
+        {/if}
+        <div class="champion-plate" class:champion-live={championId !== null}>
+          <p class="font-mono text-[9px] font-bold tracking-[0.16em] text-accent uppercase">
+            Champion
+          </p>
+          {#if championId !== null}
+            <div class="mt-2 flex min-w-0 flex-col items-center justify-center gap-1.5">
+              {#if identityOf(championId) && manifest}
+                {@const identity = identityOf(championId)}
+                <TeamLogo
+                  {manifest}
+                  franchiseId={identity?.franchiseId ?? championId}
+                  teamExternalId={identity?.teamExternalId ?? ''}
+                  alt=""
+                  className="h-8 w-8"
+                />
               {/if}
+              <span class="champion-name font-display text-base font-extrabold uppercase">
+                {nameOf(championId)}
+              </span>
             </div>
-          </div>
-        {/each}
+          {:else}
+            <p class="mt-2 font-mono text-[9px] text-muted-foreground uppercase">Undecided</p>
+          {/if}
+        </div>
       </div>
-    </div>
-  {/if}
 
-  <div class="mt-4 flex flex-col gap-2 {conference ? 'lg:hidden' : ''}">
-    {#if conference && activeRound !== 4}
+      {#each [3, 2, 1] as round (round)}
+        {@const east = roundSeries(round, 'east')}
+        <div class="bracket-col bracket-east">
+          <p class="bracket-round-label text-right">{roundNames[round - 1]}</p>
+          <div class="bracket-col-body">
+            {#each east as entry (entry.seriesId)}
+              {@render seriesCard(entry, 'left')}
+            {/each}
+            {#if east.length === 0}
+              <div class="awaiting">Awaiting</div>
+            {/if}
+          </div>
+        </div>
+      {/each}
+    </div>
+  </div>
+
+  <div class="mt-4 flex flex-col gap-2 lg:hidden">
+    {#if activeRound !== 4}
       <div class="conference-picker" role="group" aria-label="Choose a conference">
         {#each ['west', 'east'] as const as side (side)}
           <button
@@ -289,7 +270,7 @@
     {#each mobileSeries as entry (entry.seriesId)}
       {@render seriesCard(entry, 'none', true)}
     {/each}
-    {#if conference && activeRound === 4 && championId !== null}
+    {#if activeRound === 4 && championId !== null}
       <div class="champion-plate mobile-champion">
         <p class="font-mono text-[10px] font-bold tracking-[0.16em] text-accent uppercase">
           Champion

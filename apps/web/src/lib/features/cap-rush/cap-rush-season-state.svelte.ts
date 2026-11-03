@@ -467,7 +467,9 @@ export class CapRushSeasonController {
     }
     if (!(await this.ensureLeagueGames())) return false;
     const locked = view.draft.locked;
-    if (locked.leagueSchedule !== undefined) {
+    if (locked.leagueSchedule === undefined)
+      throw new Error('This legacy season is no longer supported.');
+    {
       const leagueById = new Map(this.leagueGames.map((game) => [game.gameId, game]));
       const results: CapRushStandingsGame[] = this.leagueGames.map((game) => ({
         gameId: game.gameId,
@@ -499,28 +501,6 @@ export class CapRushSeasonController {
       await this.load();
       return true;
     }
-    const bracket = await this.service.loadBracket();
-    const complete = await this.runner.simulateStandings({
-      requestId: newRequestId('cap-rush-standings'),
-      locked,
-      bracket,
-      handlers: {
-        onProgress: (message) => {
-          if (!this.isDestroyed()) {
-            this.progress = { completed: message.gamesCompleted, total: message.gamesTotal };
-          }
-        },
-      },
-    });
-    if (this.isDestroyed()) return false;
-    if (complete.cancelled || complete.result === null) {
-      this.notice = 'Standings completion paused. Accepted work is safe.';
-      return false;
-    }
-    await this.service.acceptStandings(complete.result);
-    if (this.isDestroyed()) return false;
-    await this.load();
-    return true;
   }
 
   private async acceptUserGame(message: CapRushWorkerGameMessage): Promise<void> {

@@ -16,18 +16,3 @@ export type CollectionFamily = z.infer<typeof collectionFamilySchema>;
 
 export const collectionCardAvailabilitySchema = z.enum(['active']);
 export type CollectionCardAvailability = z.infer<typeof collectionCardAvailabilitySchema>;
-
-export const collectionCurrencySchema = z.enum(['Coins', 'Exchange']);
-export type CollectionCurrency = z.infer<typeof collectionCurrencySchema>;
-
-export const collectionPackIdSchema = z.enum([
-  'tip-off',
-  'fast-break',
-  'full-court',
-  'main-event',
-  'spotlight',
-]);
-export type CollectionPackId = z.infer<typeof collectionPackIdSchema>;
-
-export const collectionSetIdSchema = z.enum(['heat-check-set', 'arm-guard-set']);
-export type CollectionSetId = z.infer<typeof collectionSetIdSchema>;
