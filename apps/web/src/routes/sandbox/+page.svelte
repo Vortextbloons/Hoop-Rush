@@ -1,7 +1,6 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
-  import { ArrowRight, Check, ChevronDown } from '@lucide/svelte';
-  import { Select } from 'bits-ui';
+  import { ArrowRight } from '@lucide/svelte';
   import type {
     HoopRushManifest,
     PeakPlayerSeason,
@@ -34,21 +33,16 @@
     type DraftFitNeed,
     type DraftFitTier,
   } from '#lib/draft-fit.js';
-  import TeamLogo from '#lib/components/TeamLogo.svelte';
+  import RosterFilters from '#lib/components/RosterFilters.svelte';
   import LineupCourt from '#lib/components/LineupCourt.svelte';
   import LineupSummaryNav from '#lib/components/LineupSummaryNav.svelte';
   import DraftValuePanel from '#lib/components/DraftValuePanel.svelte';
   import DraftPoolBrowser from '#lib/components/draft/DraftPoolBrowser.svelte';
   import AsyncState from '#lib/components/AsyncState.svelte';
-  let slotPickerModule: Promise<
-    typeof import('#lib/components/draft/SlotPickerDialog.svelte')
-  > | null = null;
-  function loadSlotPickerDialog(): Promise<
-    typeof import('#lib/components/draft/SlotPickerDialog.svelte')
-  > {
-    slotPickerModule ??= import('#lib/components/draft/SlotPickerDialog.svelte');
-    return slotPickerModule;
-  }
+  import { lazyModule } from '#lib/lazy-module.js';
+  const loadSlotPickerDialog = lazyModule(
+    () => import('#lib/components/draft/SlotPickerDialog.svelte'),
+  );
   import { planPlayerMove } from '#lib/draft-slots.js';
   type IndexRow = PlayersIndexEntry;
   type SlotRef = {
@@ -339,20 +333,6 @@
       ? resolveEraTeamIdentity(manifest, franchise.franchiseId, era.eraId)
       : null,
   );
-  const franchiseItems = $derived([
-    { value: '', label: 'Any team' },
-    ...(manifest?.modernFranchiseSlots ?? []).map((entry) => ({
-      value: entry.franchiseId,
-      label: entry.displayName,
-    })),
-  ]);
-  const eraItems = $derived([
-    { value: '', label: 'Any decade' },
-    ...(manifest?.eras ?? []).map((e) => ({
-      value: e.eraId,
-      label: e.label,
-    })),
-  ]);
   const poolRows = $derived.by(() => {
     let list = index?.players ?? [];
     if (franchiseFilter) list = list.filter((p) => p.franchiseId === franchiseFilter);
@@ -525,187 +505,18 @@
     {:else}
       <div class="mt-10 flex flex-col gap-6 pb-32">
         <div class="rounded-xl bg-surface-1 p-3 sm:p-4">
-          <div class="grid gap-4 sm:grid-cols-2">
-            <div>
-              <h2
-                id="sandbox-team-label"
-                class="font-mono text-[11px] tracking-[0.14em] text-muted-foreground uppercase"
-              >
-                Team
-              </h2>
-              <Select.Root
-                type="single"
-                value={franchiseFilter}
-                onValueChange={selectFranchise}
-                items={franchiseItems}
-              >
-                <Select.Trigger
-                  aria-labelledby="sandbox-team-label"
-                  class="mt-2 flex h-11 w-full items-center justify-between gap-3 rounded-lg border border-input bg-card px-3.5 text-sm font-semibold text-foreground outline-none transition-colors hover:border-line-strong focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <Select.Value placeholder="Any team…">
-                    {#snippet children(props)}
-                      {#if franchise}
-                        <span class="flex min-w-0 items-center gap-2.5">
-                          <TeamLogo
-                            manifest={manifest!}
-                            franchiseId={franchise.franchiseId}
-                            teamExternalId={franchise.teamExternalId}
-                            logoCandidates={eraIdentity?.logoCandidates ?? []}
-                          />
-                          <span
-                            class="truncate"
-                            title={eraIdentity?.displayLabel ?? franchise.displayName}
-                          >
-                            {eraIdentity?.abbreviationLabel ??
-                              franchiseAbbreviation(franchise.franchiseId)}
-                          </span>
-                        </span>
-                      {:else}
-                        <span class="font-normal text-muted-foreground">{props.placeholder}</span>
-                      {/if}
-                    {/snippet}
-                  </Select.Value>
-                  <ChevronDown class="h-4 w-4 shrink-0 text-muted-foreground" />
-                </Select.Trigger>
-                <Select.Portal>
-                  <Select.Content
-                    side="bottom"
-                    sideOffset={6}
-                    align="start"
-                    collisionPadding={12}
-                    class="z-50 min-w-64 max-w-[calc(100vw-1.5rem)] rounded-lg border border-border bg-popover p-1 shadow-2xl shadow-black/30"
-                  >
-                    <Select.Viewport
-                      class="max-h-[min(20rem,55vh)] overflow-y-auto overscroll-contain p-0.5"
-                    >
-                      <Select.Item
-                        value=""
-                        label="Any team"
-                        aria-label="Any team"
-                        class="cursor-pointer select-none rounded-md outline-none transition-colors data-[disabled]:cursor-not-allowed data-[disabled]:opacity-40 data-[highlighted]:bg-surface-3 data-[selected]:bg-primary/10"
-                      >
-                        {#snippet children({ selected })}
-                          <span class="flex w-full items-center gap-2.5 py-1 pr-1 pl-0.5">
-                            <span class="min-w-0 flex-1 truncate text-sm font-semibold"
-                              >Any team</span
-                            >
-                            {#if selected}
-                              <Check class="h-4 w-4 shrink-0 text-primary" />
-                            {/if}
-                          </span>
-                        {/snippet}
-                      </Select.Item>
-                      {#each manifest.modernFranchiseSlots as entry (entry.franchiseId)}
-                        <Select.Item
-                          value={entry.franchiseId}
-                          label={entry.displayName}
-                          aria-label={`${franchiseAbbreviation(entry.franchiseId)} — ${entry.displayName}`}
-                          class="cursor-pointer select-none rounded-md outline-none transition-colors data-[disabled]:cursor-not-allowed data-[disabled]:opacity-40 data-[highlighted]:bg-surface-3 data-[selected]:bg-primary/10"
-                        >
-                          {#snippet children({ selected })}
-                            <span class="flex w-full items-center gap-2.5 py-1 pr-1 pl-0.5">
-                              <TeamLogo
-                                manifest={manifest!}
-                                franchiseId={entry.franchiseId}
-                                teamExternalId={entry.teamExternalId}
-                              />
-                              <span class="min-w-0 flex-1 truncate text-sm font-semibold">
-                                {franchiseAbbreviation(entry.franchiseId)}
-                              </span>
-                              {#if selected}
-                                <Check class="h-4 w-4 shrink-0 text-primary" />
-                              {/if}
-                            </span>
-                          {/snippet}
-                        </Select.Item>
-                      {/each}
-                    </Select.Viewport>
-                  </Select.Content>
-                </Select.Portal>
-              </Select.Root>
-            </div>
-
-            <div>
-              <h2
-                id="sandbox-decade-label"
-                class="font-mono text-[11px] tracking-[0.14em] text-muted-foreground uppercase"
-              >
-                Decade
-              </h2>
-              <Select.Root
-                type="single"
-                value={eraFilter}
-                onValueChange={selectEra}
-                items={eraItems}
-              >
-                <Select.Trigger
-                  aria-labelledby="sandbox-decade-label"
-                  class="mt-2 flex h-11 w-full items-center justify-between gap-3 rounded-lg border border-input bg-card px-3.5 text-sm font-semibold text-foreground outline-none transition-colors hover:border-line-strong focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <Select.Value placeholder="Any decade…">
-                    {#snippet children(props)}
-                      {#if era}
-                        <span class="truncate font-mono">{era.label}</span>
-                      {:else}
-                        <span class="font-normal text-muted-foreground">{props.placeholder}</span>
-                      {/if}
-                    {/snippet}
-                  </Select.Value>
-                  <ChevronDown class="h-4 w-4 shrink-0 text-muted-foreground" />
-                </Select.Trigger>
-                <Select.Portal>
-                  <Select.Content
-                    side="bottom"
-                    sideOffset={6}
-                    align="start"
-                    collisionPadding={12}
-                    class="z-50 min-w-48 max-w-[calc(100vw-1.5rem)] rounded-lg border border-border bg-popover p-1 shadow-2xl shadow-black/30"
-                  >
-                    <Select.Viewport
-                      class="max-h-[min(20rem,55vh)] overflow-y-auto overscroll-contain p-0.5"
-                    >
-                      <Select.Item
-                        value=""
-                        label="Any decade"
-                        aria-label="Any decade"
-                        class="cursor-pointer select-none rounded-md outline-none transition-colors data-[disabled]:cursor-not-allowed data-[disabled]:opacity-40 data-[highlighted]:bg-surface-3 data-[selected]:bg-primary/10"
-                      >
-                        {#snippet children({ selected })}
-                          <span class="flex w-full items-center gap-2.5 py-1 pr-1 pl-0.5">
-                            <span class="min-w-0 flex-1 truncate font-mono text-sm font-semibold">
-                              Any decade
-                            </span>
-                            {#if selected}
-                              <Check class="h-4 w-4 shrink-0 text-primary" />
-                            {/if}
-                          </span>
-                        {/snippet}
-                      </Select.Item>
-                      {#each manifest.eras as e (e.eraId)}
-                        <Select.Item
-                          value={e.eraId}
-                          label={e.label}
-                          class="cursor-pointer select-none rounded-md outline-none transition-colors data-[disabled]:cursor-not-allowed data-[disabled]:opacity-40 data-[highlighted]:bg-surface-3 data-[selected]:bg-primary/10"
-                        >
-                          {#snippet children({ selected })}
-                            <span class="flex w-full items-center gap-2.5 py-1 pr-1 pl-0.5">
-                              <span class="min-w-0 flex-1 truncate font-mono text-sm font-semibold">
-                                {e.label}
-                              </span>
-                              {#if selected}
-                                <Check class="h-4 w-4 shrink-0 text-primary" />
-                              {/if}
-                            </span>
-                          {/snippet}
-                        </Select.Item>
-                      {/each}
-                    </Select.Viewport>
-                  </Select.Content>
-                </Select.Portal>
-              </Select.Root>
-            </div>
-          </div>
+          <RosterFilters
+            {manifest}
+            franchiseId={franchiseFilter}
+            eraId={eraFilter}
+            idPrefix="sandbox"
+            franchiseLabel="Team"
+            franchisePlaceholder="Any team…"
+            anyFranchiseLabel="Any team"
+            compact
+            onSelectFranchise={selectFranchise}
+            onSelectEra={selectEra}
+          />
         </div>
 
         <DraftPoolBrowser

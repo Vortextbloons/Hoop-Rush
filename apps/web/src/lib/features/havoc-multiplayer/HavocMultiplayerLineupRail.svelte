@@ -2,8 +2,8 @@
   import type { HavocMultiplayerDraftPick } from '@hoop-rush/data-contracts';
   import PlayerArt from '#lib/components/PlayerArt.svelte';
   import HavocTierBadge from '#lib/features/havoc/HavocTierBadge.svelte';
+  import { havocLineupSlotsFromPicks } from '@hoop-rush/application/havoc';
   import { mutationEntriesSummary } from '#lib/features/havoc/havoc-presentation.js';
-  import { havocMultiplayerLineupSlots } from './havoc-multiplayer-room-view';
 
   let {
     picks,
@@ -23,7 +23,7 @@
     emptyLabel?: string;
   } = $props();
 
-  const slots = $derived(havocMultiplayerLineupSlots(picks));
+  const slots = $derived(havocLineupSlotsFromPicks(picks));
 </script>
 
 {#snippet body()}

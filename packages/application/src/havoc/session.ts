@@ -52,6 +52,7 @@ import {
 } from '@hoop-rush/engine';
 import {
   HavocServiceError,
+  havocLineupSlotsFromPicks,
   type HavocActiveSnapshot,
   type HavocBatchResult,
   type HavocHistoryView,
@@ -794,20 +795,7 @@ export class HavocSession implements HavocService {
 
   private buildRunView(state: HavocRunState): HavocRunView {
     const lineup: HavocLineupSlotView[] =
-      state.locked === null
-        ? []
-        : state.locked.picks.map((pick) => ({
-            slot: pick.slot,
-            displayName: pick.card.source.displayName,
-            nickname: pick.card.nickname,
-            playerVersionId: pick.card.source.playerVersionId,
-            playerId: pick.card.source.playerId,
-            franchiseId: pick.card.source.franchiseId,
-            seasonKey: pick.card.source.seasonKey,
-            tier: pick.card.tier,
-            overall: pick.card.source.originalOverall,
-            mutations: pick.card.mutations,
-          }));
+      state.locked === null ? [] : havocLineupSlotsFromPicks(state.locked.picks);
     let nextOpponentDisplayName: string | null = null;
     let nextHumanHome: boolean | null = null;
     let nextGameNumber: number | null = null;

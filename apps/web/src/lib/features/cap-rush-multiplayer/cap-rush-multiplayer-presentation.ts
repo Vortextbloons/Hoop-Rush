@@ -71,6 +71,27 @@ export function clockLabel(ms: number): string {
   return `${String(minutes)}:${String(seconds).padStart(2, '0')}`;
 }
 
+export interface AuctionClock {
+  readonly remainingMs: number;
+  readonly label: string;
+  readonly urgent: boolean;
+}
+
+/** Shared lot countdown text and urgency for the auction cards and bid dock. */
+export function auctionClock(
+  auction: CapRushMultiplayerAuction | null,
+  nowMs: number,
+): AuctionClock {
+  if (auction === null) return { remainingMs: 0, label: '—', urgent: false };
+  const remaining = remainingMs(auction.endsAtIso, nowMs);
+  return {
+    remainingMs: remaining,
+    label:
+      auction.status === 'open' ? (remaining <= 0 ? 'Pending' : clockLabel(remaining)) : 'Closed',
+    urgent: auction.status === 'open' && remaining <= 10_000,
+  };
+}
+
 export function currentRound(
   recruitment: CapRushMultiplayerRecruitment,
 ): CapRushMultiplayerRecruitment['rounds'][number] {

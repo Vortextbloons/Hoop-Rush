@@ -4,7 +4,8 @@
   import { Shuffle, Rocket } from '@lucide/svelte';
   import HavocDraftCard from './HavocDraftCard.svelte';
   import HavocLineupLock from './HavocLineupLock.svelte';
-  import { havocOwnedExclusiveMutationIds, lineupSlotsFromPicks } from './havoc-presentation';
+  import { havocLineupSlotsFromPicks } from '@hoop-rush/application/havoc';
+  import { havocOwnedExclusiveMutationIds } from './havoc-presentation';
   let {
     draft,
     busy,
@@ -24,7 +25,7 @@
   } = $props();
   let mode = $state<'effective' | 'original'>('effective');
   const complete = $derived(draft.status === 'complete');
-  const slots = $derived(lineupSlotsFromPicks(draft.picks));
+  const slots = $derived(havocLineupSlotsFromPicks(draft.picks));
   const positions = ['PG', 'SG', 'SF', 'PF', 'C'];
   const ownedExclusive = $derived(havocOwnedExclusiveMutationIds(draft.picks));
   const cardUnavailable = (card: HavocDraftState['cards'][number]): boolean =>

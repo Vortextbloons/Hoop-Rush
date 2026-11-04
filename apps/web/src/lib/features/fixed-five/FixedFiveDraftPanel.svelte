@@ -18,6 +18,7 @@
   import PlayerFace from '#lib/components/PlayerFace.svelte';
   import DraftValuePanel from '#lib/components/DraftValuePanel.svelte';
   import { classicPoolRows } from '#lib/classic-draft.js';
+  import { lazyModule } from '#lib/lazy-module.js';
   import FixedFiveTurnTakeover from '#lib/features/fixed-five/FixedFiveTurnTakeover.svelte';
   import { arenaPickSlam } from '#lib/arena-sound.js';
   import { poolSortLabel, sortDraftRows, type DraftPresentation } from '#lib/draft-presentation.js';
@@ -76,15 +77,9 @@
     onRemove: (slotIndex: SlotIndex) => void;
     onLock: () => void;
   } = $props();
-  let slotPickerModule: Promise<
-    typeof import('#lib/components/draft/SlotPickerDialog.svelte')
-  > | null = null;
-  function loadSlotPickerDialog(): Promise<
-    typeof import('#lib/components/draft/SlotPickerDialog.svelte')
-  > {
-    slotPickerModule ??= import('#lib/components/draft/SlotPickerDialog.svelte');
-    return slotPickerModule;
-  }
+  const loadSlotPickerDialog = lazyModule(
+    () => import('#lib/components/draft/SlotPickerDialog.svelte'),
+  );
   let pickerPlayer = $state<PlayersIndexEntry | null>(null);
   let pickerTrigger = $state<HTMLElement | null>(null);
   let pickerFallbackId = $state<string | null>(null);

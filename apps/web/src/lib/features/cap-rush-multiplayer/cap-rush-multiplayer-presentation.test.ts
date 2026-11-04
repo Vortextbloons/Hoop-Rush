@@ -16,6 +16,7 @@ import {
   bidQuickChoices,
   bidRejectionNotice,
   capRushMultiplayerAcceptedAt,
+  auctionClock,
   marketPools,
   nextMinimumBid,
   parseBidDollars,
@@ -144,6 +145,19 @@ describe('cap rush multiplayer presentation', () => {
     expect(
       nextMinimumBid(auction({ leaderSeat: 'p1', leaderBidDollars: 13_000_000 }), player),
     ).toBe(13_100_000);
+  });
+
+  test('derives the lot clock label and urgency from the auction', () => {
+    const open = auction();
+    expect(auctionClock(open, Date.parse('2026-11-01T00:00:30.000Z'))).toEqual({
+      remainingMs: 30_000,
+      label: '0:30',
+      urgent: false,
+    });
+    expect(auctionClock(open, Date.parse('2026-11-01T00:00:50.000Z')).urgent).toBe(true);
+    expect(auctionClock(open, Date.parse('2026-11-01T00:02:00.000Z')).label).toBe('Pending');
+    expect(auctionClock(auction({ status: 'closed' }), 0).label).toBe('Closed');
+    expect(auctionClock(null, 0)).toEqual({ remainingMs: 0, label: '—', urgent: false });
   });
 });
 

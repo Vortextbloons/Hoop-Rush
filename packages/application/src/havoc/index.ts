@@ -2,6 +2,7 @@ export { HavocSession } from './session.ts';
 export type { HavocSessionOptions } from './session.ts';
 export {
   HavocServiceError,
+  havocLineupSlotsFromPicks,
   type HavocActiveSnapshot,
   type HavocBatchResult,
   type HavocHistoryView,

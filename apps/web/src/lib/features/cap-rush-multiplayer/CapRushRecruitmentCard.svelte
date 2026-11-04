@@ -10,11 +10,10 @@
   import type { CapRushArt } from '../cap-rush/cap-rush-art.js';
   import { bucketClass, bucketLabel, initialsOf } from '../cap-rush/cap-rush-presentation.js';
   import {
-    clockLabel,
+    auctionClock,
     exactMoney,
     lotState,
     positionLabel,
-    remainingMs,
     seatLabelFor,
   } from './cap-rush-multiplayer-presentation.js';
 
@@ -38,17 +37,7 @@
 
   const state = $derived(auction === null ? 'upcoming' : lotState(auction, localSeat));
   const offerDollars = $derived(auction?.leaderBidDollars ?? player.minimumBidDollars);
-  const remaining = $derived(auction === null ? 0 : remainingMs(auction.endsAtIso, nowMs));
-  const clockText = $derived(
-    auction === null
-      ? '—'
-      : auction.status === 'open'
-        ? remaining <= 0
-          ? 'Pending'
-          : clockLabel(remaining)
-        : 'Closed',
-  );
-  const clockUrgent = $derived(auction?.status === 'open' && remaining <= 10_000);
+  const clock = $derived(auctionClock(auction, nowMs));
   const ownershipLabel = $derived(
     auction === null ? 'Status' : auction.status === 'closed' ? 'Result' : 'Leader',
   );
@@ -150,9 +139,9 @@
       </dt>
       <dd
         class="mt-0.5 flex items-baseline gap-1 font-mono text-lg leading-none font-semibold tabular-nums"
-        class:text-negative={clockUrgent}
+        class:text-negative={clock.urgent}
       >
-        <span>{clockText}</span>
+        <span>{clock.label}</span>
         {#if extended}
           <span class="font-mono text-[8px] font-bold uppercase text-accent">Extended</span>
         {/if}

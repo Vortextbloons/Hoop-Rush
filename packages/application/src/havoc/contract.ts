@@ -1,6 +1,7 @@
 import type {
   HavocCommandResult,
   HavocComparison,
+  HavocDraftCard,
   HavocDraftState,
   HavocGameResult,
   HavocGameSummary,
@@ -33,6 +34,24 @@ export interface HavocLineupSlotView {
   tier: 1 | 2 | 3;
   overall: number;
   mutations: readonly HavocMutationEntry[];
+}
+
+/** Projects draft picks from either Havoc draft shape onto the lineup card view. */
+export function havocLineupSlotsFromPicks(
+  picks: readonly { readonly slot: Position; readonly card: HavocDraftCard }[],
+): HavocLineupSlotView[] {
+  return picks.map((pick) => ({
+    slot: pick.slot,
+    displayName: pick.card.source.displayName,
+    nickname: pick.card.nickname,
+    playerVersionId: pick.card.source.playerVersionId,
+    playerId: pick.card.source.playerId,
+    franchiseId: pick.card.source.franchiseId,
+    seasonKey: pick.card.source.seasonKey,
+    tier: pick.card.tier,
+    overall: pick.card.source.originalOverall,
+    mutations: pick.card.mutations,
+  }));
 }
 
 export interface HavocRunView {

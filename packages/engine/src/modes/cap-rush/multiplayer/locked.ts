@@ -24,6 +24,7 @@ import {
 } from '@hoop-rush/data-contracts';
 import { createRng } from '../../../sim/rng.ts';
 import { buildHavocOpponentTeam } from '../../havoc/opponents.ts';
+import { capRushHavocSourceOf } from '../effective-profile.ts';
 import {
   buildCapRushLeagueSchedule,
   capRushLeagueFieldOf,
@@ -255,19 +256,7 @@ export function capRushMultiplayerFieldOfLocked(locked: CapRushMultiplayerLocked
 export function capRushMultiplayerPlayoffPlayerSource(
   player: CapRushSourcePlayer,
 ): HavocSourcePlayer {
-  return {
-    playerId: player.playerId,
-    playerVersionId: player.playerVersionId,
-    displayName: player.displayName,
-    franchiseId: player.franchiseId,
-    eraId: player.eraId,
-    seasonKey: player.seasonKey,
-    positions: player.positions,
-    originalOverall: player.originalOverall,
-    overallSource: 'catalog',
-    profile: player.profile,
-    physical: player.physical,
-  };
+  return capRushHavocSourceOf(player);
 }
 
 export function capRushMultiplayerProfilesFromPicks(

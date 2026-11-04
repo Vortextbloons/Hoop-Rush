@@ -10,6 +10,7 @@ import { CLASSIC_ROLL_VERSION } from '@hoop-rush/data-contracts';
 import { canPlay } from '../../domain/positions.ts';
 import { slotRequirement } from '../../domain/lineup.ts';
 import {
+  applyLineupPlacements,
   planLineupReposition,
   type LineupRepositionPlayer,
 } from '../../domain/lineup-reposition.ts';
@@ -82,21 +83,6 @@ function participantLineupPlayers(
       if (!positions) throw new Error(`${pick.playerId} has no catalog record`);
       return { playerId: pick.playerId, positions, slotIndex: pick.slotIndex };
     });
-}
-function applyPlanToParticipantPicks(
-  state: DuelDraftState,
-  participantId: 'p1' | 'p2',
-  placements: ReadonlyArray<{ playerId: PlayerId; slotIndex: SlotIndex }>,
-): DuelDraftPick[] {
-  const slotByPlayerId = new Map(
-    placements.map((placement) => [placement.playerId, placement.slotIndex]),
-  );
-  return state.picks.map((pick) => {
-    if (pick.participantId !== participantId) return pick;
-    const slotIndex = slotByPlayerId.get(pick.playerId);
-    if (slotIndex === undefined) throw new Error(`no planned slot for ${pick.playerId}`);
-    return { ...pick, slotIndex };
-  });
 }
 export function duelRollCandidates(
   catalog: ClassicDraftCatalog,
@@ -273,7 +259,7 @@ export function claimDuelPlayer(
         `no legal placement for ${input.playerId} at slot ${String(input.slotIndex)}`,
       );
     }
-    picks = applyPlanToParticipantPicks(state, picker, plan.placements);
+    picks = applyLineupPlacements(state.picks, picker, plan.placements);
   }
   const pick: DuelDraftPick = {
     pickOrdinal: state.pickOrdinal,
@@ -343,7 +329,7 @@ export function repositionDuelPlayer(
   if (plan === null) {
     throw new Error(`no legal reposition for ${input.playerId} to slot ${String(input.slotIndex)}`);
   }
-  const picks = applyPlanToParticipantPicks(state, input.actor, plan.placements);
+  const picks = applyLineupPlacements(state.picks, input.actor, plan.placements);
   return { ...state, picks };
 }
 export function isDuelComplete(state: DuelDraftState): boolean {

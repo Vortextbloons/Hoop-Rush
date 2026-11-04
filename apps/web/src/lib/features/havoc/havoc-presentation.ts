@@ -12,7 +12,7 @@ import type {
   HavocSide,
   HavocTier,
 } from '@hoop-rush/data-contracts';
-import type { HavocLineupSlotView, HavocRunView } from '@hoop-rush/application/havoc';
+import type { HavocRunView } from '@hoop-rush/application/havoc';
 import { HAVOC_GAME_COUNT } from '@hoop-rush/data-contracts';
 import { havocMutationDefinitionOf, havocMutationIsTeamExclusive } from '@hoop-rush/engine';
 
@@ -129,21 +129,6 @@ export function havocCompletionStateLabel(state: HavocRunView['completionState']
   if (state === 'comparison') return 'Normal season complete';
   if (state === 'complete') return 'Complete';
   return 'Abandoned';
-}
-
-export function lineupSlotsFromPicks(picks: readonly HavocDraftPick[]): HavocLineupSlotView[] {
-  return picks.map((pick) => ({
-    slot: pick.slot,
-    displayName: pick.card.source.displayName,
-    nickname: pick.card.nickname,
-    playerVersionId: pick.card.source.playerVersionId,
-    playerId: pick.card.source.playerId,
-    franchiseId: pick.card.source.franchiseId,
-    seasonKey: pick.card.source.seasonKey,
-    tier: pick.card.tier,
-    overall: pick.card.source.originalOverall,
-    mutations: pick.card.mutations,
-  }));
 }
 
 export interface HavocEventNameContext {

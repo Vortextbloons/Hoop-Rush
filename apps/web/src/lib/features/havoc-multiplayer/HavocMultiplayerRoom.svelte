@@ -32,13 +32,13 @@
   import HavocMultiplayerSeriesTracker from '#lib/features/havoc-multiplayer/HavocMultiplayerSeriesTracker.svelte';
   import {
     HAVOC_MULTIPLAYER_STAGE_LABELS,
-    havocMultiplayerLineupSlots,
     havocMultiplayerLocalSide,
     havocMultiplayerPhaseLabel,
     havocMultiplayerSecondsLeft,
     havocMultiplayerStageIndex,
     havocMultiplayerVerificationOf,
   } from '#lib/features/havoc-multiplayer/havoc-multiplayer-room-view.js';
+  import { havocLineupSlotsFromPicks } from '@hoop-rush/application/havoc';
 
   const REACTIONS: { key: ReactionKey; label: string; glyph: string }[] = [
     { key: 'hype', label: 'Hype', glyph: '🔥' },
@@ -108,8 +108,8 @@
   const rivalPicks = $derived(
     controller.draft?.picks.filter((pick) => pick.participantId !== controller.participantId) ?? [],
   );
-  const myLineupSlots = $derived(havocMultiplayerLineupSlots(myPicks));
-  const rivalLineupSlots = $derived(havocMultiplayerLineupSlots(rivalPicks));
+  const myLineupSlots = $derived(havocLineupSlotsFromPicks(myPicks));
+  const rivalLineupSlots = $derived(havocLineupSlotsFromPicks(rivalPicks));
   const offer = $derived(controller.offer);
   const pickSecondsLeft = $derived(havocMultiplayerSecondsLeft(controller.deadlineMsLeft));
   const urgentPick = $derived(pickSecondsLeft !== null && pickSecondsLeft <= 10);

@@ -1,12 +1,10 @@
 import type {
   CapRushDraftPick,
-  CapRushSourcePlayer,
   CapRushSpinPurchaseId,
   CapRushSpinReceipt,
   CapRushSpinTarget,
   HavocMutationEntry,
   HavocMutationId,
-  HavocSourcePlayer,
   HavocTier,
   Seed,
 } from '@hoop-rush/data-contracts';
@@ -27,6 +25,7 @@ import { HAVOC_MUTATION_DEFINITIONS } from '../havoc/mutations.ts';
 import { enumerateHavocBundles } from '../havoc/compatibility.ts';
 import { materializeHavocBundle } from '../havoc/offers.ts';
 import { applyHavocMutationPackage } from '../havoc/transform.ts';
+import { capRushHavocSourceOf } from './effective-profile.ts';
 
 export const CAP_RUSH_SPIN_RECEIPT_DIGEST_PREFIX = 'cap-rush-spin-receipt-v1';
 
@@ -76,22 +75,6 @@ export function capRushSpinTargetOf(pick: CapRushDraftPick): CapRushSpinTarget {
     cardId: pick.card.cardId,
     slot: pick.slot,
     playerVersionId: pick.card.source.playerVersionId,
-  };
-}
-
-function havocSourceOf(player: CapRushSourcePlayer): HavocSourcePlayer {
-  return {
-    playerId: player.playerId,
-    playerVersionId: player.playerVersionId,
-    displayName: player.displayName,
-    franchiseId: player.franchiseId,
-    eraId: player.eraId,
-    seasonKey: player.seasonKey,
-    positions: player.positions,
-    originalOverall: player.originalOverall,
-    overallSource: 'catalog',
-    profile: player.profile,
-    physical: player.physical,
   };
 }
 
@@ -157,9 +140,11 @@ export function buildCapRushSpinReceipt(input: CapRushSpinDrawInput): CapRushSpi
       : [materializeSingleDefinition(tier, rngFactory, runSeed)];
   const entry = entries[0];
   if (entry === undefined) throw new Error('cap rush spin produced no mutations');
-  const effective = applyHavocMutationPackage(havocSourceOf(input.pick.card.source), entries, {
-    slot: input.pick.slot,
-  });
+  const effective = applyHavocMutationPackage(
+    capRushHavocSourceOf(input.pick.card.source),
+    entries,
+    { slot: input.pick.slot },
+  );
   const payload: Omit<CapRushSpinReceipt, 'receiptDigest'> = {
     purchase: input.purchase,
     priceDollars: eligibility.priceDollars,

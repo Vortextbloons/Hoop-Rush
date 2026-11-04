@@ -71,10 +71,10 @@ test('sim series stops when the next round opens immediately', async () => {
     postseasonStep: mock(() => ({ kind: 'games', games: [{ userSide: 'home' }] })),
   } as unknown as CapRushService;
   const controller = new CapRushSeasonController(service, {} as CapRushRunner);
-  const batch = mock(async () => {
+  const batch = mock(() => {
     round += 1;
     Object.assign(controller, { draft: draftOf() });
-    return 1;
+    return Promise.resolve(1);
   });
   Object.assign(controller, {
     draft: draftOf(),

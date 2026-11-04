@@ -10,12 +10,11 @@
   import type { CapRushArt } from '../cap-rush/cap-rush-art.js';
   import { bucketClass, bucketLabel, initialsOf } from '../cap-rush/cap-rush-presentation.js';
   import {
-    clockLabel,
+    auctionClock,
     exactMoney,
     lotState,
     lotStateLabel,
     money,
-    remainingMs,
     seatLabelFor,
   } from './cap-rush-multiplayer-presentation.js';
 
@@ -53,17 +52,7 @@
         ? 'Min'
         : 'Offer',
   );
-  const remaining = $derived(auction === null ? 0 : remainingMs(auction.endsAtIso, nowMs));
-  const clockText = $derived(
-    auction === null
-      ? '—'
-      : auction.status === 'open'
-        ? remaining <= 0
-          ? 'Pending'
-          : clockLabel(remaining)
-        : 'Closed',
-  );
-  const clockUrgent = $derived(auction?.status === 'open' && remaining <= 10_000);
+  const clock = $derived(auctionClock(auction, nowMs));
   const leaderText = $derived.by(() => {
     if (auction === null) return 'Not opened';
     if (auction.status === 'closed') {
@@ -92,9 +81,9 @@
   const ariaLabel = $derived(
     `${player.displayName}, ${player.position}, overall ${String(player.originalOverall)}, ${stateLabel}, ${offerLabel} ${exactMoney(offerDollars)}, ${
       auction?.status === 'open'
-        ? remaining <= 0
+        ? clock.remainingMs <= 0
           ? 'closure pending'
-          : `closes in ${clockText}`
+          : `closes in ${clock.label}`
         : leaderText
     }`,
   );
@@ -192,7 +181,7 @@
     <span class="flex min-w-0 flex-col items-end">
       <span
         class="font-mono text-[10px] font-semibold tabular-nums"
-        class:text-negative={clockUrgent}>{clockText}</span
+        class:text-negative={clock.urgent}>{clock.label}</span
       >
       {#if extended}
         <span class="font-mono text-[8px] font-bold uppercase text-accent">Extended</span>

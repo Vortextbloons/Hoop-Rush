@@ -1,12 +1,10 @@
 import type {
-  HavocMultiplayerDraftPick,
   HavocMultiplayerParticipantId,
   HavocMultiplayerPhase,
   HavocMultiplayerSeriesGame,
   HavocMultiplayerSeriesSnapshot,
   Position,
 } from '@hoop-rush/data-contracts';
-import type { HavocLineupSlotView } from '@hoop-rush/application/havoc';
 import type { HavocMultiplayerSeriesMvp } from '@hoop-rush/persistence';
 import type { GamecastSeries, GamecastSeriesGame } from '#lib/gamecast/gamecast-types.js';
 
@@ -68,24 +66,6 @@ export function havocMultiplayerCurrentGameNumber(
   series: HavocMultiplayerSeriesSnapshot | null,
 ): number | null {
   return series?.games.find((game) => game.status !== 'verified')?.gameNumber ?? null;
-}
-
-/** Lineup card view for the multiplayer draft picks (which carry `turnOrdinal`, not `pickOrdinal`). */
-export function havocMultiplayerLineupSlots(
-  picks: readonly HavocMultiplayerDraftPick[],
-): HavocLineupSlotView[] {
-  return picks.map((pick) => ({
-    slot: pick.slot,
-    displayName: pick.card.source.displayName,
-    nickname: pick.card.nickname,
-    playerVersionId: pick.card.source.playerVersionId,
-    playerId: pick.card.source.playerId,
-    franchiseId: pick.card.source.franchiseId,
-    seasonKey: pick.card.source.seasonKey,
-    tier: pick.card.tier,
-    overall: pick.card.source.originalOverall,
-    mutations: pick.card.mutations,
-  }));
 }
 
 export function havocMultiplayerLocalSide(

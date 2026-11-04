@@ -54,15 +54,10 @@
   import ClassicRollReel from '#lib/components/classic/ClassicRollReel.svelte';
   import AsyncState from '#lib/components/AsyncState.svelte';
   import { arenaDraftPick, arenaError } from '#lib/arena-sound.js';
-  let slotPickerModule: Promise<
-    typeof import('#lib/components/draft/SlotPickerDialog.svelte')
-  > | null = null;
-  function loadSlotPickerDialog(): Promise<
-    typeof import('#lib/components/draft/SlotPickerDialog.svelte')
-  > {
-    slotPickerModule ??= import('#lib/components/draft/SlotPickerDialog.svelte');
-    return slotPickerModule;
-  }
+  import { lazyModule } from '#lib/lazy-module.js';
+  const loadSlotPickerDialog = lazyModule(
+    () => import('#lib/components/draft/SlotPickerDialog.svelte'),
+  );
   type IndexRow = PlayersIndexEntry;
   type Variant = 'ratings' | 'ball-knowledge';
   let manifest = $state.raw<HoopRushManifest | null>(null);

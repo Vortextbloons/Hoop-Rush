@@ -30,6 +30,26 @@ export interface LineupRepositionPlan {
   moves: LineupRepositionMove[];
 }
 
+/** Applies planned slots to one participant's picks, leaving every other pick untouched. */
+export function applyLineupPlacements<
+  TParticipantId,
+  TPick extends { participantId: TParticipantId; playerId: PlayerId },
+>(
+  picks: readonly TPick[],
+  participantId: TParticipantId,
+  placements: ReadonlyArray<{ playerId: PlayerId; slotIndex: SlotIndex }>,
+): TPick[] {
+  const slotByPlayerId = new Map(
+    placements.map((placement) => [placement.playerId, placement.slotIndex]),
+  );
+  return picks.map((pick) => {
+    if (pick.participantId !== participantId) return pick;
+    const slotIndex = slotByPlayerId.get(pick.playerId);
+    if (slotIndex === undefined) throw new Error(`no planned slot for ${pick.playerId}`);
+    return { ...pick, slotIndex };
+  });
+}
+
 const SLOT_INDEXES: SlotIndex[] = [0, 1, 2, 3, 4];
 
 function comparePlayerIds(a: PlayerId, b: PlayerId): number {

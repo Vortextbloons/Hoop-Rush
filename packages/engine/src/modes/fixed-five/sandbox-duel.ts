@@ -2,6 +2,7 @@ import type { PlayerId, Seed, SlotIndex } from '@hoop-rush/data-contracts';
 import { canPlay } from '../../domain/positions.ts';
 import { slotRequirement } from '../../domain/lineup.ts';
 import {
+  applyLineupPlacements,
   planLineupReposition,
   type LineupRepositionPlayer,
 } from '../../domain/lineup-reposition.ts';
@@ -98,21 +99,6 @@ function placementsWithVersions(
     playerVersionId: candidateById(pool, placement.playerId).playerVersionId,
   }));
 }
-function applyPlanToOwnPicks(
-  state: SandboxDuelState,
-  participantId: 'p1' | 'p2',
-  placements: ReadonlyArray<{ playerId: PlayerId; slotIndex: SlotIndex }>,
-): SandboxDuelPick[] {
-  const slotByPlayerId = new Map(
-    placements.map((placement) => [placement.playerId, placement.slotIndex]),
-  );
-  return state.picks.map((pick) => {
-    if (pick.participantId !== participantId) return pick;
-    const slotIndex = slotByPlayerId.get(pick.playerId);
-    if (slotIndex === undefined) throw new Error(`no planned slot for ${pick.playerId}`);
-    return { ...pick, slotIndex };
-  });
-}
 export function claimSandboxDuelPlayer(
   state: SandboxDuelState,
   pool: readonly FixedFiveCandidate[],
@@ -156,7 +142,7 @@ export function claimSandboxDuelPlayer(
         `claiming ${input.playerId} in slot ${String(input.slotIndex)} leaves no legal completion`,
       );
     }
-    picks = applyPlanToOwnPicks(state, input.actor, plan.placements);
+    picks = applyLineupPlacements(state.picks, input.actor, plan.placements);
   } else {
     const trial = [
       ...own.map((p) => ({
@@ -226,7 +212,7 @@ export function repositionSandboxDuelPlayer(
       `repositioning ${input.playerId} to slot ${String(input.slotIndex)} leaves no legal completion`,
     );
   }
-  return { ...state, picks: applyPlanToOwnPicks(state, input.actor, plan.placements) };
+  return { ...state, picks: applyLineupPlacements(state.picks, input.actor, plan.placements) };
 }
 export function sandboxDuelPicksFor(
   state: SandboxDuelState,

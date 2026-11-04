@@ -9,10 +9,9 @@
   import type { CapRushArt } from '../cap-rush/cap-rush-art.js';
   import { initialsOf } from '../cap-rush/cap-rush-presentation.js';
   import {
-    clockLabel,
+    auctionClock,
     money,
     lotState,
-    remainingMs,
     seatLabelFor,
   } from './cap-rush-multiplayer-presentation.js';
 
@@ -57,17 +56,7 @@
   const face = $derived(art === null ? null : art.faceFor(player.source));
   const initials = $derived(initialsOf(player.displayName));
   const offerDollars = $derived(auction?.leaderBidDollars ?? player.minimumBidDollars);
-  const remaining = $derived(auction === null ? 0 : remainingMs(auction.endsAtIso, nowMs));
-  const clockText = $derived(
-    auction === null
-      ? '—'
-      : auction.status === 'open'
-        ? remaining <= 0
-          ? 'Pending'
-          : clockLabel(remaining)
-        : 'Closed',
-  );
-  const clockUrgent = $derived(auction?.status === 'open' && remaining <= 10_000);
+  const clock = $derived(auctionClock(auction, nowMs));
   const clockLabelText = $derived(auction?.status === 'open' ? 'Closes' : 'Status');
   const leaderText = $derived.by(() => {
     if (auction === null) return 'Not opened';
@@ -124,7 +113,7 @@
         >
         <span
           class="block font-mono text-sm font-bold tabular-nums"
-          class:text-negative={clockUrgent}>{clockText}</span
+          class:text-negative={clock.urgent}>{clock.label}</span
         >
       </span>
     </button>
@@ -188,7 +177,7 @@
         type="button"
         class="min-h-11 w-full rounded-xl border border-border bg-surface-2 px-3 text-xs font-bold outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
         aria-label={`Cancel bid on ${player.displayName}`}
-        disabled={cancelBusy || pending || remaining <= 0}
+        disabled={cancelBusy || pending || clock.remainingMs <= 0}
         onclick={oncancelbid}>Cancel bid</button
       >
     {/if}

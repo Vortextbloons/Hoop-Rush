@@ -2,8 +2,7 @@
   import { resolve } from '$app/paths';
   import { onDestroy } from 'svelte';
   import { SvelteMap } from 'svelte/reactivity';
-  import { ArrowRight, Check, ChevronDown, Search } from '@lucide/svelte';
-  import { Select } from 'bits-ui';
+  import { ArrowRight, Search } from '@lucide/svelte';
   import type {
     HoopRushManifest,
     PlayersIndex,
@@ -18,6 +17,7 @@
     getRosterDetails,
   } from '#lib/data.js';
   import { errorMessageOf } from '#lib/errors.js';
+  import { lazyModule } from '#lib/lazy-module.js';
   import { LITE_TOGGLE_EVENT, deferIdle, isLiteMode } from '#lib/device-capabilities.js';
   import { DETAILED_POSITIONS } from '#lib/player-positions.js';
   import {
@@ -32,19 +32,13 @@
     type RosterSortDirection,
     type RosterSortId,
   } from '#lib/roster-browser.js';
-  import TeamLogo from '#lib/components/TeamLogo.svelte';
+  import RosterFilters from '#lib/components/RosterFilters.svelte';
   import AsyncState from '#lib/components/AsyncState.svelte';
   import RosterComparison from '#lib/components/RosterComparison.svelte';
   import RosterTable from '#lib/components/RosterTable.svelte';
-  let playerDetailModule: Promise<
-    typeof import('#lib/components/PlayerDetailDialog.svelte')
-  > | null = null;
-  function loadPlayerDetailDialog(): Promise<
-    typeof import('#lib/components/PlayerDetailDialog.svelte')
-  > {
-    playerDetailModule ??= import('#lib/components/PlayerDetailDialog.svelte');
-    return playerDetailModule;
-  }
+  const loadPlayerDetailDialog = lazyModule(
+    () => import('#lib/components/PlayerDetailDialog.svelte'),
+  );
   type IndexRow = RosterRow;
   const SORT_OPTIONS: {
     id: RosterSortId;
@@ -186,20 +180,6 @@
     manifest?.modernFranchiseSlots.find((e) => e.franchiseId === franchiseId) ?? null,
   );
   const era = $derived(manifest?.eras.find((e) => e.eraId === eraId) ?? null);
-  const franchiseItems = $derived([
-    { value: '', label: 'Any franchise' },
-    ...(manifest?.modernFranchiseSlots ?? []).map((entry) => ({
-      value: entry.franchiseId,
-      label: entry.displayName,
-    })),
-  ]);
-  const eraItems = $derived([
-    { value: '', label: 'Any decade' },
-    ...(manifest?.eras ?? []).map((e) => ({
-      value: e.eraId,
-      label: e.label,
-    })),
-  ]);
   const eraLabel = $derived(new SvelteMap((manifest?.eras ?? []).map((e) => [e.eraId, e.label])));
   const franchiseName = $derived(
     new SvelteMap(
@@ -369,182 +349,15 @@
       <AsyncState kind="loading" title="Loading…" message="Loading…" />
     </div>
   {:else}
-    <div class="mt-8 grid gap-6 sm:grid-cols-2">
-      <div>
-        <h2
-          id="roster-franchise-label"
-          class="font-mono text-[11px] tracking-[0.14em] text-muted-foreground uppercase"
-        >
-          Franchise
-        </h2>
-        <Select.Root
-          type="single"
-          value={franchiseId}
-          onValueChange={selectFranchise}
-          items={franchiseItems}
-        >
-          <Select.Trigger
-            aria-labelledby="roster-franchise-label"
-            class="mt-3 flex h-12 w-full items-center justify-between gap-3 rounded-lg border border-input bg-card px-3.5 text-sm font-semibold text-foreground outline-none transition-colors hover:border-line-strong focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <Select.Value placeholder="Any franchise…">
-              {#snippet children(props)}
-                {#if franchise}
-                  <span class="flex min-w-0 items-center gap-2.5">
-                    <TeamLogo
-                      manifest={manifest!}
-                      franchiseId={franchise.franchiseId}
-                      teamExternalId={franchise.teamExternalId}
-                      logoCandidates={eraIdentity?.logoCandidates ?? []}
-                    />
-                    <span
-                      class="truncate"
-                      title={eraIdentity?.displayLabel ?? franchise.displayName}
-                    >
-                      {eraIdentity?.abbreviationLabel ??
-                        franchiseAbbreviation(franchise.franchiseId)}
-                    </span>
-                  </span>
-                {:else}
-                  <span class="font-normal text-muted-foreground">{props.placeholder}</span>
-                {/if}
-              {/snippet}
-            </Select.Value>
-            <ChevronDown class="h-4 w-4 shrink-0 text-muted-foreground" />
-          </Select.Trigger>
-          <Select.Portal>
-            <Select.Content
-              side="bottom"
-              sideOffset={6}
-              align="start"
-              collisionPadding={12}
-              class="z-50 min-w-64 max-w-[calc(100vw-1.5rem)] rounded-lg border border-border bg-popover p-1 shadow-2xl shadow-black/30"
-            >
-              <Select.Viewport
-                class="max-h-[min(20rem,55vh)] overflow-y-auto overscroll-contain p-0.5"
-              >
-                <Select.Item
-                  value=""
-                  label="Any franchise"
-                  aria-label="Any franchise"
-                  class="cursor-pointer select-none rounded-md outline-none transition-colors data-[disabled]:cursor-not-allowed data-[disabled]:opacity-40 data-[highlighted]:bg-surface-3 data-[selected]:bg-primary/10"
-                >
-                  {#snippet children({ selected })}
-                    <span class="flex w-full items-center gap-2.5 py-1 pr-1 pl-0.5">
-                      <span class="min-w-0 flex-1 truncate text-sm font-semibold">
-                        Any franchise
-                      </span>
-                      {#if selected}
-                        <Check class="h-4 w-4 shrink-0 text-primary" />
-                      {/if}
-                    </span>
-                  {/snippet}
-                </Select.Item>
-                {#each manifest.modernFranchiseSlots as entry (entry.franchiseId)}
-                  <Select.Item
-                    value={entry.franchiseId}
-                    label={entry.displayName}
-                    aria-label={`${franchiseAbbreviation(entry.franchiseId)} — ${entry.displayName}`}
-                    class="cursor-pointer select-none rounded-md outline-none transition-colors data-[disabled]:cursor-not-allowed data-[disabled]:opacity-40 data-[highlighted]:bg-surface-3 data-[selected]:bg-primary/10"
-                  >
-                    {#snippet children({ selected })}
-                      <span class="flex w-full items-center gap-2.5 py-1 pr-1 pl-0.5">
-                        <TeamLogo
-                          manifest={manifest!}
-                          franchiseId={entry.franchiseId}
-                          teamExternalId={entry.teamExternalId}
-                        />
-                        <span class="min-w-0 flex-1 truncate text-sm font-semibold">
-                          {franchiseAbbreviation(entry.franchiseId)}
-                        </span>
-                        {#if selected}
-                          <Check class="h-4 w-4 shrink-0 text-primary" />
-                        {/if}
-                      </span>
-                    {/snippet}
-                  </Select.Item>
-                {/each}
-              </Select.Viewport>
-            </Select.Content>
-          </Select.Portal>
-        </Select.Root>
-      </div>
-
-      <div>
-        <h2
-          id="roster-decade-label"
-          class="font-mono text-[11px] tracking-[0.14em] text-muted-foreground uppercase"
-        >
-          Decade
-        </h2>
-
-        <Select.Root type="single" value={eraId} onValueChange={selectEra} items={eraItems}>
-          <Select.Trigger
-            aria-labelledby="roster-decade-label"
-            class="mt-3 flex h-12 w-full items-center justify-between gap-3 rounded-lg border border-input bg-card px-3.5 text-sm font-semibold text-foreground outline-none transition-colors hover:border-line-strong focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <Select.Value placeholder="Any decade…">
-              {#snippet children(props)}
-                {#if era}
-                  <span class="truncate font-mono">{era.label}</span>
-                {:else}
-                  <span class="font-normal text-muted-foreground">{props.placeholder}</span>
-                {/if}
-              {/snippet}
-            </Select.Value>
-            <ChevronDown class="h-4 w-4 shrink-0 text-muted-foreground" />
-          </Select.Trigger>
-          <Select.Portal>
-            <Select.Content
-              side="bottom"
-              sideOffset={6}
-              align="start"
-              collisionPadding={12}
-              class="z-50 min-w-48 max-w-[calc(100vw-1.5rem)] rounded-lg border border-border bg-popover p-1 shadow-2xl shadow-black/30"
-            >
-              <Select.Viewport
-                class="max-h-[min(20rem,55vh)] overflow-y-auto overscroll-contain p-0.5"
-              >
-                <Select.Item
-                  value=""
-                  label="Any decade"
-                  aria-label="Any decade"
-                  class="cursor-pointer select-none rounded-md outline-none transition-colors data-[disabled]:cursor-not-allowed data-[disabled]:opacity-40 data-[highlighted]:bg-surface-3 data-[selected]:bg-primary/10"
-                >
-                  {#snippet children({ selected })}
-                    <span class="flex w-full items-center gap-2.5 py-1 pr-1 pl-0.5">
-                      <span class="min-w-0 flex-1 truncate font-mono text-sm font-semibold">
-                        Any decade
-                      </span>
-                      {#if selected}
-                        <Check class="h-4 w-4 shrink-0 text-primary" />
-                      {/if}
-                    </span>
-                  {/snippet}
-                </Select.Item>
-                {#each manifest.eras as e (e.eraId)}
-                  <Select.Item
-                    value={e.eraId}
-                    label={e.label}
-                    class="cursor-pointer select-none rounded-md outline-none transition-colors data-[disabled]:cursor-not-allowed data-[disabled]:opacity-40 data-[highlighted]:bg-surface-3 data-[selected]:bg-primary/10"
-                  >
-                    {#snippet children({ selected })}
-                      <span class="flex w-full items-center gap-2.5 py-1 pr-1 pl-0.5">
-                        <span class="min-w-0 flex-1 truncate font-mono text-sm font-semibold">
-                          {e.label}
-                        </span>
-                        {#if selected}
-                          <Check class="h-4 w-4 shrink-0 text-primary" />
-                        {/if}
-                      </span>
-                    {/snippet}
-                  </Select.Item>
-                {/each}
-              </Select.Viewport>
-            </Select.Content>
-          </Select.Portal>
-        </Select.Root>
-      </div>
+    <div class="mt-8">
+      <RosterFilters
+        {manifest}
+        {franchiseId}
+        {eraId}
+        idPrefix="roster"
+        onSelectFranchise={selectFranchise}
+        onSelectEra={selectEra}
+      />
     </div>
 
     {#if indexError || detailsError}
