@@ -7,6 +7,8 @@
   import { clearDataLoaderCaches, getManifest } from '#lib/data.js';
   import { challengeRepository } from './challenge-repo';
   import AsyncState from '#lib/components/AsyncState.svelte';
+  import ActionLink from '#lib/components/ui/ActionLink.svelte';
+  import PageHeader from '#lib/components/ui/PageHeader.svelte';
   import HistoryList from './challenge-history-list.svelte';
   let {
     mode,
@@ -58,28 +60,14 @@
   }
   const modeLabel = $derived(mode === 'sandbox' ? 'Sandbox' : 'Classic');
   const continueHref = $derived(active?.mode === mode ? `/${mode}/challenge` : null);
-  const resultHrefFor = $derived(
-    (runId: string) => `/${mode}/result?runId=${encodeURIComponent(runId)}`,
-  );
 </script>
 
 <section class="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
-  <div class="flex items-end justify-between gap-4">
-    <div>
-      <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">{eyebrow}</p>
-      <h1
-        class="font-display mt-2 text-3xl font-extrabold tracking-tight uppercase sm:text-4xl md:text-5xl"
-      >
-        Challenge history
-      </h1>
-    </div>
-    <a
-      href={resolve('/')}
-      class="font-mono text-xs text-muted-foreground underline-offset-4 hover:underline"
-    >
-      Back
-    </a>
-  </div>
+  <PageHeader {eyebrow} title="Challenge history">
+    {#snippet actions()}
+      <ActionLink href={resolve('/')} tone="ghost" size="sm">Back</ActionLink>
+    {/snippet}
+  </PageHeader>
 
   {#if error}
     <div class="mt-8">
@@ -104,7 +92,6 @@
       emptyHref={mode === 'sandbox' ? '/sandbox' : '/classic'}
       emptyCta={mode === 'sandbox' ? 'Start a sandbox challenge' : 'Start a classic challenge'}
       {continueHref}
-      {resultHrefFor}
     />
   {/if}
 </section>

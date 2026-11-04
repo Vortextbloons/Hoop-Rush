@@ -1,8 +1,10 @@
-﻿<script lang="ts">
+<script lang="ts">
   import { resolve } from '$app/paths';
-  import type { RouteId } from '$app/types';
   import { Trophy } from '@lucide/svelte';
   import AsyncState from '#lib/components/AsyncState.svelte';
+  import HistoryEntryCard from '#lib/components/basketball/HistoryEntryCard.svelte';
+  import ActionLink from '#lib/components/ui/ActionLink.svelte';
+  import Panel from '#lib/components/ui/Panel.svelte';
   import type { ActiveRunCheckpoint, CompletedRunIndex } from '@hoop-rush/persistence';
   import type { HoopRushManifest } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
@@ -17,17 +19,15 @@
     emptyHref,
     emptyCta,
     continueHref,
-    resultHrefFor,
   }: {
     manifest: HoopRushManifest | null;
     rows: CompletedRunIndex[];
     active: ActiveRunCheckpoint | null;
     modeLabel: string;
     emptyTitle: string;
-    emptyHref: string;
+    emptyHref: '/classic' | '/sandbox';
     emptyCta: string;
     continueHref: string | null;
-    resultHrefFor: (runId: string) => string;
   } = $props();
   function franchiseName(franchiseId: string | null): string {
     if (!franchiseId) return 'Mixed lineup';
@@ -43,25 +43,37 @@
     const date = new Date(iso);
     return Number.isNaN(date.getTime()) ? iso : date.toLocaleString();
   }
+  const emptyHrefResolved = $derived(
+    emptyHref === '/sandbox' ? resolve('/sandbox') : resolve('/classic'),
+  );
+  const continueHrefResolved = $derived(
+    continueHref === null
+      ? null
+      : continueHref === '/sandbox/challenge'
+        ? resolve('/sandbox/challenge')
+        : resolve('/classic/challenge'),
+  );
+  function resultHref(runId: string, mode: CompletedRunIndex['mode']): string {
+    const base = mode === 'classic' ? resolve('/classic/result') : resolve('/sandbox/result');
+    return `${base}?runId=${encodeURIComponent(runId)}`;
+  }
 </script>
 
 {#if rows.length === 0 && !active}
   <div class="mt-8">
     <AsyncState kind="empty" title={emptyTitle}>
       {#snippet actions()}
-        <a
-          href={resolve(emptyHref as any)}
-          class="ui-btn ui-btn--sm bg-primary text-primary-foreground"
-        >
+        <ActionLink href={emptyHrefResolved} size="sm" tone="primary">
           {emptyCta}
-        </a>
+        </ActionLink>
       {/snippet}
     </AsyncState>
   </div>
 {:else}
-  {#if active && active.status === 'active' && continueHref}
-    <div
-      class="mt-8 rounded-xl border border-line-strong bg-surface-2 p-5"
+  {#if active && active.status === 'active' && continueHrefResolved !== null}
+    <Panel
+      padding="md"
+      class="mt-8 border-line-strong bg-surface-2"
       aria-label={`${modeLabel} active challenge`}
     >
       <p class="font-display text-lg font-extrabold tracking-tight uppercase">Active challenge</p>
@@ -70,54 +82,46 @@
         {(active.gamesPlayed ?? 0) + 1} of 82 · {active.aggregates.team.wins}-
         {active.aggregates.team.losses}
       </p>
-      <a
-        href={resolve(continueHref as any)}
-        class="mt-3 inline-flex rounded-lg bg-primary px-5 py-2.5 font-semibold text-primary-foreground"
-      >
-        Continue
-      </a>
-    </div>
+      <ActionLink href={continueHrefResolved} tone="primary" class="mt-3">Continue</ActionLink>
+    </Panel>
   {/if}
 
   <ul class="mt-8 flex flex-col gap-3">
     {#each rows as row (row.runId)}
       {@const isClassic = row.mode === 'classic'}
-      <li>
-        <a
-          href={resolve(resultHrefFor(row.runId) as any)}
-          class="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-border bg-card p-4 transition-colors hover:border-line-strong"
-        >
-          <span
-            class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-primary/15 text-primary"
-          >
+      <HistoryEntryCard href={resultHref(row.runId, row.mode)}>
+        {#snippet leading()}
+          <span class="grid h-10 w-10 place-items-center rounded-lg bg-primary/15 text-primary">
             <Trophy class="h-5 w-5" />
           </span>
-          <span class="min-w-0 flex-1">
-            <span
-              class="font-display block truncate text-base font-extrabold tracking-tight uppercase"
-            >
-              {#if isClassic}
-                Classic · {variantLabel(row.variant ?? 'ratings')}
-              {:else}
-                {franchiseName(row.franchiseId)} · {eraName(manifest, row.eraId)}
-              {/if}
-            </span>
-            <span class="block font-mono text-[10px] text-muted-foreground">
-              {#if isClassic}
-                five drafted players
-              {:else}
-                {row.playerIds.length} players · {franchiseLabel(row.franchiseId)}
-              {/if}
-            </span>
+        {/snippet}
+        {#snippet title()}
+          <span
+            class="font-display block truncate text-base font-extrabold tracking-tight uppercase"
+          >
+            {#if isClassic}
+              Classic · {variantLabel(row.variant ?? 'ratings')}
+            {:else}
+              {franchiseName(row.franchiseId)} · {eraName(manifest, row.eraId)}
+            {/if}
           </span>
+        {/snippet}
+        {#snippet meta()}
+          <span class="block">
+            {#if isClassic}
+              five drafted players
+            {:else}
+              {row.playerIds.length} players · {franchiseLabel(row.franchiseId)}
+            {/if}
+          </span>
+          <span class="block">{formatTime(row.completedAtIso)}</span>
+        {/snippet}
+        {#snippet trailing()}
           <span class="font-display text-xl font-extrabold tracking-tight">
             {row.wins}<span class="text-muted-foreground">–</span>{row.losses}
           </span>
-          <span class="w-full font-mono text-[10px] text-muted-foreground sm:w-auto">
-            {formatTime(row.completedAtIso)}
-          </span>
-        </a>
-      </li>
+        {/snippet}
+      </HistoryEntryCard>
     {/each}
   </ul>
 {/if}

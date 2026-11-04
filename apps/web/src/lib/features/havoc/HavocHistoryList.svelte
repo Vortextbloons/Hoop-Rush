@@ -1,6 +1,10 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
   import AsyncState from '#lib/components/AsyncState.svelte';
+  import HistoryEntryCard from '#lib/components/basketball/HistoryEntryCard.svelte';
+  import ActionLink from '#lib/components/ui/ActionLink.svelte';
+  import Badge from '#lib/components/ui/Badge.svelte';
+  import PageHeader from '#lib/components/ui/PageHeader.svelte';
   import type { HavocHistoryState } from './havoc-history-state.svelte.js';
   import { havocCompletionStateLabel, havocRecordLabel } from './havoc-presentation';
 
@@ -8,17 +12,11 @@
 </script>
 
 <section class="h-shell" data-havoc-history>
-  <header>
-    <p class="font-mono text-[10px] font-bold tracking-[0.16em] text-primary uppercase">
-      Hoop Havoc · Hall of Freaks
-    </p>
-    <h1 class="font-display mt-1 text-3xl font-extrabold tracking-tight uppercase">
-      Hall of Freaks
-    </h1>
-    <p class="mt-2 max-w-2xl text-sm text-muted-foreground">
-      Every squad has a story. Revisit your seasons, wildest powers, and greatest runs.
-    </p>
-  </header>
+  <PageHeader
+    eyebrow="Hoop Havoc · Hall of Freaks"
+    title="Hall of Freaks"
+    description="Every squad has a story. Revisit your seasons, wildest powers, and greatest runs."
+  />
 
   {#if state.loading}
     <div class="mt-6">
@@ -36,47 +34,41 @@
         message="Draft a lineup and play the 82-game challenge."
       >
         {#snippet actions()}
-          <a href={resolve('havoc/')} class="h-button">Start a Havoc run</a>
+          <ActionLink href={resolve('havoc/')}>Start a Havoc run</ActionLink>
         {/snippet}
       </AsyncState>
     </div>
   {:else}
     <ul class="mt-6 flex flex-col gap-3">
       {#each state.entries as entry (entry.runId)}
-        <li>
-          <a
-            href={resolve('/havoc/history/[runId]', { runId: entry.runId })}
-            data-havoc-history-entry={entry.runId}
-            class="h-panel flex flex-wrap items-center gap-x-4 gap-y-2"
-          >
-            <span class="min-w-0 flex-1">
-              <span
-                class="font-display block truncate text-lg font-extrabold tracking-tight uppercase"
-              >
-                {havocRecordLabel(entry.havocWins, entry.havocLosses)}
-                {#if entry.perfectSeason}
-                  <span class="text-primary">· 82–0</span>
-                {/if}
-              </span>
-              <span class="mt-0.5 block truncate font-mono text-[11px] text-muted-foreground">
-                {new Date(entry.createdAtIso).toLocaleDateString()}
-              </span>
-              <span class="mt-0.5 block text-xs text-muted-foreground">
-                {havocCompletionStateLabel(entry.completionState)} · comparison:
-                {entry.comparisonStatus} · updated
-                {new Date(entry.updatedAtIso).toLocaleDateString()}
-              </span>
+        <HistoryEntryCard
+          href={resolve('/havoc/history/[runId]', { runId: entry.runId })}
+          data-havoc-history-entry={entry.runId}
+        >
+          {#snippet title()}
+            <span class="font-display text-lg font-extrabold tracking-tight uppercase">
+              {havocRecordLabel(entry.havocWins, entry.havocLosses)}
+              {#if entry.perfectSeason}
+                <span class="text-primary">· 82–0</span>
+              {/if}
             </span>
-            <span
-              class="shrink-0 rounded-full border px-2.5 py-1 font-mono text-[10px] font-bold tracking-[0.12em] uppercase {entry.comparisonStatus ===
-              'complete'
-                ? 'border-primary text-primary'
-                : 'border-border text-muted-foreground'}"
-            >
+          {/snippet}
+          {#snippet badges()}
+            <Badge tone={entry.comparisonStatus === 'complete' ? 'primary' : 'neutral'}>
               {entry.comparisonStatus === 'complete' ? 'Report ready' : 'Report partial'}
+            </Badge>
+          {/snippet}
+          {#snippet meta()}
+            <span class="block">
+              {new Date(entry.createdAtIso).toLocaleDateString()}
             </span>
-          </a>
-        </li>
+            <span class="block">
+              {havocCompletionStateLabel(entry.completionState)} · comparison:
+              {entry.comparisonStatus} · updated
+              {new Date(entry.updatedAtIso).toLocaleDateString()}
+            </span>
+          {/snippet}
+        </HistoryEntryCard>
       {/each}
     </ul>
   {/if}

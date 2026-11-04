@@ -41,9 +41,14 @@ export default tseslint.config(
   },
   ...eslintPluginSvelte.configs['flat/recommended'],
   {
-    files: ['src/lib/components/PlayerDetailDialog.svelte'],
+    files: [
+      'src/lib/components/PlayerDetailDialog.svelte',
+      // Link and card primitives receive an already-resolved href from the caller.
+      'src/lib/components/ui/ActionLink.svelte',
+      'src/lib/components/basketball/HistoryEntryCard.svelte',
+    ],
     rules: {
-      // Source links are external URLs, not app routes.
+      // Source links and forwarded hrefs are not built inside these components.
       'svelte/no-navigation-without-resolve': 'off',
     },
   },

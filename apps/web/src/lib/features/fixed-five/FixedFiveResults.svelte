@@ -17,6 +17,7 @@
     PlayersIndexEntry,
   } from '@hoop-rush/data-contracts';
   import PlayerFace from '#lib/components/PlayerFace.svelte';
+  import SegmentedControl from '#lib/components/ui/SegmentedControl.svelte';
   import { formatPositions } from '#lib/player-positions.js';
   import type { DraftPresentation } from '#lib/draft-presentation.js';
   import type { FixedFivePlayerStats } from '#lib/features/fixed-five/fixed-five-player-stats.js';
@@ -820,58 +821,26 @@
             Player stats · both fives
           </h3>
           <div class="flex flex-wrap items-center gap-2">
-            <div
-              class="flex rounded-lg border border-border p-0.5"
-              role="group"
-              aria-label="Stats side"
-            >
-              <button
-                type="button"
-                aria-pressed={statsSide === 'you'}
-                onclick={() => (statsSide = 'you')}
-                class="rounded-md px-3 py-1 font-mono text-xs font-semibold {statsSide === 'you'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground'}"
-              >
-                You
-              </button>
-              <button
-                type="button"
-                aria-pressed={statsSide === 'opp'}
-                onclick={() => (statsSide = 'opp')}
-                class="rounded-md px-3 py-1 font-mono text-xs font-semibold {statsSide === 'opp'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground'}"
-              >
-                Opponent
-              </button>
-            </div>
-            <div
-              class="flex rounded-lg border border-border p-0.5"
-              role="group"
-              aria-label="Stats values"
-            >
-              <button
-                type="button"
-                aria-pressed={!statsTotals}
-                onclick={() => (statsTotals = false)}
-                class="rounded-md px-3 py-1 font-mono text-xs font-semibold {!statsTotals
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground'}"
-              >
-                Per game
-              </button>
-              <button
-                type="button"
-                aria-pressed={statsTotals}
-                onclick={() => (statsTotals = true)}
-                class="rounded-md px-3 py-1 font-mono text-xs font-semibold {statsTotals
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground'}"
-              >
-                Totals
-              </button>
-            </div>
+            <SegmentedControl
+              label="Stats side"
+              size="md"
+              value={statsSide}
+              onchange={(next) => (statsSide = next)}
+              options={[
+                { value: 'you', label: 'You' },
+                { value: 'opp', label: 'Opponent' },
+              ]}
+            />
+            <SegmentedControl
+              label="Stats values"
+              size="md"
+              value={statsTotals ? 'totals' : 'game'}
+              onchange={(next) => (statsTotals = next === 'totals')}
+              options={[
+                { value: 'game', label: 'Per game' },
+                { value: 'totals', label: 'Totals' },
+              ]}
+            />
           </div>
         </div>
 

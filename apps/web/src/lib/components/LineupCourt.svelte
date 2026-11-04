@@ -4,6 +4,7 @@
 >
   import type { HoopRushManifest, PeakPlayerSeason } from '@hoop-rush/data-contracts';
   import PlayerFace from './PlayerFace.svelte';
+  import IconButton from './ui/IconButton.svelte';
   import { SLOT_LABELS, SLOT_INDEXES } from '#lib/player-positions.js';
   const SLOT_POSITIONS = [
     { left: 50, top: 77 },
@@ -104,14 +105,13 @@
                 {label}
               </span>
               {#if allowRemove}
-                <button
-                  type="button"
-                  aria-label={`Remove ${player.displayName}`}
+                <IconButton
+                  label={`Remove ${player.displayName}`}
                   onclick={() => onremove(i)}
-                  class="absolute top-[-8px] right-[-8px] z-10 grid h-6 w-6 place-items-center rounded-full border border-border bg-background text-xs font-bold text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                  class="absolute top-[-8px] right-[-8px] z-10 h-6 w-6 border-border bg-background text-xs font-bold"
                 >
                   ×
-                </button>
+                </IconButton>
               {/if}
             </span>
             <span class="slot-name">{player.displayName}</span>

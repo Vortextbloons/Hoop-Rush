@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import PlayerFace from '#lib/components/PlayerFace.svelte';
   import PlayerStatsTable from '#lib/components/PlayerStatsTable.svelte';
+  import Panel from '#lib/components/ui/Panel.svelte';
   import type { PlayerStatColumn } from '#lib/components/player-stats-table.js';
   import { getManifest, getPlayersIndex } from '#lib/data.js';
   import type { HoopRushManifest, PlayersIndex } from '@hoop-rush/data-contracts';
@@ -653,10 +654,7 @@
     {/if}
   </div>
 
-  <section
-    class="rounded-2xl border border-border bg-card p-5 sm:p-7"
-    aria-label="Season player statistics"
-  >
+  <Panel as="section" padding="md" class="sm:p-7" aria-label="Season player statistics">
     <p class="report-label">The box score</p>
     <h3 class="font-display mt-1 text-2xl font-extrabold tracking-tight uppercase">
       Season statistics <span class="text-sm text-muted-foreground">&middot; per game</span>
@@ -704,9 +702,9 @@
         {/snippet}
       </PlayerStatsTable>
     </div>
-  </section>
+  </Panel>
 
-  <section class="rounded-2xl border border-border bg-card p-5 sm:p-7" aria-label="League MVP">
+  <Panel as="section" padding="md" class="sm:p-7" aria-label="League MVP">
     <p class="report-label">Season honors</p>
     <h3 class="font-display mt-1 text-2xl font-extrabold tracking-tight uppercase">League MVP</h3>
     {#if mvp === null}
@@ -778,7 +776,7 @@
         </div>
       </dl>
     {/if}
-  </section>
+  </Panel>
 </div>
 
 <style>

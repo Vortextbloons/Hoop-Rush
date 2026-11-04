@@ -1,5 +1,7 @@
 <script lang="ts">
   import AchievementReveal from '#lib/features/profile/AchievementReveal.svelte';
+  import ActionLink from '#lib/components/ui/ActionLink.svelte';
+  import Button from '#lib/components/ui/Button.svelte';
   import RoomShell from '#lib/features/multiplayer/RoomShell.svelte';
   import RoomNav from '#lib/features/multiplayer/RoomNav.svelte';
   import RoomStages from '#lib/features/multiplayer/RoomStages.svelte';
@@ -244,10 +246,10 @@
       <h1>Couldn’t open this room</h1>
       <p role="alert">{controller.error}</p>
 
-      <a href={resolve('draft-duel/')} class="room-primary">
+      <ActionLink href={resolve('draft-duel/')}>
         Back to Draft Duel
         <ArrowRight size={16} aria-hidden="true" />
-      </a>
+      </ActionLink>
     </div>
   {:else}
     <RoomShell
@@ -305,22 +307,22 @@
                 {controller.snapshot.code}
               </div>
               <div class="invite-actions">
-                <button type="button" onclick={copyCode} class="room-secondary">
+                <Button tone="secondary" onclick={copyCode}>
                   {#if copiedCode}
                     <Check size={16} aria-hidden="true" />Copied
                   {:else}
                     <Copy size={16} aria-hidden="true" />Copy code
                   {/if}
-                </button>
+                </Button>
 
-                <button type="button" onclick={copyInviteLink} class="room-primary">
+                <Button onclick={copyInviteLink}>
                   {#if copiedLink}
                     <Check size={16} aria-hidden="true" />Copied
                   {:else}
                     <Link size={16} aria-hidden="true" />
                     Copy invite link
                   {/if}
-                </button>
+                </Button>
               </div>
               <p class="invite-footnote">Room codes expire after 15 minutes.</p>
             {/if}
@@ -380,15 +382,14 @@
             </p>
           </div>
           {#if isHost}
-            <button
-              type="button"
+            <Button
               onclick={() => controller.startDraft()}
               disabled={controller.busy || !bothOnline}
-              class="room-primary start-draft"
+              class="start-draft"
             >
               {controller.busy ? 'Starting draft…' : 'Start draft'}
               <ArrowRight size={18} aria-hidden="true" />
-            </button>
+            </Button>
           {/if}
           <div class="lobby-manage">
             {#if isHost && rivalMember}
@@ -497,9 +498,7 @@
           </div>
         </div>
         <div class="panel-actions">
-          <button type="button" class="room-primary" onclick={() => controller.readyForNextGame()}>
-            Ready for Game 1
-          </button>
+          <Button onclick={() => controller.readyForNextGame()}>Ready for Game 1</Button>
         </div>
       </section>
     {:else if controller.phase === 'preparing-game'}
@@ -533,14 +532,9 @@
           </p>
         {/if}
         <div class="panel-actions">
-          <button
-            type="button"
-            class="room-primary"
-            disabled={controller.localReady}
-            onclick={() => controller.readyForNextGame()}
-          >
+          <Button disabled={controller.localReady} onclick={() => controller.readyForNextGame()}>
             {controller.localReady ? 'Ready' : 'Ready for this game'}
-          </button>
+          </Button>
         </div>
       </section>
     {:else if controller.showingBroadcast && controller.currentOutput && controller.visible}
@@ -568,9 +562,9 @@
         {#if controller.error}
           <p class="panel-hint" role="alert">{controller.error}</p>
           <div class="panel-actions">
-            <button type="button" class="room-secondary" onclick={() => void controller.refresh()}>
+            <Button tone="secondary" onclick={() => void controller.refresh()}>
               Retry simulation
-            </button>
+            </Button>
           </div>
         {/if}
       </section>
@@ -600,13 +594,9 @@
           {#if controller.error}
             <p class="panel-hint" role="alert">{controller.error}</p>
             <div class="panel-actions">
-              <button
-                type="button"
-                class="room-secondary"
-                onclick={() => void controller.refresh()}
-              >
+              <Button tone="secondary" onclick={() => void controller.refresh()}>
                 Retry simulation
-              </button>
+              </Button>
             </div>
           {/if}
         </section>
@@ -636,28 +626,28 @@
         <h1>Room expired</h1>
         <p>Your local saves are kept. Create a new room to play again.</p>
 
-        <a class="room-primary" href={resolve('draft-duel/')}>
+        <ActionLink href={resolve('draft-duel/')}>
           New Draft Duel
           <ArrowRight size={16} aria-hidden="true" />
-        </a>
+        </ActionLink>
       </div>
     {:else if controller.phase === 'integrity-failed'}
       <div class="room-empty">
         <h1>Results could not be verified</h1>
         <p>The two simulations disagreed. Neither result has been accepted.</p>
 
-        <a class="room-primary" href={resolve('draft-duel/')}>
+        <ActionLink href={resolve('draft-duel/')}>
           New Draft Duel
           <ArrowRight size={16} aria-hidden="true" />
-        </a>
+        </ActionLink>
       </div>
     {/if}
 
     {#if controller.phase !== 'lobby'}
       <div class="room-footer">
-        <button type="button" onclick={leaveRoom} disabled={controller.busy} class="room-secondary"
-          ><LogOut size={14} aria-hidden="true" /> Leave room</button
-        >
+        <Button tone="secondary" onclick={leaveRoom} disabled={controller.busy}>
+          <LogOut size={14} aria-hidden="true" /> Leave room
+        </Button>
       </div>
     {/if}
   {/if}
@@ -681,11 +671,6 @@
     margin-top: 16px;
     font-size: 10px;
     color: var(--color-muted-foreground);
-  }
-
-  .room-primary:hover:not(:disabled),
-  .room-secondary:hover:not(:disabled) {
-    filter: brightness(1.08);
   }
 
   .player-seats {
@@ -727,7 +712,7 @@
     background: var(--color-positive);
   }
 
-  .start-draft {
+  :global(.start-draft) {
     width: 100%;
     padding: 14px;
     margin-bottom: 10px;
@@ -848,8 +833,7 @@
     opacity: 0.45;
     cursor: default;
   }
-  button:focus-visible,
-  a:focus-visible {
+  button:focus-visible {
     outline: 2px solid var(--color-ring);
     outline-offset: 4px;
   }
@@ -900,12 +884,11 @@
     .panel-actions {
       gap: 0.6rem;
     }
-    .panel-actions .room-primary {
+    .panel-actions :global(.ui-btn) {
       flex: 1 1 100%;
       min-height: 3rem;
     }
-    .room-primary,
-    .room-secondary {
+    :global(.ui-btn) {
       min-height: 2.9rem;
       touch-action: manipulation;
     }

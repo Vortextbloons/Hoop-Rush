@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
+  import Button from './ui/Button.svelte';
   type StateKind = 'loading' | 'empty' | 'error';
   let {
     kind,
@@ -43,8 +44,8 @@
       {@render actions()}
     </div>
   {:else if kind === 'error' && retry}
-    <button type="button" onclick={retry} class="ui-btn ui-btn--sm mt-4">
+    <Button size="sm" class="mt-4" onclick={retry}>
       {retryLabel}
-    </button>
+    </Button>
   {/if}
 </div>

@@ -12,6 +12,7 @@
     TeamResult,
   } from '@hoop-rush/data-contracts';
   import PlayerFace from '#lib/components/PlayerFace.svelte';
+  import SegmentedControl from '#lib/components/ui/SegmentedControl.svelte';
   import { SLOT_LABELS } from '#lib/player-positions.js';
   import {
     perGameText,
@@ -605,34 +606,24 @@
       <h3>Series player stats</h3>
       {#if hasBoxScores}
         <div class="stats-controls">
-          <div class="segmented" role="group" aria-label="Roster">
-            <button
-              type="button"
-              aria-pressed={statsSide === 'you'}
-              class:active={statsSide === 'you'}
-              onclick={() => (statsSide = 'you')}>You</button
-            >
-            <button
-              type="button"
-              aria-pressed={statsSide === 'opp'}
-              class:active={statsSide === 'opp'}
-              onclick={() => (statsSide = 'opp')}>Opponent</button
-            >
-          </div>
-          <div class="segmented" role="group" aria-label="Stat values">
-            <button
-              type="button"
-              aria-pressed={!statsTotals}
-              class:active={!statsTotals}
-              onclick={() => (statsTotals = false)}>Per game</button
-            >
-            <button
-              type="button"
-              aria-pressed={statsTotals}
-              class:active={statsTotals}
-              onclick={() => (statsTotals = true)}>Totals</button
-            >
-          </div>
+          <SegmentedControl
+            label="Roster"
+            value={statsSide}
+            onchange={(next) => (statsSide = next)}
+            options={[
+              { value: 'you', label: 'You' },
+              { value: 'opp', label: 'Opponent' },
+            ]}
+          />
+          <SegmentedControl
+            label="Stat values"
+            value={statsTotals ? 'totals' : 'game'}
+            onchange={(next) => (statsTotals = next === 'totals')}
+            options={[
+              { value: 'game', label: 'Per game' },
+              { value: 'totals', label: 'Totals' },
+            ]}
+          />
         </div>
       {/if}
     </div>
@@ -1131,37 +1122,6 @@
     gap: 0.4rem;
   }
 
-  .segmented {
-    display: inline-flex;
-    padding: 0.12rem;
-    border: 1px solid var(--color-line-soft);
-    border-radius: 0.5rem;
-    background: var(--color-surface-2);
-  }
-
-  .segmented button {
-    padding: 0.22rem 0.55rem;
-    border-radius: 0.35rem;
-    font-family: var(--font-mono);
-    font-size: 0.6rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--color-muted-foreground);
-    cursor: pointer;
-    outline: none;
-  }
-
-  .segmented button.active {
-    background: var(--color-primary);
-    color: var(--color-primary-foreground);
-  }
-
-  .segmented button:focus-visible {
-    outline: 2px solid var(--color-ring);
-    outline-offset: 2px;
-  }
-
   .stats-scroll {
     margin-top: 0.55rem;
     overflow-x: auto;
@@ -1543,10 +1503,10 @@
       grid-template-columns: 1fr 1fr;
       width: 100%;
     }
-    .segmented {
+    .stats-controls :global(.ui-segmented) {
       min-width: 0;
     }
-    .segmented button {
+    .stats-controls :global(.ui-segmented button) {
       flex: 1;
       min-height: 2.25rem;
       min-width: 0;

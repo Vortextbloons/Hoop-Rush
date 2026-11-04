@@ -11,6 +11,7 @@
   } from '@hoop-rush/persistence';
   import HavocMutationList from '#lib/features/havoc/HavocMutationList.svelte';
   import PlayerArt from '#lib/components/PlayerArt.svelte';
+  import SegmentedControl from '#lib/components/ui/SegmentedControl.svelte';
   import HavocTierBadge from '#lib/features/havoc/HavocTierBadge.svelte';
   import { perGameText, ratioPct, trueShootingPct } from '#lib/format.js';
   import GamecastBattleBox from '#lib/gamecast/GamecastBattleBox.svelte';
@@ -244,26 +245,26 @@
       <h3 class="h-subtitle">Series player stats</h3>
       {#if stats.games > 0}
         <div class="hm-stats-controls">
-          <div class="hm-segmented" role="group" aria-label="Roster">
-            <button
-              type="button"
-              aria-pressed={statsSide === 'home'}
-              onclick={() => (statsSide = 'home')}>You</button
-            >
-            <button
-              type="button"
-              aria-pressed={statsSide === 'away'}
-              onclick={() => (statsSide = 'away')}>Opponent</button
-            >
-          </div>
-          <div class="hm-segmented" role="group" aria-label="Stat values">
-            <button type="button" aria-pressed={!statsTotals} onclick={() => (statsTotals = false)}
-              >Per game</button
-            >
-            <button type="button" aria-pressed={statsTotals} onclick={() => (statsTotals = true)}
-              >Totals</button
-            >
-          </div>
+          <SegmentedControl
+            label="Roster"
+            size="md"
+            value={statsSide}
+            onchange={(next) => (statsSide = next)}
+            options={[
+              { value: 'home', label: 'You' },
+              { value: 'away', label: 'Opponent' },
+            ]}
+          />
+          <SegmentedControl
+            label="Stat values"
+            size="md"
+            value={statsTotals ? 'totals' : 'game'}
+            onchange={(next) => (statsTotals = next === 'totals')}
+            options={[
+              { value: 'game', label: 'Per game' },
+              { value: 'totals', label: 'Totals' },
+            ]}
+          />
         </div>
       {/if}
     </div>
@@ -402,29 +403,6 @@
     align-items: center;
     justify-content: space-between;
     gap: 10px;
-  }
-  .hm-segmented {
-    display: inline-flex;
-    padding: 3px;
-    border: 1px solid var(--color-line-strong);
-    border-radius: 8px;
-    background: var(--color-surface-2);
-  }
-  .hm-segmented button {
-    padding: 6px 10px;
-    border-radius: 5px;
-    font-family: var(--font-mono);
-    font-size: 11px;
-    color: var(--color-muted-foreground);
-    cursor: pointer;
-  }
-  .hm-segmented button[aria-pressed='true'] {
-    background: var(--color-primary);
-    color: var(--color-primary-foreground);
-  }
-  .hm-segmented button:focus-visible {
-    outline: 2px solid var(--color-primary);
-    outline-offset: 2px;
   }
   .hm-mvp-stats {
     display: grid;

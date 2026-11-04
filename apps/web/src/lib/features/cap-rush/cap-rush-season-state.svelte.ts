@@ -335,7 +335,7 @@ export class CapRushSeasonController {
         await this.simulatePlayoffBatch(step.games, { stopWhenUserSeriesComplete: true });
         if (this.isDestroyed()) return false;
         const after = this.currentUserRound();
-        if (after === null) {
+        if (after === null || after !== round) {
           await this.load();
           return true;
         }

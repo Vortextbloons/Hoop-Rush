@@ -1,4 +1,6 @@
 <script lang="ts">
+  import ActionLink from '#lib/components/ui/ActionLink.svelte';
+  import Button from '#lib/components/ui/Button.svelte';
   import RoomShell from '#lib/features/multiplayer/RoomShell.svelte';
   import RoomNav from '#lib/features/multiplayer/RoomNav.svelte';
   import RoomStages from '#lib/features/multiplayer/RoomStages.svelte';
@@ -93,9 +95,9 @@
     <div class="room-empty">
       <h1>Couldn’t open this room</h1>
       <p role="alert">{controller.error}</p>
-      <a href={resolve('multiplayer/')} class="room-primary"
-        >Back to multiplayer <ArrowRight size={16} /></a
-      >
+      <ActionLink href={resolve('multiplayer/')}>
+        Back to multiplayer <ArrowRight size={16} />
+      </ActionLink>
     </div>
   {:else if snapshot && display}
     <RoomShell
@@ -192,23 +194,17 @@
                 {snapshot.code}
               </div>
               <div class="invite-actions">
-                <button
-                  type="button"
-                  onclick={() => void controller.copyRoomCode()}
-                  class="room-secondary"
-                  >{#if controller.copiedCode}<Check size={16} /> Copied{:else}<Copy size={16} /> Copy
-                    code{/if}</button
-                ><button
-                  type="button"
-                  onclick={() => void controller.copyInviteLink()}
-                  class="room-primary"
-                >
+                <Button tone="secondary" onclick={() => void controller.copyRoomCode()}>
+                  {#if controller.copiedCode}<Check size={16} /> Copied{:else}<Copy size={16} /> Copy
+                    code{/if}
+                </Button>
+                <Button onclick={() => void controller.copyInviteLink()}>
                   {#if controller.copiedInvite}
                     <Check size={16} />Copied
                   {:else}
                     <Link size={16} />Copy invite link
                   {/if}
-                </button>
+                </Button>
               </div>
               <p class="invite-footnote">Room codes expire after 15 minutes.</p>
             {/if}
@@ -241,8 +237,7 @@
           {#if controller.assetsError}<p class="room-alert" role="alert">
               The player pool could not be loaded. Reload the room to try again.
             </p>
-            <button type="button" class="room-secondary" onclick={() => window.location.reload()}
-              >Reload room</button
+            <Button tone="secondary" onclick={() => window.location.reload()}>Reload room</Button
             >{/if}
           <div class="lobby-ready" role="status">
             <span class:joined={controller.opponent?.online}></span>
@@ -254,16 +249,15 @@
                 : 'Waiting for the host to start the draft.'}
             </p>
           </div>
-          {#if selfId === 'p1'}<button
-              type="button"
+          {#if selfId === 'p1'}<Button
               onclick={() => void controller.startDraft()}
               disabled={controller.busyAction !== null || !controller.opponent?.online || !assets}
-              class="room-primary start-draft"
+              class="start-draft"
               >{controller.busyAction === 'start'
                 ? 'Starting draft…'
                 : !assets && !controller.assetsError
                   ? 'Loading players…'
-                  : 'Start draft'}<ArrowRight size={18} aria-hidden="true" /></button
+                  : 'Start draft'}<ArrowRight size={18} aria-hidden="true" /></Button
             >{/if}
           <div class="lobby-manage">
             {#if selfId === 'p1' && controller.opponent}<button
@@ -286,10 +280,9 @@
       <div class="room-empty">
         <h2>Preparing your draft</h2>
         <p role="status">{controller.assetsError ?? 'Loading your player pool and lineup…'}</p>
-        {#if controller.assetsError}<button
-            type="button"
-            class="room-secondary"
-            onclick={() => window.location.reload()}>Reload room</button
+        {#if controller.assetsError}<Button
+            tone="secondary"
+            onclick={() => window.location.reload()}>Reload room</Button
           >{/if}
       </div>
     {:else if phase === 'drafting' && replay && assets}
@@ -384,16 +377,14 @@
               </p>
             {/if}
             <div class="mt-4 flex flex-wrap items-center gap-3">
-              <button
-                type="button"
+              <Button
                 disabled={controller.localReady || controller.busyAction !== null}
                 onclick={() => void controller.readyForNextGame()}
-                class="room-primary"
               >
                 {controller.localReady
                   ? 'Ready'
                   : `Ready for Game ${controller.duelCurrentGameNumber ?? 1}`}
-              </button>
+              </Button>
               {#if readyCountdownLabel}
                 <span class="text-xs text-muted-foreground">
                   Auto-start in {readyCountdownLabel}
@@ -421,16 +412,15 @@
           <h2>Preparing the broadcast</h2>
           <p role="status">{broadcastSimulationError ?? 'Simulating this game locally…'}</p>
           {#if broadcastSimulationError}
-            <button
-              type="button"
-              class="room-secondary"
+            <Button
+              tone="secondary"
               onclick={() =>
                 controller.shared82Broadcast
                   ? controller.retryShared82H2HGame()
                   : controller.retryDuelGame()}
             >
               Retry game
-            </button>
+            </Button>
           {/if}
         </div>
       {/if}
@@ -461,9 +451,7 @@
           <h2>Preparing game results</h2>
           <p role="status">{controller.duelSimError ?? 'Rebuilding this game locally…'}</p>
           {#if controller.duelSimError}
-            <button type="button" class="room-secondary" onclick={() => controller.retryDuelGame()}>
-              Retry game
-            </button>
+            <Button tone="secondary" onclick={() => controller.retryDuelGame()}>Retry game</Button>
           {/if}
         </div>
       {/if}
@@ -489,13 +477,9 @@
           <h2>Preparing head-to-head result</h2>
           <p role="status">{broadcastSimulationError ?? 'Rebuilding this game locally…'}</p>
           {#if broadcastSimulationError}
-            <button
-              type="button"
-              class="room-secondary"
-              onclick={() => controller.retryShared82H2HGame()}
-            >
+            <Button tone="secondary" onclick={() => controller.retryShared82H2HGame()}>
               Retry game
-            </button>
+            </Button>
           {/if}
         </div>
       {/if}
@@ -655,9 +639,9 @@
           Your local saves are kept. Create a new room to play again.
         </p>
 
-        <a class="room-primary mt-4" href={resolve('multiplayer/')}
-          >Choose a match <ArrowRight size={16} /></a
-        >
+        <ActionLink class="mt-4" href={resolve('multiplayer/')}>
+          Choose a match <ArrowRight size={16} />
+        </ActionLink>
       </div>
     {/if}
 
@@ -722,7 +706,7 @@
     grid-template-columns: 1fr;
   }
 
-  .start-draft {
+  :global(.start-draft) {
     width: 100%;
     padding: 14px;
   }
@@ -751,7 +735,6 @@
     cursor: default;
   }
   button:focus-visible,
-  a:focus-visible,
   summary:focus-visible {
     outline: 2px solid var(--color-ring);
     outline-offset: 4px;

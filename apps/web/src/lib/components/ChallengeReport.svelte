@@ -22,6 +22,7 @@
     RunAggregates,
   } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation, playerIdSchema } from '@hoop-rush/data-contracts';
+  import SegmentedControl from '#lib/components/ui/SegmentedControl.svelte';
   import type { SandboxHref } from '#lib/sandbox-url.js';
   import { explainSeason, leagueMvp, perGamePlayer, selectMemorableGames } from '@hoop-rush/engine';
   import { resolve } from '$app/paths';
@@ -681,32 +682,16 @@
         <h2 class="font-display text-xl font-extrabold tracking-tight uppercase">
           Your five · season
         </h2>
-        <div
-          class="flex rounded-lg border border-border p-0.5"
-          role="group"
-          aria-label="Season values"
-        >
-          <button
-            type="button"
-            aria-pressed={!totalsMode}
-            onclick={toggleMode}
-            class="rounded-md px-3 py-1 font-mono text-xs font-semibold {!totalsMode
-              ? 'bg-primary text-primary-foreground'
-              : 'text-muted-foreground'}"
-          >
-            Per game
-          </button>
-          <button
-            type="button"
-            aria-pressed={totalsMode}
-            onclick={toggleMode}
-            class="rounded-md px-3 py-1 font-mono text-xs font-semibold {totalsMode
-              ? 'bg-primary text-primary-foreground'
-              : 'text-muted-foreground'}"
-          >
-            Totals
-          </button>
-        </div>
+        <SegmentedControl
+          label="Season values"
+          size="md"
+          value={totalsMode ? 'totals' : 'game'}
+          onchange={() => toggleMode()}
+          options={[
+            { value: 'game', label: 'Per game' },
+            { value: 'totals', label: 'Totals' },
+          ]}
+        />
       </div>
       {#if displayAggregates}
         <div class="mt-4 hidden overflow-x-auto sm:block">

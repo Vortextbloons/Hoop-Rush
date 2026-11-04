@@ -27,7 +27,9 @@ routes/ and lib/features/<mode>/  ->  @hoop-rush/application sessions  ->  engin
   application package.
 - Shared UI primitives stay in `src/lib/components/`; shared helpers (ids, data,
   player refs, draft presentation/fit/slots, supabase runtime, membership) stay
-  in `src/lib/`.
+  in `src/lib/`. Use the primitives in `src/lib/components/ui/` and the shared
+  basketball presentation in `src/lib/components/basketball/`; see
+  `src/lib/components/ui/README.md` for usage and mode-theme examples.
 - Workers live in `src/workers/`; their messages are validated with Zod at both
   ends and must match `@hoop-rush/data-contracts` worker schemas.
   `src/lib/workers/one-shot-worker.ts` handles single-result requests. Havoc and

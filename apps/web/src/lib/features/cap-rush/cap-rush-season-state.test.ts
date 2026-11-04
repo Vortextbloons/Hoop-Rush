@@ -57,3 +57,30 @@ test('playoff batches retain accepted games without reloading the season archive
   expect(loadActive).not.toHaveBeenCalled();
   expect(controller.draft).toBe(draft as unknown as typeof controller.draft);
 });
+
+test('sim series stops when the next round opens immediately', async () => {
+  const locked = lockedRun();
+  let round = 1;
+  const draftOf = () => ({
+    draft: { locked, stage: 'postseason' },
+    postseason: {
+      series: [{ round, highTeamId: locked.human.teamId, lowTeamId: 'opponent', games: [] }],
+    },
+  });
+  const service = {
+    postseasonStep: mock(() => ({ kind: 'games', games: [{ userSide: 'home' }] })),
+  } as unknown as CapRushService;
+  const controller = new CapRushSeasonController(service, {} as CapRushRunner);
+  const batch = mock(async () => {
+    round += 1;
+    Object.assign(controller, { draft: draftOf() });
+    return 1;
+  });
+  Object.assign(controller, {
+    draft: draftOf(),
+    simulatePlayoffBatch: batch,
+    load: async () => {},
+  });
+  expect(await controller.simSeries()).toBe(true);
+  expect(batch).toHaveBeenCalledTimes(1);
+});

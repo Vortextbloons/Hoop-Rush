@@ -4,6 +4,7 @@
     CAP_RUSH_CAP_LINE_DOLLARS,
     CAP_RUSH_FIRST_APRON_DOLLARS,
   } from '@hoop-rush/data-contracts';
+  import Panel from '#lib/components/ui/Panel.svelte';
   import {
     apronPenaltyRows,
     apronPenaltyTitle,
@@ -22,10 +23,7 @@
   const target = $derived(view.slots.find((slot) => slot.highestPaid) ?? null);
 </script>
 
-<section
-  class="rounded-2xl border border-border bg-card px-4 py-2.5 sm:px-5 sm:py-3"
-  aria-label="Payroll and apron status"
->
+<Panel as="section" class="px-4 py-2.5 sm:px-5 sm:py-3" aria-label="Payroll and apron status">
   <div
     class="grid gap-3 lg:grid-cols-[minmax(170px,210px)_minmax(0,1fr)_minmax(250px,auto)] lg:items-center lg:gap-5"
   >
@@ -142,4 +140,4 @@
       {/if}
     {/if}
   </div>
-</section>
+</Panel>

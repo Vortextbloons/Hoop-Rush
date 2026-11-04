@@ -8,6 +8,22 @@
   max-width: 1400px;
   margin: auto;
   padding: 24px 32px 80px;
+  --ui-control-bg: var(--color-primary);
+  --ui-control-fg: var(--color-primary-foreground);
+  --ui-control-border: var(--color-primary);
+  --ui-control-font: var(--font-sans);
+  --ui-control-size: 12px;
+  --ui-control-weight: 600;
+  --ui-control-tracking: normal;
+  --ui-control-transform: none;
+  --ui-control-radius: 7px;
+  --ui-control-hover-filter: brightness(1.08);
+  --ui-primary-bg: var(--color-primary);
+  --ui-primary-fg: var(--color-primary-foreground);
+  --ui-primary-border: var(--color-primary);
+  --ui-secondary-bg: var(--color-surface-2);
+  --ui-secondary-fg: var(--color-foreground);
+  --ui-secondary-border: var(--color-line-strong);
 }
 
 .room-nav {
@@ -174,28 +190,6 @@
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
-}
-
-.room-primary,
-.room-secondary {
-  display: inline-flex;
-  justify-content: center;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 18px;
-  border-radius: 7px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.room-primary {
-  background: var(--color-primary);
-  color: var(--color-primary-foreground);
-}
-
-.room-secondary {
-  border: 1px solid var(--color-line-strong);
-  background: var(--color-surface-2);
 }
 
 .lobby-settings {

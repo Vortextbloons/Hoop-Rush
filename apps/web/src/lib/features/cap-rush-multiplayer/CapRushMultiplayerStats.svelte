@@ -5,6 +5,9 @@
     CapRushBoxParticipant,
   } from '@hoop-rush/data-contracts';
   import PlayerFace from '#lib/components/PlayerFace.svelte';
+  import PlayerStatsTable from '#lib/components/PlayerStatsTable.svelte';
+  import type { PlayerStatColumn } from '#lib/components/player-stats-table.js';
+  import SegmentedControl from '#lib/components/ui/SegmentedControl.svelte';
   import { trueShootingPct, usagePct, usagePossessions } from '#lib/format.js';
   import type { CapRushArt } from '../cap-rush/cap-rush-art.js';
   import { initialsOf } from '../cap-rush/cap-rush-presentation.js';
@@ -72,97 +75,113 @@
   function pct(made: number, attempted: number) {
     return attempted ? ((100 * made) / attempted).toFixed(1) + '%' : '?';
   }
+  type AggregatedLine = CapRushBoxParticipant & { games: number };
+  const statColumns: PlayerStatColumn<AggregatedLine>[] = [
+    {
+      key: 'points',
+      label: 'PTS',
+      value: (row) => value(row.points, row.games),
+      cellClass: 'font-bold text-foreground',
+    },
+    { key: 'rebounds', label: 'REB', value: (row) => value(row.rebounds, row.games) },
+    { key: 'assists', label: 'AST', value: (row) => value(row.assists, row.games) },
+    { key: 'steals', label: 'STL', value: (row) => value(row.steals, row.games) },
+    { key: 'blocks', label: 'BLK', value: (row) => value(row.blocks, row.games) },
+    { key: 'turnovers', label: 'TOV', value: (row) => value(row.turnovers, row.games) },
+    {
+      key: 'fieldGoalPct',
+      label: 'FG%',
+      value: (row) => pct(row.fieldGoalsMade, row.fieldGoalsAttempted),
+    },
+    {
+      key: 'threePointPct',
+      label: '3P%',
+      value: (row) => pct(row.threesMade, row.threesAttempted),
+    },
+    {
+      key: 'freeThrowPct',
+      label: 'FT%',
+      value: (row) => pct(row.freeThrowsMade, row.freeThrowsAttempted),
+    },
+    {
+      key: 'trueShootingPct',
+      label: 'TS%',
+      value: (row) => trueShootingPct(row.points, row.fieldGoalsAttempted, row.freeThrowsAttempted),
+    },
+    {
+      key: 'usagePct',
+      label: 'USG%',
+      value: (row) =>
+        usagePct(
+          usagePossessions(row.fieldGoalsAttempted, row.freeThrowsAttempted, row.turnovers),
+          teamUsage,
+        ),
+    },
+  ];
 </script>
 
 <section class="player-stats" aria-label="Season player stats">
   <div class="stats-head">
     <h3>Season player stats</h3>
     <div class="stats-controls">
-      <div class="segmented" role="group" aria-label="Roster">
-        <button
-          type="button"
-          class:active={side === 'you'}
-          aria-pressed={side === 'you'}
-          onclick={() => (side = 'you')}>You</button
-        >
-        <button
-          type="button"
-          class:active={side === 'opp'}
-          aria-pressed={side === 'opp'}
-          onclick={() => (side = 'opp')}>Opponent</button
-        >
-      </div>
-      <div class="segmented" role="group" aria-label="Stat values">
-        <button
-          type="button"
-          class:active={!totals}
-          aria-pressed={!totals}
-          onclick={() => (totals = false)}>Per game</button
-        >
-        <button
-          type="button"
-          class:active={totals}
-          aria-pressed={totals}
-          onclick={() => (totals = true)}>Totals</button
-        >
-      </div>
+      <SegmentedControl
+        label="Roster"
+        value={side}
+        onchange={(next) => (side = next)}
+        options={[
+          { value: 'you', label: 'You' },
+          { value: 'opp', label: 'Opponent' },
+        ]}
+      />
+      <SegmentedControl
+        label="Stat values"
+        value={totals ? 'totals' : 'game'}
+        onchange={(next) => (totals = next === 'totals')}
+        options={[
+          { value: 'game', label: 'Per game' },
+          { value: 'totals', label: 'Totals' },
+        ]}
+      />
     </div>
   </div>
   {#if rows.length > 0}
     <div class="stats-scroll">
-      <table class="stats-table">
-        <caption class="sr-only"
-          >{side === 'you' ? 'Your' : 'Opponent'} regular season player stats</caption
-        >
-        <thead
-          ><tr
-            ><th scope="col" class="is-player">Player</th
-            >{#each ['PTS', 'REB', 'AST', 'STL', 'BLK', 'TOV', 'FG%', '3P%', 'FT%', 'TS%', 'USG%'] as label (label)}<th
-                scope="col">{label}</th
-              >{/each}</tr
-          ></thead
-        >
-        <tbody>
-          {#each rows as row (row.playerId)}
-            {@const player = roomState.recruitment?.market.players.find(
-              (entry) => entry.playerId === row.playerId,
-            )}
-            {@const face = player && art ? art.faceFor(player.source) : null}
-            <tr>
-              <th scope="row" class="is-player"
-                ><span class="player-cell">
-                  {#if face && art}<PlayerFace
-                      player={face}
-                      manifest={art.manifest}
-                      size="sm"
-                      fallbackInitials={initialsOf(row.displayName)}
-                    />{:else}<span class="player-fallback">{initialsOf(row.displayName)}</span>{/if}
-                  <span
-                    ><span class="player-name">{row.displayName}</span><span class="player-pos"
-                      >{row.slot}</span
-                    ></span
-                  >
-                </span></th
-              >
-              <td class="is-points">{value(row.points, row.games)}</td><td
-                >{value(row.rebounds, row.games)}</td
-              ><td>{value(row.assists, row.games)}</td><td>{value(row.steals, row.games)}</td><td
-                >{value(row.blocks, row.games)}</td
-              ><td>{value(row.turnovers, row.games)}</td>
-              <td>{pct(row.fieldGoalsMade, row.fieldGoalsAttempted)}</td><td
-                >{pct(row.threesMade, row.threesAttempted)}</td
-              ><td>{pct(row.freeThrowsMade, row.freeThrowsAttempted)}</td><td
-                >{trueShootingPct(row.points, row.fieldGoalsAttempted, row.freeThrowsAttempted)}</td
-              ><td
-                >{usagePct(
-                  usagePossessions(row.fieldGoalsAttempted, row.freeThrowsAttempted, row.turnovers),
-                  teamUsage,
-                )}</td
-              >
-            </tr>
-          {/each}
-        </tbody>
-      </table>
+      <PlayerStatsTable
+        columns={statColumns}
+        {rows}
+        rowKey={(row) => row.playerId}
+        caption={`${side === 'you' ? 'Your' : 'Opponent'} regular season player stats`}
+        tableClass="min-w-[38rem] text-xs"
+        headClass="border-b border-line-soft font-mono text-[0.56rem] tracking-[0.08em] text-muted-foreground"
+        rowClass={() => 'border-t border-line-soft'}
+        playerCellClass="w-full max-w-44 overflow-hidden text-left font-semibold"
+        playerHeadCellClass="w-full max-w-44 text-left"
+        headCellClass="px-[0.42rem] py-[0.32rem] text-right"
+        statCellClass="px-[0.42rem] py-[0.32rem] text-right"
+      >
+        {#snippet identity(row)}
+          {@const player = roomState.recruitment?.market.players.find(
+            (entry) => entry.playerId === row.playerId,
+          )}
+          {@const face = player && art ? art.faceFor(player.source) : null}
+          <span class="player-cell">
+            {#if face && art}
+              <PlayerFace
+                player={face}
+                manifest={art.manifest}
+                size="sm"
+                fallbackInitials={initialsOf(row.displayName)}
+              />
+            {:else}
+              <span class="player-fallback">{initialsOf(row.displayName)}</span>
+            {/if}
+            <span>
+              <span class="player-name">{row.displayName}</span>
+              <span class="player-pos">{row.slot}</span>
+            </span>
+          </span>
+        {/snippet}
+      </PlayerStatsTable>
     </div>
     <p class="panel-note">
       {totals ? 'Season totals' : 'Per-game averages'} · {rows.length} players
@@ -207,88 +226,9 @@
     gap: 0.4rem;
   }
 
-  .segmented {
-    display: inline-flex;
-    padding: 0.12rem;
-    border: 1px solid var(--color-line-soft);
-    border-radius: 0.5rem;
-    background: var(--color-surface-2);
-  }
-
-  .segmented button {
-    padding: 0.22rem 0.55rem;
-    border-radius: 0.35rem;
-    font-family: var(--font-mono);
-    font-size: 0.6rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--color-muted-foreground);
-    cursor: pointer;
-    outline: none;
-  }
-
-  .segmented button.active {
-    background: var(--color-primary);
-    color: var(--color-primary-foreground);
-  }
-
-  .segmented button:focus-visible {
-    outline: 2px solid var(--color-ring);
-    outline-offset: 2px;
-  }
-
   .stats-scroll {
     margin-top: 0.55rem;
     overflow-x: auto;
-  }
-
-  .stats-table {
-    width: 100%;
-    min-width: 38rem;
-    border-collapse: collapse;
-    font-size: 0.72rem;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .stats-table th,
-  .stats-table td {
-    padding: 0.32rem 0.42rem;
-    text-align: right;
-  }
-
-  .stats-table thead th {
-    border-bottom: 1px solid var(--color-line-soft);
-    color: var(--color-muted-foreground);
-    font-family: var(--font-mono);
-    font-size: 0.56rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-  }
-
-  .stats-table tbody tr {
-    border-top: 1px solid color-mix(in srgb, var(--color-line-soft) 55%, transparent);
-  }
-
-  .stats-table tbody tr:first-child {
-    border-top: 0;
-  }
-
-  .stats-table .is-player {
-    width: 100%;
-    max-width: 11rem;
-    overflow: hidden;
-    text-align: left;
-    text-overflow: ellipsis;
-  }
-
-  .stats-table tbody th.is-player {
-    font-weight: 600;
-  }
-
-  .stats-table .is-points {
-    color: var(--color-foreground);
-    font-weight: 800;
   }
 
   .player-cell {
