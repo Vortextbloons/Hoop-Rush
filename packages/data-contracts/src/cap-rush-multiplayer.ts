@@ -275,6 +275,8 @@ export interface CapRushMultiplayerTransport {
   join(code: string): Promise<CapRushMultiplayerRoomMembership>;
   resume(roomId: string): Promise<CapRushMultiplayerRoomMembership>;
   snapshot(roomId: string): Promise<CapRushMultiplayerRoomSnapshot>;
+  /** Latest accepted snapshot already held locally, used to adopt a warm submission without another RPC. */
+  acceptedSnapshot?(roomId: string): CapRushMultiplayerRoomSnapshot | null;
   sync(roomId: string, afterOrdinal?: number): Promise<CapRushMultiplayerSync>;
   subscribe(roomId: string, onChange: () => void, onError: (error: Error) => void): () => void;
   submitCommand(input: CapRushMultiplayerSubmitInput): Promise<CapRushMultiplayerCommandReceipt>;

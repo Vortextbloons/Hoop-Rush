@@ -1,5 +1,10 @@
 import { describe, expect, test, vi } from 'bun:test';
-import { createEngineContext, simulateCapRushMultiplayerSlot } from '@hoop-rush/engine';
+import {
+  createCapRushMultiplayerState,
+  createEngineContext,
+  simulateCapRushMultiplayerSlot,
+} from '@hoop-rush/engine';
+import type { CapRushMultiplayerTransport } from '@hoop-rush/data-contracts';
 import { CapRushMultiplayerSession } from './session.ts';
 import { capRushMultiplayerStateDigest } from '@hoop-rush/engine';
 import { createSessionTestRoom } from './session-test-fixtures.ts';
@@ -258,6 +263,117 @@ test('syncs multiple offers and cancellation to the other seat', async () => {
     guest.dispose();
   }
 });
+
+test('keeps one command ID across an uncertain transport failure', async () => {
+  const room = await createSessionTestRoom();
+  const session = room.session('p1');
+  await session.attach();
+  const ids: string[] = [];
+  const original = room.transport.submitCommand.bind(room.transport);
+  vi.spyOn(room.transport, 'submitCommand')
+    .mockImplementationOnce((input) => {
+      ids.push(input.commandId);
+      return Promise.reject(new Error('connection lost after send'));
+    })
+    .mockImplementation((input) => {
+      ids.push(input.commandId);
+      return original(input);
+    });
+  await expect(session.start()).rejects.toThrow('connection lost');
+  await session.start();
+  expect(ids).toHaveLength(2);
+  expect(ids[0]).toBe(ids[1]);
+  session.dispose();
+});
+
+test('recovers an accepted intent after its response is lost without submitting it twice', async () => {
+  const room = await createSessionTestRoom();
+  const session = room.session('p1');
+  await session.attach();
+  const original = room.transport.submitCommand.bind(room.transport);
+  const submit = vi.spyOn(room.transport, 'submitCommand').mockImplementationOnce(async (input) => {
+    await original(input);
+    throw new Error('response lost after commit');
+  });
+  await expect(session.start()).rejects.toThrow('response lost');
+  const receipt = await session.start();
+  expect(receipt.accepted).toBe(true);
+  expect(submit).toHaveBeenCalledTimes(1);
+  expect(session.current.phase).toBe('recruiting');
+  session.dispose();
+});
+
+test('retries a stale retry-safe command against the refreshed revision with the same ID', async () => {
+  const room = await createSessionTestRoom();
+  const draft = await room.transport.snapshot(room.roomId);
+  let revision = 0;
+  let snapshot = {
+    ...draft,
+    revision,
+    commandCount: 0,
+    state: sessionState(),
+  };
+  const ids: string[] = [];
+  const revisions: number[] = [];
+  const submitCommand = vi.fn((input: { commandId: string; expectedRevision: number }) => {
+    ids.push(input.commandId);
+    revisions.push(input.expectedRevision);
+    if (revisions.length === 1) {
+      revision = 1;
+      snapshot = { ...snapshot, revision, commandCount: 1 };
+      return Promise.resolve({
+        roomId: room.roomId,
+        commandId: input.commandId as never,
+        ordinal: 0,
+        accepted: false,
+        rejectionCode: 'stale-revision',
+        revision,
+      });
+    }
+    revision = 2;
+    snapshot = { ...snapshot, revision, commandCount: 1 };
+    return Promise.resolve({
+      roomId: room.roomId,
+      commandId: input.commandId as never,
+      ordinal: 0,
+      accepted: true,
+      rejectionCode: null,
+      revision,
+    });
+  });
+  const transport = {
+    sync: vi.fn(() =>
+      Promise.resolve({
+        snapshot,
+        commands: [],
+        commandCount: snapshot.commandCount,
+      }),
+    ),
+    subscribe: vi.fn(() => () => {}),
+    submitCommand,
+    acceptedSnapshot: () => snapshot,
+  } as unknown as CapRushMultiplayerTransport;
+  const session = new CapRushMultiplayerSession({
+    transport,
+    environment: room.environment,
+    roomId: room.roomId,
+    seat: 'p1',
+    newCommandId: () => 'stable-command',
+  });
+  await session.attach({ resume: false });
+  const receipt = await session.start();
+  expect(receipt.accepted).toBe(true);
+  expect(ids).toEqual(['stable-command', 'stable-command']);
+  expect(revisions).toEqual([0, 1]);
+  session.dispose();
+});
+
+function sessionState() {
+  return {
+    ...createCapRushMultiplayerState(null),
+    phase: 'lobby' as const,
+  };
+}
 
 test('uses the verification port and rejects mismatches and disposed results', async () => {
   const room = await createSessionTestRoom();

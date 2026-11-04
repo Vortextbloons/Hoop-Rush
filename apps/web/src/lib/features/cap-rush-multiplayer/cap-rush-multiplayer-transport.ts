@@ -1,4 +1,5 @@
 import { getPersistence } from '#lib/persistence.js';
+import type { CapRushMultiplayerCheckpointInput } from '@hoop-rush/persistence';
 import {
   CapRushMultiplayerRunner,
   CapRushMultiplayerProjectionRejection,
@@ -66,8 +67,12 @@ function requiredString(record: Record<string, unknown>, key: string): string {
 export class CapRushMultiplayerSupabaseTransport implements CapRushMultiplayerTransport {
   private readonly projector = new CapRushMultiplayerRunner();
   private projectionTail: Promise<unknown> = Promise.resolve();
+  private checkpointTail: Promise<void> = Promise.resolve();
   private readonly snapshots = new Map<string, CapRushMultiplayerRoomSnapshot>();
+  private readonly pendingCheckpoints = new Map<string, CapRushMultiplayerCheckpointInput>();
   private readonly stateDigests = new WeakMap<CapRushMultiplayerState, string>();
+  private cachedEnvironment: import('@hoop-rush/engine').CapRushMultiplayerEnvironment | null =
+    null;
   private readonly rooms = createRealtimeRoomRegistry({
     label: 'Cap Rush',
     roomsTable: 'cap_rush_multiplayer_rooms',
@@ -192,20 +197,18 @@ export class CapRushMultiplayerSupabaseTransport implements CapRushMultiplayerTr
         throw new Error('cap rush command log is incomplete');
       const projected =
         pending.length === 0 && previous?.state
-          ? previous.state
+          ? { state: previous.state, stateDigest: this.digestOf(previous.state) }
           : await this.project(
               previous?.state ?? createCapRushMultiplayerState(rootSeed),
               pending,
               settings.variant,
             );
-      if (
-        typeof rawRoom.stateDigest === 'string' &&
-        this.digestOf(projected) !== rawRoom.stateDigest
-      )
+      if (typeof rawRoom.stateDigest === 'string' && projected.stateDigest !== rawRoom.stateDigest)
         throw new Error(
           'Cap Rush simulation mismatch. Both players must use the same game version.',
         );
-      localState = projected;
+      this.stateDigests.set(projected.state, projected.stateDigest);
+      localState = projected.state;
     }
     const snapshot = localState
       ? { ...roomMetadataSchema.parse(rawRoom), state: localState }
@@ -213,8 +216,9 @@ export class CapRushMultiplayerSupabaseTransport implements CapRushMultiplayerTr
     const latest = this.snapshots.get(roomId);
     if (!latest || snapshot.revision >= latest.revision) {
       this.snapshots.set(roomId, snapshot);
+      await this.flushCheckpoints(roomId);
       if (snapshot.state && snapshot.revision !== previous?.revision) {
-        await getPersistence().capRushMultiplayerRepository.saveCheckpoint({
+        await this.checkpointNow({
           snapshot,
           state: snapshot.state,
           commands,
@@ -227,21 +231,83 @@ export class CapRushMultiplayerSupabaseTransport implements CapRushMultiplayerTr
     return { snapshot, commands, commandCount: snapshot.commandCount };
   }
 
+  acceptedSnapshot(roomId: string): CapRushMultiplayerRoomSnapshot | null {
+    return this.snapshots.get(roomId) ?? null;
+  }
+
+  private checkpointNow(input: CapRushMultiplayerCheckpointInput): Promise<void> {
+    return getPersistence()
+      .capRushMultiplayerRepository.saveCheckpoint(input)
+      .catch(() => {
+        this.rememberPendingCheckpoint(input);
+      });
+  }
+
+  private queueCheckpoint(input: CapRushMultiplayerCheckpointInput): void {
+    this.rememberPendingCheckpoint(input);
+    void this.flushCheckpoints(input.snapshot.roomId);
+  }
+
+  private rememberPendingCheckpoint(input: CapRushMultiplayerCheckpointInput): void {
+    const pending = this.pendingCheckpoints.get(input.snapshot.roomId);
+    if (pending === undefined) {
+      this.pendingCheckpoints.set(input.snapshot.roomId, input);
+      return;
+    }
+    const latest = pending.snapshot.revision > input.snapshot.revision ? pending : input;
+    this.pendingCheckpoints.set(input.snapshot.roomId, {
+      ...latest,
+      commands: [
+        ...new Map(
+          [...pending.commands, ...input.commands].map((command) => [command.commandId, command]),
+        ).values(),
+      ],
+      receipts: [
+        ...new Map(
+          [...pending.receipts, ...input.receipts].map((receipt) => [receipt.commandId, receipt]),
+        ).values(),
+      ],
+      games: [
+        ...new Map([...pending.games, ...input.games].map((game) => [game.gameId, game])).values(),
+      ],
+    });
+  }
+
+  private flushCheckpoints(roomId: string): Promise<void> {
+    this.checkpointTail = this.checkpointTail.then(async () => {
+      const input = this.pendingCheckpoints.get(roomId);
+      if (input === undefined) return;
+      this.pendingCheckpoints.delete(roomId);
+      await this.checkpointNow(input);
+    });
+    return this.checkpointTail;
+  }
+
   private project(
     state: import('@hoop-rush/data-contracts').CapRushMultiplayerState,
     commands: readonly CapRushMultiplayerCommand[],
     variant: 'clash' | 'roulette',
   ) {
     const next = this.projectionTail.then(async () =>
-      this.projector.project({
+      this.projector.projectDetailed({
         state,
         commands,
-        environment: (await getCapRushMultiplayerData()).environment,
+        environment: await this.loadEnvironment(),
         variant,
+        baseDigest: this.stateDigests.get(state),
       }),
     );
     this.projectionTail = next.catch(() => {});
     return next;
+  }
+
+  private async loadEnvironment(): Promise<
+    import('@hoop-rush/engine').CapRushMultiplayerEnvironment
+  > {
+    if (this.cachedEnvironment === null) {
+      this.cachedEnvironment = (await getCapRushMultiplayerData()).environment;
+    }
+    return this.cachedEnvironment;
   }
 
   private digestOf(state: CapRushMultiplayerState): string {
@@ -319,8 +385,8 @@ export class CapRushMultiplayerSupabaseTransport implements CapRushMultiplayerTr
     }
     const coordinationState = {
       _localSimulation: true,
-      phase: projected.phase,
-      ready: projected.ready,
+      phase: projected.state.phase,
+      ready: projected.state.ready,
     };
     const result = await client.rpc('cap_rush_multiplayer_command_submit', {
       p_room_id: input.roomId,
@@ -328,9 +394,9 @@ export class CapRushMultiplayerSupabaseTransport implements CapRushMultiplayerTr
       p_expected_revision: input.expectedRevision,
       p_payload: input.payload,
       p_state: coordinationState,
-      p_state_digest: this.digestOf(projected),
+      p_state_digest: projected.stateDigest,
       p_accepted_at: acceptedAtIso,
-      p_deadline: capRushMultiplayerDeadlineOf(projected),
+      p_deadline: capRushMultiplayerDeadlineOf(projected.state),
     });
     if (result.error) throw new Error(result.error.message);
     const receipt = recordOf(result.data);
@@ -341,19 +407,20 @@ export class CapRushMultiplayerSupabaseTransport implements CapRushMultiplayerTr
     ) {
       const accepted = {
         ...snapshot,
-        phase: projected.phase,
+        phase: projected.state.phase,
         revision: receipt.revision,
         commandCount: receipt.ordinal + 1,
-        state: projected,
-        deadline: capRushMultiplayerDeadlineOf(projected),
+        state: projected.state,
+        deadline: capRushMultiplayerDeadlineOf(projected.state),
       };
       this.snapshots.set(snapshot.roomId, accepted);
-      await getPersistence().capRushMultiplayerRepository.saveCheckpoint({
+      this.stateDigests.set(projected.state, projected.stateDigest);
+      this.queueCheckpoint({
         snapshot: accepted,
-        state: projected,
+        state: projected.state,
         commands: [command],
         receipts: [],
-        games: freshGames(projected, state),
+        games: freshGames(projected.state, state),
         updatedAtIso: new Date().toISOString(),
       });
     }

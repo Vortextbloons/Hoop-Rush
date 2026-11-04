@@ -28,22 +28,40 @@ const base = z.object({
   requestId: idSchema,
 });
 
+const capRushMultiplayerWorkerEnvironmentSchema = z.object({
+  variant: z.enum(['clash', 'roulette']),
+  bracket: opponentBracketSchema,
+  seasonCatalog: seasonDraftCatalogSchema,
+  profile: eraSimulationProfileSchema,
+  catalogSource: capRushCatalogSourceSchema,
+  versionLocks: capRushMultiplayerVersionLocksSchema,
+});
+
 export const capRushMultiplayerWorkerRequestSchema = z.discriminatedUnion('kind', [
   base.extend({
-    kind: z.literal('cap-rush-multiplayer-project'),
-    verifyLog: z.boolean().optional(),
-    state: capRushMultiplayerStateSchema,
-    commands: z.array(capRushMultiplayerCommandSchema),
-    environment: z.object({
-      variant: z.enum(['clash', 'roulette']),
-      bracket: opponentBracketSchema,
-      seasonCatalog: seasonDraftCatalogSchema,
-      profile: eraSimulationProfileSchema,
-      catalogSource: capRushCatalogSourceSchema,
-      versionLocks: capRushMultiplayerVersionLocksSchema,
-    }),
-    variant: z.enum(['clash', 'roulette']),
+    kind: z.literal('cap-rush-multiplayer-hydrate'),
+    environment: capRushMultiplayerWorkerEnvironmentSchema,
   }),
+  base
+    .extend({
+      kind: z.literal('cap-rush-multiplayer-project'),
+      verifyLog: z.boolean().optional(),
+      // A warm projector can send only `baseDigest` and commands; a cold or restarted worker
+      // receives the full state. Verification always carries the root state.
+      state: capRushMultiplayerStateSchema.optional(),
+      baseDigest: z.string().min(1).max(64).optional(),
+      commands: z.array(capRushMultiplayerCommandSchema),
+      // The environment is sent once per worker through `hydrate`; keep it optional so the
+      // worker can reuse the adapted catalog across projections.
+      environment: capRushMultiplayerWorkerEnvironmentSchema.optional(),
+      variant: z.enum(['clash', 'roulette']),
+    })
+    .refine((value) => value.state !== undefined || value.baseDigest !== undefined, {
+      message: 'a projection needs a state or a base digest',
+    })
+    .refine((value) => value.verifyLog !== true || value.state !== undefined, {
+      message: 'a verification projection needs the root state',
+    }),
   base.extend({
     kind: z.literal('cap-rush-multiplayer-slot'),
     roomId: idSchema,
@@ -126,6 +144,9 @@ export type CapRushMultiplayerWorkerErrorMessage = z.infer<
 
 export const capRushMultiplayerWorkerMessageSchema = z.union([
   base.extend({
+    kind: z.literal('cap-rush-multiplayer-hydrated'),
+  }),
+  base.extend({
     kind: z.literal('cap-rush-multiplayer-rejection'),
     code: capRushMultiplayerCommandRejectionCodeSchema,
     message: z.string().min(1),
@@ -133,6 +154,7 @@ export const capRushMultiplayerWorkerMessageSchema = z.union([
   base.extend({
     kind: z.literal('cap-rush-multiplayer-projection'),
     state: capRushMultiplayerStateSchema,
+    stateDigest: z.string().min(1).max(64),
   }),
   capRushMultiplayerWorkerSlotMessageSchema,
   capRushMultiplayerWorkerPlayoffMessageSchema,

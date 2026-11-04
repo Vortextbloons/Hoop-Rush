@@ -11,10 +11,25 @@ import {
   mutationNameOf,
 } from '#lib/features/havoc/havoc-presentation.js';
 
-export function gamecastBattleAbilityLines(
+export interface GamecastBattleAbilityLine {
+  key: string;
+  period: number;
+  clockSeconds: number;
+  side: HavocHomeAway | null;
+  ability: string;
+  summary: string;
+}
+
+export interface GamecastBattleAbilityNames {
+  readonly names: ReadonlyMap<string, string>;
+  readonly sides: ReadonlyMap<string, HavocHomeAway>;
+  readonly homeName: string;
+  readonly awayName: string;
+}
+
+export function gamecastBattleAbilityNames(
   result: Pick<HavocBattleResult, 'home' | 'away'>,
-  events: readonly HavocBattleEvent[],
-) {
+): GamecastBattleAbilityNames {
   const names = new Map<string, string>();
   const sides = new Map<string, HavocHomeAway>();
   for (const side of ['home', 'away'] as const) {
@@ -23,28 +38,42 @@ export function gamecastBattleAbilityLines(
       sides.set(participant.instanceId, side);
     }
   }
+  return { names, sides, homeName: result.home.displayName, awayName: result.away.displayName };
+}
+
+export function gamecastBattleAbilityLineOf(
+  event: HavocBattleEvent,
+  source: GamecastBattleAbilityNames,
+): GamecastBattleAbilityLine | null {
+  const mutationId = havocEventMutationIdOf(event);
+  if (mutationId === null || event.kind === 'turnover-cancelled') return null;
+  const owner = 'ownerInstanceId' in event ? event.ownerInstanceId : null;
+  const side = 'side' in event ? event.side : owner ? source.sides.get(owner) : undefined;
+  const summary = havocEventTextOf(event, {
+    playerName: (id) => source.names.get(id) ?? 'Unknown player',
+    homeName: source.homeName,
+    awayName: source.awayName,
+    humanSide: 'home',
+  });
+  const ownerName = owner ? source.names.get(owner) : undefined;
+  return {
+    key: `ability-${String(event.sequence)}`,
+    period: event.period,
+    clockSeconds: event.clockSeconds,
+    side: side ?? null,
+    ability: mutationNameOf(mutationId),
+    summary: ownerName && !summary.includes(ownerName) ? `${ownerName}: ${summary}` : summary,
+  };
+}
+
+export function gamecastBattleAbilityLines(
+  result: Pick<HavocBattleResult, 'home' | 'away'>,
+  events: readonly HavocBattleEvent[],
+): GamecastBattleAbilityLine[] {
+  const source = gamecastBattleAbilityNames(result);
   return events.flatMap((event) => {
-    const mutationId = havocEventMutationIdOf(event);
-    if (mutationId === null || event.kind === 'turnover-cancelled') return [];
-    const owner = 'ownerInstanceId' in event ? event.ownerInstanceId : null;
-    const side = 'side' in event ? event.side : owner ? sides.get(owner) : undefined;
-    const summary = havocEventTextOf(event, {
-      playerName: (id) => names.get(id) ?? 'Unknown player',
-      homeName: result.home.displayName,
-      awayName: result.away.displayName,
-      humanSide: 'home',
-    });
-    const ownerName = owner ? names.get(owner) : undefined;
-    return [
-      {
-        key: `ability-${String(event.sequence)}`,
-        period: event.period,
-        clockSeconds: event.clockSeconds,
-        side: side ?? null,
-        ability: mutationNameOf(mutationId),
-        summary: ownerName && !summary.includes(ownerName) ? `${ownerName}: ${summary}` : summary,
-      },
-    ];
+    const line = gamecastBattleAbilityLineOf(event, source);
+    return line === null ? [] : [line];
   });
 }
 
@@ -169,7 +198,9 @@ export function gamecastBattleVisibleState(
   return { homeScore, awayScore, period, clockSeconds, events, scoring };
 }
 
-function participantNames(output: GamecastBattleOutput): Map<string, string> {
+export function gamecastBattleParticipantNames(
+  output: Pick<GamecastBattleOutput, 'result'>,
+): Map<string, string> {
   const names = new Map<string, string>();
   for (const team of [output.result.home, output.result.away]) {
     for (const participant of team.participants) {
@@ -183,7 +214,7 @@ function signedPoints(points: number): string {
   return points >= 0 ? `+${String(points)}` : String(points);
 }
 
-function feedSummary(entry: HavocBattleScoringEntry, names: Map<string, string>): string {
+function feedSummary(entry: HavocBattleScoringEntry, names: ReadonlyMap<string, string>): string {
   const name = names.get(entry.actorInstanceId) ?? 'Unknown';
   if (entry.kind === 'bonus') {
     return `${entry.side === 'home' ? 'Home' : 'Away'} bonus ${signedPoints(entry.points)}`;
@@ -194,6 +225,21 @@ function feedSummary(entry: HavocBattleScoringEntry, names: Map<string, string>)
   return `${name} ${signedPoints(entry.points)}`;
 }
 
+export function gamecastBattleFeedLineOf(
+  item: GamecastBattlePlaybackItem,
+  names: ReadonlyMap<string, string>,
+): GamecastBattleFeedLine | null {
+  if (item.scoring === null) return null;
+  return {
+    key: item.key,
+    period: item.scoring.period,
+    clockSeconds: item.scoring.clockSeconds,
+    side: item.scoring.side,
+    summary: feedSummary(item.scoring, names),
+    points: item.scoring.points,
+  };
+}
+
 export function gamecastBattleFeedLines(
   output: GamecastBattleOutput,
   items: readonly GamecastBattlePlaybackItem[],
@@ -202,19 +248,13 @@ export function gamecastBattleFeedLines(
   const count = Number.isNaN(visibleCount)
     ? 0
     : Math.max(0, Math.min(items.length, Math.trunc(visibleCount)));
-  const names = participantNames(output);
+  const names = gamecastBattleParticipantNames(output);
   const lines: GamecastBattleFeedLine[] = [];
   for (let index = 0; index < count; index += 1) {
     const item = items[index];
-    if (item === undefined || item.scoring === null) continue;
-    lines.push({
-      key: item.key,
-      period: item.scoring.period,
-      clockSeconds: item.scoring.clockSeconds,
-      side: item.scoring.side,
-      summary: feedSummary(item.scoring, names),
-      points: item.scoring.points,
-    });
+    if (item === undefined) continue;
+    const line = gamecastBattleFeedLineOf(item, names);
+    if (line !== null) lines.push(line);
   }
   return lines;
 }

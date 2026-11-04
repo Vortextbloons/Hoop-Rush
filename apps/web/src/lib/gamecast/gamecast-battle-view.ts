@@ -1,6 +1,7 @@
 import type {
   HavocBattleEvent,
   HavocBattleResult,
+  HavocBattleScoringEntry,
   HavocHomeAway,
   HavocParticipantLine,
   HavocParticipantKind,
@@ -168,27 +169,62 @@ function foldEventInto(
 }
 
 /**
- * Box lines folded from the visible playback window. Scores include visible team bonuses so the
- * live score converges on the final result (`participant points + team bonus = team points`).
+ * Incremental box folder shared by recorded broadcasts. It lets a streaming playback append
+ * newly revealed events instead of re-folding the whole prefix on every frame.
  */
-export function gamecastBattleLiveBoxes(
-  result: Pick<HavocBattleResult, 'home' | 'away'>,
-  visible: GamecastBattleVisibleState,
-): GamecastBattleSideBox[] {
-  const lines = new Map<HavocHomeAway, Map<string, GamecastBattleParticipantLine>>();
-  const bonuses = new Map<HavocHomeAway, number>();
-  for (const side of SIDES) {
-    const sideLines = new Map<string, GamecastBattleParticipantLine>();
-    for (const participant of result[side].participants) {
-      sideLines.set(participant.instanceId, blankLine(participant));
+export class GamecastBattleBoxFolder {
+  private readonly lines = new Map<HavocHomeAway, Map<string, GamecastBattleParticipantLine>>();
+  private readonly bonuses = new Map<HavocHomeAway, number>();
+
+  constructor(result: Pick<HavocBattleResult, 'home' | 'away'>) {
+    for (const side of SIDES) {
+      const sideLines = new Map<string, GamecastBattleParticipantLine>();
+      for (const participant of result[side].participants) {
+        sideLines.set(participant.instanceId, blankLine(participant));
+      }
+      this.lines.set(side, sideLines);
+      this.bonuses.set(side, 0);
     }
-    lines.set(side, sideLines);
-    bonuses.set(side, 0);
   }
-  const resolve =
+
+  applyEvent(event: HavocBattleEvent): void {
+    const side = eventSideOf(event);
+    if (side === null) return;
+    foldEventInto(this.resolve(side), event);
+  }
+
+  applyScoring(entry: HavocBattleScoringEntry): void {
+    if (entry.kind === 'bonus') {
+      this.bonuses.set(entry.side, (this.bonuses.get(entry.side) ?? 0) + entry.points);
+      return;
+    }
+    const line = this.resolve(entry.side)(entry.actorInstanceId);
+    line.points += entry.points;
+    line.adjustments += entry.points - entry.nominalPoints;
+  }
+
+  boxes(
+    result: Pick<HavocBattleResult, 'home' | 'away'>,
+    visible: Pick<GamecastBattleVisibleState, 'homeScore' | 'awayScore'>,
+  ): GamecastBattleSideBox[] {
+    return SIDES.map((side) => {
+      const team = result[side];
+      const visibleScore = side === 'home' ? visible.homeScore : visible.awayScore;
+      const bonus = this.bonuses.get(side) ?? 0;
+      return {
+        side,
+        displayName: team.displayName,
+        score: visibleScore + bonus,
+        bonusPoints: bonus,
+        lines: [...(this.lines.get(side)?.values() ?? [])].map((line) => ({ ...line })),
+      };
+    });
+  }
+
+  private resolve =
     (side: HavocHomeAway) =>
     (instanceId: string): GamecastBattleParticipantLine => {
-      const sideLines = lines.get(side);
+      const sideLines = this.lines.get(side);
       if (!sideLines) return fallbackLine(instanceId);
       const existing = sideLines.get(instanceId);
       if (existing) return existing;
@@ -196,32 +232,20 @@ export function gamecastBattleLiveBoxes(
       sideLines.set(instanceId, created);
       return created;
     };
-  for (const event of visible.events) {
-    const side = eventSideOf(event);
-    if (side === null) continue;
-    foldEventInto(resolve(side), event);
-  }
-  for (const entry of visible.scoring) {
-    if (entry.kind === 'bonus') {
-      bonuses.set(entry.side, (bonuses.get(entry.side) ?? 0) + entry.points);
-      continue;
-    }
-    const line = resolve(entry.side)(entry.actorInstanceId);
-    line.points += entry.points;
-    line.adjustments += entry.points - entry.nominalPoints;
-  }
-  return SIDES.map((side) => {
-    const team = result[side];
-    const visibleScore = side === 'home' ? visible.homeScore : visible.awayScore;
-    const bonus = bonuses.get(side) ?? 0;
-    return {
-      side,
-      displayName: team.displayName,
-      score: visibleScore + bonus,
-      bonusPoints: bonus,
-      lines: [...(lines.get(side)?.values() ?? [])],
-    };
-  });
+}
+
+/**
+ * Box lines folded from the visible playback window. Scores include visible team bonuses so the
+ * live score converges on the final result (`participant points + team bonus = team points`).
+ */
+export function gamecastBattleLiveBoxes(
+  result: Pick<HavocBattleResult, 'home' | 'away'>,
+  visible: GamecastBattleVisibleState,
+): GamecastBattleSideBox[] {
+  const folder = new GamecastBattleBoxFolder(result);
+  for (const event of visible.events) folder.applyEvent(event);
+  for (const entry of visible.scoring) folder.applyScoring(entry);
+  return folder.boxes(result, visible);
 }
 
 /** Final box lines copied from the completed result, including negative participant totals. */

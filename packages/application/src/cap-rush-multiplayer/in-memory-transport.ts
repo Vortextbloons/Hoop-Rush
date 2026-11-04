@@ -165,6 +165,11 @@ export class CapRushMultiplayerInMemoryTransport implements CapRushMultiplayerTr
     return this.snapshotOf(this.room(roomId));
   }
 
+  acceptedSnapshot(roomId: string): CapRushMultiplayerRoomSnapshot | null {
+    const room = this.rooms.get(roomId);
+    return room === undefined ? null : this.snapshotOf(room);
+  }
+
   async sync(roomId: string, afterOrdinal = -1): Promise<CapRushMultiplayerSync> {
     await Promise.resolve();
     const room = this.room(roomId);

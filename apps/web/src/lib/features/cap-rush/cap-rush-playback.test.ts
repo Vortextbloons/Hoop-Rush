@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import {
   POSITIONS,
+  type HavocBattleResult,
   type HavocBattleTape,
   type HavocGameResult,
   capRushCardSchema,
@@ -18,7 +19,11 @@ import { seedFromString } from '@hoop-rush/test-fixtures';
 import { buildScenarioTeam } from '../../../../../../packages/engine/src/modes/havoc/runtime-test-support.ts';
 import { capRushTestSetup } from '../../../../../../packages/engine/src/modes/cap-rush/cap-rush-test-support.ts';
 import { gamecastBattleVisibleState } from '#lib/gamecast/gamecast-battle-playback.js';
-import { gamecastBattleLiveBoxes } from '#lib/gamecast/gamecast-battle-view.js';
+import { GamecastBattlePlaybackStream } from '#lib/gamecast/gamecast-battle-stream.js';
+import {
+  gamecastBattleFinalBoxes,
+  gamecastBattleLiveBoxes,
+} from '#lib/gamecast/gamecast-battle-view.js';
 import { capRushPlaybackItems } from './cap-rush-playback.js';
 
 function lockedRun() {
@@ -179,6 +184,12 @@ describe('Cap Rush recorded broadcast', () => {
         expect(partial.events.some((event) => event.kind === 'game-end')).toBe(false);
         const visible = gamecastBattleVisibleState(items, items.length);
         const boxes = gamecastBattleLiveBoxes(result, visible);
+        const stream = new GamecastBattlePlaybackStream({
+          result: result as unknown as HavocBattleResult,
+          tape,
+        });
+        const finalFrame = stream.frame(stream.items.length);
+        expect(finalFrame.boxes).toEqual(gamecastBattleFinalBoxes(result));
         for (const box of boxes) {
           const team = result[box.side];
           expect(box.score).toBe(team.points);

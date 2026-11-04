@@ -223,29 +223,116 @@ test('single-slot partitions and playoff series match serial engine outputs incl
   }
 });
 
-test('dispatches projection inputs without copying the catalog or sending the local index', async () => {
+test('recovers a dropped worker by rehydrating before retrying the projection', async () => {
   const setup = capRushTestSetup();
   const environment = { ...capRushTestEnvironment(setup), seasonCatalog: setup.catalog };
   const state = createCapRushMultiplayerState(capRushTestRootSeed());
-  let posted: unknown;
+  const workers: {
+    onmessage: ((event: MessageEvent<unknown>) => void) | null;
+    onerror: ((event: ErrorEvent) => void) | null;
+    posted: string[];
+    postMessage(value: unknown): void;
+    terminate(): void;
+  }[] = [];
+  let projectRequests = 0;
+  const createWorker = () => {
+    const worker = {
+      onmessage: null as ((event: MessageEvent<unknown>) => void) | null,
+      onerror: null as ((event: ErrorEvent) => void) | null,
+      posted: [] as string[],
+      terminate() {},
+      postMessage(value: unknown) {
+        const request = capRushMultiplayerWorkerRequestSchema.parse(value);
+        worker.posted.push(request.kind);
+        if (request.kind === 'cap-rush-multiplayer-hydrate') {
+          worker.onmessage?.({
+            data: {
+              schemaVersion: request.schemaVersion,
+              requestId: request.requestId,
+              kind: 'cap-rush-multiplayer-hydrated',
+            },
+          } as MessageEvent<unknown>);
+          return;
+        }
+        if (request.kind === 'cap-rush-multiplayer-project') {
+          projectRequests += 1;
+          if (projectRequests === 1) {
+            worker.onerror?.({} as ErrorEvent);
+            return;
+          }
+          worker.onmessage?.({
+            data: {
+              schemaVersion: request.schemaVersion,
+              requestId: request.requestId,
+              kind: 'cap-rush-multiplayer-projection',
+              state,
+              stateDigest: 'b'.repeat(64),
+            },
+          } as MessageEvent<unknown>);
+        }
+      },
+    };
+    workers.push(worker);
+    return worker as unknown as Worker;
+  };
+  const runner = new CapRushMultiplayerRunner({ createWorker });
+  try {
+    const result = await runner.projectDetailed({
+      state,
+      commands: [],
+      environment,
+      variant: 'clash',
+    });
+    expect(result.stateDigest).toBe('b'.repeat(64));
+    expect(workers).toHaveLength(2);
+    expect(workers[0]?.posted).toEqual([
+      'cap-rush-multiplayer-hydrate',
+      'cap-rush-multiplayer-project',
+    ]);
+    expect(workers[1]?.posted).toEqual([
+      'cap-rush-multiplayer-hydrate',
+      'cap-rush-multiplayer-project',
+    ]);
+  } finally {
+    runner.dispose();
+  }
+});
+
+test('hydrates the catalog once, then sends only state and commands with a worker digest', async () => {
+  const setup = capRushTestSetup();
+  const environment = { ...capRushTestEnvironment(setup), seasonCatalog: setup.catalog };
+  const state = createCapRushMultiplayerState(capRushTestRootSeed());
+  const posted: import('@hoop-rush/data-contracts').CapRushMultiplayerWorkerRequest[] = [];
   const worker = {
     onmessage: null as ((event: MessageEvent<unknown>) => void) | null,
     onerror: null,
     terminate() {},
     postMessage(value: unknown) {
-      posted = value;
+      const request = capRushMultiplayerWorkerRequestSchema.parse(value);
+      posted.push(request);
+      if (request.kind === 'cap-rush-multiplayer-hydrate') {
+        worker.onmessage?.({
+          data: {
+            schemaVersion: request.schemaVersion,
+            requestId: request.requestId,
+            kind: 'cap-rush-multiplayer-hydrated',
+          },
+        } as MessageEvent<unknown>);
+      }
     },
   };
   const runner = new CapRushMultiplayerRunner({ createWorker: () => worker as unknown as Worker });
   try {
-    const pending = runner.project({ state, commands: [], environment, variant: 'clash' });
-    const request = posted as Extract<
+    const pending = runner.projectDetailed({ state, commands: [], environment, variant: 'clash' });
+    for (let index = 0; index < 5; index += 1) await Promise.resolve();
+    expect(posted[0]?.kind).toBe('cap-rush-multiplayer-hydrate');
+    const request = posted[1] as Extract<
       import('@hoop-rush/data-contracts').CapRushMultiplayerWorkerRequest,
       { kind: 'cap-rush-multiplayer-project' }
     >;
-    expect(request.environment.seasonCatalog).toBe(environment.seasonCatalog);
-    expect(request.state).toBe(state);
-    expect('index' in request.environment).toBe(false);
+    expect(request.kind).toBe('cap-rush-multiplayer-project');
+    expect(request.state).toEqual(state);
+    expect('environment' in request).toBe(false);
     expect(capRushMultiplayerWorkerRequestSchema.safeParse(request).success).toBe(true);
     worker.onmessage?.({
       data: {
@@ -253,9 +340,37 @@ test('dispatches projection inputs without copying the catalog or sending the lo
         requestId: request.requestId,
         kind: 'cap-rush-multiplayer-projection',
         state,
+        stateDigest: 'a'.repeat(64),
       },
     } as MessageEvent<unknown>);
-    expect(await pending).toEqual(state);
+    expect(await pending).toEqual({ state, stateDigest: 'a'.repeat(64) });
+
+    const warm = runner.projectDetailed({
+      state,
+      commands: [],
+      environment,
+      variant: 'clash',
+      baseDigest: 'a'.repeat(64),
+    });
+    for (let index = 0; index < 5; index += 1) await Promise.resolve();
+    const warmRequest = posted[2] as Extract<
+      import('@hoop-rush/data-contracts').CapRushMultiplayerWorkerRequest,
+      { kind: 'cap-rush-multiplayer-project' }
+    >;
+    expect('state' in warmRequest).toBe(false);
+    expect(warmRequest.baseDigest).toBe('a'.repeat(64));
+    expect(capRushMultiplayerWorkerRequestSchema.safeParse(warmRequest).success).toBe(true);
+    worker.onmessage?.({
+      data: {
+        schemaVersion: warmRequest.schemaVersion,
+        requestId: warmRequest.requestId,
+        kind: 'cap-rush-multiplayer-projection',
+        state,
+        stateDigest: 'a'.repeat(64),
+      },
+    } as MessageEvent<unknown>);
+    await warm;
+    expect(posted.filter((entry) => entry.kind === 'cap-rush-multiplayer-hydrate')).toHaveLength(1);
   } finally {
     runner.dispose();
   }

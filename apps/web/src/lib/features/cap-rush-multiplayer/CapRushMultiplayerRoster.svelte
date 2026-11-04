@@ -10,6 +10,7 @@
   import TeamLogo from '#lib/components/TeamLogo.svelte';
   import type { CapRushArt } from '../cap-rush/cap-rush-art.js';
   import { formatAverage, initialsOf } from '../cap-rush/cap-rush-presentation.js';
+  import { capRushMultiplayerPlayerAverages } from './cap-rush-multiplayer-derived.js';
   import { money, positionLabel, seatLabelFor } from './cap-rush-multiplayer-presentation.js';
 
   interface RosterSlot {
@@ -61,28 +62,7 @@
     });
   });
   const filled = $derived(slots.filter((entry) => entry.playerId !== null).length);
-  const averages = $derived.by(() => {
-    const totals = new Map<
-      string,
-      { games: number; points: number; rebounds: number; assists: number }
-    >();
-    for (const game of roomState.season?.games ?? []) {
-      for (const line of [...game.box.home.participants, ...game.box.away.participants]) {
-        const entry = totals.get(line.playerId) ?? {
-          games: 0,
-          points: 0,
-          rebounds: 0,
-          assists: 0,
-        };
-        entry.games += 1;
-        entry.points += line.points;
-        entry.rebounds += line.rebounds;
-        entry.assists += line.assists;
-        totals.set(line.playerId, entry);
-      }
-    }
-    return totals;
-  });
+  const averages = $derived(capRushMultiplayerPlayerAverages(roomState.season?.games));
 
   function nameOf(entry: RosterSlot): string {
     return entry.player?.displayName ?? entry.fallbackName ?? 'Unlisted player';
