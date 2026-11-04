@@ -22,7 +22,7 @@
     RunAggregates,
   } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation, playerIdSchema } from '@hoop-rush/data-contracts';
-  import SegmentedControl from '#lib/components/ui/SegmentedControl.svelte';
+  import PlayerStatsControls from '#lib/components/basketball/PlayerStatsControls.svelte';
   import type { SandboxHref } from '#lib/sandbox-url.js';
   import { explainSeason, leagueMvp, perGamePlayer, selectMemorableGames } from '@hoop-rush/engine';
   import { resolve } from '$app/paths';
@@ -682,15 +682,10 @@
         <h2 class="font-display text-xl font-extrabold tracking-tight uppercase">
           Your five · season
         </h2>
-        <SegmentedControl
-          label="Season values"
-          size="md"
-          value={totalsMode ? 'totals' : 'game'}
-          onchange={() => toggleMode()}
-          options={[
-            { value: 'game', label: 'Per game' },
-            { value: 'totals', label: 'Totals' },
-          ]}
+        <PlayerStatsControls
+          valuesLabel="Season values"
+          values={totalsMode ? 'totals' : 'game'}
+          onvalueschange={() => toggleMode()}
         />
       </div>
       {#if displayAggregates}

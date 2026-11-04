@@ -12,7 +12,7 @@ repeating button, panel, badge, and segmented-control markup.
 | `Button.svelte`           | native `<button>`                    | Defaults to `type="button"`. `loading` disables the control and sets `aria-busy`. Accepts native button attributes and events. |
 | `ActionLink.svelte`       | native `<a>`                         | Use for navigation. There is deliberately no disabled state; render different content instead of a dead link.                  |
 | `IconButton.svelte`       | native `<button>`                    | Requires `label`, which becomes the accessible name. Use for icon-only actions.                                                |
-| `Panel.svelte`            | `div`, `section`, `article`, or `li` | Surface only. Choose padding with `padding="none                                                                               | sm  | md  | lg"`. |
+| `Panel.svelte`            | `div`, `section`, `article`, or `li` | Surface only. Choose padding with `padding="none \| sm \| md \| lg"`.                                                          |
 | `Badge.svelte`            | `<span>`                             | Semantic tones: `neutral`, `primary`, `accent`, `positive`, `negative`.                                                        |
 | `SegmentedControl.svelte` | `role="group"` of pressed buttons    | For immediate option groups such as "Per game / Totals". Not a tab list; it does not change panels.                            |
 | `PageHeader.svelte`       | page header                          | Eyebrow, title, description, and an optional `actions` snippet.                                                                |
@@ -47,6 +47,53 @@ unions. Prefer the typed variants over passing one-off color classes.
 History screens share `#lib/components/basketball/HistoryEntryCard.svelte`.
 The mode supplies its own record, badges, and metadata through snippets, so
 Cap Rush keeps cap/postseason badges while Havoc keeps its completion state.
+
+## Basketball compositions
+
+`components/basketball/PlayerStatsSection.svelte` composes the repeated player
+stats block: heading/description/actions, roster and per-game/totals controls,
+a horizontally scrollable `PlayerStatsTable`, a footnote, an empty state, and an
+optional mobile `cards` snippet. Modes keep data selection, aggregation, and
+column formatting.
+
+```svelte
+<PlayerStatsSection
+  title="Series player stats"
+  ariaLabel="Series player stats"
+  sideOptions={[
+    { value: 'you', label: 'You' },
+    { value: 'opp', label: 'Opponent' },
+  ]}
+  {side}
+  onsidechange={(next) => (side = next)}
+  values={totals ? 'totals' : 'game'}
+  onvalueschange={(next) => (totals = next === 'totals')}
+  {rows}
+  {columns}
+  rowKey={(row) => row.playerId}
+  note={`${totals ? 'Series totals' : 'Per-game averages'} · ${rows.length} players`}
+>
+  {#snippet identity(row)}
+    <span class="ui-stats-player">
+      <span class="ui-stats-player-text">
+        <span class="ui-stats-player-name">{row.displayName}</span>
+        <span class="ui-stats-player-meta">{row.slot}</span>
+      </span>
+    </span>
+  {/snippet}
+</PlayerStatsSection>
+```
+
+Columns can set `hideBelow: 'sm' | 'md'` for responsive visibility and
+`cellClass` for emphasis. Pass `stickyIdentity` when the first column must stay
+visible during horizontal scrolling, and set `--ui-stats-line`,
+`--ui-stats-row-line`, `--ui-stats-muted`, or `--ui-stats-player-width` on an
+ancestor to theme a table without mode checks. `surface="none"` leaves the
+section unstyled inside an existing mode panel.
+
+`PlayerStatsControls.svelte` is the controls-only form for modes that supply
+their own table or box score, such as the Havoc championship:
+`<PlayerStatsControls valuesLabel="Season values" {values} {onvalueschange} />`.
 
 ## Theming
 

@@ -17,10 +17,14 @@
     PlayersIndexEntry,
   } from '@hoop-rush/data-contracts';
   import PlayerFace from '#lib/components/PlayerFace.svelte';
-  import SegmentedControl from '#lib/components/ui/SegmentedControl.svelte';
+  import PlayerStatsSection from '#lib/components/basketball/PlayerStatsSection.svelte';
+  import type { PlayerStatColumn } from '#lib/components/player-stats-table.js';
   import { formatPositions } from '#lib/player-positions.js';
   import type { DraftPresentation } from '#lib/draft-presentation.js';
-  import type { FixedFivePlayerStats } from '#lib/features/fixed-five/fixed-five-player-stats.js';
+  import type {
+    FixedFivePlayerStatLine,
+    FixedFivePlayerStats,
+  } from '#lib/features/fixed-five/fixed-five-player-stats.js';
   import { perGameText, trueShootingPct, usagePct, usagePossessions } from '#lib/format.js';
   let {
     mode,
@@ -67,16 +71,34 @@
     rematchWaiting?: boolean;
     rematchBusy?: boolean;
   } = $props();
+  interface StatsRow {
+    slotIndex: number;
+    entry: PlayersIndexEntry | null;
+    line: FixedFivePlayerStatLine | undefined;
+  }
+
   let tab = $state<'overview' | 'games' | 'players' | 'team'>('overview');
   let statsSide = $state<'you' | 'opp'>('you');
   let statsTotals = $state(false);
+  const statsSideOptions = [
+    { value: 'you', label: 'You' },
+    { value: 'opp', label: 'Opponent' },
+  ] as const;
   const statsPid = $derived<'p1' | 'p2'>(
     statsSide === 'you' ? selfId : selfId === 'p1' ? 'p2' : 'p1',
   );
-  const statsRows = $derived(statsPid === 'p1' ? p1Rows : p2Rows);
-  const statsLines = $derived.by(() => {
+  const statsEntries = $derived(statsPid === 'p1' ? p1Rows : p2Rows);
+  const statsLines = $derived.by((): Map<string, FixedFivePlayerStatLine> => {
     const lines = stats ? (statsPid === 'p1' ? stats.p1 : stats.p2) : [];
     return new Map(lines.map((line) => [line.playerId, line]));
+  });
+  const statsRows = $derived.by((): StatsRow[] | null => {
+    if (statsState !== 'ready' || !stats) return null;
+    return statsEntries.map((entry, slotIndex) => ({
+      slotIndex,
+      entry,
+      line: entry ? statsLines.get(entry.playerId) : undefined,
+    }));
   });
   const statsTeamUsage = $derived(
     [...statsLines.values()].reduce(
@@ -93,6 +115,88 @@
     if (attempted <= 0) return '—';
     return `${((made / attempted) * 100).toFixed(1)}%`;
   }
+  const statsColumns: readonly PlayerStatColumn<StatsRow>[] = [
+    {
+      key: 'minutes',
+      label: 'MIN',
+      value: (row) => (row.line ? statValue(row.line.minutes, row.line.games) : '—'),
+    },
+    {
+      key: 'points',
+      label: 'PTS',
+      value: (row) => (row.line ? statValue(row.line.points, row.line.games) : '—'),
+      cellClass: 'ui-stats-value-strong',
+    },
+    {
+      key: 'fieldGoalPct',
+      label: 'FG%',
+      value: (row) =>
+        row.line ? pctStr(row.line.fieldGoalsMade, row.line.fieldGoalsAttempted) : '—',
+    },
+    {
+      key: 'threePointPct',
+      label: '3P%',
+      value: (row) => (row.line ? pctStr(row.line.threesMade, row.line.threesAttempted) : '—'),
+    },
+    {
+      key: 'freeThrowPct',
+      label: 'FT%',
+      value: (row) =>
+        row.line ? pctStr(row.line.freeThrowsMade, row.line.freeThrowsAttempted) : '—',
+    },
+    {
+      key: 'rebounds',
+      label: 'REB',
+      value: (row) => (row.line ? statValue(row.line.rebounds, row.line.games) : '—'),
+    },
+    {
+      key: 'assists',
+      label: 'AST',
+      value: (row) => (row.line ? statValue(row.line.assists, row.line.games) : '—'),
+    },
+    {
+      key: 'steals',
+      label: 'STL',
+      value: (row) => (row.line ? statValue(row.line.steals, row.line.games) : '—'),
+    },
+    {
+      key: 'blocks',
+      label: 'BLK',
+      value: (row) => (row.line ? statValue(row.line.blocks, row.line.games) : '—'),
+    },
+    {
+      key: 'turnovers',
+      label: 'TOV',
+      value: (row) => (row.line ? statValue(row.line.turnovers, row.line.games) : '—'),
+    },
+    {
+      key: 'trueShootingPct',
+      label: 'TS%',
+      value: (row) =>
+        row.line
+          ? trueShootingPct(
+              row.line.points,
+              row.line.fieldGoalsAttempted,
+              row.line.freeThrowsAttempted,
+            )
+          : '—',
+    },
+    {
+      key: 'usagePct',
+      label: 'USG%',
+      value: (row) =>
+        row.line
+          ? usagePct(
+              usagePossessions(
+                row.line.fieldGoalsAttempted,
+                row.line.freeThrowsAttempted,
+                row.line.turnovers,
+              ),
+              statsTeamUsage,
+            )
+          : '—',
+    },
+  ];
   const modeLabel = $derived(mode === 'duel' ? 'Duel · Best of 7' : 'Season · 82 games');
   const modeDetailLabel = $derived(modeDetail ?? modeLabel);
   const youWon = $derived(
@@ -815,176 +919,62 @@
         {/if}
       </div>
     {:else if tab === 'players'}
-      <section aria-label="Player stats, both fives" class="p-4 sm:p-6">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <h3 class="font-display text-lg font-extrabold tracking-tight uppercase">
-            Player stats · both fives
-          </h3>
-          <div class="flex flex-wrap items-center gap-2">
-            <SegmentedControl
-              label="Stats side"
-              size="md"
-              value={statsSide}
-              onchange={(next) => (statsSide = next)}
-              options={[
-                { value: 'you', label: 'You' },
-                { value: 'opp', label: 'Opponent' },
-              ]}
-            />
-            <SegmentedControl
-              label="Stats values"
-              size="md"
-              value={statsTotals ? 'totals' : 'game'}
-              onchange={(next) => (statsTotals = next === 'totals')}
-              options={[
-                { value: 'game', label: 'Per game' },
-                { value: 'totals', label: 'Totals' },
-              ]}
-            />
-          </div>
-        </div>
-
-        {#if statsState === 'building'}
-          <p class="mt-3 animate-pulse text-sm text-muted-foreground" role="status">
-            Building player stats from the simulated games…
-          </p>
-        {:else if statsState !== 'ready' || !stats}
-          <div class="mt-3 flex flex-wrap items-center gap-3">
-            <p class="text-sm text-muted-foreground">
-              Stats need the simulated games, which are not on this device.
-            </p>
-            {#if onRebuildStats}
-              <button
-                type="button"
-                onclick={onRebuildStats}
-                class="rounded-lg border border-border bg-surface-1 px-4 py-2 text-sm font-semibold transition-colors hover:border-line-strong"
-              >
-                Build player stats
-              </button>
-            {/if}
-          </div>
-        {:else}
-          <div class="mt-4 hidden overflow-x-auto sm:block">
-            <table class="w-full min-w-[860px] border-collapse text-sm">
-              <thead>
-                <tr
-                  class="border-b border-border font-mono text-[10px] tracking-[0.12em] text-muted-foreground uppercase"
-                >
-                  <th scope="col" class="py-2 pr-3 text-left">Player</th>
-                  <th scope="col" class="px-2 py-2 text-right">Min</th>
-                  <th scope="col" class="px-2 py-2 text-right">PTS</th>
-                  <th scope="col" class="px-2 py-2 text-right">FG%</th>
-                  <th scope="col" class="px-2 py-2 text-right">3P%</th>
-                  <th scope="col" class="px-2 py-2 text-right">FT%</th>
-                  <th scope="col" class="px-2 py-2 text-right">REB</th>
-                  <th scope="col" class="px-2 py-2 text-right">AST</th>
-                  <th scope="col" class="px-2 py-2 text-right">STL</th>
-                  <th scope="col" class="px-2 py-2 text-right">BLK</th>
-                  <th scope="col" class="px-2 py-2 text-right">TOV</th>
-                  <th scope="col" class="px-2 py-2 text-right">TS%</th>
-                  <th scope="col" class="px-2 py-2 text-right">USG%</th>
-                </tr>
-              </thead>
-              <tbody>
-                {#each statsRows as row, i (i)}
-                  {@const line = row ? statsLines.get(row.playerId) : undefined}
-                  <tr class="border-b border-border/50 last:border-0">
-                    <th scope="row" class="py-2 pr-3 text-left">
-                      <span class="flex items-center gap-2">
-                        {#if row}
-                          <PlayerFace
-                            player={row}
-                            {manifest}
-                            size="sm"
-                            fallbackInitials={row.firstName[0]! + row.lastName[0]!}
-                          />
-                          <span class="min-w-0">
-                            <span class="block truncate font-semibold">{row.displayName}</span>
-                            <span class="block font-mono text-[10px] text-muted-foreground">
-                              {line ? `${line.games} games` : 'no games'}
-                            </span>
-                          </span>
-                        {:else}
-                          <span class="font-mono text-xs">Slot {i + 1}</span>
-                        {/if}
-                      </span>
-                    </th>
-                    {#if line}
-                      <td class="px-2 py-2 text-right font-mono"
-                        >{statValue(line.minutes, line.games)}</td
-                      >
-                      <td class="px-2 py-2 text-right font-mono font-bold"
-                        >{statValue(line.points, line.games)}</td
-                      >
-                      <td class="px-2 py-2 text-right font-mono"
-                        >{pctStr(line.fieldGoalsMade, line.fieldGoalsAttempted)}</td
-                      >
-                      <td class="px-2 py-2 text-right font-mono"
-                        >{pctStr(line.threesMade, line.threesAttempted)}</td
-                      >
-                      <td class="px-2 py-2 text-right font-mono"
-                        >{pctStr(line.freeThrowsMade, line.freeThrowsAttempted)}</td
-                      >
-                      <td class="px-2 py-2 text-right font-mono"
-                        >{statValue(line.rebounds, line.games)}</td
-                      >
-                      <td class="px-2 py-2 text-right font-mono"
-                        >{statValue(line.assists, line.games)}</td
-                      >
-                      <td class="px-2 py-2 text-right font-mono"
-                        >{statValue(line.steals, line.games)}</td
-                      >
-                      <td class="px-2 py-2 text-right font-mono"
-                        >{statValue(line.blocks, line.games)}</td
-                      >
-                      <td class="px-2 py-2 text-right font-mono"
-                        >{statValue(line.turnovers, line.games)}</td
-                      >
-                      <td class="px-2 py-2 text-right font-mono"
-                        >{trueShootingPct(
-                          line.points,
-                          line.fieldGoalsAttempted,
-                          line.freeThrowsAttempted,
-                        )}</td
-                      >
-                      <td class="px-2 py-2 text-right font-mono"
-                        >{usagePct(
-                          usagePossessions(
-                            line.fieldGoalsAttempted,
-                            line.freeThrowsAttempted,
-                            line.turnovers,
-                          ),
-                          statsTeamUsage,
-                        )}</td
-                      >
-                    {:else}
-                      <td colspan="12" class="px-2 py-2 text-right font-mono text-muted-foreground"
-                        >—</td
-                      >
-                    {/if}
-                  </tr>
-                {/each}
-              </tbody>
-            </table>
-          </div>
-          <div class="mt-4 grid min-w-0 gap-2 sm:hidden">
-            {#each statsRows as row, i (i)}
-              {@const line = row ? statsLines.get(row.playerId) : undefined}
+      <div class="p-4 sm:p-6">
+        <PlayerStatsSection
+          surface="none"
+          ariaLabel="Player stats, both fives"
+          title="Player stats · both fives"
+          sideLabel="Stats side"
+          sideOptions={statsSideOptions}
+          side={statsSide}
+          onsidechange={(next) => (statsSide = next)}
+          valuesLabel="Stats values"
+          values={statsTotals ? 'totals' : 'game'}
+          onvalueschange={(next) => (statsTotals = next === 'totals')}
+          rows={statsRows}
+          columns={statsColumns}
+          rowKey={(row) => row.entry?.playerId ?? `slot-${row.slotIndex}`}
+          tableClass="min-w-[54rem] font-mono"
+          caption={`${statsSide === 'you' ? 'Your five' : 'Opponent five'} series player stats`}
+        >
+          {#snippet identity(row)}
+            <span class="ui-stats-player">
+              {#if row.entry}
+                <PlayerFace
+                  player={row.entry}
+                  {manifest}
+                  size="sm"
+                  fallbackInitials={row.entry.firstName[0]! + row.entry.lastName[0]!}
+                />
+                <span class="ui-stats-player-text">
+                  <span class="ui-stats-player-name">{row.entry.displayName}</span>
+                  <span class="ui-stats-player-meta">
+                    {row.line ? `${row.line.games} games` : 'no games'}
+                  </span>
+                </span>
+              {:else}
+                <span class="ui-stats-player-meta">Slot {row.slotIndex + 1}</span>
+              {/if}
+            </span>
+          {/snippet}
+          {#snippet cards()}
+            {#each statsRows ?? [] as row (row.slotIndex)}
+              {@const line = row.line}
               <article class="min-w-0 rounded-lg border border-border bg-surface-1 px-4 py-3">
                 <div class="flex items-start gap-3">
-                  {#if row}
+                  {#if row.entry}
                     <PlayerFace
-                      player={row}
+                      player={row.entry}
                       {manifest}
                       size="sm"
-                      fallbackInitials={row.firstName[0]! + row.lastName[0]!}
+                      fallbackInitials={row.entry.firstName[0]! + row.entry.lastName[0]!}
                     />
                   {/if}
                   <div class="min-w-0 flex-1">
                     <div class="flex items-start justify-between gap-3">
                       <div class="min-w-0 flex-1">
                         <p class="truncate text-sm font-bold">
-                          {row?.displayName ?? `Slot ${i + 1}`}
+                          {row.entry?.displayName ?? `Slot ${row.slotIndex + 1}`}
                         </p>
                         <p class="font-mono text-[10px] text-muted-foreground">
                           {line ? `${line.games} games` : 'no games'}
@@ -1082,9 +1072,31 @@
                 {/if}
               </article>
             {/each}
-          </div>
-        {/if}
-      </section>
+          {/snippet}
+          {#snippet empty()}
+            {#if statsState === 'building'}
+              <p class="ui-stats-empty animate-pulse" role="status">
+                Building player stats from the simulated games…
+              </p>
+            {:else}
+              <div class="flex flex-wrap items-center gap-3">
+                <p class="ui-stats-empty">
+                  Stats need the simulated games, which are not on this device.
+                </p>
+                {#if onRebuildStats}
+                  <button
+                    type="button"
+                    onclick={onRebuildStats}
+                    class="rounded-lg border border-border bg-surface-1 px-4 py-2 text-sm font-semibold transition-colors hover:border-line-strong"
+                  >
+                    Build player stats
+                  </button>
+                {/if}
+              </div>
+            {/if}
+          {/snippet}
+        </PlayerStatsSection>
+      </div>
     {:else}
       <div class="grid gap-4 p-4 sm:p-6 lg:grid-cols-2">
         <section

@@ -11,7 +11,7 @@
   } from '@hoop-rush/persistence';
   import HavocMutationList from '#lib/features/havoc/HavocMutationList.svelte';
   import PlayerArt from '#lib/components/PlayerArt.svelte';
-  import SegmentedControl from '#lib/components/ui/SegmentedControl.svelte';
+  import PlayerStatsControls from '#lib/components/basketball/PlayerStatsControls.svelte';
   import HavocTierBadge from '#lib/features/havoc/HavocTierBadge.svelte';
   import { perGameText, ratioPct, trueShootingPct } from '#lib/format.js';
   import GamecastBattleBox from '#lib/gamecast/GamecastBattleBox.svelte';
@@ -244,28 +244,17 @@
     <div class="hm-stats-head">
       <h3 class="h-subtitle">Series player stats</h3>
       {#if stats.games > 0}
-        <div class="hm-stats-controls">
-          <SegmentedControl
-            label="Roster"
-            size="md"
-            value={statsSide}
-            onchange={(next) => (statsSide = next)}
-            options={[
-              { value: 'home', label: 'You' },
-              { value: 'away', label: 'Opponent' },
-            ]}
-          />
-          <SegmentedControl
-            label="Stat values"
-            size="md"
-            value={statsTotals ? 'totals' : 'game'}
-            onchange={(next) => (statsTotals = next === 'totals')}
-            options={[
-              { value: 'game', label: 'Per game' },
-              { value: 'totals', label: 'Totals' },
-            ]}
-          />
-        </div>
+        <PlayerStatsControls
+          sideLabel="Roster"
+          sideOptions={[
+            { value: 'home', label: 'You' },
+            { value: 'away', label: 'Opponent' },
+          ]}
+          side={statsSide}
+          onsidechange={(next) => (statsSide = next)}
+          values={statsTotals ? 'totals' : 'game'}
+          onvalueschange={(next) => (statsTotals = next === 'totals')}
+        />
       {/if}
     </div>
     <p class="hm-champ-sub">
@@ -396,8 +385,7 @@
   .hm-top-grid > section {
     min-width: 0;
   }
-  .hm-stats-head,
-  .hm-stats-controls {
+  .hm-stats-head {
     display: flex;
     flex-wrap: wrap;
     align-items: center;

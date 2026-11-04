@@ -1,6 +1,8 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import PlayerArt from '#lib/components/PlayerArt.svelte';
+  import PlayerStatsTable from '#lib/components/PlayerStatsTable.svelte';
+  import type { PlayerStatColumn } from '#lib/components/player-stats-table.js';
   import {
     ratioPct,
     perGameText,
@@ -9,7 +11,10 @@
     usagePossessions,
   } from '#lib/format.js';
   import { gamecastBattleParticipantKindLabel } from './gamecast-battle-labels';
-  import type { GamecastBattleSideBox } from './gamecast-battle-view';
+  import type {
+    GamecastBattleParticipantLine,
+    GamecastBattleSideBox,
+  } from './gamecast-battle-view';
 
   let {
     boxes,
@@ -39,6 +44,52 @@
   function labelOf(side: 'home' | 'away'): string {
     return side === localSide ? 'You' : 'Opponent';
   }
+
+  function columnsFor(
+    teamUsage: number,
+  ): readonly PlayerStatColumn<GamecastBattleParticipantLine>[] {
+    return [
+      {
+        key: 'role',
+        label: 'Role',
+        align: 'start',
+        value: (line) => gamecastBattleParticipantKindLabel(line.kind),
+        cellClass: 'hm-role',
+      },
+      { key: 'points', label: 'Pts', value: (line) => statOf(line.points), cellClass: 'hm-pts' },
+      {
+        key: 'fieldGoalPct',
+        label: 'FG%',
+        value: (line) => ratioPct(line.fieldGoalsMade, line.fieldGoalsAttempted),
+      },
+      {
+        key: 'freeThrowPct',
+        label: 'FT%',
+        value: (line) => ratioPct(line.freeThrowsMade, line.freeThrowsAttempted),
+      },
+      {
+        key: 'trueShootingPct',
+        label: 'TS%',
+        value: (line) =>
+          trueShootingPct(line.points, line.fieldGoalsAttempted, line.freeThrowsAttempted),
+      },
+      {
+        key: 'usagePct',
+        label: 'USG%',
+        value: (line) =>
+          usagePct(
+            usagePossessions(line.fieldGoalsAttempted, line.freeThrowsAttempted, line.turnovers),
+            teamUsage,
+          ),
+      },
+      { key: 'rebounds', label: 'Reb', value: (line) => statOf(line.rebounds) },
+      { key: 'assists', label: 'Ast', value: (line) => statOf(line.assists) },
+      { key: 'steals', label: 'Stl', value: (line) => statOf(line.steals) },
+      { key: 'blocks', label: 'Blk', value: (line) => statOf(line.blocks) },
+      { key: 'turnovers', label: 'TO', value: (line) => statOf(line.turnovers) },
+      { key: 'fouls', label: 'PF', value: (line) => statOf(line.fouls) },
+    ];
+  }
 </script>
 
 <div class="hm-boxes-container">
@@ -51,6 +102,7 @@
           usagePossessions(line.fieldGoalsAttempted, line.freeThrowsAttempted, line.turnovers),
         0,
       )}
+      {@const columns = columnsFor(teamUsage)}
       <section
         class="hm-box"
         data-side={box.side}
@@ -68,80 +120,34 @@
           {/if}
           <strong class="hm-box-score" data-negative={box.score < 0}>{statOf(box.score)}</strong>
         </header>
-        <div class="hm-box-scroll">
-          <table>
-            <caption class="sr-only">{labelOf(box.side)} participant lines</caption>
-            <thead>
-              <tr>
-                <th scope="col">Player</th>
-                <th scope="col">Role</th>
-                <th scope="col">Pts</th>
-                <th scope="col">FG%</th>
-                <th scope="col">FT%</th>
-                <th scope="col">TS%</th>
-                <th scope="col">USG%</th>
-                <th scope="col">Reb</th>
-                <th scope="col">Ast</th>
-                <th scope="col">Stl</th>
-                <th scope="col">Blk</th>
-                <th scope="col">TO</th>
-                <th scope="col">PF</th>
-              </tr>
-            </thead>
-            <tbody>
-              {#each box.lines as line (line.instanceId)}
-                <tr
-                  data-kind={line.kind}
-                  data-negative={line.points < 0}
-                  data-top-scorer={topPoints > 0 && line.points === topPoints}
-                >
-                  <th scope="row" class="hm-player">
-                    <div class="hm-player-identity">
-                      <PlayerArt
-                        playerId={line.sourcePlayerId}
-                        displayName={line.displayName}
-                        compact
-                      />
-                      <div class="hm-player-detail">
-                        <span class="hm-player-name">{line.displayName}</span>
-                        <span class="hm-player-slot">{line.slot}</span>
-                        {#if topPoints > 0 && line.points === topPoints}<span class="hm-top-scorer"
-                            >Top scorer</span
-                          >{/if}
-                      </div>
-                    </div>
-                  </th>
-                  <td class="hm-role">{gamecastBattleParticipantKindLabel(line.kind)}</td>
-                  <td class="hm-pts" data-negative={line.points < 0}>{statOf(line.points)}</td>
-                  <td>{ratioPct(line.fieldGoalsMade, line.fieldGoalsAttempted)}</td>
-                  <td>{ratioPct(line.freeThrowsMade, line.freeThrowsAttempted)}</td>
-                  <td
-                    >{trueShootingPct(
-                      line.points,
-                      line.fieldGoalsAttempted,
-                      line.freeThrowsAttempted,
-                    )}</td
-                  >
-                  <td
-                    >{usagePct(
-                      usagePossessions(
-                        line.fieldGoalsAttempted,
-                        line.freeThrowsAttempted,
-                        line.turnovers,
-                      ),
-                      teamUsage,
-                    )}</td
-                  >
-                  <td>{statOf(line.rebounds)}</td>
-                  <td>{statOf(line.assists)}</td>
-                  <td>{statOf(line.steals)}</td>
-                  <td>{statOf(line.blocks)}</td>
-                  <td>{statOf(line.turnovers)}</td>
-                  <td>{statOf(line.fouls)}</td>
-                </tr>
-              {/each}
-            </tbody>
-          </table>
+        <div class="ui-stats-scroll">
+          <PlayerStatsTable
+            {columns}
+            rows={box.lines}
+            rowKey={(line) => line.instanceId}
+            caption={`${labelOf(box.side)} participant lines`}
+            tableClass="min-w-[38rem]"
+            playerCellClass="ui-stats-player-cell"
+            playerHeadCellClass="ui-stats-player-cell"
+            rowAttributes={(line) => ({
+              'data-kind': line.kind,
+              'data-negative': String(line.points < 0),
+              'data-top-scorer': String(topPoints > 0 && line.points === topPoints),
+            })}
+          >
+            {#snippet identity(line)}
+              <span class="ui-stats-player">
+                <PlayerArt playerId={line.sourcePlayerId} displayName={line.displayName} compact />
+                <span class="ui-stats-player-text">
+                  <span class="ui-stats-player-name">{line.displayName}</span>
+                  <span class="hm-player-slot">{line.slot}</span>
+                  {#if topPoints > 0 && line.points === topPoints}<span class="hm-top-scorer"
+                      >Top scorer</span
+                    >{/if}
+                </span>
+              </span>
+            {/snippet}
+          </PlayerStatsTable>
         </div>
       </section>
     {/each}
@@ -192,6 +198,10 @@
     border: 1px solid var(--box-border);
     border-radius: 16px;
     background: var(--box-card);
+    --ui-stats-line: var(--box-line);
+    --ui-stats-row-line: color-mix(in srgb, var(--box-line) 55%, transparent);
+    --ui-stats-muted: var(--box-muted);
+    --ui-stats-player-width: 13rem;
   }
   .hm-box-head {
     display: flex;
@@ -238,69 +248,18 @@
   .hm-box-score[data-negative='true'] {
     color: var(--box-opponent);
   }
-  .hm-box-scroll {
-    overflow-x: auto;
-    overscroll-behavior-x: contain;
-  }
-  table {
-    width: 100%;
-    min-width: 38rem;
-    border-collapse: collapse;
-    font-size: 12px;
-    font-variant-numeric: tabular-nums;
-  }
-  th,
-  td {
-    padding: 7px 9px;
-    text-align: right;
-    white-space: nowrap;
-  }
-  thead th {
-    font-family: var(--font-mono);
-    font-size: 9px;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--box-muted);
-    border-bottom: 1px solid var(--box-line);
-  }
-  tbody tr {
-    border-top: 1px solid color-mix(in srgb, var(--box-line) 55%, transparent);
-  }
-  tbody tr:first-child {
-    border-top: 0;
-  }
-  tbody tr[data-kind='replacement'] {
+  .hm-box :global(tbody tr[data-kind='replacement']) {
     background: color-mix(in srgb, var(--box-accent) 7%, transparent);
   }
-  tbody tr[data-kind='clone'] {
+  .hm-box :global(tbody tr[data-kind='clone']) {
     background: color-mix(in srgb, var(--box-opponent) 7%, transparent);
   }
-  .hm-player {
-    max-width: 13rem;
-    overflow: hidden;
-    text-align: left;
-  }
-  tbody tr[data-top-scorer='true'] {
+  .hm-box :global(tbody tr[data-top-scorer='true']) {
     background: color-mix(in srgb, var(--box-highlight) 12%, transparent);
   }
   .hm-top-scorer {
     color: var(--box-highlight);
     font-size: 9px;
-  }
-  .hm-player-name {
-    display: block;
-    overflow: hidden;
-    font-weight: 700;
-    text-overflow: ellipsis;
-  }
-  .hm-player-identity {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .hm-player-detail {
-    min-width: 0;
   }
   .hm-player-slot {
     display: block;
@@ -309,19 +268,19 @@
     letter-spacing: 0.1em;
     color: var(--box-muted);
   }
-  .hm-role {
+  .hm-box :global(.hm-role) {
     font-family: var(--font-mono);
     font-size: 9px;
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--box-muted);
   }
-  .hm-pts {
+  .hm-box :global(.hm-pts) {
     font-family: var(--font-display);
     font-size: 15px;
     font-weight: 800;
   }
-  .hm-pts[data-negative='true'] {
+  .hm-box :global(tbody tr[data-negative='true'] .hm-pts) {
     color: var(--box-opponent);
   }
 </style>

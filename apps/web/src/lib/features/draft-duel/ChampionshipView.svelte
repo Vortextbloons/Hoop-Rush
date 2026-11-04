@@ -12,7 +12,8 @@
     TeamResult,
   } from '@hoop-rush/data-contracts';
   import PlayerFace from '#lib/components/PlayerFace.svelte';
-  import SegmentedControl from '#lib/components/ui/SegmentedControl.svelte';
+  import PlayerStatsSection from '#lib/components/basketball/PlayerStatsSection.svelte';
+  import type { PlayerStatColumn } from '#lib/components/player-stats-table.js';
   import { SLOT_LABELS } from '#lib/player-positions.js';
   import {
     perGameText,
@@ -104,6 +105,7 @@
 
   interface PlayerAggregate {
     playerId: PlayerId;
+    slotIndex: number;
     games: number;
     minutes: number;
     points: number;
@@ -122,6 +124,10 @@
 
   let statsSide = $state<'you' | 'opp'>('you');
   let statsTotals = $state(false);
+  const statsSideOptions = [
+    { value: 'you', label: 'You' },
+    { value: 'opp', label: 'Opponent' },
+  ] as const;
 
   const orderedGames = $derived([...games].sort((a, b) => a.gameNumber - b.gameNumber));
   const localWins = $derived(localParticipantId === 'p1' ? series.p1Wins : series.p2Wins);
@@ -279,11 +285,13 @@
     const byPlayerId = new Map<string, PlayerAggregate>();
     const order: string[] = [];
     for (const game of orderedGames) {
-      for (const player of teamOf(game).players) {
+      const team = teamOf(game);
+      for (const [slotIndex, player] of team.players.entries()) {
         let entry = byPlayerId.get(player.playerId);
         if (entry === undefined) {
           entry = {
             playerId: player.playerId,
+            slotIndex,
             games: 0,
             minutes: 0,
             points: 0,
@@ -340,6 +348,72 @@
   function statValue(value: number, gamesPlayed: number): string {
     return statsTotals ? String(value) : (value / Math.max(1, gamesPlayed)).toFixed(1);
   }
+
+  const statsColumns: readonly PlayerStatColumn<PlayerAggregate>[] = [
+    { key: 'games', label: 'GP', value: (row) => row.games },
+    {
+      key: 'minutes',
+      label: 'MIN',
+      value: (row) => statValue(row.minutes, row.games),
+      hideBelow: 'sm',
+    },
+    {
+      key: 'points',
+      label: 'PTS',
+      value: (row) => statValue(row.points, row.games),
+      cellClass: 'ui-stats-value-strong',
+    },
+    { key: 'rebounds', label: 'REB', value: (row) => statValue(row.rebounds, row.games) },
+    { key: 'assists', label: 'AST', value: (row) => statValue(row.assists, row.games) },
+    {
+      key: 'steals',
+      label: 'STL',
+      value: (row) => statValue(row.steals, row.games),
+      hideBelow: 'sm',
+    },
+    {
+      key: 'blocks',
+      label: 'BLK',
+      value: (row) => statValue(row.blocks, row.games),
+      hideBelow: 'sm',
+    },
+    {
+      key: 'turnovers',
+      label: 'TOV',
+      value: (row) => statValue(row.turnovers, row.games),
+      hideBelow: 'sm',
+    },
+    {
+      key: 'fieldGoalPct',
+      label: 'FG',
+      value: (row) => ratioPct(row.fieldGoalMakes, row.fieldGoalAttempts),
+    },
+    {
+      key: 'threePointPct',
+      label: '3P',
+      value: (row) => ratioPct(row.threeMakes, row.threeAttempts),
+    },
+    {
+      key: 'freeThrowPct',
+      label: 'FT',
+      value: (row) => ratioPct(row.freeThrowMakes, row.freeThrowAttempts),
+      hideBelow: 'sm',
+    },
+    {
+      key: 'trueShootingPct',
+      label: 'TS%',
+      value: (row) => trueShootingPct(row.points, row.fieldGoalAttempts, row.freeThrowAttempts),
+    },
+    {
+      key: 'usagePct',
+      label: 'USG%',
+      value: (row) =>
+        usagePct(
+          usagePossessions(row.fieldGoalAttempts, row.freeThrowAttempts, row.turnovers),
+          statsTeamUsage,
+        ),
+    },
+  ];
 
   const recap = $derived.by((): RecapGame[] => {
     const byGame = new Map<number, DraftDuelStandout[]>();
@@ -601,107 +675,42 @@
     {/if}
   </section>
 
-  <section class="player-stats" aria-label="Series player stats">
-    <div class="stats-head">
-      <h3>Series player stats</h3>
-      {#if hasBoxScores}
-        <div class="stats-controls">
-          <SegmentedControl
-            label="Roster"
-            value={statsSide}
-            onchange={(next) => (statsSide = next)}
-            options={[
-              { value: 'you', label: 'You' },
-              { value: 'opp', label: 'Opponent' },
-            ]}
+  <PlayerStatsSection
+    ariaLabel="Series player stats"
+    title="Series player stats"
+    sideOptions={statsSideOptions}
+    side={statsSide}
+    onsidechange={(next) => (statsSide = next)}
+    values={statsTotals ? 'totals' : 'game'}
+    onvalueschange={(next) => (statsTotals = next === 'totals')}
+    rows={hasBoxScores ? statsRows : null}
+    columns={statsColumns}
+    rowKey={(row) => row.playerId}
+    caption={`${statsSide === 'you' ? 'Your five' : 'Opponent five'} series stats`}
+    note={`${statsTotals ? 'Series totals' : 'Per-game averages'} · ${statsRows.length} players`}
+  >
+    {#snippet identity(row)}
+      <span class="ui-stats-player">
+        {#if manifest && cards[row.playerId]?.playerExternalId}
+          <PlayerFace
+            player={faceOf(row.playerId)}
+            {manifest}
+            size="sm"
+            fallbackInitials={initialsOf(nameOf(row.playerId))}
           />
-          <SegmentedControl
-            label="Stat values"
-            value={statsTotals ? 'totals' : 'game'}
-            onchange={(next) => (statsTotals = next === 'totals')}
-            options={[
-              { value: 'game', label: 'Per game' },
-              { value: 'totals', label: 'Totals' },
-            ]}
-          />
-        </div>
-      {/if}
-    </div>
-    {#if hasBoxScores}
-      <div class="stats-scroll">
-        <table class="stats-table">
-          <caption class="sr-only"
-            >{statsSide === 'you' ? 'Your five' : 'Opponent five'} series stats</caption
-          >
-          <thead>
-            <tr>
-              <th scope="col" class="is-player">Player</th>
-              <th scope="col">GP</th>
-              <th scope="col">MIN</th>
-              <th scope="col">PTS</th>
-              <th scope="col">REB</th>
-              <th scope="col">AST</th>
-              <th scope="col">STL</th>
-              <th scope="col">BLK</th>
-              <th scope="col">TOV</th>
-              <th scope="col">FG</th>
-              <th scope="col">3P</th>
-              <th scope="col">FT</th>
-              <th scope="col">TS%</th>
-              <th scope="col">USG%</th>
-            </tr>
-          </thead>
-          <tbody>
-            {#each statsRows as row, slotIndex (row.playerId)}
-              <tr>
-                <th scope="row" class="is-player">
-                  <span class="player-cell">
-                    {#if manifest && cards[row.playerId]?.playerExternalId}
-                      <PlayerFace
-                        player={faceOf(row.playerId)}
-                        {manifest}
-                        size="sm"
-                        fallbackInitials={initialsOf(nameOf(row.playerId))}
-                      />
-                    {:else}
-                      <span class="player-fallback sm">{initialsOf(nameOf(row.playerId))}</span>
-                    {/if}
-                    <span class="player-text">
-                      <span class="player-name">{nameOf(row.playerId)}</span>
-                      <span class="player-pos">{SLOT_LABELS[slotIndex] ?? ''}</span>
-                    </span>
-                  </span>
-                </th>
-                <td>{row.games}</td>
-                <td>{statValue(row.minutes, row.games)}</td>
-                <td class="is-points">{statValue(row.points, row.games)}</td>
-                <td>{statValue(row.rebounds, row.games)}</td>
-                <td>{statValue(row.assists, row.games)}</td>
-                <td>{statValue(row.steals, row.games)}</td>
-                <td>{statValue(row.blocks, row.games)}</td>
-                <td>{statValue(row.turnovers, row.games)}</td>
-                <td>{ratioPct(row.fieldGoalMakes, row.fieldGoalAttempts)}</td>
-                <td>{ratioPct(row.threeMakes, row.threeAttempts)}</td>
-                <td>{ratioPct(row.freeThrowMakes, row.freeThrowAttempts)}</td>
-                <td>{trueShootingPct(row.points, row.fieldGoalAttempts, row.freeThrowAttempts)}</td>
-                <td
-                  >{usagePct(
-                    usagePossessions(row.fieldGoalAttempts, row.freeThrowAttempts, row.turnovers),
-                    statsTeamUsage,
-                  )}</td
-                >
-              </tr>
-            {/each}
-          </tbody>
-        </table>
-      </div>
-      <p class="panel-note">
-        {statsTotals ? 'Series totals' : 'Per-game averages'} · {statsRows.length} players
-      </p>
-    {:else}
-      <p class="mvp-empty">Box scores are not available on this device.</p>
-    {/if}
-  </section>
+        {:else}
+          <span class="ui-stats-player-fallback">{initialsOf(nameOf(row.playerId))}</span>
+        {/if}
+        <span class="ui-stats-player-text">
+          <span class="ui-stats-player-name">{nameOf(row.playerId)}</span>
+          <span class="ui-stats-player-meta">{SLOT_LABELS[row.slotIndex] ?? ''}</span>
+        </span>
+      </span>
+    {/snippet}
+    {#snippet empty()}
+      <p class="ui-stats-empty">Box scores are not available on this device.</p>
+    {/snippet}
+  </PlayerStatsSection>
 
   <section class="recap" aria-label="Game recaps">
     <h3>Game recaps</h3>
@@ -871,7 +880,6 @@
   .mvp,
   .comparison,
   .leaders,
-  .player-stats,
   .recap,
   .rematch {
     padding: 0.85rem 1rem;
@@ -1108,106 +1116,6 @@
     color: var(--color-muted-foreground);
   }
 
-  .stats-head {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem 0.75rem;
-  }
-
-  .stats-controls {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem;
-  }
-
-  .stats-scroll {
-    margin-top: 0.55rem;
-    overflow-x: auto;
-  }
-
-  .stats-table {
-    width: 100%;
-    min-width: 38rem;
-    border-collapse: collapse;
-    font-size: 0.72rem;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .stats-table th,
-  .stats-table td {
-    padding: 0.32rem 0.42rem;
-    text-align: right;
-  }
-
-  .stats-table thead th {
-    border-bottom: 1px solid var(--color-line-soft);
-    color: var(--color-muted-foreground);
-    font-family: var(--font-mono);
-    font-size: 0.56rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-  }
-
-  .stats-table tbody tr {
-    border-top: 1px solid color-mix(in srgb, var(--color-line-soft) 55%, transparent);
-  }
-
-  .stats-table tbody tr:first-child {
-    border-top: 0;
-  }
-
-  .stats-table .is-player {
-    width: 100%;
-    max-width: 11rem;
-    overflow: hidden;
-    text-align: left;
-    text-overflow: ellipsis;
-  }
-
-  .stats-table tbody th.is-player {
-    font-weight: 600;
-  }
-
-  .stats-table .is-points {
-    color: var(--color-foreground);
-    font-weight: 800;
-  }
-
-  .player-cell {
-    display: flex;
-    min-width: 0;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
-  .player-text {
-    display: flex;
-    min-width: 0;
-    flex-direction: column;
-    gap: 0.05rem;
-  }
-
-  .player-name {
-    overflow: hidden;
-    font-family: var(--font-display);
-    font-size: 0.88rem;
-    font-weight: 800;
-    line-height: 1.05;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .player-pos {
-    font-family: var(--font-mono);
-    font-size: 0.5rem;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--color-muted-foreground);
-  }
-
   .recap-list {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
@@ -1400,7 +1308,6 @@
     .mvp,
     .comparison,
     .leaders,
-    .player-stats,
     .recap,
     .rematch {
       padding: 0.7rem 0.75rem;
@@ -1494,61 +1401,6 @@
     .leader-value {
       font-size: 0.64rem;
     }
-    .stats-head {
-      align-items: stretch;
-      flex-direction: column;
-    }
-    .stats-controls {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      width: 100%;
-    }
-    .stats-controls :global(.ui-segmented) {
-      min-width: 0;
-    }
-    .stats-controls :global(.ui-segmented button) {
-      flex: 1;
-      min-height: 2.25rem;
-      min-width: 0;
-      padding: 0.35rem 0.4rem;
-      font-size: 0.6rem;
-      touch-action: manipulation;
-    }
-    .stats-scroll {
-      margin-inline: -0.25rem;
-      padding-inline: 0.25rem;
-      -webkit-overflow-scrolling: touch;
-      scrollbar-width: thin;
-    }
-    .stats-table {
-      min-width: 0;
-      font-size: 0.68rem;
-    }
-    .stats-table th,
-    .stats-table td {
-      padding: 0.28rem 0.3rem;
-    }
-    .stats-table th:nth-child(3),
-    .stats-table td:nth-child(3),
-    .stats-table th:nth-child(7),
-    .stats-table td:nth-child(7),
-    .stats-table th:nth-child(8),
-    .stats-table td:nth-child(8),
-    .stats-table th:nth-child(9),
-    .stats-table td:nth-child(9),
-    .stats-table th:nth-child(12),
-    .stats-table td:nth-child(12) {
-      display: none;
-    }
-    .stats-table .is-player {
-      max-width: 8.5rem;
-    }
-    .player-cell {
-      gap: 0.4rem;
-    }
-    .player-name {
-      font-size: 0.8rem;
-    }
     .recap-list {
       grid-template-columns: 1fr;
       gap: 0.5rem;
@@ -1588,9 +1440,6 @@
     }
     .leader-cell {
       padding: 0.4rem;
-    }
-    .stats-controls {
-      grid-template-columns: 1fr;
     }
   }
 </style>
