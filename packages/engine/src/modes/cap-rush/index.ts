@@ -6,6 +6,7 @@ export * from './apron-runtime.ts';
 export * from './input.ts';
 export * from './league-schedule.ts';
 export * from './league-simulation.ts';
+export * from './league-aggregate.ts';
 export * from './conference-standings.ts';
 export * from './conference-postseason.ts';
 export * from './lock.ts';

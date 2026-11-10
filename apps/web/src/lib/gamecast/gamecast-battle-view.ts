@@ -1,6 +1,7 @@
 import type {
   HavocBattleEvent,
   HavocBattleResult,
+  HavocBattleScoringEntry,
   HavocHomeAway,
   HavocParticipantLine,
   HavocParticipantKind,
@@ -175,53 +176,117 @@ export function gamecastBattleLiveBoxes(
   result: Pick<HavocBattleResult, 'home' | 'away'>,
   visible: GamecastBattleVisibleState,
 ): GamecastBattleSideBox[] {
-  const lines = new Map<HavocHomeAway, Map<string, GamecastBattleParticipantLine>>();
-  const bonuses = new Map<HavocHomeAway, number>();
-  for (const side of SIDES) {
-    const sideLines = new Map<string, GamecastBattleParticipantLine>();
-    for (const participant of result[side].participants) {
-      sideLines.set(participant.instanceId, blankLine(participant));
+  return gamecastBattleLiveBoxFold(result).boxesAt(visible);
+}
+
+export interface GamecastBattleLiveBoxFold {
+  boxesAt(visible: GamecastBattleVisibleState): GamecastBattleSideBox[];
+}
+
+type SideLines = Map<HavocHomeAway, Map<string, GamecastBattleParticipantLine>>;
+
+/**
+ * Incremental live-box fold.
+ *
+ * The visible state exposes its events and scoring as arrays the playback fold
+ * grows in place, so each frame can fold only the newly revealed entries. A
+ * backward seek rebuilds those arrays, which the identity check below treats as
+ * a reset; the result stays identical to folding the whole window from zero.
+ */
+class LiveBoxFolder implements GamecastBattleLiveBoxFold {
+  private readonly result: Pick<HavocBattleResult, 'home' | 'away'>;
+  private lines: SideLines | null = null;
+  private bonuses = new Map<HavocHomeAway, number>();
+  private eventsRef: readonly HavocBattleEvent[] | null = null;
+  private scoringRef: readonly HavocBattleScoringEntry[] | null = null;
+  private foldedEvents = 0;
+  private foldedScoring = 0;
+
+  constructor(result: Pick<HavocBattleResult, 'home' | 'away'>) {
+    this.result = result;
+  }
+
+  private reset(): void {
+    const lines: SideLines = new Map();
+    for (const side of SIDES) {
+      const sideLines = new Map<string, GamecastBattleParticipantLine>();
+      for (const participant of this.result[side].participants) {
+        sideLines.set(participant.instanceId, blankLine(participant));
+      }
+      lines.set(side, sideLines);
     }
-    lines.set(side, sideLines);
-    bonuses.set(side, 0);
+    this.lines = lines;
+    this.bonuses = new Map();
+    this.foldedEvents = 0;
+    this.foldedScoring = 0;
   }
-  const resolve =
-    (side: HavocHomeAway) =>
-    (instanceId: string): GamecastBattleParticipantLine => {
-      const sideLines = lines.get(side);
-      if (!sideLines) return fallbackLine(instanceId);
-      const existing = sideLines.get(instanceId);
-      if (existing) return existing;
-      const created = fallbackLine(instanceId);
-      sideLines.set(instanceId, created);
-      return created;
-    };
-  for (const event of visible.events) {
-    const side = eventSideOf(event);
-    if (side === null) continue;
-    foldEventInto(resolve(side), event);
-  }
-  for (const entry of visible.scoring) {
-    if (entry.kind === 'bonus') {
-      bonuses.set(entry.side, (bonuses.get(entry.side) ?? 0) + entry.points);
-      continue;
+
+  boxesAt(visible: GamecastBattleVisibleState): GamecastBattleSideBox[] {
+    if (
+      this.lines === null ||
+      this.eventsRef !== visible.events ||
+      this.scoringRef !== visible.scoring
+    ) {
+      this.reset();
+      this.eventsRef = visible.events;
+      this.scoringRef = visible.scoring;
     }
-    const line = resolve(entry.side)(entry.actorInstanceId);
-    line.points += entry.points;
-    line.adjustments += entry.points - entry.nominalPoints;
+    const lines = this.lines;
+    if (lines === null) return [];
+    const resolve =
+      (side: HavocHomeAway) =>
+      (instanceId: string): GamecastBattleParticipantLine => {
+        const sideLines = lines.get(side);
+        if (!sideLines) return fallbackLine(instanceId);
+        const existing = sideLines.get(instanceId);
+        if (existing) return existing;
+        const created = fallbackLine(instanceId);
+        sideLines.set(instanceId, created);
+        return created;
+      };
+    for (let index = this.foldedEvents; index < visible.events.length; index += 1) {
+      const event = visible.events[index];
+      if (event === undefined) continue;
+      const side = eventSideOf(event);
+      if (side === null) continue;
+      foldEventInto(resolve(side), event);
+    }
+    this.foldedEvents = visible.events.length;
+    for (let index = this.foldedScoring; index < visible.scoring.length; index += 1) {
+      const entry = visible.scoring[index];
+      if (entry === undefined) continue;
+      if (entry.kind === 'bonus') {
+        this.bonuses.set(entry.side, (this.bonuses.get(entry.side) ?? 0) + entry.points);
+        continue;
+      }
+      const line = resolve(entry.side)(entry.actorInstanceId);
+      line.points += entry.points;
+      line.adjustments += entry.points - entry.nominalPoints;
+    }
+    this.foldedScoring = visible.scoring.length;
+    return SIDES.map((side) => {
+      const team = this.result[side];
+      const visibleScore = side === 'home' ? visible.homeScore : visible.awayScore;
+      const bonus = this.bonuses.get(side) ?? 0;
+      return {
+        side,
+        displayName: team.displayName,
+        score: visibleScore + bonus,
+        bonusPoints: bonus,
+        lines: [...(lines.get(side)?.values() ?? [])],
+      };
+    });
   }
-  return SIDES.map((side) => {
-    const team = result[side];
-    const visibleScore = side === 'home' ? visible.homeScore : visible.awayScore;
-    const bonus = bonuses.get(side) ?? 0;
-    return {
-      side,
-      displayName: team.displayName,
-      score: visibleScore + bonus,
-      bonusPoints: bonus,
-      lines: [...(lines.get(side)?.values() ?? [])],
-    };
-  });
+}
+
+/**
+ * Create a resettable fold cursor for live boxes. Reuse one per broadcast so
+ * each frame processes only newly revealed playback items.
+ */
+export function gamecastBattleLiveBoxFold(
+  result: Pick<HavocBattleResult, 'home' | 'away'>,
+): GamecastBattleLiveBoxFold {
+  return new LiveBoxFolder(result);
 }
 
 /** Final box lines copied from the completed result, including negative participant totals. */

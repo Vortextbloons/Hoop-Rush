@@ -10,11 +10,11 @@
   import { capRushPlaybackItems } from './cap-rush-playback.js';
   import type { CapRushSeasonController } from './cap-rush-season-state.svelte.js';
   import {
-    gamecastBattleVisibleState,
+    gamecastBattlePlaybackFold,
     type GamecastBattlePlaybackItem,
   } from '#lib/gamecast/gamecast-battle-playback.js';
   import {
-    gamecastBattleLiveBoxes,
+    gamecastBattleLiveBoxFold,
     gamecastBattleFinalBoxes,
   } from '#lib/gamecast/gamecast-battle-view.js';
   import GamecastBattleBox from '#lib/gamecast/GamecastBattleBox.svelte';
@@ -46,14 +46,26 @@
   });
   const cursor = $derived(playback?.evidence.cursor ?? 0);
   const finished = $derived(cursor === items.length);
-  const visible = $derived(gamecastBattleVisibleState(items, cursor));
-  const boxes = $derived(
-    playback === null
-      ? []
-      : finished
-        ? gamecastBattleFinalBoxes(playback.result)
-        : gamecastBattleLiveBoxes(playback.result, visible),
-  );
+  let foldItems: GamecastBattlePlaybackItem[] | null = null;
+  let foldCursor = gamecastBattlePlaybackFold([]);
+  const visible = $derived.by(() => {
+    if (foldItems !== items) {
+      foldItems = items;
+      foldCursor = gamecastBattlePlaybackFold(items);
+    }
+    return foldCursor.visibleAt(cursor);
+  });
+  let boxResult: object | null = null;
+  let boxFold: ReturnType<typeof gamecastBattleLiveBoxFold> | null = null;
+  const boxes = $derived.by(() => {
+    if (playback === null) return [];
+    if (finished) return gamecastBattleFinalBoxes(playback.result);
+    if (boxResult !== playback.result || boxFold === null) {
+      boxResult = playback.result;
+      boxFold = gamecastBattleLiveBoxFold(playback.result);
+    }
+    return boxFold.boxesAt(visible);
+  });
   const names = $derived(
     new Map(
       playback === null

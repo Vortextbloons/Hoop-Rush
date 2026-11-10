@@ -53,6 +53,8 @@ function auditedFindings(
     battle.battleInput,
     battle.simulation.result,
     battle.simulation.tape,
+    // The simulator validated this result and computed its input digest.
+    { inputDigest: battle.simulation.result.inputDigest, resultValidated: true },
   );
   return [...auditHavocSoloIdentity(battle.input, result), ...battleAudit.findings];
 }
@@ -75,7 +77,6 @@ export function simulateAuditedHavocGame(
 }
 
 /**
- * Same simulation and audits as {@link simulateAuditedHavocGame} without the
  * solo tape relabel. Bulk season simulation does not deliver a tape, so this
  * avoids allocating one per game while keeping every accounting guarantee.
  * Replayable tapes come from the recorded path, which replays the same seed.

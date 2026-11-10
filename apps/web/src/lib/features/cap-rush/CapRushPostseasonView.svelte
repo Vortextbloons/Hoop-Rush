@@ -4,6 +4,7 @@
     capRushConferenceStandingsEntries,
     capRushConferenceRoundName,
     type CapRushBoxScore as CapRushBoxScoreData,
+    type CapRushLeagueResult,
     type CapRushPlayoffSeries,
     type CapRushStoredPlayoffGame,
   } from '@hoop-rush/data-contracts';
@@ -88,6 +89,29 @@
   let reviewingSeason = $state(false);
   let selectedTeamId = $state<string | null>(null);
   let selectedBox = $state<{ label: string; box: CapRushBoxScoreData } | null>(null);
+  let boxLoading = $state(false);
+
+  /**
+   * League boxes are not part of the compact schedule results, so open one by
+   * reading that single game instead of loading every stored box.
+   */
+  async function openLeagueBox(game: CapRushLeagueResult): Promise<void> {
+    const runId = view.draft.runId;
+    selectedTeamId = null;
+    boxLoading = true;
+    try {
+      const stored = await controller.readLeagueGame(runId, game.gameId);
+      if (stored === null) {
+        controller.error = 'That league box score is no longer stored.';
+        return;
+      }
+      selectedBox = { label: `League game · Slot ${game.slot}`, box: stored.box };
+    } catch (error) {
+      controller.error = error instanceof Error ? error.message : 'the box score could not load';
+    } finally {
+      boxLoading = false;
+    }
+  }
 
   const roundName = capRushConferenceRoundName;
 
@@ -606,11 +630,7 @@
       leagueGames={controller.leagueGames}
       {art}
       onGameSelect={(game) => {
-        selectedTeamId = null;
-        selectedBox = {
-          label: `League game · Slot ${game.slot}`,
-          box: game.box,
-        };
+        void openLeagueBox(game);
       }}
     />
   {/if}
@@ -637,6 +657,9 @@
     <CapRushBoxScore box={selectedBox.box} label={selectedBox.label} {userTeamId} />
   {/if}
 </DialogShell>
+{#if boxLoading}
+  <p class="sr-only" role="status">Loading box score</p>
+{/if}
 
 <style>
   .cap-rush-broadcast {

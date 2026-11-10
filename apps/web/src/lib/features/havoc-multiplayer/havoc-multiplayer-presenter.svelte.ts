@@ -27,11 +27,14 @@ import type {
 import { createHavocMultiplayerSession } from './havoc-multiplayer-session';
 import type { RoomConnection } from '@hoop-rush/application/multiplayer';
 import {
+  gamecastBattleFeedCursor,
   gamecastBattleFeedLines,
+  gamecastBattlePlaybackFold,
   gamecastBattlePlaybackItems,
   gamecastBattleVisibleItemCount,
-  gamecastBattleVisibleState,
+  type GamecastBattleFeedCursor,
   type GamecastBattleFeedLine,
+  type GamecastBattlePlaybackItem,
   type GamecastBattleVisibleState,
 } from '#lib/gamecast/gamecast-battle-playback.js';
 import {
@@ -132,14 +135,26 @@ export class HavocMultiplayerPresenter {
   visibleCount = $derived(
     this.currentOutput ? gamecastBattleVisibleItemCount(this.playbackItems, this.progress) : 0,
   );
-  visible = $derived.by<GamecastBattleVisibleState | null>(() =>
-    this.currentOutput ? gamecastBattleVisibleState(this.playbackItems, this.visibleCount) : null,
-  );
-  feed = $derived.by<GamecastBattleFeedLine[]>(() =>
-    this.currentOutput
-      ? gamecastBattleFeedLines(this.currentOutput, this.playbackItems, this.visibleCount)
-      : [],
-  );
+  private foldItems: readonly GamecastBattlePlaybackItem[] | null = null;
+  private visibleFold = gamecastBattlePlaybackFold([]);
+  visible = $derived.by<GamecastBattleVisibleState | null>(() => {
+    if (!this.currentOutput) return null;
+    if (this.foldItems !== this.playbackItems) {
+      this.foldItems = this.playbackItems;
+      this.visibleFold = gamecastBattlePlaybackFold(this.playbackItems);
+    }
+    return this.visibleFold.visibleAt(this.visibleCount);
+  });
+  private feedItems: readonly GamecastBattlePlaybackItem[] | null = null;
+  private feedCursor: GamecastBattleFeedCursor | null = null;
+  feed = $derived.by<GamecastBattleFeedLine[]>(() => {
+    if (!this.currentOutput) return [];
+    if (this.feedItems !== this.playbackItems) {
+      this.feedItems = this.playbackItems;
+      this.feedCursor = gamecastBattleFeedCursor(this.currentOutput, this.playbackItems);
+    }
+    return this.feedCursor?.linesAt(this.visibleCount) ?? [];
+  });
   activeTurn = $derived(
     this.phase === 'drafting' &&
       this.draft?.status === 'drafting' &&

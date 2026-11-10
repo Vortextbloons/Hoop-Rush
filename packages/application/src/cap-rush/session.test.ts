@@ -5,7 +5,9 @@ import type {
   CapRushCommandResult,
   CapRushDraftState,
   CapRushHistoryEntry,
+  CapRushLeagueAggregate,
   CapRushLeagueGame,
+  CapRushLeagueResult,
   CapRushLockedInputs,
   CapRushReport,
   CapRushStoredGame,
@@ -20,6 +22,7 @@ import {
   CAP_RUSH_SCHEMA_VERSION,
   CAP_RUSH_SEED_DERIVATION_VERSION,
   POSITIONS,
+  capRushLeagueResultOf,
   capRushVersionSetSchema,
   commandIdSchema,
   contentHashSchema,
@@ -32,6 +35,8 @@ import {
   adaptCapRushCatalog,
   buildCapRushCatalogIndex,
   buildCapRushConferenceStandings,
+  capRushEmptyLeagueAggregate,
+  capRushFoldLeagueAggregate,
   capRushLeagueFieldOfLocked,
   capRushStoredGameOf,
   capRushUserLeagueGameOf,
@@ -95,8 +100,18 @@ class MemoryCapRushRepository implements CapRushDraftRepositoryPort {
     return [...(this.playoffGames.get(runId) ?? [])];
   }
 
-  async listLeagueGames(runId: string): Promise<CapRushLeagueGame[]> {
-    return [...(this.leagueGames.get(runId) ?? [])];
+  async listLeagueResults(runId: string): Promise<CapRushLeagueResult[]> {
+    return (this.leagueGames.get(runId) ?? []).map((game) => capRushLeagueResultOf(game));
+  }
+
+  async readLeagueGame(runId: string, gameId: string): Promise<CapRushLeagueGame | null> {
+    return (this.leagueGames.get(runId) ?? []).find((game) => game.gameId === gameId) ?? null;
+  }
+
+  async readLeagueAggregate(runId: string): Promise<CapRushLeagueAggregate | null> {
+    const games = this.leagueGames.get(runId) ?? [];
+    if (games.length === 0) return null;
+    return capRushFoldLeagueAggregate(capRushEmptyLeagueAggregate(), games);
   }
 
   async saveReport(report: CapRushReport): Promise<void> {
@@ -599,7 +614,7 @@ describe('cap rush session', () => {
     const slotGames = simulateCapRushLeagueSlot({ locked, slot: 1, context });
     await session.acceptLeagueGames(1, slotGames);
     expect(session.getSnapshot().draft?.season?.leagueGamesAccepted).toBe(slotGames.length);
-    expect(await session.listLeagueGames(locked.runId)).toHaveLength(slotGames.length);
+    expect(await session.listLeagueResults(locked.runId)).toHaveLength(slotGames.length);
 
     await expect(session.acceptLeagueGames(1, slotGames)).rejects.toBeInstanceOf(
       CapRushServiceError,

@@ -4,7 +4,9 @@ import type {
   CapRushConferenceStandings,
   CapRushDraftState,
   CapRushHistoryEntry,
+  CapRushLeagueAggregate,
   CapRushLeagueGame,
+  CapRushLeagueResult,
   CapRushReport,
   CapRushSpinPurchaseId,
   CapRushStoredGame,
@@ -45,6 +47,7 @@ import {
   buildCapRushCatalogIndex,
   capRushAssessSigning,
   capRushConferencePostseasonStep,
+  capRushEmptyLeagueAggregate,
   capRushPayrollStatus,
   capRushReport,
   capRushSpinEligibility,
@@ -284,7 +287,9 @@ export class CapRushSession implements CapRushService {
           isolations: game.isolations,
           strikes: game.strikes,
           summary: game.summary,
-          ...(game.leagueGames === undefined ? {} : { leagueGames: game.leagueGames }),
+          ...(game.leagueGames === undefined
+            ? {}
+            : { leagueGameIds: game.leagueGames.map((entry) => entry.gameId) }),
         }),
       {
         game: game.stored,
@@ -302,7 +307,7 @@ export class CapRushSession implements CapRushService {
           runId: state.runId,
           expectedRevision: state.revision,
           slot,
-          leagueGames,
+          leagueGameIds: leagueGames.map((game) => game.gameId),
         }),
       { leagueGames },
     );
@@ -350,7 +355,7 @@ export class CapRushSession implements CapRushService {
       apronTriggers: state.season.apronTriggers,
       ...(state.locked.leagueSchedule === undefined
         ? {}
-        : { leagueGames: await this.repository.listLeagueGames(state.runId) }),
+        : { leagueAggregate: await this.leagueAggregateOf(state.runId) }),
     });
     await this.dispatch(
       (current) =>
@@ -471,7 +476,7 @@ export class CapRushSession implements CapRushService {
       postseason: state.postseason,
       ...(state.locked.leagueSchedule === undefined
         ? {}
-        : { leagueGames: await this.repository.listLeagueGames(state.runId) }),
+        : { leagueAggregate: await this.leagueAggregateOf(state.runId) }),
     });
   }
 
@@ -507,12 +512,24 @@ export class CapRushSession implements CapRushService {
     }
   }
 
-  async listLeagueGames(runId: string): Promise<readonly CapRushLeagueGame[]> {
+  async listLeagueResults(runId: string): Promise<readonly CapRushLeagueResult[]> {
     try {
-      return await this.repository.listLeagueGames(runId);
+      return await this.repository.listLeagueResults(runId);
     } catch (error) {
       throw new CapRushServiceError('storage', messageOf(error));
     }
+  }
+
+  async readLeagueGame(runId: string, gameId: string): Promise<CapRushLeagueGame | null> {
+    try {
+      return await this.repository.readLeagueGame(runId, gameId);
+    } catch (error) {
+      throw new CapRushServiceError('storage', messageOf(error));
+    }
+  }
+
+  private async leagueAggregateOf(runId: string): Promise<CapRushLeagueAggregate> {
+    return (await this.repository.readLeagueAggregate(runId)) ?? capRushEmptyLeagueAggregate();
   }
 
   async abandonDraft(): Promise<void> {

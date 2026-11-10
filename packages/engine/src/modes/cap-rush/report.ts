@@ -1,5 +1,6 @@
 import type {
   CapRushBoxParticipant,
+  CapRushLeagueAggregate,
   CapRushLeagueGame,
   CapRushLockedInputs,
   CapRushMvpEntry,
@@ -24,6 +25,7 @@ import {
   POSITIONS,
   capRushReportSchema,
   capRushConferenceStandingsEntries,
+  franchiseIdSchema,
   playerIdSchema,
 } from '@hoop-rush/data-contracts';
 import {
@@ -167,6 +169,7 @@ export function capRushLeagueMvp(input: {
   readonly locked: Pick<CapRushLockedInputs, 'human' | 'opponents'>;
   readonly games: readonly CapRushStoredGame[];
   readonly leagueGames?: readonly CapRushLeagueGame[] | undefined;
+  readonly leagueAggregate?: CapRushLeagueAggregate | undefined;
 }): CapRushLeagueBaseline {
   const totals = new Map<string, LeaguePlayerTotals>();
   const names = new Map<string, string>();
@@ -199,7 +202,32 @@ export function capRushLeagueMvp(input: {
     }
   };
 
-  if (input.leagueGames !== undefined) {
+  if (input.leagueAggregate !== undefined) {
+    for (const team of input.leagueAggregate.teams) {
+      teamNames.set(team.teamId, team.displayName);
+    }
+    for (const player of input.leagueAggregate.players) {
+      const key = `${player.teamId}:${player.playerId}`;
+      totals.set(key, {
+        playerId: playerIdSchema.parse(player.playerId),
+        teamId: franchiseIdSchema.parse(player.teamId),
+        games: player.games,
+        totalValueBase: player.totalValueBase,
+        totalValueBaseSquared: player.totalValueBaseSquared,
+        totalShots: player.totalShots,
+        totalShotsSquared: player.totalShotsSquared,
+        totalValueShots: player.totalValueShots,
+        totalPoints: player.totalPoints,
+        totalRebounds: player.totalRebounds,
+        totalAssists: player.totalAssists,
+        totalSteals: player.totalSteals,
+        totalBlocks: player.totalBlocks,
+        totalGameScore: player.totalGameScore,
+        totalTrueShooting: player.totalTrueShooting,
+      });
+      names.set(key, player.displayName);
+    }
+  } else if (input.leagueGames !== undefined) {
     for (const game of input.leagueGames) {
       foldLeagueBox({
         box: game.box.home,
@@ -399,6 +427,7 @@ export function capRushReport(input: {
   readonly apronTriggers: { readonly isolations: number; readonly strikes: number };
   readonly postseason?: CapRushPostseason | null | undefined;
   readonly leagueGames?: readonly CapRushLeagueGame[] | undefined;
+  readonly leagueAggregate?: CapRushLeagueAggregate | undefined;
 }): CapRushReport {
   if (input.games.length !== CAP_RUSH_GAME_COUNT) {
     throw new Error(
@@ -415,6 +444,7 @@ export function capRushReport(input: {
     locked: input.locked,
     games: input.games,
     leagueGames: input.leagueGames,
+    leagueAggregate: input.leagueAggregate,
   });
   return capRushReportSchema.parse({
     reportVersion: CAP_RUSH_REPORT_VERSION,
@@ -470,7 +500,7 @@ export function capRushReport(input: {
       : {
           leagueFormat: CAP_RUSH_LEAGUE_VERSION,
           franchise: input.locked.franchise,
-          leagueGamesAccepted: input.leagueGames?.length ?? 0,
+          leagueGamesAccepted: input.leagueGames?.length ?? input.leagueAggregate?.games ?? 0,
         }),
     ...(input.postseason === undefined || input.postseason === null
       ? {}
