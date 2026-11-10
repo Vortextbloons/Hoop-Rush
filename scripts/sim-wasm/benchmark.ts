@@ -4,7 +4,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { deepStrictEqual } from 'node:assert';
-import { createEngineContext, simulateGame } from '../../packages/engine/src/index.ts';
+import { createEngineContext } from '../../packages/engine/src/index.ts';
+import { simulateGame } from '../../packages/engine/src/archive/code/sim/game.ts';
 import {
   createRng,
   fnv1a32,

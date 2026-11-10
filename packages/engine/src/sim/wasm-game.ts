@@ -19,6 +19,11 @@ import {
 } from './usage.ts';
 import { SHOT_ZONES } from '../domain/zones.ts';
 
+function required<T>(value: T | undefined): T {
+  if (value === undefined) throw new Error('simulation: incomplete Wasm preparation or output');
+  return value;
+}
+
 export interface GameWasm {
   memory: WebAssembly.Memory;
   input_ptr(): number;
@@ -120,9 +125,9 @@ export function prepareWasmGame(input: GameSimulationInput, injectedRng = false)
     data.push(value.total, ...value.weights);
   };
   teams.forEach((team, side) => {
-    const prep = preps[side]!;
-    const defense = teams[1 - side]!;
-    const defensive = preps[1 - side]!;
+    const prep = required(preps[side]);
+    const defense = required(teams[1 - side]);
+    const defensive = required(preps[1 - side]);
     table(prep.initiatorPickTable, team.players);
     table(prep.foulerPickTable, team.players);
     table(prep.stealerPickTable, team.players);
@@ -159,14 +164,14 @@ export function prepareWasmGame(input: GameSimulationInput, injectedRng = false)
       );
     for (const player of team.players)
       for (const start of starts)
-        table(prep.actionPickTables.get(prep.keyOf(player))!.byStart[start], ACTION_TYPES);
-    for (const player of team.players) data.push(...prep.passP.get(prep.keyOf(player))!);
+        table(required(prep.actionPickTables.get(prep.keyOf(player))).byStart[start], ACTION_TYPES);
+    for (const player of team.players) data.push(...required(prep.passP.get(prep.keyOf(player))));
     for (const player of team.players)
-      for (const shot of prep.teammateShots.get(prep.keyOf(player))!.byAction)
+      for (const shot of required(prep.teammateShots.get(prep.keyOf(player))).byAction)
         table(shot.pickTable, shot.teammates);
     for (const player of team.players)
       for (const action of ACTION_TYPES)
-        table(prep.zonePrep.get(prep.keyOf(player))!.actionPickTables[action], SHOT_ZONES);
+        table(required(prep.zonePrep.get(prep.keyOf(player))).actionPickTables[action], SHOT_ZONES);
     for (const tables of defensive.defenderBase.pickTables)
       for (const value of tables) table(value, defense.players);
     for (const shooter of team.players)
@@ -254,23 +259,26 @@ export function simulateWasmGame(
     external ? 1 : 0,
     observers,
   );
-  if (status !== 0) throw new Error(`Wasm simulation failed: ${status}`);
+  if (status !== 0) throw new Error(`Wasm simulation failed: ${String(status)}`);
   const output = new Float64Array(wasm.memory.buffer, wasm.output_ptr(), 481);
-  const periods = output[0]!;
+  const periods = required(output[0]);
   const recorder = new GameRecorder();
   let cursor = 1;
   for (const side of [0, 1] as const) {
     for (let index = 0; index < 6; index++) {
-      const target = index === 0 ? recorder.sides[side] : recorder.players[side][index - 1]!;
+      const target =
+        index === 0 ? recorder.sides[side] : required(recorder.players[side][index - 1]);
       for (let fieldIndex = 0; fieldIndex < fields.length; fieldIndex++) {
-        const field = fields[fieldIndex]!;
+        const field = required(fields[fieldIndex]);
         if (field in target)
-          (target as unknown as Record<string, number>)[field] = output[cursor + fieldIndex]!;
+          (target as unknown as Record<string, number>)[field] = required(
+            output[cursor + fieldIndex],
+          );
       }
       for (let i = 0; i < SHOT_ZONES.length; i++) {
-        const zone = SHOT_ZONES[i]!;
-        target.zoneAttempts[zone] = output[cursor + 25 + i]!;
-        target.zoneMakes[zone] = output[cursor + 30 + i]!;
+        const zone = required(SHOT_ZONES[i]);
+        target.zoneAttempts[zone] = required(output[cursor + 25 + i]);
+        target.zoneMakes[zone] = required(output[cursor + 30 + i]);
       }
       cursor += 35;
     }

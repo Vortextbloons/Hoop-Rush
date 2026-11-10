@@ -1,15 +1,7 @@
 import { deepStrictEqual } from 'node:assert';
-import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir, cpus } from 'node:os';
-import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import {
-  checkGameResult,
-  createEngineContext,
-  createGameBatchSimulator,
-  simulateGame,
-} from '../../packages/engine/src/index.ts';
+import { writeFileSync } from 'node:fs';
+import { cpus } from 'node:os';
+import { checkGameResult, createEngineContext } from '../../packages/engine/src/index.ts';
 import {
   buildInput,
   fixtureSeed,
@@ -18,37 +10,19 @@ import {
 } from '../../tools/cli/src/commands/sim.ts';
 import { loadPackagedData, PackagedData } from '../../tools/cli/src/commands/data-loader.ts';
 import { leagueAverageTeam, poolStrengthLineups } from '../../tools/cli/src/commands/calibrate.ts';
-import { prepareWasmGame, simulateWasmGame, type GameWasm } from './game.ts';
+import { prepareWasmGame, simulateWasmGame } from '../../packages/engine/src/sim/wasm-game.ts';
+import {
+  createGameBatchSimulator,
+  simulateGame,
+} from '../../packages/engine/src/archive/code/sim/game.ts';
+import { gameWasmRuntime } from '../../packages/engine/src/sim/wasm-runtime.ts';
+import { GAME_WASM_BYTES } from '../../packages/engine/src/sim/wasm/game-wasm.gen.ts';
 
-const temporary = mkdtempSync(join(tmpdir(), 'hoop-rush-full-wasm-'));
-try {
-  const binary = join(temporary, 'game.wasm');
-  execFileSync('rustc', [
-    fileURLToPath(new URL('./game.rs', import.meta.url)),
-    '--edition=2024',
-    '--crate-type',
-    'cdylib',
-    '--target',
-    'wasm32-unknown-unknown',
-    '-C',
-    'opt-level=3',
-    '-C',
-    'lto=fat',
-    '-C',
-    'panic=abort',
-    '-C',
-    'codegen-units=1',
-    '-C',
-    'strip=symbols',
-    '-o',
-    binary,
-  ]);
-  const bytes = readFileSync(binary);
+{
+  const bytes = GAME_WASM_BYTES;
   const startup = performance.now();
-  const { instance } = await WebAssembly.instantiate(bytes);
+  const wasm = gameWasmRuntime();
   const initializationMs = performance.now() - startup;
-  const wasm = instance.exports as unknown as GameWasm;
-  deepStrictEqual(WebAssembly.Module.imports(new WebAssembly.Module(bytes)), []);
   deepStrictEqual(wasm.simulate(0, 0), 1);
   const packaged = loadPackagedData();
   const data = new PackagedData(packaged.manifest, packaged.dir);
@@ -64,7 +38,7 @@ try {
       for (let i = 0; i < 100; i++) {
         const input = { ...template, seed: fixtureSeed(fixtureId, i) };
         const reference = simulateGame(input, context);
-        const candidate = simulateWasmGame(wasm, input, prepared);
+        const candidate = simulateWasmGame(wasm, input, prepared, context);
         try {
           deepStrictEqual(candidate, reference);
         } catch (error) {
@@ -103,7 +77,7 @@ try {
       for (let i = 0; i < 200; i++) {
         const input = { ...template, seed: fixtureSeed(era, i) };
         const reference = simulateGame(input, context);
-        const candidate = simulateWasmGame(wasm, input, prepared);
+        const candidate = simulateWasmGame(wasm, input, prepared, context);
         deepStrictEqual(candidate, reference, `Pool parity: ${era}, seed=${input.seed}`);
         deepStrictEqual(checkGameResult(candidate), []);
         parityGames++;
@@ -132,7 +106,8 @@ try {
     { name: 'TypeScript prepared batch', run: (game: (typeof games)[number]) => batch(game.input) },
     {
       name: 'Rust/Wasm full game (prepared)',
-      run: (game: (typeof games)[number]) => simulateWasmGame(wasm, game.input, game.prepared),
+      run: (game: (typeof games)[number]) =>
+        simulateWasmGame(wasm, game.input, game.prepared, context),
     },
   ];
   for (const backend of backends) for (const game of games) backend.run(game);
@@ -162,7 +137,7 @@ try {
         const backend = (round + offset) % 2;
         const start = performance.now();
         if (backend === 0) simulateGame(input, context);
-        else simulateWasmGame(wasm, input, prepareWasmGame(input));
+        else simulateWasmGame(wasm, input, prepareWasmGame(input), context);
         timings[backend]!.push(performance.now() - start);
       }
     }
@@ -195,7 +170,7 @@ try {
   }));
   const schedulePreparation = opponents.map((away) => prepareWasmGame({ ...base, away }));
   schedule.forEach((input, i) => {
-    const candidate = simulateWasmGame(wasm, input, schedulePreparation[i % 30]!);
+    const candidate = simulateWasmGame(wasm, input, schedulePreparation[i % 30]!, context);
     deepStrictEqual(candidate, simulateGame(input, context));
     deepStrictEqual(checkGameResult(candidate), []);
     parityGames++;
@@ -211,7 +186,7 @@ try {
         for (const input of schedule) run(input);
       } else {
         const prepared = opponents.map((away) => prepareWasmGame({ ...base, away }));
-        schedule.forEach((input, i) => simulateWasmGame(wasm, input, prepared[i % 30]!));
+        schedule.forEach((input, i) => simulateWasmGame(wasm, input, prepared[i % 30]!, context));
       }
       if (round > 0) seasonSamples[backend]!.push(performance.now() - start);
     }
@@ -240,7 +215,7 @@ try {
     cold,
     season82,
     limitations: [
-      'Standard fixed-five games only; Havoc/Cap Rush hooks and playback observers are not ported.',
+      'Standard fixed-five games; Havoc/Cap Rush retain their TypeScript mutation runtime.',
       'TypeScript prepares immutable matchup probabilities and formats complete game results.',
       'Warm timings include input copying, Rust game execution, output decoding and facts.',
       'Cold measurements include probability-table preparation; compilation is excluded.',
@@ -257,6 +232,4 @@ try {
   console.log(
     JSON.stringify({ wasmBytes: bytes.length, initializationMs, parityGames, overtimeGames }),
   );
-} finally {
-  rmSync(temporary, { recursive: true, force: true });
 }

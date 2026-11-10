@@ -1,85 +1,76 @@
-# Simulation Rust/Wasm experiments
+# Simulation Rust/Wasm build and benchmarks
 
-Run from the repository root with Bun and Rust's `wasm32-unknown-unknown` target
-installed. No Cargo dependencies or wasm-bindgen installation are required.
-Compiled modules live in a temporary directory removed after execution.
+Standard fixed-five games now use the production Rust/Wasm kernel through
+`packages/engine/src/sim/game.ts`. The old TypeScript standard game loop is in
+`packages/engine/src/archive/code/sim/game.ts` for parity tests and benchmarks.
+Shared TypeScript possession rules remain active for Havoc and Cap Rush.
 
-## Full standard game kernel
+## Building the module
+
+```sh
+rustup target add wasm32-unknown-unknown
+bun scripts/sim-wasm/build.ts
+bun scripts/sim-wasm/build.ts --check
+```
+
+Rust 1.97.0 was used for the initial production artifact. The build uses edition
+2024, optimization level 3, LTO, one codegen unit, aborting panics, and stripped
+symbols. No Cargo dependencies or wasm-bindgen installation are required.
+Temporary compiled files are removed after generation.
+
+Commit `packages/engine/src/sim/wasm/game.rs` and the generated
+`game-wasm.gen.ts` together. Normal app builds and CI consume that generated
+module without requiring Rust. The source fingerprint test rejects stale
+artifacts. The module is loaded synchronously from bundled bytes: no fetch,
+URL configuration, platform-specific loader, or async public API is needed.
+
+## Production behavior
+
+Rust owns the seeded RNG, period clock, possessions, turnovers, fouls and foul
+trouble, bonus free throws, shots, rebounds and continuations, assists, overtime,
+and stat counters. TypeScript prepares matchup probabilities and formats
+results using the existing recorder and fact builder. The binary ABI has 6,926
+input doubles and 481 output doubles. Rust reads tables in place and uses stack
+arrays, with no per-game heap allocations.
+
+Ordinary games use Rust RNG directly without JavaScript callbacks. Playback
+observers and custom RNG factories get isolated module instances so callbacks
+can start nested games without overwriting the outer game's state. Custom RNGs
+retain their `next`, `chance`, and `weightedPickTable` calls and original item
+arrays. The engine version and seeded outputs are unchanged.
+
+The batch entry point reuses matchup preparation by profile and player-array
+identities. Treat those inputs as immutable, as with the previous prepared batch
+implementation.
+
+## Full-game benchmark
 
 ```sh
 bun scripts/sim-wasm/full-benchmark.ts
 ```
 
-`game.rs` owns all random draws, the period clock, possessions, turnovers,
-fouls and foul trouble, bonus free throws, shot resolution, rebounds and
-continuations, assists, overtime, and numeric stat recording. There are no
-JavaScript imports or callbacks during simulation. Integer RNG operations wrap
-exactly like Mulberry32; probability calculations use f64 without fast math.
+This uses the committed production module and archived TypeScript reference; it
+does not compile Rust. It writes `sim-wasm-full-results.json` and checks complete
+result parity and accounting for 4,282 games, including synthetic sensitivity
+fixtures, actual 1960s/1990s/2020s Lakers player pools, and a synthetic 82-game
+schedule. The latest run included 113 overtime games.
 
-`game.ts` reuses TypeScript team preparation and computes immutable matchup
-tables. It transfers those tables once per game, calls the Rust kernel, then
-decodes counters through the existing recorder and fact builder. Rust reads
-tables in place and uses stack arrays for game state, with no per-game heap
-allocations. There are 6,926 input doubles and 481 output doubles. The adapter's
-serialized field order matches `Team::read` and `simulate`.
+Measurements include 15 rotating 900-game batches, 30 alternating one-off samples
+per fixture, and 20 alternating 82-game runs with 30 opponents after one warmup.
+Warm game timings include input transfer, execution, result decoding, and facts.
+The 82-game timings also include all matchup preparation; they do not include
+application orchestration, persistence, or reveal pacing. Module initialization
+is reported separately. One-off games can be slower because of preparation.
 
-This is an experimental full **standard fixed-five game loop**, not a production
-backend switch or a port of every engine mode. Havoc/Cap Rush mutation hooks,
-custom RNG factories, effects, home-court hooks, and playback observers are not
-implemented. Production workers and package APIs are unchanged. Regenerate
-matchup tables when teams or profiles change.
+These are desktop Bun measurements, not browser or lower-end phone results.
+Measure on the target device before claiming a larger relative speedup there.
 
-Verification compares complete results, including diagnostics and facts, against
-TypeScript and runs accounting checks for 4,282 games:
-
-- All 12 CLI fixtures, each with base and variant inputs over 100 seeds.
-- Strong/weak and average mirrored lineups from real 1960s, 1990s, and 2020s
-  Lakers pools over 200 seeds, covering anchors and reconstructed shooting.
-- An 82-game synthetic schedule with 30 distinct opponent rating profiles.
-
-The final run included 113 overtime games. Malformed input length is rejected,
-and the benchmark asserts that the compiled module has no imports.
-
-The benchmark writes `sim-wasm-full-results.json` with runtime and CPU identity,
-binary size, initialization time, parity counts, and timings. It measures:
-
-- 15 rotating rounds of 900 prepared games against ordinary TypeScript and the
-  existing prepared TypeScript batch path. Input copying, Rust execution, result
-  decoding, and facts are timed. Matchup setup and module startup are excluded.
-- 30 alternating one-off samples per fixture, including matchup preparation.
-- 20 alternating measured 82-game runs after one warmup. Both backends prepare
-  fresh state per run; Wasm prepares all 30 matchups inside the timer. TypeScript
-  uses its existing shared-team preparation. This is simulation only, not a
-  complete application season run.
-
-Latest local medians on a Ryzen 5 9600X, Windows x64, Bun 1.4.4:
-
-| Workload | TypeScript | Rust/Wasm |
-| --- | ---: | ---: |
-| 900 games, prepared batch | 145.94 ms | 29.28 ms |
-| 82 games / 30 opponents, including preparation | 15.02 ms | 10.35 ms |
-| One-off game, including preparation | 0.21-0.22 ms | 0.33 ms |
-
-The stripped module is 29,211 bytes; initialization took 4.66 ms separately.
-Repeated development runs showed roughly 4-5x prepared-loop speedups and
-1.45-1.7x speedups for the preparation-inclusive schedule. Absolute timings varied
-with machine activity. These are desktop Bun results, not browser or phone
-measurements. A slower device may save more elapsed time, but the relative gain
-must be measured on that device; CPU throttling alone does not establish it.
-
-Validation also ran the existing simulation suite (43 passed, one skipped),
-production build, experiment TypeScript checks, and formatting checks.
-The unchanged production engine passed `calibrate run --samples 2000`.
-`calibrate sensitivity --samples 200` failed `sens-fouls`: 22.88 to 23.25 FTA
-(+1.6%), below its required increase. This unresolved failure was not bypassed.
-
-## Earlier RNG-only experiment
+## Earlier RNG-only benchmark
 
 ```sh
 bun scripts/sim-wasm/benchmark.ts
 ```
 
-Writes `sim-wasm-results.json`. Verifies 20,000 draws per buffer size and
-900 complete game results per backend, then measures 12 rotating rounds.
-TypeScript took 140.70 ms per 900 games; best buffered Wasm RNG took
-142.89 ms and per-draw Wasm calls took 244.87 ms. RNG alone offered no speedup.
+This retains the original TypeScript reference and the standalone `rng.rs`
+experiment. It writes `sim-wasm-results.json`; RNG-only Wasm did not improve game
+throughput. The production migration uses the full-game kernel instead.

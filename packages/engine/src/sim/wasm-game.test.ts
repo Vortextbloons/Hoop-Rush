@@ -1,6 +1,4 @@
 import { describe, expect, it } from 'bun:test';
-import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
 import { seedSchema } from '@hoop-rush/data-contracts';
 import {
   buildGameSimulationInput,
@@ -17,24 +15,28 @@ import {
 import { checkGameResult } from './invariants.ts';
 import { createEngineContext } from './kernel.ts';
 import { createRng, type Rng } from './rng.ts';
-import { GAME_WASM_BYTES, GAME_WASM_SOURCE_HASH } from './wasm/game-wasm.gen.ts';
 
 describe('production Rust game kernel', () => {
-  it('ships a valid module matching its Rust source', () => {
-    const source = readFileSync(new URL('./wasm/game.rs', import.meta.url), 'utf8').replace(
-      /\r\n/g,
-      '\n',
-    );
-    expect(createHash('sha256').update(source).digest('hex')).toBe(GAME_WASM_SOURCE_HASH);
-    expect(WebAssembly.validate(GAME_WASM_BYTES)).toBe(true);
+  it('preserves overtime periods and playback callbacks', () => {
+    const input = buildGameSimulationInput({ seed: seedSchema.parse(seedFromString('ot-v21-8')) });
+    const context = createEngineContext();
+    const expectedPeriods: PeriodObservation[] = [];
+    const actualPeriods: PeriodObservation[] = [];
+    const expected = simulateArchivedGame(input, context, {
+      onPeriod: (period) => expectedPeriods.push(period),
+    });
+    const actual = simulateGame(input, context, {
+      onPeriod: (period) => actualPeriods.push(period),
+    });
+    expect(actual.overtimePeriods).toBeGreaterThan(0);
+    expect(actual).toEqual(expected);
+    expect(actualPeriods).toEqual(expectedPeriods);
   });
-
-  it('preserves archived results, trip snapshots and period callbacks across matchups and overtime', () => {
+  it('preserves archived results, trip snapshots and period callbacks across matchups', () => {
     const base = buildGameSimulationInput();
     const { strong, weak } = buildStrongWeakFixture();
     const context = createEngineContext({ engineVersion: 'test-version' });
     const batch = createGameBatchSimulator(context);
-    let overtime = 0;
     for (let i = 0; i < 100; i++) {
       const input = {
         ...base,
@@ -59,9 +61,7 @@ describe('production Rust game kernel', () => {
       expect(actualPeriods).toEqual(expectedPeriods);
       expect(actual.engineVersion).toBe('test-version');
       expect(checkGameResult(actual)).toEqual([]);
-      overtime += actual.overtimePeriods;
     }
-    expect(overtime).toBeGreaterThan(0);
   });
 
   it('preserves injected RNG method calls, weighted items and draw order', () => {

@@ -41,6 +41,19 @@ build/
 supabase/.temp/
 supabase/.branches/
 
+# Local perf / wasm benchmark outputs
+.perf-cap-rush/
+sim-wasm-results.json
+sim-wasm-full-results.json
+sim-before.json
+projection-before-*.json
+projection-after-*.json
+ratings-before.json
+
+# Rust / Wasm scratch
+target/
+*.wasm
+
 # Logs / caches
 *.log
 isolate-*.log

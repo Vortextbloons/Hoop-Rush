@@ -1,0 +1,13 @@
+import { expect, it } from 'bun:test';
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { GAME_WASM_BYTES, GAME_WASM_SOURCE_HASH } from './sim/wasm/game-wasm.gen.ts';
+
+it('ships a valid game module matching its Rust source', () => {
+  const source = readFileSync(new URL('./sim/wasm/game.rs', import.meta.url), 'utf8').replace(
+    /\r\n/g,
+    '\n',
+  );
+  expect(createHash('sha256').update(source).digest('hex')).toBe(GAME_WASM_SOURCE_HASH);
+  expect(WebAssembly.validate(GAME_WASM_BYTES)).toBe(true);
+});

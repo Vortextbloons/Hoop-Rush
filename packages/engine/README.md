@@ -1,6 +1,6 @@
 # @hoop-rush/engine
 
-Pure TypeScript basketball and mode rules. This package owns possession
+TypeScript basketball and mode rules with a Rust/Wasm standard game kernel. This package owns possession
 simulation, ratings effects, challenge/league aggregates, havoc, cap-rush,
 draft-duel, fixed-five, and classic draft flows.
 
@@ -21,6 +21,10 @@ draft-duel, fixed-five, and classic draft flows.
 
 - `src/sim/` — possession engine: `possession.ts`, `rng.ts`, `constants.ts`,
   `facts.ts`, `invariants.ts`, `game.ts`.
+- `src/sim/wasm/game.rs` — standard fixed-five game loop, bundled by
+  `wasm/game-wasm.gen.ts`; `wasm-game.ts` prepares and decodes its numeric ABI.
+- `src/archive/code/sim/game.ts` — replaced TypeScript game loop, used only by
+  parity tests and benchmarks. Havoc/Cap Rush retain the shared possession rules.
 - `src/modes/` — `havoc/`, `cap-rush/`, `draft-duel/`, `fixed-five/`,
   `classic/`, `sandbox/`.
 - `src/challenge/` — challenge aggregate, league simulation, seeds.
@@ -44,6 +48,12 @@ retains possession hooks and explicitly orders those owners at boundaries.
 across seeded mutation scenarios.
 
 ## Verification
+
+Normal builds and CI use the committed Wasm module and do not require Rust.
+After changing the Rust source, install the `wasm32-unknown-unknown` target and
+run `bun scripts/sim-wasm/build.ts` from the repository root. Commit both source
+and generated module; the engine tests reject an outdated source fingerprint.
+`bun scripts/sim-wasm/full-benchmark.ts` compares production Wasm with the archive.
 
 ```text
 bun test <path>

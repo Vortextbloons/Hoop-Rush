@@ -30,7 +30,9 @@ const sourceHash = createHash('sha256')
   .digest('hex');
 if (process.argv.includes('--check')) {
   if (
-    !readFileSync(target, 'utf8').includes(`export const GAME_WASM_SOURCE_HASH = '${sourceHash}';`)
+    !new RegExp(`export const GAME_WASM_SOURCE_HASH =\\s*'${sourceHash}';`).test(
+      readFileSync(target, 'utf8'),
+    )
   ) {
     throw new Error(
       'Rust game source changed. Run bun scripts/sim-wasm/build.ts and commit the generated module.',

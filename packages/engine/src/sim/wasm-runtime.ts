@@ -14,7 +14,6 @@ export function gameWasmRuntime(
 ): GameWasm {
   if (observers === undefined && rng === undefined && shared !== undefined) return shared;
   module ??= new WebAssembly.Module(GAME_WASM_BYTES);
-  let wasm: GameWasm;
   const instance = new WebAssembly.Instance(module, {
     env: {
       rng_next: () => {
@@ -71,7 +70,7 @@ export function gameWasmRuntime(
       },
     },
   });
-  wasm = instance.exports as unknown as GameWasm;
+  const wasm = instance.exports as unknown as GameWasm;
   if (observers === undefined && rng === undefined) shared = wasm;
   return wasm;
 }
