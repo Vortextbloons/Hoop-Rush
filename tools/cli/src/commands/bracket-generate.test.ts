@@ -6,6 +6,8 @@ import {
   selectSeasonFive,
   bracketSeasonDirs,
   capRushEligibilityDescription,
+  nearestSeasonFit,
+  oldestSeasonFitWithin,
 } from './bracket-generate.ts';
 
 function candidate(
@@ -116,5 +118,18 @@ describe('bracket season eligibility', () => {
     expect(seasons).toContain('1979-80');
     expect(seasons[seasons.length - 1]).toBe('2025-26');
     expect(capRushEligibilityDescription()).toContain('1960-61 through 2025-26');
+  });
+
+  it('prefers the oldest season inside the fit tolerance', () => {
+    const fits = [
+      { season: '2014-15', gap: 0.001 },
+      { season: '1964-65', gap: 0.018 },
+      { season: '1982-83', gap: 0.019 },
+      { season: '2022-23', gap: 0.05 },
+    ];
+    expect(oldestSeasonFitWithin(fits, 0.02)?.season).toBe('1964-65');
+    expect(oldestSeasonFitWithin(fits, 0.01)?.season).toBe('2014-15');
+    expect(nearestSeasonFit(fits)?.season).toBe('2014-15');
+    expect(oldestSeasonFitWithin([], 0.02)).toBeUndefined();
   });
 });

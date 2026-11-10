@@ -1,0 +1,72 @@
+{
+  "runtime": "v26.3.0",
+  "bun": "1.4.4",
+  "cpu": "AMD Ryzen 5 9600X 6-Core Processor             ",
+  "platform": "win32",
+  "arch": "x64",
+  "wasmBytes": 115902,
+  "initializationMs": 2.2135000000000673,
+  "parityGames": 4200,
+  "overtimeGames": 110,
+  "gamesPerBatch": 900,
+  "rounds": 15,
+  "results": [
+    {
+      "backend": "TypeScript simulateGame",
+      "medianBatchMs": 136.3431999999998,
+      "p95BatchMs": 149.7462999999998,
+      "minBatchMs": 130.67889999999989,
+      "gamesPerSecond": 6600.989268258346
+    },
+    {
+      "backend": "TypeScript prepared batch",
+      "medianBatchMs": 105.16040000000066,
+      "p95BatchMs": 117.07860000000028,
+      "minBatchMs": 100.47220000000016,
+      "gamesPerSecond": 8558.354665824723
+    },
+    {
+      "backend": "Rust/Wasm full game (prepared)",
+      "medianBatchMs": 24.542199999999866,
+      "p95BatchMs": 29.772699999999986,
+      "minBatchMs": 23.28360000000066,
+      "gamesPerSecond": 36671.529039776586
+    }
+  ],
+  "cold": [
+    {
+      "fixture": "equal",
+      "typescriptMs": 0.12914999999975407,
+      "wasmPreparationAndGameMs": 0.1876999999999498
+    },
+    {
+      "fixture": "strong-medium",
+      "typescriptMs": 0.13099999999985812,
+      "wasmPreparationAndGameMs": 0.18524999999999636
+    },
+    {
+      "fixture": "strong-weak",
+      "typescriptMs": 0.13094999999975698,
+      "wasmPreparationAndGameMs": 0.19295000000010987
+    }
+  ],
+  "season82": [
+    {
+      "backend": "TypeScript prepared batch",
+      "medianMs": 10.29785000000038,
+      "p95Ms": 12.610400000000482
+    },
+    {
+      "backend": "Rust/Wasm including preparation",
+      "medianMs": 6.364049999999679,
+      "p95Ms": 8.638700000000426
+    }
+  ],
+  "limitations": [
+    "Standard fixed-five games only; Havoc/Cap Rush hooks and playback observers are not ported.",
+    "TypeScript prepares immutable matchup probabilities and formats complete game results.",
+    "Warm timings include input copying, Rust game execution, output decoding and facts.",
+    "Cold measurements include probability-table preparation; compilation is excluded.",
+    "Desktop Bun results are not mobile browser measurements."
+  ]
+}

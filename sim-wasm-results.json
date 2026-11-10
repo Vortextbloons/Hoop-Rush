@@ -1,0 +1,47 @@
+{
+  "runtime": "v26.3.0",
+  "bun": "1.4.4",
+  "gamesPerBatch": 900,
+  "rounds": 12,
+  "wasmBytes": 95811,
+  "initializationMs": 2.9132999999999356,
+  "parity": "passed",
+  "results": [
+    {
+      "backend": "TypeScript",
+      "medianBatchMs": 140.69894999999997,
+      "minBatchMs": 136.53189999999995,
+      "maxBatchMs": 165.28139999999985
+    },
+    {
+      "backend": "Rust/Wasm RNG 1",
+      "medianBatchMs": 244.87419999999975,
+      "minBatchMs": 237.7577000000001,
+      "maxBatchMs": 269.518399999999
+    },
+    {
+      "backend": "Rust/Wasm RNG 64",
+      "medianBatchMs": 147.96059999999989,
+      "minBatchMs": 143.02249999999913,
+      "maxBatchMs": 198.75760000000082
+    },
+    {
+      "backend": "Rust/Wasm RNG 256",
+      "medianBatchMs": 145.0353999999993,
+      "minBatchMs": 138.8781999999992,
+      "maxBatchMs": 157.29390000000012
+    },
+    {
+      "backend": "Rust/Wasm RNG 1024",
+      "medianBatchMs": 142.88775000000032,
+      "minBatchMs": 137.04349999999977,
+      "maxBatchMs": 178.09670000000006
+    },
+    {
+      "backend": "Rust/Wasm RNG 4096",
+      "medianBatchMs": 144.1918999999998,
+      "minBatchMs": 141.16689999999835,
+      "maxBatchMs": 155.26699999999983
+    }
+  ]
+}

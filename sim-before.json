@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 2,
+  "command": "benchmark",
+  "environment": {
+    "node": "v26.3.0",
+    "platform": "win32",
+    "arch": "x64",
+    "cpus": 12,
+    "fingerprint": "v26.3.0|win32|x64|12|m3-engine-v25|m25-ratings-v6.6|m3-1990s-v1|bracket-m3-v8|schedule-v1"
+  },
+  "engineVersion": "m3-engine-v25",
+  "dataVersion": "m25-ratings-v6.6",
+  "profileVersion": "m3-1990s-v1",
+  "bracketVersion": "bracket-m3-v8",
+  "scheduleVersion": "schedule-v1",
+  "fixture": "equal",
+  "samples": 30,
+  "workers": 1,
+  "poolCold": {
+    "sampleCount": 30,
+    "medianMs": 8.38160000000002,
+    "p95Ms": 18.560900000000004,
+    "minMs": 4.61239999999998,
+    "maxMs": 26.09960000000001
+  },
+  "poolCached": {
+    "sampleCount": 30,
+    "medianMs": 0.0002000000000066393,
+    "p95Ms": 0.009900000000016007,
+    "minMs": 0.00009999999997489795,
+    "maxMs": 0.014899999999954616
+  },
+  "singleGame": {
+    "sampleCount": 30,
+    "medianMs": 0.3613000000000284,
+    "p95Ms": 0.4685999999999808,
+    "minMs": 0.20999999999997954,
+    "maxMs": 0.5181999999999789
+  },
+  "challenge82": {
+    "sampleCount": 30,
+    "medianMs": 13.015100000000075,
+    "p95Ms": 27.083799999999997,
+    "minMs": 10.71180000000004,
+    "maxMs": 35.94009999999997
+  },
+  "heapUsedMb": 55.15,
+  "heap": {
+    "beforeMb": 24.38,
+    "afterMb": 55.15,
+    "deltaMb": 30.7713680267334
+  },
+  "baselineComparison": {
+    "status": "not-requested",
+    "fingerprintMatched": false,
+    "baselineFingerprint": null,
+    "regressions": []
+  }
+}

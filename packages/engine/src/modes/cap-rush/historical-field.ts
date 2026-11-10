@@ -4,6 +4,16 @@ import { createRng, type Rng } from '../../sim/rng.ts';
 
 type Candidate = SeasonDraftCatalog['candidates'][number];
 
+const LEAGUE_TARGET_MIN = 65;
+const LEAGUE_TARGET_MAX = 85;
+const LEAGUE_BAND_RADIUS = 15;
+
+function strengthOf(lineup: readonly Candidate[]): number {
+  return (
+    lineup.reduce((sum, player) => sum + player.summaryRatings.overallRating, 0) / lineup.length
+  );
+}
+
 function lineupOf(candidates: readonly Candidate[]): Candidate[] | null {
   const ordered = [...candidates].sort(
     (a, b) =>
@@ -54,6 +64,10 @@ export function buildCapRushHistoricalField(
   catalog: SeasonDraftCatalog,
   runSeed: Seed,
 ): OpponentBracket {
+  const leagueRng = createRng(havocInstanceSeed(runSeed, 'cap-rush-league-strength-v1'));
+  const target =
+    LEAGUE_TARGET_MIN +
+    ((leagueRng.next() + leagueRng.next()) / 2) * (LEAGUE_TARGET_MAX - LEAGUE_TARGET_MIN);
   const seasons = new Map<string, Map<string, Candidate[]>>();
   for (const player of catalog.candidates) {
     if (player.anchors === undefined) continue;
@@ -76,19 +90,37 @@ export function buildCapRushHistoricalField(
         .sort(([a], [b]) => a.localeCompare(b))
         .flatMap(([seasonKey, roster]) => {
           const lineup = lineupOf(roster);
-          return lineup === null ? [] : [{ seasonKey, lineup }];
+          if (lineup === null) return [];
+          const varied = varyLineup(
+            lineup,
+            roster,
+            createRng(
+              havocInstanceSeed(
+                runSeed,
+                'cap-rush-historical-lineup-v3',
+                opponent.teamId,
+                seasonKey,
+              ),
+            ),
+          );
+          return [{ seasonKey, lineup: varied, distance: Math.abs(strengthOf(varied) - target) }];
         });
       if (choices.length === 0)
         throw new Error(`Cap Rush has no historical lineup for ${opponent.teamId}`);
       const rng = createRng(
-        havocInstanceSeed(runSeed, 'cap-rush-historical-field-v2', opponent.teamId),
+        havocInstanceSeed(runSeed, 'cap-rush-historical-field-v3', opponent.teamId),
       );
-      const chosen = rng.pick(choices);
-      const lineup = varyLineup(
-        chosen.lineup,
-        seasons.get(opponent.teamId)?.get(chosen.seasonKey) ?? [],
-        rng,
+      const inBand = choices.filter((choice) => choice.distance <= LEAGUE_BAND_RADIUS);
+      const nearestDistance = Math.min(...choices.map((choice) => choice.distance));
+      const eligible =
+        inBand.length > 0
+          ? inBand
+          : choices.filter((choice) => choice.distance === nearestDistance);
+      const chosen = rng.weightedPick(
+        eligible,
+        eligible.map((choice) => 1 + Math.max(0, 1 - choice.distance / LEAGUE_BAND_RADIUS)),
       );
+      const lineup = chosen.lineup;
       return {
         ...opponent,
         seasonKey: chosen.seasonKey,

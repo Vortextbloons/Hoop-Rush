@@ -1,7 +1,7 @@
 {
   "generationVersion": "cap-rush-field-v1",
   "seed": "8f2c1d4e6a9b7c3d8f2c1d4e6a9b7c3d",
-  "contentHash": "f6c4d13b80cc0b7d6a20996ee10bb8268829c423b9d1f27cef4eff89abe66fd7",
+  "contentHash": "abab0b421fd22169f957e3c13c54b8d0f3cc0bf84a814920f31fb52d5d0f6aaf",
   "engineVersion": "m3-engine-v25",
   "profileVersion": "m3-1990s-v1",
   "profileHash": "72c849c2564e98cbb32b41140e95714d19a56a522a7e35c4564351322bab9f4b",
@@ -4509,8 +4509,8 @@
     }
   ],
   "eligibility": "1960-61 through 2025-26; >=20 franchise games; legal cornerstone/rotation five; global player uniqueness in manifest order",
-  "objective": "nearest measured win rate to 0.035 + tierRank/29 * 0.06",
-  "tieBreaking": "first in seeded shuffled season order",
+  "objective": "oldest season within 0.02 of the measured win rate target 0.035 + tierRank/29 * 0.06; nearest measured win rate otherwise",
+  "tieBreaking": "oldest season within tolerance; otherwise first in seeded shuffled season order",
   "selectionSeeds": "<generation seed>:absolute-fit:<franchise>:<season>:<game>",
   "gamesPerCandidate": 160,
   "evidence": {
@@ -6695,6 +6695,20 @@
       },
       {
         "franchiseId": "nets",
+        "season": "1990-91",
+        "wins": 2,
+        "games": 160,
+        "targetWinRate": 0.09293103448275863,
+        "playerIds": [
+          "p-302",
+          "p-78310",
+          "p-356",
+          "p-934",
+          "p-76217"
+        ]
+      },
+      {
+        "franchiseId": "nets",
         "season": "1989-90",
         "wins": 2,
         "games": 160,
@@ -7115,20 +7129,6 @@
       },
       {
         "franchiseId": "nets",
-        "season": "1976-77",
-        "wins": 2,
-        "games": 160,
-        "targetWinRate": 0.09293103448275863,
-        "playerIds": [
-          "p-76054",
-          "p-78167",
-          "p-78400",
-          "p-76120",
-          "p-77078"
-        ]
-      },
-      {
-        "franchiseId": "nets",
         "season": "1978-79",
         "wins": 5,
         "games": 160,
@@ -7153,6 +7153,34 @@
           "p-356",
           "p-433",
           "p-77030"
+        ]
+      },
+      {
+        "franchiseId": "hornets",
+        "season": "2010-11",
+        "wins": 7,
+        "games": 160,
+        "targetWinRate": 0.06189655172413794,
+        "playerIds": [
+          "p-201571",
+          "p-1536",
+          "p-2564",
+          "p-2222",
+          "p-2198"
+        ]
+      },
+      {
+        "franchiseId": "hornets",
+        "season": "2005-06",
+        "wins": 14,
+        "games": 160,
+        "targetWinRate": 0.06189655172413794,
+        "playerIds": [
+          "p-1510",
+          "p-101109",
+          "p-1908",
+          "p-2222",
+          "p-2056"
         ]
       },
       {
@@ -7185,6 +7213,20 @@
       },
       {
         "franchiseId": "hornets",
+        "season": "2006-07",
+        "wins": 14,
+        "games": 160,
+        "targetWinRate": 0.06189655172413794,
+        "playerIds": [
+          "p-101109",
+          "p-2679",
+          "p-200747",
+          "p-2222",
+          "p-2731"
+        ]
+      },
+      {
+        "franchiseId": "hornets",
         "season": "2020-21",
         "wins": 25,
         "games": 160,
@@ -7195,20 +7237,6 @@
           "p-1628970",
           "p-1629023",
           "p-202687"
-        ]
-      },
-      {
-        "franchiseId": "hornets",
-        "season": "2000-01",
-        "wins": 4,
-        "games": 160,
-        "targetWinRate": 0.06189655172413794,
-        "playerIds": [
-          "p-1884",
-          "p-133",
-          "p-469",
-          "p-136",
-          "p-922"
         ]
       },
       {
@@ -7241,6 +7269,20 @@
       },
       {
         "franchiseId": "hornets",
+        "season": "2004-05",
+        "wins": 6,
+        "games": 160,
+        "targetWinRate": 0.06189655172413794,
+        "playerIds": [
+          "p-1510",
+          "p-2078",
+          "p-2222",
+          "p-2731",
+          "p-2056"
+        ]
+      },
+      {
+        "franchiseId": "hornets",
         "season": "1990-91",
         "wins": 4,
         "games": 160,
@@ -7265,20 +7307,6 @@
           "p-101107",
           "p-203077",
           "p-2744"
-        ]
-      },
-      {
-        "franchiseId": "hornets",
-        "season": "1999-00",
-        "wins": 12,
-        "games": 160,
-        "targetWinRate": 0.06189655172413794,
-        "playerIds": [
-          "p-133",
-          "p-224",
-          "p-193",
-          "p-934",
-          "p-922"
         ]
       },
       {
@@ -7321,6 +7349,20 @@
           "p-779",
           "p-193",
           "p-761"
+        ]
+      },
+      {
+        "franchiseId": "hornets",
+        "season": "2008-09",
+        "wins": 8,
+        "games": 160,
+        "targetWinRate": 0.06189655172413794,
+        "playerIds": [
+          "p-101109",
+          "p-201571",
+          "p-2222",
+          "p-2731",
+          "p-2564"
         ]
       },
       {
@@ -7381,6 +7423,20 @@
       },
       {
         "franchiseId": "hornets",
+        "season": "2009-10",
+        "wins": 3,
+        "games": 160,
+        "targetWinRate": 0.06189655172413794,
+        "playerIds": [
+          "p-101109",
+          "p-1536",
+          "p-2564",
+          "p-2222",
+          "p-2199"
+        ]
+      },
+      {
+        "franchiseId": "hornets",
         "season": "2013-14",
         "wins": 8,
         "games": 160,
@@ -7405,20 +7461,6 @@
           "p-779",
           "p-193",
           "p-124"
-        ]
-      },
-      {
-        "franchiseId": "hornets",
-        "season": "1989-90",
-        "wins": 10,
-        "games": 160,
-        "targetWinRate": 0.06189655172413794,
-        "playerIds": [
-          "p-177",
-          "p-209",
-          "p-462",
-          "p-288",
-          "p-76861"
         ]
       },
       {
@@ -7521,44 +7563,16 @@
       },
       {
         "franchiseId": "hornets",
-        "season": "1995-96",
-        "wins": 12,
+        "season": "2007-08",
+        "wins": 8,
         "games": 160,
         "targetWinRate": 0.06189655172413794,
         "playerIds": [
-          "p-72",
-          "p-779",
-          "p-209",
-          "p-913",
-          "p-761"
-        ]
-      },
-      {
-        "franchiseId": "hornets",
-        "season": "1998-99",
-        "wins": 4,
-        "games": 160,
-        "targetWinRate": 0.06189655172413794,
-        "playerIds": [
-          "p-133",
-          "p-184",
-          "p-359",
-          "p-934",
-          "p-922"
-        ]
-      },
-      {
-        "franchiseId": "hornets",
-        "season": "2001-02",
-        "wins": 7,
-        "games": 160,
-        "targetWinRate": 0.06189655172413794,
-        "playerIds": [
-          "p-1884",
-          "p-133",
-          "p-1924",
-          "p-136",
-          "p-922"
+          "p-101109",
+          "p-2679",
+          "p-2202",
+          "p-2222",
+          "p-2731"
         ]
       },
       {
@@ -7787,6 +7801,20 @@
       },
       {
         "franchiseId": "bulls",
+        "season": "1982-83",
+        "wins": 2,
+        "games": 160,
+        "targetWinRate": 0.08465517241379311,
+        "playerIds": [
+          "p-78310",
+          "p-76497",
+          "p-77019",
+          "p-76881",
+          "p-76453"
+        ]
+      },
+      {
+        "franchiseId": "bulls",
         "season": "2000-01",
         "wins": 1,
         "games": 160,
@@ -7797,6 +7825,20 @@
           "p-1897",
           "p-1882",
           "p-1802"
+        ]
+      },
+      {
+        "franchiseId": "bulls",
+        "season": "1980-81",
+        "wins": 7,
+        "games": 160,
+        "targetWinRate": 0.08465517241379311,
+        "playerIds": [
+          "p-78310",
+          "p-78531",
+          "p-77246",
+          "p-76881",
+          "p-600014"
         ]
       },
       {
@@ -7853,6 +7895,34 @@
           "p-203953",
           "p-1628374",
           "p-201577"
+        ]
+      },
+      {
+        "franchiseId": "bulls",
+        "season": "1979-80",
+        "wins": 2,
+        "games": 160,
+        "targetWinRate": 0.08465517241379311,
+        "playerIds": [
+          "p-78310",
+          "p-78215",
+          "p-77182",
+          "p-76881",
+          "p-76567"
+        ]
+      },
+      {
+        "franchiseId": "bulls",
+        "season": "1981-82",
+        "wins": 7,
+        "games": 160,
+        "targetWinRate": 0.08465517241379311,
+        "playerIds": [
+          "p-78310",
+          "p-77373",
+          "p-77182",
+          "p-76881",
+          "p-600014"
         ]
       },
       {
@@ -8165,20 +8235,6 @@
       },
       {
         "franchiseId": "bulls",
-        "season": "2006-07",
-        "wins": 11,
-        "games": 160,
-        "targetWinRate": 0.08465517241379311,
-        "playerIds": [
-          "p-2550",
-          "p-2732",
-          "p-2736",
-          "p-136",
-          "p-1112"
-        ]
-      },
-      {
-        "franchiseId": "bulls",
         "season": "2009-10",
         "wins": 4,
         "games": 160,
@@ -8245,6 +8301,20 @@
           "p-2736",
           "p-201959",
           "p-201149"
+        ]
+      },
+      {
+        "franchiseId": "bulls",
+        "season": "1978-79",
+        "wins": 0,
+        "games": 160,
+        "targetWinRate": 0.08465517241379311,
+        "playerIds": [
+          "p-78310",
+          "p-77042",
+          "p-77168",
+          "p-77334",
+          "p-600014"
         ]
       },
       {
@@ -9033,6 +9103,20 @@
       },
       {
         "franchiseId": "cavaliers",
+        "season": "2013-14",
+        "wins": 7,
+        "games": 160,
+        "targetWinRate": 0.07844827586206897,
+        "playerIds": [
+          "p-202681",
+          "p-101127",
+          "p-2736",
+          "p-202684",
+          "p-2760"
+        ]
+      },
+      {
+        "franchiseId": "cavaliers",
         "season": "1975-76",
         "wins": 0,
         "games": 160,
@@ -9243,6 +9327,20 @@
       },
       {
         "franchiseId": "mavericks",
+        "season": "2015-16",
+        "wins": 5,
+        "games": 160,
+        "targetWinRate": 0.07637931034482759,
+        "playerIds": [
+          "p-101114",
+          "p-202083",
+          "p-202718",
+          "p-1717",
+          "p-2585"
+        ]
+      },
+      {
+        "franchiseId": "mavericks",
         "season": "2013-14",
         "wins": 17,
         "games": 160,
@@ -9351,6 +9449,20 @@
           "p-714",
           "p-920",
           "p-762"
+        ]
+      },
+      {
+        "franchiseId": "mavericks",
+        "season": "2016-17",
+        "wins": 3,
+        "games": 160,
+        "targetWinRate": 0.07637931034482759,
+        "playerIds": [
+          "p-101114",
+          "p-202083",
+          "p-203084",
+          "p-1717",
+          "p-1626257"
         ]
       },
       {
@@ -10531,20 +10643,6 @@
       },
       {
         "franchiseId": "pistons",
-        "season": "1991-92",
-        "wins": 8,
-        "games": 160,
-        "targetWinRate": 0.08051724137931035,
-        "playerIds": [
-          "p-78318",
-          "p-247",
-          "p-78615",
-          "p-23",
-          "p-100263"
-        ]
-      },
-      {
-        "franchiseId": "pistons",
         "season": "1979-80",
         "wins": 10,
         "games": 160,
@@ -10573,20 +10671,6 @@
       },
       {
         "franchiseId": "pistons",
-        "season": "1975-76",
-        "wins": 2,
-        "games": 160,
-        "targetWinRate": 0.08051724137931035,
-        "playerIds": [
-          "p-77627",
-          "p-76733",
-          "p-76634",
-          "p-78028",
-          "p-600005"
-        ]
-      },
-      {
-        "franchiseId": "pistons",
         "season": "2023-24",
         "wins": 17,
         "games": 160,
@@ -10597,6 +10681,20 @@
           "p-1641709",
           "p-1630191",
           "p-1631105"
+        ]
+      },
+      {
+        "franchiseId": "pistons",
+        "season": "2005-06",
+        "wins": 25,
+        "games": 160,
+        "targetWinRate": 0.08051724137931035,
+        "playerIds": [
+          "p-1497",
+          "p-1888",
+          "p-2419",
+          "p-739",
+          "p-1112"
         ]
       },
       {
@@ -10615,30 +10713,30 @@
       },
       {
         "franchiseId": "pistons",
-        "season": "1974-75",
-        "wins": 2,
+        "season": "2006-07",
+        "wins": 29,
         "games": 160,
         "targetWinRate": 0.08051724137931035,
         "playerIds": [
-          "p-76166",
-          "p-76733",
-          "p-78366",
-          "p-78028",
-          "p-600005"
+          "p-1497",
+          "p-1888",
+          "p-2419",
+          "p-686",
+          "p-739"
         ]
       },
       {
         "franchiseId": "pistons",
-        "season": "1973-74",
-        "wins": 6,
+        "season": "2019-20",
+        "wins": 39,
         "games": 160,
         "targetWinRate": 0.08051724137931035,
         "playerIds": [
-          "p-76166",
-          "p-76733",
-          "p-76012",
-          "p-78028",
-          "p-600005"
+          "p-201565",
+          "p-204038",
+          "p-1628971",
+          "p-1626174",
+          "p-203083"
         ]
       },
       {
@@ -10741,6 +10839,20 @@
       },
       {
         "franchiseId": "pistons",
+        "season": "2003-04",
+        "wins": 6,
+        "games": 160,
+        "targetWinRate": 0.08051724137931035,
+        "playerIds": [
+          "p-1497",
+          "p-1888",
+          "p-2419",
+          "p-1112",
+          "p-2246"
+        ]
+      },
+      {
+        "franchiseId": "pistons",
         "season": "1966-67",
         "wins": 0,
         "games": 160,
@@ -10751,6 +10863,20 @@
           "p-78651",
           "p-76545",
           "p-78268"
+        ]
+      },
+      {
+        "franchiseId": "pistons",
+        "season": "2007-08",
+        "wins": 17,
+        "games": 160,
+        "targetWinRate": 0.08051724137931035,
+        "playerIds": [
+          "p-1497",
+          "p-1888",
+          "p-2419",
+          "p-686",
+          "p-739"
         ]
       },
       {
@@ -10811,6 +10937,20 @@
       },
       {
         "franchiseId": "pistons",
+        "season": "2004-05",
+        "wins": 12,
+        "games": 160,
+        "targetWinRate": 0.08051724137931035,
+        "playerIds": [
+          "p-1497",
+          "p-1888",
+          "p-2419",
+          "p-739",
+          "p-1112"
+        ]
+      },
+      {
+        "franchiseId": "pistons",
         "season": "1963-64",
         "wins": 1,
         "games": 160,
@@ -10867,20 +11007,6 @@
       },
       {
         "franchiseId": "pistons",
-        "season": "1977-78",
-        "wins": 2,
-        "games": 160,
-        "targetWinRate": 0.08051724137931035,
-        "playerIds": [
-          "p-77627",
-          "p-76733",
-          "p-76351",
-          "p-78143",
-          "p-600005"
-        ]
-      },
-      {
-        "franchiseId": "pistons",
         "season": "2016-17",
         "wins": 10,
         "games": 160,
@@ -10919,20 +11045,6 @@
           "p-966",
           "p-255",
           "p-183"
-        ]
-      },
-      {
-        "franchiseId": "pistons",
-        "season": "1976-77",
-        "wins": 6,
-        "games": 160,
-        "targetWinRate": 0.08051724137931035,
-        "playerIds": [
-          "p-76733",
-          "p-78157",
-          "p-77875",
-          "p-76351",
-          "p-600005"
         ]
       },
       {
@@ -11021,6 +11133,20 @@
       },
       {
         "franchiseId": "pistons",
+        "season": "2010-11",
+        "wins": 8,
+        "games": 160,
+        "targetWinRate": 0.08051724137931035,
+        "playerIds": [
+          "p-201155",
+          "p-2732",
+          "p-101111",
+          "p-2419",
+          "p-202328"
+        ]
+      },
+      {
+        "franchiseId": "pistons",
         "season": "1970-71",
         "wins": 3,
         "games": 160,
@@ -11045,6 +11171,20 @@
           "p-202711",
           "p-1630180",
           "p-1631105"
+        ]
+      },
+      {
+        "franchiseId": "pistons",
+        "season": "2002-03",
+        "wins": 18,
+        "games": 160,
+        "targetWinRate": 0.08051724137931035,
+        "playerIds": [
+          "p-1497",
+          "p-1888",
+          "p-722",
+          "p-1112",
+          "p-361"
         ]
       },
       {
@@ -12057,6 +12197,20 @@
       },
       {
         "franchiseId": "rockets",
+        "season": "1981-82",
+        "wins": 1,
+        "games": 160,
+        "targetWinRate": 0.07017241379310345,
+        "playerIds": [
+          "p-77353",
+          "p-76996",
+          "p-77936",
+          "p-76979",
+          "p-77449"
+        ]
+      },
+      {
+        "franchiseId": "rockets",
         "season": "1974-75",
         "wins": 9,
         "games": 160,
@@ -12197,6 +12351,20 @@
       },
       {
         "franchiseId": "rockets",
+        "season": "2014-15",
+        "wins": 10,
+        "games": 160,
+        "targetWinRate": 0.07017241379310345,
+        "playerIds": [
+          "p-201935",
+          "p-201976",
+          "p-2772",
+          "p-2746",
+          "p-202700"
+        ]
+      },
+      {
+        "franchiseId": "rockets",
         "season": "2021-22",
         "wins": 18,
         "games": 160,
@@ -12239,6 +12407,20 @@
       },
       {
         "franchiseId": "rockets",
+        "season": "1980-81",
+        "wins": 3,
+        "games": 160,
+        "targetWinRate": 0.07017241379310345,
+        "playerIds": [
+          "p-77353",
+          "p-77669",
+          "p-77189",
+          "p-77936",
+          "p-77449"
+        ]
+      },
+      {
+        "franchiseId": "rockets",
         "season": "2007-08",
         "wins": 8,
         "games": 160,
@@ -12277,6 +12459,20 @@
           "p-1627863",
           "p-200782",
           "p-203991"
+        ]
+      },
+      {
+        "franchiseId": "rockets",
+        "season": "1979-80",
+        "wins": 4,
+        "games": 160,
+        "targetWinRate": 0.07017241379310345,
+        "playerIds": [
+          "p-77353",
+          "p-77669",
+          "p-78350",
+          "p-77936",
+          "p-77449"
         ]
       },
       {
@@ -12407,6 +12603,20 @@
       },
       {
         "franchiseId": "rockets",
+        "season": "1976-77",
+        "wins": 8,
+        "games": 160,
+        "targetWinRate": 0.07017241379310345,
+        "playerIds": [
+          "p-77419",
+          "p-77669",
+          "p-77152",
+          "p-78350",
+          "p-77449"
+        ]
+      },
+      {
+        "franchiseId": "rockets",
         "season": "2000-01",
         "wins": 11,
         "games": 160,
@@ -12417,20 +12627,6 @@
           "p-1000",
           "p-1903",
           "p-165"
-        ]
-      },
-      {
-        "franchiseId": "rockets",
-        "season": "1997-98",
-        "wins": 6,
-        "games": 160,
-        "targetWinRate": 0.07017241379310345,
-        "playerIds": [
-          "p-17",
-          "p-1074",
-          "p-53",
-          "p-787",
-          "p-788"
         ]
       },
       {
@@ -12575,6 +12771,20 @@
       },
       {
         "franchiseId": "rockets",
+        "season": "1978-79",
+        "wins": 2,
+        "games": 160,
+        "targetWinRate": 0.07017241379310345,
+        "playerIds": [
+          "p-77669",
+          "p-77710",
+          "p-77936",
+          "p-78350",
+          "p-77449"
+        ]
+      },
+      {
+        "franchiseId": "rockets",
         "season": "1985-86",
         "wins": 5,
         "games": 160,
@@ -12585,6 +12795,20 @@
           "p-77839",
           "p-1622",
           "p-78055"
+        ]
+      },
+      {
+        "franchiseId": "rockets",
+        "season": "1977-78",
+        "wins": 1,
+        "games": 160,
+        "targetWinRate": 0.07017241379310345,
+        "playerIds": [
+          "p-77419",
+          "p-77669",
+          "p-77936",
+          "p-77182",
+          "p-77449"
         ]
       },
       {
@@ -12799,34 +13023,6 @@
       },
       {
         "franchiseId": "pacers",
-        "season": "1983-84",
-        "wins": 3,
-        "games": 160,
-        "targetWinRate": 0.05775862068965518,
-        "playerIds": [
-          "p-78146",
-          "p-76355",
-          "p-77148",
-          "p-77236",
-          "p-78257"
-        ]
-      },
-      {
-        "franchiseId": "pacers",
-        "season": "1982-83",
-        "wins": 8,
-        "games": 160,
-        "targetWinRate": 0.05775862068965518,
-        "playerIds": [
-          "p-78146",
-          "p-76355",
-          "p-77148",
-          "p-77236",
-          "p-1006"
-        ]
-      },
-      {
-        "franchiseId": "pacers",
         "season": "1998-99",
         "wins": 3,
         "games": 160,
@@ -12907,20 +13103,6 @@
           "p-76095",
           "p-78025",
           "p-229"
-        ]
-      },
-      {
-        "franchiseId": "pacers",
-        "season": "1981-82",
-        "wins": 3,
-        "games": 160,
-        "targetWinRate": 0.05775862068965518,
-        "playerIds": [
-          "p-76317",
-          "p-76526",
-          "p-77770",
-          "p-77532",
-          "p-77136"
         ]
       },
       {
@@ -13107,20 +13289,6 @@
       },
       {
         "franchiseId": "pacers",
-        "season": "1980-81",
-        "wins": 4,
-        "games": 160,
-        "targetWinRate": 0.05775862068965518,
-        "playerIds": [
-          "p-76526",
-          "p-76231",
-          "p-77770",
-          "p-77532",
-          "p-229"
-        ]
-      },
-      {
-        "franchiseId": "pacers",
         "season": "2001-02",
         "wins": 8,
         "games": 160,
@@ -13215,20 +13383,6 @@
           "p-147",
           "p-905",
           "p-22"
-        ]
-      },
-      {
-        "franchiseId": "pacers",
-        "season": "1997-98",
-        "wins": 16,
-        "games": 160,
-        "targetWinRate": 0.05775862068965518,
-        "playerIds": [
-          "p-349",
-          "p-397",
-          "p-904",
-          "p-905",
-          "p-213"
         ]
       },
       {
@@ -13387,6 +13541,20 @@
       },
       {
         "franchiseId": "pacers",
+        "season": "2014-15",
+        "wins": 10,
+        "games": 160,
+        "targetWinRate": 0.05775862068965518,
+        "playerIds": [
+          "p-201588",
+          "p-201155",
+          "p-203524",
+          "p-2561",
+          "p-201579"
+        ]
+      },
+      {
+        "franchiseId": "pacers",
         "season": "1978-79",
         "wins": 3,
         "games": 160,
@@ -13485,6 +13653,20 @@
       },
       {
         "franchiseId": "clippers",
+        "season": "2025-26",
+        "wins": 43,
+        "games": 160,
+        "targetWinRate": 0.05982758620689656,
+        "playerIds": [
+          "p-201935",
+          "p-1627739",
+          "p-202695",
+          "p-1628381",
+          "p-201572"
+        ]
+      },
+      {
+        "franchiseId": "clippers",
         "season": "1990-91",
         "wins": 1,
         "games": 160,
@@ -13523,20 +13705,6 @@
           "p-2250",
           "p-1882",
           "p-2549"
-        ]
-      },
-      {
-        "franchiseId": "clippers",
-        "season": "1985-86",
-        "wins": 9,
-        "games": 160,
-        "targetWinRate": 0.05982758620689656,
-        "playerIds": [
-          "p-77721",
-          "p-76834",
-          "p-77160",
-          "p-77487",
-          "p-104"
         ]
       },
       {
@@ -13695,6 +13863,20 @@
       },
       {
         "franchiseId": "clippers",
+        "season": "2005-06",
+        "wins": 19,
+        "games": 160,
+        "targetWinRate": 0.05982758620689656,
+        "playerIds": [
+          "p-208",
+          "p-1749",
+          "p-2624",
+          "p-1882",
+          "p-2549"
+        ]
+      },
+      {
+        "franchiseId": "clippers",
         "season": "2010-11",
         "wins": 15,
         "games": 160,
@@ -13817,20 +13999,6 @@
           "p-940",
           "p-80",
           "p-262"
-        ]
-      },
-      {
-        "franchiseId": "clippers",
-        "season": "1988-89",
-        "wins": 4,
-        "games": 160,
-        "targetWinRate": 0.05982758620689656,
-        "playerIds": [
-          "p-202",
-          "p-76497",
-          "p-293",
-          "p-80",
-          "p-104"
         ]
       },
       {
@@ -13989,6 +14157,20 @@
       },
       {
         "franchiseId": "clippers",
+        "season": "1983-84",
+        "wins": 2,
+        "games": 160,
+        "targetWinRate": 0.05982758620689656,
+        "playerIds": [
+          "p-77721",
+          "p-77034",
+          "p-77239",
+          "p-187",
+          "p-76583"
+        ]
+      },
+      {
+        "franchiseId": "clippers",
         "season": "1997-98",
         "wins": 3,
         "games": 160,
@@ -14003,6 +14185,20 @@
       },
       {
         "franchiseId": "clippers",
+        "season": "2007-08",
+        "wins": 5,
+        "games": 160,
+        "targetWinRate": 0.05982758620689656,
+        "playerIds": [
+          "p-1510",
+          "p-1749",
+          "p-201154",
+          "p-1894",
+          "p-2549"
+        ]
+      },
+      {
+        "franchiseId": "clippers",
         "season": "2019-20",
         "wins": 33,
         "games": 160,
@@ -14013,6 +14209,20 @@
           "p-202695",
           "p-1626149",
           "p-1627826"
+        ]
+      },
+      {
+        "franchiseId": "clippers",
+        "season": "2006-07",
+        "wins": 7,
+        "games": 160,
+        "targetWinRate": 0.05982758620689656,
+        "playerIds": [
+          "p-2733",
+          "p-1749",
+          "p-1894",
+          "p-1882",
+          "p-2549"
         ]
       },
       {
@@ -14115,6 +14325,20 @@
       },
       {
         "franchiseId": "lakers",
+        "season": "1991-92",
+        "wins": 16,
+        "games": 160,
+        "targetWinRate": 0.07431034482758621,
+        "playerIds": [
+          "p-9",
+          "p-2",
+          "p-64",
+          "p-920",
+          "p-922"
+        ]
+      },
+      {
+        "franchiseId": "lakers",
         "season": "1970-71",
         "wins": 1,
         "games": 160,
@@ -14213,20 +14437,6 @@
       },
       {
         "franchiseId": "lakers",
-        "season": "1971-72",
-        "wins": 11,
-        "games": 160,
-        "targetWinRate": 0.07431034482758621,
-        "playerIds": [
-          "p-78497",
-          "p-76832",
-          "p-77554",
-          "p-76916",
-          "p-76375"
-        ]
-      },
-      {
-        "franchiseId": "lakers",
         "season": "1992-93",
         "wins": 6,
         "games": 160,
@@ -14250,6 +14460,20 @@
           "p-2",
           "p-1460",
           "p-920",
+          "p-76003"
+        ]
+      },
+      {
+        "franchiseId": "lakers",
+        "season": "1979-80",
+        "wins": 17,
+        "games": 160,
+        "targetWinRate": 0.07431034482758621,
+        "playerIds": [
+          "p-77721",
+          "p-77142",
+          "p-76981",
+          "p-78532",
           "p-76003"
         ]
       },
@@ -14349,6 +14573,20 @@
           "p-1628972",
           "p-2544",
           "p-203076"
+        ]
+      },
+      {
+        "franchiseId": "lakers",
+        "season": "1978-79",
+        "wins": 10,
+        "games": 160,
+        "targetWinRate": 0.07431034482758621,
+        "playerIds": [
+          "p-77721",
+          "p-76204",
+          "p-76350",
+          "p-78532",
+          "p-76003"
         ]
       },
       {
@@ -14461,6 +14699,34 @@
           "p-77340",
           "p-76127",
           "p-78526"
+        ]
+      },
+      {
+        "franchiseId": "lakers",
+        "season": "2021-22",
+        "wins": 40,
+        "games": 160,
+        "targetWinRate": 0.07431034482758621,
+        "playerIds": [
+          "p-201566",
+          "p-1628370",
+          "p-2546",
+          "p-2544",
+          "p-203076"
+        ]
+      },
+      {
+        "franchiseId": "lakers",
+        "season": "1998-99",
+        "wins": 8,
+        "games": 160,
+        "targetWinRate": 0.07431034482758621,
+        "playerIds": [
+          "p-157",
+          "p-965",
+          "p-977",
+          "p-109",
+          "p-406"
         ]
       },
       {
@@ -14605,6 +14871,34 @@
       },
       {
         "franchiseId": "lakers",
+        "season": "1990-91",
+        "wins": 18,
+        "games": 160,
+        "targetWinRate": 0.07431034482758621,
+        "playerIds": [
+          "p-77142",
+          "p-2",
+          "p-1460",
+          "p-64",
+          "p-124"
+        ]
+      },
+      {
+        "franchiseId": "lakers",
+        "season": "1981-82",
+        "wins": 12,
+        "games": 160,
+        "targetWinRate": 0.07431034482758621,
+        "playerIds": [
+          "p-77142",
+          "p-77721",
+          "p-78532",
+          "p-77334",
+          "p-76003"
+        ]
+      },
+      {
+        "franchiseId": "lakers",
         "season": "1996-97",
         "wins": 18,
         "games": 160,
@@ -14619,16 +14913,16 @@
       },
       {
         "franchiseId": "lakers",
-        "season": "1972-73",
-        "wins": 4,
+        "season": "1977-78",
+        "wins": 7,
         "games": 160,
         "targetWinRate": 0.07431034482758621,
         "playerIds": [
-          "p-78497",
-          "p-76832",
-          "p-77554",
-          "p-76253",
-          "p-76375"
+          "p-77721",
+          "p-78097",
+          "p-76734",
+          "p-76504",
+          "p-76003"
         ]
       },
       {
@@ -14843,6 +15137,20 @@
       },
       {
         "franchiseId": "lakers",
+        "season": "1980-81",
+        "wins": 16,
+        "games": 160,
+        "targetWinRate": 0.07431034482758621,
+        "playerIds": [
+          "p-77721",
+          "p-77142",
+          "p-76248",
+          "p-78532",
+          "p-76003"
+        ]
+      },
+      {
+        "franchiseId": "lakers",
         "season": "1962-63",
         "wins": 4,
         "games": 160,
@@ -14853,6 +15161,20 @@
           "p-77340",
           "p-76127",
           "p-77311"
+        ]
+      },
+      {
+        "franchiseId": "lakers",
+        "season": "1982-83",
+        "wins": 13,
+        "games": 160,
+        "targetWinRate": 0.07431034482758621,
+        "playerIds": [
+          "p-77142",
+          "p-77721",
+          "p-78532",
+          "p-1460",
+          "p-76003"
         ]
       },
       {
@@ -15375,48 +15697,6 @@
       },
       {
         "franchiseId": "heat",
-        "season": "1993-94",
-        "wins": 9,
-        "games": 160,
-        "targetWinRate": 0.06396551724137932,
-        "playerIds": [
-          "p-216",
-          "p-120",
-          "p-779",
-          "p-3",
-          "p-938"
-        ]
-      },
-      {
-        "franchiseId": "heat",
-        "season": "1994-95",
-        "wins": 7,
-        "games": 160,
-        "targetWinRate": 0.06396551724137932,
-        "playerIds": [
-          "p-902",
-          "p-779",
-          "p-927",
-          "p-182",
-          "p-761"
-        ]
-      },
-      {
-        "franchiseId": "heat",
-        "season": "2007-08",
-        "wins": 6,
-        "games": 160,
-        "targetWinRate": 0.06396551724137932,
-        "playerIds": [
-          "p-2548",
-          "p-1715",
-          "p-1729",
-          "p-2617",
-          "p-406"
-        ]
-      },
-      {
-        "franchiseId": "heat",
         "season": "2011-12",
         "wins": 20,
         "games": 160,
@@ -15445,34 +15725,6 @@
       },
       {
         "franchiseId": "heat",
-        "season": "1988-89",
-        "wins": 2,
-        "games": 160,
-        "targetWinRate": 0.06396551724137932,
-        "playerIds": [
-          "p-600009",
-          "p-236",
-          "p-3",
-          "p-1631",
-          "p-938"
-        ]
-      },
-      {
-        "franchiseId": "heat",
-        "season": "1991-92",
-        "wins": 3,
-        "games": 160,
-        "targetWinRate": 0.06396551724137932,
-        "playerIds": [
-          "p-902",
-          "p-236",
-          "p-779",
-          "p-3",
-          "p-938"
-        ]
-      },
-      {
-        "franchiseId": "heat",
         "season": "2018-19",
         "wins": 18,
         "games": 160,
@@ -15483,20 +15735,6 @@
           "p-1626159",
           "p-203482",
           "p-1628389"
-        ]
-      },
-      {
-        "franchiseId": "heat",
-        "season": "2001-02",
-        "wins": 4,
-        "games": 160,
-        "targetWinRate": 0.06396551724137932,
-        "playerIds": [
-          "p-393",
-          "p-224",
-          "p-383",
-          "p-1752",
-          "p-297"
         ]
       },
       {
@@ -15543,6 +15781,20 @@
       },
       {
         "franchiseId": "heat",
+        "season": "2003-04",
+        "wins": 7,
+        "games": 160,
+        "targetWinRate": 0.06396551724137932,
+        "playerIds": [
+          "p-1747",
+          "p-224",
+          "p-2406",
+          "p-1885",
+          "p-258"
+        ]
+      },
+      {
+        "franchiseId": "heat",
         "season": "2025-26",
         "wins": 31,
         "games": 160,
@@ -15571,16 +15823,16 @@
       },
       {
         "franchiseId": "heat",
-        "season": "1989-90",
-        "wins": 3,
+        "season": "2015-16",
+        "wins": 9,
         "games": 160,
         "targetWinRate": 0.06396551724137932,
         "playerIds": [
-          "p-428",
-          "p-236",
-          "p-779",
-          "p-1631",
-          "p-938"
+          "p-201609",
+          "p-2548",
+          "p-1626159",
+          "p-2736",
+          "p-202355"
         ]
       },
       {
@@ -15613,6 +15865,20 @@
       },
       {
         "franchiseId": "heat",
+        "season": "2014-15",
+        "wins": 27,
+        "games": 160,
+        "targetWinRate": 0.06396551724137932,
+        "playerIds": [
+          "p-2548",
+          "p-201596",
+          "p-2736",
+          "p-2365",
+          "p-202355"
+        ]
+      },
+      {
+        "franchiseId": "heat",
         "season": "2019-20",
         "wins": 25,
         "games": 160,
@@ -15623,6 +15889,20 @@
           "p-1627884",
           "p-202710",
           "p-1628389"
+        ]
+      },
+      {
+        "franchiseId": "heat",
+        "season": "2009-10",
+        "wins": 8,
+        "games": 160,
+        "targetWinRate": 0.06396551724137932,
+        "playerIds": [
+          "p-2548",
+          "p-201596",
+          "p-201563",
+          "p-2617",
+          "p-979"
         ]
       },
       {
@@ -15655,20 +15935,6 @@
       },
       {
         "franchiseId": "heat",
-        "season": "2006-07",
-        "wins": 21,
-        "games": 160,
-        "targetWinRate": 0.06396551724137932,
-        "playerIds": [
-          "p-2548",
-          "p-1715",
-          "p-1899",
-          "p-2617",
-          "p-297"
-        ]
-      },
-      {
-        "franchiseId": "heat",
         "season": "2016-17",
         "wins": 14,
         "games": 160,
@@ -15679,20 +15945,6 @@
           "p-202337",
           "p-201949",
           "p-202355"
-        ]
-      },
-      {
-        "franchiseId": "heat",
-        "season": "1992-93",
-        "wins": 0,
-        "games": 160,
-        "targetWinRate": 0.06396551724137932,
-        "playerIds": [
-          "p-902",
-          "p-120",
-          "p-779",
-          "p-3",
-          "p-938"
         ]
       },
       {
@@ -15710,31 +15962,17 @@
         ]
       },
       {
-        "franchiseId": "heat",
-        "season": "1990-91",
-        "wins": 2,
-        "games": 160,
-        "targetWinRate": 0.06396551724137932,
-        "playerIds": [
-          "p-428",
-          "p-236",
-          "p-779",
-          "p-3",
-          "p-938"
-        ]
-      },
-      {
         "franchiseId": "bucks",
-        "season": "1972-73",
-        "wins": 3,
+        "season": "2022-23",
+        "wins": 50,
         "games": 160,
         "targetWinRate": 0.051551724137931035,
         "playerIds": [
-          "p-600015",
-          "p-76027",
-          "p-76500",
-          "p-77835",
-          "p-76003"
+          "p-201950",
+          "p-1628960",
+          "p-1626171",
+          "p-203507",
+          "p-201572"
         ]
       },
       {
@@ -15823,16 +16061,44 @@
       },
       {
         "franchiseId": "bucks",
-        "season": "1971-72",
+        "season": "1979-80",
         "wins": 8,
         "games": 160,
         "targetWinRate": 0.051551724137931035,
         "playerIds": [
-          "p-600015",
-          "p-76027",
-          "p-76187",
-          "p-76500",
-          "p-76003"
+          "p-76296",
+          "p-78600",
+          "p-77586",
+          "p-77160",
+          "p-76365"
+        ]
+      },
+      {
+        "franchiseId": "bucks",
+        "season": "1981-82",
+        "wins": 9,
+        "games": 160,
+        "targetWinRate": 0.051551724137931035,
+        "playerIds": [
+          "p-77626",
+          "p-76296",
+          "p-77160",
+          "p-77168",
+          "p-600005"
+        ]
+      },
+      {
+        "franchiseId": "bucks",
+        "season": "1998-99",
+        "wins": 8,
+        "games": 160,
+        "targetWinRate": 0.051551724137931035,
+        "playerIds": [
+          "p-951",
+          "p-688",
+          "p-209",
+          "p-299",
+          "p-911"
         ]
       },
       {
@@ -15907,6 +16173,62 @@
       },
       {
         "franchiseId": "bucks",
+        "season": "2010-11",
+        "wins": 11,
+        "games": 160,
+        "targetWinRate": 0.051551724137931035,
+        "playerIds": [
+          "p-201943",
+          "p-2422",
+          "p-2568",
+          "p-201601",
+          "p-101106"
+        ]
+      },
+      {
+        "franchiseId": "bucks",
+        "season": "2011-12",
+        "wins": 11,
+        "games": 160,
+        "targetWinRate": 0.051551724137931035,
+        "playerIds": [
+          "p-201943",
+          "p-2568",
+          "p-2399",
+          "p-101141",
+          "p-2400"
+        ]
+      },
+      {
+        "franchiseId": "bucks",
+        "season": "2009-10",
+        "wins": 11,
+        "games": 160,
+        "targetWinRate": 0.051551724137931035,
+        "playerIds": [
+          "p-201943",
+          "p-2568",
+          "p-201601",
+          "p-101141",
+          "p-101106"
+        ]
+      },
+      {
+        "franchiseId": "bucks",
+        "season": "1977-78",
+        "wins": 0,
+        "games": 160,
+        "targetWinRate": 0.051551724137931035,
+        "playerIds": [
+          "p-76296",
+          "p-78600",
+          "p-77586",
+          "p-77160",
+          "p-76806"
+        ]
+      },
+      {
+        "franchiseId": "bucks",
         "season": "2025-26",
         "wins": 45,
         "games": 160,
@@ -15931,6 +16253,20 @@
           "p-203114",
           "p-203507",
           "p-2585"
+        ]
+      },
+      {
+        "franchiseId": "bucks",
+        "season": "2015-16",
+        "wins": 8,
+        "games": 160,
+        "targetWinRate": 0.051551724137931035,
+        "playerIds": [
+          "p-203487",
+          "p-203114",
+          "p-203953",
+          "p-203507",
+          "p-202328"
         ]
       },
       {
@@ -16005,6 +16341,34 @@
       },
       {
         "franchiseId": "bucks",
+        "season": "1983-84",
+        "wins": 8,
+        "games": 160,
+        "targetWinRate": 0.051551724137931035,
+        "playerIds": [
+          "p-77626",
+          "p-77879",
+          "p-76252",
+          "p-77160",
+          "p-600005"
+        ]
+      },
+      {
+        "franchiseId": "bucks",
+        "season": "1991-92",
+        "wins": 5,
+        "games": 160,
+        "targetWinRate": 0.051551724137931035,
+        "playerIds": [
+          "p-77081",
+          "p-926",
+          "p-122",
+          "p-1474",
+          "p-77449"
+        ]
+      },
+      {
+        "franchiseId": "bucks",
         "season": "2007-08",
         "wins": 9,
         "games": 160,
@@ -16047,6 +16411,20 @@
       },
       {
         "franchiseId": "bucks",
+        "season": "2016-17",
+        "wins": 25,
+        "games": 160,
+        "targetWinRate": 0.051551724137931035,
+        "playerIds": [
+          "p-203521",
+          "p-203507",
+          "p-203503",
+          "p-203953",
+          "p-202328"
+        ]
+      },
+      {
+        "franchiseId": "bucks",
         "season": "1990-91",
         "wins": 13,
         "games": 160,
@@ -16071,6 +16449,34 @@
           "p-898",
           "p-138",
           "p-7"
+        ]
+      },
+      {
+        "franchiseId": "bucks",
+        "season": "2018-19",
+        "wins": 50,
+        "games": 160,
+        "targetWinRate": 0.051551724137931035,
+        "playerIds": [
+          "p-202339",
+          "p-1627763",
+          "p-203114",
+          "p-203507",
+          "p-201572"
+        ]
+      },
+      {
+        "franchiseId": "bucks",
+        "season": "2012-13",
+        "wins": 14,
+        "games": 160,
+        "targetWinRate": 0.051551724137931035,
+        "playerIds": [
+          "p-201943",
+          "p-101145",
+          "p-2399",
+          "p-101141",
+          "p-202336"
         ]
       },
       {
@@ -16103,58 +16509,86 @@
       },
       {
         "franchiseId": "bucks",
-        "season": "1974-75",
-        "wins": 3,
+        "season": "2023-24",
+        "wins": 61,
         "games": 160,
         "targetWinRate": 0.051551724137931035,
         "playerIds": [
-          "p-77533",
-          "p-78327",
-          "p-76500",
-          "p-78460",
-          "p-76003"
+          "p-203081",
+          "p-1627736",
+          "p-1626171",
+          "p-203507",
+          "p-201572"
         ]
       },
       {
         "franchiseId": "bucks",
-        "season": "1969-70",
-        "wins": 4,
+        "season": "1982-83",
+        "wins": 6,
         "games": 160,
         "targetWinRate": 0.051551724137931035,
         "playerIds": [
-          "p-77988",
-          "p-77533",
-          "p-76500",
-          "p-78190",
-          "p-76003"
+          "p-77626",
+          "p-77879",
+          "p-76252",
+          "p-77160",
+          "p-175"
         ]
       },
       {
         "franchiseId": "bucks",
-        "season": "1970-71",
-        "wins": 3,
+        "season": "2019-20",
+        "wins": 46,
         "games": 160,
         "targetWinRate": 0.051551724137931035,
         "playerIds": [
-          "p-600015",
-          "p-77533",
-          "p-78190",
-          "p-76500",
-          "p-76003"
+          "p-202339",
+          "p-202083",
+          "p-203114",
+          "p-203507",
+          "p-201572"
         ]
       },
       {
         "franchiseId": "bucks",
-        "season": "1973-74",
-        "wins": 5,
+        "season": "2024-25",
+        "wins": 43,
         "games": 160,
         "targetWinRate": 0.051551724137931035,
         "playerIds": [
-          "p-600015",
-          "p-76027",
-          "p-76500",
-          "p-77835",
-          "p-76003"
+          "p-203081",
+          "p-1641748",
+          "p-1627752",
+          "p-203507",
+          "p-201572"
+        ]
+      },
+      {
+        "franchiseId": "bucks",
+        "season": "2020-21",
+        "wins": 42,
+        "games": 160,
+        "targetWinRate": 0.051551724137931035,
+        "playerIds": [
+          "p-201950",
+          "p-1628978",
+          "p-203114",
+          "p-203507",
+          "p-201572"
+        ]
+      },
+      {
+        "franchiseId": "bucks",
+        "season": "1978-79",
+        "wins": 9,
+        "games": 160,
+        "targetWinRate": 0.051551724137931035,
+        "playerIds": [
+          "p-78600",
+          "p-76899",
+          "p-76252",
+          "p-77160",
+          "p-76154"
         ]
       },
       {
@@ -16201,6 +16635,20 @@
       },
       {
         "franchiseId": "bucks",
+        "season": "1980-81",
+        "wins": 6,
+        "games": 160,
+        "targetWinRate": 0.051551724137931035,
+        "playerIds": [
+          "p-76296",
+          "p-77626",
+          "p-77168",
+          "p-77160",
+          "p-600005"
+        ]
+      },
+      {
+        "franchiseId": "bucks",
         "season": "1976-77",
         "wins": 1,
         "games": 160,
@@ -16239,6 +16687,20 @@
           "p-203937",
           "p-1630183",
           "p-203497"
+        ]
+      },
+      {
+        "franchiseId": "timberwolves",
+        "season": "2004-05",
+        "wins": 19,
+        "games": 160,
+        "targetWinRate": 0.04948275862068966,
+        "playerIds": [
+          "p-84",
+          "p-2239",
+          "p-1887",
+          "p-2204",
+          "p-708"
         ]
       },
       {
@@ -16299,16 +16761,30 @@
       },
       {
         "franchiseId": "timberwolves",
-        "season": "1993-94",
-        "wins": 4,
+        "season": "2001-02",
+        "wins": 12,
         "games": 160,
         "targetWinRate": 0.04948275862068966,
         "playerIds": [
-          "p-52",
-          "p-375",
-          "p-456",
-          "p-363",
-          "p-1479"
+          "p-1497",
+          "p-324",
+          "p-1887",
+          "p-708",
+          "p-1725"
+        ]
+      },
+      {
+        "franchiseId": "timberwolves",
+        "season": "2023-24",
+        "wins": 31,
+        "games": 160,
+        "targetWinRate": 0.04948275862068966,
+        "playerIds": [
+          "p-201144",
+          "p-1630162",
+          "p-1630183",
+          "p-1626157",
+          "p-203497"
         ]
       },
       {
@@ -16411,6 +16887,20 @@
       },
       {
         "franchiseId": "timberwolves",
+        "season": "2003-04",
+        "wins": 8,
+        "games": 160,
+        "targetWinRate": 0.04948275862068966,
+        "playerIds": [
+          "p-208",
+          "p-2239",
+          "p-84",
+          "p-2058",
+          "p-708"
+        ]
+      },
+      {
+        "franchiseId": "timberwolves",
         "season": "1998-99",
         "wins": 1,
         "games": 160,
@@ -16481,20 +16971,6 @@
       },
       {
         "franchiseId": "timberwolves",
-        "season": "1992-93",
-        "wins": 6,
-        "games": 160,
-        "targetWinRate": 0.04948275862068966,
-        "playerIds": [
-          "p-52",
-          "p-28",
-          "p-456",
-          "p-363",
-          "p-280"
-        ]
-      },
-      {
-        "franchiseId": "timberwolves",
         "season": "2017-18",
         "wins": 28,
         "games": 160,
@@ -16547,20 +17023,6 @@
           "p-76338",
           "p-417",
           "p-280"
-        ]
-      },
-      {
-        "franchiseId": "timberwolves",
-        "season": "2010-11",
-        "wins": 11,
-        "games": 160,
-        "targetWinRate": 0.04948275862068966,
-        "playerIds": [
-          "p-2557",
-          "p-202325",
-          "p-201563",
-          "p-201567",
-          "p-2545"
         ]
       },
       {
@@ -16687,34 +17149,6 @@
           "p-201583",
           "p-203076",
           "p-201600"
-        ]
-      },
-      {
-        "franchiseId": "pelicans",
-        "season": "2005-06",
-        "wins": 5,
-        "games": 160,
-        "targetWinRate": 0.039137931034482765,
-        "playerIds": [
-          "p-101108",
-          "p-2049",
-          "p-2046",
-          "p-2561",
-          "p-136"
-        ]
-      },
-      {
-        "franchiseId": "pelicans",
-        "season": "2002-03",
-        "wins": 7,
-        "games": 160,
-        "targetWinRate": 0.039137931034482765,
-        "playerIds": [
-          "p-1884",
-          "p-133",
-          "p-469",
-          "p-136",
-          "p-2048"
         ]
       },
       {
@@ -16859,20 +17293,6 @@
       },
       {
         "franchiseId": "pelicans",
-        "season": "2003-04",
-        "wins": 5,
-        "games": 160,
-        "targetWinRate": 0.039137931034482765,
-        "playerIds": [
-          "p-1884",
-          "p-353",
-          "p-248",
-          "p-136",
-          "p-2048"
-        ]
-      },
-      {
-        "franchiseId": "pelicans",
         "season": "2019-20",
         "wins": 18,
         "games": 160,
@@ -16971,20 +17391,6 @@
       },
       {
         "franchiseId": "pelicans",
-        "season": "2004-05",
-        "wins": 9,
-        "games": 160,
-        "targetWinRate": 0.039137931034482765,
-        "playerIds": [
-          "p-2424",
-          "p-2747",
-          "p-1924",
-          "p-136",
-          "p-2365"
-        ]
-      },
-      {
-        "franchiseId": "pelicans",
         "season": "2022-23",
         "wins": 14,
         "games": 160,
@@ -17055,16 +17461,16 @@
       },
       {
         "franchiseId": "knicks",
-        "season": "1996-97",
-        "wins": 6,
+        "season": "2015-16",
+        "wins": 8,
         "games": 160,
         "targetWinRate": 0.08879310344827587,
         "playerIds": [
-          "p-164",
-          "p-275",
-          "p-913",
-          "p-891",
-          "p-121"
+          "p-204038",
+          "p-201167",
+          "p-2546",
+          "p-204001",
+          "p-201577"
         ]
       },
       {
@@ -17093,6 +17499,20 @@
           "p-193",
           "p-891",
           "p-121"
+        ]
+      },
+      {
+        "franchiseId": "knicks",
+        "season": "2016-17",
+        "wins": 11,
+        "games": 160,
+        "targetWinRate": 0.08879310344827587,
+        "playerIds": [
+          "p-201565",
+          "p-201584",
+          "p-2546",
+          "p-204001",
+          "p-1626195"
         ]
       },
       {
@@ -17139,16 +17559,16 @@
       },
       {
         "franchiseId": "knicks",
-        "season": "1973-74",
-        "wins": 2,
+        "season": "2000-01",
+        "wins": 9,
         "games": 160,
         "targetWinRate": 0.08879310344827587,
         "playerIds": [
-          "p-76750",
-          "p-77578",
-          "p-77106",
-          "p-76545",
-          "p-76806"
+          "p-275",
+          "p-84",
+          "p-779",
+          "p-703",
+          "p-948"
         ]
       },
       {
@@ -17181,6 +17601,20 @@
       },
       {
         "franchiseId": "knicks",
+        "season": "2002-03",
+        "wins": 5,
+        "games": 160,
+        "targetWinRate": 0.08879310344827587,
+        "playerIds": [
+          "p-275",
+          "p-84",
+          "p-221",
+          "p-703",
+          "p-970"
+        ]
+      },
+      {
+        "franchiseId": "knicks",
         "season": "2005-06",
         "wins": 4,
         "games": 160,
@@ -17191,20 +17625,6 @@
           "p-2047",
           "p-101112",
           "p-2201"
-        ]
-      },
-      {
-        "franchiseId": "knicks",
-        "season": "1978-79",
-        "wins": 3,
-        "games": 160,
-        "targetWinRate": 0.08879310344827587,
-        "playerIds": [
-          "p-78571",
-          "p-76402",
-          "p-76830",
-          "p-77289",
-          "p-77498"
         ]
       },
       {
@@ -17247,6 +17667,20 @@
           "p-203493",
           "p-203944",
           "p-203457"
+        ]
+      },
+      {
+        "franchiseId": "knicks",
+        "season": "2014-15",
+        "wins": 6,
+        "games": 160,
+        "targetWinRate": 0.08879310344827587,
+        "playerIds": [
+          "p-204038",
+          "p-203499",
+          "p-203112",
+          "p-2546",
+          "p-201160"
         ]
       },
       {
@@ -17321,34 +17755,6 @@
       },
       {
         "franchiseId": "knicks",
-        "season": "1981-82",
-        "wins": 6,
-        "games": 160,
-        "targetWinRate": 0.08879310344827587,
-        "playerIds": [
-          "p-77952",
-          "p-78200",
-          "p-78047",
-          "p-77420",
-          "p-76362"
-        ]
-      },
-      {
-        "franchiseId": "knicks",
-        "season": "1972-73",
-        "wins": 0,
-        "games": 160,
-        "targetWinRate": 0.08879310344827587,
-        "playerIds": [
-          "p-76750",
-          "p-600006",
-          "p-76233",
-          "p-76545",
-          "p-77929"
-        ]
-      },
-      {
-        "franchiseId": "knicks",
         "season": "1987-88",
         "wins": 8,
         "games": 160,
@@ -17391,44 +17797,16 @@
       },
       {
         "franchiseId": "knicks",
-        "season": "1976-77",
-        "wins": 5,
+        "season": "2007-08",
+        "wins": 10,
         "games": 160,
         "targetWinRate": 0.08879310344827587,
         "playerIds": [
-          "p-76750",
-          "p-600006",
-          "p-77554",
-          "p-78133",
-          "p-77498"
-        ]
-      },
-      {
-        "franchiseId": "knicks",
-        "season": "1970-71",
-        "wins": 1,
-        "games": 160,
-        "targetWinRate": 0.08879310344827587,
-        "playerIds": [
-          "p-76750",
-          "p-76107",
-          "p-76233",
-          "p-76545",
-          "p-77929"
-        ]
-      },
-      {
-        "franchiseId": "knicks",
-        "season": "1997-98",
-        "wins": 4,
-        "games": 160,
-        "targetWinRate": 0.08879310344827587,
-        "playerIds": [
-          "p-369",
-          "p-275",
-          "p-913",
-          "p-891",
-          "p-201"
+          "p-2037",
+          "p-101126",
+          "p-101135",
+          "p-2216",
+          "p-2201"
         ]
       },
       {
@@ -17447,20 +17825,6 @@
       },
       {
         "franchiseId": "knicks",
-        "season": "1977-78",
-        "wins": 3,
-        "games": 160,
-        "targetWinRate": 0.08879310344827587,
-        "playerIds": [
-          "p-600006",
-          "p-76402",
-          "p-76981",
-          "p-78133",
-          "p-77498"
-        ]
-      },
-      {
-        "franchiseId": "knicks",
         "season": "2006-07",
         "wins": 4,
         "games": 160,
@@ -17475,6 +17839,20 @@
       },
       {
         "franchiseId": "knicks",
+        "season": "2008-09",
+        "wins": 3,
+        "games": 160,
+        "targetWinRate": 0.08879310344827587,
+        "playerIds": [
+          "p-2768",
+          "p-101126",
+          "p-201163",
+          "p-1733",
+          "p-101135"
+        ]
+      },
+      {
+        "franchiseId": "knicks",
         "season": "1988-89",
         "wins": 15,
         "games": 160,
@@ -17485,34 +17863,6 @@
           "p-271",
           "p-891",
           "p-121"
-        ]
-      },
-      {
-        "franchiseId": "knicks",
-        "season": "1969-70",
-        "wins": 2,
-        "games": 160,
-        "targetWinRate": 0.08879310344827587,
-        "playerIds": [
-          "p-76750",
-          "p-76107",
-          "p-76233",
-          "p-76545",
-          "p-77929"
-        ]
-      },
-      {
-        "franchiseId": "knicks",
-        "season": "1971-72",
-        "wins": 1,
-        "games": 160,
-        "targetWinRate": 0.08879310344827587,
-        "playerIds": [
-          "p-76750",
-          "p-76107",
-          "p-76545",
-          "p-77418",
-          "p-77894"
         ]
       },
       {
@@ -17545,6 +17895,20 @@
       },
       {
         "franchiseId": "knicks",
+        "season": "1994-95",
+        "wins": 10,
+        "games": 160,
+        "targetWinRate": 0.08879310344827587,
+        "playerIds": [
+          "p-157",
+          "p-317",
+          "p-293",
+          "p-193",
+          "p-121"
+        ]
+      },
+      {
+        "franchiseId": "knicks",
         "season": "1982-83",
         "wins": 6,
         "games": 160,
@@ -17573,6 +17937,34 @@
       },
       {
         "franchiseId": "knicks",
+        "season": "1995-96",
+        "wins": 10,
+        "games": 160,
+        "targetWinRate": 0.08879310344827587,
+        "playerIds": [
+          "p-157",
+          "p-317",
+          "p-891",
+          "p-193",
+          "p-121"
+        ]
+      },
+      {
+        "franchiseId": "knicks",
+        "season": "2001-02",
+        "wins": 2,
+        "games": 160,
+        "targetWinRate": 0.08879310344827587,
+        "playerIds": [
+          "p-349",
+          "p-275",
+          "p-84",
+          "p-703",
+          "p-970"
+        ]
+      },
+      {
+        "franchiseId": "knicks",
         "season": "2004-05",
         "wins": 6,
         "games": 160,
@@ -17587,16 +17979,16 @@
       },
       {
         "franchiseId": "knicks",
-        "season": "1968-69",
-        "wins": 2,
+        "season": "2009-10",
+        "wins": 12,
         "games": 160,
         "targetWinRate": 0.08879310344827587,
         "playerIds": [
-          "p-76750",
-          "p-76107",
-          "p-76233",
-          "p-76545",
-          "p-77929"
+          "p-2768",
+          "p-201163",
+          "p-201568",
+          "p-1733",
+          "p-101135"
         ]
       },
       {
@@ -17653,6 +18045,20 @@
           "p-1626171",
           "p-203944",
           "p-1629011"
+        ]
+      },
+      {
+        "franchiseId": "knicks",
+        "season": "2003-04",
+        "wins": 5,
+        "games": 160,
+        "targetWinRate": 0.08879310344827587,
+        "playerIds": [
+          "p-950",
+          "p-275",
+          "p-1000",
+          "p-703",
+          "p-87"
         ]
       },
       {
@@ -17755,30 +18161,16 @@
       },
       {
         "franchiseId": "thunder",
-        "season": "2001-02",
-        "wins": 7,
+        "season": "2002-03",
+        "wins": 4,
         "games": 160,
         "targetWinRate": 0.037068965517241384,
         "playerIds": [
           "p-56",
           "p-699",
-          "p-2046",
           "p-1740",
+          "p-2501",
           "p-1542"
-        ]
-      },
-      {
-        "franchiseId": "thunder",
-        "season": "1993-94",
-        "wins": 13,
-        "games": 160,
-        "targetWinRate": 0.037068965517241384,
-        "playerIds": [
-          "p-56",
-          "p-383",
-          "p-96",
-          "p-431",
-          "p-262"
         ]
       },
       {
@@ -17811,20 +18203,6 @@
       },
       {
         "franchiseId": "thunder",
-        "season": "1971-72",
-        "wins": 4,
-        "games": 160,
-        "targetWinRate": 0.037068965517241384,
-        "playerIds": [
-          "p-78530",
-          "p-78213",
-          "p-77295",
-          "p-76981",
-          "p-76002"
-        ]
-      },
-      {
-        "franchiseId": "thunder",
         "season": "1970-71",
         "wins": 2,
         "games": 160,
@@ -17849,6 +18227,20 @@
           "p-1631114",
           "p-1631119",
           "p-1631096"
+        ]
+      },
+      {
+        "franchiseId": "thunder",
+        "season": "1996-97",
+        "wins": 22,
+        "games": 160,
+        "targetWinRate": 0.037068965517241384,
+        "playerIds": [
+          "p-56",
+          "p-765",
+          "p-96",
+          "p-431",
+          "p-64"
         ]
       },
       {
@@ -17909,6 +18301,20 @@
       },
       {
         "franchiseId": "thunder",
+        "season": "1979-80",
+        "wins": 1,
+        "games": 160,
+        "targetWinRate": 0.037068965517241384,
+        "playerIds": [
+          "p-78549",
+          "p-77141",
+          "p-77152",
+          "p-78133",
+          "p-78149"
+        ]
+      },
+      {
+        "franchiseId": "thunder",
         "season": "1991-92",
         "wins": 16,
         "games": 160,
@@ -17947,6 +18353,20 @@
           "p-1627734",
           "p-203460",
           "p-203500"
+        ]
+      },
+      {
+        "franchiseId": "thunder",
+        "season": "1977-78",
+        "wins": 0,
+        "games": 160,
+        "targetWinRate": 0.037068965517241384,
+        "playerIds": [
+          "p-78549",
+          "p-77141",
+          "p-77152",
+          "p-78151",
+          "p-78481"
         ]
       },
       {
@@ -17993,6 +18413,20 @@
       },
       {
         "franchiseId": "thunder",
+        "season": "2017-18",
+        "wins": 15,
+        "games": 160,
+        "targetWinRate": 0.037068965517241384,
+        "playerIds": [
+          "p-201566",
+          "p-101109",
+          "p-202331",
+          "p-2546",
+          "p-203500"
+        ]
+      },
+      {
+        "franchiseId": "thunder",
         "season": "1974-75",
         "wins": 3,
         "games": 160,
@@ -18007,16 +18441,16 @@
       },
       {
         "franchiseId": "thunder",
-        "season": "1994-95",
-        "wins": 18,
+        "season": "1997-98",
+        "wins": 15,
         "games": 160,
         "targetWinRate": 0.037068965517241384,
         "playerIds": [
           "p-56",
-          "p-383",
+          "p-765",
           "p-96",
-          "p-431",
-          "p-911"
+          "p-452",
+          "p-64"
         ]
       },
       {
@@ -18063,6 +18497,20 @@
       },
       {
         "franchiseId": "thunder",
+        "season": "1978-79",
+        "wins": 1,
+        "games": 160,
+        "targetWinRate": 0.037068965517241384,
+        "playerIds": [
+          "p-78549",
+          "p-77141",
+          "p-77152",
+          "p-78133",
+          "p-78149"
+        ]
+      },
+      {
+        "franchiseId": "thunder",
         "season": "2005-06",
         "wins": 10,
         "games": 160,
@@ -18101,20 +18549,6 @@
           "p-201142",
           "p-201145",
           "p-2555"
-        ]
-      },
-      {
-        "franchiseId": "thunder",
-        "season": "2019-20",
-        "wins": 32,
-        "games": 160,
-        "targetWinRate": 0.037068965517241384,
-        "playerIds": [
-          "p-101108",
-          "p-203471",
-          "p-1628983",
-          "p-201568",
-          "p-203500"
         ]
       },
       {
@@ -18213,6 +18647,20 @@
           "p-201145",
           "p-201142",
           "p-201586"
+        ]
+      },
+      {
+        "franchiseId": "thunder",
+        "season": "1995-96",
+        "wins": 28,
+        "games": 160,
+        "targetWinRate": 0.037068965517241384,
+        "playerIds": [
+          "p-56",
+          "p-765",
+          "p-96",
+          "p-431",
+          "p-64"
         ]
       },
       {
@@ -18325,6 +18773,20 @@
           "p-1739",
           "p-452",
           "p-270"
+        ]
+      },
+      {
+        "franchiseId": "thunder",
+        "season": "2004-05",
+        "wins": 16,
+        "games": 160,
+        "targetWinRate": 0.037068965517241384,
+        "playerIds": [
+          "p-2557",
+          "p-951",
+          "p-1740",
+          "p-2501",
+          "p-1744"
         ]
       },
       {
@@ -18623,6 +19085,20 @@
       },
       {
         "franchiseId": "magic",
+        "season": "2005-06",
+        "wins": 5,
+        "games": 160,
+        "targetWinRate": 0.04327586206896552,
+        "playerIds": [
+          "p-1883",
+          "p-2052",
+          "p-2045",
+          "p-2730",
+          "p-1499"
+        ]
+      },
+      {
+        "franchiseId": "magic",
         "season": "2018-19",
         "wins": 16,
         "games": 160,
@@ -18633,6 +19109,34 @@
           "p-203082",
           "p-203932",
           "p-202696"
+        ]
+      },
+      {
+        "franchiseId": "magic",
+        "season": "2004-05",
+        "wins": 6,
+        "games": 160,
+        "targetWinRate": 0.04327586206896552,
+        "playerIds": [
+          "p-1883",
+          "p-2749",
+          "p-2730",
+          "p-1499",
+          "p-1509"
+        ]
+      },
+      {
+        "franchiseId": "magic",
+        "season": "1989-90",
+        "wins": 1,
+        "games": 160,
+        "targetWinRate": 0.04327586206896552,
+        "playerIds": [
+          "p-78310",
+          "p-77946",
+          "p-767",
+          "p-76876",
+          "p-76009"
         ]
       },
       {
@@ -18707,6 +19211,20 @@
       },
       {
         "franchiseId": "magic",
+        "season": "2012-13",
+        "wins": 5,
+        "games": 160,
+        "targetWinRate": 0.04327586206896552,
+        "playerIds": [
+          "p-2749",
+          "p-202734",
+          "p-201167",
+          "p-203090",
+          "p-202696"
+        ]
+      },
+      {
+        "franchiseId": "magic",
         "season": "2002-03",
         "wins": 10,
         "games": 160,
@@ -18721,6 +19239,20 @@
       },
       {
         "franchiseId": "magic",
+        "season": "2013-14",
+        "wins": 4,
+        "games": 160,
+        "targetWinRate": 0.04327586206896552,
+        "playerIds": [
+          "p-2749",
+          "p-203506",
+          "p-201167",
+          "p-202699",
+          "p-202696"
+        ]
+      },
+      {
+        "franchiseId": "magic",
         "season": "2000-01",
         "wins": 12,
         "games": 160,
@@ -18731,6 +19263,20 @@
           "p-2034",
           "p-448",
           "p-680"
+        ]
+      },
+      {
+        "franchiseId": "magic",
+        "season": "1997-98",
+        "wins": 15,
+        "games": 160,
+        "targetWinRate": 0.04327586206896552,
+        "playerIds": [
+          "p-157",
+          "p-98",
+          "p-400",
+          "p-270",
+          "p-448"
         ]
       },
       {
@@ -18773,20 +19319,6 @@
           "p-2045",
           "p-201583",
           "p-2730"
-        ]
-      },
-      {
-        "franchiseId": "sixers",
-        "season": "1975-76",
-        "wins": 4,
-        "games": 160,
-        "targetWinRate": 0.04741379310344828,
-        "playerIds": [
-          "p-76356",
-          "p-76421",
-          "p-77618",
-          "p-77532",
-          "p-76365"
         ]
       },
       {
@@ -18857,6 +19389,20 @@
           "p-2594",
           "p-185",
           "p-2223"
+        ]
+      },
+      {
+        "franchiseId": "sixers",
+        "season": "2011-12",
+        "wins": 10,
+        "games": 160,
+        "targetWinRate": 0.04741379310344828,
+        "playerIds": [
+          "p-201950",
+          "p-2738",
+          "p-201152",
+          "p-1882",
+          "p-201150"
         ]
       },
       {
@@ -18987,20 +19533,6 @@
       },
       {
         "franchiseId": "sixers",
-        "season": "1997-98",
-        "wins": 13,
-        "games": 160,
-        "targetWinRate": 0.04741379310344828,
-        "playerIds": [
-          "p-947",
-          "p-754",
-          "p-1501",
-          "p-934",
-          "p-689"
-        ]
-      },
-      {
-        "franchiseId": "sixers",
         "season": "2022-23",
         "wins": 40,
         "games": 160,
@@ -19015,58 +19547,30 @@
       },
       {
         "franchiseId": "sixers",
-        "season": "1977-78",
-        "wins": 4,
+        "season": "2024-25",
+        "wins": 21,
         "games": 160,
         "targetWinRate": 0.04741379310344828,
         "playerIds": [
-          "p-76162",
-          "p-76421",
+          "p-1630178",
+          "p-1626162",
+          "p-202331",
+          "p-1627824",
+          "p-203083"
+        ]
+      },
+      {
+        "franchiseId": "sixers",
+        "season": "1982-83",
+        "wins": 28,
+        "games": 160,
+        "targetWinRate": 0.04741379310344828,
+        "playerIds": [
+          "p-76385",
+          "p-78351",
+          "p-77193",
           "p-76681",
-          "p-77532",
-          "p-76539"
-        ]
-      },
-      {
-        "franchiseId": "sixers",
-        "season": "1999-00",
-        "wins": 0,
-        "games": 160,
-        "targetWinRate": 0.04741379310344828,
-        "playerIds": [
-          "p-727",
-          "p-947",
-          "p-243",
-          "p-248",
-          "p-238"
-        ]
-      },
-      {
-        "franchiseId": "sixers",
-        "season": "2001-02",
-        "wins": 5,
-        "games": 160,
-        "targetWinRate": 0.04741379310344828,
-        "playerIds": [
-          "p-727",
-          "p-947",
-          "p-1723",
-          "p-934",
-          "p-87"
-        ]
-      },
-      {
-        "franchiseId": "sixers",
-        "season": "1996-97",
-        "wins": 3,
-        "games": 160,
-        "targetWinRate": 0.04741379310344828,
-        "playerIds": [
-          "p-947",
-          "p-711",
-          "p-221",
-          "p-934",
-          "p-281"
+          "p-77449"
         ]
       },
       {
@@ -19081,6 +19585,34 @@
           "p-78121",
           "p-76774",
           "p-77248"
+        ]
+      },
+      {
+        "franchiseId": "sixers",
+        "season": "1984-85",
+        "wins": 12,
+        "games": 160,
+        "targetWinRate": 0.04741379310344828,
+        "playerIds": [
+          "p-76385",
+          "p-78351",
+          "p-76681",
+          "p-787",
+          "p-77449"
+        ]
+      },
+      {
+        "franchiseId": "sixers",
+        "season": "2012-13",
+        "wins": 10,
+        "games": 160,
+        "targetWinRate": 0.04741379310344828,
+        "playerIds": [
+          "p-201950",
+          "p-202323",
+          "p-2748",
+          "p-201152",
+          "p-201150"
         ]
       },
       {
@@ -19109,6 +19641,20 @@
           "p-202710",
           "p-203954",
           "p-203488"
+        ]
+      },
+      {
+        "franchiseId": "sixers",
+        "season": "2003-04",
+        "wins": 8,
+        "games": 160,
+        "targetWinRate": 0.04741379310344828,
+        "playerIds": [
+          "p-727",
+          "p-947",
+          "p-243",
+          "p-1903",
+          "p-2223"
         ]
       },
       {
@@ -19151,6 +19697,20 @@
           "p-940",
           "p-76681",
           "p-77175"
+        ]
+      },
+      {
+        "franchiseId": "sixers",
+        "season": "1972-73",
+        "wins": 2,
+        "games": 160,
+        "targetWinRate": 0.04741379310344828,
+        "playerIds": [
+          "p-76356",
+          "p-76222",
+          "p-76187",
+          "p-76663",
+          "p-77351"
         ]
       },
       {
@@ -19239,6 +19799,34 @@
       },
       {
         "franchiseId": "sixers",
+        "season": "1983-84",
+        "wins": 17,
+        "games": 160,
+        "targetWinRate": 0.04741379310344828,
+        "playerIds": [
+          "p-76385",
+          "p-78351",
+          "p-77193",
+          "p-76681",
+          "p-77449"
+        ]
+      },
+      {
+        "franchiseId": "sixers",
+        "season": "1985-86",
+        "wins": 4,
+        "games": 160,
+        "targetWinRate": 0.04741379310344828,
+        "playerIds": [
+          "p-76385",
+          "p-9",
+          "p-76681",
+          "p-787",
+          "p-77449"
+        ]
+      },
+      {
+        "franchiseId": "sixers",
         "season": "1979-80",
         "wins": 10,
         "games": 160,
@@ -19267,16 +19855,16 @@
       },
       {
         "franchiseId": "sixers",
-        "season": "1976-77",
-        "wins": 5,
+        "season": "2007-08",
+        "wins": 11,
         "games": 160,
         "targetWinRate": 0.04741379310344828,
         "playerIds": [
-          "p-76162",
-          "p-76753",
-          "p-76681",
-          "p-77532",
-          "p-77175"
+          "p-1889",
+          "p-2584",
+          "p-2738",
+          "p-2501",
+          "p-2223"
         ]
       },
       {
@@ -19337,16 +19925,16 @@
       },
       {
         "franchiseId": "sixers",
-        "season": "2000-01",
-        "wins": 14,
+        "season": "2010-11",
+        "wins": 12,
         "games": 160,
         "targetWinRate": 0.04741379310344828,
         "playerIds": [
-          "p-243",
-          "p-947",
-          "p-248",
-          "p-238",
-          "p-87"
+          "p-201950",
+          "p-2738",
+          "p-201152",
+          "p-1882",
+          "p-201150"
         ]
       },
       {
@@ -19407,20 +19995,6 @@
       },
       {
         "franchiseId": "sixers",
-        "season": "1971-72",
-        "wins": 0,
-        "games": 160,
-        "targetWinRate": 0.04741379310344828,
-        "playerIds": [
-          "p-76882",
-          "p-76356",
-          "p-76487",
-          "p-76253",
-          "p-78042"
-        ]
-      },
-      {
-        "franchiseId": "sixers",
         "season": "1966-67",
         "wins": 7,
         "games": 160,
@@ -19431,20 +20005,6 @@
           "p-78435",
           "p-77103",
           "p-76375"
-        ]
-      },
-      {
-        "franchiseId": "sixers",
-        "season": "2002-03",
-        "wins": 14,
-        "games": 160,
-        "targetWinRate": 0.04741379310344828,
-        "playerIds": [
-          "p-727",
-          "p-947",
-          "p-934",
-          "p-1496",
-          "p-1730"
         ]
       },
       {
@@ -19501,6 +20061,20 @@
           "p-248",
           "p-689",
           "p-761"
+        ]
+      },
+      {
+        "franchiseId": "sixers",
+        "season": "2025-26",
+        "wins": 22,
+        "games": 160,
+        "targetWinRate": 0.04741379310344828,
+        "playerIds": [
+          "p-1630178",
+          "p-1642845",
+          "p-1626162",
+          "p-1631230",
+          "p-203083"
         ]
       },
       {
@@ -19561,34 +20135,6 @@
       },
       {
         "franchiseId": "suns",
-        "season": "1977-78",
-        "wins": 6,
-        "games": 160,
-        "targetWinRate": 0.035,
-        "playerIds": [
-          "p-78500",
-          "p-1453",
-          "p-78095",
-          "p-76985",
-          "p-76011"
-        ]
-      },
-      {
-        "franchiseId": "suns",
-        "season": "2000-01",
-        "wins": 7,
-        "games": 160,
-        "targetWinRate": 0.035,
-        "playerIds": [
-          "p-467",
-          "p-960",
-          "p-361",
-          "p-1890",
-          "p-2054"
-        ]
-      },
-      {
-        "franchiseId": "suns",
         "season": "2013-14",
         "wins": 11,
         "games": 160,
@@ -19613,20 +20159,6 @@
           "p-1472",
           "p-897",
           "p-457"
-        ]
-      },
-      {
-        "franchiseId": "suns",
-        "season": "1979-80",
-        "wins": 2,
-        "games": 160,
-        "targetWinRate": 0.035,
-        "playerIds": [
-          "p-78500",
-          "p-76317",
-          "p-76985",
-          "p-77993",
-          "p-76011"
         ]
       },
       {
@@ -19659,6 +20191,20 @@
       },
       {
         "franchiseId": "suns",
+        "season": "1992-93",
+        "wins": 31,
+        "games": 160,
+        "targetWinRate": 0.035,
+        "playerIds": [
+          "p-105",
+          "p-76017",
+          "p-1472",
+          "p-76",
+          "p-787"
+        ]
+      },
+      {
+        "franchiseId": "suns",
         "season": "1975-76",
         "wins": 2,
         "games": 160,
@@ -19687,16 +20233,30 @@
       },
       {
         "franchiseId": "suns",
-        "season": "2020-21",
-        "wins": 37,
+        "season": "1993-94",
+        "wins": 34,
         "games": 160,
         "targetWinRate": 0.035,
         "playerIds": [
-          "p-101108",
-          "p-1626164",
-          "p-1628969",
-          "p-203109",
-          "p-1629028"
+          "p-134",
+          "p-105",
+          "p-920",
+          "p-787",
+          "p-932"
+        ]
+      },
+      {
+        "franchiseId": "suns",
+        "season": "1980-81",
+        "wins": 3,
+        "games": 160,
+        "targetWinRate": 0.035,
+        "playerIds": [
+          "p-1453",
+          "p-77141",
+          "p-76436",
+          "p-77993",
+          "p-76011"
         ]
       },
       {
@@ -19729,6 +20289,20 @@
       },
       {
         "franchiseId": "suns",
+        "season": "1994-95",
+        "wins": 25,
+        "games": 160,
+        "targetWinRate": 0.035,
+        "playerIds": [
+          "p-386",
+          "p-105",
+          "p-330",
+          "p-920",
+          "p-787"
+        ]
+      },
+      {
+        "franchiseId": "suns",
         "season": "2017-18",
         "wins": 8,
         "games": 160,
@@ -19743,20 +20317,6 @@
       },
       {
         "franchiseId": "suns",
-        "season": "2022-23",
-        "wins": 25,
-        "games": 160,
-        "targetWinRate": 0.035,
-        "playerIds": [
-          "p-101108",
-          "p-1626164",
-          "p-1628969",
-          "p-1628470",
-          "p-1629028"
-        ]
-      },
-      {
-        "franchiseId": "suns",
         "season": "1997-98",
         "wins": 8,
         "games": 160,
@@ -19767,6 +20327,20 @@
           "p-364",
           "p-686",
           "p-361"
+        ]
+      },
+      {
+        "franchiseId": "suns",
+        "season": "1981-82",
+        "wins": 7,
+        "games": 160,
+        "targetWinRate": 0.035,
+        "playerIds": [
+          "p-77438",
+          "p-77141",
+          "p-78095",
+          "p-77993",
+          "p-76011"
         ]
       },
       {
@@ -19827,6 +20401,20 @@
       },
       {
         "franchiseId": "suns",
+        "season": "1995-96",
+        "wins": 16,
+        "games": 160,
+        "targetWinRate": 0.035,
+        "playerIds": [
+          "p-134",
+          "p-445",
+          "p-714",
+          "p-920",
+          "p-787"
+        ]
+      },
+      {
+        "franchiseId": "suns",
         "season": "1973-74",
         "wins": 2,
         "games": 160,
@@ -19865,20 +20453,6 @@
           "p-361",
           "p-915",
           "p-26"
-        ]
-      },
-      {
-        "franchiseId": "suns",
-        "season": "2001-02",
-        "wins": 1,
-        "games": 160,
-        "targetWinRate": 0.035,
-        "playerIds": [
-          "p-950",
-          "p-358",
-          "p-448",
-          "p-1890",
-          "p-2054"
         ]
       },
       {
@@ -19967,20 +20541,6 @@
       },
       {
         "franchiseId": "suns",
-        "season": "2005-06",
-        "wins": 16,
-        "games": 160,
-        "targetWinRate": 0.035,
-        "playerIds": [
-          "p-959",
-          "p-1952",
-          "p-2564",
-          "p-1890",
-          "p-703"
-        ]
-      },
-      {
-        "franchiseId": "suns",
         "season": "2018-19",
         "wins": 29,
         "games": 160,
@@ -20019,48 +20579,6 @@
           "p-255",
           "p-2405",
           "p-101112"
-        ]
-      },
-      {
-        "franchiseId": "suns",
-        "season": "2007-08",
-        "wins": 30,
-        "games": 160,
-        "targetWinRate": 0.035,
-        "playerIds": [
-          "p-959",
-          "p-1952",
-          "p-1890",
-          "p-2405",
-          "p-2564"
-        ]
-      },
-      {
-        "franchiseId": "suns",
-        "season": "2006-07",
-        "wins": 17,
-        "games": 160,
-        "targetWinRate": 0.035,
-        "playerIds": [
-          "p-959",
-          "p-1952",
-          "p-2564",
-          "p-1890",
-          "p-2405"
-        ]
-      },
-      {
-        "franchiseId": "suns",
-        "season": "2021-22",
-        "wins": 31,
-        "games": 160,
-        "targetWinRate": 0.035,
-        "playerIds": [
-          "p-101108",
-          "p-1626164",
-          "p-1628969",
-          "p-203109",
-          "p-1629028"
         ]
       },
       {
@@ -20135,6 +20653,20 @@
       },
       {
         "franchiseId": "blazers",
+        "season": "2005-06",
+        "wins": 7,
+        "games": 160,
+        "targetWinRate": 0.08672413793103448,
+        "playerIds": [
+          "p-2581",
+          "p-2413",
+          "p-2751",
+          "p-2216",
+          "p-2038"
+        ]
+      },
+      {
+        "franchiseId": "blazers",
         "season": "2007-08",
         "wins": 5,
         "games": 160,
@@ -20145,6 +20677,34 @@
           "p-101110",
           "p-2566",
           "p-200746"
+        ]
+      },
+      {
+        "franchiseId": "blazers",
+        "season": "2015-16",
+        "wins": 17,
+        "games": 160,
+        "targetWinRate": 0.08672413793103448,
+        "playerIds": [
+          "p-203081",
+          "p-203468",
+          "p-202329",
+          "p-202334",
+          "p-203486"
+        ]
+      },
+      {
+        "franchiseId": "blazers",
+        "season": "1997-98",
+        "wins": 6,
+        "games": 160,
+        "targetWinRate": 0.08672413793103448,
+        "playerIds": [
+          "p-757",
+          "p-375",
+          "p-258",
+          "p-739",
+          "p-717"
         ]
       },
       {
@@ -20163,6 +20723,20 @@
       },
       {
         "franchiseId": "blazers",
+        "season": "2019-20",
+        "wins": 35,
+        "games": 160,
+        "targetWinRate": 0.08672413793103448,
+        "playerIds": [
+          "p-203081",
+          "p-203468",
+          "p-1629018",
+          "p-2546",
+          "p-202355"
+        ]
+      },
+      {
+        "franchiseId": "blazers",
         "season": "1993-94",
         "wins": 7,
         "games": 160,
@@ -20177,16 +20751,16 @@
       },
       {
         "franchiseId": "blazers",
-        "season": "1986-87",
-        "wins": 8,
+        "season": "2000-01",
+        "wins": 15,
         "games": 160,
         "targetWinRate": 0.08672413793103448,
         "playerIds": [
-          "p-345",
-          "p-17",
-          "p-78404",
-          "p-76350",
-          "p-77134"
+          "p-757",
+          "p-120",
+          "p-937",
+          "p-739",
+          "p-905"
         ]
       },
       {
@@ -20233,16 +20807,16 @@
       },
       {
         "franchiseId": "blazers",
-        "season": "1982-83",
-        "wins": 4,
+        "season": "1999-00",
+        "wins": 8,
         "games": 160,
         "targetWinRate": 0.08672413793103448,
         "playerIds": [
-          "p-77376",
-          "p-77819",
-          "p-76350",
-          "p-77691",
-          "p-78331"
+          "p-757",
+          "p-120",
+          "p-937",
+          "p-739",
+          "p-717"
         ]
       },
       {
@@ -20289,6 +20863,20 @@
       },
       {
         "franchiseId": "blazers",
+        "season": "2006-07",
+        "wins": 4,
+        "games": 160,
+        "targetWinRate": 0.08672413793103448,
+        "playerIds": [
+          "p-101127",
+          "p-200750",
+          "p-2137",
+          "p-2216",
+          "p-2048"
+        ]
+      },
+      {
+        "franchiseId": "blazers",
         "season": "1974-75",
         "wins": 3,
         "games": 160,
@@ -20299,20 +20887,6 @@
           "p-77152",
           "p-78520",
           "p-77475"
-        ]
-      },
-      {
-        "franchiseId": "blazers",
-        "season": "1983-84",
-        "wins": 4,
-        "games": 160,
-        "targetWinRate": 0.08672413793103448,
-        "playerIds": [
-          "p-77376",
-          "p-77819",
-          "p-77691",
-          "p-76350",
-          "p-78331"
         ]
       },
       {
@@ -20341,20 +20915,6 @@
           "p-201587",
           "p-201581",
           "p-200746"
-        ]
-      },
-      {
-        "franchiseId": "blazers",
-        "season": "1985-86",
-        "wins": 7,
-        "games": 160,
-        "targetWinRate": 0.08672413793103448,
-        "playerIds": [
-          "p-17",
-          "p-306",
-          "p-78404",
-          "p-76350",
-          "p-78331"
         ]
       },
       {
@@ -20415,6 +20975,20 @@
       },
       {
         "franchiseId": "blazers",
+        "season": "2020-21",
+        "wins": 30,
+        "games": 160,
+        "targetWinRate": 0.08672413793103448,
+        "playerIds": [
+          "p-203081",
+          "p-203468",
+          "p-2546",
+          "p-203496",
+          "p-202683"
+        ]
+      },
+      {
+        "franchiseId": "blazers",
         "season": "2002-03",
         "wins": 10,
         "games": 160,
@@ -20471,6 +21045,20 @@
       },
       {
         "franchiseId": "blazers",
+        "season": "2017-18",
+        "wins": 19,
+        "games": 160,
+        "targetWinRate": 0.08672413793103448,
+        "playerIds": [
+          "p-203081",
+          "p-203468",
+          "p-202323",
+          "p-202329",
+          "p-203994"
+        ]
+      },
+      {
+        "franchiseId": "blazers",
         "season": "1989-90",
         "wins": 8,
         "games": 160,
@@ -20481,6 +21069,20 @@
           "p-760",
           "p-433",
           "p-404"
+        ]
+      },
+      {
+        "franchiseId": "blazers",
+        "season": "1998-99",
+        "wins": 2,
+        "games": 160,
+        "targetWinRate": 0.08672413793103448,
+        "playerIds": [
+          "p-757",
+          "p-375",
+          "p-258",
+          "p-739",
+          "p-717"
         ]
       },
       {
@@ -20541,6 +21143,20 @@
       },
       {
         "franchiseId": "blazers",
+        "season": "2016-17",
+        "wins": 29,
+        "games": 160,
+        "targetWinRate": 0.08672413793103448,
+        "playerIds": [
+          "p-203081",
+          "p-203468",
+          "p-203090",
+          "p-202329",
+          "p-203486"
+        ]
+      },
+      {
+        "franchiseId": "blazers",
         "season": "2008-09",
         "wins": 25,
         "games": 160,
@@ -20565,6 +21181,48 @@
           "p-201587",
           "p-200746",
           "p-948"
+        ]
+      },
+      {
+        "franchiseId": "blazers",
+        "season": "2009-10",
+        "wins": 4,
+        "games": 160,
+        "targetWinRate": 0.08672413793103448,
+        "playerIds": [
+          "p-1889",
+          "p-200750",
+          "p-101110",
+          "p-200746",
+          "p-436"
+        ]
+      },
+      {
+        "franchiseId": "blazers",
+        "season": "2025-26",
+        "wins": 23,
+        "games": 160,
+        "targetWinRate": 0.08672413793103448,
+        "playerIds": [
+          "p-201950",
+          "p-1631101",
+          "p-1641739",
+          "p-1630166",
+          "p-1642270"
+        ]
+      },
+      {
+        "franchiseId": "blazers",
+        "season": "2018-19",
+        "wins": 13,
+        "games": 160,
+        "targetWinRate": 0.08672413793103448,
+        "playerIds": [
+          "p-203081",
+          "p-203468",
+          "p-202323",
+          "p-202329",
+          "p-203994"
         ]
       },
       {
@@ -20611,6 +21269,20 @@
       },
       {
         "franchiseId": "blazers",
+        "season": "2003-04",
+        "wins": 7,
+        "games": 160,
+        "targetWinRate": 0.08672413793103448,
+        "playerIds": [
+          "p-757",
+          "p-1507",
+          "p-2216",
+          "p-739",
+          "p-905"
+        ]
+      },
+      {
+        "franchiseId": "blazers",
         "season": "1977-78",
         "wins": 3,
         "games": 160,
@@ -20639,16 +21311,30 @@
       },
       {
         "franchiseId": "kings",
-        "season": "1974-75",
-        "wins": 1,
+        "season": "1968-69",
+        "wins": 3,
         "games": 160,
         "targetWinRate": 0.08258620689655173,
         "playerIds": [
-          "p-76054",
-          "p-78439",
-          "p-78482",
-          "p-76140",
-          "p-77326"
+          "p-600015",
+          "p-78399",
+          "p-78651",
+          "p-77418",
+          "p-76566"
+        ]
+      },
+      {
+        "franchiseId": "kings",
+        "season": "2012-13",
+        "wins": 6,
+        "games": 160,
+        "targetWinRate": 0.08258620689655173,
+        "playerIds": [
+          "p-202738",
+          "p-201936",
+          "p-2422",
+          "p-201574",
+          "p-202326"
         ]
       },
       {
@@ -20681,6 +21367,20 @@
       },
       {
         "franchiseId": "kings",
+        "season": "1966-67",
+        "wins": 1,
+        "games": 160,
+        "targetWinRate": 0.08258620689655173,
+        "playerIds": [
+          "p-600015",
+          "p-78178",
+          "p-76916",
+          "p-77418",
+          "p-76566"
+        ]
+      },
+      {
+        "franchiseId": "kings",
         "season": "2024-25",
         "wins": 29,
         "games": 160,
@@ -20695,16 +21395,16 @@
       },
       {
         "franchiseId": "kings",
-        "season": "1972-73",
-        "wins": 3,
+        "season": "2009-10",
+        "wins": 2,
         "games": 160,
         "targetWinRate": 0.08258620689655173,
         "playerIds": [
-          "p-76054",
-          "p-76908",
-          "p-76867",
-          "p-77964",
-          "p-77326"
+          "p-201936",
+          "p-2757",
+          "p-201956",
+          "p-201574",
+          "p-201150"
         ]
       },
       {
@@ -20723,6 +21423,34 @@
       },
       {
         "franchiseId": "kings",
+        "season": "2006-07",
+        "wins": 7,
+        "games": 160,
+        "targetWinRate": 0.08258620689655173,
+        "playerIds": [
+          "p-1710",
+          "p-2755",
+          "p-1897",
+          "p-1903",
+          "p-949"
+        ]
+      },
+      {
+        "franchiseId": "kings",
+        "season": "2010-11",
+        "wins": 4,
+        "games": 160,
+        "targetWinRate": 0.08258620689655173,
+        "playerIds": [
+          "p-201936",
+          "p-2757",
+          "p-201956",
+          "p-201574",
+          "p-202326"
+        ]
+      },
+      {
+        "franchiseId": "kings",
         "season": "2023-24",
         "wins": 26,
         "games": 160,
@@ -20733,6 +21461,20 @@
           "p-203084",
           "p-1631099",
           "p-1627734"
+        ]
+      },
+      {
+        "franchiseId": "kings",
+        "season": "1987-88",
+        "wins": 2,
+        "games": 160,
+        "targetWinRate": 0.08258620689655173,
+        "playerIds": [
+          "p-181",
+          "p-78310",
+          "p-77881",
+          "p-901",
+          "p-170"
         ]
       },
       {
@@ -20751,6 +21493,20 @@
       },
       {
         "franchiseId": "kings",
+        "season": "2005-06",
+        "wins": 11,
+        "games": 160,
+        "targetWinRate": 0.08258620689655173,
+        "playerIds": [
+          "p-1710",
+          "p-2755",
+          "p-949",
+          "p-1903",
+          "p-1802"
+        ]
+      },
+      {
+        "franchiseId": "kings",
         "season": "1994-95",
         "wins": 10,
         "games": 160,
@@ -20765,30 +21521,30 @@
       },
       {
         "franchiseId": "kings",
-        "season": "2000-01",
-        "wins": 12,
+        "season": "2015-16",
+        "wins": 7,
         "games": 160,
         "targetWinRate": 0.08258620689655173,
         "playerIds": [
-          "p-1715",
-          "p-57",
-          "p-978",
-          "p-185",
-          "p-124"
+          "p-200765",
+          "p-201954",
+          "p-201956",
+          "p-200752",
+          "p-202326"
         ]
       },
       {
         "franchiseId": "kings",
-        "season": "1999-00",
-        "wins": 4,
+        "season": "1963-64",
+        "wins": 3,
         "games": 160,
         "targetWinRate": 0.08258620689655173,
         "playerIds": [
-          "p-1715",
-          "p-98",
-          "p-978",
-          "p-185",
-          "p-124"
+          "p-600015",
+          "p-76191",
+          "p-78388",
+          "p-77418",
+          "p-76668"
         ]
       },
       {
@@ -20807,6 +21563,20 @@
       },
       {
         "franchiseId": "kings",
+        "season": "1969-70",
+        "wins": 1,
+        "games": 160,
+        "targetWinRate": 0.08258620689655173,
+        "playerIds": [
+          "p-600015",
+          "p-78406",
+          "p-78399",
+          "p-76867",
+          "p-76566"
+        ]
+      },
+      {
+        "franchiseId": "kings",
         "season": "1983-84",
         "wins": 10,
         "games": 160,
@@ -20817,6 +21587,20 @@
           "p-77756",
           "p-698",
           "p-78"
+        ]
+      },
+      {
+        "franchiseId": "kings",
+        "season": "2014-15",
+        "wins": 12,
+        "games": 160,
+        "targetWinRate": 0.08258620689655173,
+        "playerIds": [
+          "p-201954",
+          "p-203463",
+          "p-200752",
+          "p-201574",
+          "p-202326"
         ]
       },
       {
@@ -20835,30 +21619,44 @@
       },
       {
         "franchiseId": "kings",
-        "season": "1989-90",
-        "wins": 4,
+        "season": "1964-65",
+        "wins": 3,
         "games": 160,
         "targetWinRate": 0.08258620689655173,
         "playerIds": [
-          "p-76017",
-          "p-219",
-          "p-47",
-          "p-1622",
-          "p-1123"
+          "p-600015",
+          "p-78178",
+          "p-78388",
+          "p-77418",
+          "p-76668"
         ]
       },
       {
         "franchiseId": "kings",
-        "season": "1970-71",
-        "wins": 0,
+        "season": "1985-86",
+        "wins": 5,
         "games": 160,
         "targetWinRate": 0.08258620689655173,
         "playerIds": [
-          "p-78406",
-          "p-76054",
-          "p-78399",
-          "p-76867",
-          "p-77326"
+          "p-78310",
+          "p-78614",
+          "p-698",
+          "p-77756",
+          "p-78"
+        ]
+      },
+      {
+        "franchiseId": "kings",
+        "season": "1967-68",
+        "wins": 3,
+        "games": 160,
+        "targetWinRate": 0.08258620689655173,
+        "playerIds": [
+          "p-600015",
+          "p-78178",
+          "p-76916",
+          "p-77418",
+          "p-76566"
         ]
       },
       {
@@ -20877,16 +21675,30 @@
       },
       {
         "franchiseId": "kings",
-        "season": "1973-74",
+        "season": "2017-18",
         "wins": 3,
         "games": 160,
         "targetWinRate": 0.08258620689655173,
         "playerIds": [
-          "p-76054",
-          "p-78439",
-          "p-77295",
-          "p-76140",
-          "p-77326"
+          "p-1628368",
+          "p-1627741",
+          "p-1628382",
+          "p-2216",
+          "p-1626161"
+        ]
+      },
+      {
+        "franchiseId": "kings",
+        "season": "2013-14",
+        "wins": 7,
+        "games": 160,
+        "targetWinRate": 0.08258620689655173,
+        "playerIds": [
+          "p-202738",
+          "p-203463",
+          "p-200752",
+          "p-201574",
+          "p-202326"
         ]
       },
       {
@@ -20901,20 +21713,6 @@
           "p-41",
           "p-1489",
           "p-190"
-        ]
-      },
-      {
-        "franchiseId": "kings",
-        "season": "1993-94",
-        "wins": 3,
-        "games": 160,
-        "targetWinRate": 0.08258620689655173,
-        "playerIds": [
-          "p-892",
-          "p-782",
-          "p-47",
-          "p-1489",
-          "p-178"
         ]
       },
       {
@@ -20947,16 +21745,16 @@
       },
       {
         "franchiseId": "kings",
-        "season": "1980-81",
-        "wins": 4,
+        "season": "2011-12",
+        "wins": 8,
         "games": 160,
         "targetWinRate": 0.08258620689655173,
         "playerIds": [
-          "p-76736",
-          "p-76899",
-          "p-78482",
-          "p-77273",
-          "p-76590"
+          "p-201936",
+          "p-201977",
+          "p-2422",
+          "p-201574",
+          "p-202326"
         ]
       },
       {
@@ -20975,20 +21773,6 @@
       },
       {
         "franchiseId": "kings",
-        "season": "1998-99",
-        "wins": 6,
-        "games": 160,
-        "targetWinRate": 0.08258620689655173,
-        "playerIds": [
-          "p-1715",
-          "p-1505",
-          "p-722",
-          "p-185",
-          "p-124"
-        ]
-      },
-      {
-        "franchiseId": "kings",
         "season": "1982-83",
         "wins": 7,
         "games": 160,
@@ -20999,6 +21783,20 @@
           "p-77697",
           "p-698",
           "p-77134"
+        ]
+      },
+      {
+        "franchiseId": "kings",
+        "season": "1986-87",
+        "wins": 6,
+        "games": 160,
+        "targetWinRate": 0.08258620689655173,
+        "playerIds": [
+          "p-78310",
+          "p-78183",
+          "p-698",
+          "p-901",
+          "p-78"
         ]
       },
       {
@@ -21031,30 +21829,16 @@
       },
       {
         "franchiseId": "kings",
-        "season": "1976-77",
-        "wins": 3,
+        "season": "1965-66",
+        "wins": 2,
         "games": 160,
         "targetWinRate": 0.08258620689655173,
         "playerIds": [
-          "p-78296",
-          "p-76204",
-          "p-78482",
-          "p-78468",
-          "p-77326"
-        ]
-      },
-      {
-        "franchiseId": "kings",
-        "season": "1975-76",
-        "wins": 1,
-        "games": 160,
-        "targetWinRate": 0.08258620689655173,
-        "playerIds": [
-          "p-76054",
-          "p-78439",
-          "p-77561",
-          "p-78482",
-          "p-77326"
+          "p-600015",
+          "p-78178",
+          "p-76977",
+          "p-77418",
+          "p-76668"
         ]
       },
       {
@@ -21069,20 +21853,6 @@
           "p-202357",
           "p-1628963",
           "p-1626161"
-        ]
-      },
-      {
-        "franchiseId": "kings",
-        "season": "1997-98",
-        "wins": 19,
-        "games": 160,
-        "targetWinRate": 0.08258620689655173,
-        "playerIds": [
-          "p-1533",
-          "p-782",
-          "p-182",
-          "p-722",
-          "p-1565"
         ]
       },
       {
@@ -21115,16 +21885,16 @@
       },
       {
         "franchiseId": "kings",
-        "season": "1971-72",
-        "wins": 0,
+        "season": "2004-05",
+        "wins": 15,
         "games": 160,
         "targetWinRate": 0.08258620689655173,
         "playerIds": [
-          "p-76054",
-          "p-78561",
-          "p-78399",
-          "p-76867",
-          "p-77326"
+          "p-1710",
+          "p-1749",
+          "p-978",
+          "p-185",
+          "p-1802"
         ]
       },
       {
@@ -21185,30 +21955,16 @@
       },
       {
         "franchiseId": "kings",
-        "season": "1996-97",
-        "wins": 11,
+        "season": "1984-85",
+        "wins": 5,
         "games": 160,
         "targetWinRate": 0.08258620689655173,
         "playerIds": [
-          "p-782",
-          "p-51",
-          "p-182",
-          "p-63",
-          "p-178"
-        ]
-      },
-      {
-        "franchiseId": "spurs",
-        "season": "1995-96",
-        "wins": 35,
-        "games": 160,
-        "targetWinRate": 0.053620689655172415,
-        "playerIds": [
-          "p-422",
-          "p-219",
-          "p-251",
-          "p-456",
-          "p-764"
+          "p-78310",
+          "p-76599",
+          "p-698",
+          "p-77756",
+          "p-78"
         ]
       },
       {
@@ -21227,16 +21983,16 @@
       },
       {
         "franchiseId": "spurs",
-        "season": "1997-98",
-        "wins": 9,
+        "season": "2015-16",
+        "wins": 20,
         "games": 160,
         "targetWinRate": 0.053620689655172415,
         "playerIds": [
-          "p-422",
-          "p-1114",
-          "p-456",
-          "p-1495",
-          "p-764"
+          "p-2225",
+          "p-201980",
+          "p-202695",
+          "p-200746",
+          "p-1495"
         ]
       },
       {
@@ -21265,6 +22021,20 @@
           "p-714",
           "p-1477",
           "p-1495"
+        ]
+      },
+      {
+        "franchiseId": "spurs",
+        "season": "2019-20",
+        "wins": 21,
+        "games": 160,
+        "targetWinRate": 0.053620689655172415,
+        "playerIds": [
+          "p-1627749",
+          "p-1628401",
+          "p-201942",
+          "p-1626168",
+          "p-200746"
         ]
       },
       {
@@ -21335,20 +22105,6 @@
           "p-990",
           "p-1495",
           "p-764"
-        ]
-      },
-      {
-        "franchiseId": "spurs",
-        "season": "1981-82",
-        "wins": 6,
-        "games": 160,
-        "targetWinRate": 0.053620689655172415,
-        "playerIds": [
-          "p-77633",
-          "p-76804",
-          "p-77756",
-          "p-77615",
-          "p-76453"
         ]
       },
       {
@@ -21437,20 +22193,6 @@
       },
       {
         "franchiseId": "spurs",
-        "season": "2024-25",
-        "wins": 33,
-        "games": 160,
-        "targetWinRate": 0.053620689655172415,
-        "playerIds": [
-          "p-101108",
-          "p-1642264",
-          "p-1630170",
-          "p-203084",
-          "p-1641705"
-        ]
-      },
-      {
-        "franchiseId": "spurs",
         "season": "2013-14",
         "wins": 20,
         "games": 160,
@@ -21475,6 +22217,20 @@
           "p-251",
           "p-187",
           "p-764"
+        ]
+      },
+      {
+        "franchiseId": "spurs",
+        "season": "2018-19",
+        "wins": 19,
+        "games": 160,
+        "targetWinRate": 0.053620689655172415,
+        "playerIds": [
+          "p-201942",
+          "p-1627854",
+          "p-201158",
+          "p-200752",
+          "p-200746"
         ]
       },
       {
@@ -21563,30 +22319,16 @@
       },
       {
         "franchiseId": "spurs",
-        "season": "1986-87",
-        "wins": 2,
+        "season": "2001-02",
+        "wins": 24,
         "games": 160,
         "targetWinRate": 0.053620689655172415,
         "playerIds": [
-          "p-926",
-          "p-78279",
-          "p-76158",
-          "p-76881",
-          "p-600014"
-        ]
-      },
-      {
-        "franchiseId": "spurs",
-        "season": "1980-81",
-        "wins": 1,
-        "games": 160,
-        "targetWinRate": 0.053620689655172415,
-        "playerIds": [
-          "p-78150",
-          "p-76804",
-          "p-77756",
-          "p-76889",
-          "p-76453"
+          "p-2225",
+          "p-1498",
+          "p-120",
+          "p-1495",
+          "p-764"
         ]
       },
       {
@@ -21703,6 +22445,34 @@
       },
       {
         "franchiseId": "spurs",
+        "season": "1992-93",
+        "wins": 25,
+        "games": 160,
+        "targetWinRate": 0.053620689655172415,
+        "playerIds": [
+          "p-422",
+          "p-107",
+          "p-251",
+          "p-462",
+          "p-764"
+        ]
+      },
+      {
+        "franchiseId": "spurs",
+        "season": "1993-94",
+        "wins": 22,
+        "games": 160,
+        "targetWinRate": 0.053620689655172415,
+        "playerIds": [
+          "p-335",
+          "p-107",
+          "p-462",
+          "p-23",
+          "p-764"
+        ]
+      },
+      {
+        "franchiseId": "spurs",
         "season": "1990-91",
         "wins": 19,
         "games": 160,
@@ -21713,20 +22483,6 @@
           "p-251",
           "p-187",
           "p-764"
-        ]
-      },
-      {
-        "franchiseId": "spurs",
-        "season": "1985-86",
-        "wins": 4,
-        "games": 160,
-        "targetWinRate": 0.053620689655172415,
-        "playerIds": [
-          "p-77633",
-          "p-926",
-          "p-77615",
-          "p-76881",
-          "p-600014"
         ]
       },
       {
@@ -22025,6 +22781,20 @@
       },
       {
         "franchiseId": "raptors",
+        "season": "2004-05",
+        "wins": 12,
+        "games": 160,
+        "targetWinRate": 0.095,
+        "playerIds": [
+          "p-1747",
+          "p-147",
+          "p-2050",
+          "p-2547",
+          "p-2737"
+        ]
+      },
+      {
+        "franchiseId": "raptors",
         "season": "2013-14",
         "wins": 12,
         "games": 160,
@@ -22221,6 +22991,20 @@
       },
       {
         "franchiseId": "jazz",
+        "season": "2009-10",
+        "wins": 14,
+        "games": 160,
+        "targetWinRate": 0.04120689655172414,
+        "playerIds": [
+          "p-101114",
+          "p-202083",
+          "p-2430",
+          "p-200794",
+          "p-2246"
+        ]
+      },
+      {
+        "franchiseId": "jazz",
         "season": "2025-26",
         "wins": 11,
         "games": 160,
@@ -22263,20 +23047,6 @@
       },
       {
         "franchiseId": "jazz",
-        "season": "1977-78",
-        "wins": 1,
-        "games": 160,
-        "targetWinRate": 0.04120689655172414,
-        "playerIds": [
-          "p-77459",
-          "p-76832",
-          "p-77115",
-          "p-77993",
-          "p-77235"
-        ]
-      },
-      {
-        "franchiseId": "jazz",
         "season": "2020-21",
         "wins": 53,
         "games": 160,
@@ -22301,6 +23071,20 @@
           "p-204060",
           "p-202324",
           "p-203497"
+        ]
+      },
+      {
+        "franchiseId": "jazz",
+        "season": "2008-09",
+        "wins": 16,
+        "games": 160,
+        "targetWinRate": 0.04120689655172414,
+        "playerIds": [
+          "p-101114",
+          "p-200758",
+          "p-2594",
+          "p-200794",
+          "p-2246"
         ]
       },
       {
@@ -22347,20 +23131,6 @@
       },
       {
         "franchiseId": "jazz",
-        "season": "1992-93",
-        "wins": 11,
-        "games": 160,
-        "targetWinRate": 0.04120689655172414,
-        "playerIds": [
-          "p-304",
-          "p-117",
-          "p-895",
-          "p-252",
-          "p-1479"
-        ]
-      },
-      {
-        "franchiseId": "jazz",
         "season": "1983-84",
         "wins": 5,
         "games": 160,
@@ -22375,20 +23145,6 @@
       },
       {
         "franchiseId": "jazz",
-        "season": "1993-94",
-        "wins": 14,
-        "games": 160,
-        "targetWinRate": 0.04120689655172414,
-        "playerIds": [
-          "p-304",
-          "p-117",
-          "p-895",
-          "p-252",
-          "p-280"
-        ]
-      },
-      {
-        "franchiseId": "jazz",
         "season": "1998-99",
         "wins": 27,
         "games": 160,
@@ -22399,20 +23155,6 @@
           "p-935",
           "p-252",
           "p-731"
-        ]
-      },
-      {
-        "franchiseId": "jazz",
-        "season": "1979-80",
-        "wins": 3,
-        "games": 160,
-        "targetWinRate": 0.04120689655172414,
-        "playerIds": [
-          "p-76204",
-          "p-76767",
-          "p-76948",
-          "p-76504",
-          "p-78516"
         ]
       },
       {
@@ -22441,6 +23183,20 @@
           "p-384",
           "p-252",
           "p-731"
+        ]
+      },
+      {
+        "franchiseId": "jazz",
+        "season": "2006-07",
+        "wins": 16,
+        "games": 160,
+        "targetWinRate": 0.04120689655172414,
+        "playerIds": [
+          "p-101114",
+          "p-965",
+          "p-1905",
+          "p-2430",
+          "p-2246"
         ]
       },
       {
@@ -22501,16 +23257,16 @@
       },
       {
         "franchiseId": "jazz",
-        "season": "1999-00",
-        "wins": 11,
+        "season": "2010-11",
+        "wins": 8,
         "games": 160,
         "targetWinRate": 0.04120689655172414,
         "playerIds": [
-          "p-304",
-          "p-204",
-          "p-935",
-          "p-252",
-          "p-178"
+          "p-101114",
+          "p-1952",
+          "p-1905",
+          "p-200794",
+          "p-2744"
         ]
       },
       {
@@ -22585,6 +23341,20 @@
       },
       {
         "franchiseId": "jazz",
+        "season": "2007-08",
+        "wins": 28,
+        "games": 160,
+        "targetWinRate": 0.04120689655172414,
+        "playerIds": [
+          "p-101114",
+          "p-200758",
+          "p-1905",
+          "p-2430",
+          "p-2246"
+        ]
+      },
+      {
+        "franchiseId": "jazz",
         "season": "1980-81",
         "wins": 3,
         "games": 160,
@@ -22627,6 +23397,20 @@
       },
       {
         "franchiseId": "jazz",
+        "season": "2005-06",
+        "wins": 10,
+        "games": 160,
+        "targetWinRate": 0.04120689655172414,
+        "playerIds": [
+          "p-101114",
+          "p-1723",
+          "p-1905",
+          "p-2246",
+          "p-2260"
+        ]
+      },
+      {
+        "franchiseId": "jazz",
         "season": "1991-92",
         "wins": 25,
         "games": 160,
@@ -22637,34 +23421,6 @@
           "p-898",
           "p-252",
           "p-76631"
-        ]
-      },
-      {
-        "franchiseId": "jazz",
-        "season": "1995-96",
-        "wins": 20,
-        "games": 160,
-        "targetWinRate": 0.04120689655172414,
-        "playerIds": [
-          "p-304",
-          "p-204",
-          "p-128",
-          "p-252",
-          "p-280"
-        ]
-      },
-      {
-        "franchiseId": "jazz",
-        "season": "1994-95",
-        "wins": 22,
-        "games": 160,
-        "targetWinRate": 0.04120689655172414,
-        "playerIds": [
-          "p-304",
-          "p-204",
-          "p-128",
-          "p-252",
-          "p-280"
         ]
       },
       {
@@ -22753,6 +23509,20 @@
       },
       {
         "franchiseId": "jazz",
+        "season": "2016-17",
+        "wins": 34,
+        "games": 160,
+        "targetWinRate": 0.04120689655172414,
+        "playerIds": [
+          "p-203918",
+          "p-2207",
+          "p-204060",
+          "p-202330",
+          "p-203497"
+        ]
+      },
+      {
+        "franchiseId": "jazz",
         "season": "2023-24",
         "wins": 34,
         "games": 160,
@@ -22809,6 +23579,20 @@
       },
       {
         "franchiseId": "wizards",
+        "season": "1985-86",
+        "wins": 7,
+        "games": 160,
+        "targetWinRate": 0.09086206896551724,
+        "playerIds": [
+          "p-78549",
+          "p-117",
+          "p-78025",
+          "p-77986",
+          "p-78041"
+        ]
+      },
+      {
+        "franchiseId": "wizards",
         "season": "1969-70",
         "wins": 1,
         "games": 160,
@@ -22819,6 +23603,34 @@
           "p-77463",
           "p-77150",
           "p-78392"
+        ]
+      },
+      {
+        "franchiseId": "wizards",
+        "season": "1997-98",
+        "wins": 6,
+        "games": 160,
+        "targetWinRate": 0.09086206896551724,
+        "playerIds": [
+          "p-393",
+          "p-384",
+          "p-145",
+          "p-436",
+          "p-185"
+        ]
+      },
+      {
+        "franchiseId": "wizards",
+        "season": "2012-13",
+        "wins": 4,
+        "games": 160,
+        "targetWinRate": 0.09086206896551724,
+        "playerIds": [
+          "p-202322",
+          "p-203078",
+          "p-101110",
+          "p-2403",
+          "p-2731"
         ]
       },
       {
@@ -22851,6 +23663,20 @@
       },
       {
         "franchiseId": "wizards",
+        "season": "1995-96",
+        "wins": 17,
+        "games": 160,
+        "targetWinRate": 0.09086206896551724,
+        "playerIds": [
+          "p-123",
+          "p-85",
+          "p-384",
+          "p-436",
+          "p-49"
+        ]
+      },
+      {
+        "franchiseId": "wizards",
         "season": "1968-69",
         "wins": 0,
         "games": 160,
@@ -22865,20 +23691,6 @@
       },
       {
         "franchiseId": "wizards",
-        "season": "2009-10",
-        "wins": 10,
-        "games": 160,
-        "targetWinRate": 0.09086206896551724,
-        "playerIds": [
-          "p-2240",
-          "p-2034",
-          "p-2406",
-          "p-101154",
-          "p-2217"
-        ]
-      },
-      {
-        "franchiseId": "wizards",
         "season": "1961-62",
         "wins": 1,
         "games": 160,
@@ -22889,6 +23701,20 @@
           "p-77131",
           "p-78438",
           "p-76144"
+        ]
+      },
+      {
+        "franchiseId": "wizards",
+        "season": "1986-87",
+        "wins": 2,
+        "games": 160,
+        "targetWinRate": 0.09086206896551724,
+        "playerIds": [
+          "p-941",
+          "p-117",
+          "p-78554",
+          "p-767",
+          "p-77449"
         ]
       },
       {
@@ -22991,6 +23817,20 @@
       },
       {
         "franchiseId": "wizards",
+        "season": "2015-16",
+        "wins": 15,
+        "games": 160,
+        "targetWinRate": 0.09086206896551724,
+        "playerIds": [
+          "p-202322",
+          "p-202066",
+          "p-203490",
+          "p-2403",
+          "p-101162"
+        ]
+      },
+      {
+        "franchiseId": "wizards",
         "season": "2024-25",
         "wins": 9,
         "games": 160,
@@ -23005,16 +23845,16 @@
       },
       {
         "franchiseId": "wizards",
-        "season": "1962-63",
-        "wins": 1,
+        "season": "2001-02",
+        "wins": 3,
         "games": 160,
         "targetWinRate": 0.09086206896551724,
         "playerIds": [
-          "p-76877",
-          "p-77371",
-          "p-77700",
-          "p-76577",
-          "p-76144"
+          "p-43",
+          "p-1888",
+          "p-1838",
+          "p-461",
+          "p-363"
         ]
       },
       {
@@ -23029,6 +23869,20 @@
           "p-77993",
           "p-76979",
           "p-78392"
+        ]
+      },
+      {
+        "franchiseId": "wizards",
+        "season": "2014-15",
+        "wins": 6,
+        "games": 160,
+        "targetWinRate": 0.09086206896551724,
+        "playerIds": [
+          "p-202322",
+          "p-203078",
+          "p-1718",
+          "p-2403",
+          "p-101162"
         ]
       },
       {
@@ -23061,16 +23915,16 @@
       },
       {
         "franchiseId": "wizards",
-        "season": "1963-64",
-        "wins": 1,
+        "season": "1987-88",
+        "wins": 3,
         "games": 160,
         "targetWinRate": 0.09086206896551724,
         "playerIds": [
-          "p-78335",
-          "p-76877",
-          "p-76577",
-          "p-77150",
-          "p-76144"
+          "p-306",
+          "p-117",
+          "p-77264",
+          "p-78554",
+          "p-77449"
         ]
       },
       {
@@ -23085,20 +23939,6 @@
           "p-1630166",
           "p-1628398",
           "p-204001"
-        ]
-      },
-      {
-        "franchiseId": "wizards",
-        "season": "2008-09",
-        "wins": 6,
-        "games": 160,
-        "targetWinRate": 0.09086206896551724,
-        "playerIds": [
-          "p-2229",
-          "p-201156",
-          "p-2406",
-          "p-1712",
-          "p-101154"
         ]
       },
       {
@@ -23155,6 +23995,20 @@
           "p-202344",
           "p-2772",
           "p-101162"
+        ]
+      },
+      {
+        "franchiseId": "wizards",
+        "season": "1996-97",
+        "wins": 14,
+        "games": 160,
+        "targetWinRate": 0.09086206896551724,
+        "playerIds": [
+          "p-393",
+          "p-384",
+          "p-145",
+          "p-185",
+          "p-436"
         ]
       },
       {
@@ -23257,6 +24111,20 @@
       },
       {
         "franchiseId": "wizards",
+        "season": "1984-85",
+        "wins": 9,
+        "games": 160,
+        "targetWinRate": 0.09086206896551724,
+        "playerIds": [
+          "p-78549",
+          "p-117",
+          "p-76091",
+          "p-328",
+          "p-78041"
+        ]
+      },
+      {
+        "franchiseId": "wizards",
         "season": "1976-77",
         "wins": 8,
         "games": 160,
@@ -23281,6 +24149,20 @@
           "p-77264",
           "p-265",
           "p-442"
+        ]
+      },
+      {
+        "franchiseId": "wizards",
+        "season": "1978-79",
+        "wins": 8,
+        "games": 160,
+        "targetWinRate": 0.09086206896551724,
+        "playerIds": [
+          "p-76996",
+          "p-76887",
+          "p-76500",
+          "p-76979",
+          "p-78392"
         ]
       },
       {
@@ -23313,16 +24195,16 @@
       },
       {
         "franchiseId": "wizards",
-        "season": "1998-99",
-        "wins": 11,
+        "season": "2020-21",
+        "wins": 31,
         "games": 160,
         "targetWinRate": 0.09086206896551724,
         "playerIds": [
-          "p-393",
-          "p-782",
-          "p-384",
-          "p-901",
-          "p-1112"
+          "p-201566",
+          "p-203078",
+          "p-202722",
+          "p-1629060",
+          "p-201577"
         ]
       },
       {
@@ -23336,6 +24218,20 @@
           "p-76386",
           "p-78238",
           "p-77463",
+          "p-78392"
+        ]
+      },
+      {
+        "franchiseId": "wizards",
+        "season": "1977-78",
+        "wins": 2,
+        "games": 160,
+        "targetWinRate": 0.09086206896551724,
+        "playerIds": [
+          "p-76996",
+          "p-76887",
+          "p-76500",
+          "p-76979",
           "p-78392"
         ]
       },
@@ -23383,6 +24279,20 @@
       },
       {
         "franchiseId": "wizards",
+        "season": "1994-95",
+        "wins": 11,
+        "games": 160,
+        "targetWinRate": 0.09086206896551724,
+        "playerIds": [
+          "p-77",
+          "p-348",
+          "p-384",
+          "p-185",
+          "p-436"
+        ]
+      },
+      {
+        "franchiseId": "wizards",
         "season": "2016-17",
         "wins": 20,
         "games": 160,
@@ -23393,6 +24303,20 @@
           "p-203490",
           "p-202693",
           "p-101162"
+        ]
+      },
+      {
+        "franchiseId": "wizards",
+        "season": "2003-04",
+        "wins": 3,
+        "games": 160,
+        "targetWinRate": 0.09086206896551724,
+        "playerIds": [
+          "p-2240",
+          "p-1716",
+          "p-2553",
+          "p-2407",
+          "p-2198"
         ]
       },
       {

@@ -117,6 +117,9 @@ const SHARED_SEASON_DIRS = [
 ] as const;
 const CAP_RUSH_FIRST_SEASON = 1960;
 const CAP_RUSH_LAST_SEASON = 2025;
+// The 160-game fit estimate has a standard error near 1.7 points; a two-point
+// band is statistically indistinguishable, so prefer the oldest season inside it.
+const CAP_RUSH_FIT_TOLERANCE = 0.02;
 
 function seasonDirOf(firstYear: number): string {
   return `${String(firstYear)}-${String((firstYear + 1) % 100).padStart(2, '0')}`;
@@ -129,6 +132,31 @@ const CAP_RUSH_SEASON_DIRS: readonly string[] = Array.from(
 
 export function bracketSeasonDirs(field: 'shared' | 'cap-rush'): readonly string[] {
   return field === 'cap-rush' ? CAP_RUSH_SEASON_DIRS : SHARED_SEASON_DIRS;
+}
+
+export interface SeasonFit {
+  readonly season: string;
+  readonly gap: number;
+}
+
+export function nearestSeasonFit(fits: readonly SeasonFit[]): SeasonFit | undefined {
+  let best: SeasonFit | undefined;
+  for (const fit of fits) {
+    if (best === undefined || fit.gap < best.gap) best = fit;
+  }
+  return best;
+}
+
+export function oldestSeasonFitWithin(
+  fits: readonly SeasonFit[],
+  tolerance: number,
+): SeasonFit | undefined {
+  let oldest: SeasonFit | undefined;
+  for (const fit of fits) {
+    if (fit.gap > tolerance) continue;
+    if (oldest === undefined || fit.season < oldest.season) oldest = fit;
+  }
+  return oldest ?? nearestSeasonFit(fits);
 }
 
 export function capRushEligibilityDescription(): string {
@@ -408,8 +436,7 @@ export function buildCandidateCatalog(
       createRng(`${seasonSeed}:absolute-tiers`),
     ).indexOf(slot.franchiseId);
     const targetWinRate = (field === 'cap-rush' ? 0.035 : 0.005) + (rank / 29) * 0.06;
-    let chosenSeason: string | undefined;
-    let bestGap = Infinity;
+    const fits: SeasonFit[] = [];
     for (const season of seasonOrder) {
       const roster = perSeason.get(season);
       if (!roster) continue;
@@ -453,12 +480,12 @@ export function buildCandidateCatalog(
         targetWinRate,
         playerIds: five.map((player) => player.playerId),
       });
-      const gap = Math.abs(wins / games - targetWinRate);
-      if (gap < bestGap) {
-        bestGap = gap;
-        chosenSeason = season;
-      }
+      fits.push({ season, gap: Math.abs(wins / games - targetWinRate) });
     }
+    const chosenSeason =
+      field === 'cap-rush'
+        ? oldestSeasonFitWithin(fits, CAP_RUSH_FIT_TOLERANCE)?.season
+        : nearestSeasonFit(fits)?.season;
     if (chosenSeason === undefined) {
       throw new Error(`no collision-free legal season for ${slot.franchiseId}`);
     }
@@ -572,7 +599,7 @@ export function bracketGenerate(args: {
   if (field === 'cap-rush') {
     writeFileSync(
       resolve(opponentsDir, 'cap-rush-field-selection.json'),
-      `${JSON.stringify({ generationVersion, seed, contentHash, engineVersion: ENGINE_VERSION, profileVersion: profile.profileVersion, profileHash: manifest.eraSimulationProfiles.find((entry) => entry.eraId === profile.eraId)?.contentHash, dataVersion: manifest.dataVersion, reference, eligibility: capRushEligibilityDescription(), objective: 'nearest measured win rate to 0.035 + tierRank/29 * 0.06', tieBreaking: 'first in seeded shuffled season order', selectionSeeds: '<generation seed>:absolute-fit:<franchise>:<season>:<game>', gamesPerCandidate: 160, evidence }, null, 2)}\n`,
+      `${JSON.stringify({ generationVersion, seed, contentHash, engineVersion: ENGINE_VERSION, profileVersion: profile.profileVersion, profileHash: manifest.eraSimulationProfiles.find((entry) => entry.eraId === profile.eraId)?.contentHash, dataVersion: manifest.dataVersion, reference, eligibility: capRushEligibilityDescription(), objective: `oldest season within ${String(CAP_RUSH_FIT_TOLERANCE)} of the measured win rate target 0.035 + tierRank/29 * 0.06; nearest measured win rate otherwise`, tieBreaking: 'oldest season within tolerance; otherwise first in seeded shuffled season order', selectionSeeds: '<generation seed>:absolute-fit:<franchise>:<season>:<game>', gamesPerCandidate: 160, evidence }, null, 2)}\n`,
       'utf8',
     );
   }
