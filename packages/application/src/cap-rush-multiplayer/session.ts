@@ -49,6 +49,13 @@ export interface CapRushMultiplayerAttachOptions {
   readonly initialSync?: CapRushMultiplayerSync;
 }
 
+/**
+ * Health of this client's own connection to the room. Presence of the other
+ * seat is reported separately so an opponent closing their tab never looks
+ * like a broken connection.
+ */
+export type CapRushMultiplayerConnection = 'idle' | 'connecting' | 'connected' | 'error';
+
 export interface CapRushMultiplayerSessionView {
   readonly roomId: string;
   readonly seat: CapRushMultiplayerSeatId;
@@ -57,7 +64,13 @@ export interface CapRushMultiplayerSessionView {
   readonly locked: CapRushMultiplayerLockedInputs | null;
   readonly postseason: CapRushMultiplayerPlayoffState | null;
   readonly error: string | null;
-  readonly connected: boolean;
+  readonly connection: CapRushMultiplayerConnection;
+  readonly transportError: string | null;
+  /** Every seat in the room is present right now. */
+  readonly bothOnline: boolean;
+  readonly opponentOnline: boolean;
+  /** The server still reports this seat's presence. */
+  readonly localOnline: boolean;
 }
 
 export class CapRushMultiplayerSession {
@@ -69,6 +82,8 @@ export class CapRushMultiplayerSession {
   private unsubscribe: (() => void) | null = null;
   private disposed = false;
   private readonly deps: CapRushMultiplayerSessionDeps;
+  private connection: CapRushMultiplayerConnection = 'idle';
+  private transportError: string | null = null;
   error: string | null = null;
 
   constructor(deps: CapRushMultiplayerSessionDeps) {
@@ -78,34 +93,22 @@ export class CapRushMultiplayerSession {
 
   async attach(options: CapRushMultiplayerAttachOptions = {}): Promise<void> {
     if (this.isDisposed()) return;
+    this.connection = 'connecting';
     const initialSync = options.initialSync;
     const resuming = options.resume === false ? null : this.deps.transport.resume(this.deps.roomId);
     if (resuming === null) {
       if (initialSync === undefined) await this.refresh();
+      else this.markSynced();
     } else if (initialSync === undefined) {
       await Promise.all([resuming, this.refresh()]);
     } else {
       await resuming;
+      this.markSynced();
     }
     if (this.isDisposed()) return;
     if (initialSync !== undefined) this.adopt(initialSync.snapshot, initialSync.commands);
     if (this.isDisposed()) return;
-    this.unsubscribe?.();
-    this.unsubscribe = this.deps.transport.subscribe(
-      this.deps.roomId,
-      () => {
-        void this.refresh(false).catch((error: unknown) => {
-          if (this.disposed) return;
-          this.error = error instanceof Error ? error.message : 'Could not refresh the room.';
-          this.events.publish();
-        });
-      },
-      (error) => {
-        if (this.disposed) return;
-        this.error = error.message;
-        this.events.publish();
-      },
-    );
+    this.resubscribe();
   }
 
   subscribe(listener: () => void): () => void {
@@ -117,12 +120,74 @@ export class CapRushMultiplayerSession {
     return this.refreshTask.request(queueIfRunning);
   }
 
+  /**
+   * Manual recovery: retry the room read and resubscribe to presence. Failures
+   * are reported through `connection`/`transportError` instead of throwing, so
+   * a retry button never needs its own error handling.
+   */
+  async reconnect(): Promise<void> {
+    if (this.disposed) return;
+    this.connection = 'connecting';
+    this.events.publish();
+    try {
+      await this.deps.transport.resume(this.deps.roomId);
+      await this.refresh();
+      this.resubscribe();
+    } catch (error) {
+      this.failConnection(error);
+    }
+  }
+
+  /**
+   * Replace the realtime subscription so a channel that died during a network
+   * blip is recreated. Only one handler is kept, so presence is never doubled.
+   */
+  private resubscribe(): void {
+    if (this.disposed) return;
+    this.unsubscribe?.();
+    this.unsubscribe = null;
+    this.unsubscribe = this.deps.transport.subscribe(
+      this.deps.roomId,
+      () => {
+        void this.refresh(false).catch((error: unknown) => {
+          this.failConnection(error);
+        });
+      },
+      (error) => {
+        this.failConnection(error);
+      },
+    );
+  }
+
   private async fetch(): Promise<void> {
     if (this.isDisposed()) return;
     const last = this.snapshot === null ? 2_147_483_647 : this.snapshot.commandCount - 1;
-    const sync = await this.deps.transport.sync(this.deps.roomId, last);
+    let sync: CapRushMultiplayerSync;
+    try {
+      sync = await this.deps.transport.sync(this.deps.roomId, last);
+    } catch (error) {
+      this.failConnection(error);
+      throw error;
+    }
     if (this.isDisposed()) return;
     this.adopt(sync.snapshot, sync.commands);
+    this.markSynced();
+  }
+
+  private markSynced(): void {
+    if (this.connection === 'connected' && this.transportError === null) return;
+    this.connection = 'connected';
+    this.transportError = null;
+    this.events.publish();
+  }
+
+  private failConnection(error: unknown): void {
+    if (this.disposed) return;
+    const message = error instanceof Error ? error.message : 'Could not reach the room. Try again.';
+    if (this.connection === 'error' && this.transportError === message) return;
+    this.connection = 'error';
+    this.transportError = message;
+    this.events.publish();
   }
 
   get room(): CapRushMultiplayerRoomSnapshot | null {
@@ -138,6 +203,9 @@ export class CapRushMultiplayerSession {
   }
 
   view(): CapRushMultiplayerSessionView {
+    const members = this.snapshot?.members ?? [];
+    const opponent = members.find((member) => member.participantId !== this.deps.seat) ?? null;
+    const local = members.find((member) => member.participantId === this.deps.seat) ?? null;
     return {
       roomId: this.deps.roomId,
       seat: this.deps.seat,
@@ -146,7 +214,11 @@ export class CapRushMultiplayerSession {
       locked: this.state.locked,
       postseason: this.state.postseason,
       error: this.error,
-      connected: this.snapshot?.members.every((member) => member.online) ?? false,
+      connection: this.connection,
+      transportError: this.transportError,
+      bothOnline: members.length === 2 && members.every((member) => member.online),
+      opponentOnline: opponent?.online ?? false,
+      localOnline: local?.online ?? false,
     };
   }
 

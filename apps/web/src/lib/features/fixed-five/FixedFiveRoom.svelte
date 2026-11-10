@@ -235,9 +235,9 @@
             </div>
           </dl>
           {#if controller.assetsError}<p class="room-alert" role="alert">
-              The player pool could not be loaded. Reload the room to try again.
+              The player pool could not be loaded. Try again to reload it.
             </p>
-            <Button tone="secondary" onclick={() => window.location.reload()}>Reload room</Button
+            <Button tone="secondary" onclick={() => void controller.retryLoad()}>Try again</Button
             >{/if}
           <div class="lobby-ready" role="status">
             <span class:joined={controller.opponent?.online}></span>
@@ -282,7 +282,7 @@
         <p role="status">{controller.assetsError ?? 'Loading your player pool and lineup…'}</p>
         {#if controller.assetsError}<Button
             tone="secondary"
-            onclick={() => window.location.reload()}>Reload room</Button
+            onclick={() => void controller.retryLoad()}>Try again</Button
           >{/if}
       </div>
     {:else if phase === 'drafting' && replay && assets}
@@ -358,9 +358,16 @@
               Game {controller.duelCurrentGameNumber ?? 1} · Ready check
             </h2>
             <p class="mt-2 text-sm text-muted-foreground">
-              {controller.localReady
-                ? "You're ready. Waiting for your opponent…"
-                : 'Both players need to be ready before the broadcast starts.'}
+              {#if controller.localReady && controller.opponentReady}
+                Both players are ready. Starting the broadcast…
+              {:else if controller.localReady}
+                You're ready. Waiting for your opponent…
+              {:else if controller.opponentReady}
+                Your opponent is ready. Ready up to start Game {controller.duelCurrentGameNumber ??
+                  1}.
+              {:else}
+                Both players need to be ready before the broadcast starts.
+              {/if}
             </p>
             {#if controller.duelSimError}
               <p class="mt-2 text-sm text-destructive" role="alert">{controller.duelSimError}</p>
@@ -439,6 +446,7 @@
             verification={controller.duelVerification}
             readyCountdownMs={controller.readyCountdownMs}
             localReady={controller.localReady}
+            opponentReady={controller.opponentReady}
             onready={() => void controller.readyForNextGame()}
             awaitingContinue={controller.awaitingContinue}
             oncontinue={() => controller.continueAfterGame()}

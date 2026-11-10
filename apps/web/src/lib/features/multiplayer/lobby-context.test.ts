@@ -118,4 +118,36 @@ describe('layout lobby coordinator', () => {
     expect(coordinator.snapshot.error).toBeNull();
     expect(vi.getTimerCount()).toBe(0);
   });
+
+  it('replays the same settings only for the host with the opponent still in the room', async () => {
+    vi.useFakeTimers();
+    const settings: MultiplayerMatchSettings = {
+      gameKind: 'draft-duel',
+      fairness: 'fair',
+      variant: 'ratings',
+      versions: defaultDraftDuelVersionLocks({ catalogHash: 'a'.repeat(64) }),
+    };
+    const started = { ...lobby, revision: 1, guestJoined: true, canStart: false };
+    mocked(lobbyCommand)
+      .mockReset()
+      .mockResolvedValueOnce(lobby)
+      .mockResolvedValueOnce({ ...lobby, guestJoined: true })
+      .mockResolvedValueOnce(started);
+    const coordinator = new LobbyCoordinator(vi.fn(() => Promise.resolve()));
+    await coordinator.session.create();
+    coordinator.lastMatch = settings;
+    // Missing guest: no replay is created for an empty room.
+    await coordinator.playAgain(() => true);
+    expect(lobbyCommand).not.toHaveBeenCalledWith(expect.objectContaining({ kind: 'start' }));
+
+    await coordinator.session.refresh();
+    mocked(lobbyCommand).mockClear();
+    await coordinator.playAgain(() => false);
+    expect(lobbyCommand).not.toHaveBeenCalledWith(expect.objectContaining({ kind: 'start' }));
+
+    mocked(lobbyCommand).mockResolvedValueOnce(started);
+    await coordinator.playAgain(() => true);
+    expect(lobbyCommand).toHaveBeenCalledWith(expect.objectContaining({ kind: 'start', settings }));
+    coordinator.dispose();
+  });
 });

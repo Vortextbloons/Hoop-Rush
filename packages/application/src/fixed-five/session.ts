@@ -532,6 +532,22 @@ export class FixedFiveRoomSession {
     this.competition.retry();
   }
 
+  /**
+   * Retry a failed room boot (transport or asset load) in place.
+   *
+   * The caller has already cleared any cached rejected asset load. The timers
+   * registered by `start()` stay in place; only the transport subscription is
+   * rebuilt so a retry never doubles polling or presence.
+   */
+  async retryStart(): Promise<void> {
+    if (this.isDisposed() || this.loading) return;
+    this.error = null;
+    this.assetsError = null;
+    this.unsubscribeTransport?.();
+    this.unsubscribeTransport = null;
+    await this.boot();
+  }
+
   requestStatsRebuild(): void {
     this.competition.requestStatsRebuild();
   }

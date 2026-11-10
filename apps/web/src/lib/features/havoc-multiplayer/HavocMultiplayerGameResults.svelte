@@ -21,6 +21,7 @@
     verification,
     readyCountdownMs,
     localReady,
+    opponentReady = false,
     awaitingContinue,
     onready,
     oncontinue,
@@ -31,6 +32,7 @@
     verification: HavocMultiplayerVerificationTone;
     readyCountdownMs: number | null;
     localReady: boolean;
+    opponentReady?: boolean;
     awaitingContinue: boolean;
     onready: () => void;
     oncontinue: () => void;
@@ -142,12 +144,20 @@
     {:else if nextGameNumber !== null}
       <div class="hm-ready-copy">
         <p class="hm-ready-line">
-          {localReady ? "You're ready for the next game." : 'Ready to continue?'}
+          {#if localReady && opponentReady}
+            Both players are ready. Starting Game {nextGameNumber}…
+          {:else if localReady}
+            You're ready. Waiting for your opponent.
+          {:else if opponentReady}
+            Your opponent is ready. Ready up to start Game {nextGameNumber}.
+          {:else}
+            Ready for Game {nextGameNumber}?
+          {/if}
         </p>
         {#if countdown !== null}
           <p class="hm-countdown">
             <Clock size={13} aria-hidden="true" />
-            Auto-ready in <strong>{countdown}s</strong>
+            Auto-start in <strong>{countdown}s</strong>
           </p>
         {/if}
       </div>

@@ -17,6 +17,7 @@ import {
   type RoomLogFacts,
 } from '@hoop-rush/engine';
 import type { FixedFiveSessionAssets } from '@hoop-rush/application/fixed-five';
+import { cachedAssets } from '#lib/assets/cached-assets.js';
 import { z } from 'zod';
 import { buildClassicCatalog } from '#lib/classic-draft.js';
 import { getPlayersIndex } from '#lib/data.js';
@@ -27,40 +28,40 @@ export type FixedFiveAssets = FixedFiveSessionAssets;
 
 export type PickRef = FixedFivePickRef;
 
-let assetsPromise: Promise<FixedFiveAssets> | null = null;
+const assets = cachedAssets(async (): Promise<FixedFiveAssets> => {
+  const [{ manifest, profile, bracket }, index] = await Promise.all([
+    loadRunPreamble(),
+    getPlayersIndex(),
+  ]);
+  const catalog = buildClassicCatalog(manifest, index);
+  const pool: FixedFiveCandidate[] = index.players.map((entry) => ({
+    playerId: entry.playerId,
+    playerVersionId: playerVersionId(
+      entry.playerId,
+      entry.franchiseId,
+      entry.eraId,
+      entry.seasonKey,
+    ),
+    positions: [...entry.positionsPlayable],
+    selectionScore: entry.selectionScore,
+    franchiseId: entry.franchiseId,
+    eraId: entry.eraId,
+  }));
+  return {
+    manifest,
+    profile,
+    bracket,
+    index,
+    catalog,
+    pool,
+    poolById: new Map(pool.map((c) => [c.playerId, c])),
+    context: createEngineContext(),
+  };
+});
 
+/** Concurrent calls share one load; a rejection is retried by the next call. */
 export function loadFixedFiveAssets(): Promise<FixedFiveAssets> {
-  assetsPromise ??= (async () => {
-    const [{ manifest, profile, bracket }, index] = await Promise.all([
-      loadRunPreamble(),
-      getPlayersIndex(),
-    ]);
-    const catalog = buildClassicCatalog(manifest, index);
-    const pool: FixedFiveCandidate[] = index.players.map((entry) => ({
-      playerId: entry.playerId,
-      playerVersionId: playerVersionId(
-        entry.playerId,
-        entry.franchiseId,
-        entry.eraId,
-        entry.seasonKey,
-      ),
-      positions: [...entry.positionsPlayable],
-      selectionScore: entry.selectionScore,
-      franchiseId: entry.franchiseId,
-      eraId: entry.eraId,
-    }));
-    return {
-      manifest,
-      profile,
-      bracket,
-      index,
-      catalog,
-      pool,
-      poolById: new Map(pool.map((c) => [c.playerId, c])),
-      context: createEngineContext(),
-    };
-  })();
-  return assetsPromise;
+  return assets.load();
 }
 
 export async function buildSimulationTeam(

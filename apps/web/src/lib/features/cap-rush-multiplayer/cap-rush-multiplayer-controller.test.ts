@@ -18,7 +18,11 @@ function sessionView(error: string | null): CapRushMultiplayerSessionView {
     locked: null,
     postseason: null,
     error,
-    connected: true,
+    connection: 'connected',
+    transportError: null,
+    bothOnline: true,
+    opponentOnline: true,
+    localOnline: true,
   } as unknown as CapRushMultiplayerSessionView;
 }
 

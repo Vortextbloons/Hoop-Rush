@@ -24,6 +24,7 @@
   import HavocLineupLock from '#lib/features/havoc/HavocLineupLock.svelte';
   import { HavocMultiplayerController } from '#lib/features/havoc-multiplayer/havoc-multiplayer-controller.svelte.js';
   import { inviteLinkForHavocMultiplayerCode } from '#lib/features/havoc-multiplayer/havoc-multiplayer-identity.js';
+  import { LobbyAutoStart } from '#lib/features/multiplayer/lobby-auto-start.js';
   import HavocMultiplayerBroadcast from '#lib/features/havoc-multiplayer/HavocMultiplayerBroadcast.svelte';
   import HavocMultiplayerChampionship from '#lib/features/havoc-multiplayer/HavocMultiplayerChampionship.svelte';
   import HavocMultiplayerDraftBoard from '#lib/features/havoc-multiplayer/HavocMultiplayerDraftBoard.svelte';
@@ -177,6 +178,30 @@
     });
   });
 
+  // Shared-lobby matches start once both seats are present; direct invites keep
+  // the explicit Start draft button.
+  const autoStart = new LobbyAutoStart();
+  let autoStartFailed = $state(false);
+  $effect(() => {
+    if (!lobbyId) return;
+    const gate = {
+      sharedLobby: true,
+      isHost,
+      bothOnline,
+      phase,
+      roomKey: roomId,
+    };
+    if (!autoStart.shouldStart(gate)) return;
+    void autoStart
+      .run(roomId, () => controller.startDraft())
+      .then(() => {
+        autoStartFailed = false;
+      })
+      .catch(() => {
+        autoStartFailed = true;
+      });
+  });
+
   async function copyCode(): Promise<void> {
     const code = controller.snapshot?.code;
     if (!code) return;
@@ -249,9 +274,14 @@
     <div class="hm-empty">
       <h1 class="h-title">Couldn’t open this room</h1>
       <p role="alert" class="hm-alert">{controller.error}</p>
-      <a href={resolve('/multiplayer')} class="h-button"
-        >Back to multiplayer <ArrowRight size={16} aria-hidden="true" /></a
-      >
+      <div class="h-actions">
+        <button type="button" class="h-button" onclick={() => void controller.retryAttach()}>
+          Try again
+        </button>
+        <a href={resolve('/multiplayer')} class="h-button secondary"
+          >Back to multiplayer <ArrowRight size={16} aria-hidden="true" /></a
+        >
+      </div>
     </div>
   {:else}
     <RoomShell
@@ -355,16 +385,27 @@
               {me?.ready === true ? 'Ready' : 'Ready up'}
             </button>
             {#if isHost}
-              <button
-                type="button"
-                class="h-button"
-                data-havoc-multiplayer-start
-                disabled={controller.busy || !bothOnline}
-                onclick={() => void controller.startDraft()}
-              >
-                {controller.busy ? 'Starting…' : 'Start draft'}
-                <ArrowRight size={16} aria-hidden="true" />
-              </button>
+              {#if lobbyId && !autoStartFailed}
+                <p class="hm-footnote" role="status">
+                  {bothOnline
+                    ? 'Starting the draft for both players…'
+                    : 'The draft starts automatically once your opponent is online.'}
+                </p>
+              {:else}
+                <button
+                  type="button"
+                  class="h-button"
+                  data-havoc-multiplayer-start
+                  disabled={controller.busy || !bothOnline}
+                  onclick={() => {
+                    autoStart.retry(roomId);
+                    void controller.startDraft();
+                  }}
+                >
+                  {controller.busy ? 'Starting…' : autoStartFailed ? 'Retry start' : 'Start draft'}
+                  <ArrowRight size={16} aria-hidden="true" />
+                </button>
+              {/if}
             {/if}
           </div>
           {#if isHost && !bothOnline}
@@ -547,11 +588,15 @@
                 {/if}
               </header>
               <p class="h-copy">
-                {controller.opponentReady
-                  ? 'Opponent is ready.'
-                  : controller.localReady
-                    ? 'Waiting for your opponent. The game starts automatically after 60 seconds.'
-                    : 'Both players ready up to start the broadcast.'}
+                {#if controller.opponentReady && controller.localReady}
+                  Both players are ready. Starting Game {controller.currentGameNumber ?? 1}…
+                {:else if controller.opponentReady}
+                  Opponent is ready.
+                {:else if controller.localReady}
+                  Waiting for your opponent. The game starts automatically after 60 seconds.
+                {:else}
+                  Both players ready up to start the broadcast.
+                {/if}
               </p>
               {#if lastOutput && lastGame}
                 <p class="hm-last-result">
@@ -614,6 +659,7 @@
                 verification={resultVerification}
                 readyCountdownMs={controller.readyCountdownMs}
                 localReady={controller.localReady}
+                opponentReady={controller.opponentReady}
                 awaitingContinue={controller.awaitingContinue}
                 onready={() => void controller.readyForNextGame()}
                 oncontinue={() => controller.continueAfterGame()}

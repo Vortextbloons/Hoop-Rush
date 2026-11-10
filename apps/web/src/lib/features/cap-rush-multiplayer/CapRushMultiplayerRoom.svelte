@@ -1,11 +1,12 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { resolve } from '$app/paths';
   import type {
     CapRushMultiplayerMemberSnapshot,
     CapRushMultiplayerSeatId,
   } from '@hoop-rush/data-contracts';
   import RoomShell from '../multiplayer/RoomShell.svelte';
+  import MultiplayerLobbyLink from '../multiplayer/MultiplayerLobbyLink.svelte';
   import CapRushAuctionBoard from './CapRushAuctionBoard.svelte';
   import CapRushBroadcast from './CapRushBroadcast.svelte';
   import CapRushFranchiseReveal from './CapRushFranchiseReveal.svelte';
@@ -16,9 +17,12 @@
   import { CapRushMultiplayerController } from './cap-rush-multiplayer-controller.svelte.js';
   import { seatLabel, seatOrder } from './cap-rush-multiplayer-presentation.js';
   import { variantLabel } from '../cap-rush/cap-rush-presentation.js';
+  import { loadLobbyId } from '#lib/features/multiplayer/multiplayer-lobby.js';
+  import { LobbyAutoStart } from '#lib/features/multiplayer/lobby-auto-start.js';
 
   let { roomId }: { roomId: string } = $props();
-  const controller = new CapRushMultiplayerController(roomId);
+  const controller = new CapRushMultiplayerController(untrack(() => roomId));
+  const lobbyId = untrack(() => loadLobbyId(roomId));
 
   onMount(() => {
     void controller.load();
@@ -43,7 +47,21 @@
       view?.snapshot?.members.map((member) => [member.participantId, member]) ?? [],
     ),
   );
-  const bothOnline = $derived(view?.connected ?? false);
+  const bothOnline = $derived(view?.bothOnline ?? false);
+  const opponentOnline = $derived(view?.opponentOnline ?? false);
+  const connectionLabel = $derived.by(() => {
+    switch (view?.connection ?? 'idle') {
+      case 'connected':
+        return 'connected';
+      case 'idle':
+      case 'connecting':
+        return 'idle';
+      case 'error':
+        return 'error';
+      default:
+        return 'reconnecting';
+    }
+  });
   const variant = $derived(view?.snapshot?.settings.variant ?? 'clash');
   const localTeamId = $derived(
     game?.locked?.seats[seat].franchise.franchiseId ?? game?.franchises?.[seat].franchiseId ?? '',
@@ -66,6 +84,30 @@
                   : game.phase,
   );
   const summary = $derived(variantLabel(variant));
+
+  // Shared-lobby matches start once both seats are present. Direct invites keep
+  // the explicit Start recruitment button in the room's own lobby.
+  const autoStart = new LobbyAutoStart();
+  let autoStartFailed = $state(false);
+  $effect(() => {
+    if (!lobbyId || game === null) return;
+    const gate = {
+      sharedLobby: true,
+      isHost: controller.isHost,
+      bothOnline,
+      phase: game.phase,
+      roomKey: roomId,
+    };
+    if (!autoStart.shouldStart(gate)) return;
+    void autoStart
+      .run(roomId, () => controller.startLeague())
+      .then(() => {
+        autoStartFailed = false;
+      })
+      .catch(() => {
+        autoStartFailed = true;
+      });
+  });
 </script>
 
 <div class="mx-auto w-full max-w-[1440px] px-3 pb-8 sm:px-6">
@@ -78,10 +120,32 @@
     code={view?.snapshot?.code ?? null}
     participantId={seat}
     {members}
-    connection={view?.connected ? 'connected' : 'reconnecting'}
+    connection={connectionLabel}
     error={controller.error}
   >
     {#snippet content()}
+      {#if view?.connection === 'error'}
+        <div
+          class="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2.5"
+          role="alert"
+        >
+          <p class="text-xs font-semibold">
+            Your connection to this room was interrupted. The room is kept — nothing was lost.
+          </p>
+          <button
+            type="button"
+            class="min-h-11 rounded-lg border border-destructive/50 px-3 text-xs font-bold text-destructive outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            disabled={controller.busy}
+            onclick={() => void controller.reconnect()}
+          >
+            Reconnect
+          </button>
+        </div>
+      {:else if game !== null && game.phase !== 'lobby' && game.phase !== 'completed' && !opponentOnline}
+        <p class="mb-3 text-xs text-muted-foreground" role="status">
+          Your opponent is offline. Their seat is kept and your match resumes when they return.
+        </p>
+      {/if}
       {#if controller.broadcast}
         <CapRushBroadcast
           art={controller.art}
@@ -98,10 +162,21 @@
       {:else if game === null && controller.error}
         <section class="rounded-xl border border-border bg-card p-4">
           <h2 class="font-display text-xl font-bold">Room unavailable</h2>
-          <a
-            class="mt-3 inline-flex min-h-11 items-center font-bold text-primary"
-            href={resolve('/multiplayer')}>Return to the lobby</a
-          >
+          <p class="mt-1 text-sm text-muted-foreground" role="alert">{controller.error}</p>
+          <div class="mt-3 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              class="inline-flex min-h-11 items-center justify-center rounded-xl border border-primary/50 bg-primary/10 px-4 text-sm font-bold text-primary outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
+              disabled={controller.loading}
+              onclick={() => void controller.retryLoad()}
+            >
+              {controller.loading ? 'Retrying…' : 'Try again'}
+            </button>
+            <a
+              class="inline-flex min-h-11 items-center font-bold text-primary"
+              href={resolve('/multiplayer')}>Return to the lobby</a
+            >
+          </div>
         </section>
       {:else if game === null}
         <div class="flex flex-col gap-3 py-6" role="status" aria-label="Opening the room">
@@ -171,15 +246,37 @@
 
           {#if controller.isHost}
             <div class="flex flex-col gap-2">
-              <button
-                type="button"
-                class="inline-flex min-h-11 w-fit items-center justify-center rounded-xl border border-primary/50 bg-primary/10 px-4 text-sm font-bold text-primary outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
-                disabled={controller.busy || !bothOnline}
-                onclick={() => controller.startLeague()}
-              >
-                Start recruitment
-              </button>
+              {#if lobbyId && !autoStartFailed}
+                <p class="text-xs text-muted-foreground" role="status">
+                  {bothOnline
+                    ? 'Starting the recruitment for both players…'
+                    : 'Recruitment starts automatically once your opponent is online.'}
+                </p>
+              {:else}
+                <button
+                  type="button"
+                  class="inline-flex min-h-11 w-fit items-center justify-center rounded-xl border border-primary/50 bg-primary/10 px-4 text-sm font-bold text-primary outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
+                  disabled={controller.busy || !bothOnline}
+                  onclick={() => {
+                    autoStart.retry(roomId);
+                    void controller.startLeague();
+                  }}
+                >
+                  {autoStartFailed ? 'Retry start' : 'Start recruitment'}
+                </button>
+              {/if}
+              {#if !bothOnline}
+                <p class="text-xs text-muted-foreground" role="status">
+                  Waiting for your opponent to come online.
+                </p>
+              {/if}
             </div>
+          {:else}
+            <p class="text-xs text-muted-foreground" role="status">
+              {bothOnline
+                ? 'Your host starts the recruitment.'
+                : 'Waiting for your host and opponent to be online.'}
+            </p>
           {/if}
         </section>
       {:else if game.phase === 'recruiting'}
@@ -263,10 +360,13 @@
             art={controller.art}
             onreviewgame={(gameId) => controller.reviewGame(gameId)}
           />
-          <a
-            class="inline-flex min-h-11 w-fit items-center justify-center rounded-xl border border-border bg-surface-2 px-4 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            href={resolve('/multiplayer')}>Return to the lobby</a
-          >
+          <MultiplayerLobbyLink {roomId} completed />
+          {#if !lobbyId}
+            <a
+              class="inline-flex min-h-11 w-fit items-center justify-center rounded-xl border border-border bg-surface-2 px-4 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              href={resolve('/multiplayer')}>Return to the lobby</a
+            >
+          {/if}
         </div>
       {:else}
         <section class="rounded-2xl border border-border bg-card p-5">

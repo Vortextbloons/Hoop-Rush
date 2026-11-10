@@ -35,6 +35,12 @@ export function initialLobbyView(options: {
 export class LobbyCoordinator {
   localFormat: MultiplayerFormatId | null = null;
   readonly localSettings = new Map<MultiplayerGameKind, MultiplayerSetup>();
+  /**
+   * Settings of the match this client last started from the shared lobby.
+   * In-memory only: it powers the result screen's "Play again" without
+   * persisting mode-specific settings or changing the lobby protocol.
+   */
+  lastMatch: MultiplayerStartSettings | null = null;
   snapshot = $state.raw<LobbySessionSnapshot>({
     lobby: null,
     preview: null,
@@ -121,6 +127,25 @@ export class LobbyCoordinator {
     const settings = await prepareSettings();
     if (!current() || this.active !== session || session.getSnapshot().lobby?.id !== lobbyId)
       return;
+    this.lastMatch = settings;
+    await session.startMatch(settings);
+  }
+
+  /**
+   * Start the next match in the shared lobby with the settings of the match
+   * that just ended. The lobby server still requires the host and an idle
+   * room, and the command keeps its authoritative revision retry, so consent
+   * is unchanged — the opponent simply keeps the matchup they already agreed to.
+   */
+  async playAgain(current: () => boolean): Promise<void> {
+    const session = this.session;
+    const settings = this.lastMatch;
+    const lobby = session.getSnapshot().lobby;
+    if (!settings || !lobby || !current()) return;
+    // The host starts the replay, exactly as they start any match from this
+    // lobby; the opponent must still be in the room, so an abandoned seat never
+    // gets a new match created for it.
+    if (lobby.participantId !== 'p1' || !lobby.canStart || !lobby.guestJoined) return;
     await session.startMatch(settings);
   }
 
