@@ -234,7 +234,8 @@ describe('Cap Rush recorded broadcast', () => {
     expect(overtimePossession.clockSeconds).toBeGreaterThan(0);
     expect(regulation.events.some((event) => event.kind === 'game-end')).toBe(false);
     expectReconciled(overtime.game.result, overtime.tape);
-  });
+    // Up to 128 full simulations to find an overtime fixture.
+  }, 30_000);
 
   it('keeps clones distinct and applies signed mutation scoring only at its recorded cursor', () => {
     let mutated: ReturnType<typeof scenarioRun> | undefined;
