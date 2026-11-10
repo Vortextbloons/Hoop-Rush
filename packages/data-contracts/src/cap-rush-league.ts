@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { playerIdSchema } from './ids.ts';
 import { positionSchema } from './positions.ts';
 import { capRushDigestSchema } from './cap-rush-versions.ts';
-import { leaguePlayerTotalsSchema } from './league.ts';
 
 export const CAP_RUSH_LEAGUE_VERSION = 'cap-rush-league-v1';
 export const CAP_RUSH_TAKEOVER_TEAMS = 30;
@@ -227,6 +226,7 @@ export type CapRushLeagueResult = z.infer<typeof capRushLeagueResultSchema>;
 
 export function capRushLeagueResultOf(game: CapRushLeagueGame): CapRushLeagueResult {
   const { box: _box, ...result } = game;
+  void _box;
   return result;
 }
 

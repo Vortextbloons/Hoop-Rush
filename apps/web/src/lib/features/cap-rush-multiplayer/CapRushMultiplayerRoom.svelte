@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { resolve } from '$app/paths';
   import type {
     CapRushMultiplayerMemberSnapshot,
@@ -18,7 +18,7 @@
   import { variantLabel } from '../cap-rush/cap-rush-presentation.js';
 
   let { roomId }: { roomId: string } = $props();
-  const controller = new CapRushMultiplayerController(roomId);
+  const controller = new CapRushMultiplayerController(untrack(() => roomId));
 
   onMount(() => {
     void controller.load();
