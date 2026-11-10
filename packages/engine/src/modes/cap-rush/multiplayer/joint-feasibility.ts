@@ -1,4 +1,4 @@
-import type { CapRushMultiplayerSeatId, Position } from '@hoop-rush/data-contracts';
+import type { Position } from '@hoop-rush/data-contracts';
 import { CAP_RUSH_MULTIPLAYER_HARD_LIMIT_DOLLARS, POSITIONS } from '@hoop-rush/data-contracts';
 
 export interface CapRushMultiplayerFeasibilityPlayer {
@@ -88,11 +88,4 @@ export function capRushMultiplayerCompletionFeasible(
       input.seats.p1.committedDollars + input.seats.p1.reservedDollars + combination.p1 <= limit &&
       input.seats.p2.committedDollars + input.seats.p2.reservedDollars + combination.p2 <= limit,
   );
-}
-
-export function capRushMultiplayerSeatFilledPositions(
-  seat: CapRushMultiplayerSeatId,
-  signings: readonly { readonly seat: CapRushMultiplayerSeatId; readonly position: Position }[],
-): Position[] {
-  return signings.filter((signing) => signing.seat === seat).map((signing) => signing.position);
 }

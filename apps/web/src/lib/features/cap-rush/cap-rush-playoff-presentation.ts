@@ -1,6 +1,5 @@
 import {
   CAP_RUSH_PLAYOFF_CAPS,
-  CAP_RUSH_PLAYOFF_SAMPLE_MINUTES,
   type CapRushDraftState,
   type CapRushLockedInputs,
   type CapRushPlayoffApplied,
@@ -90,9 +89,6 @@ export function sampleLabel(row: CapRushPlayoffPlayer): string {
 export function weightLabel(row: CapRushPlayoffPlayer): string {
   return `${String(Math.round(row.weight * 100))}% of the measured difference`;
 }
-
-/** Minutes at which exactly half of a measured difference is applied. */
-export const capRushPlayoffSampleMinutes = CAP_RUSH_PLAYOFF_SAMPLE_MINUTES;
 
 export function capRushPlayoffCoverage(
   locked: CapRushLockedInputs | null,

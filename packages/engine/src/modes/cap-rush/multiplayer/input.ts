@@ -98,9 +98,3 @@ export function capRushMultiplayerPlayoffInputFor(input: {
     versionSet: capRushMultiplayerBattleVersionSet(input.locked),
   });
 }
-
-export function capRushMultiplayerPlayoffGameId(plan: CapRushPlayoffGamePlan): string {
-  return `crp-${String(plan.round)}-${String(plan.seriesSlot)}-${String(plan.gameOrdinal)}`;
-}
-
-export const CAP_RUSH_MULTIPLAYER_FINALS_ROUND = CAP_RUSH_PLAYOFF_ROUNDS;

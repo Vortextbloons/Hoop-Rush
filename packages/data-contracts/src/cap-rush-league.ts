@@ -75,12 +75,6 @@ export function capRushAlignmentOf(franchiseId: string): CapRushFranchiseAlignme
   return alignment;
 }
 
-export function capRushConferenceTeams(conference: CapRushConference): readonly string[] {
-  return CAP_RUSH_FRANCHISE_ALIGNMENT.filter((entry) => entry.conference === conference).map(
-    (entry) => entry.franchiseId,
-  );
-}
-
 export const capRushLeagueGameIdSchema = z
   .string()
   .regex(/^crl-[0-9]{2}-[a-z0-9._:]+-[a-z0-9._:]+$/);
@@ -255,8 +249,6 @@ export const capRushLeaguePlayerAggregateSchema = z.object({
   totalGameScore: z.number(),
   totalTrueShooting: z.number(),
 });
-export type CapRushLeaguePlayerAggregate = z.infer<typeof capRushLeaguePlayerAggregateSchema>;
-
 export const capRushLeagueTeamAggregateSchema = z.object({
   teamId: z.string().min(1).max(64),
   displayName: z.string().min(1).max(96),
@@ -401,17 +393,4 @@ export function capRushConferenceStandingsEntries(
   standings: CapRushConferenceStandings,
 ): CapRushLeagueStandingsEntry[] {
   return [...standings.west.entries, ...standings.east.entries];
-}
-
-export function isConferenceStandings(
-  standings: CapRushConferenceStandings | object,
-): standings is CapRushConferenceStandings {
-  return 'format' in standings && (standings as { format?: unknown }).format === 'conference';
-}
-
-export function capRushConferenceTableOf(
-  standings: CapRushConferenceStandings,
-  conference: CapRushConference,
-): CapRushConferenceTable {
-  return conference === 'west' ? standings.west : standings.east;
 }

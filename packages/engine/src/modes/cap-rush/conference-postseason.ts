@@ -9,9 +9,7 @@ import type {
 } from '@hoop-rush/data-contracts';
 import {
   CAP_RUSH_PLAYOFF_ROUNDS,
-  capRushConferenceRoundName,
   capRushConferenceStandingsEntries,
-  capRushPlayoffGameId,
   capRushPlayoffSeriesId,
   capRushSeriesConferenceOf,
   capRushSeriesComplete,
@@ -88,12 +86,6 @@ export function capRushConferenceSeriesForTeam(
         series.round === round && (series.highTeamId === teamId || series.lowTeamId === teamId),
     ) ?? null
   );
-}
-
-export function capRushConferenceSeriesName(series: CapRushConferenceSeries): string {
-  const conference =
-    series.conference === null ? '' : ` · ${series.conference === 'west' ? 'West' : 'East'}`;
-  return `${capRushConferenceRoundName(series.round)}${conference} · ${String(series.highSeed)} vs ${String(series.lowSeed)}`;
 }
 
 function createNextRound(input: {
@@ -259,18 +251,6 @@ export function capRushConferenceFinalsMvp(
   );
   if (finals === undefined || capRushSeriesWinner(finals) !== champion) return null;
   return capRushFinalsMvpOf({ games: finals.games, championTeamId: champion, userTeamId });
-}
-
-export function capRushConferenceQualificationOf(input: {
-  readonly standings: CapRushConferenceStandings;
-  readonly userTeamId: string;
-}): { readonly qualified: boolean; readonly entry: CapRushLeagueStandingsEntry } {
-  const entry = entryOf(input.standings, input.userTeamId);
-  return { qualified: entry.qualified, entry };
-}
-
-export function capRushConferencePlayoffGameId(plan: CapRushPlayoffGamePlan): string {
-  return capRushPlayoffGameId(plan.round, plan.seriesSlot, plan.gameOrdinal);
 }
 
 export { capRushSeriesWins, capRushSeriesComplete, capRushSeriesWinner };

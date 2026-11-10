@@ -133,9 +133,6 @@ export const capRushMultiplayerSeatRecruitmentMapSchema = z.object({
   p1: capRushMultiplayerSeatRecruitmentSchema,
   p2: capRushMultiplayerSeatRecruitmentSchema,
 });
-export type CapRushMultiplayerSeatRecruitmentMap = z.infer<
-  typeof capRushMultiplayerSeatRecruitmentMapSchema
->;
 
 export const capRushMultiplayerRecruitmentSchema = z.object({
   schemaVersion: z.literal(CAP_RUSH_MULTIPLAYER_SCHEMA_VERSION),
@@ -146,11 +143,3 @@ export const capRushMultiplayerRecruitmentSchema = z.object({
   seats: capRushMultiplayerSeatRecruitmentMapSchema,
 });
 export type CapRushMultiplayerRecruitment = z.infer<typeof capRushMultiplayerRecruitmentSchema>;
-
-export const capRushMultiplayerBidRecordSchema = z.object({
-  commandId: idSchema,
-  seat: capRushMultiplayerSeatIdSchema,
-  playerId: playerIdSchema,
-  totalDollars: z.number().int().positive(),
-  acceptedAtIso: z.iso.datetime(),
-});

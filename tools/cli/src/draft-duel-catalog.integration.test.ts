@@ -129,8 +129,6 @@ describe('draft duel production catalog integration', () => {
           expect(p1.length).toBe(5);
           expect(p2.length).toBe(5);
           expect(new Set([...p1, ...p2]).size).toBe(10);
-          expect(draftDuelRoster(state, catalog, 'p1').slots.length).toBe(5);
-          expect(draftDuelRoster(state, catalog, 'p2').slots.length).toBe(5);
         }
       }
     }

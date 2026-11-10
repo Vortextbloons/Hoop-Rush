@@ -28,17 +28,6 @@ export function capRushBattleVersionSet(locked: CapRushLockedInputs): HavocVersi
   };
 }
 
-export function capRushHumanSideOf(
-  locked: CapRushLockedInputs,
-  gameNumber: number,
-): 'home' | 'away' {
-  const entry = locked.schedule[gameNumber - 1];
-  if (entry === undefined) {
-    throw new Error(`cap rush input: no schedule entry for game ${String(gameNumber)}`);
-  }
-  return entry.humanHome ? 'home' : 'away';
-}
-
 export function buildCapRushGameInput(input: {
   readonly locked: CapRushLockedInputs;
   readonly gameNumber: number;

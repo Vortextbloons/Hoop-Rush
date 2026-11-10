@@ -1,7 +1,6 @@
 import type {
   CapRushLeagueAggregate,
   CapRushLeagueGame,
-  CapRushLeagueResult,
   CapRushLeagueTeamAggregate,
   CapRushTeamBox,
   LeaguePlayerTotals,
@@ -10,7 +9,6 @@ import type {
 import {
   CAP_RUSH_LEAGUE_AGGREGATE_VERSION,
   capRushLeagueAggregateSchema,
-  capRushLeagueResultOf,
   playerIdSchema,
 } from '@hoop-rush/data-contracts';
 import {
@@ -158,9 +156,4 @@ export function capRushFoldLeagueAggregate(
     teams: [...teams.values()],
     players: [...players.values()],
   });
-}
-
-/** Compact results for receipts and schedule views: no box scores. */
-export function capRushLeagueResultsOf(games: readonly CapRushLeagueGame[]): CapRushLeagueResult[] {
-  return games.map((game) => capRushLeagueResultOf(game));
 }

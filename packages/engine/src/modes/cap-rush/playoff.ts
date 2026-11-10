@@ -376,11 +376,3 @@ export function capRushPlayoffTeam(input: {
     clones: input.team.clones.map(adjust),
   };
 }
-
-export function capRushPlayoffRowOfVersion(
-  performance: CapRushPlayoffPerformance | undefined,
-  playerVersionId: string | null,
-): CapRushPlayoffPlayer | null {
-  if (performance === undefined || playerVersionId === null) return null;
-  return performance.players.find((row) => row.playerVersionId === playerVersionId) ?? null;
-}

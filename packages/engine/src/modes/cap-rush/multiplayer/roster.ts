@@ -2,7 +2,6 @@ import type {
   CapRushFranchiseAssignment,
   CapRushLockedPick,
   CapRushMultiplayerMarket,
-  CapRushMultiplayerMarketPlayer,
   CapRushMultiplayerSeatId,
   CapRushMultiplayerSeatLock,
   CapRushMultiplayerSigning,
@@ -249,15 +248,4 @@ export function buildCapRushMultiplayerSeatLock(input: {
     ...(input.additionalSpins?.length ? { additionalSpins: [...input.additionalSpins] } : {}),
     ready: input.ready ?? false,
   };
-}
-
-export function capRushMultiplayerMarketPlayerSource(
-  market: CapRushMultiplayerMarket,
-  playerId: string,
-): CapRushMultiplayerMarketPlayer {
-  const player = market.players.find((entry) => entry.playerId === playerId);
-  if (player === undefined) {
-    throw new CapRushMultiplayerCompletionError(null, `market has no player ${playerId}`);
-  }
-  return player;
 }

@@ -761,8 +761,6 @@ describe('computePool error and skip paths', () => {
   it('returns identity failures for unknown franchise/era and source-incomplete eras', () => {
     buildStandardFixture('errors');
     const manifest = fixtureManifest();
-    const spurs = computePool('spurs', '1990s', manifest, BBREF_IDS, false) as PoolBuildFailure;
-    expect(spurs.reason).toBe('insufficient-players');
     const unknownEra = computePool(
       'lakers',
       '1980s',

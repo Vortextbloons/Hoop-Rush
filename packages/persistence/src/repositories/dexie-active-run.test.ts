@@ -46,8 +46,6 @@ describe('dexie active run save/load round-trip', () => {
     const loaded = await repo.loadActiveRun();
     expect(loaded).not.toBeNull();
     expect(loaded?.run.runId).toBe('roundtrip-run');
-    expect(loaded?.run.games).toHaveLength(2);
-    expect(loaded?.run.games.map((g) => g.gameNumber)).toEqual([1, 2]);
     expect(loaded?.run.aggregates).toEqual(record.run.aggregates);
     expect(loaded?.run.games).toEqual(record.run.games);
     expect(challengeRunProgressDigest(loaded?.run ?? record.run)).toBe(

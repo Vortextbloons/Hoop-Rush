@@ -251,5 +251,3 @@ export const capRushMultiplayerOutcomeSchema = z.object({
   championTeamId: z.string().min(1).max(64),
   completedAtIso: z.iso.datetime(),
 });
-
-export const capRushMultiplayerConferenceSize = CAP_RUSH_CONFERENCE_SIZE;

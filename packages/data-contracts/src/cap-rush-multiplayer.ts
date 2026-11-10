@@ -243,12 +243,6 @@ export type CapRushMultiplayerVerificationReceipt = z.infer<
   typeof capRushMultiplayerVerificationReceiptSchema
 >;
 
-export const capRushMultiplayerErrorSchema = z.object({
-  code: z.string().min(1).max(64),
-  message: z.string().min(1).max(400),
-  retryable: z.boolean(),
-});
-
 export const capRushMultiplayerCreateInputSchema = z.object({
   variant: capRushMultiplayerSettingsSchema.shape.variant,
   settings: capRushMultiplayerSettingsSchema.optional(),

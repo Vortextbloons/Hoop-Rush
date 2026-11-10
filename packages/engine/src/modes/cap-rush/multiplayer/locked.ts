@@ -3,10 +3,8 @@ import type {
   CapRushFranchiseAssignment,
   CapRushMultiplayerLockedInputs,
   CapRushMultiplayerSeatLock,
-  CapRushMultiplayerSeatId,
   CapRushMultiplayerVersionLocks,
   CapRushPlayoffPerformance,
-  CapRushSourcePlayer,
   EraSimulationProfile,
   HavocSourcePlayer,
   HavocTeamInput,
@@ -24,7 +22,6 @@ import {
 } from '@hoop-rush/data-contracts';
 import { createRng } from '../../../sim/rng.ts';
 import { buildHavocOpponentTeam } from '../../havoc/opponents.ts';
-import { capRushHavocSourceOf } from '../effective-profile.ts';
 import {
   buildCapRushLeagueSchedule,
   capRushLeagueFieldOf,
@@ -32,7 +29,6 @@ import {
   type CapRushLeagueField,
   type CapRushLeagueSchedule,
 } from '../league-schedule.ts';
-import { capRushPlayoffProfilesOf } from '../lock.ts';
 import { capRushPlayoffPerformanceOf } from '../playoff.ts';
 
 export interface CapRushMultiplayerFranchisePair {
@@ -224,15 +220,6 @@ export function capRushMultiplayerTeamById(
   return opponent.team;
 }
 
-export function capRushMultiplayerSeatOfTeam(
-  locked: CapRushMultiplayerLockedInputs,
-  teamId: string,
-): CapRushMultiplayerSeatId | null {
-  if (locked.seats.p1.franchise.franchiseId === teamId) return 'p1';
-  if (locked.seats.p2.franchise.franchiseId === teamId) return 'p2';
-  return null;
-}
-
 export function capRushMultiplayerFieldOfLocked(locked: CapRushMultiplayerLockedInputs): {
   readonly teamId: string;
   readonly displayName: string;
@@ -251,16 +238,4 @@ export function capRushMultiplayerFieldOfLocked(locked: CapRushMultiplayerLocked
       isUserTeam: false,
     })),
   ];
-}
-
-export function capRushMultiplayerPlayoffPlayerSource(
-  player: CapRushSourcePlayer,
-): HavocSourcePlayer {
-  return capRushHavocSourceOf(player);
-}
-
-export function capRushMultiplayerProfilesFromPicks(
-  catalog: SeasonDraftCatalog,
-): ReadonlyMap<string, PlayoffPerformance> {
-  return capRushPlayoffProfilesOf({ catalog, picks: [] });
 }

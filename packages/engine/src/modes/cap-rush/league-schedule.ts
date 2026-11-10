@@ -455,10 +455,3 @@ export function capRushUserScheduleOf(input: {
     return { gameNumber: index + 1, opponentId, humanHome };
   });
 }
-
-export function capRushLeagueConferenceTeamsOf(
-  field: readonly CapRushLeagueField[],
-  conference: CapRushConference,
-): CapRushLeagueField[] {
-  return field.filter((team) => capRushAlignmentOf(team.teamId).conference === conference);
-}

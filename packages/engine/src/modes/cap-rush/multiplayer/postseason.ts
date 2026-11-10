@@ -18,7 +18,6 @@ import {
   CAP_RUSH_MULTIPLAYER_POSTSEASON_VERSION,
   CAP_RUSH_PLAYOFF_ROUNDS,
   capRushPlayoffGameSummarySchema,
-  capRushPlayoffPerformanceSchema,
   capRushSeriesComplete,
   capRushSeriesWinner,
 } from '@hoop-rush/data-contracts';
@@ -28,7 +27,6 @@ import { havocBattleGameResultDigest } from '../../havoc/core/battle-digests.ts'
 import {
   capRushConferenceFinalsMvp,
   capRushConferenceOpeningSeries,
-  capRushConferenceSeriesForTeam,
   capRushRefreshConferencePostseason,
 } from '../conference-postseason.ts';
 import { capRushNextPlayoffGamePlan, capRushPlayoffSummaryOf } from '../playoff-shared.ts';
@@ -274,29 +272,6 @@ export function capRushMultiplayerApplyPlayoffStep(input: {
     planRound: round,
   };
 }
-
-export function capRushMultiplayerPlayoffReadyToComplete(
-  state: CapRushMultiplayerPlayoffState,
-): boolean {
-  return state.championTeamId !== null;
-}
-
-export function capRushMultiplayerSeatEliminated(
-  state: CapRushMultiplayerPlayoffState,
-  seat: CapRushMultiplayerSeatId,
-): boolean {
-  return (
-    state.outcomes[seat].status === 'eliminated' || state.outcomes[seat].status === 'not-qualified'
-  );
-}
-
-export function capRushMultiplayerQualifiedSeats(
-  state: CapRushMultiplayerPlayoffState,
-): CapRushMultiplayerSeatId[] {
-  return (['p1', 'p2'] as const).filter((seat) => state.outcomes[seat].status !== 'not-qualified');
-}
-
-export { capRushConferenceSeriesForTeam, capRushPlayoffPerformanceSchema };
 
 export function capRushMultiplayerHumanFinals(
   locked: CapRushMultiplayerLockedInputs,

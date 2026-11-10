@@ -223,7 +223,6 @@ describe('DexieDraftDuelRepository', () => {
     expect(loaded?.roomId).toBe(ROOM_ID);
     expect(loaded?.localParticipantId).toBe('p1');
     expect(loaded?.phase).toBe('drafting');
-    expect(loaded?.draft?.rounds).toHaveLength(5);
     expect(loaded?.draft).toEqual(state.draft);
     expect(loaded?.series).toEqual(state.series);
     expect(loaded?.updatedAtIso).toBeTruthy();

@@ -981,7 +981,6 @@ describe('DexieHavocRepository', () => {
     expect(await repo.loadActiveRun()).toBeNull();
     const completed = await repo.readCompletedRun(RUN_ID);
     expect(completed?.state).toEqual(final);
-    expect(completed?.state.havocCursor).toBe(HAVOC_GAME_COUNT);
     expect(completed?.report).toBeNull();
     expect(await repo.readComparison(RUN_ID)).toBeNull();
     const history = await repo.listHistory();

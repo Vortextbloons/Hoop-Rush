@@ -23,12 +23,6 @@ import {
 
 export type RoomParticipantId = 'p1' | 'p2';
 
-export interface RoomMembership<Code> {
-  roomId: Id;
-  participantId: RoomParticipantId;
-  code: Code;
-}
-
 export interface RoomTransportOptions {
   url?: string;
   publishableKey?: string;

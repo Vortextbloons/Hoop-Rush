@@ -2,7 +2,6 @@ import type {
   CapRushMultiplayerAuction,
   CapRushMultiplayerCommandRejectionCode,
   CapRushMultiplayerMarket,
-  CapRushMultiplayerMarketPlayer,
   CapRushMultiplayerRecruitment,
   CapRushMultiplayerRound,
   CapRushMultiplayerSeatId,
@@ -480,18 +479,4 @@ export function capRushMultiplayerNextDeadline(
     cursor: `auction:${String(round.index)}:${earliest.playerId}`,
     atIso: earliest.endsAtIso,
   };
-}
-
-export function capRushMultiplayerLeaders(recruitment: CapRushMultiplayerRecruitment): {
-  readonly p1: string | null;
-  readonly p2: string | null;
-} {
-  return { p1: recruitment.seats.p1.leadPlayerId, p2: recruitment.seats.p2.leadPlayerId };
-}
-
-export function capRushMultiplayerSigningPlayer(
-  recruitment: CapRushMultiplayerRecruitment,
-  playerId: string,
-): CapRushMultiplayerMarketPlayer {
-  return capRushMultiplayerMarketPlayerOf(recruitment.market, playerId);
 }

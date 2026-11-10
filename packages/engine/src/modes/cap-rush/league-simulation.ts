@@ -1,7 +1,6 @@
 import type {
   CapRushBoxParticipant,
   CapRushBoxScore,
-  CapRushFranchiseAssignment,
   CapRushLeagueGame,
   CapRushLeagueScheduleEntry,
   CapRushLockedInputs,
@@ -52,10 +51,6 @@ function leagueScheduleOf(locked: CapRushLockedInputs): readonly CapRushLeagueSc
     throw new Error('cap rush league: this run has no league schedule');
   }
   return locked.leagueSchedule;
-}
-
-export function capRushLeagueScheduleOf(locked: CapRushLockedInputs): CapRushLeagueScheduleEntry[] {
-  return [...leagueScheduleOf(locked)];
 }
 
 export function capRushLeagueSlotGames(
@@ -199,12 +194,6 @@ export function simulateCapRushLeagueSlot(input: {
   );
 }
 
-export function capRushLeagueGamesTotal(locked: CapRushLockedInputs): number {
-  return leagueScheduleOf(locked).filter(
-    (game) => game.homeTeamId !== locked.human.teamId && game.awayTeamId !== locked.human.teamId,
-  ).length;
-}
-
 export function capRushNextLeagueSlot(
   locked: CapRushLockedInputs,
   accepted: number,
@@ -223,11 +212,4 @@ export function capRushNextLeagueSlot(
     remaining -= count;
   }
   return null;
-}
-
-export function capRushFranchiseOfLocked(locked: CapRushLockedInputs): CapRushFranchiseAssignment {
-  if (locked.franchise === undefined) {
-    throw new Error('cap rush league: this run has no franchise assignment');
-  }
-  return locked.franchise;
 }

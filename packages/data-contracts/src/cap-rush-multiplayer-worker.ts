@@ -103,9 +103,6 @@ export const capRushMultiplayerWorkerSlotMessageSchema = z.object({
   games: z.array(capRushLeagueGameSchema).min(1).max(75),
   tapes: z.array(z.object({ gameId: z.string().min(1).max(80), tape: z.unknown() })).max(2),
 });
-export type CapRushMultiplayerWorkerSlotMessage = z.infer<
-  typeof capRushMultiplayerWorkerSlotMessageSchema
->;
 
 export const capRushMultiplayerWorkerPlayoffMessageSchema = z.object({
   schemaVersion: z.literal(CAP_RUSH_MULTIPLAYER_WORKER_WIRE_SCHEMA_VERSION),
@@ -114,9 +111,6 @@ export const capRushMultiplayerWorkerPlayoffMessageSchema = z.object({
   games: z.array(capRushPlayoffGameSummarySchema).min(1).max(8),
   tapes: z.array(z.object({ gameId: z.string().min(1).max(80), tape: z.unknown() })).max(8),
 });
-export type CapRushMultiplayerWorkerPlayoffMessage = z.infer<
-  typeof capRushMultiplayerWorkerPlayoffMessageSchema
->;
 
 export const capRushMultiplayerWorkerTapeMessageSchema = z.object({
   schemaVersion: z.literal(CAP_RUSH_MULTIPLAYER_WORKER_WIRE_SCHEMA_VERSION),
@@ -127,9 +121,6 @@ export const capRushMultiplayerWorkerTapeMessageSchema = z.object({
   result: havocBattleResultSchema,
   tape: havocBattleTapeSchema,
 });
-export type CapRushMultiplayerWorkerTapeMessage = z.infer<
-  typeof capRushMultiplayerWorkerTapeMessageSchema
->;
 
 export const capRushMultiplayerWorkerErrorMessageSchema = z.object({
   schemaVersion: z.literal(CAP_RUSH_MULTIPLAYER_WORKER_WIRE_SCHEMA_VERSION),
@@ -138,9 +129,6 @@ export const capRushMultiplayerWorkerErrorMessageSchema = z.object({
   code: z.enum(['audit-failure', 'stale-job', 'cancelled', 'internal']),
   message: z.string().min(1).max(400),
 });
-export type CapRushMultiplayerWorkerErrorMessage = z.infer<
-  typeof capRushMultiplayerWorkerErrorMessageSchema
->;
 
 export const capRushMultiplayerWorkerMessageSchema = z.union([
   base.extend({

@@ -8,18 +8,9 @@ export interface HavocRevealState {
   readonly pendingCardId: string | null;
 }
 
-export function initialHavocRevealState(): HavocRevealState {
-  return { offerId: null, cardIds: [], pendingCardId: null };
-}
-
 export function havocRevealDelayMs(index: number, reducedMotion = false): number {
   if (reducedMotion) return 0;
   return Math.max(0, index) * HAVOC_REVEAL_STAGGER_MS;
-}
-
-export function havocRevealFlipMs(cardCount: number, reducedMotion = false): number {
-  if (reducedMotion || cardCount <= 0) return 0;
-  return havocRevealDelayMs(cardCount - 1) + HAVOC_REVEAL_FLIP_MS;
 }
 
 /**

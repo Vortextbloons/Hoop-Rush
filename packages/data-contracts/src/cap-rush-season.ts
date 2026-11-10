@@ -236,5 +236,3 @@ export const capRushEmptySeasonState = (): CapRushSeasonState => ({
   completedAt: null,
   leagueGamesAccepted: 0,
 });
-
-export const capRushTeamIdSchema = franchiseIdSchema;

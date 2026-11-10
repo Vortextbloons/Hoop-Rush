@@ -43,7 +43,6 @@ export const projectionComponentScaleSchema = z.object({
   max: z.number().min(0).max(100),
   higherIsBetter: z.boolean(),
 });
-export type ProjectionComponentScale = z.infer<typeof projectionComponentScaleSchema>;
 export const PROJECTION_COMPONENT_HIGHER_IS_BETTER: Readonly<Record<string, boolean>> = {
   offensiveRating: true,
   defensiveRatingAllowed: false,
@@ -60,7 +59,6 @@ export const PROJECTION_COMPONENT_HIGHER_IS_BETTER: Readonly<Record<string, bool
   redundancy: true,
 };
 export const projectionWeaknessSeveritySchema = z.enum(['critical', 'major', 'minor']);
-export type ProjectionWeaknessSeverity = z.infer<typeof projectionWeaknessSeveritySchema>;
 export const projectionWeaknessSchema = z.object({
   code: z.string().min(1).max(64),
   severity: projectionWeaknessSeveritySchema,
@@ -77,7 +75,6 @@ export const projectionWeaknessPolicySchema = z.object({
   minSide: z.boolean(),
   message: z.string().min(1).max(256),
 });
-export type ProjectionWeaknessPolicy = z.infer<typeof projectionWeaknessPolicySchema>;
 export const projectionSearchPolicySchema = z.object({
   seedNamespace: z.string().min(1).max(64),
   partialBeamsPerLens: z.number().int().positive(),
@@ -95,14 +92,12 @@ export const projectionSearchPolicySchema = z.object({
   }),
   closeScenarioWeight: z.number().min(0).max(1),
 });
-export type ProjectionSearchPolicy = z.infer<typeof projectionSearchPolicySchema>;
 export const projectionMonotonicGateSchema = z.object({
   code: z.string().min(1).max(64),
   driver: z.string().min(1).max(64),
   output: z.string().min(1).max(64),
   description: z.string().min(1).max(256),
 });
-export type ProjectionMonotonicGate = z.infer<typeof projectionMonotonicGateSchema>;
 export const projectionTargetsSchema = z.object({
   schemaVersion: z.literal(1),
   targetsVersion: z.literal(PROJECTION_TARGETS_VERSION),
@@ -151,7 +146,6 @@ export const projectionCohortPolicySchema = z.object({
   heldOutSeedFrom: seedSchema,
   heldOutSeedTo: seedSchema,
 });
-export type ProjectionCohortPolicy = z.infer<typeof projectionCohortPolicySchema>;
 export const projectionModelArtifactSchema = z
   .object({
     schemaVersion: z.literal(1),
@@ -271,17 +265,14 @@ export const projectionActionDistributionSchema = z.record(
   z.string().min(1).max(32),
   z.number().min(0).max(1),
 );
-export type ProjectionActionDistribution = z.infer<typeof projectionActionDistributionSchema>;
 export const projectionZoneDistributionSchema = z.record(
   z.string().min(1).max(32),
   z.number().min(0).max(1),
 );
-export type ProjectionZoneDistribution = z.infer<typeof projectionZoneDistributionSchema>;
 export const projectionShooterDistributionSchema = z.record(
   projectionSlotSchema,
   z.number().min(0).max(1),
 );
-export type ProjectionShooterDistribution = z.infer<typeof projectionShooterDistributionSchema>;
 export const projectionPlayerContributionSchema = z.object({
   slot: projectionSlotSchema,
   playerId: playerIdSchema,
@@ -308,7 +299,6 @@ export const projectionLineupEntrySchema = z.object({
   displayName: z.string().min(1).max(96),
   positions: z.array(z.string().min(1).max(8)),
 });
-export type ProjectionLineupEntry = z.infer<typeof projectionLineupEntrySchema>;
 export const projectionSideSchema = z.object({
   ledger: projectionLedgerSchema,
   spacing: projectionSpacingSchema,

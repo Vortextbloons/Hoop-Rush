@@ -8,10 +8,7 @@ import type {
   HavocBattleResult,
   HavocBattleTape,
 } from '@hoop-rush/data-contracts';
-import {
-  CAP_RUSH_CONFERENCE_GAMES_PER_TEAM,
-  capRushLeagueGameSchema,
-} from '@hoop-rush/data-contracts';
+import { capRushLeagueGameSchema } from '@hoop-rush/data-contracts';
 import type { EngineContext } from '../../../sim/kernel.ts';
 import { simulateAuditedHavocBattleGame } from '../../havoc/core/battle-game.ts';
 import { havocBattleGameResultDigest } from '../../havoc/core/battle-digests.ts';
@@ -190,5 +187,3 @@ export function capRushMultiplayerAcceptedThrough(games: readonly CapRushLeagueG
   }
   return highest;
 }
-
-export const CAP_RUSH_MULTIPLAYER_REGULAR_GAMES = CAP_RUSH_CONFERENCE_GAMES_PER_TEAM;

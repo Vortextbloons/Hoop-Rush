@@ -183,19 +183,3 @@ export function buildCapRushCatalogIndex(catalog: CapRushCatalog): CapRushCatalo
   }
   return { catalog, byPlayerId, byVersionId, bySlot, playerIds, salaryOptionsBySlot };
 }
-
-export function capRushSalaryOf(player: CapRushSourcePlayer): number {
-  return capRushSalaryDollars(player.originalOverall, player.seasonKey);
-}
-
-export function capRushEligibleAt(
-  index: CapRushCatalogIndex,
-  slot: Position,
-  minOverall: number,
-  maxOverall: number,
-): readonly CapRushSourcePlayer[] {
-  const players = index.bySlot.get(slot) ?? [];
-  return players.filter(
-    (player) => player.originalOverall >= minOverall && player.originalOverall <= maxOverall,
-  );
-}

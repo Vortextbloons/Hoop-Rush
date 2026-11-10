@@ -376,10 +376,6 @@ export const capRushConferencePostseasonReportSchema = z.object({
   standings: capRushConferenceStandingsSchema,
   finalsMvp: capRushFinalsMvpSchema,
 });
-export type CapRushConferencePostseasonReport = z.infer<
-  typeof capRushConferencePostseasonReportSchema
->;
-
 export const capRushPostseasonReportSchema = capRushConferencePostseasonReportSchema;
 export type CapRushPostseasonReport = z.infer<typeof capRushPostseasonReportSchema>;
 

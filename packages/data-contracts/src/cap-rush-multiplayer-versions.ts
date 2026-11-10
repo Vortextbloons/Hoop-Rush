@@ -18,7 +18,6 @@ export const CAP_RUSH_MULTIPLAYER_WORKER_WIRE_SCHEMA_VERSION = 3;
 export const CAP_RUSH_MULTIPLAYER_POSTSEASON_VERSION = 'cap-rush-multiplayer-postseason-v1';
 export const CAP_RUSH_MULTIPLAYER_REPORT_VERSION = 'cap-rush-multiplayer-report-v1';
 
-export const CAP_RUSH_MULTIPLAYER_SEAT_COUNT = 2;
 export const CAP_RUSH_MULTIPLAYER_MARKET_SIZE = 60;
 export const CAP_RUSH_MULTIPLAYER_POOL_SIZE = 12;
 export const CAP_RUSH_MULTIPLAYER_AUCTION_MS = 60_000;
