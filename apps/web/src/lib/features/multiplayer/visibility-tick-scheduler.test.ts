@@ -8,36 +8,6 @@ afterEach(() => {
   else Reflect.deleteProperty(globalThis, 'document');
 });
 
-it('polls the hidden lobby less often and refreshes immediately on return', () => {
-  vi.useFakeTimers();
-  const events = new EventTarget();
-  let hidden = false;
-  Object.defineProperty(globalThis, 'document', {
-    configurable: true,
-    value: {
-      get hidden() {
-        return hidden;
-      },
-      addEventListener: events.addEventListener.bind(events),
-      removeEventListener: events.removeEventListener.bind(events),
-    },
-  });
-  const poll = vi.fn();
-  const stop = visibilityTickScheduler(poll, 2000, 10000);
-  vi.advanceTimersByTime(10000);
-  expect(poll).toHaveBeenCalledTimes(5);
-  hidden = true;
-  events.dispatchEvent(new Event('visibilitychange'));
-  vi.advanceTimersByTime(10000);
-  expect(poll).toHaveBeenCalledTimes(6);
-  hidden = false;
-  events.dispatchEvent(new Event('visibilitychange'));
-  expect(poll).toHaveBeenCalledTimes(7);
-  vi.advanceTimersByTime(2000);
-  expect(poll).toHaveBeenCalledTimes(8);
-  stop();
-});
-
 it('slows hidden ticks, wakes polling immediately, and removes visibility listeners on disposal', () => {
   vi.useFakeTimers();
   const events = new EventTarget();

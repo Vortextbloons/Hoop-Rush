@@ -5,6 +5,8 @@ interface CanonicalWasm {
   reserve_input(length: number): number;
   output_ptr(): number;
   canonicalize(length: number): number;
+  canonical_digest(length: number, prefixLength: number): number;
+  digest_ptr(): number;
 }
 
 let runtime: CanonicalWasm | undefined;
@@ -22,30 +24,19 @@ export function canonicalJsonText(text: string): string {
   return decoder.decode(new Uint8Array(runtime.memory.buffer, runtime.output_ptr(), length));
 }
 
-export function isNativeJson(value: unknown, seen = new Set<object>()): boolean {
-  if (
-    value === null ||
-    typeof value === 'string' ||
-    typeof value === 'number' ||
-    typeof value === 'boolean'
-  )
-    return true;
-  if (typeof value !== 'object' || seen.has(value)) return false;
-  const array = Array.isArray(value);
-  const prototype: unknown = Object.getPrototypeOf(value);
-  if ((!array && prototype !== Object.prototype && prototype !== null) || 'toJSON' in value)
-    return false;
-  seen.add(value);
-  const descriptors = Object.getOwnPropertyDescriptors(value);
-  if (array && Object.keys(value).length !== value.length) return false;
-  for (const [key, descriptor] of Object.entries(descriptors)) {
-    if (!descriptor.enumerable) continue;
-    if (!('value' in descriptor)) return false;
-    const entry: unknown = descriptor.value;
-    if (!array && entry === undefined) continue;
-    if (!isNativeJson(entry, seen)) return false;
-    if (array && !/^(0|[1-9][0-9]*)$/.test(key)) return false;
+export function canonicalDigestText(prefix: string, text: string): string {
+  runtime ??= new WebAssembly.Instance(new WebAssembly.Module(CANONICAL_WASM_BYTES))
+    .exports as unknown as CanonicalWasm;
+  const prefixBytes = prefix.length * 2;
+  const capacity = prefixBytes + text.length * 3;
+  const pointer = runtime.reserve_input(capacity);
+  const input = new Uint8Array(runtime.memory.buffer, pointer, capacity);
+  const prefixView = new DataView(runtime.memory.buffer, pointer, prefixBytes);
+  for (let i = 0; i < prefix.length; i++) prefixView.setUint16(i * 2, prefix.charCodeAt(i), true);
+  const textBytes = encoder.encodeInto(text, input.subarray(prefixBytes)).written;
+  if (runtime.canonical_digest(prefixBytes + textBytes, prefixBytes) < 0) {
+    throw new Error('canonical JSON exceeds the Wasm parser limits');
   }
-  seen.delete(value);
-  return true;
+  const hashes = new Uint32Array(runtime.memory.buffer, runtime.digest_ptr(), 4);
+  return Array.from(hashes, (hash) => hash.toString(16).padStart(8, '0')).join('');
 }

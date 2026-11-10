@@ -8,18 +8,7 @@ import {
 } from './aggregate.ts';
 
 describe('havoc aggregate folding', () => {
-  it('starts from a zeroed aggregate', () => {
-    expect(zeroHavocSeasonAggregate()).toEqual({
-      games: 0,
-      wins: 0,
-      losses: 0,
-      pointsFor: 0,
-      pointsAgainst: 0,
-      adjustments: 0,
-    });
-  });
-
-  it('sums games, wins, losses, points, and adjustments', () => {
+  it('sums games, wins, losses, points, and adjustments from a zeroed aggregate', () => {
     const win = buildHavocGameSummary({
       gameNumber: 1,
       humanScore: 110,

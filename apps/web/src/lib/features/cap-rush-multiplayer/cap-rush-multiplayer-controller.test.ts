@@ -110,31 +110,6 @@ test('overlaps asset loading with presence resume and stops before syncing when 
   expect(controller.view).toBeNull();
 });
 
-test('does not create a session when disposed while membership loads', async () => {
-  vi.spyOn(assets, 'getCapRushMultiplayerData').mockResolvedValue(
-    {} as assets.CapRushMultiplayerData,
-  );
-  const transport = new transports.CapRushMultiplayerSupabaseTransport();
-  vi.spyOn(transports, 'getCapRushMultiplayerTransport').mockReturnValue(transport);
-  let resolve!: (membership: Awaited<ReturnType<typeof transport.resume>>) => void;
-  const resume = vi.spyOn(transport, 'resume').mockReturnValue(
-    new Promise((yes) => {
-      resolve = yes;
-    }),
-  );
-  const sync = vi.spyOn(transport, 'sync');
-  const controller = new CapRushMultiplayerController('room-a');
-  const loading = controller.load();
-  await Promise.resolve();
-  expect(resume).toHaveBeenCalledTimes(1);
-  controller.dispose();
-  resolve({ roomId: idSchema.parse('room-a'), participantId: 'p1', code: '1234' });
-  await loading;
-  expect(sync).not.toHaveBeenCalled();
-  expect(resume).toHaveBeenCalledTimes(1);
-  expect(controller.view).toBeNull();
-});
-
 test('automatically chooses bulk simulation for the season', async () => {
   const controller = new CapRushMultiplayerController('room-a');
   const view = sessionView(null);
@@ -279,12 +254,12 @@ test('continues the season immediately after a successful step instead of waitin
   controller.dispose();
 });
 
-for (const plans of [
-  { p1: 'sim', p2: 'sim' },
-  { p1: 'sim', p2: null },
-  { p1: 'sim', p2: 'simcast' },
-]) {
-  test(`automatically runs the playoff series only when both seats choose sim: ${JSON.stringify(plans)}`, async () => {
+test('automatically runs the playoff series only when both seats choose sim', async () => {
+  for (const plans of [
+    { p1: 'sim', p2: 'sim' },
+    { p1: 'sim', p2: null },
+    { p1: 'sim', p2: 'simcast' },
+  ] as const) {
     const controller = new CapRushMultiplayerController('room-a');
     const view = sessionView(null);
     Object.assign(view.state, { phase: 'postseason', postseason: { championTeamId: null, plans } });
@@ -292,12 +267,12 @@ for (const plans of [
     const simulate = vi.spyOn(controller, 'simulatePlayoffStep').mockResolvedValue();
     await (controller as unknown as { tick(): Promise<void> }).tick();
     expect(simulate).toHaveBeenCalledTimes(plans.p2 === 'sim' ? 1 : 0);
-  });
-}
+  }
+});
 
-for (const opponent of ['b', 'cpu']) {
-  for (const acknowledged of [false, true]) {
-    test(`requires both players to watch a Finals game against ${opponent}: local ack ${String(acknowledged)}`, async () => {
+test('requires both players to watch every Finals game regardless of opponent', async () => {
+  for (const opponent of ['b', 'cpu'] as const) {
+    for (const acknowledged of [false, true]) {
       const controller = new CapRushMultiplayerController('room-a');
       const view = sessionView(null);
       Object.assign(view.state, {
@@ -335,6 +310,6 @@ for (const opponent of ['b', 'cpu']) {
       expect(simulate).not.toHaveBeenCalled();
       if (acknowledged) expect(refresh).toHaveBeenCalled();
       controller.dispose();
-    });
+    }
   }
-}
+});

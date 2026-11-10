@@ -102,9 +102,6 @@ describe('cap rush playoff presentation', () => {
   });
 
   it('cannot let one capped rebound shift outvote a capped shooting shift', () => {
-    const rebounds =
-      CAP_RUSH_PLAYOFF_CAPS.offensiveReboundsPerGame +
-      CAP_RUSH_PLAYOFF_CAPS.defensiveReboundsPerGame;
     expect(
       capRushPlayoffDirection({
         ...neutralApplied,
@@ -120,19 +117,15 @@ describe('cap rush playoff presentation', () => {
         defensiveReboundsPerGame: CAP_RUSH_PLAYOFF_CAPS.defensiveReboundsPerGame,
       }),
     ).toBe('up');
-    expect(rebounds).toBeGreaterThan(0);
   });
 
-  it('shows true shooting as percentage points and production per 36', () => {
+  it('formats percentage points and production per 36 without negative zero', () => {
     expect(signedPoints(0.02)).toBe('+2.0 pp');
     expect(signedPoints(-0.0123)).toBe('−1.2 pp');
     expect(signedPoints(null)).toBe('—');
     expect(signedPer36(2.44)).toBe('+2.4');
     expect(signedPer36(-1.05)).toBe('−1.1');
     expect(signedPer36(null)).toBe('—');
-  });
-
-  it('never renders a negative zero', () => {
     expect(signedFixed(-0.0001, 2)).toBe('0.00');
     expect(signedFixed(0, 1)).toBe('0.0');
   });
@@ -163,10 +156,6 @@ describe('cap rush playoff presentation', () => {
         locked,
       } as never),
     ).toBe('active');
-  });
-
-  it('treats a draft without playoff formula version as unsupported', () => {
-    const locked = { playoffPerformance: performance } as never;
     expect(
       capRushPlayoffStatusOf({
         playoffFormulaVersion: CAP_RUSH_PLAYOFF_FORMULA_VERSION,
@@ -174,7 +163,6 @@ describe('cap rush playoff presentation', () => {
         locked: { human: {} },
       } as never),
     ).toBe('no-sample');
-    void locked;
   });
 
   it('counts coverage against the roster it is given', () => {

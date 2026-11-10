@@ -12,8 +12,10 @@ import {
   battleToSoloTape,
   soloToBattleInput,
 } from '../core/battle-adapters.ts';
-import { simulateHavocBattleGame } from '../core/battle-game.ts';
-import { auditHavocBattleGame } from '../core/battle-audit.ts';
+import {
+  simulateAuditedHavocBattleGame,
+  simulateValidatedHavocBattleGame,
+} from '../core/battle-game.ts';
 import { auditHavocSoloIdentity } from './audit.ts';
 
 /**
@@ -21,11 +23,22 @@ import { auditHavocSoloIdentity } from './audit.ts';
  * from the parsed solo input, exactly as the pre-battle engine did, so solo
  * digests stay frozen.
  */
-function simulateSoloBattle(rawInput: HavocGameInput, context: EngineContext) {
+function soloInputsOf(rawInput: HavocGameInput) {
   const input = havocGameInputSchema.parse(rawInput);
   const battleInput = soloToBattleInput(input);
-  const simulation = simulateHavocBattleGame(battleInput, context);
-  return { input, battleInput, simulation };
+  return { input, battleInput };
+}
+
+function simulateSoloBattle(rawInput: HavocGameInput, context: EngineContext) {
+  const { input, battleInput } = soloInputsOf(rawInput);
+  const simulation = simulateValidatedHavocBattleGame(battleInput, context);
+  return { input, simulation };
+}
+
+function simulateAuditedSoloBattle(rawInput: HavocGameInput, context: EngineContext) {
+  const { input, battleInput } = soloInputsOf(rawInput);
+  const simulation = simulateAuditedHavocBattleGame(battleInput, context);
+  return { input, simulation };
 }
 
 function soloResultOf({
@@ -46,16 +59,10 @@ function soloSimulationOf({ input, simulation }: ReturnType<typeof simulateSoloB
 }
 
 function auditedFindings(
-  battle: ReturnType<typeof simulateSoloBattle>,
+  battle: ReturnType<typeof simulateAuditedSoloBattle>,
   result: HavocGameResult,
 ): HavocGameAudit['findings'] {
-  const battleAudit = auditHavocBattleGame(
-    battle.battleInput,
-    battle.simulation.result,
-    battle.simulation.tape,
-    // The simulator validated this result and computed its input digest.
-    { inputDigest: battle.simulation.result.inputDigest, resultValidated: true },
-  );
+  const battleAudit = battle.simulation.audit;
   return [...auditHavocSoloIdentity(battle.input, result), ...battleAudit.findings];
 }
 
@@ -70,7 +77,7 @@ export function simulateAuditedHavocGame(
   rawInput: HavocGameInput,
   context: EngineContext,
 ): { result: HavocGameResult; tape: HavocGameTape; audit: HavocGameAudit } {
-  const battle = simulateSoloBattle(rawInput, context);
+  const battle = simulateAuditedSoloBattle(rawInput, context);
   const solo = soloSimulationOf(battle);
   const findings = auditedFindings(battle, solo.result);
   return { ...solo, audit: { ok: findings.length === 0, findings } };
@@ -86,7 +93,7 @@ export function simulateAuditedHavocSummaryGame(
   rawInput: HavocGameInput,
   context: EngineContext,
 ): { result: HavocGameResult; audit: HavocGameAudit } {
-  const battle = simulateSoloBattle(rawInput, context);
+  const battle = simulateAuditedSoloBattle(rawInput, context);
   const result = soloResultOf(battle);
   const findings = auditedFindings(battle, result);
   return { result, audit: { ok: findings.length === 0, findings } };

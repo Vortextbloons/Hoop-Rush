@@ -2,8 +2,9 @@ import type {
   HavocBattleInput,
   HavocBattleResult,
   HavocBattleTape,
+  JsonData,
 } from '@hoop-rush/data-contracts';
-import { canonicalJson, havocDigestSchema, seasonDigestHex } from '@hoop-rush/data-contracts';
+import { canonicalJsonDataDigest, havocDigestSchema } from '@hoop-rush/data-contracts';
 
 /**
  * Digest prefixes are part of the frozen digest discipline: a value written by
@@ -13,8 +14,8 @@ export const HAVOC_BATTLE_INPUT_DIGEST_PREFIX = 'havoc-battle-input-v1:';
 export const HAVOC_BATTLE_RESULT_DIGEST_PREFIX = 'havoc-battle-result-v1:';
 export const HAVOC_BATTLE_TAPE_DIGEST_PREFIX = 'havoc-battle-tape-v1:';
 
-export function digestOf(prefix: string, value: unknown): string {
-  return havocDigestSchema.parse(seasonDigestHex(`${prefix}${canonicalJson(value)}`));
+export function digestOf(prefix: string, value: JsonData): string {
+  return havocDigestSchema.parse(canonicalJsonDataDigest(prefix, value));
 }
 
 export function havocBattleGameInputDigest(input: HavocBattleInput): string {

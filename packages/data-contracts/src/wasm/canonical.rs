@@ -2,6 +2,7 @@ use std::ops::Range;
 
 static mut INPUT: Vec<u8> = Vec::new();
 static mut OUTPUT: Vec<u8> = Vec::new();
+static mut DIGEST: [u32; 4] = [0; 4];
 
 #[unsafe(no_mangle)]
 pub extern "C" fn reserve_input(length: u32) -> *mut u8 {
@@ -190,23 +191,63 @@ impl Parser<'_> {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn canonicalize(length: u32) -> i32 {
+    canonicalize_range(length, 0)
+}
+
+fn canonicalize_range(length: u32, start: u32) -> i32 {
     let input = unsafe { &*core::ptr::addr_of!(INPUT) };
-    if length as usize > input.len() {
+    if length as usize > input.len() || start > length {
         return -1;
     }
     let mut parser = Parser {
-        input: &input[..length as usize],
+        input: &input[start as usize..length as usize],
         cursor: 0,
         nodes: Vec::new(),
     };
     let Some(root) = parser.value(0) else {
         return -1;
     };
-    if parser.cursor != length as usize {
+    if parser.cursor != (length - start) as usize {
         return -1;
     }
     let output = unsafe { &mut *core::ptr::addr_of_mut!(OUTPUT) };
     output.clear();
     parser.write(root, output);
     output.len() as i32
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn digest_ptr() -> *const u32 {
+    core::ptr::addr_of!(DIGEST).cast()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn canonical_digest(length: u32, prefix_length: u32) -> i32 {
+    if prefix_length % 2 != 0 {
+        return -1;
+    }
+    if canonicalize_range(length, prefix_length) < 0 {
+        return -1;
+    }
+    let input = unsafe { &*core::ptr::addr_of!(INPUT) };
+    let output = unsafe { &*core::ptr::addr_of!(OUTPUT) };
+    let mut hashes = [0x811c9dc5_u32, 0x9e3779b9, 0x85ebca6b, 0xc2b2ae35];
+    for pair in input[..prefix_length as usize].chunks_exact(2) {
+        let unit = u16::from_le_bytes([pair[0], pair[1]]);
+        for hash in &mut hashes {
+            *hash = (*hash ^ unit as u32).wrapping_mul(0x01000193);
+        }
+    }
+    let Ok(text) = std::str::from_utf8(output.as_slice()) else {
+        return -1;
+    };
+    for unit in text.encode_utf16() {
+        for hash in &mut hashes {
+            *hash = (*hash ^ unit as u32).wrapping_mul(0x01000193);
+        }
+    }
+    unsafe {
+        core::ptr::addr_of_mut!(DIGEST).write(hashes);
+    }
+    0
 }

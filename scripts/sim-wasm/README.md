@@ -4,6 +4,9 @@ Standard fixed-five games now use the production Rust/Wasm kernel through
 `packages/engine/src/sim/game.ts`. The old TypeScript standard game loop is in
 `packages/engine/src/archive/code/sim/game.ts` for parity tests and benchmarks.
 Shared TypeScript possession rules remain active for Havoc and Cap Rush.
+All modes also share typed game serialization/verification acceleration from
+`packages/data-contracts/src/wasm/canonical.rs`. This does not move Havoc or
+Cap Rush mutation execution into Rust or change multiplayer transport.
 
 ## Building the module
 
@@ -23,6 +26,8 @@ Commit `packages/engine/src/sim/wasm/game.rs` and the generated
 module without requiring Rust. The source fingerprint test rejects stale
 artifacts. The module is loaded synchronously from bundled bytes: no fetch,
 URL configuration, platform-specific loader, or async public API is needed.
+The build script also regenerates `packages/data-contracts/src/wasm/canonical-wasm.gen.ts`
+from `canonical.rs`; commit that pair together as well.
 
 ## Production behavior
 
@@ -64,6 +69,45 @@ is reported separately. One-off games can be slower because of preparation.
 
 These are desktop Bun measurements, not browser or lower-end phone results.
 Measure on the target device before claiming a larger relative speedup there.
+
+## Mode and multiplayer benchmark
+
+```sh
+bun scripts/sim-wasm/modes-benchmark.ts
+```
+
+Compares the previous TypeScript canonical serializer/digests with the production
+Wasm helpers in one process, alternating backend order over nine rounds of 40
+games per scenario. It first checks exact results, tapes, audit findings, digests,
+and apron facts for 40 seeds per scenario. The test-only backend switch uses
+Bun's module mocking; production has no switch or fallback.
+
+The scenarios cover Draft Duel and fixed-five recorded game verification,
+Havoc solo, a two-sided Havoc battle with clones and mutations, and Cap Rush
+first/second-apron battle paths. These measure local simulation, recording,
+auditing, and verification where indicated, not networking, full application
+seasons, draft UI, or persistence. Results go to `sim-wasm-modes-results.json`.
+
+The general TypeScript canonical serializer stays active for untyped values and
+existing immutable snapshot/state-digest paths. Typed game contracts use native
+JSON number/string formatting followed by Rust key ordering and the same FNV
+hashing over UTF-16 units. This preserves existing multiplayer/replay digests.
+
+## Solo validation benchmark
+
+```sh
+bun scripts/sim-wasm/summary-benchmark.ts sim-summary-results.json
+```
+
+Measures audited Havoc summary and recorded paths over nine rounds of 150 games
+after warmup, using 40 rotating seeds. Run the same script before and after a
+change; the output contains median milliseconds in summary/recorded order and a
+digest of all 40 recorded results, tapes, and audits for parity comparison.
+These are sequential desktop Bun measurements, not browser or phone results.
+
+Solo simulation reuses the adapter's validated battle input. Audited summaries
+use the battle runtime's existing lazy tape validation, retaining every event
+for accounting audits without parsing an unused playback tape.
 
 ## Earlier RNG-only benchmark
 

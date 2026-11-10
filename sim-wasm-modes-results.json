@@ -1,0 +1,56 @@
+{
+  "runtime": "v26.3.0",
+  "bun": "1.4.4",
+  "rounds": 9,
+  "rows": [
+    {
+      "mode": "Draft Duel recorded game + verification",
+      "games": 40,
+      "parityGames": 40,
+      "beforeMs": 168.1010000000001,
+      "afterMs": 135.17399999999998,
+      "speedup": 1.2435897435897447
+    },
+    {
+      "mode": "Fixed-five multiplayer recorded game + verification",
+      "games": 40,
+      "parityGames": 40,
+      "beforeMs": 165.41229999999996,
+      "afterMs": 130.9913000000006,
+      "speedup": 1.2627731765391992
+    },
+    {
+      "mode": "Havoc solo game + audit",
+      "games": 40,
+      "parityGames": 40,
+      "beforeMs": 164.91829999999936,
+      "afterMs": 157.92479999999887,
+      "speedup": 1.044283735043518
+    },
+    {
+      "mode": "Havoc multiplayer mutations + verification",
+      "games": 40,
+      "parityGames": 40,
+      "beforeMs": 176.1203999999998,
+      "afterMs": 140.503999999999,
+      "speedup": 1.2534902920913358
+    },
+    {
+      "mode": "Cap Rush first-apron battle + verification",
+      "games": 40,
+      "parityGames": 40,
+      "beforeMs": 119.96720000000096,
+      "afterMs": 90.0038999999997,
+      "speedup": 1.3329111294066296
+    },
+    {
+      "mode": "Cap Rush multiplayer second-apron battle + verification",
+      "games": 40,
+      "parityGames": 40,
+      "beforeMs": 119.16760000000068,
+      "afterMs": 85.15500000000247,
+      "speedup": 1.3994198813927217
+    }
+  ],
+  "note": "These measurements include simulation, recording, audit and verification digests where indicated. Havoc/Cap Rush mutation rules still run in TypeScript; their canonical serialization and digest work runs in Rust/Wasm."
+}

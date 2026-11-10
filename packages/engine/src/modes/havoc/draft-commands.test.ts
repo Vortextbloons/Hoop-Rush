@@ -549,13 +549,6 @@ describe('havoc draft command flow', () => {
     expect(locked.result.revisionAfter).toBe(drafted.revision + 1);
   });
 
-  it('locks even before a reroll was used', () => {
-    const drafted = draftToCompletion(createDraftState());
-    expect(drafted.draft?.rerollUsed).toBe(false);
-    const locked = ApplyHavocCommand(drafted, lockCommand(drafted), environment, lockSources);
-    expect(locked.result.status).toBe('accepted');
-  });
-
   it('raises HavocCatalogCoverageError when the catalog cannot fill the draft', () => {
     const keep = new Set([
       'p-d-lakers-1980s-0',

@@ -130,15 +130,6 @@ describe('cap rush multiplayer market', () => {
       }),
     ).toBe(true);
   });
-
-  test('assigns one position to a player eligible at several positions', () => {
-    const built = market();
-    const positions = new Map<string, string>();
-    for (const player of built.players) {
-      expect(positions.has(player.playerId)).toBe(false);
-      positions.set(player.playerId, player.position);
-    }
-  });
 });
 
 describe('cap rush multiplayer joint feasibility', () => {

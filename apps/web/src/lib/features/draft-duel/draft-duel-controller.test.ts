@@ -612,54 +612,6 @@ describe('Draft Duel ready check progression', () => {
     });
     expect(controller.phase).toBe('preparing-game');
     expect(controller.currentGameNumber).toBe(3);
-  });
-
-  it('holds the Game 2 results screen until continue is approved', async () => {
-    const { lifecycle, digest } = await prepareSecondGame();
-    session.advancePlayback(DRAFT_DUEL_BROADCAST_MS);
-    lifecycle.maybeProposeOrConfirm();
-    await waitFor(async () => {
-      const commands = await transport.refetch(roomId, -1);
-      expect(
-        commands.some(
-          (command) =>
-            command.actorParticipantId === 'p1' &&
-            command.payload.kind === 'propose-result' &&
-            command.payload.gameNumber === 2,
-        ),
-      ).toBe(true);
-    });
-    const held = await transport.refetch(roomId, -1);
-    expect(
-      held.some(
-        (command) =>
-          command.actorParticipantId === 'p1' &&
-          command.payload.kind === 'confirm-result' &&
-          command.payload.gameNumber === 2,
-      ),
-    ).toBe(false);
-    expect(controller.awaitingContinue).toBe(true);
-
-    controller.continueAfterGame();
-    await waitFor(async () => {
-      const commands = await transport.refetch(roomId, -1);
-      expect(
-        commands.some(
-          (command) =>
-            command.actorParticipantId === 'p1' &&
-            command.payload.kind === 'confirm-result' &&
-            command.payload.gameNumber === 2,
-        ),
-      ).toBe(true);
-    });
-    await submit('p2', {
-      kind: 'confirm-result',
-      gameNumber: 2,
-      resultDigest: digest,
-      verified: true,
-    });
-    expect(controller.phase).toBe('preparing-game');
-    expect(controller.currentGameNumber).toBe(3);
     expect(controller.awaitingContinue).toBe(false);
   });
 

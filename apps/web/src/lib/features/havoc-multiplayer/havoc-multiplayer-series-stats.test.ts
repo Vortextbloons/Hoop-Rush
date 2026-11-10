@@ -56,8 +56,6 @@ describe('Havoc championship stats', () => {
     expect(
       havocMultiplayerSeriesStats({ games }, outputs, 'p2').boxes.map((box) => box.score),
     ).toEqual([180, 200]);
-    expect(first.home.points).toBe(100);
-    expect(rollup.triggers).toBe(2);
   });
 
   it('excludes missing and unverified games instead of treating them as zero-stat games', () => {

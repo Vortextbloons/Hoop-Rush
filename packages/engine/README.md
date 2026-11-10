@@ -47,6 +47,14 @@ retains possession hooks and explicitly orders those owners at boundaries.
 `runtime-refactor-parity.test.ts` pins pre-refactor results and replay tapes
 across seeded mutation scenarios.
 
+Havoc and Cap Rush solo/multiplayer games use the data-contracts Rust/Wasm
+canonical serializer and digest kernel for typed game verification. Their
+possession and mutation execution remains TypeScript. Draft Duel and fixed-five
+multiplayer also use the canonical kernel for typed game/tape serialization.
+Classic and Sandbox continue to use the standard Rust game kernel in solo and
+multiplayer. Worker envelopes, digest prefixes, seeded results, and network
+coordination are unchanged.
+
 ## Verification
 
 Normal builds and CI use the committed Wasm module and do not require Rust.

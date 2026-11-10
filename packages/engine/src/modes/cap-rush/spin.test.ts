@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import type { CapRushDraftPick, CapRushDraftState, Position } from '@hoop-rush/data-contracts';
 import {
-  CAP_RUSH_CAP_LINE_DOLLARS,
   POSITIONS,
   capRushCardIdSchema,
   capRushCardSchema,
@@ -114,15 +113,10 @@ describe('cap rush spin eligibility', () => {
   it('applies the purchase-specific payroll ceiling', () => {
     expect(capRushSpinEligibility(120_000_000, 'standard').eligible).toBe(true);
     expect(capRushSpinEligibility(120_000_001, 'standard').eligible).toBe(false);
-    expect(capRushSpinEligibility(120_000_001, 'standard').eligible).toBe(false);
     expect(capRushSpinEligibility(120_000_000, 'standard').priceDollars).toBe(10_000_000);
     expect(capRushSpinEligibility(120_000_000, 'standard').maxEligiblePayrollDollars).toBe(
       120_000_000,
     );
-  });
-
-  it('keeps every purchase under the normal cap by construction', () => {
-    expect(CAP_RUSH_CAP_LINE_DOLLARS - 10_000_000).toBe(120_000_000);
   });
 });
 

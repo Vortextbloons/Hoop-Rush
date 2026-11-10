@@ -112,9 +112,14 @@ describe('OneShotWorkerRunner', () => {
     runner.dispose();
   });
 
-  it.each(['malformed', 'crash', 'mapped', 'timeout'] as const)(
-    'replaces a reusable worker after a %s failure',
-    async (failure) => {
+  it.each([
+    ['malformed', ERRORS.invalidMessage],
+    ['crash', ERRORS.crashed],
+    ['mapped', 'mapped failure'],
+    ['timeout', ERRORS.timeout],
+  ] as const)(
+    'replaces a reusable worker after a %s failure with the mapped error',
+    async (failure, expectedMessage) => {
       const { spec, workers } = stubSpec({ reuseWorker: true, timeoutMs: 10 });
       const runner = new OneShotWorkerRunner(spec);
       const pending = runner.run({ value: 1 });
@@ -124,7 +129,7 @@ describe('OneShotWorkerRunner', () => {
       if (failure === 'mapped') {
         worker.emit({ requestId: requestIdOf(worker), ok: false, message: 'mapped failure' });
       }
-      await expect(pending).rejects.toThrow();
+      await expect(pending).rejects.toThrow(expectedMessage);
       expect(worker.terminated).toBe(true);
       const next = runner.run({ value: 2 });
       const replacement = workerAt(workers, 1);
@@ -224,26 +229,6 @@ describe('OneShotWorkerRunner', () => {
     expect(worker.terminated).toBe(false);
   });
 
-  it('rejects malformed messages with the invalid-message error and terminates the worker', async () => {
-    const { spec, workers } = stubSpec();
-    const runner = new OneShotWorkerRunner(spec);
-    const pending = runner.run({ value: 1 });
-    workerAt(workers, 0).emit('not-an-object');
-    await expect(pending).rejects.toThrow(ERRORS.invalidMessage);
-    expect(workerAt(workers, 0).terminated).toBe(true);
-  });
-
-  it('rejects mapped errors with the mapped message', async () => {
-    const { spec, workers } = stubSpec();
-    const runner = new OneShotWorkerRunner(spec);
-    const pending = runner.run({ value: 1 });
-    const worker = workerAt(workers, 0);
-    worker.emit({ requestId: requestIdOf(worker), ok: false, message: 'boom' });
-    const error = await pending.catch((caught: unknown) => caught);
-    expect(error).toBeInstanceOf(Error);
-    expect((error as Error).message).toBe('boom');
-  });
-
   it('rejects the pending run as superseded when a newer run starts', async () => {
     const { spec, workers } = stubSpec();
     const runner = new OneShotWorkerRunner(spec);
@@ -257,23 +242,6 @@ describe('OneShotWorkerRunner', () => {
     await expect(second).resolves.toBe('second');
   });
 
-  it('rejects with the timeout error and terminates the worker', async () => {
-    const { spec, workers } = stubSpec({ timeoutMs: 1 });
-    const runner = new OneShotWorkerRunner(spec);
-    const pending = runner.run({ value: 1 });
-    await expect(pending).rejects.toThrow(ERRORS.timeout);
-    expect(workerAt(workers, 0).terminated).toBe(true);
-  });
-
-  it('rejects with the crash error and terminates the worker', async () => {
-    const { spec, workers } = stubSpec();
-    const runner = new OneShotWorkerRunner(spec);
-    const pending = runner.run({ value: 1 });
-    workerAt(workers, 0).crash();
-    await expect(pending).rejects.toThrow(ERRORS.crashed);
-    expect(workerAt(workers, 0).terminated).toBe(true);
-  });
-
   it('dispose rejects the pending run and ignores later messages', async () => {
     const { spec, workers } = stubSpec();
     const runner = new OneShotWorkerRunner(spec);
@@ -283,13 +251,5 @@ describe('OneShotWorkerRunner', () => {
     await expect(pending).rejects.toThrow(ERRORS.disposed);
     expect(worker.terminated).toBe(true);
     worker.emit({ requestId: requestIdOf(worker), ok: true, output: 'late' });
-  });
-
-  it('dispose terminates the current worker even when the caller ignores the rejection', () => {
-    const { spec, workers } = stubSpec();
-    const runner = new OneShotWorkerRunner(spec);
-    runner.run({ value: 1 }).catch(() => {});
-    runner.dispose();
-    expect(workerAt(workers, 0).terminated).toBe(true);
   });
 });

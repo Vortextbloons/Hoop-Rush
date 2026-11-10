@@ -111,12 +111,9 @@ function playSeason(locked: ReturnType<typeof buildLocked>) {
 }
 
 describe('cap rush wins per million', () => {
-  it('divides wins by player payroll in millions', () => {
+  it('divides wins by player payroll in millions and returns null for a zero payroll', () => {
     expect(capRushWinsPerMillion(41, 110_000_000)).toBeCloseTo(41 / 110, 10);
     expect(capRushWinsPerMillion(82, 82_000_000)).toBeCloseTo(1, 10);
-  });
-
-  it('returns null for a zero payroll', () => {
     expect(capRushWinsPerMillion(10, 0)).toBeNull();
   });
 });

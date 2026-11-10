@@ -62,17 +62,6 @@ describe('HavocResultState', () => {
     state.destroy();
   });
 
-  it('reveals a completed comparison seeded by the service', async () => {
-    const service = new FakeHavocService();
-    service.seedActiveRun(buildCompleteRunState());
-    service.seedComparison(buildFakeComparison('havoc-run-1'));
-    const state = new HavocResultState(service);
-    await state.load();
-    expect(state.comparisonComplete).toBe(true);
-    expect(state.baselineVisible).toBe(true);
-    expect(state.comparison?.games).toHaveLength(82);
-    state.destroy();
-  });
   it('publishes the completed run and its report only after the comparison is ready', async () => {
     const service = new FakeHavocService();
     service.seedActiveRun(buildCompleteRunState());
@@ -102,6 +91,8 @@ describe('HavocResultState', () => {
     expect(state.run?.comparisonStatus).toBe('complete');
     expect(state.report?.status).toBe('complete');
     expect(state.comparisonComplete).toBe(true);
+    expect(state.baselineVisible).toBe(true);
+    expect(state.comparison?.games).toHaveLength(82);
     state.destroy();
   });
 });

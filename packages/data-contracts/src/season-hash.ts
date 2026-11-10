@@ -1,4 +1,21 @@
 import { z } from 'zod';
+import { canonicalDigestText, canonicalJsonText } from './canonical-wasm.ts';
+
+export type JsonData =
+  | null
+  | boolean
+  | number
+  | string
+  | readonly JsonData[]
+  | { readonly [key: string]: JsonData | undefined };
+
+export function canonicalJsonData(value: JsonData): string {
+  return canonicalJsonText(JSON.stringify(value));
+}
+
+export function canonicalJsonDataDigest(prefix: string, value: JsonData): string {
+  return canonicalDigestText(prefix, JSON.stringify(value));
+}
 const hex32Digest = z.string().regex(/^[0-9a-f]{32}$/);
 export const seasonCheckpointDigestSchema = hex32Digest;
 export const FNV_OFFSET_32 = 0x811c9dc5;

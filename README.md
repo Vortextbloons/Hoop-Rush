@@ -106,7 +106,7 @@ Open **http://localhost:5173**, choose a mode, and draft.
 
 <br />
 
-**Stack:** SvelteKit client · TypeScript simulation engine · IndexedDB saves · Web Workers for long sims · Bun workspaces and test runner.
+**Stack:** SvelteKit client · TypeScript engine with a Rust/Wasm standard-game kernel · IndexedDB saves · Web Workers for long sims · Bun workspaces and test runner.
 
 ```
 apps/web                  → game UI (mode code under src/lib/features/<mode>)

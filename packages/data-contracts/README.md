@@ -24,6 +24,10 @@ workers embed.
 - `src/index.ts` — the public surface.
 - `src/ids.ts`, `src/versions.ts`, `src/season-versions.ts` — brands and
   versions.
+- `src/season-hash.ts`, `src/canonical-wasm.ts`, `src/wasm/canonical.rs` —
+  canonical JSON encoding and UTF-16-prefix digests used by mode/multiplayer
+  digests. The Rust module is bundled; regenerate it with
+  `bun scripts/sim-wasm/build.ts` after changing the Rust source.
 - `src/multiplayer-protocol.ts` — the room protocol version constant
   (`ROOM_PROTOCOL_VERSION`, separate from every storage and engine version) and
   the client-side legacy-room rejection message.
@@ -35,6 +39,19 @@ workers embed.
   `projection*.ts`, `worker.ts`, `league-worker.ts`.
 - `src/loaders/` — packaged-artifact parsing helpers used by the web client
   (`collection-catalog.ts` for `static/data/collection/`).
+- `src/wasm/canonical.rs` and `canonical-wasm.ts` — in-memory canonical JSON and
+  digest acceleration for typed game data. Object keys use JavaScript UTF-16
+  ordering, and the digest retains the existing four FNV streams and prefixes.
+
+`canonicalJsonData` and `canonicalJsonDataDigest` accept `JsonData` that has
+already passed the owning runtime schema. They preserve the canonical bytes of
+the dense JSON objects/arrays used by game contracts. The general
+`canonicalJson(unknown)` function retains its existing TypeScript behavior for
+other callers, including non-JSON values and immutable descendant reuse.
+
+Run `bun scripts/sim-wasm/build.ts` from the repository root after Rust edits and
+commit the generated module. Normal builds do not require Rust; the source
+fingerprint and canonical parity tests run in ordinary CI.
 
 `command-commit.ts` defines the shared Cap Rush and Havoc commit envelopes,
 including the expected revision, outcome, and mode-specific artifacts.

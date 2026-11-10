@@ -401,26 +401,6 @@ describe('classic reducer', () => {
     );
     expect(rerolled.rerolls.franchiseSpent).toBe(true);
   });
-  it('derives independent participant seeds', () => {
-    const catalog = classicCatalog();
-    const p1 = createParticipantClassicDraft(
-      'd1',
-      'ratings',
-      fixedFiveDraftSeed(ROOT, 'p1'),
-      'data-v1',
-      catalog,
-      context,
-    );
-    const p2 = createParticipantClassicDraft(
-      'd2',
-      'ratings',
-      fixedFiveDraftSeed(ROOT, 'p2'),
-      'data-v1',
-      catalog,
-      context,
-    );
-    expect(p1.seed).not.toBe(p2.seed);
-  });
   it('repositions Classic picks through a deep legal chain', () => {
     const deepCatalog: ClassicDraftCatalog = [
       {

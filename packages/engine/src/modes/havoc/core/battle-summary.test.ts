@@ -17,7 +17,6 @@ describe('audited battle summaries', () => {
       expect(summary.audit).toEqual(auditHavocBattleGame(input, recorded.result, recorded.tape));
       expect(summary.audit.ok).toBe(true);
       expect(summary.tape).toEqual(recorded.tape);
-      expect(summary.tape).toBe(summary.tape);
     }
   });
 });

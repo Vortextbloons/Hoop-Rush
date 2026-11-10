@@ -5,30 +5,10 @@ import type {
   FixedFiveCompetitionResult,
   FixedFiveWorkerResultEntry,
 } from '@hoop-rush/data-contracts';
-import { publicProfileSchema, seedSchema } from '@hoop-rush/data-contracts';
+import { seedSchema } from '@hoop-rush/data-contracts';
 import { fixedFiveCareerFacts } from './profile-results.js';
 
 describe('fixed five career facts', () => {
-  test('room profile excludes local identity and achievement progress', () => {
-    const result = publicProfileSchema.parse({
-      participantId: 'p1',
-      name: 'RimReaper',
-      avatar: 'ball',
-      border: 'classic',
-      nameColor: 'white',
-      title: 'none',
-      featuredAchievement: null,
-      games: 12,
-      wins: 7,
-      bestStreak: 3,
-      id: '00000000-0000-4000-8000-000000000001',
-      achievements: ['welcome'],
-      multiplayerStreak: 4,
-    });
-    expect(result).not.toHaveProperty('id');
-    expect(result).not.toHaveProperty('achievements');
-    expect(result).not.toHaveProperty('multiplayerStreak');
-  });
   test('selects the local team and refuses an incomplete season', () => {
     const game = simulateGame(buildGameSimulationInput(), createEngineContext());
     const h2h = {

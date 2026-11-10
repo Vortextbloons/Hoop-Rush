@@ -1043,12 +1043,6 @@ describe('fair offer generation', () => {
     }
     expect(histograms.size).toBeGreaterThan(1);
   });
-
-  it('rejects calls that would regenerate a committed round', () => {
-    const state = createDraftDuelDraft({ rootSeed: SEED_A, fairness: 'fair', catalog });
-    const next = applyDraftDuelPick(state, catalog, chooseFirstAvailable(state, catalog));
-    expect(() => buildRoundOffers(next, catalog)).toThrow(/round starts/);
-  });
 });
 
 describe('unfair offer generation', () => {

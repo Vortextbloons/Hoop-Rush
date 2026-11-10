@@ -120,21 +120,16 @@ describe('supabase runtime seat lookup', () => {
     });
   });
 
-  it('looks the uid up through auth when the caller has none', async () => {
-    const { harness, client } = setup();
-    harness.setRows(MEMBERS_TABLE, [{ room_id: ROOM_ID, participant_id: 'p1', uid: 'user-1' }]);
+  it.each([undefined, null] as const)(
+    'looks the uid up through auth when the caller uid is %s',
+    async (uid) => {
+      const { harness, client } = setup();
+      harness.setRows(MEMBERS_TABLE, [{ room_id: ROOM_ID, participant_id: 'p1', uid: 'user-1' }]);
 
-    expect(await readRoomParticipant(client, MEMBERS_TABLE, ROOM_ID)).toBe('p1');
-    expect(harness.authCalls).toContain('getUser');
-  });
-
-  it('falls back to the auth lookup when the supplied uid is null', async () => {
-    const { harness, client } = setup();
-    harness.setRows(MEMBERS_TABLE, [{ room_id: ROOM_ID, participant_id: 'p1', uid: 'user-1' }]);
-
-    expect(await readRoomParticipant(client, MEMBERS_TABLE, ROOM_ID, null)).toBe('p1');
-    expect(harness.authCalls).toContain('getUser');
-  });
+      expect(await readRoomParticipant(client, MEMBERS_TABLE, ROOM_ID, uid)).toBe('p1');
+      expect(harness.authCalls).toContain('getUser');
+    },
+  );
 
   it('still refuses a uid that holds no seat in the room', async () => {
     const { harness, client } = setup();

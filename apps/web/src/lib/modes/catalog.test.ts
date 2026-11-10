@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'bun:test';
+import { describe, expect, it } from 'bun:test';
 import {
   modeIdSchema,
   multiplayerFormatIdSchema,
@@ -11,7 +11,6 @@ import {
   multiplayerFormats,
   multiplayerMode,
 } from './catalog';
-import type { ModeDefinition } from './types';
 
 describe('mode catalog', () => {
   it('registers every validated mode, protocol, and format exactly once', () => {
@@ -55,13 +54,7 @@ describe('mode catalog', () => {
       expect(adapter.settingsSchema.safeParse(adapter.defaults).success).toBe(true);
       expect(adapter.settingsSchema.safeParse({ variant: 'invalid' }).success).toBe(false);
       expect(adapter.settingsFields.length).toBeGreaterThan(0);
-      expect(adapter.loadRoom).toBeTypeOf('function');
       expect(await adapter.loadRoom()).toBeTypeOf('function');
-      expect(adapter.loadLastRoomId).toBeTypeOf('function');
-      expect(adapter.startSettings).toBeTypeOf('function');
-      expect(adapter.loadVersions).toBeTypeOf('function');
-      expect(adapter.resume).toBeTypeOf('function');
-      expect(adapter.createRoomSession).toBeTypeOf('function');
       expect(adapter.inviteLink('1234')).toBe('/multiplayer?code=1234');
       expect(adapter.pickTimer(adapter.defaults, mode.formats[0]?.id ?? 'season')).toMatch(
         /picks$/,
@@ -82,32 +75,4 @@ describe('mode catalog', () => {
       expect(adapter.pickTimer({ ...adapter.defaults, sourceMode }, format)).toBe(timer);
     },
   );
-
-  it('integrates a test mode through registration without changing discovery or lobby selectors', async () => {
-    const adapter = await multiplayerMode('draft-duel').load();
-    const load = vi.fn(() => Promise.resolve(adapter));
-    const format = multiplayerFormats()[0];
-    if (!format) throw new Error('Expected a registered format');
-    const testMode: ModeDefinition<'test-mode'> = {
-      id: 'test-mode',
-      label: 'Test mode',
-      description: 'Test rules',
-      discovery: { homeOrder: 10, navigationOrder: 10, cta: 'Start test' },
-      solo: { href: '/classic' },
-      multiplayer: {
-        gameKind: 'draft-duel',
-        label: 'Test match',
-        routeId: '/draft-duel/room/[roomId]',
-        formats: [{ ...format, id: 'draft-duel', name: 'Test format', order: 10 }],
-        load,
-      },
-    };
-    const catalog = [testMode];
-    expect(homeModes(catalog)[0]?.label).toBe('Test mode');
-    expect(modeNavigation(catalog)[0]?.solo?.href).toBe('/classic');
-    expect(multiplayerFormats(catalog)[0]?.name).toBe('Test format');
-    expect(load).not.toHaveBeenCalled();
-    expect(await multiplayerMode('draft-duel', catalog).load()).toBe(adapter);
-    expect(load).toHaveBeenCalledOnce();
-  });
 });

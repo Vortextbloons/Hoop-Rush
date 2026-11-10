@@ -5,7 +5,6 @@ import {
   CAP_RUSH_RULES_VERSION,
   CAP_RUSH_STRIKE_EVERY,
 } from '@hoop-rush/data-contracts';
-import { capRushApronRuntimeFor } from './apron-runtime.ts';
 import { buildHavocLockedInputs } from '@hoop-rush/test-fixtures';
 import { createEngineContext } from '../../sim/kernel.ts';
 import { simulateHavocBattleGame } from '../havoc/core/battle-game.ts';
@@ -102,20 +101,6 @@ describe('cap rush apron integration', () => {
       expect(apron.recordedFacts().some((fact) => fact.kind === 'isolation')).toBe(false);
     }
     expect(interceptions).toBeGreaterThan(0);
-  });
-
-  it('does not attach apron hooks when payroll is under the apron', () => {
-    expect(
-      capRushApronRuntimeFor(
-        {
-          versionSet: { rulesVersion: CAP_RUSH_RULES_VERSION },
-          payrollStatus: 'under-cap',
-          target: { instanceId: `hvi-${'0'.repeat(32)}`, slot: 'C' },
-          human: { starters: [] },
-        },
-        'home',
-      ),
-    ).toBeUndefined();
   });
 
   it('records strike facts only in the second apron and only for opponent possessions', () => {

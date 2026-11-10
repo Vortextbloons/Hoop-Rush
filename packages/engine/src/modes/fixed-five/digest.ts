@@ -9,7 +9,12 @@ import type {
   GameTapeEvent,
   Seed,
 } from '@hoop-rush/data-contracts';
-import { canonicalJson, contentHashSchema, seasonDigestHex } from '@hoop-rush/data-contracts';
+import {
+  canonicalJson,
+  canonicalJsonData,
+  contentHashSchema,
+  seasonDigestHex,
+} from '@hoop-rush/data-contracts';
 import { gameDigest64 } from '../../sim/digests.ts';
 export interface FixedFiveDigestInput {
   rootSeed: Seed;
@@ -68,11 +73,11 @@ export function verifyFixedFiveDigest(
 }
 
 export function fixedFiveDuelGameInputDigest(input: GameSimulationInput): ContentHash {
-  return gameDigest64('fixed-five-duel-input', canonicalJson(input));
+  return gameDigest64('fixed-five-duel-input', canonicalJsonData(input));
 }
 export function fixedFiveDuelGameResultDigest(result: GameResult): ContentHash {
-  return gameDigest64('fixed-five-duel-result', canonicalJson(result));
+  return gameDigest64('fixed-five-duel-result', canonicalJsonData(result));
 }
 export function fixedFiveDuelGameTapeDigest(tape: readonly GameTapeEvent[]): ContentHash {
-  return gameDigest64('fixed-five-duel-tape', canonicalJson(tape));
+  return gameDigest64('fixed-five-duel-tape', canonicalJsonData(tape));
 }

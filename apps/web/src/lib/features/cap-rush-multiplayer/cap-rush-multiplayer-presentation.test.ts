@@ -392,11 +392,11 @@ describe('cap rush multiplayer season presentation', () => {
 });
 
 describe('playoff series focus', () => {
-  for (const localSeat of ['p1', 'p2'] as const) {
-    const otherSeat = localSeat === 'p1' ? 'p2' : 'p1';
-    for (const localStatus of ['pending', 'eliminated', 'not-qualified'] as const) {
-      for (const otherStatus of ['pending', 'eliminated', 'not-qualified'] as const) {
-        test(`${localSeat}: local ${localStatus}, opponent ${otherStatus}`, () => {
+  test('prefers the local pending seat, then the opponent pending seat, otherwise none', () => {
+    for (const localSeat of ['p1', 'p2'] as const) {
+      const otherSeat = localSeat === 'p1' ? 'p2' : 'p1';
+      for (const localStatus of ['pending', 'eliminated', 'not-qualified'] as const) {
+        for (const otherStatus of ['pending', 'eliminated', 'not-qualified'] as const) {
           const outcomes = {
             p1: { status: 'pending' as typeof localStatus, round: null },
             p2: { status: 'pending' as typeof otherStatus, round: null },
@@ -406,8 +406,8 @@ describe('playoff series focus', () => {
           const expected =
             localStatus === 'pending' ? localSeat : otherStatus === 'pending' ? otherSeat : null;
           expect(playoffSeriesSeat(outcomes, localSeat)).toBe(expected);
-        });
+        }
       }
     }
-  }
+  });
 });

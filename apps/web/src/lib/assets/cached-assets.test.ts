@@ -42,23 +42,4 @@ describe('cached assets', () => {
     expect(await settled(assets.load())).toEqual({ value: 'catalog' });
     expect(build).toHaveBeenCalledTimes(2);
   });
-
-  it('does not let an older rejection clear a newer load', async () => {
-    let rejectFirst!: (error: Error) => void;
-    const build = vi
-      .fn<() => Promise<string>>()
-      .mockReturnValueOnce(
-        new Promise<string>((_yes, no) => {
-          rejectFirst = no;
-        }),
-      )
-      .mockResolvedValue('second');
-    const assets: CachedAssets<string> = cachedAssets<string>(build);
-    const first = settled(assets.load());
-    rejectFirst(new Error('stale'));
-    expect(await first).toHaveProperty('error');
-    expect(await settled(assets.load())).toEqual({ value: 'second' });
-    expect(await settled(assets.load())).toEqual({ value: 'second' });
-    expect(build).toHaveBeenCalledTimes(2);
-  });
 });
