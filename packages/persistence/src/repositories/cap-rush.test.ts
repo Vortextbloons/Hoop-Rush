@@ -688,6 +688,43 @@ describe('cap rush repository', () => {
     expect((advance as Error).message).toContain('pending broadcast');
   });
 
+  it('stores compact league receipts, keeps boxes in the game table, and resumes the aggregate', async () => {
+    const { index, state } = await startLockedRun(repository, { league: true });
+    if (state.locked === null) throw new Error('missing locked inputs');
+    const context = createEngineContext();
+    const leagueGames = simulateCapRushLeagueSlot({ locked: state.locked, slot: 1, context });
+    const command = capRushAcceptLeagueGamesCommandSchema.parse({
+      command: 'accept-cap-rush-league-games',
+      commandId: commandIdSchema.parse('cmd-league-receipt'),
+      runId: state.runId,
+      expectedRevision: state.revision,
+      slot: 1,
+      leagueGameIds: leagueGames.map((game) => game.gameId),
+    });
+    const outcome = applyCapRushCommand(state, command, { index });
+    expect(outcome.result.status).toBe('accepted');
+    await repository.applyOutcome(prepareCommandCommit({ outcome, command, leagueGames }));
+
+    // The receipt carries identifiers only; the box scores live in their table.
+    const stored = await db.capRushCommands.get(command.commandId);
+    if (stored === undefined) throw new Error('missing stored command');
+    expect(stored.command).toEqual(command);
+    expect('box' in stored.command).toBe(false);
+    const firstGame = leagueGames[0];
+    if (firstGame === undefined) throw new Error('missing league game');
+    expect(await repository.readLeagueGame(state.runId, firstGame.gameId)).toEqual(firstGame);
+
+    const aggregate = await repository.readLeagueAggregate(state.runId);
+    expect(aggregate?.games).toBe(leagueGames.length);
+
+    db.close();
+    await db.open();
+    const reopened = new DexieCapRushRepository(db);
+    expect(await reopened.listLeagueResults(state.runId)).toHaveLength(leagueGames.length);
+    expect(await reopened.readLeagueAggregate(state.runId)).toEqual(aggregate);
+    expect(await reopened.readLeagueGame(state.runId, firstGame.gameId)).toEqual(firstGame);
+  });
+
   it('updates playback by writing only the cursor record', async () => {
     const { index, state } = await startLockedRun(repository);
     if (state.locked === null) throw new Error('missing locked inputs');
