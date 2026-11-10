@@ -1,6 +1,7 @@
 import {
   CAP_RUSH_GAME_COUNT,
   type CapRushLeagueGame,
+  type CapRushLeagueResult,
   type CapRushPlayoffGamePlan,
   type CapRushReport,
   type CapRushStandingsGame,
@@ -18,7 +19,6 @@ import {
 } from '@hoop-rush/application/cap-rush';
 import {
   buildCapRushConferenceStandings,
-  capRushBoxOf,
   capRushLeagueFieldOfLocked,
   capRushNextLeagueSlot,
   capRushUserLeagueGameOf,
@@ -39,7 +39,7 @@ export class CapRushSeasonController {
   draft = $state.raw<CapRushDraftView | null>(null);
   games = $state.raw<CapRushStoredGame[]>([]);
   playoffGames = $state.raw<CapRushStoredPlayoffGame[]>([]);
-  leagueGames = $state.raw<CapRushLeagueGame[]>([]);
+  leagueGames = $state.raw<CapRushLeagueResult[]>([]);
   report = $state.raw<CapRushReport | null>(null);
   progress = $state.raw<CapRushSeasonProgress | null>(null);
   loading = $state(true);
@@ -57,9 +57,9 @@ export class CapRushSeasonController {
 
   private readonly service: CapRushService;
   private readonly runner: CapRushRunner;
-  private aiLeagueGames: CapRushLeagueGame[] = [];
+  private aiLeagueGames: CapRushLeagueResult[] = [];
   private aiLeagueGameIds = new Set<string>();
-  private userLeagueGames = new Map<string, CapRushLeagueGame>();
+  private userLeagueGames = new Map<string, CapRushLeagueResult>();
   private destroyed = false;
 
   constructor(service: CapRushService, runner: CapRushRunner) {
@@ -97,12 +97,12 @@ export class CapRushSeasonController {
         this.playoffGames = [];
       }
       if (runId !== undefined && (snapshot.draft?.season?.leagueGamesAccepted ?? 0) > 0) {
-        const stored = await this.service.listLeagueGames(runId);
+        const stored = await this.service.listLeagueResults(runId);
         if (this.isDestroyed()) return;
         this.aiLeagueGames = [...stored];
         this.aiLeagueGameIds = new Set(stored.map((game) => game.gameId));
         this.userLeagueGames = new Map(
-          this.userLeagueGamesOf(snapshot.draft).map((game) => [game.gameId, game]),
+          this.userLeagueResultsOf(snapshot.draft).map((game) => [game.gameId, game]),
         );
         this.publishLeagueGames();
       } else {
@@ -578,7 +578,7 @@ export class CapRushSeasonController {
     }
     const locked = this.draft?.draft.locked;
     if (locked === null || locked === undefined || locked.leagueSchedule === undefined) return;
-    const leagueGame = this.userLeagueGameOf(locked, game);
+    const leagueGame = this.userLeagueResultOf(locked, game);
     this.userLeagueGames.set(leagueGame.gameId, leagueGame);
   }
 
@@ -636,16 +636,16 @@ export class CapRushSeasonController {
     }
   }
 
-  private userLeagueGamesOf(view: CapRushDraftView | null): CapRushLeagueGame[] {
+  private userLeagueResultsOf(view: CapRushDraftView | null): CapRushLeagueResult[] {
     const locked = view?.draft.locked;
     if (locked === null || locked === undefined || locked.leagueSchedule === undefined) return [];
-    return this.games.map((game) => this.userLeagueGameOf(locked, game));
+    return this.games.map((game) => this.userLeagueResultOf(locked, game));
   }
 
-  private userLeagueGameOf(
+  private userLeagueResultOf(
     locked: NonNullable<CapRushDraftView['draft']['locked']>,
     game: CapRushStoredGame,
-  ): CapRushLeagueGame {
+  ): CapRushLeagueResult {
     const entry = capRushUserLeagueGameOf(locked, game.gameNumber);
     const humanHome = entry.homeTeamId === locked.human.teamId;
     const homePoints = humanHome ? game.summary.humanPoints : game.summary.opponentPoints;
@@ -658,7 +658,6 @@ export class CapRushSeasonController {
       homePoints,
       awayPoints,
       winnerTeamId: homePoints > awayPoints ? entry.homeTeamId : entry.awayTeamId,
-      box: capRushBoxOf(game.result.home, game.result.away, game.result.overtimePeriods),
       inputDigest: game.summary.inputDigest,
       resultDigest: game.summary.resultDigest,
     };
@@ -741,6 +740,10 @@ export class CapRushSeasonController {
       if (!this.isDestroyed()) this.error = errorMessageOf(error);
       return false;
     }
+  }
+
+  async readLeagueGame(runId: string, gameId: string): Promise<CapRushLeagueGame | null> {
+    return this.service.readLeagueGame(runId, gameId);
   }
 
   async seekPlayback(cursor: number): Promise<void> {

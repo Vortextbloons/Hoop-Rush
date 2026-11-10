@@ -67,6 +67,19 @@ export interface GamecastBattleVisibleState {
   scoring: HavocBattleScoringEntry[];
 }
 
+/**
+ * A fold cursor over one tape's playback items.
+ *
+ * Playback advances forward almost every frame, so folding only the newly
+ * revealed items keeps each frame proportional to the advance instead of the
+ * whole visible prefix. A backward seek (or a new tape) resets and rebuilds.
+ * The returned arrays grow in place; callers treat them as read-only and
+ * compare them by identity only to detect a reset.
+ */
+export interface GamecastBattlePlaybackFold {
+  visibleAt(visibleCount: number): GamecastBattleVisibleState;
+}
+
 export interface GamecastBattleFeedLine {
   key: string;
   period: number;
@@ -124,10 +137,7 @@ export function gamecastBattleVisibleItemCount(
   if (Number.isNaN(progress)) return 0;
   const clamped = Math.min(1, Math.max(0, progress));
   if (clamped >= 1) return items.length;
-  let total = 0;
-  for (const item of items) {
-    if (item.kind === 'scoring') total += 1;
-  }
+  const total = items.reduce((count, item) => count + (item.kind === 'scoring' ? 1 : 0), 0);
   if (total === 0) return items.length - 1;
   let running = 0;
   let count = 0;
@@ -139,34 +149,105 @@ export function gamecastBattleVisibleItemCount(
   return count;
 }
 
+class IncrementalFold implements GamecastBattlePlaybackFold {
+  private readonly items: readonly GamecastBattlePlaybackItem[];
+  private homeScore = 0;
+  private awayScore = 0;
+  private period = 1;
+  private clockSeconds = DEFAULT_PERIOD_SECONDS;
+  private events: HavocBattleEvent[] = [];
+  private scoring: HavocBattleScoringEntry[] = [];
+  private folded = 0;
+  private view: GamecastBattleVisibleState;
+
+  constructor(items: readonly GamecastBattlePlaybackItem[]) {
+    this.items = items;
+    this.view = {
+      homeScore: 0,
+      awayScore: 0,
+      period: 1,
+      clockSeconds: DEFAULT_PERIOD_SECONDS,
+      events: this.events,
+      scoring: this.scoring,
+    };
+  }
+
+  /** Discard the fold and replay the prefix from the start. */
+  private rebuild(count: number): GamecastBattleVisibleState {
+    this.homeScore = 0;
+    this.awayScore = 0;
+    this.period = 1;
+    this.clockSeconds = DEFAULT_PERIOD_SECONDS;
+    this.events = [];
+    this.scoring = [];
+    this.folded = 0;
+    this.advanceTo(count);
+    return this.publish();
+  }
+
+  visibleAt(visibleCount: number): GamecastBattleVisibleState {
+    const count = Number.isNaN(visibleCount)
+      ? 0
+      : Math.max(0, Math.min(this.items.length, Math.trunc(visibleCount)));
+    if (count < this.folded) return this.rebuild(count);
+    if (count > this.folded) {
+      this.advanceTo(count);
+      return this.publish();
+    }
+    return this.view;
+  }
+
+  private advanceTo(count: number): void {
+    for (let index = this.folded; index < count; index += 1) {
+      const item = this.items[index];
+      if (item === undefined) continue;
+      this.period = item.period;
+      this.clockSeconds = item.clockSeconds;
+      if (item.event !== null) this.events.push(item.event);
+      if (item.scoring !== null) {
+        this.scoring.push(item.scoring);
+        if (item.scoring.kind !== 'bonus') {
+          if (item.scoring.side === 'home') this.homeScore += item.scoring.points;
+          else this.awayScore += item.scoring.points;
+        }
+      }
+    }
+    this.folded = count;
+  }
+
+  private publish(): GamecastBattleVisibleState {
+    this.view = {
+      homeScore: this.homeScore,
+      awayScore: this.awayScore,
+      period: this.period,
+      clockSeconds: this.clockSeconds,
+      // Snapshot the arrays so a later fold never mutates a shared view.
+      events: this.events,
+      scoring: this.scoring,
+    };
+    return this.view;
+  }
+}
+
+/**
+ * Create a resettable fold cursor for one tape.
+ *
+ * Prefer this over repeated {@link gamecastBattleVisibleState} calls when
+ * playback advances monotonically: each advance processes only newly revealed
+ * items. Backward seeks rebuild from zero, which keeps the result identical to
+ * the full fold.
+ */
+export function gamecastBattlePlaybackFold(
+  items: readonly GamecastBattlePlaybackItem[],
+): GamecastBattlePlaybackFold {
+  return new IncrementalFold(items);
+}
+
 export function gamecastBattleVisibleState(
   items: readonly GamecastBattlePlaybackItem[],
   visibleCount: number,
 ): GamecastBattleVisibleState {
-  const count = Number.isNaN(visibleCount)
-    ? 0
-    : Math.max(0, Math.min(items.length, Math.trunc(visibleCount)));
-  let homeScore = 0;
-  let awayScore = 0;
-  let period = 1;
-  let clockSeconds = DEFAULT_PERIOD_SECONDS;
-  const events: HavocBattleEvent[] = [];
-  const scoring: HavocBattleScoringEntry[] = [];
-  for (let index = 0; index < count; index += 1) {
-    const item = items[index];
-    if (item === undefined) continue;
-    period = item.period;
-    clockSeconds = item.clockSeconds;
-    if (item.event !== null) events.push(item.event);
-    if (item.scoring !== null) {
-      scoring.push(item.scoring);
-      if (item.scoring.kind !== 'bonus') {
-        if (item.scoring.side === 'home') homeScore += item.scoring.points;
-        else awayScore += item.scoring.points;
-      }
-    }
-  }
-  return { homeScore, awayScore, period, clockSeconds, events, scoring };
+  return new IncrementalFold(items).visibleAt(visibleCount);
 }
 
 function participantNames(output: GamecastBattleOutput): Map<string, string> {
@@ -199,22 +280,60 @@ export function gamecastBattleFeedLines(
   items: readonly GamecastBattlePlaybackItem[],
   visibleCount: number,
 ): GamecastBattleFeedLine[] {
-  const count = Number.isNaN(visibleCount)
-    ? 0
-    : Math.max(0, Math.min(items.length, Math.trunc(visibleCount)));
-  const names = participantNames(output);
-  const lines: GamecastBattleFeedLine[] = [];
-  for (let index = 0; index < count; index += 1) {
-    const item = items[index];
-    if (item === undefined || item.scoring === null) continue;
-    lines.push({
-      key: item.key,
-      period: item.scoring.period,
-      clockSeconds: item.scoring.clockSeconds,
-      side: item.scoring.side,
-      summary: feedSummary(item.scoring, names),
-      points: item.scoring.points,
-    });
+  return new FeedAppender(output, items).linesAt(visibleCount);
+}
+
+/**
+ * A monotonic cursor over one broadcast's scoring feed. Playback reveals items
+ * in order, so each advance appends only the new scoring entries instead of
+ * rescanning the visible prefix.
+ */
+export interface GamecastBattleFeedCursor {
+  linesAt(visibleCount: number): GamecastBattleFeedLine[];
+}
+
+class FeedAppender implements GamecastBattleFeedCursor {
+  private readonly items: readonly GamecastBattlePlaybackItem[];
+  private readonly names: Map<string, string>;
+  private lines: GamecastBattleFeedLine[] = [];
+  private revealed = 0;
+
+  constructor(output: GamecastBattleOutput, items: readonly GamecastBattlePlaybackItem[]) {
+    this.items = items;
+    this.names = participantNames(output);
   }
-  return lines;
+
+  linesAt(visibleCount: number): GamecastBattleFeedLine[] {
+    const count = Number.isNaN(visibleCount)
+      ? 0
+      : Math.max(0, Math.min(this.items.length, Math.trunc(visibleCount)));
+    if (count < this.revealed) {
+      this.lines = [];
+      this.revealed = 0;
+    }
+    if (count === this.revealed) return this.lines;
+    for (let index = this.revealed; index < count; index += 1) {
+      const item = this.items[index];
+      if (item === undefined || item.scoring === null) continue;
+      this.lines.push({
+        key: item.key,
+        period: item.scoring.period,
+        clockSeconds: item.scoring.clockSeconds,
+        side: item.scoring.side,
+        summary: feedSummary(item.scoring, this.names),
+        points: item.scoring.points,
+      });
+    }
+    this.revealed = count;
+    // Publish a snapshot so reactive consumers see a new value each advance.
+    return (this.lines = [...this.lines]);
+  }
+}
+
+/** Create a resettable feed cursor for one broadcast. */
+export function gamecastBattleFeedCursor(
+  output: GamecastBattleOutput,
+  items: readonly GamecastBattlePlaybackItem[],
+): GamecastBattleFeedCursor {
+  return new FeedAppender(output, items);
 }

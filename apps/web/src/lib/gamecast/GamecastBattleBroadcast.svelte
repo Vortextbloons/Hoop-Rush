@@ -5,7 +5,7 @@
     GamecastBattleFeedLine,
     GamecastBattleVisibleState,
   } from '#lib/gamecast/gamecast-battle-playback.js';
-  import { gamecastBattleLiveBoxes } from '#lib/gamecast/gamecast-battle-view.js';
+  import { gamecastBattleLiveBoxFold } from '#lib/gamecast/gamecast-battle-view.js';
   import GamecastBattleBox from '#lib/gamecast/GamecastBattleBox.svelte';
   import { gamecastBattleAbilityLines } from '#lib/gamecast/gamecast-battle-playback.js';
 
@@ -31,7 +31,15 @@
     teamIdentity?: Snippet<['home' | 'away']>;
   } = $props();
 
-  const boxes = $derived(gamecastBattleLiveBoxes(result, visible));
+  let boxResult: import('@hoop-rush/data-contracts').HavocBattleResult | null = null;
+  let boxFold: ReturnType<typeof gamecastBattleLiveBoxFold> | null = null;
+  const boxes = $derived.by(() => {
+    if (boxResult !== result || boxFold === null) {
+      boxResult = result;
+      boxFold = gamecastBattleLiveBoxFold(result);
+    }
+    return boxFold.boxesAt(visible);
+  });
   const localBox = $derived(boxes.find((box) => box.side === localSide));
   const opponentBox = $derived(boxes.find((box) => box.side !== localSide));
   const complete = $derived(progress >= 1);

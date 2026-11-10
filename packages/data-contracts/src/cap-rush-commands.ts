@@ -14,7 +14,7 @@ import {
 } from './cap-rush-versions.ts';
 import { capRushCatalogSourceSchema } from './cap-rush-versions.ts';
 import { capRushGameSummarySchema } from './cap-rush-season.ts';
-import { capRushLeagueGameSchema, capRushConferenceStandingsSchema } from './cap-rush-league.ts';
+import { capRushLeagueGameIdSchema, capRushConferenceStandingsSchema } from './cap-rush-league.ts';
 import {
   capRushPlayoffGameSummarySchema,
   capRushStoredPlayoffGameSchema,
@@ -105,7 +105,11 @@ export const capRushAcceptGameCommandSchema = z.object({
   isolations: z.number().int().nonnegative(),
   strikes: z.number().int().nonnegative(),
   summary: capRushGameSummarySchema,
-  leagueGames: z.array(capRushLeagueGameSchema).max(15).optional(),
+  /**
+   * Background league games committed with this slot. The receipt names them;
+   * their box scores live in the league-game table.
+   */
+  leagueGameIds: z.array(capRushLeagueGameIdSchema).max(15).optional(),
 });
 export type CapRushAcceptGameCommand = z.infer<typeof capRushAcceptGameCommandSchema>;
 
@@ -115,7 +119,7 @@ export const capRushAcceptLeagueGamesCommandSchema = z.object({
   runId: idSchema,
   expectedRevision: z.number().int().nonnegative(),
   slot: z.number().int().min(1).max(CAP_RUSH_GAME_COUNT),
-  leagueGames: z.array(capRushLeagueGameSchema).min(1).max(15),
+  leagueGameIds: z.array(capRushLeagueGameIdSchema).min(1).max(15),
 });
 export type CapRushAcceptLeagueGamesCommand = z.infer<typeof capRushAcceptLeagueGamesCommandSchema>;
 

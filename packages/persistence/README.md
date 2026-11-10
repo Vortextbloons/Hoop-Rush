@@ -12,7 +12,7 @@ this package for namespace rules and testing notes.
   domain schema or enum.
 - **Storage namespace**: one database, `hoop-rush-saves-v2`
   (`HOOP_RUSH_DATABASE_NAME` in `repositories/dexie.ts`). The previous
-  `hoop-rush-saves` database is never read or migrated. **Only Dexie version 14
+  `hoop-rush-saves` database is never read or migrated. **Only Dexie version 15
   is supported**; older databases reset all local saves, history, and profiles
   during upgrade so users can start fresh. Do not restore historical migrations.
 - **Command commits**: Cap Rush and Havoc share outcome/artifact contracts from

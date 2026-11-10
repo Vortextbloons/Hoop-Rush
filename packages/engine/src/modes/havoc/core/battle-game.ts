@@ -55,7 +55,7 @@ import {
 import { GameRecorder, type SideIndex } from '../../../sim/recorder.ts';
 import type { Rng } from '../../../sim/rng.ts';
 import { pickDefender } from '../../../sim/usage.ts';
-import { auditHavocBattleGame } from './battle-audit.ts';
+import { auditHavocBattleGame, type HavocBattleAuditFacts } from './battle-audit.ts';
 import { havocBattleGameInputDigest } from './battle-digests.ts';
 import { HAVOC_DOUBLE_MISS_GIFT, HavocFieldGoalRuntime } from './battle-field-goal.ts';
 import { HavocMutationLedger } from './battle-mutation-ledger.ts';
@@ -1183,6 +1183,13 @@ export interface HavocBattleOptions {
   readonly apron?: ApronRuntimeHooks;
 }
 
+interface HavocBattleRun {
+  readonly result: HavocBattleResult;
+  readonly tape: HavocBattleTape;
+  /** Facts the simulation already established; the audit reuses them. */
+  readonly auditFacts: HavocBattleAuditFacts;
+}
+
 class HavocBattleController {
   private readonly input: HavocBattleInput;
   private readonly context: EngineContext;
@@ -1191,6 +1198,7 @@ class HavocBattleController {
   private readonly state = createGameState();
   private readonly runtime: HavocBattleRuntime;
   private readonly options: HavocBattleOptions;
+  private inputDigest: string | null = null;
   private tripContext: TripContext;
   private offense: SideIndex = 0;
   private period = 1;
@@ -1243,7 +1251,11 @@ class HavocBattleController {
     };
   }
 
-  run(): { result: HavocBattleResult; tape: HavocBattleTape } {
+  private battleInputDigest(): string {
+    return (this.inputDigest ??= havocBattleGameInputDigest(this.input));
+  }
+
+  run(): HavocBattleRun {
     this.runtime.beginTipoff();
     this.offense = this.rng.chance(0.5) ? 0 : 1;
     this.secondsRemaining = REGULATION_PERIOD_SECONDS;
@@ -1321,7 +1333,7 @@ class HavocBattleController {
     }
   }
 
-  private buildResult(): { result: HavocBattleResult; tape: HavocBattleTape } {
+  private buildResult(): HavocBattleRun {
     const overtimePeriods = Math.max(0, this.period - 4);
     const gameSeconds = 4 * REGULATION_PERIOD_SECONDS + overtimePeriods * OVERTIME_PERIOD_SECONDS;
     const home = this.buildTeamResult(0, gameSeconds);
@@ -1342,7 +1354,7 @@ class HavocBattleController {
       away,
       winner: homeScore > awayScore ? 'home' : 'away',
       overtimePeriods,
-      inputDigest: havocBattleGameInputDigest(this.input),
+      inputDigest: this.battleInputDigest(),
       rollups: this.runtime.rollupsOf(),
       highlights: this.runtime.highlightsOf(overtimePeriods),
     });
@@ -1354,7 +1366,11 @@ class HavocBattleController {
       events: this.runtime.events,
       scoring: this.runtime.scoring,
     };
-    return { result, tape };
+    return {
+      result,
+      tape,
+      auditFacts: { inputDigest: result.inputDigest, resultValidated: true },
+    };
   }
 
   private buildTeamResult(sideIndex: SideIndex, gameSeconds: number): HavocTeamResult {
@@ -1503,7 +1519,7 @@ export function simulateAuditedHavocBattleGame(
   options: HavocBattleOptions = {},
 ): { result: HavocBattleResult; tape: HavocBattleTape; audit: HavocGameAudit } {
   const battle = new HavocBattleController(input, context, options).run();
-  const audit = auditHavocBattleGame(input, battle.result, battle.tape);
+  const audit = auditHavocBattleGame(input, battle.result, battle.tape, battle.auditFacts);
   let tape: HavocBattleTape | undefined;
   return {
     result: battle.result,

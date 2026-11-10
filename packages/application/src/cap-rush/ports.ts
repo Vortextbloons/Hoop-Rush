@@ -2,7 +2,9 @@ import type {
   CapRushCommandResult,
   CapRushDraftState,
   CapRushHistoryEntry,
+  CapRushLeagueAggregate,
   CapRushLeagueGame,
+  CapRushLeagueResult,
   CapRushReport,
   CapRushStoredGame,
   CapRushStoredPlayoffGame,
@@ -36,7 +38,10 @@ export interface CapRushDraftRepositoryPort {
   applyOutcome(input: CapRushApplyOutcomeInput): Promise<CapRushCommandResult>;
   listRunGames(runId: string): Promise<CapRushStoredGame[]>;
   listPlayoffGames(runId: string): Promise<CapRushStoredPlayoffGame[]>;
-  listLeagueGames(runId: string): Promise<CapRushLeagueGame[]>;
+  /** Compact schedule results only; full boxes stay in the game tables. */
+  listLeagueResults(runId: string): Promise<CapRushLeagueResult[]>;
+  readLeagueGame(runId: string, gameId: string): Promise<CapRushLeagueGame | null>;
+  readLeagueAggregate(runId: string): Promise<CapRushLeagueAggregate | null>;
   listHistory(): Promise<CapRushHistoryEntry[]>;
   readReport(runId: string): Promise<CapRushReport | null>;
   updatePlayback(

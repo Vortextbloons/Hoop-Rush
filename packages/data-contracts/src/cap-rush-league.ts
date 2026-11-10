@@ -85,6 +85,8 @@ export const capRushLeagueGameIdSchema = z
   .string()
   .regex(/^crl-[0-9]{2}-[a-z0-9._:]+-[a-z0-9._:]+$/);
 
+export const CAP_RUSH_LEAGUE_AGGREGATE_VERSION = 'cap-rush-league-aggregate-v1';
+
 export function capRushLeagueGameId(slot: number, homeTeamId: string, awayTeamId: string): string {
   return `crl-${String(slot).padStart(2, '0')}-${homeTeamId}-${awayTeamId}`;
 }
@@ -188,6 +190,101 @@ export const capRushLeagueGameSchema = z
     }
   });
 export type CapRushLeagueGame = z.infer<typeof capRushLeagueGameSchema>;
+
+/**
+ * The compact identity and result of a league game, without the box score.
+ *
+ * Schedule, standings, team records and records-only views use this shape so
+ * they never load every stored box score. Full boxes live in the game tables
+ * and load on demand.
+ */
+export const capRushLeagueResultSchema = z
+  .object({
+    gameId: capRushLeagueGameIdSchema,
+    slot: z.number().int().min(1).max(CAP_RUSH_CONFERENCE_GAMES_PER_TEAM),
+    homeTeamId: z.string().min(1).max(64),
+    awayTeamId: z.string().min(1).max(64),
+    homePoints: z.number().int(),
+    awayPoints: z.number().int(),
+    winnerTeamId: z.string().min(1).max(64),
+    inputDigest: capRushDigestSchema,
+    resultDigest: capRushDigestSchema,
+  })
+  .superRefine((game, ctx) => {
+    if (game.gameId !== capRushLeagueGameId(game.slot, game.homeTeamId, game.awayTeamId)) {
+      ctx.addIssue({ code: 'custom', message: 'league result id does not match its identity' });
+    }
+    if (game.homeTeamId === game.awayTeamId) {
+      ctx.addIssue({ code: 'custom', message: 'a team cannot play itself' });
+    }
+    const expectedWinner = game.homePoints > game.awayPoints ? game.homeTeamId : game.awayTeamId;
+    if (game.winnerTeamId !== expectedWinner) {
+      ctx.addIssue({ code: 'custom', message: 'league winner disagrees with the scoreline' });
+    }
+  });
+export type CapRushLeagueResult = z.infer<typeof capRushLeagueResultSchema>;
+
+export function capRushLeagueResultOf(game: CapRushLeagueGame): CapRushLeagueResult {
+  const { box: _box, ...result } = game;
+  void _box;
+  return result;
+}
+
+/**
+ * Compact season totals for the background league, folded as games commit.
+ *
+ * Summary views and the season report read this row instead of every stored
+ * box score. Totals use the shared league-value accumulation so the MVP and
+ * baseline stay identical to folding the boxes.
+ */
+export const capRushLeaguePlayerAggregateSchema = z.object({
+  playerId: playerIdSchema,
+  teamId: z.string().min(1).max(64),
+  displayName: z.string().min(1).max(96),
+  games: z.number().int().nonnegative(),
+  totalValueBase: z.number(),
+  totalValueBaseSquared: z.number(),
+  totalShots: z.number(),
+  totalShotsSquared: z.number(),
+  totalValueShots: z.number(),
+  totalPoints: z.number().int().nonnegative(),
+  totalRebounds: z.number().int().nonnegative(),
+  totalAssists: z.number().int().nonnegative(),
+  totalSteals: z.number().int().nonnegative(),
+  totalBlocks: z.number().int().nonnegative(),
+  totalGameScore: z.number(),
+  totalTrueShooting: z.number(),
+});
+export type CapRushLeaguePlayerAggregate = z.infer<typeof capRushLeaguePlayerAggregateSchema>;
+
+export const capRushLeagueTeamAggregateSchema = z.object({
+  teamId: z.string().min(1).max(64),
+  displayName: z.string().min(1).max(96),
+  wins: z.number().int().nonnegative(),
+  losses: z.number().int().nonnegative(),
+  pointsFor: z.number().int(),
+  pointsAgainst: z.number().int(),
+});
+export type CapRushLeagueTeamAggregate = z.infer<typeof capRushLeagueTeamAggregateSchema>;
+
+export const capRushLeagueAggregateSchema = z.object({
+  version: z.literal(CAP_RUSH_LEAGUE_AGGREGATE_VERSION),
+  games: z.number().int().nonnegative(),
+  gameIds: z.array(capRushLeagueGameIdSchema).max(CAP_RUSH_CONFERENCE_AI_GAMES),
+  teams: z.array(capRushLeagueTeamAggregateSchema).max(CAP_RUSH_TAKEOVER_TEAMS),
+  players: z.array(capRushLeaguePlayerAggregateSchema).max(600),
+});
+export type CapRushLeagueAggregate = z.infer<typeof capRushLeagueAggregateSchema>;
+
+export function capRushEmptyLeagueAggregate(): CapRushLeagueAggregate {
+  return {
+    version: CAP_RUSH_LEAGUE_AGGREGATE_VERSION,
+    games: 0,
+    gameIds: [],
+    teams: [],
+    players: [],
+  };
+}
 
 export const capRushLeagueStandingsEntrySchema = z
   .object({
