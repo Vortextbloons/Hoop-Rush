@@ -8,7 +8,6 @@ import type {
   HavocVersionSet,
 } from '@hoop-rush/data-contracts';
 import {
-  CAP_RUSH_PLAYOFF_ROUNDS,
   HAVOC_MUTATION_CATALOG_VERSION,
   HAVOC_RULES_VERSION,
   HAVOC_SCHEMA_VERSION,

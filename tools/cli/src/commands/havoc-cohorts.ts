@@ -54,7 +54,7 @@ import {
 } from '@hoop-rush/engine';
 import { parseCount, UsageError } from '../args.ts';
 import { EXIT_USAGE_OR_DATA_ERROR, makeReport, type CliReport } from '../report.ts';
-import { mean, median, percentile } from '../stats.ts';
+import { mean, median, pearsonCorrelation as rawPearsonCorrelation, percentile } from '../stats.ts';
 import {
   HAVOC_CLI_CALIBRATION_BASE,
   HAVOC_CLI_DEFAULT_FULL_SHOT_CLOCK_SECONDS,
@@ -879,21 +879,8 @@ export function runHavocMultiplayerCalibration(options: {
 }
 
 function pearsonCorrelation(xs: readonly number[], ys: readonly number[]): number | null {
-  if (xs.length !== ys.length || xs.length < 2) return null;
-  const meanX = mean(xs);
-  const meanY = mean(ys);
-  let covariance = 0;
-  let varianceX = 0;
-  let varianceY = 0;
-  for (let index = 0; index < xs.length; index += 1) {
-    const dx = (xs[index] ?? 0) - meanX;
-    const dy = (ys[index] ?? 0) - meanY;
-    covariance += dx * dy;
-    varianceX += dx * dx;
-    varianceY += dy * dy;
-  }
-  if (varianceX === 0 || varianceY === 0) return null;
-  return round4(covariance / Math.sqrt(varianceX * varianceY));
+  const correlation = rawPearsonCorrelation(xs, ys);
+  return correlation === null ? null : round4(correlation);
 }
 
 export const havocCliMultiplayerSweepsSchema = z.object({

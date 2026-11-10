@@ -7,28 +7,9 @@ import {
 import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.ts';
 import { defenseBpmCorrelationReportSchema } from '../report-schemas.ts';
 import { tryReadJson } from '../io.ts';
+import { pearsonCorrelation } from '../stats.ts';
 interface DefenseBpmCorrelationOptions {
   input: string;
-}
-export function pearsonCorrelation(xs: readonly number[], ys: readonly number[]): number | null {
-  const n = xs.length;
-  if (n !== ys.length || n < 2) return null;
-  const meanX = xs.reduce((sum, value) => sum + value, 0) / n;
-  const meanY = ys.reduce((sum, value) => sum + value, 0) / n;
-  let sumXX = 0;
-  let sumYY = 0;
-  let sumXY = 0;
-  for (let i = 0; i < n; i += 1) {
-    const dx = (xs[i] ?? 0) - meanX;
-    const dy = (ys[i] ?? 0) - meanY;
-    sumXX += dx * dx;
-    sumYY += dy * dy;
-    sumXY += dx * dy;
-  }
-  const denominator = Math.sqrt(sumXX * sumYY);
-  if (denominator === 0 || !Number.isFinite(denominator)) return null;
-  const r = sumXY / denominator;
-  return Number.isFinite(r) ? r : null;
 }
 function round4(value: number): number {
   return Math.round(value * 10000) / 10000;

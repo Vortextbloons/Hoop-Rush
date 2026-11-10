@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import type { CapRushApronRules, HavocBattleInput } from '@hoop-rush/data-contracts';
-import {
-  havocBattleInputSchema,
-  CAP_RUSH_RULES_VERSION,
-  CAP_RUSH_STRIKE_EVERY,
-} from '@hoop-rush/data-contracts';
+import { havocBattleInputSchema, CAP_RUSH_STRIKE_EVERY } from '@hoop-rush/data-contracts';
 import { buildHavocLockedInputs } from '@hoop-rush/test-fixtures';
 import { createEngineContext } from '../../sim/kernel.ts';
 import { simulateHavocBattleGame } from '../havoc/core/battle-game.ts';

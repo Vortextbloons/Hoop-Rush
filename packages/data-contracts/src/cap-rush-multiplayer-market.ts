@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { franchiseIdSchema, idSchema, playerIdSchema, seedSchema } from './ids.ts';
+import { franchiseIdSchema, playerIdSchema, seedSchema } from './ids.ts';
 import { positionSchema } from './positions.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
 import { capRushBucketSchema, capRushDigestSchema } from './cap-rush-versions.ts';

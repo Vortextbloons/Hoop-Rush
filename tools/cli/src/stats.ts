@@ -16,3 +16,23 @@ export function percentile(sorted: readonly number[], p: number): number {
   const index = Math.min(sorted.length - 1, Math.max(0, Math.floor(p * (sorted.length - 1))));
   return sorted[index] ?? 0;
 }
+
+export function pearsonCorrelation(xs: readonly number[], ys: readonly number[]): number | null {
+  if (xs.length !== ys.length || xs.length < 2) return null;
+  const meanX = mean(xs);
+  const meanY = mean(ys);
+  let covariance = 0;
+  let varianceX = 0;
+  let varianceY = 0;
+  for (let index = 0; index < xs.length; index += 1) {
+    const dx = (xs[index] ?? 0) - meanX;
+    const dy = (ys[index] ?? 0) - meanY;
+    covariance += dx * dy;
+    varianceX += dx * dx;
+    varianceY += dy * dy;
+  }
+  const denominator = Math.sqrt(varianceX * varianceY);
+  if (denominator === 0 || !Number.isFinite(denominator)) return null;
+  const r = covariance / denominator;
+  return Number.isFinite(r) ? r : null;
+}

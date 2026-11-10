@@ -1,7 +1,7 @@
 import { immutableCanonicalSchema } from './season-hash.ts';
 import { capRushPlaybackSchema } from './cap-rush-playback.ts';
 import { z } from 'zod';
-import { franchiseIdSchema, idSchema, playerIdSchema, seedSchema } from './ids.ts';
+import { idSchema, playerIdSchema, seedSchema } from './ids.ts';
 import { positionSchema } from './positions.ts';
 import { havocInstanceIdSchema } from './havoc-profile.ts';
 import { havocGameAuditSchema, havocGameResultSchema } from './havoc-game.ts';

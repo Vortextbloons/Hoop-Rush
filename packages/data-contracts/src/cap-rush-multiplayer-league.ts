@@ -12,7 +12,6 @@ import {
 import {
   CAP_RUSH_CONFERENCE_GAMES,
   CAP_RUSH_CONFERENCE_GAMES_PER_TEAM,
-  CAP_RUSH_CONFERENCE_SIZE,
   CAP_RUSH_TAKEOVER_TEAMS,
   capRushAlignmentOf,
   capRushConferenceStandingsSchema,
