@@ -28,7 +28,6 @@ import { createHavocMultiplayerSession } from './havoc-multiplayer-session';
 import type { RoomConnection } from '@hoop-rush/application/multiplayer';
 import {
   gamecastBattleFeedCursor,
-  gamecastBattleFeedLines,
   gamecastBattlePlaybackFold,
   gamecastBattlePlaybackItems,
   gamecastBattleVisibleItemCount,
