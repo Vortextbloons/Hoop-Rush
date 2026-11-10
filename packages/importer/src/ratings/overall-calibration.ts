@@ -220,6 +220,7 @@ export function calibrateOverallScale(
           diagnostics.rawBeforeRecognition +
           (diagnostics.synergyContribution ?? 0) +
           (diagnostics.weaknessContribution ?? 0) +
+          (diagnostics.specializationContribution ?? 0) +
           (diagnostics.impactContribution ?? 0) +
           diagnostics.recognitionContribution +
           (diagnostics.teamRecordContribution ?? 0),
@@ -280,7 +281,7 @@ export function calibrateOverallScale(
     modelVersion: RATING_MODEL_VERSION,
     ratingsVersion: RATINGS_VERSION,
     overallScale: scale,
-    generatedAt: '2026-10-23T00:00:00.000Z',
+    generatedAt: '2026-11-09T00:00:00.000Z',
   });
   writeJsonRetry(output, artifact);
   return scale;

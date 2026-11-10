@@ -115,6 +115,7 @@ export const overallDiagnosticsSchema = z.union([
     eraContribution: z.number().min(-4).max(4).optional(),
     synergyContribution: z.number().min(0).max(2.5).optional(),
     weaknessContribution: z.number().min(-3).max(0).optional(),
+    specializationContribution: z.number().min(-6).max(0).optional(),
     impactContribution: z.number().min(-2).max(2).optional(),
     teamRecordContribution: z.number().min(-1).max(1).optional(),
     clampContribution: z.number().min(-20).max(20).optional(),
@@ -166,6 +167,7 @@ export const ratingProfileSchema = z
                 (diagnostics.eraContribution ?? 0) +
                 (diagnostics.synergyContribution ?? 0) +
                 (diagnostics.weaknessContribution ?? 0) +
+                (diagnostics.specializationContribution ?? 0) +
                 (diagnostics.impactContribution ?? 0) +
                 (diagnostics.teamRecordContribution ?? 0) +
                 (diagnostics.clampContribution ?? 0)

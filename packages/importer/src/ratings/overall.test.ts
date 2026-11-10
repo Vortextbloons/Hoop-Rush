@@ -454,6 +454,44 @@ describe('total ability overall', () => {
     expect(observedUnrecognized.recognitionWeight).toBe(0);
   });
 
+  it('discounts defensive specialization while preserving complete two-way value', () => {
+    const specialist = derive({
+      ratings: { ...ratings, interiorDefense: 95, block: 95, defensiveRebound: 95 },
+      position: 'C',
+      stats: starterStats({ points: 700, assists: 90, usageRate: 14 }),
+    });
+    const complete = derive({
+      ratings: Object.fromEntries(
+        REQUIRED_RATING_KEYS.map((key) => [key, 90]),
+      ) as SimulationRatings,
+      position: 'C',
+      stats: starterStats({ points: 2400, assists: 500, usageRate: 30, tsPct: 0.62 }),
+    });
+    const specialistDiagnostics = specialist.profile.overallDiagnostics;
+    const completeDiagnostics = complete.profile.overallDiagnostics;
+    if (specialistDiagnostics?.schemaVersion !== 2 || completeDiagnostics?.schemaVersion !== 2) {
+      throw new Error('missing diagnostics');
+    }
+    expect(specialistDiagnostics.specializationContribution).toBeLessThan(-1);
+    expect(specialistDiagnostics.specializationContribution).toBeGreaterThanOrEqual(-6);
+    expect(completeDiagnostics.specializationContribution).toBeCloseTo(0, 10);
+    expect(complete.profile.rawOverallScore).toBeGreaterThan(specialist.profile.rawOverallScore);
+    const ordinaryDefense = derive({
+      ratings: { ...ratings, interiorDefense: 55, block: 55, defensiveRebound: 55 },
+      position: 'C',
+      stats: starterStats({ points: 700, assists: 90, usageRate: 14 }),
+    });
+    expect(specialist.profile.rawOverallScore).toBeGreaterThan(
+      ordinaryDefense.profile.rawOverallScore,
+    );
+    expect(
+      ratingProfileSchema.safeParse({
+        ...specialist.profile,
+        overallDiagnostics: { ...specialistDiagnostics, specializationContribution: 0 },
+      }).success,
+    ).toBe(false);
+  });
+
   it('keeps a two-way star above a low-usage rim protector', () => {
     const neutral = Object.fromEntries(
       Object.keys(player.ratings).map((key) => [key, 60]),

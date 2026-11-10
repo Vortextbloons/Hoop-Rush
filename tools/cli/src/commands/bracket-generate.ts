@@ -77,6 +77,66 @@ const TENDENCY_KEYS = [
 ] as const;
 const MIN_TEAM_GAMES = 20;
 
+const SHARED_SEASON_DIRS = [
+  '1990-91',
+  '1991-92',
+  '1992-93',
+  '1993-94',
+  '1994-95',
+  '1995-96',
+  '1996-97',
+  '1997-98',
+  '1998-99',
+  '1999-00',
+  '2000-01',
+  '2001-02',
+  '2002-03',
+  '2003-04',
+  '2004-05',
+  '2005-06',
+  '2006-07',
+  '2007-08',
+  '2008-09',
+  '2009-10',
+  '2010-11',
+  '2011-12',
+  '2012-13',
+  '2013-14',
+  '2014-15',
+  '2015-16',
+  '2016-17',
+  '2017-18',
+  '2018-19',
+  '2019-20',
+  '2020-21',
+  '2021-22',
+  '2022-23',
+  '2023-24',
+  '2024-25',
+  '2025-26',
+] as const;
+const CAP_RUSH_FIRST_SEASON = 1960;
+const CAP_RUSH_LAST_SEASON = 2025;
+
+function seasonDirOf(firstYear: number): string {
+  return `${String(firstYear)}-${String((firstYear + 1) % 100).padStart(2, '0')}`;
+}
+
+const CAP_RUSH_SEASON_DIRS: readonly string[] = Array.from(
+  { length: CAP_RUSH_LAST_SEASON - CAP_RUSH_FIRST_SEASON + 1 },
+  (_, index) => seasonDirOf(CAP_RUSH_FIRST_SEASON + index),
+);
+
+export function bracketSeasonDirs(field: 'shared' | 'cap-rush'): readonly string[] {
+  return field === 'cap-rush' ? CAP_RUSH_SEASON_DIRS : SHARED_SEASON_DIRS;
+}
+
+export function capRushEligibilityDescription(): string {
+  const first = CAP_RUSH_SEASON_DIRS[0] ?? '';
+  const last = CAP_RUSH_SEASON_DIRS[CAP_RUSH_SEASON_DIRS.length - 1] ?? '';
+  return `${first} through ${last}; >=${String(MIN_TEAM_GAMES)} franchise games; legal cornerstone/rotation five; global player uniqueness in manifest order`;
+}
+
 interface RosterPlayer {
   externalId: string;
   firstName: string;
@@ -230,44 +290,7 @@ export function buildCandidateCatalog(
     }[];
   };
 } {
-  const seasonDirs = [
-    '1990-91',
-    '1991-92',
-    '1992-93',
-    '1993-94',
-    '1994-95',
-    '1995-96',
-    '1996-97',
-    '1997-98',
-    '1998-99',
-    '1999-00',
-    '2000-01',
-    '2001-02',
-    '2002-03',
-    '2003-04',
-    '2004-05',
-    '2005-06',
-    '2006-07',
-    '2007-08',
-    '2008-09',
-    '2009-10',
-    '2010-11',
-    '2011-12',
-    '2012-13',
-    '2013-14',
-    '2014-15',
-    '2015-16',
-    '2016-17',
-    '2017-18',
-    '2018-19',
-    '2019-20',
-    '2020-21',
-    '2021-22',
-    '2022-23',
-    '2023-24',
-    '2024-25',
-    '2025-26',
-  ];
+  const seasonDirs = bracketSeasonDirs(field);
   const evidence = {
     sources: {} as Record<string, string>,
     candidates: [] as {
@@ -549,7 +572,7 @@ export function bracketGenerate(args: {
   if (field === 'cap-rush') {
     writeFileSync(
       resolve(opponentsDir, 'cap-rush-field-selection.json'),
-      `${JSON.stringify({ generationVersion, seed, contentHash, engineVersion: ENGINE_VERSION, profileVersion: profile.profileVersion, profileHash: manifest.eraSimulationProfiles.find((entry) => entry.eraId === profile.eraId)?.contentHash, dataVersion: manifest.dataVersion, reference, eligibility: '1990-91 through 2025-26; >=20 franchise games; legal cornerstone/rotation five; global player uniqueness in manifest order', objective: 'nearest measured win rate to 0.035 + tierRank/29 * 0.06', tieBreaking: 'first in seeded shuffled season order', selectionSeeds: '<generation seed>:absolute-fit:<franchise>:<season>:<game>', gamesPerCandidate: 160, evidence }, null, 2)}\n`,
+      `${JSON.stringify({ generationVersion, seed, contentHash, engineVersion: ENGINE_VERSION, profileVersion: profile.profileVersion, profileHash: manifest.eraSimulationProfiles.find((entry) => entry.eraId === profile.eraId)?.contentHash, dataVersion: manifest.dataVersion, reference, eligibility: capRushEligibilityDescription(), objective: 'nearest measured win rate to 0.035 + tierRank/29 * 0.06', tieBreaking: 'first in seeded shuffled season order', selectionSeeds: '<generation seed>:absolute-fit:<franchise>:<season>:<game>', gamesPerCandidate: 160, evidence }, null, 2)}\n`,
       'utf8',
     );
   }

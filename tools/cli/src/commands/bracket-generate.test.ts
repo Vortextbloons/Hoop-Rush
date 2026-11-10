@@ -1,7 +1,12 @@
 ﻿import { describe, expect, it } from 'bun:test';
 import { buildSimulationPlayer } from '@hoop-rush/test-fixtures';
 import { playerIdSchema, type PositionUnion } from '@hoop-rush/data-contracts';
-import { seasonPositions, selectSeasonFive } from './bracket-generate.ts';
+import {
+  seasonPositions,
+  selectSeasonFive,
+  bracketSeasonDirs,
+  capRushEligibilityDescription,
+} from './bracket-generate.ts';
 
 function candidate(
   id: string,
@@ -95,5 +100,21 @@ describe('season-specific bracket selection', () => {
     expect(seasonPositions({ position: 'G-F', secondaryPositions: [] })).toEqual(['SF', 'SG']);
     expect(seasonPositions({ position: 'F-C', secondaryPositions: [] })).toEqual(['C', 'PF']);
     expect(seasonPositions({ position: 'PG', secondaryPositions: ['SG'] })).toEqual(['PG', 'SG']);
+  });
+});
+
+describe('bracket season eligibility', () => {
+  it('keeps the shared bracket on its modern window', () => {
+    const seasons = bracketSeasonDirs('shared');
+    expect(seasons[0]).toBe('1990-91');
+    expect(seasons[seasons.length - 1]).toBe('2025-26');
+  });
+
+  it('opens Cap Rush to every imported historical season', () => {
+    const seasons = bracketSeasonDirs('cap-rush');
+    expect(seasons[0]).toBe('1960-61');
+    expect(seasons).toContain('1979-80');
+    expect(seasons[seasons.length - 1]).toBe('2025-26');
+    expect(capRushEligibilityDescription()).toContain('1960-61 through 2025-26');
   });
 });

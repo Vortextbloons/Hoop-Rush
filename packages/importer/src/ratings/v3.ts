@@ -447,6 +447,8 @@ export function deriveRatingProfile(input: RatingProfileInput): DerivedRatingPro
   const baseScore = combineDomainValues(offensiveAbility, defensiveValue).score;
   const combined = combineDomainValues(offensiveValue, defensiveValue);
   const rawBeforeRecognition = combined.score;
+  const specializationContribution =
+    -Math.max(0, defensiveValue - 60) * 0.15 * clamp((75 - offensiveValue) / 15, 0, 1);
   const abilityContribution =
     combined.offenseWeight * offensiveAbility * (1 - production.weight) +
     combined.defenseWeight * defensiveValue;
@@ -511,6 +513,7 @@ export function deriveRatingProfile(input: RatingProfileInput): DerivedRatingPro
     rawBeforeRecognition +
       synergyContribution +
       weaknessContribution +
+      specializationContribution +
       impactContribution +
       recognitionContribution +
       teamRecordContribution,
@@ -523,6 +526,7 @@ export function deriveRatingProfile(input: RatingProfileInput): DerivedRatingPro
     postseasonContribution +
     synergyContribution +
     weaknessContribution +
+    specializationContribution +
     impactContribution +
     recognitionContribution +
     teamRecordContribution;
@@ -559,6 +563,7 @@ export function deriveRatingProfile(input: RatingProfileInput): DerivedRatingPro
       eraContribution,
       synergyContribution,
       weaknessContribution,
+      specializationContribution,
       impactContribution,
       postseasonWeight,
       postseasonSourceAvailable:
