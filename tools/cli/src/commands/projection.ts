@@ -919,7 +919,7 @@ export function projectionCalibrateBase(input: {
   verbose: boolean;
 }): CliReport {
   const { manifest, model: modelPath, era, out, validate, verbose } = input;
-  const samples = parseCount(input.samples ?? undefined, '--samples', 25);
+  const samples = parseCount(input.samples ?? undefined, '--samples', validate ? 2048 : 25);
   void parseWorkers({ workers: input.workers ?? null }, 1);
   const data = loadData(manifest);
   const model = loadModel(manifest, modelPath);
@@ -941,7 +941,7 @@ export function projectionCalibrateBase(input: {
   };
   const cohortName = validate ? 'heldout' : 'calibration';
   const lineupCount = validate ? 16 : samples <= 25 ? 8 : 16;
-  const gamesPerLineup = validate ? 128 : samples;
+  const gamesPerLineup = samples;
   const seedBase = validate ? 'projection-heldout' : 'projection-calibration';
   const lineups = buildLineupCohort(data, eraId, lineupCount, `${seedBase}/lineups`);
   if (lineups.length === 0) {
@@ -963,7 +963,7 @@ export function projectionCalibrateBase(input: {
       seedBase: `${seedBase}/${String(index)}`,
     }),
   );
-  const stats = summarize(rows);
+  const stats = summarize(rows, gamesPerLineup);
   const details = [
     `cohort: ${cohortName} (${String(lineups.length)} lineups x ${String(gamesPerLineup)} games)`,
     `offensive rating MAE: ${stats.offensiveRatingMae.toFixed(2)}`,
@@ -1031,6 +1031,7 @@ function summarize(
       net: number;
     };
   }>,
+  gamesPerLineup: number,
 ): CalibrationStats {
   const projOrtg = rows.map((row) => row.projected.ortg);
   const simOrtg = rows.map((row) => row.simulated.ortg);
@@ -1044,7 +1045,7 @@ function summarize(
   const netBias = mean(projNet) - mean(simNet);
   return {
     lineups: rows.length,
-    games: rows.length,
+    games: rows.length * gamesPerLineup,
     offensiveRatingMae: mae(projOrtg, simOrtg),
     defensiveRatingMae: mae(projDrtg, simDrtg),
     netRatingMae: mae(projNet, simNet),

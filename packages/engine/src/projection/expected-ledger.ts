@@ -115,6 +115,7 @@ export function projectExpectedLedger(input: {
   const passingAnchorFactor = 0.5 + (profile.parameters.assistAnchorRating - 50) / 100;
   const offense = computeSide({
     side: team,
+    opponent,
     prep,
     opponentPrep,
     profile,
@@ -123,6 +124,7 @@ export function projectExpectedLedger(input: {
   });
   const defense = computeSide({
     side: opponent,
+    opponent: team,
     prep: opponentPrep,
     opponentPrep: prep,
     profile,
@@ -138,13 +140,14 @@ export function projectExpectedLedger(input: {
 }
 function computeSide(input: {
   side: SimulationTeam;
+  opponent: SimulationTeam;
   prep: TeamPrep;
   opponentPrep: TeamPrep;
   profile: EraSimulationProfile;
   eraPoss: number;
   passingAnchorFactor: number;
 }): LedgerSide {
-  const { side, prep, opponentPrep, profile, eraPoss, passingAnchorFactor } = input;
+  const { side, opponent, prep, opponentPrep, profile, eraPoss, passingAnchorFactor } = input;
   const players = side.players;
   const initiatorShares = normalizedWeights(prep.initiatorWeights);
   const turnoverRates = players.map((player) =>
@@ -350,7 +353,7 @@ function computeSide(input: {
     const defenderIndex = Math.floor(keyIndex / (actionCount * zoneCount)) % playerCount;
     const shooterIndex = Math.floor(keyIndex / (actionCount * zoneCount * playerCount));
     const shooter = players[shooterIndex];
-    const defender = players[defenderIndex];
+    const defender = opponent.players[defenderIndex];
     if (shooter === undefined || defender === undefined) continue;
     const zone = ZONES[zoneIndex];
     const action = ACTION_TYPES[actionIndex];

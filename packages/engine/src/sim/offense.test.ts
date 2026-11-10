@@ -158,6 +158,32 @@ describe('on-court offensive allocation', () => {
     });
   });
 
+  it('uses opponent ratings for shot contests and blocks', () => {
+    const team = buildLegalSimulationTeam();
+    const opponent = structuredClone(team);
+    const profile = buildGameSimulationInput().profile;
+    const project = () =>
+      projectExpectedLedger({
+        team,
+        prep: prepareTeam(team, profile),
+        opponent,
+        opponentPrep: prepareTeam(opponent, profile),
+        profile,
+      }).offense;
+    const before = project();
+    for (const player of opponent.players) {
+      player.ratings.interiorDefense = 100;
+      player.ratings.perimeterDefense = 100;
+      player.ratings.defensiveIq = 100;
+      player.ratings.block = 100;
+    }
+    const after = project();
+    expect(after.ledger.fieldGoalPct).toBeLessThan(before.ledger.fieldGoalPct);
+    expect(after.ledger.blocks).toBeGreaterThan(before.ledger.blocks);
+    expect(after.expectedContest).toBeLessThan(before.expectedContest);
+    expect(after.ledger.points).toBeLessThan(before.ledger.points);
+  });
+
   it('keeps missing action evidence consistent with the uniform RNG fallback', () => {
     const team = buildLegalSimulationTeam();
     for (const player of team.players) {

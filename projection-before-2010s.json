@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "targetsVersion": "projection-targets-v1",
+  "cohorts": {
+    "calibrationLineups": 16,
+    "validationLineups": 8,
+    "heldOutLineups": 16,
+    "gamesPerLineup": 128,
+    "calibrationSeedFrom": "00000000000000000000000000000000",
+    "calibrationSeedTo": "000000000000000000000000000007ff",
+    "validationSeedFrom": "00000000000000000000000000000800",
+    "validationSeedTo": "00000000000000000000000000000bff",
+    "heldOutSeedFrom": "00000000000000000000000000000c00",
+    "heldOutSeedTo": "000000000000000000000000000013ff"
+  },
+  "gates": {
+    "offensiveRatingMaeMax": 6,
+    "defensiveRatingMaeMax": 6,
+    "netRatingMaeMax": 8,
+    "netRatingBiasMax": 4,
+    "rankCorrelationMin": 0.6,
+    "pairwiseOrderingAccuracyMin": 0.62,
+    "monotonicPassShareMin": 1,
+    "heldOutPassShare": 0.9
+  },
+  "measured": {
+    "lineups": 16,
+    "games": 16,
+    "offensiveRatingMae": 1.0715107063840064,
+    "defensiveRatingMae": 6.724593148299051,
+    "netRatingMae": 7.744595353825822,
+    "netRatingBias": -7.744595353825822,
+    "rankCorrelation": 0.8852941176470588,
+    "pairwiseOrderingAccuracy": 0.85,
+    "monotonicFailures": 0
+  }
+}
