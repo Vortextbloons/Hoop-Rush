@@ -590,31 +590,35 @@ describe('buildStats', () => {
   });
 });
 describe('overallBandForPercentile', () => {
-  it('keeps the peak distribution generous with a thinning upper tail', () => {
-    expect(overallBandForPercentile(0)).toBe(99);
-    expect(overallBandForPercentile(0.0045)).toBe(96);
-    expect(overallBandForPercentile(0.023)).toBe(93);
-    expect(overallBandForPercentile(0.078)).toBe(89);
-    expect(overallBandForPercentile(0.188)).toBe(85);
-    expect(overallBandForPercentile(0.34)).toBe(81);
-    expect(overallBandForPercentile(0.53)).toBe(77);
-    expect(overallBandForPercentile(0.7)).toBe(73);
-    expect(overallBandForPercentile(0.83)).toBe(69);
-    expect(overallBandForPercentile(0.93)).toBe(64);
+  it('maps the agreed rating shares across the full population', () => {
+    const bands = [
+      [100, 100, 10],
+      [95, 99, 90],
+      [90, 94, 500],
+      [85, 89, 1200],
+      [80, 84, 2800],
+      [75, 79, 5000],
+      [70, 74, 5000],
+      [65, 69, 2700],
+      [60, 64, 900],
+      [50, 59, 600],
+      [40, 49, 1200],
+    ] as const;
+    const counts = new Map<number, number>();
+    let previous = 100;
+    for (let step = 0; step < 20000; step += 1) {
+      const overall = overallBandForPercentile((step + 0.5) / 20000);
+      expect(overall).toBeLessThanOrEqual(previous);
+      previous = overall;
+      counts.set(overall, (counts.get(overall) ?? 0) + 1);
+    }
+    for (const [min, max, expected] of bands) {
+      let total = 0;
+      for (let rating = min; rating <= max; rating += 1) total += counts.get(rating) ?? 0;
+      expect(total).toBe(expected);
+    }
+    expect(overallBandForPercentile(0)).toBe(100);
     expect(overallBandForPercentile(1)).toBe(40);
-  });
-  it('gives higher overalls a thinner share inside the top bands', () => {
-    const count = (overall: number) => {
-      let hits = 0;
-      for (let step = 0; step < 20000; step += 1) {
-        if (overallBandForPercentile((step + 0.5) / 20000) === overall) hits += 1;
-      }
-      return hits;
-    };
-    expect(count(99)).toBeLessThanOrEqual(count(98));
-    expect(count(98)).toBeLessThanOrEqual(count(97));
-    expect(count(96)).toBeLessThanOrEqual(count(95));
-    expect(count(95)).toBeLessThanOrEqual(count(94));
   });
 });
 describe('computePool (fixture)', () => {

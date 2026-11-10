@@ -145,7 +145,7 @@ export function buildOverallScale(
     const last = knots[knots.length - 1];
     if (first !== undefined) knots[0] = { ...first, overall: 40, percentile: 1 };
     if (last !== undefined) {
-      knots[knots.length - 1] = { ...last, overall: 99, percentile: 0 };
+      knots[knots.length - 1] = { ...last, overall: 100, percentile: 0 };
     }
   }
   return overallScaleSchema.parse({

@@ -5,25 +5,25 @@ export interface OverallBand {
   share: number;
 }
 export const OVERALL_BANDS: readonly OverallBand[] = [
-  { label: '97-99', min: 97, max: 99, share: 0.0045 },
-  { label: '94-96', min: 94, max: 96, share: 0.0185 },
-  { label: '90-93', min: 90, max: 93, share: 0.055 },
-  { label: '86-89', min: 86, max: 89, share: 0.11 },
-  { label: '82-85', min: 82, max: 85, share: 0.152 },
-  { label: '78-81', min: 78, max: 81, share: 0.19 },
-  { label: '74-77', min: 74, max: 77, share: 0.17 },
-  { label: '70-73', min: 70, max: 73, share: 0.13 },
-  { label: '65-69', min: 65, max: 69, share: 0.1 },
-  { label: '40-64', min: 40, max: 64, share: 0.07 },
+  { label: '100', min: 100, max: 100, share: 0.0005 },
+  { label: '95-99', min: 95, max: 99, share: 0.0045 },
+  { label: '90-94', min: 90, max: 94, share: 0.025 },
+  { label: '85-89', min: 85, max: 89, share: 0.06 },
+  { label: '80-84', min: 80, max: 84, share: 0.14 },
+  { label: '75-79', min: 75, max: 79, share: 0.25 },
+  { label: '70-74', min: 70, max: 74, share: 0.25 },
+  { label: '65-69', min: 65, max: 69, share: 0.135 },
+  { label: '60-64', min: 60, max: 64, share: 0.045 },
+  { label: '50-59', min: 50, max: 59, share: 0.03 },
+  { label: '40-49', min: 40, max: 49, share: 0.06 },
 ];
 function integerSlices(band: OverallBand): { overall: number; share: number }[] {
   const count = band.max - band.min + 1;
-  const weightSum = (count * (count + 1)) / 2;
   const slices: { overall: number; share: number }[] = [];
   for (let step = 0; step < count; step += 1) {
     slices.push({
       overall: band.max - step,
-      share: (band.share * (step + 1)) / weightSum,
+      share: band.share / count,
     });
   }
   return slices;

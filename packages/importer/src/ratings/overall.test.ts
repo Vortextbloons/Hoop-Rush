@@ -587,7 +587,7 @@ describe('total ability overall', () => {
     const starOverall = overallForScore(star.profile.rawOverallScore, cohort).overall;
     expect(anchorOverall).toBeGreaterThanOrEqual(84);
     expect(anchorOverall).toBeLessThanOrEqual(92);
-    expect(starOverall).toBeGreaterThanOrEqual(94);
+    expect(starOverall).toBeGreaterThanOrEqual(90);
     expect(starOverall).toBeGreaterThan(anchorOverall);
   });
 
@@ -901,7 +901,7 @@ describe('frozen overall scale', () => {
       last = result.overall;
     }
     expect(overallForScore(-100, scale).overall).toBe(40);
-    expect(overallForScore(1000, scale).overall).toBe(99);
+    expect(overallForScore(1000, scale).overall).toBe(100);
     expect(
       overallScaleSchema.safeParse({ ...scale, knots: [...scale.knots].reverse() }).success,
     ).toBe(false);

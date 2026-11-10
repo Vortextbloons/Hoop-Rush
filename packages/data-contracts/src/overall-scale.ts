@@ -18,7 +18,7 @@ export const overallScaleSchema = z
       .array(
         z.object({
           score: z.number(),
-          overall: z.number().min(40).max(99),
+          overall: z.number().min(40).max(100),
           percentile: z.number().min(0).max(1),
         }),
       )
@@ -80,7 +80,7 @@ export function overallForScore(
   return {
     overall: Math.max(
       40,
-      Math.min(99, Math.round(left.overall + fraction * (right.overall - left.overall))),
+      Math.min(100, Math.round(left.overall + fraction * (right.overall - left.overall))),
     ),
     percentile: left.percentile + fraction * (right.percentile - left.percentile),
   };
