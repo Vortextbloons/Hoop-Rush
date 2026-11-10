@@ -49,11 +49,12 @@ const immutableJson = new WeakMap<object, string>();
 function freezeCanonicalJson<T extends object>(value: T): T {
   function freeze(entry: unknown): void {
     if (entry === null || typeof entry !== 'object') return;
+    if (immutableJson.has(entry)) return;
     for (const child of Object.values(entry)) freeze(child);
     Object.freeze(entry);
+    immutableJson.set(entry, canonicalJson(entry));
   }
   freeze(value);
-  immutableJson.set(value, canonicalJson(value));
   return value;
 }
 
