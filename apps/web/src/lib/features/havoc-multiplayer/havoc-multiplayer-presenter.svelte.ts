@@ -154,6 +154,11 @@ export class HavocMultiplayerPresenter {
     return this.session.attach(roomId);
   }
 
+  /** Retry the whole room attachment after a failed load. */
+  retryAttach(): Promise<void> {
+    return this.session.retryAttach();
+  }
+
   refresh(): Promise<void> {
     return this.session.refresh();
   }

@@ -18,6 +18,7 @@ import {
   CAP_RUSH_MULTIPLAYER_VERSION,
   capRushMultiplayerVersionLocksSchema,
 } from '@hoop-rush/data-contracts';
+import { cachedAssets } from '#lib/assets/cached-assets.js';
 import { loadCapRushRosterMetadata, loadDraftCatalog } from '#lib/data-assets.js';
 import { loadRunPreamble } from '#lib/run-preamble.js';
 import { capRushBracketWithRosterMetadata } from '../cap-rush/cap-rush-opponent-metadata.js';
@@ -27,8 +28,6 @@ export interface CapRushMultiplayerData {
   readonly versionLocks: CapRushMultiplayerVersionLocks;
   readonly catalog: SeasonDraftCatalog;
 }
-
-let dataPromise: Promise<CapRushMultiplayerData> | null = null;
 
 async function buildData(): Promise<CapRushMultiplayerData> {
   const [catalog, preamble, metadata] = await Promise.all([
@@ -86,9 +85,11 @@ async function buildData(): Promise<CapRushMultiplayerData> {
   };
 }
 
+const data = cachedAssets(buildData);
+
+/** Concurrent calls share one load; a rejection is retried by the next call. */
 export function getCapRushMultiplayerData(): Promise<CapRushMultiplayerData> {
-  if (dataPromise === null) dataPromise = buildData();
-  return dataPromise;
+  return data.load();
 }
 
 export async function loadCapRushMultiplayerVersionLocks(): Promise<CapRushMultiplayerVersionLocks> {

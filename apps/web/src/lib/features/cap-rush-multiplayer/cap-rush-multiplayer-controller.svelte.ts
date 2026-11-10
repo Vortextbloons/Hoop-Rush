@@ -23,8 +23,19 @@ import { getCapRushMultiplayerData } from './cap-rush-multiplayer-assets.js';
 import { commandErrorLabel, type CapRushBidAttempt } from './cap-rush-multiplayer-presentation.js';
 import { getCapRushMultiplayerTransport } from './cap-rush-multiplayer-transport.js';
 import { CapRushMultiplayerRunner } from './cap-rush-multiplayer-runner.js';
+import { visibilityTickScheduler } from '../multiplayer/visibility-tick-scheduler.js';
 
 const POLL_MS = 1_000;
+/** Background tabs poll less often; returning to the tab refreshes immediately. */
+const HIDDEN_POLL_MS = 5_000;
+const CLOCK_MS = 1_000;
+
+type Scheduler = (tick: () => void, intervalMs: number) => () => void;
+
+export interface CapRushMultiplayerControllerDeps {
+  /** Network fallback cadence; defaults to a visibility-aware scheduler. */
+  scheduleTick?: Scheduler;
+}
 
 export interface CapRushBroadcastState {
   readonly gameId: string;
@@ -53,15 +64,21 @@ export class CapRushMultiplayerController {
   private session: CapRushMultiplayerSession | null = null;
   private readonly runner = new CapRushMultiplayerRunner();
   private readonly verifier = new CapRushMultiplayerRunner();
-  private timer: ReturnType<typeof setInterval> | null = null;
+  private clockTimer: ReturnType<typeof setInterval> | null = null;
+  private stopNetworkTick: (() => void) | null = null;
   private followUpTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly scheduleTick: Scheduler;
   private disposed = false;
+  private loadInFlight = false;
   private roomId: string;
   private lastPhase: CapRushMultiplayerPhase | null = null;
   private suppressedError: string | null = null;
 
-  constructor(roomId: string) {
+  constructor(roomId: string, deps: CapRushMultiplayerControllerDeps = {}) {
     this.roomId = roomId;
+    this.scheduleTick =
+      deps.scheduleTick ??
+      ((tick, intervalMs) => visibilityTickScheduler(tick, intervalMs, HIDDEN_POLL_MS));
   }
 
   get state(): CapRushMultiplayerState | null {
@@ -77,8 +94,10 @@ export class CapRushMultiplayerController {
   }
 
   async load(): Promise<void> {
-    if (this.isDisposed()) return;
+    if (this.isDisposed() || this.loadInFlight) return;
+    this.loadInFlight = true;
     this.loading = true;
+    this.error = null;
     try {
       const dataPromise = getCapRushMultiplayerData();
       // Keep a rejected asset load from surfacing before presence finishes; it is awaited below.
@@ -115,15 +134,31 @@ export class CapRushMultiplayerController {
       void this.tick();
     } catch (error) {
       if (this.isDisposed()) return;
+      // The asset cache forgets a rejected load, so "Try again" rebuilds it.
       this.error = error instanceof Error ? error.message : 'Could not open the room.';
     } finally {
       if (!this.isDisposed()) this.loading = false;
+      this.loadInFlight = false;
     }
   }
 
+  /** Retry opening the room after a load failure, without reloading the page. */
+  async retryLoad(): Promise<void> {
+    if (this.isDisposed() || this.loadInFlight) return;
+    this.session?.dispose();
+    this.session = null;
+    this.view = null;
+    await this.load();
+  }
+
   start(): void {
-    if (this.disposed || this.timer !== null) return;
-    this.timer = setInterval(() => {
+    if (this.disposed || this.clockTimer !== null) return;
+    // Clock duties stay local so deadlines and pick timers keep moving even
+    // while the network fallback is slowed in a background tab.
+    this.clockTimer = setInterval(() => {
+      this.nowMs = Date.now();
+    }, CLOCK_MS);
+    this.stopNetworkTick = this.scheduleTick(() => {
       this.nowMs = Date.now();
       void this.tick();
     }, POLL_MS);
@@ -131,10 +166,12 @@ export class CapRushMultiplayerController {
 
   dispose(): void {
     this.disposed = true;
-    if (this.timer !== null) {
-      clearInterval(this.timer);
-      this.timer = null;
+    if (this.clockTimer !== null) {
+      clearInterval(this.clockTimer);
+      this.clockTimer = null;
     }
+    this.stopNetworkTick?.();
+    this.stopNetworkTick = null;
     if (this.followUpTimer !== null) {
       clearTimeout(this.followUpTimer);
       this.followUpTimer = null;
@@ -146,6 +183,14 @@ export class CapRushMultiplayerController {
 
   private isDisposed(): boolean {
     return this.disposed;
+  }
+
+  /** Manual recovery when the room's own connection is interrupted. */
+  async reconnect(): Promise<void> {
+    if (this.isDisposed() || this.session === null) return;
+    this.error = null;
+    await this.session.reconnect();
+    if (!this.isDisposed()) this.sync();
   }
 
   async startLeague(): Promise<void> {
@@ -540,7 +585,8 @@ export class CapRushMultiplayerController {
     try {
       await this.session?.refresh(false);
     } catch {
-      // The transport surfaces its own connection error.
+      // The session records the connection error in its view, so the poll never
+      // has to surface a duplicate failure on top of the banner.
     }
   }
 

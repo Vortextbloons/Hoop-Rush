@@ -331,6 +331,18 @@ export abstract class SeriesRoomSession<
     return this.lifecycle.reconnect();
   }
 
+  /**
+   * Retry opening the room after attach failed (for example a rejected asset
+   * load). The cached failure is forgotten by the asset loader itself, so this
+   * reruns resume, assets, and the initial sync without a page reload.
+   */
+  async retryAttach(): Promise<void> {
+    const roomId = this.roomId;
+    if (this.disposed || roomId === null) return;
+    this.attachment = null;
+    await this.attach(roomId);
+  }
+
   async attach(roomId: string): Promise<void> {
     if (this.disposed) return;
     if (this.attachment?.roomId === roomId && this.attachment.current()) return;

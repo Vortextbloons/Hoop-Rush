@@ -37,6 +37,7 @@
   import ChampionshipView from '#lib/features/draft-duel/ChampionshipView.svelte';
   import { inviteLinkForDraftDuelCode } from '#lib/features/draft-duel/draft-duel-identity.js';
   import { loadLobbyId } from '#lib/features/multiplayer/multiplayer-lobby.js';
+  import { LobbyAutoStart } from '#lib/features/multiplayer/lobby-auto-start.js';
   import { SLOT_LABELS } from '#lib/player-positions.js';
 
   let { roomId }: { roomId: string } = $props();
@@ -183,6 +184,31 @@
     });
   });
 
+  // Shared-lobby matches start once both seats are present, so the host does
+  // not repeat the start they already made in the lobby. Direct invites keep
+  // the explicit Start draft button, and a failed automatic start offers one.
+  const autoStart = new LobbyAutoStart();
+  let autoStartFailed = $state(false);
+  $effect(() => {
+    if (!lobbyId) return;
+    const state = {
+      sharedLobby: true,
+      isHost: controller.participantId === 'p1',
+      bothOnline,
+      phase: controller.phase,
+      roomKey: roomId,
+    };
+    if (!autoStart.shouldStart(state)) return;
+    void autoStart
+      .run(roomId, () => controller.startDraft())
+      .then(() => {
+        autoStartFailed = false;
+      })
+      .catch(() => {
+        autoStartFailed = true;
+      });
+  });
+
   async function copyCode(): Promise<void> {
     const code = controller.snapshot?.code;
     if (!code) return;
@@ -246,6 +272,7 @@
       <h1>Couldn’t open this room</h1>
       <p role="alert">{controller.error}</p>
 
+      <Button tone="secondary" onclick={() => void controller.retryAttach()}>Try again</Button>
       <ActionLink href={resolve('draft-duel/')}>
         Back to Draft Duel
         <ArrowRight size={16} aria-hidden="true" />
@@ -382,14 +409,29 @@
             </p>
           </div>
           {#if isHost}
-            <Button
-              onclick={() => controller.startDraft()}
-              disabled={controller.busy || !bothOnline}
-              class="start-draft"
-            >
-              {controller.busy ? 'Starting draft…' : 'Start draft'}
-              <ArrowRight size={18} aria-hidden="true" />
-            </Button>
+            {#if lobbyId && !autoStartFailed}
+              <p class="panel-hint" role="status">
+                {bothOnline
+                  ? 'Starting the draft for both players…'
+                  : 'The draft starts automatically once your opponent is online.'}
+              </p>
+            {:else}
+              <Button
+                onclick={() => {
+                  autoStart.retry(roomId);
+                  void controller.startDraft();
+                }}
+                disabled={controller.busy || !bothOnline}
+                class="start-draft"
+              >
+                {controller.busy
+                  ? 'Starting draft…'
+                  : autoStartFailed
+                    ? 'Retry start'
+                    : 'Start draft'}
+                <ArrowRight size={18} aria-hidden="true" />
+              </Button>
+            {/if}
           {/if}
           <div class="lobby-manage">
             {#if isHost && rivalMember}
@@ -498,8 +540,23 @@
           </div>
         </div>
         <div class="panel-actions">
-          <Button onclick={() => controller.readyForNextGame()}>Ready for Game 1</Button>
+          <Button
+            disabled={controller.localReady || controller.busy}
+            onclick={() => controller.readyForNextGame()}
+            >{controller.localReady ? 'Ready' : 'Ready for Game 1'}</Button
+          >
         </div>
+        <p class="panel-hint" role="status">
+          {#if controller.localReady && controller.opponentReady}
+            Both players are ready. Starting Game 1…
+          {:else if controller.localReady}
+            You're ready. Waiting for your opponent.
+          {:else if controller.opponentReady}
+            Your opponent is ready. Ready up to start Game 1.
+          {:else}
+            Review your five, then ready up. Both players start together.
+          {/if}
+        </p>
       </section>
     {:else if controller.phase === 'preparing-game'}
       <section class="panel" aria-label="Preparing game">
@@ -512,11 +569,15 @@
         {/if}
         <h2>Game {controller.currentGameNumber ?? 1} ready check</h2>
         <p class="panel-hint">
-          {controller.opponentReady
-            ? 'Opponent is ready.'
-            : controller.localReady
-              ? 'Waiting for your opponent. The game starts automatically after 60 seconds.'
-              : 'Both players ready up to start the broadcast.'}
+          {#if controller.localReady && controller.opponentReady}
+            Both players are ready. Starting the broadcast…
+          {:else if controller.opponentReady}
+            Opponent is ready.
+          {:else if controller.localReady}
+            Waiting for your opponent. The game starts automatically after 60 seconds.
+          {:else}
+            Both players ready up to start the broadcast.
+          {/if}
         </p>
         {#if controller.readyCountdownMs !== null}
           <p class="countdown" role="status">
@@ -578,6 +639,7 @@
             verification={resultVerification}
             readyCountdownMs={controller.readyCountdownMs}
             localReady={controller.localReady}
+            opponentReady={controller.opponentReady}
             onready={() => controller.readyForNextGame()}
             awaitingContinue={controller.awaitingContinue}
             oncontinue={() => controller.continueAfterGame()}

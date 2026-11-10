@@ -367,14 +367,25 @@
           <button
             type="button"
             onclick={lobby ? startCreate : createRoom}
-            disabled={busy || (lobby !== null && !lobby.canStart) || !adapter}
+            disabled={busy ||
+              !adapter ||
+              (lobby !== null && (!lobby.canStart || !lobby.guestJoined))}
             class="primary-action"
-            >{busy ? 'Please wait…' : lobby ? 'Create match' : 'Create room'}<ArrowRight
-              size={18}
-              aria-hidden="true"
-            /></button
+            >{busy
+              ? 'Please wait…'
+              : lobby
+                ? lobby.guestJoined
+                  ? 'Start match'
+                  : 'Waiting for your opponent…'
+                : 'Create room'}<ArrowRight size={18} aria-hidden="true" /></button
           >
-          <p class="action-note">Keep this room code to play every mode with the same opponent.</p>
+          <p class="action-note">
+            {lobby
+              ? lobby.guestJoined
+                ? 'Both players drop straight into the draft — no second start needed.'
+                : 'Share the room code, then start the match once your opponent is in.'
+              : 'Keep this room code to play every mode with the same opponent.'}
+          </p>
         {:else}
           <p class="eyebrow">Meet on the court</p>
           <h2 class="join-title">Join your opponent</h2>

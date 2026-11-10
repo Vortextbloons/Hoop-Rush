@@ -49,6 +49,7 @@ import {
 import { buildSimulationTeam } from './fixed-five-room-state';
 import { getFixedFiveTransport } from './fixed-five-transport';
 import { lobbyCommand, loadLobbyId } from '../multiplayer/multiplayer-lobby';
+import { LobbyAutoStart } from '../multiplayer/lobby-auto-start';
 import { multiplayerInviteLink } from '../multiplayer/invite-link';
 import { visibilityTickScheduler } from '../multiplayer/visibility-tick-scheduler';
 import type { GamecastPlayer } from '#lib/gamecast/gamecast-types.js';
@@ -368,6 +369,7 @@ export class FixedFiveRoomController {
   private readonly deps: FixedFiveRoomControllerDeps;
   private readonly sessionDeps: FixedFiveRoomSessionDeps;
   private readonly session: FixedFiveRoomSession;
+  private readonly autoStart = new LobbyAutoStart();
   private unsubscribe: (() => void) | null = null;
   private disposed = false;
   private winPlayed = false;
@@ -399,6 +401,34 @@ export class FixedFiveRoomController {
       this.now = Date.now();
     }, TICK_MS);
     await this.session.start();
+  }
+
+  /** Retry opening the room after a failed asset load, without a page reload. */
+  async retryLoad(): Promise<void> {
+    if (this.disposed) return;
+    await this.session.retryStart();
+  }
+
+  /**
+   * Start a match created by the shared lobby once both seats are present, so
+   * the host does not have to press "Start draft" a second time after already
+   * choosing the settings and starting from the lobby. Direct-invite rooms have
+   * no lobby id and keep the explicit button.
+   */
+  async maybeAutoStart(): Promise<void> {
+    if (this.disposed || !this.lobbyId || !this.assets) return;
+    const key = this.roomId;
+    if (
+      !this.autoStart.shouldStart({
+        sharedLobby: true,
+        isHost: this.selfId === 'p1',
+        bothOnline: this.opponent?.online === true,
+        phase: this.phase,
+        roomKey: key,
+      })
+    )
+      return;
+    await this.autoStart.run(key, () => this.startDraft());
   }
 
   dispose(): void {
@@ -615,6 +645,7 @@ export class FixedFiveRoomController {
       this.winPlayed = true;
       arenaWin();
     }
+    void this.maybeAutoStart();
   }
 
   private stopPlayback(): void {

@@ -1,20 +1,46 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { resolve } from '$app/paths';
-  import { ArrowRight, Users } from '@lucide/svelte';
+  import { ArrowRight, Repeat, Users } from '@lucide/svelte';
   import { loadLobbyId } from './multiplayer-lobby';
   import { getLobbyCoordinator } from './lobby-context.svelte.js';
+
   let { roomId, completed = false }: { roomId: string; completed?: boolean } = $props();
   const coordinator = getLobbyCoordinator();
   let lobbyId = $state<string | null>(null);
+  let playingAgain = $state(false);
+  let mounted = false;
   const lobby = $derived(
     coordinator.snapshot.lobby?.id === lobbyId ? coordinator.snapshot.lobby : null,
   );
   const error = $derived(coordinator.snapshot.error);
+  const isHost = $derived(lobby?.participantId === 'p1');
+  const canPlayAgain = $derived(
+    completed &&
+      isHost &&
+      lobby?.canStart === true &&
+      lobby.guestJoined === true &&
+      coordinator.snapshot.busy === false &&
+      coordinator.lastMatch !== null,
+  );
   onMount(() => {
+    mounted = true;
     lobbyId = loadLobbyId(roomId);
     coordinator.attachRoom(roomId);
+    return () => {
+      mounted = false;
+    };
   });
+
+  async function playAgain(): Promise<void> {
+    if (!mounted || playingAgain) return;
+    playingAgain = true;
+    try {
+      await coordinator.playAgain(() => mounted);
+    } finally {
+      if (mounted) playingAgain = false;
+    }
+  }
 </script>
 
 {#if lobbyId}
@@ -28,8 +54,10 @@
         </h2>
         <p>
           {lobby?.participantId === 'p2'
-            ? 'Your host chooses the next match. You’ll enter together.'
-            : 'Return to your lobby to pick another mode. Your opponent stays with you.'}
+            ? 'Your host can start the same match again or choose a different one.'
+            : coordinator.lastMatch !== null
+              ? 'Play the same settings again, or change the mode in your lobby.'
+              : 'Return to your lobby to pick your next mode.'}
         </p>
         {#if lobby}<div class="room-facts">
             <span>ROOM <strong>{lobby.code}</strong></span><span
@@ -37,10 +65,20 @@
             >
           </div>{/if}
       </div>
-      <a class="next-action" href={resolve(`/multiplayer?lobby=${lobbyId}`)}
-        >{lobby?.participantId === 'p2' ? 'Return to lobby' : 'Choose next game'}
-        <ArrowRight size={18} aria-hidden="true" /></a
-      >
+      <div class="next-actions">
+        {#if canPlayAgain}
+          <button type="button" class="next-action" disabled={playingAgain} onclick={playAgain}>
+            <Repeat size={17} aria-hidden="true" />
+            {playingAgain ? 'Starting…' : 'Play again'}
+          </button>
+        {/if}
+        <a class="next-action secondary" href={resolve(`/multiplayer?lobby=${lobbyId}`)}
+          >{lobby?.participantId === 'p2' ? 'Return to lobby' : 'Change mode'}<ArrowRight
+            size={18}
+            aria-hidden="true"
+          /></a
+        >
+      </div>
       {#if error}<p class="connection" role="status">{error}</p>{/if}
     </section>
   {:else}
@@ -84,6 +122,7 @@
   }
   .next-match {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 20px;
     padding: 24px;
@@ -105,6 +144,7 @@
   }
   .next-copy {
     flex: 1;
+    min-width: 0;
   }
   .eyebrow {
     color: var(--color-primary);
@@ -139,28 +179,53 @@
     font-family: var(--font-mono);
     letter-spacing: 0.14em;
   }
+  .next-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    flex-basis: 100%;
+    justify-content: flex-end;
+  }
   .next-action {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 14px;
+    gap: 12px;
+    min-height: 2.75rem;
     padding: 13px 18px;
     border-radius: 10px;
+    border: 1px solid transparent;
     background: var(--color-primary);
     color: var(--color-primary-foreground);
     font-size: 13px;
     font-weight: 800;
     white-space: nowrap;
+    cursor: pointer;
   }
-  .next-action:hover {
+  .next-action.secondary {
+    background: transparent;
+    color: var(--color-foreground);
+    border-color: var(--color-border);
+  }
+  .next-action:hover:not(:disabled) {
     filter: brightness(1.08);
+  }
+  .next-action:disabled {
+    cursor: default;
+    opacity: 0.6;
   }
   .connection {
     flex-basis: 100%;
   }
-  a:focus-visible {
+  a:focus-visible,
+  button:focus-visible {
     outline: 2px solid var(--color-primary);
     outline-offset: 4px;
+  }
+  @media (min-width: 720px) {
+    .next-actions {
+      flex-basis: auto;
+    }
   }
   @media (max-width: 640px) {
     .next-match {
@@ -173,6 +238,9 @@
     }
     .next-copy {
       flex-basis: 100%;
+    }
+    .next-actions {
+      flex-direction: column;
     }
     .next-action {
       width: 100%;

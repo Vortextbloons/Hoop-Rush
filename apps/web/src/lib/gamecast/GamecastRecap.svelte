@@ -23,6 +23,7 @@
     verification,
     readyCountdownMs,
     localReady,
+    opponentReady = false,
     onready,
     awaitingContinue,
     oncontinue,
@@ -36,6 +37,7 @@
     verification: GamecastVerification;
     readyCountdownMs: number | null;
     localReady: boolean;
+    opponentReady?: boolean;
     onready: () => void;
     awaitingContinue: boolean;
     oncontinue: () => void;
@@ -362,12 +364,20 @@
     {:else if nextGameNumber !== null}
       <div class="ready-copy">
         <p class="ready-line">
-          {localReady ? "You're ready for the next game." : 'Ready to continue?'}
+          {#if localReady && opponentReady}
+            Both players are ready. Starting Game {nextGameNumber}…
+          {:else if localReady}
+            You're ready. Waiting for your opponent.
+          {:else if opponentReady}
+            Your opponent is ready. Ready up to start Game {nextGameNumber}.
+          {:else}
+            Ready for Game {nextGameNumber}?
+          {/if}
         </p>
         {#if countdownLabel !== null}
           <p class="countdown">
             <Clock size={13} aria-hidden="true" />
-            Auto-ready in <strong>{countdownLabel}</strong>
+            Auto-start in <strong>{countdownLabel}</strong>
           </p>
         {/if}
       </div>
