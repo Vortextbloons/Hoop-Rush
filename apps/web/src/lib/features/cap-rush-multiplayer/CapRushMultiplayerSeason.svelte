@@ -5,7 +5,6 @@
     CapRushMultiplayerSeatId,
     CapRushMultiplayerState,
   } from '@hoop-rush/data-contracts';
-  import { capRushMultiplayerSeatRecord, capRushMultiplayerStandings } from '@hoop-rush/engine';
   import TeamLogo from '#lib/components/TeamLogo.svelte';
   import type { CapRushArt } from '../cap-rush/cap-rush-art.js';
   import { initialsOf } from '../cap-rush/cap-rush-presentation.js';
@@ -13,6 +12,7 @@
   import CapRushMultiplayerSchedule from './CapRushMultiplayerSchedule.svelte';
   import CapRushSeatLedger from './CapRushSeatLedger.svelte';
   import CapRushSharedProgress from './CapRushSharedProgress.svelte';
+  import { capRushMultiplayerSeasonWindow } from './cap-rush-multiplayer-derived.js';
   import { seatLabelFor, seatOrder } from './cap-rush-multiplayer-presentation.js';
 
   let {
@@ -38,6 +38,10 @@
       prefersReducedMotion.current ? 0 : Math.min(4000, Math.abs(to - from) * 300),
     easing: linear,
   });
+  // The tween is continuous, but presentation only changes when the integer frontier changes.
+  // Keeping this as a primitive stops every animation frame from rebuilding the season, records,
+  // standings, and seat ledgers.
+  const displayedSlot = $derived(Math.floor(animatedSlot.current));
   const displayedState = $derived({
     ...state,
     season:
@@ -45,10 +49,8 @@
         ? null
         : {
             ...state.season,
-            frontierSlot: Math.floor(animatedSlot.current),
-            games: state.season.games.filter(
-              (game) => game.slot <= Math.floor(animatedSlot.current),
-            ),
+            frontierSlot: displayedSlot,
+            games: state.season.games.filter((game) => game.slot <= displayedSlot),
           },
   });
   const season = $derived(displayedState.season);
@@ -57,22 +59,13 @@
   const localTeamId = $derived(
     locked === null ? null : locked.seats[localSeat].franchise.franchiseId,
   );
-  const records = $derived(
-    season === null || locked === null
+  const window = $derived(
+    state.season === null || locked === null
       ? null
-      : {
-          p1: capRushMultiplayerSeatRecord(locked, season.games, 'p1'),
-          p2: capRushMultiplayerSeatRecord(locked, season.games, 'p2'),
-        },
+      : capRushMultiplayerSeasonWindow(locked, state.season.games, displayedSlot),
   );
-  const standings = $derived.by(() => {
-    if (season === null || locked === null) return null;
-    try {
-      return capRushMultiplayerStandings(locked, season.games);
-    } catch {
-      return null;
-    }
-  });
+  const records = $derived(window?.records ?? null);
+  const standings = $derived(window?.standings ?? null);
 </script>
 
 {#if season === null || locked === null || records === null}
@@ -86,7 +79,7 @@
   <div class="flex min-w-0 flex-col gap-4" data-cap-rush-multiplayer-season>
     <CapRushSharedProgress
       {state}
-      displayedSlot={animatedSlot.current}
+      {displayedSlot}
       {localSeat}
       {art}
       {busy}

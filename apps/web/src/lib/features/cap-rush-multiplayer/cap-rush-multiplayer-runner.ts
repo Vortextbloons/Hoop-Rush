@@ -1,5 +1,5 @@
 import type { CapRushMultiplayerState, CapRushMultiplayerCommand } from '@hoop-rush/data-contracts';
-import { createCapRushMultiplayerState, capRushMultiplayerStateDigest } from '@hoop-rush/engine';
+import { createCapRushMultiplayerState } from '@hoop-rush/engine';
 import type { CapRushMultiplayerEnvironment } from '@hoop-rush/engine';
 import type {
   CapRushLeagueGame,
@@ -26,6 +26,26 @@ import workerUrl from '../../../workers/cap-rush-multiplayer-worker.ts?worker&ur
 
 export interface CapRushMultiplayerProjectionInput {
   state: CapRushMultiplayerState;
+  commands: readonly CapRushMultiplayerCommand[];
+  environment: CapRushMultiplayerEnvironment;
+  variant: 'clash' | 'roulette';
+  verifyLog?: boolean;
+  /** Digest of `state` when the caller already holds one; lets the worker apply a delta. */
+  baseDigest?: string;
+}
+
+export interface CapRushMultiplayerProjectionResult {
+  state: CapRushMultiplayerState;
+  stateDigest: string;
+}
+
+interface CapRushMultiplayerHydrateInput {
+  environment: CapRushMultiplayerEnvironment;
+}
+
+interface CapRushMultiplayerWorkerProjectInput {
+  state?: CapRushMultiplayerState;
+  baseDigest?: string;
   commands: readonly CapRushMultiplayerCommand[];
   environment: CapRushMultiplayerEnvironment;
   variant: 'clash' | 'roulette';
@@ -82,30 +102,52 @@ const ERROR_MESSAGES: OneShotWorkerErrorMessages = {
   invalidMessage: 'the cap rush multiplayer worker returned an invalid message',
 };
 
+function environmentPayload(environment: CapRushMultiplayerEnvironment) {
+  return {
+    variant: environment.variant,
+    bracket: environment.bracket,
+    seasonCatalog: environment.seasonCatalog,
+    profile: environment.profile,
+    catalogSource: environment.catalogSource,
+    versionLocks: environment.versionLocks,
+  };
+}
+
+function environmentKey(environment: CapRushMultiplayerEnvironment): string {
+  return JSON.stringify([
+    environment.variant,
+    environment.catalogSource.catalogVersion,
+    environment.catalogSource.catalogHash,
+    environment.versionLocks,
+    environment.profile.profileVersion,
+  ]);
+}
+
 function buildRequest(
   payload:
     | CapRushMultiplayerSlotInput
     | CapRushMultiplayerPlayoffInput
     | CapRushMultiplayerTapeInput
-    | CapRushMultiplayerProjectionInput,
+    | CapRushMultiplayerWorkerProjectInput
+    | CapRushMultiplayerHydrateInput,
   requestId: string,
 ): CapRushMultiplayerWorkerRequest {
   if ('commands' in payload)
     return {
-      state: payload.state,
+      ...(payload.state === undefined ? {} : { state: payload.state }),
+      ...(payload.baseDigest === undefined ? {} : { baseDigest: payload.baseDigest }),
       commands: [...payload.commands],
-      environment: {
-        variant: payload.environment.variant,
-        bracket: payload.environment.bracket,
-        seasonCatalog: payload.environment.seasonCatalog,
-        profile: payload.environment.profile,
-        catalogSource: payload.environment.catalogSource,
-        versionLocks: payload.environment.versionLocks,
-      },
       variant: payload.variant,
       verifyLog: payload.verifyLog,
       schemaVersion: CAP_RUSH_MULTIPLAYER_WORKER_WIRE_SCHEMA_VERSION,
       kind: 'cap-rush-multiplayer-project',
+      requestId: idSchema.parse(requestId),
+    } satisfies CapRushMultiplayerWorkerRequest;
+  if ('environment' in payload)
+    return {
+      environment: environmentPayload(payload.environment),
+      schemaVersion: CAP_RUSH_MULTIPLAYER_WORKER_WIRE_SCHEMA_VERSION,
+      kind: 'cap-rush-multiplayer-hydrate',
       requestId: idSchema.parse(requestId),
     } satisfies CapRushMultiplayerWorkerRequest;
   if ('slot' in payload) {
@@ -154,7 +196,9 @@ function outputOf(response: CapRushMultiplayerWorkerMessage): unknown {
   if (response.kind === 'cap-rush-multiplayer-slot') {
     return { games: response.games, tapes: response.tapes };
   }
-  if (response.kind === 'cap-rush-multiplayer-projection') return response.state;
+  if (response.kind === 'cap-rush-multiplayer-hydrated') return { hydrated: true };
+  if (response.kind === 'cap-rush-multiplayer-projection')
+    return { state: response.state, stateDigest: response.stateDigest };
   if (response.kind === 'cap-rush-multiplayer-playoff-games') {
     return { games: response.games, tapes: response.tapes };
   }
@@ -180,6 +224,9 @@ export class CapRushMultiplayerProjectionRejection extends Error {
 
 export class CapRushMultiplayerRunner {
   private generation = 0;
+  private hydratedKey: string | null = null;
+  private cachedState: CapRushMultiplayerState | null = null;
+  private cachedDigest: string | null = null;
   private readonly slotRunners: CapRushMultiplayerRunner[] = [];
   private readonly options: {
     timeoutMs?: number;
@@ -191,7 +238,8 @@ export class CapRushMultiplayerRunner {
     | CapRushMultiplayerSlotInput
     | CapRushMultiplayerPlayoffInput
     | CapRushMultiplayerTapeInput
-    | CapRushMultiplayerProjectionInput,
+    | CapRushMultiplayerWorkerProjectInput
+    | CapRushMultiplayerHydrateInput,
     CapRushMultiplayerWorkerMessage,
     unknown
   >;
@@ -216,25 +264,86 @@ export class CapRushMultiplayerRunner {
   }
 
   async project(input: CapRushMultiplayerProjectionInput): Promise<CapRushMultiplayerState> {
+    return (await this.projectDetailed(input)).state;
+  }
+
+  async projectDetailed(
+    input: CapRushMultiplayerProjectionInput,
+  ): Promise<CapRushMultiplayerProjectionResult> {
+    try {
+      return await this.projectOnce(input);
+    } catch (error) {
+      if (
+        error instanceof CapRushMultiplayerProjectionRejection ||
+        (error instanceof Error &&
+          (error.message === ERROR_MESSAGES.disposed ||
+            error.message === ERROR_MESSAGES.superseded))
+      )
+        throw error;
+      // A worker crash or timeout drops the hydrated catalog and cached state. Rehydrate and
+      // retry the pure projection once instead of forcing the caller to fail the room.
+      this.hydratedKey = null;
+      this.cachedState = null;
+      this.cachedDigest = null;
+      return this.projectOnce(input);
+    }
+  }
+
+  private async projectOnce(
+    input: CapRushMultiplayerProjectionInput,
+  ): Promise<CapRushMultiplayerProjectionResult> {
+    if (this.hydratedKey !== environmentKey(input.environment))
+      await this.hydrate(input.environment);
     this.generation += 1;
     for (const runner of this.slotRunners) runner.dispose();
-    const result = (await this.transport.run(input)) as
-      | CapRushMultiplayerState
+    const reuseDigest =
+      !input.verifyLog &&
+      this.cachedState !== null &&
+      this.cachedDigest !== null &&
+      input.baseDigest === this.cachedDigest
+        ? this.cachedDigest
+        : null;
+    const payload: CapRushMultiplayerWorkerProjectInput =
+      reuseDigest !== null
+        ? {
+            baseDigest: reuseDigest,
+            commands: input.commands,
+            environment: input.environment,
+            variant: input.variant,
+          }
+        : {
+            state: input.state,
+            commands: input.commands,
+            environment: input.environment,
+            variant: input.variant,
+            verifyLog: input.verifyLog,
+          };
+    const result = (await this.transport.run(payload)) as
+      | CapRushMultiplayerProjectionResult
       | Extract<CapRushMultiplayerWorkerMessage, { kind: 'cap-rush-multiplayer-rejection' }>;
     if ('kind' in result)
       throw new CapRushMultiplayerProjectionRejection(result.code, result.message);
+    this.cachedState = result.state;
+    this.cachedDigest = result.stateDigest;
     return result;
+  }
+
+  private async hydrate(environment: CapRushMultiplayerEnvironment): Promise<void> {
+    await this.transport.run({ environment });
+    this.hydratedKey = environmentKey(environment);
+    this.cachedState = null;
+    this.cachedDigest = null;
   }
 
   async verifyLog(
     input: Omit<CapRushMultiplayerProjectionInput, 'state'> & { rootSeed: string },
   ): Promise<string> {
-    const state = await this.project({
+    const projected = await this.projectDetailed({
       ...input,
       state: createCapRushMultiplayerState(input.rootSeed),
       verifyLog: true,
     });
-    return capRushMultiplayerStateDigest(state);
+    return projected.stateDigest;
   }
 
   async simulateSlot(input: CapRushMultiplayerSlotInput): Promise<CapRushMultiplayerSlotOutput> {

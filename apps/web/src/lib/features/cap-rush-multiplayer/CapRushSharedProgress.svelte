@@ -4,8 +4,8 @@
     CapRushMultiplayerState,
   } from '@hoop-rush/data-contracts';
   import { CAP_RUSH_GAME_COUNT } from '@hoop-rush/data-contracts';
-  import { capRushMultiplayerSeatRecord } from '@hoop-rush/engine';
   import { capRushMultiplayerPendingH2H } from '@hoop-rush/application/cap-rush-multiplayer';
+  import { capRushMultiplayerSeasonWindow } from './cap-rush-multiplayer-derived.js';
   import GameScoreboard from '#lib/components/GameScoreboard.svelte';
   import TeamLogo from '#lib/components/TeamLogo.svelte';
   import type { CapRushArt } from '../cap-rush/cap-rush-art.js';
@@ -42,17 +42,13 @@
 
   const season = $derived(state.season);
   const locked = $derived(state.locked);
-  const visibleGames = $derived(
-    season?.games.filter((game) => game.slot <= Math.floor(displayedSlot)) ?? [],
-  );
-  const records = $derived(
+  const window = $derived(
     season === null || locked === null
       ? null
-      : {
-          p1: capRushMultiplayerSeatRecord(locked, visibleGames, 'p1'),
-          p2: capRushMultiplayerSeatRecord(locked, visibleGames, 'p2'),
-        },
+      : capRushMultiplayerSeasonWindow(locked, season.games, displayedSlot),
   );
+  const visibleGames = $derived(window?.games ?? []);
+  const records = $derived(window?.records ?? null);
   const localRecord = $derived(records === null ? null : records[localSeat]);
   const otherSeat = $derived(localSeat === 'p1' ? ('p2' as const) : ('p1' as const));
   const otherRecord = $derived(records === null ? null : records[otherSeat]);

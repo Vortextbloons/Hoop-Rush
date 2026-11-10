@@ -206,6 +206,35 @@ test('confirms the head-to-head broadcast without acknowledging its slot', async
   expect(controller.broadcast).toBeNull();
 });
 
+test('acknowledges the accepted high-water slot once instead of issuing per-slot commands', async () => {
+  const controller = new CapRushMultiplayerController('room-a');
+  const view = sessionView(null);
+  Object.assign(view.state, {
+    phase: 'season',
+    season: {
+      block: { index: 0, status: 'running', plans: { p1: 'sim', p2: 'sim' } },
+      games: [{ slot: 1 }, { slot: 2 }, { slot: 3 }],
+      slotAcks: { p1: 0, p2: 0 },
+      h2hSlots: [],
+    },
+  });
+  const ackSlot = vi.fn(() => Promise.resolve({ accepted: true, rejectionCode: null }));
+  Object.assign(controller, {
+    view,
+    session: {
+      ackSlot,
+      pendingH2H: () => null,
+      nextSlot: () => null,
+      refresh: () => Promise.resolve(),
+      view: () => view,
+      dispose: vi.fn(),
+    },
+  });
+  await (controller as unknown as { tick(): Promise<void> }).tick();
+  expect(ackSlot).toHaveBeenCalledWith(3);
+  controller.dispose();
+});
+
 test('continues the season immediately after a successful step instead of waiting for the poll', async () => {
   const controller = new CapRushMultiplayerController('room-a');
   const view = sessionView(null);

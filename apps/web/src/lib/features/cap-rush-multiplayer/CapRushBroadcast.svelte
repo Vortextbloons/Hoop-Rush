@@ -9,11 +9,7 @@
   } from '@hoop-rush/data-contracts';
   import GamecastBattleBroadcast from '#lib/gamecast/GamecastBattleBroadcast.svelte';
   import GamecastBattleBox from '#lib/gamecast/GamecastBattleBox.svelte';
-  import {
-    gamecastBattleFeedLines,
-    gamecastBattlePlaybackItems,
-    gamecastBattleVisibleState,
-  } from '#lib/gamecast/gamecast-battle-playback.js';
+  import { GamecastBattlePlaybackStream } from '#lib/gamecast/gamecast-battle-stream.js';
   import { gamecastBattleFinalBoxes } from '#lib/gamecast/gamecast-battle-view.js';
 
   let {
@@ -40,9 +36,9 @@
     onclose: () => void;
   } = $props();
 
-  const items = $derived(gamecastBattlePlaybackItems(tape));
-  const total = $derived(items.length);
-  const step = $derived(Math.max(1, Math.ceil((items.length * speed) / 100)));
+  const stream = $derived(new GamecastBattlePlaybackStream({ result, tape }));
+  const total = $derived(stream.items.length);
+  const step = $derived(Math.max(1, Math.ceil((total * speed) / 100)));
   let cursor = $state(0);
   let playing = $state(true);
 
@@ -55,8 +51,7 @@
     return () => clearInterval(id);
   });
 
-  const visible = $derived(gamecastBattleVisibleState(items, cursor));
-  const feed = $derived(gamecastBattleFeedLines({ result, tape }, items, cursor));
+  const frame = $derived(stream.frame(cursor));
   const progress = $derived(total === 0 ? 1 : cursor / total);
   const complete = $derived(cursor >= total);
   const localSide = $derived(input.home.teamId === localTeamId ? 'home' : 'away');
@@ -178,14 +173,6 @@
       </div>
     </header>
 
-    <GamecastBattleBroadcast
-      {teamIdentity}
-      theme="duel"
-      {result}
-      {visible}
-      {feed}
-      {progress}
-      {localSide}
-    />
+    <GamecastBattleBroadcast {teamIdentity} theme="duel" {result} {frame} {progress} {localSide} />
   </section>
 {/if}

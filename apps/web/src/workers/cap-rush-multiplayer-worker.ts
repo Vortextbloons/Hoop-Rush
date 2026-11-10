@@ -7,6 +7,7 @@ import {
 import {
   replayCapRushMultiplayerLog,
   capRushMultiplayerSimulateGame,
+  capRushMultiplayerStateDigest,
   applyCapRushMultiplayerCommand,
   adaptCapRushCatalog,
   buildCapRushCatalogIndex,
@@ -20,6 +21,11 @@ import {
 const context = createEngineContext();
 
 let catalogCache: { readonly key: string; readonly index: CapRushCatalogIndex } | null = null;
+let hydratedEnvironment: CapRushMultiplayerEnvironment | null = null;
+let cachedState: {
+  state: import('@hoop-rush/data-contracts').CapRushMultiplayerState;
+  digest: string;
+} | null = null;
 
 /**
  * The packaged catalog is static and content-addressed, so the adapted index only changes when the
@@ -52,12 +58,31 @@ self.onmessage = (event: MessageEvent<unknown>) => {
   const request = parsed.data;
   if (request.kind === 'cap-rush-multiplayer-cancel') return;
   try {
-    if (request.kind === 'cap-rush-multiplayer-project') {
-      const environment = {
+    if (request.kind === 'cap-rush-multiplayer-hydrate') {
+      hydratedEnvironment = {
         ...request.environment,
         index: catalogIndexOf(request.environment),
       };
+      cachedState = null;
+      post({
+        schemaVersion: CAP_RUSH_MULTIPLAYER_WORKER_WIRE_SCHEMA_VERSION,
+        kind: 'cap-rush-multiplayer-hydrated',
+        requestId: request.requestId,
+      });
+      return;
+    }
+    if (request.kind === 'cap-rush-multiplayer-project') {
+      let environment: CapRushMultiplayerEnvironment;
+      if (request.environment === undefined) {
+        if (hydratedEnvironment === null)
+          throw new Error('cap rush multiplayer worker is not hydrated');
+        environment = hydratedEnvironment;
+      } else {
+        environment = { ...request.environment, index: catalogIndexOf(request.environment) };
+        hydratedEnvironment = environment;
+      }
       if (request.verifyLog) {
+        if (request.state === undefined) throw new Error('verification needs the root state');
         if (request.state.rootSeed === null) throw new Error('the room has no root seed');
         const replayed = replayCapRushMultiplayerLog({
           rootSeed: request.state.rootSeed,
@@ -65,15 +90,27 @@ self.onmessage = (event: MessageEvent<unknown>) => {
           environment,
           variant: request.variant,
         });
+        cachedState = {
+          state: replayed.state,
+          digest: capRushMultiplayerStateDigest(replayed.state),
+        };
         post({
           schemaVersion: CAP_RUSH_MULTIPLAYER_WORKER_WIRE_SCHEMA_VERSION,
           kind: 'cap-rush-multiplayer-projection',
           requestId: request.requestId,
           state: replayed.state,
+          stateDigest: cachedState.digest,
         });
         return;
       }
-      let state = request.state;
+      let state: import('@hoop-rush/data-contracts').CapRushMultiplayerState;
+      if (request.baseDigest !== undefined && cachedState?.digest === request.baseDigest) {
+        state = cachedState.state;
+      } else if (request.state !== undefined) {
+        state = request.state;
+      } else {
+        throw new Error('cap rush multiplayer worker has no base state');
+      }
       for (const command of request.commands) {
         const outcome = applyCapRushMultiplayerCommand(
           state,
@@ -93,11 +130,14 @@ self.onmessage = (event: MessageEvent<unknown>) => {
         }
         state = outcome.state;
       }
+      const digest = capRushMultiplayerStateDigest(state);
+      cachedState = { state, digest };
       post({
         schemaVersion: CAP_RUSH_MULTIPLAYER_WORKER_WIRE_SCHEMA_VERSION,
         kind: 'cap-rush-multiplayer-projection',
         requestId: request.requestId,
         state,
+        stateDigest: digest,
       });
       return;
     }

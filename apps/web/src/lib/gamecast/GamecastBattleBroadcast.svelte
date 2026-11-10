@@ -8,13 +8,15 @@
   import { gamecastBattleLiveBoxFold } from '#lib/gamecast/gamecast-battle-view.js';
   import GamecastBattleBox from '#lib/gamecast/GamecastBattleBox.svelte';
   import { gamecastBattleAbilityLines } from '#lib/gamecast/gamecast-battle-playback.js';
+  import type { GamecastBattlePlaybackFrame } from '#lib/gamecast/gamecast-battle-stream.js';
 
   let {
     result,
     gameNumber = undefined,
     localSide,
-    visible,
-    feed,
+    frame = null,
+    visible: suppliedVisible = null,
+    feed: suppliedFeed = [],
     progress,
     minimal = false,
     theme = 'havoc',
@@ -23,23 +25,38 @@
     result: import('@hoop-rush/data-contracts').HavocBattleResult;
     gameNumber?: number;
     localSide: 'home' | 'away';
-    visible: GamecastBattleVisibleState;
-    feed: readonly GamecastBattleFeedLine[];
+    /** Precomputed append-only playback frame. When absent the shared component folds `visible`. */
+    frame?: GamecastBattlePlaybackFrame | null;
+    visible?: GamecastBattleVisibleState | null;
+    feed?: readonly GamecastBattleFeedLine[];
     progress: number;
     minimal?: boolean;
     theme?: 'havoc' | 'duel';
     teamIdentity?: Snippet<['home' | 'away']>;
   } = $props();
 
+  const emptyVisible: GamecastBattleVisibleState = {
+    homeScore: 0,
+    awayScore: 0,
+    period: 1,
+    clockSeconds: 720,
+    events: [],
+    scoring: [],
+  };
+  const visible = $derived(frame?.visible ?? suppliedVisible ?? emptyVisible);
+  const feed = $derived(frame?.feed ?? suppliedFeed);
+  // The stream hands over precomputed boxes; otherwise fold the revealed window
+  // incrementally so each frame only processes newly revealed items.
   let boxResult: import('@hoop-rush/data-contracts').HavocBattleResult | null = null;
   let boxFold: ReturnType<typeof gamecastBattleLiveBoxFold> | null = null;
-  const boxes = $derived.by(() => {
+  const foldedBoxes = $derived.by(() => {
     if (boxResult !== result || boxFold === null) {
       boxResult = result;
       boxFold = gamecastBattleLiveBoxFold(result);
     }
     return boxFold.boxesAt(visible);
   });
+  const boxes = $derived(frame?.boxes ?? foldedBoxes);
   const localBox = $derived(boxes.find((box) => box.side === localSide));
   const opponentBox = $derived(boxes.find((box) => box.side !== localSide));
   const complete = $derived(progress >= 1);
@@ -50,7 +67,10 @@
         ? 'local'
         : 'opponent',
   );
-  const abilities = $derived(gamecastBattleAbilityLines(result, visible.events));
+  const abilities = $derived(
+    frame?.abilities ?? gamecastBattleAbilityLines(result, visible.events),
+  );
+  const abilityCount = $derived(frame?.abilityCount ?? abilities.length);
   const progressPct = $derived(
     Math.round(Math.min(1, Math.max(0, Number.isNaN(progress) ? 0 : progress)) * 100),
   );
@@ -130,7 +150,7 @@
   <section class="hm-feed" aria-label="Ability activations">
     <header class="hm-feed-head">
       <h3>Ability activations</h3>
-      <span>{abilities.length} events</span>
+      <span>{abilityCount} events</span>
     </header>
     {#if abilities.length === 0}
       <p class="hm-feed-empty">No ability activations yet.</p>

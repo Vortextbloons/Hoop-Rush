@@ -12,7 +12,7 @@ import type {
   CapRushLeagueGame,
   CapRushPlayoffGameSummary,
 } from '@hoop-rush/data-contracts';
-import { playerIdSchema } from '@hoop-rush/data-contracts';
+import { canonicalJson, playerIdSchema } from '@hoop-rush/data-contracts';
 import { CoalescedTask, SessionEvents } from '../runtime/index.ts';
 import {
   capRushMultiplayerLockDigest,
@@ -26,6 +26,18 @@ import {
   capRushMultiplayerNextSlot,
   capRushMultiplayerPendingH2H,
 } from './recruitment-deadline.ts';
+
+const STALE_RETRY_SAFE: ReadonlySet<CapRushMultiplayerCommandPayload['kind']> = new Set([
+  'ready',
+  'start',
+  'ack-slot',
+  'ack-broadcast',
+  'ack-playoff-playback',
+  'choose-block-plan',
+  'simulate-range',
+  'simulate-playoff-step',
+]);
+const MAX_STALE_ATTEMPTS = 3;
 
 export interface CapRushMultiplayerSessionDeps {
   readonly transport: CapRushMultiplayerTransport;
@@ -79,6 +91,7 @@ export class CapRushMultiplayerSession {
   private snapshot: CapRushMultiplayerRoomSnapshot | null = null;
   private state: CapRushMultiplayerState;
   private commands: CapRushMultiplayerCommand[] = [];
+  private readonly commandIds = new Map<string, string>();
   private unsubscribe: (() => void) | null = null;
   private disposed = false;
   private readonly deps: CapRushMultiplayerSessionDeps;
@@ -424,20 +437,72 @@ export class CapRushMultiplayerSession {
   private async send(
     payload: CapRushMultiplayerCommandPayload,
   ): Promise<CapRushMultiplayerCommandReceipt> {
-    const revision = this.snapshot?.revision ?? 0;
-    const receipt = await this.deps.transport.submitCommand({
-      roomId: this.deps.roomId,
-      commandId: this.deps.newCommandId(),
-      actorParticipantId: this.deps.seat,
-      expectedRevision: revision,
-      payload,
-    });
+    const key = canonicalJson(payload);
+    // A command that never produced a definitive receipt keeps its ID, so an explicit retry of
+    // the same intent can recover an ambiguous commit instead of creating a duplicate.
+    const pendingId = this.commandIds.get(key);
+    if (pendingId !== undefined) {
+      const history = await this.deps.transport.sync(this.deps.roomId, -1);
+      if (this.isDisposed()) throw new Error('the room session was disposed');
+      this.adopt(history.snapshot, history.commands);
+      const committed = history.commands.find(
+        (command) =>
+          command.commandId === pendingId && command.actorParticipantId === this.deps.seat,
+      );
+      if (committed !== undefined) {
+        this.commandIds.delete(key);
+        this.error = null;
+        return {
+          roomId: committed.roomId,
+          commandId: committed.commandId,
+          ordinal: committed.ordinal,
+          accepted: true,
+          rejectionCode: null,
+          revision: history.snapshot.revision,
+        };
+      }
+    }
+    const commandId = pendingId ?? this.deps.newCommandId();
+    this.commandIds.set(key, commandId);
+    let receipt: CapRushMultiplayerCommandReceipt;
+    let attempts = 0;
+    for (;;) {
+      attempts += 1;
+      const revision = this.snapshot?.revision ?? 0;
+      receipt = await this.deps.transport.submitCommand({
+        roomId: this.deps.roomId,
+        commandId,
+        actorParticipantId: this.deps.seat,
+        expectedRevision: revision,
+        payload,
+      });
+      if (
+        receipt.accepted ||
+        receipt.rejectionCode !== 'stale-revision' ||
+        !STALE_RETRY_SAFE.has(payload.kind) ||
+        attempts >= MAX_STALE_ATTEMPTS
+      )
+        break;
+      await this.refresh(false);
+      if (this.isDisposed()) return receipt;
+    }
+    this.commandIds.delete(key);
     if (!receipt.accepted) {
       this.error = receipt.rejectionCode;
     } else {
       this.error = null;
     }
-    await this.refresh();
+    if (receipt.accepted) {
+      const accepted = this.deps.transport.acceptedSnapshot?.(this.deps.roomId) ?? null;
+      if (
+        accepted !== null &&
+        (this.snapshot === null || accepted.revision > this.snapshot.revision)
+      )
+        this.adopt(accepted, []);
+      else if (accepted === null) await this.refresh();
+    } else {
+      await this.refresh();
+    }
     return receipt;
   }
 }

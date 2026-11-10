@@ -29,6 +29,8 @@ const POLL_MS = 1_000;
 /** Background tabs poll less often; returning to the tab refreshes immediately. */
 const HIDDEN_POLL_MS = 5_000;
 const CLOCK_MS = 1_000;
+/** Skip fallback network work while a realtime signal already advanced the room. */
+const RECOVERY_POLL_MS = 2_000;
 
 type Scheduler = (tick: () => void, intervalMs: number) => () => void;
 
@@ -73,6 +75,8 @@ export class CapRushMultiplayerController {
   private roomId: string;
   private lastPhase: CapRushMultiplayerPhase | null = null;
   private suppressedError: string | null = null;
+  private lastSignalAt = 0;
+  private pendingSignal = false;
 
   constructor(roomId: string, deps: CapRushMultiplayerControllerDeps = {}) {
     this.roomId = roomId;
@@ -126,7 +130,12 @@ export class CapRushMultiplayerController {
         newCommandId: () => newSeasonId('cap-rush-mp-cmd'),
       });
       this.session.subscribe(() => {
+        this.lastSignalAt = Date.now();
         this.sync();
+        // Realtime is the primary signal; advance immediately instead of waiting for the recovery
+        // poll. A signal that lands while an action is in flight is folded into that action's end.
+        if (this.busy) this.pendingSignal = true;
+        else this.scheduleFollowUp();
       });
       await this.session.attach({ resume: false, initialSync });
       if (this.isDisposed()) return;
@@ -160,7 +169,7 @@ export class CapRushMultiplayerController {
     }, CLOCK_MS);
     this.stopNetworkTick = this.scheduleTick(() => {
       this.nowMs = Date.now();
-      void this.tick();
+      if (Date.now() - this.lastSignalAt >= RECOVERY_POLL_MS) void this.tick();
     }, POLL_MS);
   }
 
@@ -279,8 +288,11 @@ export class CapRushMultiplayerController {
         (highest, game) => Math.max(highest, game.slot),
         0,
       );
+      // The engine advances both seats when both plans are "sim", so acknowledge the current
+      // high-water slot once instead of issuing one command per slot. Unresolved head-to-head
+      // slots are rejected by the engine before they can be folded into the high-water mark.
       if (state.season.slotAcks[this.seat] < accepted) {
-        await session.ackSlot(state.season.slotAcks[this.seat] + 1);
+        await session.ackSlot(accepted);
       }
     });
   }
@@ -616,6 +628,10 @@ export class CapRushMultiplayerController {
       if (!this.isDisposed()) {
         this.busy = false;
         this.sync();
+        if (this.pendingSignal) {
+          this.pendingSignal = false;
+          this.scheduleFollowUp();
+        }
       }
     }
   }
