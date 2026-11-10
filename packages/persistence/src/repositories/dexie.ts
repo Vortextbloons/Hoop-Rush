@@ -60,6 +60,7 @@ import {
   type StoredCapRushDraftRow,
   type StoredCapRushGameRow,
   type StoredCapRushHistoryRow,
+  type StoredCapRushLeagueAggregateRow,
   type StoredCapRushLeagueGameRow,
   type StoredCapRushPlaybackCursorRow,
   type StoredCapRushPlaybackEvidenceRow,
@@ -120,6 +121,7 @@ export const HOOP_RUSH_DATABASE_STORES: Record<string, string> = {
   capRushReports: 'runId',
   capRushPlayoffGames: '[runId+gameId], runId',
   capRushLeagueGames: '[runId+gameId], runId',
+  capRushLeagueAggregates: 'runId',
   capRushPlaybackEvidence: '[runId+gameKey], runId',
   capRushPlaybackCursors: '[runId+gameKey], runId',
   capRushMultiplayerActive: 'roomId',
@@ -169,6 +171,7 @@ export class HoopRushDatabase extends Dexie {
   capRushReports!: EntityTable<StoredCapRushReportRow, 'runId'>;
   capRushPlayoffGames!: Table<StoredCapRushPlayoffGameRow, [string, string]>;
   capRushLeagueGames!: Table<StoredCapRushLeagueGameRow, [string, string]>;
+  capRushLeagueAggregates!: EntityTable<StoredCapRushLeagueAggregateRow, 'runId'>;
   capRushPlaybackEvidence!: Table<StoredCapRushPlaybackEvidenceRow, [string, string]>;
   capRushPlaybackCursors!: Table<StoredCapRushPlaybackCursorRow, [string, string]>;
   capRushMultiplayerActive!: EntityTable<StoredCapRushMultiplayerActiveRow, 'roomId'>;
@@ -178,7 +181,7 @@ export class HoopRushDatabase extends Dexie {
   capRushMultiplayerHistory!: EntityTable<StoredCapRushMultiplayerHistoryRow, 'recordId'>;
   constructor(name = HOOP_RUSH_DATABASE_NAME) {
     super(name);
-    this.version(14)
+    this.version(15)
       .stores(HOOP_RUSH_DATABASE_STORES)
       .upgrade((transaction) =>
         Dexie.Promise.all(transaction.storeNames.map((name) => transaction.table(name).clear())),

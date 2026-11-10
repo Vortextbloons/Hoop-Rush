@@ -653,7 +653,7 @@ describe('cap rush repository', () => {
       runId: state.runId,
       expectedRevision: bundle.state.revision,
       slot: 1,
-      leagueGames,
+      leagueGameIds: leagueGames.map((game) => game.gameId),
     });
     const outcome = applyCapRushCommand(bundle.state, command, { index });
     expect(outcome.result.status).toBe('accepted');
@@ -661,18 +661,31 @@ describe('cap rush repository', () => {
     expect((await repository.loadActiveDraft())?.season.leagueGamesAccepted).toBe(
       leagueGames.length,
     );
-    expect(await repository.listLeagueGames(state.runId)).toHaveLength(leagueGames.length);
+    expect(await repository.listLeagueResults(state.runId)).toHaveLength(leagueGames.length);
+    const firstLeagueGame = leagueGames[0];
+    if (firstLeagueGame === undefined) throw new Error('missing league game');
+    expect(await repository.readLeagueGame(state.runId, firstLeagueGame.gameId)).toEqual(
+      firstLeagueGame,
+    );
+    expect(await repository.readLeagueAggregate(state.runId)).toMatchObject({
+      games: leagueGames.length,
+    });
 
     const next = acceptBundle(index, outcome.state, 2);
-    await expect(
-      repository.applyOutcome(
+    const advance = await repository
+      .applyOutcome(
         prepareCommandCommit({
           outcome: { state: next.state, result: next.result },
           command: next.command,
           game: next.game,
         }),
-      ),
-    ).rejects.toThrow('pending broadcast');
+      )
+      .then(
+        () => null,
+        (error: unknown) => error,
+      );
+    expect(advance).toBeInstanceOf(Error);
+    expect((advance as Error).message).toContain('pending broadcast');
   });
 
   it('updates playback by writing only the cursor record', async () => {
@@ -781,7 +794,10 @@ describe('cap rush repository', () => {
       slot: 1,
       context: createEngineContext(),
     });
-    const command = capRushAcceptGameCommandSchema.parse({ ...bundle.command, leagueGames });
+    const command = capRushAcceptGameCommandSchema.parse({
+      ...bundle.command,
+      leagueGameIds: leagueGames.map((game) => game.gameId),
+    });
     const outcome = applyCapRushCommand(state, command, { index });
     expect(outcome.result.status).toBe('accepted');
     const failWrite = vi
@@ -794,14 +810,15 @@ describe('cap rush repository', () => {
     ).rejects.toThrow('league save failed');
     failWrite.mockRestore();
     expect(await repository.readRunGame(state.runId, 1)).toBeNull();
-    expect(await repository.listLeagueGames(state.runId)).toEqual([]);
+    expect(await repository.listLeagueResults(state.runId)).toEqual([]);
+    expect(await repository.readLeagueAggregate(state.runId)).toBeNull();
     expect(await repository.loadActiveDraft()).toEqual(state);
     expect(await repository.loadCommandResult(command.commandId)).toBeNull();
     await repository.applyOutcome(
       prepareCommandCommit({ outcome, command, game: bundle.game, leagueGames }),
     );
     expect(await repository.readRunGame(state.runId, 1)).toEqual(bundle.game);
-    expect(await repository.listLeagueGames(state.runId)).toHaveLength(14);
+    expect(await repository.listLeagueResults(state.runId)).toHaveLength(14);
     expect((await repository.loadActiveDraft())?.season.leagueGamesAccepted).toBe(14);
   });
 

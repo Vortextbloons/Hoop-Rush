@@ -80,11 +80,11 @@ function applyAcceptGame(
     );
   }
   let leagueGamesAccepted = state.season.leagueGamesAccepted ?? 0;
-  if (state.locked.leagueSchedule !== undefined && command.leagueGames !== undefined) {
+  if (state.locked.leagueSchedule !== undefined && command.leagueGameIds !== undefined) {
     const expected = capRushLeagueSlotGames(state.locked, command.cursor);
-    const supplied = command.leagueGames ?? [];
+    const supplied = command.leagueGameIds;
     const expectedIds = expected.map((game) => game.gameId).sort();
-    const suppliedIds = supplied.map((game) => game.gameId).sort();
+    const suppliedIds = [...supplied].sort();
     if (
       expectedIds.length !== suppliedIds.length ||
       expectedIds.some((gameId, index) => suppliedIds[index] !== gameId)
@@ -96,8 +96,8 @@ function applyAcceptGame(
         'the background league games do not match the accepted slot',
       );
     }
-    for (const game of supplied) {
-      if (game.slot !== command.cursor) {
+    for (const gameId of supplied) {
+      if (!gameId.startsWith(`crl-${String(command.cursor).padStart(2, '0')}-`)) {
         return rejectCapRushCommand(
           state,
           command,
@@ -172,7 +172,7 @@ function applyAcceptLeagueGames(
   }
   const expected = capRushLeagueSlotGames(state.locked, command.slot);
   const expectedIds = expected.map((game) => game.gameId).sort();
-  const suppliedIds = command.leagueGames.map((game) => game.gameId).sort();
+  const suppliedIds = [...command.leagueGameIds].sort();
   if (
     expectedIds.length !== suppliedIds.length ||
     expectedIds.some((gameId, index) => suppliedIds[index] !== gameId)
@@ -184,8 +184,8 @@ function applyAcceptLeagueGames(
       'the background league games do not match the accepted slot',
     );
   }
-  for (const game of command.leagueGames) {
-    if (game.slot !== command.slot) {
+  for (const gameId of command.leagueGameIds) {
+    if (!gameId.startsWith(`crl-${String(command.slot).padStart(2, '0')}-`)) {
       return rejectCapRushCommand(
         state,
         command,

@@ -5,7 +5,7 @@
     capRushConferenceStandingsEntries,
     type CapRushConferenceStandings,
     type CapRushDraftState,
-    type CapRushLeagueGame,
+    type CapRushLeagueResult,
     type CapRushLockedInputs,
   } from '@hoop-rush/data-contracts';
   import PlayerFace from '#lib/components/PlayerFace.svelte';
@@ -40,9 +40,9 @@
     locked: CapRushLockedInputs;
     draft?: CapRushDraftState | null;
     standings?: CapRushConferenceStandings | null;
-    leagueGames?: readonly CapRushLeagueGame[];
+    leagueGames?: readonly CapRushLeagueResult[];
     art?: CapRushArt | null;
-    onGameSelect?: (game: CapRushLeagueGame) => void;
+    onGameSelect?: (game: CapRushLeagueResult) => void;
   } = $props();
 
   const team = $derived(
@@ -333,7 +333,7 @@
                         .result.winnerTeamId === teamId
                         ? 'text-positive'
                         : 'text-negative'}"
-                      onclick={() => onGameSelect(game.result as CapRushLeagueGame)}
+                      onclick={() => onGameSelect(game.result as CapRushLeagueResult)}
                     >
                       {userPoints}–{otherPoints}
                     </button>

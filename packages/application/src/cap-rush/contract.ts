@@ -7,6 +7,7 @@ import type {
   CapRushGameSummary,
   CapRushHistoryEntry,
   CapRushLeagueGame,
+  CapRushLeagueResult,
   CapRushPayrollStatus,
   CapRushPlayoffGameSummary,
   CapRushPostseason,
@@ -137,6 +138,9 @@ export interface CapRushService {
   listHistory(): Promise<readonly CapRushHistoryEntry[]>;
   listRunGames(runId: string): Promise<readonly CapRushStoredGame[]>;
   listPlayoffGames(runId: string): Promise<readonly CapRushStoredPlayoffGame[]>;
-  listLeagueGames(runId: string): Promise<readonly CapRushLeagueGame[]>;
+  /** Compact league results for schedules and standings; no box scores. */
+  listLeagueResults(runId: string): Promise<readonly CapRushLeagueResult[]>;
+  /** One league box score, loaded on demand. */
+  readLeagueGame(runId: string, gameId: string): Promise<CapRushLeagueGame | null>;
   abandonDraft(): Promise<void>;
 }

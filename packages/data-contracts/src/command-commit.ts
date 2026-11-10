@@ -25,6 +25,10 @@ export interface CapRushApplyOutcomeInput extends CommandCommit<
   readonly command: CapRushCommand;
   readonly game?: CapRushStoredGame;
   readonly playoffGame?: CapRushStoredPlayoffGame;
+  /**
+   * Full league games committed alongside the command. The command receipt
+   * names their ids; these rows carry the box scores the game table stores.
+   */
   readonly leagueGames?: readonly CapRushLeagueGame[];
   readonly report?: CapRushReport;
 }

@@ -39,23 +39,42 @@ interface FoulState {
   charged: number;
 }
 
+/**
+ * Facts the recording simulation already established for its own output.
+ *
+ * Callers outside the simulator keep the default, independent validation: the
+ * result is re-parsed and the input digest recomputed from the supplied input.
+ * The simulation may pass these because it built the result through the
+ * validated path and already computed the digest; the remaining checks are
+ * unchanged either way.
+ */
+export interface HavocBattleAuditFacts {
+  /** Digest already computed for exactly this input. */
+  readonly inputDigest?: string;
+  /** The result came straight out of the simulator's validated builder. */
+  readonly resultValidated?: boolean;
+}
+
 export function auditHavocBattleGame(
   input: HavocBattleInput,
   result: HavocBattleResult,
   tape?: HavocBattleTape,
+  facts: HavocBattleAuditFacts = {},
 ): HavocGameAudit {
   const findings: HavocAuditFinding[] = [];
   const fail = (code: string, message: string): void => {
     if (findings.length < 200) findings.push({ code, message: message.slice(0, 512) });
   };
 
-  const parsed = havocBattleResultSchema.safeParse(result);
-  if (!parsed.success) {
-    fail(
-      'result-schema',
-      `result does not satisfy havocBattleResultSchema: ${parsed.error.issues[0]?.message ?? 'unknown'}`,
-    );
-    return { ok: false, findings };
+  if (facts.resultValidated !== true) {
+    const parsed = havocBattleResultSchema.safeParse(result);
+    if (!parsed.success) {
+      fail(
+        'result-schema',
+        `result does not satisfy havocBattleResultSchema: ${parsed.error.issues[0]?.message ?? 'unknown'}`,
+      );
+      return { ok: false, findings };
+    }
   }
   if (result.gameNumber !== input.gameNumber)
     fail('input-identity', 'result game number differs from input');
@@ -70,7 +89,7 @@ export function auditHavocBattleGame(
   ) {
     fail('input-identity', 'result team display names differ from input');
   }
-  if (result.inputDigest !== havocBattleGameInputDigest(input)) {
+  if (result.inputDigest !== (facts.inputDigest ?? havocBattleGameInputDigest(input))) {
     fail('input-digest', 'result input digest does not match the supplied input');
   }
   if (result.winner !== (result.home.points > result.away.points ? 'home' : 'away')) {

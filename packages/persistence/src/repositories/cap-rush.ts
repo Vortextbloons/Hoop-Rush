@@ -3,7 +3,9 @@ import type {
   CapRushCommandResult,
   CapRushDraftState,
   CapRushHistoryEntry,
+  CapRushLeagueAggregate,
   CapRushLeagueGame,
+  CapRushLeagueResult,
   CapRushPlayback,
   CapRushReport,
   CapRushStoredGame,
@@ -18,12 +20,15 @@ import {
   capRushCommandSchema,
   capRushConferenceStandingsEntries,
   capRushLeagueGameSchema,
+  capRushLeagueResultOf,
   capRushReportSchema,
   capRushStoredGameSchema,
   capRushStoredPlayoffGameSchema,
 } from '@hoop-rush/data-contracts';
 import {
   auditHavocBattleGame,
+  capRushEmptyLeagueAggregate,
+  capRushFoldLeagueAggregate,
   havocBattleGameInputDigest,
   soloToBattleResult,
   capRushStateDigest,
@@ -35,6 +40,7 @@ import {
   storedCapRushDraftRowSchema,
   storedCapRushGameRowSchema,
   storedCapRushHistoryRowSchema,
+  storedCapRushLeagueAggregateRowSchema,
   storedCapRushLeagueGameRowSchema,
   storedCapRushPlaybackCursorRowSchema,
   storedCapRushPlaybackEvidenceRowSchema,
@@ -292,21 +298,20 @@ export class DexieCapRushRepository {
           command.command === 'accept-cap-rush-league-games',
         'stored league games require an accept command',
       );
-      const acceptedGames =
+      const acceptedIds =
         command.command === 'accept-cap-rush-league-games'
-          ? command.leagueGames
-          : (command.leagueGames ?? []);
+          ? command.leagueGameIds
+          : (command.leagueGameIds ?? []);
       const slot =
         command.command === 'accept-cap-rush-league-games' ? command.slot : command.cursor;
       invariant(
-        acceptedGames.length === leagueGames.length,
+        acceptedIds.length === leagueGames.length,
         'accept command does not describe the stored league games',
       );
       for (const leagueGame of leagueGames) {
-        const commandGame = acceptedGames.find((entry) => entry.gameId === leagueGame.gameId);
         invariant(
-          commandGame !== undefined && canonicalEquals(commandGame, leagueGame),
-          'stored league game does not match the accept command',
+          acceptedIds.includes(leagueGame.gameId),
+          'stored league game is missing from the accept command',
         );
         invariant(leagueGame.slot === slot, 'stored league game belongs to another slot');
       }
@@ -367,14 +372,15 @@ export class DexieCapRushRepository {
         broadcastResult !== null && playback.cursor === 0,
         'a new broadcast requires an initial cursor and user result',
       );
+      // The adapter validates the result again, and the committed receipt already
+      // proves this payload matches the stored state. Compute the battle input
+      // digest once and hand it to the audit instead of hashing twice.
+      const inputDigest = havocBattleGameInputDigest(playback.input);
       const audit = auditHavocBattleGame(
         playback.input,
-        soloToBattleResult(
-          broadcastResult,
-          broadcastResult.humanSide,
-          havocBattleGameInputDigest(playback.input),
-        ),
+        soloToBattleResult(broadcastResult, broadcastResult.humanSide, inputDigest),
         playback.tape,
+        { inputDigest, resultValidated: true },
       );
       invariant(audit.ok, 'the recorded broadcast does not reconcile with the accepted result');
     }
@@ -426,6 +432,7 @@ export class DexieCapRushRepository {
         this.db.capRushPlaybackCursors,
         this.db.capRushPlayoffGames,
         this.db.capRushLeagueGames,
+        this.db.capRushLeagueAggregates,
         this.db.capRushHistory,
         this.db.capRushReports,
       ],
@@ -543,6 +550,18 @@ export class DexieCapRushRepository {
                   updatedAtIso: now,
                 }),
               ),
+            );
+            // Fold the same commit into the compact aggregate so summary views
+            // never need to load these boxes again.
+            const existingAggregate =
+              (await this.readLeagueAggregate(result.runId)) ?? capRushEmptyLeagueAggregate();
+            await this.db.capRushLeagueAggregates.put(
+              storedCapRushLeagueAggregateRowSchema.parse({
+                saveSchemaVersion: CAP_RUSH_SAVE_SCHEMA_VERSION,
+                runId: result.runId,
+                aggregate: capRushFoldLeagueAggregate(existingAggregate, leagueGames),
+                updatedAtIso: now,
+              }),
             );
           }
           if (report !== null) {
@@ -699,6 +718,7 @@ export class DexieCapRushRepository {
         this.db.capRushPlaybackEvidence,
         this.db.capRushPlayoffGames,
         this.db.capRushLeagueGames,
+        this.db.capRushLeagueAggregates,
       ],
       async () => {
         const row: unknown = await this.db.capRushActive.get(CAP_RUSH_ACTIVE_DRAFT_RECORD_ID);
@@ -712,6 +732,7 @@ export class DexieCapRushRepository {
           await this.db.capRushPlaybackEvidence.where('runId').equals(runId).delete();
           await this.db.capRushPlayoffGames.where('runId').equals(runId).delete();
           await this.db.capRushLeagueGames.where('runId').equals(runId).delete();
+          await this.db.capRushLeagueAggregates.delete(runId as Id);
         }
       },
     );
@@ -746,14 +767,40 @@ export class DexieCapRushRepository {
     return playback === undefined ? game : { ...game, playback };
   }
 
-  async listLeagueGames(runId: string): Promise<CapRushLeagueGame[]> {
+  /**
+   * Compact league results for schedules, standings and records.
+   *
+   * This reads only the keys and scores the views need. Full box scores stay
+   * in the league-game table and load through {@link readLeagueGame} when a
+   * caller actually opens one.
+   */
+  async listLeagueResults(runId: string): Promise<CapRushLeagueResult[]> {
     const rows = await this.db.capRushLeagueGames.where('runId').equals(runId).toArray();
     return rows
       .map((row) =>
         parseStored(storedCapRushLeagueGameRowSchema, row, `cap rush league game ${runId}`),
       )
-      .map((row) => row.game)
+      .map((row) => capRushLeagueResultOf(row.game))
       .sort((left, right) => left.slot - right.slot || left.gameId.localeCompare(right.gameId));
+  }
+
+  async readLeagueGame(runId: string, gameId: string): Promise<CapRushLeagueGame | null> {
+    const stored = await getParsedRecord(
+      this.db.capRushLeagueGames,
+      [runId, gameId] as [string, string],
+      (row) => parseStored(storedCapRushLeagueGameRowSchema, row, `cap rush league game ${gameId}`),
+    );
+    return stored?.game ?? null;
+  }
+
+  async readLeagueAggregate(runId: string): Promise<CapRushLeagueAggregate | null> {
+    const row: unknown = await this.db.capRushLeagueAggregates.get(asRunId(runId));
+    if (row === undefined) return null;
+    return parseStored(
+      storedCapRushLeagueAggregateRowSchema,
+      row,
+      `cap rush league aggregate ${runId}`,
+    ).aggregate;
   }
 
   async readRunGame(runId: string, gameNumber: number): Promise<CapRushStoredGame | null> {
@@ -860,7 +907,9 @@ export type CapRushRepository = Pick<
   | 'applyOutcome'
   | 'listRunGames'
   | 'listPlayoffGames'
-  | 'listLeagueGames'
+  | 'listLeagueResults'
+  | 'readLeagueGame'
+  | 'readLeagueAggregate'
   | 'listHistory'
   | 'readReport'
   | 'updatePlayback'

@@ -7,6 +7,7 @@ import {
   capRushDraftStateSchema,
   capRushDigestSchema,
   capRushHistoryEntrySchema,
+  capRushLeagueAggregateSchema,
   capRushLeagueGameIdSchema,
   capRushLeagueGameSchema,
   capRushPlaybackSchema,
@@ -209,3 +210,20 @@ export const storedCapRushReportRowSchema = z
     }
   });
 export type StoredCapRushReportRow = z.infer<typeof storedCapRushReportRowSchema>;
+
+export const storedCapRushLeagueAggregateRowSchema = z
+  .object({
+    saveSchemaVersion: z.literal(CAP_RUSH_SAVE_SCHEMA_VERSION),
+    runId: idSchema,
+    aggregate: capRushLeagueAggregateSchema,
+    updatedAtIso: isoDateSchema,
+  })
+  .superRefine((row, ctx) => {
+    if (row.aggregate.games !== row.aggregate.gameIds.length) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'league aggregate game count disagrees with its ids',
+      });
+    }
+  });
+export type StoredCapRushLeagueAggregateRow = z.infer<typeof storedCapRushLeagueAggregateRowSchema>;
