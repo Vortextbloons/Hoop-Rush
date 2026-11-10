@@ -38,6 +38,8 @@ try {
     'panic=abort',
     '-C',
     'codegen-units=1',
+    '-C',
+    'strip=symbols',
     '-o',
     binary,
   ]);
@@ -46,6 +48,8 @@ try {
   const { instance } = await WebAssembly.instantiate(bytes);
   const initializationMs = performance.now() - startup;
   const wasm = instance.exports as unknown as GameWasm;
+  deepStrictEqual(WebAssembly.Module.imports(new WebAssembly.Module(bytes)), []);
+  deepStrictEqual(wasm.simulate(0, 0), 1);
   const packaged = loadPackagedData();
   const data = new PackagedData(packaged.manifest, packaged.dir);
   const profile = data.eraProfile();
@@ -189,6 +193,14 @@ try {
     seed: fixtureSeed('wasm-season', i),
     gameNumber: i + 1,
   }));
+  const schedulePreparation = opponents.map((away) => prepareWasmGame({ ...base, away }));
+  schedule.forEach((input, i) => {
+    const candidate = simulateWasmGame(wasm, input, schedulePreparation[i % 30]!);
+    deepStrictEqual(candidate, simulateGame(input, context));
+    deepStrictEqual(checkGameResult(candidate), []);
+    parityGames++;
+    if (candidate.overtimePeriods > 0) overtimeGames++;
+  });
   const seasonSamples = [[], []] as [number[], number[]];
   for (let round = 0; round < 21; round++) {
     for (let offset = 0; offset < 2; offset++) {

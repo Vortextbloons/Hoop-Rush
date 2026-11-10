@@ -1,4 +1,4 @@
-const CAPACITY: usize = 32768;
+const CAPACITY: usize = 6926;
 static mut INPUT: [f64; CAPACITY] = [0.0; CAPACITY];
 static mut OUTPUT: [f64; 481] = [0.0; 481];
 
@@ -415,13 +415,17 @@ impl Game<'_> {
                 }
             }
         }
-        0
+        if self.stats[0][0][0] != self.stats[1][0][0] {
+            30
+        } else {
+            0
+        }
     }
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn simulate(seed: u32, length: u32) -> u32 {
-    if length as usize > CAPACITY {
+    if length as usize != CAPACITY {
         return 1;
     }
     let data = unsafe { core::slice::from_raw_parts(input_ptr(), length as usize) };

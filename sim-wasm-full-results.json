@@ -4,62 +4,62 @@
   "cpu": "AMD Ryzen 5 9600X 6-Core Processor             ",
   "platform": "win32",
   "arch": "x64",
-  "wasmBytes": 115902,
-  "initializationMs": 2.2135000000000673,
-  "parityGames": 4200,
-  "overtimeGames": 110,
+  "wasmBytes": 29211,
+  "initializationMs": 4.663099999999986,
+  "parityGames": 4282,
+  "overtimeGames": 113,
   "gamesPerBatch": 900,
   "rounds": 15,
   "results": [
     {
       "backend": "TypeScript simulateGame",
-      "medianBatchMs": 136.3431999999998,
-      "p95BatchMs": 149.7462999999998,
-      "minBatchMs": 130.67889999999989,
-      "gamesPerSecond": 6600.989268258346
+      "medianBatchMs": 194.95259999999962,
+      "p95BatchMs": 200.57729999999992,
+      "minBatchMs": 163.88870000000043,
+      "gamesPerSecond": 4616.506781648472
     },
     {
       "backend": "TypeScript prepared batch",
-      "medianBatchMs": 105.16040000000066,
-      "p95BatchMs": 117.07860000000028,
-      "minBatchMs": 100.47220000000016,
-      "gamesPerSecond": 8558.354665824723
+      "medianBatchMs": 145.94309999999996,
+      "p95BatchMs": 154.77990000000045,
+      "minBatchMs": 122.36779999999999,
+      "gamesPerSecond": 6166.786919011589
     },
     {
       "backend": "Rust/Wasm full game (prepared)",
-      "medianBatchMs": 24.542199999999866,
-      "p95BatchMs": 29.772699999999986,
-      "minBatchMs": 23.28360000000066,
-      "gamesPerSecond": 36671.529039776586
+      "medianBatchMs": 29.284599999999955,
+      "p95BatchMs": 30.318900000000212,
+      "minBatchMs": 23.766700000000128,
+      "gamesPerSecond": 30732.876665551223
     }
   ],
   "cold": [
     {
       "fixture": "equal",
-      "typescriptMs": 0.12914999999975407,
-      "wasmPreparationAndGameMs": 0.1876999999999498
+      "typescriptMs": 0.2117000000007465,
+      "wasmPreparationAndGameMs": 0.32630000000062864
     },
     {
       "fixture": "strong-medium",
-      "typescriptMs": 0.13099999999985812,
-      "wasmPreparationAndGameMs": 0.18524999999999636
+      "typescriptMs": 0.21810000000004948,
+      "wasmPreparationAndGameMs": 0.3283999999994194
     },
     {
       "fixture": "strong-weak",
-      "typescriptMs": 0.13094999999975698,
-      "wasmPreparationAndGameMs": 0.19295000000010987
+      "typescriptMs": 0.2098999999998341,
+      "wasmPreparationAndGameMs": 0.33224999999947613
     }
   ],
   "season82": [
     {
       "backend": "TypeScript prepared batch",
-      "medianMs": 10.29785000000038,
-      "p95Ms": 12.610400000000482
+      "medianMs": 15.018000000000029,
+      "p95Ms": 17.459500000000844
     },
     {
       "backend": "Rust/Wasm including preparation",
-      "medianMs": 6.364049999999679,
-      "p95Ms": 8.638700000000426
+      "medianMs": 10.345400000001064,
+      "p95Ms": 11.674600000000282
     }
   ],
   "limitations": [

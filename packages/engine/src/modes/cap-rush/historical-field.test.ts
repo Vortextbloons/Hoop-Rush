@@ -71,8 +71,8 @@ test('league targets allow weak and strong fields within a wide band with neares
     const rng = createRng(havocInstanceSeed(seed, 'cap-rush-league-strength-v1'));
     const target = 65 + ((rng.next() + rng.next()) / 2) * 20;
     const field = buildCapRushHistoricalField(bracket, catalog, seed);
-    const strengths = field.opponents.map((team) =>
-      team.players.reduce((sum, player) => sum + (player.overall ?? 0), 0) / 5,
+    const strengths = field.opponents.map(
+      (team) => team.players.reduce((sum, player) => sum + (player.overall ?? 0), 0) / 5,
     );
     expect(strengths[0]).toBe(45);
     expect(strengths[1]).toBe(95);

@@ -212,7 +212,7 @@ export function prepareWasmGame(input: GameSimulationInput): Float64Array {
             );
           }
   });
-  if (data.length > 32768 || data.some((value) => !Number.isFinite(value)))
+  if (data.length !== 6926 || data.some((value) => !Number.isFinite(value)))
     throw new Error('Invalid Wasm preparation');
   return Float64Array.from(data);
 }
@@ -259,14 +259,16 @@ export function simulateWasmGame(
   for (const side of [0, 1] as const) {
     for (let index = 0; index < 6; index++) {
       const target = index === 0 ? recorder.sides[side] : recorder.players[side][index - 1]!;
-      for (const [fieldIndex, field] of fields.entries()) {
+      for (let fieldIndex = 0; fieldIndex < fields.length; fieldIndex++) {
+        const field = fields[fieldIndex]!;
         if (field in target)
           (target as unknown as Record<string, number>)[field] = output[cursor + fieldIndex]!;
       }
-      SHOT_ZONES.forEach((zone, i) => {
+      for (let i = 0; i < SHOT_ZONES.length; i++) {
+        const zone = SHOT_ZONES[i]!;
         target.zoneAttempts[zone] = output[cursor + 25 + i]!;
         target.zoneMakes[zone] = output[cursor + 30 + i]!;
-      });
+      }
       cursor += 35;
     }
     recorder.sides[side].periodPoints = Array.from(output.subarray(cursor, cursor + periods));
