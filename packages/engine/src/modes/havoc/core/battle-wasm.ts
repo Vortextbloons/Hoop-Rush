@@ -1504,6 +1504,7 @@ export class HavocBattleWasmSimulation {
   private possessionId = 0;
   private books?: [PreparedSideResult, PreparedSideResult];
   private struck: [number, number] = [-1, -1];
+  private struckInstalled: [boolean, boolean] = [false, false];
 
   constructor(
     input: HavocBattleInput,
@@ -1533,6 +1534,7 @@ export class HavocBattleWasmSimulation {
       return;
     this.books = books;
     this.struck = struck;
+    this.struckInstalled = [false, false];
     const preparedBooks: [PreparedSide, PreparedSide] = [books[0].prepared, books[1].prepared];
     preparedBooks[0].defenseTeam = books[1].prepared.team;
     preparedBooks[0].defensePrep = books[1].prepared.prep;
@@ -1542,26 +1544,42 @@ export class HavocBattleWasmSimulation {
       const prepared = preparedBooks[side];
       const normal = buildBattleTeamBlock(prepared, books);
       this.writeLayout(side, 0, normal);
-      const struckIndex = battleKernel().battle_struck_index(this.init.handle, side);
-      if (struckIndex < 0) continue;
-      const struckSlot = books[side].bindings.findIndex((binding) => binding.index === struckIndex);
-      const pool = books[side].players.filter((_player, slot) => slot !== struckSlot);
-      const team: SimulationTeam = {
-        teamId: prepared.team.teamId,
-        displayName: prepared.team.displayName,
-        players: pool,
-      };
-      const keyByPlayer = new Map<SimulationPlayer, string>();
-      books[side].players.forEach((player, slot) => {
-        keyByPlayer.set(
-          player,
-          books[side].bindings[slot]?.participant.instanceId ?? player.playerId,
-        );
-      });
-      const adjustedPrep = prepareTeam(team, this.input.profile, { aggregateDivisor: 5 });
-      const struck = buildBattleTeamBlock(prepared, books, { prep: adjustedPrep, pool });
-      this.writeLayout(side, 1, struck);
     }
+  }
+
+  private ensureStruckLayouts(): void {
+    if (this.books === undefined) return;
+    for (const side of [0, 1] as const) {
+      if (this.struckInstalled[side]) continue;
+      if (battleKernel().battle_required_layout(this.init.handle, side) === 0) continue;
+      this.installStruckLayout(side, this.books);
+      this.struckInstalled[side] = true;
+    }
+  }
+
+  private installStruckLayout(side: 0 | 1, books: [PreparedSideResult, PreparedSideResult]): void {
+    const prepared = books[side].prepared;
+    const struckIndex = this.struck[side];
+    if (struckIndex < 0) return;
+    const struckSlot = books[side].bindings.findIndex((binding) => binding.index === struckIndex);
+    const pool = books[side].players.filter((_player, slot) => slot !== struckSlot);
+    const team: SimulationTeam = {
+      teamId: prepared.team.teamId,
+      displayName: prepared.team.displayName,
+      players: pool,
+    };
+    const adjustedPrep = prepareTeam(team, this.input.profile, {
+      keyOf: (player) =>
+        books[side].bindings[books[side].players.indexOf(player)]?.participant.instanceId ??
+        player.playerId,
+      responsibilitySlotOf: (player) => books[side].slots.get(player) ?? 0,
+      evidenceOf: (player) => books[side].evidence.get(player),
+      aggregateDivisor: 5,
+      rebounderWeightScale: (player) => books[side].scale.get(player) ?? 1,
+      reboundMeanReach: (player) => books[side].reach.get(player) ?? 0,
+    });
+    const struck = buildBattleTeamBlock(prepared, books, { prep: adjustedPrep, pool });
+    this.writeLayout(side, 1, struck);
   }
 
   private writeLayout(side: 0 | 1, struck: 0 | 1, data: readonly number[]): void {

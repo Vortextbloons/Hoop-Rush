@@ -1,4 +1,4 @@
-// Shared possession/trip kernel used by Havoc and Cap Rush.
+﻿// Shared possession/trip kernel used by Havoc and Cap Rush.
 //
 // TypeScript prepares the team tables (the same `prepareTeam` output used by
 // the TypeScript reference stepper) and owns every mode rule through the hook
@@ -4960,9 +4960,6 @@ fn battle_recompute_equalizer(handle: u32, tipoff: bool) -> bool {
         }
         battle.equalizer_applied[side] = true;
     }
-    if !tipoff && changed {
-        battle_rebuild_profiles(handle);
-    }
     changed
 }
 
@@ -5456,10 +5453,7 @@ pub extern "C" fn battle_boundary(handle: u32) -> u32 {
     };
     let changed = battle_process_exits_inner(battle);
     let equalizer_changed = battle_recompute_equalizer(handle, false);
-    let time_lord_changed = battle_recompute_time_lord(handle, true);
-    let darwinism_changed = battle.darwinism_dirty;
-    battle.darwinism_dirty = false;
-    if changed || equalizer_changed || time_lord_changed || darwinism_changed {
+    let _time_lord_changed = battle_recompute_time_lord(handle, true);\n    let darwinism_changed = battle.darwinism_dirty;\n    battle.darwinism_dirty = false;\n    if changed || equalizer_changed || darwinism_changed {
         battle_rebuild_all(handle);
         1
     } else {
@@ -5567,6 +5561,14 @@ fn battle_kill_layout(battle: &mut Battle, side: usize, struck: bool) -> Vec<f64
     battle.layouts[side * 2 + struck as usize]
         .take()
         .unwrap_or_default()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn battle_required_layout(handle: u32, side: u32) -> u32 {
+    let Some(battle) = battle_ref(handle) else {
+        return 0;
+    };
+    battle_struck_for_side(battle, side as usize) as u32
 }
 
 #[unsafe(no_mangle)]

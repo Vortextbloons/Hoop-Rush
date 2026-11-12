@@ -1,0 +1,170 @@
+<section id="rating-distribution" data-viz-composition>
+  <style>
+    #rating-distribution {
+      font-family: var(--font-sans);
+      color: var(--foreground);
+      display: grid;
+      gap: 16px;
+    }
+    #rating-distribution .rating-inputs {
+      display: grid;
+      gap: 10px;
+    }
+    #rating-distribution .rating-row {
+      display: grid;
+      grid-template-columns: 70px minmax(80px, 110px) 1fr;
+      align-items: center;
+      gap: 12px;
+    }
+    #rating-distribution .rating-row small {
+      color: var(--muted-foreground);
+    }
+    #rating-distribution .form-control {
+      box-sizing: border-box;
+      max-width: 100%;
+    }
+    #rating-distribution textarea {
+      width: 100%;
+      box-sizing: border-box;
+    }
+    #rating-distribution .status {
+      font-variant-numeric: tabular-nums;
+    }
+    #rating-distribution .invalid {
+      color: var(--destructive);
+    }
+    @media (max-width: 420px) {
+      #rating-distribution .rating-row {
+        grid-template-columns: 60px 85px 1fr;
+        gap: 8px;
+      }
+    }
+  </style>
+  <div data-viz-container></div>
+  <script type="application/json" data-viz-chart>
+    {
+      "id": "rating-targets",
+      "title": "Player peak rating targets",
+      "height": 420,
+      "description": "Current and proposed shares of qualifying unique-player peaks. The calibration population is 3,041 players; these are not season-card probabilities.",
+      "columns": ["Overall", "Current target", "Proposed target"],
+      "rows": [
+        ["100", 0.0005, 0.0005],
+        ["95-99", 0.0045, 0.0045],
+        ["90-94", 0.025, 0.025],
+        ["85-89", 0.06, 0.06],
+        ["80-84", 0.14, 0.14],
+        ["75-79", 0.25, 0.25],
+        ["70-74", 0.25, 0.25],
+        ["65-69", 0.135, 0.135],
+        ["60-64", 0.045, 0.045],
+        ["50-59", 0.03, 0.03],
+        ["40-49", 0.06, 0.06]
+      ],
+      "spec": {
+        "type": "horizontalBar",
+        "y": "Overall",
+        "x": ["Current target", "Proposed target"],
+        "xLabel": "Share of players",
+        "showLegend": true,
+        "sortOrder": "original",
+        "valueFormat": { "style": "percent", "maximumFractionDigits": 2 }
+      }
+    }
+  </script>
+  <div class="rating-inputs" aria-label="Proposed percentage per rating band"></div>
+  <div class="viz-controls">
+    <span class="status" aria-live="polite"></span>
+    <button class="btn" type="button" id="rating-normalize">Scale all to 100%</button>
+  </div>
+  <label class="form-label" for="rating-proposal">Proposed targets to send in your reply</label>
+  <textarea class="form-control" id="rating-proposal" readonly rows="5"></textarea>
+</section>
+<script type="module">
+  import { mountChart } from 'https://persistent.oaistatic.com/plugins/visualize/charts/1.1.6/element.js';
+  const root = document.getElementById('rating-distribution');
+  const config = JSON.parse(root.querySelector('[data-viz-chart]').textContent);
+  const defaults = config.rows.map((row) => row[1] * 100);
+  const observed = [2, 13, 76, 180, 407, 746, 758, 407, 121, 98, 190];
+  const nf = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
+  let proposed = [...defaults];
+  const validState = (state) =>
+    state?.version === 1 &&
+    Array.isArray(state.percentages) &&
+    state.percentages.length === 11 &&
+    state.percentages.every((value) => Number.isFinite(value) && value >= 0 && value <= 100);
+  const saved = window.openai?.widgetState?.modelContent;
+  if (validState(saved)) proposed = [...saved.percentages];
+  const controls = root.querySelector('.rating-inputs');
+  config.rows.forEach((row, index) => {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'rating-row';
+    const label = document.createElement('label');
+    label.htmlFor = `rating-band-${index}`;
+    label.textContent = row[0];
+    const input = document.createElement('input');
+    Object.assign(input, {
+      id: label.htmlFor,
+      className: 'form-control',
+      type: 'number',
+      min: '0',
+      max: '100',
+      step: '0.05',
+      value: String(proposed[index]),
+    });
+    input.setAttribute('aria-label', `Proposed percent of players rated ${row[0]}`);
+    const detail = document.createElement('small');
+    detail.textContent = `% · ${observed[index]} catalog players currently`;
+    wrapper.append(label, input, detail);
+    controls.append(wrapper);
+    input.addEventListener('input', () => {
+      proposed[index] = Number(input.value);
+      update(true);
+    });
+  });
+  function buildConfig() {
+    return {
+      ...config,
+      rows: config.rows.map((row, index) => [row[0], row[1], proposed[index] / 100]),
+    };
+  }
+  const chart = mountChart(root.querySelector('[data-viz-container]'), buildConfig());
+  function update(save) {
+    const sum = proposed.reduce((total, value) => total + value, 0);
+    const valid = proposed.every((value) => Number.isFinite(value) && value >= 0 && value <= 100);
+    const balanced = valid && Math.abs(sum - 100) < 0.000001;
+    const status = root.querySelector('.status');
+    status.textContent = `Total: ${nf.format(sum)}%${balanced ? ' · balanced' : ' · needs 100%'}`;
+    status.classList.toggle('invalid', !balanced);
+    if (valid) chart.config = buildConfig();
+    root.querySelector('#rating-proposal').value =
+      `Set player-peak overall targets to: ${config.rows.map((row, index) => `${row[0]}: ${nf.format(proposed[index])}%`).join('; ')}. Total: ${nf.format(sum)}%. Review these and adjust if needed before regenerating ratings.`;
+    root.querySelector('#rating-normalize').disabled = !valid || sum <= 0;
+    if (save && valid && window.openai?.setWidgetState)
+      window.openai
+        .setWidgetState({
+          modelContent: { version: 1, percentages: proposed },
+          privateContent: null,
+        })
+        .catch(() => {});
+  }
+  root.querySelector('#rating-normalize').addEventListener('click', () => {
+    const sum = proposed.reduce((total, value) => total + value, 0);
+    if (sum <= 0) return;
+    proposed = proposed.map((value) => (value * 100) / sum);
+    root.querySelectorAll('input').forEach((input, index) => {
+      input.value = String(proposed[index]);
+    });
+    update(true);
+  });
+  window.addEventListener('openai:set_globals', (event) => {
+    const state = event.detail?.globals?.widgetState?.modelContent;
+    if (!validState(state)) return;
+    proposed = [...state.percentages];
+    root.querySelectorAll('input').forEach((input, index) => {
+      input.value = String(proposed[index]);
+    });
+    update(false);
+  });
+  update(false);
+</script>

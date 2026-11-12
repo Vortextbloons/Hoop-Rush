@@ -1,6 +1,6 @@
 {
   "note": "Legacy = frozen pre-migration TypeScript battle/possession runtime. Current = live production runtime. Both sides use the same production digest/serializer functions inside the timed section, and parity is checked first with the reference canonical serializer.",
-  "capturedAt": "2026-11-12T00:04:14.417Z",
+  "capturedAt": "2026-11-12T00:35:19.247Z",
   "metadata": {
     "bun": "1.4.4",
     "node": "v26.3.0",
@@ -30,8 +30,8 @@
       ]
     }
   },
-  "rounds": 15,
-  "gamesPerRound": 20,
+  "rounds": 9,
+  "gamesPerRound": 6,
   "parity": true,
   "rows": [
     {
@@ -61,9 +61,9 @@
         "resultDigest": "b5ebafaa6076263efab14798394d615a",
         "tapeDigest": "cf2ccafd289963898a39283382215b8d"
       },
-      "legacyMs": 71.03570000000013,
-      "currentMs": 71.16129999999998,
-      "speedup": 0.9982349957069383,
+      "legacyMs": 31.969100000000026,
+      "currentMs": 31.887299999999982,
+      "speedup": 1.0025652846117434,
       "currentChanged": true
     },
     {
@@ -93,9 +93,9 @@
         "resultDigest": "588abd93401cf637ffb35f1125c90163",
         "tapeDigest": "8a0ed0fed49c06da57f89bb4b9ea246e"
       },
-      "legacyMs": 38.90069999999969,
-      "currentMs": 39.21080000000029,
-      "speedup": 0.9920914645964735,
+      "legacyMs": 15.540399999999977,
+      "currentMs": 13.964299999999866,
+      "speedup": 1.1128663806993637,
       "currentChanged": true
     },
     {
@@ -125,9 +125,9 @@
         "resultDigest": "cb0ed399c7de44b5bc265c035ebea5e9",
         "tapeDigest": "f5361af9715dea1542d95a1f20cf0389"
       },
-      "legacyMs": 76.39120000000003,
-      "currentMs": 62.214300000000094,
-      "speedup": 1.2278720487090575,
+      "legacyMs": 21.470100000000002,
+      "currentMs": 17.939599999999928,
+      "speedup": 1.1967992597382378,
       "currentChanged": true
     },
     {
@@ -157,9 +157,9 @@
         "resultDigest": "c10e9bfd8ec386e99d9be6b7eb0aabed",
         "tapeDigest": "d3b75092d0dc1f06a614afbcaf1b76c2"
       },
-      "legacyMs": 62.13389999999981,
-      "currentMs": 57.4975000000004,
-      "speedup": 1.0806365494151813,
+      "legacyMs": 22.423000000000002,
+      "currentMs": 20.333599999999933,
+      "speedup": 1.1027560294291259,
       "currentChanged": true
     },
     {
@@ -189,9 +189,9 @@
         "resultDigest": "efdf41045ada5c0854d4fb9e81dd3614",
         "tapeDigest": "5b29abe4a537c2d89210469e968a1e74"
       },
-      "legacyMs": 42.845900000000256,
-      "currentMs": 49.85819999999967,
-      "speedup": 0.8593551311519577,
+      "legacyMs": 13.550499999999829,
+      "currentMs": 12.672300000000178,
+      "speedup": 1.0693007583469172,
       "currentChanged": true
     },
     {
@@ -221,9 +221,9 @@
         "resultDigest": "dc53e1636a147057eaf2abadc3326ed3",
         "tapeDigest": "609163f1e6523e0db47fdfd71d127081"
       },
-      "legacyMs": 47.38270000000011,
-      "currentMs": 58.721700000000055,
-      "speedup": 0.8069027293147178,
+      "legacyMs": 14.024799999999686,
+      "currentMs": 14.789299999999912,
+      "speedup": 0.948307222113269,
       "currentChanged": true
     },
     {
@@ -253,9 +253,9 @@
         "resultDigest": "95503dde985d5302a8fa92e40c1fb64e",
         "tapeDigest": "f7193ebd9a9a56c15dcf6557cae9428d"
       },
-      "legacyMs": 51.63590000000113,
-      "currentMs": 47.16980000000149,
-      "speedup": 1.0946813427235116,
+      "legacyMs": 14.864199999999983,
+      "currentMs": 12.823199999999815,
+      "speedup": 1.1591646390916617,
       "currentChanged": true
     },
     {
@@ -289,9 +289,9 @@
         "resultDigest": "e296e2125e6f518e7630dfb832799dc2",
         "tapeDigest": "50c4950340f14e7feccf46a516f48013"
       },
-      "legacyMs": 42.79749999999876,
-      "currentMs": 43.62459999999919,
-      "speedup": 0.9810405138385121,
+      "legacyMs": 13.814099999999598,
+      "currentMs": 14.130500000000211,
+      "speedup": 0.9776087187289475,
       "currentChanged": true
     },
     {
@@ -325,9 +325,9 @@
         "resultDigest": "f7ee8fb55f41e70959a84bcfc0d0cd45",
         "tapeDigest": "92bb9bf17a7e6935f096f887a1a0c001"
       },
-      "legacyMs": 42.95509999999922,
-      "currentMs": 44.90620000000126,
-      "speedup": 0.9565516565640827,
+      "legacyMs": 13.716600000000199,
+      "currentMs": 17.651499999999942,
+      "speedup": 0.7770784352604733,
       "currentChanged": true
     },
     {
@@ -361,9 +361,9 @@
         "resultDigest": "0624740c9b653e48f85db62afb0851fc",
         "tapeDigest": "d3878c79318ca22dfad590e7ea59cd49"
       },
-      "legacyMs": 57.52850000000035,
-      "currentMs": 53.73829999999907,
-      "speedup": 1.0705307015666916,
+      "legacyMs": 18.584299999999985,
+      "currentMs": 16.96730000000025,
+      "speedup": 1.095300961260761,
       "currentChanged": true
     },
     {
@@ -397,9 +397,9 @@
         "resultDigest": "8fbe916426079ef0bb119e2227853014",
         "tapeDigest": "24020f5270d9135602420b68d33392c2"
       },
-      "legacyMs": 59.754400000001624,
-      "currentMs": 67.70300000000134,
-      "speedup": 0.882596044488434,
+      "legacyMs": 19.13700000000017,
+      "currentMs": 20.28670000000011,
+      "speedup": 0.9433274016966814,
       "currentChanged": true
     }
   ]
