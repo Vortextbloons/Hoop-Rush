@@ -19,7 +19,7 @@ simulation implementation.
 - `src/commands/` — the handlers and their basketball metrics. Calibration
   gates, cohort definitions, and artifact schemas stay with each command.
 - `src/gen-*.ts` — standalone generators run through package scripts
-  (`gen-fixtures`, `gen-season-assets`, `gen-collection-catalog` for
+  (`gen-fixtures`, `gen-collection-catalog` for
   `static/data/collection/` player catalog artifacts, ...), not through the
   command registry.
 

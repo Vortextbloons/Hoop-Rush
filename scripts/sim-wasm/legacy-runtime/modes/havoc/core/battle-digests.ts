@@ -1,0 +1,34 @@
+import type {
+  HavocBattleInput,
+  HavocBattleResult,
+  HavocBattleTape,
+  JsonData,
+} from '../../../../../../packages/data-contracts/src/index.ts';
+import {
+  canonicalJsonDataDigest,
+  havocDigestSchema,
+} from '../../../../../../packages/data-contracts/src/index.ts';
+
+/**
+ * Digest prefixes are part of the frozen digest discipline: a value written by
+ * one prefix must never collide with another. Version them with the rules.
+ */
+export const HAVOC_BATTLE_INPUT_DIGEST_PREFIX = 'havoc-battle-input-v1:';
+export const HAVOC_BATTLE_RESULT_DIGEST_PREFIX = 'havoc-battle-result-v1:';
+export const HAVOC_BATTLE_TAPE_DIGEST_PREFIX = 'havoc-battle-tape-v1:';
+
+export function digestOf(prefix: string, value: JsonData): string {
+  return havocDigestSchema.parse(canonicalJsonDataDigest(prefix, value));
+}
+
+export function havocBattleGameInputDigest(input: HavocBattleInput): string {
+  return digestOf(HAVOC_BATTLE_INPUT_DIGEST_PREFIX, input);
+}
+
+export function havocBattleGameResultDigest(result: HavocBattleResult): string {
+  return digestOf(HAVOC_BATTLE_RESULT_DIGEST_PREFIX, result);
+}
+
+export function havocBattleGameTapeDigest(tape: HavocBattleTape): string {
+  return digestOf(HAVOC_BATTLE_TAPE_DIGEST_PREFIX, tape);
+}

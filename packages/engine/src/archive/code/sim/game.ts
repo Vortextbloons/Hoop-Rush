@@ -17,7 +17,11 @@ import {
   recorderSideStatLine,
   type SideIndex,
 } from '../../../sim/recorder.ts';
-import { createGameState, createTripContext, resolveTrip } from '../../../sim/possession.ts';
+import {
+  createGameState,
+  createTripContext,
+  resolveTripWithTypeScript as resolveTrip,
+} from '../../../sim/possession.ts';
 import { buildFacts } from '../../../sim/facts.ts';
 import { prepareTeam, type TeamPrep } from '../../../sim/prepare.ts';
 export interface TripObservation {

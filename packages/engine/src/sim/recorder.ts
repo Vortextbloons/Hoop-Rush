@@ -167,6 +167,9 @@ export class GameRecorder {
     }
     this.activeSlots[side] = [...rosterIndices];
   }
+  activeRosterIndices(side: SideIndex): readonly number[] {
+    return this.activeSlots[side];
+  }
   playSeconds(side: SideIndex, rosterIndex: number, seconds: number): void {
     this.playerAtRosterIndex(side, rosterIndex).seconds += seconds;
   }

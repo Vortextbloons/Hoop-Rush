@@ -90,6 +90,12 @@ export function capRushMultiplayerApronFor(input: {
       onPassIntercepted(passer, defender) {
         for (const runtime of runtimes) runtime.onPassIntercepted(passer, defender);
       },
+      completeBattle() {
+        for (const runtime of runtimes) runtime.completeBattle();
+      },
+      battleApronStates() {
+        return runtimes.map((runtime) => runtime.battleApronState());
+      },
     },
     facts: () => runtimes.flatMap((runtime) => [...runtime.recordedFacts()]),
   };

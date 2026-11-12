@@ -20,6 +20,8 @@ gathers intent, the engine owns basketball rules, adapters own I/O.
 ## Entry points
 
 ```text
+@hoop-rush/application/cap-rush        cap rush solo session (draft/season/postseason)
+@hoop-rush/application/cap-rush-multiplayer cap rush room session and ports
 @hoop-rush/application/challenge  challenge run session (classic/sandbox job lifecycle)
 @hoop-rush/application/draft-duel draft duel room session (transport/repository ports)
 @hoop-rush/application/fixed-five fixed-five room session + command policy/retry helpers
@@ -80,30 +82,19 @@ gathers intent, the engine owns basketball rules, adapters own I/O.
 - `HavocSession` + ports: the havoc draft/run/season/comparison lifecycle with
   a runner port, repository port, asset port, and id port; `HavocServiceError`
   and the run/history view contract live here (`src/havoc/`).
-- Season block wire helpers moved out of the web runner:
-  `buildWorkerRequest`, `acceptWorkerResult`, `SeasonRunnerEvent`,
-  `SeasonBlockStartInput`, `SeasonBlockResumeInput`, `SeasonBlockRunner`,
-  `SeasonBlockTransport`, `SeasonArtifactUrls` (`src/season/block-wire.ts`).
-- `SEASON_COMMAND_POLICY`, `SEASON_BLOCK_POLICY`, `canResubmitBlock`
-  (`src/season/policies.ts`).
+- `CapRushSession` + ports: the Cap Rush draft/season/postseason lifecycle with
+  draft repository, asset, and id ports (`src/cap-rush/`).
+- `CapRushMultiplayerSession` + ports: the shared auction draft, league season,
+  and playoff coordination (`src/cap-rush-multiplayer/`).
 
-## Migration status (Season Run session)
+## History
 
-Landed:
+Season Run was removed on 2026-10-14 and Ultimate Run/Collection mode on
+2026-10-22. Their sessions, policies, and wire helpers no longer exist in this
+package; treat any `season/` or `SeasonSession` reference in older notes as
+historical.
 
-1. Shared submission runtime moved from `apps/web/src/lib/submit`.
-2. Season command/block policies moved here (web re-exports them).
-3. Season domain error classes moved to `data-contracts`
-   (`SeasonRunLoadError`, `SeasonRunCommandStaleStateError`, ...).
-4. Block wire/acceptance helpers moved here (`block-wire.ts`).
-5. **`SeasonSession` landed**: the former web `season-hub-state.ts` now lives
-   in `src/season/session.ts`, constructed through the ports in `ports.ts`.
-   The snapshot cache is instance-scoped (`state-cache.ts`), and a `disposed`
-   guard drops late continuations. The web app builds it through
-   `apps/web/src/lib/season/season-session-ports.ts`; the old web hub and
-   cache modules are deleted, and `session.test.ts` (23 tests) runs here.
-
-Stage 7 status: tooling consolidated and dead code removed.
+## Tooling status
 
 - The CLI is a typed command registry (`tools/cli/src/registry/`) with pinned
   command surface and help fixtures; calibration artifacts, cohorts, and gate
@@ -159,42 +150,9 @@ Stage 6 landed: storage and multiplayer adapters simplified.
   notice, guard storage). Web keeps presenters, controllers, composition, and
   browser adapters; `createDraftDuelSession` stays in web as composition.
 
-Stage 4 landed: engine season orchestration is split and de-duplicated.
-`postseason.ts` (1,911 lines) became `postseason/{schedule,state,play-in,
-bracket,injuries,game,progression}` with a facade, and the three postseason
-command handlers share one `advanceSeasonPostseason` loop. `block.ts` (2,174
-lines) became `block/{validation,preparation,execution,assembly,commit,audit,
-run}` with a facade. Shared regular-season/postseason mechanisms now live in
-`injuries.ts` (`rollInjuryWithSeedNamespace`), `health.ts`
-(`seasonGameHealthSeamWithRoll`), `injury-events.ts`, and `game-launch.ts`;
-deliberate differences (postseason ignores the rehab premium) are pinned by
-`injuries.test.ts`. Golden pins added before the split:
-`block-golden.test.ts` (block-0 checkpoint/state/commit digests),
-`season-block-validation.test.ts` (rejection matrix), and
-`injuries.test.ts` (roll vectors for both namespaces). Block game iteration
-is centralized in `block/iteration.ts` (`seasonBlockGameSteps`, shared
-options, rotation-scoped rosters); `run.ts`, the season block worker job, and
-the free-agency calibrate CLI all use it. CLI post-block commit
-deduplication against `completeSeasonBlockCommit` remains open.
+Stage 4 landed: engine season orchestration was split and de-duplicated
+(`postseason/` and `block/` subpackages with facades). Both trees, and their
+shared injury/health helpers, were removed with Season Run on 2026-10-14.
 
-Stage 2 complete: block jobs return raw `candidate`/`interrupted` events and
-`SeasonSession` owns start/resume reconciliation, acceptance, atomic commits,
-interruption persistence, and publication (part A). Postseason coordination
-also lives in the session now: the decision loop, command-id chaining,
-duplicate retry, advancement commits, and champion promotion; the web
-postseason runner is a simulation job over the worker only (part B). Covered
-by `session-block.test.ts` (16), `session-postseason.test.ts` (14), and the
-web transport/integration suites.
-
-Stage 3 landed: `apps/web/src/lib/season/season-shell-state.svelte.ts` is now
-the reactive presenter — one subscription mirrors `session.getSnapshot()`
-into `$state`, cheap views are `$derived`, and the layout
-(`routes/season/run/+layout.svelte`, 957 → 428 lines) only owns session
-lifetime, navigation, dialogs, and rendering. The mirrored `recomputeRunFacts`
-cycle and the 160-line command façade are gone; local editor state survives
-progress emits and unchanged-rotation commits (covered by
-`season-shell-state.test.ts`).
-
-Determinism guard for all of it: seeded block/postseason digests, the
-committed fixtures under `tools/cli/src/fixtures/`, and the golden suites must
-stay byte-identical. See `scripts/code-size/README.md` for the baseline log.
+Determinism guard for mode orchestration: seeded digests and the committed
+fixtures under `tools/cli/src/fixtures/` must stay byte-identical.

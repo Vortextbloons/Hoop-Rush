@@ -1,0 +1,76 @@
+import type {
+  EraSimulationProfile,
+  ShotZone,
+  SimulationPlayer,
+  SimulationTeam,
+} from '../../../../packages/data-contracts/src/index.ts';
+import type { HavocEvidence } from './havoc-runtime.ts';
+import { ENGINE_CONSTANTS } from './constants.ts';
+import { isThreePointZone } from './usage.ts';
+export function shootingFoulProbability(
+  shooter: SimulationPlayer,
+  defender: SimulationPlayer,
+  zone: ShotZone,
+  profile: EraSimulationProfile,
+): number {
+  const p = profile.parameters;
+  const base = p.foulsPerPossession * p.shootingFoulShare * ENGINE_CONSTANTS.shootingFoulScale;
+  const tendencyFactor = 0.5 + shooter.tendencies.freeThrowRate / 100;
+  const observedRate = shooter.anchors?.freeThrowAttemptRate;
+  const anchorFactor =
+    observedRate === undefined
+      ? 1
+      : Math.min(2, Math.max(0.4, observedRate / Math.max(1e-9, p.leagueFtaPerFga)));
+  const drawsFouls =
+    tendencyFactor * (1 - ENGINE_CONSTANTS.observedFoulDrawBlend) +
+    anchorFactor * ENGINE_CONSTANTS.observedFoulDrawBlend;
+  const zoneFactor = zone === 'rim' ? 1.4 : isThreePointZone(zone) ? 0.7 : 1;
+  const discipline =
+    (1 - (defender.ratings.defensiveIq - 50) / 200) *
+    (0.85 + Math.min(15, defender.tendencies.foulRate) / 50);
+  return Math.min(0.25, Math.max(0.01, base * drawsFouls * zoneFactor * discipline));
+}
+export function nonShootingFoulProbability(profile: EraSimulationProfile): number {
+  const p = profile.parameters;
+  return Math.min(0.3, Math.max(0.01, p.foulsPerPossession * (1 - p.shootingFoulShare)));
+}
+export function foulAvoidanceFactor(personalFouls: number): number {
+  const trouble = Math.max(0, personalFouls - ENGINE_CONSTANTS.foulTroubleStart);
+  const penalty = ENGINE_CONSTANTS.foulAvoidancePerFoulSquared * trouble * trouble;
+  return Math.max(ENGINE_CONSTANTS.foulAvoidanceFloor, 1 - penalty);
+}
+export function foulerWeights(defense: SimulationTeam): number[] {
+  return defense.players.map((d) =>
+    Math.max(
+      0.5,
+      (30 + (d.ratings.strength + d.ratings.interiorDefense) / 4) *
+        (0.8 + Math.min(20, d.tendencies.foulRate) / 25),
+    ),
+  );
+}
+export function freeThrowShooterWeights(team: SimulationTeam): number[] {
+  return team.players.map(
+    (p) => Math.max(0.5, p.tendencies.freeThrowRate) * (0.6 + 0.8 * (p.ratings.freeThrow / 100)),
+  );
+}
+export function freeThrowsForZone(zone: ShotZone): number {
+  return isThreePointZone(zone) ? 3 : 2;
+}
+export function freeThrowProbability(
+  shooter: SimulationPlayer,
+  profile: EraSimulationProfile,
+  evidence?: HavocEvidence,
+): number {
+  const anchor = profile.parameters.freeThrowAnchorRating;
+  const factor = shooter.ratings.freeThrow / Math.max(1, anchor);
+  const ratingProbability = profile.parameters.leagueFtPct * factor;
+  const observedProbability = evidence?.isAuthoritative('free-throw-accuracy')
+    ? undefined
+    : shooter.anchors?.freeThrowPct;
+  const probability =
+    observedProbability === undefined
+      ? ratingProbability
+      : observedProbability * ENGINE_CONSTANTS.observedFreeThrowBlend +
+        ratingProbability * (1 - ENGINE_CONSTANTS.observedFreeThrowBlend);
+  return Math.min(0.97, Math.max(0.1, probability + ENGINE_CONSTANTS.freeThrowCalibrationOffset));
+}

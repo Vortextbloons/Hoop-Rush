@@ -1,0 +1,335 @@
+{
+  "note": "Captured from the frozen pre-migration TypeScript battle/possession runtime. Hashes use the reference canonical JSON implementation, not the Wasm serializer. Regenerate only when intentional rule changes land.",
+  "baseline": {
+    "commit": "3e17805c3f67c45cd583eb980548ab66635f439a",
+    "capturedAt": "2026-11-11T02:51:19.988Z",
+    "runtime": "TypeScript battle core + shared possession runtime (frozen copy)",
+    "serializer": "reference canonicalJson + seasonDigestHex"
+  },
+  "scenarios": [
+    {
+      "id": "havoc-plain-solo",
+      "label": "Havoc plain solo game + audit",
+      "kind": "solo",
+      "seedText": "parity-havoc-plain-0",
+      "seed": "7f71e1007f71e1007f71e1007f71e100",
+      "apron": null,
+      "expected": {
+        "resultHash": "a399fdc420f6c8a0a286c626524945d4",
+        "tapeHash": "cfcdda0e7872e9629b212f485e7f62fe",
+        "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
+        "factsHash": "741638a5a99a6e013d712db700467055",
+        "summary": {
+          "homePoints": 104,
+          "awayPoints": 121,
+          "overtimePeriods": 0,
+          "tapeEvents": 587,
+          "tapeScoring": 124,
+          "auditOk": true,
+          "findingCodes": [],
+          "facts": 0
+        },
+        "inputDigest": "",
+        "resultDigest": "",
+        "tapeDigest": "",
+        "features": []
+      }
+    },
+    {
+      "id": "havoc-plain-battle",
+      "label": "Havoc plain battle game + audit",
+      "kind": "battle",
+      "seedText": "parity-havoc-plain-0",
+      "seed": "7f71e1007f71e1007f71e1007f71e100",
+      "apron": null,
+      "expected": {
+        "resultHash": "1bc2b8cde5d64169e13340efec529cfd",
+        "tapeHash": "b318467bb2dfd30fd7d4bde51dbb1f8b",
+        "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
+        "factsHash": "741638a5a99a6e013d712db700467055",
+        "summary": {
+          "homePoints": 104,
+          "awayPoints": 121,
+          "overtimePeriods": 0,
+          "tapeEvents": 587,
+          "tapeScoring": 124,
+          "auditOk": true,
+          "findingCodes": [],
+          "facts": 0
+        },
+        "inputDigest": "409e3301ed323d3d83e803d7848a5971",
+        "resultDigest": "588abd93401cf637ffb35f1125c90163",
+        "tapeDigest": "8a0ed0fed49c06da57f89bb4b9ea246e",
+        "features": []
+      }
+    },
+    {
+      "id": "havoc-mutations",
+      "label": "Havoc mutations battle game + audit",
+      "kind": "battle",
+      "seedText": "parity-havoc-mutations-0",
+      "seed": "a4a2ba9ca4a2ba9ca4a2ba9ca4a2ba9c",
+      "apron": null,
+      "expected": {
+        "resultHash": "055c04f7d909c89b05f338ad50bfb067",
+        "tapeHash": "7e61afeae82e42ee6ef7882c986ffa5a",
+        "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
+        "factsHash": "741638a5a99a6e013d712db700467055",
+        "summary": {
+          "homePoints": 114,
+          "awayPoints": 95,
+          "overtimePeriods": 0,
+          "tapeEvents": 669,
+          "tapeScoring": 108,
+          "auditOk": true,
+          "findingCodes": [],
+          "facts": 0
+        },
+        "inputDigest": "8449dcd5cfbe39612e7af5d79cc25aa5",
+        "resultDigest": "cb0ed399c7de44b5bc265c035ebea5e9",
+        "tapeDigest": "f5361af9715dea1542d95a1f20cf0389",
+        "features": ["clone-entered"]
+      }
+    },
+    {
+      "id": "havoc-clones",
+      "label": "Havoc opposing clone armies + audit",
+      "kind": "battle",
+      "seedText": "parity-havoc-clones-2",
+      "seed": "58be992a58be992a58be992a58be992a",
+      "apron": null,
+      "expected": {
+        "resultHash": "04c4b29b4da076bf78a9b1312bed386b",
+        "tapeHash": "3bcf2ff70783ac13e4e1977d6e82a707",
+        "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
+        "factsHash": "741638a5a99a6e013d712db700467055",
+        "summary": {
+          "homePoints": 101,
+          "awayPoints": 111,
+          "overtimePeriods": 0,
+          "tapeEvents": 607,
+          "tapeScoring": 122,
+          "auditOk": true,
+          "findingCodes": [],
+          "facts": 0
+        },
+        "inputDigest": "f998530fc001bf4b84e44e05d3ebaf3f",
+        "resultDigest": "c10e9bfd8ec386e99d9be6b7eb0aabed",
+        "tapeDigest": "d3b75092d0dc1f06a614afbcaf1b76c2",
+        "features": ["clone-entered", "clone-exited", "foul-out"]
+      }
+    },
+    {
+      "id": "havoc-fusion",
+      "label": "Havoc opposing fusion dances + audit",
+      "kind": "battle",
+      "seedText": "parity-havoc-fusion-0",
+      "seed": "c343bd96c343bd96c343bd96c343bd96",
+      "apron": null,
+      "expected": {
+        "resultHash": "7eeed3eafd96f3d62b3865405a3d2a9a",
+        "tapeHash": "f1b8334ff3d4c0cba647a90dcbfd707f",
+        "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
+        "factsHash": "741638a5a99a6e013d712db700467055",
+        "summary": {
+          "homePoints": 88,
+          "awayPoints": 87,
+          "overtimePeriods": 0,
+          "tapeEvents": 567,
+          "tapeScoring": 94,
+          "auditOk": true,
+          "findingCodes": [],
+          "facts": 0
+        },
+        "inputDigest": "6d0e912cc27a17b0d90d774e77fe5f1c",
+        "resultDigest": "efdf41045ada5c0854d4fb9e81dd3614",
+        "tapeDigest": "5b29abe4a537c2d89210469e968a1e74",
+        "features": ["foul-out", "fusion"]
+      }
+    },
+    {
+      "id": "havoc-foul-out",
+      "label": "Havoc foul-out substitution + audit",
+      "kind": "battle",
+      "seedText": "parity-havoc-foul-out-0",
+      "seed": "117eb33d117eb33d117eb33d117eb33d",
+      "apron": null,
+      "expected": {
+        "resultHash": "0d11abc9258780a5628b20af5a1ddd99",
+        "tapeHash": "75ce7c9c497a40d048c3c70e56effa8c",
+        "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
+        "factsHash": "741638a5a99a6e013d712db700467055",
+        "summary": {
+          "homePoints": 117,
+          "awayPoints": 114,
+          "overtimePeriods": 0,
+          "tapeEvents": 623,
+          "tapeScoring": 137,
+          "auditOk": true,
+          "findingCodes": [],
+          "facts": 0
+        },
+        "inputDigest": "aa5bc2c2b3d0a43675f261cc938739b2",
+        "resultDigest": "dc53e1636a147057eaf2abadc3326ed3",
+        "tapeDigest": "609163f1e6523e0db47fdfd71d127081",
+        "features": ["foul-out"]
+      }
+    },
+    {
+      "id": "havoc-overtime",
+      "label": "Havoc overtime game + audit",
+      "kind": "battle",
+      "seedText": "parity-havoc-overtime-12",
+      "seed": "ebccdaa0ebccdaa0ebccdaa0ebccdaa0",
+      "apron": null,
+      "expected": {
+        "resultHash": "2b8e2c60e75c50bc9253c4fa91404a70",
+        "tapeHash": "6a2529ea4d09e5a66cf04b985794bc1a",
+        "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
+        "factsHash": "741638a5a99a6e013d712db700467055",
+        "summary": {
+          "homePoints": 133,
+          "awayPoints": 127,
+          "overtimePeriods": 1,
+          "tapeEvents": 665,
+          "tapeScoring": 141,
+          "auditOk": true,
+          "findingCodes": [],
+          "facts": 0
+        },
+        "inputDigest": "ddc799a6fe95fd6232dac8204646f4b6",
+        "resultDigest": "95503dde985d5302a8fa92e40c1fb64e",
+        "tapeDigest": "f7193ebd9a9a56c15dcf6557cae9428d",
+        "features": ["overtime"]
+      }
+    },
+    {
+      "id": "cap-rush-first-apron",
+      "label": "Cap Rush first-apron solo battle + audit",
+      "kind": "battle",
+      "seedText": "parity-cap-rush-first-0",
+      "seed": "991f1770991f1770991f1770991f1770",
+      "apron": {
+        "side": 0,
+        "payrollStatus": "first-apron",
+        "targetSlot": "C"
+      },
+      "expected": {
+        "resultHash": "e95b0a7c2d072bd0c62dfbc6c4e41b8c",
+        "tapeHash": "d6ba2bf88b4b548c8ebd478ea23d2968",
+        "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
+        "factsHash": "c27dbaa4d46e3e98032d3d82cc3b7d94",
+        "summary": {
+          "homePoints": 94,
+          "awayPoints": 101,
+          "overtimePeriods": 0,
+          "tapeEvents": 577,
+          "tapeScoring": 109,
+          "auditOk": true,
+          "findingCodes": [],
+          "facts": 1
+        },
+        "inputDigest": "d84207c9377b010599d6960f68523979",
+        "resultDigest": "e296e2125e6f518e7630dfb832799dc2",
+        "tapeDigest": "50c4950340f14e7feccf46a516f48013",
+        "features": []
+      }
+    },
+    {
+      "id": "cap-rush-second-apron",
+      "label": "Cap Rush second-apron solo battle + audit",
+      "kind": "battle",
+      "seedText": "parity-cap-rush-second-0",
+      "seed": "c6c11f5cc6c11f5cc6c11f5cc6c11f5c",
+      "apron": {
+        "side": 1,
+        "payrollStatus": "second-apron",
+        "targetSlot": "C"
+      },
+      "expected": {
+        "resultHash": "bb976e4bc63804b77fd7e5115bf5d7bb",
+        "tapeHash": "dce8e522353199de77097144d4782412",
+        "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
+        "factsHash": "359823cb2003621728789c0d6bf2739b",
+        "summary": {
+          "homePoints": 118,
+          "awayPoints": 105,
+          "overtimePeriods": 0,
+          "tapeEvents": 584,
+          "tapeScoring": 113,
+          "auditOk": true,
+          "findingCodes": [],
+          "facts": 12
+        },
+        "inputDigest": "5120a49998c10975b1fa6abf7f7981c9",
+        "resultDigest": "f7ee8fb55f41e70959a84bcfc0d0cd45",
+        "tapeDigest": "92bb9bf17a7e6935f096f887a1a0c001",
+        "features": []
+      }
+    },
+    {
+      "id": "cap-rush-first-apron-mutated",
+      "label": "Cap Rush first-apron multiplayer battle + audit",
+      "kind": "battle",
+      "seedText": "parity-cap-rush-first-mutated-0",
+      "seed": "cc0d7bc7cc0d7bc7cc0d7bc7cc0d7bc7",
+      "apron": {
+        "side": 0,
+        "payrollStatus": "first-apron",
+        "targetSlot": "C"
+      },
+      "expected": {
+        "resultHash": "1c5b658e67e2b382b861cee06558591e",
+        "tapeHash": "94b3ac722625be8e9cdaac84a4c9d8a2",
+        "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
+        "factsHash": "741638a5a99a6e013d712db700467055",
+        "summary": {
+          "homePoints": 120,
+          "awayPoints": 97,
+          "overtimePeriods": 0,
+          "tapeEvents": 649,
+          "tapeScoring": 108,
+          "auditOk": true,
+          "findingCodes": [],
+          "facts": 0
+        },
+        "inputDigest": "00f49fed46d769f9a2c44b0f8986c67d",
+        "resultDigest": "0624740c9b653e48f85db62afb0851fc",
+        "tapeDigest": "d3878c79318ca22dfad590e7ea59cd49",
+        "features": ["clone-entered"]
+      }
+    },
+    {
+      "id": "cap-rush-second-apron-mutated",
+      "label": "Cap Rush second-apron multiplayer battle + audit",
+      "kind": "battle",
+      "seedText": "parity-cap-rush-second-mutated-0",
+      "seed": "f97fbe1bf97fbe1bf97fbe1bf97fbe1b",
+      "apron": {
+        "side": 1,
+        "payrollStatus": "second-apron",
+        "targetSlot": "C"
+      },
+      "expected": {
+        "resultHash": "681552a66d1f5b5a91e64608db05c9f6",
+        "tapeHash": "f7ced455597674a1922909f7f76fc025",
+        "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
+        "factsHash": "e92e9d595e31ed7519bc5a1fa3b35189",
+        "summary": {
+          "homePoints": 129,
+          "awayPoints": 102,
+          "overtimePeriods": 0,
+          "tapeEvents": 664,
+          "tapeScoring": 126,
+          "auditOk": true,
+          "findingCodes": [],
+          "facts": 17
+        },
+        "inputDigest": "8b6de365ce2489b1d8be7f9720e5fe75",
+        "resultDigest": "8fbe916426079ef0bb119e2227853014",
+        "tapeDigest": "24020f5270d9135602420b68d33392c2",
+        "features": ["clone-entered", "foul-out"]
+      }
+    }
+  ]
+}

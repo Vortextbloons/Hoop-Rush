@@ -43,6 +43,7 @@ import { prepareTeam, type TeamPrep } from './prepare.ts';
 import type { HavocRuntimeHooks, HavocEvidence } from './havoc-runtime.ts';
 import type { ApronRuntimeHooks } from './apron-runtime.ts';
 import { apronPlayerKeyOf } from './apron-runtime.ts';
+import { resolvePossessionTripWithWasm } from './possession-wasm.ts';
 import { ENGINE_CONSTANTS } from './constants.ts';
 import { creationScore } from '../domain/archetypes.ts';
 import type { HomeCourtMechanisms } from '../game/home-court.ts';
@@ -116,6 +117,8 @@ export interface TripContext {
   effects?: EffectsHook;
   havoc?: HavocRuntimeHooks;
   apron?: ApronRuntimeHooks;
+  /** True when `rng` is a custom implementation that the Rust kernel must call back. */
+  externalRng?: boolean;
 }
 export function createTripContext(
   rng: Rng,
@@ -684,7 +687,10 @@ export class PossessionStepper {
     return result;
   }
 }
-export function resolveTrip(ctx: TripContext, offenseSide: SideIndex): TripResolution {
+export function resolveTripWithTypeScript(
+  ctx: TripContext,
+  offenseSide: SideIndex,
+): TripResolution {
   const startedRemaining = ctx.state.secondsRemaining;
   ctx.apron?.beginPossession(offenseSide);
   const stepper = new PossessionStepper(ctx, offenseSide);
@@ -699,6 +705,20 @@ export function resolveTrip(ctx: TripContext, offenseSide: SideIndex): TripResol
   return {
     secondsElapsed: startedRemaining - ctx.state.secondsRemaining,
     ended: step.ended,
+  };
+}
+export function resolveTrip(ctx: TripContext, offenseSide: SideIndex): TripResolution {
+  const startedRemaining = ctx.state.secondsRemaining;
+  ctx.apron?.beginPossession(offenseSide);
+  let ended: boolean;
+  try {
+    ended = resolvePossessionTripWithWasm(ctx, offenseSide, ctx.recorder);
+  } finally {
+    ctx.apron?.endPossession();
+  }
+  return {
+    secondsElapsed: startedRemaining - ctx.state.secondsRemaining,
+    ended,
   };
 }
 function consumeTime(state: GameState, seconds: number): number {
@@ -1000,7 +1020,7 @@ function resolveShot(
     }) ?? null;
   const adjustedDefense = strikeAdjustedDefense(ctx, defenseSide);
   const defender =
-    havocPlan === null
+    havocPlan === null || havocPlan.defender === null
       ? pickDefender(
           adjustedDefense.team,
           zone,

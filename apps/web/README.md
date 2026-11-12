@@ -11,16 +11,18 @@ routes/ and lib/features/<mode>/  ->  @hoop-rush/application sessions  ->  engin
                                        ^ persistence, workers, assets are ports
 ```
 
-- Mode code lives under `src/lib/features/<mode>/` (challenge, havoc, draft-duel,
-  fixed-five, havoc-multiplayer). Shared room and lobby
-  infrastructure lives in `src/lib/features/multiplayer/`.
+- Mode code lives under `src/lib/features/<mode>/` (challenge, cap-rush,
+  cap-rush-multiplayer, havoc, draft-duel, fixed-five, havoc-multiplayer).
+  Shared room and lobby infrastructure lives in
+  `src/lib/features/multiplayer/`.
 - `src/lib/modes/catalog.ts` registers discovery, formats, preserved routes,
   and lazy settings/room adapters. Add modes through this catalog and their
   validated data-contracts settings; shared lobby and shell views stay generic.
 - The root layout owns one lobby coordinator. It consumes application lobby
   snapshots/navigation intents, polls through one non-overlapping scheduler,
   and refreshes on focus/reconnection. Room layouts scope mode sessions.
-- Mode sessions (`ChallengeSession`, `HavocSession`, `DraftDuelSession`,
+- Mode sessions (`ChallengeSession`, `CapRushSession`,
+  `CapRushMultiplayerSession`, `HavocSession`, `DraftDuelSession`,
   `FixedFiveRoomSession`, `HavocMultiplayerSession`) live in
   `@hoop-rush/application` behind ports. Web composes them with browser
   adapters; do not reintroduce Dexie, workers, or localStorage into the
@@ -45,7 +47,8 @@ routes/ and lib/features/<mode>/  ->  @hoop-rush/application sessions  ->  engin
 - Saves go through `@hoop-rush/persistence` repositories composed by
   `getPersistence()` in `src/lib/persistence.ts`, one `HoopRushDatabase` on the
   `hoop-rush-saves-v2` namespace. The only other direct Dexie use is the
-  content-addressed asset cache (`src/lib/pool-cache.ts`).
+  content-addressed asset cache (`src/lib/pool-cache.ts`) and the `liveQuery`
+  subscription in `src/lib/features/profile/AchievementReveal.svelte`.
 - `static/data/**` is generated. Never edit it by hand; regenerate with the CLI
   (`bun run hoop-rush import ...`, package `gen-*` scripts) and run
   `bun run hoop-rush data validate`. `static/data/collection/` is the packaged

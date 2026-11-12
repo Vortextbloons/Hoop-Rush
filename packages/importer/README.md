@@ -19,7 +19,8 @@ raw-data / .raw_nba_cache
 - `ratings/compute.ts` orchestrates; `ratings/v2.ts` derives the player record,
   `ratings/v3.ts` the rating profile, `ratings/overall-*.ts` the Overall scale.
 - `pools/compute.ts` owns pool derivation; `lineage.ts` the franchise-era
-  lineage ranges; `positions/` the position normalization.
+  lineage ranges and historical identity; `positions/` and `pools/positions.ts`
+  the position normalization.
 - `shared/manifest.ts` is the leaf manifest module: schema, `loadManifest`,
   `manifestPath`, and `writeManifestValidated`. Stage modules import it instead
   of re-declaring schemas (this removed the pools <-> manifest cycle).

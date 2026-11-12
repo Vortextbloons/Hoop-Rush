@@ -1,5 +1,8 @@
-import type { SimulationRatings } from '@hoop-rush/data-contracts';
-import { HAVOC_SCORING_RATING_FIELDS, REQUIRED_RATING_KEYS } from '@hoop-rush/data-contracts';
+import type { SimulationRatings } from '../../../../../../packages/data-contracts/src/index.ts';
+import {
+  HAVOC_SCORING_RATING_FIELDS,
+  REQUIRED_RATING_KEYS,
+} from '../../../../../../packages/data-contracts/src/index.ts';
 import { ENGINE_CONSTANTS } from '../../../sim/constants.ts';
 import { type TripContext } from '../../../sim/possession.ts';
 import { type SideIndex } from '../../../sim/recorder.ts';

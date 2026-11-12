@@ -30,6 +30,11 @@ const kernels = [
     target: '../../packages/engine/src/sim/wasm/game-wasm.gen.ts',
   },
   {
+    name: 'POSSESSION',
+    source: '../../packages/engine/src/sim/wasm/possession.rs',
+    target: '../../packages/engine/src/sim/wasm/possession-wasm.gen.ts',
+  },
+  {
     name: 'CANONICAL',
     source: '../../packages/data-contracts/src/wasm/canonical.rs',
     target: '../../packages/data-contracts/src/wasm/canonical-wasm.gen.ts',

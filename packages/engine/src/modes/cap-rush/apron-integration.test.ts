@@ -62,6 +62,24 @@ function runWithApron(rules: CapRushApronRules, side: 0 | 1 = 0) {
 }
 
 describe('cap rush apron integration', () => {
+  it('updates a retained facts array when the Rust battle completes', () => {
+    const input = battleInput();
+    const target = input.home.starters[4];
+    if (target === undefined) throw new Error('missing target');
+    const apron = new CapRushApronRuntime({
+      side: 0,
+      rules: { payrollStatus: 'second-apron' },
+      targetInstanceId: target.instanceId,
+      targetSlot: 'C',
+    });
+    const facts = apron.recordedFacts();
+    simulateHavocBattleGame(input, createEngineContext(), { apron });
+    expect(facts.length).toBeGreaterThan(0);
+    expect(apron.recordedFacts()).toBe(facts);
+    apron.dispose();
+    expect(apron.recordedFacts()).toBe(facts);
+  });
+
   it('records intercepted passes with audited accounting and seeded replay', () => {
     let interceptions = 0;
     for (let index = 0; index < 8; index += 1) {

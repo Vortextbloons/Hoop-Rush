@@ -31,7 +31,7 @@ Progress **saves in your browser** (IndexedDB). No account required for solo mod
 <table>
 <tr>
 <td width="28%"><strong>Classic</strong></td>
-<td>Five draft rounds. Each round assigns a franchise and decade; you get one reroll per round, then lock a <code>G, G, F, F, C</code> lineup. Same frozen 30-team bracket as the other challenge modes — the draft is the puzzle.</td>
+<td>Five draft rounds. Each round assigns a franchise and decade; you get one franchise reroll and one era reroll for the whole draft, then lock a <code>G, G, F, F, C</code> lineup. Same frozen 30-team bracket as the other challenge modes — the draft is the puzzle.</td>
 </tr>
 <tr>
 <td><strong>Sandbox</strong></td>
@@ -43,7 +43,7 @@ Progress **saves in your browser** (IndexedDB). No account required for solo mod
 </tr>
 <tr>
 <td><strong>Cap Rush</strong></td>
-<td>Salary-cap draft: five historical seasons at fixed positions, apron and luxury-tax pressure, optional mutation spins — then an 82-game season (and postseason) built from that payroll puzzle. Still chasing 82–0 when the build allows it.</td>
+<td>Salary-cap draft: five historical seasons at fixed positions, apron pressure, optional mutation spins — then an 82-game season (and postseason) built from that payroll puzzle. Still chasing 82–0 when the build allows it.</td>
 </tr>
 </table>
 
@@ -106,7 +106,7 @@ Open **http://localhost:5173**, choose a mode, and draft.
 
 <br />
 
-**Stack:** SvelteKit client · TypeScript engine with a Rust/Wasm standard-game kernel · IndexedDB saves · Web Workers for long sims · Bun workspaces and test runner.
+**Stack:** SvelteKit client · TypeScript mode rules with Rust/Wasm game kernels · IndexedDB saves · Web Workers for long sims · Bun workspaces and test runner.
 
 ```
 apps/web                  → game UI (mode code under src/lib/features/<mode>)

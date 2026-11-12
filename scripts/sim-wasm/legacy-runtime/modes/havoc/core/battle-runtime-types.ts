@@ -9,7 +9,7 @@ import type {
   HavocScoringSource,
   Position,
   SimulationPlayer,
-} from '@hoop-rush/data-contracts';
+} from '../../../../../../packages/data-contracts/src/index.ts';
 import type { HavocEvidence } from '../../../sim/havoc-runtime.ts';
 import type { SideIndex } from '../../../sim/recorder.ts';
 

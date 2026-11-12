@@ -26,6 +26,8 @@ function required<T>(value: T | undefined): T {
 
 export interface GameWasm {
   memory: WebAssembly.Memory;
+  tape_ptr(): number;
+  tape_len(): number;
   input_ptr(): number;
   output_ptr(): number;
   simulate(seed: number, length: number, external?: number, observers?: number): number;

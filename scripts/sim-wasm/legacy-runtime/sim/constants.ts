@@ -1,0 +1,154 @@
+import type { ShotZone, SlotGroup } from '../../../../packages/data-contracts/src/index.ts';
+import type { ActionType } from './usage.ts';
+
+export interface PositionResponsibilityModifiers {
+  initiation: number;
+  pnrHandler: number;
+  rollMan: number;
+  postUp: number;
+  rebounding: number;
+  rimProtection: number;
+}
+
+export const ENGINE_VERSION = 'm3-engine-v25';
+
+export const ENGINE_CONSTANTS = {
+  version: ENGINE_VERSION,
+  offensiveAllocation: {
+    minimumDemand: 0.5,
+    evidenceMinutes: 1000,
+    neutralAttemptsPer36: 12,
+    fallbackShotWeight: 0.65,
+  },
+
+  zoneBaseMake: {
+    rim: 0.62,
+    shortMid: 0.46,
+    longMid: 0.44,
+    cornerThree: 0.43,
+    aboveBreakThree: 0.4,
+  } as const satisfies Record<ShotZone, number>,
+  zoneMakeFloor: {
+    rim: 0.24,
+    shortMid: 0.2,
+    longMid: 0.18,
+    cornerThree: 0.15,
+    aboveBreakThree: 0.12,
+  } as const satisfies Record<ShotZone, number>,
+  skillRange: 0.095,
+  contestMax: 0.12,
+  contestMin: -0.05,
+  contestRatioPivot: 66,
+  contestRatioRange: 28,
+  eraEfficiencyWeight: 0.35,
+  shotQuality: {
+    isolation: { rim: 0, shortMid: -0.005, longMid: -0.01, cornerThree: 0, aboveBreakThree: 0 },
+    pickAndRoll: { rim: 0.01, shortMid: 0, longMid: 0, cornerThree: 0, aboveBreakThree: 0 },
+    pickAndRollRoll: { rim: 0.02, shortMid: 0, longMid: 0, cornerThree: 0, aboveBreakThree: 0 },
+    postUp: { rim: -0.005, shortMid: -0.005, longMid: 0, cornerThree: 0, aboveBreakThree: 0 },
+    spotUp: { rim: 0, shortMid: 0, longMid: 0, cornerThree: 0, aboveBreakThree: 0 },
+    cut: { rim: 0.03, shortMid: 0, longMid: 0, cornerThree: 0, aboveBreakThree: 0 },
+    transition: { rim: 0.03, shortMid: 0.02, longMid: 0, cornerThree: 0, aboveBreakThree: 0 },
+  } as const satisfies Record<ActionType, Record<ShotZone, number>>,
+  spacingBonusScale: 0.06,
+
+  threePointRateWeight: 0.35,
+  eraZoneMixBlend: 0.55,
+  observedThreePointBlend: 0.55,
+  anchoredThreePointSkillRange: 0.06,
+  threePointCalibrationOffset: -0.012,
+  threePointEvidenceMinimum: 0.02,
+  threePointLowVolumeThreshold: 0.06,
+  threePointLowVolumeCap: 0.08,
+  threePointLowVolumeEraPull: 0.05,
+  threePointEraPull: 0.3,
+
+  twoPointAnchorMin: 0.82,
+  twoPointAnchorMax: 1.32,
+  twoPointAnchorSkillScale: 0.3,
+  transitionStartMultiplier: {
+    neutral: 1,
+    madeBasket: 0.45,
+    deadBall: 0.35,
+    liveTurnover: 2.15,
+    defensiveRebound: 1.55,
+    offensiveRebound: 0.2,
+  } as const,
+
+  turnoverObservedBlend: 0.62,
+  turnoverNeutralTendency: 0.14,
+  turnoverNeutralPressure: 0.671,
+  turnoverNeutralHandling: 0.22,
+  turnoverNeutralPassing: 0.12,
+  turnoverPressureWeight: 0.12,
+  turnoverHandlingWeight: 0.05,
+  turnoverPassingWeight: 0.03,
+  turnoverMin: 0.03,
+  turnoverMax: 0.3,
+
+  stealNeutralAbility: 67,
+  blockRimMax: 0.14,
+  blockMidMax: 0.07,
+  blockThreeMax: 0.04,
+  blockDriveBonus: 0.03,
+  blockAnchorFloorPer48: 0.8,
+  blockAnchorScale: 0.025,
+  blockAnchorMax: 0.06,
+
+  shootingFoulScale: 1.75,
+  assistCreditScale: 1.1,
+  fouledShotMakeScale: 0.95,
+  observedFoulDrawBlend: 0.7,
+  offensiveFoulShare: 0.32,
+  offensiveFoulTurnoverOffset: 0.029,
+  foulTroubleStart: 2,
+  foulAvoidancePerFoulSquared: 0.18,
+  foulAvoidanceFloor: 0.1,
+  freeThrowAnchorRating: 75,
+  bonusFoulsRegulation: 5,
+  bonusFoulsOvertime: 2,
+  observedFreeThrowBlend: 0.72,
+  freeThrowCalibrationOffset: -0.001,
+
+  offensiveReboundScale: 0.055,
+  offensiveReboundRange: 50,
+  offensiveReboundRimBonus: 0.045,
+  offensiveReboundPerimeterPenalty: 0.04,
+  observedReboundWeight: 6,
+
+  shotClockSeconds: 24,
+  minimumTripSeconds: 1,
+  minimumStartSeconds: 0.5,
+  inboundConsumption: 2,
+  continuationConsumption: 3,
+  estimateToTripsFactor: 0.93,
+
+  positionResponsibility: {
+    G: {
+      initiation: 1.08,
+      pnrHandler: 1.1,
+      rollMan: 0.94,
+      postUp: 0.94,
+      rebounding: 0.92,
+      rimProtection: 0.9,
+    },
+    F: {
+      initiation: 1.02,
+      pnrHandler: 1.02,
+      rollMan: 1,
+      postUp: 1.04,
+      rebounding: 1.04,
+      rimProtection: 1.04,
+    },
+    C: {
+      initiation: 0.92,
+      pnrHandler: 0.92,
+      rollMan: 1.08,
+      postUp: 1.08,
+      rebounding: 1.1,
+      rimProtection: 1.1,
+    },
+  } as const satisfies Record<SlotGroup, PositionResponsibilityModifiers>,
+  positionResponsibilityBound: 0.12,
+  positionMatchBonus: 1.35,
+} as const;

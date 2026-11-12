@@ -35,9 +35,9 @@ this package for namespace rules and testing notes.
 ## Layout
 
 - `src/index.ts` — runtime surface (repositories + record schemas).
-- `src/repositories/` — `dexie.ts`, `cap-rush.ts`, `havoc.ts`, `fixed-five.ts`,
-  `draft-duel.ts`, `havoc-multiplayer.ts`, `profile.ts`, `support.ts`,
-  `save-envelope.ts`.
+- `src/repositories/` — `dexie.ts`, `cap-rush.ts`, `cap-rush-multiplayer.ts`,
+  `havoc.ts`, `fixed-five.ts`, `draft-duel.ts`, `havoc-multiplayer.ts`,
+  `profile.ts`, `support.ts`, `save-envelope.ts`.
 - `src/schemas/` — record envelopes per mode.
 - `src/testing/` — fake-IndexedDB test support.
 
@@ -49,4 +49,5 @@ bun run --filter @hoop-rush/persistence test:run
 ```
 
 `storage-namespace.test.ts` proves the legacy database is never touched;
-`support.test.ts` covers the shared guards.
+`dexie-active-run.test.ts` covers the challenge save/load round-trip and
+progress digest.

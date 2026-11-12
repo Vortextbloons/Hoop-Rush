@@ -5,8 +5,11 @@ import type {
   HavocParticipant,
   SimulationPlayer,
   SimulationTeam,
-} from '@hoop-rush/data-contracts';
-import { HAVOC_PERSONAL_FOUL_LIMIT, POSITIONS } from '@hoop-rush/data-contracts';
+} from '../../../../../../packages/data-contracts/src/index.ts';
+import {
+  HAVOC_PERSONAL_FOUL_LIMIT,
+  POSITIONS,
+} from '../../../../../../packages/data-contracts/src/index.ts';
 import type { HavocEvidence } from '../../../sim/havoc-runtime.ts';
 import { type TripContext } from '../../../sim/possession.ts';
 import { prepareTeam } from '../../../sim/prepare.ts';

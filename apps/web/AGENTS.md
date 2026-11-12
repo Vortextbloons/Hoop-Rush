@@ -19,11 +19,16 @@ imports engine, never the reverse.
   `GamecastBattleBox.svelte` shared by Havoc multiplayer and Cap Rush. Keep
   mode labels, controls, and series-specific stats in `features/<mode>/`.
 - Mode sessions live in `@hoop-rush/application` behind ports:
-  `challenge/`, `havoc/`, `draft-duel/`, `fixed-five/`, `havoc-multiplayer/`,
+  `challenge/`, `cap-rush/`, `cap-rush-multiplayer/`, `havoc/`,
+  `draft-duel/`, `fixed-five/`, `havoc-multiplayer/`,
   and `multiplayer/` (lobby). Web
   composes them with browser adapters; do not reintroduce Dexie, workers, or
   localStorage into the application package.
 - `challenge/` — classic/sandbox run views + the worker job transport.
+- `cap-rush/` — Cap Rush draft, season, postseason, and playback views with
+  their state presenters and the parallel worker runner.
+- `cap-rush-multiplayer/` — Cap Rush room views, auction draft controller,
+  presenter, transport, runner, and derived state.
 - `havoc/` — havoc views, presenters, runner (transport), and service
   composition.
 - `draft-duel/` — presenter/controller, Supabase transport, worker runner,
@@ -54,7 +59,8 @@ imports engine, never the reverse.
   instance on the `hoop-rush-saves-v2` namespace). Do not construct repository
   databases ad hoc. The only other direct Dexie use in web is the
   content-addressed asset cache (`src/lib/pool-cache.ts`), which hash-verifies
-  packaged data.
+  packaged data, and the `liveQuery` subscription in
+  `src/lib/features/profile/AchievementReveal.svelte`.
 - `apps/web/static/data/**` is generated build-time data — never edit by hand;
 regenerate through the CLI (`bun run hoop-rush import ...`, `gen-*` package
 scripts) and run `bun run hoop-rush data validate`. `static/data/collection/`

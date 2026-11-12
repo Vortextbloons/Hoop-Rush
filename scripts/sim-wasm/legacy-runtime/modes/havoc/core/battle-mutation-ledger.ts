@@ -4,7 +4,7 @@ import type {
   HavocBattleScoringEntry,
   HavocHighlight,
   HavocMutationId,
-} from '@hoop-rush/data-contracts';
+} from '../../../../../../packages/data-contracts/src/index.ts';
 import { type SideIndex } from '../../../sim/recorder.ts';
 import type { HavocParticipants } from './battle-participants.ts';
 import type {

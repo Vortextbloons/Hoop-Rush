@@ -1,0 +1,406 @@
+{
+  "note": "Legacy = frozen pre-migration TypeScript battle/possession runtime. Current = live production runtime. Both sides use the same production digest/serializer functions inside the timed section, and parity is checked first with the reference canonical serializer.",
+  "capturedAt": "2026-11-12T00:04:14.417Z",
+  "metadata": {
+    "bun": "1.4.4",
+    "node": "v26.3.0",
+    "platform": "win32",
+    "release": "10.0.26300",
+    "arch": "x64",
+    "cpu": "AMD Ryzen 5 9600X 6-Core Processor             ",
+    "parallelism": 12,
+    "runtimeIdentity": {
+      "currentMatchesFrozenRuntime": false,
+      "havocChanged": true,
+      "apronChanged": true,
+      "comparedFiles": 37,
+      "changedFiles": [
+        "modes/cap-rush/apron-runtime.ts",
+        "modes/havoc/core/battle-field-goal.ts",
+        "modes/havoc/core/battle-game.ts",
+        "modes/havoc/core/battle-mutation-ledger.ts",
+        "modes/havoc/core/battle-participants.ts",
+        "modes/havoc/core/battle-profile-effects.ts",
+        "modes/havoc/core/battle-runtime-types.ts",
+        "sim/apron-runtime.ts",
+        "sim/havoc-runtime.ts",
+        "sim/possession.ts",
+        "sim/recorder.ts",
+        "sim/rng.ts"
+      ]
+    }
+  },
+  "rounds": 15,
+  "gamesPerRound": 20,
+  "parity": true,
+  "rows": [
+    {
+      "id": "havoc-plain-solo",
+      "label": "Havoc plain solo game + audit",
+      "kind": "solo",
+      "seed": "parity-havoc-plain-0",
+      "apron": null,
+      "parity": true,
+      "legacy": {
+        "resultHash": "a399fdc420f6c8a0a286c626524945d4",
+        "tapeHash": "cfcdda0e7872e9629b212f485e7f62fe",
+        "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
+        "factsHash": "741638a5a99a6e013d712db700467055"
+      },
+      "current": {
+        "resultHash": "a399fdc420f6c8a0a286c626524945d4",
+        "tapeHash": "cfcdda0e7872e9629b212f485e7f62fe",
+        "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
+        "factsHash": "741638a5a99a6e013d712db700467055"
+      },
+      "legacyDigests": {
+        "resultDigest": "b5ebafaa6076263efab14798394d615a",
+        "tapeDigest": "cf2ccafd289963898a39283382215b8d"
+      },
+      "currentDigests": {
+        "resultDigest": "b5ebafaa6076263efab14798394d615a",
+        "tapeDigest": "cf2ccafd289963898a39283382215b8d"
+      },
+      "legacyMs": 71.03570000000013,
+      "currentMs": 71.16129999999998,
+      "speedup": 0.9982349957069383,
+      "currentChanged": true
+    },
+    {
+      "id": "havoc-plain-battle",
+      "label": "Havoc plain battle game + audit",
+      "kind": "battle",
+      "seed": "parity-havoc-plain-0",
+      "apron": null,
+      "parity": true,
+      "legacy": {
+        "resultHash": "1bc2b8cde5d64169e13340efec529cfd",
+        "tapeHash": "b318467bb2dfd30fd7d4bde51dbb1f8b",
+        "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
+        "factsHash": "741638a5a99a6e013d712db700467055"
+      },
+      "current": {
+        "resultHash": "1bc2b8cde5d64169e13340efec529cfd",
+        "tapeHash": "b318467bb2dfd30fd7d4bde51dbb1f8b",
+        "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
+        "factsHash": "741638a5a99a6e013d712db700467055"
+      },
+      "legacyDigests": {
+        "resultDigest": "588abd93401cf637ffb35f1125c90163",
+        "tapeDigest": "8a0ed0fed49c06da57f89bb4b9ea246e"
+      },
+      "currentDigests": {
+        "resultDigest": "588abd93401cf637ffb35f1125c90163",
+        "tapeDigest": "8a0ed0fed49c06da57f89bb4b9ea246e"
+      },
+      "legacyMs": 38.90069999999969,
+      "currentMs": 39.21080000000029,
+      "speedup": 0.9920914645964735,
+      "currentChanged": true
+    },
+    {
+      "id": "havoc-mutations",
+      "label": "Havoc mutations battle game + audit",
+      "kind": "battle",
+      "seed": "parity-havoc-mutations-0",
+      "apron": null,
+      "parity": true,
+      "legacy": {
+        "resultHash": "055c04f7d909c89b05f338ad50bfb067",
+        "tapeHash": "7e61afeae82e42ee6ef7882c986ffa5a",
+        "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
+        "factsHash": "741638a5a99a6e013d712db700467055"
+      },
+      "current": {
+        "resultHash": "055c04f7d909c89b05f338ad50bfb067",
+        "tapeHash": "7e61afeae82e42ee6ef7882c986ffa5a",
+        "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
+        "factsHash": "741638a5a99a6e013d712db700467055"
+      },
+      "legacyDigests": {
+        "resultDigest": "cb0ed399c7de44b5bc265c035ebea5e9",
+        "tapeDigest": "f5361af9715dea1542d95a1f20cf0389"
+      },
+      "currentDigests": {
+        "resultDigest": "cb0ed399c7de44b5bc265c035ebea5e9",
+        "tapeDigest": "f5361af9715dea1542d95a1f20cf0389"
+      },
+      "legacyMs": 76.39120000000003,
+      "currentMs": 62.214300000000094,
+      "speedup": 1.2278720487090575,
+      "currentChanged": true
+    },
+    {
+      "id": "havoc-clones",
+      "label": "Havoc opposing clone armies + audit",
+      "kind": "battle",
+      "seed": "parity-havoc-clones-2",
+      "apron": null,
+      "parity": true,
+      "legacy": {
+        "resultHash": "04c4b29b4da076bf78a9b1312bed386b",
+        "tapeHash": "3bcf2ff70783ac13e4e1977d6e82a707",
+        "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
+        "factsHash": "741638a5a99a6e013d712db700467055"
+      },
+      "current": {
+        "resultHash": "04c4b29b4da076bf78a9b1312bed386b",
+        "tapeHash": "3bcf2ff70783ac13e4e1977d6e82a707",
+        "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
+        "factsHash": "741638a5a99a6e013d712db700467055"
+      },
+      "legacyDigests": {
+        "resultDigest": "c10e9bfd8ec386e99d9be6b7eb0aabed",
+        "tapeDigest": "d3b75092d0dc1f06a614afbcaf1b76c2"
+      },
+      "currentDigests": {
+        "resultDigest": "c10e9bfd8ec386e99d9be6b7eb0aabed",
+        "tapeDigest": "d3b75092d0dc1f06a614afbcaf1b76c2"
+      },
+      "legacyMs": 62.13389999999981,
+      "currentMs": 57.4975000000004,
+      "speedup": 1.0806365494151813,
+      "currentChanged": true
+    },
+    {
+      "id": "havoc-fusion",
+      "label": "Havoc opposing fusion dances + audit",
+      "kind": "battle",
+      "seed": "parity-havoc-fusion-0",
+      "apron": null,
+      "parity": true,
+      "legacy": {
+        "resultHash": "7eeed3eafd96f3d62b3865405a3d2a9a",
+        "tapeHash": "f1b8334ff3d4c0cba647a90dcbfd707f",
+        "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
+        "factsHash": "741638a5a99a6e013d712db700467055"
+      },
+      "current": {
+        "resultHash": "7eeed3eafd96f3d62b3865405a3d2a9a",
+        "tapeHash": "f1b8334ff3d4c0cba647a90dcbfd707f",
+        "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
+        "factsHash": "741638a5a99a6e013d712db700467055"
+      },
+      "legacyDigests": {
+        "resultDigest": "efdf41045ada5c0854d4fb9e81dd3614",
+        "tapeDigest": "5b29abe4a537c2d89210469e968a1e74"
+      },
+      "currentDigests": {
+        "resultDigest": "efdf41045ada5c0854d4fb9e81dd3614",
+        "tapeDigest": "5b29abe4a537c2d89210469e968a1e74"
+      },
+      "legacyMs": 42.845900000000256,
+      "currentMs": 49.85819999999967,
+      "speedup": 0.8593551311519577,
+      "currentChanged": true
+    },
+    {
+      "id": "havoc-foul-out",
+      "label": "Havoc foul-out substitution + audit",
+      "kind": "battle",
+      "seed": "parity-havoc-foul-out-0",
+      "apron": null,
+      "parity": true,
+      "legacy": {
+        "resultHash": "0d11abc9258780a5628b20af5a1ddd99",
+        "tapeHash": "75ce7c9c497a40d048c3c70e56effa8c",
+        "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
+        "factsHash": "741638a5a99a6e013d712db700467055"
+      },
+      "current": {
+        "resultHash": "0d11abc9258780a5628b20af5a1ddd99",
+        "tapeHash": "75ce7c9c497a40d048c3c70e56effa8c",
+        "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
+        "factsHash": "741638a5a99a6e013d712db700467055"
+      },
+      "legacyDigests": {
+        "resultDigest": "dc53e1636a147057eaf2abadc3326ed3",
+        "tapeDigest": "609163f1e6523e0db47fdfd71d127081"
+      },
+      "currentDigests": {
+        "resultDigest": "dc53e1636a147057eaf2abadc3326ed3",
+        "tapeDigest": "609163f1e6523e0db47fdfd71d127081"
+      },
+      "legacyMs": 47.38270000000011,
+      "currentMs": 58.721700000000055,
+      "speedup": 0.8069027293147178,
+      "currentChanged": true
+    },
+    {
+      "id": "havoc-overtime",
+      "label": "Havoc overtime game + audit",
+      "kind": "battle",
+      "seed": "parity-havoc-overtime-12",
+      "apron": null,
+      "parity": true,
+      "legacy": {
+        "resultHash": "2b8e2c60e75c50bc9253c4fa91404a70",
+        "tapeHash": "6a2529ea4d09e5a66cf04b985794bc1a",
+        "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
+        "factsHash": "741638a5a99a6e013d712db700467055"
+      },
+      "current": {
+        "resultHash": "2b8e2c60e75c50bc9253c4fa91404a70",
+        "tapeHash": "6a2529ea4d09e5a66cf04b985794bc1a",
+        "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
+        "factsHash": "741638a5a99a6e013d712db700467055"
+      },
+      "legacyDigests": {
+        "resultDigest": "95503dde985d5302a8fa92e40c1fb64e",
+        "tapeDigest": "f7193ebd9a9a56c15dcf6557cae9428d"
+      },
+      "currentDigests": {
+        "resultDigest": "95503dde985d5302a8fa92e40c1fb64e",
+        "tapeDigest": "f7193ebd9a9a56c15dcf6557cae9428d"
+      },
+      "legacyMs": 51.63590000000113,
+      "currentMs": 47.16980000000149,
+      "speedup": 1.0946813427235116,
+      "currentChanged": true
+    },
+    {
+      "id": "cap-rush-first-apron",
+      "label": "Cap Rush first-apron solo battle + audit",
+      "kind": "battle",
+      "seed": "parity-cap-rush-first-0",
+      "apron": {
+        "side": 0,
+        "payrollStatus": "first-apron",
+        "targetSlot": "C"
+      },
+      "parity": true,
+      "legacy": {
+        "resultHash": "e95b0a7c2d072bd0c62dfbc6c4e41b8c",
+        "tapeHash": "d6ba2bf88b4b548c8ebd478ea23d2968",
+        "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
+        "factsHash": "c27dbaa4d46e3e98032d3d82cc3b7d94"
+      },
+      "current": {
+        "resultHash": "e95b0a7c2d072bd0c62dfbc6c4e41b8c",
+        "tapeHash": "d6ba2bf88b4b548c8ebd478ea23d2968",
+        "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
+        "factsHash": "c27dbaa4d46e3e98032d3d82cc3b7d94"
+      },
+      "legacyDigests": {
+        "resultDigest": "e296e2125e6f518e7630dfb832799dc2",
+        "tapeDigest": "50c4950340f14e7feccf46a516f48013"
+      },
+      "currentDigests": {
+        "resultDigest": "e296e2125e6f518e7630dfb832799dc2",
+        "tapeDigest": "50c4950340f14e7feccf46a516f48013"
+      },
+      "legacyMs": 42.79749999999876,
+      "currentMs": 43.62459999999919,
+      "speedup": 0.9810405138385121,
+      "currentChanged": true
+    },
+    {
+      "id": "cap-rush-second-apron",
+      "label": "Cap Rush second-apron solo battle + audit",
+      "kind": "battle",
+      "seed": "parity-cap-rush-second-0",
+      "apron": {
+        "side": 1,
+        "payrollStatus": "second-apron",
+        "targetSlot": "C"
+      },
+      "parity": true,
+      "legacy": {
+        "resultHash": "bb976e4bc63804b77fd7e5115bf5d7bb",
+        "tapeHash": "dce8e522353199de77097144d4782412",
+        "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
+        "factsHash": "359823cb2003621728789c0d6bf2739b"
+      },
+      "current": {
+        "resultHash": "bb976e4bc63804b77fd7e5115bf5d7bb",
+        "tapeHash": "dce8e522353199de77097144d4782412",
+        "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
+        "factsHash": "359823cb2003621728789c0d6bf2739b"
+      },
+      "legacyDigests": {
+        "resultDigest": "f7ee8fb55f41e70959a84bcfc0d0cd45",
+        "tapeDigest": "92bb9bf17a7e6935f096f887a1a0c001"
+      },
+      "currentDigests": {
+        "resultDigest": "f7ee8fb55f41e70959a84bcfc0d0cd45",
+        "tapeDigest": "92bb9bf17a7e6935f096f887a1a0c001"
+      },
+      "legacyMs": 42.95509999999922,
+      "currentMs": 44.90620000000126,
+      "speedup": 0.9565516565640827,
+      "currentChanged": true
+    },
+    {
+      "id": "cap-rush-first-apron-mutated",
+      "label": "Cap Rush first-apron multiplayer battle + audit",
+      "kind": "battle",
+      "seed": "parity-cap-rush-first-mutated-0",
+      "apron": {
+        "side": 0,
+        "payrollStatus": "first-apron",
+        "targetSlot": "C"
+      },
+      "parity": true,
+      "legacy": {
+        "resultHash": "1c5b658e67e2b382b861cee06558591e",
+        "tapeHash": "94b3ac722625be8e9cdaac84a4c9d8a2",
+        "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
+        "factsHash": "741638a5a99a6e013d712db700467055"
+      },
+      "current": {
+        "resultHash": "1c5b658e67e2b382b861cee06558591e",
+        "tapeHash": "94b3ac722625be8e9cdaac84a4c9d8a2",
+        "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
+        "factsHash": "741638a5a99a6e013d712db700467055"
+      },
+      "legacyDigests": {
+        "resultDigest": "0624740c9b653e48f85db62afb0851fc",
+        "tapeDigest": "d3878c79318ca22dfad590e7ea59cd49"
+      },
+      "currentDigests": {
+        "resultDigest": "0624740c9b653e48f85db62afb0851fc",
+        "tapeDigest": "d3878c79318ca22dfad590e7ea59cd49"
+      },
+      "legacyMs": 57.52850000000035,
+      "currentMs": 53.73829999999907,
+      "speedup": 1.0705307015666916,
+      "currentChanged": true
+    },
+    {
+      "id": "cap-rush-second-apron-mutated",
+      "label": "Cap Rush second-apron multiplayer battle + audit",
+      "kind": "battle",
+      "seed": "parity-cap-rush-second-mutated-0",
+      "apron": {
+        "side": 1,
+        "payrollStatus": "second-apron",
+        "targetSlot": "C"
+      },
+      "parity": true,
+      "legacy": {
+        "resultHash": "681552a66d1f5b5a91e64608db05c9f6",
+        "tapeHash": "f7ced455597674a1922909f7f76fc025",
+        "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
+        "factsHash": "e92e9d595e31ed7519bc5a1fa3b35189"
+      },
+      "current": {
+        "resultHash": "681552a66d1f5b5a91e64608db05c9f6",
+        "tapeHash": "f7ced455597674a1922909f7f76fc025",
+        "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
+        "factsHash": "e92e9d595e31ed7519bc5a1fa3b35189"
+      },
+      "legacyDigests": {
+        "resultDigest": "8fbe916426079ef0bb119e2227853014",
+        "tapeDigest": "24020f5270d9135602420b68d33392c2"
+      },
+      "currentDigests": {
+        "resultDigest": "8fbe916426079ef0bb119e2227853014",
+        "tapeDigest": "24020f5270d9135602420b68d33392c2"
+      },
+      "legacyMs": 59.754400000001624,
+      "currentMs": 67.70300000000134,
+      "speedup": 0.882596044488434,
+      "currentChanged": true
+    }
+  ]
+}

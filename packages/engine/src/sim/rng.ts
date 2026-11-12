@@ -62,6 +62,8 @@ export interface Rng {
   pick<T>(items: readonly T[]): T;
   weightedPick<T>(items: readonly T[], weights: readonly number[] | WeightedPickTable): T;
   weightedPickTable<T>(items: readonly T[], table: WeightedPickTable): T;
+  getState?(): number;
+  setState?(state: number): void;
 }
 export function swapAt(values: unknown[], a: number, b: number): void {
   const va = values[a];
@@ -79,17 +81,14 @@ export function shuffle<T>(items: readonly T[], rng: Rng): T[] {
   }
   return result;
 }
-function mulberry32(seed: number): () => number {
-  let a = seed | 0;
-  return () => {
+export function createRng(seed: string, position = 0): Rng {
+  let a = fnv1a32(seed) | 0;
+  const next = (): number => {
     a = (a + 0x6d2b79f5) | 0;
     let t = Math.imul(a ^ (a >>> 15), 1 | a);
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
-}
-export function createRng(seed: string, position = 0): Rng {
-  const next = mulberry32(fnv1a32(seed));
   for (let i = 0; i < position; i += 1) next();
   const api: Rng = {
     next() {
@@ -128,6 +127,12 @@ export function createRng(seed: string, position = 0): Rng {
     weightedPickTable(items, table) {
       if (items.length === 0) throw new Error('weightedPick: cannot pick from an empty list');
       return weightedPickFromTable(items, table, api);
+    },
+    getState() {
+      return a;
+    },
+    setState(state) {
+      a = state | 0;
     },
   };
   return api;

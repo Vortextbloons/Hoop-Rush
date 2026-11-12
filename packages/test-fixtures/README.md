@@ -5,12 +5,19 @@ to players.
 
 ## What it provides
 
-- League, schedule, roster, rotation, and draft-catalog builders
-  (`buildSeasonLeague`, `buildSeasonDraftCatalog`, `buildFixtureBracket`, ...).
-- Havoc fixtures (`buildHavocEffectiveProfile`, `buildHavocLockedInputs`,
-  `buildHavocSourcePlayer`, `buildHavocStatLine`, `buildHavocVersionSet`).
-- Era profile and opponent fixtures (`buildEraSimulationProfile`,
-  `buildFixtureBracket`).
+- League, bracket, manifest, and challenge-run builders (`buildLeagueRecord`,
+  `buildFixtureBracket`, `buildManifest`, `buildChallengeRun`), plus simulation
+  team/player builders (`buildSimulationPlayer`, `buildLegalSimulationTeam`,
+  `buildUserTeam`, `buildRolesTeam`, `buildGameSimulationInput`) and the
+  committed strength fixtures (`buildEqualFixture`, `buildStrongWeakFixture`,
+  `buildStrongMediumFixture`).
+- Draft-catalog builders (`buildSeasonDraftCatalog`,
+  `buildSeasonDraftCandidate`) and Cap Rush catalog fixtures
+  (`buildCapRushTestCatalog`, `capRushTestCatalogSource`).
+- Havoc fixtures (`buildHavocCard`, `buildHavocDraftState`,
+  `buildHavocLockedInputs`, `buildHavocRunState`, `buildHavocGameInput`,
+  `buildHavocGameResult`, `buildHavocGameSummary`, `buildHavocVersionSet`, ...).
+- Era profile fixtures (`buildEraSimulationProfile`, `DEFAULT_ERA_SIM_PROFILE`).
 
 ## Rules
 
@@ -24,5 +31,5 @@ to players.
 
 ```text
 bun test <path>
-bun run test:run
+bun run --filter @hoop-rush/test-fixtures test:run
 ```

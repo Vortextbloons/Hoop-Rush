@@ -19,7 +19,8 @@ export interface HavocCoveragePlan {
 }
 
 export interface HavocShotPlan {
-  defender: SimulationPlayer;
+  /** Null lets the shared kernel pick the default defender with the main RNG. */
+  defender: SimulationPlayer | null;
   coverage: HavocCoveragePlan;
   shotKind: HavocShotKind;
   putback: boolean;
@@ -37,6 +38,7 @@ export interface HavocRuntimeHooks {
   keyOf(player: SimulationPlayer): string;
   responsibilitySlotOf(player: SimulationPlayer): number;
   evidenceOf(player: SimulationPlayer): HavocEvidence | undefined;
+  changesEvidence?(): boolean;
   reboundWeightScale(player: SimulationPlayer): number;
   reboundMeanReach(player: SimulationPlayer): number;
   aggregateDivisor(): number;
@@ -90,4 +92,10 @@ export interface HavocRuntimeHooks {
   onAssist(offense: SideIndex, assister: SimulationPlayer, scorer: SimulationPlayer): void;
   onRebound(side: SideIndex, rebounder: SimulationPlayer, offensive: boolean): void;
   onBlock(defense: SideIndex, blocker: SimulationPlayer, shooter: SimulationPlayer): void;
+
+  /** Defender-reach coverage for the kernel's default defender pick. */
+  shotReach?(
+    defender: SimulationPlayer,
+    zone: ShotZone,
+  ): { contestPointDelta: number; blockPointDelta: number };
 }

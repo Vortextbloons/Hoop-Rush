@@ -19,6 +19,16 @@ unsafe extern "C" {
     fn observe(kind: u32, period: u32, side: u32, clock: f64, elapsed: f64, ended: u32);
 }
 
+static mut TAPE: Vec<f64> = Vec::new();
+#[unsafe(no_mangle)]
+pub extern "C" fn tape_ptr() -> *const f64 {
+    unsafe { (&*core::ptr::addr_of!(TAPE)).as_ptr() }
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn tape_len() -> usize {
+    unsafe { (&*core::ptr::addr_of!(TAPE)).len() }
+}
+
 struct Reader<'a> {
     data: &'a [f64],
     cursor: usize,
@@ -140,6 +150,7 @@ struct Game<'a> {
     period_fouls: [usize; 2],
     start: usize,
     observers: u32,
+    previous: std::cell::RefCell<[[[f64; 15]; 6]; 2]>,
 }
 impl Game<'_> {
     fn write_output(&self, periods: usize) {
@@ -156,6 +167,25 @@ impl Game<'_> {
         }
     }
     fn emit(&self, kind: u32, period: usize, side: usize, elapsed: f64, ended: bool) {
+        if self.observers & 4 != 0 {
+            let tape = unsafe { &mut *core::ptr::addr_of_mut!(TAPE) };
+            tape.extend_from_slice(&[kind as f64, period as f64, side as f64, self.remaining,
+                elapsed, ended as u32 as f64, self.stats[0][0][0], self.stats[1][0][0]]);
+            if kind == 1 {
+                let mut previous = self.previous.borrow_mut();
+                for side in 0..2 {
+                    for player in 0..6 {
+                        for field in 0..15 {
+                            let value = if player > 0 && field == 14 { 0.0 }
+                                else { self.stats[side][player][field] };
+                            tape.push(value - previous[side][player][field]);
+                            previous[side][player][field] = value;
+                        }
+                    }
+                }
+            }
+            return;
+        }
         if self.observers & kind == 0 {
             return;
         }
@@ -491,6 +521,7 @@ pub extern "C" fn simulate(seed: u32, length: u32, external: u32, observers: u32
     if reader.cursor != length as usize {
         return 2;
     }
+    unsafe { (&mut *core::ptr::addr_of_mut!(TAPE)).clear(); }
     let mut game = Game {
         teams: &teams,
         c: &constants,
@@ -505,6 +536,7 @@ pub extern "C" fn simulate(seed: u32, length: u32, external: u32, observers: u32
         period_fouls: [0; 2],
         start: 0,
         observers,
+        previous: std::cell::RefCell::new([[[0.0; 15]; 6]; 2]),
     };
     let periods = game.play();
     if periods == 0 {

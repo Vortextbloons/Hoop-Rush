@@ -1,4 +1,8 @@
-import type { HavocMutationId, ShotZone, SimulationPlayer } from '@hoop-rush/data-contracts';
+import type {
+  HavocMutationId,
+  ShotZone,
+  SimulationPlayer,
+} from '../../../../../../packages/data-contracts/src/index.ts';
 import type { EngineContext } from '../../../sim/kernel.ts';
 import type { HavocRuntimeHooks } from '../../../sim/havoc-runtime.ts';
 import type { TripContext } from '../../../sim/possession.ts';

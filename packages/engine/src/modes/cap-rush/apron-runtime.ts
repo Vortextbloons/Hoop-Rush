@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   CapRushApronFact,
   CapRushApronRules,
   CapRushIsolationReason,
@@ -7,9 +7,18 @@ import type {
   SimulationPlayer,
   SimulationTeam,
 } from '@hoop-rush/data-contracts';
-import { CAP_RUSH_SCHEMA_VERSION, capRushStrikeDue } from '@hoop-rush/data-contracts';
+import { CAP_RUSH_SCHEMA_VERSION } from '@hoop-rush/data-contracts';
 import type { SideIndex } from '../../sim/recorder.ts';
 import { apronPlayerKeyOf } from '../../sim/apron-runtime.ts';
+import {
+  APRON_FACT_PASS_INTERCEPTION,
+  APRON_FACT_STRIKE,
+  apronPayrollCode,
+  createApronState,
+  trackApronState,
+  untrackApronState,
+} from './apron-wasm-runtime.ts';
+import type { BattleKernel } from '../havoc/core/battle-wasm.ts';
 
 export interface CapRushApronSpec {
   readonly side: SideIndex;
@@ -25,20 +34,64 @@ export interface CapRushPossessionState {
   readonly strike: boolean;
 }
 
+interface InterceptionPayload {
+  readonly passerPlayerId: SimulationPlayer['playerId'];
+  readonly defenderPlayerId: SimulationPlayer['playerId'];
+}
+
 function sideLabel(side: SideIndex): 'home' | 'away' {
   return side === 0 ? 'home' : 'away';
 }
 
 export class CapRushApronRuntime {
   private readonly spec: CapRushApronSpec;
-  private readonly ordinals: [number, number] = [0, 0];
-  private readonly facts: CapRushApronFact[] = [];
+  private readonly kernel: BattleKernel;
+  private readonly handle: number;
+  private readonly interceptions: InterceptionPayload[] = [];
   private current: CapRushPossessionState | null = null;
   private targetPlayer: SimulationPlayer | null = null;
   private targetPlayerKey: string | null = null;
+  private readonly facts: CapRushApronFact[] = [];
+  private decodedInterceptions = 0;
+  private disposed = false;
 
   constructor(spec: CapRushApronSpec) {
     this.spec = spec;
+    const state = createApronState(spec.side, spec.rules);
+    this.kernel = state.kernel;
+    this.handle = state.handle;
+    trackApronState(this, state);
+  }
+
+  battleApronState(): {
+    side: SideIndex;
+    payroll: 1 | 2;
+    handle: number;
+    targetInstanceId: string;
+  } {
+    return {
+      side: this.spec.side,
+      payroll: apronPayrollCode(this.spec.rules),
+      handle: this.handle,
+      targetInstanceId: this.spec.targetInstanceId,
+    };
+  }
+
+  battleApronStates() {
+    return [this.battleApronState()];
+  }
+
+  completeBattle(): void {
+    this.recordedFacts();
+    this.current = null;
+  }
+
+  dispose(): void {
+    if (this.disposed) return;
+    this.recordedFacts();
+    this.disposed = true;
+    untrackApronState(this);
+    this.kernel.apron_destroy(this.handle);
   }
 
   bindTarget(player: SimulationPlayer): void {
@@ -51,29 +104,21 @@ export class CapRushApronRuntime {
   }
 
   beginPossession(offense: SideIndex): CapRushPossessionState {
-    const ordinal = (this.ordinals[offense] += 1);
-    const defendOrdinal = this.ordinals[offense === 0 ? 1 : 0];
-    const strike = offense !== this.spec.side && capRushStrikeDue(this.spec.rules, ordinal);
-    this.current = {
-      offenseOrdinal: ordinal,
-      defenseOrdinal: defendOrdinal,
-      isolation: null,
-      strike,
-    };
-    if (strike) {
-      this.facts.push({
-        schemaVersion: CAP_RUSH_SCHEMA_VERSION,
-        kind: 'strike',
-        side: sideLabel(this.spec.side),
-        possessionOrdinal: ordinal,
-        targetInstanceId: this.spec.targetInstanceId,
-        targetSlot: this.spec.targetSlot,
-      });
+    if (this.kernel.apron_begin(this.handle, offense) !== 0) {
+      throw new Error(`cap rush apron: invalid offense side ${String(offense)}`);
     }
+    this.current = {
+      offenseOrdinal: this.kernel.apron_offense_ordinal(this.handle),
+      defenseOrdinal: this.kernel.apron_defense_ordinal(this.handle),
+      isolation: this.isolationState(),
+      strike: this.kernel.apron_strike(this.handle) !== 0,
+    };
+    this.recordedFacts();
     return this.current;
   }
 
   endPossession(): void {
+    this.kernel.apron_end(this.handle);
     this.current = null;
   }
 
@@ -100,20 +145,23 @@ export class CapRushApronRuntime {
   }
 
   passInterceptionChance(offense: SideIndex): number {
-    if (offense !== this.spec.side) return 0;
-    return this.spec.rules.payrollStatus === 'first-apron' ? 0.015 : 0.07;
+    return this.kernel.apron_interception_chance(this.handle, offense);
   }
 
   onPassIntercepted(passer: SimulationPlayer, defender: SimulationPlayer): void {
-    if (this.current === null) return;
-    this.facts.push({
-      schemaVersion: CAP_RUSH_SCHEMA_VERSION,
-      kind: 'pass-interception',
-      side: sideLabel(this.spec.side),
-      possessionOrdinal: this.current.offenseOrdinal,
+    if (this.kernel.apron_record_interception(this.handle) !== 0) return;
+    this.interceptions.push({
       passerPlayerId: passer.playerId,
       defenderPlayerId: defender.playerId,
     });
+    this.recordedFacts();
+  }
+
+  private isolationState(): CapRushIsolationReason | null {
+    if (this.kernel.apron_isolation(this.handle) !== 0) {
+      throw new Error('cap rush apron: unsupported isolation state from Rust kernel');
+    }
+    return null;
   }
 
   private resolveTarget(team: SimulationTeam): SimulationPlayer | null {
@@ -125,7 +173,51 @@ export class CapRushApronRuntime {
   }
 
   recordedFacts(): readonly CapRushApronFact[] {
-    return this.facts;
+    if (this.disposed) return this.facts;
+    const count = this.kernel.apron_fact_count(this.handle);
+    const facts = this.facts;
+    for (let index = facts.length; index < count; index += 1) {
+      const kind = this.kernel.apron_fact_kind(this.handle, index);
+      const possessionOrdinal = this.kernel.apron_fact_ordinal(this.handle, index);
+      if (kind === APRON_FACT_STRIKE) {
+        facts.push({
+          schemaVersion: CAP_RUSH_SCHEMA_VERSION,
+          kind: 'strike',
+          side: sideLabel(this.spec.side),
+          possessionOrdinal,
+          targetInstanceId: this.spec.targetInstanceId,
+          targetSlot: this.spec.targetSlot,
+        });
+      } else if (kind === APRON_FACT_PASS_INTERCEPTION) {
+        const readPlayer = (defender: number) =>
+          new TextDecoder().decode(
+            new Uint8Array(
+              this.kernel.memory.buffer,
+              this.kernel.apron_fact_player_ptr(this.handle, index, defender),
+              this.kernel.apron_fact_player_len(this.handle, index, defender),
+            ),
+          );
+        const integratedPasser = readPlayer(0);
+        const payload =
+          integratedPasser.length > 0
+            ? { passerPlayerId: integratedPasser, defenderPlayerId: readPlayer(1) }
+            : this.interceptions[this.decodedInterceptions++];
+        if (payload === undefined) {
+          throw new Error('cap rush apron: missing pass interception payload');
+        }
+        facts.push({
+          schemaVersion: CAP_RUSH_SCHEMA_VERSION,
+          kind: 'pass-interception',
+          side: sideLabel(this.spec.side),
+          possessionOrdinal,
+          passerPlayerId: payload.passerPlayerId as SimulationPlayer['playerId'],
+          defenderPlayerId: payload.defenderPlayerId as SimulationPlayer['playerId'],
+        });
+      } else {
+        throw new Error(`cap rush apron: unsupported fact kind ${String(kind)} from Rust kernel`);
+      }
+    }
+    return facts;
   }
 }
 

@@ -1,12 +1,15 @@
 # Simulation Rust/Wasm build and benchmarks
 
-Standard fixed-five games now use the production Rust/Wasm kernel through
-`packages/engine/src/sim/game.ts`. The old TypeScript standard game loop is in
-`packages/engine/src/archive/code/sim/game.ts` for parity tests and benchmarks.
-Shared TypeScript possession rules remain active for Havoc and Cap Rush.
-All modes also share typed game serialization/verification acceleration from
-`packages/data-contracts/src/wasm/canonical.rs`. This does not move Havoc or
-Cap Rush mutation execution into Rust or change multiplayer transport.
+Standard games use `game.rs`. Havoc and Cap Rush use `possession.rs` for
+possessions, participant state, mutations, scoring attribution, event/scoring
+ledgers, and apron rules. TypeScript validates inputs, prepares probability tables,
+coordinates games and decodes final results. Auditing stays in TypeScript.
+The frozen TypeScript runtime under `legacy-runtime/` is benchmark-only.
+
+`bun scripts/sim-wasm/battle-runtime-benchmark.ts` compares complete results,
+tapes, audits, facts, and digests before timing alternating legacy/current rounds.
+It writes `sim-wasm-battle-runtime-results.json`. These are desktop Bun timings;
+performance varies by workload and is not a browser/phone measurement.
 
 ## Building the module
 
@@ -22,9 +25,10 @@ symbols. No Cargo dependencies or wasm-bindgen installation are required.
 Temporary compiled files are removed after generation.
 
 Commit `packages/engine/src/sim/wasm/game.rs` and the generated
-`game-wasm.gen.ts` together. Normal app builds and CI consume that generated
-module without requiring Rust. The source fingerprint test rejects stale
-artifacts. The module is loaded synchronously from bundled bytes: no fetch,
+`game-wasm.gen.ts` together, and the shared trip `possession.rs` with
+`possession-wasm.gen.ts`. Normal app builds and CI consume those generated
+modules without requiring Rust. The source fingerprint test rejects stale
+artifacts. The modules are loaded synchronously from bundled bytes: no fetch,
 URL configuration, platform-specific loader, or async public API is needed.
 The build script also regenerates `packages/data-contracts/src/wasm/canonical-wasm.gen.ts`
 from `canonical.rs`; commit that pair together as well.
@@ -87,6 +91,20 @@ Havoc solo, a two-sided Havoc battle with clones and mutations, and Cap Rush
 first/second-apron battle paths. These measure local simulation, recording,
 auditing, and verification where indicated, not networking, full application
 seasons, draft UI, or persistence. Results go to `sim-wasm-modes-results.json`.
+
+## Battle runtime benchmark
+
+```sh
+bun scripts/sim-wasm/battle-runtime-benchmark.ts
+```
+
+Compares the frozen pre-migration TypeScript battle/possession runtime in
+`scripts/sim-wasm/legacy-runtime/` with the live production runtime on the shared
+parity scenarios (plain, mutations, clones, fusion, foul-out, overtime, and both
+Cap Rush aprons). It asserts complete `deepStrictEqual` output parity, production
+digests, and apron facts before timing, alternates runtime order, and writes
+local `sim-wasm-battle-runtime-results.json`. Timings include simulation, audit,
+and digests; they are desktop Bun measurements, not browser or phone claims.
 
 The general TypeScript canonical serializer stays active for untyped values and
 existing immutable snapshot/state-digest paths. Typed game contracts use native
