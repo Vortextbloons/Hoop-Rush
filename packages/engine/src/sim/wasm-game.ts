@@ -7,7 +7,7 @@ import { assistProbabilityPure } from './possession.ts';
 import { prepareTeam } from './prepare.ts';
 import { offensiveReboundProbability } from './rebounding.ts';
 import type { EngineContext } from './kernel.ts';
-import { GameRecorder, type SideIndex } from './recorder.ts';
+import { usageOf, type SideIndex } from './recorder.ts';
 import { fnv1a32, type WeightedPickTable } from './rng.ts';
 import { eraPossEstimatePerTrip, turnoverProbability } from './security.ts';
 import { blockProbability, contestPenalty, shotQualityBonus } from './shooting.ts';
@@ -219,32 +219,7 @@ export function prepareWasmGame(input: GameSimulationInput, injectedRng = false)
   return { data: Float64Array.from(data), pickTables };
 }
 
-const fields = [
-  'points',
-  'fieldGoalMakes',
-  'fieldGoalAttempts',
-  'threeMakes',
-  'threeAttempts',
-  'freeThrowMakes',
-  'freeThrowAttempts',
-  'offensiveRebounds',
-  'defensiveRebounds',
-  'assists',
-  'steals',
-  'blocks',
-  'turnovers',
-  'fouls',
-  'teamRebounds',
-  'possessions',
-  'freeThrowTrips',
-  'reboundOpportunities',
-  'assistedFieldGoals',
-  'unassistedFieldGoals',
-  'assistOpportunities',
-  'offensiveReboundChances',
-  'defensiveReboundChances',
-  'contestedShots',
-] as const;
+const installedInputs = new WeakMap<GameWasm, PreparedWasmGame>();
 
 export function simulateWasmGame(
   wasm: GameWasm,
@@ -254,7 +229,10 @@ export function simulateWasmGame(
   external = false,
   observers = 0,
 ): GameResult {
-  new Float64Array(wasm.memory.buffer, wasm.input_ptr(), prepared.data.length).set(prepared.data);
+  if (installedInputs.get(wasm) !== prepared) {
+    new Float64Array(wasm.memory.buffer, wasm.input_ptr(), prepared.data.length).set(prepared.data);
+    installedInputs.set(wasm, prepared);
+  }
   const status = wasm.simulate(
     fnv1a32(input.seed),
     prepared.data.length,
@@ -264,44 +242,79 @@ export function simulateWasmGame(
   if (status !== 0) throw new Error(`Wasm simulation failed: ${String(status)}`);
   const output = new Float64Array(wasm.memory.buffer, wasm.output_ptr(), 481);
   const periods = required(output[0]);
-  const recorder = new GameRecorder();
-  let cursor = 1;
-  for (const side of [0, 1] as const) {
-    for (let index = 0; index < 6; index++) {
-      const target =
-        index === 0 ? recorder.sides[side] : required(recorder.players[side][index - 1]);
-      for (let fieldIndex = 0; fieldIndex < fields.length; fieldIndex++) {
-        const field = required(fields[fieldIndex]);
-        if (field in target)
-          (target as unknown as Record<string, number>)[field] = required(
-            output[cursor + fieldIndex],
-          );
-      }
-      for (let i = 0; i < SHOT_ZONES.length; i++) {
-        const zone = required(SHOT_ZONES[i]);
-        target.zoneAttempts[zone] = required(output[cursor + 25 + i]);
-        target.zoneMakes[zone] = required(output[cursor + 30 + i]);
-      }
-      cursor += 35;
-    }
-    recorder.sides[side].periodPoints = Array.from(output.subarray(cursor, cursor + periods));
-    cursor += 30;
-  }
   const overtimePeriods = periods - 4;
-  recorder.assignMinutes(48 + overtimePeriods * 5);
   const sideResult = (side: SideIndex): GameResult['home'] => {
     const team = side === 0 ? input.home : input.away;
+    const base = 1 + side * 240;
+    const value = (offset: number, field: number): number => required(output[offset + field]);
+    const zones = (offset: number) =>
+      SHOT_ZONES.map((zone, index) => ({
+        zone,
+        attempts: value(offset, 25 + index),
+        makes: value(offset, 30 + index),
+      }));
+    const counts = (offset: number) => ({
+      points: value(offset, 0),
+      fieldGoals: { made: value(offset, 1), attempted: value(offset, 2) },
+      threes: { made: value(offset, 3), attempted: value(offset, 4) },
+      freeThrows: { made: value(offset, 5), attempted: value(offset, 6) },
+      assists: value(offset, 9),
+      steals: value(offset, 10),
+      blocks: value(offset, 11),
+      turnovers: value(offset, 12),
+      fouls: value(offset, 13),
+    });
+    let contestedShots = 0;
+    const players = team.players.map((player, slot) => {
+      const offset = base + (slot + 1) * 35;
+      contestedShots += value(offset, 23);
+      return {
+        playerId: player.playerId,
+        minutes: 48 + overtimePeriods * 5,
+        ...counts(offset),
+        rebounds: {
+          total: value(offset, 7) + value(offset, 8),
+          offensive: value(offset, 7),
+          defensive: value(offset, 8),
+        },
+        diagnostics: {
+          usage: usageOf(value(offset, 2), value(offset, 6), value(offset, 12)),
+          shotZones: zones(offset),
+          assistOpportunities: value(offset, 20),
+          offensiveReboundChances: value(offset, 21),
+          defensiveReboundChances: value(offset, 22),
+          contestedShots: value(offset, 23),
+        },
+      };
+    });
+    const box = {
+      teamId: team.teamId,
+      ...counts(base),
+      rebounds: {
+        total: value(base, 7) + value(base, 8) + value(base, 14),
+        offensive: value(base, 7),
+        defensive: value(base, 8),
+        team: value(base, 14),
+      },
+      possessions: value(base, 15),
+      shotClockViolations: 0,
+      diagnostics: {
+        assistedFieldGoals: value(base, 18),
+        unassistedFieldGoals: value(base, 19),
+        reboundOpportunities: value(base, 17),
+        contestedShots,
+      },
+    };
     return {
       teamId: team.teamId,
       displayName: team.displayName,
-      box: recorder.teamBox(side, team.teamId),
-      players: team.players.map((player, slot) => ({
-        ...recorder.playerBox(side, slot),
-        playerId: player.playerId,
-      })),
-      shotZones: recorder.zoneSummary(side),
+      box,
+      players,
+      shotZones: zones(base),
     };
   };
+  const home = sideResult(0);
+  const away = sideResult(1);
   const result: GameResult = {
     schemaVersion: 1,
     gameNumber: input.gameNumber,
@@ -309,10 +322,13 @@ export function simulateWasmGame(
     engineVersion: context.engineVersion,
     dataVersion: input.dataVersion,
     profileVersion: input.profile.profileVersion,
-    home: sideResult(0),
-    away: sideResult(1),
-    periodScores: { home: recorder.sides[0].periodPoints, away: recorder.sides[1].periodPoints },
-    winner: recorder.sides[0].points > recorder.sides[1].points ? 'home' : 'away',
+    home,
+    away,
+    periodScores: {
+      home: Array.from(output.subarray(211, 211 + periods)),
+      away: Array.from(output.subarray(451, 451 + periods)),
+    },
+    winner: home.box.points > away.box.points ? 'home' : 'away',
     overtimePeriods,
     facts: [],
   };

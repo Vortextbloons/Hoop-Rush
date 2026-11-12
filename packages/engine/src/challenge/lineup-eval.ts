@@ -6,7 +6,7 @@ import type {
 } from '@hoop-rush/data-contracts';
 import { seedSchema } from '@hoop-rush/data-contracts';
 import type { EngineContext } from '../sim/kernel.ts';
-import { simulateGame } from '../sim/game.ts';
+import { createGameBatchSimulator } from '../sim/game.ts';
 import { seedFromString } from './seeds.ts';
 import { BENCHMARK_WEIGHTS } from './benchmarks.ts';
 import { mean } from '../domain/math.ts';
@@ -85,6 +85,7 @@ export function evaluateLineupStrength(
   options: StrengthOptions,
 ): StrengthMeasurement {
   const { samplesPerBenchmark, seedBase } = options;
+  const simulate = createGameBatchSimulator(context);
   const byBenchmark: StrengthMeasurement['byBenchmark'] = {};
   let weightedWins = 0;
   let totalGames = 0;
@@ -102,7 +103,7 @@ export function evaluateLineupStrength(
         home: homeFirst ? team : benchmark,
         away: homeFirst ? benchmark : team,
       };
-      const result: GameResult = simulateGame(input, context);
+      const result: GameResult = simulate(input);
       if (result.winner === (homeFirst ? 'home' : 'away')) wins += 1;
       totalGames += 1;
     }

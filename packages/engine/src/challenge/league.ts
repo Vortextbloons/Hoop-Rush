@@ -17,7 +17,7 @@ import {
   leagueRecordSchema,
 } from '@hoop-rush/data-contracts';
 import type { EngineContext } from '../sim/kernel.ts';
-import { simulateGame } from '../sim/game.ts';
+import { createGameBatchSimulator } from '../sim/game.ts';
 import { checkGameResult } from '../sim/invariants.ts';
 import { accumulateLeagueAppearance, emptyLeaguePlayerTotals } from './league-value.ts';
 import { deriveLeagueGameSeed } from './seeds.ts';
@@ -254,6 +254,7 @@ export function createLeagueSimulationCore(
       record.losses += 1;
     }
   };
+  const simulate = createGameBatchSimulator(context);
   let done = 0;
   return {
     plan,
@@ -270,18 +271,15 @@ export function createLeagueSimulationCore(
         if (!game) throw new Error(`${errorLabel}: missing planned game ${String(index)}`);
         const home = simulationTeamOf(input.bracket, game.homeTeamIndex, errorLabel);
         const away = simulationTeamOf(input.bracket, game.awayTeamIndex, errorLabel);
-        const result: GameResult = simulateGame(
-          {
-            schemaVersion: 2,
-            seed: deriveLeagueGameSeed(input.seed, game.gameIndex),
-            gameNumber: (game.gameIndex % LEAGUE_GAME_NUMBER_CYCLE) + 1,
-            dataVersion: input.profile.dataVersion,
-            profile: input.profile,
-            home,
-            away,
-          },
-          context,
-        );
+        const result: GameResult = simulate({
+          schemaVersion: 2,
+          seed: deriveLeagueGameSeed(input.seed, game.gameIndex),
+          gameNumber: (game.gameIndex % LEAGUE_GAME_NUMBER_CYCLE) + 1,
+          dataVersion: input.profile.dataVersion,
+          profile: input.profile,
+          home,
+          away,
+        });
         if (input.checkResult === true) {
           const failures = checkGameResult(result);
           if (failures.length > 0) {

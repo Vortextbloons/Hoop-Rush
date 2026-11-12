@@ -3418,15 +3418,15 @@ fn battle_ensure_coverage(handle: u32, offense: usize, defense: usize) {
     let Some(battle) = battle_ptr(handle) else {
         return;
     };
-    let offense_active = battle.teams[offense].active.clone();
-    let defense_active = battle.teams[defense].active.clone();
-    if offense_active.len() == 5 && defense_active.len() == 5 {
+    if battle.teams[offense].active.len() == 5 && battle.teams[defense].active.len() == 5 {
         battle.coverage.valid = false;
         return;
     }
     if battle.coverage.valid && battle.coverage.possession == battle.possession_id {
         return;
     }
+    let offense_active = &battle.teams[offense].active;
+    let defense_active = &battle.teams[defense].active;
     let material = format!(
         "havoc-runtime-v1\u{0}{}\u{0}coverage\u{0}{}\u{0}{}",
         battle.seed, battle.possession_id, offense
@@ -3434,7 +3434,7 @@ fn battle_ensure_coverage(handle: u32, offense: usize, defense: usize) {
     let mut rng = derived_rng_state(&material, !battle.internal_rng);
     let mut covered: Vec<bool> = vec![false; battle.participants.len()];
     let mut assignment: Vec<i32> = vec![-1; battle.participants.len()];
-    for defender in &defense_active {
+    for defender in defense_active {
         let candidates: Vec<usize> = offense_active
             .iter()
             .copied()
@@ -3479,29 +3479,28 @@ fn battle_pick_helper(handle: u32, defense: usize, zone: usize) -> i32 {
     let Some(battle) = battle_ptr(handle) else {
         return -1;
     };
-    let team_active = battle.teams[defense].active.clone();
-    let assigned: Vec<i32> = battle
-        .coverage
-        .assignment
-        .iter()
-        .copied()
-        .filter(|value| *value >= 0)
-        .collect();
-    let mut candidates: Vec<usize> = team_active
-        .iter()
-        .copied()
-        .filter(|defender| !assigned.contains(&(*defender as i32)))
-        .collect();
-    if candidates.is_empty() {
-        candidates = team_active;
+    let team_active = &battle.teams[defense].active;
+    let mut candidates = [0usize; MAX_UNITS];
+    let mut count = 0;
+    for &defender in team_active {
+        if !battle.coverage.assignment.contains(&(defender as i32)) {
+            candidates[count] = defender;
+            count += 1;
+        }
     }
-    if candidates.is_empty() {
+    if count == 0 {
+        count = team_active.len();
+        candidates[..count].copy_from_slice(team_active);
+    }
+    if count == 0 {
         return -1;
     }
-    let weights: Vec<f64> = candidates
-        .iter()
-        .map(|defender| zone_defense_weight(battle, *defender, zone))
-        .collect();
+    let candidates = &candidates[..count];
+    let mut storage = [0.0; MAX_UNITS];
+    for (slot, &defender) in candidates.iter().enumerate() {
+        storage[slot] = zone_defense_weight(battle, defender, zone);
+    }
+    let weights = &storage[..count];
     let total: f64 = weights.iter().sum();
     let mut rng = battle.coverage.rng_state;
     let chosen = derived_pick(&mut rng, total, &weights);
@@ -5684,7 +5683,7 @@ pub extern "C" fn battle_trip(handle: u32, offense: u32, seconds: f64) -> u32 {
     }
     let mut cursor = 16;
     for side in 0..2 {
-        for index in battle.teams[side].active.clone() {
+        for &index in &battle.teams[side].active {
             dynamic[cursor] = battle.participants[index].personal_fouls;
             cursor += 1;
         }
@@ -5692,7 +5691,7 @@ pub extern "C" fn battle_trip(handle: u32, offense: u32, seconds: f64) -> u32 {
     let evidence_base = 16 + count0 + count1;
     let mut cursor = evidence_base;
     for side in 0..2 {
-        for index in battle.teams[side].active.clone() {
+        for &index in &battle.teams[side].active {
             dynamic[cursor] =
                 if battle_evidence_mask_for(&battle.participants, index) == ALL_CHANNELS {
                     2.0
@@ -5739,7 +5738,7 @@ pub extern "C" fn battle_trip(handle: u32, offense: u32, seconds: f64) -> u32 {
         period_ended: false,
     };
     for side in 0..2 {
-        for (slot, index) in battle.teams[side].active.clone().iter().enumerate() {
+        for (slot, index) in battle.teams[side].active.iter().enumerate() {
             trip.personal[side][slot] = battle.participants[*index].personal_fouls;
         }
     }
@@ -5752,14 +5751,14 @@ pub extern "C" fn battle_trip(handle: u32, offense: u32, seconds: f64) -> u32 {
     battle.possession_start = trip.possession_start;
     battle.rng_state = trip.rng.state;
     for side in 0..2 {
-        for (slot, index) in battle.teams[side].active.clone().iter().enumerate() {
+        for (slot, index) in battle.teams[side].active.iter().enumerate() {
             battle.participants[*index].personal_fouls = trip.personal[side][slot];
         }
     }
     let elapsed = seconds - remaining;
     if elapsed > 0.0 {
         for side in 0..2 {
-            for index in battle.teams[side].active.clone() {
+            for &index in &battle.teams[side].active {
                 battle.participants[index].active_seconds += elapsed;
             }
         }
@@ -6092,4 +6091,38 @@ pub extern "C" fn battle_layout_ptr(handle: u32, side: u32, struck: u32) -> *con
         .and_then(|b| b.layouts.get(side as usize * 2 + struck as usize))
         .and_then(|v| v.as_ref())
         .map_or(core::ptr::null(), |v| v.as_ptr())
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn battle_run_segment(
+    handle: u32,
+    mut offense: u32,
+    mut seconds: f64,
+    first: u32,
+    mut possession_id: u32,
+) -> u32 {
+    let mut first = first != 0;
+    while seconds > 0.0 {
+        if battle_consume_extra(handle, offense) < 0 && !first {
+            offense = 1 - offense;
+        }
+        first = false;
+        possession_id += 1;
+        battle_begin_possession(handle, possession_id, offense);
+        let ended = battle_trip(handle, offense, seconds);
+        if ended >= 0xffff_fffe {
+            return ended;
+        }
+        seconds = battle_seconds(handle);
+        battle_end_possession(handle, offense);
+        let changed = battle_boundary(handle);
+        if changed != 0 || ended == 0 || seconds <= 0.0 {
+            let output = battle_scratch();
+            output[0] = offense as f64;
+            output[1] = seconds;
+            output[2] = possession_id as f64;
+            return changed | if ended == 0 || seconds <= 0.0 { 2 } else { 0 };
+        }
+    }
+    2
 }

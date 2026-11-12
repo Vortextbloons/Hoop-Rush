@@ -86,6 +86,13 @@ export interface BattleKernel {
   battle_expire_extra(handle: number): void;
   battle_consume_extra(handle: number, side: number): number;
   battle_trip(handle: number, offense: number, seconds: number): number;
+  battle_run_segment(
+    handle: number,
+    offense: number,
+    seconds: number,
+    first: number,
+    possessionId: number,
+  ): number;
   battle_finalize(handle: number, gameSeconds: number): number;
   battle_side_points_scalar(handle: number, side: number): number;
   battle_seconds(handle: number): number;
@@ -455,6 +462,7 @@ const PARTICIPANT_SPEC_FIELDS = 52;
 const PARTICIPANT_RECORD_FIELDS = 50;
 
 interface PreparedSideResult {
+  readonly spec: Float64Array;
   readonly prepared: PreparedSide;
   readonly players: SimulationPlayer[];
   readonly bindings: ParticipantBinding[];
@@ -469,10 +477,17 @@ function preparedSide(
   handle: number,
   side: 0 | 1,
   allBindings: readonly ParticipantBinding[],
+  previous?: PreparedSideResult,
 ): PreparedSideResult {
   const count = battleKernel().battle_active_count(handle, side);
   const length = battleKernel().battle_fill_team_spec(handle, side);
   const spec = scratch(length);
+  if (
+    previous?.spec.length === length &&
+    spec.every((value, index) => value === previous.spec[index])
+  ) {
+    return previous;
+  }
   let cursor = 1;
   const players: SimulationPlayer[] = [];
   const bindings: ParticipantBinding[] = [];
@@ -557,7 +572,7 @@ function preparedSide(
         participant.mutationPackage.some((entry) => entry.mutationId === 'basketball-darwinism'),
       ),
   };
-  return { prepared, players, bindings, evidence, scale, reach, slots };
+  return { spec: spec.slice(), prepared, players, bindings, evidence, scale, reach, slots };
 }
 
 function buildBattleTeamBlock(
@@ -1487,6 +1502,8 @@ export class HavocBattleWasmSimulation {
   private period = 1;
   private seconds = 720;
   private possessionId = 0;
+  private books?: [PreparedSideResult, PreparedSideResult];
+  private struck: [number, number] = [-1, -1];
 
   constructor(
     input: HavocBattleInput,
@@ -1500,9 +1517,22 @@ export class HavocBattleWasmSimulation {
 
   private installLayouts(): void {
     const books: [PreparedSideResult, PreparedSideResult] = [
-      preparedSide(this.input, this.init.handle, 0, this.init.bindings),
-      preparedSide(this.input, this.init.handle, 1, this.init.bindings),
+      preparedSide(this.input, this.init.handle, 0, this.init.bindings, this.books?.[0]),
+      preparedSide(this.input, this.init.handle, 1, this.init.bindings, this.books?.[1]),
     ];
+    const struck: [number, number] = [
+      battleKernel().battle_struck_index(this.init.handle, 0),
+      battleKernel().battle_struck_index(this.init.handle, 1),
+    ];
+    if (
+      this.books?.[0] === books[0] &&
+      this.books[1] === books[1] &&
+      this.struck[0] === struck[0] &&
+      this.struck[1] === struck[1]
+    )
+      return;
+    this.books = books;
+    this.struck = struck;
     const preparedBooks: [PreparedSide, PreparedSide] = [books[0].prepared, books[1].prepared];
     preparedBooks[0].defenseTeam = books[1].prepared.team;
     preparedBooks[0].defensePrep = books[1].prepared.prep;
@@ -1612,19 +1642,21 @@ export class HavocBattleWasmSimulation {
   private playPeriod(): void {
     let first = true;
     while (this.seconds > 0) {
-      const grant = battleKernel().battle_consume_extra(this.init.handle, this.offense);
-      if (grant < 0 && !first) this.offense = (1 - this.offense) as 0 | 1;
+      const status = battleKernel().battle_run_segment(
+        this.init.handle,
+        this.offense,
+        this.seconds,
+        first ? 1 : 0,
+        this.possessionId,
+      );
+      if (status >>> 0 >= 0xfffffffe) throw new Error('havoc battle: trip kernel error');
+      const output = scratch(4);
+      this.offense = (output[0] ?? 0) as 0 | 1;
+      this.seconds = output[1] ?? 0;
+      this.possessionId = output[2] ?? 0;
       first = false;
-      this.possessionId += 1;
-      battleKernel().battle_begin_possession(this.init.handle, this.possessionId, this.offense);
-      const ended = battleKernel().battle_trip(this.init.handle, this.offense, this.seconds);
-      if (ended >>> 0 >= 0xfffffffe) {
-        throw new Error('havoc battle: trip kernel error');
-      }
-      this.seconds = battleKernel().battle_seconds(this.init.handle);
-      battleKernel().battle_end_possession(this.init.handle, this.offense);
-      if (battleKernel().battle_boundary(this.init.handle) !== 0) this.installLayouts();
-      if (ended === 0) break;
+      if ((status & 1) !== 0) this.installLayouts();
+      if ((status & 2) !== 0) break;
     }
   }
 }

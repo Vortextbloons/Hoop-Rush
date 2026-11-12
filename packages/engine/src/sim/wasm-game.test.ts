@@ -17,6 +17,19 @@ import { createEngineContext } from './kernel.ts';
 import { createRng, type Rng } from './rng.ts';
 
 describe('production Rust game kernel', () => {
+  it('reinstalls matchup inputs when independent batches share the kernel', () => {
+    const base = buildGameSimulationInput();
+    const { strong, weak } = buildStrongWeakFixture();
+    const context = createEngineContext();
+    const first = createGameBatchSimulator(context);
+    const second = createGameBatchSimulator(context);
+    const other = { ...base, home: strong, away: weak };
+    for (let index = 0; index < 8; index++) {
+      expect(first(base)).toEqual(simulateArchivedGame(base, context));
+      expect(second(other)).toEqual(simulateArchivedGame(other, context));
+      expect(first(base)).toEqual(simulateArchivedGame(base, context));
+    }
+  });
   it('preserves overtime periods and playback callbacks', () => {
     const input = buildGameSimulationInput({ seed: seedSchema.parse(seedFromString('ot-v21-8')) });
     const context = createEngineContext();
