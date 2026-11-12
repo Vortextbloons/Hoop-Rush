@@ -1,4 +1,5 @@
-import Dexie, { type EntityTable } from 'dexie';
+import type Dexie from 'dexie';
+import type { EntityTable } from 'dexie';
 import { franchiseEraPoolSchema, type FranchiseEraPool } from '@hoop-rush/data-contracts';
 import { isLiteMode } from './device-capabilities';
 interface CachedPoolRecord {
@@ -26,7 +27,7 @@ type HoopRushCacheDb = Dexie & {
   pools: EntityTable<CachedPoolRecord, 'key'>;
   assets: EntityTable<CachedAssetRecord, 'key'>;
 };
-let dbInstance: HoopRushCacheDb | null = null;
+let dbPromise: Promise<HoopRushCacheDb> | null = null;
 const parsedPoolCache = new Map<string, { hash: string; pool: FranchiseEraPool }>();
 const PARSED_POOL_CACHE_MAX = 16;
 function rememberParsedPool(key: string, hash: string, pool: FranchiseEraPool): void {
@@ -38,30 +39,40 @@ function rememberParsedPool(key: string, hash: string, pool: FranchiseEraPool): 
     parsedPoolCache.delete(oldest);
   }
 }
-function getDb(): HoopRushCacheDb {
-  if (!dbInstance) {
-    const db = new Dexie('hoop-rush') as HoopRushCacheDb;
-    db.version(1).stores({
-      pools: 'key',
+async function openDb(): Promise<HoopRushCacheDb> {
+  // Imported on demand so pages that never touch the cache (home, roster) do not
+  // load Dexie on their critical path.
+  const { default: Dexie } = await import('dexie');
+  const db = new Dexie('hoop-rush') as HoopRushCacheDb;
+  db.version(1).stores({
+    pools: 'key',
+  });
+  db.version(2).stores({
+    pools: 'key',
+    assets: 'key',
+  });
+  db.version(3).stores({
+    pools: 'key, savedAt',
+    assets: 'key, savedAt',
+  });
+  return db;
+}
+function getDb(): Promise<HoopRushCacheDb> {
+  if (dbPromise === null) {
+    dbPromise = openDb().catch((error: unknown) => {
+      dbPromise = null;
+      throw error;
     });
-    db.version(2).stores({
-      pools: 'key',
-      assets: 'key',
-    });
-    db.version(3).stores({
-      pools: 'key, savedAt',
-      assets: 'key, savedAt',
-    });
-    dbInstance = db;
   }
-  return dbInstance;
+  return dbPromise;
 }
 export async function readCachedPool(
   key: string,
   expectedHash: string,
 ): Promise<FranchiseEraPool | null> {
   try {
-    const record = await getDb().pools.get(key);
+    const db = await getDb();
+    const record = await db.pools.get(key);
     if (!record) return null;
     if (record.contentHash !== expectedHash) {
       console.warn(
@@ -89,7 +100,7 @@ export async function writeCachedPool(
   pool: FranchiseEraPool,
 ): Promise<void> {
   try {
-    const db = getDb();
+    const db = await getDb();
     await db.pools.put({ key, contentHash, pool, savedAt: Date.now() });
     rememberParsedPool(key, contentHash, pool);
     const count = await db.pools.count();
@@ -108,7 +119,8 @@ export async function readCachedAsset<T>(
   parse: (value: unknown) => T,
 ): Promise<T | null> {
   try {
-    const record = await getDb().assets.get(contentHash);
+    const db = await getDb();
+    const record = await db.assets.get(contentHash);
     if (!record) return null;
     return parse(record.value);
   } catch (error) {
@@ -118,7 +130,7 @@ export async function readCachedAsset<T>(
 }
 export async function writeCachedAsset(contentHash: string, value: unknown): Promise<void> {
   try {
-    const db = getDb();
+    const db = await getDb();
     await db.assets.put({ key: contentHash, value, savedAt: Date.now() });
     const count = await db.assets.count();
     const max = poolCacheMaxAssets();

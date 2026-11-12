@@ -293,7 +293,7 @@ function runPolicy(
           ...base(),
           command: 'accept-cap-rush-league-games',
           slot: gameNumber,
-          leagueGames,
+          leagueGameIds: leagueGames.map((game) => game.gameId),
         }),
       );
     });

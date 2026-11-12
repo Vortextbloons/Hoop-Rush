@@ -2,12 +2,37 @@ import { expect, test, mock } from 'bun:test';
 import type { CapRushService } from '@hoop-rush/application/cap-rush';
 import {
   CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION,
+  type CapRushPlayback,
   type CapRushPlayoffGamePlan,
+  type HavocGameResult,
 } from '@hoop-rush/data-contracts';
 import { createEngineContext, simulateCapRushPlayoffGame } from '@hoop-rush/engine';
 import { CapRushSeasonController } from './cap-rush-season-state.svelte';
 import type { CapRushRunner } from './cap-rush-runner';
 import { lockedRun } from './cap-rush-runner-test-support';
+
+test('broadcast ticks advance the cursor without waiting for storage', () => {
+  const updatePlayback = mock(() => Promise.resolve());
+  const controller = new CapRushSeasonController(
+    { updatePlayback } as unknown as CapRushService,
+    { destroy: () => {} } as unknown as CapRushRunner,
+  );
+  controller.playback = {
+    game: 1,
+    evidence: {
+      cursor: 0,
+      tape: { events: new Array(10).fill({}), scoring: [] },
+    } as unknown as CapRushPlayback,
+    result: {} as HavocGameResult,
+  };
+  controller.seekPlayback(4);
+  expect(controller.playback.evidence.cursor).toBe(4);
+  controller.seekPlayback(9);
+  expect(controller.playback.evidence.cursor).toBe(9);
+  // Storage is flushed on a coarse timer, never on the tick itself.
+  expect(updatePlayback).not.toHaveBeenCalled();
+  controller.destroy();
+});
 
 test('playoff batches retain accepted games without reloading the season archive', async () => {
   const locked = lockedRun();

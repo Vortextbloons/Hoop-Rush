@@ -20,7 +20,6 @@ import {
   capRushCommandSchema,
   capRushConferenceStandingsEntries,
   capRushLeagueGameSchema,
-  capRushLeagueResultOf,
   capRushReportSchema,
   capRushStoredGameSchema,
   capRushStoredPlayoffGameSchema,
@@ -37,11 +36,13 @@ import {
   CAP_RUSH_ACTIVE_DRAFT_RECORD_ID,
   capRushPlaybackGameKey,
   storedCapRushCommandRowSchema,
+  storedCapRushDraftProgressRowSchema,
   storedCapRushDraftRowSchema,
   storedCapRushGameRowSchema,
   storedCapRushHistoryRowSchema,
   storedCapRushLeagueAggregateRowSchema,
   storedCapRushLeagueGameRowSchema,
+  storedCapRushLeagueResultRowSchema,
   storedCapRushPlaybackCursorRowSchema,
   storedCapRushPlaybackEvidenceRowSchema,
   storedCapRushPlayoffGameRowSchema,
@@ -466,7 +467,8 @@ export class DexieCapRushRepository {
         const active = await getParsedRecord(
           this.db.capRushActive,
           CAP_RUSH_ACTIVE_DRAFT_RECORD_ID,
-          (row) => parseStored(storedCapRushDraftRowSchema, row, 'active cap rush draft'),
+          (row) =>
+            parseStored(storedCapRushDraftProgressRowSchema, row, 'active cap rush draft progress'),
         );
         let createdAtIso = now;
         if (active !== null) {
@@ -778,9 +780,9 @@ export class DexieCapRushRepository {
     const rows = await this.db.capRushLeagueGames.where('runId').equals(runId).toArray();
     return rows
       .map((row) =>
-        parseStored(storedCapRushLeagueGameRowSchema, row, `cap rush league game ${runId}`),
+        parseStored(storedCapRushLeagueResultRowSchema, row, `cap rush league result ${runId}`),
       )
-      .map((row) => capRushLeagueResultOf(row.game))
+      .map((row) => row.game)
       .sort((left, right) => left.slot - right.slot || left.gameId.localeCompare(right.gameId));
   }
 

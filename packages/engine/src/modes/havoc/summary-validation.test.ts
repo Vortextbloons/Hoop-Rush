@@ -1,5 +1,5 @@
 import { describe, expect, it, spyOn } from 'bun:test';
-import { havocBattleInputSchema, havocBattleTapeSchema } from '@hoop-rush/data-contracts';
+import { havocBattleTapeSchema } from '@hoop-rush/data-contracts';
 import { buildHavocGameInput } from '@hoop-rush/test-fixtures';
 import { createEngineContext } from '../../sim/kernel.ts';
 import { simulateAuditedHavocGame, simulateAuditedHavocSummaryGame } from './solo/simulate.ts';
@@ -10,16 +10,13 @@ describe('audited Havoc summaries', () => {
     const context = createEngineContext();
     const recorded = simulateAuditedHavocGame(input, context);
     const parse = spyOn(havocBattleTapeSchema, 'parse');
-    const parseInput = spyOn(havocBattleInputSchema, 'parse');
     try {
       const summary = simulateAuditedHavocSummaryGame(input, context);
       expect(summary).toEqual({ result: recorded.result, audit: recorded.audit });
       expect(summary.audit.ok).toBe(true);
       expect(parse).not.toHaveBeenCalled();
-      expect(parseInput).toHaveBeenCalledTimes(1);
     } finally {
       parse.mockRestore();
-      parseInput.mockRestore();
     }
   });
 

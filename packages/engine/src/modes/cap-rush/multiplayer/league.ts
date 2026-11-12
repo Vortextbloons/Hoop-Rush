@@ -93,12 +93,14 @@ export function capRushMultiplayerSimulateGame(input: {
     inputDigest: battle.result.inputDigest,
     resultDigest: havocBattleGameResultDigest(battle.result),
   });
+  const facts = apron?.facts() ?? [];
+  apron?.dispose();
   return {
     game,
     get tape() {
       return battle.tape;
     },
-    facts: apron?.facts() ?? [],
+    facts,
     input: battleInput,
     result: battle.result,
   };

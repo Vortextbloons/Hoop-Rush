@@ -30,6 +30,12 @@ import type { CapRushRunner } from './cap-rush-runner.ts';
 
 import { errorMessageOf } from '#lib/errors.js';
 
+/**
+ * The broadcast cursor only exists to resume an interrupted game, so it is
+ * flushed on a coarse cadence instead of on every animation tick.
+ */
+const PLAYBACK_PERSIST_INTERVAL_MS = 750;
+
 export interface CapRushSeasonProgress {
   readonly completed: number;
   readonly total: number;
@@ -60,6 +66,9 @@ export class CapRushSeasonController {
   private aiLeagueGames: CapRushLeagueResult[] = [];
   private aiLeagueGameIds = new Set<string>();
   private userLeagueGames = new Map<string, CapRushLeagueResult>();
+  private playbackPersistTimer: ReturnType<typeof setTimeout> | null = null;
+  private playbackPersistPromise: Promise<void> | null = null;
+  private playbackPersistedAtMs = 0;
   private destroyed = false;
 
   constructor(service: CapRushService, runner: CapRushRunner) {
@@ -266,9 +275,9 @@ export class CapRushSeasonController {
         },
       });
       if (this.isDestroyed()) return false;
-      await this.load();
-      if (this.isDestroyed()) return false;
       if (complete.cancelled) {
+        await this.load();
+        if (this.isDestroyed()) return false;
         this.notice = 'The game did not finish. Accepted results are saved.';
         return false;
       }
@@ -281,9 +290,9 @@ export class CapRushSeasonController {
         if (played === CAP_RUSH_GAME_COUNT) {
           if (!(await this.ensureLeagueGames())) return false;
           await this.service.finalizeSeason();
+          if (this.isDestroyed()) return false;
+          await this.load();
         }
-        if (this.isDestroyed()) return false;
-        await this.load();
       }
       return !this.isDestroyed();
     } catch (error) {
@@ -746,23 +755,54 @@ export class CapRushSeasonController {
     return this.service.readLeagueGame(runId, gameId);
   }
 
-  async seekPlayback(cursor: number): Promise<void> {
+  /**
+   * Advances the broadcast cursor in memory immediately so playback cadence is
+   * never bounded by storage latency, then persists at a coarse cadence.
+   */
+  seekPlayback(cursor: number): void {
     const playback = this.playback;
-    if (playback === null || this.playbackSaving || this.isDestroyed()) return;
+    if (playback === null || this.isDestroyed()) return;
+    const total = playback.evidence.tape.events.length + playback.evidence.tape.scoring.length;
+    const next = Math.min(cursor, total);
+    if (next <= playback.evidence.cursor) return;
+    this.playback = { ...playback, evidence: { ...playback.evidence, cursor: next } };
+    this.schedulePlaybackPersist();
+  }
+
+  private schedulePlaybackPersist(): void {
+    if (this.isDestroyed() || this.playbackPersistTimer !== null) return;
+    const delay = Math.max(
+      0,
+      PLAYBACK_PERSIST_INTERVAL_MS - (Date.now() - this.playbackPersistedAtMs),
+    );
+    this.playbackPersistTimer = setTimeout(() => {
+      this.playbackPersistTimer = null;
+      this.playbackPersistPromise = this.persistPlaybackCursor();
+    }, delay);
+  }
+
+  private async persistPlaybackCursor(): Promise<void> {
+    const playback = this.playback;
+    if (playback === null || this.isDestroyed()) return;
+    const cursor = playback.evidence.cursor;
     this.playbackSaving = true;
-    this.error = null;
+    this.playbackPersistedAtMs = Date.now();
     try {
       await this.service.updatePlayback(playback.game, cursor, false);
-      if (!this.isDestroyed())
-        this.playback = { ...playback, evidence: { ...playback.evidence, cursor } };
     } catch (error) {
       if (!this.isDestroyed()) this.error = errorMessageOf(error);
     } finally {
+      this.playbackPersistPromise = null;
       if (!this.isDestroyed()) this.playbackSaving = false;
     }
   }
 
   async finishPlayback(): Promise<void> {
+    if (this.playbackPersistTimer !== null) {
+      clearTimeout(this.playbackPersistTimer);
+      this.playbackPersistTimer = null;
+    }
+    if (this.playbackPersistPromise !== null) await this.playbackPersistPromise;
     const playback = this.playback;
     if (playback === null || this.playbackSaving || this.busy || this.isDestroyed()) return;
     const total = playback.evidence.tape.events.length + playback.evidence.tape.scoring.length;
@@ -773,14 +813,13 @@ export class CapRushSeasonController {
       await this.service.updatePlayback(playback.game, total, true);
       if (this.isDestroyed()) return;
       this.playback = null;
-      await this.load();
-      if (this.isDestroyed()) return;
       if (
         this.draft?.draft.stage === 'locked' &&
         this.draft.season?.games.length === CAP_RUSH_GAME_COUNT
       ) {
         if (!(await this.ensureLeagueGames())) return;
         await this.service.finalizeSeason();
+        if (this.isDestroyed()) return;
         await this.load();
       }
       const outcome = this.draft?.postseason?.userOutcome.status;
@@ -802,6 +841,10 @@ export class CapRushSeasonController {
 
   destroy(): void {
     this.destroyed = true;
+    if (this.playbackPersistTimer !== null) {
+      clearTimeout(this.playbackPersistTimer);
+      this.playbackPersistTimer = null;
+    }
     this.runner.destroy();
   }
 }

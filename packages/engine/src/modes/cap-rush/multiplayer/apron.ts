@@ -10,6 +10,7 @@ import { capRushApronRuntimeFor, type CapRushApronRuntime } from '../apron-runti
 export interface CapRushMultiplayerApron {
   readonly hooks: ApronRuntimeHooks;
   readonly facts: () => readonly CapRushApronFact[];
+  readonly dispose: () => void;
 }
 
 function runtimeFor(
@@ -98,6 +99,9 @@ export function capRushMultiplayerApronFor(input: {
       },
     },
     facts: () => runtimes.flatMap((runtime) => [...runtime.recordedFacts()]),
+    dispose: () => {
+      for (const runtime of runtimes) runtime.dispose();
+    },
   };
 }
 

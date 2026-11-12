@@ -9,9 +9,7 @@ import {
   CAP_RUSH_MAX_OVERALL,
   CAP_RUSH_MIN_OVERALL,
   POSITIONS,
-  capRushCatalogSchema,
   capRushCatalogSourceSchema,
-  capRushSourcePlayerSchema,
 } from '@hoop-rush/data-contracts';
 import { compareStrings } from '../../domain/math.ts';
 import { capRushSalaryDollars } from './salary.ts';
@@ -42,7 +40,9 @@ function adaptSourcePlayer(
       `cap rush catalog candidate ${candidate.playerVersionId} is not fully modeled (missing anchors)`,
     );
   }
-  return capRushSourcePlayerSchema.parse({
+  // Fields are copied from the already-validated source catalog; the adapter only
+  // narrows their shape, so a per-candidate schema pass would repeat that work.
+  const adapted: CapRushSourcePlayer = {
     playerId: candidate.playerId,
     playerVersionId: candidate.playerVersionId,
     displayName: candidate.displayName,
@@ -66,7 +66,8 @@ function adaptSourcePlayer(
     ...(candidate.playoffPerformance === undefined
       ? {}
       : { playoffPerformance: candidate.playoffPerformance }),
-  });
+  };
+  return adapted;
 }
 
 export function assertCapRushCatalogSourceMatches(
@@ -134,7 +135,11 @@ export function adaptCapRushCatalog(
   if (candidates.length === 0) {
     throw new Error('cap rush catalog has no candidates with an overall in 40..99');
   }
-  return capRushCatalogSchema.parse({ source: parsedSource, candidates });
+  // The source catalog is already parsed by `seasonDraftCatalogSchema`, and every
+  // adapted field is copied from it, so re-validating all ~8k candidates here only
+  // repeats that work on the main thread.
+  const adapted: CapRushCatalog = { source: parsedSource, candidates };
+  return adapted;
 }
 
 export function buildCapRushCatalogIndex(catalog: CapRushCatalog): CapRushCatalogIndex {
@@ -182,4 +187,23 @@ export function buildCapRushCatalogIndex(catalog: CapRushCatalog): CapRushCatalo
     );
   }
   return { catalog, byPlayerId, byVersionId, bySlot, playerIds, salaryOptionsBySlot };
+}
+
+const sharedIndexes = new WeakMap<SeasonDraftCatalog, CapRushCatalogIndex>();
+
+/**
+ * Adapts and indexes a packaged catalog once per loaded catalog object. Solo and
+ * multiplayer entry points both receive the same cached `SeasonDraftCatalog`
+ * instance, so opening a room after a solo draft reuses the index instead of
+ * rebuilding it on the main thread.
+ */
+export function capRushCatalogIndexOf(
+  catalog: SeasonDraftCatalog,
+  source: CapRushCatalogSource,
+): CapRushCatalogIndex {
+  const cached = sharedIndexes.get(catalog);
+  if (cached !== undefined) return cached;
+  const index = buildCapRushCatalogIndex(adaptCapRushCatalog(catalog, source));
+  sharedIndexes.set(catalog, index);
+  return index;
 }

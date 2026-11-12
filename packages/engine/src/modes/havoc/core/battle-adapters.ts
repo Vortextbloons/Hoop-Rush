@@ -57,11 +57,22 @@ function relabelScoringEntry(
 
 /** Solo input -> battle input: copies every field and relabels the team sides. */
 export function soloToBattleInput(input: HavocGameInput): HavocBattleInput {
-  return havocBattleInputSchema.parse({
-    ...input,
-    home: { ...input.home, side: 'home' },
-    away: { ...input.away, side: 'away' },
-  });
+  return havocBattleInputSchema.parse(soloToBattleInputValidated(input));
+}
+
+/**
+ * Same relabel for callers that already validated `input` with
+ * `havocGameInputSchema`; the solo contract is a superset of the battle
+ * constraints after the side relabel, so a second full parse is redundant.
+ */
+export function soloToBattleInputValidated(input: HavocGameInput): HavocBattleInput {
+  const { humanSide: _humanSide, home, away, ...rest } = input;
+  void _humanSide;
+  return {
+    ...rest,
+    home: { ...home, side: 'home' },
+    away: { ...away, side: 'away' },
+  };
 }
 
 /** Battle result -> solo result: adds the human side and relabels rollup sides. */

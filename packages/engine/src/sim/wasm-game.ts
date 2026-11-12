@@ -1,10 +1,16 @@
-import type { GameResult, GameSimulationInput, ShotZone } from '@hoop-rush/data-contracts';
+import type {
+  EraSimulationProfile,
+  GameResult,
+  GameSimulationInput,
+  ShotZone,
+  SimulationTeam,
+} from '@hoop-rush/data-contracts';
 import { ENGINE_CONSTANTS as C } from './constants.ts';
 import { meanTripSeconds } from './clock.ts';
 import { buildFacts } from './facts.ts';
 import { nonShootingFoulProbability, shootingFoulProbability } from './fouls.ts';
 import { assistProbabilityPure } from './possession.ts';
-import { prepareTeam } from './prepare.ts';
+import { prepareTeam, type TeamPrep } from './prepare.ts';
 import { offensiveReboundProbability } from './rebounding.ts';
 import type { EngineContext } from './kernel.ts';
 import { usageOf, type SideIndex } from './recorder.ts';
@@ -100,12 +106,45 @@ export interface PreparedWasmGame {
   data: Float64Array;
   pickTables: ReadonlyMap<number, { items: readonly unknown[]; table: WeightedPickTable }>;
 }
-export function prepareWasmGame(input: GameSimulationInput, injectedRng = false): PreparedWasmGame {
+export type TeamPrepCache = WeakMap<
+  SimulationTeam['players'],
+  WeakMap<EraSimulationProfile, TeamPrep>
+>;
+const PREPARED_GAME_DOUBLES = 6926;
+function prepareTeams(
+  input: GameSimulationInput,
+  cache: TeamPrepCache | undefined,
+): readonly TeamPrep[] {
+  const teams = [input.home, input.away] as const;
+  if (cache === undefined) return teams.map((team) => prepareTeam(team, input.profile));
+  return teams.map((team) => {
+    let byProfile = cache.get(team.players);
+    if (byProfile === undefined) {
+      byProfile = new WeakMap();
+      cache.set(team.players, byProfile);
+    }
+    let prep = byProfile.get(input.profile);
+    if (prep === undefined) {
+      prep = prepareTeam(team, input.profile);
+      byProfile.set(input.profile, prep);
+    }
+    return prep;
+  });
+}
+export function prepareWasmGame(
+  input: GameSimulationInput,
+  injectedRng = false,
+  teamPreps?: TeamPrepCache,
+): PreparedWasmGame {
   if (input.home.players.length !== 5 || input.away.players.length !== 5)
     throw new Error('simulation requires five players per side');
   const teams = [input.home, input.away] as const;
-  const preps = teams.map((team) => prepareTeam(team, input.profile));
-  const data: number[] = [
+  const preps = prepareTeams(input, teamPreps);
+  // A fixed typed buffer with direct index writes avoids growing a JS array
+  // element by element; the write order (and every offset) is unchanged.
+  const data = new Float64Array(PREPARED_GAME_DOUBLES);
+  let cursor = 0;
+  const initial = [
     meanTripSeconds(input.profile),
     C.minimumStartSeconds,
     C.minimumTripSeconds,
@@ -121,10 +160,12 @@ export function prepareWasmGame(input: GameSimulationInput, injectedRng = false)
     C.bonusFoulsOvertime,
     C.fouledShotMakeScale,
   ];
+  for (const value of initial) data[cursor++] = value;
   const pickTables = new Map<number, { items: readonly unknown[]; table: WeightedPickTable }>();
   const table = (value: WeightedPickTable, items: readonly unknown[]) => {
-    if (injectedRng) pickTables.set(data.length, { items, table: value });
-    data.push(value.total, ...value.weights);
+    if (injectedRng) pickTables.set(cursor, { items, table: value });
+    data[cursor++] = value.total;
+    for (const weight of value.weights) data[cursor++] = weight;
   };
   teams.forEach((team, side) => {
     const prep = required(preps[side]);
@@ -135,39 +176,34 @@ export function prepareWasmGame(input: GameSimulationInput, injectedRng = false)
     table(prep.stealerPickTable, team.players);
     table(prep.rebounderPickTables[0], team.players);
     table(prep.rebounderPickTables[1], team.players);
-    data.push(...prep.freeThrowP);
+    for (const value of prep.freeThrowP) data[cursor++] = value;
     for (const player of team.players)
-      data.push(
-        turnoverProbability(
-          player,
-          defensive.pressure,
-          eraPossEstimatePerTrip(input.profile) ?? 1,
-          input.profile,
-        ),
+      data[cursor++] = turnoverProbability(
+        player,
+        defensive.pressure,
+        eraPossEstimatePerTrip(input.profile) ?? 1,
+        input.profile,
       );
-    data.push(
-      Math.min(
-        0.9,
-        Math.max(
-          0.3,
-          input.profile.parameters.stealShareOfTurnovers *
-            (1 + (prep.stealAbility - C.stealNeutralAbility) / 100),
-        ),
+    data[cursor++] = Math.min(
+      0.9,
+      Math.max(
+        0.3,
+        input.profile.parameters.stealShareOfTurnovers *
+          (1 + (prep.stealAbility - C.stealNeutralAbility) / 100),
       ),
     );
     for (const zone of SHOT_ZONES)
-      data.push(
-        offensiveReboundProbability(
-          prep.offensiveReboundMean,
-          defensive.defensiveReboundMean,
-          zone,
-          input.profile,
-        ),
+      data[cursor++] = offensiveReboundProbability(
+        prep.offensiveReboundMean,
+        defensive.defensiveReboundMean,
+        zone,
+        input.profile,
       );
     for (const player of team.players)
       for (const start of starts)
         table(required(prep.actionPickTables.get(prep.keyOf(player))).byStart[start], ACTION_TYPES);
-    for (const player of team.players) data.push(...required(prep.passP.get(prep.keyOf(player))));
+    for (const player of team.players)
+      for (const value of required(prep.passP.get(prep.keyOf(player)))) data[cursor++] = value;
     for (const player of team.players)
       for (const shot of required(prep.teammateShots.get(prep.keyOf(player))).byAction)
         table(shot.pickTable, shot.teammates);
@@ -179,44 +215,41 @@ export function prepareWasmGame(input: GameSimulationInput, injectedRng = false)
     for (const shooter of team.players)
       for (const action of ACTION_TYPES)
         for (const zone of SHOT_ZONES)
-          data.push(
-            ...makeParts(
-              input,
-              shooter,
-              zone,
-              action,
-              prep.spacing,
-              prep.twoPointAnchor.get(prep.keyOf(shooter)) ?? null,
-            ),
-          );
+          for (const value of makeParts(
+            input,
+            shooter,
+            zone,
+            action,
+            prep.spacing,
+            prep.twoPointAnchor.get(prep.keyOf(shooter)) ?? null,
+          ))
+            data[cursor++] = value;
     for (const defender of defense.players)
-      for (const zone of SHOT_ZONES) data.push(-contestPenalty(defender, zone) * 1 + 0 + 0);
+      for (const zone of SHOT_ZONES) data[cursor++] = -contestPenalty(defender, zone) * 1 + 0 + 0;
     for (const defender of defense.players)
       for (const action of ACTION_TYPES)
-        for (const zone of SHOT_ZONES) data.push(blockProbability(defender, zone, action));
+        for (const zone of SHOT_ZONES) data[cursor++] = blockProbability(defender, zone, action);
     for (const shooter of team.players)
       for (const defender of defense.players)
         for (const zone of SHOT_ZONES)
-          data.push(shootingFoulProbability(shooter, defender, zone, input.profile));
+          data[cursor++] = shootingFoulProbability(shooter, defender, zone, input.profile);
     for (const initiator of team.players)
       for (const shooter of team.players)
         for (const action of ACTION_TYPES)
           for (const zone of SHOT_ZONES) {
-            data.push(
-              assistProbabilityPure(
-                input.profile,
-                0.5 + (input.profile.parameters.assistAnchorRating - 50) / 100,
-                initiator,
-                action,
-                zone,
-                shooter,
-              ),
+            data[cursor++] = assistProbabilityPure(
+              input.profile,
+              0.5 + (input.profile.parameters.assistAnchorRating - 50) / 100,
+              initiator,
+              action,
+              zone,
+              shooter,
             );
           }
   });
-  if (data.length !== 6926 || data.some((value) => !Number.isFinite(value)))
+  if (cursor !== PREPARED_GAME_DOUBLES || data.some((value) => !Number.isFinite(value)))
     throw new Error('Invalid Wasm preparation');
-  return { data: Float64Array.from(data), pickTables };
+  return { data, pickTables };
 }
 
 const installedInputs = new WeakMap<GameWasm, PreparedWasmGame>();

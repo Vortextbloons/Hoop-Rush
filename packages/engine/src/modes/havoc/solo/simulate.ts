@@ -10,7 +10,7 @@ import { havocGameInputDigest } from '../digests.ts';
 import {
   battleToSoloResult,
   battleToSoloTape,
-  soloToBattleInput,
+  soloToBattleInputValidated,
 } from '../core/battle-adapters.ts';
 import {
   simulateAuditedHavocBattleGame,
@@ -25,7 +25,7 @@ import { auditHavocSoloIdentity } from './audit.ts';
  */
 function soloInputsOf(rawInput: HavocGameInput) {
   const input = havocGameInputSchema.parse(rawInput);
-  const battleInput = soloToBattleInput(input);
+  const battleInput = soloToBattleInputValidated(input);
   return { input, battleInput };
 }
 

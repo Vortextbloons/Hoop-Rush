@@ -42,10 +42,9 @@ import {
 } from '@hoop-rush/data-contracts';
 import {
   ENGINE_VERSION,
-  adaptCapRushCatalog,
   applyCapRushCommand,
-  buildCapRushCatalogIndex,
   capRushAssessSigning,
+  capRushCatalogIndexOf,
   capRushConferencePostseasonStep,
   capRushEmptyLeagueAggregate,
   capRushPayrollStatus,
@@ -759,7 +758,7 @@ export class CapRushSession implements CapRushService {
       profileHash: profileEntry.contentHash,
     };
     return {
-      index: buildCapRushCatalogIndex(adaptCapRushCatalog(catalog, catalogSource)),
+      index: capRushCatalogIndexOf(catalog, catalogSource),
       versionSet,
       lockSources: {
         bracket: preamble.bracket,

@@ -9,7 +9,7 @@ import type {
   SimulationTeam,
 } from '@hoop-rush/data-contracts';
 import { checkGameResult } from '../../sim/invariants.ts';
-import { simulateGame } from '../../sim/game.ts';
+import { createGameBatchSimulator } from '../../sim/game.ts';
 import { simulateRecordedGame } from '../../sim/tape.ts';
 import type { EngineContext } from '../../sim/kernel.ts';
 import { fixedFiveDuelGameSeed } from './seeds.ts';
@@ -85,9 +85,12 @@ export function* duelGameEvents(
 ): Generator<DuelGameEvent, void, undefined> {
   let p1Wins = 0;
   let p2Wins = 0;
+  // The duel alternates only two lineups, so one batch simulator keeps both
+  // prepared layouts instead of re-preparing every game.
+  const simulate = createGameBatchSimulator(context);
   for (let gameNumber = 1; gameNumber <= 7; gameNumber += 1) {
     if (p1Wins === 4 || p2Wins === 4) break;
-    const result = simulateGame(duelGameSimulationInput(input, gameNumber), context);
+    const result = simulate(duelGameSimulationInput(input, gameNumber));
     const failures = checkGameResult(result);
     if (failures.length > 0)
       throw new Error(`duel game ${String(gameNumber)} failed invariants: ${failures.join('; ')}`);

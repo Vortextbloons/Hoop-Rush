@@ -369,7 +369,7 @@
           retry={retryRosterData}
         />
       </div>
-    {:else if !index || !details}
+    {:else if !index}
       <div class="mt-8">
         <AsyncState kind="loading" title="Loading players…" message="Getting rosters ready." />
       </div>

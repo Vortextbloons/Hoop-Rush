@@ -102,9 +102,10 @@ export function revisionMatches(current: { revision: number } | null, expected: 
 export async function listCompletedHistory<T, TKey, TInsertType>(
   table: Pick<Table<T, TKey, TInsertType>, 'orderBy'>,
   index = 'completedAtIso',
+  limit?: number,
 ): Promise<T[]> {
-  const rows = await table.orderBy(index).reverse().toArray();
-  return rows;
+  const ordered = table.orderBy(index).reverse();
+  return limit === undefined ? ordered.toArray() : ordered.limit(limit).toArray();
 }
 
 export interface CommandRowDedupe<TRow> {

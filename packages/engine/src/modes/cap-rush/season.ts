@@ -90,6 +90,8 @@ export function simulateCapRushGame(input: {
     inputDigest,
     resultDigest: havocGameResultDigest(soloResult),
   };
+  const facts = apron?.recordedFacts() ?? [];
+  apron?.dispose();
   return {
     input: soloInput,
     result: soloResult,
@@ -98,7 +100,7 @@ export function simulateCapRushGame(input: {
     },
     audit: battleAudit,
     summary,
-    facts: apron?.recordedFacts() ?? [],
+    facts,
   };
 }
 

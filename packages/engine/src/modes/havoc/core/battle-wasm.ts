@@ -591,10 +591,14 @@ function buildBattleTeamBlock(
   const profile = prepared.profile;
   const changesEvidence = books[0].prepared.changesEvidence || books[1].prepared.changesEvidence;
   const data: number[] = [];
+  const append = (values: readonly number[]): void => {
+    for (const value of values) data.push(value);
+  };
   const table = (value: WeightedPickTable, items: readonly unknown[] = team.players): void => {
     if (collectPickTables)
       pendingPickTables.push({ offset: data.length * 8, entry: { items, table: value } });
-    data.push(value.total, ...value.weights);
+    data.push(value.total);
+    append(value.weights);
   };
   const evidenceOf = (player: SimulationPlayer): HavocEvidence | undefined =>
     books[prepared.side].evidence.get(player);
@@ -635,8 +639,8 @@ function buildBattleTeamBlock(
     }
     turnoverVariants.push(values);
   }
-  data.push(...(turnoverVariants[0] ?? []));
-  data.push(...(turnoverVariants[1] ?? turnoverVariants[0] ?? []));
+  append(turnoverVariants[0] ?? []);
+  append(turnoverVariants[1] ?? turnoverVariants[0] ?? []);
   for (const player of team.players) {
     const tables = prep.actionPickTables.get(keyOf(player));
     if (tables === undefined) throw new Error('havoc battle: missing action tables');
@@ -645,7 +649,7 @@ function buildBattleTeamBlock(
   for (const player of team.players) {
     const values = prep.passP.get(keyOf(player));
     if (values === undefined) throw new Error('havoc battle: missing pass probabilities');
-    data.push(...values);
+    append(values);
   }
   for (const initiator of team.players) {
     const shots = prep.teammateShots.get(keyOf(initiator));
@@ -699,10 +703,10 @@ function buildBattleTeamBlock(
     shotVariants.push(arrays);
   }
   for (let component = 0; component < 7; component += 1) {
-    data.push(...(shotVariants[0]?.[component] ?? []));
+    append(shotVariants[0]?.[component] ?? []);
   }
   for (let component = 0; component < 7; component += 1) {
-    data.push(...(shotVariants[1]?.[component] ?? shotVariants[0]?.[component] ?? []));
+    append(shotVariants[1]?.[component] ?? shotVariants[0]?.[component] ?? []);
   }
   for (const player of team.players) data.push(prep.twoPointAnchor.get(keyOf(player)) ?? -1);
   const blockVariants: Array<[number[], number[]]> = [];
@@ -723,10 +727,10 @@ function buildBattleTeamBlock(
     });
     blockVariants.push([value, maximum]);
   }
-  data.push(...(blockVariants[0]?.[0] ?? []));
-  data.push(...(blockVariants[1]?.[0] ?? blockVariants[0]?.[0] ?? []));
-  data.push(...(blockVariants[0]?.[1] ?? []));
-  data.push(...(blockVariants[1]?.[1] ?? blockVariants[0]?.[1] ?? []));
+  append(blockVariants[0]?.[0] ?? []);
+  append(blockVariants[1]?.[0] ?? blockVariants[0]?.[0] ?? []);
+  append(blockVariants[0]?.[1] ?? []);
+  append(blockVariants[1]?.[1] ?? blockVariants[0]?.[1] ?? []);
   for (const shooter of team.players) {
     for (const defender of defense.prepared.team.players) {
       for (const zone of SHOT_ZONES) {
@@ -758,9 +762,9 @@ function buildBattleTeamBlock(
     }
     assistVariants.push(values);
   }
-  data.push(...(assistVariants[0] ?? []));
-  data.push(...(assistVariants[1] ?? assistVariants[0] ?? []));
-  data.push(...Array.from({ length: team.players.length * 2 }, () => 0));
+  append(assistVariants[0] ?? []);
+  append(assistVariants[1] ?? assistVariants[0] ?? []);
+  for (let index = 0; index < team.players.length * 2; index += 1) data.push(0);
   data.push(0);
   if (adjusted === undefined) {
     data.push(0);

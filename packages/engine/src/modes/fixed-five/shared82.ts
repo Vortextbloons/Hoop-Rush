@@ -9,7 +9,7 @@ import type {
   SimulationTeam,
 } from '@hoop-rush/data-contracts';
 import { checkGameResult } from '../../sim/invariants.ts';
-import { simulateGame } from '../../sim/game.ts';
+import { createGameBatchSimulator } from '../../sim/game.ts';
 import { simulateRecordedGame } from '../../sim/tape.ts';
 import type { EngineContext } from '../../sim/kernel.ts';
 import { fixedFiveH2HSeed, fixedFiveSharedGameSeed } from './seeds.ts';
@@ -117,6 +117,9 @@ export function* shared82GameEvents(
   const weakest = findWeakestOpponent(input.bracket);
   const h2hNumbers = h2hGameNumbersFor(input.bracket, weakest.opponentId);
   const h2hSet = new Set(h2hNumbers);
+  // Reuse prepared lineups across the 82-game schedule; each opponent pairing
+  // would otherwise prepare both teams from scratch.
+  const simulate = createGameBatchSimulator(context);
   for (let gameNumber = startGameNumber; gameNumber <= 82; gameNumber += 1) {
     const entry = input.bracket.schedule[gameNumber - 1];
     if (!entry) throw new Error(`schedule missing game ${String(gameNumber)}`);
@@ -125,7 +128,7 @@ export function* shared82GameEvents(
         const recorded = simulateRecordedShared82H2HGame(input, gameNumber, context);
         yield { tag: 'h2h', game: recorded.result, tape: recorded.tape };
       } else {
-        const result = simulateGame(shared82H2HGameInput(input, gameNumber), context);
+        const result = simulate(shared82H2HGameInput(input, gameNumber));
         const failures = checkGameResult(result);
         if (failures.length > 0)
           throw new Error(
@@ -137,22 +140,19 @@ export function* shared82GameEvents(
     }
     const opponent = opponentById(input.bracket, entry.opponentId);
     const p1Seed = fixedFiveSharedGameSeed(input.rootSeed, 'p1', gameNumber);
-    const p1Result = simulateGame(
-      {
-        schemaVersion: 2,
-        seed: p1Seed,
-        gameNumber,
-        dataVersion: input.dataVersion,
-        profile: input.profile,
-        home: input.p1Team,
-        away: {
-          teamId: opponent.teamId,
-          displayName: opponent.displayName,
-          players: opponent.players,
-        },
+    const p1Result = simulate({
+      schemaVersion: 2,
+      seed: p1Seed,
+      gameNumber,
+      dataVersion: input.dataVersion,
+      profile: input.profile,
+      home: input.p1Team,
+      away: {
+        teamId: opponent.teamId,
+        displayName: opponent.displayName,
+        players: opponent.players,
       },
-      context,
-    );
+    });
     const p1Failures = checkGameResult(p1Result);
     if (p1Failures.length > 0)
       throw new Error(
@@ -160,22 +160,19 @@ export function* shared82GameEvents(
       );
     yield { tag: 'p1', game: p1Result };
     const p2Seed = fixedFiveSharedGameSeed(input.rootSeed, 'p2', gameNumber);
-    const p2Result = simulateGame(
-      {
-        schemaVersion: 2,
-        seed: p2Seed,
-        gameNumber,
-        dataVersion: input.dataVersion,
-        profile: input.profile,
-        home: input.p2Team,
-        away: {
-          teamId: opponent.teamId,
-          displayName: opponent.displayName,
-          players: opponent.players,
-        },
+    const p2Result = simulate({
+      schemaVersion: 2,
+      seed: p2Seed,
+      gameNumber,
+      dataVersion: input.dataVersion,
+      profile: input.profile,
+      home: input.p2Team,
+      away: {
+        teamId: opponent.teamId,
+        displayName: opponent.displayName,
+        players: opponent.players,
       },
-      context,
-    );
+    });
     const p2Failures = checkGameResult(p2Result);
     if (p2Failures.length > 0)
       throw new Error(

@@ -174,12 +174,14 @@ export function simulateCapRushMultiplayerPlayoffGame(input: {
       awayTeam,
     }),
   );
+  const facts = apron?.facts() ?? [];
+  apron?.dispose();
   return {
     game: summary,
     get tape() {
       return battle.tape;
     },
-    facts: apron?.facts() ?? [],
+    facts,
     input: battleInput,
     result: battle.result,
   };

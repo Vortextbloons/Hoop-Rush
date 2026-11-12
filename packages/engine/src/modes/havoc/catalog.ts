@@ -7,7 +7,7 @@ import type {
   SeasonDraftCandidate,
   SeasonDraftCatalog,
 } from '@hoop-rush/data-contracts';
-import { havocCatalogSourceSchema, havocCatalogSchema } from '@hoop-rush/data-contracts';
+import { havocCatalogSourceSchema } from '@hoop-rush/data-contracts';
 
 export function copyHavocEffectiveProfile(profile: HavocEffectiveProfile): HavocEffectiveProfile {
   return {
@@ -148,5 +148,9 @@ export function AdaptHavocCatalog(
     seenVersions.add(candidate.playerVersionId);
     candidates.push(adaptHavocCandidate(candidate));
   }
-  return havocCatalogSchema.parse({ source: parsedSource, candidates });
+  // The source catalog is already parsed by `seasonDraftCatalogSchema`, and every
+  // adapted field is copied from it, so re-validating the whole catalog here only
+  // repeats that work on the main thread.
+  const adapted: HavocCatalog = { source: parsedSource, candidates };
+  return adapted;
 }

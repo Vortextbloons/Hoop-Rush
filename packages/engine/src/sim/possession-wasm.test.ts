@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'bun:test';
-import { buildGameSimulationInput, buildHavocLockedInputs, seedFromString } from '@hoop-rush/test-fixtures';
+import {
+  buildGameSimulationInput,
+  buildHavocLockedInputs,
+  seedFromString,
+} from '@hoop-rush/test-fixtures';
 import { seedSchema } from '@hoop-rush/data-contracts';
 import { soloToBattleInput } from '../modes/havoc/core/battle-adapters.ts';
 import {
@@ -11,12 +15,7 @@ import { buildHavocGameInput } from '../modes/havoc/input.ts';
 import { createEngineContext } from './kernel.ts';
 import { createRng, type Rng } from './rng.ts';
 import { GameRecorder, type SideIndex } from './recorder.ts';
-import {
-  createGameState,
-  createTripContext,
-  resolveTrip,
-  type TripContext,
-} from './possession.ts';
+import { createGameState, createTripContext, resolveTrip, type TripContext } from './possession.ts';
 import { REGULATION_PERIOD_SECONDS } from './clock.ts';
 
 function customRng(seed: string): Rng {

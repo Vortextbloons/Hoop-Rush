@@ -27,6 +27,7 @@
   let { controller, art = null }: { controller: CapRushSeasonController; art?: CapRushArt | null } =
     $props();
   let paused = $state(false);
+  let boxOpen = $state(false);
   const speed = 4;
   const playback = $derived(controller.playback);
   let itemsTape: unknown = null;
@@ -112,9 +113,9 @@
 
   onMount(() => {
     const timer = setInterval(() => {
-      if (paused || finished || controller.playbackSaving || controller.error !== null) return;
+      if (paused || finished || controller.error !== null) return;
       const step = Math.max(1, Math.ceil((items.length * speed) / 100));
-      void controller.seekPlayback(Math.min(items.length, cursor + step));
+      controller.seekPlayback(Math.min(items.length, cursor + step));
     }, 100);
     return () => clearInterval(timer);
   });
@@ -289,11 +290,13 @@
     {/each}
   </div>
   {#if playback !== null}
-    <details class="rounded-xl border border-line-soft bg-card p-4">
+    <details class="rounded-xl border border-line-soft bg-card p-4" bind:open={boxOpen}>
       <summary class="cursor-pointer text-sm font-bold"
         >Full {finished ? 'final' : 'live'} box score</summary
       >
-      <div class="mt-3"><GamecastBattleBox {boxes} {localSide} /></div>
+      {#if boxOpen}
+        <div class="mt-3"><GamecastBattleBox {boxes} {localSide} /></div>
+      {/if}
     </details>
   {/if}
   {#if apronFacts.length > 0}

@@ -7,7 +7,7 @@ import {
 import { postWorkerMessage, workerErrorMessage } from '../lib/workers/worker-protocol';
 import { sleep } from '../lib/sleep';
 
-const CHUNK_GAMES = 96;
+const CHUNK_GAMES = 256;
 let currentRequestId: string | null = null;
 let requestToken = 0;
 

@@ -6,7 +6,12 @@ import type {
 } from '@hoop-rush/data-contracts';
 import type { EngineContext } from './kernel.ts';
 import { createRng } from './rng.ts';
-import { prepareWasmGame, simulateWasmGame, type PreparedWasmGame } from './wasm-game.ts';
+import {
+  prepareWasmGame,
+  simulateWasmGame,
+  type PreparedWasmGame,
+  type TeamPrepCache,
+} from './wasm-game.ts';
 import { gameWasmRuntime } from './wasm-runtime.ts';
 import type { SideIndex } from './recorder.ts';
 
@@ -66,6 +71,7 @@ export function createGameBatchSimulator(
     GameSimulationInput['profile'],
     WeakMap<Players, WeakMap<Players, PreparedWasmGame>>
   >();
+  const teamPreps: TeamPrepCache = new WeakMap();
   return (input, observers) => {
     let homes = profiles.get(input.profile);
     if (homes === undefined) {
@@ -79,7 +85,7 @@ export function createGameBatchSimulator(
     }
     let prepared = opponents.get(input.away.players);
     if (prepared === undefined) {
-      prepared = prepareWasmGame(input, context.rngFactory !== createRng);
+      prepared = prepareWasmGame(input, context.rngFactory !== createRng, teamPreps);
       opponents.set(input.away.players, prepared);
     }
     return simulatePreparedGame(input, context, prepared, observers);

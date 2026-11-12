@@ -31,6 +31,7 @@ import {
 } from '../lib/workers/worker-protocol';
 import { sleep } from '../lib/sleep';
 const BATCH = 4;
+const YIELD_INTERVAL_MS = 8;
 let currentRequestId: string | null = null;
 let requestToken = 0;
 let lastProgressAt = 0;
@@ -226,7 +227,6 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
             7,
             delivered === 7 || p1Wins === 4 || p2Wins === 4,
           );
-          await sleep(0);
         }
         if (token !== requestToken) return;
         flush(request.requestId);
@@ -246,6 +246,7 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
       }
       const total = 82 + 82 - h2hSet.size;
       let delivered = 0;
+      let lastYieldAt = Date.now();
       const events = shared82GameEvents(
         {
           p1Team: request.p1Team,
@@ -298,7 +299,10 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
         if (event.tag === 'p1') continue;
         if (pending.length >= BATCH) flush(request.requestId);
         maybeProgress(request.requestId, delivered, total);
-        if (event.game.gameNumber % BATCH === 0) await sleep(0);
+        if (Date.now() - lastYieldAt >= YIELD_INTERVAL_MS) {
+          lastYieldAt = Date.now();
+          await sleep(0);
+        }
       }
       if (token !== requestToken) return;
       flush(request.requestId);

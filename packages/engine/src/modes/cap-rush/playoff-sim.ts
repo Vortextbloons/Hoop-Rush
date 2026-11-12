@@ -113,6 +113,8 @@ export function simulateCapRushPlayoffGame(input: {
     homeTeam,
     awayTeam,
   });
+  const facts = apron?.recordedFacts() ?? [];
+  apron?.dispose();
   return {
     game: {
       gameId: summary.gameId,
@@ -126,6 +128,6 @@ export function simulateCapRushPlayoffGame(input: {
     get tape() {
       return battle.tape;
     },
-    facts: apron?.recordedFacts() ?? [],
+    facts,
   };
 }

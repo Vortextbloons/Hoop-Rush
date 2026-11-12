@@ -347,8 +347,8 @@ export class DexieChallengeRepository {
       },
     );
   }
-  async listCompletedRuns(): Promise<CompletedRunIndex[]> {
-    const rows = await listCompletedHistory(this.db.history);
+  async listCompletedRuns(limit?: number): Promise<CompletedRunIndex[]> {
+    const rows = await listCompletedHistory(this.db.history, 'completedAtIso', limit);
     return rows.map((row) => completedRunIndexSchema.parse(row));
   }
   async loadCompletedRun(runId: string): Promise<StoredRunRecord | null> {

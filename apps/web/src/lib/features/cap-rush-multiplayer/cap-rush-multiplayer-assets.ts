@@ -1,6 +1,5 @@
 import {
-  adaptCapRushCatalog,
-  buildCapRushCatalogIndex,
+  capRushCatalogIndexOf,
   ENGINE_VERSION,
   type CapRushMultiplayerEnvironment,
 } from '@hoop-rush/engine';
@@ -75,7 +74,7 @@ async function buildData(): Promise<CapRushMultiplayerData> {
       variant: 'clash',
       bracket,
       seasonCatalog: catalog,
-      index: buildCapRushCatalogIndex(adaptCapRushCatalog(catalog, catalogSource)),
+      index: capRushCatalogIndexOf(catalog, catalogSource),
       profile: preamble.profile,
       catalogSource,
       versionLocks,

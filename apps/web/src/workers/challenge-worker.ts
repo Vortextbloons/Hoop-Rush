@@ -18,6 +18,7 @@ import {
 } from '../lib/workers/challenge-attempt-cache';
 import { sleep } from '../lib/sleep';
 const BATCH_SIZE = 4;
+const YIELD_INTERVAL_MS = 8;
 let currentRequestId: string | null = null;
 let requestToken = 0;
 const retainedAttempts = new ChallengeAttemptCache();
@@ -99,6 +100,7 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
       };
     }
     let delivered = 0;
+    let lastYieldAt = Date.now();
     try {
       for (
         let gameNumber = request.startGameNumber;
@@ -119,7 +121,10 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
           fromGameNumber: gameNumber,
           results,
         });
-        await sleep(0);
+        if (Date.now() - lastYieldAt >= YIELD_INTERVAL_MS) {
+          lastYieldAt = Date.now();
+          await sleep(0);
+        }
       }
       if (token === requestToken) {
         postWorkerMessage(workerMessageSchema, {

@@ -55,7 +55,7 @@
         .then(({ challengeRepository }) =>
           Promise.all([
             challengeRepository.loadActiveRunCheckpoint(),
-            challengeRepository.listCompletedRuns(),
+            challengeRepository.listCompletedRuns(3),
             challengeRepository.loadClassicDraft(),
           ]),
         )

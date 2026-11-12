@@ -10,6 +10,7 @@ import {
   capRushLeagueAggregateSchema,
   capRushLeagueGameIdSchema,
   capRushLeagueGameSchema,
+  capRushLeagueResultSchema,
   capRushPlaybackSchema,
   capRushReportSchema,
   capRushStoredGameSchema,
@@ -82,6 +83,35 @@ export const storedCapRushDraftRowSchema = z
     }
   });
 export type StoredCapRushDraftRow = z.infer<typeof storedCapRushDraftRowSchema>;
+
+/**
+ * Envelope-only view of the active draft row. The 1 MB `draft.locked` subtree is
+ * immutable and validated on load and on every write; the per-command overwrite
+ * guard only needs the row envelope and the draft's run/revision.
+ */
+export const storedCapRushDraftProgressRowSchema = z
+  .object({
+    saveSchemaVersion: z.literal(CAP_RUSH_SAVE_SCHEMA_VERSION),
+    recordId: z.literal(CAP_RUSH_ACTIVE_DRAFT_RECORD_ID),
+    runId: idSchema,
+    revision: z.number().int().nonnegative(),
+    stateDigest: capRushDigestSchema,
+    draft: z.looseObject({
+      runId: idSchema,
+      revision: z.number().int().nonnegative(),
+    }),
+    createdAtIso: isoDateSchema,
+    updatedAtIso: isoDateSchema,
+  })
+  .superRefine((row, ctx) => {
+    if (row.draft.runId !== row.runId) {
+      ctx.addIssue({ code: 'custom', message: 'stored draft run id does not match its row' });
+    }
+    if (row.draft.revision !== row.revision) {
+      ctx.addIssue({ code: 'custom', message: 'stored draft revision does not match its row' });
+    }
+  });
+export type StoredCapRushDraftProgressRow = z.infer<typeof storedCapRushDraftProgressRowSchema>;
 
 export const storedCapRushCommandRowSchema = z
   .object({
@@ -187,6 +217,26 @@ export const storedCapRushLeagueGameRowSchema = z
     }
   });
 export type StoredCapRushLeagueGameRow = z.infer<typeof storedCapRushLeagueGameRowSchema>;
+
+/**
+ * Projection of a stored league-game row for schedule/standings reads. The box
+ * score is stripped by the schema and never parsed, so listing a full season
+ * does not validate every box on the main thread.
+ */
+export const storedCapRushLeagueResultRowSchema = z
+  .object({
+    saveSchemaVersion: z.literal(CAP_RUSH_SAVE_SCHEMA_VERSION),
+    runId: idSchema,
+    gameId: capRushLeagueGameIdSchema,
+    game: capRushLeagueResultSchema,
+    updatedAtIso: isoDateSchema,
+  })
+  .superRefine((row, ctx) => {
+    if (row.game.gameId !== row.gameId) {
+      ctx.addIssue({ code: 'custom', message: 'stored league game id does not match its row' });
+    }
+  });
+export type StoredCapRushLeagueResultRow = z.infer<typeof storedCapRushLeagueResultRowSchema>;
 
 export const storedCapRushHistoryRowSchema = capRushHistoryEntrySchema
   .safeExtend({ saveSchemaVersion: z.literal(CAP_RUSH_SAVE_SCHEMA_VERSION) })
