@@ -1,0 +1,12 @@
+<section id="elite-player-results" data-viz-composition>
+  <div data-viz-container></div>
+  <script type="application/json" data-viz-chart>
+    {"id":"elite-player-counts","title":"More players in the elite tiers","description":"Distinct players at their best available base-card season: 2,998 players. Rating bands are mutually exclusive; authored special cards are excluded.","height":300,"columns":["Rating band","Before","After"],"rows":[["100",2,3],["95-99",13,21],["90-94",76,114],["85-89",180,204]],"spec":{"type":"horizontalBar","y":"Rating band","x":["Before","After"],"xLabel":"Players","showLegend":true,"showValues":true,"sortOrder":"original","valueFormat":{"style":"decimal","maximumFractionDigits":0}}}
+  </script>
+</section>
+<script type="module">
+  import { mountChart } from 'https://persistent.oaistatic.com/plugins/visualize/charts/1.1.6/element.js';
+  const root = document.getElementById('elite-player-results');
+  const config = JSON.parse(root.querySelector('[data-viz-chart]').textContent);
+  mountChart(root.querySelector('[data-viz-container]'), config);
+</script>

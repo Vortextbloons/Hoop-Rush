@@ -73,6 +73,7 @@ export interface BattleKernel {
   battle_active_count(handle: number, side: number): number;
   battle_active_index(handle: number, side: number, slot: number): number;
   battle_struck_index(handle: number, side: number): number;
+  battle_required_layout(handle: number, side: number): number;
   battle_fill_team_spec(handle: number, side: number): number;
   battle_layout_ptr(handle: number, side: number, struck: number): number;
   battle_install_layout(handle: number, side: number, struck: number, length: number): number;
@@ -92,6 +93,7 @@ export interface BattleKernel {
     seconds: number,
     first: number,
     possessionId: number,
+    resume: number,
   ): number;
   battle_finalize(handle: number, gameSeconds: number): number;
   battle_side_points_scalar(handle: number, side: number): number;
@@ -1503,6 +1505,7 @@ export class HavocBattleWasmSimulation {
   private seconds = 720;
   private possessionId = 0;
   private books?: [PreparedSideResult, PreparedSideResult];
+  private normalBlocks?: [number[], number[]];
   private struck: [number, number] = [-1, -1];
   private struckInstalled: [boolean, boolean] = [false, false];
 
@@ -1532,9 +1535,17 @@ export class HavocBattleWasmSimulation {
       this.struck[1] === struck[1]
     )
       return;
+    const previousBooks = this.books;
+    const previousStruck = this.struck;
+    if (
+      previousBooks?.[0] === books[0] &&
+      previousBooks[1] === books[1] &&
+      previousStruck[0] === struck[0] &&
+      previousStruck[1] === struck[1]
+    )
+      return;
     this.books = books;
     this.struck = struck;
-    this.struckInstalled = [false, false];
     const preparedBooks: [PreparedSide, PreparedSide] = [books[0].prepared, books[1].prepared];
     preparedBooks[0].defenseTeam = books[1].prepared.team;
     preparedBooks[0].defensePrep = books[1].prepared.prep;
@@ -1543,18 +1554,24 @@ export class HavocBattleWasmSimulation {
     for (const side of [0, 1] as const) {
       const prepared = preparedBooks[side];
       const normal = buildBattleTeamBlock(prepared, books);
+      this.normalBlocks ??= [[], []];
+      this.normalBlocks[side] = normal;
       this.writeLayout(side, 0, normal);
+      this.struckInstalled[side] = false;
     }
   }
 
-  private ensureStruckLayouts(): void {
-    if (this.books === undefined) return;
+  private ensureStruckLayouts(): number {
+    if (this.books === undefined) return 0;
+    let installed = 0;
     for (const side of [0, 1] as const) {
       if (this.struckInstalled[side]) continue;
       if (battleKernel().battle_required_layout(this.init.handle, side) === 0) continue;
       this.installStruckLayout(side, this.books);
       this.struckInstalled[side] = true;
+      installed += 1;
     }
+    return installed;
   }
 
   private installStruckLayout(side: 0 | 1, books: [PreparedSideResult, PreparedSideResult]): void {
@@ -1578,8 +1595,12 @@ export class HavocBattleWasmSimulation {
       rebounderWeightScale: (player) => books[side].scale.get(player) ?? 1,
       reboundMeanReach: (player) => books[side].reach.get(player) ?? 0,
     });
-    const struck = buildBattleTeamBlock(prepared, books, { prep: adjustedPrep, pool });
-    this.writeLayout(side, 1, struck);
+    const struck = buildAdjustedSection(prepared, books, { prep: adjustedPrep, pool });
+    const base = this.normalBlocks?.[side];
+    if (base === undefined) {
+      throw new Error('havoc battle: base layout is unavailable for the struck variant');
+    }
+    this.writeLayout(side, 1, [...base.slice(0, base.length - 2), ...struck]);
   }
 
   private writeLayout(side: 0 | 1, struck: 0 | 1, data: readonly number[]): void {
@@ -1659,6 +1680,7 @@ export class HavocBattleWasmSimulation {
 
   private playPeriod(): void {
     let first = true;
+    let resume = false;
     while (this.seconds > 0) {
       const status = battleKernel().battle_run_segment(
         this.init.handle,
@@ -1666,6 +1688,7 @@ export class HavocBattleWasmSimulation {
         this.seconds,
         first ? 1 : 0,
         this.possessionId,
+        resume ? 1 : 0,
       );
       if (status >>> 0 >= 0xfffffffe) throw new Error('havoc battle: trip kernel error');
       const output = scratch(4);
@@ -1673,8 +1696,42 @@ export class HavocBattleWasmSimulation {
       this.seconds = output[1] ?? 0;
       this.possessionId = output[2] ?? 0;
       first = false;
+      if ((status & 4) !== 0) {
+        if (this.ensureStruckLayouts() === 0) {
+          throw new Error('havoc battle: kernel requested a struck layout that is unavailable');
+        }
+        resume = true;
+        continue;
+      }
+      resume = false;
       if ((status & 1) !== 0) this.installLayouts();
       if ((status & 2) !== 0) break;
     }
   }
+}
+
+function buildAdjustedSection(
+  prepared: PreparedSide,
+  books: [PreparedSideResult, PreparedSideResult],
+  adjusted: { readonly prep: TeamPrep; readonly pool: SimulationPlayer[] },
+): number[] {
+  const team = prepared.team;
+  const defense = books[(1 - prepared.side) as 0 | 1];
+  const shooters = defense.prepared.team.players.length;
+  const data: number[] = [1, adjusted.pool.length];
+  for (const player of adjusted.pool) data.push(team.players.indexOf(player));
+  data.push(adjusted.prep.defensiveReboundMean);
+  const table = (value: WeightedPickTable): void => {
+    data.push(value.total, ...value.weights);
+  };
+  table(adjusted.prep.stealerPickTable);
+  table(adjusted.prep.rebounderPickTables[1]);
+  for (let zoneIndex = 0; zoneIndex < SHOT_ZONES.length; zoneIndex += 1) {
+    for (let shooterSlot = 0; shooterSlot < shooters; shooterSlot += 1) {
+      const defenderTable = adjusted.prep.defenderBase.pickTables[zoneIndex]?.[shooterSlot];
+      table(defenderTable ?? zeroTable(adjusted.pool.length));
+    }
+  }
+  table(zeroTable(adjusted.pool.length));
+  return data;
 }

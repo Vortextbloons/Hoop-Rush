@@ -51,6 +51,8 @@ const AUTHORITATIVE_CHANNELS = havocAuthoritativeChannelSchema.options;
 const ALL_AUTHORITATIVE: HavocEvidence = { isAuthoritative: () => true };
 const STAT_FIELDS = 40;
 const OUTPUT_DOUBLES = 2048;
+const INPUT_DOUBLES = 131_072;
+const HOOK_DOUBLES = 64;
 
 interface PickTableEntry {
   readonly items: readonly unknown[];
@@ -1092,12 +1094,40 @@ export function resolvePossessionTripWithWasm(
   runtime.recorder = recorder;
   runtime.currentOffense = offenseSide;
   const previous = activeRuntime;
+  const nested = previous !== null;
+  const snapshot = nested ? snapshotSharedKernel() : null;
   activeRuntime = runtime;
   try {
     return runTrip(runtime, offenseSide);
   } finally {
     activeRuntime = previous;
+    if (snapshot !== null) restoreSharedKernel(snapshot);
   }
+}
+
+interface KernelSnapshot {
+  readonly input: Float64Array;
+  readonly output: Float64Array;
+  readonly hook: Float64Array;
+  readonly layout: StaticLayout | null;
+}
+
+function snapshotSharedKernel(): KernelSnapshot {
+  const wasm = wasmRuntime();
+  return {
+    input: new Float64Array(wasm.memory.buffer, wasm.input_ptr(), INPUT_DOUBLES).slice(),
+    output: new Float64Array(wasm.memory.buffer, wasm.output_ptr(), OUTPUT_DOUBLES).slice(),
+    hook: new Float64Array(wasm.memory.buffer, wasm.hook_output_ptr(), HOOK_DOUBLES).slice(),
+    layout: loadedLayout,
+  };
+}
+
+function restoreSharedKernel(snapshot: KernelSnapshot): void {
+  const wasm = wasmRuntime();
+  new Float64Array(wasm.memory.buffer, wasm.input_ptr(), INPUT_DOUBLES).set(snapshot.input);
+  new Float64Array(wasm.memory.buffer, wasm.output_ptr(), OUTPUT_DOUBLES).set(snapshot.output);
+  new Float64Array(wasm.memory.buffer, wasm.hook_output_ptr(), HOOK_DOUBLES).set(snapshot.hook);
+  loadedLayout = snapshot.layout;
 }
 
 function runTrip(runtime: Runtime, offenseSide: SideIndex): boolean {

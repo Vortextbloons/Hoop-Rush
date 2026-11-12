@@ -4,6 +4,8 @@ import {
   ratingsModelArtifactSchema,
   overallForScore,
   overallScaleSchema,
+  OVERALL_BANDS,
+  overallBandIndexOf,
   REQUIRED_RATING_KEYS,
   type SimulationRatings,
 } from '@hoop-rush/data-contracts';
@@ -878,6 +880,22 @@ describe('role and impact contributions', () => {
 });
 
 describe('frozen overall scale', () => {
+  it('allocates unique-player peaks to the configured elite-friendly bands', () => {
+    const count = 10_000;
+    const samples = Array.from({ length: count }, (_, score) => ({
+      key: `p-${String(score)}`,
+      score,
+    }));
+    const calibrated = buildOverallScale(samples);
+    const counts = OVERALL_BANDS.map(() => 0);
+    for (const sample of samples) {
+      const { overall } = overallForScore(sample.score, calibrated);
+      const band = overallBandIndexOf(overall);
+      counts[band] = (counts[band] ?? 0) + 1;
+    }
+    expect(OVERALL_BANDS.reduce((total, band) => total + band.share, 0)).toBeCloseTo(1, 12);
+    expect(counts).toEqual([10, 68, 379, 683, 1351, 2438, 2438, 1317, 439, 293, 584]);
+  });
   it('deduplicates player-seasons and is independent of sample order', () => {
     const samples = [
       { key: 'a|2000-01', score: 50 },

@@ -5453,7 +5453,10 @@ pub extern "C" fn battle_boundary(handle: u32) -> u32 {
     };
     let changed = battle_process_exits_inner(battle);
     let equalizer_changed = battle_recompute_equalizer(handle, false);
-    let _time_lord_changed = battle_recompute_time_lord(handle, true);\n    let darwinism_changed = battle.darwinism_dirty;\n    battle.darwinism_dirty = false;\n    if changed || equalizer_changed || darwinism_changed {
+    let _time_lord_changed = battle_recompute_time_lord(handle, true);
+    let darwinism_changed = battle.darwinism_dirty;
+    battle.darwinism_dirty = false;
+    if changed || equalizer_changed || darwinism_changed {
         battle_rebuild_all(handle);
         1
     } else {
@@ -6102,15 +6105,30 @@ pub extern "C" fn battle_run_segment(
     mut seconds: f64,
     first: u32,
     mut possession_id: u32,
+    resume: u32,
 ) -> u32 {
     let mut first = first != 0;
+    let mut pending_resume = resume != 0;
     while seconds > 0.0 {
-        if battle_consume_extra(handle, offense) < 0 && !first {
-            offense = 1 - offense;
+        if !pending_resume {
+            if battle_consume_extra(handle, offense) < 0 && !first {
+                offense = 1 - offense;
+            }
+            first = false;
+            possession_id += 1;
+            battle_begin_possession(handle, possession_id, offense);
+            let defense = (1 - offense) as u32;
+            if battle_required_layout(handle, defense) != 0
+                && battle_struck_layout_missing(handle, defense as usize)
+            {
+                let output = battle_scratch();
+                output[0] = offense as f64;
+                output[1] = seconds;
+                output[2] = possession_id as f64;
+                return 4;
+            }
         }
-        first = false;
-        possession_id += 1;
-        battle_begin_possession(handle, possession_id, offense);
+        pending_resume = false;
         let ended = battle_trip(handle, offense, seconds);
         if ended >= 0xffff_fffe {
             return ended;
@@ -6127,4 +6145,13 @@ pub extern "C" fn battle_run_segment(
         }
     }
     2
+}
+
+fn battle_struck_layout_missing(handle: u32, side: usize) -> bool {
+    battle_ref(handle).is_none_or(|battle| {
+        battle
+            .layouts
+            .get(side * 2 + 1)
+            .is_none_or(|layout| layout.is_none() || layout.as_ref().is_none_or(|value| value.is_empty()))
+    })
 }

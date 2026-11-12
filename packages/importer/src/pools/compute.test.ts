@@ -592,17 +592,17 @@ describe('buildStats', () => {
 describe('overallBandForPercentile', () => {
   it('maps the agreed rating shares across the full population', () => {
     const bands = [
-      [100, 100, 10],
-      [95, 99, 90],
-      [90, 94, 500],
-      [85, 89, 1200],
-      [80, 84, 2800],
-      [75, 79, 5000],
-      [70, 74, 5000],
-      [65, 69, 2700],
-      [60, 64, 900],
-      [50, 59, 600],
-      [40, 49, 1200],
+      [100, 100, 20],
+      [95, 99, 136],
+      [90, 94, 758],
+      [85, 89, 1366],
+      [80, 84, 2702],
+      [75, 79, 4876],
+      [70, 74, 4876],
+      [65, 69, 2634],
+      [60, 64, 878],
+      [50, 59, 586],
+      [40, 49, 1168],
     ] as const;
     const counts = new Map<number, number>();
     let previous = 100;
