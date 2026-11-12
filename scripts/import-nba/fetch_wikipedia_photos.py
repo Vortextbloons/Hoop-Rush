@@ -40,8 +40,8 @@ HEADSHOT_URL = "https://www.basketball-reference.com/req/20200617/images/headsho
 
 HEADERS = {
     "User-Agent": (
-        "HoopRush/1.0 (build-time asset resolver; contact: hooprush@example.com) "
-        "requests/{0} +https://en.wikipedia.org/"
+        "HoopRush/1.0 (https://github.com/Vortextbloons/Hoop-Rush; "
+        "build-time player photo resolver)"
     )
 }
 
@@ -137,7 +137,11 @@ def _pageimage(title: str) -> str | None:
         params={
             "action": "query",
             "titles": title,
-            "prop": "pageimages",
+            "prop": "pageimages|extracts|pageprops",
+            "redirects": 1,
+            "exintro": 1,
+            "explaintext": 1,
+            "exsentences": 2,
             "piprop": "thumbnail",
             "pithumbsize": 320,
             "format": "json",
@@ -147,6 +151,11 @@ def _pageimage(title: str) -> str | None:
     )
     resp.raise_for_status()
     for page in resp.json().get("query", {}).get("pages", {}).values():
+        intro = page.get("extract", "").lower()
+        if "disambiguation" in page.get("pageprops", {}) or not (
+            "basketball" in intro or "national basketball association" in intro
+        ):
+            continue
         source = page.get("thumbnail", {}).get("source")
         if source and source.startswith("https://upload.wikimedia.org/"):
             return source
@@ -233,6 +242,51 @@ def flush_photos(
 
 
 if __name__ == "__main__":
+    import sys
+
+    if "--fetch-missing" in sys.argv:
+        import requests
+        from .config import PUBLIC_DATA
+
+        players = {}
+        for path in sorted((PUBLIC_DATA / "pools").glob("*.json")):
+            for player in json.loads(path.read_text(encoding="utf-8"))["players"]:
+                players[player["playerExternalId"]] = player
+        photos = load_wikipedia_photos()
+        missing = [p for p in players.values() if not p.get("altIds", {}).get("nbaHeadshotAvailable")
+                   and not p.get("altIds", {}).get("photoUrl") and not photos.get(p["playerExternalId"])]
+        found = 0
+        for offset in range(0, len(missing), 16):
+            batch = missing[offset:offset + 16]
+            titles = {title: p for p in batch for title in
+                      (p["displayName"], p["displayName"] + " (basketball)",
+                       p["displayName"] + " (basketball player)")}
+            WIKI_LIMITER.wait()
+            response = requests.get(WIKIPEDIA_API, params={
+                "action": "query", "titles": "|".join(titles), "redirects": 1,
+                "prop": "pageimages|extracts|pageprops", "piprop": "thumbnail",
+                "pithumbsize": 320, "exintro": 1, "explaintext": 1,
+                "exsentences": 2, "format": "json",
+            }, headers=HEADERS, timeout=30)
+            response.raise_for_status()
+            query = response.json().get("query", {})
+            aliases = dict(titles)
+            for redirect in query.get("normalized", []) + query.get("redirects", []):
+                if redirect["from"] in aliases:
+                    aliases[redirect["to"]] = aliases[redirect["from"]]
+            for page in query.get("pages", {}).values():
+                player = aliases.get(page["title"])
+                source = page.get("thumbnail", {}).get("source", "")
+                intro = page.get("extract", "").lower()
+                if (player and "disambiguation" not in page.get("pageprops", {})
+                        and ("basketball" in intro or "national basketball association" in intro)
+                        and source.startswith("https://upload.wikimedia.org/")):
+                    key = player["playerExternalId"]
+                    if not photos.get(key):
+                        photos[key] = source.split("?")[0]
+                        found += 1
+            save_wikipedia_photos(photos)
+            print(f"Wikipedia: {min(offset + 16, len(missing))}/{len(missing)} checked; {found} photos found", flush=True)
     print(f"bbref status cache: {len(load_bbref_status())} entries")
     photos = load_wikipedia_photos()
     print(

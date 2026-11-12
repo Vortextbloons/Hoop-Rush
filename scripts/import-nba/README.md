@@ -1,4 +1,31 @@
-# Historical roster statistics
+# NBA data acquisition
+
+## Player photo fallbacks
+
+Wikipedia requests identify Hoop Rush with its repository URL, as required by
+Wikimedia's User-Agent policy. Generic Python request identities receive HTTP 403.
+Fetch missing photos in paced batches, then apply cached URLs and refresh the
+generated catalogs:
+
+```powershell
+python -m scripts.import-nba.fetch_wikipedia_photos --fetch-missing
+python -m scripts.import-nba.fetch_bbref_ids
+python -m scripts.import-nba.fetch_bbref_photos
+bun scripts/annotate-markers.mjs
+bun run hoop-rush import manifest
+bun run --filter @hoop-rush/cli gen-collection-catalog
+bun run hoop-rush data validate
+```
+
+Only basketball biography thumbnails are accepted. Existing photo URLs are kept;
+players whose articles have no suitable image retain their existing fallback.
+The Basketball Reference pass uses the existing verified NBA-to-BBRef ID mapping
+in `.raw_nba_cache/bbref_ids.json`. It accepts complete JPEG image responses only,
+paces requests, and stops on access blocks or rate limits. Its successful URLs
+are stored separately in `.raw_nba_cache/fallback_photos.json` and applied by the
+same annotation command without replacing existing photos.
+
+## Historical roster statistics
 
 The NBA historical totals endpoint does not include PER, BPM, or Usage.
 Fetch the published Basketball Reference advanced tables separately:

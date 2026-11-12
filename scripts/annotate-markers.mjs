@@ -3,6 +3,15 @@ import { join, basename } from 'node:path';
 const ROOT = process.cwd();
 const POOLS_DIR = join(ROOT, 'apps', 'web', 'static', 'data', 'pools');
 const CACHE_PATH = join(ROOT, '.raw_nba_cache', 'nba_headshot_status.json');
+const PHOTO_CACHE_PATH = join(ROOT, '.raw_nba_cache', 'wikipedia_photos.json');
+const wikipediaPhotos = existsSync(PHOTO_CACHE_PATH)
+  ? JSON.parse(readFileSync(PHOTO_CACHE_PATH, 'utf8'))
+  : {};
+const FALLBACK_CACHE_PATH = join(ROOT, '.raw_nba_cache', 'fallback_photos.json');
+const photos = {
+  ...(existsSync(FALLBACK_CACHE_PATH) ? JSON.parse(readFileSync(FALLBACK_CACHE_PATH, 'utf8')) : {}),
+  ...Object.fromEntries(Object.entries(wikipediaPhotos).filter(([, url]) => url)),
+};
 const PLACEHOLDER_BYTES = 12430;
 const CONCURRENCY = 8;
 function loadCache() {
@@ -70,14 +79,22 @@ async function annotatePool(path) {
   const pool = JSON.parse(readFileSync(path, 'utf8'));
   const players = pool.players ?? [];
   const pending = players.filter((p) => (p.altIds ?? {}).nbaHeadshotAvailable === undefined);
-  if (pending.length === 0) return 'up-to-date';
+  let addedPhotos = 0;
+  for (const player of players) {
+    const photo = photos[player.playerExternalId];
+    if (photo && !player.altIds?.photoUrl) {
+      player.altIds = { ...(player.altIds ?? {}), photoUrl: photo };
+      addedPhotos += 1;
+    }
+  }
+  if (pending.length === 0 && addedPhotos === 0) return 'up-to-date';
   await mapLimit(pending, CONCURRENCY, async (player) => {
     const available = await headAvailable(player.playerExternalId);
     player.altIds = { ...(player.altIds ?? {}), nbaHeadshotAvailable: available };
   });
   writeJsonRetry(path, pool);
   saveCache();
-  return `${players.length - pending.length}/${players.length} kept, ${pending.length} annotated`;
+  return `${players.length - pending.length}/${players.length} kept, ${pending.length} annotated, ${addedPhotos} photos added`;
 }
 const prefixes = process.argv.slice(2);
 const files = readdirSync(POOLS_DIR)
