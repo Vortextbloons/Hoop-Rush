@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 export function ensureDir(path: string): void {
   mkdirSync(path, { recursive: true });
@@ -15,7 +15,9 @@ function jsonText(value: unknown, newline: boolean): string {
 }
 export function writeJson(path: string, value: unknown, newline = false): void {
   ensureDir(dirname(path));
-  writeFileSync(path, jsonText(value, newline), 'utf8');
+  const temporaryPath = `${path}.tmp-${String(process.pid)}`;
+  writeFileSync(temporaryPath, jsonText(value, newline), 'utf8');
+  renameSync(temporaryPath, path);
 }
 function retrySync<T>(fn: () => T, attempts = 12): T {
   for (let attempt = 0; attempt < attempts; attempt += 1) {
@@ -29,10 +31,8 @@ function retrySync<T>(fn: () => T, attempts = 12): T {
   throw new Error('unreachable retrySync');
 }
 export function writeJsonRetry(path: string, value: unknown, newline = false): void {
-  ensureDir(dirname(path));
-  const text = jsonText(value, newline);
   retrySync(() => {
-    writeFileSync(path, text, 'utf8');
+    writeJson(path, value, newline);
   });
 }
 export function sha256Hex(data: string | Uint8Array): string {

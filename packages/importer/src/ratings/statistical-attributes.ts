@@ -62,11 +62,11 @@ export function estimateAttributes(
   const secondary = rate('secondaryAssists', 0);
   const potential = rate('potentialAssists', assists);
   const creation = assists + secondary * 0.4 + Math.max(0, potential - assists) * 0.15;
+  const creationWeight = clamp(creation / 8, 0.25, 1);
   const turnovers = rate('turnovers', 3);
   const expectedTurnovers = 1.5 + usage * 0.045 + creation * 0.12;
   const security = clamp((expectedTurnovers - turnovers) * 5, -12, 12);
   const ts = effectiveTrueShooting(stats, input.era.league3PARate);
-  const scoring = rate('points', 22, 200);
   const ft = shootingRate(stats, 'ftm', 'fta', input.ratePriors?.freeThrowPctPrior ?? 0.76, 35);
   const ftRating = ft === null ? 68 : ft * 100;
   const zone = (
@@ -75,11 +75,12 @@ export function estimateAttributes(
     prior: number,
     slope: number,
     fallback: number,
+    fallbackFields = ['fgm', 'fga', 'tpm', 'tpa', 'minutes'],
   ) => {
     const accuracy = shootingRate(stats, made, attempted, prior, 60);
     const volume = ratePer100(stats, attempted, pace);
     return accuracy === null
-      ? estimate(fallback, ['fgm', 'fga', 'ftm', 'fta', 'points', 'minutes'], 'estimated')
+      ? estimate(fallback, fallbackFields, 'estimated')
       : estimate(
           65 + (accuracy - prior) * slope + Math.min(8, (volume ?? 0) * 0.5),
           [made, attempted, 'minutes'],
@@ -103,7 +104,12 @@ export function estimateAttributes(
       0.51,
       60,
     ) ?? 0.51;
-  const insideFallback = 62 + Math.max(0, scoring - 22) * 1.4 + ((ts ?? 0.565) - 0.565) * 100;
+  const twoAttempts = Math.max(0, (observed(stats, 'fga') ?? 0) - (observed(stats, 'tpa') ?? 0));
+  const twoVolume = exposure > 0 ? (twoAttempts * 100) / (exposure + 200) : 0;
+  const twoScoring = clamp((twoVolume - 12) * 0.6, -4, 8);
+  const insideFallback = 65 + clamp((fg2 - 0.51) * 110, -15, 20) + twoScoring;
+  const midrangeFallback =
+    60 + clamp(((ft ?? 0.72) - 0.72) * 45, -10, 10) + Math.max(0, twoScoring) * creationWeight;
   const three = shootingRate(
     stats,
     'tpm',
@@ -196,10 +202,27 @@ export function estimateAttributes(
   const mass =
     input.weightLbs != null && input.weightLbs > 0 ? input.weightLbs * (78 / height) ** 2 : null;
   const jump = observed(stats, 'maxVerticalInches');
+  const ageDecline = input.age == null ? 0 : clamp((input.age - 28) * 0.7, 0, 8);
+  const sizeAdjustment =
+    clamp((78 - height) * 0.5, -4, 4) + (mass === null ? 0 : clamp((220 - mass) * 0.04, -3, 3));
+  const speedPrior = (group === 'G' ? 72 : group === 'F' ? 66 : 58) + sizeAdjustment - ageDecline;
+  const verticalPrior =
+    (group === 'G' ? 68 : group === 'F' ? 66 : 62) + sizeAdjustment * 0.5 - ageDecline;
+  const driveExposure = fieldPossessionExposure(stats, 'drives', pace);
+  const driveWeight = driveExposure / (driveExposure + 400);
   const result: Record<keyof SimulationRatings, AttributeEstimate> = {
     insideScoring: zone('insideFgm', 'insideFga', 0.6, 200, insideFallback),
     closeShot: zone('closeFgm', 'closeFga', 0.44, 220, 60 + (fg2 - 0.51) * 90),
-    midrange: zone('midFgm', 'midFga', 0.42, 260, 35 + (ft ?? 0.72) * 38),
+    midrange: zone('midFgm', 'midFga', 0.42, 260, midrangeFallback, [
+      'ftm',
+      'fta',
+      'fga',
+      'tpa',
+      'minutes',
+      'assists',
+      ...(available('secondaryAssists') ? ['secondaryAssists', 'passingMinutes'] : []),
+      ...(available('potentialAssists') ? ['potentialAssists', 'passingMinutes'] : []),
+    ]),
     threePoint: threeEstimate,
     freeThrow: estimate(
       ftRating,
@@ -219,10 +242,20 @@ export function estimateAttributes(
     ),
     ballHandling: estimate(
       60 +
-        clamp((usage - 18) * 1.1, -10, 18) +
+        clamp((usage - 18) * 1.1, -10, 18) * creationWeight +
         security +
         (drives === null ? 0 : clamp((drives - 5) * 0.5, -3, 6)),
-      ['fga', 'fta', 'turnovers', 'minutes', ...(drives === null ? [] : ['drives'])],
+      [
+        'usageRate',
+        'fga',
+        'fta',
+        'turnovers',
+        'assists',
+        'minutes',
+        ...(available('secondaryAssists') ? ['secondaryAssists', 'passingMinutes'] : []),
+        ...(available('potentialAssists') ? ['potentialAssists', 'passingMinutes'] : []),
+        ...(drives === null ? [] : ['drives', 'drivesMinutes']),
+      ],
       available('turnovers') ? 'derived' : 'estimated',
     ),
     offensiveIq: estimate(
@@ -264,12 +297,17 @@ export function estimateAttributes(
       'estimated',
     ),
     speed: estimate(
-      62 +
-        (speed === null ? 0 : (speed - 4.25) * 12) +
-        (drives === null ? 0 : clamp((drives - 5) * 0.35, -2, 6)),
-      speed === null
-        ? ['position', ...(drives === null ? [] : ['drives', 'minutes'])]
-        : ['avgSpeed', ...(drives === null ? [] : ['drives', 'minutes'])],
+      speedPrior +
+        (speed === null ? 0 : clamp((speed - 4.25) * 4, -4, 4)) +
+        (drives === null ? 0 : clamp((drives - 5) * 0.2, -2, 2) * driveWeight),
+      [
+        'position',
+        'heightInches',
+        'weightLbs',
+        'age',
+        ...(speed === null ? [] : ['avgSpeed']),
+        ...(drives === null ? [] : ['drives', 'drivesMinutes']),
+      ],
       'estimated',
     ),
     strength: estimate(
@@ -278,8 +316,8 @@ export function estimateAttributes(
       'estimated',
     ),
     vertical: estimate(
-      jump === null ? 62 : 70 + (jump - 28) * 2,
-      jump === null ? ['prior'] : ['maxVerticalInches'],
+      jump === null ? verticalPrior : 70 + (jump - 28) * 2,
+      jump === null ? ['position', 'heightInches', 'weightLbs', 'age'] : ['maxVerticalInches'],
       jump === null ? 'estimated' : 'derived',
       jump === null ? 0 : 1500,
     ),

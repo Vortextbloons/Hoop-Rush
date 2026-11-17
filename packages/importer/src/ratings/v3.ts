@@ -175,7 +175,7 @@ export function offensiveAbilityFor(
   const routeBreadth =
     (interiorScoring + ratings.midrange + spacingWeight * ratings.threePoint) / (2 + spacingWeight);
   const scoring =
-    0.92 * (0.88 * Math.max(...routes) + 0.12 * routeBreadth) + 0.08 * ratings.freeThrow;
+    0.92 * (0.6 * Math.max(...routes) + 0.4 * routeBreadth) + 0.08 * ratings.freeThrow;
   const creation = 0.6 * ratings.passing + 0.4 * ratings.ballHandling;
   const security =
     0.5 * ratings.ballHandling + 0.5 * clamp(100 - (tendencies.turnoverRate - 5) * 5, 0, 100);
@@ -608,7 +608,7 @@ export function tendenciesForProfile(
   stats: StatsRow,
   ratings: SimulationRatings,
 ): SimulationTendencies {
-  const usageRate = clamp(safeFloat(stats.usageRate, 18), 0, 100);
+  const usageRate = usageFor(stats, possessionPaceFor(stats));
   const fga = Math.max(1, safeFloat(stats.fga));
   const tpa = Math.max(0, safeFloat(stats.tpa));
   const fta = Math.max(0, safeFloat(stats.fta));

@@ -26,34 +26,42 @@ import { auditHavocSoloIdentity } from './audit.ts';
 function soloInputsOf(rawInput: HavocGameInput) {
   const input = havocGameInputSchema.parse(rawInput);
   const battleInput = soloToBattleInputValidated(input);
-  return { input, battleInput };
+  return { input, battleInput, soloInputDigest: havocGameInputDigest(input) };
 }
 
 function simulateSoloBattle(rawInput: HavocGameInput, context: EngineContext) {
-  const { input, battleInput } = soloInputsOf(rawInput);
+  const { input, battleInput, soloInputDigest } = soloInputsOf(rawInput);
   const simulation = simulateValidatedHavocBattleGame(battleInput, context);
-  return { input, simulation };
+  return { input, simulation, soloInputDigest };
 }
 
 function simulateAuditedSoloBattle(rawInput: HavocGameInput, context: EngineContext) {
-  const { input, battleInput } = soloInputsOf(rawInput);
+  const { input, battleInput, soloInputDigest } = soloInputsOf(rawInput);
   const simulation = simulateAuditedHavocBattleGame(battleInput, context);
-  return { input, simulation };
+  return { input, simulation, soloInputDigest };
 }
 
 function soloResultOf({
   input,
   simulation,
-}: Pick<ReturnType<typeof simulateSoloBattle>, 'input' | 'simulation'>): HavocGameResult {
-  return battleToSoloResult(simulation.result, input.humanSide, havocGameInputDigest(input));
+  soloInputDigest,
+}: Pick<
+  ReturnType<typeof simulateSoloBattle>,
+  'input' | 'simulation' | 'soloInputDigest'
+>): HavocGameResult {
+  return battleToSoloResult(simulation.result, input.humanSide, soloInputDigest);
 }
 
-function soloSimulationOf({ input, simulation }: ReturnType<typeof simulateSoloBattle>): {
+function soloSimulationOf({
+  input,
+  simulation,
+  soloInputDigest,
+}: ReturnType<typeof simulateSoloBattle>): {
   result: HavocGameResult;
   tape: HavocGameTape;
 } {
   return {
-    result: soloResultOf({ input, simulation }),
+    result: soloResultOf({ input, simulation, soloInputDigest }),
     tape: battleToSoloTape(simulation.tape, input.humanSide),
   };
 }
@@ -63,7 +71,10 @@ function auditedFindings(
   result: HavocGameResult,
 ): HavocGameAudit['findings'] {
   const battleAudit = battle.simulation.audit;
-  return [...auditHavocSoloIdentity(battle.input, result), ...battleAudit.findings];
+  return [
+    ...auditHavocSoloIdentity(battle.input, result, { inputDigest: battle.soloInputDigest }),
+    ...battleAudit.findings,
+  ];
 }
 
 export function simulateHavocGame(

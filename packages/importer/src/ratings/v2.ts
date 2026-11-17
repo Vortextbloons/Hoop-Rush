@@ -23,7 +23,7 @@ import { predictReconstructedProfile, ratingFromAccuracy } from '../reconstructi
 import { seasonIndexFor, type ReconstructionRow } from '../reconstruction/rows.ts';
 import type { StatsRow } from './stats.ts';
 import { estimateAttributes } from './statistical-attributes.ts';
-import { seasonStatsEvidenceSchema } from './season-evidence.ts';
+import { seasonStatsEvidenceSchema, usageFor } from './season-evidence.ts';
 export interface SeasonContext {
   leaguePpg: number;
   league3PARate: number;
@@ -493,8 +493,19 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
     tendencies[key as keyof SimulationTendencies] = Math.round(value * 100) / 100;
   };
   const fgaPerGame = fga !== null ? fga / Math.max(1, gp) : null;
-  const usageVal = usage ?? 18;
-  t('usageRate', usageVal, usage !== null ? 'observed' : 'estimated', ['usageRate']);
+  const usageVal = usageFor(input.stats, input.era.pace);
+  t(
+    'usageRate',
+    usageVal,
+    usage !== null && usageVal === usage
+      ? 'observed'
+      : fga !== null && minutes > 0
+        ? 'derived'
+        : 'estimated',
+    usage !== null && usageVal === usage
+      ? ['usageRate']
+      : ['fga', 'fta', 'turnovers', 'minutes', 'possessionPace'],
+  );
   const passEvidence = apg !== null ? (apg / Math.max(1, apg + (ppg ?? 10) * 0.5 + 1)) * 40 : 18;
   t('passRate', passEvidence, apg !== null ? 'derived' : 'estimated', ['assists', 'points']);
   t(

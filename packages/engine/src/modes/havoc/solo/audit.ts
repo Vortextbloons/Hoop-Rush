@@ -15,15 +15,25 @@ import {
 import { auditHavocBattleGame } from '../core/battle-audit.ts';
 import { havocBattleGameInputDigest } from '../core/battle-digests.ts';
 
+/**
+ * Facts the solo simulation already established. Callers outside the simulator
+ * omit these so the solo identity check recomputes the digest independently.
+ */
+export interface HavocSoloAuditFacts {
+  /** Digest already computed from exactly this input by the simulator. */
+  readonly inputDigest?: string;
+}
+
 export function auditHavocSoloIdentity(
   input: HavocGameInput,
   result: HavocGameResult,
+  facts: HavocSoloAuditFacts = {},
 ): HavocAuditFinding[] {
   const findings: HavocAuditFinding[] = [];
   if (result.humanSide !== input.humanSide) {
     findings.push({ code: 'input-identity', message: 'result human side differs from input' });
   }
-  if (result.inputDigest !== havocGameInputDigest(input)) {
+  if (result.inputDigest !== (facts.inputDigest ?? havocGameInputDigest(input))) {
     findings.push({
       code: 'input-digest',
       message: 'result input digest does not match the supplied input',

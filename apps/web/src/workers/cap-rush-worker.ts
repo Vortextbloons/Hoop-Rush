@@ -113,6 +113,7 @@ async function simulate(
 
   const runBackfill = async (): Promise<'ok' | 'cancelled' | 'failed'> => {
     if (backfillFrom === null || backfillTo === null) return 'ok';
+    let lastYieldAt = Date.now();
     for (let slot = backfillFrom; slot <= backfillTo; slot += 1) {
       if (signal.cancelled || cancelledRequests.has(request.requestId)) return 'cancelled';
       if (!postLeagueSlot(request.requestId, request.locked, slot, request.partition))
@@ -127,7 +128,10 @@ async function simulate(
           gamesTotal: backfillTo,
         });
       }
-      await sleep(0);
+      if (Date.now() - lastYieldAt >= YIELD_INTERVAL_MS) {
+        lastYieldAt = Date.now();
+        await sleep(0);
+      }
     }
     return 'ok';
   };
@@ -148,6 +152,7 @@ async function simulate(
       return;
     }
     const to = Math.min(request.startGame + request.count - 1, CAP_RUSH_GAME_COUNT);
+    let lastYieldAt = Date.now();
     for (let slot = request.startGame; slot <= to; slot += 1) {
       if (signal.cancelled || cancelledRequests.has(request.requestId)) {
         cancelledRequests.delete(request.requestId);
@@ -167,7 +172,10 @@ async function simulate(
           gamesTotal: to,
         });
       }
-      await sleep(0);
+      if (Date.now() - lastYieldAt >= YIELD_INTERVAL_MS) {
+        lastYieldAt = Date.now();
+        await sleep(0);
+      }
     }
     post({
       schemaVersion: CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION,

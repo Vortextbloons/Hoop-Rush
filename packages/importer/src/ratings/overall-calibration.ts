@@ -203,7 +203,7 @@ export function calibrateOverallScale(
           positionOverrideFor(id)?.primary ?? primaryPositionForSource(player.position ?? 'SF'),
         heightInches: player.heightInches ?? null,
         weightLbs: player.weightLbs ?? null,
-        age: player.age ?? null,
+        age: typeof row.age === 'number' ? row.age : (player.age ?? null),
         artifact: DEFAULT_RATINGS_MODEL_ARTIFACT,
         era,
         threePointReconstruction,
@@ -281,7 +281,7 @@ export function calibrateOverallScale(
     modelVersion: RATING_MODEL_VERSION,
     ratingsVersion: RATINGS_VERSION,
     overallScale: scale,
-    generatedAt: '2026-11-09T00:00:00.000Z',
+    generatedAt: '2026-11-12T00:00:00.000Z',
   });
   writeJsonRetry(output, artifact);
   return scale;

@@ -46,6 +46,16 @@ const derive = (overrides: Partial<RatingProfileInput> = {}) =>
   deriveRatingProfile({ ...input, ...overrides });
 
 describe('total ability overall', () => {
+  it('gives meaningful offensive value to scoring breadth at the same best route', () => {
+    const limited = { ...ratings, insideScoring: 90, closeShot: 90, midrange: 40, threePoint: 40 };
+    const versatile = { ...limited, midrange: 80, threePoint: 80 };
+    expect(
+      offensiveAbilityFor(versatile, input.tendencies) -
+        offensiveAbilityFor(limited, input.tendencies),
+    ).toBeGreaterThan(5);
+    expect(defensiveAbilityFor(versatile, 'C')).toBe(defensiveAbilityFor(limited, 'C'));
+  });
+
   it('does not turn a two-game hustle sample into season-long defensive weakness', () => {
     const stats = starterStats({ minutes: 2700, gamesPlayed: 79, steals: 166 });
     const estimate = (evidence: Record<string, unknown>) =>

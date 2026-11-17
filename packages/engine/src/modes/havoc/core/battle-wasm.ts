@@ -463,6 +463,77 @@ interface PreparedSide {
 const PARTICIPANT_SPEC_FIELDS = 52;
 const PARTICIPANT_RECORD_FIELDS = 50;
 
+/**
+ * A team's battle layout block. Every number outside the turnover and
+ * shooting-foul regions is derived from the team alone, so one template serves
+ * every opponent: the fast path copies it and rewrites those two regions.
+ *
+ * Verified against the live layout: varying the opponent's ratings changes
+ * exactly those two cell ranges and nothing else.
+ */
+interface TeamBlockTemplate {
+  readonly data: readonly number[];
+  readonly turnoverStart: number;
+  readonly foulStart: number;
+}
+
+/**
+ * Content key for a prepared side. It hashes the values that actually feed the
+ * layout block: the kernel spec (height, weight, ratings, tendencies, evidence
+ * mask, slot, scale, reach) plus the shooting anchors and reconstructed
+ * three-point data, which live only on the simulation players. Teams whose
+ * playoff performance adjustments change anchors therefore key differently.
+ */
+function preparedSideKey(side: PreparedSideResult): string {
+  let hash = 2166136261;
+  const mix = (value: number): void => {
+    hash ^= Math.round(value * 1e6);
+    hash = Math.imul(hash, 16777619);
+  };
+  const spec = side.spec;
+  for (let index = 0; index < spec.length; index += 1) mix(spec[index] ?? 0);
+  for (const player of side.players) {
+    const anchors = player.anchors;
+    if (anchors === undefined) {
+      mix(-1);
+    } else {
+      mix(1);
+      mix(anchors.threePointPct ?? 0);
+    }
+    const reconstructed = player.reconstructedThreePoint;
+    if (reconstructed === undefined) {
+      mix(-1);
+    } else {
+      mix(2);
+      mix(reconstructed.accuracyConservative);
+      mix(reconstructed.zoneFloors.cornerThree);
+      mix(reconstructed.zoneFloors.aboveBreakThree);
+    }
+  }
+  return `${String(spec.length)}:${(hash >>> 0).toString(36)}`;
+}
+
+/**
+ * Block templates keyed by the owning side's content plus the layout shape.
+ * The two opponent-dependent regions are rewritten on every use, so the stored
+ * copy of those regions is never read; that is why the opponent is not part of
+ * the key. `changesEvidence` and the opposing roster size do change team-local
+ * values and the region offsets, so they are.
+ */
+const TEAM_BLOCK_TEMPLATE_CACHE_LIMIT = 512;
+const teamBlockTemplates = new Map<string, TeamBlockTemplate>();
+
+function readTeamBlockTemplate(key: string): TeamBlockTemplate | undefined {
+  return teamBlockTemplates.get(key);
+}
+
+function storeTeamBlockTemplate(key: string, template: TeamBlockTemplate): void {
+  if (teamBlockTemplates.size >= TEAM_BLOCK_TEMPLATE_CACHE_LIMIT) {
+    teamBlockTemplates.delete(teamBlockTemplates.keys().next().value as string);
+  }
+  teamBlockTemplates.set(key, template);
+}
+
 interface PreparedSideResult {
   readonly spec: Float64Array;
   readonly prepared: PreparedSide;
@@ -581,6 +652,7 @@ function buildBattleTeamBlock(
   prepared: PreparedSide,
   books: [PreparedSideResult, PreparedSideResult],
   adjusted?: { readonly prep: TeamPrep; readonly pool: SimulationPlayer[] },
+  recordTemplate?: (template: TeamBlockTemplate) => void,
 ): number[] {
   const team = prepared.team;
   const prep = prepared.prep;
@@ -639,6 +711,7 @@ function buildBattleTeamBlock(
     }
     turnoverVariants.push(values);
   }
+  const turnoverStart = data.length;
   append(turnoverVariants[0] ?? []);
   append(turnoverVariants[1] ?? turnoverVariants[0] ?? []);
   for (const player of team.players) {
@@ -731,6 +804,7 @@ function buildBattleTeamBlock(
   append(blockVariants[1]?.[0] ?? blockVariants[0]?.[0] ?? []);
   append(blockVariants[0]?.[1] ?? []);
   append(blockVariants[1]?.[1] ?? blockVariants[0]?.[1] ?? []);
+  const foulStart = data.length;
   for (const shooter of team.players) {
     for (const defender of defense.prepared.team.players) {
       for (const zone of SHOT_ZONES) {
@@ -788,6 +862,60 @@ function buildBattleTeamBlock(
       }
     }
     table(zeroTable(pool.length), pool);
+  }
+  if (recordTemplate !== undefined && adjusted === undefined) {
+    recordTemplate({ data: data.slice(), turnoverStart, foulStart });
+  }
+  return data;
+}
+
+/**
+ * Fast path for a cached template: copy the team's numbers and rewrite the two
+ * regions that depend on the opponent. Produces exactly the array
+ * `buildBattleTeamBlock` would have built, without re-deriving the team's
+ * 5,799 team-local values.
+ */
+function applyTeamBlockTemplate(
+  template: TeamBlockTemplate,
+  prepared: PreparedSide,
+  books: [PreparedSideResult, PreparedSideResult],
+): number[] {
+  const team = prepared.team;
+  const defense = books[(1 - prepared.side) as 0 | 1];
+  const defensePrep = defense.prepared.prep;
+  const profile = prepared.profile;
+  const changesEvidence = books[0].prepared.changesEvidence || books[1].prepared.changesEvidence;
+  const variantCount = changesEvidence ? 2 : 1;
+  const evidenceOf = (player: SimulationPlayer): HavocEvidence | undefined =>
+    books[prepared.side].evidence.get(player);
+  const variants = [evidenceOf, () => ALL_AUTHORITATIVE] as const;
+
+  const data = template.data.slice();
+  for (let variant = 0; variant < variantCount; variant += 1) {
+    const base = template.turnoverStart + variant * team.players.length;
+    team.players.forEach((player, index) => {
+      data[base + index] = turnoverProbabilityFor(
+        player,
+        defensePrep.pressure,
+        profile,
+        variants[variant]?.(player),
+      );
+    });
+  }
+  const shooters = defense.prepared.team.players.length;
+  for (let shooterIndex = 0; shooterIndex < team.players.length; shooterIndex += 1) {
+    const shooter = team.players[shooterIndex];
+    if (shooter === undefined) continue;
+    for (let defenderSlot = 0; defenderSlot < shooters; defenderSlot += 1) {
+      const defender = defense.prepared.team.players[defenderSlot];
+      if (defender === undefined) continue;
+      for (let zoneIndex = 0; zoneIndex < SHOT_ZONES.length; zoneIndex += 1) {
+        const zone = SHOT_ZONES[zoneIndex];
+        if (zone === undefined) continue;
+        data[template.foulStart + (shooterIndex * shooters + defenderSlot) * 5 + zoneIndex] =
+          shootingFoulProbability(shooter, defender, zone, profile);
+      }
+    }
   }
   return data;
 }
@@ -1557,12 +1685,42 @@ export class HavocBattleWasmSimulation {
     preparedBooks[1].defensePrep = books[0].prepared.prep;
     for (const side of [0, 1] as const) {
       const prepared = preparedBooks[side];
-      const normal = buildBattleTeamBlock(prepared, books);
+      const normal = this.battleTeamBlock(side, prepared, books);
       this.normalBlocks ??= [[], []];
       this.normalBlocks[side] = normal;
       this.writeLayout(side, 0, normal);
       this.struckInstalled[side] = false;
     }
+  }
+
+  /**
+   * Builds (or reuses) a side's normal layout block. Everything outside the
+   * turnover and shooting-foul regions is derived from this side alone, so the
+   * block is cached under the side's own content and reused across opponents,
+   * seeds, and games. Custom-RNG runs keep the full build because they register
+   * pick-table offsets while writing.
+   */
+  private battleTeamBlock(
+    side: 0 | 1,
+    prepared: PreparedSide,
+    books: [PreparedSideResult, PreparedSideResult],
+  ): number[] {
+    if (collectPickTables) return buildBattleTeamBlock(prepared, books);
+    const opposingCount = books[(1 - side) as 0 | 1].prepared.team.players.length;
+    const changesEvidence = books[0].prepared.changesEvidence || books[1].prepared.changesEvidence;
+    const key = [
+      preparedSideKey(books[side]),
+      String(opposingCount),
+      changesEvidence ? 'e' : 'p',
+    ].join('#');
+    const template = readTeamBlockTemplate(key);
+    if (template !== undefined) return applyTeamBlockTemplate(template, prepared, books);
+    let recorded: TeamBlockTemplate | undefined;
+    const normal = buildBattleTeamBlock(prepared, books, undefined, (value) => {
+      recorded = value;
+    });
+    if (recorded !== undefined) storeTeamBlockTemplate(key, recorded);
+    return normal;
   }
 
   private ensureStruckLayouts(): number {

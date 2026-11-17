@@ -27,6 +27,14 @@ raw-data / .raw_nba_cache
 - `json.ts` owns file I/O helpers (`readJsonLoose`, `writeJsonRetry`, hashes).
 - `reconstruction/` fits and validates the historical-stat reconstruction model.
 
+Ratings v6.7 keeps the defensive specialization discount and gives scoring breadth
+more weight in offensive ability. Missing shot-location estimates use two-point
+production for inside scoring and shooting/creation evidence for midrange; total
+scoring and true shooting do not establish rim ability. Usage tendencies reuse the
+same possession-based estimate as attributes. Athletic fallbacks vary conservatively
+with position, size, and age, with bounded movement-tracking adjustments. These
+fallbacks remain low-confidence estimates rather than measured athletic ability.
+
 ## Invariants
 
 - Generated artifact contents are part of the product: after any importer
