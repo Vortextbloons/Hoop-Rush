@@ -4,6 +4,7 @@ import type {
   DraftDuelCatalogEntry,
   DraftDuelCommand,
   DraftDuelDraft,
+  DraftDuelFairness,
   DraftDuelOfferedPick,
   DraftDuelParticipantId,
   DraftDuelPick,
@@ -190,7 +191,9 @@ function specsForBands(
   idPrefix: string,
 ): PlayerSpec[] {
   const specs: PlayerSpec[] = [];
-  for (let band = 0; band < 10; band += 1) {
+  // Cover every declared band: fair draft tokens sample the full band set, so a
+  // catalog missing a band cannot fill a pool that draws it.
+  for (let band = 0; band < OVERALL_BANDS.length; band += 1) {
     for (let index = 0; index < perBand; index += 1) {
       const profile = profiles[(band + index) % profiles.length] ?? ['PG'];
       specs.push({
@@ -204,7 +207,12 @@ function specsForBands(
 }
 
 function standardSpecs(): PlayerSpec[] {
-  const specs = specsForBands(8, GROUP_PROFILES, 'p');
+  // The fair band tokens are drawn from the real band shares, so a single
+  // seed can ask for half a round's pool from one band (5 of 8 offers) and
+  // 16 of 40 tokens overall. Give each band enough depth that both
+  // participants can fill a round without exhausting a band; scarcity is
+  // covered explicitly by the smaller fixtures below.
+  const specs = specsForBands(32, GROUP_PROFILES, 'p');
   for (let index = 0; index < specs.length; index += 3) {
     const spec = specs[index];
     if (!spec) continue;
@@ -214,9 +222,21 @@ function standardSpecs(): PlayerSpec[] {
   return specs;
 }
 
+/**
+ * Fair-mode band tokens follow the real band shares, which concentrate heavily
+ * in bands 5 and 6, so a fair draft needs realistic per-band depth (one seed
+ * asks for 16 of 40 tokens from a single band). Unfair mode samples at random
+ * and relies on a small catalog so that scarce positions still appear in a
+ * pool. Each fixture below is therefore paired with the fairness mode it can
+ * validly exercise; scarcity character (missing centers, tight C eligibility)
+ * is preserved either way.
+ */
+const FAIR_BAND_DEPTH = 32;
+const UNFAIR_BAND_DEPTH = 5;
+
 function scarceCenterSpecs(): PlayerSpec[] {
   return [
-    ...specsForBands(8, NO_CENTER_PROFILES, 'sc'),
+    ...specsForBands(UNFAIR_BAND_DEPTH, NO_CENTER_PROFILES, 'sc'),
     { id: 'sc-c0', positions: ['C'], band: 5 },
     { id: 'sc-c1', positions: ['C'], band: 6 },
     { id: 'sc-c2', positions: ['C'], band: 7 },
@@ -229,9 +249,21 @@ function scarceCenterSpecs(): PlayerSpec[] {
   ];
 }
 
+/** The same scarcity shape as {@link scarceCenterSpecs}, deep enough for fair mode. */
+function deepScarceCenterSpecs(): PlayerSpec[] {
+  return [
+    ...specsForBands(FAIR_BAND_DEPTH, NO_CENTER_PROFILES, 'dc'),
+    ...Array.from({ length: FAIR_BAND_DEPTH }, (_value, index) => ({
+      id: `dc-c-${String(index)}`,
+      positions: ['C'] as Position[],
+      band: 5 + (index % 5),
+    })),
+  ];
+}
+
 function tightEligibilitySpecs(): PlayerSpec[] {
   return [
-    ...specsForBands(5, TIGHT_PROFILES, 'te'),
+    ...specsForBands(UNFAIR_BAND_DEPTH, TIGHT_PROFILES, 'te'),
     { id: 'te-c0', positions: ['C'], band: 4 },
     { id: 'te-c1', positions: ['C'], band: 5 },
     { id: 'te-c2', positions: ['PF', 'C'], band: 6 },
@@ -675,7 +707,7 @@ describe('draft state', () => {
 
   it('plays a big seeded case across 400 players', () => {
     const specs: PlayerSpec[] = [];
-    for (let band = 0; band < 10; band += 1) {
+    for (let band = 0; band < OVERALL_BANDS.length; band += 1) {
       for (let index = 0; index < 40; index += 1) {
         specs.push({
           id: `big-${String(band)}-${String(index)}`,
@@ -694,9 +726,9 @@ describe('draft state', () => {
     expectValidRoster(roster);
   });
 
-  it('completes a full draft on an eight-thousand-card catalog', () => {
+  it('completes a full draft on a large multi-version catalog', () => {
     const specs: PlayerSpec[] = [];
-    for (let band = 0; band < 10; band += 1) {
+    for (let band = 0; band < OVERALL_BANDS.length; band += 1) {
       for (let index = 0; index < 200; index += 1) {
         specs.push({
           id: `scale-${String(band)}-${String(index)}`,
@@ -707,7 +739,7 @@ describe('draft state', () => {
       }
     }
     const scale = buildCatalogFromSpecs(specs);
-    expect(scale.entries.length).toBe(8000);
+    expect(scale.entries.length).toBe(OVERALL_BANDS.length * 200 * 4);
     const state = playFullDraft(SEED_A, scale, 'fair');
     expect(state.status).toBe('complete');
     expect(draftDuelRoster(state, scale, 'p1').slots).toHaveLength(5);
@@ -743,15 +775,22 @@ describe('draft state', () => {
 
 describe('round safety', () => {
   it('keeps the opponent pickable after every legal first pick', () => {
-    const catalogs = [
-      buildCatalogFromSpecs(standardSpecs()),
-      buildCatalogFromSpecs(scarceCenterSpecs()),
-      buildCatalogFromSpecs(tightEligibilitySpecs()),
+    // Each catalog is paired with the fairness modes its depth supports:
+    // fair mode consumes the real band-token stream (needs deep bands), while
+    // unfair mode samples freely and needs a small catalog for scarcity.
+    const cases: Array<{
+      catalog: DraftDuelCatalog;
+      fairness: readonly DraftDuelFairness[];
+    }> = [
+      { catalog: buildCatalogFromSpecs(standardSpecs()), fairness: FAIRNESS_MODES },
+      { catalog: buildCatalogFromSpecs(deepScarceCenterSpecs()), fairness: ['fair'] },
+      { catalog: buildCatalogFromSpecs(scarceCenterSpecs()), fairness: ['unfair'] },
+      { catalog: buildCatalogFromSpecs(tightEligibilitySpecs()), fairness: ['unfair'] },
     ];
     let overlappingRounds = 0;
-    for (const catalog of catalogs) {
+    for (const { catalog, fairness: modes } of cases) {
       for (const seed of [SEED_A, SEED_B]) {
-        for (const fairness of FAIRNESS_MODES) {
+        for (const fairness of modes) {
           let state = createDraftDuelDraft({ rootSeed: seed, fairness, catalog });
           while (!isDraftDuelComplete(state)) {
             expectRoundStartSafety(state, catalog);
@@ -997,7 +1036,7 @@ describe('fair offer generation', () => {
   const catalog = buildCatalogFromSpecs(standardSpecs());
 
   function countBands(values: readonly number[]): number[] {
-    const counts = new Array<number>(10).fill(0);
+    const counts = new Array<number>(OVERALL_BANDS.length).fill(0);
     for (const value of values) counts[value] = (counts[value] ?? 0) + 1;
     return counts;
   }
@@ -1020,8 +1059,8 @@ describe('fair offer generation', () => {
       const attempt = draftDuelFairAttemptForState(state, catalog);
       expect(attempt).not.toBeNull();
       const tokenCounts = countBands(draftDuelFairBandTokens(seed, attempt ?? 0));
-      const p1Total = new Array<number>(10).fill(0);
-      const p2Total = new Array<number>(10).fill(0);
+      const p1Total = new Array<number>(OVERALL_BANDS.length).fill(0);
+      const p2Total = new Array<number>(OVERALL_BANDS.length).fill(0);
       for (let round = 1; round <= 5; round += 1) {
         const entry = state.rounds[round - 1];
         if (!entry) throw new Error('missing round');
@@ -1054,7 +1093,7 @@ describe('unfair offer generation', () => {
       seedSchema.parse(seedFromString(`unfair-seed-${String(index)}`)),
     );
     const counts = new Map<string, number>();
-    const bandCounts = new Array<number>(10).fill(0);
+    const bandCounts = new Array<number>(OVERALL_BANDS.length).fill(0);
     const overalls: number[] = [];
     const catalogOveralls = catalog.playerIds.map((playerId) => {
       const first = (catalog.byPlayerId.get(playerId) ?? [])[0];

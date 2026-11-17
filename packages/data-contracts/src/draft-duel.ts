@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { collectionCardIdSchema } from './collection-primitives.ts';
+import { OVERALL_BANDS } from './overall-bands.ts';
 import {
   commandIdSchema,
   contentHashSchema,
@@ -113,7 +114,13 @@ export const draftDuelCardSchema = z.object({
   eraId: eraIdSchema,
   positions: positionUnionSchema,
   overall: z.number().int().min(0).max(100),
-  bandIndex: z.number().int().min(0).max(9),
+  // Derived from the declared band table so adding a band cannot leave the
+  // schema rejecting indices that `overallBandIndexOf` legitimately produces.
+  bandIndex: z
+    .number()
+    .int()
+    .min(0)
+    .max(OVERALL_BANDS.length - 1),
 });
 export type DraftDuelCard = z.infer<typeof draftDuelCardSchema>;
 export const draftDuelCatalogEntrySchema = z.object({
