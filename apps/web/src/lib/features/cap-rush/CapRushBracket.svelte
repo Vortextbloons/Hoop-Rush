@@ -9,6 +9,7 @@
   import TeamLogo from '#lib/components/TeamLogo.svelte';
   import { franchiseIdentityOf } from '#lib/branding.js';
   import SegmentedControl from '#lib/components/ui/SegmentedControl.svelte';
+  import Panel from '#lib/components/ui/Panel.svelte';
 
   let {
     series,
@@ -139,10 +140,7 @@
   );
 </script>
 
-<section
-  class="bracket rounded-2xl border border-border bg-card p-4 sm:p-6"
-  aria-label="Playoff bracket"
->
+<Panel as="section" padding="none" class="bracket p-4 sm:p-6" aria-label="Playoff bracket">
   <div class="flex flex-wrap items-end justify-between gap-3">
     <div>
       <p class="ui-label">Conference bracket</p>
@@ -271,7 +269,7 @@
       </p>
     {/if}
   </div>
-</section>
+</Panel>
 
 {#snippet seriesCard(entry: BracketSeries, direction: 'left' | 'right' | 'none', mobile = false)}
   {@const winner = winnerOf(entry)}

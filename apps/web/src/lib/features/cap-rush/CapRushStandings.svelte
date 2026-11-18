@@ -8,6 +8,7 @@
   } from '@hoop-rush/data-contracts';
   import TeamLogo from '#lib/components/TeamLogo.svelte';
   import { franchiseIdentityOf } from '#lib/branding.js';
+  import Panel from '#lib/components/ui/Panel.svelte';
 
   let {
     standings,
@@ -57,10 +58,7 @@
   ]);
 </script>
 
-<section
-  class="rounded-2xl border border-border bg-card p-4 sm:p-6"
-  aria-label="Final league standings"
->
+<Panel as="section" padding="none" class="p-4 sm:p-6" aria-label="Final league standings">
   <div class="flex flex-wrap items-end justify-between gap-3">
     <div>
       <p class="ui-label">Conference standings</p>
@@ -202,4 +200,4 @@
       </div>
     {/each}
   </div>
-</section>
+</Panel>

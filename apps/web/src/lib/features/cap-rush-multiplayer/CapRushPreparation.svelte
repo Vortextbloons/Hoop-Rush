@@ -362,9 +362,11 @@
             {#each receipts as receipt (receipt.receiptDigest)}
               {@const changes = ratingChanges(receipt)}
               {@const physical = receipt.effective.physical}
-              <li
-                class="spin-reveal flex min-w-0 flex-col gap-3 rounded-xl border bg-card p-4"
-                style:border-color={HAVOC_TIER_COLORS[receipt.tier]}
+              <Panel
+                as="li"
+                padding="none"
+                class="spin-reveal flex min-w-0 flex-col gap-3 p-4"
+                style="border-color: {HAVOC_TIER_COLORS[receipt.tier]}"
                 role="status"
               >
                 <div class="flex flex-wrap items-center justify-between gap-2">
@@ -424,7 +426,7 @@
                     {/if}
                   </dl>
                 {/if}
-              </li>
+              </Panel>
             {/each}
           </ul>
         </div>

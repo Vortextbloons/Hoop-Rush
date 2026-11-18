@@ -255,8 +255,9 @@
   }
 </script>
 
-<div
-  class="mt-8 rounded-2xl border border-primary/25 bg-card shadow-[0_0_40px_hsl(13_100%_62%/0.12)]"
+<Panel
+  padding="none"
+  class="mt-8 border-primary/25 shadow-[0_0_40px_hsl(13_100%_62%/0.12)]"
   title={modeLabel}
 >
   <div class="border-b border-border/60 px-4 py-6 text-center sm:px-8 sm:py-8">
@@ -288,7 +289,7 @@
     >
       {#each lastGames as game (game.gameNumber)}
         {@const won = game.winner === 'home'}
-        <div class="rounded-xl border border-primary/25 bg-surface-1 p-3 text-center sm:p-4">
+        <Panel padding="none" class="border-primary/25 p-3 text-center sm:p-4">
           <div class="flex items-center justify-between">
             <span class="font-mono text-[11px] text-muted-foreground">G{game.gameNumber}</span>
             <span
@@ -303,7 +304,7 @@
           </p>
           <p class="mt-1 font-mono text-[10px] text-muted-foreground uppercase">You · Opp</p>
           <p class="font-mono text-[10px] text-muted-foreground">Final</p>
-        </div>
+        </Panel>
       {/each}
     </div>
   {/if}
@@ -372,7 +373,7 @@
 
   {#if tab === 'overview'}
     <div class="p-4 sm:p-6">
-      <section aria-label="Your five" class="rounded-xl border border-line-soft bg-surface-1 p-4">
+      <Panel as="section" padding="none" aria-label="Your five" class="p-4">
         <h3 class="ui-label">Your five</h3>
         {#if seasonTable.length > 0}
           <ul class="mt-2 flex flex-col divide-y divide-border/60">
@@ -422,14 +423,11 @@
         {:else}
           <p class="mt-3 animate-pulse text-sm text-muted-foreground">Loading player details…</p>
         {/if}
-      </section>
+      </Panel>
     </div>
 
     <div class="grid gap-4 px-4 pb-4 sm:px-6 sm:pb-6 lg:grid-cols-3">
-      <section
-        aria-label="League MVP"
-        class="rounded-xl border border-line-soft bg-surface-1 p-4 text-center"
-      >
+      <Panel as="section" padding="none" aria-label="League MVP" class="p-4 text-center">
         <h3 class="text-left ui-label">League MVP</h3>
         {#if mvp}
           <div class="mt-2 flex items-center justify-center gap-2">
@@ -478,12 +476,9 @@
         {:else}
           <EmptyState class="mt-3" title="No games recorded yet" surface="none" />
         {/if}
-      </section>
+      </Panel>
 
-      <section
-        aria-label="Season comparison"
-        class="rounded-xl border border-line-soft bg-surface-1 p-4"
-      >
+      <Panel as="section" padding="none" aria-label="Season comparison" class="p-4">
         <h3 class="ui-label">Season comparison</h3>
         {#if record}
           <table class="mt-2 w-full text-sm">
@@ -556,12 +551,9 @@
             </tbody>
           </table>
         {/if}
-      </section>
+      </Panel>
 
-      <section
-        aria-label="Season summary"
-        class="rounded-xl border border-line-soft bg-surface-1 p-4"
-      >
+      <Panel as="section" padding="none" aria-label="Season summary" class="p-4">
         <h3 class="ui-label">Season summary</h3>
         <ul class="mt-3 flex flex-col gap-3 text-sm">
           <li class="flex items-center gap-3">
@@ -609,11 +601,11 @@
             >
           </li>
         </ul>
-      </section>
+      </Panel>
     </div>
 
     <div class="px-4 pb-4 sm:px-6 sm:pb-6">
-      <details class="rounded-xl border border-line-soft bg-surface-1">
+      <details class="ui-panel" data-padding="none">
         <summary
           class="flex cursor-pointer list-none items-center gap-3 p-4 [&::-webkit-details-marker]:hidden"
         >
@@ -636,9 +628,9 @@
     </div>
   {:else if tab === 'games'}
     <div class="p-4 sm:p-6">
-      <div class="rounded-xl border border-border bg-surface-1 p-3 sm:p-4">
+      <Panel padding="none" class="p-3 sm:p-4">
         <GameStrip {run} games={run.games} compact />
-      </div>
+      </Panel>
       {#if firstLoss}
         <section
           aria-labelledby="first-loss-heading"
@@ -1035,4 +1027,4 @@
       </Panel>
     </div>
   {/if}
-</div>
+</Panel>

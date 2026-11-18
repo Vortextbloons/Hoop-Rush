@@ -15,6 +15,7 @@
     selectedProfile,
   } from '#lib/features/profile/profile.js';
   import Alert from '#lib/components/ui/Alert.svelte';
+  import Panel from '#lib/components/ui/Panel.svelte';
 
   let profile = $state<PlayerProfile | null>(null);
   let name = $state('');
@@ -248,7 +249,7 @@
             {@const badge = achievementCatalog[id]}
             {@const Icon = badge.icon}
             {@const rewardTitle = achievementTitleFor(id)}
-            <li class="flex gap-3 rounded-xl border border-border bg-card p-4">
+            <Panel as="li" padding="none" class="flex gap-3 p-4">
               <div
                 class={[
                   'flex size-10 shrink-0 items-center justify-center rounded-lg border',
@@ -279,12 +280,12 @@
                   <p class="mt-2 text-sm text-primary">{evidence.get(id)}</p>
                 {/if}
               </div>
-            </li>
+            </Panel>
           {/each}
         </ul>
       {/each}
       {#if legacyAchievementIdSchema.options.some((id) => earned.has(id))}
-        <details class="mt-8 rounded-xl border border-border bg-card p-4">
+        <details class="ui-panel mt-8 p-4" data-padding="none">
           <summary class="cursor-pointer font-semibold">Earlier badges</summary>
           <ul class="mt-3 flex flex-wrap gap-3">
             {#each legacyAchievementIdSchema.options.filter((id) => earned.has(id)) as id (id)}

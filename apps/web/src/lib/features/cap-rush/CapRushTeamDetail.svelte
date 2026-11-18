@@ -26,6 +26,7 @@
     capRushPlayoffRowFor,
     capRushPlayoffStatusOf,
   } from './cap-rush-playoff-presentation.ts';
+  import Panel from '#lib/components/ui/Panel.svelte';
 
   let {
     teamId,
@@ -251,10 +252,7 @@
     </table>
   </section>
 
-  <section
-    aria-label="Playoff performance coverage"
-    class="rounded-xl border border-line-soft bg-surface-1 p-3"
-  >
+  <Panel as="section" padding="none" aria-label="Playoff performance coverage" class="p-3">
     <div class="flex items-center justify-between gap-2">
       <p class="font-mono text-[9px] font-bold tracking-[0.12em] text-muted-foreground uppercase">
         Playoff form
@@ -271,7 +269,7 @@
         Select a marked player for the measured history and the exact simulation change.
       {/if}
     </p>
-  </section>
+  </Panel>
 
   {#if isUserTeam && penalties.length > 0}
     <section

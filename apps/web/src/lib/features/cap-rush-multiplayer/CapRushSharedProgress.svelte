@@ -233,9 +233,7 @@
           />
           <StatTile label="Remaining" size="lg" surface="tile" value={remaining} />
         </StatGrid>
-        <div
-          class="mt-2 flex min-w-0 items-center gap-2 rounded-xl border border-border bg-surface-1 px-3 py-2"
-        >
+        <Panel padding="none" class="mt-2 flex min-w-0 items-center gap-2 px-3 py-2">
           {#if otherIdentity !== null && art !== null}
             <TeamLogo
               manifest={art.manifest}
@@ -258,12 +256,12 @@
           <p class="shrink-0 font-display text-2xl font-extrabold tabular-nums">
             {otherRecord.wins}–{otherRecord.losses}
           </p>
-        </div>
+        </Panel>
       </div>
     </div>
 
     <div class="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
-      <div class="min-w-0 rounded-xl border border-line-strong bg-surface-1 p-4">
+      <Panel padding="none" class="min-w-0 border-line-strong p-4">
         {#if latest === null}
           <p
             class="font-mono text-[10px] font-bold tracking-[0.14em] text-muted-foreground uppercase"
@@ -317,7 +315,7 @@
             {/snippet}
           </GameScoreboard>
         {/if}
-      </div>
+      </Panel>
 
       <div
         class="flex min-w-0 flex-col gap-2 rounded-xl border p-4 {nextStep.mine

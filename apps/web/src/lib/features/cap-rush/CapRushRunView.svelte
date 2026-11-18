@@ -19,6 +19,7 @@
   import { capRushPlayoffStatusOf } from './cap-rush-playoff-presentation.ts';
   import type { CapRushArt } from './cap-rush-art.ts';
   import { formatMillions, recordLabel, variantLabel } from './cap-rush-presentation.ts';
+  import Panel from '#lib/components/ui/Panel.svelte';
 
   let {
     controller,
@@ -163,8 +164,10 @@
 
     <div class="mt-4 flex flex-col gap-3">
       {#if view.draft.stage === 'locked' && !complete}
-        <section
-          class="rounded-2xl border border-primary/30 bg-card p-4 sm:p-5"
+        <Panel
+          as="section"
+          padding="none"
+          class="border-primary/30 p-4 sm:p-5"
           aria-label="Next matchup and simulation controls"
         >
           <div class="flex flex-wrap items-start justify-between gap-4">
@@ -273,10 +276,12 @@
               {controller.notice}
             </p>
           {/if}
-        </section>
+        </Panel>
       {:else if complete}
-        <section
-          class="rounded-2xl border border-primary/30 bg-card p-4 sm:p-5"
+        <Panel
+          as="section"
+          padding="none"
+          class="border-primary/30 p-4 sm:p-5"
           aria-label="Season complete"
         >
           <div class="flex flex-wrap items-center justify-between gap-3">
@@ -294,20 +299,17 @@
               onclick={onReport}>Open the final report</button
             >
           </div>
-        </section>
+        </Panel>
       {:else}
-        <div class="rounded-2xl border border-border bg-card p-4 sm:p-5">
+        <Panel padding="none" class="p-4 sm:p-5">
           <p class="text-sm font-semibold">
             {view.draft.stage === 'abandoned' ? 'This run was abandoned.' : 'Season complete.'}
           </p>
-        </div>
+        </Panel>
       {/if}
 
       {#if recent.length > 0}
-        <section
-          class="rounded-2xl border border-border bg-card p-4 sm:p-5"
-          aria-label="Recent results"
-        >
+        <Panel as="section" padding="none" class="p-4 sm:p-5" aria-label="Recent results">
           <div class="flex items-baseline justify-between gap-2">
             <p class="ui-label">Recent results</p>
             <span class="font-mono text-[9px] text-muted-foreground uppercase">accepted games</span>
@@ -344,7 +346,7 @@
               </li>
             {/each}
           </ol>
-        </section>
+        </Panel>
       {/if}
 
       <CapRushSeasonProgress draft={view.draft} {season} storedGames={controller.games} {art} />

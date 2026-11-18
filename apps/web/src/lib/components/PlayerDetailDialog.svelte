@@ -19,6 +19,7 @@
   import PlayerFace from './PlayerFace.svelte';
   import PlayoffEffectDetails from './PlayoffEffectDetails.svelte';
   import { capRushPlayoffEffectOf, positionDefenseOf } from '@hoop-rush/engine';
+  import Panel from '#lib/components/ui/Panel.svelte';
 
   let {
     player,
@@ -229,16 +230,14 @@
       ></div>
       <div class="relative flex gap-3 px-4 pb-4 pt-10 sm:gap-4 sm:px-6 sm:pb-5 sm:pt-4 sm:pr-14">
         <div class="relative shrink-0">
-          <div
-            class="overflow-hidden rounded-xl border border-line-soft bg-card shadow-lg shadow-black/20"
-          >
+          <Panel padding="none" class="overflow-hidden shadow-lg shadow-black/20">
             <PlayerFace
               player={subject}
               {manifest}
               size="xl"
               fallbackInitials={subject.firstName[0]! + subject.lastName[0]!}
             />
-          </div>
+          </Panel>
           {#if teamExternalId}
             <span
               class="absolute -bottom-1.5 -right-1.5 rounded-lg border border-border bg-card p-1 shadow-md"

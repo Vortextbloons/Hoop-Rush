@@ -364,7 +364,7 @@
     </Panel>
   {/if}
 
-  <div class="rounded-2xl border border-border bg-card p-4 sm:p-5" aria-label="Postseason action">
+  <Panel padding="none" class="p-4 sm:p-5" aria-label="Postseason action">
     <div class="flex flex-wrap items-center gap-2">
       {#if controller.busy}
         <button
@@ -447,7 +447,7 @@
         {controller.error}
       </Alert>
     {/if}
-  </div>
+  </Panel>
 
   {#if userSeries !== null && postseason?.phase !== 'complete' && !reviewingSeason}
     <section class="matchup-panel rounded-2xl p-4 sm:p-6" aria-label="Current series">
@@ -589,12 +589,12 @@
       />
     {/if}
   {:else if awaitingStandings}
-    <div class="rounded-2xl border border-line-soft bg-card p-5 text-sm text-muted-foreground">
+    <Panel padding="none" class="p-5 text-sm text-muted-foreground">
       <p class="font-display text-lg font-extrabold uppercase">Seeding the bracket</p>
       <p class="mt-1">
         The conference tables are finalising. Accepted results are saved as they arrive.
       </p>
-    </div>
+    </Panel>
   {/if}
 </section>
 

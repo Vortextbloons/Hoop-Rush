@@ -7,6 +7,7 @@
   import PlayerStatsTable from '#lib/components/PlayerStatsTable.svelte';
   import type { PlayerStatColumn } from '#lib/components/player-stats-table.js';
   import { formatShootingPercentage } from './cap-rush-presentation.ts';
+  import Panel from '#lib/components/ui/Panel.svelte';
 
   let {
     box,
@@ -59,7 +60,7 @@
   }
 </script>
 
-<section class="overflow-hidden rounded-2xl border border-border bg-card" aria-label={label}>
+<Panel as="section" padding="none" class="overflow-hidden" aria-label={label}>
   <div class="border-b border-line-soft px-4 py-3 sm:px-5">
     <p class="ui-label text-muted-foreground">
       {label}
@@ -180,4 +181,4 @@
       </p>
     </div>
   {/each}
-</section>
+</Panel>

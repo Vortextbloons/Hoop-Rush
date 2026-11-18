@@ -273,7 +273,7 @@
       </ul>
       {#if !showLeagueResults}
         {#each postseason.series.filter((series) => series.round === currentRound && (series.highTeamId === displayedSeriesTeamId || series.lowTeamId === displayedSeriesTeamId)) as series (series.seriesId)}
-          <section class="rounded-xl border border-line-soft bg-surface-1 p-4">
+          <Panel as="section" padding="none" class="p-4">
             <header class="flex flex-wrap items-baseline justify-between gap-2">
               <h3 class="font-display text-xl font-extrabold uppercase">
                 {capRushConferenceRoundName(series.round)}
@@ -318,7 +318,7 @@
                   >{/if}
               {/each}
             </div>
-          </section>
+          </Panel>
         {/each}
       {/if}
     </Panel>

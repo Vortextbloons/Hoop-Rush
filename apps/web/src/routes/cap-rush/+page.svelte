@@ -12,6 +12,7 @@
   import { loadCapRushArt, type CapRushArt } from '#lib/features/cap-rush/cap-rush-art.js';
   import { variantLabel } from '#lib/features/cap-rush/cap-rush-presentation.js';
   import Alert from '#lib/components/ui/Alert.svelte';
+  import Panel from '#lib/components/ui/Panel.svelte';
 
   let controller = $state<CapRushDraftController | null>(null);
   let art = $state.raw<CapRushArt | null>(null);
@@ -98,7 +99,7 @@
     </PageShell>
   {:else if controller.draft !== null && stage === 'abandoned'}
     <PageShell as="section" width="sm" padding="xl">
-      <div class="rounded-2xl border border-border bg-card p-6">
+      <Panel padding="none" class="p-6">
         <p class="ui-label text-muted-foreground">
           {variantLabel(controller.draft.draft.variant)} · Run abandoned
         </p>
@@ -126,7 +127,7 @@
         {#if controller.error !== null}
           <Alert class="mt-3" tone="danger">{controller.error}</Alert>
         {/if}
-      </div>
+      </Panel>
     </PageShell>
   {:else if controller.draft !== null && handedOff}
     <PageShell width="lg" padding="2xl">

@@ -165,8 +165,10 @@
 </script>
 
 <div class="flex flex-col gap-3">
-  <section
-    class="season-scoreboard rounded-2xl border border-border bg-card p-5 sm:p-7"
+  <Panel
+    as="section"
+    padding="none"
+    class="season-scoreboard p-5 sm:p-7"
     aria-label="Season progress"
   >
     <div class="flex flex-wrap items-end justify-between gap-3">
@@ -208,7 +210,7 @@
     </div>
 
     {#if latest !== null}
-      <div class="mt-5 rounded-xl border border-line-strong bg-surface-1 p-4">
+      <Panel padding="none" class="mt-5 border-line-strong p-4">
         <p
           class="font-mono text-[10px] font-bold tracking-[0.14em] text-muted-foreground uppercase"
         >
@@ -243,14 +245,14 @@
             </div>
           {/snippet}
         </GameScoreboard>
-      </div>
+      </Panel>
     {/if}
     {#if season.completedAt !== null}
       <p class="mt-2 text-xs font-semibold text-positive">
         Season complete · {new Date(season.completedAt).toLocaleDateString()}
       </p>
     {/if}
-  </section>
+  </Panel>
 
   <Panel as="section" padding="md" aria-label="Schedule results">
     <SectionHeading title="Schedule · 82 games" level={3} size="sm">
@@ -626,7 +628,7 @@
 </div>
 
 <style>
-  .season-scoreboard {
+  :global(.season-scoreboard) {
     border-top: 3px solid var(--color-primary);
     background-image: radial-gradient(
       ellipse at top right,

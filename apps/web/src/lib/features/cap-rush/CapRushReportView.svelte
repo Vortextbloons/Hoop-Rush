@@ -221,7 +221,7 @@
       {/if}
     </section>
 
-    <section class="rounded-2xl border border-accent/40 bg-card p-5 sm:p-7" aria-label="Finals MVP">
+    <Panel as="section" padding="none" class="border-accent/40 p-5 sm:p-7" aria-label="Finals MVP">
       <p class="ui-label text-accent">Finals MVP</p>
       <div class="mt-3 flex flex-wrap items-center gap-4">
         <div class="shrink-0">
@@ -277,7 +277,7 @@
         Ranked by cumulative Finals game score, then Finals points, assists, rebounds and stable
         player ID.
       </p>
-    </section>
+    </Panel>
 
     <CapRushBracket
       series={postseason.series}
@@ -292,10 +292,7 @@
     </Alert>
   {/if}
 
-  <section
-    class="report-hero rounded-2xl border border-border bg-card p-5 sm:p-7"
-    aria-label="Final report"
-  >
+  <Panel as="section" padding="none" class="report-hero p-5 sm:p-7" aria-label="Final report">
     <div class="flex flex-wrap items-end justify-between gap-3">
       <div class="min-w-0">
         <p class="ui-label">
@@ -388,7 +385,7 @@
         >
       </p>
     </div>
-  </section>
+  </Panel>
 
   <Panel as="section" class="p-5 sm:p-7" aria-label="Your five">
     <SectionHeading eyebrow="The roster" title="Your starting five" level={3} size="lg">
@@ -474,7 +471,7 @@
           >
         {/snippet}
       </SectionHeading>
-      <div class="mt-4 rounded-xl border border-line-soft bg-surface-1 p-4">
+      <Panel padding="none" class="mt-4 p-4">
         <p class="font-mono text-[9px] font-bold tracking-[0.12em] text-muted-foreground uppercase">
           Applied penalties
         </p>
@@ -498,7 +495,7 @@
             {/each}
           </dl>
         {/if}
-      </div>
+      </Panel>
       {#if report.apronTriggers.isolations > 0 || report.payrollStatus === 'second-apron' || report.apronTriggers.strikes > 0}
         <div class="mt-4">
           <p class="ui-label" data-tone="muted">Season effects</p>
@@ -535,7 +532,7 @@
               {@const mutation = havocMutationDefinitionOf(spin.mutationId)}
               {@const spinTarget =
                 players.find((line) => line.cardId === spin.targetCardId) ?? null}
-              <details class="group min-w-0 rounded-xl border border-line-soft bg-surface-1 p-3">
+              <details class="ui-panel group min-w-0 p-3" data-padding="none">
                 <summary
                   class="cursor-pointer list-none rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
@@ -603,7 +600,7 @@
     <SectionHeading eyebrow="The box score" title="Season statistics" level={3}>
       <span class="text-sm text-muted-foreground">&middot; per game</span>
     </SectionHeading>
-    <div class="mt-4 overflow-x-auto rounded-xl border border-line-soft bg-surface-1">
+    <Panel padding="none" class="mt-4 overflow-x-auto">
       <PlayerStatsTable
         columns={statColumns}
         rows={players}
@@ -645,7 +642,7 @@
           </div>
         {/snippet}
       </PlayerStatsTable>
-    </div>
+    </Panel>
   </Panel>
 
   <Panel as="section" padding="md" class="sm:p-7" aria-label="League MVP">

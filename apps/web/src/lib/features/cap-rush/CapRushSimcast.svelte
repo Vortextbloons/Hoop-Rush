@@ -24,6 +24,7 @@
     havocEventTextOf,
   } from '#lib/features/havoc/havoc-presentation.js';
   import Alert from '#lib/components/ui/Alert.svelte';
+  import Panel from '#lib/components/ui/Panel.svelte';
 
   let { controller, art = null }: { controller: CapRushSeasonController; art?: CapRushArt | null } =
     $props();
@@ -291,7 +292,7 @@
     {/each}
   </div>
   {#if playback !== null}
-    <details class="rounded-xl border border-line-soft bg-card p-4" bind:open={boxOpen}>
+    <details class="ui-panel p-4" data-padding="none" bind:open={boxOpen}>
       <summary class="cursor-pointer text-sm font-bold"
         >Full {finished ? 'final' : 'live'} box score</summary
       >
@@ -301,7 +302,7 @@
     </details>
   {/if}
   {#if apronFacts.length > 0}
-    <section class="rounded-2xl border border-line-soft bg-card p-4" aria-label="Apron facts">
+    <Panel as="section" padding="none" class="p-4" aria-label="Apron facts">
       <h2 class="font-display text-lg font-bold">Apron effects</h2>
       <ol class="mt-3 space-y-2 text-sm">
         {#each apronFacts as fact, index (index)}
@@ -315,7 +316,7 @@
           </li>
         {/each}
       </ol>
-    </section>
+    </Panel>
   {/if}
   <section class="bc-feed" aria-label="Play-by-play feed">
     <header class="bc-feed-head">

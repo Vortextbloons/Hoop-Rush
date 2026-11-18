@@ -161,7 +161,7 @@
           onclose={() => controller.closeBroadcast()}
         />
       {:else if game === null && controller.error}
-        <section class="rounded-xl border border-border bg-card p-4">
+        <Panel as="section" padding="none" class="p-4">
           <h2 class="font-display text-xl font-bold">Room unavailable</h2>
           <Alert class="mt-1" tone="danger">{controller.error}</Alert>
           <div class="mt-3 flex flex-wrap items-center gap-3">
@@ -178,7 +178,7 @@
               href={resolve('/multiplayer')}>Return to the lobby</a
             >
           </div>
-        </section>
+        </Panel>
       {:else if game === null}
         <div class="flex flex-col gap-3 py-6" role="status" aria-label="Opening the room">
           <div
@@ -287,9 +287,7 @@
             animate={controller.franchiseReveal}
           />
           {#if activeRound?.status === 'bidding'}
-            <div
-              class="flex flex-wrap items-center justify-end gap-3 rounded-xl border border-border bg-card p-3"
-            >
+            <Panel padding="none" class="flex flex-wrap items-center justify-end gap-3 p-3">
               <button
                 type="button"
                 class="min-h-11 rounded-xl border border-primary/40 px-4 text-sm font-bold text-primary outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
@@ -304,7 +302,7 @@
                   ? 'Cancel agreement'
                   : 'End auction early'} · {activeRound.endEarlySeats?.length ?? 0}/2
               </button>
-            </div>
+            </Panel>
           {/if}
           <CapRushAuctionBoard
             {game}

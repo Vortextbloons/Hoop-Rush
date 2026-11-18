@@ -2,6 +2,7 @@
   import type { FixedFiveRoomMode, FixedFiveWorkerResultEntry } from '@hoop-rush/data-contracts';
   import { arenaGameResult, arenaLeaderChange, arenaStreak } from '#lib/arena-sound.js';
   import Alert from '#lib/components/ui/Alert.svelte';
+  import Panel from '#lib/components/ui/Panel.svelte';
   let {
     mode,
     progress = null,
@@ -202,7 +203,7 @@
   }
 </script>
 
-<div class="broadcast overflow-hidden rounded-xl border border-line-strong bg-card">
+<Panel padding="none" class="broadcast overflow-hidden border-line-strong">
   <div class="scorebug">
     <span class="scorebug-team scorebug-team--you">
       <span class="scorebug-abbr">YOU</span>
@@ -417,7 +418,7 @@
         {#each bottomLine as line, i (i)}<li>{line}</li>{/each}
       </ol>
     </details>{/if}
-</div>
+</Panel>
 
 <style>
   .scorebug {

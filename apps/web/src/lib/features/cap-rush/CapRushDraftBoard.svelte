@@ -21,6 +21,7 @@
   import { formatMillions, initialsOf, variantLabel } from './cap-rush-presentation.ts';
   import PageShell from '#lib/components/ui/PageShell.svelte';
   import Alert from '#lib/components/ui/Alert.svelte';
+  import Panel from '#lib/components/ui/Panel.svelte';
 
   let {
     view,
@@ -191,10 +192,7 @@
       </div>
       <div class="draft-main">
         {#if draft.stage === 'select-position'}
-          <section
-            class="rounded-2xl border border-border bg-card p-4 sm:p-5"
-            aria-label="Choose a position"
-          >
+          <Panel as="section" padding="none" class="p-4 sm:p-5" aria-label="Choose a position">
             <div class="flex flex-wrap items-end justify-between gap-2">
               <div>
                 <p class="ui-label text-muted-foreground">
@@ -242,7 +240,7 @@
               Choosing a position opens ten cards at that exact slot. You cannot change the position
               after the offer appears.
             </p>
-          </section>
+          </Panel>
         {:else if draft.stage === 'review-offer' && offer !== null}
           <section aria-label="Current offer">
             <div class="flex flex-wrap items-end justify-between gap-3">
@@ -301,8 +299,10 @@
             {/if}
           </section>
         {:else if complete}
-          <section
-            class="draft-summary rounded-2xl border border-border bg-card p-4 sm:p-5"
+          <Panel
+            as="section"
+            padding="none"
+            class="draft-summary p-4 sm:p-5"
             aria-label="Draft summary"
           >
             {#if spin !== null}
@@ -318,7 +318,7 @@
                         : 'Build your mutations'}
                     </h3>
                   </div>
-                  <div class="rounded-xl border border-line-soft bg-card px-4 py-3">
+                  <Panel padding="none" class="px-4 py-3">
                     <p class="font-mono text-[9px] tracking-wider text-muted-foreground uppercase">
                       Room before the cap
                     </p>
@@ -327,7 +327,7 @@
                         Math.max(0, CAP_RUSH_CAP_LINE_DOLLARS - view.payrollDollars - spinSpend),
                       )}
                     </p>
-                  </div>
+                  </Panel>
                 </div>
                 {#if spin.state.status === 'purchased'}
                   <div class="mt-5 grid gap-2 sm:grid-cols-2">
@@ -335,9 +335,10 @@
                       {#key receipt.receiptDigest}
                         <div class="spin-result relative min-w-0">
                           <div class="mutation-wheel" aria-hidden="true"></div>
-                          <div
-                            class="spin-reveal flex h-full items-start gap-3 rounded-xl border bg-card p-4"
-                            style:border-color={HAVOC_TIER_COLORS[receipt.tier]}
+                          <Panel
+                            padding="none"
+                            class="spin-reveal flex h-full items-start gap-3 p-4"
+                            style="border-color: {HAVOC_TIER_COLORS[receipt.tier]}"
                             role="status"
                           >
                             <span
@@ -359,7 +360,7 @@
                                 {formatMillions(receipt.priceDollars)}
                               </p>
                             </div>
-                          </div>
+                          </Panel>
                         </div>
                       {/key}
                     {/each}
@@ -520,7 +521,7 @@
                 {/if}
               </span>
             </div>
-          </section>
+          </Panel>
         {/if}
       </div>
     </div>
@@ -634,7 +635,7 @@
       opacity: 0;
     }
   }
-  .spin-reveal {
+  :global(.spin-reveal) {
     animation: reveal-spin 700ms 1.2s ease-out both;
   }
   .spin-reveal-icon {
@@ -662,12 +663,12 @@
     .mutation-wheel {
       display: none;
     }
-    .spin-reveal,
+    :global(.spin-reveal),
     .spin-reveal-icon {
       animation: none;
     }
   }
-  .draft-summary {
+  :global(.draft-summary) {
     border-top: 3px solid var(--color-primary);
   }
   .spin-panel {

@@ -26,6 +26,7 @@
     FixedFivePlayerStats,
   } from '#lib/features/fixed-five/fixed-five-player-stats.js';
   import { perGameText, trueShootingPct, usagePct, usagePossessions } from '#lib/format.js';
+  import Panel from '#lib/components/ui/Panel.svelte';
   let {
     mode,
     result,
@@ -461,7 +462,7 @@
   {#if duel}
     <div class="grid grid-cols-2 gap-3 px-4 py-4 sm:grid-cols-4 sm:px-6" aria-label="Series games">
       {#each duelScores as g (g.gameNumber)}
-        <div class="rounded-xl border border-primary/25 bg-surface-1 p-3 text-center sm:p-4">
+        <Panel padding="none" class="border-primary/25 p-3 text-center sm:p-4">
           <div class="flex items-center justify-between">
             <span class="font-mono text-[11px] text-muted-foreground">G{g.gameNumber}</span>
 
@@ -480,7 +481,7 @@
           </p>
           <p class="mt-1 font-mono text-[10px] text-muted-foreground uppercase">You · Opp</p>
           <p class="font-mono text-[10px] text-muted-foreground">Final</p>
-        </div>
+        </Panel>
       {/each}
     </div>
   {:else if shared && youShared && oppShared}
@@ -488,7 +489,7 @@
       class="grid grid-cols-2 gap-3 px-4 py-4 sm:grid-cols-4 sm:px-6"
       aria-label="Season summary"
     >
-      <div class="rounded-xl border border-primary/25 bg-surface-1 p-3 text-center sm:p-4">
+      <Panel padding="none" class="border-primary/25 p-3 text-center sm:p-4">
         <p class="font-mono text-[11px] text-muted-foreground uppercase">You</p>
         <p class="font-display mt-1 text-2xl font-extrabold tabular-nums">
           {youShared.wins} <span class="text-muted-foreground">-</span>
@@ -497,8 +498,8 @@
         <p class="mt-1 font-mono text-[10px] text-muted-foreground">
           Diff {youShared.differential >= 0 ? '+' : ''}{youShared.differential} · Final
         </p>
-      </div>
-      <div class="rounded-xl border border-primary/25 bg-surface-1 p-3 text-center sm:p-4">
+      </Panel>
+      <Panel padding="none" class="border-primary/25 p-3 text-center sm:p-4">
         <p class="font-mono text-[11px] text-muted-foreground uppercase">Opp</p>
         <p class="font-display mt-1 text-2xl font-extrabold tabular-nums">
           {oppShared.wins} <span class="text-muted-foreground">-</span>
@@ -507,20 +508,20 @@
         <p class="mt-1 font-mono text-[10px] text-muted-foreground">
           Diff {oppShared.differential >= 0 ? '+' : ''}{oppShared.differential} · Final
         </p>
-      </div>
-      <div class="rounded-xl border border-primary/25 bg-surface-1 p-3 text-center sm:p-4">
+      </Panel>
+      <Panel padding="none" class="border-primary/25 p-3 text-center sm:p-4">
         <p class="font-mono text-[11px] text-muted-foreground uppercase">H2H</p>
         <p class="font-display mt-1 text-2xl font-extrabold tabular-nums">
           {youShared.h2hWins} <span class="text-muted-foreground">-</span>
           {oppShared.h2hWins}
         </p>
         <p class="mt-1 font-mono text-[10px] text-muted-foreground">Head to head · Final</p>
-      </div>
-      <div class="rounded-xl border border-primary/25 bg-surface-1 p-3 text-center sm:p-4">
+      </Panel>
+      <Panel padding="none" class="border-primary/25 p-3 text-center sm:p-4">
         <p class="font-mono text-[11px] text-muted-foreground uppercase">Tie-break</p>
         <p class="mt-1 text-xs font-bold">Wins → diff → seed</p>
         <p class="mt-1 font-mono text-[10px] text-muted-foreground">H2H mirrored</p>
-      </div>
+      </Panel>
     </div>
   {/if}
 
@@ -591,9 +592,11 @@
               >
             </div>
           {/if}
-          <section
+          <Panel
+            as="section"
+            padding="none"
             aria-label={isYou ? 'Your five' : 'Opponent five'}
-            class="rounded-xl border border-line-soft bg-surface-1 p-4"
+            class="p-4"
           >
             <h3 class="ui-label">
               {isYou ? 'Your five' : 'Opponent five'}
@@ -646,15 +649,12 @@
                 </li>
               {/each}
             </ul>
-          </section>
+          </Panel>
         {/each}
       </div>
 
       <div class="grid gap-4 px-4 pb-4 sm:px-6 sm:pb-6 lg:grid-cols-3">
-        <section
-          aria-label="Series MVP"
-          class="rounded-xl border border-line-soft bg-surface-1 p-4 text-center"
-        >
+        <Panel as="section" padding="none" aria-label="Series MVP" class="p-4 text-center">
           <h3 class="ui-label text-left">Series MVP</h3>
           {#if mvp && mvp.entry}
             <div class="mx-auto mt-2 h-16 w-16 overflow-hidden rounded-full">
@@ -707,24 +707,18 @@
               </button>
             {/if}
           {/if}
-        </section>
+        </Panel>
 
-        <section
-          aria-label="Series comparison"
-          class="rounded-xl border border-line-soft bg-surface-1 p-4"
-        >
+        <Panel as="section" padding="none" aria-label="Series comparison" class="p-4">
           <h3 class="ui-label">Series comparison</h3>
           {#if comparison}
             {@render comparisonTable(comparison)}
           {:else}
             <p class="mt-3 text-sm text-muted-foreground">Comparison needs simulated games.</p>
           {/if}
-        </section>
+        </Panel>
 
-        <section
-          aria-label="Series summary"
-          class="rounded-xl border border-line-soft bg-surface-1 p-4"
-        >
+        <Panel as="section" padding="none" aria-label="Series summary" class="p-4">
           <h3 class="ui-label">Series summary</h3>
           <ul class="mt-3 flex flex-col gap-3 text-sm">
             <li class="flex items-center gap-3">
@@ -786,11 +780,11 @@
               >
             </li>
           </ul>
-        </section>
+        </Panel>
       </div>
 
       <div class="px-4 pb-4 sm:px-6 sm:pb-6">
-        <details class="rounded-xl border border-line-soft bg-surface-1">
+        <details class="ui-panel" data-padding="none">
           <summary
             class="flex cursor-pointer list-none items-center gap-3 p-4 [&::-webkit-details-marker]:hidden"
           >
@@ -820,7 +814,7 @@
         {#if duel}
           <ol class="grid gap-3 sm:grid-cols-2" aria-label="All series games">
             {#each duelScores as g (g.gameNumber)}
-              <li class="rounded-xl border border-primary/25 bg-surface-1 p-4">
+              <Panel as="li" padding="none" class="border-primary/25 p-4">
                 <div class="flex items-center justify-between">
                   <span class="font-mono text-xs text-muted-foreground">Game {g.gameNumber}</span>
                   <span
@@ -845,7 +839,7 @@
                     Score streams in once the simulated games rebuild on this device.
                   </p>
                 {/if}
-              </li>
+              </Panel>
             {/each}
           </ol>
           {#if duelScores.every((g) => g.youScore === null)}
@@ -858,7 +852,7 @@
           {#if h2hScores.length > 0}
             <ol class="grid gap-3 sm:grid-cols-2" aria-label="Head-to-head games">
               {#each h2hScores as g (g.gameNumber)}
-                <li class="rounded-xl border border-primary/25 bg-surface-1 p-4">
+                <Panel as="li" padding="none" class="border-primary/25 p-4">
                   <div class="flex items-center justify-between">
                     <span class="font-mono text-xs text-muted-foreground"
                       >H2H · Game {g.gameNumber}</span
@@ -876,7 +870,7 @@
                   <p class="mt-1 font-mono text-[11px] text-muted-foreground uppercase">
                     You · Opp · Final
                   </p>
-                </li>
+                </Panel>
               {/each}
             </ol>
             <p class="mt-3 text-xs text-muted-foreground">
@@ -885,7 +879,7 @@
             </p>
           {:else if shared && youShared && oppShared}
             <div class="grid gap-3 sm:grid-cols-2">
-              <div class="rounded-xl border border-line-soft bg-surface-1 p-4 text-center">
+              <Panel padding="none" class="p-4 text-center">
                 <p class="font-mono text-[11px] text-muted-foreground uppercase">You</p>
                 <p class="font-display mt-1 text-4xl font-extrabold tabular-nums">
                   {youShared.wins}<span class="text-muted-foreground">–</span>{youShared.losses}
@@ -893,8 +887,8 @@
                 <p class="mt-1 font-mono text-[11px] text-muted-foreground">
                   Diff {youShared.differential >= 0 ? '+' : ''}{youShared.differential} · H2H {youShared.h2hWins}
                 </p>
-              </div>
-              <div class="rounded-xl border border-line-soft bg-surface-1 p-4 text-center">
+              </Panel>
+              <Panel padding="none" class="p-4 text-center">
                 <p class="font-mono text-[11px] text-muted-foreground uppercase">Opponent</p>
                 <p class="font-display mt-1 text-4xl font-extrabold tabular-nums">
                   {oppShared.wins}<span class="text-muted-foreground">–</span>{oppShared.losses}
@@ -902,7 +896,7 @@
                 <p class="mt-1 font-mono text-[11px] text-muted-foreground">
                   Diff {oppShared.differential >= 0 ? '+' : ''}{oppShared.differential} · H2H {oppShared.h2hWins}
                 </p>
-              </div>
+              </Panel>
             </div>
             <p class="mt-3 text-xs text-muted-foreground">
               Per-game scores rebuild on this device after the simulated games stream back.
@@ -1091,10 +1085,7 @@
       </div>
     {:else}
       <div class="grid gap-4 p-4 sm:p-6 lg:grid-cols-2">
-        <section
-          aria-label="Team comparison detail"
-          class="rounded-xl border border-line-soft bg-surface-1 p-4"
-        >
+        <Panel as="section" padding="none" aria-label="Team comparison detail" class="p-4">
           <h3 class="ui-label">Team comparison</h3>
           {#if comparison}
             {@render comparisonTable(comparison)}
@@ -1110,11 +1101,8 @@
               </button>
             {/if}
           {/if}
-        </section>
-        <section
-          aria-label="Verification"
-          class="rounded-xl border border-line-soft bg-surface-1 p-4"
-        >
+        </Panel>
+        <Panel as="section" padding="none" aria-label="Verification" class="p-4">
           <h3 class="ui-label">Verification</h3>
           <ul class="mt-3 flex flex-col gap-2 font-mono text-[11px] text-muted-foreground">
             <li class="flex items-center gap-2">
@@ -1140,7 +1128,7 @@
               <li>First to 4 · stopped at game {duel.stoppedAtGame}</li>
             {/if}
           </ul>
-        </section>
+        </Panel>
       </div>
     {/if}
   </div>

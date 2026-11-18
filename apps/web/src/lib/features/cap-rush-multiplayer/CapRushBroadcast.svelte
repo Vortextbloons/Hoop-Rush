@@ -2,6 +2,7 @@
   import TeamLogo from '#lib/components/TeamLogo.svelte';
   import type { CapRushArt } from '../cap-rush/cap-rush-art.js';
   import { onMount } from 'svelte';
+  import { BROADCAST_TICK_MS, broadcastCursor } from './cap-rush-broadcast-playback.js';
   import type {
     HavocBattleInput,
     HavocBattleResult,
@@ -39,17 +40,43 @@
 
   const stream = $derived(new GamecastBattlePlaybackStream({ result, tape }));
   const total = $derived(stream.items.length);
-  const step = $derived(Math.max(1, Math.ceil((total * speed) / 100)));
   let cursor = $state(0);
   let playing = $state(true);
+  let playedMs = 0;
+  let startedAtMs = 0;
+  let timer: ReturnType<typeof setInterval> | null = null;
+
+  function stopClock(): void {
+    if (timer === null) return;
+    clearInterval(timer);
+    timer = null;
+  }
+
+  function startClock(): void {
+    if (cursor >= total) return;
+    startedAtMs = performance.now();
+    timer = setInterval(() => {
+      cursor = broadcastCursor(playedMs + performance.now() - startedAtMs, total, speed);
+      if (cursor >= total) {
+        playing = false;
+        stopClock();
+      }
+    }, BROADCAST_TICK_MS);
+  }
+
+  function togglePlayback(): void {
+    if (playing) {
+      playedMs += performance.now() - startedAtMs;
+      stopClock();
+    } else {
+      startClock();
+    }
+    playing = !playing;
+  }
 
   onMount(() => {
-    const id = setInterval(() => {
-      if (!playing) return;
-      cursor = Math.min(total, cursor + step);
-      if (cursor >= total) playing = false;
-    }, 100);
-    return () => clearInterval(id);
+    startClock();
+    return stopClock;
   });
 
   const frame = $derived(stream.frame(cursor));
@@ -164,7 +191,7 @@
         <button
           type="button"
           class="inline-flex min-h-11 items-center justify-center rounded-lg border border-border bg-surface-2 px-3 text-xs font-semibold"
-          onclick={() => (playing = !playing)}
+          onclick={togglePlayback}
         >
           {playing ? 'Pause' : 'Resume'}
         </button>
