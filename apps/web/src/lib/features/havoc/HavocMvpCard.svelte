@@ -3,6 +3,8 @@
   import PlayerArt from '#lib/components/PlayerArt.svelte';
   import { havocMvpFormulaLabel } from './havoc-presentation';
   import Panel from '#lib/components/ui/Panel.svelte';
+  import StatGrid from '#lib/components/ui/StatGrid.svelte';
+  import StatTile from '#lib/components/ui/StatTile.svelte';
 
   let { comparison }: { comparison: HavocComparison } = $props();
   const mvp = $derived(comparison.mvp);
@@ -25,38 +27,30 @@
   />
   <details>
     <summary>How the MVP earned the award</summary>
-    <dl class="mt-3 grid grid-cols-3 gap-2 text-sm sm:gap-3">
-      <div class="min-w-0">
-        <dt class="font-mono text-[10px] tracking-[0.1em] text-muted-foreground uppercase">
-          Havoc index
-        </dt>
-        <dd class="font-mono text-base font-bold break-words sm:text-xl" data-havoc-mvp-havoc-index>
-          {mvp.havocIndex}
-        </dd>
-      </div>
-      <div class="min-w-0">
-        <dt class="font-mono text-[10px] tracking-[0.1em] text-muted-foreground uppercase">
-          Normal index
-        </dt>
-        <dd
-          class="font-mono text-base font-bold break-words sm:text-xl"
-          data-havoc-mvp-normal-index
-        >
-          {mvp.normalIndex}
-        </dd>
-      </div>
-      <div class="min-w-0">
-        <dt class="font-mono text-[10px] tracking-[0.1em] text-muted-foreground uppercase">Gain</dt>
-        <dd
-          class="font-mono text-base font-bold break-words sm:text-xl {mvp.gain < 0
-            ? 'text-destructive'
-            : 'text-primary'}"
-          data-havoc-mvp-gain
-        >
-          {mvp.gain >= 0 ? '+' : ''}{mvp.gain}
-        </dd>
-      </div>
-    </dl>
+    <StatGrid class="mt-3" columns={3} mobile={3} gap="md">
+      <StatTile
+        label="Havoc index"
+        size="md"
+        valueClass="font-mono text-base break-words sm:text-xl"
+        value={mvp.havocIndex}
+        data-havoc-mvp-havoc-index
+      />
+      <StatTile
+        label="Normal index"
+        size="md"
+        valueClass="font-mono text-base break-words sm:text-xl"
+        value={mvp.normalIndex}
+        data-havoc-mvp-normal-index
+      />
+      <StatTile
+        label="Gain"
+        size="md"
+        valueClass="font-mono text-base break-words sm:text-xl"
+        tone={mvp.gain < 0 ? 'negative' : 'primary'}
+        value={`${mvp.gain >= 0 ? '+' : ''}${mvp.gain}`}
+        data-havoc-mvp-gain
+      />
+    </StatGrid>
     <p class="mt-3 text-xs leading-relaxed text-muted-foreground">
       Index = {formula}. Each slot's starter, replacement, and clone totals are included; the
       highest gain wins. Ties use the mutated index, then draft order. The index is a transparent

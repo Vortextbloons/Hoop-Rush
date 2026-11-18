@@ -1,6 +1,8 @@
 <script lang="ts">
   import type { HavocComparison } from '@hoop-rush/data-contracts';
   import { havocPeriodLabel, mutationNameOf } from './havoc-presentation';
+  import StatGrid from '#lib/components/ui/StatGrid.svelte';
+  import StatTile from '#lib/components/ui/StatTile.svelte';
 
   let { comparison, gameNumber }: { comparison: HavocComparison; gameNumber: number } = $props();
 
@@ -60,20 +62,26 @@
         </p>
       </div>
     </div>
-    <dl class="mt-3 grid grid-cols-3 gap-2 text-xs">
-      <div class="min-w-0">
-        <dt class="text-muted-foreground">Δ points for</dt>
-        <dd class="font-mono font-bold break-words">{game.deltas.pointsFor}</dd>
-      </div>
-      <div class="min-w-0">
-        <dt class="text-muted-foreground">Δ points against</dt>
-        <dd class="font-mono font-bold break-words">{game.deltas.pointsAgainst}</dd>
-      </div>
-      <div class="min-w-0">
-        <dt class="text-muted-foreground">Δ margin</dt>
-        <dd class="font-mono font-bold break-words">{game.deltas.margin}</dd>
-      </div>
-    </dl>
+    <StatGrid class="mt-3" columns={3} mobile={3}>
+      <StatTile
+        label="Δ points for"
+        size="sm"
+        valueClass="font-mono font-bold break-words"
+        value={game.deltas.pointsFor}
+      />
+      <StatTile
+        label="Δ points against"
+        size="sm"
+        valueClass="font-mono font-bold break-words"
+        value={game.deltas.pointsAgainst}
+      />
+      <StatTile
+        label="Δ margin"
+        size="sm"
+        valueClass="font-mono font-bold break-words"
+        value={game.deltas.margin}
+      />
+    </StatGrid>
     {#if game.flips.havocWinNormalLoss || game.flips.normalWinHavocLoss}
       <p class="mt-2 text-xs font-semibold">
         {#if game.flips.havocWinNormalLoss}

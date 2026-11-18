@@ -14,6 +14,8 @@
   import ActionLink from '#lib/components/ui/ActionLink.svelte';
   import Panel from '#lib/components/ui/Panel.svelte';
   import Alert from '#lib/components/ui/Alert.svelte';
+  import StatGrid from '#lib/components/ui/StatGrid.svelte';
+  import StatTile from '#lib/components/ui/StatTile.svelte';
   let { state: resultState }: { state: HavocResultState } = $props();
   const run = $derived(resultState.run);
   const comparison = $derived(resultState.comparison);
@@ -112,39 +114,36 @@
           Same squad, opponents and seeds. Deltas compare the two seasons; individual abilities
           can't be isolated from them.
         </p>
-        <dl class="h-result-metrics mt-4">
-          <div>
-            <dt>Scored / game</dt>
-            <dd>
-              {comparison.havoc.averagePointsFor.toFixed(1)} / {comparison.normal.averagePointsFor.toFixed(
-                1,
-              )}
-            </dd>
-          </div>
-          <div>
-            <dt>Allowed / game</dt>
-            <dd>
-              {comparison.havoc.averagePointsAgainst.toFixed(1)} / {comparison.normal.averagePointsAgainst.toFixed(
-                1,
-              )}
-            </dd>
-          </div>
-          <div>
-            <dt>Margin delta / game</dt>
-            <dd>
-              {formatSignedPoints(
-                Number((comparison.differentialDelta / comparison.havoc.games).toFixed(1)),
-              )}
-            </dd>
-          </div>
-          <div>
-            <dt>Direct power points</dt>
-            <dd data-havoc-direct-mutation-points>
-              {resultState.report?.directMutationPoints ??
-                comparison.mutations.reduce((sum, power) => sum + power.pointsDelta, 0)}
-            </dd>
-          </div>
-        </dl>
+        <StatGrid class="mt-4" columns={4} mobile={2}>
+          <StatTile
+            label="Scored / game"
+            size="sm"
+            valueClass="font-sans text-base font-bold"
+            value={`${comparison.havoc.averagePointsFor.toFixed(1)} / ${comparison.normal.averagePointsFor.toFixed(1)}`}
+          />
+          <StatTile
+            label="Allowed / game"
+            size="sm"
+            valueClass="font-sans text-base font-bold"
+            value={`${comparison.havoc.averagePointsAgainst.toFixed(1)} / ${comparison.normal.averagePointsAgainst.toFixed(1)}`}
+          />
+          <StatTile
+            label="Margin delta / game"
+            size="sm"
+            valueClass="font-sans text-base font-bold"
+            value={formatSignedPoints(
+              Number((comparison.differentialDelta / comparison.havoc.games).toFixed(1)),
+            )}
+          />
+          <StatTile
+            label="Direct power points"
+            size="sm"
+            valueClass="font-sans text-base font-bold"
+            value={resultState.report?.directMutationPoints ??
+              comparison.mutations.reduce((sum, power) => sum + power.pointsDelta, 0)}
+            data-havoc-direct-mutation-points
+          />
+        </StatGrid>
       {/if}
       <AchievementReveal bindingId={`havoc:${run.runId}`} />
     </header>
@@ -153,18 +152,22 @@
         This saved season uses older rules. Its results are preserved, but a matching comparison is
         unavailable.
       </Alert>
-      {#if resultState.report !== null}<dl class="h-result-metrics mt-4">
-          <div>
-            <dt>Average score margin</dt>
-            <dd>
-              {(resultState.report.havoc.differential / resultState.report.havoc.games).toFixed(1)}
-            </dd>
-          </div>
-          <div>
-            <dt>Direct power points</dt>
-            <dd>{resultState.report.directMutationPoints}</dd>
-          </div>
-        </dl>{/if}
+      {#if resultState.report !== null}<StatGrid class="mt-4" columns={4} mobile={2}>
+          <StatTile
+            label="Average score margin"
+            size="sm"
+            valueClass="font-sans text-base font-bold"
+            value={(resultState.report.havoc.differential / resultState.report.havoc.games).toFixed(
+              1,
+            )}
+          />
+          <StatTile
+            label="Direct power points"
+            size="sm"
+            valueClass="font-sans text-base font-bold"
+            value={resultState.report.directMutationPoints}
+          />
+        </StatGrid>{/if}
     {/if}
     {#if comparison !== null && resultState.comparisonComplete}
       <HavocSquadReport {comparison} lineup={run.lineup} />
@@ -241,26 +244,7 @@
   .h-result-record.h-negative {
     color: var(--h-pink);
   }
-  .h-result-metrics {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 16px;
-    border-top: 1px solid #465273;
-    padding-top: 16px;
-  }
-  .h-result-metrics dt {
-    font-size: 11px;
-    color: #c1cae4;
-  }
-  .h-result-metrics dd {
-    font-size: 16px;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-  }
   @media (max-width: 600px) {
-    .h-result-metrics {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
     .h-record-comparison {
       gap: 8px;
     }

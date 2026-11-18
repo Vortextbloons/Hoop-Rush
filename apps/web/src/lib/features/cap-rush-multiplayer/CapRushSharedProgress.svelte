@@ -12,6 +12,8 @@
   import { capStatusLabel } from '../cap-rush/cap-rush-presentation.js';
   import { seatLabelFor, teamNameOf } from './cap-rush-multiplayer-presentation.js';
   import Panel from '#lib/components/ui/Panel.svelte';
+  import StatGrid from '#lib/components/ui/StatGrid.svelte';
+  import StatTile from '#lib/components/ui/StatTile.svelte';
 
   type StepAction = 'watch-h2h' | null;
 

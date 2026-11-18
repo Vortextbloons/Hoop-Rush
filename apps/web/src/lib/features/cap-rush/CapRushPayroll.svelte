@@ -12,6 +12,8 @@
     capStatusLabel,
     formatMillions,
   } from './cap-rush-presentation.ts';
+  import StatGrid from '#lib/components/ui/StatGrid.svelte';
+  import StatTile from '#lib/components/ui/StatTile.svelte';
 
   let { view }: { view: CapRushDraftView } = $props();
 
