@@ -5,6 +5,8 @@ import {
   profileBindingSchema,
   profileGameSchema,
   profileSelectionSchema,
+  profileTitleSchema,
+  profileTitles,
   type AchievementId,
   type AchievementUnlock,
   type PlayerProfile,
@@ -22,6 +24,12 @@ export type ProfileCommand = {
   title: PlayerProfile['title'];
   featuredAchievement: PlayerProfile['featuredAchievement'];
 };
+
+function assertTitleUnlocked(profile: PlayerProfile, title: PlayerProfile['title']): void {
+  const achievementId = profileTitles[title].achievementId;
+  if (achievementId && !profile.achievements.includes(achievementId))
+    throw new Error('Title is locked');
+}
 
 export class DexieProfileRepository {
   private readonly db: HoopRushDatabase;
@@ -121,10 +129,7 @@ export class DexieProfileRepository {
         throw new Error('Cosmetic is locked');
       if (command.nameColor === 'blue' && !profile.achievements.includes('hands-off'))
         throw new Error('Cosmetic is locked');
-      if (command.title === 'defensive-wall' && !profile.achievements.includes('no-easy-buckets'))
-        throw new Error('Title is locked');
-      if (command.title === 'floor-general' && !profile.achievements.includes('silent-carry'))
-        throw new Error('Title is locked');
+      assertTitleUnlocked(profile, command.title);
       const updated = playerProfileSchema.parse({
         ...profile,
         name: command.name,
@@ -136,6 +141,24 @@ export class DexieProfileRepository {
       });
       await this.db.profiles.put(updated);
       return updated;
+    });
+  }
+
+  async equipTitle(id: string, title: PlayerProfile['title']): Promise<PlayerProfile> {
+    return this.db.transaction('rw', this.db.profiles, this.db.profileSelection, async () => {
+      const selection = profileSelectionSchema.parse(
+        await this.db.profileSelection.get('selected'),
+      );
+      if (selection.profileId !== id) throw new Error('Profile not found');
+      const row = await this.db.profiles.get(id);
+      if (!row) throw new Error('Profile not found');
+      const profile = playerProfileSchema.parse(row);
+      const nextTitle = profileTitleSchema.parse(title);
+      assertTitleUnlocked(profile, nextTitle);
+      await this.db.profiles.update(id, { title: nextTitle });
+      const saved = await this.db.profiles.get(id);
+      if (!saved) throw new Error('Profile not found');
+      return playerProfileSchema.parse(saved);
     });
   }
 

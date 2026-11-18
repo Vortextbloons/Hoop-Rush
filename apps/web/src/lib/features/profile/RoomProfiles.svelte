@@ -1,6 +1,10 @@
 <script lang="ts">
   import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js';
-  import { publicProfileSchema, type PublicProfile } from '@hoop-rush/data-contracts';
+  import {
+    profileTitles,
+    publicProfileSchema,
+    type PublicProfile,
+  } from '@hoop-rush/data-contracts';
   import { getMultiplayerClient } from '#lib/supabase-runtime.js';
   import { achievements, profileRepository, selectedProfile } from './profile.js';
   let {
@@ -70,18 +74,18 @@
                 : player.avatar === 'crown'
                   ? '👑'
                   : player.name.slice(0, 2).toUpperCase()}</span
-            ><strong
-              class:blue={player.nameColor === 'blue'}
-              class:orange={player.nameColor === 'orange'}>{player.name}</strong
-            ><small>{seat === 'p1' ? 'Host' : 'Guest'} · {seat.toUpperCase()}</small></summary
+            ><span class="identity">
+              <strong
+                class:blue={player.nameColor === 'blue'}
+                class:orange={player.nameColor === 'orange'}
+              >
+                {player.name}
+              </strong>
+              {#if player.title !== 'none'}
+                <small>{profileTitles[player.title].name}</small>
+              {/if}
+            </span><small>{seat === 'p1' ? 'Host' : 'Guest'} · {seat.toUpperCase()}</small></summary
           >
-          <p>
-            {player.title === 'defensive-wall'
-              ? 'Defensive Wall'
-              : player.title === 'floor-general'
-                ? 'Floor General'
-                : 'Player'}
-          </p>
           <p>{player.wins} wins · {player.games} games · {player.bestStreak} best streak</p>
           {#if player.featuredAchievement}<p>
               Featured: {achievements[player.featuredAchievement].name}
@@ -116,6 +120,10 @@
   }
   small {
     color: var(--color-muted-foreground);
+  }
+  .identity {
+    display: grid;
+    min-width: 0;
   }
   p {
     margin-top: 0.5rem;

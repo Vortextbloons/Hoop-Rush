@@ -1,7 +1,7 @@
 {
-  "note": "Seeded result, tape, audit, and digest baseline after the five-position simulation change.",
+  "note": "Seeded result, tape, audit, and digest baseline after the shared allocation change.",
   "baseline": {
-    "engineVersion": "m3-engine-v26",
+    "engineVersion": "m3-engine-v27",
     "runtime": "Production Rust battle and possession runtime"
   },
   "scenarios": [
@@ -13,8 +13,8 @@
       "seed": "7f71e1007f71e1007f71e1007f71e100",
       "apron": null,
       "expected": {
-        "resultHash": "c1a652098ac60eed1770474333cc24d9",
-        "tapeHash": "7aabba51b42f2725714feeb7615bfe81",
+        "resultHash": "4049f022e12fb8ae8b5dc3ecc970b5b2",
+        "tapeHash": "9e8178ed877f27994db8c2934d99d31d",
         "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
         "factsHash": "741638a5a99a6e013d712db700467055",
         "summary": {
@@ -41,8 +41,8 @@
       "seed": "7f71e1007f71e1007f71e1007f71e100",
       "apron": null,
       "expected": {
-        "resultHash": "4bb2cbd8bd50ae2cb620e92ad9b7fc48",
-        "tapeHash": "daeca423a38b3affed7dcc4d2c205713",
+        "resultHash": "66ac6b6108bcf7ed572f1fc37fda8c91",
+        "tapeHash": "05f0b473d174e587e670fdeda34ee1a3",
         "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
         "factsHash": "741638a5a99a6e013d712db700467055",
         "summary": {
@@ -56,8 +56,8 @@
           "facts": 0
         },
         "inputDigest": "409e3301ed323d3d83e803d7848a5971",
-        "resultDigest": "40788f567153d6b20f445814271471a6",
-        "tapeDigest": "3645d588880bd94c8cbe0ee64705ed98",
+        "resultDigest": "fbfea257e29f18dbe923fcc553136027",
+        "tapeDigest": "e7a2d54403907820078fd8da0bcc6e54",
         "features": []
       }
     },
@@ -69,8 +69,8 @@
       "seed": "a4a2ba9ca4a2ba9ca4a2ba9ca4a2ba9c",
       "apron": null,
       "expected": {
-        "resultHash": "3dff9474a6b3f8e8fe6c5c0ef5322da4",
-        "tapeHash": "6c9ebdc6ad2fa80a4d17d28851cf18d6",
+        "resultHash": "f9265699890c6f8de5d97fc3fdb5f589",
+        "tapeHash": "d3a6356535cb618962e0c0cb3d8238f5",
         "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
         "factsHash": "741638a5a99a6e013d712db700467055",
         "summary": {
@@ -84,8 +84,8 @@
           "facts": 0
         },
         "inputDigest": "8449dcd5cfbe39612e7af5d79cc25aa5",
-        "resultDigest": "dc8e58aaa5375e16080419706fc8973a",
-        "tapeDigest": "70642d9f8764c27b2d3b2af575dc4d4f",
+        "resultDigest": "aa4a3b3fd42a4a9b6a345a650e346bcf",
+        "tapeDigest": "294cb534af443e70848301260f6014e4",
         "features": ["clone-entered"]
       }
     },
@@ -97,8 +97,8 @@
       "seed": "c9fbf318c9fbf318c9fbf318c9fbf318",
       "apron": null,
       "expected": {
-        "resultHash": "ddc783d533a065e1633926f72efe9845",
-        "tapeHash": "d51d04326f943cb6f52810fca7970f22",
+        "resultHash": "1d6c92a55767c1d1652cd86366645e55",
+        "tapeHash": "6f715c058d9efc89fd152b3319a09515",
         "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
         "factsHash": "741638a5a99a6e013d712db700467055",
         "summary": {
@@ -112,8 +112,8 @@
           "facts": 0
         },
         "inputDigest": "ca2c715f8588cd1b2059642516333dcf",
-        "resultDigest": "df5ac4eb3b59a08f94fd3f5980e9c77b",
-        "tapeDigest": "959573a7a6de31b3b74e89cd8809e277",
+        "resultDigest": "6b7500c763a6ad6b132623d90da82997",
+        "tapeDigest": "19c9dbe61e382222f12597f864f6fa96",
         "features": ["clone-entered", "clone-exited", "foul-out"]
       }
     },
@@ -125,8 +125,8 @@
       "seed": "c343bd96c343bd96c343bd96c343bd96",
       "apron": null,
       "expected": {
-        "resultHash": "7864a6102fb4dcd4b45fd02671163cc0",
-        "tapeHash": "15e7e0a73d763da33c7584f52ebd8957",
+        "resultHash": "ef997ab7934cacc3bf7de50d44b8c6e7",
+        "tapeHash": "27224cbfa33f09e3f6267badc58901cf",
         "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
         "factsHash": "741638a5a99a6e013d712db700467055",
         "summary": {
@@ -140,8 +140,8 @@
           "facts": 0
         },
         "inputDigest": "6d0e912cc27a17b0d90d774e77fe5f1c",
-        "resultDigest": "452437f2dbcd66de4f0b012c329110c2",
-        "tapeDigest": "151e5444df914998613d410ebf2d8b14",
+        "resultDigest": "8ca4c9212d6d36250100199b3c1e8c71",
+        "tapeDigest": "9184e1464d5bbb12171701e8d9d4f676",
         "features": ["foul-out", "fusion"]
       }
     },
@@ -153,23 +153,23 @@
       "seed": "117eb33d117eb33d117eb33d117eb33d",
       "apron": null,
       "expected": {
-        "resultHash": "565c5260cf050f1c58891afe6bf14670",
-        "tapeHash": "b704f35fe0b3d6bb30f297719718740f",
+        "resultHash": "7b65fb7751085bb332437d6db85b8f87",
+        "tapeHash": "e90909980d0018acdfc6390285205ac8",
         "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
         "factsHash": "741638a5a99a6e013d712db700467055",
         "summary": {
           "homePoints": 125,
           "awayPoints": 109,
           "overtimePeriods": 0,
-          "tapeEvents": 604,
-          "tapeScoring": 137,
+          "tapeEvents": 607,
+          "tapeScoring": 138,
           "auditOk": true,
           "findingCodes": [],
           "facts": 0
         },
         "inputDigest": "aa5bc2c2b3d0a43675f261cc938739b2",
-        "resultDigest": "85c206729df74e26604e54c49ec25ee2",
-        "tapeDigest": "ed4e76565441b3ca0cf8b1d4705943e6",
+        "resultDigest": "75bdad1140ac8475feb5009be8c92e81",
+        "tapeDigest": "5de865e32d6e3bbf9f3352f984433033",
         "features": ["foul-out"]
       }
     },
@@ -181,8 +181,8 @@
       "seed": "87c9fe9d87c9fe9d87c9fe9d87c9fe9d",
       "apron": null,
       "expected": {
-        "resultHash": "3e0d51dbd923c83f8299a631432dde2b",
-        "tapeHash": "22ce3dff2d43326b848215b549d0784f",
+        "resultHash": "91bc21836c63379fb130bf9967503913",
+        "tapeHash": "cf01d03d9226d5598789e6d308df720d",
         "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
         "factsHash": "741638a5a99a6e013d712db700467055",
         "summary": {
@@ -196,8 +196,8 @@
           "facts": 0
         },
         "inputDigest": "5a59f8b667275b923aad52e098c40886",
-        "resultDigest": "d8b18eed26f82769e3252097d1ff17dd",
-        "tapeDigest": "78a1146c06be0710c90074f6aab8b21c",
+        "resultDigest": "d569f3edd1d91d519762277796f1a3dd",
+        "tapeDigest": "eacf6b3ee069a082d2e62d6861eec3ae",
         "features": ["foul-out", "overtime"]
       }
     },
@@ -213,8 +213,8 @@
         "targetSlot": "C"
       },
       "expected": {
-        "resultHash": "0057ab2196b7c8a5c5c8decf2356c9f1",
-        "tapeHash": "4365184ee2abf2da9a421abc9e4a459e",
+        "resultHash": "4c1e6ad42b9be700310bf142f83564e4",
+        "tapeHash": "9bf8f86c4395e1589c4b7ee26bb313dc",
         "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
         "factsHash": "741638a5a99a6e013d712db700467055",
         "summary": {
@@ -228,8 +228,8 @@
           "facts": 0
         },
         "inputDigest": "d84207c9377b010599d6960f68523979",
-        "resultDigest": "e63147cb26938777ddc37eed952cc2bb",
-        "tapeDigest": "72ec608fd2968b73a7074081c5c4007f",
+        "resultDigest": "182c4366c9f03dca9e482ae88a501b56",
+        "tapeDigest": "5e8129271ba58c8b67a93561ac0195b7",
         "features": []
       }
     },
@@ -245,8 +245,8 @@
         "targetSlot": "C"
       },
       "expected": {
-        "resultHash": "5b6541adfc58843118c48a635716795d",
-        "tapeHash": "532608c7ef287ddb14f1f8e5620427f7",
+        "resultHash": "36e4b39e64cc0ac279894e08de990f8e",
+        "tapeHash": "83af90ad26db0f498e83d6e78a798f9d",
         "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
         "factsHash": "550073c3fdc6f1778a398209e365bbd3",
         "summary": {
@@ -260,8 +260,8 @@
           "facts": 15
         },
         "inputDigest": "5120a49998c10975b1fa6abf7f7981c9",
-        "resultDigest": "fbc802bfa830b96b9c8826590235eecf",
-        "tapeDigest": "87722870f5eb7abca9638cba025bee40",
+        "resultDigest": "d615d994cad38ad0a12414aa454e3f64",
+        "tapeDigest": "a550a52ed870af525ce5f644e66b47be",
         "features": []
       }
     },
@@ -277,8 +277,8 @@
         "targetSlot": "C"
       },
       "expected": {
-        "resultHash": "622124c6103066f2124e16848f356236",
-        "tapeHash": "79da5c2e0d93469a85f25f505dc3073e",
+        "resultHash": "9445423e45aaf64244dd66b44650a86e",
+        "tapeHash": "88437e6060c9447c36b91402a1f01b30",
         "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
         "factsHash": "741638a5a99a6e013d712db700467055",
         "summary": {
@@ -292,8 +292,8 @@
           "facts": 0
         },
         "inputDigest": "00f49fed46d769f9a2c44b0f8986c67d",
-        "resultDigest": "31662558dfc84bdc2f55eb4a6a9663e8",
-        "tapeDigest": "fbc3f39f286bee8381153ef552e0444f",
+        "resultDigest": "acc5185070cb20cc9bfd53fa60f67ee0",
+        "tapeDigest": "d4d65abd8f2d21a12c6c6beb01cfd2ed",
         "features": ["clone-entered", "foul-out"]
       }
     },
@@ -309,8 +309,8 @@
         "targetSlot": "C"
       },
       "expected": {
-        "resultHash": "ce30a19554f724e1b15e6e43bd21d625",
-        "tapeHash": "6afe1f711e3963857c78a0276ca0f741",
+        "resultHash": "d5233f44e84aecd0f650180efadffdd4",
+        "tapeHash": "243b5efd9e13fe910a503bbb0d82910d",
         "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
         "factsHash": "e92e9d595e31ed7519bc5a1fa3b35189",
         "summary": {
@@ -324,8 +324,8 @@
           "facts": 17
         },
         "inputDigest": "8b6de365ce2489b1d8be7f9720e5fe75",
-        "resultDigest": "70dd31d709a82ccbe7e63089c22f1907",
-        "tapeDigest": "d0f126cae190e106a56d6d5c285357fa",
+        "resultDigest": "c592b7a22b0f1bf69079c8f88b5ca692",
+        "tapeDigest": "e77ff776d1cb87326513e10836daf4e6",
         "features": ["clone-entered", "foul-out"]
       }
     }

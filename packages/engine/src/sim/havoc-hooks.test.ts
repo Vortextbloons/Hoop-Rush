@@ -153,6 +153,35 @@ describe('havoc sim hooks: evidence handling', () => {
 });
 
 describe('havoc sim hooks: physical and aggregation options', () => {
+  it('credits rebound evidence at the same rate for full-time and reserve players', () => {
+    const starter = anchoredShooter();
+    const anchors = starter.anchors;
+    if (!anchors) throw new Error('Missing rebound anchors');
+    const reserve = {
+      ...starter,
+      anchors: {
+        ...anchors,
+        minutesPerGame: 25,
+        defensiveReboundsPerGame: (anchors.defensiveReboundsPerGame * 25) / anchors.minutesPerGame,
+      },
+    };
+    const team = { ...buildLegalSimulationTeam(), players: [starter, reserve] };
+    const [starterWeight, reserveWeight] = rebounderWeights(team, false);
+    expect(starterWeight).toBeCloseTo(reserveWeight ?? 0, 10);
+
+    const [authoritative] = rebounderWeights(team, false, undefined, undefined, () =>
+      evidenceFor(['rebound-weights']),
+    );
+    const [unanchored] = rebounderWeights(
+      {
+        ...team,
+        players: [{ ...starter, anchors: { ...anchors, minutesPerGame: 0 } }],
+      },
+      false,
+    );
+    expect(authoritative).toBe(unanchored);
+  });
+
   it('scales individual rebounder weights', () => {
     const team = buildLegalSimulationTeam();
     const base = rebounderWeights(team, true);

@@ -1,8 +1,10 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import {
+    achievementTitleFor,
     collectionAchievementIdSchema,
     legacyAchievementIdSchema,
+    profileTitles,
     type PlayerProfile,
   } from '@hoop-rush/data-contracts';
   import { Trophy } from '@lucide/svelte';
@@ -35,6 +37,10 @@
       (id) => achievementCatalog[id].category === category,
     ),
   }));
+  const titleOptions = Object.keys(profileTitles)
+    .map((key) => key as PlayerProfile['title'])
+    .map((value) => ({ value, ...profileTitles[value] }))
+    .toSorted((left, right) => Number(right.value === 'none') - Number(left.value === 'none'));
   let earned = $derived(new Set(profile?.achievements));
   let evidence = $derived(
     new Map(profile?.achievementMoments?.map((moment) => [moment.id, moment.evidence])),
@@ -99,11 +105,7 @@
                 {profile.name}
               </h2>
               <p class="text-muted-foreground">
-                {profile.title === 'defensive-wall'
-                  ? 'Defensive Wall'
-                  : profile.title === 'floor-general'
-                    ? 'Floor General'
-                    : 'Player'}
+                {profile.title === 'none' ? 'Player' : profileTitles[profile.title].name}
               </p>
             </div>
           </div>
@@ -195,13 +197,15 @@
             >Title<select
               class="rounded-lg border border-border bg-background p-3"
               bind:value={title}
-              ><option value="none">None</option><option
-                value="defensive-wall"
-                disabled={!profile.achievements.includes('no-easy-buckets')}>Defensive Wall</option
-              ><option
-                value="floor-general"
-                disabled={!profile.achievements.includes('silent-carry')}>Floor General</option
-              ></select
+              >{#each titleOptions as option (option.value)}
+                <option
+                  value={option.value}
+                  disabled={option.achievementId !== null &&
+                    !profile.achievements.includes(option.achievementId)}
+                >
+                  {option.name}
+                </option>
+              {/each}</select
             ></label
           >
           <label class="grid gap-1 text-sm font-semibold"
@@ -243,6 +247,7 @@
           {#each ids as id (id)}
             {@const badge = achievementCatalog[id]}
             {@const Icon = badge.icon}
+            {@const rewardTitle = achievementTitleFor(id)}
             <li class="flex gap-3 rounded-xl border border-border bg-card p-4">
               <div
                 class={[
@@ -261,6 +266,15 @@
                 </p>
                 <h4 class="font-display text-base font-bold">{badge.name}</h4>
                 <p class="mt-1 text-sm text-muted-foreground">{badge.description}</p>
+                {#if rewardTitle}
+                  <p class="mt-2 flex items-center gap-1.5 text-sm">
+                    <Trophy class="size-3.5 shrink-0 text-primary" aria-hidden="true" />
+                    <span>
+                      {earned.has(id) ? 'Title unlocked' : 'Title reward'}:
+                      <strong>{profileTitles[rewardTitle].name}</strong>
+                    </span>
+                  </p>
+                {/if}
                 {#if evidence.has(id)}
                   <p class="mt-2 text-sm text-primary">{evidence.get(id)}</p>
                 {/if}

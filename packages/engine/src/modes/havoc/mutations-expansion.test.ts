@@ -581,59 +581,33 @@ describe('fusion dance runtime', () => {
 
   it('keeps fusion through a donor exit and ends it when the owner exits', () => {
     const human = buildScenarioTeam('human', fusionSlots());
-    const donorExitRun = searchScenario(
-      96,
-      human,
-      away,
-      (candidate) => {
-        const applied = candidate.tape.events.find(
-          (event) => event.kind === 'fusion-dance' && event.outcome === 'applied',
-        );
-        if (applied?.kind !== 'fusion-dance') return false;
-        const ownerExited = candidate.tape.events.some(
-          (event) =>
-            event.kind === 'substitution' && event.outInstanceId === applied.ownerInstanceId,
-        );
-        if (ownerExited) return false;
-        return candidate.tape.events.some(
-          (event) =>
-            event.kind === 'substitution' && event.outInstanceId === applied.donorInstanceId,
-        );
-      },
-      'havoc-fusion-donor',
-    );
-    expect(donorExitRun, 'expected a donor exit while the owner stayed').not.toBeNull();
-    if (donorExitRun !== null) {
+    for (const [seed, ownerExits] of [
+      ['havoc-fusion-donor-98', false],
+      ['havoc-fusion-owner-48', true],
+    ] as const) {
+      const { tape } = runScenario(human, away, seed);
+      const applied = tape.events.find(
+        (event) => event.kind === 'fusion-dance' && event.outcome === 'applied',
+      );
+      if (applied?.kind !== 'fusion-dance') throw new Error('missing fusion application');
+      if (!ownerExits) {
+        expect(
+          tape.events.some(
+            (event) =>
+              event.kind === 'substitution' && event.outInstanceId === applied.donorInstanceId,
+          ),
+        ).toBe(true);
+      }
       expect(
-        donorExitRun.tape.events.some(
-          (event) => event.kind === 'fusion-dance' && event.outcome === 'ended',
-        ),
-      ).toBe(false);
-    }
-
-    const ownerExitRun = searchScenario(
-      96,
-      human,
-      away,
-      (candidate) => {
-        const applied = candidate.tape.events.find(
-          (event) => event.kind === 'fusion-dance' && event.outcome === 'applied',
-        );
-        if (applied?.kind !== 'fusion-dance') return false;
-        return candidate.tape.events.some(
+        tape.events.some(
           (event) =>
             event.kind === 'substitution' && event.outInstanceId === applied.ownerInstanceId,
-        );
-      },
-      'havoc-fusion-owner',
-    );
-    expect(ownerExitRun, 'expected an owner exit').not.toBeNull();
-    if (ownerExitRun === null) return;
-    expect(
-      ownerExitRun.tape.events.some(
-        (event) => event.kind === 'fusion-dance' && event.outcome === 'ended',
-      ),
-    ).toBe(true);
+        ),
+      ).toBe(ownerExits);
+      expect(
+        tape.events.some((event) => event.kind === 'fusion-dance' && event.outcome === 'ended'),
+      ).toBe(ownerExits);
+    }
   });
 
   it('changes outcomes, replays identically, and records swap seconds', () => {

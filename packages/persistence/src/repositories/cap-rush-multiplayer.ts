@@ -87,14 +87,16 @@ export class DexieCapRushMultiplayerRepository {
   }
 
   async saveCheckpoint(input: CapRushMultiplayerCheckpointInput): Promise<void> {
+    const sharedState = input.snapshot.state === input.state;
     const active = storedCapRushMultiplayerActiveRowSchema.parse({
       saveSchemaVersion: CAP_RUSH_MULTIPLAYER_SAVE_SCHEMA_VERSION,
       roomId: input.snapshot.roomId,
-      snapshot: input.snapshot,
+      snapshot: sharedState ? { ...input.snapshot, state: null } : input.snapshot,
       state: input.state,
       commandCursor: input.snapshot.revision,
       updatedAtIso: input.updatedAtIso,
     });
+    if (sharedState) active.snapshot.state = active.state;
     const commandRows = input.commands.map((command, index) =>
       storedCapRushMultiplayerCommandRowSchema.parse({
         saveSchemaVersion: CAP_RUSH_MULTIPLAYER_SAVE_SCHEMA_VERSION,

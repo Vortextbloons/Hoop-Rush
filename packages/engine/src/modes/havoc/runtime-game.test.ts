@@ -86,7 +86,7 @@ describe('havoc runtime smoke', () => {
     }
   });
 
-  it('pins default 24/24 results and tapes under engine v26', () => {
+  it('pins default 24/24 results and tapes under engine v27', () => {
     const context = createEngineContext();
     const fixture = simulateHavocGame(buildFixtureGameInput(), context);
     expect(havocGameResultDigest(fixture.result)).toBe(DEFAULT_HAVOC_RESULT_DIGEST);
@@ -111,9 +111,9 @@ describe('havoc runtime smoke', () => {
   });
 });
 
-const DEFAULT_HAVOC_RESULT_DIGEST = 'ca928d4fd5a8d7bbfbcf434115e811ff';
-const DEFAULT_HAVOC_TAPE_DIGEST = '4f77783c1f435ef046a1d55e3ae57b6c';
-const LOCKED_HAVOC_RESULT_DIGEST = '78cea5f6d86e48b25ed29730c14577c6';
-const LOCKED_HAVOC_TAPE_DIGEST = 'a26d5dd8822ec81c05b6bb9ab9cd92a8';
-const LOCKED_NORMAL_RESULT_DIGEST = '5d80424f23b7836b4804a29d4450015f';
-const LOCKED_NORMAL_TAPE_DIGEST = '15b6c05eda5d508ab59129049d89278e';
+const DEFAULT_HAVOC_RESULT_DIGEST = '2e78072a320664e6671d547cd5267a1a';
+const DEFAULT_HAVOC_TAPE_DIGEST = '43c72708fab720b48887fd32f60998b8';
+const LOCKED_HAVOC_RESULT_DIGEST = 'fb591414a9767128fc361206ee3b5ae4';
+const LOCKED_HAVOC_TAPE_DIGEST = '24429d054ca374c989d82f2bcabccdf5';
+const LOCKED_NORMAL_RESULT_DIGEST = '56e0ed215d134a65cfd54b1f1707a771';
+const LOCKED_NORMAL_TAPE_DIGEST = '2f1355c526e13e119252e81749152e95';

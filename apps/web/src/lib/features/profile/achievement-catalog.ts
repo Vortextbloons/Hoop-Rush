@@ -64,6 +64,7 @@ export const achievementCatalog = {
     description: 'Finish an 82-game season undefeated.',
     category: 'classic',
     icon: Trophy,
+    rarity: 'mythic',
   },
   'one-game-short': {
     name: 'One Game Short',
@@ -285,6 +286,7 @@ export const achievementCatalog = {
     description: 'Win a series after trailing 0-3.',
     category: 'multiplayer',
     icon: RefreshCcw,
+    rarity: 'legendary',
   },
   'bring-out-the-brooms': {
     name: 'Bring Out the Brooms',

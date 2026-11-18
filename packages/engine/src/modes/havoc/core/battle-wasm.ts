@@ -480,7 +480,7 @@ interface TeamBlockTemplate {
 /**
  * Content key for a prepared side. It hashes the values that actually feed the
  * layout block: the kernel spec (height, weight, ratings, tendencies, evidence
- * mask, slot, scale, reach) plus the shooting anchors and reconstructed
+ * mask, slot, scale, reach) plus allocation inputs, shooting anchors, and reconstructed
  * three-point data, which live only on the simulation players. Teams whose
  * playoff performance adjustments change anchors therefore key differently.
  */
@@ -492,6 +492,10 @@ function preparedSideKey(side: PreparedSideResult): string {
   };
   const spec = side.spec;
   for (let index = 0; index < spec.length; index += 1) mix(spec[index] ?? 0);
+  for (const demand of side.prepared.prep.offense.demands) mix(demand.attemptsPer36);
+  for (const weights of side.prepared.prep.rebounderWeights) {
+    for (const weight of weights) mix(weight);
+  }
   for (const player of side.players) {
     const anchors = player.anchors;
     if (anchors === undefined) {

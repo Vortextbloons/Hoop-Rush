@@ -20,7 +20,7 @@ export const ENGINE_CONSTANTS = {
     neutralAttemptsPer36: 12,
     fallbackShotWeight: 0.65,
     finishingDemandExponent: 1.25,
-    creationPassingExponent: 1.5,
+    creationPassingExponent: 0.75,
   },
 
   zoneBaseMake: {
@@ -118,6 +118,7 @@ export const ENGINE_CONSTANTS = {
   offensiveReboundPerimeterPenalty: 0.04,
   reboundEvidenceMinutes: 1800,
   reboundEvidenceMaxWeight: 0.65,
+  reboundEvidenceReferenceWeight: 85,
   reboundEvidencePer36: { offensive: 1.5, defensive: 4 },
 
   shotClockSeconds: 24,

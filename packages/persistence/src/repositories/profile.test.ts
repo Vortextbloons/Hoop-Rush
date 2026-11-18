@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import { PROFILE_SAVE_SCHEMA_VERSION } from '@hoop-rush/data-contracts';
+import {
+  PROFILE_SAVE_SCHEMA_VERSION,
+  achievementTitleFor,
+  profileTitles,
+  publicProfileSchema,
+} from '@hoop-rush/data-contracts';
 import { HoopRushDatabase } from './dexie.ts';
 import { DexieProfileRepository } from './profile.ts';
 import {
@@ -196,5 +201,86 @@ describe('local profiles', () => {
     } finally {
       db.close();
     }
+  });
+
+  test('equips a badge title and leaves every other profile field intact', async () => {
+    resetIndexedDb();
+    const db = new HoopRushDatabase(testDatabaseName('profile-equip-title'));
+    await db.open();
+    try {
+      const repo = new DexieProfileRepository(db);
+      const profile = await repo.initialize(crypto.randomUUID());
+      await repo.bind('havoc:title');
+      await repo.recordGame('havoc:title', '1', {
+        won: true,
+        multiplayer: false,
+        players: [{ points: 10, assists: 0, steals: 3, blocks: 0 }],
+      });
+      await repo.awardAchievements('havoc:title', 'title', [
+        { id: 'brodie-mode', evidence: 'Recorded a triple-double' },
+      ]);
+      const before = await repo.loadBound('havoc:title');
+      if (!before) throw new Error('Profile is missing');
+      const equipped = await repo.equipTitle(profile.id, 'triple-double-machine');
+      expect(equipped).toEqual({ ...before, title: 'triple-double-machine' });
+      expect(await repo.list()).toEqual([equipped]);
+    } finally {
+      db.close();
+    }
+  });
+
+  test('equips only titles unlocked by the matching badge', async () => {
+    resetIndexedDb();
+    const db = new HoopRushDatabase(testDatabaseName('profile-title-locks'));
+    await db.open();
+    try {
+      const repo = new DexieProfileRepository(db);
+      const profile = await repo.initialize(crypto.randomUUID());
+      await repo.bind('havoc:titles');
+      await expect(repo.equipTitle(profile.id, 'century-club')).rejects.toThrow('Title is locked');
+      await expect(repo.equipTitle(profile.id, 'defensive-wall')).rejects.toThrow(
+        'Title is locked',
+      );
+      await expect(repo.equipTitle(crypto.randomUUID(), 'none')).rejects.toThrow(
+        'Profile not found',
+      );
+      expect((await repo.loadBound('havoc:titles'))?.title).toBe('none');
+
+      await repo.recordGame('havoc:titles', '1', {
+        won: true,
+        multiplayer: false,
+        players: [{ points: 2, assists: 0, steals: 0, blocks: 3 }],
+      });
+      expect((await repo.equipTitle(profile.id, 'defensive-wall')).title).toBe('defensive-wall');
+      await expect(repo.equipTitle(profile.id, 'floor-general')).rejects.toThrow('Title is locked');
+      expect((await repo.equipTitle(profile.id, 'none')).title).toBe('none');
+    } finally {
+      db.close();
+    }
+  });
+
+  test('shares badge title names and keeps them on the public profile', () => {
+    expect(achievementTitleFor('better-than-73-9')).toBe('the-undefeated');
+    expect(achievementTitleFor('brodie-mode')).toBe('triple-double-machine');
+    expect(achievementTitleFor('wilt-chamberlain-mode')).toBe('century-club');
+    expect(achievementTitleFor('the-reverse-sweep')).toBe('never-out');
+    expect(achievementTitleFor('no-easy-buckets')).toBe('defensive-wall');
+    expect(achievementTitleFor('silent-carry')).toBe('floor-general');
+    expect(achievementTitleFor('welcome')).toBeUndefined();
+    expect(profileTitles['triple-double-machine'].name).toBe('Triple-Double Machine');
+    expect(
+      publicProfileSchema.parse({
+        name: 'Player',
+        avatar: 'initials',
+        border: 'classic',
+        nameColor: 'white',
+        title: 'century-club',
+        featuredAchievement: 'wilt-chamberlain-mode',
+        games: 1,
+        wins: 1,
+        bestStreak: 1,
+        participantId: 'p1',
+      }).title,
+    ).toBe('century-club');
   });
 });

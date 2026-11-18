@@ -124,14 +124,17 @@ describe('cap rush multiplayer persistence', () => {
     const db = new TestDatabase(testDatabaseName('cap-rush-mp'));
     const repository = new DexieCapRushMultiplayerRepository(db);
     try {
+      const state = createCapRushMultiplayerState(ROOT);
       await repository.saveCheckpoint({
-        snapshot: snapshot(1),
-        state: createCapRushMultiplayerState(ROOT),
+        snapshot: { ...snapshot(1), state },
+        state,
         commands: [command()],
         receipts: [receipt()],
         games: [],
         updatedAtIso: AT,
       });
+      const stored = await db.capRushMultiplayerActive.get(ROOM);
+      expect(stored?.snapshot.state).toBe(stored?.state);
       const active = await repository.loadActive(ROOM);
       expect(active).not.toBeNull();
       expect(active?.state.phase).toBe('lobby');

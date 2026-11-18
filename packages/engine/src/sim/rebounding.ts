@@ -96,7 +96,8 @@ export function rebounderWeights(
       const reference = offensive
         ? c.reboundEvidencePer36.offensive
         : c.reboundEvidencePer36.defensive;
-      const historicalWeight = (historical * 36 * 85) / (anchors.minutesPerGame * reference);
+      const historicalWeight =
+        (historical * 36 * c.reboundEvidenceReferenceWeight) / (anchors.minutesPerGame * reference);
       weight += confidence * (historicalWeight - ratingWeight);
     }
     return Math.max(0.5, weight) * responsibility * scale;
