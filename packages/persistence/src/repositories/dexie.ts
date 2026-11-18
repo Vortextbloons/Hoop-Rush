@@ -6,7 +6,7 @@ import type {
   ProfileSelection,
 } from '@hoop-rush/data-contracts';
 import { SAVE_SCHEMA_VERSION } from '@hoop-rush/data-contracts';
-import { challengeRunProgressDigest } from '@hoop-rush/engine';
+import { challengeRunProgressDigest, evaluateRunAchievements } from '@hoop-rush/engine';
 import {
   classicDraftRecordSchema,
   type StoredClassicDraft,
@@ -309,10 +309,16 @@ export class DexieChallengeRepository {
     }
     await this.db.transaction(
       'rw',
-      this.db.active,
-      this.db.activeGames,
-      this.db.completed,
-      this.db.history,
+      [
+        this.db.active,
+        this.db.activeGames,
+        this.db.completed,
+        this.db.history,
+        this.db.profileBindings,
+        this.db.profileGames,
+        this.db.profiles,
+        this.db.archivedProfiles,
+      ],
       async () => {
         const checkpoint = await this.db.active.get(ACTIVE_RECORD_ID);
         if (checkpoint === undefined) {
@@ -344,6 +350,14 @@ export class DexieChallengeRepository {
         await this.db.activeGames.clear();
         await this.db.completed.put({ ...validatedRun, recordId: validatedIndex.runId });
         await this.db.history.put({ ...validatedIndex, recordId: validatedIndex.runId });
+        const bindingId = `challenge:${storedRun.runId}`;
+        if (await this.db.profileBindings.get(bindingId)) {
+          await new DexieProfileRepository(this.db).awardAchievements(
+            bindingId,
+            'season',
+            evaluateRunAchievements(storedRun),
+          );
+        }
       },
     );
   }

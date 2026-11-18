@@ -45,6 +45,7 @@ export interface TeamPrep {
     shotShares: number[];
   };
   slotByPlayerId: Map<string, number>;
+  responsibilitySlots: readonly number[];
   keyOf: (player: SimulationPlayer) => string;
   initiatorWeights: number[];
   initiatorPickTable: WeightedPickTable;
@@ -77,6 +78,9 @@ export function prepareTeam(
   options: TeamPrepOptions = {},
 ): TeamPrep {
   const players = team.players;
+  const responsibilitySlots = players.map(
+    (player, index) => options.responsibilitySlotOf?.(player, index) ?? index,
+  );
   const keyOf = options.keyOf ?? enginePlayerKey;
   const evidenceOf = options.evidenceOf;
   const slotByPlayerId = new Map<string, number>();
@@ -94,7 +98,7 @@ export function prepareTeam(
     const key = keyOf(player);
     const evidence = evidenceOf?.(player);
     slotByPlayerId.set(key, index);
-    const responsibilitySlot = options.responsibilitySlotOf?.(player, index) ?? index;
+    const responsibilitySlot = responsibilitySlots[index] ?? index;
     const positionModifiers = responsibilityModifiersForSlot(responsibilitySlot);
     positionModifiersByPlayer.set(key, positionModifiers);
     positionModifiersByPlayer.set(player.playerId, positionModifiers);
@@ -198,6 +202,7 @@ export function prepareTeam(
   return {
     offense: { version: OFFENSIVE_ALLOCATION_VERSION, demands, creatorShares, shotShares },
     slotByPlayerId,
+    responsibilitySlots,
     keyOf,
     initiatorWeights,
     initiatorPickTable: buildWeightedPickTable(initiatorWeights),
@@ -229,11 +234,12 @@ export function prepareTeam(
     zonePrep: zonePrepByPlayer,
     twoPointAnchor: twoPointAnchorByPlayer,
     positionModifiers: positionModifiersByPlayer,
-    defenderBase: defenderBase(team, positionModifiersByPlayer, keyOf, (index) => {
-      const player = players[index];
-      if (player === undefined) return index;
-      return options.responsibilitySlotOf?.(player, index) ?? index;
-    }),
+    defenderBase: defenderBase(
+      team,
+      positionModifiersByPlayer,
+      keyOf,
+      (index) => responsibilitySlots[index] ?? index,
+    ),
     freeThrowP,
     passP: passPByPlayer,
   };

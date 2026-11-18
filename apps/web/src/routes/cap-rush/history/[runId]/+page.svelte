@@ -1,6 +1,7 @@
 <script lang="ts">
   import { page } from '$app/state';
   import ServiceErrorPanel from '#lib/components/ServiceErrorPanel.svelte';
+  import PageShell from '#lib/components/ui/PageShell.svelte';
   import { openService } from '#lib/service-state.js';
   import CapRushRunDetail from '#lib/features/cap-rush/CapRushRunDetail.svelte';
   import { CapRushResultState } from '#lib/features/cap-rush/cap-rush-result-state.svelte.js';
@@ -29,9 +30,9 @@
 </svelte:head>
 
 {#if serviceError !== null}
-  <section class="mx-auto w-full max-w-xl px-3 py-10 sm:px-6">
+  <PageShell as="section" width="sm" padding="xl">
     <ServiceErrorPanel title="Cap Rush could not start" message={serviceError} />
-  </section>
+  </PageShell>
 {:else if resultState !== null}
   <CapRushRunDetail state={resultState} {runId} />
 {/if}

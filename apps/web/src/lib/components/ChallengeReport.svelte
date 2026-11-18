@@ -29,6 +29,7 @@
   import GameStrip from '#lib/components/GameStrip.svelte';
   import PlayerFace from '#lib/components/PlayerFace.svelte';
   import TierBadge from '#lib/components/TierBadge.svelte';
+  import AchievementReveal from '#lib/features/profile/AchievementReveal.svelte';
   import { oneDecimal, percentOneDecimal, ratioPct, trueShootingPct } from '#lib/format.js';
   import { SLOT_LABELS } from '#lib/player-positions.js';
   type PeakPlayer = PeakPlayerSeason;
@@ -272,6 +273,7 @@
     <p class="mt-1 font-mono text-[11px] text-muted-foreground">
       {modeLabel} · {franchiseLabel(run.franchiseId)} · {era?.label ?? run.eraId}
     </p>
+    <AchievementReveal bindingId={`challenge:${run.runId}`} centered />
   </div>
 
   {#if lastGames.length > 0}

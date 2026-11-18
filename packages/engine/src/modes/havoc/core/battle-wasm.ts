@@ -745,8 +745,9 @@ function buildBattleTeamBlock(
       table(defenderTable);
     }
   }
-  for (const defender of team.players) {
-    for (const zone of SHOT_ZONES) data.push(contestPenalty(defender, zone));
+  for (const [slot, defender] of team.players.entries()) {
+    for (const zone of SHOT_ZONES)
+      data.push(contestPenalty(defender, zone, prep.responsibilitySlots[slot]));
   }
   const shotVariants: number[][][] = [];
   for (let variant = 0; variant < variantCount; variant += 1) {

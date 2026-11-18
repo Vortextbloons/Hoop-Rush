@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { buildGameSimulationInput, buildLegalSimulationTeam } from '@hoop-rush/test-fixtures';
 import { prepareTeam } from './prepare.ts';
 import { ACTION_TYPES } from './usage.ts';
+import { contestPenalty } from './shooting.ts';
 import { createRng } from './rng.ts';
 import { pickAction, pickShot } from './usage.ts';
 import { projectExpectedLedger } from '../projection/expected-ledger.ts';
@@ -199,4 +200,34 @@ describe('on-court offensive allocation', () => {
     expect(prep.offense.shotShares.reduce((sum, share) => sum + share, 0)).toBeCloseTo(1, 12);
     expect(prep.offense.shotShares.every((share) => share > 0)).toBe(true);
   });
+});
+
+it('moving a slow center to SF reduces his rim coverage and perimeter contest strength', () => {
+  const team = buildLegalSimulationTeam();
+  const center = required(team.players[4]);
+  center.ratings.speed = 55;
+  center.ratings.perimeterDefense = 85;
+  const profile = buildGameSimulationInput().profile;
+  const atCenter = prepareTeam(team, profile);
+  const players = [...team.players];
+  players[4] = required(team.players[2]);
+  players[2] = center;
+  const atWing = prepareTeam({ ...team, players }, profile);
+  const centerRim = required(atCenter.defenderBase.pickTables[0]?.[0]);
+  const wingRim = required(atWing.defenderBase.pickTables[0]?.[0]);
+  expect(required(wingRim.weights[2]) / wingRim.total).toBeLessThan(
+    required(centerRim.weights[4]) / centerRim.total,
+  );
+  const centerPerimeter = required(atCenter.defenderBase.pickTables[4]?.[2]);
+  const wingPerimeter = required(atWing.defenderBase.pickTables[4]?.[2]);
+  expect(required(wingPerimeter.weights[2]) / wingPerimeter.total).toBeGreaterThan(
+    required(centerPerimeter.weights[4]) / centerPerimeter.total,
+  );
+  expect(contestPenalty(center, 'cornerThree', 2)).toBeLessThan(
+    contestPenalty(center, 'cornerThree', 4),
+  );
+  expect(contestPenalty(center, 'rim', 2)).toEqual(contestPenalty(center, 'rim', 4));
+  expect(atWing.zonePrep.get(atWing.keyOf(center))?.threePointTarget).toEqual(
+    atCenter.zonePrep.get(atCenter.keyOf(center))?.threePointTarget,
+  );
 });

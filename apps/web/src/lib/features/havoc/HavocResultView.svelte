@@ -68,7 +68,6 @@
         >{/if}
     </div>
   {:else}
-    <AchievementReveal bindingId={`havoc:${run.runId}`} />
     <header class="h-panel h-result-hero">
       <p class="h-eyebrow">Hoop Havoc · Season report</p>
       <h1 class="h-subtitle mt-2">
@@ -142,6 +141,7 @@
           </div>
         </dl>
       {/if}
+      <AchievementReveal bindingId={`havoc:${run.runId}`} />
     </header>
     {#if run.comparisonStatus === 'unsupported'}
       <p class="h-alert mt-4" data-havoc-comparison-unsupported>

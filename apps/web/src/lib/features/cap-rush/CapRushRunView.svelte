@@ -7,6 +7,8 @@
   import AsyncState from '#lib/components/AsyncState.svelte';
   import DialogShell from '#lib/components/DialogShell.svelte';
   import TeamLogo from '#lib/components/TeamLogo.svelte';
+  import Alert from '#lib/components/ui/Alert.svelte';
+  import PageShell from '#lib/components/ui/PageShell.svelte';
   import { capRushBoxOf } from '@hoop-rush/engine';
   import CapRushBoxScore from './CapRushBoxScore.svelte';
   import CapRushSimcast from './CapRushSimcast.svelte';
@@ -72,8 +74,10 @@
   }
 </script>
 
-<section
-  class="mx-auto w-full max-w-5xl px-3 py-4 sm:px-6 sm:py-6"
+<PageShell
+  as="section"
+  width="lg"
+  padding="md"
   aria-label={inPostseason ? 'Cap Rush postseason' : 'Cap Rush season'}
 >
   {#if controller.loading}
@@ -356,10 +360,7 @@
       />
 
       {#if controller.error !== null}
-        <div
-          role="alert"
-          class="rounded-xl border border-negative/40 bg-negative/10 p-4 text-sm text-negative"
-        >
+        <Alert tone="danger">
           {controller.error}
           {#if controller.unsupported}
             <p class="mt-2 text-[11px] text-muted-foreground">
@@ -367,11 +368,11 @@
               resumed.
             </p>
           {/if}
-        </div>
+        </Alert>
       {/if}
     </div>
   {/if}
-</section>
+</PageShell>
 
 <DialogShell
   open={selectedBox !== null && controller.playback === null}

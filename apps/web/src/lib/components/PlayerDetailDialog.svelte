@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { HoopRushManifest, PlayoffPerformance } from '@hoop-rush/data-contracts';
-  import { resolveEraTeamIdentity } from '@hoop-rush/data-contracts';
+  import { POSITIONS, resolveEraTeamIdentity } from '@hoop-rush/data-contracts';
   import { Dialog } from 'bits-ui';
   import { ExternalLink, X } from '@lucide/svelte';
   import DialogShell from '#lib/components/DialogShell.svelte';
@@ -15,9 +15,10 @@
   } from '#lib/roster-browser.js';
   import { formatPositions } from '#lib/player-positions.js';
   import { teamNameFor } from '#lib/branding.js';
+  import { getPool } from '#lib/data.js';
   import PlayerFace from './PlayerFace.svelte';
   import PlayoffEffectDetails from './PlayoffEffectDetails.svelte';
-  import { capRushPlayoffEffectOf } from '@hoop-rush/engine';
+  import { capRushPlayoffEffectOf, positionDefenseOf } from '@hoop-rush/engine';
 
   let {
     player,
@@ -151,6 +152,28 @@
       { label: 'AST', value: formatPerGame(s.apg) },
       { label: 'PER', value: formatDecimal(s.per) },
     ];
+  });
+
+  const fitPool = $derived(
+    manifest.pools.find(
+      (pool) => pool.franchiseId === player?.franchiseId && pool.eraId === player?.eraId,
+    ),
+  );
+  const fitPlayerId = $derived(player?.playerId);
+  const fitSeason = $derived(player?.seasonKey);
+  const positionFit = $derived.by(() => {
+    const playerId = fitPlayerId;
+    const seasonKey = fitSeason;
+    if (!fitPool) return null;
+    return getPool(fitPool).then((pool) => {
+      const season = pool.players.find(
+        (candidate) => candidate.playerId === playerId && candidate.seasonKey === seasonKey,
+      );
+      if (!season) return null;
+      return POSITIONS.filter((position) => season.positions.playable.includes(position)).map(
+        (position) => ({ position, ...positionDefenseOf(season.detailedRatings, position) }),
+      );
+    });
   });
 
   const playoffSection = $derived.by(() => {
@@ -341,6 +364,49 @@
             </section>
           {/each}
         </div>
+        <section class="mt-5" aria-label="Position fit">
+          <h3 class="font-mono text-[10px] font-bold tracking-[0.14em] text-primary uppercase">
+            Position fit
+          </h3>
+          {#await positionFit}
+            <p class="mt-2 text-xs text-muted-foreground">Loading position fit?</p>
+          {:then fit}
+            {#if fit}
+              <p class="mt-2 text-xs text-muted-foreground">
+                Rim help is the relative weight used to assign a rim defender. Perimeter contest
+                shows how much of the player's usual contest strength applies.
+              </p>
+              <table
+                class="mt-2 w-full rounded-lg bg-surface-1 text-left font-mono text-xs tabular-nums"
+              >
+                <thead class="text-muted-foreground">
+                  <tr>
+                    <th scope="col" class="px-3 py-2">Position</th>
+                    <th scope="col" class="px-3 py-2 text-right">Rim help weight</th>
+                    <th scope="col" class="px-3 py-2 text-right">Perimeter contest</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {#each fit as row (row.position)}
+                    <tr class="border-t border-border/50">
+                      <th scope="row" class="px-3 py-2">{row.position}</th>
+                      <td class="px-3 py-2 text-right">{Math.round(row.rimHelpWeight * 100)}%</td>
+                      <td class="px-3 py-2 text-right"
+                        >{Math.round(row.perimeterContestScale * 100)}%</td
+                      >
+                    </tr>
+                  {/each}
+                </tbody>
+              </table>
+            {:else}
+              <p class="mt-2 text-xs text-muted-foreground">
+                Position fit is unavailable for this season.
+              </p>
+            {/if}
+          {:catch}
+            <p class="mt-2 text-xs text-muted-foreground">Position fit could not load.</p>
+          {/await}
+        </section>
         {#if playoffSection}
           <section class="mt-5">
             <div class="flex flex-wrap items-baseline justify-between gap-2">

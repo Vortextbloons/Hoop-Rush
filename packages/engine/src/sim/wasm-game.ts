@@ -224,8 +224,8 @@ export function prepareWasmGame(
             prep.twoPointAnchor.get(prep.keyOf(shooter)) ?? null,
           ))
             data[cursor++] = value;
-    for (const defender of defense.players)
-      for (const zone of SHOT_ZONES) data[cursor++] = -contestPenalty(defender, zone) * 1 + 0 + 0;
+    for (const [slot, defender] of defense.players.entries())
+      for (const zone of SHOT_ZONES) data[cursor++] = -contestPenalty(defender, zone, slot);
     for (const defender of defense.players)
       for (const action of ACTION_TYPES)
         for (const zone of SHOT_ZONES) data[cursor++] = blockProbability(defender, zone, action);

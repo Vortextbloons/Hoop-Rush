@@ -1,4 +1,4 @@
-import type { ShotZone, SlotGroup } from '@hoop-rush/data-contracts';
+import type { Position, ShotZone } from '@hoop-rush/data-contracts';
 import type { ActionType } from './usage.ts';
 
 export interface PositionResponsibilityModifiers {
@@ -10,7 +10,7 @@ export interface PositionResponsibilityModifiers {
   rimProtection: number;
 }
 
-export const ENGINE_VERSION = 'm3-engine-v25';
+export const ENGINE_VERSION = 'm3-engine-v26';
 
 export const ENGINE_CONSTANTS = {
   version: ENGINE_VERSION,
@@ -124,7 +124,7 @@ export const ENGINE_CONSTANTS = {
   estimateToTripsFactor: 0.93,
 
   positionResponsibility: {
-    G: {
+    PG: {
       initiation: 1.08,
       pnrHandler: 1.1,
       rollMan: 0.94,
@@ -132,7 +132,23 @@ export const ENGINE_CONSTANTS = {
       rebounding: 0.92,
       rimProtection: 0.9,
     },
-    F: {
+    SG: {
+      initiation: 1.04,
+      pnrHandler: 1.05,
+      rollMan: 0.94,
+      postUp: 0.94,
+      rebounding: 0.95,
+      rimProtection: 0.9,
+    },
+    SF: {
+      initiation: 1.02,
+      pnrHandler: 1.02,
+      rollMan: 1,
+      postUp: 1.04,
+      rebounding: 1,
+      rimProtection: 0.9,
+    },
+    PF: {
       initiation: 1.02,
       pnrHandler: 1.02,
       rollMan: 1,
@@ -148,7 +164,8 @@ export const ENGINE_CONSTANTS = {
       rebounding: 1.1,
       rimProtection: 1.1,
     },
-  } as const satisfies Record<SlotGroup, PositionResponsibilityModifiers>,
+  } as const satisfies Record<Position, PositionResponsibilityModifiers>,
   positionResponsibilityBound: 0.12,
   positionMatchBonus: 1.35,
+  perimeterMatchBonus: 2.5,
 } as const;

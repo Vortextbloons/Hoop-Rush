@@ -52,6 +52,7 @@ export const classicCompletedDraftSchema = z.object({
   draftId: z.string().min(1).max(64),
   variant: classicVariantSchema,
   seed: seedSchema,
+  rerolls: classicRerollStateSchema.optional(),
   picks: z.array(classicPickSchema).length(5),
 });
 export type ClassicCompletedDraft = z.infer<typeof classicCompletedDraftSchema>;

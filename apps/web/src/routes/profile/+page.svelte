@@ -1,6 +1,12 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import type { PlayerProfile } from '@hoop-rush/data-contracts';
+  import {
+    collectionAchievementIdSchema,
+    legacyAchievementIdSchema,
+    type PlayerProfile,
+  } from '@hoop-rush/data-contracts';
+  import { Trophy } from '@lucide/svelte';
+  import { achievementCatalog } from '#lib/features/profile/achievement-catalog.js';
   import {
     achievements,
     profileRepository,
@@ -16,6 +22,22 @@
   let featured = $state<PlayerProfile['featuredAchievement']>(null);
   let error = $state('');
   let busy = $state(false);
+  const achievementGroups = [
+    { category: 'classic', name: 'Classic' },
+    { category: 'player', name: 'Player and Sandbox' },
+    { category: 'cap-rush', name: 'Cap Rush' },
+    { category: 'havoc', name: 'Hoop Havoc' },
+    { category: 'multiplayer', name: 'Multiplayer' },
+  ].map(({ category, name }) => ({
+    name,
+    ids: collectionAchievementIdSchema.options.filter(
+      (id) => achievementCatalog[id].category === category,
+    ),
+  }));
+  let earned = $derived(new Set(profile?.achievements));
+  let evidence = $derived(
+    new Map(profile?.achievementMoments?.map((moment) => [moment.id, moment.evidence])),
+  );
 
   function show(value: PlayerProfile) {
     profile = value;
@@ -98,9 +120,14 @@
               <p class="text-sm text-muted-foreground">Best streak</p>
             </div>
           </div>
-          {#if profile.featuredAchievement}<p class="mt-6 text-sm">
-              Featured: <strong>{achievements[profile.featuredAchievement].name}</strong>
-            </p>{/if}
+          {#if profile.featuredAchievement}
+            {@const badge = achievements[profile.featuredAchievement]}
+            {@const Icon = badge.icon ?? Trophy}
+            <p class="mt-6 flex items-center gap-2 text-sm">
+              <Icon class="size-4 text-primary" aria-hidden="true" />
+              <span>Featured badge <strong>{badge.name}</strong></span>
+            </p>
+          {/if}
         </div>
       </section>
       <section class="rounded-3xl border border-border bg-card p-6">
@@ -196,27 +223,64 @@
       <div class="flex items-end justify-between gap-4">
         <div>
           <h2 class="font-display text-3xl font-bold">My achievements</h2>
-          <p class="mt-1 text-muted-foreground">Collect badges and earn profile rewards.</p>
         </div>
-        <strong>{profile.achievements.length}/{Object.keys(achievements).length}</strong>
+        <strong>
+          {collectionAchievementIdSchema.options.filter((id) => earned.has(id))
+            .length}/{collectionAchievementIdSchema.options.length}
+        </strong>
       </div>
-      <div class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {#each Object.entries(achievements) as [id, achievement] (id)}<article
-            class="rounded-2xl border border-border bg-card p-5"
-          >
-            <p class="text-xs font-bold uppercase tracking-wider text-primary">
-              {profile.achievements.includes(id as any) ? 'Unlocked' : 'Locked'}
-            </p>
-            <h3 class="mt-2 text-lg font-bold">{achievement.name}</h3>
-            <p class="mt-1 text-sm text-muted-foreground">{achievement.description}</p>
-            <p class="mt-3 text-sm">{achievement.reward}</p>
-            {#if id === 'built-different' && !profile.achievements.includes('built-different')}<p
-                class="mt-2 text-sm font-bold"
+      {#each achievementGroups as { name: groupName, ids } (groupName)}
+        <h3
+          class="mt-8 mb-3 flex items-baseline justify-between gap-2 font-display text-xl font-bold"
+        >
+          {groupName}
+          <span class="text-sm font-normal tabular-nums text-muted-foreground">
+            {ids.filter((id) => earned.has(id)).length}/{ids.length}
+          </span>
+        </h3>
+        <ul class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {#each ids as id (id)}
+            {@const badge = achievementCatalog[id]}
+            {@const Icon = badge.icon}
+            <li class="flex gap-3 rounded-xl border border-border bg-card p-4">
+              <div
+                class={[
+                  'flex size-10 shrink-0 items-center justify-center rounded-lg border',
+                  earned.has(id)
+                    ? 'border-primary/35 bg-primary/10 text-primary'
+                    : 'border-border text-muted-foreground',
+                ]}
               >
-                {profile.multiplayerStreak}/5 wins
-              </p>{/if}
-          </article>{/each}
-      </div>
+                <Icon class="size-5" aria-hidden="true" />
+              </div>
+              <div>
+                <p class="text-xs capitalize text-muted-foreground">
+                  {#if 'rarity' in badge}{badge.rarity} ·
+                  {/if}{earned.has(id) ? 'Unlocked' : 'Locked'}
+                </p>
+                <h4 class="font-display text-base font-bold">{badge.name}</h4>
+                <p class="mt-1 text-sm text-muted-foreground">{badge.description}</p>
+                {#if evidence.has(id)}
+                  <p class="mt-2 text-sm text-primary">{evidence.get(id)}</p>
+                {/if}
+              </div>
+            </li>
+          {/each}
+        </ul>
+      {/each}
+      {#if legacyAchievementIdSchema.options.some((id) => earned.has(id))}
+        <details class="mt-8 rounded-xl border border-border bg-card p-4">
+          <summary class="cursor-pointer font-semibold">Earlier badges</summary>
+          <ul class="mt-3 flex flex-wrap gap-3">
+            {#each legacyAchievementIdSchema.options.filter((id) => earned.has(id)) as id (id)}
+              <li class="flex items-center gap-2 text-sm">
+                <Trophy class="size-4 text-primary" aria-hidden="true" />
+                {achievements[id].name}
+              </li>
+            {/each}
+          </ul>
+        </details>
+      {/if}
     </section>
   {/if}
 </div>

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import ServiceErrorPanel from '#lib/components/ServiceErrorPanel.svelte';
+  import PageShell from '#lib/components/ui/PageShell.svelte';
   import { openService } from '#lib/service-state.js';
   import CapRushHistoryList from '#lib/features/cap-rush/CapRushHistoryList.svelte';
   import { CapRushHistoryState } from '#lib/features/cap-rush/cap-rush-history-state.svelte.js';
@@ -27,9 +28,9 @@
 </svelte:head>
 
 {#if serviceError !== null}
-  <section class="mx-auto w-full max-w-xl px-3 py-10 sm:px-6">
+  <PageShell as="section" width="sm" padding="xl">
     <ServiceErrorPanel title="Cap Rush could not start" message={serviceError} />
-  </section>
+  </PageShell>
 {:else if historyState !== null}
   <CapRushHistoryList state={historyState} />
 {/if}

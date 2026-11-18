@@ -11,6 +11,28 @@ import {
 afterEach(restoreIndexedDb);
 
 describe('local profiles', () => {
+  test('keeps the first achievement moment when a result is retried or the feat is repeated', async () => {
+    resetIndexedDb();
+    const db = new HoopRushDatabase(testDatabaseName('achievement-moments'));
+    await db.open();
+    try {
+      const repo = new DexieProfileRepository(db);
+      await repo.initialize(crypto.randomUUID());
+      await repo.bind('havoc:run');
+      const first = { id: 'wilt-chamberlain-mode' as const, evidence: 'Player scored 101 points' };
+      const repeated = { ...first, evidence: 'Player scored 103 points' };
+      expect(await repo.awardAchievements('havoc:run', '12', [first, repeated])).toEqual([
+        first.id,
+      ]);
+      expect(await repo.awardAchievements('havoc:run', '12', [repeated])).toEqual([first.id]);
+      expect(await repo.awardAchievements('havoc:run', '13', [repeated])).toEqual([]);
+      expect(await repo.listUnlocks('havoc:run')).toEqual([first.id]);
+      expect((await repo.loadBound('havoc:run'))?.achievementMoments).toEqual([first]);
+    } finally {
+      db.close();
+    }
+  });
+
   test('retains the selected career and archives other profiles and their runs', async () => {
     resetIndexedDb();
     const db = new HoopRushDatabase(testDatabaseName('profile-migration'));

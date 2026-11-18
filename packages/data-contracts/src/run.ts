@@ -1,5 +1,11 @@
 import { z } from 'zod';
-import { franchiseIdSchema, eraIdSchema, playerIdSchema, seedSchema } from './ids.ts';
+import {
+  franchiseIdSchema,
+  eraIdSchema,
+  playerIdSchema,
+  seasonKeySchema,
+  seedSchema,
+} from './ids.ts';
 import { difficultyProfileSchema } from './difficulty.ts';
 import { lineupSchema } from './lineup.ts';
 import { simulationPlayerSchema } from './simulation.ts';
@@ -47,6 +53,7 @@ export const runPlayerSelectionSchema = z.object({
   playerId: playerIdSchema,
   franchiseId: franchiseIdSchema,
   eraId: eraIdSchema,
+  seasonKey: seasonKeySchema.optional(),
 });
 export type RunPlayerSelection = z.infer<typeof runPlayerSelectionSchema>;
 export const challengeRunSchema = z.object({

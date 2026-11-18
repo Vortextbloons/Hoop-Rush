@@ -120,19 +120,22 @@ describe('havoc participant mechanics', () => {
       POSITIONS.map((slot) => ({ slot, mutations: [] })),
     );
     const run = searchScenario(96, human, away, (candidate) =>
-      candidate.tape.events.some((event) => event.kind === 'clone' && event.outcome === 'exited'),
+      candidate.tape.events.some(
+        (event) =>
+          event.kind === 'clone' && event.outcome === 'exited' && event.reason === 'owner-exited',
+      ),
     );
     expect(run, 'expected a clone removal').not.toBeNull();
     if (run === null) return;
     const exit = run.tape.events.find(
-      (event) => event.kind === 'clone' && event.outcome === 'exited',
+      (event) =>
+        event.kind === 'clone' && event.outcome === 'exited' && event.reason === 'owner-exited',
     );
     if (exit?.kind !== 'clone') throw new Error('missing clone exit');
     const owner = run.tape.events.find(
       (event) => event.kind === 'substitution' && event.outInstanceId === exit.ownerInstanceId,
     );
     expect(owner).toBeDefined();
-    expect(exit.reason === 'owner-exited' || exit.reason === 'fouled-out').toBe(true);
   });
 
   it('never respawns clones after they foul out', () => {

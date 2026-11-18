@@ -5,6 +5,7 @@
   import ActionLink from '#lib/components/ui/ActionLink.svelte';
   import Badge from '#lib/components/ui/Badge.svelte';
   import PageHeader from '#lib/components/ui/PageHeader.svelte';
+  import PageShell from '#lib/components/ui/PageShell.svelte';
   import type { CapRushHistoryState } from './cap-rush-history-state.svelte.js';
   import {
     capStatusClass,
@@ -19,7 +20,7 @@
   let { state }: { state: CapRushHistoryState } = $props();
 </script>
 
-<section class="mx-auto w-full max-w-5xl px-3 py-4 sm:px-6 sm:py-6" aria-label="Cap Rush history">
+<PageShell as="section" width="lg" padding="md" aria-label="Cap Rush history">
   <PageHeader
     eyebrow="Cap Rush · History"
     title="Every five you built."
@@ -94,4 +95,4 @@
       </ul>
     {/if}
   </div>
-</section>
+</PageShell>

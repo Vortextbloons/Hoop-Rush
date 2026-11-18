@@ -1,11 +1,14 @@
 <script lang="ts">
   import type { AchievementId } from '@hoop-rush/data-contracts';
+  import { Trophy } from '@lucide/svelte';
   import { liveQuery } from 'dexie';
   import { achievements, profileRepository } from './profile.js';
-  let { bindingId }: { bindingId: string } = $props();
-  let unlocked = $state<AchievementId[]>([]);
+  let { bindingId, centered = false }: { bindingId: string; centered?: boolean } = $props();
+  let unlocked = $state<{ id: AchievementId; evidence?: string }[]>([]);
   $effect(() => {
-    const subscription = liveQuery(() => profileRepository().listUnlocks(bindingId)).subscribe({
+    const subscription = liveQuery(() =>
+      profileRepository().listAchievementReveals(bindingId),
+    ).subscribe({
       next: (items) => {
         unlocked = items;
       },
@@ -14,18 +17,39 @@
   });
 </script>
 
-{#if unlocked.length}
-  <section
-    class="mx-auto my-6 max-w-6xl rounded-2xl border border-primary bg-card p-6"
-    aria-label="Achievements unlocked"
-  >
-    <p class="text-sm font-bold uppercase tracking-widest text-primary">Achievement unlocked</p>
-    {#each unlocked as id (id)}
-      <div class="mt-4">
-        <h2 class="font-display text-2xl font-bold">{achievements[id].name}</h2>
-        <p class="text-muted-foreground">{achievements[id].description}</p>
-        <p class="mt-1 text-sm font-semibold">{achievements[id].reward}</p>
-      </div>
-    {/each}
-  </section>
-{/if}
+<div role="status" aria-label="Achievements unlocked">
+  {#if unlocked.length}
+    <ul class="mt-3 flex flex-wrap gap-2" class:justify-center={centered}>
+      {#each unlocked as { id, evidence } (id)}
+        {@const achievement = achievements[id]}
+        {@const Icon = achievement.icon ?? Trophy}
+        <li
+          class="reveal flex max-w-full items-center gap-2 rounded-lg border border-border bg-card px-3 py-2"
+        >
+          <Icon class="size-4 shrink-0 text-primary" aria-hidden="true" />
+          <div class="text-left text-sm">
+            <span class="font-semibold">{achievement.name}</span>
+            <span class="block text-xs text-muted-foreground"
+              >{evidence ?? achievement.description}</span
+            >
+          </div>
+        </li>
+      {/each}
+    </ul>
+  {/if}
+</div>
+
+<style>
+  @media (prefers-reduced-motion: no-preference) {
+    .reveal {
+      animation: badge-appear 220ms ease-out both;
+    }
+  }
+
+  @keyframes badge-appear {
+    from {
+      opacity: 0;
+      transform: translateY(3px);
+    }
+  }
+</style>

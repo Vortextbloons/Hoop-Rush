@@ -1,4 +1,5 @@
 export { canPlay, type SlotGroup } from './domain/positions.ts';
+export { positionDefenseOf } from './sim/position-responsibilities.ts';
 export { slotRequirement, validateLineup } from './domain/lineup.ts';
 export {
   planLineupReposition,
@@ -353,3 +354,12 @@ export {
 export * from './modes/havoc/index.ts';
 export * from './modes/cap-rush/index.ts';
 export * from './profile.ts';
+export { evaluateRunAchievements } from './achievements/classic.ts';
+export {
+  evaluateCapRushMultiplayerAchievements,
+  evaluateSeriesAchievements,
+  evaluateSharedSeasonAchievements,
+  type CapRushMultiplayerAchievementFacts,
+  type SeriesAchievementFacts,
+  type SharedSeasonAchievementFacts,
+} from './achievements/multiplayer.ts';

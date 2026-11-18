@@ -78,7 +78,13 @@ export async function startClassicRun(draft: ClassicDraftState, runSeed: Seed): 
       .slice(0, 96),
     ...(league ? { league } : {}),
   });
-  const run = createChallenge(creation);
+  const run = createChallenge({
+    ...creation,
+    selections: creation.selections.map((selection, slot) => ({
+      ...selection,
+      seasonKey: players[slot]?.seasonKey,
+    })),
+  });
   await selectedProfile();
   await profileRepository().bind(`challenge:${run.runId}`);
   await challengeRepository.promoteClassicDraftToRun(
@@ -98,6 +104,7 @@ export async function startSandboxRun(players: PeakPlayerSeason[], seed: Seed): 
     playerId: p.playerId,
     franchiseId: p.franchiseId,
     eraId: p.eraId,
+    seasonKey: p.seasonKey,
   }));
   const sample = players[0];
   const creation: ChallengeCreation = {

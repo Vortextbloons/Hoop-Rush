@@ -4,6 +4,7 @@
   import { resolve } from '$app/paths';
   import AsyncState from '#lib/components/AsyncState.svelte';
   import ServiceErrorPanel from '#lib/components/ServiceErrorPanel.svelte';
+  import PageShell from '#lib/components/ui/PageShell.svelte';
   import { openService } from '#lib/service-state.js';
   import CapRushReportView from '#lib/features/cap-rush/CapRushReportView.svelte';
   import { CapRushResultState } from '#lib/features/cap-rush/cap-rush-result-state.svelte.js';
@@ -34,7 +35,7 @@
   <title>Cap Rush Result — Hoop Rush</title>
 </svelte:head>
 
-<section class="mx-auto w-full max-w-5xl px-3 py-4 sm:px-6 sm:py-6">
+<PageShell as="section" width="lg" padding="md">
   {#if serviceError !== null}
     <ServiceErrorPanel title="Cap Rush could not start" message={serviceError} />
   {:else if resultState !== null}
@@ -113,4 +114,4 @@
       </AsyncState>
     {/if}
   {/if}
-</section>
+</PageShell>

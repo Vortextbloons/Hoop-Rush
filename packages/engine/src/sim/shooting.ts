@@ -4,6 +4,7 @@ import type {
   SimulationPlayer,
   SimulationTeam,
 } from '@hoop-rush/data-contracts';
+import { positionDefenseOf, positionOfSlot } from './position-responsibilities.ts';
 import type { HavocEvidence } from './havoc-runtime.ts';
 import { ENGINE_CONSTANTS } from './constants.ts';
 import {
@@ -16,6 +17,7 @@ import {
 export interface ShotPrep {
   spacing: number;
   twoPointAnchor: number | null;
+  defenderResponsibilitySlot?: number;
 }
 export function teamSpacing(team: SimulationTeam): number {
   return (
@@ -29,7 +31,11 @@ export function teamSpacing(team: SimulationTeam): number {
 export function shotQualityBonus(action: ActionType, zone: ShotZone): number {
   return ENGINE_CONSTANTS.shotQuality[action][zone];
 }
-export function contestPenalty(defender: SimulationPlayer, zone: ShotZone): number {
+export function contestPenalty(
+  defender: SimulationPlayer,
+  zone: ShotZone,
+  responsibilitySlot?: number,
+): number {
   let contest: number;
   if (zone === 'rim' || zone === 'shortMid') {
     contest =
@@ -51,7 +57,18 @@ export function contestPenalty(defender: SimulationPlayer, zone: ShotZone): numb
       (contest - ENGINE_CONSTANTS.contestRatioPivot) / ENGINE_CONSTANTS.contestRatioRange,
     ),
   );
-  return ratio * ENGINE_CONSTANTS.contestMax;
+  const perimeter =
+    responsibilitySlot === undefined
+      ? 1
+      : positionDefenseOf(defender.ratings, positionOfSlot(responsibilitySlot))
+          .perimeterContestScale;
+  const fit =
+    zone === 'rim' || zone === 'shortMid'
+      ? 1
+      : zone === 'longMid'
+        ? (1 + perimeter) / 2
+        : perimeter;
+  return Math.max(ENGINE_CONSTANTS.contestMin, ratio * ENGINE_CONSTANTS.contestMax * fit);
 }
 export function observedTwoPointPct(
   shooter: SimulationPlayer,
@@ -195,7 +212,7 @@ export function makeProbability(
       (anchoredTwo ? ENGINE_CONSTANTS.twoPointAnchorSkillScale : 1);
   const contestScale = havoc?.contestScale ?? 1;
   const contest =
-    -contestPenalty(defender, zone) * contestScale +
+    -contestPenalty(defender, zone, prep.defenderResponsibilitySlot) * contestScale +
     (havoc?.contestPointDelta ?? 0) +
     (havoc?.makePointDelta ?? 0);
   const era =

@@ -16,7 +16,6 @@
   import { arenaBlockComplete } from '#lib/arena-sound.js';
   import ChallengeReport from '#lib/components/ChallengeReport.svelte';
   import AsyncState from '#lib/components/AsyncState.svelte';
-  import AchievementReveal from '#lib/features/profile/AchievementReveal.svelte';
   let {
     mode,
     eyebrow,
@@ -182,7 +181,6 @@
       <AsyncState kind="loading" title="Loading result" message="Reading the completed run…" />
     </div>
   {:else}
-    <AchievementReveal bindingId={`challenge:${run.runId}`} />
     <ChallengeReport
       {manifest}
       {run}

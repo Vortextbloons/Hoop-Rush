@@ -18,7 +18,7 @@ import {
 } from '../sim/fouls.ts';
 import { assistProbabilityPure } from '../sim/possession.ts';
 import type { TeamPrep } from '../sim/prepare.ts';
-import { sameGroupMatchWeight } from '../sim/position-responsibilities.ts';
+import { positionMatchWeight } from '../sim/position-responsibilities.ts';
 import { offensiveReboundProbability } from '../sim/rebounding.ts';
 import { eraPossEstimatePerTrip, turnoverProbability } from '../sim/security.ts';
 import {
@@ -661,7 +661,7 @@ function contestAt(
 ): number {
   const key = defenderIndex * SHOT_ZONES.length + zoneIndex;
   if (seen[key] === 1) return flat[key] ?? 0;
-  const value = contestPenalty(defender, zone);
+  const value = contestPenalty(defender, zone, defenderIndex);
   flat[key] = value;
   seen[key] = 1;
   return value;
@@ -673,7 +673,7 @@ function defenderDistribution(prep: TeamPrep, zone: ShotZone, shooterSlot: numbe
   const size = prep.defenderBase.weights[0]?.length ?? 5;
   const weights = new Array<number>(size).fill(0);
   for (let slot = 0; slot < size; slot += 1) {
-    const match = sameGroupMatchWeight(slot, shooterSlot);
+    const match = positionMatchWeight(slot, shooterSlot, interior);
     const rim = interior ? (prep.defenderBase.rimProtection[slot] ?? 1) : 1;
     weights[slot] = (zoneWeights[slot] ?? 0) * match * rim;
   }

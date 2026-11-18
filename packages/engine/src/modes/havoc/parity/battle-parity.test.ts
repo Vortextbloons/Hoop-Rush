@@ -128,7 +128,7 @@ function simulate(golden: GoldenScenario): {
   };
 }
 
-describe('Havoc/Cap Rush Rust migration parity', () => {
+describe('Havoc/Cap Rush seeded replay', () => {
   it('covers every declared parity scenario exactly once', () => {
     expect(fixture.scenarios.map((scenario) => scenario.id).sort()).toEqual(
       PARITY_SCENARIOS.map((scenario) => scenario.id).sort(),

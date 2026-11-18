@@ -472,6 +472,7 @@ export function createClassicChallenge(
     draftId: draft.draftId,
     variant: draft.variant,
     seed: draft.seed,
+    rerolls: draft.rerolls,
     picks: orderedPicks,
   };
   return {

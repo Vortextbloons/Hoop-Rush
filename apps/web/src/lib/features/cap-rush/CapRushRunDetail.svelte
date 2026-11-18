@@ -1,13 +1,14 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
   import AsyncState from '#lib/components/AsyncState.svelte';
+  import PageShell from '#lib/components/ui/PageShell.svelte';
   import CapRushReportView from './CapRushReportView.svelte';
   import type { CapRushResultState } from './cap-rush-result-state.svelte.js';
 
   let { state, runId }: { state: CapRushResultState; runId: string } = $props();
 </script>
 
-<section class="mx-auto w-full max-w-5xl px-3 py-4 sm:px-6 sm:py-6" aria-label="Saved Cap Rush run">
+<PageShell as="section" width="lg" padding="md" aria-label="Saved Cap Rush run">
   <a
     href={resolve('cap-rush/history/')}
     class="font-mono text-[11px] text-muted-foreground underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
@@ -54,4 +55,4 @@
       </AsyncState>
     {/if}
   </div>
-</section>
+</PageShell>

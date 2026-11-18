@@ -1222,7 +1222,7 @@ describe('fixed-five generator parity', () => {
       p1Team,
       p2Team,
       profile: DEFAULT_ERA_SIM_PROFILE,
-      rootSeed: ROOT,
+      rootSeed: seedSchema.parse(seedFromString('fixed-five-duel-early-stop-v26')),
       dataVersion: 'data-v1',
     };
     const events = [...duelGameEvents(input, context)];

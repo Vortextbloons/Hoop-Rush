@@ -9,6 +9,7 @@ import {
 } from '@hoop-rush/engine';
 import { storedRunRecordSchema } from '../schemas/run-record.ts';
 import { DexieChallengeRepository } from './dexie.ts';
+import { DexieProfileRepository } from './profile.ts';
 import {
   resetIndexedDb,
   restoreIndexedDb,
@@ -88,5 +89,69 @@ describe('dexie active run save/load round-trip', () => {
     const reloaded = await repo.loadActiveRun();
     expect(reloaded?.run.games).toHaveLength(0);
     expect(await db.activeGames.count()).toBe(0);
+  });
+
+  it('records a season achievement when promoting the accepted result', async () => {
+    resetIndexedDb();
+    const db = new TestDatabase(testDatabaseName('dexie-season-achievement'));
+    try {
+      const repo = new DexieChallengeRepository(db);
+      const profiles = new DexieProfileRepository(db);
+      const context = createEngineContext();
+      const base = buildChallengeRun({
+        runId: 'perfect-classic',
+        mode: 'classic',
+        variant: 'ratings',
+      });
+      const game = simulateGame(buildGameSimulationInput(), context);
+      const run = buildChallengeRun({
+        ...base,
+        status: 'finished',
+        outcome: 'perfect',
+        games: Array.from({ length: 82 }, (_, i) => ({
+          ...game,
+          gameNumber: i + 1,
+          winner: 'home',
+        })),
+        aggregates: {
+          ...base.aggregates,
+          team: { ...base.aggregates.team, wins: 82, gamesPlayed: 82 },
+        },
+      });
+      const bindingId = `challenge:${run.runId}`;
+      await profiles.initialize(crypto.randomUUID());
+      await profiles.bind(bindingId);
+      const record = storedRunRecordSchema.parse({
+        recordId: 'active',
+        saveSchemaVersion: 2,
+        run,
+      });
+      await repo.saveActiveRun(record);
+      expect(await profiles.listUnlocks(bindingId)).toEqual([]);
+      await repo.promoteActiveToCompleted(
+        record,
+        {
+          recordId: run.runId,
+          runId: run.runId,
+          mode: run.mode,
+          franchiseId: run.franchiseId,
+          eraId: run.eraId,
+          playerIds: run.playerIds,
+          runSeed: run.runSeed,
+          wins: 82,
+          losses: 0,
+          gamesPlayed: 82,
+          outcome: 'perfect',
+          completedAtIso: '2026-01-01T00:00:00.000Z',
+        },
+        { expectedGamesPlayed: 82, expectedRunDigest: challengeRunProgressDigest(run) },
+      );
+      expect(await profiles.listAchievementReveals(bindingId)).toContainEqual({
+        id: 'better-than-73-9',
+        evidence: '82-0 season',
+      });
+    } finally {
+      db.close();
+    }
   });
 });

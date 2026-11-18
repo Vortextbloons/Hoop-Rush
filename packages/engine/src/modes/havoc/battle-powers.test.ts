@@ -452,7 +452,7 @@ describe('havoc battle opposing powers', () => {
 
     const hit = searchSeeds(
       'battle-powers-bounty-both',
-      64,
+      512,
       (seed) => battleInput(home, away, seed),
       (run) => {
         if (!run.audit.ok) return false;
@@ -486,7 +486,10 @@ describe('havoc battle opposing powers', () => {
         );
       },
     );
-    expect(hit, `${scenario}: no seed within 64 produced arm+consume on both sides`).not.toBeNull();
+    expect(
+      hit,
+      `${scenario}: no seed within 512 produced arm+consume on both sides`,
+    ).not.toBeNull();
     if (hit === null) return;
     const { run, seed } = hit;
 

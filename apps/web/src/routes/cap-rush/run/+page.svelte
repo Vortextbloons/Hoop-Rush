@@ -3,6 +3,7 @@
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import ServiceErrorPanel from '#lib/components/ServiceErrorPanel.svelte';
+  import PageShell from '#lib/components/ui/PageShell.svelte';
   import { openService } from '#lib/service-state.js';
   import CapRushRunView from '#lib/features/cap-rush/CapRushRunView.svelte';
   import { loadCapRushArt, type CapRushArt } from '#lib/features/cap-rush/cap-rush-art.js';
@@ -43,9 +44,9 @@
 </svelte:head>
 
 {#if serviceError !== null}
-  <section class="mx-auto w-full max-w-xl px-3 py-10 sm:px-6">
+  <PageShell as="section" width="sm" padding="xl">
     <ServiceErrorPanel title="Cap Rush could not start" message={serviceError} homeLink />
-  </section>
+  </PageShell>
 {:else if controller !== null}
   <CapRushRunView
     {controller}

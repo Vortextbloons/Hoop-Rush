@@ -24,7 +24,7 @@ function run(seed: string) {
 describe('game determinism and golden replay', () => {
   it('is stable across identical inputs (golden digest)', () => {
     const result = run('golden-1');
-    expect(fnv1a32(gameResultDigest(result))).toBe(GOLDEN_EQUAL_FIXTURE_V25_HASH);
+    expect(fnv1a32(gameResultDigest(result))).toBe(GOLDEN_EQUAL_FIXTURE_V26_HASH);
   });
   it('is stable for the strong-vs-weak fixture (golden digest)', () => {
     const { strong, weak } = buildStrongWeakFixture();
@@ -33,7 +33,7 @@ describe('game determinism and golden replay', () => {
       home: strong,
       away: weak,
     });
-    expect(fnv1a32(gameResultDigest(simulateGame(input, ctx)))).toBe(GOLDEN_STRONG_WEAK_V25_HASH);
+    expect(fnv1a32(gameResultDigest(simulateGame(input, ctx)))).toBe(GOLDEN_STRONG_WEAK_V26_HASH);
   });
   it('batch preparation preserves complete results and observations across seeds, teams, and profiles', () => {
     const simulate = createGameBatchSimulator(ctx);
@@ -204,5 +204,5 @@ describe('lineup strength across fixtures', () => {
     assert(homeWins, awayWins);
   });
 });
-const GOLDEN_EQUAL_FIXTURE_V25_HASH = 156550049;
-const GOLDEN_STRONG_WEAK_V25_HASH = 3185917802;
+const GOLDEN_EQUAL_FIXTURE_V26_HASH = 1055601212;
+const GOLDEN_STRONG_WEAK_V26_HASH = 2593155105;

@@ -3398,16 +3398,8 @@ fn zone_defense_weight(battle: &Battle, index: usize, zone: usize) -> f64 {
     ((zone_defense_skill(battle, index, zone) - 45.0) / 35.0).max(0.25)
 }
 
-fn slot_group(slot: usize) -> usize {
-    match slot {
-        0 | 1 => 0,
-        2 | 3 => 1,
-        _ => 2,
-    }
-}
-
-fn same_group_match_weight(defender_slot: usize, shooter_slot: usize) -> f64 {
-    if slot_group(defender_slot) == slot_group(shooter_slot) {
+fn position_match_weight(defender_slot: usize, shooter_slot: usize) -> f64 {
+    if defender_slot == shooter_slot {
         1.35
     } else {
         1.0
@@ -3454,7 +3446,7 @@ fn battle_ensure_coverage(handle: u32, offense: usize, defense: usize) {
                     .participants
                     .get(*shooter)
                     .map_or(0, |participant| participant.slot_index);
-                same_group_match_weight(defender_slot, shooter_slot).max(0.0001)
+                position_match_weight(defender_slot, shooter_slot).max(0.0001)
             })
             .collect();
         let total: f64 = weights.iter().sum();

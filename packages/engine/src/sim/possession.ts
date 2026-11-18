@@ -1034,6 +1034,11 @@ function resolveShot(
   if (defenderSlot >= 0) recorder.contest(defenseSide, defenderSlot);
   const shotPrep: ShotPrep = {
     spacing: teamPrep.spacing,
+    ...(defenderSlot < 0
+      ? {}
+      : {
+          defenderResponsibilitySlot: defensePrep.responsibilitySlots[defenderSlot] ?? defenderSlot,
+        }),
     twoPointAnchor: teamPrep.twoPointAnchor.get(teamPrep.keyOf(shooter)) ?? null,
   };
   const effectsAdjustment =

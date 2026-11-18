@@ -2,7 +2,12 @@
   import { onMount } from 'svelte';
   import PlayerFace from '#lib/components/PlayerFace.svelte';
   import PlayerStatsTable from '#lib/components/PlayerStatsTable.svelte';
+  import Alert from '#lib/components/ui/Alert.svelte';
+  import EmptyState from '#lib/components/ui/EmptyState.svelte';
   import Panel from '#lib/components/ui/Panel.svelte';
+  import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
+  import StatGrid from '#lib/components/ui/StatGrid.svelte';
+  import StatTile from '#lib/components/ui/StatTile.svelte';
   import type { PlayerStatColumn } from '#lib/components/player-stats-table.js';
   import { getManifest, getPlayersIndex } from '#lib/data.js';
   import type { HoopRushManifest, PlayersIndex } from '@hoop-rush/data-contracts';
@@ -14,6 +19,7 @@
   } from '@hoop-rush/data-contracts';
   import { havocMutationDefinitionOf } from '@hoop-rush/engine';
   import HavocTierBadge from '#lib/features/havoc/HavocTierBadge.svelte';
+  import AchievementReveal from '#lib/features/profile/AchievementReveal.svelte';
   import CapRushBracket from './CapRushBracket.svelte';
   import { Crown, Trophy } from '@lucide/svelte';
   import { trueShootingPct, usagePct, usagePossessions } from '#lib/format.js';
@@ -165,17 +171,9 @@
 
 <div class="flex flex-col gap-4" data-cap-rush-report>
   {#if aggregate.perfectSeason}
-    <div
-      class="flex flex-wrap items-center gap-3 rounded-2xl border border-accent/50 bg-accent/10 p-4 sm:p-5"
-      role="status"
-    >
-      <Trophy size={22} class="shrink-0 text-accent" aria-hidden="true" />
-      <div class="min-w-0">
-        <p class="font-display text-lg font-extrabold tracking-tight uppercase text-accent">
-          Perfect season &middot; 82&ndash;0
-        </p>
-      </div>
-    </div>
+    <Alert tone="warning" title="Perfect season &middot; 82&ndash;0" class="rounded-2xl p-4 sm:p-5">
+      {#snippet icon()}<Trophy size={22} aria-hidden="true" />{/snippet}
+    </Alert>
   {/if}
 
   {#if postseason !== null}
@@ -222,6 +220,9 @@
           >
         {/if}
       </div>
+      {#if postseason.isUserChampion}
+        <AchievementReveal bindingId={`cap-rush:${report.runId}`} />
+      {/if}
     </section>
 
     <section class="rounded-2xl border border-accent/40 bg-card p-5 sm:p-7" aria-label="Finals MVP">
@@ -252,32 +253,28 @@
             {postseason.finalsMvp.slot} · {postseason.championName} · {postseason.finalsMvp.games}
             Finals games
           </p>
-          <dl class="mt-3 grid grid-cols-4 gap-2">
-            <div>
-              <dt class="font-mono text-[8px] text-muted-foreground uppercase">PTS</dt>
-              <dd class="font-display text-lg font-extrabold tabular-nums">
-                {formatAverage(postseason.finalsMvp.totalPoints, postseason.finalsMvp.games)}
-              </dd>
-            </div>
-            <div>
-              <dt class="font-mono text-[8px] text-muted-foreground uppercase">REB</dt>
-              <dd class="font-display text-lg font-extrabold tabular-nums">
-                {formatAverage(postseason.finalsMvp.totalRebounds, postseason.finalsMvp.games)}
-              </dd>
-            </div>
-            <div>
-              <dt class="font-mono text-[8px] text-muted-foreground uppercase">AST</dt>
-              <dd class="font-display text-lg font-extrabold tabular-nums">
-                {formatAverage(postseason.finalsMvp.totalAssists, postseason.finalsMvp.games)}
-              </dd>
-            </div>
-            <div>
-              <dt class="font-mono text-[8px] text-muted-foreground uppercase">Game score</dt>
-              <dd class="font-display text-lg font-extrabold tabular-nums">
-                {formatAverage(postseason.finalsMvp.totalGameScore, postseason.finalsMvp.games)}
-              </dd>
-            </div>
-          </dl>
+          <StatGrid class="mt-3" columns={4} mobile={2}>
+            <StatTile
+              label="PTS"
+              size="sm"
+              value={formatAverage(postseason.finalsMvp.totalPoints, postseason.finalsMvp.games)}
+            />
+            <StatTile
+              label="REB"
+              size="sm"
+              value={formatAverage(postseason.finalsMvp.totalRebounds, postseason.finalsMvp.games)}
+            />
+            <StatTile
+              label="AST"
+              size="sm"
+              value={formatAverage(postseason.finalsMvp.totalAssists, postseason.finalsMvp.games)}
+            />
+            <StatTile
+              label="Game score"
+              size="sm"
+              value={formatAverage(postseason.finalsMvp.totalGameScore, postseason.finalsMvp.games)}
+            />
+          </StatGrid>
         </div>
       </div>
       <p class="mt-3 text-[11px] text-muted-foreground">
@@ -295,10 +292,10 @@
       userTeamId={report.franchise?.franchiseId ?? null}
     />
   {:else}
-    <p class="rounded-2xl border border-line-soft bg-surface-1 p-4 text-xs text-muted-foreground">
+    <Alert tone="info" class="rounded-2xl">
       This is a regular-season run. It was played before Cap Rush postseasons existed, so it has no
       bracket or Finals MVP.
-    </p>
+    </Alert>
   {/if}
 
   <section
@@ -330,81 +327,58 @@
       >
     </div>
 
-    <dl class="mt-6 grid grid-cols-3 gap-3 border-t border-line-soft pt-5">
-      <div>
-        <dt class="font-mono text-[9px] tracking-wider text-muted-foreground uppercase">
-          Points / game
-        </dt>
-        <dd class="font-display mt-1 text-2xl font-extrabold tabular-nums">
-          {formatAverage(aggregate.pointsFor, aggregate.games)}
-        </dd>
-      </div>
-      <div>
-        <dt class="font-mono text-[9px] tracking-wider text-muted-foreground uppercase">
-          Allowed / game
-        </dt>
-        <dd class="font-display mt-1 text-2xl font-extrabold tabular-nums">
-          {formatAverage(aggregate.pointsAgainst, aggregate.games)}
-        </dd>
-      </div>
-      <div>
-        <dt class="font-mono text-[9px] tracking-wider text-muted-foreground uppercase">
-          Margin / game
-        </dt>
-        <dd class="font-display mt-1 text-2xl font-extrabold tabular-nums">
-          {formatAverage(aggregate.pointsFor - aggregate.pointsAgainst, aggregate.games)}
-        </dd>
-      </div>
-    </dl>
-    <dl
-      class="mt-5 grid grid-cols-2 gap-2 border-t border-line-soft pt-5 {report.variant ===
-      'roulette'
-        ? 'lg:grid-cols-4'
-        : 'lg:grid-cols-3'}"
+    <StatGrid class="mt-6 border-t border-line-soft pt-5" columns={3} mobile={3} gap="md">
+      <StatTile
+        label="Points / game"
+        size="lg"
+        value={formatAverage(aggregate.pointsFor, aggregate.games)}
+      />
+      <StatTile
+        label="Allowed / game"
+        size="lg"
+        value={formatAverage(aggregate.pointsAgainst, aggregate.games)}
+      />
+      <StatTile
+        label="Margin / game"
+        size="lg"
+        value={formatAverage(aggregate.pointsFor - aggregate.pointsAgainst, aggregate.games)}
+      />
+    </StatGrid>
+    <StatGrid
+      class="mt-5 border-t border-line-soft pt-5"
+      columns={report.variant === 'roulette' ? 4 : 3}
+      mobile={2}
+      gap="md"
     >
-      <div class="min-w-0 rounded-xl border border-line-soft bg-surface-1 p-3 sm:p-4">
-        <dt class="font-mono text-[9px] tracking-[0.1em] text-muted-foreground uppercase">
-          Player payroll
-        </dt>
-        <dd class="font-display mt-0.5 text-xl font-extrabold tabular-nums">
-          {formatMillions(report.payrollDollars)}
-        </dd>
-      </div>
+      <StatTile
+        label="Player payroll"
+        size="md"
+        surface="tile"
+        value={formatMillions(report.payrollDollars)}
+      />
       {#if report.variant === 'roulette'}
-        <div class="min-w-0 rounded-xl border border-line-soft bg-surface-1 p-3 sm:p-4">
-          <dt class="font-mono text-[9px] tracking-[0.1em] text-muted-foreground uppercase">
-            Mutation spend
-          </dt>
-          <dd
-            class="font-display mt-0.5 text-xl font-extrabold tabular-nums {report.spinSpendDollars ===
-            0
-              ? 'text-muted-foreground'
-              : ''}"
-          >
-            {report.spinSpendDollars === 0 ? 'None' : formatMillions(report.spinSpendDollars)}
-          </dd>
-        </div>
+        <StatTile
+          label="Mutation spend"
+          size="md"
+          surface="tile"
+          tone={report.spinSpendDollars === 0 ? 'muted' : 'default'}
+          value={report.spinSpendDollars === 0 ? 'None' : formatMillions(report.spinSpendDollars)}
+        />
       {/if}
-      <div class="min-w-0 rounded-xl border border-line-soft bg-surface-1 p-3 sm:p-4">
-        <dt class="font-mono text-[9px] tracking-[0.1em] text-muted-foreground uppercase">
-          Total spend
-        </dt>
-        <dd class="font-display mt-0.5 text-xl font-extrabold tabular-nums">
-          {formatMillions(report.totalSpendDollars)}
-        </dd>
-      </div>
-      <div class="min-w-0 rounded-xl border border-line-soft bg-surface-1 p-3 sm:p-4">
-        <dt class="font-mono text-[9px] tracking-[0.1em] text-muted-foreground uppercase">
-          Unused normal-cap budget
-        </dt>
-        <dd
-          class="font-display mt-0.5 text-xl font-extrabold tabular-nums"
-          class:text-negative={report.unusedCapDollars < 0}
-        >
-          {formatMillions(report.unusedCapDollars)}
-        </dd>
-      </div>
-    </dl>
+      <StatTile
+        label="Total spend"
+        size="md"
+        surface="tile"
+        value={formatMillions(report.totalSpendDollars)}
+      />
+      <StatTile
+        label="Unused normal-cap budget"
+        size="md"
+        surface="tile"
+        tone={report.unusedCapDollars < 0 ? 'negative' : 'default'}
+        value={formatMillions(report.unusedCapDollars)}
+      />
+    </StatGrid>
 
     <div class="mt-4 flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t border-line-soft pt-4">
       <p class="font-mono text-[9px] tracking-[0.1em] text-muted-foreground uppercase">
@@ -422,22 +396,16 @@
     </div>
   </section>
 
-  <section class="rounded-2xl border border-border bg-card p-5 sm:p-7" aria-label="Your five">
-    <div class="flex flex-wrap items-end justify-between gap-3">
-      <div>
-        <p class="font-mono text-[10px] font-bold tracking-[0.16em] text-primary uppercase">
-          The roster
+  <Panel as="section" class="p-5 sm:p-7" aria-label="Your five">
+    <SectionHeading eyebrow="The roster" title="Your starting five" level={3} size="lg">
+      {#snippet actions()}
+        <p class="text-xs text-muted-foreground">
+          Player payroll <strong class="font-display ml-1 text-lg text-foreground"
+            >{formatMillions(report.payrollDollars)}</strong
+          >
         </p>
-        <h3 class="font-display mt-1 text-3xl font-extrabold tracking-tight uppercase">
-          Your starting five
-        </h3>
-      </div>
-      <p class="text-xs text-muted-foreground">
-        Player payroll <strong class="font-display ml-1 text-lg text-foreground"
-          >{formatMillions(report.payrollDollars)}</strong
-        >
-      </p>
-    </div>
+      {/snippet}
+    </SectionHeading>
     <ul class="report-player-grid">
       {#each players as line (line.slot)}
         {@const face = playerIndex?.players.find((entry) => entry.playerId === line.playerId)}
@@ -499,26 +467,19 @@
         </li>
       {/each}
     </ul>
-  </section>
+  </Panel>
 
   <div class="grid gap-4">
-    <section
-      class="rounded-2xl border border-border bg-card p-5 sm:p-7"
-      aria-label="Cap status and applied penalties"
-    >
-      <div class="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p class="report-label">Payroll impact</p>
-          <h3 class="font-display mt-1 text-2xl font-extrabold tracking-tight uppercase">
-            Cap status
-          </h3>
-        </div>
-        <span
-          class="inline-flex rounded-full border px-3 py-1 font-mono text-[10px] font-bold tracking-[0.1em] uppercase {capStatusClass(
-            report.payrollStatus,
-          )}">{capStatusLabel(report.payrollStatus)}</span
-        >
-      </div>
+    <Panel as="section" class="p-5 sm:p-7" aria-label="Cap status and applied penalties">
+      <SectionHeading eyebrow="Payroll impact" title="Cap status" level={3} align="start">
+        {#snippet actions()}
+          <span
+            class="inline-flex rounded-full border px-3 py-1 font-mono text-[10px] font-bold tracking-[0.1em] uppercase {capStatusClass(
+              report.payrollStatus,
+            )}">{capStatusLabel(report.payrollStatus)}</span
+          >
+        {/snippet}
+      </SectionHeading>
       <div class="mt-4 rounded-xl border border-line-soft bg-surface-1 p-4">
         <p class="font-mono text-[9px] font-bold tracking-[0.12em] text-muted-foreground uppercase">
           Applied penalties
@@ -546,44 +507,34 @@
       </div>
       {#if report.apronTriggers.isolations > 0 || report.payrollStatus === 'second-apron' || report.apronTriggers.strikes > 0}
         <div class="mt-4">
-          <p
-            class="font-mono text-[9px] font-bold tracking-[0.12em] text-muted-foreground uppercase"
-          >
-            Season effects
-          </p>
-          <dl class="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <p class="ui-label" data-tone="muted">Season effects</p>
+          <StatGrid class="mt-2" columns={2} mobile={1}>
             {#if report.apronTriggers.isolations > 0}
-              <div class="rounded-xl border border-line-soft px-3 py-3">
-                <dt class="text-xs text-muted-foreground">Forced isolations</dt>
-                <dd class="font-display mt-1 text-2xl font-extrabold tabular-nums">
-                  {report.apronTriggers.isolations.toLocaleString()}
-                </dd>
-              </div>
+              <StatTile
+                label="Forced isolations"
+                size="lg"
+                surface="tile"
+                value={report.apronTriggers.isolations.toLocaleString()}
+              />
             {/if}
             {#if report.payrollStatus === 'second-apron' || report.apronTriggers.strikes > 0}
-              <div class="rounded-xl border border-line-soft px-3 py-3">
-                <dt class="text-xs text-muted-foreground">Defensive strikes</dt>
-                <dd class="font-display mt-1 text-2xl font-extrabold tabular-nums">
-                  {report.apronTriggers.strikes.toLocaleString()}
-                </dd>
-              </div>
+              <StatTile
+                label="Defensive strikes"
+                size="lg"
+                surface="tile"
+                value={report.apronTriggers.strikes.toLocaleString()}
+              />
             {/if}
-          </dl>
+          </StatGrid>
         </div>
       {/if}
-    </section>
+    </Panel>
 
     {#if report.variant === 'roulette'}
-      <section
-        class="rounded-2xl border border-border bg-card p-5 sm:p-7"
-        aria-label="Cap Roulette spin"
-      >
-        <p class="report-label">The wild card</p>
-        <h3 class="font-display mt-1 text-2xl font-extrabold tracking-tight uppercase">
-          Mutation spin
-        </h3>
+      <Panel as="section" class="p-5 sm:p-7" aria-label="Cap Roulette spin">
+        <SectionHeading eyebrow="The wild card" title="Mutation spin" level={3} />
         {#if spins.length === 0}
-          <p class="mt-4 text-lg font-bold">No spin purchased</p>
+          <EmptyState class="mt-4" title="No spin purchased" surface="none" />
         {:else}
           <div class="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {#each spins as spin (spin.targetCardId)}
@@ -650,15 +601,14 @@
             {/each}
           </div>
         {/if}
-      </section>
+      </Panel>
     {/if}
   </div>
 
   <Panel as="section" padding="md" class="sm:p-7" aria-label="Season player statistics">
-    <p class="report-label">The box score</p>
-    <h3 class="font-display mt-1 text-2xl font-extrabold tracking-tight uppercase">
-      Season statistics <span class="text-sm text-muted-foreground">&middot; per game</span>
-    </h3>
+    <SectionHeading eyebrow="The box score" title="Season statistics" level={3}>
+      <span class="text-sm text-muted-foreground">&middot; per game</span>
+    </SectionHeading>
     <div class="mt-4 overflow-x-auto rounded-xl border border-line-soft bg-surface-1">
       <PlayerStatsTable
         columns={statColumns}
@@ -705,10 +655,14 @@
   </Panel>
 
   <Panel as="section" padding="md" class="sm:p-7" aria-label="League MVP">
-    <p class="report-label">Season honors</p>
-    <h3 class="font-display mt-1 text-2xl font-extrabold tracking-tight uppercase">League MVP</h3>
+    <SectionHeading eyebrow="Season honors" title="League MVP" level={3} />
     {#if mvp === null}
-      <p class="mt-2 text-xs text-muted-foreground">No league MVP was recorded for this run.</p>
+      <EmptyState
+        class="mt-2"
+        title="No league MVP"
+        message="No league MVP was recorded for this run."
+        surface="none"
+      />
     {:else}
       {@const mvpFace = playerIndex?.players.find((entry) => entry.playerId === mvp.playerId)}
       <div class="mvp-feature mt-4">
@@ -751,30 +705,29 @@
           </div>
         </dl>
       </div>
-      <dl class="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
-        <div class="rounded-xl border border-line-soft bg-surface-1 px-3 py-2.5">
-          <dt class="font-mono text-[9px] tracking-[0.08em] text-muted-foreground uppercase">
-            MVP score
-          </dt>
-          <dd class="font-mono text-xs font-extrabold tabular-nums">{mvp.mvpScore.toFixed(2)}</dd>
-        </div>
-        <div class="rounded-xl border border-line-soft bg-surface-1 px-3 py-2.5">
-          <dt class="font-mono text-[9px] tracking-[0.08em] text-muted-foreground uppercase">
-            Game score
-          </dt>
-          <dd class="font-mono text-xs font-extrabold tabular-nums">
-            {mvp.averageGameScore.toFixed(1)}
-          </dd>
-        </div>
-        <div class="rounded-xl border border-line-soft bg-surface-1 px-3 py-2.5">
-          <dt class="font-mono text-[9px] tracking-[0.08em] text-muted-foreground uppercase">
-            League baseline TS
-          </dt>
-          <dd class="font-mono text-xs font-extrabold tabular-nums">
-            {report.leagueBaselineTs.toFixed(3)}
-          </dd>
-        </div>
-      </dl>
+      <StatGrid class="mt-4" columns={3} mobile={2}>
+        <StatTile
+          label="MVP score"
+          size="sm"
+          surface="tile"
+          valueClass="font-mono text-xs"
+          value={mvp.mvpScore.toFixed(2)}
+        />
+        <StatTile
+          label="Game score"
+          size="sm"
+          surface="tile"
+          valueClass="font-mono text-xs"
+          value={mvp.averageGameScore.toFixed(1)}
+        />
+        <StatTile
+          label="League baseline TS"
+          size="sm"
+          surface="tile"
+          valueClass="font-mono text-xs"
+          value={report.leagueBaselineTs.toFixed(3)}
+        />
+      </StatGrid>
     {/if}
   </Panel>
 </div>

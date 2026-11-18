@@ -1,9 +1,11 @@
-import type { AchievementId } from '@hoop-rush/data-contracts';
+import type { AchievementId, LegacyAchievementId } from '@hoop-rush/data-contracts';
+import type { Trophy } from '@lucide/svelte';
 import { randomUUID } from '#lib/ids.js';
 import { getPersistence } from '#lib/persistence.js';
+import { achievementCatalog } from './achievement-catalog.js';
 
-export const achievements: Record<
-  AchievementId,
+const legacyAchievements: Record<
+  LegacyAchievementId,
   { name: string; description: string; reward: string }
 > = {
   welcome: {
@@ -36,6 +38,14 @@ export const achievements: Record<
     description: 'Win 5 multiplayer matches in a row.',
     reward: 'Crown avatar and gold border',
   },
+};
+
+export const achievements: Record<
+  AchievementId,
+  { name: string; description: string; icon?: typeof Trophy; reward?: string }
+> = {
+  ...legacyAchievements,
+  ...achievementCatalog,
 };
 
 export function profileRepository() {

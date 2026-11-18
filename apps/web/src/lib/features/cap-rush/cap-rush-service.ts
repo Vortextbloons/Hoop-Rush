@@ -12,6 +12,11 @@ import { getPersistence } from '#lib/persistence.js';
 import { capRushBracketWithRosterMetadata } from './cap-rush-opponent-metadata.js';
 import { loadCapRushRosterMetadata, loadDraftCatalog } from '#lib/data-assets.js';
 import { loadRunPreamble } from '#lib/run-preamble.js';
+import {
+  profileRepository,
+  selectedProfile,
+  withRepositoryHooks,
+} from '#lib/features/profile/profile.js';
 
 export interface CreateCapRushServiceOptions {
   repository?: CapRushDraftRepositoryPort;
@@ -26,8 +31,28 @@ export interface CreateCapRushServiceOptions {
 }
 
 export function createCapRushService(options: CreateCapRushServiceOptions = {}): CapRushService {
+  const baseRepository = options.repository ?? getPersistence().capRushRepository;
+  const repository = options.repository
+    ? baseRepository
+    : withRepositoryHooks<CapRushDraftRepositoryPort>(baseRepository, {
+        applyOutcome: async (input) => {
+          if (input.command.command === 'create-cap-rush-draft') {
+            await selectedProfile();
+            await profileRepository().bind(`cap-rush:${input.outcome.state.runId}`);
+          }
+          return baseRepository.applyOutcome(input);
+        },
+        loadActiveDraft: async () => {
+          const run = await baseRepository.loadActiveDraft();
+          if (run) {
+            await selectedProfile();
+            await profileRepository().bind(`cap-rush:${run.runId}`);
+          }
+          return run;
+        },
+      });
   return new CapRushSession({
-    repository: options.repository ?? getPersistence().capRushRepository,
+    repository,
     assets: {
       loadCatalog: options.loadCatalog ?? loadDraftCatalog,
       loadPreamble:

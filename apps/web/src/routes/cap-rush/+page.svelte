@@ -3,6 +3,7 @@
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import ServiceErrorPanel from '#lib/components/ServiceErrorPanel.svelte';
+  import PageShell from '#lib/components/ui/PageShell.svelte';
   import { openService } from '#lib/service-state.js';
   import CapRushDraftBoard from '#lib/features/cap-rush/CapRushDraftBoard.svelte';
   import CapRushSetup from '#lib/features/cap-rush/CapRushSetup.svelte';
@@ -80,9 +81,9 @@
 </svelte:head>
 
 {#if serviceError !== null}
-  <section class="mx-auto w-full max-w-xl px-3 py-10 sm:px-6">
+  <PageShell as="section" width="sm" padding="xl">
     <ServiceErrorPanel title="Cap Rush could not start" message={serviceError} homeLink />
-  </section>
+  </PageShell>
 {:else if controller !== null}
   {#if controller.loading}
     <div class="mx-auto w-full max-w-5xl px-4 py-16 sm:px-6">
@@ -97,7 +98,7 @@
       ></div>
     </div>
   {:else if controller.draft !== null && stage === 'abandoned'}
-    <section class="mx-auto w-full max-w-xl px-3 py-10 sm:px-6">
+    <PageShell as="section" width="sm" padding="xl">
       <div class="rounded-2xl border border-border bg-card p-6">
         <p
           class="font-mono text-[10px] font-bold tracking-[0.18em] text-muted-foreground uppercase"
@@ -129,7 +130,7 @@
           <p role="alert" class="mt-3 text-xs font-semibold text-negative">{controller.error}</p>
         {/if}
       </div>
-    </section>
+    </PageShell>
   {:else if controller.draft !== null && handedOff}
     <div class="mx-auto w-full max-w-5xl px-4 py-16 sm:px-6">
       <p class="font-mono text-[10px] font-bold tracking-[0.18em] text-muted-foreground uppercase">

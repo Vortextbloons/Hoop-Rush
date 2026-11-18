@@ -1,9 +1,12 @@
 import {
   PROFILE_SAVE_SCHEMA_VERSION,
+  achievementUnlockSchema,
   playerProfileSchema,
   profileBindingSchema,
   profileGameSchema,
   profileSelectionSchema,
+  type AchievementId,
+  type AchievementUnlock,
   type PlayerProfile,
 } from '@hoop-rush/data-contracts';
 import { applyProfileGame, type ProfileGameFacts } from '@hoop-rush/engine';
@@ -79,12 +82,21 @@ export class DexieProfileRepository {
   }
 
   async listUnlocks(bindingId: string) {
+    return (await this.listAchievementReveals(bindingId)).map(({ id }) => id);
+  }
+
+  async listAchievementReveals(bindingId: string) {
     const profile = await this.loadBound(bindingId);
     if (!profile) return [];
+    const evidence = new Map<AchievementId, string>(
+      profile.achievementMoments?.map(({ id, evidence }) => [id, evidence]),
+    );
     const rows = await this.db.profileGames.where('id').startsWith(`${bindingId}:`).toArray();
     return rows.flatMap((row) => {
       const receipt = profileGameSchema.parse(row);
-      return receipt.profileId === profile.id ? receipt.unlocked : [];
+      return receipt.profileId === profile.id
+        ? receipt.unlocked.map((id) => ({ id, evidence: evidence.get(id) }))
+        : [];
     });
   }
 
@@ -169,6 +181,31 @@ export class DexieProfileRepository {
           achievements: [...profile.achievements, ...unlocked],
         },
         unlocked,
+      };
+    });
+  }
+
+  async awardAchievements(
+    bindingId: string,
+    eventId: string,
+    candidates: readonly AchievementUnlock[],
+  ) {
+    if (candidates.length === 0) return [];
+    const awards = candidates.map((candidate) => achievementUnlockSchema.parse(candidate));
+    return this.recordOnce(bindingId, `achievement:${eventId}`, (profile) => {
+      const earned = new Set(profile.achievements);
+      const moments = awards.filter(({ id }) => {
+        if (earned.has(id)) return false;
+        earned.add(id);
+        return true;
+      });
+      return {
+        profile: {
+          ...profile,
+          achievements: [...earned],
+          achievementMoments: [...(profile.achievementMoments ?? []), ...moments],
+        },
+        unlocked: moments.map(({ id }) => id),
       };
     });
   }

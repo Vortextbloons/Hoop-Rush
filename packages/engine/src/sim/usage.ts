@@ -8,7 +8,7 @@ import type { Rng, WeightedPickTable } from './rng.ts';
 import { buildTrustedWeightedPickTable, buildWeightedPickTable } from './rng.ts';
 import type { HavocEvidence } from './havoc-runtime.ts';
 import { ENGINE_CONSTANTS, type PositionResponsibilityModifiers } from './constants.ts';
-import { sameGroupMatchWeight } from './position-responsibilities.ts';
+import { positionMatchWeight } from './position-responsibilities.ts';
 import { creationScore, interiorScoringScore, spacingScore } from '../domain/archetypes.ts';
 import { SHOT_ZONES } from '../domain/zones.ts';
 import { creationResponsibility } from './offense.ts';
@@ -209,7 +209,6 @@ function defenderWeight(defender: SimulationPlayer, zone: ShotZone): number {
 export interface DefenderBase {
   weights: number[][];
   rimProtection: number[];
-  matchMatrix: number[][];
   pickTables: WeightedPickTable[][];
 }
 export function defenderBase(
@@ -229,14 +228,6 @@ export function defenderBase(
       positionModifiers.get(defender.playerId)?.rimProtection ??
       1,
   );
-  const matchMatrix = team.players.map((_, defenderSlot) =>
-    team.players.map((_, shooterSlot) =>
-      sameGroupMatchWeight(
-        baseSlots[defenderSlot] ?? defenderSlot,
-        baseSlots[shooterSlot] ?? shooterSlot,
-      ),
-    ),
-  );
   const pickTables: WeightedPickTable[][] = [];
   for (let zoneIndex = 0; zoneIndex < SHOT_ZONES.length; zoneIndex += 1) {
     const interior = zoneIndex === 0 || zoneIndex === 1;
@@ -244,7 +235,11 @@ export function defenderBase(
     const zoneTables: WeightedPickTable[] = [];
     for (let shooterSlot = 0; shooterSlot < count; shooterSlot += 1) {
       const slotWeights = team.players.map((_, defenderSlot) => {
-        const match = matchMatrix[defenderSlot]?.[shooterSlot] ?? 1;
+        const match = positionMatchWeight(
+          baseSlots[defenderSlot] ?? defenderSlot,
+          baseSlots[shooterSlot] ?? shooterSlot,
+          interior,
+        );
         const rim = interior ? (rimProtection[defenderSlot] ?? 1) : 1;
         return (zoneWeights[defenderSlot] ?? 0) * match * rim;
       });
@@ -255,7 +250,6 @@ export function defenderBase(
   return {
     weights,
     rimProtection,
-    matchMatrix,
     pickTables,
   };
 }

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const PROFILE_SAVE_SCHEMA_VERSION = 1;
-export const achievementIdSchema = z.enum([
+export const legacyAchievementIdSchema = z.enum([
   'welcome',
   'first-multiplayer-win',
   'hands-off',
@@ -9,7 +9,65 @@ export const achievementIdSchema = z.enum([
   'silent-carry',
   'built-different',
 ]);
+export const collectionAchievementIdSchema = z.enum([
+  'better-than-73-9',
+  'one-game-short',
+  'the-popovich-way',
+  'ball-dont-lie',
+  'goin-to-work',
+  '30-for-30',
+  'we-believe',
+  'brodie-mode',
+  'welcome-to-the-50-40-90-club',
+  'the-harden-system',
+  'the-beautiful-game',
+  'magic-vision',
+  'leeverything',
+  'the-dream-team',
+  'laker-legacy',
+  'old-school-legends',
+  '73-9-hold-my-ring',
+  'moneyball',
+  'the-dirk-run',
+  'going-all-in',
+  'the-heatles',
+  'we-believe-2-0',
+  'the-cardiac-kings',
+  'linsanity',
+  'detroit-basketball',
+  'the-shot',
+  'the-curry-effect',
+  'the-dynasty-effect',
+  'all-star-game-numbers',
+  'wilt-chamberlain-mode',
+  'better-without-the-boost',
+  'the-monstars',
+  'space-jam',
+  'manu-off-the-bench',
+  'havoc-built-different',
+  'cleveland-this-is-for-you',
+  'the-reverse-sweep',
+  'bring-out-the-brooms',
+  'dame-time',
+  'upset-of-the-year',
+  'the-revenge-tour',
+  'the-splash-brothers',
+  'moneyball-champions',
+  'season-sweep',
+  'the-finals-rematch',
+]);
+export const achievementIdSchema = z.enum([
+  ...legacyAchievementIdSchema.options,
+  ...collectionAchievementIdSchema.options,
+]);
 export type AchievementId = z.infer<typeof achievementIdSchema>;
+export type LegacyAchievementId = z.infer<typeof legacyAchievementIdSchema>;
+
+export const achievementUnlockSchema = z.object({
+  id: collectionAchievementIdSchema,
+  evidence: z.string().min(1).max(250),
+});
+export type AchievementUnlock = z.infer<typeof achievementUnlockSchema>;
 
 export const playerProfileSchema = z.object({
   saveSchemaVersion: z.literal(PROFILE_SAVE_SCHEMA_VERSION),
@@ -21,6 +79,7 @@ export const playerProfileSchema = z.object({
   title: z.enum(['none', 'defensive-wall', 'floor-general']),
   featuredAchievement: achievementIdSchema.nullable(),
   achievements: z.array(achievementIdSchema),
+  achievementMoments: z.array(achievementUnlockSchema).optional(),
   games: z.number().int().nonnegative(),
   wins: z.number().int().nonnegative(),
   streak: z.number().int().nonnegative(),
