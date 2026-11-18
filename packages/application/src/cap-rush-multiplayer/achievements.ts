@@ -13,10 +13,6 @@ function rivalSeat(seat: CapRushMultiplayerSeatId): CapRushMultiplayerSeatId {
   return seat === 'p1' ? 'p2' : 'p1';
 }
 
-/**
- * Builds pure achievement facts from accepted room state. Payroll uses the
- * locked player salaries (the report's `payrollDollars`), never mutation spend.
- */
 export function capRushMultiplayerAchievementFacts(input: {
   readonly state: CapRushMultiplayerState;
   readonly seat: CapRushMultiplayerSeatId;
@@ -40,10 +36,12 @@ export function capRushMultiplayerAchievementFacts(input: {
         ? rivalId
         : null;
 
-  const payrollDollars = {
-    p1: report?.seats.p1.payrollDollars ?? locked.seats.p1.payrollDollars,
-    p2: report?.seats.p2.payrollDollars ?? locked.seats.p2.payrollDollars,
-  };
+  const totalSpendDollars = report
+    ? {
+        p1: report.seats.p1.payrollDollars + report.seats.p1.spinSpendDollars,
+        p2: report.seats.p2.payrollDollars + report.seats.p2.spinSpendDollars,
+      }
+    : null;
 
   const headToHead = (input.state.season?.games ?? [])
     .filter(
@@ -75,7 +73,7 @@ export function capRushMultiplayerAchievementFacts(input: {
     participantId: input.seat,
     rivalId,
     championSeat,
-    payrollDollars,
+    totalSpendDollars,
     headToHead,
     finals,
   };

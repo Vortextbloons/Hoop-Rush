@@ -50,7 +50,7 @@ function capRushFacts(
     participantId: 'p1',
     rivalId: 'p2',
     championSeat: null,
-    payrollDollars: { p1: 80_000_000, p2: 80_000_000 },
+    totalSpendDollars: { p1: 80_000_000, p2: 80_000_000 },
     headToHead: [],
     finals: null,
     ...overrides,
@@ -235,16 +235,16 @@ describe('evaluateSharedSeasonAchievements', () => {
 });
 
 describe('evaluateCapRushMultiplayerAchievements', () => {
-  test('awards Moneyball at exactly 20M less payroll and only for the champion', () => {
+  test('awards Moneyball at exactly 20M less spending and only for the champion', () => {
     const achievements = evaluateCapRushMultiplayerAchievements(
       capRushFacts({
         championSeat: 'p1',
-        payrollDollars: { p1: 72_000_000, p2: 95_000_000 },
+        totalSpendDollars: { p1: 72_000_000, p2: 95_000_000 },
       }),
     );
     expect(ids(achievements)).toEqual(['moneyball-champions']);
     expect(achievements[0]?.evidence).toBe(
-      'Won the Cap Rush championship with $72,000,000 payroll against $95,000,000 ($23,000,000 less)',
+      'Won the Cap Rush championship spending $72,000,000 against $95,000,000 ($23,000,000 less)',
     );
 
     expect(
@@ -252,7 +252,7 @@ describe('evaluateCapRushMultiplayerAchievements', () => {
         evaluateCapRushMultiplayerAchievements(
           capRushFacts({
             championSeat: 'p1',
-            payrollDollars: { p1: 72_000_000, p2: 92_000_000 },
+            totalSpendDollars: { p1: 72_000_000, p2: 92_000_000 },
           }),
         ),
       ),
@@ -262,7 +262,7 @@ describe('evaluateCapRushMultiplayerAchievements', () => {
         evaluateCapRushMultiplayerAchievements(
           capRushFacts({
             championSeat: 'p1',
-            payrollDollars: { p1: 72_000_000, p2: 91_999_999 },
+            totalSpendDollars: { p1: 72_000_000, p2: 91_999_999 },
           }),
         ),
       ),
@@ -272,7 +272,7 @@ describe('evaluateCapRushMultiplayerAchievements', () => {
         evaluateCapRushMultiplayerAchievements(
           capRushFacts({
             championSeat: 'p2',
-            payrollDollars: { p1: 72_000_000, p2: 95_000_000 },
+            totalSpendDollars: { p1: 72_000_000, p2: 95_000_000 },
           }),
         ),
       ),
@@ -347,7 +347,7 @@ describe('evaluateCapRushMultiplayerAchievements', () => {
             participantId: 'p1',
             rivalId: 'p1',
             championSeat: 'p1',
-            payrollDollars: { p1: 50_000_000, p2: 100_000_000 },
+            totalSpendDollars: { p1: 50_000_000, p2: 100_000_000 },
           }),
         ),
       ),

@@ -123,7 +123,7 @@ describe('capRushMultiplayerAchievementFacts', () => {
       participantId: 'p1',
       rivalId: 'p2',
       championSeat: 'p1',
-      payrollDollars: { p1: 72_000_000, p2: 95_000_000 },
+      totalSpendDollars: { p1: 72_000_000, p2: 95_000_000 },
       headToHead: [
         { gameId: 'crl-5-franchise-p1-franchise-p2', winnerSeat: 'p1' },
         { gameId: 'crl-61-franchise-p2-franchise-p1', winnerSeat: 'p1' },
@@ -204,7 +204,7 @@ describe('capRushMultiplayerAchievementFacts', () => {
     expect(achievements).toEqual([]);
   });
 
-  test('uses locked player payroll instead of roulette mutation spend', () => {
+  test('includes roulette purchases when comparing championship spending', () => {
     const achievements = capRushMultiplayerAchievements({
       state: state({
         locked: locked({ p1Payroll: 72_000_000, p2Payroll: 95_000_000 }),
@@ -218,7 +218,7 @@ describe('capRushMultiplayerAchievementFacts', () => {
       seat: 'p1',
     });
 
-    expect(achievements.map((achievement) => achievement.id)).toEqual(['moneyball-champions']);
+    expect(achievements.map((achievement) => achievement.id)).toEqual([]);
   });
 
   test('requires the Finals to be between both human seats', () => {

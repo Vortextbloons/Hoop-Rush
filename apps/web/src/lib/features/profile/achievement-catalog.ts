@@ -318,7 +318,8 @@ export const achievementCatalog = {
   },
   'moneyball-champions': {
     name: 'Moneyball Champions',
-    description: 'Win a Cap Rush title with a payroll at least $20M cheaper than your human rival.',
+    description:
+      'Win a Cap Rush title spending at least $20M less than your human rival, including Roulette spins.',
     category: 'multiplayer',
     icon: Trophy,
   },

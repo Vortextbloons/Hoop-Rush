@@ -81,6 +81,7 @@ export class CapRushMultiplayerController {
   private loadInFlight = false;
   private roomId: string;
   private lastPhase: CapRushMultiplayerPhase | null = null;
+  private lastAchievementState: CapRushMultiplayerState | null = null;
   private suppressedError: string | null = null;
   private lastSignalAt = 0;
   private pendingSignal = false;
@@ -664,6 +665,8 @@ export class CapRushMultiplayerController {
     const view = this.view;
     const binding = this.profileBinding;
     if (view === null || binding === null || this.isDisposed()) return;
+    if (view.state === this.lastAchievementState) return;
+    this.lastAchievementState = view.state;
     for (const award of capRushMultiplayerAchievementAwards(view.state, view.seat)) {
       if (this.awardedAchievements.has(award.eventId)) continue;
       this.awardedAchievements.add(award.eventId);

@@ -77,7 +77,7 @@ export interface CapRushMultiplayerAchievementFacts {
   participantId: MultiplayerSeatId;
   rivalId: MultiplayerSeatId;
   championSeat: MultiplayerSeatId | null;
-  payrollDollars: Readonly<Record<MultiplayerSeatId, number>>;
+  totalSpendDollars: Readonly<Record<MultiplayerSeatId, number>> | null;
   headToHead: readonly CapRushHeadToHeadGameFact[];
   finals: CapRushFinalsFact | null;
 }
@@ -91,7 +91,7 @@ const UPSET_OVR_GAP = 6;
 // Averages can be fractional, so an exact gap can land just below six in
 // binary floating point.
 const AVERAGE_COMPARISON_EPSILON = 1e-9;
-const MONEYBALL_PAYROLL_GAP_DOLLARS = 20_000_000;
+const MONEYBALL_SPEND_GAP_DOLLARS = 20_000_000;
 
 function otherSeat(seat: MultiplayerSeatId): MultiplayerSeatId {
   return seat === 'p1' ? 'p2' : 'p1';
@@ -253,22 +253,24 @@ export function evaluateCapRushMultiplayerAchievements(
 ): MultiplayerAchievement[] {
   if (facts.participantId === facts.rivalId) return [];
   const achievements: MultiplayerAchievement[] = [];
-  const participantPayroll = facts.payrollDollars[facts.participantId];
-  const rivalPayroll = facts.payrollDollars[facts.rivalId];
+  const participantSpend = facts.totalSpendDollars?.[facts.participantId];
+  const rivalSpend = facts.totalSpendDollars?.[facts.rivalId];
   if (
     facts.championSeat === facts.participantId &&
-    Number.isFinite(participantPayroll) &&
-    participantPayroll >= 0 &&
-    Number.isFinite(rivalPayroll) &&
-    rivalPayroll >= 0 &&
-    rivalPayroll - participantPayroll >= MONEYBALL_PAYROLL_GAP_DOLLARS
+    participantSpend !== undefined &&
+    Number.isFinite(participantSpend) &&
+    participantSpend >= 0 &&
+    rivalSpend !== undefined &&
+    Number.isFinite(rivalSpend) &&
+    rivalSpend >= 0 &&
+    rivalSpend - participantSpend >= MONEYBALL_SPEND_GAP_DOLLARS
   ) {
-    const savings = rivalPayroll - participantPayroll;
+    const savings = rivalSpend - participantSpend;
     achievements.push({
       id: 'moneyball-champions',
       evidence:
-        `Won the Cap Rush championship with ${formatDollars(participantPayroll)} payroll ` +
-        `against ${formatDollars(rivalPayroll)} (${formatDollars(savings)} less)`,
+        `Won the Cap Rush championship spending ${formatDollars(participantSpend)} ` +
+        `against ${formatDollars(rivalSpend)} (${formatDollars(savings)} less)`,
     });
   }
 

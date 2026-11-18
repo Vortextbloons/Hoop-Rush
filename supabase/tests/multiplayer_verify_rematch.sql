@@ -223,6 +223,15 @@ insert into public.havoc_multiplayer_room_commands (room_id, command_id, ordinal
   ('22222222-2222-4222-8222-222222222207', 'hv-protocol-request', 0, 'p1', '{"kind":"rematch-request"}'),
   ('22222222-2222-4222-8222-222222222207', 'hv-protocol-confirm', 1, 'p2', '{"kind":"rematch-confirm"}');
 
+-- Keep fabricated rooms outside the one-minute rematch rate-limit window; the
+-- real flows below create their own fresh rooms.
+update public.draft_duel_rooms
+   set created_at = now() - interval '10 minutes'
+ where id::text like '11111111-1111-4111-8111-1111111111%';
+update public.havoc_multiplayer_rooms
+   set created_at = now() - interval '10 minutes'
+ where id::text like '22222222-2222-4222-8222-2222222222%';
+
 -- 3. Draft Duel behavior.
 select is(
   public.mvr_pgtap_verify(
