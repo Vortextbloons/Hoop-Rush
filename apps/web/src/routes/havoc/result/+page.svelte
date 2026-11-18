@@ -5,6 +5,7 @@
   import HavocResultView from '#lib/features/havoc/HavocResultView.svelte';
   import { HavocResultState } from '#lib/features/havoc/havoc-result-state.svelte.js';
   import { getHavocService } from '#lib/features/havoc/havoc-service.js';
+  import PageShell from '#lib/components/ui/PageShell.svelte';
 
   let resultState = $state<HavocResultState | null>(null);
   let serviceError = $state<string | null>(null);
@@ -36,9 +37,9 @@
 </svelte:head>
 
 {#if serviceError !== null}
-  <section class="mx-auto w-full max-w-xl px-3 py-10 sm:px-6">
+  <PageShell as="section" width="sm" padding="xl">
     <ServiceErrorPanel title="Havoc is not wired yet" message={serviceError} tone="destructive" />
-  </section>
+  </PageShell>
 {:else if resultState !== null}
   <HavocResultView state={resultState} />
 {/if}

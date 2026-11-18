@@ -10,6 +10,10 @@
   import HavocGameDetail from './HavocGameDetail.svelte';
   import AchievementReveal from '#lib/features/profile/AchievementReveal.svelte';
   import { havocRecordLabel, havocDeltaTitle, formatSignedPoints } from './havoc-presentation';
+  import Button from '#lib/components/ui/Button.svelte';
+  import ActionLink from '#lib/components/ui/ActionLink.svelte';
+  import Panel from '#lib/components/ui/Panel.svelte';
+  import Alert from '#lib/components/ui/Alert.svelte';
   let { state: resultState }: { state: HavocResultState } = $props();
   const run = $derived(resultState.run);
   const comparison = $derived(resultState.comparison);
@@ -24,20 +28,20 @@
 
 <section class="h-shell" data-havoc-result>
   {#if resultState.loading}<p class="h-copy" aria-live="polite">Opening your season report…</p>
-  {:else if run === null || run.phase === 'draft'}<div class="h-panel">
+  {:else if run === null || run.phase === 'draft'}<Panel padding="md">
       <h1 class="h-title">Your story starts here.</h1>
-      <a class="h-button mt-6" href={resolve('havoc/')}>Draft your squad</a>
-    </div>
-  {:else if !resultState.havocSeasonComplete}<div class="h-panel">
+      <ActionLink class="mt-6" href={resolve('havoc/')}>Draft your squad</ActionLink>
+    </Panel>
+  {:else if !resultState.havocSeasonComplete}<Panel padding="md">
       <h1 class="h-title">Season in progress.</h1>
       <p class="h-copy mt-4">
         Your report arrives after both 82-game seasons: with powers, then the same schedule without
         them.
       </p>
-      <a class="h-button mt-6" href={resolve('havoc/run/')}>Continue season</a>
-    </div>
+      <ActionLink class="mt-6" href={resolve('havoc/run/')}>Continue season</ActionLink>
+    </Panel>
   {:else if !resultState.comparisonComplete && run.comparisonStatus !== 'unsupported'}
-    <div class="h-panel" data-havoc-comparison-pending>
+    <Panel padding="md" data-havoc-comparison-pending>
       <p class="h-eyebrow">One last thing</p>
       <h1 class="h-title mt-3">The powers. The proof.</h1>
       <p class="h-copy mt-4">
@@ -55,20 +59,21 @@
       </div>
 
       <p class="h-copy" data-havoc-comparison-progress>{completed} / 82</p>
-      {#if !resultState.busy}<button
-          class="h-button mt-4"
+      {#if !resultState.busy}<Button
+          class="mt-4"
           data-havoc-run-normal
-          onclick={() => void resultState.runNormalSeason()}>Finish season report</button
+          onclick={() => void resultState.runNormalSeason()}>Finish season report</Button
         >{/if}
-      {#if resultState.busy}<button
-          class="h-button secondary mt-4"
+      {#if resultState.busy}<Button
+          class="mt-4"
+          tone="secondary"
           disabled={resultState.cancelling}
           onclick={() => void resultState.cancelComparison()}
-          >{resultState.cancelling ? 'Pausing...' : 'Pause report preparation'}</button
+          >{resultState.cancelling ? 'Pausing...' : 'Pause report preparation'}</Button
         >{/if}
-    </div>
+    </Panel>
   {:else}
-    <header class="h-panel h-result-hero">
+    <header class="ui-panel h-result-hero" data-padding="md">
       <p class="h-eyebrow">Hoop Havoc · Season report</p>
       <h1 class="h-subtitle mt-2">
         {comparison !== null && resultState.comparisonComplete
@@ -144,10 +149,10 @@
       <AchievementReveal bindingId={`havoc:${run.runId}`} />
     </header>
     {#if run.comparisonStatus === 'unsupported'}
-      <p class="h-alert mt-4" data-havoc-comparison-unsupported>
+      <Alert class="mt-4" tone="warning" data-havoc-comparison-unsupported>
         This saved season uses older rules. Its results are preserved, but a matching comparison is
         unavailable.
-      </p>
+      </Alert>
       {#if resultState.report !== null}<dl class="h-result-metrics mt-4">
           <div>
             <dt>Average score margin</dt>
@@ -163,7 +168,7 @@
     {/if}
     {#if comparison !== null && resultState.comparisonComplete}
       <HavocSquadReport {comparison} lineup={run.lineup} />
-      <details class="h-panel mt-4">
+      <details class="ui-panel mt-4" data-padding="md">
         <summary>Your season, game by game · 82 matched results</summary>
         <HavocComparisonChart
           {comparison}
@@ -176,12 +181,12 @@
       </details>
     {:else}<div class="mt-6"><HavocLineupLock slots={run.lineup} /></div>{/if}
     <div class="h-actions mt-6">
-      <a class="h-button" href={resolve('havoc/')}>Draft another squad <ArrowRight size={18} /></a>
+      <ActionLink href={resolve('havoc/')}>Draft another squad <ArrowRight size={18} /></ActionLink>
       <a class="h-link" href={resolve('havoc/history/')}>Hall of Freaks</a>
     </div>
 
     {#if comparison !== null && resultState.comparisonComplete}
-      <details class="h-panel mt-8">
+      <details class="ui-panel mt-8" data-padding="md">
         <summary>Explore the box scores, powers & game-by-game comparison</summary>
         <HavocComparisonView {comparison} showChart={false} />
       </details>
@@ -192,8 +197,8 @@
       href={resolve('/havoc/history/[runId]', { runId: run.runId })}>Open full saved report</a
     >
   {/if}
-  {#if resultState.error !== null}<p role="alert" class="h-alert">{resultState.error}</p>{/if}
-  {#if resultState.notice !== null}<p role="status" class="h-alert">{resultState.notice}</p>{/if}
+  {#if resultState.error !== null}<Alert tone="danger">{resultState.error}</Alert>{/if}
+  {#if resultState.notice !== null}<Alert tone="info">{resultState.notice}</Alert>{/if}
 </section>
 <Dialog.Root bind:open={gameDetailsOpen}>
   <Dialog.Portal>
@@ -201,7 +206,8 @@
     <Dialog.Content class="havoc-world h-result-dialog">
       <header class="h-header">
         <Dialog.Title class="h-subtitle">Game {selectedGame} comparison</Dialog.Title><Dialog.Close
-          class="h-button secondary">Close</Dialog.Close
+          class="ui-btn"
+          data-tone="secondary">Close</Dialog.Close
         >
       </header>
 

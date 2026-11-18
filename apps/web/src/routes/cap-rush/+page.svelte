@@ -86,23 +86,19 @@
   </PageShell>
 {:else if controller !== null}
   {#if controller.loading}
-    <div class="mx-auto w-full max-w-5xl px-4 py-16 sm:px-6">
-      <p class="font-mono text-[10px] font-bold tracking-[0.18em] text-muted-foreground uppercase">
-        Loading the draft room…
-      </p>
+    <PageShell width="lg" padding="2xl">
+      <p class="ui-label text-muted-foreground">Loading the draft room…</p>
       <div
         class="mt-4 h-3 w-48 animate-pulse rounded-full bg-surface-2 motion-reduce:animate-none"
       ></div>
       <div
         class="mt-2 h-3 w-72 animate-pulse rounded-full bg-surface-2 motion-reduce:animate-none"
       ></div>
-    </div>
+    </PageShell>
   {:else if controller.draft !== null && stage === 'abandoned'}
     <PageShell as="section" width="sm" padding="xl">
       <div class="rounded-2xl border border-border bg-card p-6">
-        <p
-          class="font-mono text-[10px] font-bold tracking-[0.18em] text-muted-foreground uppercase"
-        >
+        <p class="ui-label text-muted-foreground">
           {variantLabel(controller.draft.draft.variant)} · Run abandoned
         </p>
         <h1 class="font-display mt-2 text-2xl font-extrabold tracking-tight uppercase">
@@ -132,14 +128,14 @@
       </div>
     </PageShell>
   {:else if controller.draft !== null && handedOff}
-    <div class="mx-auto w-full max-w-5xl px-4 py-16 sm:px-6">
-      <p class="font-mono text-[10px] font-bold tracking-[0.18em] text-muted-foreground uppercase">
+    <PageShell width="lg" padding="2xl">
+      <p class="ui-label text-muted-foreground">
         Opening the {stage === 'completed' ? 'season report' : 'season'}…
       </p>
       <div
         class="mt-4 h-3 w-48 animate-pulse rounded-full bg-surface-2 motion-reduce:animate-none"
       ></div>
-    </div>
+    </PageShell>
   {:else if controller.draft !== null}
     <CapRushDraftBoard
       view={controller.draft}

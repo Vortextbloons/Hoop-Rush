@@ -22,6 +22,10 @@
   import CapRushSeasonProgress from './CapRushSeasonProgress.svelte';
   import type { CapRushArt } from './cap-rush-art.ts';
   import { formatAverage, initialsOf, recordLabel } from './cap-rush-presentation.ts';
+  import Panel from '#lib/components/ui/Panel.svelte';
+  import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
+  import StatGrid from '#lib/components/ui/StatGrid.svelte';
+  import StatTile from '#lib/components/ui/StatTile.svelte';
 
   let {
     controller,
@@ -239,9 +243,7 @@
 <section class="cap-rush-broadcast flex flex-col gap-4" aria-label="Cap Rush postseason">
   <header class="flex flex-wrap items-end justify-between gap-3">
     <div class="min-w-0">
-      <p class="font-mono text-[10px] font-bold tracking-[0.18em] text-primary uppercase">
-        Cap Rush · Postseason
-      </p>
+      <p class="ui-label">Cap Rush · Postseason</p>
       <h1 class="font-display mt-1 text-3xl font-extrabold tracking-tight uppercase sm:text-4xl">
         {statusHeadline()}
       </h1>
@@ -278,9 +280,7 @@
       <div class="relative flex items-center gap-4">
         <Trophy size={40} class="shrink-0 text-accent" aria-hidden="true" />
         <div class="min-w-0">
-          <p class="font-mono text-[10px] font-bold tracking-[0.16em] text-accent uppercase">
-            Cap Rush champion
-          </p>
+          <p class="ui-label text-accent">Cap Rush champion</p>
           <h2 class="font-display text-3xl font-extrabold tracking-tight uppercase">
             {championEntry?.displayName ?? 'Your five'}
           </h2>
@@ -291,26 +291,23 @@
       </div>
     </div>
   {:else if championEntry !== null}
-    <div class="rounded-2xl border border-border bg-card p-5 sm:p-6" role="status">
-      <p class="font-mono text-[10px] font-bold tracking-[0.16em] text-muted-foreground uppercase">
-        Champion
-      </p>
-      <h2 class="font-display mt-1 text-2xl font-extrabold tracking-tight uppercase">
-        {championEntry.displayName}
-      </h2>
-      <p class="mt-1 text-sm text-muted-foreground">
-        {isChampion
+    <Panel role="status" padding="md">
+      <SectionHeading
+        eyebrow="Champion"
+        eyebrowTone="muted"
+        title={championEntry.displayName}
+        level={2}
+        size="md"
+        description={isChampion
           ? 'Your run ends with the trophy.'
           : 'Your run is over, but the bracket finished.'}
-      </p>
-    </div>
+      />
+    </Panel>
   {/if}
 
   {#if finalsMvp !== null}
-    <div class="rounded-2xl border border-accent/40 bg-card p-5 sm:p-6" aria-label="Finals MVP">
-      <p class="font-mono text-[10px] font-bold tracking-[0.16em] text-accent uppercase">
-        Finals MVP
-      </p>
+    <Panel aria-label="Finals MVP" padding="md" class="border-accent/40">
+      <p class="ui-label text-accent">Finals MVP</p>
       <div class="mt-3 flex flex-wrap items-center gap-4">
         <div class="shrink-0">
           {#if mvpFace && art}
@@ -334,32 +331,28 @@
           <p class="font-mono text-[10px] text-muted-foreground uppercase">
             {finalsMvp.slot} · {nameOf(finalsMvp.teamId)} · {finalsMvp.games} Finals games
           </p>
-          <dl class="mt-3 grid grid-cols-4 gap-2">
-            <div>
-              <dt class="font-mono text-[8px] text-muted-foreground uppercase">PTS</dt>
-              <dd class="font-display text-lg font-extrabold tabular-nums">
-                {formatAverage(finalsMvp.totalPoints, finalsMvp.games)}
-              </dd>
-            </div>
-            <div>
-              <dt class="font-mono text-[8px] text-muted-foreground uppercase">REB</dt>
-              <dd class="font-display text-lg font-extrabold tabular-nums">
-                {formatAverage(finalsMvp.totalRebounds, finalsMvp.games)}
-              </dd>
-            </div>
-            <div>
-              <dt class="font-mono text-[8px] text-muted-foreground uppercase">AST</dt>
-              <dd class="font-display text-lg font-extrabold tabular-nums">
-                {formatAverage(finalsMvp.totalAssists, finalsMvp.games)}
-              </dd>
-            </div>
-            <div>
-              <dt class="font-mono text-[8px] text-muted-foreground uppercase">Game score</dt>
-              <dd class="font-display text-lg font-extrabold tabular-nums">
-                {formatAverage(finalsMvp.totalGameScore, finalsMvp.games)}
-              </dd>
-            </div>
-          </dl>
+          <StatGrid class="mt-3" columns={4} mobile={2}>
+            <StatTile
+              label="PTS"
+              size="sm"
+              value={formatAverage(finalsMvp.totalPoints, finalsMvp.games)}
+            />
+            <StatTile
+              label="REB"
+              size="sm"
+              value={formatAverage(finalsMvp.totalRebounds, finalsMvp.games)}
+            />
+            <StatTile
+              label="AST"
+              size="sm"
+              value={formatAverage(finalsMvp.totalAssists, finalsMvp.games)}
+            />
+            <StatTile
+              label="Game score"
+              size="sm"
+              value={formatAverage(finalsMvp.totalGameScore, finalsMvp.games)}
+            />
+          </StatGrid>
         </div>
       </div>
       <p class="mt-3 text-[11px] text-muted-foreground">
@@ -367,7 +360,7 @@
         <strong class="text-foreground">{finalsMvp.totalGameScore.toFixed(1)}</strong>. Ranked by
         cumulative Finals game score, then Finals points, assists, rebounds and stable player ID.
       </p>
-    </div>
+    </Panel>
   {/if}
 
   <div class="rounded-2xl border border-border bg-card p-4 sm:p-5" aria-label="Postseason action">
@@ -461,7 +454,7 @@
   {#if userSeries !== null && postseason?.phase !== 'complete' && !reviewingSeason}
     <section class="matchup-panel rounded-2xl p-4 sm:p-6" aria-label="Current series">
       <div class="flex flex-wrap items-center justify-between gap-2">
-        <p class="font-mono text-[10px] font-bold tracking-[0.16em] text-accent uppercase">
+        <p class="ui-label text-accent">
           {roundName(userSeries.round)} ·
           {userSeriesActive
             ? `Game ${String(Math.min(7, userSeries.games.length + 1))}`
@@ -617,9 +610,7 @@
   headerClass="mb-4"
 >
   {#snippet header()}
-    <p class="font-mono text-[10px] font-bold tracking-[0.16em] text-primary uppercase">
-      Team detail
-    </p>
+    <p class="ui-label">Team detail</p>
   {/snippet}
   {#if selectedTeamId !== null && view.draft.locked !== null && standings !== null}
     <CapRushTeamDetail
@@ -646,9 +637,7 @@
   grabHandle={true}
 >
   {#snippet header()}
-    <p class="font-mono text-[10px] font-bold tracking-[0.16em] text-primary uppercase">
-      Box score
-    </p>
+    <p class="ui-label">Box score</p>
     <p class="font-display text-lg font-extrabold tracking-tight uppercase">
       {selectedBox?.label ?? ''}
     </p>

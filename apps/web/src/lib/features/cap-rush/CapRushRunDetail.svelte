@@ -28,7 +28,7 @@
       </div>
     {:else if state.report !== null}
       <header class="mb-4">
-        <p class="font-mono text-[10px] font-bold tracking-[0.18em] text-primary uppercase">
+        <p class="ui-label">
           Cap Rush ·
           {state.report.postseason === undefined ? 'Regular-season run' : 'Saved postseason'}
         </p>

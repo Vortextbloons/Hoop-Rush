@@ -32,6 +32,11 @@
   import AchievementReveal from '#lib/features/profile/AchievementReveal.svelte';
   import { oneDecimal, percentOneDecimal, ratioPct, trueShootingPct } from '#lib/format.js';
   import { SLOT_LABELS } from '#lib/player-positions.js';
+  import EmptyState from '#lib/components/ui/EmptyState.svelte';
+  import Panel from '#lib/components/ui/Panel.svelte';
+  import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
+  import StatGrid from '#lib/components/ui/StatGrid.svelte';
+  import StatTile from '#lib/components/ui/StatTile.svelte';
   type PeakPlayer = PeakPlayerSeason;
   let {
     manifest,
@@ -368,9 +373,7 @@
   {#if tab === 'overview'}
     <div class="p-4 sm:p-6">
       <section aria-label="Your five" class="rounded-xl border border-line-soft bg-surface-1 p-4">
-        <h3 class="font-mono text-[11px] font-bold tracking-[0.16em] text-primary uppercase">
-          Your five
-        </h3>
+        <h3 class="ui-label">Your five</h3>
         {#if seasonTable.length > 0}
           <ul class="mt-2 flex flex-col divide-y divide-border/60">
             {#each seasonTable as row, index (row.aggregate.playerId)}
@@ -427,11 +430,7 @@
         aria-label="League MVP"
         class="rounded-xl border border-line-soft bg-surface-1 p-4 text-center"
       >
-        <h3
-          class="text-left font-mono text-[11px] font-bold tracking-[0.16em] text-primary uppercase"
-        >
-          League MVP
-        </h3>
+        <h3 class="text-left ui-label">League MVP</h3>
         {#if mvp}
           <div class="mt-2 flex items-center justify-center gap-2">
             <span
@@ -477,7 +476,7 @@
             </div>
           </div>
         {:else}
-          <p class="mt-3 text-sm text-muted-foreground">No games recorded yet.</p>
+          <EmptyState class="mt-3" title="No games recorded yet" surface="none" />
         {/if}
       </section>
 
@@ -485,9 +484,7 @@
         aria-label="Season comparison"
         class="rounded-xl border border-line-soft bg-surface-1 p-4"
       >
-        <h3 class="font-mono text-[11px] font-bold tracking-[0.16em] text-primary uppercase">
-          Season comparison
-        </h3>
+        <h3 class="ui-label">Season comparison</h3>
         {#if record}
           <table class="mt-2 w-full text-sm">
             <thead>
@@ -565,9 +562,7 @@
         aria-label="Season summary"
         class="rounded-xl border border-line-soft bg-surface-1 p-4"
       >
-        <h3 class="font-mono text-[11px] font-bold tracking-[0.16em] text-primary uppercase">
-          Season summary
-        </h3>
+        <h3 class="ui-label">Season summary</h3>
         <ul class="mt-3 flex flex-col gap-3 text-sm">
           <li class="flex items-center gap-3">
             <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface-3"
@@ -650,15 +645,13 @@
           class="mt-4 rounded-xl border border-destructive/30 bg-destructive/5 p-4 sm:p-5"
         >
           <div class="flex flex-wrap items-baseline justify-between gap-2">
-            <h2
-              id="first-loss-heading"
-              class="font-display text-xl font-extrabold tracking-tight uppercase"
-            >
-              First loss
-            </h2>
-            <span class="font-mono text-[10px] text-muted-foreground"
-              >Game {firstLoss.game.gameNumber}</span
-            >
+            <SectionHeading title="First loss" headingId="first-loss-heading" level={2} size="md">
+              {#snippet actions()}
+                <span class="font-mono text-[10px] text-muted-foreground"
+                  >Game {firstLoss.game.gameNumber}</span
+                >
+              {/snippet}
+            </SectionHeading>
           </div>
           <p class="mt-2 text-sm font-semibold">
             {firstLoss.opponentName} won {firstLoss.game.away.box.points}–{firstLoss.game.home.box
@@ -673,7 +666,7 @@
               {/each}
             </ul>
           {:else}
-            <p class="mt-3 text-xs text-muted-foreground">No clear factor recorded.</p>
+            <EmptyState class="mt-3" title="No clear factor recorded" surface="none" />
           {/if}
         </section>
       {/if}
@@ -681,9 +674,7 @@
   {:else if tab === 'players'}
     <section aria-label="Your five, season table" class="min-w-0 p-4 sm:p-6">
       <div class="flex flex-wrap items-center justify-between gap-3">
-        <h2 class="font-display text-xl font-extrabold tracking-tight uppercase">
-          Your five · season
-        </h2>
+        <SectionHeading title="Your five · season" level={2} size="md" />
         <PlayerStatsControls
           valuesLabel="Season values"
           values={totalsMode ? 'totals' : 'game'}
@@ -929,48 +920,44 @@
   {:else}
     <div class="flex flex-col gap-4 p-4 sm:p-6">
       {#if record}
-        <section
-          aria-label="Season snapshot"
-          class="rounded-xl border border-border bg-surface-1 p-4 sm:p-5"
-        >
-          <div class="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 class="font-display text-xl font-extrabold tracking-tight uppercase">
-              Season snapshot
-            </h2>
-            <span class="font-mono text-[10px] text-muted-foreground">{gamesPlayed} games</span>
-          </div>
-          <dl class="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
-            <div class="rounded-lg border border-border bg-card p-3">
-              <dt class="font-mono text-[10px] text-muted-foreground uppercase">Your PPG</dt>
-              <dd class="mt-1 font-display text-xl font-extrabold">
-                {perGameValue(record.points, gamesPlayed)}
-              </dd>
-            </div>
-            <div class="rounded-lg border border-border bg-card p-3">
-              <dt class="font-mono text-[10px] text-muted-foreground uppercase">Opponent PPG</dt>
-              <dd class="mt-1 font-display text-xl font-extrabold">
-                {oneDecimal(opponentPointsPerGame)}
-              </dd>
-            </div>
-            <div class="rounded-lg border border-border bg-card p-3">
-              <dt class="font-mono text-[10px] text-muted-foreground uppercase">Point diff</dt>
-              <dd class="mt-1 font-display text-xl font-extrabold">
-                {pointDifferential >= 0 ? '+' : ''}{perGameValue(pointDifferential, gamesPlayed)}
-              </dd>
-            </div>
-            <div class="rounded-lg border border-border bg-card p-3">
-              <dt class="font-mono text-[10px] text-muted-foreground uppercase">Pace</dt>
-              <dd class="mt-1 font-display text-xl font-extrabold">
-                {perGameValue(record.possessions, gamesPlayed)}
-              </dd>
-            </div>
-            <div class="rounded-lg border border-border bg-card p-3">
-              <dt class="font-mono text-[10px] text-muted-foreground uppercase">Rebounds/G</dt>
-              <dd class="mt-1 font-display text-xl font-extrabold">
-                {perGameValue(record.rebounds.total, gamesPlayed)}
-              </dd>
-            </div>
-          </dl>
+        <Panel as="section" aria-label="Season snapshot" padding="md">
+          <SectionHeading title="Season snapshot" level={2} size="md">
+            {#snippet actions()}
+              <span class="font-mono text-[10px] text-muted-foreground">{gamesPlayed} games</span>
+            {/snippet}
+          </SectionHeading>
+          <StatGrid class="mt-4" columns={5} mobile={2}>
+            <StatTile
+              label="Your PPG"
+              size="md"
+              surface="tile"
+              value={perGameValue(record.points, gamesPlayed)}
+            />
+            <StatTile
+              label="Opponent PPG"
+              size="md"
+              surface="tile"
+              value={oneDecimal(opponentPointsPerGame)}
+            />
+            <StatTile
+              label="Point diff"
+              size="md"
+              surface="tile"
+              value={`${pointDifferential >= 0 ? '+' : ''}${perGameValue(pointDifferential, gamesPlayed)}`}
+            />
+            <StatTile
+              label="Pace"
+              size="md"
+              surface="tile"
+              value={perGameValue(record.possessions, gamesPlayed)}
+            />
+            <StatTile
+              label="Rebounds/G"
+              size="md"
+              surface="tile"
+              value={perGameValue(record.rebounds.total, gamesPlayed)}
+            />
+          </StatGrid>
           <div class="mt-3 grid gap-2 font-mono text-xs sm:grid-cols-5">
             <p>
               <span class="text-muted-foreground">FG</span>
@@ -997,13 +984,11 @@
               {perGameValue(record.turnovers, gamesPlayed)}
             </p>
           </div>
-        </section>
+        </Panel>
       {/if}
 
-      <section aria-label="How your five won" class="rounded-xl border border-border bg-card p-5">
-        <h2 class="font-display text-xl font-extrabold tracking-tight uppercase">
-          How your five won
-        </h2>
+      <Panel as="section" aria-label="How your five won" padding="md">
+        <SectionHeading title="How your five won" level={2} size="md" />
         <ul class="mt-3 grid gap-2 text-sm sm:grid-cols-2">
           <li class="rounded-lg border border-border bg-surface-1 p-3">
             <span class="font-semibold"
@@ -1047,7 +1032,7 @@
             </li>
           {/if}
         </ul>
-      </section>
+      </Panel>
     </div>
   {/if}
 </div>

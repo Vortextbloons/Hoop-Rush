@@ -36,6 +36,7 @@
   import AsyncState from '#lib/components/AsyncState.svelte';
   import RosterComparison from '#lib/components/RosterComparison.svelte';
   import RosterTable from '#lib/components/RosterTable.svelte';
+  import PageShell from '#lib/components/ui/PageShell.svelte';
   const loadPlayerDetailDialog = lazyModule(
     () => import('#lib/components/PlayerDetailDialog.svelte'),
   );
@@ -314,10 +315,11 @@
   <title>Roster — Hoop Rush</title>
 </svelte:head>
 
-<section
-  class="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10 {compareSelection.length > 0
-    ? 'pb-40 md:pb-10'
-    : 'pb-24 md:pb-10'}"
+<PageShell
+  as="section"
+  width="xl"
+  padding="lg"
+  class={compareSelection.length > 0 ? 'pb-40 md:pb-10' : 'pb-24 md:pb-10'}
 >
   <div class="flex items-end justify-between gap-4">
     <div>
@@ -544,4 +546,4 @@
       />
     {/await}
   {/if}
-</section>
+</PageShell>

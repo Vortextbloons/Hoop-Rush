@@ -10,6 +10,7 @@
   import ActionLink from '#lib/components/ui/ActionLink.svelte';
   import PageHeader from '#lib/components/ui/PageHeader.svelte';
   import HistoryList from './challenge-history-list.svelte';
+  import PageShell from '#lib/components/ui/PageShell.svelte';
   let {
     mode,
     eyebrow,
@@ -62,7 +63,7 @@
   const continueHref = $derived(active?.mode === mode ? `/${mode}/challenge` : null);
 </script>
 
-<section class="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
+<PageShell as="section" width="xl" padding="lg">
   <PageHeader {eyebrow} title="Challenge history">
     {#snippet actions()}
       <ActionLink href={resolve('/')} tone="ghost" size="sm">Back</ActionLink>
@@ -94,4 +95,4 @@
       {continueHref}
     />
   {/if}
-</section>
+</PageShell>

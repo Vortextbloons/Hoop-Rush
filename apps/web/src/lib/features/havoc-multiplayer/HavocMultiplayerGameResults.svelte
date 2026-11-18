@@ -13,6 +13,7 @@
     type HavocMultiplayerVerificationTone,
   } from './havoc-multiplayer-room-view';
   import GamecastBattleBox from '#lib/gamecast/GamecastBattleBox.svelte';
+  import Button from '#lib/components/ui/Button.svelte';
 
   let {
     output,
@@ -136,9 +137,7 @@
   <footer class="hm-results-footer">
     {#if awaitingContinue}
       <p class="hm-ready-line">Review the box score, then continue when ready.</p>
-      <button type="button" class="h-button" data-havoc-multiplayer-continue onclick={oncontinue}>
-        Continue
-      </button>
+      <Button type="button" data-havoc-multiplayer-continue onclick={oncontinue}>Continue</Button>
     {:else if seriesOver}
       <p class="hm-ready-line">Series complete.</p>
     {:else if nextGameNumber !== null}
@@ -161,15 +160,9 @@
           </p>
         {/if}
       </div>
-      <button
-        type="button"
-        class="h-button"
-        data-havoc-multiplayer-ready
-        disabled={localReady}
-        onclick={onready}
-      >
+      <Button type="button" data-havoc-multiplayer-ready disabled={localReady} onclick={onready}>
         {localReady ? 'Ready' : `Ready for Game ${nextGameNumber}`}
-      </button>
+      </Button>
     {:else}
       <p class="hm-ready-line">The next game opens once this result is accepted.</p>
     {/if}
@@ -297,7 +290,7 @@
   .hm-countdown strong {
     color: #f2f4ff;
   }
-  .hm-results-footer .h-button {
+  .hm-results-footer :global(.ui-btn) {
     min-width: 12rem;
   }
 </style>

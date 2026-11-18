@@ -4,6 +4,7 @@
   import HavocTierBadge from '#lib/features/havoc/HavocTierBadge.svelte';
   import { havocLineupSlotsFromPicks } from '@hoop-rush/application/havoc';
   import { mutationEntriesSummary } from '#lib/features/havoc/havoc-presentation.js';
+  import Panel from '#lib/components/ui/Panel.svelte';
 
   let {
     picks,
@@ -60,7 +61,7 @@
 {/snippet}
 
 {#if collapsible}
-  <details class="hm-rail h-panel" data-active={active}>
+  <details class="ui-panel hm-rail" data-padding="md" data-active={active}>
     <summary>
       <span class="h-eyebrow">{eyebrow}</span>
       <span class="hm-rail-title">{title}</span>
@@ -69,7 +70,7 @@
     {@render body()}
   </details>
 {:else}
-  <section class="hm-rail h-panel" data-active={active} aria-label={title}>
+  <Panel as="section" padding="md" class="hm-rail" data-active={active} aria-label={title}>
     <header class="hm-rail-head">
       <p class="h-eyebrow">{eyebrow}</p>
       <div class="hm-rail-title-row">
@@ -78,7 +79,7 @@
       </div>
     </header>
     {@render body()}
-  </section>
+  </Panel>
 {/if}
 
 <style>

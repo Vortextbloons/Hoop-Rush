@@ -4,6 +4,10 @@
   import { HAVOC_GAME_COUNT } from '@hoop-rush/data-contracts';
   import type { HavocHubState } from './havoc-hub-state.svelte.js';
   import HavocLineupLock from './HavocLineupLock.svelte';
+  import Button from '#lib/components/ui/Button.svelte';
+  import ActionLink from '#lib/components/ui/ActionLink.svelte';
+  import Panel from '#lib/components/ui/Panel.svelte';
+  import Alert from '#lib/components/ui/Alert.svelte';
   let {
     hub,
     onOpenResult,
@@ -33,10 +37,10 @@
   {#if hub.loading && run === null}<p class="h-copy" aria-live="polite">
       Getting your squad ready…
     </p>
-  {:else if run === null || run.phase === 'draft'}<div class="h-panel">
+  {:else if run === null || run.phase === 'draft'}<Panel padding="md">
       <h1 class="h-title">Your squad awaits.</h1>
-      <a class="h-button mt-6" href={resolve('havoc/')}>Continue to draft</a>
-    </div>
+      <ActionLink class="mt-6" href={resolve('havoc/')}>Continue to draft</ActionLink>
+    </Panel>
   {:else}
     <header class="h-header">
       <div>
@@ -64,7 +68,7 @@
       </div>
       <Rocket size={64} color="#ffd782" strokeWidth={1.25} />
     </header>
-    <section class="h-panel" aria-label="Season progress" aria-busy={hub.busy}>
+    <Panel as="section" padding="md" aria-label="Season progress" aria-busy={hub.busy}>
       <div class="flex flex-wrap items-center justify-between gap-3">
         <h2 class="h-subtitle">
           {finalizing
@@ -98,22 +102,22 @@
           disabled={hub.cancelling}
           onclick={() => void hub.cancel()}>{hub.cancelling ? 'Pausing…' : 'Pause season'}</button
         >
-      {:else if run.comparisonStatus === 'complete' || run.comparisonStatus === 'unsupported'}<button
-          class="h-button mt-4"
+      {:else if run.comparisonStatus === 'complete' || run.comparisonStatus === 'unsupported'}<Button
+          class="mt-4"
           data-havoc-open-result
-          onclick={onOpenResult}>Reveal season report</button
+          onclick={onOpenResult}>Reveal season report</Button
         >
-      {:else}<button class="h-button mt-4" data-havoc-resume onclick={() => void resume()}
-          >Continue automatic season</button
+      {:else}<Button class="mt-4" data-havoc-resume onclick={() => void resume()}
+          >Continue automatic season</Button
         >{/if}
-    </section>
-    {#if hub.error !== null}<p class="h-alert" role="alert">{hub.error}</p>{/if}
-    {#if hub.error !== null && hub.isUnsupportedVersionError()}<button
-        class="h-button mt-4"
+    </Panel>
+    {#if hub.error !== null}<Alert tone="danger">{hub.error}</Alert>{/if}
+    {#if hub.error !== null && hub.isUnsupportedVersionError()}<Button
+        class="mt-4"
         data-havoc-discard-stale
-        onclick={() => void discardStale()}>Discard outdated run and start fresh</button
+        onclick={() => void discardStale()}>Discard outdated run and start fresh</Button
       >{/if}
-    {#if hub.notice !== null}<p class="h-alert" role="status">{hub.notice}</p>{/if}
+    {#if hub.notice !== null}<Alert tone="info">{hub.notice}</Alert>{/if}
     <div class="mt-6"><HavocLineupLock slots={run.lineup} /></div>
     {#if !hub.busy}<button
         class="h-link mt-6"
@@ -123,17 +127,17 @@
     {/if}
 
     {#if abandonOpen}
-      <div class="h-panel mt-4" role="group" aria-label="Retire squad confirmation">
+      <Panel padding="md" class="mt-4" role="group" aria-label="Retire squad confirmation">
         <h2 class="h-subtitle">Retire this squad?</h2>
         <p class="h-copy mt-2">
           This ends the run. The games you've played stay in the Hall of Freaks.
         </p>
         <div class="h-actions mt-4">
-          <button class="h-button" onclick={() => void abandon()}>Retire squad</button><button
-            class="h-button secondary"
-            onclick={() => (abandonOpen = false)}>Keep playing</button
+          <Button onclick={() => void abandon()}>Retire squad</Button><Button
+            tone="secondary"
+            onclick={() => (abandonOpen = false)}>Keep playing</Button
           >
         </div>
-      </div>{/if}
+      </Panel>{/if}
   {/if}
 </section>

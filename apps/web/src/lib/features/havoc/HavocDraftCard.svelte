@@ -11,6 +11,7 @@
     havocFieldLabel,
     HAVOC_TIER_COLORS,
   } from './havoc-presentation';
+  import Button from '#lib/components/ui/Button.svelte';
   let {
     card,
     mode,
@@ -157,14 +158,13 @@
     {#if unavailable}<p class="h-copy text-xs mt-2" data-havoc-exclusive-taken>
         One per roster — this power is already on your team.
       </p>{/if}
-    <button
-      class="h-button"
+    <Button
       disabled={busy || unavailable}
       onclick={() => onPick(card.cardId)}
       aria-label="Draft {card.source.displayName} — {card.nickname}"
       >{unavailable
         ? 'Power already drafted'
-        : `Draft ${card.source.displayName.split(' ').at(-1)}`}</button
+        : `Draft ${card.source.displayName.split(' ').at(-1)}`}</Button
     >
   </div>
 </article>

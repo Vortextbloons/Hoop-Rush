@@ -8,6 +8,8 @@
   import { getManifest } from '#lib/data.js';
   import { HavocDraftController } from '#lib/features/havoc/havoc-draft-state.svelte.js';
   import { getHavocService } from '#lib/features/havoc/havoc-service.js';
+  import ActionLink from '#lib/components/ui/ActionLink.svelte';
+  import PageShell from '#lib/components/ui/PageShell.svelte';
 
   let controller = $state<HavocDraftController | null>(null);
   let serviceError = $state<string | null>(null);
@@ -43,17 +45,19 @@
 </svelte:head>
 
 {#if serviceError !== null}
-  <section class="mx-auto w-full max-w-xl px-3 py-10 sm:px-6">
+  <PageShell as="section" width="sm" padding="xl">
     <ServiceErrorPanel
       title="Havoc is not wired yet"
       message={serviceError}
       tone="destructive"
       homeLink
     />
-  </section>
+  </PageShell>
 {:else if controller !== null}
   <div class="multiplayer-entry">
-    <a class="h-button secondary" href={resolve('/multiplayer?format=havoc')}>Play multiplayer</a>
+    <ActionLink tone="secondary" href={resolve('/multiplayer?format=havoc')}
+      >Play multiplayer</ActionLink
+    >
   </div>
   <HavocSetup {controller} {franchiseName} onLocked={() => void goto(resolve('havoc/run/'))} />
 {/if}

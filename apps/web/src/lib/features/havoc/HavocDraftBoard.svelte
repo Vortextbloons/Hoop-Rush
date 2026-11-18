@@ -6,6 +6,8 @@
   import HavocLineupLock from './HavocLineupLock.svelte';
   import { havocLineupSlotsFromPicks } from '@hoop-rush/application/havoc';
   import { havocOwnedExclusiveMutationIds } from './havoc-presentation';
+  import Button from '#lib/components/ui/Button.svelte';
+  import Alert from '#lib/components/ui/Alert.svelte';
   let {
     draft,
     busy,
@@ -49,11 +51,11 @@
   </header>
   {#if !complete}
     <div class="h-actions">
-      <button
-        class="h-button secondary"
+      <Button
+        tone="secondary"
         data-havoc-reroll
         onclick={onReroll}
-        disabled={busy || draft.rerollUsed}><Shuffle size={16} />New choices</button
+        disabled={busy || draft.rerollUsed}><Shuffle size={16} />New choices</Button
       ><span class="h-copy text-xs" data-havoc-rerolls-remaining
         >{draft.rerollUsed ? 0 : 1} of {HAVOC_REROLL_LIMIT} reroll{draft.rerollUsed ? 's' : ''} left</span
       >
@@ -75,14 +77,14 @@
     <details class="mt-4">
       <summary>Compare original player ratings</summary>
       <div class="h-actions" role="group" aria-label="Attribute view">
-        <button
-          class="h-button secondary"
+        <Button
+          tone="secondary"
           aria-pressed={mode === 'effective'}
-          onclick={() => (mode = 'effective')}>Effective</button
-        ><button
-          class="h-button secondary"
+          onclick={() => (mode = 'effective')}>Effective</Button
+        ><Button
+          tone="secondary"
           aria-pressed={mode === 'original'}
-          onclick={() => (mode = 'original')}>Original</button
+          onclick={() => (mode = 'original')}>Original</Button
         >
       </div>
       <p class="h-copy text-xs mt-2">Expand a card's attributes to inspect the numbers.</p>
@@ -92,12 +94,12 @@
       <HavocLineupLock {slots} title={complete ? 'Your starting five' : 'Your squad so far'} />
     </div>{/if}
   {#if complete}<div class="h-actions mt-6">
-      <button class="h-button" data-havoc-lock onclick={onLock} disabled={busy}
-        ><Rocket size={18} />{busy ? 'Launching…' : 'Launch 82-game season'}</button
+      <Button data-havoc-lock onclick={onLock} disabled={busy}
+        ><Rocket size={18} />{busy ? 'Launching…' : 'Launch 82-game season'}</Button
       >
       <p class="h-copy text-xs">All games play automatically. Your report comes next.</p>
     </div>{/if}
-  {#if error !== null}<p role="alert" class="h-alert">{error}</p>{/if}
+  {#if error !== null}<Alert tone="danger">{error}</Alert>{/if}
 </div>
 
 <style>

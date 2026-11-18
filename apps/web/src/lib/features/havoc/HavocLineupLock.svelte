@@ -3,6 +3,7 @@
   import PlayerArt from '#lib/components/PlayerArt.svelte';
   import HavocTierBadge from './HavocTierBadge.svelte';
   import HavocMutationList from './HavocMutationList.svelte';
+  import Panel from '#lib/components/ui/Panel.svelte';
   let {
     slots,
     title = 'Your starting five',
@@ -10,7 +11,13 @@
   }: { slots: readonly HavocLineupSlotView[]; title?: string; compact?: boolean } = $props();
 </script>
 
-<section class={['h-panel', 'lineup-panel', { compact }]} aria-label={title} data-havoc-lineup>
+<Panel
+  as="section"
+  padding="md"
+  class={compact ? 'compact' : ''}
+  aria-label={title}
+  data-havoc-lineup
+>
   <header class="lineup-heading">
     <h2 class="h-subtitle">{title}</h2>
     <span class="lineup-count">{slots.length}/5</span>
@@ -52,12 +59,9 @@
       has no powers and stays in the game through further fouls.
     </p>
   </details>
-</section>
+</Panel>
 
 <style>
-  .lineup-panel {
-    min-width: 0;
-  }
   .lineup-heading {
     display: flex;
     align-items: baseline;
@@ -78,7 +82,7 @@
     padding: 0;
     list-style: none;
   }
-  .compact .lineup-list {
+  :global(.compact) .lineup-list {
     grid-template-columns: minmax(0, 1fr);
   }
   .lineup-card {

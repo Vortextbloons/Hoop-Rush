@@ -48,15 +48,15 @@
   }
 
   .ui-panel[data-padding='sm'] {
-    padding: 0.75rem;
+    padding: var(--ui-panel-padding-sm, 0.75rem);
   }
 
   .ui-panel[data-padding='md'] {
-    padding: 1.25rem;
+    padding: var(--ui-panel-padding-md, 1.25rem);
   }
 
   .ui-panel[data-padding='lg'] {
-    padding: 1.75rem;
+    padding: var(--ui-panel-padding-lg, 1.75rem);
   }
 
   .ui-btn {
@@ -595,6 +595,10 @@
 
   .ui-shell[data-padding='xl'] {
     padding-block: 2.5rem;
+  }
+
+  .ui-shell[data-padding='2xl'] {
+    padding-block: 4rem;
   }
 
   @media (min-width: 640px) {

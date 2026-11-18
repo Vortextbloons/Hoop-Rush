@@ -3,6 +3,10 @@
   import { Zap, ArrowRight } from '@lucide/svelte';
   import type { HavocDraftController } from './havoc-draft-state.svelte.js';
   import HavocDraftBoard from './HavocDraftBoard.svelte';
+  import Button from '#lib/components/ui/Button.svelte';
+  import ActionLink from '#lib/components/ui/ActionLink.svelte';
+  import Panel from '#lib/components/ui/Panel.svelte';
+  import Alert from '#lib/components/ui/Alert.svelte';
   let {
     controller,
     franchiseName,
@@ -33,7 +37,7 @@
       onLock={() => void lock()}
     />
   {:else if run?.phase === 'run'}
-    <div class="h-panel">
+    <Panel padding="md">
       <p class="h-eyebrow">Your squad is ready</p>
       <h1 class="h-title">
         {run.havocCursor >= 82 ? 'The results are in.' : 'Back to the havoc.'}
@@ -42,21 +46,20 @@
         {run.havocCursor} of 82 games completed. Your lineup and progress are saved.
       </p>
       <div class="h-actions mt-6">
-        {#if run.comparisonStatus === 'complete'}<button
-            class="h-button"
+        {#if run.comparisonStatus === 'complete'}<Button
             disabled={controller.busy}
-            onclick={() => void controller.createDraft()}>Draft another squad</button
-          >{/if}<a
-          class="h-button secondary"
+            onclick={() => void controller.createDraft()}>Draft another squad</Button
+          >{/if}<ActionLink
+          tone="secondary"
           href={resolve(run.havocCursor >= 82 ? '/havoc/result' : '/havoc/run')}
         >
           {run.havocCursor >= 82 ? 'See season report' : 'Continue season'}
           <ArrowRight size={18} />
-        </a>
+        </ActionLink>
 
         <a class="h-link" href={resolve('havoc/history/')}>Hall of Freaks</a>
       </div>
-    </div>
+    </Panel>
   {:else}
     <div class="h-header">
       <p class="h-eyebrow">Hoop Havoc · Anything but ordinary</p>
@@ -70,15 +73,14 @@
           season. See just how far your freaks can go.
         </p>
         <div class="h-actions mt-8">
-          <button
-            class="h-button"
+          <Button
             data-havoc-start
             disabled={controller.busy}
             onclick={() => void controller.createDraft()}
           >
             <Zap size={18} />
             {controller.busy ? 'Opening draft…' : 'Draft your squad'}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -87,7 +89,7 @@
       <li><strong>2</strong> Launch your automatic season</li>
       <li><strong>3</strong> Reveal your squad's final report</li>
     </ol>
-    <details class="h-panel">
+    <details class="ui-panel" data-padding="md">
       <summary>How does Havoc work?</summary>
       <p class="h-copy">
         Choose one player for each position, PG through C. Every card has powers and tradeoffs. You
@@ -97,18 +99,17 @@
       </p>
     </details>
   {/if}
-  {#if controller.error !== null}<div role="alert" class="h-alert">
-      {controller.error}<button
-        class="h-button secondary mt-3"
-        onclick={() => void controller.load()}>Try again</button
+  {#if controller.error !== null}<Alert tone="danger">
+      {controller.error}<Button class="mt-3" tone="secondary" onclick={() => void controller.load()}
+        >Try again</Button
       >
-      {#if controller.isUnsupportedVersionError()}<button
-          class="h-button mt-3"
+      {#if controller.isUnsupportedVersionError()}<Button
+          class="mt-3"
           data-havoc-discard-stale
           onclick={() => void controller.discardStaleRun()}
-          >Discard outdated run and start fresh</button
+          >Discard outdated run and start fresh</Button
         >{/if}
-    </div>{/if}
+    </Alert>{/if}
 </section>
 
 <style>

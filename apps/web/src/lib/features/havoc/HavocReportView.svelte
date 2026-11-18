@@ -10,6 +10,11 @@
     havocRecordLabel,
     mutationNameOf,
   } from './havoc-presentation';
+  import EmptyState from '#lib/components/ui/EmptyState.svelte';
+  import Panel from '#lib/components/ui/Panel.svelte';
+  import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
+  import StatGrid from '#lib/components/ui/StatGrid.svelte';
+  import StatTile from '#lib/components/ui/StatTile.svelte';
 
   let { report }: { report: HavocReport } = $props();
   const comparison = $derived(report.comparison);
@@ -76,59 +81,56 @@
 </script>
 
 <div class="flex min-w-0 flex-col gap-4" data-havoc-report>
-  <section aria-labelledby="havoc-report-heading" class="rounded-xl bg-surface-1 p-4 sm:p-5">
-    <div class="flex flex-wrap items-end justify-between gap-3">
-      <div class="min-w-0">
-        <p class="font-mono text-[10px] font-bold tracking-[0.16em] text-primary uppercase">
-          Havoc Report · {report.runId}
-        </p>
-        <h2
-          id="havoc-report-heading"
-          class="font-display mt-1 text-2xl font-extrabold tracking-tight uppercase"
+  <Panel as="section" padding="md" aria-labelledby="havoc-report-heading">
+    <SectionHeading
+      eyebrow={`Havoc Report · ${report.runId}`}
+      headingId="havoc-report-heading"
+      align="end"
+    >
+      {#snippet title()}
+        {havocRecordLabel(report.havoc.wins, report.havoc.losses)}
+        {#if report.perfectSeason}
+          <span class="text-primary">· 82–0</span>
+        {/if}
+      {/snippet}
+      {#snippet actions()}
+        <span
+          class="rounded-full border px-2.5 py-1 font-mono text-[10px] font-bold tracking-[0.12em] uppercase {report.status ===
+          'complete'
+            ? 'border-primary text-primary'
+            : 'border-border text-muted-foreground'}"
         >
-          {havocRecordLabel(report.havoc.wins, report.havoc.losses)}
-          {#if report.perfectSeason}
-            <span class="text-primary">· 82–0</span>
-          {/if}
-        </h2>
-      </div>
-      <span
-        class="rounded-full border px-2.5 py-1 font-mono text-[10px] font-bold tracking-[0.12em] uppercase {report.status ===
-        'complete'
-          ? 'border-primary text-primary'
-          : 'border-border text-muted-foreground'}"
-      >
-        {report.status === 'complete' ? 'Comparison complete' : 'Comparison pending'}
-      </span>
-    </div>
-    <dl class="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-      <div>
-        <dt class="font-mono text-[10px] tracking-[0.1em] text-muted-foreground uppercase">
-          Points for
-        </dt>
-        <dd class="font-mono text-lg font-bold">{report.havoc.pointsFor}</dd>
-      </div>
-      <div>
-        <dt class="font-mono text-[10px] tracking-[0.1em] text-muted-foreground uppercase">
-          Points against
-        </dt>
-        <dd class="font-mono text-lg font-bold">{report.havoc.pointsAgainst}</dd>
-      </div>
-      <div>
-        <dt class="font-mono text-[10px] tracking-[0.1em] text-muted-foreground uppercase">
-          Differential
-        </dt>
-        <dd class="font-mono text-lg font-bold">{report.havoc.differential}</dd>
-      </div>
-      <div>
-        <dt class="font-mono text-[10px] tracking-[0.1em] text-muted-foreground uppercase">
-          Direct mutation points
-        </dt>
-        <dd class="font-mono text-lg font-bold" data-havoc-direct-mutation-points>
-          {report.directMutationPoints}
-        </dd>
-      </div>
-    </dl>
+          {report.status === 'complete' ? 'Comparison complete' : 'Comparison pending'}
+        </span>
+      {/snippet}
+    </SectionHeading>
+    <StatGrid class="mt-3" columns={4} mobile={2} gap="md">
+      <StatTile
+        label="Points for"
+        size="sm"
+        valueClass="font-mono"
+        value={report.havoc.pointsFor}
+      />
+      <StatTile
+        label="Points against"
+        size="sm"
+        valueClass="font-mono"
+        value={report.havoc.pointsAgainst}
+      />
+      <StatTile
+        label="Differential"
+        size="sm"
+        valueClass="font-mono"
+        value={report.havoc.differential}
+      />
+      <StatTile
+        label="Direct mutation points"
+        size="sm"
+        valueClass="font-mono"
+        value={report.directMutationPoints}
+        data-havoc-direct-mutation-points
+      />
+    </StatGrid>
     <details class="mt-3">
       <summary
         class="cursor-pointer font-mono text-[10px] font-bold tracking-[0.12em] text-muted-foreground uppercase outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -170,15 +172,15 @@
         </div>
       </dl>
     </details>
-  </section>
+  </Panel>
 
-  <section aria-labelledby="havoc-report-lineup" class="rounded-xl bg-surface-1 p-4 sm:p-5">
-    <h3
-      id="havoc-report-lineup"
-      class="font-display text-base font-extrabold tracking-tight uppercase"
-    >
-      Drafted lineup & packages
-    </h3>
+  <Panel as="section" padding="md" aria-labelledby="havoc-report-lineup">
+    <SectionHeading
+      title="Drafted lineup & packages"
+      headingId="havoc-report-lineup"
+      level={3}
+      size="sm"
+    />
     <ul class="mt-3 flex flex-col gap-2">
       {#each report.lineup as entry (entry.slot)}
         <li class="flex min-w-0 flex-wrap items-start gap-x-3 gap-y-1">
@@ -200,22 +202,17 @@
         </li>
       {/each}
     </ul>
-  </section>
+  </Panel>
 
   {#if report.mvp !== null && comparison !== null}
     <HavocMvpCard {comparison} />
   {/if}
 
   <div class="grid gap-4 lg:grid-cols-2">
-    <section aria-labelledby="havoc-report-gains" class="rounded-xl bg-surface-1 p-4 sm:p-5">
-      <h3
-        id="havoc-report-gains"
-        class="font-display text-base font-extrabold tracking-tight uppercase"
-      >
-        Top gains
-      </h3>
+    <Panel as="section" padding="md" aria-labelledby="havoc-report-gains">
+      <SectionHeading title="Top gains" headingId="havoc-report-gains" level={3} size="sm" />
       {#if report.topGains.length === 0}
-        <p class="mt-2 text-xs text-muted-foreground">Available after the comparison completes.</p>
+        <EmptyState class="mt-2" title="Available after the comparison completes" surface="none" />
       {:else}
         <ul class="mt-2 flex flex-col gap-1 text-xs">
           {#each report.topGains as difference (difference.gameNumber)}
@@ -231,17 +228,12 @@
           {/each}
         </ul>
       {/if}
-    </section>
+    </Panel>
 
-    <section aria-labelledby="havoc-report-losses" class="rounded-xl bg-surface-1 p-4 sm:p-5">
-      <h3
-        id="havoc-report-losses"
-        class="font-display text-base font-extrabold tracking-tight uppercase"
-      >
-        Top losses
-      </h3>
+    <Panel as="section" padding="md" aria-labelledby="havoc-report-losses">
+      <SectionHeading title="Top losses" headingId="havoc-report-losses" level={3} size="sm" />
       {#if report.topLosses.length === 0}
-        <p class="mt-2 text-xs text-muted-foreground">Available after the comparison completes.</p>
+        <EmptyState class="mt-2" title="Available after the comparison completes" surface="none" />
       {:else}
         <ul class="mt-2 flex flex-col gap-1 text-xs">
           {#each report.topLosses as difference (difference.gameNumber)}
@@ -257,18 +249,18 @@
           {/each}
         </ul>
       {/if}
-    </section>
+    </Panel>
   </div>
 
-  <section aria-labelledby="havoc-report-wildest" class="rounded-xl bg-surface-1 p-4 sm:p-5">
-    <h3
-      id="havoc-report-wildest"
-      class="font-display text-base font-extrabold tracking-tight uppercase"
-    >
-      Wildest recorded games
-    </h3>
+  <Panel as="section" padding="md" aria-labelledby="havoc-report-wildest">
+    <SectionHeading
+      title="Wildest recorded games"
+      headingId="havoc-report-wildest"
+      level={3}
+      size="sm"
+    />
     {#if report.wildestGames.length === 0}
-      <p class="mt-2 text-xs text-muted-foreground">No games recorded yet.</p>
+      <EmptyState class="mt-2" title="No games recorded yet" surface="none" />
     {:else}
       <ul class="mt-2 flex flex-col gap-1.5 text-xs">
         {#each report.wildestGames as game (game.gameNumber)}
@@ -284,20 +276,17 @@
         {/each}
       </ul>
     {/if}
-  </section>
+  </Panel>
 
   {#if comparison !== null}
-    <section aria-labelledby="havoc-report-lines" class="rounded-xl bg-surface-1 p-4 sm:p-5">
-      <h3
-        id="havoc-report-lines"
-        class="font-display text-base font-extrabold tracking-tight uppercase"
-      >
-        Starter, clone, and replacement lines
-      </h3>
-      <p class="mt-1 text-xs text-muted-foreground">
-        Clone and replacement production belongs to its originating draft slot for the comparison
-        and awards, but each line stays visible.
-      </p>
+    <Panel as="section" padding="md" aria-labelledby="havoc-report-lines">
+      <SectionHeading
+        title="Starter, clone, and replacement lines"
+        headingId="havoc-report-lines"
+        level={3}
+        size="sm"
+        description="Clone and replacement production belongs to its originating draft slot for the comparison and awards, but each line stays visible."
+      />
       <div class="mt-3 flex flex-col gap-3">
         {#each comparison.slots as slot (slot.slot)}
           <div class="min-w-0 rounded-lg bg-surface-2 p-3">
@@ -469,18 +458,18 @@
           </div>
         {/each}
       </div>
-    </section>
+    </Panel>
 
     <HavocComparisonView {comparison} />
   {:else}
-    <section class="rounded-xl bg-surface-1 p-4 sm:p-5">
-      <h3 class="font-display text-base font-extrabold tracking-tight uppercase">
-        Matched comparison
-      </h3>
-      <p class="mt-2 text-xs text-muted-foreground">
-        The normal season is not final yet. Baseline numbers, the paired chart, and the MVP stay
-        hidden until all 82 normal games are accepted.
-      </p>
-    </section>
+    <Panel as="section" padding="md">
+      <SectionHeading title="Matched comparison" level={3} size="sm" />
+      <EmptyState
+        class="mt-2"
+        title="Matched comparison unavailable"
+        message="The normal season is not final yet. Baseline numbers, the paired chart, and the MVP stay hidden until all 82 normal games are accepted."
+        surface="none"
+      />
+    </Panel>
   {/if}
 </div>

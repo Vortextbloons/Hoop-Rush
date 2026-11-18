@@ -12,6 +12,12 @@
     havocRecordLabel,
     mutationEntriesSummary,
   } from './havoc-presentation';
+  import Alert from '#lib/components/ui/Alert.svelte';
+  import EmptyState from '#lib/components/ui/EmptyState.svelte';
+  import Panel from '#lib/components/ui/Panel.svelte';
+  import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
+  import StatGrid from '#lib/components/ui/StatGrid.svelte';
+  import StatTile from '#lib/components/ui/StatTile.svelte';
 
   let { state, runId }: { state: HavocHistoryState; runId: string } = $props();
 
@@ -33,37 +39,31 @@
   {#if state.detailLoading}
     <p class="mt-6 font-mono text-sm text-muted-foreground" aria-live="polite">Loading run…</p>
   {:else if detail === null || run === null}
-    <div class="mt-6 rounded-xl bg-surface-1 p-6">
-      <h1 class="font-display text-xl font-extrabold tracking-tight uppercase">Run unavailable</h1>
-      <p class="mt-2 text-sm text-muted-foreground">
-        {state.error ?? `No completed Havoc run with id ${runId} was found on this device.`}
-      </p>
-    </div>
+    <Alert class="mt-6" tone="warning" title="Run unavailable">
+      {state.error ?? `No completed Havoc run with id ${runId} was found on this device.`}
+    </Alert>
   {:else}
-    <header
-      class="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between"
-    >
-      <div class="min-w-0">
-        <p class="font-mono text-[10px] font-bold tracking-[0.16em] text-primary uppercase">
-          Hoop Havoc · Saved season
-        </p>
-        <h1 class="font-display mt-1 text-3xl font-extrabold tracking-tight uppercase">
+    <header class="mt-4">
+      <SectionHeading eyebrow="Hoop Havoc · Saved season" level={1} size="lg" align="start">
+        {#snippet title()}
           {havocRecordLabel(run.havocWins, run.havocLosses)}
           {#if run.perfectSeason}
             <span class="text-primary">· 82–0</span>
           {/if}
-        </h1>
+        {/snippet}
         <p class="mt-1 text-sm text-muted-foreground" data-havoc-detail-comparison-status>
           Comparison: {havocComparisonStatusLabel(run.comparisonStatus)}
         </p>
-      </div>
-      {#if run.completionState === 'abandoned'}
-        <span
-          class="rounded-full border border-border px-2.5 py-1 font-mono text-[10px] font-bold tracking-[0.12em] text-muted-foreground uppercase"
-        >
-          Unsuccessful run preserved
-        </span>
-      {/if}
+        {#if run.completionState === 'abandoned'}
+          {#snippet actions()}
+            <span
+              class="rounded-full border border-border px-2.5 py-1 font-mono text-[10px] font-bold tracking-[0.12em] text-muted-foreground uppercase"
+            >
+              Unsuccessful run preserved
+            </span>
+          {/snippet}
+        {/if}
+      </SectionHeading>
     </header>
 
     {#if comparisonComplete && comparison !== null}
@@ -72,33 +72,31 @@
       <div class="mt-6"><HavocLineupLock slots={run.lineup} /></div>
     {/if}
 
-    <details class="h-panel mt-6">
+    <details class="ui-panel mt-6" data-padding="md">
       <summary>Full season report & game details</summary>
       <div class="mt-4 grid gap-4 lg:grid-cols-2">
-        <section class="rounded-xl bg-surface-1 p-4 sm:p-5">
-          <h2 class="font-display text-base font-extrabold tracking-tight uppercase">Record</h2>
-          <dl class="mt-3 grid grid-cols-2 gap-3 text-sm">
-            <div>
-              <dt class="font-mono text-[10px] tracking-[0.1em] text-muted-foreground uppercase">
-                Havoc record
-              </dt>
-              <dd class="font-mono text-lg font-bold">
-                {havocRecordLabel(run.havocWins, run.havocLosses)}
-              </dd>
-            </div>
-            <div>
-              <dt class="font-mono text-[10px] tracking-[0.1em] text-muted-foreground uppercase">
-                Normal record
-              </dt>
-              <dd class="font-mono text-lg font-bold" data-havoc-detail-normal-record>
-                {#if comparisonComplete && comparison !== null}
-                  {havocRecordLabel(comparison.normal.wins, comparison.normal.losses)}
-                {:else}
-                  <span class="text-muted-foreground">Hidden until the comparison completes</span>
-                {/if}
-              </dd>
-            </div>
-          </dl>
+        <Panel as="section" padding="md">
+          <SectionHeading title="Record" level={2} size="sm" />
+          <StatGrid class="mt-3" columns={2} mobile={2} gap="md">
+            <StatTile
+              label="Havoc record"
+              size="sm"
+              valueClass="font-mono"
+              value={havocRecordLabel(run.havocWins, run.havocLosses)}
+            />
+            <StatTile
+              label="Normal record"
+              size="sm"
+              valueClass="font-mono"
+              data-havoc-detail-normal-record
+            >
+              {#if comparisonComplete && comparison !== null}
+                {havocRecordLabel(comparison.normal.wins, comparison.normal.losses)}
+              {:else}
+                <span class="text-muted-foreground">Hidden until the comparison completes</span>
+              {/if}
+            </StatTile>
+          </StatGrid>
           {#if report !== null}
             <details class="mt-3">
               <summary
@@ -142,12 +140,10 @@
               </dl>
             </details>
           {/if}
-        </section>
+        </Panel>
 
-        <section class="rounded-xl bg-surface-1 p-4 sm:p-5">
-          <h2 class="font-display text-base font-extrabold tracking-tight uppercase">
-            Lineup & packages
-          </h2>
+        <Panel as="section" padding="md">
+          <SectionHeading title="Lineup & packages" level={2} size="sm" />
           <ul class="mt-3 flex flex-col gap-2">
             {#each run.lineup as slot (slot.slot)}
               <li class="flex min-w-0 flex-wrap items-start gap-x-3 gap-y-1">
@@ -173,7 +169,7 @@
               </li>
             {/each}
           </ul>
-        </section>
+        </Panel>
       </div>
 
       <div class="mt-4">
@@ -182,14 +178,15 @@
         {:else if comparisonComplete && comparison !== null}
           <HavocComparisonView {comparison} />
         {:else}
-          <section class="rounded-xl bg-surface-1 p-4 sm:p-5">
-            <h2 class="font-display text-base font-extrabold tracking-tight uppercase">
-              Report unavailable
-            </h2>
-            <p class="mt-2 text-xs text-muted-foreground">
-              This run has no stored report. Its lineup and record above are the surviving record.
-            </p>
-          </section>
+          <Panel as="section" padding="md">
+            <SectionHeading title="Report unavailable" level={2} size="sm" />
+            <EmptyState
+              class="mt-2"
+              title="No stored report"
+              message="This run has no stored report. Its lineup and record above are the surviving record."
+              surface="none"
+            />
+          </Panel>
         {/if}
       </div>
     </details>

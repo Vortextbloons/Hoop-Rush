@@ -22,6 +22,8 @@
     havocMultiplayerMvpPick,
     havocMultiplayerSeriesRows,
   } from './havoc-multiplayer-room-view';
+  import Button from '#lib/components/ui/Button.svelte';
+  import Panel from '#lib/components/ui/Panel.svelte';
 
   let {
     series,
@@ -130,7 +132,7 @@
 
   <div class="hm-top-grid">
     {#if mvp}
-      <section class="hm-mvp h-panel" aria-label="Series MVP">
+      <Panel as="section" padding="md" class="hm-mvp" aria-label="Series MVP">
         <p class="h-eyebrow">{mvpIsLocal ? 'Your series MVP' : 'Opponent series MVP'}</p>
         <div class="hm-mvp-body">
           {#if mvpPick}
@@ -176,11 +178,11 @@
             Totals: {mvpStats.points} pts · {mvpStats.rebounds} reb · {mvpStats.assists} ast
           </p>
         {/if}
-      </section>
+      </Panel>
     {:else}
       <p class="hm-no-mvp">No series MVP was recorded for this room.</p>
     {/if}
-    <section class="h-panel hm-games" aria-label="Series comparison">
+    <Panel as="section" padding="md" class="hm-games" aria-label="Series comparison">
       <h3 class="h-subtitle">Series comparison</h3>
       {#if stats.games > 0}
         <div class="hm-games-scroll">
@@ -202,10 +204,10 @@
         </div>
         <p class="hm-champ-sub">{stats.games} games · per-game averages</p>
       {:else}<p class="hm-no-mvp">Box scores are not available on this device.</p>{/if}
-    </section>
+    </Panel>
   </div>
 
-  <section class="h-panel hm-games" aria-label="Series games">
+  <Panel as="section" padding="md" class="hm-games" aria-label="Series games">
     <h3 class="h-subtitle">Every game</h3>
     <div class="hm-games-scroll">
       <table>
@@ -238,9 +240,14 @@
         </tbody>
       </table>
     </div>
-  </section>
+  </Panel>
 
-  <section class="h-panel hm-games hm-player-stats" aria-label="Series player stats">
+  <Panel
+    as="section"
+    padding="md"
+    class="hm-games hm-player-stats"
+    aria-label="Series player stats"
+  >
     <div class="hm-stats-head">
       <h3 class="h-subtitle">Series player stats</h3>
       {#if stats.games > 0}
@@ -272,9 +279,9 @@
     {:else}
       <p class="hm-no-mvp">Box scores are not available on this device.</p>
     {/if}
-  </section>
+  </Panel>
 
-  <section class="h-panel hm-games" aria-label="Series ability triggers">
+  <Panel as="section" padding="md" class="hm-games" aria-label="Series ability triggers">
     <h3 class="h-subtitle">Abilities triggered</h3>
     {#if stats.abilities.length > 0}
       <div class="hm-games-scroll">
@@ -316,14 +323,14 @@
           : 'Ability stats are not available on this device.'}
       </p>
     {/if}
-  </section>
+  </Panel>
 
   <section class="hm-games" aria-label="Game box scores">
     <h3 class="h-subtitle">Game box scores</h3>
     {#each rows as row (row.gameNumber)}
       {@const output = outputs[row.gameNumber]}
       {#if output && row.status === 'verified'}
-        <details class="h-panel hm-game-detail">
+        <details class="ui-panel hm-game-detail" data-padding="md">
           <summary
             >Game {row.gameNumber} · {statusLabel(row)} · {row.localIsHome
               ? row.homeScore
@@ -345,28 +352,26 @@
         </p>
       {:else if rivalRematchRequested && !myRematchRequested}
         <p class="hm-rematch-note" role="status">Your opponent wants a rematch.</p>
-        <button
+        <Button
           type="button"
-          class="h-button"
           data-havoc-multiplayer-confirm-rematch
           disabled={rematchBusy}
           onclick={onconfirmrematch}
         >
           <Handshake size={16} aria-hidden="true" /> Accept rematch
-        </button>
+        </Button>
       {:else if myRematchRequested}
         <p class="hm-rematch-note" role="status">Waiting for your opponent to accept…</p>
       {:else}
         <p class="hm-rematch-note">Run it back with the same squads?</p>
-        <button
+        <Button
           type="button"
-          class="h-button"
           data-havoc-multiplayer-request-rematch
           disabled={rematchBusy}
           onclick={onrematch}
         >
           <RefreshCcw size={16} aria-hidden="true" /> Request rematch
-        </button>
+        </Button>
       {/if}
     </footer>{/if}
 </section>
@@ -382,7 +387,7 @@
     gap: 14px;
     grid-template-columns: minmax(0, 1fr);
   }
-  .hm-top-grid > section {
+  .hm-top-grid > :global(section) {
     min-width: 0;
   }
   .hm-stats-head {
@@ -412,7 +417,7 @@
   .hm-comparison-table {
     min-width: 0;
   }
-  .hm-player-stats :global(.hm-boxes) {
+  :global(.hm-player-stats .hm-boxes) {
     grid-template-columns: minmax(0, 1fr);
   }
   .hm-comparison-table th,
@@ -482,7 +487,7 @@
     text-transform: uppercase;
     color: #c1cae4;
   }
-  .hm-mvp {
+  :global(.hm-mvp) {
     display: grid;
     gap: 10px;
   }

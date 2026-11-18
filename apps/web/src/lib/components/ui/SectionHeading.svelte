@@ -6,6 +6,7 @@
     eyebrow = null,
     eyebrowTone = 'primary',
     title,
+    headingId = undefined,
     description = null,
     level = 2,
     size = 'md',
@@ -17,9 +18,10 @@
   }: {
     eyebrow?: string | null;
     eyebrowTone?: 'primary' | 'muted' | 'accent';
-    title: string;
+    title: string | Snippet;
+    headingId?: string;
     description?: string | null;
-    level?: 2 | 3 | 4;
+    level?: 1 | 2 | 3 | 4;
     size?: 'sm' | 'md' | 'lg';
     align?: 'start' | 'end';
     actions?: Snippet | null;
@@ -32,8 +34,12 @@
     {#if eyebrow !== null}
       <p class="ui-label" data-tone={eyebrowTone}>{eyebrow}</p>
     {/if}
-    <svelte:element this={`h${level}`} class="ui-section-title" data-size={size}>
-      {title}
+    <svelte:element this={`h${level}`} class="ui-section-title" data-size={size} id={headingId}>
+      {#if typeof title === 'function'}
+        {@render title()}
+      {:else}
+        {title}
+      {/if}
     </svelte:element>
     {#if description !== null}
       <p class="ui-section-description">{description}</p>

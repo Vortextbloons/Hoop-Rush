@@ -40,6 +40,9 @@
     havocMultiplayerVerificationOf,
   } from '#lib/features/havoc-multiplayer/havoc-multiplayer-room-view.js';
   import { havocLineupSlotsFromPicks } from '@hoop-rush/application/havoc';
+  import Button from '#lib/components/ui/Button.svelte';
+  import ActionLink from '#lib/components/ui/ActionLink.svelte';
+  import Panel from '#lib/components/ui/Panel.svelte';
 
   const REACTIONS: { key: ReactionKey; label: string; glyph: string }[] = [
     { key: 'hype', label: 'Hype', glyph: '🔥' },
@@ -275,11 +278,9 @@
       <h1 class="h-title">Couldn’t open this room</h1>
       <p role="alert" class="hm-alert">{controller.error}</p>
       <div class="h-actions">
-        <button type="button" class="h-button" onclick={() => void controller.retryAttach()}>
-          Try again
-        </button>
-        <a href={resolve('/multiplayer')} class="h-button secondary"
-          >Back to multiplayer <ArrowRight size={16} aria-hidden="true" /></a
+        <Button type="button" onclick={() => void controller.retryAttach()}>Try again</Button>
+        <ActionLink href={resolve('/multiplayer')} tone="secondary"
+          >Back to multiplayer <ArrowRight size={16} aria-hidden="true" /></ActionLink
         >
       </div>
     </div>
@@ -329,7 +330,7 @@
 
     {#if phase === 'lobby'}
       <div class="hm-lobby">
-        <div class="h-panel hm-invite">
+        <Panel padding="md" class="hm-invite">
           <p class="h-eyebrow">{isHost ? 'Bring your opponent' : 'You’re in'}</p>
           <h2 class="h-subtitle">{isHost ? 'Your room. Your invite.' : 'The matchup is set.'}</h2>
           <p class="h-copy">
@@ -341,25 +342,25 @@
             {controller.snapshot.code}
           </div>
           <div class="h-actions">
-            <button type="button" class="h-button secondary" onclick={copyCode}
+            <Button type="button" tone="secondary" onclick={copyCode}
               >{#if copiedCode}<Check size={16} aria-hidden="true" /> Copied{:else}<Copy
                   size={16}
                   aria-hidden="true"
-                /> Copy code{/if}</button
+                /> Copy code{/if}</Button
             >
-            <button type="button" class="h-button" onclick={copyInviteLink}
+            <Button type="button" onclick={copyInviteLink}
               >{#if copiedLink}<Check size={16} aria-hidden="true" /> Copied{:else}<Link
                   size={16}
                   aria-hidden="true"
-                /> Copy invite link{/if}</button
+                /> Copy invite link{/if}</Button
             >
           </div>
           <p class="hm-footnote">
             Hoop Havoc · {variantLabel} · Room codes expire after 15 minutes.
           </p>
-        </div>
+        </Panel>
 
-        <div class="h-panel hm-seats">
+        <Panel padding="md" class="hm-seats">
           <div class="hm-seats-head">
             <h2 class="h-subtitle">Players</h2>
             <span>{onlineCount}/2 online</span>
@@ -376,14 +377,14 @@
             {/each}
           </ul>
           <div class="hm-lobby-actions">
-            <button
+            <Button
               type="button"
-              class="h-button secondary"
+              tone="secondary"
               disabled={controller.busy || me?.ready === true}
               onclick={() => void controller.setReady()}
             >
               {me?.ready === true ? 'Ready' : 'Ready up'}
-            </button>
+            </Button>
             {#if isHost}
               {#if lobbyId && !autoStartFailed}
                 <p class="hm-footnote" role="status">
@@ -392,9 +393,8 @@
                     : 'The draft starts automatically once your opponent is online.'}
                 </p>
               {:else}
-                <button
+                <Button
                   type="button"
-                  class="h-button"
                   data-havoc-multiplayer-start
                   disabled={controller.busy || !bothOnline}
                   onclick={() => {
@@ -404,7 +404,7 @@
                 >
                   {controller.busy ? 'Starting…' : autoStartFailed ? 'Retry start' : 'Start draft'}
                   <ArrowRight size={16} aria-hidden="true" />
-                </button>
+                </Button>
               {/if}
             {/if}
           </div>
@@ -421,22 +421,22 @@
               ><LogOut size={14} aria-hidden="true" /> Leave room</button
             >
           </div>
-        </div>
+        </Panel>
       </div>
     {:else if phase === 'expired'}
       <div class="hm-empty">
         <h1 class="h-title">Room expired</h1>
         <p class="h-copy">Your local saves are kept. Create a new room to play again.</p>
-        <a class="h-button" href={resolve('/multiplayer')}
-          >New Havoc room <ArrowRight size={16} aria-hidden="true" /></a
+        <ActionLink href={resolve('/multiplayer')}
+          >New Havoc room <ArrowRight size={16} aria-hidden="true" /></ActionLink
         >
       </div>
     {:else if phase === 'integrity-failed'}
       <div class="hm-empty">
         <h1 class="h-title">Results could not be verified</h1>
         <p class="h-copy">The two simulations disagreed. Neither result has been accepted.</p>
-        <a class="h-button" href={resolve('/multiplayer')}
-          >New Havoc room <ArrowRight size={16} aria-hidden="true" /></a
+        <ActionLink href={resolve('/multiplayer')}
+          >New Havoc room <ArrowRight size={16} aria-hidden="true" /></ActionLink
         >
       </div>
     {:else}
@@ -464,7 +464,7 @@
 
         <div class="hm-main">
           {#if phase === 'drafting'}
-            <section class="h-panel hm-draft" aria-label="Draft stage">
+            <Panel as="section" padding="md" class="hm-draft" aria-label="Draft stage">
               <header class="hm-draft-head">
                 <div>
                   <p class="h-eyebrow">
@@ -509,14 +509,14 @@
               {/if}
 
               <div class="hm-draft-actions">
-                <button
+                <Button
                   type="button"
-                  class="h-button secondary"
+                  tone="secondary"
                   disabled={controller.busy || !canReroll}
                   onclick={() => void controller.rerollOffer()}
                 >
                   <Shuffle size={16} aria-hidden="true" /> New choices
-                </button>
+                </Button>
                 <span class="hm-rerolls">{rerollsUsed === 0 ? 1 : 0} of 1 reroll left</span>
               </div>
 
@@ -540,9 +540,9 @@
                   {controller.muted ? 'Unmute' : 'Mute'}
                 </button>
               </div>
-            </section>
+            </Panel>
           {:else if phase === 'lineup-showdown'}
-            <section class="h-panel hm-draft" aria-label="Lineup showdown">
+            <Panel as="section" padding="md" class="hm-draft" aria-label="Lineup showdown">
               <header class="hm-draft-head">
                 <div>
                   <p class="h-eyebrow">Lineup showdown</p>
@@ -560,18 +560,17 @@
                 <HavocLineupLock slots={rivalLineupSlots} title="Opponent five" compact />
               </div>
               <div class="hm-draft-actions">
-                <button
+                <Button
                   type="button"
-                  class="h-button"
                   disabled={!showdownReady || controller.busy || controller.localReady}
                   onclick={() => void controller.readyForNextGame()}
                 >
                   {controller.localReady ? 'Ready' : 'Ready for Game 1'}
-                </button>
+                </Button>
               </div>
-            </section>
+            </Panel>
           {:else if phase === 'preparing-game'}
-            <section class="h-panel hm-draft" aria-label="Preparing game">
+            <Panel as="section" padding="md" class="hm-draft" aria-label="Preparing game">
               <header class="hm-draft-head">
                 <div>
                   <p class="h-eyebrow">Game {controller.currentGameNumber ?? '—'} ready check</p>
@@ -613,16 +612,15 @@
                 </p>
               {/if}
               <div class="hm-draft-actions">
-                <button
+                <Button
                   type="button"
-                  class="h-button"
                   disabled={controller.localReady || controller.busy}
                   onclick={() => void controller.readyForNextGame()}
                 >
                   {controller.localReady ? 'Ready' : 'Ready for this game'}
-                </button>
+                </Button>
               </div>
-            </section>
+            </Panel>
           {:else if controller.showingBroadcast && controller.currentOutput && controller.visible}
             <HavocMultiplayerBroadcast
               output={controller.currentOutput}
@@ -634,7 +632,7 @@
               minimal={reducedMotion}
             />
           {:else if phase === 'broadcasting'}
-            <section class="h-panel hm-wait" aria-label="Broadcast loading">
+            <Panel as="section" padding="md" class="hm-wait" aria-label="Broadcast loading">
               <p class="h-eyebrow">Broadcast</p>
               <h2 class="h-subtitle">
                 Simulating Game {controller.currentBroadcast?.gameNumber ?? '—'}…
@@ -645,11 +643,11 @@
               </p>
               {#if controller.error}
                 <p class="h-copy" role="alert">{controller.error}</p>
-                <button type="button" class="h-button" onclick={() => void controller.refresh()}>
+                <Button type="button" onclick={() => void controller.refresh()}>
                   Retry simulation
-                </button>
+                </Button>
               {/if}
-            </section>
+            </Panel>
           {:else if phase === 'game-results'}
             {#if controller.currentOutput && controller.series}
               <HavocMultiplayerGameResults
@@ -665,15 +663,15 @@
                 oncontinue={() => controller.continueAfterGame()}
               />
             {:else}
-              <section class="h-panel hm-wait" aria-label="Game results loading">
+              <Panel as="section" padding="md" class="hm-wait" aria-label="Game results loading">
                 <p class="h-copy" role="status">Loading the game result…</p>
                 {#if controller.error}
                   <p class="h-copy" role="alert">{controller.error}</p>
-                  <button type="button" class="h-button" onclick={() => void controller.refresh()}>
+                  <Button type="button" onclick={() => void controller.refresh()}>
                     Retry simulation
-                  </button>
+                  </Button>
                 {/if}
-              </section>
+              </Panel>
             {/if}
           {:else if phase === 'championship'}
             <AchievementReveal bindingId={`havoc-multiplayer:${roomId}`} />
@@ -693,9 +691,9 @@
                 showRematch={!lobbyId}
               />
             {:else}
-              <section class="h-panel hm-wait" aria-label="Championship loading">
+              <Panel as="section" padding="md" class="hm-wait" aria-label="Championship loading">
                 <p class="h-copy" role="status">Loading the series…</p>
-              </section>
+              </Panel>
             {/if}
           {/if}
         </div>
@@ -714,11 +712,8 @@
       </div>
 
       <footer class="hm-footer">
-        <button
-          type="button"
-          class="h-button secondary"
-          onclick={leaveRoom}
-          disabled={controller.busy}><LogOut size={14} aria-hidden="true" /> Leave room</button
+        <Button type="button" tone="secondary" onclick={leaveRoom} disabled={controller.busy}
+          ><LogOut size={14} aria-hidden="true" /> Leave room</Button
         >
       </footer>
     {/if}
@@ -839,7 +834,7 @@
       grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
     }
   }
-  .hm-invite {
+  :global(.hm-invite) {
     display: grid;
     gap: 12px;
   }
@@ -858,7 +853,7 @@
     font-size: 11px;
     color: #aab9db;
   }
-  .hm-seats {
+  :global(.hm-seats) {
     display: grid;
     gap: 14px;
   }
@@ -922,7 +917,7 @@
     flex-wrap: wrap;
     gap: 10px;
   }
-  .hm-lobby-actions .h-button {
+  .hm-lobby-actions :global(.ui-btn) {
     flex: 1 1 auto;
   }
   .hm-lobby-manage {
@@ -976,7 +971,7 @@
       top: 12px;
     }
   }
-  .hm-draft {
+  :global(.hm-draft) {
     display: grid;
     gap: 14px;
     min-width: 0;
@@ -1097,7 +1092,7 @@
     font-size: 12px;
     color: #c1cae4;
   }
-  .hm-wait {
+  :global(.hm-wait) {
     display: grid;
     gap: 10px;
   }
@@ -1119,7 +1114,7 @@
     .hm-stages li {
       padding: 6px 10px;
     }
-    .hm-draft-actions .h-button {
+    .hm-draft-actions :global(.ui-btn) {
       flex: 1 1 100%;
       min-height: 44px;
     }

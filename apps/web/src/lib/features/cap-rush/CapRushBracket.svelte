@@ -8,6 +8,7 @@
   } from '@hoop-rush/data-contracts';
   import TeamLogo from '#lib/components/TeamLogo.svelte';
   import { franchiseIdentityOf } from '#lib/branding.js';
+  import SegmentedControl from '#lib/components/ui/SegmentedControl.svelte';
 
   let {
     series,
@@ -144,29 +145,19 @@
 >
   <div class="flex flex-wrap items-end justify-between gap-3">
     <div>
-      <p class="font-mono text-[10px] font-bold tracking-[0.16em] text-primary uppercase">
-        Conference bracket
-      </p>
+      <p class="ui-label">Conference bracket</p>
       <h2 class="font-display mt-1 text-2xl font-extrabold tracking-tight uppercase">
         West to East. One champion.
       </h2>
     </div>
-    <div
-      class="round-picker conference-round-picker"
-      role="group"
-      aria-label="Choose a playoff round"
-    >
-      {#each roundNames as name, index (name)}
-        <button
-          type="button"
-          class="round-button {activeRound === index + 1 ? 'is-active' : ''}"
-          aria-pressed={activeRound === index + 1}
-          onclick={() => (selectedRound = index + 1)}
-        >
-          {name}
-        </button>
-      {/each}
-    </div>
+    <SegmentedControl
+      class="lg:hidden"
+      label="Choose a playoff round"
+      size="md"
+      value={activeRound}
+      onchange={(round) => (selectedRound = round)}
+      options={roundNames.map((name, index) => ({ value: index + 1, label: name }))}
+    />
   </div>
 
   <div class="mt-4 hidden lg:block">
@@ -251,18 +242,16 @@
 
   <div class="mt-4 flex flex-col gap-2 lg:hidden">
     {#if activeRound !== 4}
-      <div class="conference-picker" role="group" aria-label="Choose a conference">
-        {#each ['west', 'east'] as const as side (side)}
-          <button
-            type="button"
-            class="conference-button {mobileConference === side ? 'is-active' : ''}"
-            aria-pressed={mobileConference === side}
-            onclick={() => (mobileConference = side)}
-          >
-            {side === 'west' ? 'West' : 'East'}
-          </button>
-        {/each}
-      </div>
+      <SegmentedControl
+        class="w-full"
+        label="Choose a conference"
+        value={mobileConference}
+        onchange={(side) => (mobileConference = side)}
+        options={[
+          { value: 'west', label: 'West' },
+          { value: 'east', label: 'East' },
+        ]}
+      />
     {/if}
     <p class="font-mono text-[10px] font-bold tracking-[0.12em] text-primary uppercase">
       {roundNames[activeRound - 1]}
@@ -272,9 +261,7 @@
     {/each}
     {#if activeRound === 4 && championId !== null}
       <div class="champion-plate mobile-champion">
-        <p class="font-mono text-[10px] font-bold tracking-[0.16em] text-accent uppercase">
-          Champion
-        </p>
+        <p class="ui-label text-accent">Champion</p>
         <p class="champion-name font-display mt-1 text-xl font-extrabold uppercase">
           {nameOf(championId)}
         </p>
@@ -350,42 +337,6 @@
 {/snippet}
 
 <style>
-  .round-picker,
-  .conference-picker {
-    display: flex;
-    gap: 6px;
-  }
-  .round-picker {
-    width: 100%;
-    overflow-x: auto;
-    padding-bottom: 2px;
-  }
-  .round-button,
-  .conference-button {
-    min-height: 44px;
-    border: 1px solid var(--color-line-soft);
-    border-radius: 9px;
-    padding: 8px 12px;
-    color: var(--color-muted-foreground);
-    font-size: 11px;
-    font-weight: 700;
-    white-space: nowrap;
-    text-transform: uppercase;
-  }
-  .round-button.is-active,
-  .conference-button.is-active {
-    border-color: var(--color-primary);
-    background: color-mix(in srgb, var(--color-primary) 15%, var(--color-surface-1));
-    color: var(--color-primary);
-  }
-  .round-button:focus-visible,
-  .conference-button:focus-visible {
-    outline: 2px solid var(--color-primary);
-    outline-offset: 2px;
-  }
-  .conference-button {
-    flex: 1;
-  }
   .bracket-side-label {
     font-family: var(--font-mono);
     font-size: 10px;
@@ -555,11 +506,6 @@
     to {
       transform: none;
       opacity: 1;
-    }
-  }
-  @media (min-width: 1024px) {
-    .conference-round-picker {
-      display: none;
     }
   }
   @media (prefers-reduced-motion: reduce) {

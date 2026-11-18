@@ -55,6 +55,7 @@
   import AsyncState from '#lib/components/AsyncState.svelte';
   import { arenaDraftPick, arenaError } from '#lib/arena-sound.js';
   import { lazyModule } from '#lib/lazy-module.js';
+  import PageShell from '#lib/components/ui/PageShell.svelte';
   const loadSlotPickerDialog = lazyModule(
     () => import('#lib/components/draft/SlotPickerDialog.svelte'),
   );
@@ -480,7 +481,7 @@
   <title>Classic — Hoop Rush</title>
 </svelte:head>
 
-<section class="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
+<PageShell as="section" width="xl" padding="lg">
   <div class="flex items-end justify-between gap-4">
     <div>
       <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">Classic</p>
@@ -807,4 +808,4 @@
       </Dialog.Content>
     </Dialog.Portal>
   </Dialog.Root>
-</section>
+</PageShell>

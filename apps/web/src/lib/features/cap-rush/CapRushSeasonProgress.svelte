@@ -26,6 +26,10 @@
     recordLabel,
     variantLabel,
   } from './cap-rush-presentation.ts';
+  import Panel from '#lib/components/ui/Panel.svelte';
+  import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
+  import StatGrid from '#lib/components/ui/StatGrid.svelte';
+  import StatTile from '#lib/components/ui/StatTile.svelte';
 
   let {
     draft,
@@ -167,7 +171,7 @@
   >
     <div class="flex flex-wrap items-end justify-between gap-3">
       <div class="min-w-0">
-        <p class="font-mono text-[10px] font-bold tracking-[0.16em] text-primary uppercase">
+        <p class="ui-label">
           {variantLabel(draft.variant)} ·
           {season.completedAt === null ? 'Season in progress' : 'Season complete'}
         </p>
@@ -180,44 +184,27 @@
           {played} of {CAP_RUSH_GAME_COUNT} games played
         </p>
       </div>
-      <dl
-        class="grid {userPlayoffSeed !== null ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'} gap-2"
+      <StatGrid
+        columns={userPlayoffSeed !== null ? 4 : 3}
+        mobile={userPlayoffSeed !== null ? 2 : 3}
+        gap="md"
       >
-        <div class="rounded-xl border border-line-soft bg-surface-1 px-3 py-2.5">
-          <dt class="font-mono text-[9px] tracking-[0.08em] text-muted-foreground uppercase">
-            Points for
-          </dt>
-          <dd class="font-display mt-1 text-xl font-extrabold tabular-nums">
-            {season.aggregate.pointsFor}
-          </dd>
-        </div>
-        <div class="rounded-xl border border-line-soft bg-surface-1 px-3 py-2.5">
-          <dt class="font-mono text-[9px] tracking-[0.08em] text-muted-foreground uppercase">
-            Points against
-          </dt>
-          <dd class="font-display mt-1 text-xl font-extrabold tabular-nums">
-            {season.aggregate.pointsAgainst}
-          </dd>
-        </div>
-        <div class="rounded-xl border border-line-soft bg-surface-1 px-3 py-2.5">
-          <dt class="font-mono text-[9px] tracking-[0.08em] text-muted-foreground uppercase">
-            Remaining
-          </dt>
-          <dd class="font-display mt-1 text-xl font-extrabold tabular-nums">{remaining}</dd>
-        </div>
+        <StatTile label="Points for" size="md" surface="tile" value={season.aggregate.pointsFor} />
+        <StatTile
+          label="Points against"
+          size="md"
+          surface="tile"
+          value={season.aggregate.pointsAgainst}
+        />
+        <StatTile label="Remaining" size="md" surface="tile" value={remaining} />
         {#if userPlayoffSeed !== null}
-          <div class="rounded-xl border border-accent/40 bg-accent/10 px-3 py-2.5">
-            <dt class="font-mono text-[9px] tracking-[0.08em] text-accent uppercase">
-              Playoff seed
-            </dt>
-            <dd class="font-display mt-1 text-xl font-extrabold tabular-nums text-accent">
-              {userConference === null
-                ? `#${userPlayoffSeed}`
-                : `${CAP_RUSH_CONFERENCE_NAMES[userConference].split(' ')[0]} #${userPlayoffSeed}`}
-            </dd>
-          </div>
+          <StatTile label="Playoff seed" size="md" surface="tile" tone="accent">
+            {userConference === null
+              ? `#${userPlayoffSeed}`
+              : `${CAP_RUSH_CONFERENCE_NAMES[userConference].split(' ')[0]} #${userPlayoffSeed}`}
+          </StatTile>
         {/if}
-      </dl>
+      </StatGrid>
     </div>
 
     {#if latest !== null}
@@ -265,18 +252,14 @@
     {/if}
   </section>
 
-  <section
-    class="rounded-2xl border border-border bg-card p-4 sm:p-5"
-    aria-label="Schedule results"
-  >
-    <div class="flex flex-wrap items-end justify-between gap-2">
-      <h3 class="font-display text-base font-extrabold tracking-tight uppercase">
-        Schedule · 82 games
-      </h3>
-      <p class="font-mono text-[10px] text-muted-foreground uppercase">
-        {hasBoxScores ? 'Select a stored game for its box score' : 'Results only'}
-      </p>
-    </div>
+  <Panel as="section" padding="md" aria-label="Schedule results">
+    <SectionHeading title="Schedule · 82 games" level={3} size="sm">
+      {#snippet actions()}
+        <p class="font-mono text-[10px] text-muted-foreground uppercase">
+          {hasBoxScores ? 'Select a stored game for its box score' : 'Results only'}
+        </p>
+      {/snippet}
+    </SectionHeading>
 
     <ol class="mt-3 grid grid-cols-4 gap-1 sm:grid-cols-6 lg:grid-cols-8" aria-label="Game results">
       {#each cells as cell (cell.gameNumber)}
@@ -324,18 +307,13 @@
         </li>
       {/each}
     </ol>
-  </section>
+  </Panel>
 
   {#if selectedSummary !== null}
-    <section
-      class="rounded-2xl border border-border bg-card p-4 sm:p-5"
-      aria-label={`Game ${selectedSummary.gameNumber} box score`}
-    >
+    <Panel as="section" padding="md" aria-label={`Game ${selectedSummary.gameNumber} box score`}>
       <div class="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <p
-            class="font-mono text-[10px] font-bold tracking-[0.16em] text-muted-foreground uppercase"
-          >
+          <p class="ui-label" data-tone="muted">
             Game {selectedSummary.gameNumber} · {selectedSummary.humanHome ? 'Home' : 'Away'}
             {#if selectedSummary.overtimePeriods > 0}
               · {selectedSummary.overtimePeriods} OT
@@ -468,27 +446,23 @@
           {/each}
         </div>
       {/if}
-    </section>
+    </Panel>
   {/if}
 
-  <section
-    class="rounded-2xl border border-border bg-card p-4 sm:p-5"
-    aria-label="Season player totals and averages"
-  >
-    <div class="flex flex-wrap items-end justify-between gap-2">
-      <h3 class="font-display text-base font-extrabold tracking-tight uppercase">
-        Season averages
-      </h3>
-      <p class="font-mono text-[10px] text-muted-foreground uppercase">
-        {#if boxScoresComplete}
-          {storedGames.length} stored {storedGames.length === 1 ? 'game' : 'games'}
-        {:else if hasBoxScores}
-          {storedGames.length} of {played} box scores
-        {:else}
-          No stored box scores
-        {/if}
-      </p>
-    </div>
+  <Panel as="section" padding="md" aria-label="Season player totals and averages">
+    <SectionHeading title="Season averages" level={3} size="sm">
+      {#snippet actions()}
+        <p class="font-mono text-[10px] text-muted-foreground uppercase">
+          {#if boxScoresComplete}
+            {storedGames.length} stored {storedGames.length === 1 ? 'game' : 'games'}
+          {:else if hasBoxScores}
+            {storedGames.length} of {played} box scores
+          {:else}
+            No stored box scores
+          {/if}
+        </p>
+      {/snippet}
+    </SectionHeading>
 
     {#if !hasBoxScores}
       <p class="mt-2 text-xs leading-relaxed text-muted-foreground">
@@ -648,7 +622,7 @@
         </table>
       </div>
     {/if}
-  </section>
+  </Panel>
 </div>
 
 <style>

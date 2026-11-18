@@ -139,7 +139,7 @@
           />
         {/if}
         <div class="min-w-0">
-          <p class="font-mono text-[10px] font-bold tracking-[0.18em] text-primary uppercase">
+          <p class="ui-label">
             Cap Rush · {variantLabel(view.draft.variant)}
           </p>
           <h1
@@ -384,9 +384,7 @@
   grabHandle={true}
 >
   {#snippet header()}
-    <p class="font-mono text-[10px] font-bold tracking-[0.16em] text-primary uppercase">
-      Box score
-    </p>
+    <p class="ui-label">Box score</p>
     <p class="font-display text-lg font-extrabold tracking-tight uppercase">
       {selectedBox?.label ?? ''}
     </p>

@@ -16,6 +16,7 @@
   import { ChallengeRunPresenter } from './challenge-session.svelte.js';
   import ChallengeOverlay from './challenge-overlay.svelte';
   import AsyncState from '#lib/components/AsyncState.svelte';
+  import PageShell from '#lib/components/ui/PageShell.svelte';
   let {
     mode,
     modeLabelFor,
@@ -162,7 +163,7 @@
 
 <p id="challenge-announcer" class="sr-only" aria-live="polite"></p>
 
-<section class="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
+<PageShell as="section" width="xl" padding="lg">
   {#if loadError}
     <div class="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm">
       <AsyncState
@@ -199,4 +200,4 @@
       onResume={() => presenter.resume()}
     />
   {/if}
-</section>
+</PageShell>

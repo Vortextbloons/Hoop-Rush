@@ -2,16 +2,15 @@
   import type { HavocComparison } from '@hoop-rush/data-contracts';
   import PlayerArt from '#lib/components/PlayerArt.svelte';
   import { havocMvpFormulaLabel } from './havoc-presentation';
+  import Panel from '#lib/components/ui/Panel.svelte';
 
   let { comparison }: { comparison: HavocComparison } = $props();
   const mvp = $derived(comparison.mvp);
   const formula = $derived(havocMvpFormulaLabel(comparison.mvpIndexWeights));
 </script>
 
-<section aria-labelledby="havoc-mvp-heading" class="h-panel" data-havoc-mvp>
-  <p class="font-mono text-[10px] font-bold tracking-[0.16em] text-primary uppercase">
-    Your Havoc MVP
-  </p>
+<Panel as="section" padding="md" aria-labelledby="havoc-mvp-heading" data-havoc-mvp>
+  <p class="ui-label">Your Havoc MVP</p>
   <h2
     id="havoc-mvp-heading"
     class="font-display mt-1 text-2xl font-extrabold tracking-tight uppercase"
@@ -64,4 +63,4 @@
       award rule, not exact causal value.
     </p>
   </details>
-</section>
+</Panel>

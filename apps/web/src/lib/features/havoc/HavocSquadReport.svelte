@@ -16,6 +16,7 @@
   } from './havoc-presentation';
   import { trueShootingRate } from '#lib/format.js';
   import PlayerArt from '#lib/components/PlayerArt.svelte';
+  import Panel from '#lib/components/ui/Panel.svelte';
   let {
     comparison,
     lineup,
@@ -110,7 +111,13 @@
   const selectedSource = $derived(lineup.find((player) => player.slot === selectedSlot));
 </script>
 
-<section class="h-panel mt-4" aria-labelledby="h-squad-report" data-havoc-squad-report>
+<Panel
+  as="section"
+  padding="md"
+  class="mt-4"
+  aria-labelledby="h-squad-report"
+  data-havoc-squad-report
+>
   <h2 id="h-squad-report" class="h-subtitle">Season box score</h2>
   <p class="h-copy text-xs mt-2">
     Per-game Havoc stats. The signed value below is the change from Normal. Select a player for both
@@ -208,7 +215,7 @@
       </tbody>
     </table>
   </div>
-</section>
+</Panel>
 <Dialog.Root bind:open={detailsOpen}>
   <Dialog.Portal>
     <Dialog.Overlay class="h-result-overlay" />
@@ -220,7 +227,7 @@
             <p class="h-eyebrow">{player.slot} / Season comparison</p>
             <Dialog.Title class="h-subtitle mt-2">{player.displayName}</Dialog.Title>
           </div>
-          <Dialog.Close class="h-button secondary" aria-label="Close player details"
+          <Dialog.Close class="ui-btn" data-tone="secondary" aria-label="Close player details"
             >Close</Dialog.Close
           >
         </header>

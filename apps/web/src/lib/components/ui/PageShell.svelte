@@ -12,7 +12,7 @@
   }: {
     as?: 'div' | 'section' | 'main';
     width?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
-    padding?: 'none' | 'sm' | 'md' | 'lg' | 'xl';
+    padding?: 'none' | 'sm' | 'md' | 'lg' | 'xl' | '2xl';
     children?: Snippet;
   } & HTMLAttributes<HTMLElement> = $props();
 </script>

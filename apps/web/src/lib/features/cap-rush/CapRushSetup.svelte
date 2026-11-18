@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { CapRushDraftController } from './cap-rush-draft-state.svelte.js';
   import { ArrowRight, Dices, Trophy } from '@lucide/svelte';
+  import PageShell from '#lib/components/ui/PageShell.svelte';
 
   let { controller }: { controller: CapRushDraftController } = $props();
 
@@ -24,7 +25,12 @@
   ];
 </script>
 
-<section class="mx-auto w-full max-w-5xl px-4 pt-10 pb-24 sm:px-6 md:pt-16 md:pb-12">
+<PageShell
+  as="section"
+  width="lg"
+  padding="none"
+  class="px-4 pt-10 pb-24 sm:px-6 md:pt-16 md:pb-12"
+>
   <div class="max-w-3xl">
     <p class="font-mono text-[10px] font-bold tracking-[0.2em] text-primary uppercase">Cap Rush</p>
     <h1
@@ -77,7 +83,7 @@
       {/if}
     </div>
   {/if}
-</section>
+</PageShell>
 
 <style>
   .mode-card {

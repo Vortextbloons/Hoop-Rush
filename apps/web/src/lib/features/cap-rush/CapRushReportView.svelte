@@ -226,9 +226,7 @@
     </section>
 
     <section class="rounded-2xl border border-accent/40 bg-card p-5 sm:p-7" aria-label="Finals MVP">
-      <p class="font-mono text-[10px] font-bold tracking-[0.16em] text-accent uppercase">
-        Finals MVP
-      </p>
+      <p class="ui-label text-accent">Finals MVP</p>
       <div class="mt-3 flex flex-wrap items-center gap-4">
         <div class="shrink-0">
           {#if manifest && finalsMvpFace}
@@ -304,7 +302,7 @@
   >
     <div class="flex flex-wrap items-end justify-between gap-3">
       <div class="min-w-0">
-        <p class="font-mono text-[10px] font-bold tracking-[0.16em] text-primary uppercase">
+        <p class="ui-label">
           {variantLabel(report.variant)} &middot; Season report
         </p>
         <h2

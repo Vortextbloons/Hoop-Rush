@@ -2,6 +2,7 @@
   import type { HavocComparison } from '@hoop-rush/data-contracts';
   import { Zap } from '@lucide/svelte';
   import { mutationNameOf, mutationTierOf, formatSignedPoints } from './havoc-presentation';
+  import Panel from '#lib/components/ui/Panel.svelte';
   let { comparison }: { comparison: HavocComparison } = $props();
 </script>
 
@@ -18,7 +19,7 @@
   {:else}
     <ul class="h-ability-list mt-4">
       {#each comparison.mutations as power (power.mutationId)}
-        <li class="h-panel" data-havoc-ability={power.mutationId}>
+        <Panel as="li" padding="md" data-havoc-ability={power.mutationId}>
           <div class="flex items-center gap-3">
             <Zap size={18} color="#ffd782" />
             <h3 class="h-subtitle">{mutationNameOf(power.mutationId)}</h3>
@@ -82,7 +83,7 @@
                 </div>{/if}
             </dl>
           {/if}
-        </li>
+        </Panel>
       {/each}
     </ul>
   {/if}

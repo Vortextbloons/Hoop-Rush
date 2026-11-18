@@ -16,6 +16,7 @@
   import { arenaBlockComplete } from '#lib/arena-sound.js';
   import ChallengeReport from '#lib/components/ChallengeReport.svelte';
   import AsyncState from '#lib/components/AsyncState.svelte';
+  import PageShell from '#lib/components/ui/PageShell.svelte';
   let {
     mode,
     eyebrow,
@@ -163,7 +164,7 @@
   }
 </script>
 
-<section class="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
+<PageShell as="section" width="xl" padding="lg">
   <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">{eyebrow}</p>
 
   {#if error}
@@ -193,4 +194,4 @@
       {editTeamHref}
     />
   {/if}
-</section>
+</PageShell>

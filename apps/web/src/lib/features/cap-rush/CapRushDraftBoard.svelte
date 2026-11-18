@@ -19,6 +19,7 @@
   import { capRushPlayoffStatusOf } from './cap-rush-playoff-presentation.ts';
   import type { CapRushArt } from './cap-rush-art.ts';
   import { formatMillions, initialsOf, variantLabel } from './cap-rush-presentation.ts';
+  import PageShell from '#lib/components/ui/PageShell.svelte';
 
   let {
     view,
@@ -100,7 +101,7 @@
   }
 </script>
 
-<div class="mx-auto w-full max-w-[1440px] px-3 pt-4 pb-24 sm:px-6 md:pb-10">
+<PageShell width="full" padding="none" class="px-3 pt-4 pb-24 sm:px-6 md:pb-10">
   {#if view.franchise}
     {@const franchiseIdentity = art === null ? null : art.teamFor(view.franchise.franchiseId)}
     <div
@@ -135,7 +136,7 @@
   {/if}
   <header class="flex flex-wrap items-end justify-between gap-4">
     <div class="min-w-0">
-      <p class="font-mono text-[10px] font-bold tracking-[0.18em] text-primary uppercase">
+      <p class="ui-label">
         {variantLabel(draft.variant)} · Draft night
       </p>
       <h1
@@ -197,9 +198,7 @@
           >
             <div class="flex flex-wrap items-end justify-between gap-2">
               <div>
-                <p
-                  class="font-mono text-[10px] font-bold tracking-[0.16em] text-muted-foreground uppercase"
-                >
+                <p class="ui-label text-muted-foreground">
                   Round {draft.round} of 5
                 </p>
                 <h2 class="font-display mt-1 text-xl font-extrabold tracking-tight uppercase">
@@ -249,9 +248,7 @@
           <section aria-label="Current offer">
             <div class="flex flex-wrap items-end justify-between gap-3">
               <div>
-                <p
-                  class="font-mono text-[10px] font-bold tracking-[0.16em] text-muted-foreground uppercase"
-                >
+                <p class="ui-label text-muted-foreground">
                   Round {draft.round} of 5 · {offer.slot}
                 </p>
                 <h2
@@ -313,11 +310,7 @@
               <div class="spin-panel rounded-2xl border border-primary/30 p-4 sm:p-6">
                 <div class="flex flex-wrap items-start justify-between gap-4">
                   <div>
-                    <p
-                      class="font-mono text-[10px] font-bold tracking-[0.16em] text-primary uppercase"
-                    >
-                      Cap Roulette
-                    </p>
+                    <p class="ui-label">Cap Roulette</p>
                     <h3
                       class="font-display mt-1 text-3xl leading-none font-extrabold tracking-tight uppercase"
                     >
@@ -582,7 +575,7 @@
       </div>
     {/if}
   </div>
-</div>
+</PageShell>
 
 <style>
   .assignment-reveal {

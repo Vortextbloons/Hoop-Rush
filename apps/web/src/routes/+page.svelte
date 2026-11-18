@@ -10,6 +10,7 @@
   import { variantLabel } from '#lib/draft-presentation.js';
   import { eraName } from '#lib/branding.js';
   import type { ActiveRunCheckpoint, CompletedRunIndex } from '@hoop-rush/persistence';
+  import PageShell from '#lib/components/ui/PageShell.svelte';
   const historyHref = resolve('sandbox/history/');
   const road = Array.from({ length: 82 }, (_, i) => i);
   const modes = homeModes();
@@ -81,7 +82,7 @@
   }
 </script>
 
-<section class="mx-auto w-full max-w-4xl px-4 pb-24 sm:px-6 md:pb-10">
+<PageShell as="section" width="md" padding="none" class="px-4 pb-24 sm:px-6 md:pb-10">
   <div class="flex flex-col items-center gap-8 py-16 text-center md:py-24">
     <div>
       <h1
@@ -242,4 +243,4 @@
       </ul>
     </section>
   {/if}
-</section>
+</PageShell>
