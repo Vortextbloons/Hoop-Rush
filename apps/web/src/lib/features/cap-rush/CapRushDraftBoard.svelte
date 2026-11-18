@@ -20,6 +20,7 @@
   import type { CapRushArt } from './cap-rush-art.ts';
   import { formatMillions, initialsOf, variantLabel } from './cap-rush-presentation.ts';
   import PageShell from '#lib/components/ui/PageShell.svelte';
+  import Alert from '#lib/components/ui/Alert.svelte';
 
   let {
     view,
@@ -527,10 +528,7 @@
     </div>
 
     {#if error !== null}
-      <div
-        role="alert"
-        class="rounded-xl border border-negative/40 bg-negative/10 p-4 text-sm text-negative"
-      >
+      <Alert tone="danger">
         <p>{error}</p>
         {#if unsupported || error !== null}
           <button
@@ -540,7 +538,7 @@
             onclick={onDiscard}>Discard draft and start fresh</button
           >
         {/if}
-      </div>
+      </Alert>
     {/if}
 
     {#if !complete}

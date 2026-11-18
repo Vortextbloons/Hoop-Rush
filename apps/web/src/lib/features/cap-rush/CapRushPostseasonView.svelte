@@ -26,6 +26,7 @@
   import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
   import StatGrid from '#lib/components/ui/StatGrid.svelte';
   import StatTile from '#lib/components/ui/StatTile.svelte';
+  import Alert from '#lib/components/ui/Alert.svelte';
 
   let {
     controller,
@@ -442,12 +443,9 @@
       </p>
     {/if}
     {#if controller.error !== null}
-      <div
-        role="alert"
-        class="mt-3 rounded-xl border border-negative/40 bg-negative/10 p-3 text-sm text-negative"
-      >
+      <Alert class="mt-3" tone="danger">
         {controller.error}
-      </div>
+      </Alert>
     {/if}
   </div>
 

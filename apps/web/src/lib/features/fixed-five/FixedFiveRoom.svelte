@@ -289,7 +289,7 @@
     {:else if phase === 'drafting' && replay && assets}
       <div class="draft-room">
         {#if controller.assetsError}
-          <p class="mt-2 text-xs text-destructive" role="alert">{controller.assetsError}</p>
+          <Alert class="mt-2" tone="danger">{controller.assetsError}</Alert>
         {:else}
           <FixedFiveDraftPanel
             mode={snapshot.settings.mode}
@@ -323,7 +323,7 @@
         {#if controller.simError}
           <div class="rounded-2xl bg-surface-1 p-6">
             <h2 class="font-display text-sm font-extrabold uppercase">Simulating locally</h2>
-            <p class="mt-2 text-sm text-destructive" role="alert">{controller.simError}</p>
+            <Alert class="mt-2" tone="danger">{controller.simError}</Alert>
             <button
               type="button"
               onclick={() => controller.retrySimulation()}
@@ -371,7 +371,7 @@
               {/if}
             </p>
             {#if controller.duelSimError}
-              <p class="mt-2 text-sm text-destructive" role="alert">{controller.duelSimError}</p>
+              <Alert class="mt-2" tone="danger">{controller.duelSimError}</Alert>
               <button
                 type="button"
                 onclick={() => controller.retryDuelGame()}
@@ -631,15 +631,9 @@
         </p>
       </div>
     {:else if phase === 'integrity-failed'}
-      <div class="mt-6 rounded-2xl border border-destructive/40 bg-destructive/10 p-6" role="alert">
-        <h2 class="font-display text-sm font-extrabold uppercase">
-          The results could not be verified
-        </h2>
-        <p class="mt-1 text-xs">
-          The match was replayed, but the two results still differ. Neither result has been
-          accepted.
-        </p>
-      </div>
+      <Alert class="mt-6" tone="danger" title="The results could not be verified">
+        The match was replayed, but the two results still differ. Neither result has been accepted.
+      </Alert>
     {:else if phase === 'expired'}
       <div class="mt-6 rounded-2xl bg-surface-1 p-6">
         <h2 class="font-display text-2xl font-extrabold uppercase">Room expired</h2>

@@ -11,6 +11,7 @@
   import { getCapRushService } from '#lib/features/cap-rush/cap-rush-service.js';
   import { loadCapRushArt, type CapRushArt } from '#lib/features/cap-rush/cap-rush-art.js';
   import { variantLabel } from '#lib/features/cap-rush/cap-rush-presentation.js';
+  import Alert from '#lib/components/ui/Alert.svelte';
 
   let controller = $state<CapRushDraftController | null>(null);
   let art = $state.raw<CapRushArt | null>(null);
@@ -123,7 +124,7 @@
           </a>
         </div>
         {#if controller.error !== null}
-          <p role="alert" class="mt-3 text-xs font-semibold text-negative">{controller.error}</p>
+          <Alert class="mt-3" tone="danger">{controller.error}</Alert>
         {/if}
       </div>
     </PageShell>

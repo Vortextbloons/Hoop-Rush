@@ -43,6 +43,7 @@
   import Button from '#lib/components/ui/Button.svelte';
   import ActionLink from '#lib/components/ui/ActionLink.svelte';
   import Panel from '#lib/components/ui/Panel.svelte';
+  import Alert from '#lib/components/ui/Alert.svelte';
 
   const REACTIONS: { key: ReactionKey; label: string; glyph: string }[] = [
     { key: 'hype', label: 'Hype', glyph: '🔥' },
@@ -276,7 +277,7 @@
   {:else if !controller.snapshot}
     <div class="hm-empty">
       <h1 class="h-title">Couldn’t open this room</h1>
-      <p role="alert" class="hm-alert">{controller.error}</p>
+      <Alert tone="danger">{controller.error}</Alert>
       <div class="h-actions">
         <Button type="button" onclick={() => void controller.retryAttach()}>Try again</Button>
         <ActionLink href={resolve('/multiplayer')} tone="secondary"
@@ -323,9 +324,7 @@
       </p>
     {/if}
     {#if controller.integrityFailed && phase !== 'integrity-failed'}
-      <p class="hm-alert" role="alert">
-        The two simulations disagreed. This room can no longer advance.
-      </p>
+      <Alert tone="danger">The two simulations disagreed. This room can no longer advance.</Alert>
     {/if}
 
     {#if phase === 'lobby'}
@@ -642,7 +641,7 @@
                 lands.
               </p>
               {#if controller.error}
-                <p class="h-copy" role="alert">{controller.error}</p>
+                <Alert tone="danger">{controller.error}</Alert>
                 <Button type="button" onclick={() => void controller.refresh()}>
                   Retry simulation
                 </Button>
@@ -666,7 +665,7 @@
               <Panel as="section" padding="md" class="hm-wait" aria-label="Game results loading">
                 <p class="h-copy" role="status">Loading the game result…</p>
                 {#if controller.error}
-                  <p class="h-copy" role="alert">{controller.error}</p>
+                  <Alert tone="danger">{controller.error}</Alert>
                   <Button type="button" onclick={() => void controller.refresh()}>
                     Retry simulation
                   </Button>
@@ -798,15 +797,6 @@
   .hm-stages li.finished > span {
     background: #8bceaf;
     color: #141b39;
-  }
-  .hm-alert {
-    margin: 16px 0;
-    padding: 14px;
-    border: 1px solid #f290c5;
-    border-radius: 12px;
-    background: rgb(242 144 197 / 8%);
-    font-size: 13px;
-    line-height: 1.6;
   }
   .hm-notice {
     margin: 12px 0;

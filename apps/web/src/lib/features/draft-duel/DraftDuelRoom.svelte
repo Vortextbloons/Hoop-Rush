@@ -653,7 +653,7 @@
             Rebuilding this game from the room's seed and accepted commands.
           </p>
           {#if controller.error}
-            <p class="panel-hint" role="alert">{controller.error}</p>
+            <Alert tone="danger">{controller.error}</Alert>
             <div class="panel-actions">
               <Button tone="secondary" onclick={() => void controller.refresh()}>
                 Retry simulation
