@@ -31,6 +31,7 @@
     seatOrder,
     teamNameOf,
   } from './cap-rush-multiplayer-presentation.js';
+  import EmptyState from '#lib/components/ui/EmptyState.svelte';
 
   let {
     state,
@@ -145,7 +146,7 @@
 </script>
 
 {#if report === null && locked === null && season === null}
-  <p class="text-sm text-muted-foreground">No final report has been recorded yet.</p>
+  <EmptyState title="No final report yet" surface="none" />
 {:else}
   <div class="final-report" data-cap-rush-multiplayer-results>
     <section class="champion-banner" aria-label="League champion">

@@ -24,6 +24,7 @@
   } from './havoc-multiplayer-room-view';
   import Button from '#lib/components/ui/Button.svelte';
   import Panel from '#lib/components/ui/Panel.svelte';
+  import EmptyState from '#lib/components/ui/EmptyState.svelte';
 
   let {
     series,
@@ -180,7 +181,7 @@
         {/if}
       </Panel>
     {:else}
-      <p class="hm-no-mvp">No series MVP was recorded for this room.</p>
+      <EmptyState title="No series MVP was recorded for this room" surface="none" />
     {/if}
     <Panel as="section" padding="md" class="hm-games" aria-label="Series comparison">
       <h3 class="h-subtitle">Series comparison</h3>

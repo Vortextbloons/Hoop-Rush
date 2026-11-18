@@ -23,7 +23,7 @@
     description?: string | null;
     level?: 1 | 2 | 3 | 4;
     size?: 'sm' | 'md' | 'lg';
-    align?: 'start' | 'end';
+    align?: 'start' | 'center' | 'end';
     actions?: Snippet | null;
     children?: Snippet;
   } & Omit<HTMLAttributes<HTMLDivElement>, 'title'> = $props();

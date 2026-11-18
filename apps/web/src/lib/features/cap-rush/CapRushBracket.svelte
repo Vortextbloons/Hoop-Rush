@@ -10,6 +10,7 @@
   import { franchiseIdentityOf } from '#lib/branding.js';
   import SegmentedControl from '#lib/components/ui/SegmentedControl.svelte';
   import Panel from '#lib/components/ui/Panel.svelte';
+  import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
 
   let {
     series,
@@ -141,22 +142,18 @@
 </script>
 
 <Panel as="section" padding="none" class="bracket p-4 sm:p-6" aria-label="Playoff bracket">
-  <div class="flex flex-wrap items-end justify-between gap-3">
-    <div>
-      <p class="ui-label">Conference bracket</p>
-      <h2 class="font-display mt-1 text-2xl font-extrabold tracking-tight uppercase">
-        West to East. One champion.
-      </h2>
-    </div>
-    <SegmentedControl
-      class="lg:hidden"
-      label="Choose a playoff round"
-      size="md"
-      value={activeRound}
-      onchange={(round) => (selectedRound = round)}
-      options={roundNames.map((name, index) => ({ value: index + 1, label: name }))}
-    />
-  </div>
+  <SectionHeading eyebrow="Conference bracket" title="West to East. One champion." size="md">
+    {#snippet actions()}
+      <SegmentedControl
+        class="lg:hidden"
+        label="Choose a playoff round"
+        size="md"
+        value={activeRound}
+        onchange={(round) => (selectedRound = round)}
+        options={roundNames.map((name, index) => ({ value: index + 1, label: name }))}
+      />
+    {/snippet}
+  </SectionHeading>
 
   <div class="mt-4 hidden lg:block">
     <div class="mb-2 grid grid-cols-[1fr_1fr_1fr_1.1fr_1fr_1fr_1fr] gap-2">

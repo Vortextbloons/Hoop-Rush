@@ -27,6 +27,7 @@
     teamNameOf,
   } from './cap-rush-multiplayer-presentation.js';
   import Panel from '#lib/components/ui/Panel.svelte';
+  import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
 
   let {
     state: game,
@@ -325,12 +326,7 @@
 
     {#if showLeagueResults && standings !== null}
       <section class="min-w-0" aria-label="Final regular season standings">
-        <header class="mb-3">
-          <p class="ui-label">Regular season complete</p>
-          <h2 class="font-display text-2xl font-extrabold tracking-tight uppercase">
-            Final standings
-          </h2>
-        </header>
+        <SectionHeading eyebrow="Regular season complete" title="Final standings" size="md" />
         <CapRushStandings {standings} manifest={art?.manifest ?? null} userTeamId={localTeamId} />
       </section>
     {/if}

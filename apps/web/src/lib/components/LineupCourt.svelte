@@ -6,6 +6,7 @@
   import PlayerFace from './PlayerFace.svelte';
   import IconButton from './ui/IconButton.svelte';
   import { SLOT_LABELS, SLOT_INDEXES } from '#lib/player-positions.js';
+  import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
   const SLOT_POSITIONS = [
     { left: 50, top: 77 },
     { left: 22, top: 55 },
@@ -69,12 +70,15 @@
 
 <div id="your-five" class="scroll-mt-4 px-0 sm:px-0">
   <p class="sr-only" role="status" aria-live="polite">{announcement}</p>
-  <div class="flex items-center justify-between gap-3 px-3 py-2.5 sm:px-1 sm:py-3">
-    <h2 class="font-display text-lg font-extrabold tracking-tight uppercase">Your five</h2>
-    <span class="shrink-0 font-mono text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
-      {filledCount}/5
-    </span>
-  </div>
+  <SectionHeading class="px-3 py-2.5 sm:px-1 sm:py-3" title="Your five" size="sm" align="center">
+    {#snippet actions()}
+      <span
+        class="shrink-0 font-mono text-[10px] tracking-[0.14em] text-muted-foreground uppercase"
+      >
+        {filledCount}/5
+      </span>
+    {/snippet}
+  </SectionHeading>
   <div class="px-1.5 sm:p-3">
     <div class="court" role="group" aria-label="Your five on the court">
       <span class="court-arc" aria-hidden="true"></span>

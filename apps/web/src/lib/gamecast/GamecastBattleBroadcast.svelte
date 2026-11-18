@@ -9,6 +9,7 @@
   import GamecastBattleBox from '#lib/gamecast/GamecastBattleBox.svelte';
   import { gamecastBattleAbilityLines } from '#lib/gamecast/gamecast-battle-playback.js';
   import type { GamecastBattlePlaybackFrame } from '#lib/gamecast/gamecast-battle-stream.js';
+  import EmptyState from '#lib/components/ui/EmptyState.svelte';
 
   let {
     result,
@@ -153,7 +154,7 @@
       <span>{abilityCount} events</span>
     </header>
     {#if abilities.length === 0}
-      <p class="hm-feed-empty">No ability activations yet.</p>
+      <EmptyState title="No ability activations yet" surface="none" />
     {:else}
       <ol class="hm-feed-list" aria-live="polite">
         {#each [...abilities].reverse() as line (line.key)}

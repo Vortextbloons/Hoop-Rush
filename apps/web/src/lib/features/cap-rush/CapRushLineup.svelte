@@ -11,6 +11,7 @@
     capRushPlayoffRowFor,
     type CapRushPlayoffStatus,
   } from './cap-rush-playoff-presentation.ts';
+  import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
 
   let {
     slots,
@@ -45,28 +46,29 @@
 </script>
 
 <section aria-label="Your lineup" class="min-w-0">
-  <div class="flex items-center justify-between gap-3 px-1 py-3">
-    <h2 class="font-display text-lg font-extrabold tracking-tight uppercase">Your five</h2>
-    <div class="flex items-center gap-2">
-      {#if coverage.withEvidence > 0}
-        <span
-          class="flex items-center gap-1 rounded border px-1.5 py-0.5 font-mono text-[9px] font-bold tracking-[0.04em] uppercase {playoffStatus ===
-          'active'
-            ? 'border-positive/50 bg-positive/10 text-positive'
-            : playoffStatus === 'pending'
-              ? 'border-accent/50 bg-accent/10 text-accent'
-              : 'border-line-soft text-muted-foreground'}"
-          title={`Playoff form is recorded for ${String(coverage.withEvidence)} of ${String(coverage.total)} starters: ${statusLabel[playoffStatus]}.`}
+  <SectionHeading class="px-1 py-3" title="Your five" size="sm" align="center">
+    {#snippet actions()}
+      <div class="flex items-center gap-2">
+        {#if coverage.withEvidence > 0}
+          <span
+            class="flex items-center gap-1 rounded border px-1.5 py-0.5 font-mono text-[9px] font-bold tracking-[0.04em] uppercase {playoffStatus ===
+            'active'
+              ? 'border-positive/50 bg-positive/10 text-positive'
+              : playoffStatus === 'pending'
+                ? 'border-accent/50 bg-accent/10 text-accent'
+                : 'border-line-soft text-muted-foreground'}"
+            title={`Playoff form is recorded for ${String(coverage.withEvidence)} of ${String(coverage.total)} starters: ${statusLabel[playoffStatus]}.`}
+          >
+            PO {coverage.withEvidence}/{coverage.total}
+            <span class="font-normal opacity-80">{statusLabel[playoffStatus]}</span>
+          </span>
+        {/if}
+        <span class="font-mono text-[10px] tracking-[0.14em] text-muted-foreground uppercase"
+          >{filled}/5</span
         >
-          PO {coverage.withEvidence}/{coverage.total}
-          <span class="font-normal opacity-80">{statusLabel[playoffStatus]}</span>
-        </span>
-      {/if}
-      <span class="font-mono text-[10px] tracking-[0.14em] text-muted-foreground uppercase"
-        >{filled}/5</span
-      >
-    </div>
-  </div>
+      </div>
+    {/snippet}
+  </SectionHeading>
   <div class="court" role="group" aria-label="Your five on the court">
     <span class="court-arc" aria-hidden="true"></span>
     <span class="court-rim" aria-hidden="true"></span>

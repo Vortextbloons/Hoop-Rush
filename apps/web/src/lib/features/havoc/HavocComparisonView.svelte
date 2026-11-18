@@ -4,6 +4,7 @@
   import HavocComparisonTable from './HavocComparisonTable.svelte';
   import HavocGameDetail from './HavocGameDetail.svelte';
   import { havocRecordLabel, mutationNameOf } from './havoc-presentation';
+  import EmptyState from '#lib/components/ui/EmptyState.svelte';
 
   let { comparison, showChart = true }: { comparison: HavocComparison; showChart?: boolean } =
     $props();
@@ -107,7 +108,7 @@
       turnovers, and earned or used extra possessions.
     </p>
     {#if comparison.mutations.length === 0}
-      <p class="mt-2 text-xs text-muted-foreground">No mutation triggers recorded.</p>
+      <EmptyState class="mt-2" title="No mutation triggers recorded" surface="none" />
     {:else}
       <div class="havoc-scroll-x mt-3 overflow-x-auto">
         <table class="w-full min-w-[34rem] text-xs" data-havoc-comparison-mutations>

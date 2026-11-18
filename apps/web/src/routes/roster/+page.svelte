@@ -37,6 +37,7 @@
   import RosterComparison from '#lib/components/RosterComparison.svelte';
   import RosterTable from '#lib/components/RosterTable.svelte';
   import PageShell from '#lib/components/ui/PageShell.svelte';
+  import EmptyState from '#lib/components/ui/EmptyState.svelte';
   const loadPlayerDetailDialog = lazyModule(
     () => import('#lib/components/PlayerDetailDialog.svelte'),
   );
@@ -490,7 +491,7 @@
             {/if}
           </div>
         {:else if filteredRows.length === 0}
-          <p class="p-6 text-center font-mono text-xs text-muted-foreground">No players match.</p>
+          <EmptyState class="p-6" title="No players match" surface="none" />
         {:else}
           <RosterTable
             items={visibleItems}

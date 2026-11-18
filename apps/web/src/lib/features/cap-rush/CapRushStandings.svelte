@@ -9,6 +9,7 @@
   import TeamLogo from '#lib/components/TeamLogo.svelte';
   import { franchiseIdentityOf } from '#lib/branding.js';
   import Panel from '#lib/components/ui/Panel.svelte';
+  import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
 
   let {
     standings,
@@ -59,23 +60,19 @@
 </script>
 
 <Panel as="section" padding="none" class="p-4 sm:p-6" aria-label="Final league standings">
-  <div class="flex flex-wrap items-end justify-between gap-3">
-    <div>
-      <p class="ui-label">Conference standings</p>
-      <h2 class="font-display mt-1 text-2xl font-extrabold tracking-tight uppercase">
-        Eight per conference.
-      </h2>
-    </div>
-    {#if userEntry}
-      <p
-        class="rounded-lg border border-primary/40 bg-primary/10 px-3 py-1.5 font-mono text-[10px] font-bold text-primary uppercase"
-      >
-        {userConference !== null
-          ? `${CAP_RUSH_CONFERENCE_NAMES[userConference]} · Seed ${userEntry.seed}`
-          : `Your seed · ${userEntry.seed}`}
-      </p>
-    {/if}
-  </div>
+  <SectionHeading eyebrow="Conference standings" title="Eight per conference." size="md">
+    {#snippet actions()}
+      {#if userEntry}
+        <p
+          class="rounded-lg border border-primary/40 bg-primary/10 px-3 py-1.5 font-mono text-[10px] font-bold text-primary uppercase"
+        >
+          {userConference !== null
+            ? `${CAP_RUSH_CONFERENCE_NAMES[userConference]} · Seed ${userEntry.seed}`
+            : `Your seed · ${userEntry.seed}`}
+        </p>
+      {/if}
+    {/snippet}
+  </SectionHeading>
 
   <p class="mt-2 text-xs text-muted-foreground">
     Seeds 1?{CAP_RUSH_CONFERENCE_PLAYOFF_TEAMS} in each conference qualify. Ties break on wins, then head-to-head
