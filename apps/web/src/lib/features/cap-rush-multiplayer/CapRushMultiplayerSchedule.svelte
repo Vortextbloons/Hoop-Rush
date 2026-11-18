@@ -10,6 +10,7 @@
     seatScheduleCells,
     teamNameOf,
   } from './cap-rush-multiplayer-presentation.js';
+  import Panel from '#lib/components/ui/Panel.svelte';
 
   let {
     state,
@@ -78,15 +79,15 @@
 {#if season === null || locked === null || cells.length === 0}
   <p class="text-sm text-muted-foreground">The shared schedule is not ready yet.</p>
 {:else}
-  <section
-    class="flex min-w-0 flex-col gap-4 rounded-2xl border border-border bg-card p-4 sm:p-5"
+  <Panel
+    as="section"
+    padding="none"
+    class="flex min-w-0 flex-col gap-4 p-4 sm:p-5"
     aria-label={`${played} of ${cells.length} games played`}
   >
     <header class="flex flex-wrap items-end justify-between gap-3">
       <div class="min-w-0">
-        <p class="font-mono text-[10px] font-bold tracking-[0.16em] text-primary uppercase">
-          Your schedule
-        </p>
+        <p class="ui-label">Your schedule</p>
         <h2 class="mt-1 font-display text-3xl font-extrabold tracking-tight uppercase">
           {played} played · {remaining} left
         </h2>
@@ -185,5 +186,5 @@
         </ul>
       </div>
     {/if}
-  </section>
+  </Panel>
 {/if}

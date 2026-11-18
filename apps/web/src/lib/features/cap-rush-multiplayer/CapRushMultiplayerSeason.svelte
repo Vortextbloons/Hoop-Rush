@@ -14,6 +14,7 @@
   import CapRushSharedProgress from './CapRushSharedProgress.svelte';
   import { capRushMultiplayerSeasonWindow } from './cap-rush-multiplayer-derived.js';
   import { seatLabelFor, seatOrder } from './cap-rush-multiplayer-presentation.js';
+  import Panel from '#lib/components/ui/Panel.svelte';
 
   let {
     state,
@@ -69,12 +70,9 @@
 </script>
 
 {#if season === null || locked === null || records === null}
-  <section
-    class="rounded-2xl border border-border bg-card p-3 sm:p-4"
-    data-cap-rush-multiplayer-season
-  >
+  <Panel as="section" padding="none" class="p-3 sm:p-4" data-cap-rush-multiplayer-season>
     <p class="text-sm text-muted-foreground">The shared season is not ready yet.</p>
-  </section>
+  </Panel>
 {:else}
   <div class="flex min-w-0 flex-col gap-4" data-cap-rush-multiplayer-season>
     <CapRushSharedProgress
@@ -148,8 +146,9 @@
       {#if standings !== null}
         <CapRushStandings {standings} manifest={art?.manifest ?? null} userTeamId={localTeamId} />
       {:else}
-        <div
-          class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-2xl border border-border bg-card px-4 py-3"
+        <Panel
+          padding="none"
+          class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-3"
         >
           <p
             class="font-mono text-[10px] font-bold tracking-[0.14em] text-muted-foreground uppercase"
@@ -159,7 +158,7 @@
           <p class="text-sm text-muted-foreground">
             Final standings unlock after slot 82. {season.games.length} of 1230 results accepted.
           </p>
-        </div>
+        </Panel>
       {/if}
     </section>
   </div>

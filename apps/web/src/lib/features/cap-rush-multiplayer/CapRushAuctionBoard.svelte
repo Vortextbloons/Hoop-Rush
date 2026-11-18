@@ -34,6 +34,7 @@
     type CapRushBidAttempt,
     type MarketPool,
   } from './cap-rush-multiplayer-presentation.js';
+  import Panel from '#lib/components/ui/Panel.svelte';
 
   let {
     game,
@@ -427,7 +428,7 @@
   {#key inspectedSelection?.player.playerId}
     <div class="panel-fade flex flex-col gap-3">
       {#if inspectedSelection === null}
-        <p class="rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground">
+        <p class="ui-panel p-4 text-sm text-muted-foreground" data-padding="none">
           Select a lot to inspect it.
         </p>
       {:else}
@@ -524,7 +525,8 @@
             >
               {#if projection !== null}
                 <dl
-                  class="grid grid-cols-2 gap-2 rounded-2xl border border-border bg-card p-2.5"
+                  class="ui-panel grid grid-cols-2 gap-2 p-2.5"
+                  data-padding="none"
                   aria-label="Payroll projection"
                 >
                   <div class="min-w-0">
@@ -595,7 +597,7 @@
             {/if}
           </section>
         {:else}
-          <section class="flex flex-col gap-2 rounded-2xl border border-border bg-card p-3">
+          <Panel as="section" padding="none" class="flex flex-col gap-2 p-3">
             <button
               type="button"
               class="inline-flex min-h-11 w-fit items-center justify-center rounded-xl border border-primary/50 bg-primary/10 px-3 text-xs font-bold text-primary outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -603,7 +605,7 @@
             >
               Go to the {positionLabel(activePool?.position ?? 'PG')} auction
             </button>
-          </section>
+          </Panel>
         {/if}
       {/if}
     </div>
@@ -611,19 +613,17 @@
 {/snippet}
 
 {#if recruitment === null || pools.length === 0}
-  <p class="rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground">
+  <p class="ui-panel p-6 text-sm text-muted-foreground" data-padding="none">
     The recruitment market is not open yet.
   </p>
 {:else}
   <div
     class="flex w-full min-w-0 flex-col gap-3 pb-[calc(13rem_+_env(safe-area-inset-bottom))] md:pb-0"
   >
-    <header class="flex flex-col gap-3 rounded-2xl border border-border bg-card p-3 sm:p-4">
+    <header class="ui-panel flex flex-col gap-3 p-3 sm:p-4" data-padding="none">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div class="min-w-0">
-          <p
-            class="font-mono text-[10px] font-bold tracking-[0.16em] text-muted-foreground uppercase"
-          >
+          <p class="ui-label text-muted-foreground">
             {inspectedPool?.status === 'active'
               ? 'Live auction'
               : inspectedPool?.status === 'completed'
@@ -753,7 +753,7 @@
 
   <CapRushBidSheet open={sheetOpen} onOpenChange={(open) => (sheetOpen = open)}>
     {#snippet header()}
-      <p class="font-mono text-[10px] font-bold tracking-[0.16em] text-primary uppercase">
+      <p class="ui-label">
         {inspectedIndex === activePoolIndex && bidBlock === null ? 'Place a bid' : 'Inspect lot'}
         {#if inspectedSelection !== null}· {inspectedSelection.player.position}{/if}
       </p>

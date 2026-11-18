@@ -244,7 +244,7 @@
     <p class="font-display text-sm font-extrabold tracking-widest uppercase">
       {#if mode === 'duel'}Duel · Best of 7{:else}Season · 82 games{/if}
     </p>
-    <span class="font-mono text-[10px] tracking-[0.16em] text-muted-foreground uppercase">
+    <span class="ui-label text-muted-foreground">
       {pct.toFixed(0)}% of games revealed
     </span>
   </div>
@@ -253,7 +253,7 @@
     {#if isDuel}
       <div class="showdown-duel">
         <div class="duel-lane">
-          <p class="font-mono text-[10px] tracking-[0.16em] text-muted-foreground uppercase">
+          <p class="ui-label text-muted-foreground">
             {laneName('p1')}
           </p>
           <p
@@ -265,7 +265,7 @@
         </div>
         <div class="vs-puck" aria-hidden="true"><span>VS</span></div>
         <div class="duel-lane">
-          <p class="font-mono text-[10px] tracking-[0.16em] text-muted-foreground uppercase">
+          <p class="ui-label text-muted-foreground">
             {laneName('p2')}
           </p>
           <p
@@ -306,7 +306,7 @@
               : 'border-line-soft bg-surface-1'}"
           >
             <div class="flex items-baseline justify-between gap-2">
-              <p class="font-mono text-[10px] tracking-[0.16em] text-muted-foreground uppercase">
+              <p class="ui-label text-muted-foreground">
                 {laneName(pid)}
               </p>
               <p class="font-display text-3xl font-extrabold tabular-nums" aria-live="polite">

@@ -11,6 +11,7 @@
   import GamecastBattleBox from '#lib/gamecast/GamecastBattleBox.svelte';
   import { GamecastBattlePlaybackStream } from '#lib/gamecast/gamecast-battle-stream.js';
   import { gamecastBattleFinalBoxes } from '#lib/gamecast/gamecast-battle-view.js';
+  import Panel from '#lib/components/ui/Panel.svelte';
 
   let {
     art = null,
@@ -95,14 +96,16 @@
 {/snippet}
 
 {#if complete}
-  <section
-    class="flex flex-col gap-4 rounded-2xl border border-border border-t-[3px] border-t-primary bg-card p-4"
+  <Panel
+    as="section"
+    padding="none"
+    class="flex flex-col gap-4 border-t-[3px] border-t-primary p-4"
     aria-label={`${label} result`}
     data-cap-rush-broadcast={kind}
     data-complete="true"
   >
     <header class="flex flex-col items-center gap-1 text-center">
-      <p class="font-mono text-[10px] tracking-[0.16em] text-primary uppercase">
+      <p class="ui-label">
         {matchupLabel} · Final
       </p>
       <h2 class="font-display text-2xl font-extrabold tracking-tight uppercase sm:text-3xl">
@@ -135,16 +138,18 @@
         Continue
       </button>
     </footer>
-  </section>
+  </Panel>
 {:else}
-  <section
-    class="flex flex-col gap-4 rounded-2xl border border-border border-t-[3px] border-t-primary bg-card p-4"
+  <Panel
+    as="section"
+    padding="none"
+    class="flex flex-col gap-4 border-t-[3px] border-t-primary p-4"
     aria-label={`${label} broadcast`}
     data-cap-rush-broadcast={kind}
   >
     <header class="flex flex-wrap items-center justify-between gap-2">
       <div>
-        <p class="font-mono text-[10px] uppercase tracking-[0.16em] text-primary">
+        <p class="ui-label">
           {matchupLabel} · {speed}×
         </p>
         <h2
@@ -174,5 +179,5 @@
     </header>
 
     <GamecastBattleBroadcast {teamIdentity} theme="duel" {result} {frame} {progress} {localSide} />
-  </section>
+  </Panel>
 {/if}

@@ -25,6 +25,7 @@
     seatOrder,
     seatPayrollSummary,
   } from './cap-rush-multiplayer-presentation.js';
+  import Panel from '#lib/components/ui/Panel.svelte';
 
   const PURCHASE_OPTIONS: readonly CapRushSpinPurchaseId[] = ['standard', 'surge'];
 
@@ -115,9 +116,7 @@
 
 <div class="flex flex-col gap-4">
   <header class="flex flex-col gap-1">
-    <p class="font-mono text-[10px] font-bold tracking-[0.16em] text-primary uppercase">
-      Preparation
-    </p>
+    <p class="ui-label">Preparation</p>
     <h2 class="font-display text-2xl font-extrabold tracking-tight uppercase sm:text-3xl">
       {variant === 'roulette' ? 'Mutation window' : 'Roster lock'}
     </h2>
@@ -128,7 +127,7 @@
       {@const summary = seatPayrollSummary(game, seat)}
       {@const franchise = franchiseOf(seat)}
       {@const team = franchise !== null && art !== null ? art.teamFor(franchise.franchiseId) : null}
-      <section class="flex min-w-0 flex-col gap-2.5 rounded-2xl border border-border bg-card p-3">
+      <Panel as="section" padding="none" class="flex min-w-0 flex-col gap-2.5 p-3">
         <header class="flex flex-wrap items-center justify-between gap-2">
           <div class="flex min-w-0 items-center gap-2">
             {#if team !== null && art !== null}
@@ -183,20 +182,20 @@
             </dd>
           </div>
         </dl>
-      </section>
+      </Panel>
     {/each}
   </div>
 
   {#if mutationWindow && localLock !== null}
-    <section
-      class="flex flex-col gap-3 rounded-2xl border border-primary/30 bg-card p-3 sm:p-4"
+    <Panel
+      as="section"
+      padding="none"
+      class="flex flex-col gap-3 border-primary/30 p-3 sm:p-4"
       aria-label="Mutations"
     >
       <header class="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <p class="font-mono text-[10px] font-bold tracking-[0.16em] text-primary uppercase">
-            Cap Roulette
-          </p>
+          <p class="ui-label">Cap Roulette</p>
           <h3 class="font-display text-lg font-extrabold tracking-tight uppercase">
             Mutation spins
           </h3>
@@ -430,10 +429,10 @@
           </ul>
         </div>
       {/if}
-    </section>
+    </Panel>
   {/if}
 
-  <section class="flex flex-col gap-2 rounded-2xl border border-border bg-card p-3 sm:p-4">
+  <Panel as="section" padding="none" class="flex flex-col gap-2 p-3 sm:p-4">
     <h3 class="font-display text-lg font-extrabold tracking-tight uppercase">Lock the rosters</h3>
     <div class="flex flex-wrap items-center gap-3">
       <button
@@ -454,7 +453,7 @@
         {/if}
       </p>
     </div>
-  </section>
+  </Panel>
 </div>
 
 <style>

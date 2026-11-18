@@ -119,9 +119,7 @@
         />
       {/if}
       <div class="min-w-0">
-        <p class="font-mono text-[9px] font-bold tracking-[0.16em] text-accent uppercase">
-          Franchise takeover
-        </p>
+        <p class="ui-label text-accent">Franchise takeover</p>
         <p class="font-display truncate text-lg font-extrabold uppercase">
           {view.franchise.displayName}
         </p>

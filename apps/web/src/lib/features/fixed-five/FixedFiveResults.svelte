@@ -595,7 +595,7 @@
             aria-label={isYou ? 'Your five' : 'Opponent five'}
             class="rounded-xl border border-line-soft bg-surface-1 p-4"
           >
-            <h3 class="font-mono text-[11px] font-bold tracking-[0.16em] text-primary uppercase">
+            <h3 class="ui-label">
               {isYou ? 'Your five' : 'Opponent five'}
             </h3>
             <ul class="mt-2 flex flex-col divide-y divide-border/60">
@@ -655,11 +655,7 @@
           aria-label="Series MVP"
           class="rounded-xl border border-line-soft bg-surface-1 p-4 text-center"
         >
-          <h3
-            class="text-left font-mono text-[11px] font-bold tracking-[0.16em] text-primary uppercase"
-          >
-            Series MVP
-          </h3>
+          <h3 class="ui-label text-left">Series MVP</h3>
           {#if mvp && mvp.entry}
             <div class="mx-auto mt-2 h-16 w-16 overflow-hidden rounded-full">
               <PlayerFace
@@ -717,9 +713,7 @@
           aria-label="Series comparison"
           class="rounded-xl border border-line-soft bg-surface-1 p-4"
         >
-          <h3 class="font-mono text-[11px] font-bold tracking-[0.16em] text-primary uppercase">
-            Series comparison
-          </h3>
+          <h3 class="ui-label">Series comparison</h3>
           {#if comparison}
             {@render comparisonTable(comparison)}
           {:else}
@@ -731,9 +725,7 @@
           aria-label="Series summary"
           class="rounded-xl border border-line-soft bg-surface-1 p-4"
         >
-          <h3 class="font-mono text-[11px] font-bold tracking-[0.16em] text-primary uppercase">
-            Series summary
-          </h3>
+          <h3 class="ui-label">Series summary</h3>
           <ul class="mt-3 flex flex-col gap-3 text-sm">
             <li class="flex items-center gap-3">
               <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface-3"
@@ -1103,9 +1095,7 @@
           aria-label="Team comparison detail"
           class="rounded-xl border border-line-soft bg-surface-1 p-4"
         >
-          <h3 class="font-mono text-[11px] font-bold tracking-[0.16em] text-primary uppercase">
-            Team comparison
-          </h3>
+          <h3 class="ui-label">Team comparison</h3>
           {#if comparison}
             {@render comparisonTable(comparison)}
           {:else}
@@ -1125,9 +1115,7 @@
           aria-label="Verification"
           class="rounded-xl border border-line-soft bg-surface-1 p-4"
         >
-          <h3 class="font-mono text-[11px] font-bold tracking-[0.16em] text-primary uppercase">
-            Verification
-          </h3>
+          <h3 class="ui-label">Verification</h3>
           <ul class="mt-3 flex flex-col gap-2 font-mono text-[11px] text-muted-foreground">
             <li class="flex items-center gap-2">
               <ShieldCheck class="h-4 w-4" />

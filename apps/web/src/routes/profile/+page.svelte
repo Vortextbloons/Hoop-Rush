@@ -12,6 +12,7 @@
     profileRepository,
     selectedProfile,
   } from '#lib/features/profile/profile.js';
+  import Alert from '#lib/components/ui/Alert.svelte';
 
   let profile = $state<PlayerProfile | null>(null);
   let name = $state('');
@@ -70,7 +71,7 @@
   <p class="text-sm font-bold uppercase tracking-widest text-primary">Your basketball career</p>
   <h1 class="mt-2 font-display text-4xl font-extrabold">Player profile</h1>
   <p class="mt-2 text-muted-foreground">Keep your identity and achievements on this device.</p>
-  {#if error}<p role="alert" class="mt-4 text-red-400">{error}</p>{/if}
+  {#if error}<Alert class="mt-4" tone="danger">{error}</Alert>{/if}
   {#if profile}
     <div class="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
       <section class="rounded-3xl border border-border bg-card p-6">

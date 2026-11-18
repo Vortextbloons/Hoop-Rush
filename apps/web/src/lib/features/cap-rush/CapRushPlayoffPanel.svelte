@@ -146,7 +146,7 @@
 <div class="flex flex-col gap-4">
   <header class="flex flex-wrap items-end gap-x-2 gap-y-1">
     <div class="min-w-0">
-      <p class="font-mono text-[9px] font-bold tracking-[0.16em] text-muted-foreground uppercase">
+      <p class="ui-label text-muted-foreground">
         Playoff form · {seasonKey}
       </p>
       <h3 class="font-display mt-0.5 truncate text-xl leading-none font-extrabold uppercase">

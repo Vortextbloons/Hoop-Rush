@@ -459,7 +459,7 @@
 <PageShell as="section" width="xl" padding="lg">
   <div class="flex items-end justify-between gap-4">
     <div>
-      <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">Sandbox</p>
+      <p class="ui-label">Sandbox</p>
       <h1
         class="font-display mt-2 text-3xl font-extrabold tracking-tight uppercase sm:text-4xl md:text-5xl"
       >

@@ -29,9 +29,7 @@
   >
     <div class="flex items-center justify-between gap-3 lg:block">
       <div>
-        <p class="font-mono text-[9px] font-bold tracking-[0.16em] text-muted-foreground uppercase">
-          Player payroll
-        </p>
+        <p class="ui-label text-muted-foreground">Player payroll</p>
         <p class="font-display mt-0.5 text-3xl font-extrabold tracking-tight tabular-nums">
           {formatMillions(payroll)}
         </p>

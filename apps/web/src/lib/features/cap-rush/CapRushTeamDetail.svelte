@@ -365,9 +365,7 @@
   grabHandle={true}
 >
   {#snippet header()}
-    <p class="font-mono text-[10px] font-bold tracking-[0.16em] text-primary uppercase">
-      Playoff performance
-    </p>
+    <p class="ui-label">Playoff performance</p>
     <p class="font-display text-lg font-extrabold tracking-tight uppercase">
       {selectedPlayer?.starter.source.displayName ?? ''}
     </p>

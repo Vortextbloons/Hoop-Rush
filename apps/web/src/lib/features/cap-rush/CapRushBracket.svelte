@@ -198,9 +198,7 @@
           <div class="awaiting">Conference champions meet here.</div>
         {/if}
         <div class="champion-plate" class:champion-live={championId !== null}>
-          <p class="font-mono text-[9px] font-bold tracking-[0.16em] text-accent uppercase">
-            Champion
-          </p>
+          <p class="ui-label text-accent">Champion</p>
           {#if championId !== null}
             <div class="mt-2 flex min-w-0 flex-col items-center justify-center gap-1.5">
               {#if identityOf(championId) && manifest}

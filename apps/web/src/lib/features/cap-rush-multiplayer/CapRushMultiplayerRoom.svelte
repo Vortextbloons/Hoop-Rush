@@ -20,6 +20,8 @@
   import { variantLabel } from '../cap-rush/cap-rush-presentation.js';
   import { loadLobbyId } from '#lib/features/multiplayer/multiplayer-lobby.js';
   import { LobbyAutoStart } from '#lib/features/multiplayer/lobby-auto-start.js';
+  import Panel from '#lib/components/ui/Panel.svelte';
+  import Alert from '#lib/components/ui/Alert.svelte';
 
   let { roomId }: { roomId: string } = $props();
   const controller = new CapRushMultiplayerController(untrack(() => roomId));
@@ -127,22 +129,19 @@
   >
     {#snippet content()}
       {#if view?.connection === 'error'}
-        <div
-          class="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2.5"
-          role="alert"
-        >
-          <p class="text-xs font-semibold">
-            Your connection to this room was interrupted. The room is kept — nothing was lost.
-          </p>
-          <button
-            type="button"
-            class="min-h-11 rounded-lg border border-destructive/50 px-3 text-xs font-bold text-destructive outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            disabled={controller.busy}
-            onclick={() => void controller.reconnect()}
-          >
-            Reconnect
-          </button>
-        </div>
+        <Alert class="mb-3" tone="danger">
+          {#snippet actions()}
+            <button
+              type="button"
+              class="min-h-11 rounded-lg border border-destructive/50 px-3 text-xs font-bold text-destructive outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              disabled={controller.busy}
+              onclick={() => void controller.reconnect()}
+            >
+              Reconnect
+            </button>
+          {/snippet}
+          Your connection to this room was interrupted. The room is kept — nothing was lost.
+        </Alert>
       {:else if game !== null && game.phase !== 'lobby' && game.phase !== 'completed' && !opponentOnline}
         <p class="mb-3 text-xs text-muted-foreground" role="status">
           Your opponent is offline. Their seat is kept and your match resumes when they return.
@@ -164,7 +163,7 @@
       {:else if game === null && controller.error}
         <section class="rounded-xl border border-border bg-card p-4">
           <h2 class="font-display text-xl font-bold">Room unavailable</h2>
-          <p class="mt-1 text-sm text-muted-foreground" role="alert">{controller.error}</p>
+          <Alert class="mt-1" tone="danger">{controller.error}</Alert>
           <div class="mt-3 flex flex-wrap items-center gap-3">
             <button
               type="button"
@@ -191,12 +190,10 @@
           <p class="text-sm text-muted-foreground">Opening the room…</p>
         </div>
       {:else if game.phase === 'lobby'}
-        <section class="flex flex-col gap-4 rounded-2xl border border-border bg-card p-4 sm:p-5">
+        <Panel as="section" padding="none" class="flex flex-col gap-4 p-4 sm:p-5">
           <div class="flex flex-wrap items-start justify-between gap-3">
             <div class="min-w-0">
-              <p class="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
-                Lobby
-              </p>
+              <p class="ui-label text-muted-foreground">Lobby</p>
               <h2 class="font-display text-2xl font-extrabold uppercase tracking-tight">
                 {bothOnline ? 'Both seats are in' : 'Waiting for your opponent'}
               </h2>
@@ -280,7 +277,7 @@
                 : 'Waiting for your host and opponent to be online.'}
             </p>
           {/if}
-        </section>
+        </Panel>
       {:else if game.phase === 'recruiting'}
         <div class="flex flex-col gap-3">
           <CapRushFranchiseReveal
@@ -372,14 +369,14 @@
           {/if}
         </div>
       {:else}
-        <section class="rounded-2xl border border-border bg-card p-5">
+        <Panel as="section" padding="none" class="p-5">
           <h2 class="font-display text-2xl font-extrabold uppercase tracking-tight">
             This room is closed
           </h2>
           <p class="mt-1 text-sm text-muted-foreground">
             The room ended with phase {game.phase}. Start a new room from the multiplayer lobby.
           </p>
-        </section>
+        </Panel>
       {/if}
     {/snippet}
   </RoomShell>

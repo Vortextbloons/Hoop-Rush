@@ -60,7 +60,7 @@
   class="fixed inset-0 z-50 overflow-x-hidden overflow-y-auto overscroll-none bg-background [scrollbar-gutter:stable]"
 >
   <div class="mx-auto flex w-full max-w-4xl flex-col px-4 py-8 sm:px-6 sm:py-10">
-    <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">
+    <p class="ui-label">
       {modeLabel} · {franchiseLabel(run.franchiseId)}
     </p>
     <h1 class="font-display mt-2 text-2xl font-extrabold tracking-tight uppercase sm:text-3xl">

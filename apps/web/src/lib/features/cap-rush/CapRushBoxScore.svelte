@@ -61,7 +61,7 @@
 
 <section class="overflow-hidden rounded-2xl border border-border bg-card" aria-label={label}>
   <div class="border-b border-line-soft px-4 py-3 sm:px-5">
-    <p class="font-mono text-[9px] font-bold tracking-[0.16em] text-muted-foreground uppercase">
+    <p class="ui-label text-muted-foreground">
       {label}
     </p>
     <div class="mt-2 grid grid-cols-[1fr_auto_1fr] items-center gap-2">

@@ -26,6 +26,7 @@
     seatOrder,
     teamNameOf,
   } from './cap-rush-multiplayer-presentation.js';
+  import Panel from '#lib/components/ui/Panel.svelte';
 
   let {
     state: game,
@@ -161,12 +162,10 @@
   <p class="text-sm text-muted-foreground">The postseason has not started.</p>
 {:else}
   <div class="flex min-w-0 flex-col gap-4" data-cap-rush-multiplayer-postseason>
-    <section
-      class="flex min-w-0 flex-col gap-5 rounded-2xl border border-border bg-card p-4 sm:p-6"
-    >
+    <Panel as="section" padding="none" class="flex min-w-0 flex-col gap-5 p-4 sm:p-6">
       <header class="flex flex-wrap items-end justify-between gap-2">
         <div class="min-w-0">
-          <p class="font-mono text-[10px] tracking-[0.16em] text-muted-foreground uppercase">
+          <p class="ui-label text-muted-foreground">
             Postseason · {championTeamId === null ? `round ${currentRound} of 4` : 'complete'}
           </p>
           <h2 class="font-display text-2xl font-extrabold tracking-tight uppercase">
@@ -322,14 +321,12 @@
           </section>
         {/each}
       {/if}
-    </section>
+    </Panel>
 
     {#if showLeagueResults && standings !== null}
       <section class="min-w-0" aria-label="Final regular season standings">
         <header class="mb-3">
-          <p class="font-mono text-[10px] tracking-[0.16em] text-primary uppercase">
-            Regular season complete
-          </p>
+          <p class="ui-label">Regular season complete</p>
           <h2 class="font-display text-2xl font-extrabold tracking-tight uppercase">
             Final standings
           </h2>
@@ -347,20 +344,16 @@
         Continue to playoffs
       </button>
     {:else if standings === null}
-      <section class="rounded-2xl border border-border bg-card p-4">
-        <p class="font-mono text-[10px] tracking-[0.16em] text-muted-foreground uppercase">
-          Bracket
-        </p>
+      <Panel as="section" padding="none" class="p-4">
+        <p class="ui-label text-muted-foreground">Bracket</p>
         <h2 class="font-display text-2xl font-extrabold tracking-tight uppercase">
           Waiting for final standings
         </h2>
-      </section>
+      </Panel>
     {:else}
-      <section class="flex min-w-0 flex-col gap-3 rounded-2xl border border-border bg-card p-4">
+      <Panel as="section" padding="none" class="flex min-w-0 flex-col gap-3 p-4">
         <header>
-          <p class="font-mono text-[10px] tracking-[0.16em] text-muted-foreground uppercase">
-            Playoffs
-          </p>
+          <p class="ui-label text-muted-foreground">Playoffs</p>
           <h2 class="font-display text-2xl font-extrabold tracking-tight uppercase">
             {championTeamId === null
               ? `${capRushConferenceRoundName(currentRound)}`
@@ -433,7 +426,7 @@
             </button>
           </div>
         {/if}
-      </section>
+      </Panel>
 
       <CapRushBracket
         series={postseason.series}

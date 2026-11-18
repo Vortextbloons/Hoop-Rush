@@ -165,7 +165,7 @@
 </script>
 
 <PageShell as="section" width="xl" padding="lg">
-  <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">{eyebrow}</p>
+  <p class="ui-label">{eyebrow}</p>
 
   {#if error}
     <div class="mt-8 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm">

@@ -11,6 +11,7 @@
   import type { CapRushArt } from '../cap-rush/cap-rush-art.js';
   import { capStatusLabel } from '../cap-rush/cap-rush-presentation.js';
   import { seatLabelFor, teamNameOf } from './cap-rush-multiplayer-presentation.js';
+  import Panel from '#lib/components/ui/Panel.svelte';
 
   type StepAction = 'watch-h2h' | null;
 
@@ -171,8 +172,10 @@
 {#if season === null || locked === null || records === null || localRecord === null || otherRecord === null}
   <p class="text-sm text-muted-foreground">The shared season is not ready yet.</p>
 {:else}
-  <section
-    class="season-hero flex min-w-0 flex-col gap-5 rounded-2xl border border-border bg-card p-4 sm:p-6 lg:p-7"
+  <Panel
+    as="section"
+    padding="none"
+    class="season-hero flex min-w-0 flex-col gap-5 p-4 sm:p-6 lg:p-7"
     data-cap-rush-shared-progress
   >
     <div class="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:items-end">
@@ -372,11 +375,11 @@
         {/if}
       </div>
     </div>
-  </section>
+  </Panel>
 {/if}
 
 <style>
-  .season-hero {
+  :global(.season-hero) {
     border-top: 3px solid var(--color-primary);
     background-image: radial-gradient(
       ellipse at top right,

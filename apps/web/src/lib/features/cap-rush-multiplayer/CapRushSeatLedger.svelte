@@ -11,6 +11,7 @@
   import { capStatusClass, capStatusLabel } from '../cap-rush/cap-rush-presentation.js';
   import CapRushMultiplayerRoster from './CapRushMultiplayerRoster.svelte';
   import { exactMoney, money, seatPayrollSummary } from './cap-rush-multiplayer-presentation.js';
+  import Panel from '#lib/components/ui/Panel.svelte';
 
   let {
     state,
@@ -38,7 +39,7 @@
   );
 </script>
 
-<section class="flex min-w-0 flex-col gap-3 rounded-2xl border border-border bg-card p-4 sm:p-5">
+<Panel as="section" padding="none" class="flex min-w-0 flex-col gap-3 p-4 sm:p-5">
   <header class="flex items-start justify-between gap-3">
     <div class="min-w-0">
       <p class="font-mono text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
@@ -100,4 +101,4 @@
   </dl>
 
   <CapRushMultiplayerRoster {state} {seat} {localSeat} {art} {highlightPlayerId} />
-</section>
+</Panel>

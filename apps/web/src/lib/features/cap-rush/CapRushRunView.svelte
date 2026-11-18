@@ -169,7 +169,7 @@
         >
           <div class="flex flex-wrap items-start justify-between gap-4">
             <div class="min-w-0">
-              <p class="font-mono text-[9px] font-bold tracking-[0.16em] text-primary uppercase">
+              <p class="ui-label">
                 Game {played + 1} of {CAP_RUSH_GAME_COUNT} ·
                 {nextEntry?.humanHome ? 'Home' : 'Away'}
               </p>
@@ -281,9 +281,7 @@
         >
           <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p class="font-mono text-[9px] font-bold tracking-[0.16em] text-primary uppercase">
-                Regular season complete
-              </p>
+              <p class="ui-label">Regular season complete</p>
               <p class="font-display mt-1 text-2xl font-extrabold uppercase">
                 {recordLabel(season.aggregate.wins, season.aggregate.losses)}
                 {#if season.aggregate.perfectSeason}
@@ -311,9 +309,7 @@
           aria-label="Recent results"
         >
           <div class="flex items-baseline justify-between gap-2">
-            <p class="font-mono text-[9px] font-bold tracking-[0.16em] text-primary uppercase">
-              Recent results
-            </p>
+            <p class="ui-label">Recent results</p>
             <span class="font-mono text-[9px] text-muted-foreground uppercase">accepted games</span>
           </div>
           <ol class="mt-3 flex flex-col gap-1">

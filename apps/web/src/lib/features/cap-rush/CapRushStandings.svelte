@@ -63,9 +63,7 @@
 >
   <div class="flex flex-wrap items-end justify-between gap-3">
     <div>
-      <p class="font-mono text-[10px] font-bold tracking-[0.16em] text-primary uppercase">
-        Conference standings
-      </p>
+      <p class="ui-label">Conference standings</p>
       <h2 class="font-display mt-1 text-2xl font-extrabold tracking-tight uppercase">
         Eight per conference.
       </h2>
