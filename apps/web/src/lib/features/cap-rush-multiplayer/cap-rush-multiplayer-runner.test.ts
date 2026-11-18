@@ -7,17 +7,19 @@ import {
   type CapRushMultiplayerCommandPayload,
 } from '@hoop-rush/data-contracts';
 import {
+  applyCapRushMultiplayerCommand,
   createEngineContext,
   simulateCapRushMultiplayerPlayoffGame,
   simulateCapRushMultiplayerSlot,
-  applyCapRushMultiplayerCommand,
+  capRushMultiplayerStateDigest,
   createCapRushMultiplayerState,
 } from '@hoop-rush/engine';
+import { createCapRushMultiplayerStatePatch } from './cap-rush-multiplayer-patch';
 import { capRushTestSetup } from '../../../../../../packages/engine/src/modes/cap-rush/cap-rush-test-support.ts';
 import {
+  capRushTestDate,
   capRushTestEnvironment,
   capRushTestRootSeed,
-  capRushTestDate,
 } from '../../../../../../packages/engine/src/modes/cap-rush/multiplayer/shared-league.test-support.ts';
 import { CapRushMultiplayerRunner } from './cap-rush-multiplayer-runner';
 
@@ -227,6 +229,7 @@ test('recovers a dropped worker by rehydrating before retrying the projection', 
   const setup = capRushTestSetup();
   const environment = { ...capRushTestEnvironment(setup), seasonCatalog: setup.catalog };
   const state = createCapRushMultiplayerState(capRushTestRootSeed());
+  const digest = capRushMultiplayerStateDigest(state);
   const workers: {
     onmessage: ((event: MessageEvent<unknown>) => void) | null;
     onerror: ((event: ErrorEvent) => void) | null;
@@ -266,7 +269,7 @@ test('recovers a dropped worker by rehydrating before retrying the projection', 
               requestId: request.requestId,
               kind: 'cap-rush-multiplayer-projection',
               state,
-              stateDigest: 'b'.repeat(64),
+              stateDigest: digest,
             },
           } as MessageEvent<unknown>);
         }
@@ -283,7 +286,7 @@ test('recovers a dropped worker by rehydrating before retrying the projection', 
       environment,
       variant: 'clash',
     });
-    expect(result.stateDigest).toBe('b'.repeat(64));
+    expect(result.stateDigest).toBe(digest);
     expect(workers).toHaveLength(2);
     expect(workers[0]?.posted).toEqual([
       'cap-rush-multiplayer-hydrate',
@@ -302,6 +305,7 @@ test('hydrates the catalog once, then sends only state and commands with a worke
   const setup = capRushTestSetup();
   const environment = { ...capRushTestEnvironment(setup), seasonCatalog: setup.catalog };
   const state = createCapRushMultiplayerState(capRushTestRootSeed());
+  const digest = capRushMultiplayerStateDigest(state);
   const posted: import('@hoop-rush/data-contracts').CapRushMultiplayerWorkerRequest[] = [];
   const worker = {
     onmessage: null as ((event: MessageEvent<unknown>) => void) | null,
@@ -333,6 +337,7 @@ test('hydrates the catalog once, then sends only state and commands with a worke
     expect(request.kind).toBe('cap-rush-multiplayer-project');
     expect(request.state).toEqual(state);
     expect('environment' in request).toBe(false);
+    expect(request.response).toBe('snapshot');
     expect(capRushMultiplayerWorkerRequestSchema.safeParse(request).success).toBe(true);
     worker.onmessage?.({
       data: {
@@ -340,17 +345,17 @@ test('hydrates the catalog once, then sends only state and commands with a worke
         requestId: request.requestId,
         kind: 'cap-rush-multiplayer-projection',
         state,
-        stateDigest: 'a'.repeat(64),
+        stateDigest: digest,
       },
     } as MessageEvent<unknown>);
-    expect(await pending).toEqual({ state, stateDigest: 'a'.repeat(64) });
+    expect(await pending).toEqual({ state, stateDigest: digest });
 
     const warm = runner.projectDetailed({
       state,
       commands: [],
       environment,
       variant: 'clash',
-      baseDigest: 'a'.repeat(64),
+      baseDigest: digest,
     });
     for (let index = 0; index < 5; index += 1) await Promise.resolve();
     const warmRequest = posted[2] as Extract<
@@ -358,7 +363,8 @@ test('hydrates the catalog once, then sends only state and commands with a worke
       { kind: 'cap-rush-multiplayer-project' }
     >;
     expect('state' in warmRequest).toBe(false);
-    expect(warmRequest.baseDigest).toBe('a'.repeat(64));
+    expect(warmRequest.baseDigest).toBe(digest);
+    expect(warmRequest.response).toBe('patch');
     expect(capRushMultiplayerWorkerRequestSchema.safeParse(warmRequest).success).toBe(true);
     worker.onmessage?.({
       data: {
@@ -366,11 +372,86 @@ test('hydrates the catalog once, then sends only state and commands with a worke
         requestId: warmRequest.requestId,
         kind: 'cap-rush-multiplayer-projection',
         state,
-        stateDigest: 'a'.repeat(64),
+        stateDigest: digest,
       },
     } as MessageEvent<unknown>);
     await warm;
     expect(posted.filter((entry) => entry.kind === 'cap-rush-multiplayer-hydrate')).toHaveLength(1);
+  } finally {
+    runner.dispose();
+  }
+});
+
+test('falls back to a full snapshot when a patch refers to a different base', async () => {
+  const setup = capRushTestSetup();
+  const environment = { ...capRushTestEnvironment(setup), seasonCatalog: setup.catalog };
+  const state = createCapRushMultiplayerState(capRushTestRootSeed());
+  const baseDigest = capRushMultiplayerStateDigest(state);
+  const stateDigest = capRushMultiplayerStateDigest(state);
+  const patch = createCapRushMultiplayerStatePatch(state, state);
+  const requests: import('@hoop-rush/data-contracts').CapRushMultiplayerWorkerRequest[] = [];
+  let projectRequests = 0;
+  const worker = {
+    onmessage: null as ((event: MessageEvent<unknown>) => void) | null,
+    onerror: null,
+    terminate() {},
+    postMessage(value: unknown) {
+      const request = capRushMultiplayerWorkerRequestSchema.parse(value);
+      requests.push(request);
+      if (request.kind === 'cap-rush-multiplayer-hydrate') {
+        worker.onmessage?.({
+          data: {
+            schemaVersion: request.schemaVersion,
+            requestId: request.requestId,
+            kind: 'cap-rush-multiplayer-hydrated',
+          },
+        } as MessageEvent<unknown>);
+        return;
+      }
+      if (request.kind !== 'cap-rush-multiplayer-project') throw new Error('unexpected request');
+      projectRequests += 1;
+      if (projectRequests === 2) {
+        worker.onmessage?.({
+          data: {
+            schemaVersion: request.schemaVersion,
+            requestId: request.requestId,
+            kind: 'cap-rush-multiplayer-projection',
+            patch,
+            baseDigest: 'different-base',
+            stateDigest,
+          },
+        } as MessageEvent<unknown>);
+        return;
+      }
+      worker.onmessage?.({
+        data: {
+          schemaVersion: request.schemaVersion,
+          requestId: request.requestId,
+          kind: 'cap-rush-multiplayer-projection',
+          state,
+          stateDigest,
+        },
+      } as MessageEvent<unknown>);
+    },
+  };
+  const runner = new CapRushMultiplayerRunner({ createWorker: () => worker as unknown as Worker });
+  try {
+    const input = {
+      state,
+      commands: [],
+      environment,
+      variant: 'clash' as const,
+    };
+    await runner.projectDetailed(input);
+    const result = await runner.projectDetailed({ ...input, baseDigest });
+    expect(result.stateDigest).toBe(stateDigest);
+    expect(projectRequests).toBe(3);
+    const projectRequest = requests.at(-1) as Extract<
+      import('@hoop-rush/data-contracts').CapRushMultiplayerWorkerRequest,
+      { kind: 'cap-rush-multiplayer-project' }
+    >;
+    expect(projectRequest.response).toBe('snapshot');
+    expect(projectRequest.state).toEqual(state);
   } finally {
     runner.dispose();
   }

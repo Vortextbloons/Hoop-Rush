@@ -2,6 +2,8 @@ import {
   CAP_RUSH_MULTIPLAYER_WORKER_WIRE_SCHEMA_VERSION,
   capRushMultiplayerWorkerMessageSchema,
   capRushMultiplayerWorkerRequestSchema,
+  type CapRushMultiplayerState,
+  type CapRushMultiplayerWorkerRequest,
   type CapRushPlayoffGameSummary,
 } from '@hoop-rush/data-contracts';
 import {
@@ -17,13 +19,14 @@ import {
   type CapRushCatalogIndex,
   type CapRushMultiplayerEnvironment,
 } from '@hoop-rush/engine';
+import { createCapRushMultiplayerStatePatch } from '#lib/features/cap-rush-multiplayer/cap-rush-multiplayer-patch.js';
 
 const context = createEngineContext();
 
 let catalogCache: { readonly key: string; readonly index: CapRushCatalogIndex } | null = null;
 let hydratedEnvironment: CapRushMultiplayerEnvironment | null = null;
 let cachedState: {
-  state: import('@hoop-rush/data-contracts').CapRushMultiplayerState;
+  state: CapRushMultiplayerState;
   digest: string;
 } | null = null;
 
@@ -50,6 +53,25 @@ function post(message: unknown): void {
 
 function failureMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'unknown cap rush multiplayer worker failure';
+}
+
+type ProjectionRequest = Extract<
+  CapRushMultiplayerWorkerRequest,
+  { kind: 'cap-rush-multiplayer-project' }
+>;
+
+function snapshotMessage(
+  request: ProjectionRequest,
+  state: CapRushMultiplayerState,
+  stateDigest: string,
+): unknown {
+  return {
+    schemaVersion: CAP_RUSH_MULTIPLAYER_WORKER_WIRE_SCHEMA_VERSION,
+    kind: 'cap-rush-multiplayer-projection',
+    requestId: request.requestId,
+    state,
+    stateDigest,
+  };
 }
 
 self.onmessage = (event: MessageEvent<unknown>) => {
@@ -92,25 +114,15 @@ self.onmessage = (event: MessageEvent<unknown>) => {
         });
         cachedState = {
           state: replayed.state,
-          digest: capRushMultiplayerStateDigest(replayed.state),
+          digest: replayed.stateDigest,
         };
-        post({
-          schemaVersion: CAP_RUSH_MULTIPLAYER_WORKER_WIRE_SCHEMA_VERSION,
-          kind: 'cap-rush-multiplayer-projection',
-          requestId: request.requestId,
-          state: replayed.state,
-          stateDigest: cachedState.digest,
-        });
+        // Replay is the divergence check, so it always returns the authoritative full snapshot.
+        post(snapshotMessage(request, replayed.state, cachedState.digest));
         return;
       }
-      let state: import('@hoop-rush/data-contracts').CapRushMultiplayerState;
-      if (request.baseDigest !== undefined && cachedState?.digest === request.baseDigest) {
-        state = cachedState.state;
-      } else if (request.state !== undefined) {
-        state = request.state;
-      } else {
-        throw new Error('cap rush multiplayer worker has no base state');
-      }
+      const base = cachedState?.digest === request.baseDigest ? cachedState : null;
+      let state = request.state ?? base?.state;
+      if (state === undefined) throw new Error('cap rush multiplayer worker has no base state');
       for (const command of request.commands) {
         const outcome = applyCapRushMultiplayerCommand(
           state,
@@ -132,11 +144,16 @@ self.onmessage = (event: MessageEvent<unknown>) => {
       }
       const digest = capRushMultiplayerStateDigest(state);
       cachedState = { state, digest };
+      if (request.response !== 'patch' || request.state !== undefined || base === null) {
+        post(snapshotMessage(request, state, digest));
+        return;
+      }
       post({
         schemaVersion: CAP_RUSH_MULTIPLAYER_WORKER_WIRE_SCHEMA_VERSION,
         kind: 'cap-rush-multiplayer-projection',
         requestId: request.requestId,
-        state,
+        patch: createCapRushMultiplayerStatePatch(base.state, state),
+        baseDigest: base.digest,
         stateDigest: digest,
       });
       return;

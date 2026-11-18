@@ -170,6 +170,8 @@ export const capRushMultiplayerPlaybackAckSchema = z.object({
   resolved: z.boolean(),
 });
 
+export const CAP_RUSH_MULTIPLAYER_PLAYBACK_ACK_LIMIT = 256;
+
 export const capRushMultiplayerSeasonStateSchema = z.object({
   games: z.array(capRushLeagueGameSchema).max(CAP_RUSH_CONFERENCE_GAMES),
   frontierSlot: z.number().int().min(0).max(CAP_RUSH_CONFERENCE_GAMES_PER_TEAM),
@@ -179,7 +181,9 @@ export const capRushMultiplayerSeasonStateSchema = z.object({
     p1: z.number().int().min(0).max(CAP_RUSH_CONFERENCE_GAMES_PER_TEAM),
     p2: z.number().int().min(0).max(CAP_RUSH_CONFERENCE_GAMES_PER_TEAM),
   }),
-  playbackAcks: z.array(capRushMultiplayerPlaybackAckSchema).max(256),
+  playbackAcks: z
+    .array(capRushMultiplayerPlaybackAckSchema)
+    .max(CAP_RUSH_MULTIPLAYER_PLAYBACK_ACK_LIMIT),
 });
 export type CapRushMultiplayerSeasonState = z.infer<typeof capRushMultiplayerSeasonStateSchema>;
 
