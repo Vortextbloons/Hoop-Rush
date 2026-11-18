@@ -2,6 +2,9 @@
   import TeamLogo from '#lib/components/TeamLogo.svelte';
   import type { CapRushArt } from '../cap-rush/cap-rush-art.js';
   import { onMount } from 'svelte';
+  import { isLiteMode } from '#lib/device-capabilities.js';
+  import { PlaybackCadence, presentationIntervalMs } from '#lib/playback-cadence.js';
+  import { broadcastCursor, broadcastDurationMs } from './cap-rush-broadcast-playback.js';
   import type {
     HavocBattleInput,
     HavocBattleResult,
@@ -39,17 +42,43 @@
 
   const stream = $derived(new GamecastBattlePlaybackStream({ result, tape }));
   const total = $derived(stream.items.length);
-  const step = $derived(Math.max(1, Math.ceil((total * speed) / 100)));
-  let cursor = $state(0);
+  const durationMs = $derived(broadcastDurationMs(total, speed));
+  let elapsedMs = $state(0);
+  const cursor = $derived(broadcastCursor(elapsedMs, total, speed));
   let playing = $state(true);
 
+  let rafId: number | null = null;
+  let lastFrameMs: number | null = null;
+  const cadence = new PlaybackCadence(presentationIntervalMs(isLiteMode()));
+
+  function stopLoop(): void {
+    if (rafId !== null) {
+      cancelAnimationFrame(rafId);
+      rafId = null;
+    }
+  }
+
   onMount(() => {
-    const id = setInterval(() => {
-      if (!playing) return;
-      cursor = Math.min(total, cursor + step);
-      if (cursor >= total) playing = false;
-    }, 100);
-    return () => clearInterval(id);
+    if (typeof requestAnimationFrame !== 'function') return;
+    const frame = (now: number): void => {
+      const last = lastFrameMs ?? now;
+      lastFrameMs = now;
+      // Pause/resume keeps the loop alive but never feeds paused wall time, so
+      // the elapsed-time budget only grows while actually playing.
+      if (playing && elapsedMs < durationMs) {
+        const advance = cadence.add(Math.max(0, now - last));
+        if (advance !== null) elapsedMs += advance;
+        if (elapsedMs >= durationMs) {
+          elapsedMs = durationMs;
+          playing = false;
+          stopLoop();
+          return;
+        }
+      }
+      rafId = requestAnimationFrame(frame);
+    };
+    rafId = requestAnimationFrame(frame);
+    return () => stopLoop();
   });
 
   const frame = $derived(stream.frame(cursor));
