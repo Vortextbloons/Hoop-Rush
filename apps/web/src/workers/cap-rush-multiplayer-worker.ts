@@ -2,6 +2,8 @@ import {
   CAP_RUSH_MULTIPLAYER_WORKER_WIRE_SCHEMA_VERSION,
   capRushMultiplayerWorkerMessageSchema,
   capRushMultiplayerWorkerRequestSchema,
+  type CapRushMultiplayerState,
+  type CapRushMultiplayerWorkerRequest,
   type CapRushPlayoffGameSummary,
 } from '@hoop-rush/data-contracts';
 import {
@@ -17,13 +19,17 @@ import {
   type CapRushCatalogIndex,
   type CapRushMultiplayerEnvironment,
 } from '@hoop-rush/engine';
+import {
+  applyCapRushMultiplayerStatePatchUnchecked,
+  createCapRushMultiplayerStatePatch,
+} from '#lib/features/cap-rush-multiplayer/cap-rush-multiplayer-patch.js';
 
 const context = createEngineContext();
 
 let catalogCache: { readonly key: string; readonly index: CapRushCatalogIndex } | null = null;
 let hydratedEnvironment: CapRushMultiplayerEnvironment | null = null;
 let cachedState: {
-  state: import('@hoop-rush/data-contracts').CapRushMultiplayerState;
+  state: CapRushMultiplayerState;
   digest: string;
 } | null = null;
 
@@ -50,6 +56,55 @@ function post(message: unknown): void {
 
 function failureMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'unknown cap rush multiplayer worker failure';
+}
+
+type ProjectionRequest = Extract<
+  CapRushMultiplayerWorkerRequest,
+  { kind: 'cap-rush-multiplayer-project' }
+>;
+
+/**
+ * Resolves the projection base from the warm cache by digest. A cold or restarted worker accepts
+ * the full state instead, validates any supplied digest, and caches the input for the next call.
+ */
+function projectionBase(request: ProjectionRequest): {
+  readonly state: CapRushMultiplayerState;
+  readonly digest: string;
+} {
+  if (request.baseDigest !== undefined && cachedState?.digest === request.baseDigest) {
+    if (request.state !== undefined && request.state !== cachedState.state) {
+      const suppliedDigest = capRushMultiplayerStateDigest(request.state);
+      if (suppliedDigest !== request.baseDigest)
+        throw new Error('cap rush multiplayer projection base digest does not match its state');
+    }
+    return cachedState;
+  }
+  if (request.state !== undefined) {
+    const digest = capRushMultiplayerStateDigest(request.state);
+    if (request.baseDigest !== undefined && request.baseDigest !== digest)
+      throw new Error('cap rush multiplayer projection base digest does not match its state');
+    cachedState = { state: request.state, digest };
+    return cachedState;
+  }
+  if (request.baseDigest !== undefined)
+    throw new Error('cap rush multiplayer worker has no cached base state');
+  throw new Error('cap rush multiplayer worker has no base state');
+}
+
+function snapshotMessage(
+  request: ProjectionRequest,
+  state: CapRushMultiplayerState,
+  stateDigest: string,
+  baseDigest?: string,
+): unknown {
+  return {
+    schemaVersion: CAP_RUSH_MULTIPLAYER_WORKER_WIRE_SCHEMA_VERSION,
+    kind: 'cap-rush-multiplayer-projection',
+    requestId: request.requestId,
+    state,
+    ...(baseDigest === undefined ? {} : { baseDigest }),
+    stateDigest,
+  };
 }
 
 self.onmessage = (event: MessageEvent<unknown>) => {
@@ -94,23 +149,12 @@ self.onmessage = (event: MessageEvent<unknown>) => {
           state: replayed.state,
           digest: capRushMultiplayerStateDigest(replayed.state),
         };
-        post({
-          schemaVersion: CAP_RUSH_MULTIPLAYER_WORKER_WIRE_SCHEMA_VERSION,
-          kind: 'cap-rush-multiplayer-projection',
-          requestId: request.requestId,
-          state: replayed.state,
-          stateDigest: cachedState.digest,
-        });
+        // Replay is the divergence check, so it always returns the authoritative full snapshot.
+        post(snapshotMessage(request, replayed.state, cachedState.digest));
         return;
       }
-      let state: import('@hoop-rush/data-contracts').CapRushMultiplayerState;
-      if (request.baseDigest !== undefined && cachedState?.digest === request.baseDigest) {
-        state = cachedState.state;
-      } else if (request.state !== undefined) {
-        state = request.state;
-      } else {
-        throw new Error('cap rush multiplayer worker has no base state');
-      }
+      const base = projectionBase(request);
+      let state = base.state;
       for (const command of request.commands) {
         const outcome = applyCapRushMultiplayerCommand(
           state,
@@ -132,11 +176,27 @@ self.onmessage = (event: MessageEvent<unknown>) => {
       }
       const digest = capRushMultiplayerStateDigest(state);
       cachedState = { state, digest };
+      if (request.response === 'snapshot') {
+        post(snapshotMessage(request, state, digest, base.digest));
+        return;
+      }
+      let patch;
+      try {
+        patch = createCapRushMultiplayerStatePatch(base.state, state);
+        const reconstructed = applyCapRushMultiplayerStatePatchUnchecked(base.state, patch);
+        if (capRushMultiplayerStateDigest(reconstructed) !== digest)
+          throw new Error('cap rush multiplayer projection patch digest diverged');
+      } catch {
+        // A patch that cannot reproduce the result is never sent; fall back to the snapshot.
+        post(snapshotMessage(request, state, digest, base.digest));
+        return;
+      }
       post({
         schemaVersion: CAP_RUSH_MULTIPLAYER_WORKER_WIRE_SCHEMA_VERSION,
         kind: 'cap-rush-multiplayer-projection',
         requestId: request.requestId,
-        state,
+        patch,
+        baseDigest: base.digest,
         stateDigest: digest,
       });
       return;

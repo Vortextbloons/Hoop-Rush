@@ -1,5 +1,5 @@
 import type { CapRushMultiplayerState, CapRushMultiplayerCommand } from '@hoop-rush/data-contracts';
-import { createCapRushMultiplayerState } from '@hoop-rush/engine';
+import { capRushMultiplayerStateDigest, createCapRushMultiplayerState } from '@hoop-rush/engine';
 import type { CapRushMultiplayerEnvironment } from '@hoop-rush/engine';
 import type {
   CapRushLeagueGame,
@@ -22,6 +22,7 @@ import {
   OneShotWorkerRunner,
   type OneShotWorkerErrorMessages,
 } from '#lib/workers/one-shot-worker.js';
+import { applyCapRushMultiplayerStatePatch } from './cap-rush-multiplayer-patch.js';
 import workerUrl from '../../../workers/cap-rush-multiplayer-worker.ts?worker&url';
 
 export interface CapRushMultiplayerProjectionInput {
@@ -39,6 +40,11 @@ export interface CapRushMultiplayerProjectionResult {
   stateDigest: string;
 }
 
+type CapRushMultiplayerProjectionMessage = Extract<
+  CapRushMultiplayerWorkerMessage,
+  { kind: 'cap-rush-multiplayer-projection' }
+>;
+
 interface CapRushMultiplayerHydrateInput {
   environment: CapRushMultiplayerEnvironment;
 }
@@ -50,6 +56,7 @@ interface CapRushMultiplayerWorkerProjectInput {
   environment: CapRushMultiplayerEnvironment;
   variant: 'clash' | 'roulette';
   verifyLog?: boolean;
+  response?: 'patch' | 'snapshot';
 }
 
 export interface CapRushMultiplayerSlotInput {
@@ -139,6 +146,7 @@ function buildRequest(
       commands: [...payload.commands],
       variant: payload.variant,
       verifyLog: payload.verifyLog,
+      ...(payload.response === undefined ? {} : { response: payload.response }),
       schemaVersion: CAP_RUSH_MULTIPLAYER_WORKER_WIRE_SCHEMA_VERSION,
       kind: 'cap-rush-multiplayer-project',
       requestId: idSchema.parse(requestId),
@@ -197,8 +205,7 @@ function outputOf(response: CapRushMultiplayerWorkerMessage): unknown {
     return { games: response.games, tapes: response.tapes };
   }
   if (response.kind === 'cap-rush-multiplayer-hydrated') return { hydrated: true };
-  if (response.kind === 'cap-rush-multiplayer-projection')
-    return { state: response.state, stateDigest: response.stateDigest };
+  if (response.kind === 'cap-rush-multiplayer-projection') return response;
   if (response.kind === 'cap-rush-multiplayer-playoff-games') {
     return { games: response.games, tapes: response.tapes };
   }
@@ -271,7 +278,7 @@ export class CapRushMultiplayerRunner {
     input: CapRushMultiplayerProjectionInput,
   ): Promise<CapRushMultiplayerProjectionResult> {
     try {
-      return await this.projectOnce(input);
+      return await this.projectOnce(input, false);
     } catch (error) {
       if (
         error instanceof CapRushMultiplayerProjectionRejection ||
@@ -280,17 +287,18 @@ export class CapRushMultiplayerRunner {
             error.message === ERROR_MESSAGES.superseded))
       )
         throw error;
-      // A worker crash or timeout drops the hydrated catalog and cached state. Rehydrate and
-      // retry the pure projection once instead of forcing the caller to fail the room.
+      // A worker crash, timeout, cache loss, or a patch that failed validation drops the
+      // hydrated catalog and cached state. Rehydrate and retry once with a full snapshot.
       this.hydratedKey = null;
       this.cachedState = null;
       this.cachedDigest = null;
-      return this.projectOnce(input);
+      return this.projectOnce(input, true);
     }
   }
 
   private async projectOnce(
     input: CapRushMultiplayerProjectionInput,
+    snapshot: boolean,
   ): Promise<CapRushMultiplayerProjectionResult> {
     if (this.hydratedKey !== environmentKey(input.environment))
       await this.hydrate(input.environment);
@@ -298,9 +306,12 @@ export class CapRushMultiplayerRunner {
     for (const runner of this.slotRunners) runner.dispose();
     const reuseDigest =
       !input.verifyLog &&
+      !snapshot &&
       this.cachedState !== null &&
       this.cachedDigest !== null &&
-      input.baseDigest === this.cachedDigest
+      (input.baseDigest === undefined
+        ? input.state === this.cachedState
+        : input.baseDigest === this.cachedDigest)
         ? this.cachedDigest
         : null;
     const payload: CapRushMultiplayerWorkerProjectInput =
@@ -310,6 +321,7 @@ export class CapRushMultiplayerRunner {
             commands: input.commands,
             environment: input.environment,
             variant: input.variant,
+            response: 'patch',
           }
         : {
             state: input.state,
@@ -317,15 +329,49 @@ export class CapRushMultiplayerRunner {
             environment: input.environment,
             variant: input.variant,
             verifyLog: input.verifyLog,
+            response: input.verifyLog || snapshot ? 'snapshot' : 'patch',
           };
     const result = (await this.transport.run(payload)) as
-      | CapRushMultiplayerProjectionResult
+      | CapRushMultiplayerProjectionMessage
       | Extract<CapRushMultiplayerWorkerMessage, { kind: 'cap-rush-multiplayer-rejection' }>;
-    if ('kind' in result)
+    if (result.kind === 'cap-rush-multiplayer-rejection')
       throw new CapRushMultiplayerProjectionRejection(result.code, result.message);
-    this.cachedState = result.state;
-    this.cachedDigest = result.stateDigest;
-    return result;
+    return this.materialize(input, result, snapshot);
+  }
+
+  private materialize(
+    input: CapRushMultiplayerProjectionInput,
+    response: CapRushMultiplayerProjectionMessage,
+    snapshot: boolean,
+  ): CapRushMultiplayerProjectionResult {
+    if (response.state !== undefined) {
+      const digest = capRushMultiplayerStateDigest(response.state);
+      if (digest !== response.stateDigest)
+        throw new Error('cap rush multiplayer projection snapshot digest diverged');
+      this.cachedState = response.state;
+      this.cachedDigest = digest;
+      return { state: response.state, stateDigest: digest };
+    }
+    const patch = response.patch;
+    if (snapshot || patch === undefined || response.baseDigest === undefined)
+      throw new Error('cap rush multiplayer worker returned an invalid projection response');
+    const base =
+      this.cachedState !== null && this.cachedDigest === response.baseDigest
+        ? this.cachedState
+        : input.state;
+    const baseDigest =
+      base === this.cachedState && this.cachedDigest !== null
+        ? this.cachedDigest
+        : capRushMultiplayerStateDigest(base);
+    if (baseDigest !== response.baseDigest)
+      throw new Error('cap rush multiplayer projection patch base diverged');
+    const state = applyCapRushMultiplayerStatePatch(base, patch);
+    const digest = capRushMultiplayerStateDigest(state);
+    if (digest !== response.stateDigest)
+      throw new Error('cap rush multiplayer projection patch digest diverged');
+    this.cachedState = state;
+    this.cachedDigest = digest;
+    return { state, stateDigest: digest };
   }
 
   private async hydrate(environment: CapRushMultiplayerEnvironment): Promise<void> {
