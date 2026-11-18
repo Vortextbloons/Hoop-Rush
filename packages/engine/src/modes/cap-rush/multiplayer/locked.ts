@@ -150,6 +150,7 @@ export function buildCapRushMultiplayerLockedInputs(input: {
   readonly bracket: OpponentBracket;
   readonly seasonCatalog: SeasonDraftCatalog;
   readonly schedule?: CapRushLeagueSchedule;
+  readonly opponents?: CapRushMultiplayerLockedInputs['opponents'];
 }): CapRushMultiplayerLockedInputs {
   const seatTeams = [input.seats.p1, input.seats.p2];
   const humanIds = new Set(seatTeams.map((seat) => seat.franchise.franchiseId));
@@ -161,21 +162,18 @@ export function buildCapRushMultiplayerLockedInputs(input: {
     });
   }
   capRushValidateLeagueField(field);
-  const historicalBracket = buildCapRushHistoricalField(
-    input.bracket,
-    input.seasonCatalog,
-    input.rootSeed,
-  );
-  const opponents = historicalBracket.opponents
-    .filter((opponent) => !humanIds.has(opponent.teamId))
-    .map((opponent) => ({
-      opponentId: opponent.teamId,
-      team: opponentTeamOf({
-        rootSeed: input.rootSeed,
-        opponent,
-        profile: input.profile,
-      }),
-    }));
+  const opponents =
+    input.opponents ??
+    buildCapRushHistoricalField(input.bracket, input.seasonCatalog, input.rootSeed)
+      .opponents.filter((opponent) => !humanIds.has(opponent.teamId))
+      .map((opponent) => ({
+        opponentId: opponent.teamId,
+        team: opponentTeamOf({
+          rootSeed: input.rootSeed,
+          opponent,
+          profile: input.profile,
+        }),
+      }));
   const schedule = input.schedule ?? buildCapRushLeagueSchedule({ runSeed: input.rootSeed, field });
   const profiles = playoffProfilesOf({ catalog: input.seasonCatalog, seats: seatTeams });
   const allTeams = [...seatTeams.map((seat) => seat.team), ...opponents.map((entry) => entry.team)];

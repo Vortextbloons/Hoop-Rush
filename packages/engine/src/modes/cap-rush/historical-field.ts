@@ -40,15 +40,18 @@ function lineupOf(candidates: readonly Candidate[]): Candidate[] | null {
 
 function varyLineup(lineup: Candidate[], roster: readonly Candidate[], rng: Rng): Candidate[] {
   const variants: Candidate[][] = [lineup];
+  const ordered = [...roster].sort((a, b) => a.playerVersionId.localeCompare(b.playerVersionId));
   for (const [slot, starter] of lineup.entries()) {
     const position = POSITIONS[slot];
-    for (const player of [...roster].sort((a, b) =>
-      a.playerVersionId.localeCompare(b.playerVersionId),
-    )) {
+    for (const player of ordered) {
       if (
         position === undefined ||
         !player.positions.playable.includes(position) ||
-        lineup.some((selected) => selected.playerId === player.playerId) ||
+        lineup.some(
+          (selected, index) =>
+            selected.playerId === player.playerId &&
+            (index !== slot || selected.seasonKey === player.seasonKey),
+        ) ||
         Math.abs(player.summaryRatings.overallRating - starter.summaryRatings.overallRating) > 2 ||
         (player.anchors?.minutesPerGame ?? 0) < (starter.anchors?.minutesPerGame ?? 0) * 0.8
       )
@@ -86,14 +89,19 @@ export function buildCapRushHistoricalField(
   return opponentBracketSchema.parse({
     ...bracket,
     opponents: bracket.opponents.map((opponent) => {
-      const choices = [...(seasons.get(opponent.teamId) ?? new Map<string, Candidate[]>())]
+      const franchiseSeasons = [...(seasons.get(opponent.teamId) ?? [])];
+      const choices = franchiseSeasons
         .sort(([a], [b]) => a.localeCompare(b))
         .flatMap(([seasonKey, roster]) => {
           const lineup = lineupOf(roster);
           if (lineup === null) return [];
+          const year = Number(seasonKey.slice(0, 4));
+          const adjacent = franchiseSeasons.flatMap(([key, players]) =>
+            Math.abs(Number(key.slice(0, 4)) - year) === 1 ? players : [],
+          );
           const varied = varyLineup(
             lineup,
-            roster,
+            [...roster, ...adjacent],
             createRng(
               havocInstanceSeed(
                 runSeed,

@@ -259,6 +259,7 @@ function rebuildLocked(input: {
     bracket: input.environment.bracket,
     seasonCatalog: input.environment.seasonCatalog,
     schedule: { teams: [], games: input.scheduleGames },
+    opponents: locked.opponents,
   });
 }
 

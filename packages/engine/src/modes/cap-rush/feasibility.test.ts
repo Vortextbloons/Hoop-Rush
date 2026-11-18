@@ -143,7 +143,7 @@ describe('cap rush completion matching', () => {
         signedPlayerIds: new Set(),
         slots: POSITIONS,
       }),
-    ).toBe(17_250_000);
+    ).toBe(16_390_000);
   });
 
   it('includes sub-60 wildcard salaries when checking completion and signings', () => {
@@ -154,7 +154,7 @@ describe('cap rush completion matching', () => {
     );
     expect(
       capRushMinimumCompletionPayroll({ index, signedPlayerIds: new Set(), slots: POSITIONS }),
-    ).toBe(5_750_000);
+    ).toBe(5_465_000);
     const card = { ...cardOf(playerOf(index, 'PG', 40), 'PG'), bucket: 'wildcard' as const };
     expect(capRushAssessSigning({ picks: [] }, index, card).legal).toBe(true);
   });
@@ -187,7 +187,7 @@ describe('cap rush completion matching', () => {
         signedPlayerIds: new Set(),
         slots: ['SF', 'PF'],
       }),
-    ).toBe(7_360_000);
+    ).toBe(6_993_000);
   });
 
   it('excludes already signed people from the completion pool', () => {
@@ -214,18 +214,20 @@ describe('cap rush budget-safe signing', () => {
     const card = cardOf(playerOf(index, 'PG', 60), 'PG');
     const assessment = capRushAssessSigning({ picks }, index, card);
     expect(assessment.legal).toBe(true);
-    expect(assessment.payrollAfterSigning).toBe(146_510_000);
-    expect(assessment.minimumCompletionPayroll).toBe(3_450_000);
-    expect(assessment.projectedPayroll).toBe(149_960_000);
+    expect(assessment.payrollAfterSigning).toBe(139_185_000);
+    expect(assessment.minimumCompletionPayroll).toBe(3_278_000);
+    expect(assessment.projectedPayroll).toBe(142_463_000);
   });
 
   it('rejects a signing whose completion would exceed the hard limit', () => {
-    const index = testIndex();
+    const index = testIndex(
+      buildCapRushTestCatalog({ extraPlayers: [{ positions: ['SG'], overall: 91 }] }),
+    );
     const picks = picksOf(index, [
       { slot: 'C', overall: 99 },
-      { slot: 'SG', overall: 92 },
+      { slot: 'SG', overall: 91 },
     ]);
-    const card = cardOf(playerOf(index, 'PG', 97), 'PG');
+    const card = cardOf(playerOf(index, 'PG', 99), 'PG');
     const assessment = capRushAssessSigning({ picks }, index, card);
     expect(assessment.legal).toBe(false);
     expect(assessment.reason).toBe('completion');

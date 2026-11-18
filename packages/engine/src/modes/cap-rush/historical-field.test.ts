@@ -1,5 +1,10 @@
 import { expect, test } from 'bun:test';
-import { havocInstanceSeed, seasonKeySchema, seedSchema } from '@hoop-rush/data-contracts';
+import {
+  havocInstanceSeed,
+  playerVersionId,
+  seasonKeySchema,
+  seedSchema,
+} from '@hoop-rush/data-contracts';
 import { createRng } from '../../sim/rng.ts';
 import { capRushTestSetup } from './cap-rush-test-support.ts';
 import { buildCapRushHistoricalField } from './historical-field.ts';
@@ -94,6 +99,45 @@ test('historical fields reject franchises without a complete eligible lineup', (
       seedSchema.parse('0123456789abcdef'),
     ),
   ).toThrow('Cap Rush has no historical lineup');
+});
+
+test('one adjacent-season starter can vary a complete anchor lineup', () => {
+  const setup = capRushTestSetup();
+  const bracket = setup.lockSources.bracket;
+  const candidates = bracket.opponents.flatMap((opponent) =>
+    setup.catalog.candidates.flatMap((player) =>
+      ['1995-96', '1996-97', '1997-98']
+        .slice(0, player.positions.playable.includes('PG') ? 3 : 1)
+        .map((key) => ({
+          ...player,
+          franchiseId: opponent.teamId,
+          seasonKey: seasonKeySchema.parse(key),
+          playerVersionId: playerVersionId(player.playerId, opponent.teamId, player.eraId, key),
+        })),
+    ),
+  );
+  const byVersion = new Map(candidates.map((player) => [player.playerVersionId, player]));
+  let adjacentSwaps = 0;
+  for (let index = 0; index < 8; index += 1) {
+    const field = buildCapRushHistoricalField(
+      bracket,
+      { ...setup.catalog, candidates },
+      seedSchema.parse(index.toString(16).padStart(16, '0')),
+    );
+    for (const team of field.opponents) {
+      expect(team.seasonKey).toBe(seasonKeySchema.parse('1995-96'));
+      expect(new Set(team.players.map((player) => player.playerId)).size).toBe(5);
+      const sources = team.players.map((player) => byVersion.get(player.playerVersionId ?? ''));
+      expect(sources.every((player) => player?.franchiseId === team.teamId)).toBe(true);
+      const swaps = sources.filter((player) => player?.seasonKey !== team.seasonKey);
+      expect(swaps.length).toBeLessThanOrEqual(1);
+      if (swaps.length > 0) {
+        expect(swaps[0]?.seasonKey).toBe(seasonKeySchema.parse('1996-97'));
+        adjacentSwaps += 1;
+      }
+    }
+  }
+  expect(adjacentSwaps).toBeGreaterThan(0);
 });
 
 test('historical lineup variation stays close to the starting five strength', () => {
