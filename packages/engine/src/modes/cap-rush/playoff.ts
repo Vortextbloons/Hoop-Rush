@@ -286,6 +286,18 @@ function adjustedAnchors(
   const threeRate = anchors.threePointAttemptRate ?? 0;
   const modernFieldGoalShift =
     (applied.twoPointPct ?? 0) * (1 - threeRate) + cappedThree * threeRate;
+  const offensiveRebounds = Math.max(
+    0,
+    anchors.offensiveReboundsPerGame + applied.offensiveReboundsPerGame,
+  );
+  const defensiveRebounds = Math.max(
+    0,
+    anchors.defensiveReboundsPerGame + applied.defensiveReboundsPerGame,
+  );
+  const reboundDelta =
+    offensiveRebounds -
+    anchors.offensiveReboundsPerGame +
+    (defensiveRebounds - anchors.defensiveReboundsPerGame);
   return {
     ...anchors,
     fieldGoalPct: shift(
@@ -309,14 +321,9 @@ function adjustedAnchors(
           ),
         }),
     assistsPerGame: Math.max(0, anchors.assistsPerGame + applied.assistsPerGame),
-    offensiveReboundsPerGame: Math.max(
-      0,
-      anchors.offensiveReboundsPerGame + applied.offensiveReboundsPerGame,
-    ),
-    defensiveReboundsPerGame: Math.max(
-      0,
-      anchors.defensiveReboundsPerGame + applied.defensiveReboundsPerGame,
-    ),
+    reboundsPerGame: Math.max(0, anchors.reboundsPerGame + reboundDelta),
+    offensiveReboundsPerGame: offensiveRebounds,
+    defensiveReboundsPerGame: defensiveRebounds,
   };
 }
 

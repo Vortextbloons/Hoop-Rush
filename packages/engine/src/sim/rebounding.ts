@@ -71,9 +71,6 @@ export function rebounderWeights(
   return team.players.map((p) => {
     const authoritative = evidenceOf?.(p)?.isAuthoritative('rebound-weights') ?? false;
     const anchors = authoritative ? undefined : p.anchors;
-    const historical = offensive
-      ? anchors?.offensiveReboundsPerGame
-      : anchors?.defensiveReboundsPerGame;
     const heightContribution = p.heightInches === null ? 0 : Math.max(0, p.heightInches - 72) * 0.8;
     const weightContribution = p.weightLbs === null ? 0 : Math.max(0, p.weightLbs - 180) * 0.03;
     const responsibility =
@@ -82,24 +79,23 @@ export function rebounderWeights(
       1;
     const scale = weightScale?.(p) ?? 1;
     const crash = offensive ? 0.75 + p.tendencies.crashOffensiveGlassRate / 40 : 1;
-    const ratingWeight =
-      p.ratings[rating] * crash +
-      p.ratings.vertical * 0.25 +
-      heightContribution +
-      weightContribution;
-    let weight = ratingWeight;
-    if (anchors && anchors.minutesPerGame > 0 && historical != null) {
+    let evidenceScale = 1;
+    if (anchors && anchors.minutesPerGame > 0 && anchors.gamesPlayed > 0) {
       const c = ENGINE_CONSTANTS;
       const minutes = anchors.gamesPlayed * anchors.minutesPerGame;
       const confidence =
         Math.min(1, minutes / c.reboundEvidenceMinutes) * c.reboundEvidenceMaxWeight;
-      const reference = offensive
-        ? c.reboundEvidencePer36.offensive
-        : c.reboundEvidencePer36.defensive;
-      const historicalWeight =
-        (historical * 36 * c.reboundEvidenceReferenceWeight) / (anchors.minutesPerGame * reference);
-      weight += confidence * (historicalWeight - ratingWeight);
+      const rateRatio = Math.min(
+        c.reboundEvidenceMaxRateRatio,
+        (anchors.reboundsPerGame * 36) / (anchors.minutesPerGame * c.reboundEvidenceReferencePer36),
+      );
+      evidenceScale += confidence * (rateRatio - 1);
     }
+    const weight =
+      p.ratings[rating] * crash * evidenceScale +
+      p.ratings.vertical * 0.25 +
+      heightContribution +
+      weightContribution;
     return Math.max(0.5, weight) * responsibility * scale;
   });
 }

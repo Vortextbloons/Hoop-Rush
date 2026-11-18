@@ -1,7 +1,7 @@
 {
   "note": "Seeded result, tape, audit, and digest baseline after the shared allocation change.",
   "baseline": {
-    "engineVersion": "m3-engine-v27",
+    "engineVersion": "m3-engine-v28",
     "runtime": "Production Rust battle and possession runtime"
   },
   "scenarios": [
@@ -13,7 +13,7 @@
       "seed": "7f71e1007f71e1007f71e1007f71e100",
       "apron": null,
       "expected": {
-        "resultHash": "4049f022e12fb8ae8b5dc3ecc970b5b2",
+        "resultHash": "3b4424254ffc901934f15853fb9c5ab5",
         "tapeHash": "9e8178ed877f27994db8c2934d99d31d",
         "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
         "factsHash": "741638a5a99a6e013d712db700467055",
@@ -41,7 +41,7 @@
       "seed": "7f71e1007f71e1007f71e1007f71e100",
       "apron": null,
       "expected": {
-        "resultHash": "66ac6b6108bcf7ed572f1fc37fda8c91",
+        "resultHash": "724b5f340e9fa508a747079a21c523a4",
         "tapeHash": "05f0b473d174e587e670fdeda34ee1a3",
         "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
         "factsHash": "741638a5a99a6e013d712db700467055",
@@ -56,7 +56,7 @@
           "facts": 0
         },
         "inputDigest": "409e3301ed323d3d83e803d7848a5971",
-        "resultDigest": "fbfea257e29f18dbe923fcc553136027",
+        "resultDigest": "6ebd03e68fb670a2e5bf70704d821f76",
         "tapeDigest": "e7a2d54403907820078fd8da0bcc6e54",
         "features": []
       }
@@ -69,7 +69,7 @@
       "seed": "a4a2ba9ca4a2ba9ca4a2ba9ca4a2ba9c",
       "apron": null,
       "expected": {
-        "resultHash": "f9265699890c6f8de5d97fc3fdb5f589",
+        "resultHash": "a59f0bec8e43bd084baac56ad8803edc",
         "tapeHash": "d3a6356535cb618962e0c0cb3d8238f5",
         "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
         "factsHash": "741638a5a99a6e013d712db700467055",
@@ -84,7 +84,7 @@
           "facts": 0
         },
         "inputDigest": "8449dcd5cfbe39612e7af5d79cc25aa5",
-        "resultDigest": "aa4a3b3fd42a4a9b6a345a650e346bcf",
+        "resultDigest": "09de4c6eebf8125279554b1010c079fe",
         "tapeDigest": "294cb534af443e70848301260f6014e4",
         "features": ["clone-entered"]
       }
@@ -97,7 +97,7 @@
       "seed": "c9fbf318c9fbf318c9fbf318c9fbf318",
       "apron": null,
       "expected": {
-        "resultHash": "1d6c92a55767c1d1652cd86366645e55",
+        "resultHash": "5499187a895e9fce63374f24afe16cea",
         "tapeHash": "6f715c058d9efc89fd152b3319a09515",
         "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
         "factsHash": "741638a5a99a6e013d712db700467055",
@@ -112,7 +112,7 @@
           "facts": 0
         },
         "inputDigest": "ca2c715f8588cd1b2059642516333dcf",
-        "resultDigest": "6b7500c763a6ad6b132623d90da82997",
+        "resultDigest": "b813f220738b4d9c668f5aa64f2058b0",
         "tapeDigest": "19c9dbe61e382222f12597f864f6fa96",
         "features": ["clone-entered", "clone-exited", "foul-out"]
       }
@@ -125,7 +125,7 @@
       "seed": "c343bd96c343bd96c343bd96c343bd96",
       "apron": null,
       "expected": {
-        "resultHash": "ef997ab7934cacc3bf7de50d44b8c6e7",
+        "resultHash": "23e6f3e27d5484d674bc2dbc00794892",
         "tapeHash": "27224cbfa33f09e3f6267badc58901cf",
         "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
         "factsHash": "741638a5a99a6e013d712db700467055",
@@ -140,7 +140,7 @@
           "facts": 0
         },
         "inputDigest": "6d0e912cc27a17b0d90d774e77fe5f1c",
-        "resultDigest": "8ca4c9212d6d36250100199b3c1e8c71",
+        "resultDigest": "4f360718c68fdc648910071e37dc5568",
         "tapeDigest": "9184e1464d5bbb12171701e8d9d4f676",
         "features": ["foul-out", "fusion"]
       }
@@ -153,7 +153,7 @@
       "seed": "117eb33d117eb33d117eb33d117eb33d",
       "apron": null,
       "expected": {
-        "resultHash": "7b65fb7751085bb332437d6db85b8f87",
+        "resultHash": "a751d626a812209afda18ba076ac3a76",
         "tapeHash": "e90909980d0018acdfc6390285205ac8",
         "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
         "factsHash": "741638a5a99a6e013d712db700467055",
@@ -168,7 +168,7 @@
           "facts": 0
         },
         "inputDigest": "aa5bc2c2b3d0a43675f261cc938739b2",
-        "resultDigest": "75bdad1140ac8475feb5009be8c92e81",
+        "resultDigest": "cc07e1dc73057038cfbbe912b8050a8c",
         "tapeDigest": "5de865e32d6e3bbf9f3352f984433033",
         "features": ["foul-out"]
       }
@@ -181,7 +181,7 @@
       "seed": "87c9fe9d87c9fe9d87c9fe9d87c9fe9d",
       "apron": null,
       "expected": {
-        "resultHash": "91bc21836c63379fb130bf9967503913",
+        "resultHash": "d56e9e8a286ed18ef73b26147f3fa91a",
         "tapeHash": "cf01d03d9226d5598789e6d308df720d",
         "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
         "factsHash": "741638a5a99a6e013d712db700467055",
@@ -196,7 +196,7 @@
           "facts": 0
         },
         "inputDigest": "5a59f8b667275b923aad52e098c40886",
-        "resultDigest": "d569f3edd1d91d519762277796f1a3dd",
+        "resultDigest": "ffe76d1092c0e2bcc5764f1638fb5180",
         "tapeDigest": "eacf6b3ee069a082d2e62d6861eec3ae",
         "features": ["foul-out", "overtime"]
       }
@@ -213,7 +213,7 @@
         "targetSlot": "C"
       },
       "expected": {
-        "resultHash": "4c1e6ad42b9be700310bf142f83564e4",
+        "resultHash": "d4ee3b6dc7ffdcb1d379a6b7ae5b247d",
         "tapeHash": "9bf8f86c4395e1589c4b7ee26bb313dc",
         "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
         "factsHash": "741638a5a99a6e013d712db700467055",
@@ -228,7 +228,7 @@
           "facts": 0
         },
         "inputDigest": "d84207c9377b010599d6960f68523979",
-        "resultDigest": "182c4366c9f03dca9e482ae88a501b56",
+        "resultDigest": "295d32532bc1022f09c91f09d12e1d43",
         "tapeDigest": "5e8129271ba58c8b67a93561ac0195b7",
         "features": []
       }
@@ -245,7 +245,7 @@
         "targetSlot": "C"
       },
       "expected": {
-        "resultHash": "36e4b39e64cc0ac279894e08de990f8e",
+        "resultHash": "496ed481331af2ed625c8d1fda9f10b1",
         "tapeHash": "83af90ad26db0f498e83d6e78a798f9d",
         "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
         "factsHash": "550073c3fdc6f1778a398209e365bbd3",
@@ -260,7 +260,7 @@
           "facts": 15
         },
         "inputDigest": "5120a49998c10975b1fa6abf7f7981c9",
-        "resultDigest": "d615d994cad38ad0a12414aa454e3f64",
+        "resultDigest": "1e7f9c03f464a117eb9e1be5af85d393",
         "tapeDigest": "a550a52ed870af525ce5f644e66b47be",
         "features": []
       }
@@ -277,7 +277,7 @@
         "targetSlot": "C"
       },
       "expected": {
-        "resultHash": "9445423e45aaf64244dd66b44650a86e",
+        "resultHash": "3f13b7d5a871dcf11d6ad67f61a89785",
         "tapeHash": "88437e6060c9447c36b91402a1f01b30",
         "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
         "factsHash": "741638a5a99a6e013d712db700467055",
@@ -292,7 +292,7 @@
           "facts": 0
         },
         "inputDigest": "00f49fed46d769f9a2c44b0f8986c67d",
-        "resultDigest": "acc5185070cb20cc9bfd53fa60f67ee0",
+        "resultDigest": "0a1f2d53347ea1c78d9a96d91df8f223",
         "tapeDigest": "d4d65abd8f2d21a12c6c6beb01cfd2ed",
         "features": ["clone-entered", "foul-out"]
       }
@@ -309,7 +309,7 @@
         "targetSlot": "C"
       },
       "expected": {
-        "resultHash": "d5233f44e84aecd0f650180efadffdd4",
+        "resultHash": "a39557e3584c6ad73975f9d92f61caf3",
         "tapeHash": "243b5efd9e13fe910a503bbb0d82910d",
         "auditHash": "5cf231f13eea60ad199a43bb27d133c1",
         "factsHash": "e92e9d595e31ed7519bc5a1fa3b35189",
@@ -324,7 +324,7 @@
           "facts": 17
         },
         "inputDigest": "8b6de365ce2489b1d8be7f9720e5fe75",
-        "resultDigest": "c592b7a22b0f1bf69079c8f88b5ca692",
+        "resultDigest": "3a0e39654a4827316e53358f25245355",
         "tapeDigest": "e77ff776d1cb87326513e10836daf4e6",
         "features": ["clone-entered", "foul-out"]
       }

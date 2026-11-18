@@ -10,7 +10,7 @@ export interface PositionResponsibilityModifiers {
   rimProtection: number;
 }
 
-export const ENGINE_VERSION = 'm3-engine-v27';
+export const ENGINE_VERSION = 'm3-engine-v28';
 
 export const ENGINE_CONSTANTS = {
   version: ENGINE_VERSION,
@@ -117,9 +117,9 @@ export const ENGINE_CONSTANTS = {
   offensiveReboundRimBonus: 0.045,
   offensiveReboundPerimeterPenalty: 0.04,
   reboundEvidenceMinutes: 1800,
-  reboundEvidenceMaxWeight: 0.65,
-  reboundEvidenceReferenceWeight: 85,
-  reboundEvidencePer36: { offensive: 1.5, defensive: 4 },
+  reboundEvidenceMaxWeight: 0.3,
+  reboundEvidenceReferencePer36: 6,
+  reboundEvidenceMaxRateRatio: 2,
 
   shotClockSeconds: 24,
   minimumTripSeconds: 1,

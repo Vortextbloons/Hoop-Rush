@@ -383,7 +383,12 @@ export function createHavocMultiplayerTransport(
   }
   const getClient = clientFactory;
   const loadDraftAssets = options?.loadDraftAssets ?? loadHavocMultiplayerDraftAssets;
-  let replayedDraft: { key: string; draft: HavocMultiplayerDraftState } | null = null;
+  let replayedDraft: {
+    settingsKey: string;
+    commandsKey: string;
+    rows: HavocMultiplayerCommandRow[];
+    draft: HavocMultiplayerDraftState;
+  } | null = null;
   let acceptedLog: { roomId: string; rows: HavocMultiplayerCommandRow[] } | null = null;
   async function draftFromRow(
     row: HavocMultiplayerRoomRow,
@@ -408,11 +413,17 @@ export function createHavocMultiplayerTransport(
     const versions = havocMultiplayerVersionLocksSchema.parse(row.versions);
     const rootSeed = seedSchema.parse(row.root_seed);
     const variant = havocMultiplayerVariantSchema.parse(row.variant ?? 'standard');
+    const settingsKey = JSON.stringify([row.id, rootSeed, variant, versions]);
+    const cached = replayedDraft?.settingsKey === settingsKey ? replayedDraft : null;
+    if (cached?.rows === commandRows) return cached.draft;
     const commands = commandRows.map((command) =>
       havocMultiplayerCommandPayloadSchema.parse(command.payload),
     );
-    const key = JSON.stringify([row.id, rootSeed, variant, versions, commands]);
-    if (replayedDraft?.key === key) return replayedDraft.draft;
+    const commandsKey = JSON.stringify(commands);
+    if (cached?.commandsKey === commandsKey) {
+      cached.rows = commandRows;
+      return cached.draft;
+    }
     const assets = await loadDraftAssets();
     const draft = replayHavocMultiplayerDraft({
       rootSeed,
@@ -424,7 +435,7 @@ export function createHavocMultiplayerTransport(
         rulesVersion: versions.rulesVersion,
       },
     });
-    replayedDraft = { key, draft };
+    replayedDraft = { settingsKey, commandsKey, rows: commandRows, draft };
     return draft;
   }
   return createRoomTransport(
@@ -488,10 +499,8 @@ export function createHavocMultiplayerTransport(
         const cached = acceptedLog?.roomId === roomId ? acceptedLog.rows : [];
         const cursor = afterOrdinal >= 0 && cached.length === afterOrdinal + 1 ? afterOrdinal : -1;
         let payload = await readRoomSync(client, 'havoc', roomId, cursor);
-        let fullRows = [
-          ...(cursor < 0 ? [] : cached),
-          ...(payload.commands as unknown as HavocMultiplayerCommandRow[]),
-        ];
+        let fullRows = payload.commands as unknown as HavocMultiplayerCommandRow[];
+        if (cursor >= 0) fullRows = fullRows.length === 0 ? cached : [...cached, ...fullRows];
         if (
           fullRows.length !== payload.room['command_count'] ||
           fullRows.some((command, ordinal) => command.ordinal !== ordinal)

@@ -162,12 +162,16 @@ describe('havoc sim hooks: physical and aggregation options', () => {
       anchors: {
         ...anchors,
         minutesPerGame: 25,
-        defensiveReboundsPerGame: (anchors.defensiveReboundsPerGame * 25) / anchors.minutesPerGame,
+        reboundsPerGame: (anchors.reboundsPerGame * 25) / anchors.minutesPerGame,
+        offensiveReboundsPerGame: 0,
+        defensiveReboundsPerGame: (anchors.reboundsPerGame * 25) / anchors.minutesPerGame,
       },
     };
     const team = { ...buildLegalSimulationTeam(), players: [starter, reserve] };
-    const [starterWeight, reserveWeight] = rebounderWeights(team, false);
-    expect(starterWeight).toBeCloseTo(reserveWeight ?? 0, 10);
+    for (const offensive of [true, false]) {
+      const [starterWeight, reserveWeight] = rebounderWeights(team, offensive);
+      expect(starterWeight).toBeCloseTo(reserveWeight ?? 0, 10);
+    }
 
     const [authoritative] = rebounderWeights(team, false, undefined, undefined, () =>
       evidenceFor(['rebound-weights']),

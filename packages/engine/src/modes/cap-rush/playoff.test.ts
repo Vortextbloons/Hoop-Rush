@@ -421,7 +421,8 @@ describe('cap rush playoff application', () => {
     const performance = capRushPlayoffPerformanceOf({
       human,
       opponents: [],
-      profileOf: () => profile({ season: seasonKey, tsPct: 0.06, assistsPer36: 2 }),
+      profileOf: () =>
+        profile({ season: seasonKey, tsPct: 0.06, assistsPer36: 2, reboundsPer36: 2 }),
     });
     for (const row of performance.players) {
       row.applied = capRushPlayoffAppliedOf({
@@ -438,8 +439,17 @@ describe('cap rush playoff application', () => {
     expect(human.starters[0]?.source.profile.anchors).toEqual(baseAnchors);
     expect(human.starters[0]?.source.profile.tendencies).toEqual(baseTendencies);
     const changed = required(adjusted.starters[0], 'an adjusted starter');
+    const adjustedAnchors = required(changed.source.profile.anchors, 'adjusted anchors');
     expect(changed.source.profile.tendencies.passRate).not.toBe(baseTendencies.passRate);
-    expect(changed.source.profile.anchors?.assistsPerGame).not.toBe(baseAnchors.assistsPerGame);
+    expect(adjustedAnchors.assistsPerGame).not.toBe(baseAnchors.assistsPerGame);
+    const applied = required(performance.players[0], 'a pinned row').applied;
+    expect(adjustedAnchors.reboundsPerGame).toBeGreaterThan(baseAnchors.reboundsPerGame);
+    expect(adjustedAnchors.reboundsPerGame).toBeCloseTo(
+      baseAnchors.reboundsPerGame +
+        applied.offensiveReboundsPerGame +
+        applied.defensiveReboundsPerGame,
+      10,
+    );
     expect(changed.effective.tendencies).toEqual(changed.source.profile.tendencies);
     havocTeamInputSchema.parse(adjusted);
   });

@@ -418,6 +418,38 @@ describe('havoc multiplayer supabase transport protocol pins', () => {
     expect(harness.rpcCalls.at(-1)?.args['p_after_ordinal']).toBe(-1);
   });
 
+  it('reuses the draft on an empty delta and validates the log on a full read', async () => {
+    const loadDraftAssets = mock(() => Promise.resolve(fixtureDraftAssets()));
+    const { harness, transport } = setupTransport({ loadDraftAssets });
+    let payloadReads = 0;
+    const rows = [
+      {
+        command_id: 'cmd-0',
+        ordinal: 0,
+        actor_participant_id: 'p1',
+        payload: {
+          get kind() {
+            payloadReads += 1;
+            return 'ready';
+          },
+        },
+      },
+    ];
+    harness.setRpc('multiplayer_room_sync', (args) => ({
+      room: roomRow({ draft_state: { turn_ordinal: 0, first_picker: 'p1' }, command_count: 1 }),
+      members: [memberRow('p1'), memberRow('p2')],
+      commands: args['p_after_ordinal'] === -1 ? rows : [],
+    }));
+
+    await transport.sync(ROOM_ID);
+    payloadReads = 0;
+    expect((await transport.sync(ROOM_ID, 0)).commands).toHaveLength(0);
+    expect(payloadReads).toBe(0);
+    await transport.sync(ROOM_ID);
+    expect(payloadReads).toBeGreaterThan(0);
+    expect(loadDraftAssets).toHaveBeenCalledTimes(1);
+  });
+
   it('subscribe opens one realtime channel and tears it down with the last handler', async () => {
     const { harness, transport } = setupTransport();
     seedRoom(harness);
