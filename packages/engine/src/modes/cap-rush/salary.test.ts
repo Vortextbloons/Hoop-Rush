@@ -19,7 +19,7 @@ describe('cap rush salary curve', () => {
   it('matches every supplied anchor exactly', () => {
     for (const anchor of CAP_RUSH_SALARY_ANCHORS) {
       expect(capRushSalaryThousands(anchor.overall)).toBe(anchor.thousands);
-      expect(capRushSalaryDollars(anchor.overall, '1995-96')).toBe(
+      expect(capRushSalaryDollars(anchor.overall, '2010-11')).toBe(
         Math.round(anchor.thousands * 1.15) * 1_000,
       );
     }
@@ -36,16 +36,16 @@ describe('cap rush salary curve', () => {
   });
 
   it('prices seasons by decade and rounds the combined adjustment to thousands', () => {
-    expect(capRushSalaryDollars(40, '1969-70')).toBe(920_000);
-    expect(capRushSalaryDollars(40, '1990-91')).toBe(1_150_000);
-    expect(capRushSalaryDollars(50, '1990-91')).toBe(2_300_000);
-    expect(capRushSalaryDollars(85, '1969-70')).toBe(18_400_000);
-    expect(capRushSalaryDollars(85, '1970-71')).toBe(20_700_000);
-    expect(capRushSalaryDollars(85, '1980-81')).toBe(21_850_000);
-    expect(capRushSalaryDollars(85, '1990-91')).toBe(23_000_000);
-    expect(capRushSalaryDollars(89, '1990-91')).toBe(32_200_000);
-    expect(capRushSalaryDollars(85, '2000-01')).toBe(23_000_000);
-    expect(capRushSalaryDollars(96, '1989-90')).toBe(55_354_000);
+    expect(capRushSalaryDollars(85, '1959-60')).toBe(23_000_000);
+    expect(capRushSalaryDollars(85, '1960-61')).toBe(16_100_000);
+    expect(capRushSalaryDollars(85, '1969-70')).toBe(16_100_000);
+    expect(capRushSalaryDollars(85, '1970-71')).toBe(19_550_000);
+    expect(capRushSalaryDollars(85, '1980-81')).toBe(20_700_000);
+    expect(capRushSalaryDollars(85, '1990-91')).toBe(21_850_000);
+    expect(capRushSalaryDollars(85, '2000-01')).toBe(22_310_000);
+    expect(capRushSalaryDollars(85, '2009-10')).toBe(22_310_000);
+    expect(capRushSalaryDollars(85, '2010-11')).toBe(23_000_000);
+    expect(capRushSalaryDollars(96, '1989-90')).toBe(52_440_000);
   });
 
   it('is strictly monotone across the draft range', () => {

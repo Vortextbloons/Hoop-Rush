@@ -1,4 +1,3 @@
-import type { HavocCommandOutcome } from '@hoop-rush/data-contracts';
 import type {
   HavocCatalog,
   HavocComparison,
