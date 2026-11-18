@@ -32,6 +32,7 @@ import {
   type HavocVariant,
   type Id,
 } from '@hoop-rush/data-contracts';
+import { evaluateHavocAchievements, havocAchievementFactsFromRun } from '@hoop-rush/engine';
 import {
   HAVOC_ACTIVE_RECORD_ID,
   havocDigestTextSchema,
@@ -626,6 +627,27 @@ export class DexieHavocRepository {
             `retained tape ${String(tape.tape.gameNumber)}`,
           );
           await this.db.havocRetainedTapes.put(tapeRow);
+        }
+        const finishedHavoc =
+          game?.result.variant === 'havoc' && game.result.gameNumber === HAVOC_GAME_COUNT;
+        const completedComparison =
+          acceptedState.comparisonStatus === 'complete' ? (comparison ?? report?.comparison) : null;
+        if (finishedHavoc || completedComparison) {
+          const bindingId = `havoc:${result.runId}`;
+          if (await this.db.profileBindings.get(bindingId)) {
+            const havocGames = finishedHavoc ? await this.listRunGames(result.runId, 'havoc') : [];
+            const facts = havocAchievementFactsFromRun({
+              totals: acceptedState.havocAggregate,
+              starters: finishedHavoc ? (acceptedState.locked?.human.starters ?? []) : [],
+              havocGames: havocGames.map((gameResult) => ({ result: gameResult })),
+              comparison: completedComparison,
+            });
+            await new DexieProfileRepository(this.db).awardAchievements(
+              bindingId,
+              finishedHavoc ? 'season' : 'comparison',
+              evaluateHavocAchievements(facts),
+            );
+          }
         }
         if (archiveSnapshot || targetCompleted !== null) {
           await this.putHistory(

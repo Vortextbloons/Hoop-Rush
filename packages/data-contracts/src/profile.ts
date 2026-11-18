@@ -108,6 +108,7 @@ export const profileBindingSchema = z.object({
   id: z.string().min(1).max(128),
   profileId: z.uuid(),
   participantId: z.enum(['p1', 'p2']).optional(),
+  rematchAfterLoss: z.string().min(1).max(64).optional(),
 });
 export type ProfileBinding = z.infer<typeof profileBindingSchema>;
 

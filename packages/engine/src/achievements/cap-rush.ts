@@ -137,7 +137,6 @@ export function capRushAchievementFactsFromReport(
 
 interface UserSeriesRecord {
   series: CapRushPlayoffSeriesFacts;
-  userTeamId: string;
   userWins: number;
   opponentWins: number;
 }
@@ -158,7 +157,6 @@ function userSeriesRecords(postseason: CapRushPostseasonFacts): UserSeriesRecord
     const userWins = series.games.filter((game) => game.winnerTeamId === userTeamId).length;
     records.push({
       series,
-      userTeamId,
       userWins,
       opponentWins: series.games.length - userWins,
     });
@@ -183,7 +181,6 @@ function scoringLeaderOf(
 }
 
 interface FinalsGameSeven {
-  game: CapRushPlayoffGameFacts;
   userPoints: number;
   opponentPoints: number;
 }
@@ -196,7 +193,6 @@ function finalsGameSevenOf(postseason: CapRushPostseasonFacts): FinalsGameSeven 
     for (const game of series.games) {
       if (game.gameOrdinal !== 7 || game.userSide === null) continue;
       return {
-        game,
         userPoints: game.userSide === 'home' ? game.homePoints : game.awayPoints,
         opponentPoints: game.userSide === 'home' ? game.awayPoints : game.homePoints,
       };
@@ -214,7 +210,7 @@ export function evaluateCapRushAchievements(facts: CapRushAchievementFacts): Cap
   const playoffSweep =
     fourSeries && records.every((record) => record.userWins === 4 && record.opponentWins === 0);
 
-  if (champion && facts.wins >= 74 && playoffSweep) {
+  if (champion && facts.wins + facts.losses === 82 && facts.wins >= 74 && playoffSweep) {
     unlocks.push({
       id: '73-9-hold-my-ring',
       evidence: `${String(facts.wins)}-${String(facts.losses)} season with a 16-0 playoff sweep`,
@@ -309,9 +305,7 @@ export function evaluateCapRushAchievements(facts: CapRushAchievementFacts): Cap
   ) {
     unlocks.push({
       id: 'the-shot',
-      evidence:
-        `Won Finals Game 7 ${String(finalsGameSeven.userPoints)}-` +
-        `${String(finalsGameSeven.opponentPoints)}`,
+      evidence: `Won Finals Game 7 ${String(finalsGameSeven.userPoints)}-${String(finalsGameSeven.opponentPoints)}`,
     });
   }
 

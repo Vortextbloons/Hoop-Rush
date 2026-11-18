@@ -1,10 +1,12 @@
 import {
   FIXED_FIVE_ROOM_SCHEMA_VERSION,
+  type AchievementUnlock,
   type FixedFiveCommand,
   type FixedFiveCompetitionRun,
   type FixedFiveRoomSnapshot,
   profileBindingSchema,
 } from '@hoop-rush/data-contracts';
+import type { ProfileGameFacts } from '@hoop-rush/engine';
 import {
   storedFixedFiveActiveSchema,
   storedFixedFiveCommandRowSchema,
@@ -88,6 +90,26 @@ export class DexieFixedFiveRepository {
   }
   async clearPendingResult(roomId: string): Promise<void> {
     await this.db.fixedFivePendingResults.delete(roomId);
+  }
+  async recordCareer(
+    bindingId: string,
+    games: readonly { gameId: string; facts: ProfileGameFacts }[],
+    won: boolean,
+    eventId: string,
+    candidates: readonly AchievementUnlock[],
+  ): Promise<void> {
+    await this.db.transaction(
+      'rw',
+      this.db.profileBindings,
+      this.db.profileGames,
+      this.db.profiles,
+      this.db.archivedProfiles,
+      async () => {
+        const profiles = new DexieProfileRepository(this.db);
+        await profiles.recordCompletedMatch(bindingId, games, won);
+        await profiles.awardAchievements(bindingId, eventId, candidates);
+      },
+    );
   }
   async promoteToCompleted(roomId: string, run: FixedFiveCompetitionRun): Promise<void> {
     const completedAtIso = new Date().toISOString();

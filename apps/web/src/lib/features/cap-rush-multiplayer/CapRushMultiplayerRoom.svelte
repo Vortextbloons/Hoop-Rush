@@ -15,6 +15,7 @@
   import CapRushMultiplayerSeason from './CapRushMultiplayerSeason.svelte';
   import CapRushPreparation from './CapRushPreparation.svelte';
   import { CapRushMultiplayerController } from './cap-rush-multiplayer-controller.svelte.js';
+  import { capRushMultiplayerBindingId } from './cap-rush-multiplayer-achievements.js';
   import { seatLabel, seatOrder } from './cap-rush-multiplayer-presentation.js';
   import { variantLabel } from '../cap-rush/cap-rush-presentation.js';
   import { loadLobbyId } from '#lib/features/multiplayer/multiplayer-lobby.js';
@@ -23,6 +24,7 @@
   let { roomId }: { roomId: string } = $props();
   const controller = new CapRushMultiplayerController(untrack(() => roomId));
   const lobbyId = untrack(() => loadLobbyId(roomId));
+  const bindingId = untrack(() => capRushMultiplayerBindingId(roomId));
 
   onMount(() => {
     void controller.load();
@@ -110,7 +112,7 @@
   });
 </script>
 
-<div class="mx-auto w-full max-w-[1440px] px-3 pb-8 sm:px-6">
+<div class="px-3 pb-8 sm:px-6">
   <RoomShell
     compactMobile
     {roomId}
@@ -357,6 +359,7 @@
           <CapRushMultiplayerResults
             state={game}
             localSeat={seat}
+            {bindingId}
             art={controller.art}
             onreviewgame={(gameId) => controller.reviewGame(gameId)}
           />

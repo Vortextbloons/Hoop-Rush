@@ -5,6 +5,7 @@
   } from '@hoop-rush/data-contracts';
   import { recordFixedFiveCareer } from './profile-results.js';
   import AchievementReveal from '#lib/features/profile/AchievementReveal.svelte';
+  import Alert from '#lib/components/ui/Alert.svelte';
   let {
     roomId,
     participant,
@@ -38,5 +39,5 @@
   });
 </script>
 
-{#if error}<p role="alert">{error}</p>{/if}
+{#if error}<Alert tone="danger">{error}</Alert>{/if}
 {#if recorded}<AchievementReveal bindingId={`fixed-five:${roomId}`} />{/if}

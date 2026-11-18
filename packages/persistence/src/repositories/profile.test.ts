@@ -11,6 +11,28 @@ import {
 afterEach(restoreIndexedDb);
 
 describe('local profiles', () => {
+  test('keeps the previous lost room with the successor binding across repository instances', async () => {
+    resetIndexedDb();
+    const db = new HoopRushDatabase(testDatabaseName('profile-rematch'));
+    try {
+      const repo = new DexieProfileRepository(db);
+      const profile = await repo.initialize(crypto.randomUUID());
+      await repo.bind('draft-duel:previous', 'p2');
+      await repo.rememberRematchAfterLoss(
+        'draft-duel:previous',
+        'draft-duel:next',
+        'previous',
+        'p2',
+      );
+      const reloaded = new DexieProfileRepository(db);
+      expect(await reloaded.bind('draft-duel:next', 'p2')).toBe(profile.id);
+      expect(await reloaded.rematchAfterLoss('draft-duel:next')).toBe('previous');
+      expect(await reloaded.rematchAfterLoss('draft-duel:previous')).toBeUndefined();
+    } finally {
+      db.close();
+    }
+  });
+
   test('keeps the first achievement moment when a result is retried or the feat is repeated', async () => {
     resetIndexedDb();
     const db = new HoopRushDatabase(testDatabaseName('achievement-moments'));

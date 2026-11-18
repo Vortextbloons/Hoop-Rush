@@ -6,7 +6,7 @@ import type {
   FixedFiveWorkerResultEntry,
 } from '@hoop-rush/data-contracts';
 import { seedSchema } from '@hoop-rush/data-contracts';
-import { fixedFiveCareerFacts } from './profile-results.js';
+import { fixedFiveAchievementCandidates, fixedFiveCareerFacts } from './profile-results.js';
 
 describe('fixed five career facts', () => {
   test('selects the local team and refuses an incomplete season', () => {
@@ -39,6 +39,10 @@ describe('fixed five career facts', () => {
     expect(facts?.map((fact) => fact.won)).toEqual([true, true, true, true]);
     expect(facts?.[0]?.players).toEqual(h2h.away.players);
     expect(fixedFiveCareerFacts('p2', result, entries.slice(1))).toBeNull();
+    const candidates = fixedFiveAchievementCandidates('p2', result, entries, null);
+    expect(candidates.map((candidate) => candidate.id)).toContain('bring-out-the-brooms');
+    expect(candidates.map((candidate) => candidate.id)).not.toContain('upset-of-the-year');
+    expect(fixedFiveAchievementCandidates('p2', result, entries.slice(1), null)).toEqual([]);
   });
 
   test('counts each shared season game once for the selected participant', () => {
@@ -84,5 +88,61 @@ describe('fixed five career facts', () => {
     expect(facts).toHaveLength(82);
     expect(facts?.every((item) => item.won)).toBe(true);
     expect(facts?.[0]?.players).toEqual(game.away.players);
+    const candidates = fixedFiveAchievementCandidates('p2', result, entries, null);
+    expect(candidates.map((candidate) => candidate.id)).toContain('the-splash-brothers');
+
+    const oneLoss: FixedFiveCompetitionResult = {
+      ...result,
+      participants: result.participants.map((participant) =>
+        participant.participantId === 'p2' ? { ...participant, wins: 81, losses: 1 } : participant,
+      ),
+    };
+    expect(fixedFiveAchievementCandidates('p2', oneLoss, entries, null)).toEqual([]);
+  });
+
+  test('awards Dame Time from a verified one-point Game 7', () => {
+    const game = simulateGame(buildGameSimulationInput(), createEngineContext());
+    const winners = ['p1', 'p2', 'p1', 'p2', 'p1', 'p2', 'p1'] as const;
+    const result: FixedFiveCompetitionResult = {
+      competition: 'duel',
+      games: winners.map((winner, index) => ({
+        gameNumber: index + 1,
+        seed: seedSchema.parse(game.seed),
+        winner,
+      })),
+      p1Wins: 4,
+      p2Wins: 3,
+      winner: 'p1',
+      stoppedAtGame: 7,
+    };
+    const entries: FixedFiveWorkerResultEntry[] = winners.map((winner, index) => {
+      const homeWins = winner === 'p1';
+      return {
+        tag: 'duel',
+        game: {
+          ...game,
+          gameNumber: index + 1,
+          home: {
+            ...game.home,
+            teamId: 'p1',
+            box: {
+              ...game.home.box,
+              points: 100 + (homeWins ? (index === 6 ? 1 : 7) : 0),
+            },
+          },
+          away: {
+            ...game.away,
+            teamId: 'p2',
+            box: {
+              ...game.away.box,
+              points: 100 + (homeWins ? 0 : index === 6 ? 1 : 7),
+            },
+          },
+          winner: homeWins ? 'home' : 'away',
+        },
+      };
+    });
+    const candidates = fixedFiveAchievementCandidates('p1', result, entries, null);
+    expect(candidates.map((candidate) => candidate.id)).toContain('dame-time');
   });
 });

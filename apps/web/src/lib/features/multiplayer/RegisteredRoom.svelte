@@ -4,6 +4,7 @@
   import { multiplayerMode } from '#lib/modes/catalog.js';
   import Button from '#lib/components/ui/Button.svelte';
   import ActionLink from '#lib/components/ui/ActionLink.svelte';
+  import Alert from '#lib/components/ui/Alert.svelte';
 
   let { gameKind, roomId }: { gameKind: MultiplayerGameKind; roomId: string } = $props();
   let attempt = $state.raw(0);
@@ -26,9 +27,9 @@
     <Room {roomId} />
   {:catch error}
     <div class="mx-auto flex max-w-6xl flex-col items-start gap-3 p-6">
-      <p class="text-sm text-destructive" role="alert">
+      <Alert tone="danger">
         {error instanceof Error ? error.message : 'Could not open this room.'}
-      </p>
+      </Alert>
       <div class="flex flex-wrap items-center gap-3">
         <Button tone="secondary" onclick={() => (attempt += 1)}>Try again</Button>
         <ActionLink href={resolve('/multiplayer')}>Back to the lobby</ActionLink>

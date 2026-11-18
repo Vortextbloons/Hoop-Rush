@@ -120,6 +120,7 @@ export interface SeriesRoomSessionDeps<
   friendlyError: (error: unknown) => string;
   loadMembership: (roomId: string) => TMembership | null;
   saveMembership: (membership: TMembership) => void;
+  rememberRematch?: (previousRoomId: string, membership: TMembership) => Promise<void>;
   scheduleTick?: TickScheduler;
   transport: SeriesRoomTransport<TSnapshot, TMembership, TTransient, TPayload, TCommand>;
   repository: RoomSessionRepository<TStoredVerification, TCompleted, TResultRow>;
@@ -502,11 +503,13 @@ export abstract class SeriesRoomSession<
   }
 
   async followRematch(): Promise<Id | null> {
-    if (!this.roomId) return null;
+    const previousRoomId = this.roomId;
+    if (!previousRoomId) return null;
     try {
-      const rematch = await this.deps.transport.rematch(this.roomId);
+      const rematch = await this.deps.transport.rematch(previousRoomId);
       const joined = await this.deps.transport.join(rematch.code);
       this.deps.saveMembership(joined.membership);
+      await this.deps.rememberRematch?.(previousRoomId, joined.membership).catch(() => {});
       return idSchema.parse(joined.snapshot.roomId);
     } catch (error) {
       this.error = this.deps.friendlyError(error);

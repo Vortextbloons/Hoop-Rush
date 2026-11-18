@@ -34,6 +34,7 @@
   } from '#lib/gamecast/gamecast-playback.js';
   import { FixedFiveRoomController } from '#lib/features/fixed-five/fixed-five-room-controller.svelte.js';
   import type { PublicProfile } from '@hoop-rush/data-contracts';
+  import Alert from '#lib/components/ui/Alert.svelte';
   let { roomId }: { roomId: string } = $props();
   let roomProfiles = $state<PublicProfile[]>([]);
   const controller = new FixedFiveRoomController({ roomId: untrack(() => roomId) });
@@ -94,7 +95,7 @@
   {:else if controller.error && !snapshot}
     <div class="room-empty">
       <h1>Couldn’t open this room</h1>
-      <p role="alert">{controller.error}</p>
+      <Alert tone="danger">{controller.error}</Alert>
       <ActionLink href={resolve('multiplayer/')}>
         Back to multiplayer <ArrowRight size={16} />
       </ActionLink>
@@ -139,7 +140,7 @@
     {/if}
 
     {#if controller.error}
-      <p class="room-alert" role="alert">{controller.error}</p>
+      <Alert tone="danger">{controller.error}</Alert>
     {/if}
 
     <p class="room-connection" role="status" aria-live="polite">
@@ -234,9 +235,9 @@
               <dd>Invite only</dd>
             </div>
           </dl>
-          {#if controller.assetsError}<p class="room-alert" role="alert">
+          {#if controller.assetsError}<Alert tone="danger">
               The player pool could not be loaded. Try again to reload it.
-            </p>
+            </Alert>
             <Button tone="secondary" onclick={() => void controller.retryLoad()}>Try again</Button
             >{/if}
           <div class="lobby-ready" role="status">

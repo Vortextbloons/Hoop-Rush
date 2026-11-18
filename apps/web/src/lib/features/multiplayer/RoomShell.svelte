@@ -7,6 +7,7 @@
   import { multiplayerInviteLink } from './invite-link';
   import RoomProfiles from '#lib/features/profile/RoomProfiles.svelte';
   import type { PublicProfile } from '@hoop-rush/data-contracts';
+  import Alert from '#lib/components/ui/Alert.svelte';
   let {
     roomId,
     compactMobile = false,
@@ -121,9 +122,9 @@
     {#if lobbyId}<a href={resolve(`/multiplayer?lobby=${lobbyId}`)}>Room lobby →</a>{/if}
     {@render children?.()}
   </div>
-  {#if error || copyError || (lobbyId && coordinator.snapshot.error)}<p class="error" role="alert">
+  {#if error || copyError || (lobbyId && coordinator.snapshot.error)}<Alert tone="danger">
       {error ?? copyError ?? coordinator.snapshot.error}
-    </p>{/if}
+    </Alert>{/if}
   {#if content}
     <div class="room-content">{@render content()}</div>
   {/if}

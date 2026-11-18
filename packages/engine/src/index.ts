@@ -356,6 +356,11 @@ export * from './modes/cap-rush/index.ts';
 export * from './profile.ts';
 export { evaluateRunAchievements } from './achievements/classic.ts';
 export {
+  capRushAchievementFactsFromReport,
+  evaluateCapRushAchievements,
+} from './achievements/cap-rush.ts';
+export { evaluateHavocAchievements, havocAchievementFactsFromRun } from './achievements/havoc.ts';
+export {
   evaluateCapRushMultiplayerAchievements,
   evaluateSeriesAchievements,
   evaluateSharedSeasonAchievements,

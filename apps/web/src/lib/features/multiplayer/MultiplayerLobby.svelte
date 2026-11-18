@@ -27,6 +27,7 @@
   import { multiplayerFormats } from '#lib/modes/catalog.js';
   import SettingsChoices from '#lib/modes/SettingsChoices.svelte';
   import type { MultiplayerModeAdapter } from '#lib/modes/types.js';
+  import Alert from '#lib/components/ui/Alert.svelte';
   let {
     initialFormat,
     showChooser = true,
@@ -428,7 +429,7 @@
           </form>
           {#if preview}<p class="room-preview" role="status">{preview}</p>{/if}
         {/if}
-        {#if error}<p class="room-error" role="alert">{error}</p>{/if}
+        {#if error}<Alert tone="danger">{error}</Alert>{/if}
         {#if !isMultiplayerConfigured()}<p class="connection-note">
             Online rooms are unavailable in this setup. Solo Classic and Sandbox are ready to play.
           </p>{/if}

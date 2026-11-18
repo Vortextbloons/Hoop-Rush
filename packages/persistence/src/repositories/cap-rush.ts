@@ -26,8 +26,10 @@ import {
 } from '@hoop-rush/data-contracts';
 import {
   auditHavocBattleGame,
+  capRushAchievementFactsFromReport,
   capRushEmptyLeagueAggregate,
   capRushFoldLeagueAggregate,
+  evaluateCapRushAchievements,
   havocBattleGameInputDigest,
   soloToBattleResult,
   capRushStateDigest,
@@ -49,6 +51,7 @@ import {
   storedCapRushReportRowSchema,
 } from '../schemas/cap-rush-record.ts';
 import { HoopRushDatabase } from './dexie.ts';
+import { DexieProfileRepository } from './profile.ts';
 import {
   classifyCommandReplay,
   commandEnvelopeMatches,
@@ -423,6 +426,10 @@ export class DexieCapRushRepository {
       }
     }
 
+    const championship =
+      report?.postseason && state.postseason?.championTeamId === state.locked?.human.teamId
+        ? state.locked
+        : null;
     const outcome = await this.db.transaction(
       'rw',
       [
@@ -436,6 +443,14 @@ export class DexieCapRushRepository {
         this.db.capRushLeagueAggregates,
         this.db.capRushHistory,
         this.db.capRushReports,
+        ...(championship
+          ? [
+              this.db.profileBindings,
+              this.db.profileGames,
+              this.db.profiles,
+              this.db.archivedProfiles,
+            ]
+          : []),
       ],
       async (): Promise<CapRushCommandResult | null> => {
         const existing = await readStoredCommand({
@@ -576,6 +591,18 @@ export class DexieCapRushRepository {
               }),
             );
             await this.putHistory(state);
+            if (championship) {
+              const bindingId = `cap-rush:${state.runId}`;
+              if (await this.db.profileBindings.get(bindingId)) {
+                await new DexieProfileRepository(this.db).awardAchievements(
+                  bindingId,
+                  'championship',
+                  evaluateCapRushAchievements(
+                    capRushAchievementFactsFromReport(report, championship.human.starters),
+                  ),
+                );
+              }
+            }
           }
         }
 

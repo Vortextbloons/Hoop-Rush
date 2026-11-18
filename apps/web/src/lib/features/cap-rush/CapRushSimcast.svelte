@@ -23,6 +23,7 @@
     havocPeriodLabel,
     havocEventTextOf,
   } from '#lib/features/havoc/havoc-presentation.js';
+  import Alert from '#lib/components/ui/Alert.svelte';
 
   let { controller, art = null }: { controller: CapRushSeasonController; art?: CapRushArt | null } =
     $props();
@@ -219,7 +220,7 @@
     {/if}
   </div>
   {#if controller.error !== null}
-    <div role="alert" class="rounded-xl border border-negative p-4">
+    <Alert tone="danger">
       <p>{controller.error}</p>
       <button
         class="mt-2 min-h-11 underline"
@@ -228,7 +229,7 @@
           paused = false;
         }}>Retry playback</button
       >
-    </div>
+    </Alert>
   {/if}
   <div class="bc-panels">
     {#each sides as side (side.side)}

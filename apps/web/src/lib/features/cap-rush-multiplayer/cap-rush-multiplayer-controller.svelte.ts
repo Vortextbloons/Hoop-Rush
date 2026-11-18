@@ -23,6 +23,11 @@ import { getCapRushMultiplayerData } from './cap-rush-multiplayer-assets.js';
 import { commandErrorLabel, type CapRushBidAttempt } from './cap-rush-multiplayer-presentation.js';
 import { getCapRushMultiplayerTransport } from './cap-rush-multiplayer-transport.js';
 import { CapRushMultiplayerRunner } from './cap-rush-multiplayer-runner.js';
+import {
+  awardCapRushMultiplayerAchievement,
+  bindCapRushMultiplayerProfile,
+  capRushMultiplayerAchievementAwards,
+} from './cap-rush-multiplayer-achievements.js';
 import { visibilityTickScheduler } from '../multiplayer/visibility-tick-scheduler.js';
 
 const POLL_MS = 1_000;
@@ -66,6 +71,8 @@ export class CapRushMultiplayerController {
   private session: CapRushMultiplayerSession | null = null;
   private readonly runner = new CapRushMultiplayerRunner();
   private readonly verifier = new CapRushMultiplayerRunner();
+  private profileBinding: Promise<boolean> | null = null;
+  private readonly awardedAchievements = new Set<string>();
   private clockTimer: ReturnType<typeof setInterval> | null = null;
   private stopNetworkTick: (() => void) | null = null;
   private followUpTimer: ReturnType<typeof setTimeout> | null = null;
@@ -116,6 +123,7 @@ export class CapRushMultiplayerController {
       const transport = getCapRushMultiplayerTransport();
       const membership = await transport.resume(this.roomId);
       if (this.isDisposed()) return;
+      this.bindProfile(membership.participantId);
       const [data, initialSync] = await Promise.all([
         dataPromise,
         transport.sync(this.roomId, 2_147_483_647),
@@ -636,9 +644,40 @@ export class CapRushMultiplayerController {
     }
   }
 
+  private bindProfile(seat: CapRushMultiplayerSeatId): void {
+    if (this.profileBinding !== null) return;
+    this.awardedAchievements.clear();
+    const binding = bindCapRushMultiplayerProfile(this.roomId, seat)
+      .then(() => true)
+      .catch(() => {
+        if (this.profileBinding === binding) this.profileBinding = null;
+        return false;
+      });
+    this.profileBinding = binding;
+  }
+
+  /**
+   * Awards local achievements from accepted state at most once per candidate.
+   * Profile writes are deliberately silent: a failed save never interrupts play.
+   */
+  private awardAchievements(): void {
+    const view = this.view;
+    const binding = this.profileBinding;
+    if (view === null || binding === null || this.isDisposed()) return;
+    for (const award of capRushMultiplayerAchievementAwards(view.state, view.seat)) {
+      if (this.awardedAchievements.has(award.eventId)) continue;
+      this.awardedAchievements.add(award.eventId);
+      void binding.then((bound) => {
+        if (!bound || this.isDisposed()) return;
+        return awardCapRushMultiplayerAchievement(this.roomId, award).catch(() => {});
+      });
+    }
+  }
+
   private sync(): void {
     if (this.disposed) return;
     this.view = this.session?.view() ?? null;
+    this.awardAchievements();
     const phase = this.view?.state.phase ?? null;
     if (phase !== null) {
       if (phase === 'recruiting' && this.lastPhase === 'lobby') this.franchiseReveal = true;

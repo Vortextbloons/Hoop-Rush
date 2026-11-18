@@ -87,9 +87,7 @@ describe('evaluateSeriesAchievements', () => {
       seriesFacts(['p1', 'p2', 'p2', 'p2', 'p1', 'p1', 'p1']),
     );
     expect(ids(achievements)).toEqual(['cleveland-this-is-for-you']);
-    expect(achievements[0]?.evidence).toBe(
-      'recovered from a 1-3 deficit to win 4-3 in series series-1',
-    );
+    expect(achievements[0]?.evidence).toBe('Came back from 1–3 to win 4–3');
   });
 
   test('awards the reverse sweep and Cleveland together for a 0-3 comeback', () => {
@@ -246,7 +244,7 @@ describe('evaluateCapRushMultiplayerAchievements', () => {
     );
     expect(ids(achievements)).toEqual(['moneyball-champions']);
     expect(achievements[0]?.evidence).toBe(
-      'won the Cap Rush championship with $72,000,000 payroll against $95,000,000 ($23,000,000 less)',
+      'Won the Cap Rush championship with $72,000,000 payroll against $95,000,000 ($23,000,000 less)',
     );
 
     expect(

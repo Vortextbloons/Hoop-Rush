@@ -33,6 +33,7 @@ import {
   type StoredDraftDuelCommandRow,
 } from '../schemas/draft-duel-record.ts';
 import { DexieDraftDuelRepository } from './draft-duel.ts';
+import { DexieProfileRepository } from './profile.ts';
 import {
   resetIndexedDb,
   restoreIndexedDb,
@@ -100,14 +101,71 @@ function buildDraft(): DraftDuelDraft {
   });
 }
 
-function buildSeries(): DraftDuelSeriesSnapshot {
+function buildDraftWithLineups(p1Overall: number, p2Overall: number): DraftDuelDraft {
+  const draft = buildDraft();
+  let ordinal = 0;
+  const rounds = draft.rounds.map((round, roundIndex) => ({
+    ...round,
+    picks: (['p1', 'p2'] as const).map((participantId, index) => ({
+      pickOrdinal: ordinal++,
+      round: roundIndex + 1,
+      slot: (roundIndex * 2 + index) % 8,
+      participantId,
+      card: {
+        ...buildCard(roundIndex * 2 + index),
+        overall: participantId === 'p1' ? p1Overall : p2Overall,
+      },
+      slotIndex: roundIndex,
+    })),
+  }));
+  return draftDuelDraftSchema.parse({ ...draft, rounds, pickOrdinal: 10, status: 'complete' });
+}
+
+function resultDigest(gameNumber: number): string {
+  return gameNumber.toString(16).padStart(2, '0').repeat(32);
+}
+
+function buildOutcome(
+  gameNumber: number,
+  winner: 'p1' | 'p2',
+  margin: number,
+  seed: string,
+): DraftDuelGameOutput {
+  const output = buildGameOutput(gameNumber, seed);
+  const homeWins = winner === 'p1';
+  return draftDuelGameOutputSchema.parse({
+    ...output,
+    result: {
+      ...output.result,
+      home: {
+        ...output.result.home,
+        box: { ...output.result.home.box, points: 100 + (homeWins ? margin : 0) },
+      },
+      away: {
+        ...output.result.away,
+        box: { ...output.result.away.box, points: 100 + (homeWins ? 0 : margin) },
+      },
+      winner: homeWins ? 'home' : 'away',
+    },
+    resultDigest: resultDigest(gameNumber),
+  });
+}
+
+function buildSeries(winners: readonly ('p1' | 'p2')[] = []): DraftDuelSeriesSnapshot {
+  const p1Wins = winners.filter((winner) => winner === 'p1').length;
+  const p2Wins = winners.length - p1Wins;
   return {
     homeWinner: 'p1',
-    games: [],
-    p1Wins: 0,
-    p2Wins: 0,
+    games: winners.map((winner, index) => ({
+      gameNumber: index + 1,
+      homeParticipantId: 'p1',
+      awayParticipantId: 'p2',
+      winner,
+    })),
+    p1Wins,
+    p2Wins,
     currentGameNumber: null,
-    champion: null,
+    champion: p1Wins === 4 ? 'p1' : p2Wins === 4 ? 'p2' : null,
   };
 }
 
@@ -190,11 +248,12 @@ function buildCommand(ordinal: number, commandId = `cmd-${String(ordinal)}`): Dr
 function buildVerification(
   gameNumber: number,
   status: DraftDuelPartiallyVerified['status'],
+  localResultDigest = 'b'.repeat(64),
 ): DraftDuelPartiallyVerified {
   return draftDuelPartiallyVerifiedSchema.parse({
     gameNumber,
-    localResultDigest: 'b'.repeat(64),
-    peerResultDigest: status === 'pending' ? null : 'b'.repeat(64),
+    localResultDigest,
+    peerResultDigest: status === 'pending' ? null : localResultDigest,
     status,
   });
 }
@@ -317,6 +376,125 @@ describe('DexieDraftDuelRepository', () => {
     expect(await repo.loadCompleted(ROOM_ID)).toBeNull();
     expect(await repo.listHistory()).toEqual([]);
     expect(await repo.loadResults(ROOM_ID)).toEqual([]);
+    db.close();
+  });
+
+  it('awards verified series achievements without inventing rematch evidence', async () => {
+    const { db, repo } = createRepository('draft-duel-achievements');
+    const profiles = new DexieProfileRepository(db);
+    await profiles.initialize(crypto.randomUUID());
+    const bindingId = `draft-duel:${ROOM_ID}`;
+    await profiles.bind(bindingId);
+    const series = buildSeries(['p1', 'p1', 'p1', 'p1']);
+    await repo.saveActive(
+      buildActiveState({
+        phase: 'championship',
+        draft: buildDraftWithLineups(78, 84),
+        series,
+      }),
+    );
+    for (const game of series.games) {
+      await repo.saveResult(
+        buildOutcome(game.gameNumber, game.winner, 7, `dd-award-${String(game.gameNumber)}`),
+      );
+    }
+    await repo.saveVerification(
+      ROOM_ID,
+      series.games.map((game) =>
+        buildVerification(game.gameNumber, 'verified', resultDigest(game.gameNumber)),
+      ),
+    );
+    await repo.complete({
+      roomId: ROOM_ID,
+      champion: 'p1',
+      series,
+      mvp: null,
+      standouts: [],
+      games: series.games.length,
+    });
+    const unlocks = await profiles.listUnlocks(bindingId);
+    expect(unlocks).toContain('bring-out-the-brooms');
+    expect(unlocks).toContain('upset-of-the-year');
+    expect(unlocks).not.toContain('dame-time');
+    expect(unlocks).not.toContain('the-revenge-tour');
+    const reveal = (await profiles.listAchievementReveals(bindingId)).find(
+      (entry) => entry.id === 'bring-out-the-brooms',
+    );
+    expect(reveal?.evidence).not.toContain(ROOM_ID);
+    db.close();
+  });
+
+  it('requires a verified Game 7 result for Dame Time', async () => {
+    const { db, repo } = createRepository('draft-duel-dame-time');
+    const profiles = new DexieProfileRepository(db);
+    await profiles.initialize(crypto.randomUUID());
+    const bindingId = `draft-duel:${ROOM_ID}`;
+    await profiles.bind(bindingId);
+    const series = buildSeries(['p1', 'p2', 'p1', 'p2', 'p1', 'p2', 'p1']);
+    await repo.saveActive(buildActiveState({ phase: 'championship', series }));
+    for (const game of series.games) {
+      await repo.saveResult(
+        buildOutcome(
+          game.gameNumber,
+          game.winner,
+          game.gameNumber === 7 ? 1 : 7,
+          `dd-dame-${String(game.gameNumber)}`,
+        ),
+      );
+    }
+    await repo.saveVerification(
+      ROOM_ID,
+      series.games
+        .filter((game) => game.gameNumber !== 7)
+        .map((game) =>
+          buildVerification(game.gameNumber, 'verified', resultDigest(game.gameNumber)),
+        ),
+    );
+    await repo.complete({
+      roomId: ROOM_ID,
+      champion: 'p1',
+      series,
+      mvp: null,
+      standouts: [],
+      games: series.games.length,
+    });
+    expect(await profiles.listUnlocks(bindingId)).not.toContain('dame-time');
+    db.close();
+  });
+
+  it('awards Dame Time when the decisive Game 7 score is verified', async () => {
+    const { db, repo } = createRepository('draft-duel-dame-time-verified');
+    const profiles = new DexieProfileRepository(db);
+    await profiles.initialize(crypto.randomUUID());
+    const bindingId = `draft-duel:${ROOM_ID}`;
+    await profiles.bind(bindingId);
+    const series = buildSeries(['p1', 'p2', 'p1', 'p2', 'p1', 'p2', 'p1']);
+    await repo.saveActive(buildActiveState({ phase: 'championship', series }));
+    for (const game of series.games) {
+      await repo.saveResult(
+        buildOutcome(
+          game.gameNumber,
+          game.winner,
+          game.gameNumber === 7 ? 1 : 7,
+          `dd-dame-verified-${String(game.gameNumber)}`,
+        ),
+      );
+    }
+    await repo.saveVerification(
+      ROOM_ID,
+      series.games.map((game) =>
+        buildVerification(game.gameNumber, 'verified', resultDigest(game.gameNumber)),
+      ),
+    );
+    await repo.complete({
+      roomId: ROOM_ID,
+      champion: 'p1',
+      series,
+      mvp: null,
+      standouts: [],
+      games: series.games.length,
+    });
+    expect(await profiles.listUnlocks(bindingId)).toContain('dame-time');
     db.close();
   });
 

@@ -3,9 +3,11 @@ import {
   havocMultiplayerCommandSchema,
   havocMultiplayerVerificationReceiptSchema,
   type HavocMultiplayerCommand,
+  type HavocMultiplayerSeriesGame,
   type HavocMultiplayerVerificationReceipt,
   profileBindingSchema,
 } from '@hoop-rush/data-contracts';
+import { evaluateSeriesAchievements, type SeriesAchievementFacts } from '@hoop-rush/engine';
 import {
   havocMultiplayerCompletionRecapSchema,
   havocMultiplayerGameOutputSchema,
@@ -52,6 +54,38 @@ function commandRowMatches(
       payload: incoming.payload,
     },
   );
+}
+
+const SERIES_ACHIEVEMENT_LABEL = 'Havoc Multiplayer';
+
+function averageOriginalOverall(draft: StoredHavocMultiplayerActive['snapshot']['draft']): {
+  p1: number;
+  p2: number;
+} {
+  if (!draft || draft.status !== 'complete') {
+    return { p1: Number.NaN, p2: Number.NaN };
+  }
+  const totals = { p1: 0, p2: 0 };
+  const counts = { p1: 0, p2: 0 };
+  for (const pick of draft.picks) {
+    totals[pick.participantId] += pick.card.source.originalOverall;
+    counts[pick.participantId] += 1;
+  }
+  return {
+    p1: counts.p1 === 5 ? totals.p1 / 5 : Number.NaN,
+    p2: counts.p2 === 5 ? totals.p2 / 5 : Number.NaN,
+  };
+}
+
+// A room marks a game verified only after both participants confirm the same
+// result digest, so the stored score is trusted only when it matches that digest.
+function verifiedScores(
+  game: HavocMultiplayerSeriesGame,
+  row: StoredHavocMultiplayerResultRow | undefined,
+): { homeScore: number; awayScore: number } | null {
+  if (!row || game.status !== 'verified' || game.resultDigest === null) return null;
+  if (row.resultDigest !== game.resultDigest) return null;
+  return { homeScore: row.result.home.points, awayScore: row.result.away.points };
 }
 
 export class DexieHavocMultiplayerRepository {
@@ -239,22 +273,43 @@ export class DexieHavocMultiplayerRepository {
         const binding = await this.db.profileBindings.get(bindingId);
         const participant = binding ? profileBindingSchema.parse(binding).participantId : undefined;
         if (participant) {
+          const activeRow = await this.db.havocMultiplayerActive.get(validated.roomId);
+          const active = activeRow ? storedHavocMultiplayerActiveSchema.parse(activeRow) : null;
           const profileRepo = new DexieProfileRepository(this.db);
+          const achievementGames: SeriesAchievementFacts['games'][number][] = [];
           for (const game of validated.games) {
             if (game.winner === null) continue;
             const row = await this.db.havocMultiplayerResults.get([
               validated.roomId,
               game.gameNumber,
             ]);
-            const result = row ? storedHavocMultiplayerResultRowSchema.parse(row).result : null;
+            const parsedRow = row ? storedHavocMultiplayerResultRowSchema.parse(row) : undefined;
+            const result = parsedRow?.result ?? null;
             const side = game.homeParticipantId === participant ? 'home' : 'away';
             await profileRepo.recordGame(bindingId, String(game.gameNumber), {
               won: game.winner === participant,
               multiplayer: true,
               players: result?.[side].participants ?? [],
             });
+            const scores = verifiedScores(game, parsedRow);
+            achievementGames.push({
+              gameNumber: game.gameNumber,
+              winner: game.winner,
+              homeScore: scores?.homeScore ?? Number.NaN,
+              awayScore: scores?.awayScore ?? Number.NaN,
+            });
           }
           await profileRepo.recordMatch(bindingId, validated.champion === participant);
+          await profileRepo.awardAchievements(
+            bindingId,
+            'series',
+            evaluateSeriesAchievements({
+              seriesId: SERIES_ACHIEVEMENT_LABEL,
+              participantId: participant,
+              games: achievementGames,
+              averageOriginalOverall: averageOriginalOverall(active?.snapshot.draft ?? null),
+            }),
+          );
         }
         await this.db.havocMultiplayerCompleted.put(completed);
         await this.db.havocMultiplayerHistory.put(index);

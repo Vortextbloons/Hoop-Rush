@@ -14,6 +14,7 @@
   } from '@hoop-rush/engine';
   import PlayerFace from '#lib/components/PlayerFace.svelte';
   import TeamLogo from '#lib/components/TeamLogo.svelte';
+  import AchievementReveal from '#lib/features/profile/AchievementReveal.svelte';
   import type { CapRushArt } from '../cap-rush/cap-rush-art.js';
   import {
     apronPenaltyRows,
@@ -34,11 +35,13 @@
   let {
     state,
     localSeat,
+    bindingId,
     art = null,
     onreviewgame,
   }: {
     state: CapRushMultiplayerState;
     localSeat: CapRushMultiplayerSeatId;
+    bindingId: string;
     art?: CapRushArt | null;
     onreviewgame?: (gameId: string) => void;
   } = $props();
@@ -170,6 +173,8 @@
         />
       {/if}
     </section>
+
+    <AchievementReveal {bindingId} />
 
     <section class="team-comparison" aria-label="Team results">
       {#each seatViews as detail (detail.seat)}

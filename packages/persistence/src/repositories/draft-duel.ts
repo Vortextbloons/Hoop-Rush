@@ -5,6 +5,7 @@ import {
   type DraftDuelGameOutput,
   type DraftDuelPartiallyVerified,
 } from '@hoop-rush/data-contracts';
+import { evaluateSeriesAchievements, type SeriesAchievementFacts } from '@hoop-rush/engine';
 import {
   DRAFT_DUEL_SAVE_SCHEMA_VERSION,
   draftDuelCompletionRecapSchema,
@@ -31,6 +32,43 @@ import {
   putResultPreservingVerified,
   rowsWhereEquals,
 } from './support.ts';
+
+const SERIES_ACHIEVEMENT_LABEL = 'Draft Duel';
+
+function averageOriginalOverall(draft: StoredDraftDuelActive['draft']): { p1: number; p2: number } {
+  if (!draft || draft.status !== 'complete') {
+    return { p1: Number.NaN, p2: Number.NaN };
+  }
+  const totals = { p1: 0, p2: 0 };
+  const counts = { p1: 0, p2: 0 };
+  for (const round of draft.rounds) {
+    for (const pick of round.picks) {
+      totals[pick.participantId] += pick.card.overall;
+      counts[pick.participantId] += 1;
+    }
+  }
+  return {
+    p1: counts.p1 === 5 ? totals.p1 / 5 : Number.NaN,
+    p2: counts.p2 === 5 ? totals.p2 / 5 : Number.NaN,
+  };
+}
+
+function verifiedScores(
+  active: StoredDraftDuelActive,
+  gameNumber: number,
+  row: StoredDraftDuelResultRow | undefined,
+): { homeScore: number; awayScore: number } | null {
+  if (!row) return null;
+  const verification = active.verification.find(
+    (entry) => entry.gameNumber === gameNumber && entry.status === 'verified',
+  );
+  if (!verification || verification.localResultDigest !== row.output.resultDigest) return null;
+  return {
+    homeScore: row.output.result.home.box.points,
+    awayScore: row.output.result.away.box.points,
+  };
+}
+
 export class DexieDraftDuelRepository {
   private readonly db: HoopRushDatabase;
   constructor(db: HoopRushDatabase) {
@@ -178,22 +216,42 @@ export class DexieDraftDuelRepository {
         this.db.archivedProfiles,
       ],
       async () => {
-        const active = await this.db.draftDuelActive.get(validated.roomId);
+        const activeRow = await this.db.draftDuelActive.get(validated.roomId);
+        const active = activeRow ? storedDraftDuelActiveSchema.parse(activeRow) : null;
         const bindingId = `draft-duel:${validated.roomId}`;
         if (active && (await this.db.profileBindings.get(bindingId))) {
-          const participant = storedDraftDuelActiveSchema.parse(active).localParticipantId;
+          const participant = active.localParticipantId;
           const profileRepo = new DexieProfileRepository(this.db);
+          const achievementGames: SeriesAchievementFacts['games'][number][] = [];
           for (const game of validated.series.games) {
             const row = await this.db.draftDuelResults.get([validated.roomId, game.gameNumber]);
-            const output = row ? storedDraftDuelResultRowSchema.parse(row).output : null;
+            const parsedRow = row ? storedDraftDuelResultRowSchema.parse(row) : undefined;
+            const output = parsedRow?.output ?? null;
             const side = game.homeParticipantId === participant ? 'home' : 'away';
             await profileRepo.recordGame(bindingId, String(game.gameNumber), {
               won: game.winner === participant,
               multiplayer: true,
               players: output?.result[side].players ?? [],
             });
+            const scores = verifiedScores(active, game.gameNumber, parsedRow);
+            achievementGames.push({
+              gameNumber: game.gameNumber,
+              winner: game.winner,
+              homeScore: scores?.homeScore ?? Number.NaN,
+              awayScore: scores?.awayScore ?? Number.NaN,
+            });
           }
           await profileRepo.recordMatch(bindingId, validated.champion === participant);
+          await profileRepo.awardAchievements(
+            bindingId,
+            'series',
+            evaluateSeriesAchievements({
+              seriesId: SERIES_ACHIEVEMENT_LABEL,
+              participantId: participant,
+              games: achievementGames,
+              averageOriginalOverall: averageOriginalOverall(active.draft),
+            }),
+          );
         }
         await this.db.draftDuelCompleted.put(completed);
         await this.db.draftDuelHistory.put(index);

@@ -41,6 +41,7 @@
     type DraftReplay,
     type FixedFiveAssets,
   } from '#lib/features/fixed-five/fixed-five-room-state.js';
+  import Alert from '#lib/components/ui/Alert.svelte';
   let {
     mode,
     selfId,
@@ -722,12 +723,7 @@
       </div>
     {/if}
     {#if error}
-      <p
-        class="mt-2 rounded-lg border border-destructive/40 bg-destructive/10 p-2 text-xs"
-        role="alert"
-      >
-        {error}
-      </p>
+      <Alert class="mt-2" tone="danger">{error}</Alert>
     {/if}
   </div>
   {#if mode !== 'sandbox-shared-82' && rollView}

@@ -2,6 +2,7 @@
   import type { CapRushDraftController } from './cap-rush-draft-state.svelte.js';
   import { ArrowRight, Dices, Trophy } from '@lucide/svelte';
   import PageShell from '#lib/components/ui/PageShell.svelte';
+  import Alert from '#lib/components/ui/Alert.svelte';
 
   let { controller }: { controller: CapRushDraftController } = $props();
 
@@ -68,10 +69,7 @@
   </div>
 
   {#if controller.error !== null}
-    <div
-      role="alert"
-      class="mt-5 rounded-xl border border-negative/40 bg-negative/10 p-4 text-sm text-negative"
-    >
+    <Alert class="mt-5" tone="danger">
       {controller.error}
       {#if controller.error !== null}
         <button
@@ -81,7 +79,7 @@
           onclick={() => void controller.discard()}>Discard draft and start fresh</button
         >
       {/if}
-    </div>
+    </Alert>
   {/if}
 </PageShell>
 

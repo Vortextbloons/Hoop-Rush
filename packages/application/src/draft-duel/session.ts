@@ -119,6 +119,7 @@ export interface DraftDuelSessionDeps {
   friendlyError: (error: unknown) => string;
   loadMembership: (roomId: string) => DraftDuelRoomMembership | null;
   saveMembership: (membership: DraftDuelRoomMembership) => void;
+  rememberRematch?: (previousRoomId: string, membership: DraftDuelRoomMembership) => Promise<void>;
   scheduleTick?: TickScheduler;
 }
 

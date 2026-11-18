@@ -2,7 +2,7 @@ import type { AchievementId, LegacyAchievementId } from '@hoop-rush/data-contrac
 import type { Trophy } from '@lucide/svelte';
 import { randomUUID } from '#lib/ids.js';
 import { getPersistence } from '#lib/persistence.js';
-import { achievementCatalog } from './achievement-catalog.js';
+import { achievementCatalog, type AchievementRarity } from './achievement-catalog.js';
 
 const legacyAchievements: Record<
   LegacyAchievementId,
@@ -42,7 +42,13 @@ const legacyAchievements: Record<
 
 export const achievements: Record<
   AchievementId,
-  { name: string; description: string; icon?: typeof Trophy; reward?: string }
+  {
+    name: string;
+    description: string;
+    icon?: typeof Trophy;
+    rarity?: AchievementRarity;
+    reward?: string;
+  }
 > = {
   ...legacyAchievements,
   ...achievementCatalog,

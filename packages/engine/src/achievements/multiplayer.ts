@@ -160,7 +160,7 @@ export function evaluateSeriesAchievements(
   if (afterFour.participantWins === 1 && afterFour.opponentWins === 3) {
     achievements.push({
       id: 'cleveland-this-is-for-you',
-      evidence: `recovered from a 1-3 deficit to win 4-3 in series ${facts.seriesId}`,
+      evidence: 'Came back from 1–3 to win 4–3',
     });
   }
   if (
@@ -170,13 +170,13 @@ export function evaluateSeriesAchievements(
   ) {
     achievements.push({
       id: 'the-reverse-sweep',
-      evidence: `recovered from a 0-3 deficit to win 4-3 in series ${facts.seriesId}`,
+      evidence: 'Won four straight after falling behind 0–3',
     });
   }
   if (series.opponentWins === 0) {
     achievements.push({
       id: 'bring-out-the-brooms',
-      evidence: `won the series 4-0 in ${facts.seriesId}`,
+      evidence: 'Swept the series 4–0',
     });
   }
 
@@ -195,7 +195,7 @@ export function evaluateSeriesAchievements(
     achievements.push({
       id: 'dame-time',
       evidence:
-        `won decisive Game 7 by one point ` +
+        `Won Game 7 by one point ` +
         `(${String(finalGame.homeScore)}-${String(finalGame.awayScore)})`,
     });
   }
@@ -210,7 +210,7 @@ export function evaluateSeriesAchievements(
     achievements.push({
       id: 'upset-of-the-year',
       evidence:
-        `won with a ${String(participantOverall)} average original OVR lineup ` +
+        `Won with a ${String(participantOverall)} average original OVR lineup ` +
         `against ${String(opponentOverall)}`,
     });
   }
@@ -229,7 +229,7 @@ export function evaluateSeriesAchievements(
   ) {
     achievements.push({
       id: 'the-revenge-tour',
-      evidence: `beat ${opponentPlayerId} in an accepted rematch (${rematch.previousSeriesId})`,
+      evidence: 'Won the rematch after dropping the first series',
     });
   }
 
@@ -243,7 +243,7 @@ export function evaluateSharedSeasonAchievements(
   return [
     {
       id: 'the-splash-brothers',
-      evidence: 'completed an 82-0 shared season with another player',
+      evidence: 'Went 82–0 in a shared season',
     },
   ];
 }
@@ -267,7 +267,7 @@ export function evaluateCapRushMultiplayerAchievements(
     achievements.push({
       id: 'moneyball-champions',
       evidence:
-        `won the Cap Rush championship with ${formatDollars(participantPayroll)} payroll ` +
+        `Won the Cap Rush championship with ${formatDollars(participantPayroll)} payroll ` +
         `against ${formatDollars(rivalPayroll)} (${formatDollars(savings)} less)`,
     });
   }
@@ -282,9 +282,7 @@ export function evaluateCapRushMultiplayerAchievements(
   ) {
     achievements.push({
       id: 'season-sweep',
-      evidence:
-        `beat the human rival in both regular-season matchups ` +
-        `(${[...headToHeadIds].sort().join(', ')})`,
+      evidence: 'Won both regular-season matchups against your rival',
     });
   }
 
@@ -298,9 +296,7 @@ export function evaluateCapRushMultiplayerAchievements(
   ) {
     achievements.push({
       id: 'the-finals-rematch',
-      evidence:
-        `defeated the human rival in the Cap Rush Finals ` +
-        `(${finals.participantTeamId} over ${finals.rivalTeamId})`,
+      evidence: 'Beat your rival in the Cap Rush Finals',
     });
   }
 

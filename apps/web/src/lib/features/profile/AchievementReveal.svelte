@@ -1,10 +1,21 @@
 <script lang="ts">
-  import type { AchievementId } from '@hoop-rush/data-contracts';
+  import { collectionAchievementIdSchema, type AchievementId } from '@hoop-rush/data-contracts';
   import { Trophy } from '@lucide/svelte';
   import { liveQuery } from 'dexie';
   import { achievements, profileRepository } from './profile.js';
   let { bindingId, centered = false }: { bindingId: string; centered?: boolean } = $props();
   let unlocked = $state<{ id: AchievementId; evidence?: string }[]>([]);
+  const collectionIds = new Set<AchievementId>(collectionAchievementIdSchema.options);
+  const orderedUnlocks = $derived(
+    unlocked.toSorted((left, right) => priority(right.id) - priority(left.id)),
+  );
+
+  function priority(id: AchievementId): number {
+    if (achievements[id].rarity) return 3;
+    if (id === 'the-reverse-sweep') return 2;
+    return Number(collectionIds.has(id));
+  }
+
   $effect(() => {
     const subscription = liveQuery(() =>
       profileRepository().listAchievementReveals(bindingId),
@@ -17,27 +28,39 @@
   });
 </script>
 
+{#snippet badge(id: AchievementId, evidence: string | undefined)}
+  {@const achievement = achievements[id]}
+  {@const Icon = achievement.icon ?? Trophy}
+  <li
+    class="reveal flex max-w-full items-center gap-2 rounded-lg border border-border bg-card px-3 py-2"
+  >
+    <Icon class="size-4 shrink-0 text-primary" aria-hidden="true" />
+    <div class="text-left text-sm">
+      <span class="font-semibold">{achievement.name}</span>
+      <span class="block text-xs text-muted-foreground">{evidence ?? achievement.description}</span>
+    </div>
+  </li>
+{/snippet}
+
 <div role="status" aria-label="Achievements unlocked">
-  {#if unlocked.length}
+  {#if orderedUnlocks.length}
     <ul class="mt-3 flex flex-wrap gap-2" class:justify-center={centered}>
-      {#each unlocked as { id, evidence } (id)}
-        {@const achievement = achievements[id]}
-        {@const Icon = achievement.icon ?? Trophy}
-        <li
-          class="reveal flex max-w-full items-center gap-2 rounded-lg border border-border bg-card px-3 py-2"
-        >
-          <Icon class="size-4 shrink-0 text-primary" aria-hidden="true" />
-          <div class="text-left text-sm">
-            <span class="font-semibold">{achievement.name}</span>
-            <span class="block text-xs text-muted-foreground"
-              >{evidence ?? achievement.description}</span
-            >
-          </div>
-        </li>
+      {#each orderedUnlocks.slice(0, 2) as { id, evidence } (id)}
+        {@render badge(id, evidence)}
       {/each}
     </ul>
   {/if}
 </div>
+{#if orderedUnlocks.length > 2}
+  <details class="mt-2 text-xs text-muted-foreground">
+    <summary class="cursor-pointer">+{orderedUnlocks.length - 2} more badges</summary>
+    <ul class="mt-2 flex flex-wrap gap-2" class:justify-center={centered}>
+      {#each orderedUnlocks.slice(2) as { id, evidence } (id)}
+        {@render badge(id, evidence)}
+      {/each}
+    </ul>
+  </details>
+{/if}
 
 <style>
   @media (prefers-reduced-motion: no-preference) {

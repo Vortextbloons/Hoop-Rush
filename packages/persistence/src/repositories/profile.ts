@@ -167,6 +167,35 @@ export class DexieProfileRepository {
     return this.recordOnce(bindingId, gameId, (profile) => applyProfileGame(profile, facts));
   }
 
+  async rememberRematchAfterLoss(
+    priorBindingId: string,
+    bindingId: string,
+    priorRoomId: string,
+    participantId: 'p1' | 'p2',
+  ): Promise<void> {
+    await this.db.transaction('rw', this.db.profileBindings, async () => {
+      const prior = await this.db.profileBindings.get(priorBindingId);
+      if (!prior) return;
+      const { profileId } = profileBindingSchema.parse(prior);
+      const existing = await this.db.profileBindings.get(bindingId);
+      if (existing && profileBindingSchema.parse(existing).profileId !== profileId) return;
+      await this.db.profileBindings.put(
+        profileBindingSchema.parse({
+          saveSchemaVersion: PROFILE_SAVE_SCHEMA_VERSION,
+          id: bindingId,
+          profileId,
+          participantId,
+          rematchAfterLoss: priorRoomId,
+        }),
+      );
+    });
+  }
+
+  async rematchAfterLoss(bindingId: string): Promise<string | undefined> {
+    const row = await this.db.profileBindings.get(bindingId);
+    return row ? profileBindingSchema.parse(row).rematchAfterLoss : undefined;
+  }
+
   async recordMatch(bindingId: string, won: boolean) {
     return this.recordOnce(bindingId, 'match', (profile) => {
       const multiplayerStreak = won ? profile.multiplayerStreak + 1 : 0;

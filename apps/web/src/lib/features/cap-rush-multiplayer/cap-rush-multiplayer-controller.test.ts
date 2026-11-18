@@ -2,6 +2,7 @@ import { afterEach, expect, test, vi } from 'bun:test';
 import type { CapRushMultiplayerSessionView } from '@hoop-rush/application/cap-rush-multiplayer';
 import { idSchema, type CapRushMultiplayerRoomMembership } from '@hoop-rush/data-contracts';
 import * as assets from './cap-rush-multiplayer-assets';
+import * as achievements from './cap-rush-multiplayer-achievements';
 import * as transports from './cap-rush-multiplayer-transport';
 import { CapRushMultiplayerController } from './cap-rush-multiplayer-controller.svelte';
 
@@ -108,6 +109,105 @@ test('overlaps asset loading with presence resume and stops before syncing when 
   await loading;
   expect(transport.sync).not.toHaveBeenCalled();
   expect(controller.view).toBeNull();
+});
+
+test('binds the resumed membership seat through the room profile once', async () => {
+  const bind = vi.spyOn(achievements, 'bindCapRushMultiplayerProfile').mockResolvedValue(undefined);
+  vi.spyOn(assets, 'getCapRushMultiplayerData').mockResolvedValue(
+    {} as assets.CapRushMultiplayerData,
+  );
+  const membership: CapRushMultiplayerRoomMembership = {
+    roomId: idSchema.parse('room-a'),
+    participantId: 'p2',
+    code: '1234',
+  };
+  const initialSync = {
+    snapshot: {
+      roomId: membership.roomId,
+      revision: 0,
+      commandCount: 0,
+      members: [],
+      state: null,
+      rootSeed: null,
+      code: '1234',
+      codeActive: true,
+      settings: { variant: 'clash' },
+      deadline: null,
+      resultDigest: null,
+      confirmedDigest: null,
+      successorRoomId: null,
+      expiresAt: null,
+      createdAt: null,
+    },
+    commands: [],
+    commandCount: 0,
+  };
+  const transport = {
+    resume: vi.fn(() => Promise.resolve(membership)),
+    sync: vi.fn(() => Promise.resolve(initialSync)),
+    subscribe: vi.fn(() => () => {}),
+  };
+  vi.spyOn(transports, 'getCapRushMultiplayerTransport').mockReturnValue(
+    transport as unknown as transports.CapRushMultiplayerSupabaseTransport,
+  );
+  const controller = new CapRushMultiplayerController('room-a');
+
+  await controller.load();
+
+  expect(bind).toHaveBeenCalledTimes(1);
+  expect(bind).toHaveBeenCalledWith('room-a', 'p2');
+  controller.dispose();
+});
+
+test('awards a newly accepted season sweep once across room syncs', async () => {
+  const award = vi
+    .spyOn(achievements, 'awardCapRushMultiplayerAchievement')
+    .mockResolvedValue(undefined);
+  const controller = new CapRushMultiplayerController('room-a');
+  const view = sessionView(null);
+  Object.assign(view.state, {
+    phase: 'season',
+    postseason: null,
+    locked: {
+      seats: {
+        p1: { franchise: { franchiseId: 'franchise-p1' }, payrollDollars: 80_000_000 },
+        p2: { franchise: { franchiseId: 'franchise-p2' }, payrollDollars: 80_000_000 },
+      },
+    },
+    season: {
+      games: [
+        {
+          gameId: 'crl-5-franchise-p1-franchise-p2',
+          slot: 5,
+          homeTeamId: 'franchise-p1',
+          awayTeamId: 'franchise-p2',
+          winnerTeamId: 'franchise-p1',
+        },
+        {
+          gameId: 'crl-61-franchise-p2-franchise-p1',
+          slot: 61,
+          homeTeamId: 'franchise-p2',
+          awayTeamId: 'franchise-p1',
+          winnerTeamId: 'franchise-p1',
+        },
+      ],
+    },
+  });
+  Object.assign(controller, {
+    view,
+    session: { view: () => view, dispose: vi.fn() },
+    profileBinding: Promise.resolve(true),
+  });
+
+  (controller as unknown as { sync(): void }).sync();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(award).toHaveBeenCalledTimes(1);
+
+  (controller as unknown as { sync(): void }).sync();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(award).toHaveBeenCalledTimes(1);
+  expect(award.mock.calls[0]?.[1].eventId).toBe('cap-rush:season-sweep');
+  controller.dispose();
 });
 
 test('automatically chooses bulk simulation for the season', async () => {

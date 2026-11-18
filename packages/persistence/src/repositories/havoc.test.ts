@@ -62,6 +62,7 @@ import {
   type HavocCommandOutcome,
   type HavocLoadFailureCode,
 } from './havoc.ts';
+import { DexieProfileRepository } from './profile.ts';
 import {
   HAVOC_ACTIVE_RECORD_ID,
   storedHavocHistoryRowSchema,
@@ -1014,6 +1015,35 @@ describe('DexieHavocRepository', () => {
     expect(completedAfterRestart?.state).toEqual(final);
     expect(await repo.listHistory()).toHaveLength(1);
     db.close();
+  });
+
+  it('awards a perfect Havoc season before starting the Normal comparison', async () => {
+    const { db, repo } = createRepository('havoc-perfect-achievement');
+    try {
+      const profiles = new DexieProfileRepository(db);
+      await profiles.initialize(crypto.randomUUID());
+      await profiles.bind(`havoc:${RUN_ID}`);
+      const { locked } = await applyDraftChain(repo, true);
+      const late = lateSeasonState(locked);
+      const undefeated = havocRunStateSchema.parse({
+        ...late,
+        havocAggregate: { ...late.havocAggregate, wins: 81, losses: 0 },
+      });
+      await repo.applyOutcome(
+        prepareCommandCommit({
+          outcome: acceptedOutcome(undefeated, locked.revision, 'cmd-batch-81'),
+        }),
+      );
+      expect(await profiles.listUnlocks(`havoc:${RUN_ID}`)).not.toContain('the-monstars');
+      const lastGame = buildGame(undefeated, HAVOC_GAME_COUNT, 'havoc', 'cmd-game-82');
+      await applyGameBundle(repo, undefeated, lastGame);
+      expect(await profiles.listAchievementReveals(`havoc:${RUN_ID}`)).toContainEqual({
+        id: 'the-monstars',
+        evidence: 'Finished the Havoc season 82-0',
+      });
+    } finally {
+      db.close();
+    }
   });
 
   it('resumes a partial normal comparison against the completed run id', async () => {

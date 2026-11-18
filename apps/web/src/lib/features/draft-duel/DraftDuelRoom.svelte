@@ -39,6 +39,7 @@
   import { loadLobbyId } from '#lib/features/multiplayer/multiplayer-lobby.js';
   import { LobbyAutoStart } from '#lib/features/multiplayer/lobby-auto-start.js';
   import { SLOT_LABELS } from '#lib/player-positions.js';
+  import Alert from '#lib/components/ui/Alert.svelte';
 
   let { roomId }: { roomId: string } = $props();
   const controller = new DraftDuelController();
@@ -270,7 +271,7 @@
   {:else if !controller.snapshot}
     <div class="room-empty">
       <h1>Couldn’t open this room</h1>
-      <p role="alert">{controller.error}</p>
+      <Alert tone="danger">{controller.error}</Alert>
 
       <Button tone="secondary" onclick={() => void controller.retryAttach()}>Try again</Button>
       <ActionLink href={resolve('draft-duel/')}>
@@ -308,9 +309,7 @@
       </p>
     {/if}
     {#if controller.integrityFailed}
-      <p class="room-alert" role="alert">
-        The two simulations disagreed. This room can no longer advance.
-      </p>
+      <Alert tone="danger">The two simulations disagreed. This room can no longer advance.</Alert>
     {/if}
 
     {#if controller.phase === 'lobby'}
@@ -621,7 +620,7 @@
           Both players simulate the game locally. The tape starts as soon as your simulation lands.
         </p>
         {#if controller.error}
-          <p class="panel-hint" role="alert">{controller.error}</p>
+          <Alert tone="danger">{controller.error}</Alert>
           <div class="panel-actions">
             <Button tone="secondary" onclick={() => void controller.refresh()}>
               Retry simulation

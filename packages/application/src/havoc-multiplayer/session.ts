@@ -155,6 +155,10 @@ export interface HavocMultiplayerSessionDeps {
   friendlyError: (error: unknown) => string;
   loadMembership: (roomId: string) => HavocMultiplayerRoomMembership | null;
   saveMembership: (membership: HavocMultiplayerRoomMembership) => void;
+  rememberRematch?: (
+    previousRoomId: string,
+    membership: HavocMultiplayerRoomMembership,
+  ) => Promise<void>;
   scheduleTick?: TickScheduler;
 }
 

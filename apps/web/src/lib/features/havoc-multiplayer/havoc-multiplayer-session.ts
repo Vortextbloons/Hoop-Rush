@@ -18,11 +18,14 @@ import {
   selectedProfile,
   withRepositoryHooks,
 } from '#lib/features/profile/profile.js';
+import { rematchAchievementHooks } from '#lib/features/profile/rematch-achievement.js';
 
 function profileAwareHavocMultiplayerRepository(
   repository: HavocMultiplayerSessionDeps['repository'],
+  rematch: Partial<HavocMultiplayerSessionDeps['repository']>,
 ): HavocMultiplayerSessionDeps['repository'] {
   return withRepositoryHooks(repository, {
+    ...rematch,
     saveActive: async (state) => {
       const membership = loadHavocMultiplayerMembership(state.roomId);
       if (membership) {
@@ -41,9 +44,22 @@ export function createHavocMultiplayerSession(
   overrides: Partial<HavocMultiplayerSessionDeps> = {},
 ): HavocMultiplayerSession {
   const baseRepository = overrides.repository ?? getPersistence().havocMultiplayerRepository;
+  const loadMembership = overrides.loadMembership ?? loadHavocMultiplayerMembership;
+  const rematch =
+    overrides.repository || overrides.transport
+      ? undefined
+      : rematchAchievementHooks({
+          mode: 'havoc',
+          bindingPrefix: 'havoc-multiplayer',
+          loadMembership,
+          loadCompleted: (id) => baseRepository.loadCompleted(id),
+          complete: (recap) => baseRepository.complete(recap),
+        });
   const repository = overrides.repository
     ? baseRepository
-    : profileAwareHavocMultiplayerRepository(baseRepository);
+    : profileAwareHavocMultiplayerRepository(baseRepository, {
+        ...(rematch && { complete: rematch.complete, loadCompleted: rematch.loadCompleted }),
+      });
   return new HavocMultiplayerSession({
     transport: overrides.transport ?? getHavocMultiplayerTransport(),
     repository,
@@ -53,7 +69,8 @@ export function createHavocMultiplayerSession(
     now: overrides.now ?? (() => Date.now()),
     newCommandId: overrides.newCommandId ?? (() => newRequestId()),
     friendlyError: overrides.friendlyError ?? friendlyHavocMultiplayerError,
-    loadMembership: overrides.loadMembership ?? loadHavocMultiplayerMembership,
+    loadMembership,
+    rememberRematch: overrides.rememberRematch ?? rematch?.rememberRematch,
     saveMembership: overrides.saveMembership ?? saveHavocMultiplayerMembership,
   });
 }

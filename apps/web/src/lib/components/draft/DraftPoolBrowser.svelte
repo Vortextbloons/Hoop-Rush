@@ -25,6 +25,7 @@
   import { SLOT_INDEXES, SLOT_LABELS, canFillSlot, planPlayerMove } from '#lib/draft-slots.js';
   import { formatPositions } from '#lib/player-positions.js';
   import PlayerFace from '#lib/components/PlayerFace.svelte';
+  import Alert from '#lib/components/ui/Alert.svelte';
   type IndexRow = PlayersIndexEntry;
   const PAGE_SIZE = DRAFT_POOL_PAGE_SIZE;
   const SEARCH_DEBOUNCE_MS = 80;
@@ -216,13 +217,7 @@
     </div>
   {/if}
   {#if error}
-    <p
-      class="border-b border-border/60 p-4 text-sm text-destructive"
-      role="alert"
-      aria-live="assertive"
-    >
-      {error}
-    </p>
+    <Alert tone="danger">{error}</Alert>
   {/if}
   {#if filteredRows.length === 0}
     <p class="p-6 text-center font-mono text-xs text-muted-foreground">{emptyMessage}</p>

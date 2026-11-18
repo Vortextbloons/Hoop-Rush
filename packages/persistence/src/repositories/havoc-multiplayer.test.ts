@@ -36,6 +36,7 @@ import {
   type StoredHavocMultiplayerCommandRow,
 } from '../schemas/havoc-multiplayer-record.ts';
 import { DexieHavocMultiplayerRepository } from './havoc-multiplayer.ts';
+import { DexieProfileRepository } from './profile.ts';
 import {
   resetIndexedDb,
   restoreIndexedDb,
@@ -150,14 +151,70 @@ function buildSeries(): HavocMultiplayerSeriesSnapshot {
   });
 }
 
-function buildRecap(roomId = ROOM_ID): HavocMultiplayerCompletionRecap {
-  const series = buildSeries();
+function buildRecap(roomId = ROOM_ID, series = buildSeries()): HavocMultiplayerCompletionRecap {
   return havocMultiplayerCompletionRecapSchema.parse({
     roomId,
     champion: 'p1',
     series,
     mvp: { participantId: 'p1', slot: 'PG', index: 12 },
     games: series.games,
+  });
+}
+
+function resultDigest(gameNumber: number): string {
+  return gameNumber.toString(16).padStart(2, '0').repeat(16);
+}
+
+function buildOutcome(
+  roomId: string,
+  gameNumber: number,
+  homeParticipantId: 'p1' | 'p2',
+  winner: 'p1' | 'p2',
+  margin: number,
+): HavocMultiplayerGameOutput {
+  const output = buildGameOutput(roomId, gameNumber);
+  const homeWins = winner === homeParticipantId;
+  const digest = resultDigest(gameNumber);
+  return havocMultiplayerGameOutputSchema.parse({
+    ...output,
+    winner,
+    result: {
+      ...output.result,
+      home: {
+        ...output.result.home,
+        points: 100 + (homeWins ? margin : 0),
+      },
+      away: {
+        ...output.result.away,
+        points: 100 + (homeWins ? 0 : margin),
+      },
+      winner: homeWins ? 'home' : 'away',
+    },
+    resultDigest: digest,
+  });
+}
+
+function buildVerifiedSeries(winners: readonly ('p1' | 'p2')[]): HavocMultiplayerSeriesSnapshot {
+  const games = winners.map((winner, index) => {
+    const gameNumber = index + 1;
+    const homeParticipantId = [1, 2, 5, 7].includes(gameNumber) ? 'p1' : 'p2';
+    return {
+      gameNumber,
+      homeParticipantId,
+      awayParticipantId: homeParticipantId === 'p1' ? 'p2' : 'p1',
+      status: 'verified' as const,
+      winner,
+      inputDigest: resultDigest(gameNumber),
+      resultDigest: resultDigest(gameNumber),
+      tapeDigest: resultDigest(gameNumber),
+    };
+  });
+  const p1Wins = winners.filter((winner) => winner === 'p1').length;
+  const p2Wins = winners.length - p1Wins;
+  return havocMultiplayerSeriesSnapshotSchema.parse({
+    wins: { p1: p1Wins, p2: p2Wins },
+    games,
+    champion: p1Wins === 4 ? 'p1' : p2Wins === 4 ? 'p2' : null,
   });
 }
 
@@ -293,6 +350,66 @@ describe('DexieHavocMultiplayerRepository', () => {
     expect(await repo.loadCompleted(ROOM_ID)).toBeNull();
     expect(await repo.listHistory()).toEqual([]);
     expect(await repo.loadResults(ROOM_ID)).toEqual([]);
+    db.close();
+  });
+
+  it('awards verified series achievements without inventing rematch evidence', async () => {
+    const { db, repo } = createRepository('havoc-multiplayer-achievements');
+    const profiles = new DexieProfileRepository(db);
+    await profiles.initialize(crypto.randomUUID());
+    const bindingId = `havoc-multiplayer:${ROOM_ID}`;
+    await profiles.bind(bindingId, 'p1');
+    const winners = ['p1', 'p1', 'p1', 'p1'] as const;
+    const series = buildVerifiedSeries(winners);
+    await repo.saveActive(
+      buildActiveState(ROOM_ID, {
+        snapshot: { ...buildSnapshot(ROOM_ID), phase: 'championship', series },
+      }),
+    );
+    for (const [index, game] of series.games.entries()) {
+      await repo.saveResult(
+        buildOutcome(ROOM_ID, game.gameNumber, game.homeParticipantId, winners[index] ?? 'p1', 7),
+      );
+    }
+    await repo.complete(buildRecap(ROOM_ID, series));
+    const unlocks = await profiles.listUnlocks(bindingId);
+    expect(unlocks).toContain('bring-out-the-brooms');
+    expect(unlocks).not.toContain('upset-of-the-year');
+    expect(unlocks).not.toContain('dame-time');
+    expect(unlocks).not.toContain('the-revenge-tour');
+    const reveal = (await profiles.listAchievementReveals(bindingId)).find(
+      (entry) => entry.id === 'bring-out-the-brooms',
+    );
+    expect(reveal?.evidence).not.toContain(ROOM_ID);
+    db.close();
+  });
+
+  it('awards Dame Time when the verified Game 7 score is one point apart', async () => {
+    const { db, repo } = createRepository('havoc-multiplayer-dame-time');
+    const profiles = new DexieProfileRepository(db);
+    await profiles.initialize(crypto.randomUUID());
+    const bindingId = `havoc-multiplayer:${ROOM_ID}`;
+    await profiles.bind(bindingId, 'p1');
+    const winners = ['p1', 'p2', 'p1', 'p2', 'p1', 'p2', 'p1'] as const;
+    const series = buildVerifiedSeries(winners);
+    await repo.saveActive(
+      buildActiveState(ROOM_ID, {
+        snapshot: { ...buildSnapshot(ROOM_ID), phase: 'championship', series },
+      }),
+    );
+    for (const [index, game] of series.games.entries()) {
+      await repo.saveResult(
+        buildOutcome(
+          ROOM_ID,
+          game.gameNumber,
+          game.homeParticipantId,
+          winners[index] ?? 'p1',
+          index === 6 ? 1 : 7,
+        ),
+      );
+    }
+    await repo.complete(buildRecap(ROOM_ID, series));
+    expect(await profiles.listUnlocks(bindingId)).toContain('dame-time');
     db.close();
   });
 

@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { FixedFiveRoomMode, FixedFiveWorkerResultEntry } from '@hoop-rush/data-contracts';
   import { arenaGameResult, arenaLeaderChange, arenaStreak } from '#lib/arena-sound.js';
+  import Alert from '#lib/components/ui/Alert.svelte';
   let {
     mode,
     progress = null,
@@ -365,7 +366,7 @@
         }`}
       >
         {#if h2hError}
-          <p class="text-sm text-destructive" role="alert">{h2hError}</p>
+          <Alert tone="danger">{h2hError}</Alert>
         {:else}
           <p class="text-sm text-muted-foreground" role="status">
             Preparing head-to-head game {h2hSimulatingGame}…
