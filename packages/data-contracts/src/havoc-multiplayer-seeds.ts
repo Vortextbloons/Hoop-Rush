@@ -57,10 +57,6 @@ function assertGameNumber(gameNumber: number): void {
   }
 }
 
-export function havocMultiplayerFirstPickerSeed(rootSeed: Seed): Seed {
-  return havocMultiplayerSeed(rootSeed, 'draft', 'first-picker');
-}
-
 export type HavocMultiplayerOfferStream =
   'players' | 'version' | 'tier' | 'mutations' | 'physical' | 'nickname' | 'specialist' | 'window';
 
@@ -101,10 +97,6 @@ export function havocMultiplayerTimeoutSeed(
   assertTurnOrdinal(turnOrdinal);
   assertOfferRevision(offerRevision);
   return havocMultiplayerSeed(rootSeed, 'draft', 'timeout', turnOrdinal, offerRevision);
-}
-
-export function havocMultiplayerHomeCourtSeed(rootSeed: Seed): Seed {
-  return havocMultiplayerSeed(rootSeed, 'series', 'home-court');
 }
 
 export function havocMultiplayerGameSeed(rootSeed: Seed, gameNumber: number): Seed {

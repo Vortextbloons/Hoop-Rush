@@ -1,16 +1,11 @@
 import type {
-  CapRushAbandonCommand,
   CapRushCommand,
   CapRushCommandRejectionCode,
   CapRushCommandResult,
   CommandOutcome,
   CapRushDraftState,
 } from '@hoop-rush/data-contracts';
-import {
-  CAP_RUSH_SCHEMA_VERSION,
-  capRushCommandResultSchema,
-  capRushDraftStateSchema,
-} from '@hoop-rush/data-contracts';
+import { CAP_RUSH_SCHEMA_VERSION, capRushCommandResultSchema } from '@hoop-rush/data-contracts';
 import type { Rng } from '../../sim/rng.ts';
 import type { CapRushCatalogIndex } from './catalog.ts';
 import { assertCapRushCatalogSourceMatches } from './catalog.ts';
@@ -93,27 +88,4 @@ export function validateRunAndRevision(
   }
   assertCapRushCatalogSourceMatches(environment.index.catalog.source, state.catalog);
   return null;
-}
-
-export function applyAbandon(
-  state: CapRushDraftState,
-  command: CapRushAbandonCommand,
-  environment: CapRushCommandEnvironment,
-): CapRushCommandOutcome {
-  const mismatch = validateRunAndRevision(state, command, environment);
-  if (mismatch !== null) return mismatch;
-  if (state.stage === 'abandoned' || state.stage === 'completed') {
-    return rejectCapRushCommand(
-      state,
-      command,
-      'phase-mismatch',
-      `the run is already ${state.stage}`,
-    );
-  }
-  const nextState = capRushDraftStateSchema.parse({
-    ...state,
-    revision: state.revision + 1,
-    stage: 'abandoned',
-  });
-  return acceptCapRushCommand(state, command, nextState);
 }

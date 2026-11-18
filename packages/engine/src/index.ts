@@ -129,7 +129,6 @@ export {
 } from './projection/index.ts';
 export {
   FIXED_FIVE_SEED_VERSION,
-  FIXED_FIVE_SANDBOX_DRAFT_ORDER_VERSION,
   fixedFiveParticipantSeed,
   fixedFiveDraftSeed,
   fixedFiveFirstPicker,
@@ -174,8 +173,6 @@ export {
   createSandboxDuelDraft,
   claimSandboxDuelPlayer,
   repositionSandboxDuelPlayer,
-  sandboxDuelPicksFor,
-  isSandboxDuelComplete,
   sandboxDuelAlternationHolds,
   sandboxDuelSnakeOrderHolds,
   sandboxDuelPicker,
@@ -224,7 +221,6 @@ export {
 } from './modes/fixed-five/results.ts';
 export {
   fixedFiveResultDigest,
-  verifyFixedFiveDigest,
   canonicalFixedFiveDigestPayload,
   isFixedFiveGameInputCommand,
   gameInputCommands,
@@ -250,7 +246,6 @@ export {
   restoreFixedFiveCommandSyncState,
   deriveEffectivePhase,
   pickOrdinalOf,
-  timeoutMsFor,
   computeDueAutopick,
   summarizeWorkerEntries,
   lineupEntryFor,
@@ -274,20 +269,16 @@ export {
 export { ENGINE_VERSION } from './sim/constants.ts';
 export {
   DRAFT_DUEL_SEED_VERSION,
-  DRAFT_DUEL_FAIR_BAND_VERSION,
   draftDuelSharedBandSeed,
   draftDuelOfferSeed,
-  draftDuelSafetySeed,
   draftDuelFirstPicker,
   draftDuelTimeoutSeed,
   draftDuelTimeoutSeedPath,
   draftDuelHomeWinner,
   draftDuelGameSeed,
-  draftDuelRematchSeed,
 } from './modes/draft-duel/seeds.ts';
 export {
   buildDraftDuelCatalog,
-  cardGroupSet,
   cardPlayableAt,
   catalogEntryForVersion,
   catalogSimulationForVersion,
@@ -316,8 +307,6 @@ export {
   draftDuelFairAttemptForState,
 } from './modes/draft-duel/offers.ts';
 export {
-  assignSlots,
-  neededGroups,
   completionFeasible,
   unclaimedProfileCounts,
   rosterCompletionPossible,

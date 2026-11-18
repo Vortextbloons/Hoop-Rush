@@ -52,14 +52,11 @@ import {
 } from '../schemas/cap-rush-record.ts';
 import { HoopRushDatabase } from './dexie.ts';
 import { DexieProfileRepository } from './profile.ts';
-import {
-  classifyCommandReplay,
-  commandEnvelopeMatches,
-  readStoredCommand,
-} from './save-envelope.ts';
+import { classifyCommandReplay, readStoredCommand } from './save-envelope.ts';
 import {
   assertSaveSchemaVersion,
   canonicalEquals,
+  commandReceiptMatches,
   getParsedRecord,
   listCompletedHistory,
   parseOptionalRecord,
@@ -465,7 +462,7 @@ export class DexieCapRushRepository {
           resultOf: (row) => row.result,
           // Cap Rush replays only when both the command and the result status match.
           matches: (row, incoming) =>
-            commandEnvelopeMatches(incoming, row.command) && row.result.status === result.status,
+            commandReceiptMatches(incoming, row.command) && row.result.status === result.status,
         });
         if (replay.kind === 'replayed') return replay.result;
         if (replay.kind === 'conflict') throw new CapRushCommandConflictError(result.commandId);

@@ -33,7 +33,7 @@ import {
   toSimulationPlayer,
   type EngineContext,
 } from '@hoop-rush/engine';
-import { parseCount, parseWorkers } from '../args.ts';
+import { parseCount } from '../args.ts';
 import { makeReport, type CliReport } from '../report.ts';
 import { PackagedData, REPO_ROOT, loadPackagedData } from './data-loader.ts';
 import { readJson, sha256Hex } from '../io.ts';
@@ -907,11 +907,7 @@ function seededOrder(length: number, namespace: string): number[] {
 export function projectionCalibrateBase(input: {
   manifest?: string | null;
   model?: string | null;
-  targets?: string | null;
-  'seed-from'?: string | null;
-  'seed-to'?: string | null;
   samples?: string | null;
-  workers?: string | null;
   era?: string | null;
   out?: string | null;
   validate: boolean;
@@ -920,7 +916,6 @@ export function projectionCalibrateBase(input: {
 }): CliReport {
   const { manifest, model: modelPath, era, out, validate, verbose } = input;
   const samples = parseCount(input.samples ?? undefined, '--samples', validate ? 2048 : 25);
-  void parseWorkers({ workers: input.workers ?? null }, 1);
   const data = loadData(manifest);
   const model = loadModel(manifest, modelPath);
   const rawEraId = era ?? '2010s';

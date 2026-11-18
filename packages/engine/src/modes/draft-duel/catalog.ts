@@ -56,11 +56,6 @@ export function buildDraftDuelCatalog(source: DraftDuelCatalogSource): DraftDuel
     playerIds: [...byPlayerId.keys()],
   };
 }
-export function cardGroupSet(card: DraftDuelCard): SlotGroup[] {
-  const groups = new Set<SlotGroup>();
-  for (const position of card.positions) groups.add(slotGroupOf(position));
-  return [...groups].sort();
-}
 export function cardPlayableAt(card: DraftDuelCard, group: SlotGroup): boolean {
   for (const position of card.positions) {
     if (slotGroupOf(position) === group) return true;

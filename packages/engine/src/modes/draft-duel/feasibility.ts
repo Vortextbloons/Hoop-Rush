@@ -153,27 +153,6 @@ export function draftDuelOccupiedSlotIndexes(
   return occupied;
 }
 
-export function assignSlots(cards: readonly DraftDuelCard[]): number[] | null {
-  const assignment = new Array<number>(cards.length).fill(-1);
-  const used = new Array<boolean>(LINEUP_SIZE).fill(false);
-  function search(index: number): boolean {
-    if (index === cards.length) return true;
-    const card = cards[index];
-    if (card === undefined) return false;
-    for (let slot = 0; slot < LINEUP_SIZE; slot += 1) {
-      if (used[slot]) continue;
-      if (!draftDuelCardPlayableAtSlot(card, slot)) continue;
-      assignment[index] = slot;
-      used[slot] = true;
-      if (search(index + 1)) return true;
-      used[slot] = false;
-      assignment[index] = -1;
-    }
-    return false;
-  }
-  return search(0) ? assignment : null;
-}
-
 const SLOT_RANGE: readonly number[] = Array.from({ length: LINEUP_SIZE }, (_, index) => index);
 
 interface PlacementScore {
@@ -273,29 +252,6 @@ export function draftDuelFallbackPlacements(
     return false;
   }
   return search(0) ? result : null;
-}
-
-function needsForUsedSlots(used: readonly boolean[]): DraftDuelGroupNeeds {
-  const needs: DraftDuelGroupNeeds = { G: 0, F: 0, C: 0 };
-  for (let slot = 0; slot < LINEUP_SIZE; slot += 1) {
-    if (used[slot]) continue;
-    const group = slotGroupAt(slot);
-    if (group === undefined) continue;
-    needs[group] += 1;
-  }
-  return needs;
-}
-
-export function neededGroups(cards: readonly DraftDuelCard[]): DraftDuelGroupNeeds {
-  const assignment = assignSlots(cards);
-  if (assignment === null) {
-    throw new Error('draft duel roster cannot be assigned to lineup slots');
-  }
-  const used = new Array<boolean>(LINEUP_SIZE).fill(false);
-  for (const slot of assignment) {
-    if (slot >= 0 && slot < LINEUP_SIZE) used[slot] = true;
-  }
-  return needsForUsedSlots(used);
 }
 
 export function completionFeasible(input: DraftDuelCompletionInput): boolean {

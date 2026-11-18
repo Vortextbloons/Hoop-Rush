@@ -5,6 +5,7 @@
   import PlayerStatsTable from '#lib/components/PlayerStatsTable.svelte';
   import type { PlayerStatColumn, PlayerStatsTotals } from '#lib/components/player-stats-table.js';
   import { SLOT_LABELS } from '#lib/player-positions.js';
+  import { initialsOf } from '#lib/branding.js';
   import { trueShootingPct, usagePct, usagePossessions } from '#lib/format.js';
   import { gamecastTeamOf } from './gamecast-broadcast-view';
   import type {
@@ -51,16 +52,6 @@
 
   function nameOf(playerId: string): string {
     return playerOf(playerId)?.displayName ?? playerId.replace(/^p-/, '#').slice(0, 7);
-  }
-
-  function initialsOf(name: string): string {
-    return name
-      .split(' ')
-      .filter((part) => part.length > 0)
-      .map((part) => part[0] ?? '')
-      .join('')
-      .slice(0, 2)
-      .toUpperCase();
   }
 
   function formatCountdown(ms: number): string {

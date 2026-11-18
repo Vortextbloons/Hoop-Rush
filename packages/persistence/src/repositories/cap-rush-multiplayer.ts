@@ -23,7 +23,6 @@ import {
   storedCapRushMultiplayerHistoryRowSchema,
   type StoredCapRushMultiplayerActiveRow,
   type StoredCapRushMultiplayerCommandRow,
-  type StoredCapRushMultiplayerGameRow,
 } from '../schemas/cap-rush-multiplayer-record.ts';
 
 export class CapRushMultiplayerLoadError extends Error {
@@ -185,13 +184,6 @@ export class DexieCapRushMultiplayerRepository {
       }));
   }
 
-  async loadGames(roomId: string): Promise<StoredCapRushMultiplayerGameRow[]> {
-    const rows = await this.db.capRushMultiplayerGames.where('roomId').equals(roomId).toArray();
-    return rows.map((row) =>
-      parseOrThrow<StoredCapRushMultiplayerGameRow>(storedCapRushMultiplayerGameRowSchema, row),
-    );
-  }
-
   async complete(input: {
     readonly snapshot: CapRushMultiplayerRoomSnapshot;
     readonly report: CapRushMultiplayerReport;
@@ -234,18 +226,5 @@ export class DexieCapRushMultiplayerRepository {
   > {
     const rows = await listCompletedHistory(this.db.capRushMultiplayerHistory);
     return rows.map((row) => storedCapRushMultiplayerHistoryRowSchema.parse(row));
-  }
-
-  async clearActive(roomId: string): Promise<void> {
-    const key = idSchema.parse(roomId);
-    await this.db.transaction(
-      'rw',
-      this.db.capRushMultiplayerActive,
-      this.db.capRushMultiplayerCommands,
-      async () => {
-        await this.db.capRushMultiplayerActive.delete(key);
-        await this.db.capRushMultiplayerCommands.where('roomId').equals(key).delete();
-      },
-    );
   }
 }

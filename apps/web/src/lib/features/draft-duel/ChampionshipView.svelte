@@ -15,6 +15,7 @@
   import PlayerStatsSection from '#lib/components/basketball/PlayerStatsSection.svelte';
   import type { PlayerStatColumn } from '#lib/components/player-stats-table.js';
   import { SLOT_LABELS } from '#lib/player-positions.js';
+  import { initialsOf } from '#lib/branding.js';
   import {
     perGameText,
     ratioPct,
@@ -138,16 +139,6 @@
 
   function nameOf(playerId: string): string {
     return cards[playerId]?.displayName ?? playerId.replace(/^p-/, '#').slice(0, 7);
-  }
-
-  function initialsOf(name: string): string {
-    return name
-      .split(' ')
-      .filter((part) => part.length > 0)
-      .map((part) => part[0] ?? '')
-      .join('')
-      .slice(0, 2)
-      .toUpperCase();
   }
 
   function faceOf(playerId: PlayerId): {

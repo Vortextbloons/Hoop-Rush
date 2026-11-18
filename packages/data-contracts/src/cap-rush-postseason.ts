@@ -409,10 +409,6 @@ export function capRushPlayoffSeriesId(round: number, seriesSlot: number): strin
   return `crs-${String(round)}-${String(seriesSlot)}`;
 }
 
-export function capRushPlayoffGameId(round: number, seriesSlot: number, ordinal: number): string {
-  return `crp-${String(round)}-${String(seriesSlot)}-${String(ordinal)}`;
-}
-
 export function capRushSeriesWins(series: CapRushPlayoffSeries, teamId: string): number {
   return series.games.filter((game) => game.winnerTeamId === teamId).length;
 }

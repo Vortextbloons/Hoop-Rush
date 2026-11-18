@@ -8,6 +8,7 @@
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
   import PlayerFace from '#lib/components/PlayerFace.svelte';
   import { formatPositions } from '#lib/player-positions.js';
+  import { initialsOf } from '#lib/branding.js';
   import { DRAFT_DUEL_REASON_LABELS, draftDuelCardView } from './draft-duel-card-view.ts';
 
   let {
@@ -38,15 +39,7 @@
   const reasonLabel = $derived(reason === null ? null : DRAFT_DUEL_REASON_LABELS[reason]);
   const franchiseLabel = $derived(franchiseAbbreviation(card.franchiseId));
   const positionsLabel = $derived(formatPositions(view.positions));
-  const initials = $derived(
-    view.displayName
-      .split(' ')
-      .filter((part) => part.length > 0)
-      .map((part) => part[0] ?? '')
-      .join('')
-      .slice(0, 2)
-      .toUpperCase(),
-  );
+  const initials = $derived(initialsOf(view.displayName));
   const state = $derived(
     disabled ? 'disabled' : selected ? 'selected' : considering ? 'considering' : 'idle',
   );

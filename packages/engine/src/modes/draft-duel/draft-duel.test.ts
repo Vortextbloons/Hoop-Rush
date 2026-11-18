@@ -53,12 +53,10 @@ import {
 } from './draft.ts';
 import {
   assessDraftDuelOffers,
-  assignSlots,
   buildDraftDuelSafetyInput,
   completionFeasible,
   draftDuelParticipantCompletionPossible,
   draftDuelRepositionSlots,
-  neededGroups,
   rosterCompletionPossible,
 } from './feasibility.ts';
 import {
@@ -1362,21 +1360,6 @@ describe('generation failure', () => {
 });
 
 describe('feasibility primitives', () => {
-  it('assigns slots lexicographically and reports needs', () => {
-    const catalog = buildCatalogFromSpecs([
-      { id: 'f-hybrid', positions: ['PG', 'SF'], band: 3 },
-      { id: 'f-guard', positions: ['SG'], band: 4 },
-      { id: 'f-big', positions: ['C'], band: 5 },
-    ]);
-    const hybrid = cardOf(catalog, 'f-hybrid');
-    const guard = cardOf(catalog, 'f-guard');
-    const big = cardOf(catalog, 'f-big');
-    expect(assignSlots([hybrid, guard])).toEqual([0, 1]);
-    expect(neededGroups([hybrid, guard])).toEqual({ G: 0, F: 2, C: 1 });
-    expect(assignSlots([big, big])).toBeNull();
-    expect(assignSlots([hybrid, guard, big])).not.toBeNull();
-  });
-
   it('handles distinct-player scarcity exactly', () => {
     expect(
       completionFeasible({

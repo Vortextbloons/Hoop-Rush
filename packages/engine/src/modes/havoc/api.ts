@@ -1,24 +1,17 @@
 import type { HavocCommandOutcome } from '@hoop-rush/data-contracts';
 import type {
   HavocCatalog,
-  HavocCatalogSource,
-  HavocCommand,
   HavocComparison,
-  HavocCreateDraftCommand,
   HavocDraftOffer,
   HavocGameResult,
-  HavocGameSummary,
-  HavocGameTape,
   HavocLockedInputs,
   HavocMutationDefinition,
   HavocMutationId,
   HavocRunState,
-  HavocSeasonAggregate,
   HavocVariant,
   OpponentBracket,
   EraSimulationProfile,
   Position,
-  SeasonDraftCatalog,
   Seed,
 } from '@hoop-rush/data-contracts';
 import type { Rng } from '../../sim/rng.ts';
@@ -39,11 +32,6 @@ export interface HavocDraftEnvironment {
   readonly definitions: readonly HavocMutationDefinition[];
   readonly catalog?: HavocCatalog;
 }
-
-export type AdaptHavocCatalog = (
-  catalog: SeasonDraftCatalog,
-  source: HavocCatalogSource,
-) => HavocCatalog;
 
 export interface GenerateHavocOfferInput {
   readonly catalog: HavocCatalog;
@@ -68,35 +56,10 @@ export interface HavocLockSources {
 
 export type { HavocCommandOutcome } from '@hoop-rush/data-contracts';
 
-export type CreateHavocRunState = (
-  command: HavocCreateDraftCommand,
-  catalog: HavocCatalog,
-  environment: HavocDraftEnvironment,
-) => HavocRunState;
-
-export type ApplyHavocCommand = (
-  state: HavocRunState,
-  command: HavocCommand,
-  environment: HavocDraftEnvironment,
-  lockSources: HavocLockSources,
-) => HavocCommandOutcome;
-
-export type FoldHavocAggregate = (
-  aggregate: HavocSeasonAggregate,
-  summary: HavocGameSummary,
-) => HavocSeasonAggregate;
-
-export type HavocStateDigest = (state: HavocRunState) => string;
-
 export interface BuildHavocGameInputInput {
   readonly locked: HavocLockedInputs;
   readonly gameNumber: number;
   readonly variant: HavocVariant;
-}
-
-export interface HavocGameSimulation {
-  readonly result: HavocGameResult;
-  readonly tape: HavocGameTape;
 }
 
 export interface HavocStoredGame {

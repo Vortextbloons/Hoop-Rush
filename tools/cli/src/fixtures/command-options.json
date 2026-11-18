@@ -98,17 +98,11 @@
   "sim game": {
     "input": "string",
     "seed": "string",
-    "seed-from": "string",
-    "seed-to": "string",
-    "samples": "string",
-    "workers": "string",
-    "fixture": "string",
     "profile": "string",
     "format": "string",
     "verbose": "flag"
   },
   "sim batch": {
-    "input": "string",
     "seed": "string",
     "seed-from": "string",
     "seed-to": "string",
@@ -212,14 +206,8 @@
   },
   "calibrate sensitivity": {
     "samples": "string",
-    "seed-from": "string",
-    "workers": "string",
-    "fixture": "string",
     "profile": "string",
     "era": "string",
-    "challenge-samples": "string",
-    "opponent-games": "string",
-    "allow-skipped": "flag",
     "format": "string",
     "verbose": "flag"
   },
@@ -249,11 +237,6 @@
   },
   "projection base": {
     "fixture": "string",
-    "seed-from": "string",
-    "seed-to": "string",
-    "samples": "string",
-    "workers": "string",
-    "profile": "string",
     "manifest": "string",
     "model": "string",
     "era": "string",
@@ -271,11 +254,7 @@
   "projection calibrate-base": {
     "manifest": "string",
     "model": "string",
-    "targets": "string",
-    "seed-from": "string",
-    "seed-to": "string",
     "samples": "string",
-    "workers": "string",
     "era": "string",
     "out": "string",
     "validate": "flag",
@@ -286,11 +265,7 @@
   "projection validate": {
     "manifest": "string",
     "model": "string",
-    "targets": "string",
-    "seed-from": "string",
-    "seed-to": "string",
     "samples": "string",
-    "workers": "string",
     "era": "string",
     "out": "string",
     "validate": "flag",

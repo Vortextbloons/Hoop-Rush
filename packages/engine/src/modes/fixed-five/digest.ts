@@ -65,13 +65,6 @@ export function fixedFiveResultDigest(input: FixedFiveDigestInput): ContentHash 
     `${seasonDigestHex(`fixed-five-digest-v1:${material}`)}${seasonDigestHex(`fixed-five-digest-v2:${material}`)}`,
   );
 }
-export function verifyFixedFiveDigest(
-  input: FixedFiveDigestInput,
-  expectedDigest: string,
-): boolean {
-  return fixedFiveResultDigest(input) === expectedDigest;
-}
-
 export function fixedFiveDuelGameInputDigest(input: GameSimulationInput): ContentHash {
   return gameDigest64('fixed-five-duel-input', canonicalJsonData(input));
 }

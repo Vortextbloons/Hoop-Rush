@@ -214,17 +214,6 @@ export function repositionSandboxDuelPlayer(
   }
   return { ...state, picks: applyLineupPlacements(state.picks, input.actor, plan.placements) };
 }
-export function sandboxDuelPicksFor(
-  state: SandboxDuelState,
-  participantId: 'p1' | 'p2',
-): SandboxDuelPick[] {
-  return state.picks
-    .filter((p) => p.participantId === participantId)
-    .sort((a, b) => a.slotIndex - b.slotIndex);
-}
-export function isSandboxDuelComplete(state: SandboxDuelState): boolean {
-  return state.status === 'complete' && state.picks.length === 10;
-}
 export function sandboxDuelAlternationHolds(state: SandboxDuelState): boolean {
   for (let i = 0; i < state.picks.length; i += 1) {
     const expected =

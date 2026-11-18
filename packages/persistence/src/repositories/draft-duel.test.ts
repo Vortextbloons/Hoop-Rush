@@ -285,8 +285,6 @@ describe('DexieDraftDuelRepository', () => {
     expect(loaded?.draft).toEqual(state.draft);
     expect(loaded?.series).toEqual(state.series);
     expect(loaded?.updatedAtIso).toBeTruthy();
-    await repo.deleteActive(ROOM_ID);
-    expect(await repo.loadActive(ROOM_ID)).toBeNull();
     db.close();
   });
 
@@ -372,10 +370,6 @@ describe('DexieDraftDuelRepository', () => {
     expect(history[0]?.roomId).toBe(ROOM_ID);
     expect(history[0]?.champion).toBe('p1');
     expect(history[0]?.gameCount).toBe(6);
-    await repo.deleteCompleted(ROOM_ID);
-    expect(await repo.loadCompleted(ROOM_ID)).toBeNull();
-    expect(await repo.listHistory()).toEqual([]);
-    expect(await repo.loadResults(ROOM_ID)).toEqual([]);
     db.close();
   });
 

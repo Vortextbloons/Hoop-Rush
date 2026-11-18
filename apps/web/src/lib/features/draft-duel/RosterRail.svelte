@@ -9,6 +9,7 @@
   import PlayerFace from '#lib/components/PlayerFace.svelte';
   import TeamLogo from '#lib/components/TeamLogo.svelte';
   import { SLOT_NAMES } from '#lib/player-positions.js';
+  import { initialsOf } from '#lib/branding.js';
   import { draftDuelCardView } from './draft-duel-card-view.ts';
 
   let {
@@ -42,16 +43,6 @@
     roster.slots.filter((slot) => slot.slotIndex >= 0 && slot.slotIndex < LINEUP_STRUCTURE.length)
       .length,
   );
-
-  function initialsOf(name: string): string {
-    return name
-      .split(' ')
-      .filter((part) => part.length > 0)
-      .map((part) => part[0] ?? '')
-      .join('')
-      .slice(0, 2)
-      .toUpperCase();
-  }
 
   function franchiseSlotOf(franchiseId: string) {
     return manifest?.modernFranchiseSlots.find((slot) => slot.franchiseId === franchiseId) ?? null;

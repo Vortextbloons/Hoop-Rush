@@ -49,14 +49,8 @@ export const calibrateCommands: CommandSpec[] = [
     name: 'calibrate sensitivity',
     options: {
       samples: 'string',
-      'seed-from': 'string',
-      workers: 'string',
-      fixture: 'string',
       profile: 'string',
       era: 'string',
-      'challenge-samples': 'string',
-      'opponent-games': 'string',
-      'allow-skipped': 'flag',
     },
     help: `  calibrate sensitivity  A/B the single-dimension sensitivity fixtures.
                          --samples N (default 2000)  --profile <path>  --era <eraId>`,

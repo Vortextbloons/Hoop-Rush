@@ -3,7 +3,6 @@ import {
   LINEUP_STRUCTURE,
   canonicalJson,
   contentHashSchema,
-  fixedFiveTimeoutMsForMode,
   idSchema,
   playerIdSchema,
   type ClassicDraftCatalog,
@@ -652,10 +651,6 @@ export function pickOrdinalOf(replay: DraftReplay, participant: FixedFivePartici
     return (participant === 'p1' ? replay.p1 : replay.p2).placements.length;
   }
   return (participant === 'p1' ? replay.p1 : replay.p2).picks.length;
-}
-
-export function timeoutMsFor(mode: FixedFiveRoomMode): number {
-  return fixedFiveTimeoutMsForMode(mode);
 }
 
 export function computeDueAutopick(

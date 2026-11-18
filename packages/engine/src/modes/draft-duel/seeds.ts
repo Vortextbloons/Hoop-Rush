@@ -2,7 +2,6 @@ import type { DraftDuelParticipantId, Seed } from '@hoop-rush/data-contracts';
 import { hexSeed } from '../../challenge/seeds.ts';
 
 export const DRAFT_DUEL_SEED_VERSION = 'draft-duel-v1';
-export const DRAFT_DUEL_FAIR_BAND_VERSION = 'draft-duel-fair-bands-v1';
 function seedByteParity(rootSeed: Seed, offset: number): boolean {
   return Number.parseInt(rootSeed.slice(offset, offset + 2), 16) % 2 === 0;
 }
@@ -30,20 +29,6 @@ export function draftDuelOfferSeed(
   }
   return hexSeed(
     `hoop-rush:${DRAFT_DUEL_SEED_VERSION}:${rootSeed}:offers:${participantId}:round-${String(round)}:attempt-${String(attempt)}`,
-  );
-}
-export function draftDuelSafetySeed(
-  rootSeed: Seed,
-  participantId: DraftDuelParticipantId,
-  pickOrdinal: number,
-): Seed {
-  if (!Number.isInteger(pickOrdinal) || pickOrdinal < 0 || pickOrdinal > 9) {
-    throw new Error(
-      `draft duel pickOrdinal must be an integer in 0..9 (got ${String(pickOrdinal)})`,
-    );
-  }
-  return hexSeed(
-    `hoop-rush:${DRAFT_DUEL_SEED_VERSION}:${rootSeed}:safety:${participantId}:pick-${String(pickOrdinal)}`,
   );
 }
 export function draftDuelFirstPicker(rootSeed: Seed): DraftDuelParticipantId {
@@ -78,13 +63,5 @@ export function draftDuelGameSeed(rootSeed: Seed, gameNumber: number): Seed {
   }
   return hexSeed(
     `hoop-rush:${DRAFT_DUEL_SEED_VERSION}:${rootSeed}:series:game-${String(gameNumber)}`,
-  );
-}
-export function draftDuelRematchSeed(rootSeed: Seed, rematchOrdinal: number): Seed {
-  if (!Number.isInteger(rematchOrdinal) || rematchOrdinal < 1) {
-    throw new Error(`rematch ordinal must be a positive integer (got ${String(rematchOrdinal)})`);
-  }
-  return hexSeed(
-    `hoop-rush:${DRAFT_DUEL_SEED_VERSION}:${rootSeed}:rematch-${String(rematchOrdinal)}`,
   );
 }

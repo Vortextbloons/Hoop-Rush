@@ -87,9 +87,6 @@ export class DexieDraftDuelRepository {
       storedDraftDuelActiveSchema.parse(row),
     );
   }
-  async deleteActive(roomId: string): Promise<void> {
-    await this.db.draftDuelActive.delete(roomId);
-  }
   async appendCommands(roomId: string, commands: readonly DraftDuelCommand[]): Promise<void> {
     if (commands.length === 0) return;
     const updatedAtIso = new Date().toISOString();
@@ -267,19 +264,6 @@ export class DexieDraftDuelRepository {
   }
   async listHistory(): Promise<StoredDraftDuelHistoryIndex[]> {
     return listCompletedHistory(this.db.draftDuelHistory);
-  }
-  async deleteCompleted(roomId: string): Promise<void> {
-    await this.db.transaction(
-      'rw',
-      this.db.draftDuelCompleted,
-      this.db.draftDuelHistory,
-      this.db.draftDuelResults,
-      async () => {
-        await this.db.draftDuelCompleted.delete(roomId);
-        await this.db.draftDuelHistory.delete(`dd-${roomId}`);
-        await deleteWhereEquals(this.db.draftDuelResults, 'roomId', roomId);
-      },
-    );
   }
 }
 export type DraftDuelRepository = DexieDraftDuelRepository;

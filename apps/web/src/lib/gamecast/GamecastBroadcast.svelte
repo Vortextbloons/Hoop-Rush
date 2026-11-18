@@ -12,6 +12,7 @@
   import TeamLogo from '#lib/components/TeamLogo.svelte';
   import { SLOT_LABELS } from '#lib/player-positions.js';
   import { formatClock, ratioPct } from '#lib/format.js';
+  import { initialsOf } from '#lib/branding.js';
   import {
     TAPE_STAT_INDEXES,
     gamecastPeriodLabel,
@@ -79,16 +80,6 @@
     if (player) return player.displayName;
     if (playerId) return playerId.replace(/^p-/, '#').slice(0, 7);
     return `Slot ${String(slot + 1)}`;
-  }
-
-  function initialsOf(name: string): string {
-    return name
-      .split(' ')
-      .filter((part) => part.length > 0)
-      .map((part) => part[0] ?? '')
-      .join('')
-      .slice(0, 2)
-      .toUpperCase();
   }
 
   const playerIds = $derived(Object.keys(players));

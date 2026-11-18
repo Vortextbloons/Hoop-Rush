@@ -160,10 +160,6 @@ describe('cap rush multiplayer persistence', () => {
         updatedAtIso: AT,
       });
       expect((await repository.loadActive(ROOM))?.snapshot.revision).toBe(1);
-
-      await repository.clearActive(ROOM);
-      expect(await repository.loadActive(ROOM)).toBeNull();
-      expect(await repository.loadCommands(ROOM)).toHaveLength(0);
     } finally {
       db.close();
     }

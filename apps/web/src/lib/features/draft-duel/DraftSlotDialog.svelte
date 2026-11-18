@@ -7,6 +7,7 @@
   import PlayerFace from '#lib/components/PlayerFace.svelte';
   import PositionOptionRow from '#lib/components/PositionOptionRow.svelte';
   import { SLOT_INDEXES, SLOT_LABELS, SLOT_NAMES, formatPositions } from '#lib/player-positions.js';
+  import { initialsOf } from '#lib/branding.js';
 
   let {
     card,
@@ -98,15 +99,7 @@
     });
   });
 
-  const initials = $derived(
-    (card?.displayName ?? '')
-      .split(' ')
-      .filter((part) => part.length > 0)
-      .map((part) => part[0] ?? '')
-      .join('')
-      .slice(0, 2)
-      .toUpperCase(),
-  );
+  const initials = $derived(initialsOf(card?.displayName ?? ''));
 
   function stateText(state: SlotOption['state']): string {
     if (state === 'occupied') return 'Occupied';

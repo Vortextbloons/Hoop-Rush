@@ -50,11 +50,7 @@ import {
 } from '../schemas/havoc-record.ts';
 import { HoopRushDatabase } from './dexie.ts';
 import { DexieProfileRepository } from './profile.ts';
-import {
-  classifyCommandReplay,
-  commandEnvelopeMatches,
-  readStoredCommand,
-} from './save-envelope.ts';
+import { classifyCommandReplay, readStoredCommand } from './save-envelope.ts';
 import {
   assertSaveSchemaVersion,
   canonicalEquals,
@@ -466,7 +462,7 @@ export class DexieHavocRepository {
          */
         matches: (row, incoming) => {
           if (incoming.command !== null && row.command !== null) {
-            return commandEnvelopeMatches(incoming.command, row.command);
+            return commandReceiptMatches(incoming.command, row.command);
           }
           return (
             row.outcomeDigest === incoming.outcomeDigest ||

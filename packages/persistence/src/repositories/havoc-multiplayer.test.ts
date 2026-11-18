@@ -253,8 +253,6 @@ describe('DexieHavocMultiplayerRepository', () => {
     expect(loaded?.snapshot.members).toHaveLength(2);
     expect(loaded?.verification).toEqual(state.verification);
     expect(loaded?.updatedAtIso).toBeTruthy();
-    await repo.deleteActive(ROOM_ID);
-    expect(await repo.loadActive(ROOM_ID)).toBeNull();
     db.close();
   });
 
@@ -346,10 +344,6 @@ describe('DexieHavocMultiplayerRepository', () => {
     expect(history[0]?.roomId).toBe(ROOM_ID);
     expect(history[0]?.championParticipantId).toBe('p1');
     expect(history[0]?.wins).toBe(HAVOC_MULTIPLAYER_SERIES_WINS);
-    await repo.deleteCompleted(ROOM_ID);
-    expect(await repo.loadCompleted(ROOM_ID)).toBeNull();
-    expect(await repo.listHistory()).toEqual([]);
-    expect(await repo.loadResults(ROOM_ID)).toEqual([]);
     db.close();
   });
 

@@ -19,11 +19,6 @@ export const simCommands: CommandSpec[] = [
     options: {
       input: 'string',
       seed: 'string',
-      'seed-from': 'string',
-      'seed-to': 'string',
-      samples: 'string',
-      workers: 'string',
-      fixture: 'string',
       profile: 'string',
     },
     help: `  sim game               Simulate one game from a fixture with an explicit seed.
@@ -35,7 +30,6 @@ export const simCommands: CommandSpec[] = [
   {
     name: 'sim batch',
     options: {
-      input: 'string',
       seed: 'string',
       'seed-from': 'string',
       'seed-to': 'string',

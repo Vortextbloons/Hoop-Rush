@@ -2,7 +2,6 @@ import type { FixedFiveParticipantId, FixedFiveRoomMode, Seed } from '@hoop-rush
 import { createRng } from '../../sim/rng.ts';
 import { hexSeed } from '../../challenge/seeds.ts';
 export const FIXED_FIVE_SEED_VERSION = 'fixed-five-v1';
-export const FIXED_FIVE_SANDBOX_DRAFT_ORDER_VERSION = 'fixed-five-sandbox-snake-v1';
 export function fixedFiveParticipantSeed(
   rootSeed: Seed,
   participantId: FixedFiveParticipantId,

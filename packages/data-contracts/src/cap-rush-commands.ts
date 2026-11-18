@@ -161,14 +161,6 @@ export type CapRushFinalizePostseasonCommand = z.infer<
   typeof capRushFinalizePostseasonCommandSchema
 >;
 
-export const capRushAbandonCommandSchema = z.object({
-  command: z.literal('abandon-cap-rush-run'),
-  commandId: commandIdSchema,
-  runId: idSchema,
-  expectedRevision: z.number().int().nonnegative(),
-});
-export type CapRushAbandonCommand = z.infer<typeof capRushAbandonCommandSchema>;
-
 export const capRushCommandSchema = z.discriminatedUnion('command', [
   capRushCreateDraftCommandSchema,
   capRushChoosePositionCommandSchema,
@@ -183,7 +175,6 @@ export const capRushCommandSchema = z.discriminatedUnion('command', [
   capRushAcceptStandingsCommandSchema,
   capRushAcceptPlayoffGameCommandSchema,
   capRushFinalizePostseasonCommandSchema,
-  capRushAbandonCommandSchema,
 ]);
 export type CapRushCommand = z.infer<typeof capRushCommandSchema>;
 

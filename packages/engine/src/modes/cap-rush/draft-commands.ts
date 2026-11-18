@@ -1,6 +1,5 @@
 import type { CapRushCommand, CapRushDraftState } from '@hoop-rush/data-contracts';
 import {
-  applyAbandon,
   rejectCapRushCommand,
   type CapRushCommandEnvironment,
   type CapRushCommandOutcome,
@@ -38,7 +37,5 @@ export function applyCapRushCommand(
     case 'accept-cap-rush-playoff-game':
     case 'finalize-cap-rush-postseason':
       return applyCapRushPostseasonCommand(state, command, environment);
-    case 'abandon-cap-rush-run':
-      return applyAbandon(state, command, environment);
   }
 }

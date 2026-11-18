@@ -7,6 +7,8 @@ import type {
 import { capRushConferenceRoundName, capRushRoundName } from '@hoop-rush/data-contracts';
 import { capRushApronReductions, type CapRushApronReduction } from '@hoop-rush/engine';
 
+export { initialsOf } from '#lib/branding.js';
+
 export function postseasonOutcomeLabel(postseason: CapRushHistoryPostseason): string {
   if (postseason.isUserChampion) return 'Champion';
   if (postseason.userStatus === 'champion') return 'Champion';
@@ -29,16 +31,6 @@ export function postseasonResultClass(postseason: CapRushHistoryPostseason): str
 
 export function variantLabel(variant: CapRushVariant): string {
   return variant === 'clash' ? 'Cap Clash' : 'Cap Roulette';
-}
-
-export function initialsOf(displayName: string): string {
-  return displayName
-    .split(' ')
-    .filter((part) => part.length > 0)
-    .map((part) => part[0] ?? '')
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();
 }
 
 export function formatMillions(amount: number): string {

@@ -1,5 +1,5 @@
 import type { Table } from 'dexie';
-import { commandReceiptMatches, getParsedRecord } from './support.ts';
+import { getParsedRecord } from './support.ts';
 
 /**
  * Shared save-commit mechanics.
@@ -57,21 +57,6 @@ export function classifyCommandReplay<Stored, Incoming, Result>(input: {
   return { kind: 'conflict' };
 }
 
-/**
- * The default replay match: identical canonical command JSON.
- *
- * Most modes only need this. Havoc layers an outcome-digest comparison on top.
- */
-export function commandEnvelopeMatches(storedCommand: unknown, incomingCommand: unknown): boolean {
-  return commandReceiptMatches(storedCommand, incomingCommand);
-}
-
-/**
- * Read a stored command row by ID.
- *
- * Shared because every mode keys its command table on `commandId` and parses
- * the row the same way; only the row schema differs.
- */
 export async function readStoredCommand<Row, Key extends string>(input: {
   table: Pick<Table<Row, Key>, 'get'>;
   commandId: Key;

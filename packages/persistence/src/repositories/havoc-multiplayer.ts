@@ -106,9 +106,6 @@ export class DexieHavocMultiplayerRepository {
       storedHavocMultiplayerActiveSchema.parse(record),
     );
   }
-  async deleteActive(roomId: string): Promise<void> {
-    await this.db.havocMultiplayerActive.delete(roomId);
-  }
   async appendCommands(
     roomId: string,
     entries: readonly HavocMultiplayerCommandEntry[],
@@ -325,19 +322,6 @@ export class DexieHavocMultiplayerRepository {
   }
   async listHistory(): Promise<StoredHavocMultiplayerHistoryIndex[]> {
     return listCompletedHistory(this.db.havocMultiplayerHistory);
-  }
-  async deleteCompleted(roomId: string): Promise<void> {
-    await this.db.transaction(
-      'rw',
-      this.db.havocMultiplayerCompleted,
-      this.db.havocMultiplayerHistory,
-      this.db.havocMultiplayerResults,
-      async () => {
-        await this.db.havocMultiplayerCompleted.delete(roomId);
-        await this.db.havocMultiplayerHistory.delete(`hvm-${roomId}`);
-        await deleteWhereEquals(this.db.havocMultiplayerResults, 'roomId', roomId);
-      },
-    );
   }
 }
 export type HavocMultiplayerRepository = DexieHavocMultiplayerRepository;
