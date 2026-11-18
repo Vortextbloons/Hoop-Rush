@@ -24,11 +24,14 @@ import {
   playerIdSchema,
   seasonDigestHex,
   type CommandId,
+  type HavocAcceptGameCommand,
+  type HavocAcceptNormalGameCommand,
   type HavocCommand,
   type HavocCommandResult,
   type HavocComparison,
   type HavocDraftCard,
   type HavocDraftPick,
+  type HavocGameBatchCommit,
   type HavocGameResult,
   type HavocGameSummary,
   type HavocGameTape,
@@ -393,6 +396,45 @@ function buildGame(
     nextState,
     commandId,
   };
+}
+
+function buildGameBatch(
+  state: HavocRunState,
+  startGame: number,
+  count: number,
+  variant: HavocVariant,
+  prefix: string,
+): {
+  commits: HavocGameBatchCommit[];
+  finalState: HavocRunState;
+  games: GameBundle[];
+} {
+  const games: GameBundle[] = [];
+  let working = state;
+  for (let index = 0; index < count; index += 1) {
+    const game = buildGame(
+      working,
+      startGame + index,
+      variant,
+      `${prefix}-${String(startGame + index)}`,
+    );
+    games.push(game);
+    working = game.nextState;
+  }
+  const commits = games.map((game, index): HavocGameBatchCommit => {
+    const before = index === 0 ? state : games[index - 1]?.nextState;
+    if (before === undefined) throw new Error('missing batch predecessor');
+    return {
+      command: game.command as HavocAcceptGameCommand | HavocAcceptNormalGameCommand,
+      outcome: acceptedOutcome(game.nextState, before.revision, game.commandId),
+      game: {
+        result: game.result,
+        inputDigest: game.inputDigest,
+        resultDigest: game.resultDigest,
+      },
+    };
+  });
+  return { commits, finalState: working, games };
 }
 
 function buildComparisonFixture(runId: string): HavocComparison {
@@ -956,6 +998,222 @@ describe('DexieHavocRepository', () => {
     expect(read?.resultDigest).toBe(game.resultDigest);
     expect(read?.result).toEqual(game.result);
     expect(await repo.listRunGames(RUN_ID, 'havoc')).toHaveLength(1);
+    db.close();
+  });
+
+  it('commits a six-game batch in one transaction instead of six per-game commits', async () => {
+    const { db, repo } = createRepository('havoc-batch-one');
+    const states = await applyDraftChain(repo, true);
+    const batch = buildGameBatch(states.locked, 1, 6, 'havoc', 'cmd-batch');
+    const transactionSpy = vi.spyOn(db, 'transaction');
+    const receipt = await repo.applyGameBatch({
+      expectedRevision: states.locked.revision,
+      games: batch.commits,
+    });
+    expect(transactionSpy).toHaveBeenCalledTimes(1);
+    expect(receipt.status).toBe('accepted');
+    expect(receipt.revisionAfter).toBe(batch.finalState.revision);
+    expect((await repo.loadActiveRun())?.havocCursor).toBe(6);
+    expect(await repo.listRunGames(RUN_ID, 'havoc')).toHaveLength(6);
+    expect(await db.havocGames.count()).toBe(6);
+    expect(await db.havocCommands.count()).toBe(10);
+    for (let gameNumber = 1; gameNumber <= 6; gameNumber += 1) {
+      const stored = await repo.readRunGame(RUN_ID, 'havoc', gameNumber);
+      expect(stored).not.toBeNull();
+      const result = await repo.loadCommandResult(
+        batch.commits[gameNumber - 1]?.command.commandId ?? '',
+      );
+      expect(result?.revisionAfter).toBe(states.locked.revision + gameNumber);
+    }
+    db.close();
+
+    const singles = createRepository('havoc-batch-many');
+    const singleStates = await applyDraftChain(singles.repo, true);
+    const singleBatch = buildGameBatch(singleStates.locked, 1, 6, 'havoc', 'cmd-single');
+    const singleSpy = vi.spyOn(singles.db, 'transaction');
+    for (const commit of singleBatch.commits) {
+      await singles.repo.applyOutcome(
+        prepareCommandCommit({
+          outcome: commit.outcome,
+          command: commit.command,
+          game: commit.game,
+        }),
+      );
+    }
+    expect(singleSpy).toHaveBeenCalledTimes(6);
+    expect((await singles.repo.loadActiveRun())?.havocCursor).toBe(6);
+    singles.db.close();
+  });
+
+  it('replays a stored batch without duplicating games or receipts', async () => {
+    const { db, repo } = createRepository('havoc-batch-replay');
+    const states = await applyDraftChain(repo, true);
+    const batch = buildGameBatch(states.locked, 1, 6, 'havoc', 'cmd-replay');
+    const input = { expectedRevision: states.locked.revision, games: batch.commits };
+    const first = await repo.applyGameBatch(input);
+    const second = await repo.applyGameBatch(input);
+    expect(second).toEqual(first);
+    expect(await db.havocGames.count()).toBe(6);
+    expect(await db.havocCommands.count()).toBe(10);
+    expect(await repo.listRunGames(RUN_ID, 'havoc')).toHaveLength(6);
+    expect((await repo.loadActiveRun())?.revision).toBe(batch.finalState.revision);
+    db.close();
+  });
+
+  it('rejects stale or malformed game batches before writing any rows', async () => {
+    const { db, repo } = createRepository('havoc-batch-reject');
+    const states = await applyDraftChain(repo, true);
+    const first = buildGameBatch(states.locked, 1, 6, 'havoc', 'cmd-first');
+    await repo.applyGameBatch({
+      expectedRevision: states.locked.revision,
+      games: first.commits,
+    });
+    const stale = buildGameBatch(states.locked, 1, 6, 'havoc', 'cmd-stale');
+    await expect(
+      repo.applyGameBatch({
+        expectedRevision: states.locked.revision,
+        games: stale.commits,
+      }),
+    ).rejects.toBeInstanceOf(HavocStaleRevisionError);
+
+    const outOfOrder = buildGameBatch(states.locked, 1, 3, 'havoc', 'cmd-order');
+    const [orderedFirst, orderedSecond, orderedThird] = outOfOrder.commits;
+    if (orderedFirst === undefined || orderedSecond === undefined || orderedThird === undefined) {
+      throw new Error('expected three ordered commits');
+    }
+    const reordered: HavocGameBatchCommit[] = [orderedSecond, orderedFirst, orderedThird];
+    await expect(
+      repo.applyGameBatch({ expectedRevision: states.locked.revision, games: reordered }),
+    ).rejects.toBeInstanceOf(HavocOutcomeIntegrityError);
+
+    const duplicate = buildGameBatch(states.locked, 1, 2, 'havoc', 'cmd-duplicate');
+    const [duplicateFirst, duplicateSecond] = duplicate.commits;
+    if (duplicateFirst === undefined || duplicateSecond === undefined) {
+      throw new Error('expected two duplicate candidates');
+    }
+    const duplicateCommandId = duplicateFirst.command.commandId;
+    const duplicated: HavocGameBatchCommit[] = [
+      duplicateFirst,
+      {
+        ...duplicateSecond,
+        command: {
+          ...duplicateSecond.command,
+          commandId: duplicateCommandId,
+        },
+        outcome: {
+          ...duplicateSecond.outcome,
+          result: {
+            ...duplicateSecond.outcome.result,
+            commandId: duplicateCommandId,
+          },
+        },
+      },
+    ];
+    await expect(
+      repo.applyGameBatch({ expectedRevision: states.locked.revision, games: duplicated }),
+    ).rejects.toThrow('repeats a command id');
+
+    const oversized = buildGameBatch(states.locked, 1, 9, 'havoc', 'cmd-oversized');
+    await expect(
+      repo.applyGameBatch({ expectedRevision: states.locked.revision, games: oversized.commits }),
+    ).rejects.toThrow('1-8');
+
+    expect((await repo.loadActiveRun())?.havocCursor).toBe(6);
+    expect(await db.havocGames.count()).toBe(6);
+    expect(await db.havocCommands.count()).toBe(10);
+    db.close();
+  });
+
+  it('rolls back every game and receipt when a batch write fails mid-transaction', async () => {
+    const { db, repo } = createRepository('havoc-batch-rollback');
+    const states = await applyDraftChain(repo, true);
+    const batch = buildGameBatch(states.locked, 1, 6, 'havoc', 'cmd-batch-rollback');
+    const spy = vi.spyOn(db.havocCommands, 'bulkPut').mockImplementation(() => {
+      throw new Error('injected-batch-write-failure');
+    });
+    await expect(
+      repo.applyGameBatch({
+        expectedRevision: states.locked.revision,
+        games: batch.commits,
+      }),
+    ).rejects.toThrow('injected-batch-write-failure');
+    spy.mockRestore();
+    expect(await repo.loadActiveRun()).toEqual(states.locked);
+    expect(await repo.listRunGames(RUN_ID, 'havoc')).toEqual([]);
+    expect(await db.havocCommands.count()).toBe(4);
+    db.close();
+  });
+
+  it('archives a batch that finishes game 82 and awards the perfect season', async () => {
+    const { db, repo } = createRepository('havoc-batch-archive');
+    try {
+      const profiles = new DexieProfileRepository(db);
+      await profiles.initialize(crypto.randomUUID());
+      await profiles.bind(`havoc:${RUN_ID}`);
+      const { locked } = await applyDraftChain(repo, true);
+      const late = lateSeasonState(locked);
+      const undefeated = havocRunStateSchema.parse({
+        ...late,
+        havocAggregate: { ...late.havocAggregate, wins: 81, losses: 0 },
+      });
+      await repo.applyOutcome(
+        prepareCommandCommit({
+          outcome: acceptedOutcome(undefeated, locked.revision, 'cmd-before-batch'),
+        }),
+      );
+      const batch = buildGameBatch(undefeated, HAVOC_GAME_COUNT, 1, 'havoc', 'cmd-batch-82');
+      await repo.applyGameBatch({
+        expectedRevision: undefeated.revision,
+        games: batch.commits,
+      });
+      expect(await repo.loadActiveRun()).toBeNull();
+      const completed = await repo.readCompletedRun(RUN_ID);
+      expect(completed?.state.havocCursor).toBe(HAVOC_GAME_COUNT);
+      expect(completed?.state.perfectSeason).toBe(true);
+      expect(await repo.listRunGames(RUN_ID, 'havoc')).toHaveLength(1);
+      const history = await repo.listHistory();
+      expect(history).toHaveLength(1);
+      expect(history[0]).toMatchObject({
+        runId: RUN_ID,
+        perfectSeason: true,
+        completionState: 'comparison',
+      });
+      expect(await profiles.listAchievementReveals(`havoc:${RUN_ID}`)).toContainEqual({
+        id: 'the-monstars',
+        evidence: 'Finished the Havoc season 82-0',
+      });
+    } finally {
+      db.close();
+    }
+  });
+
+  it('advances a normal comparison batch against the completed run id', async () => {
+    const { db, repo } = createRepository('havoc-batch-normal');
+    const states = await applyDraftChain(repo, true);
+    const { final } = await archiveRunAtGame82(repo, states.locked);
+    const secondRun = buildHavocRunState({
+      runId: RUN_ID_2,
+      revision: 1,
+      draft: buildHavocDraftState({ runId: RUN_ID_2, revision: 1 }),
+    });
+    await repo.applyOutcome(
+      prepareCommandCommit({
+        outcome: acceptedOutcome(secondRun, 0, 'cmd-create-2'),
+        command: buildCreateCommand('cmd-create-2', RUN_ID_2),
+      }),
+    );
+    const batch = buildGameBatch(final, 1, 4, 'normal', 'cmd-normal-batch');
+    await repo.applyGameBatch({
+      expectedRevision: final.revision,
+      games: batch.commits,
+    });
+    const completed = await repo.readCompletedRun(RUN_ID);
+    expect(completed?.state.normalCursor).toBe(4);
+    expect(completed?.state.normalAggregate).toMatchObject({ games: 4, wins: 4 });
+    expect((await repo.loadActiveRun())?.runId).toBe(RUN_ID_2);
+    expect((await repo.loadActiveRun())?.revision).toBe(1);
+    expect(await repo.listRunGames(RUN_ID, 'normal')).toHaveLength(4);
+    expect(await repo.listHistory()).toHaveLength(1);
     db.close();
   });
 

@@ -13,6 +13,7 @@ import type {
   OpponentBracket,
   SeasonDraftCatalog,
   Seed,
+  SeasonPlayoffProfiles,
 } from '@hoop-rush/data-contracts';
 import type { CapRushApplyOutcomeInput } from '@hoop-rush/data-contracts';
 
@@ -55,6 +56,11 @@ export interface CapRushDraftRepositoryPort {
 
 export interface CapRushAssetPort {
   loadCatalog(): Promise<SeasonDraftCatalog>;
+  /**
+   * Optional split playoff evidence. It is fetched only when the lineup locks;
+   * legacy manifests/adapters that package evidence inside the catalog omit it.
+   */
+  loadPlayoffProfiles?(manifest: HoopRushManifest): Promise<SeasonPlayoffProfiles | null>;
   loadPreamble(): Promise<{
     manifest: HoopRushManifest;
     profile: EraSimulationProfile;

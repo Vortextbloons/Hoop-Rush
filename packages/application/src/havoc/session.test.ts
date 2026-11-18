@@ -3,6 +3,7 @@ import { describe, expect, it } from 'bun:test';
 import {
   HAVOC_GAME_COUNT,
   HAVOC_WORKER_WIRE_SCHEMA_VERSION,
+  havocNextGameBatchSize,
   seedSchema,
   type HavocCommandResult,
   type HavocComparison,
@@ -11,6 +12,7 @@ import {
   type HavocReport,
   type HavocRunState,
   type HavocVariant,
+  type HavocWorkerGameResult,
   type HoopRushManifest,
   type EraSimulationProfile,
 } from '@hoop-rush/data-contracts';
@@ -29,6 +31,7 @@ import {
   buildSeasonDraftCatalog,
 } from '@hoop-rush/test-fixtures';
 import type {
+  HavocApplyGameBatchInput,
   HavocApplyOutcomeInput,
   HavocBatchHandlers,
   HavocHistoryEntry,
@@ -47,6 +50,8 @@ class MemoryHavocRepository implements HavocRunRepositoryPort {
   private comparisons = new Map<string, HavocComparison>();
   private reports = new Map<string, HavocReport>();
   private history = new Map<string, HavocHistoryEntry>();
+  readonly batchSizes: number[] = [];
+  batchFailure: Error | null = null;
 
   async loadActiveRun(): Promise<HavocRunState | null> {
     return this.active;
@@ -58,6 +63,69 @@ class MemoryHavocRepository implements HavocRunRepositoryPort {
 
   async loadCommandResult(commandId: string): Promise<HavocCommandResult | null> {
     return this.commands.get(commandId) ?? null;
+  }
+
+  async applyGameBatch(input: HavocApplyGameBatchInput): Promise<HavocCommandResult> {
+    this.batchSizes.push(input.games.length);
+    if (this.batchFailure !== null) throw this.batchFailure;
+    const last = input.games[input.games.length - 1];
+    if (last === undefined) throw new Error('empty game batch');
+    if (input.games.some((game) => this.commands.has(game.outcome.result.commandId))) {
+      const stored = this.commands.get(last.outcome.result.commandId);
+      if (stored === undefined) throw new Error('partially applied game batch');
+      return stored;
+    }
+    const current =
+      this.active !== null && this.active.runId === last.outcome.result.runId
+        ? this.active
+        : [...this.completed.values()].find(
+            (entry) => entry.state.runId === last.outcome.result.runId,
+          )?.state;
+    if (current === undefined || current.revision !== input.expectedRevision) {
+      throw new Error('stale game batch revision');
+    }
+    const next = last.outcome.state;
+    for (const commit of input.games) {
+      const result = commit.outcome.result;
+      if (result.status !== 'accepted') throw new Error('batch receipt was rejected');
+      this.commands.set(result.commandId, result);
+      this.games.set(
+        `${next.runId}:${commit.game.result.variant}:${String(commit.game.result.gameNumber)}`,
+        {
+          result: commit.game.result,
+          resultDigest: commit.game.resultDigest,
+        },
+      );
+    }
+    if (next.revision !== last.outcome.result.revisionAfter) {
+      throw new Error('accepted outcome state must match revisionAfter');
+    }
+    const archived =
+      next.completionState === 'complete' ||
+      (next.completionState === 'abandoned' && next.phase === 'run') ||
+      next.havocCursor === HAVOC_GAME_COUNT;
+    if (archived) {
+      this.completed.set(next.runId, {
+        state: next,
+        report: this.reports.get(next.runId) ?? null,
+      });
+      this.active = null;
+    } else {
+      this.active = next;
+    }
+    if (next.phase === 'run') {
+      this.history.set(next.runId, {
+        runId: next.runId,
+        createdAtIso: '2026-10-11T00:00:00.000Z',
+        updatedAtIso: '2026-10-11T00:00:00.000Z',
+        havocWins: next.havocAggregate.wins,
+        havocLosses: next.havocAggregate.losses,
+        perfectSeason: next.perfectSeason,
+        comparisonStatus: next.comparisonStatus,
+        completionState: next.completionState === 'draft' ? 'season' : next.completionState,
+      });
+    }
+    return last.outcome.result;
   }
 
   async applyOutcome(input: HavocApplyOutcomeInput): Promise<HavocCommandResult> {
@@ -180,30 +248,51 @@ class EngineRunner implements HavocRunnerPort {
     this.cancelled = false;
     const context = createEngineContext();
     let delivered = 0;
-    for (let offset = 0; offset < request.count; offset += 1) {
+    while (delivered < request.count) {
       if (this.isCancelled()) break;
-      const gameNumber = request.cursor + offset + 1;
-      const input = buildHavocGameInput({
-        locked: request.locked,
-        gameNumber,
-        variant: request.variant,
-      });
-      const { result, tape } = simulateHavocGame(input, context);
-      const audit = auditHavocGame(input, result, tape);
-      if (!audit.ok) throw new Error(`audit failed for game ${String(gameNumber)}`);
-      const resultDigest = havocGameResultDigest(result);
-      await handlers.onGame?.({
-        schemaVersion: HAVOC_WORKER_WIRE_SCHEMA_VERSION,
-        type: 'havoc-game',
-        requestId: request.requestId,
-        variant: request.variant,
-        cursor: gameNumber,
-        inputDigest: result.inputDigest,
-        resultDigest,
-        summary: havocGameSummaryOf(result, resultDigest),
-        result,
-      });
-      delivered += 1;
+      const target = havocNextGameBatchSize(request.count - delivered);
+      const games: HavocWorkerGameResult[] = [];
+      while (games.length < target) {
+        if (this.isCancelled()) break;
+        const gameNumber = request.cursor + delivered + games.length + 1;
+        const input = buildHavocGameInput({
+          locked: request.locked,
+          gameNumber,
+          variant: request.variant,
+        });
+        const { result, tape } = simulateHavocGame(input, context);
+        const audit = auditHavocGame(input, result, tape);
+        if (!audit.ok) throw new Error(`audit failed for game ${String(gameNumber)}`);
+        const resultDigest = havocGameResultDigest(result);
+        games.push({
+          variant: request.variant,
+          cursor: gameNumber,
+          inputDigest: result.inputDigest,
+          resultDigest,
+          summary: havocGameSummaryOf(result, resultDigest),
+          result,
+        });
+      }
+      if (games.length === 0 || this.isCancelled()) break;
+      if (handlers.onGameBatch !== undefined) {
+        await handlers.onGameBatch({
+          schemaVersion: HAVOC_WORKER_WIRE_SCHEMA_VERSION,
+          type: 'havoc-game-batch',
+          requestId: request.requestId,
+          variant: request.variant,
+          games,
+        });
+      } else {
+        for (const game of games) {
+          await handlers.onGame?.({
+            schemaVersion: HAVOC_WORKER_WIRE_SCHEMA_VERSION,
+            type: 'havoc-game',
+            requestId: request.requestId,
+            ...game,
+          });
+        }
+      }
+      delivered += games.length;
     }
     return {
       schemaVersion: HAVOC_WORKER_WIRE_SCHEMA_VERSION,
@@ -298,7 +387,7 @@ async function draftFivePicks(service: HavocService): Promise<void> {
 }
 
 describe('HavocService integration', () => {
-  it('reports every saved game, including the starting cursor when resuming', async () => {
+  it('reports durable batch progress, including the starting cursor when resuming', async () => {
     const { service } = buildService();
     await service.createDraft();
     await draftFivePicks(service);
@@ -313,9 +402,73 @@ describe('HavocService integration', () => {
       }
     });
     await service.simulateRange({ variant: 'havoc', count: 2 });
-    expect(completed).toEqual([2, 3, 4]);
+    expect(completed).toEqual([2, 4]);
     service.dispose();
   });
+
+  it('accepts small ordered game groups through one repository batch each', async () => {
+    const { service, repository } = buildService();
+    await service.createDraft();
+    await draftFivePicks(service);
+    await service.lockLineup();
+    const accepted: number[] = [];
+    service.subscribe((event) => {
+      if (event.type === 'game-accepted') accepted.push(event.summary.gameNumber);
+    });
+    const batch = await service.simulateRange({ variant: 'havoc', count: 10 });
+    expect(batch).toMatchObject({ accepted: 10, cancelled: false, nextCursor: 10 });
+    expect(repository.batchSizes).toEqual([6, 4]);
+    expect(accepted).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    const games = await service.listGames('havoc');
+    expect(games.map((game) => game.gameNumber)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    expect((await service.loadActive()).run?.havocCursor).toBe(10);
+    service.dispose();
+  });
+
+  it('does not advance durable progress when a game batch commit fails', async () => {
+    const { service, repository } = buildService();
+    await service.createDraft();
+    await draftFivePicks(service);
+    await service.lockLineup();
+    repository.batchFailure = new Error('injected batch failure');
+    await expect(service.simulateRange({ variant: 'havoc', count: 4 })).rejects.toThrow(
+      'injected batch failure',
+    );
+    const snapshot = await service.loadActive();
+    expect(snapshot.run?.havocCursor).toBe(0);
+    expect(await service.listGames('havoc')).toEqual([]);
+    repository.batchFailure = null;
+    const resumed = await service.simulateRange({ variant: 'havoc', count: 4 });
+    expect(resumed.accepted).toBe(4);
+    expect((await service.loadActive()).run?.havocCursor).toBe(4);
+    service.dispose();
+  });
+
+  it('cancels between committed batches and resumes from the durable cursor', async () => {
+    const { service, repository } = buildService();
+    await service.createDraft();
+    await draftFivePicks(service);
+    await service.lockLineup();
+    let cancelAfterFirst = true;
+    service.subscribe((event) => {
+      if (event.type === 'game-accepted' && cancelAfterFirst) {
+        cancelAfterFirst = false;
+        void service.cancelSimulation();
+      }
+    });
+    const first = await service.simulateRange({ variant: 'havoc', count: 10 });
+    expect(first.cancelled).toBe(true);
+    expect(first.accepted).toBe(6);
+    expect(first.nextCursor).toBe(6);
+    expect(repository.batchSizes).toEqual([6]);
+    expect((await service.loadActive()).run?.havocCursor).toBe(6);
+    const resumed = await service.simulateRange({ variant: 'havoc', count: 'remaining' });
+    expect(resumed.cancelled).toBe(false);
+    expect(resumed.accepted).toBe(76);
+    expect(resumed.nextCursor).toBe(82);
+    expect((await service.listGames('havoc')).length).toBe(82);
+    service.dispose();
+  }, 120_000);
 
   it('drafts, rerolls once, locks, plays, watches, and finalizes a matched comparison', async () => {
     const { service } = buildService();

@@ -1,8 +1,11 @@
 import {
   HAVOC_WORKER_WIRE_SCHEMA_VERSION,
+  havocLockedInputDigest,
+  havocNextGameBatchSize,
   havocWorkerMessageSchema,
   havocWorkerRequestSchema,
   type HavocWorkerErrorCode,
+  type HavocWorkerGameResult,
   type HavocWorkerSimulateRequest,
   type HavocWorkerTapeRequest,
 } from '@hoop-rush/data-contracts';
@@ -46,8 +49,22 @@ function failureMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'unknown havoc worker failure';
 }
 
+function assertRequestDigest(
+  request: HavocWorkerTapeRequest | HavocWorkerSimulateRequest,
+): boolean {
+  if (havocLockedInputDigest(request.locked) === request.inputDigest) return true;
+  postError(
+    request.requestId,
+    'invariant-failure',
+    'the locked inputs do not match the request digest',
+    request.type === 'havoc-tape' ? request.gameNumber : null,
+  );
+  return false;
+}
+
 // eslint-disable-next-line @typescript-eslint/require-await -- the body is synchronous engine work with promise-returning callers
 async function runTape(request: HavocWorkerTapeRequest): Promise<void> {
+  if (!assertRequestDigest(request)) return;
   try {
     const input = buildHavocGameInput({
       locked: request.locked,
@@ -84,41 +101,59 @@ async function runTape(request: HavocWorkerTapeRequest): Promise<void> {
 }
 
 async function runSimulation(request: HavocWorkerSimulateRequest): Promise<void> {
+  if (!assertRequestDigest(request)) return;
   let delivered = 0;
   let lastProgressAt = 0;
   let lastYieldAt = Date.now();
   try {
-    for (let offset = 0; offset < request.count; offset += 1) {
+    let offset = 0;
+    while (offset < request.count) {
       if (cancelledRequests.has(request.requestId)) break;
-      const gameNumber = request.cursor + offset + 1;
-      const input = buildHavocGameInput({
-        locked: request.locked,
-        gameNumber,
-        variant: request.variant,
-      });
-      const { result, audit } = simulateAuditedHavocSummaryGame(input, engineContext);
-      if (!audit.ok) {
-        postError(
-          request.requestId,
-          'audit-failure',
-          audit.findings.map((finding) => `${finding.code}: ${finding.message}`).join('; '),
+      const target = havocNextGameBatchSize(request.count - offset);
+      const batch: HavocWorkerGameResult[] = [];
+      while (batch.length < target) {
+        if (cancelledRequests.has(request.requestId)) break;
+        const gameNumber = request.cursor + offset + 1;
+        const input = buildHavocGameInput({
+          locked: request.locked,
           gameNumber,
-        );
-        return;
+          variant: request.variant,
+        });
+        const { result, audit } = simulateAuditedHavocSummaryGame(input, engineContext);
+        if (!audit.ok) {
+          postError(
+            request.requestId,
+            'audit-failure',
+            audit.findings.map((finding) => `${finding.code}: ${finding.message}`).join('; '),
+            gameNumber,
+          );
+          return;
+        }
+        const resultDigest = havocGameResultDigest(result);
+        batch.push({
+          variant: request.variant,
+          cursor: gameNumber,
+          inputDigest: result.inputDigest,
+          resultDigest,
+          summary: havocGameSummaryOf(result, resultDigest),
+          result,
+        });
+        offset += 1;
+        const now = Date.now();
+        if (now - lastYieldAt >= YIELD_INTERVAL_MS) {
+          lastYieldAt = now;
+          await sleep(0);
+        }
       }
-      const resultDigest = havocGameResultDigest(result);
+      if (batch.length !== target || cancelledRequests.has(request.requestId)) break;
       post({
         schemaVersion: HAVOC_WORKER_WIRE_SCHEMA_VERSION,
-        type: 'havoc-game',
+        type: 'havoc-game-batch',
         requestId: request.requestId,
         variant: request.variant,
-        cursor: gameNumber,
-        inputDigest: result.inputDigest,
-        resultDigest,
-        summary: havocGameSummaryOf(result, resultDigest),
-        result,
+        games: batch,
       });
-      delivered += 1;
+      delivered += batch.length;
       const now = Date.now();
       if (now - lastProgressAt >= PROGRESS_INTERVAL_MS) {
         lastProgressAt = now;
@@ -130,10 +165,6 @@ async function runSimulation(request: HavocWorkerSimulateRequest): Promise<void>
           gamesCompleted: delivered,
           gamesTotal: request.count,
         });
-      }
-      if (now - lastYieldAt >= YIELD_INTERVAL_MS) {
-        lastYieldAt = now;
-        await sleep(0);
       }
     }
     post({

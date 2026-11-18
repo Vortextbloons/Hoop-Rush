@@ -4,7 +4,6 @@ import {
   type WorkerMessage,
 } from '@hoop-rush/data-contracts';
 import type {
-  ChallengeJobAttemptInput,
   ChallengeJobEvents,
   ChallengeJobPort,
   ChallengeJobSimulationInput,
@@ -15,20 +14,6 @@ export class ChallengeWorkerJob implements ChallengeJobPort {
   private worker: Worker | null = null;
   private requestId: string | null = null;
   private events: ChallengeJobEvents | null = null;
-
-  startAttempt(input: ChallengeJobAttemptInput, events: ChallengeJobEvents): void {
-    const { worker, requestId } = this.ensureWorker(events);
-    worker.postMessage(
-      workerRequestSchema.parse({
-        schemaVersion: 1,
-        type: 'start',
-        requestId,
-        run: { ...input.run, games: [] },
-        profile: input.profile,
-        engineVersion: input.run.versions.engineVersion,
-      }),
-    );
-  }
 
   startSimulation(input: ChallengeJobSimulationInput, events: ChallengeJobEvents): void {
     const { worker, requestId } = this.ensureWorker(events);
@@ -93,9 +78,6 @@ export class ChallengeWorkerJob implements ChallengeJobPort {
     switch (envelope.type) {
       case 'results':
         this.events?.onResults(envelope.results);
-        break;
-      case 'start-result':
-        this.events?.onStartResult(envelope.chosenRunSeed);
         break;
       case 'error':
         this.events?.onError(envelope.message);

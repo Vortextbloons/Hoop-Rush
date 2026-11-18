@@ -2,6 +2,7 @@ import type {
   CapRushBucket,
   CapRushHistoryPostseason,
   CapRushPayrollStatus,
+  CapRushSpinPurchaseId,
   CapRushVariant,
 } from '@hoop-rush/data-contracts';
 import { capRushConferenceRoundName, capRushRoundName } from '@hoop-rush/data-contracts';
@@ -31,6 +32,38 @@ export function postseasonResultClass(postseason: CapRushHistoryPostseason): str
 
 export function variantLabel(variant: CapRushVariant): string {
   return variant === 'clash' ? 'Cap Clash' : 'Cap Roulette';
+}
+
+export function capRushSpinPurchaseLabel(purchase: CapRushSpinPurchaseId): string {
+  return purchase === 'standard' ? 'Mutation Spark' : 'Mutation Surge';
+}
+
+export interface CapRushSpinOutcomeRow {
+  readonly tier: 1 | 2 | 3;
+  readonly label: string;
+  readonly odds: number;
+}
+
+export function capRushSpinOutcomeRows(
+  purchase: CapRushSpinPurchaseId,
+  odds: Readonly<Record<1 | 2 | 3, number>>,
+): CapRushSpinOutcomeRow[] {
+  return ([1, 2, 3] as const).map((tier) => {
+    const chance = odds[tier];
+    let label: string;
+    if (chance <= 0) {
+      label = `No Tier ${String(tier)} outcome`;
+    } else if (purchase === 'standard') {
+      label = `1 Tier ${String(tier)} mutation`;
+    } else if (tier === 1) {
+      label = '3 Tier 1 mutations';
+    } else if (tier === 2) {
+      label = '2 mutations: 1 Tier 2 + 1 Tier 1';
+    } else {
+      label = '1 Tier 3 mutation';
+    }
+    return { tier, label, odds: chance };
+  });
 }
 
 export function formatMillions(amount: number): string {

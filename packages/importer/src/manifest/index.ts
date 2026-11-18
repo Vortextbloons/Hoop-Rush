@@ -19,8 +19,10 @@ import {
   SEASON_DRAFT_CATALOG_VERSION,
   SEASON_STAMINA_VERSION,
   SEASON_DURABILITY_VERSION,
+  applySeasonPlayoffProfiles,
   playerVersionId,
   seasonDraftCatalogSchema,
+  seasonPlayoffProfilesSchema,
   type FranchiseEraPool,
 } from '@hoop-rush/data-contracts';
 import { LINEAGE_SEGMENTS, MODERN_SLOTS } from '../lineage.ts';
@@ -39,53 +41,90 @@ import {
 } from '../shared/manifest.ts';
 export { MANIFEST_PATH };
 export type { Manifest };
+function draftCandidateOf(player: FranchiseEraPool['players'][number]) {
+  const historicalMpg = player.stats.minutes / Math.max(1, player.stats.gamesPlayed);
+  const gamesPlayed = player.stats.gamesPlayed;
+  const teamGames = player.eligibility.teamGames;
+  return {
+    playerVersionId: playerVersionId(
+      player.playerId,
+      player.franchiseId,
+      player.eraId,
+      player.seasonKey,
+    ),
+    playerId: player.playerId,
+    franchiseId: player.franchiseId,
+    eraId: player.eraId,
+    seasonKey: player.seasonKey,
+    displayName: player.displayName,
+    playerExternalId: player.playerExternalId,
+    positions: player.positions,
+    heightInches: player.heightInches,
+    weightLbs: player.weightLbs,
+    summaryRatings: player.summaryRatings,
+    detailedRatings: player.detailedRatings,
+    tendencies: player.tendencies,
+    stamina: {
+      rating: Math.round(Math.min(95, Math.max(45, 45 + 1.25 * historicalMpg))),
+      historicalMpg,
+      derivationVersion: SEASON_STAMINA_VERSION,
+    },
+    durability: {
+      rating: Math.round(
+        Math.min(95, Math.max(45, 45 + (50 * gamesPlayed) / Math.max(1, teamGames))),
+      ),
+      derivationVersion: SEASON_DURABILITY_VERSION,
+    },
+    anchors: player.anchors,
+    reconstructedThreePoint: player.reconstructedThreePoint,
+  };
+}
+function playoffProfileOf(player: FranchiseEraPool['players'][number]) {
+  if (player.playoffPerformance === undefined) return null;
+  return {
+    playerVersionId: playerVersionId(
+      player.playerId,
+      player.franchiseId,
+      player.eraId,
+      player.seasonKey,
+    ),
+    playoffPerformance: player.playoffPerformance,
+  };
+}
+function playoffProfilesOf(pools: readonly FranchiseEraPool[]) {
+  return pools
+    .flatMap((pool) => pool.players.map((player) => playoffProfileOf(player)))
+    .filter((profile): profile is NonNullable<typeof profile> => profile !== null)
+    .sort((a, b) => a.playerVersionId.localeCompare(b.playerVersionId));
+}
+function writeCompactJson(path: string, value: unknown): void {
+  const temporaryPath = `${path}.tmp-${String(process.pid)}`;
+  writeFileSync(temporaryPath, `${JSON.stringify(value)}\n`, 'utf8');
+  renameSync(temporaryPath, path);
+}
+function buildPlayoffProfiles(pools: readonly FranchiseEraPool[]) {
+  const profiles = playoffProfilesOf(pools);
+  if (profiles.length === 0) return null;
+  return seasonPlayoffProfilesSchema.parse({
+    schemaVersion: 1,
+    catalogVersion: SEASON_DRAFT_CATALOG_VERSION,
+    dataVersion: DATA_VERSION,
+    profiles,
+  });
+}
+function writePlayoffProfiles(
+  dataDir: string,
+  artifact: NonNullable<ReturnType<typeof buildPlayoffProfiles>>,
+): { url: string; contentHash: string } {
+  const path = join(dataDir, 'playoff-profiles.json');
+  writeCompactJson(path, artifact);
+  return { url: 'playoff-profiles.json', contentHash: sha256File(path) };
+}
 function rebuildDraftCatalog(pools: readonly FranchiseEraPool[], dataDir: string) {
   const candidates = pools
-    .flatMap((pool) =>
-      pool.players.map((player) => {
-        const historicalMpg = player.stats.minutes / Math.max(1, player.stats.gamesPlayed);
-        const gamesPlayed = player.stats.gamesPlayed;
-        const teamGames = player.eligibility.teamGames;
-        return {
-          playerVersionId: playerVersionId(
-            player.playerId,
-            player.franchiseId,
-            player.eraId,
-            player.seasonKey,
-          ),
-          playerId: player.playerId,
-          franchiseId: player.franchiseId,
-          eraId: player.eraId,
-          seasonKey: player.seasonKey,
-          displayName: player.displayName,
-          playerExternalId: player.playerExternalId,
-          positions: player.positions,
-          heightInches: player.heightInches,
-          weightLbs: player.weightLbs,
-          summaryRatings: player.summaryRatings,
-          detailedRatings: player.detailedRatings,
-          tendencies: player.tendencies,
-          stamina: {
-            rating: Math.round(Math.min(95, Math.max(45, 45 + 1.25 * historicalMpg))),
-            historicalMpg,
-            derivationVersion: SEASON_STAMINA_VERSION,
-          },
-          durability: {
-            rating: Math.round(
-              Math.min(95, Math.max(45, 45 + (50 * gamesPlayed) / Math.max(1, teamGames))),
-            ),
-            derivationVersion: SEASON_DURABILITY_VERSION,
-          },
-          anchors: player.anchors,
-          reconstructedThreePoint: player.reconstructedThreePoint,
-          ...(player.playoffPerformance === undefined
-            ? {}
-            : { playoffPerformance: player.playoffPerformance }),
-        };
-      }),
-    )
+    .flatMap((pool) => pool.players.map(draftCandidateOf))
     .sort((a, b) => a.playerVersionId.localeCompare(b.playerVersionId));
-  const catalog = seasonDraftCatalogSchema.parse({
+  const baseCatalog = seasonDraftCatalogSchema.parse({
     schemaVersion: 1,
     catalogVersion: SEASON_DRAFT_CATALOG_VERSION,
     dataVersion: DATA_VERSION,
@@ -103,11 +142,27 @@ function rebuildDraftCatalog(pools: readonly FranchiseEraPool[], dataDir: string
     })),
     candidates,
   });
+  const playoffArtifact = buildPlayoffProfiles(pools);
+  // The identity hash covers the pre-split logical catalog so existing saves
+  // (which pinned that byte hash) keep resuming after the asset split. Merge
+  // the schema-parsed profiles so key order/optional fields match the old
+  // single-catalog serialization exactly.
+  const fullCatalog =
+    playoffArtifact === null
+      ? baseCatalog
+      : applySeasonPlayoffProfiles(baseCatalog, playoffArtifact);
+  const identityHash = sha256Hex(`${JSON.stringify(fullCatalog)}\n`);
   const path = join(dataDir, 'draft-catalog.json');
-  const temporaryPath = `${path}.tmp-${String(process.pid)}`;
-  writeFileSync(temporaryPath, `${JSON.stringify(catalog)}\n`, 'utf8');
-  renameSync(temporaryPath, path);
-  return { url: 'draft-catalog.json', contentHash: sha256File(path) };
+  writeCompactJson(path, baseCatalog);
+  return {
+    catalog: {
+      url: 'draft-catalog.json',
+      contentHash: sha256File(path),
+      identityHash,
+    },
+    playoffProfiles:
+      playoffArtifact === null ? null : writePlayoffProfiles(dataDir, playoffArtifact),
+  };
 }
 
 function peakPlayerToDraftEntry(player: ReturnType<typeof parsePool>['players'][number]) {
@@ -138,9 +193,6 @@ function peakPlayerToRosterDetails(player: ReturnType<typeof parsePool>['players
     heightInches: player.heightInches,
     weightLbs: player.weightLbs,
     stats: player.stats,
-    ...(player.playoffPerformance !== undefined
-      ? { playoffPerformance: player.playoffPerformance }
-      : {}),
   };
 }
 export function rebuildPlayersIndex(
@@ -182,20 +234,32 @@ export function rebuildPlayersIndex(
 export function rebuildRosterDetails(
   dataDir = PUBLIC_DATA,
   preloaded?: ReadonlyMap<string, unknown>,
+  splitPlayoffProfiles = false,
 ): {
   url: string;
   contentHash: string;
+  playoffProfilesSplit?: true;
 } | null {
   const poolsDir = join(dataDir, 'pools');
   const poolFiles = sortedJsonFiles(poolsDir);
-  const detailPlayers: ReturnType<typeof peakPlayerToRosterDetails>[] = [];
+  const detailPlayers: Array<
+    ReturnType<typeof peakPlayerToRosterDetails> & {
+      playoffPerformance?: FranchiseEraPool['players'][number]['playoffPerformance'];
+    }
+  > = [];
   const recoverAdvanced = rosterAdvancedLoader();
   for (const name of poolFiles) {
     try {
       const raw = preloaded?.get(name) ?? readJson(join(poolsDir, name));
       const validated = parsePool(raw);
       for (const player of validated.players) {
-        detailPlayers.push({ ...peakPlayerToRosterDetails(player), ...recoverAdvanced(player) });
+        detailPlayers.push({
+          ...peakPlayerToRosterDetails(player),
+          ...recoverAdvanced(player),
+          ...(!splitPlayoffProfiles && player.playoffPerformance !== undefined
+            ? { playoffPerformance: player.playoffPerformance }
+            : {}),
+        });
       }
     } catch (error) {
       throw new Error(
@@ -214,6 +278,7 @@ export function rebuildRosterDetails(
   return {
     url: 'roster-details.json',
     contentHash: sha256File(detailsPath),
+    ...(splitPlayoffProfiles ? { playoffProfilesSplit: true } : {}),
   };
 }
 export function refreshPlayersIndexInManifest(dataDir = PUBLIC_DATA): void {
@@ -306,11 +371,17 @@ export function run(dataDir = PUBLIC_DATA): void {
     });
   }
   manifest.pools = poolEntries;
+  const draftAssets =
+    poolByKey.size === 0 ? null : rebuildDraftCatalog([...poolByKey.values()], dataDir);
   const playersIndexEntry = rebuildPlayersIndex(dataDir, poolByKey);
   if (playersIndexEntry !== null) {
     manifest.playersIndex = playersIndexEntry;
   }
-  const rosterDetailsEntry = rebuildRosterDetails(dataDir, poolByKey);
+  const rosterDetailsEntry = rebuildRosterDetails(
+    dataDir,
+    poolByKey,
+    draftAssets?.playoffProfiles != null,
+  );
   if (rosterDetailsEntry !== null) {
     manifest.rosterDetails = rosterDetailsEntry;
   }
@@ -380,8 +451,12 @@ export function run(dataDir = PUBLIC_DATA): void {
       };
     }
   }
-  if (poolByKey.size > 0)
-    manifest.draftCatalog = rebuildDraftCatalog([...poolByKey.values()], dataDir);
+  if (draftAssets !== null) {
+    manifest.draftCatalog = draftAssets.catalog;
+    if (draftAssets.playoffProfiles !== null) {
+      manifest.playoffProfiles = draftAssets.playoffProfiles;
+    }
+  }
   if (previousCollection !== undefined) {
     manifest.collection = previousCollection;
   }

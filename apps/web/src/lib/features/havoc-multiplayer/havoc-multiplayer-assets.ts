@@ -4,6 +4,7 @@ import {
   HAVOC_SCHEMA_VERSION,
   HAVOC_SEED_DERIVATION_VERSION,
   defaultHavocMultiplayerVersionLocks,
+  seasonDraftCatalogIdentityHash,
   type HavocCatalog,
   type HavocCatalogSource,
   type HavocMultiplayerVersionLocks,
@@ -42,7 +43,7 @@ const assets = cachedAssets(async (): Promise<HavocMultiplayerSessionAssets> => 
   }
   const catalogSource: HavocCatalogSource = {
     catalogVersion: draftCatalog.catalogVersion,
-    catalogHash: catalogEntry.contentHash,
+    catalogHash: seasonDraftCatalogIdentityHash(catalogEntry),
     dataVersion: draftCatalog.dataVersion,
     ratingsVersion: draftCatalog.ratingsVersion,
     playerVersionIdVersion: draftCatalog.playerVersionIdVersion,
@@ -57,7 +58,7 @@ const assets = cachedAssets(async (): Promise<HavocMultiplayerSessionAssets> => 
     profileVersion: preamble.profile.profileVersion,
     dataVersion: draftCatalog.dataVersion,
     catalogVersion: draftCatalog.catalogVersion,
-    catalogHash: catalogEntry.contentHash,
+    catalogHash: seasonDraftCatalogIdentityHash(catalogEntry),
     bracketHash: bracketEntry.contentHash,
     profileHash: profileEntry.contentHash,
   };

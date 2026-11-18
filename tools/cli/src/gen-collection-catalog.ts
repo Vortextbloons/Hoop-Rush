@@ -19,6 +19,7 @@ import {
   eraIdSchema,
   seasonKeySchema,
   reconstructedThreePointProfileSchema,
+  seasonDraftCatalogIdentityHash,
   type CollectionCatalog,
   type CollectionCardDefinition,
   type CollectionRarity,
@@ -175,7 +176,7 @@ function specialSummaryRatings(
 function main(): void {
   const manifest = readJson(MANIFEST_PATH) as {
     dataVersion: string;
-    draftCatalog?: { url?: string; contentHash?: string };
+    draftCatalog?: { url?: string; contentHash?: string; identityHash?: string };
   };
   const draftRef = manifest.draftCatalog;
   if (draftRef?.url === undefined || draftRef.contentHash === undefined) {
@@ -282,7 +283,10 @@ function main(): void {
     positionNormalizationVersion: POSITION_NORMALIZATION_VERSION,
     playerVersionIdVersion: 'player-version-id-v1',
     sourceCatalogVersion: 'season-draft-catalog-v4',
-    sourceCatalogHash: draftRef.contentHash,
+    sourceCatalogHash: seasonDraftCatalogIdentityHash({
+      contentHash: draftRef.contentHash,
+      identityHash: draftRef.identityHash,
+    }),
     cards,
   };
   const parsed = collectionCatalogSchema.safeParse(catalog);

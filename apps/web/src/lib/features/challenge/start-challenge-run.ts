@@ -4,7 +4,6 @@ import {
   LINEUP_STRUCTURE,
   type ClassicDraftState,
   type EraSimulationProfile,
-  type HoopRushManifest,
   type LeagueRecord,
   type OpponentBracket,
   type PeakPlayerSeason,
@@ -15,9 +14,11 @@ import {
   classic,
   createChallenge,
   createEngineContext,
+  deriveAttemptSeed,
   toSimulationPlayer,
   type ChallengeCreation,
 } from '@hoop-rush/engine';
+import { getManifest } from '#lib/data.js';
 import { randomUUID } from '#lib/ids.js';
 import { resolvePlayerRefs } from '#lib/player-refs.js';
 import { FIXED_SANDBOX_ERA, loadRunPreamble } from '#lib/run-preamble.js';
@@ -27,7 +28,6 @@ import { leaguePrecompute } from './league-precompute';
 import { profileRepository, selectedProfile } from '#lib/features/profile/profile.js';
 
 interface ChallengeRunPreamble {
-  manifest: HoopRushManifest;
   profile: EraSimulationProfile;
   bracket: OpponentBracket;
   league: LeagueRecord | null;
@@ -35,11 +35,11 @@ interface ChallengeRunPreamble {
 }
 
 async function loadChallengeRunPreamble(runSeed: Seed): Promise<ChallengeRunPreamble> {
-  const [{ manifest, profile, bracket }, league] = await Promise.all([
+  const [{ profile, bracket }, league] = await Promise.all([
     loadRunPreamble(),
     leaguePrecompute.ensure(runSeed),
   ]);
-  return { manifest, profile, bracket, league, engineVersion: createEngineContext().engineVersion };
+  return { profile, bracket, league, engineVersion: createEngineContext().engineVersion };
 }
 
 export async function startClassicRun(draft: ClassicDraftState, runSeed: Seed): Promise<void> {
@@ -49,8 +49,6 @@ export async function startClassicRun(draft: ClassicDraftState, runSeed: Seed): 
   if (draft.picks.length !== 5) {
     throw new Error('A classic draft needs exactly five picks.');
   }
-  const { manifest, profile, bracket, league, engineVersion } =
-    await loadChallengeRunPreamble(runSeed);
   const pickBySlot = new Map(draft.picks.map((pick) => [pick.slotIndex, pick]));
   const refs = [0, 1, 2, 3, 4].map((slotIndex) => {
     const pick = pickBySlot.get(slotIndex);
@@ -59,7 +57,10 @@ export async function startClassicRun(draft: ClassicDraftState, runSeed: Seed): 
     }
     return { playerId: pick.playerId, franchiseId: pick.franchiseId, eraId: pick.eraId };
   });
-  const players = await resolvePlayerRefs(refs, manifest);
+  const [{ profile, bracket, league, engineVersion }, players] = await Promise.all([
+    loadChallengeRunPreamble(runSeed),
+    getManifest().then((manifest) => resolvePlayerRefs(refs, manifest)),
+  ]);
   const sample = players[0];
   const creation = classic.createClassicChallenge(draft, {
     runId: randomUUID(),
@@ -85,10 +86,12 @@ export async function startClassicRun(draft: ClassicDraftState, runSeed: Seed): 
       seasonKey: players[slot]?.seasonKey,
     })),
   });
+  // The league record uses the draft seed, while games use the first attempt seed.
+  const firstAttemptRun = { ...run, runSeed: deriveAttemptSeed(runSeed, 0) };
   await selectedProfile();
-  await profileRepository().bind(`challenge:${run.runId}`);
+  await profileRepository().bind(`challenge:${firstAttemptRun.runId}`);
   await challengeRepository.promoteClassicDraftToRun(
-    { recordId: 'active', saveSchemaVersion: 2, run },
+    { recordId: 'active', saveSchemaVersion: 2, run: firstAttemptRun },
     draft.draftId,
   );
   setClassicGuardBypass(true);
@@ -135,10 +138,15 @@ export async function startSandboxRun(players: PeakPlayerSeason[], seed: Seed): 
     bracket,
     ...(league ? { league } : {}),
   };
-  const run = createChallenge({ ...creation, runSeed: seed });
+  const run = createChallenge(creation);
+  const firstAttemptRun = { ...run, runSeed: deriveAttemptSeed(seed, 0) };
 
   await selectedProfile();
-  await profileRepository().bind(`challenge:${run.runId}`);
-  await challengeRepository.saveActiveRun({ recordId: 'active', saveSchemaVersion: 2, run });
+  await profileRepository().bind(`challenge:${firstAttemptRun.runId}`);
+  await challengeRepository.saveActiveRun({
+    recordId: 'active',
+    saveSchemaVersion: 2,
+    run: firstAttemptRun,
+  });
   void goto(resolve('sandbox/challenge/'));
 }

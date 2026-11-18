@@ -35,6 +35,7 @@ import {
   opponentBracketSchema,
   seedFromString,
   seedSchema,
+  seasonDraftCatalogIdentityHash,
   type CapRushCommand,
   type CapRushLeagueGame,
 } from '@hoop-rush/data-contracts';
@@ -102,7 +103,7 @@ function errorMessage(error: unknown): string {
 function bootstrap() {
   const { manifest, dir } = loadPackagedData();
   const data = new PackagedData(manifest, dir);
-  const catalog = data.draftCatalog();
+  const catalog = data.draftCatalogWithPlayoffs();
   const profile = data.eraProfile('2010s');
   const bracketEntry = manifest.bracket;
   const catalogEntry = manifest.draftCatalog;
@@ -116,7 +117,7 @@ function bootstrap() {
   );
   const source = {
     catalogVersion: catalog.catalogVersion,
-    catalogHash: catalogEntry.contentHash,
+    catalogHash: seasonDraftCatalogIdentityHash(catalogEntry),
     dataVersion: catalog.dataVersion,
     ratingsVersion: catalog.ratingsVersion,
     playerVersionIdVersion: catalog.playerVersionIdVersion,

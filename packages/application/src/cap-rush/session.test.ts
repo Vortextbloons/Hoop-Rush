@@ -28,6 +28,8 @@ import {
   contentHashSchema,
   eraIdSchema,
   idSchema,
+  playoffPerformanceSchema,
+  seasonPlayoffProfilesSchema,
   seedSchema,
   playerVersionId,
 } from '@hoop-rush/data-contracts';
@@ -54,7 +56,12 @@ import {
   buildManifest,
   capRushTestCatalogSource,
 } from '@hoop-rush/test-fixtures';
-import { CapRushServiceError, CapRushSession, type CapRushDraftRepositoryPort } from './index.ts';
+import {
+  CapRushServiceError,
+  CapRushSession,
+  type CapRushAssetPort,
+  type CapRushDraftRepositoryPort,
+} from './index.ts';
 
 class MemoryCapRushRepository implements CapRushDraftRepositoryPort {
   active: CapRushDraftState | null = null;
@@ -237,16 +244,21 @@ function createAssets() {
   };
 }
 
-function createSession(repository: CapRushDraftRepositoryPort, bracketHash?: string) {
+function createSession(
+  repository: CapRushDraftRepositoryPort,
+  bracketHash?: string,
+  assetOverrides?: Partial<CapRushAssetPort>,
+) {
   const { assets } = createAssets();
   let counter = 0;
   return new CapRushSession({
     repository,
     assets:
       bracketHash === undefined
-        ? assets
+        ? { ...assets, ...assetOverrides }
         : {
             ...assets,
+            ...assetOverrides,
             loadPreamble: async () => {
               const preamble = await assets.loadPreamble();
               if (preamble.manifest.bracket === undefined)
@@ -325,6 +337,72 @@ async function acceptSimulatedGame(
 }
 
 describe('cap rush session', () => {
+  it('defers split playoff profiles until the lineup locks', async () => {
+    const repository = new MemoryCapRushRepository();
+    const catalog = buildCapRushTestCatalog();
+    const profile = playoffPerformanceSchema.parse({
+      season: '1995-96',
+      regularSeason: {
+        gamesPlayed: 82,
+        minutes: 2800,
+        points: 2000,
+        assists: 400,
+        rebounds: 500,
+        turnovers: 200,
+        fga: 1500,
+        fta: 500,
+        tsPct: 0.58,
+      },
+      playoffs: {
+        playerExternalId: '101',
+        gamesPlayed: 10,
+        minutes: 350,
+        points: 250,
+        assists: 50,
+        rebounds: 60,
+        offensiveRebounds: null,
+        defensiveRebounds: null,
+        steals: null,
+        blocks: null,
+        turnovers: null,
+        fga: 190,
+        fta: 70,
+        tsPct: 0.6,
+      },
+      differences: {
+        tsPct: 0.02,
+        pointsPer36: 0.5,
+        assistsPer36: 0.1,
+        reboundsPer36: 0.2,
+        turnoversPer36: 0,
+      },
+    });
+    const profiles = seasonPlayoffProfilesSchema.parse({
+      schemaVersion: 1,
+      catalogVersion: catalog.catalogVersion,
+      dataVersion: catalog.dataVersion,
+      profiles: catalog.candidates.map((candidate) => ({
+        playerVersionId: candidate.playerVersionId,
+        playoffPerformance: profile,
+      })),
+    });
+    let profileLoads = 0;
+    const session = createSession(repository, undefined, {
+      loadPlayoffProfiles: async () => {
+        profileLoads += 1;
+        return profiles;
+      },
+    });
+
+    await draftLineup(session);
+    expect(profileLoads).toBe(0);
+
+    await session.lockLineup();
+    expect(profileLoads).toBe(1);
+    const locked = session.getSnapshot().draft?.draft.locked;
+    expect(locked?.playoffPerformance?.players.length).toBeGreaterThan(0);
+  });
+
   it('creates, drafts, persists, and resumes a run', async () => {
     const repository = new MemoryCapRushRepository();
     const session = createSession(repository);

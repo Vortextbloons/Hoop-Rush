@@ -16,9 +16,10 @@ import {
   CAP_RUSH_MULTIPLAYER_SEED_DERIVATION_VERSION,
   CAP_RUSH_MULTIPLAYER_VERSION,
   capRushMultiplayerVersionLocksSchema,
+  seasonDraftCatalogIdentityHash,
 } from '@hoop-rush/data-contracts';
 import { cachedAssets } from '#lib/assets/cached-assets.js';
-import { loadCapRushRosterMetadata, loadDraftCatalog } from '#lib/data-assets.js';
+import { loadCapRushRosterMetadata, loadDraftCatalogWithPlayoffs } from '#lib/data-assets.js';
 import { loadRunPreamble } from '#lib/run-preamble.js';
 import { capRushBracketWithRosterMetadata } from '../cap-rush/cap-rush-opponent-metadata.js';
 
@@ -29,8 +30,11 @@ export interface CapRushMultiplayerData {
 }
 
 async function buildData(): Promise<CapRushMultiplayerData> {
+  // Room projections can build locked inputs from any client, so multiplayer
+  // keeps the full logical catalog (including split playoff evidence) in the
+  // worker environment. Solo drafts defer the same asset until lock instead.
   const [catalog, preamble, metadata] = await Promise.all([
-    loadDraftCatalog(),
+    loadDraftCatalogWithPlayoffs(),
     loadRunPreamble((manifest) => manifest.capRushBracket),
     loadCapRushRosterMetadata(),
   ]);
@@ -43,7 +47,7 @@ async function buildData(): Promise<CapRushMultiplayerData> {
   }
   const catalogSource: CapRushCatalogSource = {
     catalogVersion: catalog.catalogVersion,
-    catalogHash: catalogEntry.contentHash,
+    catalogHash: seasonDraftCatalogIdentityHash(catalogEntry),
     dataVersion: catalog.dataVersion,
     ratingsVersion: catalog.ratingsVersion,
     playerVersionIdVersion: catalog.playerVersionIdVersion,
@@ -65,7 +69,7 @@ async function buildData(): Promise<CapRushMultiplayerData> {
     profileVersion: preamble.profile.profileVersion,
     dataVersion: catalog.dataVersion,
     catalogVersion: catalog.catalogVersion,
-    catalogHash: catalogEntry.contentHash,
+    catalogHash: seasonDraftCatalogIdentityHash(catalogEntry),
     bracketHash: bracketEntry.contentHash,
     profileHash: profileEntry.contentHash,
   });

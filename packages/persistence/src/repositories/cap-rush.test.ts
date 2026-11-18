@@ -7,6 +7,7 @@ import type {
 } from '@hoop-rush/data-contracts';
 import {
   CAP_RUSH_GAME_COUNT,
+  CAP_RUSH_LEGACY_SAVE_SCHEMA_VERSION,
   CAP_RUSH_RULES_VERSION,
   CAP_RUSH_SALARY_CURVE_VERSION,
   CAP_RUSH_SAVE_SCHEMA_VERSION,
@@ -57,8 +58,9 @@ import {
 } from '@hoop-rush/test-fixtures';
 import {
   CAP_RUSH_ACTIVE_DRAFT_RECORD_ID,
-  storedCapRushDraftRowSchema,
+  storedCapRushDraftProgressRowSchema,
   storedCapRushHistoryRowSchema,
+  storedCapRushLegacyDraftRowSchema,
 } from '../schemas/cap-rush-record.ts';
 import {
   CapRushCommandConflictError,
@@ -297,6 +299,31 @@ describe('cap rush repository', () => {
     expect(await repository.listRunGames(run.state.runId)).toEqual([]);
   });
 
+  it('rolls back the locked-input row when the first lock commit fails', async () => {
+    const run = lockedRun();
+    await repository.applyOutcome(
+      prepareCommandCommit({
+        outcome: { state: run.created, result: run.createResult },
+        command: run.createCommand,
+      }),
+    );
+    const failWrite = vi
+      .spyOn(db.capRushActive, 'put')
+      .mockRejectedValueOnce(new Error('active save failed'));
+    await expect(
+      repository.applyOutcome(
+        prepareCommandCommit({
+          outcome: { state: run.state, result: run.result },
+          command: run.command,
+        }),
+      ),
+    ).rejects.toThrow('active save failed');
+    failWrite.mockRestore();
+    expect(await db.capRushLockedInputs.count()).toBe(0);
+    expect(await repository.loadActiveDraft()).toEqual(run.created);
+    expect(await repository.loadCommandResult(run.command.commandId)).toBeNull();
+  });
+
   it('replaying an accepted receipt writes no duplicate artifacts', async () => {
     const run = await startLockedRun(repository);
     const bundle = acceptBundle(run.index, run.state, 1);
@@ -446,7 +473,7 @@ describe('cap rush repository', () => {
 
   it('rejects a stored draft whose digest does not match', async () => {
     const { state } = setup();
-    const row = storedCapRushDraftRowSchema.parse({
+    const row = storedCapRushDraftProgressRowSchema.parse({
       saveSchemaVersion: CAP_RUSH_SAVE_SCHEMA_VERSION,
       recordId: CAP_RUSH_ACTIVE_DRAFT_RECORD_ID,
       runId: state.runId,
@@ -463,8 +490,13 @@ describe('cap rush repository', () => {
   it('rejects an old locked season without deleting the save', async () => {
     await startLockedRun(repository);
     const row = await db.capRushActive.get(CAP_RUSH_ACTIVE_DRAFT_RECORD_ID);
-    if (!row) throw new Error('missing locked run');
-    await db.capRushActive.put({ ...row, draft: { ...row.draft, postseasonEligible: true } });
+    if (!row || row.saveSchemaVersion !== CAP_RUSH_SAVE_SCHEMA_VERSION) {
+      throw new Error('missing version-4 locked run');
+    }
+    await db.capRushActive.put({
+      ...row,
+      draft: { ...row.draft, postseasonEligible: true },
+    });
     await expect(repository.loadActiveDraft()).rejects.toMatchObject({ code: 'unsupported' });
     expect(await db.capRushActive.get(CAP_RUSH_ACTIVE_DRAFT_RECORD_ID)).toBeDefined();
   });
@@ -472,7 +504,9 @@ describe('cap rush repository', () => {
   it('rejects an old postseason without deleting the save', async () => {
     await startLockedRun(repository);
     const row = await db.capRushActive.get(CAP_RUSH_ACTIVE_DRAFT_RECORD_ID);
-    if (!row) throw new Error('missing locked run');
+    if (!row || row.saveSchemaVersion !== CAP_RUSH_SAVE_SCHEMA_VERSION) {
+      throw new Error('missing version-4 locked run');
+    }
     await db.capRushActive.put({
       ...row,
       draft: { ...row.draft, postseason: { version: 'cap-rush-postseason-v1' } },
@@ -484,16 +518,14 @@ describe('cap rush repository', () => {
   it('recognizes an older rules version in a locked active run as unsupported', async () => {
     await startLockedRun(repository);
     const row = await db.capRushActive.get(CAP_RUSH_ACTIVE_DRAFT_RECORD_ID);
-    if (!row || !row.draft.locked) throw new Error('missing locked run');
+    if (!row || row.saveSchemaVersion !== CAP_RUSH_SAVE_SCHEMA_VERSION) {
+      throw new Error('missing version-4 locked run');
+    }
     await db.capRushActive.put({
       ...row,
       draft: {
         ...row.draft,
         versionSet: { ...row.draft.versionSet, rulesVersion: 'cap-rush-rules-v1' },
-        locked: {
-          ...row.draft.locked,
-          versionSet: { ...row.draft.locked.versionSet, rulesVersion: 'cap-rush-rules-v1' },
-        },
       },
     } as never);
     await expect(repository.loadActiveDraft()).rejects.toMatchObject({ code: 'unsupported' });
@@ -502,16 +534,14 @@ describe('cap rush repository', () => {
   it('recognizes an older salary curve in a locked active run as unsupported', async () => {
     await startLockedRun(repository);
     const row = await db.capRushActive.get(CAP_RUSH_ACTIVE_DRAFT_RECORD_ID);
-    if (!row || !row.draft.locked) throw new Error('missing locked run');
+    if (!row || row.saveSchemaVersion !== CAP_RUSH_SAVE_SCHEMA_VERSION) {
+      throw new Error('missing version-4 locked run');
+    }
     await db.capRushActive.put({
       ...row,
       draft: {
         ...row.draft,
         versionSet: { ...row.draft.versionSet, salaryCurveVersion: 'cap-rush-salary-v1' },
-        locked: {
-          ...row.draft.locked,
-          versionSet: { ...row.draft.locked.versionSet, salaryCurveVersion: 'cap-rush-salary-v1' },
-        },
       },
     } as never);
     await expect(repository.loadActiveDraft()).rejects.toMatchObject({ code: 'unsupported' });
@@ -792,6 +822,215 @@ describe('cap rush repository', () => {
     });
   });
 
+  it('stores locked inputs once and keeps every later progress row small', async () => {
+    const run = await startLockedRun(repository, { league: true });
+    if (run.state.locked === null) throw new Error('missing locked inputs');
+    const lockedRow = await db.capRushLockedInputs.get(run.state.runId);
+    if (lockedRow === undefined) throw new Error('missing locked-input row');
+    expect(lockedRow.locked).toEqual(run.state.locked);
+
+    const active = await db.capRushActive.get(CAP_RUSH_ACTIVE_DRAFT_RECORD_ID);
+    if (!active || active.saveSchemaVersion !== CAP_RUSH_SAVE_SCHEMA_VERSION) {
+      throw new Error('missing version-4 progress row');
+    }
+    expect(active.draft.locked).toEqual({
+      runId: run.state.runId,
+      digest: lockedRow.digest,
+    });
+    expect(JSON.stringify(active).length * 10).toBeLessThan(JSON.stringify(lockedRow).length);
+
+    const putLocked = vi.spyOn(db.capRushLockedInputs, 'put');
+    const bundle = acceptBundle(run.index, run.state, 1);
+    await repository.applyOutcome(
+      prepareCommandCommit({
+        outcome: { state: bundle.state, result: bundle.result },
+        command: bundle.command,
+        game: bundle.game,
+      }),
+    );
+    expect(putLocked).not.toHaveBeenCalled();
+    putLocked.mockRestore();
+    expect(await repository.loadActiveDraft()).toEqual(bundle.state);
+    expect(await db.capRushLockedInputs.count()).toBe(1);
+  });
+
+  it('rejects a progress row whose locked record is missing or tampered with', async () => {
+    const run = await startLockedRun(repository);
+    const lockedRow = await db.capRushLockedInputs.get(run.state.runId);
+    if (lockedRow === undefined) throw new Error('missing locked-input row');
+    await db.capRushLockedInputs.delete(run.state.runId);
+    await expect(repository.loadActiveDraft()).rejects.toMatchObject({ code: 'malformed' });
+
+    await db.capRushLockedInputs.put({ ...lockedRow, digest: '0'.repeat(32) });
+    await expect(repository.loadActiveDraft()).rejects.toMatchObject({ code: 'malformed' });
+
+    await db.capRushLockedInputs.put({
+      ...lockedRow,
+      locked: { ...lockedRow.locked, payrollDollars: lockedRow.locked.payrollDollars + 1 },
+    });
+    await expect(repository.loadActiveDraft()).rejects.toMatchObject({ code: 'malformed' });
+  });
+
+  it('resumes a version-3 active save and migrates it on the next accepted command', async () => {
+    const run = lockedRun();
+    await db.capRushActive.put(
+      storedCapRushLegacyDraftRowSchema.parse({
+        saveSchemaVersion: CAP_RUSH_LEGACY_SAVE_SCHEMA_VERSION,
+        recordId: CAP_RUSH_ACTIVE_DRAFT_RECORD_ID,
+        runId: run.state.runId,
+        revision: run.state.revision,
+        stateDigest: capRushStateDigest(run.state),
+        draft: run.state,
+        createdAtIso: '2026-01-01T00:00:00.000Z',
+        updatedAtIso: '2026-01-01T00:00:00.000Z',
+      }),
+    );
+    expect(await db.capRushLockedInputs.count()).toBe(0);
+    expect(await repository.loadActiveDraft()).toEqual(run.state);
+
+    const bundle = acceptBundle(run.index, run.state, 1);
+    await repository.applyOutcome(
+      prepareCommandCommit({
+        outcome: { state: bundle.state, result: bundle.result },
+        command: bundle.command,
+        game: bundle.game,
+      }),
+    );
+
+    const active = await db.capRushActive.get(CAP_RUSH_ACTIVE_DRAFT_RECORD_ID);
+    if (!active || active.saveSchemaVersion !== CAP_RUSH_SAVE_SCHEMA_VERSION) {
+      throw new Error('expected the active row to migrate to version 4');
+    }
+    expect(active.draft.locked).toEqual({
+      runId: run.state.runId,
+      digest: expect.stringMatching(/^[0-9a-f]{32}$/) as unknown as string,
+    });
+    expect(await db.capRushLockedInputs.get(run.state.runId)).toBeDefined();
+    expect(await repository.loadActiveDraft()).toEqual(bundle.state);
+    expect(await repository.loadCommandResult(bundle.command.commandId)).toEqual(bundle.result);
+  });
+
+  it('lists league results from score rows without parsing boxes and backfills old saves', async () => {
+    const { index, state } = await startLockedRun(repository, { league: true });
+    if (state.locked === null) throw new Error('missing locked inputs');
+    const leagueGames = simulateCapRushLeagueSlot({
+      locked: state.locked,
+      slot: 1,
+      context: createEngineContext(),
+    });
+    const command = capRushAcceptLeagueGamesCommandSchema.parse({
+      command: 'accept-cap-rush-league-games',
+      commandId: commandIdSchema.parse('cmd-league-scores'),
+      runId: state.runId,
+      expectedRevision: state.revision,
+      slot: 1,
+      leagueGameIds: leagueGames.map((game) => game.gameId),
+    });
+    const outcome = applyCapRushCommand(state, command, { index });
+    expect(outcome.result.status).toBe('accepted');
+    await repository.applyOutcome(prepareCommandCommit({ outcome, command, leagueGames }));
+
+    const scores = await db.capRushLeagueResults.where('runId').equals(state.runId).toArray();
+    expect(scores).toHaveLength(leagueGames.length);
+    for (const row of scores) {
+      expect('box' in row.result).toBe(false);
+      expect(JSON.stringify(row).length).toBeLessThan(2_000);
+    }
+    expect(await repository.listLeagueResults(state.runId)).toHaveLength(leagueGames.length);
+
+    const first = leagueGames[0];
+    if (first === undefined) throw new Error('missing league game');
+    expect(await repository.readLeagueGame(state.runId, first.gameId)).toEqual(first);
+
+    // A full box malformed for the list projection proves listing does not
+    // deserialize boxes while score rows are complete.
+    const gameRow = await db.capRushLeagueGames.get([state.runId, first.gameId]);
+    if (gameRow === undefined) throw new Error('missing stored league game');
+    await db.capRushLeagueGames.put({
+      ...gameRow,
+      game: { ...gameRow.game, box: null },
+    } as never);
+    expect(await repository.listLeagueResults(state.runId)).toHaveLength(leagueGames.length);
+    await expect(repository.readLeagueGame(state.runId, first.gameId)).rejects.toMatchObject({
+      code: 'malformed',
+    });
+    await db.capRushLeagueGames.put(gameRow);
+
+    // Emulate a version-15 save: full boxes exist without score rows. The
+    // first read returns the projected results and caches them for next time.
+    await db.capRushLeagueResults.clear();
+    const legacyResults = await repository.listLeagueResults(state.runId);
+    expect(legacyResults).toHaveLength(leagueGames.length);
+    expect(await db.capRushLeagueResults.count()).toBe(leagueGames.length);
+    expect(await repository.listLeagueResults(state.runId)).toEqual(legacyResults);
+
+    // A partly migrated save (some score rows, more full boxes) must not hide
+    // the legacy results behind a matching prefix.
+    const scoresAgain = await db.capRushLeagueResults.where('runId').equals(state.runId).toArray();
+    await db.capRushLeagueResults.clear();
+    await db.capRushLeagueResults.bulkPut(scoresAgain.slice(0, 5));
+    expect(await repository.listLeagueResults(state.runId)).toHaveLength(leagueGames.length);
+    expect(await db.capRushLeagueResults.count()).toBe(leagueGames.length);
+  });
+
+  it('rolls back boxes, score rows, aggregate, and the receipt when the score write fails', async () => {
+    const { index, state } = await startLockedRun(repository, { league: true });
+    if (state.locked === null) throw new Error('missing locked inputs');
+    const bundle = acceptBundle(index, state, 1);
+    const leagueGames = simulateCapRushLeagueSlot({
+      locked: state.locked,
+      slot: 1,
+      context: createEngineContext(),
+    });
+    const command = capRushAcceptGameCommandSchema.parse({
+      ...bundle.command,
+      leagueGameIds: leagueGames.map((game) => game.gameId),
+    });
+    const outcome = applyCapRushCommand(state, command, { index });
+    expect(outcome.result.status).toBe('accepted');
+    const failWrite = vi
+      .spyOn(db.capRushLeagueResults, 'bulkPut')
+      .mockRejectedValueOnce(new Error('score save failed'));
+    await expect(
+      repository.applyOutcome(
+        prepareCommandCommit({ outcome, command, game: bundle.game, leagueGames }),
+      ),
+    ).rejects.toThrow('score save failed');
+    failWrite.mockRestore();
+    expect(await repository.readRunGame(state.runId, 1)).toBeNull();
+    expect(await db.capRushLeagueGames.where('runId').equals(state.runId).count()).toBe(0);
+    expect(await db.capRushLeagueResults.where('runId').equals(state.runId).count()).toBe(0);
+    expect(await repository.readLeagueAggregate(state.runId)).toBeNull();
+    expect(await repository.loadActiveDraft()).toEqual(state);
+    expect(await repository.loadCommandResult(command.commandId)).toBeNull();
+  });
+
+  it('clears locked inputs and score rows with the active run', async () => {
+    const run = await startLockedRun(repository, { league: true });
+    if (run.state.locked === null) throw new Error('missing locked inputs');
+    const leagueGames = simulateCapRushLeagueSlot({
+      locked: run.state.locked,
+      slot: 1,
+      context: createEngineContext(),
+    });
+    const command = capRushAcceptLeagueGamesCommandSchema.parse({
+      command: 'accept-cap-rush-league-games',
+      commandId: commandIdSchema.parse('cmd-league-clear'),
+      runId: run.state.runId,
+      expectedRevision: run.state.revision,
+      slot: 1,
+      leagueGameIds: leagueGames.map((game) => game.gameId),
+    });
+    const outcome = applyCapRushCommand(run.state, command, { index: run.index });
+    expect(outcome.result.status).toBe('accepted');
+    await repository.applyOutcome(prepareCommandCommit({ outcome, command, leagueGames }));
+    expect(await db.capRushLockedInputs.count()).toBe(1);
+    expect(await db.capRushLeagueResults.count()).toBe(leagueGames.length);
+    await repository.clearActiveDraft();
+    expect(await db.capRushLockedInputs.count()).toBe(0);
+    expect(await db.capRushLeagueResults.count()).toBe(0);
+  });
+
   it('orders history newest first across completed runs', async () => {
     const rows = [
       { runId: 'run-older', completedAtIso: '2026-01-01T00:00:00.000Z', wins: 50, losses: 32 },
@@ -911,9 +1150,11 @@ describe('cap rush repository', () => {
         completedAt: null,
       },
     });
+    // Write the version-3 layout on purpose: finalizing must still accept an
+    // existing save and migrate it in the same transaction.
     await db.capRushActive.put(
-      storedCapRushDraftRowSchema.parse({
-        saveSchemaVersion: CAP_RUSH_SAVE_SCHEMA_VERSION,
+      storedCapRushLegacyDraftRowSchema.parse({
+        saveSchemaVersion: CAP_RUSH_LEGACY_SAVE_SCHEMA_VERSION,
         recordId: CAP_RUSH_ACTIVE_DRAFT_RECORD_ID,
         runId: completed.runId,
         revision: completed.revision,

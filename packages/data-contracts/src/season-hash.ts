@@ -63,6 +63,10 @@ export function seasonDigestHex(material: string, offsets?: SeasonDigestState): 
 }
 const immutableJson = new WeakMap<object, string>();
 
+export function hasCachedCanonicalJson(value: object): boolean {
+  return immutableJson.has(value);
+}
+
 function freezeCanonicalJson<T extends object>(value: T): T {
   function freeze(entry: unknown): void {
     if (entry === null || typeof entry !== 'object') return;

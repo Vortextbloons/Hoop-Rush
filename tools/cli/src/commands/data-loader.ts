@@ -3,12 +3,14 @@ import { dirname, isAbsolute, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   DEFAULT_ERA_ID,
+  applySeasonPlayoffProfiles,
   eraSimulationProfileSchema,
   franchiseEraPoolSchema,
   hoopRushManifestSchema,
   opponentBracketSchema,
   parseProjectionModelArtifact,
   parseSeasonDraftCatalog,
+  parseSeasonPlayoffProfiles,
   playersIndexSchema,
   type EraSimulationProfile,
   type FranchiseEraPool,
@@ -148,6 +150,14 @@ export class PackagedData {
     verifyHash(path, bytes, entry.contentHash);
     this.draftCatalogCache = parseSeasonDraftCatalog(parseJson(path, bytes));
     return this.draftCatalogCache;
+  }
+  draftCatalogWithPlayoffs(): SeasonDraftCatalog {
+    const catalog = this.draftCatalog();
+    const entry = this.manifest.playoffProfiles;
+    if (!entry) return catalog;
+    const { path, bytes } = this.artifact(entry.url);
+    verifyHash(path, bytes, entry.contentHash);
+    return applySeasonPlayoffProfiles(catalog, parseSeasonPlayoffProfiles(parseJson(path, bytes)));
   }
 }
 export function loadProfileFile(path: string): EraSimulationProfile {

@@ -15,6 +15,9 @@
     modeLabel,
     draftHref,
     resultHref,
+    fastSim,
+    reducedMotion,
+    onFastSimChange,
     onCancel,
     onResume,
   }: {
@@ -25,6 +28,9 @@
     modeLabel: string;
     draftHref: string;
     resultHref: string | null;
+    fastSim: boolean;
+    reducedMotion: boolean;
+    onFastSimChange: (enabled: boolean) => void;
     onCancel: () => void;
     onResume: () => void;
   } = $props();
@@ -160,6 +166,18 @@
     </div>
 
     <div class="mt-6 flex flex-wrap items-center gap-3">
+      <label
+        class="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm font-semibold outline-none focus-within:ring-2 focus-within:ring-ring"
+      >
+        <input
+          type="checkbox"
+          checked={fastSim}
+          onchange={(event) => onFastSimChange(event.currentTarget.checked)}
+          aria-describedby={reducedMotion ? 'challenge-fast-sim-note' : undefined}
+          class="h-4 w-4 accent-primary"
+        />
+        Fast Sim
+      </label>
       {#if phase === 'running'}
         <button
           type="button"
@@ -200,6 +218,11 @@
       {/if}
       {#if phase === 'error' && error}
         <p class="w-full text-sm text-destructive">Couldn’t finish the run. Try again.</p>
+      {/if}
+      {#if reducedMotion}
+        <p id="challenge-fast-sim-note" class="w-full text-xs text-muted-foreground">
+          Reduced motion is on, so games always reveal at full speed.
+        </p>
       {/if}
     </div>
   </div>

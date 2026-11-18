@@ -7,7 +7,6 @@ import {
   HAVOC_WORKER_WIRE_SCHEMA_VERSION,
   HavocLoadError,
   canonicalJson,
-  canonicalHavocLockedInputs,
   havocAbandonRunCommandSchema,
   havocAcceptGameCommandSchema,
   havocAcceptNormalGameCommandSchema,
@@ -15,11 +14,13 @@ import {
   havocCompleteComparisonCommandSchema,
   havocCreateDraftCommandSchema,
   havocLockLineupCommandSchema,
+  havocLockedInputDigest,
   havocPickCardCommandSchema,
   havocRerollOfferCommandSchema,
   havocWorkerSimulateRequestSchema,
   havocWorkerTapeRequestSchema,
   seasonDigestHex,
+  seasonDraftCatalogIdentityHash,
   type EraSimulationProfile,
   type HavocCatalogSource,
   type HavocCatalog,
@@ -34,7 +35,8 @@ import {
   type HavocVariant,
   type HavocVersionSet,
   type HavocWorkerCompleteMessage,
-  type HavocWorkerGameMessage,
+  type HavocWorkerGameBatchMessage,
+  type HavocWorkerGameResult,
   type OpponentBracket,
 } from '@hoop-rush/data-contracts';
 import {
@@ -65,6 +67,7 @@ import {
 import type {
   HavocAssetPort,
   HavocBatchHandlers,
+  HavocGameBatchCommit,
   HavocIdPort,
   HavocRunRepositoryPort,
   HavocRunnerPort,
@@ -84,10 +87,6 @@ export interface HavocSessionOptions {
   runner: HavocRunnerPort;
   assets: HavocAssetPort;
   ids: HavocIdPort;
-}
-
-function lockedDigestOf(locked: HavocLockedInputs): string {
-  return seasonDigestHex(`havoc-locked-v1:${canonicalHavocLockedInputs(locked)}`);
 }
 
 function messageOf(error: unknown): string {
@@ -314,7 +313,7 @@ export class HavocSession implements HavocService {
         requestId,
         runId: state.runId,
         revision: state.revision,
-        inputDigest: lockedDigestOf(state.locked),
+        inputDigest: havocLockedInputDigest(state.locked),
         variant: input.variant,
         cursor,
         count: requested,
@@ -333,19 +332,27 @@ export class HavocSession implements HavocService {
         });
       };
       publishProgress();
+      const acceptBatch = async (games: readonly HavocWorkerGameResult[]): Promise<void> => {
+        if (games.length === 0) return;
+        if (accepted + games.length > requested) {
+          throw new HavocServiceError('simulation', 'the worker delivered too many games');
+        }
+        if (games.some((game) => game.variant !== input.variant)) {
+          throw new HavocServiceError('simulation', 'the delivered game variant does not match');
+        }
+        await this.acceptStreamedGames(games);
+        accepted += games.length;
+        for (const game of games) {
+          this.emit({ type: 'game-accepted', summary: game.summary });
+        }
+        publishProgress();
+      };
       const handlers: HavocBatchHandlers = {
         onGame: async (message) => {
-          const recomputed = havocGameResultDigest(message.result);
-          if (recomputed !== message.resultDigest) {
-            throw new HavocServiceError(
-              'simulation',
-              `game ${String(message.cursor)} failed digest verification`,
-            );
-          }
-          await this.acceptStreamedGame(message);
-          accepted += 1;
-          this.emit({ type: 'game-accepted', summary: message.summary });
-          publishProgress();
+          await acceptBatch([message]);
+        },
+        onGameBatch: async (message: HavocWorkerGameBatchMessage) => {
+          await acceptBatch(message.games);
         },
         onError: (message) => {
           this.emit({
@@ -364,6 +371,13 @@ export class HavocSession implements HavocService {
       }
       const nextState = this.requireRun();
       const nextCursor = input.variant === 'havoc' ? nextState.havocCursor : nextState.normalCursor;
+      if (
+        accepted !== complete.gamesDelivered ||
+        nextCursor !== complete.lastCursor ||
+        (!complete.cancelled && accepted !== requested)
+      ) {
+        throw new HavocServiceError('simulation', 'the worker completed with missing games');
+      }
       return { accepted, cancelled: complete.cancelled, nextCursor };
     });
   }
@@ -394,7 +408,7 @@ export class HavocSession implements HavocService {
         requestId: this.ids.newRequestId('havoc-tape'),
         runId: state.runId,
         revision: state.revision,
-        inputDigest: lockedDigestOf(state.locked),
+        inputDigest: havocLockedInputDigest(state.locked),
         variant: input.variant,
         gameNumber: input.gameNumber,
         locked: state.locked,
@@ -649,68 +663,92 @@ export class HavocSession implements HavocService {
     }
   }
 
-  private async acceptStreamedGame(message: HavocWorkerGameMessage): Promise<void> {
+  private async acceptStreamedGames(games: readonly HavocWorkerGameResult[]): Promise<void> {
     const state = this.requireRun();
     const assets = await this.loadAssets();
     this.assertSupportedVersion(state, assets);
-    const command: HavocCommand =
-      message.variant === 'havoc'
-        ? havocAcceptGameCommandSchema.parse({
-            schemaVersion: HAVOC_SCHEMA_VERSION,
-            commandId: this.ids.newCommandId(),
-            runId: state.runId,
-            expectedRevision: state.revision,
-            command: 'accept-havoc-game',
-            cursor: message.cursor,
-            inputDigest: message.inputDigest,
-            resultDigest: message.resultDigest,
-            summary: message.summary,
-          })
-        : havocAcceptNormalGameCommandSchema.parse({
-            schemaVersion: HAVOC_SCHEMA_VERSION,
-            commandId: this.ids.newCommandId(),
-            runId: state.runId,
-            expectedRevision: state.revision,
-            command: 'accept-havoc-normal-game',
-            cursor: message.cursor,
-            inputDigest: message.inputDigest,
-            resultDigest: message.resultDigest,
-            summary: message.summary,
-          });
     const environment = createHavocCommandEnvironment(assets.catalog);
-    const outcome = ApplyHavocCommand(state, command, environment, {
-      bracket: assets.bracket,
-      profile: assets.profile,
-    });
-    if (outcome.result.status === 'rejected') {
-      throw new HavocServiceError(
-        'simulation',
-        outcome.result.rejection?.message ?? 'the accepted game was rejected',
-      );
-    }
-    const applied = await this.repository.applyOutcome(
-      prepareCommandCommit({
-        outcome,
+    const lockSources = { bracket: assets.bracket, profile: assets.profile };
+    const commits: HavocGameBatchCommit[] = [];
+    let working = state;
+    for (const game of games) {
+      if (game.result.variant !== game.variant || game.result.gameNumber !== game.cursor) {
+        throw new HavocServiceError(
+          'simulation',
+          `game ${String(game.cursor)} does not match its delivered variant or cursor`,
+        );
+      }
+      if (game.result.inputDigest !== game.inputDigest) {
+        throw new HavocServiceError(
+          'simulation',
+          `game ${String(game.cursor)} input digest does not match its result`,
+        );
+      }
+      const recomputed = havocGameResultDigest(game.result);
+      if (recomputed !== game.resultDigest) {
+        throw new HavocServiceError(
+          'simulation',
+          `game ${String(game.cursor)} failed digest verification`,
+        );
+      }
+      const command: HavocCommand =
+        game.variant === 'havoc'
+          ? havocAcceptGameCommandSchema.parse({
+              schemaVersion: HAVOC_SCHEMA_VERSION,
+              commandId: this.ids.newCommandId(),
+              runId: working.runId,
+              expectedRevision: working.revision,
+              command: 'accept-havoc-game',
+              cursor: game.cursor,
+              inputDigest: game.inputDigest,
+              resultDigest: game.resultDigest,
+              summary: game.summary,
+            })
+          : havocAcceptNormalGameCommandSchema.parse({
+              schemaVersion: HAVOC_SCHEMA_VERSION,
+              commandId: this.ids.newCommandId(),
+              runId: working.runId,
+              expectedRevision: working.revision,
+              command: 'accept-havoc-normal-game',
+              cursor: game.cursor,
+              inputDigest: game.inputDigest,
+              resultDigest: game.resultDigest,
+              summary: game.summary,
+            });
+      const outcome = ApplyHavocCommand(working, command, environment, lockSources);
+      if (outcome.result.status === 'rejected') {
+        throw new HavocServiceError(
+          'simulation',
+          outcome.result.rejection?.message ?? 'the accepted game was rejected',
+        );
+      }
+      commits.push({
         command,
+        outcome,
         game: {
-          result: message.result,
-          inputDigest: message.inputDigest,
-          resultDigest: message.resultDigest,
+          result: game.result,
+          inputDigest: game.inputDigest,
+          resultDigest: game.resultDigest,
         },
-      }),
-    );
+      });
+      working = outcome.state;
+    }
+    const applied = await this.repository.applyGameBatch({
+      expectedRevision: state.revision,
+      games: commits,
+    });
     if (applied.status !== 'accepted') {
       throw new HavocServiceError(
         'simulation',
         applied.rejection?.message ?? 'the accepted game was rejected',
       );
     }
-    this.run = outcome.state;
+    this.run = working;
     this.lastAcceptedResult = applied;
+    const watched = this.lastWatched;
     if (
-      this.lastWatched !== null &&
-      this.lastWatched.variant === message.variant &&
-      this.lastWatched.gameNumber === message.cursor
+      watched !== null &&
+      games.some((game) => watched.variant === game.variant && watched.gameNumber === game.cursor)
     ) {
       this.lastWatched = null;
     }
@@ -765,7 +803,7 @@ export class HavocSession implements HavocService {
     ]);
     const catalogSource: HavocCatalogSource = {
       catalogVersion: seasonCatalog.catalogVersion,
-      catalogHash: catalogEntry.contentHash,
+      catalogHash: seasonDraftCatalogIdentityHash(catalogEntry),
       dataVersion: seasonCatalog.dataVersion,
       ratingsVersion: seasonCatalog.ratingsVersion,
       playerVersionIdVersion: seasonCatalog.playerVersionIdVersion,
@@ -780,7 +818,7 @@ export class HavocSession implements HavocService {
       profileVersion: preamble.profile.profileVersion,
       dataVersion: seasonCatalog.dataVersion,
       catalogVersion: seasonCatalog.catalogVersion,
-      catalogHash: catalogEntry.contentHash,
+      catalogHash: seasonDraftCatalogIdentityHash(catalogEntry),
       bracketHash: bracketEntry.contentHash,
       profileHash: profileEntry.contentHash,
     };

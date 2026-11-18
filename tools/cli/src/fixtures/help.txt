@@ -87,15 +87,13 @@ Commands:
                                               qualifying forms; a franchise-qualified
                                               name picks the best peak (highest selection score)
                          --seed <hex>          Run seed (required)
-                         --reruns N            Best-of whole-season attempts (default 2)
                          --era <eraId>         Simulation era (default 2010s; selects the
                                                packaged era profile)
                          --profile <path>      Override the packaged era profile
                          --bracket <path>      Override the packaged bracket artifact
   sim challenge-average  Run N complete 82-game challenges against the frozen bracket and
                          report the mean of every stat across attempts (plus min/max/sd).
-                         Same options as sim challenge; --reruns defaults to 10 and is
-                         the number of attempts averaged. Use this to debug variance.
+                         Use this to debug variance across different seeds.
                          --lineup <ref[,...]>  Five players in G,G,F,F,C slot order
                          --seed <hex>          Run seed (required)
                          --reruns N            Attempts to average (default 10)

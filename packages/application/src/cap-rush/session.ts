@@ -13,6 +13,7 @@ import type {
   CapRushStoredPlayoffGame,
   CapRushVariant,
   CapRushVersionSet,
+  HoopRushManifest,
   Position,
 } from '@hoop-rush/data-contracts';
 import {
@@ -25,6 +26,7 @@ import {
   CAP_RUSH_SEED_DERIVATION_VERSION,
   CAP_RUSH_SPIN_PURCHASES,
   POSITIONS,
+  applySeasonPlayoffProfiles,
   capRushAcceptGameCommandSchema,
   capRushAcceptLeagueGamesCommandSchema,
   capRushAcceptPlayoffGameCommandSchema,
@@ -39,6 +41,7 @@ import {
   capRushRerollOfferCommandSchema,
   capRushSignCardCommandSchema,
   capRushSkipSpinCommandSchema,
+  seasonDraftCatalogIdentityHash,
 } from '@hoop-rush/data-contracts';
 import {
   ENGINE_VERSION,
@@ -71,6 +74,7 @@ import { prepareCommandCommit } from '@hoop-rush/data-contracts';
 
 interface CapRushAssets {
   readonly index: CapRushCatalogIndex;
+  readonly manifest: HoopRushManifest;
   readonly versionSet: CapRushVersionSet;
   readonly lockSources: CapRushLockSources;
 }
@@ -104,6 +108,7 @@ export class CapRushSession implements CapRushService {
   private draft: CapRushDraftState | null = null;
   private loaded: CapRushAssets | null = null;
   private assetsPromise: Promise<CapRushAssets> | null = null;
+  private playoffLockSources: Promise<CapRushLockSources> | null = null;
 
   constructor(options: CapRushSessionOptions) {
     this.repository = options.repository;
@@ -559,7 +564,10 @@ export class CapRushSession implements CapRushService {
       const command = build(state);
       const outcome = applyCapRushCommand(state, command, {
         index: assets.index,
-        lockSources: assets.lockSources,
+        lockSources:
+          command.command === 'lock-cap-rush-lineup'
+            ? await this.loadPlayoffLockSources(assets)
+            : assets.lockSources,
       });
       const accepted = outcome.result.status === 'accepted';
       const applied = await this.repository.applyOutcome(
@@ -708,6 +716,31 @@ export class CapRushSession implements CapRushService {
     }
   }
 
+  private loadPlayoffLockSources(assets: CapRushAssets): Promise<CapRushLockSources> {
+    if (this.playoffLockSources !== null) return this.playoffLockSources;
+    const { lockSources } = assets;
+    const { historicalCatalog } = lockSources;
+    if (historicalCatalog === undefined) return Promise.resolve(lockSources);
+    const promise = (async () => {
+      try {
+        const profiles = await this.assets.loadPlayoffProfiles?.(assets.manifest);
+        return profiles == null
+          ? lockSources
+          : {
+              ...lockSources,
+              historicalCatalog: applySeasonPlayoffProfiles(historicalCatalog, profiles),
+            };
+      } catch (error) {
+        throw new CapRushServiceError('catalog', messageOf(error));
+      }
+    })();
+    this.playoffLockSources = promise;
+    promise.catch(() => {
+      if (this.playoffLockSources === promise) this.playoffLockSources = null;
+    });
+    return promise;
+  }
+
   private loadAssets(): Promise<CapRushAssets> {
     if (this.loaded !== null) return Promise.resolve(this.loaded);
     if (this.assetsPromise !== null) return this.assetsPromise;
@@ -738,7 +771,7 @@ export class CapRushSession implements CapRushService {
     }
     const catalogSource: CapRushCatalogSource = {
       catalogVersion: catalog.catalogVersion,
-      catalogHash: catalogEntry.contentHash,
+      catalogHash: seasonDraftCatalogIdentityHash(catalogEntry),
       dataVersion: catalog.dataVersion,
       ratingsVersion: catalog.ratingsVersion,
       playerVersionIdVersion: catalog.playerVersionIdVersion,
@@ -753,12 +786,13 @@ export class CapRushSession implements CapRushService {
       profileVersion: preamble.profile.profileVersion,
       dataVersion: catalog.dataVersion,
       catalogVersion: catalog.catalogVersion,
-      catalogHash: catalogEntry.contentHash,
+      catalogHash: seasonDraftCatalogIdentityHash(catalogEntry),
       bracketHash: bracketEntry.contentHash,
       profileHash: profileEntry.contentHash,
     };
     return {
       index: capRushCatalogIndexOf(catalog, catalogSource),
+      manifest,
       versionSet,
       lockSources: {
         bracket: preamble.bracket,

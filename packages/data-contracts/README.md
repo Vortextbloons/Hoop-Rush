@@ -32,10 +32,10 @@ workers embed.
   (`ROOM_PROTOCOL_VERSION`, separate from every storage and engine version) and
   the client-side legacy-room rejection message.
 - Domain groups: `run.ts`, `bracket.ts`, `classic.ts`, `player-season.ts`,
-  `season-*.ts` (hash, identity, versions, plus the shared draft catalog),
-  `havoc-*.ts`, `draft-duel*.ts`, `fixed-five*.ts`, `collection*.ts` (player
-  catalog artifacts; not the removed Ultimate Run mode),
-  `projection*.ts`, `worker.ts`, `league-worker.ts`.
+  `season-*.ts` (hash, identity, versions, the shared draft catalog, and the
+  split playoff-profile artifact), `havoc-*.ts`, `draft-duel*.ts`,
+  `fixed-five*.ts`, `collection*.ts` (player catalog artifacts; not the
+  removed Ultimate Run mode), `projection*.ts`, `worker.ts`, `league-worker.ts`.
 - `src/loaders/` — packaged-artifact parsing helpers used by the web client
   (`collection-catalog.ts` for `static/data/collection/`).
 - `src/wasm/canonical.rs` and `canonical-wasm.ts` — in-memory canonical JSON and

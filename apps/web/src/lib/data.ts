@@ -17,6 +17,7 @@ import {
 import { resolveAssetUrl } from './asset-url';
 import { isLiteMode } from './device-capabilities';
 import { readCachedPool, writeCachedPool } from './pool-cache';
+import { clearDraftCatalogMergeCache } from './data-assets';
 import {
   clearManifestAssetCaches,
   clearManifestCache,
@@ -163,5 +164,7 @@ export function getRosterDetails(): Promise<RosterDetails> {
 export function clearDataLoaderCaches(): void {
   clearManifestCache();
   clearManifestAssetCaches('data/');
+  clearManifestAssetCaches('season/');
+  clearDraftCatalogMergeCache();
   poolCache.clear();
 }

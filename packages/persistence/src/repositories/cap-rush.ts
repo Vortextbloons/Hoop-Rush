@@ -6,6 +6,7 @@ import type {
   CapRushLeagueAggregate,
   CapRushLeagueGame,
   CapRushLeagueResult,
+  CapRushLockedInputs,
   CapRushPlayback,
   CapRushReport,
   CapRushStoredGame,
@@ -14,15 +15,20 @@ import type {
   Id,
 } from '@hoop-rush/data-contracts';
 import {
+  CAP_RUSH_LEGACY_SAVE_SCHEMA_VERSION,
   CAP_RUSH_SAVE_SCHEMA_VERSION,
   CAP_RUSH_SALARY_CURVE_VERSION,
+  canonicalJson,
   capRushCommandResultSchema,
   capRushCommandSchema,
   capRushConferenceStandingsEntries,
+  capRushDraftStateSchema,
   capRushLeagueGameSchema,
+  capRushLeagueResultOf,
   capRushReportSchema,
   capRushStoredGameSchema,
   capRushStoredPlayoffGameSchema,
+  seasonDigestHex,
 } from '@hoop-rush/data-contracts';
 import {
   auditHavocBattleGame,
@@ -38,29 +44,34 @@ import {
   CAP_RUSH_ACTIVE_DRAFT_RECORD_ID,
   capRushPlaybackGameKey,
   storedCapRushCommandRowSchema,
+  storedCapRushDraftProgressEnvelopeRowSchema,
   storedCapRushDraftProgressRowSchema,
-  storedCapRushDraftRowSchema,
   storedCapRushGameRowSchema,
   storedCapRushHistoryRowSchema,
   storedCapRushLeagueAggregateRowSchema,
+  storedCapRushLeagueGameResultRowSchema,
   storedCapRushLeagueGameRowSchema,
-  storedCapRushLeagueResultRowSchema,
+  storedCapRushLeagueScoreRowSchema,
+  storedCapRushLegacyDraftRowSchema,
+  storedCapRushLockedInputsRowSchema,
   storedCapRushPlaybackCursorRowSchema,
   storedCapRushPlaybackEvidenceRowSchema,
   storedCapRushPlayoffGameRowSchema,
   storedCapRushReportRowSchema,
+  type CapRushStoredLockedInputsRef,
+  type StoredCapRushDraftProgressRow,
 } from '../schemas/cap-rush-record.ts';
 import { HoopRushDatabase } from './dexie.ts';
 import { DexieProfileRepository } from './profile.ts';
 import { classifyCommandReplay, readStoredCommand } from './save-envelope.ts';
 import {
-  assertSaveSchemaVersion,
   canonicalEquals,
   commandReceiptMatches,
   getParsedRecord,
   listCompletedHistory,
   parseOptionalRecord,
   parseRecord,
+  saveSchemaVersionOf,
   scopedNumericRows,
   type ParseableSchema,
 } from './support.ts';
@@ -152,13 +163,89 @@ function asRunId(runId: string): Id {
   return runId as Id;
 }
 
+function readableSaveSchemaVersionOf(
+  row: unknown,
+): typeof CAP_RUSH_LEGACY_SAVE_SCHEMA_VERSION | typeof CAP_RUSH_SAVE_SCHEMA_VERSION {
+  const version = saveSchemaVersionOf(row);
+  if (version !== CAP_RUSH_LEGACY_SAVE_SCHEMA_VERSION && version !== CAP_RUSH_SAVE_SCHEMA_VERSION) {
+    throw unsupported(
+      `stored save schema ${version === null ? 'unknown' : String(version)} does not match current ${String(CAP_RUSH_SAVE_SCHEMA_VERSION)}`,
+    );
+  }
+  return version;
+}
+
 function parseStored<T>(schema: ParseableSchema<T>, row: unknown, label: string): T {
-  assertSaveSchemaVersion(row, CAP_RUSH_SAVE_SCHEMA_VERSION, unsupported);
+  readableSaveSchemaVersionOf(row);
   return parseRecord(schema, row, label, malformed);
 }
 
 function invariant(condition: unknown, message: string): asserts condition {
   if (!condition) throw malformed(message);
+}
+
+interface ActiveDraftEnvelope {
+  readonly runId: string;
+  readonly revision: number;
+  readonly createdAtIso: string;
+  readonly lockedDigest: string | null;
+  /** Version-3 rows carry the immutably locked subtree inline. */
+  readonly legacyLocked: CapRushLockedInputs | null;
+}
+
+const CAP_RUSH_LOCKED_INPUTS_DIGEST_PREFIX = 'cap-rush-locked-inputs-v1';
+
+function capRushLockedInputsDigest(locked: CapRushLockedInputs): string {
+  return seasonDigestHex(`${CAP_RUSH_LOCKED_INPUTS_DIGEST_PREFIX}\u0000${canonicalJson(locked)}`);
+}
+
+/**
+ * Returns the stable format problems that older Cap Rush saves report as
+ * unsupported rather than malformed. Applied to the inline version-3 draft
+ * before parsing and to the hydrated version-4 draft after parsing.
+ */
+function assertSupportedDraftFormat(
+  draft: unknown,
+  options: { lockedIsReference?: boolean } = {},
+): void {
+  if (typeof draft !== 'object' || draft === null) return;
+  const value = draft as Record<string, unknown>;
+  const postseason = value.postseason;
+  if (
+    typeof postseason === 'object' &&
+    postseason !== null &&
+    'version' in postseason &&
+    postseason.version === 'cap-rush-postseason-v1'
+  ) {
+    throw unsupported('active cap rush draft uses an unsupported postseason format');
+  }
+  const locked = value.locked;
+  if (
+    value.postseasonEligible === true &&
+    options.lockedIsReference !== true &&
+    typeof locked === 'object' &&
+    locked !== null &&
+    !('leagueSchedule' in locked)
+  ) {
+    throw unsupported('active cap rush draft uses an unsupported league format');
+  }
+  const versionSet = value.versionSet;
+  if (typeof versionSet === 'object' && versionSet !== null) {
+    if (
+      'salaryCurveVersion' in versionSet &&
+      typeof versionSet.salaryCurveVersion === 'string' &&
+      versionSet.salaryCurveVersion !== CAP_RUSH_SALARY_CURVE_VERSION
+    ) {
+      throw unsupported('active cap rush draft uses an unsupported salary curve version');
+    }
+    if (
+      'rulesVersion' in versionSet &&
+      typeof versionSet.rulesVersion === 'string' &&
+      versionSet.rulesVersion !== CAP_RUSH_RULES_VERSION
+    ) {
+      throw unsupported('active cap rush draft uses an unsupported rules version');
+    }
+  }
 }
 
 export class DexieCapRushRepository {
@@ -168,60 +255,159 @@ export class DexieCapRushRepository {
   }
 
   async loadActiveDraft(): Promise<CapRushDraftState | null> {
+    return this.db.transaction('r', [this.db.capRushActive, this.db.capRushLockedInputs], () =>
+      this.readActiveDraft(),
+    );
+  }
+
+  private async readActiveDraft(): Promise<CapRushDraftState | null> {
     const row: unknown = await this.db.capRushActive.get(CAP_RUSH_ACTIVE_DRAFT_RECORD_ID);
     if (row === undefined) return null;
-    if (typeof row === 'object' && row !== null && 'draft' in row) {
-      const draft = row.draft;
-      if (typeof draft === 'object' && draft !== null && 'postseason' in draft) {
-        const postseason = draft.postseason;
-        if (
-          typeof postseason === 'object' &&
-          postseason !== null &&
-          'version' in postseason &&
-          postseason.version === 'cap-rush-postseason-v1'
-        ) {
-          throw unsupported('active cap rush draft uses an unsupported postseason format');
-        }
+    const version = readableSaveSchemaVersionOf(row);
+    if (version === CAP_RUSH_LEGACY_SAVE_SCHEMA_VERSION) {
+      // Version 3 stores the whole draft, locked inputs included, inline. It is
+      // read-only compatible: the next accepted command rewrites it as version 4.
+      if (typeof row === 'object' && row !== null && 'draft' in row) {
+        assertSupportedDraftFormat((row as { draft?: unknown }).draft);
       }
-      if (
-        typeof draft === 'object' &&
-        draft !== null &&
-        'postseasonEligible' in draft &&
-        draft.postseasonEligible === true &&
-        'locked' in draft &&
-        typeof draft.locked === 'object' &&
-        draft.locked !== null &&
-        !('leagueSchedule' in draft.locked)
-      ) {
-        throw unsupported('active cap rush draft uses an unsupported league format');
+      const parsed = parseStored(storedCapRushLegacyDraftRowSchema, row, 'active cap rush draft');
+      if (capRushStateDigest(parsed.draft) !== parsed.stateDigest) {
+        throw malformed('active cap rush draft digest does not match its state');
       }
-      if (typeof draft === 'object' && draft !== null && 'versionSet' in draft) {
-        const versionSet = draft.versionSet;
-        if (
-          typeof versionSet === 'object' &&
-          versionSet !== null &&
-          'salaryCurveVersion' in versionSet &&
-          typeof versionSet.salaryCurveVersion === 'string' &&
-          versionSet.salaryCurveVersion !== CAP_RUSH_SALARY_CURVE_VERSION
-        ) {
-          throw unsupported('active cap rush draft uses an unsupported salary curve version');
-        }
-        if (
-          typeof versionSet === 'object' &&
-          versionSet !== null &&
-          'rulesVersion' in versionSet &&
-          typeof versionSet.rulesVersion === 'string' &&
-          versionSet.rulesVersion !== CAP_RUSH_RULES_VERSION
-        ) {
-          throw unsupported('active cap rush draft uses an unsupported rules version');
-        }
-      }
+      return parsed.draft;
     }
-    const parsed = parseStored(storedCapRushDraftRowSchema, row, 'active cap rush draft');
-    if (capRushStateDigest(parsed.draft) !== parsed.stateDigest) {
+    if (typeof row === 'object' && row !== null && 'draft' in row) {
+      // Version literals inside the draft would fail parsing as "malformed";
+      // report the same stale-version cases as unsupported before that.
+      // The reference cannot answer the league-format check; the hydrated draft
+      // below is checked again with the full locked subtree available.
+      assertSupportedDraftFormat((row as { draft?: unknown }).draft, {
+        lockedIsReference: true,
+      });
+    }
+    const parsed = parseStored(
+      storedCapRushDraftProgressRowSchema,
+      row,
+      'active cap rush draft progress',
+    );
+    const draft = await this.hydrateDraft(parsed);
+    if (capRushStateDigest(draft) !== parsed.stateDigest) {
       throw malformed('active cap rush draft digest does not match its state');
     }
-    return parsed.draft;
+    return draft;
+  }
+
+  private async hydrateDraft(parsed: StoredCapRushDraftProgressRow): Promise<CapRushDraftState> {
+    const reference = parsed.draft.locked;
+    if (reference === null) {
+      return parseRecord(capRushDraftStateSchema, parsed.draft, 'active cap rush draft', malformed);
+    }
+    const stored = await getParsedRecord(this.db.capRushLockedInputs, parsed.runId, (row) =>
+      parseStored(
+        storedCapRushLockedInputsRowSchema,
+        row,
+        `cap rush locked inputs ${parsed.runId}`,
+      ),
+    );
+    if (stored === null) throw malformed('stored cap rush locked inputs are missing');
+    if (
+      stored.runId !== reference.runId ||
+      stored.digest !== reference.digest ||
+      stored.digest !== this.digestOfLockedInputs(stored.locked)
+    ) {
+      throw malformed('stored cap rush locked inputs do not match the saved draft');
+    }
+    const draft = { ...parsed.draft, locked: stored.locked };
+    assertSupportedDraftFormat(draft);
+    return parseRecord(capRushDraftStateSchema, draft, 'active cap rush draft', malformed);
+  }
+
+  private readonly lockedDigests = new WeakMap<object, string>();
+
+  /**
+   * Locked inputs never change once a season starts, so their canonical digest
+   * is cached per frozen object. The engine carries the same object through
+   * every command, making repeat commits O(1) instead of re-serializing ~1 MB.
+   */
+  private digestOfLockedInputs(locked: CapRushLockedInputs): string {
+    const cached = this.lockedDigests.get(locked);
+    if (cached !== undefined) return cached;
+    const digest = capRushLockedInputsDigest(locked);
+    this.lockedDigests.set(locked, digest);
+    return digest;
+  }
+
+  private async readActiveDraftEnvelope(): Promise<ActiveDraftEnvelope | null> {
+    const row: unknown = await this.db.capRushActive.get(CAP_RUSH_ACTIVE_DRAFT_RECORD_ID);
+    if (row === undefined) return null;
+    const version = readableSaveSchemaVersionOf(row);
+    if (version === CAP_RUSH_LEGACY_SAVE_SCHEMA_VERSION) {
+      const parsed = parseStored(storedCapRushLegacyDraftRowSchema, row, 'active cap rush draft');
+      if (capRushStateDigest(parsed.draft) !== parsed.stateDigest) {
+        throw malformed('active cap rush draft digest does not match its state');
+      }
+      return {
+        runId: parsed.runId,
+        revision: parsed.revision,
+        createdAtIso: parsed.createdAtIso,
+        lockedDigest:
+          parsed.draft.locked === null ? null : this.digestOfLockedInputs(parsed.draft.locked),
+        legacyLocked: parsed.draft.locked,
+      };
+    }
+    const parsed = parseStored(
+      storedCapRushDraftProgressEnvelopeRowSchema,
+      row,
+      'active cap rush draft progress',
+    );
+    return {
+      runId: parsed.runId,
+      revision: parsed.revision,
+      createdAtIso: parsed.createdAtIso,
+      lockedDigest: parsed.draft.locked?.digest ?? null,
+      legacyLocked: null,
+    };
+  }
+
+  /**
+   * Writes the immutable locked inputs on the first lock and keeps their
+   * reference from then on. Version-3 saves migrate their inline subtree here
+   * on the first accepted command. A changed lock is rejected rather than
+   * silently replacing the inputs a season was simulated with.
+   */
+  private async writeLockedInputsOnce(
+    state: CapRushDraftState,
+    active: ActiveDraftEnvelope | null,
+    updatedAtIso: string,
+  ): Promise<CapRushStoredLockedInputsRef | null> {
+    const locked = state.locked;
+    if (locked === null) {
+      invariant(
+        active === null || active.lockedDigest === null,
+        'a locked cap rush run cannot drop its locked inputs',
+      );
+      return null;
+    }
+    const digest = this.digestOfLockedInputs(locked);
+    if (active !== null && active.lockedDigest !== null) {
+      invariant(
+        active.lockedDigest === digest,
+        'locked inputs changed after the lineup was locked',
+      );
+      if (active.legacyLocked === null) {
+        return { runId: state.runId, digest };
+      }
+    }
+    await this.db.capRushLockedInputs.put(
+      storedCapRushLockedInputsRowSchema.parse({
+        saveSchemaVersion: CAP_RUSH_SAVE_SCHEMA_VERSION,
+        runId: state.runId,
+        digest,
+        locked,
+        updatedAtIso,
+      }),
+    );
+    return { runId: state.runId, digest };
   }
 
   async loadCommandResult(commandId: string): Promise<CapRushCommandResult | null> {
@@ -238,7 +424,9 @@ export class DexieCapRushRepository {
       'commit expected revision does not match the outcome receipt',
     );
     const command = capRushCommandSchema.parse(input.command);
-    const state = input.outcome.state;
+    // Validate the domain state on write. The frozen locked subtree passes the
+    // immutable check in O(1), so this no longer re-parses ~1 MB per command.
+    const state = capRushDraftStateSchema.parse(input.outcome.state);
     invariant(
       command.commandId === result.commandId && command.runId === result.runId,
       'cap rush command envelope does not match the outcome receipt',
@@ -437,6 +625,8 @@ export class DexieCapRushRepository {
         this.db.capRushPlaybackCursors,
         this.db.capRushPlayoffGames,
         this.db.capRushLeagueGames,
+        this.db.capRushLeagueResults,
+        this.db.capRushLockedInputs,
         this.db.capRushLeagueAggregates,
         this.db.capRushHistory,
         this.db.capRushReports,
@@ -476,19 +666,14 @@ export class DexieCapRushRepository {
         }
 
         const now = new Date().toISOString();
-        const active = await getParsedRecord(
-          this.db.capRushActive,
-          CAP_RUSH_ACTIVE_DRAFT_RECORD_ID,
-          (row) =>
-            parseStored(storedCapRushDraftProgressRowSchema, row, 'active cap rush draft progress'),
-        );
+        const active = await this.readActiveDraftEnvelope();
         let createdAtIso = now;
         if (active !== null) {
-          if (active.draft.revision !== result.revisionBefore) {
+          if (active.revision !== result.revisionBefore) {
             throw new CapRushStaleRevisionError(
               result.commandId,
               result.revisionBefore,
-              active.draft.revision,
+              active.revision,
             );
           }
           if (active.runId !== result.runId) {
@@ -501,14 +686,16 @@ export class DexieCapRushRepository {
           if (active === null && result.revisionBefore !== 0) {
             throw new CapRushStaleRevisionError(result.commandId, result.revisionBefore, 0);
           }
+          const lockedRef = await this.writeLockedInputsOnce(state, active, now);
           await this.db.capRushActive.put(
-            storedCapRushDraftRowSchema.parse({
+            storedCapRushDraftProgressRowSchema.parse({
               saveSchemaVersion: CAP_RUSH_SAVE_SCHEMA_VERSION,
               recordId: CAP_RUSH_ACTIVE_DRAFT_RECORD_ID,
               runId: state.runId,
               revision: state.revision,
               stateDigest: result.stateDigest,
-              draft: state,
+              // The locked subtree lives in `capRushLockedInputs` from here on.
+              draft: { ...state, locked: lockedRef },
               createdAtIso,
               updatedAtIso: now,
             }),
@@ -561,6 +748,19 @@ export class DexieCapRushRepository {
                   runId: result.runId,
                   gameId: leagueGame.gameId,
                   game: leagueGame,
+                  updatedAtIso: now,
+                }),
+              ),
+            );
+            // Keep a compact score row beside every full box so schedule and
+            // standings reads never deserialize the box-score table.
+            await this.db.capRushLeagueResults.bulkPut(
+              leagueGames.map((leagueGame) =>
+                storedCapRushLeagueScoreRowSchema.parse({
+                  saveSchemaVersion: CAP_RUSH_SAVE_SCHEMA_VERSION,
+                  runId: result.runId,
+                  gameId: leagueGame.gameId,
+                  result: capRushLeagueResultOf(leagueGame),
                   updatedAtIso: now,
                 }),
               ),
@@ -744,6 +944,8 @@ export class DexieCapRushRepository {
         this.db.capRushPlaybackEvidence,
         this.db.capRushPlayoffGames,
         this.db.capRushLeagueGames,
+        this.db.capRushLeagueResults,
+        this.db.capRushLockedInputs,
         this.db.capRushLeagueAggregates,
       ],
       async () => {
@@ -758,6 +960,8 @@ export class DexieCapRushRepository {
           await this.db.capRushPlaybackEvidence.where('runId').equals(runId).delete();
           await this.db.capRushPlayoffGames.where('runId').equals(runId).delete();
           await this.db.capRushLeagueGames.where('runId').equals(runId).delete();
+          await this.db.capRushLeagueResults.where('runId').equals(runId).delete();
+          await this.db.capRushLockedInputs.delete(runId as Id);
           await this.db.capRushLeagueAggregates.delete(runId as Id);
         }
       },
@@ -801,13 +1005,55 @@ export class DexieCapRushRepository {
    * caller actually opens one.
    */
   async listLeagueResults(runId: string): Promise<CapRushLeagueResult[]> {
-    const rows = await this.db.capRushLeagueGames.where('runId').equals(runId).toArray();
-    return rows
-      .map((row) =>
-        parseStored(storedCapRushLeagueResultRowSchema, row, `cap rush league result ${runId}`),
-      )
-      .map((row) => row.game)
-      .sort((left, right) => left.slot - right.slot || left.gameId.localeCompare(right.gameId));
+    const tables = [this.db.capRushLeagueGames, this.db.capRushLeagueResults];
+    const scores = await this.db.transaction('r', tables, async () => {
+      const scoreRows = this.db.capRushLeagueResults.where('runId').equals(runId);
+      const [scoreCount, gameCount] = await Promise.all([
+        scoreRows.count(),
+        this.db.capRushLeagueGames.where('runId').equals(runId).count(),
+      ]);
+      return scoreCount === gameCount ? scoreRows.toArray() : null;
+    });
+    if (scores !== null) {
+      return scores
+        .map(
+          (row) =>
+            parseStored(storedCapRushLeagueScoreRowSchema, row, `cap rush league score ${runId}`)
+              .result,
+        )
+        .sort((left, right) => left.slot - right.slot || left.gameId.localeCompare(right.gameId));
+    }
+    // Saves written before score rows existed still resume: project the full
+    // boxes once and cache the projection in the same transaction so a
+    // concurrent abandon cannot leave orphan score rows behind.
+    return this.db.transaction('rw', tables, async () => {
+      const rows = await this.db.capRushLeagueGames.where('runId').equals(runId).toArray();
+      const results = rows
+        .map((row) =>
+          parseStored(
+            storedCapRushLeagueGameResultRowSchema,
+            row,
+            `cap rush league result ${runId}`,
+          ),
+        )
+        .map((row) => row.game)
+        .sort((left, right) => left.slot - right.slot || left.gameId.localeCompare(right.gameId));
+      if (results.length > 0) {
+        const updatedAtIso = new Date().toISOString();
+        await this.db.capRushLeagueResults.bulkPut(
+          results.map((result) =>
+            storedCapRushLeagueScoreRowSchema.parse({
+              saveSchemaVersion: CAP_RUSH_SAVE_SCHEMA_VERSION,
+              runId,
+              gameId: result.gameId,
+              result,
+              updatedAtIso,
+            }),
+          ),
+        );
+      }
+      return results;
+    });
   }
 
   async readLeagueGame(runId: string, gameId: string): Promise<CapRushLeagueGame | null> {

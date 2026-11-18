@@ -67,7 +67,6 @@ export const simCommands: CommandSpec[] = [
     options: {
       lineup: 'string',
       seed: 'string',
-      reruns: 'string',
       era: 'string',
       profile: 'string',
       bracket: 'string',
@@ -81,13 +80,11 @@ export const simCommands: CommandSpec[] = [
                                               qualifying forms; a franchise-qualified
                                               name picks the best peak (highest selection score)
                          --seed <hex>          Run seed (required)
-                         --reruns N            Best-of whole-season attempts (default 2)
                          --era <eraId>         Simulation era (default 2010s; selects the
                                                packaged era profile)
                          --profile <path>      Override the packaged era profile
                          --bracket <path>      Override the packaged bracket artifact`,
-    run: (args) =>
-      simChallenge(pickU(args, ['lineup', 'seed', 'reruns', 'era', 'profile', 'bracket'])),
+    run: (args) => simChallenge(pickU(args, ['lineup', 'seed', 'era', 'profile', 'bracket'])),
   },
   {
     name: 'sim challenge-average',
@@ -101,8 +98,7 @@ export const simCommands: CommandSpec[] = [
     },
     help: `  sim challenge-average  Run N complete 82-game challenges against the frozen bracket and
                          report the mean of every stat across attempts (plus min/max/sd).
-                         Same options as sim challenge; --reruns defaults to 10 and is
-                         the number of attempts averaged. Use this to debug variance.
+                         Use this to debug variance across different seeds.
                          --lineup <ref[,...]>  Five players in G,G,F,F,C slot order
                          --seed <hex>          Run seed (required)
                          --reruns N            Attempts to average (default 10)

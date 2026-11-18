@@ -91,6 +91,82 @@ describe('dexie active run save/load round-trip', () => {
     expect(await db.activeGames.count()).toBe(0);
   });
 
+  it('commits an ordered game batch and its checkpoint in one transaction', async () => {
+    resetIndexedDb();
+    const db = new TestDatabase(testDatabaseName('dexie-active-batch'));
+    const repo = new DexieChallengeRepository(db);
+    const context = createEngineContext();
+    const profile = buildGameSimulationInput().profile;
+    const fixture = buildChallengeRun({ runId: 'batch-run' });
+    const base = {
+      ...fixture,
+      versions: { ...fixture.versions, engineVersion: context.engineVersion },
+    };
+    await repo.saveActiveRun({
+      recordId: 'active',
+      saveSchemaVersion: 2,
+      run: base,
+      updatedAtIso: '2026-01-01T00:00:00.000Z',
+    });
+    const appends = [];
+    let current = base;
+    for (let gameNumber = 1; gameNumber <= 3; gameNumber += 1) {
+      const result = simulateGame(createGameInput(current, profile, gameNumber), context);
+      current = acceptGameResult(current, result);
+      appends.push({
+        runId: current.runId,
+        gameNumber,
+        result,
+        aggregates: current.aggregates,
+        status: current.status === 'finished' ? ('finished' as const) : ('active' as const),
+        firstLossGameNumber: current.firstLossGameNumber,
+      });
+    }
+    await repo.appendActiveGames(appends);
+    const loaded = await repo.loadActiveRun();
+    expect(loaded?.run.games.map((game) => game.gameNumber)).toEqual([1, 2, 3]);
+    expect(loaded?.run.aggregates).toEqual(current.aggregates);
+    expect((await db.active.get('active'))?.gamesPlayed).toBe(3);
+  });
+
+  it('rejects an out-of-order batch without writing any game rows', async () => {
+    resetIndexedDb();
+    const db = new TestDatabase(testDatabaseName('dexie-active-batch-order'));
+    const repo = new DexieChallengeRepository(db);
+    const context = createEngineContext();
+    const profile = buildGameSimulationInput().profile;
+    const fixture = buildChallengeRun({ runId: 'batch-order-run' });
+    const base = {
+      ...fixture,
+      versions: { ...fixture.versions, engineVersion: context.engineVersion },
+    };
+    await repo.saveActiveRun({
+      recordId: 'active',
+      saveSchemaVersion: 2,
+      run: base,
+      updatedAtIso: '2026-01-01T00:00:00.000Z',
+    });
+    const second = acceptGameResult(
+      acceptGameResult(base, simulateGame(createGameInput(base, profile, 1), context)),
+      simulateGame(createGameInput(base, profile, 2), context),
+    );
+    const secondGame = second.games[1];
+    if (secondGame === undefined) throw new Error('missing second fixture game');
+    const outOfOrder = [
+      {
+        runId: second.runId,
+        gameNumber: 2,
+        result: secondGame,
+        aggregates: second.aggregates,
+        status: 'active' as const,
+        firstLossGameNumber: second.firstLossGameNumber,
+      },
+    ];
+    await expect(repo.appendActiveGames(outOfOrder)).rejects.toThrow('out of order');
+    expect(await db.activeGames.count()).toBe(0);
+    expect((await repo.loadActiveRun())?.run.games).toHaveLength(0);
+  });
+
   it('records a season achievement when promoting the accepted result', async () => {
     resetIndexedDb();
     const db = new TestDatabase(testDatabaseName('dexie-season-achievement'));

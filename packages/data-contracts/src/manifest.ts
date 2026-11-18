@@ -53,6 +53,23 @@ export const seasonArtifactIndexEntrySchema = z.object({
   url: z.string().min(1).max(512),
   contentHash: contentHashSchema,
 });
+/**
+ * The draft catalog is packaged without optional playoff evidence. Its asset
+ * hash pins the shipped bytes, while `identityHash` pins the full logical
+ * catalog (including split evidence) so seeded saves keep resuming across
+ * compatible packaging changes.
+ */
+export const seasonDraftCatalogAssetSchema = seasonArtifactIndexEntrySchema.extend({
+  identityHash: contentHashSchema.optional(),
+});
+export type SeasonDraftCatalogAsset = z.infer<typeof seasonDraftCatalogAssetSchema>;
+/** Logical catalog identity used by version locks; legacy assets fall back to their byte hash. */
+export function seasonDraftCatalogIdentityHash<T extends string>(entry: {
+  readonly contentHash: T;
+  readonly identityHash?: T | undefined;
+}): T {
+  return entry.identityHash ?? entry.contentHash;
+}
 export const hoopRushManifestSchema = z.object({
   schemaVersion: z.union([z.literal(3), z.literal(MANIFEST_SCHEMA_VERSION)]),
   dataVersion: z.string().min(1).max(64),
@@ -66,8 +83,11 @@ export const hoopRushManifestSchema = z.object({
   capRushBracket: opponentIndexEntrySchema.optional(),
   capRushRosterMetadata: opponentIndexEntrySchema.optional(),
   playersIndex: playersIndexAssetSchema.optional(),
-  rosterDetails: playersIndexAssetSchema.optional(),
-  draftCatalog: seasonArtifactIndexEntrySchema.optional(),
+  rosterDetails: playersIndexAssetSchema
+    .extend({ playoffProfilesSplit: z.literal(true).optional() })
+    .optional(),
+  draftCatalog: seasonDraftCatalogAssetSchema.optional(),
+  playoffProfiles: seasonArtifactIndexEntrySchema.optional(),
   projection: z
     .object({
       model: seasonArtifactIndexEntrySchema,

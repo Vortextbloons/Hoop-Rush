@@ -36,6 +36,7 @@ import {
   playerVersionIdSchema,
   positionSchema,
   seasonDigestHex,
+  seasonDraftCatalogIdentityHash,
   seedSchema,
   type EraSimulationProfile,
   type HavocCatalog,
@@ -187,10 +188,10 @@ export function loadHavocCliAssets(manifestPath: string = DEFAULT_MANIFEST): Hav
       `manifest ${manifestPath} has no ${HAVOC_CLI_ERA_ID} era simulation profile`,
     );
   }
-  const source = havocCatalogSourceOf(catalog, catalogEntry.contentHash);
+  const source = havocCatalogSourceOf(catalog, seasonDraftCatalogIdentityHash(catalogEntry));
   const versionSet = havocVersionSetOf({
     catalog,
-    catalogHash: catalogEntry.contentHash,
+    catalogHash: seasonDraftCatalogIdentityHash(catalogEntry),
     bracketHash: bracketRef.contentHash,
     profile,
     profileHash: profileRef.contentHash,

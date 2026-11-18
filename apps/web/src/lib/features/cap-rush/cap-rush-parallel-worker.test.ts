@@ -55,7 +55,7 @@ const base = {
 } as const;
 
 test('single-player partitions merge complete slots in order and drain asynchronous acceptance', async () => {
-  const { runner, lane } = harness();
+  const { runner, lane, workers } = harness();
   const locked = lockedRun();
   const context = createEngineContext();
   const delivered: number[] = [];
@@ -74,8 +74,17 @@ test('single-player partitions merge complete slots in order and drain asynchron
         },
       },
     });
-    expect(lane(0).requests[0]).toMatchObject({ partition: 0 });
-    expect(lane(1).requests[0]).toMatchObject({ partition: 1, leagueOnly: true });
+    expect(lane(0).requests[0]).toMatchObject({
+      partition: 0,
+      locked,
+      runId: locked.runId,
+    });
+    expect(lane(1).requests[0]).toMatchObject({
+      partition: 1,
+      leagueOnly: true,
+      locked,
+      runId: locked.runId,
+    });
     for (const slot of [2, 1]) {
       lane(1).emit({
         ...base,
@@ -108,6 +117,37 @@ test('single-player partitions merge complete slots in order and drain asynchron
       });
     expect(await pending).toMatchObject({ gamesDelivered: 2, lastCursor: 2, cancelled: false });
     expect(delivered).toEqual([1, 2]);
+
+    // The next job is small: the wrapper only forwards the run id. Cancelling
+    // terminates the lanes, and the following job rehydrates new lanes from the
+    // wrapper's validated copy without another 1 MB round trip.
+    const next = runner.simulate({
+      requestId: 'parallel-hydrated',
+      locked,
+      startGame: 1,
+      count: 1,
+      handlers: { onGame: () => {} },
+    });
+    expect(lane(0).requests[1]).toMatchObject({ runId: locked.runId });
+    expect(lane(0).requests[1]).not.toHaveProperty('locked');
+    expect(lane(1).requests[1]).toMatchObject({ runId: locked.runId });
+    expect(lane(1).requests[1]).not.toHaveProperty('locked');
+    runner.cancel();
+    expect(await next).toMatchObject({ cancelled: true });
+    expect(workers[0]?.terminated).toBe(true);
+    expect(workers[1]?.terminated).toBe(true);
+
+    const rehydrated = runner.simulate({
+      requestId: 'parallel-rehydrate',
+      locked,
+      startGame: 1,
+      count: 1,
+      handlers: { onGame: () => {} },
+    });
+    expect(lane(2).requests[0]).toMatchObject({ locked, runId: locked.runId });
+    expect(lane(3).requests[0]).toMatchObject({ locked, runId: locked.runId });
+    runner.cancel();
+    expect(await rehydrated).toMatchObject({ cancelled: true });
   } finally {
     runner.destroy();
   }
@@ -143,6 +183,34 @@ test('parallel cancellation and crashes settle and terminate both workers', asyn
     lane(2).onerror?.({} as ErrorEvent);
     expect(await failed).toBeInstanceOf(Error);
     expect(workers.every((worker) => worker.terminated)).toBe(true);
+  } finally {
+    runner.destroy();
+  }
+});
+
+test('forwards cancellation to the single lane used for a watched game', async () => {
+  const { runner, lane, workers } = harness();
+  const locked = lockedRun();
+  try {
+    const pending = runner.simulate({
+      requestId: base.requestId,
+      locked,
+      startGame: 1,
+      count: 1,
+      includeTape: true,
+      handlers: { onGame: () => {} },
+    });
+    expect(workers).toHaveLength(1);
+    runner.cancel();
+    expect(lane(0).requests[1]).toEqual({ ...base, type: 'cap-rush-cancel' });
+    lane(0).emit({
+      ...base,
+      type: 'cap-rush-complete',
+      gamesDelivered: 0,
+      lastCursor: 0,
+      cancelled: true,
+    });
+    expect(await pending).toMatchObject({ cancelled: true });
   } finally {
     runner.destroy();
   }

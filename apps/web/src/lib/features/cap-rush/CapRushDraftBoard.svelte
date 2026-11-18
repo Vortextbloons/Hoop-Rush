@@ -5,12 +5,13 @@
     CAP_RUSH_CONFERENCE_NAMES,
     POSITIONS,
     type CapRushSpinPurchaseId,
+    type CapRushSpinReceipt,
     type Position,
   } from '@hoop-rush/data-contracts';
   import HavocMutationList from '#lib/features/havoc/HavocMutationList.svelte';
   import HavocTierBadge from '#lib/features/havoc/HavocTierBadge.svelte';
-  import { HAVOC_TIER_COLORS } from '#lib/features/havoc/havoc-presentation.js';
-  import { Check, Lock, Shuffle, Sparkles } from '@lucide/svelte';
+  import { mutationNameOf } from '#lib/features/havoc/havoc-presentation.js';
+  import { Check, ChevronDown, Lock, Shuffle } from '@lucide/svelte';
   import PlayerFace from '#lib/components/PlayerFace.svelte';
   import TeamLogo from '#lib/components/TeamLogo.svelte';
   import CapRushCard from './CapRushCard.svelte';
@@ -18,10 +19,21 @@
   import CapRushPayroll from './CapRushPayroll.svelte';
   import { capRushPlayoffStatusOf } from './cap-rush-playoff-presentation.ts';
   import type { CapRushArt } from './cap-rush-art.ts';
-  import { formatMillions, initialsOf, variantLabel } from './cap-rush-presentation.ts';
+  import {
+    capRushSpinOutcomeRows,
+    capRushSpinPurchaseLabel,
+    formatMillions,
+    initialsOf,
+    variantLabel,
+  } from './cap-rush-presentation.ts';
   import PageShell from '#lib/components/ui/PageShell.svelte';
   import Alert from '#lib/components/ui/Alert.svelte';
   import Panel from '#lib/components/ui/Panel.svelte';
+  import Badge from '#lib/components/ui/Badge.svelte';
+  import Button from '#lib/components/ui/Button.svelte';
+  import SectionHeading from '#lib/components/ui/SectionHeading.svelte';
+  import StatGrid from '#lib/components/ui/StatGrid.svelte';
+  import StatTile from '#lib/components/ui/StatTile.svelte';
 
   let {
     view,
@@ -77,9 +89,61 @@
       null,
   );
   const spinSpend = $derived(receipts.reduce((total, receipt) => total + receipt.priceDollars, 0));
+  const mutationBudget = $derived(
+    Math.max(0, CAP_RUSH_CAP_LINE_DOLLARS - view.payrollDollars - spinSpend),
+  );
+  const latestReceipt = $derived(
+    receipts.length === 0 ? null : (receipts[receipts.length - 1] ?? null),
+  );
+  const previousReceipts = $derived(receipts.slice(0, -1).reverse());
+  const spinDecisionOpen = $derived(
+    spin?.state.status === 'pending' || spin?.state.status === 'purchased',
+  );
+  const anyPurchaseEligible = $derived((spin?.purchases ?? []).some((option) => option.eligible));
+  const allTargetsMutated = $derived(spin !== null && eligibleTargets.length === 0);
+  const decisionOpen = $derived(
+    spinDecisionOpen && eligibleTargets.length > 0 && anyPurchaseEligible,
+  );
+  const spinHeading = $derived.by(() => {
+    if (spin === null) return 'Draft complete';
+    switch (spin.state.status) {
+      case 'skipped':
+        return 'No mutations purchased';
+      case 'unavailable':
+        return 'Mutation window closed';
+      default:
+        return allTargetsMutated ? 'Mutations complete' : 'Build your mutations';
+    }
+  });
+  const spinDescription = $derived.by(() => {
+    if (spin === null) return null;
+    if (spin.state.status === 'skipped') return 'Your five stay unmutated.';
+    if (spin.state.status === 'unavailable') return 'No mutation spin is available for this draft.';
+    if (allTargetsMutated) return null;
+    return 'Mutation purchases draw from the normal cap. The roster hard limit applies to player payroll.';
+  });
 
   function spinTargetName(cardId: string): string {
     return spin?.targets.find((entry) => entry.cardId === cardId)?.player.displayName ?? cardId;
+  }
+
+  function targetFor(cardId: string) {
+    return spin?.targets.find((entry) => entry.cardId === cardId) ?? null;
+  }
+
+  function mutationNames(receipt: CapRushSpinReceipt): string {
+    return [receipt.entry, ...(receipt.additionalEntries ?? [])]
+      .map((entry) => mutationNameOf(entry.mutationId))
+      .join(' / ');
+  }
+
+  function purchaseCostSummary(): string {
+    return (spin?.purchases ?? [])
+      .map(
+        (option) =>
+          `${capRushSpinPurchaseLabel(option.purchase)} ${formatMillions(option.priceDollars)}`,
+      )
+      .join(' · ');
   }
 
   function buySpin(purchase: CapRushSpinPurchaseId): void {
@@ -124,7 +188,7 @@
         <p class="font-display truncate text-lg font-extrabold uppercase">
           {view.franchise.displayName}
         </p>
-        <p class="font-mono text-[9px] text-muted-foreground uppercase">
+        <p class="ui-micro">
           {CAP_RUSH_CONFERENCE_NAMES[view.franchise.conference]} · {view.franchise.division}
         </p>
       </div>
@@ -226,9 +290,7 @@
                       <span class="block truncate text-[11px] font-semibold"
                         >{player.displayName}</span
                       >
-                      <span class="font-mono text-[9px] text-muted-foreground uppercase"
-                        >Filled</span
-                      >
+                      <span class="ui-micro">Filled</span>
                     </span>
                   {:else}
                     <span class="text-[11px] text-muted-foreground">Open slot</span>
@@ -299,104 +361,72 @@
             {/if}
           </section>
         {:else if complete}
-          <Panel
-            as="section"
-            padding="none"
-            class="draft-summary p-4 sm:p-5"
-            aria-label="Draft summary"
-          >
+          <Panel as="section" padding="none" class="p-4 sm:p-5" aria-label="Draft summary">
             {#if spin !== null}
-              <div class="spin-panel rounded-2xl border border-primary/30 p-4 sm:p-6">
-                <div class="flex flex-wrap items-start justify-between gap-4">
-                  <div>
-                    <p class="ui-label">Cap Roulette</p>
-                    <h3
-                      class="font-display mt-1 text-3xl leading-none font-extrabold tracking-tight uppercase"
-                    >
-                      {spin.state.status === 'skipped'
-                        ? 'No mutations purchased'
-                        : 'Build your mutations'}
-                    </h3>
-                  </div>
-                  <Panel padding="none" class="px-4 py-3">
-                    <p class="font-mono text-[9px] tracking-wider text-muted-foreground uppercase">
-                      Room before the cap
-                    </p>
-                    <p class="font-display mt-1 text-2xl font-extrabold tabular-nums">
-                      {formatMillions(
-                        Math.max(0, CAP_RUSH_CAP_LINE_DOLLARS - view.payrollDollars - spinSpend),
-                      )}
-                    </p>
-                  </Panel>
-                </div>
-                {#if spin.state.status === 'purchased'}
-                  <div class="mt-5 grid gap-2 sm:grid-cols-2">
-                    {#each receipts as receipt (receipt.receiptDigest)}
-                      {#key receipt.receiptDigest}
-                        <div class="spin-result relative min-w-0">
-                          <div class="mutation-wheel" aria-hidden="true"></div>
-                          <Panel
-                            padding="none"
-                            class="spin-reveal flex h-full items-start gap-3 p-4"
-                            style="border-color: {HAVOC_TIER_COLORS[receipt.tier]}"
-                            role="status"
-                          >
-                            <span
-                              class="spin-reveal-icon grid h-14 w-14 shrink-0 place-items-center rounded-xl border border-accent/40 bg-accent/10 text-accent"
-                              ><Sparkles size={26} aria-hidden="true" /></span
-                            >
-                            <div class="min-w-0 flex-1">
-                              <HavocTierBadge tier={receipt.tier} size="sm" />
-                              <div class="mt-2">
-                                <HavocMutationList
-                                  mutations={[receipt.entry, ...(receipt.additionalEntries ?? [])]}
-                                  readable
-                                />
-                              </div>
-                              <p class="mt-3 font-mono text-[10px] text-muted-foreground uppercase">
-                                {receipt.target.slot} &middot; {spinTargetName(
-                                  receipt.target.cardId,
-                                )} &middot;
-                                {formatMillions(receipt.priceDollars)}
-                              </p>
-                            </div>
-                          </Panel>
-                        </div>
-                      {/key}
-                    {/each}
-                  </div>
-                {/if}
-                {#if spin.state.status === 'skipped'}
-                  <p class="mt-1 text-sm font-semibold">
-                    No spin purchased. Your five stay unmutated.
-                  </p>
-                {:else}
-                  <div class="mt-6">
-                    <div class="flex items-baseline justify-between gap-3">
-                      <h4 class="font-display text-lg font-extrabold uppercase">
-                        Pick your player
-                      </h4>
-                      <span
-                        class="font-mono text-[9px] tracking-wider text-muted-foreground uppercase"
-                        >One purchase per player</span
-                      >
-                    </div>
+              <SectionHeading
+                eyebrow="Cap Roulette"
+                title={spinHeading}
+                description={spinDescription}
+                level={2}
+              />
+
+              {#if spinDecisionOpen}
+                <StatGrid class="mt-4" columns={3} mobile={2}>
+                  <StatTile
+                    label="Mutation budget left"
+                    size="md"
+                    surface="tile"
+                    note="Normal cap"
+                    tone={mutationBudget === 0 ? 'negative' : 'default'}
+                    value={formatMillions(mutationBudget)}
+                  />
+                  <StatTile
+                    label="Mutation spend"
+                    size="md"
+                    surface="tile"
+                    note={`${receipts.length} of 5 purchases`}
+                    tone={receipts.length === 0 ? 'muted' : 'default'}
+                    value={formatMillions(spinSpend)}
+                  />
+                  <StatTile
+                    label="Draft payroll room"
+                    size="md"
+                    surface="tile"
+                    note="Hard limit"
+                    tone={view.remainingRoomDollars < 0 ? 'negative' : 'default'}
+                    value={formatMillions(view.remainingRoomDollars)}
+                  />
+                </StatGrid>
+              {/if}
+
+              {#if spinDecisionOpen}
+                {#if decisionOpen}
+                  <div class="mt-5">
+                    <SectionHeading level={3} size="sm" title="Choose a player" align="center">
+                      {#snippet actions()}
+                        <span class="ui-micro">One purchase per player</span>
+                      {/snippet}
+                    </SectionHeading>
                     <div
-                      class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3"
+                      class="mt-2.5 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3"
                       role="group"
                       aria-label="Spin target"
                     >
                       {#each spin.targets as entry (entry.cardId)}
                         {@const active = spinTarget === entry.cardId}
+                        {@const mutated = receipts.some(
+                          (receipt) => receipt.target.cardId === entry.cardId,
+                        )}
                         {@const face = art !== null ? art.faceFor(entry.player) : null}
                         <button
                           type="button"
                           aria-pressed={active}
-                          class="spin-target flex min-w-0 items-center gap-2 rounded-xl border p-2.5 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 {active
-                            ? 'border-primary bg-primary/10'
-                            : 'border-line-soft bg-card hover:border-line-strong'}"
-                          disabled={busy ||
-                            receipts.some((receipt) => receipt.target.cardId === entry.cardId)}
+                          class="flex min-h-14 min-w-0 items-center gap-2.5 rounded-xl border p-2 text-left text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring {mutated
+                            ? 'border-line-soft bg-surface-1'
+                            : active
+                              ? 'border-primary bg-primary/10'
+                              : 'border-line-soft bg-card hover:border-line-strong'}"
+                          disabled={busy || mutated}
                           onclick={() => (spinTargetId = entry.cardId)}
                         >
                           {#if face !== null && art !== null}
@@ -412,115 +442,287 @@
                               aria-hidden="true">{initialsOf(entry.player.displayName)}</span
                             >
                           {/if}
-                          <span class="min-w-0 flex-1"
-                            ><span class="block font-mono text-[9px] font-bold text-primary"
-                              >{entry.slot}</span
-                            ><span class="block text-sm leading-tight font-bold"
-                              >{entry.player.displayName}</span
-                            >{#if receipts.some((receipt) => receipt.target.cardId === entry.cardId)}<span
-                                class="block text-[9px] text-muted-foreground">Mutated</span
-                              >{/if}</span
-                          >
-                          {#if active}<Check
-                              size={15}
-                              class="shrink-0 text-primary"
-                              aria-hidden="true"
-                            />{/if}
-                        </button>
-                      {/each}
-                    </div>
-                  </div>
-                  <div class="mt-6">
-                    <h4 class="font-display text-lg font-extrabold uppercase">Choose your spin</h4>
-                    <p class="mt-1 text-xs text-muted-foreground">
-                      Tier odds are shown for each option. The spin is charged when purchased.
-                    </p>
-                    <div class="mt-3 grid gap-2">
-                      {#each spin.purchases as option (option.purchase)}
-                        <button
-                          type="button"
-                          class="spin-option rounded-xl border border-line-soft bg-card p-4 text-left outline-none transition-colors hover:border-primary focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
-                          disabled={busy || spinTarget === null || !option.eligible}
-                          onclick={() => buySpin(option.purchase)}
-                        >
-                          <span class="flex items-center justify-between gap-3"
-                            ><span class="font-display text-xl font-extrabold uppercase"
-                              >{option.purchase === 'standard'
-                                ? 'Mutation Spark'
-                                : 'Mutation Surge'}</span
-                            ><span
-                              class="font-display text-xl font-extrabold text-primary tabular-nums"
-                              >{formatMillions(option.priceDollars)}</span
-                            ></span
-                          >
-                          <span class="mt-3 grid grid-cols-3 gap-2 border-t border-line-soft pt-3">
-                            {#each [1, 2, 3] as tier (tier)}
-                              <span
-                                ><span
-                                  class="block font-mono text-[9px] text-muted-foreground uppercase"
-                                  >{option.purchase === 'standard'
-                                    ? `1 T${tier}`
-                                    : tier === 1
-                                      ? '3 T1s'
-                                      : tier === 2
-                                        ? '1 T2 + 1 T1'
-                                        : '1 T3'}</span
-                                ><span class="mt-0.5 block text-sm font-bold tabular-nums"
-                                  >{Math.round(option.tierOdds[tier as 1 | 2 | 3] * 100)}%</span
-                                ></span
+                          <span class="min-w-0 flex-1">
+                            <span class="flex min-w-0 items-center gap-1.5">
+                              <span class="shrink-0 font-mono text-[10px] font-bold text-primary"
+                                >{entry.slot}</span
                               >
-                            {/each}
+                              <span class="truncate text-sm leading-tight font-bold"
+                                >{entry.player.displayName}</span
+                              >
+                            </span>
+                            <span class="ui-micro mt-0.5 block truncate"
+                              >{formatMillions(entry.salaryDollars)} &middot;
+                              {entry.player.originalOverall} OVR</span
+                            >
                           </span>
-                          {#if !option.eligible}
-                            <span class="mt-3 block text-[11px] font-semibold text-negative"
-                              >Requires total spend of {formatMillions(
-                                option.maxEligiblePayrollDollars,
-                              )} or less</span
-                            >
-                          {:else}
-                            <span class="mt-3 block text-[11px] font-bold text-primary"
-                              >Buy {option.purchase === 'standard' ? 'Spark' : 'Surge'} &rarr;</span
-                            >
+                          {#if mutated}
+                            <Badge tone="accent">Mutated</Badge>
+                          {:else if active}
+                            <Check size={16} class="shrink-0 text-primary" aria-hidden="true" />
                           {/if}
                         </button>
                       {/each}
                     </div>
-                    {#if spin.state.status === 'pending'}
-                      <button
-                        type="button"
-                        class="mt-4 min-h-10 rounded-lg px-1 text-xs font-semibold text-muted-foreground underline underline-offset-4 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-                        disabled={busy}
-                        onclick={onSkipSpin}>Skip mutations and keep my lineup</button
-                      >
+                  </div>
+
+                  <div class="mt-5">
+                    <SectionHeading
+                      level={3}
+                      size="sm"
+                      title="Choose your spin"
+                      description="Tier odds are exact. The spin is charged when purchased."
+                    />
+                    <div class="mt-2.5 grid gap-2 sm:grid-cols-2">
+                      {#each spin.purchases as option (option.purchase)}
+                        <Panel as="article" padding="none" class="flex min-w-0 flex-col p-3 sm:p-4">
+                          <div
+                            class="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1"
+                          >
+                            <h4 class="font-display text-lg leading-tight font-extrabold uppercase">
+                              {capRushSpinPurchaseLabel(option.purchase)}
+                            </h4>
+                            <p class="font-mono text-sm font-bold tabular-nums">
+                              {formatMillions(option.priceDollars)}
+                            </p>
+                          </div>
+                          <p class="mt-1 text-xs text-muted-foreground">
+                            {option.purchase === 'standard'
+                              ? 'One mutation, drawn at the odds below.'
+                              : 'One to three mutations, drawn as a bundle.'}
+                          </p>
+                          <dl class="mt-3 divide-y divide-line-soft border-t border-line-soft">
+                            {#each capRushSpinOutcomeRows(option.purchase, option.tierOdds) as row (row.tier)}
+                              <div class="flex items-baseline justify-between gap-2 py-1.5">
+                                <dt class="min-w-0 text-[11px] leading-snug">{row.label}</dt>
+                                <dd class="shrink-0 font-mono text-xs font-bold tabular-nums">
+                                  {Math.round(row.odds * 100)}%
+                                </dd>
+                              </div>
+                            {/each}
+                          </dl>
+                          {#if !option.eligible}
+                            <p class="mt-2.5 text-[11px] leading-snug font-semibold text-negative">
+                              {formatMillions(mutationBudget)} available for mutations.
+                            </p>
+                          {/if}
+                          <div class="mt-auto pt-3">
+                            <Button
+                              class="w-full"
+                              tone="primary"
+                              disabled={busy || spinTarget === null || !option.eligible}
+                              onclick={() => buySpin(option.purchase)}
+                            >
+                              Buy {capRushSpinPurchaseLabel(option.purchase)}
+                            </Button>
+                          </div>
+                        </Panel>
+                      {/each}
+                    </div>
+                  </div>
+                {:else}
+                  <div class="mt-4 rounded-xl border border-line-soft bg-surface-1 p-3">
+                    {#if allTargetsMutated}
+                      <p class="text-sm font-semibold">Every player already has a mutation.</p>
+                      <p class="mt-1 text-xs leading-relaxed text-muted-foreground">
+                        One purchase per player. Lock the lineup to open the season.
+                      </p>
+                    {:else}
+                      <p class="text-sm font-semibold">No spin fits the normal cap.</p>
+                      <p class="mt-1 text-xs leading-relaxed text-muted-foreground">
+                        {formatMillions(mutationBudget)} mutation budget left.
+                        {purchaseCostSummary()}.
+                      </p>
                     {/if}
                   </div>
                 {/if}
-              </div>
+              {/if}
+
+              {#if spin.state.status === 'pending' || view.canLock}
+                <div
+                  class="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-line-soft pt-3"
+                >
+                  {#if spin.state.status === 'pending'}
+                    <Button tone="secondary" disabled={busy} onclick={onSkipSpin}>
+                      Skip mutations
+                    </Button>
+                    <p class="text-xs leading-snug text-muted-foreground">
+                      Keep your five unmutated. Lock the lineup after skipping.
+                    </p>
+                  {:else if view.canLock}
+                    <Button tone="primary" disabled={busy} onclick={onLock}>
+                      <Lock size={15} aria-hidden="true" />
+                      Lock the lineup
+                    </Button>
+                    <p class="text-xs leading-snug text-muted-foreground">
+                      {#if spin.state.status === 'purchased'}
+                        Purchases are final. Lock the lineup to open the season.
+                      {:else}
+                        Lock the lineup to open the season.
+                      {/if}
+                    </p>
+                  {/if}
+                </div>
+              {/if}
+
+              {#if receipts.length > 0}
+                <div class="mt-5 border-t border-line-soft pt-4">
+                  <SectionHeading level={3} size="sm" title="Mutation results" align="center">
+                    {#snippet actions()}
+                      <span class="ui-micro"
+                        >{receipts.length} of 5 purchases &middot; {formatMillions(spinSpend)}</span
+                      >
+                    {/snippet}
+                  </SectionHeading>
+
+                  {#if latestReceipt !== null}
+                    {@const target = targetFor(latestReceipt.target.cardId)}
+                    {@const face =
+                      target !== null && art !== null ? art.faceFor(target.player) : null}
+                    {#key latestReceipt.receiptDigest}
+                      <Panel
+                        as="article"
+                        padding="none"
+                        class="latest-receipt mt-2.5 flex min-w-0 items-start gap-2.5 p-3 sm:gap-3 sm:p-4"
+                        role="status"
+                      >
+                        {#if face !== null && art !== null}
+                          <PlayerFace
+                            player={face}
+                            manifest={art.manifest}
+                            size="sm"
+                            fallbackInitials={initialsOf(
+                              target?.player.displayName ??
+                                spinTargetName(latestReceipt.target.cardId),
+                            )}
+                          />
+                        {:else}
+                          <span
+                            class="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-surface-3 font-display text-xs font-extrabold text-muted-foreground"
+                            aria-hidden="true"
+                            >{initialsOf(
+                              target?.player.displayName ??
+                                spinTargetName(latestReceipt.target.cardId),
+                            )}</span
+                          >
+                        {/if}
+                        <div class="min-w-0 flex-1">
+                          <div class="flex flex-wrap items-center gap-2">
+                            <span class="ui-label">Latest purchase</span>
+                            <HavocTierBadge tier={latestReceipt.tier} size="sm" />
+                          </div>
+                          <p class="mt-1 min-w-0 text-sm font-bold">
+                            <span class="font-mono text-[10px] text-primary"
+                              >{latestReceipt.target.slot}</span
+                            >
+                            <span class="break-words"
+                              >{target?.player.displayName ??
+                                spinTargetName(latestReceipt.target.cardId)}</span
+                            >
+                          </p>
+                          <p class="ui-micro mt-0.5">
+                            {capRushSpinPurchaseLabel(latestReceipt.purchase)} &middot;
+                            {formatMillions(latestReceipt.priceDollars)}
+                          </p>
+                          <div class="mt-2">
+                            <HavocMutationList
+                              mutations={[
+                                latestReceipt.entry,
+                                ...(latestReceipt.additionalEntries ?? []),
+                              ]}
+                              readable
+                            />
+                          </div>
+                        </div>
+                      </Panel>
+                    {/key}
+                  {/if}
+
+                  {#if previousReceipts.length > 0}
+                    <ul class="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                      {#each previousReceipts as receipt (receipt.receiptDigest)}
+                        {@const target = targetFor(receipt.target.cardId)}
+                        {@const face =
+                          target !== null && art !== null ? art.faceFor(target.player) : null}
+                        <li class="min-w-0">
+                          <details class="ui-panel group min-w-0" data-padding="none">
+                            <summary
+                              class="flex min-h-11 cursor-pointer list-none items-center gap-2 p-2.5 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            >
+                              {#if face !== null && art !== null}
+                                <PlayerFace
+                                  player={face}
+                                  manifest={art.manifest}
+                                  size="sm"
+                                  fallbackInitials={initialsOf(
+                                    target?.player.displayName ??
+                                      spinTargetName(receipt.target.cardId),
+                                  )}
+                                />
+                              {:else}
+                                <span
+                                  class="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-surface-3 font-display text-[10px] font-extrabold text-muted-foreground"
+                                  aria-hidden="true"
+                                  >{initialsOf(
+                                    target?.player.displayName ??
+                                      spinTargetName(receipt.target.cardId),
+                                  )}</span
+                                >
+                              {/if}
+                              <span class="min-w-0 flex-1">
+                                <span class="flex min-w-0 items-center gap-1.5">
+                                  <span
+                                    class="shrink-0 font-mono text-[10px] font-bold text-primary"
+                                    >{receipt.target.slot}</span
+                                  >
+                                  <span class="truncate text-xs font-bold"
+                                    >{target?.player.displayName ??
+                                      spinTargetName(receipt.target.cardId)}</span
+                                  >
+                                </span>
+                                <span class="ui-micro mt-0.5 block truncate"
+                                  >{capRushSpinPurchaseLabel(receipt.purchase)} &middot;
+                                  {formatMillions(receipt.priceDollars)}</span
+                                >
+                                <span class="mt-0.5 block truncate text-[10px] text-primary"
+                                  >{mutationNames(receipt)}</span
+                                >
+                              </span>
+                              <HavocTierBadge tier={receipt.tier} size="sm" />
+                              <ChevronDown
+                                size={14}
+                                class="receipt-chevron shrink-0 text-muted-foreground"
+                                aria-hidden="true"
+                              />
+                            </summary>
+                            <div class="border-t border-line-soft p-2.5">
+                              <HavocMutationList
+                                mutations={[receipt.entry, ...(receipt.additionalEntries ?? [])]}
+                                readable
+                              />
+                            </div>
+                          </details>
+                        </li>
+                      {/each}
+                    </ul>
+                  {/if}
+                </div>
+              {/if}
             {/if}
 
-            <div class="mt-4 flex flex-wrap items-center gap-3">
-              {#if view.canLock}
-                <button
-                  type="button"
-                  class="inline-flex min-h-11 items-center gap-2 rounded-xl border border-primary/50 bg-primary/10 px-4 text-sm font-bold text-primary outline-none hover:bg-primary/15 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-                  disabled={busy}
-                  onclick={onLock}
-                >
+            {#if spin === null && view.canLock}
+              <div
+                class="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-line-soft pt-3"
+              >
+                <Button tone="primary" disabled={busy} onclick={onLock}>
                   <Lock size={15} aria-hidden="true" />
                   Lock the lineup
-                </button>
-              {/if}
-              <span class="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                <Sparkles size={13} aria-hidden="true" />
-                {#if draft.stage === 'locked'}
-                  Locked. The 82-game season is next.
-                {:else if draft.variant === 'roulette' && spin?.state.status === 'pending'}
-                  Resolve the mutation spin to close the draft.
-                {:else}
+                </Button>
+                <p class="text-xs leading-snug text-muted-foreground">
                   Five salaries, one apron bill, one target. Lock it in to open the season.
-                {/if}
-              </span>
-            </div>
+                </p>
+              </div>
+            {/if}
           </Panel>
         {/if}
       </div>
@@ -614,70 +816,31 @@
       top: 1rem;
     }
   }
-  .mutation-wheel {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    z-index: 1;
-    width: 2.5rem;
-    height: 2.5rem;
-    margin: -1.25rem 0 0 -1.25rem;
-    pointer-events: none;
-    border: 4px solid var(--color-surface-3);
-    border-top-color: var(--color-primary);
-    border-right-color: var(--color-accent);
-    border-radius: 50%;
-    animation: wheel-spin 1.4s cubic-bezier(0.12, 0.65, 0.2, 1) both;
+  :global(.latest-receipt) {
+    animation: receipt-in 500ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
   }
-  @keyframes wheel-spin {
-    to {
-      transform: rotate(1080deg);
-      opacity: 0;
-    }
-  }
-  :global(.spin-reveal) {
-    animation: reveal-spin 700ms 1.2s ease-out both;
-  }
-  .spin-reveal-icon {
-    animation: reveal-icon 700ms ease-out both;
-  }
-  @keyframes reveal-spin {
+  @keyframes receipt-in {
     from {
       opacity: 0;
-      transform: translateY(10px);
+      transform: translateY(6px);
     }
     to {
       opacity: 1;
-      transform: translateY(0);
+      transform: none;
     }
   }
-  @keyframes reveal-icon {
-    from {
-      transform: rotate(-35deg) scale(0.6);
-    }
-    to {
-      transform: rotate(0) scale(1);
-    }
+  :global(.receipt-chevron) {
+    transition: transform 150ms ease;
+  }
+  details[open] :global(.receipt-chevron) {
+    transform: rotate(180deg);
   }
   @media (prefers-reduced-motion: reduce) {
-    .mutation-wheel {
-      display: none;
-    }
-    :global(.spin-reveal),
-    .spin-reveal-icon {
+    :global(.latest-receipt) {
       animation: none;
     }
-  }
-  :global(.draft-summary) {
-    border-top: 3px solid var(--color-primary);
-  }
-  .spin-panel {
-    background:
-      radial-gradient(
-        ellipse at top right,
-        color-mix(in srgb, var(--color-primary) 12%, transparent),
-        transparent 55%
-      ),
-      var(--color-surface-1);
+    :global(.receipt-chevron) {
+      transition: none;
+    }
   }
 </style>

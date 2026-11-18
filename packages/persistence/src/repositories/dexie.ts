@@ -57,11 +57,14 @@ import type {
 } from '../schemas/havoc-multiplayer-record.ts';
 import {
   type StoredCapRushCommandRow,
-  type StoredCapRushDraftRow,
+  type StoredCapRushDraftProgressRow,
   type StoredCapRushGameRow,
   type StoredCapRushHistoryRow,
   type StoredCapRushLeagueAggregateRow,
   type StoredCapRushLeagueGameRow,
+  type StoredCapRushLeagueScoreRow,
+  type StoredCapRushLegacyDraftRow,
+  type StoredCapRushLockedInputsRow,
   type StoredCapRushPlaybackCursorRow,
   type StoredCapRushPlaybackEvidenceRow,
   type StoredCapRushPlayoffGameRow,
@@ -81,7 +84,12 @@ const CLASSIC_DRAFT_RECORD_ID = 'classic-draft';
 
 export const HOOP_RUSH_DATABASE_NAME = 'hoop-rush-saves-v2';
 
-export const HOOP_RUSH_DATABASE_STORES: Record<string, string> = {
+/**
+ * Database version 15. Only databases opened before the Cap Rush save split
+ * still use this shape; it must not change, because Dexie upgrades a version-15
+ * database in place instead of clearing it.
+ */
+export const HOOP_RUSH_DATABASE_STORES_V15: Record<string, string> = {
   active: 'recordId',
   activeGames: '[runId+gameNumber], runId',
   completed: 'recordId',
@@ -131,6 +139,17 @@ export const HOOP_RUSH_DATABASE_STORES: Record<string, string> = {
   capRushMultiplayerHistory: 'recordId, completedAtIso',
 };
 
+/**
+ * Current database shape. Version 16 adds Cap Rush's immutable locked-input
+ * record and the compact league score rows; opening a version-15 database only
+ * creates these tables and keeps every existing record.
+ */
+export const HOOP_RUSH_DATABASE_STORES: Record<string, string> = {
+  ...HOOP_RUSH_DATABASE_STORES_V15,
+  capRushLockedInputs: 'runId',
+  capRushLeagueResults: '[runId+gameId], runId',
+};
+
 export class HoopRushDatabase extends Dexie {
   profiles!: EntityTable<PlayerProfile, 'id'>;
   archivedProfiles!: EntityTable<PlayerProfile, 'id'>;
@@ -164,13 +183,18 @@ export class HoopRushDatabase extends Dexie {
   havocMultiplayerResults!: Table<StoredHavocMultiplayerResultRow, [string, number]>;
   havocMultiplayerCompleted!: EntityTable<StoredHavocMultiplayerCompleted, 'roomId'>;
   havocMultiplayerHistory!: EntityTable<StoredHavocMultiplayerHistoryIndex, 'recordId'>;
-  capRushActive!: EntityTable<StoredCapRushDraftRow, 'recordId'>;
+  capRushActive!: EntityTable<
+    StoredCapRushLegacyDraftRow | StoredCapRushDraftProgressRow,
+    'recordId'
+  >;
   capRushCommands!: EntityTable<StoredCapRushCommandRow, 'commandId'>;
   capRushGames!: Table<StoredCapRushGameRow, [string, number]>;
   capRushHistory!: EntityTable<StoredCapRushHistoryRow, 'runId'>;
   capRushReports!: EntityTable<StoredCapRushReportRow, 'runId'>;
   capRushPlayoffGames!: Table<StoredCapRushPlayoffGameRow, [string, string]>;
   capRushLeagueGames!: Table<StoredCapRushLeagueGameRow, [string, string]>;
+  capRushLockedInputs!: EntityTable<StoredCapRushLockedInputsRow, 'runId'>;
+  capRushLeagueResults!: Table<StoredCapRushLeagueScoreRow, [string, string]>;
   capRushLeagueAggregates!: EntityTable<StoredCapRushLeagueAggregateRow, 'runId'>;
   capRushPlaybackEvidence!: Table<StoredCapRushPlaybackEvidenceRow, [string, string]>;
   capRushPlaybackCursors!: Table<StoredCapRushPlaybackCursorRow, [string, string]>;
@@ -181,11 +205,18 @@ export class HoopRushDatabase extends Dexie {
   capRushMultiplayerHistory!: EntityTable<StoredCapRushMultiplayerHistoryRow, 'recordId'>;
   constructor(name = HOOP_RUSH_DATABASE_NAME) {
     super(name);
+    // Versions below 15 are unsupported and reset. A version-15 database keeps
+    // every record and only gains the version-16 store and indexes.
     this.version(15)
-      .stores(HOOP_RUSH_DATABASE_STORES)
+      .stores(HOOP_RUSH_DATABASE_STORES_V15)
       .upgrade((transaction) =>
-        Dexie.Promise.all(transaction.storeNames.map((name) => transaction.table(name).clear())),
+        Dexie.Promise.all(
+          Object.keys(HOOP_RUSH_DATABASE_STORES_V15)
+            .filter((name) => transaction.storeNames.includes(name))
+            .map((name) => transaction.table(name).clear()),
+        ),
       );
+    this.version(16).stores(HOOP_RUSH_DATABASE_STORES);
   }
 }
 export class DexieChallengeRepository {
@@ -220,14 +251,27 @@ export class DexieChallengeRepository {
     });
   }
   async appendActiveGame(input: ActiveGameAppend): Promise<void> {
-    const row = activeGameRowSchema.parse({
-      runId: input.runId,
-      gameNumber: input.gameNumber,
-      result: input.result,
-    });
+    await this.appendActiveGames([input]);
+  }
+  /**
+   * Commits an ordered run of accepted games and the checkpoint they advance in
+   * one transaction. Inputs must start at the next unplayed game so a batch can
+   * never leave a gap or overwrite an earlier result.
+   */
+  async appendActiveGames(inputs: readonly ActiveGameAppend[]): Promise<void> {
+    if (inputs.length === 0) return;
+    const rows = inputs.map((input) =>
+      activeGameRowSchema.parse({
+        runId: input.runId,
+        gameNumber: input.gameNumber,
+        result: input.result,
+      }),
+    );
+    const lastInput = inputs[inputs.length - 1];
+    if (lastInput === undefined) return;
     const checkpointUpdate = activeRunCheckpointSchema
       .pick({ status: true, firstLossGameNumber: true, gamesPlayed: true, aggregates: true })
-      .parse({ ...input, gamesPlayed: input.gameNumber });
+      .parse({ ...lastInput, gamesPlayed: lastInput.gameNumber });
     const updatedAtIso = new Date().toISOString();
     await this.db.transaction(
       'rw',
@@ -242,20 +286,37 @@ export class DexieChallengeRepository {
       async () => {
         const checkpoint = await this.db.active.get(ACTIVE_RECORD_ID);
         if (checkpoint === undefined) {
-          throw new Error('appendActiveGame: no active run checkpoint to update');
+          throw new Error('appendActiveGames: no active run checkpoint to update');
         }
-        if (checkpoint.runId !== row.runId) {
-          throw new Error('appendActiveGame: runId does not match the active checkpoint');
+        const { runId, gamesPlayed } = activeRunCheckpointSchema
+          .pick({ recordId: true, saveSchemaVersion: true, runId: true, gamesPlayed: true })
+          .parse(checkpoint);
+        for (const row of rows) {
+          if (row.runId !== runId) {
+            throw new Error('appendActiveGames: runId does not match the active checkpoint');
+          }
         }
-        await this.db.activeGames.put({ ...row, updatedAtIso });
+        let expectedGameNumber = gamesPlayed + 1;
+        for (const row of rows) {
+          if (row.gameNumber !== expectedGameNumber) {
+            throw new Error(
+              `appendActiveGames: game ${String(row.gameNumber)} is out of order; expected ${String(expectedGameNumber)}`,
+            );
+          }
+          expectedGameNumber += 1;
+        }
+        await this.db.activeGames.bulkPut(rows.map((row) => ({ ...row, updatedAtIso })));
         await this.db.active.put({ ...checkpoint, ...checkpointUpdate, updatedAtIso });
-        const bindingId = `challenge:${row.runId}`;
+        const bindingId = `challenge:${runId}`;
         if (await this.db.profileBindings.get(bindingId)) {
-          await new DexieProfileRepository(this.db).recordGame(bindingId, String(row.gameNumber), {
-            won: row.result.winner === 'home',
-            multiplayer: false,
-            players: row.result.home.players,
-          });
+          const profiles = new DexieProfileRepository(this.db);
+          for (const row of rows) {
+            await profiles.recordGame(bindingId, String(row.gameNumber), {
+              won: row.result.winner === 'home',
+              multiplayer: false,
+              players: row.result.home.players,
+            });
+          }
         }
       },
     );

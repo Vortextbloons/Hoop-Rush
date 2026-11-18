@@ -10,6 +10,7 @@ import type {
   HavocVariant,
   HavocWorkerCompleteMessage,
   HavocWorkerErrorMessage,
+  HavocWorkerGameBatchMessage,
   HavocWorkerGameMessage,
   HavocWorkerProgressMessage,
   HavocWorkerSimulateRequest,
@@ -20,9 +21,14 @@ import type {
   SeasonDraftCatalog,
   Seed,
 } from '@hoop-rush/data-contracts';
-import type { HavocApplyOutcomeInput } from '@hoop-rush/data-contracts';
+import type { HavocApplyOutcomeInput, HavocApplyGameBatchInput } from '@hoop-rush/data-contracts';
 
-export type { HavocApplyOutcomeInput, HavocCommandOutcome } from '@hoop-rush/data-contracts';
+export type {
+  HavocApplyGameBatchInput,
+  HavocApplyOutcomeInput,
+  HavocCommandOutcome,
+  HavocGameBatchCommit,
+} from '@hoop-rush/data-contracts';
 
 /** Completion states a Havoc run can carry once it appears in history. */
 export type HavocHistoryCompletionState = Exclude<HavocCompletionState, 'draft'>;
@@ -43,6 +49,7 @@ export interface HavocRunRepositoryPort {
   clearActiveRun(): Promise<void>;
   loadCommandResult(commandId: string): Promise<HavocCommandResult | null>;
   applyOutcome(input: HavocApplyOutcomeInput): Promise<HavocCommandResult>;
+  applyGameBatch(input: HavocApplyGameBatchInput): Promise<HavocCommandResult>;
   listRunGames(runId: string, variant: HavocVariant): Promise<HavocGameResult[]>;
   readRunGame(
     runId: string,
@@ -71,6 +78,7 @@ export interface HavocHistoryEntry {
 
 export interface HavocBatchHandlers {
   onGame?: (message: HavocWorkerGameMessage) => void | Promise<void>;
+  onGameBatch?: (message: HavocWorkerGameBatchMessage) => void | Promise<void>;
   onProgress?: (message: HavocWorkerProgressMessage) => void;
   onError?: (message: HavocWorkerErrorMessage) => void;
 }

@@ -6,6 +6,7 @@ import { sleep } from '#lib/sleep.js';
 import { prefersReducedMotion } from '#lib/device-capabilities.js';
 import { challengeRepository } from './challenge-repo';
 import { ChallengeWorkerJob } from './challenge-job';
+import { readFastSimPreference, writeFastSimPreference } from './fast-sim';
 import { profileRepository, selectedProfile } from '#lib/features/profile/profile.js';
 
 export class ChallengeRunPresenter {
@@ -13,6 +14,8 @@ export class ChallengeRunPresenter {
   phase = $state<ChallengePhase>('idle');
   error = $state<string | null>(null);
   loadError = $state<string | null>(null);
+  fastSim = $state(readFastSimPreference());
+  reducedMotion = $state(false);
   private session: ChallengeSession | null = null;
   private unsubscribe: (() => void) | null = null;
   init(): void {
@@ -52,11 +55,18 @@ export class ChallengeRunPresenter {
     if (this.session) void this.load(this.session);
   }
   start(): void {
-    this.session?.start({ reducedMotion: prefersReducedMotion() });
+    this.reducedMotion = prefersReducedMotion();
+    this.session?.start({ reducedMotion: this.reducedMotion, fastSim: this.fastSim });
     this.mirror();
   }
   resume(): void {
     this.start();
+  }
+  setFastSim(enabled: boolean): void {
+    if (this.fastSim === enabled) return;
+    this.fastSim = enabled;
+    writeFastSimPreference(enabled);
+    this.session?.setFast(enabled);
   }
   cancel(): void {
     this.session?.cancel();

@@ -5,17 +5,24 @@
   import { ArrowRight, Search } from '@lucide/svelte';
   import type {
     HoopRushManifest,
+    PlayoffPerformance,
     PlayersIndex,
     RosterDetails,
     RosterDetailsEntry,
+    SeasonPlayoffProfiles,
   } from '@hoop-rush/data-contracts';
-  import { franchiseAbbreviation, resolveEraTeamIdentity } from '@hoop-rush/data-contracts';
+  import {
+    franchiseAbbreviation,
+    playerVersionId,
+    resolveEraTeamIdentity,
+  } from '@hoop-rush/data-contracts';
   import {
     clearDataLoaderCaches,
     getManifest,
     getPlayersIndex,
     getRosterDetails,
   } from '#lib/data.js';
+  import { loadPlayoffProfiles } from '#lib/data-assets.js';
   import { errorMessageOf } from '#lib/errors.js';
   import { lazyModule } from '#lib/lazy-module.js';
   import { LITE_TOGGLE_EVENT, deferIdle, isLiteMode } from '#lib/device-capabilities.js';
@@ -69,6 +76,9 @@
   let details = $state.raw<RosterDetails | null>(null);
   let detailsError: string | null = $state(null);
   let detailsLoading = $state(false);
+  let playoffProfiles = $state.raw<SeasonPlayoffProfiles | null>(null);
+  let playoffProfilesError: string | null = $state(null);
+  let playoffProfilesLoading = $state(false);
   let liteActive = $state(false);
   const pageSize = $derived(liteActive ? LITE_PAGE_SIZE : DEFAULT_PAGE_SIZE);
   let franchiseId = $state('');
@@ -82,6 +92,7 @@
   let dialogKey = $state<string | null>(null);
   let compareKeys = $state<string[]>([]);
   let detailsRequest: Promise<void> | null = null;
+  let playoffProfilesRequest: Promise<void> | null = null;
   let dataGeneration = 0;
   $effect(() => {
     const syncLite = () => {
@@ -113,9 +124,13 @@
     detailsError = null;
     detailsLoading = false;
     detailsRequest = null;
+    playoffProfilesError = null;
+    playoffProfilesLoading = false;
+    playoffProfilesRequest = null;
     manifest = null;
     index = null;
     details = null;
+    playoffProfiles = null;
     const current = () => generation === dataGeneration;
     getManifest().then(
       (m) => {
@@ -157,6 +172,34 @@
     detailsRequest = request;
     return request;
   }
+  function ensurePlayoffProfiles(): Promise<void> {
+    if (playoffProfiles !== null || manifest?.rosterDetails?.playoffProfilesSplit !== true) {
+      return Promise.resolve();
+    }
+    if (playoffProfilesRequest !== null) return playoffProfilesRequest;
+    const generation = dataGeneration;
+    playoffProfilesLoading = true;
+    playoffProfilesError = null;
+    const request = loadPlayoffProfiles(manifest).then(
+      (profiles) => {
+        if (generation !== dataGeneration) return;
+        playoffProfiles = profiles;
+        playoffProfilesLoading = false;
+        playoffProfilesRequest = null;
+      },
+      (error: unknown) => {
+        if (generation !== dataGeneration) return;
+        playoffProfilesError = errorMessageOf(error);
+        playoffProfilesLoading = false;
+        playoffProfilesRequest = null;
+      },
+    );
+    playoffProfilesRequest = request;
+    return request;
+  }
+  $effect(() => {
+    if (dialogKey !== null && playoffProfiles === null) void ensurePlayoffProfiles();
+  });
   $effect(() => {
     if (!manifest || !index || details !== null || detailsRequest !== null) return;
     let cancelled = false;
@@ -243,7 +286,24 @@
     sortDir = defaultDirection(id);
   }
   const rowsByKey = $derived(new Map(rosterRows.map((row) => [comparisonKey(row), row] as const)));
+  const playoffByVersionId = $derived.by(() => {
+    const byVersion = new Map<string, PlayoffPerformance>();
+    for (const profile of playoffProfiles?.profiles ?? []) {
+      byVersion.set(profile.playerVersionId, profile.playoffPerformance);
+    }
+    return byVersion;
+  });
+  function playoffPerformanceFor(row: IndexRow | null): PlayoffPerformance | null {
+    if (!row) return null;
+    if (row.detail?.playoffPerformance !== undefined) return row.detail.playoffPerformance;
+    return (
+      playoffByVersionId.get(
+        playerVersionId(row.playerId, row.franchiseId, row.eraId, row.seasonKey),
+      ) ?? null
+    );
+  }
   const dialogPlayer = $derived(dialogKey === null ? null : (rowsByKey.get(dialogKey) ?? null));
+  const dialogPlayoffPerformance = $derived(playoffPerformanceFor(dialogPlayer));
   const compareSelection = $derived(
     compareKeys
       .map((key) => rowsByKey.get(key))
@@ -543,7 +603,13 @@
         {eraLabel}
         onClose={closePlayer}
         {detailsError}
-        onRetry={() => void ensureDetails()}
+        onRetry={() => {
+          void ensureDetails();
+          void ensurePlayoffProfiles();
+        }}
+        playoffPerformance={dialogPlayoffPerformance}
+        playoffLoading={playoffProfilesLoading}
+        playoffError={playoffProfilesError}
       />
     {/await}
   {/if}

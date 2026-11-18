@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'bun:test';
 import type { HavocBattleInput } from '@hoop-rush/data-contracts';
-import { havocBattleInputSchema } from '@hoop-rush/data-contracts';
+import {
+  canonicalJsonDataDigest,
+  havocBattleInputSchema,
+  immutableCanonicalSchema,
+} from '@hoop-rush/data-contracts';
 import { buildHavocLockedInputs } from '@hoop-rush/test-fixtures';
 import { createEngineContext } from '../../sim/kernel.ts';
 import {
@@ -12,6 +16,7 @@ import {
 } from './core/battle-adapters.ts';
 import { auditHavocBattleGame } from './core/battle-audit.ts';
 import {
+  HAVOC_BATTLE_INPUT_DIGEST_PREFIX,
   havocBattleGameInputDigest,
   havocBattleGameResultDigest,
   havocBattleGameTapeDigest,
@@ -164,6 +169,24 @@ describe('havoc battle runtime', () => {
     expect(havocBattleGameInputDigest(battleInput)).not.toBe(havocGameInputDigest(soloInput));
     expect(havocBattleGameResultDigest(battle.result)).not.toBe(havocGameResultDigest(solo.result));
     expect(havocBattleGameTapeDigest(battle.tape)).not.toBe(havocGameTapeDigest(solo.tape));
+  });
+
+  it('reuses validated battle fragments with the same digest as canonical Wasm', () => {
+    const locked = immutableCanonicalSchema(havocBattleInputSchema).parse(twoSidedBattleInput());
+    const input = {
+      ...locked,
+      gameNumber: 2,
+      home: { ...locked.home, displayName: 'Équipe «Home» 🏀' },
+      away: { ...locked.away },
+    };
+    const digest = havocBattleGameInputDigest(input);
+    expect(digest).toBe(canonicalJsonDataDigest(HAVOC_BATTLE_INPUT_DIGEST_PREFIX, input));
+
+    const edited = structuredClone(input);
+    edited.home.displayName = 'Changed display name';
+    const editedDigest = havocBattleGameInputDigest(edited);
+    expect(editedDigest).toBe(canonicalJsonDataDigest(HAVOC_BATTLE_INPUT_DIGEST_PREFIX, edited));
+    expect(editedDigest).not.toBe(digest);
   });
 
   it('runs a two-sided battle with tier-1 profile mutations deterministically', () => {

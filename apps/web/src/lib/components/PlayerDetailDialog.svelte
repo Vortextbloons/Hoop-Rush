@@ -29,6 +29,9 @@
     onClose,
     detailsError = null,
     onRetry,
+    playoffPerformance = null,
+    playoffLoading = false,
+    playoffError = null,
   }: {
     player: RosterRow | null;
     manifest: HoopRushManifest;
@@ -37,6 +40,9 @@
     onClose: () => void;
     detailsError?: string | null;
     onRetry?: () => void;
+    playoffPerformance?: PlayoffPerformance | null;
+    playoffLoading?: boolean;
+    playoffError?: string | null;
   } = $props();
 
   function rosterPlayoffSampleLabel(performance: PlayoffPerformance): string {
@@ -178,8 +184,8 @@
   });
 
   const playoffSection = $derived.by(() => {
-    const performance = player?.detail?.playoffPerformance;
-    if (performance === undefined) return null;
+    const performance = playoffPerformance ?? player?.detail?.playoffPerformance;
+    if (performance === undefined || performance === null) return null;
     return {
       sample: rosterPlayoffSampleLabel(performance),
       season: performance.season,
@@ -439,6 +445,31 @@
                 </p>
               </div>
             {/if}
+          </section>
+        {:else if playoffLoading}
+          <section class="mt-5" aria-label="Playoffs">
+            <h3 class="font-mono text-[10px] font-bold tracking-[0.14em] text-primary uppercase">
+              Playoffs
+            </h3>
+            <p class="mt-2 text-xs text-muted-foreground">Loading playoff data…</p>
+          </section>
+        {:else if playoffError}
+          <section class="mt-5" aria-label="Playoffs">
+            <h3 class="font-mono text-[10px] font-bold tracking-[0.14em] text-primary uppercase">
+              Playoffs
+            </h3>
+            <div class="mt-2 flex flex-wrap items-center justify-between gap-2">
+              <p class="text-xs text-muted-foreground">{playoffError}</p>
+              {#if onRetry}
+                <button
+                  type="button"
+                  onclick={onRetry}
+                  class="rounded-md border border-border px-3 py-1.5 font-mono text-xs font-bold text-foreground outline-none transition-colors hover:border-line-strong focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  Retry
+                </button>
+              {/if}
+            </div>
           </section>
         {/if}
         <p class="mt-4 text-[11px] leading-relaxed text-muted-foreground">

@@ -62,7 +62,8 @@ export class HavocRunner {
         requestId: request.requestId,
       },
       handle: (message, enqueue) => {
-        if (message.type === 'havoc-game') enqueue(() => handlers.onGame?.(message));
+        if (message.type === 'havoc-game-batch') enqueue(() => handlers.onGameBatch?.(message));
+        else if (message.type === 'havoc-game') enqueue(() => handlers.onGame?.(message));
         else if (message.type === 'havoc-progress') handlers.onProgress?.(message);
       },
     });

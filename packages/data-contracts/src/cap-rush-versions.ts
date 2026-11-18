@@ -6,7 +6,17 @@ export const CAP_RUSH_RULES_VERSION = 'cap-rush-rules-v4';
 export const CAP_RUSH_SALARY_CURVE_VERSION = 'cap-rush-salary-v3';
 export const CAP_RUSH_SEED_DERIVATION_VERSION = 'cap-rush-seeds-v1';
 export const CAP_RUSH_REPORT_VERSION = 'cap-rush-report-v1';
-export const CAP_RUSH_SAVE_SCHEMA_VERSION = 3;
+/**
+ * Current Cap Rush save envelope.
+ *
+ * Version 4 stores the immutable extended-draft `locked` inputs once in their
+ * own record and keeps only a `{ runId, digest }` reference in the active draft
+ * progress row. Version 3 (inline locked inputs) stays readable so existing
+ * `hoop-rush-saves-v2` saves resume; the next accepted command rewrites the
+ * active row in the version-4 layout.
+ */
+export const CAP_RUSH_SAVE_SCHEMA_VERSION = 4;
+export const CAP_RUSH_LEGACY_SAVE_SCHEMA_VERSION = 3;
 export const CAP_RUSH_GAME_COUNT = 82;
 export const CAP_RUSH_DRAFT_ROUNDS = 5;
 export const CAP_RUSH_OFFER_SIZE = 10;

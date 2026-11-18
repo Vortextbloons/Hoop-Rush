@@ -77,8 +77,11 @@ gathers intent, the engine owns basketball rules, adapters own I/O.
 - `ChallengeSession` + ports: the classic/sandbox run lifecycle (load, start,
   cancel, reveal pacing, acceptance, completion promotion) with a worker job
   port, repository port, asset port, and clock (`src/challenge/`). Each execution
-  owns a `ChallengeResultQueue` for ordering and pacing. Restarts settle pending
-  writes before using the committed run; completion promotion has its own phase.
+  owns a `ChallengeResultQueue` for ordering and pacing; fast sim (or reduced
+  motion) commits accepted games in ordered batches in one repository
+  transaction. Solo runs use the first derived attempt seed; best-of selection
+  remains a CLI simulation utility. Restarts settle pending writes before using
+  the committed run; completion promotion has its own phase.
 - `HavocSession` + ports: the havoc draft/run/season/comparison lifecycle with
   a runner port, repository port, asset port, and id port; `HavocServiceError`
   and the run/history view contract live here (`src/havoc/`).

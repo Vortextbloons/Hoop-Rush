@@ -3,7 +3,12 @@ import type { CapRushDraftState } from './cap-rush-draft.ts';
 import type { CapRushLeagueGame } from './cap-rush-league.ts';
 import type { CapRushStoredPlayoffGame } from './cap-rush-postseason.ts';
 import type { CapRushReport, CapRushStoredGame } from './cap-rush-season.ts';
-import type { HavocCommand, HavocCommandResult } from './havoc-commands.ts';
+import type {
+  HavocAcceptGameCommand,
+  HavocAcceptNormalGameCommand,
+  HavocCommand,
+  HavocCommandResult,
+} from './havoc-commands.ts';
 import type { HavocComparison, HavocReport } from './havoc-comparison.ts';
 import type { HavocGameResult, HavocGameTape } from './havoc-game.ts';
 import type { HavocRunState } from './havoc-run.ts';
@@ -41,6 +46,22 @@ export interface HavocApplyOutcomeInput extends CommandCommit<HavocRunState, Hav
   readonly tape?: { tape: HavocGameTape; tapeDigest: string; selectedRank?: number };
   readonly comparison?: HavocComparison;
   readonly report?: HavocReport;
+}
+
+/** One ordered, already-applied game acceptance inside an atomic batch. */
+export interface HavocGameBatchCommit {
+  readonly command: HavocAcceptGameCommand | HavocAcceptNormalGameCommand;
+  readonly outcome: HavocCommandOutcome;
+  readonly game: { result: HavocGameResult; inputDigest: string; resultDigest: string };
+}
+
+/**
+ * A small ordered group of accepted games written in a single transaction.
+ * `expectedRevision` must equal the stored run revision before the first game.
+ */
+export interface HavocApplyGameBatchInput {
+  readonly expectedRevision: number;
+  readonly games: readonly HavocGameBatchCommit[];
 }
 
 export function prepareCommandCommit<T extends { outcome: { result: { revisionBefore: number } } }>(

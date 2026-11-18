@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { capRushApronFactSchema } from './cap-rush-apron.ts';
 import { CAP_RUSH_GAME_COUNT, capRushDigestSchema } from './cap-rush-versions.ts';
+import { idSchema } from './ids.ts';
 import { capRushGameSummarySchema } from './cap-rush-season.ts';
 import { capRushLockedInputsSchema } from './cap-rush-lock.ts';
 import { capRushLeagueGameSchema } from './cap-rush-league.ts';
@@ -16,16 +17,27 @@ import {
 } from './havoc-game.ts';
 import { havocBattleInputSchema, havocBattleTapeSchema } from './havoc-battle.ts';
 
-export const CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION = 5;
+export const CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION = 6;
 
 const capRushWorkerBase = z.object({
   schemaVersion: z.literal(CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION),
   requestId: z.string().min(1).max(64),
 });
 
+/**
+ * A job either carries the validated locked inputs (the first job on a worker)
+ * or references the lock the same worker hydrated earlier by run id. Locked
+ * inputs are immutable for a run, so a worker may reuse one hydrated copy for
+ * every subsequent request and never re-parse the ~1 MB payload.
+ */
+const capRushWorkerLockRequest = {
+  locked: capRushLockedInputsSchema.optional(),
+  runId: idSchema.optional(),
+};
+
 export const capRushWorkerSimulateRequestSchema = capRushWorkerBase.extend({
   type: z.literal('cap-rush-simulate'),
-  locked: capRushLockedInputsSchema,
+  ...capRushWorkerLockRequest,
   startGame: z.number().int().min(1).max(CAP_RUSH_GAME_COUNT),
   count: z.number().int().min(1).max(CAP_RUSH_GAME_COUNT),
   includeTape: z.boolean().optional(),
@@ -37,7 +49,7 @@ export const capRushWorkerSimulateRequestSchema = capRushWorkerBase.extend({
 
 export const capRushWorkerPlayoffsRequestSchema = capRushWorkerBase.extend({
   type: z.literal('cap-rush-playoffs'),
-  locked: capRushLockedInputsSchema,
+  ...capRushWorkerLockRequest,
   games: z.array(capRushPlayoffGamePlanSchema).min(1).max(8),
   includeTape: z.boolean().optional(),
 });
@@ -46,11 +58,20 @@ export const capRushWorkerCancelRequestSchema = capRushWorkerBase.extend({
   type: z.literal('cap-rush-cancel'),
 });
 
-export const capRushWorkerRequestSchema = z.discriminatedUnion('type', [
-  capRushWorkerSimulateRequestSchema,
-  capRushWorkerPlayoffsRequestSchema,
-  capRushWorkerCancelRequestSchema,
-]);
+export const capRushWorkerRequestSchema = z
+  .discriminatedUnion('type', [
+    capRushWorkerSimulateRequestSchema,
+    capRushWorkerPlayoffsRequestSchema,
+    capRushWorkerCancelRequestSchema,
+  ])
+  .refine(
+    (request) =>
+      request.type === 'cap-rush-cancel' ||
+      (request.locked === undefined
+        ? request.runId !== undefined
+        : request.runId === undefined || request.runId === request.locked.runId),
+    'provide locked inputs or the matching run id',
+  );
 export type CapRushWorkerRequest = z.infer<typeof capRushWorkerRequestSchema>;
 
 export const capRushWorkerGameMessageSchema = capRushWorkerBase.extend({
@@ -122,6 +143,7 @@ export const capRushWorkerErrorCodeSchema = z.enum([
   'audit-failure',
   'stale-job',
   'cancelled',
+  'lock-missing',
   'internal',
 ]);
 export type CapRushWorkerErrorCode = z.infer<typeof capRushWorkerErrorCodeSchema>;

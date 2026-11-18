@@ -7,6 +7,7 @@ import {
   type CapRushWorkerMessage,
   type CapRushWorkerPlayoffGameMessage,
   type CapRushWorkerRequest,
+  type CapRushLockedInputs,
 } from '@hoop-rush/data-contracts';
 
 type Job = Extract<CapRushWorkerRequest, { type: 'cap-rush-simulate' | 'cap-rush-playoffs' }>;
@@ -24,25 +25,43 @@ export class CapRushParallelWorker {
   private readonly games = new Map<number, CapRushWorkerGameMessage>();
   private readonly league = new Map<number, Map<number, CapRushLeagueGame[]>>();
   private readonly playoffs = new Map<string, CapRushWorkerPlayoffGameMessage>();
+  /**
+   * The wrapper forwards one validated lock per lane worker. Later jobs only
+   * carry `runId`; a lane recreated after a cancel/error is hydrated again from
+   * the cached copy instead of asking the main thread to clone another 1 MB.
+   */
+  private locked: CapRushLockedInputs | null = null;
+  private readonly hydratedLanes = new Set<number>();
+  private singleRequestId: string | null = null;
 
   constructor(private readonly createWorker: () => Worker) {}
 
   postMessage(value: unknown): void {
     const request = capRushWorkerRequestSchema.parse(value);
-    if (request.type === 'cap-rush-cancel' && this.job !== null) {
-      if (request.requestId !== this.job.requestId) return;
-      this.finish(true);
-      this.stopWorkers();
+    if (request.type === 'cap-rush-cancel') {
+      if (request.requestId === this.job?.requestId) {
+        this.finish(true);
+        this.stopWorkers();
+      } else if (request.requestId === this.singleRequestId) {
+        this.workers[0]?.postMessage(request);
+      }
       return;
     }
+    const runId = request.runId ?? request.locked?.runId;
+    if (request.locked !== undefined) {
+      if (request.locked.runId !== this.locked?.runId) this.hydratedLanes.clear();
+      this.locked = request.locked;
+    }
+    const locked = this.locked?.runId === runId ? this.locked : null;
     this.games.clear();
     this.league.clear();
     this.playoffs.clear();
     this.delivered = 0;
     this.done = 0;
+    this.singleRequestId = null;
     const parallelSeason =
       request.type === 'cap-rush-simulate' &&
-      request.locked.leagueSchedule !== undefined &&
+      locked?.leagueSchedule !== undefined &&
       request.includeTape !== true &&
       request.backfillLeagueFrom === undefined &&
       request.backfillLeagueTo === undefined;
@@ -53,7 +72,15 @@ export class CapRushParallelWorker {
     const parallelPlayoffs = request.type === 'cap-rush-playoffs' && series.length > 1;
     if (!parallelSeason && !parallelPlayoffs) {
       this.job = null;
+      this.singleRequestId = request.requestId;
       this.start([request], (message) => {
+        if (
+          message.type === 'cap-rush-complete' ||
+          message.type === 'cap-rush-playoffs-complete' ||
+          message.type === 'cap-rush-error'
+        ) {
+          this.singleRequestId = null;
+        }
         this.emit(message);
       });
       return;
@@ -87,13 +114,17 @@ export class CapRushParallelWorker {
   }
 
   private start(
-    requests: CapRushWorkerRequest[],
+    requests: Job[],
     accept: (message: CapRushWorkerMessage, lane: number) => void,
   ): void {
     const generation = ++this.generation;
     requests.forEach((request, lane) => {
-      const worker = this.workers[lane] ?? this.createWorker();
-      this.workers[lane] = worker;
+      let worker = this.workers[lane];
+      if (worker === undefined) {
+        worker = this.createWorker();
+        this.workers[lane] = worker;
+        this.hydratedLanes.delete(lane);
+      }
       worker.onmessage = (event: MessageEvent<unknown>) => {
         if (generation !== this.generation) return;
         const parsed = capRushWorkerMessageSchema.safeParse(event.data);
@@ -116,8 +147,19 @@ export class CapRushParallelWorker {
         this.onerror?.(event);
         this.stopWorkers();
       };
-      worker.postMessage(request);
+      worker.postMessage(this.laneRequest(request, lane));
     });
+  }
+
+  private laneRequest(request: Job, lane: number): Job {
+    const { locked: supplied, ...reference } = request;
+    const runId = reference.runId ?? supplied?.runId;
+    if (runId === undefined || this.locked?.runId !== runId) return request;
+    if (!this.hydratedLanes.has(lane)) {
+      this.hydratedLanes.add(lane);
+      return { ...reference, runId, locked: this.locked };
+    }
+    return { ...reference, runId };
   }
 
   private accept(message: CapRushWorkerMessage, lane: number): void {
@@ -251,11 +293,14 @@ export class CapRushParallelWorker {
     this.generation += 1;
     for (const worker of this.workers) worker.terminate();
     this.workers = [];
+    this.hydratedLanes.clear();
+    this.singleRequestId = null;
   }
 
   terminate(): void {
     this.job = null;
     this.stopWorkers();
+    this.locked = null;
     this.games.clear();
     this.league.clear();
     this.playoffs.clear();

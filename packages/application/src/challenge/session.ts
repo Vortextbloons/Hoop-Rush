@@ -1,14 +1,14 @@
 import { ChallengeResultQueue } from './result-queue.ts';
 import {
-  challengeRunSchema,
   SAVE_SCHEMA_VERSION,
-  seedSchema,
+  type ActiveGameAppend,
   type ChallengeRun,
+  type CompletedRunIndex,
   type EraSimulationProfile,
   type GameResult,
+  type StoredRunRecord,
 } from '@hoop-rush/data-contracts';
 import { acceptGameResult, challengeRunProgressDigest } from '@hoop-rush/engine';
-import type { CompletedRunIndex, StoredRunRecord } from '@hoop-rush/data-contracts';
 import type {
   ChallengeAssetPort,
   ChallengeClockPort,
@@ -32,13 +32,17 @@ export interface ChallengeSessionOptions {
   assets: ChallengeAssetPort;
   clock: ChallengeClockPort;
 }
+export interface ChallengeStartOptions {
+  reducedMotion: boolean;
+  /** Run without the reveal cadence and persist results in ordered batches. */
+  fastSim?: boolean;
+}
 interface ChallengeExecution {
   token: number;
-  intervalMs: number;
-  awaitingSeed: boolean;
+  reducedMotion: boolean;
+  fast: boolean;
   reveal: ChallengeResultQueue | null;
 }
-const ACTIVE_RECORD_ID = 'active';
 export class ChallengeSession {
   private readonly repo: ChallengeRunRepositoryPort;
   private readonly job: ChallengeJobPort;
@@ -139,7 +143,7 @@ export class ChallengeSession {
       this.emit();
     }
   }
-  start(options: { reducedMotion: boolean }): void {
+  start(options: ChallengeStartOptions): void {
     if (
       this.disposed ||
       this.phase === 'loading' ||
@@ -150,11 +154,12 @@ export class ChallengeSession {
       this.run === null
     )
       return;
+    const fast = options.reducedMotion || options.fastSim === true;
     const execution: ChallengeExecution = {
       token: this.invalidate(),
-      intervalMs: options.reducedMotion ? 0 : REVEAL_INTERVAL_MS,
+      reducedMotion: options.reducedMotion,
+      fast,
       reveal: null,
-      awaitingSeed: true,
     };
     this.execution = execution;
     this.error = null;
@@ -171,6 +176,18 @@ export class ChallengeSession {
       );
     } else this.beginExecution(execution);
   }
+  /**
+   * Applies a fast-sim toggle to the running execution. Reduced motion keeps the
+   * fast path on regardless of the toggle.
+   */
+  setFast(fastSim: boolean): void {
+    const execution = this.execution;
+    if (execution === null) return;
+    const fast = execution.reducedMotion || fastSim;
+    if (execution.fast === fast) return;
+    execution.fast = fast;
+    execution.reveal?.setFast(fast);
+  }
   private beginExecution(execution: ChallengeExecution): void {
     if (this.abandoned(execution.token)) return;
     const run = this.run;
@@ -184,9 +201,7 @@ export class ChallengeSession {
       return;
     }
     try {
-      if (run.games.length === 0) {
-        this.job.startAttempt({ run, profile: this.profile }, this.jobEvents(execution));
-      } else this.beginReveal(run, execution);
+      this.beginReveal(run, execution);
     } catch (error) {
       this.fail(error instanceof Error ? error.message : String(error));
     }
@@ -228,9 +243,6 @@ export class ChallengeSession {
   private jobEvents(execution: ChallengeExecution): ChallengeJobEvents {
     const token = execution.token;
     return {
-      onStartResult: (chosenRunSeed) => {
-        void this.onStartResult(chosenRunSeed, execution);
-      },
       onResults: (results) => {
         if (this.abandoned(token)) return;
         execution.reveal?.deliver(results);
@@ -241,49 +253,6 @@ export class ChallengeSession {
       },
     };
   }
-  private async onStartResult(chosenRunSeed: string, execution: ChallengeExecution): Promise<void> {
-    const token = execution.token;
-    if (this.abandoned(token) || this.phase !== 'starting' || !execution.awaitingSeed) return;
-    execution.awaitingSeed = false;
-    const run = this.run;
-    if (run === null) return;
-    const parsedSeed = seedSchema.safeParse(chosenRunSeed);
-    if (!parsedSeed.success) {
-      this.fail('invalid attempt seed');
-      return;
-    }
-    const chosenSeed = parsedSeed.data;
-    const updatedRun =
-      chosenSeed === run.runSeed ? run : challengeRunSchema.parse({ ...run, runSeed: chosenSeed });
-    if (updatedRun !== run) {
-      try {
-        await this.save(
-          () =>
-            this.repo.saveActiveRun({
-              recordId: ACTIVE_RECORD_ID,
-              saveSchemaVersion: SAVE_SCHEMA_VERSION,
-              run: updatedRun,
-            }),
-          () => {
-            this.run = updatedRun;
-          },
-        );
-      } catch (error) {
-        if (this.abandoned(token)) return;
-        this.fail(
-          `could not save the chosen attempt seed: ${error instanceof Error ? error.message : String(error)}`,
-        );
-        return;
-      }
-      if (this.abandoned(token)) return;
-    }
-    if (this.abandoned(token)) return;
-    try {
-      this.beginReveal(updatedRun, execution);
-    } catch (error) {
-      if (!this.abandoned(token)) this.fail(error instanceof Error ? error.message : String(error));
-    }
-  }
   private beginReveal(run: ChallengeRun, execution: ChallengeExecution): void {
     const profile = this.profile;
     if (profile === null) return;
@@ -291,10 +260,11 @@ export class ChallengeSession {
     const startGameNumber = run.games.length + 1;
     execution.reveal = new ChallengeResultQueue({
       startGameNumber,
-      intervalMs: execution.intervalMs,
+      intervalMs: REVEAL_INTERVAL_MS,
+      fast: execution.fast,
       clock: this.clock,
       current: () => !this.abandoned(token) && this.phase === 'running',
-      accept: (result) => this.acceptResult(result, token),
+      accept: (results) => this.acceptResults(results, token),
       fail: (message) => {
         if (!this.abandoned(token)) this.fail(message);
       },
@@ -304,27 +274,33 @@ export class ChallengeSession {
     if (this.abandoned(token)) return;
     this.job.startSimulation({ run, profile, startGameNumber }, this.jobEvents(execution));
   }
-  private async acceptResult(result: GameResult, token: number): Promise<boolean> {
+  private async acceptResults(results: GameResult[], token: number): Promise<boolean> {
     const run = this.run;
-    if (run === null || this.abandoned(token)) return false;
-    let accepted: ChallengeRun;
-    try {
-      accepted = acceptGameResult(run, result);
-    } catch (error) {
-      this.fail(`invalid game result: ${error instanceof Error ? error.message : String(error)}`);
-      return false;
+    if (run === null || this.abandoned(token) || results.length === 0) return false;
+    let accepted = run;
+    const appends: ActiveGameAppend[] = [];
+    for (const result of results) {
+      let next: ChallengeRun;
+      try {
+        next = acceptGameResult(accepted, result);
+      } catch (error) {
+        this.fail(`invalid game result: ${error instanceof Error ? error.message : String(error)}`);
+        return false;
+      }
+      accepted = next;
+      appends.push({
+        runId: run.runId,
+        gameNumber: result.gameNumber,
+        result,
+        aggregates: accepted.aggregates,
+        status: accepted.status === 'finished' ? 'finished' : 'active',
+        firstLossGameNumber: accepted.firstLossGameNumber,
+      });
+      if (accepted.status === 'finished') break;
     }
     try {
       await this.save(
-        () =>
-          this.repo.appendActiveGame({
-            runId: run.runId,
-            gameNumber: result.gameNumber,
-            result,
-            aggregates: accepted.aggregates,
-            status: accepted.status === 'finished' ? 'finished' : 'active',
-            firstLossGameNumber: accepted.firstLossGameNumber,
-          }),
+        () => this.repo.appendActiveGames(appends),
         () => {
           this.run = accepted;
         },

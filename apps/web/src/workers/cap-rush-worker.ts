@@ -20,6 +20,25 @@ const cancelledRequests = new Set<string>();
 const PROGRESS_INTERVAL_MS = 250;
 const YIELD_INTERVAL_MS = 8;
 
+/**
+ * Locked inputs are immutable for a run and dominate the request payload
+ * (~1 MB). The first request hydrates this cache; later requests reference the
+ * run id and avoid re-validating the whole lock. A recreated worker starts
+ * empty and hydrates again from the next payload.
+ */
+let hydratedLock: CapRushLockedInputs | null = null;
+
+function hydrateLockedInputs(request: {
+  readonly locked?: CapRushLockedInputs;
+  readonly runId?: string;
+}): CapRushLockedInputs | null {
+  if (request.locked !== undefined) {
+    hydratedLock = request.locked;
+    return hydratedLock;
+  }
+  return hydratedLock?.runId === request.runId ? hydratedLock : null;
+}
+
 function post(message: unknown): void {
   self.postMessage(capRushWorkerMessageSchema.parse(message));
 }
@@ -382,15 +401,35 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
       cancelledRequests.add(request.requestId);
       return;
     case 'cap-rush-simulate': {
+      const locked = hydrateLockedInputs(request);
+      if (locked === null) {
+        postError(
+          request.requestId,
+          'lock-missing',
+          'the worker has not hydrated this run; send the locked inputs again',
+          null,
+        );
+        return;
+      }
       const signal = { cancelled: false };
-      void simulate(request, signal).catch((error: unknown) => {
+      void simulate({ ...request, locked }, signal).catch((error: unknown) => {
         postError(request.requestId, 'internal', failureMessage(error), null);
       });
       return;
     }
     case 'cap-rush-playoffs': {
+      const locked = hydrateLockedInputs(request);
+      if (locked === null) {
+        postError(
+          request.requestId,
+          'lock-missing',
+          'the worker has not hydrated this run; send the locked inputs again',
+          null,
+        );
+        return;
+      }
       const signal = { cancelled: false };
-      void simulatePlayoffs(request, signal).catch((error: unknown) => {
+      void simulatePlayoffs({ ...request, locked }, signal).catch((error: unknown) => {
         postError(request.requestId, 'internal', failureMessage(error), null);
       });
       return;

@@ -40,6 +40,10 @@ fallbacks remain low-confidence estimates rather than measured athletic ability.
 - Generated artifact contents are part of the product: after any importer
   change, regenerating must produce byte-identical files
   (`bun run hoop-rush import manifest` and `data validate` must stay green).
+- Optional playoff evidence is split out of `draft-catalog.json` and
+  `roster-details.json` into the shared `playoff-profiles.json`. The manifest
+  keeps `draftCatalog.identityHash` pinned to the pre-split logical catalog so
+  seeded saves and resumed runs keep comparing the same catalog identity.
 - Artifacts are validated with data-contracts schemas before writing; the
   manifest is validated with `hoopRushManifestSchema` on every write.
 - Importer stages must not read the database, the browser, or Supabase.

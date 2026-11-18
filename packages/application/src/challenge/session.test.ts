@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { seedSchema, type ChallengeRun, type GameResult } from '@hoop-rush/data-contracts';
+import type { ChallengeRun, GameResult } from '@hoop-rush/data-contracts';
 import {
   acceptGameResult,
   createEngineContext,
@@ -20,7 +20,6 @@ import { ChallengeSession } from './session.ts';
 import type {
   ChallengeAssetPort,
   ChallengeClockPort,
-  ChallengeJobAttemptInput,
   ChallengeJobEvents,
   ChallengeJobPort,
   ChallengeJobSimulationInput,
@@ -78,18 +77,16 @@ function pick<T>(items: T[], index: number): T {
 class MemoryChallengeRepository implements ChallengeRunRepositoryPort {
   record: StoredRunRecord | null = null;
   appends: ActiveGameAppend[] = [];
+  batches: ActiveGameAppend[][] = [];
   promotion: { completed: StoredRunRecord; index: CompletedRunIndex } | null = null;
   failPromotion = false;
 
   loadActiveRun(): Promise<StoredRunRecord | null> {
     return Promise.resolve(this.record);
   }
-  saveActiveRun(record: StoredRunRecord): Promise<void> {
-    this.record = record;
-    return Promise.resolve(undefined);
-  }
-  appendActiveGame(input: ActiveGameAppend): Promise<void> {
-    this.appends.push(input);
+  appendActiveGames(inputs: readonly ActiveGameAppend[]): Promise<void> {
+    this.batches.push([...inputs]);
+    this.appends.push(...inputs);
     return Promise.resolve(undefined);
   }
   promoteActiveToCompleted(completed: StoredRunRecord, index: CompletedRunIndex): Promise<void> {
@@ -101,15 +98,10 @@ class MemoryChallengeRepository implements ChallengeRunRepositoryPort {
 
 class FakeChallengeJob implements ChallengeJobPort {
   events: ChallengeJobEvents | null = null;
-  attempts: ChallengeJobAttemptInput[] = [];
   simulations: ChallengeJobSimulationInput[] = [];
   cancels = 0;
   disposals = 0;
 
-  startAttempt(input: ChallengeJobAttemptInput, events: ChallengeJobEvents): void {
-    this.attempts.push(input);
-    this.events = events;
-  }
   startSimulation(input: ChallengeJobSimulationInput, events: ChallengeJobEvents): void {
     this.simulations.push(input);
     this.events = events;
@@ -119,9 +111,6 @@ class FakeChallengeJob implements ChallengeJobPort {
   }
   dispose(): void {
     this.disposals += 1;
-  }
-  chooseSeed(chosenRunSeed: string): void {
-    this.events?.onStartResult(chosenRunSeed);
   }
   deliver(results: GameResult[]): void {
     this.events?.onResults(results);
@@ -182,6 +171,10 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
+function batchSizes(repository: MemoryChallengeRepository): number[] {
+  return repository.batches.map((batch) => batch.length);
+}
+
 describe('ChallengeSession', () => {
   it('loads an active run and its era profile', async () => {
     const run = fixtureRun({ runId: 'run-load' });
@@ -203,7 +196,6 @@ describe('ChallengeSession', () => {
 
   it('reports a profile failure without leaking the run', async () => {
     const run = fixtureRun();
-    const { session } = setup(run);
     const failingRepo = new MemoryChallengeRepository();
     failingRepo.record = storedRecord(run);
     const failing = new ChallengeSession({
@@ -214,9 +206,7 @@ describe('ChallengeSession', () => {
       },
       clock: new FakeChallengeClock(),
     });
-    await session.load();
     await failing.load();
-    expect(session.getSnapshot().loadError).toBeNull();
     expect(failing.getSnapshot().run).toBeNull();
     expect(failing.getSnapshot().loadError).toBe('The decade simulation profile is unavailable.');
   });
@@ -229,26 +219,19 @@ describe('ChallengeSession', () => {
     await session.load();
     expect(session.getSnapshot().phase).toBe('finished');
     session.start({ reducedMotion: true });
-    expect(job.attempts).toHaveLength(0);
     expect(job.simulations).toHaveLength(0);
   });
 
-  it('chooses an attempt seed, persists it, and reveals games in order', async () => {
+  it('simulates a fresh run once from its persisted seed and reveals games in order', async () => {
     const run = fixtureRun({ runId: 'run-reveal' });
-    const chosenSeed = seedSchema.parse('ffffffffffffffffffffffffffffffff');
-    const chosenRun = fixtureRun({ runId: 'run-reveal', runSeed: seedSchema.parse(chosenSeed) });
-    const results = resultsUntilFinished(chosenRun);
+    const results = resultsUntilFinished(run);
     const { repository, job, session } = setup(run);
     await session.load();
     session.start({ reducedMotion: true });
-    expect(session.getSnapshot().phase).toBe('starting');
-    expect(job.attempts).toHaveLength(1);
-    job.chooseSeed(chosenSeed);
-    await flush();
     expect(session.getSnapshot().phase).toBe('running');
-    expect(repository.record?.run.runSeed).toBe(chosenSeed);
+    expect(job.simulations).toHaveLength(1);
     expect(job.simulations[0]).toMatchObject({ startGameNumber: 1 });
-    expect(job.simulations[0]?.run.runSeed).toBe(chosenSeed);
+    expect(job.simulations[0]?.run.runSeed).toBe(run.runSeed);
     job.deliver(results.slice(0, 2));
     await flush();
     expect(repository.appends.map((append) => append.gameNumber)).toEqual([1, 2]);
@@ -263,14 +246,13 @@ describe('ChallengeSession', () => {
     expect(repository.promotion?.index.outcome).toBe(session.getSnapshot().run?.outcome);
   });
 
-  it('resumes an existing run without replaying the attempt seed', async () => {
+  it('resumes an existing run from the next unplayed game', async () => {
     const base = fixtureRun({ runId: 'run-resume' });
     const first = pick(resultSequence(base, 1), 0);
     const withGame = acceptGameResult(base, first);
     const { job, session } = setup(withGame);
     await session.load();
     session.start({ reducedMotion: true });
-    expect(job.attempts).toHaveLength(0);
     expect(job.simulations).toHaveLength(1);
     expect(job.simulations[0]?.startGameNumber).toBe(2);
   });
@@ -281,22 +263,63 @@ describe('ChallengeSession', () => {
     const timed = setup(run);
     await timed.session.load();
     timed.session.start({ reducedMotion: false });
-    timed.job.chooseSeed(run.runSeed);
-    await flush();
     timed.job.deliver(results);
     await flush();
     expect(timed.clock.sleeps).toHaveLength(3);
     expect(timed.clock.sleeps.every((ms) => ms > 0)).toBe(true);
+    expect(batchSizes(timed.repository)).toEqual([1, 1, 1]);
 
     const reduced = setup(run);
     await reduced.session.load();
     reduced.session.start({ reducedMotion: true });
-    reduced.job.chooseSeed(run.runSeed);
-    await flush();
     reduced.job.deliver(results);
     await flush();
     expect(reduced.clock.sleeps).toEqual([]);
+    expect(batchSizes(reduced.repository)).toEqual([3]);
     expect(reduced.repository.appends.map((append) => append.gameNumber)).toEqual([1, 2, 3]);
+  });
+
+  it('batches fast-sim results into one durable append', async () => {
+    const run = fixtureRun({ runId: 'run-fast-batch' });
+    const results = resultSequence(run, 6);
+    const { repository, job, session } = setup(run);
+    await session.load();
+    session.start({ reducedMotion: false, fastSim: true });
+    job.deliver(results);
+    await flush();
+    expect(batchSizes(repository)).toEqual([6]);
+    expect(repository.batches[0]?.map((append) => append.gameNumber)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(repository.batches[0]?.at(-1)?.aggregates).toEqual(
+      session.getSnapshot().run?.aggregates,
+    );
+  });
+
+  it('switches a running reveal to fast batching', async () => {
+    const run = fixtureRun({ runId: 'run-fast-toggle' });
+    const results = resultSequence(run, 3);
+    const { repository, job, session, clock } = setup(run);
+    const gate = deferred<undefined>();
+    clock.sleep = () => gate.promise;
+    await session.load();
+    session.start({ reducedMotion: false });
+    job.deliver(results);
+    session.setFast(true);
+    gate.resolve(undefined);
+    await flush();
+    expect(batchSizes(repository)).toEqual([1, 2]);
+    expect(repository.appends.map((append) => append.gameNumber)).toEqual([1, 2, 3]);
+  });
+
+  it('keeps reduced motion fast when the toggle is off', async () => {
+    const run = fixtureRun({ runId: 'run-reduced-toggle' });
+    const results = resultSequence(run, 2);
+    const { repository, job, session } = setup(run);
+    await session.load();
+    session.start({ reducedMotion: true });
+    session.setFast(false);
+    job.deliver(results);
+    await flush();
+    expect(batchSizes(repository)).toEqual([2]);
   });
 
   it('cancels into paused and drops late results', async () => {
@@ -305,8 +328,6 @@ describe('ChallengeSession', () => {
     const { repository, job, session } = setup(run);
     await session.load();
     session.start({ reducedMotion: true });
-    job.chooseSeed(run.runSeed);
-    await flush();
     job.deliver([pick(results, 0)]);
     await flush();
     expect(repository.appends).toHaveLength(1);
@@ -326,8 +347,6 @@ describe('ChallengeSession', () => {
     const { job, session } = setup(run);
     await session.load();
     session.start({ reducedMotion: true });
-    job.chooseSeed(run.runSeed);
-    await flush();
     job.deliver([pick(results, 0)]);
     await flush();
     job.fail('worker exploded');
@@ -345,8 +364,6 @@ describe('ChallengeSession', () => {
     const { session, job } = setup(run);
     await session.load();
     session.start({ reducedMotion: true });
-    job.chooseSeed(run.runSeed);
-    await flush();
     job.deliver([pick(results, 1)]);
     await flush();
     expect(session.getSnapshot().phase).toBe('error');
@@ -359,8 +376,6 @@ describe('ChallengeSession', () => {
     const { repository, job, session } = setup(base, { failPromotion: true });
     await session.load();
     session.start({ reducedMotion: true });
-    job.chooseSeed(base.runSeed);
-    await flush();
     job.deliver(results);
     await flush();
     expect(session.getSnapshot().phase).toBe('error');
@@ -378,8 +393,6 @@ describe('ChallengeSession', () => {
     const { repository, job, session } = setup(run);
     await session.load();
     session.start({ reducedMotion: true });
-    job.chooseSeed(run.runSeed);
-    await flush();
     session.dispose();
     expect(job.disposals).toBeGreaterThan(0);
     job.deliver(results);
@@ -431,11 +444,9 @@ describe('ChallengeSession', () => {
     clock.sleep = () => sleep.promise;
     await session.load();
     session.start({ reducedMotion: false });
-    job.chooseSeed(run.runSeed);
     job.deliver([pick(results, 0)]);
     session.cancel();
     session.start({ reducedMotion: true });
-    job.chooseSeed(run.runSeed);
     job.deliver(results);
     await flush();
     expect(repository.appends.map((row) => row.gameNumber)).toEqual([1, 2]);
@@ -448,10 +459,9 @@ describe('ChallengeSession', () => {
     const run = fixtureRun();
     const { session, job, repository } = setup(run);
     const append = deferred<undefined>();
-    repository.appendActiveGame = () => append.promise;
+    repository.appendActiveGames = () => append.promise;
     await session.load();
     session.start({ reducedMotion: true });
-    job.chooseSeed(run.runSeed);
     job.deliver(resultSequence(run, 1));
     session.cancel();
     session.start({ reducedMotion: true });
@@ -466,34 +476,16 @@ describe('ChallengeSession', () => {
     const run = fixtureRun();
     const { session, job, repository } = setup(run);
     const append = deferred<undefined>();
-    repository.appendActiveGame = () => append.promise;
+    repository.appendActiveGames = () => append.promise;
     await session.load();
     session.start({ reducedMotion: true });
-    job.chooseSeed(run.runSeed);
     job.deliver(resultSequence(run, 1));
     session.cancel();
     session.start({ reducedMotion: true });
     append.reject(new Error('old append failed'));
     await flush();
-    expect(session.getSnapshot()).toMatchObject({ phase: 'starting', error: null });
-    expect(job.attempts).toHaveLength(2);
-  });
-
-  it('waits for seed persistence before restarting an attempt', async () => {
-    const run = fixtureRun();
-    const { session, job, repository } = setup(run);
-    const save = deferred<undefined>();
-    repository.saveActiveRun = () => save.promise;
-    await session.load();
-    session.start({ reducedMotion: true });
-    const chosen = seedSchema.parse('abcdef0123456789');
-    job.chooseSeed(chosen);
-    session.cancel();
-    session.start({ reducedMotion: true });
-    expect(job.attempts).toHaveLength(1);
-    save.resolve(undefined);
-    await flush();
-    expect(job.attempts[1]?.run.runSeed).toBe(chosen);
+    expect(session.getSnapshot()).toMatchObject({ phase: 'running', error: null });
+    expect(job.simulations).toHaveLength(2);
   });
 
   it('keeps completion pending and prevents duplicate promotions', async () => {
@@ -507,7 +499,6 @@ describe('ChallengeSession', () => {
     };
     await session.load();
     session.start({ reducedMotion: true });
-    job.chooseSeed(run.runSeed);
     job.deliver(resultsUntilFinished(run));
     await flush();
     expect(session.getSnapshot().phase).toBe('completing');
@@ -532,25 +523,5 @@ describe('ChallengeSession', () => {
     await flush();
     expect(session.getSnapshot().phase).toBe('finished');
     expect(repository.promotion?.completed.run.runId).toBe(base.runId);
-  });
-
-  it('ignores duplicate seed responses while the chosen seed is being saved', async () => {
-    const run = fixtureRun();
-    const { session, job, repository } = setup(run);
-    const save = deferred<undefined>();
-    let saves = 0;
-    repository.saveActiveRun = () => {
-      saves += 1;
-      return save.promise;
-    };
-    await session.load();
-    session.start({ reducedMotion: true });
-    job.chooseSeed('abcdef0123456789');
-    job.chooseSeed('fedcba9876543210');
-    save.resolve(undefined);
-    await flush();
-    expect(saves).toBe(1);
-    expect(job.simulations).toHaveLength(1);
-    expect(session.getSnapshot().run?.runSeed).toBe(seedSchema.parse('abcdef0123456789'));
   });
 });

@@ -10,6 +10,10 @@ import {
   opponentBracketSchema,
   playersIndexSchema,
   rosterDetailsSchema,
+  seasonDraftCatalogSchema,
+  seasonPlayoffProfilesSchema,
+  seasonDraftCatalogIdentityHash,
+  applySeasonPlayoffProfiles,
   REQUIRED_RATING_KEYS,
   SELECTION_SCORE_VERSION,
   COLLECTION_CATALOG_VERSION,
@@ -666,7 +670,11 @@ async function auditGlobalAssets(
 ): Promise<AuditResult> {
   const failures: string[] = [];
   const details: string[] = [];
-  if (manifest.playersIndex === undefined && manifest.rosterDetails === undefined) {
+  if (
+    manifest.playersIndex === undefined &&
+    manifest.rosterDetails === undefined &&
+    manifest.playoffProfiles === undefined
+  ) {
     return { ok: true, details, failures };
   }
   const loadAsset = async (
@@ -772,6 +780,44 @@ async function auditGlobalAssets(
       }
     }
   }
+  if (manifest.rosterDetails?.playoffProfilesSplit && manifest.playoffProfiles === undefined) {
+    failures.push('rosterDetails: split playoff profiles are missing from the manifest');
+  }
+  if (manifest.playoffProfiles !== undefined) {
+    const playoffAsset = await loadAsset(manifest.playoffProfiles, 'playoffProfiles');
+    if (playoffAsset !== null) {
+      const parsed = seasonPlayoffProfilesSchema.safeParse(playoffAsset.parsed);
+      if (!parsed.success) {
+        failures.push(
+          `playoffProfiles: asset fails the schema: ${parsed.error.issues[0]?.path.join('.') ?? '(root)'} ${parsed.error.issues[0]?.message ?? ''}`,
+        );
+      } else {
+        if (parsed.data.dataVersion !== manifest.dataVersion) {
+          failures.push(
+            `playoffProfiles: dataVersion ${parsed.data.dataVersion} does not match the manifest ${manifest.dataVersion}`,
+          );
+        }
+        details.push(`playoffProfiles: ${String(parsed.data.profiles.length)} profiles`);
+        const entry = manifest.draftCatalog;
+        const catalogAsset = await loadAsset(entry, 'draftCatalog');
+        if (catalogAsset !== null) {
+          try {
+            const catalog = seasonDraftCatalogSchema.parse(catalogAsset.parsed);
+            const versions = new Set(catalog.candidates.map((row) => row.playerVersionId));
+            if (parsed.data.profiles.some((row) => !versions.has(row.playerVersionId))) {
+              failures.push('playoffProfiles: profile has no matching draft catalog entry');
+            }
+            const merged = applySeasonPlayoffProfiles(catalog, parsed.data);
+            if (sha256Hex(`${JSON.stringify(merged)}\n`) !== entry?.identityHash) {
+              failures.push('draftCatalog: reconstructed catalog does not match the identity hash');
+            }
+          } catch (error) {
+            failures.push(`draftCatalog: split assets cannot be merged (${String(error)})`);
+          }
+        }
+      }
+    }
+  }
   return { ok: failures.length === 0, details, failures };
 }
 async function auditCollectionCatalog(
@@ -863,7 +909,7 @@ async function auditCollectionCatalog(
   const draftEntry = manifest.draftCatalog;
   if (draftEntry === undefined) {
     failures.push('collection-catalog: manifest has no draftCatalog entry to pin against');
-  } else if (catalog.sourceCatalogHash !== draftEntry.contentHash) {
+  } else if (catalog.sourceCatalogHash !== seasonDraftCatalogIdentityHash(draftEntry)) {
     failures.push(
       'collection-catalog: sourceCatalogHash does not match the packaged draft catalog',
     );

@@ -2,9 +2,16 @@ import type {
   HavocBattleInput,
   HavocBattleResult,
   HavocBattleTape,
+  HavocBattleTeamInput,
   JsonData,
 } from '@hoop-rush/data-contracts';
-import { canonicalJsonDataDigest, havocDigestSchema } from '@hoop-rush/data-contracts';
+import {
+  canonicalJson,
+  canonicalJsonDataDigest,
+  hasCachedCanonicalJson,
+  havocDigestSchema,
+  seasonDigestHex,
+} from '@hoop-rush/data-contracts';
 
 /**
  * Digest prefixes are part of the frozen digest discipline: a value written by
@@ -18,7 +25,25 @@ export function digestOf(prefix: string, value: JsonData): string {
   return havocDigestSchema.parse(canonicalJsonDataDigest(prefix, value));
 }
 
+function hasCachedTeamFragments(team: HavocBattleTeamInput): boolean {
+  return (
+    hasCachedCanonicalJson(team.starters) &&
+    hasCachedCanonicalJson(team.replacements) &&
+    hasCachedCanonicalJson(team.clones)
+  );
+}
+
 export function havocBattleGameInputDigest(input: HavocBattleInput): string {
+  // Locked teams and profiles already carry canonical JSON from validation.
+  if (
+    hasCachedCanonicalJson(input.profile) &&
+    hasCachedTeamFragments(input.home) &&
+    hasCachedTeamFragments(input.away)
+  ) {
+    return havocDigestSchema.parse(
+      seasonDigestHex(HAVOC_BATTLE_INPUT_DIGEST_PREFIX + canonicalJson(input)),
+    );
+  }
   return digestOf(HAVOC_BATTLE_INPUT_DIGEST_PREFIX, input);
 }
 

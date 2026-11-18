@@ -65,15 +65,7 @@ export {
   type FranchiseCandidates,
 } from './bracket/generator.ts';
 export { toSimulationPlayer } from './modes/sandbox/adapters.ts';
-export {
-  BEST_OF_ATTEMPTS,
-  chooseBestRunSeed,
-  chooseBestRunSeedWithGames,
-  simulateChallengeAttempts,
-  simulateChallengeBestOf,
-  type BestOfChoice,
-  type BestOfSelection,
-} from './modes/sandbox/selection.ts';
+export { simulateChallengeAttempts } from './modes/sandbox/selection.ts';
 export { type HomeCourtMechanisms } from './game/home-court.ts';
 export { type EffectsHook } from './game/effects.ts';
 export {

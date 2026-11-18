@@ -37,7 +37,8 @@ class FakeWorker {
   }
 }
 
-const LOCKED = {} as CapRushLockedInputs;
+const LOCKED = { runId: 'run-runner-test' } as CapRushLockedInputs;
+const OTHER_LOCKED = { runId: 'run-runner-other' } as CapRushLockedInputs;
 
 function participant(slot: 'PG' | 'SG' | 'SF' | 'PF' | 'C', playerId: string, points: number) {
   return {
@@ -169,15 +170,72 @@ describe('CapRushRunner', () => {
     const fake = new FakeWorker();
     const runner = new CapRushRunner({ parallelism: 1, createWorker: () => fake.asWorker() });
     const pending = simulate(runner, 'req-1');
-    expect(fake.posted[0]).toMatchObject({ type: 'cap-rush-simulate', requestId: 'req-1' });
+    expect(fake.posted[0]).toMatchObject({
+      type: 'cap-rush-simulate',
+      requestId: 'req-1',
+      locked: LOCKED,
+      runId: LOCKED.runId,
+    });
     fake.emit(completeMessage('req-1'));
     await expect(pending).resolves.toMatchObject({ type: 'cap-rush-complete' });
     expect(fake.terminated).toBe(false);
 
     const next = simulate(runner, 'req-2');
-    expect(fake.posted[1]).toMatchObject({ type: 'cap-rush-simulate', requestId: 'req-2' });
+    expect(fake.posted[1]).toMatchObject({
+      type: 'cap-rush-simulate',
+      requestId: 'req-2',
+      runId: LOCKED.runId,
+    });
+    expect(fake.posted[1]).not.toHaveProperty('locked');
     fake.emit(completeMessage('req-2'));
     await expect(next).resolves.toMatchObject({ type: 'cap-rush-complete' });
+  });
+
+  it('hydrates again when the runner switches run and keeps the lock across cancellation', async () => {
+    const fake = new FakeWorker();
+    const runner = new CapRushRunner({ parallelism: 1, createWorker: () => fake.asWorker() });
+    const first = simulate(runner, 'req-1');
+    fake.emit(completeMessage('req-1'));
+    await first;
+
+    const other = runner.simulate({
+      requestId: 'req-other',
+      locked: OTHER_LOCKED,
+      startGame: 1,
+      count: 1,
+      handlers: { onGame: () => {} },
+    });
+    expect(fake.posted[1]).toMatchObject({
+      requestId: 'req-other',
+      locked: OTHER_LOCKED,
+      runId: OTHER_LOCKED.runId,
+    });
+    fake.emit(completeMessage('req-other'));
+    await other;
+
+    const cancelled = runner.simulate({
+      requestId: 'req-cancelled',
+      locked: OTHER_LOCKED,
+      startGame: 1,
+      count: 1,
+      handlers: { onGame: () => {} },
+    });
+    expect(fake.posted[2]).not.toHaveProperty('locked');
+    runner.cancel();
+    fake.emit(completeMessage('req-cancelled', true));
+    await expect(cancelled).resolves.toMatchObject({ cancelled: true });
+
+    // Cancellation leaves the worker alive, so the hydrated lock is reusable.
+    const afterCancel = runner.simulate({
+      requestId: 'req-after-cancel',
+      locked: OTHER_LOCKED,
+      startGame: 1,
+      count: 1,
+      handlers: { onGame: () => {} },
+    });
+    expect(fake.posted[3]).not.toHaveProperty('locked');
+    fake.emit(completeMessage('req-after-cancel'));
+    await afterCancel;
   });
 
   it('rejects concurrent jobs without disturbing the active job', async () => {
@@ -310,7 +368,12 @@ describe('CapRushRunner', () => {
     expect(first.terminated).toBe(true);
 
     const next = simulate(runner, 'req-2');
-    expect(second.posted[0]).toMatchObject({ type: 'cap-rush-simulate', requestId: 'req-2' });
+    expect(second.posted[0]).toMatchObject({
+      type: 'cap-rush-simulate',
+      requestId: 'req-2',
+      locked: LOCKED,
+      runId: LOCKED.runId,
+    });
     second.emit(completeMessage('req-2'));
     await next;
   });

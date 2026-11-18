@@ -1,6 +1,11 @@
 import Dexie from 'dexie';
 import { afterEach, describe, expect, it } from 'bun:test';
-import { HOOP_RUSH_DATABASE_NAME, HOOP_RUSH_DATABASE_STORES, HoopRushDatabase } from './dexie.ts';
+import {
+  HOOP_RUSH_DATABASE_NAME,
+  HOOP_RUSH_DATABASE_STORES,
+  HOOP_RUSH_DATABASE_STORES_V15,
+  HoopRushDatabase,
+} from './dexie.ts';
 import {
   resetIndexedDb,
   restoreIndexedDb,
@@ -12,16 +17,42 @@ const LEGACY_DATABASE_NAME = 'hoop-rush-saves';
 afterEach(restoreIndexedDb);
 
 describe('storage namespace', () => {
-  it('opens the new namespace at version 15 with every store', async () => {
+  it('opens the new namespace at version 16 with every store', async () => {
     resetIndexedDb();
     const db = new HoopRushDatabase(testDatabaseName('namespace-new'));
     await db.open();
     expect(HOOP_RUSH_DATABASE_NAME).toBe('hoop-rush-saves-v2');
     expect(db.name).not.toBe(LEGACY_DATABASE_NAME);
-    expect(db.verno).toBe(15);
+    expect(db.verno).toBe(16);
     const tableNames = db.tables.map((table) => table.name).sort();
     expect(tableNames).toEqual(Object.keys(HOOP_RUSH_DATABASE_STORES).sort());
     db.close();
+  });
+
+  it('upgrades a version-15 database without clearing its records', async () => {
+    resetIndexedDb();
+    const name = testDatabaseName('v15-upgrade');
+    const old = new Dexie(name);
+    old.version(15).stores(HOOP_RUSH_DATABASE_STORES_V15);
+    await old.open();
+    await old.table('profileSelection').put({ id: 'selection', profileId: 'v15-profile' });
+    await old.table('capRushActive').put({ recordId: 'cap-rush-draft', saveSchemaVersion: 3 });
+    old.close();
+
+    const current = new HoopRushDatabase(name);
+    await current.open();
+    expect(current.verno).toBe(16);
+    expect(await current.table('profileSelection').get('selection')).toEqual({
+      id: 'selection',
+      profileId: 'v15-profile',
+    });
+    expect(await current.table('capRushActive').get('cap-rush-draft')).toEqual({
+      recordId: 'cap-rush-draft',
+      saveSchemaVersion: 3,
+    });
+    expect(await current.capRushLockedInputs.count()).toBe(0);
+    expect(await current.capRushLeagueResults.count()).toBe(0);
+    current.close();
   });
 
   it('reopens current saves without resetting records', async () => {
@@ -51,7 +82,7 @@ describe('storage namespace', () => {
       old.close();
       const current = new HoopRushDatabase(name);
       await current.open();
-      expect(current.verno).toBe(15);
+      expect(current.verno).toBe(16);
       for (const table of current.tables) expect(await table.count()).toBe(0);
       await current.table('capRushMultiplayerActive').put({ roomId: 'new-room' });
       current.close();

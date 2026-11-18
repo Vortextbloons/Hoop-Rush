@@ -196,6 +196,9 @@
       {modeLabel}
       draftHref={draftPath}
       {resultHref}
+      fastSim={presenter.fastSim}
+      reducedMotion={presenter.reducedMotion}
+      onFastSimChange={(enabled) => presenter.setFastSim(enabled)}
       onCancel={() => presenter.cancel()}
       onResume={() => presenter.resume()}
     />

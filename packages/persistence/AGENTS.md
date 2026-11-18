@@ -18,7 +18,8 @@ schemas live here; domain schemas live in `@hoop-rush/data-contracts`.
 - **Storage namespace**: the database is `hoop-rush-saves-v2`
   (`HOOP_RUSH_DATABASE_NAME` in `src/repositories/dexie.ts`). The previous
   `hoop-rush-saves` database is never read or migrated; do not add upgrade
-  hooks for it. Only database version 15 is supported; older databases reset all
+  hooks for it. Only database versions 15 and 16 are supported. Version 15
+  upgrades additively to 16 without clearing records; older databases reset all
   local saves, history, and profiles during upgrade. Do not restore historical migrations.
 - **Record envelopes**: every stored record carries its domain
   `saveSchemaVersion`. Readers raise unsupported-version errors through the
@@ -26,6 +27,15 @@ schemas live here; domain schemas live in `@hoop-rush/data-contracts`.
 - **Atomic commits**: checkpoint writes commit in one transaction; pending
   blocks are deleted in the same transaction as the state they supersede.
   Never commit state and clear pendings separately.
+- **Cap Rush save layout**: save schema 4 stores the immutable `locked` inputs
+  once in `capRushLockedInputs` (`{ runId, digest, locked }`) and keeps only a
+  `{ runId, digest }` reference in `capRushActive`. League score rows in
+  `capRushLeagueResults` back `listLeagueResults`; full boxes stay in
+  `capRushLeagueGames`. Version-3 rows (inline locked, no score rows) stay
+  readable and migrate on the next accepted command.
+- **Cap Rush worker wire**: a job carries `locked` on the first request a
+  worker sees for a run and only `runId` afterwards; `hasLeague` tells the
+  parallel wrapper how to partition without the locked payload.
 - **Validate on read**: records parsed with Zod at read time; reconciliation
   audits detect drift. Do not silently accept malformed records.
 - **Shared repository helpers**: `repositories/support.ts` owns record

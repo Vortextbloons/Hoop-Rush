@@ -3,11 +3,11 @@ export type {
   ChallengePhase,
   ChallengeSessionOptions,
   ChallengeSessionSnapshot,
+  ChallengeStartOptions,
 } from './session.ts';
 export type {
   ChallengeAssetPort,
   ChallengeClockPort,
-  ChallengeJobAttemptInput,
   ChallengeJobEvents,
   ChallengeJobPort,
   ChallengeJobSimulationInput,

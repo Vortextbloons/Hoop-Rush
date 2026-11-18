@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { canonicalJson } from './season-hash.ts';
+import { canonicalJson, seasonDigestHex } from './season-hash.ts';
 import { idSchema, seedSchema } from './ids.ts';
 import { eraSimulationProfileSchema } from './era-sim-profile.ts';
 import { HAVOC_GAME_COUNT, HAVOC_SCHEMA_VERSION, havocVersionSetSchema } from './havoc-versions.ts';
@@ -72,7 +72,10 @@ export const havocLockedInputsSchema = z
   });
 export type HavocLockedInputs = z.infer<typeof havocLockedInputsSchema>;
 
-const lockedInputsJson = new WeakMap<HavocLockedInputs, string>();
+const frozenLocks = new WeakMap<
+  HavocLockedInputs,
+  { json: string; inputDigest?: string; snapshotDigest?: string }
+>();
 
 function freezeLockedValue(value: object): void {
   for (const child of Object.values(value as Record<string, unknown>)) {
@@ -82,15 +85,32 @@ function freezeLockedValue(value: object): void {
 }
 
 export function freezeHavocLockedInputs(locked: HavocLockedInputs): HavocLockedInputs {
-  if (!lockedInputsJson.has(locked)) {
+  if (!frozenLocks.has(locked)) {
     freezeLockedValue(locked);
-    lockedInputsJson.set(locked, canonicalJson(locked));
+    frozenLocks.set(locked, { json: canonicalJson(locked) });
   }
   return locked;
 }
 
 export function canonicalHavocLockedInputs(locked: HavocLockedInputs): string {
-  return lockedInputsJson.get(locked) ?? canonicalJson(locked);
+  return frozenLocks.get(locked)?.json ?? canonicalJson(locked);
+}
+
+/**
+ * Digest the frozen lock payload the worker receives. The session computes this
+ * once per batch and the worker re-checks it before simulating, so a cloned or
+ * mutated lock snapshot cannot silently drive a simulation.
+ */
+export function havocLockedInputDigest(locked: HavocLockedInputs): string {
+  const frozen = frozenLocks.get(locked);
+  if (frozen === undefined) return seasonDigestHex(`havoc-locked-v1:${canonicalJson(locked)}`);
+  return (frozen.inputDigest ??= seasonDigestHex(`havoc-locked-v1:${frozen.json}`));
+}
+
+export function havocLockedSnapshotDigest(locked: HavocLockedInputs): string {
+  const frozen = frozenLocks.get(locked);
+  if (frozen === undefined) return seasonDigestHex(canonicalJson(locked));
+  return (frozen.snapshotDigest ??= seasonDigestHex(frozen.json));
 }
 
 export const havocSeasonAggregateSchema = z

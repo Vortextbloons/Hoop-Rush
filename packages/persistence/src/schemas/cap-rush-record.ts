@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   CAP_RUSH_GAME_COUNT,
+  CAP_RUSH_LEGACY_SAVE_SCHEMA_VERSION,
   CAP_RUSH_SAVE_SCHEMA_VERSION,
   capRushCommandResultSchema,
   capRushCommandSchema,
@@ -11,6 +12,7 @@ import {
   capRushLeagueGameIdSchema,
   capRushLeagueGameSchema,
   capRushLeagueResultSchema,
+  capRushLockedInputsSchema,
   capRushPlaybackSchema,
   capRushReportSchema,
   capRushStoredGameSchema,
@@ -23,13 +25,23 @@ import {
 export const CAP_RUSH_ACTIVE_DRAFT_RECORD_ID = 'cap-rush-draft';
 const isoDateSchema = z.iso.datetime();
 
+/**
+ * Save schema 3 remains readable for existing saves; every new record is
+ * written with the current version. Keeping the union explicit (instead of
+ * rewriting old rows on open) preserves "never rewrite a record on read".
+ */
+const capRushReadableSaveSchemaVersionSchema = z.union([
+  z.literal(CAP_RUSH_LEGACY_SAVE_SCHEMA_VERSION),
+  z.literal(CAP_RUSH_SAVE_SCHEMA_VERSION),
+]);
+
 export function capRushPlaybackGameKey(game: number | string): string {
   return typeof game === 'number' ? `regular:${String(game)}` : `playoff:${game}`;
 }
 
 export const storedCapRushPlaybackEvidenceRowSchema = z
   .object({
-    saveSchemaVersion: z.literal(CAP_RUSH_SAVE_SCHEMA_VERSION),
+    saveSchemaVersion: capRushReadableSaveSchemaVersionSchema,
     runId: idSchema,
     gameKey: z.string().min(1),
     playback: capRushPlaybackSchema,
@@ -49,7 +61,7 @@ export type StoredCapRushPlaybackEvidenceRow = z.infer<
 
 export const storedCapRushPlaybackCursorRowSchema = z
   .object({
-    saveSchemaVersion: z.literal(CAP_RUSH_SAVE_SCHEMA_VERSION),
+    saveSchemaVersion: capRushReadableSaveSchemaVersionSchema,
     runId: idSchema,
     gameKey: z.string().min(1),
     cursor: z.number().int().nonnegative(),
@@ -63,9 +75,14 @@ export const storedCapRushPlaybackCursorRowSchema = z
   });
 export type StoredCapRushPlaybackCursorRow = z.infer<typeof storedCapRushPlaybackCursorRowSchema>;
 
-export const storedCapRushDraftRowSchema = z
+/**
+ * Version-3 active draft row: the full draft, including the ~1 MB immutable
+ * `locked` subtree, lives inline. Kept for reading saves written before the
+ * split; new writes use {@link storedCapRushDraftProgressRowSchema}.
+ */
+export const storedCapRushLegacyDraftRowSchema = z
   .object({
-    saveSchemaVersion: z.literal(CAP_RUSH_SAVE_SCHEMA_VERSION),
+    saveSchemaVersion: z.literal(CAP_RUSH_LEGACY_SAVE_SCHEMA_VERSION),
     recordId: z.literal(CAP_RUSH_ACTIVE_DRAFT_RECORD_ID),
     runId: idSchema,
     revision: z.number().int().nonnegative(),
@@ -82,13 +99,34 @@ export const storedCapRushDraftRowSchema = z
       ctx.addIssue({ code: 'custom', message: 'stored draft revision does not match its row' });
     }
   });
-export type StoredCapRushDraftRow = z.infer<typeof storedCapRushDraftRowSchema>;
+export type StoredCapRushLegacyDraftRow = z.infer<typeof storedCapRushLegacyDraftRowSchema>;
 
 /**
- * Envelope-only view of the active draft row. The 1 MB `draft.locked` subtree is
- * immutable and validated on load and on every write; the per-command overwrite
- * guard only needs the row envelope and the draft's run/revision.
+ * Reference from the active progress row to the immutable locked inputs held in
+ * `capRushLockedInputs`. The digest covers the locked inputs themselves, so a
+ * mutated lock cannot silently pass as the one the run locked.
  */
+export const capRushStoredLockedInputsRefSchema = z.object({
+  runId: idSchema,
+  digest: capRushDigestSchema,
+});
+export type CapRushStoredLockedInputsRef = z.infer<typeof capRushStoredLockedInputsRefSchema>;
+
+/**
+ * Version-4 active draft progress: the same domain draft with `locked` reduced
+ * to a reference. The row-level `stateDigest` still covers the full hydrated
+ * draft, so revision and digest validation are unchanged.
+ *
+ * This is a storage projection, not a second domain schema: field-level domain
+ * validation is inherited from the draft shape, and the hydrated draft is
+ * parsed with `capRushDraftStateSchema` on load.
+ */
+export const storedCapRushDraftProgressStateSchema = z.object({
+  ...capRushDraftStateSchema.shape,
+  locked: capRushStoredLockedInputsRefSchema.nullable(),
+});
+export type StoredCapRushDraftProgressState = z.infer<typeof storedCapRushDraftProgressStateSchema>;
+
 export const storedCapRushDraftProgressRowSchema = z
   .object({
     saveSchemaVersion: z.literal(CAP_RUSH_SAVE_SCHEMA_VERSION),
@@ -96,9 +134,43 @@ export const storedCapRushDraftProgressRowSchema = z
     runId: idSchema,
     revision: z.number().int().nonnegative(),
     stateDigest: capRushDigestSchema,
-    draft: z.looseObject({
+    draft: storedCapRushDraftProgressStateSchema,
+    createdAtIso: isoDateSchema,
+    updatedAtIso: isoDateSchema,
+  })
+  .superRefine((row, ctx) => {
+    if (row.draft.runId !== row.runId) {
+      ctx.addIssue({ code: 'custom', message: 'stored draft run id does not match its row' });
+    }
+    if (row.draft.revision !== row.revision) {
+      ctx.addIssue({ code: 'custom', message: 'stored draft revision does not match its row' });
+    }
+    if (row.draft.locked !== null && row.draft.locked.runId !== row.runId) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'stored locked inputs reference belongs to another run',
+      });
+    }
+  });
+export type StoredCapRushDraftProgressRow = z.infer<typeof storedCapRushDraftProgressRowSchema>;
+
+/**
+ * Envelope-only view of the version-4 active row for the per-command overwrite
+ * guard. The season progress is validated on load and on write; the guard only
+ * needs the revision and the locked-input reference, so it never walks a full
+ * draft on every commit.
+ */
+export const storedCapRushDraftProgressEnvelopeRowSchema = z
+  .object({
+    saveSchemaVersion: z.literal(CAP_RUSH_SAVE_SCHEMA_VERSION),
+    recordId: z.literal(CAP_RUSH_ACTIVE_DRAFT_RECORD_ID),
+    runId: idSchema,
+    revision: z.number().int().nonnegative(),
+    stateDigest: capRushDigestSchema,
+    draft: z.object({
       runId: idSchema,
       revision: z.number().int().nonnegative(),
+      locked: capRushStoredLockedInputsRefSchema.nullable(),
     }),
     createdAtIso: isoDateSchema,
     updatedAtIso: isoDateSchema,
@@ -110,12 +182,35 @@ export const storedCapRushDraftProgressRowSchema = z
     if (row.draft.revision !== row.revision) {
       ctx.addIssue({ code: 'custom', message: 'stored draft revision does not match its row' });
     }
+    if (row.draft.locked !== null && row.draft.locked.runId !== row.runId) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'stored locked inputs reference belongs to another run',
+      });
+    }
   });
-export type StoredCapRushDraftProgressRow = z.infer<typeof storedCapRushDraftProgressRowSchema>;
+export type StoredCapRushDraftProgressEnvelopeRow = z.infer<
+  typeof storedCapRushDraftProgressEnvelopeRowSchema
+>;
+
+export const storedCapRushLockedInputsRowSchema = z
+  .object({
+    saveSchemaVersion: z.literal(CAP_RUSH_SAVE_SCHEMA_VERSION),
+    runId: idSchema,
+    digest: capRushDigestSchema,
+    locked: capRushLockedInputsSchema,
+    updatedAtIso: isoDateSchema,
+  })
+  .superRefine((row, ctx) => {
+    if (row.locked.runId !== row.runId) {
+      ctx.addIssue({ code: 'custom', message: 'stored locked inputs belong to another run' });
+    }
+  });
+export type StoredCapRushLockedInputsRow = z.infer<typeof storedCapRushLockedInputsRowSchema>;
 
 export const storedCapRushCommandRowSchema = z
   .object({
-    saveSchemaVersion: z.literal(CAP_RUSH_SAVE_SCHEMA_VERSION),
+    saveSchemaVersion: capRushReadableSaveSchemaVersionSchema,
     commandId: commandIdSchema,
     runId: idSchema,
     command: capRushCommandSchema,
@@ -140,7 +235,7 @@ export type StoredCapRushCommandRow = z.infer<typeof storedCapRushCommandRowSche
 
 export const storedCapRushGameRowSchema = z
   .object({
-    saveSchemaVersion: z.literal(CAP_RUSH_SAVE_SCHEMA_VERSION),
+    saveSchemaVersion: capRushReadableSaveSchemaVersionSchema,
     runId: idSchema,
     gameNumber: z.number().int().min(1).max(CAP_RUSH_GAME_COUNT),
     game: capRushStoredGameSchema,
@@ -180,7 +275,7 @@ export type StoredCapRushGameRow = z.infer<typeof storedCapRushGameRowSchema>;
 
 export const storedCapRushPlayoffGameRowSchema = z
   .object({
-    saveSchemaVersion: z.literal(CAP_RUSH_SAVE_SCHEMA_VERSION),
+    saveSchemaVersion: capRushReadableSaveSchemaVersionSchema,
     runId: idSchema,
     gameId: capRushPlayoffGameIdSchema,
     game: capRushStoredPlayoffGameSchema,
@@ -205,7 +300,7 @@ export type StoredCapRushPlayoffGameRow = z.infer<typeof storedCapRushPlayoffGam
 
 export const storedCapRushLeagueGameRowSchema = z
   .object({
-    saveSchemaVersion: z.literal(CAP_RUSH_SAVE_SCHEMA_VERSION),
+    saveSchemaVersion: capRushReadableSaveSchemaVersionSchema,
     runId: idSchema,
     gameId: capRushLeagueGameIdSchema,
     game: capRushLeagueGameSchema,
@@ -223,9 +318,9 @@ export type StoredCapRushLeagueGameRow = z.infer<typeof storedCapRushLeagueGameR
  * score is stripped by the schema and never parsed, so listing a full season
  * does not validate every box on the main thread.
  */
-export const storedCapRushLeagueResultRowSchema = z
+export const storedCapRushLeagueGameResultRowSchema = z
   .object({
-    saveSchemaVersion: z.literal(CAP_RUSH_SAVE_SCHEMA_VERSION),
+    saveSchemaVersion: capRushReadableSaveSchemaVersionSchema,
     runId: idSchema,
     gameId: capRushLeagueGameIdSchema,
     game: capRushLeagueResultSchema,
@@ -236,10 +331,32 @@ export const storedCapRushLeagueResultRowSchema = z
       ctx.addIssue({ code: 'custom', message: 'stored league game id does not match its row' });
     }
   });
-export type StoredCapRushLeagueResultRow = z.infer<typeof storedCapRushLeagueResultRowSchema>;
+export type StoredCapRushLeagueGameResultRow = z.infer<
+  typeof storedCapRushLeagueGameResultRowSchema
+>;
+
+/**
+ * Compact league score row. `listLeagueResults` reads these (a few hundred
+ * bytes each) instead of deserializing 1,148 full box scores. Full boxes stay
+ * in `capRushLeagueGames` for on-demand reads.
+ */
+export const storedCapRushLeagueScoreRowSchema = z
+  .object({
+    saveSchemaVersion: z.literal(CAP_RUSH_SAVE_SCHEMA_VERSION),
+    runId: idSchema,
+    gameId: capRushLeagueGameIdSchema,
+    result: capRushLeagueResultSchema,
+    updatedAtIso: isoDateSchema,
+  })
+  .superRefine((row, ctx) => {
+    if (row.result.gameId !== row.gameId) {
+      ctx.addIssue({ code: 'custom', message: 'stored league score id does not match its row' });
+    }
+  });
+export type StoredCapRushLeagueScoreRow = z.infer<typeof storedCapRushLeagueScoreRowSchema>;
 
 export const storedCapRushHistoryRowSchema = capRushHistoryEntrySchema
-  .safeExtend({ saveSchemaVersion: z.literal(CAP_RUSH_SAVE_SCHEMA_VERSION) })
+  .safeExtend({ saveSchemaVersion: capRushReadableSaveSchemaVersionSchema })
   .superRefine((row, ctx) => {
     if (row.wins + row.losses > CAP_RUSH_GAME_COUNT) {
       ctx.addIssue({ code: 'custom', message: 'stored history wins and losses exceed a season' });
@@ -249,7 +366,7 @@ export type StoredCapRushHistoryRow = z.infer<typeof storedCapRushHistoryRowSche
 
 export const storedCapRushReportRowSchema = z
   .object({
-    saveSchemaVersion: z.literal(CAP_RUSH_SAVE_SCHEMA_VERSION),
+    saveSchemaVersion: capRushReadableSaveSchemaVersionSchema,
     runId: idSchema,
     report: capRushReportSchema,
     updatedAtIso: isoDateSchema,
@@ -263,7 +380,7 @@ export type StoredCapRushReportRow = z.infer<typeof storedCapRushReportRowSchema
 
 export const storedCapRushLeagueAggregateRowSchema = z
   .object({
-    saveSchemaVersion: z.literal(CAP_RUSH_SAVE_SCHEMA_VERSION),
+    saveSchemaVersion: capRushReadableSaveSchemaVersionSchema,
     runId: idSchema,
     aggregate: capRushLeagueAggregateSchema,
     updatedAtIso: isoDateSchema,

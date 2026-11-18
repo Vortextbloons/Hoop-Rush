@@ -1,9 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { isAbsolute, resolve } from 'node:path';
 import {
-  BEST_OF_ATTEMPTS,
+  createChallenge,
   createEngineContext,
-  simulateChallengeBestOf,
+  deriveAttemptSeed,
+  simulateChallenge,
   toSimulationPlayer,
   type ChallengeCreation,
   type EngineContext,
@@ -22,7 +23,7 @@ import {
   type SimulationPlayer,
   type SimulationTeam,
 } from '@hoop-rush/data-contracts';
-import { parseCount, UsageError } from '../args.ts';
+import { UsageError } from '../args.ts';
 import { makeReport, type CliReport } from '../report.ts';
 import { simChallengeReportSchema } from '../report-schemas.ts';
 import { loadPackagedData, PackagedData, loadBracketFile, loadProfileFile } from './data-loader.ts';
@@ -332,18 +333,19 @@ export function prepareChallenge(
 export function simChallenge(args: {
   lineup?: string;
   seed?: string;
-  reruns?: string;
   era?: string;
   profile?: string;
   bracket?: string;
 }): CliReport {
   const { lineupSpec, seed, eraId, creation, profile, context } = prepareChallenge(args);
-  const reruns = parseCount(args.reruns, '--reruns', BEST_OF_ATTEMPTS);
-  if (reruns < 1) throw new UsageError('--reruns must be >= 1');
   const started = performance.now();
   let run: ChallengeRun;
   try {
-    run = simulateChallengeBestOf(creation, profile, context, reruns);
+    run = simulateChallenge(
+      createChallenge({ ...creation, runSeed: deriveAttemptSeed(creation.runSeed, 0) }),
+      profile,
+      context,
+    );
   } catch (error) {
     throw new Error(`challenge simulation failed: ${(error as Error).message}`);
   }
@@ -355,7 +357,7 @@ export function simChallenge(args: {
     seed,
     eraId,
     chosenSeed: run.runSeed,
-    attempts: reruns,
+    attempts: 1,
     engineVersion: context.engineVersion,
     dataVersion: run.versions.dataVersion,
     profileVersion: run.eraProfileVersion,
@@ -496,7 +498,7 @@ export function simChallenge(args: {
   ].join('  ');
   const details = [
     `record ${String(payload.record.wins)}-${String(payload.record.losses)} · outcome ${payload.outcome}${payload.firstLossGameNumber !== null ? ` · first loss game ${String(payload.firstLossGameNumber)}` : ''}`,
-    `best of ${String(payload.attempts)} attempts · chosen seed ${payload.chosenSeed}`,
+    `first attempt · seed ${payload.chosenSeed}`,
     `engine ${payload.engineVersion} · data ${payload.dataVersion} · profile ${payload.profileVersion} · bracket ${payload.bracketVersion} · schedule ${payload.scheduleVersion} · era ${eraId} · seed ${seed}`,
     `team: ${String(payload.record.gamesPlayed)} games · ${String(payload.teamPossessions)} possessions`,
     header,

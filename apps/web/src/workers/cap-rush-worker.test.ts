@@ -129,6 +129,61 @@ describe('Cap Rush worker broadcast ordering', () => {
     });
   }, 60_000);
 
+  it('reuses a hydrated lock by run id and reports an unknown run', async () => {
+    const locked = lockedRun();
+    const run = async (data: unknown): Promise<PostedMessage[]> => {
+      const posted: PostedMessage[] = [];
+      let settle: (() => void) | null = null;
+      const completed = new Promise<void>((resolve) => {
+        settle = resolve;
+      });
+      fakeSelf.postMessage = (message) => {
+        posted.push(message);
+        if (message.type === 'cap-rush-complete' || message.type === 'cap-rush-error') settle?.();
+      };
+      fakeSelf.onmessage?.({ data });
+      await completed;
+      return posted;
+    };
+
+    const hydrated = await run({
+      schemaVersion: CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION,
+      type: 'cap-rush-simulate',
+      requestId: 'worker-hydrate',
+      locked,
+      startGame: 1,
+      count: 1,
+    });
+    expect(hydrated.find((message) => message.type === 'cap-rush-error')).toBeUndefined();
+    expect(hydrated.find((message) => message.type === 'cap-rush-game')).toMatchObject({
+      cursor: 1,
+    });
+
+    const reused = await run({
+      schemaVersion: CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION,
+      type: 'cap-rush-simulate',
+      requestId: 'worker-reuse',
+      runId: locked.runId,
+      hasLeague: locked.leagueSchedule !== undefined,
+      startGame: 2,
+      count: 1,
+    });
+    expect(reused.find((message) => message.type === 'cap-rush-error')).toBeUndefined();
+    expect(reused.find((message) => message.type === 'cap-rush-game')).toMatchObject({
+      cursor: 2,
+    });
+
+    const missing = await run({
+      schemaVersion: CAP_RUSH_WORKER_WIRE_SCHEMA_VERSION,
+      type: 'cap-rush-simulate',
+      requestId: 'worker-missing-lock',
+      runId: 'run-missing',
+      startGame: 1,
+      count: 1,
+    });
+    expect(missing.at(-1)).toMatchObject({ type: 'cap-rush-error', code: 'lock-missing' });
+  }, 60_000);
+
   it('cancels a batch at a complete slot with both user and league results delivered', async () => {
     const posted: PostedMessage[] = [];
     let settle: (() => void) | null = null;

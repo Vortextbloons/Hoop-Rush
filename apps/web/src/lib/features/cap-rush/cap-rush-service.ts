@@ -10,7 +10,11 @@ import type {
 import { newSeasonId, seasonRootSeed } from '#lib/ids.js';
 import { getPersistence } from '#lib/persistence.js';
 import { capRushBracketWithRosterMetadata } from './cap-rush-opponent-metadata.js';
-import { loadCapRushRosterMetadata, loadDraftCatalog } from '#lib/data-assets.js';
+import {
+  loadCapRushRosterMetadata,
+  loadDraftCatalog,
+  loadPlayoffProfiles,
+} from '#lib/data-assets.js';
 import { loadRunPreamble } from '#lib/run-preamble.js';
 import {
   profileRepository,
@@ -55,6 +59,7 @@ export function createCapRushService(options: CreateCapRushServiceOptions = {}):
     repository,
     assets: {
       loadCatalog: options.loadCatalog ?? loadDraftCatalog,
+      loadPlayoffProfiles,
       loadPreamble:
         options.loadPreamble ??
         (async () => {
