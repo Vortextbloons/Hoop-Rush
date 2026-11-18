@@ -111,6 +111,24 @@ existing immutable snapshot/state-digest paths. Typed game contracts use native
 JSON number/string formatting followed by Rust key ordering and the same FNV
 hashing over UTF-16 units. This preserves existing multiplayer/replay digests.
 
+## Cap Rush AI-league compact audit benchmark
+
+```sh
+bun scripts/sim-wasm/league-summary-benchmark.ts
+```
+
+Compares the tape-backed audited battle runtime with the playback-free compact
+ledger audit across a complete 82-slot Cap Rush AI league (1,148 games). It
+first asserts result, audit, input/result digest, and derived box parity for
+every game, then times isolated child processes so one runtime cannot bias the
+other's JIT state. It also measures the immutable-input digest path and the
+Havoc summary caller. Results go to
+`sim-wasm-league-compact-results.json`. These are desktop Bun measurements, not
+browser or phone claims.
+
+Games without playback use the kernel's numeric event/scoring ledger directly.
+The full tape path is unchanged for watched and replay games.
+
 ## Solo validation benchmark
 
 ```sh

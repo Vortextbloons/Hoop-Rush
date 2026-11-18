@@ -1,0 +1,39 @@
+{
+  "note": "Full = tape-backed audited battle. Compact = kernel numeric-ledger audit without a playback tape. inputDigest reference = canonical JSON plus Wasm canonicalization; cached = immutable-fragment composition with the same FNV offsets. Havoc summary compares the production compact caller with the previous tape-backed summary caller. Isolated child-process timings after in-process parity over all 1,148 AI league games. Desktop Bun timings only.",
+  "capturedAt": "2026-11-18T23:38:50.053Z",
+  "bun": "1.4.4",
+  "parity": true,
+  "games": 1148,
+  "ledgerDigest": "29fbeb87cb3c45ab109cdf1d10355b77",
+  "samples": 7,
+  "league": {
+    "fullWallMs": 870.7532999999999,
+    "compactWallMs": 767.2121,
+    "wallSpeedup": 1.134957725510325,
+    "wallReductionPercent": 11.89099139790798,
+    "fullCpuMs": 985,
+    "compactCpuMs": 828,
+    "cpuSpeedup": 1.1896135265700483,
+    "cpuReductionPercent": 15.939086294416239
+  },
+  "inputDigest": {
+    "referenceWallMs": 694.9722999999999,
+    "cachedWallMs": 173.13190000000003,
+    "wallSpeedup": 4.014120448051456,
+    "wallReductionPercent": 75.08794235396144,
+    "referenceCpuMs": 718,
+    "cachedCpuMs": 188,
+    "cpuSpeedup": 3.8191489361702127,
+    "cpuReductionPercent": 73.81615598885793
+  },
+  "havocSummary": {
+    "fullWallMs": 10672.2265,
+    "compactWallMs": 9871.039700000001,
+    "wallSpeedup": 1.081165391321443,
+    "wallReductionPercent": 7.50721323240281,
+    "fullCpuMs": 11953,
+    "compactCpuMs": 11094,
+    "cpuSpeedup": 1.077429241031188,
+    "cpuReductionPercent": 7.186480381494187
+  }
+}

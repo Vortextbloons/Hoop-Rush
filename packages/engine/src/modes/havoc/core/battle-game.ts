@@ -16,8 +16,13 @@ import {
 import type { ApronRuntimeHooks } from '../../../sim/apron-runtime.ts';
 import type { EngineContext } from '../../../sim/kernel.ts';
 import type { Rng } from '../../../sim/rng.ts';
-import { auditHavocBattleGame, type HavocBattleAuditFacts } from './battle-audit.ts';
+import {
+  auditHavocBattleGame,
+  auditHavocBattleLedger,
+  type HavocBattleAuditFacts,
+} from './battle-audit.ts';
 import { havocBattleGameInputDigest } from './battle-digests.ts';
+import type { HavocBattleLedger } from './battle-ledger.ts';
 import { HavocBattleWasmSimulation } from './battle-wasm.ts';
 export { HAVOC_SCORING_SOURCE_MUTATION, havocFieldGoalValue } from './battle-scoring.ts';
 export type {
@@ -72,6 +77,13 @@ interface HavocBattleRun {
   readonly auditFacts: HavocBattleAuditFacts;
 }
 
+interface HavocBattleCompactRun {
+  readonly result: HavocBattleResult;
+  readonly ledger: HavocBattleLedger;
+  /** Facts the simulation already established; the audit reuses them. */
+  readonly auditFacts: HavocBattleAuditFacts;
+}
+
 function runBattle(
   input: HavocBattleInput,
   context: EngineContext,
@@ -86,14 +98,30 @@ function runBattle(
   }
 }
 
-function buildRun(
+function runBattleLedger(
   input: HavocBattleInput,
   context: EngineContext,
   options: HavocBattleOptions,
-): HavocBattleRun {
-  const { raw, inputDigest } = runBattle(input, context, options);
-  const overtimePeriods = raw.overtimePeriods;
-  const result = havocBattleResultSchema.parse({
+): { raw: ReturnType<HavocBattleWasmSimulation['runWithLedger']>; inputDigest: string } {
+  const apron = options.apron?.battleApronStates?.() ?? [];
+  const simulation = new HavocBattleWasmSimulation(input, context, apron);
+  try {
+    return { raw: simulation.runWithLedger(), inputDigest: havocBattleGameInputDigest(input) };
+  } finally {
+    options.apron?.completeBattle?.();
+  }
+}
+
+function battleResultOf(
+  input: HavocBattleInput,
+  raw: Pick<
+    ReturnType<HavocBattleWasmSimulation['run']>,
+    'home' | 'away' | 'overtimePeriods' | 'rollups' | 'highlights'
+  >,
+  inputDigest: string,
+  context: EngineContext,
+): HavocBattleResult {
+  return havocBattleResultSchema.parse({
     schemaVersion: HAVOC_SCHEMA_VERSION,
     gameNumber: input.gameNumber,
     variant: input.variant,
@@ -106,11 +134,20 @@ function buildRun(
     home: raw.home,
     away: raw.away,
     winner: raw.home.points > raw.away.points ? 'home' : 'away',
-    overtimePeriods,
+    overtimePeriods: raw.overtimePeriods,
     inputDigest,
     rollups: raw.rollups,
     highlights: raw.highlights,
   });
+}
+
+function buildRun(
+  input: HavocBattleInput,
+  context: EngineContext,
+  options: HavocBattleOptions,
+): HavocBattleRun {
+  const { raw, inputDigest } = runBattle(input, context, options);
+  const result = battleResultOf(input, raw, inputDigest, context);
   const tape: HavocBattleTape = {
     schemaVersion: HAVOC_SCHEMA_VERSION,
     gameNumber: input.gameNumber,
@@ -122,6 +159,20 @@ function buildRun(
   return {
     result,
     tape,
+    auditFacts: { inputDigest: result.inputDigest, resultValidated: true },
+  };
+}
+
+function buildCompactRun(
+  input: HavocBattleInput,
+  context: EngineContext,
+  options: HavocBattleOptions,
+): HavocBattleCompactRun {
+  const { raw, inputDigest } = runBattleLedger(input, context, options);
+  const result = battleResultOf(input, raw, inputDigest, context);
+  return {
+    result,
+    ledger: raw.ledger,
     auditFacts: { inputDigest: result.inputDigest, resultValidated: true },
   };
 }
@@ -157,6 +208,25 @@ export function simulateAuditedHavocBattleGame(
     get tape() {
       return (tape ??= havocBattleTapeSchema.parse(battle.tape));
     },
+  };
+}
+
+/**
+ * Audited battle without a playback tape. The simulation keeps the kernel's
+ * compact event/scoring ledger and the audit checks it in place, so no typed
+ * event objects or tape schema work are performed. Results, rollups,
+ * highlights, digests, overtime, apron facts, and every accounting check are
+ * identical to {@link simulateAuditedHavocBattleGame}.
+ */
+export function simulateAuditedHavocBattleSummary(
+  input: HavocBattleInput,
+  context: EngineContext,
+  options: HavocBattleOptions = {},
+): { result: HavocBattleResult; audit: HavocGameAudit } {
+  const battle = buildCompactRun(input, context, options);
+  return {
+    result: battle.result,
+    audit: auditHavocBattleLedger(input, battle.result, battle.ledger, battle.auditFacts),
   };
 }
 

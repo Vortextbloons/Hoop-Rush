@@ -58,9 +58,13 @@ use the standard `game.rs` kernel. Havoc and Cap Rush games (solo and
 multiplayer) run the shared `possession.rs` battle kernel, including mutations,
 scoring attribution, and Cap Rush apron rules. TypeScript validates inputs,
 prepares tables, owns mode rules through the hook interfaces, and decodes
-results. Typed game verification uses the data-contracts canonical serializer
-and digest kernel. Worker envelopes, digest prefixes, seeded results, and
-network coordination are unchanged.
+results. Games that never deliver a playback tape (the Cap Rush AI league and
+bulk Havoc summaries) audit the kernel's compact numeric event/scoring ledger
+directly; watched and replay games keep the full typed tape and tape audit.
+Typed game verification
+uses the data-contracts canonical serializer and digest kernel. Worker
+envelopes, digest prefixes, seeded results, and network coordination are
+unchanged.
 
 ## Verification
 

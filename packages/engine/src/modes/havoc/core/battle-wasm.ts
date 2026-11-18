@@ -35,6 +35,13 @@ import {
 } from '../../../sim/evolution-rules.ts';
 import { createRng, type Rng, type WeightedPickTable } from '../../../sim/rng.ts';
 import { contestPenalty } from '../../../sim/shooting.ts';
+import {
+  BATTLE_LEDGER_EVENT_FIELDS,
+  BATTLE_LEDGER_SCORING_FIELDS,
+  BATTLE_LEDGER_SCORING_SOURCES,
+  type HavocBattleLedger,
+  type HavocBattleLedgerParticipant,
+} from './battle-ledger.ts';
 import { ACTION_TYPES } from '../../../sim/usage.ts';
 import { SHOT_ZONES } from '../../../domain/zones.ts';
 import { freeThrowProbability, shootingFoulProbability } from '../../../sim/fouls.ts';
@@ -953,23 +960,8 @@ function shotKindName(kind: number): 'layup' | 'dunk' | 'jumper' {
   return kind === 2 ? 'dunk' : kind === 1 ? 'layup' : 'jumper';
 }
 
-const SCORING_SOURCES: HavocScoringSource[] = [
-  'roulette',
-  'four-point-dunk',
-  'reverse-basketball',
-  'golden-assist',
-  'double-or-nothing',
-  'heat-check',
-  'second-chance-jackpot',
-  'the-bounty',
-  'buzzer-bandit',
-  'charity-casino',
-  'cold-blooded',
-  'triple-threat',
-];
-
 function scoringSourceName(source: number): HavocScoringSource {
-  return SCORING_SOURCES[source] ?? 'roulette';
+  return BATTLE_LEDGER_SCORING_SOURCES[source] ?? 'roulette';
 }
 
 function decodeEvents(handle: number, bindings: readonly ParticipantBinding[]): HavocBattleEvent[] {
@@ -1450,14 +1442,21 @@ function decodeScoring(
   return entries;
 }
 
-interface BattleRawOutput {
+interface BattleCoreOutput {
   readonly home: HavocTeamResult;
   readonly away: HavocTeamResult;
-  readonly events: HavocBattleEvent[];
-  readonly scoring: HavocBattleScoringEntry[];
   readonly rollups: HavocBattleMutationRollup[];
   readonly highlights: HavocHighlight[];
   readonly overtimePeriods: number;
+}
+
+interface BattleRawOutput extends BattleCoreOutput {
+  readonly events: HavocBattleEvent[];
+  readonly scoring: HavocBattleScoringEntry[];
+}
+
+export interface BattleLedgerOutput extends BattleCoreOutput {
+  readonly ledger: HavocBattleLedger;
 }
 
 function decodeTeam(
@@ -1547,12 +1546,11 @@ function decodeTeam(
   };
 }
 
-function decodeOutput(
+function decodeCoreOutput(
   input: HavocBattleInput,
-  handle: number,
   bindings: readonly ParticipantBinding[],
   overtimePeriods: number,
-): BattleRawOutput {
+): BattleCoreOutput {
   const pointer = battleKernel().battle_output_ptr();
   const output = memoryView(pointer, 65536, Float64Array);
   const header = (field: number): number => output[field] ?? 0;
@@ -1625,11 +1623,71 @@ function decodeOutput(
   return {
     home: decodeTeam(input, bindings, 0, homeRecord, participantRecords, periods),
     away: decodeTeam(input, bindings, 1, awayRecord, participantRecords, periods),
-    events: decodeEvents(handle, bindings),
-    scoring: decodeScoring(handle, bindings),
     rollups,
     highlights,
     overtimePeriods,
+  };
+}
+
+function decodeOutput(
+  input: HavocBattleInput,
+  handle: number,
+  bindings: readonly ParticipantBinding[],
+  overtimePeriods: number,
+): BattleRawOutput {
+  return {
+    ...decodeCoreOutput(input, bindings, overtimePeriods),
+    events: decodeEvents(handle, bindings),
+    scoring: decodeScoring(handle, bindings),
+  };
+}
+
+function ledgerParticipants(
+  bindings: readonly ParticipantBinding[],
+): HavocBattleLedgerParticipant[] {
+  return bindings.map((binding) => ({
+    instanceId: binding.participant.instanceId,
+    sideIndex: binding.side,
+    kind: binding.participant.kind,
+    slot: binding.participant.slot,
+    ownerInstanceId: binding.participant.ownerInstanceId,
+    sourcePlayerId: binding.participant.source.playerId,
+    sourcePlayerVersionId: binding.participant.source.playerVersionId,
+    mutations: new Set(binding.participant.mutationPackage.map((entry) => entry.mutationId)),
+  }));
+}
+
+function decodeLedgerOutput(
+  input: HavocBattleInput,
+  handle: number,
+  bindings: readonly ParticipantBinding[],
+  overtimePeriods: number,
+): BattleLedgerOutput {
+  const eventCount = battleKernel().battle_event_count(handle);
+  const events = new Float64Array(
+    memoryView(
+      battleKernel().battle_event_ptr(handle),
+      eventCount * BATTLE_LEDGER_EVENT_FIELDS,
+      Float64Array,
+    ),
+  );
+  const scoringCount = battleKernel().battle_scoring_count(handle);
+  const scoring = new Float64Array(
+    memoryView(
+      battleKernel().battle_scoring_ptr(handle),
+      scoringCount * BATTLE_LEDGER_SCORING_FIELDS,
+      Float64Array,
+    ),
+  );
+  return {
+    ...decodeCoreOutput(input, bindings, overtimePeriods),
+    ledger: {
+      participants: ledgerParticipants(bindings),
+      events,
+      eventCount,
+      scoring,
+      scoringCount,
+    },
   };
 }
 
@@ -1789,6 +1847,26 @@ export class HavocBattleWasmSimulation {
   }
 
   run(): BattleRawOutput {
+    return this.execute(decodeOutput);
+  }
+
+  /**
+   * Runs the same battle and returns the kernel's compact event/scoring ledger
+   * instead of decoding thousands of typed tape objects. Callers without
+   * playback audit that ledger directly; the full path above is unchanged.
+   */
+  runWithLedger(): BattleLedgerOutput {
+    return this.execute(decodeLedgerOutput);
+  }
+
+  private execute<T>(
+    decode: (
+      input: HavocBattleInput,
+      handle: number,
+      bindings: readonly ParticipantBinding[],
+      overtimePeriods: number,
+    ) => T,
+  ): T {
     const handle = this.init.handle;
     const previousRng = activeExternalRng;
     const previousFactory = derivedFactory;
@@ -1833,7 +1911,7 @@ export class HavocBattleWasmSimulation {
       const overtimePeriods = Math.max(0, this.period - 4);
       const gameSeconds = 4 * 720 + overtimePeriods * 300;
       battleKernel().battle_finalize(handle, gameSeconds);
-      return decodeOutput(this.input, handle, this.init.bindings, overtimePeriods);
+      return decode(this.input, handle, this.init.bindings, overtimePeriods);
     } finally {
       activeExternalRng = previousRng;
       derivedFactory = previousFactory;

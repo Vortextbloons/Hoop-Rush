@@ -14,6 +14,7 @@ import {
 } from '../core/battle-adapters.ts';
 import {
   simulateAuditedHavocBattleGame,
+  simulateAuditedHavocBattleSummary,
   simulateValidatedHavocBattleGame,
 } from '../core/battle-game.ts';
 import { auditHavocSoloIdentity } from './audit.ts';
@@ -41,14 +42,26 @@ function simulateAuditedSoloBattle(rawInput: HavocGameInput, context: EngineCont
   return { input, simulation, soloInputDigest };
 }
 
-function soloResultOf({
-  input,
-  simulation,
-  soloInputDigest,
-}: Pick<
-  ReturnType<typeof simulateSoloBattle>,
-  'input' | 'simulation' | 'soloInputDigest'
->): HavocGameResult {
+function simulateAuditedSoloBattleSummary(rawInput: HavocGameInput, context: EngineContext) {
+  const { input, battleInput, soloInputDigest } = soloInputsOf(rawInput);
+  const simulation = simulateAuditedHavocBattleSummary(battleInput, context);
+  return { input, simulation, soloInputDigest };
+}
+
+interface SoloResultSource {
+  readonly input: HavocGameInput;
+  readonly simulation: { readonly result: Parameters<typeof battleToSoloResult>[0] };
+  readonly soloInputDigest: string;
+}
+
+interface SoloAuditSource extends SoloResultSource {
+  readonly simulation: {
+    readonly result: Parameters<typeof battleToSoloResult>[0];
+    readonly audit: HavocGameAudit;
+  };
+}
+
+function soloResultOf({ input, simulation, soloInputDigest }: SoloResultSource): HavocGameResult {
   return battleToSoloResult(simulation.result, input.humanSide, soloInputDigest);
 }
 
@@ -67,7 +80,7 @@ function soloSimulationOf({
 }
 
 function auditedFindings(
-  battle: ReturnType<typeof simulateAuditedSoloBattle>,
+  battle: SoloAuditSource,
   result: HavocGameResult,
 ): HavocGameAudit['findings'] {
   const battleAudit = battle.simulation.audit;
@@ -95,16 +108,17 @@ export function simulateAuditedHavocGame(
 }
 
 /**
- * Same simulation and audits as {@link simulateAuditedHavocGame} without the
- * solo tape relabel. Bulk season simulation does not deliver a tape, so this
- * avoids allocating one per game while keeping every accounting guarantee.
- * Replayable tapes come from the recorded path, which replays the same seed.
+ * Same seeded result and audits as {@link simulateAuditedHavocGame} without the
+ * solo tape relabel or typed event decoding. Bulk season simulation does not
+ * deliver a tape, so this audits the kernel's compact ledger instead and keeps
+ * every accounting guarantee. Replayable tapes come from the recorded path,
+ * which replays the same seed.
  */
 export function simulateAuditedHavocSummaryGame(
   rawInput: HavocGameInput,
   context: EngineContext,
 ): { result: HavocGameResult; audit: HavocGameAudit } {
-  const battle = simulateAuditedSoloBattle(rawInput, context);
+  const battle = simulateAuditedSoloBattleSummary(rawInput, context);
   const result = soloResultOf(battle);
   const findings = auditedFindings(battle, result);
   return { result, audit: { ok: findings.length === 0, findings } };
