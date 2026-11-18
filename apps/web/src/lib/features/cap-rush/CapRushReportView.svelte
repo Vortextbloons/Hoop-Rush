@@ -190,11 +190,7 @@
           aria-hidden="true"
         />
         <div class="min-w-0 flex-1">
-          <p
-            class="font-mono text-[10px] font-bold tracking-[0.16em] uppercase {postseason.isUserChampion
-              ? 'text-accent'
-              : 'text-muted-foreground'}"
-          >
+          <p class="ui-label {postseason.isUserChampion ? 'text-accent' : 'text-muted-foreground'}">
             {postseason.isUserChampion ? 'Cap Rush champion' : 'Champion'}
           </p>
           <h2 class="font-display mt-1 text-3xl font-extrabold tracking-tight uppercase">

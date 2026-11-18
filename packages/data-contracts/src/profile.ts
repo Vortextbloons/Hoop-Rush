@@ -69,6 +69,16 @@ export const achievementUnlockSchema = z.object({
 });
 export type AchievementUnlock = z.infer<typeof achievementUnlockSchema>;
 
+export const profileTitleSchema = z.enum([
+  'none',
+  'defensive-wall',
+  'floor-general',
+  'the-undefeated',
+  'triple-double-machine',
+  'century-club',
+  'never-out',
+]);
+
 export const playerProfileSchema = z.object({
   saveSchemaVersion: z.literal(PROFILE_SAVE_SCHEMA_VERSION),
   id: z.uuid(),
@@ -76,7 +86,7 @@ export const playerProfileSchema = z.object({
   avatar: z.enum(['initials', 'ball', 'crown']),
   border: z.enum(['classic', 'gold']),
   nameColor: z.enum(['white', 'orange', 'blue']),
-  title: z.enum(['none', 'defensive-wall', 'floor-general']),
+  title: profileTitleSchema,
   featuredAchievement: achievementIdSchema.nullable(),
   achievements: z.array(achievementIdSchema),
   achievementMoments: z.array(achievementUnlockSchema).optional(),
@@ -87,6 +97,28 @@ export const playerProfileSchema = z.object({
   multiplayerStreak: z.number().int().nonnegative(),
 });
 export type PlayerProfile = z.infer<typeof playerProfileSchema>;
+
+export const profileTitles: Record<
+  PlayerProfile['title'],
+  { name: string; achievementId: AchievementId | null }
+> = {
+  none: { name: 'None', achievementId: null },
+  'defensive-wall': { name: 'Defensive Wall', achievementId: 'no-easy-buckets' },
+  'floor-general': { name: 'Floor General', achievementId: 'silent-carry' },
+  'the-undefeated': { name: 'The Undefeated', achievementId: 'better-than-73-9' },
+  'triple-double-machine': { name: 'Triple-Double Machine', achievementId: 'brodie-mode' },
+  'century-club': { name: 'Century Club', achievementId: 'wilt-chamberlain-mode' },
+  'never-out': { name: 'Never Out', achievementId: 'the-reverse-sweep' },
+};
+
+export function achievementTitleFor(
+  id: AchievementId,
+): Exclude<PlayerProfile['title'], 'none'> | undefined {
+  return (Object.keys(profileTitles) as PlayerProfile['title'][]).find(
+    (title): title is Exclude<PlayerProfile['title'], 'none'> =>
+      title !== 'none' && profileTitles[title].achievementId === id,
+  );
+}
 
 export const publicProfileSchema = playerProfileSchema
   .pick({
