@@ -265,11 +265,6 @@
     font-size: 12px;
     font-weight: 700;
   }
-  .error {
-    margin-top: 14px;
-    color: var(--color-destructive);
-    font-size: 12px;
-  }
   @media (max-width: 560px) {
     .room-shell {
       padding: 18px;

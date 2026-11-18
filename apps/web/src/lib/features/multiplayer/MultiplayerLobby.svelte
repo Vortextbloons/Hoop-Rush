@@ -826,7 +826,6 @@
     font-weight: 600;
   }
   .room-preview,
-  .room-error,
   .connection-note {
     padding: 12px;
     border-radius: 8px;
@@ -837,10 +836,6 @@
   .room-preview {
     border: 1px solid var(--color-positive);
     background: color-mix(in srgb, var(--color-positive) 8%, var(--color-card));
-  }
-  .room-error {
-    border: 1px solid var(--color-destructive);
-    background: color-mix(in srgb, var(--color-destructive) 8%, var(--color-card));
   }
   .connection-note {
     border-top: 1px solid var(--color-line-soft);
