@@ -70,11 +70,10 @@ export function rebounderWeights(
   const rating = offensive ? 'offensiveRebound' : 'defensiveRebound';
   return team.players.map((p) => {
     const authoritative = evidenceOf?.(p)?.isAuthoritative('rebound-weights') ?? false;
-    const historical = authoritative
-      ? 0
-      : offensive
-        ? (p.anchors?.offensiveReboundsPerGame ?? 0)
-        : (p.anchors?.defensiveReboundsPerGame ?? 0);
+    const anchors = authoritative ? undefined : p.anchors;
+    const historical = offensive
+      ? anchors?.offensiveReboundsPerGame
+      : anchors?.defensiveReboundsPerGame;
     const heightContribution = p.heightInches === null ? 0 : Math.max(0, p.heightInches - 72) * 0.8;
     const weightContribution = p.weightLbs === null ? 0 : Math.max(0, p.weightLbs - 180) * 0.03;
     const responsibility =
@@ -82,17 +81,24 @@ export function rebounderWeights(
       positionModifiers?.get(p.playerId)?.rebounding ??
       1;
     const scale = weightScale?.(p) ?? 1;
-    return (
-      Math.max(
-        0.5,
-        p.ratings[rating] * (offensive ? 0.75 + p.tendencies.crashOffensiveGlassRate / 40 : 1) +
-          p.ratings.vertical * 0.25 +
-          historical * ENGINE_CONSTANTS.observedReboundWeight +
-          heightContribution +
-          weightContribution,
-      ) *
-      responsibility *
-      scale
-    );
+    const crash = offensive ? 0.75 + p.tendencies.crashOffensiveGlassRate / 40 : 1;
+    const ratingWeight =
+      p.ratings[rating] * crash +
+      p.ratings.vertical * 0.25 +
+      heightContribution +
+      weightContribution;
+    let weight = ratingWeight;
+    if (anchors && anchors.minutesPerGame > 0 && historical != null) {
+      const c = ENGINE_CONSTANTS;
+      const minutes = anchors.gamesPlayed * anchors.minutesPerGame;
+      const confidence =
+        Math.min(1, minutes / c.reboundEvidenceMinutes) * c.reboundEvidenceMaxWeight;
+      const reference = offensive
+        ? c.reboundEvidencePer36.offensive
+        : c.reboundEvidencePer36.defensive;
+      const historicalWeight = (historical * 36 * 85) / (anchors.minutesPerGame * reference);
+      weight += confidence * (historicalWeight - ratingWeight);
+    }
+    return Math.max(0.5, weight) * responsibility * scale;
   });
 }

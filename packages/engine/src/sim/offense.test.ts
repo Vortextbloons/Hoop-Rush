@@ -60,6 +60,25 @@ describe('on-court offensive allocation', () => {
     expect(after.offense.shotShares.reduce((sum, share) => sum + share, 0)).toBeCloseTo(1, 12);
   });
 
+  it('lets a skilled center initiate more often than a similarly equipped point guard', () => {
+    const team = buildLegalSimulationTeam();
+    const guard = required(team.players[0]);
+    const center = required(team.players[4]);
+    center.ratings = { ...guard.ratings, passing: guard.ratings.passing + 12 };
+    center.tendencies = { ...guard.tendencies };
+    const profile = buildGameSimulationInput().profile;
+    const skilled = prepareTeam(team, profile);
+    expect(required(skilled.offense.creatorShares[4])).toBeGreaterThan(
+      required(skilled.offense.creatorShares[0]),
+    );
+
+    center.ratings.passing = guard.ratings.passing;
+    const equal = prepareTeam(team, profile);
+    expect(required(equal.offense.creatorShares[0])).toBeGreaterThan(
+      required(equal.offense.creatorShares[4]),
+    );
+  });
+
   it('matches the prepared marginal distribution across seeded action samples', () => {
     const team = buildLegalSimulationTeam();
     team.players.forEach((player, index) => {

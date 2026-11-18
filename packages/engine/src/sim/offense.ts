@@ -3,7 +3,7 @@ import { creationScore } from '../domain/archetypes.ts';
 import type { HavocEvidence } from './havoc-runtime.ts';
 import { ENGINE_CONSTANTS } from './constants.ts';
 
-export const OFFENSIVE_ALLOCATION_VERSION = 'offensive-allocation-v1';
+export const OFFENSIVE_ALLOCATION_VERSION = 'offensive-allocation-v2';
 
 export interface FinishingDemand {
   attemptsPer36: number;
@@ -71,5 +71,12 @@ export function creationResponsibility(player: SimulationPlayer): number {
   const style =
     0.5 + (player.tendencies.pickAndRollBallHandlerRate + player.tendencies.isolationRate) / 100;
   const passing = 0.6 + player.tendencies.passRate / 100;
-  return Math.max(0.1, creationScore(player) ** 2 * style * passing);
+  const passingSkill = Math.max(0.5, player.ratings.passing / 70);
+  return Math.max(
+    0.1,
+    creationScore(player) ** 2 *
+      style *
+      passing *
+      passingSkill ** ENGINE_CONSTANTS.offensiveAllocation.creationPassingExponent,
+  );
 }

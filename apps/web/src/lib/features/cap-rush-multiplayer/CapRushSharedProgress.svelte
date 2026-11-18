@@ -221,30 +221,16 @@
       </div>
 
       <div class="min-w-0">
-        <dl class="grid grid-cols-3 gap-2">
-          <div class="rounded-xl border border-line-soft bg-surface-1 px-3 py-2.5">
-            <dt class="font-mono text-[9px] tracking-[0.08em] text-muted-foreground uppercase">
-              Points for
-            </dt>
-            <dd class="mt-1 font-display text-2xl font-extrabold tabular-nums">
-              {localRecord.pointsFor}
-            </dd>
-          </div>
-          <div class="rounded-xl border border-line-soft bg-surface-1 px-3 py-2.5">
-            <dt class="font-mono text-[9px] tracking-[0.08em] text-muted-foreground uppercase">
-              Points against
-            </dt>
-            <dd class="mt-1 font-display text-2xl font-extrabold tabular-nums">
-              {localRecord.pointsAgainst}
-            </dd>
-          </div>
-          <div class="rounded-xl border border-line-soft bg-surface-1 px-3 py-2.5">
-            <dt class="font-mono text-[9px] tracking-[0.08em] text-muted-foreground uppercase">
-              Remaining
-            </dt>
-            <dd class="mt-1 font-display text-2xl font-extrabold tabular-nums">{remaining}</dd>
-          </div>
-        </dl>
+        <StatGrid columns={3} mobile={3}>
+          <StatTile label="Points for" size="lg" surface="tile" value={localRecord.pointsFor} />
+          <StatTile
+            label="Points against"
+            size="lg"
+            surface="tile"
+            value={localRecord.pointsAgainst}
+          />
+          <StatTile label="Remaining" size="lg" surface="tile" value={remaining} />
+        </StatGrid>
         <div
           class="mt-2 flex min-w-0 items-center gap-2 rounded-xl border border-border bg-surface-1 px-3 py-2"
         >

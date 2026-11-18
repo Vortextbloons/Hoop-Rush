@@ -113,11 +113,13 @@ export function prepareTeam(
     stealTotal += player.ratings.steal;
   });
   const demands = players.map((player) => finishingDemand(player, evidenceOf?.(player)));
+  const allocation = ENGINE_CONSTANTS.offensiveAllocation;
+  const finishingWeights = demands.map(
+    ({ attemptsPer36 }) =>
+      (attemptsPer36 / allocation.neutralAttemptsPer36) ** allocation.finishingDemandExponent,
+  );
   const demandByKey = new Map(
-    players.map((player, index) => [
-      keyOf(player),
-      demands[index]?.attemptsPer36 ?? ENGINE_CONSTANTS.offensiveAllocation.minimumDemand,
-    ]),
+    players.map((player, index) => [keyOf(player), finishingWeights[index] ?? 0]),
   );
   const teammateListsByKey = new Map<string, SimulationPlayer[]>();
   for (const player of players) {
@@ -136,8 +138,7 @@ export function prepareTeam(
         action,
         positionModifiersByPlayer,
         keyOf,
-        (receiver) =>
-          demandByKey.get(keyOf(receiver)) ?? ENGINE_CONSTANTS.offensiveAllocation.minimumDemand,
+        (receiver) => demandByKey.get(keyOf(receiver)) ?? 0,
       ),
     );
     teammateShotsByPlayer.set(key, { byAction });
@@ -146,9 +147,7 @@ export function prepareTeam(
       ACTION_TYPES.map((action, actionIndex) => {
         const stylePass = passProbability(player, action);
         const self =
-          ((demands[index]?.attemptsPer36 ?? 0.5) *
-            Math.max(1, players.length - 1) *
-            (1 - stylePass)) /
+          ((finishingWeights[index] ?? 0) * Math.max(1, players.length - 1) * (1 - stylePass)) /
           stylePass;
         const peers = byAction[actionIndex]?.pickTable.total ?? 0;
         return peers / Math.max(1e-9, self + peers);

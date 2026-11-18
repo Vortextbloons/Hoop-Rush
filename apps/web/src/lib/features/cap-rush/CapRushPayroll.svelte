@@ -76,35 +76,30 @@
       </div>
     </div>
 
-    <dl class="grid grid-cols-3 gap-2">
-      <div class="min-w-0 rounded-lg bg-surface-1 px-2 py-1 sm:px-2.5 sm:py-1.5">
-        <dt class="truncate font-mono text-[9px] tracking-[0.08em] text-muted-foreground uppercase">
-          Room
-        </dt>
-        <dd
-          class="mt-0.5 text-[11px] font-extrabold tabular-nums sm:text-xs"
-          class:text-negative={view.remainingRoomDollars < 0}
-        >
-          {formatMillions(view.remainingRoomDollars)}
-        </dd>
-      </div>
-      <div class="min-w-0 rounded-lg bg-surface-1 px-2 py-1 sm:px-2.5 sm:py-1.5">
-        <dt class="truncate font-mono text-[9px] tracking-[0.08em] text-muted-foreground uppercase">
-          Limit
-        </dt>
-        <dd class="mt-0.5 text-[11px] font-extrabold tabular-nums sm:text-xs">
-          {formatMillions(view.hardLimitDollars)}
-        </dd>
-      </div>
-      <div class="min-w-0 rounded-lg bg-surface-1 px-2 py-1 sm:px-2.5 sm:py-1.5">
-        <dt class="truncate font-mono text-[9px] tracking-[0.08em] text-muted-foreground uppercase">
-          Target
-        </dt>
-        <dd class="mt-0.5 text-[11px] leading-tight font-extrabold sm:text-xs">
-          {target?.player?.displayName ?? '—'}
-        </dd>
-      </div>
-    </dl>
+    <StatGrid columns={3} mobile={3}>
+      <StatTile
+        label="Room"
+        size="sm"
+        surface="tile"
+        valueClass="font-sans text-[11px] font-extrabold sm:text-xs"
+        tone={view.remainingRoomDollars < 0 ? 'negative' : 'default'}
+        value={formatMillions(view.remainingRoomDollars)}
+      />
+      <StatTile
+        label="Limit"
+        size="sm"
+        surface="tile"
+        valueClass="font-sans text-[11px] font-extrabold sm:text-xs"
+        value={formatMillions(view.hardLimitDollars)}
+      />
+      <StatTile
+        label="Target"
+        size="sm"
+        surface="tile"
+        valueClass="font-sans text-[11px] leading-tight font-extrabold sm:text-xs"
+        value={target?.player?.displayName ?? '—'}
+      />
+    </StatGrid>
   </div>
 
   <div class="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line-soft pt-2.5">

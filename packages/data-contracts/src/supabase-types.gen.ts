@@ -1420,6 +1420,15 @@ export type Database = {
         Args: { p_after_ordinal?: number; p_mode: string; p_room_id: string }
         Returns: Json
       }
+      multiplayer_verify_rematch: {
+        Args: {
+          p_kind: string
+          p_previous_room_id: string
+          p_protocol_version: number
+          p_room_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never

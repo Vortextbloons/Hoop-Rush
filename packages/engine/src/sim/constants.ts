@@ -10,7 +10,7 @@ export interface PositionResponsibilityModifiers {
   rimProtection: number;
 }
 
-export const ENGINE_VERSION = 'm3-engine-v26';
+export const ENGINE_VERSION = 'm3-engine-v27';
 
 export const ENGINE_CONSTANTS = {
   version: ENGINE_VERSION,
@@ -19,6 +19,8 @@ export const ENGINE_CONSTANTS = {
     evidenceMinutes: 1000,
     neutralAttemptsPer36: 12,
     fallbackShotWeight: 0.65,
+    finishingDemandExponent: 1.25,
+    creationPassingExponent: 1.5,
   },
 
   zoneBaseMake: {
@@ -114,7 +116,9 @@ export const ENGINE_CONSTANTS = {
   offensiveReboundRange: 50,
   offensiveReboundRimBonus: 0.045,
   offensiveReboundPerimeterPenalty: 0.04,
-  observedReboundWeight: 6,
+  reboundEvidenceMinutes: 1800,
+  reboundEvidenceMaxWeight: 0.65,
+  reboundEvidencePer36: { offensive: 1.5, defensive: 4 },
 
   shotClockSeconds: 24,
   minimumTripSeconds: 1,
@@ -125,23 +129,23 @@ export const ENGINE_CONSTANTS = {
 
   positionResponsibility: {
     PG: {
-      initiation: 1.08,
+      initiation: 1.04,
       pnrHandler: 1.1,
       rollMan: 0.94,
       postUp: 0.94,
-      rebounding: 0.92,
+      rebounding: 0.96,
       rimProtection: 0.9,
     },
     SG: {
-      initiation: 1.04,
+      initiation: 1.02,
       pnrHandler: 1.05,
       rollMan: 0.94,
       postUp: 0.94,
-      rebounding: 0.95,
+      rebounding: 0.975,
       rimProtection: 0.9,
     },
     SF: {
-      initiation: 1.02,
+      initiation: 1.01,
       pnrHandler: 1.02,
       rollMan: 1,
       postUp: 1.04,
@@ -149,19 +153,19 @@ export const ENGINE_CONSTANTS = {
       rimProtection: 0.9,
     },
     PF: {
-      initiation: 1.02,
+      initiation: 1.01,
       pnrHandler: 1.02,
       rollMan: 1,
       postUp: 1.04,
-      rebounding: 1.04,
+      rebounding: 1.02,
       rimProtection: 1.04,
     },
     C: {
-      initiation: 0.92,
+      initiation: 0.96,
       pnrHandler: 0.92,
       rollMan: 1.08,
       postUp: 1.08,
-      rebounding: 1.1,
+      rebounding: 1.05,
       rimProtection: 1.1,
     },
   } as const satisfies Record<Position, PositionResponsibilityModifiers>,
