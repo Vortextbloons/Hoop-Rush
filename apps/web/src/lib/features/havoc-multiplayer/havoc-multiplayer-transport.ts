@@ -19,6 +19,8 @@ import {
   havocMultiplayerVerificationReceiptSchema,
   idSchema,
   seedSchema,
+  type HavocMultiplayerCommand,
+  type HavocMultiplayerCommandPayload,
   type HavocMultiplayerCommandReceipt,
   type HavocMultiplayerCommandRejectionCode,
   type HavocMultiplayerDraftState,
@@ -39,7 +41,6 @@ import {
   cachedRoomTransport,
   createRoomClientFactory,
   parseRoomCode,
-  parseRoomCommandRows,
   readRoomSync,
   stringField,
 } from '#lib/supabase-runtime.js';
@@ -84,13 +85,6 @@ interface HavocMultiplayerMemberRow {
   last_seen_at: string | null;
 }
 
-interface HavocMultiplayerCommandRow {
-  command_id: string;
-  ordinal: number;
-  actor_participant_id: string;
-  payload: unknown;
-}
-
 interface ServerDraftState {
   turn_ordinal: number;
   first_picker: HavocMultiplayerParticipantId;
@@ -107,6 +101,37 @@ interface ServerSeriesGame {
 interface ServerSeries {
   homeParticipantId: HavocMultiplayerParticipantId;
   games: ServerSeriesGame[];
+}
+
+/**
+ * Bumped when the canonical accepted-log identity or the draft projection
+ * changes shape. A cached projection from another version is never reused.
+ */
+const ACCEPTED_LOG_IDENTITY_VERSION = 1;
+const ACCEPTED_LOG_TOKEN_SEPARATOR = '\u001e';
+
+interface AcceptedCommandEntry {
+  ordinal: number;
+  command: HavocMultiplayerCommand;
+  payload: HavocMultiplayerCommandPayload;
+  /** Canonical, order-preserving identity for one accepted command. */
+  token: string;
+}
+
+interface AcceptedLogState {
+  roomId: string;
+  entries: AcceptedCommandEntry[];
+  commandIds: Set<string>;
+  /** Canonical identity of the complete ordered log, built incrementally. */
+  identity: string;
+}
+
+interface DraftProjectionCache {
+  identityVersion: number;
+  roomId: string;
+  settingsKey: string;
+  logIdentity: string;
+  draft: HavocMultiplayerDraftState;
 }
 
 const ROOM_COLUMNS =
@@ -359,6 +384,105 @@ function previewSnapshot(
   });
 }
 
+function commandToken(ordinal: number, command: HavocMultiplayerCommand): string {
+  return JSON.stringify([ordinal, command.commandId, command.actorParticipantId, command.payload]);
+}
+
+/**
+ * Validate one untrusted command row at the transport boundary and give it a
+ * canonical identity token. The token includes the ordinal, command id, actor,
+ * and the parsed payload, so a replacement row that keeps the same count and
+ * ordinal but changes its content still changes the accepted-log identity.
+ */
+function acceptedCommandEntry(
+  raw: unknown,
+  roomId: Id,
+  expectedOrdinal: number,
+): AcceptedCommandEntry {
+  if (typeof raw !== 'object' || raw === null) throw new Error('command row is not an object');
+  const record = raw as Record<string, unknown>;
+  if (record['ordinal'] !== expectedOrdinal) throw new Error('command log is not contiguous');
+  const command = havocMultiplayerCommandSchema.parse({
+    schemaVersion: HAVOC_MULTIPLAYER_SAVE_SCHEMA_VERSION,
+    roomId,
+    commandId: record['command_id'],
+    actorParticipantId: record['actor_participant_id'],
+    payload: record['payload'],
+  });
+  return {
+    ordinal: expectedOrdinal,
+    command,
+    payload: command.payload,
+    token: commandToken(expectedOrdinal, command),
+  };
+}
+
+function assertUniqueCommandId(state: {
+  commandIds: Set<string>;
+  command: HavocMultiplayerCommand;
+}): void {
+  if (state.commandIds.has(state.command.commandId)) {
+    throw new Error('command log repeats a command id');
+  }
+  state.commandIds.add(state.command.commandId);
+}
+
+/** Build a validated, canonically ordered accepted log from a full read. */
+function buildAcceptedLog(roomId: string, rawRows: readonly unknown[]): AcceptedLogState {
+  const parsedRoomId = idSchema.parse(roomId);
+  const entries: AcceptedCommandEntry[] = [];
+  const commandIds = new Set<string>();
+  for (const [ordinal, raw] of rawRows.entries()) {
+    const entry = acceptedCommandEntry(raw, parsedRoomId, ordinal);
+    assertUniqueCommandId({ commandIds, command: entry.command });
+    entries.push(entry);
+  }
+  return {
+    roomId,
+    entries,
+    commandIds,
+    identity: entries.map((entry) => entry.token).join(ACCEPTED_LOG_TOKEN_SEPARATOR),
+  };
+}
+
+/**
+ * Extend a cache that was already validated from ordinal zero. Only the delta
+ * rows are validated and tokenized, so an unchanged poll does not touch the
+ * growing prefix at all.
+ */
+function appendAcceptedLog(
+  cached: AcceptedLogState,
+  rawRows: readonly unknown[],
+  roomId: Id,
+): AcceptedLogState {
+  if (rawRows.length === 0) return cached;
+  const entries = [...cached.entries];
+  const commandIds = new Set(cached.commandIds);
+  for (const [index, raw] of rawRows.entries()) {
+    const entry = acceptedCommandEntry(raw, roomId, cached.entries.length + index);
+    assertUniqueCommandId({ commandIds, command: entry.command });
+    entries.push(entry);
+  }
+  const appended = entries
+    .slice(cached.entries.length)
+    .map((entry) => entry.token)
+    .join(ACCEPTED_LOG_TOKEN_SEPARATOR);
+  return {
+    roomId: cached.roomId,
+    entries,
+    commandIds,
+    identity:
+      cached.identity === ''
+        ? appended
+        : `${cached.identity}${ACCEPTED_LOG_TOKEN_SEPARATOR}${appended}`,
+  };
+}
+
+function commandCountOf(room: Record<string, unknown>): number | null {
+  const count = room['command_count'];
+  return typeof count === 'number' && Number.isInteger(count) && count >= 0 ? count : null;
+}
+
 const configuredTransportCache = new Map<string, HavocMultiplayerTransport>();
 
 export interface HavocMultiplayerTransportOptions extends RoomTransportOptions {
@@ -383,48 +507,68 @@ export function createHavocMultiplayerTransport(
   }
   const getClient = clientFactory;
   const loadDraftAssets = options?.loadDraftAssets ?? loadHavocMultiplayerDraftAssets;
-  let replayedDraft: { key: string; draft: HavocMultiplayerDraftState } | null = null;
-  let acceptedLog: { roomId: string; rows: HavocMultiplayerCommandRow[] } | null = null;
+  let draftProjection: DraftProjectionCache | null = null;
+  let acceptedLog: AcceptedLogState | null = null;
+
+  async function readAcceptedLog(
+    client: Awaited<ReturnType<typeof getClient>>,
+    roomId: string,
+  ): Promise<AcceptedLogState> {
+    const commandsResponse = await client
+      .from(COMMANDS_TABLE)
+      .select(COMMAND_COLUMNS)
+      .eq('room_id', roomId)
+      .order('ordinal', { ascending: true });
+    if (commandsResponse.error) {
+      throw new Error('draft failed: cannot read the accepted command log');
+    }
+    const commandData: unknown = commandsResponse.data;
+    return buildAcceptedLog(roomId, Array.isArray(commandData) ? commandData : []);
+  }
+
   async function draftFromRow(
     row: HavocMultiplayerRoomRow,
     client: Awaited<ReturnType<typeof getClient>>,
-    acceptedCommands?: HavocMultiplayerCommandRow[],
+    accepted?: AcceptedLogState,
   ): Promise<HavocMultiplayerDraftState | null> {
     const server = serverDraftStateOf(row.draft_state);
     if (server === null) return null;
-    let commandRows = acceptedCommands;
-    if (commandRows === undefined) {
-      const commandsResponse = await client
-        .from(COMMANDS_TABLE)
-        .select(COMMAND_COLUMNS)
-        .eq('room_id', row.id)
-        .order('ordinal', { ascending: true });
-      if (commandsResponse.error) {
-        throw new Error('draft failed: cannot read the accepted command log');
-      }
-      const commandData: unknown = commandsResponse.data;
-      commandRows = (Array.isArray(commandData) ? commandData : []) as HavocMultiplayerCommandRow[];
-    }
+    const roomId = idSchema.parse(row.id);
+    const log =
+      accepted !== undefined && accepted.roomId === roomId
+        ? accepted
+        : await readAcceptedLog(client, roomId);
     const versions = havocMultiplayerVersionLocksSchema.parse(row.versions);
     const rootSeed = seedSchema.parse(row.root_seed);
     const variant = havocMultiplayerVariantSchema.parse(row.variant ?? 'standard');
-    const commands = commandRows.map((command) =>
-      havocMultiplayerCommandPayloadSchema.parse(command.payload),
-    );
-    const key = JSON.stringify([row.id, rootSeed, variant, versions, commands]);
-    if (replayedDraft?.key === key) return replayedDraft.draft;
+    const settingsKey = JSON.stringify([rootSeed, variant, versions]);
+    if (
+      draftProjection !== null &&
+      draftProjection.identityVersion === ACCEPTED_LOG_IDENTITY_VERSION &&
+      draftProjection.roomId === roomId &&
+      draftProjection.settingsKey === settingsKey &&
+      draftProjection.logIdentity === log.identity
+    ) {
+      return draftProjection.draft;
+    }
     const assets = await loadDraftAssets();
     const draft = replayHavocMultiplayerDraft({
       rootSeed,
       catalog: assets.catalog,
       environment: assets.environment,
-      commands,
+      commands: log.entries.map((entry) => entry.payload),
       settings: {
         variant,
         rulesVersion: versions.rulesVersion,
       },
     });
-    replayedDraft = { key, draft };
+    draftProjection = {
+      identityVersion: ACCEPTED_LOG_IDENTITY_VERSION,
+      roomId,
+      settingsKey,
+      logIdentity: log.identity,
+      draft,
+    };
     return draft;
   }
   return createRoomTransport(
@@ -485,41 +629,50 @@ export function createHavocMultiplayerTransport(
       failFallbackPhase: 'integrity-failed',
       transientEventSchema: havocMultiplayerTransientEventSchema,
       sync: async (client, roomId, afterOrdinal) => {
-        const cached = acceptedLog?.roomId === roomId ? acceptedLog.rows : [];
-        const cursor = afterOrdinal >= 0 && cached.length === afterOrdinal + 1 ? afterOrdinal : -1;
+        const cached = acceptedLog?.roomId === roomId ? acceptedLog : null;
+        const cursor =
+          afterOrdinal >= 0 && cached !== null && cached.entries.length === afterOrdinal + 1
+            ? afterOrdinal
+            : -1;
         let payload = await readRoomSync(client, 'havoc', roomId, cursor);
-        let fullRows = [
-          ...(cursor < 0 ? [] : cached),
-          ...(payload.commands as unknown as HavocMultiplayerCommandRow[]),
-        ];
-        if (
-          fullRows.length !== payload.room['command_count'] ||
-          fullRows.some((command, ordinal) => command.ordinal !== ordinal)
-        ) {
-          payload = await readRoomSync(client, 'havoc', roomId, -1);
-          fullRows = payload.commands as unknown as HavocMultiplayerCommandRow[];
-          if (
-            fullRows.length !== payload.room['command_count'] ||
-            fullRows.some((command, ordinal) => command.ordinal !== ordinal)
-          )
-            throw new Error('room sync returned an incomplete command log');
+        const parsedRoomId = idSchema.parse(roomId);
+        let log: AcceptedLogState | null = null;
+        if (cursor >= 0 && cached !== null) {
+          try {
+            log = appendAcceptedLog(cached, payload.commands, parsedRoomId);
+          } catch {
+            // A non-contiguous, duplicate, or malformed delta forces a full read.
+            log = null;
+          }
+          if (log === null || log.entries.length !== commandCountOf(payload.room)) {
+            payload = await readRoomSync(client, 'havoc', roomId, -1);
+            try {
+              log = buildAcceptedLog(roomId, payload.commands);
+            } catch {
+              log = null;
+            }
+          }
+        } else {
+          try {
+            log = buildAcceptedLog(roomId, payload.commands);
+          } catch {
+            log = null;
+          }
+        }
+        if (log === null || log.entries.length !== commandCountOf(payload.room)) {
+          throw new Error('room sync returned an incomplete command log');
         }
         const row = payload.room as unknown as HavocMultiplayerRoomRow;
         const members = payload.members as unknown as HavocMultiplayerMemberRow[];
-        const rows = fullRows.filter((command) => command.ordinal > afterOrdinal);
-        const commands = parseRoomCommandRows(
-          rows,
-          idSchema.parse(roomId),
-          HAVOC_MULTIPLAYER_SAVE_SCHEMA_VERSION,
-          havocMultiplayerCommandSchema,
-          false,
-        );
-        const draft = await draftFromRow(row, client, fullRows);
-        acceptedLog = { roomId, rows: fullRows };
+        const commands = log.entries
+          .filter((entry) => entry.ordinal > afterOrdinal)
+          .map((entry) => entry.command);
+        const draft = await draftFromRow(row, client, log);
+        acceptedLog = log;
         return {
           snapshot: roomRowToSnapshot(row, members, draft),
           commands,
-          commandCount: fullRows.length,
+          commandCount: log.entries.length,
         };
       },
     },

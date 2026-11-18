@@ -418,6 +418,212 @@ describe('havoc multiplayer supabase transport protocol pins', () => {
     expect(harness.rpcCalls.at(-1)?.args['p_after_ordinal']).toBe(-1);
   });
 
+  it('skips reparsing the accepted log when a poll returns no new commands', async () => {
+    const loadDraftAssets = mock(() => Promise.resolve(fixtureDraftAssets()));
+    const { harness, transport } = setupTransport({ loadDraftAssets });
+    let payloadReads = 0;
+    const payload: Record<string, unknown> = {};
+    Object.defineProperty(payload, 'kind', {
+      enumerable: true,
+      configurable: true,
+      get() {
+        payloadReads += 1;
+        return 'ready';
+      },
+    });
+    const rows = [
+      {
+        room_id: ROOM_ID,
+        command_id: 'cmd-0',
+        ordinal: 0,
+        actor_participant_id: 'p1',
+        payload,
+      },
+    ];
+    harness.setRpc('multiplayer_room_sync', (args) => ({
+      room: roomRow({
+        draft_state: { turn_ordinal: 0, first_picker: 'p1' },
+        command_count: 1,
+      }),
+      members: [memberRow('p1'), memberRow('p2')],
+      commands: (args['p_after_ordinal'] as number) < 0 ? rows : [],
+    }));
+
+    const first = await transport.sync(ROOM_ID);
+    expect(first.commandCount).toBe(1);
+    expect(loadDraftAssets).toHaveBeenCalledTimes(1);
+
+    payloadReads = 0;
+    const unchanged = await transport.sync(ROOM_ID, 0);
+    expect(unchanged.commands).toHaveLength(0);
+    expect(unchanged.commandCount).toBe(1);
+    expect(payloadReads).toBe(0);
+    expect(loadDraftAssets).toHaveBeenCalledTimes(1);
+  });
+
+  it('reprojects when the log grows or is replaced even at the same count', async () => {
+    const loadDraftAssets = mock(() => Promise.resolve(fixtureDraftAssets()));
+    const { harness, transport } = setupTransport({ loadDraftAssets });
+    let rows = [
+      {
+        room_id: ROOM_ID,
+        command_id: 'cmd-a',
+        ordinal: 0,
+        actor_participant_id: 'p1',
+        payload: { kind: 'ready' },
+      },
+    ];
+    harness.setRpc('multiplayer_room_sync', (args) => {
+      const after = args['p_after_ordinal'] as number;
+      return {
+        room: roomRow({
+          draft_state: { turn_ordinal: 0, first_picker: 'p1' },
+          command_count: rows.length,
+        }),
+        members: [memberRow('p1'), memberRow('p2')],
+        commands: rows.filter((row) => row.ordinal > after),
+      };
+    });
+
+    await transport.sync(ROOM_ID);
+    expect(loadDraftAssets).toHaveBeenCalledTimes(1);
+
+    rows = [
+      ...rows,
+      {
+        room_id: ROOM_ID,
+        command_id: 'cmd-b',
+        ordinal: 1,
+        actor_participant_id: 'p2',
+        payload: { kind: 'ready' },
+      },
+    ];
+    const grown = await transport.sync(ROOM_ID, 0);
+    expect(grown.commands.map((command) => command.commandId)).toEqual([
+      commandIdSchema.parse('cmd-b'),
+    ]);
+    expect(grown.commandCount).toBe(2);
+    expect(loadDraftAssets).toHaveBeenCalledTimes(2);
+
+    // Recovery re-reads the log from ordinal 0. The replacement keeps the same
+    // row count but changes the canonical identity, so the projection reruns.
+    rows = [
+      {
+        room_id: ROOM_ID,
+        command_id: 'cmd-c',
+        ordinal: 0,
+        actor_participant_id: 'p2',
+        payload: { kind: 'ready' },
+      },
+    ];
+    const recovered = await transport.sync(ROOM_ID, -1);
+    expect(recovered.commandCount).toBe(1);
+    expect(loadDraftAssets).toHaveBeenCalledTimes(3);
+    expect(harness.rpcCalls.at(-1)?.args['p_after_ordinal']).toBe(-1);
+  });
+
+  it('rejects a replacement log with repeated command ids instead of trusting its count', async () => {
+    const loadDraftAssets = mock(() => Promise.resolve(fixtureDraftAssets()));
+    const { harness, transport } = setupTransport({ loadDraftAssets });
+    let rows = [
+      {
+        room_id: ROOM_ID,
+        command_id: 'cmd-a',
+        ordinal: 0,
+        actor_participant_id: 'p1',
+        payload: { kind: 'ready' },
+      },
+    ];
+    harness.setRpc('multiplayer_room_sync', (args) => {
+      const after = args['p_after_ordinal'] as number;
+      return {
+        room: roomRow({
+          draft_state: { turn_ordinal: 0, first_picker: 'p1' },
+          command_count: rows.length,
+        }),
+        members: [memberRow('p1'), memberRow('p2')],
+        commands: rows.filter((row) => row.ordinal > after),
+      };
+    });
+
+    await transport.sync(ROOM_ID);
+    rows = [
+      ...rows,
+      {
+        room_id: ROOM_ID,
+        command_id: 'cmd-a',
+        ordinal: 1,
+        actor_participant_id: 'p2',
+        payload: { kind: 'ready' },
+      },
+    ];
+    await expect(transport.sync(ROOM_ID, 0)).rejects.toThrow(/incomplete command log/);
+    expect(loadDraftAssets).toHaveBeenCalledTimes(1);
+  });
+
+  it('evicts the accepted log and projection when syncing a different room', async () => {
+    const loadDraftAssets = mock(() => Promise.resolve(fixtureDraftAssets()));
+    const { harness, transport } = setupTransport({ loadDraftAssets });
+    const secondRoomId = 'hm-room-2';
+    const rowsByRoom = new Map<string, Record<string, unknown>[]>([
+      [
+        ROOM_ID,
+        [
+          {
+            room_id: ROOM_ID,
+            command_id: 'cmd-a',
+            ordinal: 0,
+            actor_participant_id: 'p1',
+            payload: { kind: 'ready' },
+          },
+        ],
+      ],
+      [
+        secondRoomId,
+        [
+          {
+            room_id: secondRoomId,
+            command_id: 'cmd-b',
+            ordinal: 0,
+            actor_participant_id: 'p2',
+            payload: { kind: 'ready' },
+          },
+        ],
+      ],
+    ]);
+    harness.setRpc('multiplayer_room_sync', (args) => {
+      const id = args['p_room_id'] as string;
+      const rows = rowsByRoom.get(id) ?? [];
+      const after = args['p_after_ordinal'] as number;
+      return {
+        room: roomRow({
+          id,
+          draft_state: { turn_ordinal: 0, first_picker: 'p1' },
+          command_count: rows.length,
+        }),
+        members: [memberRow('p1'), memberRow('p2')],
+        commands: rows.filter((row) => (row['ordinal'] as number) > after),
+      };
+    });
+
+    await transport.sync(ROOM_ID);
+    expect(loadDraftAssets).toHaveBeenCalledTimes(1);
+
+    await transport.sync(secondRoomId);
+    expect(harness.rpcCalls.at(-1)?.args).toMatchObject({
+      p_room_id: secondRoomId,
+      p_after_ordinal: -1,
+    });
+    expect(loadDraftAssets).toHaveBeenCalledTimes(2);
+
+    await transport.sync(ROOM_ID);
+    expect(harness.rpcCalls.at(-1)?.args).toMatchObject({
+      p_room_id: ROOM_ID,
+      p_after_ordinal: -1,
+    });
+    expect(loadDraftAssets).toHaveBeenCalledTimes(3);
+  });
+
   it('subscribe opens one realtime channel and tears it down with the last handler', async () => {
     const { harness, transport } = setupTransport();
     seedRoom(harness);
